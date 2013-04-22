@@ -1,80 +1,92 @@
-From: s-anna@ti.com (Anna, Suman)
-Date: Mon, 22 Apr 2013 15:56:57 +0000
-Subject: [PATCHv3 00/14] drivers: mailbox: framework creation
-In-Reply-To: <CABb+yY0RYkVeo2Sb4WsDJY0jf17488FEz0d2CB994eQaSOEsVg@mail.gmail.com>
-References: <1363145021-14339-1-git-send-email-s-anna@ti.com>
- <CABb+yY0RYkVeo2Sb4WsDJY0jf17488FEz0d2CB994eQaSOEsVg@mail.gmail.com>
-Message-ID: <37C860A02101E749A747FA2D3C1E3C504A5DF7@DLEE11.ent.ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 22 Apr 2013 12:07:23 -0400 (EDT)
+Subject: [Xen-devel] [PATCH v6 1/4] arm: introduce psci_smp_ops
+In-Reply-To: <1366644069.20256.8.camel@zakaz.uk.xensource.com>
+References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
+ <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130418161341.GB14496@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
+ <alpine.DEB.2.02.1304181749260.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304181336280.17375@syhkavp.arg>
+ <alpine.DEB.2.02.1304191035360.7254@kaball.uk.xensource.com>
+ <alpine.LFD.2.03.1304191146230.17375@syhkavp.arg>
+ <1366388166.29403.2.camel@dagon.hellion.org.uk>
+ <alpine.LFD.2.03.1304191223280.17375@syhkavp.arg>
+ <alpine.DEB.2.02.1304191739120.7254@kaball.uk.xensource.com>
+ <1366644069.20256.8.camel@zakaz.uk.xensource.com>
+Message-ID: <alpine.LFD.2.03.1304221151200.17375@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 22 Apr 2013, Ian Campbell wrote:
+
+> On Fri, 2013-04-19 at 18:06 +0100, Stefano Stabellini wrote:
+> > On Fri, 19 Apr 2013, Nicolas Pitre wrote:
+> > > On Fri, 19 Apr 2013, Ian Campbell wrote:
+> > > 
+> > > > On Fri, 2013-04-19 at 16:47 +0100, Nicolas Pitre wrote:
+> > > > > No one should be probing registers without making sure it is safe to do 
+> > > > > so.  Even on non virtualized hardware this can be a dangerous thing to 
+> > > > > do.
+> > > > 
+> > > > Won't people writing per machine code consider, not unreasonably, that
+> > > > having been called through a mdesc machine specific hook constitutes
+> > > > enough "making sure" that they think it is safe to touch registers which
+> > > > are specific to that machine?
+> > > 
+> > > Remember that this hook was introduced to decide at run time between 
+> > > different possibilities for SMP ops on the _same_ machine configuration.  
+> > > That machine shouldn't do things which is not permitted on either 
+> > > possible alternatives already.  So far the actual usage of that hook 
+> > > only looks in the DT to make a decision.  But even if it were to touch 
+> > > the hardware, that means it has to be safe to do so on all the possible 
+> > > hardware variations this mdesc is associated to.
+> > 
+> > This last sentence is the key.
+> > 
+> > It is not guaranteed that being safe on "all the possible hardware
+> > variations this mdesc is associated to" and being safe on Xen are the
+> > same thing.
+> > 
+> > What if the same magic configuration register exists on all the possible
+> > variations of the platform?
+> > I understand that it is unlikely but I think it is a possibility.
 > 
-> Hi Suman,
-> 
->   [Resending with mailing-list CCed this time. For some reason LKML doesn't
-> appear in reply-to despite this message being fwd'ed from there]
-> 
-> On Wed, Mar 13, 2013 at 8:53 AM, Suman Anna <s-anna@ti.com> wrote:
-> > Hi,
-> > Please find the updated mailbox patch series for pulling into linux-next.
-> > The series is rebased on top of 3.9-rc2, and includes one new patch to
-> > rename an existing mailbox.h added as part of the highbank cpufreq
-> > support for 3.9 merge window [1].
-> >
-> I am to implement IPC protocol and client drivers on a platform that has a master
-> processor having control over critical h/w resources, like clock and power
-> management, to be used by the MPCore running linux. And there are 2 such IPC
-> controllers - one for communication within the MPCore and another for between
-> MPCore and the 'Master'.
-> 
-> I have a few concerns about this api as follows...
+> I think it is actually quite likely for such configuration registers,
+> nvram etc to exist on all variants of a platform and not all that
+> unlikely that smp_init might want to consult them.
 
-Thank Jassi for your comments. I am aware of some of the concerns, Andy Green had highlighted (a) & (b) as well previously, and I am actually working through the next set of patches to fix these. I will post them sometime next week. 
+In which case the rest of the kernel is also going to consult those 
+registers for other purposes.
 
-> 
-> a) No documentation. Usually the header would have proper documentation of
-> data structures and info for users of both side of the api.
+Again, what's the problem please?
 
-I will fix the documentation portion for 3.10. I will also add a TODO as part of the documentation so that it highlights the gaps and work-items.
+> I think the key thing that non-Xen folks aren't aware of is that
+> although Xen passes the majority of the underlying hardware to the dom0
+> kernel to manage one of the few things it does not expose to guests
+> (where "guests" includes dom0) is the SMP topology of the underlying system.
 
-> 
-> b) The api is not scalable. The assumption of just one IPC controller in the
-> platform is hardcoded.
+I suspect it is unlikely to pass on the DT information about the CCI 
+either.  Which means that, in the case that started this thread, the 
+smp_init function needed by MCPM will simply return false and the next 
+priority in the list i.e. plain PSCI will be initialized instead.
 
-Yes, this is a major concern and I will be handling this in the upcoming patches . The current code was primarily based on moving the OMAP mailbox code and expanding it to support the ST DBX500 mailbox. As it is today, it doesn't scale to support multiple IP instances/controllers.
+I don't forsee the need to poke at the hardware directly within 
+->smp_init, not since everything is moving to DT now.
 
-> 
-> c) There seems to be no consistent design - mailbox_ops has 12 callback hooks.
-> Some, save_ctx, restore_ctx, enable_irq, disable_irq are exported for no
-> apparent reason (legacy of a legacy - OMAP), while other hooks are kept private
-> to the api.
-> I believe OMAP had valid reasons to make IPC clients save/restore context of the
-> IPC controller, but I don't think that is the case in general. I2C client drivers don't
-> save/restore context of I2C controller's, why should IPC's?  Similarly
-> enable/disable_irq of the controller seem too intrusive for a client driver.
+Sure there are ways to screw up Xen support from within this hook, but 
+that can be achieved in many other places.  Will Xen take over every 
+possible hooks in the kernel to prevent that from happening?
 
-Yep, these are exported because of the OMAP legacy TIDSPBRIDGE stack, and should vanish with the addition of runtime_pm support.
+So please let's not cry wolf needlessly.
 
-> 
-> mailbox_ops.mailbox_type_t makes no sense to me. At least not without
-> documentation, though I doubt any amount of documentation could help it -
-> mailbox.c doesn't even read the member. Btw, isn't every mailbox a
-> MBOX_SHARED_MEM_TYPE? A part of data passed via FIFO/REG could point to
-> location in shared memory that might have full command/payload for the
-> message. Or did I get the meaning of MBOX_SHARED_MEM_TYPE wrong in the
-> absence of documentation?
+> Currently the VCPUs are all considered to be uniform i.e. there is no
+> big.LITTLE exposed to guests, although the hypervisor will most likely
+> eventually support it and so may be scheduling the VCPUs among the big
+> and LITTLE PCPUs according to $THINGS.
 
-Yes, this needs to be removed, it is a carry-over from the OMAP mailbox code.
+Indeed.  That's what I suggested earlier.
 
-> 
-> The api seems to worry too much about the low-level details of the IPC controller
-> (save/restore context, enable/disable_irq and ack_irq), while it fails to provide a
-> tight well-defined interface to client drivers.
-> 
-> There are also some code issues, which might come as replies to respective
-> patches.
 
-Thanks for the review of the patches. I will await your comments, and will address them as incremental patches. 
-
-Regards
-Suman
+Nicolas
