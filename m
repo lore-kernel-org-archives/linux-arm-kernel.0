@@ -1,83 +1,57 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 22 Apr 2013 12:01:17 +0200
-Subject: [PATCH 20/23] ARM: u300: add SPI PL022 to the device tree
-Message-ID: <1366624877-6932-1-git-send-email-linus.walleij@stericsson.com>
+Date: Mon, 22 Apr 2013 12:01:25 +0200
+Subject: [PATCH 21/23] ARM: u300: probe the U300 dummy-spichip from device tree
+Message-ID: <1366624885-6966-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This registers the PL022 PrimeCell from the U300 device
-tree. We make a new copy of the platform data for the
-device tree boot path, as the old platform data is in an
-older file which will be going away.
+This probes the U300 dummy-spichip from the device tree
+and adds the apropriate node to the tree.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-u300.dts |  7 +++++++
- arch/arm/mach-u300/core.c      | 19 +++++++++++++++++++
- 2 files changed, 26 insertions(+)
+ arch/arm/boot/dts/ste-u300.dts    | 5 +++++
+ arch/arm/mach-u300/dummyspichip.c | 6 ++++++
+ 2 files changed, 11 insertions(+)
 
 diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
-index cdffeb9..979d96c 100644
+index 979d96c..9a163e1 100644
 --- a/arch/arm/boot/dts/ste-u300.dts
 +++ b/arch/arm/boot/dts/ste-u300.dts
-@@ -214,5 +214,12 @@
- 			cd-inverted;
- 			vmmc-supply = <&ab3100_ldo_g_reg>;
+@@ -220,6 +220,11 @@
+ 			reg = <0xc0006000 0x1000>;
+ 			interrupt-parent = <&vica>;
+ 			interrupts = <23>;
++			spi-dummy at 1 {
++				compatible = "arm,pl022-dummy";
++				reg = <1>;
++				spi-max-frequency = <20000000>;
++			};
  		};
-+
-+		spi: ssp at c0006000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			reg = <0xc0006000 0x1000>;
-+			interrupt-parent = <&vica>;
-+			interrupts = <23>;
-+		};
  	};
  };
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index 98d4dbe..9467ffe 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -19,6 +19,7 @@
- #include <linux/dmaengine.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/mmci.h>
-+#include <linux/amba/pl022.h>
- #include <linux/amba/serial.h>
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
-@@ -703,6 +704,22 @@ MACHINE_END
+diff --git a/arch/arm/mach-u300/dummyspichip.c b/arch/arm/mach-u300/dummyspichip.c
+index 2785cb6..52962bf 100644
+--- a/arch/arm/mach-u300/dummyspichip.c
++++ b/arch/arm/mach-u300/dummyspichip.c
+@@ -263,10 +263,16 @@ static int pl022_dummy_remove(struct spi_device *spi)
+ 	return 0;
+ }
  
- #ifdef CONFIG_OF
- 
-+static struct pl022_ssp_controller spi_plat_data = {
-+	/* If you have several SPI buses this varies, we have only bus 0 */
-+	.bus_id = 0,
-+	/*
-+	 * On the APP CPU GPIO 4, 5 and 6 are connected as generic
-+	 * chip selects for SPI. (Same on U330, U335 and U365.)
-+	 * TODO: make sure the GPIO driver can select these properly
-+	 * and do padmuxing accordingly too.
-+	 */
-+	.num_chipselect = 3,
-+	.enable_dma = 1,
-+	.dma_filter = coh901318_filter_id,
-+	.dma_rx_param = (void *) U300_DMA_SPI_RX,
-+	.dma_tx_param = (void *) U300_DMA_SPI_TX,
++static const struct of_device_id pl022_dummy_dt_match[] = {
++	{ .compatible = "arm,pl022-dummy" },
++	{},
 +};
 +
- /* These are mostly to get the right device names for the clock lookups */
- static struct of_dev_auxdata u300_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("stericsson,pinctrl-u300", U300_SYSCON_BASE,
-@@ -719,6 +736,8 @@ static struct of_dev_auxdata u300_auxdata_lookup[] __initdata = {
- 		"uart0", &uart0_plat_data),
- 	OF_DEV_AUXDATA("arm,primecell", U300_UART1_BASE,
- 		"uart1", &uart1_plat_data),
-+	OF_DEV_AUXDATA("arm,primecell", U300_SPI_BASE,
-+		"pl022", &spi_plat_data),
- 	OF_DEV_AUXDATA("st,ddci2c", U300_I2C0_BASE,
- 		"stu300.0", NULL),
- 	OF_DEV_AUXDATA("st,ddci2c", U300_I2C1_BASE,
+ static struct spi_driver pl022_dummy_driver = {
+ 	.driver = {
+ 		.name	= "spi-dummy",
+ 		.owner	= THIS_MODULE,
++		.of_match_table = pl022_dummy_dt_match,
+ 	},
+ 	.probe	= pl022_dummy_probe,
+ 	.remove	= pl022_dummy_remove,
 -- 
 1.7.11.3
