@@ -1,47 +1,112 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Mon, 22 Apr 2013 08:00:34 +0200
-Subject: [PATCH] ARM i.MX6: correct MLB clock configuration
-Message-ID: <1366610434-23042-1-git-send-email-dirk.behme@de.bosch.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 22 Apr 2013 11:39:57 +0530
+Subject: [PATCH v3 1/6] drivers: phy: add generic PHY framework
+In-Reply-To: <20130419090933.AB4253E116D@localhost>
+References: <1363770725-13717-1-git-send-email-kishon@ti.com>
+ <1363770725-13717-2-git-send-email-kishon@ti.com>
+ <20130415113416.7C3943E0AA8@localhost> <516BF1E2.3020104@ti.com>
+ <20130415195030.9F7E93E0AA8@localhost> <516D255F.40604@ti.com>
+ <20130419090933.AB4253E116D@localhost>
+Message-ID: <5174D435.7080408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dirk Behme <dirk.behme@gmail.com>
+Hi,
 
-According to the i.MX6 Dual/Quad technical reference manual
-(Figure 18-2. Clock Tree - Part 1) the MLB clock is directly
-feed by the AXI_CLK_ROOT. This is called 'axi' in our code.
+On Friday 19 April 2013 02:39 PM, Grant Likely wrote:
+> On Tue, 16 Apr 2013 15:48:07 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>> On Tuesday 16 April 2013 01:20 AM, Grant Likely wrote:
+>>> On Mon, 15 Apr 2013 17:56:10 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>> On Monday 15 April 2013 05:04 PM, Grant Likely wrote:
+>>>>> On Wed, 20 Mar 2013 14:42:00 +0530, Kishon Vijay Abraham I <kishon@ti.com> wrote:
+>>>> We have decided not to implement the PHY layer as a separate bus layer.
+>>>> The PHY provider can be part of any other bus. Making the PHY layer as a
+>>>> bus will make the PHY provider to be part of multiple buses which will
+>>>> lead to bad design. All we are trying to do here is keep the pool of PHY
+>>>> devices under PHY class in this layer and help any controller that wants
+>>>> to use the PHY to get it.
+>>>
+>>> If you're using a class, then you already have your list of registered
+>>> phy devices! :-) No need to create another global list that you need to
+>>> manage.
+>>
+>> right. We already use _class_dev_iter_ for finding the phy device.
+>> .
+>> .
+>> +static struct phy *of_phy_lookup(struct device *dev, struct device_node
+>> *node)
+>> +{
+>> +	struct phy *phy;
+>> +	struct class_dev_iter iter;
+>> +
+>> +	class_dev_iter_init(&iter, phy_class, NULL, NULL);
+>> +	while ((dev = class_dev_iter_next(&iter))) {
+>> +		phy = container_of(dev, struct phy, dev);
+>> +		if (node != phy->of_node)
+>> +			continue;
+>> +
+>> +		class_dev_iter_exit(&iter);
+>> +		return phy;
+>> +	}
+>> +
+>> +	class_dev_iter_exit(&iter);
+>> +	return ERR_PTR(-EPROBE_DEFER);
+>> +}
+>> .
+>> .
+>>
+>> however we can't get rid of the other list (phy_bind_list) where we
+>> maintain the phy binding information. It's used for the non-dt boot case.
+>
+> Why? If you're using a class, then it is always there. Why would non-DT
+> and DT be different in this regard? (more below)
+>
+>>>>> Since there is at most a 1:N relationship between host controllers and
+>>>>> PHYs, there shouldn't be any need for a separate structure to describe
+>>>>> binding. Put the inding data into the struct phy itself. Each host
+>>>>> controller can have a list of phys that it is bound to.
+>>>>
+>>>> No. Having the host controller to have a list of phys wont be a good
+>>>> idea IMHO. The host controller is just an IP and the PHY to which it
+>>>> will be connected can vary from board to board, platform to platform. So
+>>>> ideally this binding should come from platform initialization code/dt data.
+>>>
+>>> That is not what I mean. I mean the host controller instance should
+>>> contain a list of all the PHYs that are attached to it. There should not
+>>
+>> Doesn't sound correct IMO. The host controller instance need not know
+>> anything about the PHY instances that is connected to it. Think of it
+>> similar to regulator, the controller wouldn't know which regulator it is
+>> connected to, all it has to know is it just has a regulator connected to
+>> it. It's up-to the regulator framework to give the controller the
+>> correct regulator. It's similar here. It makes sense for me to keep a
+>> list in the PHY framework in order for it to return the correct PHY (but
+>> note that this list is not needed for dt boot).
+>
+> With regulators and clocks it makes sense to have a global
+> registration place becase both implement an interconnected network
+> independent of the device that use them. (clocks depend on other clocks;
+> regulators depend on other regulators).
+>
+> Phys are different. There is a 1:N relationship between host controllers
+> and phys, and you don't get a interconnected network of PHYs. Its a bad
+> idea to keep the binding data separate from the actual host controller
+> when there is nothing else that actually needs to use the data. It
+> creates a new set of data structures that need housekeeping to keep them
+> in sync with the actual device structures. It really is just a bad idea
+> and it becomes more difficult (in the non-DT case) to determine what
+> data is associated with a given host controller. You can't tell by
+> looking at the struct device.
+>
+> Instead, for the non-DT case, do what we've always done for describing
+> connections. Put the phy reference into the host controllers
+> platform_data structure.
+hmm... my only concern here is there is no way we can enforce the phy 
+reference is added in the platform_data structure.
+That is what it is there for. That completely
+> eliminates the need to housekeep a new set of data structures.
 
-Note that the clock of the MLB IP block on the i.MX6 is completely
-independent of the PLL8 (MLB PLL). The MLB PLL isn't responsible
-for feeding the MLB IP block with a clock. Instead, it's used
-internally by the MLB module to sync the bus clock in case the MLB
-6-pin interface is enabled:
+Ok. Makes sense.
 
-MediaLB Control 0 Register, MLB150_MLBC0[5], MLBPEN:
-1 MediaLB 6-pin interface enabled. MLB PLL and MLB PHY is enabled in this case.
-
-I.e. the PLL8 MLB PLL has to be handled by the MLB driver and isn't needed
-for clocking the MLB module itself.
-
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-CC: Shawn Guo <shawn.guo@linaro.org>
-CC: Jiada Wang <Jiada_Wang@mentor.com>
----
- arch/arm/mach-imx/clk-imx6q.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index d38e54f..fd0189d 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -399,7 +399,7 @@ int __init mx6q_clocks_init(void)
- 	clk[ldb_di1]      = imx_clk_gate2("ldb_di1",       "ldb_di1_podf",      base + 0x74, 14);
- 	clk[ipu2_di1]     = imx_clk_gate2("ipu2_di1",      "ipu2_di1_sel",      base + 0x74, 10);
- 	clk[hsi_tx]       = imx_clk_gate2("hsi_tx",        "hsi_tx_podf",       base + 0x74, 16);
--	clk[mlb]          = imx_clk_gate2("mlb",           "pll8_mlb",          base + 0x74, 18);
-+	clk[mlb]          = imx_clk_gate2("mlb",           "axi",               base + 0x74, 18);
- 	clk[mmdc_ch0_axi] = imx_clk_gate2("mmdc_ch0_axi",  "mmdc_ch0_axi_podf", base + 0x74, 20);
- 	clk[mmdc_ch1_axi] = imx_clk_gate2("mmdc_ch1_axi",  "mmdc_ch1_axi_podf", base + 0x74, 22);
- 	clk[ocram]        = imx_clk_gate2("ocram",         "ahb",               base + 0x74, 28);
--- 
-1.8.2
+Thanks
+Kishon
