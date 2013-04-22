@@ -1,93 +1,44 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Mon, 22 Apr 2013 16:21:09 +0100
-Subject: [Xen-devel] [PATCH v6 1/4] arm: introduce psci_smp_ops
-In-Reply-To: <alpine.DEB.2.02.1304191739120.7254@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304031239550.5078@kaball.uk.xensource.com>
- <1365167495-18508-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130418161341.GB14496@n2100.arm.linux.org.uk>
- <alpine.DEB.2.02.1304181714560.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181237480.17375@syhkavp.arg>
- <alpine.DEB.2.02.1304181749260.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304181336280.17375@syhkavp.arg>
- <alpine.DEB.2.02.1304191035360.7254@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304191146230.17375@syhkavp.arg>
- <1366388166.29403.2.camel@dagon.hellion.org.uk>
- <alpine.LFD.2.03.1304191223280.17375@syhkavp.arg>
- <alpine.DEB.2.02.1304191739120.7254@kaball.uk.xensource.com>
-Message-ID: <1366644069.20256.8.camel@zakaz.uk.xensource.com>
+From: vinayakm.list@gmail.com (vinayakm.list at gmail.com)
+Date: Mon, 22 Apr 2013 20:53:00 +0530
+Subject: [PATCH] mm: add an option to disable bounce
+Message-ID: <1366644180-6140-1-git-send-email-vinayakm.list@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-04-19 at 18:06 +0100, Stefano Stabellini wrote:
-> On Fri, 19 Apr 2013, Nicolas Pitre wrote:
-> > On Fri, 19 Apr 2013, Ian Campbell wrote:
-> > 
-> > > On Fri, 2013-04-19 at 16:47 +0100, Nicolas Pitre wrote:
-> > > > No one should be probing registers without making sure it is safe to do 
-> > > > so.  Even on non virtualized hardware this can be a dangerous thing to 
-> > > > do.
-> > > 
-> > > Won't people writing per machine code consider, not unreasonably, that
-> > > having been called through a mdesc machine specific hook constitutes
-> > > enough "making sure" that they think it is safe to touch registers which
-> > > are specific to that machine?
-> > 
-> > Remember that this hook was introduced to decide at run time between 
-> > different possibilities for SMP ops on the _same_ machine configuration.  
-> > That machine shouldn't do things which is not permitted on either 
-> > possible alternatives already.  So far the actual usage of that hook 
-> > only looks in the DT to make a decision.  But even if it were to touch 
-> > the hardware, that means it has to be safe to do so on all the possible 
-> > hardware variations this mdesc is associated to.
-> 
-> This last sentence is the key.
-> 
-> It is not guaranteed that being safe on "all the possible hardware
-> variations this mdesc is associated to" and being safe on Xen are the
-> same thing.
-> 
-> What if the same magic configuration register exists on all the possible
-> variations of the platform?
-> I understand that it is unlikely but I think it is a possibility.
+From: Vinayak Menon <vinayakm.list@gmail.com>
 
-I think it is actually quite likely for such configuration registers,
-nvram etc to exist on all variants of a platform and not all that
-unlikely that smp_init might want to consult them.
+There are times when HIGHMEM is enabled, but
+we don't prefer CONFIG_BOUNCE to be enabled.
+CONFIG_BOUNCE can reduce the block device
+throughput, and this is not ideal for machines
+where we don't gain much by enabling it. So
+provide an option to deselect CONFIG_BOUNCE. The
+observation was made while measuring eMMC throughput
+using iozone on an ARM device with 1GB RAM.
 
-> If we don't take further precautions I'll be forced to regularly scan
-> the list for smp_init implementations and look for possible breakages,
-> pointing the unaware author of the patches to this conversation.
-> Honestly it is not my idea of fun.
-> 
-> 
-> > And if Xen wants to emulate one of those hardware alternatives, then it 
-> > better be ready to emulate it properly, or manage for _another_ mdesc to 
-> > be selected instead.  That's why mach-virt was introduced.
-> 
-> I don't mean to argue pointlessly here, but I thought that it was clear
-> that Xen does not emulate any hardware interfaces at all.
-> 
-> Of course when a convenient virtualization aware hardware interface is
-> available (the vGIC for example) Xen is going to use it, but other than
-> that no emulation is going to be done.
+Signed-off-by: Vinayak Menon <vinayakm.list@gmail.com>
+---
+ mm/Kconfig |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-I think the key thing that non-Xen folks aren't aware of is that
-although Xen passes the majority of the underlying hardware to the dom0
-kernel to manage one of the few things it does not expose to guests
-(where "guests" includes dom0) is the SMP topology of the underlying system.
-
-The physical CPUs are managed/scheduled/etc by the hypervisor and it is
-the hypervisor which will need to be aware of big.LITTLE and MCPM etc.
-
-The guests, and again this includes dom0, see only a set of VCPUs which
-are scheduled amongst the PCPUs by the hypervisor. It is not unusual to
-configure dom0 to have less VCPUs than there are PCPUs in the system.
-Currently the VCPUs are all considered to be uniform i.e. there is no
-big.LITTLE exposed to guests, although the hypervisor will most likely
-eventually support it and so may be scheduling the VCPUs among the big
-and LITTLE PCPUs according to $THINGS.
-
-I don't think we want to go the route of mandating a 1:1 PCPU:VCPU
-relationship for dom0 for Xen on ARM.
-
-Ian.
+diff --git a/mm/Kconfig b/mm/Kconfig
+index 3bea74f..29f9736 100644
+--- a/mm/Kconfig
++++ b/mm/Kconfig
+@@ -263,8 +263,14 @@ config ZONE_DMA_FLAG
+ 	default "1"
+ 
+ config BOUNCE
++	bool "Enable bounce buffers"
+ 	def_bool y
+ 	depends on BLOCK && MMU && (ZONE_DMA || HIGHMEM)
++	help
++	  Enable bounce buffers for devices that cannot access
++	  the full range of memory available to the CPU. Enabled
++	  by default when ZONE_DMA or HIGMEM is selected, but you
++	  may say n to override this.
+ 
+ # On the 'tile' arch, USB OHCI needs the bounce pool since tilegx will often
+ # have more than 4GB of memory, but we don't currently use the IOTLB to present
+-- 
+1.7.10.4
