@@ -1,51 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Apr 2013 10:09:43 +0100
-Subject: [RFC PATCH v2 00/13] ARM: DT cpu bindings updates
-In-Reply-To: <201304222118.41262.arnd@arndb.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 23 Apr 2013 10:15:20 +0100
+Subject: [RFC PATCH v2 12/13] ARM: mach-vt8500: cpus/cpu nodes dts updates
+In-Reply-To: <5175EE3E.7080809@prisktech.co.nz>
 References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130422164112.GB3076@mudshark.cambridge.arm.com>
- <20130422180057.GB17071@e102568-lin.cambridge.arm.com>
- <201304222118.41262.arnd@arndb.de>
-Message-ID: <20130423090942.GA17593@mudshark.cambridge.arm.com>
+ <1366644455-16550-13-git-send-email-lorenzo.pieralisi@arm.com>
+ <5175EE3E.7080809@prisktech.co.nz>
+Message-ID: <20130423091519.GA22946@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Tue, Apr 23, 2013 at 03:13:18AM +0100, Tony Prisk wrote:
+> On 23/04/13 03:27, Lorenzo Pieralisi wrote:
+> > This patch updates the in-kernel dts files according to the latest cpus
+> > and cpu bindings updates for ARM.
+> >
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> >   arch/arm/boot/dts/wm8505.dtsi | 2 +-
+> >   1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
+> > index e74a1c0..a470808 100644
+> > --- a/arch/arm/boot/dts/wm8505.dtsi
+> > +++ b/arch/arm/boot/dts/wm8505.dtsi
+> > @@ -13,7 +13,7 @@
+> >   
+> >   	cpus {
+> >   		cpu at 0 {
+> > -			compatible = "arm,arm926ejs";
+> > +			compatible = "arm,arm926";
+> >   		};
+> >   	};
+> >   
+> As the only author for that file, and the arch-vt8500 maintainer, a CC 
+> would have been nice :)
 
-On Mon, Apr 22, 2013 at 08:18:41PM +0100, Arnd Bergmann wrote:
-> On Monday 22 April 2013, Lorenzo Pieralisi wrote:
-> > > Thoughts? I notice Catalin has some patches queued for arm64 which
-> > > unconditionally use of_property_read_u64, but I have a patch to honour the
-> > > #address-cells property instead.
-> > 
-> > Basically you want me to rule out passing a dtb with cpus node having
-> > #address-cells == 2 to a 32-bit kernel, correct ? Or put it another way:
+Apologies.
 
-No, I'm not proposing that! I don't see why we couldn't make the same change
-for 32-bit kernels and honour the address-cells field there too.
+> This binding is still incomplete.device_type, compatible and reg are all 
+> required properties.
 
-> > 
-> > - a 32-bit kernel must always get passed a dtb with cpus node
-> >   #address-cells == 1. 
-> 
-> Why that? For other registers, we allow leading zeroes. This is
-> already required for MMIO registers on LPAE capable machines.
+device_type should already be there and I should not be in charge of
+adding it; reg is not required for that processor.
 
-Indeed, we should probably allow any old #address-cells and parse the reg
-property accordingly. Of course, if any bits above bit 31 are non-zero, then
-we should complain loudly on an AArch32 system.
+> Also, you seem to have only fixed the wm8505.dtsi, while vt8500.dtsi, 
+> wm8650.dtsi and wm8850.dtsi are all left incorrect.
 
-> >   If the system is ARMv8 with CPUs having
-> >   MPIDR_EL1[63:32] != 0x0, well, running 32-bit kernel on it is not
-> >   the safest thing to do anyway.
-> 
-> I would assume the hypervisor to provide a virtual MPIDR_EL1 for
-> a 32 bit kernel in that case.
+There is no cpus node in there. I can't add cpus node in all dts files
+in the kernel where it is missing (why have those dts files been
+accepted in the first place, with no cpus node ? why ? cpus node is mandatory
+since device tree was introduced, I really do not understand why those dts
+landed in the kernel as they are), I would kindly ask maintainers to do
+that, I just can not know what cpus are there for every given SoC.
 
-Correct, but that doesn't help with the bare-metal/host case (where we will
-need to scream, as described above).
+> I am already carrying a patch to fix all this properly so could you drop 
+> the arch-vt8500 related patch and I will send in a more complete version 
+> for 3.11
 
-Also, when I mentioned the mpidr check, I was just referring to the boot
-CPU -- you're right about the secondaries.
-
-Will
+Good, thanks.
+Lorenzo
