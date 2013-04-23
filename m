@@ -1,105 +1,83 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 23 Apr 2013 23:14:54 +0900
-Subject: [PATCH RESEND] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
-In-Reply-To: <201304222111.45653.arnd@arndb.de>
-References: <51642dab.e844440a.0ad1.ffffc13f@mx.google.com>
- <516571BC.9030909@samsung.com> <51756E98.9040606@samsung.com>
- <201304222111.45653.arnd@arndb.de>
-Message-ID: <5176975E.5000802@samsung.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 23 Apr 2013 16:22:07 +0200
+Subject: [V3 patch 06/19] cpuidle: make a single register function for all
+In-Reply-To: <51769316.9090309@ti.com>
+References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365770165-27096-7-git-send-email-daniel.lezcano@linaro.org>
+ <516FB35D.7000303@ti.com> <51769011.7030608@linaro.org>
+ <51769316.9090309@ti.com>
+Message-ID: <5176990F.5070605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/13 04:11, Arnd Bergmann wrote:
-
->>>> I still have hope to get those included.
+On 04/23/2013 03:56 PM, Santosh Shilimkar wrote:
+> On Tuesday 23 April 2013 07:13 PM, Daniel Lezcano wrote:
+>> On 04/18/2013 10:48 AM, Santosh Shilimkar wrote:
+>>> On Friday 12 April 2013 06:05 PM, Daniel Lezcano wrote:
+>>>> The usual scheme to initialize a cpuidle driver on a SMP is:
 >>>>
->>> I agree and I asked Tomasz to re-send universal dt patch.
->>>
->> Hi Arnd and Olof,
+>>>> 	cpuidle_register_driver(drv);
+>>>> 	for_each_possible_cpu(cpu) {
+>>>> 		device = &per_cpu(cpuidle_dev, cpu);
+>>>> 		cpuidle_register_device(device);
+>>>> 	}
+>>>>
+>>> Not exactly related to $subject patch but the driver should
+>>> be registered after all devices has been registered to avoid
+>>> devices start using the idle state data as soon as it is
+>>> registered. In multi CPU system, this race can easily happen.
 >>
->> Is it possible to send one more pull-request for this and something like
->> dt patches for exynos?
->
-> I think it's too late for that now, let's just fix the broken pieces
-> now and do the minimum amount of patches on top of what we have:
->
-Agreed, but following has been sent to arm-soc as a name of 'dt-exynos2 
-for v3.10' at 4/10, even though its base should be fixed.
+>> Could you elaborate what problems the system will be facing if a cpu
+>> starts using the idle state data as soon as it is registered ?
+>>
+>> Is there a bug related to this ?
+>>
+> Ofcouse. In multi-CPU scenario, where CPU C-states needs co-ordination
+> can just lead into unknown issues if all the CPUs are not already part
+> registered.
 
---------8<----------------8<---------
-Sachin Kamat (5):
-       ARM: dts: Remove keypad entries from exynos4x12-pinctrl.dtsi
-       ARM: dts: Add keypad entries to Exynos4412 based Origen
-       ARM: dts: Add keypad entries to SMDK4412
-       ARM: dts: Add MFC clock entries for exynos4
-       ARM: dts: Update MFC documentation for clock entries
+Hmm, ok. I don't see a scenario, with the current code, where that could
+occurs. The coupled idle state will wait for the other cpus to enter
+idle before initiating a shutdown sequence and, so far, the other sync
+algorithm (last man standing) are doing the same.
 
-Vivek Gautam (5):
-       ARM: dts: Enabling samsung-usb2phy driver for exynos5250
-       ARM: dts: Enabling samsung-usb3phy driver for exynos5250
-       ARM: dts: Add device tree bindings for dwc3-exynos
-       ARM: dts: Enabling dwc3-exynos driver for exynos5250
-       ARM: EXYNOS: Enable XHCI support on exynos5
+There are some systems with 1024 cpus, and I did not heard problems like
+this.
 
-.../devicetree/bindings/media/s5p-mfc.txt          |  5 ++
-  .../devicetree/bindings/usb/exynos-usb.txt         | 34 +++++++++
-  arch/arm/boot/dts/exynos4.dtsi                     |  2 +
-  arch/arm/boot/dts/exynos4412-origen.dts            | 62 +++++++++++++++
-  arch/arm/boot/dts/exynos4412-smdk4412.dts          | 87 
-++++++++++++++++++++++
-  arch/arm/boot/dts/exynos4x12-pinctrl.dtsi          | 56 --------------
-  arch/arm/boot/dts/exynos5250.dtsi                  | 45 +++++++++++
-  arch/arm/mach-exynos/Kconfig                       |  1 +
-  8 files changed, 236 insertions(+), 56 deletions(-)
---------8<----------------8<---------
+Do you know a system where this problem occurred ? Or is it something
+you suspect that can happen ?
 
-So I'd like to send below you mentioned with above.
+That would be interesting to have a system where this race occurs in
+order to check the modifications will solve the issue.
 
-Note that I will send this removing non-DT exynos support patch to 
-arm-soc tree after release v3.10-rc1.
+>>> Current CPUIDLE core layer is also written with the assumption
+>>> that driver will be registered first and then the devices which
+>>> is not mandatory as per typical drive/device model.
+>>
+>> Yes, that's true. The framework assumes cpuidle_register_driver is
+>> called before cpuidle_register_device.
+>>
+>>> May be you can fix that part while you are creating this common
+>>> wrapper.
+>>
+>> Personally, as that will modify the cpuidle core layer and the changes
+>> are not obvious (because of the design of the code) I prefer to do that
+>> in a separate patchset if it is worth to do it - if there is a bug
+>> related to it, then there is no discussion, we have to do it :)
+>>
+> Sure. It would have been nice if you would have clarified that before
+> posting the next version.
+> 
+> You still need to fix the kernel doc in your v4 though.
 
-> * Thomas Abraham's fix for the clk code
+Which one ? "s/accross/across" ?
 
-Included in my late-dt branch for exynos.
+Thanks
+  -- Daniel
 
-> * Tomasz Figa's patch to restore Universal C210
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-If you mean '[PATCH v2 0/3] ARM: EXYNOS: DT-enabled support for 
-Universal C210', the series included but as I know, that depends on 
-'[PATCH v5 00/14] ARM: samsung-time: Prepare for multiplatform support' 
-you asked to postpone for v3.11...
-
-> * Whatever is needed to get USB working again on Arndale
-
-Hmm, I'm not sure which patch is needed for this on Arndale, 
-unfortunately, I don't have the platform...Probably above Vivek's patches?
-
-> * Anything else that comes up that is really a bug fix.
-
-Yes, right.
-
-> * Getting the PWM and ADC drivers working with DT, that can
->    easily be done.
-
-OK.
-
-> * Possibly a patch to mark CONFIG_EXYNOS_ATAGS as broken,
->    if you think that helps.
-
-Yes.
-
-> but not:
->
-> * The entire series to rework the PWM clock from Tomasz
-
-See above comments.
-
-> * The entire series to remove ATAGS support on Exynos
-
-OK.
-
-> * Any other non-bugfix patches
->
-OK.
-
-- Kukjin
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
