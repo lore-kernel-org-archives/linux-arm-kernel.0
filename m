@@ -1,46 +1,82 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 23 Apr 2013 15:11:33 +0200
-Subject: RFC: [PATCH] clocksource: tcb: fix min_delta calculation
-In-Reply-To: <1366722524-25991-1-git-send-email-mkl@pengutronix.de>
-References: <517687AB.1040309@pengutronix.de>
- <1366722524-25991-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <51768885.4080301@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 23 Apr 2013 08:11:46 -0500
+Subject: [RFC PATCH v2 03/13] ARM: mach-at91: cpus/cpu node dts updates
+In-Reply-To: <1366644455-16550-4-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366644455-16550-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <51768892.7060807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2013 03:08 PM, Marc Kleine-Budde wrote:
-> The commit
+On 04/22/2013 10:27 AM, Lorenzo Pieralisi wrote:
+> This patch updates the in-kernel dts files according to the latest cpus
+> and cpu bindings updates for ARM.
 > 
->     77cc982 clocksource: use clockevents_config_and_register() where possible
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>  arch/arm/boot/dts/at91sam9260.dtsi | 2 +-
+>  arch/arm/boot/dts/at91sam9263.dtsi | 2 +-
+>  arch/arm/boot/dts/at91sam9g45.dtsi | 2 +-
+>  arch/arm/boot/dts/at91sam9n12.dtsi | 2 +-
+>  4 files changed, 4 insertions(+), 4 deletions(-)
 > 
-> switches from manually calculating min_delta_ns (and others) and
-> clockevents_register_device() to automatic calculation via
-> clockevents_config_and_register(). During this conversation the "+ 1" in
-> 
->     min_delta_ns = clockevent_delta2ns(1, &clkevt.clkevt) + 1;
-> 
-> was lost. This leads to problems with schedule_delayed_work() with a delay of
-> "1". Resulting in the work not scheduled in time.
-> 
-> This patch fixes the problem by increasing the min_delta to "2" ticks.
-> 
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> index cb7bcc5..2e9de85 100644
+> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> @@ -33,7 +33,7 @@
+>  	};
+>  	cpus {
+>  		cpu at 0 {
+> -			compatible = "arm,arm926ejs";
+> +			compatible = "arm,arm926";
 
-The problem appears on at91sam9263. This patch successfully fixes the
-problem and applies to current linus/master (post v3.9-rc8).
+I don't understand why you are doing this. If this does not match the
+documentation, fix the documentation. We can't continue on changing dts
+files without reqard to breaking compatibility.
 
-regards,
-Marc
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Rob
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130423/84a18667/attachment.sig>
+>  		};
+>  	};
+>  
+> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+> index 271d4de..25c4725 100644
+> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+> @@ -30,7 +30,7 @@
+>  	};
+>  	cpus {
+>  		cpu at 0 {
+> -			compatible = "arm,arm926ejs";
+> +			compatible = "arm,arm926";
+>  		};
+>  	};
+>  
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index 6b1d4ca..cf647d1 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -36,7 +36,7 @@
+>  	};
+>  	cpus {
+>  		cpu at 0 {
+> -			compatible = "arm,arm926ejs";
+> +			compatible = "arm,arm926";
+>  		};
+>  	};
+>  
+> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+> index 7750f98..d531ae3 100644
+> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+> @@ -32,7 +32,7 @@
+>  	};
+>  	cpus {
+>  		cpu at 0 {
+> -			compatible = "arm,arm926ejs";
+> +			compatible = "arm,arm926";
+>  		};
+>  	};
+>  
+> 
