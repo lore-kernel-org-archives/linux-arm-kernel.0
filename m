@@ -1,88 +1,80 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Tue, 23 Apr 2013 16:51:38 -0700
-Subject: [PATCH] arm: mm: Use phys_addr_t properly for ioremap functions
-Message-ID: <1366761098-4485-1-git-send-email-lauraa@codeaurora.org>
+From: syin@broadcom.com (Sherman Yin)
+Date: Tue, 23 Apr 2013 16:55:40 -0700
+Subject: [PATCH v2] ARM: Fix l2x0_init log message
+In-Reply-To: <5ddc968feee3af6c462b24ca53eeeb11bbb7b7a3>
+References: <5ddc968feee3af6c462b24ca53eeeb11bbb7b7a3>
+Message-ID: <1366761340-6550-1-git-send-email-syin@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several of the ioremap functions use unsigned long in places
-resulting in truncation if physical addresses greater than
-4G are passed in. Change the types appropriately.
+In the log at the end of l2x0_init(), "ways" and "l2x0_size" should be derived
+from the most recently read value from the AUX register.  Previously, these
+were derived from the earlier value of the AUX register with modifications by
+the function paramters aux_val and aux_mask.
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Sherman Yin <syin@broadcom.com>
 ---
- arch/arm/include/asm/io.h |    8 ++++----
- arch/arm/mm/ioremap.c     |   12 ++++++------
- 2 files changed, 10 insertions(+), 10 deletions(-)
+v2: Corrected switch statement
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index c1295c4..70d82ec 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -119,16 +119,16 @@ extern void __raw_readsl(const void __iomem *addr, void *data, int longlen);
-  */
- extern void __iomem *__arm_ioremap_pfn_caller(unsigned long, unsigned long,
- 	size_t, unsigned int, void *);
--extern void __iomem *__arm_ioremap_caller(unsigned long, size_t, unsigned int,
-+extern void __iomem *__arm_ioremap_caller(phys_addr_t, size_t, unsigned int,
- 	void *);
+arch/arm/mm/cache-l2x0.c |   39 +++++++++++++++++++++++++++++++--------
+ 1 file changed, 31 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index c465fac..ca50099 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -376,14 +376,6 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 	l2x0_way_mask = (1 << ways) - 1;
  
- extern void __iomem *__arm_ioremap_pfn(unsigned long, unsigned long, size_t, unsigned int);
--extern void __iomem *__arm_ioremap(unsigned long, size_t, unsigned int);
--extern void __iomem *__arm_ioremap_exec(unsigned long, size_t, bool cached);
-+extern void __iomem *__arm_ioremap(phys_addr_t, size_t, unsigned int);
-+extern void __iomem *__arm_ioremap_exec(phys_addr_t, size_t, bool cached);
- extern void __iounmap(volatile void __iomem *addr);
- extern void __arm_iounmap(volatile void __iomem *addr);
+ 	/*
+-	 * L2 cache Size =  Way size * Number of ways
+-	 */
+-	way_size = (aux & L2X0_AUX_CTRL_WAY_SIZE_MASK) >> 17;
+-	way_size = 1 << (way_size + way_size_shift);
+-
+-	l2x0_size = ways * way_size * SZ_1K;
+-
+-	/*
+ 	 * Check if l2x0 controller is already enabled.
+ 	 * If you are booting from non-secure mode
+ 	 * accessing the below registers will fault.
+@@ -417,6 +409,37 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
+ 		outer_cache.disable = l2x0_disable;
+ 	}
  
--extern void __iomem * (*arch_ioremap_caller)(unsigned long, size_t,
-+extern void __iomem * (*arch_ioremap_caller)(phys_addr_t, size_t,
- 	unsigned int, void *);
- extern void (*arch_iounmap)(volatile void __iomem *);
- 
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index 8df41e2..07b6f6c 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -280,11 +280,11 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
- 	return (void __iomem *) (offset + addr);
- }
- 
--void __iomem *__arm_ioremap_caller(unsigned long phys_addr, size_t size,
-+void __iomem *__arm_ioremap_caller(phys_addr_t phys_addr, size_t size,
- 	unsigned int mtype, void *caller)
- {
--	unsigned long last_addr;
-- 	unsigned long offset = phys_addr & ~PAGE_MASK;
-+	phys_addr_t last_addr;
-+	phys_addr_t offset = phys_addr & ~PAGE_MASK;
-  	unsigned long pfn = __phys_to_pfn(phys_addr);
- 
-  	/*
-@@ -316,12 +316,12 @@ __arm_ioremap_pfn(unsigned long pfn, unsigned long offset, size_t size,
- }
- EXPORT_SYMBOL(__arm_ioremap_pfn);
- 
--void __iomem * (*arch_ioremap_caller)(unsigned long, size_t,
-+void __iomem * (*arch_ioremap_caller)(phys_addr_t, size_t,
- 				      unsigned int, void *) =
- 	__arm_ioremap_caller;
- 
- void __iomem *
--__arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
-+__arm_ioremap(phys_addr_t phys_addr, size_t size, unsigned int mtype)
- {
- 	return arch_ioremap_caller(phys_addr, size, mtype,
- 		__builtin_return_address(0));
-@@ -336,7 +336,7 @@ EXPORT_SYMBOL(__arm_ioremap);
-  * CONFIG_GENERIC_ALLOCATOR for allocating external memory.
-  */
- void __iomem *
--__arm_ioremap_exec(unsigned long phys_addr, size_t size, bool cached)
-+__arm_ioremap_exec(phys_addr_t phys_addr, size_t size, bool cached)
- {
- 	unsigned int mtype;
- 
++	/* Update number of ways based on aux ctrl register value */
++	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
++	case L2X0_CACHE_ID_PART_L310:
++		if (aux & (1 << 16))
++			ways = 16;
++		else
++			ways = 8;
++		break;
++	case L2X0_CACHE_ID_PART_L210:
++		ways = (aux >> 13) & 0xf;
++		break;
++
++	case AURORA_CACHE_ID:
++		ways = (aux >> 13) & 0xf;
++		ways = 2 << ((ways + 1) >> 2);
++		way_size_shift = AURORA_WAY_SIZE_SHIFT;
++		break;
++	default:
++		/* Assume unknown chips have 8 ways */
++		ways = 8;
++		break;
++	}
++
++	/*
++	 * L2 cache Size =  Way size * Number of ways
++	 */
++	way_size = (aux & L2X0_AUX_CTRL_WAY_SIZE_MASK) >> 17;
++	way_size = 1 << (way_size + way_size_shift);
++
++	l2x0_size = ways * way_size * SZ_1K;
++
+ 	printk(KERN_INFO "%s cache controller enabled\n", type);
+ 	printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache size: %d B\n",
+ 			ways, cache_id, aux, l2x0_size);
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
