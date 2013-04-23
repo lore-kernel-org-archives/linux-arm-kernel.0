@@ -1,65 +1,59 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 23 Apr 2013 16:03:12 +0100
-Subject: [PATCH 08/10] ARM: ux500: Populate the ux500-musb Device Tree entry
+Date: Tue, 23 Apr 2013 16:03:14 +0100
+Subject: [PATCH 10/10] ARM: ux500: Remove empty function
+ u8500_of_init_devices()
 In-Reply-To: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
 References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366729394-11406-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <1366729394-11406-11-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides all the information to successfully probe() and
-correctly configure the ux500-musb device driver for DMA.
+As promised, now all devices which resided in u8500_of_init_devices()
+have been enabled for Device Tree, we can completely remove it.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi |   31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
+ arch/arm/mach-ux500/cpu-db8500.c |   14 +-------------
+ 1 file changed, 1 insertion(+), 13 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index 86b35a1..f4f371f 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -175,11 +175,40 @@
- 			prcm = <&prcmu>;
- 		};
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 36ef6ed..a2c83c2 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -221,15 +221,6 @@ struct device * __init u8500_init_devices(struct ab8500_platform_data *ab8500)
+ }
  
--		usb at a03e0000 {
-+		usb_per5 at a03e0000 {
- 			compatible = "stericsson,db8500-musb",
- 				"mentor,musb";
- 			reg = <0xa03e0000 0x10000>;
- 			interrupts = <0 23 0x4>;
-+			interrupt-names = "mc";
-+
-+			mode = "otg";
-+
-+			dmas = <&dma 38 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 38 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 37 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 37 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 36 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 36 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 19 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 19 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 18 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 18 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 17 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 17 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 16 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 16 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 39 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 39 0 0x0>; /* Logical - MemToDev */
-+
-+			dma-names = "iep_1_9",  "oep_1_9",
-+				    "iep_2_10", "oep_2_10",
-+				    "iep_3_11", "oep_3_11",
-+				    "iep_4_12", "oep_4_12",
-+				    "iep_5_13", "oep_5_13",
-+				    "iep_6_14", "oep_6_14",
-+				    "iep_7_15", "oep_7_15",
-+				    "iep_8",    "oep_8";
- 		};
+ #ifdef CONFIG_MACH_UX500_DT
+-
+-/* TODO: Once all pieces are DT:ed, remove completely. */
+-static struct device * __init u8500_of_init_devices(void)
+-{
+-	struct device *parent = db8500_soc_device_init();
+-
+-	return parent;
+-}
+-
+ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	/* Requires call-back bindings. */
+ 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
+@@ -288,7 +279,7 @@ static const struct of_device_id u8500_local_bus_nodes[] = {
  
- 		dma: dma-controller at 801C0000 {
+ static void __init u8500_init_machine(void)
+ {
+-	struct device *parent = NULL;
++	struct device *parent = db8500_soc_device_init();
+ 
+ 	/* Pinmaps must be in place before devices register */
+ 	if (of_machine_is_compatible("st-ericsson,mop500"))
+@@ -301,9 +292,6 @@ static void __init u8500_init_machine(void)
+ 	else if (of_machine_is_compatible("st-ericsson,ccu9540")) {}
+ 		/* TODO: Add pinmaps for ccu9540 board. */
+ 
+-	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
+-	parent = u8500_of_init_devices();
+-
+ 	/* automatically probe child nodes of db8500 device */
+ 	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
+ }
 -- 
 1.7.10.4
