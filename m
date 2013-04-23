@@ -1,35 +1,32 @@
-From: kgene.kim@gmail.com (Kukjin Kim)
-Date: Tue, 23 Apr 2013 23:33:38 +0900
-Subject: [PATCH v5 3/6] gpio: samsung: Skip legacy GPIO registration if
- pinctrl-s3c64xx is present
-In-Reply-To: <20130417130609.GA13687@opensource.wolfsonmicro.com>
-References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
- <1366060483-20342-4-git-send-email-tomasz.figa@gmail.com>
- <20130416162750.GO26958@opensource.wolfsonmicro.com>
- <22399020.Z89v9QS8su@flatron>
- <20130417130609.GA13687@opensource.wolfsonmicro.com>
-Message-ID: <51769BC2.9010507@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 23 Apr 2013 15:42:56 +0100
+Subject: [PATCH 2/3] spi: s3c64xx: Added provision for dedicated cs pin
+In-Reply-To: <1366614565-3743-3-git-send-email-ks.giri@samsung.com>
+References: <1366614565-3743-1-git-send-email-ks.giri@samsung.com>
+ <1366614565-3743-3-git-send-email-ks.giri@samsung.com>
+Message-ID: <20130423144256.GP5019@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/13 22:06, Mark Brown wrote:
-> On Wed, Apr 17, 2013 at 12:35:58AM +0200, Tomasz Figa wrote:
->> On Tuesday 16 of April 2013 17:27:50 Mark Brown wrote:
->
->>> Strictly speaking this is a separate bug fix (though I see that's
->>> already in -next separately anyway so whatever).
->
-I agree with this.
+On Mon, Apr 22, 2013 at 12:39:24PM +0530, Girish K S wrote:
+> From: Girish K S <girishks2000@gmail.com>
+> 
+> The existing driver supports gpio based /cs signal.
+> For controller's that have one device per controller,
+> the slave device's /cs signal might be internally controlled
+> by the chip select bit of slave select register. They are not
+> externally asserted/deasserted using gpio pin.
 
->> Right. But this fix is so small that I thought it would be a major waste
->> of mail server processing power to send it as a separate patch.
->
-But the fix would be value...
+This doesn't build:
 
-> There's reviewer bandwidth too - one of the things people check for is
-> that the change is doing what it's supposed to do, extra stuff in there
-> is usually a red flag.
-
-Thanks.
-
-- Kukjin
+drivers/spi/spi-s3c64xx.c: In function 's3c64xx_get_slave_ctrldata':
+drivers/spi/spi-s3c64xx.c:1023: error: 'sdd' undeclared (first use in this function)
+drivers/spi/spi-s3c64xx.c:1023: error: (Each undeclared identifier is reported only once
+drivers/spi/spi-s3c64xx.c:1023: error: for each function it appears in.)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130423/ab4c606f/attachment.sig>
