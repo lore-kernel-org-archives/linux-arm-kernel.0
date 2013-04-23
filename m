@@ -1,72 +1,72 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Apr 2013 18:30:37 +0200
-Subject: [PATCH 05/21] ARM: OMAP2+: add dependencies on ARCH_MULTI_V6/V7
+Date: Tue, 23 Apr 2013 18:30:43 +0200
+Subject: [PATCH 11/21] drm/tilcdc: use only a single module device table
 In-Reply-To: <1366734653-488286-1-git-send-email-arnd@arndb.de>
 References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
-Message-ID: <1366734653-488286-6-git-send-email-arnd@arndb.de>
+Message-ID: <1366734653-488286-12-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_ARCH_OMAP2PLUS depends on (ARCH_MULTI_V6 || ARCH_MULTI_V7) as of
-a0694861 "ARM: OMAP2+: Enable ARCH_MULTIPLATFORM support", but the
-individual OMAP2/3/4/5 and AM33XX platforms can all be selected independent
-of what we are building for, which is a bug and prevents us from easily
-building e.g. an ARMv7-only defconfig.
+The tilcdc driver fails to be built as a module because of extraneous
+MODULE_DEVICE_TABLE entries:
 
-This makes ARCH_OMAP2 depend on ARCH_MULTI_V6 and the others depend on
-ARCH_MULTI_V7, to ensure we really only build the platforms for the
-CPUs we have enabled in the global multiplatform configuration step.
+drivers/gpu/drm/tilcdc/tilcdc_slave.o:(.data+0x54): multiple definition of `__mod_of_device_table'
+drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
+drivers/gpu/drm/tilcdc/tilcdc_panel.o:(.data+0x54): multiple definition of `__mod_of_device_table'
+drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
+drivers/gpu/drm/tilcdc/tilcdc_drv.o:(.data+0x184): multiple definition of `__mod_of_device_table'
+drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
 
+Since the entire point of these entries is to make the module autoload
+when one of the devices is present, it's enough to keep the one entry
+for "ti,am33xx-tilcdc", which should always be there if any of the
+others are.
+
+Cc: Rob Clark <robdclark@gmail.com>
+Cc: Dave Airlie <airlied@linux.ie>
+Cc: dri-devel at lists.freedesktop.org
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/Kconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/gpu/drm/tilcdc/tilcdc_panel.c  | 1 -
+ drivers/gpu/drm/tilcdc/tilcdc_slave.c  | 1 -
+ drivers/gpu/drm/tilcdc/tilcdc_tfp410.c | 1 -
+ 3 files changed, 3 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 8111cd9..552341d 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -55,6 +55,7 @@ config SOC_HAS_REALTIME_COUNTER
- config ARCH_OMAP2
- 	bool "TI OMAP2"
- 	depends on ARCH_OMAP2PLUS
-+	depends on ARCH_MULTI_V6
- 	default y
- 	select CPU_V6
- 	select MULTI_IRQ_HANDLER
-@@ -64,6 +65,7 @@ config ARCH_OMAP2
- config ARCH_OMAP3
- 	bool "TI OMAP3"
- 	depends on ARCH_OMAP2PLUS
-+	depends on ARCH_MULTI_V7
- 	default y
- 	select ARCH_HAS_OPP
- 	select ARM_CPU_SUSPEND if PM
-@@ -80,6 +82,7 @@ config ARCH_OMAP4
- 	bool "TI OMAP4"
- 	default y
- 	depends on ARCH_OMAP2PLUS
-+	depends on ARCH_MULTI_V7
- 	select ARCH_HAS_OPP
- 	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
- 	select ARM_CPU_SUSPEND if PM
-@@ -99,6 +102,7 @@ config ARCH_OMAP4
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_panel.c b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
+index 580b74e..eb99f42 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_panel.c
++++ b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
+@@ -413,7 +413,6 @@ static struct of_device_id panel_of_match[] = {
+ 		{ .compatible = "ti,tilcdc,panel", },
+ 		{ },
+ };
+-MODULE_DEVICE_TABLE(of, panel_of_match);
  
- config SOC_OMAP5
- 	bool "TI OMAP5"
-+	depends on ARCH_MULTI_V7
- 	select ARM_CPU_SUSPEND if PM
- 	select ARM_GIC
- 	select CPU_V7
-@@ -135,6 +139,7 @@ config SOC_TI81XX
+ struct platform_driver panel_driver = {
+ 	.probe = panel_probe,
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_slave.c b/drivers/gpu/drm/tilcdc/tilcdc_slave.c
+index 568dc1c..db1d2fc 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_slave.c
++++ b/drivers/gpu/drm/tilcdc/tilcdc_slave.c
+@@ -353,7 +353,6 @@ static struct of_device_id slave_of_match[] = {
+ 		{ .compatible = "ti,tilcdc,slave", },
+ 		{ },
+ };
+-MODULE_DEVICE_TABLE(of, slave_of_match);
  
- config SOC_AM33XX
- 	bool "AM33XX support"
-+	depends on ARCH_MULTI_V7
- 	default y
- 	select ARM_CPU_SUSPEND if PM
- 	select CPU_V7
+ struct platform_driver slave_driver = {
+ 	.probe = slave_probe,
+diff --git a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
+index 58d487b..a36788f 100644
+--- a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
++++ b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
+@@ -396,7 +396,6 @@ static struct of_device_id tfp410_of_match[] = {
+ 		{ .compatible = "ti,tilcdc,tfp410", },
+ 		{ },
+ };
+-MODULE_DEVICE_TABLE(of, tfp410_of_match);
+ 
+ struct platform_driver tfp410_driver = {
+ 	.probe = tfp410_probe,
 -- 
 1.8.1.2
