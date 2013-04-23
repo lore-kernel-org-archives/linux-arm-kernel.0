@@ -1,49 +1,20 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Tue, 23 Apr 2013 08:02:43 -0700
-Subject: [PATCH] ARM: mm: Get rid of L_PTE_USER ref from PAGE_S2_DEVICE
-In-Reply-To: <062dea0374552dcb48be3687ae95262d@localhost>
-References: <1366683430-24328-1-git-send-email-cdall@cs.columbia.edu>
- <062dea0374552dcb48be3687ae95262d@localhost>
-Message-ID: <CAEDV+gK9J-grV=e0OfEo-bL0UezaAwFH1p1k4YkbvOB7D2LTbw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 23 Apr 2013 16:03:04 +0100
+Subject: [PATCH 00/10] usb: musb: ux500: pathe the way for Device Tree
+ enablement
+Message-ID: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 12:45 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Mon, 22 Apr 2013 19:17:10 -0700, Christoffer Dall
-> <cdall@cs.columbia.edu> wrote:
->> THe L_PTE_USER actually has nothing to do with stage 2 mappings and the
->> L_PTE_S2_RDONLY value sets the readable bit, which was what L_PTE_USER
->> was used for before proper handling of stage 2 memory defines.
->>
->> Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
->> ---
->>  arch/arm/include/asm/pgtable.h |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/include/asm/pgtable.h
->> b/arch/arm/include/asm/pgtable.h
->> index 80d6fc4..1d1f97f 100644
->> --- a/arch/arm/include/asm/pgtable.h
->> +++ b/arch/arm/include/asm/pgtable.h
->> @@ -88,7 +88,7 @@ extern pgprot_t             pgprot_s2_device;
->>  #define PAGE_HYP             _MOD_PROT(pgprot_kernel, L_PTE_HYP)
->>  #define PAGE_HYP_DEVICE              _MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
->>  #define PAGE_S2                      _MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
->> -#define PAGE_S2_DEVICE               _MOD_PROT(pgprot_s2_device, L_PTE_USER |
->> L_PTE_S2_RDONLY)
->> +#define PAGE_S2_DEVICE               _MOD_PROT(pgprot_s2_device, L_PTE_S2_RDONLY)
->>
->>  #define __PAGE_NONE          __pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN
-> |
->>  L_PTE_NONE)
->>  #define __PAGE_SHARED                __pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
->
-> Good catch.
->
-> While we're at it, why not directly set it to be RW instead of RO? The
-> only use of PAGE_S2_DEVICE immediately sets the writeable bit anyway.
->
+In this patch-set we firstly ease the burden on data being passed from
+platform data, then start to build up support to finally enable Device
+Tree.
 
-hmm, any potential future uses of read-only device mappings? It seems
-"easier" to or on write permissions than remove them, or maybe I'm
-imagining things...
+ Documentation/devicetree/bindings/usb/ux500-usb.txt |   49 +++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/dbx5x0.dtsi                       |   31 ++++++++++++++++++++++++++++++-
+ arch/arm/mach-ux500/cpu-db8500.c                    |   17 ++---------------
+ arch/arm/mach-ux500/usb.c                           |   25 ++++++-------------------
+ drivers/usb/musb/ux500.c                            |   61 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ drivers/usb/musb/ux500_dma.c                        |   59 +++++++++++++++++++++++++++++++++--------------------------
+ include/linux/platform_data/usb-musb-ux500.h        |    5 +----
+ 7 files changed, 181 insertions(+), 66 deletions(-)
