@@ -1,41 +1,53 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 23 Apr 2013 12:42:23 -0400 (EDT)
-Subject: [PATCH 18/21] usb: phy: tegra: don't call into tegra-ehci directly
-In-Reply-To: <1366734653-488286-19-git-send-email-arnd@arndb.de>
-Message-ID: <Pine.LNX.4.44L0.1304231239220.1679-100000@iolanthe.rowland.org>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 23 Apr 2013 12:46:15 -0400
+Subject: [PATCH 12/21] mmc: sdhci-tegra: fix MODULE_DEVICE_TABLE
+In-Reply-To: <1366734653-488286-13-git-send-email-arnd@arndb.de> (Arnd
+ Bergmann's message of "Tue, 23 Apr 2013 18:30:44 +0200")
+References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
+ <1366734653-488286-13-git-send-email-arnd@arndb.de>
+Message-ID: <87bo95tctk.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Apr 2013, Arnd Bergmann wrote:
+Hi Arnd,
 
-> Both phy-tegra-usb.c and ehci-tegra.c export symbols used by the other one,
-> which does not work if one of them or both are loadable modules, resulting
-> in an error like:
-> 
-> drivers/built-in.o: In function `utmi_phy_clk_disable':
-> drivers/usb/phy/phy-tegra-usb.c:302: undefined reference to `tegra_ehci_set_phcd'
-> drivers/built-in.o: In function `utmi_phy_clk_enable':
-> drivers/usb/phy/phy-tegra-usb.c:324: undefined reference to `tegra_ehci_set_phcd'
-> drivers/built-in.o: In function `utmi_phy_power_on':
-> drivers/usb/phy/phy-tegra-usb.c:447: undefined reference to `tegra_ehci_set_pts'
-> 
-> This turns the interface into a one-way dependency by letting the tegra ehci
-> driver pass two function pointers for callbacks that need to be called by
-> the phy driver.
-
-> @@ -733,7 +731,9 @@ static int tegra_ehci_probe(struct platform_device *pdev)
+On Tue, Apr 23 2013, Arnd Bergmann wrote:
+> The symbol referenced in MODULE_DEVICE_TABLE must match the actual
+> table, otherwise we get a build error like
+>
+> sdhci-tegra.c:206:34: error: '__mod_of_device_table' aliased to undefined symbol 'sdhci_dt_ids'
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Stephen Warren <swarren@nvidia.com>
+> Cc: Chris Ball <cjb@laptop.org>
+> ---
+>  drivers/mmc/host/sdhci-tegra.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+> index 08b06e9..85052bf 100644
+> --- a/drivers/mmc/host/sdhci-tegra.c
+> +++ b/drivers/mmc/host/sdhci-tegra.c
+> @@ -214,7 +214,7 @@ static const struct of_device_id sdhci_tegra_dt_match[] = {
+>  #endif
+>  	{}
+>  };
+> -MODULE_DEVICE_TABLE(of, sdhci_dt_ids);
+> +MODULE_DEVICE_TABLE(of, sdhci_tegra_dt_match);
 >  
->  	tegra->phy = tegra_usb_phy_open(&pdev->dev, instance, hcd->regs,
->  					pdata->phy_config,
-> -					TEGRA_USB_PHY_MODE_HOST);
-> +					TEGRA_USB_PHY_MODE_HOST,
-> +					&tegra_ehci_set_pts,
-> +					tegra_ehci_set_phcd);
+>  static void sdhci_tegra_parse_dt(struct device *dev,
+>  					struct sdhci_tegra *tegra_host)
 
-Does the compiler warn about the unnecessary '&'?  In any case, it
-looks strange to have one function pointer with an '&' and another
-without.
+I was going to take this, but it doesn't apply to mmc-next or
+linux-next, because the #endif in your first line of context isn't
+present in those trees -- which tree is this based on?
 
-Aside from that minor detail, the ehci-tegra.c changes are fine.
+Sounds like it might make more sense for you to take this; if so:
+Acked-by: Chris Ball <cjb@laptop.org>
 
-Alan Stern
+Thanks,
+
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
