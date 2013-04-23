@@ -1,38 +1,400 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 23 Apr 2013 17:46:33 +0200
-Subject: [PATCH v3 12/13] ARM: dts: exynos4: Add node for PWM device
+Date: Tue, 23 Apr 2013 17:46:34 +0200
+Subject: [PATCH v3 13/13] ARM: dts: exynos4210: Add basic dts file for
+ universal_c210 board
 In-Reply-To: <1366731994-7478-1-git-send-email-t.figa@samsung.com>
 References: <1366731994-7478-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1366731994-7478-13-git-send-email-t.figa@samsung.com>
+Message-ID: <1366731994-7478-14-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds device tree node for PWM block present on Exynos 4 SoCs.
+This patch adds basic device tree sources for Universal C210 board.
+
+Currently support includes:
+- eMMC
+- serial
+- max8952 and max8998 voltage regulators.
+- gpio-keys
+
+More support will be added in further patches.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/boot/dts/exynos4.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/Makefile                      |   1 +
+ arch/arm/boot/dts/exynos4210-universal_c210.dts | 352 ++++++++++++++++++++++++
+ 2 files changed, 353 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos4210-universal_c210.dts
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index efd441a..bed40ee 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -338,6 +338,14 @@
- 		status = "disabled";
- 	};
- 
-+	pwm at 139D0000 {
-+		compatible = "samsung,exynos4210-pwm";
-+		reg = <0x139D0000 0x1000>;
-+		interrupts = <0 37 0>, <0 38 0>, <0 39 0>, <0 40 0>, <0 41 0>;
-+		#pwm-cells = <2>;
-+		status = "disabled";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 8fd41b3..6647274 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -49,6 +49,7 @@ dtb-$(CONFIG_ARCH_DOVE) += dove-cm-a510.dtb \
+ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+ 	exynos4210-smdkv310.dtb \
+ 	exynos4210-trats.dtb \
++	exynos4210-universal_c210.dtb \
+ 	exynos4412-odroidx.dtb \
+ 	exynos4412-smdk4412.dtb \
+ 	exynos4412-origen.dtb \
+diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+new file mode 100644
+index 0000000..345cdb5
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
+@@ -0,0 +1,352 @@
++/*
++ * Samsung's Exynos4210 based Universal C210 board device tree source
++ *
++ * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * Device tree source file for Samsung's Universal C210 board which is based on
++ * Samsung's Exynos4210 rev0 SoC.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++/dts-v1/;
++/include/ "exynos4210.dtsi"
++
++/ {
++	model = "Samsung Universal C210 based on Exynos4210 rev0";
++	compatible = "samsung,universal_c210", "samsung,exynos4210";
++
++	memory {
++		reg =  <0x40000000 0x10000000
++			0x50000000 0x10000000>;
 +	};
 +
- 	amba {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
++	chosen {
++		bootargs = "console=ttySAC2,115200N8 root=/dev/mmcblk0p5 rw rootwait earlyprintk panic=5 maxcpus=1";
++	};
++
++	mct at 10050000 {
++		compatible = "none";
++	};
++
++	fixed-rate-clocks {
++		xxti {
++			compatible = "samsung,clock-xxti";
++			clock-frequency = <0>;
++		};
++
++		xusbxti {
++			compatible = "samsung,clock-xusbxti";
++			clock-frequency = <24000000>;
++		};
++	};
++
++	vemmc_reg: voltage-regulator {
++	        compatible = "regulator-fixed";
++		regulator-name = "VMEM_VDD_2_8V";
++		regulator-min-microvolt = <2800000>;
++		regulator-max-microvolt = <2800000>;
++		gpio = <&gpe1 3 0>;
++		enable-active-high;
++	};
++
++	sdhci_emmc: sdhci at 12510000 {
++		bus-width = <8>;
++		non-removable;
++		pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus8>;
++		pinctrl-names = "default";
++		vmmc-supply = <&vemmc_reg>;
++		status = "okay";
++	};
++
++	serial at 13800000 {
++		status = "okay";
++	};
++
++	serial at 13810000 {
++		status = "okay";
++	};
++
++	serial at 13820000 {
++		status = "okay";
++	};
++
++	serial at 13830000 {
++		status = "okay";
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++
++		vol-up-key {
++			gpios = <&gpx2 0 1>;
++			linux,code = <115>;
++			label = "volume up";
++			debounce-interval = <1>;
++		};
++
++		vol-down-key {
++			gpios = <&gpx2 1 1>;
++			linux,code = <114>;
++			label = "volume down";
++			debounce-interval = <1>;
++		};
++
++		config-key {
++			gpios = <&gpx2 2 1>;
++			linux,code = <171>;
++			label = "config";
++			debounce-interval = <1>;
++			gpio-key,wakeup;
++		};
++
++		camera-key {
++			gpios = <&gpx2 3 1>;
++			linux,code = <212>;
++			label = "camera";
++			debounce-interval = <1>;
++		};
++
++		power-key {
++			gpios = <&gpx2 7 1>;
++			linux,code = <116>;
++			label = "power";
++			debounce-interval = <1>;
++			gpio-key,wakeup;
++		};
++
++		ok-key {
++			gpios = <&gpx3 5 1>;
++			linux,code = <352>;
++			label = "ok";
++			debounce-interval = <1>;
++		};
++	};
++
++	tsp_reg: voltage-regulator {
++	        compatible = "regulator-fixed";
++		regulator-name = "TSP_2_8V";
++		regulator-min-microvolt = <2800000>;
++		regulator-max-microvolt = <2800000>;
++		gpio = <&gpe2 3 0>;
++		enable-active-high;
++	};
++
++	i2c at 13890000 {
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-slave-addr = <0x10>;
++		samsung,i2c-max-bus-freq = <100000>;
++		pinctrl-0 = <&i2c3_bus>;
++		pinctrl-names = "default";
++		status = "okay";
++
++		tsp at 4a {
++			/* TBD: Atmel maXtouch touchscreen */
++			reg = <0x4a>;
++		};
++	};
++
++	i2c at 138B0000 {
++		samsung,i2c-sda-delay = <100>;
++		samsung,i2c-slave-addr = <0x10>;
++		samsung,i2c-max-bus-freq = <100000>;
++		pinctrl-0 = <&i2c5_bus>;
++		pinctrl-names = "default";
++		status = "okay";
++
++		vdd_arm_reg: pmic at 60 {
++			compatible = "maxim,max8952";
++			reg = <0x60>;
++
++			max8952,vid-gpios = <&gpx0 3 0>, <&gpx0 4 0>;
++			max8952,default-mode = <0>;
++			max8952,dvs-mode-microvolt = <1250000>, <1200000>,
++							<1050000>, <950000>;
++			max8952,sync-freq = <0>;
++			max8952,ramp-speed = <0>;
++
++			regulator-name = "vdd_arm";
++			regulator-min-microvolt = <770000>;
++			regulator-max-microvolt = <1400000>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		pmic at 66 {
++			compatible = "national,lp3974";
++			reg = <0x66>;
++
++			max8998,pmic-buck1-default-dvs-idx = <0>;
++			max8998,pmic-buck1-dvs-gpios = <&gpx0 5 0>,
++							<&gpx0 6 0>;
++			max8998,pmic-buck1-dvs-voltage = <1100000>, <1000000>,
++							<1100000>, <1000000>;
++
++			max8998,pmic-buck2-default-dvs-idx = <0>;
++			max8998,pmic-buck2-dvs-gpio = <&gpe2 0 0>;
++			max8998,pmic-buck2-dvs-voltage = <1200000>, <1100000>;
++
++			regulators {
++				ldo2_reg: LDO2 {
++					regulator-name = "VALIVE_1.2V";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++				};
++
++				ldo3_reg: LDO3 {
++					regulator-name = "VUSB+MIPI_1.1V";
++					regulator-min-microvolt = <1100000>;
++					regulator-max-microvolt = <1100000>;
++				};
++
++				ldo4_reg: LDO4 {
++					regulator-name = "VADC_3.3V";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++				};
++
++				ldo5_reg: LDO5 {
++					regulator-name = "VTF_2.8V";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++				};
++
++				ldo6_reg: LDO6 {
++					regulator-name = "LDO6";
++					regulator-min-microvolt = <2000000>;
++					regulator-max-microvolt = <2000000>;
++				};
++
++				ldo7_reg: LDO7 {
++					regulator-name = "VLCD+VMIPI_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
++				ldo8_reg: LDO8 {
++					regulator-name = "VUSB+VDAC_3.3V";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++				};
++
++				ldo9_reg: LDO9 {
++					regulator-name = "VCC_2.8V";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					regulator-always-on;
++				};
++
++				ldo10_reg: LDO10 {
++					regulator-name = "VPLL_1.1V";
++					regulator-min-microvolt = <1100000>;
++					regulator-max-microvolt = <1100000>;
++					regulator-boot-on;
++					regulator-always-on;
++				};
++
++				ldo11_reg: LDO11 {
++					regulator-name = "CAM_AF_3.3V";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++				};
++
++				ldo12_reg: LDO12 {
++					regulator-name = "PS_2.8V";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++				};
++
++				ldo13_reg: LDO13 {
++					regulator-name = "VHIC_1.2V";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++				};
++
++				ldo14_reg: LDO14 {
++					regulator-name = "CAM_I_HOST_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++				};
++
++				ldo15_reg: LDO15 {
++					regulator-name = "CAM_S_DIG+FM33_CORE_1.2V";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++				};
++
++				ldo16_reg: LDO16 {
++					regulator-name = "CAM_S_ANA_2.8V";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++				};
++
++				ldo17_reg: LDO17 {
++					regulator-name = "VCC_3.0V_LCD";
++					regulator-min-microvolt = <3000000>;
++					regulator-max-microvolt = <3000000>;
++				};
++
++				buck1_reg: BUCK1 {
++					regulator-name = "VINT_1.1V";
++					regulator-min-microvolt = <750000>;
++					regulator-max-microvolt = <1500000>;
++					regulator-boot-on;
++					regulator-always-on;
++				};
++
++				buck2_reg: BUCK2 {
++					regulator-name = "VG3D_1.1V";
++					regulator-min-microvolt = <750000>;
++					regulator-max-microvolt = <1500000>;
++					regulator-boot-on;
++				};
++
++				buck3_reg: BUCK3 {
++					regulator-name = "VCC_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				buck4_reg: BUCK4 {
++					regulator-name = "VMEM_1.2V";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++				};
++
++				ap32khz_reg: EN32KHz-AP {
++					regulator-name = "32KHz AP";
++					regulator-always-on;
++				};
++
++				cp32khz_reg: EN32KHz-CP {
++					regulator-name = "32KHz CP";
++				};
++
++				vichg_reg: ENVICHG {
++					regulator-name = "VICHG";
++				};
++
++				safeout1_reg: ESAFEOUT1 {
++					regulator-name = "SAFEOUT1";
++					regulator-always-on;
++				};
++
++				safeout2_reg: ESAFEOUT2 {
++					regulator-name = "SAFEOUT2";
++					regulator-boot-on;
++				};
++			};
++		};
++	};
++
++	pwm at 139D0000 {
++		compatible = "samsung,s5p6440-pwm";
++		status = "okay";
++	};
++};
 -- 
 1.8.2.1
