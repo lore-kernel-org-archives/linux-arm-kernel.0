@@ -1,112 +1,98 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 23 Apr 2013 14:53:04 +0100
-Subject: [RFC PATCH v2 03/13] ARM: mach-at91: cpus/cpu node dts updates
-In-Reply-To: <51768892.7060807@gmail.com>
-References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366644455-16550-4-git-send-email-lorenzo.pieralisi@arm.com>
- <51768892.7060807@gmail.com>
-Message-ID: <20130423135304.GG22946@e102568-lin.cambridge.arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 23 Apr 2013 16:53:12 +0300
+Subject: Multiple issues with omap4 panda es in linux next
+In-Reply-To: <20130422180822.GB10155@atomide.com>
+References: <20130419171318.GK10155@atomide.com> <5174FE16.6080307@ti.com>
+ <51750FF8.6000401@ti.com> <51752B48.50700@ti.com>
+ <20130422180822.GB10155@atomide.com>
+Message-ID: <51769248.60602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 02:11:46PM +0100, Rob Herring wrote:
-> On 04/22/2013 10:27 AM, Lorenzo Pieralisi wrote:
-> > This patch updates the in-kernel dts files according to the latest cpus
-> > and cpu bindings updates for ARM.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  arch/arm/boot/dts/at91sam9260.dtsi | 2 +-
-> >  arch/arm/boot/dts/at91sam9263.dtsi | 2 +-
-> >  arch/arm/boot/dts/at91sam9g45.dtsi | 2 +-
-> >  arch/arm/boot/dts/at91sam9n12.dtsi | 2 +-
-> >  4 files changed, 4 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> > index cb7bcc5..2e9de85 100644
-> > --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> > +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> > @@ -33,7 +33,7 @@
-> >  	};
-> >  	cpus {
-> >  		cpu at 0 {
-> > -			compatible = "arm,arm926ejs";
-> > +			compatible = "arm,arm926";
-> 
-> I don't understand why you are doing this. If this does not match the
-> documentation, fix the documentation. We can't continue on changing dts
-> files without reqard to breaking compatibility.
+On 04/22/2013 09:08 PM, Tony Lindgren wrote:
+> * Grygorii Strashko <grygorii.strashko@ti.com> [130422 05:27]:
+>> On 04/22/2013 01:24 PM, Tomi Valkeinen wrote:
+>>> On 2013-04-22 12:08, Tomi Valkeinen wrote:
+>>>> On 2013-04-19 20:13, Tony Lindgren wrote:
+>>>>
+>>>>> 3. DSS fails with DT booting
+>>>>>
+>>>>> Works with legacy booting but fails with DT. I'm almost certain
+>>>>> the DT booting was working last week or so?
+>>>>>
+>>>>> This is what I now get with DT booting:
+>>>>>
+>>>>> omapdss DSI error: can't get VDDS_DSI regulator
+>>>>> omapdss HDMI error: can't get VDDA_HDMI_DAC regulator
+>>>>> omapdss HDMI error: device hdmi init failed: -517
+>>>>> omapdss CORE error: driver probe failed: -22
+>>>>> ...
+>>>> I think this is the issue Christoph Fritz reported earlier, DSS is being
+>>>> initialized before TWL, and thus DSS doesn't find the regulators.
+>>>>
+>>>> The proper fix is of course to make DSS support EPROBE_DEFER, but that's
+>>>> easier said than done. I'll have a look if I can get it working enough
+>>>> to fix this issue.
+>>> Yes, it seems delayed regulator initialization brought up this issue.
+>>>
+>>> I hacked DSI driver of omapdss and Taal panel driver to somewhat work
+>>> with EPROBE_DEFER. But then the issue was with omapfb.
+>>>
+>>> omapfb is currently set to start at late_initcall, so that omapdss and
+>>> panels are loaded before omapfb. But even that's not late enough to get
+>>> the regulators for omapdss. It seems the regulators get also initialized
+>>> at the late_initcall level. Changing omapfb to late_initcall_sync was
+>>> late enough to get things working.
+>>>
+>>> Again, making omapdss, panel drivers and omapfb support EPROBE_DEFER and
+>>> dynamic panel driver insertion is the proper fix, but it's a big job,
+>>> and there are "interesting" issues with it (like how to know if a panel
+>>> device will ever get a driver loaded).
+>>>
+>>> But is there something wrong with the TWL and regulators? late_initcall
+>>> sounds rather late for such a core resource. Even if all drivers
+>>> supported EPROBE_DEFER, won't it cause extra delays in the boot as
+>>> drivers are getting probed multiple times?
+>>>
+>>> As for fixing the DSS problem for 3.10, I don't have any ideas except
+>>> pure hacks. I'll continue studying this.
+>> Hi Tomi,
+>> twl is not initialized because of I2C,
+>> I2C is not initialized because of pinctrl-single,
+>> pinctrl-single is initialized at mudule/device init time.
+>> So, most everything will be shifted at late_initcall time.
+>>
+>> Hack that sequence is here - https://patchwork.kernel.org/patch/2444501/
+> Hmm I'm pretty sure the LCD was working on panda with DT
+> few weeks ago?
+>
+> In any case, all those drivers should be just module_init
+> so we get out of the race to bottom to initialize drivers
+> early. Pinctrl is already before i2c in drivers/Makefile.
+>
+> I suspect there may be some recent regression that has
+> happened in linux next over past few weeks.
+Hi Tony,
 
-IMHO compatibility is already broken. There are a number of dts in the
-kernel missing cpus and cpu nodes, others with cpu nodes missing
-device_type = "cpu", missing cpu nodes compatible properties and the list
-goes on and on. Those files got merged in the kernel before bindings were
-properly defined for ARM so at that point in time the only reference was the
-ePAPR and still, it was not followed (eg my broken patch above fails to add
-device_type = "cpu" to the cpu node, should I change the documentation (ePAPR)
-to make the dts above compliant ? I do not think so, I reckon we should fix
-all dts and force them to comply with the ePAPR and the in-kernel bindings).
+I've posted two patches to fix I2C/TWL initialization and they should fix
+DSS indirectly (if not - DSS need to be shifted to init later).
+lkml.org/lkml/2013/4/23/215
+lkml.org/lkml/2013/4/23/217
 
-If we do not set in stone the bindings and draw a line now, this stuff will
-go wild, it is already in a state that I do not like much.
+In addition, It seems, possibly :), drivers/Makefile might need to be 
+changed a bit:
+- move generic drivers framework to be initialized first ("base", "clk");
+- move "i2c" buses initialization as early as possible (but after 
+"pinctrl" and "gpio")
+- move "mfd" initialization before "regulators"
+- move "video" initialization down after "regulators" (as minimum).
 
-The reason we are patching the compatible property above is to avoid having
-compatible properties containing suffixes for CPUs, we do not deem that
-necessary, see:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/145305.html
-
-That's just my opinion, open to change it to find a proper solution to this
-issue as long as we make progress.
-
-Thanks for the review,
-Lorenzo
-
-> 
-> Rob
-> 
-> >  		};
-> >  	};
-> >  
-> > diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> > index 271d4de..25c4725 100644
-> > --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> > +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> > @@ -30,7 +30,7 @@
-> >  	};
-> >  	cpus {
-> >  		cpu at 0 {
-> > -			compatible = "arm,arm926ejs";
-> > +			compatible = "arm,arm926";
-> >  		};
-> >  	};
-> >  
-> > diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> > index 6b1d4ca..cf647d1 100644
-> > --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> > +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> > @@ -36,7 +36,7 @@
-> >  	};
-> >  	cpus {
-> >  		cpu at 0 {
-> > -			compatible = "arm,arm926ejs";
-> > +			compatible = "arm,arm926";
-> >  		};
-> >  	};
-> >  
-> > diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> > index 7750f98..d531ae3 100644
-> > --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> > +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> > @@ -32,7 +32,7 @@
-> >  	};
-> >  	cpus {
-> >  		cpu at 0 {
-> > -			compatible = "arm,arm926ejs";
-> > +			compatible = "arm,arm926";
-> >  		};
-> >  	};
-> >  
-> > 
-> 
-> 
+Regards
+-grygorii
+> Regards,
+>
+> Tony
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
