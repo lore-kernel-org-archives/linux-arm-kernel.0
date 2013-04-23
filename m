@@ -1,23 +1,58 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 23 Apr 2013 19:53:41 +0400
-Subject: [PATCH v5 0/3] Add USB support to R8A7778/BOCK-W
-Message-ID: <201304231953.42505.sergei.shtylyov@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Apr 2013 17:54:32 +0200
+Subject: [PATCH] usb: phy: phy core cannot yet be a module
+In-Reply-To: <1366732475-479886-1-git-send-email-arnd@arndb.de>
+References: <1366732475-479886-1-git-send-email-arnd@arndb.de>
+Message-ID: <1366732475-479886-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+A lot of platform code calls into the usb phy core at the moment, which
+does not work if it is built as a loadable module. This will hopefully
+change when those platforms are all converted to DT based probing,
+but for now, the easiest solution is to change it from "tristate"
+to "bool".
 
-   Here's the set of 3 patches against the Simon Horman's 'renesas.git' repo,
-'renesas-next-20130422' tag and the R8A7779/Marzen patchset I've posted.
- It was created to add support of R8A7778/BOCK-W USB to the platform code and
-the USB common PHY driver, and so spans both arch/arm/mach-shmobile/ and
-drivers/usb/phy/ subtrees.
+This solves at least these ARM allmodconfig build errors:
 
-[1/3] rcar-phy: add R8A7778 support
-[2/3] ARM: shmobile: r8a7778: add USB support
-[3/3] ARM: shmobile: BOCK-W: add USB support
+arch/arm/mach-imx/built-in.o: In function `imx_otg_ulpi_create':
+arch/arm/mach-imx/ulpi.c:117: undefined reference to `otg_ulpi_create'
+arch/arm/mach-omap2/built-in.o: In function `usbhs_init_phys':
+arch/arm/mach-omap2/usb-host.c:652: undefined reference to `usb_bind_phy'
+arch/arm/mach-omap2/built-in.o: In function `omap_2430sdp_init':
+arch/arm/mach-omap2/board-2430sdp.c:236: undefined reference to `usb_bind_phy'
+arch/arm/mach-omap2/built-in.o: In function `omap3_beagle_init':
+arch/arm/mach-omap2/board-omap3beagle.c:554: undefined reference to `usb_bind_phy'
+arch/arm/mach-omap2/built-in.o: In function `devkit8000_init':
+arch/arm/mach-omap2/board-devkit8000.c:596: undefined reference to `usb_bind_phy'
+arch/arm/mach-omap2/built-in.o: In function `omap_ldp_init':
+arch/arm/mach-omap2/board-ldp.c:379: undefined reference to `usb_bind_phy'
+drivers/built-in.o: In function `ab8500_charger_probe':
+drivers/power/ab8500_charger.c:3629: undefined reference to `usb_get_phy'
+drivers/power/ab8500_charger.c:3706: undefined reference to `usb_put_phy'
+drivers/built-in.o: In function `ab8500_charger_remove':
+drivers/power/ab8500_charger.c:3411: undefined reference to `usb_put_phy'
 
-The patch #4 (ARM: shmobile: BOCK-W: enable USB in defconfig) that has been
-already merged, is not reposted.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: linux-usb at vger.kernel.org
+---
+ drivers/usb/phy/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-WBR, Sergei
+diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
+index 21153d1..371d0e7 100644
+--- a/drivers/usb/phy/Kconfig
++++ b/drivers/usb/phy/Kconfig
+@@ -2,7 +2,7 @@
+ # Physical Layer USB driver configuration
+ #
+ menuconfig USB_PHY
+-	tristate "USB Physical Layer drivers"
++	bool "USB Physical Layer drivers"
+ 	help
+ 	  USB controllers (those which are host, device or DRD) need a
+ 	  device to handle the physical layer signalling, commonly called
+-- 
+1.8.1.2
