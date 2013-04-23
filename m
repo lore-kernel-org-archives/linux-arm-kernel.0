@@ -1,39 +1,57 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 23 Apr 2013 21:34:51 +0400
-Subject: [PATCH v3 5/5] ARM: shmobile: BOCK-W: enable VIN and ML86V7667 in
- defconfig
-In-Reply-To: <201304232118.43686.sergei.shtylyov@cogentembedded.com>
-References: <201304232118.43686.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201304232134.52153.sergei.shtylyov@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 23 Apr 2013 10:36:23 -0700
+Subject: [PATCH] ARM: OMAP4: change the device names in usb_bind_phy
+In-Reply-To: <1366697656-14315-1-git-send-email-kishon@ti.com>
+References: <1366697656-14315-1-git-send-email-kishon@ti.com>
+Message-ID: <20130423173623.GG10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+* Kishon Vijay Abraham I <kishon@ti.com> [130422 23:19]:
+> After the device names are created using PLATFORM_DEVID_AUTO, the old
+> device names given in usb_bind_phy are no longer valid causing the musb
+> controller not to get the phy reference. Updated the usb_bind_phy with
+> the new device names to get MUSB functional in omap4 panda.
 
-Add the VIN and ML86V7667 drivers to 'bockw_defconfig'.
+Thanks will apply this into omap-for-v3.10/fixes.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Regards,
 
----
- arch/arm/configs/bockw_defconfig |    7 +++++++
- 1 file changed, 7 insertions(+)
-
-Index: renesas/arch/arm/configs/bockw_defconfig
-===================================================================
---- renesas.orig/arch/arm/configs/bockw_defconfig
-+++ renesas/arch/arm/configs/bockw_defconfig
-@@ -76,6 +76,13 @@ CONFIG_SERIAL_SH_SCI_CONSOLE=y
- # CONFIG_HWMON is not set
- CONFIG_I2C=y
- CONFIG_I2C_RCAR=y
-+CONFIG_MEDIA_SUPPORT=y
-+CONFIG_MEDIA_CAMERA_SUPPORT=y
-+CONFIG_V4L_PLATFORM_DRIVERS=y
-+CONFIG_SOC_CAMERA=y
-+CONFIG_VIDEO_RCAR_VIN=y
-+# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
-+CONFIG_VIDEO_ML86V7667=y
- CONFIG_USB=y
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
- CONFIG_USB_EHCI_HCD=y
+Tony
+ 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+> Tested in OMAP4 PANDA.
+>  arch/arm/mach-omap2/board-4430sdp.c    |    2 +-
+>  arch/arm/mach-omap2/board-omap4panda.c |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+> index 00d7290..56a9a4f 100644
+> --- a/arch/arm/mach-omap2/board-4430sdp.c
+> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> @@ -730,7 +730,7 @@ static void __init omap_4430sdp_init(void)
+>  	omap4_sdp4430_wifi_init();
+>  	omap4_twl6030_hsmmc_init(mmc);
+>  
+> -	usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
+> +	usb_bind_phy("musb-hdrc.2.auto", 0, "omap-usb2.3.auto");
+>  	usb_musb_init(&musb_board_data);
+>  
+>  	status = omap_ethernet_init();
+> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+> index a71ad34..1e2c75e 100644
+> --- a/arch/arm/mach-omap2/board-omap4panda.c
+> +++ b/arch/arm/mach-omap2/board-omap4panda.c
+> @@ -435,7 +435,7 @@ static void __init omap4_panda_init(void)
+>  	omap_sdrc_init(NULL, NULL);
+>  	omap4_twl6030_hsmmc_init(mmc);
+>  	omap4_ehci_init();
+> -	usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
+> +	usb_bind_phy("musb-hdrc.2.auto", 0, "omap-usb2.3.auto");
+>  	usb_musb_init(&musb_board_data);
+>  	omap4_panda_display_init();
+>  }
+> -- 
+> 1.7.10.4
+> 
