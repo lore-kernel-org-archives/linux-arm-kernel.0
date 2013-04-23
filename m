@@ -1,152 +1,122 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 23 Apr 2013 21:10:59 +0400
-Subject: [PATCH v3 2/4] ARM: shmobile: r8a7779: add VIN support
+Date: Tue, 23 Apr 2013 21:13:29 +0400
+Subject: [PATCH v3 3/4] ARM: shmobile: Marzen: add VIN and ADV7180 support
 In-Reply-To: <201304232106.45889.sergei.shtylyov@cogentembedded.com>
 References: <201304232106.45889.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201304232110.59718.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201304232113.30512.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-Add VIN clocks and platform devices for R8A7779 SoC; add function to register
-the VIN platform devices.
+Add ADV7180 platform devices on the Marzen board, configure VIN1/3 pins, and
+register VIN1/3 devices with the ADV7180 specific platform data.
 
 Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-[Sergei: added 'id' parameter check to r8a7779_add_vin_device(), renamed some
-variables, annotated vin[01]_resources[] and 'vin[01]_info' as '__initdata'.]
+[Sergei: removed superfluous tabulation and inserted empty lines in the  macro
+definition, updated the copyrights, annotated VIN platform data as '__initdata']
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
 Changes since version 2:
-- annotated vin[01]_resources[] and 'vin[01]_info' as '__initdata' since they're
-  kmemdup()'ed while registering the platform devices anyway;
+- annotated 'vin_platform_data' as '__initdata' since they're kmemdup()'ed while
+  registering the platform devices anyway.
 
 Changes since the original posting:
-- added 'id' parameter check to r8a7779_add_vin_device().
+- used a macro to define the camera platform devices;
+- updated the copyrights;
+- refreshed the patch.
 
- arch/arm/mach-shmobile/clock-r8a7779.c        |   10 ++++++
- arch/arm/mach-shmobile/include/mach/r8a7779.h |    3 ++
- arch/arm/mach-shmobile/setup-r8a7779.c        |   38 ++++++++++++++++++++++++++
- 3 files changed, 51 insertions(+)
+ arch/arm/mach-shmobile/board-marzen.c |   44 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
 
-Index: renesas/arch/arm/mach-shmobile/clock-r8a7779.c
+Index: renesas/arch/arm/mach-shmobile/board-marzen.c
 ===================================================================
---- renesas.orig/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ renesas/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -112,7 +112,9 @@ static struct clk *main_clks[] = {
- };
- 
- enum { MSTP323, MSTP322, MSTP321, MSTP320,
-+	MSTP120,
- 	MSTP116, MSTP115, MSTP114,
-+	MSTP110, MSTP109, MSTP108,
- 	MSTP103, MSTP101, MSTP100,
- 	MSTP030,
- 	MSTP029, MSTP028, MSTP027, MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
-@@ -125,9 +127,13 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP322] = SH_CLK_MSTP32(&clkp_clk, MSTPCR3, 22, 0), /* SDHI1 */
- 	[MSTP321] = SH_CLK_MSTP32(&clkp_clk, MSTPCR3, 21, 0), /* SDHI2 */
- 	[MSTP320] = SH_CLK_MSTP32(&clkp_clk, MSTPCR3, 20, 0), /* SDHI3 */
-+	[MSTP120] = SH_CLK_MSTP32(&clks_clk, MSTPCR1, 20, 0), /* VIN3 */
- 	[MSTP116] = SH_CLK_MSTP32(&clkp_clk, MSTPCR1, 16, 0), /* PCIe */
- 	[MSTP115] = SH_CLK_MSTP32(&clkp_clk, MSTPCR1, 15, 0), /* SATA */
- 	[MSTP114] = SH_CLK_MSTP32(&clkp_clk, MSTPCR1, 14, 0), /* Ether */
-+	[MSTP110] = SH_CLK_MSTP32(&clks_clk, MSTPCR1, 10, 0), /* VIN0 */
-+	[MSTP109] = SH_CLK_MSTP32(&clks_clk, MSTPCR1,  9, 0), /* VIN1 */
-+	[MSTP108] = SH_CLK_MSTP32(&clks_clk, MSTPCR1,  8, 0), /* VIN2 */
- 	[MSTP103] = SH_CLK_MSTP32(&clks_clk, MSTPCR1,  3, 0), /* DU */
- 	[MSTP101] = SH_CLK_MSTP32(&clkp_clk, MSTPCR1,  1, 0), /* USB2 */
- 	[MSTP100] = SH_CLK_MSTP32(&clkp_clk, MSTPCR1,  0, 0), /* USB0/1 */
-@@ -162,10 +168,14 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("peripheral_clk",	&clkp_clk),
- 
- 	/* MSTP32 clocks */
-+	CLKDEV_DEV_ID("rcar_vin.3", &mstp_clks[MSTP120]), /* VIN3 */
- 	CLKDEV_DEV_ID("rcar-pcie", &mstp_clks[MSTP116]), /* PCIe */
- 	CLKDEV_DEV_ID("sata_rcar", &mstp_clks[MSTP115]), /* SATA */
- 	CLKDEV_DEV_ID("fc600000.sata", &mstp_clks[MSTP115]), /* SATA w/DT */
- 	CLKDEV_DEV_ID("sh-eth", &mstp_clks[MSTP114]), /* Ether */
-+	CLKDEV_DEV_ID("rcar_vin.0", &mstp_clks[MSTP110]), /* VIN0 */
-+	CLKDEV_DEV_ID("rcar_vin.1", &mstp_clks[MSTP109]), /* VIN1 */
-+	CLKDEV_DEV_ID("rcar_vin.2", &mstp_clks[MSTP108]), /* VIN2 */
- 	CLKDEV_DEV_ID("ehci-platform.1", &mstp_clks[MSTP101]), /* USB EHCI port2 */
- 	CLKDEV_DEV_ID("ohci-platform.1", &mstp_clks[MSTP101]), /* USB OHCI port2 */
- 	CLKDEV_DEV_ID("ehci-platform.0", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
-Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7779.h
-+++ renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
-@@ -5,6 +5,7 @@
- #include <linux/pm_domain.h>
- #include <linux/sh_eth.h>
- #include <linux/usb/rcar-phy.h>
-+#include <linux/platform_data/camera-rcar.h>
- 
- struct platform_device;
- 
-@@ -35,6 +36,8 @@ extern void r8a7779_add_standard_devices
- extern void r8a7779_add_standard_devices_dt(void);
- extern void r8a7779_add_ether_device(struct sh_eth_plat_data *pdata);
- extern void r8a7779_add_usb_phy_device(struct rcar_phy_platform_data *pdata);
-+extern void r8a7779_add_vin_device(int idx,
-+				   struct rcar_vin_platform_data *pdata);
- extern void r8a7779_init_late(void);
- extern void r8a7779_clock_init(void);
- extern void r8a7779_pinmux_init(void);
-Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -559,6 +559,33 @@ static struct resource ether_resources[]
+--- renesas.orig/arch/arm/mach-shmobile/board-marzen.c
++++ renesas/arch/arm/mach-shmobile/board-marzen.c
+@@ -1,8 +1,9 @@
+ /*
+  * marzen board support
+  *
+- * Copyright (C) 2011  Renesas Solutions Corp.
++ * Copyright (C) 2011, 2013  Renesas Solutions Corp.
+  * Copyright (C) 2011  Magnus Damm
++ * Copyright (C) 2013  Cogent Embedded, Inc.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -37,6 +38,7 @@
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/mfd/tmio.h>
++#include <media/soc_camera.h>
+ #include <mach/hardware.h>
+ #include <mach/r8a7779.h>
+ #include <mach/common.h>
+@@ -178,12 +180,40 @@ static struct platform_device leds_devic
  	},
  };
  
-+#define R8A7779_VIN(idx) \
-+static struct resource vin##idx##_resources[] __initdata = {		\
-+	DEFINE_RES_MEM(0xffc50000 + 0x1000 * (idx), 0x1000),		\
-+	DEFINE_RES_IRQ(gic_iid(0x5f + (idx))),				\
-+};									\
-+									\
-+static struct platform_device_info vin##idx##_info __initdata = {	\
-+	.parent		= &platform_bus,				\
-+	.name		= "rcar_vin",					\
-+	.id		= idx,						\
-+	.res		= vin##idx##_resources,				\
-+	.num_res	= ARRAY_SIZE(vin##idx##_resources),		\
-+	.dma_mask	= DMA_BIT_MASK(32),				\
-+}
-+
-+R8A7779_VIN(0);
-+R8A7779_VIN(1);
-+R8A7779_VIN(2);
-+R8A7779_VIN(3);
-+
-+static struct platform_device_info *vin_info_table[] __initdata = {
-+	&vin0_info,
-+	&vin1_info,
-+	&vin2_info,
-+	&vin3_info,
++static struct rcar_vin_platform_data vin_platform_data __initdata = {
++	.flags	= RCAR_VIN_BT656,
 +};
 +
- static struct platform_device *r8a7779_devices_dt[] __initdata = {
- 	&scif0_device,
- 	&scif1_device,
-@@ -610,6 +637,17 @@ void __init r8a7779_add_usb_phy_device(s
- 					  pdata, sizeof(*pdata));
- }
++#define MARZEN_CAMERA(idx)					\
++static struct i2c_board_info camera##idx##_info = {		\
++	I2C_BOARD_INFO("adv7180", 0x20 + (idx)),		\
++};								\
++								\
++static struct soc_camera_link iclink##idx##_adv7180 = {		\
++	.bus_id		= 1 + 2 * (idx),			\
++	.i2c_adapter_id	= 0,					\
++	.board_info	= &camera##idx##_info,			\
++};								\
++								\
++static struct platform_device camera##idx##_device = {		\
++	.name	= "soc-camera-pdrv",				\
++	.id	= idx,						\
++	.dev	= {						\
++		.platform_data	= &iclink##idx##_adv7180,	\
++	},							\
++};
++
++MARZEN_CAMERA(0);
++MARZEN_CAMERA(1);
++
+ static struct platform_device *marzen_devices[] __initdata = {
+ 	&eth_device,
+ 	&sdhi0_device,
+ 	&thermal_device,
+ 	&hspi_device,
+ 	&leds_device,
++	&camera0_device,
++	&camera1_device,
+ };
  
-+void __init r8a7779_add_vin_device(int id,
-+				   struct rcar_vin_platform_data *pdata)
-+{
-+	BUG_ON(id < 0 || id > 3);
-+
-+	vin_info_table[id]->data = pdata;
-+	vin_info_table[id]->size_data = sizeof(struct rcar_vin_platform_data);
-+
-+	platform_device_register_full(vin_info_table[id]);
-+}
-+
- /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
- void __init __weak r8a7779_register_twd(void) { }
+ static const struct pinctrl_map marzen_pinctrl_map[] = {
+@@ -219,6 +249,16 @@ static const struct pinctrl_map marzen_p
+ 	/* USB2 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform.1", "pfc-r8a7779",
+ 				  "usb2", "usb2"),
++	/* VIN1 */
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.1", "pfc-r8a7779",
++				  "vin1_clk", "vin1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.1", "pfc-r8a7779",
++				  "vin1_data8", "vin1"),
++	/* VIN3 */
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.3", "pfc-r8a7779",
++				  "vin3_clk", "vin3"),
++	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.3", "pfc-r8a7779",
++				  "vin3_data8", "vin3"),
+ };
+ 
+ static void __init marzen_init(void)
+@@ -235,6 +275,8 @@ static void __init marzen_init(void)
+ 
+ 	r8a7779_add_standard_devices();
+ 	r8a7779_add_usb_phy_device(&usb_phy_platform_data);
++	r8a7779_add_vin_device(1, &vin_platform_data);
++	r8a7779_add_vin_device(3, &vin_platform_data);
+ 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
+ }
  
