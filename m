@@ -1,66 +1,59 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 23 Apr 2013 16:03:08 +0100
-Subject: [PATCH 04/10] usb: musb: ux500: harden checks for platform data
+Date: Tue, 23 Apr 2013 16:03:07 +0100
+Subject: [PATCH 03/10] usb: musb: ux500: take the dma_mask from
+ coherent_dma_mask
 In-Reply-To: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
 References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366729394-11406-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1366729394-11406-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In its current state, the ux500-musb driver uses platform data pointers
-blindly with no prior checking. If no platform data pointer is passed
-this will Oops the kernel. In this patch we ensure platform data and
-board data are present prior to using them.
+The dma_mask will always be the same as the coherent_dma_mask, so let's
+cut down on the platform_data burden and set it as such in the driver.
+This also saves us from supporting it separately when we come to enable
+this driver for Device Tree.
 
 Cc: Felipe Balbi <balbi@ti.com>
 Cc: linux-usb at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/usb/musb/ux500_dma.c |   11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/mach-ux500/usb.c |    3 ---
+ drivers/usb/musb/ux500.c  |    2 +-
+ 2 files changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/drivers/usb/musb/ux500_dma.c b/drivers/usb/musb/ux500_dma.c
-index c75e07a..02b4a6e 100644
---- a/drivers/usb/musb/ux500_dma.c
-+++ b/drivers/usb/musb/ux500_dma.c
-@@ -287,7 +287,7 @@ static int ux500_dma_controller_start(struct dma_controller *c)
- 	struct musb *musb = controller->private_data;
- 	struct device *dev = musb->controller;
- 	struct musb_hdrc_platform_data *plat = dev->platform_data;
--	struct ux500_musb_board_data *data = plat->board_data;
-+	struct ux500_musb_board_data *data;
- 	struct dma_channel *dma_channel = NULL;
- 	u32 ch_num;
- 	u8 dir;
-@@ -297,14 +297,19 @@ static int ux500_dma_controller_start(struct dma_controller *c)
- 	struct ux500_dma_channel *channel_array;
- 	dma_cap_mask_t mask;
+diff --git a/arch/arm/mach-ux500/usb.c b/arch/arm/mach-ux500/usb.c
+index 4f68a9c..e6c4a05 100644
+--- a/arch/arm/mach-ux500/usb.c
++++ b/arch/arm/mach-ux500/usb.c
+@@ -74,8 +74,6 @@ static struct ux500_musb_board_data musb_board_data = {
+ 	.dma_filter = stedma40_filter,
+ };
  
-+	if (!plat) {
-+		dev_err(musb->controller, "No platform data\n");
-+		return -EINVAL;
-+	}
- 
-+	data = plat->board_data;
- 
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 
- 	/* Prepare the loop for RX channels */
- 	channel_array = controller->rx_channel;
--	param_array = data->dma_rx_param_array;
-+	param_array = (data) ? data->dma_rx_param_array : NULL;
- 
- 	for (dir = 0; dir < 2; dir++) {
- 		for (ch_num = 0;
-@@ -337,7 +342,7 @@ static int ux500_dma_controller_start(struct dma_controller *c)
- 
- 		/* Prepare the loop for TX channels */
- 		channel_array = controller->tx_channel;
--		param_array = data->dma_tx_param_array;
-+		param_array = (data) ? data->dma_tx_param_array : NULL;
- 		is_tx = 1;
+-static u64 ux500_musb_dmamask = DMA_BIT_MASK(32);
+-
+ static struct musb_hdrc_platform_data musb_platform_data = {
+ 	.mode = MUSB_OTG,
+ 	.board_data = &musb_board_data,
+@@ -98,7 +96,6 @@ struct platform_device ux500_musb_device = {
+ 	.id = 0,
+ 	.dev = {
+ 		.platform_data = &musb_platform_data,
+-		.dma_mask = &ux500_musb_dmamask,
+ 		.coherent_dma_mask = DMA_BIT_MASK(32),
+ 	},
+ 	.num_resources = ARRAY_SIZE(usb_resources),
+diff --git a/drivers/usb/musb/ux500.c b/drivers/usb/musb/ux500.c
+index 4a8f5c9..7ddb132 100644
+--- a/drivers/usb/musb/ux500.c
++++ b/drivers/usb/musb/ux500.c
+@@ -122,7 +122,7 @@ static int ux500_probe(struct platform_device *pdev)
  	}
  
+ 	musb->dev.parent		= &pdev->dev;
+-	musb->dev.dma_mask		= pdev->dev.dma_mask;
++	musb->dev.dma_mask		= &pdev->dev.coherent_dma_mask;
+ 	musb->dev.coherent_dma_mask	= pdev->dev.coherent_dma_mask;
+ 
+ 	glue->dev			= &pdev->dev;
 -- 
 1.7.10.4
