@@ -1,82 +1,25 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 23 Apr 2013 22:00:06 +0400
-Subject: [PATCH v3 4/4] ARM: shmobile: BOCK-W: enable USB in defconfig
-In-Reply-To: <20130422040043.GJ15680@verge.net.au>
-References: <201304170135.10251.sergei.shtylyov@cogentembedded.com>
- <20130418140552.GO20929@verge.net.au> <5170789D.5020108@cogentembedded.com>
- <20130419021414.GB25718@verge.net.au> <5171A7D8.2010000@cogentembedded.com>
- <20130422040043.GJ15680@verge.net.au>
-Message-ID: <5176CC26.8010705@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 23 Apr 2013 11:01:46 -0700
+Subject: [PATCH 05/21] ARM: OMAP2+: add dependencies on ARCH_MULTI_V6/V7
+In-Reply-To: <1366734653-488286-6-git-send-email-arnd@arndb.de>
+References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
+ <1366734653-488286-6-git-send-email-arnd@arndb.de>
+Message-ID: <20130423180146.GI10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+* Arnd Bergmann <arnd@arndb.de> [130423 09:36]:
+> CONFIG_ARCH_OMAP2PLUS depends on (ARCH_MULTI_V6 || ARCH_MULTI_V7) as of
+> a0694861 "ARM: OMAP2+: Enable ARCH_MULTIPLATFORM support", but the
+> individual OMAP2/3/4/5 and AM33XX platforms can all be selected independent
+> of what we are building for, which is a bug and prevents us from easily
+> building e.g. an ARMv7-only defconfig.
+> 
+> This makes ARCH_OMAP2 depend on ARCH_MULTI_V6 and the others depend on
+> ARCH_MULTI_V7, to ensure we really only build the platforms for the
+> CPUs we have enabled in the global multiplatform configuration step.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-On 04/22/2013 08:00 AM, Simon Horman wrote:
-
->>>>>> Enable USB platform EHCI/OHCI and common PHY drivers in 'bockw_defconfig'.
->>>>>> Enable USB storage driver and SCSI disk driver that it needs as well...
->>>>>>
->>>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>>> I realise that this is not going to be useful until the rest
->>>>> of the series has been merged. But regardless I have pre-emptively
->>>>> queued it up for v3.11 in the defconfig-bockw branch.
->>>>>> ---
->>>>>>   arch/arm/configs/bockw_defconfig |   11 ++++++++++-
->>>>>>   1 file changed, 10 insertions(+), 1 deletion(-)
->>>>>>
->>>>>> Index: renesas/arch/arm/configs/bockw_defconfig
->>>>>> ===================================================================
->>>>>> --- renesas.orig/arch/arm/configs/bockw_defconfig
->>>>>> +++ renesas/arch/arm/configs/bockw_defconfig
->>>>>> @@ -48,6 +48,8 @@ CONFIG_DEVTMPFS_MOUNT=y
->>>>>>   # CONFIG_STANDALONE is not set
->>>>>>   # CONFIG_PREVENT_FIRMWARE_BUILD is not set
->>>>>>   # CONFIG_FW_LOADER is not set
->>>>>> +CONFIG_SCSI=y
->>>>>> +CONFIG_BLK_DEV_SD=y
->>>>>>   CONFIG_NETDEVICES=y
->>>>>>   # CONFIG_NET_CADENCE is not set
->>>>>>   # CONFIG_NET_VENDOR_BROADCOM is not set
->>>>>> @@ -71,7 +73,14 @@ CONFIG_SERIAL_SH_SCI_NR_UARTS=6
->>>>>>   CONFIG_SERIAL_SH_SCI_CONSOLE=y
->>>>>>   # CONFIG_HW_RANDOM is not set
->>>>>>   # CONFIG_HWMON is not set
->>>>>> -# CONFIG_USB_SUPPORT is not set
->>>>>> +CONFIG_USB=y
->>>>>> +CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
->>>>>> +CONFIG_USB_EHCI_HCD=y
->>>>>> +CONFIG_USB_OHCI_HCD=y
->>>>>> +CONFIG_USB_OHCI_HCD_PLATFORM=y
->>>>>> +CONFIG_USB_EHCI_HCD_PLATFORM=y
->>>>>> +CONFIG_USB_STORAGE=y
->>>>>> +CONFIG_USB_RCAR_PHY=y
->>>>>>
->>>>     Unfortunately, you've made a mistake in this last line of the patch:
->>>> you've truncated it to just "CONFIG_USB_RCAR". :-(
->>>>     Will you correct it?
->>> Sorry about that, I will fix it.
->>      Sorry to say, but you fixed it the wrong way; now it's:
->>
->> +CONFIG_USB_RCAR=y
->>
->> instead of:
->>
->> +CONFIG_USB_RCAR_PHY=y
-> Sorry for my carelessness.
-> I will forcibly push the following:
->
->  From 26b78f5c9ad1e4809f6d0a5547e4eab222f53f23 Mon Sep 17 00:00:00 2001
-> From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Date: Wed, 17 Apr 2013 01:35:09 +0400
-> Subject: [PATCH] ARM: shmobile: BOCK-W: enable USB in defconfig
->
-> Enable USB platform EHCI/OHCI and common PHY drivers in 'bockw_defconfig'.
-> Enable USB storage driver and SCSI disk driver that it needs as well...
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-    Third time's a charm, as they say. :-)
-
-WBR, Sergei
+Acked-by: Tony Lindgren <tony@atomide.com>
