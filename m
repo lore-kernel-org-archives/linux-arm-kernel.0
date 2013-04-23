@@ -1,59 +1,30 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 23 Apr 2013 20:40:19 +0530
-Subject: Multiple issues with omap4 panda es in linux next
-In-Reply-To: <20130422180316.GA10155@atomide.com>
-References: <20130419171318.GK10155@atomide.com> <5174F7A8.7070308@ti.com>
- <20130422180316.GA10155@atomide.com>
-Message-ID: <5176A45B.5@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 23 Apr 2013 19:11:55 +0400
+Subject: [PATCH v6 0/9] Reorganize R8A7779/Marzen USB code
+Message-ID: <201304231911.56202.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hello.
 
-On Monday 22 April 2013 11:33 PM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [130422 01:46]:
->> Hi,
->>
->> On Friday 19 April 2013 10:43 PM, Tony Lindgren wrote:
->>> Hi all,
->>>
->>> Here's a list of breakage I've noticed so far while trying to
->>> use linux next on my pandaboard es. Probably similar issues exist
->>> on other boards as well.
->>>
->>> Ideally we would not have any breakage by the merge window, so
->>> let's try to get these fixed ASAP:
->>>
->>> 1. Serial console broken on panda es booting with DT
->>>
->>> The symptoms are dmesg output stopping after few lines
->>> and only continuing after pressing a key. Does not seem to
->>> happen on blaze with DT for some reason. And does not happen
->>> on panda es with legacy booting.
->>>
->>> 2. MUSB fails with legacy booting and DT on panda es
->>>
->>> With both legacy and DT booting I get something like:
->>>
->>> HS USB OTG: no transceiver configured
->>> musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
->>
->> The dt should work fine with https://patchwork.kernel.org/patch/2423061/.
->
-> OK thanks for checking that.
->
->> But non-dt has got a real issue. We were using usb_bind_phy() for
->> binding the controller with the PHY (we use device names). But in
->> linux-next the device names have changed because of using
->> PLATFORM_DEVID_AUTO. We can modify the usb_bind_phy() calls to use
->> the new device names, But I suspect the device names can change
->> again. Not sure what we can do here :-(
->
-> Let's do a minimal fix for v3.10. Then we'll make omap4 DT only for
-> v3.11 and that problem is solved for good.
+   Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
+'renesas-next-20130422' tag.  It was created to fix the shortcomings in the
+R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
+spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
+to touch both subtrees). The patches were conceived with the complete
+bisectability goal in mind.
 
-Have posted a patch https://patchwork.kernel.org/patch/2475521/ for 
-getting MUSB functional in omap4 panda.
+[1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+[2/9] ehci-platform: add pre_setup() method to platform data
+[3/9] ARM: shmobile: r8a7779: setup EHCI internal buffer
+[4/9] rcar-phy: remove EHCI internal buffer setup
+[5/9] ARM: shmobile: r8a7779: remove USB PHY 2nd memory resource
+[6/9] rcar-phy: correct base address
+[7/9] rcar-phy: add platform data
+[8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
+[9/9] rcar-phy: handle platform data
 
-Thanks
-Kishon
+   Felipe, please ACK or NAK the rcar-phy patches ASAP. It's time consuming for
+me to keep all these patches fresh atop of ever changing 'next' branch....
+
+WBR, Sergei
