@@ -1,30 +1,37 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 23 Apr 2013 19:11:55 +0400
-Subject: [PATCH v6 0/9] Reorganize R8A7779/Marzen USB code
-Message-ID: <201304231911.56202.sergei.shtylyov@cogentembedded.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Apr 2013 17:14:06 +0200
+Subject: [PATCH 06/10] usb: musb: ux500: add device tree probing support
+In-Reply-To: <1366729394-11406-7-git-send-email-lee.jones@linaro.org>
+References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
+ <1366729394-11406-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <201304231714.06326.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tuesday 23 April 2013, Lee Jones wrote:
+> +Required properties:
+> + - compatible : Should be "stericsson,db8500-musb"
+> + - reg        : Offset and length of registers
+> + - interrupts : Interrupt; mode, number and trigger
+> + - mode       : One of; "host", "otg", or "peripheral"
 
-   Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
-'renesas-next-20130422' tag.  It was created to fix the shortcomings in the
-R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
-spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
-to touch both subtrees). The patches were conceived with the complete
-bisectability goal in mind.
+I think we don't have any precedent for this combination of "mode" property
+and contents. You could either try to match ehci-omap.txt and do
 
-[1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
-[2/9] ehci-platform: add pre_setup() method to platform data
-[3/9] ARM: shmobile: r8a7779: setup EHCI internal buffer
-[4/9] rcar-phy: remove EHCI internal buffer setup
-[5/9] ARM: shmobile: r8a7779: remove USB PHY 2nd memory resource
-[6/9] rcar-phy: correct base address
-[7/9] rcar-phy: add platform data
-[8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
-[9/9] rcar-phy: handle platform data
+ - mode : Should be "3" to represent OTG. "1" signifies HOST and "2"
+   represents PERIPHERAL.
 
-   Felipe, please ACK or NAK the rcar-phy patches ASAP. It's time consuming for
-me to keep all these patches fresh atop of ever changing 'next' branch....
+Or you match fsl-usb.txt and nvidia,tegra20-ehci.txt, defining
 
-WBR, Sergei
+ - dr_mode : dual role mode. Indicates the working mode to
+   controllers.  Can be "host", "peripheral", or "otg".  Default to
+   "host" if not defined for backward compatibility.
+
+> +Optional properties:
+> + - dmas       : A list of dma channels;
+> +                dma-controller, event-line, fixed-channel, flags
+> + - dma-names  : An ordered list of channel names affiliated to the above
+
+Please list the exact dma-names that are required.
+
+	Arnd
