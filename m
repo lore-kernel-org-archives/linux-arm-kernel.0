@@ -1,45 +1,48 @@
-From: vinayakm.list@gmail.com (vinayakm.list at gmail.com)
-Date: Tue, 23 Apr 2013 06:58:26 +0530
-Subject: [PATCH v2] mm: add an option to disable bounce
-Message-ID: <1366680506-2812-1-git-send-email-vinayakm.list@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 23 Apr 2013 03:48:58 +0200
+Subject: [PATCH 1/3] mmc: mvsdio: Support inverted CD and WP GPIO lines
+In-Reply-To: <87sj2iteue.fsf@octavius.laptop.org>
+References: <1366660500-26835-1-git-send-email-gmbnomis@gmail.com>
+ <1366660500-26835-2-git-send-email-gmbnomis@gmail.com>
+ <87wqrutjss.fsf@octavius.laptop.org>
+ <20130422203723.GI29947@lunn.ch>
+ <20130422210949.GJ25724@titan.lakedaemon.net>
+ <20130422214543.GJ29947@lunn.ch>
+ <87sj2iteue.fsf@octavius.laptop.org>
+Message-ID: <20130423034858.28c7f99c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vinayak Menon <vinayakm.list@gmail.com>
+Dear Chris Ball,
 
-There are times when HIGHMEM is enabled, but
-we don't prefer CONFIG_BOUNCE to be enabled.
-CONFIG_BOUNCE can reduce the block device
-throughput, and this is not ideal for machines
-where we don't gain much by enabling it. So
-provide an option to deselect CONFIG_BOUNCE. The
-observation was made while measuring eMMC throughput
-using iozone on an ARM device with 1GB RAM.
+On Mon, 22 Apr 2013 17:50:17 -0400, Chris Ball wrote:
 
-Signed-off-by: Vinayak Menon <vinayakm.list@gmail.com>
----
- mm/Kconfig |    8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+> On Mon, Apr 22 2013, Andrew Lunn wrote:
+> >> Nothing else really jumps out though.  Where either of these what you
+> >> were thinking of?
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138514.html
+> >
+> > and
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138513.html
+> 
+> These patches move mvsdio to slot-gpio, which is a prerequisite for
+> using the shared mmc_of_parse(), but they don't go all the way to
+> using mmc_of_parse().
+> 
+> (Which makes sense; mmc_of_parse() was merged to mmc-next in February,
+> so it wasn't available for this patchset in December.)
 
-diff --git a/mm/Kconfig b/mm/Kconfig
-index 3bea74f..e742d06 100644
---- a/mm/Kconfig
-+++ b/mm/Kconfig
-@@ -263,8 +263,14 @@ config ZONE_DMA_FLAG
- 	default "1"
- 
- config BOUNCE
--	def_bool y
-+	bool "Enable bounce buffers"
-+	default y
- 	depends on BLOCK && MMU && (ZONE_DMA || HIGHMEM)
-+	help
-+	  Enable bounce buffers for devices that cannot access
-+	  the full range of memory available to the CPU. Enabled
-+	  by default when ZONE_DMA or HIGHMEM is selected, but you
-+	  may say n to override this.
- 
- # On the 'tile' arch, USB OHCI needs the bounce pool since tilegx will often
- # have more than 4GB of memory, but we don't currently use the IOTLB to present
+Correct. I used the slot-gpio infrastructure in mvsdio, but I wasn't
+aware of the new mmc_of_parse() thing, and I don't have any patch that
+converts mvsdio to use it for the moment.
+
+Best regards,
+
+Thomas
 -- 
-1.7.10.4
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
