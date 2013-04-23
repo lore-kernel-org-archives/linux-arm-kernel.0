@@ -1,57 +1,69 @@
 From: cedric@precidata.com (Cedric Berger)
-Date: Tue, 23 Apr 2013 10:02:19 +0200 (CEST)
-Subject: [PATCH 3/10] LPC32XX: 003-mmc.2: Cleanup,
- Don't access private fields in MMC controller (V2)
-Message-ID: <mailman.1.1366704159.1125.linux-arm-kernel@lists.infradead.org>
+Date: Tue, 23 Apr 2013 10:02:17 +0200 (CEST)
+Subject: [PATCH 1/10] LPC32XX: 001-mmc.2: Define + Implement DMA_FORCE_BURST
+ for pl08x (V2)
+Message-ID: <mailman.2.1366704174.1125.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mmci_set_clkreg() function violates its general contract by accessing
-directly private host->mmc fields. This prevents us from implementing a MUX
-on top of this driver. Fix that by changing slightly the function prototype.
+To implement the MMC driver on LPC32xx (and other silicon using PL08x+PL18x),
+we need a way to force a DMA burst by software. This patch defines a new
+DMA_FORCE_BURST hook and implements it for the pl08x.c
 
 Signed-off-by: Gabriele Mondada <gabriele@precidata.com>
 ---
 
-Index: drivers/mmc/host/mmci.c
+Index: include/linux/dmaengine.h
 ===================================================================
---- drivers/mmc/host/mmci.c	(revision 1726)
-+++ drivers/mmc/host/mmci.c	(revision 1727)
-@@ -207,10 +207,11 @@
- /*
-  * This must be called with host->lock held
+--- include/linux/dmaengine.h	(revision 1688)
++++ include/linux/dmaengine.h	(revision 1736)
+@@ -208,6 +208,7 @@
+  * argument of struct dma_slave_config must be passed in with this
+  * command.
+  * @FSLDMA_EXTERNAL_START: this command will put the Freescale DMA controller
++ * @DMA_FORCE_BURST: force DMA burst
+  * into external start mode.
   */
--static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
-+static void mmci_set_clkreg(struct mmci_host *host, struct mmc_ios *ios)
+ enum dma_ctrl_cmd {
+@@ -216,6 +217,7 @@
+ 	DMA_RESUME,
+ 	DMA_SLAVE_CONFIG,
+ 	FSLDMA_EXTERNAL_START,
++	DMA_FORCE_BURST,
+ };
+ 
+ /**
+Index: drivers/dma/amba-pl08x.c
+===================================================================
+--- drivers/dma/amba-pl08x.c	(revision 1688)
++++ drivers/dma/amba-pl08x.c	(revision 1736)
+@@ -448,6 +448,19 @@
+ 	writel(1 << ch->id, pl08x->base + PL080_TC_CLEAR);
+ }
+ 
++/*
++ * simulate a DMA request by software, generating a burst transfer
++ */
++static void pl08x_force_burst(struct pl08x_dma_chan *plchan)
++{
++	struct pl08x_driver_data *pl08x = plchan->host;
++
++	dev_dbg(&pl08x->adev->dev, "force burst signal=%d plchan=%p\n",
++		plchan->signal, plchan);
++	if (plchan->signal >= 0)
++		writel(1 << plchan->signal, pl08x->base + PL080_SOFT_BREQ);
++}
++
+ static inline u32 get_bytes_in_cctl(u32 cctl)
  {
- 	struct variant_data *variant = host->variant;
- 	u32 clk = variant->clkreg;
-+	unsigned int desired = ios->clock;
- 
- 	if (desired) {
- 		if (desired >= host->mclk) {
-@@ -246,12 +247,12 @@
- 		/* clk |= MCI_CLK_PWRSAVE; */
- 	}
- 
--	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_4)
-+	if (ios->bus_width == MMC_BUS_WIDTH_4)
- 		clk |= MCI_4BIT_BUS;
--	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_8)
-+	if (ios->bus_width == MMC_BUS_WIDTH_8)
- 		clk |= MCI_ST_8BIT_BUS;
- 
--	if (host->mmc->ios.timing == MMC_TIMING_UHS_DDR50)
-+	if (ios->timing == MMC_TIMING_UHS_DDR50)
- 		clk |= MCI_ST_UX500_NEG_EDGE;
- 
- 	mmci_write_clkreg(host, clk);
-@@ -1319,7 +1320,7 @@
- 
- 	spin_lock_irqsave(&host->lock, flags);
- 
--	mmci_set_clkreg(host, ios->clock);
-+	mmci_set_clkreg(host, ios);
- 	mmci_write_pwrreg(host, pwr);
- 
- 	spin_unlock_irqrestore(&host->lock, flags);
+ 	/* The source width defines the number of bytes */
+@@ -1574,6 +1587,9 @@
+ 		pl08x_resume_phy_chan(plchan->phychan);
+ 		plchan->state = PL08X_CHAN_RUNNING;
+ 		break;
++	case DMA_FORCE_BURST:
++		pl08x_force_burst(plchan);
++		break;
+ 	default:
+ 		/* Unknown command */
+ 		ret = -ENXIO;
