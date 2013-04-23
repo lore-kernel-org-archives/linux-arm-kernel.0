@@ -1,122 +1,89 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 23 Apr 2013 21:13:29 +0400
-Subject: [PATCH v3 3/4] ARM: shmobile: Marzen: add VIN and ADV7180 support
-In-Reply-To: <201304232106.45889.sergei.shtylyov@cogentembedded.com>
-References: <201304232106.45889.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201304232113.30512.sergei.shtylyov@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 23 Apr 2013 10:14:38 -0700
+Subject: [GIT PULL] omap dss board clean-up for v3.10 merge window
+In-Reply-To: <5174F593.20705@ti.com>
+References: <20130418033936.GC10155@atomide.com>
+ <20130419184518.GA30836@quad.lixom.net> <5174F593.20705@ti.com>
+Message-ID: <20130423171438.GC10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [130422 01:37]:
+> On 2013-04-19 21:45, Olof Johansson wrote:
+> > Hi,
+> > 
+> > On Wed, Apr 17, 2013 at 08:39:37PM -0700, Tony Lindgren wrote:
+> >> The following changes since commit 07961ac7c0ee8b546658717034fe692fd12eefa9:
+> >>
+> >>   Linux 3.9-rc5 (2013-03-31 15:12:43 -0700)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/dss-signed
+> > 
+> > 
+> > Merged, but not happy about it.
+> 
+> Thanks.
+> 
+> > As mentioned on IRC, I was going to let this one be until 3.11, but it sounds
+> > like it will cause regressions in DSS if we don't merge it.
+> 
+> Yes, that's true. The branch has been unchanged and in linux-next, so
+> merging it late shouldn't cause any bigger issues. But I understand it's
+> quite late, and I should've pushed the branch forward much earlier.
+> Sorry about that.
+> 
+> > This is an indication that the work wasn't done right on the DSS rework.
+> > Ideally the old configurations through platform_data should have been left in
+> > for a release to give the boards a window to convert over without regressing
+> > functionality. Tomi, please don't do it this way in the future since it's
+> > painful for everybody to deal with.
+> 
+> I've been trying to keep everything working even if parts of the whole
+> series go through different trees. I've been very strict on that things
+> must compile, but keeping display working if only half of the series is
+> merged is rather difficult at times.
+> 
+> For this series, I think it could've been done, but it would have
+> required adding hacks, or some kind of "bool new_pdata" fields so that
+> the driver understand what to do. And duplicate code to manage the
+> different platform data versions.
+> 
+> In the near future we'll get rid of the current custom omapdss panel
+> device, and use the standard platform/i2c/etc devices for the panel. The
+> only way to do that while keeping everything running is to clone the
+> panel drivers, one handling the old one and the other handling the new one.
+> 
+> All this makes me spend lots of time doing extra work, that in no way
+> improves the driver. Its only for the purpose of getting arch changes
+> through one tree, and driver changes through the other. And this makes
+> the patches much more difficult to follow, as the related changes are in
+> separate series, and there may be extra crud just to handle this separation.
+> 
+> So while I think it is a good habit to push the arch changes and driver
+> changes separately, my question is, should that rule be followed to the
+> extreme? Can I just keep all the changes in one branch if separating the
+> arch and driver changes would end up with cloning files or lots of extra
+> code?
 
-Add ADV7180 platform devices on the Marzen board, configure VIN1/3 pins, and
-register VIN1/3 devices with the ADV7180 specific platform data.
-
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-[Sergei: removed superfluous tabulation and inserted empty lines in the  macro
-definition, updated the copyrights, annotated VIN platform data as '__initdata']
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
-Changes since version 2:
-- annotated 'vin_platform_data' as '__initdata' since they're kmemdup()'ed while
-  registering the platform devices anyway.
-
-Changes since the original posting:
-- used a macro to define the camera platform devices;
-- updated the copyrights;
-- refreshed the patch.
-
- arch/arm/mach-shmobile/board-marzen.c |   44 +++++++++++++++++++++++++++++++++-
- 1 file changed, 43 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/mach-shmobile/board-marzen.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-marzen.c
-+++ renesas/arch/arm/mach-shmobile/board-marzen.c
-@@ -1,8 +1,9 @@
- /*
-  * marzen board support
-  *
-- * Copyright (C) 2011  Renesas Solutions Corp.
-+ * Copyright (C) 2011, 2013  Renesas Solutions Corp.
-  * Copyright (C) 2011  Magnus Damm
-+ * Copyright (C) 2013  Cogent Embedded, Inc.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -37,6 +38,7 @@
- #include <linux/mmc/host.h>
- #include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/mfd/tmio.h>
-+#include <media/soc_camera.h>
- #include <mach/hardware.h>
- #include <mach/r8a7779.h>
- #include <mach/common.h>
-@@ -178,12 +180,40 @@ static struct platform_device leds_devic
- 	},
- };
+Shread branches are just fine. In most cases it's possible to add new
+pdata and then remove the old pdata later on with follow-up patches.
  
-+static struct rcar_vin_platform_data vin_platform_data __initdata = {
-+	.flags	= RCAR_VIN_BT656,
-+};
-+
-+#define MARZEN_CAMERA(idx)					\
-+static struct i2c_board_info camera##idx##_info = {		\
-+	I2C_BOARD_INFO("adv7180", 0x20 + (idx)),		\
-+};								\
-+								\
-+static struct soc_camera_link iclink##idx##_adv7180 = {		\
-+	.bus_id		= 1 + 2 * (idx),			\
-+	.i2c_adapter_id	= 0,					\
-+	.board_info	= &camera##idx##_info,			\
-+};								\
-+								\
-+static struct platform_device camera##idx##_device = {		\
-+	.name	= "soc-camera-pdrv",				\
-+	.id	= idx,						\
-+	.dev	= {						\
-+		.platform_data	= &iclink##idx##_adv7180,	\
-+	},							\
-+};
-+
-+MARZEN_CAMERA(0);
-+MARZEN_CAMERA(1);
-+
- static struct platform_device *marzen_devices[] __initdata = {
- 	&eth_device,
- 	&sdhi0_device,
- 	&thermal_device,
- 	&hspi_device,
- 	&leds_device,
-+	&camera0_device,
-+	&camera1_device,
- };
- 
- static const struct pinctrl_map marzen_pinctrl_map[] = {
-@@ -219,6 +249,16 @@ static const struct pinctrl_map marzen_p
- 	/* USB2 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform.1", "pfc-r8a7779",
- 				  "usb2", "usb2"),
-+	/* VIN1 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.1", "pfc-r8a7779",
-+				  "vin1_clk", "vin1"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.1", "pfc-r8a7779",
-+				  "vin1_data8", "vin1"),
-+	/* VIN3 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.3", "pfc-r8a7779",
-+				  "vin3_clk", "vin3"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.3", "pfc-r8a7779",
-+				  "vin3_data8", "vin3"),
- };
- 
- static void __init marzen_init(void)
-@@ -235,6 +275,8 @@ static void __init marzen_init(void)
- 
- 	r8a7779_add_standard_devices();
- 	r8a7779_add_usb_phy_device(&usb_phy_platform_data);
-+	r8a7779_add_vin_device(1, &vin_platform_data);
-+	r8a7779_add_vin_device(3, &vin_platform_data);
- 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
- }
- 
+> Of course, I don't know what DRM maintainer thinks of merging arch
+> changes through his tree, so that's also open.
+
+No let's not go there, Linus T already complained about the conflicts
+between drivers/net and arch/arm/*omap*/ code few merge windows ago.
+We need to remove the driver dependencies to the arch/arm code, otherwise
+the merging requires way too much work from multiple maintainers. That
+does not scale well and often leads into merge errors that could have
+been avoided in the first place.
+
+Of course the real solution here is to get things moved over to DT
+based booting and then we don't have any of these dependencies as the
+.dts changes can get merged separately from the driver changes.
+
+Regards,
+
+Tony
