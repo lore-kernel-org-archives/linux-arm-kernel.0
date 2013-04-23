@@ -1,42 +1,39 @@
 From: vkale@apm.com (Vinayak Kale)
-Date: Tue, 23 Apr 2013 15:55:57 +0530
-Subject: [PATCH V2 2/4] arm64: Enable APM X-Gene SOC family in the defconfig
+Date: Tue, 23 Apr 2013 15:55:58 +0530
+Subject: [PATCH V2 3/4] arm64: Add defines for APM ARMv8 implementation
 In-Reply-To: <1366712759-3431-1-git-send-email-vkale@apm.com>
 References: <1366712759-3431-1-git-send-email-vkale@apm.com>
-Message-ID: <1366712759-3431-3-git-send-email-vkale@apm.com>
+Message-ID: <1366712759-3431-4-git-send-email-vkale@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables APM X-Gene SOC family in the defconfig. It also enables 8250 serial driver needed by X-Gene SOC family.
+This patch adds defines for APM CPU implementer ID and APM CPU part numbers in asm/cputype.h
 
 Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
 Signed-off-by: Loc Ho <lho@apm.com>
 Signed-off-by: Feng Kan <fkan@apm.com>
 ---
- arch/arm64/configs/defconfig |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ arch/arm64/include/asm/cputype.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 09bef29..7dfad0a 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -23,6 +23,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_XGENE=y
- CONFIG_SMP=y
- CONFIG_PREEMPT_VOLUNTARY=y
- CONFIG_CMDLINE="console=ttyAMA0"
-@@ -52,6 +53,9 @@ CONFIG_INPUT_EVDEV=y
- # CONFIG_SERIO_I8042 is not set
- # CONFIG_SERIO_SERPORT is not set
- CONFIG_LEGACY_PTY_COUNT=16
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_OF_PLATFORM=y
- # CONFIG_HW_RANDOM is not set
- # CONFIG_HWMON is not set
- CONFIG_FB=y
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index cf27494..5fe138e 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -37,11 +37,14 @@
+ })
+ 
+ #define ARM_CPU_IMP_ARM		0x41
++#define ARM_CPU_IMP_APM		0x50
+ 
+ #define ARM_CPU_PART_AEM_V8	0xD0F0
+ #define ARM_CPU_PART_FOUNDATION	0xD000
+ #define ARM_CPU_PART_CORTEX_A57	0xD070
+ 
++#define APM_CPU_PART_POTENZA	0x0000
++
+ #ifndef __ASSEMBLY__
+ 
+ /*
 -- 
 1.7.4.1
