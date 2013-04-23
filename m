@@ -1,37 +1,44 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 23 Apr 2013 17:11:48 -0400 (EDT)
-Subject: [PATCH v4 00/15] multi-cluster power management
-In-Reply-To: <20130423200429.GF5316@n2100.arm.linux.org.uk>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <20130423200429.GF5316@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.03.1304231703390.17375@syhkavp.arg>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Tue, 23 Apr 2013 23:22:25 +0200
+Subject: [PATCH 1/3] mmc: mvsdio: Support inverted CD and WP GPIO lines
+In-Reply-To: <87sj2iteue.fsf@octavius.laptop.org>
+References: <1366660500-26835-1-git-send-email-gmbnomis@gmail.com>
+ <1366660500-26835-2-git-send-email-gmbnomis@gmail.com>
+ <87wqrutjss.fsf@octavius.laptop.org>
+ <20130422203723.GI29947@lunn.ch>
+ <20130422210949.GJ25724@titan.lakedaemon.net>
+ <20130422214543.GJ29947@lunn.ch>
+ <87sj2iteue.fsf@octavius.laptop.org>
+Message-ID: <20130423212224.GA29507@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Apr 2013, Russell King - ARM Linux wrote:
+Hi Chris, Guennadi,
 
-> That all said, my biggest concern so far from this set is the independent
-> issue of moving the cache handling into generic code, so that we avoid
-> the existing problem where every platform ends up implementing that stuff
-> time and time again - and the impact that will have on this MCPM code.
+On Mon, Apr 22, 2013 at 05:50:17PM -0400, Chris Ball wrote:
+> Hi,
 > 
-> Currently as I see it, the two things are mutually incompatible with
-> each other - and having discussed with Will, we'd come to the conclusion
-> that I'd merge what I had because the comments alone on how the cpu
-> hotplug stuff is supposed to work are a valuable improvement, even
-> though the code changes don't completely solve all the issues.
+> On Mon, Apr 22 2013, Andrew Lunn wrote:
+> >> Nothing else really jumps out though.  Where either of these what you
+> >> were thinking of?
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138514.html
+> >
+> > and
+> >
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138513.html
 > 
-> However, MCPMm gets in the way of that.  So... that presents a dilema...
-> it's a case of this or that but not both.  Or do you think MCPM can
-> survive with additional LOUIS flushing before the cpu die callback is
-> called?
+> These patches move mvsdio to slot-gpio, which is a prerequisite for
+> using the shared mmc_of_parse(), but they don't go all the way to
+> using mmc_of_parse().
 
-We can have both for now.  MCPM most certainly can survive it.
+That's nice functionality, I was not aware of that. I will convert this
+to mmc_of_parse() once I find some time.
 
-The cache should be mostly clean when the machine backend flushes up to 
-LOUIS in that case so that shouldn't be very costly to do it again. And 
-the removing of a CPU via the hotplug path is hardly a performance 
-critical operation.
+One question already: Why does mmc_of_parse() not return errors to
+the caller?  If, for example, a GPIO line was given for CD in the DT,
+but it could not be obtained, shouldn't the caller at least have the
+possibility to handle this as an error?  (mvsdio currently
+aborts the probe if it can't get the GPIO line).
 
-
-Nicolas
+- Simon
