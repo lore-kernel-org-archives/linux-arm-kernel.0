@@ -1,41 +1,32 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Tue, 23 Apr 2013 21:55:48 +0200
-Subject: [PATCH 14/21] staging: nvec: allow modular build
-In-Reply-To: <201304232141.04123.arnd@arndb.de>
-References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
- <4082180.JXNz6TsAKc@ax5200p> <201304232141.04123.arnd@arndb.de>
-Message-ID: <1373204.GiWOFfjzyB@ax5200p>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 23 Apr 2013 15:56:35 -0400 (EDT)
+Subject: [PATCH v4 15/15] ARM: vexpress: Select multi-cluster SMP operation
+ if required
+In-Reply-To: <20130423194237.GE5316@n2100.arm.linux.org.uk>
+References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+ <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
+ <20130423194237.GE5316@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.03.1304231554560.17375@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 April 2013 21:41:03 Arnd Bergmann wrote:
-> On Tuesday 23 April 2013, Marc Dietrich wrote:
-> > On Tuesday 23 April 2013 18:30:46 Arnd Bergmann wrote:
-> > > The serio code can be a loadable module, which in turn means that nvec
-> > > also has to be a module, so mark it as "tristate" in Kconfig.
-> > 
-> > oh, I didn't saw this randconfig error posting. NVEC isn't prepared for
-> > modularized builds yet (it's on the TODO list though). So better say
-> > SERIO=y here. Looking a bit closer, there is other stuff which can also
-> > be a module (GPIOLIB, I2C, ...) so these also need a =y.
+On Tue, 23 Apr 2013, Russell King - ARM Linux wrote:
+
+> On Tue, Feb 05, 2013 at 12:22:12AM -0500, Nicolas Pitre wrote:
+> > +void __init vexpress_smp_init_ops(void)
+> > +{
+> > +	struct smp_operations *ops = &vexpress_smp_ops;
+> > +#ifdef CONFIG_CLUSTER_PM
+> > +	extern struct smp_operations mcpm_smp_ops;
+> > +	if(of_find_compatible_node(NULL, NULL, "arm,cci"))
+> > +		ops = &mcpm_smp_ops;
 > 
-> What is the problem with building it as a module? It looks all fine in that
-> regard.
+> Hmm, so these patches haven't been subjected to checkpatch treatment?
+> As a seasoned kernel programmer, I'm surprised you haven't checked that
+> already.
 
-It builds, but I haven't tried out it yet. At least the mfd children need to 
-unregister the event notifier I guess. Anyway, I have no time to test this 
-now, so I prefer to force =y for the dependencies for now.
+They have and fixes applied, although after this set was posted.  I 
+didn't think it was worth a repost.
 
-> I also did not see any problems with the other symbols, but that may be
-> because they get turned on as built-in even in allmodconfig. Marking it
-> as tristate certainly avoids the problem altogether.
-> 
-> > Should a post a patch?
-> 
-> If you have follow-on patches, they need to go on top now, since Greg
-> already took this patch.
 
-arrr, I wonder why Greg thought that a 4 minute review time is enough :-(
-I'll try to post a patch tomorrow then.
-
-Marc
+Nicolas
