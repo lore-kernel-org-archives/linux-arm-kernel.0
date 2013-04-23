@@ -1,121 +1,27 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 23 Apr 2013 14:00:26 +0200
-Subject: [V4 patch 00/15] cpuidle: code consolidation
-In-Reply-To: <1366707285-12179-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1366707285-12179-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1575993.FIabeJeWGY@vostro.rjw.lan>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Apr 2013 14:00:11 +0200
+Subject: [PATCH 1/2] pinctrl: s3c64xx: Fix build error caused by undefined
+ chained_irq_enter
+In-Reply-To: <30362001.FF4K7WsZvh@flatron>
+References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
+ <20130416163331.GP26958@opensource.wolfsonmicro.com>
+ <30362001.FF4K7WsZvh@flatron>
+Message-ID: <CACRpkdZ_9K-=4C7ksScqoX3WeF0LyPrzkCS6iMG6u_mCNnWRWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, April 23, 2013 10:54:30 AM Daniel Lezcano wrote:
-> This patchset series provide some code consolidation across the different
-> cpuidle drivers. It contains two parts, the first one is the removal of
-> the time keeping flag and the second one, is a common initialization routine.
-> 
-> All the drivers use the en_core_tk_irqen flag, which means it is not necessary
-> to make the time computation optional. We can remove this flag and assume the
-> cpuidle framework always manage this operation.
-> 
-> The cpuidle code initialization is duplicated across the different drivers in
-> the same manner.
-> 
-> The repeating pattern is:
-> 
-> SMP:
-> 
-> cpuidle_register_driver(drv);
-> for_each_possible_cpu(cpu) {
->         dev = per_cpu(cpuidle_device, cpu);
->         cpuidle_register_device(dev);
-> }
-> 
-> UP:
-> 
-> cpuidle_register_driver(drv);
-> cpuidle_register_device(dev);
-> 
-> As on a UP machine the macro 'for_each_cpu' is a one iteration loop, using the
-> initialization loop from SMP to UP works.
-> 
-> The patchset does some cleanup for different drivers in order to make the init
-> code the same. Then it introduces a generic function:
-> 
->   cpuidle_register(struct cpuidle_driver *drv, struct cpumask *cpumask)
-> 
-> The cpumask is for the coupled idle states.
-> 
-> The drivers are then modified to take into account this new function and
-> to remove the duplicated code.
-> 
-> The benefit is observable in the diffstat: 332 lines of code removed.
-> 
-> Changelog:
->  - V4:
->    * Added the different Acked-by and Reviewed-by
->    * Removed the patches already merged:
->      * ARM: shmobile: cpuidle: remove shmobile_enter_wfi function
->      * ARM: shmobile: cpuidle: remove shmobile_enter_wfi prototype
->      * ARM: OMAP3: remove cpuidle_wrap_enter
->    * Removed patch without acked-by (no answer from the maintainer)
->      * ARM: s3c64xx: cpuidle: use init/exit common routine
-> 
->  - V3:
->    * folded patch 5/19 into 19/19, they were:
->      * ARM: imx: cpuidle: use init/exit common routine
->      * ARM: imx: cpuidle: create separate drivers for imx5/imx6
->    * removed rule to make cpuidle.o in the imx's Makefile
->    * splitted patch 1/19 into two, they are:
->      * [V3 patch 01/19] ARM: shmobile: cpuidle: remove shmobile_enter_wfi
->      * [V3 patch 02/19] ARM: shmobile: cpuidle: remove shmobile_enter_wfi prototype
-> 
->  - V2:
->    * fixed cpumask NULL test for coupled state in cpuidle_register
->    * added comment about structure copy
->    * changed printk by pr_err
->    * folded splitted message
->    * fixed return code in cpuidle_register
->    * updated Documentation/cpuidle/drivers.txt
->    * added in the changelog dev->state_count is filled by cpuidle_enable_device
->    * fixed tag for tegra in the first line patch description
->    * fixed tegra2 removed tegra_tear_down_cpu = tegra20_tear_down_cpu;
-> 
->  - V1: Initial post
-> 
-> Tested-on: u8500
-> Tested-on: at91
-> Tested-on: intel i5
-> Tested-on: OMAP4
-> Tested-by: Kevin Hilman <khilman@linaro.org> # OMAP3, OMAP4
-> Tested-by: Andrew Lunn <andrew@lunn.ch> # Kirkwood
-> 
-> Compiled with and without CPU_IDLE for:
->  u8500, at91, davinci, exynos, imx5, imx6, kirkwood, multi_v7 (for calxeda),
->  omap2plus, s3c64, tegra1, tegra2, tegra3
-> 
-> Daniel Lezcano (15):
->   cpuidle: remove en_core_tk_irqen flag
->   ARM: ux500: cpuidle: replace for_each_online_cpu by
->     for_each_possible_cpu
->   cpuidle: make a single register function for all
->   ARM: ux500: cpuidle: use init/exit common routine
->   ARM: at91: cpuidle: use init/exit common routine
->   ARM: OMAP3: cpuidle: use init/exit common routine
->   ARM: tegra: cpuidle: use init/exit common routine
->   ARM: shmobile: cpuidle: use init/exit common routine
->   ARM: OMAP4: cpuidle: use init/exit common routine
->   ARM: tegra: cpuidle: use init/exit common routine for tegra2
->   ARM: tegra: cpuidle: use init/exit common routine for tegra3
->   ARM: calxeda: cpuidle: use init/exit common routine
->   ARM: kirkwood: cpuidle: use init/exit common routine
->   ARM: davinci: cpuidle: use init/exit common routine
->   ARM: imx: cpuidle: use init/exit common routine
+On Wed, Apr 17, 2013 at 12:23 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 
-Whole series applied.
+> Commit de88cbb7 moved definitions of chained_irq_enter and
+> chained_irq_exit to a generic header, which must be now included instead
+> of the legacy arch-specific one.
+>
+> This patch fixes build error caused by including the legacy header
+> leading to undefined chained_irq_enter and chained_irq_exit symbols.
+>
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-Thanks,
-Rafael
+Patch applied.
 
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Thanks!
+Linus Walleij
