@@ -1,176 +1,88 @@
-From: mfuzzey@parkeon.com (Martin Fuzzey)
-Date: Tue, 23 Apr 2013 11:16:33 +0200
-Subject: [PATCH V4] ARM: i.MX5: Allow DT clock providers
-Message-ID: <20130423091633.22088.58225.stgit@localhost>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 23 Apr 2013 10:26:38 +0100
+Subject: [RFC PATCH v2 12/13] ARM: mach-vt8500: cpus/cpu nodes dts updates
+In-Reply-To: <5175F564.8030405@prisktech.co.nz>
+References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366644455-16550-13-git-send-email-lorenzo.pieralisi@arm.com>
+ <5175F564.8030405@prisktech.co.nz>
+Message-ID: <20130423092637.GC22946@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently clock providers defined in the DT are not registered
-on i.MX5 platforms since of_clk_init() is not called.
+On Tue, Apr 23, 2013 at 03:43:48AM +0100, Tony Prisk wrote:
+> On 23/04/13 03:27, Lorenzo Pieralisi wrote:
+> > This patch updates the in-kernel dts files according to the latest cpus
+> > and cpu bindings updates for ARM.
+> >
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> >   arch/arm/boot/dts/wm8505.dtsi | 2 +-
+> >   1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
+> > index e74a1c0..a470808 100644
+> > --- a/arch/arm/boot/dts/wm8505.dtsi
+> > +++ b/arch/arm/boot/dts/wm8505.dtsi
+> > @@ -13,7 +13,7 @@
+> >   
+> >   	cpus {
+> >   		cpu at 0 {
+> > -			compatible = "arm,arm926ejs";
+> > +			compatible = "arm,arm926";
+> >   		};
+> >   	};
+> >   
+> The more I look at this, the more wrong it is :/
+> 
+>  From the new binding documentation,
+> 
+> +	A cpus node must define the following properties:
+> +
+> +	- #address-cells
+> +		Usage: required
+> +		Value type: <u32>
+> +		Definition: must be set to 1 for 32-bit systems and 2 for
+> +			    64-bit systems
+> +	- #size-cells
+> +		Usage: required
+> +		Value type: <u32>
+> +		Definition: must be set to 0
+> 
+> ...
+> 
+> +- cpu node
+> +
+> +	Description: Describes a CPU in an ARM based system
+> +
+> +	PROPERTIES
+> +
+> +	- device_type
+> +		Usage: required
+> +		Value type: <string>
+> +		Definition: must be "cpu"
+> 
 
-This is not a problem for the SOC's own clocks, which are registered
-in code,  but prevents the DT being used to define clocks for external
-hardware.
+This property is required since DT was invented, again, I should not be
+in charge of adding it.
 
-Fix this by calling of_clk_init() and actually using the DT to obtain
-the 4 SOC fixed clocks.
-These are already defined in the DT but were previously just used to
-manually obtain the rate.
+> Three required properties that aren't present in the patch.
+> 
+> cpus {
+>      #size-cells = <0>;
+>      #address-cells = <1>;
+> 
+>      cpu {
+>          device_type = "cpu"
+>          compatible = "arm,arm926";
+>      };
+> };
 
-Fall back to the old scheme for non DT platforms.
+I am of two minds about this. That processor does not have an MPIDR
+equivalent so in theory #address-cells and #size-cells could be omitted
+because the reg property is meaningless. I do not know to be honest the
+best way to handle this.
 
-Since the same method may be useful for other i.MX platforms
-implement the imx_obtain_fixed_clock() function in common code.
+Thoughts ?
 
-Actually changing other i.MX platforms to use this should be done
-later by someone with access to the appropriate hardware.
-
-Signed-off-by: Martin Fuzzey <mfuzzey@parkeon.com>
-Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-
----
-Changelog:
-V2: Applied comments from Sascha Hauer:
-	* Use kasprintf instead of scnprintf to avoid length limit
-	* Avoid use of IS_ERR_OR_NULL
-
-V3: Applied comments from Shawn Guo:
-	* Find clocks by path rather than compatible string
-	* Remove unnecessary #ifdef CONFIG_OF
-
-V4:
-	* Moved clock obtention function to mach-imx/clk.c to allow use by
-		other imx platforms (request from Sascha)
-	* Added Tested-by from Fabio Estevam
----
- arch/arm/mach-imx/clk-imx51-imx53.c |   44 ++++++-----------------------------
- arch/arm/mach-imx/clk.c             |   37 +++++++++++++++++++++++++++++
- arch/arm/mach-imx/clk.h             |    3 ++
- 3 files changed, 48 insertions(+), 36 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx51-imx53.c b/arch/arm/mach-imx/clk-imx51-imx53.c
-index 3228b4e..debd76d 100644
---- a/arch/arm/mach-imx/clk-imx51-imx53.c
-+++ b/arch/arm/mach-imx/clk-imx51-imx53.c
-@@ -123,11 +123,13 @@ static void __init mx5_clocks_common_init(unsigned long rate_ckil,
- {
- 	int i;
- 
-+	of_clk_init(NULL);
-+
- 	clk[dummy] = imx_clk_fixed("dummy", 0);
--	clk[ckil] = imx_clk_fixed("ckil", rate_ckil);
--	clk[osc] = imx_clk_fixed("osc", rate_osc);
--	clk[ckih1] = imx_clk_fixed("ckih1", rate_ckih1);
--	clk[ckih2] = imx_clk_fixed("ckih2", rate_ckih2);
-+	clk[ckil] = imx_obtain_fixed_clock("ckil", rate_ckil);
-+	clk[osc] = imx_obtain_fixed_clock("osc", rate_osc);
-+	clk[ckih1] = imx_obtain_fixed_clock("ckih1", rate_ckih1);
-+	clk[ckih2] = imx_obtain_fixed_clock("ckih2", rate_ckih2);
- 
- 	clk[lp_apm] = imx_clk_mux("lp_apm", MXC_CCM_CCSR, 9, 1,
- 				lp_apm_sel, ARRAY_SIZE(lp_apm_sel));
-@@ -539,42 +541,12 @@ int __init mx53_clocks_init(unsigned long rate_ckil, unsigned long rate_osc,
- 	return of_clk_configure();
- }
- 
--#ifdef CONFIG_OF
--static void __init clk_get_freq_dt(unsigned long *ckil, unsigned long *osc,
--				   unsigned long *ckih1, unsigned long *ckih2)
--{
--	struct device_node *np;
--
--	/* retrieve the freqency of fixed clocks from device tree */
--	for_each_compatible_node(np, NULL, "fixed-clock") {
--		u32 rate;
--		if (of_property_read_u32(np, "clock-frequency", &rate))
--			continue;
--
--		if (of_device_is_compatible(np, "fsl,imx-ckil"))
--			*ckil = rate;
--		else if (of_device_is_compatible(np, "fsl,imx-osc"))
--			*osc = rate;
--		else if (of_device_is_compatible(np, "fsl,imx-ckih1"))
--			*ckih1 = rate;
--		else if (of_device_is_compatible(np, "fsl,imx-ckih2"))
--			*ckih2 = rate;
--	}
--}
--
- int __init mx51_clocks_init_dt(void)
- {
--	unsigned long ckil, osc, ckih1, ckih2;
--
--	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
--	return mx51_clocks_init(ckil, osc, ckih1, ckih2);
-+	return mx51_clocks_init(0, 0, 0, 0);
- }
- 
- int __init mx53_clocks_init_dt(void)
- {
--	unsigned long ckil, osc, ckih1, ckih2;
--
--	clk_get_freq_dt(&ckil, &osc, &ckih1, &ckih2);
--	return mx53_clocks_init(ckil, osc, ckih1, ckih2);
-+	return mx53_clocks_init(0, 0, 0, 0);
- }
--#endif
-diff --git a/arch/arm/mach-imx/clk.c b/arch/arm/mach-imx/clk.c
-index f5e8be8..f2c73f2 100644
---- a/arch/arm/mach-imx/clk.c
-+++ b/arch/arm/mach-imx/clk.c
-@@ -1,3 +1,40 @@
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/slab.h>
- #include <linux/spinlock.h>
- 
-+#include "clk.h"
-+
- DEFINE_SPINLOCK(imx_ccm_lock);
-+
-+static struct clk * __init imx_obtain_fixed_clock_from_dt(const char *name)
-+{
-+	struct of_phandle_args phandle = {0};
-+	struct clk *clk = ERR_PTR(-ENODEV);
-+	char *path;
-+
-+	path = kasprintf(GFP_KERNEL, "/clocks/%s", name);
-+	if (!path)
-+		return ERR_PTR(-ENOMEM);
-+
-+	phandle.np = of_find_node_by_path(path);
-+	kfree(path);
-+
-+	if (phandle.np) {
-+		clk = of_clk_get_from_provider(&phandle);
-+		of_node_put(phandle.np);
-+	}
-+	return clk;
-+}
-+
-+struct clk * __init imx_obtain_fixed_clock(
-+			const char *name, unsigned long rate)
-+{
-+	struct clk *clk;
-+
-+	clk = imx_obtain_fixed_clock_from_dt(name);
-+	if (IS_ERR(clk))
-+		clk = imx_clk_fixed(name, rate);
-+	return clk;
-+}
-diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
-index d9d9d9c..780fd67 100644
---- a/arch/arm/mach-imx/clk.h
-+++ b/arch/arm/mach-imx/clk.h
-@@ -29,6 +29,9 @@ struct clk *clk_register_gate2(struct device *dev, const char *name,
- 		void __iomem *reg, u8 bit_idx,
- 		u8 clk_gate_flags, spinlock_t *lock);
- 
-+struct clk * __init imx_obtain_fixed_clock(
-+			const char *name, unsigned long rate);
-+
- static inline struct clk *imx_clk_gate2(const char *name, const char *parent,
- 		void __iomem *reg, u8 shift)
- {
+Thanks for the review,
+Lorenzo
