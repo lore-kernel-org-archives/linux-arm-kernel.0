@@ -1,88 +1,44 @@
 From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 23 Apr 2013 15:07:55 +0200
-Subject: BUG: Re: [PATCH v2 3/3] clocksource: use
- clockevents_config_and_register() where possible
-In-Reply-To: <1357991406-22778-4-git-send-email-shawn.guo@linaro.org>
-References: <1357991406-22778-1-git-send-email-shawn.guo@linaro.org>
- <1357991406-22778-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <517687AB.1040309@pengutronix.de>
+Date: Tue, 23 Apr 2013 15:08:44 +0200
+Subject: RFC: [PATCH] clocksource: tcb: fix min_delta calculation
+In-Reply-To: <517687AB.1040309@pengutronix.de>
+References: <517687AB.1040309@pengutronix.de>
+Message-ID: <1366722524-25991-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The commit
 
-On 01/12/2013 12:50 PM, Shawn Guo wrote:
-> The clockevent core is able to figure out the best mult and shift,
-> calculate min_delta_ns and max_delta_ns, with the necessary info passed
-> into clockevents_config_and_register().  Use this combined configure
-> and register function where possible to make the codes less error prone
-> and gain some positive diff stat.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Andres Salomon <dilinger@queued.net>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+    77cc982 clocksource: use clockevents_config_and_register() where possible
 
-[...]
+switches from manually calculating min_delta_ns (and others) and
+clockevents_register_device() to automatic calculation via
+clockevents_config_and_register(). During this conversation the "+ 1" in
 
-I just bisected a timer problem down to this commit.
+    min_delta_ns = clockevent_delta2ns(1, &clkevt.clkevt) + 1;
 
-> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-> index 32cb929..8a61872 100644
-> --- a/drivers/clocksource/tcb_clksrc.c
-> +++ b/drivers/clocksource/tcb_clksrc.c
-> @@ -157,7 +157,6 @@ static struct tc_clkevt_device clkevt = {
->  		.name		= "tc_clkevt",
->  		.features	= CLOCK_EVT_FEAT_PERIODIC
->  					| CLOCK_EVT_FEAT_ONESHOT,
-> -		.shift		= 32,
->  		/* Should be lower than at91rm9200's system timer */
->  		.rating		= 125,
->  		.set_next_event	= tc_next_event,
-> @@ -196,13 +195,9 @@ static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
->  
->  	timer_clock = clk32k_divisor_idx;
->  
-> -	clkevt.clkevt.mult = div_sc(32768, NSEC_PER_SEC, clkevt.clkevt.shift);
-> -	clkevt.clkevt.max_delta_ns
-> -		= clockevent_delta2ns(0xffff, &clkevt.clkevt);
-> -	clkevt.clkevt.min_delta_ns = clockevent_delta2ns(1, &clkevt.clkevt) + 1;
-                                                                           ^^^^^^
+was lost. This leads to problems with schedule_delayed_work() with a delay of
+"1". Resulting in the work not scheduled in time.
 
-With this patch, the "+ 1" gets lost, resulting in a different
-"min_delta_ns".
+This patch fixes the problem by increasing the min_delta to "2" ticks.
 
-good:
-setup_clkevents: shift=32 mult=140737 min=30518 max=1999976422
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+ drivers/clocksource/tcb_clksrc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-bad:
-setup_clkevents: shift=32 mult=140737 min=30517 max=1999976422
-
-This leads to problems with schedule_delayed_work() with a delay of
-"1". These worksqueues seem to be hanging for several seconds. I'll
-send a RFC patch.
-
->  	clkevt.clkevt.cpumask = cpumask_of(0);
->  
-> -	clockevents_register_device(&clkevt.clkevt);
-> +	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
->  
->  	setup_irq(irq, &tc_irqaction);
->  }
-> 
-
-Marc
-
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index 8a61872..7cf6dc7 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -197,7 +197,7 @@ static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+ 
+ 	clkevt.clkevt.cpumask = cpumask_of(0);
+ 
+-	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
++	clockevents_config_and_register(&clkevt.clkevt, 32768, 2, 0xffff);
+ 
+ 	setup_irq(irq, &tc_irqaction);
+ }
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130423/63f7b390/attachment.sig>
+1.8.2.rc2
