@@ -1,120 +1,39 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 23 Apr 2013 17:21:44 +0200
-Subject: [V3 patch 06/19] cpuidle: make a single register function for all
-In-Reply-To: <5176A3C4.2020008@ti.com>
-References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
- <1365770165-27096-7-git-send-email-daniel.lezcano@linaro.org>
- <516FB35D.7000303@ti.com> <51769011.7030608@linaro.org>
- <51769316.9090309@ti.com> <5176990F.5070605@linaro.org>
- <5176A3C4.2020008@ti.com>
-Message-ID: <5176A708.2070506@linaro.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 24 Apr 2013 00:25:59 +0900
+Subject: [PATCH 07/18] cpufreq: s3c24xx: move cpufreq driver to
+ drivers/cpufreq
+In-Reply-To: <1769336.FkfMpuXqqb@vostro.rjw.lan>
+References: <cover.1365079581.git.viresh.kumar@linaro.org>
+ <2a5901ce31c9$95160980$bf421c80$%kim@samsung.com>
+ <CAKohpokk1Q+0gRpeW=ts0a8D+rGAUpHu62X+7ejdpfom_B6FYA@mail.gmail.com>
+ <1769336.FkfMpuXqqb@vostro.rjw.lan>
+Message-ID: <5176A807.2090005@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2013 05:07 PM, Santosh Shilimkar wrote:
-> On Tuesday 23 April 2013 07:52 PM, Daniel Lezcano wrote:
->> On 04/23/2013 03:56 PM, Santosh Shilimkar wrote:
->>> On Tuesday 23 April 2013 07:13 PM, Daniel Lezcano wrote:
->>>> On 04/18/2013 10:48 AM, Santosh Shilimkar wrote:
->>>>> On Friday 12 April 2013 06:05 PM, Daniel Lezcano wrote:
->>>>>> The usual scheme to initialize a cpuidle driver on a SMP is:
->>>>>>
->>>>>> 	cpuidle_register_driver(drv);
->>>>>> 	for_each_possible_cpu(cpu) {
->>>>>> 		device = &per_cpu(cpuidle_dev, cpu);
->>>>>> 		cpuidle_register_device(device);
->>>>>> 	}
->>>>>>
->>>>> Not exactly related to $subject patch but the driver should
->>>>> be registered after all devices has been registered to avoid
->>>>> devices start using the idle state data as soon as it is
->>>>> registered. In multi CPU system, this race can easily happen.
->>>>
->>>> Could you elaborate what problems the system will be facing if a cpu
->>>> starts using the idle state data as soon as it is registered ?
->>>>
->>>> Is there a bug related to this ?
->>>>
->>> Ofcouse. In multi-CPU scenario, where CPU C-states needs co-ordination
->>> can just lead into unknown issues if all the CPUs are not already part
->>> registered.
+On 04/05/13 20:36, Rafael J. Wysocki wrote:
+> On Friday, April 05, 2013 12:36:34 PM Viresh Kumar wrote:
+>> On 5 April 2013 12:18, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>>> Basically, this moving looks good to me, but should be re-worked based on
+>>> for-next of samsung tree because this touches too many samsung stuff so this
+>>> should be sent to upstream via samsung tree.
 >>
->> Hmm, ok. I don't see a scenario, with the current code, where that could
->> occurs. The coupled idle state will wait for the other cpus to enter
->> idle before initiating a shutdown sequence and, so far, the other sync
->> algorithm (last man standing) are doing the same.
->>
-> Its no just couple idle state usages. CPUs do share power domains, clock
-> domains, clocks etc. One CPU going ahead and tampering/progarmming
-> the low power states till the next one isn't registered yet
-> can lead to issues.
-> 
->> There are some systems with 1024 cpus, and I did not heard problems like
->> this.
->>
-> That is because todays CPUIDLe core code doesn't let that happen. Once
-> you fix the ordering issue, there is window where the issue could happen.
-> 
->> Do you know a system where this problem occurred ? Or is it something
->> you suspect that can happen ?
->>
-> See above. Its more prone to issues true for systems with higher
-> number of CPUs. Not sure if that was the reason the core code, doesn't
-> proceed without all the devices are registered ?
-> 
->> That would be interesting to have a system where this race occurs in
->> order to check the modifications will solve the issue.
->>
-> I haven't see the issue myself but logically it could easily happen
-> once the core code is fixed.
-> 
->>>>> Current CPUIDLE core layer is also written with the assumption
->>>>> that driver will be registered first and then the devices which
->>>>> is not mandatory as per typical drive/device model.
->>>>
->>>> Yes, that's true. The framework assumes cpuidle_register_driver is
->>>> called before cpuidle_register_device.
->>>>
->>>>> May be you can fix that part while you are creating this common
->>>>> wrapper.
->>>>
->>>> Personally, as that will modify the cpuidle core layer and the changes
->>>> are not obvious (because of the design of the code) I prefer to do that
->>>> in a separate patchset if it is worth to do it - if there is a bug
->>>> related to it, then there is no discussion, we have to do it :)
->>>>
->>> Sure. It would have been nice if you would have clarified that before
->>> posting the next version.
->>>
->>> You still need to fix the kernel doc in your v4 though.
->>
->> Which one ? "s/accross/across" ?
->>
-> s/*/** below hunk in v4
-> 
-> +/*
-> + * cpuidle_unregister: unregister a driver and the devices. This function
-> + * can be used only if the driver has been previously registered through
-> + * the cpuidle_register function.
-> + *
-> + * @drv: a valid pointer to a struct cpuidle_driver
-> + */
-> +void cpuidle_unregister(struct cpuidle_driver *drv)
-> +{
-> +	int cpu;
-> +	struct cpuidle_device *device;
-> 
+>> Hmm... Its already applied in Rafael's tree. But it doesn't mean that
+>> it can't be
+>> moved to your tree if there is a issue.
+>
+> Well, I'm dropping it.  Please merge via the Samsung tree.
+>
 
-Ah, ok. I thought you were referring to something in 'Documentation'.
+Oops, I missed, maybe I have no more chance to send this to upstream for 
+upcoming merge window :-(
 
-I will fix this nit.
+Rafael, please take this patch with my ack in your tree, sorry for noise.
 
-Thanks !
-  -- Daniel
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+If any problems, please kindly let me know.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Thanks.
+
+- Kukjin
