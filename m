@@ -1,43 +1,73 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Apr 2013 18:30:40 +0200
-Subject: [PATCH 08/21] ASoC: ux500: forward declare msp_i2s_platform_data
+Date: Tue, 23 Apr 2013 18:30:46 +0200
+Subject: [PATCH 14/21] staging: nvec: allow modular build
 In-Reply-To: <1366734653-488286-1-git-send-email-arnd@arndb.de>
 References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
-Message-ID: <1366734653-488286-9-git-send-email-arnd@arndb.de>
+Message-ID: <1366734653-488286-15-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We get a lot of build warnings from the msp driver like:
+The serio code can be a loadable module, which in turn means that nvec
+also has to be a module, so mark it as "tristate" in Kconfig.
 
-In file included from sound/soc/ux500/ux500_msp_dai.h:21:0,
-                 from sound/soc/ux500/mop500.c:25:
-sound/soc/ux500/ux500_msp_i2s.h:546:11: warning: 'struct msp_i2s_platform_data' declared inside parameter list [enabled by default]
-    struct msp_i2s_platform_data *platform_data);
-           ^
-sound/soc/ux500/ux500_msp_i2s.h:546:11: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
-
-The easiest solution is to add a declaration of the struct name.
+drivers/built-in.o: In function `nvec_mouse_remove':
+drivers/staging/nvec/nvec_ps2.c:136: undefined reference to `serio_unregister_port'
+drivers/built-in.o: In function `nvec_mouse_probe':
+drivers/staging/nvec/nvec_ps2.c:126: undefined reference to `__serio_register_port'
+drivers/built-in.o: In function `nvec_ps2_notifier':
+drivers/staging/nvec/nvec_ps2.c:84: undefined reference to `serio_interrupt'
+drivers/staging/nvec/nvec_ps2.c:91: undefined reference to `serio_interrupt'
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Cc: Ola Lilja <ola.o.lilja@stericsson.com>
-Cc: alsa-devel at alsa-project.org
+Cc: Marc Dietrich <marvin24@gmx.de>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- sound/soc/ux500/ux500_msp_i2s.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/staging/nvec/Kconfig | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/sound/soc/ux500/ux500_msp_i2s.h b/sound/soc/ux500/ux500_msp_i2s.h
-index 1311c0d..6f3e3dc 100644
---- a/sound/soc/ux500/ux500_msp_i2s.h
-+++ b/sound/soc/ux500/ux500_msp_i2s.h
-@@ -543,6 +543,7 @@ struct ux500_msp_dma_params {
- 	struct stedma40_chan_cfg *dma_cfg;
- };
+diff --git a/drivers/staging/nvec/Kconfig b/drivers/staging/nvec/Kconfig
+index f779fdc..7e61ada 100644
+--- a/drivers/staging/nvec/Kconfig
++++ b/drivers/staging/nvec/Kconfig
+@@ -1,5 +1,5 @@
+ config MFD_NVEC
+-	bool "NV Tegra Embedded Controller SMBus Interface"
++	tristate "NV Tegra Embedded Controller SMBus Interface"
+ 	depends on I2C && GPIOLIB && ARCH_TEGRA
+ 	select MFD_CORE
+ 	help
+@@ -7,28 +7,28 @@ config MFD_NVEC
+ 	    controller.
  
-+struct msp_i2s_platform_data;
- int ux500_msp_i2s_init_msp(struct platform_device *pdev,
- 			struct ux500_msp **msp_p,
- 			struct msp_i2s_platform_data *platform_data);
+ config KEYBOARD_NVEC
+-	bool "Keyboard on nVidia compliant EC"
++	tristate "Keyboard on nVidia compliant EC"
+ 	depends on MFD_NVEC && INPUT
+ 	help
+ 	  Say Y here to enable support for a keyboard connected to 
+ 	  a nVidia compliant embedded controller.
+ 
+ config SERIO_NVEC_PS2
+-	bool "PS2 on nVidia EC"
++	tristate "PS2 on nVidia EC"
+ 	depends on MFD_NVEC && SERIO
+ 	help
+ 	  Say Y here to enable support for a Touchpad / Mouse connected
+ 	  to a nVidia compliant embedded controller.
+ 
+ config NVEC_POWER
+-	bool "NVEC charger and battery"
++	tristate "NVEC charger and battery"
+ 	depends on MFD_NVEC && POWER_SUPPLY
+ 	help
+ 	  Say Y to enable support for battery and charger interface for
+ 	  nVidia compliant embedded controllers.
+ 
+ config NVEC_PAZ00
+-	bool "Support for OEM specific functions on Compal PAZ00 based devices"
++	tristate "Support for OEM specific functions on Compal PAZ00 based devices"
+ 	depends on MFD_NVEC && LEDS_CLASS
+ 	help
+ 	  Say Y to enable control of the yellow side leds on Compal PAZ00 based
 -- 
 1.8.1.2
