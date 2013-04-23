@@ -1,210 +1,147 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Tue, 23 Apr 2013 10:57:40 +0530
-Subject: [PATCH 4/4] arm64: Add initial DTS for APM X-Gene Storm SOC and
- APM Mustang board
-In-Reply-To: <5175A4C3.3090009@gmail.com>
-References: <1366442131-26094-1-git-send-email-vkale@apm.com>
- <1366442131-26094-5-git-send-email-vkale@apm.com>
- <5175A4C3.3090009@gmail.com>
-Message-ID: <CAPrCYkct5TA8BK2TGHyMroxBxrSVB5+UgFQQVQJfGLYOmAZceA@mail.gmail.com>
+From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
+Date: Tue, 23 Apr 2013 11:23:38 +0530
+Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
+In-Reply-To: <87mwsr9md7.fsf@rustcorp.com.au>
+References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
+ <87wqs02uws.fsf@rustcorp.com.au>
+ <CAAHg+HiHKV+8hBT1QWe4hSxocCX6wpRd3bCPWB7zU8jVFmPuAA@mail.gmail.com>
+ <87ehe3bbsm.fsf@rustcorp.com.au>
+ <CALrVBkub+TABrrBwh4+P6S5TGL1qSmnZrd1cbGgj6JiRpY=rOA@mail.gmail.com>
+ <87mwsr9md7.fsf@rustcorp.com.au>
+Message-ID: <CAAHg+Hg1u-md_5hSWxyVOOrg_f9=h0tO5iv2WQL-U-MyTMAV9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 2:29 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On 04/20/2013 02:15 AM, Vinayak Kale wrote:
->> This patch adds initial DTS files required for APM Mustang board.
+On 22 April 2013 10:45, Rusty Russell <rusty@rustcorp.com.au> wrote:
+> Anup Patel <anup.patel@linaro.org> writes:
+>> On 22 April 2013 06:51, Rusty Russell <rusty@rustcorp.com.au> wrote:
+>>>
+>>> Pranavkumar Sawargaonkar <pranavkumar@linaro.org> writes:
+>>> > On 18 April 2013 12:21, Rusty Russell <rusty@rustcorp.com.au> wrote:
+>>> >>
+>>> >> PranavkumarSawargaonkar <pranavkumar@linaro.org> writes:
+>>> >> > From: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>> >> >
+>>> >> > This patch implements early printk support for virtio-mmio console
+>>> >> > devices without using any hypercalls.
+>>> >>
+>>> >> This makes some sense, though not sure that early console *read* makes
+>>> >> much sense.  I can see the PCI version of this being useful as well.
+>>> >
+>>> > Read can be useful for "mach-virt" which will have only virtio console
+>>> > as a console device. Then if someone wants to have UEFI or any other
+>>> > boot-loader emulation, which expects user to input few things, in that
+>>> > case read might become handy.
+>>>
+>>> But implementing virtio inside a bootloader has already been done for
+>>> coreboot, for example.  A bootloader probably wants a virtio block
+>>> device, so a console is trivial.
+>>>
+>>> A single writable field for debugging makes sense.  Anything more is far
+>>> less certain.
 >>
->> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
->> Signed-off-by: Loc Ho <lho@apm.com>
->> Signed-off-by: Feng Kan <fkan@apm.com>
->> ---
->>  arch/arm64/boot/dts/Makefile    |    1 +
->>  arch/arm64/boot/dts/mustang.dts |   28 +++++++++
->>  arch/arm64/boot/dts/storm.dtsi  |  116 +++++++++++++++++++++++++++++++++++++++
+>> The early read can be handy for bootloader who don't want to implement
+>> complete VirtIO programming.
 >
-> Can you add "apm" to these filenames.
+> I've said this twice already.  This is the last time.
 >
-Okay, I'll add 'apm-' prefix to dts filenames.
->>  3 files changed, 145 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm64/boot/dts/mustang.dts
->>  create mode 100644 arch/arm64/boot/dts/storm.dtsi
->>
->> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
->> index 68457e9..faeab34 100644
->> --- a/arch/arm64/boot/dts/Makefile
->> +++ b/arch/arm64/boot/dts/Makefile
->> @@ -1,4 +1,5 @@
->>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
->> +dtb-$(CONFIG_ARCH_XGENE) += mustang.dtb
->>
->>  targets += dtbs
->>  targets += $(dtb-y)
->> diff --git a/arch/arm64/boot/dts/mustang.dts b/arch/arm64/boot/dts/mustang.dts
->> new file mode 100644
->> index 0000000..a061c99
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/mustang.dts
->> @@ -0,0 +1,28 @@
->> +/*
->> + * dts file for AppliedMicro (APM) Mustang Board
->> + *
->> + * Copyright (C) 2013, Applied Micro Circuits Corporation
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation; either version 2 of
->> + * the License, or (at your option) any later version.
->> + */
->> +
->> +/dts-v1/;
->> +
->> +/include/ "storm.dtsi"
->> +
->> +/ {
->> +     model = "mustang";
->> +
->> +     /* chosen */
+> 1) We do not add complexity unless we have to.
+> 2) Making it optional does not make it significantly less complex.
+> 3) Having two ways of doing the same thing is always ugly.
+> 4) Having an emergency output method makes sense for several use cases,
+>    an emergency input method does not.
+Okay,  i will restructure my patch by keeping just output write part
+and post it back.
+
+Thanks,
+Pranav
+
+> 5) A bootloader which uses virtio to get the images to boot can
+>    implement a console in less than 10 lines.
+> 6) A bootloader which does not use any virtio devices but nonetheless
+>    wants to obtain input can implement a simple console in well under 100
+>    lines.  See below.
 >
-> Wow, that's a useful comment.
+> Finally, in case you still don't understand:
 >
->> +     chosen {
->> +             linux,stdout-path = &serial0;
+> My task is to make this decision, and I've made it.  Arguing with me is
+> only useful if you bring new facts which you can change my mind.
 >
-> I don't think this is needed if you only have a single uart.
+> Hope that clarifies,
+> Rusty.
 >
-In subsequent patches we will add other serial nodes in the dts.
->> +     };
->> +
->> +     memory {
->> +             device_type = "memory";
->> +             reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
->> +     };
->> +};
->> diff --git a/arch/arm64/boot/dts/storm.dtsi b/arch/arm64/boot/dts/storm.dtsi
->> new file mode 100644
->> index 0000000..8cab5d1
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/storm.dtsi
->> @@ -0,0 +1,116 @@
->> +/*
->> + * dts file for AppliedMicro (APM) X-Gene Storm SOC
->> + *
->> + * Copyright (C) 2013, Applied Micro Circuits Corporation
->> + *
->> + * This program is free software; you can redistribute it and/or
->> + * modify it under the terms of the GNU General Public License as
->> + * published by the Free Software Foundation; either version 2 of
->> + * the License, or (at your option) any later version.
->> + */
->> +
->> +/ {
->> +     compatible = "apm,xgene,storm", "apm,xgene";
+> #define VIRTIO_MMIO_GUEST_PAGE_SIZE     0x028
+> #define VIRTIO_MMIO_QUEUE_SEL           0x030
+> #define VIRTIO_MMIO_QUEUE_NUM_MAX       0x034
+> #define VIRTIO_MMIO_QUEUE_NUM           0x038
+> #define VIRTIO_MMIO_QUEUE_ALIGN         0x03c
+> #define VIRTIO_MMIO_QUEUE_PFN           0x040
+> #define VIRTIO_MMIO_QUEUE_NOTIFY        0x050
 >
-> Need to add documentation for the binding and the vendor prefix if it is
-> not already there.
+> struct vring_desc {
+>         __u64 addr;
+>         __u32 len;
+>         __u16 flags;
+>         __u16 next;
+> };
 >
->> +     interrupt-parent = <&gic>;
->> +     #address-cells = <2>;
->> +     #size-cells = <2>;
->> +
->> +     cpus {
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +
->> +             cpu at 0 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0000>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +             cpu at 1 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0001>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +             cpu at 2 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0100>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +             cpu at 3 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0101>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +             cpu at 4 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0200>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +             cpu at 5 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0201>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +             cpu at 6 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0300>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +             cpu at 7 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,armv8";
->> +                     reg = <0x0 0x0301>;
->> +                     enable-method = "spin-table";
->> +                     cpu-release-addr = <0x1 0x0000fff8>;
->> +             };
->> +     };
->> +
->> +     gic: interrupt-controller at 78010000 {
->> +             compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
->> +             #interrupt-cells = <3>;
->> +             interrupt-controller;
->> +             reg = <0x0 0x78010000 0x0 0x1000>,      /* GIC Dist */
->> +                   <0x0 0x78020000 0x0 0x1000>,      /* GIC CPU */
->> +                   <0x0 0x78040000 0x0 0x2000>,      /* GIC VCPU Control */
->> +                   <0x0 0x78060000 0x0 0x2000>;      /* GIC VCPU */
->> +             interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
->> +     };
->> +
->> +     timer {
->> +             compatible = "arm,armv8-timer";
->> +             interrupts = <1 0 0xff01>,      /* Secure Phys IRQ */
->> +                          <1 13 0xff01>,     /* Non-secure Phys IRQ */
->> +                          <1 14 0xff01>,     /* Virt IRQ */
->> +                          <1 15 0xff01>;     /* Hyp IRQ */
->> +             clock-frequency = <50000000>;
->> +     };
->> +
->> +     soc {
->> +             compatible = "simple-bus";
->> +             #address-cells = <2>;
->> +             #size-cells = <2>;
->> +             ranges;
->> +
->> +             serial0: uart0 at 1c020000 {
->> +                     device_type = "serial";
->> +                     compatible = "ns16550";
->> +                     reg = <0 0x1c020000 0x0 0x1000>;
->> +                     reg-shift = <2>;
->> +                     clock-frequency = <10000000>; /* Updated by bootloader */
->> +                     interrupt-parent = <&gic>;
->> +                     interrupts = <0x0 0x4c 0x4>;
->> +             };
->> +     };
->> +};
->>
+> struct vring_used_elem {
+>         __u32 id;
+>         __u32 len;
+> };
 >
+> struct vconsole_ring {
+>         struct vring_desc desc[2];
+>         __u16 avail_flags;
+>         __u16 avail_idx;
+>         __u16 available[2];
+>         __u16 used_event_idx;
+>         __u16 pad; /* Hit 4-byte boundary */
+>
+>         // A ring of used descriptor heads with free-running index.
+>         __u16 used_flags;
+>         __u16 used_idx;
+>         struct vring_used_elem used[2];
+>         __u16 avail_event_idx;
+> };
+>
+> static char console_in;
+> static struct vconsole_ring vc_ring = {
+>         { { PHYSICAL_ADDR(console_in), 1, 2, 0 } },
+>         1, /* No interrupts */
+> }
+>
+> static void post_buffer(void *base)
+> {
+>         vc_ring->avail_idx++;
+>         wmb();
+>         writel(0, base + VIRTIO_MMIO_QUEUE_NOTIFY);
+> }
+>
+> bool vc_read(void *base, char *c)
+> {
+>         mb();
+>         if (vc_ring->used_idx != vc_ring->avail_idx)
+>                 return false;
+>         *c = console_in;
+>         post_buffer(base);
+>         return true;
+> }
+>
+> void vc_init(void *base)
+> {
+>         /* Alignment of 4 bytes, don't waste any. */
+>         writel(4, base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
+>
+>         /* Setup incoming vq. */
+>         writel(0, base + VIRTIO_MMIO_QUEUE_SEL);
+>
+>         /* 2 elements */
+>         writel(2, base + VIRTIO_MMIO_QUEUE_NUM);
+>         /* Alignment of 4 bytes */
+>         writel(4, base + VIRTIO_MMIO_QUEUE_ALIGN);
+>         /* Location of queue. */
+>         writel(PHYSICAL_ADDR(&vc_ring) >> 4, base + VIRTIO_MMIO_QUEUE_PFN);
+>
+>         post_buffer(base);
+> }
