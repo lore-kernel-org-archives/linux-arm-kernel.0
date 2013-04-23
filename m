@@ -1,41 +1,31 @@
-From: marek.belisko@gmail.com (Marek Belisko)
-Date: Tue, 23 Apr 2013 08:22:50 +0200
-Subject: [PATCH 2/2] clk: si5351: Apply rate when clock-frequency is defined
- in devicetree.
-In-Reply-To: <1366698170-31346-1-git-send-email-marek.belisko@streamunlimited.com>
-References: <1366698170-31346-1-git-send-email-marek.belisko@streamunlimited.com>
-Message-ID: <1366698170-31346-2-git-send-email-marek.belisko@streamunlimited.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Tue, 23 Apr 2013 07:48:46 +0100
+Subject: [PATCH v1] ARM: do not select ARCH_VEXPRESS by default on
+ ARCH_MULTI_V7
+In-Reply-To: <CAOMZO5BMesWazKtfgQ9BFDiW0oiWCQop2LUs0j6P4fDSGMhvfg@mail.gmail.com>
+References: <1366634604-12637-1-git-send-email-srinivas.kandagatla@st.com>
+ <1366649966.3203.40.camel@hornet>
+ <CAOMZO5BMesWazKtfgQ9BFDiW0oiWCQop2LUs0j6P4fDSGMhvfg@mail.gmail.com>
+Message-ID: <51762ECE.8070202@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clock-frequency property from devicetree was read but never used. Apply
-defined rate when clock is registered.
-
-Signed-off-by: Marek Belisko <marek.belisko@streamunlimited.com>
----
- drivers/clk/clk-si5351.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
-
-diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-index cf39e53..8323c31 100644
---- a/drivers/clk/clk-si5351.c
-+++ b/drivers/clk/clk-si5351.c
-@@ -1477,6 +1477,16 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 			return -EINVAL;
- 		}
- 		drvdata->onecell.clks[n] = clk;
-+
-+		/* set rate when defined in devicetree */
-+		if (pdata->clkout[n].rate != 0) {
-+			int ret;
-+			ret = clk_set_rate(clk, pdata->clkout[n].rate);
-+			if (ret != 0) {
-+				dev_err(&client->dev, "Cannot set rate : %d\n",
-+					ret);
-+			}
-+		}
- 	}
- 
- 	ret = of_clk_add_provider(client->dev.of_node, of_clk_src_onecell_get,
--- 
-1.7.9.5
+On 22/04/13 18:10, Fabio Estevam wrote:
+> On Mon, Apr 22, 2013 at 1:59 PM, Pawel Moll <pawel.moll@arm.com> wrote:
+>
+>> Fabio was looking at this some time ago:
+>> http://thread.gmane.org/gmane.linux.ports.arm.kernel/201499
+>> He may comment on the relevant issues.
+Thankyou for the patch, now I understand the reasoning.
+> Arnd has recently posted a patch to address this issue:
+> https://patchwork.kernel.org/patch/2436131/
+>
+> Regards,
+>
+> Fabio Estevam
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
