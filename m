@@ -1,51 +1,40 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 23 Apr 2013 19:26:53 +0400
-Subject: [PATCH v6 5/9] ARM: shmobile: r8a7779: remove USB PHY 2nd memory
- resource
-In-Reply-To: <201304231911.56202.sergei.shtylyov@cogentembedded.com>
-References: <201304231911.56202.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201304231926.53887.sergei.shtylyov@cogentembedded.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 23 Apr 2013 18:29:21 +0300
+Subject: [PATCH 06/10] usb: musb: ux500: add device tree probing support
+In-Reply-To: <201304231727.10696.arnd@arndb.de>
+References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
+ <201304231714.06326.arnd@arndb.de>
+ <20130423151533.GD15177@arwen.pp.htv.fi>
+ <201304231727.10696.arnd@arndb.de>
+Message-ID: <20130423152921.GE15177@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that 'drivers/usb/phy/rcar-phy.c' doesn't require the second memory resource
-anymore, we can remove it from the R8A7779's USB PHY platform device.
+Hi,
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+On Tue, Apr 23, 2013 at 05:27:10PM +0200, Arnd Bergmann wrote:
+> > > > +Required properties:
+> > > > + - compatible : Should be "stericsson,db8500-musb"
+> > > > + - reg        : Offset and length of registers
+> > > > + - interrupts : Interrupt; mode, number and trigger
+> > > > + - mode       : One of; "host", "otg", or "peripheral"
+> > > 
+> > > I think we don't have any precedent for this combination of "mode" property
+> > > and contents. You could either try to match ehci-omap.txt and do
+> > 
+> > there is dr_mode which other folks are using. Let's use the same thing.
+> 
+> On that topic, should we support the same property in am35x.c and 
+> musbhsdma.c? They currently use an integer rather than a string.
 
----
-Changes since version 4:
-- refreshed the patch.
+certainly :) I also plan to add dr_mode support for dwc3.
 
-Changes since version 3:
-- lowercased the SoC name in the subject.
-
-Changes since version 2:
-- refreshed atop of the prior patches;
-- added a note about testing to the changelog;
-- added ACKs from Simon Horman and Kuninori Morimoto.
-
-Changes since the original posting:
-- new patch in this version, split from the previous one.
-
- arch/arm/mach-shmobile/setup-r8a7779.c |    5 -----
- 1 file changed, 5 deletions(-)
-
-Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -395,11 +395,6 @@ static struct resource usb_phy_resources
- 		.end		= 0xffe70900 - 1,
- 		.flags		= IORESOURCE_MEM,
- 	},
--	[1] = {
--		.start		= 0xfff70000,
--		.end		= 0xfff70900 - 1,
--		.flags		= IORESOURCE_MEM,
--	},
- };
- 
- static struct platform_device usb_phy_device = {
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130423/03d6dba2/attachment.sig>
