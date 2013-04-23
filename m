@@ -1,73 +1,48 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 23 Apr 2013 09:42:51 +0200
-Subject: Query on pinctrl usage for DT nodes
-In-Reply-To: <20130416213232.GU10155@atomide.com>
-References: <CA+V-a8uiPwsAD--OHFAE=i2ed+-wbXm4p2deZXr92+Zv6GDS1w@mail.gmail.com>
- <515C5C76.3080009@wwwdotorg.org>
- <CA+V-a8t3wtP77DdeUoQHKMjAuWmV+ude+1J3UjJmMTqobgStjA@mail.gmail.com>
- <5162FD4A.1030909@wwwdotorg.org>
- <CA+V-a8vwdCkyMqiynj5BodXbjwJ=e4qNb-29FhLweqbjc7DBQA@mail.gmail.com>
- <5165A22B.4070200@wwwdotorg.org> <20130410203408.GP10155@atomide.com>
- <516BB99F.2080502@ti.com> <20130416213232.GU10155@atomide.com>
-Message-ID: <51763B7B.707@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 23 Apr 2013 09:45:51 +0200
+Subject: [PATCH] ARM: mm: Get rid of
+ =?UTF-8?Q?L=5FPTE=5FUSER=20ref=20from=20P?=
+ =?UTF-8?Q?AGE=5FS=32=5FDEVICE?=
+In-Reply-To: <1366683430-24328-1-git-send-email-cdall@cs.columbia.edu>
+References: <1366683430-24328-1-git-send-email-cdall@cs.columbia.edu>
+Message-ID: <062dea0374552dcb48be3687ae95262d@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/16/2013 11:32 PM, Tony Lindgren wrote:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [130415 01:30]:
->> On 04/10/2013 10:34 PM, Tony Lindgren wrote:
->>> Yeah how about just change the pintctrl-single,bits register
->>> naming to be register + bit?  Something like 0xdeadbeef.0 and
->>> 0xdeadbeef.1 and so on.
->>
->> Something like this might work I think. It is going to be a bit tricky IMHO
->> since we might need span out new 'register' every time a device requests for a
->> new pinctrl-single,bits for already used register in the
->> pinctrl-single,bit-per-mux area. In this way we still can make sure that
->> certain bit are only used by a single driver.
+On Mon, 22 Apr 2013 19:17:10 -0700, Christoffer Dall
+<cdall@cs.columbia.edu> wrote:
+> THe L_PTE_USER actually has nothing to do with stage 2 mappings and the
+> L_PTE_S2_RDONLY value sets the readable bit, which was what L_PTE_USER
+> was used for before proper handling of stage 2 memory defines.
 > 
-> OK. If it's one bit per mux type register we should be able to create
-> the right amount of entries based on the submask in pinctrs-single,bit?
+> Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
+> ---
+>  arch/arm/include/asm/pgtable.h |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/asm/pgtable.h
+> b/arch/arm/include/asm/pgtable.h
+> index 80d6fc4..1d1f97f 100644
+> --- a/arch/arm/include/asm/pgtable.h
+> +++ b/arch/arm/include/asm/pgtable.h
+> @@ -88,7 +88,7 @@ extern pgprot_t		pgprot_s2_device;
+>  #define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
+>  #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+>  #define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
+> -#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_USER |
+> L_PTE_S2_RDONLY)
+> +#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_S2_RDONLY)
+>  
+>  #define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN
+|
+>  L_PTE_NONE)
+>  #define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
 
-Right now it seams to be true that we have one bit per mux (in DEVCONF0 on
-OMAP3 for example). So that would work fine, but There could be different
-registers around with more than one bit per mux.
+Good catch.
 
-Another way to deal with this is to:
-in case of pinctrl-single,bit-per-mux we assume one bit per mux and create
-entries based on the pinctrl-single,function-mask's bits.
+While we're at it, why not directly set it to be RW instead of RO? The
+only use of PAGE_S2_DEVICE immediately sets the writeable bit anyway.
 
-In case we have more than one bit for the mux in the register we could have
-optional property stating the number of different muxes handled by the register.
-
-One bit per mux type:
-
-control_devconf0: pinmux at 48002274 {
-        compatible = "pinctrl-single";
-        reg = <0x48002274 4>;   /* Single register */
-        #address-cells = <1>;
-        #size-cells = <0>;
-        pinctrl-single,bit-per-mux;
-        pinctrl-single,register-width = <32>;
-        pinctrl-single,function-mask = <0x5F>;
-};
-
-Results six entries.
-
-control_devconf0: pinmux at 48002274 {
-        compatible = "pinctrl-single";
-        reg = <0x48002274 4>;   /* Single register */
-        #address-cells = <1>;
-        #size-cells = <0>;
-        pinctrl-single,bit-per-mux;
-        pinctrl-single,functions-in-register = <3>;
-        pinctrl-single,register-width = <32>;
-        pinctrl-single,function-mask = <0x5F>;
-};
-
-Will results three entries.
-
-In both cases we still need to test overlaps in the handled bits.
-
+        M.
 -- 
-P?ter
+Fast, cheap, reliable. Pick two.
