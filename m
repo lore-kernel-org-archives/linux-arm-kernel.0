@@ -1,35 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Apr 2013 20:19:27 +0100
-Subject: [PATCH v4 01/15] ARM: multi-cluster PM: secondary kernel entry
- code
-In-Reply-To: <1360041732-17936-2-git-send-email-nicolas.pitre@linaro.org>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <1360041732-17936-2-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20130423191927.GA5316@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Apr 2013 21:31:07 +0200
+Subject: [PATCH 05/21] ARM: OMAP2+: add dependencies on ARCH_MULTI_V6/V7
+In-Reply-To: <20130423180146.GI10155@atomide.com>
+References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
+ <1366734653-488286-6-git-send-email-arnd@arndb.de>
+ <20130423180146.GI10155@atomide.com>
+Message-ID: <201304232131.07512.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 12:21:58AM -0500, Nicolas Pitre wrote:
-> +#include <asm/mcpm_entry.h>
-> +#include <asm/barrier.h>
-> +#include <asm/proc-fns.h>
-> +#include <asm/cacheflush.h>
-> +
-> +extern volatile unsigned long mcpm_entry_vectors[MAX_NR_CLUSTERS][MAX_CPUS_PER_CLUSTER];
+On Tuesday 23 April 2013, Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [130423 09:36]:
+> > CONFIG_ARCH_OMAP2PLUS depends on (ARCH_MULTI_V6 || ARCH_MULTI_V7) as of
+> > a0694861 "ARM: OMAP2+: Enable ARCH_MULTIPLATFORM support", but the
+> > individual OMAP2/3/4/5 and AM33XX platforms can all be selected independent
+> > of what we are building for, which is a bug and prevents us from easily
+> > building e.g. an ARMv7-only defconfig.
+> > 
+> > This makes ARCH_OMAP2 depend on ARCH_MULTI_V6 and the others depend on
+> > ARCH_MULTI_V7, to ensure we really only build the platforms for the
+> > CPUs we have enabled in the global multiplatform configuration step.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> 
+Thanks, I've now applied it to the next/fixes-non-critical branch.
 
-This should not be volatile.  You should know by now the stance in the
-Linux community against using volatile on data declarations.  See
-Documentation/volatile-considered-harmful.txt to remind yourself of
-the reasoning.
-
-> +
-> +void mcpm_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr)
-> +{
-> +	unsigned long val = ptr ? virt_to_phys(ptr) : 0;
-> +	mcpm_entry_vectors[cluster][cpu] = val;
-> +	__cpuc_flush_dcache_area((void *)&mcpm_entry_vectors[cluster][cpu], 4);
-> +	outer_clean_range(__pa(&mcpm_entry_vectors[cluster][cpu]),
-> +			  __pa(&mcpm_entry_vectors[cluster][cpu + 1]));
-
-And really, if the write hasn't been done by the compiler prior to calling
-__cpuc_flush_dcache_area() then we're into really bad problems.
+	Arnd
