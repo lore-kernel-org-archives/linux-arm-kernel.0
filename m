@@ -1,31 +1,55 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Mon, 22 Apr 2013 19:17:10 -0700
-Subject: [PATCH] ARM: mm: Get rid of L_PTE_USER ref from PAGE_S2_DEVICE
-Message-ID: <1366683430-24328-1-git-send-email-cdall@cs.columbia.edu>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Tue, 23 Apr 2013 14:20:46 +1200
+Subject: [RFC PATCH v2 12/13] ARM: mach-vt8500: cpus/cpu nodes dts updates
+In-Reply-To: <5175EE3E.7080809@prisktech.co.nz>
+References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366644455-16550-13-git-send-email-lorenzo.pieralisi@arm.com>
+ <5175EE3E.7080809@prisktech.co.nz>
+Message-ID: <5175EFFE.7020903@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-THe L_PTE_USER actually has nothing to do with stage 2 mappings and the
-L_PTE_S2_RDONLY value sets the readable bit, which was what L_PTE_USER
-was used for before proper handling of stage 2 memory defines.
+On 23/04/13 14:13, Tony Prisk wrote:
+> On 23/04/13 03:27, Lorenzo Pieralisi wrote:
+>> This patch updates the in-kernel dts files according to the latest cpus
+>> and cpu bindings updates for ARM.
+>>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> ---
+>>   arch/arm/boot/dts/wm8505.dtsi | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/boot/dts/wm8505.dtsi 
+>> b/arch/arm/boot/dts/wm8505.dtsi
+>> index e74a1c0..a470808 100644
+>> --- a/arch/arm/boot/dts/wm8505.dtsi
+>> +++ b/arch/arm/boot/dts/wm8505.dtsi
+>> @@ -13,7 +13,7 @@
+>>         cpus {
+>>           cpu at 0 {
+>> -            compatible = "arm,arm926ejs";
+>> +            compatible = "arm,arm926";
+>>           };
+>>       };
+> As the only author for that file, and the arch-vt8500 maintainer, a CC 
+> would have been nice :)
+>
+> This binding is still incomplete.device_type, compatible and reg are 
+> all required properties.
+> Also, you seem to have only fixed the wm8505.dtsi, while vt8500.dtsi, 
+> wm8650.dtsi and wm8850.dtsi are all left incorrect.
+>
+> I am already carrying a patch to fix all this properly so could you 
+> drop the arch-vt8500 related patch and I will send in a more complete 
+> version for 3.11
+>
+> Regards
+> Tony Prisk
 
-Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
----
- arch/arm/include/asm/pgtable.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I didn't notice the rules had been changed in the last patch - shouldn't 
+you be changing the rules (read: binding) before changing the devicetree 
+files?
+Request still stands - please drop this patch and I will submit a more 
+complete one with the other SoCs updated as well.
 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 80d6fc4..1d1f97f 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -88,7 +88,7 @@ extern pgprot_t		pgprot_s2_device;
- #define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
- #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
- #define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
--#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_USER | L_PTE_S2_RDONLY)
-+#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_S2_RDONLY)
- 
- #define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN | L_PTE_NONE)
- #define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
--- 
-1.7.10.4
+Tony P
