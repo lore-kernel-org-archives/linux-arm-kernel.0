@@ -1,39 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 23 Apr 2013 21:15:23 +0400
-Subject: [PATCH v3 4/4] ARM: shmobile: Marzen: enable VIN and ADV7180 in
- defconfig
-In-Reply-To: <201304232106.45889.sergei.shtylyov@cogentembedded.com>
-References: <201304232106.45889.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201304232115.24523.sergei.shtylyov@cogentembedded.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 23 Apr 2013 10:17:02 -0700
+Subject: [PATCH 18/21] usb: phy: tegra: don't call into tegra-ehci directly
+In-Reply-To: <1366734653-488286-19-git-send-email-arnd@arndb.de>
+References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
+ <1366734653-488286-19-git-send-email-arnd@arndb.de>
+Message-ID: <20130423171701.GA31397@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+On Tue, Apr 23, 2013 at 06:30:50PM +0200, Arnd Bergmann wrote:
+> Both phy-tegra-usb.c and ehci-tegra.c export symbols used by the other one,
+> which does not work if one of them or both are loadable modules, resulting
+> in an error like:
+> 
+> drivers/built-in.o: In function `utmi_phy_clk_disable':
+> drivers/usb/phy/phy-tegra-usb.c:302: undefined reference to `tegra_ehci_set_phcd'
+> drivers/built-in.o: In function `utmi_phy_clk_enable':
+> drivers/usb/phy/phy-tegra-usb.c:324: undefined reference to `tegra_ehci_set_phcd'
+> drivers/built-in.o: In function `utmi_phy_power_on':
+> drivers/usb/phy/phy-tegra-usb.c:447: undefined reference to `tegra_ehci_set_pts'
+> 
+> This turns the interface into a one-way dependency by letting the tegra ehci
+> driver pass two function pointers for callbacks that need to be called by
+> the phy driver.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Venu Byravarasu <vbyravarasu@nvidia.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Stephen Warren <swarren@nvidia.com>
+> Cc: linux-usb at vger.kernel.org
+> ---
+>  drivers/usb/host/ehci-tegra.c     | 10 +++++-----
+>  drivers/usb/phy/tegra_usb_phy.c   | 13 +++++++++----
+>  include/linux/usb/tegra_usb_phy.h | 10 +++++-----
+>  3 files changed, 19 insertions(+), 14 deletions(-)
 
-Add the VIN and ADV7180 drivers to 'marzen_defconfig'.
+Not all of these files are in my usb-next tree, so I can't take this
+patch, sorry.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
- arch/arm/configs/marzen_defconfig |    7 +++++++
- 1 file changed, 7 insertions(+)
-
-Index: renesas/arch/arm/configs/marzen_defconfig
-===================================================================
---- renesas.orig/arch/arm/configs/marzen_defconfig
-+++ renesas/arch/arm/configs/marzen_defconfig
-@@ -84,6 +84,13 @@ CONFIG_GPIO_RCAR=y
- CONFIG_THERMAL=y
- CONFIG_RCAR_THERMAL=y
- CONFIG_SSB=y
-+CONFIG_MEDIA_SUPPORT=y
-+CONFIG_MEDIA_CAMERA_SUPPORT=y
-+CONFIG_V4L_PLATFORM_DRIVERS=y
-+CONFIG_SOC_CAMERA=y
-+CONFIG_VIDEO_RCAR_VIN=y
-+# CONFIG_MEDIA_SUBDRV_AUTOSELECT is not set
-+CONFIG_VIDEO_ADV7180=y
- CONFIG_USB=y
- CONFIG_USB_RCAR_PHY=y
- CONFIG_MMC=y
+greg k-h
