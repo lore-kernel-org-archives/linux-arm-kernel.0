@@ -1,71 +1,56 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 23 Apr 2013 15:53:39 -0400 (EDT)
-Subject: [PATCH v4 11/15] drivers/bus: add ARM CCI support
-In-Reply-To: <20130423193805.GC5316@n2100.arm.linux.org.uk>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <1360041732-17936-12-git-send-email-nicolas.pitre@linaro.org>
- <20130423193805.GC5316@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.03.1304231545350.17375@syhkavp.arg>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 23 Apr 2013 16:55:58 -0300
+Subject: [PATCH] drivers: memory: Introduce Marvell EBU Device Bus driver
+In-Reply-To: <20130423194822.GA7214@kroah.com>
+References: <1366744886-3019-1-git-send-email-elezegarcia@gmail.com>
+ <20130423194822.GA7214@kroah.com>
+Message-ID: <20130423195556.GA3335@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Apr 2013, Russell King - ARM Linux wrote:
-
-> On Tue, Feb 05, 2013 at 12:22:08AM -0500, Nicolas Pitre wrote:
-> > +void disable_cci(int cluster)
-> > +{
-> > +	u32 slave_reg = cluster ? CCI400_KF_OFFSET : CCI400_EAG_OFFSET;
-> > +	writel_relaxed(0x0, info->baseaddr + slave_reg);
-> > +
-> > +	while (readl_relaxed(info->baseaddr + CCI_STATUS_OFFSET)
-> > +						& STATUS_CHANGE_PENDING)
-> > +			barrier();
-> > +}
-> > +EXPORT_SYMBOL_GPL(disable_cci);
+On Tue, Apr 23, 2013 at 12:48:22PM -0700, Greg KH wrote:
+> On Tue, Apr 23, 2013 at 04:21:26PM -0300, Ezequiel Garcia wrote:
+> > From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > 
+> > Marvell EBU SoCs such as Armada 370/XP, Orion5x (88f5xxx) and
+> > Discovery (mv78xx0) supports a Device Bus controller to access several
+> > kinds of memories and I/O devices (NOR, NAND, SRAM, FPGA).
+> > 
+> > This commit adds a driver to handle this controller. So far only
+> > Armada 370, Armada XP and Discovery SoCs are supported.
+> > 
+> > The driver must be registered through a device tree node;
+> > as explained in the binding document.
+> > 
+> > For each child node in the device tree, this driver will:
+> >   * set timing parameters
+> >   * register a child device
+> >   * setup an address decoding window, using the mbus driver
+> > 
+> > Keep in mind the address decoding window setup is only a temporary hack.
+> > This code will be removed from this devbus driver as soon as a proper device
+> > tree binding for the mbus driver is added.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> > Hi Greg,
+> > 
+> > This patch Applies on today linux-next.
+> > I don't know if we are still in time for you to take this
+> > and merge it into v3.10.
+> > 
+> > All of the DT related changes are in linux-next through arm-soc,
+> > but this driver was left out and, unless you take it, will
+> > get queued for v3.11. So it's up to you.
 > 
-> This will blow up if the cci driver hasn't been probed - which I guess is
-> fine.
+> It's way too late for new drivers for 3.10, sorry.  I'll hold on to this
+> and merge it to my trees after 3.10-rc1 is out for inclusion in 3.11.
 > 
-> > +
-> > +static int cci_driver_probe(struct platform_device *pdev)
-> > +{
-> > +	struct resource *res;
-> > +	int ret = 0;
-> > +
-> > +	info = kzalloc(sizeof(*info), GFP_KERNEL);
-> > +	if (!info) {
-> > +		dev_err(&pdev->dev, "unable to allocate mem\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	if (!res) {
-> > +		dev_err(&pdev->dev, "No memory resource\n");
-> > +		ret = -EINVAL;
-> > +		goto mem_free;
-> > +	}
-> > +
-> > +	if (!request_mem_region(res->start, resource_size(res),
-> > +				dev_name(&pdev->dev))) {
-> > +		dev_err(&pdev->dev, "address 0x%x in use\n", (u32) res->start);
-> > +		ret = -EBUSY;
-> > +		goto mem_free;
-> > +	}
-> > +
-> > +	info->baseaddr = ioremap(res->start, resource_size(res));
-> 
-> As we are moving stuff over to the devm_* APIs, it would be a good idea to
-> avoid introducing new code not using those APIs - otherwise it just creates
-> yet more churn, something which Linus objects to.  Can we please try in
-> future to avoid creating stuff which then needs to be subsequently modified
-> for the latest ways to do stuff...
 
-This driver is not part of the MCPM pull request.  It was provided to 
-illustrate how the MCPM layer is meant to be used.  The on-going 
-discussion about CPU/cluster/CCI deviice tree bindings by Lorenzo will 
-significantly enhance this driver.  And given the current timing it is 
-likely that the enhanced driver will simply replace this one during the 
-next cycle, so we should take your comment into account.
+That's fine, no problem.
 
-
-Nicolas
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
