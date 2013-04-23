@@ -1,46 +1,40 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 23 Apr 2013 07:07:45 +0200
-Subject: [RFC][PATCH] video: imx: Select VIDEOMODE_HELPERS
-In-Reply-To: <201304230157.47992.marex@denx.de>
-References: <1366666110-9585-1-git-send-email-marex@denx.de>
- <CAOMZO5Av8RyptoxAQ13Psxjjd4nhHVbEJoVm6SqyLr55bPmSng@mail.gmail.com>
- <201304230157.47992.marex@denx.de>
-Message-ID: <20130423050745.GO32299@pengutronix.de>
+From: mpfj-list@newflow.co.uk (Mark Jackson)
+Date: Tue, 23 Apr 2013 06:11:06 +0100
+Subject: [PATCH 0/3] Dual EMAC mode implementation of CPSW
+In-Reply-To: <51756CF2.4050602@ti.com>
+References: <1360612340-9266-1-git-send-email-mugunthanvnm@ti.com>
+ <516B0098.4040809@mimc.co.uk> <516C33D2.4050105@ti.com>
+ <516C38B9.50904@mimc.co.uk> <516C3A0D.70903@ti.com>
+ <517018E6.6080108@newflow.co.uk> <51754427.7000908@newflow.co.uk>
+ <51756CF2.4050602@ti.com>
+Message-ID: <517617EA.7050807@newflow.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 01:57:47AM +0200, Marek Vasut wrote:
-> Dear Fabio Estevam,
-> 
-> > Hi Marek,
-> > 
-> > On Mon, Apr 22, 2013 at 6:28 PM, Marek Vasut <marex@denx.de> wrote:
-> > > Without this, I get the following problem when building kernel:
-> > > 
-> > > drivers/built-in.o: In function `imx_pd_connector_get_modes':
-> > > /linux-2.6/drivers/staging/imx-drm/parallel-display.c:78: undefined
-> > > reference to `of_get_drm_display_mode' make: *** [vmlinux] Error 1
-> > > 
-> > > NOTE: I think this patch is almost absolutely not correct.
-> > > 
-> > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > Patch looks good, but you should have copied Greg Kroah-Hartman, as he
-> > is the one who takes patches into staging.
-> 
-> I'm not sure if the select is at correct symbol, I dont think it is.
+On 22/04/13 18:01, Mugunthan V N wrote:
+> On 4/22/2013 7:37 PM, Mark Jackson wrote:
+>> Mugunthan
+>>
+>> Can you confirm that I'm actually trying to achieve the right thing ?
+>>
+>> I have all along assumed that Dual EMAC mode would simply provide the
+>> kernel will a pair of independent Ethernet ports.
+> Yes, it will provide two network interfaces for ex eth0 and eth1
+>> All I am trying to do is to get both Ethernet ports working so I can
+>> have one port on (say) 10.0.x.x and the other on (say) 10.1.x.x
+> This is perfectly correct
+>> But there is all this reference to VLANs(in the source code and the TRM)
+>> ... I have not setup any VLANs.  Do I need to ?  If so, how ?
+> No need to setup any VLAN. VLAN are used to segregate the
+> two down stream ports and it will be taken care by the driver
 
-No it's not. The parallel display driver needs it, not the i.MX drm
-support in general.
+Mugunthan
 
-Sascha
+I now have this all working, thanks to Markus Brunner who spotted that
+the CPSW_VLAN_AWARE bit is being incorrectly set rather than cleared in
+cpsw_init_host_port().
 
+I think he will be posting a patch soon.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Mark J.
