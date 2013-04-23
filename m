@@ -1,44 +1,23 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 23 Apr 2013 12:29:48 +0200
-Subject: [RFC][PATCH] video: imx: Select VIDEOMODE_HELPERS
-In-Reply-To: <20130423050745.GO32299@pengutronix.de>
-References: <1366666110-9585-1-git-send-email-marex@denx.de>
- <201304230157.47992.marex@denx.de> <20130423050745.GO32299@pengutronix.de>
-Message-ID: <201304231229.48511.marex@denx.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 23 Apr 2013 12:42:12 +0200
+Subject: [PATCH] ARM: ux500: Supply a DTS file for the u8540 platform
+In-Reply-To: <20130404072907.GB3004@gmail.com>
+References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
+ <1364908916-29803-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdafSvT5Xb=7sqnkRHcc4UKkVzr8jzThMgWn6459RDmKGw@mail.gmail.com>
+ <20130404072907.GB3004@gmail.com>
+Message-ID: <CACRpkdZL=j+gj8dFbWMfYiNFisjQj23HKiMeZXk+OAfcp=j4zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sascha Hauer,
+On Thu, Apr 4, 2013 at 9:29 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> On Tue, Apr 23, 2013 at 01:57:47AM +0200, Marek Vasut wrote:
-> > Dear Fabio Estevam,
-> > 
-> > > Hi Marek,
-> > > 
-> > > On Mon, Apr 22, 2013 at 6:28 PM, Marek Vasut <marex@denx.de> wrote:
-> > > > Without this, I get the following problem when building kernel:
-> > > > 
-> > > > drivers/built-in.o: In function `imx_pd_connector_get_modes':
-> > > > /linux-2.6/drivers/staging/imx-drm/parallel-display.c:78: undefined
-> > > > reference to `of_get_drm_display_mode' make: *** [vmlinux] Error 1
-> > > > 
-> > > > NOTE: I think this patch is almost absolutely not correct.
-> > > > 
-> > > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> > > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > > 
-> > > Patch looks good, but you should have copied Greg Kroah-Hartman, as he
-> > > is the one who takes patches into staging.
-> > 
-> > I'm not sure if the select is at correct symbol, I dont think it is.
-> 
-> No it's not. The parallel display driver needs it, not the i.MX drm
-> support in general.
+> This is a skeleton DTS file which only enables serial. Just using
+> this simple file yields a terminal when booting u8540.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Yep, I expected this coming, thus RFC. I'll roll out new patch and move this to 
-parallel display, ok?
+I've queued this patch for v3.11.
 
-Best regards,
-Marek Vasut
+Yours,
+Linus Walleij
