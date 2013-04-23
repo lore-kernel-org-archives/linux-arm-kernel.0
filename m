@@ -1,108 +1,93 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 23 Apr 2013 14:12:15 +0100
-Subject: [PATCH V2 4/4] arm64: Add initial DTS for APM X-Gene Storm SOC
- and APM Mustang board
-In-Reply-To: <1366712759-3431-5-git-send-email-vkale@apm.com>
-References: <1366712759-3431-1-git-send-email-vkale@apm.com>
- <1366712759-3431-5-git-send-email-vkale@apm.com>
-Message-ID: <20130423131215.GB28663@e106331-lin.cambridge.arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 23 Apr 2013 21:25:11 +0800
+Subject: [RFC PATCH v2 03/13] ARM: mach-at91: cpus/cpu node dts updates
+In-Reply-To: <51768892.7060807@gmail.com>
+References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366644455-16550-4-git-send-email-lorenzo.pieralisi@arm.com>
+ <51768892.7060807@gmail.com>
+Message-ID: <C0C2D01E-6F76-4606-9F63-70F3877C02BB@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tue, Apr 23, 2013 at 11:25:59AM +0100, Vinayak Kale wrote:
-> This patch adds initial DTS files required for APM Mustang board.
+On Apr 23, 2013, at 9:11 PM, Rob Herring <robherring2@gmail.com> wrote:
+
+> On 04/22/2013 10:27 AM, Lorenzo Pieralisi wrote:
+>> This patch updates the in-kernel dts files according to the latest cpus
+>> and cpu bindings updates for ARM.
+>> 
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> ---
+>> arch/arm/boot/dts/at91sam9260.dtsi | 2 +-
+>> arch/arm/boot/dts/at91sam9263.dtsi | 2 +-
+>> arch/arm/boot/dts/at91sam9g45.dtsi | 2 +-
+>> arch/arm/boot/dts/at91sam9n12.dtsi | 2 +-
+>> 4 files changed, 4 insertions(+), 4 deletions(-)
+>> 
+>> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+>> index cb7bcc5..2e9de85 100644
+>> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+>> @@ -33,7 +33,7 @@
+>> 	};
+>> 	cpus {
+>> 		cpu at 0 {
+>> -			compatible = "arm,arm926ejs";
+>> +			compatible = "arm,arm926";
 > 
-> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
-> Signed-off-by: Loc Ho <lho@apm.com>
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
->  arch/arm64/boot/dts/Makefile        |    1 +
->  arch/arm64/boot/dts/apm-mustang.dts |   27 ++++++++
->  arch/arm64/boot/dts/apm-storm.dtsi  |  116 +++++++++++++++++++++++++++++++++++
->  3 files changed, 144 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/apm-mustang.dts
->  create mode 100644 arch/arm64/boot/dts/apm-storm.dtsi
+> I don't understand why you are doing this. If this does not match the
+> documentation, fix the documentation. We can't continue on changing dts
+> files without reqard to breaking compatibility.
+
+agreed and on AT91 it's a arm926ejs cpu
 > 
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index 68457e9..c52bdb0 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -1,4 +1,5 @@
->  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
-> +dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
->  
->  targets += dtbs
->  targets += $(dtb-y)
-> diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
-> new file mode 100644
-> index 0000000..625322c
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/apm-mustang.dts
-> @@ -0,0 +1,27 @@
-> +/*
-> + * dts file for AppliedMicro (APM) Mustang Board
-> + *
-> + * Copyright (C) 2013, Applied Micro Circuits Corporation
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +/include/ "apm-storm.dtsi"
-> +
-> +/ {
-> +	model = "mustang";
-> +
-> +	chosen {
-> +		linux,stdout-path = &serial0;
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-> new file mode 100644
-> index 0000000..d3f3f5d
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-> @@ -0,0 +1,116 @@
-> +/*
-> + * dts file for AppliedMicro (APM) X-Gene Storm SOC
-> + *
-> + * Copyright (C) 2013, Applied Micro Circuits Corporation
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
-> + */
-> +
-> +/ {
-> +	compatible = "apm,xgene,storm", "apm,xgene";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 000 {
-> +			device_type = "cpu";
-> +			compatible = "apm,xgene", "arm,armv8";
-
-You've used the "apm,xgene" compatible string for both the CPU and the board.
-
-In PATCH 3, you added APM_CPU_PART_POTENZA, so presumably "apm,potenza" makes
-more sense as the CPU compatible string?
-
-Thanks,
-Mark.
+> Rob
+> 
+>> 		};
+>> 	};
+>> 
+>> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+>> index 271d4de..25c4725 100644
+>> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+>> @@ -30,7 +30,7 @@
+>> 	};
+>> 	cpus {
+>> 		cpu at 0 {
+>> -			compatible = "arm,arm926ejs";
+>> +			compatible = "arm,arm926";
+>> 		};
+>> 	};
+>> 
+>> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+>> index 6b1d4ca..cf647d1 100644
+>> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+>> @@ -36,7 +36,7 @@
+>> 	};
+>> 	cpus {
+>> 		cpu at 0 {
+>> -			compatible = "arm,arm926ejs";
+>> +			compatible = "arm,arm926";
+>> 		};
+>> 	};
+>> 
+>> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+>> index 7750f98..d531ae3 100644
+>> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+>> @@ -32,7 +32,7 @@
+>> 	};
+>> 	cpus {
+>> 		cpu at 0 {
+>> -			compatible = "arm,arm926ejs";
+>> +			compatible = "arm,arm926";
+>> 		};
+>> 	};
+>> 
+>> 
+> 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
