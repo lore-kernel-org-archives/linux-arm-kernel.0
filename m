@@ -1,59 +1,103 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 23 Apr 2013 16:03:14 +0100
-Subject: [PATCH 10/10] ARM: ux500: Remove empty function
- u8500_of_init_devices()
-In-Reply-To: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
-References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366729394-11406-11-git-send-email-lee.jones@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 23 Apr 2013 20:37:48 +0530
+Subject: [V3 patch 06/19] cpuidle: make a single register function for all
+In-Reply-To: <5176990F.5070605@linaro.org>
+References: <1365770165-27096-1-git-send-email-daniel.lezcano@linaro.org>
+ <1365770165-27096-7-git-send-email-daniel.lezcano@linaro.org>
+ <516FB35D.7000303@ti.com> <51769011.7030608@linaro.org>
+ <51769316.9090309@ti.com> <5176990F.5070605@linaro.org>
+Message-ID: <5176A3C4.2020008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As promised, now all devices which resided in u8500_of_init_devices()
-have been enabled for Device Tree, we can completely remove it.
+On Tuesday 23 April 2013 07:52 PM, Daniel Lezcano wrote:
+> On 04/23/2013 03:56 PM, Santosh Shilimkar wrote:
+>> On Tuesday 23 April 2013 07:13 PM, Daniel Lezcano wrote:
+>>> On 04/18/2013 10:48 AM, Santosh Shilimkar wrote:
+>>>> On Friday 12 April 2013 06:05 PM, Daniel Lezcano wrote:
+>>>>> The usual scheme to initialize a cpuidle driver on a SMP is:
+>>>>>
+>>>>> 	cpuidle_register_driver(drv);
+>>>>> 	for_each_possible_cpu(cpu) {
+>>>>> 		device = &per_cpu(cpuidle_dev, cpu);
+>>>>> 		cpuidle_register_device(device);
+>>>>> 	}
+>>>>>
+>>>> Not exactly related to $subject patch but the driver should
+>>>> be registered after all devices has been registered to avoid
+>>>> devices start using the idle state data as soon as it is
+>>>> registered. In multi CPU system, this race can easily happen.
+>>>
+>>> Could you elaborate what problems the system will be facing if a cpu
+>>> starts using the idle state data as soon as it is registered ?
+>>>
+>>> Is there a bug related to this ?
+>>>
+>> Ofcouse. In multi-CPU scenario, where CPU C-states needs co-ordination
+>> can just lead into unknown issues if all the CPUs are not already part
+>> registered.
+> 
+> Hmm, ok. I don't see a scenario, with the current code, where that could
+> occurs. The coupled idle state will wait for the other cpus to enter
+> idle before initiating a shutdown sequence and, so far, the other sync
+> algorithm (last man standing) are doing the same.
+> 
+Its no just couple idle state usages. CPUs do share power domains, clock
+domains, clocks etc. One CPU going ahead and tampering/progarmming
+the low power states till the next one isn't registered yet
+can lead to issues.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/cpu-db8500.c |   14 +-------------
- 1 file changed, 1 insertion(+), 13 deletions(-)
+> There are some systems with 1024 cpus, and I did not heard problems like
+> this.
+> 
+That is because todays CPUIDLe core code doesn't let that happen. Once
+you fix the ordering issue, there is window where the issue could happen.
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 36ef6ed..a2c83c2 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -221,15 +221,6 @@ struct device * __init u8500_init_devices(struct ab8500_platform_data *ab8500)
- }
- 
- #ifdef CONFIG_MACH_UX500_DT
--
--/* TODO: Once all pieces are DT:ed, remove completely. */
--static struct device * __init u8500_of_init_devices(void)
--{
--	struct device *parent = db8500_soc_device_init();
--
--	return parent;
--}
--
- static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	/* Requires call-back bindings. */
- 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
-@@ -288,7 +279,7 @@ static const struct of_device_id u8500_local_bus_nodes[] = {
- 
- static void __init u8500_init_machine(void)
- {
--	struct device *parent = NULL;
-+	struct device *parent = db8500_soc_device_init();
- 
- 	/* Pinmaps must be in place before devices register */
- 	if (of_machine_is_compatible("st-ericsson,mop500"))
-@@ -301,9 +292,6 @@ static void __init u8500_init_machine(void)
- 	else if (of_machine_is_compatible("st-ericsson,ccu9540")) {}
- 		/* TODO: Add pinmaps for ccu9540 board. */
- 
--	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
--	parent = u8500_of_init_devices();
--
- 	/* automatically probe child nodes of db8500 device */
- 	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
- }
--- 
-1.7.10.4
+> Do you know a system where this problem occurred ? Or is it something
+> you suspect that can happen ?
+> 
+See above. Its more prone to issues true for systems with higher
+number of CPUs. Not sure if that was the reason the core code, doesn't
+proceed without all the devices are registered ?
+
+> That would be interesting to have a system where this race occurs in
+> order to check the modifications will solve the issue.
+> 
+I haven't see the issue myself but logically it could easily happen
+once the core code is fixed.
+
+>>>> Current CPUIDLE core layer is also written with the assumption
+>>>> that driver will be registered first and then the devices which
+>>>> is not mandatory as per typical drive/device model.
+>>>
+>>> Yes, that's true. The framework assumes cpuidle_register_driver is
+>>> called before cpuidle_register_device.
+>>>
+>>>> May be you can fix that part while you are creating this common
+>>>> wrapper.
+>>>
+>>> Personally, as that will modify the cpuidle core layer and the changes
+>>> are not obvious (because of the design of the code) I prefer to do that
+>>> in a separate patchset if it is worth to do it - if there is a bug
+>>> related to it, then there is no discussion, we have to do it :)
+>>>
+>> Sure. It would have been nice if you would have clarified that before
+>> posting the next version.
+>>
+>> You still need to fix the kernel doc in your v4 though.
+> 
+> Which one ? "s/accross/across" ?
+> 
+s/*/** below hunk in v4
+
++/*
++ * cpuidle_unregister: unregister a driver and the devices. This function
++ * can be used only if the driver has been previously registered through
++ * the cpuidle_register function.
++ *
++ * @drv: a valid pointer to a struct cpuidle_driver
++ */
++void cpuidle_unregister(struct cpuidle_driver *drv)
++{
++	int cpu;
++	struct cpuidle_device *device;
