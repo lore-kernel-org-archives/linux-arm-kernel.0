@@ -1,64 +1,37 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Tue, 23 Apr 2013 10:29:11 -0700
-Subject: [PATCH 04/21] ARM: kvm: define KVM_ARM_MAX_VCPUS unconditionally
-In-Reply-To: <1366734653-488286-5-git-send-email-arnd@arndb.de>
-References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
- <1366734653-488286-5-git-send-email-arnd@arndb.de>
-Message-ID: <CAEDV+gKEf5-uau8WxxuMk0+p0N5ba2AMKj8-O6kbZv1OiWDVpQ@mail.gmail.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Tue, 23 Apr 2013 22:59:34 +0530
+Subject: [PATCH] remove vlan tags in CPSW dual emac mode
+In-Reply-To: <4699400.vD3TdgH1nR@localhost>
+References: <4699400.vD3TdgH1nR@localhost>
+Message-ID: <5176C4FE.4080305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 9:30 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The CONFIG_KVM_ARM_MAX_VCPUS symbol is needed in order to build the
-> kernel/context_tracking.c code, which includes the vgic data structures
-> implictly through the kvm headers. Definining the symbol to zero
-> on builds without KVM resolves this build error:
+On 4/23/2013 9:48 PM, Markus Brunner wrote:
+> If operating in dual emac mode all packets sent by the CPSW contain vlan headers with the reserved VID 0,
+> which gets stripped away by all somewhat recent Linux versions. Operating systems without that behaviour will fail to communicate.
+> This patch fixes that behaviour by disabling the VLAN_AWARE mode as already described by the comment above.
 >
-> In file included from include/linux/kvm_host.h:33:0,
->                  from kernel/context_tracking.c:18:
-> arch/arm/include/asm/kvm_host.h:28:23: warning: "CONFIG_KVM_ARM_MAX_VCPUS" is not defined [-Wundef]
->  #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
->                        ^
-> arch/arm/include/asm/kvm_vgic.h:34:24: note: in expansion of macro 'KVM_MAX_VCPUS'
->  #define VGIC_MAX_CPUS  KVM_MAX_VCPUS
->                         ^
-> arch/arm/include/asm/kvm_vgic.h:38:6: note: in expansion of macro 'VGIC_MAX_CPUS'
->  #if (VGIC_MAX_CPUS > 8)
->       ^
-> In file included from arch/arm/include/asm/kvm_host.h:41:0,
->                  from include/linux/kvm_host.h:33,
->                  from kernel/context_tracking.c:18:
-> arch/arm/include/asm/kvm_vgic.h:59:11: error: 'CONFIG_KVM_ARM_MAX_VCPUS' undeclared here (not in a function)
->   } percpu[VGIC_MAX_CPUS];
->            ^
+> Signed-off-by: Markus Brunner <systemprogrammierung.brunner@gmail.com>
+> Tested-by: Mark Jackson <mpfj@newflow.co.uk>
 >
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Christoffer Dall <cdall@cs.columbia.edu>
-> Cc: Will Deacon <will.deacon@arm.com>
 > ---
->  arch/arm/kvm/Kconfig | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-> index 49dd64e..370e1a8 100644
-> --- a/arch/arm/kvm/Kconfig
-> +++ b/arch/arm/kvm/Kconfig
-> @@ -41,9 +41,9 @@ config KVM_ARM_HOST
->           Provides host support for ARM processors.
->
->  config KVM_ARM_MAX_VCPUS
-> -       int "Number maximum supported virtual CPUs per VM"
-> -       depends on KVM_ARM_HOST
-> -       default 4
-> +       int "Number maximum supported virtual CPUs per VM" if KVM_ARM_HOST
-> +       default 4 if KVM_ARM_HOST
-> +       default 0
->         help
->           Static number of max supported virtual CPUs per VM.
->
-> --
-> 1.8.1.2
->
+> --- linux-3.9-rc8.orig/drivers/net/ethernet/ti/cpsw.c	2013-04-23 17:26:11.000000000 +0200
+> +++ linux-3.9-rc8/drivers/net/ethernet/ti/cpsw.c	2013-04-23 17:36:25.000000000 +0200
+> @@ -751,9 +751,9 @@ static void cpsw_init_host_port(struct c
+>   	/* switch to vlan unaware mode */
+>   	cpsw_ale_control_set(priv->ale, priv->host_port, ALE_VLAN_AWARE,
+>   			     CPSW_ALE_VLAN_AWARE);
+>   	control_reg = readl(&priv->regs->control);
+> -	control_reg |= CPSW_VLAN_AWARE;
+> +	control_reg &= ~CPSW_VLAN_AWARE;
+>   	writel(control_reg, &priv->regs->control);
+>   	fifo_mode = (priv->data.dual_emac) ? CPSW_FIFO_DUAL_MAC_MODE :
+>   		     CPSW_FIFO_NORMAL_MODE;
+>   	writel(fifo_mode, &priv->host_port_regs->tx_in_ctl);
+Disabling VLAN aware mode will enable switching mode and the feature of
+separating the two down stream port is lost with this patch
+Please check TRM for more info in *14.3.2.10.2 Dual Mac Mode* chapter
 
-Acked-by: Christoffer Dall <cdall@cs.columbia.edu>
+Regards
+Mugunthan V N
