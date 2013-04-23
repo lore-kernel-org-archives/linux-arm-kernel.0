@@ -1,30 +1,22 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 23 Apr 2013 10:17:34 -0700
-Subject: [PATCH 19/21] usb: phy: don't mark usb_bind_phy as __init
-In-Reply-To: <1366734653-488286-20-git-send-email-arnd@arndb.de>
-References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
- <1366734653-488286-20-git-send-email-arnd@arndb.de>
-Message-ID: <20130423171734.GA31432@kroah.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 23 Apr 2013 21:18:42 +0400
+Subject: [PATCH v3 0/5] OKI ML86V7667 driver and R8A7778/BOCK-W VIN support
+Message-ID: <201304232118.43686.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 06:30:51PM +0200, Arnd Bergmann wrote:
-> It makes no sense for a symbol to be both exported and marked __init,
-> because any users in modules would be calling this function after
-> it gets discarded. Further, this patch revolves a section mismatch
-> warning from usbhs_init_phys(), which is intentionally not marked
-> __init:
-> 
-> WARNING: vmlinux.o(.text+0x413f8): Section mismatch in reference from
-> the function usbhs_init_phys() to the function .init.text:usb_bind_phy()
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: linux-usb at vger.kernel.org
-> ---
->  drivers/usb/otg/otg.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Hello.
 
-What tree has this file?  It's not mine :(
+   Here's the set of 5 patches against the Simon Horman's 'renesas.git' repo,
+'renesas-next-20130422' tag and my recent yet unapplied patches. Here we
+add the OKI ML86V7667 video decoder driver and the VIN platform code working on
+the R8A7778/BOCK-W with ML86V7667. The driver patch also applies (with offsets)
+to Mauro's 'media_tree.git'...
+
+[1/5] V4L2: I2C: ML86V7667 video decoder driver
+[2/5] sh-pfc: r8a7778: add VIN pin groups
+[3/5] ARM: shmobile: r8a7778: add VIN support
+[4/5] ARM: shmobile: BOCK-W: add VIN and ML86V7667 support
+[5/5] ARM: shmobile: BOCK-W: enable VIN and ML86V7667 in defconfig
+
+WBR, Sergei
