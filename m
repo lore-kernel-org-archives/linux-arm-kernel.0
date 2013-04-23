@@ -1,61 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Apr 2013 21:04:29 +0100
-Subject: [PATCH v4 00/15] multi-cluster power management
-In-Reply-To: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20130423200429.GF5316@n2100.arm.linux.org.uk>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 23 Apr 2013 13:05:55 -0700
+Subject: [PATCH 14/21] staging: nvec: allow modular build
+In-Reply-To: <1373204.GiWOFfjzyB@ax5200p>
+References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
+ <4082180.JXNz6TsAKc@ax5200p> <201304232141.04123.arnd@arndb.de>
+ <1373204.GiWOFfjzyB@ax5200p>
+Message-ID: <20130423200555.GA31383@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 12:21:57AM -0500, Nicolas Pitre wrote:
-> This is version 4 of the patch series required to safely power up
-> and down CPUs in a cluster as can be found in b.L systems.  If nothing
-> major is reported, I'll send a pull request to Russell for this set
-> very soon.
+On Tue, Apr 23, 2013 at 09:55:48PM +0200, Marc Dietrich wrote:
+> On Tuesday 23 April 2013 21:41:03 Arnd Bergmann wrote:
+> > On Tuesday 23 April 2013, Marc Dietrich wrote:
+> > > On Tuesday 23 April 2013 18:30:46 Arnd Bergmann wrote:
+> > > > The serio code can be a loadable module, which in turn means that nvec
+> > > > also has to be a module, so mark it as "tristate" in Kconfig.
+> > > 
+> > > oh, I didn't saw this randconfig error posting. NVEC isn't prepared for
+> > > modularized builds yet (it's on the TODO list though). So better say
+> > > SERIO=y here. Looking a bit closer, there is other stuff which can also
+> > > be a module (GPIOLIB, I2C, ...) so these also need a =y.
+> > 
+> > What is the problem with building it as a module? It looks all fine in that
+> > regard.
+> 
+> It builds, but I haven't tried out it yet. At least the mfd children need to 
+> unregister the event notifier I guess. Anyway, I have no time to test this 
+> now, so I prefer to force =y for the dependencies for now.
+> 
+> > I also did not see any problems with the other symbols, but that may be
+> > because they get turned on as built-in even in allmodconfig. Marking it
+> > as tristate certainly avoids the problem altogether.
+> > 
+> > > Should a post a patch?
+> > 
+> > If you have follow-on patches, they need to go on top now, since Greg
+> > already took this patch.
+> 
+> arrr, I wonder why Greg thought that a 4 minute review time is enough :-(
 
-Okay, so from spending an hour or so quickly scanning these patches,
-on the face of it there are only a few comments I have which I'm very
-surprised that your exhaustive team of apparant reviewers didn't
-already catch.
+It was longer than 4 minutes...
 
-The biggest disappointment so far in this patch set is finding the
-re-use of the repeated cache handling stuff - when I've already made
-my feelings _well_ known towards re-using existing cache APIs (which
-are designed to handle a _purpose_) for different purposes "just
-because" they appear to do what you need on a particular CPU.  I've
-stated my objection to this kind of behaviour many times in the past,
-I've even _purposely_ broken stuff (mtd stuff) when that's happened in
-the past, and I've not changed my views on this one bit.  It's really
-surprising to me that someone who has been around for such a long time,
-and who knows my views on this, is pushing a patch set which goes
-against that, and somehow thinks that I won't have a problem with
-it... really?
+I trust Arnd, and it's only a staging driver, what's the worse thing
+that could happen to it?  :)
 
-What I suggest for the time being is to provide new inline function(s)
-in arch/arm/include/cacheflush.h which are purposed for your application,
-document them in that file, and call the implementation you're currently
-using.  That means if we do have to change it in the future (for example,
-we don't need to do anything in the dcache flushing stuff) we don't have
-to hunt through all the code to find _your_ different use of that function
-and fix it - we can just fix it in one place and we have the reference
-there for what your code expects.
+> I'll try to post a patch tomorrow then.
 
-Again, this is nothing new - I've made my position on this kind of stuff
-_exceedingly_ plain in the past.
+That would be great.
 
+thanks,
 
-That all said, my biggest concern so far from this set is the independent
-issue of moving the cache handling into generic code, so that we avoid
-the existing problem where every platform ends up implementing that stuff
-time and time again - and the impact that will have on this MCPM code.
-
-Currently as I see it, the two things are mutually incompatible with
-each other - and having discussed with Will, we'd come to the conclusion
-that I'd merge what I had because the comments alone on how the cpu
-hotplug stuff is supposed to work are a valuable improvement, even
-though the code changes don't completely solve all the issues.
-
-However, MCPMm gets in the way of that.  So... that presents a dilema...
-it's a case of this or that but not both.  Or do you think MCPM can
-survive with additional LOUIS flushing before the cpu die callback is
-called?
+greg k-h
