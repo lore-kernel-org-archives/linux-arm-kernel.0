@@ -1,50 +1,30 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 23 Apr 2013 14:31:52 -0700
-Subject: Multiple issues with omap4 panda es in linux next
-In-Reply-To: <20130423172353.GD10155@atomide.com>
-References: <20130419171318.GK10155@atomide.com> <5174F7A8.7070308@ti.com>
- <20130422180316.GA10155@atomide.com> <5176A45B.5@ti.com>
- <20130423172353.GD10155@atomide.com>
-Message-ID: <20130423213151.GM10155@atomide.com>
+Date: Tue, 23 Apr 2013 14:45:45 -0700
+Subject: [GIT PULL] musb regression on omap4 for v3.9
+Message-ID: <20130423214544.GN10155@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130423 10:28]:
-> * Kishon Vijay Abraham I <kishon@ti.com> [130423 08:15]:
-> > >>>2. MUSB fails with legacy booting and DT on panda es
-> > >>>
-> > >>>With both legacy and DT booting I get something like:
-> > >>>
-> > >>>HS USB OTG: no transceiver configured
-> > >>>musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
-> > >>
-> > >>The dt should work fine with https://patchwork.kernel.org/patch/2423061/.
-> > >
-> > >OK thanks for checking that.
-> > >
-> > >>But non-dt has got a real issue. We were using usb_bind_phy() for
-> > >>binding the controller with the PHY (we use device names). But in
-> > >>linux-next the device names have changed because of using
-> > >>PLATFORM_DEVID_AUTO. We can modify the usb_bind_phy() calls to use
-> > >>the new device names, But I suspect the device names can change
-> > >>again. Not sure what we can do here :-(
-> > >
-> > >Let's do a minimal fix for v3.10. Then we'll make omap4 DT only for
-> > >v3.11 and that problem is solved for good.
-> > 
-> > Have posted a patch https://patchwork.kernel.org/patch/2475521/ for
-> > getting MUSB functional in omap4 panda.
-> 
-> OK thanks. Paul it seems that this patch is still queued in one of
-> your branches?
-> 
-> Let me know if you want me to pick that one up for fixes for the
-> merge window, or if you have multiple patches to pull.
 
-Oops this I already have sitting in omap-for-v3.9-rc6/fixes.. Let's
-see if that can still get merged. Looks like I forgot to send off
-that one, sorry about that.
+The following changes since commit 31880c37c11e28cb81c70757e38392b42e695dc6:
 
-Regards,
+  Linux 3.9-rc6 (2013-04-07 20:49:54 -0700)
 
-Tony
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9-rc6/fixes-signed
+
+for you to fetch changes up to f4d7a536faa43f30d87f701268db76b8433a2a8b:
+
+  ARM: OMAP4: hwmod data: make 'ocp2scp_usb_phy_phy_48m" as the main clock (2013-04-10 13:26:07 -0700)
+
+----------------------------------------------------------------
+One MUSB regression fix that I forgot to send earlier. Without
+this MUSB no longer works on omap4 based devices.
+
+----------------------------------------------------------------
+Kishon Vijay Abraham I (1):
+      ARM: OMAP4: hwmod data: make 'ocp2scp_usb_phy_phy_48m" as the main clock
+
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
