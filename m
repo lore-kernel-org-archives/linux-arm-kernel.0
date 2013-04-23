@@ -1,46 +1,55 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Apr 2013 18:30:33 +0200
-Subject: [PATCH 01/21] Turn off -Wmaybe-uninitialized when building with -Os
+Date: Tue, 23 Apr 2013 18:30:38 +0200
+Subject: [PATCH 06/21] ARM: tegra: call cpu_do_idle from C code
 In-Reply-To: <1366734653-488286-1-git-send-email-arnd@arndb.de>
 References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
-Message-ID: <1366734653-488286-2-git-send-email-arnd@arndb.de>
+Message-ID: <1366734653-488286-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gcc-4.7 and higher add a lot of false positive warnings about
-potential uses of uninitialized warnings, but only when optimizing
-for size (-Os). This is the default when building allyesconfig,
-which turns on CONFIG_CC_OPTIMIZE_FOR_SIZE.
+When building a kernel for multiple CPU architecture levels,
+cpu_do_idle() is a macro for an indirect function call, which
+cannot be called from assembly code as Tegra does.
 
-In order to avoid getting a lot of patches that initialize such
-variables and accidentally hide real errors along the way, let's
-just turn off this warning on the respective gcc versions
-when building with size optimizations. The -Wmaybe-uninitialized
-option was introduced in the same gcc version (4.7) that is now
-causing the false positives, so there is no effect on older compilers.
-
-A side effect is that when building with CONFIG_CC_OPTIMIZE_FOR_SIZE,
-we might now see /fewer/ warnings about possibly uninitialized
-warnings than with -O2, but that is still much better than seeing
-warnings known to be bogus.
+Adding a trivial C wrapper for this function lets us build
+a tegra kernel with ARMv6 support enabled.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Joseph Lo <josephl@nvidia.com>
+Cc: Stephen Warren <swarren@nvidia.com>
 ---
- Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-tegra/pm.c            | 5 +++++
+ arch/arm/mach-tegra/sleep-tegra20.S | 2 +-
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/Makefile b/Makefile
-index 46263d8..dc87b2e 100644
---- a/Makefile
-+++ b/Makefile
-@@ -571,7 +571,7 @@ endif # $(dot-config)
- all: vmlinux
+diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+index 523604d..398e932 100644
+--- a/arch/arm/mach-tegra/pm.c
++++ b/arch/arm/mach-tegra/pm.c
+@@ -181,6 +181,11 @@ bool tegra_set_cpu_in_lp2(int phy_cpu_id)
+ 	return last_cpu;
+ }
  
- ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
--KBUILD_CFLAGS	+= -Os
-+KBUILD_CFLAGS	+= -Os $(call cc-disable-warning,maybe-uninitialized,)
- else
- KBUILD_CFLAGS	+= -O2
- endif
++int tegra_cpu_do_idle(void)
++{
++	return cpu_do_idle();
++}
++
+ static int tegra_sleep_cpu(unsigned long v2p)
+ {
+ 	/* Switch to the identity mapping. */
+diff --git a/arch/arm/mach-tegra/sleep-tegra20.S b/arch/arm/mach-tegra/sleep-tegra20.S
+index 9f6bfafd..e3f2417 100644
+--- a/arch/arm/mach-tegra/sleep-tegra20.S
++++ b/arch/arm/mach-tegra/sleep-tegra20.S
+@@ -197,7 +197,7 @@ ENTRY(tegra20_sleep_cpu_secondary_finish)
+ 	mov	r3, #CPU_RESETTABLE
+ 	str	r3, [r0]
+ 
+-	bl	cpu_do_idle
++	bl	tegra_cpu_do_idle
+ 
+ 	/*
+ 	 * cpu may be reset while in wfi, which will return through
 -- 
 1.8.1.2
