@@ -1,30 +1,27 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 23 Apr 2013 14:45:45 -0700
-Subject: [GIT PULL] musb regression on omap4 for v3.9
-Message-ID: <20130423214544.GN10155@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Apr 2013 22:46:10 +0100
+Subject: [PATCH v4 00/15] multi-cluster power management
+In-Reply-To: <alpine.LFD.2.03.1304231657150.17375@syhkavp.arg>
+References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+ <20130423200429.GF5316@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.03.1304231657150.17375@syhkavp.arg>
+Message-ID: <20130423214610.GY14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Apr 23, 2013 at 05:03:06PM -0400, Nicolas Pitre wrote:
+> On Tue, 23 Apr 2013, Russell King - ARM Linux wrote:
+> 
+> > What I suggest for the time being is to provide new inline function(s)
+> > in arch/arm/include/cacheflush.h which are purposed for your application,
+> > document them in that file, and call the implementation you're currently
+> > using.  That means if we do have to change it in the future (for example,
+> > we don't need to do anything in the dcache flushing stuff) we don't have
+> > to hunt through all the code to find _your_ different use of that function
+> > and fix it - we can just fix it in one place and we have the reference
+> > there for what your code expects.
+> 
+> What about the patch below?  Once you tell me it is fine to you I'll 
+> adapt the MCPM series to it.
 
-The following changes since commit 31880c37c11e28cb81c70757e38392b42e695dc6:
-
-  Linux 3.9-rc6 (2013-04-07 20:49:54 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9-rc6/fixes-signed
-
-for you to fetch changes up to f4d7a536faa43f30d87f701268db76b8433a2a8b:
-
-  ARM: OMAP4: hwmod data: make 'ocp2scp_usb_phy_phy_48m" as the main clock (2013-04-10 13:26:07 -0700)
-
-----------------------------------------------------------------
-One MUSB regression fix that I forgot to send earlier. Without
-this MUSB no longer works on omap4 based devices.
-
-----------------------------------------------------------------
-Kishon Vijay Abraham I (1):
-      ARM: OMAP4: hwmod data: make 'ocp2scp_usb_phy_phy_48m" as the main clock
-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 18 +++++++++++-------
- 1 file changed, 11 insertions(+), 7 deletions(-)
+Yes, that looks like a saner solution.  Thanks.
