@@ -1,44 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 23 Apr 2013 10:23:53 -0700
-Subject: Multiple issues with omap4 panda es in linux next
-In-Reply-To: <5176A45B.5@ti.com>
-References: <20130419171318.GK10155@atomide.com> <5174F7A8.7070308@ti.com>
- <20130422180316.GA10155@atomide.com> <5176A45B.5@ti.com>
-Message-ID: <20130423172353.GD10155@atomide.com>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Tue, 23 Apr 2013 10:29:11 -0700
+Subject: [PATCH 04/21] ARM: kvm: define KVM_ARM_MAX_VCPUS unconditionally
+In-Reply-To: <1366734653-488286-5-git-send-email-arnd@arndb.de>
+References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
+ <1366734653-488286-5-git-send-email-arnd@arndb.de>
+Message-ID: <CAEDV+gKEf5-uau8WxxuMk0+p0N5ba2AMKj8-O6kbZv1OiWDVpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kishon Vijay Abraham I <kishon@ti.com> [130423 08:15]:
-> >>>2. MUSB fails with legacy booting and DT on panda es
-> >>>
-> >>>With both legacy and DT booting I get something like:
-> >>>
-> >>>HS USB OTG: no transceiver configured
-> >>>musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
-> >>
-> >>The dt should work fine with https://patchwork.kernel.org/patch/2423061/.
-> >
-> >OK thanks for checking that.
-> >
-> >>But non-dt has got a real issue. We were using usb_bind_phy() for
-> >>binding the controller with the PHY (we use device names). But in
-> >>linux-next the device names have changed because of using
-> >>PLATFORM_DEVID_AUTO. We can modify the usb_bind_phy() calls to use
-> >>the new device names, But I suspect the device names can change
-> >>again. Not sure what we can do here :-(
-> >
-> >Let's do a minimal fix for v3.10. Then we'll make omap4 DT only for
-> >v3.11 and that problem is solved for good.
-> 
-> Have posted a patch https://patchwork.kernel.org/patch/2475521/ for
-> getting MUSB functional in omap4 panda.
+On Tue, Apr 23, 2013 at 9:30 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The CONFIG_KVM_ARM_MAX_VCPUS symbol is needed in order to build the
+> kernel/context_tracking.c code, which includes the vgic data structures
+> implictly through the kvm headers. Definining the symbol to zero
+> on builds without KVM resolves this build error:
+>
+> In file included from include/linux/kvm_host.h:33:0,
+>                  from kernel/context_tracking.c:18:
+> arch/arm/include/asm/kvm_host.h:28:23: warning: "CONFIG_KVM_ARM_MAX_VCPUS" is not defined [-Wundef]
+>  #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+>                        ^
+> arch/arm/include/asm/kvm_vgic.h:34:24: note: in expansion of macro 'KVM_MAX_VCPUS'
+>  #define VGIC_MAX_CPUS  KVM_MAX_VCPUS
+>                         ^
+> arch/arm/include/asm/kvm_vgic.h:38:6: note: in expansion of macro 'VGIC_MAX_CPUS'
+>  #if (VGIC_MAX_CPUS > 8)
+>       ^
+> In file included from arch/arm/include/asm/kvm_host.h:41:0,
+>                  from include/linux/kvm_host.h:33,
+>                  from kernel/context_tracking.c:18:
+> arch/arm/include/asm/kvm_vgic.h:59:11: error: 'CONFIG_KVM_ARM_MAX_VCPUS' undeclared here (not in a function)
+>   } percpu[VGIC_MAX_CPUS];
+>            ^
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Christoffer Dall <cdall@cs.columbia.edu>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/kvm/Kconfig | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+> index 49dd64e..370e1a8 100644
+> --- a/arch/arm/kvm/Kconfig
+> +++ b/arch/arm/kvm/Kconfig
+> @@ -41,9 +41,9 @@ config KVM_ARM_HOST
+>           Provides host support for ARM processors.
+>
+>  config KVM_ARM_MAX_VCPUS
+> -       int "Number maximum supported virtual CPUs per VM"
+> -       depends on KVM_ARM_HOST
+> -       default 4
+> +       int "Number maximum supported virtual CPUs per VM" if KVM_ARM_HOST
+> +       default 4 if KVM_ARM_HOST
+> +       default 0
+>         help
+>           Static number of max supported virtual CPUs per VM.
+>
+> --
+> 1.8.1.2
+>
 
-OK thanks. Paul it seems that this patch is still queued in one of
-your branches?
-
-Let me know if you want me to pick that one up for fixes for the
-merge window, or if you have multiple patches to pull.
-
-Regards,
-
-Tony
+Acked-by: Christoffer Dall <cdall@cs.columbia.edu>
