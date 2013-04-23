@@ -1,47 +1,57 @@
 From: cedric@precidata.com (Cedric Berger)
-Date: Tue, 23 Apr 2013 10:02:20 +0200 (CEST)
-Subject: [PATCH 4/10] LPC32XX: 004-mmc.2: Enable dma for Phytec board (V2)
-Message-ID: <mailman.0.1366704147.1125.linux-arm-kernel@lists.infradead.org>
+Date: Tue, 23 Apr 2013 10:02:19 +0200 (CEST)
+Subject: [PATCH 3/10] LPC32XX: 003-mmc.2: Cleanup,
+ Don't access private fields in MMC controller (V2)
+Message-ID: <mailman.1.1366704159.1125.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable DMA for phy3250. Without that, the mmc driver is unusable.
+The mmci_set_clkreg() function violates its general contract by accessing
+directly private host->mmc fields. This prevents us from implementing a MUX
+on top of this driver. Fix that by changing slightly the function prototype.
 
 Signed-off-by: Gabriele Mondada <gabriele@precidata.com>
 ---
 
-Index: arch/arm/mach-lpc32xx/phy3250.c
+Index: drivers/mmc/host/mmci.c
 ===================================================================
---- arch/arm/mach-lpc32xx/phy3250.c	(revision 1769)
-+++ arch/arm/mach-lpc32xx/phy3250.c	(working copy)
-@@ -168,6 +168,12 @@
- 		.max_signal = 12,
- 		.periph_buses = PL08X_AHB1,
- 	},
-+	{
-+		.bus_id = "mmc",
-+		.min_signal = 4,
-+		.max_signal = 4,
-+		.periph_buses = PL08X_AHB1,
-+	},
- };
+--- drivers/mmc/host/mmci.c	(revision 1726)
++++ drivers/mmc/host/mmci.c	(revision 1727)
+@@ -207,10 +207,11 @@
+ /*
+  * This must be called with host->lock held
+  */
+-static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
++static void mmci_set_clkreg(struct mmci_host *host, struct mmc_ios *ios)
+ {
+ 	struct variant_data *variant = host->variant;
+ 	u32 clk = variant->clkreg;
++	unsigned int desired = ios->clock;
  
- static int pl08x_get_signal(const struct pl08x_channel_data *cd)
-@@ -202,9 +208,14 @@
- 	.ocr_mask	= MMC_VDD_30_31 | MMC_VDD_31_32 |
- 			  MMC_VDD_32_33 | MMC_VDD_33_34,
- 	.ios_handler	= mmc_handle_ios,
--	.dma_filter	= NULL,
--	/* No DMA for now since AMBA PL080 dmaengine driver only does scatter
--	 * gather, and the MMCI driver doesn't do it this way */
-+	.dma_filter	= pl08x_filter_id,
-+	.dma_quirks	= MCI_DMA_QUIRK_PL18X_RX | MCI_DMA_QUIRK_PL18X_TX,
-+	.dma_rx_param	= "mmc",
-+	/*
-+	 * When not defined, tx channel is the same as rx.
-+	 * Defining dma_tx_param with the same value as dma_rx_param does not
-+	 * work.
-+	 */
- };
+ 	if (desired) {
+ 		if (desired >= host->mclk) {
+@@ -246,12 +247,12 @@
+ 		/* clk |= MCI_CLK_PWRSAVE; */
+ 	}
  
- static struct lpc32xx_slc_platform_data lpc32xx_slc_data = {
+-	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_4)
++	if (ios->bus_width == MMC_BUS_WIDTH_4)
+ 		clk |= MCI_4BIT_BUS;
+-	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_8)
++	if (ios->bus_width == MMC_BUS_WIDTH_8)
+ 		clk |= MCI_ST_8BIT_BUS;
+ 
+-	if (host->mmc->ios.timing == MMC_TIMING_UHS_DDR50)
++	if (ios->timing == MMC_TIMING_UHS_DDR50)
+ 		clk |= MCI_ST_UX500_NEG_EDGE;
+ 
+ 	mmci_write_clkreg(host, clk);
+@@ -1319,7 +1320,7 @@
+ 
+ 	spin_lock_irqsave(&host->lock, flags);
+ 
+-	mmci_set_clkreg(host, ios->clock);
++	mmci_set_clkreg(host, ios);
+ 	mmci_write_pwrreg(host, pwr);
+ 
+ 	spin_unlock_irqrestore(&host->lock, flags);
