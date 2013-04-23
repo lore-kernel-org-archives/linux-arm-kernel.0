@@ -1,125 +1,64 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 23 Apr 2013 21:52:59 +0200
-Subject: [RFC PATCH v2 03/13] ARM: mach-at91: cpus/cpu node dts updates
-In-Reply-To: <20130423135304.GG22946@e102568-lin.cambridge.arm.com>
-References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366644455-16550-4-git-send-email-lorenzo.pieralisi@arm.com>
- <51768892.7060807@gmail.com>
- <20130423135304.GG22946@e102568-lin.cambridge.arm.com>
-Message-ID: <20130423195259.GJ4998@game.jcrosoft.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 24 Apr 2013 00:03:51 +0400
+Subject: [PATCH 04/10] usb: musb: ux500: harden checks for platform data
+In-Reply-To: <1366729394-11406-5-git-send-email-lee.jones@linaro.org>
+References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
+ <1366729394-11406-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <5176E927.908@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:53 Tue 23 Apr     , Lorenzo Pieralisi wrote:
-> On Tue, Apr 23, 2013 at 02:11:46PM +0100, Rob Herring wrote:
-> > On 04/22/2013 10:27 AM, Lorenzo Pieralisi wrote:
-> > > This patch updates the in-kernel dts files according to the latest cpus
-> > > and cpu bindings updates for ARM.
-> > > 
-> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > ---
-> > >  arch/arm/boot/dts/at91sam9260.dtsi | 2 +-
-> > >  arch/arm/boot/dts/at91sam9263.dtsi | 2 +-
-> > >  arch/arm/boot/dts/at91sam9g45.dtsi | 2 +-
-> > >  arch/arm/boot/dts/at91sam9n12.dtsi | 2 +-
-> > >  4 files changed, 4 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> > > index cb7bcc5..2e9de85 100644
-> > > --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> > > +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> > > @@ -33,7 +33,7 @@
-> > >  	};
-> > >  	cpus {
-> > >  		cpu at 0 {
-> > > -			compatible = "arm,arm926ejs";
-> > > +			compatible = "arm,arm926";
-> > 
-> > I don't understand why you are doing this. If this does not match the
-> > documentation, fix the documentation. We can't continue on changing dts
-> > files without reqard to breaking compatibility.
-> 
-> IMHO compatibility is already broken. There are a number of dts in the
-> kernel missing cpus and cpu nodes, others with cpu nodes missing
-> device_type = "cpu", missing cpu nodes compatible properties and the list
-> goes on and on. Those files got merged in the kernel before bindings were
-> properly defined for ARM so at that point in time the only reference was the
-> ePAPR and still, it was not followed (eg my broken patch above fails to add
-> device_type = "cpu" to the cpu node, should I change the documentation (ePAPR)
-> to make the dts above compliant ? I do not think so, I reckon we should fix
-> all dts and force them to comply with the ePAPR and the in-kernel bindings).
-> 
-> If we do not set in stone the bindings and draw a line now, this stuff will
-> go wild, it is already in a state that I do not like much.
-> 
-> The reason we are patching the compatible property above is to avoid having
-> compatible properties containing suffixes for CPUs, we do not deem that
-> necessary, see:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/145305.html
-> 
-> That's just my opinion, open to change it to find a proper solution to this
-> issue as long as we make progress.
+Hello.
 
-I do not agree when you set the compatible you need to be preceise the cpu is
-a arm926ejs not a arm926
+On 04/23/2013 07:03 PM, Lee Jones wrote:
 
-Best Regards,
-J/
-> 
-> Thanks for the review,
-> Lorenzo
-> 
-> > 
-> > Rob
-> > 
-> > >  		};
-> > >  	};
-> > >  
-> > > diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> > > index 271d4de..25c4725 100644
-> > > --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> > > +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> > > @@ -30,7 +30,7 @@
-> > >  	};
-> > >  	cpus {
-> > >  		cpu at 0 {
-> > > -			compatible = "arm,arm926ejs";
-> > > +			compatible = "arm,arm926";
-> > >  		};
-> > >  	};
-> > >  
-> > > diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> > > index 6b1d4ca..cf647d1 100644
-> > > --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> > > +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> > > @@ -36,7 +36,7 @@
-> > >  	};
-> > >  	cpus {
-> > >  		cpu at 0 {
-> > > -			compatible = "arm,arm926ejs";
-> > > +			compatible = "arm,arm926";
-> > >  		};
-> > >  	};
-> > >  
-> > > diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> > > index 7750f98..d531ae3 100644
-> > > --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> > > +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> > > @@ -32,7 +32,7 @@
-> > >  	};
-> > >  	cpus {
-> > >  		cpu at 0 {
-> > > -			compatible = "arm,arm926ejs";
-> > > +			compatible = "arm,arm926";
-> > >  		};
-> > >  	};
-> > >  
-> > > 
-> > 
-> > 
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> In its current state, the ux500-musb driver uses platform data pointers
+> blindly with no prior checking. If no platform data pointer is passed
+> this will Oops the kernel. In this patch we ensure platform data and
+> board data are present prior to using them.
+>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: linux-usb at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>   drivers/usb/musb/ux500_dma.c |   11 ++++++++---
+>   1 file changed, 8 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/usb/musb/ux500_dma.c b/drivers/usb/musb/ux500_dma.c
+> index c75e07a..02b4a6e 100644
+> --- a/drivers/usb/musb/ux500_dma.c
+> +++ b/drivers/usb/musb/ux500_dma.c
+> @@ -287,7 +287,7 @@ static int ux500_dma_controller_start(struct dma_controller *c)
+>   	struct musb *musb = controller->private_data;
+>   	struct device *dev = musb->controller;
+>   	struct musb_hdrc_platform_data *plat = dev->platform_data;
+> -	struct ux500_musb_board_data *data = plat->board_data;
+> +	struct ux500_musb_board_data *data;
+>   	struct dma_channel *dma_channel = NULL;
+>   	u32 ch_num;
+>   	u8 dir;
+> @@ -297,14 +297,19 @@ static int ux500_dma_controller_start(struct dma_controller *c)
+
+[...]
+
+>   
+>   	/* Prepare the loop for RX channels */
+>   	channel_array = controller->rx_channel;
+> -	param_array = data->dma_rx_param_array;
+> +	param_array = (data) ? data->dma_rx_param_array : NULL;
+
+    Why enclose a simple variable in parens?
+
+>   
+>   	for (dir = 0; dir < 2; dir++) {
+>   		for (ch_num = 0;
+> @@ -337,7 +342,7 @@ static int ux500_dma_controller_start(struct dma_controller *c)
+>   
+>   		/* Prepare the loop for TX channels */
+>   		channel_array = controller->tx_channel;
+> -		param_array = data->dma_tx_param_array;
+> +		param_array = (data) ? data->dma_tx_param_array : NULL;
+
+    Again, why?
+
+WBR, Sergei
