@@ -1,39 +1,21 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 23 Apr 2013 16:09:59 +0100
-Subject: [PATCH] ARM: ux500: Over-ride TCDM size when booting the DB8540
- platform
-In-Reply-To: <CACRpkdYLJyvCK33pAHeOkXfBOiPJGAZ9bV+s-cJanfOXz+VTOg@mail.gmail.com>
-References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
- <1364908916-29803-5-git-send-email-lee.jones@linaro.org>
- <CACRpkdbh-DJti2ny=uBe-b_vGkQBNL=emMuZ6+_cE5jvRsA4sA@mail.gmail.com>
- <20130404073340.GA6892@gmail.com>
- <CACRpkdYLJyvCK33pAHeOkXfBOiPJGAZ9bV+s-cJanfOXz+VTOg@mail.gmail.com>
-Message-ID: <20130423150959.GA17416@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Apr 2013 17:16:54 +0200
+Subject: [PATCH 00/10] usb: musb: ux500: pathe the way for Device Tree
+ enablement
+In-Reply-To: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
+References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <201304231716.54516.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Apr 2013, Linus Walleij wrote:
+On Tuesday 23 April 2013, Lee Jones wrote:
+> In this patch-set we firstly ease the burden on data being passed from
+> platform data, then start to build up support to finally enable Device
+> Tree.
 
-> On Thu, Apr 4, 2013 at 9:33 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > The PRCMU's Tightly Coupled Data Memory on the DB8540 platform is
-> > 8kB larger than it's predecessor's. We need to reflect that in its
-> > Device Tree. By re-specifying the address and size of the device
-> > we effectively over-ride the previous values with more accurate
-> > ones.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> As mentioned this patch does not apply. Some whitespace trouble.
-> 
-> And please squash it into the patch adding the ccu8540, 3/9.
+Very nice series!
 
-I'm not sure what's going on with all this whitespace stuff, my branch
-looks fine. Any chance I can just supply you with a branch to take
-instead?
+I only have two small comments on the binding document, everything else looks
+great.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Acked-by: Arnd Bergmann <arnd@arndb.de>
