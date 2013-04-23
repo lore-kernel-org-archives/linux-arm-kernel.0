@@ -1,29 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 23 Apr 2013 12:59:50 +0200
-Subject: [PATCH] ARM: ux500: Over-ride TCDM size when booting the DB8540
- platform
-In-Reply-To: <20130404073340.GA6892@gmail.com>
-References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
- <1364908916-29803-5-git-send-email-lee.jones@linaro.org>
- <CACRpkdbh-DJti2ny=uBe-b_vGkQBNL=emMuZ6+_cE5jvRsA4sA@mail.gmail.com>
- <20130404073340.GA6892@gmail.com>
-Message-ID: <CACRpkdYLJyvCK33pAHeOkXfBOiPJGAZ9bV+s-cJanfOXz+VTOg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 23 Apr 2013 12:20:34 +0100
+Subject: [PATCH V2 0/4] arm64: Initial patch-set for APM X-Gene SOC family
+In-Reply-To: <1366712759-3431-1-git-send-email-vkale@apm.com>
+References: <1366712759-3431-1-git-send-email-vkale@apm.com>
+Message-ID: <20130423112034.GE23407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 4, 2013 at 9:33 AM, Lee Jones <lee.jones@linaro.org> wrote:
+Hi Vinayak,
 
-> The PRCMU's Tightly Coupled Data Memory on the DB8540 platform is
-> 8kB larger than it's predecessor's. We need to reflect that in its
-> Device Tree. By re-specifying the address and size of the device
-> we effectively over-ride the previous values with more accurate
-> ones.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Tue, Apr 23, 2013 at 11:25:55AM +0100, Vinayak Kale wrote:
+> These are initial patches for APM X-Gene SOC family.
+> This patch-set is based on soc-armv8-model branch of
+> git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git
 
-As mentioned this patch does not apply. Some whitespace trouble.
+The patches look ok to me but let's see if there are any other comments
+on the dts files.
 
-And please squash it into the patch adding the ccu8540, 3/9.
+Since we go with a common defconfig, I'll drop the vexpress_defconfig as
+well. There are dependencies on GIC and some other vexpress patches to
+go into mainline before I can push my soc-armv8-model changes. I'll
+queue your patches for 3.11 (after this merging window).
 
-Yours,
-Linus Walleij
+Thanks.
+
+-- 
+Catalin
