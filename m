@@ -1,39 +1,44 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 23 Apr 2013 14:05:31 +0200
-Subject: [PATCH V2] ARM: mx5: Add support for DENX M53EVK
-In-Reply-To: <20130423115007.GD27475@S2101-09.ap.freescale.net>
-References: <1366665827-8949-1-git-send-email-marex@denx.de>
- <20130423115007.GD27475@S2101-09.ap.freescale.net>
-Message-ID: <201304231405.31785.marex@denx.de>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 23 Apr 2013 14:09:46 +0200
+Subject: [PATCH 2/2] pinctrl: samsung: Fix link error with
+ CONFIG_PINCTRL_EXYNOS disabled
+In-Reply-To: <CACRpkdbJj9Newk+sCTvJzxA4V2cmJ3hzuQELv7t1wFMhd_Y8+Q@mail.gmail.com>
+References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
+ <1398545.9FqHoC0WZW@flatron>
+ <CACRpkdbJj9Newk+sCTvJzxA4V2cmJ3hzuQELv7t1wFMhd_Y8+Q@mail.gmail.com>
+Message-ID: <6940961.67Lk2axxPL@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+Hi Linus,
 
-> On Mon, Apr 22, 2013 at 11:23:47PM +0200, Marek Vasut wrote:
-> > This patch adds support for the DENX M53EVK board. The board currently
-> > supports NAND, Ethernet, UART, CAN, I2C.
+On Tuesday 23 of April 2013 14:03:12 Linus Walleij wrote:
+> On Wed, Apr 17, 2013 at 12:24 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> > Commit f67faf487 added driver data for Exynos5250, which is available
+> > only if CONFIG_PINCTRL_EXYNOS is enabled. However probably due to merge
+> > error, the reference to this driver data structure was located outside
+> > of relevant ifdef and compiled unconditionally, leading to link error
+> > with CONFIG_PINCTRL_EXYNOS.
 > > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > Cc: Shawn Guo <shawn.guo@linaro.org>
-> > ---
+> > This patch fixes mentioned link error by moving driver data entry under
+> > ifdef CONFIG_PINCTRL_EXYNOS.
 > > 
-> >  arch/arm/boot/dts/Makefile         |    1 +
-> >  arch/arm/boot/dts/imx53-m53evk.dts |  259
-> >  ++++++++++++++++++++++++++++++++++++ 2 files changed, 260 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/imx53-m53evk.dts
-> > 
-> > V2: - Rebase on top of Shawn's patch:
-> >       "[PATCH] ARM: imx: move imx53-qsb audio codec clk lookup into DT"
-> >     
-> >     - Use BGR666 format on LCD, this makes it depend on:
-> >       "[PATCH V2] video: imx: Add BGR666 support for parallel display"
+> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 > 
-> Does it hurt if I just go ahead to apply the patch?  Or do I have to
-> wait for above patch goes in?
+> This does not apply to my "devel" branch in the pinctrl tree.
+> 
+> Could you rebase it on that branch?
+> 
+> Or is the error not even in my tree?
 
-The LCD will fail to probe, but other than that, it will work OK.
+This one got sent incorrectly due to my mistake. Please try the correct 
+version:
+
+[PATCH RESEND 2/2] pinctrl: samsung: Fix link error with CONFIG_PINCTRL_EXYNOS 
+disabled
 
 Best regards,
-Marek Vasut
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Kernel and System Framework
