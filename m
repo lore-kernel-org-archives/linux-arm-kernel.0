@@ -1,62 +1,71 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 23 Apr 2013 17:46:21 +0200
-Subject: [PATCH v3 00/13] ARM: EXYNOS: Fix Universal C210 support
-Message-ID: <1366731994-7478-1-git-send-email-t.figa@samsung.com>
+Date: Tue, 23 Apr 2013 17:46:22 +0200
+Subject: [PATCH v3 01/13] Documentation: Add device tree bindings for Samsung
+ PWM timers
+In-Reply-To: <1366731994-7478-1-git-send-email-t.figa@samsung.com>
+References: <1366731994-7478-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1366731994-7478-2-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series intends to fix support for Universal C210 board in mainline.
-Main difference from other boards based on Exynos 4210 is that hardware
-revision of the SoC used on Universal C210 does not support MCT timers
-and legacy PWM timers must be used instead.
+This patch adds missing documentation describing Device Tree bindings
+for Samsung PWM timers.
 
-First (and the biggest) part of the series deals with cleaning up and
-fixing the samsung_pwm_timer clocksource driver, that was posted
-recently by Arnd. In addition the driver is prepared to share the
-hardware with PWM driver that will be reworked later, since it is not
-a component crucial for system operation.
-
-Second part fixes ATAGS support of Exynos 4210 rev0 SoC, which needs
-different timer initialization, using the new samsung_pwm_timer driver.
-
-Third and last part adds Device Tree-based support for Universal C210
-board by providing device tree sources for it.
-
-On Universal C210 board, both with and without DT:
-
-Tested-by: Tomasz Figa <t.figa@samsung.com>
-
-Tomasz Figa (13):
-  Documentation: Add device tree bindings for Samsung PWM timers
-  clocksource: samsung_pwm_timer: Let platforms select the driver
-  clocksource: samsung_pwm_timer: Make PWM spinlock global
-  clocksource: samsung_pwm_timer: Keep all driver data in a structure
-  clocksource: samsung_pwm_timer: Drop unused samsung_pwm struct
-  clocksource: samsung_pwm_timer: Add support for non-DT platforms
-  clocksource: samsung_pwm_timer: Use proper clockevents max_delta
-  clocksource: samsung_pwm_timer: Correct programming of clock events
-  clocksource: samsung_pwm_timer: Work around rounding errors in
-    clockevents core
-  ARM: SAMSUNG: Do not register legacy timer interrupts on Exynos
-  ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
-  ARM: dts: exynos4: Add node for PWM device
-  ARM: dts: exynos4210: Add basic dts file for universal_c210 board
-
- .../devicetree/bindings/pwm/pwm-samsung.txt        |  43 +++
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/exynos4.dtsi                     |   8 +
- arch/arm/boot/dts/exynos4210-universal_c210.dts    | 352 +++++++++++++++++++++
- arch/arm/mach-exynos/Kconfig                       |   3 +-
- arch/arm/mach-exynos/common.c                      |  45 ++-
- arch/arm/mach-exynos/common.h                      |   2 +
- arch/arm/mach-exynos/mach-universal_c210.c         |   5 +-
- arch/arm/plat-samsung/Kconfig                      |   4 +-
- drivers/clocksource/Kconfig                        |   3 +-
- drivers/clocksource/samsung_pwm_timer.c            | 215 +++++++------
- include/clocksource/samsung_pwm.h                  |  11 +-
- 12 files changed, 561 insertions(+), 131 deletions(-)
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ .../devicetree/bindings/pwm/pwm-samsung.txt        | 43 ++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-samsung.txt
- create mode 100644 arch/arm/boot/dts/exynos4210-universal_c210.dts
 
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-samsung.txt b/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
+new file mode 100644
+index 0000000..ac67c68
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/pwm-samsung.txt
+@@ -0,0 +1,43 @@
++* Samsung PWM timers
++
++Samsung SoCs contain PWM timer blocks which can be used for system clock source
++and clock event timers, as well as to drive SoC outputs with PWM signal. Each
++PWM timer block provides 5 PWM channels (not all of them can drive physical
++outputs - see SoC and board manual).
++
++Be aware that the clocksource driver supports only uniprocessor systems.
++
++Required properties:
++- compatible : should be one of following:
++    samsung,s3c2410-pwm - for 16-bit timers present on S3C24xx SoCs
++    samsung,s3c6400-pwm - for 32-bit timers present on S3C64xx SoCs
++    samsung,s5p6440-pwm - for 32-bit timers present on S5P64x0 SoCs
++    samsung,s5pc100-pwm - for 32-bit timers present on S5PC100, S5PV210,
++			  Exynos4210 rev0 SoCs
++    samsung,exynos4210-pwm - for 32-bit timers present on Exynos4210,
++                          Exynos4x12 and Exynos5250 SoCs
++- reg: base address and size of register area
++- interrupts: list of timer interrupts (one interrupt per timer, starting at
++  timer 0)
++- #pwm-cells: number of cells used for PWM specifier - must be 3
++   the specifier format is as follows:
++     - phandle to PWM controller node
++     - index of PWM channel (from 0 to 4)
++     - PWM signal period in nanoseconds
++     - bitmask of optional PWM flags:
++        0x1 - invert PWM signal
++
++Optional properties:
++- samsung,pwm-outputs: list of PWM channels used as PWM outputs on particular
++    platform - an array of up to 5 elements being indices of PWM channels
++    (from 0 to 4), the order does not matter.
++
++Example:
++	pwm at 7f006000 {
++		compatible = "samsung,s3c6400-pwm";
++		reg = <0x7f006000 0x1000>;
++		interrupt-parent = <&vic0>;
++		interrupts = <23>, <24>, <25>, <27>, <28>;
++		samsung,pwm-outputs = <0>, <1>;
++		#pwm-cells = <3>;
++	}
 -- 
 1.8.2.1
