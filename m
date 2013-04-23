@@ -1,146 +1,178 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Tue, 23 Apr 2013 16:02:29 -0700
-Subject: [PATCH v3 30/32] arm64: KVM: enable initialization of a 32bit vcpu
-In-Reply-To: <1365437854-30214-31-git-send-email-marc.zyngier@arm.com>
+Date: Tue, 23 Apr 2013 16:02:52 -0700
+Subject: [PATCH v3 31/32] arm64: KVM: userspace API documentation
+In-Reply-To: <1365437854-30214-32-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-31-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130423230229.GN20569@gmail.com>
+ <1365437854-30214-32-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130423230252.GO20569@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 05:17:32PM +0100, Marc Zyngier wrote:
-> Wire the init of a 32bit vcpu by allowing 32bit modes in pstate,
-> and providing sensible defaults out of reset state.
-> 
-> This feature is of course conditioned by the presence of 32bit
-> capability on the physical CPU, and is checked by the KVM_CAP_ARM_EL1_32BIT
-> capability.
+On Mon, Apr 08, 2013 at 05:17:33PM +0100, Marc Zyngier wrote:
+> Unsurprisingly, the arm64 userspace API is extremely similar to
+> the 32bit one, the only significant difference being the ONE_REG
+> register mapping.
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm64/include/asm/kvm_host.h |  2 +-
->  arch/arm64/include/uapi/asm/kvm.h |  1 +
->  arch/arm64/kvm/guest.c            |  6 ++++++
->  arch/arm64/kvm/reset.c            | 25 ++++++++++++++++++++++++-
->  include/uapi/linux/kvm.h          |  1 +
->  5 files changed, 33 insertions(+), 2 deletions(-)
+>  Documentation/virtual/kvm/api.txt | 55 +++++++++++++++++++++++++--------------
+>  1 file changed, 36 insertions(+), 19 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index d44064d..c3ec107 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -34,7 +34,7 @@
->  #include <asm/kvm_vgic.h>
->  #include <asm/kvm_arch_timer.h>
+> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> index 119358d..7c3385e 100644
+> --- a/Documentation/virtual/kvm/api.txt
+> +++ b/Documentation/virtual/kvm/api.txt
+> @@ -280,7 +280,7 @@ kvm_run' (see below).
+>  4.11 KVM_GET_REGS
 >  
-> -#define KVM_VCPU_MAX_FEATURES 1
-> +#define KVM_VCPU_MAX_FEATURES 2
+>  Capability: basic
+> -Architectures: all except ARM
+> +Architectures: all except ARM, arm64
+>  Type: vcpu ioctl
+>  Parameters: struct kvm_regs (out)
+>  Returns: 0 on success, -1 on error
+> @@ -301,7 +301,7 @@ struct kvm_regs {
+>  4.12 KVM_SET_REGS
 >  
->  /* We don't currently support large pages. */
->  #define KVM_HPAGE_GFN_SHIFT(x)	0
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 5b1110c..5031f42 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -75,6 +75,7 @@ struct kvm_regs {
->  #define KVM_VGIC_V2_CPU_SIZE		0x2000
+>  Capability: basic
+> -Architectures: all except ARM
+> +Architectures: all except ARM, arm64
+>  Type: vcpu ioctl
+>  Parameters: struct kvm_regs (in)
+>  Returns: 0 on success, -1 on error
+> @@ -587,7 +587,7 @@ struct kvm_fpu {
+>  4.24 KVM_CREATE_IRQCHIP
 >  
->  #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
-> +#define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+>  Capability: KVM_CAP_IRQCHIP
+> -Architectures: x86, ia64, ARM
+> +Architectures: x86, ia64, ARM, arm64
+>  Type: vm ioctl
+>  Parameters: none
+>  Returns: 0 on success, -1 on error
+> @@ -595,14 +595,14 @@ Returns: 0 on success, -1 on error
+>  Creates an interrupt controller model in the kernel.  On x86, creates a virtual
+>  ioapic, a virtual PIC (two PICs, nested), and sets up future vcpus to have a
+>  local APIC.  IRQ routing for GSIs 0-15 is set to both PIC and IOAPIC; GSI 16-23
+> -only go to the IOAPIC.  On ia64, a IOSAPIC is created. On ARM, a GIC is
+> +only go to the IOAPIC.  On ia64, a IOSAPIC is created. On ARM/arm64, a GIC is
+>  created.
 >  
->  struct kvm_vcpu_init {
->  	__u32 target;
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> index 47d3729..74ef7d5 100644
-> --- a/arch/arm64/kvm/guest.c
-> +++ b/arch/arm64/kvm/guest.c
-> @@ -93,6 +93,12 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
->  		unsigned long mode = (*(unsigned long *)valp) & COMPAT_PSR_MODE_MASK;
->  		switch (mode) {
-> +		case COMPAT_PSR_MODE_USR:
-> +		case COMPAT_PSR_MODE_FIQ:
-> +		case COMPAT_PSR_MODE_IRQ:
-> +		case COMPAT_PSR_MODE_SVC:
-> +		case COMPAT_PSR_MODE_ABT:
-> +		case COMPAT_PSR_MODE_UND:
->  		case PSR_MODE_EL0t:
->  		case PSR_MODE_EL1t:
->  		case PSR_MODE_EL1h:
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> index bc33e76..a282d35 100644
-> --- a/arch/arm64/kvm/reset.c
-> +++ b/arch/arm64/kvm/reset.c
-> @@ -35,11 +35,27 @@ static struct kvm_regs default_regs_reset = {
->  	.regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
->  };
 >  
-> +static struct kvm_regs default_regs_reset32 = {
-> +	.regs.pstate = (COMPAT_PSR_MODE_SVC | COMPAT_PSR_A_BIT |
-> +			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
-> +};
+>  4.25 KVM_IRQ_LINE
+>  
+>  Capability: KVM_CAP_IRQCHIP
+> -Architectures: x86, ia64, arm
+> +Architectures: x86, ia64, arm, arm64
+>  Type: vm ioctl
+>  Parameters: struct kvm_irq_level
+>  Returns: 0 on success, -1 on error
+> @@ -612,9 +612,10 @@ On some architectures it is required that an interrupt controller model has
+>  been previously created with KVM_CREATE_IRQCHIP.  Note that edge-triggered
+>  interrupts require the level to be set to 1 and then back to 0.
+>  
+> -ARM can signal an interrupt either at the CPU level, or at the in-kernel irqchip
+> -(GIC), and for in-kernel irqchip can tell the GIC to use PPIs designated for
+> -specific cpus.  The irq field is interpreted like this:
+> +ARM/arm64 can signal an interrupt either at the CPU level, or at the
+> +in-kernel irqchip (GIC), and for in-kernel irqchip can tell the GIC to
+> +use PPIs designated for specific cpus.  The irq field is interpreted
+> +like this:
+>  
+>   ?bits:  | 31 ... 24 | 23  ... 16 | 15    ...    0 |
+>    field: | irq_type  | vcpu_index |     irq_id     |
+> @@ -1802,6 +1803,19 @@ ARM 32-bit VFP control registers have the following id bit patterns:
+>  ARM 64-bit FP registers have the following id bit patterns:
+>    0x4002 0000 0012 0 <regno:12>
+>  
 > +
-> +static bool cpu_has_32bit_el1(void)
-> +{
-> +	u64 pfr0;
+> +arm64 registers are mapped using the lower 32 bits. The upper 16 of
+> +that is the register group type, or coprocessor number:
 > +
-> +	pfr0 = read_cpuid(ID_AA64PFR0_EL1);
-> +	return !!(pfr0 & 0x20);
-
-again we don't need the double negation
-
-> +}
+> +arm64 core/FP-SIMD registers have the following id bit patterns:
+> +  0x6002 0000 0010 <index into the kvm_regs struct:16>
 > +
->  int kvm_arch_dev_ioctl_check_extention(long ext)
->  {
->  	int r;
->  
->  	switch (ext) {
-> +	case KVM_CAP_ARM_EL1_32BIT:
-> +		r = cpu_has_32bit_el1();
-> +		break;
->  	default:
->  		r = 0;
->  	}
-> @@ -62,7 +78,14 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
->  
->  	switch (vcpu->arch.target) {
->  	default:
-> -		cpu_reset = &default_regs_reset;
-> +		if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features)) {
-> +			if (!cpu_has_32bit_el1())
-> +				return -EINVAL;
+> +arm64 CCSIDR registers are demultiplexed by CSSELR value:
+> +  0x6002 0000 0011 00 <csselr:8>
+> +
+> +arm64 system registers have the following id bit patterns:
+> +  0x6002 0000 0013 <op0:2> <op1:3> <crn:4> <crm:4> <op2:3>
+> +
 
-I'm not sure EINVAL is appropriate here, the value specified was not
-incorrect, it's that the hardware doesn't support it. ENXIO, ENODEV, and
-add that in Documentation/virtual/kvm/api.txt ?
+I think these size encodings are 4 bits off, and not accurate for for
+the core registers, which have variable sizes, which should be indicated
+here (unless you decide for a separate category as per my other
+comment).
 
-> +			cpu_reset = &default_regs_reset32;
-> +			vcpu->arch.hcr_el2 &= ~HCR_RW;
-> +		} else {
-> +			cpu_reset = &default_regs_reset;
-> +		}
->  		break;
->  	}
+>  4.69 KVM_GET_ONE_REG
 >  
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index 2bf42b0..ce05763 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-> @@ -665,6 +665,7 @@ struct kvm_ppc_smmu_info {
->  #define KVM_CAP_PPC_EPR 86
->  #define KVM_CAP_ARM_PSCI 87
->  #define KVM_CAP_ARM_SET_DEVICE_ADDR 88
-> +#define KVM_CAP_ARM_EL1_32BIT 89
+>  Capability: KVM_CAP_ONE_REG
+> @@ -2165,7 +2179,7 @@ valid entries found.
+>  4.77 KVM_ARM_VCPU_INIT
 >  
->  #ifdef KVM_CAP_IRQ_ROUTING
+>  Capability: basic
+> -Architectures: arm
+> +Architectures: arm, arm64
+>  Type: vcpu ioctl
+>  Parameters: struct struct kvm_vcpu_init (in)
+>  Returns: 0 on success; -1 on error
+> @@ -2184,12 +2198,14 @@ should be created before this ioctl is invoked.
+>  Possible features:
+>  	- KVM_ARM_VCPU_POWER_OFF: Starts the CPU in a power-off state.
+>  	  Depends on KVM_CAP_ARM_PSCI.
+> +	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
+> +	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
 >  
+>  
+>  4.78 KVM_GET_REG_LIST
+>  
+>  Capability: basic
+> -Architectures: arm
+> +Architectures: arm, arm64
+>  Type: vcpu ioctl
+>  Parameters: struct kvm_reg_list (in/out)
+>  Returns: 0 on success; -1 on error
+> @@ -2209,7 +2225,7 @@ KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
+>  4.80 KVM_ARM_SET_DEVICE_ADDR
+>  
+>  Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
+> -Architectures: arm
+> +Architectures: arm, arm64
+>  Type: vm ioctl
+>  Parameters: struct kvm_arm_device_address (in)
+>  Returns: 0 on success, -1 on error
+> @@ -2230,18 +2246,19 @@ can access emulated or directly exposed devices, which the host kernel needs
+>  to know about. The id field is an architecture specific identifier for a
+>  specific device.
+>  
+> -ARM divides the id field into two parts, a device id and an address type id
+> -specific to the individual device.
+> +ARM/arm64 divides the id field into two parts, a device id and an
+> +address type id specific to the individual device.
+>  
+>   ?bits:  | 63        ...       32 | 31    ...    16 | 15    ...    0 |
+>    field: |        0x00000000      |     device id   |  addr type id  |
+>  
+> -ARM currently only require this when using the in-kernel GIC support for the
+> -hardware VGIC features, using KVM_ARM_DEVICE_VGIC_V2 as the device id.  When
+> -setting the base address for the guest's mapping of the VGIC virtual CPU
+> -and distributor interface, the ioctl must be called after calling
+> -KVM_CREATE_IRQCHIP, but before calling KVM_RUN on any of the VCPUs.  Calling
+> -this ioctl twice for any of the base addresses will return -EEXIST.
+> +ARM/arm64 currently only require this when using the in-kernel GIC
+> +support for the hardware VGIC features, using KVM_ARM_DEVICE_VGIC_V2
+> +as the device id.  When setting the base address for the guest's
+> +mapping of the VGIC virtual CPU and distributor interface, the ioctl
+> +must be called after calling KVM_CREATE_IRQCHIP, but before calling
+> +KVM_RUN on any of the VCPUs.  Calling this ioctl twice for any of the
+> +base addresses will return -EEXIST.
+>  
+>  
+>  5. The kvm_run structure
 > -- 
 > 1.8.1.4
 > 
 > 
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
