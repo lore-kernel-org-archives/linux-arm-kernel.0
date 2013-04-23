@@ -1,64 +1,61 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 24 Apr 2013 00:03:51 +0400
-Subject: [PATCH 04/10] usb: musb: ux500: harden checks for platform data
-In-Reply-To: <1366729394-11406-5-git-send-email-lee.jones@linaro.org>
-References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
- <1366729394-11406-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <5176E927.908@cogentembedded.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Apr 2013 21:04:29 +0100
+Subject: [PATCH v4 00/15] multi-cluster power management
+In-Reply-To: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130423200429.GF5316@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Feb 05, 2013 at 12:21:57AM -0500, Nicolas Pitre wrote:
+> This is version 4 of the patch series required to safely power up
+> and down CPUs in a cluster as can be found in b.L systems.  If nothing
+> major is reported, I'll send a pull request to Russell for this set
+> very soon.
 
-On 04/23/2013 07:03 PM, Lee Jones wrote:
+Okay, so from spending an hour or so quickly scanning these patches,
+on the face of it there are only a few comments I have which I'm very
+surprised that your exhaustive team of apparant reviewers didn't
+already catch.
 
-> In its current state, the ux500-musb driver uses platform data pointers
-> blindly with no prior checking. If no platform data pointer is passed
-> this will Oops the kernel. In this patch we ensure platform data and
-> board data are present prior to using them.
->
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: linux-usb at vger.kernel.org
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->   drivers/usb/musb/ux500_dma.c |   11 ++++++++---
->   1 file changed, 8 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/usb/musb/ux500_dma.c b/drivers/usb/musb/ux500_dma.c
-> index c75e07a..02b4a6e 100644
-> --- a/drivers/usb/musb/ux500_dma.c
-> +++ b/drivers/usb/musb/ux500_dma.c
-> @@ -287,7 +287,7 @@ static int ux500_dma_controller_start(struct dma_controller *c)
->   	struct musb *musb = controller->private_data;
->   	struct device *dev = musb->controller;
->   	struct musb_hdrc_platform_data *plat = dev->platform_data;
-> -	struct ux500_musb_board_data *data = plat->board_data;
-> +	struct ux500_musb_board_data *data;
->   	struct dma_channel *dma_channel = NULL;
->   	u32 ch_num;
->   	u8 dir;
-> @@ -297,14 +297,19 @@ static int ux500_dma_controller_start(struct dma_controller *c)
+The biggest disappointment so far in this patch set is finding the
+re-use of the repeated cache handling stuff - when I've already made
+my feelings _well_ known towards re-using existing cache APIs (which
+are designed to handle a _purpose_) for different purposes "just
+because" they appear to do what you need on a particular CPU.  I've
+stated my objection to this kind of behaviour many times in the past,
+I've even _purposely_ broken stuff (mtd stuff) when that's happened in
+the past, and I've not changed my views on this one bit.  It's really
+surprising to me that someone who has been around for such a long time,
+and who knows my views on this, is pushing a patch set which goes
+against that, and somehow thinks that I won't have a problem with
+it... really?
 
-[...]
+What I suggest for the time being is to provide new inline function(s)
+in arch/arm/include/cacheflush.h which are purposed for your application,
+document them in that file, and call the implementation you're currently
+using.  That means if we do have to change it in the future (for example,
+we don't need to do anything in the dcache flushing stuff) we don't have
+to hunt through all the code to find _your_ different use of that function
+and fix it - we can just fix it in one place and we have the reference
+there for what your code expects.
 
->   
->   	/* Prepare the loop for RX channels */
->   	channel_array = controller->rx_channel;
-> -	param_array = data->dma_rx_param_array;
-> +	param_array = (data) ? data->dma_rx_param_array : NULL;
+Again, this is nothing new - I've made my position on this kind of stuff
+_exceedingly_ plain in the past.
 
-    Why enclose a simple variable in parens?
 
->   
->   	for (dir = 0; dir < 2; dir++) {
->   		for (ch_num = 0;
-> @@ -337,7 +342,7 @@ static int ux500_dma_controller_start(struct dma_controller *c)
->   
->   		/* Prepare the loop for TX channels */
->   		channel_array = controller->tx_channel;
-> -		param_array = data->dma_tx_param_array;
-> +		param_array = (data) ? data->dma_tx_param_array : NULL;
+That all said, my biggest concern so far from this set is the independent
+issue of moving the cache handling into generic code, so that we avoid
+the existing problem where every platform ends up implementing that stuff
+time and time again - and the impact that will have on this MCPM code.
 
-    Again, why?
+Currently as I see it, the two things are mutually incompatible with
+each other - and having discussed with Will, we'd come to the conclusion
+that I'd merge what I had because the comments alone on how the cpu
+hotplug stuff is supposed to work are a valuable improvement, even
+though the code changes don't completely solve all the issues.
 
-WBR, Sergei
+However, MCPMm gets in the way of that.  So... that presents a dilema...
+it's a case of this or that but not both.  Or do you think MCPM can
+survive with additional LOUIS flushing before the cpu die callback is
+called?
