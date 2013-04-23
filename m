@@ -1,38 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Apr 2013 23:44:41 +0100
-Subject: [PATCH v4 00/15] multi-cluster power management
-In-Reply-To: <alpine.LFD.2.03.1304231755370.17375@syhkavp.arg>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <20130423200429.GF5316@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1304231657150.17375@syhkavp.arg>
- <20130423214610.GY14496@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1304231755370.17375@syhkavp.arg>
-Message-ID: <20130423224441.GZ14496@n2100.arm.linux.org.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 24 Apr 2013 00:59:26 +0200
+Subject: [PATCH 07/18] cpufreq: s3c24xx: move cpufreq driver to
+ drivers/cpufreq
+In-Reply-To: <5176A807.2090005@samsung.com>
+References: <cover.1365079581.git.viresh.kumar@linaro.org>
+ <1769336.FkfMpuXqqb@vostro.rjw.lan> <5176A807.2090005@samsung.com>
+Message-ID: <2264237.NUtkmvZG3W@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 05:56:03PM -0400, Nicolas Pitre wrote:
-> On Tue, 23 Apr 2013, Russell King - ARM Linux wrote:
+On Wednesday, April 24, 2013 12:25:59 AM Kukjin Kim wrote:
+> On 04/05/13 20:36, Rafael J. Wysocki wrote:
+> > On Friday, April 05, 2013 12:36:34 PM Viresh Kumar wrote:
+> >> On 5 April 2013 12:18, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+> >>> Basically, this moving looks good to me, but should be re-worked based on
+> >>> for-next of samsung tree because this touches too many samsung stuff so this
+> >>> should be sent to upstream via samsung tree.
+> >>
+> >> Hmm... Its already applied in Rafael's tree. But it doesn't mean that
+> >> it can't be
+> >> moved to your tree if there is a issue.
+> >
+> > Well, I'm dropping it.  Please merge via the Samsung tree.
+> >
 > 
-> > On Tue, Apr 23, 2013 at 05:03:06PM -0400, Nicolas Pitre wrote:
-> > > On Tue, 23 Apr 2013, Russell King - ARM Linux wrote:
-> > > 
-> > > > What I suggest for the time being is to provide new inline function(s)
-> > > > in arch/arm/include/cacheflush.h which are purposed for your application,
-> > > > document them in that file, and call the implementation you're currently
-> > > > using.  That means if we do have to change it in the future (for example,
-> > > > we don't need to do anything in the dcache flushing stuff) we don't have
-> > > > to hunt through all the code to find _your_ different use of that function
-> > > > and fix it - we can just fix it in one place and we have the reference
-> > > > there for what your code expects.
-> > > 
-> > > What about the patch below?  Once you tell me it is fine to you I'll 
-> > > adapt the MCPM series to it.
-> > 
-> > Yes, that looks like a saner solution.  Thanks.
+> Oops, I missed, maybe I have no more chance to send this to upstream for 
+> upcoming merge window :-(
 > 
-> May I add your ACK to the patch?
+> Rafael, please take this patch with my ack in your tree, sorry for noise.
+> 
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> 
+> If any problems, please kindly let me know.
 
-Yes, sure.
+Well, I suppose I can take the original patch, but then it will conflict with
+your tree during merge.  Is that not a problem?
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Rafael
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
