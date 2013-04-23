@@ -1,52 +1,63 @@
-From: cedric@precidata.com (Cedric Berger)
-Date: Tue, 23 Apr 2013 10:06:47 +0200
-Subject: [PATCH 2/10] LPC32XX: 002-mmc.1: Workaround for MMC+DMA on LPC32xx
-In-Reply-To: <20130418095650.GK14496@n2100.arm.linux.org.uk>
-References: <E1USZDI-0006T8-MV@merlin.infradead.org>
- <20130418095650.GK14496@n2100.arm.linux.org.uk>
-Message-ID: <51764117.20905@precidata.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Tue, 23 Apr 2013 08:19:52 +0000 (UTC)
+Subject: [PATCH 2/8] ARM: OMAP2+: hwmod: Cleanup sidle/mstandby programming
+In-Reply-To: <516FD093.1020607@ti.com>
+References: <1361354272-18089-1-git-send-email-santosh.shilimkar@ti.com>
+ <1361354272-18089-3-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.DEB.2.00.1303310053351.6436@utopia.booyaka.com>
+ <515947D3.50904@ti.com> <516FD093.1020607@ti.com>
+Message-ID: <alpine.DEB.2.00.1304230804410.30196@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/18/13 11:56 AM, Russell King - ARM Linux wrote:
-> On Wed, Apr 17, 2013 at 10:42:50PM +0200, Cedric Berger wrote:
->> Signed-off-by: Gabriele Mondada <gabriele@precidata.com>
->> ---
->> the connection between the MMC controller and the DMA on NXP LPC32xx has
->> silicon bugs. NXP did a patch to workaround this, but it has not been commited
->> on the main branch. This is a rework of that patch for 3.9 kernel.
->
-> Again, this should be in the commit description.
->
->> +#ifdef CONFIG_ARCH_LPC32XX
->> +	/*
->> +	 * The LPC32XX do not support sg on TX DMA. So
->> +	 * a temporary bounce buffer is used if more than 1 sg segment
->> +	 * is passed in the data request. The bounce buffer will get a
->> +	 * contiguous copy of the TX data and it will be used instead.
->> +	 */
->
-> I don't think this is a silicon bug.  If you read the PL08x and PL18x
-> manuals carefully, you will come to the realisation that the whole thing
-> is a buggered up design - the PL08x will ignore the individual segment
-> lengths when using flow control, and rely on the PL18x to tell it when
-> to move to the next DMA segment, but the PL18x will only signal that at
-> the end of the transfer.
->
-> Someone in ARM Ltd did not have their head screwed on properly when they
-> designed this.  I decided to totally scrap the idea of getting this crap
-> working on ARMs evaluation boards because of this - but if we have real
-> platforms with this problem, we shouldn't limit it to just those
-> platforms.
->
-> However, the problem affects both transmit and receive sides when flow
-> control is used - I don't remember if FC is supposed to be used with
-> receive with the PL18x though.
+Hi Rajendra,
 
-Hello,
+On Thu, 18 Apr 2013, Rajendra Nayak wrote:
 
-I just sent a new set of patches (the first 4 mmc-related).
-Is that something like that you wanted?
+> >>> _enable_wakeup() and _disable_wakeup() are expected to program the
+> >>> OCP_SYSCONFIG.ENAWAKEUP bit.
+> >>
+> >> These functions were originally intended to take care of everything needed 
+> >> for the IP block to wake up the chip, including the PRCM WKEN programming.  
+> >> ENAWAKEUP is simply one part of that.
+> >>
+> >>> Get rid of the additional sidle/mstandby programming in them, as its 
+> >>> confusing (this is expected to be handled elsewhere as part of 
+> >>> _enable_sysc()/__idle_sysc())
+> >>
+> >> Sorry, why does the expectation exist for the code to enable and disable 
+> >> device wakeup to be part of _enable_sysc()/_idle_sysc(), rather than in 
+> >> functions called by _enable_sysc()/_idle_sysc()?
+> > 
+> > It all comes down to if SIDLE_SMART_WKUP/MSTANDBY_SMART_WKUP programming
+> > be considered as 'idlemode' programming or 'enwakeup' programming.
+> > If you consider these are being part of 'enwakeup' progrmming, these should
+> > certainly be handled as part of _enable_wakeup() and _disable_wakeup().
+> > 
+> > Today, in some cases, these are *also* handled as part of _enable_sysc()
+> > and _idle_sysc(). The way _enable_wakeup() is invoked from _enable_sysc()
+> > is also very inconsistent. For instance, for any IP which supports
+> > SYSC_HAS_MIDLEMODE and SYSC_HAS_ENAWAKEUP, we invoke _enable_wakeup()
+> > regardless of the MIDLEMODE programmmed.
+> > While in case of the IP supporting SYSC_HAS_SIDLEMODE, _enable_wakeup() is
+> > invoked only when the SIDLEMODE programmed is SMART or SMART_WKUP.
+> > 
+> > I understand the cleanups you are suggesting below as part of the movement
+> > of some of these things outside of mach-omap2.
+> > I was more looking at fixing the existing piece so its readable and does
+> > things more consistently.
+> 
+> Do you have any further thoughts on how we should do about this?
 
-Thanks for looking into that.
-Cedric
+Is it possible to implement a solution that preserves _enable_wakeup() and 
+_disable_wakeup() as distinct functions, that can be called by separate 
+wakeup control entry points?
+
+If it makes sense to change _enable_sysc() so that it doesn't call 
+_enable_wakeup(), but does similar work itself, that's fine with me, as 
+long as there's not too much code duplication.
+
+It will be good to have the inconsistencies fixed.
+
+
+- Paul
