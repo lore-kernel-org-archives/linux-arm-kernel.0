@@ -1,87 +1,71 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 24 Apr 2013 01:19:37 +0900
-Subject: [GIT PULL] Late Exynos stuff for v3.10
-Message-ID: <5176B499.1000208@samsung.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 23 Apr 2013 09:26:04 -0700
+Subject: [PATCH] usb: phy: phy core cannot yet be a module
+In-Reply-To: <20130423160759.GF15177@arwen.pp.htv.fi>
+References: <1366732475-479886-1-git-send-email-arnd@arndb.de>
+ <1366732475-479886-2-git-send-email-arnd@arndb.de>
+ <20130423160759.GF15177@arwen.pp.htv.fi>
+Message-ID: <20130423162604.GA6983@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 58a7bbf75442ea439a4d3b7993ad87023e406063:
+On Tue, Apr 23, 2013 at 07:07:59PM +0300, Felipe Balbi wrote:
+> Hi,
+> 
+> On Tue, Apr 23, 2013 at 05:54:32PM +0200, Arnd Bergmann wrote:
+> > A lot of platform code calls into the usb phy core at the moment, which
+> > does not work if it is built as a loadable module. This will hopefully
+> > change when those platforms are all converted to DT based probing,
+> > but for now, the easiest solution is to change it from "tristate"
+> > to "bool".
+> > 
+> > This solves at least these ARM allmodconfig build errors:
+> > 
+> > arch/arm/mach-imx/built-in.o: In function `imx_otg_ulpi_create':
+> > arch/arm/mach-imx/ulpi.c:117: undefined reference to `otg_ulpi_create'
+> > arch/arm/mach-omap2/built-in.o: In function `usbhs_init_phys':
+> > arch/arm/mach-omap2/usb-host.c:652: undefined reference to `usb_bind_phy'
+> > arch/arm/mach-omap2/built-in.o: In function `omap_2430sdp_init':
+> > arch/arm/mach-omap2/board-2430sdp.c:236: undefined reference to `usb_bind_phy'
+> > arch/arm/mach-omap2/built-in.o: In function `omap3_beagle_init':
+> > arch/arm/mach-omap2/board-omap3beagle.c:554: undefined reference to `usb_bind_phy'
+> > arch/arm/mach-omap2/built-in.o: In function `devkit8000_init':
+> > arch/arm/mach-omap2/board-devkit8000.c:596: undefined reference to `usb_bind_phy'
+> > arch/arm/mach-omap2/built-in.o: In function `omap_ldp_init':
+> > arch/arm/mach-omap2/board-ldp.c:379: undefined reference to `usb_bind_phy'
+> > drivers/built-in.o: In function `ab8500_charger_probe':
+> > drivers/power/ab8500_charger.c:3629: undefined reference to `usb_get_phy'
+> > drivers/power/ab8500_charger.c:3706: undefined reference to `usb_put_phy'
+> > drivers/built-in.o: In function `ab8500_charger_remove':
+> > drivers/power/ab8500_charger.c:3411: undefined reference to `usb_put_phy'
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Cc: linux-usb at vger.kernel.org
+> > ---
+> >  drivers/usb/phy/Kconfig | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
+> > index 21153d1..371d0e7 100644
+> > --- a/drivers/usb/phy/Kconfig
+> > +++ b/drivers/usb/phy/Kconfig
+> > @@ -2,7 +2,7 @@
+> >  # Physical Layer USB driver configuration
+> >  #
+> >  menuconfig USB_PHY
+> > -	tristate "USB Physical Layer drivers"
+> > +	bool "USB Physical Layer drivers"
+> 
+> looks like this is the only way, indeed. Do you need on the merge window
+> on can this wait until -rc1 ? I just sent a pull request to Greg with
+> urgent fixes for the merge window.
+> 
+> Greg, if you want to take this one as a patch, go for it:
+> 
+> Acked-by: Felipe Balbi <balbi@ti.com>
 
-   ARM: dts: add PDMA0 changes for exynos5440 (2013-04-09 01:39:27 +0900)
+I'll take this now, thanks.
 
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/late-exynos-for-v3.10
-
-for you to fetch changes up to 9007025f3438ec3bdea02439e760585345102b8d:
-
-   ARM: dts: Disable the RTC by default on exynos5 (2013-04-24 00:32:28 
-+0900)
-
-----------------------------------------------------------------
-This includes late exynos stuff for v3.10 1) keypad for smdk4412 and 
-origen4412 boards 2) adds mfc clock entries for exynos4 3) enables 
-usb2phy, usb3phy and dwc3-exynos for exynos5250 4) enables tmu for 
-exynos4210 5) support chip id with dt
-
-----------------------------------------------------------------
-Doug Anderson (1):
-       ARM: dts: Disable the RTC by default on exynos5
-
-Girish K S (1):
-       ARM: EXYNOS: force MAC ip to 32bit DMA
-
-Sachin Kamat (7):
-       ARM: dts: Remove keypad entries from exynos4x12-pinctrl.dtsi
-       ARM: dts: Add keypad entries to Exynos4412 based Origen
-       ARM: dts: Add keypad entries to SMDK4412
-       ARM: dts: Add MFC clock entries for exynos4
-       ARM: dts: Update MFC documentation for clock entries
-       ARM: dts: Add TMU clock entries to exynos4210.dtsi
-       ARM: dts: Enable TMU on Origen4210 board
-
-Thomas Abraham (4):
-       ARM: dts: add mshc controller node for Exynos4x12 SoCs
-       ARM: EXYNOS: Add a platform bus notifier to set dma masks for 
-Exynos5440
-       ARM: EXYNOS: Create virtual I/O mapping for Chip-ID controller 
-using device tree
-       ARM: dts: Add chip-id controller node on Exynos4/5 SoC
-
-Vivek Gautam (5):
-       ARM: dts: Enabling samsung-usb2phy driver for exynos5250
-       ARM: dts: Enabling samsung-usb3phy driver for exynos5250
-       ARM: dts: Add device tree bindings for dwc3-exynos
-       ARM: dts: Enabling dwc3-exynos driver for exynos5250
-       ARM: EXYNOS: Enable XHCI support on exynos5
-
-  .../devicetree/bindings/media/s5p-mfc.txt          |  5 ++
-  .../devicetree/bindings/usb/exynos-usb.txt         | 34 +++++++++
-  arch/arm/boot/dts/exynos4.dtsi                     |  7 ++
-  arch/arm/boot/dts/exynos4210-origen.dts            |  4 +
-  arch/arm/boot/dts/exynos4210.dtsi                  |  3 +
-  arch/arm/boot/dts/exynos4412-origen.dts            | 62 +++++++++++++++
-  arch/arm/boot/dts/exynos4412-smdk4412.dts          | 87 
-++++++++++++++++++++++
-  arch/arm/boot/dts/exynos4412.dtsi                  |  8 ++
-  arch/arm/boot/dts/exynos4x12-pinctrl.dtsi          | 56 --------------
-  arch/arm/boot/dts/exynos5250.dtsi                  | 51 +++++++++++++
-  arch/arm/boot/dts/exynos5440.dtsi                  |  1 +
-  arch/arm/mach-exynos/Kconfig                       |  1 +
-  arch/arm/mach-exynos/common.c                      | 53 +++++++------
-  arch/arm/mach-exynos/include/mach/map.h            |  1 -
-  arch/arm/mach-exynos/mach-exynos5-dt.c             | 28 +++++++
-  15 files changed, 321 insertions(+), 80 deletions(-)
-
-Hi Arnd and Olof,
-
-As I said, last my pull-request at 4/10 included most of above changes. 
-So would be nice if you could pull this and small patches added on top 
-of that though.
-
-If any problems, please kindly let me know.
-
-Thanks.
-
-- Kukjin
+greg k-h
