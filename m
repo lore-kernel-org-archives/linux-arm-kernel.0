@@ -1,111 +1,70 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 23 Apr 2013 10:21:06 +0530
-Subject: [PATCHv3 00/14] drivers: mailbox: framework creation
-In-Reply-To: <37C860A02101E749A747FA2D3C1E3C504A5DF7@DLEE11.ent.ti.com>
-References: <1363145021-14339-1-git-send-email-s-anna@ti.com>
- <CABb+yY0RYkVeo2Sb4WsDJY0jf17488FEz0d2CB994eQaSOEsVg@mail.gmail.com>
- <37C860A02101E749A747FA2D3C1E3C504A5DF7@DLEE11.ent.ti.com>
-Message-ID: <CABb+yY1x4x_A+QtGG9ohsLPgs8c3nEVnd_ExJBGOOR8=6YLPFA@mail.gmail.com>
+From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
+Date: Tue, 23 Apr 2013 10:27:13 +0530
+Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
+In-Reply-To: <5175F09E.1000304@intel.com>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
+ <1364302359.5053.21.camel@laptop>
+ <CAKfTPtD=_oS5gJeynUG=ft-Y1zEdxZEMhUPH9hSXx+H2pi4xgA@mail.gmail.com>
+ <1364308932.5053.46.camel@laptop>
+ <CAKfTPtArtgkH5MU_xFAKjLDS-i32g2qQMdvyW=LLkG84tH8Hhg@mail.gmail.com>
+ <5174CE96.3060805@linux.vnet.ibm.com>
+ <CAKfTPtCCCifC=c+xjjnAH_HSqkR80PiQoddQKXPHuZwZawbvcA@mail.gmail.com>
+ <5175F09E.1000304@intel.com>
+Message-ID: <517614A9.50600@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suman,
+Hi Alex,
 
-On Mon, Apr 22, 2013 at 9:26 PM, Anna, Suman <s-anna@ti.com> wrote:
+I have one point below.
+
+On 04/23/2013 07:53 AM, Alex Shi wrote:
+> Thanks you, Preeti and Vincent to talk the power aware scheduler for
+> details! believe this open discussion is helpful to conduct a a more
+> comprehensive solution. :)
+> 
+>> Hi Preeti,
 >>
->> a) No documentation. Usually the header would have proper documentation of
->> data structures and info for users of both side of the api.
->
-> I will fix the documentation portion for 3.10. I will also add a TODO as part of the documentation so that it highlights the gaps and work-items.
->
->>
->> b) The api is not scalable. The assumption of just one IPC controller in the
->> platform is hardcoded.
->
-> Yes, this is a major concern and I will be handling this in the upcoming patches . The current code was primarily based on moving the OMAP mailbox code and expanding it to support the ST DBX500 mailbox. As it is today, it doesn't scale to support multiple IP instances/controllers.
->
->>
->> c) There seems to be no consistent design - mailbox_ops has 12 callback hooks.
->> Some, save_ctx, restore_ctx, enable_irq, disable_irq are exported for no
->> apparent reason (legacy of a legacy - OMAP), while other hooks are kept private
->> to the api.
->> I believe OMAP had valid reasons to make IPC clients save/restore context of the
->> IPC controller, but I don't think that is the case in general. I2C client drivers don't
->> save/restore context of I2C controller's, why should IPC's?  Similarly
->> enable/disable_irq of the controller seem too intrusive for a client driver.
->
-> Yep, these are exported because of the OMAP legacy TIDSPBRIDGE stack, and should vanish with the addition of runtime_pm support.
->
->>
->> mailbox_ops.mailbox_type_t makes no sense to me. At least not without
->> documentation, though I doubt any amount of documentation could help it -
->> mailbox.c doesn't even read the member. Btw, isn't every mailbox a
->> MBOX_SHARED_MEM_TYPE? A part of data passed via FIFO/REG could point to
->> location in shared memory that might have full command/payload for the
->> message. Or did I get the meaning of MBOX_SHARED_MEM_TYPE wrong in the
->> absence of documentation?
->
-> Yes, this needs to be removed, it is a carry-over from the OMAP mailbox code.
->
->>
->> The api seems to worry too much about the low-level details of the IPC controller
->> (save/restore context, enable/disable_irq and ack_irq), while it fails to provide a
->> tight well-defined interface to client drivers.
->>
->> There are also some code issues, which might come as replies to respective
->> patches.
->
-> Thanks for the review of the patches. I will await your comments, and will address them as incremental patches.
->
-So we agree
-a) Documentation is missing.
-b) mailbox_type_t, save_ctx, restore_ctx, ack_irq, enable_irq,
-disable_irq need to be removed.
-c) Support for more than one IPC controllers is needed.
+>> I have had a look at Alex patches but i have some concerns with his patches
+>> -There no notion of power domain which is quite important when we speak
+>> about power saving IMHO. Packing tasks has got an interest if the idle
+>> CPUs can reach a useful low power state independently from busy CPUs.
+>> Architectures have different low power state capabilities which must be
+>> taken into account. In addition, you can have system which have CPUs
+>> with better power efficiency and this kind of system are not taken into
+>> account.
+> 
+> I agree with you on this point. and like what's you done to add new flag
+> in sched domain. It also make scheduler easy pick up new idea in balancing.
+> BTW, Currently, the my balance is trying pack task per SMT, maybe
+> packing task per cpu horse power is more compatible for other archs?
 
-Out of 11 exported functions, we'll be left with the 5 trivial ones
-mailbox_un/register, mailbox_get/put and mailbox_msg_send.
-mailbox_msg_send_no_irq and mailbox_msg_send_receive_no_irq are STE(?)
-specific quirky requirements, which should be possible to simulate
-over the mailbox API if designed well.
+Correct me if I am wrong,but the scheduler today does not compare the
+task load to the destination cpu power before moving the task to the
+destination cpu.This could be during:
 
-Documentation wise, we'd need documentation for what we finally wanna
-have, not the current implementation.
+1. Load balancing: In move_tasks(), only the imbalance is verified
+against the task load before moving tasks and does not necessarily check
+if the destination cpu has enough cpu power to handle these tasks.
 
-There are also some desired features in a good API:-
+2. select_task_rq_fair(): For a forked task, the idlest cpu in the group
+leader is found during power save balance( I am focussing only on the
+power save policy),and is returned as the destination cpu for the forked
+task.But I feel we need to check if the idle cpu has the cpu power to
+handle the task load.
 
-a) The API should be simple and efficient, i.e, submission of requests
-by clients and notifications of data received by the API should be
-possible from atomic context - most of the IPC is going to be about
-exchanging 'commands'. The API shouldn't add to the latencies.
+Why I am bringing about this point is due to a use case which we might
+need to handle in the power aware scheduler going ahead.That being the
+big.LITTLE cpus. We would ideally want the short running tasks on the
+LITTLE cpus and the long running tasks on the big cpus.
 
-b) It would be very useful to allow submission of a new request from
-the completion callback of last one.
+While the power aware scheduler strives to pack tasks,it should not end
+up packing long running tasks on LITTLE cpus. Not having big cpus to
+handle short running tasks is the next step of course but atleast not
+throttle the long running tasks by scheduling them on LITTLE cpus.
 
-c) The request/free/ack_irq on behalf of the IPC controller driver
-should be no business of the API. The API design should only assume a
-simple but generic enough h/w model beneath it and provide support to
-h/w that doesn't have an expected feature.
- For example, API should assume the IPC controller can detect and
-report when the remote asserts Ready-To-Receive (RTR). This is when
-the API callbacks .tx_done(mssg) on the client. If some h/w doesn't
-have RTR assertion interrupt, the API should provide optional feature
-to poll the controller periodically.
+Thanks
 
-(d) The 'struct mailbox_msg' should be just an opaque void* - the
-client/protocol driver typecasts to void* the IPC controller specific
-message structure. API shouldn't aim the impossible of providing a
-generic message format.
-
-(a) and (b) are already proved to be useful and supported by a similar
-API - DMAEngine.
-
-As you see there would be not much of the present left eventually. So
-I wonder if should sculpt a new api out of TI's or start from scratch?
-One of my controllers is similar to 'pl320' (which you left out
-converting to the API). I am in process of implementing all this
-assuming it is OK to keep a controller out of this API :)  So maybe we
-can collaborate on a new implementation from scratch.
-
-Regards,
-Jassi
+Regards
+Preeti U Murthy
