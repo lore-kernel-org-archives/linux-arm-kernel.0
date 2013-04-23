@@ -1,48 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 23 Apr 2013 03:48:58 +0200
-Subject: [PATCH 1/3] mmc: mvsdio: Support inverted CD and WP GPIO lines
-In-Reply-To: <87sj2iteue.fsf@octavius.laptop.org>
-References: <1366660500-26835-1-git-send-email-gmbnomis@gmail.com>
- <1366660500-26835-2-git-send-email-gmbnomis@gmail.com>
- <87wqrutjss.fsf@octavius.laptop.org>
- <20130422203723.GI29947@lunn.ch>
- <20130422210949.GJ25724@titan.lakedaemon.net>
- <20130422214543.GJ29947@lunn.ch>
- <87sj2iteue.fsf@octavius.laptop.org>
-Message-ID: <20130423034858.28c7f99c@skate>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 23 Apr 2013 10:52:31 +0900
+Subject: [PATCH v5 1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and
+ PHY devices to R8A7779 code
+In-Reply-To: <51753C4D.4080701@cogentembedded.com>
+References: <201304200156.23830.sergei.shtylyov@cogentembedded.com>
+ <51743BC0.20506@cogentembedded.com>
+ <20130422010917.GC15680@verge.net.au>
+ <51753C4D.4080701@cogentembedded.com>
+Message-ID: <20130423015230.GJ12017@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Chris Ball,
-
-On Mon, 22 Apr 2013 17:50:17 -0400, Chris Ball wrote:
-
-> On Mon, Apr 22 2013, Andrew Lunn wrote:
-> >> Nothing else really jumps out though.  Where either of these what you
-> >> were thinking of?
-> >
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138514.html
-> >
-> > and
-> >
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138513.html
+On Mon, Apr 22, 2013 at 05:34:05PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> These patches move mvsdio to slot-gpio, which is a prerequisite for
-> using the shared mmc_of_parse(), but they don't go all the way to
-> using mmc_of_parse().
+> On 22-04-2013 5:09, Simon Horman wrote:
 > 
-> (Which makes sense; mmc_of_parse() was merged to mmc-next in February,
-> so it wasn't available for this patchset in December.)
+> >>>USB EHCI, OHCI, and common PHY are the SoC devices but are wrongly defined and
+> >>>registered in the Marzen board file.  Move the data and code to their proper
+> >>>place in setup-r8a7779.c; while at it, we have to rename 8a7779_late_devices[]
+> >>>to 8a7779_standard_devices[] -- this seems legitimate since they are registered
+> >>
+> >>     I've been pointed to the types in the above variable names privately.
+> >>Don't know should I resend or Simon could fix s/8a7779/r8a7779/ while
+> >>applying... well, the USB patches haven't been ACK'ed yet.
+> 
+> >I can fix that up.
+> 
+> >Is the series waiting on anything?
+> 
+>    Probably on Felipe's ACKs on rcar-phy.c patches... Felipe hasn't
+> appeared on this list for a week but I see his mails from today.
 
-Correct. I used the slot-gpio infrastructure in mvsdio, but I wasn't
-aware of the new mmc_of_parse() thing, and I don't have any patch that
-converts mvsdio to use it for the moment.
+Thanks, lets wait a little longer for his feedback.
+Please feel free to ping me if things stagnate.
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> >>>from r8a7779_add_standard_devices() anyway.
+> 
+> >>>Note that I'm deliberately changing the USB PHY platform device's 'id' field
+> >>>from (previously just omitted) 0 to -1 as the device is a single of its kind.
+> 
+> >>>Note also that the board and SoC code have to be in one patch to keep the code
+> >>>bisectable...
+> 
+> >>>The patch has been tested on the Marzen board.
+> 
+> >>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>>Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> >>>Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> WBR, Sergei
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
