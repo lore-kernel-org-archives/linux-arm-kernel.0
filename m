@@ -1,81 +1,75 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 23 Apr 2013 19:17:47 +0400
-Subject: [PATCH v6 2/9] ehci-platform: add pre_setup() method to platform data
+Date: Tue, 23 Apr 2013 19:20:40 +0400
+Subject: [PATCH v6 3/9] ARM: shmobile: r8a7779: setup EHCI internal buffer
 In-Reply-To: <201304231911.56202.sergei.shtylyov@cogentembedded.com>
 References: <201304231911.56202.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201304231917.48349.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201304231920.41469.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes there is a need  to initialize some non-standard registers mapped to
-the EHCI region before accessing the standard EHCI registers.  Add pre_setup()
-method with 'struct usb_hcd *' parameter to be called just before ehci_setup()
-to the 'ehci-platform'  driver's platform data for this purpose...
+Setup the EHCI internal buffer (before EHCI driver has a chance to touch the
+registers) using the pre_setup() method in 'struct usb_ehci_pdata'.
 
-While at it, add the missing incomplete declaration of 'struct platform_device'
-to <linux/usb/ehci_pdriver.h>...
+The patch has been tested on the Marzen board.
 
-The patch has been tested on the Marzen and BOCK-W boards.
-
-Suggested-by: Alan Stern <stern@rowland.harvard.edu>
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
 
 ---
+Changes since version 4:
+- refreshed the patch.
+
 Changes since version 3:
-- added ACK from Alan Stern.
+- lowercased the SoC name in the subject.
 
 Changes since version 2:
-- replaced #include with incomplete declarations of 'struct platform_device' and
-  'struct usb_hcd';
+- added #include <linux/usb/hcd.h>;
 - added a note about testing to the changelog;
 - added ACKs from Simon Horman and Kuninori Morimoto.
 
 Changes since the original posting:
-- changed init() method to pre_setup() with different parameters and call site.
+- changed from init() platform device method to pre_setup() as per the previous
+  patch.
 
- drivers/usb/host/ehci-platform.c |    6 ++++++
- include/linux/usb/ehci_pdriver.h |    4 ++++
- 2 files changed, 10 insertions(+)
+ arch/arm/mach-shmobile/setup-r8a7779.c |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Index: renesas/drivers/usb/host/ehci-platform.c
+Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
 ===================================================================
---- renesas.orig/drivers/usb/host/ehci-platform.c
-+++ renesas/drivers/usb/host/ehci-platform.c
-@@ -46,6 +46,12 @@ static int ehci_platform_reset(struct us
- 	ehci->big_endian_desc = pdata->big_endian_desc;
- 	ehci->big_endian_mmio = pdata->big_endian_mmio;
+--- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
++++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -33,6 +33,7 @@
+ #include <linux/sh_timer.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/usb/otg.h>
++#include <linux/usb/hcd.h>
+ #include <linux/usb/ehci_pdriver.h>
+ #include <linux/usb/ohci_pdriver.h>
+ #include <linux/pm_runtime.h>
+@@ -435,10 +436,25 @@ static void usb_power_off(struct platfor
+ 	pm_runtime_disable(&pdev->dev);
+ }
  
-+	if (pdata->pre_setup) {
-+		retval = pdata->pre_setup(hcd);
-+		if (retval < 0)
-+			return retval;
-+	}
++static int ehci_init_internal_buffer(struct usb_hcd *hcd)
++{
++	/*
++	 * Below are recommended values from the datasheet;
++	 * see [USB :: Setting of EHCI Internal Buffer].
++	 */
++	/* EHCI IP internal buffer setting */
++	iowrite32(0x00ff0040, hcd->regs + 0x0094);
++	/* EHCI IP internal buffer enable */
++	iowrite32(0x00000001, hcd->regs + 0x009C);
 +
- 	ehci->caps = hcd->regs + pdata->caps_offset;
- 	retval = ehci_setup(hcd);
- 	if (retval)
-Index: renesas/include/linux/usb/ehci_pdriver.h
-===================================================================
---- renesas.orig/include/linux/usb/ehci_pdriver.h
-+++ renesas/include/linux/usb/ehci_pdriver.h
-@@ -19,6 +19,9 @@
- #ifndef __USB_CORE_EHCI_PDRIVER_H
- #define __USB_CORE_EHCI_PDRIVER_H
- 
-+struct platform_device;
-+struct usb_hcd;
++	return 0;
++}
 +
- /**
-  * struct usb_ehci_pdata - platform_data for generic ehci driver
-  *
-@@ -50,6 +53,7 @@ struct usb_ehci_pdata {
- 	/* Turn on only VBUS suspend power and hotplug detection,
- 	 * turn off everything else */
- 	void (*power_suspend)(struct platform_device *pdev);
-+	int (*pre_setup)(struct usb_hcd *hcd);
+ static struct usb_ehci_pdata ehcix_pdata = {
+ 	.power_on	= usb_power_on,
+ 	.power_off	= usb_power_off,
+ 	.power_suspend	= usb_power_off,
++	.pre_setup	= ehci_init_internal_buffer,
  };
  
- #endif /* __USB_CORE_EHCI_PDRIVER_H */
+ static struct resource ehci0_resources[] = {
