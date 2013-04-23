@@ -1,88 +1,228 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 23 Apr 2013 18:23:05 -0400
-Subject: [PATCHv1 3/3] hwmon: Add DT documentation for g762 driver
-In-Reply-To: <6ee748f450ba2a80c87aba08c0672105e2800f93.1366753420.git.arno@natisbad.org>
-References: <cover.1366753420.git.arno@natisbad.org>
- <6ee748f450ba2a80c87aba08c0672105e2800f93.1366753420.git.arno@natisbad.org>
-Message-ID: <20130423222305.GD13884@titan.lakedaemon.net>
+From: nerv@dawncrow.de (=?ISO-8859-1?Q?Andr=E9_Hentschel?=)
+Date: Wed, 24 Apr 2013 00:42:22 +0200
+Subject: [PATCHv2] arm: Preserve TPIDRURW on context switch
+In-Reply-To: <20130423091536.GB17593@mudshark.cambridge.arm.com>
+References: <517168BB.3070903@dawncrow.de>
+ <20130422143616.GP14496@n2100.arm.linux.org.uk>
+ <20130422151836.GA15665@mudshark.cambridge.arm.com>
+ <5175A697.3080308@dawncrow.de>
+ <20130423091536.GB17593@mudshark.cambridge.arm.com>
+Message-ID: <51770E4E.2040003@dawncrow.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 12:06:20AM +0200, Arnaud Ebalard wrote:
+Am 23.04.2013 11:15, schrieb Will Deacon:
+> On Mon, Apr 22, 2013 at 10:07:35PM +0100, Andr? Hentschel wrote:
+>> Am 22.04.2013 17:18, schrieb Will Deacon:
+>>> On Mon, Apr 22, 2013 at 03:36:16PM +0100, Russell King - ARM Linux wrote:
+>>>> On Fri, Apr 19, 2013 at 05:54:35PM +0200, Andr? Hentschel wrote:
+>>>>> From: =?UTF-8?q?Andr=C3=A9=20Hentschel?= <nerv@dawncrow.de>
+>>>>>
+>>>>> There are more and more applications coming to WinRT, Wine could support them,
+>>>>> but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
+>>>>> This register must be preserved per thread instead of being cleared.
+>>>>>
+>>>>> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+>>>>
+>>>> This actually makes things less efficient all round, because you
+>>>> now use the value immediately after loading, which means it will cause
+>>>> pipeline stalls, certainly on older CPUs.
+>>>>
+>>>> Could you please rework the patch to try avoiding soo many modifications
+>>>> to the way things have been done here?
+>>>
+>>> copy_thread also needs updating so that the *register* value for the parent
+>>> is copied to the child, since the parent may have written the register
+>>> after the last context-switch, meaning that tp_value is out-of-date.
+>>
+>> Thank you both for reviewing.
+>>
+>> I guess you mostly mean "ldr	r6, [r2, #TI_CPU_DOMAIN]".
+>> I just thought about old CPUs and remembered again that we at Wine
+>> need that patch only on v7 (and later). So is it ok to introduce a set_tls_v7
+>> in tls.h and make use of CONFIG_CPU_V7 compile-time check in
+>> the changed files and in the copy_thread function?
 > 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
->  Documentation/devicetree/bindings/hwmon/g762.txt |   57 ++++++++++++++++++++++
->  1 file changed, 57 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/hwmon/g762.txt
+> No, we should support this feature on any CPU with the TPIDRURW register,
+> otherwise it's going to get really confusing for userspace.
+
+Sure, remembered that today.
+
+>> Do i need any further flag checks in copy_thread or can i use the
+>> compile-time check to add unconditional code?
 > 
-> diff --git a/Documentation/devicetree/bindings/hwmon/g762.txt b/Documentation/devicetree/bindings/hwmon/g762.txt
-> new file mode 100644
-> index 0000000..87d7cf5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/hwmon/g762.txt
-> @@ -0,0 +1,57 @@
-> +GMT G762/G763 PWM Fan controller
-> +
-> +Required node properties:
-> +
-> + - "compatible": must be either "gmt,g762" or "gmt,g763"
-> + - "reg": I2C bus address of the device
-> +
-> +Optional properties:
-> +
-> + - "pwm_mode": fan driving mode. 1 for PWM mode, 0 for linear. Default
-> +               value is 0, i.e. linear.
-> +
-> + - "pwm_enable": fan speed control. 1 for open-loop, 2 for closed-loop.
-> +               Default value is 2, i.e. closed-loop.
-> +
-> + - "pwm_freq": reference clock frequency for PWM mode in Hz. Default is
-> +               32768.
-> +
-> + - "fan_pulses": number of pulses per fan revolution. Supported values
-> +               are 2 and 4. Default is 2.
-> +
-> + - "fan_div": fan clock frequency divisor value. Supported values are 1,
-> +               2, 4 and 8. Default is 1.
-> +
-> + - "fan_target": initial target fan speed in RPM. By default, current
-> +               value is not modified. Only works in closed-loop fan speed
-> +	       control, i.e. when pwm_enable has already been set to 2.
-> +
-> + - "fan_startv": fan startup voltage. Accepted values are 0, 1, 2 and 3.
-> +               Default value is 1. The higher the more.
-> +
-> + - "pwm_polarity": pwm polarity. Accepted values are 0 (positive duty)
-> +               and 1 (negative duty). Default is 0 i.e. positive duty.
-> +
-> + - "fan_gear_mode": fan gear mode. Supported values are 0, 1 and 2.
-> +               Default is 0.
-> +
-> +
-> +Additional information on operational parameters for the device is available
-> +in Documentation/hwmon/g762. A detailed datasheet for the device is available
-> +at http://natisbad.org/NAS/refs/GMT_EDS-762_763-080710-0.2.pdf.
-> +
-> +Example g762 node:
-> +
-> +   g762: g762 at 3e {
-> +        compatible = "gmt,g762";
-> +   	reg = <0x3e>;
-> +   	pwm_mode = <1>;      /* closed-loop control */
-> +   	pwm_enable = <2>;    /* PWM mode */
-> +   	pwm_freq = <8192>;   /* PWM reference clock freq */
-> +   	fan_pulses = <2>;    /* 2 pulses per rev */
-> +   	fan_div = <2>;       /* fan clock divisor */
-> +   	fan_target = <2000>; /* target fan speed at 2000 RPM */
-> +        fan_gear_mode = <0>; /* default */
-> +        fan_startv = <1>;    /* default */
-> +        pwm_polarity = <0>;  /* default */
-> +   };
+> You could introduce `get' tls functions, which don't do anything for CPUs
+> without the relevant registers.
 
-I was just giving this quick overview and noticed that you have
-leading whitespace issues in the above block...
+Before i have another round of testing and patch formatting/sending,
+what about the untested patch below?
 
-thx,
 
-Jason,
+diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+index cddda1f..bb5b48d 100644
+--- a/arch/arm/include/asm/thread_info.h
++++ b/arch/arm/include/asm/thread_info.h
+@@ -58,7 +58,7 @@ struct thread_info {
+ 	struct cpu_context_save	cpu_context;	/* cpu context */
+ 	__u32			syscall;	/* syscall number */
+ 	__u8			used_cp[16];	/* thread used copro */
+-	unsigned long		tp_value;
++	unsigned long		tp_value[2];
+ #ifdef CONFIG_CRUNCH
+ 	struct crunch_state	crunchstate;
+ #endif
+diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
+index 73409e6..1c10163 100644
+--- a/arch/arm/include/asm/tls.h
++++ b/arch/arm/include/asm/tls.h
+@@ -2,13 +2,30 @@
+ #define __ASMARM_TLS_H
+ 
+ #ifdef __ASSEMBLY__
++	.macro get_tls2_none, tp, tmp1
++	.endm
++
++	.macro get_tls2_v6k, tp, tmp1
++	mrc	p15, 0, \tmp1, c13, c0, 2		@ get user r/w TLS register
++	str	\tmp1, [\tp, #4]
++	.endm
++
++	.macro get_tls2_v6, tp, tmp1
++	ldr	\tmp1, =elf_hwcap
++	ldr	\tmp1, [\tmp1, #0]
++	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
++	mrcne	p15, 0, \tmp1, c13, c0, 2		@ get user r/w TLS register
++	strne	\tmp1, [\tp, #4]
++	.endm
++
++
+ 	.macro set_tls_none, tp, tmp1, tmp2
+ 	.endm
+ 
+ 	.macro set_tls_v6k, tp, tmp1, tmp2
+-	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
+-	mov	\tmp1, #0
+-	mcr	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
++	ldrd	\tmp1, \tmp2, [\tp]
++	mcr	p15, 0, \tmp1, c13, c0, 3	@ set user r/o TLS register
++	mcr	p15, 0, \tmp2, c13, c0, 2	@ set user r/w TLS register
+ 	.endm
+ 
+ 	.macro set_tls_v6, tp, tmp1, tmp2
+@@ -16,33 +33,39 @@
+ 	ldr	\tmp1, [\tmp1, #0]
+ 	mov	\tmp2, #0xffff0fff
+ 	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
+-	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
+-	movne	\tmp1, #0
+-	mcrne	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
+-	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
++	ldrdne	\tmp1, \tmp2, [\tp]
++	ldreq	\tmp1, [\tp]
++	mcrne	p15, 0, \tmp1, c13, c0, 3	@ yes, set user r/o TLS register
++	mcrne	p15, 0, \tmp2, c13, c0, 2	@ set user r/w TLS register
++	streq	\tmp1, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
+ 	.endm
+ 
+ 	.macro set_tls_software, tp, tmp1, tmp2
+-	mov	\tmp1, #0xffff0fff
+-	str	\tp, [\tmp1, #-15]		@ set TLS value at 0xffff0ff0
++	ldr	\tmp1, [\tp]
++	mov	\tmp2, #0xffff0fff
++	str	\tmp1, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
+ 	.endm
+ #endif
+ 
+ #ifdef CONFIG_TLS_REG_EMUL
+ #define tls_emu		1
+ #define has_tls_reg		1
++#define get_tls2		get_tls2_none
+ #define set_tls		set_tls_none
+ #elif defined(CONFIG_CPU_V6)
+ #define tls_emu		0
+ #define has_tls_reg		(elf_hwcap & HWCAP_TLS)
++#define get_tls2		get_tls2_v6
+ #define set_tls		set_tls_v6
+ #elif defined(CONFIG_CPU_32v6K)
+ #define tls_emu		0
+ #define has_tls_reg		1
++#define get_tls2		get_tls2_v6k
+ #define set_tls		set_tls_v6k
+ #else
+ #define tls_emu		0
+ #define has_tls_reg		0
++#define get_tls2		get_tls2_none
+ #define set_tls		set_tls_software
+ #endif
+ 
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 0f82098..097686b 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -728,7 +728,7 @@ ENTRY(__switch_to)
+  UNWIND(.fnstart	)
+  UNWIND(.cantunwind	)
+ 	add	ip, r1, #TI_CPU_SAVE
+-	ldr	r3, [r2, #TI_TP_VALUE]
++	add	r3, r1, #TI_TP_VALUE
+  ARM(	stmia	ip!, {r4 - sl, fp, sp, lr} )	@ Store most regs on stack
+  THUMB(	stmia	ip!, {r4 - sl, fp}	   )	@ Store most regs on stack
+  THUMB(	str	sp, [ip], #4		   )
+@@ -736,6 +736,8 @@ ENTRY(__switch_to)
+ #ifdef CONFIG_CPU_USE_DOMAINS
+ 	ldr	r6, [r2, #TI_CPU_DOMAIN]
+ #endif
++	get_tls2	r3, r4
++	add	r3, r2, #TI_TP_VALUE
+ 	set_tls	r3, r4, r5
+ #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
+ 	ldr	r7, [r2, #TI_TASK]
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 047d3e4..6138eb1 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -395,7 +395,8 @@ copy_thread(unsigned long clone_flags, unsigned long stack_start,
+ 	clear_ptrace_hw_breakpoint(p);
+ 
+ 	if (clone_flags & CLONE_SETTLS)
+-		thread->tp_value = childregs->ARM_r3;
++		thread->tp_value[0] = childregs->ARM_r3;
++	thread->tp_value[1] = current_thread_info()->tp_value[1];
+ 
+ 	thread_notify(THREAD_NOTIFY_COPY, thread);
+ 
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index 03deeff..2bc1514 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -849,7 +849,7 @@ long arch_ptrace(struct task_struct *child, long request,
+ #endif
+ 
+ 		case PTRACE_GET_THREAD_AREA:
+-			ret = put_user(task_thread_info(child)->tp_value,
++			ret = put_user(task_thread_info(child)->tp_value[0],
+ 				       datap);
+ 			break;
+ 
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 1c08911..f9d6259 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -588,7 +588,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
+ 		return regs->ARM_r0;
+ 
+ 	case NR(set_tls):
+-		thread->tp_value = regs->ARM_r0;
++		thread->tp_value[0] = regs->ARM_r0;
+ 		if (tls_emu)
+ 			return 0;
+ 		if (has_tls_reg) {
+@@ -706,7 +706,7 @@ static int get_tp_trap(struct pt_regs *regs, unsigned int instr)
+ 	int reg = (instr >> 12) & 15;
+ 	if (reg == 15)
+ 		return 1;
+-	regs->uregs[reg] = current_thread_info()->tp_value;
++	regs->uregs[reg] = current_thread_info()->tp_value[0];
+ 	regs->ARM_pc += 4;
+ 	return 0;
+ }
