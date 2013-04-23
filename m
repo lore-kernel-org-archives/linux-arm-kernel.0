@@ -1,32 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Apr 2013 20:57:36 +0200
-Subject: [PATCH 07/21] ARM: tegra: unify tegra_idle_device definitions
-In-Reply-To: <5176BD29.1000405@linaro.org>
-References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
- <1366734653-488286-8-git-send-email-arnd@arndb.de>
- <5176BD29.1000405@linaro.org>
-Message-ID: <201304232057.37055.arnd@arndb.de>
+Date: Tue, 23 Apr 2013 21:02:20 +0200
+Subject: [PATCH 18/21] usb: phy: tegra: don't call into tegra-ehci directly
+In-Reply-To: <Pine.LNX.4.44L0.1304231239220.1679-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1304231239220.1679-100000@iolanthe.rowland.org>
+Message-ID: <201304232102.20573.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 April 2013, Daniel Lezcano wrote:
-> the patch sounds good but I think the side effect of the consolidation
-> patchset [1] fixed that.
-> 
-> You can find these fixes in Rafael's tree:
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&amp;id=4c637b2175a0dc65d533494225525c6c82d73293
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&amp;id=e158f9da6974cc11bfab2246a9b10021af0e0d8a
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&amp;id=c5106c9dea9a6022ab84c6cb1d4a0b19fc5af0e2
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&amp;id=f040c26ffaa5e56f2bca427c719c9601a02e70e5
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg239811.html
-> 
+On Tuesday 23 April 2013, Alan Stern wrote:
+> On Tue, 23 Apr 2013, Arnd Bergmann wrote:
 
-Ah. Is that not in linux-next? I created the patch today based on the latest
-linux-next from today (Tuesday).
+> > @@ -733,7 +731,9 @@ static int tegra_ehci_probe(struct platform_device *pdev)
+> >  
+> >  	tegra->phy = tegra_usb_phy_open(&pdev->dev, instance, hcd->regs,
+> >  					pdata->phy_config,
+> > -					TEGRA_USB_PHY_MODE_HOST);
+> > +					TEGRA_USB_PHY_MODE_HOST,
+> > +					&tegra_ehci_set_pts,
+> > +					tegra_ehci_set_phcd);
+> 
+> Does the compiler warn about the unnecessary '&'? 
+
+No, AFAIK, both variants are equally acceptable C.
+
+> In any case, it
+> looks strange to have one function pointer with an '&' and another
+> without.
+
+Yes, that was certainly not intentional. I've removed the '&' now.
+
+> Aside from that minor detail, the ehci-tegra.c changes are fine.
+
+Ok, thanks for the feedback.
 
 	Arnd
