@@ -1,40 +1,39 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 23 Apr 2013 18:29:21 +0300
-Subject: [PATCH 06/10] usb: musb: ux500: add device tree probing support
-In-Reply-To: <201304231727.10696.arnd@arndb.de>
-References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
- <201304231714.06326.arnd@arndb.de>
- <20130423151533.GD15177@arwen.pp.htv.fi>
- <201304231727.10696.arnd@arndb.de>
-Message-ID: <20130423152921.GE15177@arwen.pp.htv.fi>
+From: arjan@linux.intel.com (Arjan van de Ven)
+Date: Tue, 23 Apr 2013 08:30:58 -0700
+Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
+In-Reply-To: <5175F09E.1000304@intel.com>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
+ <1364302359.5053.21.camel@laptop>
+ <CAKfTPtD=_oS5gJeynUG=ft-Y1zEdxZEMhUPH9hSXx+H2pi4xgA@mail.gmail.com>
+ <1364308932.5053.46.camel@laptop>
+ <CAKfTPtArtgkH5MU_xFAKjLDS-i32g2qQMdvyW=LLkG84tH8Hhg@mail.gmail.com>
+ <5174CE96.3060805@linux.vnet.ibm.com>
+ <CAKfTPtCCCifC=c+xjjnAH_HSqkR80PiQoddQKXPHuZwZawbvcA@mail.gmail.com>
+ <5175F09E.1000304@intel.com>
+Message-ID: <5176A932.5050506@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 4/22/2013 7:23 PM, Alex Shi wrote:
+> Thanks you, Preeti and Vincent to talk the power aware scheduler for
+> details! believe this open discussion is helpful to conduct a a more
+> comprehensive solution. :)
+>
+>> Hi Preeti,
+>>
+>> I have had a look at Alex patches but i have some concerns with his patches
+>> -There no notion of power domain which is quite important when we speak
+>> about power saving IMHO. Packing tasks has got an interest if the idle
+>> CPUs can reach a useful low power state independently from busy CPUs.
+>> Architectures have different low power state capabilities which must be
+>> taken into account. In addition, you can have system which have CPUs
+>> with better power efficiency and this kind of system are not taken into
+>> account.
+>
+> I agree with you on this point. and like what's you done to add new flag
+> in sched domain.
 
-On Tue, Apr 23, 2013 at 05:27:10PM +0200, Arnd Bergmann wrote:
-> > > > +Required properties:
-> > > > + - compatible : Should be "stericsson,db8500-musb"
-> > > > + - reg        : Offset and length of registers
-> > > > + - interrupts : Interrupt; mode, number and trigger
-> > > > + - mode       : One of; "host", "otg", or "peripheral"
-> > > 
-> > > I think we don't have any precedent for this combination of "mode" property
-> > > and contents. You could either try to match ehci-omap.txt and do
-> > 
-> > there is dr_mode which other folks are using. Let's use the same thing.
-> 
-> On that topic, should we support the same property in am35x.c and 
-> musbhsdma.c? They currently use an integer rather than a string.
-
-certainly :) I also plan to add dr_mode support for dwc3.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130423/03d6dba2/attachment.sig>
+For x86 we should not be setting such flag then; we don't have a way for some cpu packages to
+go to an extra deep power state if they're completely idle.
+(this afaik is true for both Intel and AMD)
