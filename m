@@ -1,44 +1,37 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Tue, 23 Apr 2013 23:22:25 +0200
-Subject: [PATCH 1/3] mmc: mvsdio: Support inverted CD and WP GPIO lines
-In-Reply-To: <87sj2iteue.fsf@octavius.laptop.org>
-References: <1366660500-26835-1-git-send-email-gmbnomis@gmail.com>
- <1366660500-26835-2-git-send-email-gmbnomis@gmail.com>
- <87wqrutjss.fsf@octavius.laptop.org>
- <20130422203723.GI29947@lunn.ch>
- <20130422210949.GJ25724@titan.lakedaemon.net>
- <20130422214543.GJ29947@lunn.ch>
- <87sj2iteue.fsf@octavius.laptop.org>
-Message-ID: <20130423212224.GA29507@schnuecks.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Apr 2013 23:23:27 +0200
+Subject: [PATCH] ARM: OMAP: remove unused variable
+In-Reply-To: <1363818875-15978-1-git-send-email-robherring2@gmail.com>
+References: <1363818875-15978-1-git-send-email-robherring2@gmail.com>
+Message-ID: <201304232323.27751.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris, Guennadi,
+ARM: OMAP: remove unused variable
+    
+Commit 0583fe478a7 "ARM: convert arm/arm64 arch timer to use CLKSRC_OF init"
+has left the omap5_realtime_timer_init() function with a stale variable and
+broken whitespace. This fixes both.
+    
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+I've applied this patch on top of the timer cleanup series
 
-On Mon, Apr 22, 2013 at 05:50:17PM -0400, Chris Ball wrote:
-> Hi,
-> 
-> On Mon, Apr 22 2013, Andrew Lunn wrote:
-> >> Nothing else really jumps out though.  Where either of these what you
-> >> were thinking of?
-> >
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138514.html
-> >
-> > and
-> >
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/138513.html
-> 
-> These patches move mvsdio to slot-gpio, which is a prerequisite for
-> using the shared mmc_of_parse(), but they don't go all the way to
-> using mmc_of_parse().
-
-That's nice functionality, I was not aware of that. I will convert this
-to mmc_of_parse() once I find some time.
-
-One question already: Why does mmc_of_parse() not return errors to
-the caller?  If, for example, a GPIO line was given for CD in the DT,
-but it could not be obtained, shouldn't the caller at least have the
-possibility to handle this as an error?  (mvsdio currently
-aborts the probe if it can't get the GPIO line).
-
-- Simon
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index 7dd6453..686e498 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -618,12 +618,10 @@ OMAP_SYS_32K_TIMER_INIT(5, 1, OMAP4_32K_SOURCE, "ti,timer-alwon",
+ 			2, OMAP4_MPU_SOURCE);
+ void __init omap5_realtime_timer_init(void)
+ {
+-	int err;
+-
+ 	omap5_sync32k_timer_init();
+ 	realtime_counter_init();
+ 
+-        clocksource_of_init();
++	clocksource_of_init();
+ }
+ #endif /* CONFIG_SOC_OMAP5 */
+ 
