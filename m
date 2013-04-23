@@ -1,33 +1,39 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 23 Apr 2013 18:15:33 +0300
-Subject: [PATCH 06/10] usb: musb: ux500: add device tree probing support
-In-Reply-To: <201304231714.06326.arnd@arndb.de>
-References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
- <1366729394-11406-7-git-send-email-lee.jones@linaro.org>
- <201304231714.06326.arnd@arndb.de>
-Message-ID: <20130423151533.GD15177@arwen.pp.htv.fi>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 23 Apr 2013 16:09:59 +0100
+Subject: [PATCH] ARM: ux500: Over-ride TCDM size when booting the DB8540
+ platform
+In-Reply-To: <CACRpkdYLJyvCK33pAHeOkXfBOiPJGAZ9bV+s-cJanfOXz+VTOg@mail.gmail.com>
+References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
+ <1364908916-29803-5-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbh-DJti2ny=uBe-b_vGkQBNL=emMuZ6+_cE5jvRsA4sA@mail.gmail.com>
+ <20130404073340.GA6892@gmail.com>
+ <CACRpkdYLJyvCK33pAHeOkXfBOiPJGAZ9bV+s-cJanfOXz+VTOg@mail.gmail.com>
+Message-ID: <20130423150959.GA17416@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 05:14:06PM +0200, Arnd Bergmann wrote:
-> On Tuesday 23 April 2013, Lee Jones wrote:
-> > +Required properties:
-> > + - compatible : Should be "stericsson,db8500-musb"
-> > + - reg        : Offset and length of registers
-> > + - interrupts : Interrupt; mode, number and trigger
-> > + - mode       : One of; "host", "otg", or "peripheral"
-> 
-> I think we don't have any precedent for this combination of "mode" property
-> and contents. You could either try to match ehci-omap.txt and do
+On Tue, 23 Apr 2013, Linus Walleij wrote:
 
-there is dr_mode which other folks are using. Let's use the same thing.
+> On Thu, Apr 4, 2013 at 9:33 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > The PRCMU's Tightly Coupled Data Memory on the DB8540 platform is
+> > 8kB larger than it's predecessor's. We need to reflect that in its
+> > Device Tree. By re-specifying the address and size of the device
+> > we effectively over-ride the previous values with more accurate
+> > ones.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> As mentioned this patch does not apply. Some whitespace trouble.
+> 
+> And please squash it into the patch adding the ccu8540, 3/9.
+
+I'm not sure what's going on with all this whitespace stuff, my branch
+looks fine. Any chance I can just supply you with a branch to take
+instead?
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130423/22540e2b/attachment.sig>
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
