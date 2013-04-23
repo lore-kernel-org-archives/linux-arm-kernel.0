@@ -1,42 +1,81 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 24 Apr 2013 00:04:13 +0200
-Subject: [PATCH 07/21] ARM: tegra: unify tegra_idle_device definitions
-In-Reply-To: <201304232057.37055.arnd@arndb.de>
-References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
- <1366734653-488286-8-git-send-email-arnd@arndb.de>
- <5176BD29.1000405@linaro.org> <201304232057.37055.arnd@arndb.de>
-Message-ID: <5177055D.1060307@linaro.org>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 24 Apr 2013 00:05:43 +0200
+Subject: [PATCHv1 0/3] hwmon: GMT G72/G763 PWM fan controller
+References: <cover.1366322287.git.arno@natisbad.org>
+ <4f4a821bbc61e2da28fd70553fd717ada255097d.1366322287.git.arno@natisbad.org>
+ <20130419043555.GA14124@roeck-us.net>
+Message-ID: <cover.1366753420.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2013 08:57 PM, Arnd Bergmann wrote:
-> On Tuesday 23 April 2013, Daniel Lezcano wrote:
->> the patch sounds good but I think the side effect of the consolidation
->> patchset [1] fixed that.
->>
->> You can find these fixes in Rafael's tree:
->>
->> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&amp;id=4c637b2175a0dc65d533494225525c6c82d73293
->>
->> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&amp;id=e158f9da6974cc11bfab2246a9b10021af0e0d8a
->>
->> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&amp;id=c5106c9dea9a6022ab84c6cb1d4a0b19fc5af0e2
->>
->> https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/commit/?h=linux-next&amp;id=f040c26ffaa5e56f2bca427c719c9601a02e70e5
->>
->> [1] http://www.spinics.net/lists/arm-kernel/msg239811.html
->>
-> 
-> Ah. Is that not in linux-next? I created the patch today based on the latest
-> linux-next from today (Tuesday).
+Hi,
 
-Ah, ok. Actually the patches were taken by Rafael right today. So it is
-possible the changes were not reflected in linux-next yet.
+This series adds support for GMT G762/G763. This work is based on a
+basic version for 2.6.31 kernel developed Olivier Mouchet (kept as
+author for this reason in g762.c) for LaCie NAS. Updates have been
+performed to run on recent kernels. Supported has been completed and
+additional features added: ability to configure various characteristics
+from .dts file, better initialization, alarms and error reporting
+support, gear mode, polarity, fan pulse per revolution, fan startup
+voltage control. The following detailed datasheet has been used as a
+basis for this work:
 
+  http://natisbad.org/NAS/refs/GMT_EDS-762_763-080710-0.2.pdf
+
+The patch was developed for and tested against the GMT G762 fan
+controller used in a Netgear ReadyNAS Duo v2 (kirkwood 88F6282-based
+NAS). This is the main reason for the device tree bindings provided in
+first patch. The patches are against current ARM tree; tell me if you
+need me to rebase it against something else.
+
+Patch 2 and 3 provides documentation for the driver and DT bindings, 
+respectively.
+
+I hope the comments provided on v0 have all been correctly taken into
+account. A list of changes is provided below.
+
+Comments welcome,
+
+Cheers,
+
+a+
+
+Changes since v0:
+    Removed forward declaration 
+    Used bool for 'valid' field instead of bit field.
+    Protected macro args
+    Fixed typo in subject line
+    Added mention for G763 support in Kconfig
+    Fixed typo in driver name in Kconfig
+    Do not use DRVNAME in i2c_device_id g762_id[] 
+    Following discussions, kept DEVICE_ATTR (i.e. no switch to SENSOR_DEVICE_ATTR)
+    Removed useless casts when flipping bit values
+    Sanity check user input value (e.g. to prevent 256 to silenty become 0)
+    Added extra lines for multiline comments when needed
+    Removed various testing knobs
+    Make removed knobs available via DT
+    Passed checkpatch script on the patch
+    Removed useless lock protection againt clk setting
+    Moved all setter at the beginning of the file
+    Removed bad (u16) casts in g762_write_value() calls
+    Added config structure and helpers
+    Provide specific helper to overload config from dts
+
+
+Arnaud Ebalard (3):
+  Add support for GMT G762/G763 PWM fan controller
+  Add documentation for g762 driver
+  Add DT documentation for g762 driver
+
+ Documentation/devicetree/bindings/hwmon/g762.txt |   57 ++
+ Documentation/hwmon/g762                         |   67 ++
+ drivers/hwmon/Kconfig                            |   10 +
+ drivers/hwmon/Makefile                           |    1 +
+ drivers/hwmon/g762.c                             | 1058 ++++++++++++++++++++++
+ 5 files changed, 1193 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/g762.txt
+ create mode 100644 Documentation/hwmon/g762
+ create mode 100644 drivers/hwmon/g762.c
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.7.10.4
