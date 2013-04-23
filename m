@@ -1,26 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Apr 2013 20:40:07 +0100
-Subject: [PATCH v4 12/15] ARM: CCI: ensure powerdown-time data is
- flushed from cache
-In-Reply-To: <1360041732-17936-13-git-send-email-nicolas.pitre@linaro.org>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <1360041732-17936-13-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20130423194007.GD5316@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Apr 2013 21:41:03 +0200
+Subject: [PATCH 14/21] staging: nvec: allow modular build
+In-Reply-To: <4082180.JXNz6TsAKc@ax5200p>
+References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
+ <1366734653-488286-15-git-send-email-arnd@arndb.de>
+ <4082180.JXNz6TsAKc@ax5200p>
+Message-ID: <201304232141.04123.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 12:22:09AM -0500, Nicolas Pitre wrote:
-> +	/*
-> +	 * Multi-cluster systems may need this data when non-coherent, during
-> +	 * cluster power-up/power-down. Make sure it reaches main memory:
-> +	 */
-> +	__cpuc_flush_dcache_area(info, sizeof *info);
-> +	__cpuc_flush_dcache_area(&info, sizeof info);
-> +	outer_clean_range(virt_to_phys(info), virt_to_phys(info + 1));
-> +	outer_clean_range(virt_to_phys(&info), virt_to_phys(&info + 1));
+On Tuesday 23 April 2013, Marc Dietrich wrote:
+> On Tuesday 23 April 2013 18:30:46 Arnd Bergmann wrote:
+> > The serio code can be a loadable module, which in turn means that nvec
+> > also has to be a module, so mark it as "tristate" in Kconfig.
+> 
+> oh, I didn't saw this randconfig error posting. NVEC isn't prepared for 
+> modularized builds yet (it's on the TODO list though). So better say SERIO=y 
+> here. Looking a bit closer, there is other stuff which can also be a module 
+> (GPIOLIB, I2C, ...) so these also need a =y.
 
-This seems to be a recurring theme throughout these patches.  What it's
-saying is that we need a proper way to do this, rather than keep on
-open coding this same thing time and time again.  So, it's do something
-about that rather than having to go back and rework all this stuff later,
-creating "pointless churn" that Linus really hates.
+What is the problem with building it as a module? It looks all fine in that
+regard.
+
+I also did not see any problems with the other symbols, but that may be
+because they get turned on as built-in even in allmodconfig. Marking it
+as tristate certainly avoids the problem altogether.
+
+> Should a post a patch?
+
+If you have follow-on patches, they need to go on top now, since Greg
+already took this patch.
+
+	Arnd
