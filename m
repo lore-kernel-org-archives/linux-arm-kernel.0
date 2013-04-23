@@ -1,34 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Apr 2013 21:41:03 +0200
-Subject: [PATCH 14/21] staging: nvec: allow modular build
-In-Reply-To: <4082180.JXNz6TsAKc@ax5200p>
-References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
- <1366734653-488286-15-git-send-email-arnd@arndb.de>
- <4082180.JXNz6TsAKc@ax5200p>
-Message-ID: <201304232141.04123.arnd@arndb.de>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Tue, 23 Apr 2013 12:42:48 -0700
+Subject: gpio-pxa initcall level change and machine init breakage
+In-Reply-To: <CACRpkdbk24kR75fanvXVAocnuozNq_=jWDSPHPCWhbZCOrN5_Q@mail.gmail.com>
+References: <5172B398.7060706@newsguy.com>
+ <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
+ <517466F6.3000003@newsguy.com>
+ <CAD6h2NSy0=3P-PHdCiJJQG_jvGaFnr7uex+Uxs=0F-VsUxtPWg@mail.gmail.com>
+ <CACRpkdbk24kR75fanvXVAocnuozNq_=jWDSPHPCWhbZCOrN5_Q@mail.gmail.com>
+Message-ID: <5176E438.80800@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 April 2013, Marc Dietrich wrote:
-> On Tuesday 23 April 2013 18:30:46 Arnd Bergmann wrote:
-> > The serio code can be a loadable module, which in turn means that nvec
-> > also has to be a module, so mark it as "tristate" in Kconfig.
+On 04/23/2013 12:26 AM, Linus Walleij wrote:
+> On Mon, Apr 22, 2013 at 2:58 AM, Haojian Zhuang
+> <haojian.zhuang@linaro.org> wrote:
+>> On 22 April 2013 06:23, Mike Dunn <mikedunn@newsguy.com> wrote:
+>>> Will the big guy see this?  Only posted to linux-arm-kernel ML.
+>>>
+>>> Thanks Haojian,
+>>> Mike
 > 
-> oh, I didn't saw this randconfig error posting. NVEC isn't prepared for 
-> modularized builds yet (it's on the TODO list though). So better say SERIO=y 
-> here. Looking a bit closer, there is other stuff which can also be a module 
-> (GPIOLIB, I2C, ...) so these also need a =y.
+> I guess Haojian is referring to me, not Torvalds ...
 
-What is the problem with building it as a module? It looks all fine in that
-regard.
 
-I also did not see any problems with the other symbols, but that may be
-because they get turned on as built-in even in allmodconfig. Marking it
-as tristate certainly avoids the problem altogether.
+Oops, sorry Linus.  Note that the other Linus has the patch in his official tree.
 
-> Should a post a patch?
+[...]
 
-If you have follow-on patches, they need to go on top now, since Greg
-already took this patch.
 
-	Arnd
+> 
+> How hard is it to fix the real problem?
+> 
+> I'm looking at arch/arm/mach-pxa/palmtreo.c, would
+> something like this solve the problem:
+> 
+>>From 5acf99a576f563d48ca5d25b9e5a1bcdd09331eb Mon Sep 17 00:00:00 2001
+> From: Linus Walleij <linus.walleij@linaro.org>
+> Date: Tue, 23 Apr 2013 09:24:43 +0200
+> Subject: [PATCH] ARM: pxa: set up Treo GPIOs using device initcall
+> 
+> This augments the Treo setup to grab LCD GPIOs at device_initcall()
+> level instead of at init_machine() time, and propagates any
+> returned errors so that deferred probe will work.
+
+
+Thanks for the patch.  I am not having initial success, but will troubleshoot
+tomorrow morning.
+
+On a more general note... I'm surprised that gpiolib can not run earlier, for
+something so low-level.  The kernel documentation on gpio talks about running
+early.  I'm not involved in nor knowledgeable of the pinctrl/gpio work so I
+won't question the need.  I'll probably be able to educate myself some more
+tomorrow.
+
+Thanks again,
+Mike
