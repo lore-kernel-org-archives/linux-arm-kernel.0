@@ -1,40 +1,47 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 23 Apr 2013 15:49:43 +0800
-Subject: gpio-pxa initcall level change and machine init breakage
-In-Reply-To: <CACRpkdbk24kR75fanvXVAocnuozNq_=jWDSPHPCWhbZCOrN5_Q@mail.gmail.com>
-References: <5172B398.7060706@newsguy.com>
- <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
- <517466F6.3000003@newsguy.com>
- <CAD6h2NSy0=3P-PHdCiJJQG_jvGaFnr7uex+Uxs=0F-VsUxtPWg@mail.gmail.com>
- <CACRpkdbk24kR75fanvXVAocnuozNq_=jWDSPHPCWhbZCOrN5_Q@mail.gmail.com>
-Message-ID: <CAD6h2NSpDc-uaB5e5BLmr1u89PZ1Z-wQO=a77JtBcmL0R+iTdA@mail.gmail.com>
+From: cedric@precidata.com (Cedric Berger)
+Date: Tue, 23 Apr 2013 10:02:20 +0200 (CEST)
+Subject: [PATCH 4/10] LPC32XX: 004-mmc.2: Enable dma for Phytec board (V2)
+Message-ID: <mailman.0.1366704147.1125.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2013 15:26, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Apr 22, 2013 at 2:58 AM, Haojian Zhuang
-> <haojian.zhuang@linaro.org> wrote:
->> On 22 April 2013 06:23, Mike Dunn <mikedunn@newsguy.com> wrote:
->>> Will the big guy see this?  Only posted to linux-arm-kernel ML.
->>>
->>> Thanks Haojian,
->>> Mike
->
-> I guess Haojian is referring to me, not Torvalds ...
->
->> Sorry, I forgot to loop him in.
->>
->> Linus,
->> Should I send the revert commit to you? Or will you revert it directly?
->
-> How hard is it to fix the real problem?
->
-> I'm looking at arch/arm/mach-pxa/palmtreo.c, would
-> something like this solve the problem:
->
-Your fix could resolve the issue on palmtreo. After grep
-gpio_request() in arch-pxa,
-I found that there're a lot of files using gpio_request() in .init_machine().
+Enable DMA for phy3250. Without that, the mmc driver is unusable.
 
-Regards
-Haojian
+Signed-off-by: Gabriele Mondada <gabriele@precidata.com>
+---
+
+Index: arch/arm/mach-lpc32xx/phy3250.c
+===================================================================
+--- arch/arm/mach-lpc32xx/phy3250.c	(revision 1769)
++++ arch/arm/mach-lpc32xx/phy3250.c	(working copy)
+@@ -168,6 +168,12 @@
+ 		.max_signal = 12,
+ 		.periph_buses = PL08X_AHB1,
+ 	},
++	{
++		.bus_id = "mmc",
++		.min_signal = 4,
++		.max_signal = 4,
++		.periph_buses = PL08X_AHB1,
++	},
+ };
+ 
+ static int pl08x_get_signal(const struct pl08x_channel_data *cd)
+@@ -202,9 +208,14 @@
+ 	.ocr_mask	= MMC_VDD_30_31 | MMC_VDD_31_32 |
+ 			  MMC_VDD_32_33 | MMC_VDD_33_34,
+ 	.ios_handler	= mmc_handle_ios,
+-	.dma_filter	= NULL,
+-	/* No DMA for now since AMBA PL080 dmaengine driver only does scatter
+-	 * gather, and the MMCI driver doesn't do it this way */
++	.dma_filter	= pl08x_filter_id,
++	.dma_quirks	= MCI_DMA_QUIRK_PL18X_RX | MCI_DMA_QUIRK_PL18X_TX,
++	.dma_rx_param	= "mmc",
++	/*
++	 * When not defined, tx channel is the same as rx.
++	 * Defining dma_tx_param with the same value as dma_rx_param does not
++	 * work.
++	 */
+ };
+ 
+ static struct lpc32xx_slc_platform_data lpc32xx_slc_data = {
