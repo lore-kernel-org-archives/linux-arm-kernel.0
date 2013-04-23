@@ -1,57 +1,23 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Tue, 23 Apr 2013 12:42:48 -0700
-Subject: gpio-pxa initcall level change and machine init breakage
-In-Reply-To: <CACRpkdbk24kR75fanvXVAocnuozNq_=jWDSPHPCWhbZCOrN5_Q@mail.gmail.com>
-References: <5172B398.7060706@newsguy.com>
- <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
- <517466F6.3000003@newsguy.com>
- <CAD6h2NSy0=3P-PHdCiJJQG_jvGaFnr7uex+Uxs=0F-VsUxtPWg@mail.gmail.com>
- <CACRpkdbk24kR75fanvXVAocnuozNq_=jWDSPHPCWhbZCOrN5_Q@mail.gmail.com>
-Message-ID: <5176E438.80800@newsguy.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 23 Apr 2013 20:42:37 +0100
+Subject: [PATCH v4 15/15] ARM: vexpress: Select multi-cluster SMP
+ operation if required
+In-Reply-To: <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
+References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+ <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130423194237.GE5316@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2013 12:26 AM, Linus Walleij wrote:
-> On Mon, Apr 22, 2013 at 2:58 AM, Haojian Zhuang
-> <haojian.zhuang@linaro.org> wrote:
->> On 22 April 2013 06:23, Mike Dunn <mikedunn@newsguy.com> wrote:
->>> Will the big guy see this?  Only posted to linux-arm-kernel ML.
->>>
->>> Thanks Haojian,
->>> Mike
-> 
-> I guess Haojian is referring to me, not Torvalds ...
+On Tue, Feb 05, 2013 at 12:22:12AM -0500, Nicolas Pitre wrote:
+> +void __init vexpress_smp_init_ops(void)
+> +{
+> +	struct smp_operations *ops = &vexpress_smp_ops;
+> +#ifdef CONFIG_CLUSTER_PM
+> +	extern struct smp_operations mcpm_smp_ops;
+> +	if(of_find_compatible_node(NULL, NULL, "arm,cci"))
+> +		ops = &mcpm_smp_ops;
 
-
-Oops, sorry Linus.  Note that the other Linus has the patch in his official tree.
-
-[...]
-
-
-> 
-> How hard is it to fix the real problem?
-> 
-> I'm looking at arch/arm/mach-pxa/palmtreo.c, would
-> something like this solve the problem:
-> 
->>From 5acf99a576f563d48ca5d25b9e5a1bcdd09331eb Mon Sep 17 00:00:00 2001
-> From: Linus Walleij <linus.walleij@linaro.org>
-> Date: Tue, 23 Apr 2013 09:24:43 +0200
-> Subject: [PATCH] ARM: pxa: set up Treo GPIOs using device initcall
-> 
-> This augments the Treo setup to grab LCD GPIOs at device_initcall()
-> level instead of at init_machine() time, and propagates any
-> returned errors so that deferred probe will work.
-
-
-Thanks for the patch.  I am not having initial success, but will troubleshoot
-tomorrow morning.
-
-On a more general note... I'm surprised that gpiolib can not run earlier, for
-something so low-level.  The kernel documentation on gpio talks about running
-early.  I'm not involved in nor knowledgeable of the pinctrl/gpio work so I
-won't question the need.  I'll probably be able to educate myself some more
-tomorrow.
-
-Thanks again,
-Mike
+Hmm, so these patches haven't been subjected to checkpatch treatment?
+As a seasoned kernel programmer, I'm surprised you haven't checked that
+already.
