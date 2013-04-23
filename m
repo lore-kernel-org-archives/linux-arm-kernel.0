@@ -1,31 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Apr 2013 21:31:07 +0200
-Subject: [PATCH 05/21] ARM: OMAP2+: add dependencies on ARCH_MULTI_V6/V7
-In-Reply-To: <20130423180146.GI10155@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 23 Apr 2013 22:30:46 +0300
+Subject: [PATCH v2] usb: phy: don't mark usb_bind_phy as __init
+In-Reply-To: <201304232107.22084.arnd@arndb.de>
 References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
- <1366734653-488286-6-git-send-email-arnd@arndb.de>
- <20130423180146.GI10155@atomide.com>
-Message-ID: <201304232131.07512.arnd@arndb.de>
+ <1366734653-488286-20-git-send-email-arnd@arndb.de>
+ <20130423171734.GA31432@kroah.com>
+ <201304232107.22084.arnd@arndb.de>
+Message-ID: <20130423193046.GC13453@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 April 2013, Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [130423 09:36]:
-> > CONFIG_ARCH_OMAP2PLUS depends on (ARCH_MULTI_V6 || ARCH_MULTI_V7) as of
-> > a0694861 "ARM: OMAP2+: Enable ARCH_MULTIPLATFORM support", but the
-> > individual OMAP2/3/4/5 and AM33XX platforms can all be selected independent
-> > of what we are building for, which is a bug and prevents us from easily
-> > building e.g. an ARMv7-only defconfig.
-> > 
-> > This makes ARCH_OMAP2 depend on ARCH_MULTI_V6 and the others depend on
-> > ARCH_MULTI_V7, to ensure we really only build the platforms for the
-> > CPUs we have enabled in the global multiplatform configuration step.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+On Tue, Apr 23, 2013 at 09:07:21PM +0200, Arnd Bergmann wrote:
+> It makes no sense for a symbol to be both exported and marked __init,
+> because any users in modules would be calling this function after
+> it gets discarded. Further, this patch revolves a section mismatch
+> warning from usbhs_init_phys(), which is intentionally not marked
+> __init:
 > 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+> WARNING: vmlinux.o(.text+0x413f8): Section mismatch in reference from
+> the function usbhs_init_phys() to the function .init.text:usb_bind_phy()
 > 
-Thanks, I've now applied it to the next/fixes-non-critical branch.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: linux-usb at vger.kernel.org
+> ---
+> 
+> v2: rebased on linux-next
 
-	Arnd
+not needed, Greg already has a patch doing exactly this in usb-next.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130423/a005dd4f/attachment.sig>
