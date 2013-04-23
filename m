@@ -1,91 +1,30 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 23 Apr 2013 14:51:41 +0200
-Subject: [V4 patch 03/15] cpuidle: make a single register function for all
-In-Reply-To: <51767F57.7060809@ti.com>
-References: <1366707285-12179-1-git-send-email-daniel.lezcano@linaro.org>
- <1366707285-12179-4-git-send-email-daniel.lezcano@linaro.org>
- <51767F57.7060809@ti.com>
-Message-ID: <517683DD.6060805@linaro.org>
+From: cb@sgoc.de (Christoph G. Baumann)
+Date: Tue, 23 Apr 2013 14:55:57 +0200 (CEST)
+Subject: [PATCH] Support fsl-dcp crypto coprocessor
+In-Reply-To: <20130423123408.GB1366@pengutronix.de>
+References: <1366710460-11637-1-git-send-email-cb@sgoc.de>
+ <20130423123408.GB1366@pengutronix.de>
+Message-ID: <341422577.566569.1366721757554.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2013 02:32 PM, Santosh Shilimkar wrote:
-> On Tuesday 23 April 2013 02:24 PM, Daniel Lezcano wrote:
->> The usual scheme to initialize a cpuidle driver on a SMP is:
->>
->> 	cpuidle_register_driver(drv);
->> 	for_each_possible_cpu(cpu) {
->> 		device = &per_cpu(cpuidle_dev, cpu);
->> 		cpuidle_register_device(device);
->> 	}
->>
->> This code is duplicated in each cpuidle driver.
->>
->> On UP systems, it is done this way:
->>
->> 	cpuidle_register_driver(drv);
->> 	device = &per_cpu(cpuidle_dev, cpu);
->> 	cpuidle_register_device(device);
->>
->> On UP, the macro 'for_each_cpu' does one iteration:
->>
->> #define for_each_cpu(cpu, mask)                 \
->>         for ((cpu) = 0; (cpu) < 1; (cpu)++, (void)mask)
->>
->> Hence, the initialization loop is the same for UP than SMP.
->>
->> Beside, we saw different bugs / mis-initialization / return code unchecked in
->> the different drivers, the code is duplicated including bugs. After fixing all
->> these ones, it appears the initialization pattern is the same for everyone.
->>
->> Please note, some drivers are doing dev->state_count = drv->state_count. This is
->> not necessary because it is done by the cpuidle_enable_device function in the
->> cpuidle framework. This is true, until you have the same states for all your
->> devices. Otherwise, the 'low level' API should be used instead with the specific
->> initialization for the driver.
->>
->> Let's add a wrapper function doing this initialization with a cpumask parameter
->> for the coupled idle states and use it for all the drivers.
->>
->> That will save a lot of LOC, consolidate the code, and the modifications in the
->> future could be done in a single place. Another benefit is the consolidation of
->> the cpuidle_device variable which is now in the cpuidle framework and no longer
->> spread accross the different arch specific drivers.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
-> 
-> I don't see you have addressed the comment on V3 [1] i gave for the subject patch
-> Any reason ?
 
-Yes, sorry for not answering.
+> IMHO it doesn't make any sense to push this into staging. The Freescale
+> kernel is full of drivers which are not ready for mainline yet.
 
-This modification should be handled in the __cpuidle_register_device
-function.
+Indeed the Freescale kernel is a heap of <censored>.
 
-diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
-index 49e8d30..936d862 100644
---- a/drivers/cpuidle/cpuidle.c
-+++ b/drivers/cpuidle/cpuidle.c
-@@ -372,7 +372,7 @@ static int __cpuidle_register_device(struct
-cpuidle_device *dev)
-        int ret;
-        struct cpuidle_driver *drv = cpuidle_get_cpu_driver(dev);
 
--       if (!try_module_get(drv->owner))
-+       if (!drv || !try_module_get(drv->owner))
-                return -EINVAL;
+> Until now, it was a good strategy to wait until some code is needed,
+> then clean it up, adapt it to the right kernel APIs and push it into
+> non-staging mainline.
 
-        per_cpu(cpuidle_devices, dev->cpu) = dev;
+Well, that's what I'm trying to do. I picked a particular driver and
+adapted it to the current mainline.
+So if there are concrete proposals or criticism about this patch, please
+tell me. As I stated the code is from Freescale and I won't be offended.
 
-Thus, the cpuidle_register function is not impacted by this as it will
-always do cpuidle_register_driver, followed by cpuidle_register_device.
 
-  -- Daniel
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Christoph
