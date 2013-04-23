@@ -1,102 +1,317 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Tue, 23 Apr 2013 15:59:21 -0700
-Subject: [PATCH v3 11/32] arm64: KVM: CPU specific system registers
- handling
-In-Reply-To: <5168307E.2080700@arm.com>
+Date: Tue, 23 Apr 2013 15:59:37 -0700
+Subject: [PATCH v3 15/32] arm64: KVM: guest one-reg interface
+In-Reply-To: <1365437854-30214-16-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-12-git-send-email-marc.zyngier@arm.com>
- <20130410170624.GL26992@mudshark.cambridge.arm.com>
- <5168307E.2080700@arm.com>
-Message-ID: <20130423225921.GD20569@gmail.com>
+ <1365437854-30214-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130423225937.GE20569@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 05:04:14PM +0100, Marc Zyngier wrote:
-> On 10/04/13 18:06, Will Deacon wrote:
-> > On Mon, Apr 08, 2013 at 05:17:13PM +0100, Marc Zyngier wrote:
-> >> Add the support code for CPU specific system registers. Not much
-> >> here yet.
-> >>
-> >> Reviewed-by: Christopher Covington <cov@codeaurora.org>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  arch/arm64/kvm/sys_regs_generic_v8.c | 85 ++++++++++++++++++++++++++++++++++++
-> >>  1 file changed, 85 insertions(+)
-> >>  create mode 100644 arch/arm64/kvm/sys_regs_generic_v8.c
-> >>
-> >> diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
-> >> new file mode 100644
-> >> index 0000000..d4e8039
-> >> --- /dev/null
-> >> +++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-> >> @@ -0,0 +1,85 @@
-> >> +/*
-> >> + * Copyright (C) 2012,2013 - ARM Ltd
-> >> + * Author: Marc Zyngier <marc.zyngier@arm.com>
-> >> + *
-> >> + * Based on arch/arm/kvm/coproc_a15.c:
-> >> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-> >> + * Authors: Rusty Russell <rusty@rustcorp.au>
-> >> + *          Christoffer Dall <c.dall@virtualopensystems.com>
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License, version 2, as
-> >> + * published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + *
-> >> + * You should have received a copy of the GNU General Public License
-> >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >> + */
-> >> +#include <linux/kvm_host.h>
-> >> +#include <asm/cputype.h>
-> >> +#include <asm/kvm_arm.h>
-> >> +#include <asm/kvm_asm.h>
-> >> +#include <asm/kvm_host.h>
-> >> +#include <asm/kvm_emulate.h>
-> >> +#include <asm/kvm_coproc.h>
-> >> +#include <linux/init.h>
-> >> +
-> >> +#include "sys_regs.h"
-> >> +
-> >> +static bool access_actlr(struct kvm_vcpu *vcpu,
-> >> +			 const struct sys_reg_params *p,
-> >> +			 const struct sys_reg_desc *r)
-> >> +{
-> >> +	if (p->is_write)
-> >> +		return ignore_write(vcpu, p);
-> >> +
-> >> +	*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, ACTLR_EL1);
-> >> +	return true;
-> >> +}
-> >> +
-> >> +static void reset_actlr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-> >> +{
-> >> +	u64 actlr;
-> >> +
-> >> +	asm volatile("mrs %0, actlr_el1\n" : "=r" (actlr));
-> >> +	vcpu_sys_reg(vcpu, ACTLR_EL1) = actlr;
-> >> +}
-> > 
-> > Do we actually need this? If so, there are likely other registers (things
-> > like the ectlr) that should be considered too.
+On Mon, Apr 08, 2013 at 05:17:17PM +0100, Marc Zyngier wrote:
+> Let userspace play with the guest registers.
 > 
-> I'm focussing on the architected registers, and only those. ECTLR is
-> implementation dependent, and is not specified as an architected sysreg.
+> Reviewed-by: Christopher Covington <cov@codeaurora.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/kvm/guest.c | 254 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 254 insertions(+)
+>  create mode 100644 arch/arm64/kvm/guest.c
 > 
-> As this is one of the registers that we trap (TACR set in HCR_EL2), we
-> have to emulate it. Now, maybe it is not that useful to trap it (nobody
-> uses that code path yet).
-> 
-why is this even in a generic_v8 file then? Should it not be able to be
-handled generically in the sys_regs file and only when you have specific
-meanings of the register for a specific core should you add something
-like this file?
+> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> new file mode 100644
+> index 0000000..47d3729
+> --- /dev/null
+> +++ b/arch/arm64/kvm/guest.c
+> @@ -0,0 +1,254 @@
+> +/*
+> + * Copyright (C) 2012,2013 - ARM Ltd
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> + *
+> + * Derived from arch/arm/kvm/guest.c:
+> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/errno.h>
+> +#include <linux/err.h>
+> +#include <linux/kvm_host.h>
+> +#include <linux/module.h>
+> +#include <linux/vmalloc.h>
+> +#include <linux/fs.h>
+> +#include <asm/cputype.h>
+> +#include <asm/uaccess.h>
+> +#include <asm/kvm.h>
+> +#include <asm/kvm_asm.h>
+> +#include <asm/kvm_emulate.h>
+> +#include <asm/kvm_coproc.h>
+> +
+> +struct kvm_stats_debugfs_item debugfs_entries[] = {
+> +	{ NULL }
+> +};
+> +
+> +int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
+> +{
+> +	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
+> +	return 0;
+> +}
+> +
+> +static u64 core_reg_offset_from_id(u64 id)
+> +{
+> +	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
+> +}
+> +
+> +static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> +{
+> +	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
+> +	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
+> +	int nr_regs = sizeof(*regs) / sizeof(__u32);
 
-I think it's preferred to have something that traps and shouts than
-something that may or may not work (ie. just allowing the guest to read
-the register directly), but you guys know better than me what kind of
-things can be exposed through this register in the future.
+eh, arent' your regs 64 bit?  Or are you 32-bit indexing into a 64-bit
+structure?  If so, this needs to be described in a big fat comment
+somewhere, which I couldn't even see looking forward in the patch series
+for the documentation part.
+
+Seems to me you'd want to remove the fp_regs from the core regs and just
+use a 64-bit indexing and have a separate category for the fp stuff...
+
+> +	u32 off;
+> +
+> +	/* Our ID is an index into the kvm_regs struct. */
+> +	off = core_reg_offset_from_id(reg->id);
+> +	if (off >= nr_regs ||
+> +	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
+
+According to your documentation you will always save/restore 32-bit
+registers here, so the desijunction shouldn't be necessary, nor will it
+be if you just base everything on 64-bit here.
+
+> +		return -ENOENT;
+> +
+> +	if (copy_to_user(uaddr, ((u32 *)regs) + off, KVM_REG_SIZE(reg->id)))
+> +		return -EFAULT;
+> +
+> +	return 0;
+> +}
+> +
+> +static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> +{
+> +	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
+> +	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
+> +	int nr_regs = sizeof(*regs) / sizeof(__u32);
+
+same concern here
+
+> +	void *valp;
+> +	u64 off;
+> +	int err = 0;
+> +
+> +	/* Our ID is an index into the kvm_regs struct. */
+> +	off = core_reg_offset_from_id(reg->id);
+> +	if (off >= nr_regs ||
+> +	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
+> +		return -ENOENT;
+> +
+> +	valp = kmalloc(KVM_REG_SIZE(reg->id), GFP_KERNEL);
+> +	if (!valp)
+> +		return -ENOMEM;
+
+Why are you dynamically allocating this?  Do you ever have anything
+larger than a 64 bit core register? Just put that on the stack.
+
+> +
+> +	if (copy_from_user(valp, uaddr, KVM_REG_SIZE(reg->id))) {
+> +		err = -EFAULT;
+> +		goto out;
+> +	}
+> +
+> +	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
+> +		unsigned long mode = (*(unsigned long *)valp) & COMPAT_PSR_MODE_MASK;
+> +		switch (mode) {
+> +		case PSR_MODE_EL0t:
+> +		case PSR_MODE_EL1t:
+> +		case PSR_MODE_EL1h:
+> +			break;
+> +		default:
+> +			err = -EINVAL;
+> +			goto out;
+> +		}
+> +	}
+> +
+> +	memcpy((u32 *)regs + off, valp, KVM_REG_SIZE(reg->id));
+> +out:
+> +	kfree(valp);
+> +	return err;
+> +}
+> +
+> +int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+> +int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+> +static unsigned long num_core_regs(void)
+> +{
+> +	return sizeof(struct kvm_regs) / sizeof(unsigned long);
+> +}
+> +
+> +/**
+> + * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
+> + *
+> + * This is for all registers.
+> + */
+> +unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
+> +{
+> +	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu);
+> +}
+> +
+> +/**
+> + * kvm_arm_copy_reg_indices - get indices of all registers.
+> + *
+> + * We do core registers right here, then we apppend system regs.
+> + */
+> +int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+> +{
+> +	unsigned int i;
+> +	const u64 core_reg = KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE;
+> +
+> +	for (i = 0; i < sizeof(struct kvm_regs)/sizeof(unsigned long); i++) {
+
+nit: spaces around the division
+nit: the kvm_regs struct uses __u64, so would be slightly more coherent
+     to use that for the sizeof(...) as well
+
+> +		if (put_user(core_reg | i, uindices))
+> +			return -EFAULT;
+> +		uindices++;
+> +	}
+> +
+> +	return kvm_arm_copy_sys_reg_indices(vcpu, uindices);
+> +}
+> +
+> +int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> +{
+> +	/* We currently use nothing arch-specific in upper 32 bits */
+> +	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
+> +		return -EINVAL;
+> +
+> +	/* Register group 16 means we want a core register. */
+> +	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+> +		return get_core_reg(vcpu, reg);
+> +
+> +	return kvm_arm_sys_reg_get_reg(vcpu, reg);
+> +}
+> +
+> +int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> +{
+> +	/* We currently use nothing arch-specific in upper 32 bits */
+> +	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
+> +		return -EINVAL;
+> +
+> +	/* Register group 16 means we set a core register. */
+> +	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
+> +		return set_core_reg(vcpu, reg);
+> +
+> +	return kvm_arm_sys_reg_set_reg(vcpu, reg);
+> +}
+> +
+> +int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
+> +				  struct kvm_sregs *sregs)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+> +int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+> +				  struct kvm_sregs *sregs)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+> +int __attribute_const__ kvm_target_cpu(void)
+> +{
+> +	unsigned long implementor = read_cpuid_implementor();
+> +	unsigned long part_number = read_cpuid_part_number();
+> +
+> +	if (implementor != ARM_CPU_IMP_ARM)
+> +		return -EINVAL;
+> +
+> +	switch (part_number) {
+> +	case ARM_CPU_PART_AEM_V8:
+> +		return KVM_ARM_TARGET_AEM_V8;
+> +	case ARM_CPU_PART_FOUNDATION:
+> +		return KVM_ARM_TARGET_FOUNDATION_V8;
+> +	case ARM_CPU_PART_CORTEX_A57:
+> +		/* Currently handled by the generic backend */
+
+Seems like a slightly off place to keep this comment...
+
+> +		return KVM_ARM_TARGET_CORTEX_A57;
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +}
+> +
+> +int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+> +			const struct kvm_vcpu_init *init)
+> +{
+> +	unsigned int i;
+> +	int phys_target = kvm_target_cpu();
+> +
+> +	if (init->target != phys_target)
+> +		return -EINVAL;
+> +
+> +	vcpu->arch.target = phys_target;
+> +	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
+> +
+> +	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
+> +	for (i = 0; i < sizeof(init->features)*8; i++) {
+> +		if (init->features[i / 32] & (1 << (i % 32))) {
+> +			if (i >= KVM_VCPU_MAX_FEATURES)
+> +				return -ENOENT;
+> +			set_bit(i, vcpu->arch.features);
+> +		}
+> +	}
+> +
+> +	/* Now we know what it is, we can reset it. */
+> +	return kvm_reset_vcpu(vcpu);
+> +}
+> +
+> +int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+> +int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+> +{
+> +	return -EINVAL;
+> +}
+> +
+> +int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
+> +				  struct kvm_translation *tr)
+> +{
+> +	return -EINVAL;
+> +}
+> -- 
+> 1.8.1.4
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
