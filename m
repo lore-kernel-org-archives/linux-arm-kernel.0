@@ -1,21 +1,29 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 23 Apr 2013 11:48:17 +0530
-Subject: [RFC PATCH v2 10/13] ARM: mach-spear: cpus/cpu nodes dts updates
-In-Reply-To: <1366644455-16550-11-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366644455-16550-11-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <CAKohpon+8k9Fm-GoStP1HTnUfxeUJaLaVa4dbkGw925Mg9_1dA@mail.gmail.com>
+From: marek.belisko@gmail.com (Marek Belisko)
+Date: Tue, 23 Apr 2013 08:22:49 +0200
+Subject: [PATCH 1/2] clk: si5351: Fix clkout rate computation.
+Message-ID: <1366698170-31346-1-git-send-email-marek.belisko@streamunlimited.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 April 2013 20:57, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> This patch updates the in-kernel dts files according to the latest cpus
-> and cpu bindings updates for ARM.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm/boot/dts/spear3xx.dtsi | 2 +-
->  arch/arm/boot/dts/spear600.dtsi | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+Rate was incorrectly computed because we read from wrong divider register.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Marek Belisko <marek.belisko@streamunlimited.com>
+---
+ drivers/clk/clk-si5351.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+index 8927284..cf39e53 100644
+--- a/drivers/clk/clk-si5351.c
++++ b/drivers/clk/clk-si5351.c
+@@ -932,7 +932,7 @@ static unsigned long si5351_clkout_recalc_rate(struct clk_hw *hw,
+ 	unsigned char reg;
+ 	unsigned char rdiv;
+ 
+-	if (hwdata->num > 5)
++	if (hwdata->num <= 5)
+ 		reg = si5351_msynth_params_address(hwdata->num) + 2;
+ 	else
+ 		reg = SI5351_CLK6_7_OUTPUT_DIVIDER;
+-- 
+1.7.9.5
