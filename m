@@ -1,131 +1,209 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 23 Apr 2013 18:34:11 +0530
-Subject: [V4 patch 03/15] cpuidle: make a single register function for all
-In-Reply-To: <517683DD.6060805@linaro.org>
-References: <1366707285-12179-1-git-send-email-daniel.lezcano@linaro.org>
- <1366707285-12179-4-git-send-email-daniel.lezcano@linaro.org>
- <51767F57.7060809@ti.com> <517683DD.6060805@linaro.org>
-Message-ID: <517686CB.7080909@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 23 Apr 2013 08:05:30 -0500
+Subject: [PATCH V2 4/4] arm64: Add initial DTS for APM X-Gene Storm SOC
+ and APM Mustang board
+In-Reply-To: <1366712759-3431-5-git-send-email-vkale@apm.com>
+References: <1366712759-3431-1-git-send-email-vkale@apm.com>
+ <1366712759-3431-5-git-send-email-vkale@apm.com>
+Message-ID: <5176871A.4040209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 April 2013 06:21 PM, Daniel Lezcano wrote:
-> On 04/23/2013 02:32 PM, Santosh Shilimkar wrote:
->> On Tuesday 23 April 2013 02:24 PM, Daniel Lezcano wrote:
->>> The usual scheme to initialize a cpuidle driver on a SMP is:
->>>
->>> 	cpuidle_register_driver(drv);
->>> 	for_each_possible_cpu(cpu) {
->>> 		device = &per_cpu(cpuidle_dev, cpu);
->>> 		cpuidle_register_device(device);
->>> 	}
->>>
->>> This code is duplicated in each cpuidle driver.
->>>
->>> On UP systems, it is done this way:
->>>
->>> 	cpuidle_register_driver(drv);
->>> 	device = &per_cpu(cpuidle_dev, cpu);
->>> 	cpuidle_register_device(device);
->>>
->>> On UP, the macro 'for_each_cpu' does one iteration:
->>>
->>> #define for_each_cpu(cpu, mask)                 \
->>>         for ((cpu) = 0; (cpu) < 1; (cpu)++, (void)mask)
->>>
->>> Hence, the initialization loop is the same for UP than SMP.
->>>
->>> Beside, we saw different bugs / mis-initialization / return code unchecked in
->>> the different drivers, the code is duplicated including bugs. After fixing all
->>> these ones, it appears the initialization pattern is the same for everyone.
->>>
->>> Please note, some drivers are doing dev->state_count = drv->state_count. This is
->>> not necessary because it is done by the cpuidle_enable_device function in the
->>> cpuidle framework. This is true, until you have the same states for all your
->>> devices. Otherwise, the 'low level' API should be used instead with the specific
->>> initialization for the driver.
->>>
->>> Let's add a wrapper function doing this initialization with a cpumask parameter
->>> for the coupled idle states and use it for all the drivers.
->>>
->>> That will save a lot of LOC, consolidate the code, and the modifications in the
->>> future could be done in a single place. Another benefit is the consolidation of
->>> the cpuidle_device variable which is now in the cpuidle framework and no longer
->>> spread accross the different arch specific drivers.
->>>
->>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>> ---
->>
->> I don't see you have addressed the comment on V3 [1] i gave for the subject patch
->> Any reason ?
+On 04/23/2013 05:25 AM, Vinayak Kale wrote:
+> This patch adds initial DTS files required for APM Mustang board.
 > 
-> Yes, sorry for not answering.
-> 
-> This modification should be handled in the __cpuidle_register_device
-> function.
-> 
-> diff --git a/drivers/cpuidle/cpuidle.c b/drivers/cpuidle/cpuidle.c
-> index 49e8d30..936d862 100644
-> --- a/drivers/cpuidle/cpuidle.c
-> +++ b/drivers/cpuidle/cpuidle.c
-> @@ -372,7 +372,7 @@ static int __cpuidle_register_device(struct
-> cpuidle_device *dev)
->         int ret;
->         struct cpuidle_driver *drv = cpuidle_get_cpu_driver(dev);
-> 
-> -       if (!try_module_get(drv->owner))
-> +       if (!drv || !try_module_get(drv->owner))
->                 return -EINVAL;
-> 
->         per_cpu(cpuidle_devices, dev->cpu) = dev;
-> 
-> Thus, the cpuidle_register function is not impacted by this as it will
-> always do cpuidle_register_driver, followed by cpuidle_register_device.
-> 
-I still don't follow you. I know the fix will be needed but in the subject
-patch sequence as well, the device registration should be done first and
-then the driver registration. Below hunk I mean.
+> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
+> Signed-off-by: Loc Ho <lho@apm.com>
+> Signed-off-by: Feng Kan <fkan@apm.com>
+> ---
+>  arch/arm64/boot/dts/Makefile        |    1 +
+>  arch/arm64/boot/dts/apm-mustang.dts |   27 ++++++++
+>  arch/arm64/boot/dts/apm-storm.dtsi  |  116 +++++++++++++++++++++++++++++++++++
 
-----
-+int cpuidle_register(struct cpuidle_driver *drv,
-+		     const struct cpumask *const coupled_cpus)
-+{
-+	int ret, cpu;
-+	struct cpuidle_device *device;
-+
-+	ret = cpuidle_register_driver(drv);
-+	if (ret) {
-+		pr_err("failed to register cpuidle driver\n");
-+		return ret;
-+	}
-+
-+	for_each_possible_cpu(cpu) {
-+		device = &per_cpu(cpuidle_dev, cpu);
-+		device->cpu = cpu;
-+
-+#ifdef CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED
-+		/*
-+		 * On multiplatform for ARM, the coupled idle states could
-+		 * enabled in the kernel even if the cpuidle driver does not
-+		 * use it. Note, coupled_cpus is a struct copy.
-+		 */
-+		if (coupled_cpus)
-+			device->coupled_cpus = *coupled_cpus;
-+#endif
-+		ret = cpuidle_register_device(device);
-+		if (!ret)
-+			continue;
-+
-+		pr_err("Failed to register cpuidle device for cpu%d\n", cpu);
-+
-+		cpuidle_unregister(drv);
-+		break;
-+	}
-------
+Well, you renamed the files, but did not address any of my other comments.
 
-I also had a comment on kernel doc for both of these new functions.
-Out of curiosity I have seen this patch again o.w I would have assumed
-that you did address the comments.
+>  3 files changed, 144 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/apm-mustang.dts
+>  create mode 100644 arch/arm64/boot/dts/apm-storm.dtsi
+> 
+> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+> index 68457e9..c52bdb0 100644
+> --- a/arch/arm64/boot/dts/Makefile
+> +++ b/arch/arm64/boot/dts/Makefile
+> @@ -1,4 +1,5 @@
+>  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
+> +dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+>  
+>  targets += dtbs
+>  targets += $(dtb-y)
+> diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
+> new file mode 100644
+> index 0000000..625322c
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/apm-mustang.dts
+> @@ -0,0 +1,27 @@
+> +/*
+> + * dts file for AppliedMicro (APM) Mustang Board
+> + *
+> + * Copyright (C) 2013, Applied Micro Circuits Corporation
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +/include/ "apm-storm.dtsi"
+> +
+> +/ {
+> +	model = "mustang";
 
-Regards,
-Santosh
+This should/can be a more descriptive string.
+
+You need a compatible field for the board.
+
+> +
+> +	chosen {
+> +		linux,stdout-path = &serial0;
+
+See my prior comment.
+
+> +	};
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
+> +	};
+> +};
+> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
+> new file mode 100644
+> index 0000000..d3f3f5d
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
+> @@ -0,0 +1,116 @@
+> +/*
+> + * dts file for AppliedMicro (APM) X-Gene Storm SOC
+> + *
+> + * Copyright (C) 2013, Applied Micro Circuits Corporation
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + */
+> +
+> +/ {
+> +	compatible = "apm,xgene,storm", "apm,xgene";
+
+This still needs documentation. "apm,xgene-storm" would be more in line
+with convention. apm,xgene collides with the cpu name. Is xgene the soc
+or cpu core? Use the soc name here.
+
+Rob
+
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	cpus {
+> +		#address-cells = <2>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 000 {
+> +			device_type = "cpu";
+> +			compatible = "apm,xgene", "arm,armv8";
+> +			reg = <0x0 0x000>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +		cpu at 001 {
+> +			device_type = "cpu";
+> +			compatible = "apm,xgene", "arm,armv8";
+> +			reg = <0x0 0x001>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +		cpu at 100 {
+> +			device_type = "cpu";
+> +			compatible = "apm,xgene", "arm,armv8";
+> +			reg = <0x0 0x100>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +		cpu at 101 {
+> +			device_type = "cpu";
+> +			compatible = "apm,xgene", "arm,armv8";
+> +			reg = <0x0 0x101>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +		cpu at 200 {
+> +			device_type = "cpu";
+> +			compatible = "apm,xgene", "arm,armv8";
+> +			reg = <0x0 0x200>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +		cpu at 201 {
+> +			device_type = "cpu";
+> +			compatible = "apm,xgene", "arm,armv8";
+> +			reg = <0x0 0x201>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +		cpu at 300 {
+> +			device_type = "cpu";
+> +			compatible = "apm,xgene", "arm,armv8";
+> +			reg = <0x0 0x300>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +		cpu at 301 {
+> +			device_type = "cpu";
+> +			compatible = "apm,xgene", "arm,armv8";
+> +			reg = <0x0 0x301>;
+> +			enable-method = "spin-table";
+> +			cpu-release-addr = <0x1 0x0000fff8>;
+> +		};
+> +	};
+> +
+> +	gic: interrupt-controller at 78010000 {
+> +		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+> +		#interrupt-cells = <3>;
+> +		interrupt-controller;
+> +		reg = <0x0 0x78010000 0x0 0x1000>,	/* GIC Dist */
+> +		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU */
+> +		      <0x0 0x78040000 0x0 0x2000>,	/* GIC VCPU Control */
+> +		      <0x0 0x78060000 0x0 0x2000>;	/* GIC VCPU */
+> +		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupts = <1 0 0xff01>,	/* Secure Phys IRQ */
+> +			     <1 13 0xff01>,	/* Non-secure Phys IRQ */
+> +			     <1 14 0xff01>,	/* Virt IRQ */
+> +			     <1 15 0xff01>;	/* Hyp IRQ */
+> +		clock-frequency = <50000000>;
+> +	};
+> +
+> +	soc {
+> +		compatible = "simple-bus";
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		ranges;
+> +
+> +		serial0: serial at 1c020000 {
+> +			device_type = "serial";
+> +			compatible = "ns16550";
+> +			reg = <0 0x1c020000 0x0 0x1000>;
+> +			reg-shift = <2>;
+> +			clock-frequency = <10000000>; /* Updated by bootloader */
+> +			interrupt-parent = <&gic>;
+> +			interrupts = <0x0 0x4c 0x4>;
+> +		};
+> +	};
+> +};
+> 
