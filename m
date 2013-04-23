@@ -1,178 +1,197 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Tue, 23 Apr 2013 16:02:52 -0700
-Subject: [PATCH v3 31/32] arm64: KVM: userspace API documentation
-In-Reply-To: <1365437854-30214-32-git-send-email-marc.zyngier@arm.com>
+Date: Tue, 23 Apr 2013 16:04:09 -0700
+Subject: [PATCH v3 00/32] Port of KVM to arm64
+In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-32-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130423230252.GO20569@gmail.com>
+Message-ID: <20130423230409.GA32157@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 05:17:33PM +0100, Marc Zyngier wrote:
-> Unsurprisingly, the arm64 userspace API is extremely similar to
-> the 32bit one, the only significant difference being the ONE_REG
-> register mapping.
+On Mon, Apr 08, 2013 at 05:17:02PM +0100, Marc Zyngier wrote:
+> This series contains the third version of KVM for arm64.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  Documentation/virtual/kvm/api.txt | 55 +++++++++++++++++++++++++--------------
->  1 file changed, 36 insertions(+), 19 deletions(-)
+> It depends on the following branches/series:
+> - git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git soc-armv8-model
+>   Catalin's platform support branch for v8 models
+> - git://github.com/columbia/linux-kvm-arm.git kvm-arm-fixes
+>   mostly reworking the 32bit port to accomodate for arm64
+> - git://github.com/columbia/linux-kvm-arm.git kvm-arm-next
+>   adding perf support
+> - http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/161381.html
+>   reworking the whole init procedure for KVM/ARM
+> - http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/161395.html
+>   more 32bit rework
 > 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index 119358d..7c3385e 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -280,7 +280,7 @@ kvm_run' (see below).
->  4.11 KVM_GET_REGS
->  
->  Capability: basic
-> -Architectures: all except ARM
-> +Architectures: all except ARM, arm64
->  Type: vcpu ioctl
->  Parameters: struct kvm_regs (out)
->  Returns: 0 on success, -1 on error
-> @@ -301,7 +301,7 @@ struct kvm_regs {
->  4.12 KVM_SET_REGS
->  
->  Capability: basic
-> -Architectures: all except ARM
-> +Architectures: all except ARM, arm64
->  Type: vcpu ioctl
->  Parameters: struct kvm_regs (in)
->  Returns: 0 on success, -1 on error
-> @@ -587,7 +587,7 @@ struct kvm_fpu {
->  4.24 KVM_CREATE_IRQCHIP
->  
->  Capability: KVM_CAP_IRQCHIP
-> -Architectures: x86, ia64, ARM
-> +Architectures: x86, ia64, ARM, arm64
->  Type: vm ioctl
->  Parameters: none
->  Returns: 0 on success, -1 on error
-> @@ -595,14 +595,14 @@ Returns: 0 on success, -1 on error
->  Creates an interrupt controller model in the kernel.  On x86, creates a virtual
->  ioapic, a virtual PIC (two PICs, nested), and sets up future vcpus to have a
->  local APIC.  IRQ routing for GSIs 0-15 is set to both PIC and IOAPIC; GSI 16-23
-> -only go to the IOAPIC.  On ia64, a IOSAPIC is created. On ARM, a GIC is
-> +only go to the IOAPIC.  On ia64, a IOSAPIC is created. On ARM/arm64, a GIC is
->  created.
->  
->  
->  4.25 KVM_IRQ_LINE
->  
->  Capability: KVM_CAP_IRQCHIP
-> -Architectures: x86, ia64, arm
-> +Architectures: x86, ia64, arm, arm64
->  Type: vm ioctl
->  Parameters: struct kvm_irq_level
->  Returns: 0 on success, -1 on error
-> @@ -612,9 +612,10 @@ On some architectures it is required that an interrupt controller model has
->  been previously created with KVM_CREATE_IRQCHIP.  Note that edge-triggered
->  interrupts require the level to be set to 1 and then back to 0.
->  
-> -ARM can signal an interrupt either at the CPU level, or at the in-kernel irqchip
-> -(GIC), and for in-kernel irqchip can tell the GIC to use PPIs designated for
-> -specific cpus.  The irq field is interpreted like this:
-> +ARM/arm64 can signal an interrupt either at the CPU level, or at the
-> +in-kernel irqchip (GIC), and for in-kernel irqchip can tell the GIC to
-> +use PPIs designated for specific cpus.  The irq field is interpreted
-> +like this:
->  
->   ?bits:  | 31 ... 24 | 23  ... 16 | 15    ...    0 |
->    field: | irq_type  | vcpu_index |     irq_id     |
-> @@ -1802,6 +1803,19 @@ ARM 32-bit VFP control registers have the following id bit patterns:
->  ARM 64-bit FP registers have the following id bit patterns:
->    0x4002 0000 0012 0 <regno:12>
->  
-> +
-> +arm64 registers are mapped using the lower 32 bits. The upper 16 of
-> +that is the register group type, or coprocessor number:
-> +
-> +arm64 core/FP-SIMD registers have the following id bit patterns:
-> +  0x6002 0000 0010 <index into the kvm_regs struct:16>
-> +
-> +arm64 CCSIDR registers are demultiplexed by CSSELR value:
-> +  0x6002 0000 0011 00 <csselr:8>
-> +
-> +arm64 system registers have the following id bit patterns:
-> +  0x6002 0000 0013 <op0:2> <op1:3> <crn:4> <crm:4> <op2:3>
-> +
+> The code is unsurprisingly extremely similar to the KVM/arm code, and
+> a lot of it is actually shared with the 32bit version. Some of the
+> include files are duplicated though (I'm definitely willing to fix
+> that).
+> 
+> In terms of features:
+> - Support for 4k and 64k pages
+> - Support for 32bit and 64bit guests
+> - PSCI support for SMP booting
+> 
+> Testing has been done on both AEMv8 and Foundation models, with
+> various 32 and 64bit guests running a variety of distributions (OE,
+> Ubuntu and openSUSE for 64bit, Debian and Ubuntu on 32bit).
+> 
+> The patches are also available on the following branch:
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/kvm
 
-I think these size encodings are 4 bits off, and not accurate for for
-the core registers, which have variable sizes, which should be indicated
-here (unless you decide for a separate category as per my other
-comment).
+Hi Marc,
 
->  4.69 KVM_GET_ONE_REG
->  
->  Capability: KVM_CAP_ONE_REG
-> @@ -2165,7 +2179,7 @@ valid entries found.
->  4.77 KVM_ARM_VCPU_INIT
->  
->  Capability: basic
-> -Architectures: arm
-> +Architectures: arm, arm64
->  Type: vcpu ioctl
->  Parameters: struct struct kvm_vcpu_init (in)
->  Returns: 0 on success; -1 on error
-> @@ -2184,12 +2198,14 @@ should be created before this ioctl is invoked.
->  Possible features:
->  	- KVM_ARM_VCPU_POWER_OFF: Starts the CPU in a power-off state.
->  	  Depends on KVM_CAP_ARM_PSCI.
-> +	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
-> +	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
->  
->  
->  4.78 KVM_GET_REG_LIST
->  
->  Capability: basic
-> -Architectures: arm
-> +Architectures: arm, arm64
->  Type: vcpu ioctl
->  Parameters: struct kvm_reg_list (in/out)
->  Returns: 0 on success; -1 on error
-> @@ -2209,7 +2225,7 @@ KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
->  4.80 KVM_ARM_SET_DEVICE_ADDR
->  
->  Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
-> -Architectures: arm
-> +Architectures: arm, arm64
->  Type: vm ioctl
->  Parameters: struct kvm_arm_device_address (in)
->  Returns: 0 on success, -1 on error
-> @@ -2230,18 +2246,19 @@ can access emulated or directly exposed devices, which the host kernel needs
->  to know about. The id field is an architecture specific identifier for a
->  specific device.
->  
-> -ARM divides the id field into two parts, a device id and an address type id
-> -specific to the individual device.
-> +ARM/arm64 divides the id field into two parts, a device id and an
-> +address type id specific to the individual device.
->  
->   ?bits:  | 63        ...       32 | 31    ...    16 | 15    ...    0 |
->    field: |        0x00000000      |     device id   |  addr type id  |
->  
-> -ARM currently only require this when using the in-kernel GIC support for the
-> -hardware VGIC features, using KVM_ARM_DEVICE_VGIC_V2 as the device id.  When
-> -setting the base address for the guest's mapping of the VGIC virtual CPU
-> -and distributor interface, the ioctl must be called after calling
-> -KVM_CREATE_IRQCHIP, but before calling KVM_RUN on any of the VCPUs.  Calling
-> -this ioctl twice for any of the base addresses will return -EEXIST.
-> +ARM/arm64 currently only require this when using the in-kernel GIC
-> +support for the hardware VGIC features, using KVM_ARM_DEVICE_VGIC_V2
-> +as the device id.  When setting the base address for the guest's
-> +mapping of the VGIC virtual CPU and distributor interface, the ioctl
-> +must be called after calling KVM_CREATE_IRQCHIP, but before calling
-> +KVM_RUN on any of the VCPUs.  Calling this ioctl twice for any of the
-> +base addresses will return -EEXIST.
->  
->  
->  5. The kvm_run structure
+Nice job! I finally got through this series, and besides the mostly
+cosmetic comments it looks pretty good to me.  I hope we can do slightly
+more code sharing between the two platforms before a merge (especially
+the identical header files and some of the fault injection stuff), but I
+realize there may be technical reasons that make this hard to
+accomplish.  Definitely kudos on being so feature complete that early.
+
+I haven't been able to verify every bit and piece of control registers
+and such, since I don't have the necessary docs, but from what I can
+gather this looks pretty good, so, assuming you address the comments I
+gave (especially at the least clearly commenting on the index into the
+kvm_regs struct):
+
+	Acked-by: Christoffer Dall <cdall@cs.columbia.edu>
+
+-Christoffer
+
+> 
+> As we do not have a 64bit QEMU port, it has been tested using
+> kvmtools. Note that some of the changes have broken the userspace ABI
+> in v2, and you must update and rebuild your kvmtools (the previous
+> version won't work anymore):
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/kvmtool
+> 
+> >From v2:
+> - Dropped the idmap code and use the new KVM/ARM boot protocol
+> - New KVM_CAP_ARM_EL1_32BIT capability to let userspace detect if EL1
+>   is 32bit capable
+> - Fixed a bug in arch/arm/entry.S, where EL0/EL1 breakpoint handling was
+>   mixed up (spotted by Catalin Marinas)
+> - Some sparse fixes (courtesy of Geoff Levand)
+> - Dropped the "shared" attribute from device mappings (spotted by Catalin)
+> - Add API documentation
+> - Add MAINTAINERS entry
+> 
+> >From v1:
+> - Rework of the world-switch to use common structure between host and
+>   guests (suggested by Christopher Covington)
+> - Some additional constants to make the EL1 fault injection clearer
+>   (suggested by Christopher Covington)
+> - Use of __u64 instead of "unsigned long" in the userspace API
+>   (suggested by Michael S. Tsirkin)
+> - Move the FP/SIMD registers into the "core" registers, dropping the
+>   specific accessors.
+> - Generic MPIDR implementation (suggested by Christopher Covington)
+> - Cleaner handling of the various host implementations
+> 
+> Marc Zyngier (32):
+>   arm64: add explicit symbols to ESR_EL1 decoding
+>   arm64: KVM: define HYP and Stage-2 translation page flags
+>   arm64: KVM: HYP mode idmap support
+>   arm64: KVM: EL2 register definitions
+>   arm64: KVM: system register definitions for 64bit guests
+>   arm64: KVM: Basic ESR_EL2 helpers and vcpu register access
+>   arm64: KVM: fault injection into a guest
+>   arm64: KVM: architecture specific MMU backend
+>   arm64: KVM: user space interface
+>   arm64: KVM: system register handling
+>   arm64: KVM: CPU specific system registers handling
+>   arm64: KVM: virtual CPU reset
+>   arm64: KVM: kvm_arch and kvm_vcpu_arch definitions
+>   arm64: KVM: MMIO access backend
+>   arm64: KVM: guest one-reg interface
+>   arm64: KVM: hypervisor initialization code
+>   arm64: KVM: HYP mode world switch implementation
+>   arm64: KVM: Exit handling
+>   arm64: KVM: Plug the VGIC
+>   arm64: KVM: Plug the arch timer
+>   arm64: KVM: PSCI implementation
+>   arm64: KVM: Build system integration
+>   arm64: KVM: define 32bit specific registers
+>   arm64: KVM: 32bit GP register access
+>   arm64: KVM: 32bit conditional execution emulation
+>   arm64: KVM: 32bit handling of coprocessor traps
+>   arm64: KVM: CPU specific 32bit coprocessor access
+>   arm64: KVM: 32bit specific register world switch
+>   arm64: KVM: 32bit guest fault injection
+>   arm64: KVM: enable initialization of a 32bit vcpu
+>   arm64: KVM: userspace API documentation
+>   arm64: KVM: MAINTAINERS update
+> 
+>  Documentation/virtual/kvm/api.txt       |   55 +-
+>  MAINTAINERS                             |    9 +
+>  arch/arm/kvm/arch_timer.c               |    1 +
+>  arch/arm64/Kconfig                      |    2 +
+>  arch/arm64/Makefile                     |    2 +-
+>  arch/arm64/include/asm/esr.h            |   55 ++
+>  arch/arm64/include/asm/kvm_arch_timer.h |   58 ++
+>  arch/arm64/include/asm/kvm_arm.h        |  243 ++++++++
+>  arch/arm64/include/asm/kvm_asm.h        |  104 ++++
+>  arch/arm64/include/asm/kvm_coproc.h     |   56 ++
+>  arch/arm64/include/asm/kvm_emulate.h    |  185 ++++++
+>  arch/arm64/include/asm/kvm_host.h       |  202 ++++++
+>  arch/arm64/include/asm/kvm_mmio.h       |   59 ++
+>  arch/arm64/include/asm/kvm_mmu.h        |  136 ++++
+>  arch/arm64/include/asm/kvm_psci.h       |   23 +
+>  arch/arm64/include/asm/kvm_vgic.h       |  156 +++++
+>  arch/arm64/include/asm/pgtable-hwdef.h  |   13 +
+>  arch/arm64/include/asm/pgtable.h        |   12 +
+>  arch/arm64/include/uapi/asm/kvm.h       |  168 +++++
+>  arch/arm64/kernel/asm-offsets.c         |   34 +
+>  arch/arm64/kernel/entry.S               |   53 +-
+>  arch/arm64/kernel/vmlinux.lds.S         |   16 +
+>  arch/arm64/kvm/Kconfig                  |   59 ++
+>  arch/arm64/kvm/Makefile                 |   19 +
+>  arch/arm64/kvm/emulate.c                |  154 +++++
+>  arch/arm64/kvm/guest.c                  |  260 ++++++++
+>  arch/arm64/kvm/handle_exit.c            |  124 ++++
+>  arch/arm64/kvm/hyp-init.S               |  112 ++++
+>  arch/arm64/kvm/hyp.S                    |  816 ++++++++++++++++++++++++
+>  arch/arm64/kvm/inject_fault.c           |  195 ++++++
+>  arch/arm64/kvm/regmap.c                 |  168 +++++
+>  arch/arm64/kvm/reset.c                  |   99 +++
+>  arch/arm64/kvm/sys_regs.c               | 1035 +++++++++++++++++++++++++++++++
+>  arch/arm64/kvm/sys_regs.h               |  138 +++++
+>  arch/arm64/kvm/sys_regs_generic_v8.c    |   95 +++
+>  include/uapi/linux/kvm.h                |    2 +
+>  36 files changed, 4872 insertions(+), 46 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/esr.h
+>  create mode 100644 arch/arm64/include/asm/kvm_arch_timer.h
+>  create mode 100644 arch/arm64/include/asm/kvm_arm.h
+>  create mode 100644 arch/arm64/include/asm/kvm_asm.h
+>  create mode 100644 arch/arm64/include/asm/kvm_coproc.h
+>  create mode 100644 arch/arm64/include/asm/kvm_emulate.h
+>  create mode 100644 arch/arm64/include/asm/kvm_host.h
+>  create mode 100644 arch/arm64/include/asm/kvm_mmio.h
+>  create mode 100644 arch/arm64/include/asm/kvm_mmu.h
+>  create mode 100644 arch/arm64/include/asm/kvm_psci.h
+>  create mode 100644 arch/arm64/include/asm/kvm_vgic.h
+>  create mode 100644 arch/arm64/include/uapi/asm/kvm.h
+>  create mode 100644 arch/arm64/kvm/Kconfig
+>  create mode 100644 arch/arm64/kvm/Makefile
+>  create mode 100644 arch/arm64/kvm/emulate.c
+>  create mode 100644 arch/arm64/kvm/guest.c
+>  create mode 100644 arch/arm64/kvm/handle_exit.c
+>  create mode 100644 arch/arm64/kvm/hyp-init.S
+>  create mode 100644 arch/arm64/kvm/hyp.S
+>  create mode 100644 arch/arm64/kvm/inject_fault.c
+>  create mode 100644 arch/arm64/kvm/regmap.c
+>  create mode 100644 arch/arm64/kvm/reset.c
+>  create mode 100644 arch/arm64/kvm/sys_regs.c
+>  create mode 100644 arch/arm64/kvm/sys_regs.h
+>  create mode 100644 arch/arm64/kvm/sys_regs_generic_v8.c
+> 
 > -- 
 > 1.8.1.4
 > 
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
