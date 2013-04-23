@@ -1,27 +1,45 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 23 Apr 2013 23:48:46 +0900
-Subject: [PATCH v5 5/6] ARM: dts: Add basic dts include files for Samsung
- S3C64xx SoCs
-In-Reply-To: <3174365.tBvafCFyal@amdc1227>
-References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
- <CAL_JsqL_i-5SDCsGZCrsxMehLVMGoLO1s_V3R-H6Oa5ff16dEQ@mail.gmail.com>
- <51769ACC.4070706@samsung.com> <3174365.tBvafCFyal@amdc1227>
-Message-ID: <51769F4E.3010602@samsung.com>
+Date: Wed, 24 Apr 2013 00:02:29 +0900
+Subject: [PATCH v2 2/3] ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
+In-Reply-To: <1696892.zdvbYPFFr0@amdc1227>
+References: <1366036922-4103-1-git-send-email-t.figa@samsung.com>
+ <201304222310.34775.arnd@arndb.de> <517692FD.9080005@samsung.com>
+ <1696892.zdvbYPFFr0@amdc1227>
+Message-ID: <5176A285.9030009@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/13 23:44, Tomasz Figa wrote:
+On 04/23/13 23:26, Tomasz Figa wrote:
+> Hi Kukjin,
 
->> Tomasz, can you address comments?
->
-> Please discard this series for now.
->
-OK.
+[...]
 
-> I've decided to post it for 3.11, including a driver for Common Clock
-> Framework and several cleanup patches, which I have ready and waiting.
+>>> Acked-by: Arnd Bergmann<arnd@arndb.de>
+>>>
+>>> Note that it would be helpful to mention here that this is required for
+>>> the calling samsung_timer_init from the exynos4-dt.c file.
+>>
+>> I did 'amend' as per your suggestion and added your ack on this series.
+>>
+>> Thanks.
+>>
+>> - Kukjin
 >
-Sounds good.
+> Since the samsung-time rework patches were replaced with a non-invasive subset
+> with different semantics (going to send them in a while), this patch should be
+> replaced with new version I'm going to send (in a while as well).
+>
+Oh, OK. You want to replace with new patches you will send. I dropped 
+this series in my late dt branch.
+
+BTW, the series should depend on your samsung-time patches, right?
+
+One more note, this makes following build error.
+
+arch/arm/mach-exynos/built-in.o: In function `exynos_init_time':
+arch/arm/mach-exynos/common.c:424: undefined reference to 
+`samsung_timer_init'
+make: *** [vmlinux] Error 1
 
 Thanks.
 
