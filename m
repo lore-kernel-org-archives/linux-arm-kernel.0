@@ -1,36 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Apr 2013 21:46:19 +0200
-Subject: [PATCH v2] usb: phy: don't mark usb_bind_phy as __init
-In-Reply-To: <20130423193046.GC13453@arwen.pp.htv.fi>
-References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
- <201304232107.22084.arnd@arndb.de> <20130423193046.GC13453@arwen.pp.htv.fi>
-Message-ID: <201304232146.20011.arnd@arndb.de>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 23 Apr 2013 12:48:22 -0700
+Subject: [PATCH] drivers: memory: Introduce Marvell EBU Device Bus driver
+In-Reply-To: <1366744886-3019-1-git-send-email-elezegarcia@gmail.com>
+References: <1366744886-3019-1-git-send-email-elezegarcia@gmail.com>
+Message-ID: <20130423194822.GA7214@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 April 2013, Felipe Balbi wrote:
-> On Tue, Apr 23, 2013 at 09:07:21PM +0200, Arnd Bergmann wrote:
-> > It makes no sense for a symbol to be both exported and marked __init,
-> > because any users in modules would be calling this function after
-> > it gets discarded. Further, this patch revolves a section mismatch
-> > warning from usbhs_init_phys(), which is intentionally not marked
-> > __init:
-> > 
-> > WARNING: vmlinux.o(.text+0x413f8): Section mismatch in reference from
-> > the function usbhs_init_phys() to the function .init.text:usb_bind_phy()
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Alan Stern <stern@rowland.harvard.edu>
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: linux-usb at vger.kernel.org
-> > ---
-> > 
-> > v2: rebased on linux-next
+On Tue, Apr 23, 2013 at 04:21:26PM -0300, Ezequiel Garcia wrote:
+> From: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > 
-> not needed, Greg already has a patch doing exactly this in usb-next.
+> Marvell EBU SoCs such as Armada 370/XP, Orion5x (88f5xxx) and
+> Discovery (mv78xx0) supports a Device Bus controller to access several
+> kinds of memories and I/O devices (NOR, NAND, SRAM, FPGA).
+> 
+> This commit adds a driver to handle this controller. So far only
+> Armada 370, Armada XP and Discovery SoCs are supported.
+> 
+> The driver must be registered through a device tree node;
+> as explained in the binding document.
+> 
+> For each child node in the device tree, this driver will:
+>   * set timing parameters
+>   * register a child device
+>   * setup an address decoding window, using the mbus driver
+> 
+> Keep in mind the address decoding window setup is only a temporary hack.
+> This code will be removed from this devbus driver as soon as a proper device
+> tree binding for the mbus driver is added.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> Hi Greg,
+> 
+> This patch Applies on today linux-next.
+> I don't know if we are still in time for you to take this
+> and merge it into v3.10.
+> 
+> All of the DT related changes are in linux-next through arm-soc,
+> but this driver was left out and, unless you take it, will
+> get queued for v3.11. So it's up to you.
 
-Right, I see it now. I had checked today's linux-next but not usb-next
-or any of the other trees for stuff that was just applied today.
+It's way too late for new drivers for 3.10, sorry.  I'll hold on to this
+and merge it to my trees after 3.10-rc1 is out for inclusion in 3.11.
 
-	Arnd
+thanks,
+
+greg k-h
