@@ -1,71 +1,47 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 23 Apr 2013 09:26:04 -0700
-Subject: [PATCH] usb: phy: phy core cannot yet be a module
-In-Reply-To: <20130423160759.GF15177@arwen.pp.htv.fi>
-References: <1366732475-479886-1-git-send-email-arnd@arndb.de>
- <1366732475-479886-2-git-send-email-arnd@arndb.de>
- <20130423160759.GF15177@arwen.pp.htv.fi>
-Message-ID: <20130423162604.GA6983@kroah.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 23 Apr 2013 17:28:07 +0100
+Subject: [RFC PATCH] drivers: bus: add ARM CCI support
+In-Reply-To: <1366725128.8473.21.camel@computer5.home>
+References: <1365691679-28674-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1365691679-28674-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366725128.8473.21.camel@computer5.home>
+Message-ID: <20130423162807.GA2461@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 07:07:59PM +0300, Felipe Balbi wrote:
-> Hi,
-> 
-> On Tue, Apr 23, 2013 at 05:54:32PM +0200, Arnd Bergmann wrote:
-> > A lot of platform code calls into the usb phy core at the moment, which
-> > does not work if it is built as a loadable module. This will hopefully
-> > change when those platforms are all converted to DT based probing,
-> > but for now, the easiest solution is to change it from "tristate"
-> > to "bool".
-> > 
-> > This solves at least these ARM allmodconfig build errors:
-> > 
-> > arch/arm/mach-imx/built-in.o: In function `imx_otg_ulpi_create':
-> > arch/arm/mach-imx/ulpi.c:117: undefined reference to `otg_ulpi_create'
-> > arch/arm/mach-omap2/built-in.o: In function `usbhs_init_phys':
-> > arch/arm/mach-omap2/usb-host.c:652: undefined reference to `usb_bind_phy'
-> > arch/arm/mach-omap2/built-in.o: In function `omap_2430sdp_init':
-> > arch/arm/mach-omap2/board-2430sdp.c:236: undefined reference to `usb_bind_phy'
-> > arch/arm/mach-omap2/built-in.o: In function `omap3_beagle_init':
-> > arch/arm/mach-omap2/board-omap3beagle.c:554: undefined reference to `usb_bind_phy'
-> > arch/arm/mach-omap2/built-in.o: In function `devkit8000_init':
-> > arch/arm/mach-omap2/board-devkit8000.c:596: undefined reference to `usb_bind_phy'
-> > arch/arm/mach-omap2/built-in.o: In function `omap_ldp_init':
-> > arch/arm/mach-omap2/board-ldp.c:379: undefined reference to `usb_bind_phy'
-> > drivers/built-in.o: In function `ab8500_charger_probe':
-> > drivers/power/ab8500_charger.c:3629: undefined reference to `usb_get_phy'
-> > drivers/power/ab8500_charger.c:3706: undefined reference to `usb_put_phy'
-> > drivers/built-in.o: In function `ab8500_charger_remove':
-> > drivers/power/ab8500_charger.c:3411: undefined reference to `usb_put_phy'
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Felipe Balbi <balbi@ti.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: linux-usb at vger.kernel.org
-> > ---
-> >  drivers/usb/phy/Kconfig | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-> > index 21153d1..371d0e7 100644
-> > --- a/drivers/usb/phy/Kconfig
-> > +++ b/drivers/usb/phy/Kconfig
-> > @@ -2,7 +2,7 @@
-> >  # Physical Layer USB driver configuration
-> >  #
-> >  menuconfig USB_PHY
-> > -	tristate "USB Physical Layer drivers"
-> > +	bool "USB Physical Layer drivers"
-> 
-> looks like this is the only way, indeed. Do you need on the merge window
-> on can this wait until -rc1 ? I just sent a pull request to Greg with
-> urgent fixes for the merge window.
-> 
-> Greg, if you want to take this one as a patch, go for it:
-> 
-> Acked-by: Felipe Balbi <balbi@ti.com>
+On Tue, Apr 23, 2013 at 02:52:08PM +0100, Jon Medhurst (Tixy) wrote:
+> On Thu, 2013-04-11 at 15:47 +0100, Lorenzo Pieralisi wrote:
+> [...]
 
-I'll take this now, thanks.
+[...]
 
-greg k-h
+> > diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> > +/*
+> > + * cci_port_control()
+> > + *	@port = index of the port to setup
+> > + *	@enable = if true enables the port, if false disables it
+> > + */
+> > +static void notrace cci_port_control(unsigned int port, bool enable)
+> > +{
+> > +	void __iomem *base = ports[port].base;
+> > +
+> > +	if (!base)
+> > +		return;
+> > +
+> > +	writel_relaxed(enable, base + CCI_PORT_CTRL);
+> 
+> If enable is bool (0 or 1) then this is going to set snoops as specified
+> but is always going to clear DVM broadcast as that is controlled by bit1
+> of the register. So, does the API need specifying different to allow the
+> caller to choose DVM state as well, or does this function need to assume
+> DVM and snoops state should be equal? I.e.
+> 
+> 	writel_relaxed(enable ? 0x3 : 0x0, base + CCI_PORT_CTRL);
+
+Some #defines for that magic "3" would be a good idea too.  Ultimately we
+may want independent control over snoops and DVM, but I think that could
+be done later as an extension to the code, if needed.  We don't expect
+there to be a large number of callers for this code...
+
+Cheers
+---Dave
