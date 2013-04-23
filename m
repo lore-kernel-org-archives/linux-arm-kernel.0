@@ -1,46 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 24 Apr 2013 00:02:29 +0900
-Subject: [PATCH v2 2/3] ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
-In-Reply-To: <1696892.zdvbYPFFr0@amdc1227>
-References: <1366036922-4103-1-git-send-email-t.figa@samsung.com>
- <201304222310.34775.arnd@arndb.de> <517692FD.9080005@samsung.com>
- <1696892.zdvbYPFFr0@amdc1227>
-Message-ID: <5176A285.9030009@samsung.com>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Tue, 23 Apr 2013 08:02:43 -0700
+Subject: [PATCH] ARM: mm: Get rid of L_PTE_USER ref from PAGE_S2_DEVICE
+In-Reply-To: <062dea0374552dcb48be3687ae95262d@localhost>
+References: <1366683430-24328-1-git-send-email-cdall@cs.columbia.edu>
+ <062dea0374552dcb48be3687ae95262d@localhost>
+Message-ID: <CAEDV+gK9J-grV=e0OfEo-bL0UezaAwFH1p1k4YkbvOB7D2LTbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/13 23:26, Tomasz Figa wrote:
-> Hi Kukjin,
-
-[...]
-
->>> Acked-by: Arnd Bergmann<arnd@arndb.de>
->>>
->>> Note that it would be helpful to mention here that this is required for
->>> the calling samsung_timer_init from the exynos4-dt.c file.
+On Tue, Apr 23, 2013 at 12:45 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On Mon, 22 Apr 2013 19:17:10 -0700, Christoffer Dall
+> <cdall@cs.columbia.edu> wrote:
+>> THe L_PTE_USER actually has nothing to do with stage 2 mappings and the
+>> L_PTE_S2_RDONLY value sets the readable bit, which was what L_PTE_USER
+>> was used for before proper handling of stage 2 memory defines.
 >>
->> I did 'amend' as per your suggestion and added your ack on this series.
+>> Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
+>> ---
+>>  arch/arm/include/asm/pgtable.h |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> Thanks.
+>> diff --git a/arch/arm/include/asm/pgtable.h
+>> b/arch/arm/include/asm/pgtable.h
+>> index 80d6fc4..1d1f97f 100644
+>> --- a/arch/arm/include/asm/pgtable.h
+>> +++ b/arch/arm/include/asm/pgtable.h
+>> @@ -88,7 +88,7 @@ extern pgprot_t             pgprot_s2_device;
+>>  #define PAGE_HYP             _MOD_PROT(pgprot_kernel, L_PTE_HYP)
+>>  #define PAGE_HYP_DEVICE              _MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+>>  #define PAGE_S2                      _MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
+>> -#define PAGE_S2_DEVICE               _MOD_PROT(pgprot_s2_device, L_PTE_USER |
+>> L_PTE_S2_RDONLY)
+>> +#define PAGE_S2_DEVICE               _MOD_PROT(pgprot_s2_device, L_PTE_S2_RDONLY)
 >>
->> - Kukjin
+>>  #define __PAGE_NONE          __pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN
+> |
+>>  L_PTE_NONE)
+>>  #define __PAGE_SHARED                __pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
 >
-> Since the samsung-time rework patches were replaced with a non-invasive subset
-> with different semantics (going to send them in a while), this patch should be
-> replaced with new version I'm going to send (in a while as well).
+> Good catch.
 >
-Oh, OK. You want to replace with new patches you will send. I dropped 
-this series in my late dt branch.
+> While we're at it, why not directly set it to be RW instead of RO? The
+> only use of PAGE_S2_DEVICE immediately sets the writeable bit anyway.
+>
 
-BTW, the series should depend on your samsung-time patches, right?
-
-One more note, this makes following build error.
-
-arch/arm/mach-exynos/built-in.o: In function `exynos_init_time':
-arch/arm/mach-exynos/common.c:424: undefined reference to 
-`samsung_timer_init'
-make: *** [vmlinux] Error 1
-
-Thanks.
-
-- Kukjin
+hmm, any potential future uses of read-only device mappings? It seems
+"easier" to or on write permissions than remove them, or maybe I'm
+imagining things...
