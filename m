@@ -1,40 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 23 Apr 2013 11:09:46 +0900
-Subject: [PATCH v2 0/1] Add I2C support to R8A7778/BOCK-W
-In-Reply-To: <51752E24.6030800@cogentembedded.com>
-References: <201304200217.32844.sergei.shtylyov@cogentembedded.com>
- <5171C4FE.9000807@cogentembedded.com>
- <20130422045248.GO15680@verge.net.au>
- <51752E24.6030800@cogentembedded.com>
-Message-ID: <20130423020946.GN12017@verge.net.au>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Tue, 23 Apr 2013 14:13:18 +1200
+Subject: [RFC PATCH v2 12/13] ARM: mach-vt8500: cpus/cpu nodes dts updates
+In-Reply-To: <1366644455-16550-13-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366644455-16550-13-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <5175EE3E.7080809@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 04:33:40PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 22-04-2013 8:52, Simon Horman wrote:
-> 
-> >>>    Here's the patch against the Simon Horman's 'renesas.git' repo,
-> >>>'renesas-next-20130417' tag and my recent yet unapplied USB patches.
-> 
-> >>    Sorry, it's against 'renesas-next-20130419' tag now.
-> 
-> >Sorry, it doesn't seem to apply cleanly on top of
-> >renesas-next-20130417 or renesas-next-20130419.
-> 
->    It's also atop of USB the patches.
+On 23/04/13 03:27, Lorenzo Pieralisi wrote:
+> This patch updates the in-kernel dts files according to the latest cpus
+> and cpu bindings updates for ARM.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>   arch/arm/boot/dts/wm8505.dtsi | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
+> index e74a1c0..a470808 100644
+> --- a/arch/arm/boot/dts/wm8505.dtsi
+> +++ b/arch/arm/boot/dts/wm8505.dtsi
+> @@ -13,7 +13,7 @@
+>   
+>   	cpus {
+>   		cpu at 0 {
+> -			compatible = "arm,arm926ejs";
+> +			compatible = "arm,arm926";
+>   		};
+>   	};
+>   
+As the only author for that file, and the arch-vt8500 maintainer, a CC 
+would have been nice :)
 
-Sorry for missing that.
+This binding is still incomplete.device_type, compatible and reg are all 
+required properties.
+Also, you seem to have only fixed the wm8505.dtsi, while vt8500.dtsi, 
+wm8650.dtsi and wm8850.dtsi are all left incorrect.
 
-> >Could you please rebase, add Morimoto-san's Acked-by and repost?
-> 
->    I don't think we're in a hurry to apply this before USB patches
-> but if you insist, I'll exchange these patchsets in my series and
-> repost.
+I am already carrying a patch to fix all this properly so could you drop 
+the arch-vt8500 related patch and I will send in a more complete version 
+for 3.11
 
-I'm comfortable with waiting if you are.
-
-Please let me know if/when any of your series are ready.
-I try to keep on top of things things but there are a number
-of patches in-flight so there is ample scope for error on my part.
+Regards
+Tony Prisk
