@@ -1,44 +1,85 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 24 Apr 2013 00:59:26 +0200
-Subject: [PATCH 07/18] cpufreq: s3c24xx: move cpufreq driver to
- drivers/cpufreq
-In-Reply-To: <5176A807.2090005@samsung.com>
-References: <cover.1365079581.git.viresh.kumar@linaro.org>
- <1769336.FkfMpuXqqb@vostro.rjw.lan> <5176A807.2090005@samsung.com>
-Message-ID: <2264237.NUtkmvZG3W@vostro.rjw.lan>
+From: ohaugan@codeaurora.org (Olav Haugan)
+Date: Tue, 23 Apr 2013 15:54:53 -0700
+Subject: [PATCH] documentation: iommu: add description of ARM System MMU
+ binding
+In-Reply-To: <20130418190131.GA12344@mudshark.cambridge.arm.com>
+References: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
+ <515F37C1.4000109@codeaurora.org>
+ <20130408092535.GA17476@mudshark.cambridge.arm.com>
+ <5162F87A.7070409@codeaurora.org>
+ <20130410173732.GQ26992@mudshark.cambridge.arm.com>
+ <5169C7D1.8070300@codeaurora.org>
+ <20130415131341.GG9827@mudshark.cambridge.arm.com>
+ <516D9602.2010404@codeaurora.org>
+ <20130418190131.GA12344@mudshark.cambridge.arm.com>
+Message-ID: <5177113D.7060300@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, April 24, 2013 12:25:59 AM Kukjin Kim wrote:
-> On 04/05/13 20:36, Rafael J. Wysocki wrote:
-> > On Friday, April 05, 2013 12:36:34 PM Viresh Kumar wrote:
-> >> On 5 April 2013 12:18, Kukjin Kim<kgene.kim@samsung.com>  wrote:
-> >>> Basically, this moving looks good to me, but should be re-worked based on
-> >>> for-next of samsung tree because this touches too many samsung stuff so this
-> >>> should be sent to upstream via samsung tree.
-> >>
-> >> Hmm... Its already applied in Rafael's tree. But it doesn't mean that
-> >> it can't be
-> >> moved to your tree if there is a issue.
-> >
-> > Well, I'm dropping it.  Please merge via the Samsung tree.
-> >
-> 
-> Oops, I missed, maybe I have no more chance to send this to upstream for 
-> upcoming merge window :-(
-> 
-> Rafael, please take this patch with my ack in your tree, sorry for noise.
-> 
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> If any problems, please kindly let me know.
+Hi Will,
 
-Well, I suppose I can take the original patch, but then it will conflict with
-your tree during merge.  Is that not a problem?
+On 4/18/2013 12:01 PM, Will Deacon wrote:
+> On Tue, Apr 16, 2013 at 07:18:42PM +0100, Olav Haugan wrote:
+>> On 4/15/2013 6:13 AM, Will Deacon wrote:
+>>> If so, doesn't that strongly tie your video driver to the SMMU?
+>>
+>> Isn't this more or less what you are doing in DT where you associate
+>> specific devices with an IOMMU (mmu-masters)?
+> 
+> No. The device-tree describes the *hardware*, as per usual. The StreamIDs
+> are fixed properties of the SoC and we can't change them from Linux, so we
+> describe all of the StreamIDs upstream of each SMMU so that we can program
+> the thing. There's no way to generic way to discover them.
 
-Rafael
+I meant that you are putting phandles to bus masters in the device tree
+that use/need the SMMU for VA2PA translation. Doesn't this put a
+dependency on the bus master devices? How will this work? Lets say that
+we have a device during bootup that needs to use the SMMU (such as a
+display processor [DP]). Don't you have cyclic dependency? The SMMU
+device needs the DP device (phandle) but the DP device needs the SMMU to
+initialize its device driver?
 
+>>> This seems to be where we differ. My anticipated use-case is that a domain
+>>> is allocated, which defines an empty address space. Masters are then
+>>> attached to the domain by passing their struct device, so this may
+>>> correspond to a DMA controller or a video core, in your case. The context
+>>> bank is allocated dynamically when the first device is added to the
+>>> domain, and then it is subsequently shared between all the masters in that
+>>> domain.
+>>
+>> I feel that there are some limitation with this. Maybe you can address
+>> the following:
+>>
+>> 1) What if you want two context banks in one domain (shared page table)?
+> 
+> Why would a page table shared between devices require multiple context
+> banks? Multiple SMRs and S2CRs, sure, but they would ultimately point at the
+> same context bank (and hence same address space).
+
+What if you want to have 2 different VMID's being generated? Also, what
+about TLB management? If I have two context banks I can invalidate only
+entries associated with 1 of the context banks (if VMID differ for the
+two context banks).
+
+>> 2) What if a master (device) needs to use 2 or more context banks?
+> 
+> If a master needs to be in two address spaces at once, then it will need to
+> attach it's StreamIDs to different domains. You can't place a single
+> StreamID in two address spaces (this is an architectural constraint).
+
+Yes, you would have a separate domain. I am just wondering how I would
+model this in DT using the bindings that you are proposing? How does it
+work? The bindings specify bus masters to StreamIDs. So if I call attach
+with the master device you will allocate a context bank and program the
+StreamIDs as specified in the DT. So now if I want to have another
+context bank associated with the same master device what do I do? I call
+into attach with a new domain but with the same master device but the
+master device is already attached to a context/domain.
+
+Thanks,
+
+Olav Haugan
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
