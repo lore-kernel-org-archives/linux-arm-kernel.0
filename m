@@ -1,27 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 23 Apr 2013 16:15:12 +0100
-Subject: [PATCH 1/3] spi: s3c64xx: added support for polling mode
-In-Reply-To: <1366614565-3743-2-git-send-email-ks.giri@samsung.com>
-References: <1366614565-3743-1-git-send-email-ks.giri@samsung.com>
- <1366614565-3743-2-git-send-email-ks.giri@samsung.com>
-Message-ID: <20130423151511.GR5019@opensource.wolfsonmicro.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 23 Apr 2013 18:15:33 +0300
+Subject: [PATCH 06/10] usb: musb: ux500: add device tree probing support
+In-Reply-To: <201304231714.06326.arnd@arndb.de>
+References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
+ <1366729394-11406-7-git-send-email-lee.jones@linaro.org>
+ <201304231714.06326.arnd@arndb.de>
+Message-ID: <20130423151533.GD15177@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 12:39:23PM +0530, Girish K S wrote:
-> From: Girish K S <girishks2000@gmail.com>
+On Tue, Apr 23, 2013 at 05:14:06PM +0200, Arnd Bergmann wrote:
+> On Tuesday 23 April 2013, Lee Jones wrote:
+> > +Required properties:
+> > + - compatible : Should be "stericsson,db8500-musb"
+> > + - reg        : Offset and length of registers
+> > + - interrupts : Interrupt; mode, number and trigger
+> > + - mode       : One of; "host", "otg", or "peripheral"
 > 
-> The 64xx spi driver supports partial polling mode.
-> Only the last chunk of the transfer length is transferred
-> or recieved in polling mode.
+> I think we don't have any precedent for this combination of "mode" property
+> and contents. You could either try to match ehci-omap.txt and do
 
-This appears to have a very noticable negative impact on SPI performance
-on my S3C6410 based system.  Not delved into it to test why but are you
-sure it's not mistakenly selecting polling?
+there is dr_mode which other folks are using. Let's use the same thing.
+
+-- 
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130423/8081cceb/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130423/22540e2b/attachment.sig>
