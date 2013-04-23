@@ -1,80 +1,75 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 23 Apr 2013 11:37:05 +0900
-Subject: [PATCH] ARM: shmobile: lager: Add GPIO LEDs
-Message-ID: <1366684625-17256-1-git-send-email-horms+renesas@verge.net.au>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Tue, 23 Apr 2013 14:43:48 +1200
+Subject: [RFC PATCH v2 12/13] ARM: mach-vt8500: cpus/cpu nodes dts updates
+In-Reply-To: <1366644455-16550-13-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366644455-16550-13-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <5175F564.8030405@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board has 3 LEDs connected to GPIOs. Add a led-gpio device to
-support them.
+On 23/04/13 03:27, Lorenzo Pieralisi wrote:
+> This patch updates the in-kernel dts files according to the latest cpus
+> and cpu bindings updates for ARM.
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+>   arch/arm/boot/dts/wm8505.dtsi | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/wm8505.dtsi b/arch/arm/boot/dts/wm8505.dtsi
+> index e74a1c0..a470808 100644
+> --- a/arch/arm/boot/dts/wm8505.dtsi
+> +++ b/arch/arm/boot/dts/wm8505.dtsi
+> @@ -13,7 +13,7 @@
+>   
+>   	cpus {
+>   		cpu at 0 {
+> -			compatible = "arm,arm926ejs";
+> +			compatible = "arm,arm926";
+>   		};
+>   	};
+>   
+The more I look at this, the more wrong it is :/
 
-Based on "ARM: shmobile: marzen: Add GPIO LEDs" by Laurent Pinchart.
+ From the new binding documentation,
 
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
----
-
-v2
-* As suggested by Sergei Shtylyov:
-  Use platform_device_register_data() instead of platform_add_devices()
-* As suggested by Laurent Pinchart:
-  Use -1 as device id as there is only one such device
----
- arch/arm/mach-shmobile/board-lager.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 6114edd..6a1ba38 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -21,13 +21,37 @@
- #include <linux/interrupt.h>
- #include <linux/irqchip.h>
- #include <linux/kernel.h>
-+#include <linux/leds.h>
- #include <linux/pinctrl/machine.h>
-+#include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_device.h>
- #include <mach/common.h>
- #include <mach/r8a7790.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
-+/* LEDS */
-+static struct gpio_led lager_leds[] = {
-+	{
-+		.name		= "led8",
-+		.gpio		= RCAR_GP_PIN(5, 17),
-+		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-+	}, {
-+		.name		= "led7",
-+		.gpio		= RCAR_GP_PIN(4, 23),
-+		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-+	}, {
-+		.name		= "led6",
-+		.gpio		= RCAR_GP_PIN(4, 22),
-+		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-+	},
-+};
++	A cpus node must define the following properties:
 +
-+static struct gpio_led_platform_data lager_leds_pdata = {
-+	.leds		= lager_leds,
-+	.num_leds	= ARRAY_SIZE(lager_leds),
-+};
++	- #address-cells
++		Usage: required
++		Value type: <u32>
++		Definition: must be set to 1 for 32-bit systems and 2 for
++			    64-bit systems
++	- #size-cells
++		Usage: required
++		Value type: <u32>
++		Definition: must be set to 0
+
+...
+
++- cpu node
 +
- static const struct pinctrl_map lager_pinctrl_map[] = {
- 	/* SCIF0 (CN19: DEBUG SERIAL0) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
-@@ -46,6 +70,9 @@ static void __init lager_add_standard_devices(void)
- 	r8a7790_pinmux_init();
- 
- 	r8a7790_add_standard_devices();
-+	platform_device_register_data(&platform_bus, "leds-gpio", -1,
-+				      &lager_leds_pdata,
-+				      sizeof(lager_leds_pdata));
- }
- 
- static const char *lager_boards_compat_dt[] __initdata = {
--- 
-1.8.2.1
++	Description: Describes a CPU in an ARM based system
++
++	PROPERTIES
++
++	- device_type
++		Usage: required
++		Value type: <string>
++		Definition: must be "cpu"
+
+Three required properties that aren't present in the patch.
+
+cpus {
+     #size-cells = <0>;
+     #address-cells = <1>;
+
+     cpu {
+         device_type = "cpu"
+         compatible = "arm,arm926";
+     };
+};
+
+Regards
+Tony P
