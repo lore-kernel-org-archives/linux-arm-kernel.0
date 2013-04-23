@@ -1,72 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Apr 2013 18:30:43 +0200
-Subject: [PATCH 11/21] drm/tilcdc: use only a single module device table
+Date: Tue, 23 Apr 2013 18:30:44 +0200
+Subject: [PATCH 12/21] mmc: sdhci-tegra: fix MODULE_DEVICE_TABLE
 In-Reply-To: <1366734653-488286-1-git-send-email-arnd@arndb.de>
 References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
-Message-ID: <1366734653-488286-12-git-send-email-arnd@arndb.de>
+Message-ID: <1366734653-488286-13-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tilcdc driver fails to be built as a module because of extraneous
-MODULE_DEVICE_TABLE entries:
+The symbol referenced in MODULE_DEVICE_TABLE must match the actual
+table, otherwise we get a build error like
 
-drivers/gpu/drm/tilcdc/tilcdc_slave.o:(.data+0x54): multiple definition of `__mod_of_device_table'
-drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
-drivers/gpu/drm/tilcdc/tilcdc_panel.o:(.data+0x54): multiple definition of `__mod_of_device_table'
-drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
-drivers/gpu/drm/tilcdc/tilcdc_drv.o:(.data+0x184): multiple definition of `__mod_of_device_table'
-drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
+sdhci-tegra.c:206:34: error: '__mod_of_device_table' aliased to undefined symbol 'sdhci_dt_ids'
 
-Since the entire point of these entries is to make the module autoload
-when one of the devices is present, it's enough to keep the one entry
-for "ti,am33xx-tilcdc", which should always be there if any of the
-others are.
-
-Cc: Rob Clark <robdclark@gmail.com>
-Cc: Dave Airlie <airlied@linux.ie>
-Cc: dri-devel at lists.freedesktop.org
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Chris Ball <cjb@laptop.org>
 ---
- drivers/gpu/drm/tilcdc/tilcdc_panel.c  | 1 -
- drivers/gpu/drm/tilcdc/tilcdc_slave.c  | 1 -
- drivers/gpu/drm/tilcdc/tilcdc_tfp410.c | 1 -
- 3 files changed, 3 deletions(-)
+ drivers/mmc/host/sdhci-tegra.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_panel.c b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-index 580b74e..eb99f42 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-@@ -413,7 +413,6 @@ static struct of_device_id panel_of_match[] = {
- 		{ .compatible = "ti,tilcdc,panel", },
- 		{ },
+diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+index 08b06e9..85052bf 100644
+--- a/drivers/mmc/host/sdhci-tegra.c
++++ b/drivers/mmc/host/sdhci-tegra.c
+@@ -214,7 +214,7 @@ static const struct of_device_id sdhci_tegra_dt_match[] = {
+ #endif
+ 	{}
  };
--MODULE_DEVICE_TABLE(of, panel_of_match);
+-MODULE_DEVICE_TABLE(of, sdhci_dt_ids);
++MODULE_DEVICE_TABLE(of, sdhci_tegra_dt_match);
  
- struct platform_driver panel_driver = {
- 	.probe = panel_probe,
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_slave.c b/drivers/gpu/drm/tilcdc/tilcdc_slave.c
-index 568dc1c..db1d2fc 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_slave.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_slave.c
-@@ -353,7 +353,6 @@ static struct of_device_id slave_of_match[] = {
- 		{ .compatible = "ti,tilcdc,slave", },
- 		{ },
- };
--MODULE_DEVICE_TABLE(of, slave_of_match);
- 
- struct platform_driver slave_driver = {
- 	.probe = slave_probe,
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-index 58d487b..a36788f 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-@@ -396,7 +396,6 @@ static struct of_device_id tfp410_of_match[] = {
- 		{ .compatible = "ti,tilcdc,tfp410", },
- 		{ },
- };
--MODULE_DEVICE_TABLE(of, tfp410_of_match);
- 
- struct platform_driver tfp410_driver = {
- 	.probe = tfp410_probe,
+ static void sdhci_tegra_parse_dt(struct device *dev,
+ 					struct sdhci_tegra *tegra_host)
 -- 
 1.8.1.2
