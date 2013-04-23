@@ -1,98 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Apr 2013 18:30:32 +0200
-Subject: [PATCH 00/21] ARM build fixes for 3.10
-Message-ID: <1366734653-488286-1-git-send-email-arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 23 Apr 2013 09:34:50 -0700
+Subject: [PATCH 0/4] ARM 64 bit sched_clock take #2
+In-Reply-To: <5175A1B8.1090202@gmail.com>
+References: <51709FD7.8050408@gmail.com>
+ <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
+ <51756CB6.5060607@linaro.org> <5175A1B8.1090202@gmail.com>
+Message-ID: <5176B82A.9070003@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+On 04/22/13 13:46, Rob Herring wrote:
+> On 04/22/2013 12:00 PM, John Stultz wrote:
+>> On 04/19/2013 05:29 PM, Stephen Boyd wrote:
+>>> This is what I was thinking. I don't see why we can't move this to
+>>> generic code and have arm64 use it too. Those patches will follow once
+>>> I find an arm64
+>>> compiler.
+>> I think moving this to generic code sounds like a good idea. You could
+>> probably also prototype and test the 64bit code with x86_64, using the
+>> TSC counter.
+> I agree this should all be common, but I'd like to see the common
+> version first. That is not going to make it for 3.10. For 3.10, the
+> immediate need is to fix suspend and initial time for the arch timer. I
+> think this should be fixed locally in arch timer code for 3.10. The
+> alternative is to revert linux-next commit 023796b9be3a77481cd5 (ARM:
+> arch_timer: use full 64-bit counter for sched_clock) which will cause
+> the arch timer to not be used as sched_clock if another higher frequency
+> sched_clock is registered.
 
-This is a set of bug fixes for build errors and warnings I am
-seeing in the various defconfigs and/or allmodconfig builds
-on linux-next. The majority of these showed up because we now
-include a lot more platforms in allmodconfig than we used to.
-
-Please apply to appropriate maintainer trees or provide
-feedback, I can take care of the rest sending those through
-arm-soc that I get no feedback on.
-
-	Arnd
-
-Arnd Bergmann (21):
-  Turn off -Wmaybe-uninitialized when building with -Os
-  ARM: compressed/head.S: work around new binutils warning
-  ARM: use optimized do_div only for EABI
-  ARM: kvm: define KVM_ARM_MAX_VCPUS unconditionally
-  ARM: OMAP2+: add dependencies on ARCH_MULTI_V6/V7
-  ARM: tegra: call cpu_do_idle from C code
-  ARM: tegra: unify tegra_idle_device definitions
-  ASoC: ux500: forward declare msp_i2s_platform_data
-  spi/sirf: fix MODULE_DEVICE_TABLE
-  ssb: fix alignment of struct bcma_device_id
-  drm/tilcdc: use only a single module device table
-  mmc: sdhci-tegra: fix MODULE_DEVICE_TABLE
-  misc: mark spear13xx-pcie-gadget as broken
-  staging: nvec: allow modular build
-  staging: comedi/dawboard2000: use mdelay for large delays
-  staging/zsmalloc: don't use pgtable-mapping from modules
-  tty/serial/sirf: fix MODULE_DEVICE_TABLE
-  usb: phy: tegra: don't call into tegra-ehci directly
-  usb: phy: don't mark usb_bind_phy as __init
-  MFD: ab8500: export ab8500_gpadc_sw_hw_convert properly
-  mtd: omap2: allow bulding as a module
-
- Makefile                                      |  2 +-
- arch/arm/boot/compressed/Makefile             |  2 +-
- arch/arm/boot/compressed/head.S               | 12 ++++++++++++
- arch/arm/include/asm/div64.h                  |  2 +-
- arch/arm/kvm/Kconfig                          |  6 +++---
- arch/arm/mach-omap2/Kconfig                   |  5 +++++
- arch/arm/mach-tegra/cpuidle-tegra114.c        |  5 ++---
- arch/arm/mach-tegra/cpuidle-tegra20.c         |  4 +---
- arch/arm/mach-tegra/cpuidle-tegra30.c         |  4 +---
- arch/arm/mach-tegra/cpuidle.c                 |  2 ++
- arch/arm/mach-tegra/cpuidle.h                 |  4 ++++
- arch/arm/mach-tegra/pm.c                      |  5 +++++
- arch/arm/mach-tegra/sleep-tegra20.S           |  2 +-
- drivers/gpu/drm/tilcdc/tilcdc_panel.c         |  1 -
- drivers/gpu/drm/tilcdc/tilcdc_slave.c         |  1 -
- drivers/gpu/drm/tilcdc/tilcdc_tfp410.c        |  1 -
- drivers/mfd/ab8500-gpadc.c                    |  2 +-
- drivers/misc/Kconfig                          |  2 +-
- drivers/mmc/host/sdhci-tegra.c                |  2 +-
- drivers/mtd/nand/Kconfig                      |  2 +-
- drivers/spi/spi-sirf.c                        |  2 +-
- drivers/staging/comedi/drivers/daqboard2000.c | 14 +++++++-------
- drivers/staging/nvec/Kconfig                  | 10 +++++-----
- drivers/staging/zsmalloc/zsmalloc-main.c      |  2 +-
- drivers/tty/serial/sirfsoc_uart.c             |  2 +-
- drivers/usb/host/ehci-tegra.c                 | 10 +++++-----
- drivers/usb/otg/otg.c                         |  2 +-
- drivers/usb/phy/tegra_usb_phy.c               | 13 +++++++++----
- include/linux/mod_devicetable.h               |  5 +++--
- include/linux/usb/tegra_usb_phy.h             | 10 +++++-----
- sound/soc/ux500/ux500_msp_i2s.h               |  1 +
- 31 files changed, 82 insertions(+), 55 deletions(-)
+This would make sense to me if we were already in the 3.10-rc1 or rc2
+phase, but this code isn't even in Linus' tree yet. Why can't we just
+fix it properly before sending off to Linus? Obviously this is up to the
+maintainers to decide, so if we can't fix it properly with this patch
+series I propose we revert like you say.
 
 -- 
-1.8.1.2
-
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: Dave Airlie <airlied@linux.ie>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Mark Brown <broonie@kernel.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Cc: Stephen Warren <swarren@nvidia.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Viresh Kumar <viresh.kumar@st.com>
-Cc: alsa-devel at alsa-project.org
-Cc: dri-devel at lists.freedesktop.org
-Cc: linux-mtd at lists.infradead.org
-Cc: linux-usb at vger.kernel.org
-Cc: spi-devel-general at lists.sourceforge.net
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
