@@ -1,28 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 23 Apr 2013 12:20:34 +0100
-Subject: [PATCH V2 0/4] arm64: Initial patch-set for APM X-Gene SOC family
-In-Reply-To: <1366712759-3431-1-git-send-email-vkale@apm.com>
-References: <1366712759-3431-1-git-send-email-vkale@apm.com>
-Message-ID: <20130423112034.GE23407@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 23 Apr 2013 19:47:42 +0800
+Subject: [PATCH 3/3] pinctrl: add MVF pinctrl driver
+In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E851B17D9@039-SN1MPN1-003.039d.mgd.msft.net>
+References: <1365753432-14247-1-git-send-email-b35083@freescale.com>
+ <20130422145727.GA27475@S2101-09.ap.freescale.net>
+ <B56CDBE15CE27145A4B77D2D24263E851B17D9@039-SN1MPN1-003.039d.mgd.msft.net>
+Message-ID: <20130423114740.GC27475@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinayak,
+On Tue, Apr 23, 2013 at 10:09:46AM +0000, Lu Jingchang-B35083 wrote:
+> >> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> >> ---
+> >>  .../bindings/pinctrl/fsl,mvf-pinctrl.txt           |  825 ++++++++
+> >>  drivers/pinctrl/Kconfig                            |    8 +
+> >>  drivers/pinctrl/Makefile                           |    1 +
+> >>  drivers/pinctrl/pinctrl-mvf.c                      | 2042
+> >++++++++++++++++++++
+> >
+> >We just removed those big arrays of imx_pin_reg from imx pinctrl soc
+> >drivers.  Please do not bring it back for MVF.
+> >
+> [Lu Jingchang-B35083] 
+> What's the status of your new i.mx pinctrl framework? I found that there are some discussion for that, Are they accepted? Where can I find the latest code so I can use it as the base for MVF platform? Thanks.
+> 
+It's on linux-next right now, and should be merged in the coming 3.10
+window.
 
-On Tue, Apr 23, 2013 at 11:25:55AM +0100, Vinayak Kale wrote:
-> These are initial patches for APM X-Gene SOC family.
-> This patch-set is based on soc-armv8-model branch of
-> git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git
-
-The patches look ok to me but let's see if there are any other comments
-on the dts files.
-
-Since we go with a common defconfig, I'll drop the vexpress_defconfig as
-well. There are dependencies on GIC and some other vexpress patches to
-go into mainline before I can push my soc-armv8-model changes. I'll
-queue your patches for 3.11 (after this merging window).
-
-Thanks.
-
--- 
-Catalin
+Shawn
