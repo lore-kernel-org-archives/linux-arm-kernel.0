@@ -1,53 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 23 Apr 2013 15:34:26 +0800
-Subject: [RFC PATCH v2 05/13] ARM: mach-imx: cpus/cpu nodes dts updates
-In-Reply-To: <1366644455-16550-6-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366644455-16550-6-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130423073425.GB27475@S2101-09.ap.freescale.net>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 23 Apr 2013 09:41:02 +0200
+Subject: [RFC][PATCH] video: imx: Select VIDEOMODE_HELPERS
+In-Reply-To: <201304230157.47992.marex@denx.de>
+References: <1366666110-9585-1-git-send-email-marex@denx.de>
+ <CAOMZO5Av8RyptoxAQ13Psxjjd4nhHVbEJoVm6SqyLr55bPmSng@mail.gmail.com>
+ <201304230157.47992.marex@denx.de>
+Message-ID: <1366702862.4365.2.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 04:27:27PM +0100, Lorenzo Pieralisi wrote:
-> This patch updates the in-kernel dts files according to the latest cpus
-> and cpu bindings updates for ARM.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Hi Marek,
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Am Dienstag, den 23.04.2013, 01:57 +0200 schrieb Marek Vasut:
+> Dear Fabio Estevam,
+> 
+> > Hi Marek,
+> > 
+> > On Mon, Apr 22, 2013 at 6:28 PM, Marek Vasut <marex@denx.de> wrote:
+> > > Without this, I get the following problem when building kernel:
+> > > 
+> > > drivers/built-in.o: In function `imx_pd_connector_get_modes':
+> > > /linux-2.6/drivers/staging/imx-drm/parallel-display.c:78: undefined
+> > > reference to `of_get_drm_display_mode' make: *** [vmlinux] Error 1
+> > > 
+> > > NOTE: I think this patch is almost absolutely not correct.
+> > > 
+> > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > Patch looks good, but you should have copied Greg Kroah-Hartman, as he
+> > is the one who takes patches into staging.
+> 
+> I'm not sure if the select is at correct symbol, I dont think it is.
 
-> ---
->  arch/arm/boot/dts/imx23.dtsi | 2 +-
->  arch/arm/boot/dts/imx28.dtsi | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-> index 56afcf4..d98330c 100644
-> --- a/arch/arm/boot/dts/imx23.dtsi
-> +++ b/arch/arm/boot/dts/imx23.dtsi
-> @@ -24,7 +24,7 @@
->  
->  	cpus {
->  		cpu at 0 {
-> -			compatible = "arm,arm926ejs";
-> +			compatible = "arm,arm926";
->  		};
->  	};
->  
-> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> index 7ba4966..8c5a3ba 100644
-> --- a/arch/arm/boot/dts/imx28.dtsi
-> +++ b/arch/arm/boot/dts/imx28.dtsi
-> @@ -33,7 +33,7 @@
->  
->  	cpus {
->  		cpu at 0 {
-> -			compatible = "arm,arm926ejs";
-> +			compatible = "arm,arm926";
->  		};
->  	};
->  
-> -- 
-> 1.7.12
-> 
-> 
+OF_VIDEOMODE is the correct one. The implementation of
+of_get_drm_display_mode in drivers/gpu/drm/drm_modes.c depends on it.
+
+regards
+Philipp
