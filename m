@@ -1,42 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Apr 2013 21:07:21 +0200
-Subject: [PATCH v2] usb: phy: don't mark usb_bind_phy as __init
-In-Reply-To: <20130423171734.GA31432@kroah.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 23 Apr 2013 15:07:35 -0400
+Subject: [PATCH 12/21] mmc: sdhci-tegra: fix MODULE_DEVICE_TABLE
+In-Reply-To: <201304232055.32715.arnd@arndb.de> (Arnd Bergmann's message of
+ "Tue, 23 Apr 2013 20:55:32 +0200")
 References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
- <1366734653-488286-20-git-send-email-arnd@arndb.de>
- <20130423171734.GA31432@kroah.com>
-Message-ID: <201304232107.22084.arnd@arndb.de>
+ <1366734653-488286-13-git-send-email-arnd@arndb.de>
+ <87bo95tctk.fsf@octavius.laptop.org>
+ <201304232055.32715.arnd@arndb.de>
+Message-ID: <8738uht6a0.fsf@octavius.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It makes no sense for a symbol to be both exported and marked __init,
-because any users in modules would be calling this function after
-it gets discarded. Further, this patch revolves a section mismatch
-warning from usbhs_init_phys(), which is intentionally not marked
-__init:
+Hi,
 
-WARNING: vmlinux.o(.text+0x413f8): Section mismatch in reference from
-the function usbhs_init_phys() to the function .init.text:usb_bind_phy()
+On Tue, Apr 23 2013, Arnd Bergmann wrote:
+>> I was going to take this, but it doesn't apply to mmc-next or
+>> linux-next, because the #endif in your first line of context isn't
+>> present in those trees -- which tree is this based on?
+>
+> I based it on 3.9-rc8.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: linux-usb at vger.kernel.org
----
+Thanks, I should have thought of that; applied to mmc-next for 3.10.
 
-v2: rebased on linux-next
-
-diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
-index f52c006..a9984c7 100644
---- a/drivers/usb/phy/phy.c
-+++ b/drivers/usb/phy/phy.c
-@@ -413,7 +413,7 @@ EXPORT_SYMBOL_GPL(usb_remove_phy);
-  *
-  * To be used by platform specific initialization code.
-  */
--int __init usb_bind_phy(const char *dev_name, u8 index,
-+int usb_bind_phy(const char *dev_name, u8 index,
- 				const char *phy_dev_name)
- {
- 	struct usb_phy_bind *phy_bind;
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
