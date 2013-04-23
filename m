@@ -1,39 +1,149 @@
-From: arjan@linux.intel.com (Arjan van de Ven)
-Date: Tue, 23 Apr 2013 08:30:58 -0700
-Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
-In-Reply-To: <5175F09E.1000304@intel.com>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
- <1364302359.5053.21.camel@laptop>
- <CAKfTPtD=_oS5gJeynUG=ft-Y1zEdxZEMhUPH9hSXx+H2pi4xgA@mail.gmail.com>
- <1364308932.5053.46.camel@laptop>
- <CAKfTPtArtgkH5MU_xFAKjLDS-i32g2qQMdvyW=LLkG84tH8Hhg@mail.gmail.com>
- <5174CE96.3060805@linux.vnet.ibm.com>
- <CAKfTPtCCCifC=c+xjjnAH_HSqkR80PiQoddQKXPHuZwZawbvcA@mail.gmail.com>
- <5175F09E.1000304@intel.com>
-Message-ID: <5176A932.5050506@linux.intel.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 23 Apr 2013 19:39:01 +0400
+Subject: [PATCH v6 8/9] ARM: shmobile: Marzen: pass platform data to USB PHY
+ device
+In-Reply-To: <201304231911.56202.sergei.shtylyov@cogentembedded.com>
+References: <201304231911.56202.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201304231939.02407.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/22/2013 7:23 PM, Alex Shi wrote:
-> Thanks you, Preeti and Vincent to talk the power aware scheduler for
-> details! believe this open discussion is helpful to conduct a a more
-> comprehensive solution. :)
->
->> Hi Preeti,
->>
->> I have had a look at Alex patches but i have some concerns with his patches
->> -There no notion of power domain which is quite important when we speak
->> about power saving IMHO. Packing tasks has got an interest if the idle
->> CPUs can reach a useful low power state independently from busy CPUs.
->> Architectures have different low power state capabilities which must be
->> taken into account. In addition, you can have system which have CPUs
->> with better power efficiency and this kind of system are not taken into
->> account.
->
-> I agree with you on this point. and like what's you done to add new flag
-> in sched domain.
+Since we're now going to setup the USBPCTRL0 register using the USB PHY device's
+platform data, we now need a way to pass those platform data from the board file
+to the device which is situated in setup-r8a7779.c -- and what I'm suggesting is
+r8a7779_add_usb_phy_device() that will register USB PHY platform device with the
+passed platform data using platform_device_register_resndata() call; creating
+this function involves deletion of 'usb_phy_device' from r8a7779_devices_dt[],
+so that it will no longer be registered for the generic R8A7779 machine (where
+we can't provide the platform data anyway), hence EHCI/OHCI drivers will fail
+to load as well.
 
-For x86 we should not be setting such flag then; we don't have a way for some cpu packages to
-go to an extra deep power state if they're completely idle.
-(this afaik is true for both Intel and AMD)
+For the Marzen board, this new function will be called from marzen_init() to
+register the USB PHY device early enough.
+
+Note that the board and the SoC code have to be in one patch to keep the code
+bisectable...
+
+The patch has been tested on the Marzen board.
+
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
+---
+Changes since version 5:
+- annotated USB PHY resources and platform data as '__initdata' since they're
+  kmemdup()'ed while registering the platform device anyway;
+- fixed typo in the changelog.
+
+Changes since version 4:
+- refreshed the patch.
+
+Changes since version 3:
+- removed the initializer for 'usb_phy_platform_data';
+- refreshed the 'board-marzen.c' file.
+
+Changes since version 2:
+- refreshed atop of the prior patches;
+- added a note about testing to the changelog;
+- added ACKs from Simon Horman and Kuninori Morimoto.
+
+Changes since the original posting:
+- added a note about bisectability to the changelog.
+
+ arch/arm/mach-shmobile/board-marzen.c         |    3 +++
+ arch/arm/mach-shmobile/include/mach/r8a7779.h |    2 ++
+ arch/arm/mach-shmobile/setup-r8a7779.c        |   18 +++++++++---------
+ 3 files changed, 14 insertions(+), 9 deletions(-)
+
+Index: renesas/arch/arm/mach-shmobile/board-marzen.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/board-marzen.c
++++ renesas/arch/arm/mach-shmobile/board-marzen.c
+@@ -57,6 +57,8 @@ static struct regulator_consumer_supply 
+ 	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
+ };
+ 
++static struct rcar_phy_platform_data usb_phy_platform_data __initdata;
++
+ /* SMSC LAN89218 */
+ static struct resource smsc911x_resources[] = {
+ 	[0] = {
+@@ -232,6 +234,7 @@ static void __init marzen_init(void)
+ 	r8a7779_init_irq_extpin(1); /* IRQ1 as individual interrupt */
+ 
+ 	r8a7779_add_standard_devices();
++	r8a7779_add_usb_phy_device(&usb_phy_platform_data);
+ 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
+ }
+ 
+Index: renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/include/mach/r8a7779.h
++++ renesas/arch/arm/mach-shmobile/include/mach/r8a7779.h
+@@ -4,6 +4,7 @@
+ #include <linux/sh_clk.h>
+ #include <linux/pm_domain.h>
+ #include <linux/sh_eth.h>
++#include <linux/usb/rcar-phy.h>
+ 
+ struct platform_device;
+ 
+@@ -33,6 +34,7 @@ extern void r8a7779_add_early_devices(vo
+ extern void r8a7779_add_standard_devices(void);
+ extern void r8a7779_add_standard_devices_dt(void);
+ extern void r8a7779_add_ether_device(struct sh_eth_plat_data *pdata);
++extern void r8a7779_add_usb_phy_device(struct rcar_phy_platform_data *pdata);
+ extern void r8a7779_init_late(void);
+ extern void r8a7779_clock_init(void);
+ extern void r8a7779_pinmux_init(void);
+Index: renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/setup-r8a7779.c
++++ renesas/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -389,7 +389,7 @@ static struct platform_device sata_devic
+ };
+ 
+ /* USB PHY */
+-static struct resource usb_phy_resources[] = {
++static struct resource usb_phy_resources[] __initdata = {
+ 	[0] = {
+ 		.start		= 0xffe70800,
+ 		.end		= 0xffe70900 - 1,
+@@ -397,13 +397,6 @@ static struct resource usb_phy_resources
+ 	},
+ };
+ 
+-static struct platform_device usb_phy_device = {
+-	.name		= "rcar_usb_phy",
+-	.id		= -1,
+-	.resource	= usb_phy_resources,
+-	.num_resources	= ARRAY_SIZE(usb_phy_resources),
+-};
+-
+ /* USB */
+ static struct usb_phy *phy;
+ 
+@@ -575,7 +568,6 @@ static struct platform_device *r8a7779_d
+ 	&scif5_device,
+ 	&tmu00_device,
+ 	&tmu01_device,
+-	&usb_phy_device,
+ };
+ 
+ static struct platform_device *r8a7779_standard_devices[] __initdata = {
+@@ -610,6 +602,14 @@ void __init r8a7779_add_ether_device(str
+ 					  pdata, sizeof(*pdata));
+ }
+ 
++void __init r8a7779_add_usb_phy_device(struct rcar_phy_platform_data *pdata)
++{
++	platform_device_register_resndata(&platform_bus, "rcar_usb_phy", -1,
++					  usb_phy_resources,
++					  ARRAY_SIZE(usb_phy_resources),
++					  pdata, sizeof(*pdata));
++}
++
+ /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
+ void __init __weak r8a7779_register_twd(void) { }
+ 
