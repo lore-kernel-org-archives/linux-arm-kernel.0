@@ -1,64 +1,75 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 23 Apr 2013 20:03:41 +0400
-Subject: [PATCH v5 3/3] ARM: shmobile: BOCK-W: add USB support
-In-Reply-To: <201304231953.42505.sergei.shtylyov@cogentembedded.com>
-References: <201304231953.42505.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201304232003.41838.sergei.shtylyov@cogentembedded.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 23 Apr 2013 19:07:59 +0300
+Subject: [PATCH] usb: phy: phy core cannot yet be a module
+In-Reply-To: <1366732475-479886-2-git-send-email-arnd@arndb.de>
+References: <1366732475-479886-1-git-send-email-arnd@arndb.de>
+ <1366732475-479886-2-git-send-email-arnd@arndb.de>
+Message-ID: <20130423160759.GF15177@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the USB PHY device from bockw_init(), passing the platform  data to it.
-Set machine's init_late() method to r8a7778_init_late() in order for [EO]HCI to
-get registered too...
+Hi,
 
-The patch has been tested on the BOCK-W board.
+On Tue, Apr 23, 2013 at 05:54:32PM +0200, Arnd Bergmann wrote:
+> A lot of platform code calls into the usb phy core at the moment, which
+> does not work if it is built as a loadable module. This will hopefully
+> change when those platforms are all converted to DT based probing,
+> but for now, the easiest solution is to change it from "tristate"
+> to "bool".
+> 
+> This solves at least these ARM allmodconfig build errors:
+> 
+> arch/arm/mach-imx/built-in.o: In function `imx_otg_ulpi_create':
+> arch/arm/mach-imx/ulpi.c:117: undefined reference to `otg_ulpi_create'
+> arch/arm/mach-omap2/built-in.o: In function `usbhs_init_phys':
+> arch/arm/mach-omap2/usb-host.c:652: undefined reference to `usb_bind_phy'
+> arch/arm/mach-omap2/built-in.o: In function `omap_2430sdp_init':
+> arch/arm/mach-omap2/board-2430sdp.c:236: undefined reference to `usb_bind_phy'
+> arch/arm/mach-omap2/built-in.o: In function `omap3_beagle_init':
+> arch/arm/mach-omap2/board-omap3beagle.c:554: undefined reference to `usb_bind_phy'
+> arch/arm/mach-omap2/built-in.o: In function `devkit8000_init':
+> arch/arm/mach-omap2/board-devkit8000.c:596: undefined reference to `usb_bind_phy'
+> arch/arm/mach-omap2/built-in.o: In function `omap_ldp_init':
+> arch/arm/mach-omap2/board-ldp.c:379: undefined reference to `usb_bind_phy'
+> drivers/built-in.o: In function `ab8500_charger_probe':
+> drivers/power/ab8500_charger.c:3629: undefined reference to `usb_get_phy'
+> drivers/power/ab8500_charger.c:3706: undefined reference to `usb_put_phy'
+> drivers/built-in.o: In function `ab8500_charger_remove':
+> drivers/power/ab8500_charger.c:3411: undefined reference to `usb_put_phy'
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: linux-usb at vger.kernel.org
+> ---
+>  drivers/usb/phy/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
+> index 21153d1..371d0e7 100644
+> --- a/drivers/usb/phy/Kconfig
+> +++ b/drivers/usb/phy/Kconfig
+> @@ -2,7 +2,7 @@
+>  # Physical Layer USB driver configuration
+>  #
+>  menuconfig USB_PHY
+> -	tristate "USB Physical Layer drivers"
+> +	bool "USB Physical Layer drivers"
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+looks like this is the only way, indeed. Do you need on the merge window
+on can this wait until -rc1 ? I just sent a pull request to Greg with
+urgent fixes for the merge window.
 
----
-Changes since version 4:
-- annotated 'usb_phy_platform_data' as '__initdata' since it's kmemdup()'ed
-  while registering the platform device anyway;
-- refreshed the patch.
+Greg, if you want to take this one as a patch, go for it:
 
-Changes since version 3:
-- removed initializer for 'usb_phy_platform_data' letting it be set to all 0s;
-- refreshed the patch.
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-Changes since version 2:
-- refreshed the patch.
-
-Changes since the original posting:
-- removed initializer for no longer existing field in 'usb_phy_platform_data',
-  modified the comment to the 'ferrite_bead' field initializer.
-
- arch/arm/mach-shmobile/board-bockw.c |    4 ++++
- 1 file changed, 4 insertions(+)
-
-Index: renesas/arch/arm/mach-shmobile/board-bockw.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
-+++ renesas/arch/arm/mach-shmobile/board-bockw.c
-@@ -63,6 +63,8 @@ static struct sh_mobile_sdhi_info sdhi0_
- 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
- };
- 
-+static struct rcar_phy_platform_data usb_phy_platform_data __initdata;
-+
- static const struct pinctrl_map bockw_pinctrl_map[] = {
- 	/* SCIF0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
-@@ -91,6 +93,7 @@ static void __init bockw_init(void)
- 	r8a7778_clock_init();
- 	r8a7778_init_irq_extpin(1);
- 	r8a7778_add_standard_devices();
-+	r8a7778_add_usb_phy_device(&usb_phy_platform_data);
- 
- 	pinctrl_register_mappings(bockw_pinctrl_map,
- 				  ARRAY_SIZE(bockw_pinctrl_map));
-@@ -146,4 +149,5 @@ DT_MACHINE_START(BOCKW_DT, "bockw")
- 	.init_machine	= bockw_init,
- 	.init_time	= shmobile_timer_init,
- 	.dt_compat	= bockw_boards_compat_dt,
-+	.init_late      = r8a7778_init_late,
- MACHINE_END
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130423/036f247a/attachment.sig>
