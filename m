@@ -1,209 +1,88 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 23 Apr 2013 08:05:30 -0500
-Subject: [PATCH V2 4/4] arm64: Add initial DTS for APM X-Gene Storm SOC
- and APM Mustang board
-In-Reply-To: <1366712759-3431-5-git-send-email-vkale@apm.com>
-References: <1366712759-3431-1-git-send-email-vkale@apm.com>
- <1366712759-3431-5-git-send-email-vkale@apm.com>
-Message-ID: <5176871A.4040209@gmail.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 23 Apr 2013 15:07:55 +0200
+Subject: BUG: Re: [PATCH v2 3/3] clocksource: use
+ clockevents_config_and_register() where possible
+In-Reply-To: <1357991406-22778-4-git-send-email-shawn.guo@linaro.org>
+References: <1357991406-22778-1-git-send-email-shawn.guo@linaro.org>
+ <1357991406-22778-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <517687AB.1040309@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2013 05:25 AM, Vinayak Kale wrote:
-> This patch adds initial DTS files required for APM Mustang board.
-> 
-> Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
-> Signed-off-by: Loc Ho <lho@apm.com>
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> ---
->  arch/arm64/boot/dts/Makefile        |    1 +
->  arch/arm64/boot/dts/apm-mustang.dts |   27 ++++++++
->  arch/arm64/boot/dts/apm-storm.dtsi  |  116 +++++++++++++++++++++++++++++++++++
+Hello,
 
-Well, you renamed the files, but did not address any of my other comments.
-
->  3 files changed, 144 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/apm-mustang.dts
->  create mode 100644 arch/arm64/boot/dts/apm-storm.dtsi
+On 01/12/2013 12:50 PM, Shawn Guo wrote:
+> The clockevent core is able to figure out the best mult and shift,
+> calculate min_delta_ns and max_delta_ns, with the necessary info passed
+> into clockevents_config_and_register().  Use this combined configure
+> and register function where possible to make the codes less error prone
+> and gain some positive diff stat.
 > 
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index 68457e9..c52bdb0 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -1,4 +1,5 @@
->  dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
-> +dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Andres Salomon <dilinger@queued.net>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+[...]
+
+I just bisected a timer problem down to this commit.
+
+> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> index 32cb929..8a61872 100644
+> --- a/drivers/clocksource/tcb_clksrc.c
+> +++ b/drivers/clocksource/tcb_clksrc.c
+> @@ -157,7 +157,6 @@ static struct tc_clkevt_device clkevt = {
+>  		.name		= "tc_clkevt",
+>  		.features	= CLOCK_EVT_FEAT_PERIODIC
+>  					| CLOCK_EVT_FEAT_ONESHOT,
+> -		.shift		= 32,
+>  		/* Should be lower than at91rm9200's system timer */
+>  		.rating		= 125,
+>  		.set_next_event	= tc_next_event,
+> @@ -196,13 +195,9 @@ static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
 >  
->  targets += dtbs
->  targets += $(dtb-y)
-> diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
-> new file mode 100644
-> index 0000000..625322c
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/apm-mustang.dts
-> @@ -0,0 +1,27 @@
-> +/*
-> + * dts file for AppliedMicro (APM) Mustang Board
-> + *
-> + * Copyright (C) 2013, Applied Micro Circuits Corporation
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +/include/ "apm-storm.dtsi"
-> +
-> +/ {
-> +	model = "mustang";
+>  	timer_clock = clk32k_divisor_idx;
+>  
+> -	clkevt.clkevt.mult = div_sc(32768, NSEC_PER_SEC, clkevt.clkevt.shift);
+> -	clkevt.clkevt.max_delta_ns
+> -		= clockevent_delta2ns(0xffff, &clkevt.clkevt);
+> -	clkevt.clkevt.min_delta_ns = clockevent_delta2ns(1, &clkevt.clkevt) + 1;
+                                                                           ^^^^^^
 
-This should/can be a more descriptive string.
+With this patch, the "+ 1" gets lost, resulting in a different
+"min_delta_ns".
 
-You need a compatible field for the board.
+good:
+setup_clkevents: shift=32 mult=140737 min=30518 max=1999976422
 
-> +
-> +	chosen {
-> +		linux,stdout-path = &serial0;
+bad:
+setup_clkevents: shift=32 mult=140737 min=30517 max=1999976422
 
-See my prior comment.
+This leads to problems with schedule_delayed_work() with a delay of
+"1". These worksqueues seem to be hanging for several seconds. I'll
+send a RFC patch.
 
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
-> +	};
-> +};
-> diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-> new file mode 100644
-> index 0000000..d3f3f5d
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/apm-storm.dtsi
-> @@ -0,0 +1,116 @@
-> +/*
-> + * dts file for AppliedMicro (APM) X-Gene Storm SOC
-> + *
-> + * Copyright (C) 2013, Applied Micro Circuits Corporation
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
-> + */
-> +
-> +/ {
-> +	compatible = "apm,xgene,storm", "apm,xgene";
-
-This still needs documentation. "apm,xgene-storm" would be more in line
-with convention. apm,xgene collides with the cpu name. Is xgene the soc
-or cpu core? Use the soc name here.
-
-Rob
-
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	cpus {
-> +		#address-cells = <2>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 000 {
-> +			device_type = "cpu";
-> +			compatible = "apm,xgene", "arm,armv8";
-> +			reg = <0x0 0x000>;
-> +			enable-method = "spin-table";
-> +			cpu-release-addr = <0x1 0x0000fff8>;
-> +		};
-> +		cpu at 001 {
-> +			device_type = "cpu";
-> +			compatible = "apm,xgene", "arm,armv8";
-> +			reg = <0x0 0x001>;
-> +			enable-method = "spin-table";
-> +			cpu-release-addr = <0x1 0x0000fff8>;
-> +		};
-> +		cpu at 100 {
-> +			device_type = "cpu";
-> +			compatible = "apm,xgene", "arm,armv8";
-> +			reg = <0x0 0x100>;
-> +			enable-method = "spin-table";
-> +			cpu-release-addr = <0x1 0x0000fff8>;
-> +		};
-> +		cpu at 101 {
-> +			device_type = "cpu";
-> +			compatible = "apm,xgene", "arm,armv8";
-> +			reg = <0x0 0x101>;
-> +			enable-method = "spin-table";
-> +			cpu-release-addr = <0x1 0x0000fff8>;
-> +		};
-> +		cpu at 200 {
-> +			device_type = "cpu";
-> +			compatible = "apm,xgene", "arm,armv8";
-> +			reg = <0x0 0x200>;
-> +			enable-method = "spin-table";
-> +			cpu-release-addr = <0x1 0x0000fff8>;
-> +		};
-> +		cpu at 201 {
-> +			device_type = "cpu";
-> +			compatible = "apm,xgene", "arm,armv8";
-> +			reg = <0x0 0x201>;
-> +			enable-method = "spin-table";
-> +			cpu-release-addr = <0x1 0x0000fff8>;
-> +		};
-> +		cpu at 300 {
-> +			device_type = "cpu";
-> +			compatible = "apm,xgene", "arm,armv8";
-> +			reg = <0x0 0x300>;
-> +			enable-method = "spin-table";
-> +			cpu-release-addr = <0x1 0x0000fff8>;
-> +		};
-> +		cpu at 301 {
-> +			device_type = "cpu";
-> +			compatible = "apm,xgene", "arm,armv8";
-> +			reg = <0x0 0x301>;
-> +			enable-method = "spin-table";
-> +			cpu-release-addr = <0x1 0x0000fff8>;
-> +		};
-> +	};
-> +
-> +	gic: interrupt-controller at 78010000 {
-> +		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
-> +		#interrupt-cells = <3>;
-> +		interrupt-controller;
-> +		reg = <0x0 0x78010000 0x0 0x1000>,	/* GIC Dist */
-> +		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU */
-> +		      <0x0 0x78040000 0x0 0x2000>,	/* GIC VCPU Control */
-> +		      <0x0 0x78060000 0x0 0x2000>;	/* GIC VCPU */
-> +		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <1 0 0xff01>,	/* Secure Phys IRQ */
-> +			     <1 13 0xff01>,	/* Non-secure Phys IRQ */
-> +			     <1 14 0xff01>,	/* Virt IRQ */
-> +			     <1 15 0xff01>;	/* Hyp IRQ */
-> +		clock-frequency = <50000000>;
-> +	};
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		serial0: serial at 1c020000 {
-> +			device_type = "serial";
-> +			compatible = "ns16550";
-> +			reg = <0 0x1c020000 0x0 0x1000>;
-> +			reg-shift = <2>;
-> +			clock-frequency = <10000000>; /* Updated by bootloader */
-> +			interrupt-parent = <&gic>;
-> +			interrupts = <0x0 0x4c 0x4>;
-> +		};
-> +	};
-> +};
+>  	clkevt.clkevt.cpumask = cpumask_of(0);
+>  
+> -	clockevents_register_device(&clkevt.clkevt);
+> +	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
+>  
+>  	setup_irq(irq, &tc_irqaction);
+>  }
 > 
+
+Marc
+
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130423/63f7b390/attachment.sig>
