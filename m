@@ -1,23 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 23 Apr 2013 20:42:37 +0100
-Subject: [PATCH v4 15/15] ARM: vexpress: Select multi-cluster SMP
- operation if required
-In-Reply-To: <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <1360041732-17936-16-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <20130423194237.GE5316@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Apr 2013 21:46:19 +0200
+Subject: [PATCH v2] usb: phy: don't mark usb_bind_phy as __init
+In-Reply-To: <20130423193046.GC13453@arwen.pp.htv.fi>
+References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
+ <201304232107.22084.arnd@arndb.de> <20130423193046.GC13453@arwen.pp.htv.fi>
+Message-ID: <201304232146.20011.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Feb 05, 2013 at 12:22:12AM -0500, Nicolas Pitre wrote:
-> +void __init vexpress_smp_init_ops(void)
-> +{
-> +	struct smp_operations *ops = &vexpress_smp_ops;
-> +#ifdef CONFIG_CLUSTER_PM
-> +	extern struct smp_operations mcpm_smp_ops;
-> +	if(of_find_compatible_node(NULL, NULL, "arm,cci"))
-> +		ops = &mcpm_smp_ops;
+On Tuesday 23 April 2013, Felipe Balbi wrote:
+> On Tue, Apr 23, 2013 at 09:07:21PM +0200, Arnd Bergmann wrote:
+> > It makes no sense for a symbol to be both exported and marked __init,
+> > because any users in modules would be calling this function after
+> > it gets discarded. Further, this patch revolves a section mismatch
+> > warning from usbhs_init_phys(), which is intentionally not marked
+> > __init:
+> > 
+> > WARNING: vmlinux.o(.text+0x413f8): Section mismatch in reference from
+> > the function usbhs_init_phys() to the function .init.text:usb_bind_phy()
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Alan Stern <stern@rowland.harvard.edu>
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Cc: linux-usb at vger.kernel.org
+> > ---
+> > 
+> > v2: rebased on linux-next
+> 
+> not needed, Greg already has a patch doing exactly this in usb-next.
 
-Hmm, so these patches haven't been subjected to checkpatch treatment?
-As a seasoned kernel programmer, I'm surprised you haven't checked that
-already.
+Right, I see it now. I had checked today's linux-next but not usb-next
+or any of the other trees for stuff that was just applied today.
+
+	Arnd
