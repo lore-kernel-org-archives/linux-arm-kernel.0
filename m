@@ -1,42 +1,47 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 23 Apr 2013 11:47:06 -0700
-Subject: [GIT PULL] OMAP PM cleanups for v3.10
-In-Reply-To: <20130423175934.GA6728@quad.lixom.net> (Olof Johansson's message
- of "Tue, 23 Apr 2013 10:59:34 -0700")
-References: <87ehej1ena.fsf@linaro.org> <20130410181452.GG10155@atomide.com>
- <20130423175934.GA6728@quad.lixom.net>
-Message-ID: <8761zd6q51.fsf@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 23 Apr 2013 20:55:32 +0200
+Subject: [PATCH 12/21] mmc: sdhci-tegra: fix MODULE_DEVICE_TABLE
+In-Reply-To: <87bo95tctk.fsf@octavius.laptop.org>
+References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
+ <1366734653-488286-13-git-send-email-arnd@arndb.de>
+ <87bo95tctk.fsf@octavius.laptop.org>
+Message-ID: <201304232055.32715.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson <olof@lixom.net> writes:
+The symbol referenced in MODULE_DEVICE_TABLE must match the actual
+table, otherwise we get a build error like
 
-> On Wed, Apr 10, 2013 at 11:14:52AM -0700, Tony Lindgren wrote:
->> Hi,
->> 
->> Added Olof to cc, I suggest Olof pull this directly as we're starting
->> to run out of time.
->
-> Hi,
->
-> I'm terribly sorry for dropping this one on the floor, in spite of repeated
-> pings from Tony. :(
+sdhci-tegra.c:206:34: error: '__mod_of_device_table' aliased to undefined symbol 'sdhci_dt_ids'
 
-Your sins will be absolved by the beer you hand me at the next
-conference. ;)
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Chris Ball <cjb@laptop.org>
+---
+On Tuesday 23 April 2013, Chris Ball wrote:
 
-> If it wasn't for the fact that we're pushing back on some of the other
-> late submissions I'd be open to taking this, but to be fair it makes
-> more sense to merge it right after -rc1. The changes don't look like
-> they're truly critical for 3.10, and you should still be able to use
-> this as a base for your 3.11 changes, so hopefully this doesn't cause
-> too much trouble.
+> I was going to take this, but it doesn't apply to mmc-next or
+> linux-next, because the #endif in your first line of context isn't
+> present in those trees -- which tree is this based on?
 
-Yeah, this is mostly cleanup in preparation for OMAP5, so not extrememly
-urgent.
+I based it on 3.9-rc8.
 
-> So, please resend right after the merge window closes.
+> Sounds like it might make more sense for you to take this; if so:
+> Acked-by: Chris Ball <cjb@laptop.org>
 
-OK, will do.
+This is the rebased version on linux-next. I think it's better if you
+take it, otherwise we just create a merge conflict for Linus.
 
-Kevin
+diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+index 45048d1..e0dba74 100644
+--- a/drivers/mmc/host/sdhci-tegra.c
++++ b/drivers/mmc/host/sdhci-tegra.c
+@@ -203,7 +203,7 @@ static const struct of_device_id sdhci_tegra_dt_match[] = {
+ 	{ .compatible = "nvidia,tegra20-sdhci", .data = &soc_data_tegra20 },
+ 	{}
+ };
+-MODULE_DEVICE_TABLE(of, sdhci_dt_ids);
++MODULE_DEVICE_TABLE(of, sdhci_tegra_dt_match);
+ 
+ static void sdhci_tegra_parse_dt(struct device *dev)
+ {
