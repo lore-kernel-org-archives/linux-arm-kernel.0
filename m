@@ -1,73 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Apr 2013 18:30:46 +0200
-Subject: [PATCH 14/21] staging: nvec: allow modular build
+Date: Tue, 23 Apr 2013 18:30:52 +0200
+Subject: [PATCH 20/21] MFD: ab8500: export ab8500_gpadc_sw_hw_convert properly
 In-Reply-To: <1366734653-488286-1-git-send-email-arnd@arndb.de>
 References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
-Message-ID: <1366734653-488286-15-git-send-email-arnd@arndb.de>
+Message-ID: <1366734653-488286-21-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The serio code can be a loadable module, which in turn means that nvec
-also has to be a module, so mark it as "tristate" in Kconfig.
+Apparently the ab8500_gpadc_sw_hw_convert function got renamed
+from ab8500_gpadc_convert to ab8500_gpadc_sw_hw_convert in
+commit 734823462 "mfd: ab8500-gpadc: Add gpadc hw conversion",
+but the export for this function did not get changed at the
+same time, causing this allyesconfig error:
 
-drivers/built-in.o: In function `nvec_mouse_remove':
-drivers/staging/nvec/nvec_ps2.c:136: undefined reference to `serio_unregister_port'
-drivers/built-in.o: In function `nvec_mouse_probe':
-drivers/staging/nvec/nvec_ps2.c:126: undefined reference to `__serio_register_port'
-drivers/built-in.o: In function `nvec_ps2_notifier':
-drivers/staging/nvec/nvec_ps2.c:84: undefined reference to `serio_interrupt'
-drivers/staging/nvec/nvec_ps2.c:91: undefined reference to `serio_interrupt'
+ERROR: "ab8500_gpadc_sw_hw_convert" [drivers/hwmon/ab8500.ko] undefined!
+
+This patch fixes the export.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Marc Dietrich <marvin24@gmx.de>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: M'boumba Cedric Madianga <cedric.madianga@stericsson.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Mattias WALLIN <mattias.wallin@stericsson.com>
+Cc: Michel JAOUEN <michel.jaouen@stericsson.com>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
 ---
- drivers/staging/nvec/Kconfig | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/mfd/ab8500-gpadc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/nvec/Kconfig b/drivers/staging/nvec/Kconfig
-index f779fdc..7e61ada 100644
---- a/drivers/staging/nvec/Kconfig
-+++ b/drivers/staging/nvec/Kconfig
-@@ -1,5 +1,5 @@
- config MFD_NVEC
--	bool "NV Tegra Embedded Controller SMBus Interface"
-+	tristate "NV Tegra Embedded Controller SMBus Interface"
- 	depends on I2C && GPIOLIB && ARCH_TEGRA
- 	select MFD_CORE
- 	help
-@@ -7,28 +7,28 @@ config MFD_NVEC
- 	    controller.
+diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
+index 5f341a5..184df96 100644
+--- a/drivers/mfd/ab8500-gpadc.c
++++ b/drivers/mfd/ab8500-gpadc.c
+@@ -269,7 +269,7 @@ int ab8500_gpadc_convert(struct ab8500_gpadc *gpadc, u8 channel)
  
- config KEYBOARD_NVEC
--	bool "Keyboard on nVidia compliant EC"
-+	tristate "Keyboard on nVidia compliant EC"
- 	depends on MFD_NVEC && INPUT
- 	help
- 	  Say Y here to enable support for a keyboard connected to 
- 	  a nVidia compliant embedded controller.
+ 	return voltage;
+ }
+-EXPORT_SYMBOL(ab8500_gpadc_convert);
++EXPORT_SYMBOL(ab8500_gpadc_sw_hw_convert);
  
- config SERIO_NVEC_PS2
--	bool "PS2 on nVidia EC"
-+	tristate "PS2 on nVidia EC"
- 	depends on MFD_NVEC && SERIO
- 	help
- 	  Say Y here to enable support for a Touchpad / Mouse connected
- 	  to a nVidia compliant embedded controller.
- 
- config NVEC_POWER
--	bool "NVEC charger and battery"
-+	tristate "NVEC charger and battery"
- 	depends on MFD_NVEC && POWER_SUPPLY
- 	help
- 	  Say Y to enable support for battery and charger interface for
- 	  nVidia compliant embedded controllers.
- 
- config NVEC_PAZ00
--	bool "Support for OEM specific functions on Compal PAZ00 based devices"
-+	tristate "Support for OEM specific functions on Compal PAZ00 based devices"
- 	depends on MFD_NVEC && LEDS_CLASS
- 	help
- 	  Say Y to enable control of the yellow side leds on Compal PAZ00 based
+ /**
+  * ab8500_gpadc_read_raw() - gpadc read
 -- 
 1.8.1.2
