@@ -1,50 +1,40 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Mon, 22 Apr 2013 19:05:02 -0700
-Subject: [PATCH] KVM: ARM: Fix API documentation for ONE_REG encoding
-Message-ID: <1366682702-23947-1-git-send-email-cdall@cs.columbia.edu>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 23 Apr 2013 11:09:46 +0900
+Subject: [PATCH v2 0/1] Add I2C support to R8A7778/BOCK-W
+In-Reply-To: <51752E24.6030800@cogentembedded.com>
+References: <201304200217.32844.sergei.shtylyov@cogentembedded.com>
+ <5171C4FE.9000807@cogentembedded.com>
+ <20130422045248.GO15680@verge.net.au>
+ <51752E24.6030800@cogentembedded.com>
+Message-ID: <20130423020946.GN12017@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unless I'm mistaken, the size field was encoded 4 bits off and a wrong
-value was used for 64-bit FP registers.
+On Mon, Apr 22, 2013 at 04:33:40PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 22-04-2013 8:52, Simon Horman wrote:
+> 
+> >>>    Here's the patch against the Simon Horman's 'renesas.git' repo,
+> >>>'renesas-next-20130417' tag and my recent yet unapplied USB patches.
+> 
+> >>    Sorry, it's against 'renesas-next-20130419' tag now.
+> 
+> >Sorry, it doesn't seem to apply cleanly on top of
+> >renesas-next-20130417 or renesas-next-20130419.
+> 
+>    It's also atop of USB the patches.
 
-Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
----
- Documentation/virtual/kvm/api.txt |   12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+Sorry for missing that.
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 976eb65..7145ee9 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -1797,22 +1797,22 @@ ARM registers are mapped using the lower 32 bits.  The upper 16 of that
- is the register group type, or coprocessor number:
- 
- ARM core registers have the following id bit patterns:
--  0x4002 0000 0010 <index into the kvm_regs struct:16>
-+  0x4020 0000 0010 <index into the kvm_regs struct:16>
- 
- ARM 32-bit CP15 registers have the following id bit patterns:
--  0x4002 0000 000F <zero:1> <crn:4> <crm:4> <opc1:4> <opc2:3>
-+  0x4020 0000 000F <zero:1> <crn:4> <crm:4> <opc1:4> <opc2:3>
- 
- ARM 64-bit CP15 registers have the following id bit patterns:
--  0x4003 0000 000F <zero:1> <zero:4> <crm:4> <opc1:4> <zero:3>
-+  0x4030 0000 000F <zero:1> <zero:4> <crm:4> <opc1:4> <zero:3>
- 
- ARM CCSIDR registers are demultiplexed by CSSELR value:
--  0x4002 0000 0011 00 <csselr:8>
-+  0x4020 0000 0011 00 <csselr:8>
- 
- ARM 32-bit VFP control registers have the following id bit patterns:
--  0x4002 0000 0012 1 <regno:12>
-+  0x4020 0000 0012 1 <regno:12>
- 
- ARM 64-bit FP registers have the following id bit patterns:
--  0x4002 0000 0012 0 <regno:12>
-+  0x4030 0000 0012 0 <regno:12>
- 
- 4.69 KVM_GET_ONE_REG
- 
--- 
-1.7.10.4
+> >Could you please rebase, add Morimoto-san's Acked-by and repost?
+> 
+>    I don't think we're in a hurry to apply this before USB patches
+> but if you insist, I'll exchange these patchsets in my series and
+> repost.
+
+I'm comfortable with waiting if you are.
+
+Please let me know if/when any of your series are ready.
+I try to keep on top of things things but there are a number
+of patches in-flight so there is ample scope for error on my part.
