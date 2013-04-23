@@ -1,61 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 23 Apr 2013 10:55:11 +0900
-Subject: [RFC PATCH v2 09/13] ARM: mach-shmobile: cpus/cpu nodes dts
- updates
-In-Reply-To: <1366644455-16550-10-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366644455-16550-10-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130423015511.GK12017@verge.net.au>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Mon, 22 Apr 2013 19:05:02 -0700
+Subject: [PATCH] KVM: ARM: Fix API documentation for ONE_REG encoding
+Message-ID: <1366682702-23947-1-git-send-email-cdall@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 04:27:31PM +0100, Lorenzo Pieralisi wrote:
-> This patch updates the in-kernel dts files according to the latest cpus
-> and cpu bindings updates for ARM.
+Unless I'm mistaken, the size field was encoded 4 bits off and a wrong
+value was used for 64-bit FP registers.
 
-Sorry to be a pain, but I would appreciate two separate patches,
-one per-Soc.
+Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
+---
+ Documentation/virtual/kvm/api.txt |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm/boot/dts/r8a7740.dtsi | 3 +++
->  arch/arm/boot/dts/sh7372.dtsi  | 4 ++++
->  2 files changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-> index 798fa35..b47bb36 100644
-> --- a/arch/arm/boot/dts/r8a7740.dtsi
-> +++ b/arch/arm/boot/dts/r8a7740.dtsi
-> @@ -14,8 +14,11 @@
->  	compatible = "renesas,r8a7740";
->  
->  	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
->  		cpu at 0 {
->  			compatible = "arm,cortex-a9";
-> +			reg = <0x0>;
->  		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/sh7372.dtsi b/arch/arm/boot/dts/sh7372.dtsi
-> index 677fc60..78478af 100644
-> --- a/arch/arm/boot/dts/sh7372.dtsi
-> +++ b/arch/arm/boot/dts/sh7372.dtsi
-> @@ -14,8 +14,12 @@
->  	compatible = "renesas,sh7372";
->  
->  	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
->  		cpu at 0 {
->  			compatible = "arm,cortex-a8";
-> +			reg = <0x0>;
->  		};
->  	};
->  };
-> -- 
-> 1.7.12
-> 
-> 
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 976eb65..7145ee9 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -1797,22 +1797,22 @@ ARM registers are mapped using the lower 32 bits.  The upper 16 of that
+ is the register group type, or coprocessor number:
+ 
+ ARM core registers have the following id bit patterns:
+-  0x4002 0000 0010 <index into the kvm_regs struct:16>
++  0x4020 0000 0010 <index into the kvm_regs struct:16>
+ 
+ ARM 32-bit CP15 registers have the following id bit patterns:
+-  0x4002 0000 000F <zero:1> <crn:4> <crm:4> <opc1:4> <opc2:3>
++  0x4020 0000 000F <zero:1> <crn:4> <crm:4> <opc1:4> <opc2:3>
+ 
+ ARM 64-bit CP15 registers have the following id bit patterns:
+-  0x4003 0000 000F <zero:1> <zero:4> <crm:4> <opc1:4> <zero:3>
++  0x4030 0000 000F <zero:1> <zero:4> <crm:4> <opc1:4> <zero:3>
+ 
+ ARM CCSIDR registers are demultiplexed by CSSELR value:
+-  0x4002 0000 0011 00 <csselr:8>
++  0x4020 0000 0011 00 <csselr:8>
+ 
+ ARM 32-bit VFP control registers have the following id bit patterns:
+-  0x4002 0000 0012 1 <regno:12>
++  0x4020 0000 0012 1 <regno:12>
+ 
+ ARM 64-bit FP registers have the following id bit patterns:
+-  0x4002 0000 0012 0 <regno:12>
++  0x4030 0000 0012 0 <regno:12>
+ 
+ 4.69 KVM_GET_ONE_REG
+ 
+-- 
+1.7.10.4
