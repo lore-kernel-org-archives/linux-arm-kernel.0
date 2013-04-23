@@ -1,55 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 23 Apr 2013 18:30:42 +0200
-Subject: [PATCH 10/21] ssb: fix alignment of struct bcma_device_id
-In-Reply-To: <1366734653-488286-1-git-send-email-arnd@arndb.de>
-References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
-Message-ID: <1366734653-488286-11-git-send-email-arnd@arndb.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 23 Apr 2013 12:42:23 -0400 (EDT)
+Subject: [PATCH 18/21] usb: phy: tegra: don't call into tegra-ehci directly
+In-Reply-To: <1366734653-488286-19-git-send-email-arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1304231239220.1679-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM OABI and EABI disagree on the alignment of structures
-with small members, so module init tools may interpret the
-ssb device table incorrectly, as shown  by this warning when
-building the b43 device driver in an OABI kernel:
+On Tue, 23 Apr 2013, Arnd Bergmann wrote:
 
-FATAL: drivers/net/wireless/b43/b43: sizeof(struct ssb_device_id)=6 is
-not a modulo of the size of section __mod_ssb_device_table=88.
+> Both phy-tegra-usb.c and ehci-tegra.c export symbols used by the other one,
+> which does not work if one of them or both are loadable modules, resulting
+> in an error like:
+> 
+> drivers/built-in.o: In function `utmi_phy_clk_disable':
+> drivers/usb/phy/phy-tegra-usb.c:302: undefined reference to `tegra_ehci_set_phcd'
+> drivers/built-in.o: In function `utmi_phy_clk_enable':
+> drivers/usb/phy/phy-tegra-usb.c:324: undefined reference to `tegra_ehci_set_phcd'
+> drivers/built-in.o: In function `utmi_phy_power_on':
+> drivers/usb/phy/phy-tegra-usb.c:447: undefined reference to `tegra_ehci_set_pts'
+> 
+> This turns the interface into a one-way dependency by letting the tegra ehci
+> driver pass two function pointers for callbacks that need to be called by
+> the phy driver.
 
-Forcing the default (EABI) alignment on the structure makes this
-problem go away. Since the ssb_device_id may have the same problem,
-better fix both structures.
+> @@ -733,7 +731,9 @@ static int tegra_ehci_probe(struct platform_device *pdev)
+>  
+>  	tegra->phy = tegra_usb_phy_open(&pdev->dev, instance, hcd->regs,
+>  					pdata->phy_config,
+> -					TEGRA_USB_PHY_MODE_HOST);
+> +					TEGRA_USB_PHY_MODE_HOST,
+> +					&tegra_ehci_set_pts,
+> +					tegra_ehci_set_phcd);
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: John W. Linville <linville@tuxdriver.com>
-Cc: Michael Buesch <mb@bu3sch.de>
-Cc: Larry Finger <Larry.Finger@lwfinger.net>
----
- include/linux/mod_devicetable.h | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Does the compiler warn about the unnecessary '&'?  In any case, it
+looks strange to have one function pointer with an '&' and another
+without.
 
-diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
-index 779cf7c..ce363a5 100644
---- a/include/linux/mod_devicetable.h
-+++ b/include/linux/mod_devicetable.h
-@@ -360,7 +360,8 @@ struct ssb_device_id {
- 	__u16	vendor;
- 	__u16	coreid;
- 	__u8	revision;
--};
-+	__u8	__pad;
-+} __attribute__((packed, aligned(2)));
- #define SSB_DEVICE(_vendor, _coreid, _revision)  \
- 	{ .vendor = _vendor, .coreid = _coreid, .revision = _revision, }
- #define SSB_DEVTABLE_END  \
-@@ -376,7 +377,7 @@ struct bcma_device_id {
- 	__u16	id;
- 	__u8	rev;
- 	__u8	class;
--};
-+} __attribute__((packed,aligned(2)));
- #define BCMA_CORE(_manuf, _id, _rev, _class)  \
- 	{ .manuf = _manuf, .id = _id, .rev = _rev, .class = _class, }
- #define BCMA_CORETABLE_END  \
--- 
-1.8.1.2
+Aside from that minor detail, the ehci-tegra.c changes are fine.
+
+Alan Stern
