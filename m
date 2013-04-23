@@ -1,147 +1,47 @@
-From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
-Date: Tue, 23 Apr 2013 11:23:38 +0530
-Subject: [RFC] arm64: Early printk support for virtio-mmio console devices.
-In-Reply-To: <87mwsr9md7.fsf@rustcorp.com.au>
-References: <1366264344-28025-1-git-send-email-pranavkumar@linaro.org>
- <87wqs02uws.fsf@rustcorp.com.au>
- <CAAHg+HiHKV+8hBT1QWe4hSxocCX6wpRd3bCPWB7zU8jVFmPuAA@mail.gmail.com>
- <87ehe3bbsm.fsf@rustcorp.com.au>
- <CALrVBkub+TABrrBwh4+P6S5TGL1qSmnZrd1cbGgj6JiRpY=rOA@mail.gmail.com>
- <87mwsr9md7.fsf@rustcorp.com.au>
-Message-ID: <CAAHg+Hg1u-md_5hSWxyVOOrg_f9=h0tO5iv2WQL-U-MyTMAV9g@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 23 Apr 2013 11:44:16 +0530
+Subject: [PATCH] ARM: OMAP4: change the device names in usb_bind_phy
+Message-ID: <1366697656-14315-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 April 2013 10:45, Rusty Russell <rusty@rustcorp.com.au> wrote:
-> Anup Patel <anup.patel@linaro.org> writes:
->> On 22 April 2013 06:51, Rusty Russell <rusty@rustcorp.com.au> wrote:
->>>
->>> Pranavkumar Sawargaonkar <pranavkumar@linaro.org> writes:
->>> > On 18 April 2013 12:21, Rusty Russell <rusty@rustcorp.com.au> wrote:
->>> >>
->>> >> PranavkumarSawargaonkar <pranavkumar@linaro.org> writes:
->>> >> > From: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>> >> >
->>> >> > This patch implements early printk support for virtio-mmio console
->>> >> > devices without using any hypercalls.
->>> >>
->>> >> This makes some sense, though not sure that early console *read* makes
->>> >> much sense.  I can see the PCI version of this being useful as well.
->>> >
->>> > Read can be useful for "mach-virt" which will have only virtio console
->>> > as a console device. Then if someone wants to have UEFI or any other
->>> > boot-loader emulation, which expects user to input few things, in that
->>> > case read might become handy.
->>>
->>> But implementing virtio inside a bootloader has already been done for
->>> coreboot, for example.  A bootloader probably wants a virtio block
->>> device, so a console is trivial.
->>>
->>> A single writable field for debugging makes sense.  Anything more is far
->>> less certain.
->>
->> The early read can be handy for bootloader who don't want to implement
->> complete VirtIO programming.
->
-> I've said this twice already.  This is the last time.
->
-> 1) We do not add complexity unless we have to.
-> 2) Making it optional does not make it significantly less complex.
-> 3) Having two ways of doing the same thing is always ugly.
-> 4) Having an emergency output method makes sense for several use cases,
->    an emergency input method does not.
-Okay,  i will restructure my patch by keeping just output write part
-and post it back.
+After the device names are created using PLATFORM_DEVID_AUTO, the old
+device names given in usb_bind_phy are no longer valid causing the musb
+controller not to get the phy reference. Updated the usb_bind_phy with
+the new device names to get MUSB functional in omap4 panda.
 
-Thanks,
-Pranav
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+Tested in OMAP4 PANDA.
+ arch/arm/mach-omap2/board-4430sdp.c    |    2 +-
+ arch/arm/mach-omap2/board-omap4panda.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-> 5) A bootloader which uses virtio to get the images to boot can
->    implement a console in less than 10 lines.
-> 6) A bootloader which does not use any virtio devices but nonetheless
->    wants to obtain input can implement a simple console in well under 100
->    lines.  See below.
->
-> Finally, in case you still don't understand:
->
-> My task is to make this decision, and I've made it.  Arguing with me is
-> only useful if you bring new facts which you can change my mind.
->
-> Hope that clarifies,
-> Rusty.
->
-> #define VIRTIO_MMIO_GUEST_PAGE_SIZE     0x028
-> #define VIRTIO_MMIO_QUEUE_SEL           0x030
-> #define VIRTIO_MMIO_QUEUE_NUM_MAX       0x034
-> #define VIRTIO_MMIO_QUEUE_NUM           0x038
-> #define VIRTIO_MMIO_QUEUE_ALIGN         0x03c
-> #define VIRTIO_MMIO_QUEUE_PFN           0x040
-> #define VIRTIO_MMIO_QUEUE_NOTIFY        0x050
->
-> struct vring_desc {
->         __u64 addr;
->         __u32 len;
->         __u16 flags;
->         __u16 next;
-> };
->
-> struct vring_used_elem {
->         __u32 id;
->         __u32 len;
-> };
->
-> struct vconsole_ring {
->         struct vring_desc desc[2];
->         __u16 avail_flags;
->         __u16 avail_idx;
->         __u16 available[2];
->         __u16 used_event_idx;
->         __u16 pad; /* Hit 4-byte boundary */
->
->         // A ring of used descriptor heads with free-running index.
->         __u16 used_flags;
->         __u16 used_idx;
->         struct vring_used_elem used[2];
->         __u16 avail_event_idx;
-> };
->
-> static char console_in;
-> static struct vconsole_ring vc_ring = {
->         { { PHYSICAL_ADDR(console_in), 1, 2, 0 } },
->         1, /* No interrupts */
-> }
->
-> static void post_buffer(void *base)
-> {
->         vc_ring->avail_idx++;
->         wmb();
->         writel(0, base + VIRTIO_MMIO_QUEUE_NOTIFY);
-> }
->
-> bool vc_read(void *base, char *c)
-> {
->         mb();
->         if (vc_ring->used_idx != vc_ring->avail_idx)
->                 return false;
->         *c = console_in;
->         post_buffer(base);
->         return true;
-> }
->
-> void vc_init(void *base)
-> {
->         /* Alignment of 4 bytes, don't waste any. */
->         writel(4, base + VIRTIO_MMIO_GUEST_PAGE_SIZE);
->
->         /* Setup incoming vq. */
->         writel(0, base + VIRTIO_MMIO_QUEUE_SEL);
->
->         /* 2 elements */
->         writel(2, base + VIRTIO_MMIO_QUEUE_NUM);
->         /* Alignment of 4 bytes */
->         writel(4, base + VIRTIO_MMIO_QUEUE_ALIGN);
->         /* Location of queue. */
->         writel(PHYSICAL_ADDR(&vc_ring) >> 4, base + VIRTIO_MMIO_QUEUE_PFN);
->
->         post_buffer(base);
-> }
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 00d7290..56a9a4f 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -730,7 +730,7 @@ static void __init omap_4430sdp_init(void)
+ 	omap4_sdp4430_wifi_init();
+ 	omap4_twl6030_hsmmc_init(mmc);
+ 
+-	usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
++	usb_bind_phy("musb-hdrc.2.auto", 0, "omap-usb2.3.auto");
+ 	usb_musb_init(&musb_board_data);
+ 
+ 	status = omap_ethernet_init();
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index a71ad34..1e2c75e 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -435,7 +435,7 @@ static void __init omap4_panda_init(void)
+ 	omap_sdrc_init(NULL, NULL);
+ 	omap4_twl6030_hsmmc_init(mmc);
+ 	omap4_ehci_init();
+-	usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
++	usb_bind_phy("musb-hdrc.2.auto", 0, "omap-usb2.3.auto");
+ 	usb_musb_init(&musb_board_data);
+ 	omap4_panda_display_init();
+ }
+-- 
+1.7.10.4
