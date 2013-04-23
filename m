@@ -1,42 +1,73 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 23 Apr 2013 09:41:02 +0200
-Subject: [RFC][PATCH] video: imx: Select VIDEOMODE_HELPERS
-In-Reply-To: <201304230157.47992.marex@denx.de>
-References: <1366666110-9585-1-git-send-email-marex@denx.de>
- <CAOMZO5Av8RyptoxAQ13Psxjjd4nhHVbEJoVm6SqyLr55bPmSng@mail.gmail.com>
- <201304230157.47992.marex@denx.de>
-Message-ID: <1366702862.4365.2.camel@pizza.hi.pengutronix.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 23 Apr 2013 09:42:51 +0200
+Subject: Query on pinctrl usage for DT nodes
+In-Reply-To: <20130416213232.GU10155@atomide.com>
+References: <CA+V-a8uiPwsAD--OHFAE=i2ed+-wbXm4p2deZXr92+Zv6GDS1w@mail.gmail.com>
+ <515C5C76.3080009@wwwdotorg.org>
+ <CA+V-a8t3wtP77DdeUoQHKMjAuWmV+ude+1J3UjJmMTqobgStjA@mail.gmail.com>
+ <5162FD4A.1030909@wwwdotorg.org>
+ <CA+V-a8vwdCkyMqiynj5BodXbjwJ=e4qNb-29FhLweqbjc7DBQA@mail.gmail.com>
+ <5165A22B.4070200@wwwdotorg.org> <20130410203408.GP10155@atomide.com>
+ <516BB99F.2080502@ti.com> <20130416213232.GU10155@atomide.com>
+Message-ID: <51763B7B.707@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-Am Dienstag, den 23.04.2013, 01:57 +0200 schrieb Marek Vasut:
-> Dear Fabio Estevam,
+On 04/16/2013 11:32 PM, Tony Lindgren wrote:
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [130415 01:30]:
+>> On 04/10/2013 10:34 PM, Tony Lindgren wrote:
+>>> Yeah how about just change the pintctrl-single,bits register
+>>> naming to be register + bit?  Something like 0xdeadbeef.0 and
+>>> 0xdeadbeef.1 and so on.
+>>
+>> Something like this might work I think. It is going to be a bit tricky IMHO
+>> since we might need span out new 'register' every time a device requests for a
+>> new pinctrl-single,bits for already used register in the
+>> pinctrl-single,bit-per-mux area. In this way we still can make sure that
+>> certain bit are only used by a single driver.
 > 
-> > Hi Marek,
-> > 
-> > On Mon, Apr 22, 2013 at 6:28 PM, Marek Vasut <marex@denx.de> wrote:
-> > > Without this, I get the following problem when building kernel:
-> > > 
-> > > drivers/built-in.o: In function `imx_pd_connector_get_modes':
-> > > /linux-2.6/drivers/staging/imx-drm/parallel-display.c:78: undefined
-> > > reference to `of_get_drm_display_mode' make: *** [vmlinux] Error 1
-> > > 
-> > > NOTE: I think this patch is almost absolutely not correct.
-> > > 
-> > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > Patch looks good, but you should have copied Greg Kroah-Hartman, as he
-> > is the one who takes patches into staging.
-> 
-> I'm not sure if the select is at correct symbol, I dont think it is.
+> OK. If it's one bit per mux type register we should be able to create
+> the right amount of entries based on the submask in pinctrs-single,bit?
 
-OF_VIDEOMODE is the correct one. The implementation of
-of_get_drm_display_mode in drivers/gpu/drm/drm_modes.c depends on it.
+Right now it seams to be true that we have one bit per mux (in DEVCONF0 on
+OMAP3 for example). So that would work fine, but There could be different
+registers around with more than one bit per mux.
 
-regards
-Philipp
+Another way to deal with this is to:
+in case of pinctrl-single,bit-per-mux we assume one bit per mux and create
+entries based on the pinctrl-single,function-mask's bits.
+
+In case we have more than one bit for the mux in the register we could have
+optional property stating the number of different muxes handled by the register.
+
+One bit per mux type:
+
+control_devconf0: pinmux at 48002274 {
+        compatible = "pinctrl-single";
+        reg = <0x48002274 4>;   /* Single register */
+        #address-cells = <1>;
+        #size-cells = <0>;
+        pinctrl-single,bit-per-mux;
+        pinctrl-single,register-width = <32>;
+        pinctrl-single,function-mask = <0x5F>;
+};
+
+Results six entries.
+
+control_devconf0: pinmux at 48002274 {
+        compatible = "pinctrl-single";
+        reg = <0x48002274 4>;   /* Single register */
+        #address-cells = <1>;
+        #size-cells = <0>;
+        pinctrl-single,bit-per-mux;
+        pinctrl-single,functions-in-register = <3>;
+        pinctrl-single,register-width = <32>;
+        pinctrl-single,function-mask = <0x5F>;
+};
+
+Will results three entries.
+
+In both cases we still need to test overlaps in the handled bits.
+
+-- 
+P?ter
