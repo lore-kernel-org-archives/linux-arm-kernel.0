@@ -1,53 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 23 Apr 2013 10:15:36 +0100
-Subject: [PATCHv2] arm: Preserve TPIDRURW on context switch
-In-Reply-To: <5175A697.3080308@dawncrow.de>
-References: <517168BB.3070903@dawncrow.de>
- <20130422143616.GP14496@n2100.arm.linux.org.uk>
- <20130422151836.GA15665@mudshark.cambridge.arm.com>
- <5175A697.3080308@dawncrow.de>
-Message-ID: <20130423091536.GB17593@mudshark.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 23 Apr 2013 10:16:18 +0100
+Subject: [RFC PATCH v2 12/13] ARM: mach-vt8500: cpus/cpu nodes dts updates
+In-Reply-To: <5175EFFE.7020903@prisktech.co.nz>
+References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366644455-16550-13-git-send-email-lorenzo.pieralisi@arm.com>
+ <5175EE3E.7080809@prisktech.co.nz>
+ <5175EFFE.7020903@prisktech.co.nz>
+Message-ID: <20130423091618.GB22946@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 10:07:35PM +0100, Andr? Hentschel wrote:
-> Am 22.04.2013 17:18, schrieb Will Deacon:
-> > On Mon, Apr 22, 2013 at 03:36:16PM +0100, Russell King - ARM Linux wrote:
-> >> On Fri, Apr 19, 2013 at 05:54:35PM +0200, Andr? Hentschel wrote:
-> >>> From: =?UTF-8?q?Andr=C3=A9=20Hentschel?= <nerv@dawncrow.de>
-> >>>
-> >>> There are more and more applications coming to WinRT, Wine could support them,
-> >>> but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
-> >>> This register must be preserved per thread instead of being cleared.
-> >>>
-> >>> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+On Tue, Apr 23, 2013 at 03:20:46AM +0100, Tony Prisk wrote:
+> On 23/04/13 14:13, Tony Prisk wrote:
+> > On 23/04/13 03:27, Lorenzo Pieralisi wrote:
+> >> This patch updates the in-kernel dts files according to the latest cpus
+> >> and cpu bindings updates for ARM.
 > >>
-> >> This actually makes things less efficient all round, because you
-> >> now use the value immediately after loading, which means it will cause
-> >> pipeline stalls, certainly on older CPUs.
+> >> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> ---
+> >>   arch/arm/boot/dts/wm8505.dtsi | 2 +-
+> >>   1 file changed, 1 insertion(+), 1 deletion(-)
 > >>
-> >> Could you please rework the patch to try avoiding soo many modifications
-> >> to the way things have been done here?
-> > 
-> > copy_thread also needs updating so that the *register* value for the parent
-> > is copied to the child, since the parent may have written the register
-> > after the last context-switch, meaning that tp_value is out-of-date.
+> >> diff --git a/arch/arm/boot/dts/wm8505.dtsi 
+> >> b/arch/arm/boot/dts/wm8505.dtsi
+> >> index e74a1c0..a470808 100644
+> >> --- a/arch/arm/boot/dts/wm8505.dtsi
+> >> +++ b/arch/arm/boot/dts/wm8505.dtsi
+> >> @@ -13,7 +13,7 @@
+> >>         cpus {
+> >>           cpu at 0 {
+> >> -            compatible = "arm,arm926ejs";
+> >> +            compatible = "arm,arm926";
+> >>           };
+> >>       };
+> > As the only author for that file, and the arch-vt8500 maintainer, a CC 
+> > would have been nice :)
+> >
+> > This binding is still incomplete.device_type, compatible and reg are 
+> > all required properties.
+> > Also, you seem to have only fixed the wm8505.dtsi, while vt8500.dtsi, 
+> > wm8650.dtsi and wm8850.dtsi are all left incorrect.
+> >
+> > I am already carrying a patch to fix all this properly so could you 
+> > drop the arch-vt8500 related patch and I will send in a more complete 
+> > version for 3.11
+> >
+> > Regards
+> > Tony Prisk
 > 
-> Thank you both for reviewing.
-> 
-> I guess you mostly mean "ldr	r6, [r2, #TI_CPU_DOMAIN]".
-> I just thought about old CPUs and remembered again that we at Wine
-> need that patch only on v7 (and later). So is it ok to introduce a set_tls_v7
-> in tls.h and make use of CONFIG_CPU_V7 compile-time check in
-> the changed files and in the copy_thread function?
+> I didn't notice the rules had been changed in the last patch - shouldn't 
+> you be changing the rules (read: binding) before changing the devicetree 
+> files?
 
-No, we should support this feature on any CPU with the TPIDRURW register,
-otherwise it's going to get really confusing for userspace.
+Fair enough, point taken.
 
-> Do i need any further flag checks in copy_thread or can i use the
-> compile-time check to add unconditional code?
+> Request still stands - please drop this patch and I will submit a more 
+> complete one with the other SoCs updated as well.
 
-You could introduce `get' tls functions, which don't do anything for CPUs
-without the relevant registers.
-
-Will
+Great, thanks,
+Lorenzo
