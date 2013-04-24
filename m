@@ -1,31 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Apr 2013 16:44:44 +0200
-Subject: [PATCH 02/32] dmaengine: ste_dma40: Move default memcpy configs
- into the driver
-In-Reply-To: <1366279934-30761-3-git-send-email-lee.jones@linaro.org>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbBeyofVs=G3L-jSXuAv8GRYfwfUNPcV3TAfz2B9ACJ3A@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 24 Apr 2013 16:47:08 +0200
+Subject: [PATCH 2/2] pinctrl: samsung: Fix link error with
+ CONFIG_PINCTRL_EXYNOS disabled
+In-Reply-To: <CACRpkdZmSj-AqUA9kd7NMN6cL2Nxa0EaKoSVkwQSrxhcWEeQtg@mail.gmail.com>
+References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
+ <6940961.67Lk2axxPL@amdc1227>
+ <CACRpkdZmSj-AqUA9kd7NMN6cL2Nxa0EaKoSVkwQSrxhcWEeQtg@mail.gmail.com>
+Message-ID: <2113989.KXXvDDhnMa@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wednesday 24 of April 2013 16:27:09 Linus Walleij wrote:
+> On Tue, Apr 23, 2013 at 2:09 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> > On Tuesday 23 of April 2013 14:03:12 Linus Walleij wrote:
+> >> This does not apply to my "devel" branch in the pinctrl tree.
+> >> 
+> >> Could you rebase it on that branch?
+> >> 
+> >> Or is the error not even in my tree?
+> > 
+> > This one got sent incorrectly due to my mistake. Please try the correct
+> > version:
+> > 
+> > [PATCH RESEND 2/2] pinctrl: samsung: Fix link error with
+> > CONFIG_PINCTRL_EXYNOS disabled
+> 
+> This does not apply either.
+> 
+> Can you please test against the "devel" branch in the pinctrl tree?
 
-> There are only two default memcpy configurations used for the DMA40
-> driver; one for physical memcpy and one for logical memcpy. Instead
-> of invariably passing the same configurations though platform data,
-> we're moving them into the driver instead.
->
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Right, it does not apply.
 
-Nice!
+Well, actually it does with git am -3, but it is incorrect, since the problem 
+it intends to fix is not present in your tree, but rather is a merge error in 
+linux-next in a merge of Kgene's and your tree...
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Kernel and System Framework
