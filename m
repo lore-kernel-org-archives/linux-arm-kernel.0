@@ -1,41 +1,119 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Wed, 24 Apr 2013 11:51:24 +0530
-Subject: [PATCH 4/4] arm64: Add initial DTS for APM X-Gene Storm SOC and
- APM Mustang board
-In-Reply-To: <20130423181109.GA6850@quad.lixom.net>
-References: <1366442131-26094-1-git-send-email-vkale@apm.com>
- <1366442131-26094-5-git-send-email-vkale@apm.com>
- <20130423181109.GA6850@quad.lixom.net>
-Message-ID: <CAPrCYkfq=ypk+3=FamZQgMhaxMHDzsSFdsNByMoq1H=kLSY8YA@mail.gmail.com>
+From: chao.xie@marvell.com (Chao Xie)
+Date: Wed, 24 Apr 2013 02:23:14 -0400
+Subject: [V9 PATCH 00/12] mv-usb phy driver
+Message-ID: <1366784606-1813-1-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 11:41 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Sat, Apr 20, 2013 at 12:45:31PM +0530, Vinayak Kale wrote:
->
->> +     gic: interrupt-controller at 78010000 {
->> +             compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
->> +             #interrupt-cells = <3>;
->> +             interrupt-controller;
->> +             reg = <0x0 0x78010000 0x0 0x1000>,      /* GIC Dist */
->> +                   <0x0 0x78020000 0x0 0x1000>,      /* GIC CPU */
->> +                   <0x0 0x78040000 0x0 0x2000>,      /* GIC VCPU Control */
->> +                   <0x0 0x78060000 0x0 0x2000>;      /* GIC VCPU */
->> +             interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
->> +     };
->
-> Others have commented on other compatible fields, so it's my turn. :-)
->
-> Is this the exact same GIC that's used with A15? I don't think it is? It might
-> make more sense to use a new compatible field and add it to the driver.
->
-> Also, other platforms have removed the a9 fallback, so even if you happen to
-> have an a15-compatible gic, in this case you should at least take out the a9
-> string.
->
-Okay, will remove a9-gic string. Our's is a15-compatible gic, will use
-a15 string.
->
-> -Olof
-Thanks
--Vinayak
+The patches create the mv-usb phy driver
+
+The patches remove the callbacks in the platform data for phy
+initialization and shutdown, and directly write a phy driver
+and make udc/ehci/otg to call it.
+
+  usb: phy: protect phy init and shutdown for mutiple deivces
+  usb: phy: mv_usb2: add PHY driver for marvell usb2 controller
+Above patches are marvell usb PHY driver support.
+
+  usb: gadget: mv_udc: use PHY driver for udc
+  usb: ehci: ehci-mv: use PHY driver for ehci
+  usb: phy: phy-mv-usb: use USB2 PHY driver for otg
+Above patches modify the udc/ehci/otg drivers to make use of PHY
+driver.
+
+  usb: mv_u3d: usb phy drivers for phy operation
+Above patch is the fix for marvel usb3 gadget driver. It will make
+use of PHY driver.
+
+  arm: mmp2: change the defintion of usb devices
+  arm: pxa910: change the defintion of usb devices
+  arm: ttc_dkb: modify usb support
+  arm: mmp: remove unused usb devices
+  arm: brownstone: add usb support for the board
+Above patches are the changes from SOCes.
+
+  usb: mv_usb: remove the phy callbacks in pdata
+Above patch finally remove the callbacks for PHY in pdata.
+
+V2->V1:
+  Change the Signed-off-by to be right email address
+
+v3->v2
+  re-format the patches to new code base
+
+v4->v3
+  1. make mv udc gadget driver depend on ARCH_PXA and ARCH_MMP
+  2. remove __devinit and __devexit
+  3. make the driver compiled successful if CONFIG_MV_USB2_PHY is not defined.
+  The modified patches are
+  usb: gadget: mv_udc: make mv_udc depends on ARCH_MMP or ARCH_PXA
+  usb: phy: mv_usb2: add PHY driver for marvell usb2 controller
+
+v5->v4
+  make the struct mv_usb2_extern_chip member ->head to be
+  struct atomic_notifier_head instead of struct atomic_notifier_head *.
+
+v6->v5
+  the bug fix patches are merged.
+  Removed the dependcy of ARCH_MMP and ARCH_PXA, and make the driver can be
+  compiled for x86.
+  The device tree support patches need modification, remove them from this
+  patch series, and they will be submitted in another series.
+
+
+v7->v6
+  Use usb_add_phy_dev and related APIs to add PHY drivers.
+  Removed the device tree support in PHY driver. It will be added in another
+  patch series.
+
+v8->v7
+  bugs fix in phy driver.
+  directly use devm_usb_get_phy_dev return value for error return.
+
+v9->v8
+  Remove u2o_xxx.
+  Add prefix for register definition
+  Move mutex to common PHY layer
+  Use module_platform_driver() to register driver
+  Use usleep_range to replace udelay
+
+Chao Xie (12):
+  usb: phy: protect phy init and shutdown for mutiple deivces
+  usb: phy: mv_usb2: add PHY driver for marvell usb2 controller
+  usb: gadget: mv_udc: use PHY driver for udc
+  usb: ehci: ehci-mv: use PHY driver for ehci
+  usb: phy: phy-mv-usb: use USB2 PHY driver for otg
+  usb: mv_u3d: usb phy drivers for phy operation
+  arm: mmp2: change the defintion of usb devices
+  arm: pxa910: change the defintion of usb devices
+  arm: ttc_dkb: modify usb support
+  arm: mmp: remove unused usb devices
+  arm: brownstone: add usb support for the board
+  usb: mv_usb: remove the phy callbacks in pdata
+
+ arch/arm/mach-mmp/brownstone.c          |   56 +++++
+ arch/arm/mach-mmp/include/mach/mmp2.h   |    4 +
+ arch/arm/mach-mmp/include/mach/pxa910.h |    7 +-
+ arch/arm/mach-mmp/mmp2.c                |    4 +
+ arch/arm/mach-mmp/pxa910.c              |    4 +
+ arch/arm/mach-mmp/ttc_dkb.c             |   39 +++-
+ drivers/usb/gadget/mv_u3d.h             |    3 +-
+ drivers/usb/gadget/mv_u3d_core.c        |   54 ++---
+ drivers/usb/gadget/mv_udc.h             |    2 +-
+ drivers/usb/gadget/mv_udc_core.c        |   50 ++---
+ drivers/usb/host/ehci-mv.c              |   49 ++---
+ drivers/usb/phy/Kconfig                 |    6 +
+ drivers/usb/phy/Makefile                |    1 +
+ drivers/usb/phy/phy-mv-usb.c            |   53 ++---
+ drivers/usb/phy/phy-mv-usb.h            |    2 +-
+ drivers/usb/phy/phy-mv-usb2.c           |  380 +++++++++++++++++++++++++++++++
+ drivers/usb/phy/phy.c                   |    6 +
+ include/linux/platform_data/mv_usb.h    |    3 -
+ include/linux/usb/mv_usb2.h             |   29 +++
+ include/linux/usb/phy.h                 |   22 ++-
+ 20 files changed, 624 insertions(+), 150 deletions(-)
+ create mode 100644 drivers/usb/phy/phy-mv-usb2.c
+ create mode 100644 include/linux/usb/mv_usb2.h
+
+-- 
+1.7.4.1
