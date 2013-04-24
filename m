@@ -1,87 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Apr 2013 16:55:47 +0100
-Subject: [PATCH v2] mmc: mmci: Allow MMCI to request channels with
- information acquired from DT
-In-Reply-To: <1366801122-13302-1-git-send-email-lee.jones@linaro.org>
-References: <1366801122-13302-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130424155547.GA4623@gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Wed, 24 Apr 2013 17:56:57 +0200
+Subject: [PATCH v3 00/13] ARM: EXYNOS: Fix Universal C210 support
+In-Reply-To: <1366731994-7478-1-git-send-email-t.figa@samsung.com>
+References: <1366731994-7478-1-git-send-email-t.figa@samsung.com>
+Message-ID: <1412451.qIYy1KKdql@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, if DMA information isn't passed from platform data, then DMA
-will not be used. This patch allows DMA information obtained though Device
-Tree to be used as well.
+On Tuesday 23 of April 2013 17:46:21 Tomasz Figa wrote:
+> This series intends to fix support for Universal C210 board in mainline.
+> Main difference from other boards based on Exynos 4210 is that hardware
+> revision of the SoC used on Universal C210 does not support MCT timers
+> and legacy PWM timers must be used instead.
+> 
+> First (and the biggest) part of the series deals with cleaning up and
+> fixing the samsung_pwm_timer clocksource driver, that was posted
+> recently by Arnd. In addition the driver is prepared to share the
+> hardware with PWM driver that will be reworked later, since it is not
+> a component crucial for system operation.
+> 
+> Second part fixes ATAGS support of Exynos 4210 rev0 SoC, which needs
+> different timer initialization, using the new samsung_pwm_timer driver.
+> 
+> Third and last part adds Device Tree-based support for Universal C210
+> board by providing device tree sources for it.
+> 
+> On Universal C210 board, both with and without DT:
+> 
+> Tested-by: Tomasz Figa <t.figa@samsung.com>
+> 
+> Tomasz Figa (13):
+>   Documentation: Add device tree bindings for Samsung PWM timers
+>   clocksource: samsung_pwm_timer: Let platforms select the driver
+>   clocksource: samsung_pwm_timer: Make PWM spinlock global
+>   clocksource: samsung_pwm_timer: Keep all driver data in a structure
+>   clocksource: samsung_pwm_timer: Drop unused samsung_pwm struct
+>   clocksource: samsung_pwm_timer: Add support for non-DT platforms
+>   clocksource: samsung_pwm_timer: Use proper clockevents max_delta
+>   clocksource: samsung_pwm_timer: Correct programming of clock events
+>   clocksource: samsung_pwm_timer: Work around rounding errors in
+>     clockevents core
+>   ARM: SAMSUNG: Do not register legacy timer interrupts on Exynos
+>   ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
+>   ARM: dts: exynos4: Add node for PWM device
+>   ARM: dts: exynos4210: Add basic dts file for universal_c210 board
+> 
+>  .../devicetree/bindings/pwm/pwm-samsung.txt        |  43 +++
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/exynos4.dtsi                     |   8 +
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts    | 352
+> +++++++++++++++++++++ arch/arm/mach-exynos/Kconfig                       | 
+>  3 +-
+>  arch/arm/mach-exynos/common.c                      |  45 ++-
+>  arch/arm/mach-exynos/common.h                      |   2 +
+>  arch/arm/mach-exynos/mach-universal_c210.c         |   5 +-
+>  arch/arm/plat-samsung/Kconfig                      |   4 +-
+>  drivers/clocksource/Kconfig                        |   3 +-
+>  drivers/clocksource/samsung_pwm_timer.c            | 215 +++++++------
+>  include/clocksource/samsung_pwm.h                  |  11 +-
+>  12 files changed, 561 insertions(+), 131 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-samsung.txt
+>  create mode 100644 arch/arm/boot/dts/exynos4210-universal_c210.dts
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: linux-mmc at vger.kernel.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Kgene, could you merge this series and send a pull request, please?
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 372e921..45dda46 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -304,10 +304,8 @@ static void mmci_dma_setup(struct mmci_host *host)
- 	const char *rxname, *txname;
- 	dma_cap_mask_t mask;
- 
--	if (!plat || !plat->dma_filter) {
--		dev_info(mmc_dev(host->mmc), "no DMA platform data\n");
--		return;
--	}
-+	host->dma_rx_channel = dma_request_slave_channel(mmc_dev(host->mmc), "rx");
-+	host->dma_tx_channel = dma_request_slave_channel(mmc_dev(host->mmc), "tx");
- 
- 	/* initialize pre request cookie */
- 	host->next_data.cookie = 1;
-@@ -316,30 +314,33 @@ static void mmci_dma_setup(struct mmci_host *host)
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 
--	/*
--	 * If only an RX channel is specified, the driver will
--	 * attempt to use it bidirectionally, however if it is
--	 * is specified but cannot be located, DMA will be disabled.
--	 */
--	if (plat->dma_rx_param) {
--		host->dma_rx_channel = dma_request_channel(mask,
-+	if (plat && plat->dma_filter) {
-+		if (!host->dma_rx_channel && plat->dma_rx_param) {
-+			host->dma_rx_channel = dma_request_channel(mask,
- 							   plat->dma_filter,
- 							   plat->dma_rx_param);
--		/* E.g if no DMA hardware is present */
--		if (!host->dma_rx_channel)
--			dev_err(mmc_dev(host->mmc), "no RX DMA channel\n");
--	}
-+			/* E.g if no DMA hardware is present */
-+			if (!host->dma_rx_channel)
-+				dev_err(mmc_dev(host->mmc), "no RX DMA channel\n");
-+		}
- 
--	if (plat->dma_tx_param) {
--		host->dma_tx_channel = dma_request_channel(mask,
-+		if (!host->dma_tx_channel && plat->dma_tx_param) {
-+			host->dma_tx_channel = dma_request_channel(mask,
- 							   plat->dma_filter,
- 							   plat->dma_tx_param);
--		if (!host->dma_tx_channel)
--			dev_warn(mmc_dev(host->mmc), "no TX DMA channel\n");
--	} else {
--		host->dma_tx_channel = host->dma_rx_channel;
-+			if (!host->dma_tx_channel)
-+				dev_warn(mmc_dev(host->mmc), "no TX DMA channel\n");
-+		}
- 	}
- 
-+	/*
-+	 * If only an RX channel is specified, the driver will
-+	 * attempt to use it bidirectionally, however if it is
-+	 * is specified but cannot be located, DMA will be disabled.
-+	 */
-+	if (host->dma_rx_channel && !host->dma_tx_channel)
-+		host->dma_tx_channel = host->dma_rx_channel;
-+
- 	if (host->dma_rx_channel)
- 		rxname = dma_chan_name(host->dma_rx_channel);
- 	else
+Best regards,
+-- 
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Kernel and System Framework
