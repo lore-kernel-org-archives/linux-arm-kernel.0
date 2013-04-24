@@ -1,79 +1,76 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Apr 2013 16:05:21 +0100
-Subject: [PATCH 05/10 v2] usb: musb: ux500: attempt to find channels by name
- before using pdata
-In-Reply-To: <1366729394-11406-6-git-send-email-lee.jones@linaro.org>
-References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
- <1366729394-11406-6-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130424150521.GE9652@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 Apr 2013 17:05:29 +0200
+Subject: [PATCH 1/8] dmaengine: ste_dma40: Assign memcpy channels in the
+ driver
+In-Reply-To: <CAF2Aj3jHPvc=hOcgLq8LONppGtnxUPP96HRPLfCwQ5x4HONUOw@mail.gmail.com>
+References: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYUT+5J-phV=ez-EkmA9EdfxwmDMApTssi+P3=mSE3cew@mail.gmail.com>
+ <CAF2Aj3jHPvc=hOcgLq8LONppGtnxUPP96HRPLfCwQ5x4HONUOw@mail.gmail.com>
+Message-ID: <CACRpkdZceyOte4vG8QcN5Dy1ooiTT69oOQ1Ud=SffRWbPMXOSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we can ever get to a state where we can solely search for DMA channels
-by name, this will almost completely alleviate the requirement to pass
-copious amounts of information though platform data. Here we take the
-first step towards this. The next step will be to enable Device Tree
-complete with name<->event_line mapping.
+On Wed, Apr 24, 2013 at 4:54 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On 24 April 2013 14:45, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Tue, Apr 9, 2013 at 8:39 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>>
+>> > The channels reserved for memcpy are the same for all currently
+>> > supported platforms. With this in mind, we can ease the platform
+>> > data passing requirement by moving these assignments out from
+>> > platform code and place them directly into the driver.
+>> >
+>> > Cc: Vinod Koul <vinod.koul@intel.com>
+>> > Cc: Dan Williams <djbw@fb.com>
+>> > Cc: Per Forlin <per.forlin@stericsson.com>
+>> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> (...)
+>>
+>> > -/* Reserved event lines for memcpy only */
+>> > -static int dma40_memcpy_event[] = {
+>> > -       DB8500_DMA_MEMCPY_TX_0,
+>> > -       DB8500_DMA_MEMCPY_TX_1,
+>> > -       DB8500_DMA_MEMCPY_TX_2,
+>> > -       DB8500_DMA_MEMCPY_TX_3,
+>> > -       DB8500_DMA_MEMCPY_TX_4,
+>> > -       DB8500_DMA_MEMCPY_TX_5,
+>> > -};
+>>
+>> (...)
+>>
+>> > +/* Reserved event lines for memcpy only. */
+>> > +static int dma40_memcpy_channels[] = { 56, 57, 58, 59, 60 };
+>>
+>> So what's so bad with using the #defines?
+>>
+>> I would prefer if you took the entire content of
+>> arch/arm/mach-ux500/ste-dma40-db8500.h
+>> and copied into the DMA driver, so you atleast
+>> have a chance of understanding what these numbers
+>> are about.
+>
+>
+> I did attempt to do that, but Arnd NAK:ed it:
+>
+> "Hmm, not sure about this one. The slave numbers are not really
+> platform_data and I think they should not be exposed to drivers. It
+> makes sense to keep the numbers for the memcpy channels in the driver
+> itself as they are hardwired in the driver, but the slave channels
+> should stay in the platform I think."
+>
+> ... and I didn't want to duplicate the defines, but I'll so whatever
+> you choose.
 
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: linux-usb at vger.kernel.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+I don't think I agree.
 
-diff --git a/drivers/usb/musb/ux500_dma.c b/drivers/usb/musb/ux500_dma.c
-index 8d5128d..99ad1fe 100644
---- a/drivers/usb/musb/ux500_dma.c
-+++ b/drivers/usb/musb/ux500_dma.c
-@@ -33,6 +33,11 @@
- #include <linux/platform_data/usb-musb-ux500.h>
- #include "musb_core.h"
- 
-+static const char *iep_chan_names[] = { "iep_1_9", "iep_2_10", "iep_3_11", "iep_4_12",
-+					"iep_5_13", "iep_6_14", "iep_7_15", "iep_8" };
-+static const char *oep_chan_names[] = { "oep_1_9", "oep_2_10", "oep_3_11", "oep_4_12",
-+					"oep_5_13", "oep_6_14", "oep_7_15", "oep_8" };
-+
- struct ux500_dma_channel {
- 	struct dma_channel channel;
- 	struct ux500_dma_controller *controller;
-@@ -289,6 +294,7 @@ static int ux500_dma_controller_start(struct dma_controller *c)
- 	struct musb_hdrc_platform_data *plat = dev->platform_data;
- 	struct ux500_musb_board_data *data;
- 	struct dma_channel *dma_channel = NULL;
-+	char **chan_names;
- 	u32 ch_num;
- 	u8 dir;
- 	u8 is_tx = 0;
-@@ -310,6 +316,7 @@ static int ux500_dma_controller_start(struct dma_controller *c)
- 	/* Prepare the loop for RX channels */
- 	channel_array = controller->rx_channel;
- 	param_array = data ? data->dma_rx_param_array : NULL;
-+	chan_names = (char **)iep_chan_names;
- 
- 	for (dir = 0; dir < 2; dir++) {
- 		for (ch_num = 0;
-@@ -325,9 +332,15 @@ static int ux500_dma_controller_start(struct dma_controller *c)
- 			dma_channel->status = MUSB_DMA_STATUS_FREE;
- 			dma_channel->max_len = SZ_16M;
- 
--			ux500_channel->dma_chan = dma_request_channel(mask,
--							data->dma_filter,
--							param_array[ch_num]);
-+			ux500_channel->dma_chan =
-+				dma_request_slave_channel(dev, chan_names[ch_num]);
-+
-+			if (!ux500_channel->dma_chan)
-+				ux500_channel->dma_chan =
-+					dma_request_channel(mask,
-+							    data->dma_filter,
-+							    param_array[ch_num]);
-+
- 			if (!ux500_channel->dma_chan) {
- 				ERR("Dma pipe allocation error dir=%d ch=%d\n",
- 					dir, ch_num);
-@@ -343,6 +356,7 @@ static int ux500_dma_controller_start(struct dma_controller *c)
- 		/* Prepare the loop for TX channels */
- 		channel_array = controller->tx_channel;
- 		param_array = data ? data->dma_tx_param_array : NULL;
-+		chan_names = (char **)oep_chan_names;
- 		is_tx = 1;
- 	}
+OK atleast define the numbers with something like
+#define DB8500_DMA_MEMCPY_TX_0 56
+etc, just hard-coding the numbers is pretty unhelpful, OK?
+
+Ultimately these 5 numbers should (optionally) come in from
+the device tree node for the DMA40 itself, maybe a later patch
+adds that...?
+
+Yours,
+Linus Walleij
