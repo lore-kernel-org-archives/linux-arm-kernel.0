@@ -1,48 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 Apr 2013 14:52:35 +0100
-Subject: [PATCH v3 31/32] arm64: KVM: userspace API documentation
-In-Reply-To: <20130423230252.GO20569@gmail.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-32-git-send-email-marc.zyngier@arm.com>
- <20130423230252.GO20569@gmail.com>
-Message-ID: <5177E3A3.4000600@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 24 Apr 2013 09:55:45 -0400
+Subject: [PATCH] cpuidle: add maintainer entry
+In-Reply-To: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20130424135545.GE13884@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/13 00:02, Christoffer Dall wrote:
-> On Mon, Apr 08, 2013 at 05:17:33PM +0100, Marc Zyngier wrote:
->> Unsurprisingly, the arm64 userspace API is extremely similar to
->> the 32bit one, the only significant difference being the ONE_REG
->> register mapping.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-
-[...]
-
->> +
->> +arm64 registers are mapped using the lower 32 bits. The upper 16 of
->> +that is the register group type, or coprocessor number:
->> +
->> +arm64 core/FP-SIMD registers have the following id bit patterns:
->> +  0x6002 0000 0010 <index into the kvm_regs struct:16>
->> +
->> +arm64 CCSIDR registers are demultiplexed by CSSELR value:
->> +  0x6002 0000 0011 00 <csselr:8>
->> +
->> +arm64 system registers have the following id bit patterns:
->> +  0x6002 0000 0013 <op0:2> <op1:3> <crn:4> <crm:4> <op2:3>
->> +
+On Wed, Apr 24, 2013 at 03:34:23PM +0200, Daniel Lezcano wrote:
+> Currently the cpuidle drivers are spread across the different archs.
 > 
-> I think these size encodings are 4 bits off, and not accurate for for
-> the core registers, which have variable sizes, which should be indicated
-> here (unless you decide for a separate category as per my other
-> comment).
+> The patch submission for cpuidle are following different path: the cpuidle core
+> code goes to linux-pm, the ARM drivers goes to arm-soc or the SoC specific
+> tree, sh goes through sh arch tree, pseries goes through PowerPC and
+> finally intel goes through Len's tree while acpi_idle goes under linux-pm.
+> 
+> That makes difficult to consolidate the code and to propagate modifications
+> from the cpuidle core to the different drivers.
+> 
+> Hopefully, a movement has initiated to put the cpuidle drivers into the
+> drivers/cpuidle directory like cpuidle-calxeda.c and cpuidle-kirkwood.c
+> 
+> Add an explicit maintainer entry in the MAINTAINER to clarify the situation
+> and prevent new cpuidle drivers to goes to an arch directory.
+> 
+> The upstreaming process is unchanged: Rafael takes the patches to merge them
+> into its tree but with the acked-by from the driver's maintainer. So the header
+> must contains the name of the maintainer.
+> 
+> This organization will be the same than cpufreq.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  MAINTAINERS                        |    7 +++++++
+>  drivers/cpuidle/cpuidle-calxeda.c  |    4 +++-
+>  drivers/cpuidle/cpuidle-kirkwood.c |    5 +++--
+>  3 files changed, 13 insertions(+), 3 deletions(-)
 
-Indeed you're right, they're completely wrong. I realized that after
-your 32bit patch fixing the same thing...
+For the kirkwood bit:
 
-Thanks,
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+thx,
+
+Jason.
