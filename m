@@ -1,46 +1,62 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 24 Apr 2013 09:55:45 -0400
-Subject: [PATCH] cpuidle: add maintainer entry
-In-Reply-To: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20130424135545.GE13884@titan.lakedaemon.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 24 Apr 2013 18:00:28 +0400
+Subject: [PATCH 04/10] usb: musb: ux500: harden checks for platform data
+In-Reply-To: <20130424065344.GB17416@gmail.com>
+References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
+ <1366729394-11406-5-git-send-email-lee.jones@linaro.org>
+ <5176E927.908@cogentembedded.com> <20130424065344.GB17416@gmail.com>
+Message-ID: <5177E57C.3010802@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 03:34:23PM +0200, Daniel Lezcano wrote:
-> Currently the cpuidle drivers are spread across the different archs.
-> 
-> The patch submission for cpuidle are following different path: the cpuidle core
-> code goes to linux-pm, the ARM drivers goes to arm-soc or the SoC specific
-> tree, sh goes through sh arch tree, pseries goes through PowerPC and
-> finally intel goes through Len's tree while acpi_idle goes under linux-pm.
-> 
-> That makes difficult to consolidate the code and to propagate modifications
-> from the cpuidle core to the different drivers.
-> 
-> Hopefully, a movement has initiated to put the cpuidle drivers into the
-> drivers/cpuidle directory like cpuidle-calxeda.c and cpuidle-kirkwood.c
-> 
-> Add an explicit maintainer entry in the MAINTAINER to clarify the situation
-> and prevent new cpuidle drivers to goes to an arch directory.
-> 
-> The upstreaming process is unchanged: Rafael takes the patches to merge them
-> into its tree but with the acked-by from the driver's maintainer. So the header
-> must contains the name of the maintainer.
-> 
-> This organization will be the same than cpufreq.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  MAINTAINERS                        |    7 +++++++
->  drivers/cpuidle/cpuidle-calxeda.c  |    4 +++-
->  drivers/cpuidle/cpuidle-kirkwood.c |    5 +++--
->  3 files changed, 13 insertions(+), 3 deletions(-)
+Hello.
 
-For the kirkwood bit:
+On 24-04-2013 10:53, Lee Jones wrote:
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+>>>   	struct musb_hdrc_platform_data *plat = dev->platform_data;
+>>> -	struct ux500_musb_board_data *data = plat->board_data;
+>>> +	struct ux500_musb_board_data *data;
 
-thx,
+>>> -	param_array = data->dma_rx_param_array;
+>>> +	param_array = (data) ? data->dma_rx_param_array : NULL;
 
-Jason.
+>>     Why enclose a simple variable in parens?
+
+> Because 'data' is a pointer, so it contains a memory location,
+
+    Pointer points to memory location, not contains it.
+
+> but if
+> 'plat->board_data' is NULL, then 'data' will be NULL (essentially
+> memory location 0x00000000).
+
+    So what?
+
+> So if we were to read-in to 'struct ux500_musb_board_data *data', by
+> index 'dma_rx_param_array', which I believe is '0' in this case:
+
+> struct ux500_musb_board_data {
+>          void    **dma_rx_param_array;
+>          void    **dma_tx_param_array;
+>          bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
+> };
+
+> ... then we're saying take the data from this memory location:
+
+> param_array = *((0x00000000)->(0x0));
+
+> Which will cause a kernel Oops, due to the fact that address 0x0 isn't
+> allocated to us, so you get something like:
+
+> "Unable to handle kernel NULL pointer dereference at virtual address 00000000"
+
+    We're not dereferencing 'data', so I completely fail to follow you.
+
+> Hope that helps.
+
+    Not at all.
+
+> Kind regards,
+> Lee
+
+WBR, Sergei
