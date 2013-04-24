@@ -1,21 +1,31 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 24 Apr 2013 19:43:06 +0800
-Subject: [PATCH V4] ARM: i.MX5: Allow DT clock providers
-In-Reply-To: <CAOMZO5CDPwwA2LhugUBxABz9dZXgLG7F3_osMDiiPO+5odzvsg@mail.gmail.com>
-References: <20130423091633.22088.58225.stgit@localhost>
- <20130423122007.GE27475@S2101-09.ap.freescale.net>
- <CAOMZO5CDPwwA2LhugUBxABz9dZXgLG7F3_osMDiiPO+5odzvsg@mail.gmail.com>
-Message-ID: <CAAQ0ZWQdsSVz0bLmR1rQtzp_r2iOxzxRXSN7k8-oMKtHBiWGXA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 24 Apr 2013 12:43:21 +0100
+Subject: [PATCH v3 19/32] arm64: KVM: Plug the VGIC
+In-Reply-To: <20130423230012.GG20569@gmail.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-20-git-send-email-marc.zyngier@arm.com>
+ <20130423230012.GG20569@gmail.com>
+Message-ID: <5177C559.9070806@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 11:39:13PM -0300, Fabio Estevam wrote:
-> On Tue, Apr 23, 2013 at 9:20 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->
-> > Applied with a small fixup below.
->
-> Into which branch, please? I could not find it in your tree.
+On 24/04/13 00:00, Christoffer Dall wrote:
+> On Mon, Apr 08, 2013 at 05:17:21PM +0100, Marc Zyngier wrote:
+>> Add support for the in-kernel GIC emulation. The include file
+>> is a complete duplicate of the 32bit one - something to fix
+>> at one point.
+> 
+> seems like something that should be fixed sooner as opposed to later...
+> Is it hard?
 
-Just pushed branch imx/soc-3.11 for that.
+Hard? No. Disgusting? Yes.
 
-Shawn
+You need to find a common location for the files. Something like
+virt/kvm/arm/vgic.h? The x86/ia64 guys already have virt/kvm/ioapic.h as
+a (bad) precedent.
+
+While your at it, you could put a lot of the common code there as well.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
