@@ -1,38 +1,41 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 Apr 2013 12:27:39 +0100
-Subject: [PATCH v3 15/32] arm64: KVM: guest one-reg interface
-In-Reply-To: <20130423225937.GE20569@gmail.com>
+Date: Wed, 24 Apr 2013 12:39:39 +0100
+Subject: [PATCH v3 17/32] arm64: KVM: HYP mode world switch implementation
+In-Reply-To: <20130423225958.GF20569@gmail.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-16-git-send-email-marc.zyngier@arm.com>
- <20130423225937.GE20569@gmail.com>
-Message-ID: <5177C1AB.3090301@arm.com>
+ <1365437854-30214-18-git-send-email-marc.zyngier@arm.com>
+ <20130423225958.GF20569@gmail.com>
+Message-ID: <5177C47B.6090502@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 23/04/13 23:59, Christoffer Dall wrote:
-> On Mon, Apr 08, 2013 at 05:17:17PM +0100, Marc Zyngier wrote:
->> Let userspace play with the guest registers.
+> On Mon, Apr 08, 2013 at 05:17:19PM +0100, Marc Zyngier wrote:
+>> The HYP mode world switch in all its glory.
+>>
+>> Implements save/restore of host/guest registers, EL2 trapping,
+>> IPA resolution, and additional services (tlb invalidation).
 >>
 >> Reviewed-by: Christopher Covington <cov@codeaurora.org>
 >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >> ---
->>  arch/arm64/kvm/guest.c | 254 +++++++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 254 insertions(+)
->>  create mode 100644 arch/arm64/kvm/guest.c
+>>  arch/arm64/kernel/asm-offsets.c |  34 +++
+>>  arch/arm64/kvm/hyp.S            | 602 ++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 636 insertions(+)
+>>  create mode 100644 arch/arm64/kvm/hyp.S
 >>
->> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+
+[...]
+
+>> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
 >> new file mode 100644
->> index 0000000..47d3729
+>> index 0000000..c745d20
 >> --- /dev/null
->> +++ b/arch/arm64/kvm/guest.c
->> @@ -0,0 +1,254 @@
+>> +++ b/arch/arm64/kvm/hyp.S
+>> @@ -0,0 +1,602 @@
 >> +/*
 >> + * Copyright (C) 2012,2013 - ARM Ltd
 >> + * Author: Marc Zyngier <marc.zyngier@arm.com>
->> + *
->> + * Derived from arch/arm/kvm/guest.c:
->> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
->> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 >> + *
 >> + * This program is free software; you can redistribute it and/or modify
 >> + * it under the terms of the GNU General Public License version 2 as
@@ -47,184 +50,148 @@ On 23/04/13 23:59, Christoffer Dall wrote:
 >> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 >> + */
 >> +
->> +#include <linux/errno.h>
->> +#include <linux/err.h>
->> +#include <linux/kvm_host.h>
->> +#include <linux/module.h>
->> +#include <linux/vmalloc.h>
->> +#include <linux/fs.h>
->> +#include <asm/cputype.h>
->> +#include <asm/uaccess.h>
+>> +#include <linux/linkage.h>
+>> +#include <linux/irqchip/arm-gic.h>
+>> +
+>> +#include <asm/assembler.h>
+>> +#include <asm/memory.h>
+>> +#include <asm/asm-offsets.h>
+>> +#include <asm/fpsimdmacros.h>
 >> +#include <asm/kvm.h>
 >> +#include <asm/kvm_asm.h>
->> +#include <asm/kvm_emulate.h>
->> +#include <asm/kvm_coproc.h>
+>> +#include <asm/kvm_arm.h>
+>> +#include <asm/kvm_mmu.h>
 >> +
->> +struct kvm_stats_debugfs_item debugfs_entries[] = {
->> +	{ NULL }
->> +};
+>> +#define CPU_GP_REG_OFFSET(x) (CPU_GP_REGS + x)
+>> +#define CPU_XREG_OFFSET(x)   CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
+>> +#define CPU_SPSR_OFFSET(x)   CPU_GP_REG_OFFSET(CPU_SPSR + 8*x)
+>> +#define CPU_SYSREG_OFFSET(x) (CPU_SYSREGS + 8*x)
 >> +
->> +int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
->> +{
->> +	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
->> +	return 0;
->> +}
+>> +     .text
+>> +     .pushsection    .hyp.text, "ax"
+>> +     .align  PAGE_SHIFT
 >> +
->> +static u64 core_reg_offset_from_id(u64 id)
->> +{
->> +	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
->> +}
+>> +__kvm_hyp_code_start:
+>> +     .globl __kvm_hyp_code_start
 >> +
->> +static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->> +{
->> +	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
->> +	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
->> +	int nr_regs = sizeof(*regs) / sizeof(__u32);
+>> +.macro save_common_regs
+>> +     // x2: base address for cpu context
+>> +     // x3: tmp register
 > 
-> eh, arent' your regs 64 bit?  Or are you 32-bit indexing into a 64-bit
-> structure?  If so, this needs to be described in a big fat comment
-> somewhere, which I couldn't even see looking forward in the patch series
-> for the documentation part.
+> what's with the C99 style comments? Standard for arm64 assembly?
 
-As you noticed below, we have a mix of 32/64/128bit fields there. The
-index is indeed on 32bit boundary.
+Yes. The toolchain guys got rid of '@' as a single line comment delimiter.
 
-> Seems to me you'd want to remove the fp_regs from the core regs and just
-> use a 64-bit indexing and have a separate category for the fp stuff...
+[...]
 
-Hell no! ;-)
-
-FP is mandatory on arm64, and I'm not going down the road of having
-separate structures for that. 32bit has historical baggage to deal with,
-but not arm64.
-
-This is the register set, and if the ONE_REG API is too cumbersome to
-deal with it, then lets change ONE_REG instead (yes, I can run faster
-than you think... ;-).
-
->> +	u32 off;
+>> +el1_sync:                                    // Guest trapped into EL2
+>> +     push    x0, x1
+>> +     push    x2, x3
 >> +
->> +	/* Our ID is an index into the kvm_regs struct. */
->> +	off = core_reg_offset_from_id(reg->id);
->> +	if (off >= nr_regs ||
->> +	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
+>> +     mrs     x1, esr_el2
+>> +     lsr     x2, x1, #ESR_EL2_EC_SHIFT
+>> +
+>> +     cmp     x2, #ESR_EL2_EC_HVC64
+>> +     b.ne    el1_trap
+>> +
+>> +     mrs     x3, vttbr_el2                   // If vttbr is valid, the 64bit guest
+>> +     cbnz    x3, el1_trap                    // called HVC
+>> +
+>> +     /* Here, we're pretty sure the host called HVC. */
+>> +     pop     x2, x3
+>> +     pop     x0, x1
+>> +
+>> +     push    lr, xzr
+>> +
+>> +     /*
+>> +      * Compute the function address in EL2, and shuffle the parameters.
+>> +      */
+>> +     kern_hyp_va     x0
+>> +     mov     lr, x0
+>> +     mov     x0, x1
+>> +     mov     x1, x2
+>> +     mov     x2, x3
+>> +     blr     lr
+>> +
+>> +     pop     lr, xzr
+>> +     eret
+>> +
+>> +el1_trap:
+>> +     /*
+>> +      * x1: ESR
+>> +      * x2: ESR_EC
+>> +      */
+>> +     cmp     x2, #ESR_EL2_EC_DABT
+>> +     mov     x0, #ESR_EL2_EC_IABT
+>> +     ccmp    x2, x0, #4, ne
+>> +     b.ne    1f              // Not an abort we care about
 > 
-> According to your documentation you will always save/restore 32-bit
-> registers here, so the desijunction shouldn't be necessary, nor will it
-> be if you just base everything on 64-bit here.
+> why do we get the hpfar_el2 if it's not an abort (or is this for a
+> special type of abort) ?
 
-No. Your *offset* is a 32bit index. The size can be anything, and you
-want to make sure you don't read/write past the kvm_regs structure.
+No, we could actually avoid saving HPFAR_EL2 altogether in this case.
 
->> +		return -ENOENT;
 >> +
->> +	if (copy_to_user(uaddr, ((u32 *)regs) + off, KVM_REG_SIZE(reg->id)))
->> +		return -EFAULT;
+>> +     /* This is an abort. Check for permission fault */
+>> +     and     x2, x1, #ESR_EL2_FSC_TYPE
+>> +     cmp     x2, #FSC_PERM
+>> +     b.ne    1f              // Not a permission fault
 >> +
->> +	return 0;
->> +}
+>> +     /*
+>> +      * Check for Stage-1 page table walk, which is guaranteed
+>> +      * to give a valid HPFAR_EL2.
+>> +      */
+>> +     tbnz    x1, #7, 1f      // S1PTW is set
 >> +
->> +static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->> +{
->> +	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
->> +	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
->> +	int nr_regs = sizeof(*regs) / sizeof(__u32);
+>> +     /*
+>> +      * Permission fault, HPFAR_EL2 is invalid.
+>> +      * Resolve the IPA the hard way using the guest VA.
+>> +      * We always perform an EL1 lookup, as we already
+>> +      * went through Stage-1.
+>> +      */
 > 
-> same concern here
+> What does the last sentence mean exactly?
 
-Same answer.
+It means that the Stage-1 translation already validated the memory
+access rights. As such, we can use the EL1 translation regime, and don't
+have to distinguish between EL0 and EL1 access.
 
+>> +     mrs     x3, far_el2
+>> +     at      s1e1r, x3
+>> +     isb
+>> +
+>> +     /* Read result */
+>> +     mrs     x3, par_el1
+>> +     tbnz    x3, #1, 3f              // Bail out if we failed the translation
+>> +     ubfx    x3, x3, #12, #36        // Extract IPA
+>> +     lsl     x3, x3, #4              // and present it like HPFAR
+>> +     b       2f
+>> +
+>> +1:   mrs     x3, hpfar_el2
+>> +
+>> +2:   mrs     x0, tpidr_el2
+>> +     mrs     x2, far_el2
+>> +     str     x1, [x0, #VCPU_ESR_EL2]
+>> +     str     x2, [x0, #VCPU_FAR_EL2]
+>> +     str     x3, [x0, #VCPU_HPFAR_EL2]
+>> +
+>> +     mov     x1, #ARM_EXCEPTION_TRAP
+>> +     b       __kvm_vcpu_return
+>> +
+>> +     /*
+>> +      * Translation failed. Just return to the guest and
+>> +      * let it fault again. Another CPU is probably playing
+>> +      * behind our back.
+>> +      */
 > 
->> +	void *valp;
->> +	u64 off;
->> +	int err = 0;
->> +
->> +	/* Our ID is an index into the kvm_regs struct. */
->> +	off = core_reg_offset_from_id(reg->id);
->> +	if (off >= nr_regs ||
->> +	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
->> +		return -ENOENT;
->> +
->> +	valp = kmalloc(KVM_REG_SIZE(reg->id), GFP_KERNEL);
->> +	if (!valp)
->> +		return -ENOMEM;
-> 
-> Why are you dynamically allocating this?  Do you ever have anything
-> larger than a 64 bit core register? Just put that on the stack.
+> This actually makes me wonder if this is a potential DOS attack from
+> guests (on the 32-bit code as well), or are we sure that an asynchronous
+> timer interrupt to the host will always creep in between e.g. a tight
+> loop playing this trick on us?
 
-Look at what a ONE_REG access can be: up to 1kB. I'm not allocating that
-on the stack.
-
->> +
->> +	if (copy_from_user(valp, uaddr, KVM_REG_SIZE(reg->id))) {
->> +		err = -EFAULT;
->> +		goto out;
->> +	}
->> +
->> +	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
->> +		unsigned long mode = (*(unsigned long *)valp) & COMPAT_PSR_MODE_MASK;
->> +		switch (mode) {
->> +		case PSR_MODE_EL0t:
->> +		case PSR_MODE_EL1t:
->> +		case PSR_MODE_EL1h:
->> +			break;
->> +		default:
->> +			err = -EINVAL;
->> +			goto out;
->> +		}
->> +	}
->> +
->> +	memcpy((u32 *)regs + off, valp, KVM_REG_SIZE(reg->id));
->> +out:
->> +	kfree(valp);
->> +	return err;
->> +}
->> +
->> +int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
->> +{
->> +	return -EINVAL;
->> +}
->> +
->> +int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
->> +{
->> +	return -EINVAL;
->> +}
->> +
->> +static unsigned long num_core_regs(void)
->> +{
->> +	return sizeof(struct kvm_regs) / sizeof(unsigned long);
->> +}
->> +
->> +/**
->> + * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
->> + *
->> + * This is for all registers.
->> + */
->> +unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
->> +{
->> +	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu);
->> +}
->> +
->> +/**
->> + * kvm_arm_copy_reg_indices - get indices of all registers.
->> + *
->> + * We do core registers right here, then we apppend system regs.
->> + */
->> +int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
->> +{
->> +	unsigned int i;
->> +	const u64 core_reg = KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE;
->> +
->> +	for (i = 0; i < sizeof(struct kvm_regs)/sizeof(unsigned long); i++) {
-> 
-> nit: spaces around the division
-> nit: the kvm_regs struct uses __u64, so would be slightly more coherent
->      to use that for the sizeof(...) as well
-
-Actually, it should be __u32, as that is an index into the kvm_regs
-structure.
-
-Thanks,
+Host interrupts will fire as soon as you eret into the guest. At that
+point, the (malicious) guest will be scheduled out, just like a normal
+process.
 
 	M.
 -- 
