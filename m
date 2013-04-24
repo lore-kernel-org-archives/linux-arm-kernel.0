@@ -1,81 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Apr 2013 08:52:12 +0100
-Subject: [PATCH] ARM: ux500: Supply a DTS file for the u8540 platform
-In-Reply-To: <CACRpkdZWuw9O3-wr=g1AehZqmBR1YJ353w9ANfBTHhr5mRiwiw@mail.gmail.com>
-References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
- <1364908916-29803-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdafSvT5Xb=7sqnkRHcc4UKkVzr8jzThMgWn6459RDmKGw@mail.gmail.com>
- <20130404072907.GB3004@gmail.com>
- <CACRpkdZWuw9O3-wr=g1AehZqmBR1YJ353w9ANfBTHhr5mRiwiw@mail.gmail.com>
-Message-ID: <20130424075212.GE17416@gmail.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Wed, 24 Apr 2013 13:29:46 +0530
+Subject: [PATCHv3 00/14] drivers: mailbox: framework creation
+In-Reply-To: <51778C3B.7010501@st.com>
+References: <1363145021-14339-1-git-send-email-s-anna@ti.com>
+ <CABb+yY0RYkVeo2Sb4WsDJY0jf17488FEz0d2CB994eQaSOEsVg@mail.gmail.com>
+ <37C860A02101E749A747FA2D3C1E3C504A5DF7@DLEE11.ent.ti.com>
+ <CABb+yY1x4x_A+QtGG9ohsLPgs8c3nEVnd_ExJBGOOR8=6YLPFA@mail.gmail.com>
+ <37C860A02101E749A747FA2D3C1E3C504A63B4@DLEE11.ent.ti.com>
+ <51778C3B.7010501@st.com>
+Message-ID: <CAJe_ZhfF93wWuUBktnt8eBnYR6fauUngViALuopfeiQ7P_N1uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Apr 2013, Linus Walleij wrote:
+Hi Loic,
 
-> On Thu, Apr 4, 2013 at 9:29 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > This is a skeleton DTS file which only enables serial. Just using
-> > this simple file yields a terminal when booting u8540.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Now, wait... this doesn't work.
+On 24 April 2013 13:09, Loic PALLARDY <loic.pallardy@st.com> wrote:
+> Hi Jassi, Suman,
+>
+> Yes, the xxx_no_irq API has been introduced to answer some STE
+> requirements. It must be possible to send some message under atomic
+> context for different reasons (latency, during idle/suspend procedures...).
+> This is not the best way to do, but the goal was to preserve TI legacy
+> in a first step. As explained by Suman, this patch series is coming from
+> the original TI mailbox framework and is modified step by step to fit
+> with all platforms.
+>
+IMHO a better way is to introduce a clean generically designed API and
+convert the existing drivers one at time. Let the TI drivers work as
+such for a while until someone converts them to the common API.
+Cloning and then complete organ transplantation seems a very
+inefficient way to have something new ;)
 
-This is very strange and not what I see in my branch.
+>>>
+>>> (d) The 'struct mailbox_msg' should be just an opaque void* - the client/protocol
+>>> driver typecasts to void* the IPC controller specific message structure. API
+>>> shouldn't aim the impossible of providing a generic message format.
+>>
+>> The size parameter would still be needed. Depending on the h/w, it can be just an u32 or a series of bytes, and even in the latter case, it is not guaranteed that all messages transmitted will occupy the entire h/w shared memory data packet. I can see the current header field getting absorbed into the opaque void * structure for the ST mailbox driver. The size and ptr together provide a very generic message format.
+> That's something we discussed with Suman. The mailbox framework should
+> be independent from message format. Since mailbox could be base don a
+> shared mem or an hw fifo, message size is mandatory to transmit the
+> right number of data.
+>
+I too believe the "mailbox framework should be independent from
+message format" but _also_ that .size doesn't have to be a part of the
+standard format.
+Maybe it will help if I know what you guys mean by "shared mem" or an
+"hw fifo" mailbox?
 
-> > +/ {
-> > +  model = "ST-Ericsson U8540 platform with Device Tree";
-> > +  compatible = "st-ericsson,u8540";
-> > +
-> > +       memory {
-> > +              reg = <0x00000000 0x20000000>;
-> > +              };
-> 
-> Funny whitespace. Use tabs ...
-
-This a single tab in my branch/editor.
-
-> > +       soc-u9500 {
-> 
-> Please rename this not just "soc"
-
-Done.
-
-> > +                 uart at 80120000 {
-> > +                                       status = "okay";
-> > +                                              };
-> > +
-> > +               uart at 80121000 {
-> > +                               status = "okay";
-> > +                                      };
-> > +
-> > +               uart at 80007000 {
-> > +                               status = "okay";
-> > +                                      };
-> > +                                      };
-> > +};
-> 
-> The whitespace looks a bit funny compared to the
-> old patch, what happened here?
-> 
-> It also has the side effect that patch 5/9 does not
-> apply... By the way, since I already applied 4/9, please
-> squash 5/9 into this patch to avoid problems.
-
-It's quite common for issues to occur when patches are taken
-out-of-order. As I work with topic branches, my preference would
-normally be to fix issues with the patch-set as a whole until Acks are
-obtained for all of the patches, then either send a pull-request or to
-have all of the patches taken from the MLs in order.
-
-> Finally, please patch arch/arm/boot/dts/Makefile
-> in the obvious way so that the DTB gets compiled.
-
-Ah  yes. Good spot.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks
+-Jassi
