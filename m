@@ -1,106 +1,158 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 24 Apr 2013 10:32:16 -0700
-Subject: [PATCHv1 2/3] hwmon: Add documentation for g762 driver
-In-Reply-To: <24acd174f829d211f5d4c1b8631ffc3f8dd97910.1366753420.git.arno@natisbad.org>
-References: <cover.1366753420.git.arno@natisbad.org>
- <24acd174f829d211f5d4c1b8631ffc3f8dd97910.1366753420.git.arno@natisbad.org>
-Message-ID: <20130424173216.GA1073@roeck-us.net>
+From: dborkman@redhat.com (Daniel Borkmann)
+Date: Wed, 24 Apr 2013 19:41:34 +0200
+Subject: [PATCH V3 2/3] ARM: net: bpf_jit: make code generation less
+ dependent on struct sk_filter.
+In-Reply-To: <1366824429-26652-3-git-send-email-nschichan@freebox.fr>
+References: <1366824429-26652-1-git-send-email-nschichan@freebox.fr>
+ <1366824429-26652-3-git-send-email-nschichan@freebox.fr>
+Message-ID: <5178194E.5000403@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 12:06:08AM +0200, Arnaud Ebalard wrote:
-> 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+On 04/24/2013 07:27 PM, Nicolas Schichan wrote:
+> This is in preparation of bpf_jit support for seccomp filters.
+
+Please also CC the netdev list for BPF related patches.
+
+Just to give you a heads-up, this might likely lead to a merge
+conflict with the net-next tree (commit 79617801ea0c0e66, "filter:
+bpf_jit_comp: refactor and unify BPF JIT image dump output").
+
+> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
 > ---
->  Documentation/hwmon/g762 |   67 ++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 67 insertions(+)
->  create mode 100644 Documentation/hwmon/g762
-> 
-> diff --git a/Documentation/hwmon/g762 b/Documentation/hwmon/g762
-> new file mode 100644
-> index 0000000..5015829
-> --- /dev/null
-> +++ b/Documentation/hwmon/g762
-> @@ -0,0 +1,67 @@
-> +Kernel driver g762
-> +==================
+>   arch/arm/net/bpf_jit_32.c |   46 ++++++++++++++++++++++++++++-----------------
+>   1 file changed, 29 insertions(+), 17 deletions(-)
+>
+> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+> index a0bd8a7..bb66a2b 100644
+> --- a/arch/arm/net/bpf_jit_32.c
+> +++ b/arch/arm/net/bpf_jit_32.c
+> @@ -55,7 +55,8 @@
+>   #define FLAG_NEED_X_RESET	(1 << 0)
+>
+>   struct jit_ctx {
+> -	const struct sk_filter *skf;
+> +	unsigned short prog_len;
+> +	struct sock_filter *prog_insns;
+>   	unsigned idx;
+>   	unsigned prologue_bytes;
+>   	int ret0_fp_idx;
+> @@ -131,8 +132,8 @@ static u16 saved_regs(struct jit_ctx *ctx)
+>   {
+>   	u16 ret = 0;
+>
+> -	if ((ctx->skf->len > 1) ||
+> -	    (ctx->skf->insns[0].code == BPF_S_RET_A))
+> +	if ((ctx->prog_len > 1) ||
+> +	    (ctx->prog_insns[0].code == BPF_S_RET_A))
+>   		ret |= 1 << r_A;
+>
+>   #ifdef CONFIG_FRAME_POINTER
+> @@ -181,7 +182,7 @@ static inline bool is_load_to_a(u16 inst)
+>   static void build_prologue(struct jit_ctx *ctx)
+>   {
+>   	u16 reg_set = saved_regs(ctx);
+> -	u16 first_inst = ctx->skf->insns[0].code;
+> +	u16 first_inst = ctx->prog_insns[0].code;
+>   	u16 off;
+>
+>   #ifdef CONFIG_FRAME_POINTER
+> @@ -279,7 +280,7 @@ static u16 imm_offset(u32 k, struct jit_ctx *ctx)
+>   		ctx->imms[i] = k;
+>
+>   	/* constants go just after the epilogue */
+> -	offset =  ctx->offsets[ctx->skf->len];
+> +	offset =  ctx->offsets[ctx->prog_len];
+>   	offset += ctx->prologue_bytes;
+>   	offset += ctx->epilogue_bytes;
+>   	offset += i * 4;
+> @@ -419,7 +420,7 @@ static inline void emit_err_ret(u8 cond, struct jit_ctx *ctx)
+>   		emit(ARM_MOV_R(ARM_R0, ARM_R0), ctx);
+>   	} else {
+>   		_emit(cond, ARM_MOV_I(ARM_R0, 0), ctx);
+> -		_emit(cond, ARM_B(b_imm(ctx->skf->len, ctx)), ctx);
+> +		_emit(cond, ARM_B(b_imm(ctx->prog_len, ctx)), ctx);
+>   	}
+>   }
+>
+> @@ -469,14 +470,13 @@ static inline void update_on_xread(struct jit_ctx *ctx)
+>   static int build_body(struct jit_ctx *ctx)
+>   {
+>   	void *load_func[] = {jit_get_skb_b, jit_get_skb_h, jit_get_skb_w};
+> -	const struct sk_filter *prog = ctx->skf;
+>   	const struct sock_filter *inst;
+>   	unsigned i, load_order, off, condt;
+>   	int imm12;
+>   	u32 k;
+>
+> -	for (i = 0; i < prog->len; i++) {
+> -		inst = &(prog->insns[i]);
+> +	for (i = 0; i < ctx->prog_len; i++) {
+> +		inst = &(ctx->prog_insns[i]);
+>   		/* K as an immediate value operand */
+>   		k = inst->k;
+>
+> @@ -769,8 +769,8 @@ cmp_x:
+>   				ctx->ret0_fp_idx = i;
+>   			emit_mov_i(ARM_R0, k, ctx);
+>   b_epilogue:
+> -			if (i != ctx->skf->len - 1)
+> -				emit(ARM_B(b_imm(prog->len, ctx)), ctx);
+> +			if (i != ctx->prog_len - 1)
+> +				emit(ARM_B(b_imm(ctx->prog_len, ctx)), ctx);
+>   			break;
+>   		case BPF_S_MISC_TAX:
+>   			/* X = A */
+> @@ -858,7 +858,7 @@ b_epilogue:
+>   }
+>
+>
+> -void bpf_jit_compile(struct sk_filter *fp)
+> +static void __bpf_jit_compile(struct jit_ctx *out_ctx)
+>   {
+>   	struct jit_ctx ctx;
+>   	unsigned tmp_idx;
+> @@ -867,11 +867,10 @@ void bpf_jit_compile(struct sk_filter *fp)
+>   	if (!bpf_jit_enable)
+>   		return;
+>
+> -	memset(&ctx, 0, sizeof(ctx));
+> -	ctx.skf		= fp;
+> +	ctx = *out_ctx;
+>   	ctx.ret0_fp_idx = -1;
+>
+> -	ctx.offsets = kzalloc(4 * (ctx.skf->len + 1), GFP_KERNEL);
+> +	ctx.offsets = kzalloc(4 * (ctx.prog_len + 1), GFP_KERNEL);
+>   	if (ctx.offsets == NULL)
+>   		return;
+>
+> @@ -921,13 +920,26 @@ void bpf_jit_compile(struct sk_filter *fp)
+>   		print_hex_dump(KERN_INFO, "BPF JIT code: ",
+>   			       DUMP_PREFIX_ADDRESS, 16, 4, ctx.target,
+>   			       alloc_size, false);
+> -
+> -	fp->bpf_func = (void *)ctx.target;
+>   out:
+>   	kfree(ctx.offsets);
 > +
-> +This documentation is based on G760a one, GMT G762 datasheet available
-
-G760a ? If this refers to Documentation/hwmon/g760a, I think it is just
-confusing.
-
-> +at http://natisbad.org/NAS/ref/GMT_EDS-762_763-080710-0.2.pdf (used
-> +for the development of the driver) and sysfs bindings described in
-
-I would hope that you used the data sheet for the driver ;), but that
-information does not add much if any value here. I would suggest
-to drop it. Just point to the data sheet.
-
-> +Documentation/hwmon/sysfs-interface.
+> +	*out_ctx = ctx;
+>   	return;
+>   }
+>
+> +void bpf_jit_compile(struct sk_filter *fp)
+> +{
+> +	struct jit_ctx ctx;
 > +
-> +The GMT G762 Fan Speed PWM Controller is connected directly to a fan
-> +and performs closed-loop or open-loop control of the fan speed. Two
-> +modes - PWM or linear - are supported by the device.
+> +	memset(&ctx, 0, sizeof(ctx));
+> +	ctx.prog_len = fp->len;
+> +	ctx.prog_insns = fp->insns;
 > +
-> +The following entries are available to the user in a subdirectory of
-> +/sys/bus/i2c/drivers/g762/ to control the operation of the device.
-> +This can be done manually using the following entries but is usually
-> +done via a userland daemon like fancontrol.
+> +	__bpf_jit_compile(&ctx);
+> +	if (ctx.target)
+> +		fp->bpf_func = (void *)ctx.target;
+> +}
 > +
-> +Note that those entries do not provide ways to setup the specific
-> +hardware characteristics of the system (reference clock, pulses per
-> +fan revolution, ...); Those can be modified via devicetree bindings
-> +documented in Documentation/devicetree/bindings/hwmon/g762.txt.
-> +
-> +
-> +  fan1_target: set desired fan speed. This only makes sense in closed-loop
-> +            fan speed control (i.e. when pwm1_enable is set to 2).
-> +
-> +  fan1_input: provide current fan rotation value in RPM as reported by
-> +            the fan to the device.
-> +
-> +  fan1_div: fan clock divisor. Supported value are 1, 2, 4 and 8. Default
-> +            value is 1.
-> +
-> +  fan1_gear_mode: fan gear mode. Supported values are 0, 1 and 2. Default
-> +            value is 0. The value is a characteristic of the system
-> +            and a higher value can be set for more precisely control
-> +            fans with a high rotation speed. Note that this affects the
-> +            measurable speed range, not the read value.
-> +
-This attribute no longer exists.
-
-> +  fan1_fault: reports fan failure, i.e. no transition on fan gear pin for
-> +            about 0.7s (if the fan is not voluntarily set off).
-> +
-> +  fan1_alarm: in closed-loop control mode, if fan RPM value is 25% out
-> +            of the programmed value for over 6 seconds 'fan1_alarm' is
-> +            set to 1.
-> +
-> +  pwm1: get or set PWM fan control value. This is an integer value
-> +            between 0 and 255. 0 stops the fan, 255 makes it run at
-> +            full speed.
-> +
-> +  pwm1_enable: set current fan speed control mode i.e. 1 for manual fan
-> +            speed control (open-loop), 2 for automatic fan speed control
-> +            (closed-loop).
-> +
-> +  pwm1_mode: set or get fan driving mode: 1 for PWM mode, 0 for linear
-> +            mode. Default is linear mode.
-> +
-> +
-> +In PWM mode ('pwm1_mode' set to 1), the fan speed is programmed either by
-> +setting a value between 0 and 255 via 'pwm1' entry (0 stops the fan, 255
-> +makes it run at full speed). This can also be done by passing the
-> +expected RPM value via 'fan1_target'. Current fan speed value can be
-> +retrieved via 'fan1_input'. This fan speed value is computed based on
-> +the parameters associated with the physical characteristics of the
-> +system: a reference clock source frequency, a number of pulses per fan
-> +revolution, etc.
-> +
-> +Note that the driver will update its values at most once per second.
-> -- 
-> 1.7.10.4
-> 
-> 
+>   static void bpf_jit_free_worker(struct work_struct *work)
+>   {
+>   	module_free(NULL, work);
+>
