@@ -1,72 +1,38 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 24 Apr 2013 19:40:19 +0100
-Subject: [PATCH v8 2/2] ARM: Enable selection of SMP operations at boot time
-In-Reply-To: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
-Message-ID: <1366828819-10745-2-git-send-email-stefano.stabellini@eu.citrix.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 24 Apr 2013 20:43:59 +0200
+Subject: [PATCH V2] video: imx: Select VIDEOMODE_HELPERS for parallel display
+Message-ID: <1366829039-12452-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Medhurst <tixy@linaro.org>
+Without this, I get the following problem when building kernel:
 
-Add a new 'smp_init' hook to machine_desc so platforms can specify a
-function to be used to setup smp ops instead of having a statically
-defined value.  The hook must return true when smp_ops are initialized.
-If false the static mdesc->smp_ops will be used by default.
+drivers/built-in.o: In function `imx_pd_connector_get_modes':
+/linux-2.6/drivers/staging/imx-drm/parallel-display.c:78: undefined reference to `of_get_drm_display_mode'
+make: *** [vmlinux] Error 1
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/include/asm/mach/arch.h |    4 ++++
- arch/arm/kernel/setup.c          |   10 ++++++----
- 2 files changed, 10 insertions(+), 4 deletions(-)
+ drivers/staging/imx-drm/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 308ad7d..4669e0b 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -16,8 +16,10 @@ struct pt_regs;
- struct smp_operations;
- #ifdef CONFIG_SMP
- #define smp_ops(ops) (&(ops))
-+#define smp_init_ops(ops) (&(ops))
- #else
- #define smp_ops(ops) (struct smp_operations *)NULL
-+#define smp_init_ops(ops) (bool (*)(void))NULL
- #endif
+V2: Select VIDEOMODE_HELPERS only for parallel display
+
+diff --git a/drivers/staging/imx-drm/Kconfig b/drivers/staging/imx-drm/Kconfig
+index 8c9e403..0550f01 100644
+--- a/drivers/staging/imx-drm/Kconfig
++++ b/drivers/staging/imx-drm/Kconfig
+@@ -19,6 +19,7 @@ config DRM_IMX_FB_HELPER
+ config DRM_IMX_PARALLEL_DISPLAY
+ 	tristate "Support for parallel displays"
+ 	depends on DRM_IMX
++	select VIDEOMODE_HELPERS
  
- struct machine_desc {
-@@ -41,6 +43,8 @@ struct machine_desc {
- 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
- 	char			restart_mode;	/* default restart mode	*/
- 	struct smp_operations	*smp;		/* SMP operations	*/
-+	/* Detect smp_ops dynamically, based on DT */
-+	bool			(*smp_init)(void);
- 	void			(*fixup)(struct tag *, char **,
- 					 struct meminfo *);
- 	void			(*reserve)(void);/* reserve mem blocks	*/
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index dad3048..22cc863 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -770,10 +770,12 @@ void __init setup_arch(char **cmdline_p)
- 	psci_init();
- #ifdef CONFIG_SMP
- 	if (is_smp()) {
--		if (psci_smp_available())
--			smp_set_ops(&psci_smp_ops);
--		else if (mdesc->smp)
--			smp_set_ops(mdesc->smp);
-+		if (!mdesc->smp_init || !mdesc->smp_init()) {
-+			if (psci_smp_available())
-+				smp_set_ops(&psci_smp_ops);
-+			else if (mdesc->smp)
-+				smp_set_ops(mdesc->smp);
-+		}
- 		smp_init_cpus();
- 	}
- #endif
+ config DRM_IMX_TVE
+ 	tristate "Support for TV and VGA displays"
 -- 
-1.7.2.5
+1.7.10.4
