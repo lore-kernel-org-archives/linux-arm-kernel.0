@@ -1,256 +1,499 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 Apr 2013 14:13:37 +0100
-Subject: [PATCH v3 25/32] arm64: KVM: 32bit conditional execution emulation
-In-Reply-To: <20130423230057.GJ20569@gmail.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-26-git-send-email-marc.zyngier@arm.com>
- <20130423230057.GJ20569@gmail.com>
-Message-ID: <5177DA81.3020400@arm.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 24 Apr 2013 15:26:21 +0200
+Subject: [PATCH v4 2/2] video: imxfb: Add DT support
+In-Reply-To: <20130422155125.GI4998@game.jcrosoft.org>
+References: <1366290183-367-1-git-send-email-mpa@pengutronix.de>
+ <1366290183-367-3-git-send-email-mpa@pengutronix.de>
+ <20130418160614.GF4998@game.jcrosoft.org>
+ <20130421081115.GA31179@pengutronix.de>
+ <20130422155125.GI4998@game.jcrosoft.org>
+Message-ID: <20130424132621.GG3973@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/13 00:00, Christoffer Dall wrote:
-> On Mon, Apr 08, 2013 at 05:17:27PM +0100, Marc Zyngier wrote:
->> As conditional instructions can trap on AArch32, add the thinest
->> possible emulation layer to keep 32bit guests happy.
->>
->> Reviewed-by: Christopher Covington <cov@codeaurora.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/include/asm/kvm_emulate.h |  13 ++-
->>  arch/arm64/kvm/Makefile              |   2 +-
->>  arch/arm64/kvm/emulate.c             | 154 +++++++++++++++++++++++++++++++++++
->>  3 files changed, 166 insertions(+), 3 deletions(-)
->>  create mode 100644 arch/arm64/kvm/emulate.c
->>
->> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
->> index 37a6567..8d4ab33 100644
->> --- a/arch/arm64/include/asm/kvm_emulate.h
->> +++ b/arch/arm64/include/asm/kvm_emulate.h
->> @@ -31,6 +31,9 @@
->>  unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
->>  unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
->>  
->> +bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
->> +void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
->> +
->>  void kvm_inject_undefined(struct kvm_vcpu *vcpu);
->>  void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
->>  void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
->> @@ -57,12 +60,18 @@ static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
->>  
->>  static inline bool kvm_condition_valid(const struct kvm_vcpu *vcpu)
->>  {
->> -	return true;	/* No conditionals on arm64 */
->> +	if (vcpu_mode_is_32bit(vcpu))
->> +		return kvm_condition_valid32(vcpu);
->> +
->> +	return true;
->>  }
->>  
->>  static inline void kvm_skip_instr(struct kvm_vcpu *vcpu, bool is_wide_instr)
->>  {
->> -	*vcpu_pc(vcpu) += 4;
->> +	if (vcpu_mode_is_32bit(vcpu))
->> +		kvm_skip_instr32(vcpu, is_wide_instr);
->> +	else
->> +		*vcpu_pc(vcpu) += 4;
->>  }
->>  
->>  static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
->> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
->> index 1668448..88c6639 100644
->> --- a/arch/arm64/kvm/Makefile
->> +++ b/arch/arm64/kvm/Makefile
->> @@ -11,7 +11,7 @@ obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
->>  kvm-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o)
->>  kvm-$(CONFIG_KVM_ARM_HOST) += $(addprefix ../../../arch/arm/kvm/, arm.o mmu.o mmio.o psci.o perf.o)
->>  
->> -kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o
->> +kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
->>  kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
->>  kvm-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
->>  
->> diff --git a/arch/arm64/kvm/emulate.c b/arch/arm64/kvm/emulate.c
->> new file mode 100644
->> index 0000000..01d4713
->> --- /dev/null
->> +++ b/arch/arm64/kvm/emulate.c
->> @@ -0,0 +1,154 @@
->> +/*
->> + * (not much of an) Emulation layer for 32bit guests.
->> + *
->> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
->> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
+On Mon, Apr 22, 2013 at 05:51:25PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 10:11 Sun 21 Apr     , Markus Pargmann wrote:
+> > On Thu, Apr 18, 2013 at 06:06:14PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > On 15:03 Thu 18 Apr     , Markus Pargmann wrote:
+> > > > Add devicetree support for imx framebuffer driver. It uses the generic
+> > > > display bindings and helper functions.
+> > > > 
+> > > > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > > > Cc: Fabio Estevam <festevam@gmail.com>
+> > > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > > ---
+> > > > 
+> > > > Notes:
+> > > >     Changes in v4:
+> > > >     - Remove eukrea specific dmacr property.
+> > > >     - Add optional dmacr property. If not present, the dmacr reset value is not
+> > > >       changed.
+> > > >     
+> > > >     Changes in v3:
+> > > >     - Fix returncodes of of_read_mode function and print error messages
+> > > >     - Introduce a lower bound check for bits per pixel
+> > > >     - Calculate correct bytes per pixel value before using it for the calculation of
+> > > >     	memory size
+> > > >     - Change DT property names
+> > > >     
+> > > >     Changes in v2:
+> > > >     - Removed pwmr register property
+> > > >     - Cleanup of devicetree binding documentation
+> > > >     - Use default values for pwmr and lscr1
+> > > > 
+> > > >  .../devicetree/bindings/video/fsl,imx-fb.txt       |  51 ++++++
+> > > >  drivers/video/imxfb.c                              | 194 +++++++++++++++++----
+> > > >  2 files changed, 210 insertions(+), 35 deletions(-)
+> > > >  create mode 100644 Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/video/fsl,imx-fb.txt b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > > > new file mode 100644
+> > > > index 0000000..aff16a4
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/video/fsl,imx-fb.txt
+> > > > @@ -0,0 +1,51 @@
+> > > > +Freescale imx21 Framebuffer
+> > > > +
+> > > > +This framebuffer driver supports devices imx1, imx21, imx25, and imx27.
+> > > > +
+> > > > +Required properties:
+> > > > +- compatible : "fsl,<chip>-fb", chip should be imx1 or imx21
+> > > > +- reg : Should contain 1 register ranges(address and length)
+> > > > +- interrupts : One interrupt of the fb dev
+> > > > +
+> > > > +Required nodes:
+> > > > +- display: Phandle to a display node as described in
+> > > > +	Documentation/devicetree/bindings/video/display-timing.txt
+> > > > +	Additional, the display node has to define properties:
+> > > > +	- fsl,bpp: Bits per pixel
+> > > > +	- fsl,pcr: LCDC PCR value
+> > > > +
+> > > > +Optional properties:
+> > > > +- fsl,dmacr: DMA Control Register value. This is optional. By default, the
+> > > > +	register is not modified as recommended by the datasheet.
+> > > > +- fsl,lscr1: LCDC Sharp Configuration Register value.
+> > > > +
+> > > > +Example:
+> > > > +
+> > > > +	imxfb: fb at 10021000 {
+> > > > +		compatible = "fsl,imx27-fb", "fsl,imx21-fb";
+> > > you put both when in the doc you request one
+> > 
+> > Thanks, fixed.
+> > 
+> > > > +		interrupts = <61>;
+> > > > +		reg = <0x10021000 0x1000>;
+> > > > +		display = <&display0>;
+> > > > +	};
+> > > > +
+> > > > +	...
+> > > > +
+> > > > +	display0: display0 {
+> > > > +		model = "Primeview-PD050VL1";
+> > > > +		native-mode = <&timing_disp0>;
+> > > > +		fsl,bpp = <16>;		/* non-standard but required */
+> > > there is a generic binding bit-per-pixel use a cross other IP
+> > 
+> > I can't find a generic binding for that. There are only 2 other drivers
+> > using a "bpp" property, but they both use it within different contexts.
+> > tilcdc panel uses it within a "panel-info" property and via,vt8500-fb
+> > within modes. So I think it would be better to use a clear distinction
+> > because there is no generic binding. That was also suggested in comments
+> > on version 2 of this patch:
+> > https://patchwork.kernel.org/patch/2220511/
 > 
-> don't you want to add yourself here?
-
-There's really nothing I actually wrote here. Most of it is your code,
-and the rest comes from other parts of arch/arm.
-
-I guess I could always mention myself for the ESR_EL2_* macros... ;-)
-
->> + *
->> + * This program is free software: you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->> + */
->> +
->> +#include <linux/kvm_host.h>
->> +#include <asm/kvm_emulate.h>
->> +
->> +/*
->> + * stolen from arch/arm/kernel/opcodes.c
->> + *
->> + * condition code lookup table
->> + * index into the table is test code: EQ, NE, ... LT, GT, AL, NV
->> + *
->> + * bit position in short is condition code: NZCV
->> + */
->> +static const unsigned short cc_map[16] = {
->> +	0xF0F0,			/* EQ == Z set            */
->> +	0x0F0F,			/* NE                     */
->> +	0xCCCC,			/* CS == C set            */
->> +	0x3333,			/* CC                     */
->> +	0xFF00,			/* MI == N set            */
->> +	0x00FF,			/* PL                     */
->> +	0xAAAA,			/* VS == V set            */
->> +	0x5555,			/* VC                     */
->> +	0x0C0C,			/* HI == C set && Z clear */
->> +	0xF3F3,			/* LS == C clear || Z set */
->> +	0xAA55,			/* GE == (N==V)           */
->> +	0x55AA,			/* LT == (N!=V)           */
->> +	0x0A05,			/* GT == (!Z && (N==V))   */
->> +	0xF5FA,			/* LE == (Z || (N!=V))    */
->> +	0xFFFF,			/* AL always              */
->> +	0			/* NV                     */
->> +};
->> +
->> +static int kvm_vcpu_get_condition(const struct kvm_vcpu *vcpu)
->> +{
->> +	u32 esr = kvm_vcpu_get_hsr(vcpu);
->> +
->> +	if (esr & ESR_EL2_CV)
->> +		return (esr & ESR_EL2_COND) >> ESR_EL2_COND_SHIFT;
->> +
->> +	return -1;
->> +}
->> +
->> +/*
->> + * Check if a trapped instruction should have been executed or not.
->> + */
->> +bool kvm_condition_valid32(const struct kvm_vcpu *vcpu)
->> +{
->> +	unsigned long cpsr;
->> +	u32 cpsr_cond;
->> +	int cond;
->> +
->> +	/* Top two bits non-zero?  Unconditional. */
->> +	if (kvm_vcpu_get_hsr(vcpu) >> 30)
->> +		return true;
->> +
->> +	/* Is condition field valid? */
->> +	cond = kvm_vcpu_get_condition(vcpu);
->> +	if (cond == 0xE)
->> +		return true;
->> +
->> +	cpsr = *vcpu_cpsr(vcpu);
->> +
->> +	if (cond < 0) {
->> +		/* This can happen in Thumb mode: examine IT state. */
->> +		unsigned long it;
->> +
->> +		it = ((cpsr >> 8) & 0xFC) | ((cpsr >> 25) & 0x3);
->> +
->> +		/* it == 0 => unconditional. */
->> +		if (it == 0)
->> +			return true;
->> +
->> +		/* The cond for this insn works out as the top 4 bits. */
->> +		cond = (it >> 4);
->> +	}
->> +
->> +	cpsr_cond = cpsr >> 28;
->> +
->> +	if (!((cc_map[cond] >> cpsr_cond) & 1))
->> +		return false;
->> +
->> +	return true;
->> +}
->> +
->> +/**
->> + * adjust_itstate - adjust ITSTATE when emulating instructions in IT-block
->> + * @vcpu:	The VCPU pointer
->> + *
->> + * When exceptions occur while instructions are executed in Thumb IF-THEN
->> + * blocks, the ITSTATE field of the CPSR is not advanved (updated), so we have
+> via use bits-per-pixel
+> atmel ditto
+> mxs ditto IIRC
 > 
-> s/advanved/advanced/
+> Best Regards,
+> J.
 
-See? You actually hold the copyright on that spelling mistake! ;-)
+Thanks, I renamed fsl,bpp to bits-per-pixel in v5.
+
+Regards,
+
+Markus
+
+> > 
+> > Regards,
+> > 
+> > Markus
+> > 
+> > > > +		fsl,pcr = <0xf0c88080>;	/* non-standard but required */
+> > > > +		display-timings {
+> > > > +			timing_disp0: 640x480 {
+> > > > +				hactive = <640>;
+> > > > +				vactive = <480>;
+> > > > +				hback-porch = <112>;
+> > > > +				hfront-porch = <36>;
+> > > > +				hsync-len = <32>;
+> > > > +				vback-porch = <33>;
+> > > > +				vfront-porch = <33>;
+> > > > +				vsync-len = <2>;
+> > > > +				clock-frequency = <25000000>;
+> > > > +			};
+> > > > +		};
+> > > > +	};
+> > > > diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+> > > > index ef2b587..e0230f8 100644
+> > > > --- a/drivers/video/imxfb.c
+> > > > +++ b/drivers/video/imxfb.c
+> > > > @@ -32,6 +32,12 @@
+> > > >  #include <linux/io.h>
+> > > >  #include <linux/math64.h>
+> > > >  #include <linux/uaccess.h>
+> > > > +#include <linux/of.h>
+> > > > +#include <linux/of_device.h>
+> > > > +
+> > > > +#include <video/of_display_timing.h>
+> > > > +#include <video/of_videomode.h>
+> > > > +#include <video/videomode.h>
+> > > >  
+> > > >  #include <linux/platform_data/video-imxfb.h>
+> > > >  
+> > > > @@ -117,10 +123,11 @@
+> > > >  #define LGWCR_GWAV(alpha)	(((alpha) & 0xff) << 24)
+> > > >  #define LGWCR_GWE	(1 << 22)
+> > > >  
+> > > > +#define IMXFB_LSCR1_DEFAULT 0x00120300
+> > > > +
+> > > >  /* Used fb-mode. Can be set on kernel command line, therefore file-static. */
+> > > >  static const char *fb_mode;
+> > > >  
+> > > > -
+> > > >  /*
+> > > >   * These are the bitfields for each
+> > > >   * display depth that we support.
+> > > > @@ -192,6 +199,19 @@ static struct platform_device_id imxfb_devtype[] = {
+> > > >  };
+> > > >  MODULE_DEVICE_TABLE(platform, imxfb_devtype);
+> > > >  
+> > > > +static struct of_device_id imxfb_of_dev_id[] = {
+> > > > +	{
+> > > > +		.compatible = "fsl,imx1-fb",
+> > > > +		.data = &imxfb_devtype[IMX1_FB],
+> > > > +	}, {
+> > > > +		.compatible = "fsl,imx21-fb",
+> > > > +		.data = &imxfb_devtype[IMX21_FB],
+> > > > +	}, {
+> > > > +		/* sentinel */
+> > > > +	}
+> > > > +};
+> > > > +MODULE_DEVICE_TABLE(of, imxfb_of_dev_id);
+> > > > +
+> > > >  static inline int is_imx1_fb(struct imxfb_info *fbi)
+> > > >  {
+> > > >  	return fbi->devtype == IMX1_FB;
+> > > > @@ -324,6 +344,9 @@ static const struct imx_fb_videomode *imxfb_find_mode(struct imxfb_info *fbi)
+> > > >  	struct imx_fb_videomode *m;
+> > > >  	int i;
+> > > >  
+> > > > +	if (!fb_mode)
+> > > > +		return &fbi->mode[0];
+> > > > +
+> > > >  	for (i = 0, m = &fbi->mode[0]; i < fbi->num_modes; i++, m++) {
+> > > >  		if (!strcmp(m->mode.name, fb_mode))
+> > > >  			return m;
+> > > > @@ -479,6 +502,9 @@ static int imxfb_bl_update_status(struct backlight_device *bl)
+> > > >  	struct imxfb_info *fbi = bl_get_data(bl);
+> > > >  	int brightness = bl->props.brightness;
+> > > >  
+> > > > +	if (!fbi->pwmr)
+> > > > +		return 0;
+> > > > +
+> > > >  	if (bl->props.power != FB_BLANK_UNBLANK)
+> > > >  		brightness = 0;
+> > > >  	if (bl->props.fb_blank != FB_BLANK_UNBLANK)
+> > > > @@ -719,10 +745,14 @@ static int imxfb_activate_var(struct fb_var_screeninfo *var, struct fb_info *inf
+> > > >  
+> > > >  	writel(fbi->pcr, fbi->regs + LCDC_PCR);
+> > > >  #ifndef PWMR_BACKLIGHT_AVAILABLE
+> > > > -	writel(fbi->pwmr, fbi->regs + LCDC_PWMR);
+> > > > +	if (fbi->pwmr)
+> > > > +		writel(fbi->pwmr, fbi->regs + LCDC_PWMR);
+> > > >  #endif
+> > > >  	writel(fbi->lscr1, fbi->regs + LCDC_LSCR1);
+> > > > -	writel(fbi->dmacr, fbi->regs + LCDC_DMACR);
+> > > > +
+> > > > +	/* dmacr = 0 is no valid value, as we need DMA control marks. */
+> > > > +	if (fbi->dmacr)
+> > > > +		writel(fbi->dmacr, fbi->regs + LCDC_DMACR);
+> > > >  
+> > > >  	return 0;
+> > > >  }
+> > > > @@ -758,13 +788,12 @@ static int imxfb_resume(struct platform_device *dev)
+> > > >  #define imxfb_resume	NULL
+> > > >  #endif
+> > > >  
+> > > > -static int __init imxfb_init_fbinfo(struct platform_device *pdev)
+> > > > +static int imxfb_init_fbinfo(struct platform_device *pdev)
+> > > >  {
+> > > >  	struct imx_fb_platform_data *pdata = pdev->dev.platform_data;
+> > > >  	struct fb_info *info = dev_get_drvdata(&pdev->dev);
+> > > >  	struct imxfb_info *fbi = info->par;
+> > > > -	struct imx_fb_videomode *m;
+> > > > -	int i;
+> > > > +	struct device_node *np;
+> > > >  
+> > > >  	pr_debug("%s\n",__func__);
+> > > >  
+> > > > @@ -795,41 +824,95 @@ static int __init imxfb_init_fbinfo(struct platform_device *pdev)
+> > > >  	info->fbops			= &imxfb_ops;
+> > > >  	info->flags			= FBINFO_FLAG_DEFAULT |
+> > > >  					  FBINFO_READS_FAST;
+> > > > -	info->var.grayscale		= pdata->cmap_greyscale;
+> > > > -	fbi->cmap_inverse		= pdata->cmap_inverse;
+> > > > -	fbi->cmap_static		= pdata->cmap_static;
+> > > > -	fbi->lscr1			= pdata->lscr1;
+> > > > -	fbi->dmacr			= pdata->dmacr;
+> > > > -	fbi->pwmr			= pdata->pwmr;
+> > > > -	fbi->lcd_power			= pdata->lcd_power;
+> > > > -	fbi->backlight_power		= pdata->backlight_power;
+> > > > -
+> > > > -	for (i = 0, m = &pdata->mode[0]; i < pdata->num_modes; i++, m++)
+> > > > -		info->fix.smem_len = max_t(size_t, info->fix.smem_len,
+> > > > -				m->mode.xres * m->mode.yres * m->bpp / 8);
+> > > > +	if (pdata) {
+> > > > +		info->var.grayscale		= pdata->cmap_greyscale;
+> > > > +		fbi->cmap_inverse		= pdata->cmap_inverse;
+> > > > +		fbi->cmap_static		= pdata->cmap_static;
+> > > > +		fbi->lscr1			= pdata->lscr1;
+> > > > +		fbi->dmacr			= pdata->dmacr;
+> > > > +		fbi->pwmr			= pdata->pwmr;
+> > > > +		fbi->lcd_power			= pdata->lcd_power;
+> > > > +		fbi->backlight_power		= pdata->backlight_power;
+> > > > +	} else {
+> > > > +		np = pdev->dev.of_node;
+> > > > +		info->var.grayscale = of_property_read_bool(np,
+> > > > +						"cmap-greyscale");
+> > > > +		fbi->cmap_inverse = of_property_read_bool(np, "cmap-inverse");
+> > > > +		fbi->cmap_static = of_property_read_bool(np, "cmap-static");
+> > > > +
+> > > > +		fbi->lscr1 = IMXFB_LSCR1_DEFAULT;
+> > > > +		of_property_read_u32(np, "fsl,lscr1", &fbi->lscr1);
+> > > > +
+> > > > +		of_property_read_u32(np, "fsl,dmacr", &fbi->dmacr);
+> > > > +
+> > > > +		/* These two function pointers could be used by some specific
+> > > > +		 * platforms. */
+> > > > +		fbi->lcd_power = NULL;
+> > > > +		fbi->backlight_power = NULL;
+> > > > +	}
+> > > > +
+> > > > +	return 0;
+> > > > +}
+> > > > +
+> > > > +static int imxfb_of_read_mode(struct device *dev, struct device_node *np,
+> > > > +		struct imx_fb_videomode *imxfb_mode)
+> > > > +{
+> > > > +	int ret;
+> > > > +	struct fb_videomode *of_mode = &imxfb_mode->mode;
+> > > > +	u32 bpp;
+> > > > +	u32 pcr;
+> > > > +
+> > > > +	ret = of_property_read_string(np, "model", &of_mode->name);
+> > > > +	if (ret)
+> > > > +		of_mode->name = NULL;
+> > > > +
+> > > > +	ret = of_get_fb_videomode(np, of_mode, OF_USE_NATIVE_MODE);
+> > > > +	if (ret) {
+> > > > +		dev_err(dev, "Failed to get videomode from DT\n");
+> > > > +		return ret;
+> > > > +	}
+> > > > +
+> > > > +	ret = of_property_read_u32(np, "fsl,bpp", &bpp);
+> > > > +	ret |= of_property_read_u32(np, "fsl,pcr", &pcr);
+> > > > +
+> > > > +	if (ret) {
+> > > > +		dev_err(dev, "Failed to read bpp and pcr from DT\n");
+> > > > +		return -EINVAL;
+> > > > +	}
+> > > > +
+> > > > +	if (bpp < 1 || bpp > 255) {
+> > > > +		dev_err(dev, "Bits per pixel have to be between 1 and 255\n");
+> > > > +		return -EINVAL;
+> > > > +	}
+> > > > +
+> > > > +	imxfb_mode->bpp = bpp;
+> > > > +	imxfb_mode->pcr = pcr;
+> > > >  
+> > > >  	return 0;
+> > > >  }
+> > > >  
+> > > > -static int __init imxfb_probe(struct platform_device *pdev)
+> > > > +static int imxfb_probe(struct platform_device *pdev)
+> > > >  {
+> > > >  	struct imxfb_info *fbi;
+> > > >  	struct fb_info *info;
+> > > >  	struct imx_fb_platform_data *pdata;
+> > > >  	struct resource *res;
+> > > > +	struct imx_fb_videomode *m;
+> > > > +	const struct of_device_id *of_id;
+> > > >  	int ret, i;
+> > > > +	int bytes_per_pixel;
+> > > >  
+> > > >  	dev_info(&pdev->dev, "i.MX Framebuffer driver\n");
+> > > >  
+> > > > +	of_id = of_match_device(imxfb_of_dev_id, &pdev->dev);
+> > > > +	if (of_id)
+> > > > +		pdev->id_entry = of_id->data;
+> > > > +
+> > > >  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > >  	if (!res)
+> > > >  		return -ENODEV;
+> > > >  
+> > > >  	pdata = pdev->dev.platform_data;
+> > > > -	if (!pdata) {
+> > > > -		dev_err(&pdev->dev,"No platform_data available\n");
+> > > > -		return -ENOMEM;
+> > > > -	}
+> > > >  
+> > > >  	info = framebuffer_alloc(sizeof(struct imxfb_info), &pdev->dev);
+> > > >  	if (!info)
+> > > > @@ -837,15 +920,55 @@ static int __init imxfb_probe(struct platform_device *pdev)
+> > > >  
+> > > >  	fbi = info->par;
+> > > >  
+> > > > -	if (!fb_mode)
+> > > > -		fb_mode = pdata->mode[0].mode.name;
+> > > > -
+> > > >  	platform_set_drvdata(pdev, info);
+> > > >  
+> > > >  	ret = imxfb_init_fbinfo(pdev);
+> > > >  	if (ret < 0)
+> > > >  		goto failed_init;
+> > > >  
+> > > > +	if (pdata) {
+> > > > +		if (!fb_mode)
+> > > > +			fb_mode = pdata->mode[0].mode.name;
+> > > > +
+> > > > +		fbi->mode = pdata->mode;
+> > > > +		fbi->num_modes = pdata->num_modes;
+> > > > +	} else {
+> > > > +		struct device_node *display_np;
+> > > > +		fb_mode = NULL;
+> > > > +
+> > > > +		display_np = of_parse_phandle(pdev->dev.of_node, "display", 0);
+> > > > +		if (!display_np) {
+> > > > +			dev_err(&pdev->dev, "No display defined in devicetree\n");
+> > > > +			ret = -EINVAL;
+> > > > +			goto failed_of_parse;
+> > > > +		}
+> > > > +
+> > > > +		/*
+> > > > +		 * imxfb does not support more modes, we choose only the native
+> > > > +		 * mode.
+> > > > +		 */
+> > > > +		fbi->num_modes = 1;
+> > > > +
+> > > > +		fbi->mode = devm_kzalloc(&pdev->dev,
+> > > > +				sizeof(struct imx_fb_videomode), GFP_KERNEL);
+> > > > +		if (!fbi->mode) {
+> > > > +			ret = -ENOMEM;
+> > > > +			goto failed_of_parse;
+> > > > +		}
+> > > > +
+> > > > +		ret = imxfb_of_read_mode(&pdev->dev, display_np, fbi->mode);
+> > > > +		if (ret)
+> > > > +			goto failed_of_parse;
+> > > > +	}
+> > > > +
+> > > > +	/* Calculate maximum bytes used per pixel. In most cases this should
+> > > > +	 * be the same as m->bpp/8 */
+> > > > +	m = &fbi->mode[0];
+> > > > +	bytes_per_pixel = (m->bpp + 7) / 8;
+> > > > +	for (i = 0; i < fbi->num_modes; i++, m++)
+> > > > +		info->fix.smem_len = max_t(size_t, info->fix.smem_len,
+> > > > +				m->mode.xres * m->mode.yres * bytes_per_pixel);
+> > > > +
+> > > >  	res = request_mem_region(res->start, resource_size(res),
+> > > >  				DRIVER_NAME);
+> > > >  	if (!res) {
+> > > > @@ -878,7 +1001,8 @@ static int __init imxfb_probe(struct platform_device *pdev)
+> > > >  		goto failed_ioremap;
+> > > >  	}
+> > > >  
+> > > > -	if (!pdata->fixed_screen_cpu) {
+> > > > +	/* Seems not being used by anyone, so no support for oftree */
+> > > > +	if (!pdata || !pdata->fixed_screen_cpu) {
+> > > >  		fbi->map_size = PAGE_ALIGN(info->fix.smem_len);
+> > > >  		fbi->map_cpu = dma_alloc_writecombine(&pdev->dev,
+> > > >  				fbi->map_size, &fbi->map_dma, GFP_KERNEL);
+> > > > @@ -903,18 +1027,16 @@ static int __init imxfb_probe(struct platform_device *pdev)
+> > > >  		info->fix.smem_start = fbi->screen_dma;
+> > > >  	}
+> > > >  
+> > > > -	if (pdata->init) {
+> > > > +	if (pdata && pdata->init) {
+> > > >  		ret = pdata->init(fbi->pdev);
+> > > >  		if (ret)
+> > > >  			goto failed_platform_init;
+> > > >  	}
+> > > >  
+> > > > -	fbi->mode = pdata->mode;
+> > > > -	fbi->num_modes = pdata->num_modes;
+> > > >  
+> > > >  	INIT_LIST_HEAD(&info->modelist);
+> > > > -	for (i = 0; i < pdata->num_modes; i++)
+> > > > -		fb_add_videomode(&pdata->mode[i].mode, &info->modelist);
+> > > > +	for (i = 0; i < fbi->num_modes; i++)
+> > > > +		fb_add_videomode(&fbi->mode[i].mode, &info->modelist);
+> > > >  
+> > > >  	/*
+> > > >  	 * This makes sure that our colour bitfield
+> > > > @@ -944,10 +1066,10 @@ static int __init imxfb_probe(struct platform_device *pdev)
+> > > >  failed_register:
+> > > >  	fb_dealloc_cmap(&info->cmap);
+> > > >  failed_cmap:
+> > > > -	if (pdata->exit)
+> > > > +	if (pdata && pdata->exit)
+> > > >  		pdata->exit(fbi->pdev);
+> > > >  failed_platform_init:
+> > > > -	if (!pdata->fixed_screen_cpu)
+> > > > +	if (pdata && !pdata->fixed_screen_cpu)
+> > > >  		dma_free_writecombine(&pdev->dev,fbi->map_size,fbi->map_cpu,
+> > > >  			fbi->map_dma);
+> > > >  failed_map:
+> > > > @@ -956,6 +1078,7 @@ failed_ioremap:
+> > > >  failed_getclock:
+> > > >  	release_mem_region(res->start, resource_size(res));
+> > > >  failed_req:
+> > > > +failed_of_parse:
+> > > >  	kfree(info->pseudo_palette);
+> > > >  failed_init:
+> > > >  	platform_set_drvdata(pdev, NULL);
+> > > > @@ -980,7 +1103,7 @@ static int imxfb_remove(struct platform_device *pdev)
+> > > >  	unregister_framebuffer(info);
+> > > >  
+> > > >  	pdata = pdev->dev.platform_data;
+> > > > -	if (pdata->exit)
+> > > > +	if (pdata && pdata->exit)
+> > > >  		pdata->exit(fbi->pdev);
+> > > >  
+> > > >  	fb_dealloc_cmap(&info->cmap);
+> > > > @@ -1009,6 +1132,7 @@ static struct platform_driver imxfb_driver = {
+> > > >  	.shutdown	= imxfb_shutdown,
+> > > >  	.driver		= {
+> > > >  		.name	= DRIVER_NAME,
+> > > > +		.of_match_table = imxfb_of_dev_id,
+> > > >  	},
+> > > >  	.id_table	= imxfb_devtype,
+> > > >  };
+> > > > -- 
+> > > > 1.8.1.5
+> > > > 
+> > > 
+> > 
+> > -- 
+> > Pengutronix e.K.                           |                             |
+> > Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> > Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
 > 
->> + * to do this little bit of work manually. The fields map like this:
->> + *
->> + * IT[7:0] -> CPSR[26:25],CPSR[15:10]
->> + */
->> +static void kvm_adjust_itstate(struct kvm_vcpu *vcpu)
->> +{
->> +	unsigned long itbits, cond;
->> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
->> +	bool is_arm = !(cpsr & COMPAT_PSR_T_BIT);
->> +
->> +	BUG_ON(is_arm && (cpsr & COMPAT_PSR_IT_MASK));
->> +
->> +	if (!(cpsr & COMPAT_PSR_IT_MASK))
->> +		return;
->> +
->> +	cond = (cpsr & 0xe000) >> 13;
->> +	itbits = (cpsr & 0x1c00) >> (10 - 2);
->> +	itbits |= (cpsr & (0x3 << 25)) >> 25;
->> +
->> +	/* Perform ITAdvance (see page A-52 in ARM DDI 0406C) */
-> 
-> That's actually page A2-52 to be a little more precise...
 
-Yup. Feel free to update the 32bit code as well... ;-)
-
->> +	if ((itbits & 0x7) == 0)
->> +		itbits = cond = 0;
->> +	else
->> +		itbits = (itbits << 1) & 0x1f;
->> +
->> +	cpsr &= ~COMPAT_PSR_IT_MASK;
->> +	cpsr |= cond << 13;
->> +	cpsr |= (itbits & 0x1c) << (10 - 2);
->> +	cpsr |= (itbits & 0x3) << 25;
->> +	*vcpu_cpsr(vcpu) = cpsr;
->> +}
->> +
->> +/**
->> + * kvm_skip_instr - skip a trapped instruction and proceed to the next
->> + * @vcpu: The vcpu pointer
->> + */
->> +void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr)
->> +{
->> +	bool is_thumb;
->> +
->> +	is_thumb = !!(*vcpu_cpsr(vcpu) & COMPAT_PSR_T_BIT);
-> 
-> again we don't need the '!!' when it's a bool.
-
-I'm still not prepared to consider a bitwise and as a bool, and I'm
-happy for the !! to make the conversion to a bool completely obvious.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
