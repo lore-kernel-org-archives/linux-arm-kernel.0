@@ -1,189 +1,114 @@
-From: vkale@apm.com (Vinayak Kale)
-Date: Wed, 24 Apr 2013 14:37:00 +0530
-Subject: [PATCH V3 4/4] arm64: Add initial DTS for APM X-Gene Storm SOC and
- APM Mustang board
-In-Reply-To: <1366794420-17849-1-git-send-email-vkale@apm.com>
-References: <1366794420-17849-1-git-send-email-vkale@apm.com>
-Message-ID: <1366794420-17849-5-git-send-email-vkale@apm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 24 Apr 2013 10:10:18 +0100
+Subject: [PATCH v4 03/15] ARM: mcpm: introduce helpers for platform
+ coherency exit/setup
+In-Reply-To: <20130405230017.GC14308@quad.lixom.net>
+References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
+ <1360041732-17936-4-git-send-email-nicolas.pitre@linaro.org>
+ <20130405230017.GC14308@quad.lixom.net>
+Message-ID: <20130424091007.GA2664@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds initial DTS files required for APM Mustang board.
+On Fri, Apr 05, 2013 at 04:00:17PM -0700, Olof Johansson wrote:
+> Hi,
+> 
+> Just two nits below. One could be fixed incrementally, the other is
+> a longer-term potential cleanup.
+> 
+> On Tue, Feb 05, 2013 at 12:22:00AM -0500, Nicolas Pitre wrote:
+> 
+> > diff --git a/arch/arm/include/asm/mcpm_entry.h b/arch/arm/include/asm/mcpm_entry.h
+> > index 3286d5eb91..e76652209d 100644
+> > --- a/arch/arm/include/asm/mcpm_entry.h
+> > +++ b/arch/arm/include/asm/mcpm_entry.h
+> > @@ -15,8 +15,37 @@
+> >  #define MAX_CPUS_PER_CLUSTER	4
+> >  #define MAX_NR_CLUSTERS		2
+> >  
+> > +/* Definitions for mcpm_sync_struct */
+> > +#define CPU_DOWN		0x11
+> > +#define CPU_COMING_UP		0x12
+> > +#define CPU_UP			0x13
+> > +#define CPU_GOING_DOWN		0x14
+> > +
+> > +#define CLUSTER_DOWN		0x21
+> > +#define CLUSTER_UP		0x22
+> > +#define CLUSTER_GOING_DOWN	0x23
+> > +
+> > +#define INBOUND_NOT_COMING_UP	0x31
+> > +#define INBOUND_COMING_UP	0x32
+> > +
+> > +/* This is a complete guess. */
+> > +#define __CACHE_WRITEBACK_ORDER	6
+> > +#define __CACHE_WRITEBACK_GRANULE (1 << __CACHE_WRITEBACK_ORDER)
+> 
+> Something a little more educational could be useful here. It needs to
+> be the max writeback/line size of the supported platforms of the binary
+> kernel, i.e. if someone builds an SoC with 128-byte L2 cache lines this
+> guess will break.
 
-Signed-off-by: Kumar Sankaran <ksankaran@apm.com>
-Signed-off-by: Loc Ho <lho@apm.com>
-Signed-off-by: Feng Kan <fkan@apm.com>
----
- arch/arm64/boot/dts/Makefile        |    1 +
- arch/arm64/boot/dts/apm-mustang.dts |   26 ++++++++
- arch/arm64/boot/dts/apm-storm.dtsi  |  116 +++++++++++++++++++++++++++++++++++
- 3 files changed, 143 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm64/boot/dts/apm-mustang.dts
- create mode 100644 arch/arm64/boot/dts/apm-storm.dtsi
+Will commented on the same thing.  Ideally, a suitable definition should
+get selected through Kconfig.
 
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index 68457e9..c52bdb0 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_VEXPRESS) += rtsm_ve-aemv8a.dtb foundation-v8.dtb
-+dtb-$(CONFIG_ARCH_XGENE) += apm-mustang.dtb
- 
- targets += dtbs
- targets += $(dtb-y)
-diff --git a/arch/arm64/boot/dts/apm-mustang.dts b/arch/arm64/boot/dts/apm-mustang.dts
-new file mode 100644
-index 0000000..1247ca1
---- /dev/null
-+++ b/arch/arm64/boot/dts/apm-mustang.dts
-@@ -0,0 +1,26 @@
-+/*
-+ * dts file for AppliedMicro (APM) Mustang Board
-+ *
-+ * Copyright (C) 2013, Applied Micro Circuits Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ */
-+
-+/dts-v1/;
-+
-+/include/ "apm-storm.dtsi"
-+
-+/ {
-+	model = "APM X-Gene Mustang board";
-+	compatible = "apm,mustang", "apm,xgene-storm";
-+
-+	chosen { };
-+
-+	memory {
-+		device_type = "memory";
-+		reg = < 0x1 0x00000000 0x0 0x80000000 >; /* Updated by bootloader */
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/apm-storm.dtsi b/arch/arm64/boot/dts/apm-storm.dtsi
-new file mode 100644
-index 0000000..bfdc578
---- /dev/null
-+++ b/arch/arm64/boot/dts/apm-storm.dtsi
-@@ -0,0 +1,116 @@
-+/*
-+ * dts file for AppliedMicro (APM) X-Gene Storm SOC
-+ *
-+ * Copyright (C) 2013, Applied Micro Circuits Corporation
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ */
-+
-+/ {
-+	compatible = "apm,xgene-storm";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu at 000 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x000>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 001 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x001>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 100 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x100>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 101 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x101>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 200 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x200>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 201 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x201>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 300 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x300>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+		cpu at 301 {
-+			device_type = "cpu";
-+			compatible = "apm,potenza", "arm,armv8";
-+			reg = <0x0 0x301>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x1 0x0000fff8>;
-+		};
-+	};
-+
-+	gic: interrupt-controller at 78010000 {
-+		compatible = "arm,cortex-a15-gic";
-+		#interrupt-cells = <3>;
-+		interrupt-controller;
-+		reg = <0x0 0x78010000 0x0 0x1000>,	/* GIC Dist */
-+		      <0x0 0x78020000 0x0 0x1000>,	/* GIC CPU */
-+		      <0x0 0x78040000 0x0 0x2000>,	/* GIC VCPU Control */
-+		      <0x0 0x78060000 0x0 0x2000>;	/* GIC VCPU */
-+		interrupts = <1 9 0xf04>;	/* GIC Maintenence IRQ */
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <1 0 0xff01>,	/* Secure Phys IRQ */
-+			     <1 13 0xff01>,	/* Non-secure Phys IRQ */
-+			     <1 14 0xff01>,	/* Virt IRQ */
-+			     <1 15 0xff01>;	/* Hyp IRQ */
-+		clock-frequency = <50000000>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		serial0: serial at 1c020000 {
-+			device_type = "serial";
-+			compatible = "ns16550";
-+			reg = <0 0x1c020000 0x0 0x1000>;
-+			reg-shift = <2>;
-+			clock-frequency = <10000000>; /* Updated by bootloader */
-+			interrupt-parent = <&gic>;
-+			interrupts = <0x0 0x4c 0x4>;
-+		};
-+	};
-+};
--- 
-1.7.4.1
+The guess specified here is adequate for known b.L platforms, but a
+better framework for configuring this is desirable.
+
+My original comment here is certainly not very informative though --
+I'll post a clarification.
+
+> > +/* Offsets for the mcpm_sync_struct members, for use in asm: */
+> > +#define MCPM_SYNC_CLUSTER_CPUS	0
+> > +#define MCPM_SYNC_CPU_SIZE	__CACHE_WRITEBACK_GRANULE
+> > +#define MCPM_SYNC_CLUSTER_CLUSTER \
+> > +	(MCPM_SYNC_CLUSTER_CPUS + MCPM_SYNC_CPU_SIZE * MAX_CPUS_PER_CLUSTER)
+> > +#define MCPM_SYNC_CLUSTER_INBOUND \
+> > +	(MCPM_SYNC_CLUSTER_CLUSTER + __CACHE_WRITEBACK_GRANULE)
+> > +#define MCPM_SYNC_CLUSTER_SIZE \
+> > +	(MCPM_SYNC_CLUSTER_INBOUND + __CACHE_WRITEBACK_GRANULE)
+> > +
+> >  #ifndef __ASSEMBLY__
+> >  
+> > +#include <linux/types.h>
+> > +
+> >  /*
+> >   * Platform specific code should use this symbol to set up secondary
+> >   * entry location for processors to use when released from reset.
+> > @@ -123,5 +152,39 @@ struct mcpm_platform_ops {
+> >   */
+> >  int __init mcpm_platform_register(const struct mcpm_platform_ops *ops);
+> >  
+> > +/* Synchronisation structures for coordinating safe cluster setup/teardown: */
+> > +
+> > +/*
+> > + * When modifying this structure, make sure you update the MCPM_SYNC_ defines
+> > + * to match.
+> > + */
+> 
+> It would be nice to introduce something like arch/powerpc/kernel/asm-offsets.c
+> on ARM to generate the ASM-side automatically from the C struct instead for
+> this and other cases, but that's unrelated to this addition.
+
+ARM already has its own asm-offsets, and we actually used this in an earlier
+version of the patches.  However, this felt like pollution of that file for
+not a lot of benefit.  Does powerpc have a problem with asm-offsets becoming
+a dumping ground for random junk, or is there a better way to organise it?
+
+Cheers
+---Dave
+
+> > +struct mcpm_sync_struct {
+> > +	/* individual CPU states */
+> > +	struct {
+> > +		volatile s8 cpu __aligned(__CACHE_WRITEBACK_GRANULE);
+> > +	} cpus[MAX_CPUS_PER_CLUSTER];
+> > +
+> > +	/* cluster state */
+> > +	volatile s8 cluster __aligned(__CACHE_WRITEBACK_GRANULE);
+> > +
+> > +	/* inbound-side state */
+> > +	volatile s8 inbound __aligned(__CACHE_WRITEBACK_GRANULE);
+> > +};
+> 
+> 
+> -Olof
