@@ -1,57 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 24 Apr 2013 12:23:30 -0700
-Subject: Multiple issues with omap4 panda es in linux next
-In-Reply-To: <20130424190821.GB5184@atomide.com>
-References: <20130419171318.GK10155@atomide.com> <5174F7A8.7070308@ti.com>
- <20130422180316.GA10155@atomide.com> <5176A45B.5@ti.com>
- <20130423172353.GD10155@atomide.com>
- <20130423213151.GM10155@atomide.com>
- <20130423231605.GO10155@atomide.com> <517770A0.4000609@ti.com>
- <20130424190821.GB5184@atomide.com>
-Message-ID: <20130424192330.GC5184@atomide.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 24 Apr 2013 21:24:05 +0200
+Subject: [PATCH 03/32 v3] dmaengine: ste_dma40: Use the BIT macro to
+ replace ugly '(1 << x)'s
+In-Reply-To: <20130424151145.GH9652@gmail.com>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-4-git-send-email-lee.jones@linaro.org>
+ <20130424151145.GH9652@gmail.com>
+Message-ID: <CAH+eYFBKnEWkcJ+9DxVqnxbPS4QYtswi7Ux0JHnTWYfRFy_5Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130424 12:13]:
-> * Kishon Vijay Abraham I <kishon@ti.com> [130423 22:46]:
-> > Hi Tony,
-> > 
-> > On Wednesday 24 April 2013 04:46 AM, Tony Lindgren wrote:
-> > >* Tony Lindgren <tony@atomide.com> [130423 14:37]:
-> > >>* Tony Lindgren <tony@atomide.com> [130423 10:28]:
-> > >>>* Kishon Vijay Abraham I <kishon@ti.com> [130423 08:15]:
-> > >>>>>>>2. MUSB fails with legacy booting and DT on panda es
-> > >>>>>>>
-> > >>>>>>>With both legacy and DT booting I get something like:
-> > >>>>>>>
-> > >>>>>>>HS USB OTG: no transceiver configured
-> > >>>>>>>musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
-> > >>>>>>
-> > >>>>>>The dt should work fine with https://patchwork.kernel.org/patch/2423061/.
-> > >>>>>
-> > >>>>>OK thanks for checking that.
-> > >
-> > >Kishon, I think there's also some other issue remaining
-> > >in linux next with MUSB and DT. I'm still getting the
-> > >"HS USB OTG: no transceiver configured" although the nop
-> > >xceiv is compiled in. Maybe give it a try against linux
-> > >next?
-> > 
-> > For OMAP4 MUSB, you'll need omap-usb2 phy. I've attached my .config.
-> 
-> Thanks your config helped me to track it down. Looks like I got
-> the PHYs the wrong way around between EHCI and MUSB..
-> 
-> In any case, I did have omap-usb2 compiled in, but I did not have
-> OMAP_OCP2SCP=y set. Should OMAP_USB2 depend on that?
-> 
-> Also, looks like MUSB just sits in b_idle mode though, so no more
-> ID pin interrupt for some reason.
+2013/4/24 Lee Jones <lee.jones@linaro.org>:
+> The aim is to make the code that little more readable.
+>
+> Acked-by: Vinod Koul <vnod.koul@intel.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-OK looks like I got the ID interrupt going by enabling
-CONFIG_TWL6030_USB=y. Still stays in a_idle with no keyboard
-after plugging it in, but now changes between a and b mode.
+Please pay closer attention to the semantics of each usage instead of
+just replacing all x left shifts of 1 by BIT(x) for "readability".
 
-Regards,
+>         if (seg_max > STEDMA40_MAX_SEG_SIZE)
+> -               seg_max -= (1 << max_w);
+> +               seg_max -= BIT(max_w);
+>
+> -       if (!IS_ALIGNED(size, 1 << max_w))
+> +       if (!IS_ALIGNED(size, BIT(max_w)))
+>                 return -EINVAL;
 
-Tony
+Here and in all other places where the values are from cfg->data_width,
+the semantic purpose of the shift is not for setting a particular bit
+but instead for converting the data_width field into the data width
+value in bytes.  You should not change these usages to BIT().
+
+It would be instead better to just make the cfg->data_width as the
+number of bytes and convert them to the appropriate hardware field
+values when the descriptors are constructed.  That of course should be
+in another patch.
