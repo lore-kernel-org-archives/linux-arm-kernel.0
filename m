@@ -1,15 +1,13 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Apr 2013 16:09:14 +0100
-Subject: [PATCH 03/32] dmaengine: ste_dma40: Use the BIT macro to replace
+Date: Wed, 24 Apr 2013 16:11:45 +0100
+Subject: [PATCH 03/32 v3] dmaengine: ste_dma40: Use the BIT macro to replace
  ugly '(1 << x)'s
 In-Reply-To: <1366279934-30761-4-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
  <1366279934-30761-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130424150914.GG9652@gmail.com>
+Message-ID: <20130424151145.GH9652@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-dmaengine: ste_dma40: Use the BIT macro to replace ugly '(1 << x)'s
 
 The aim is to make the code that little more readable.
 
