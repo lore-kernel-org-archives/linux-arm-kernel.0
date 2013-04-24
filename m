@@ -1,46 +1,55 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 24 Apr 2013 10:22:52 +0200
-Subject: [PATCH 2/2] drivers/video: mxs-fb: Fix build, use renamed function
-In-Reply-To: <1366791772-11133-1-git-send-email-mpa@pengutronix.de>
-References: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
- <1366791772-11133-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1366791772-11133-3-git-send-email-mpa@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 24 Apr 2013 10:22:43 +0200
+Subject: [RFC][PATCH] video: imx: Select VIDEOMODE_HELPERS
+In-Reply-To: <201304240231.49579.marex@denx.de>
+References: <1366666110-9585-1-git-send-email-marex@denx.de>
+ <201304230157.47992.marex@denx.de>
+ <1366702862.4365.2.camel@pizza.hi.pengutronix.de>
+ <201304240231.49579.marex@denx.de>
+Message-ID: <1366791763.4089.3.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kernel build fails with commit 669406534b4abb827d1bdc39bb5e2d5255818ae2
+Hi Marek,
 
-This patch renames videomode_from_timing to videomode_from_timings and
-vm.data_flags to vm.flags.
+Am Mittwoch, den 24.04.2013, 02:31 +0200 schrieb Marek Vasut:
+> Hi Philipp,
+> 
+> > Hi Marek,
+> > 
+> > Am Dienstag, den 23.04.2013, 01:57 +0200 schrieb Marek Vasut:
+> > > Dear Fabio Estevam,
+> > > 
+> > > > Hi Marek,
+> > > > 
+> > > > On Mon, Apr 22, 2013 at 6:28 PM, Marek Vasut <marex@denx.de> wrote:
+> > > > > Without this, I get the following problem when building kernel:
+> > > > > 
+> > > > > drivers/built-in.o: In function `imx_pd_connector_get_modes':
+> > > > > /linux-2.6/drivers/staging/imx-drm/parallel-display.c:78: undefined
+> > > > > reference to `of_get_drm_display_mode' make: *** [vmlinux] Error 1
+> > > > > 
+> > > > > NOTE: I think this patch is almost absolutely not correct.
+> > > > > 
+> > > > > Signed-off-by: Marek Vasut <marex@denx.de>
+> > > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > > > > Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> > > > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> > > > 
+> > > > Patch looks good, but you should have copied Greg Kroah-Hartman, as he
+> > > > is the one who takes patches into staging.
+> > > 
+> > > I'm not sure if the select is at correct symbol, I dont think it is.
+> > 
+> > OF_VIDEOMODE is the correct one. The implementation of
+> > of_get_drm_display_mode in drivers/gpu/drm/drm_modes.c depends on it.
+> 
+> I really need VIDEOMODE_HELPERS, not OF_VIDEOMODE. If I select only 
+> OF_VIDEOMODE, I still get the issue above.
+> 
+> Check drivers/gpu/drm/drm_modes.c , it's protected by CONFIG_VIDEOMODE_HELPERS
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- drivers/video/mxsfb.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Indeed, I was looking at the wrong checkout. Sorry for the noise.
 
-diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-index 1b2c26d..d78827e 100644
---- a/drivers/video/mxsfb.c
-+++ b/drivers/video/mxsfb.c
-@@ -777,16 +777,16 @@ static int mxsfb_init_fbinfo_dt(struct mxsfb_info *host)
- 		struct videomode vm;
- 		struct fb_videomode fb_vm;
- 
--		ret = videomode_from_timing(timings, &vm, i);
-+		ret = videomode_from_timings(timings, &vm, i);
- 		if (ret < 0)
- 			goto put_timings_node;
- 		ret = fb_videomode_from_videomode(&vm, &fb_vm);
- 		if (ret < 0)
- 			goto put_timings_node;
- 
--		if (vm.data_flags & DISPLAY_FLAGS_DE_HIGH)
-+		if (vm.flags & DISPLAY_FLAGS_DE_HIGH)
- 			host->sync |= MXSFB_SYNC_DATA_ENABLE_HIGH_ACT;
--		if (vm.data_flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
-+		if (vm.flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
- 			host->sync |= MXSFB_SYNC_DOTCLK_FALLING_ACT;
- 		fb_add_videomode(&fb_vm, &fb_info->modelist);
- 	}
--- 
-1.8.1.5
+regards
+Philipp
