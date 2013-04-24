@@ -1,141 +1,49 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Wed, 24 Apr 2013 02:23:17 -0400
-Subject: [V9 PATCH 03/12] usb: gadget: mv_udc: use PHY driver for udc
+Date: Wed, 24 Apr 2013 02:23:21 -0400
+Subject: [V9 PATCH 07/12] arm: mmp2: change the defintion of usb devices
 In-Reply-To: <1366784606-1813-1-git-send-email-chao.xie@marvell.com>
 References: <1366784606-1813-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1366784606-1813-4-git-send-email-chao.xie@marvell.com>
+Message-ID: <1366784606-1813-8-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Originaly, udc driver will call the callbacks in platform data
-for PHY initialization and shut down.
-With PHY driver, it will call the APIs provided by PHY driver
-for PHY initialization and shut down. It removes the callbacks
-in platform data, and at same time it removes one block in the
-way of enabling device tree for udc driver.
+add the udc/otg/ehci devices for mmp2
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/usb/gadget/mv_udc.h      |    2 +-
- drivers/usb/gadget/mv_udc_core.c |   50 +++++++++++++-------------------------
- 2 files changed, 18 insertions(+), 34 deletions(-)
+ arch/arm/mach-mmp/include/mach/mmp2.h |    4 ++++
+ arch/arm/mach-mmp/mmp2.c              |    4 ++++
+ 2 files changed, 8 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/usb/gadget/mv_udc.h b/drivers/usb/gadget/mv_udc.h
-index be77f20..02f36fe 100644
---- a/drivers/usb/gadget/mv_udc.h
-+++ b/drivers/usb/gadget/mv_udc.h
-@@ -180,7 +180,6 @@ struct mv_udc {
+diff --git a/arch/arm/mach-mmp/include/mach/mmp2.h b/arch/arm/mach-mmp/include/mach/mmp2.h
+index 0764f4e..95b6bd7 100644
+--- a/arch/arm/mach-mmp/include/mach/mmp2.h
++++ b/arch/arm/mach-mmp/include/mach/mmp2.h
+@@ -29,6 +29,10 @@ extern struct pxa_device_desc mmp2_device_sdh2;
+ extern struct pxa_device_desc mmp2_device_sdh3;
+ extern struct pxa_device_desc mmp2_device_asram;
+ extern struct pxa_device_desc mmp2_device_isram;
++extern struct pxa_device_desc mmp2_device_u2o;
++extern struct pxa_device_desc mmp2_device_u2ootg;
++extern struct pxa_device_desc mmp2_device_u2oehci;
++extern struct pxa_device_desc mmp2_device_u2ophy;
  
- 	struct mv_cap_regs __iomem	*cap_regs;
- 	struct mv_op_regs __iomem	*op_regs;
--	void __iomem                    *phy_regs;
- 	unsigned int			max_eps;
- 	struct mv_dqh			*ep_dqh;
- 	size_t				ep_dqh_size;
-@@ -217,6 +216,7 @@ struct mv_udc {
- 	struct work_struct	vbus_work;
- 	struct workqueue_struct *qwork;
+ extern struct platform_device mmp2_device_gpio;
  
-+	struct usb_phy		*phy;
- 	struct usb_phy		*transceiver;
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index d94d114..e7b7642 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -149,6 +149,10 @@ MMP2_DEVICE(sdh3, "sdhci-pxav3", 3, MMC4, 0xd4281800, 0x120);
+ MMP2_DEVICE(asram, "asram", -1, NONE, 0xe0000000, 0x4000);
+ /* 0xd1000000 ~ 0xd101ffff is reserved for secure processor */
+ MMP2_DEVICE(isram, "isram", -1, NONE, 0xd1020000, 0x18000);
++MMP2_DEVICE(u2ophy, "mmp2-usb-phy", -1, NONE, 0xd4207000, 0x1ff);
++MMP2_DEVICE(u2o, "mv-udc", -1, USB_OTG, 0xd4208100, 0x1ff);
++MMP2_DEVICE(u2ootg, "mv-otg", -1, USB_OTG, 0xd4208100, 0x1ff);
++MMP2_DEVICE(u2oehci, "mv-ehci", -1, USB_OTG, 0xd4208100, 0x1ff);
  
- 	struct mv_usb_platform_data     *pdata;
-diff --git a/drivers/usb/gadget/mv_udc_core.c b/drivers/usb/gadget/mv_udc_core.c
-index c2a5702..a6beef6 100644
---- a/drivers/usb/gadget/mv_udc_core.c
-+++ b/drivers/usb/gadget/mv_udc_core.c
-@@ -35,6 +35,7 @@
- #include <linux/platform_device.h>
- #include <linux/clk.h>
- #include <linux/platform_data/mv_usb.h>
-+#include <linux/usb/mv_usb2.h>
- #include <asm/unaligned.h>
- 
- #include "mv_udc.h"
-@@ -1083,15 +1084,14 @@ static int mv_udc_enable_internal(struct mv_udc *udc)
- 
- 	dev_dbg(&udc->dev->dev, "enable udc\n");
- 	udc_clock_enable(udc);
--	if (udc->pdata->phy_init) {
--		retval = udc->pdata->phy_init(udc->phy_regs);
--		if (retval) {
--			dev_err(&udc->dev->dev,
--				"init phy error %d\n", retval);
--			udc_clock_disable(udc);
--			return retval;
--		}
-+	retval = usb_phy_init(udc->phy);
-+	if (retval) {
-+		dev_err(&udc->dev->dev,
-+			"init phy error %d\n", retval);
-+		udc_clock_disable(udc);
-+		return retval;
- 	}
-+
- 	udc->active = 1;
- 
- 	return 0;
-@@ -1109,8 +1109,7 @@ static void mv_udc_disable_internal(struct mv_udc *udc)
- {
- 	if (udc->active) {
- 		dev_dbg(&udc->dev->dev, "disable udc\n");
--		if (udc->pdata->phy_deinit)
--			udc->pdata->phy_deinit(udc->phy_regs);
-+		usb_phy_shutdown(udc->phy);
- 		udc_clock_disable(udc);
- 		udc->active = 0;
- 	}
-@@ -2124,17 +2123,10 @@ static int mv_udc_probe(struct platform_device *pdev)
- 	udc->dev = pdev;
- 
- 	if (pdata->mode == MV_USB_MODE_OTG) {
--		udc->transceiver = devm_usb_get_phy(&pdev->dev,
--					USB_PHY_TYPE_USB2);
--		if (IS_ERR(udc->transceiver)) {
--			retval = PTR_ERR(udc->transceiver);
--
--			if (retval == -ENXIO)
--				return retval;
--
--			udc->transceiver = NULL;
--			return -EPROBE_DEFER;
--		}
-+		udc->transceiver = devm_usb_get_phy_dev(&pdev->dev,
-+					MV_USB2_OTG_PHY_INDEX);
-+		if (IS_ERR_OR_NULL(udc->transceiver))
-+			return PTR_ERR(udc->transceiver);
- 	}
- 
- 	/* udc only have one sysclk. */
-@@ -2142,7 +2134,7 @@ static int mv_udc_probe(struct platform_device *pdev)
- 	if (IS_ERR(udc->clk))
- 		return PTR_ERR(udc->clk);
- 
--	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "capregs");
-+	r = platform_get_resource(udc->dev, IORESOURCE_MEM, 0);
- 	if (r == NULL) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
- 		return -ENODEV;
-@@ -2155,17 +2147,9 @@ static int mv_udc_probe(struct platform_device *pdev)
- 		return -EBUSY;
- 	}
- 
--	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "phyregs");
--	if (r == NULL) {
--		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
--		return -ENODEV;
--	}
--
--	udc->phy_regs = ioremap(r->start, resource_size(r));
--	if (udc->phy_regs == NULL) {
--		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
--		return -EBUSY;
--	}
-+	udc->phy = devm_usb_get_phy_dev(&pdev->dev, MV_USB2_PHY_INDEX);
-+	if (IS_ERR_OR_NULL(udc->phy))
-+		return PTR_ERR(udc->phy);
- 
- 	/* we will acces controller register, so enable the clk */
- 	retval = mv_udc_enable_internal(udc);
+ struct resource mmp2_resource_gpio[] = {
+ 	{
 -- 
 1.7.4.1
