@@ -1,33 +1,31 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 25 Apr 2013 01:59:59 +0800
-Subject: [PATCH v2] ARM: Kconfig: let ARM9TDMI and ARM7TDMI invisible.
-In-Reply-To: <20130424174602.GA14496@n2100.arm.linux.org.uk>
-References: <51775BB3.6000607@asianux.com> <51775D88.2000406@asianux.com>
- <20130424174602.GA14496@n2100.arm.linux.org.uk>
-Message-ID: <8EB7C52E-5044-4B8A-99F2-BCFF9DFDBD2E@jcrosoft.com>
+From: viral.vkm@gmail.com (Viral Mehta)
+Date: Wed, 24 Apr 2013 23:37:15 +0530
+Subject: No subject
+Message-ID: <CANX6Damwoz0MSEu5Sb4uKTUhcsC0g+ua1DjuQuMEzXyBOkL7PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On Apr 25, 2013, at 1:46 AM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+I am using Marvell's ARMADA XP platform in my development environment.
 
-> On Wed, Apr 24, 2013 at 12:20:24PM +0800, Chen Gang wrote:
->> If CONFIG_MMU is disabled, it will let ARM9TDMI and ARM7TDMI visible,
->> but in fact, only AT91X40 need ARM7TDMI, so need not let them visible.
-> 
-> I'll apply it myself this evening.  Can I add:
-> 
-> Tested-by: Chen Gang <gang.chen@asianux.com>
-you add it mine too
+Recently, I faced DMA related issue. While moving data from memory to
+the device, I  found that sometimes I am getting Junk data. I looked
+further to see if this is related to DMA Sync problem. So, basically,
+I have following questions,
 
-Tested-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+1. As per [1] ARMADA has Coherency Fabric that sits between CPU and
+other devices and takes care of hardware based I/O cache coherency. Do
+we need to enable any support for the same in software ? I am running
+3.0.29 based linux kernel. How do I verify that I have all the things
+enabled in Linux Kernel.
 
-Best Regards,
-J.
-> 
-> to it?
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+2. Do I still need to use dma_[map,unamp]_* APIs while copying data to
+and from device ?
+
+
+[1] http://www.marvell.com/embedded-processors/armada-xp/assets/Marvell-ArmadaXP-SoC-product%20brief.pdf
+
+--
+Thanks,
+Viral Mehta
