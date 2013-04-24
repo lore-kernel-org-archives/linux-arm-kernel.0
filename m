@@ -1,30 +1,54 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Apr 2013 14:52:10 +0200
-Subject: [PATCH] ASoC: don't call of_dma_request_slave_channel directly
-In-Reply-To: <20130424011153.GA2319@shlinux1.ap.freescale.net>
-References: <1366732475-479886-1-git-send-email-arnd@arndb.de>
- <1366732475-479886-3-git-send-email-arnd@arndb.de>
- <20130424011153.GA2319@shlinux1.ap.freescale.net>
-Message-ID: <201304241452.10298.arnd@arndb.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 24 Apr 2013 14:06:41 +0100
+Subject: [PATCH v3 24/32] arm64: KVM: 32bit GP register access
+In-Reply-To: <20130423230039.GI20569@gmail.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-25-git-send-email-marc.zyngier@arm.com>
+ <20130423230039.GI20569@gmail.com>
+Message-ID: <5177D8E1.6010903@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 April 2013, Shawn Guo wrote:
-> On Tue, Apr 23, 2013 at 05:54:33PM +0200, Arnd Bergmann wrote:
-> > The exported interface for device drivers is dma_request_slave_channel,
-> > not of_dma_request_slave_channel. The former does not depend on device
-> > tree but also works with ACPI and other interfaces providing an
-> > abstraction for DMA channels.
-> > 
-> > This fixes link errors when building ALSA as a loadable module.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On 24/04/13 00:00, Christoffer Dall wrote:
+> On Mon, Apr 08, 2013 at 05:17:26PM +0100, Marc Zyngier wrote:
+>> Allow access to the 32bit register file through the usual API.
+>>
+>> Reviewed-by: Christopher Covington <cov@codeaurora.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/include/asm/kvm_emulate.h |  17 +++-
+>>  arch/arm64/kvm/Makefile              |   2 +-
+>>  arch/arm64/kvm/regmap.c              | 168 +++++++++++++++++++++++++++++++++++
+>>  3 files changed, 184 insertions(+), 3 deletions(-)
+>>  create mode 100644 arch/arm64/kvm/regmap.c
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+>> index 2dcfa74..37a6567 100644
+>> --- a/arch/arm64/include/asm/kvm_emulate.h
+>> +++ b/arch/arm64/include/asm/kvm_emulate.h
+>> @@ -28,6 +28,9 @@
+>>  #include <asm/kvm_mmio.h>
+>>  #include <asm/ptrace.h>
+>>  
+>> +unsigned long *vcpu_reg32(const struct kvm_vcpu *vcpu, u8 reg_num);
+>> +unsigned long *vcpu_spsr32(const struct kvm_vcpu *vcpu);
+>> +
+>>  void kvm_inject_undefined(struct kvm_vcpu *vcpu);
+>>  void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
+>>  void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
+>> @@ -49,7 +52,7 @@ static inline unsigned long *vcpu_cpsr(const struct kvm_vcpu *vcpu)
+>>  
+>>  static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
+>>  {
+>> -	return false;	/* 32bit? Bahhh... */
+>> +	return !!(*vcpu_cpsr(vcpu) & PSR_MODE32_BIT);
 > 
-> I had already sent a similar patch [1] for that.
-> 
+> nit: you don't need the '!!': it's a bool
 
-Yes, I see it in linux-next now.
+No it is not. It is a bitwise and, turned into a bool.
 
 Thanks,
 
-	Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny...
