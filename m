@@ -1,51 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 Apr 2013 10:36:18 +0100
-Subject: [PATCH v3 03/32] arm64: KVM: HYP mode idmap support
-In-Reply-To: <20130423225733.GA20569@gmail.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-4-git-send-email-marc.zyngier@arm.com>
- <20130423225733.GA20569@gmail.com>
-Message-ID: <5177A792.9030001@arm.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Wed, 24 Apr 2013 11:36:33 +0200
+Subject: [PATCH v3 1/2] ARM: shmobile: r8a7740: Add Suspend-To-RAM A3SM
+In-Reply-To: <20130424074904.GG847@verge.net.au>
+References: <1366196190-14011-1-git-send-email-hechtb+renesas@gmail.com>
+ <20130424074904.GG847@verge.net.au>
+Message-ID: <CABYn4swtOdJG18833FLXifeuVsL4R5vUzGjAg5Fv8r==CT5HBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/04/13 23:57, Christoffer Dall wrote:
-> 
-> 
-> On Mon, Apr 8, 2013 at 9:17 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> Add the necessary infrastructure for identity-mapped HYP page
->> tables. Idmap-ed code must be in the ".hyp.idmap.text" linker
->> section.
+2013/4/24 Simon Horman <horms@verge.net.au>:
+> On Wed, Apr 17, 2013 at 12:56:29PM +0200, Bastian Hecht wrote:
+>> We add 2 Suspend to RAM modes:
+>> - A3SM PLL0 on/off:     Power domain A3SM that contains the ARM core
+>>                         and the 2nd level cache with either PLL0 on
+>>                         or off
 >>
->> The rest of the HYP ends up in ".hyp.text".
+>> As the suspend to memory mechanism we use A3SM PLL off. A3SM PLL on
+>> is included here too, so CPUIdle can use both power down modes (not
+>> included in this patch).
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> The setup of the SYSC regarding the external IRQs is taken from
+>> pm-sh7372.c from Magnus Damm.
+>>
+>> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
 >> ---
->>  arch/arm64/kernel/vmlinux.lds.S | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
+>> v3:
 >>
->> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
->> index 3fae2be..855d43d 100644
->> --- a/arch/arm64/kernel/vmlinux.lds.S
->> +++ b/arch/arm64/kernel/vmlinux.lds.S
->> @@ -17,6 +17,15 @@ ENTRY(stext)
->>
->>  jiffies = jiffies_64;
->>
->> +#define HYPERVISOR_TEXT                                        \
->> +       . = ALIGN(2048);                                \
-> 
-> why align to 2048?  Comment?
+>> We now stubbornly loop until the SoC really shuts down when we issue
+>> the WFI command.
+>
+> Hi Bastian,
+>
+> could you let me know what the status of this series is.
+> Is it ready to be queued-up for v3.11?
 
-Vectors require a 2kB alignment. I'll add a comment to that effect.
+Hello Simon!
 
-> are you changing this to the same idea as for the 32-bit code to reduce the kernel size?
-
-The mechanism is exactly the same indeed. Only the alignment
-requirements are (massively) different.
+I consider it stable and as there are no more comments, I would be
+happy if you queued it up.
 
 Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Bastian
