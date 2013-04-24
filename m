@@ -1,9 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 24 Apr 2013 18:28:15 +0100
-Subject: [RFC PATCH v3 10/17] ARM: dts: picoxcell: cpus/cpu nodes dts updates
+Date: Wed, 24 Apr 2013 18:28:21 +0100
+Subject: [RFC PATCH v3 16/17] ARM: dts: sunxi: cpus/cpu nodes dts updates
 In-Reply-To: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1366824502-19729-11-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1366824502-19729-17-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,53 +12,26 @@ and cpu bindings updates for ARM.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/boot/dts/picoxcell-pc3x2.dtsi | 8 ++++----
- arch/arm/boot/dts/picoxcell-pc3x3.dtsi | 8 ++++----
- 2 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/sunxi.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/picoxcell-pc3x2.dtsi b/arch/arm/boot/dts/picoxcell-pc3x2.dtsi
-index f0a8c20..533919e 100644
---- a/arch/arm/boot/dts/picoxcell-pc3x2.dtsi
-+++ b/arch/arm/boot/dts/picoxcell-pc3x2.dtsi
-@@ -18,13 +18,13 @@
- 	#size-cells = <1>;
+diff --git a/arch/arm/boot/dts/sunxi.dtsi b/arch/arm/boot/dts/sunxi.dtsi
+index 8b36abe..9f45ecf 100644
+--- a/arch/arm/boot/dts/sunxi.dtsi
++++ b/arch/arm/boot/dts/sunxi.dtsi
+@@ -17,8 +17,13 @@
+ 	interrupt-parent = <&intc>;
  
  	cpus {
--		#address-cells = <1>;
-+		#address-cells = <0>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
--			compatible = "arm,1176jz-s";
-+		cpu {
-+			compatible = "arm,arm1176jz-s";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a8";
 +			device_type = "cpu";
- 			clock-frequency = <400000000>;
--			reg = <0>;
- 			d-cache-line-size = <32>;
- 			d-cache-size = <32768>;
- 			i-cache-line-size = <32>;
-diff --git a/arch/arm/boot/dts/picoxcell-pc3x3.dtsi b/arch/arm/boot/dts/picoxcell-pc3x3.dtsi
-index daa962d..ab3e800 100644
---- a/arch/arm/boot/dts/picoxcell-pc3x3.dtsi
-+++ b/arch/arm/boot/dts/picoxcell-pc3x3.dtsi
-@@ -18,13 +18,13 @@
- 	#size-cells = <1>;
++			reg = <0x0>;
+ 		};
+ 	};
  
- 	cpus {
--		#address-cells = <1>;
-+		#address-cells = <0>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
--			compatible = "arm,1176jz-s";
-+		cpu {
-+			compatible = "arm,arm1176jz-s";
-+			device_type = "cpu";
- 			cpu-clock = <&arm_clk>, "cpu";
--			reg = <0>;
- 			d-cache-line-size = <32>;
- 			d-cache-size = <32768>;
- 			i-cache-line-size = <32>;
 -- 
 1.7.12
