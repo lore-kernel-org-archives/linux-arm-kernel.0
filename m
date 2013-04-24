@@ -1,51 +1,30 @@
-From: vapier@gentoo.org (Mike Frysinger)
-Date: Tue, 23 Apr 2013 22:51:46 -0400
-Subject: [PATCH] ARM: footbridge: fix overlapping PCI mappings
-In-Reply-To: <201304200203.04719.vapier@gentoo.org>
-References: <201304200203.04719.vapier@gentoo.org>
-Message-ID: <1366771906-16640-1-git-send-email-vapier@gentoo.org>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 24 Apr 2013 10:55:18 +0800
+Subject: [PATCH 06/21] ARM: tegra: call cpu_do_idle from C code
+In-Reply-To: <1366734653-488286-7-git-send-email-arnd@arndb.de>
+References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
+ <1366734653-488286-7-git-send-email-arnd@arndb.de>
+Message-ID: <1366772118.18275.2.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 8ef6e6201b26cb9fde79c1baa08145af6aca2815 (ARM: footbridge: use
-fixed PCI i/o mapping) broke booting on my netwinder.  Before that,
-everything boots fine.  Since then, it crashes on boot.
+On Wed, 2013-04-24 at 00:30 +0800, Arnd Bergmann wrote:
+> When building a kernel for multiple CPU architecture levels,
+> cpu_do_idle() is a macro for an indirect function call, which
+> cannot be called from assembly code as Tegra does.
+> 
+> Adding a trivial C wrapper for this function lets us build
+> a tegra kernel with ARMv6 support enabled.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Joseph Lo <josephl@nvidia.com>
+> Cc: Stephen Warren <swarren@nvidia.com>
+> ---
 
-With earlyprintk, I see it BUG-ing like so:
-kernel BUG at lib/ioremap.c:27!
-Internal error: Oops - BUG: 0 [#1] ARM
-...
-[<c0139b54>] (ioremap_page_range+0x128/0x154) from [<c02e6a6c>] (dc21285_setup+0xd0/0x114)
-[<c02e6a6c>] (dc21285_setup+0xd0/0x114) from [<c02e4874>] (pci_common_init+0xa0/0x298)
-[<c02e4874>] (pci_common_init+0xa0/0x298) from [<c02e793c>] (netwinder_pci_init+0xc/0x18)
-[<c02e793c>] (netwinder_pci_init+0xc/0x18) from [<c02e27d0>] (do_one_initcall+0xb4/0x180)
-...
+Hi Arnd,
 
-Russell points out it's because of overlapping PCI mappings that was
-added with the aforementioned commit.  Rob thought the code would re-use
-the static mapping, but that turns out to not be the case and instead
-hits the BUG further down.
+Thanks for fixing.
 
-After deleting this hunk as suggested by Russel, the system boots up fine
-again and all my PCI devices work (IDE, ethernet, the DC21285).
+Tested-by: Joseph Lo <josephl@nvidia.com>
 
-Signed-off-by: Mike Frysinger <vapier@gentoo.org>
----
- arch/arm/mach-footbridge/dc21285.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
-index a7cd2cf..3490a24 100644
---- a/arch/arm/mach-footbridge/dc21285.c
-+++ b/arch/arm/mach-footbridge/dc21285.c
-@@ -276,8 +276,6 @@ int __init dc21285_setup(int nr, struct pci_sys_data *sys)
- 
- 	sys->mem_offset  = DC21285_PCI_MEM;
- 
--	pci_ioremap_io(0, DC21285_PCI_IO);
--
- 	pci_add_resource_offset(&sys->resources, &res[0], sys->mem_offset);
- 	pci_add_resource_offset(&sys->resources, &res[1], sys->mem_offset);
- 
--- 
-1.8.2.1
+Joseph
