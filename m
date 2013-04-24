@@ -1,56 +1,60 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 24 Apr 2013 22:33:24 +0200
-Subject: [PATCHv1 2/3] hwmon: Add documentation for g762 driver
-In-Reply-To: <20130424173216.GA1073@roeck-us.net> (Guenter Roeck's message of
- "Wed, 24 Apr 2013 10:32:16 -0700")
-References: <cover.1366753420.git.arno@natisbad.org>
- <24acd174f829d211f5d4c1b8631ffc3f8dd97910.1366753420.git.arno@natisbad.org>
- <20130424173216.GA1073@roeck-us.net>
-Message-ID: <87haiv8y97.fsf@natisbad.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 24 Apr 2013 23:02:15 +0200
+Subject: [PATCH 0/6] Davinci fbdev driver and enable it for DMx platform
+In-Reply-To: <1366804808-22720-1-git-send-email-prabhakar.csengg@gmail.com>
+References: <1366804808-22720-1-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <1780031.B4OAypccep@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Prabhakar,
 
-Guenter Roeck <linux@roeck-us.net> writes:
+Thank you for the patch.
 
-> On Wed, Apr 24, 2013 at 12:06:08AM +0200, Arnaud Ebalard wrote:
->> 
->> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
->> ---
->>  Documentation/hwmon/g762 |   67 ++++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 67 insertions(+)
->>  create mode 100644 Documentation/hwmon/g762
->> 
->> diff --git a/Documentation/hwmon/g762 b/Documentation/hwmon/g762
->> new file mode 100644
->> index 0000000..5015829
->> --- /dev/null
->> +++ b/Documentation/hwmon/g762
->> @@ -0,0 +1,67 @@
->> +Kernel driver g762
->> +==================
->> +
->> +This documentation is based on G760a one, GMT G762 datasheet available
->
-> G760a ? If this refers to Documentation/hwmon/g760a, I think it is just
-> confusing.
->
->> +at http://natisbad.org/NAS/ref/GMT_EDS-762_763-080710-0.2.pdf (used
->> +for the development of the driver) and sysfs bindings described in
->
-> I would hope that you used the data sheet for the driver ;), but that
-> information does not add much if any value here. I would suggest
-> to drop it. Just point to the data sheet.
->
->> +  fan1_gear_mode: fan gear mode. Supported values are 0, 1 and 2. Default
->> +            value is 0. The value is a characteristic of the system
->> +            and a higher value can be set for more precisely control
->> +            fans with a high rotation speed. Note that this affects the
->> +            measurable speed range, not the read value.
->> +
-> This attribute no longer exists.
+On Wednesday 24 April 2013 17:30:02 Prabhakar Lad wrote:
+> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> 
+> This patch series adds an fbdev driver for Texas
+> Instruments Davinci SoC.The display subsystem consists
+> of OSD and VENC, with OSD supporting 2 RGb planes and
+> 2 video planes.
+> http://focus.ti.com/general/docs/lit/
+> getliterature.tsp?literatureNumber=sprue37d&fileType=pdf
+> 
+> A good amount of the OSD and VENC enabling code is
+> present in the kernel, and this patch series adds the
+> fbdev interface.
+> 
+> The fbdev driver exports 4 nodes representing each
+> plane to the user - from fb0 to fb3.
 
-All thoses will be fixed in v2.
+The obvious question is: why not a KMS driver instead ? :-)
 
-a+
+> Lad, Prabhakar (6):
+>   media: davinci: vpbe: fix checkpatch warning for CamelCase
+>   media: davinci: vpbe: enable vpbe for fbdev addition
+>   davinci: vpbe: add fbdev driver
+>   ARM: davinci: dm355: enable fbdev driver
+>   ARM: davinci: dm365: enable fbdev driver
+>   ARM: davinci: dm644x: enable fbdev driver
+> 
+>  arch/arm/mach-davinci/dm355.c                 |   24 +-
+>  arch/arm/mach-davinci/dm365.c                 |   10 +
+>  arch/arm/mach-davinci/dm644x.c                |   10 +
+>  drivers/media/platform/davinci/vpbe_display.c |    8 +-
+>  drivers/media/platform/davinci/vpbe_osd.c     |  820 ++++++++-
+>  drivers/media/platform/davinci/vpbe_venc.c    |   43 +
+>  drivers/video/Kconfig                         |   12 +
+>  drivers/video/Makefile                        |    1 +
+>  drivers/video/davincifb.c                     | 2523 ++++++++++++++++++++++
+>  drivers/video/davincifb.h                     |  194 ++
+>  include/media/davinci/vpbe_osd.h              |   66 +-
+>  include/media/davinci/vpbe_venc.h             |   21 +
+>  12 files changed, 3702 insertions(+), 30 deletions(-)
+>  create mode 100644 drivers/video/davincifb.c
+>  create mode 100644 drivers/video/davincifb.h
+
+-- 
+Regards,
+
+Laurent Pinchart
