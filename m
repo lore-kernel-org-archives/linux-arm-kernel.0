@@ -1,17 +1,15 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 24 Apr 2013 09:22:37 +0100
-Subject: [PATCH] arm64: compiling issue, need add include/asm/vga.h file
-In-Reply-To: <5177551D.8090007@asianux.com>
-References: <5177551D.8090007@asianux.com>
-Message-ID: <20130424082237.GA23397@arm.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 24 Apr 2013 10:22:50 +0200
+Subject: [PATCH 0/2] drivers/video: mxs-fb: build fixes
+In-Reply-To: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
+References: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1366791772-11133-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 04:44:29AM +0100, Chen Gang wrote:
-> For compiling with allmodconfig, need vga.h file, so copy it from arm32.
+Sorry, I messed up the email addresses in the last two patches, the following
+two are exactly the same just with the correct addresses.
 
-I would rather use the generic vga.h. We don't even have a vga_base
-defined.
+Regards,
 
--- 
-Catalin
+Markus
