@@ -1,37 +1,89 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 24 Apr 2013 23:15:46 +0800
-Subject: [PATCH 2/2] dma: imx-sdma: move to generic device tree bindings
-In-Reply-To: <201304241652.48951.arnd@arndb.de>
-References: <1366812273-10833-1-git-send-email-shawn.guo@linaro.org>
- <201304241626.22518.arnd@arndb.de>
- <20130424144318.GD2736@S2101-09.ap.freescale.net>
- <201304241652.48951.arnd@arndb.de>
-Message-ID: <20130424151544.GE2736@S2101-09.ap.freescale.net>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Wed, 24 Apr 2013 17:52:34 +0200
+Subject: [PATCH V2 1/3] seccomp: add generic code for jitted seccomp
+ filters.
+In-Reply-To: <20130423164303.d2eb663c4a1becea4a185087@linux-foundation.org>
+References: <1363618233-6375-1-git-send-email-nschichan@freebox.fr>
+ <1363618233-6375-2-git-send-email-nschichan@freebox.fr>
+ <20130417145628.88058f0f3104ab9ae551ddd3@linux-foundation.org>
+ <51752D98.8070709@freebox.fr>
+ <20130423164303.d2eb663c4a1becea4a185087@linux-foundation.org>
+Message-ID: <5177FFC2.5020102@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 04:52:48PM +0200, Arnd Bergmann wrote:
-> On Wednesday 24 April 2013, Shawn Guo wrote:
-> > Using macros will help us to:
-> > 
-> > 1) Improve the readability of "dmas" property in dts
-> > 2) Keep the values stay in sync between kernel and DT
-> > 
-> 
-> I can understand the second part, but I strongly disagree on the first one.
-> Using symbolic constants in the DT will make it harder to understand because
-> you now have to look in multiple places to see what you actually put in there.
+On 04/24/2013 01:43 AM, Andrew Morton wrote:
+> On Mon, 22 Apr 2013 14:31:20 +0200 Nicolas Schichan <nschichan@freebox.fr> wrote:
+>> Would including <uapi/linux/filter.h> instead of <linux/filter.h> in seccomp.h
+>> be an acceptable solution ?
+>>
+>> I have tried that and (with an additional forward declaration of struct
+>> sk_buff) an x86_64 "make clean; make allmodconfig" run finishes succesfully.
+>>
+>> If that's ok with you, I can resend the serie with that fix.
+>
+> It would be better to make the code and include tangle less complex,
+> rather than more complex.
+>
+> Did we really need to move the `struct seccomp_filter' definition into
+> the header file?  afaict that wasn't really necessary - we can add a
+> few helper functions to kernel/seccomp.c and then have the remote code
+> treat seccomp_filter in an opaque fashion rather than directly poking
+> at its internals.
 
-So for example below, I did not use macro for the first cell which is
-the DMA request ID, because it's unique for each peripheral.  But
-IMX_DMATYPE_SSI_SP will be applied on all 3 SSI controllers on imx51
-for 6 times (rx and tx).
+Hi,
 
-	dmas = <&sdma 24 IMX_DMATYPE_SSI_SP DMA_PRIO_HIGH>,
-	       <&sdma 25 IMX_DMATYPE_SSI_SP DMA_PRIO_HIGH>;
-	dma-names = "rx", "tx";
+I will resend a V3 of the patch serie with the accessors.
 
-Shawn
+> btw, what on earth is going on with seccomp_jit_free()?  It does
+> disturbing undocumented typecasting and it punts the module_free into a
+> kernel thread for mysterious, undocumented and possibly buggy reasons.
+>
+> I realize it just copies bpf_jit_free().  The same observations apply there.
 
-> It makes some sense for the priorities, since they get reused for each
-> dma specifier.
+The reason for this hack for both seccomp filters and socket filters is that 
+{seccomp,bpf}_jit_free are called from a softirq. module_free() cannot be 
+called directly from softirq, as it will in turn call vfree() which will 
+BUG_ON() if in_interrupt() is non zero. So to call module_free(), it is 
+therefore required to be in a process context, which is provided by the work 
+struct.
+
+Here is the call stack for the socket filter case:
+
+[<c0087bf8>] (vfree+0x28/0x2c) from [<c001fc5c>] (bpf_jit_free+0x10/0x18)
+[<c001fc5c>] (bpf_jit_free+0x10/0x18) from 
+[<c0231188>](sk_filter_release_rcu+0x10/0x1c)
+[<c0231188>] (sk_filter_release_rcu+0x10/0x1c) from [<c0060bb4>] 
+(__rcu_process_callbacks+0x98/0xac)
+[<c0060bb4>] (__rcu_process_callbacks+0x98/0xac) from [<c0060bd8>] 
+(rcu_process_callbacks+0x10/0x20)
+[<c0060bd8>] (rcu_process_callbacks+0x10/0x20) from [<c0029498>] 
+(__do_softirq+0xbc/0x194)
+[<c0029498>] (__do_softirq+0xbc/0x194) from [<c00295b0>] (run_ksoftirqd+0x40/0x64)
+[<c00295b0>] (run_ksoftirqd+0x40/0x64) from [<c0041954>] 
+(smpboot_thread_fn+0x150/0x15c)
+[<c0041954>] (smpboot_thread_fn+0x150/0x15c) from [<c003bb2c>] (kthread+0xa4/0xb0)
+[<c003bb2c>] (kthread+0xa4/0xb0) from [<c0013450>] (ret_from_fork+0x14/0x24)
+
+Here is the call stack for the seccomp filter case:
+
+[<c0087c28>] (vfree+0x28/0x2c) from [<c0060834>] (put_seccomp_filter+0x6c/0x84)
+[<c0060834>] (put_seccomp_filter+0x6c/0x84) from [<c0020db4>] 
+(free_task+0x30/0x50)
+[<c0020db4>] (free_task+0x30/0x50) from [<c0060be4>] 
+(__rcu_process_callbacks+0x98/0xac)
+[<c0060be4>] (__rcu_process_callbacks+0x98/0xac) from [<c0060c08>] 
+(rcu_process_callbacks+0x10/0x20)
+[<c0060c08>] (rcu_process_callbacks+0x10/0x20) from [<c00294c8>] 
+(__do_softirq+0xbc/0x194)
+[<c00294c8>] (__do_softirq+0xbc/0x194) from [<c00295e0>] (run_ksoftirqd+0x40/0x64)
+[<c00295e0>] (run_ksoftirqd+0x40/0x64) from [<c0041984>] 
+(smpboot_thread_fn+0x150/0x15c)
+[<c0041984>] (smpboot_thread_fn+0x150/0x15c) from [<c003bb5c>] (kthread+0xa4/0xb0)
+[<c003bb5c>] (kthread+0xa4/0xb0) from [<c0013450>] (ret_from_fork+0x14/0x24)
+
+Regards,
+
+-- 
+Nicolas Schichan
+Freebox SAS
