@@ -1,14 +1,12 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 24 Apr 2013 22:28:47 +0200
-Subject: [PATCHv1 1/3] hwmon: Add support for GMT G762/G763 PWM fan
- controller
-In-Reply-To: <20130424133856.GA18851@roeck-us.net> (Guenter Roeck's message of
- "Wed, 24 Apr 2013 06:38:56 -0700")
+Date: Wed, 24 Apr 2013 22:33:24 +0200
+Subject: [PATCHv1 2/3] hwmon: Add documentation for g762 driver
+In-Reply-To: <20130424173216.GA1073@roeck-us.net> (Guenter Roeck's message of
+ "Wed, 24 Apr 2013 10:32:16 -0700")
 References: <cover.1366753420.git.arno@natisbad.org>
- <63961d39aee9db94767f28fd441312bec2029473.1366753420.git.arno@natisbad.org>
- <20130424053758.GC8710@lunn.ch> <87obd4wb4e.fsf@natisbad.org>
- <20130424133856.GA18851@roeck-us.net>
-Message-ID: <87li878ygw.fsf@natisbad.org>
+ <24acd174f829d211f5d4c1b8631ffc3f8dd97910.1366753420.git.arno@natisbad.org>
+ <20130424173216.GA1073@roeck-us.net>
+Message-ID: <87haiv8y97.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -16,50 +14,43 @@ Hi,
 
 Guenter Roeck <linux@roeck-us.net> writes:
 
->> > You could consider using regmap for holding this cache.
->> >
->> > http://elceurope2012.sched.org/event/100619b669ce5767341624253aa03659?iframe=no&w=900&sidebar=yes&bg=no#.UXdspHLQ5jM
->> >
->> > http://elinux.org/ELCE_Europe_2012_Presentations
+> On Wed, Apr 24, 2013 at 12:06:08AM +0200, Arnaud Ebalard wrote:
 >> 
->> Interesting. As I am not yet familiar w/ regmap I would prefer having
->> the driver accepted during merge window with current data structure and
->> then convert it to regmap. But I will take a look (e.g. will study
->> fca1dd03 for instance). Thanks for the pointers. 
+>> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+>> ---
+>>  Documentation/hwmon/g762 |   67 ++++++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 67 insertions(+)
+>>  create mode 100644 Documentation/hwmon/g762
 >> 
-> I have not had time for a detailed review, but adding regmap support
-> will not be a requirement.
+>> diff --git a/Documentation/hwmon/g762 b/Documentation/hwmon/g762
+>> new file mode 100644
+>> index 0000000..5015829
+>> --- /dev/null
+>> +++ b/Documentation/hwmon/g762
+>> @@ -0,0 +1,67 @@
+>> +Kernel driver g762
+>> +==================
+>> +
+>> +This documentation is based on G760a one, GMT G762 datasheet available
 >
-> Note that it is too late for 3.10, so the driver will have to wait for
-> 3.11.
+> G760a ? If this refers to Documentation/hwmon/g760a, I think it is just
+> confusing.
+>
+>> +at http://natisbad.org/NAS/ref/GMT_EDS-762_763-080710-0.2.pdf (used
+>> +for the development of the driver) and sysfs bindings described in
+>
+> I would hope that you used the data sheet for the driver ;), but that
+> information does not add much if any value here. I would suggest
+> to drop it. Just point to the data sheet.
+>
+>> +  fan1_gear_mode: fan gear mode. Supported values are 0, 1 and 2. Default
+>> +            value is 0. The value is a characteristic of the system
+>> +            and a higher value can be set for more precisely control
+>> +            fans with a high rotation speed. Note that this affects the
+>> +            measurable speed range, not the read value.
+>> +
+> This attribute no longer exists.
 
-Well, I think I can live with it; The only bad thing is that it kills my
-excuses not to spend time on regmap ;-)
-
-
->> >> +/*
->> >> + * Helpers to import hardware characteristics from .dts file and overload
->> >> + * default config values.
->> >> + */
->> >> +
->> >> +#ifdef CONFIG_OF
->> >
->> > Can the driver be used without device tree? Would it be simpler to
->> >  just add depends OF in the Kconfig entry?
->> 
->> It can be used if the default params (or those configured by u-boot I
->> guess) fit your needs. I think it would be fairly easy to extend the
->> driver later to expose g762_config struct to allow parameters to be set
->> w/o using OF. If someone wants to do that, I think it is better to not
->> depend on OF in Kconfig at the moment but I have not strong argument
->> other that that one. I'll let you decide.
->> 
-> Agreed. As long as there are major platforms not supporting device tree,
-> and as long as device tree overlays are not supported, it must not be made
-> mandatory. Especially for I2C and SPI devices I reserve the right to be able
-> test the hardware on an X86 system and not require a reboot to do so.
-
-Understood. Following Simon's post, I think it's useful to implement
-some init function for non DT-enabled platforms. 
+All thoses will be fixed in v2.
 
 a+
