@@ -1,74 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 24 Apr 2013 09:50:05 -0700
-Subject: [GIT PULL] omap dss board clean-up for v3.10 merge window
-In-Reply-To: <5177902C.5070407@ti.com>
-References: <20130418033936.GC10155@atomide.com>
- <20130419184518.GA30836@quad.lixom.net> <5174F593.20705@ti.com>
- <20130423171438.GC10155@atomide.com> <5177902C.5070407@ti.com>
-Message-ID: <20130424165005.GA5184@atomide.com>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Wed, 24 Apr 2013 09:50:38 -0700
+Subject: [PATCH v3 08/32] arm64: KVM: architecture specific MMU backend
+In-Reply-To: <20130424111002.GJ21850@mudshark.cambridge.arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-9-git-send-email-marc.zyngier@arm.com>
+ <20130423225816.GC20569@gmail.com> <5177BBEE.1090209@arm.com>
+ <20130424111002.GJ21850@mudshark.cambridge.arm.com>
+Message-ID: <CAEDV+gJAyE2teK963iMYujPmyY0fqSZ7kQmq5CiKwvxNKm=SWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [130424 01:01]:
-> On 2013-04-23 20:14, Tony Lindgren wrote:
-> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [130422 01:37]:
-> 
-> >> So while I think it is a good habit to push the arch changes and driver
-> >> changes separately, my question is, should that rule be followed to the
-> >> extreme? Can I just keep all the changes in one branch if separating the
-> >> arch and driver changes would end up with cloning files or lots of extra
-> >> code?
-> > 
-> > Shread branches are just fine. In most cases it's possible to add new
-> > pdata and then remove the old pdata later on with follow-up patches.
-> 
-> Yes, that's what I've been doing. But it's not possible in all cases,
-> and in some cases it's just really difficult/laborious.
-> 
-> I'll soon need to change the dss panel device model, and the only way I
-> can see that would allow us to keep everything running if only arch or
-> driver changes are merged, is to create a copy of all the omap display
-> drivers, and change the copy for the new dss device model.
+On Wed, Apr 24, 2013 at 4:10 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Wed, Apr 24, 2013 at 12:03:10PM +0100, Marc Zyngier wrote:
+>> On 23/04/13 23:58, Christoffer Dall wrote:
+>> > I noticed that this doesn't do any cache cleaning.  Are the MMU page
+>> > table walks guaranteed to be coherent with the MMU on arm64?
+>>
+>> I suppose you meant the cache. In this case, yes. The hardware page
+>> table walker must snoop the caches.
 >
-> And that's obviously a terrible way to do it.
-
-Yes that is the case if you have to completely redo the pdata and
-cannot get away by just changing the existing pdata.
- 
-> So presuming I need to have the dss changes in separate arch and driver
-> series, and everything should run fine even if only the other half is
-> merged, then, well, I have no idea how to proceed. I'll continue looking
-> at this, but it's a bit frustrating to spend most of my time trying to
-> twist the code to accommodate the merging process, instead of making the
-> code work.
+> Also, for ARMv7, SMP implies that the hardware walker snoops the cache. I
+> recently upstreamed some patches for this (see "ARM: 7691/1: mm: kill unused
+> TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead" in -next), so you might
+> want to check if there are any remaining, redundant flushes in kvm for ARMv7.
 >
-> That said, this dss device model change should be a one time thing.
-> After it's done, these merging-problems should be greatly reduced.
+always on SMP? I thought this was implementation specific and you
+could read this in some feature register?
 
-Right, if it's more complex than just changing the pdata then what you've
-been doing is probably the best approach. Just needs to be done earlier :)
- 
-> >> Of course, I don't know what DRM maintainer thinks of merging arch
-> >> changes through his tree, so that's also open.
-> > 
-> > No let's not go there, Linus T already complained about the conflicts
-> > between drivers/net and arch/arm/*omap*/ code few merge windows ago.
-> > We need to remove the driver dependencies to the arch/arm code, otherwise
-> > the merging requires way too much work from multiple maintainers. That
-> > does not scale well and often leads into merge errors that could have
-> > been avoided in the first place.
-> > 
-> > Of course the real solution here is to get things moved over to DT
-> > based booting and then we don't have any of these dependencies as the
-> > .dts changes can get merged separately from the driver changes.
-> 
-> It will remove compile time dependencies, but we'll still have runtime
-> dependencies just like we do now.
-
-Only for adding new features. If the new features are missing from the
-.dts changes, the driver should still work with limited features. The
-idea is to support DT bindings in the long term.
-
-Regards,
-
-Tony
+In any case, I'm quite sure we do some unnecessary cleaning in KVM
+then, so I'll look at it.
