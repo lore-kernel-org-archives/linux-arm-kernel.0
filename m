@@ -1,71 +1,98 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 24 Apr 2013 17:56:57 +0200
-Subject: [PATCH v3 00/13] ARM: EXYNOS: Fix Universal C210 support
-In-Reply-To: <1366731994-7478-1-git-send-email-t.figa@samsung.com>
-References: <1366731994-7478-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1412451.qIYy1KKdql@amdc1227>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Wed, 24 Apr 2013 09:07:17 -0700
+Subject: gpio-pxa initcall level change and machine init breakage
+In-Reply-To: <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
+References: <5172B398.7060706@newsguy.com>
+ <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
+Message-ID: <51780335.6030100@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 23 of April 2013 17:46:21 Tomasz Figa wrote:
-> This series intends to fix support for Universal C210 board in mainline.
-> Main difference from other boards based on Exynos 4210 is that hardware
-> revision of the SoC used on Universal C210 does not support MCT timers
-> and legacy PWM timers must be used instead.
-> 
-> First (and the biggest) part of the series deals with cleaning up and
-> fixing the samsung_pwm_timer clocksource driver, that was posted
-> recently by Arnd. In addition the driver is prepared to share the
-> hardware with PWM driver that will be reworked later, since it is not
-> a component crucial for system operation.
-> 
-> Second part fixes ATAGS support of Exynos 4210 rev0 SoC, which needs
-> different timer initialization, using the new samsung_pwm_timer driver.
-> 
-> Third and last part adds Device Tree-based support for Universal C210
-> board by providing device tree sources for it.
-> 
-> On Universal C210 board, both with and without DT:
-> 
-> Tested-by: Tomasz Figa <t.figa@samsung.com>
-> 
-> Tomasz Figa (13):
->   Documentation: Add device tree bindings for Samsung PWM timers
->   clocksource: samsung_pwm_timer: Let platforms select the driver
->   clocksource: samsung_pwm_timer: Make PWM spinlock global
->   clocksource: samsung_pwm_timer: Keep all driver data in a structure
->   clocksource: samsung_pwm_timer: Drop unused samsung_pwm struct
->   clocksource: samsung_pwm_timer: Add support for non-DT platforms
->   clocksource: samsung_pwm_timer: Use proper clockevents max_delta
->   clocksource: samsung_pwm_timer: Correct programming of clock events
->   clocksource: samsung_pwm_timer: Work around rounding errors in
->     clockevents core
->   ARM: SAMSUNG: Do not register legacy timer interrupts on Exynos
->   ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
->   ARM: dts: exynos4: Add node for PWM device
->   ARM: dts: exynos4210: Add basic dts file for universal_c210 board
-> 
->  .../devicetree/bindings/pwm/pwm-samsung.txt        |  43 +++
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/exynos4.dtsi                     |   8 +
->  arch/arm/boot/dts/exynos4210-universal_c210.dts    | 352
-> +++++++++++++++++++++ arch/arm/mach-exynos/Kconfig                       | 
->  3 +-
->  arch/arm/mach-exynos/common.c                      |  45 ++-
->  arch/arm/mach-exynos/common.h                      |   2 +
->  arch/arm/mach-exynos/mach-universal_c210.c         |   5 +-
->  arch/arm/plat-samsung/Kconfig                      |   4 +-
->  drivers/clocksource/Kconfig                        |   3 +-
->  drivers/clocksource/samsung_pwm_timer.c            | 215 +++++++------
->  include/clocksource/samsung_pwm.h                  |  11 +-
->  12 files changed, 561 insertions(+), 131 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-samsung.txt
->  create mode 100644 arch/arm/boot/dts/exynos4210-universal_c210.dts
+Linus,
 
-Kgene, could you merge this series and send a pull request, please?
+The patch you offered yesterday does not fix things on palmtreo, because there
+are calls to gpio_request() in another file (palm27x.c) that are made from
+init_machine().  I'd be grateful for any insight into how to resolve this.
+Please see below...
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Kernel and System Framework
+
+On 04/20/2013 11:02 PM, Haojian Zhuang wrote:
+> On 20 April 2013 23:26, Mike Dunn <mikedunn@newsguy.com> wrote:
+>> Hi,
+>>
+>> After a few months of neglect, I rebased my palm treo 680 kernel with the latest
+>> from Linus' official tree, and now all the calls to gpio lib functions
+>> (gpio_request(), etc) made from the init_machine() method in struct machine_desc
+>> fail.  I tracked this back to commit 6c7e660a27da7494c670bfba21cfeba30457656c
+>> dated Jan 23 2013
+>>
+>>     gpio: pxa: set initcall level to module init
+>>
+>>     gpio & pinctrl driver are used together. The pinctrl driver is already
+>>     launched before gpio driver in Makefile. So set gpio driver to module
+>>     init level. Otherwise, the sequence will be inverted.
+>>
+>>     Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>>     Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> At the time, Haojian addressed a question about this patch regarding module
+>> dependencies, advising use of the deferred probe infrastructure.  But unless I'm
+>> mistaken, mine is an initcall level problem, not a dependency issue among driver
+>> probes.  Now that gpio-pxa initialization is at the device level (initcall6),
+>> calls to gpiolib are no longer possible from init_machine(), which remains at
+>> the initcall3 level.
+>>
+>> I feel like I must be missing something, because a lot of pxa boards call
+>> gpiolib from init machine(), so my breakage should not be an isolated case.
+>>
+>> If I'm not missing anything and the patch is necessary, it looks like one
+>> solution would be to move all the initializations that use gpiolib to the
+>> init_late method in struct machine_desc, which runs as initcall7.
+>>
+>> Grateful for any advice!
+>>
+>> Thanks,
+>> Mike
+> 
+> Actually gpio request should be handled in the driver, not machine platform
+> driver. For example, lcd init may request gpio. pxafb.c provides the callback
+> to handle it. We need to move code of requesting gpio into the callback.
+
+
+It appears that some pxa27x drivers will need to be reworked to accomplish this.
+ For example, in the case of the pxa27x lcd driver (pxafb), there are callbacks
+for turning the lcd and its backlight on and off, but it seems that the gpios
+should have already been requested when these run.  The board-specific gpios
+*could* be passed to the pxafb driver via platform_data, and the driver could
+request them in its probe function, but currently this is not done.
+
+Moving gpiolib calls to init_late() in struct machine_desc, which runs as
+initcall7, may also be a solution.
+
+
+> 
+> Since this change breaks current platform, we have to revert it. We still need
+> a code cleanup in arch-pxa directory.
+
+
+Indeed, if I'm not mistaken, at least these boards are now broken:
+  - tosa
+  - baloon3
+  - gumstix
+  - hx4700
+  - magician
+  - mioa701
+  - palmtreo/palmcentro
+  - palmld
+  - palmtc
+  - palmz72
+
+
+> 
+> Linus,
+> Could you help to revert this commit? Or do I need to send a revert commit
+> to you?
+> 
+
+Thanks,
+Mike
