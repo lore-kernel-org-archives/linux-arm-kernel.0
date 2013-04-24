@@ -1,41 +1,79 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 24 Apr 2013 09:28:47 -0700
-Subject: [PATCH V4 1/6] clk: OMAP: introduce device tree binding to kernel
- clock data
-In-Reply-To: <20130414211917.GA3275@snafu>
-References: <1365807278-554-1-git-send-email-nm@ti.com>
- <1365807278-554-2-git-send-email-nm@ti.com>
- <20130412233142.GE10155@atomide.com> <20130412233900.GA1599@kahuna>
- <20130413172210.GM10155@atomide.com> <20130414211917.GA3275@snafu>
-Message-ID: <20130424162847.8998.73264@quantum>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 24 Apr 2013 17:31:24 +0100
+Subject: [PATCH] mfd: vexpress: Handle pending config transactions
+Message-ID: <1366821084-12815-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Nishanth Menon (2013-04-14 14:19:17)
-> Overall strategy introduced here is simple: a clock node described in
-> device tree blob is used to identify the exact clock provided in the
-> SoC specific data. This is then linked back using of_clk_add_provider
-> to the device node to be accessible by of_clk_get.
-> 
-> Based on discussion contributions from Roger Quadros, Grygorii Strashko
-> and others.
-> 
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> [tony at atomide.com: co-developed]
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Nishanth Menon <nm@ti.com>
+The config transactions "scheduler" was hopelessly broken,
+repeating completed transaction instead of picking up
+next pending one.
 
-I can take this into clk-next after the merge window.  Please refresh it
-for -rc1 as we discussed on irc.
+Fixed now. Also improved debug messages.
 
-As an aside, will Tero's series for migrating to drivers/clk/omap[1] and
-Rajendra's patch for registering clocks late[2] be refreshed after the
-merge window?  It would be nice to combine these efforts.
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ drivers/mfd/vexpress-config.c |   31 ++++++++++++++++++++-----------
+ 1 file changed, 20 insertions(+), 11 deletions(-)
 
-Thanks,
-Mike
-
-[1] http://article.gmane.org/gmane.linux.ports.arm.omap/95948
-[2] http://www.spinics.net/lists/arm-kernel/msg231288.html
+diff --git a/drivers/mfd/vexpress-config.c b/drivers/mfd/vexpress-config.c
+index 3c1723aa..4991db3 100644
+--- a/drivers/mfd/vexpress-config.c
++++ b/drivers/mfd/vexpress-config.c
+@@ -184,13 +184,14 @@ static int vexpress_config_schedule(struct vexpress_config_trans *trans)
+ 
+ 	spin_lock_irqsave(&bridge->transactions_lock, flags);
+ 
+-	vexpress_config_dump_trans("Executing", trans);
+-
+-	if (list_empty(&bridge->transactions))
++	if (list_empty(&bridge->transactions)) {
++		vexpress_config_dump_trans("Executing", trans);
+ 		status = bridge->info->func_exec(trans->func->func,
+ 				trans->offset, trans->write, trans->data);
+-	else
++	} else {
++		vexpress_config_dump_trans("Queuing", trans);
+ 		status = VEXPRESS_CONFIG_STATUS_WAIT;
++	}
+ 
+ 	switch (status) {
+ 	case VEXPRESS_CONFIG_STATUS_DONE:
+@@ -217,20 +218,28 @@ void vexpress_config_complete(struct vexpress_config_bridge *bridge,
+ 
+ 	trans = list_first_entry(&bridge->transactions,
+ 			struct vexpress_config_trans, list);
++	trans->status = status;
+ 	vexpress_config_dump_trans("Completed", trans);
+ 
+-	trans->status = status;
+ 	list_del(&trans->list);
+ 
+-	if (!list_empty(&bridge->transactions)) {
+-		vexpress_config_dump_trans("Pending", trans);
++	complete(&trans->completion);
++
++	while (!list_empty(&bridge->transactions)) {
++		trans = list_first_entry(&bridge->transactions,
++				struct vexpress_config_trans, list);
+ 
+-		bridge->info->func_exec(trans->func->func, trans->offset,
+-				trans->write, trans->data);
++		vexpress_config_dump_trans("Executing pending", trans);
++		status = bridge->info->func_exec(trans->func->func,
++				trans->offset, trans->write, trans->data);
++
++		if (status == VEXPRESS_CONFIG_STATUS_DONE)
++			vexpress_config_dump_trans("Finished pending", trans);
++		else
++			break;
+ 	}
+-	spin_unlock_irqrestore(&bridge->transactions_lock, flags);
+ 
+-	complete(&trans->completion);
++	spin_unlock_irqrestore(&bridge->transactions_lock, flags);
+ }
+ EXPORT_SYMBOL(vexpress_config_complete);
+ 
+-- 
+1.7.10.4
