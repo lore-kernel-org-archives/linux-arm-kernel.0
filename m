@@ -1,26 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 24 Apr 2013 16:52:48 +0200
-Subject: [PATCH 2/2] dma: imx-sdma: move to generic device tree bindings
-In-Reply-To: <20130424144318.GD2736@S2101-09.ap.freescale.net>
-References: <1366812273-10833-1-git-send-email-shawn.guo@linaro.org>
- <201304241626.22518.arnd@arndb.de>
- <20130424144318.GD2736@S2101-09.ap.freescale.net>
-Message-ID: <201304241652.48951.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 24 Apr 2013 16:54:49 +0200
+Subject: [PATCH 03/32 v2] dmaengine: ste_dma40: Use the BIT macro to
+ replace ugly '(1 << x)'s
+In-Reply-To: <20130418121637.GG27903@gmail.com>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-4-git-send-email-lee.jones@linaro.org>
+ <20130418121637.GG27903@gmail.com>
+Message-ID: <CACRpkdYCub2GN5okM4NW9E5snwVnGKvnGd02V2qLX=s6R04e9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 April 2013, Shawn Guo wrote:
-> Using macros will help us to:
-> 
-> 1) Improve the readability of "dmas" property in dts
-> 2) Keep the values stay in sync between kernel and DT
-> 
+On Thu, Apr 18, 2013 at 2:16 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-I can understand the second part, but I strongly disagree on the first one.
-Using symbolic constants in the DT will make it harder to understand because
-you now have to look in multiple places to see what you actually put in there.
+> The aim is to make the code that little more readable.
+>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Per Forlin <per.forlin@stericsson.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>
+> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+> index 3b83dee..ddf5ff1 100644
+> --- a/drivers/dma/ste_dma40.c
+> +++ b/drivers/dma/ste_dma40.c
+> @@ -49,9 +49,9 @@
+>  #define MAX_LCLA_ALLOC_ATTEMPTS 256
+>
+>  /* Bit markings for allocation map */
+> -#define D40_ALLOC_FREE         (1 << 31)
+> -#define D40_ALLOC_PHY          (1 << 30)
+> -#define D40_ALLOC_LOG_FREE     0
+> +#define D40_ALLOC_FREE         BIT(31)
+> +#define D40_ALLOC_PHY          BIT(30)
+> +#define D40_ALLOC_LOG_FREE     BIT(0)
 
-It makes some sense for the priorities, since they get reused for each
-dma specifier.
+No. 0 != BIT(0)
 
-	Arnd
+Please fix this...
+
+Yours,
+Linus Walleij
