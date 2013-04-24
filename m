@@ -1,50 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Apr 2013 15:45:37 +0200
-Subject: [PATCH 1/8] dmaengine: ste_dma40: Assign memcpy channels in the
- driver
-In-Reply-To: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
-References: <1365532783-27425-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYUT+5J-phV=ez-EkmA9EdfxwmDMApTssi+P3=mSE3cew@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 24 Apr 2013 14:46:44 +0100
+Subject: [PATCH v3 29/32] arm64: KVM: 32bit guest fault injection
+In-Reply-To: <20130423230214.GM20569@gmail.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-30-git-send-email-marc.zyngier@arm.com>
+ <20130423230214.GM20569@gmail.com>
+Message-ID: <5177E244.9000404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 9, 2013 at 8:39 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On 24/04/13 00:02, Christoffer Dall wrote:
+> On Mon, Apr 08, 2013 at 05:17:31PM +0100, Marc Zyngier wrote:
+>> Add fault injection capability for 32bit guests.
+> 
+> looks ok, but seems we are duplicating some functionality here, but I
+> realize it may not be that easy to share due to different define names
+> for things like PSR_X_BIT...  Did you look further into this?
 
-> The channels reserved for memcpy are the same for all currently
-> supported platforms. With this in mind, we can ease the platform
-> data passing requirement by moving these assignments out from
-> platform code and place them directly into the driver.
->
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+I did, but as you noticed, the namespaces are different. We could
+probably define a set of KVM_AARCH32_* symbols, but I'm not sure it
+would be any nicer though.
 
-(...)
-
-> -/* Reserved event lines for memcpy only */
-> -static int dma40_memcpy_event[] = {
-> -       DB8500_DMA_MEMCPY_TX_0,
-> -       DB8500_DMA_MEMCPY_TX_1,
-> -       DB8500_DMA_MEMCPY_TX_2,
-> -       DB8500_DMA_MEMCPY_TX_3,
-> -       DB8500_DMA_MEMCPY_TX_4,
-> -       DB8500_DMA_MEMCPY_TX_5,
-> -};
-
-(...)
-
-> +/* Reserved event lines for memcpy only. */
-> +static int dma40_memcpy_channels[] = { 56, 57, 58, 59, 60 };
-
-So what's so bad with using the #defines?
-
-I would prefer if you took the entire content of
-arch/arm/mach-ux500/ste-dma40-db8500.h
-and copied into the DMA driver, so you atleast
-have a chance of understanding what these numbers
-are about.
-
-Yours,
-Linus Walleij
+	M.
+-- 
+Jazz is not dead. It just smells funny...
