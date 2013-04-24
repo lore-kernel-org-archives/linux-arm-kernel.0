@@ -1,50 +1,90 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 24 Apr 2013 18:51:22 +0800
-Subject: [PATCH v2] arm64: compiling issue, need add include/asm/vga.h file
-In-Reply-To: <20130424104231.GJ23397@arm.com>
-References: <5177551D.8090007@asianux.com> <20130424082237.GA23397@arm.com>
- <5177B1F0.10106@asianux.com> <20130424104231.GJ23397@arm.com>
-Message-ID: <5177B92A.5030004@asianux.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Apr 2013 11:58:42 +0100
+Subject: [PATCH] mmc: mmci: Allow MMCI to request channels with information
+ acquired from DT
+Message-ID: <1366801122-13302-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?04?24? 18:42, Catalin Marinas wrote:
-> On Wed, Apr 24, 2013 at 11:20:32AM +0100, Chen Gang wrote:
->> For compiling with allmodconfig, need vga.h file, so generate it which
->> just only include the asm-generic one.
->>
->> It is firstly used by drivers/gpu/drm/drm_irq.c.
->>
->> The related error:
->> include/video/vga.h:22:21: fatal error: asm/vga.h: No such file or directory
->>
->> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> ---
->>  arch/arm64/include/asm/vga.h |   21 +++++++++++++++++++++
->>  1 files changed, 21 insertions(+), 0 deletions(-)
->>  create mode 100644 arch/arm64/include/asm/vga.h
-> 
-> As Will said, please use asm/Kbuild.
-> 
+Currently, if DMA information isn't passed from platform data, then DMA
+will not be used. This patch allows DMA information obtained though Device
+Tree to be used as well.
 
-OK, I will send.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Chris Ball <cjb@laptop.org>
+Cc: linux-mmc at vger.kernel.org
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/mmc/host/mmci.c |   43 ++++++++++++++++++++++---------------------
+ 1 file changed, 22 insertions(+), 21 deletions(-)
 
->> diff --git a/arch/arm64/include/asm/vga.h b/arch/arm64/include/asm/vga.h
->> new file mode 100644
->> index 0000000..1c49d51
->> --- /dev/null
->> +++ b/arch/arm64/include/asm/vga.h
->> @@ -0,0 +1,21 @@
->> +/*
->> + * Copyright (C) 2012 ARM Ltd.
-> 
-> ARM copyright? You either work for ARM or there is a copyright
-> assignment between you and ARM ;)
-> 
-
-:-)
-
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 372e921..ecd256b 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -304,10 +304,8 @@ static void mmci_dma_setup(struct mmci_host *host)
+ 	const char *rxname, *txname;
+ 	dma_cap_mask_t mask;
+ 
+-	if (!plat || !plat->dma_filter) {
+-		dev_info(mmc_dev(host->mmc), "no DMA platform data\n");
+-		return;
+-	}
++	host->dma_rx_channel = dma_request_slave_channel(dev, "rx");
++	host->dma_tx_channel = dma_request_slave_channel(dev, "tx");
+ 
+ 	/* initialize pre request cookie */
+ 	host->next_data.cookie = 1;
+@@ -316,30 +314,33 @@ static void mmci_dma_setup(struct mmci_host *host)
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
+ 
+-	/*
+-	 * If only an RX channel is specified, the driver will
+-	 * attempt to use it bidirectionally, however if it is
+-	 * is specified but cannot be located, DMA will be disabled.
+-	 */
+-	if (plat->dma_rx_param) {
+-		host->dma_rx_channel = dma_request_channel(mask,
++	if (plat && plat->dma_filter) {
++		if (!host->dma_rx_channel && plat->dma_rx_param) {
++			host->dma_rx_channel = dma_request_channel(mask,
+ 							   plat->dma_filter,
+ 							   plat->dma_rx_param);
+-		/* E.g if no DMA hardware is present */
+-		if (!host->dma_rx_channel)
+-			dev_err(mmc_dev(host->mmc), "no RX DMA channel\n");
+-	}
++			/* E.g if no DMA hardware is present */
++			if (!host->dma_rx_channel)
++				dev_err(mmc_dev(host->mmc), "no RX DMA channel\n");
++		}
+ 
+-	if (plat->dma_tx_param) {
+-		host->dma_tx_channel = dma_request_channel(mask,
++		if (!host->dma_tx_channel && plat->dma_tx_param) {
++			host->dma_tx_channel = dma_request_channel(mask,
+ 							   plat->dma_filter,
+ 							   plat->dma_tx_param);
+-		if (!host->dma_tx_channel)
+-			dev_warn(mmc_dev(host->mmc), "no TX DMA channel\n");
+-	} else {
+-		host->dma_tx_channel = host->dma_rx_channel;
++			if (!host->dma_tx_channel)
++				dev_warn(mmc_dev(host->mmc), "no TX DMA channel\n");
++		}
+ 	}
+ 
++	/*
++	 * If only an RX channel is specified, the driver will
++	 * attempt to use it bidirectionally, however if it is
++	 * is specified but cannot be located, DMA will be disabled.
++	 */
++	if (host->dma_rx_channel && !host->dma_tx_channel)
++		host->dma_tx_channel = host->dma_rx_channel;
++
+ 	if (host->dma_rx_channel)
+ 		rxname = dma_chan_name(host->dma_rx_channel);
+ 	else
 -- 
-Chen Gang
-
-Asianux Corporation
+1.7.10.4
