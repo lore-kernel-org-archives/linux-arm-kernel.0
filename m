@@ -1,44 +1,38 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Wed, 24 Apr 2013 05:34:21 +0000
-Subject: [PATCH 21/21] mtd: omap2: allow bulding as a module
-In-Reply-To: <20130423180320.GJ10155@atomide.com>
-References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
- <1366734653-488286-22-git-send-email-arnd@arndb.de>
- <20130423180320.GJ10155@atomide.com>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73E9BCFAE@DBDE04.ent.ti.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Wed, 24 Apr 2013 17:38:19 +1200
+Subject: [PATCH 0/3] dts: v8500: Cleanups for 3.10
+Message-ID: <1366781902-13025-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> * Arnd Bergmann <arnd@arndb.de> [130423 09:37]:
-> > The omap2 nand device driver calls into the the elm code, which can
-> > be a loadable module, and in that case it cannot be built-in itself.
-> > I can see no reason why the omap2 driver cannot also be a module,
-> > so let's make the option "tristate" in Kconfig to fix this allmodconfig
-> > build error:
-> >
-> > ERROR: "elm_config" [drivers/mtd/nand/omap2.ko] undefined!
-> > ERROR: "elm_decode_bch_error_page" [drivers/mtd/nand/omap2.ko]
-> undefined!
-> >
-[Pekon]: 
-ELM module is required in for Hardware based ECC correction for 
-NAND devices. And this driver has a very small foot-print.
+Arnd, Olof,
 
-The only cases this drives would _not_ be used are:
-(a) Using S/W based ECC scheme, which have vey high CPU utilization
-(b) Using single bit ECC scheme, which are becoming obsolete due to
- increasing NAND densities.
-For most of the cases ELM module will be used with nand-driver. So
-there should be no harm in having this module as built-in, if not used
-in 10% of the use-cases.
+This is probably a bit late for 3.10 now but its just a bunch of cleanups for
+the arch-vt8500 devicetree SoC and board files, and the addition of a new
+dts for the VIA APC8750.
 
-Thus I think it's better to keep this module tied to GPMC module, 
-rather than independent control via KConfig.
-And user should just selects which ECC scheme he would like to
-use via DT, without worrying about KConfig options.
+Regards
+Tony P
 
-I'm working in cleaning up omap2-nand driver to remove some 
-redundancies. So would like to know your feedback on same..
+Tony Prisk (3):
+  dts: vt8500: Fix invalid/missing cpu nodes for soc files.
+  dts: vt8500: Add devicetree support for WM8750 SoC and APC8750 board
+  dts: vt8500: Update serial nodes and disable by default in SoC files
 
+ arch/arm/boot/dts/Makefile           |    1 +
+ arch/arm/boot/dts/vt8500-bv07.dts    |    4 +
+ arch/arm/boot/dts/vt8500.dtsi        |   29 ++-
+ arch/arm/boot/dts/wm8505-ref.dts     |    4 +
+ arch/arm/boot/dts/wm8505.dtsi        |   35 +++-
+ arch/arm/boot/dts/wm8650-mid.dts     |    4 +
+ arch/arm/boot/dts/wm8650.dtsi        |   21 +-
+ arch/arm/boot/dts/wm8750-apc8750.dts |   30 +++
+ arch/arm/boot/dts/wm8750.dtsi        |  355 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/wm8850-w70v2.dts   |    4 +
+ arch/arm/boot/dts/wm8850.dtsi        |   23 ++-
+ 11 files changed, 492 insertions(+), 18 deletions(-)
+ create mode 100644 arch/arm/boot/dts/wm8750-apc8750.dts
+ create mode 100644 arch/arm/boot/dts/wm8750.dtsi
 
-with regards, pekon
+-- 
+1.7.9.5
