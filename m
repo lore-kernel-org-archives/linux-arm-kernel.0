@@ -1,31 +1,28 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 24 Apr 2013 20:28:09 +0100
-Subject: [PATCH v4 1/7] xen/arm: actually pass a non-NULL percpu pointer to
- request_percpu_irq
+Date: Wed, 24 Apr 2013 20:28:13 +0100
+Subject: [PATCH v4 5/7] xen/arm: XEN selects ARM_PSCI
 In-Reply-To: <alpine.DEB.2.02.1304242012590.4180@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1304242012590.4180@kaball.uk.xensource.com>
-Message-ID: <1366831695-13214-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1366831695-13214-5-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-CC: stable at vger.kernel.org
 ---
- arch/arm/xen/enlighten.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 8dc0605..99ce189 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -239,7 +239,7 @@ static int __init xen_init_events(void)
- 	xen_init_IRQ();
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2c3bdce..344e299 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1892,6 +1892,7 @@ config XEN
+ 	depends on ARM && AEABI && OF
+ 	depends on CPU_V7 && !CPU_V6
+ 	depends on !GENERIC_ATOMIC64
++	select ARM_PSCI
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
  
- 	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
--			"events", xen_vcpu)) {
-+			"events", &xen_vcpu)) {
- 		pr_err("Error requesting IRQ %d\n", xen_events_irq);
- 		return -EINVAL;
- 	}
 -- 
 1.7.2.5
