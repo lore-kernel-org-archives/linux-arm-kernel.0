@@ -1,48 +1,38 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Wed, 24 Apr 2013 17:30:08 +0530
-Subject: [PATCH 6/6] ARM: davinci: dm644x: enable fbdev driver
-In-Reply-To: <1366804808-22720-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1366804808-22720-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <1366804808-22720-7-git-send-email-prabhakar.csengg@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Apr 2013 14:35:50 +0200
+Subject: [PATCH 04/11] dmaengine: dw_dmac: simplify master selection
+In-Reply-To: <1366796443-7083-4-git-send-email-andriy.shevchenko@linux.intel.com>
+References: <1366796443-7083-1-git-send-email-andriy.shevchenko@linux.intel.com>
+ <1366796443-7083-4-git-send-email-andriy.shevchenko@linux.intel.com>
+Message-ID: <201304241435.50963.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+On Wednesday 24 April 2013, Andy Shevchenko wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
+> 
+> The patch to add the common DMA binding added a dummy dw_dma_slave
+> structure into the dw_dma_chan structure in order to configure the
+> masters correctly. It turns out that this can be simplified if we
+> pick the DMA masters in the dwc_alloc_chan_resources function instead
+> and save them in the dw_dma_chan structure directly.
+> 
+> This could be simplified further once all users that today use
+> dw_dma_slave for configuration get converted to device tree based
+> setup instead.
+> 
+> (Upstream commit id: f776076b9fa82d630651c9af56359d80fce86d68)
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
 
-This patch enables fbdev driver by creating fbdev device and register it.
+Hi Andy,
 
-Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
----
- arch/arm/mach-davinci/dm644x.c |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+Did you intend that to get sent to everyone, or just forget to
+pass --suppress-cc=all to git-send-email?
 
-diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
-index c2a9273..a4fee07 100644
---- a/arch/arm/mach-davinci/dm644x.c
-+++ b/arch/arm/mach-davinci/dm644x.c
-@@ -745,6 +745,15 @@ static struct platform_device dm644x_vpbe_display = {
- 	},
- };
- 
-+static struct platform_device dm644x_davincifb = {
-+	.name           = "davinci-vpbe-fb",
-+	.id             = -1,
-+	.dev            = {
-+		.dma_mask		= &dm644x_video_dma_mask,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+	},
-+};
-+
- static struct venc_platform_data dm644x_venc_pdata = {
- 	.setup_clock	= dm644x_venc_setup_clock,
- };
-@@ -909,6 +918,7 @@ int __init dm644x_init_video(struct vpfe_config *vpfe_cfg,
- 		platform_device_register(&dm644x_venc_dev);
- 		platform_device_register(&dm644x_vpbe_dev);
- 		platform_device_register(&dm644x_vpbe_display);
-+		platform_device_register(&dm644x_davincifb);
- 	}
- 
- 	return 0;
--- 
-1.7.4.1
+	Arnd
