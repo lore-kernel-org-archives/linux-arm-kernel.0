@@ -1,41 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 24 Apr 2013 11:42:31 +0100
-Subject: [PATCH v2] arm64: compiling issue, need add include/asm/vga.h file
-In-Reply-To: <5177B1F0.10106@asianux.com>
-References: <5177551D.8090007@asianux.com> <20130424082237.GA23397@arm.com>
- <5177B1F0.10106@asianux.com>
-Message-ID: <20130424104231.GJ23397@arm.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 24 Apr 2013 12:50:12 +0200
+Subject: [PATCHv1 1/3] hwmon: Add support for GMT G762/G763 PWM fan
+ controller
+In-Reply-To: <20130424100458.GA17771@kw.sim.vm.gnt> (Simon Guinot's message of
+ "Wed, 24 Apr 2013 12:04:59 +0200")
+References: <cover.1366753420.git.arno@natisbad.org>
+ <63961d39aee9db94767f28fd441312bec2029473.1366753420.git.arno@natisbad.org>
+ <20130424053758.GC8710@lunn.ch> <87obd4wb4e.fsf@natisbad.org>
+ <20130424100458.GA17771@kw.sim.vm.gnt>
+Message-ID: <87ehe06w4b.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 11:20:32AM +0100, Chen Gang wrote:
-> For compiling with allmodconfig, need vga.h file, so generate it which
-> just only include the asm-generic one.
-> 
-> It is firstly used by drivers/gpu/drm/drm_irq.c.
-> 
-> The related error:
-> include/video/vga.h:22:21: fatal error: asm/vga.h: No such file or directory
-> 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm64/include/asm/vga.h |   21 +++++++++++++++++++++
->  1 files changed, 21 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm64/include/asm/vga.h
+Hi Simon,
 
-As Will said, please use asm/Kbuild.
+Simon Guinot <simon.guinot@sequanux.org> writes:
 
-> diff --git a/arch/arm64/include/asm/vga.h b/arch/arm64/include/asm/vga.h
-> new file mode 100644
-> index 0000000..1c49d51
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/vga.h
-> @@ -0,0 +1,21 @@
-> +/*
-> + * Copyright (C) 2012 ARM Ltd.
+>> It can be used if the default params (or those configured by u-boot I
+>> guess) fit your needs. I think it would be fairly easy to extend the
+>> driver later to expose g762_config struct to allow parameters to be set
+>> w/o using OF. If someone wants to do that, I think it is better to not
+>> depend on OF in Kconfig at the moment but I have not strong argument
+>> other that that one. I'll let you decide.
+>
+> A g762 device is embedded on the 2Big Network v2 board (net2big_v2),
+> which is not DT compliant. Then, I think it could be nice to allow
+> device registration from board setup files.
 
-ARM copyright? You either work for ARM or there is a copyright
-assignment between you and ARM ;)
+ok, I will try and provide that for v2 then. :-)
 
--- 
-Catalin
+Cheers,
+
+a+
