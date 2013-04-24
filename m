@@ -1,34 +1,46 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 24 Apr 2013 10:22:51 +0200
-Subject: [PATCH 1/2] drivers/video: Kconfig, fix mxsfb build
+Date: Wed, 24 Apr 2013 10:22:52 +0200
+Subject: [PATCH 2/2] drivers/video: mxs-fb: Fix build, use renamed function
 In-Reply-To: <1366791772-11133-1-git-send-email-mpa@pengutronix.de>
 References: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
  <1366791772-11133-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1366791772-11133-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <1366791772-11133-3-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Kernel build fails with commit 669406534b4abb827d1bdc39bb5e2d5255818ae2
 
-This patch replaces OF_VIDEOMODE symbol by VIDEOMODE_HELPERS.
+This patch renames videomode_from_timing to videomode_from_timings and
+vm.data_flags to vm.flags.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/video/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/video/mxsfb.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
-index d8ecc52..6246056 100644
---- a/drivers/video/Kconfig
-+++ b/drivers/video/Kconfig
-@@ -2429,7 +2429,7 @@ config FB_MXS
- 	select FB_CFB_COPYAREA
- 	select FB_CFB_IMAGEBLIT
- 	select FB_MODE_HELPERS
--	select OF_VIDEOMODE
-+	select VIDEOMODE_HELPERS
- 	help
- 	  Framebuffer support for the MXS SoC.
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index 1b2c26d..d78827e 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -777,16 +777,16 @@ static int mxsfb_init_fbinfo_dt(struct mxsfb_info *host)
+ 		struct videomode vm;
+ 		struct fb_videomode fb_vm;
  
+-		ret = videomode_from_timing(timings, &vm, i);
++		ret = videomode_from_timings(timings, &vm, i);
+ 		if (ret < 0)
+ 			goto put_timings_node;
+ 		ret = fb_videomode_from_videomode(&vm, &fb_vm);
+ 		if (ret < 0)
+ 			goto put_timings_node;
+ 
+-		if (vm.data_flags & DISPLAY_FLAGS_DE_HIGH)
++		if (vm.flags & DISPLAY_FLAGS_DE_HIGH)
+ 			host->sync |= MXSFB_SYNC_DATA_ENABLE_HIGH_ACT;
+-		if (vm.data_flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
++		if (vm.flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
+ 			host->sync |= MXSFB_SYNC_DOTCLK_FALLING_ACT;
+ 		fb_add_videomode(&fb_vm, &fb_info->modelist);
+ 	}
 -- 
 1.8.1.5
