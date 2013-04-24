@@ -1,80 +1,76 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Tue, 23 Apr 2013 16:55:40 -0700
-Subject: [PATCH v2] ARM: Fix l2x0_init log message
-In-Reply-To: <5ddc968feee3af6c462b24ca53eeeb11bbb7b7a3>
-References: <5ddc968feee3af6c462b24ca53eeeb11bbb7b7a3>
-Message-ID: <1366761340-6550-1-git-send-email-syin@broadcom.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 23 Apr 2013 17:06:38 -0700
+Subject: [GIT PULL] Late Exynos stuff for v3.10
+In-Reply-To: <51770697.7080504@samsung.com>
+References: <5176B499.1000208@samsung.com>
+ <51770697.7080504@samsung.com>
+Message-ID: <20130424000638.GA9067@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the log at the end of l2x0_init(), "ways" and "l2x0_size" should be derived
-from the most recently read value from the AUX register.  Previously, these
-were derived from the earlier value of the AUX register with modifications by
-the function paramters aux_val and aux_mask.
+Hi,
 
-Signed-off-by: Sherman Yin <syin@broadcom.com>
----
-v2: Corrected switch statement
+On Wed, Apr 24, 2013 at 07:09:27AM +0900, Kukjin Kim wrote:
 
-arch/arm/mm/cache-l2x0.c |   39 +++++++++++++++++++++++++++++++--------
- 1 file changed, 31 insertions(+), 8 deletions(-)
+> Arnd, Olof,
+> 
+> Since above request should be too late, so I did sort out like
+> following. I think, it should be fine to you ;-) Sorry for noise.
+> 
+> Note that others will be queued for v3.11.
+> 
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index c465fac..ca50099 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -376,14 +376,6 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
- 	l2x0_way_mask = (1 << ways) - 1;
- 
- 	/*
--	 * L2 cache Size =  Way size * Number of ways
--	 */
--	way_size = (aux & L2X0_AUX_CTRL_WAY_SIZE_MASK) >> 17;
--	way_size = 1 << (way_size + way_size_shift);
--
--	l2x0_size = ways * way_size * SZ_1K;
--
--	/*
- 	 * Check if l2x0 controller is already enabled.
- 	 * If you are booting from non-secure mode
- 	 * accessing the below registers will fault.
-@@ -417,6 +409,37 @@ void __init l2x0_init(void __iomem *base, u32 aux_val, u32 aux_mask)
- 		outer_cache.disable = l2x0_disable;
- 	}
- 
-+	/* Update number of ways based on aux ctrl register value */
-+	switch (cache_id & L2X0_CACHE_ID_PART_MASK) {
-+	case L2X0_CACHE_ID_PART_L310:
-+		if (aux & (1 << 16))
-+			ways = 16;
-+		else
-+			ways = 8;
-+		break;
-+	case L2X0_CACHE_ID_PART_L210:
-+		ways = (aux >> 13) & 0xf;
-+		break;
-+
-+	case AURORA_CACHE_ID:
-+		ways = (aux >> 13) & 0xf;
-+		ways = 2 << ((ways + 1) >> 2);
-+		way_size_shift = AURORA_WAY_SIZE_SHIFT;
-+		break;
-+	default:
-+		/* Assume unknown chips have 8 ways */
-+		ways = 8;
-+		break;
-+	}
-+
-+	/*
-+	 * L2 cache Size =  Way size * Number of ways
-+	 */
-+	way_size = (aux & L2X0_AUX_CTRL_WAY_SIZE_MASK) >> 17;
-+	way_size = 1 << (way_size + way_size_shift);
-+
-+	l2x0_size = ways * way_size * SZ_1K;
-+
- 	printk(KERN_INFO "%s cache controller enabled\n", type);
- 	printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache size: %d B\n",
- 			ways, cache_id, aux, l2x0_size);
--- 
-1.7.9.5
+[..]
+
+
+>  ----------------------------------------------------------------
+>  This includes late exynos stuff for v3.10 and 2nd version for pull
+> request 1) enables usb2phy, usb3phy and dwc3-exynos for exynos5250
+> 2) support chip id with dt
+> 
+>  ----------------------------------------------------------------
+>  Doug Anderson (1):
+>        ARM: dts: Disable the RTC by default on exynos5
+> 
+>  Thomas Abraham (3):
+>        ARM: dts: add mshc controller node for Exynos4x12 SoCs
+>        ARM: EXYNOS: Create virtual I/O mapping for Chip-ID
+> controller using device tree
+>        ARM: dts: Add chip-id controller node on Exynos4/5 SoC
+> 
+>  Vivek Gautam (5):
+>        ARM: dts: Enabling samsung-usb2phy driver for exynos5250
+>        ARM: dts: Enabling samsung-usb3phy driver for exynos5250
+>        ARM: dts: Add device tree bindings for dwc3-exynos
+>        ARM: dts: Enabling dwc3-exynos driver for exynos5250
+>        ARM: EXYNOS: Enable XHCI support on exynos5
+
+
+Can I please ask you to make our life a little easier by telling us what the
+specific problems these patches solve are? What I am looking for is something
+along the lines of:
+
+--
+
+This branch includes some last-minute enablements of DT contents for features
+that are queued for 3.10:
+ - USB PHY drivers on Exynos 5250
+ - MMC (mshc) on Exynos 4x12
+ - XCHI (USB 3.0) on Exynos 5250
+
+It also contains a fix to disable RTC on exynos [because ... you fill in this
+part].
+
+--
+
+It doesn't have to be something super-elaborate, but I'd like it to be sort of
+self-documenting in a way that I don't have to look through the series of
+patches to get an overview of what's in the branch. Of course we'll also do
+that to review the code, but having the description there makes things easier
+for us to tell if we should even be looking at it, etc.
+
+
+
+Thanks!
+
+-Olof
