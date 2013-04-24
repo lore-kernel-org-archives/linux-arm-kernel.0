@@ -1,70 +1,81 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 24 Apr 2013 10:56:28 +0300
-Subject: [GIT PULL] omap dss board clean-up for v3.10 merge window
-In-Reply-To: <20130423171438.GC10155@atomide.com>
-References: <20130418033936.GC10155@atomide.com>
- <20130419184518.GA30836@quad.lixom.net> <5174F593.20705@ti.com>
- <20130423171438.GC10155@atomide.com>
-Message-ID: <5177902C.5070407@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Apr 2013 08:52:12 +0100
+Subject: [PATCH] ARM: ux500: Supply a DTS file for the u8540 platform
+In-Reply-To: <CACRpkdZWuw9O3-wr=g1AehZqmBR1YJ353w9ANfBTHhr5mRiwiw@mail.gmail.com>
+References: <1364908916-29803-1-git-send-email-lee.jones@linaro.org>
+ <1364908916-29803-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdafSvT5Xb=7sqnkRHcc4UKkVzr8jzThMgWn6459RDmKGw@mail.gmail.com>
+ <20130404072907.GB3004@gmail.com>
+ <CACRpkdZWuw9O3-wr=g1AehZqmBR1YJ353w9ANfBTHhr5mRiwiw@mail.gmail.com>
+Message-ID: <20130424075212.GE17416@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013-04-23 20:14, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@ti.com> [130422 01:37]:
+On Tue, 23 Apr 2013, Linus Walleij wrote:
 
->> So while I think it is a good habit to push the arch changes and driver
->> changes separately, my question is, should that rule be followed to the
->> extreme? Can I just keep all the changes in one branch if separating the
->> arch and driver changes would end up with cloning files or lots of extra
->> code?
+> On Thu, Apr 4, 2013 at 9:29 AM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> Shread branches are just fine. In most cases it's possible to add new
-> pdata and then remove the old pdata later on with follow-up patches.
-
-Yes, that's what I've been doing. But it's not possible in all cases,
-and in some cases it's just really difficult/laborious.
-
-I'll soon need to change the dss panel device model, and the only way I
-can see that would allow us to keep everything running if only arch or
-driver changes are merged, is to create a copy of all the omap display
-drivers, and change the copy for the new dss device model.
-
-And that's obviously a terrible way to do it.
-
-So presuming I need to have the dss changes in separate arch and driver
-series, and everything should run fine even if only the other half is
-merged, then, well, I have no idea how to proceed. I'll continue looking
-at this, but it's a bit frustrating to spend most of my time trying to
-twist the code to accommodate the merging process, instead of making the
-code work.
-
-That said, this dss device model change should be a one time thing.
-After it's done, these merging-problems should be greatly reduced.
-
->> Of course, I don't know what DRM maintainer thinks of merging arch
->> changes through his tree, so that's also open.
+> > This is a skeleton DTS file which only enables serial. Just using
+> > this simple file yields a terminal when booting u8540.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> No let's not go there, Linus T already complained about the conflicts
-> between drivers/net and arch/arm/*omap*/ code few merge windows ago.
-> We need to remove the driver dependencies to the arch/arm code, otherwise
-> the merging requires way too much work from multiple maintainers. That
-> does not scale well and often leads into merge errors that could have
-> been avoided in the first place.
+> Now, wait... this doesn't work.
+
+This is very strange and not what I see in my branch.
+
+> > +/ {
+> > +  model = "ST-Ericsson U8540 platform with Device Tree";
+> > +  compatible = "st-ericsson,u8540";
+> > +
+> > +       memory {
+> > +              reg = <0x00000000 0x20000000>;
+> > +              };
 > 
-> Of course the real solution here is to get things moved over to DT
-> based booting and then we don't have any of these dependencies as the
-> .dts changes can get merged separately from the driver changes.
+> Funny whitespace. Use tabs ...
 
-It will remove compile time dependencies, but we'll still have runtime
-dependencies just like we do now.
+This a single tab in my branch/editor.
 
- Tomi
+> > +       soc-u9500 {
+> 
+> Please rename this not just "soc"
 
+Done.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 899 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130424/dfaf82bb/attachment.sig>
+> > +                 uart at 80120000 {
+> > +                                       status = "okay";
+> > +                                              };
+> > +
+> > +               uart at 80121000 {
+> > +                               status = "okay";
+> > +                                      };
+> > +
+> > +               uart at 80007000 {
+> > +                               status = "okay";
+> > +                                      };
+> > +                                      };
+> > +};
+> 
+> The whitespace looks a bit funny compared to the
+> old patch, what happened here?
+> 
+> It also has the side effect that patch 5/9 does not
+> apply... By the way, since I already applied 4/9, please
+> squash 5/9 into this patch to avoid problems.
+
+It's quite common for issues to occur when patches are taken
+out-of-order. As I work with topic branches, my preference would
+normally be to fix issues with the patch-set as a whole until Acks are
+obtained for all of the patches, then either send a pull-request or to
+have all of the patches taken from the MLs in order.
+
+> Finally, please patch arch/arm/boot/dts/Makefile
+> in the obvious way so that the DTB gets compiled.
+
+Ah  yes. Good spot.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
