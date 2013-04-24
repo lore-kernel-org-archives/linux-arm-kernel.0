@@ -1,57 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 24 Apr 2013 11:23:27 +0100
-Subject: [PATCH v2] arm64: compiling issue, need add include/asm/vga.h file
-In-Reply-To: <5177B1F0.10106@asianux.com>
-References: <5177551D.8090007@asianux.com> <20130424082237.GA23397@arm.com>
- <5177B1F0.10106@asianux.com>
-Message-ID: <20130424102327.GF21850@mudshark.cambridge.arm.com>
+From: francescolavra.fl@gmail.com (Francesco Lavra)
+Date: Wed, 24 Apr 2013 12:30:49 +0200
+Subject: [Linaro-mm-sig] [RFC/PATCH v2 2/2] drivers: dma-contiguous: add
+ initialization from device tree
+In-Reply-To: <1365679330-2514-3-git-send-email-m.szyprowski@samsung.com>
+References: <1365679330-2514-1-git-send-email-m.szyprowski@samsung.com>
+ <1365679330-2514-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <5177B459.1080009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 11:20:32AM +0100, Chen Gang wrote:
-> 
-> For compiling with allmodconfig, need vga.h file, so generate it which
-> just only include the asm-generic one.
-> 
-> It is firstly used by drivers/gpu/drm/drm_irq.c.
-> 
-> The related error:
-> include/video/vga.h:22:21: fatal error: asm/vga.h: No such file or directory
-> 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm64/include/asm/vga.h |   21 +++++++++++++++++++++
->  1 files changed, 21 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm64/include/asm/vga.h
-> 
-> diff --git a/arch/arm64/include/asm/vga.h b/arch/arm64/include/asm/vga.h
-> new file mode 100644
-> index 0000000..1c49d51
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/vga.h
-> @@ -0,0 +1,21 @@
-> +/*
-> + * Copyright (C) 2012 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef ASMARM_VGA_H
-> +#define ASMARM_VGA_H
-> +
-> +#include <asm-generic/vga.h>
-> +
-> +#endif /* ASMARM_VGA_H */
+On 04/11/2013 01:22 PM, Marek Szyprowski wrote:
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index 01fe743..6a8abab 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+[...]
+> +void scan_cma_nodes(void)
 
-Can't you just add this as a generic-y entry in asm/Kbuild?
+Should be declared static.
 
-Will
+> +{
+> +	struct device_node *parent = of_find_node_by_path("/chosen/contiguous-memory");
+> +	struct device_node *child;
+> +
+> +	if (!parent)
+> +		return;
+> +
+> +	for_each_child_of_node(parent, child) {
+> +		struct cma *cma = NULL;
+> +		int i;
+> +
+> +		for (i=0; i<cma_area_count; i++)
+> +			if (strstr(child->full_name, cma_areas[i].full_name))
+> +				cma = &cma_areas[i];
+> +		if (!cma)
+> +			continue;
+> +
+> +		for (i=0;; i++) {
+> +			struct device_node *node;
+> +			node = of_parse_phandle(child, "device", i);
+> +			if (!node)
+> +				break;
+> +
+> +			cma_maps[cma_map_count].cma = cma;
+> +			cma_maps[cma_map_count].node = node;
+> +			cma_map_count++;
+> +		}
+
+of_parse_phandle() requires of_node_put() to be called when done with
+the device node.
+Also, of_node_put() should be called on the parent node as well.
+
+> +	}
+> +}
+
+--
+Francesco
