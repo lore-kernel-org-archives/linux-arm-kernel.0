@@ -1,133 +1,80 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Wed, 24 Apr 2013 10:17:32 -0700
-Subject: [PATCH v3 30/32] arm64: KVM: enable initialization of a 32bit vcpu
-In-Reply-To: <5177E303.7050801@arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-31-git-send-email-marc.zyngier@arm.com>
- <20130423230229.GN20569@gmail.com> <5177E303.7050801@arm.com>
-Message-ID: <CAEDV+g+OL+37w9jA8=0WGea5FgW5y3mazqFzv9GLxDgjCe6dtg@mail.gmail.com>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Wed, 24 Apr 2013 19:27:06 +0200
+Subject: [PATCH V3] Support for JIT in Seccomp BPF filters.
+Message-ID: <1366824429-26652-1-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 6:49 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 24/04/13 00:02, Christoffer Dall wrote:
->> On Mon, Apr 08, 2013 at 05:17:32PM +0100, Marc Zyngier wrote:
->>> Wire the init of a 32bit vcpu by allowing 32bit modes in pstate,
->>> and providing sensible defaults out of reset state.
->>>
->>> This feature is of course conditioned by the presence of 32bit
->>> capability on the physical CPU, and is checked by the KVM_CAP_ARM_EL1_32BIT
->>> capability.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  arch/arm64/include/asm/kvm_host.h |  2 +-
->>>  arch/arm64/include/uapi/asm/kvm.h |  1 +
->>>  arch/arm64/kvm/guest.c            |  6 ++++++
->>>  arch/arm64/kvm/reset.c            | 25 ++++++++++++++++++++++++-
->>>  include/uapi/linux/kvm.h          |  1 +
->>>  5 files changed, 33 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->>> index d44064d..c3ec107 100644
->>> --- a/arch/arm64/include/asm/kvm_host.h
->>> +++ b/arch/arm64/include/asm/kvm_host.h
->>> @@ -34,7 +34,7 @@
->>>  #include <asm/kvm_vgic.h>
->>>  #include <asm/kvm_arch_timer.h>
->>>
->>> -#define KVM_VCPU_MAX_FEATURES 1
->>> +#define KVM_VCPU_MAX_FEATURES 2
->>>
->>>  /* We don't currently support large pages. */
->>>  #define KVM_HPAGE_GFN_SHIFT(x)      0
->>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->>> index 5b1110c..5031f42 100644
->>> --- a/arch/arm64/include/uapi/asm/kvm.h
->>> +++ b/arch/arm64/include/uapi/asm/kvm.h
->>> @@ -75,6 +75,7 @@ struct kvm_regs {
->>>  #define KVM_VGIC_V2_CPU_SIZE                0x2000
->>>
->>>  #define KVM_ARM_VCPU_POWER_OFF              0 /* CPU is started in OFF state */
->>> +#define KVM_ARM_VCPU_EL1_32BIT              1 /* CPU running a 32bit VM */
->>>
->>>  struct kvm_vcpu_init {
->>>      __u32 target;
->>> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
->>> index 47d3729..74ef7d5 100644
->>> --- a/arch/arm64/kvm/guest.c
->>> +++ b/arch/arm64/kvm/guest.c
->>> @@ -93,6 +93,12 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->>>      if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
->>>              unsigned long mode = (*(unsigned long *)valp) & COMPAT_PSR_MODE_MASK;
->>>              switch (mode) {
->>> +            case COMPAT_PSR_MODE_USR:
->>> +            case COMPAT_PSR_MODE_FIQ:
->>> +            case COMPAT_PSR_MODE_IRQ:
->>> +            case COMPAT_PSR_MODE_SVC:
->>> +            case COMPAT_PSR_MODE_ABT:
->>> +            case COMPAT_PSR_MODE_UND:
->>>              case PSR_MODE_EL0t:
->>>              case PSR_MODE_EL1t:
->>>              case PSR_MODE_EL1h:
->>> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->>> index bc33e76..a282d35 100644
->>> --- a/arch/arm64/kvm/reset.c
->>> +++ b/arch/arm64/kvm/reset.c
->>> @@ -35,11 +35,27 @@ static struct kvm_regs default_regs_reset = {
->>>      .regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
->>>  };
->>>
->>> +static struct kvm_regs default_regs_reset32 = {
->>> +    .regs.pstate = (COMPAT_PSR_MODE_SVC | COMPAT_PSR_A_BIT |
->>> +                    COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
->>> +};
->>> +
->>> +static bool cpu_has_32bit_el1(void)
->>> +{
->>> +    u64 pfr0;
->>> +
->>> +    pfr0 = read_cpuid(ID_AA64PFR0_EL1);
->>> +    return !!(pfr0 & 0x20);
->>
->> again we don't need the double negation
->
-> I still hold that it makes things more readable.
->
->>> +}
->>> +
->>>  int kvm_arch_dev_ioctl_check_extention(long ext)
->>>  {
->>>      int r;
->>>
->>>      switch (ext) {
->>> +    case KVM_CAP_ARM_EL1_32BIT:
->>> +            r = cpu_has_32bit_el1();
->>> +            break;
->>>      default:
->>>              r = 0;
->>>      }
->>> @@ -62,7 +78,14 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
->>>
->>>      switch (vcpu->arch.target) {
->>>      default:
->>> -            cpu_reset = &default_regs_reset;
->>> +            if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features)) {
->>> +                    if (!cpu_has_32bit_el1())
->>> +                            return -EINVAL;
->>
->> I'm not sure EINVAL is appropriate here, the value specified was not
->> incorrect, it's that the hardware doesn't support it. ENXIO, ENODEV, and
->> add that in Documentation/virtual/kvm/api.txt ?
->
-> Not sure. If you ended up here, it means you tried to start a 32bit
-> guest on a 64bit-only CPU, despite KVM_CAP_ARM_EL1_32BIT telling you
-> that your CPU is not 32bit capable.
->
-> This is clearly an invalid input, isn't it?
->
-check the API documentation for this ioctl, I don't think that's the
-type of invalid input meant when describing the meaning of EINVAL. If
-you feel strongly about it of course it's no big deal, but I think
-EINVAL is so overloaded anyway that telling the user something more
-specific would be great, but I'll leave it up to you.
+Hi,
+
+This patch serie adds support for jitted seccomp BPF filters, with the
+required modifications to make it work on the ARM architecture.
+
+- The first patch in the serie adds the required boiler plate in the
+  core kernel seccomp code to invoke the JIT compilation/free code.
+
+- The second patch reworks the ARM BPF JIT code to make the generation
+  process less dependent on struct sk_filter.
+
+- The last patch actually implements the ARM part in the BPF jit code.
+
+Some benchmarks, on a 1.6Ghz 88f6282 CPU:
+
+Each system call is tested in two way (fast/slow):
+
+ - on the fast version, the tested system call is accepted immediately
+   after checking the architecture (5 BPF instructions).
+
+ - on the slow version, the tested system call is accepted after
+   previously checking for 85 syscall (90 instructions, including the
+   architecture check).
+
+The tested syscall is invoked in a loop 1000000 time, the reported
+time is the time spent in the loop in seconds.
+
+Without Seccomp JIT:
+
+Syscall		Time-Fast  Time-Slow
+--------------- ---------- ----------
+gettimeofday	0.389	   1.633
+getpid		0.406	   1.688
+getresuid	1.003	   2.266
+getcwd		1.342	   2.128
+
+With Seccomp JIT:
+
+Syscall		Time-Fast  Time-Slow
+--------------- ----------- ---------
+gettimeofday	0.348	    0.428
+getpid		0.365	    0.480
+getresuid	0.981	    1.060
+getcwd		1.237	    1.294
+
+For reference, the same code without any seccomp filter:
+
+Syscall		Time
+--------------- -----
+gettimeofday	0.119
+getpid		0.137
+getresuid	0.747
+getcwd		1.021
+
+The activation of the BPF JIT for seccomp is still controled with the
+/proc/sys/net/core/bpf_jit_enable sysctl knob.
+
+Those changes are based on the latest rmk-for-next branch.
+
+V2 Changes:
+- Document the @bpf_func field in struct seccomp_filter as recommended
+  by Kees Cook.
+- Invoke seccomp_bpf_load directly from generated code without going
+  via a wrapper.
+
+V3 Changes:
+- add accessors giving access to the fields in struct seccomp_filter
+  as recommended by Andrew Morton. This avoids having to include
+  <linux/filter.h> in <linux/seccomp.h>, and fixes broken include
+  dependencies on x86_64 allmodconfig build.
+- checkpatch fixes (void*) -> (void *)
+
+Regards,
