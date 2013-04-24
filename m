@@ -1,24 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 24 Apr 2013 12:43:51 +0100
-Subject: [PATCH v3 20/32] arm64: KVM: Plug the arch timer
-In-Reply-To: <20130423230024.GH20569@gmail.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-21-git-send-email-marc.zyngier@arm.com>
- <20130423230024.GH20569@gmail.com>
-Message-ID: <5177C577.2050209@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 24 Apr 2013 19:49:45 +0800
+Subject: [PATCH 0/2] drivers/video: mxs-fb: build fixes
+In-Reply-To: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
+References: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130424114943.GA2736@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/04/13 00:00, Christoffer Dall wrote:
-> On Mon, Apr 08, 2013 at 05:17:22PM +0100, Marc Zyngier wrote:
->> Add support for the in-kernel timer emulation. The include file
->> is a complete duplicate of the 32bit one - something to fix
->> at one point.
+On Wed, Apr 24, 2013 at 10:08:12AM +0200, Markus Pargmann wrote:
+> Hi,
 > 
-> again, I'd really like to see this fixed before we merge the code...
+> mxs-fb commit
+> 
+> 669406534b4abb827d1bdc39bb5e2d5255818ae2 video: mxsfb: get display timings from device tree
+> 
+> creates a build failure together with those commits:
+> 
+> a38884f681a4d044befd30d9f3d19a0821bae63a videomode: simplify videomode Kconfig and Makefile
+> 6cd2c7db41eab204b6474534df4ca68a7dc53d86 videomode: videomode_from_timing work
+> 
+> All of them are in linux-next, so mxs-fb fails to build there.
 
-Feel free to suggest a solution. None of the one I tried are nice.
+Fabio already had a patch [1] for that.  I will send it mainline during
+3.10-rc.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Shawn
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/230938
