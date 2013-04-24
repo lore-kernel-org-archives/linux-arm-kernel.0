@@ -1,44 +1,23 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Apr 2013 09:39:44 +0100
-Subject: [PATCH 21/32 v2] dmaengine: ste_dma40: Also report the number of
- logical channels
-In-Reply-To: <1366279934-30761-22-git-send-email-lee.jones@linaro.org>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-22-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130424083944.GG17416@gmail.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 24 Apr 2013 16:44:54 +0800
+Subject: [PATCH] arm64: compiling issue, need add include/asm/vga.h file
+In-Reply-To: <20130424082237.GA23397@arm.com>
+References: <5177551D.8090007@asianux.com> <20130424082237.GA23397@arm.com>
+Message-ID: <51779B86.4030306@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dmaengine: ste_dma40: Also report the number of logical channels
+On 2013?04?24? 16:22, Catalin Marinas wrote:
+> On Wed, Apr 24, 2013 at 04:44:29AM +0100, Chen Gang wrote:
+>> For compiling with allmodconfig, need vga.h file, so copy it from arm32.
+> 
+> I would rather use the generic vga.h. We don't even have a vga_base
+> defined.
+> 
 
-Now we know the total of physical and logical channels, we may as
-well report them within the information log.
+OK, thanks. I need send patch v2.
 
-Before:
-dma40 dma40.0: hardware revision: 3 @ 0x801c0000 with 8 physical channels
+-- 
+Chen Gang
 
-After:
-<as above ...> and 256 logical channels
-
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <djbw@fb.com>
-Cc: Per Forlin <per.forlin@stericsson.com>
-Cc: Rabin Vincent <rabin@rab.in>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 4c6df0e..d5a15ec 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -3200,8 +3200,9 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
- 
- 	num_log_chans = num_phy_chans * D40_MAX_LOG_CHAN_PER_PHY;
- 
--	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with %d physical channels\n",
--		 rev, res->start, num_phy_chans);
-+	dev_info(&pdev->dev,
-+		 "hardware rev: %d @ 0x%x with %d physical chans and %d logical chans\n",
-+		 rev, res->start, num_phy_chans, num_log_chans);
- 
- 	base = kzalloc(ALIGN(sizeof(struct d40_base), 4) +
- 		       (num_phy_chans + num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) *
+Asianux Corporation
