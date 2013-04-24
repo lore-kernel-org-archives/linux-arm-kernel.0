@@ -1,117 +1,33 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 24 Apr 2013 12:50:00 -0500
-Subject: [PATCH] cpuidle: add maintainer entry
-In-Reply-To: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <51781B48.30208@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 25 Apr 2013 01:59:59 +0800
+Subject: [PATCH v2] ARM: Kconfig: let ARM9TDMI and ARM7TDMI invisible.
+In-Reply-To: <20130424174602.GA14496@n2100.arm.linux.org.uk>
+References: <51775BB3.6000607@asianux.com> <51775D88.2000406@asianux.com>
+ <20130424174602.GA14496@n2100.arm.linux.org.uk>
+Message-ID: <8EB7C52E-5044-4B8A-99F2-BCFF9DFDBD2E@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2013 08:34 AM, Daniel Lezcano wrote:
-> Currently the cpuidle drivers are spread across the different archs.
-> 
-> The patch submission for cpuidle are following different path: the cpuidle core
-> code goes to linux-pm, the ARM drivers goes to arm-soc or the SoC specific
-> tree, sh goes through sh arch tree, pseries goes through PowerPC and
-> finally intel goes through Len's tree while acpi_idle goes under linux-pm.
-> 
-> That makes difficult to consolidate the code and to propagate modifications
-> from the cpuidle core to the different drivers.
-> 
-> Hopefully, a movement has initiated to put the cpuidle drivers into the
-> drivers/cpuidle directory like cpuidle-calxeda.c and cpuidle-kirkwood.c
-> 
-> Add an explicit maintainer entry in the MAINTAINER to clarify the situation
-> and prevent new cpuidle drivers to goes to an arch directory.
-> 
-> The upstreaming process is unchanged: Rafael takes the patches to merge them
-> into its tree but with the acked-by from the driver's maintainer. So the header
-> must contains the name of the maintainer.
 
-Shouldn't MAINTAINERS contain the driver maintainers too?
+On Apr 25, 2013, at 1:46 AM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
+> On Wed, Apr 24, 2013 at 12:20:24PM +0800, Chen Gang wrote:
+>> If CONFIG_MMU is disabled, it will let ARM9TDMI and ARM7TDMI visible,
+>> but in fact, only AT91X40 need ARM7TDMI, so need not let them visible.
 > 
-> This organization will be the same than cpufreq.
+> I'll apply it myself this evening.  Can I add:
 > 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  MAINTAINERS                        |    7 +++++++
->  drivers/cpuidle/cpuidle-calxeda.c  |    4 +++-
->  drivers/cpuidle/cpuidle-kirkwood.c |    5 +++--
->  3 files changed, 13 insertions(+), 3 deletions(-)
+> Tested-by: Chen Gang <gang.chen@asianux.com>
+you add it mine too
+
+Tested-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+
+Best Regards,
+J.
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 61677c3..effa0f3 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -2206,6 +2206,13 @@ S:	Maintained
->  F:	drivers/cpufreq/
->  F:	include/linux/cpufreq.h
->  
-> +CPUIDLE DRIVERS
-> +M:	Rafael J. Wysocki <rjw@sisk.pl>
-> +L:	linux-pm at vger.kernel.org
-> +S:	Maintained
-> +F:	drivers/cpuidle/*
-> +F:	include/linux/cpuidle.h
-> +
->  CPU FREQUENCY DRIVERS - ARM BIG LITTLE
->  M:	Viresh Kumar <viresh.kumar@linaro.org>
->  M:	Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-> index e344b56..2378c39 100644
-> --- a/drivers/cpuidle/cpuidle-calxeda.c
-> +++ b/drivers/cpuidle/cpuidle-calxeda.c
-> @@ -1,7 +1,6 @@
->  /*
->   * Copyright 2012 Calxeda, Inc.
->   *
-> - * Based on arch/arm/plat-mxc/cpuidle.c:
-
-This file may have moved, but it existed at the time this was committed.
-So the comment still applies and documents what part of the file the FSL
-and Linaro copyright applies to.
-
-Of course most of what was copied here was the boilerplate which your
-patch series removes. The heart of the functionality was developed by me.
-
->   * Copyright 2012 Freescale Semiconductor, Inc.
->   * Copyright 2012 Linaro Ltd.
->   *
-> @@ -16,6 +15,9 @@
->   *
->   * You should have received a copy of the GNU General Public License along with
->   * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + *
-> + * Author    : Rob Herring <rob.herring@calxeda.com>
-> + * Maintainer: Rob Herring <rob.herring@calxeda.com>
-
-As mentioned above, this doesn't seem right.
-
-Rob
-
->   */
->  
->  #include <linux/cpuidle.h>
-> diff --git a/drivers/cpuidle/cpuidle-kirkwood.c b/drivers/cpuidle/cpuidle-kirkwood.c
-> index 53290e1..521b0a7 100644
-> --- a/drivers/cpuidle/cpuidle-kirkwood.c
-> +++ b/drivers/cpuidle/cpuidle-kirkwood.c
-> @@ -1,6 +1,4 @@
->  /*
-> - * arch/arm/mach-kirkwood/cpuidle.c
-> - *
->   * CPU idle Marvell Kirkwood SoCs
->   *
->   * This file is licensed under the terms of the GNU General Public
-> @@ -11,6 +9,9 @@
->   * to implement two idle states -
->   * #1 wait-for-interrupt
->   * #2 wait-for-interrupt and DDR self refresh
-> + *
-> + * Maintainer: Jason Cooper <jason@lakedaemon.net>
-> + * Maintainer: Andrew Lunn <andrew@lunn.ch>
->   */
->  
->  #include <linux/kernel.h>
+> to it?
 > 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
