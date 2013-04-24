@@ -1,32 +1,44 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Apr 2013 09:51:21 +0100
-Subject: [PATCH 15/32] dmaengine: ste_dma40: Separate Logical Global
- Interrupt Mask (GIM) unmasking
-In-Reply-To: <20130422104012.GL3432@gmail.com>
+Date: Wed, 24 Apr 2013 09:53:58 +0100
+Subject: [PATCH 05/32] dmaengine: ste_dma40: Supply macros to resolve
+ 'src' and 'dst' directions
+In-Reply-To: <20130422102748.GJ3432@gmail.com>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-16-git-send-email-lee.jones@linaro.org>
- <20130422095130.GM24632@intel.com>
- <20130422104012.GL3432@gmail.com>
-Message-ID: <20130424085121.GI17416@gmail.com>
+ <1366279934-30761-6-git-send-email-lee.jones@linaro.org>
+ <20130422094250.GJ24632@intel.com>
+ <20130422102748.GJ3432@gmail.com>
+Message-ID: <20130424085358.GJ17416@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 22 Apr 2013, Lee Jones wrote:
 
-> > >  void d40_phy_cfg(struct stedma40_chan_cfg *cfg,
-> > >  		 u32 *src_cfg, u32 *dst_cfg, bool is_log)
-> > > @@ -107,11 +113,6 @@ void d40_phy_cfg(struct stedma40_chan_cfg *cfg,
-> > >  			src |= 1 << D40_SREG_CFG_PRI_POS;
-> > >  			dst |= 1 << D40_SREG_CFG_PRI_POS;
-> > shouldnt these be converted to BIT() macro and in gim_unmask above?
-> > Driver needs to be consistent in doing things
+> On Mon, 22 Apr 2013, Vinod Koul wrote:
 > 
-> Absolutely they do. I haven't converted ste_dma40_ll.c to BIT yet
-> though. I have this on my TODO and it will happen in the next
-> patch-set.
+> > On Thu, Apr 18, 2013 at 11:11:47AM +0100, Lee Jones wrote:
+> > > There are lots of lengthy if() statements located sporadically up and
+> > > down the driver. This simple macro should make many of them a little
+> > > simpler to decipher. The remainder have to stay in place, as they
+> > > detail slightly more specific settings.
+> > I would like these to be DMAENGINE_IS_SRC...
+> 
+> I don't understand, as they're DMA40 specific?
+> 
+> > and this patch use the defines provided in dmaengine
+> 
+> I think a subsequent patch doing he following would be more suitable:
+> 
+> s/STEDMA40_MEM_TO_MEM/DMA_MEM_TO_MEM/
+> s/STEDMA40_MEM_TO_PERIPH/DMA_MEM_TO_DEV/
+> s/STEDMA40_PERIPH_TO_MEM/DMA_DEV_TO_MEM/
+> s/STEDMA40_PERIPH_TO_PERIPH/DMA_DEV_TO_DEV/
+> 
+> If you don't mind?
 
-Vinod, are you happy to Ack this on the proviso that I follow it up
-with a subsequent patch converting the ste_dma40_ll driver to BIT()?
+Are you happy to Ack this one too if I follow up with a subsequent
+patch converting all STEDMA direction defines over to the generic DMA
+ones? There are also quite a lot in platform data that I'd like to
+convert too.
 
 -- 
 Lee Jones
