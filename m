@@ -1,17 +1,24 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 23 Apr 2013 23:39:13 -0300
-Subject: [PATCH V4] ARM: i.MX5: Allow DT clock providers
-In-Reply-To: <20130423122007.GE27475@S2101-09.ap.freescale.net>
-References: <20130423091633.22088.58225.stgit@localhost>
- <20130423122007.GE27475@S2101-09.ap.freescale.net>
-Message-ID: <CAOMZO5CDPwwA2LhugUBxABz9dZXgLG7F3_osMDiiPO+5odzvsg@mail.gmail.com>
+Date: Tue, 23 Apr 2013 23:48:31 -0300
+Subject: [RFC][PATCH] video: imx: Select VIDEOMODE_HELPERS
+In-Reply-To: <1366702862.4365.2.camel@pizza.hi.pengutronix.de>
+References: <1366666110-9585-1-git-send-email-marex@denx.de>
+ <CAOMZO5Av8RyptoxAQ13Psxjjd4nhHVbEJoVm6SqyLr55bPmSng@mail.gmail.com>
+ <201304230157.47992.marex@denx.de>
+ <1366702862.4365.2.camel@pizza.hi.pengutronix.de>
+Message-ID: <CAOMZO5DtupVZv0iUtEptEoi2QJzddiwjq=vw9iZyBQhpcvVwHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 9:20 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+Hi Philipp,
 
-> Applied with a small fixup below.
+On Tue, Apr 23, 2013 at 4:41 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
 
-Into which branch, please? I could not find it in your tree.
+> OF_VIDEOMODE is the correct one. The implementation of
+> of_get_drm_display_mode in drivers/gpu/drm/drm_modes.c depends on it.
 
-I will submit a series that depend on this one.
+The symbol OF_VIDEOMODE has been deprecated.
+
+Regards,
+
+Fabio Estevam
