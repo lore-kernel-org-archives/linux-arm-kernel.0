@@ -1,9 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 24 Apr 2013 18:28:10 +0100
-Subject: [RFC PATCH v3 05/17] ARM: dts: at91: cpus/cpu node dts updates
+Date: Wed, 24 Apr 2013 18:28:17 +0100
+Subject: [RFC PATCH v3 12/17] ARM: dts: pxa2xx: cpus/cpu nodes dts updates
 In-Reply-To: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1366824502-19729-6-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1366824502-19729-13-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,123 +12,23 @@ and cpu bindings updates for ARM.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/boot/dts/at91rm9200.dtsi  | 6 +++++-
- arch/arm/boot/dts/at91sam9260.dtsi | 8 ++++++--
- arch/arm/boot/dts/at91sam9263.dtsi | 8 ++++++--
- arch/arm/boot/dts/at91sam9g45.dtsi | 8 ++++++--
- arch/arm/boot/dts/at91sam9n12.dtsi | 8 ++++++--
- arch/arm/boot/dts/at91sam9x5.dtsi  | 8 ++++++--
- 6 files changed, 35 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/pxa2xx.dtsi | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-index b0268a5..f16b3d4 100644
---- a/arch/arm/boot/dts/at91rm9200.dtsi
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -34,8 +34,12 @@
- 		ssc2 = &ssc2;
- 	};
- 	cpus {
--		cpu at 0 {
-+		#address-cells = <0>;
-+		#size-cells = <0>;
-+
-+		cpu {
- 			compatible = "arm,arm920t";
-+			device_type = "cpu";
- 		};
+diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
+index f18aad3..a5e90f0 100644
+--- a/arch/arm/boot/dts/pxa2xx.dtsi
++++ b/arch/arm/boot/dts/pxa2xx.dtsi
+@@ -23,8 +23,11 @@
  	};
  
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index cb7bcc5..c4eeef7 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -32,8 +32,12 @@
- 		ssc0 = &ssc0;
- 	};
  	cpus {
 -		cpu at 0 {
--			compatible = "arm,arm926ejs";
+-			compatible = "arm,xscale";
 +		#address-cells = <0>;
 +		#size-cells = <0>;
-+
 +		cpu {
-+			compatible = "arm,arm926ej-s";
-+			device_type = "cpu";
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 271d4de..f3b5c2a 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -29,8 +29,12 @@
- 		ssc1 = &ssc1;
- 	};
- 	cpus {
--		cpu at 0 {
--			compatible = "arm,arm926ejs";
-+		#address-cells = <0>;
-+		#size-cells = <0>;
-+
-+		cpu {
-+			compatible = "arm,arm926ej-s";
-+			device_type = "cpu";
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 6b1d4ca..6c18bd3 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -35,8 +35,12 @@
- 		ssc1 = &ssc1;
- 	};
- 	cpus {
--		cpu at 0 {
--			compatible = "arm,arm926ejs";
-+		#address-cells = <0>;
-+		#size-cells = <0>;
-+
-+		cpu {
-+			compatible = "arm,arm926ej-s";
-+			device_type = "cpu";
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 7750f98..c3b11af 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -31,8 +31,12 @@
- 		ssc0 = &ssc0;
- 	};
- 	cpus {
--		cpu at 0 {
--			compatible = "arm,arm926ejs";
-+		#address-cells = <0>;
-+		#size-cells = <0>;
-+
-+		cpu {
-+			compatible = "arm,arm926ej-s";
-+			device_type = "cpu";
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index aa98e64..6c39d0f 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -33,8 +33,12 @@
- 		ssc0 = &ssc0;
- 	};
- 	cpus {
--		cpu at 0 {
--			compatible = "arm,arm926ejs";
-+		#address-cells = <0>;
-+		#size-cells = <0>;
-+
-+		cpu {
-+			compatible = "arm,arm926ej-s";
++			compatible = "marvell,xscale";
 +			device_type = "cpu";
  		};
  	};
