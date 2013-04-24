@@ -1,39 +1,39 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Wed, 24 Apr 2013 09:55:57 -0700
-Subject: [PATCH v3 08/32] arm64: KVM: architecture specific MMU backend
-In-Reply-To: <5177BBEE.1090209@arm.com>
+Date: Wed, 24 Apr 2013 10:05:57 -0700
+Subject: [PATCH v3 15/32] arm64: KVM: guest one-reg interface
+In-Reply-To: <5177C1AB.3090301@arm.com>
 References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-9-git-send-email-marc.zyngier@arm.com>
- <20130423225816.GC20569@gmail.com> <5177BBEE.1090209@arm.com>
-Message-ID: <CAEDV+g+H+NFc5gsQYBmQDx598Oz3BHWHcrYhBYsWPbXaVYataA@mail.gmail.com>
+ <1365437854-30214-16-git-send-email-marc.zyngier@arm.com>
+ <20130423225937.GE20569@gmail.com> <5177C1AB.3090301@arm.com>
+Message-ID: <CAEDV+gKOTfkmMm9cRwcfSVCVe5rUpeZN979KFb+pyVj_obM3Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 4:03 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 23/04/13 23:58, Christoffer Dall wrote:
->> On Mon, Apr 08, 2013 at 05:17:10PM +0100, Marc Zyngier wrote:
->>> Define the arm64 specific MMU backend:
->>> - HYP/kernel VA offset
->>> - S2 4/64kB definitions
->>> - S2 page table populating and flushing
->>> - icache cleaning
+On Wed, Apr 24, 2013 at 4:27 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 23/04/13 23:59, Christoffer Dall wrote:
+>> On Mon, Apr 08, 2013 at 05:17:17PM +0100, Marc Zyngier wrote:
+>>> Let userspace play with the guest registers.
 >>>
 >>> Reviewed-by: Christopher Covington <cov@codeaurora.org>
 >>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >>> ---
->>>  arch/arm64/include/asm/kvm_mmu.h | 136 +++++++++++++++++++++++++++++++++++++++
->>>  1 file changed, 136 insertions(+)
->>>  create mode 100644 arch/arm64/include/asm/kvm_mmu.h
+>>>  arch/arm64/kvm/guest.c | 254 +++++++++++++++++++++++++++++++++++++++++++++++++
+>>>  1 file changed, 254 insertions(+)
+>>>  create mode 100644 arch/arm64/kvm/guest.c
 >>>
->>> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+>>> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
 >>> new file mode 100644
->>> index 0000000..2eb2230
+>>> index 0000000..47d3729
 >>> --- /dev/null
->>> +++ b/arch/arm64/include/asm/kvm_mmu.h
->>> @@ -0,0 +1,136 @@
+>>> +++ b/arch/arm64/kvm/guest.c
+>>> @@ -0,0 +1,254 @@
 >>> +/*
 >>> + * Copyright (C) 2012,2013 - ARM Ltd
 >>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>>> + *
+>>> + * Derived from arch/arm/kvm/guest.c:
+>>> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+>>> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 >>> + *
 >>> + * This program is free software; you can redistribute it and/or modify
 >>> + * it under the terms of the GNU General Public License version 2 as
@@ -48,170 +48,209 @@ On Wed, Apr 24, 2013 at 4:03 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
 >>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 >>> + */
 >>> +
->>> +#ifndef __ARM64_KVM_MMU_H__
->>> +#define __ARM64_KVM_MMU_H__
+>>> +#include <linux/errno.h>
+>>> +#include <linux/err.h>
+>>> +#include <linux/kvm_host.h>
+>>> +#include <linux/module.h>
+>>> +#include <linux/vmalloc.h>
+>>> +#include <linux/fs.h>
+>>> +#include <asm/cputype.h>
+>>> +#include <asm/uaccess.h>
+>>> +#include <asm/kvm.h>
+>>> +#include <asm/kvm_asm.h>
+>>> +#include <asm/kvm_emulate.h>
+>>> +#include <asm/kvm_coproc.h>
 >>> +
->>> +#include <asm/page.h>
->>> +#include <asm/memory.h>
+>>> +struct kvm_stats_debugfs_item debugfs_entries[] = {
+>>> +    { NULL }
+>>> +};
 >>> +
->>> +/*
->>> + * As we only have the TTBR0_EL2 register, we cannot express
->>> + * "negative" addresses. This makes it impossible to directly share
->>> + * mappings with the kernel.
+>>> +int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
+>>> +{
+>>> +    vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
+>>> +    return 0;
+>>> +}
+>>> +
+>>> +static u64 core_reg_offset_from_id(u64 id)
+>>> +{
+>>> +    return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
+>>> +}
+>>> +
+>>> +static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>>> +{
+>>> +    __u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
+>>> +    struct kvm_regs *regs = vcpu_gp_regs(vcpu);
+>>> +    int nr_regs = sizeof(*regs) / sizeof(__u32);
+>>
+>> eh, arent' your regs 64 bit?  Or are you 32-bit indexing into a 64-bit
+>> structure?  If so, this needs to be described in a big fat comment
+>> somewhere, which I couldn't even see looking forward in the patch series
+>> for the documentation part.
+>
+> As you noticed below, we have a mix of 32/64/128bit fields there. The
+> index is indeed on 32bit boundary.
+>
+>> Seems to me you'd want to remove the fp_regs from the core regs and just
+>> use a 64-bit indexing and have a separate category for the fp stuff...
+>
+> Hell no! ;-)
+
+easy now
+
+>
+> FP is mandatory on arm64, and I'm not going down the road of having
+> separate structures for that. 32bit has historical baggage to deal with,
+> but not arm64.
+>
+> This is the register set, and if the ONE_REG API is too cumbersome to
+> deal with it, then lets change ONE_REG instead (yes, I can run faster
+> than you think... ;-).
+>
+
+You chose yourself how to use the fields in ONE_REG, and that's what I
+think makes this code a little weird, I don't care that much how the
+underlying structure is.  The fact that we (Rusty) used the index into
+the 32 bit fields was simply that it was more convenient and quite
+unambiguous on the 32-bit side, as opposed to defining in the API
+document a specific ID for each register, like the PPC stuff does.
+
+You don't have to follow that on arm64 if it doesn't make sense.
+Notice that in the documentation on arm32 (although it had errors in
+there) we explicitly specify that all sizes must be 32 bit, so you
+need to change that to indicate that it's a variable size and they use
+a 32 bit index into variably sized elements, which I think is a super
+funky interface, or change it to split it up into more sane categories
+and map that onto your internal data structure.
+
+>>> +    u32 off;
+>>> +
+>>> +    /* Our ID is an index into the kvm_regs struct. */
+>>> +    off = core_reg_offset_from_id(reg->id);
+>>> +    if (off >= nr_regs ||
+>>> +        (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
+>>
+>> According to your documentation you will always save/restore 32-bit
+>> registers here, so the desijunction shouldn't be necessary, nor will it
+>> be if you just base everything on 64-bit here.
+>
+> No. Your *offset* is a 32bit index. The size can be anything, and you
+> want to make sure you don't read/write past the kvm_regs structure.
+>
+
+I see why you need it as things stand now, my point is that if the
+interface definition was different you probably don't need it.
+
+>>> +            return -ENOENT;
+>>> +
+>>> +    if (copy_to_user(uaddr, ((u32 *)regs) + off, KVM_REG_SIZE(reg->id)))
+>>> +            return -EFAULT;
+>>> +
+>>> +    return 0;
+>>> +}
+>>> +
+>>> +static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>>> +{
+>>> +    __u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
+>>> +    struct kvm_regs *regs = vcpu_gp_regs(vcpu);
+>>> +    int nr_regs = sizeof(*regs) / sizeof(__u32);
+>>
+>> same concern here
+>
+> Same answer.
+>
+>>
+>>> +    void *valp;
+>>> +    u64 off;
+>>> +    int err = 0;
+>>> +
+>>> +    /* Our ID is an index into the kvm_regs struct. */
+>>> +    off = core_reg_offset_from_id(reg->id);
+>>> +    if (off >= nr_regs ||
+>>> +        (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
+>>> +            return -ENOENT;
+>>> +
+>>> +    valp = kmalloc(KVM_REG_SIZE(reg->id), GFP_KERNEL);
+>>> +    if (!valp)
+>>> +            return -ENOMEM;
+>>
+>> Why are you dynamically allocating this?  Do you ever have anything
+>> larger than a 64 bit core register? Just put that on the stack.
+>
+> Look at what a ONE_REG access can be: up to 1kB. I'm not allocating that
+> on the stack.
+>
+
+Of course not, but you don't have 1KB registers do you? You probably
+don't want user space accessing your 64 bit regs with a 1KB size, 128
+bits should be allocatable on the stack.
+
+>>> +
+>>> +    if (copy_from_user(valp, uaddr, KVM_REG_SIZE(reg->id))) {
+>>> +            err = -EFAULT;
+>>> +            goto out;
+>>> +    }
+>>> +
+>>> +    if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
+>>> +            unsigned long mode = (*(unsigned long *)valp) & COMPAT_PSR_MODE_MASK;
+>>> +            switch (mode) {
+>>> +            case PSR_MODE_EL0t:
+>>> +            case PSR_MODE_EL1t:
+>>> +            case PSR_MODE_EL1h:
+>>> +                    break;
+>>> +            default:
+>>> +                    err = -EINVAL;
+>>> +                    goto out;
+>>> +            }
+>>> +    }
+>>> +
+>>> +    memcpy((u32 *)regs + off, valp, KVM_REG_SIZE(reg->id));
+>>> +out:
+>>> +    kfree(valp);
+>>> +    return err;
+>>> +}
+>>> +
+>>> +int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+>>> +{
+>>> +    return -EINVAL;
+>>> +}
+>>> +
+>>> +int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+>>> +{
+>>> +    return -EINVAL;
+>>> +}
+>>> +
+>>> +static unsigned long num_core_regs(void)
+>>> +{
+>>> +    return sizeof(struct kvm_regs) / sizeof(unsigned long);
+>>> +}
+>>> +
+>>> +/**
+>>> + * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
 >>> + *
->>> + * Instead, give the HYP mode its own VA region at a fixed offset from
->>> + * the kernel by just masking the top bits (which are all ones for a
->>> + * kernel address).
->>
->> For some reason I keep choking on this, despite it being very simple.
->> We're just defining a different PAGE_OFFSET, right? Why not do a hard
->> define as:
->>
->> #define HYP_PAGE_OFFSET_MASK  0x0000ffffffffffff
->> #define HYP_PAGE_OFFSET               0x0000ffc000000000
->>
->> ...or change the second paragraph of the comment to say
->> that we definethe HYP_PAGE_OFFSET to be 0x 0000ffc0 00000000.
->
-> One of these days, VA_BITS will change to accommodate for more virtual
-> space. When that day comes, I don't want to touch any of this because it
-> did hurt enough when writing it. As such, I'll refrain from hardcoding
-> anything.
->
-> I don't mind a comment, though.
->
+>>> + * This is for all registers.
 >>> + */
->>> +#define HYP_PAGE_OFFSET_SHIFT       VA_BITS
->>> +#define HYP_PAGE_OFFSET_MASK        ((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
->>
->> In any case, is there a reason for the HYP_PAGE_OFFSET_SHIFT
->> indirection? It may be simpler without...
->
-> It is common practice to have XXX_SHIFT and XXX_MASK together.
->
->>> +#define HYP_PAGE_OFFSET             (PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
+>>> +unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
+>>> +{
+>>> +    return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu);
+>>> +}
 >>> +
->>> +/*
->>> + * Our virtual mapping for the idmap-ed MMU-enable code. Must be
->>> + * shared across all the page-tables. Conveniently, we use the last
->>> + * possible page, where no kernel mapping will ever exist.
+>>> +/**
+>>> + * kvm_arm_copy_reg_indices - get indices of all registers.
+>>> + *
+>>> + * We do core registers right here, then we apppend system regs.
 >>> + */
->>> +#define TRAMPOLINE_VA               (HYP_PAGE_OFFSET_MASK & PAGE_MASK)
+>>> +int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+>>> +{
+>>> +    unsigned int i;
+>>> +    const u64 core_reg = KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE;
+>>> +
+>>> +    for (i = 0; i < sizeof(struct kvm_regs)/sizeof(unsigned long); i++) {
 >>
->> hmmm, ok, here it's kind of nice to have that define correlation, so
->> maybe it's not cleaner.  Something should be improved here in the define
->> or the comment to make it more clear.  Perhaps just adding the real
->> constants in the comment or in Documentation/arm64/memory.txt would
->> help.
+>> nit: spaces around the division
+>> nit: the kvm_regs struct uses __u64, so would be slightly more coherent
+>>      to use that for the sizeof(...) as well
 >
-> Yes, I plan to write something there.
+> Actually, it should be __u32, as that is an index into the kvm_regs
+> structure.
 >
->>> +
->>> +#ifdef __ASSEMBLY__
->>> +
->>> +/*
->>> + * Convert a kernel VA into a HYP VA.
->>> + * reg: VA to be converted.
->>> + */
->>> +.macro kern_hyp_va  reg
->>> +    and     \reg, \reg, #HYP_PAGE_OFFSET_MASK
->>> +.endm
->>> +
->>> +#else
->>> +
->>> +#include <asm/cacheflush.h>
->>> +
->>> +#define KERN_TO_HYP(kva)    ((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
->>> +
->>> +/*
->>> + * Align KVM with the kernel's view of physical memory. Should be
->>> + * 40bit IPA, with PGD being 8kB aligned.
->>> + */
->>> +#define KVM_PHYS_SHIFT      PHYS_MASK_SHIFT
->>> +#define KVM_PHYS_SIZE       (1UL << KVM_PHYS_SHIFT)
->>> +#define KVM_PHYS_MASK       (KVM_PHYS_SIZE - 1UL)
->>> +
->>> +#ifdef CONFIG_ARM64_64K_PAGES
->>> +#define PAGE_LEVELS 2
->>> +#define BITS_PER_LEVEL      13
->>> +#else  /* 4kB pages */
->>> +#define PAGE_LEVELS 3
->>> +#define BITS_PER_LEVEL      9
->>> +#endif
->>
->> What are the semantics of these defines exactly? They should be
->> S2_PAGE_LEVELS and make some assumptions of the VTCR_EL2.SL0 field
->> right?
->
-> Indeed, we assume SL0 is always 1, just like for the kernel. As for the
-> semantics, I though they were pretty obvious...
->
-
-this is all stage2 right? so S2_PAGE_LEVELS may be more clear...
-
-> PAGE_LEVELS is just that, the number of page levels. BITS_PER_LEVEL is
-> the number of bits you need to index a particular level.
->
->>> +
->>> +/* Make sure we get the right size, and thus the right alignment */
->>
->> this comment is not particularly helpful, something explaining why the
->> max() thingy below makes sense would be more so :)  I really can't
->> follow the BITS_PER_S2_PGD and PTRS_PER_S2_PGD defines.
->
-> Admittedly, they are a bit convoluted:
->
->>> +#define BITS_PER_S2_PGD (KVM_PHYS_SHIFT - (PAGE_LEVELS - 1) * BITS_PER_LEVEL - PAGE_SHIFT)
->
-> This is how many bits of index you need in a PGD. With a 40bit IPA and a
-> 4kB page size, you end up with a 10 bit index.
->
-
-oh, I see it now, you're basically taking away all the other bits you
-know are used to find your address and consider the remaining amount
-the necessary number of bits used to index into the PGD. Right? So I
-think at least a comment saying that BITS_ indicates bits used for
-indexing, not bits for a single entry or something else...
-
->>> +#define PTRS_PER_S2_PGD (1 << max(BITS_PER_LEVEL, BITS_PER_S2_PGD))
->
-> Now, in order to allocate your PGD, you need to find out how many
-> pointers your PGD is going to contain. The max() is make sure we
-> allocate at least a full page worth of pointers.
-
-I still don't get this, sorry. Can you provide me with the sane
-counter example where BITS_PER_S2_PGD is not sufficient?
-
->
->>> +#define S2_PGD_ORDER        get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
->>> +#define S2_PGD_SIZE (1 << S2_PGD_ORDER)
->>> +
->>> +int create_hyp_mappings(void *from, void *to);
->>> +int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
->>> +void free_hyp_pgds(void);
->>> +
->>> +int kvm_alloc_stage2_pgd(struct kvm *kvm);
->>> +void kvm_free_stage2_pgd(struct kvm *kvm);
->>> +int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
->>> +                      phys_addr_t pa, unsigned long size);
->>> +
->>> +int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
->>> +
->>> +void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
->>> +
->>> +phys_addr_t kvm_mmu_get_httbr(void);
->>> +phys_addr_t kvm_mmu_get_boot_httbr(void);
->>> +phys_addr_t kvm_get_idmap_vector(void);
->>> +int kvm_mmu_init(void);
->>> +void kvm_clear_hyp_idmap(void);
->>> +
->>> +#define     kvm_set_pte(ptep, pte)          set_pte(ptep, pte)
->>
->> I noticed that this doesn't do any cache cleaning.  Are the MMU page
->> table walks guaranteed to be coherent with the MMU on arm64?
->
-> I suppose you meant the cache. In this case, yes. The hardware page
-> table walker must snoop the caches.
->
-
-yes, that's what I meant. thanks.
+again, I can only repeat that I think this all becomes quite unintuitive.
