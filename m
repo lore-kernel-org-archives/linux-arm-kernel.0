@@ -1,15 +1,34 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 24 Apr 2013 10:22:50 +0200
-Subject: [PATCH 0/2] drivers/video: mxs-fb: build fixes
-In-Reply-To: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
+Date: Wed, 24 Apr 2013 10:22:51 +0200
+Subject: [PATCH 1/2] drivers/video: Kconfig, fix mxsfb build
+In-Reply-To: <1366791772-11133-1-git-send-email-mpa@pengutronix.de>
 References: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1366791772-11133-1-git-send-email-mpa@pengutronix.de>
+ <1366791772-11133-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1366791772-11133-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, I messed up the email addresses in the last two patches, the following
-two are exactly the same just with the correct addresses.
+Kernel build fails with commit 669406534b4abb827d1bdc39bb5e2d5255818ae2
 
-Regards,
+This patch replaces OF_VIDEOMODE symbol by VIDEOMODE_HELPERS.
 
-Markus
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ drivers/video/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+index d8ecc52..6246056 100644
+--- a/drivers/video/Kconfig
++++ b/drivers/video/Kconfig
+@@ -2429,7 +2429,7 @@ config FB_MXS
+ 	select FB_CFB_COPYAREA
+ 	select FB_CFB_IMAGEBLIT
+ 	select FB_MODE_HELPERS
+-	select OF_VIDEOMODE
++	select VIDEOMODE_HELPERS
+ 	help
+ 	  Framebuffer support for the MXS SoC.
+ 
+-- 
+1.8.1.5
