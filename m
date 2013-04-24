@@ -1,256 +1,553 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Wed, 24 Apr 2013 10:05:57 -0700
-Subject: [PATCH v3 15/32] arm64: KVM: guest one-reg interface
-In-Reply-To: <5177C1AB.3090301@arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-16-git-send-email-marc.zyngier@arm.com>
- <20130423225937.GE20569@gmail.com> <5177C1AB.3090301@arm.com>
-Message-ID: <CAEDV+gKOTfkmMm9cRwcfSVCVe5rUpeZN979KFb+pyVj_obM3Bg@mail.gmail.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Wed, 24 Apr 2013 19:06:46 +0200
+Subject: [PATCHv1 1/3] hwmon: Add support for GMT G762/G763 PWM fan
+ controller
+In-Reply-To: <63961d39aee9db94767f28fd441312bec2029473.1366753420.git.arno@natisbad.org>
+References: <cover.1366753420.git.arno@natisbad.org>
+ <63961d39aee9db94767f28fd441312bec2029473.1366753420.git.arno@natisbad.org>
+Message-ID: <20130424170646.GB17771@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 4:27 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 23/04/13 23:59, Christoffer Dall wrote:
->> On Mon, Apr 08, 2013 at 05:17:17PM +0100, Marc Zyngier wrote:
->>> Let userspace play with the guest registers.
->>>
->>> Reviewed-by: Christopher Covington <cov@codeaurora.org>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  arch/arm64/kvm/guest.c | 254 +++++++++++++++++++++++++++++++++++++++++++++++++
->>>  1 file changed, 254 insertions(+)
->>>  create mode 100644 arch/arm64/kvm/guest.c
->>>
->>> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
->>> new file mode 100644
->>> index 0000000..47d3729
->>> --- /dev/null
->>> +++ b/arch/arm64/kvm/guest.c
->>> @@ -0,0 +1,254 @@
->>> +/*
->>> + * Copyright (C) 2012,2013 - ARM Ltd
->>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
->>> + *
->>> + * Derived from arch/arm/kvm/guest.c:
->>> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
->>> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + *
->>> + * You should have received a copy of the GNU General Public License
->>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>> + */
->>> +
->>> +#include <linux/errno.h>
->>> +#include <linux/err.h>
->>> +#include <linux/kvm_host.h>
->>> +#include <linux/module.h>
->>> +#include <linux/vmalloc.h>
->>> +#include <linux/fs.h>
->>> +#include <asm/cputype.h>
->>> +#include <asm/uaccess.h>
->>> +#include <asm/kvm.h>
->>> +#include <asm/kvm_asm.h>
->>> +#include <asm/kvm_emulate.h>
->>> +#include <asm/kvm_coproc.h>
->>> +
->>> +struct kvm_stats_debugfs_item debugfs_entries[] = {
->>> +    { NULL }
->>> +};
->>> +
->>> +int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
->>> +{
->>> +    vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
->>> +    return 0;
->>> +}
->>> +
->>> +static u64 core_reg_offset_from_id(u64 id)
->>> +{
->>> +    return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
->>> +}
->>> +
->>> +static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->>> +{
->>> +    __u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
->>> +    struct kvm_regs *regs = vcpu_gp_regs(vcpu);
->>> +    int nr_regs = sizeof(*regs) / sizeof(__u32);
->>
->> eh, arent' your regs 64 bit?  Or are you 32-bit indexing into a 64-bit
->> structure?  If so, this needs to be described in a big fat comment
->> somewhere, which I couldn't even see looking forward in the patch series
->> for the documentation part.
->
-> As you noticed below, we have a mix of 32/64/128bit fields there. The
-> index is indeed on 32bit boundary.
->
->> Seems to me you'd want to remove the fp_regs from the core regs and just
->> use a 64-bit indexing and have a separate category for the fp stuff...
->
-> Hell no! ;-)
+On Wed, Apr 24, 2013 at 12:05:56AM +0200, Arnaud Ebalard wrote:
+> 
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> Tested-by: Arnaud Ebalard <arno@natisbad.org>
 
-easy now
+Hi Arnaud,
 
->
-> FP is mandatory on arm64, and I'm not going down the road of having
-> separate structures for that. 32bit has historical baggage to deal with,
-> but not arm64.
->
-> This is the register set, and if the ONE_REG API is too cumbersome to
-> deal with it, then lets change ONE_REG instead (yes, I can run faster
-> than you think... ;-).
->
+Thanks for this patch.
 
-You chose yourself how to use the fields in ONE_REG, and that's what I
-think makes this code a little weird, I don't care that much how the
-underlying structure is.  The fact that we (Rusty) used the index into
-the 32 bit fields was simply that it was more convenient and quite
-unambiguous on the 32-bit side, as opposed to defining in the API
-document a specific ID for each register, like the PPC stuff does.
+I have partially tested this driver (with the default configuration) on
+a net2big_v2 board. I say "partially" because on this board, a two wire
+fan is connected to the g762. This means that the measure speed and
+alarm features as well as the closed-loop mode are not available.
+But all what is left seems to work as expected.
 
-You don't have to follow that on arm64 if it doesn't make sense.
-Notice that in the documentation on arm32 (although it had errors in
-there) we explicitly specify that all sizes must be 32 bit, so you
-need to change that to indicate that it's a variable size and they use
-a 32 bit index into variably sized elements, which I think is a super
-funky interface, or change it to split it up into more sane categories
-and map that onto your internal data structure.
+See below for a few remarks and questions about the driver code.
 
->>> +    u32 off;
->>> +
->>> +    /* Our ID is an index into the kvm_regs struct. */
->>> +    off = core_reg_offset_from_id(reg->id);
->>> +    if (off >= nr_regs ||
->>> +        (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
->>
->> According to your documentation you will always save/restore 32-bit
->> registers here, so the desijunction shouldn't be necessary, nor will it
->> be if you just base everything on 64-bit here.
->
-> No. Your *offset* is a 32bit index. The size can be anything, and you
-> want to make sure you don't read/write past the kvm_regs structure.
->
+> ---
+>  drivers/hwmon/Kconfig  |   10 +
+>  drivers/hwmon/Makefile |    1 +
+>  drivers/hwmon/g762.c   | 1058 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 1069 insertions(+)
+>  create mode 100644 drivers/hwmon/g762.c
+> 
+> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+> index 89ac1cb..cb4879c 100644
+> --- a/drivers/hwmon/Kconfig
+> +++ b/drivers/hwmon/Kconfig
+> @@ -423,6 +423,16 @@ config SENSORS_G760A
+>  	  This driver can also be built as a module.  If so, the module
+>  	  will be called g760a.
+>  
+> +config SENSORS_G762
+> +	tristate "GMT G762 and G763"
+> +	depends on I2C
+> +	help
+> +	  If you say yes here you get support for Global Mixed-mode
+> +	  Technology Inc G762 and G763 fan speed PWM controller chips.
+> +
+> +	  This driver can also be built as a module.  If so, the module
+> +	  will be called g762.
+> +
+>  config SENSORS_GL518SM
+>  	tristate "Genesys Logic GL518SM"
+>  	depends on I2C
+> diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
+> index 8d6d97e..4b49504 100644
+> --- a/drivers/hwmon/Makefile
+> +++ b/drivers/hwmon/Makefile
+> @@ -57,6 +57,7 @@ obj-$(CONFIG_SENSORS_F75375S)	+= f75375s.o
+>  obj-$(CONFIG_SENSORS_FAM15H_POWER) += fam15h_power.o
+>  obj-$(CONFIG_SENSORS_FSCHMD)	+= fschmd.o
+>  obj-$(CONFIG_SENSORS_G760A)	+= g760a.o
+> +obj-$(CONFIG_SENSORS_G762)	+= g762.o
+>  obj-$(CONFIG_SENSORS_GL518SM)	+= gl518sm.o
+>  obj-$(CONFIG_SENSORS_GL520SM)	+= gl520sm.o
+>  obj-$(CONFIG_SENSORS_GPIO_FAN)	+= gpio-fan.o
+> diff --git a/drivers/hwmon/g762.c b/drivers/hwmon/g762.c
+> new file mode 100644
+> index 0000000..810b019
+> --- /dev/null
+> +++ b/drivers/hwmon/g762.c
 
-I see why you need it as things stand now, my point is that if the
-interface definition was different you probably don't need it.
+Snip
 
->>> +            return -ENOENT;
->>> +
->>> +    if (copy_to_user(uaddr, ((u32 *)regs) + off, KVM_REG_SIZE(reg->id)))
->>> +            return -EFAULT;
->>> +
->>> +    return 0;
->>> +}
->>> +
->>> +static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->>> +{
->>> +    __u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
->>> +    struct kvm_regs *regs = vcpu_gp_regs(vcpu);
->>> +    int nr_regs = sizeof(*regs) / sizeof(__u32);
->>
->> same concern here
->
-> Same answer.
->
->>
->>> +    void *valp;
->>> +    u64 off;
->>> +    int err = 0;
->>> +
->>> +    /* Our ID is an index into the kvm_regs struct. */
->>> +    off = core_reg_offset_from_id(reg->id);
->>> +    if (off >= nr_regs ||
->>> +        (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
->>> +            return -ENOENT;
->>> +
->>> +    valp = kmalloc(KVM_REG_SIZE(reg->id), GFP_KERNEL);
->>> +    if (!valp)
->>> +            return -ENOMEM;
->>
->> Why are you dynamically allocating this?  Do you ever have anything
->> larger than a 64 bit core register? Just put that on the stack.
->
-> Look at what a ONE_REG access can be: up to 1kB. I'm not allocating that
-> on the stack.
->
+> +/* Set pwm mode. Accepts either 0 (pwm mode) or 1 (linear mode) */
+> +static int do_set_pwm_mode(struct device *dev, unsigned long val)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct g762_data *data = g762_update_client(dev);
+> +	int ret = 0;
+> +
+> +	mutex_lock(&data->update_lock);
+> +	switch (val) {
+> +	case OUT_MODE_PWM:
+> +		data->fan_cmd1 |= G762_REG_FAN_CMD1_OUT_MODE;
+> +		break;
+> +	case OUT_MODE_DAC: /* i.e. linear mode */
+> +		data->fan_cmd1 &= ~G762_REG_FAN_CMD1_OUT_MODE;
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +	g762_write_value(client, G762_REG_FAN_CMD1, data->fan_cmd1);
 
-Of course not, but you don't have 1KB registers do you? You probably
-don't want user space accessing your 64 bit regs with a 1KB size, 128
-bits should be allocatable on the stack.
+I noticed you never check the value returned by the functions
+g762_{read,write}_value(). Is that because the functions
+i2c_smbus_{read,write}_byte_data() are not likely to fail ?
 
->>> +
->>> +    if (copy_from_user(valp, uaddr, KVM_REG_SIZE(reg->id))) {
->>> +            err = -EFAULT;
->>> +            goto out;
->>> +    }
->>> +
->>> +    if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
->>> +            unsigned long mode = (*(unsigned long *)valp) & COMPAT_PSR_MODE_MASK;
->>> +            switch (mode) {
->>> +            case PSR_MODE_EL0t:
->>> +            case PSR_MODE_EL1t:
->>> +            case PSR_MODE_EL1h:
->>> +                    break;
->>> +            default:
->>> +                    err = -EINVAL;
->>> +                    goto out;
->>> +            }
->>> +    }
->>> +
->>> +    memcpy((u32 *)regs + off, valp, KVM_REG_SIZE(reg->id));
->>> +out:
->>> +    kfree(valp);
->>> +    return err;
->>> +}
->>> +
->>> +int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
->>> +{
->>> +    return -EINVAL;
->>> +}
->>> +
->>> +int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
->>> +{
->>> +    return -EINVAL;
->>> +}
->>> +
->>> +static unsigned long num_core_regs(void)
->>> +{
->>> +    return sizeof(struct kvm_regs) / sizeof(unsigned long);
->>> +}
->>> +
->>> +/**
->>> + * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
->>> + *
->>> + * This is for all registers.
->>> + */
->>> +unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
->>> +{
->>> +    return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu);
->>> +}
->>> +
->>> +/**
->>> + * kvm_arm_copy_reg_indices - get indices of all registers.
->>> + *
->>> + * We do core registers right here, then we apppend system regs.
->>> + */
->>> +int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
->>> +{
->>> +    unsigned int i;
->>> +    const u64 core_reg = KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE;
->>> +
->>> +    for (i = 0; i < sizeof(struct kvm_regs)/sizeof(unsigned long); i++) {
->>
->> nit: spaces around the division
->> nit: the kvm_regs struct uses __u64, so would be slightly more coherent
->>      to use that for the sizeof(...) as well
->
-> Actually, it should be __u32, as that is an index into the kvm_regs
-> structure.
->
-again, I can only repeat that I think this all becomes quite unintuitive.
+> + out:
+> +	mutex_unlock(&data->update_lock);
+> +
+> +	return ret;
+> +}
+> +
+> +/*
+> + * Set reference clock. Accepted values are between 0 and 0xffffff.
+> + * Note that this is an internal parameter, i.e. value is not passed
+> + * to the device.
+> + */
+> +static int do_set_pwm_freq(struct device *dev, unsigned long val)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct g762_data *data = i2c_get_clientdata(client);
+> +	int ret = -EINVAL;
+> +
+> +	if (val <= 0xffffff) {
+> +		data->clk = val;
+> +		ret = 0;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +/* Set fan clock divisor. Accepted values are 1, 2, 4 and 8. */
+> +static int do_set_fan_div(struct device *dev, unsigned long val)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct g762_data *data = g762_update_client(dev);
+> +	int ret = 0;
+> +
+> +	mutex_lock(&data->update_lock);
+> +	switch (val) {
+> +	case 1:
+> +		data->fan_cmd1 &= ~G762_REG_FAN_CMD1_CLK_DIV_ID0;
+> +		data->fan_cmd1 &= ~G762_REG_FAN_CMD1_CLK_DIV_ID1;
+> +		break;
+> +	case 2:
+> +		data->fan_cmd1 |=  G762_REG_FAN_CMD1_CLK_DIV_ID0;
+> +		data->fan_cmd1 &= ~G762_REG_FAN_CMD1_CLK_DIV_ID1;
+> +		break;
+> +	case 4:
+> +		data->fan_cmd1 &= ~G762_REG_FAN_CMD1_CLK_DIV_ID0;
+> +		data->fan_cmd1 |=  G762_REG_FAN_CMD1_CLK_DIV_ID1;
+> +		break;
+> +	case 8:
+> +		data->fan_cmd1 |=  G762_REG_FAN_CMD1_CLK_DIV_ID0;
+> +		data->fan_cmd1 |=  G762_REG_FAN_CMD1_CLK_DIV_ID1;
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +	g762_write_value(client, G762_REG_FAN_CMD1, data->fan_cmd1);
+> + out:
+> +	mutex_unlock(&data->update_lock);
+> +
+> +	return ret;
+> +}
+> +
+> +/* Set fan gear mode. Accepted values are either 0, 1 or 2. */
+> +static int do_set_fan_gear_mode(struct device *dev, unsigned long val)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct g762_data *data = g762_update_client(dev);
+> +	int ret = 0;
+> +
+> +	mutex_lock(&data->update_lock);
+> +	switch (val) {
+> +	case 0:
+> +		data->fan_cmd2 &= ~G762_REG_FAN_CMD2_GEAR_MODE_0;
+> +		data->fan_cmd2 &= ~G762_REG_FAN_CMD2_GEAR_MODE_1;
+> +		break;
+> +	case 1:
+> +		data->fan_cmd2 |=  G762_REG_FAN_CMD2_GEAR_MODE_0;
+> +		data->fan_cmd2 &= ~G762_REG_FAN_CMD2_GEAR_MODE_1;
+> +		break;
+> +	case 2:
+> +		data->fan_cmd2 &= ~G762_REG_FAN_CMD2_GEAR_MODE_0;
+> +		data->fan_cmd2 |=  G762_REG_FAN_CMD2_GEAR_MODE_1;
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +	g762_write_value(client, G762_REG_FAN_CMD2, data->fan_cmd2);
+> + out:
+> +	mutex_unlock(&data->update_lock);
+> +
+> +	return ret;
+> +}
+> +
+> +/* Set pulse per revolution value. Accepts either 2 or 4. */
+> +static int do_set_fan_pulses(struct device *dev, unsigned long val)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct g762_data *data = g762_update_client(dev);
+> +	int ret = 0;
+> +
+> +	mutex_lock(&data->update_lock);
+> +	switch (val) {
+> +	case 2:
+> +		data->fan_cmd1 &= ~G762_REG_FAN_CMD1_PULSE_PER_REV;
+> +		break;
+> +	case 4:
+> +		data->fan_cmd1 |=  G762_REG_FAN_CMD1_PULSE_PER_REV;
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +	g762_write_value(client, G762_REG_FAN_CMD1, data->fan_cmd1);
+> + out:
+> +	mutex_unlock(&data->update_lock);
+> +
+> +	return ret;
+> +}
+> +
+> +/* Set fan mode. Accepts either 1 (open loop) or 2 (closed loop). */
+> +static int do_set_pwm_enable(struct device *dev, unsigned long val)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct g762_data *data = g762_update_client(dev);
+> +	int ret = 0;
+> +
+> +	mutex_lock(&data->update_lock);
+> +	switch (val) {
+> +	case FAN_MODE_OPEN_LOOP:
+> +		data->fan_cmd1 &= ~G762_REG_FAN_CMD1_FAN_MODE;
+> +		break;
+> +	case FAN_MODE_CLOSED_LOOP:
+> +		data->fan_cmd1 |=  G762_REG_FAN_CMD1_FAN_MODE;
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +
+> +	g762_write_value(client, G762_REG_FAN_CMD1, data->fan_cmd1);
+> + out:
+> +	mutex_unlock(&data->update_lock);
+> +
+> +	return ret;
+> +}
+> +
+> +/* Set pwm polarity (0 for negative duty, 1 for positive duty) */
+> +static int do_set_pwm_polarity(struct device *dev, unsigned long val)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct g762_data *data = g762_update_client(dev);
+> +	int ret = 0;
+> +
+> +	mutex_lock(&data->update_lock);
+> +	switch (val) {
+> +	case 0: /* i.e. negative duty */
+> +		data->fan_cmd1 &= ~G762_REG_FAN_CMD1_PWM_POLARITY;
+> +		break;
+> +	case 1: /* i.e. positive duty */
+> +		data->fan_cmd1 |=  G762_REG_FAN_CMD1_PWM_POLARITY;
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +	g762_write_value(client, G762_REG_FAN_CMD1, data->fan_cmd1);
+> + out:
+> +	mutex_unlock(&data->update_lock);
+> +
+> +	return ret;
+> +}
+> +
+> +/*
+> + * Set pwm value. Accepted values are between 0 and 255. Note that the
+> + * internal register used for setting the value depends ont the fan
+> + * mode of the device.
+> + */
+> +static int do_set_pwm(struct device *dev, unsigned long val)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct g762_data *data = g762_update_client(dev);
+> +	int ret = -EINVAL;
+> +
+> +	mutex_lock(&data->update_lock);
+> +	if (val > 255)
+> +		goto out;
+> +
+> +	if (data->fan_cmd1 & G762_REG_FAN_CMD1_FAN_MODE) { /* closed-loop */
+> +		data->set_cnt = PWM_TO_CNT(val);
+> +		g762_write_value(client, G762_REG_SET_CNT, (u8)val);
+> +	} else {                                           /* open-loop */
+> +		data->set_out = val;
+> +		g762_write_value(client, G762_REG_SET_OUT, (u8)val);
+> +	}
+> +
+> +	ret = 0;
+> + out:
+> +	mutex_unlock(&data->update_lock);
+> +
+> +	return ret;
+> +}
+> +
+> +/* Set fan RPM value. This only makes sense in closed-loop mode. */
+> +static int do_set_fan_target(struct device *dev, unsigned long val)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct g762_data *data = g762_update_client(dev);
+> +	int ret = -EINVAL;
+> +
+> +	mutex_lock(&data->update_lock);
+> +	if (data->fan_cmd1 & G762_REG_FAN_CMD1_FAN_MODE) { /* closed-loop */
+> +		data->set_cnt = cnt_from_rpm(val, data->clk,
+> +					     PULSE_FROM_REG(data->fan_cmd1),
+> +					     CLKDIV_FROM_REG(data->fan_cmd1),
+> +					     GEARMODE_FROM_REG(data->fan_cmd2));
+> +		g762_write_value(client, G762_REG_SET_CNT, data->set_cnt);
+> +		ret = 0;
+> +	}
+> +	mutex_unlock(&data->update_lock);
+> +
+> +	return ret;
+> +}
+> +
+> +/* Enable/disable fan failure detection. Accepted values are 1 and 0. */
+> +static int do_fan_failure_detection_toggle(struct device *dev,
+> +					   unsigned long enable)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct g762_data *data = g762_update_client(dev);
+> +	int ret = 0;
+> +
+> +	mutex_lock(&data->update_lock);
+> +	switch (enable) {
+> +	case 0:
+> +		data->fan_cmd1 &= ~G762_REG_FAN_CMD1_DET_FAN_FAIL;
+> +		break;
+> +	case 1:
+> +		data->fan_cmd1 |=  G762_REG_FAN_CMD1_DET_FAN_FAIL;
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +	g762_write_value(client, G762_REG_FAN_CMD1, data->fan_cmd1);
+> + out:
+> +	mutex_unlock(&data->update_lock);
+> +
+> +	return ret;
+> +}
+> +
+> +/* Enable/disable fan out of control detection. Accepted values are 1 and 0 */
+> +static int do_fan_ooc_detection_toggle(struct device *dev, unsigned int enable)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct g762_data *data = g762_update_client(dev);
+> +	int ret = 0;
+> +
+> +	mutex_lock(&data->update_lock);
+> +	switch (enable) {
+> +	case 0:
+> +		data->fan_cmd1 &= ~G762_REG_FAN_CMD1_DET_FAN_OOC;
+> +		break;
+> +	case 1:
+> +		data->fan_cmd1 |=  G762_REG_FAN_CMD1_DET_FAN_OOC;
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +	g762_write_value(client, G762_REG_FAN_CMD1, data->fan_cmd1);
+> + out:
+> +	mutex_unlock(&data->update_lock);
+> +
+> +	return ret;
+> +}
+> +
+> +/* Set startup voltage. Accepted values are either 0, 1, 2 or 3. */
+> +static int do_set_fan_startv(struct device *dev, unsigned long val)
+> +{
+> +	struct i2c_client *client = to_i2c_client(dev);
+> +	struct g762_data *data = g762_update_client(dev);
+> +	int ret = 0;
+> +
+> +	mutex_lock(&data->update_lock);
+> +	switch (val) {
+> +	case 0:
+> +		data->fan_cmd2 &= ~G762_REG_FAN_CMD2_FAN_STARTV_0;
+> +		data->fan_cmd2 &= ~G762_REG_FAN_CMD2_FAN_STARTV_1;
+> +		break;
+> +	case 1:
+> +		data->fan_cmd2 |=  G762_REG_FAN_CMD2_FAN_STARTV_0;
+> +		data->fan_cmd2 &= ~G762_REG_FAN_CMD2_FAN_STARTV_1;
+> +		break;
+> +	case 2:
+> +		data->fan_cmd2 &= ~G762_REG_FAN_CMD2_FAN_STARTV_0;
+> +		data->fan_cmd2 |=  G762_REG_FAN_CMD2_FAN_STARTV_1;
+> +		break;
+> +	case 3:
+> +		data->fan_cmd2 |=  G762_REG_FAN_CMD2_FAN_STARTV_0;
+> +		data->fan_cmd2 |=  G762_REG_FAN_CMD2_FAN_STARTV_1;
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +		goto out;
+> +	}
+> +	g762_write_value(client, G762_REG_FAN_CMD2, data->fan_cmd2);
+> + out:
+> +	mutex_unlock(&data->update_lock);
+> +
+> +	return ret;
+> +}
+
+It seems to me that all the functions above are more or less using the
+same code. For example do_set_fan_pulses, do_set_pwm_enable and
+do_set_pwm_polarity are very similar. Then, there is probably room for
+some code factorisation ? For example, you could use some functions to
+set or clear a mask against a given register. Or something else...
+
+> +
+> +
+> +
+> +/*
+> + * Configuration-related definitions
+> + */
+> +
+> +struct g762_config {
+> +	u32 fan_startv;
+> +	u32 fan_gear_mode;
+> +	u32 fan_div;
+> +	u32 fan_pulses;
+> +	u32 fan_target;
+> +	u32 pwm_polarity;
+> +	u32 pwm_enable;
+> +	u32 pwm_freq;
+> +	u32 pwm_mode;
+> +};
+> +
+> +/*
+> + * g762 default values: it is assumed that the fan is set for a 32KHz clock
+> + * source, a fan clock divisor of 1 and two pulses per revolution. Default
+> + * fan driving mode is linear mode (g762/g763 also support PWM mode). Note
+> + * the specific init value for properties which may be left unmodified.
+> + */
+> +#define G762_DEFAULT_CLK            32768
+> +#define G762_DEFAULT_FAN_DIV        1
+> +#define G762_DEFAULT_FAN_PULSES     2
+> +#define G762_DEFAULT_OUT_MODE       0
+> +#define G762_DEFAULT_FAN_MODE       2
+> +#define G762_DEFAULT_FAN_STARTV     1
+> +#define G762_DEFAULT_FAN_GEAR_MODE  0
+> +#define G762_DEFAULT_FAN_POLARITY   0
+> +#define G762_UNTOUCHED_VAL          0xffffffff
+> +
+> +static void g762_config_init(struct g762_config *conf)
+> +{
+> +	conf->pwm_enable = G762_DEFAULT_FAN_MODE;
+> +	conf->pwm_mode = G762_DEFAULT_OUT_MODE;
+> +	conf->pwm_freq = G762_DEFAULT_CLK;
+> +	conf->pwm_polarity = G762_DEFAULT_FAN_POLARITY;
+> +	conf->fan_pulses = G762_DEFAULT_FAN_PULSES;
+> +	conf->fan_div = G762_DEFAULT_FAN_DIV;
+> +	conf->fan_startv = G762_DEFAULT_FAN_STARTV;
+> +	conf->fan_gear_mode = G762_DEFAULT_FAN_GEAR_MODE;
+> +	conf->fan_target = G762_UNTOUCHED_VAL;
+> +}
+> +
+> +static inline int g762_one_prop_commit(struct i2c_client *client,
+> +				       u32 pval, const char *pname,
+> +				       int (*psetter)(struct device *dev,
+> +						      unsigned long val))
+> +{
+> +	int ret = 0;
+> +
+> +	if ((pval != G762_UNTOUCHED_VAL) && (*psetter)(&client->dev, pval)) {
+> +		dev_info(&client->dev, "unable to set %s (%d)\n", pname, pval);
+> +		ret = -EINVAL;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static int g762_config_commit(struct i2c_client *client,
+> +			      struct g762_config *conf)
+> +{
+> +	int ret = 0;
+> +
+> +	if (g762_one_prop_commit(client, conf->pwm_mode,
+> +				 "pwm_mode", &do_set_pwm_mode) ||
+> +	    g762_one_prop_commit(client, conf->pwm_enable,
+> +				 "pwm_enable", &do_set_pwm_enable) ||
+> +	    g762_one_prop_commit(client, conf->fan_div,
+> +				 "fan_div", &do_set_fan_div) ||
+> +	    g762_one_prop_commit(client, conf->fan_pulses,
+> +				 "fan_pulses", &do_set_fan_pulses) ||
+> +	    g762_one_prop_commit(client, conf->pwm_freq,
+> +				 "pwm_freq", &do_set_pwm_freq) ||
+> +	    g762_one_prop_commit(client, conf->fan_gear_mode,
+> +				 "fan_gear_mode", &do_set_fan_gear_mode) ||
+> +	    g762_one_prop_commit(client, conf->pwm_polarity,
+> +				 "pwm_polarity", &do_set_pwm_polarity) ||
+> +	    g762_one_prop_commit(client, conf->fan_startv,
+> +				 "fan_startv", &do_set_fan_startv) ||
+> +	    g762_one_prop_commit(client, conf->fan_target,
+> +				 "fan_target", &do_set_fan_target)) {
+
+Is that correct ? Here, g762_update_client() is called several times in
+a short time interval. This means that the registers are not re-read
+after each write operation (only after the first). If the chip updates
+internally some registers after a write, then a mismatch between
+struct g762_data and the real registers values could happen.
+
+> +		ret = -EINVAL;
+> +	}
+> +
+> +	return ret;
+> +}
+
+Snip
+
+> +/*
+> + * Get/set the fan speed in open-loop mode using pwm1 sysfs file. Speed is
+> + * given as a relative value from 0 to 255, where 255 is maximum speed. Note
+> + * that this is done by writing directly to the chip's DAC, it won't change
+> + * the closed loop speed set by fan1_target. Also note that due to rounding
+> + * errors it is possible that you don't read back exactly the value you have
+> + * set.
+> + */
+> +static ssize_t get_pwm(struct device *dev, struct device_attribute *da,
+> +		       char *buf)
+> +{
+> +	struct g762_data *data = g762_update_client(dev);
+> +	int val;
+> +
+> +	mutex_lock(&data->update_lock);
+> +	if (data->fan_cmd1 & G762_REG_FAN_CMD1_FAN_MODE) { /* closed-loop */
+> +		val = PWM_FROM_CNT(data->set_cnt);
+> +	} else {                                            /* open-loop */
+> +		val = data->set_out;
+> +	}
+
+I don't think you need to use braces for the above statement.
+
+Regards,
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130424/9838afdc/attachment-0001.sig>
