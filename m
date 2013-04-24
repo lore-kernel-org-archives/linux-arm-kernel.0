@@ -1,23 +1,127 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 24 Apr 2013 11:03:58 +0100
-Subject: [PATCH v8 6/8] ARM: dts: add spi nodes for atmel SoC
-In-Reply-To: <1364968938-24198-1-git-send-email-wenyou.yang@atmel.com>
-References: <1364968581-23700-1-git-send-email-wenyou.yang@atmel.com>
- <1364968938-24198-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20130424100358.GF5019@opensource.wolfsonmicro.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 24 Apr 2013 11:04:06 +0100
+Subject: [PATCH v3 07/32] arm64: KVM: fault injection into a guest
+In-Reply-To: <20130423225758.GB20569@gmail.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-8-git-send-email-marc.zyngier@arm.com>
+ <20130423225758.GB20569@gmail.com>
+Message-ID: <5177AE16.6080509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 03, 2013 at 02:02:18PM +0800, Wenyou Yang wrote:
-> From: Richard Genoud <richard.genoud@gmail.com>
+On 23/04/13 23:57, Christoffer Dall wrote:
+> On Mon, Apr 08, 2013 at 05:17:09PM +0100, Marc Zyngier wrote:
+>> Implement the injection of a fault (undefined, data abort or
+>> prefetch abort) into a 64bit guest.
+>>
+>> Reviewed-by: Christopher Covington <cov@codeaurora.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/inject_fault.c | 118 ++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 118 insertions(+)
+>>  create mode 100644 arch/arm64/kvm/inject_fault.c
+>>
+>> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+>> new file mode 100644
+>> index 0000000..2ff3b78
+>> --- /dev/null
+>> +++ b/arch/arm64/kvm/inject_fault.c
+>> @@ -0,0 +1,118 @@
+>> +/*
+>> + * Fault injection for 64bit guests.
+>> + *
+>> + * Copyright (C) 2012,2013 - ARM Ltd
+>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + * Based on arch/arm/kvm/emulate.c
+>> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+>> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
+>> + *
+>> + * This program is free software: you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/kvm_host.h>
+>> +#include <asm/kvm_emulate.h>
+>> +#include <asm/esr.h>
+>> +
+>> +static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
+>> +{
+>> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
+>> +	int is_aarch32;
+>> +	u32 esr = 0;
+>> +
+>> +	is_aarch32 = vcpu_mode_is_32bit(vcpu);
+>> +
+>> +	*vcpu_spsr(vcpu) = cpsr;
+>> +	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
+>> +
+>> +	*vcpu_cpsr(vcpu) = PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | PSR_I_BIT;
+>> +	*vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + 0x200;
 > 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> consider a define for the 0x200?
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130424/c731ec53/attachment.sig>
+Yeah, I think Will already mentioned this.
+
+>> +
+>> +	vcpu_sys_reg(vcpu, FAR_EL1) = addr;
+>> +
+>> +	/*
+>> +	 * Build an {i,d}abort, depending on the level and the
+>> +	 * instruction set. Report an external synchronous abort.
+>> +	 */
+>> +	if (kvm_vcpu_trap_il_is32bit(vcpu))
+>> +		esr |= ESR_EL1_IL;
+>> +
+>> +	if (is_aarch32 || (cpsr & PSR_MODE_MASK) == PSR_MODE_EL0t)
+>> +		esr |= (ESR_EL1_EC_IABT_EL0 << ESR_EL1_EC_SHIFT);
+>> +	else
+>> +		esr |= (ESR_EL1_EC_IABT_EL1 << ESR_EL1_EC_SHIFT);
+> 
+> why is it assumed that the abort must come from EL0 if the vcpu is in
+> aarch32 mode?
+
+We're injecting a fault into a VM that runs with a 64bit EL1. So if we
+end-up faulting in 32bit code, it must come from EL0.
+
+>> +
+>> +	if (!is_iabt)
+>> +		esr |= ESR_EL1_EC_DABT_EL0;
+> 
+> this is slightly confusing unless you actually look at the definitions
+> and realize that or'ing on that extra bit works both in i- and d-abt
+> cases.
+
+Blame Christopher for that, he came up with the idea... ;-)
+
+>> +
+>> +	vcpu_sys_reg(vcpu, ESR_EL1) = esr | 0x10; /* External abort */
+>> +}
+>> +
+>> +static void inject_undef64(struct kvm_vcpu *vcpu)
+>> +{
+>> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
+>> +	u32 esr = (ESR_EL1_EC_UNKNOWN << ESR_EL1_EC_SHIFT);
+>> +
+>> +	*vcpu_spsr(vcpu) = cpsr;
+>> +	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
+>> +
+>> +	*vcpu_cpsr(vcpu) = PSR_MODE_EL1h | PSR_F_BIT | PSR_I_BIT;
+> 
+> would it make sense to have a define for a common set of these bits or
+> is this explicitly defined per exception type in the specs?
+
+Maybe. Not sure that would be any clearer though...
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
