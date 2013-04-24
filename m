@@ -1,142 +1,74 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Wed, 24 Apr 2013 09:46:57 -0700
-Subject: [PATCH v3 07/32] arm64: KVM: fault injection into a guest
-In-Reply-To: <5177AE16.6080509@arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-8-git-send-email-marc.zyngier@arm.com>
- <20130423225758.GB20569@gmail.com> <5177AE16.6080509@arm.com>
-Message-ID: <CAEDV+gJverKr2wKV__bMTWT2ePrEmZjXzWhOcwu4Hb4HN3wjjQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 24 Apr 2013 09:50:05 -0700
+Subject: [GIT PULL] omap dss board clean-up for v3.10 merge window
+In-Reply-To: <5177902C.5070407@ti.com>
+References: <20130418033936.GC10155@atomide.com>
+ <20130419184518.GA30836@quad.lixom.net> <5174F593.20705@ti.com>
+ <20130423171438.GC10155@atomide.com> <5177902C.5070407@ti.com>
+Message-ID: <20130424165005.GA5184@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 3:04 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 23/04/13 23:57, Christoffer Dall wrote:
->> On Mon, Apr 08, 2013 at 05:17:09PM +0100, Marc Zyngier wrote:
->>> Implement the injection of a fault (undefined, data abort or
->>> prefetch abort) into a 64bit guest.
->>>
->>> Reviewed-by: Christopher Covington <cov@codeaurora.org>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  arch/arm64/kvm/inject_fault.c | 118 ++++++++++++++++++++++++++++++++++++++++++
->>>  1 file changed, 118 insertions(+)
->>>  create mode 100644 arch/arm64/kvm/inject_fault.c
->>>
->>> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
->>> new file mode 100644
->>> index 0000000..2ff3b78
->>> --- /dev/null
->>> +++ b/arch/arm64/kvm/inject_fault.c
->>> @@ -0,0 +1,118 @@
->>> +/*
->>> + * Fault injection for 64bit guests.
->>> + *
->>> + * Copyright (C) 2012,2013 - ARM Ltd
->>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
->>> + *
->>> + * Based on arch/arm/kvm/emulate.c
->>> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
->>> + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
->>> + *
->>> + * This program is free software: you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + *
->>> + * You should have received a copy of the GNU General Public License
->>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>> + */
->>> +
->>> +#include <linux/kvm_host.h>
->>> +#include <asm/kvm_emulate.h>
->>> +#include <asm/esr.h>
->>> +
->>> +static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
->>> +{
->>> +    unsigned long cpsr = *vcpu_cpsr(vcpu);
->>> +    int is_aarch32;
->>> +    u32 esr = 0;
->>> +
->>> +    is_aarch32 = vcpu_mode_is_32bit(vcpu);
->>> +
->>> +    *vcpu_spsr(vcpu) = cpsr;
->>> +    *vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
->>> +
->>> +    *vcpu_cpsr(vcpu) = PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | PSR_I_BIT;
->>> +    *vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + 0x200;
->>
->> consider a define for the 0x200?
+* Tomi Valkeinen <tomi.valkeinen@ti.com> [130424 01:01]:
+> On 2013-04-23 20:14, Tony Lindgren wrote:
+> > * Tomi Valkeinen <tomi.valkeinen@ti.com> [130422 01:37]:
+> 
+> >> So while I think it is a good habit to push the arch changes and driver
+> >> changes separately, my question is, should that rule be followed to the
+> >> extreme? Can I just keep all the changes in one branch if separating the
+> >> arch and driver changes would end up with cloning files or lots of extra
+> >> code?
+> > 
+> > Shread branches are just fine. In most cases it's possible to add new
+> > pdata and then remove the old pdata later on with follow-up patches.
+> 
+> Yes, that's what I've been doing. But it's not possible in all cases,
+> and in some cases it's just really difficult/laborious.
+> 
+> I'll soon need to change the dss panel device model, and the only way I
+> can see that would allow us to keep everything running if only arch or
+> driver changes are merged, is to create a copy of all the omap display
+> drivers, and change the copy for the new dss device model.
 >
-> Yeah, I think Will already mentioned this.
->
->>> +
->>> +    vcpu_sys_reg(vcpu, FAR_EL1) = addr;
->>> +
->>> +    /*
->>> +     * Build an {i,d}abort, depending on the level and the
->>> +     * instruction set. Report an external synchronous abort.
->>> +     */
->>> +    if (kvm_vcpu_trap_il_is32bit(vcpu))
->>> +            esr |= ESR_EL1_IL;
->>> +
->>> +    if (is_aarch32 || (cpsr & PSR_MODE_MASK) == PSR_MODE_EL0t)
->>> +            esr |= (ESR_EL1_EC_IABT_EL0 << ESR_EL1_EC_SHIFT);
->>> +    else
->>> +            esr |= (ESR_EL1_EC_IABT_EL1 << ESR_EL1_EC_SHIFT);
->>
->> why is it assumed that the abort must come from EL0 if the vcpu is in
->> aarch32 mode?
->
-> We're injecting a fault into a VM that runs with a 64bit EL1. So if we
-> end-up faulting in 32bit code, it must come from EL0.
->
+> And that's obviously a terrible way to do it.
 
-ah ok, it could be mentioned in a comment, but meh...
+Yes that is the case if you have to completely redo the pdata and
+cannot get away by just changing the existing pdata.
+ 
+> So presuming I need to have the dss changes in separate arch and driver
+> series, and everything should run fine even if only the other half is
+> merged, then, well, I have no idea how to proceed. I'll continue looking
+> at this, but it's a bit frustrating to spend most of my time trying to
+> twist the code to accommodate the merging process, instead of making the
+> code work.
+>
+> That said, this dss device model change should be a one time thing.
+> After it's done, these merging-problems should be greatly reduced.
 
->>> +
->>> +    if (!is_iabt)
->>> +            esr |= ESR_EL1_EC_DABT_EL0;
->>
->> this is slightly confusing unless you actually look at the definitions
->> and realize that or'ing on that extra bit works both in i- and d-abt
->> cases.
->
-> Blame Christopher for that, he came up with the idea... ;-)
->
+Right, if it's more complex than just changing the pdata then what you've
+been doing is probably the best approach. Just needs to be done earlier :)
+ 
+> >> Of course, I don't know what DRM maintainer thinks of merging arch
+> >> changes through his tree, so that's also open.
+> > 
+> > No let's not go there, Linus T already complained about the conflicts
+> > between drivers/net and arch/arm/*omap*/ code few merge windows ago.
+> > We need to remove the driver dependencies to the arch/arm code, otherwise
+> > the merging requires way too much work from multiple maintainers. That
+> > does not scale well and often leads into merge errors that could have
+> > been avoided in the first place.
+> > 
+> > Of course the real solution here is to get things moved over to DT
+> > based booting and then we don't have any of these dependencies as the
+> > .dts changes can get merged separately from the driver changes.
+> 
+> It will remove compile time dependencies, but we'll still have runtime
+> dependencies just like we do now.
 
-I think this is one of those cases where the compiler should be this
-smart, and C should be a little more verbose, but it's not a cardinal
-point.
+Only for adding new features. If the new features are missing from the
+.dts changes, the driver should still work with limited features. The
+idea is to support DT bindings in the long term.
 
->>> +
->>> +    vcpu_sys_reg(vcpu, ESR_EL1) = esr | 0x10; /* External abort */
->>> +}
->>> +
->>> +static void inject_undef64(struct kvm_vcpu *vcpu)
->>> +{
->>> +    unsigned long cpsr = *vcpu_cpsr(vcpu);
->>> +    u32 esr = (ESR_EL1_EC_UNKNOWN << ESR_EL1_EC_SHIFT);
->>> +
->>> +    *vcpu_spsr(vcpu) = cpsr;
->>> +    *vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
->>> +
->>> +    *vcpu_cpsr(vcpu) = PSR_MODE_EL1h | PSR_F_BIT | PSR_I_BIT;
->>
->> would it make sense to have a define for a common set of these bits or
->> is this explicitly defined per exception type in the specs?
->
-> Maybe. Not sure that would be any clearer though...
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
->
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+Regards,
+
+Tony
