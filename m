@@ -1,40 +1,41 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Wed, 24 Apr 2013 07:43:51 +0200
-Subject: [PATCHv1 3/3] hwmon: Add DT documentation for g762 driver
-In-Reply-To: <20130423222305.GD13884@titan.lakedaemon.net> (Jason Cooper's
- message of "Tue, 23 Apr 2013 18:23:05 -0400")
-References: <cover.1366753420.git.arno@natisbad.org>
- <6ee748f450ba2a80c87aba08c0672105e2800f93.1366753420.git.arno@natisbad.org>
- <20130423222305.GD13884@titan.lakedaemon.net>
-Message-ID: <87r4i0fppk.fsf@natisbad.org>
+From: vkale@apm.com (Vinayak Kale)
+Date: Wed, 24 Apr 2013 11:51:24 +0530
+Subject: [PATCH 4/4] arm64: Add initial DTS for APM X-Gene Storm SOC and
+ APM Mustang board
+In-Reply-To: <20130423181109.GA6850@quad.lixom.net>
+References: <1366442131-26094-1-git-send-email-vkale@apm.com>
+ <1366442131-26094-5-git-send-email-vkale@apm.com>
+ <20130423181109.GA6850@quad.lixom.net>
+Message-ID: <CAPrCYkfq=ypk+3=FamZQgMhaxMHDzsSFdsNByMoq1H=kLSY8YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-Jason Cooper <jason@lakedaemon.net> writes:
-
->> +Example g762 node:
->> +
->> +   g762: g762 at 3e {
->> +        compatible = "gmt,g762";
->> +   	reg = <0x3e>;
->> +   	pwm_mode = <1>;      /* closed-loop control */
->> +   	pwm_enable = <2>;    /* PWM mode */
->> +   	pwm_freq = <8192>;   /* PWM reference clock freq */
->> +   	fan_pulses = <2>;    /* 2 pulses per rev */
->> +   	fan_div = <2>;       /* fan clock divisor */
->> +   	fan_target = <2000>; /* target fan speed at 2000 RPM */
->> +        fan_gear_mode = <0>; /* default */
->> +        fan_startv = <1>;    /* default */
->> +        pwm_polarity = <0>;  /* default */
->> +   };
+On Tue, Apr 23, 2013 at 11:41 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Sat, Apr 20, 2013 at 12:45:31PM +0530, Vinayak Kale wrote:
 >
-> I was just giving this quick overview and noticed that you have
-> leading whitespace issues in the above block...
-
-Will fix that in next round. Sorry for that and thanks for your time.
-
-Cheers,
-
-a+
+>> +     gic: interrupt-controller at 78010000 {
+>> +             compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+>> +             #interrupt-cells = <3>;
+>> +             interrupt-controller;
+>> +             reg = <0x0 0x78010000 0x0 0x1000>,      /* GIC Dist */
+>> +                   <0x0 0x78020000 0x0 0x1000>,      /* GIC CPU */
+>> +                   <0x0 0x78040000 0x0 0x2000>,      /* GIC VCPU Control */
+>> +                   <0x0 0x78060000 0x0 0x2000>;      /* GIC VCPU */
+>> +             interrupts = <1 9 0xf04>;       /* GIC Maintenence IRQ */
+>> +     };
+>
+> Others have commented on other compatible fields, so it's my turn. :-)
+>
+> Is this the exact same GIC that's used with A15? I don't think it is? It might
+> make more sense to use a new compatible field and add it to the driver.
+>
+> Also, other platforms have removed the a9 fallback, so even if you happen to
+> have an a15-compatible gic, in this case you should at least take out the a9
+> string.
+>
+Okay, will remove a9-gic string. Our's is a15-compatible gic, will use
+a15 string.
+>
+> -Olof
+Thanks
+-Vinayak
