@@ -1,73 +1,120 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 24 Apr 2013 10:29:14 +0100
-Subject: [RFC PATCH v2 03/13] ARM: mach-at91: cpus/cpu node dts updates
-In-Reply-To: <20130423195259.GJ4998@game.jcrosoft.org>
-References: <1366644455-16550-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366644455-16550-4-git-send-email-lorenzo.pieralisi@arm.com>
- <51768892.7060807@gmail.com>
- <20130423135304.GG22946@e102568-lin.cambridge.arm.com>
- <20130423195259.GJ4998@game.jcrosoft.org>
-Message-ID: <20130424092914.GA1561@e102568-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 24 Apr 2013 10:33:15 +0100
+Subject: [PATCH v3 11/32] arm64: KVM: CPU specific system registers
+ handling
+In-Reply-To: <20130423225921.GD20569@gmail.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-12-git-send-email-marc.zyngier@arm.com>
+ <20130410170624.GL26992@mudshark.cambridge.arm.com>
+ <5168307E.2080700@arm.com> <20130423225921.GD20569@gmail.com>
+Message-ID: <5177A6DB.1080607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 08:52:59PM +0100, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 14:53 Tue 23 Apr     , Lorenzo Pieralisi wrote:
-> > On Tue, Apr 23, 2013 at 02:11:46PM +0100, Rob Herring wrote:
-> > > On 04/22/2013 10:27 AM, Lorenzo Pieralisi wrote:
-> > > > This patch updates the in-kernel dts files according to the latest cpus
-> > > > and cpu bindings updates for ARM.
-> > > > 
-> > > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > > ---
-> > > >  arch/arm/boot/dts/at91sam9260.dtsi | 2 +-
-> > > >  arch/arm/boot/dts/at91sam9263.dtsi | 2 +-
-> > > >  arch/arm/boot/dts/at91sam9g45.dtsi | 2 +-
-> > > >  arch/arm/boot/dts/at91sam9n12.dtsi | 2 +-
-> > > >  4 files changed, 4 insertions(+), 4 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> > > > index cb7bcc5..2e9de85 100644
-> > > > --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> > > > +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> > > > @@ -33,7 +33,7 @@
-> > > >  	};
-> > > >  	cpus {
-> > > >  		cpu at 0 {
-> > > > -			compatible = "arm,arm926ejs";
-> > > > +			compatible = "arm,arm926";
-> > > 
-> > > I don't understand why you are doing this. If this does not match the
-> > > documentation, fix the documentation. We can't continue on changing dts
-> > > files without reqard to breaking compatibility.
-> > 
-> > IMHO compatibility is already broken. There are a number of dts in the
-> > kernel missing cpus and cpu nodes, others with cpu nodes missing
-> > device_type = "cpu", missing cpu nodes compatible properties and the list
-> > goes on and on. Those files got merged in the kernel before bindings were
-> > properly defined for ARM so at that point in time the only reference was the
-> > ePAPR and still, it was not followed (eg my broken patch above fails to add
-> > device_type = "cpu" to the cpu node, should I change the documentation (ePAPR)
-> > to make the dts above compliant ? I do not think so, I reckon we should fix
-> > all dts and force them to comply with the ePAPR and the in-kernel bindings).
-> > 
-> > If we do not set in stone the bindings and draw a line now, this stuff will
-> > go wild, it is already in a state that I do not like much.
-> > 
-> > The reason we are patching the compatible property above is to avoid having
-> > compatible properties containing suffixes for CPUs, we do not deem that
-> > necessary, see:
-> > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2013-January/145305.html
-> > 
-> > That's just my opinion, open to change it to find a proper solution to this
-> > issue as long as we make progress.
-> 
-> I do not agree when you set the compatible you need to be preceise the cpu is
-> a arm926ejs not a arm926
+On 23/04/13 23:59, Christoffer Dall wrote:
+> On Fri, Apr 12, 2013 at 05:04:14PM +0100, Marc Zyngier wrote:
+>> On 10/04/13 18:06, Will Deacon wrote:
+>>> On Mon, Apr 08, 2013 at 05:17:13PM +0100, Marc Zyngier wrote:
+>>>> Add the support code for CPU specific system registers. Not much
+>>>> here yet.
+>>>>
+>>>> Reviewed-by: Christopher Covington <cov@codeaurora.org>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  arch/arm64/kvm/sys_regs_generic_v8.c | 85 ++++++++++++++++++++++++++++++++++++
+>>>>  1 file changed, 85 insertions(+)
+>>>>  create mode 100644 arch/arm64/kvm/sys_regs_generic_v8.c
+>>>>
+>>>> diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+>>>> new file mode 100644
+>>>> index 0000000..d4e8039
+>>>> --- /dev/null
+>>>> +++ b/arch/arm64/kvm/sys_regs_generic_v8.c
+>>>> @@ -0,0 +1,85 @@
+>>>> +/*
+>>>> + * Copyright (C) 2012,2013 - ARM Ltd
+>>>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>>>> + *
+>>>> + * Based on arch/arm/kvm/coproc_a15.c:
+>>>> + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
+>>>> + * Authors: Rusty Russell <rusty@rustcorp.au>
+>>>> + *          Christoffer Dall <c.dall@virtualopensystems.com>
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or modify
+>>>> + * it under the terms of the GNU General Public License, version 2, as
+>>>> + * published by the Free Software Foundation.
+>>>> + *
+>>>> + * This program is distributed in the hope that it will be useful,
+>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>> + * GNU General Public License for more details.
+>>>> + *
+>>>> + * You should have received a copy of the GNU General Public License
+>>>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>>> + */
+>>>> +#include <linux/kvm_host.h>
+>>>> +#include <asm/cputype.h>
+>>>> +#include <asm/kvm_arm.h>
+>>>> +#include <asm/kvm_asm.h>
+>>>> +#include <asm/kvm_host.h>
+>>>> +#include <asm/kvm_emulate.h>
+>>>> +#include <asm/kvm_coproc.h>
+>>>> +#include <linux/init.h>
+>>>> +
+>>>> +#include "sys_regs.h"
+>>>> +
+>>>> +static bool access_actlr(struct kvm_vcpu *vcpu,
+>>>> +			 const struct sys_reg_params *p,
+>>>> +			 const struct sys_reg_desc *r)
+>>>> +{
+>>>> +	if (p->is_write)
+>>>> +		return ignore_write(vcpu, p);
+>>>> +
+>>>> +	*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, ACTLR_EL1);
+>>>> +	return true;
+>>>> +}
+>>>> +
+>>>> +static void reset_actlr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>>>> +{
+>>>> +	u64 actlr;
+>>>> +
+>>>> +	asm volatile("mrs %0, actlr_el1\n" : "=r" (actlr));
+>>>> +	vcpu_sys_reg(vcpu, ACTLR_EL1) = actlr;
+>>>> +}
+>>>
+>>> Do we actually need this? If so, there are likely other registers (things
+>>> like the ectlr) that should be considered too.
+>>
+>> I'm focussing on the architected registers, and only those. ECTLR is
+>> implementation dependent, and is not specified as an architected sysreg.
+>>
+>> As this is one of the registers that we trap (TACR set in HCR_EL2), we
+>> have to emulate it. Now, maybe it is not that useful to trap it (nobody
+>> uses that code path yet).
+>>
+> why is this even in a generic_v8 file then? Should it not be able to be
+> handled generically in the sys_regs file and only when you have specific
+> meanings of the register for a specific core should you add something
+> like this file?
 
-I updated the bindings with all processor variants so that we will all
-be happy again (I hope). My comments still stand though and these dts need
-patching, I am posting the required changes in v3.
+That would be a possibility. But I'd rather have a separate file that
+describes targets, rather then stuffing this into sys_regs.c (which is
+already too big for my taste), and have the implementation defined
+registers there.
 
-Lorenzo
+The AEMv8/Foundation being "generic" implementations of ARMv8, I'm
+giving them their own target file. The A57 mention in this file is just
+a temporary hack until I get to boot the stuff on a real A57.
+
+> I think it's preferred to have something that traps and shouts than
+> something that may or may not work (ie. just allowing the guest to read
+> the register directly), but you guys know better than me what kind of
+> things can be exposed through this register in the future.
+
+At least for the models, this handling of ACTLR_EL1 should be correct.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
