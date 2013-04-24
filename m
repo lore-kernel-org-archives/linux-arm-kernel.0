@@ -1,116 +1,59 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 24 Apr 2013 00:11:26 -0400 (EDT)
-Subject: [PATCH v4 00/15] multi-cluster power management
-In-Reply-To: <20130423224441.GZ14496@n2100.arm.linux.org.uk>
-References: <1360041732-17936-1-git-send-email-nicolas.pitre@linaro.org>
- <20130423200429.GF5316@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1304231657150.17375@syhkavp.arg>
- <20130423214610.GY14496@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1304231755370.17375@syhkavp.arg>
- <20130423224441.GZ14496@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.03.1304232327120.17375@syhkavp.arg>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 24 Apr 2013 12:12:35 +0800
+Subject: [PATCH] ARM: Kconfig: let ARM9TDMI and ARM7TDMI invisible.
+In-Reply-To: <5174D4FA.70404@asianux.com>
+References: <514FB202.3040807@asianux.com> <515BFA8D.2000204@asianux.com>
+ <20130403101018.GE11040@mudshark.cambridge.arm.com>
+ <515C047A.9010906@asianux.com> <516E6A8E.3000001@asianux.com>
+ <20130417100243.GV14496@n2100.arm.linux.org.uk> <5174D4FA.70404@asianux.com>
+Message-ID: <51775BB3.6000607@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Apr 2013, Russell King - ARM Linux wrote:
 
-> On Tue, Apr 23, 2013 at 05:56:03PM -0400, Nicolas Pitre wrote:
-> > On Tue, 23 Apr 2013, Russell King - ARM Linux wrote:
-> > 
-> > > On Tue, Apr 23, 2013 at 05:03:06PM -0400, Nicolas Pitre wrote:
-> > > > On Tue, 23 Apr 2013, Russell King - ARM Linux wrote:
-> > > > 
-> > > > > What I suggest for the time being is to provide new inline function(s)
-> > > > > in arch/arm/include/cacheflush.h which are purposed for your application,
-> > > > > document them in that file, and call the implementation you're currently
-> > > > > using.  That means if we do have to change it in the future (for example,
-> > > > > we don't need to do anything in the dcache flushing stuff) we don't have
-> > > > > to hunt through all the code to find _your_ different use of that function
-> > > > > and fix it - we can just fix it in one place and we have the reference
-> > > > > there for what your code expects.
-> > > > 
-> > > > What about the patch below?  Once you tell me it is fine to you I'll 
-> > > > adapt the MCPM series to it.
-> > > 
-> > > Yes, that looks like a saner solution.  Thanks.
-> > 
-> > May I add your ACK to the patch?
-> 
-> Yes, sure.
-> 
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+If CONFIG_MMU is disabled, it will let ARM9TDMI and ARM7TDMI visible,
+but in fact, only AT91X40 need ARM7TDMI, so not need let them visible.
 
-Thanks.  I've adapted the series to this, and mcpm_set_entry_vector() 
-now looks like this:
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm/mach-at91/Kconfig.non_dt |    1 +
+ arch/arm/mm/Kconfig               |    4 ++--
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-+extern unsigned long mcpm_entry_vectors[MAX_NR_CLUSTERS][MAX_CPUS_PER_CLUSTER];
-+
-+void mcpm_set_entry_vector(unsigned cpu, unsigned cluster, void *ptr)
-+{
-+	unsigned long val = ptr ? virt_to_phys(ptr) : 0;
-+	mcpm_entry_vectors[cluster][cpu] = val;
-+	sync_cache_w(&mcpm_entry_vectors[cluster][cpu]);
-+}
+diff --git a/arch/arm/mach-at91/Kconfig.non_dt
+b/arch/arm/mach-at91/Kconfig.non_dt
+index 6c24985..dc972e1 100644
+--- a/arch/arm/mach-at91/Kconfig.non_dt
++++ b/arch/arm/mach-at91/Kconfig.non_dt
+@@ -47,6 +47,7 @@ config ARCH_AT91X40
+ 	select ARCH_USES_GETTIMEOFFSET
+ 	select MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
++	select CPU_ARM7TDMI
 
-Similarly for the CCI driver:
+ endchoice
 
-+	/*
-+	 * Multi-cluster systems may need this data when non-coherent, during
-+	 * cluster power-up/power-down. Make sure it reaches main memory:
-+	 */
-+	sync_cache_w(info);
-+	sync_cache_w(&info);
+diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
+index 9e8101e..3397d05 100644
+--- a/arch/arm/mm/Kconfig
++++ b/arch/arm/mm/Kconfig
+@@ -6,7 +6,7 @@ comment "Processor Type"
 
-This is also much prettier.
+ # ARM7TDMI
+ config CPU_ARM7TDMI
+-	bool "Support ARM7TDMI processor"
++	bool
+ 	depends on !MMU
+ 	select CPU_32v4T
+ 	select CPU_ABRT_LV4T
+@@ -56,7 +56,7 @@ config CPU_ARM740T
 
-Assorted small changes for comments that followed the v4 post have been 
-integrated as well.  I don't think they justify a repost of the whole 
-thing though.  They are:
-
-- Replace custom cache sync helpers with the sync_cache_*() ones from 
-  cacheflush.h.
-
-- Remove volatile annotations since explicit cache ops act as memory 
-  barriers now.
-
-- Rename mcpm_entry.h to mcpm.h since this is not solely about entry but
-  more general.
-
-- Export the __CACHE_WRITEBACK_* constants via asm_offsets.h since 
-  they're needed by assembly code.
-
-- Add some more comments and clarify some existing ones.
-
-I managed to retest this on RTSM after fighting with the license system.
-
-The latest MCPM patches are available here:
-
-  git://git.linaro.org/people/nico/linux mcpm
-
-Diffstat:
-
- Documentation/arm/cluster-pm-race-avoidance.txt | 498 ++++++++++++++++++
- Documentation/arm/vlocks.txt                    | 211 ++++++++
- arch/arm/Kconfig                                |   8 +
- arch/arm/common/Makefile                        |   1 +
- arch/arm/common/mcpm_entry.c                    | 263 +++++++++
- arch/arm/common/mcpm_head.S                     | 219 ++++++++
- arch/arm/common/mcpm_platsmp.c                  |  92 ++++
- arch/arm/common/vlock.S                         | 108 ++++
- arch/arm/common/vlock.h                         |  29 +
- arch/arm/include/asm/cacheflush.h               |  75 +++
- arch/arm/include/asm/mcpm.h                     | 209 ++++++++
- arch/arm/kernel/asm-offsets.c                   |   4 +
- 12 files changed, 1717 insertions(+)
-
-The corresponding DCSCB support for RTSM is here:
-
-  git://git.linaro.org/people/nico/linux mcpm+dcscb
-
-although that part is probably more suitable for ARM-SOC.
-
-Do you want those patches to be posted again, or should I send a new 
-pull request?
-
-
-Nicolas
+ # ARM9TDMI
+ config CPU_ARM9TDMI
+-	bool "Support ARM9TDMI processor"
++	bool
+ 	depends on !MMU
+ 	select CPU_32v4T
+ 	select CPU_ABRT_NOMMU
+-- 
+1.7.7.6
