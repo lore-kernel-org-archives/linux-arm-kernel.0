@@ -1,44 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Apr 2013 16:54:49 +0200
-Subject: [PATCH 03/32 v2] dmaengine: ste_dma40: Use the BIT macro to
- replace ugly '(1 << x)'s
-In-Reply-To: <20130418121637.GG27903@gmail.com>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-4-git-send-email-lee.jones@linaro.org>
- <20130418121637.GG27903@gmail.com>
-Message-ID: <CACRpkdYCub2GN5okM4NW9E5snwVnGKvnGd02V2qLX=s6R04e9Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 24 Apr 2013 16:56:53 +0200
+Subject: [PATCH 04/10] usb: musb: ux500: harden checks for platform data
+In-Reply-To: <CAF2Aj3ga7R3Vti4YB-83T_AsanB3iL34aysAN3MiMWZBvB=z2Q@mail.gmail.com>
+References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
+ <20130424142615.GF23081@arwen.pp.htv.fi>
+ <CAF2Aj3ga7R3Vti4YB-83T_AsanB3iL34aysAN3MiMWZBvB=z2Q@mail.gmail.com>
+Message-ID: <201304241656.53432.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 2:16 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wednesday 24 April 2013, Lee Jones wrote:
+> Yeah, I agree, although does it make a difference?
+> 
+> Is it evaluated a second time, or does it take up extra cycles by being
+> enclosed in parentheses?
+> 
+> Or is this just a coding style thing?
 
-> The aim is to make the code that little more readable.
->
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
->
-> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-> index 3b83dee..ddf5ff1 100644
-> --- a/drivers/dma/ste_dma40.c
-> +++ b/drivers/dma/ste_dma40.c
-> @@ -49,9 +49,9 @@
->  #define MAX_LCLA_ALLOC_ATTEMPTS 256
->
->  /* Bit markings for allocation map */
-> -#define D40_ALLOC_FREE         (1 << 31)
-> -#define D40_ALLOC_PHY          (1 << 30)
-> -#define D40_ALLOC_LOG_FREE     0
-> +#define D40_ALLOC_FREE         BIT(31)
-> +#define D40_ALLOC_PHY          BIT(30)
-> +#define D40_ALLOC_LOG_FREE     BIT(0)
+Just coding style. I agree you should have no parentheses there, but it
+does not change the compiled code.
 
-No. 0 != BIT(0)
-
-Please fix this...
-
-Yours,
-Linus Walleij
+	Arnd
