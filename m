@@ -1,60 +1,41 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 24 Apr 2013 23:02:15 +0200
-Subject: [PATCH 0/6] Davinci fbdev driver and enable it for DMx platform
-In-Reply-To: <1366804808-22720-1-git-send-email-prabhakar.csengg@gmail.com>
-References: <1366804808-22720-1-git-send-email-prabhakar.csengg@gmail.com>
-Message-ID: <1780031.B4OAypccep@avalon>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed, 24 Apr 2013 14:35:32 -0700
+Subject: RFC: Unified DMA allocation algorithms
+Message-ID: <51785024.40305@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prabhakar,
+Hi all,
 
-Thank you for the patch.
+I've been looking at a better way to do custom dma allocation algorithms 
+in a similar style to Ion heaps. Most drivers/clients have come up with 
+a series of semi-standard ways to get memory (CMA, memblock_reserve, 
+discontiguous pages etc.) . As these allocation schemes get more and 
+more complex, there needs to be a since place where all clients (Ion 
+based driver vs. DRM driver vs. ???)  can independently take advantage 
+of any optimizations and call a single API for the backing allocations.
 
-On Wednesday 24 April 2013 17:30:02 Prabhakar Lad wrote:
-> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> 
-> This patch series adds an fbdev driver for Texas
-> Instruments Davinci SoC.The display subsystem consists
-> of OSD and VENC, with OSD supporting 2 RGb planes and
-> 2 video planes.
-> http://focus.ti.com/general/docs/lit/
-> getliterature.tsp?literatureNumber=sprue37d&fileType=pdf
-> 
-> A good amount of the OSD and VENC enabling code is
-> present in the kernel, and this patch series adds the
-> fbdev interface.
-> 
-> The fbdev driver exports 4 nodes representing each
-> plane to the user - from fb0 to fb3.
+The dma_map_ops take care of almost everything needed for abstraction
+but the question is where should new allocation algorithms be located?
+Most of the work has been added to either arm/mm/dma-mapping.c or
+dma-contiguous.c . My current thought:
 
-The obvious question is: why not a KMS driver instead ? :-)
+1) split out the dma_map_ops currently in dma-mapping.c into separate 
+files (dma-mapping-common.c, dma-mapping-iommu.c)
+2) Extend dma-contiguous.c to support memblock_reserve memory
+3) Place additional algorithms in either arch/arm/mm or 
+drivers/base/dma-alloc/ as appropriate to the code. This is the part 
+where I'm most unsure about the direction.
 
-> Lad, Prabhakar (6):
->   media: davinci: vpbe: fix checkpatch warning for CamelCase
->   media: davinci: vpbe: enable vpbe for fbdev addition
->   davinci: vpbe: add fbdev driver
->   ARM: davinci: dm355: enable fbdev driver
->   ARM: davinci: dm365: enable fbdev driver
->   ARM: davinci: dm644x: enable fbdev driver
-> 
->  arch/arm/mach-davinci/dm355.c                 |   24 +-
->  arch/arm/mach-davinci/dm365.c                 |   10 +
->  arch/arm/mach-davinci/dm644x.c                |   10 +
->  drivers/media/platform/davinci/vpbe_display.c |    8 +-
->  drivers/media/platform/davinci/vpbe_osd.c     |  820 ++++++++-
->  drivers/media/platform/davinci/vpbe_venc.c    |   43 +
->  drivers/video/Kconfig                         |   12 +
->  drivers/video/Makefile                        |    1 +
->  drivers/video/davincifb.c                     | 2523 ++++++++++++++++++++++
->  drivers/video/davincifb.h                     |  194 ++
->  include/media/davinci/vpbe_osd.h              |   66 +-
->  include/media/davinci/vpbe_venc.h             |   21 +
->  12 files changed, 3702 insertions(+), 30 deletions(-)
->  create mode 100644 drivers/video/davincifb.c
->  create mode 100644 drivers/video/davincifb.h
+I don't have anything written yet but I plan to draft some patches 
+assuming the proposed approach sounds reasonable and no one else has 
+started on something similar already.
+
+Thoughts? Opinions?
+
+Thanks,
+Laura
 
 -- 
-Regards,
-
-Laurent Pinchart
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
