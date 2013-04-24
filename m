@@ -1,33 +1,94 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Wed, 24 Apr 2013 02:23:24 -0400
-Subject: [V9 PATCH 10/12] arm: mmp: remove unused usb devices
+Date: Wed, 24 Apr 2013 02:23:15 -0400
+Subject: [V9 PATCH 01/12] usb: phy: protect phy init and shutdown for mutiple
+ deivces
 In-Reply-To: <1366784606-1813-1-git-send-email-chao.xie@marvell.com>
 References: <1366784606-1813-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1366784606-1813-11-git-send-email-chao.xie@marvell.com>
+Message-ID: <1366784606-1813-2-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We defined new usb devices for usb ehci/udc/otg/phy.
-So remove the old definitions.
+Some USB devices will share same phy, so make the ->init
+and ->shutdown to be protected.
+Only first device will initialize the phy, and only last device
+can shutdown phy.
 
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/mach-mmp/include/mach/pxa910.h |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
+ drivers/usb/phy/phy.c   |    6 ++++++
+ include/linux/usb/phy.h |   22 ++++++++++++++++++----
+ 2 files changed, 24 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/include/mach/pxa910.h b/arch/arm/mach-mmp/include/mach/pxa910.h
-index c695982..d17ffee 100644
---- a/arch/arm/mach-mmp/include/mach/pxa910.h
-+++ b/arch/arm/mach-mmp/include/mach/pxa910.h
-@@ -19,9 +19,6 @@ extern struct pxa_device_desc pxa910_device_pwm2;
- extern struct pxa_device_desc pxa910_device_pwm3;
- extern struct pxa_device_desc pxa910_device_pwm4;
- extern struct pxa_device_desc pxa910_device_nand;
--extern struct platform_device pxa168_device_u2o;
--extern struct platform_device pxa168_device_u2ootg;
--extern struct platform_device pxa168_device_u2oehci;
- extern struct pxa_device_desc pxa910_device_u2o;
- extern struct pxa_device_desc pxa910_device_u2ootg;
- extern struct pxa_device_desc pxa910_device_u2oehci;
+diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
+index f52c006..168332b 100644
+--- a/drivers/usb/phy/phy.c
++++ b/drivers/usb/phy/phy.c
+@@ -329,6 +329,9 @@ int usb_add_phy(struct usb_phy *x, enum usb_phy_type type)
+ 		return -EINVAL;
+ 	}
+ 
++	mutex_init(&x->phy_mutex);
++	x->refcount = 0;
++
+ 	spin_lock_irqsave(&phy_lock, flags);
+ 
+ 	list_for_each_entry(phy, &phy_list, head) {
+@@ -367,6 +370,9 @@ int usb_add_phy_dev(struct usb_phy *x)
+ 		return -EINVAL;
+ 	}
+ 
++	mutex_init(&x->phy_mutex);
++	x->refcount = 0;
++
+ 	spin_lock_irqsave(&phy_lock, flags);
+ 	list_for_each_entry(phy_bind, &phy_bind_list, list)
+ 		if (!(strcmp(phy_bind->phy_dev_name, dev_name(x->dev))))
+diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+index 6b5978f..98d7e60 100644
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -87,6 +87,14 @@ struct usb_phy {
+ 	/* to support controllers that have multiple transceivers */
+ 	struct list_head	head;
+ 
++	/*
++	 * PHY may be shared by multiple devices.
++	 * mutex and refcount are used to make sure PHY only initialize or
++	 * shutdown once.
++	 */
++	struct mutex		phy_mutex;
++	unsigned int		refcount;
++
+ 	/* initialize/shutdown the OTG controller */
+ 	int	(*init)(struct usb_phy *x);
+ 	void	(*shutdown)(struct usb_phy *x);
+@@ -150,17 +158,23 @@ static inline int usb_phy_io_write(struct usb_phy *x, u32 val, u32 reg)
+ static inline int
+ usb_phy_init(struct usb_phy *x)
+ {
+-	if (x->init)
+-		return x->init(x);
++	int ret = 0;
+ 
+-	return 0;
++	mutex_lock(&x->phy_mutex);
++	if (x->refcount++ == 0 && x->init)
++		ret = x->init(x);
++	mutex_unlock(&x->phy_mutex);
++
++	return ret;
+ }
+ 
+ static inline void
+ usb_phy_shutdown(struct usb_phy *x)
+ {
+-	if (x->shutdown)
++	mutex_lock(&x->phy_mutex);
++	if (--x->refcount == 0 && x->shutdown)
+ 		x->shutdown(x);
++	mutex_unlock(&x->phy_mutex);
+ }
+ 
+ static inline int
 -- 
 1.7.4.1
