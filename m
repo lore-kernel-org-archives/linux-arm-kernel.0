@@ -1,27 +1,53 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 24 Apr 2013 11:21:13 +0100
-Subject: [PATCH 15/23] ARM: u300: set up board power from device tree
-In-Reply-To: <1366624656-6648-1-git-send-email-linus.walleij@stericsson.com>
-References: <1366624656-6648-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130424102113.GI5019@opensource.wolfsonmicro.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 24 Apr 2013 18:20:32 +0800
+Subject: [PATCH v2] arm64: compiling issue, need add include/asm/vga.h file
+In-Reply-To: <20130424082237.GA23397@arm.com>
+References: <5177551D.8090007@asianux.com> <20130424082237.GA23397@arm.com>
+Message-ID: <5177B1F0.10106@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 11:57:36AM +0200, Linus Walleij wrote:
 
-> Hi Mark, this was especially tricky due to the absence of a
-> function to get a named regulator without a device node. After
-> some cleverness introducing a node for the board akin to the
-> solution I did for Nomadik, this seems to be an acceptable way
-> forward, any other suggestions welcome.
+For compiling with allmodconfig, need vga.h file, so generate it which
+just only include the asm-generic one.
 
-I would expect this to be bound based on the board name that appears in
-the device tree which (given the way this stuff mostly works) I'd expect
-to have a device node available.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130424/3a4ae311/attachment.sig>
+It is firstly used by drivers/gpu/drm/drm_irq.c.
+
+The related error:
+include/video/vga.h:22:21: fatal error: asm/vga.h: No such file or directory
+
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm64/include/asm/vga.h |   21 +++++++++++++++++++++
+ 1 files changed, 21 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/include/asm/vga.h
+
+diff --git a/arch/arm64/include/asm/vga.h b/arch/arm64/include/asm/vga.h
+new file mode 100644
+index 0000000..1c49d51
+--- /dev/null
++++ b/arch/arm64/include/asm/vga.h
+@@ -0,0 +1,21 @@
++/*
++ * Copyright (C) 2012 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef ASMARM_VGA_H
++#define ASMARM_VGA_H
++
++#include <asm-generic/vga.h>
++
++#endif /* ASMARM_VGA_H */
+-- 
+1.7.7.6
