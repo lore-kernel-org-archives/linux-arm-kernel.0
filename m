@@ -1,31 +1,38 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Wed, 24 Apr 2013 09:50:38 -0700
-Subject: [PATCH v3 08/32] arm64: KVM: architecture specific MMU backend
-In-Reply-To: <20130424111002.GJ21850@mudshark.cambridge.arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-9-git-send-email-marc.zyngier@arm.com>
- <20130423225816.GC20569@gmail.com> <5177BBEE.1090209@arm.com>
- <20130424111002.GJ21850@mudshark.cambridge.arm.com>
-Message-ID: <CAEDV+gJAyE2teK963iMYujPmyY0fqSZ7kQmq5CiKwvxNKm=SWA@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 24 Apr 2013 09:55:27 -0700
+Subject: [PATCH] cpuidle: add maintainer entry
+In-Reply-To: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
+ (Daniel Lezcano's message of "Wed, 24 Apr 2013 15:34:23 +0200")
+References: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <87k3nr50n4.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 4:10 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Apr 24, 2013 at 12:03:10PM +0100, Marc Zyngier wrote:
->> On 23/04/13 23:58, Christoffer Dall wrote:
->> > I noticed that this doesn't do any cache cleaning.  Are the MMU page
->> > table walks guaranteed to be coherent with the MMU on arm64?
->>
->> I suppose you meant the cache. In this case, yes. The hardware page
->> table walker must snoop the caches.
->
-> Also, for ARMv7, SMP implies that the hardware walker snoops the cache. I
-> recently upstreamed some patches for this (see "ARM: 7691/1: mm: kill unused
-> TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead" in -next), so you might
-> want to check if there are any remaining, redundant flushes in kvm for ARMv7.
->
-always on SMP? I thought this was implementation specific and you
-could read this in some feature register?
+Rafael,
 
-In any case, I'm quite sure we do some unnecessary cleaning in KVM
-then, so I'll look at it.
+Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+
+[...]
+
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 61677c3..effa0f3 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2206,6 +2206,13 @@ S:	Maintained
+>  F:	drivers/cpufreq/
+>  F:	include/linux/cpufreq.h
+>  
+> +CPUIDLE DRIVERS
+> +M:	Rafael J. Wysocki <rjw@sisk.pl>
+> +L:	linux-pm at vger.kernel.org
+> +S:	Maintained
+> +F:	drivers/cpuidle/*
+> +F:	include/linux/cpuidle.h
+
+What do you think about having Daniel listed here as a co-maintainer?
+
+He has been driving a significant consolidation effort, and will
+continue to do that, so I think he should help take care of this area
+and ensure all drivers are moving in the right direction.
+
+Kevin
