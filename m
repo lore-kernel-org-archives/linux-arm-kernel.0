@@ -1,49 +1,39 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 24 Apr 2013 02:31:49 +0200
-Subject: [RFC][PATCH] video: imx: Select VIDEOMODE_HELPERS
-In-Reply-To: <1366702862.4365.2.camel@pizza.hi.pengutronix.de>
-References: <1366666110-9585-1-git-send-email-marex@denx.de>
- <201304230157.47992.marex@denx.de>
- <1366702862.4365.2.camel@pizza.hi.pengutronix.de>
-Message-ID: <201304240231.49579.marex@denx.de>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Tue, 23 Apr 2013 17:50:49 -0700
+Subject: [PATCH] of: Set the DMA mask to 64 bits on ARM LPAE systems
+Message-ID: <1366764649-10342-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+By default on ARM systems, the coherent DMA mask (lowest
+address) is set to ~0 or 0xFFFFFFFFFFFFFFFF. Currently,
+of_platform_device_create_pdata sets the coherent DMA mask to
+32 bits. This prevents coherent dma allocations from working by default
+without clients setting the DMA mask. Rather than make every client
+on an LPAE system set the mask, set the mask to a 64 bit value on
+ARM LPAE systems.
 
-> Hi Marek,
-> 
-> Am Dienstag, den 23.04.2013, 01:57 +0200 schrieb Marek Vasut:
-> > Dear Fabio Estevam,
-> > 
-> > > Hi Marek,
-> > > 
-> > > On Mon, Apr 22, 2013 at 6:28 PM, Marek Vasut <marex@denx.de> wrote:
-> > > > Without this, I get the following problem when building kernel:
-> > > > 
-> > > > drivers/built-in.o: In function `imx_pd_connector_get_modes':
-> > > > /linux-2.6/drivers/staging/imx-drm/parallel-display.c:78: undefined
-> > > > reference to `of_get_drm_display_mode' make: *** [vmlinux] Error 1
-> > > > 
-> > > > NOTE: I think this patch is almost absolutely not correct.
-> > > > 
-> > > > Signed-off-by: Marek Vasut <marex@denx.de>
-> > > > Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> > > > Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> > > > Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> > > 
-> > > Patch looks good, but you should have copied Greg Kroah-Hartman, as he
-> > > is the one who takes patches into staging.
-> > 
-> > I'm not sure if the select is at correct symbol, I dont think it is.
-> 
-> OF_VIDEOMODE is the correct one. The implementation of
-> of_get_drm_display_mode in drivers/gpu/drm/drm_modes.c depends on it.
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ drivers/of/platform.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-I really need VIDEOMODE_HELPERS, not OF_VIDEOMODE. If I select only 
-OF_VIDEOMODE, I still get the issue above.
-
-Check drivers/gpu/drm/drm_modes.c , it's protected by CONFIG_VIDEOMODE_HELPERS
-
-Best regards,
-Marek Vasut
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 0970505..18b69c1 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -214,7 +214,11 @@ struct platform_device *of_platform_device_create_pdata(
+ #if defined(CONFIG_MICROBLAZE)
+ 	dev->archdata.dma_mask = 0xffffffffUL;
+ #endif
++#ifdef CONFIG_ARM_LPAE
++	dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
++#else
+ 	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
++#endif
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
