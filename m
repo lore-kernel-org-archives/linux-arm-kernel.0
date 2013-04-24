@@ -1,97 +1,181 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 24 Apr 2013 16:36:35 +0200
-Subject: [PATCH v5 06/10] ARM: imx: Export ac97 reset functions
+Date: Wed, 24 Apr 2013 16:36:38 +0200
+Subject: [PATCH v5 09/10] ASoC: fsl: Move fsl-ssi binding doc to sound/
 In-Reply-To: <1366814199-14827-1-git-send-email-mpa@pengutronix.de>
 References: <1366814199-14827-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1366814199-14827-7-git-send-email-mpa@pengutronix.de>
+Message-ID: <1366814199-14827-10-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+fsl-ssi was located in powerpc/fsl/ssi.txt. This is no powerpc specific
+device, so it should be moved to sound/ as it connects to differen audio
+codecs.
+
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm/mach-imx/mach-pca100.c | 7 +++++--
- arch/arm/mach-imx/mach-pcm043.c | 7 +++++--
- 2 files changed, 10 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/powerpc/fsl/ssi.txt        | 73 ----------------------
+ .../devicetree/bindings/sound/fsl,ssi.txt          | 73 ++++++++++++++++++++++
+ 2 files changed, 73 insertions(+), 73 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/powerpc/fsl/ssi.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/fsl,ssi.txt
 
-diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
-index b8b15bb..68badf8 100644
---- a/arch/arm/mach-imx/mach-pca100.c
-+++ b/arch/arm/mach-imx/mach-pca100.c
-@@ -22,6 +22,7 @@
- #include <linux/i2c.h>
- #include <linux/i2c/at24.h>
- #include <linux/dma-mapping.h>
-+#include <linux/export.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/eeprom.h>
- #include <linux/irq.h>
-@@ -208,7 +209,7 @@ static const struct spi_imx_master pca100_spi0_data __initconst = {
- 	.num_chipselect = ARRAY_SIZE(pca100_spi_cs),
- };
- 
--static void pca100_ac97_warm_reset(struct snd_ac97 *ac97)
-+void pca100_ac97_warm_reset(struct snd_ac97 *ac97)
- {
- 	mxc_gpio_mode(GPIO_PORTC | 20 | GPIO_GPIO | GPIO_OUT);
- 	gpio_set_value(GPIO_PORTC + 20, 1);
-@@ -217,8 +218,9 @@ static void pca100_ac97_warm_reset(struct snd_ac97 *ac97)
- 	mxc_gpio_mode(PC20_PF_SSI1_FS);
- 	msleep(2);
- }
-+EXPORT_SYMBOL(pca100_ac97_warm_reset);
- 
--static void pca100_ac97_cold_reset(struct snd_ac97 *ac97)
-+void pca100_ac97_cold_reset(struct snd_ac97 *ac97)
- {
- 	mxc_gpio_mode(GPIO_PORTC | 20 | GPIO_GPIO | GPIO_OUT);  /* FS */
- 	gpio_set_value(GPIO_PORTC + 20, 0);
-@@ -232,6 +234,7 @@ static void pca100_ac97_cold_reset(struct snd_ac97 *ac97)
- 	mxc_gpio_mode(PC22_PF_SSI1_TXD);
- 	msleep(2);
- }
-+EXPORT_SYMBOL(pca100_ac97_cold_reset);
- 
- static const struct imx_ssi_platform_data pca100_ssi_pdata __initconst = {
- 	.ac97_reset		= pca100_ac97_cold_reset,
-diff --git a/arch/arm/mach-imx/mach-pcm043.c b/arch/arm/mach-imx/mach-pcm043.c
-index 8ed533f..4f318ca 100644
---- a/arch/arm/mach-imx/mach-pcm043.c
-+++ b/arch/arm/mach-imx/mach-pcm043.c
-@@ -27,6 +27,7 @@
- #include <linux/i2c/at24.h>
- #include <linux/usb/otg.h>
- #include <linux/usb/ulpi.h>
-+#include <linux/export.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -217,7 +218,7 @@ static iomux_v3_cfg_t pcm043_pads[] = {
- #define SD1_GPIO_WP	IMX_GPIO_NR(2, 23)
- #define SD1_GPIO_CD	IMX_GPIO_NR(2, 24)
- 
--static void pcm043_ac97_warm_reset(struct snd_ac97 *ac97)
-+void pcm043_ac97_warm_reset(struct snd_ac97 *ac97)
- {
- 	iomux_v3_cfg_t txfs_gpio = MX35_PAD_STXFS4__GPIO2_31;
- 	iomux_v3_cfg_t txfs = MX35_PAD_STXFS4__AUDMUX_AUD4_TXFS;
-@@ -239,8 +240,9 @@ static void pcm043_ac97_warm_reset(struct snd_ac97 *ac97)
- 	gpio_free(AC97_GPIO_TXFS);
- 	mxc_iomux_v3_setup_pad(txfs);
- }
-+EXPORT_SYMBOL(pcm043_ac97_warm_reset);
- 
--static void pcm043_ac97_cold_reset(struct snd_ac97 *ac97)
-+void pcm043_ac97_cold_reset(struct snd_ac97 *ac97)
- {
- 	iomux_v3_cfg_t txfs_gpio = MX35_PAD_STXFS4__GPIO2_31;
- 	iomux_v3_cfg_t txfs = MX35_PAD_STXFS4__AUDMUX_AUD4_TXFS;
-@@ -286,6 +288,7 @@ err1:
- 		printk("%s failed with %d\n", __func__, ret);
- 	mdelay(1);
- }
-+EXPORT_SYMBOL(pcm043_ac97_cold_reset);
- 
- static const struct imx_ssi_platform_data pcm043_ssi_pdata __initconst = {
- 	.ac97_reset = pcm043_ac97_cold_reset,
+diff --git a/Documentation/devicetree/bindings/powerpc/fsl/ssi.txt b/Documentation/devicetree/bindings/powerpc/fsl/ssi.txt
+deleted file mode 100644
+index 5ff76c9..0000000
+--- a/Documentation/devicetree/bindings/powerpc/fsl/ssi.txt
++++ /dev/null
+@@ -1,73 +0,0 @@
+-Freescale Synchronous Serial Interface
+-
+-The SSI is a serial device that communicates with audio codecs.  It can
+-be programmed in AC97, I2S, left-justified, or right-justified modes.
+-
+-Required properties:
+-- compatible:       Compatible list, contains "fsl,ssi".
+-- cell-index:       The SSI, <0> = SSI1, <1> = SSI2, and so on.
+-- reg:              Offset and length of the register set for the device.
+-- interrupts:       <a b> where a is the interrupt number and b is a
+-                    field that represents an encoding of the sense and
+-                    level information for the interrupt.  This should be
+-                    encoded based on the information in section 2)
+-                    depending on the type of interrupt controller you
+-                    have.
+-- interrupt-parent: The phandle for the interrupt controller that
+-                    services interrupts for this device.
+-- fsl,mode:         The operating mode for the SSI interface.
+-                    "i2s-slave" - I2S mode, SSI is clock slave
+-                    "i2s-master" - I2S mode, SSI is clock master
+-                    "lj-slave" - left-justified mode, SSI is clock slave
+-                    "lj-master" - l.j. mode, SSI is clock master
+-                    "rj-slave" - right-justified mode, SSI is clock slave
+-                    "rj-master" - r.j., SSI is clock master
+-                    "ac97-slave" - AC97 mode, SSI is clock slave
+-                    "ac97-master" - AC97 mode, SSI is clock master
+-- fsl,playback-dma: Phandle to a node for the DMA channel to use for
+-                    playback of audio.  This is typically dictated by SOC
+-                    design.  See the notes below.
+-- fsl,capture-dma:  Phandle to a node for the DMA channel to use for
+-                    capture (recording) of audio.  This is typically dictated
+-                    by SOC design.  See the notes below.
+-- fsl,fifo-depth:   The number of elements in the transmit and receive FIFOs.
+-                    This number is the maximum allowed value for SFCSR[TFWM0].
+-- fsl,ssi-asynchronous:
+-                    If specified, the SSI is to be programmed in asynchronous
+-                    mode.  In this mode, pins SRCK, STCK, SRFS, and STFS must
+-                    all be connected to valid signals.  In synchronous mode,
+-                    SRCK and SRFS are ignored.  Asynchronous mode allows
+-                    playback and capture to use different sample sizes and
+-                    sample rates.  Some drivers may require that SRCK and STCK
+-                    be connected together, and SRFS and STFS be connected
+-                    together.  This would still allow different sample sizes,
+-                    but not different sample rates.
+-
+-Optional properties:
+-- codec-handle:     Phandle to a 'codec' node that defines an audio
+-                    codec connected to this SSI.  This node is typically
+-                    a child of an I2C or other control node.
+-
+-Child 'codec' node required properties:
+-- compatible:       Compatible list, contains the name of the codec
+-
+-Child 'codec' node optional properties:
+-- clock-frequency:  The frequency of the input clock, which typically comes
+-                    from an on-board dedicated oscillator.
+-
+-Notes on fsl,playback-dma and fsl,capture-dma:
+-
+-On SOCs that have an SSI, specific DMA channels are hard-wired for playback
+-and capture.  On the MPC8610, for example, SSI1 must use DMA channel 0 for
+-playback and DMA channel 1 for capture.  SSI2 must use DMA channel 2 for
+-playback and DMA channel 3 for capture.  The developer can choose which
+-DMA controller to use, but the channels themselves are hard-wired.  The
+-purpose of these two properties is to represent this hardware design.
+-
+-The device tree nodes for the DMA channels that are referenced by
+-"fsl,playback-dma" and "fsl,capture-dma" must be marked as compatible with
+-"fsl,ssi-dma-channel".  The SOC-specific compatible string (e.g.
+-"fsl,mpc8610-dma-channel") can remain.  If these nodes are left as
+-"fsl,elo-dma-channel" or "fsl,eloplus-dma-channel", then the generic Elo DMA
+-drivers (fsldma) will attempt to use them, and it will conflict with the
+-sound drivers.
+diff --git a/Documentation/devicetree/bindings/sound/fsl,ssi.txt b/Documentation/devicetree/bindings/sound/fsl,ssi.txt
+new file mode 100644
+index 0000000..5ff76c9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/fsl,ssi.txt
+@@ -0,0 +1,73 @@
++Freescale Synchronous Serial Interface
++
++The SSI is a serial device that communicates with audio codecs.  It can
++be programmed in AC97, I2S, left-justified, or right-justified modes.
++
++Required properties:
++- compatible:       Compatible list, contains "fsl,ssi".
++- cell-index:       The SSI, <0> = SSI1, <1> = SSI2, and so on.
++- reg:              Offset and length of the register set for the device.
++- interrupts:       <a b> where a is the interrupt number and b is a
++                    field that represents an encoding of the sense and
++                    level information for the interrupt.  This should be
++                    encoded based on the information in section 2)
++                    depending on the type of interrupt controller you
++                    have.
++- interrupt-parent: The phandle for the interrupt controller that
++                    services interrupts for this device.
++- fsl,mode:         The operating mode for the SSI interface.
++                    "i2s-slave" - I2S mode, SSI is clock slave
++                    "i2s-master" - I2S mode, SSI is clock master
++                    "lj-slave" - left-justified mode, SSI is clock slave
++                    "lj-master" - l.j. mode, SSI is clock master
++                    "rj-slave" - right-justified mode, SSI is clock slave
++                    "rj-master" - r.j., SSI is clock master
++                    "ac97-slave" - AC97 mode, SSI is clock slave
++                    "ac97-master" - AC97 mode, SSI is clock master
++- fsl,playback-dma: Phandle to a node for the DMA channel to use for
++                    playback of audio.  This is typically dictated by SOC
++                    design.  See the notes below.
++- fsl,capture-dma:  Phandle to a node for the DMA channel to use for
++                    capture (recording) of audio.  This is typically dictated
++                    by SOC design.  See the notes below.
++- fsl,fifo-depth:   The number of elements in the transmit and receive FIFOs.
++                    This number is the maximum allowed value for SFCSR[TFWM0].
++- fsl,ssi-asynchronous:
++                    If specified, the SSI is to be programmed in asynchronous
++                    mode.  In this mode, pins SRCK, STCK, SRFS, and STFS must
++                    all be connected to valid signals.  In synchronous mode,
++                    SRCK and SRFS are ignored.  Asynchronous mode allows
++                    playback and capture to use different sample sizes and
++                    sample rates.  Some drivers may require that SRCK and STCK
++                    be connected together, and SRFS and STFS be connected
++                    together.  This would still allow different sample sizes,
++                    but not different sample rates.
++
++Optional properties:
++- codec-handle:     Phandle to a 'codec' node that defines an audio
++                    codec connected to this SSI.  This node is typically
++                    a child of an I2C or other control node.
++
++Child 'codec' node required properties:
++- compatible:       Compatible list, contains the name of the codec
++
++Child 'codec' node optional properties:
++- clock-frequency:  The frequency of the input clock, which typically comes
++                    from an on-board dedicated oscillator.
++
++Notes on fsl,playback-dma and fsl,capture-dma:
++
++On SOCs that have an SSI, specific DMA channels are hard-wired for playback
++and capture.  On the MPC8610, for example, SSI1 must use DMA channel 0 for
++playback and DMA channel 1 for capture.  SSI2 must use DMA channel 2 for
++playback and DMA channel 3 for capture.  The developer can choose which
++DMA controller to use, but the channels themselves are hard-wired.  The
++purpose of these two properties is to represent this hardware design.
++
++The device tree nodes for the DMA channels that are referenced by
++"fsl,playback-dma" and "fsl,capture-dma" must be marked as compatible with
++"fsl,ssi-dma-channel".  The SOC-specific compatible string (e.g.
++"fsl,mpc8610-dma-channel") can remain.  If these nodes are left as
++"fsl,elo-dma-channel" or "fsl,eloplus-dma-channel", then the generic Elo DMA
++drivers (fsldma) will attempt to use them, and it will conflict with the
++sound drivers.
 -- 
 1.8.1.5
