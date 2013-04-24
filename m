@@ -1,29 +1,50 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 24 Apr 2013 19:49:45 +0800
-Subject: [PATCH 0/2] drivers/video: mxs-fb: build fixes
-In-Reply-To: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
-References: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130424114943.GA2736@S2101-09.ap.freescale.net>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Wed, 24 Apr 2013 17:30:02 +0530
+Subject: [PATCH 0/6] Davinci fbdev driver and enable it for DMx platform
+Message-ID: <1366804808-22720-1-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 10:08:12AM +0200, Markus Pargmann wrote:
-> Hi,
-> 
-> mxs-fb commit
-> 
-> 669406534b4abb827d1bdc39bb5e2d5255818ae2 video: mxsfb: get display timings from device tree
-> 
-> creates a build failure together with those commits:
-> 
-> a38884f681a4d044befd30d9f3d19a0821bae63a videomode: simplify videomode Kconfig and Makefile
-> 6cd2c7db41eab204b6474534df4ca68a7dc53d86 videomode: videomode_from_timing work
-> 
-> All of them are in linux-next, so mxs-fb fails to build there.
+From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-Fabio already had a patch [1] for that.  I will send it mainline during
-3.10-rc.
+This patch series adds an fbdev driver for Texas
+Instruments Davinci SoC.The display subsystem consists
+of OSD and VENC, with OSD supporting 2 RGb planes and 
+2 video planes.
+http://focus.ti.com/general/docs/lit/
+getliterature.tsp?literatureNumber=sprue37d&fileType=pdf
 
-Shawn
+A good amount of the OSD and VENC enabling code is
+present in the kernel, and this patch series adds the 
+fbdev interface.
 
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/230938
+The fbdev driver exports 4 nodes representing each
+plane to the user - from fb0 to fb3.
+
+
+Lad, Prabhakar (6):
+  media: davinci: vpbe: fix checkpatch warning for CamelCase
+  media: davinci: vpbe: enable vpbe for fbdev addition
+  davinci: vpbe: add fbdev driver
+  ARM: davinci: dm355: enable fbdev driver
+  ARM: davinci: dm365: enable fbdev driver
+  ARM: davinci: dm644x: enable fbdev driver
+
+ arch/arm/mach-davinci/dm355.c                 |   24 +-
+ arch/arm/mach-davinci/dm365.c                 |   10 +
+ arch/arm/mach-davinci/dm644x.c                |   10 +
+ drivers/media/platform/davinci/vpbe_display.c |    8 +-
+ drivers/media/platform/davinci/vpbe_osd.c     |  820 ++++++++-
+ drivers/media/platform/davinci/vpbe_venc.c    |   43 +
+ drivers/video/Kconfig                         |   12 +
+ drivers/video/Makefile                        |    1 +
+ drivers/video/davincifb.c                     | 2523 +++++++++++++++++++++++++
+ drivers/video/davincifb.h                     |  194 ++
+ include/media/davinci/vpbe_osd.h              |   66 +-
+ include/media/davinci/vpbe_venc.h             |   21 +
+ 12 files changed, 3702 insertions(+), 30 deletions(-)
+ create mode 100644 drivers/video/davincifb.c
+ create mode 100644 drivers/video/davincifb.h
+
+-- 
+1.7.4.1
