@@ -1,47 +1,23 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 24 Apr 2013 10:08:14 +0200
-Subject: [PATCH 2/2] drivers/video: mxs-fb: Fix build, use renamed function
-In-Reply-To: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
-References: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1366790894-20426-3-git-send-email-mpa@pengutronix.de>
+Date: Wed, 24 Apr 2013 10:08:12 +0200
+Subject: [PATCH 0/2] drivers/video: mxs-fb: build fixes
+Message-ID: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Pargmann <mpargmann@allfex.org>
+Hi,
 
-Kernel build fails with commit 669406534b4abb827d1bdc39bb5e2d5255818ae2
+mxs-fb commit
 
-This patch renames videomode_from_timing to videomode_from_timings and
-vm.data_flags to vm.flags.
+669406534b4abb827d1bdc39bb5e2d5255818ae2 video: mxsfb: get display timings from device tree
 
-Signed-off-by: Markus Pargmann <mpargmann@allfex.org>
----
- drivers/video/mxsfb.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+creates a build failure together with those commits:
 
-diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
-index 1b2c26d..d78827e 100644
---- a/drivers/video/mxsfb.c
-+++ b/drivers/video/mxsfb.c
-@@ -777,16 +777,16 @@ static int mxsfb_init_fbinfo_dt(struct mxsfb_info *host)
- 		struct videomode vm;
- 		struct fb_videomode fb_vm;
- 
--		ret = videomode_from_timing(timings, &vm, i);
-+		ret = videomode_from_timings(timings, &vm, i);
- 		if (ret < 0)
- 			goto put_timings_node;
- 		ret = fb_videomode_from_videomode(&vm, &fb_vm);
- 		if (ret < 0)
- 			goto put_timings_node;
- 
--		if (vm.data_flags & DISPLAY_FLAGS_DE_HIGH)
-+		if (vm.flags & DISPLAY_FLAGS_DE_HIGH)
- 			host->sync |= MXSFB_SYNC_DATA_ENABLE_HIGH_ACT;
--		if (vm.data_flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
-+		if (vm.flags & DISPLAY_FLAGS_PIXDATA_NEGEDGE)
- 			host->sync |= MXSFB_SYNC_DOTCLK_FALLING_ACT;
- 		fb_add_videomode(&fb_vm, &fb_info->modelist);
- 	}
--- 
-1.8.1.5
+a38884f681a4d044befd30d9f3d19a0821bae63a videomode: simplify videomode Kconfig and Makefile
+6cd2c7db41eab204b6474534df4ca68a7dc53d86 videomode: videomode_from_timing work
+
+All of them are in linux-next, so mxs-fb fails to build there.
+
+Regards,
+
+Markus
