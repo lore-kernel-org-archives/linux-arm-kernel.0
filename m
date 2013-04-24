@@ -1,37 +1,76 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Apr 2013 21:37:37 +0200
-Subject: gpio-pxa initcall level change and machine init breakage
-In-Reply-To: <5176E438.80800@newsguy.com>
-References: <5172B398.7060706@newsguy.com>
- <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
- <517466F6.3000003@newsguy.com>
- <CAD6h2NSy0=3P-PHdCiJJQG_jvGaFnr7uex+Uxs=0F-VsUxtPWg@mail.gmail.com>
- <CACRpkdbk24kR75fanvXVAocnuozNq_=jWDSPHPCWhbZCOrN5_Q@mail.gmail.com>
- <5176E438.80800@newsguy.com>
-Message-ID: <CACRpkdYLCKKZZFi6Y-viPUvrwupJGzfxr3f20a1emp-9qE0YBg@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 24 Apr 2013 20:28:15 +0100
+Subject: [PATCH v4 7/7] mach-virt: support Xen hypercalls for shutdown and
+ reboot
+In-Reply-To: <alpine.DEB.2.02.1304242012590.4180@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304242012590.4180@kaball.uk.xensource.com>
+Message-ID: <1366831695-13214-7-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 9:42 PM, Mike Dunn <mikedunn@newsguy.com> wrote:
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+CC: Marc Zyngier <marc.zyngier@arm.com>
+CC: will.deacon at arm.com
+CC: arnd at arndb.de
+CC: rob.herring at calxeda.com
+---
+ arch/arm/mach-virt/virt.c |   32 ++++++++++++++++++++++++++++++++
+ 1 files changed, 32 insertions(+), 0 deletions(-)
 
-> On a more general note... I'm surprised that gpiolib can not run earlier, for
-> something so low-level.
-
-Well I think the patch we're discussing is making it run less early, and it
-can actually run as arch_initcall() or similar if you wish (it's up to the
-driver).
-
-However that is beside the point, Haojian is still doing the right thing
-trying to push this to driver init (==module_init) level. The reason is
-that basically all hardware drivers should be initialized at this level
-because the other init levels are basically for other things and driver
-deps are just shoehorned into them.
-
-Instead of relying on things to be set up early one shall rely on
-deferred probe.
-
-Alas, it is not an easy change, and not expected to happen quickly
-or painlessly.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
+index 528c05e..ba14321 100644
+--- a/arch/arm/mach-virt/virt.c
++++ b/arch/arm/mach-virt/virt.c
+@@ -23,13 +23,44 @@
+ #include <linux/of_platform.h>
+ #include <linux/smp.h>
+ 
++#include <xen/xen.h>
++#include <xen/interface/sched.h>
++
+ #include <asm/arch_timer.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
++#include <asm/xen/hypercall.h>
++
++static void virt_restart(char str, const char *cmd)
++{
++#ifdef CONFIG_XEN
++	if (xen_domain()) {
++		struct sched_shutdown r = { .reason = SHUTDOWN_reboot };
++		int rc;
++		rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &r);
++		if (rc)
++			BUG();
++	}
++#endif
++}
++
++static void virt_power_off(void)
++{
++#ifdef CONFIG_XEN
++	if (xen_domain()) {
++		struct sched_shutdown r = { .reason = SHUTDOWN_poweroff };
++		int rc;
++		rc = HYPERVISOR_sched_op(SCHEDOP_shutdown, &r);
++		if (rc)
++			BUG();
++	}
++#endif
++}
+ 
+ static void __init virt_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++	pm_power_off = virt_power_off;
+ }
+ 
+ static void __init virt_timer_init(void)
+@@ -52,4 +83,5 @@ DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
+ 	.init_machine	= virt_init,
+ 	.smp		= smp_ops(virt_smp_ops),
+ 	.dt_compat	= virt_dt_match,
++	.restart	= virt_restart,
+ MACHINE_END
+-- 
+1.7.2.5
