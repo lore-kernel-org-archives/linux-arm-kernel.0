@@ -1,254 +1,202 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 24 Apr 2013 12:40:36 +0300
-Subject: [PATCH 04/11] dmaengine: dw_dmac: simplify master selection
-In-Reply-To: <1366796443-7083-1-git-send-email-andriy.shevchenko@linux.intel.com>
-References: <1366796443-7083-1-git-send-email-andriy.shevchenko@linux.intel.com>
-Message-ID: <1366796443-7083-4-git-send-email-andriy.shevchenko@linux.intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 24 Apr 2013 10:42:51 +0100
+Subject: [PATCHv2] arm: Preserve TPIDRURW on context switch
+In-Reply-To: <51770E4E.2040003@dawncrow.de>
+References: <517168BB.3070903@dawncrow.de>
+ <20130422143616.GP14496@n2100.arm.linux.org.uk>
+ <20130422151836.GA15665@mudshark.cambridge.arm.com>
+ <5175A697.3080308@dawncrow.de>
+ <20130423091536.GB17593@mudshark.cambridge.arm.com>
+ <51770E4E.2040003@dawncrow.de>
+Message-ID: <20130424094251.GA21850@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+Hi Andrew,
 
-The patch to add the common DMA binding added a dummy dw_dma_slave
-structure into the dw_dma_chan structure in order to configure the
-masters correctly. It turns out that this can be simplified if we
-pick the DMA masters in the dwc_alloc_chan_resources function instead
-and save them in the dw_dma_chan structure directly.
+On Tue, Apr 23, 2013 at 11:42:22PM +0100, Andr? Hentschel wrote:
+> Am 23.04.2013 11:15, schrieb Will Deacon:
+> > You could introduce `get' tls functions, which don't do anything for CPUs
+> > without the relevant registers.
+> 
+> Before i have another round of testing and patch formatting/sending,
+> what about the untested patch below?
 
-This could be simplified further once all users that today use
-dw_dma_slave for configuration get converted to device tree based
-setup instead.
+Ok. Comments inline.
 
-(Upstream commit id: f776076b9fa82d630651c9af56359d80fce86d68)
+> diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+> index cddda1f..bb5b48d 100644
+> --- a/arch/arm/include/asm/thread_info.h
+> +++ b/arch/arm/include/asm/thread_info.h
+> @@ -58,7 +58,7 @@ struct thread_info {
+>  	struct cpu_context_save	cpu_context;	/* cpu context */
+>  	__u32			syscall;	/* syscall number */
+>  	__u8			used_cp[16];	/* thread used copro */
+> -	unsigned long		tp_value;
+> +	unsigned long		tp_value[2];
+>  #ifdef CONFIG_CRUNCH
+>  	struct crunch_state	crunchstate;
+>  #endif
+> diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
+> index 73409e6..1c10163 100644
+> --- a/arch/arm/include/asm/tls.h
+> +++ b/arch/arm/include/asm/tls.h
+> @@ -2,13 +2,30 @@
+>  #define __ASMARM_TLS_H
+>  
+>  #ifdef __ASSEMBLY__
+> +	.macro get_tls2_none, tp, tmp1
+> +	.endm
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Vinod Koul <vinod.koul@intel.com>
----
- drivers/dma/dw_dmac.c      |   76 +++++++++++++++++---------------------------
- drivers/dma/dw_dmac_regs.h |    5 ++-
- 2 files changed, 33 insertions(+), 48 deletions(-)
+Cosmetic, but these are really horrible macro names.
 
-diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
-index 274fd7d..951ef5b 100644
---- a/drivers/dma/dw_dmac.c
-+++ b/drivers/dma/dw_dmac.c
-@@ -49,29 +49,22 @@ static inline unsigned int dwc_get_sms(struct dw_dma_slave *slave)
- 	return slave ? slave->src_master : 1;
- }
- 
--#define SRC_MASTER	0
--#define DST_MASTER	1
--
--static inline unsigned int dwc_get_master(struct dma_chan *chan, int master)
-+static inline void dwc_set_masters(struct dw_dma_chan *dwc)
- {
--	struct dw_dma *dw = to_dw_dma(chan->device);
--	struct dw_dma_slave *dws = chan->private;
--	unsigned int m;
--
--	if (master == SRC_MASTER)
--		m = dwc_get_sms(dws);
--	else
--		m = dwc_get_dms(dws);
-+	struct dw_dma *dw = to_dw_dma(dwc->chan.device);
-+	struct dw_dma_slave *dws = dwc->chan.private;
-+	unsigned char mmax = dw->nr_masters - 1;
- 
--	return min_t(unsigned int, dw->nr_masters - 1, m);
-+	if (dwc->request_line == ~0) {
-+		dwc->src_master = min_t(unsigned char, mmax, dwc_get_sms(dws));
-+		dwc->dst_master = min_t(unsigned char, mmax, dwc_get_dms(dws));
-+	}
- }
- 
- #define DWC_DEFAULT_CTLLO(_chan) ({				\
- 		struct dw_dma_chan *_dwc = to_dw_dma_chan(_chan);	\
- 		struct dma_slave_config	*_sconfig = &_dwc->dma_sconfig;	\
- 		bool _is_slave = is_slave_direction(_dwc->direction);	\
--		int _dms = dwc_get_master(_chan, DST_MASTER);		\
--		int _sms = dwc_get_master(_chan, SRC_MASTER);		\
- 		u8 _smsize = _is_slave ? _sconfig->src_maxburst :	\
- 			DW_DMA_MSIZE_16;			\
- 		u8 _dmsize = _is_slave ? _sconfig->dst_maxburst :	\
-@@ -81,8 +74,8 @@ static inline unsigned int dwc_get_master(struct dma_chan *chan, int master)
- 		 | DWC_CTLL_SRC_MSIZE(_smsize)			\
- 		 | DWC_CTLL_LLP_D_EN				\
- 		 | DWC_CTLL_LLP_S_EN				\
--		 | DWC_CTLL_DMS(_dms)				\
--		 | DWC_CTLL_SMS(_sms));				\
-+		 | DWC_CTLL_DMS(_dwc->dst_master)		\
-+		 | DWC_CTLL_SMS(_dwc->src_master));		\
- 	})
- 
- /*
-@@ -92,13 +85,6 @@ static inline unsigned int dwc_get_master(struct dma_chan *chan, int master)
-  */
- #define NR_DESCS_PER_CHANNEL	64
- 
--static inline unsigned int dwc_get_data_width(struct dma_chan *chan, int master)
--{
--	struct dw_dma *dw = to_dw_dma(chan->device);
--
--	return dw->data_width[dwc_get_master(chan, master)];
--}
--
- /*----------------------------------------------------------------------*/
- 
- static struct device *chan2dev(struct dma_chan *chan)
-@@ -172,13 +158,7 @@ static void dwc_initialize(struct dw_dma_chan *dwc)
- 	if (dwc->initialized == true)
- 		return;
- 
--	if (dws && dws->cfg_hi == ~0 && dws->cfg_lo == ~0) {
--		/* Autoconfigure based on request line from DT */
--		if (dwc->direction == DMA_MEM_TO_DEV)
--			cfghi = DWC_CFGH_DST_PER(dwc->request_line);
--		else if (dwc->direction == DMA_DEV_TO_MEM)
--			cfghi = DWC_CFGH_SRC_PER(dwc->request_line);
--	} else if (dws) {
-+	if (dws) {
- 		/*
- 		 * We need controller-specific data to set up slave
- 		 * transfers.
-@@ -189,9 +169,9 @@ static void dwc_initialize(struct dw_dma_chan *dwc)
- 		cfglo |= dws->cfg_lo & ~DWC_CFGL_CH_PRIOR_MASK;
- 	} else {
- 		if (dwc->direction == DMA_MEM_TO_DEV)
--			cfghi = DWC_CFGH_DST_PER(dwc->dma_sconfig.slave_id);
-+			cfghi = DWC_CFGH_DST_PER(dwc->request_line);
- 		else if (dwc->direction == DMA_DEV_TO_MEM)
--			cfghi = DWC_CFGH_SRC_PER(dwc->dma_sconfig.slave_id);
-+			cfghi = DWC_CFGH_SRC_PER(dwc->request_line);
- 	}
- 
- 	channel_writel(dwc, CFG_LO, cfglo);
-@@ -745,6 +725,7 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
- 		size_t len, unsigned long flags)
- {
- 	struct dw_dma_chan	*dwc = to_dw_dma_chan(chan);
-+	struct dw_dma		*dw = to_dw_dma(chan->device);
- 	struct dw_desc		*desc;
- 	struct dw_desc		*first;
- 	struct dw_desc		*prev;
-@@ -767,8 +748,8 @@ dwc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
- 
- 	dwc->direction = DMA_MEM_TO_MEM;
- 
--	data_width = min_t(unsigned int, dwc_get_data_width(chan, SRC_MASTER),
--			   dwc_get_data_width(chan, DST_MASTER));
-+	data_width = min_t(unsigned int, dw->data_width[dwc->src_master],
-+			   dw->data_width[dwc->dst_master]);
- 
- 	src_width = dst_width = min_t(unsigned int, data_width,
- 				      dwc_fast_fls(src | dest | len));
-@@ -826,6 +807,7 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 		unsigned long flags, void *context)
- {
- 	struct dw_dma_chan	*dwc = to_dw_dma_chan(chan);
-+	struct dw_dma		*dw = to_dw_dma(chan->device);
- 	struct dma_slave_config	*sconfig = &dwc->dma_sconfig;
- 	struct dw_desc		*prev;
- 	struct dw_desc		*first;
-@@ -859,7 +841,7 @@ dwc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 		ctllo |= sconfig->device_fc ? DWC_CTLL_FC(DW_DMA_FC_P_M2P) :
- 			DWC_CTLL_FC(DW_DMA_FC_D_M2P);
- 
--		data_width = dwc_get_data_width(chan, SRC_MASTER);
-+		data_width = dw->data_width[dwc->src_master];
- 
- 		for_each_sg(sgl, sg, sg_len, i) {
- 			struct dw_desc	*desc;
-@@ -919,7 +901,7 @@ slave_sg_todev_fill_desc:
- 		ctllo |= sconfig->device_fc ? DWC_CTLL_FC(DW_DMA_FC_P_P2M) :
- 			DWC_CTLL_FC(DW_DMA_FC_D_P2M);
- 
--		data_width = dwc_get_data_width(chan, DST_MASTER);
-+		data_width = dw->data_width[dwc->dst_master];
- 
- 		for_each_sg(sgl, sg, sg_len, i) {
- 			struct dw_desc	*desc;
-@@ -1020,6 +1002,10 @@ set_runtime_config(struct dma_chan *chan, struct dma_slave_config *sconfig)
- 	memcpy(&dwc->dma_sconfig, sconfig, sizeof(*sconfig));
- 	dwc->direction = sconfig->direction;
- 
-+	/* Take the request line from slave_id member */
-+	if (dwc->request_line == ~0)
-+		dwc->request_line = sconfig->slave_id;
-+
- 	convert_burst(&dwc->dma_sconfig.src_maxburst);
- 	convert_burst(&dwc->dma_sconfig.dst_maxburst);
- 	convert_slave_id(dwc);
-@@ -1170,6 +1156,8 @@ static int dwc_alloc_chan_resources(struct dma_chan *chan)
- 	 * doesn't mean what you think it means), and status writeback.
- 	 */
- 
-+	dwc_set_masters(dwc);
-+
- 	spin_lock_irqsave(&dwc->lock, flags);
- 	i = dwc->descs_allocated;
- 	while (dwc->descs_allocated < NR_DESCS_PER_CHANNEL) {
-@@ -1227,6 +1215,7 @@ static void dwc_free_chan_resources(struct dma_chan *chan)
- 	list_splice_init(&dwc->free_list, &list);
- 	dwc->descs_allocated = 0;
- 	dwc->initialized = false;
-+	dwc->request_line = ~0;
- 
- 	/* Disable interrupts */
- 	channel_clear_bit(dw, MASK.XFER, dwc->mask);
-@@ -1254,23 +1243,15 @@ struct dw_dma_of_filter_args {
- static bool dw_dma_of_filter(struct dma_chan *chan, void *param)
- {
- 	struct dw_dma_chan *dwc = to_dw_dma_chan(chan);
--	struct dw_dma *dw = to_dw_dma(chan->device);
- 	struct dw_dma_of_filter_args *fargs = param;
--	struct dw_dma_slave *dws = &dwc->slave;
- 
- 	/* Ensure the device matches our channel */
-         if (chan->device != &fargs->dw->dma)
-                 return false;
- 
--	dws->dma_dev	= dw->dma.dev;
--	dws->cfg_hi	= ~0;
--	dws->cfg_lo	= ~0;
--	dws->src_master	= fargs->src;
--	dws->dst_master	= fargs->dst;
--
- 	dwc->request_line = fargs->req;
--
--	chan->private = dws;
-+	dwc->src_master	= fargs->src;
-+	dwc->dst_master	= fargs->dst;
- 
- 	return true;
- }
-@@ -1784,6 +1765,7 @@ static int dw_probe(struct platform_device *pdev)
- 		channel_clear_bit(dw, CH_EN, dwc->mask);
- 
- 		dwc->direction = DMA_TRANS_NONE;
-+		dwc->request_line = ~0;
- 
- 		/* Hardware configuration */
- 		if (autocfg) {
-diff --git a/drivers/dma/dw_dmac_regs.h b/drivers/dma/dw_dmac_regs.h
-index 4d02c36..9b0e12e 100644
---- a/drivers/dma/dw_dmac_regs.h
-+++ b/drivers/dma/dw_dmac_regs.h
-@@ -212,8 +212,11 @@ struct dw_dma_chan {
- 	/* hardware configuration */
- 	unsigned int		block_size;
- 	bool			nollp;
-+
-+	/* custom slave configuration */
- 	unsigned int		request_line;
--	struct dw_dma_slave	slave;
-+	unsigned char		src_master;
-+	unsigned char		dst_master;
- 
- 	/* configuration passed via DMA_SLAVE_CONFIG */
- 	struct dma_slave_config dma_sconfig;
--- 
-1.7.10.4
+> +	.macro get_tls2_v6k, tp, tmp1
+> +	mrc	p15, 0, \tmp1, c13, c0, 2		@ get user r/w TLS register
+> +	str	\tmp1, [\tp, #4]
+> +	.endm
+> +
+> +	.macro get_tls2_v6, tp, tmp1
+> +	ldr	\tmp1, =elf_hwcap
+> +	ldr	\tmp1, [\tmp1, #0]
+> +	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
+> +	mrcne	p15, 0, \tmp1, c13, c0, 2		@ get user r/w TLS register
+> +	strne	\tmp1, [\tp, #4]
+
+You could factor out some of this hwcap checking now that it's used by both
+set and get.
+
+> +	.endm
+> +
+> +
+>  	.macro set_tls_none, tp, tmp1, tmp2
+>  	.endm
+>  
+>  	.macro set_tls_v6k, tp, tmp1, tmp2
+> -	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
+> -	mov	\tmp1, #0
+> -	mcr	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
+> +	ldrd	\tmp1, \tmp2, [\tp]
+> +	mcr	p15, 0, \tmp1, c13, c0, 3	@ set user r/o TLS register
+> +	mcr	p15, 0, \tmp2, c13, c0, 2	@ set user r/w TLS register
+>  	.endm
+>  
+>  	.macro set_tls_v6, tp, tmp1, tmp2
+> @@ -16,33 +33,39 @@
+>  	ldr	\tmp1, [\tmp1, #0]
+>  	mov	\tmp2, #0xffff0fff
+>  	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
+> -	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
+> -	movne	\tmp1, #0
+> -	mcrne	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
+> -	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
+> +	ldrdne	\tmp1, \tmp2, [\tp]
+
+Does this work for big-endian CPUs?
+
+> +	ldreq	\tmp1, [\tp]
+> +	mcrne	p15, 0, \tmp1, c13, c0, 3	@ yes, set user r/o TLS register
+> +	mcrne	p15, 0, \tmp2, c13, c0, 2	@ set user r/w TLS register
+> +	streq	\tmp1, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
+>  	.endm
+>  
+>  	.macro set_tls_software, tp, tmp1, tmp2
+> -	mov	\tmp1, #0xffff0fff
+> -	str	\tp, [\tmp1, #-15]		@ set TLS value at 0xffff0ff0
+> +	ldr	\tmp1, [\tp]
+> +	mov	\tmp2, #0xffff0fff
+> +	str	\tmp1, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
+>  	.endm
+>  #endif
+>  
+>  #ifdef CONFIG_TLS_REG_EMUL
+>  #define tls_emu		1
+>  #define has_tls_reg		1
+> +#define get_tls2		get_tls2_none
+>  #define set_tls		set_tls_none
+>  #elif defined(CONFIG_CPU_V6)
+>  #define tls_emu		0
+>  #define has_tls_reg		(elf_hwcap & HWCAP_TLS)
+> +#define get_tls2		get_tls2_v6
+>  #define set_tls		set_tls_v6
+>  #elif defined(CONFIG_CPU_32v6K)
+>  #define tls_emu		0
+>  #define has_tls_reg		1
+> +#define get_tls2		get_tls2_v6k
+>  #define set_tls		set_tls_v6k
+>  #else
+>  #define tls_emu		0
+>  #define has_tls_reg		0
+> +#define get_tls2		get_tls2_none
+>  #define set_tls		set_tls_software
+>  #endif
+>  
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index 0f82098..097686b 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -728,7 +728,7 @@ ENTRY(__switch_to)
+>   UNWIND(.fnstart	)
+>   UNWIND(.cantunwind	)
+>  	add	ip, r1, #TI_CPU_SAVE
+> -	ldr	r3, [r2, #TI_TP_VALUE]
+> +	add	r3, r1, #TI_TP_VALUE
+>   ARM(	stmia	ip!, {r4 - sl, fp, sp, lr} )	@ Store most regs on stack
+>   THUMB(	stmia	ip!, {r4 - sl, fp}	   )	@ Store most regs on stack
+>   THUMB(	str	sp, [ip], #4		   )
+> @@ -736,6 +736,8 @@ ENTRY(__switch_to)
+>  #ifdef CONFIG_CPU_USE_DOMAINS
+>  	ldr	r6, [r2, #TI_CPU_DOMAIN]
+>  #endif
+> +	get_tls2	r3, r4
+> +	add	r3, r2, #TI_TP_VALUE
+>  	set_tls	r3, r4, r5
+>  #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
+>  	ldr	r7, [r2, #TI_TASK]
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index 047d3e4..6138eb1 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -395,7 +395,8 @@ copy_thread(unsigned long clone_flags, unsigned long stack_start,
+>  	clear_ptrace_hw_breakpoint(p);
+>  
+>  	if (clone_flags & CLONE_SETTLS)
+> -		thread->tp_value = childregs->ARM_r3;
+> +		thread->tp_value[0] = childregs->ARM_r3;
+> +	thread->tp_value[1] = current_thread_info()->tp_value[1];
+>
+
+This still isn't correct. Imagine the following sequence of events:
+
+  - Task foo writes its TPIDRURW register from userspace and then issues a
+    fork() system call. No context switch occurs between these two events.
+
+  - We start creating the child task, bar, and end up in copy_thread with
+    the `thread' pointing at foo's struct thread_info, which contains the
+    *old* TPIDRURW value.
+
+  - We copy out the stale value into bar, which is then scheduled with an
+    old TPIDRURW value.
+
+The solution is to reload the value sitting in the register in copy_thread,
+rather than relying on the thread_info being up-to-date. That's why I
+previously suggested not using asm macros for the getters.
+
+>  	thread_notify(THREAD_NOTIFY_COPY, thread);
+>  
+> diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+> index 03deeff..2bc1514 100644
+> --- a/arch/arm/kernel/ptrace.c
+> +++ b/arch/arm/kernel/ptrace.c
+> @@ -849,7 +849,7 @@ long arch_ptrace(struct task_struct *child, long request,
+>  #endif
+>  
+>  		case PTRACE_GET_THREAD_AREA:
+> -			ret = put_user(task_thread_info(child)->tp_value,
+> +			ret = put_user(task_thread_info(child)->tp_value[0],
+>  				       datap);
+>  			break;
+
+I'm guessing debuggers don't care about the new TLS value, or do we need a
+new ptrace request?
+
+Will
