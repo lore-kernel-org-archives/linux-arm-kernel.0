@@ -1,34 +1,196 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 24 Apr 2013 16:27:09 +0200
-Subject: [PATCH 2/2] pinctrl: samsung: Fix link error with
- CONFIG_PINCTRL_EXYNOS disabled
-In-Reply-To: <6940961.67Lk2axxPL@amdc1227>
-References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
- <1398545.9FqHoC0WZW@flatron>
- <CACRpkdbJj9Newk+sCTvJzxA4V2cmJ3hzuQELv7t1wFMhd_Y8+Q@mail.gmail.com>
- <6940961.67Lk2axxPL@amdc1227>
-Message-ID: <CACRpkdZmSj-AqUA9kd7NMN6cL2Nxa0EaKoSVkwQSrxhcWEeQtg@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 24 Apr 2013 16:36:33 +0200
+Subject: [PATCH v5 04/10] ASoC: fsl-ssi: Add support for imx-pcm-fiq
+In-Reply-To: <1366814199-14827-1-git-send-email-mpa@pengutronix.de>
+References: <1366814199-14827-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1366814199-14827-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 2:09 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> On Tuesday 23 of April 2013 14:03:12 Linus Walleij wrote:
+Add support for non-dma pcm for imx platforms with imx-pcm-fiq support.
+Instead of imx-pcm-audio, in this case imx-pcm-fiq-audio device is added
+and the SIER flags are set differently.
 
->> This does not apply to my "devel" branch in the pinctrl tree.
->>
->> Could you rebase it on that branch?
->>
->> Or is the error not even in my tree?
->
-> This one got sent incorrectly due to my mistake. Please try the correct
-> version:
->
-> [PATCH RESEND 2/2] pinctrl: samsung: Fix link error with CONFIG_PINCTRL_EXYNOS
-> disabled
+We need imx-pcm-fiq for some boards that use an incompatible codec.
+imx-pcm-fiq handles those codecs differently and allows to operate with
+them. DMA is not possible because some data sent by the codecs, e.g.
+wm9712, is not in the datastream. Also some data is mixed up in the
+fifos, so that we need to sort them out manually.
 
-This does not apply either.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
 
-Can you please test against the "devel" branch in the pinctrl tree?
+Notes:
+    Changes in v4:
+     - Add a comment about the reason why we add a imx-pcm-fiq device.
+     - Change commit message to include information about the usage of imx-pcm-fiq
+    
+    Changes in v3:
+     - Rename bool "dma" to "use_dma"
 
-Yours,
-Linus Walleij
+ sound/soc/fsl/fsl_ssi.c | 94 +++++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 80 insertions(+), 14 deletions(-)
+
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 0f0bed6..5165d41 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -8,6 +8,26 @@
+  * This file is licensed under the terms of the GNU General Public License
+  * version 2.  This program is licensed "as is" without any warranty of any
+  * kind, whether express or implied.
++ *
++ *
++ * Some notes why imx-pcm-fiq is used instead of DMA on some boards:
++ *
++ * The i.MX SSI core has some nasty limitations in AC97 mode. While most
++ * sane processor vendors have a FIFO per AC97 slot, the i.MX has only
++ * one FIFO which combines all valid receive slots. We cannot even select
++ * which slots we want to receive. The WM9712 with which this driver
++ * was developed with always sends GPIO status data in slot 12 which
++ * we receive in our (PCM-) data stream. The only chance we have is to
++ * manually skip this data in the FIQ handler. With sampling rates different
++ * from 48000Hz not every frame has valid receive data, so the ratio
++ * between pcm data and GPIO status data changes. Our FIQ handler is not
++ * able to handle this, hence this driver only works with 48000Hz sampling
++ * rate.
++ * Reading and writing AC97 registers is another challenge. The core
++ * provides us status bits when the read register is updated with *another*
++ * value. When we read the same register two times (and the register still
++ * contains the same value) these status bits are not set. We work
++ * around this by not polling these bits but only wait a fixed delay.
+  */
+ 
+ #include <linux/init.h>
+@@ -121,12 +141,14 @@ struct fsl_ssi_private {
+ 
+ 	bool new_binding;
+ 	bool ssi_on_imx;
++	bool use_dma;
+ 	struct clk *clk;
+ 	struct platform_device *imx_pcm_pdev;
+ 	struct snd_dmaengine_dai_dma_data dma_params_tx;
+ 	struct snd_dmaengine_dai_dma_data dma_params_rx;
+ 	struct imx_dma_data filter_data_tx;
+ 	struct imx_dma_data filter_data_rx;
++	struct imx_pcm_fiq_params fiq_params;
+ 
+ 	struct {
+ 		unsigned int rfrc;
+@@ -356,7 +378,12 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 		 */
+ 
+ 		/* Enable the interrupts and DMA requests */
+-		write_ssi(SIER_FLAGS, &ssi->sier);
++		if (ssi_private->use_dma)
++			write_ssi(SIER_FLAGS, &ssi->sier);
++		else
++			write_ssi(CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TFE0_EN |
++					CCSR_SSI_SIER_RIE |
++					CCSR_SSI_SIER_RFF0_EN, &ssi->sier);
+ 
+ 		/*
+ 		 * Set the watermark for transmit FIFI 0 and receive FIFO 0. We
+@@ -550,7 +577,7 @@ static int fsl_ssi_dai_probe(struct snd_soc_dai *dai)
+ {
+ 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(dai);
+ 
+-	if (ssi_private->ssi_on_imx) {
++	if (ssi_private->ssi_on_imx && ssi_private->use_dma) {
+ 		dai->playback_dma_data = &ssi_private->dma_params_tx;
+ 		dai->capture_dma_data = &ssi_private->dma_params_rx;
+ 	}
+@@ -695,6 +722,8 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	       sizeof(fsl_ssi_dai_template));
+ 	ssi_private->cpu_dai_drv.name = ssi_private->name;
+ 
++	ssi_private->use_dma = !of_property_read_bool(np, "fsl,imx-fiq");
++
+ 	/* Get the addresses and IRQ */
+ 	ret = of_address_to_resource(np, 0, &res);
+ 	if (ret) {
+@@ -716,12 +745,15 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 		goto error_iomap;
+ 	}
+ 
+-	/* The 'name' should not have any slashes in it. */
+-	ret = request_irq(ssi_private->irq, fsl_ssi_isr, 0, ssi_private->name,
+-			  ssi_private);
+-	if (ret < 0) {
+-		dev_err(&pdev->dev, "could not claim irq %u\n", ssi_private->irq);
+-		goto error_irqmap;
++	if (ssi_private->use_dma) {
++		/* The 'name' should not have any slashes in it. */
++		ret = request_irq(ssi_private->irq, fsl_ssi_isr, 0,
++				ssi_private->name, ssi_private);
++		if (ret < 0) {
++			dev_err(&pdev->dev, "could not claim irq %u\n",
++					ssi_private->irq);
++			goto error_irqmap;
++		}
+ 	}
+ 
+ 	/* Are the RX and the TX clocks locked? */
+@@ -770,7 +802,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 		 */
+ 		ret = of_property_read_u32_array(pdev->dev.of_node,
+ 					"fsl,ssi-dma-events", dma_events, 2);
+-		if (ret) {
++		if (ret && !ssi_private->use_dma) {
+ 			dev_err(&pdev->dev, "could not get dma events\n");
+ 			goto error_clk;
+ 		}
+@@ -809,12 +841,46 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (ssi_private->ssi_on_imx) {
+-		ssi_private->imx_pcm_pdev =
+-			platform_device_register_simple("imx-pcm-audio",
++		if (!ssi_private->use_dma) {
++
++			/*
++			 * Some boards use an incompatible codec. To get it
++			 * working, we are using imx-fiq-pcm-audio, that
++			 * can handle those codecs. DMA is not possible in this
++			 * situation.
++			 */
++
++			ssi_private->imx_pcm_pdev = platform_device_alloc(
++							"imx-fiq-pcm-audio",
++							pdev->id);
++			if (!ssi_private->imx_pcm_pdev) {
++				ret = -ENOMEM;
++				goto error_dev;
++			}
++
++			ssi_private->fiq_params.irq = ssi_private->irq;
++			ssi_private->fiq_params.base = ssi_private->ssi;
++			ssi_private->fiq_params.dma_params_rx =
++				&ssi_private->dma_params_rx;
++			ssi_private->fiq_params.dma_params_tx =
++				&ssi_private->dma_params_tx;
++
++			platform_set_drvdata(ssi_private->imx_pcm_pdev,
++					&ssi_private->fiq_params);
++			ret = platform_device_add(ssi_private->imx_pcm_pdev);
++			if (ret) {
++				dev_err(&pdev->dev, "Failed to add imx-fiq-pcm-audio device\n");
++				platform_device_put(ssi_private->imx_pcm_pdev);
++				goto error_dev;
++			}
++		} else {
++			ssi_private->imx_pcm_pdev =
++				platform_device_register_simple("imx-pcm-audio",
+ 							-1, NULL, 0);
+-		if (IS_ERR(ssi_private->imx_pcm_pdev)) {
+-			ret = PTR_ERR(ssi_private->imx_pcm_pdev);
+-			goto error_dev;
++			if (IS_ERR(ssi_private->imx_pcm_pdev)) {
++				ret = PTR_ERR(ssi_private->imx_pcm_pdev);
++				goto error_dev;
++			}
+ 		}
+ 	}
+ 
+-- 
+1.8.1.5
