@@ -1,23 +1,53 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 24 Apr 2013 16:44:54 +0800
-Subject: [PATCH] arm64: compiling issue, need add include/asm/vga.h file
-In-Reply-To: <20130424082237.GA23397@arm.com>
-References: <5177551D.8090007@asianux.com> <20130424082237.GA23397@arm.com>
-Message-ID: <51779B86.4030306@asianux.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 24 Apr 2013 09:49:12 +0100
+Subject: [PATCH 08/32 v2] dmaengine: ste_dma40: Remove home-brew MAX() macro
+In-Reply-To: <1366279934-30761-9-git-send-email-lee.jones@linaro.org>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130424084912.GH17416@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?04?24? 16:22, Catalin Marinas wrote:
-> On Wed, Apr 24, 2013 at 04:44:29AM +0100, Chen Gang wrote:
->> For compiling with allmodconfig, need vga.h file, so copy it from arm32.
-> 
-> I would rather use the generic vga.h. We don't even have a vga_base
-> defined.
-> 
+The current implementation of the DMA40's local MAX() macro evaluates
+its arguments more times than is necessary and it not type checked.
+This patch strips replaces it with a new, more efficient constant.
 
-OK, thanks. I need send patch v2.
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <djbw@fb.com>
+Cc: Per Forlin <per.forlin@stericsson.com>
+Cc: Rabin Vincent <rabin@rab.in>
+Reported-by: Harvey Harrison <harvey.harrison@gmail.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
--- 
-Chen Gang
-
-Asianux Corporation
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index cc93416..a1984d2 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -53,8 +53,6 @@
+ #define D40_ALLOC_PHY		BIT(30)
+ #define D40_ALLOC_LOG_FREE	0
+ 
+-#define MAX(a, b) (((a) < (b)) ? (b) : (a))
+-
+ #define D40_IS_SRC(dir)  (dir == STEDMA40_PERIPH_TO_MEM)
+ #define D40_IS_DST(dir) ((dir == STEDMA40_MEM_TO_PERIPH) || \
+ 			 (dir == STEDMA40_MEM_TO_MEM))
+@@ -206,6 +204,9 @@ static u32 d40_backup_regs_chan[] = {
+ 	D40_CHAN_REG_SDLNK,
+ };
+ 
++#define BACKUP_REGS_SZ_MAX ((BACKUP_REGS_SZ_V4A > BACKUP_REGS_SZ_V4B) ? \
++			     BACKUP_REGS_SZ_V4A : BACKUP_REGS_SZ_V4B)
++
+ /**
+  * struct d40_interrupt_lookup - lookup table for interrupt handler
+  *
+@@ -569,7 +570,7 @@ struct d40_base {
+ 	resource_size_t			  lcpa_size;
+ 	struct kmem_cache		 *desc_slab;
+ 	u32				  reg_val_backup[BACKUP_REGS_SZ];
+-	u32				  reg_val_backup_v4[MAX(BACKUP_REGS_SZ_V4A, BACKUP_REGS_SZ_V4B)];
++	u32				  reg_val_backup_v4[BACKUP_REGS_SZ_MAX];
+ 	u32				 *reg_val_backup_chan;
+ 	u16				  gcc_pwr_off_mask;
+ 	bool				  initialized;
