@@ -1,9 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 24 Apr 2013 18:28:17 +0100
-Subject: [RFC PATCH v3 12/17] ARM: dts: pxa2xx: cpus/cpu nodes dts updates
+Date: Wed, 24 Apr 2013 18:28:19 +0100
+Subject: [RFC PATCH v3 14/17] ARM: dts: sh7372: cpus/cpu nodes dts updates
 In-Reply-To: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1366824502-19729-13-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1366824502-19729-15-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,26 +12,26 @@ and cpu bindings updates for ARM.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/boot/dts/pxa2xx.dtsi | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sh7372.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
-index f18aad3..a5e90f0 100644
---- a/arch/arm/boot/dts/pxa2xx.dtsi
-+++ b/arch/arm/boot/dts/pxa2xx.dtsi
-@@ -23,8 +23,11 @@
- 	};
+diff --git a/arch/arm/boot/dts/sh7372.dtsi b/arch/arm/boot/dts/sh7372.dtsi
+index 677fc60..7bf020e 100644
+--- a/arch/arm/boot/dts/sh7372.dtsi
++++ b/arch/arm/boot/dts/sh7372.dtsi
+@@ -14,8 +14,13 @@
+ 	compatible = "renesas,sh7372";
  
  	cpus {
--		cpu at 0 {
--			compatible = "arm,xscale";
-+		#address-cells = <0>;
++		#address-cells = <1>;
 +		#size-cells = <0>;
-+		cpu {
-+			compatible = "marvell,xscale";
++
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a8";
 +			device_type = "cpu";
++			reg = <0x0>;
  		};
  	};
- 
+ };
 -- 
 1.7.12
