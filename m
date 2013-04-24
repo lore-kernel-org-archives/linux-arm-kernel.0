@@ -1,135 +1,45 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 24 Apr 2013 15:33:23 -0700
-Subject: [PATCH V2 1/3] seccomp: add generic code for jitted seccomp
- filters.
-In-Reply-To: <5177FFC2.5020102@freebox.fr>
-References: <1363618233-6375-1-git-send-email-nschichan@freebox.fr>
- <1363618233-6375-2-git-send-email-nschichan@freebox.fr>
- <20130417145628.88058f0f3104ab9ae551ddd3@linux-foundation.org>
- <51752D98.8070709@freebox.fr>
- <20130423164303.d2eb663c4a1becea4a185087@linux-foundation.org>
- <5177FFC2.5020102@freebox.fr>
-Message-ID: <20130424153323.73901c8e026580dc279329b0@linux-foundation.org>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 25 Apr 2013 10:39:28 +1200
+Subject: [PATCH 0/3] dts: v8500: Cleanups for 3.10
+In-Reply-To: <1366781902-13025-1-git-send-email-linux@prisktech.co.nz>
+References: <1366781902-13025-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <51785F20.704@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 24 Apr 2013 17:52:34 +0200 Nicolas Schichan <nschichan@freebox.fr> wrote:
+On 24/04/13 17:38, Tony Prisk wrote:
+> Arnd, Olof,
+>
+> This is probably a bit late for 3.10 now but its just a bunch of cleanups for
+> the arch-vt8500 devicetree SoC and board files, and the addition of a new
+> dts for the VIA APC8750.
+>
+> Regards
+> Tony P
+>
+> Tony Prisk (3):
+>    dts: vt8500: Fix invalid/missing cpu nodes for soc files.
+>    dts: vt8500: Add devicetree support for WM8750 SoC and APC8750 board
+>    dts: vt8500: Update serial nodes and disable by default in SoC files
+>
+>   arch/arm/boot/dts/Makefile           |    1 +
+>   arch/arm/boot/dts/vt8500-bv07.dts    |    4 +
+>   arch/arm/boot/dts/vt8500.dtsi        |   29 ++-
+>   arch/arm/boot/dts/wm8505-ref.dts     |    4 +
+>   arch/arm/boot/dts/wm8505.dtsi        |   35 +++-
+>   arch/arm/boot/dts/wm8650-mid.dts     |    4 +
+>   arch/arm/boot/dts/wm8650.dtsi        |   21 +-
+>   arch/arm/boot/dts/wm8750-apc8750.dts |   30 +++
+>   arch/arm/boot/dts/wm8750.dtsi        |  355 ++++++++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/wm8850-w70v2.dts   |    4 +
+>   arch/arm/boot/dts/wm8850.dtsi        |   23 ++-
+>   11 files changed, 492 insertions(+), 18 deletions(-)
+>   create mode 100644 arch/arm/boot/dts/wm8750-apc8750.dts
+>   create mode 100644 arch/arm/boot/dts/wm8750.dtsi
+>
+Don't worry about this patch series - it looks like we are going back to 
+926ejs (rather than changing to 926) so I will send out another request 
+after the merge window.
 
-> > btw, what on earth is going on with seccomp_jit_free()?  It does
-> > disturbing undocumented typecasting and it punts the module_free into a
-> > kernel thread for mysterious, undocumented and possibly buggy reasons.
-> >
-> > I realize it just copies bpf_jit_free().  The same observations apply there.
-> 
-> The reason for this hack for both seccomp filters and socket filters is that 
-> {seccomp,bpf}_jit_free are called from a softirq. module_free() cannot be 
-> called directly from softirq, as it will in turn call vfree() which will 
-> BUG_ON() if in_interrupt() is non zero. So to call module_free(), it is 
-> therefore required to be in a process context, which is provided by the work 
-> struct.
-
-Well let's explain this to the next sucker who comes along.
-
-From: Andrew Morton <akpm@linux-foundation.org>
-Subject: bpf: add comments explaining the schedule_work() operation
-
-Cc: Will Drewry <wad@chromium.org>
-Cc: Mircea Gherzan <mgherzan@gmail.com>
-Cc: Nicolas Schichan <nschichan@freebox.fr>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: Daniel Borkmann <daniel.borkmann@tik.ee.ethz.ch>
-Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
----
-
- arch/arm/net/bpf_jit_32.c       |    8 ++++++++
- arch/powerpc/net/bpf_jit_comp.c |    4 ++++
- arch/s390/net/bpf_jit_comp.c    |    4 ++++
- arch/sparc/net/bpf_jit_comp.c   |    4 ++++
- arch/x86/net/bpf_jit_comp.c     |    4 ++++
- 5 files changed, 24 insertions(+)
-
-diff -puN arch/arm/net/bpf_jit_32.c~a arch/arm/net/bpf_jit_32.c
---- a/arch/arm/net/bpf_jit_32.c~a
-+++ a/arch/arm/net/bpf_jit_32.c
-@@ -958,6 +958,10 @@ void bpf_jit_free(struct sk_filter *fp)
- 	struct work_struct *work;
- 
- 	if (fp->bpf_func != sk_run_filter) {
-+		/*
-+		 * bpf_jit_free() can be called from softirq; module_free()
-+		 * requires process context.
-+		 */
- 		work = (struct work_struct *)fp->bpf_func;
- 
- 		INIT_WORK(work, bpf_jit_free_worker);
-@@ -985,6 +989,10 @@ void seccomp_jit_free(struct seccomp_fil
- 	void *bpf_func = seccomp_filter_get_bpf_func(fp);
- 
- 	if (bpf_func != sk_run_filter) {
-+		/*
-+		 * seccomp_jit_free() can be called from softirq; module_free()
-+		 * requires process context.
-+		 */
- 		work = (struct work_struct *)bpf_func;
- 
- 		INIT_WORK(work, bpf_jit_free_worker);
-diff -puN arch/sparc/net/bpf_jit_comp.c~a arch/sparc/net/bpf_jit_comp.c
---- a/arch/sparc/net/bpf_jit_comp.c~a
-+++ a/arch/sparc/net/bpf_jit_comp.c
-@@ -817,6 +817,10 @@ static void jit_free_defer(struct work_s
- void bpf_jit_free(struct sk_filter *fp)
- {
- 	if (fp->bpf_func != sk_run_filter) {
-+		/*
-+		 * bpf_jit_free() can be called from softirq; module_free()
-+		 * requires process context.
-+		 */
- 		struct work_struct *work = (struct work_struct *)fp->bpf_func;
- 
- 		INIT_WORK(work, jit_free_defer);
-diff -puN arch/powerpc/net/bpf_jit_comp.c~a arch/powerpc/net/bpf_jit_comp.c
---- a/arch/powerpc/net/bpf_jit_comp.c~a
-+++ a/arch/powerpc/net/bpf_jit_comp.c
-@@ -699,6 +699,10 @@ static void jit_free_defer(struct work_s
- void bpf_jit_free(struct sk_filter *fp)
- {
- 	if (fp->bpf_func != sk_run_filter) {
-+		/*
-+		 * bpf_jit_free() can be called from softirq; module_free()
-+		 * requires process context.
-+		 */
- 		struct work_struct *work = (struct work_struct *)fp->bpf_func;
- 
- 		INIT_WORK(work, jit_free_defer);
-diff -puN arch/s390/net/bpf_jit_comp.c~a arch/s390/net/bpf_jit_comp.c
---- a/arch/s390/net/bpf_jit_comp.c~a
-+++ a/arch/s390/net/bpf_jit_comp.c
-@@ -818,6 +818,10 @@ void bpf_jit_free(struct sk_filter *fp)
- 
- 	if (fp->bpf_func == sk_run_filter)
- 		return;
-+	/*
-+	 * bpf_jit_free() can be called from softirq; module_free() requires
-+	 * process context.
-+	 */
- 	work = (struct work_struct *)fp->bpf_func;
- 	INIT_WORK(work, jit_free_defer);
- 	schedule_work(work);
-diff -puN arch/x86/net/bpf_jit_comp.c~a arch/x86/net/bpf_jit_comp.c
---- a/arch/x86/net/bpf_jit_comp.c~a
-+++ a/arch/x86/net/bpf_jit_comp.c
-@@ -749,6 +749,10 @@ static void jit_free_defer(struct work_s
- void bpf_jit_free(struct sk_filter *fp)
- {
- 	if (fp->bpf_func != sk_run_filter) {
-+		/*
-+		 * bpf_jit_free() can be called from softirq; module_free()
-+		 * requires process context.
-+		 */
- 		struct work_struct *work = (struct work_struct *)fp->bpf_func;
- 
- 		INIT_WORK(work, jit_free_defer);
-diff -puN include/linux/filter.h~a include/linux/filter.h
-diff -puN net/core/filter.c~a net/core/filter.c
-_
+Regards
+Tony P
