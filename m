@@ -1,44 +1,22 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 24 Apr 2013 09:53:58 +0100
-Subject: [PATCH 05/32] dmaengine: ste_dma40: Supply macros to resolve
- 'src' and 'dst' directions
-In-Reply-To: <20130422102748.GJ3432@gmail.com>
+Date: Wed, 24 Apr 2013 09:55:07 +0100
+Subject: [PATCH 17/32] dmaengine: ste_dma40: Remove redundant argument
+ from d40_phy_cfg()
+In-Reply-To: <20130422093423.GD24632@intel.com>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-6-git-send-email-lee.jones@linaro.org>
- <20130422094250.GJ24632@intel.com>
- <20130422102748.GJ3432@gmail.com>
-Message-ID: <20130424085358.GJ17416@gmail.com>
+ <1366279934-30761-18-git-send-email-lee.jones@linaro.org>
+ <20130422093423.GD24632@intel.com>
+Message-ID: <20130424085507.GK17416@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Apr 2013, Lee Jones wrote:
+> > +	if ((cfg->dir ==  STEDMA40_PERIPH_TO_MEM) ||
+> > +	    (cfg->dir == STEDMA40_PERIPH_TO_PERIPH)) {
+> Why would you need your own direction defines, I see that there is not much
+> diff between these and what dmaengine defines, so perhpas you could use
+> those?
 
-> On Mon, 22 Apr 2013, Vinod Koul wrote:
-> 
-> > On Thu, Apr 18, 2013 at 11:11:47AM +0100, Lee Jones wrote:
-> > > There are lots of lengthy if() statements located sporadically up and
-> > > down the driver. This simple macro should make many of them a little
-> > > simpler to decipher. The remainder have to stay in place, as they
-> > > detail slightly more specific settings.
-> > I would like these to be DMAENGINE_IS_SRC...
-> 
-> I don't understand, as they're DMA40 specific?
-> 
-> > and this patch use the defines provided in dmaengine
-> 
-> I think a subsequent patch doing he following would be more suitable:
-> 
-> s/STEDMA40_MEM_TO_MEM/DMA_MEM_TO_MEM/
-> s/STEDMA40_MEM_TO_PERIPH/DMA_MEM_TO_DEV/
-> s/STEDMA40_PERIPH_TO_MEM/DMA_DEV_TO_MEM/
-> s/STEDMA40_PERIPH_TO_PERIPH/DMA_DEV_TO_DEV/
-> 
-> If you don't mind?
-
-Are you happy to Ack this one too if I follow up with a subsequent
-patch converting all STEDMA direction defines over to the generic DMA
-ones? There are also quite a lot in platform data that I'd like to
-convert too.
+Same with these ones, subsequent patch?
 
 -- 
 Lee Jones
