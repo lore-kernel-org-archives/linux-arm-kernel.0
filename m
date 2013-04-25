@@ -1,39 +1,26 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 25 Apr 2013 14:50:18 +0100
-Subject: [PATCH] ARM: make cpu_init() notrace
-In-Reply-To: <20130425121504.GD14496@n2100.arm.linux.org.uk>
-References: <1366302046.3388.8.camel@linaro1.home>
- <20130422140711.GI14496@n2100.arm.linux.org.uk>
- <1366654116.3989.16.camel@computer5.home>
- <20130425121504.GD14496@n2100.arm.linux.org.uk>
-Message-ID: <1366897818.3528.38.camel@computer5.home>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 25 Apr 2013 14:51:06 +0100
+Subject: [PATCH] ARM64: mm: Correct show_pte behaviour.
+In-Reply-To: <1366382971-12682-1-git-send-email-steve.capper@linaro.org>
+References: <1366382971-12682-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130425135106.GB7157@localhost.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-04-25 at 13:15 +0100, Russell King - ARM Linux wrote:
-
-> $ pdb getpatch 7700/1 |tr ' ' '_' |less
-> diff_--git_a/arch/arm/kernel/setup.c_b/arch/arm/kernel/setup.c
-> index_d343a6c..943cbf0_100644
-> ---_a/arch/arm/kernel/setup.c
-> +++_b/arch/arm/kernel/setup.c
-> @@_-390,7_+390,7_@@_static_void___init_feat_v6_fixup(void)
-> __*
-> __*_cpu_init_sets_up_the_per-CPU_stacks.
-> __*/
-> -void_cpu_init(void)
-> +void_notrace_cpu_init(void)
-> _{
-> ________unsigned_int_cpu_=_smp_processor_id();
-> ________struct_stack_*stk_=_&stacks[cpu];
+On Fri, Apr 19, 2013 at 03:49:31PM +0100, Steve Capper wrote:
+> show_pte makes use of the *_none_or_clear_bad style functions. If a
+> pgd, pud or pmd is identified as being bad, it will then be cleared.
 > 
-> Can you guess why git has a problem appying the above... 
+> As show_pte appears to be called from either the user or kernel
+> fault handlers this side effect can lead to unpredictable behaviour;
+> especially as TLB entries are not invalidated.
+> 
+> This patch removes the page table sanitisation from show_pte. If a
+> bad pgd, pud or pmd is encountered it is left unmodified.
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
 
-Sorry about that, the user forgot to tell their mailer it was
-pre-formatted text. I've sent a fixed version.
-
-Note to self: bcc self on patch submissions and then run them though
-'git am' to catch problems before others hit them.
+Thanks. Applied.
 
 -- 
-Tixy
+Catalin
