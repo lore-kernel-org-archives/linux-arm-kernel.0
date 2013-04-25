@@ -1,41 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Apr 2013 12:49:31 +0100
-Subject: [PATCH 30/32] ARM: ux500: Supply MMC DMA configuration via
- Device Tree
-In-Reply-To: <CACRpkdbYXxkC2y9zCNcMAAmmQ7+3V0Y=hq7zgtp5L=Ts9QzpQQ@mail.gmail.com>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-31-git-send-email-lee.jones@linaro.org>
- <CACRpkdbYXxkC2y9zCNcMAAmmQ7+3V0Y=hq7zgtp5L=Ts9QzpQQ@mail.gmail.com>
-Message-ID: <20130425114931.GJ4623@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Apr 2013 13:55:39 +0200
+Subject: [PATCH 2/9] crypto: ux500/hash - Set DMA configuration though
+ dma_slave_config()
+In-Reply-To: <1366280825-31136-3-git-send-email-lee.jones@linaro.org>
+References: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
+ <1366280825-31136-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkda0sE+KgdagN0CsRsoDFR+VoUzh2jaipB_1BtShYpBCcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Apr 2013, Linus Walleij wrote:
+Pls include Magnus.p.persson at stericsson.com on all these crypto/hash
+postings.
 
-> On Thu, Apr 18, 2013 at 12:12 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > When requesting a channel, a DMA client needs to pass some pieces of
-> > information such as; request channel, device type, channel type and
-> > direction etc. Normally we do this in the form of platform data, but
-> > when DT is enabled we need to pass it using the driver's bindings
-> > instead.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> This requires that the pending MMCI patch get merged *first* right?
+On Thu, Apr 18, 2013 at 12:26 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-No, it doesn't. There is no harm in applying this *before*.
+> The DMA controller currently takes configuration information from
+> information passed though dma_channel_request(), but it shouldn't.
+> Using the API, the DMA channel should only be configured during
+> a dma_slave_config() call.
+>
+> Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> Cc: David S. Miller <davem@davemloft.net>
+> Cc: Andreas Westin <andreas.westin@stericsson.com>
+> Cc: linux-crypto at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-It will just lay dormant until it is.
+(...)
+>  #define HASH_BLOCK_SIZE                        64
+> +#define HASH_DMA_FIFO                  4
 
-> So you need to make sure Russell will merge that (or ACK it
-> and include it) before you send any pull requests to me.
-> 
-> Apart from that it looks allright:
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+This is an address so write 0x0004 here please. Some hex notation atleast.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>  /**
+>   * struct hash_device_data - structure for a hash device.
+> - * @base:              Pointer to the hardware base address.
+> + * @base:              Pointer to virtual base address of the hash device.
+> + * @phybase:           Pointer to physical memory location of the hash device.
+>   * @list_node:         For inclusion in klist.
+>   * @dev:               Pointer to the device dev structure.
+>   * @ctx_lock:          Spinlock for current_ctx.
+> @@ -361,6 +363,7 @@ struct hash_req_ctx {
+>   */
+>  struct hash_device_data {
+>         struct hash_register __iomem    *base;
+> +       phys_addr_t             phybase;
+
+What you pass to the config function is a dma_addr_t actually.
+
+This is the same thing on the platform, but generally:
+
+phys_addr_t = in the address space as the memory controller sees it.
+dma_addr_t = in the address space as the DMA controller sees it.
+
+Often the same. Not always. So use dma_addr_t.
+
+Apart from this a real nice patch!
+
+Yours,
+Linus Walleij
