@@ -1,23 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 15:40:39 +0200
-Subject: [PATCH 13/23] regulator: ab3100: refactor probe to use IDs
-In-Reply-To: <20130422123749.GJ30351@opensource.wolfsonmicro.com>
-References: <1366624634-6579-1-git-send-email-linus.walleij@stericsson.com>
- <20130422123749.GJ30351@opensource.wolfsonmicro.com>
-Message-ID: <CACRpkdZkP57POYViehqvfWpn-TrrcYRzgLetdteFzANmw8exBg@mail.gmail.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Thu, 25 Apr 2013 14:41:18 +0100
+Subject: [PATCH v4 4/7] xen/arm: implement HYPERVISOR_vcpu_op
+In-Reply-To: <1366831695-13214-4-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1304242012590.4180@kaball.uk.xensource.com>
+ <1366831695-13214-4-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1366897278.20256.545.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 2:37 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Apr 22, 2013 at 11:57:14AM +0200, Linus Walleij wrote:
->
->> Hi Mark, seeking an ACK on this to take it through the
->> ARM SoC tree.
->
-> Since the arm-soc tree is locked down now I may as well just apply it so
-> it shows up in the merge window?
+On Wed, 2013-04-24 at 20:28 +0100, Stefano Stabellini wrote:
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-Yep, saw you picked in these two, thanks!
+Reviewed-by: Ian Campbell <ian.campbell@citrix.com>
 
-Linus Walleij
+> ---
+>  arch/arm/include/asm/xen/hypercall.h |    1 +
+>  arch/arm/xen/enlighten.c             |    1 +
+>  arch/arm/xen/hypercall.S             |    1 +
+>  3 files changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
+> index 8a82325..799f42e 100644
+> --- a/arch/arm/include/asm/xen/hypercall.h
+> +++ b/arch/arm/include/asm/xen/hypercall.h
+> @@ -46,6 +46,7 @@ int HYPERVISOR_event_channel_op(int cmd, void *arg);
+>  unsigned long HYPERVISOR_hvm_op(int op, void *arg);
+>  int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
+>  int HYPERVISOR_physdev_op(int cmd, void *arg);
+> +int HYPERVISOR_vcpu_op(int cmd, int vcpuid, void *extra_args);
+>  
+>  static inline void
+>  MULTI_update_va_mapping(struct multicall_entry *mcl, unsigned long va,
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index 94bbf3b..b002822 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -295,4 +295,5 @@ EXPORT_SYMBOL_GPL(HYPERVISOR_sched_op);
+>  EXPORT_SYMBOL_GPL(HYPERVISOR_hvm_op);
+>  EXPORT_SYMBOL_GPL(HYPERVISOR_memory_op);
+>  EXPORT_SYMBOL_GPL(HYPERVISOR_physdev_op);
+> +EXPORT_SYMBOL_GPL(HYPERVISOR_vcpu_op);
+>  EXPORT_SYMBOL_GPL(privcmd_call);
+> diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
+> index 71f7239..199cb2d 100644
+> --- a/arch/arm/xen/hypercall.S
+> +++ b/arch/arm/xen/hypercall.S
+> @@ -87,6 +87,7 @@ HYPERCALL2(event_channel_op);
+>  HYPERCALL2(hvm_op);
+>  HYPERCALL2(memory_op);
+>  HYPERCALL2(physdev_op);
+> +HYPERCALL3(vcpu_op);
+>  
+>  ENTRY(privcmd_call)
+>  	stmdb sp!, {r4}
