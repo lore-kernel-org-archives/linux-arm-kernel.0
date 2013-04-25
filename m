@@ -1,44 +1,51 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 25 Apr 2013 12:19:56 +0530
-Subject: [PATCH] cpuidle: add maintainer entry
-In-Reply-To: <5178D0EF.3090004@linaro.org>
-References: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
- <51781B48.30208@gmail.com> <5178D0EF.3090004@linaro.org>
-Message-ID: <CAKohpo=Ct7WCBSOqmgk8asVyXWa5o+jqpTwaQgxKVm_XNLfnMA@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 25 Apr 2013 12:31:22 +0530
+Subject: [PATCH V4 1/6] clk: OMAP: introduce device tree binding to kernel
+ clock data
+In-Reply-To: <20130424162847.8998.73264@quantum>
+References: <1365807278-554-1-git-send-email-nm@ti.com>
+ <1365807278-554-2-git-send-email-nm@ti.com>
+ <20130412233142.GE10155@atomide.com> <20130412233900.GA1599@kahuna>
+ <20130413172210.GM10155@atomide.com> <20130414211917.GA3275@snafu>
+ <20130424162847.8998.73264@quantum>
+Message-ID: <5178D4C2.7080400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 April 2013 12:15, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> On 04/24/2013 07:50 PM, Rob Herring wrote:
+On Wednesday 24 April 2013 09:58 PM, Mike Turquette wrote:
+> Quoting Nishanth Menon (2013-04-14 14:19:17)
+>> Overall strategy introduced here is simple: a clock node described in
+>> device tree blob is used to identify the exact clock provided in the
+>> SoC specific data. This is then linked back using of_clk_add_provider
+>> to the device node to be accessible by of_clk_get.
+>>
+>> Based on discussion contributions from Roger Quadros, Grygorii Strashko
+>> and others.
+>>
+>> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+>> Cc: Mike Turquette <mturquette@linaro.org>
+>> Cc: Paul Walmsley <paul@pwsan.com>
+>> [tony at atomide.com: co-developed]
+>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+> 
+> I can take this into clk-next after the merge window.  Please refresh it
+> for -rc1 as we discussed on irc.
+> 
+> As an aside, will Tero's series for migrating to drivers/clk/omap[1] and
+> Rajendra's patch for registering clocks late[2] be refreshed after the
 
->> Shouldn't MAINTAINERS contain the driver maintainers too?
->
-> It should contains the upstream maintainer for the subsystem, and
-> optionally a co-maintainer.
->
-> The MAINTAINERS file gives informations about the patch submission path.
->
-> The file's header should contain the maintainer of the driver, so the
-> submitted patches will go to the subsystem maintainer for upstreaming
-> and to the driver maintainer for acked-by.
->
-> If you add an entry in MAINTAINERS like:
->
-> ARM/CALXEDA HIGHBANK ARCHITECTURE
-> M:      Rob Herring <rob.herring@calxeda.com>
-> L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> S:      Maintained
-> F:      arch/arm/mach-highbank/
-> +F:     drivers/cpuidle/cpuidle-calxeda.c
->
-> That will add confusion while we are trying to clarify the situation
-> with a single entry point for the patches submission. If someone wants
-> to submit a patch for this driver, it will look at the MAINTAINERS file
-> and won't know if it should send the patch against arm-soc or linux-pm.
+[2] is already in mainline.
 
-I though otherwise. We can add entry in MAINTAINERS for any module.
-Module can be a framework/architecture or a single driver.
-
-Adding entry for cpuidle driver of a architecture as you wrote for calxeda is
-wrong as it adds to confusion and so there should be a separate entry for
-this driver rather than merging it with arch/ entries.
+> merge window?  It would be nice to combine these efforts.
+> 
+> Thanks,
+> Mike
+> 
+> [1] http://article.gmane.org/gmane.linux.ports.arm.omap/95948
+> [2] http://www.spinics.net/lists/arm-kernel/msg231288.html
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> 
