@@ -1,86 +1,118 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 25 Apr 2013 15:31:07 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCAxLzJdIEdQSU86IGNscHM3MTF4OiBSZXdyaXRlIGRy?=
- =?UTF-8?B?aXZlciBmb3IgdXNpbmcgZ2VuZXJpYyBHUElPIGNvZGU=?=
-In-Reply-To: <20130419140357.GR14496@n2100.arm.linux.org.uk>
-References: <1365826900-30136-1-git-send-email-shc_work@mail.ru>
- <20130419140357.GR14496@n2100.arm.linux.org.uk>
-Message-ID: <1366889467.845096985@f366.mail.ru>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Apr 2013 13:33:41 +0200
+Subject: [PATCH 24/32 v3] dmaengine: ste_dma40: Supply full Device Tree
+ parsing support
+In-Reply-To: <20130418141752.GC3959@gmail.com>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-25-git-send-email-lee.jones@linaro.org>
+ <20130418121253.GF27903@gmail.com>
+ <20130418141752.GC3959@gmail.com>
+Message-ID: <CACRpkdZiTCpkhLWiOU3yKJkHgg=od5qc-UemWRB07f7OE+RZ0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Sat, Apr 13, 2013 at 08:21:39AM +0400, Alexander Shiyan wrote:
-> > +static void __init clps711x_add_gpio(void)
-> > +{
-> > +	const struct resource clps711x_gpio0_res[] = {
-> > +		DEFINE_RES_MEM(PADR, SZ_1),
-> > +		DEFINE_RES_MEM(PADDR, SZ_1),
-> > +	};
-...
-> Don't do this - this is incredibly wasteful.
-> 
-> C lesson 1: do not put unmodified initialised structures onto the stack.
-> 
-> What the C compiler will do with the above is exactly the same as this
-> for each structure:
-> 
-> static const struct resource private_clps711x_gpio4_res[] = {
-> 	DEFINE_RES_MEM(PEDR, SZ_1),
-> 	DEFINE_RES_MEM(PEDDR, SZ_1),
-> };
-> 
-> static void __init clps711x_add_gpio(void)
-> {
-> 	const struct resource clps711x_gpio4_res[] = private_clps711x_gpio4_res;
-> 	...
-> 
-> which will in itself be a call out to memcpy, or an inlined memcpy.  Now
-> do you see why it's wasteful?  You might as well write the thing in that
-> way to start with and safe the additional code to copy the structures.
-> 
-> The other way to do this, which will probably be far more space efficient:
-> 
-> static phys_addr_t gpio_addrs[][2] = {
-> 	{ PADR, PADDR },
-> 	{ PBDR, PBDDR },
-> ...
-> };
-> 
-> static void __init clps711x_add_gpio(void)
-> {
-> 	struct resource gpio_res[2];
-> 	unsigned i;
-> 
-> 	gpio_res[0].flags = IORESOURCE_MEM;
-> 	gpio_res[1].flags = IORESOURCE_MEM;
-> 
-> 	for (i = 0; i < ARRAY_SIZE(gpio_addrs); i++) {
-> 		gpio_res[0].start = gpio_addrs[i][0];
-> 		gpio_res[0].end = gpio_res[0].start;
-> 		gpio_res[1].start = gpio_addrs[i][1];
-> 		gpio_res[1].end = gpio_res[1].start;
-> 
-> 		platform_device_register_simple("clps711x-gpio", i,
-> 					gpio_res, ARRAY_SIZE(gpio_res));
-> 	}
-> }
-> 
-> which results in smaller storage and most probably also smaller code size
-> too.
+On Thu, Apr 18, 2013 at 4:17 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Very strange results with this change.
-So, I add a debug output before "platform_device_register_simple" for
-print resource and in "__request_resource" for print parent.
-This is output.
-gpio 0 [mem 0x80000000] [mem 0x80000040]
-resource: root [??? 0xe3a0f000-0x00000000 flags 0xb00000]
-clps711x-gpio.0: failed to claim resource 0
+> Using the new DMA DT bindings and API, we can register the DMA40 driver
+> as Device Tree capable. Now, when a client attempts to allocate a
+> channel using the DMA DT bindings via its own node, we are able to parse
+> the request and allocate a channel in the correct manner.
+>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Per Forlin <per.forlin@stericsson.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-The first line is seems correct. But I do not understand why
-parent is wrong here. Normally it should be as:
-resource: root [mem 0x00000000-0xffffffff].
-And it shows normal with my first version.
-Have anyone any ideas?
-Thanks.
 
----
+This needs to be CC: to devicetree-discussed so it can be checked for OS
+independence and such... Also consider including Rob Herring on posts.
+
+> diff --git a/Documentation/devicetree/bindings/dma/ste-dma40.txt b/Documentation/devicetree/bindings/dma/ste-dma40.txt
+> new file mode 100644
+> index 0000000..2679a87
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/ste-dma40.txt
+> @@ -0,0 +1,62 @@
+> +* DMA40 DMA Controller
+> +
+> +Required properties:
+> +- compatible: "stericsson,dma40"
+> +- reg: Address range of the DMAC registers
+> +- reg-names: Names of the above areas to use during resource look-up
+> +- interrupt: Should contain the DMAC interrupt number
+> +- #dma-cells: must be <3>
+> +
+> +Optional properties:
+> +- dma-channels: Number of channels supported by hardware - if not present
+> +               the driver will attempt to obtain the information from H/W
+
+I want you to define the memcpy channels in device tree as well.
+Right now these are hardcoded into the driver and there is no way
+to check whether they happen to overlap with other channels from the
+device tree, i.e. a source of confusion.
+
+Please add configuration for the static memcpy channels here.
+
+> +#define D40_DT_FLAGS_MODE(flags)       ((flags >> 0) & 0x1)
+> +#define D40_DT_FLAGS_DIR(flags)        ((flags >> 1) & 0x1)
+> +#define D40_DT_FLAGS_BIG_ENDIAN(flags) ((flags >> 2) & 0x1)
+> +#define D40_DT_FLAGS_FIXED_CHAN(flags) ((flags >> 3) & 0x1)
+> +
+> +static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
+> +                                 struct of_dma *ofdma)
+> +{
+> +       struct stedma40_chan_cfg cfg;
+> +       dma_cap_mask_t cap;
+> +       u32 flags;
+> +
+> +       memset(&cfg, 0, sizeof(struct stedma40_chan_cfg));
+> +
+> +       dma_cap_zero(cap);
+> +       dma_cap_set(DMA_SLAVE, cap);
+> +
+> +       cfg.dev_type = dma_spec->args[0];
+> +       flags = dma_spec->args[2];
+> +
+> +       switch (D40_DT_FLAGS_MODE(flags)) {
+> +       case 0: cfg.mode = STEDMA40_MODE_LOGICAL; break;
+> +       case 1: cfg.mode = STEDMA40_MODE_PHYSICAL; break;
+> +       }
+> +
+> +       switch (D40_DT_FLAGS_DIR(flags)) {
+> +       case 0:
+> +               cfg.dir = STEDMA40_MEM_TO_PERIPH;
+> +               cfg.dst_info.big_endian = D40_DT_FLAGS_BIG_ENDIAN(flags);
+> +               break;
+> +       case 1:
+> +               cfg.dir = STEDMA40_PERIPH_TO_MEM;
+> +               cfg.src_info.big_endian = D40_DT_FLAGS_BIG_ENDIAN(flags);
+> +               break;
+> +       }
+> +
+> +       if (D40_DT_FLAGS_FIXED_CHAN(flags)) {
+> +               cfg.phy_channel = dma_spec->args[1];
+> +               cfg.use_fixed_channel = true;
+> +       }
+> +
+> +       return dma_request_channel(cap, stedma40_filter, &cfg);
+> +}
+
+Nice! But please include handling of the memcpy channels.
+(Unclear to me how to do that, but now i becomes your problem ;-)
+
+> +       if (np) {
+> +               err = of_dma_controller_register(np, d40_xlate, NULL);
+> +               if (err && err != -ENODEV)
+> +                       dev_err(&pdev->dev,
+> +                               "could not register of_dma_controller\n");
+> +       }
+> +
+>         dev_info(base->dev, "initialized\n");
+>         return 0;
+
+Is it really OK to just fall through after failing to register the controller
+from the device tree?
+
+Yours,
+Linus Walleij
