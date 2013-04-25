@@ -1,42 +1,56 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 14:49:59 +0200
-Subject: [PATCH 09/32] ARM: ux500: Remove unused 'data_width' attributes
- from SDI DMA configs
-In-Reply-To: <20130425091428.GD4623@gmail.com>
+Date: Thu, 25 Apr 2013 14:51:51 +0200
+Subject: [PATCH 13/32] dmaengine: ste_dma40: Calculate number of logical
+ channels from physical ones
+In-Reply-To: <20130425092930.GI4623@gmail.com>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdbf03ajQaYujGfimHE+hDVjNLycE3J9Q-W-tzN2EX0fkQ@mail.gmail.com>
- <20130425091428.GD4623@gmail.com>
-Message-ID: <CACRpkdaeuK0p2SynenQjght9fCzTTJpt+S7hGC6d6ahPHAA7Hw@mail.gmail.com>
+ <1366279934-30761-14-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYq9QLRaaysc=izGgi53ogf1oRHuCwWKW+rQBbE_UtfnA@mail.gmail.com>
+ <20130425092930.GI4623@gmail.com>
+Message-ID: <CACRpkdYywbCeP7wemk2Vy81rm9q3VUbpkN1jUs6UBPLVSOoyHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 11:14 AM, Lee Jones <lee.jones@linaro.org> wrote:
+On Thu, Apr 25, 2013 at 11:29 AM, Lee Jones <lee.jones@linaro.org> wrote:
 > On Thu, 25 Apr 2013, Linus Walleij wrote:
 >
 >> On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
 >>
->> > DMA configuration data is now allocated in the MMCI driver, so these
->> > are just ignored.
+>> > This change will cost ~25KB of memory, but it's worth the trade-off,
+>> > as it removes a great deal of overhead. It means that instead of only
+>> > allocating memory for the logical channels in use, it does so for all
+>> > available ones, which is 32 per physical channel. However, this now
+>> > means we can remove some platform data and we don't have to worry
+>> > about adding vendor specific variables to Device Tree.
 >> >
+>> > Cc: Vinod Koul <vinod.koul@intel.com>
+>> > Cc: Dan Williams <djbw@fb.com>
+>> > Cc: Per Forlin <per.forlin@stericsson.com>
+>> > Cc: Rabin Vincent <rabin@rab.in>
 >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 >>
->> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+>> (...)
+>> >  static struct stedma40_platform_data dma40_plat_data = {
+>> > -       .dev_len = DB8500_DMA_NR_DEV,
 >>
->> I tried just applying this (since it's pretty stand-alone) but seems to
->> be dependent on things not yet in Torvalds tree so lets keep it in this
->> series then...
+>> So that was set to 64 in the platform...
+>>
+>> > -       /* Count the number of logical channels in use */
+>> > -       for (i = 0; i < plat_data->dev_len; i++)
+>> > -               if (plat_data->dev_rx[i] != 0)
+>> > -                       num_log_chans++;
+>> > -
+>> > -       for (i = 0; i < plat_data->dev_len; i++)
+>> > -               if (plat_data->dev_tx[i] != 0)
+>> > -                       num_log_chans++;
+>>
+>> And I guess this code snippet made it go down to <= 32 all the time,
+>> correct?
 >
-> Ideally I'd like to keep them all in the same branch, as it may lead
-> to confusion/conflicts later down the line (I'm still coding a lot of
-> this stuff).
->
-> Naturally, I'll go with whatever you think is best, but this is my
-> preference.
+> However many were described in dma40_[rx|tx]_map, yes.
 
-This works find for now, I just want the DT changes kept separately
-because I'm in hell with these right now and don't want to end up
-there again next merge cycle.
+OK how fragile, but definately not your fault.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
