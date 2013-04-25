@@ -1,36 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Apr 2013 19:28:47 +0200
-Subject: [PATCH 04/21] ARM: orion5x: include linux/cpu.h
+Date: Thu, 25 Apr 2013 19:28:51 +0200
+Subject: [PATCH 08/21] drm/nouveau: use mdelay instead of large udelay
+ constants
 In-Reply-To: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
 References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
-Message-ID: <1366910944-3033663-5-git-send-email-arnd@arndb.de>
+Message-ID: <1366910944-3033663-9-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The linux/cpu.h header is no longer implictly included in this
-file, so we need to an #include statement to avoid this build
-warning:
-
-arch/arm/mach-orion5x/common.c:339:3: error: implicit declaration of function 'cpu_idle_poll_ctrl' [-Werror=implicit-function-declaration]
+ARM cannot handle udelay for more than 2 miliseconds, so we
+should use mdelay instead for those.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: David Airlie <airlied@linux.ie>
+Cc: Ben Skeggs <bskeggs@redhat.com>
+Cc: dri-devel at lists.freedesktop.org
 ---
- arch/arm/mach-orion5x/common.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/gpu/drm/nouveau/core/engine/disp/dacnv50.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-index 664c97d..b97fd67 100644
---- a/arch/arm/mach-orion5x/common.c
-+++ b/arch/arm/mach-orion5x/common.c
-@@ -19,6 +19,7 @@
- #include <linux/ata_platform.h>
- #include <linux/delay.h>
- #include <linux/clk-provider.h>
-+#include <linux/cpu.h>
- #include <net/dsa.h>
- #include <asm/page.h>
- #include <asm/setup.h>
+diff --git a/drivers/gpu/drm/nouveau/core/engine/disp/dacnv50.c b/drivers/gpu/drm/nouveau/core/engine/disp/dacnv50.c
+index d0817d9..ed7415e 100644
+--- a/drivers/gpu/drm/nouveau/core/engine/disp/dacnv50.c
++++ b/drivers/gpu/drm/nouveau/core/engine/disp/dacnv50.c
+@@ -51,7 +51,8 @@ nv50_dac_sense(struct nv50_disp_priv *priv, int or, u32 loadval)
+ 	const u32 doff = (or * 0x800);
+ 	int load = -EINVAL;
+ 	nv_wr32(priv, 0x61a00c + doff, 0x00100000 | loadval);
+-	udelay(9500);
++	mdelay(9);
++	udelay(500);
+ 	nv_wr32(priv, 0x61a00c + doff, 0x80000000);
+ 	load = (nv_rd32(priv, 0x61a00c + doff) & 0x38000000) >> 27;
+ 	nv_wr32(priv, 0x61a00c + doff, 0x00000000);
 -- 
 1.8.1.2
