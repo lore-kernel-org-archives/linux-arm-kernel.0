@@ -1,31 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 11:00:22 +0200
-Subject: [PATCH 12/32] ARM: ux500: Remove superfluous 'psize' attribute
- from Audio platform data
-In-Reply-To: <1366279934-30761-13-git-send-email-lee.jones@linaro.org>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-13-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbu-e75rz+BgbfFH7nXMWMTzpFT=k2yhA80jJKv9jpzkQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 25 Apr 2013 12:04:47 +0300
+Subject: Multiple issues with omap4 panda es in linux next
+In-Reply-To: <20130424192330.GC5184@atomide.com>
+References: <20130419171318.GK10155@atomide.com> <5174F7A8.7070308@ti.com>
+ <20130422180316.GA10155@atomide.com> <5176A45B.5@ti.com>
+ <20130423172353.GD10155@atomide.com>
+ <20130423213151.GM10155@atomide.com>
+ <20130423231605.GO10155@atomide.com> <517770A0.4000609@ti.com>
+ <20130424190821.GB5184@atomide.com>
+ <20130424192330.GC5184@atomide.com>
+Message-ID: <20130425090447.GK7889@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Hi,
 
-> 'psize' is used to calculate the maximum DMA burst size. However it
-> is only taken into consideration when editing the DMA channel's
-> configuration. The Audio DMA platform data is only used to allocate
-> a channel, not configure it. That will be done at a later date within
-> the MSP driver.
->
-> We're also removing comments which are no longer required, as
-> 'data_width' is no longer set in any device's platform data period.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Wed, Apr 24, 2013 at 12:23:30PM -0700, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [130424 12:13]:
+> > * Kishon Vijay Abraham I <kishon@ti.com> [130423 22:46]:
+> > > Hi Tony,
+> > > 
+> > > On Wednesday 24 April 2013 04:46 AM, Tony Lindgren wrote:
+> > > >* Tony Lindgren <tony@atomide.com> [130423 14:37]:
+> > > >>* Tony Lindgren <tony@atomide.com> [130423 10:28]:
+> > > >>>* Kishon Vijay Abraham I <kishon@ti.com> [130423 08:15]:
+> > > >>>>>>>2. MUSB fails with legacy booting and DT on panda es
+> > > >>>>>>>
+> > > >>>>>>>With both legacy and DT booting I get something like:
+> > > >>>>>>>
+> > > >>>>>>>HS USB OTG: no transceiver configured
+> > > >>>>>>>musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
+> > > >>>>>>
+> > > >>>>>>The dt should work fine with https://patchwork.kernel.org/patch/2423061/.
+> > > >>>>>
+> > > >>>>>OK thanks for checking that.
+> > > >
+> > > >Kishon, I think there's also some other issue remaining
+> > > >in linux next with MUSB and DT. I'm still getting the
+> > > >"HS USB OTG: no transceiver configured" although the nop
+> > > >xceiv is compiled in. Maybe give it a try against linux
+> > > >next?
+> > > 
+> > > For OMAP4 MUSB, you'll need omap-usb2 phy. I've attached my .config.
+> > 
+> > Thanks your config helped me to track it down. Looks like I got
+> > the PHYs the wrong way around between EHCI and MUSB..
+> > 
+> > In any case, I did have omap-usb2 compiled in, but I did not have
+> > OMAP_OCP2SCP=y set. Should OMAP_USB2 depend on that?
+> > 
+> > Also, looks like MUSB just sits in b_idle mode though, so no more
+> > ID pin interrupt for some reason.
+> 
+> OK looks like I got the ID interrupt going by enabling
+> CONFIG_TWL6030_USB=y. Still stays in a_idle with no keyboard
+> after plugging it in, but now changes between a and b mode.
 
-Pls CC patches like this to Ola LILJA.
+come again, you ground ID pin and have no devices attached ? Then it
+should stay in a_idle.
 
-So if I understand correctly this is now handled by
-dmaengine_pcm.c, os that right?
-
-Yours,
-Linus Walleij
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130425/c2074be5/attachment-0001.sig>
