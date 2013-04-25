@@ -1,60 +1,89 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 25 Apr 2013 16:21:58 +0200 (CEST)
-Subject: RFC: [PATCH] clocksource: tcb: fix min_delta calculation
-In-Reply-To: <1366722524-25991-1-git-send-email-mkl@pengutronix.de>
-References: <517687AB.1040309@pengutronix.de>
- <1366722524-25991-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <alpine.LFD.2.02.1304251618590.21884@ionos>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Thu, 25 Apr 2013 16:39:38 +0200
+Subject: [PATCH] ARM: add unwind annotations to ftrace asm
+In-Reply-To: <1364076649-16841-1-git-send-email-rabin@rab.in>
+References: <1364076649-16841-1-git-send-email-rabin@rab.in>
+Message-ID: <1366900778.4158.124.camel@coredoba.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Apr 2013, Marc Kleine-Budde wrote:
-> The commit
+On Sat, 2013-03-23 at 23:10 +0100, Rabin Vincent wrote:
+> Add unwind annotations to the ftrace assembly code so that the function
+> tracer's stacktracing options (func_stack_trace, etc.) work when
+> CONFIG_ARM_UNWIND is enabled.
 > 
->     77cc982 clocksource: use clockevents_config_and_register() where possible
-> 
-> switches from manually calculating min_delta_ns (and others) and
-> clockevents_register_device() to automatic calculation via
-> clockevents_config_and_register(). During this conversation the "+ 1" in
-> 
->     min_delta_ns = clockevent_delta2ns(1, &clkevt.clkevt) + 1;
-> 
-> was lost. This leads to problems with schedule_delayed_work() with a delay of
-> "1". Resulting in the work not scheduled in time.
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
 
-Errm. How is schedule_delayed_work() related to this?
+In my test this fixes func_stack_trace:
 
-schedule_delayed_work() is jiffies based and has absolutely nothing to
-do with clockevents.
- 
-> This patch fixes the problem by increasing the min_delta to "2" ticks.
+== without patch ==
+# tracer: function
+#
+# entries-in-buffer/entries-written: 318/318   #P:1
+#
+#                              _-------=> irqs-off          
+#                            /  _------=> need-resched      
+#                            |/  _-----=> need-resched_lazy 
+#                            ||/  _----=> hardirq/softirq   
+#                            |||/  _---=> preempt-depth     
+#                            ||||/  _--=> preempt-lazy-depth
+#                            ||||| / _-=> migrate-disable   
+#                            |||||| /     delay
+#           TASK-PID   CPU#  |||||||    TIMESTAMP  FUNCTION
+#              | |       |   |||||||       |         |
+              sh-829   [000] d..h1..   838.966903: ktime_get <-tick_sched_timer
+              sh-829   [000] d..h1..   838.966933: <stack trace>
+ => ftrace_ops_no_ops
+ => ftrace_graph_call
+              sh-829   [000] d..h1..   838.966979: ktime_get <-clockevents_program_event
+              sh-829   [000] d..h1..   838.966990: <stack trace>
 
-This changelog sucks.
+== with patch ==
+# tracer: function
+#
+# entries-in-buffer/entries-written: 678/678   #P:1
+#
+#                              _-------=> irqs-off          
+#                            /  _------=> need-resched      
+#                            |/  _-----=> need-resched_lazy 
+#                            ||/  _----=> hardirq/softirq   
+#                            |||/  _---=> preempt-depth     
+#                            ||||/  _--=> preempt-lazy-depth
+#                            ||||| / _-=> migrate-disable   
+#                            |||||| /     delay
+#           TASK-PID   CPU#  |||||||    TIMESTAMP  FUNCTION
+#              | |       |   |||||||       |         |
+              sh-828   [000] d..h2..   108.367156: ktime_get <-tick_sched_timer
+              sh-828   [000] d..h2..   108.367224: <stack trace>
+ => ftrace_ops_no_ops
+ => ftrace_graph_call
+ => ktime_get
+ => tick_sched_timer
+ => __run_hrtimer
+ => hrtimer_interrupt
+ => omap2_gp_timer_interrupt
+ => handle_irq_event_percpu
+ => handle_irq_event
+ => handle_level_irq
+ => generic_handle_irq
+ => handle_IRQ
+ => omap3_intc_handle_irq
+ => __irq_svc
+ => sub_preempt_count
+ => cap_vm_enough_memory
+ => security_vm_enough_memory_mm
+ => mmap_region
+ => do_mmap_pgoff
+ => vm_mmap_pgoff
+ => sys_mmap_pgoff
+ => ret_fast_syscall
 
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> ---
->  drivers/clocksource/tcb_clksrc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-> index 8a61872..7cf6dc7 100644
-> --- a/drivers/clocksource/tcb_clksrc.c
-> +++ b/drivers/clocksource/tcb_clksrc.c
-> @@ -197,7 +197,7 @@ static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
->  
->  	clkevt.clkevt.cpumask = cpumask_of(0);
->  
-> -	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
-> +	clockevents_config_and_register(&clkevt.clkevt, 32768, 2, 0xffff);
->  
->  	setup_irq(irq, &tc_irqaction);
->  }
-> -- 
-> 1.8.2.rc2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Thanks for this fix!
+
+Regards,
+Jan
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
