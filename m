@@ -1,36 +1,79 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 25 Apr 2013 20:12:29 +0200
-Subject: [PATCH 07/18] cpufreq: s3c24xx: move cpufreq driver to
- drivers/cpufreq
-In-Reply-To: <51795E53.5030908@samsung.com>
-References: <cover.1365079581.git.viresh.kumar@linaro.org>
- <2264237.NUtkmvZG3W@vostro.rjw.lan> <51795E53.5030908@samsung.com>
-Message-ID: <1615834.7iOsapYTqY@vostro.rjw.lan>
+From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
+Date: Thu, 25 Apr 2013 20:14:06 +0200
+Subject: [PATCH 14/21] cpufreq: pxa2xx: initialize variables
+In-Reply-To: <1366910944-3033663-15-git-send-email-arnd@arndb.de>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <1366910944-3033663-15-git-send-email-arnd@arndb.de>
+Message-ID: <5179726E.9020003@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, April 26, 2013 01:48:19 AM Kukjin Kim wrote:
-> On 04/24/13 07:59, Rafael J. Wysocki wrote:
-> 
-> [...]
-> 
-> >> Rafael, please take this patch with my ack in your tree, sorry for noise.
-> >>
-> >> Acked-by: Kukjin Kim<kgene.kim@samsung.com>
-> >>
-> >> If any problems, please kindly let me know.
-> >
-> > Well, I suppose I can take the original patch, but then it will conflict with
-> > your tree during merge.  Is that not a problem?
-> >
-> I think, some conflicts can be occurred but if so, we can fix it before 
-> merge window.
+On 4/25/2013 7:28 PM, Arnd Bergmann wrote:
+> gcc-3.8 correctly found that the variables set by find_freq_tables()
+> are not initialized if this function is called on something other
+> than a pxa2xx or pxa3xx:
+>
+> pxa2xx-cpufreq.c: In function 'pxa_verify_policy':
+> pxa2xx-cpufreq.c:272:6: warning: 'pxa_freqs_table' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> pxa2xx-cpufreq.c: In function 'pxa_set_target':
+> pxa2xx-cpufreq.c:345:23: warning: 'pxa_freq_settings' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>
+> Rather than adding a bogus initialization that would let us
+> get a little further before crashing, add an explicit BUG().
+> We know that this code is designed to run on only these cpus,
+> so this will fix the build warning and give a more helpful
+> diagnostic if the code ever changes to run on other machines.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-Well, how exactly would you like to address them?
+OK, applied.
 
+Can you please CC future cpufreq changes to linux-pm at vger.kernel.org?  
+That'd make the handling of them much easier.
+
+Thanks,
 Rafael
 
 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+> ---
+>   drivers/cpufreq/pxa2xx-cpufreq.c | 5 +++--
+>   1 file changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/cpufreq/pxa2xx-cpufreq.c b/drivers/cpufreq/pxa2xx-cpufreq.c
+> index fe4c55b..9e5bc8e 100644
+> --- a/drivers/cpufreq/pxa2xx-cpufreq.c
+> +++ b/drivers/cpufreq/pxa2xx-cpufreq.c
+> @@ -221,10 +221,11 @@ static void find_freq_tables(struct cpufreq_frequency_table **freq_table,
+>   			*pxa_freqs = pxa255_turbo_freqs;
+>   			*freq_table = pxa255_turbo_freq_table;
+>   		}
+> -	}
+> -	if (cpu_is_pxa27x()) {
+> +	} else if (cpu_is_pxa27x()) {
+>   		*pxa_freqs = pxa27x_freqs;
+>   		*freq_table = pxa27x_freq_table;
+> +	} else {
+> +		BUG();
+>   	}
+>   }
+>   
+
+---------------------------------------------------------------------
+Intel Technology Poland sp. z o.o.
+z siedziba w Gdansku
+ul. Slowackiego 173
+80-298 Gdansk
+
+Sad Rejonowy Gdansk Polnoc w Gdansku, 
+VII Wydzial Gospodarczy Krajowego Rejestru Sadowego, 
+numer KRS 101882
+
+NIP 957-07-52-316
+Kapital zakladowy 200.000 zl
+
+This e-mail and any attachments may contain confidential material for
+the sole use of the intended recipient(s). Any review or distribution
+by others is strictly prohibited. If you are not the intended
+recipient, please contact the sender and delete all copies.
