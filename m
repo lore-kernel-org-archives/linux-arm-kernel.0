@@ -1,74 +1,63 @@
-From: B16395@freescale.com (Sethi Varun-B16395)
-Date: Thu, 25 Apr 2013 17:42:12 +0000
-Subject: [PATCH 13/21] iommu: tegra: print dma_addr_t using %lld
-In-Reply-To: <1366910944-3033663-14-git-send-email-arnd@arndb.de>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 25 Apr 2013 10:59:50 -0700
+Subject: [PATCH 18/21] USB: ehci-msm: USB_MSM_OTG needs USB_PHY
+In-Reply-To: <1366910944-3033663-19-git-send-email-arnd@arndb.de>
 References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <1366910944-3033663-14-git-send-email-arnd@arndb.de>
-Message-ID: <C5ECD7A89D1DC44195F34B25E172658D4BD243@039-SN2MPN1-011.039d.mgd.msft.net>
+ <1366910944-3033663-19-git-send-email-arnd@arndb.de>
+Message-ID: <20130425175950.GA14654@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-I already submitted a patch to fix this.
-http://permalink.gmane.org/gmane.linux.kernel.iommu/2036
-
-Regards
-Varun
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Thursday, April 25, 2013 10:59 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org; Arnd Bergmann; Sethi Varun-B16395;
-> Joerg Roedel
-> Subject: [PATCH 13/21] iommu: tegra: print dma_addr_t using %lld
+On Thu, Apr 25, 2013 at 07:29:01PM +0200, Arnd Bergmann wrote:
+> The Kconfig entry for USB_EHCI_MSM unconditionally selects USB_MSM_OTG,
+> which is now only visible when USB_PHY is also enabled.
 > 
-> The code was recently changed to work for builds with a 64 bit
-> dma_addr_t, but the printk unconditionally uses a format string for an
-> "long" variable, which is always wrong as the dma_add_t is now either
-> 'unsigned int' or 'unsigned long long'
-> depending on configuration.
+> This adds an appropriate dependency and enables USB_PHY in the msm
+> defconfig, avoiding the Kbuild warning:
 > 
-> The easiest solution is to cast the variable to u64 and print it as a 64
-> bit value.
+> warning: (USB_EHCI_MSM) selects USB_MSM_OTG which has unmet direct dependencies (USB_SUPPORT && USB_PHY && (USB || USB_GADGET) && ARCH_MSM)
 > 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Varun Sethi <Varun.Sethi@freescale.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: linux-usb at vger.kernel.org
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Pavankumar Kondeti <pkondeti@codeaurora.org>
 > ---
->  drivers/iommu/tegra-gart.c | 3 ++-
->  drivers/iommu/tegra-smmu.c | 2 +-
->  2 files changed, 3 insertions(+), 2 deletions(-)
+>  arch/arm/configs/msm_defconfig | 1 +
+>  drivers/usb/host/Kconfig       | 1 +
+>  2 files changed, 2 insertions(+)
 > 
-> diff --git a/drivers/iommu/tegra-gart.c b/drivers/iommu/tegra-gart.c
-> index 4aec8be..ebbdd82 100644
-> --- a/drivers/iommu/tegra-gart.c
-> +++ b/drivers/iommu/tegra-gart.c
-> @@ -295,7 +295,8 @@ static phys_addr_t gart_iommu_iova_to_phys(struct
-> iommu_domain *domain,
-> 
->  	pa = (pte & GART_PAGE_MASK);
->  	if (!pfn_valid(__phys_to_pfn(pa))) {
-> -		dev_err(gart->dev, "No entry for %08lx:%08x\n", iova, pa);
-> +		dev_err(gart->dev, "No entry for %08llx:%pa\n",
-> +				(u64)iova, &pa);
->  		gart_dump_table(gart);
->  		return -EINVAL;
->  	}
-> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-> index bc9b599..ef2a120 100644
-> --- a/drivers/iommu/tegra-smmu.c
-> +++ b/drivers/iommu/tegra-smmu.c
-> @@ -772,7 +772,7 @@ static phys_addr_t smmu_iommu_iova_to_phys(struct
-> iommu_domain *domain,
->  	pfn = *pte & SMMU_PFN_MASK;
->  	WARN_ON(!pfn_valid(pfn));
->  	dev_dbg(as->smmu->dev,
-> -		"iova:%08lx pfn:%08lx asid:%d\n", iova, pfn, as->asid);
-> +		"iova:%08llx pfn:%08lx asid:%d\n", (u64)iova, pfn, as->asid);
-> 
->  	spin_unlock_irqrestore(&as->lock, flags);
->  	return PFN_PHYS(pfn);
-> --
-> 1.8.1.2
-> 
+> diff --git a/arch/arm/configs/msm_defconfig b/arch/arm/configs/msm_defconfig
+> index 44f9291..690b5f9 100644
+> --- a/arch/arm/configs/msm_defconfig
+> +++ b/arch/arm/configs/msm_defconfig
+> @@ -101,6 +101,7 @@ CONFIG_SND_DYNAMIC_MINORS=y
+>  CONFIG_SND_SOC=y
+>  CONFIG_HID_BATTERY_STRENGTH=y
+>  CONFIG_USB=y
+> +CONFIG_USB_PHY=y
+>  CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+>  CONFIG_USB_MON=y
+>  CONFIG_USB_EHCI_HCD=y
+
+This part of the patch doesn't apply to my tree, so I can't take it.
+
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index c558472..de94f26 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -188,6 +188,7 @@ config USB_EHCI_HCD_AT91
+>  config USB_EHCI_MSM
+>  	tristate "Support for Qualcomm QSD/MSM on-chip EHCI USB controller"
+>  	depends on ARCH_MSM
+> +	depends on USB_PHY
+>  	select USB_EHCI_ROOT_HUB_TT
+>  	select USB_MSM_OTG
+>  	---help---
+
+But this does, and I'm guessing that it's the more important part, so
+I'll just edit it and only take this hunk, ok?
+
+thanks,
+
+greg k-h
