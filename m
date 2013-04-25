@@ -1,97 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Apr 2013 19:28:43 +0200
-Subject: [PATCH 00/21] more arm build fixes
-Message-ID: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+Date: Thu, 25 Apr 2013 19:29:01 +0200
+Subject: [PATCH 18/21] USB: ehci-msm: USB_MSM_OTG needs USB_PHY
+In-Reply-To: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+Message-ID: <1366910944-3033663-19-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi subsystem maintainers,
+The Kconfig entry for USB_EHCI_MSM unconditionally selects USB_MSM_OTG,
+which is now only visible when USB_PHY is also enabled.
 
-Here is another set of patches that resulted from build testing on
-linux-next. Please apply directly into your trees if you agree,
-or let me know if I made a mistake.
+This adds an appropriate dependency and enables USB_PHY in the msm
+defconfig, avoiding the Kbuild warning:
 
-I can take whatever remains through the arm-soc tree if you prefer
-that or I don't hear back.
+warning: (USB_EHCI_MSM) selects USB_MSM_OTG which has unmet direct dependencies (USB_SUPPORT && USB_PHY && (USB || USB_GADGET) && ARCH_MSM)
 
-	Arnd
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-usb at vger.kernel.org
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Pavankumar Kondeti <pkondeti@codeaurora.org>
+---
+ arch/arm/configs/msm_defconfig | 1 +
+ drivers/usb/host/Kconfig       | 1 +
+ 2 files changed, 2 insertions(+)
 
-
-Arnd Bergmann (21):
-  ARM: topology: export cpu_topology
-  ARM: default machine descriptor for multiplatform
-  ARM: shmobile: don't call irqchip_init unconditionally
-  ARM: orion5x: include linux/cpu.h
-  atm: he: use mdelay instead of large udelay constants
-  ALSA: ali5451: use mdelay instead of large udelay constants
-  oss/dmabuf: use dma_map_single
-  drm/nouveau: use mdelay instead of large udelay constants
-  drm: export drm_vm_open_locked
-  [SCSI] nsp32: use mdelay instead of large udelay constants
-  irqdomain: export irq_domain_add_simple
-  irqchip: s3c24xx: add missing __init annotations
-  iommu: tegra: print dma_addr_t using %lld
-  cpufreq: pxa2xx: initialize variables
-  thermal: cooling: avoid uninitialied used gcc warning
-  OF: remove #ifdef from linux/of_platform.h
-  X.509: do not emit any informational output
-  USB: ehci-msm: USB_MSM_OTG needs USB_PHY
-  USB: lpc32xx: ISP1301 needs USB_PHY
-  USB: OMAP: ISP1301 needs USB_PHY
-  USB: OHCI: avoid conflicting platform drivers
-
- arch/arm/Kconfig                                   |   1 -
- arch/arm/configs/lpc32xx_defconfig                 |   1 +
- arch/arm/configs/msm_defconfig                     |   1 +
- arch/arm/configs/omap1_defconfig                   |   1 +
- arch/arm/kernel/devtree.c                          |   7 ++
- arch/arm/kernel/setup.c                            |  11 +-
- arch/arm/kernel/topology.c                         |   1 +
- arch/arm/mach-orion5x/common.c                     |   1 +
- arch/arm/mach-shmobile/intc-r8a7740.c              |  13 +-
- drivers/atm/he.c                                   |   2 +-
- drivers/cpufreq/pxa2xx-cpufreq.c                   |   5 +-
- drivers/gpu/drm/drm_vm.c                           |   1 +
- drivers/gpu/drm/nouveau/core/engine/disp/dacnv50.c |   3 +-
- drivers/iommu/tegra-gart.c                         |   3 +-
- drivers/iommu/tegra-smmu.c                         |   2 +-
- drivers/irqchip/irq-s3c24xx.c                      |   4 +-
- drivers/scsi/nsp32.c                               |   2 +-
- drivers/thermal/cpu_cooling.c                      |  17 +--
- drivers/usb/gadget/Kconfig                         |   2 +
- drivers/usb/host/Kconfig                           |   1 +
- drivers/usb/host/ohci-hcd.c                        | 136 ++++++++++++++++++---
- drivers/usb/phy/Makefile                           |   2 +-
- include/linux/of_platform.h                        |  13 +-
- kernel/irq/irqdomain.c                             |   1 +
- lib/build_OID_registry                             |   2 -
- sound/oss/dmabuf.c                                 |   3 +-
- sound/pci/ali5451/ali5451.c                        |   8 +-
- 27 files changed, 187 insertions(+), 57 deletions(-)
-
+diff --git a/arch/arm/configs/msm_defconfig b/arch/arm/configs/msm_defconfig
+index 44f9291..690b5f9 100644
+--- a/arch/arm/configs/msm_defconfig
++++ b/arch/arm/configs/msm_defconfig
+@@ -101,6 +101,7 @@ CONFIG_SND_DYNAMIC_MINORS=y
+ CONFIG_SND_SOC=y
+ CONFIG_HID_BATTERY_STRENGTH=y
+ CONFIG_USB=y
++CONFIG_USB_PHY=y
+ CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+ CONFIG_USB_MON=y
+ CONFIG_USB_EHCI_HCD=y
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index c558472..de94f26 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -188,6 +188,7 @@ config USB_EHCI_HCD_AT91
+ config USB_EHCI_MSM
+ 	tristate "Support for Qualcomm QSD/MSM on-chip EHCI USB controller"
+ 	depends on ARCH_MSM
++	depends on USB_PHY
+ 	select USB_EHCI_ROOT_HUB_TT
+ 	select USB_MSM_OTG
+ 	---help---
 -- 
 1.8.1.2
-
-Cc: "James E.J. Bottomley" <JBottomley@parallels.com>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: David Airlie <airlied@linux.ie>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Inki Dae <inki.dae@samsung.com>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Cc: Rob Herring <robherring2@gmail.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Simon Horman <horms+renesas@verge.net.au>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: alsa-devel at alsa-project.org
-Cc: dri-devel at lists.freedesktop.org
-Cc: linux-atm-general at lists.sourceforge.net
-Cc: linux-scsi at vger.kernel.org
-Cc: linux-usb at vger.kernel.org
-Cc: netdev at vger.kernel.org
