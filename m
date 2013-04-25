@@ -1,78 +1,155 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 25 Apr 2013 19:23:25 +0200
-Subject: [PATCH 09/14] sched: evaluate the activity level of the system
+Date: Thu, 25 Apr 2013 19:23:26 +0200
+Subject: [PATCH 10/14] sched: update the buddy CPU
 In-Reply-To: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
 References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1366910611-20048-10-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1366910611-20048-11-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We evaluate the activity level of CPUs, groups and domains in order to define
-how many CPUs are required to handle the current activity.
+Periodically updates the buddy of a CPU according to the current activity of
+the system. A CPU is its own buddy if it participates to the packing effort.
+Otherwise, it points to a CPU that participates to the packing effort.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- kernel/sched/fair.c |   19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ kernel/sched/fair.c |   91 ++++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 86 insertions(+), 5 deletions(-)
 
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 954adfd..234ecdd 100644
+index 234ecdd..28f8ea7 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
-@@ -3465,7 +3465,22 @@ static int check_pack_buddy(int cpu, struct task_struct *p)
- 		return true;
+@@ -174,11 +174,17 @@ void sched_init_granularity(void)
  
- 	return false;
+ 
+ #ifdef CONFIG_SMP
++static unsigned long power_of(int cpu)
++{
++	return cpu_rq(cpu)->cpu_power;
 +}
 +
-+static int get_cpu_activity(int cpu)
-+{
-+	struct rq *rq = cpu_rq(cpu);
-+	u32 sum = rq->avg.runnable_avg_sum;
-+	u32 period = rq->avg.runnable_avg_period;
-+
-+	sum = min(sum, period);
-+
-+	if (sum == period) {
-+		u32 overload = rq->nr_running > 1 ? 1 : 0;
-+		return power_of(cpu) + overload;
-+	}
- 
-+	return (sum * power_of(cpu)) / period;
- }
+ /*
+  * Save the id of the optimal CPU that should be used to pack small tasks
+  * The value -1 is used when no buddy has been found
+  */
+ DEFINE_PER_CPU(int, sd_pack_buddy);
++DEFINE_PER_CPU(struct sched_domain *, sd_pack_domain);
  
  /*
-@@ -4355,6 +4370,7 @@ struct sd_lb_stats {
- 	struct sched_group *busiest; /* Busiest group in this sd */
- 	struct sched_group *this;  /* Local group in this sd */
- 	unsigned long total_load;  /* Total load of all groups in sd */
-+	unsigned long total_activity;  /* Total activity of all groups in sd */
- 	unsigned long total_pwr;   /*	Total power of all groups in sd */
- 	unsigned long avg_load;	   /* Average load across all groups in sd */
+  * Look for the best buddy CPU that can be used to pack small tasks
+@@ -237,6 +243,68 @@ void update_packing_domain(int cpu)
+ 	}
  
-@@ -4383,6 +4399,7 @@ struct sd_lb_stats {
- struct sg_lb_stats {
- 	unsigned long avg_load; /*Avg load across the CPUs of the group */
- 	unsigned long group_load; /* Total load over the CPUs of the group */
-+	unsigned long group_activity; /* Total activity of the group */
- 	unsigned long sum_nr_running; /* Nr tasks running in the group */
- 	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
- 	unsigned long group_capacity;
-@@ -4629,6 +4646,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
- 		}
+ 	pr_debug("CPU%d packing on CPU%d\n", cpu, id);
++	per_cpu(sd_pack_domain, cpu) = sd;
++	per_cpu(sd_pack_buddy, cpu) = id;
++}
++
++void update_packing_buddy(int cpu, int activity)
++{
++	struct sched_domain *sd = per_cpu(sd_pack_domain, cpu);
++	struct sched_group *sg, *pack, *tmp;
++	int id = cpu;
++
++	if (!sd)
++		return;
++
++	/*
++	 * The sched_domain of a CPU points on the local sched_group
++	 * and this CPU of this local group is a good candidate
++	 */
++	pack = sg = sd->groups;
++
++	/* loop the sched groups to find the best one */
++	for (tmp = sg->next; tmp != sg; tmp = tmp->next) {
++		if ((tmp->sgp->power * pack->group_weight) >
++			(pack->sgp->power_available * tmp->group_weight))
++			continue;
++
++		if (((tmp->sgp->power * pack->group_weight) ==
++			 (pack->sgp->power * tmp->group_weight))
++		 && (cpumask_first(sched_group_cpus(tmp)) >= id))
++			continue;
++
++		/* we have found a better group */
++		pack = tmp;
++
++		/* Take the 1st CPU of the new group */
++		id = cpumask_first(sched_group_cpus(pack));
++	}
++
++	if ((cpu == id) || (activity <= power_of(id))) {
++		per_cpu(sd_pack_buddy, cpu) = id;
++		return;
++	}
++
++	for (tmp = pack; activity > 0; tmp = tmp->next) {
++		if (tmp->sgp->power > activity) {
++			id = cpumask_first(sched_group_cpus(tmp));
++			activity -= power_of(id);
++			if (cpu == id)
++				activity = 0;
++			while ((activity > 0) && (id < nr_cpu_ids)) {
++				id = cpumask_next(id, sched_group_cpus(tmp));
++				activity -= power_of(id);
++				if (cpu == id)
++					activity = 0;
++			}
++		} else if (cpumask_test_cpu(cpu, sched_group_cpus(tmp))) {
++			id = cpu;
++			activity = 0;
++		} else {
++			activity -= tmp->sgp->power;
++		}
++	}
++
+ 	per_cpu(sd_pack_buddy, cpu) = id;
+ }
  
- 		sgs->group_load += load;
-+		sgs->group_activity += get_cpu_activity(i);
- 		sgs->sum_nr_running += nr_running;
- 		sgs->sum_weighted_load += weighted_cpuload(i);
- 		if (idle_cpu(i))
-@@ -4752,6 +4770,7 @@ static inline void update_sd_lb_stats(struct lb_env *env,
- 			return;
+@@ -3014,11 +3082,6 @@ static unsigned long target_load(int cpu, int type)
+ 	return max(rq->cpu_load[type-1], total);
+ }
  
- 		sds->total_load += sgs.group_load;
-+		sds->total_activity += sgs.group_activity;
- 		sds->total_pwr += sg->sgp->power;
+-static unsigned long power_of(int cpu)
+-{
+-	return cpu_rq(cpu)->cpu_power;
+-}
+-
+ static unsigned long cpu_avg_load_per_task(int cpu)
+ {
+ 	struct rq *rq = cpu_rq(cpu);
+@@ -4740,6 +4803,22 @@ static bool update_sd_pick_busiest(struct lb_env *env,
+ 	return false;
+ }
  
- 		/*
++static void update_plb_buddy(int cpu, int *balance, struct sd_lb_stats *sds,
++		struct sched_domain *sd)
++{
++	int buddy;
++
++	if (sysctl_sched_packing_mode != SCHED_PACKING_FULL)
++		return;
++
++	/* Update my buddy */
++	if (sd == per_cpu(sd_pack_domain, cpu))
++		update_packing_buddy(cpu, sds->total_activity);
++
++	/* Get my new buddy */
++	buddy = per_cpu(sd_pack_buddy, cpu);
++}
++
+ /**
+  * update_sd_lb_stats - Update sched_domain's statistics for load balancing.
+  * @env: The load balancing environment.
+@@ -4807,6 +4886,8 @@ static inline void update_sd_lb_stats(struct lb_env *env,
+ 
+ 		sg = sg->next;
+ 	} while (sg != env->sd->groups);
++
++	update_plb_buddy(env->dst_cpu, balance, sds, env->sd);
+ }
+ 
+ /**
 -- 
 1.7.9.5
