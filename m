@@ -1,70 +1,225 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 25 Apr 2013 12:04:47 +0300
-Subject: Multiple issues with omap4 panda es in linux next
-In-Reply-To: <20130424192330.GC5184@atomide.com>
-References: <20130419171318.GK10155@atomide.com> <5174F7A8.7070308@ti.com>
- <20130422180316.GA10155@atomide.com> <5176A45B.5@ti.com>
- <20130423172353.GD10155@atomide.com>
- <20130423213151.GM10155@atomide.com>
- <20130423231605.GO10155@atomide.com> <517770A0.4000609@ti.com>
- <20130424190821.GB5184@atomide.com>
- <20130424192330.GC5184@atomide.com>
-Message-ID: <20130425090447.GK7889@arwen.pp.htv.fi>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Apr 2013 10:06:12 +0100
+Subject: [PATCH 04/32] dmaengine: ste_dma40: Amalgamate DMA source and
+ destination channel numbers
+In-Reply-To: <CACRpkdaauDYTdoBHGG9FO4kKqvCYyCrjY8EGWs5gAQWErGW6_A@mail.gmail.com>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-5-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaauDYTdoBHGG9FO4kKqvCYyCrjY8EGWs5gAQWErGW6_A@mail.gmail.com>
+Message-ID: <20130425090612.GC4623@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Apr 24, 2013 at 12:23:30PM -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [130424 12:13]:
-> > * Kishon Vijay Abraham I <kishon@ti.com> [130423 22:46]:
-> > > Hi Tony,
-> > > 
-> > > On Wednesday 24 April 2013 04:46 AM, Tony Lindgren wrote:
-> > > >* Tony Lindgren <tony@atomide.com> [130423 14:37]:
-> > > >>* Tony Lindgren <tony@atomide.com> [130423 10:28]:
-> > > >>>* Kishon Vijay Abraham I <kishon@ti.com> [130423 08:15]:
-> > > >>>>>>>2. MUSB fails with legacy booting and DT on panda es
-> > > >>>>>>>
-> > > >>>>>>>With both legacy and DT booting I get something like:
-> > > >>>>>>>
-> > > >>>>>>>HS USB OTG: no transceiver configured
-> > > >>>>>>>musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
-> > > >>>>>>
-> > > >>>>>>The dt should work fine with https://patchwork.kernel.org/patch/2423061/.
-> > > >>>>>
-> > > >>>>>OK thanks for checking that.
-> > > >
-> > > >Kishon, I think there's also some other issue remaining
-> > > >in linux next with MUSB and DT. I'm still getting the
-> > > >"HS USB OTG: no transceiver configured" although the nop
-> > > >xceiv is compiled in. Maybe give it a try against linux
-> > > >next?
-> > > 
-> > > For OMAP4 MUSB, you'll need omap-usb2 phy. I've attached my .config.
-> > 
-> > Thanks your config helped me to track it down. Looks like I got
-> > the PHYs the wrong way around between EHCI and MUSB..
-> > 
-> > In any case, I did have omap-usb2 compiled in, but I did not have
-> > OMAP_OCP2SCP=y set. Should OMAP_USB2 depend on that?
-> > 
-> > Also, looks like MUSB just sits in b_idle mode though, so no more
-> > ID pin interrupt for some reason.
+> > Devices which utilise DMA tend to use the same channel numbers for
+> > transmitting and receiving. For this reason and the fact that it'll
+> > decrease the burden of platform data passed to each device, we're
+> > amalgamating source and destination device types.
 > 
-> OK looks like I got the ID interrupt going by enabling
-> CONFIG_TWL6030_USB=y. Still stays in a_idle with no keyboard
-> after plugging it in, but now changes between a and b mode.
+> I don't think this explains what the patch is actually doing.
+> 
+> Instead describe this:
+> 
+> > @@ -56,8 +54,7 @@ static struct stedma40_chan_cfg msp1_dma_rx = {
+> >         .high_priority = true,
+> >         .dir = STEDMA40_PERIPH_TO_MEM,
+> >
+> > -       .src_dev_type = DB8500_DMA_DEV30_MSP3_RX,
+> > -       .dst_dev_type = STEDMA40_DEV_DST_MEMORY,
+> > +       .dev_type = DB8500_DMA_DEV30_MSP3,
+> (...)
+> 
+> What the message should say is that we're encoding pairs of
+> information for sources and destinations. Since every such
+> entry contains a .dir entry stating the direction of the transfer
+> it is implicit whether the channel is for RX or TX and this is what
+> you're exploiting in this patch.
+> 
+> So channel numbers (as mentioned in the commit) is not
+> the key issue here.
 
-come again, you ground ID pin and have no devices attached ? Then it
-should stay in a_idle.
+Channel numbers should really be device types in the commit
+message. I'll expand using your explanation too though.
+
+> Now we should ask ourselves why it was done like this from
+> the beginning. The reason is that DMA40 supports device-to-device
+> DMA, so if you encoded one device in .src_dev_type and another
+> device in .dst_dev_type and set .dir to
+> STEDMA40_PERIPH_TO_PERIPH (which as you can see is
+> defined in <linux/platform_data/dma-ste-dma40.h>) you get a
+> device to device transfer.
+> 
+> Are we now sacrificing that ability on the altar of simplification?
+>
+> I actually think not, but that we should do periph-to-periph transfers
+> in some other way, and that the .dir attribute should go away from
+> the struct stedma40_chan_cfg as well but I'm not entirely sure.
+> Someone else?
+
+Although the DMA40 device supports device-to-device transfers, Linux
+does not, so this subject is moot AFAICT.
+
+> (...)
+> > +++ b/arch/arm/mach-ux500/cpu-db8500.c
+> > @@ -167,25 +167,25 @@ static void __init db8500_add_gpios(struct device *parent)
+> >  }
+> >
+> >  static int usb_db8500_rx_dma_cfg[] = {
+> > -       DB8500_DMA_DEV38_USB_OTG_IEP_1_9,
+> > -       DB8500_DMA_DEV37_USB_OTG_IEP_2_10,
+> > -       DB8500_DMA_DEV36_USB_OTG_IEP_3_11,
+> > -       DB8500_DMA_DEV19_USB_OTG_IEP_4_12,
+> > -       DB8500_DMA_DEV18_USB_OTG_IEP_5_13,
+> > -       DB8500_DMA_DEV17_USB_OTG_IEP_6_14,
+> > -       DB8500_DMA_DEV16_USB_OTG_IEP_7_15,
+> > -       DB8500_DMA_DEV39_USB_OTG_IEP_8
+> > +       DB8500_DMA_DEV38_USB_OTG_IEP_AND_OEP_1_9,
+> > +       DB8500_DMA_DEV37_USB_OTG_IEP_AND_OEP_2_10,
+> > +       DB8500_DMA_DEV36_USB_OTG_IEP_AND_OEP_3_11,
+> > +       DB8500_DMA_DEV19_USB_OTG_IEP_AND_OEP_4_12,
+> > +       DB8500_DMA_DEV18_USB_OTG_IEP_AND_OEP_5_13,
+> > +       DB8500_DMA_DEV17_USB_OTG_IEP_AND_OEP_6_14,
+> > +       DB8500_DMA_DEV16_USB_OTG_IEP_AND_OEP_7_15,
+> > +       DB8500_DMA_DEV39_USB_OTG_IEP_AND_OEP_8
+> >  };
+> >
+> >  static int usb_db8500_tx_dma_cfg[] = {
+> > -       DB8500_DMA_DEV38_USB_OTG_OEP_1_9,
+> > -       DB8500_DMA_DEV37_USB_OTG_OEP_2_10,
+> > -       DB8500_DMA_DEV36_USB_OTG_OEP_3_11,
+> > -       DB8500_DMA_DEV19_USB_OTG_OEP_4_12,
+> > -       DB8500_DMA_DEV18_USB_OTG_OEP_5_13,
+> > -       DB8500_DMA_DEV17_USB_OTG_OEP_6_14,
+> > -       DB8500_DMA_DEV16_USB_OTG_OEP_7_15,
+> > -       DB8500_DMA_DEV39_USB_OTG_OEP_8
+> > +       DB8500_DMA_DEV38_USB_OTG_IEP_AND_OEP_1_9,
+> > +       DB8500_DMA_DEV37_USB_OTG_IEP_AND_OEP_2_10,
+> > +       DB8500_DMA_DEV36_USB_OTG_IEP_AND_OEP_3_11,
+> > +       DB8500_DMA_DEV19_USB_OTG_IEP_AND_OEP_4_12,
+> > +       DB8500_DMA_DEV18_USB_OTG_IEP_AND_OEP_5_13,
+> > +       DB8500_DMA_DEV17_USB_OTG_IEP_AND_OEP_6_14,
+> > +       DB8500_DMA_DEV16_USB_OTG_IEP_AND_OEP_7_15,
+> > +       DB8500_DMA_DEV39_USB_OTG_IEP_AND_OEP_8
+> >  };
+> 
+> 
+> If you're doing this change, and after this RX and TX has no semantical
+> meaning for these lists, join these two config lists
+> into one.
+
+I agree. See patch: ARM: ux500: Strip out duplicate USB DMA configuration
+
+> (...)
+> > diff --git a/arch/arm/mach-ux500/usb.c b/arch/arm/mach-ux500/usb.c
+> >  static u32 d40_chan_has_events(struct d40_chan *d40c)
+> > @@ -1744,8 +1740,6 @@ static int d40_validate_conf(struct d40_chan *d40c,
+> >                              struct stedma40_chan_cfg *conf)
+> >  {
+> >         int res = 0;
+> > -       u32 dst_event_group = D40_TYPE_TO_GROUP(conf->dst_dev_type);
+> > -       u32 src_event_group = D40_TYPE_TO_GROUP(conf->src_dev_type);
+> 
+> Please explain why this is not important to check anymore, I'm not
+> following.
+> 
+> >         if (conf->dir == STEDMA40_MEM_TO_PERIPH &&
+> > -           dst_event_group == STEDMA40_DEV_DST_MEMORY) {
+> > -               chan_err(d40c, "Invalid dst\n");
+> > +           d40c->base->plat_data->dev_tx[conf->dev_type] == 0 &&
+> > +           d40c->runtime_addr == 0) {
+> > +               chan_err(d40c, "Invalid TX channel address (%d)\n",
+> > +                        conf->dev_type);
+> 
+> Like here. We are checking for inconsistency between group
+> and channel direction, why is it no longer important to check this?
+
+I'm not entirely sure how this ever worked:
+
+  #define D40_TYPE_TO_GROUP(type) (type / 16)
+  #define STEDMA40_DEV_DST_MEMORY (-1)
+
+  (dev_type / 16) == -1
+
+What number would dev_type have to be for this to be true? -16?
+
+> >         if (conf->dir == STEDMA40_PERIPH_TO_MEM &&
+> > -           src_event_group == STEDMA40_DEV_SRC_MEMORY) {
+> > -               chan_err(d40c, "Invalid src\n");
+> > -               res = -EINVAL;
+> > -       }
+
+As above.
+
+> > -       if (src_event_group == STEDMA40_DEV_SRC_MEMORY &&
+> > -           dst_event_group == STEDMA40_DEV_DST_MEMORY && is_log) {
+> > -               chan_err(d40c, "No event line\n");
+> > -               res = -EINVAL;
+> > -       }
+
+We still check for this.
+
+> > -       if (conf->dir == STEDMA40_PERIPH_TO_PERIPH &&
+> > -           (src_event_group != dst_event_group)) {
+> > -               chan_err(d40c, "Invalid event group\n");
+> > +           d40c->base->plat_data->dev_rx[conf->dev_type] == 0 &&
+> > +           d40c->runtime_addr == 0) {
+> > +               chan_err(d40c, "Invalid RX channel address (%d)\n",
+> > +                        conf->dev_type);
+> 
+> Same here.
+
+I stopped all 'dev_src/dev_dest' comparisons, as there is only 'dev' now.
+
+> (...)
+> > @@ -2062,7 +2035,7 @@ static int d40_free_dma(struct d40_chan *d40c)
+> >  {
+> >
+> >         int res = 0;
+> > -       u32 event;
+> > +       u32 event = D40_TYPE_TO_EVENT(d40c->dma_cfg.dev_type);
+> >         struct d40_phy_res *phy = d40c->phy_chan;
+> >         bool is_src;
+> >
+> > @@ -2081,13 +2054,11 @@ static int d40_free_dma(struct d40_chan *d40c)
+> >         }
+> >
+> >         if (d40c->dma_cfg.dir == STEDMA40_MEM_TO_PERIPH ||
+> > -           d40c->dma_cfg.dir == STEDMA40_MEM_TO_MEM) {
+> > -               event = D40_TYPE_TO_EVENT(d40c->dma_cfg.dst_dev_type);
+> > +           d40c->dma_cfg.dir == STEDMA40_MEM_TO_MEM)
+> 
+> Why did you just stop checking dma_cfg.dir for == STEDMA40_MEM_TO_MEM
+> above?
+
+That's not what this is doing. STEDMA40_MEM_TO_MEM is still there.
+
+This patch is doing this:
+
++       u32 event = D40_TYPE_TO_EVENT(d40c->dma_cfg.dev_type);
+<snip>
+-       event = D40_TYPE_TO_EVENT(d40c->dma_cfg.dst_dev_type);
+-       event = D40_TYPE_TO_EVENT(d40c->dma_cfg.src_dev_type);
+
+> And why is dma_cfg.dir suddenly hardcoded to MEM_TO_MEM??
+
+It's not. Look again. :)
+
+> This seems like a totally unrelated change and should it be done
+> it need to be a separate patch with a separate explanation
+> AFAICT.
+> 
+> This seems to happen in some other places too,
+
+If you could point those out, I'll re-evaluate, or explain.
+
+> and I find it
+> very hard to follow the changes here ... can you please consider
+> splitting the changes to groups and types semantics into a separate
+> patch?
+
+Can you read the patch again and reconsider please?
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130425/c2074be5/attachment-0001.sig>
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
