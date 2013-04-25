@@ -1,91 +1,46 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu, 25 Apr 2013 12:14:50 +0200
-Subject: [PATCHv1 1/3] hwmon: Add support for GMT G762/G763 PWM fan
- controller
-In-Reply-To: <20130424224731.GB7767@roeck-us.net>
-References: <cover.1366753420.git.arno@natisbad.org>
- <63961d39aee9db94767f28fd441312bec2029473.1366753420.git.arno@natisbad.org>
- <20130424053758.GC8710@lunn.ch> <87obd4wb4e.fsf@natisbad.org>
- <20130424133856.GA18851@roeck-us.net> <87li878ygw.fsf@natisbad.org>
- <20130424224731.GB7767@roeck-us.net>
-Message-ID: <20130425101450.GD17771@kw.sim.vm.gnt>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 25 Apr 2013 11:25:01 +0100
+Subject: [PATCH v8 2/2] ARM: Enable selection of SMP operations at boot
+ time
+In-Reply-To: <20130425084933.GB12848@mudshark.cambridge.arm.com>
+References: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
+ <1366828819-10745-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130425084933.GB12848@mudshark.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1304251123410.4180@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 03:47:31PM -0700, Guenter Roeck wrote:
-> On Wed, Apr 24, 2013 at 10:28:47PM +0200, Arnaud Ebalard wrote:
-> > Hi,
+On Thu, 25 Apr 2013, Will Deacon wrote:
+> On Wed, Apr 24, 2013 at 07:40:19PM +0100, Stefano Stabellini wrote:
+> > From: Jon Medhurst <tixy@linaro.org>
 > > 
-> > Guenter Roeck <linux@roeck-us.net> writes:
+> > Add a new 'smp_init' hook to machine_desc so platforms can specify a
+> > function to be used to setup smp ops instead of having a statically
+> > defined value.  The hook must return true when smp_ops are initialized.
+> > If false the static mdesc->smp_ops will be used by default.
 > > 
-> > >> > You could consider using regmap for holding this cache.
-> > >> >
-> > >> > http://elceurope2012.sched.org/event/100619b669ce5767341624253aa03659?iframe=no&w=900&sidebar=yes&bg=no#.UXdspHLQ5jM
-> > >> >
-> > >> > http://elinux.org/ELCE_Europe_2012_Presentations
-> > >> 
-> > >> Interesting. As I am not yet familiar w/ regmap I would prefer having
-> > >> the driver accepted during merge window with current data structure and
-> > >> then convert it to regmap. But I will take a look (e.g. will study
-> > >> fca1dd03 for instance). Thanks for the pointers. 
-> > >> 
-> > > I have not had time for a detailed review, but adding regmap support
-> > > will not be a requirement.
-> > >
-> > > Note that it is too late for 3.10, so the driver will have to wait for
-> > > 3.11.
-> > 
-> > Well, I think I can live with it; The only bad thing is that it kills my
-> > excuses not to spend time on regmap ;-)
-> > 
-> Your call.
+> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > ---
+> >  arch/arm/include/asm/mach/arch.h |    4 ++++
+> >  arch/arm/kernel/setup.c          |   10 ++++++----
+> >  2 files changed, 10 insertions(+), 4 deletions(-)
 > 
-> > 
-> > >> >> +/*
-> > >> >> + * Helpers to import hardware characteristics from .dts file and overload
-> > >> >> + * default config values.
-> > >> >> + */
-> > >> >> +
-> > >> >> +#ifdef CONFIG_OF
-> > >> >
-> > >> > Can the driver be used without device tree? Would it be simpler to
-> > >> >  just add depends OF in the Kconfig entry?
-> > >> 
-> > >> It can be used if the default params (or those configured by u-boot I
-> > >> guess) fit your needs. I think it would be fairly easy to extend the
-> > >> driver later to expose g762_config struct to allow parameters to be set
-> > >> w/o using OF. If someone wants to do that, I think it is better to not
-> > >> depend on OF in Kconfig at the moment but I have not strong argument
-> > >> other that that one. I'll let you decide.
-> > >> 
-> > > Agreed. As long as there are major platforms not supporting device tree,
-> > > and as long as device tree overlays are not supported, it must not be made
-> > > mandatory. Especially for I2C and SPI devices I reserve the right to be able
-> > > test the hardware on an X86 system and not require a reboot to do so.
-> > 
-> > Understood. Following Simon's post, I think it's useful to implement
-> > some init function for non DT-enabled platforms. 
-> > 
-> Sure, as long as Simon commits to test it and - if possible - to provide
-> the necessary platform code.
+> [...]
+> 
+> >  	if (is_smp()) {
+> > -		if (psci_smp_available())
+> > -			smp_set_ops(&psci_smp_ops);
+> > -		else if (mdesc->smp)
+> > -			smp_set_ops(mdesc->smp);
+> > +		if (!mdesc->smp_init || !mdesc->smp_init()) {
+> 
+> Minor nit, but this feels backwards to me. We usually return 0 on success,
+> yet we're saying here that if mdesc->smp_init() returns 0, then we go and
+> override the smp ops.
 
-Hi Guenter,
-
-I commit to do whatever needed to have g762 support on the 2Big Network
-v2 and 2Big NAS boards.
-
-But note that I am can't test the options "pwm_enable" and "fan_target".
-As we are using a two wire fan on this boards, this options are not
-relevant.
-
-Moreover except for the out_mode/pwm_mode setting, I am rather happy
-with the default configuration.
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130425/fdf1f927/attachment-0001.sig>
+I am OK with changing the interface to return an int instead of a bool,
+but given that Nicolas is the main user of smp_init at the moment, I'll
+wait for his opinion.
