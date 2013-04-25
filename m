@@ -1,31 +1,19 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 26 Apr 2013 00:31:01 +0900
-Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle: use init/exit common routine
-In-Reply-To: <5178F8E0.6010606@linaro.org>
-References: <1366728077-18988-1-git-send-email-daniel.lezcano@linaro.org>
- <5178F8E0.6010606@linaro.org>
-Message-ID: <51794C35.6070400@samsung.com>
+Date: Fri, 26 Apr 2013 00:33:39 +0900
+Subject: Exynos regressions w.r.t. config and debuggability due to
+ multiplatform
+In-Reply-To: <201304241703.49864.arnd@arndb.de>
+References: <CAOesGMgRsa-AvbEZCc1=_ovaZMaG0S-CDok2MDp_zu5yderAYw@mail.gmail.com>
+ <201304241703.49864.arnd@arndb.de>
+Message-ID: <51794CD3.4080807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/13 18:35, Daniel Lezcano wrote:
-> On 04/23/2013 04:41 PM, Daniel Lezcano wrote:
->> Remove the duplicated code and use the cpuidle common code for initialization.
+On 04/25/13 00:03, Arnd Bergmann wrote:
+> On Wednesday 24 April 2013, Olof Johansson wrote:
+>> I think we should hold off on multiplatform for exynos until it works
+>> better, i.e. 3.11.
 >>
->> Signed-off-by: Daniel Lezcano<daniel.lezcano@linaro.org>
->> ---
->
-> Hi Kim and Ben,
->
-> It is the last patch in the series which was not acked-by.
-> Rafael is willing to take it in its tree if you ack it.
->
-> Are you ok if this patch ?
->
-Looks OK to me, please go ahead with my ack if you want:
-
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Thanks.
+I think, this would be better choice for now if it's not urgent...
 
 - Kukjin
