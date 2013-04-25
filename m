@@ -1,64 +1,68 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 25 Apr 2013 10:58:19 -0400 (EDT)
-Subject: [PATCH v8 1/2] arm: introduce psci_smp_ops
-In-Reply-To: <20130425104508.GG12848@mudshark.cambridge.arm.com>
-References: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
- <1366828819-10745-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130425084711.GA12848@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1304251104090.4180@kaball.uk.xensource.com>
- <20130425104508.GG12848@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1304251054420.1258@syhkavp.arg>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 25 Apr 2013 08:01:20 -0700
+Subject: Multiple issues with omap4 panda es in linux next
+In-Reply-To: <20130425090447.GK7889@arwen.pp.htv.fi>
+References: <5174F7A8.7070308@ti.com> <20130422180316.GA10155@atomide.com>
+ <5176A45B.5@ti.com> <20130423172353.GD10155@atomide.com>
+ <20130423213151.GM10155@atomide.com>
+ <20130423231605.GO10155@atomide.com> <517770A0.4000609@ti.com>
+ <20130424190821.GB5184@atomide.com>
+ <20130424192330.GC5184@atomide.com>
+ <20130425090447.GK7889@arwen.pp.htv.fi>
+Message-ID: <20130425150120.GH5184@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Apr 2013, Will Deacon wrote:
-
-> On Thu, Apr 25, 2013 at 11:12:54AM +0100, Stefano Stabellini wrote:
-> > On Thu, 25 Apr 2013, Will Deacon wrote:
-> > > > +/*
-> > > > + * cpu_suspend   Suspend the execution on a CPU
-> > > > + * @state        we don't currently describe affinity levels, so just pass 0.
-> > > > + * @entry_point  the first instruction to be executed on return
-> > > > + * returns 0  success, < 0 on failure
-> > > > + *
-> > > > + * cpu_off       Power down a CPU
-> > > > + * @state        we don't currently describe affinity levels, so just pass 0.
-> > > > + * no return on successful call
-> > > > + *
-> > > > + * cpu_on        Power up a CPU
-> > > > + * @cpuid        cpuid of target CPU, as from MPIDR
-> > > > + * @entry_point  the first instruction to be executed on return
-> > > > + * returns 0  success, < 0 on failure
-> > > > + *
-> > > > + * migrate       Migrate the context to a different CPU
-> > > > + * @cpuid        cpuid of target CPU, as from MPIDR
-> > > > + * returns 0  success, < 0 on failure
-> > > > + *
-> > > > + */
+* Felipe Balbi <balbi@ti.com> [130425 02:10]:
+> On Wed, Apr 24, 2013 at 12:23:30PM -0700, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [130424 12:13]:
+> > > * Kishon Vijay Abraham I <kishon@ti.com> [130423 22:46]:
+> > > > Hi Tony,
+> > > > 
+> > > > On Wednesday 24 April 2013 04:46 AM, Tony Lindgren wrote:
+> > > > >* Tony Lindgren <tony@atomide.com> [130423 14:37]:
+> > > > >>* Tony Lindgren <tony@atomide.com> [130423 10:28]:
+> > > > >>>* Kishon Vijay Abraham I <kishon@ti.com> [130423 08:15]:
+> > > > >>>>>>>2. MUSB fails with legacy booting and DT on panda es
+> > > > >>>>>>>
+> > > > >>>>>>>With both legacy and DT booting I get something like:
+> > > > >>>>>>>
+> > > > >>>>>>>HS USB OTG: no transceiver configured
+> > > > >>>>>>>musb-hdrc musb-hdrc.0.auto: musb_init_controller failed with status -517
+> > > > >>>>>>
+> > > > >>>>>>The dt should work fine with https://patchwork.kernel.org/patch/2423061/.
+> > > > >>>>>
+> > > > >>>>>OK thanks for checking that.
+> > > > >
+> > > > >Kishon, I think there's also some other issue remaining
+> > > > >in linux next with MUSB and DT. I'm still getting the
+> > > > >"HS USB OTG: no transceiver configured" although the nop
+> > > > >xceiv is compiled in. Maybe give it a try against linux
+> > > > >next?
+> > > > 
+> > > > For OMAP4 MUSB, you'll need omap-usb2 phy. I've attached my .config.
 > > > 
-> > > Can you move these comments into psci-smp.c please? They're really specific
-> > > to the implementation there, and if we put them in a header we're lying to
-> > > ourselves about the parameters actually described by the PSCI specification.
+> > > Thanks your config helped me to track it down. Looks like I got
+> > > the PHYs the wrong way around between EHCI and MUSB..
+> > > 
+> > > In any case, I did have omap-usb2 compiled in, but I did not have
+> > > OMAP_OCP2SCP=y set. Should OMAP_USB2 depend on that?
+> > > 
+> > > Also, looks like MUSB just sits in b_idle mode though, so no more
+> > > ID pin interrupt for some reason.
 > > 
-> > You have a good point about the PSCI spec.
-> > 
-> > However from the Linux POV these comments should regard the functions
-> > exported by psci_operations, not the firmware interface, this is why I
-> > think it makes sense to keep them in psci.h.
-> > What we are saying is for example that psci_operations.cpu_on returns 0
-> > on success and < 0 on failure, and it takes a cpuid and an entry point
-> > as parameters. We are not saying anything about the firmware interface.
+> > OK looks like I got the ID interrupt going by enabling
+> > CONFIG_TWL6030_USB=y. Still stays in a_idle with no keyboard
+> > after plugging it in, but now changes between a and b mode.
 > 
-> I disagree. You're explicitly stating that we pass the `cpuid of target CPU,
-> as from MPIDR'. That's simply not true -- the firmware could choose any
-> numbering scheme to identify the CPUs. For KVM and Xen, it *is* the mpidr,
-> which is why psci-smp.c works at all, but that's where the comment belongs,
-> not in this header file.
+> come again, you ground ID pin and have no devices attached ? Then it
+> should stay in a_idle.
 
-At some point, the _kernel_ API for interfacing with the firmware's PSCI 
-will have to ensure uniformity somehow.  The PSCI interface code could 
-translate the passed MPIDR into whatever the firmware decided to use for 
-identifying CPUs if needed, keeping this issue localized.
+After playing with looks like it detects the keyboard after replugging
+the cable a few times. So it's not detecting the keyboard every time when
+plugged in, but sounds like that's not related to the DT patches. It's
+probably the session bit related issues again..
 
+Regards,
 
-Nicolas
+Tony
