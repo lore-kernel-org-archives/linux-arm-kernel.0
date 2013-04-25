@@ -1,32 +1,53 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Apr 2013 14:44:43 +0100
-Subject: [PATCH 5/9] crypto: ux500/cryp - Fix compile error
-In-Reply-To: <CACRpkdZNFqbHJB7R5zqVzkAn_nV=G+c27YRB7VCQxiMyFTnPbg@mail.gmail.com>
+Date: Thu, 25 Apr 2013 14:46:36 +0100
+Subject: [PATCH 1/9 v2] crypto: ux500/hash - Prepare clock before
+ enabling it
+In-Reply-To: <CACRpkdYrCA6SduwMJF=7C9hyjP2Or7gxhjVFtLshdzkbYnxX1w@mail.gmail.com>
 References: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
- <1366280825-31136-6-git-send-email-lee.jones@linaro.org>
- <CACRpkdZNFqbHJB7R5zqVzkAn_nV=G+c27YRB7VCQxiMyFTnPbg@mail.gmail.com>
-Message-ID: <20130425134443.GO4623@gmail.com>
+ <1366280825-31136-2-git-send-email-lee.jones@linaro.org>
+ <20130419122428.GC3432@gmail.com>
+ <CACRpkdYrCA6SduwMJF=7C9hyjP2Or7gxhjVFtLshdzkbYnxX1w@mail.gmail.com>
+Message-ID: <20130425134636.GP4623@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 25 Apr 2013, Linus Walleij wrote:
 
-> On Thu, Apr 18, 2013 at 12:27 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > Clearly this driver hasn't been tested, or even enabled in a while.
+> On Fri, Apr 19, 2013 at 2:24 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > Slight change of plan for v2.
 > >
-> > drivers/crypto/ux500/cryp/cryp_core.c:1771:3:
-> >         error: request for member ?pm? in something not a structure or union
+> > Now we're doing a seperate clk_prepare(), as the clk_enable() in the
+> > previous patch turned out to be called inside a spin_lock().
+> >
+> > Arnd, can you confirm your Ack please?
+> 
+> Do you really want letters to Arnd to be part of the commit log?
+> 
+> >
+> > ---
+> 
+> Note: stuff following the three dashes (---) will be *omitted*
+> from the change log. This seems to be turned upside-down.
+
+Ah, I didn't know that, thanks.
+
+This patch wasn't due for 'plucking', just reviewing.
+
+> > crypto: ux500/hash - Prepare clock before enabling it
+> >
+> > If we fail to prepare the ux500-hash clock before enabling it the
+> > platform will fail to boot. Here we insure this happens.
 > >
 > > Cc: Herbert Xu <herbert@gondor.apana.org.au>
 > > Cc: David S. Miller <davem@davemloft.net>
 > > Cc: Andreas Westin <andreas.westin@stericsson.com>
 > > Cc: linux-crypto at vger.kernel.org
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
 > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> NAK. I already fixed this. It is in v3.9-rc7.
+> Pls include Ulf Hansson <ulf.hansson@linaro.org> on this patch.
 
-Yes, I saw it when I rebased. I've dropped the patch.
+Sure.
 
 -- 
 Lee Jones
