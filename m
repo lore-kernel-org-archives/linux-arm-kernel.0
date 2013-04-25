@@ -1,67 +1,61 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 25 Apr 2013 21:36:22 +0200
-Subject: gpio-pxa initcall level change and machine init breakage
-References: <5172B398.7060706@newsguy.com>
- <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
- <517466F6.3000003@newsguy.com>
- <CAD6h2NSy0=3P-PHdCiJJQG_jvGaFnr7uex+Uxs=0F-VsUxtPWg@mail.gmail.com>
- <CACRpkdbk24kR75fanvXVAocnuozNq_=jWDSPHPCWhbZCOrN5_Q@mail.gmail.com>
- <5176E438.80800@newsguy.com>
- <CACRpkdYLCKKZZFi6Y-viPUvrwupJGzfxr3f20a1emp-9qE0YBg@mail.gmail.com>
-Message-ID: <87ppxiz9l5.fsf@free.fr>
+From: stigge@antcom.de (Roland Stigge)
+Date: Thu, 25 Apr 2013 21:50:42 +0200
+Subject: [PATCH 19/21] USB: lpc32xx: ISP1301 needs USB_PHY
+In-Reply-To: <1366910944-3033663-20-git-send-email-arnd@arndb.de>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <1366910944-3033663-20-git-send-email-arnd@arndb.de>
+Message-ID: <51798912.4090108@antcom.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+On 25/04/13 19:29, Arnd Bergmann wrote:
+> The Kconfig entry for USB_LPC32XX unconditionally selects USB_ISP1301,
+> which is now only visible when USB_PHY is also enabled.
+> 
+> This adds an appropriate dependency and enables USB_PHY in the msm
+> defconfig, avoiding these build errors:
+> 
+> warning: (USB_LPC32XX) selects USB_ISP1301 which has unmet direct dependencies (USB_SUPPORT && USB_PHY && (USB || USB_GADGET) && I2C)
+> drivers/built-in.o: In function `usb_hcd_nxp_probe':
+> drivers/usb/host/ohci-nxp.c:224: undefined reference to `isp1301_get_client'
+> drivers/built-in.o: In function `lpc32xx_udc_probe':
+> drivers/usb/gadget/lpc32xx_udc.c:3071: undefined reference to `isp1301_get_client'
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-usb at vger.kernel.org
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Roland Stigge <stigge@antcom.de>
 
-> On Tue, Apr 23, 2013 at 9:42 PM, Mike Dunn <mikedunn@newsguy.com> wrote:
->
->> On a more general note... I'm surprised that gpiolib can not run earlier, for
->> something so low-level.
->
-> Well I think the patch we're discussing is making it run less early, and it
-> can actually run as arch_initcall() or similar if you wish (it's up to the
-> driver).
->
-> However that is beside the point, Haojian is still doing the right thing
-> trying to push this to driver init (==module_init) level. The reason is
-> that basically all hardware drivers should be initialized at this level
-> because the other init levels are basically for other things and driver
-> deps are just shoehorned into them.
->
-> Instead of relying on things to be set up early one shall rely on
-> deferred probe.
-Hi Linus,
+Tested-by: Roland Stigge <stigge@antcom.de>
+Acked-by: Roland Stigge <stigge@antcom.de>
 
-Even if that is the long term goal, and I agree with that goal, let me quote
-Documentation/gpio.txt : "However, for spinlock-safe GPIOs it's OK to use them
-before tasking is enabled, as part of early board setup.".
-
-When gpio abstraction was written, it was assumed GPIO usage was usable in early
-platform setup code. As this was granted, we (board maintainers) coded
-accordingly.
-
-Now this patch breaks boards. I disagree in having my board code broken without
-notice. What I would find less intrusive would be to :
- (a) revert the patch
- (b) inform board maintainers that they must fix their board code (for example
- give them 1 window)
- (c) put back the patch. Board maintainers who did not amend their board
- code cannot say anymore they didn't know it. Board maintainers will also have
- time to rise objections if they think they cannot change their board code
- (which I do not believe is possible, but who knows ...)
-
-Ah and change the Documentation too I think, if you want GPIO to be only usable
-from device initcall level.
-
-> Alas, it is not an easy change, and not expected to happen quickly
-> or painlessly.
-Sure, so let's do it in right order, shall we ?
-
-Cheers.
-
--- 
-Robert
-
-PS: When I say "broken code", in the mioa701 case, my phone doesn't wakeup on
-phone calls. Disturbing, isn't it ?
+> ---
+>  arch/arm/configs/lpc32xx_defconfig | 1 +
+>  drivers/usb/gadget/Kconfig         | 1 +
+>  2 files changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/configs/lpc32xx_defconfig b/arch/arm/configs/lpc32xx_defconfig
+> index 8fee514..398a367 100644
+> --- a/arch/arm/configs/lpc32xx_defconfig
+> +++ b/arch/arm/configs/lpc32xx_defconfig
+> @@ -146,6 +146,7 @@ CONFIG_SND_DEBUG_VERBOSE=y
+>  # CONFIG_SND_SPI is not set
+>  CONFIG_SND_SOC=y
+>  CONFIG_USB=y
+> +CONFIG_USB_PHY=y
+>  CONFIG_USB_OHCI_HCD=y
+>  CONFIG_USB_STORAGE=y
+>  CONFIG_USB_GADGET=y
+> diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
+> index a61d981..f85b427 100644
+> --- a/drivers/usb/gadget/Kconfig
+> +++ b/drivers/usb/gadget/Kconfig
+> @@ -144,6 +144,7 @@ config USB_AT91
+>  config USB_LPC32XX
+>  	tristate "LPC32XX USB Peripheral Controller"
+>  	depends on ARCH_LPC32XX
+> +	depends on USB_PHY
+>  	select USB_ISP1301
+>  	select USB_OTG_UTILS
+>  	help
