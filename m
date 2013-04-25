@@ -1,65 +1,90 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 25 Apr 2013 15:36:50 +0200
-Subject: RFC: [PATCH] clocksource: tcb: fix min_delta calculation
-In-Reply-To: <1366722524-25991-1-git-send-email-mkl@pengutronix.de>
-References: <517687AB.1040309@pengutronix.de>
- <1366722524-25991-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <51793172.9030802@pengutronix.de>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Thu, 25 Apr 2013 14:40:21 +0100
+Subject: [PATCH v4 2/7] xen/arm: SMP support
+In-Reply-To: <1366831695-13214-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1304242012590.4180@kaball.uk.xensource.com>
+ <1366831695-13214-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1366897221.20256.544.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2013 03:08 PM, Marc Kleine-Budde wrote:
-> The commit
+On Wed, 2013-04-24 at 20:28 +0100, Stefano Stabellini wrote:
+> Map vcpu_info using VCPUOP_register_vcpu_info on secondary cpus.
 > 
->     77cc982 clocksource: use clockevents_config_and_register() where possible
+> Call enable_percpu_irq on every cpu.
 > 
-> switches from manually calculating min_delta_ns (and others) and
-> clockevents_register_device() to automatic calculation via
-> clockevents_config_and_register(). During this conversation the "+ 1" in
+> Changed in v2:
+> - move the percpu variable argument fix to a separate patch;
+> - remove unused variable.
 > 
->     min_delta_ns = clockevent_delta2ns(1, &clkevt.clkevt) + 1;
-> 
-> was lost. This leads to problems with schedule_delayed_work() with a delay of
-> "1". Resulting in the work not scheduled in time.
-> 
-> This patch fixes the problem by increasing the min_delta to "2" ticks.
-> 
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-
-Who will take care of this patch?
-
-Marc
-
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 > ---
->  drivers/clocksource/tcb_clksrc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm/xen/enlighten.c |   38 +++++++++++++++++++++++++++++++++++++-
+>  1 files changed, 37 insertions(+), 1 deletions(-)
 > 
-> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-> index 8a61872..7cf6dc7 100644
-> --- a/drivers/clocksource/tcb_clksrc.c
-> +++ b/drivers/clocksource/tcb_clksrc.c
-> @@ -197,7 +197,7 @@ static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index 99ce189..94bbf3b 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -2,6 +2,7 @@
+>  #include <xen/events.h>
+>  #include <xen/grant_table.h>
+>  #include <xen/hvm.h>
+> +#include <xen/interface/vcpu.h>
+>  #include <xen/interface/xen.h>
+>  #include <xen/interface/memory.h>
+>  #include <xen/interface/hvm/params.h>
+> @@ -32,6 +33,7 @@ struct shared_info xen_dummy_shared_info;
+>  struct shared_info *HYPERVISOR_shared_info = (void *)&xen_dummy_shared_info;
 >  
->  	clkevt.clkevt.cpumask = cpumask_of(0);
->  
-> -	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
-> +	clockevents_config_and_register(&clkevt.clkevt, 32768, 2, 0xffff);
->  
->  	setup_irq(irq, &tc_irqaction);
+>  DEFINE_PER_CPU(struct vcpu_info *, xen_vcpu);
+> +DEFINE_PER_CPU(struct vcpu_info, xen_vcpu_info);
+
+>  /* These are unused until we support booting "pre-ballooned" */
+>  unsigned long xen_released_pages;
+> @@ -148,6 +150,32 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
 >  }
-> 
+>  EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
+>  
+> +static int __init xen_secondary_init(unsigned int cpu)
+> +{
+> +	struct vcpu_register_vcpu_info info;
+> +	struct vcpu_info *vcpup;
+> +	int err;
+> +
+> +	if (cpu == 0)
+> +		return 0;
+> +
+> +	pr_info("Xen: initializing cpu%d\n", cpu);
+> +	vcpup = &per_cpu(xen_vcpu_info, cpu);
+> +
+> +	info.mfn = __pa(vcpup) >> PAGE_SHIFT;
+> +	info.offset = offset_in_page(vcpup);
 
+Do you need to somehow guarantee it's not going to cross a page? Maybe
+standard C alignment rules make that the case?
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+> @@ -216,6 +245,8 @@ static int __init xen_guest_init(void)
+>  	 * is required to use VCPUOP_register_vcpu_info to place vcpu info
+>  	 * for secondary CPUs as they are brought up. */
+>  	per_cpu(xen_vcpu, 0) = &HYPERVISOR_shared_info->vcpu_info[0];
+> +	for_each_online_cpu(i)
+> +		xen_secondary_init(i);
+>  
+>  	gnttab_init();
+>  	if (!xen_initial_domain())
+[...]
+> @@ -244,7 +280,7 @@ static int __init xen_init_events(void)
+>  		return -EINVAL;
+>  	}
+>  
+> -	enable_percpu_irq(xen_events_irq, 0);
+> +	on_each_cpu(xen_percpu_enable_events, NULL, 0);
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130425/6c6ec9f4/attachment.sig>
+It feels like there ought to be some sort of per-cpu bringup callback
+which takes care of these dynamically. Maybe that doesn't matter until
+we get vcpu hotplug going?
+
+>  
+>  	return 0;
+>  }
