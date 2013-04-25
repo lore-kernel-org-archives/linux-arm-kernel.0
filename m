@@ -1,41 +1,49 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 25 Apr 2013 15:40:49 +0100
-Subject: [PATCH] mfd: vexpress: Handle pending config transactions
-In-Reply-To: <1366894965.3528.19.camel@computer5.home>
-References: <1366821084-12815-1-git-send-email-pawel.moll@arm.com>
- <1366894965.3528.19.camel@computer5.home>
-Message-ID: <1366900849.10438.12.camel@hornet>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 25 Apr 2013 10:42:41 -0400 (EDT)
+Subject: [PATCH v8 2/2] ARM: Enable selection of SMP operations at boot
+ time
+In-Reply-To: <20130425084933.GB12848@mudshark.cambridge.arm.com>
+References: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
+ <1366828819-10745-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130425084933.GB12848@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.03.1304251040430.1258@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-04-25 at 14:02 +0100, Jon Medhurst (Tixy) wrote:
-> > +	while (!list_empty(&bridge->transactions)) {
-> > +		trans = list_first_entry(&bridge->transactions,
-> > +				struct vexpress_config_trans, list);
-> >  
-> > -		bridge->info->func_exec(trans->func->func, trans->offset,
-> > -				trans->write, trans->data);
-> > +		vexpress_config_dump_trans("Executing pending", trans);
-> > +		status = bridge->info->func_exec(trans->func->func,
-> > +				trans->offset, trans->write, trans->data);
-> > +
-> > +		if (status == VEXPRESS_CONFIG_STATUS_DONE)
-> > +			vexpress_config_dump_trans("Finished pending", trans);
-> > +		else
-> > +			break;
-> 
-> For each transaction we execute in this loop, don't we also need to do
-> the actions vexpress_config_complete does? E.g.
-> 
-> 	trans->status = status;
-> 	list_del(&trans->list);
-> 	complete(&trans->completion);
-> 
-> except in the case status==VEXPRESS_CONFIG_STATUS_WAIT.
+On Thu, 25 Apr 2013, Will Deacon wrote:
 
-You're completely right. I shouldn't have write this code as the last
-thing in the afternoon...
+> On Wed, Apr 24, 2013 at 07:40:19PM +0100, Stefano Stabellini wrote:
+> > From: Jon Medhurst <tixy@linaro.org>
+> > 
+> > Add a new 'smp_init' hook to machine_desc so platforms can specify a
+> > function to be used to setup smp ops instead of having a statically
+> > defined value.  The hook must return true when smp_ops are initialized.
+> > If false the static mdesc->smp_ops will be used by default.
+> > 
+> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > ---
+> >  arch/arm/include/asm/mach/arch.h |    4 ++++
+> >  arch/arm/kernel/setup.c          |   10 ++++++----
+> >  2 files changed, 10 insertions(+), 4 deletions(-)
+> 
+> [...]
+> 
+> >  	if (is_smp()) {
+> > -		if (psci_smp_available())
+> > -			smp_set_ops(&psci_smp_ops);
+> > -		else if (mdesc->smp)
+> > -			smp_set_ops(mdesc->smp);
+> > +		if (!mdesc->smp_init || !mdesc->smp_init()) {
+> 
+> Minor nit, but this feels backwards to me. We usually return 0 on success,
+> yet we're saying here that if mdesc->smp_init() returns 0, then we go and
+> override the smp ops.
 
-Will send v2.
+It doesn't return 0, but true or false.  So, semantically, if ->smp_init 
+returns false, that means it didn't initialize anything.
 
-Pawe?
+
+Nicolas
