@@ -1,68 +1,94 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 25 Apr 2013 06:58:19 -0700
-Subject: Multiple issues with omap4 panda es in linux next
-In-Reply-To: <20130419181825.GN10155@atomide.com> (Tony Lindgren's message of
- "Fri, 19 Apr 2013 11:18:26 -0700")
-References: <20130419171318.GK10155@atomide.com> <517181B2.9070302@ti.com>
- <20130419174454.GM10155@atomide.com> <517184A2.9020908@ti.com>
- <20130419181825.GN10155@atomide.com>
-Message-ID: <87obd21zlw.fsf@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Apr 2013 16:05:57 +0200
+Subject: [PATCH 6/9] crypto: ux500/cryp - Set DMA configuration though
+ dma_slave_config()
+In-Reply-To: <20130425134402.GN4623@gmail.com>
+References: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
+ <1366280825-31136-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbFgW6bGYt59WtN4r2izuN09AJw4J1cqir82uzFsuMmWQ@mail.gmail.com>
+ <20130425134402.GN4623@gmail.com>
+Message-ID: <CACRpkdaugQO5aMBnfvD8fmYkKbiWsHwvqg3=eARovqFe9MDExw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
-
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130419 10:56]:
->> On Friday 19 April 2013 11:14 PM, Tony Lindgren wrote:
->> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [130419 10:43]:
->> >> On Friday 19 April 2013 10:43 PM, Tony Lindgren wrote:
->> >>> Hi all,
->> >>>
->> >>> Here's a list of breakage I've noticed so far while trying to
->> >>> use linux next on my pandaboard es. Probably similar issues exist
->> >>> on other boards as well.
->> >>>
->> >>> Ideally we would not have any breakage by the merge window, so
->> >>> let's try to get these fixed ASAP:
->> >>>
->> >>> 1. Serial console broken on panda es booting with DT
->> >>>
->> >>> The symptoms are dmesg output stopping after few lines
->> >>> and only continuing after pressing a key. Does not seem to
->> >>> happen on blaze with DT for some reason. And does not happen
->> >>> on panda es with legacy booting.
->> >>>
->> >> This one is known and reported on list along with fix patches and
->> >> later pull request [1].
->> >>
->> >> Unfortunately with all the testing and everything and patches have
->> >> been on the list for quite some time, feedback on one of the patch
->> >> received was after pull request and then there was no further
->> >> clarification. That series address the same exact issue you have
->> >> mentioned above.
->> > 
->> > OK thanks. I think Paul picked some of those and the plan was
->> > to update the branch? Which one(s) should go into v3.10 as fixes?
->> > 
->> Main in that series was to handle driver sysc handling withing hwmod
->> layer and that is where the series got stuck [2]. Without that support
->> other patches won't fix the issue.
+On Thu, Apr 25, 2013 at 3:44 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 25 Apr 2013, Linus Walleij wrote:
+>> On Thu, Apr 18, 2013 at 12:27 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>>
+>> > The DMA controller currently takes configuration information from
+>> > information passed though dma_channel_request(), but it shouldn't.
+>> > Using the API, the DMA channel should only be configured during
+>> > a dma_slave_config() call.
+>> >
+>> > Cc: Herbert Xu <herbert@gondor.apana.org.au>
+>> > Cc: David S. Miller <davem@davemloft.net>
+>> > Cc: Andreas Westin <andreas.westin@stericsson.com>
+>> > Cc: linux-crypto at vger.kernel.org
+>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> (...)
+>> >  /* Cryp DMA interface */
+>> > +#define HASH_DMA_TX_FIFO       0x08
+>> > +#define HASH_DMA_RX_FIFO       0x10
+>>
+>> Yes, this is nice address notation :-)
+>>
+>> >  /**
+>> >   * struct cryp_device_data - structure for a cryp device.
+>> > - * @base: Pointer to the hardware base address.
+>> > + * @base: Pointer to virtual base address of the cryp device.
+>> > + * @phybase: Pointer to physical memory location of the cryp device.
+>> >   * @dev: Pointer to the devices dev structure.
+>> >   * @clk: Pointer to the device's clock control.
+>> >   * @pwr_regulator: Pointer to the device's power control.
+>> > @@ -232,6 +236,7 @@ struct cryp_dma {
+>> >   */
+>> >  struct cryp_device_data {
+>> >         struct cryp_register __iomem *base;
+>> > +       phys_addr_t phybase;
+>>
+>> Use dma_addr_t. Maybe "phybase" is misleading,
+>> "dmabase" is probably better. (Also applies to the
+>> cryp patch).
 >
-> OK it seems that that is still ongoing discussion. For v3.10 we should
-> probably just disable PM for omap4 for DT booting so people can use
-> it for DT related development.
+> Accept it's not the dmabase.
+>
+> It's the phybase (U8500_CRYP1_BASE) i.e. the physical base address of
+> the device's regs.
 
-Disabling PM (and even avoiding WFI using 'nohlt') will not fix this
-problem, since it's related to the idle-mode of the IP block itself.
+So when you assign the src_addr or dst_addr in struct
+dmaengine_slave_config in this code,
+you notice that this looks like so:
 
-What fixes the problem is the series from Santosh for the SYSC removal.
+struct dma_slave_config {
+        enum dma_transfer_direction direction;
+        dma_addr_t src_addr;
+        dma_addr_t dst_addr;
+        enum dma_slave_buswidth src_addr_width;
+        enum dma_slave_buswidth dst_addr_width;
+        u32 src_maxburst;
+        u32 dst_maxburst;
+        bool device_fc;
+};
 
-Santosh, it seems that series combined a fix for this problem with some
-cleanup of the hwmod code that Paul had some concerns with.  Is there
-any chance you can split up that series into a fix targetted at the
-DT-boot UART problem and a feature cleanup for hwmod?
+So when you do this:
 
-Then we hopefully get this fix into v3.10-rc and work on the hwmod
-changes/cleanup for the following merge window.
++       struct dma_slave_config mem2cryp = {
++               .direction = DMA_MEM_TO_DEV,
++               .dst_addr = device_data->phybase + HASH_DMA_TX_FIFO,
++               .dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES,
++               .dst_maxburst = 4,
++        };
 
-Kevin
+on .dst_addr you are effectively casting a phys_addr_t
+into a dma_addr_t.
+
+But  we must do this at some point, and now I think
+that doing it here may be just as good (because we might
+just add a physical-to-dma memory translation if need
+be).
+
+So allright.
+
+Yours,
+Linus Walleij
