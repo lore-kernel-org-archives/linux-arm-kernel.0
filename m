@@ -1,55 +1,56 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Apr 2013 19:28:56 +0200
-Subject: [PATCH 13/21] iommu: tegra: print dma_addr_t using %lld
+Date: Thu, 25 Apr 2013 19:28:49 +0200
+Subject: [PATCH 06/21] ALSA: ali5451: use mdelay instead of large udelay
+ constants
 In-Reply-To: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
 References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
-Message-ID: <1366910944-3033663-14-git-send-email-arnd@arndb.de>
+Message-ID: <1366910944-3033663-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code was recently changed to work for builds with a 64 bit
-dma_addr_t, but the printk unconditionally uses a format
-string for an "long" variable, which is always wrong as
-the dma_add_t is now either 'unsigned int' or 'unsigned long long'
-depending on configuration.
-
-The easiest solution is to cast the variable to u64 and print
-it as a 64 bit value.
+ARM cannot handle udelay for more than 2 miliseconds, so we
+should use mdelay instead for those.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Varun Sethi <Varun.Sethi@freescale.com>
-Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Takashi Iwai <tiwai@suse.de>
+Cc: alsa-devel at alsa-project.org
 ---
- drivers/iommu/tegra-gart.c | 3 ++-
- drivers/iommu/tegra-smmu.c | 2 +-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ sound/pci/ali5451/ali5451.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/iommu/tegra-gart.c b/drivers/iommu/tegra-gart.c
-index 4aec8be..ebbdd82 100644
---- a/drivers/iommu/tegra-gart.c
-+++ b/drivers/iommu/tegra-gart.c
-@@ -295,7 +295,8 @@ static phys_addr_t gart_iommu_iova_to_phys(struct iommu_domain *domain,
- 
- 	pa = (pte & GART_PAGE_MASK);
- 	if (!pfn_valid(__phys_to_pfn(pa))) {
--		dev_err(gart->dev, "No entry for %08lx:%08x\n", iova, pa);
-+		dev_err(gart->dev, "No entry for %08llx:%pa\n",
-+				(u64)iova, &pa);
- 		gart_dump_table(gart);
- 		return -EINVAL;
+diff --git a/sound/pci/ali5451/ali5451.c b/sound/pci/ali5451/ali5451.c
+index e760af9..53754f5 100644
+--- a/sound/pci/ali5451/ali5451.c
++++ b/sound/pci/ali5451/ali5451.c
+@@ -451,10 +451,10 @@ static int snd_ali_reset_5451(struct snd_ali *codec)
+ 	if (pci_dev) {
+ 		pci_read_config_dword(pci_dev, 0x7c, &dwVal);
+ 		pci_write_config_dword(pci_dev, 0x7c, dwVal | 0x08000000);
+-		udelay(5000);
++		mdelay(5);
+ 		pci_read_config_dword(pci_dev, 0x7c, &dwVal);
+ 		pci_write_config_dword(pci_dev, 0x7c, dwVal & 0xf7ffffff);
+-		udelay(5000);
++		mdelay(5);
  	}
-diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-index bc9b599..ef2a120 100644
---- a/drivers/iommu/tegra-smmu.c
-+++ b/drivers/iommu/tegra-smmu.c
-@@ -772,7 +772,7 @@ static phys_addr_t smmu_iommu_iova_to_phys(struct iommu_domain *domain,
- 	pfn = *pte & SMMU_PFN_MASK;
- 	WARN_ON(!pfn_valid(pfn));
- 	dev_dbg(as->smmu->dev,
--		"iova:%08lx pfn:%08lx asid:%d\n", iova, pfn, as->asid);
-+		"iova:%08llx pfn:%08lx asid:%d\n", (u64)iova, pfn, as->asid);
+ 	
+ 	pci_dev = codec->pci;
+@@ -463,14 +463,14 @@ static int snd_ali_reset_5451(struct snd_ali *codec)
+ 	udelay(500);
+ 	pci_read_config_dword(pci_dev, 0x44, &dwVal);
+ 	pci_write_config_dword(pci_dev, 0x44, dwVal & 0xfffbffff);
+-	udelay(5000);
++	mdelay(5);
+ 	
+ 	wCount = 200;
+ 	while(wCount--) {
+ 		wReg = snd_ali_codec_peek(codec, 0, AC97_POWERDOWN);
+ 		if ((wReg & 0x000f) == 0x000f)
+ 			return 0;
+-		udelay(5000);
++		mdelay(5);
+ 	}
  
- 	spin_unlock_irqrestore(&as->lock, flags);
- 	return PFN_PHYS(pfn);
+ 	/* non-fatal if you have a non PM capable codec */
 -- 
 1.8.1.2
