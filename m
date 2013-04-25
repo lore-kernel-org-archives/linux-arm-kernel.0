@@ -1,26 +1,24 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Apr 2013 19:31:24 +0200
-Subject: Exynos regressions w.r.t. config and debuggability due to
- multiplatform
-In-Reply-To: <51794CD3.4080807@samsung.com>
-References: <CAOesGMgRsa-AvbEZCc1=_ovaZMaG0S-CDok2MDp_zu5yderAYw@mail.gmail.com>
- <201304241703.49864.arnd@arndb.de> <51794CD3.4080807@samsung.com>
-Message-ID: <201304251931.25028.arnd@arndb.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 25 Apr 2013 21:32:01 +0400
+Subject: [PATCH 1/2] drivers/video: Kconfig, fix mxsfb build
+In-Reply-To: <1366791772-11133-2-git-send-email-mpa@pengutronix.de>
+References: <1366790894-20426-1-git-send-email-mpa@pengutronix.de>
+ <1366791772-11133-1-git-send-email-mpa@pengutronix.de>
+ <1366791772-11133-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <51796891.3040908@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 April 2013, Kukjin Kim wrote:
-> 
-> On 04/25/13 00:03, Arnd Bergmann wrote:
-> > On Wednesday 24 April 2013, Olof Johansson wrote:
-> >> I think we should hold off on multiplatform for exynos until it works
-> >> better, i.e. 3.11.
-> >>
-> I think, this would be better choice for now if it's not urgent...
-> 
+Hello.
 
-I spent a lot of time on it because it's a priority for Linaro, but
-that means I'm biased in the question of whether to merge it or not.
-It should only get in if you and Olof think it's a good idea.
+On 24-04-2013 12:22, Markus Pargmann wrote:
 
-	Arnd
+> Kernel build fails with commit 669406534b4abb827d1bdc39bb5e2d5255818ae2
+
+   Please also specify the summary line of that commit in parens.
+
+> This patch replaces OF_VIDEOMODE symbol by VIDEOMODE_HELPERS.
+
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+
+WBR, Sergei
