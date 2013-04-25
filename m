@@ -1,69 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 25 Apr 2013 11:35:12 -0700
-Subject: [PATCHv2 1/4] Documentation: Add memory mapped ARM architected
- timer binding
-In-Reply-To: <516C7231.6060305@codeaurora.org>
-References: <1365812863-5367-1-git-send-email-sboyd@codeaurora.org>
- <1365812863-5367-2-git-send-email-sboyd@codeaurora.org>
- <516C6F12.5020208@gmail.com> <516C7231.6060305@codeaurora.org>
-Message-ID: <51797760.4040906@codeaurora.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 25 Apr 2013 19:45:51 +0100
+Subject: [PATCH v4 2/7] xen/arm: SMP support
+In-Reply-To: <1366909184.3142.0.camel@zakaz.uk.xensource.com>
+References: <alpine.DEB.2.02.1304242012590.4180@kaball.uk.xensource.com>
+ <1366831695-13214-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1366897221.20256.544.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.02.1304251503100.4180@kaball.uk.xensource.com>
+ <1366909184.3142.0.camel@zakaz.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1304251945290.4180@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rob,
+On Thu, 25 Apr 2013, Ian Campbell wrote:
+> > > > @@ -216,6 +245,8 @@ static int __init xen_guest_init(void)
+> > > >  	 * is required to use VCPUOP_register_vcpu_info to place vcpu info
+> > > >  	 * for secondary CPUs as they are brought up. */
+> > > >  	per_cpu(xen_vcpu, 0) = &HYPERVISOR_shared_info->vcpu_info[0];
+> > > > +	for_each_online_cpu(i)
+> > > > +		xen_secondary_init(i);
+> > > >  
+> > > >  	gnttab_init();
+> > > >  	if (!xen_initial_domain())
+> > > [...]
+> > > > @@ -244,7 +280,7 @@ static int __init xen_init_events(void)
+> > > >  		return -EINVAL;
+> > > >  	}
+> > > >  
+> > > > -	enable_percpu_irq(xen_events_irq, 0);
+> > > > +	on_each_cpu(xen_percpu_enable_events, NULL, 0);
+> > > 
+> > > It feels like there ought to be some sort of per-cpu bringup callback
+> > > which takes care of these dynamically. Maybe that doesn't matter until
+> > > we get vcpu hotplug going?
+> > 
+> > I suspect there isn't one, considering that on_each_cpu is also used by 
+> > kvm_vgic_hyp_init, kvm_timer_hyp_init and others.
+> 
+> Could we use cpu_notifiers for this?
 
-Can I get your ack on this binding or do you think we need to change
-something?
-
-Thanks,
-Stephen
-
-On 04/15/13 14:33, Stephen Boyd wrote:
-> On 04/15/13 14:20, Rob Herring wrote:
->> On Fri, Apr 12, 2013 at 7:27 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->>> @@ -26,3 +30,52 @@ Example:
->>>                              <1 10 0xf08>;
->>>                 clock-frequency = <100000000>;
->>>         };
->>> +
->>> +** Memory mapped timer node properties
->>> +
->>> +- compatible : Should at least contain "arm,armv7-timer-mem".
->> Everything about this timer is architecturally defined? If not, let's
->> use a more specific name.
-> I'm not sure I'm following you, but everything described here is part of
-> the ARM definition. What would be a more specific name?
->
->>> +
->>> +- clock-frequency : The frequency of the main counter, in Hz. Optional.
->>> +
->>> +- reg : The control frame base address.
->>> +
->>> +Note that #address-cells, #size-cells, and ranges shall be present to ensure
->>> +the CPU can address a frame's registers.
->>> +
->>> +Frame:
->>> +
->>> +- frame-number: 0 to 7.
->> I'd really like to get rid of the frame numbers and sub-nodes. Is the
->> frame number significant to software?
-> We need the frame number to read and write registers in the control
-> frame (the first base in the parent node). We currently use it to
-> determine if a frame has support for the virtual timer by reading the
-> CNTTIDR (a register with 4 bits per frame describing capabilities). If
-> we wanted to control access to the second view of a frame we would also
-> need to configure the CNTPL0ACRn register that pertains to the frame
-> we're controlling. Without a frame number we wouldn't know which
-> register to write.
->
->>> +- interrupts : Interrupt list for physical and virtual timers in that order.
->>> +  The virtual timer interrupt is optional.
->> Is that optional per frame?
-> Yes the virtual and physical timer interrupt is per-frame and the
-> virtual interrupt is optional.
->
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+cpu_notifiers are for cpu hotplug, not for secondary cpu bringup
