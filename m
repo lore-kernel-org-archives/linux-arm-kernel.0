@@ -1,50 +1,29 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 25 Apr 2013 11:12:54 +0100
-Subject: [PATCH v8 1/2] arm: introduce psci_smp_ops
-In-Reply-To: <20130425084711.GA12848@mudshark.cambridge.arm.com>
-References: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
- <1366828819-10745-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130425084711.GA12848@mudshark.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1304251104090.4180@kaball.uk.xensource.com>
+Date: Thu, 25 Apr 2013 11:14:43 +0100
+Subject: [PATCH v4 7/7] mach-virt: support Xen hypercalls for shutdown
+ and reboot
+In-Reply-To: <20130425085452.GC12848@mudshark.cambridge.arm.com>
+References: <alpine.DEB.2.02.1304242012590.4180@kaball.uk.xensource.com>
+ <1366831695-13214-7-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1304242301390.4180@kaball.uk.xensource.com>
+ <20130425085452.GC12848@mudshark.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1304251114280.4180@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 25 Apr 2013, Will Deacon wrote:
-> > +/*
-> > + * cpu_suspend   Suspend the execution on a CPU
-> > + * @state        we don't currently describe affinity levels, so just pass 0.
-> > + * @entry_point  the first instruction to be executed on return
-> > + * returns 0  success, < 0 on failure
-> > + *
-> > + * cpu_off       Power down a CPU
-> > + * @state        we don't currently describe affinity levels, so just pass 0.
-> > + * no return on successful call
-> > + *
-> > + * cpu_on        Power up a CPU
-> > + * @cpuid        cpuid of target CPU, as from MPIDR
-> > + * @entry_point  the first instruction to be executed on return
-> > + * returns 0  success, < 0 on failure
-> > + *
-> > + * migrate       Migrate the context to a different CPU
-> > + * @cpuid        cpuid of target CPU, as from MPIDR
-> > + * returns 0  success, < 0 on failure
-> > + *
-> > + */
+> On Wed, Apr 24, 2013 at 11:14:28PM +0100, Stefano Stabellini wrote:
+> > On Wed, 24 Apr 2013, Stefano Stabellini wrote:
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > CC: Marc Zyngier <marc.zyngier@arm.com>
+> > > CC: will.deacon at arm.com
+> > > CC: arnd at arndb.de
+> > > CC: rob.herring at calxeda.com
+> > 
+> > Thinking twice about this patch, a less intrusive alternative would be
+> > to set arm_pm_restart and pm_power_off to two xen specific functions
+> > later on from xen_guest_init.
 > 
-> Can you move these comments into psci-smp.c please? They're really specific
-> to the implementation there, and if we put them in a header we're lying to
-> ourselves about the parameters actually described by the PSCI specification.
+> Yes please. We'd like to remove mach-virt/* some day.
 
-You have a good point about the PSCI spec.
-
-However from the Linux POV these comments should regard the functions
-exported by psci_operations, not the firmware interface, this is why I
-think it makes sense to keep them in psci.h.
-What we are saying is for example that psci_operations.cpu_on returns 0
-on success and < 0 on failure, and it takes a cpuid and an entry point
-as parameters. We are not saying anything about the firmware interface.
-
-Maybe I should add@the top:
-
-"psci_operations functions and parameters, might different from the
-firmware interface:"
+I'll do
