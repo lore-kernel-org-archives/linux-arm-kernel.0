@@ -1,43 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 15:26:05 +0200
-Subject: [PATCH 2/2] pinctrl: samsung: Fix link error with
- CONFIG_PINCTRL_EXYNOS disabled
-In-Reply-To: <2113989.KXXvDDhnMa@amdc1227>
-References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
- <6940961.67Lk2axxPL@amdc1227>
- <CACRpkdZmSj-AqUA9kd7NMN6cL2Nxa0EaKoSVkwQSrxhcWEeQtg@mail.gmail.com>
- <2113989.KXXvDDhnMa@amdc1227>
-Message-ID: <CACRpkdY61h-H14QYHhADnAz1JRa=8Wbi0aYKSRW21xm4WHOHGA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 25 Apr 2013 14:33:15 +0100
+Subject: [PATCH] of: Set the DMA mask to 64 bits on ARM LPAE systems
+In-Reply-To: <1366764649-10342-1-git-send-email-lauraa@codeaurora.org>
+References: <1366764649-10342-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20130425133315.GA7157@localhost.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 4:47 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> On Wednesday 24 of April 2013 16:27:09 Linus Walleij wrote:
->> On Tue, Apr 23, 2013 at 2:09 PM, Tomasz Figa <t.figa@samsung.com> wrote:
->> > On Tuesday 23 of April 2013 14:03:12 Linus Walleij wrote:
->> >> This does not apply to my "devel" branch in the pinctrl tree.
->> >>
->> >> Could you rebase it on that branch?
->> >>
->> >> Or is the error not even in my tree?
->> >
->> > This one got sent incorrectly due to my mistake. Please try the correct
->> > version:
->> >
->> > [PATCH RESEND 2/2] pinctrl: samsung: Fix link error with
->> > CONFIG_PINCTRL_EXYNOS disabled
->>
->> This does not apply either.
->>
->> Can you please test against the "devel" branch in the pinctrl tree?
->
-> Right, it does not apply.
->
-> Well, actually it does with git am -3, but it is incorrect, since the problem
-> it intends to fix is not present in your tree, but rather is a merge error in
-> linux-next in a merge of Kgene's and your tree...
+On Wed, Apr 24, 2013 at 01:50:49AM +0100, Laura Abbott wrote:
+> By default on ARM systems, the coherent DMA mask (lowest
+> address) is set to ~0 or 0xFFFFFFFFFFFFFFFF. Currently,
+> of_platform_device_create_pdata sets the coherent DMA mask to
+> 32 bits. This prevents coherent dma allocations from working by default
+> without clients setting the DMA mask. Rather than make every client
+> on an LPAE system set the mask, set the mask to a 64 bit value on
+> ARM LPAE systems.
+> 
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  drivers/of/platform.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 0970505..18b69c1 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -214,7 +214,11 @@ struct platform_device *of_platform_device_create_pdata(
+>  #if defined(CONFIG_MICROBLAZE)
+>  	dev->archdata.dma_mask = 0xffffffffUL;
+>  #endif
+> +#ifdef CONFIG_ARM_LPAE
+> +	dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
+> +#else
+>  	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> +#endif
 
-Oh. Then you have to send the patch to Stephen Rothwell.
+I wouldn't add CONFIG_ARM_LPAE checks in here, you can use
+CONFIG_ARCH_DMA_ADDR_T_64BIT (types.h uses this for the dma_addr_t
+definition).
 
-Yours,
-Linus Walleij
+-- 
+Catalin
