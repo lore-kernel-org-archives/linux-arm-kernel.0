@@ -1,61 +1,78 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 25 Apr 2013 19:23:24 +0200
-Subject: [PATCH 08/14] sched: trig ILB on an idle buddy
+Date: Thu, 25 Apr 2013 19:23:25 +0200
+Subject: [PATCH 09/14] sched: evaluate the activity level of the system
 In-Reply-To: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
 References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1366910611-20048-9-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1366910611-20048-10-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the buddy CPU is not full and currently idle, we trigger an Idle Load
-Balance to give it the opportunity to pull more tasks.
+We evaluate the activity level of CPUs, groups and domains in order to define
+how many CPUs are required to handle the current activity.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- kernel/sched/fair.c |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ kernel/sched/fair.c |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 874f330..954adfd 100644
+index 954adfd..234ecdd 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
-@@ -5776,6 +5776,26 @@ end:
- 	clear_bit(NOHZ_BALANCE_KICK, nohz_flags(this_cpu));
- }
+@@ -3465,7 +3465,22 @@ static int check_pack_buddy(int cpu, struct task_struct *p)
+ 		return true;
  
-+static int check_nohz_buddy(int cpu)
-+{
-+	int buddy = per_cpu(sd_pack_buddy, cpu);
-+
-+	if (sysctl_sched_packing_mode != SCHED_PACKING_FULL)
-+		return false;
-+
-+	/* No pack buddy for this CPU */
-+	if (buddy == -1)
-+		return false;
-+
-+	if (is_buddy_full(buddy))
-+		return false;
-+
-+	if (cpumask_test_cpu(buddy, nohz.idle_cpus_mask))
-+		return true;
-+
-+	return false;
+ 	return false;
 +}
 +
- /*
-  * Current heuristic for kicking the idle load balancer in the presence
-  * of an idle cpu is the system.
-@@ -5813,6 +5833,10 @@ static inline int nohz_kick_needed(struct rq *rq, int cpu)
- 	if (rq->nr_running >= 2)
- 		goto need_kick;
- 
-+	/* the buddy is idle and not busy so we can pack */
-+	if (check_nohz_buddy(cpu))
-+		goto need_kick;
++static int get_cpu_activity(int cpu)
++{
++	struct rq *rq = cpu_rq(cpu);
++	u32 sum = rq->avg.runnable_avg_sum;
++	u32 period = rq->avg.runnable_avg_period;
 +
- 	rcu_read_lock();
- 	for_each_domain(cpu, sd) {
- 		struct sched_group *sg = sd->groups;
++	sum = min(sum, period);
++
++	if (sum == period) {
++		u32 overload = rq->nr_running > 1 ? 1 : 0;
++		return power_of(cpu) + overload;
++	}
+ 
++	return (sum * power_of(cpu)) / period;
+ }
+ 
+ /*
+@@ -4355,6 +4370,7 @@ struct sd_lb_stats {
+ 	struct sched_group *busiest; /* Busiest group in this sd */
+ 	struct sched_group *this;  /* Local group in this sd */
+ 	unsigned long total_load;  /* Total load of all groups in sd */
++	unsigned long total_activity;  /* Total activity of all groups in sd */
+ 	unsigned long total_pwr;   /*	Total power of all groups in sd */
+ 	unsigned long avg_load;	   /* Average load across all groups in sd */
+ 
+@@ -4383,6 +4399,7 @@ struct sd_lb_stats {
+ struct sg_lb_stats {
+ 	unsigned long avg_load; /*Avg load across the CPUs of the group */
+ 	unsigned long group_load; /* Total load over the CPUs of the group */
++	unsigned long group_activity; /* Total activity of the group */
+ 	unsigned long sum_nr_running; /* Nr tasks running in the group */
+ 	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
+ 	unsigned long group_capacity;
+@@ -4629,6 +4646,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+ 		}
+ 
+ 		sgs->group_load += load;
++		sgs->group_activity += get_cpu_activity(i);
+ 		sgs->sum_nr_running += nr_running;
+ 		sgs->sum_weighted_load += weighted_cpuload(i);
+ 		if (idle_cpu(i))
+@@ -4752,6 +4770,7 @@ static inline void update_sd_lb_stats(struct lb_env *env,
+ 			return;
+ 
+ 		sds->total_load += sgs.group_load;
++		sds->total_activity += sgs.group_activity;
+ 		sds->total_pwr += sg->sgp->power;
+ 
+ 		/*
 -- 
 1.7.9.5
