@@ -1,57 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 11:17:53 +0200
-Subject: [PATCH 14/32] dmaengine: ste_dma40: Remove 'always true' checking
-In-Reply-To: <1366279934-30761-15-git-send-email-lee.jones@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Apr 2013 10:19:06 +0100
+Subject: [PATCH 05/32] dmaengine: ste_dma40: Supply macros to resolve
+ 'src' and 'dst' directions
+In-Reply-To: <CACRpkdYD21VEHZ2825=e7PnATp-tfrL2rg4rKboG-Fq04U162A@mail.gmail.com>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-15-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZ5BzmjFNxHrhXVyRhMTMsH4Cq1XRmgiWQjU2e6cCO1bA@mail.gmail.com>
+ <1366279934-30761-6-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYD21VEHZ2825=e7PnATp-tfrL2rg4rKboG-Fq04U162A@mail.gmail.com>
+Message-ID: <20130425091906.GG4623@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Thu, 25 Apr 2013, Linus Walleij wrote:
 
-> Before allocating memory for logical channels, the current driver
-> checks to see if there are any. Well as the dma40_memcpy_channels[]
-> array is always populated, the check is always true. Best to
-> remove the check.
->
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > There are lots of lengthy if() statements located sporadically up and
+> > down the driver. This simple macro should make many of them a little
+> > simpler to decipher. The remainder have to stay in place, as they
+> > detail slightly more specific settings.
+> >
+> > Cc: Vinod Koul <vinod.koul@intel.com>
+> > Cc: Dan Williams <djbw@fb.com>
+> > Cc: Per Forlin <per.forlin@stericsson.com>
+> > Cc: Rabin Vincent <rabin@rab.in>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> (...)
+> 
+> > +#define D40_IS_SRC(dir)  ((dir == STEDMA40_PERIPH_TO_MEM) ? true : false)
+> 
+> And when I reas the code and see D40_IS_SRC, what does that
+> mean? That the channel is a source of .. what exactly?
+> 
+> The older explicit comparison would be more informative.
+> 
+> > +#define D40_IS_DST(dir) (((dir == STEDMA40_MEM_TO_PERIPH) || \
+> > +                         (dir == STEDMA40_MEM_TO_MEM)) ? true : false)
+> > +
+> 
+> The comparison to STEDMA40_MEM_TO_MEM is unintelligible, if I see
+> that macro it has a very unintuitive name, since it is not just
+> DST but also SRC.
+> 
+> The latter macro would be named somthing like D40_IS_DST_OR_MEM2MEM
+> and then it will not simplify the code very much.
+> 
+> You need to come up with something different here, this is just making the
+> driver harder to understand.
+> 
+> I think this patch should be just dropped.
 
-(...)
+Okay.
 
-> -       if (num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) {
-
-So I guess this was changed when moving the memcpy channels
-into the driver.
-
-> -               /*
-> -                * The max number of logical channels are event lines for all
-> -                * src devices and dst devices
-> -                */
-> -               base->lookup_log_chans = kzalloc(num_log_chans *
-> -                                                sizeof(struct d40_chan *),
-> -                                                GFP_KERNEL);
-
-And at that point you forgot to rewrite this as
-kzalloc((num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)), ...)?
-
-> -               if (!base->lookup_log_chans)
-> -                       goto failure;
-> -       }
-> +       base->lookup_log_chans = kzalloc(num_log_chans *
-> +                                        sizeof(struct d40_chan *),
-> +                                        GFP_KERNEL);
-> +       if (!base->lookup_log_chans)
-> +               goto failure;
-
-So this change should also include the memcpy channels.
-
-I'll go back and comment again on the patch moving the
-memcpy channels into the driver.
-
-Yours,
-Linus Walleij
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
