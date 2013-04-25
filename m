@@ -1,57 +1,32 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 25 Apr 2013 17:57:11 +0100
-Subject: [PATCH v5 0/7] xen/arm: move to mach-virt and support SMP
-Message-ID: <alpine.DEB.2.02.1304251750160.4180@kaball.uk.xensource.com>
+Date: Thu, 25 Apr 2013 17:57:49 +0100
+Subject: [PATCH v5 1/7] xen/arm: actually pass a non-NULL percpu pointer to
+ request_percpu_irq
+In-Reply-To: <alpine.DEB.2.02.1304251750160.4180@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304251750160.4180@kaball.uk.xensource.com>
+Message-ID: <1366909075-28775-1-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-this patch series, based on 3.9-rc3, moves xenvm to mach-virt,
-introduces SMP support in Xen on ARM and implements machine reboot and
-power off via Xen sched_op hypercalls.
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Reviewed-by: Ian Campbell <ian.camjpbell@citrix.com>
+CC: stable at vger.kernel.org
+---
+ arch/arm/xen/enlighten.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Each patch comes with a detailed changelog.
-
-
-The merge window is approaching, this patch series only contains Xen
-specific changes for ARM, if anybody has any objections speak now
-please.
-
-I would like an ack from an ARM maintainer on patch #4 and #5 since they
-touch generic ARM Makefiles.
-
-
-Changes in v5:
-- allocate xen_vcpu_info dynamically, aligning it to the size of the
-struct;
-- use VCPUOP_register_vcpu_info on cpu0 too;
-- set pm_power_off and arm_pm_restart from the Xen specific
-intialization code.
-
-
-
-Stefano Stabellini (7):
-      xen/arm: actually pass a non-NULL percpu pointer to request_percpu_irq
-      xen/arm: implement HYPERVISOR_vcpu_op
-      xen/arm: SMP support
-      xen: move the xenvm machine to mach-virt
-      xen/arm: XEN selects ARM_PSCI
-      xenvm: add a simple PSCI node and a second cpu
-      xen/arm: use sched_op hypercalls for machine reboot and power off
-
- arch/arm/Kconfig                     |    1 +
- arch/arm/boot/dts/Makefile           |    4 +-
- arch/arm/boot/dts/xenvm-4.2.dts      |   13 ++++++
- arch/arm/include/asm/xen/hypercall.h |    1 +
- arch/arm/mach-vexpress/v2m.c         |    1 -
- arch/arm/mach-virt/virt.c            |    1 +
- arch/arm/xen/enlighten.c             |   75 ++++++++++++++++++++++++++++++---
- arch/arm/xen/hypercall.S             |    1 +
- 8 files changed, 87 insertions(+), 10 deletions(-)
-
-
-git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git 3.9-rc3-smp-5-tag
-
-Cheers,
-
-Stefano
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 8dc0605..99ce189 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -239,7 +239,7 @@ static int __init xen_init_events(void)
+ 	xen_init_IRQ();
+ 
+ 	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
+-			"events", xen_vcpu)) {
++			"events", &xen_vcpu)) {
+ 		pr_err("Error requesting IRQ %d\n", xen_events_irq);
+ 		return -EINVAL;
+ 	}
+-- 
+1.7.2.5
