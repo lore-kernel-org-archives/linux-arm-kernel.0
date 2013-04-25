@@ -1,69 +1,67 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 25 Apr 2013 11:31:27 -0700
-Subject: [PATCH/RESEND] ARM: arch_timer: Silence debug preempt warnings
-In-Reply-To: <1366241178-16626-1-git-send-email-sboyd@codeaurora.org>
-References: <1366241178-16626-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <5179767F.5030405@codeaurora.org>
+Date: Thu, 25 Apr 2013 11:35:12 -0700
+Subject: [PATCHv2 1/4] Documentation: Add memory mapped ARM architected
+ timer binding
+In-Reply-To: <516C7231.6060305@codeaurora.org>
+References: <1365812863-5367-1-git-send-email-sboyd@codeaurora.org>
+ <1365812863-5367-2-git-send-email-sboyd@codeaurora.org>
+ <516C6F12.5020208@gmail.com> <516C7231.6060305@codeaurora.org>
+Message-ID: <51797760.4040906@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/17/13 16:26, Stephen Boyd wrote:
-> Hot-plugging with CONFIG_DEBUG_PREEMPT=y on a device with arm
-> architected timers causes a slew of "using smp_processor_id() in
-> preemptible" warnings:
->
->   BUG: using smp_processor_id() in preemptible [00000000] code: sh/111
->   caller is arch_timer_cpu_notify+0x14/0xc8
->
-> This happens because sometimes the cpu notifier,
-> arch_timer_cpu_notify(), is called in preemptible context and
-> other times in non-preemptible context but we use this_cpu_ptr()
-> to retrieve the clockevent in all cases. We're only going to
-> actually use the pointer in non-preemptible context though, so
-> push the this_cpu_ptr() access down into the cases to force the
-> checks to occur only in non-preemptible contexts.
->
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Marc Zyngier <Marc.Zyngier@arm.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
->
-> Resending to arm-soc maintainers instead of timekeeping maintainers. Who
-> maintains this driver?
+Rob,
 
-Ping.
+Can I get your ack on this binding or do you think we need to change
+something?
 
+Thanks,
+Stephen
+
+On 04/15/13 14:33, Stephen Boyd wrote:
+> On 04/15/13 14:20, Rob Herring wrote:
+>> On Fri, Apr 12, 2013 at 7:27 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>> @@ -26,3 +30,52 @@ Example:
+>>>                              <1 10 0xf08>;
+>>>                 clock-frequency = <100000000>;
+>>>         };
+>>> +
+>>> +** Memory mapped timer node properties
+>>> +
+>>> +- compatible : Should at least contain "arm,armv7-timer-mem".
+>> Everything about this timer is architecturally defined? If not, let's
+>> use a more specific name.
+> I'm not sure I'm following you, but everything described here is part of
+> the ARM definition. What would be a more specific name?
 >
->  drivers/clocksource/arm_arch_timer.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
+>>> +
+>>> +- clock-frequency : The frequency of the main counter, in Hz. Optional.
+>>> +
+>>> +- reg : The control frame base address.
+>>> +
+>>> +Note that #address-cells, #size-cells, and ranges shall be present to ensure
+>>> +the CPU can address a frame's registers.
+>>> +
+>>> +Frame:
+>>> +
+>>> +- frame-number: 0 to 7.
+>> I'd really like to get rid of the frame numbers and sub-nodes. Is the
+>> frame number significant to software?
+> We need the frame number to read and write registers in the control
+> frame (the first base in the parent node). We currently use it to
+> determine if a frame has support for the virtual timer by reading the
+> CNTTIDR (a register with 4 bits per frame describing capabilities). If
+> we wanted to control access to the second view of a frame we would also
+> need to configure the CNTPL0ACRn register that pertains to the frame
+> we're controlling. Without a frame number we wouldn't know which
+> register to write.
 >
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index d7ad425..a65a710 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -248,14 +248,16 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
->  static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
->  					   unsigned long action, void *hcpu)
->  {
-> -	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
-> -
-> +	/*
-> +	 * Grab cpu pointer in each case to avoid spurious
-> +	 * preemptible warnings
-> +	 */
->  	switch (action & ~CPU_TASKS_FROZEN) {
->  	case CPU_STARTING:
-> -		arch_timer_setup(evt);
-> +		arch_timer_setup(this_cpu_ptr(arch_timer_evt));
->  		break;
->  	case CPU_DYING:
-> -		arch_timer_stop(evt);
-> +		arch_timer_stop(this_cpu_ptr(arch_timer_evt));
->  		break;
->  	}
->  
+>>> +- interrupts : Interrupt list for physical and virtual timers in that order.
+>>> +  The virtual timer interrupt is optional.
+>> Is that optional per frame?
+> Yes the virtual and physical timer interrupt is per-frame and the
+> virtual interrupt is optional.
+>
 
 
 -- 
