@@ -1,52 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Apr 2013 19:28:50 +0200
-Subject: [PATCH 07/21] oss/dmabuf: use dma_map_single
+Date: Thu, 25 Apr 2013 19:28:48 +0200
+Subject: [PATCH 05/21] atm: he: use mdelay instead of large udelay constants
 In-Reply-To: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
 References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
-Message-ID: <1366910944-3033663-8-git-send-email-arnd@arndb.de>
+Message-ID: <1366910944-3033663-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The virt_to_bus/bus_to_virt functions have been deprecated
-for as long as I can remember, and they are used in very
-few remaining instances, usually in obscure ISA device
-drivers. The OSS sound drivers are the only ones that are
-still used on the ARM architecture, and only on some of
-the earliest StrongARM machines.
-
-The problem for converting the OSS subsystem to use
-dma_map_single instead is that the caller of virt_to_bus
-does not have a device pointer, since the subsystem has
-never been ported to use the common device infrastructure.
+ARM cannot handle udelay for more than 2 miliseconds, so we
+should use mdelay instead for those.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Jaroslav Kysela <perex@perex.cz>
-Cc: Takashi Iwai <tiwai@suse.de>
-Cc: alsa-devel at alsa-project.org
+Cc: Chas Williams <chas@cmf.nrl.navy.mil>
+Cc: linux-atm-general at lists.sourceforge.net
+Cc: netdev at vger.kernel.org
 ---
- sound/oss/dmabuf.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/atm/he.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/sound/oss/dmabuf.c b/sound/oss/dmabuf.c
-index bcc3e8e..a59c888 100644
---- a/sound/oss/dmabuf.c
-+++ b/sound/oss/dmabuf.c
-@@ -114,7 +114,7 @@ static int sound_alloc_dmap(struct dma_buffparms *dmap)
- 		}
- 	}
- 	dmap->raw_buf = start_addr;
--	dmap->raw_buf_phys = virt_to_bus(start_addr);
-+	dmap->raw_buf_phys = dma_map_single(NULL, start_addr, dmap->buffsize, DMA_BIDIRECTIONAL);
+diff --git a/drivers/atm/he.c b/drivers/atm/he.c
+index d689126..7700061 100644
+--- a/drivers/atm/he.c
++++ b/drivers/atm/he.c
+@@ -1055,7 +1055,7 @@ static int he_start(struct atm_dev *dev)
+ 	he_writel(he_dev, 0x0, RESET_CNTL);
+ 	he_writel(he_dev, 0xff, RESET_CNTL);
  
- 	for (page = virt_to_page(start_addr); page <= virt_to_page(end_addr); page++)
- 		SetPageReserved(page);
-@@ -139,6 +139,7 @@ static void sound_free_dmap(struct dma_buffparms *dmap)
- 	for (page = virt_to_page(start_addr); page <= virt_to_page(end_addr); page++)
- 		ClearPageReserved(page);
- 
-+	dma_unmap_single(NULL, dmap->raw_buf_phys, dmap->buffsize, DMA_BIDIRECTIONAL);
- 	free_pages((unsigned long) dmap->raw_buf, sz);
- 	dmap->raw_buf = NULL;
- }
+-	udelay(16*1000);	/* 16 ms */
++	mdelay(16);	/* 16 ms */
+ 	status = he_readl(he_dev, RESET_CNTL);
+ 	if ((status & BOARD_RST_STATUS) == 0) {
+ 		hprintk("reset failed\n");
 -- 
 1.8.1.2
