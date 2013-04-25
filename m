@@ -1,36 +1,71 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 25 Apr 2013 14:27:32 -0400
-Subject: [PATCH 04/21] ARM: orion5x: include linux/cpu.h
-In-Reply-To: <20130425173445.GD32497@titan.lakedaemon.net>
-References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <1366910944-3033663-5-git-send-email-arnd@arndb.de>
- <20130425173445.GD32497@titan.lakedaemon.net>
-Message-ID: <20130425182732.GE32497@titan.lakedaemon.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 25 Apr 2013 11:31:27 -0700
+Subject: [PATCH/RESEND] ARM: arch_timer: Silence debug preempt warnings
+In-Reply-To: <1366241178-16626-1-git-send-email-sboyd@codeaurora.org>
+References: <1366241178-16626-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <5179767F.5030405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 01:34:45PM -0400, Jason Cooper wrote:
-> On Thu, Apr 25, 2013 at 07:28:47PM +0200, Arnd Bergmann wrote:
-> > The linux/cpu.h header is no longer implictly included in this
-> > file, so we need to an #include statement to avoid this build
-> > warning:
-> > 
-> > arch/arm/mach-orion5x/common.c:339:3: error: implicit declaration of function 'cpu_idle_poll_ctrl' [-Werror=implicit-function-declaration]
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Jason Cooper <jason@lakedaemon.net>
-> > Cc: Andrew Lunn <andrew@lunn.ch>
-> > ---
-> >  arch/arm/mach-orion5x/common.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> 
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> 
-> I imagine it's easiest for you to take this through a branch you already
-> have set up, so have it.
+On 04/17/13 16:26, Stephen Boyd wrote:
+> Hot-plugging with CONFIG_DEBUG_PREEMPT=y on a device with arm
+> architected timers causes a slew of "using smp_processor_id() in
+> preemptible" warnings:
+>
+>   BUG: using smp_processor_id() in preemptible [00000000] code: sh/111
+>   caller is arch_timer_cpu_notify+0x14/0xc8
+>
+> This happens because sometimes the cpu notifier,
+> arch_timer_cpu_notify(), is called in preemptible context and
+> other times in non-preemptible context but we use this_cpu_ptr()
+> to retrieve the clockevent in all cases. We're only going to
+> actually use the pointer in non-preemptible context though, so
+> push the this_cpu_ptr() access down into the cases to force the
+> checks to occur only in non-preemptible contexts.
+>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Marc Zyngier <Marc.Zyngier@arm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>
+> Resending to arm-soc maintainers instead of timekeeping maintainers. Who
+> maintains this driver?
 
-s/have it/have at it/  :)
+Ping.
 
-thx,
+>
+>  drivers/clocksource/arm_arch_timer.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index d7ad425..a65a710 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -248,14 +248,16 @@ static void __cpuinit arch_timer_stop(struct clock_event_device *clk)
+>  static int __cpuinit arch_timer_cpu_notify(struct notifier_block *self,
+>  					   unsigned long action, void *hcpu)
+>  {
+> -	struct clock_event_device *evt = this_cpu_ptr(arch_timer_evt);
+> -
+> +	/*
+> +	 * Grab cpu pointer in each case to avoid spurious
+> +	 * preemptible warnings
+> +	 */
+>  	switch (action & ~CPU_TASKS_FROZEN) {
+>  	case CPU_STARTING:
+> -		arch_timer_setup(evt);
+> +		arch_timer_setup(this_cpu_ptr(arch_timer_evt));
+>  		break;
+>  	case CPU_DYING:
+> -		arch_timer_stop(evt);
+> +		arch_timer_stop(this_cpu_ptr(arch_timer_evt));
+>  		break;
+>  	}
+>  
 
-Jason.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
