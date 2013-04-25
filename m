@@ -1,61 +1,67 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Apr 2013 10:29:30 +0100
-Subject: [PATCH 13/32] dmaengine: ste_dma40: Calculate number of logical
- channels from physical ones
-In-Reply-To: <CACRpkdYq9QLRaaysc=izGgi53ogf1oRHuCwWKW+rQBbE_UtfnA@mail.gmail.com>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-14-git-send-email-lee.jones@linaro.org>
- <CACRpkdYq9QLRaaysc=izGgi53ogf1oRHuCwWKW+rQBbE_UtfnA@mail.gmail.com>
-Message-ID: <20130425092930.GI4623@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 25 Apr 2013 11:35:28 +0200
+Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle: use init/exit common routine
+In-Reply-To: <1366728077-18988-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1366728077-18988-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <5178F8E0.6010606@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Apr 2013, Linus Walleij wrote:
+On 04/23/2013 04:41 PM, Daniel Lezcano wrote:
+> Remove the duplicated code and use the cpuidle common code for initialization.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
 
-> On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > This change will cost ~25KB of memory, but it's worth the trade-off,
-> > as it removes a great deal of overhead. It means that instead of only
-> > allocating memory for the logical channels in use, it does so for all
-> > available ones, which is 32 per physical channel. However, this now
-> > means we can remove some platform data and we don't have to worry
-> > about adding vendor specific variables to Device Tree.
-> >
-> > Cc: Vinod Koul <vinod.koul@intel.com>
-> > Cc: Dan Williams <djbw@fb.com>
-> > Cc: Per Forlin <per.forlin@stericsson.com>
-> > Cc: Rabin Vincent <rabin@rab.in>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> (...)
-> >  static struct stedma40_platform_data dma40_plat_data = {
-> > -       .dev_len = DB8500_DMA_NR_DEV,
-> 
-> So that was set to 64 in the platform...
-> 
-> > -       /* Count the number of logical channels in use */
-> > -       for (i = 0; i < plat_data->dev_len; i++)
-> > -               if (plat_data->dev_rx[i] != 0)
-> > -                       num_log_chans++;
-> > -
-> > -       for (i = 0; i < plat_data->dev_len; i++)
-> > -               if (plat_data->dev_tx[i] != 0)
-> > -                       num_log_chans++;
-> 
-> And I guess this code snippet made it go down to <= 32 all the time,
-> correct?
+Hi Kim and Ben,
 
-However many were described in dma40_[rx|tx]_map, yes.
+It is the last patch in the series which was not acked-by.
+Rafael is willing to take it in its tree if you ack it.
 
-> Just want to understand it before I ACK. (The idea is sound.)
-> 
-> I notice there is no check whatsoever of the bounds of
-> plat_data->dev_[rx|tx]  but that is a different problem I guess...
+Are you ok if this patch ?
 
-The array is going away anyway, so we don't need to threat.
+Thanks
+-- Daniel
+
+>  arch/arm/mach-s3c64xx/cpuidle.c |   14 +-------------
+>  1 file changed, 1 insertion(+), 13 deletions(-)
+>
+> diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-s3c64xx/cpuidle.c
+> index 852ff16..3c8ab07 100644
+> --- a/arch/arm/mach-s3c64xx/cpuidle.c
+> +++ b/arch/arm/mach-s3c64xx/cpuidle.c
+> @@ -40,8 +40,6 @@ static int s3c64xx_enter_idle(struct cpuidle_device *dev,
+>  	return index;
+>  }
+>  
+> -static DEFINE_PER_CPU(struct cpuidle_device, s3c64xx_cpuidle_device);
+> -
+>  static struct cpuidle_driver s3c64xx_cpuidle_driver = {
+>  	.name	= "s3c64xx_cpuidle",
+>  	.owner  = THIS_MODULE,
+> @@ -60,16 +58,6 @@ static struct cpuidle_driver s3c64xx_cpuidle_driver = {
+>  
+>  static int __init s3c64xx_init_cpuidle(void)
+>  {
+> -	int ret;
+> -
+> -	cpuidle_register_driver(&s3c64xx_cpuidle_driver);
+> -
+> -	ret = cpuidle_register_device(&s3c64xx_cpuidle_device);
+> -	if (ret) {
+> -		pr_err("Failed to register cpuidle device: %d\n", ret);
+> -		return ret;
+> -	}
+> -
+> -	return 0;
+> +	return cpuidle_register(&s3c64xx_cpuidle_driver, NULL);
+>  }
+>  device_initcall(s3c64xx_init_cpuidle);
+
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
