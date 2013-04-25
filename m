@@ -1,31 +1,43 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 15:24:21 +0200
-Subject: [PATCH 04/32] dmaengine: ste_dma40: Amalgamate DMA source and
- destination channel numbers
-In-Reply-To: <20130425132025.GM4623@gmail.com>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-5-git-send-email-lee.jones@linaro.org>
- <CACRpkdaauDYTdoBHGG9FO4kKqvCYyCrjY8EGWs5gAQWErGW6_A@mail.gmail.com>
- <20130425090612.GC4623@gmail.com>
- <CACRpkdbV8yEK0470q_-DWv6Q0hAG2wGntXFi5kaLUMgm9b=e-Q@mail.gmail.com>
- <20130425132025.GM4623@gmail.com>
-Message-ID: <CACRpkdbpbQTCxeQ6cCbAkvvQXJMQUhLv8=qcbBgvBVnMDdysOA@mail.gmail.com>
+Date: Thu, 25 Apr 2013 15:26:05 +0200
+Subject: [PATCH 2/2] pinctrl: samsung: Fix link error with
+ CONFIG_PINCTRL_EXYNOS disabled
+In-Reply-To: <2113989.KXXvDDhnMa@amdc1227>
+References: <1366060483-20342-1-git-send-email-tomasz.figa@gmail.com>
+ <6940961.67Lk2axxPL@amdc1227>
+ <CACRpkdZmSj-AqUA9kd7NMN6cL2Nxa0EaKoSVkwQSrxhcWEeQtg@mail.gmail.com>
+ <2113989.KXXvDDhnMa@amdc1227>
+Message-ID: <CACRpkdY61h-H14QYHhADnAz1JRa=8Wbi0aYKSRW21xm4WHOHGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 3:20 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Thu, 25 Apr 2013, Linus Walleij wrote:
-
->> As we may want to support DEV_TO_DEV at some point.
+On Wed, Apr 24, 2013 at 4:47 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> On Wednesday 24 of April 2013 16:27:09 Linus Walleij wrote:
+>> On Tue, Apr 23, 2013 at 2:09 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+>> > On Tuesday 23 of April 2013 14:03:12 Linus Walleij wrote:
+>> >> This does not apply to my "devel" branch in the pinctrl tree.
+>> >>
+>> >> Could you rebase it on that branch?
+>> >>
+>> >> Or is the error not even in my tree?
+>> >
+>> > This one got sent incorrectly due to my mistake. Please try the correct
+>> > version:
+>> >
+>> > [PATCH RESEND 2/2] pinctrl: samsung: Fix link error with
+>> > CONFIG_PINCTRL_EXYNOS disabled
 >>
->> Then no longer, and that is not related to $SUBJECT.
+>> This does not apply either.
+>>
+>> Can you please test against the "devel" branch in the pinctrl tree?
 >
-> That's not why I'm removing it. The statement can never be true due to
-> the fact that the second evaluation (src_event_group != dst_event_group)
-> can never be true, which is a direct effect of 'THIS_PATCH'.
+> Right, it does not apply.
+>
+> Well, actually it does with git am -3, but it is incorrect, since the problem
+> it intends to fix is not present in your tree, but rather is a merge error in
+> linux-next in a merge of Kgene's and your tree...
 
-OK that is correct, I'm fine with this then ... as part of that other
-patch dealing with unreacable conditions I keep talking about...
+Oh. Then you have to send the patch to Stephen Rothwell.
 
 Yours,
 Linus Walleij
