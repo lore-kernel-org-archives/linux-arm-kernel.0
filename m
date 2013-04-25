@@ -1,22 +1,39 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 14:04:38 +0200
-Subject: [PATCH 9/9] ARM: ux500: Register Cyrp and Hash platform drivers
- on Snowball
-In-Reply-To: <1366280825-31136-10-git-send-email-lee.jones@linaro.org>
-References: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
- <1366280825-31136-10-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdafij8an62xwcZ=TeF7a9Sv6MAuF3RHtkjhrStTygw7PQ@mail.gmail.com>
+Date: Thu, 25 Apr 2013 14:09:11 +0200
+Subject: [PATCH] cpuidle: add maintainer entry
+In-Reply-To: <87k3nr50n4.fsf@linaro.org>
+References: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
+ <87k3nr50n4.fsf@linaro.org>
+Message-ID: <CACRpkdaA8uG5jYyYTbuvzZNRr47EhWHFMLLz+jbiE3FPC1vjmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 12:27 PM, Lee Jones <lee.jones@linaro.org> wrote:
-
-> These drivers are now operational and even use the latest common clk
-> and DMA APIs. There's no reason why we shouldn't start them up now.
+On Wed, Apr 24, 2013 at 6:55 PM, Kevin Hilman <khilman@linaro.org> wrote:
+> Rafael,
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Daniel Lezcano <daniel.lezcano@linaro.org> writes:
+>
+> [...]
+>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 61677c3..effa0f3 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -2206,6 +2206,13 @@ S:     Maintained
+>>  F:   drivers/cpufreq/
+>>  F:   include/linux/cpufreq.h
+>>
+>> +CPUIDLE DRIVERS
+>> +M:   Rafael J. Wysocki <rjw@sisk.pl>
+>> +L:   linux-pm at vger.kernel.org
+>> +S:   Maintained
+>> +F:   drivers/cpuidle/*
+>> +F:   include/linux/cpuidle.h
+>
+> What do you think about having Daniel listed here as a co-maintainer?
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+I second that. He will bring useful embedded knowledge to the
+subsystem.
 
 Yours,
 Linus Walleij
