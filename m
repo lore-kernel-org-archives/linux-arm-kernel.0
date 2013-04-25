@@ -1,47 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 25 Apr 2013 14:09:22 +0100
-Subject: [PATCH 04/32] dmaengine: ste_dma40: Amalgamate DMA source and
- destination channel numbers
-In-Reply-To: <CACRpkdbV8yEK0470q_-DWv6Q0hAG2wGntXFi5kaLUMgm9b=e-Q@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Apr 2013 14:11:29 +0100
+Subject: [PATCH 30/32] ARM: ux500: Supply MMC DMA configuration via
+ Device Tree
+In-Reply-To: <CACRpkdbnGbVwqnY=aPU5Jic88v7VAsDWaB0yDU3iMo=YLCd9EQ@mail.gmail.com>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-5-git-send-email-lee.jones@linaro.org>
- <CACRpkdaauDYTdoBHGG9FO4kKqvCYyCrjY8EGWs5gAQWErGW6_A@mail.gmail.com>
- <20130425090612.GC4623@gmail.com>
- <CACRpkdbV8yEK0470q_-DWv6Q0hAG2wGntXFi5kaLUMgm9b=e-Q@mail.gmail.com>
-Message-ID: <20130425130922.GE14496@n2100.arm.linux.org.uk>
+ <1366279934-30761-31-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbYXxkC2y9zCNcMAAmmQ7+3V0Y=hq7zgtp5L=Ts9QzpQQ@mail.gmail.com>
+ <20130425114931.GJ4623@gmail.com>
+ <CACRpkdbnGbVwqnY=aPU5Jic88v7VAsDWaB0yDU3iMo=YLCd9EQ@mail.gmail.com>
+Message-ID: <20130425131129.GK4623@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 02:43:16PM +0200, Linus Walleij wrote:
-> So while there is no active usecase, Linux surely has the ambition to do
-> that as can be seen in:
+On Thu, 25 Apr 2013, Linus Walleij wrote:
+
+> On Thu, Apr 25, 2013 at 1:49 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Thu, 25 Apr 2013, Linus Walleij wrote:
+> >
+> >> On Thu, Apr 18, 2013 at 12:12 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >>
+> >> > When requesting a channel, a DMA client needs to pass some pieces of
+> >> > information such as; request channel, device type, channel type and
+> >> > direction etc. Normally we do this in the form of platform data, but
+> >> > when DT is enabled we need to pass it using the driver's bindings
+> >> > instead.
+> >> >
+> >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >>
+> >> This requires that the pending MMCI patch get merged *first* right?
+> >
+> > No, it doesn't. There is no harm in applying this *before*.
+> >
+> > It will just lay dormant until it is.
 > 
-> /**
->  * enum dma_transfer_direction - dma transfer mode and direction indicator
->  * @DMA_MEM_TO_MEM: Async/Memcpy mode
->  * @DMA_MEM_TO_DEV: Slave mode & From Memory to Device
->  * @DMA_DEV_TO_MEM: Slave mode & From Device to Memory
->  * @DMA_DEV_TO_DEV: Slave mode & From Device to Device
->  */
-> enum dma_transfer_direction {
->         DMA_MEM_TO_MEM,
->         DMA_MEM_TO_DEV,
->         DMA_DEV_TO_MEM,
->         DMA_DEV_TO_DEV,
->         DMA_TRANS_NONE,
-> };
-> 
-> I think we need a handshake with Vinod on this.
+> Ah yeah, right. But the patch stripping out the platform data (no 31) will
+> wreak havoc if applied before the MMCI patch right?
 
-DEV_TO_DEV was added when the change to dma_transfer_direction happened,
-to "fill in" the full pattern.
+Yes, that will cause problems. It will most likely go into PIO mode.
 
-There's a problem with device to device transfers though - you have to
-consider the rate at which the devices produce and consume data, and
-whether they both can cope with differing data rates.
-
-Take for instance your audio in to audio out idea - even if they are
-both operating at the same bits per sample and sample rate, if they are
-independently clocked, chances are that the clocks are not exactly the
-same, which means you will either underrun or overrun one of the FIFOs
-in the system.
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
