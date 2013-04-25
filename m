@@ -1,51 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Apr 2013 14:13:23 +0100
-Subject: [PATCH 09/32] ARM: ux500: Remove unused 'data_width' attributes
- from SDI DMA configs
-In-Reply-To: <CACRpkdaeuK0p2SynenQjght9fCzTTJpt+S7hGC6d6ahPHAA7Hw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Apr 2013 15:21:06 +0200
+Subject: [PATCH 04/32] dmaengine: ste_dma40: Amalgamate DMA source and
+ destination channel numbers
+In-Reply-To: <20130425130922.GE14496@n2100.arm.linux.org.uk>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdbf03ajQaYujGfimHE+hDVjNLycE3J9Q-W-tzN2EX0fkQ@mail.gmail.com>
- <20130425091428.GD4623@gmail.com>
- <CACRpkdaeuK0p2SynenQjght9fCzTTJpt+S7hGC6d6ahPHAA7Hw@mail.gmail.com>
-Message-ID: <20130425131323.GL4623@gmail.com>
+ <1366279934-30761-5-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaauDYTdoBHGG9FO4kKqvCYyCrjY8EGWs5gAQWErGW6_A@mail.gmail.com>
+ <20130425090612.GC4623@gmail.com>
+ <CACRpkdbV8yEK0470q_-DWv6Q0hAG2wGntXFi5kaLUMgm9b=e-Q@mail.gmail.com>
+ <20130425130922.GE14496@n2100.arm.linux.org.uk>
+Message-ID: <CACRpkdZj-3DbcX1LREGKf2RZs4FqbDn6sWkaZ-t67KUKJhZaow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Apr 2013, Linus Walleij wrote:
+On Thu, Apr 25, 2013 at 3:09 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-> On Thu, Apr 25, 2013 at 11:14 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Thu, 25 Apr 2013, Linus Walleij wrote:
-> >
-> >> On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >>
-> >> > DMA configuration data is now allocated in the MMCI driver, so these
-> >> > are just ignored.
-> >> >
-> >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>
-> >> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> >>
-> >> I tried just applying this (since it's pretty stand-alone) but seems to
-> >> be dependent on things not yet in Torvalds tree so lets keep it in this
-> >> series then...
-> >
-> > Ideally I'd like to keep them all in the same branch, as it may lead
-> > to confusion/conflicts later down the line (I'm still coding a lot of
-> > this stuff).
-> >
-> > Naturally, I'll go with whatever you think is best, but this is my
-> > preference.
-> 
-> This works find for now, I just want the DT changes kept separately
-> because I'm in hell with these right now and don't want to end up
-> there again next merge cycle.
+> There's a problem with device to device transfers though - you have to
+> consider the rate at which the devices produce and consume data, and
+> whether they both can cope with differing data rates.
+>
+> Take for instance your audio in to audio out idea - even if they are
+> both operating at the same bits per sample and sample rate, if they are
+> independently clocked, chances are that the clocks are not exactly the
+> same, which means you will either underrun or overrun one of the FIFOs
+> in the system.
 
-Sure. Just let me know what you plan to manually apply and I'll do my
-utmost to keep things sane in the patch-set.
+This magically works for us, but yes, I think they had to use the same
+clock (simplest solution, anyway).
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+It is/was a very real usecase, IIRC coming from roundtrip constraints
+in the GSM 3GPP spec, wanting to keep the latency as low as possible.
+With this scheme there is no more than a FIFO on each end of delay,
+which is nice.
+
+Yours,
+Linus Walleij
