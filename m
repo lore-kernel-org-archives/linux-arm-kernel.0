@@ -1,31 +1,49 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 25 Apr 2013 09:16:47 +0800
-Subject: [PATCH v2] ARM: Kconfig: let ARM9TDMI and ARM7TDMI invisible.
-In-Reply-To: <8EB7C52E-5044-4B8A-99F2-BCFF9DFDBD2E@jcrosoft.com>
-References: <51775BB3.6000607@asianux.com> <51775D88.2000406@asianux.com>
- <20130424174602.GA14496@n2100.arm.linux.org.uk>
- <8EB7C52E-5044-4B8A-99F2-BCFF9DFDBD2E@jcrosoft.com>
-Message-ID: <517883FF.4050206@asianux.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 25 Apr 2013 04:04:58 +0200
+Subject: dma cache coherency on Armada XP dev board
+In-Reply-To: <20130424182202.GK13884@titan.lakedaemon.net>
+References: <CANX6Damwoz0MSEu5Sb4uKTUhcsC0g+ua1DjuQuMEzXyBOkL7PA@mail.gmail.com>
+ <20130424182202.GK13884@titan.lakedaemon.net>
+Message-ID: <20130425040458.1084355f@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013?04?25? 01:59, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On Apr 25, 2013, at 1:46 AM, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
->> > On Wed, Apr 24, 2013 at 12:20:24PM +0800, Chen Gang wrote:
->>> >> If CONFIG_MMU is disabled, it will let ARM9TDMI and ARM7TDMI visible,
->>> >> but in fact, only AT91X40 need ARM7TDMI, so need not let them visible.
->> > 
->> > I'll apply it myself this evening.  Can I add:
->> > 
->> > Tested-by: Chen Gang <gang.chen@asianux.com>
-> you add it mine too
-> 
-> Tested-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Viral, Jason,
 
-Thanks.
+On Wed, 24 Apr 2013 14:22:02 -0400, Jason Cooper wrote:
 
+> > Recently, I faced DMA related issue. While moving data from memory
+> > to the device, I  found that sometimes I am getting Junk data. I
+> > looked further to see if this is related to DMA Sync problem. So,
+> > basically, I have following questions,
+> > 
+> > 1. As per [1] ARMADA has Coherency Fabric that sits between CPU and
+> > other devices and takes care of hardware based I/O cache coherency.
+> > Do we need to enable any support for the same in software ? I am
+> > running 3.0.29 based linux kernel. How do I verify that I have all
+> > the things enabled in Linux Kernel.
+> 
+> 3.0.29 must be a Marvell supplied kernel.  You'd have to ask them,
+> unfortunately.  I've added the free-electrons guys as they are
+> assisting Marvell with adding ArmadaXP/370 to the mainline kernel.
+> 
+> My advice is to try building the mainline kernel from kernel.org and
+> see if the problem remains.
+> 
+> Thomas and the guys may be able to help you with specific questions
+> regarding the Marvell kernel.
+
+As Jason state, 3.0.29 is a kernel that has been heavily patched by
+Marvell, so you should consult your Marvell support to get help with
+this kernel. We do only support the mainline kernel for the Armada 370
+and Armada XP platforms. Do not hesitate to get back to us if you face
+similar issues with the mainline kernel.
+
+Best regards,
+
+Thomas Petazzoni
 -- 
-Chen Gang
-
-Asianux Corporation
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
