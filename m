@@ -1,48 +1,78 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 23:39:18 +0200
-Subject: [PATCH] pinctrl: document the "GPIO mode" pitfall
-In-Reply-To: <2408684.1bsjMDDzMu@avalon>
-References: <1363345636-2006-1-git-send-email-linus.walleij@stericsson.com>
- <2408684.1bsjMDDzMu@avalon>
-Message-ID: <CACRpkdag=YTeQH=VjW4fQ+G94REWeURhC=ErJxjmSUuP=pKYbA@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 25 Apr 2013 16:47:52 -0500
+Subject: [PATCHv2 1/4] Documentation: Add memory mapped ARM architected
+ timer binding
+In-Reply-To: <516C7231.6060305@codeaurora.org>
+References: <1365812863-5367-1-git-send-email-sboyd@codeaurora.org>
+ <1365812863-5367-2-git-send-email-sboyd@codeaurora.org>
+ <516C6F12.5020208@gmail.com> <516C7231.6060305@codeaurora.org>
+Message-ID: <5179A488.5050102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 3:33 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
+On 04/15/2013 04:33 PM, Stephen Boyd wrote:
+> On 04/15/13 14:20, Rob Herring wrote:
+>> On Fri, Apr 12, 2013 at 7:27 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>> @@ -26,3 +30,52 @@ Example:
+>>>                              <1 10 0xf08>;
+>>>                 clock-frequency = <100000000>;
+>>>         };
+>>> +
+>>> +** Memory mapped timer node properties
+>>> +
+>>> +- compatible : Should at least contain "arm,armv7-timer-mem".
+>> Everything about this timer is architecturally defined? If not, let's
+>> use a more specific name.
+> 
+> I'm not sure I'm following you, but everything described here is part of
+> the ARM definition. What would be a more specific name?
 
->> +And your machine configuration may look like this:
->> +--------------------------------------------------
->> +
->> +static unsigned long uart_default_mode[] = {
->> +    PIN_CONF_PACKED(PIN_CONFIG_DRIVE_PUSH_PULL, 0),
->> +};
->> +
->> +static unsigned long uart_sleep_mode[] = {
->> +    PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 0),
->> +};
->
-> I'm having a bit of trouble with PIN_CONFIG_DRIVE_PUSH_PULL and
-> PIN_CONFIG_OUTPUT. Strictly speaking, when configured in output mode, the pin
-> will be in a push-pull configuration.
+Something that corresponds to the particular implementation like
+cortex-a15 (obviously not an example that has this). I'm fine with
+leaving this for now, but would like to see that added when specific SOC
+dts are added. Better to be specific in case we need to use it for
+something like errata work-arounds. Of course we haven't done that so
+far with the arch timer bindings...
 
-For your system or for any system? Open drain, open source are also
-output modes, and none of them are push-pull.
+>>> +
+>>> +- clock-frequency : The frequency of the main counter, in Hz. Optional.
+>>> +
+>>> +- reg : The control frame base address.
+>>> +
+>>> +Note that #address-cells, #size-cells, and ranges shall be present to ensure
+>>> +the CPU can address a frame's registers.
+>>> +
+>>> +Frame:
+>>> +
+>>> +- frame-number: 0 to 7.
+>> I'd really like to get rid of the frame numbers and sub-nodes. Is the
+>> frame number significant to software?
+> 
+> We need the frame number to read and write registers in the control
+> frame (the first base in the parent node). We currently use it to
+> determine if a frame has support for the virtual timer by reading the
+> CNTTIDR (a register with 4 bits per frame describing capabilities). If
+> we wanted to control access to the second view of a frame we would also
+> need to configure the CNTPL0ACRn register that pertains to the frame
+> we're controlling. Without a frame number we wouldn't know which
+> register to write.
 
-> Could you clarify the exact scope of the
-> two configuration parameters ?
+I've gone thru the memory mapped part of the spec now, so I think I
+understand things better. I see how the frame number is needed, but...
 
-PIN_CONFIG_OUTPUT is left a bit unspecified, but here the
-idea was a passive drive, like just connecting the pin to
-VDD or GND without any driver stage at all. Maybe I should
-patch the documentation since we seem to be the only
-user?
+The control base is only accessible in secure or hyp mode. How does a
+guest know that it is a guest and can't map the control base? Seems like
+we need to allow a subset of the binding that is just a reg and
+interrupts properties without the frame sub nodes.
 
-In the above case (which is derived from the ABx500) I think what is
-happening is that the pin is connected to ground during sleep,
-without any enabled driver stages, which saves a lot of power,
-since you do not need to bias the totempole during
-sleep in that way.
+Rob
 
-Yours,
-Linus Walleij
+> 
+>>
+>>> +- interrupts : Interrupt list for physical and virtual timers in that order.
+>>> +  The virtual timer interrupt is optional.
+>> Is that optional per frame?
+> 
+> Yes the virtual and physical timer interrupt is per-frame and the
+> virtual interrupt is optional.
+> 
