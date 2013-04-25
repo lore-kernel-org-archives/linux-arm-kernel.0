@@ -1,43 +1,53 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 25 Apr 2013 09:07:01 +0900
-Subject: [RFC PATCH v3 13/17] ARM: dts: r8a7740: cpus/cpu nodes dts updates
-In-Reply-To: <1366824502-19729-14-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366824502-19729-14-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130425000701.GD31061@verge.net.au>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 24 Apr 2013 17:19:13 -0700
+Subject: [PATCH] idle: fix hlt/nohlt command-line handling in new generic idle
+Message-ID: <1366849153-25564-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 06:28:18PM +0100, Lorenzo Pieralisi wrote:
-> This patch updates the in-kernel dts files according to the latest cpus
-> and cpu bindings updates for ARM.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+commit d1669912 (idle: Implement generic idle function) added a new
+generic idle along with support for hlt/nohlt command line options to
+override default idle loop behavior.  However, the command-line
+processing is never compiled.
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+The command-line handling is wrapped by CONFIG_GENERIC_IDLE_POLL_SETUP
+and arches that use this feature select it in their Kconfigs.
+However, no Kconfig definition was created for this option, so it is
+never enabled, and therefore command-line override of the idle-loop
+behavior is broken after migrating to the generic idle loop.
 
-> ---
->  arch/arm/boot/dts/r8a7740.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
-> index 798fa35..8a831e9 100644
-> --- a/arch/arm/boot/dts/r8a7740.dtsi
-> +++ b/arch/arm/boot/dts/r8a7740.dtsi
-> @@ -14,8 +14,12 @@
->  	compatible = "renesas,r8a7740";
->  
->  	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
->  		cpu at 0 {
->  			compatible = "arm,cortex-a9";
-> +			device_type = "cpu";
-> +			reg = <0x0>;
->  		};
->  	};
->  };
-> -- 
-> 1.7.12
-> 
-> 
+To fix, add a Kconfig definition for GENERIC_IDLE_POLL_SETUP.
+
+Tested on ARM (OMAP4/Panda) which enables the command-line overrides
+by default.
+
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Linus Torvalds <torvalds@linux-foundation.org>
+Cc: Rusty Russell <rusty@rustcorp.com.au>
+Cc: Paul McKenney <paulmck@linux.vnet.ibm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+Applies on tip/smp/hotplug where generic idle feature is added
+
+ arch/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/Kconfig b/arch/Kconfig
+index 1455579..e0ef57b 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -216,6 +216,9 @@ config USE_GENERIC_SMP_HELPERS
+ config GENERIC_SMP_IDLE_THREAD
+        bool
+ 
++config GENERIC_IDLE_POLL_SETUP
++       bool
++
+ # Select if arch init_task initializer is different to init/init_task.c
+ config ARCH_INIT_TASK
+        bool
+-- 
+1.8.2
