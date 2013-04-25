@@ -1,50 +1,33 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 25 Apr 2013 20:27:45 +0200
-Subject: [PATCH] cpuidle: add maintainer entry
-In-Reply-To: <CACRpkdaA8uG5jYyYTbuvzZNRr47EhWHFMLLz+jbiE3FPC1vjmA@mail.gmail.com>
-References: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
- <87k3nr50n4.fsf@linaro.org>
- <CACRpkdaA8uG5jYyYTbuvzZNRr47EhWHFMLLz+jbiE3FPC1vjmA@mail.gmail.com>
-Message-ID: <9935265.yXMiRQV8Yo@vostro.rjw.lan>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 25 Apr 2013 19:19:44 +0100
+Subject: [PATCH] ARM: KVM: Allow host virtual timer irq number to be
+ different from guest virtual timer irq number
+In-Reply-To: <CAEDV+gLKwrxxdoB9NDBLb7CSnXL1j=O7f=2Y_ftXmLfGtTBnbA@mail.gmail.com>
+References: <1366879534-31578-1-git-send-email-anup.patel@linaro.org>
+ <CAEDV+gLKwrxxdoB9NDBLb7CSnXL1j=O7f=2Y_ftXmLfGtTBnbA@mail.gmail.com>
+Message-ID: <CAFEAcA_bPHkZX00ccUFg2mUXdmrui3XeBMg-rgxtsE_4-abeiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, April 25, 2013 02:09:11 PM Linus Walleij wrote:
-> On Wed, Apr 24, 2013 at 6:55 PM, Kevin Hilman <khilman@linaro.org> wrote:
-> > Rafael,
-> >
-> > Daniel Lezcano <daniel.lezcano@linaro.org> writes:
-> >
-> > [...]
-> >
-> >> diff --git a/MAINTAINERS b/MAINTAINERS
-> >> index 61677c3..effa0f3 100644
-> >> --- a/MAINTAINERS
-> >> +++ b/MAINTAINERS
-> >> @@ -2206,6 +2206,13 @@ S:     Maintained
-> >>  F:   drivers/cpufreq/
-> >>  F:   include/linux/cpufreq.h
-> >>
-> >> +CPUIDLE DRIVERS
-> >> +M:   Rafael J. Wysocki <rjw@sisk.pl>
-> >> +L:   linux-pm at vger.kernel.org
-> >> +S:   Maintained
-> >> +F:   drivers/cpuidle/*
-> >> +F:   include/linux/cpuidle.h
-> >
-> > What do you think about having Daniel listed here as a co-maintainer?
-> 
-> I second that. He will bring useful embedded knowledge to the
-> subsystem.
+On 25 April 2013 19:04, Christoffer Dall <cdall@cs.columbia.edu> wrote:
+> I prefer not hard-coding this stuff in the kernel, but let user space
+> decide this. If we have good technical arguments not to do that (such
+> as knowing that this is always defined per-core and not for an SoC
+> (ARM guys?) then at least the patch should lookup the target processor
+> and set the irq number accordingly.
 
-I'd still like to have a say about the core, but if Daniel is willing to
-maintain ARM cpuidle drivers and all of the relevant ARM people agree with
-that, that'll be great.
+Well, this is all implementation-defined. The ARM ARM mandates
+that the generic timers deliver a PPI, and that it must be the
+same PPI for all processors in an MP implementation, but not which
+PPI. The A15 and A7 happen to both be hardwired to ID27. You could
+in theory design a core which let the SoC configure the virtual
+timer ID (or let the guest arbitrarily program it, for that
+matter, I suppose), though I'm not sure why you'd want to.
 
-Thanks,
-Rafael
+I think I'd take the simple approach of saying "the timer PPI
+is a fixed property of the guest CPU" unless somebody actually
+builds something where it isn't fixed... (for that CPU we
+could then define it as a feature argument to KVM_ARM_VCPU_INIT).
 
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+thanks
+-- PMM
