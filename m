@@ -1,87 +1,132 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Thu, 25 Apr 2013 18:14:51 +0100
-Subject: [PATCH v2] mfd: vexpress: Handle pending config transactions
-In-Reply-To: <1366821084-12815-1-git-send-email-pawel.moll@arm.com>
-References: <1366821084-12815-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1366910091-17971-1-git-send-email-pawel.moll@arm.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 25 Apr 2013 19:23:17 +0200
+Subject: [PATCH 01/14] Revert "sched: Introduce temporary FAIR_GROUP_SCHED
+ dependency for load-tracking"
+In-Reply-To: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
+References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1366910611-20048-2-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The config transactions "scheduler" was hopelessly broken,
-repeating completed transaction instead of picking up
-next pending one.
+This reverts commit f4e26b120b9de84cb627bc7361ba43cfdc51341f.
 
-Fixed now. Also improved debug messages.
-
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- drivers/mfd/vexpress-config.c |   35 +++++++++++++++++++++--------------
- 1 file changed, 21 insertions(+), 14 deletions(-)
+ include/linux/sched.h |    8 +-------
+ kernel/sched/core.c   |    7 +------
+ kernel/sched/fair.c   |   13 ++-----------
+ kernel/sched/sched.h  |    9 +--------
+ 4 files changed, 5 insertions(+), 32 deletions(-)
 
-diff --git a/drivers/mfd/vexpress-config.c b/drivers/mfd/vexpress-config.c
-index 3c1723aa..84ce6b9 100644
---- a/drivers/mfd/vexpress-config.c
-+++ b/drivers/mfd/vexpress-config.c
-@@ -184,13 +184,14 @@ static int vexpress_config_schedule(struct vexpress_config_trans *trans)
- 
- 	spin_lock_irqsave(&bridge->transactions_lock, flags);
- 
--	vexpress_config_dump_trans("Executing", trans);
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index d35d2b6..16b0d18 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -1159,13 +1159,7 @@ struct sched_entity {
+ 	/* rq "owned" by this entity/group: */
+ 	struct cfs_rq		*my_q;
+ #endif
 -
--	if (list_empty(&bridge->transactions))
-+	if (list_empty(&bridge->transactions)) {
-+		vexpress_config_dump_trans("Executing", trans);
- 		status = bridge->info->func_exec(trans->func->func,
- 				trans->offset, trans->write, trans->data);
--	else
-+	} else {
-+		vexpress_config_dump_trans("Queuing", trans);
- 		status = VEXPRESS_CONFIG_STATUS_WAIT;
-+	}
+-/*
+- * Load-tracking only depends on SMP, FAIR_GROUP_SCHED dependency below may be
+- * removed when useful for applications beyond shares distribution (e.g.
+- * load-balance).
+- */
+-#if defined(CONFIG_SMP) && defined(CONFIG_FAIR_GROUP_SCHED)
++#ifdef CONFIG_SMP
+ 	/* Per-entity load-tracking */
+ 	struct sched_avg	avg;
+ #endif
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 67d0465..c8db984 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -1563,12 +1563,7 @@ static void __sched_fork(struct task_struct *p)
+ 	p->se.vruntime			= 0;
+ 	INIT_LIST_HEAD(&p->se.group_node);
  
- 	switch (status) {
- 	case VEXPRESS_CONFIG_STATUS_DONE:
-@@ -212,25 +213,31 @@ void vexpress_config_complete(struct vexpress_config_bridge *bridge,
- {
- 	struct vexpress_config_trans *trans;
- 	unsigned long flags;
-+	const char *message = "Completed";
- 
- 	spin_lock_irqsave(&bridge->transactions_lock, flags);
- 
- 	trans = list_first_entry(&bridge->transactions,
- 			struct vexpress_config_trans, list);
--	vexpress_config_dump_trans("Completed", trans);
--
- 	trans->status = status;
--	list_del(&trans->list);
- 
--	if (!list_empty(&bridge->transactions)) {
--		vexpress_config_dump_trans("Pending", trans);
-+	do {
-+		vexpress_config_dump_trans(message, trans);
-+		list_del(&trans->list);
-+		complete(&trans->completion);
- 
--		bridge->info->func_exec(trans->func->func, trans->offset,
--				trans->write, trans->data);
--	}
--	spin_unlock_irqrestore(&bridge->transactions_lock, flags);
-+		if (list_empty(&bridge->transactions))
-+			break;
-+
-+		trans = list_first_entry(&bridge->transactions,
-+				struct vexpress_config_trans, list);
-+		vexpress_config_dump_trans("Executing pending", trans);
-+		trans->status = bridge->info->func_exec(trans->func->func,
-+				trans->offset, trans->write, trans->data);
-+		message = "Finished pending";
-+	} while (trans->status == VEXPRESS_CONFIG_STATUS_DONE);
- 
--	complete(&trans->completion);
-+	spin_unlock_irqrestore(&bridge->transactions_lock, flags);
+-/*
+- * Load-tracking only depends on SMP, FAIR_GROUP_SCHED dependency below may be
+- * removed when useful for applications beyond shares distribution (e.g.
+- * load-balance).
+- */
+-#if defined(CONFIG_SMP) && defined(CONFIG_FAIR_GROUP_SCHED)
++#ifdef CONFIG_SMP
+ 	p->se.avg.runnable_avg_period = 0;
+ 	p->se.avg.runnable_avg_sum = 0;
+ #endif
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 7a33e59..9c2f726 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -1109,8 +1109,7 @@ static inline void update_cfs_shares(struct cfs_rq *cfs_rq)
  }
- EXPORT_SYMBOL(vexpress_config_complete);
+ #endif /* CONFIG_FAIR_GROUP_SCHED */
  
+-/* Only depends on SMP, FAIR_GROUP_SCHED may be removed when useful in lb */
+-#if defined(CONFIG_SMP) && defined(CONFIG_FAIR_GROUP_SCHED)
++#ifdef CONFIG_SMP
+ /*
+  * We choose a half-life close to 1 scheduling period.
+  * Note: The tables below are dependent on this value.
+@@ -3394,12 +3393,6 @@ unlock:
+ }
+ 
+ /*
+- * Load-tracking only depends on SMP, FAIR_GROUP_SCHED dependency below may be
+- * removed when useful for applications beyond shares distribution (e.g.
+- * load-balance).
+- */
+-#ifdef CONFIG_FAIR_GROUP_SCHED
+-/*
+  * Called immediately before a task is migrated to a new cpu; task_cpu(p) and
+  * cfs_rq_of(p) references at time of call are still valid and identify the
+  * previous cpu.  However, the caller only guarantees p->pi_lock is held; no
+@@ -3422,7 +3415,6 @@ migrate_task_rq_fair(struct task_struct *p, int next_cpu)
+ 		atomic64_add(se->avg.load_avg_contrib, &cfs_rq->removed_load);
+ 	}
+ }
+-#endif
+ #endif /* CONFIG_SMP */
+ 
+ static unsigned long
+@@ -6114,9 +6106,8 @@ const struct sched_class fair_sched_class = {
+ 
+ #ifdef CONFIG_SMP
+ 	.select_task_rq		= select_task_rq_fair,
+-#ifdef CONFIG_FAIR_GROUP_SCHED
+ 	.migrate_task_rq	= migrate_task_rq_fair,
+-#endif
++
+ 	.rq_online		= rq_online_fair,
+ 	.rq_offline		= rq_offline_fair,
+ 
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index cc03cfd..7f36024f 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -227,12 +227,6 @@ struct cfs_rq {
+ #endif
+ 
+ #ifdef CONFIG_SMP
+-/*
+- * Load-tracking only depends on SMP, FAIR_GROUP_SCHED dependency below may be
+- * removed when useful for applications beyond shares distribution (e.g.
+- * load-balance).
+- */
+-#ifdef CONFIG_FAIR_GROUP_SCHED
+ 	/*
+ 	 * CFS Load tracking
+ 	 * Under CFS, load is tracked on a per-entity basis and aggregated up.
+@@ -242,8 +236,7 @@ struct cfs_rq {
+ 	u64 runnable_load_avg, blocked_load_avg;
+ 	atomic64_t decay_counter, removed_load;
+ 	u64 last_decay;
+-#endif /* CONFIG_FAIR_GROUP_SCHED */
+-/* These always depend on CONFIG_FAIR_GROUP_SCHED */
++
+ #ifdef CONFIG_FAIR_GROUP_SCHED
+ 	u32 tg_runnable_contrib;
+ 	u64 tg_load_contrib;
 -- 
-1.7.10.4
+1.7.9.5
