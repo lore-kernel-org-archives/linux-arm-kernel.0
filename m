@@ -1,23 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 13:44:12 +0200
-Subject: [PATCH 31/32] ARM: ux500: Stop passing MMC's platform data for
- Device Tree boots
-In-Reply-To: <1366279934-30761-32-git-send-email-lee.jones@linaro.org>
+Date: Thu, 25 Apr 2013 13:46:22 +0200
+Subject: [PATCH 32/32] ARM: ux500: Move SDI (MMC) and UART devices under
+ more descriptive heading
+In-Reply-To: <1366279934-30761-33-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-32-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaF3he9X7fd88TrmtNK8g1U4jUEuy6QpKG0Hg8srXWbng@mail.gmail.com>
+ <1366279934-30761-33-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbxwPh+j_=CBFeH83n0XHSbcShnZ7Reb54+5cWYL-j3-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, Apr 18, 2013 at 12:12 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> It was required to pass DMA channel configuration information to the
-> MMC driver before the new DMA API was in place. Now that it is, and
-> is fully compatible with Device Tree we can stop doing that.
+> Now DMA DT bindings exist and are in use by he MMC and UART drivers, it
+> should be possible to remove them from the auxdata structure. However,
+> after doing so the drivers fail. Something must be reliant on the dev
+> name applied by using auxdata; probably common clk.
 >
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Really nice provided the dependencies are in place.
+You can remove "probably" from that sentence. Common clock is
+still relying on dev_name() to match the device name.
+
+There are some example of how to fix this, I recently sent a patch
+series fixing DT probed clocks for the Nomadik, check it out.
+
 Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
