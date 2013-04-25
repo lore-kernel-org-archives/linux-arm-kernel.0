@@ -1,41 +1,48 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 23:22:13 +0200
-Subject: gpio-pxa initcall level change and machine init breakage
-In-Reply-To: <87ppxiz9l5.fsf@free.fr>
-References: <5172B398.7060706@newsguy.com>
- <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
- <517466F6.3000003@newsguy.com>
- <CAD6h2NSy0=3P-PHdCiJJQG_jvGaFnr7uex+Uxs=0F-VsUxtPWg@mail.gmail.com>
- <CACRpkdbk24kR75fanvXVAocnuozNq_=jWDSPHPCWhbZCOrN5_Q@mail.gmail.com>
- <5176E438.80800@newsguy.com>
- <CACRpkdYLCKKZZFi6Y-viPUvrwupJGzfxr3f20a1emp-9qE0YBg@mail.gmail.com>
- <87ppxiz9l5.fsf@free.fr>
-Message-ID: <CACRpkdYEi7i_kSuUy4dBW-tE4BxifJY5wFdYVyLe6La5=HwEmg@mail.gmail.com>
+Date: Thu, 25 Apr 2013 23:39:18 +0200
+Subject: [PATCH] pinctrl: document the "GPIO mode" pitfall
+In-Reply-To: <2408684.1bsjMDDzMu@avalon>
+References: <1363345636-2006-1-git-send-email-linus.walleij@stericsson.com>
+ <2408684.1bsjMDDzMu@avalon>
+Message-ID: <CACRpkdag=YTeQH=VjW4fQ+G94REWeURhC=ErJxjmSUuP=pKYbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 9:36 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+On Tue, Apr 23, 2013 at 3:33 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
 
-> Now this patch breaks boards. I disagree in having my board code broken without
-> notice. What I would find less intrusive would be to :
->  (a) revert the patch
+>> +And your machine configuration may look like this:
+>> +--------------------------------------------------
+>> +
+>> +static unsigned long uart_default_mode[] = {
+>> +    PIN_CONF_PACKED(PIN_CONFIG_DRIVE_PUSH_PULL, 0),
+>> +};
+>> +
+>> +static unsigned long uart_sleep_mode[] = {
+>> +    PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 0),
+>> +};
+>
+> I'm having a bit of trouble with PIN_CONFIG_DRIVE_PUSH_PULL and
+> PIN_CONFIG_OUTPUT. Strictly speaking, when configured in output mode, the pin
+> will be in a push-pull configuration.
 
-This was done by pull request to Torvalds yesterday ...
+For your system or for any system? Open drain, open source are also
+output modes, and none of them are push-pull.
 
->  (b) inform board maintainers that they must fix their board code (for example
->  give them 1 window)
->  (c) put back the patch. Board maintainers who did not amend their board
->  code cannot say anymore they didn't know it. Board maintainers will also have
->  time to rise objections if they think they cannot change their board code
->  (which I do not believe is possible, but who knows ...)
+> Could you clarify the exact scope of the
+> two configuration parameters ?
 
-So when it comes to the PXA there is maybe this list of things that
-would be nice to change, and this is likely on top of it ... moving the
-PXA machines over to device tree would be more important if people
-who like them want them so stay around, because non-device tree
-platforms will at some point become deprecated, and fixing the platforms
-to support device tree will inevitably lead to this problem being fixed
-as well.
+PIN_CONFIG_OUTPUT is left a bit unspecified, but here the
+idea was a passive drive, like just connecting the pin to
+VDD or GND without any driver stage at all. Maybe I should
+patch the documentation since we seem to be the only
+user?
+
+In the above case (which is derived from the ABx500) I think what is
+happening is that the pin is connected to ground during sleep,
+without any enabled driver stages, which saves a lot of power,
+since you do not need to bias the totempole during
+sleep in that way.
 
 Yours,
 Linus Walleij
