@@ -1,183 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 10:06:05 +0200
-Subject: [PATCH 04/32] dmaengine: ste_dma40: Amalgamate DMA source and
- destination channel numbers
-In-Reply-To: <1366279934-30761-5-git-send-email-lee.jones@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 25 Apr 2013 09:13:38 +0100
+Subject: [PATCH 03/32 v3] dmaengine: ste_dma40: Use the BIT macro to
+ replace ugly '(1 << x)'s
+In-Reply-To: <CAH+eYFBKnEWkcJ+9DxVqnxbPS4QYtswi7Ux0JHnTWYfRFy_5Aw@mail.gmail.com>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaauDYTdoBHGG9FO4kKqvCYyCrjY8EGWs5gAQWErGW6_A@mail.gmail.com>
+ <1366279934-30761-4-git-send-email-lee.jones@linaro.org>
+ <20130424151145.GH9652@gmail.com>
+ <CAH+eYFBKnEWkcJ+9DxVqnxbPS4QYtswi7Ux0JHnTWYfRFy_5Aw@mail.gmail.com>
+Message-ID: <20130425081338.GB4623@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wed, 24 Apr 2013, Rabin Vincent wrote:
 
-> Devices which utilise DMA tend to use the same channel numbers for
-> transmitting and receiving. For this reason and the fact that it'll
-> decrease the burden of platform data passed to each device, we're
-> amalgamating source and destination device types.
+> 2013/4/24 Lee Jones <lee.jones@linaro.org>:
+> > The aim is to make the code that little more readable.
+> >
+> > Acked-by: Vinod Koul <vnod.koul@intel.com>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Please pay closer attention to the semantics of each usage instead of
+> just replacing all x left shifts of 1 by BIT(x) for "readability".
+> 
+> >         if (seg_max > STEDMA40_MAX_SEG_SIZE)
+> > -               seg_max -= (1 << max_w);
+> > +               seg_max -= BIT(max_w);
+> >
+> > -       if (!IS_ALIGNED(size, 1 << max_w))
+> > +       if (!IS_ALIGNED(size, BIT(max_w)))
+> >                 return -EINVAL;
+> 
+> Here and in all other places where the values are from cfg->data_width,
+> the semantic purpose of the shift is not for setting a particular bit
+> but instead for converting the data_width field into the data width
+> value in bytes.  You should not change these usages to BIT().
+> 
+> It would be instead better to just make the cfg->data_width as the
+> number of bytes and convert them to the appropriate hardware field
+> values when the descriptors are constructed.  That of course should be
+> in another patch.
 
-I don't think this explains what the patch is actually doing.
+I'll do that. Thanks for the pointer.
 
-Instead describe this:
-
-> @@ -56,8 +54,7 @@ static struct stedma40_chan_cfg msp1_dma_rx = {
->         .high_priority = true,
->         .dir = STEDMA40_PERIPH_TO_MEM,
->
-> -       .src_dev_type = DB8500_DMA_DEV30_MSP3_RX,
-> -       .dst_dev_type = STEDMA40_DEV_DST_MEMORY,
-> +       .dev_type = DB8500_DMA_DEV30_MSP3,
-(...)
-
-What the message should say is that we're encoding pairs of
-information for sources and destinations. Since every such
-entry contains a .dir entry stating the direction of the transfer
-it is implicit whether the channel is for RX or TX and this is what
-you're exploiting in this patch.
-
-So channel numbers (as mentioned in the commit) is not
-the key issue here.
-
-Now we should ask ourselves why it was done like this from
-the beginning. The reason is that DMA40 supports device-to-device
-DMA, so if you encoded one device in .src_dev_type and another
-device in .dst_dev_type and set .dir to
-STEDMA40_PERIPH_TO_PERIPH (which as you can see is
-defined in <linux/platform_data/dma-ste-dma40.h>) you get a
-device to device transfer.
-
-Are we now sacrificing that ability on the altar of simplification?
-
-I actually think not, but that we should do periph-to-periph transfers
-in some other way, and that the .dir attribute should go away from
-the struct stedma40_chan_cfg as well but I'm not entirely sure.
-Someone else?
-
-(...)
-> +++ b/arch/arm/mach-ux500/cpu-db8500.c
-> @@ -167,25 +167,25 @@ static void __init db8500_add_gpios(struct device *parent)
->  }
->
->  static int usb_db8500_rx_dma_cfg[] = {
-> -       DB8500_DMA_DEV38_USB_OTG_IEP_1_9,
-> -       DB8500_DMA_DEV37_USB_OTG_IEP_2_10,
-> -       DB8500_DMA_DEV36_USB_OTG_IEP_3_11,
-> -       DB8500_DMA_DEV19_USB_OTG_IEP_4_12,
-> -       DB8500_DMA_DEV18_USB_OTG_IEP_5_13,
-> -       DB8500_DMA_DEV17_USB_OTG_IEP_6_14,
-> -       DB8500_DMA_DEV16_USB_OTG_IEP_7_15,
-> -       DB8500_DMA_DEV39_USB_OTG_IEP_8
-> +       DB8500_DMA_DEV38_USB_OTG_IEP_AND_OEP_1_9,
-> +       DB8500_DMA_DEV37_USB_OTG_IEP_AND_OEP_2_10,
-> +       DB8500_DMA_DEV36_USB_OTG_IEP_AND_OEP_3_11,
-> +       DB8500_DMA_DEV19_USB_OTG_IEP_AND_OEP_4_12,
-> +       DB8500_DMA_DEV18_USB_OTG_IEP_AND_OEP_5_13,
-> +       DB8500_DMA_DEV17_USB_OTG_IEP_AND_OEP_6_14,
-> +       DB8500_DMA_DEV16_USB_OTG_IEP_AND_OEP_7_15,
-> +       DB8500_DMA_DEV39_USB_OTG_IEP_AND_OEP_8
->  };
->
->  static int usb_db8500_tx_dma_cfg[] = {
-> -       DB8500_DMA_DEV38_USB_OTG_OEP_1_9,
-> -       DB8500_DMA_DEV37_USB_OTG_OEP_2_10,
-> -       DB8500_DMA_DEV36_USB_OTG_OEP_3_11,
-> -       DB8500_DMA_DEV19_USB_OTG_OEP_4_12,
-> -       DB8500_DMA_DEV18_USB_OTG_OEP_5_13,
-> -       DB8500_DMA_DEV17_USB_OTG_OEP_6_14,
-> -       DB8500_DMA_DEV16_USB_OTG_OEP_7_15,
-> -       DB8500_DMA_DEV39_USB_OTG_OEP_8
-> +       DB8500_DMA_DEV38_USB_OTG_IEP_AND_OEP_1_9,
-> +       DB8500_DMA_DEV37_USB_OTG_IEP_AND_OEP_2_10,
-> +       DB8500_DMA_DEV36_USB_OTG_IEP_AND_OEP_3_11,
-> +       DB8500_DMA_DEV19_USB_OTG_IEP_AND_OEP_4_12,
-> +       DB8500_DMA_DEV18_USB_OTG_IEP_AND_OEP_5_13,
-> +       DB8500_DMA_DEV17_USB_OTG_IEP_AND_OEP_6_14,
-> +       DB8500_DMA_DEV16_USB_OTG_IEP_AND_OEP_7_15,
-> +       DB8500_DMA_DEV39_USB_OTG_IEP_AND_OEP_8
->  };
-
-
-If you're doing this change, and after this RX and TX has no semantical
-meaning for these lists, join these two config lists
-into one.
-
-(...)
-> diff --git a/arch/arm/mach-ux500/usb.c b/arch/arm/mach-ux500/usb.c
->  static u32 d40_chan_has_events(struct d40_chan *d40c)
-> @@ -1744,8 +1740,6 @@ static int d40_validate_conf(struct d40_chan *d40c,
->                              struct stedma40_chan_cfg *conf)
->  {
->         int res = 0;
-> -       u32 dst_event_group = D40_TYPE_TO_GROUP(conf->dst_dev_type);
-> -       u32 src_event_group = D40_TYPE_TO_GROUP(conf->src_dev_type);
-
-Please explain why this is not important to check anymore, I'm not
-following.
-
->         if (conf->dir == STEDMA40_MEM_TO_PERIPH &&
-> -           dst_event_group == STEDMA40_DEV_DST_MEMORY) {
-> -               chan_err(d40c, "Invalid dst\n");
-> +           d40c->base->plat_data->dev_tx[conf->dev_type] == 0 &&
-> +           d40c->runtime_addr == 0) {
-> +               chan_err(d40c, "Invalid TX channel address (%d)\n",
-> +                        conf->dev_type);
-
-Like here. We are checking for inconsistency between group
-and channel direction, why is it no longer important to check this?
-
->         if (conf->dir == STEDMA40_PERIPH_TO_MEM &&
-> -           src_event_group == STEDMA40_DEV_SRC_MEMORY) {
-> -               chan_err(d40c, "Invalid src\n");
-> -               res = -EINVAL;
-> -       }
-> -
-> -       if (src_event_group == STEDMA40_DEV_SRC_MEMORY &&
-> -           dst_event_group == STEDMA40_DEV_DST_MEMORY && is_log) {
-> -               chan_err(d40c, "No event line\n");
-> -               res = -EINVAL;
-> -       }
-> -
-> -       if (conf->dir == STEDMA40_PERIPH_TO_PERIPH &&
-> -           (src_event_group != dst_event_group)) {
-> -               chan_err(d40c, "Invalid event group\n");
-> +           d40c->base->plat_data->dev_rx[conf->dev_type] == 0 &&
-> +           d40c->runtime_addr == 0) {
-> +               chan_err(d40c, "Invalid RX channel address (%d)\n",
-> +                        conf->dev_type);
-
-Same here.
-
-(...)
-> @@ -2062,7 +2035,7 @@ static int d40_free_dma(struct d40_chan *d40c)
->  {
->
->         int res = 0;
-> -       u32 event;
-> +       u32 event = D40_TYPE_TO_EVENT(d40c->dma_cfg.dev_type);
->         struct d40_phy_res *phy = d40c->phy_chan;
->         bool is_src;
->
-> @@ -2081,13 +2054,11 @@ static int d40_free_dma(struct d40_chan *d40c)
->         }
->
->         if (d40c->dma_cfg.dir == STEDMA40_MEM_TO_PERIPH ||
-> -           d40c->dma_cfg.dir == STEDMA40_MEM_TO_MEM) {
-> -               event = D40_TYPE_TO_EVENT(d40c->dma_cfg.dst_dev_type);
-> +           d40c->dma_cfg.dir == STEDMA40_MEM_TO_MEM)
-
-Why did you just stop checking dma_cfg.dir for == STEDMA40_MEM_TO_MEM
-above?
-
-And why is dma_cfg.dir suddenly hardcoded to MEM_TO_MEM??
-
-This seems like a totally unrelated change and should it be done
-it need to be a separate patch with a separate explanation
-AFAICT.
-
-This seems to happen in some other places too, and I find it
-very hard to follow the changes here ... can you please consider
-splitting the changes to groups and types semantics into a separate
-patch?
-
-Yours,
-Linus Walleij
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
