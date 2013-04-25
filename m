@@ -1,34 +1,39 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Thu, 25 Apr 2013 14:48:38 +0100
-Subject: [PATCH v4 1/7] xen/arm: actually pass a non-NULL percpu pointer
- to request_percpu_irq
-In-Reply-To: <1366831695-13214-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1304242012590.4180@kaball.uk.xensource.com>
- <1366831695-13214-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1366897718.20256.546.camel@zakaz.uk.xensource.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 25 Apr 2013 14:50:18 +0100
+Subject: [PATCH] ARM: make cpu_init() notrace
+In-Reply-To: <20130425121504.GD14496@n2100.arm.linux.org.uk>
+References: <1366302046.3388.8.camel@linaro1.home>
+ <20130422140711.GI14496@n2100.arm.linux.org.uk>
+ <1366654116.3989.16.camel@computer5.home>
+ <20130425121504.GD14496@n2100.arm.linux.org.uk>
+Message-ID: <1366897818.3528.38.camel@computer5.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-04-24 at 20:28 +0100, Stefano Stabellini wrote:
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+On Thu, 2013-04-25 at 13:15 +0100, Russell King - ARM Linux wrote:
 
-Reviewed-by: Ian Campbell <ian.camjpbell@citrix.com>
-
-> CC: stable at vger.kernel.org
-> ---
->  arch/arm/xen/enlighten.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> $ pdb getpatch 7700/1 |tr ' ' '_' |less
+> diff_--git_a/arch/arm/kernel/setup.c_b/arch/arm/kernel/setup.c
+> index_d343a6c..943cbf0_100644
+> ---_a/arch/arm/kernel/setup.c
+> +++_b/arch/arm/kernel/setup.c
+> @@_-390,7_+390,7_@@_static_void___init_feat_v6_fixup(void)
+> __*
+> __*_cpu_init_sets_up_the_per-CPU_stacks.
+> __*/
+> -void_cpu_init(void)
+> +void_notrace_cpu_init(void)
+> _{
+> ________unsigned_int_cpu_=_smp_processor_id();
+> ________struct_stack_*stk_=_&stacks[cpu];
 > 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 8dc0605..99ce189 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -239,7 +239,7 @@ static int __init xen_init_events(void)
->  	xen_init_IRQ();
->  
->  	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
-> -			"events", xen_vcpu)) {
-> +			"events", &xen_vcpu)) {
->  		pr_err("Error requesting IRQ %d\n", xen_events_irq);
->  		return -EINVAL;
->  	}
+> Can you guess why git has a problem appying the above... 
+
+Sorry about that, the user forgot to tell their mailer it was
+pre-formatted text. I've sent a fixed version.
+
+Note to self: bcc self on patch submissions and then run them though
+'git am' to catch problems before others hit them.
+
+-- 
+Tixy
