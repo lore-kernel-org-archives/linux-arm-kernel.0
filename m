@@ -1,57 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Apr 2013 19:29:02 +0200
-Subject: [PATCH 19/21] USB: lpc32xx: ISP1301 needs USB_PHY
+Date: Thu, 25 Apr 2013 19:28:57 +0200
+Subject: [PATCH 14/21] cpufreq: pxa2xx: initialize variables
 In-Reply-To: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
 References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
-Message-ID: <1366910944-3033663-20-git-send-email-arnd@arndb.de>
+Message-ID: <1366910944-3033663-15-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig entry for USB_LPC32XX unconditionally selects USB_ISP1301,
-which is now only visible when USB_PHY is also enabled.
+gcc-3.8 correctly found that the variables set by find_freq_tables()
+are not initialized if this function is called on something other
+than a pxa2xx or pxa3xx:
 
-This adds an appropriate dependency and enables USB_PHY in the msm
-defconfig, avoiding these build errors:
+pxa2xx-cpufreq.c: In function 'pxa_verify_policy':
+pxa2xx-cpufreq.c:272:6: warning: 'pxa_freqs_table' may be used uninitialized in this function [-Wmaybe-uninitialized]
+pxa2xx-cpufreq.c: In function 'pxa_set_target':
+pxa2xx-cpufreq.c:345:23: warning: 'pxa_freq_settings' may be used uninitialized in this function [-Wmaybe-uninitialized]
 
-warning: (USB_LPC32XX) selects USB_ISP1301 which has unmet direct dependencies (USB_SUPPORT && USB_PHY && (USB || USB_GADGET) && I2C)
-drivers/built-in.o: In function `usb_hcd_nxp_probe':
-drivers/usb/host/ohci-nxp.c:224: undefined reference to `isp1301_get_client'
-drivers/built-in.o: In function `lpc32xx_udc_probe':
-drivers/usb/gadget/lpc32xx_udc.c:3071: undefined reference to `isp1301_get_client'
+Rather than adding a bogus initialization that would let us
+get a little further before crashing, add an explicit BUG().
+We know that this code is designed to run on only these cpus,
+so this will fix the build warning and give a more helpful
+diagnostic if the code ever changes to run on other machines.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: linux-usb at vger.kernel.org
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Roland Stigge <stigge@antcom.de>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 ---
- arch/arm/configs/lpc32xx_defconfig | 1 +
- drivers/usb/gadget/Kconfig         | 1 +
- 2 files changed, 2 insertions(+)
+ drivers/cpufreq/pxa2xx-cpufreq.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/lpc32xx_defconfig b/arch/arm/configs/lpc32xx_defconfig
-index 8fee514..398a367 100644
---- a/arch/arm/configs/lpc32xx_defconfig
-+++ b/arch/arm/configs/lpc32xx_defconfig
-@@ -146,6 +146,7 @@ CONFIG_SND_DEBUG_VERBOSE=y
- # CONFIG_SND_SPI is not set
- CONFIG_SND_SOC=y
- CONFIG_USB=y
-+CONFIG_USB_PHY=y
- CONFIG_USB_OHCI_HCD=y
- CONFIG_USB_STORAGE=y
- CONFIG_USB_GADGET=y
-diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
-index a61d981..f85b427 100644
---- a/drivers/usb/gadget/Kconfig
-+++ b/drivers/usb/gadget/Kconfig
-@@ -144,6 +144,7 @@ config USB_AT91
- config USB_LPC32XX
- 	tristate "LPC32XX USB Peripheral Controller"
- 	depends on ARCH_LPC32XX
-+	depends on USB_PHY
- 	select USB_ISP1301
- 	select USB_OTG_UTILS
- 	help
+diff --git a/drivers/cpufreq/pxa2xx-cpufreq.c b/drivers/cpufreq/pxa2xx-cpufreq.c
+index fe4c55b..9e5bc8e 100644
+--- a/drivers/cpufreq/pxa2xx-cpufreq.c
++++ b/drivers/cpufreq/pxa2xx-cpufreq.c
+@@ -221,10 +221,11 @@ static void find_freq_tables(struct cpufreq_frequency_table **freq_table,
+ 			*pxa_freqs = pxa255_turbo_freqs;
+ 			*freq_table = pxa255_turbo_freq_table;
+ 		}
+-	}
+-	if (cpu_is_pxa27x()) {
++	} else if (cpu_is_pxa27x()) {
+ 		*pxa_freqs = pxa27x_freqs;
+ 		*freq_table = pxa27x_freq_table;
++	} else {
++		BUG();
+ 	}
+ }
+ 
 -- 
 1.8.1.2
