@@ -1,49 +1,51 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 25 Apr 2013 04:04:58 +0200
-Subject: dma cache coherency on Armada XP dev board
-In-Reply-To: <20130424182202.GK13884@titan.lakedaemon.net>
-References: <CANX6Damwoz0MSEu5Sb4uKTUhcsC0g+ua1DjuQuMEzXyBOkL7PA@mail.gmail.com>
- <20130424182202.GK13884@titan.lakedaemon.net>
-Message-ID: <20130425040458.1084355f@skate>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 25 Apr 2013 11:35:20 +0800
+Subject: [PATCH v5 01/10] ASoC: phycore-ac97: Add DT support
+In-Reply-To: <20130424194540.GF32299@pengutronix.de>
+References: <1366814199-14827-1-git-send-email-mpa@pengutronix.de>
+ <1366814199-14827-2-git-send-email-mpa@pengutronix.de>
+ <20130424194540.GF32299@pengutronix.de>
+Message-ID: <20130425033517.GA1276@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viral, Jason,
-
-On Wed, 24 Apr 2013 14:22:02 -0400, Jason Cooper wrote:
-
-> > Recently, I faced DMA related issue. While moving data from memory
-> > to the device, I  found that sometimes I am getting Junk data. I
-> > looked further to see if this is related to DMA Sync problem. So,
-> > basically, I have following questions,
+On Wed, Apr 24, 2013 at 09:45:40PM +0200, Sascha Hauer wrote:
+> Hi Markus,
+> 
+> On Wed, Apr 24, 2013 at 04:36:30PM +0200, Markus Pargmann wrote:
+> > Add devicetree support for this audio soc fabric driver.
 > > 
-> > 1. As per [1] ARMADA has Coherency Fabric that sits between CPU and
-> > other devices and takes care of hardware based I/O cache coherency.
-> > Do we need to enable any support for the same in software ? I am
-> > running 3.0.29 based linux kernel. How do I verify that I have all
-> > the things enabled in Linux Kernel.
+> > @@ -32,8 +35,12 @@ static struct snd_soc_dai_link imx_phycore_dai_ac97[] = {
+> >  		.stream_name	= "HiFi",
+> >  		.codec_dai_name		= "wm9712-hifi",
+> >  		.codec_name	= "wm9712-codec",
+> > +#ifdef CONFIG_MACH_IMX27_DT
+> > +		.platform_name	= "imx-fiq-pcm-audio",
+> > +#else
+> >  		.cpu_dai_name	= "imx-ssi.0",
+> >  		.platform_name	= "imx-fiq-pcm-audio.0",
+> > +#endif
 > 
-> 3.0.29 must be a Marvell supplied kernel.  You'd have to ask them,
-> unfortunately.  I've added the free-electrons guys as they are
-> assisting Marvell with adding ArmadaXP/370 to the mainline kernel.
+> This doesn't work properly. Compiling the kernel with IMX27_DT enabled
+> does not necessarily mean that it also started with dt support.
 > 
-> My advice is to try building the mainline kernel from kernel.org and
-> see if the problem remains.
+Right, we should run-time check pdev->dev.of_node to see if it's a DT
+boot and set .platform_of_node rather than .platform_name if it is.  But
+it's only possible with the cleanup series "ASoC: fsl: imx-pcm driver
+cleanup" I just sent being the base.  I hope you can rebase your series
+on that :)
+
+Shawn
+
+> Personally I am fine with removing platform based support for this
+> driver if it's too much effort to fix it properly, but we shouldn't
+> start working with ifdefs here.
 > 
-> Thomas and the guys may be able to help you with specific questions
-> regarding the Marvell kernel.
-
-As Jason state, 3.0.29 is a kernel that has been heavily patched by
-Marvell, so you should consult your Marvell support to get help with
-this kernel. We do only support the mainline kernel for the Armada 370
-and Armada XP platforms. Do not hesitate to get back to us if you face
-similar issues with the mainline kernel.
-
-Best regards,
-
-Thomas Petazzoni
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> Sascha
+> 
+> 
+> -- 
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
