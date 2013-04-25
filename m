@@ -1,58 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Apr 2013 10:19:06 +0100
-Subject: [PATCH 05/32] dmaengine: ste_dma40: Supply macros to resolve
- 'src' and 'dst' directions
-In-Reply-To: <CACRpkdYD21VEHZ2825=e7PnATp-tfrL2rg4rKboG-Fq04U162A@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Apr 2013 11:20:18 +0200
+Subject: [PATCH 01/32] dmaengine: ste_dma40: Assign memcpy channels in the
+ driver
+In-Reply-To: <1366279934-30761-2-git-send-email-lee.jones@linaro.org>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-6-git-send-email-lee.jones@linaro.org>
- <CACRpkdYD21VEHZ2825=e7PnATp-tfrL2rg4rKboG-Fq04U162A@mail.gmail.com>
-Message-ID: <20130425091906.GG4623@gmail.com>
+ <1366279934-30761-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdaMS8RBi7aWyBRRZbf7OpK82C3-79tEaq+A-QU5zbVyxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Apr 2013, Linus Walleij wrote:
+On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > There are lots of lengthy if() statements located sporadically up and
-> > down the driver. This simple macro should make many of them a little
-> > simpler to decipher. The remainder have to stay in place, as they
-> > detail slightly more specific settings.
-> >
-> > Cc: Vinod Koul <vinod.koul@intel.com>
-> > Cc: Dan Williams <djbw@fb.com>
-> > Cc: Per Forlin <per.forlin@stericsson.com>
-> > Cc: Rabin Vincent <rabin@rab.in>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> (...)
-> 
-> > +#define D40_IS_SRC(dir)  ((dir == STEDMA40_PERIPH_TO_MEM) ? true : false)
-> 
-> And when I reas the code and see D40_IS_SRC, what does that
-> mean? That the channel is a source of .. what exactly?
-> 
-> The older explicit comparison would be more informative.
-> 
-> > +#define D40_IS_DST(dir) (((dir == STEDMA40_MEM_TO_PERIPH) || \
-> > +                         (dir == STEDMA40_MEM_TO_MEM)) ? true : false)
-> > +
-> 
-> The comparison to STEDMA40_MEM_TO_MEM is unintelligible, if I see
-> that macro it has a very unintuitive name, since it is not just
-> DST but also SRC.
-> 
-> The latter macro would be named somthing like D40_IS_DST_OR_MEM2MEM
-> and then it will not simplify the code very much.
-> 
-> You need to come up with something different here, this is just making the
-> driver harder to understand.
-> 
-> I think this patch should be just dropped.
+> The channels reserved for memcpy are the same for all currently
+> supported platforms. With this in mind, we can ease the platform
+> data passing requirement by moving these assignments out from
+> platform code and place them directly into the driver.
+>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Per Forlin <per.forlin@stericsson.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Okay.
+(...)
+> -       if (num_log_chans + plat_data->memcpy_len) {
+> +       if (num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) {
+>                 /*
+>                  * The max number of logical channels are event lines for all
+>                  * src devices and dst devices
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+So as mentioned in review of another patch there is a kzalloc
+right below here where you forget to add + ARRAY_SIZE(dma40_memcpy_channels)
+please fix this...
+
+Yours,
+Linus Walleij
