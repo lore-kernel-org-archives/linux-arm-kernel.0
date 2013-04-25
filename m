@@ -1,206 +1,238 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 25 Apr 2013 19:23:16 +0200
-Subject: [RFC PATCH v4 00/14] sched: packing small tasks
-Message-ID: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
+Date: Thu, 25 Apr 2013 19:23:19 +0200
+Subject: [PATCH 03/14] sched: pack small tasks
+In-Reply-To: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
+References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1366910611-20048-4-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+During the creation of sched_domain, we define a pack buddy CPU for each CPU
+when one is available. We want to pack at all levels where a group of CPUs can
+be power gated independently from others.
+On a system that can't power gate a group of CPUs independently, the flag is
+set at all sched_domain level and the buddy is set to -1. This is the default
+behavior.
 
-This patchset takes advantage of the new per-task load tracking that is
-available in the kernel for packing the tasks in as few as possible
-CPU/Cluster/Core. It has got 2 packing modes:
--The 1st mode packs the small tasks when the system is not too busy. The main
-goal is to reduce the power consumption in the low system load use cases by
-minimizing the number of power domain that are enabled but it also keeps the
-default behavior which is performance oriented.
--The 2nd mode packs all tasks in as few as possible power domains in order to
-improve the power consumption of the system but at the cost of possible
-performance decrease because of the increase of the rate of ressources sharing
-compared to the default mode.
+On a dual clusters / dual cores system which can power gate each core and
+cluster independently, the buddy configuration will be :
 
-The packing is done in 3 steps (the last step is only applicable for the
-agressive packing mode):
-
-The 1st step looks for the best place to pack tasks in a system according to
-its topology and it defines a 1st pack buddy CPU for each CPU if there is one
-available. The policy for defining a buddy CPU is that we want to pack at
-levels where a group of CPU can be power gated independently from others. To
-describe this capability, a new flag SD_SHARE_POWERDOMAIN has been introduced,
-that is used to indicate whether the groups of CPUs of a scheduling domain
-share their power state. By default, this flag is set in all sched_domain in
-order to keep unchanged the current behavior of the scheduler and only ARM
-platform clears the SD_SHARE_POWERDOMAIN flag for MC and CPU level.
-
-In a 2nd step, the scheduler checks the load average of a task which wakes up
-as well as the load average of the buddy CPU and it can decide to migrate the
-light tasks on a not busy buddy. This check is done during the wake up because
-small tasks tend to wake up between periodic load balance and asynchronously
-to each other which prevents the default mechanism to catch and migrate them
-efficiently. A light task is defined by a runnable_avg_sum that is less than
-20% of the runnable_avg_period. In fact, the former condition encloses 2 ones:
-The average CPU load of the task must be less than 20% and the task must have
-been runnable less than 10ms when it woke up last time in order to be
-electable for the packing migration. So, a task than runs 1 ms each 5ms will
-be considered as a small task but a task that runs 50 ms with a period of
-500ms, will not.
-Then, the business of the buddy CPU depends of the load average for the rq and
-the number of running tasks. A CPU with a load average greater than 50% will
-be considered as busy CPU whatever the number of running tasks is and this
-threshold will be reduced by the number of running tasks in order to not
-increase too much the wake up latency of a task. When the buddy CPU is busy,
-the scheduler falls back to default CFS policy.
-
-The 3rd step is only used when the agressive packing mode is enable. In this
-case, the CPUs pack their tasks in their buddy until they becomes full. Unlike
-the previous step, we can't keep the same buddy so we update it during load
-balance. During the periodic load balance, the scheduler computes the activity
-of the system thanks the runnable_avg_sum and the cpu_power of all CPUs and
-then it defines the CPUs that will be used to handle the current activity. The
-selected CPUs will be their own buddy and will participate to the default
-load balancing mecanism in order to share the tasks in a fair way, whereas the
-not selected CPUs will not, and their buddy will be the last selected CPU.
-The behavior can be summarized as: The scheduler defines how many CPUs are
-required to handle the current activity, keeps the tasks on these CPUS and
-perform normal load balancing (or any evolution of the current load balancer
-like the use of runnable load avg from Alex https://lkml.org/lkml/2013/4/1/580)
-on this limited number of CPUs . Like the other steps, the CPUs are selected to
-minimize the number of power domain that must stay on.
-
-Change since V3:
-
- - Take into account comments on previous version.
- - Add an agressive packing mode and a knob to select between the various mode
-
-Change since V2:
-
- - Migrate only a task that wakes up
- - Change the light tasks threshold to 20%
- - Change the loaded CPU threshold to not pull tasks if the current number of
-   running tasks is null but the load average is already greater than 50%
- - Fix the algorithm for selecting the buddy CPU.
-
-Change since V1:
-
-Patch 2/6
- - Change the flag name which was not clear. The new name is
-   SD_SHARE_POWERDOMAIN.
- - Create an architecture dependent function to tune the sched_domain flags
-Patch 3/6
- - Fix issues in the algorithm that looks for the best buddy CPU
- - Use pr_debug instead of pr_info
- - Fix for uniprocessor
-Patch 4/6
- - Remove the use of usage_avg_sum which has not been merged
-Patch 5/6
- - Change the way the coherency of runnable_avg_sum and runnable_avg_period is
-   ensured
-Patch 6/6
- - Use the arch dependent function to set/clear SD_SHARE_POWERDOMAIN for ARM
-   platform
-
-Previous results for v3:
-
-This series has been tested with hackbench on ARM platform and the results
-don't show any performance regression
-
-Hackbench             3.9-rc2  +patches
-Mean Time (10 tests): 2.048    2.015
-stdev               : 0.047    0.068
-
-Previous results for V2:
-
-This series has been tested with MP3 play back on ARM platform:
-TC2 HMP (dual CA-15 and 3xCA-7 cluster).
-
-The measurements have been done on an Ubuntu image during 60 seconds of
-playback and the result has been normalized to 100.
-
-              | CA15 | CA7  | total |
--------------------------------------
-default       |  81  |   97 | 178   |
-pack          |  13  |  100 | 113   |
--------------------------------------
-
-Previous results for V1:
-
-The patch-set has been tested on ARM platforms: quad CA-9 SMP and TC2 HMP
-(dual CA-15 and 3xCA-7 cluster). For ARM platform, the results have
-demonstrated that it's worth packing small tasks at all topology levels.
-
-The performance tests have been done on both platforms with sysbench. The
-results don't show any performance regressions. These results are aligned with
-the policy which uses the normal behavior with heavy use cases.
-
-test: sysbench --test=cpu --num-threads=N --max-requests=R run
-
-Results below is the average duration of 3 tests on the quad CA-9.
-default is the current scheduler behavior (pack buddy CPU is -1)
-pack is the scheduler with the pack mechanism
-
-              | default |  pack   |
+      | Cluster 0   | Cluster 1   |
+      | CPU0 | CPU1 | CPU2 | CPU3 |
 -----------------------------------
-N=8;  R=200   |  3.1999 |  3.1921 |
-N=8;  R=2000  | 31.4939 | 31.4844 |
-N=12; R=200   |  3.2043 |  3.2084 |
-N=12; R=2000  | 31.4897 | 31.4831 |
-N=16; R=200   |  3.1774 |  3.1824 |
-N=16; R=2000  | 31.4899 | 31.4897 |
+buddy | CPU0 | CPU0 | CPU0 | CPU2 |
+
+If the cores in a cluster can't be power gated independently, the buddy
+configuration becomes:
+
+      | Cluster 0   | Cluster 1   |
+      | CPU0 | CPU1 | CPU2 | CPU3 |
 -----------------------------------
+buddy | CPU0 | CPU1 | CPU0 | CPU0 |
 
-The power consumption tests have been done only on TC2 platform which has got
-accessible power lines and I have used cyclictest to simulate small tasks. The
-tests show some power consumption improvements.
+Small tasks tend to slip out of the periodic load balance so the best place
+to choose to migrate them is during their wake up. The decision is in O(1) as
+we only check again one buddy CPU
 
-test: cyclictest -t 8 -q -e 1000000 -D 20 & cyclictest -t 8 -q -e 1000000 -D 20
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+Reviewed-by: Morten Rasmussen <morten.rasmussen@arm.com>
+---
+ kernel/sched/core.c  |    1 +
+ kernel/sched/fair.c  |  132 ++++++++++++++++++++++++++++++++++++++++++++++++++
+ kernel/sched/sched.h |    5 ++
+ 3 files changed, 138 insertions(+)
 
-The measurements have been done during 16 seconds and the result has been
-normalized to 100
-
-              | CA15 | CA7  | total |
--------------------------------------
-default       | 100  |  40  | 140   |
-pack          |  <1  |  45  | <46   |
--------------------------------------
-
-The A15 cluster is less power efficient than the A7 cluster but if we assume
-that the tasks is well spread on both clusters, we can guest estimate that the
-power consumption on a dual cluster of CA7 would have been for a default
-kernel:
-
-              | CA7  | CA7  | total |
--------------------------------------
-default       |  40  |  40  |  80   |
--------------------------------------
-
-Vincent Guittot (14):
-  Revert "sched: Introduce temporary FAIR_GROUP_SCHED dependency for
-    load-tracking"
-  sched: add a new SD_SHARE_POWERDOMAIN flag for sched_domain
-  sched: pack small tasks
-  sched: pack the idle load balance
-  ARM: sched: clear SD_SHARE_POWERDOMAIN
-  sched: add a knob to choose the packing level
-  sched: agressively pack@wake/fork/exec
-  sched: trig ILB on an idle buddy
-  sched: evaluate the activity level of the system
-  sched: update the buddy CPU
-  sched: filter task pull request
-  sched: create a new field with available capacity
-  sched: update the cpu_power
-  sched: force migration on buddy CPU
-
- arch/arm/kernel/topology.c       |    9 +
- arch/ia64/include/asm/topology.h |    1 +
- arch/tile/include/asm/topology.h |    1 +
- include/linux/sched.h            |   11 +-
- include/linux/sched/sysctl.h     |    8 +
- include/linux/topology.h         |    4 +
- kernel/sched/core.c              |   14 +-
- kernel/sched/fair.c              |  393 +++++++++++++++++++++++++++++++++++---
- kernel/sched/sched.h             |   15 +-
- kernel/sysctl.c                  |   13 ++
- 10 files changed, 423 insertions(+), 46 deletions(-)
-
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index 3b9861f..c5ef170 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -5664,6 +5664,7 @@ cpu_attach_domain(struct sched_domain *sd, struct root_domain *rd, int cpu)
+ 	rcu_assign_pointer(rq->sd, sd);
+ 	destroy_sched_domains(tmp, cpu);
+ 
++	update_packing_domain(cpu);
+ 	update_top_cache_domain(cpu);
+ }
+ 
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index 9c2f726..6adc57c 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -160,6 +160,76 @@ void sched_init_granularity(void)
+ 	update_sysctl();
+ }
+ 
++
++#ifdef CONFIG_SMP
++/*
++ * Save the id of the optimal CPU that should be used to pack small tasks
++ * The value -1 is used when no buddy has been found
++ */
++DEFINE_PER_CPU(int, sd_pack_buddy);
++
++/*
++ * Look for the best buddy CPU that can be used to pack small tasks
++ * We make the assumption that it doesn't wort to pack on CPU that share the
++ * same powerline. We look for the 1st sched_domain without the
++ * SD_SHARE_POWERDOMAIN flag. Then we look for the sched_group with the lowest
++ * power per core based on the assumption that their power efficiency is
++ * better
++ */
++void update_packing_domain(int cpu)
++{
++	struct sched_domain *sd;
++	int id = -1;
++
++	sd = highest_flag_domain(cpu, SD_SHARE_POWERDOMAIN);
++	if (!sd)
++		sd = rcu_dereference_check_sched_domain(cpu_rq(cpu)->sd);
++	else
++		sd = sd->parent;
++
++	while (sd && (sd->flags & SD_LOAD_BALANCE)
++		&& !(sd->flags & SD_SHARE_POWERDOMAIN)) {
++		struct sched_group *sg = sd->groups;
++		struct sched_group *pack = sg;
++		struct sched_group *tmp;
++
++		/*
++		 * The sched_domain of a CPU points on the local sched_group
++		 * and this CPU of this local group is a good candidate
++		 */
++		id = cpu;
++
++		/* loop the sched groups to find the best one */
++		for (tmp = sg->next; tmp != sg; tmp = tmp->next) {
++			if (tmp->sgp->power * pack->group_weight >
++					pack->sgp->power * tmp->group_weight)
++				continue;
++
++			if ((tmp->sgp->power * pack->group_weight ==
++					pack->sgp->power * tmp->group_weight)
++			 && (cpumask_first(sched_group_cpus(tmp)) >= id))
++				continue;
++
++			/* we have found a better group */
++			pack = tmp;
++
++			/* Take the 1st CPU of the new group */
++			id = cpumask_first(sched_group_cpus(pack));
++		}
++
++		/* Look for another CPU than itself */
++		if (id != cpu)
++			break;
++
++		sd = sd->parent;
++	}
++
++	pr_debug("CPU%d packing on CPU%d\n", cpu, id);
++	per_cpu(sd_pack_buddy, cpu) = id;
++}
++
++#endif /* CONFIG_SMP */
++
+ #if BITS_PER_LONG == 32
+ # define WMULT_CONST	(~0UL)
+ #else
+@@ -3291,6 +3361,64 @@ done:
+ 	return target;
+ }
+ 
++static bool is_buddy_busy(int cpu)
++{
++	struct rq *rq = cpu_rq(cpu);
++	u32 sum = rq->avg.runnable_avg_sum;
++	u32 period = rq->avg.runnable_avg_period;
++
++	/*
++	 * If a CPU accesses the runnable_avg_sum and runnable_avg_period
++	 * fields of its buddy CPU while the latter updates it, it can get the
++	 * new version of a field and the old version of the other one. This
++	 * can generate erroneous decisions. We don't want to use a lock
++	 * mechanism for ensuring the coherency because of the overhead in
++	 * this critical path.
++	 * The runnable_avg_period of a runqueue tends to the max value in
++	 * less than 345ms after plugging a CPU, which implies that we could
++	 * use the max value instead of reading runnable_avg_period after
++	 * 345ms. During the starting phase, we must ensure a minimum of
++	 * coherency between the fields. A simple rule is runnable_avg_sum <=
++	 * runnable_avg_period.
++	 */
++	sum = min(sum, period);
++
++	/*
++	 * A busy buddy is a CPU with a high load or a small load with a lot of
++	 * running tasks.
++	 */
++	return (sum > (period / (rq->nr_running + 2)));
++}
++
++static bool is_light_task(struct task_struct *p)
++{
++	/* A light task runs less than 20% in average */
++	return ((p->se.avg.runnable_avg_sum  * 5) <
++			(p->se.avg.runnable_avg_period));
++}
++
++static int check_pack_buddy(int cpu, struct task_struct *p)
++{
++	int buddy = per_cpu(sd_pack_buddy, cpu);
++
++	/* No pack buddy for this CPU */
++	if (buddy == -1)
++		return false;
++
++	/* buddy is not an allowed CPU */
++	if (!cpumask_test_cpu(buddy, tsk_cpus_allowed(p)))
++		return false;
++
++	/*
++	 * If the task is a small one and the buddy is not overloaded,
++	 * we use buddy cpu
++	 */
++	if (!is_light_task(p) || is_buddy_busy(buddy))
++		return false;
++
++	return true;
++}
++
+ /*
+  * sched_balance_self: balance the current task (running on cpu) in domains
+  * that have the 'flag' flag set. In practice, this is SD_BALANCE_FORK and
+@@ -3319,6 +3447,10 @@ select_task_rq_fair(struct task_struct *p, int sd_flag, int wake_flags)
+ 		if (cpumask_test_cpu(cpu, tsk_cpus_allowed(p)))
+ 			want_affine = 1;
+ 		new_cpu = prev_cpu;
++
++		/* We pack only at wake up and not new task */
++		if (check_pack_buddy(new_cpu, p))
++			return per_cpu(sd_pack_buddy, new_cpu);
+ 	}
+ 
+ 	rcu_read_lock();
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index 7f36024f..96b164d 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -872,6 +872,7 @@ extern const struct sched_class idle_sched_class;
+ 
+ extern void trigger_load_balance(struct rq *rq, int cpu);
+ extern void idle_balance(int this_cpu, struct rq *this_rq);
++extern void update_packing_domain(int cpu);
+ 
+ #else	/* CONFIG_SMP */
+ 
+@@ -879,6 +880,10 @@ static inline void idle_balance(int cpu, struct rq *rq)
+ {
+ }
+ 
++static inline void update_packing_domain(int cpu)
++{
++}
++
+ #endif
+ 
+ extern void sysrq_sched_debug_show(void);
 -- 
 1.7.9.5
