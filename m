@@ -1,56 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Apr 2013 14:46:36 +0100
-Subject: [PATCH 1/9 v2] crypto: ux500/hash - Prepare clock before
- enabling it
-In-Reply-To: <CACRpkdYrCA6SduwMJF=7C9hyjP2Or7gxhjVFtLshdzkbYnxX1w@mail.gmail.com>
-References: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
- <1366280825-31136-2-git-send-email-lee.jones@linaro.org>
- <20130419122428.GC3432@gmail.com>
- <CACRpkdYrCA6SduwMJF=7C9hyjP2Or7gxhjVFtLshdzkbYnxX1w@mail.gmail.com>
-Message-ID: <20130425134636.GP4623@gmail.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Thu, 25 Apr 2013 14:48:38 +0100
+Subject: [PATCH v4 1/7] xen/arm: actually pass a non-NULL percpu pointer
+ to request_percpu_irq
+In-Reply-To: <1366831695-13214-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1304242012590.4180@kaball.uk.xensource.com>
+ <1366831695-13214-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1366897718.20256.546.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Apr 2013, Linus Walleij wrote:
+On Wed, 2013-04-24 at 20:28 +0100, Stefano Stabellini wrote:
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-> On Fri, Apr 19, 2013 at 2:24 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > Slight change of plan for v2.
-> >
-> > Now we're doing a seperate clk_prepare(), as the clk_enable() in the
-> > previous patch turned out to be called inside a spin_lock().
-> >
-> > Arnd, can you confirm your Ack please?
+Reviewed-by: Ian Campbell <ian.camjpbell@citrix.com>
+
+> CC: stable at vger.kernel.org
+> ---
+>  arch/arm/xen/enlighten.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> Do you really want letters to Arnd to be part of the commit log?
-> 
-> >
-> > ---
-> 
-> Note: stuff following the three dashes (---) will be *omitted*
-> from the change log. This seems to be turned upside-down.
-
-Ah, I didn't know that, thanks.
-
-This patch wasn't due for 'plucking', just reviewing.
-
-> > crypto: ux500/hash - Prepare clock before enabling it
-> >
-> > If we fail to prepare the ux500-hash clock before enabling it the
-> > platform will fail to boot. Here we insure this happens.
-> >
-> > Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> > Cc: David S. Miller <davem@davemloft.net>
-> > Cc: Andreas Westin <andreas.westin@stericsson.com>
-> > Cc: linux-crypto at vger.kernel.org
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Pls include Ulf Hansson <ulf.hansson@linaro.org> on this patch.
-
-Sure.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index 8dc0605..99ce189 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -239,7 +239,7 @@ static int __init xen_init_events(void)
+>  	xen_init_IRQ();
+>  
+>  	if (request_percpu_irq(xen_events_irq, xen_arm_callback,
+> -			"events", xen_vcpu)) {
+> +			"events", &xen_vcpu)) {
+>  		pr_err("Error requesting IRQ %d\n", xen_events_irq);
+>  		return -EINVAL;
+>  	}
