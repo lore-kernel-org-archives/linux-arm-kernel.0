@@ -1,79 +1,74 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 25 Apr 2013 13:39:32 -0400
-Subject: [PATCH 11/21] drm/tilcdc: use only a single module device table
-In-Reply-To: <1366734653-488286-12-git-send-email-arnd@arndb.de>
-References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
- <1366734653-488286-12-git-send-email-arnd@arndb.de>
-Message-ID: <CAF6AEGvOmQDvD64=WiGjS1SKeSOOf=5rTefn5c=ciBhaxfhntw@mail.gmail.com>
+From: B16395@freescale.com (Sethi Varun-B16395)
+Date: Thu, 25 Apr 2013 17:42:12 +0000
+Subject: [PATCH 13/21] iommu: tegra: print dma_addr_t using %lld
+In-Reply-To: <1366910944-3033663-14-git-send-email-arnd@arndb.de>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <1366910944-3033663-14-git-send-email-arnd@arndb.de>
+Message-ID: <C5ECD7A89D1DC44195F34B25E172658D4BD243@039-SN2MPN1-011.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 12:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The tilcdc driver fails to be built as a module because of extraneous
-> MODULE_DEVICE_TABLE entries:
->
-> drivers/gpu/drm/tilcdc/tilcdc_slave.o:(.data+0x54): multiple definition of `__mod_of_device_table'
-> drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
-> drivers/gpu/drm/tilcdc/tilcdc_panel.o:(.data+0x54): multiple definition of `__mod_of_device_table'
-> drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
-> drivers/gpu/drm/tilcdc/tilcdc_drv.o:(.data+0x184): multiple definition of `__mod_of_device_table'
-> drivers/gpu/drm/tilcdc/tilcdc_tfp410.o:(.data+0x54): first defined here
->
-> Since the entire point of these entries is to make the module autoload
-> when one of the devices is present, it's enough to keep the one entry
-> for "ti,am33xx-tilcdc", which should always be there if any of the
-> others are.
+Hi Arnd,
+I already submitted a patch to fix this.
+http://permalink.gmane.org/gmane.linux.kernel.iommu/2036
 
-Thanks Arnd
+Regards
+Varun
 
-Acked-By: Rob Clark <robdclark@gmail.com>
-
-> Cc: Rob Clark <robdclark@gmail.com>
-> Cc: Dave Airlie <airlied@linux.ie>
-> Cc: dri-devel at lists.freedesktop.org
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Thursday, April 25, 2013 10:59 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org; Arnd Bergmann; Sethi Varun-B16395;
+> Joerg Roedel
+> Subject: [PATCH 13/21] iommu: tegra: print dma_addr_t using %lld
+> 
+> The code was recently changed to work for builds with a 64 bit
+> dma_addr_t, but the printk unconditionally uses a format string for an
+> "long" variable, which is always wrong as the dma_add_t is now either
+> 'unsigned int' or 'unsigned long long'
+> depending on configuration.
+> 
+> The easiest solution is to cast the variable to u64 and print it as a 64
+> bit value.
+> 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Varun Sethi <Varun.Sethi@freescale.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
 > ---
->  drivers/gpu/drm/tilcdc/tilcdc_panel.c  | 1 -
->  drivers/gpu/drm/tilcdc/tilcdc_slave.c  | 1 -
->  drivers/gpu/drm/tilcdc/tilcdc_tfp410.c | 1 -
->  3 files changed, 3 deletions(-)
->
-> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_panel.c b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-> index 580b74e..eb99f42 100644
-> --- a/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-> +++ b/drivers/gpu/drm/tilcdc/tilcdc_panel.c
-> @@ -413,7 +413,6 @@ static struct of_device_id panel_of_match[] = {
->                 { .compatible = "ti,tilcdc,panel", },
->                 { },
->  };
-> -MODULE_DEVICE_TABLE(of, panel_of_match);
->
->  struct platform_driver panel_driver = {
->         .probe = panel_probe,
-> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_slave.c b/drivers/gpu/drm/tilcdc/tilcdc_slave.c
-> index 568dc1c..db1d2fc 100644
-> --- a/drivers/gpu/drm/tilcdc/tilcdc_slave.c
-> +++ b/drivers/gpu/drm/tilcdc/tilcdc_slave.c
-> @@ -353,7 +353,6 @@ static struct of_device_id slave_of_match[] = {
->                 { .compatible = "ti,tilcdc,slave", },
->                 { },
->  };
-> -MODULE_DEVICE_TABLE(of, slave_of_match);
->
->  struct platform_driver slave_driver = {
->         .probe = slave_probe,
-> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-> index 58d487b..a36788f 100644
-> --- a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-> +++ b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-> @@ -396,7 +396,6 @@ static struct of_device_id tfp410_of_match[] = {
->                 { .compatible = "ti,tilcdc,tfp410", },
->                 { },
->  };
-> -MODULE_DEVICE_TABLE(of, tfp410_of_match);
->
->  struct platform_driver tfp410_driver = {
->         .probe = tfp410_probe,
+>  drivers/iommu/tegra-gart.c | 3 ++-
+>  drivers/iommu/tegra-smmu.c | 2 +-
+>  2 files changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/iommu/tegra-gart.c b/drivers/iommu/tegra-gart.c
+> index 4aec8be..ebbdd82 100644
+> --- a/drivers/iommu/tegra-gart.c
+> +++ b/drivers/iommu/tegra-gart.c
+> @@ -295,7 +295,8 @@ static phys_addr_t gart_iommu_iova_to_phys(struct
+> iommu_domain *domain,
+> 
+>  	pa = (pte & GART_PAGE_MASK);
+>  	if (!pfn_valid(__phys_to_pfn(pa))) {
+> -		dev_err(gart->dev, "No entry for %08lx:%08x\n", iova, pa);
+> +		dev_err(gart->dev, "No entry for %08llx:%pa\n",
+> +				(u64)iova, &pa);
+>  		gart_dump_table(gart);
+>  		return -EINVAL;
+>  	}
+> diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+> index bc9b599..ef2a120 100644
+> --- a/drivers/iommu/tegra-smmu.c
+> +++ b/drivers/iommu/tegra-smmu.c
+> @@ -772,7 +772,7 @@ static phys_addr_t smmu_iommu_iova_to_phys(struct
+> iommu_domain *domain,
+>  	pfn = *pte & SMMU_PFN_MASK;
+>  	WARN_ON(!pfn_valid(pfn));
+>  	dev_dbg(as->smmu->dev,
+> -		"iova:%08lx pfn:%08lx asid:%d\n", iova, pfn, as->asid);
+> +		"iova:%08llx pfn:%08lx asid:%d\n", (u64)iova, pfn, as->asid);
+> 
+>  	spin_unlock_irqrestore(&as->lock, flags);
+>  	return PFN_PHYS(pfn);
 > --
 > 1.8.1.2
->
+> 
