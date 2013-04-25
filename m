@@ -1,62 +1,47 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 26 Apr 2013 01:15:09 +0200
-Subject: [PATCH] pinctrl: document the "GPIO mode" pitfall
-In-Reply-To: <CACRpkdag=YTeQH=VjW4fQ+G94REWeURhC=ErJxjmSUuP=pKYbA@mail.gmail.com>
-References: <1363345636-2006-1-git-send-email-linus.walleij@stericsson.com>
- <2408684.1bsjMDDzMu@avalon>
- <CACRpkdag=YTeQH=VjW4fQ+G94REWeURhC=ErJxjmSUuP=pKYbA@mail.gmail.com>
-Message-ID: <1761651.lXztZzrj1S@avalon>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 25 Apr 2013 16:25:52 -0700
+Subject: [PATCHv2 1/4] Documentation: Add memory mapped ARM architected
+ timer binding
+In-Reply-To: <5179B6ED.9000301@gmail.com>
+References: <1365812863-5367-1-git-send-email-sboyd@codeaurora.org>
+ <1365812863-5367-2-git-send-email-sboyd@codeaurora.org>
+ <516C6F12.5020208@gmail.com> <516C7231.6060305@codeaurora.org>
+ <5179A488.5050102@gmail.com> <5179B2B2.8000201@codeaurora.org>
+ <5179B6ED.9000301@gmail.com>
+Message-ID: <5179BB80.9060405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 04/25/13 16:06, Rob Herring wrote:
+> On 04/25/2013 05:48 PM, Stephen Boyd wrote:
+>
+>> We don't really care about CNTFRQ because it's duplicated into each
+>> view. We do care about CNTNSAR. Luckily the spec "just works" there in
+>> the sense that we can use CNTTIDR in conjunction with CNTACRn and
+>> determine if we have access to a frame we're interested in if the
+>> CNTTIDR bits say the frame is present and the CNTACRn register says we
+>> can access it. If not then it must be locked down for secure users.
+>>
+>> Unfortunately hardware doesn't have a way to say that a particular frame
+>> is reserved for the hypervisor or the guest kernel/userspace. We need
+>> some help from software, so we have the status property express that a
+>> particular frame is available. We have to assume the DT is going to be
+>> different depending on if you're the hypervisor or the guest. That's a
+>> valid assumption right? Otherwise I hope we can do some trapping of the
+>> guest's mapping to the control base and then rewrite what they read so
+>> that they only see the frame that we want to be available to them.
+> Yeah, I believe the only way to prevent access within non-secure world
+> is with the MMU. So I guess the example is just policy that the
+> hypervisor would/may not create a stage2 mapping. You still have the
+> same issue that the guest should not be passed the control base. You
+> could make the reg property optional, but then what do you do with the
+> node name?
 
-On Thursday 25 April 2013 23:39:18 Linus Walleij wrote:
-> On Tue, Apr 23, 2013 at 3:33 PM, Laurent Pinchart wrote:
-> >> +And your machine configuration may look like this:
-> >> +--------------------------------------------------
-> >> +
-> >> +static unsigned long uart_default_mode[] = {
-> >> +    PIN_CONF_PACKED(PIN_CONFIG_DRIVE_PUSH_PULL, 0),
-> >> +};
-> >> +
-> >> +static unsigned long uart_sleep_mode[] = {
-> >> +    PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 0),
-> >> +};
-> > 
-> > I'm having a bit of trouble with PIN_CONFIG_DRIVE_PUSH_PULL and
-> > PIN_CONFIG_OUTPUT. Strictly speaking, when configured in output mode, the
-> > pin will be in a push-pull configuration.
-> 
-> For your system or for any system? Open drain, open source are also
-> output modes, and none of them are push-pull.
-
-Indeed. I was actually thinking about the opposite, push-pull is output.
-
-> > Could you clarify the exact scope of the two configuration parameters ?
-> 
-> PIN_CONFIG_OUTPUT is left a bit unspecified, but here the idea was a passive
-> drive, like just connecting the pin to VDD or GND without any driver stage
-> at all.
-
-Isn't that a driver stage ? :-)
-
-> Maybe I should patch the documentation since we seem to be the only user?
-> 
-> In the above case (which is derived from the ABx500) I think what is
-> happening is that the pin is connected to ground during sleep, without any
-> enabled driver stages, which saves a lot of power, since you do not need to
-> bias the totempole during sleep in that way.
-
-Right. What is unclear to me is the interaction between OUTPUT and DRIVE_*. 
-That's the part I would like to see clarified. Does DRIVE_* imply that the pin 
-is driven by the selected function, and OUTPUT imply that the pin is driven to 
-a fixed level ? If so, how do you configure the drive type of a pin that will 
-be used through the GPIO API ? What about cases where I want to drive the pin 
-to a fixed level in a non low-power output mode (for instance because I need 
-more current that what the low-power output mode provides) ?
+I don't follow. Why shouldn't we tell the guest about the hardware
+that's there? Shouldn't they be able to safely assume they can access
+the control base just like a non-guest kernel running in PL1 would be
+able to?
 
 -- 
-Regards,
-
-Laurent Pinchart
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
