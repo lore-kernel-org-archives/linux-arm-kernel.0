@@ -1,54 +1,110 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 10:55:46 +0200
-Subject: [PATCH 04/32] dmaengine: ste_dma40: Amalgamate DMA source and
- destination channel numbers
-In-Reply-To: <201304251036.52284.arnd@arndb.de>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-5-git-send-email-lee.jones@linaro.org>
- <CACRpkdaauDYTdoBHGG9FO4kKqvCYyCrjY8EGWs5gAQWErGW6_A@mail.gmail.com>
- <201304251036.52284.arnd@arndb.de>
-Message-ID: <CACRpkdY96CKOtE6ByMuz_RAkyOY44RSrfz6Z3OFV6pcFTK3KwQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 25 Apr 2013 09:59:27 +0100
+Subject: [RFC PATCH v3 07/17] ARM: dts: imx: cpus/cpu nodes dts updates
+In-Reply-To: <20130425054426.GG1389@S2101-09.ap.freescale.net>
+References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366824502-19729-8-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130425054426.GG1389@S2101-09.ap.freescale.net>
+Message-ID: <20130425085926.GA25870@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 10:36 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 25 April 2013, Linus Walleij wrote:
->> Are we now sacrificing that ability on the altar of simplification?
->>
->> I actually think not, but that we should do periph-to-periph transfers
->> in some other way, and that the .dir attribute should go away from
->> the struct stedma40_chan_cfg as well but I'm not entirely sure.
->> Someone else?
->
-> The dma-engine core has no support for device-to-device transfers,
+On Thu, Apr 25, 2013 at 06:44:28AM +0100, Shawn Guo wrote:
+> On Wed, Apr 24, 2013 at 06:28:12PM +0100, Lorenzo Pieralisi wrote:
+> > This patch updates the in-kernel dts files according to the latest cpus
+> > and cpu bindings updates for ARM.
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> >  arch/arm/boot/dts/imx23.dtsi  | 8 ++++++--
+> >  arch/arm/boot/dts/imx28.dtsi  | 8 ++++++--
+> >  arch/arm/boot/dts/imx6dl.dtsi | 2 ++
+> >  arch/arm/boot/dts/imx6q.dtsi  | 1 +
+> >  4 files changed, 15 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+> > index 56afcf4..0aae18b 100644
+> > --- a/arch/arm/boot/dts/imx23.dtsi
+> > +++ b/arch/arm/boot/dts/imx23.dtsi
+> > @@ -23,8 +23,12 @@
+> >  	};
+> >  
+> >  	cpus {
+> > -		cpu at 0 {
+> > -			compatible = "arm,arm926ejs";
+> > +		#address-cells = <0>;
+> > +		#size-cells = <0>;
+> > +
+> > +		cpu {
+> > +			compatible = "arm,arm926ej-s";
+> > +			device_type = "cpu";
+> >  		};
+> >  	};
+> >  
+> > diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> > index 7ba4966..07f131fc 100644
+> > --- a/arch/arm/boot/dts/imx28.dtsi
+> > +++ b/arch/arm/boot/dts/imx28.dtsi
+> > @@ -32,8 +32,12 @@
+> >  	};
+> >  
+> >  	cpus {
+> > -		cpu at 0 {
+> > -			compatible = "arm,arm926ejs";
+> > +		#address-cells = <0>;
+> > +		#size-cells = <0>;
+> > +
+> > +		cpu {
+> > +			compatible = "arm,arm926ej-s";
+> > +			device_type = "cpu";
+> >  		};
+> >  	};
+> >  
+> > diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+> > index 63fafe2..b76d85e 100644
+> > --- a/arch/arm/boot/dts/imx6dl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6dl.dtsi
+> > @@ -16,12 +16,14 @@
+> >  
+> >  		cpu at 0 {
+> >  			compatible = "arm,cortex-a9";
+> > +			device_type = "cpu";
+> >  			reg = <0>;
+> >  			next-level-cache = <&L2>;
+> >  		};
+> >  
+> >  		cpu at 1 {
+> >  			compatible = "arm,cortex-a9";
+> > +			device_type = "cpu";
+> >  			reg = <1>;
+> >  			next-level-cache = <&L2>;
+> >  		};
+> > diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+> > index cba021e..65c1b62 100644
+> > --- a/arch/arm/boot/dts/imx6q.dtsi
+> > +++ b/arch/arm/boot/dts/imx6q.dtsi
+> > @@ -17,6 +17,7 @@
+> >  
+> >  		cpu at 0 {
+> >  			compatible = "arm,cortex-a9";
+> > +			device_type = "cpu";
+> 
+> Shouldn't this line be added for cpu at 1, cpu at 2 and cpu at 3 too?  Other than
+> that,
 
-It has this: DMA_DEV_TO_DEV (enum dma_transfer_direction)
-so it has been thought of. Alas, it is unused for now.
+Yes, you are right, fixed. Thanks for reviewing.
 
-> and as far as I understand that is neither considered a useful
-> feature in real life, nor easy to add, so I don't think it matters
-> much here.
+Lorenzo
 
-It is a very useful feature in real life, we used that for PCM transfer
-in U300. (I have heard this from other handset vendors too, so it
-is a common thing.)
-
-Consider a high-speed on-chip link from a
-modem providing audio in (telephony) from the microphone in
-one endpoint and audio out on another endpoint.
-
-We just set that up so we connect a hose from the modem
-RX to the PCM sink (D/A-codec) and vice versa as long as
-the phone conversation is on.
-
-This gives outstanding power performance since the CPU itself
-can actually sleep during the enture voicecall, only the DMA
-engine if awake.
-
-We just never got around to modifying the DMAengine framework
-to support this and integrate it... it is bound to come back to us,
-especially with things like ever more accelerators on chips that
-provide such autonomous data streams. (I think.)
-
-Yours,
-Linus Walleij
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> >  			reg = <0>;
+> >  			next-level-cache = <&L2>;
+> >  			operating-points = <
+> > -- 
+> > 1.7.12
+> > 
+> > 
+> 
+> 
