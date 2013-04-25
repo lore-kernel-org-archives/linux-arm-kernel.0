@@ -1,65 +1,50 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu, 25 Apr 2013 11:58:16 +0200
-Subject: [PATCHv1 1/3] hwmon: Add support for GMT G762/G763 PWM fan
- controller
-In-Reply-To: <63961d39aee9db94767f28fd441312bec2029473.1366753420.git.arno@natisbad.org>
-References: <cover.1366753420.git.arno@natisbad.org>
- <63961d39aee9db94767f28fd441312bec2029473.1366753420.git.arno@natisbad.org>
-Message-ID: <20130425095816.GC17771@kw.sim.vm.gnt>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 25 Apr 2013 11:12:54 +0100
+Subject: [PATCH v8 1/2] arm: introduce psci_smp_ops
+In-Reply-To: <20130425084711.GA12848@mudshark.cambridge.arm.com>
+References: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
+ <1366828819-10745-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130425084711.GA12848@mudshark.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1304251104090.4180@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+On Thu, 25 Apr 2013, Will Deacon wrote:
+> > +/*
+> > + * cpu_suspend   Suspend the execution on a CPU
+> > + * @state        we don't currently describe affinity levels, so just pass 0.
+> > + * @entry_point  the first instruction to be executed on return
+> > + * returns 0  success, < 0 on failure
+> > + *
+> > + * cpu_off       Power down a CPU
+> > + * @state        we don't currently describe affinity levels, so just pass 0.
+> > + * no return on successful call
+> > + *
+> > + * cpu_on        Power up a CPU
+> > + * @cpuid        cpuid of target CPU, as from MPIDR
+> > + * @entry_point  the first instruction to be executed on return
+> > + * returns 0  success, < 0 on failure
+> > + *
+> > + * migrate       Migrate the context to a different CPU
+> > + * @cpuid        cpuid of target CPU, as from MPIDR
+> > + * returns 0  success, < 0 on failure
+> > + *
+> > + */
+> 
+> Can you move these comments into psci-smp.c please? They're really specific
+> to the implementation there, and if we put them in a header we're lying to
+> ourselves about the parameters actually described by the PSCI specification.
 
-On Wed, Apr 24, 2013 at 12:05:56AM +0200, Arnaud Ebalard wrote:
-> diff --git a/drivers/hwmon/g762.c b/drivers/hwmon/g762.c
-> new file mode 100644
-> index 0000000..810b019
-> --- /dev/null
-> +++ b/drivers/hwmon/g762.c
+You have a good point about the PSCI spec.
 
-Snip
+However from the Linux POV these comments should regard the functions
+exported by psci_operations, not the firmware interface, this is why I
+think it makes sense to keep them in psci.h.
+What we are saying is for example that psci_operations.cpu_on returns 0
+on success and < 0 on failure, and it takes a cpuid and an entry point
+as parameters. We are not saying anything about the firmware interface.
 
-> +
-> +/*
-> + * Configuration-related definitions
-> + */
-> +
-> +struct g762_config {
-> +	u32 fan_startv;
-> +	u32 fan_gear_mode;
-> +	u32 fan_div;
-> +	u32 fan_pulses;
-> +	u32 fan_target;
-> +	u32 pwm_polarity;
-> +	u32 pwm_enable;
-> +	u32 pwm_freq;
-> +	u32 pwm_mode;
-> +};
-> +
-> +/*
-> + * g762 default values: it is assumed that the fan is set for a 32KHz clock
-> + * source, a fan clock divisor of 1 and two pulses per revolution. Default
-> + * fan driving mode is linear mode (g762/g763 also support PWM mode). Note
-> + * the specific init value for properties which may be left unmodified.
-> + */
-> +#define G762_DEFAULT_CLK            32768
-> +#define G762_DEFAULT_FAN_DIV        1
-> +#define G762_DEFAULT_FAN_PULSES     2
-> +#define G762_DEFAULT_OUT_MODE       0
-> +#define G762_DEFAULT_FAN_MODE       2
+Maybe I should add@the top:
 
-Maybe you could use here the same macros as the ones used in the
-do_set_* functions:
-
-#define G762_DEFAULT_OUT_MODE		OUT_MODE_DAC
-#define G762_DEFAULT_FAN_MODE		FAN_MODE_CLOSED_LOOP
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130425/3ed71656/attachment.sig>
+"psci_operations functions and parameters, might different from the
+firmware interface:"
