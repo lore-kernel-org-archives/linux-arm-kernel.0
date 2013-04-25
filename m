@@ -1,56 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Apr 2013 19:28:49 +0200
-Subject: [PATCH 06/21] ALSA: ali5451: use mdelay instead of large udelay
- constants
+Date: Thu, 25 Apr 2013 19:28:55 +0200
+Subject: [PATCH 12/21] irqchip: s3c24xx: add missing __init annotations
 In-Reply-To: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
 References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
-Message-ID: <1366910944-3033663-7-git-send-email-arnd@arndb.de>
+Message-ID: <1366910944-3033663-13-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM cannot handle udelay for more than 2 miliseconds, so we
-should use mdelay instead for those.
+The s3c24xx_init_intc and s3c2412_init_irq functions are only called
+at init time, and they call functions already marked __init, so they
+should be marked in the same way. This was reported as
+
+WARNING: vmlinux.o(.text+0x19e0b4): Section mismatch in reference from the function s3c2412_init_irq() to the function .init.text:s3c24xx_init_intc.constprop.8()
+The function s3c2412_init_irq() references
+the function __init s3c24xx_init_intc.constprop.8().
+This is often because s3c2412_init_irq lacks a __init
+annotation or the annotation of s3c24xx_init_intc.constprop.8 is wrong.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Takashi Iwai <tiwai@suse.de>
-Cc: alsa-devel at alsa-project.org
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
 ---
- sound/pci/ali5451/ali5451.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/irqchip/irq-s3c24xx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/sound/pci/ali5451/ali5451.c b/sound/pci/ali5451/ali5451.c
-index e760af9..53754f5 100644
---- a/sound/pci/ali5451/ali5451.c
-+++ b/sound/pci/ali5451/ali5451.c
-@@ -451,10 +451,10 @@ static int snd_ali_reset_5451(struct snd_ali *codec)
- 	if (pci_dev) {
- 		pci_read_config_dword(pci_dev, 0x7c, &dwVal);
- 		pci_write_config_dword(pci_dev, 0x7c, dwVal | 0x08000000);
--		udelay(5000);
-+		mdelay(5);
- 		pci_read_config_dword(pci_dev, 0x7c, &dwVal);
- 		pci_write_config_dword(pci_dev, 0x7c, dwVal & 0xf7ffffff);
--		udelay(5000);
-+		mdelay(5);
+diff --git a/drivers/irqchip/irq-s3c24xx.c b/drivers/irqchip/irq-s3c24xx.c
+index c8afd7b..bbcc944 100644
+--- a/drivers/irqchip/irq-s3c24xx.c
++++ b/drivers/irqchip/irq-s3c24xx.c
+@@ -535,7 +535,7 @@ static void s3c24xx_clear_intc(struct s3c_irq_intc *intc)
  	}
- 	
- 	pci_dev = codec->pci;
-@@ -463,14 +463,14 @@ static int snd_ali_reset_5451(struct snd_ali *codec)
- 	udelay(500);
- 	pci_read_config_dword(pci_dev, 0x44, &dwVal);
- 	pci_write_config_dword(pci_dev, 0x44, dwVal & 0xfffbffff);
--	udelay(5000);
-+	mdelay(5);
- 	
- 	wCount = 200;
- 	while(wCount--) {
- 		wReg = snd_ali_codec_peek(codec, 0, AC97_POWERDOWN);
- 		if ((wReg & 0x000f) == 0x000f)
- 			return 0;
--		udelay(5000);
-+		mdelay(5);
- 	}
+ }
  
- 	/* non-fatal if you have a non PM capable codec */
+-static struct s3c_irq_intc *s3c24xx_init_intc(struct device_node *np,
++static struct s3c_irq_intc * __init s3c24xx_init_intc(struct device_node *np,
+ 				       struct s3c_irq_data *irq_data,
+ 				       struct s3c_irq_intc *parent,
+ 				       unsigned long address)
+@@ -795,7 +795,7 @@ static struct s3c_irq_data init_s3c2412subint[32] = {
+ 	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 21 }, /* CF */
+ };
+ 
+-void s3c2412_init_irq(void)
++void __init s3c2412_init_irq(void)
+ {
+ 	pr_info("S3C2412: IRQ Support\n");
+ 
 -- 
 1.8.1.2
