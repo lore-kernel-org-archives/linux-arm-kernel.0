@@ -1,62 +1,44 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Thu, 25 Apr 2013 12:12:17 +0530
-Subject: [PATCH] idle: fix hlt/nohlt command-line handling in new generic
- idle
-In-Reply-To: <1366849153-25564-1-git-send-email-khilman@linaro.org>
-References: <1366849153-25564-1-git-send-email-khilman@linaro.org>
-Message-ID: <5178D049.9090303@linux.vnet.ibm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 25 Apr 2013 12:19:56 +0530
+Subject: [PATCH] cpuidle: add maintainer entry
+In-Reply-To: <5178D0EF.3090004@linaro.org>
+References: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
+ <51781B48.30208@gmail.com> <5178D0EF.3090004@linaro.org>
+Message-ID: <CAKohpo=Ct7WCBSOqmgk8asVyXWa5o+jqpTwaQgxKVm_XNLfnMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/2013 05:49 AM, Kevin Hilman wrote:
-> commit d1669912 (idle: Implement generic idle function) added a new
-> generic idle along with support for hlt/nohlt command line options to
-> override default idle loop behavior.  However, the command-line
-> processing is never compiled.
-> 
-> The command-line handling is wrapped by CONFIG_GENERIC_IDLE_POLL_SETUP
-> and arches that use this feature select it in their Kconfigs.
-> However, no Kconfig definition was created for this option, so it is
-> never enabled, and therefore command-line override of the idle-loop
-> behavior is broken after migrating to the generic idle loop.
-> 
-> To fix, add a Kconfig definition for GENERIC_IDLE_POLL_SETUP.
-> 
-> Tested on ARM (OMAP4/Panda) which enables the command-line overrides
-> by default.
-> 
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Linus Torvalds <torvalds@linux-foundation.org>
-> Cc: Rusty Russell <rusty@rustcorp.com.au>
-> Cc: Paul McKenney <paulmck@linux.vnet.ibm.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
+On 25 April 2013 12:15, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> On 04/24/2013 07:50 PM, Rob Herring wrote:
 
-Reviewed-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
-
-Regards,
-Srivatsa S. Bhat
-
-> Applies on tip/smp/hotplug where generic idle feature is added
+>> Shouldn't MAINTAINERS contain the driver maintainers too?
 >
->  arch/Kconfig | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index 1455579..e0ef57b 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -216,6 +216,9 @@ config USE_GENERIC_SMP_HELPERS
->  config GENERIC_SMP_IDLE_THREAD
->         bool
-> 
-> +config GENERIC_IDLE_POLL_SETUP
-> +       bool
-> +
->  # Select if arch init_task initializer is different to init/init_task.c
->  config ARCH_INIT_TASK
->         bool
-> 
+> It should contains the upstream maintainer for the subsystem, and
+> optionally a co-maintainer.
+>
+> The MAINTAINERS file gives informations about the patch submission path.
+>
+> The file's header should contain the maintainer of the driver, so the
+> submitted patches will go to the subsystem maintainer for upstreaming
+> and to the driver maintainer for acked-by.
+>
+> If you add an entry in MAINTAINERS like:
+>
+> ARM/CALXEDA HIGHBANK ARCHITECTURE
+> M:      Rob Herring <rob.herring@calxeda.com>
+> L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> S:      Maintained
+> F:      arch/arm/mach-highbank/
+> +F:     drivers/cpuidle/cpuidle-calxeda.c
+>
+> That will add confusion while we are trying to clarify the situation
+> with a single entry point for the patches submission. If someone wants
+> to submit a patch for this driver, it will look at the MAINTAINERS file
+> and won't know if it should send the patch against arm-soc or linux-pm.
+
+I though otherwise. We can add entry in MAINTAINERS for any module.
+Module can be a framework/architecture or a single driver.
+
+Adding entry for cpuidle driver of a architecture as you wrote for calxeda is
+wrong as it adds to confusion and so there should be a separate entry for
+this driver rather than merging it with arch/ entries.
