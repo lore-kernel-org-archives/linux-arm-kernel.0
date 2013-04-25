@@ -1,39 +1,65 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 25 Apr 2013 11:42:06 +0200
-Subject: [PATCHv2 0/2] Add support for the Solomon SSD1306 OLED Controller
-In-Reply-To: <1366624555-5616-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1366624555-5616-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <5178FA6E.2050709@free-electrons.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 25 Apr 2013 11:58:16 +0200
+Subject: [PATCHv1 1/3] hwmon: Add support for GMT G762/G763 PWM fan
+ controller
+In-Reply-To: <63961d39aee9db94767f28fd441312bec2029473.1366753420.git.arno@natisbad.org>
+References: <cover.1366753420.git.arno@natisbad.org>
+ <63961d39aee9db94767f28fd441312bec2029473.1366753420.git.arno@natisbad.org>
+Message-ID: <20130425095816.GC17771@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi Arnaud,
 
-Le 22/04/2013 11:55, Maxime Ripard a ?crit :
-> This patchset adds the needed bits to the ssd1307fb driver to support the
-> very similar Solomon SSD1306 controller.
-> 
-> Since the SSD1307 has been replaced by the SSD1306 in the latest CFA-10036
-> production samples, we also need to change the device tree accordingly.
+On Wed, Apr 24, 2013 at 12:05:56AM +0200, Arnaud Ebalard wrote:
+> diff --git a/drivers/hwmon/g762.c b/drivers/hwmon/g762.c
+> new file mode 100644
+> index 0000000..810b019
+> --- /dev/null
+> +++ b/drivers/hwmon/g762.c
 
-These patches have been around for more than a month and a half now,
-without anyone making any comments on it.
+Snip
 
-I know that you have taken framebuffer patches in the past, especially
-the driver that this patch modifies, would you consider merging it
-through your tree?
+> +
+> +/*
+> + * Configuration-related definitions
+> + */
+> +
+> +struct g762_config {
+> +	u32 fan_startv;
+> +	u32 fan_gear_mode;
+> +	u32 fan_div;
+> +	u32 fan_pulses;
+> +	u32 fan_target;
+> +	u32 pwm_polarity;
+> +	u32 pwm_enable;
+> +	u32 pwm_freq;
+> +	u32 pwm_mode;
+> +};
+> +
+> +/*
+> + * g762 default values: it is assumed that the fan is set for a 32KHz clock
+> + * source, a fan clock divisor of 1 and two pulses per revolution. Default
+> + * fan driving mode is linear mode (g762/g763 also support PWM mode). Note
+> + * the specific init value for properties which may be left unmodified.
+> + */
+> +#define G762_DEFAULT_CLK            32768
+> +#define G762_DEFAULT_FAN_DIV        1
+> +#define G762_DEFAULT_FAN_PULSES     2
+> +#define G762_DEFAULT_OUT_MODE       0
+> +#define G762_DEFAULT_FAN_MODE       2
 
-I begin to have patches that depends on this one (the patchset "drivers:
-video: Optimisations for the ssd1307fb driver"). I understand that we
-are quite close to the 3.10 merge window opening (we even reached the
-end of it for the ARM part, so the second patch will only be in 3.11),
-but I'd like to make sure that this patch and the others doesn't get
-silently ignored.
+Maybe you could use here the same macros as the ones used in the
+do_set_* functions:
 
-Thanks,
-Maxime
+#define G762_DEFAULT_OUT_MODE		OUT_MODE_DAC
+#define G762_DEFAULT_FAN_MODE		FAN_MODE_CLOSED_LOOP
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130425/3ed71656/attachment.sig>
