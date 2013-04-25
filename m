@@ -1,67 +1,39 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 25 Apr 2013 11:35:28 +0200
-Subject: [PATCH 1/2] ARM: s3c64xx: cpuidle: use init/exit common routine
-In-Reply-To: <1366728077-18988-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1366728077-18988-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <5178F8E0.6010606@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 25 Apr 2013 11:42:06 +0200
+Subject: [PATCHv2 0/2] Add support for the Solomon SSD1306 OLED Controller
+In-Reply-To: <1366624555-5616-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1366624555-5616-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <5178FA6E.2050709@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2013 04:41 PM, Daniel Lezcano wrote:
-> Remove the duplicated code and use the cpuidle common code for initialization.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
+Hi Andrew,
 
-Hi Kim and Ben,
+Le 22/04/2013 11:55, Maxime Ripard a ?crit :
+> This patchset adds the needed bits to the ssd1307fb driver to support the
+> very similar Solomon SSD1306 controller.
+> 
+> Since the SSD1307 has been replaced by the SSD1306 in the latest CFA-10036
+> production samples, we also need to change the device tree accordingly.
 
-It is the last patch in the series which was not acked-by.
-Rafael is willing to take it in its tree if you ack it.
+These patches have been around for more than a month and a half now,
+without anyone making any comments on it.
 
-Are you ok if this patch ?
+I know that you have taken framebuffer patches in the past, especially
+the driver that this patch modifies, would you consider merging it
+through your tree?
 
-Thanks
--- Daniel
+I begin to have patches that depends on this one (the patchset "drivers:
+video: Optimisations for the ssd1307fb driver"). I understand that we
+are quite close to the 3.10 merge window opening (we even reached the
+end of it for the ARM part, so the second patch will only be in 3.11),
+but I'd like to make sure that this patch and the others doesn't get
+silently ignored.
 
->  arch/arm/mach-s3c64xx/cpuidle.c |   14 +-------------
->  1 file changed, 1 insertion(+), 13 deletions(-)
->
-> diff --git a/arch/arm/mach-s3c64xx/cpuidle.c b/arch/arm/mach-s3c64xx/cpuidle.c
-> index 852ff16..3c8ab07 100644
-> --- a/arch/arm/mach-s3c64xx/cpuidle.c
-> +++ b/arch/arm/mach-s3c64xx/cpuidle.c
-> @@ -40,8 +40,6 @@ static int s3c64xx_enter_idle(struct cpuidle_device *dev,
->  	return index;
->  }
->  
-> -static DEFINE_PER_CPU(struct cpuidle_device, s3c64xx_cpuidle_device);
-> -
->  static struct cpuidle_driver s3c64xx_cpuidle_driver = {
->  	.name	= "s3c64xx_cpuidle",
->  	.owner  = THIS_MODULE,
-> @@ -60,16 +58,6 @@ static struct cpuidle_driver s3c64xx_cpuidle_driver = {
->  
->  static int __init s3c64xx_init_cpuidle(void)
->  {
-> -	int ret;
-> -
-> -	cpuidle_register_driver(&s3c64xx_cpuidle_driver);
-> -
-> -	ret = cpuidle_register_device(&s3c64xx_cpuidle_device);
-> -	if (ret) {
-> -		pr_err("Failed to register cpuidle device: %d\n", ret);
-> -		return ret;
-> -	}
-> -
-> -	return 0;
-> +	return cpuidle_register(&s3c64xx_cpuidle_driver, NULL);
->  }
->  device_initcall(s3c64xx_init_cpuidle);
-
+Thanks,
+Maxime
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
