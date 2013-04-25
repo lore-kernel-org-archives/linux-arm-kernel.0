@@ -1,72 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 13:00:03 +0200
-Subject: [PATCH 15/32] dmaengine: ste_dma40: Separate Logical Global
- Interrupt Mask (GIM) unmasking
-In-Reply-To: <1366279934-30761-16-git-send-email-lee.jones@linaro.org>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-16-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZ1tSeqcctS138QkRn6PENMrjMyrnkHeMOYaOBW096N1g@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 25 Apr 2013 13:02:43 +0200
+Subject: [PATCH v5 01/10] ASoC: phycore-ac97: Add DT support
+In-Reply-To: <20130425033517.GA1276@S2101-09.ap.freescale.net>
+References: <1366814199-14827-1-git-send-email-mpa@pengutronix.de>
+ <1366814199-14827-2-git-send-email-mpa@pengutronix.de>
+ <20130424194540.GF32299@pengutronix.de>
+ <20130425033517.GA1276@S2101-09.ap.freescale.net>
+Message-ID: <20130425110243.GA27763@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Thu, Apr 25, 2013 at 11:35:20AM +0800, Shawn Guo wrote:
+> On Wed, Apr 24, 2013 at 09:45:40PM +0200, Sascha Hauer wrote:
+> > Hi Markus,
+> > 
+> > On Wed, Apr 24, 2013 at 04:36:30PM +0200, Markus Pargmann wrote:
+> > > Add devicetree support for this audio soc fabric driver.
+> > > 
+> > > @@ -32,8 +35,12 @@ static struct snd_soc_dai_link imx_phycore_dai_ac97[] = {
+> > >  		.stream_name	= "HiFi",
+> > >  		.codec_dai_name		= "wm9712-hifi",
+> > >  		.codec_name	= "wm9712-codec",
+> > > +#ifdef CONFIG_MACH_IMX27_DT
+> > > +		.platform_name	= "imx-fiq-pcm-audio",
+> > > +#else
+> > >  		.cpu_dai_name	= "imx-ssi.0",
+> > >  		.platform_name	= "imx-fiq-pcm-audio.0",
+> > > +#endif
+> > 
+> > This doesn't work properly. Compiling the kernel with IMX27_DT enabled
+> > does not necessarily mean that it also started with dt support.
+> > 
+> Right, we should run-time check pdev->dev.of_node to see if it's a DT
+> boot and set .platform_of_node rather than .platform_name if it is.  But
+> it's only possible with the cleanup series "ASoC: fsl: imx-pcm driver
+> cleanup" I just sent being the base.  I hope you can rebase your series
+> on that :)
 
-> During the initial setup of a logical channel, it is necessary to unmask
-> the GIM in order to receive generated terminal count and error interrupts.
-> We're separating out this required code so it will be possible to move
-> the remaining code in d40_phy_cfg(), which is mostly runtime configuration
-> into the runtime_config() routine.
->
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+The current version of phycore-ac97.c is not a driver, it is just a late
+init call. So run-time check is not possible unless I modify the old
+part to be a driver and add a device to all board init functions using
+ac97. (I would prefer dropping the non-DT part in this case ;) )
 
-This commit message needs to reflect the fact that you've observed
-that one argument to the d40_phy_cfg() is hardcoded to false in the
-runtime config, and that is why we can sink the use into
-d40_alloc_chan_resources().
+Yes I rebased this series onto your cleanups, looks good so far and
+platform_of_node works finally.
 
-(...)
-> @@ -2456,6 +2456,9 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
->                                 D40_LCPA_CHAN_SIZE + D40_LCPA_CHAN_DST_DELTA;
->         }
->
-> +       if (chan_is_logical(d40c))
-> +               d40_log_gim_unmask(&d40c->src_def_cfg, &d40c->dst_def_cfg);
+Thanks,
 
-The clause right above is already a if (chan_is_logical(c)).
-Just insert the function call into that clause.
+Markus
 
-> +void d40_log_gim_unmask(u32 *src_cfg, u32 *dst_cfg) {
-> +
-> +       *src_cfg |= 1 << D40_SREG_CFG_LOG_GIM_POS;
-> +       *dst_cfg |= 1 << D40_SREG_CFG_LOG_GIM_POS;
-> +}
+> 
+> Shawn
+> 
+> > Personally I am fine with removing platform based support for this
+> > driver if it's too much effort to fix it properly, but we shouldn't
+> > start working with ifdefs here.
+> > 
+> > Sascha
+> > 
+> > 
+> > -- 
+> > Pengutronix e.K.                           |                             |
+> > Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> > Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> > Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 
+> 
 
-Why create a separate function with two lines which is just called from
-one single place?
-
-Just sink this into the d40_alloc_chan_resources() function like that:
-
-if (logical) {
-  *d40c->src_def_cfg |= 1 << D40_SREG_CFG_LOG_GIM_POS;
-  *d40c->dst_def_cfg |= 1 << D40_SREG_CFG_LOG_GIM_POS;
-
-No need for a separate function and a separate header.
-
-(...)
->  /* Sets up SRC and DST CFG register for both logical and physical channels */
->  void d40_phy_cfg(struct stedma40_chan_cfg *cfg,
->                  u32 *src_cfg, u32 *dst_cfg, bool is_log)
-
-Take this opportunity to:
-
-(A) delete the argument is_log since it has no use whatsoever after this.
-    Why pass it at all!
-
-(B) De-indent the if (!is_log) clause... as a natural consequence.
-
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
