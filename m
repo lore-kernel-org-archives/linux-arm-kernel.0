@@ -1,43 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 25 Apr 2013 14:33:15 +0100
-Subject: [PATCH] of: Set the DMA mask to 64 bits on ARM LPAE systems
-In-Reply-To: <1366764649-10342-1-git-send-email-lauraa@codeaurora.org>
-References: <1366764649-10342-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20130425133315.GA7157@localhost.cambridge.arm.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 25 Apr 2013 15:36:50 +0200
+Subject: RFC: [PATCH] clocksource: tcb: fix min_delta calculation
+In-Reply-To: <1366722524-25991-1-git-send-email-mkl@pengutronix.de>
+References: <517687AB.1040309@pengutronix.de>
+ <1366722524-25991-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <51793172.9030802@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 01:50:49AM +0100, Laura Abbott wrote:
-> By default on ARM systems, the coherent DMA mask (lowest
-> address) is set to ~0 or 0xFFFFFFFFFFFFFFFF. Currently,
-> of_platform_device_create_pdata sets the coherent DMA mask to
-> 32 bits. This prevents coherent dma allocations from working by default
-> without clients setting the DMA mask. Rather than make every client
-> on an LPAE system set the mask, set the mask to a 64 bit value on
-> ARM LPAE systems.
+On 04/23/2013 03:08 PM, Marc Kleine-Budde wrote:
+> The commit
 > 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
->  drivers/of/platform.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
+>     77cc982 clocksource: use clockevents_config_and_register() where possible
 > 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 0970505..18b69c1 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -214,7 +214,11 @@ struct platform_device *of_platform_device_create_pdata(
->  #if defined(CONFIG_MICROBLAZE)
->  	dev->archdata.dma_mask = 0xffffffffUL;
->  #endif
-> +#ifdef CONFIG_ARM_LPAE
-> +	dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
-> +#else
->  	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> +#endif
+> switches from manually calculating min_delta_ns (and others) and
+> clockevents_register_device() to automatic calculation via
+> clockevents_config_and_register(). During this conversation the "+ 1" in
+> 
+>     min_delta_ns = clockevent_delta2ns(1, &clkevt.clkevt) + 1;
+> 
+> was lost. This leads to problems with schedule_delayed_work() with a delay of
+> "1". Resulting in the work not scheduled in time.
+> 
+> This patch fixes the problem by increasing the min_delta to "2" ticks.
+> 
+> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 
-I wouldn't add CONFIG_ARM_LPAE checks in here, you can use
-CONFIG_ARCH_DMA_ADDR_T_64BIT (types.h uses this for the dma_addr_t
-definition).
+Who will take care of this patch?
+
+Marc
+
+> ---
+>  drivers/clocksource/tcb_clksrc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> index 8a61872..7cf6dc7 100644
+> --- a/drivers/clocksource/tcb_clksrc.c
+> +++ b/drivers/clocksource/tcb_clksrc.c
+> @@ -197,7 +197,7 @@ static void __init setup_clkevents(struct atmel_tc *tc, int clk32k_divisor_idx)
+>  
+>  	clkevt.clkevt.cpumask = cpumask_of(0);
+>  
+> -	clockevents_config_and_register(&clkevt.clkevt, 32768, 1, 0xffff);
+> +	clockevents_config_and_register(&clkevt.clkevt, 32768, 2, 0xffff);
+>  
+>  	setup_irq(irq, &tc_irqaction);
+>  }
+> 
+
 
 -- 
-Catalin
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130425/6c6ec9f4/attachment.sig>
