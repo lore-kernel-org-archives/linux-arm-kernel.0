@@ -1,61 +1,87 @@
-From: stigge@antcom.de (Roland Stigge)
-Date: Thu, 25 Apr 2013 21:50:42 +0200
-Subject: [PATCH 19/21] USB: lpc32xx: ISP1301 needs USB_PHY
-In-Reply-To: <1366910944-3033663-20-git-send-email-arnd@arndb.de>
+From: edubezval@gmail.com (edubezval at gmail.com)
+Date: Thu, 25 Apr 2013 16:07:56 -0400
+Subject: [PATCH 15/21] thermal: cooling: avoid uninitialied used gcc
+ warning
+In-Reply-To: <1366910944-3033663-16-git-send-email-arnd@arndb.de>
 References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <1366910944-3033663-20-git-send-email-arnd@arndb.de>
-Message-ID: <51798912.4090108@antcom.de>
+ <1366910944-3033663-16-git-send-email-arnd@arndb.de>
+Message-ID: <CAC-25o_bmrZZ9n10cBE=ewO7Yr+FmgP2JTYJNr1y=V_9BgcyXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/13 19:29, Arnd Bergmann wrote:
-> The Kconfig entry for USB_LPC32XX unconditionally selects USB_ISP1301,
-> which is now only visible when USB_PHY is also enabled.
-> 
-> This adds an appropriate dependency and enables USB_PHY in the msm
-> defconfig, avoiding these build errors:
-> 
-> warning: (USB_LPC32XX) selects USB_ISP1301 which has unmet direct dependencies (USB_SUPPORT && USB_PHY && (USB || USB_GADGET) && I2C)
-> drivers/built-in.o: In function `usb_hcd_nxp_probe':
-> drivers/usb/host/ohci-nxp.c:224: undefined reference to `isp1301_get_client'
-> drivers/built-in.o: In function `lpc32xx_udc_probe':
-> drivers/usb/gadget/lpc32xx_udc.c:3071: undefined reference to `isp1301_get_client'
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: linux-usb at vger.kernel.org
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Roland Stigge <stigge@antcom.de>
+Arnd,
 
-Tested-by: Roland Stigge <stigge@antcom.de>
-Acked-by: Roland Stigge <stigge@antcom.de>
+On Thu, Apr 25, 2013 at 1:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The newly rewritten get_property() function causes a bogus warning
+> from gcc-3.8, which cannot figure out that "level" is always
+> initialized at the point where it gets evaluated:
+>
+> drivers/thermal/cpu_cooling.c: In function 'get_property':
+> drivers/thermal/cpu_cooling.c:189:37: warning: 'level' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>    if (property == GET_FREQ && level == j) {
+>                                      ^
+>
+> Slightly rearranging the code makes this more obvious and
+> avoids the warning.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Amit Daniel kachhap <amit.daniel@samsung.com>
+
+Rui has merged a patch that removes this bogus compiler warning:
+http://git.kernel.org/cgit/linux/kernel/git/rzhang/linux.git/commit/?h=next&id=4469b99743d296e24aefc5f8ed7df1bc9cfbbac8
+
+Though, as not as elegant as your patch, it does the trick. :-)
 
 > ---
->  arch/arm/configs/lpc32xx_defconfig | 1 +
->  drivers/usb/gadget/Kconfig         | 1 +
->  2 files changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/configs/lpc32xx_defconfig b/arch/arm/configs/lpc32xx_defconfig
-> index 8fee514..398a367 100644
-> --- a/arch/arm/configs/lpc32xx_defconfig
-> +++ b/arch/arm/configs/lpc32xx_defconfig
-> @@ -146,6 +146,7 @@ CONFIG_SND_DEBUG_VERBOSE=y
->  # CONFIG_SND_SPI is not set
->  CONFIG_SND_SOC=y
->  CONFIG_USB=y
-> +CONFIG_USB_PHY=y
->  CONFIG_USB_OHCI_HCD=y
->  CONFIG_USB_STORAGE=y
->  CONFIG_USB_GADGET=y
-> diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
-> index a61d981..f85b427 100644
-> --- a/drivers/usb/gadget/Kconfig
-> +++ b/drivers/usb/gadget/Kconfig
-> @@ -144,6 +144,7 @@ config USB_AT91
->  config USB_LPC32XX
->  	tristate "LPC32XX USB Peripheral Controller"
->  	depends on ARCH_LPC32XX
-> +	depends on USB_PHY
->  	select USB_ISP1301
->  	select USB_OTG_UTILS
->  	help
+>  drivers/thermal/cpu_cooling.c | 17 +++++++++--------
+>  1 file changed, 9 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+> index 768b508..34878e6 100644
+> --- a/drivers/thermal/cpu_cooling.c
+> +++ b/drivers/thermal/cpu_cooling.c
+> @@ -165,10 +165,6 @@ static int get_property(unsigned int cpu, unsigned long input,
+>                 return 0;
+>         }
+>
+> -       if (property == GET_FREQ)
+> -               level = descend ? input : (max_level - input -1);
+> -
+> -
+>         for (i = 0, j = 0; table[i].frequency != CPUFREQ_TABLE_END; i++) {
+>                 /* ignore invalid entry */
+>                 if (table[i].frequency == CPUFREQ_ENTRY_INVALID)
+> @@ -186,10 +182,15 @@ static int get_property(unsigned int cpu, unsigned long input,
+>                         *output = descend ? j : (max_level - j - 1);
+>                         return 0;
+>                 }
+> -               if (property == GET_FREQ && level == j) {
+> -                       /* get frequency by level */
+> -                       *output = freq;
+> -                       return 0;
+> +
+> +               if (property == GET_FREQ) {
+> +                       level = descend ? input : (max_level - input -1);
+> +
+> +                       if (level == j) {
+> +                               /* get frequency by level */
+> +                               *output = freq;
+> +                               return 0;
+> +                       }
+>                 }
+>                 j++;
+>         }
+> --
+> 1.8.1.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+
+
+-- 
+Eduardo Bezerra Valentin
