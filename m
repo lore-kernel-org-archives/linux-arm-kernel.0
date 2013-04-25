@@ -1,55 +1,72 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 25 Apr 2013 11:45:08 +0100
-Subject: [PATCH v8 1/2] arm: introduce psci_smp_ops
-In-Reply-To: <alpine.DEB.2.02.1304251104090.4180@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
- <1366828819-10745-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130425084711.GA12848@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1304251104090.4180@kaball.uk.xensource.com>
-Message-ID: <20130425104508.GG12848@mudshark.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Apr 2013 13:00:03 +0200
+Subject: [PATCH 15/32] dmaengine: ste_dma40: Separate Logical Global
+ Interrupt Mask (GIM) unmasking
+In-Reply-To: <1366279934-30761-16-git-send-email-lee.jones@linaro.org>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-16-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZ1tSeqcctS138QkRn6PENMrjMyrnkHeMOYaOBW096N1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 11:12:54AM +0100, Stefano Stabellini wrote:
-> On Thu, 25 Apr 2013, Will Deacon wrote:
-> > > +/*
-> > > + * cpu_suspend   Suspend the execution on a CPU
-> > > + * @state        we don't currently describe affinity levels, so just pass 0.
-> > > + * @entry_point  the first instruction to be executed on return
-> > > + * returns 0  success, < 0 on failure
-> > > + *
-> > > + * cpu_off       Power down a CPU
-> > > + * @state        we don't currently describe affinity levels, so just pass 0.
-> > > + * no return on successful call
-> > > + *
-> > > + * cpu_on        Power up a CPU
-> > > + * @cpuid        cpuid of target CPU, as from MPIDR
-> > > + * @entry_point  the first instruction to be executed on return
-> > > + * returns 0  success, < 0 on failure
-> > > + *
-> > > + * migrate       Migrate the context to a different CPU
-> > > + * @cpuid        cpuid of target CPU, as from MPIDR
-> > > + * returns 0  success, < 0 on failure
-> > > + *
-> > > + */
-> > 
-> > Can you move these comments into psci-smp.c please? They're really specific
-> > to the implementation there, and if we put them in a header we're lying to
-> > ourselves about the parameters actually described by the PSCI specification.
-> 
-> You have a good point about the PSCI spec.
-> 
-> However from the Linux POV these comments should regard the functions
-> exported by psci_operations, not the firmware interface, this is why I
-> think it makes sense to keep them in psci.h.
-> What we are saying is for example that psci_operations.cpu_on returns 0
-> on success and < 0 on failure, and it takes a cpuid and an entry point
-> as parameters. We are not saying anything about the firmware interface.
+On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-I disagree. You're explicitly stating that we pass the `cpuid of target CPU,
-as from MPIDR'. That's simply not true -- the firmware could choose any
-numbering scheme to identify the CPUs. For KVM and Xen, it *is* the mpidr,
-which is why psci-smp.c works at all, but that's where the comment belongs,
-not in this header file.
+> During the initial setup of a logical channel, it is necessary to unmask
+> the GIM in order to receive generated terminal count and error interrupts.
+> We're separating out this required code so it will be possible to move
+> the remaining code in d40_phy_cfg(), which is mostly runtime configuration
+> into the runtime_config() routine.
+>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Per Forlin <per.forlin@stericsson.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Will
+This commit message needs to reflect the fact that you've observed
+that one argument to the d40_phy_cfg() is hardcoded to false in the
+runtime config, and that is why we can sink the use into
+d40_alloc_chan_resources().
+
+(...)
+> @@ -2456,6 +2456,9 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
+>                                 D40_LCPA_CHAN_SIZE + D40_LCPA_CHAN_DST_DELTA;
+>         }
+>
+> +       if (chan_is_logical(d40c))
+> +               d40_log_gim_unmask(&d40c->src_def_cfg, &d40c->dst_def_cfg);
+
+The clause right above is already a if (chan_is_logical(c)).
+Just insert the function call into that clause.
+
+> +void d40_log_gim_unmask(u32 *src_cfg, u32 *dst_cfg) {
+> +
+> +       *src_cfg |= 1 << D40_SREG_CFG_LOG_GIM_POS;
+> +       *dst_cfg |= 1 << D40_SREG_CFG_LOG_GIM_POS;
+> +}
+
+Why create a separate function with two lines which is just called from
+one single place?
+
+Just sink this into the d40_alloc_chan_resources() function like that:
+
+if (logical) {
+  *d40c->src_def_cfg |= 1 << D40_SREG_CFG_LOG_GIM_POS;
+  *d40c->dst_def_cfg |= 1 << D40_SREG_CFG_LOG_GIM_POS;
+
+No need for a separate function and a separate header.
+
+(...)
+>  /* Sets up SRC and DST CFG register for both logical and physical channels */
+>  void d40_phy_cfg(struct stedma40_chan_cfg *cfg,
+>                  u32 *src_cfg, u32 *dst_cfg, bool is_log)
+
+Take this opportunity to:
+
+(A) delete the argument is_log since it has no use whatsoever after this.
+    Why pass it at all!
+
+(B) De-indent the if (!is_log) clause... as a natural consequence.
+
+Yours,
+Linus Walleij
