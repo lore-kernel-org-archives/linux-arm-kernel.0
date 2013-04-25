@@ -1,69 +1,23 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 25 Apr 2013 10:50:27 -0500
-Subject: [PATCH] cpuidle: add maintainer entry
-In-Reply-To: <5178D5EF.9090102@linaro.org>
-References: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
- <51781B48.30208@gmail.com> <5178D0EF.3090004@linaro.org>
- <CAKohpo=Ct7WCBSOqmgk8asVyXWa5o+jqpTwaQgxKVm_XNLfnMA@mail.gmail.com>
- <5178D5EF.9090102@linaro.org>
-Message-ID: <CAL_Jsq+o1kF2GJNX5a01B9nPcq6uVLbpC-3RirU2uJAZ8C-jUg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 26 Apr 2013 01:15:47 +0900
+Subject: linux-next: manual merge of the arm-soc tree with the pm tree
+In-Reply-To: <20130424165417.5e2b74a01728d307e454750f@canb.auug.org.au>
+References: <20130424165417.5e2b74a01728d307e454750f@canb.auug.org.au>
+Message-ID: <517956B3.2000201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 2:06 AM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 04/25/2013 08:49 AM, Viresh Kumar wrote:
->> On 25 April 2013 12:15, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
->>> On 04/24/2013 07:50 PM, Rob Herring wrote:
->>
->>>> Shouldn't MAINTAINERS contain the driver maintainers too?
->>>
->>> It should contains the upstream maintainer for the subsystem, and
->>> optionally a co-maintainer.
->>>
->>> The MAINTAINERS file gives informations about the patch submission path.
->>>
->>> The file's header should contain the maintainer of the driver, so the
->>> submitted patches will go to the subsystem maintainer for upstreaming
->>> and to the driver maintainer for acked-by.
->>>
->>> If you add an entry in MAINTAINERS like:
->>>
->>> ARM/CALXEDA HIGHBANK ARCHITECTURE
->>> M:      Rob Herring <rob.herring@calxeda.com>
->>> L:      linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>> S:      Maintained
->>> F:      arch/arm/mach-highbank/
->>> +F:     drivers/cpuidle/cpuidle-calxeda.c
->>>
->>> That will add confusion while we are trying to clarify the situation
->>> with a single entry point for the patches submission. If someone wants
->>> to submit a patch for this driver, it will look at the MAINTAINERS file
->>> and won't know if it should send the patch against arm-soc or linux-pm.
->>
->> I though otherwise. We can add entry in MAINTAINERS for any module.
->> Module can be a framework/architecture or a single driver.
+On 04/24/13 15:54, Stephen Rothwell wrote:
+> Hi all,
 >
-> IMO, there are too much drivers for that. It is simpler for someone to
-> read the MAINTAINERS file to find the cpuidle drivers goes through
-> linux-pm. I think we can trust Rafael to ask for the acked-by from the
-> maintainer of the driver before taking the patches.
-
-It not a maintainer's job to solicit acks. It is the submitter's job
-to Cc the correct people. The maintainer should only check for
-necessary CC/acks and bitch at the submitter if they did not use
-get_maintainers.pl.
-
-Perhaps the MAINTAINERS file needs to be distributed to scale better
-or we need a way to put the maintainer data into the source and be
-usable by get_maintainers.pl.
-
->> Adding entry for cpuidle driver of a architecture as you wrote for calxeda is
->> wrong as it adds to confusion and so there should be a separate entry for
->> this driver rather than merging it with arch/ entries.
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/mach-exynos/cpuidle.c between commit 554c06ba3ee2 ("cpuidle:
+> remove en_core_tk_irqen flag") from the pm tree and commit 2eb89f893e44
+> ("ARM: EXYNOS: factor out the idle states") from the arm-soc tree.
 >
-> Yes, actually it was an example to show the confusion we could be facing.
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 
-I'm confused about what is the confusion...
+Looks OK to me, thanks.
 
-Rob
+- Kukjin
