@@ -1,48 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 25 Apr 2013 13:09:39 +0200
-Subject: [PATCH 16/32] dmaengine: ste_dma40: Remove unnecessary call to
- d40_phy_cfg()
-In-Reply-To: <1366279934-30761-17-git-send-email-lee.jones@linaro.org>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-17-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbQpiEZ4etyE=mveH8HFughVe_oa81P3QEWWJHPtrxn0g@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Apr 2013 12:11:25 +0100
+Subject: [PATCH v8 1/2] arm: introduce psci_smp_ops
+In-Reply-To: <alpine.DEB.2.02.1304251158080.4180@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
+ <1366828819-10745-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130425084711.GA12848@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1304251104090.4180@kaball.uk.xensource.com>
+ <20130425104508.GG12848@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1304251158080.4180@kaball.uk.xensource.com>
+Message-ID: <20130425111125.GI12848@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Thu, Apr 25, 2013 at 12:08:02PM +0100, Stefano Stabellini wrote:
+> On Thu, 25 Apr 2013, Will Deacon wrote:
+> > On Thu, Apr 25, 2013 at 11:12:54AM +0100, Stefano Stabellini wrote:
+> > > However from the Linux POV these comments should regard the functions
+> > > exported by psci_operations, not the firmware interface, this is why I
+> > > think it makes sense to keep them in psci.h.
+> > > What we are saying is for example that psci_operations.cpu_on returns 0
+> > > on success and < 0 on failure, and it takes a cpuid and an entry point
+> > > as parameters. We are not saying anything about the firmware interface.
+> > 
+> > I disagree. You're explicitly stating that we pass the `cpuid of target CPU,
+> > as from MPIDR'. That's simply not true -- the firmware could choose any
+> > numbering scheme to identify the CPUs. For KVM and Xen, it *is* the mpidr,
+> > which is why psci-smp.c works at all, but that's where the comment belongs,
+> > not in this header file.
+> 
+> I see, you want to keep psci_operations true to the firmware interface
+> while explaining that psci_smp makes some assumptions about it.
 
-> All configuration left in d40_phy_cfg() is runtime configurable and
-> there is already a call into it from d40_runtime_config(), so let's
-> rely on that.
->
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Precisely! :)
 
-NAK. Have you really tested this with memcpy()?
+> So the comment should be something like:
+> 
+> /*
+>  * psci_smp assumes that the following is true about PSCI:
+>  * 
+>  * cpu_suspend   Suspend the execution on a CPU
+>  * @state        we don't currently describe affinity levels, so just pass 0.
+>  * @entry_point  the first instruction to be executed on return
+>  * returns 0  success, < 0 on failure
+>  *
+>  * cpu_off       Power down a CPU
+>  * @state        we don't currently describe affinity levels, so just pass 0.
+>  * no return on successful call
+>  *
+>  * cpu_on        Power up a CPU
+>  * @cpuid        cpuid of target CPU, as from MPIDR
+>  * @entry_point  the first instruction to be executed on return
+>  * returns 0  success, < 0 on failure
+>  *
+>  * migrate       Migrate the context to a different CPU
+>  * @cpuid        cpuid of target CPU, as from MPIDR
+>  * returns 0  success, < 0 on failure
+>  *
+>  */
 
-The runtime config function is *not* called when doing memcpy
-DMA, still the channels used for memcpy need to be configured
-obviously. Now you're assuming that every time anyone is using
-a DMA channel they will first allocate it, then call the runtime
-config. This is not true.
+That's certainly better, but I'd still rather see the comment with the
+implementation as there's a greater potential for confusion having it here.
 
-Runtime config is only used when doing dev->mem and
-mem->dev DMA.
-
-You may just as well compile in the test program that is there right
-in the kernel and run it ... it's good! (DMA Test Client in
-menuconfig under drivers/dma engine support...)
-
-There was this other patch not taking the memcpy channels
-into the array that I think will also cause a crash when doing
-memcpy so I'm pretty sure you're not testing this.
-
-When I test these patches I will run it, and just report
-that memcpy doesn't work if it doesn't and then you'll
-have to figure it out anyway, so enjoy...
-
-Yours,
-Linus Walleij
+Will
