@@ -1,11 +1,12 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 25 Apr 2013 10:24:13 +0100
-Subject: [PATCH 14/32] dmaengine: ste_dma40: Remove 'always true' checking
-In-Reply-To: <CACRpkdZ5BzmjFNxHrhXVyRhMTMsH4Cq1XRmgiWQjU2e6cCO1bA@mail.gmail.com>
+Date: Thu, 25 Apr 2013 10:29:30 +0100
+Subject: [PATCH 13/32] dmaengine: ste_dma40: Calculate number of logical
+ channels from physical ones
+In-Reply-To: <CACRpkdYq9QLRaaysc=izGgi53ogf1oRHuCwWKW+rQBbE_UtfnA@mail.gmail.com>
 References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-15-git-send-email-lee.jones@linaro.org>
- <CACRpkdZ5BzmjFNxHrhXVyRhMTMsH4Cq1XRmgiWQjU2e6cCO1bA@mail.gmail.com>
-Message-ID: <20130425092413.GH4623@gmail.com>
+ <1366279934-30761-14-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYq9QLRaaysc=izGgi53ogf1oRHuCwWKW+rQBbE_UtfnA@mail.gmail.com>
+Message-ID: <20130425092930.GI4623@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,10 +14,12 @@ On Thu, 25 Apr 2013, Linus Walleij wrote:
 
 > On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> > Before allocating memory for logical channels, the current driver
-> > checks to see if there are any. Well as the dma40_memcpy_channels[]
-> > array is always populated, the check is always true. Best to
-> > remove the check.
+> > This change will cost ~25KB of memory, but it's worth the trade-off,
+> > as it removes a great deal of overhead. It means that instead of only
+> > allocating memory for the logical channels in use, it does so for all
+> > available ones, which is 32 per physical channel. However, this now
+> > means we can remove some platform data and we don't have to worry
+> > about adding vendor specific variables to Device Tree.
 > >
 > > Cc: Vinod Koul <vinod.koul@intel.com>
 > > Cc: Dan Williams <djbw@fb.com>
@@ -25,42 +28,31 @@ On Thu, 25 Apr 2013, Linus Walleij wrote:
 > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
 > (...)
+> >  static struct stedma40_platform_data dma40_plat_data = {
+> > -       .dev_len = DB8500_DMA_NR_DEV,
 > 
-> > -       if (num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) {
+> So that was set to 64 in the platform...
 > 
-> So I guess this was changed when moving the memcpy channels
-> into the driver.
-
-Right.
-
-> > -               /*
-> > -                * The max number of logical channels are event lines for all
-> > -                * src devices and dst devices
-> > -                */
-> > -               base->lookup_log_chans = kzalloc(num_log_chans *
-> > -                                                sizeof(struct d40_chan *),
-> > -                                                GFP_KERNEL);
+> > -       /* Count the number of logical channels in use */
+> > -       for (i = 0; i < plat_data->dev_len; i++)
+> > -               if (plat_data->dev_rx[i] != 0)
+> > -                       num_log_chans++;
+> > -
+> > -       for (i = 0; i < plat_data->dev_len; i++)
+> > -               if (plat_data->dev_tx[i] != 0)
+> > -                       num_log_chans++;
 > 
-> And at that point you forgot to rewrite this as
-> kzalloc((num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)), ...)?
+> And I guess this code snippet made it go down to <= 32 all the time,
+> correct?
 
-I guess I didn't notice that, yes.
+However many were described in dma40_[rx|tx]_map, yes.
 
-> > -               if (!base->lookup_log_chans)
-> > -                       goto failure;
-> > -       }
-> > +       base->lookup_log_chans = kzalloc(num_log_chans *
-> > +                                        sizeof(struct d40_chan *),
-> > +                                        GFP_KERNEL);
-> > +       if (!base->lookup_log_chans)
-> > +               goto failure;
+> Just want to understand it before I ACK. (The idea is sound.)
 > 
-> So this change should also include the memcpy channels.
-> 
-> I'll go back and comment again on the patch moving the
-> memcpy channels into the driver.
+> I notice there is no check whatsoever of the bounds of
+> plat_data->dev_[rx|tx]  but that is a different problem I guess...
 
-Okay, NP.
+The array is going away anyway, so we don't need to threat.
 
 -- 
 Lee Jones
