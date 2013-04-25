@@ -1,58 +1,114 @@
 From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 25 Apr 2013 19:23:27 +0200
-Subject: [PATCH 11/14] sched: filter task pull request
+Date: Thu, 25 Apr 2013 19:23:28 +0200
+Subject: [PATCH 12/14] sched: create a new field with available capacity
 In-Reply-To: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
 References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <1366910611-20048-12-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <1366910611-20048-13-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only CPUs that participates to the packing effort can pull tasks on a busiest
-group.
+This new field power_available reflects the available capacity of a CPU
+unlike the cpu_power which reflects the current capacity.
 
 Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
 ---
- kernel/sched/fair.c |   14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ include/linux/sched.h |    2 +-
+ kernel/sched/fair.c   |   18 +++++++++++++++---
+ kernel/sched/sched.h  |    1 +
+ 3 files changed, 17 insertions(+), 4 deletions(-)
 
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index a82cdeb..03a5143 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -824,7 +824,7 @@ struct sched_group_power {
+ 	 * CPU power of this group, SCHED_LOAD_SCALE being max power for a
+ 	 * single CPU.
+ 	 */
+-	unsigned int power, power_orig;
++	unsigned int power, power_orig, power_available;
+ 	unsigned long next_update;
+ 	/*
+ 	 * Number of busy cpus in this group.
 diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-index 28f8ea7..6f63fb9 100644
+index 6f63fb9..756b1e3 100644
 --- a/kernel/sched/fair.c
 +++ b/kernel/sched/fair.c
-@@ -3494,6 +3494,12 @@ static bool is_buddy_full(int cpu)
- 	return (sum * 1024 >= period * 1000);
+@@ -179,6 +179,11 @@ static unsigned long power_of(int cpu)
+ 	return cpu_rq(cpu)->cpu_power;
  }
  
-+static bool is_my_buddy(int cpu, int buddy)
++static unsigned long available_of(int cpu)
 +{
-+	int my_buddy = per_cpu(sd_pack_buddy, cpu);
-+	return (my_buddy == -1) || (buddy == my_buddy);
++	return cpu_rq(cpu)->cpu_available;
 +}
 +
- static bool is_light_task(struct task_struct *p)
- {
- 	/* A light task runs less than 20% in average */
-@@ -4688,8 +4694,8 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+ /*
+  * Save the id of the optimal CPU that should be used to pack small tasks
+  * The value -1 is used when no buddy has been found
+@@ -4588,6 +4593,9 @@ static void update_cpu_power(struct sched_domain *sd, int cpu)
+ 	if (!power)
+ 		power = 1;
  
- 		/* Bias balancing toward cpus of our domain */
- 		if (local_group) {
--			if (idle_cpu(i) && !first_idle_cpu &&
--					cpumask_test_cpu(i, sched_group_mask(group))) {
-+			if (is_my_buddy(i, i) && idle_cpu(i) && !first_idle_cpu
-+			 && cpumask_test_cpu(i, sched_group_mask(group))) {
- 				first_idle_cpu = 1;
- 				balance_cpu = i;
- 			}
-@@ -4817,6 +4823,10 @@ static void update_plb_buddy(int cpu, int *balance, struct sd_lb_stats *sds,
- 
- 	/* Get my new buddy */
- 	buddy = per_cpu(sd_pack_buddy, cpu);
++	cpu_rq(cpu)->cpu_available = power;
++	sdg->sgp->power_available = power;
 +
-+	/* This CPU doesn't act for agressive packing */
-+	if (buddy != cpu)
-+		sds->busiest = 0;
+ 	cpu_rq(cpu)->cpu_power = power;
+ 	sdg->sgp->power = power;
+ }
+@@ -4596,7 +4604,7 @@ void update_group_power(struct sched_domain *sd, int cpu)
+ {
+ 	struct sched_domain *child = sd->child;
+ 	struct sched_group *group, *sdg = sd->groups;
+-	unsigned long power;
++	unsigned long power, available;
+ 	unsigned long interval;
+ 
+ 	interval = msecs_to_jiffies(sd->balance_interval);
+@@ -4608,7 +4616,7 @@ void update_group_power(struct sched_domain *sd, int cpu)
+ 		return;
+ 	}
+ 
+-	power = 0;
++	power = available = 0;
+ 
+ 	if (child->flags & SD_OVERLAP) {
+ 		/*
+@@ -4618,6 +4626,8 @@ void update_group_power(struct sched_domain *sd, int cpu)
+ 
+ 		for_each_cpu(cpu, sched_group_cpus(sdg))
+ 			power += power_of(cpu);
++			available += available_of(cpu);
++
+ 	} else  {
+ 		/*
+ 		 * !SD_OVERLAP domains can assume that child groups
+@@ -4627,11 +4637,13 @@ void update_group_power(struct sched_domain *sd, int cpu)
+ 		group = child->groups;
+ 		do {
+ 			power += group->sgp->power;
++			available += group->sgp->power_available;
+ 			group = group->next;
+ 		} while (group != child->groups);
+ 	}
+ 
+-	sdg->sgp->power_orig = sdg->sgp->power = power;
++	sdg->sgp->power_orig = sdg->sgp->power_available = available;
++	sdg->sgp->power = power;
  }
  
- /**
+ /*
+diff --git a/kernel/sched/sched.h b/kernel/sched/sched.h
+index 96b164d..2b6eaf9 100644
+--- a/kernel/sched/sched.h
++++ b/kernel/sched/sched.h
+@@ -413,6 +413,7 @@ struct rq {
+ 	struct sched_domain *sd;
+ 
+ 	unsigned long cpu_power;
++	unsigned long cpu_available;
+ 
+ 	unsigned char idle_balance;
+ 	/* For active balancing */
 -- 
 1.7.9.5
