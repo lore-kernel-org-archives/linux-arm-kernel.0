@@ -1,264 +1,97 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 25 Apr 2013 19:29:04 +0200
-Subject: [PATCH 21/21] USB: OHCI: avoid conflicting platform drivers
-In-Reply-To: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
-References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
-Message-ID: <1366910944-3033663-22-git-send-email-arnd@arndb.de>
+Date: Thu, 25 Apr 2013 19:28:43 +0200
+Subject: [PATCH 00/21] more arm build fixes
+Message-ID: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Like the EHCI driver, OHCI supports a large number of different platform
-glue drivers by directly including them, which causes problems with
-conflicting macro definitions in some cases. As more ARM architecture
-specific back-ends are required to coexist in a single build, we should
-split those out into separate drivers. Unfortunately, the infrastructure
-for that is still under development, so to give us more time, this uses
-a separate *_PLATFORM_DRIVER macro for each ARM specific OHCI backend,
-just like we already do on PowerPC and some of the other ARM platforms.
+Hi subsystem maintainers,
 
-In linux-3.10, only the SPEAr and CNS3xxx back-ends would actually conflict
-without this patch, but over time we would get more of them, so this
-is a way to avoid having to patch the driver every time it breaks. We
-should still split out all back-ends into separate loadable modules,
-but that work is only needed to improve code size and cleanliness after
-this patch, not for correctness.
+Here is another set of patches that resulted from build testing on
+linux-next. Please apply directly into your trees if you agree,
+or let me know if I made a mistake.
 
-While we're here, this fixes the incorrectly sorted error path
-for the OMAP1 and OMAP3 backends to ensure we always unregister
-the exact set of drivers that were registered before erroring out.
+I can take whatever remains through the arm-soc tree if you prefer
+that or I don't hear back.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
-Cc: linux-usb at vger.kernel.org
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
- drivers/usb/host/ohci-hcd.c | 136 ++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 118 insertions(+), 18 deletions(-)
+	Arnd
 
-diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index 180a2b0..9e6de95 100644
---- a/drivers/usb/host/ohci-hcd.c
-+++ b/drivers/usb/host/ohci-hcd.c
-@@ -1102,12 +1102,12 @@ MODULE_LICENSE ("GPL");
- 
- #if defined(CONFIG_ARCH_S3C24XX) || defined(CONFIG_ARCH_S3C64XX)
- #include "ohci-s3c2410.c"
--#define PLATFORM_DRIVER		ohci_hcd_s3c2410_driver
-+#define S3C2410_PLATFORM_DRIVER	ohci_hcd_s3c2410_driver
- #endif
- 
- #ifdef CONFIG_USB_OHCI_EXYNOS
- #include "ohci-exynos.c"
--#define PLATFORM_DRIVER		exynos_ohci_driver
-+#define EXYNOS_PLATFORM_DRIVER	exynos_ohci_driver
- #endif
- 
- #ifdef CONFIG_USB_OHCI_HCD_OMAP1
-@@ -1127,25 +1127,24 @@ MODULE_LICENSE ("GPL");
- 
- #ifdef CONFIG_ARCH_EP93XX
- #include "ohci-ep93xx.c"
--#define PLATFORM_DRIVER		ohci_hcd_ep93xx_driver
-+#define EP93XX_PLATFORM_DRIVER	ohci_hcd_ep93xx_driver
- #endif
- 
- #ifdef CONFIG_ARCH_AT91
- #include "ohci-at91.c"
--#define PLATFORM_DRIVER		ohci_hcd_at91_driver
-+#define AT91_PLATFORM_DRIVER	ohci_hcd_at91_driver
- #endif
- 
- #ifdef CONFIG_ARCH_LPC32XX
- #include "ohci-nxp.c"
--#define PLATFORM_DRIVER		usb_hcd_nxp_driver
-+#define NXP_PLATFORM_DRIVER	usb_hcd_nxp_driver
- #endif
- 
- #ifdef CONFIG_ARCH_DAVINCI_DA8XX
- #include "ohci-da8xx.c"
--#define PLATFORM_DRIVER		ohci_hcd_da8xx_driver
-+#define DAVINCI_PLATFORM_DRIVER	ohci_hcd_da8xx_driver
- #endif
- 
--
- #ifdef CONFIG_USB_OHCI_HCD_PPC_OF
- #include "ohci-ppc-of.c"
- #define OF_PLATFORM_DRIVER	ohci_hcd_ppc_of_driver
-@@ -1153,7 +1152,7 @@ MODULE_LICENSE ("GPL");
- 
- #ifdef CONFIG_PLAT_SPEAR
- #include "ohci-spear.c"
--#define PLATFORM_DRIVER		spear_ohci_hcd_driver
-+#define SPEAR_PLATFORM_DRIVER	spear_ohci_hcd_driver
- #endif
- 
- #ifdef CONFIG_PPC_PS3
-@@ -1199,7 +1198,14 @@ MODULE_LICENSE ("GPL");
- 	!defined(SA1111_DRIVER) &&	\
- 	!defined(PS3_SYSTEM_BUS_DRIVER) && \
- 	!defined(SM501_OHCI_DRIVER) && \
--	!defined(TMIO_OHCI_DRIVER)
-+	!defined(TMIO_OHCI_DRIVER) && \
-+	!defined(S3C2410_PLATFORM_DRIVER) && \
-+	!defined(EXYNOS_PLATFORM_DRIVER) && \
-+	!defined(EP93XX_PLATFORM_DRIVER) && \
-+	!defined(AT91_PLATFORM_DRIVER) && \
-+	!defined(NXP_PLATFORM_DRIVER) && \
-+	!defined(DAVINCI_PLATFORM_DRIVER) && \
-+	!defined(SPEAR_PLATFORM_DRIVER)
- #error "missing bus glue for ohci-hcd"
- #endif
- 
-@@ -1277,9 +1283,79 @@ static int __init ohci_hcd_mod_init(void)
- 		goto error_tmio;
- #endif
- 
-+#ifdef S3C2410_PLATFORM_DRIVER
-+	retval = platform_driver_register(&S3C2410_PLATFORM_DRIVER);
-+	if (retval < 0)
-+		goto error_s3c2410;
-+#endif
-+
-+#ifdef EXYNOS_PLATFORM_DRIVER
-+	retval = platform_driver_register(&EXYNOS_PLATFORM_DRIVER);
-+	if (retval < 0)
-+		goto error_exynos;
-+#endif
-+
-+#ifdef EP93XX_PLATFORM_DRIVER
-+	retval = platform_driver_register(&EP93XX_PLATFORM_DRIVER);
-+	if (retval < 0)
-+		goto error_ep93xx;
-+#endif
-+
-+#ifdef AT91_PLATFORM_DRIVER
-+	retval = platform_driver_register(&AT91_PLATFORM_DRIVER);
-+	if (retval < 0)
-+		goto error_at91;
-+#endif
-+
-+#ifdef NXP_PLATFORM_DRIVER
-+	retval = platform_driver_register(&NXP_PLATFORM_DRIVER);
-+	if (retval < 0)
-+		goto error_nxp;
-+#endif
-+
-+#ifdef DAVINCI_PLATFORM_DRIVER
-+	retval = platform_driver_register(&DAVINCI_PLATFORM_DRIVER);
-+	if (retval < 0)
-+		goto error_davinci;
-+#endif
-+
-+#ifdef SPEAR_PLATFORM_DRIVER
-+	retval = platform_driver_register(&SPEAR_PLATFORM_DRIVER);
-+	if (retval < 0)
-+		goto error_spear;
-+#endif
-+
- 	return retval;
- 
- 	/* Error path */
-+#ifdef SPEAR_PLATFORM_DRIVER
-+	platform_driver_unregister(&SPEAR_PLATFORM_DRIVER);
-+ error_spear:
-+#endif
-+#ifdef DAVINCI_PLATFORM_DRIVER
-+	platform_driver_unregister(&DAVINCI_PLATFORM_DRIVER);
-+ error_davinci:
-+#endif
-+#ifdef NXP_PLATFORM_DRIVER
-+	platform_driver_unregister(&NXP_PLATFORM_DRIVER);
-+ error_nxp:
-+#endif
-+#ifdef AT91_PLATFORM_DRIVER
-+	platform_driver_unregister(&AT91_PLATFORM_DRIVER);
-+ error_at91:
-+#endif
-+#ifdef EP93XX_PLATFORM_DRIVER
-+	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
-+ error_ep93xx:
-+#endif
-+#ifdef EXYNOS_PLATFORM_DRIVER
-+	platform_driver_unregister(&EXYNOS_PLATFORM_DRIVER);
-+ error_exynos:
-+#endif
-+#ifdef S3C2410_PLATFORM_DRIVER
-+	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
-+ error_s3c2410:
-+#endif
- #ifdef TMIO_OHCI_DRIVER
- 	platform_driver_unregister(&TMIO_OHCI_DRIVER);
-  error_tmio:
-@@ -1300,17 +1376,17 @@ static int __init ohci_hcd_mod_init(void)
- 	platform_driver_unregister(&OF_PLATFORM_DRIVER);
-  error_of_platform:
- #endif
--#ifdef PLATFORM_DRIVER
--	platform_driver_unregister(&PLATFORM_DRIVER);
-- error_platform:
-+#ifdef OMAP3_PLATFORM_DRIVER
-+	platform_driver_unregister(&OMAP3_PLATFORM_DRIVER);
-+ error_omap3_platform:
- #endif
- #ifdef OMAP1_PLATFORM_DRIVER
- 	platform_driver_unregister(&OMAP1_PLATFORM_DRIVER);
-  error_omap1_platform:
- #endif
--#ifdef OMAP3_PLATFORM_DRIVER
--	platform_driver_unregister(&OMAP3_PLATFORM_DRIVER);
-- error_omap3_platform:
-+#ifdef PLATFORM_DRIVER
-+	platform_driver_unregister(&PLATFORM_DRIVER);
-+ error_platform:
- #endif
- #ifdef PS3_SYSTEM_BUS_DRIVER
- 	ps3_ohci_driver_unregister(&PS3_SYSTEM_BUS_DRIVER);
-@@ -1329,6 +1405,27 @@ module_init(ohci_hcd_mod_init);
- 
- static void __exit ohci_hcd_mod_exit(void)
- {
-+#ifdef SPEAR_PLATFORM_DRIVER
-+	platform_driver_unregister(&SPEAR_PLATFORM_DRIVER);
-+#endif
-+#ifdef DAVINCI_PLATFORM_DRIVER
-+	platform_driver_unregister(&DAVINCI_PLATFORM_DRIVER);
-+#endif
-+#ifdef NXP_PLATFORM_DRIVER
-+	platform_driver_unregister(&NXP_PLATFORM_DRIVER);
-+#endif
-+#ifdef AT91_PLATFORM_DRIVER
-+	platform_driver_unregister(&AT91_PLATFORM_DRIVER);
-+#endif
-+#ifdef EP93XX_PLATFORM_DRIVER
-+	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
-+#endif
-+#ifdef EXYNOS_PLATFORM_DRIVER
-+	platform_driver_unregister(&EXYNOS_PLATFORM_DRIVER);
-+#endif
-+#ifdef S3C2410_PLATFORM_DRIVER
-+	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
-+#endif
- #ifdef TMIO_OHCI_DRIVER
- 	platform_driver_unregister(&TMIO_OHCI_DRIVER);
- #endif
-@@ -1344,12 +1441,15 @@ static void __exit ohci_hcd_mod_exit(void)
- #ifdef OF_PLATFORM_DRIVER
- 	platform_driver_unregister(&OF_PLATFORM_DRIVER);
- #endif
--#ifdef PLATFORM_DRIVER
--	platform_driver_unregister(&PLATFORM_DRIVER);
--#endif
- #ifdef OMAP3_PLATFORM_DRIVER
- 	platform_driver_unregister(&OMAP3_PLATFORM_DRIVER);
- #endif
-+#ifdef OMAP1_PLATFORM_DRIVER
-+	platform_driver_unregister(&OMAP1_PLATFORM_DRIVER);
-+#endif
-+#ifdef PLATFORM_DRIVER
-+	platform_driver_unregister(&PLATFORM_DRIVER);
-+#endif
- #ifdef PS3_SYSTEM_BUS_DRIVER
- 	ps3_ohci_driver_unregister(&PS3_SYSTEM_BUS_DRIVER);
- #endif
+
+Arnd Bergmann (21):
+  ARM: topology: export cpu_topology
+  ARM: default machine descriptor for multiplatform
+  ARM: shmobile: don't call irqchip_init unconditionally
+  ARM: orion5x: include linux/cpu.h
+  atm: he: use mdelay instead of large udelay constants
+  ALSA: ali5451: use mdelay instead of large udelay constants
+  oss/dmabuf: use dma_map_single
+  drm/nouveau: use mdelay instead of large udelay constants
+  drm: export drm_vm_open_locked
+  [SCSI] nsp32: use mdelay instead of large udelay constants
+  irqdomain: export irq_domain_add_simple
+  irqchip: s3c24xx: add missing __init annotations
+  iommu: tegra: print dma_addr_t using %lld
+  cpufreq: pxa2xx: initialize variables
+  thermal: cooling: avoid uninitialied used gcc warning
+  OF: remove #ifdef from linux/of_platform.h
+  X.509: do not emit any informational output
+  USB: ehci-msm: USB_MSM_OTG needs USB_PHY
+  USB: lpc32xx: ISP1301 needs USB_PHY
+  USB: OMAP: ISP1301 needs USB_PHY
+  USB: OHCI: avoid conflicting platform drivers
+
+ arch/arm/Kconfig                                   |   1 -
+ arch/arm/configs/lpc32xx_defconfig                 |   1 +
+ arch/arm/configs/msm_defconfig                     |   1 +
+ arch/arm/configs/omap1_defconfig                   |   1 +
+ arch/arm/kernel/devtree.c                          |   7 ++
+ arch/arm/kernel/setup.c                            |  11 +-
+ arch/arm/kernel/topology.c                         |   1 +
+ arch/arm/mach-orion5x/common.c                     |   1 +
+ arch/arm/mach-shmobile/intc-r8a7740.c              |  13 +-
+ drivers/atm/he.c                                   |   2 +-
+ drivers/cpufreq/pxa2xx-cpufreq.c                   |   5 +-
+ drivers/gpu/drm/drm_vm.c                           |   1 +
+ drivers/gpu/drm/nouveau/core/engine/disp/dacnv50.c |   3 +-
+ drivers/iommu/tegra-gart.c                         |   3 +-
+ drivers/iommu/tegra-smmu.c                         |   2 +-
+ drivers/irqchip/irq-s3c24xx.c                      |   4 +-
+ drivers/scsi/nsp32.c                               |   2 +-
+ drivers/thermal/cpu_cooling.c                      |  17 +--
+ drivers/usb/gadget/Kconfig                         |   2 +
+ drivers/usb/host/Kconfig                           |   1 +
+ drivers/usb/host/ohci-hcd.c                        | 136 ++++++++++++++++++---
+ drivers/usb/phy/Makefile                           |   2 +-
+ include/linux/of_platform.h                        |  13 +-
+ kernel/irq/irqdomain.c                             |   1 +
+ lib/build_OID_registry                             |   2 -
+ sound/oss/dmabuf.c                                 |   3 +-
+ sound/pci/ali5451/ali5451.c                        |   8 +-
+ 27 files changed, 187 insertions(+), 57 deletions(-)
+
 -- 
 1.8.1.2
+
+Cc: "James E.J. Bottomley" <JBottomley@parallels.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: David Airlie <airlied@linux.ie>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Inki Dae <inki.dae@samsung.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Cc: Rob Herring <robherring2@gmail.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Simon Horman <horms+renesas@verge.net.au>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: alsa-devel at alsa-project.org
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-atm-general at lists.sourceforge.net
+Cc: linux-scsi at vger.kernel.org
+Cc: linux-usb at vger.kernel.org
+Cc: netdev at vger.kernel.org
