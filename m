@@ -1,47 +1,61 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 25 Apr 2013 16:25:52 -0700
-Subject: [PATCHv2 1/4] Documentation: Add memory mapped ARM architected
- timer binding
-In-Reply-To: <5179B6ED.9000301@gmail.com>
-References: <1365812863-5367-1-git-send-email-sboyd@codeaurora.org>
- <1365812863-5367-2-git-send-email-sboyd@codeaurora.org>
- <516C6F12.5020208@gmail.com> <516C7231.6060305@codeaurora.org>
- <5179A488.5050102@gmail.com> <5179B2B2.8000201@codeaurora.org>
- <5179B6ED.9000301@gmail.com>
-Message-ID: <5179BB80.9060405@codeaurora.org>
+From: andy.green@linaro.org (Andy Green)
+Date: Fri, 26 Apr 2013 07:51:35 +0800
+Subject: [PATCHv3 00/14] drivers: mailbox: framework creation
+In-Reply-To: <5179AE2F.3040403@ti.com>
+References: <1363145021-14339-1-git-send-email-s-anna@ti.com>
+ <CABb+yY0RYkVeo2Sb4WsDJY0jf17488FEz0d2CB994eQaSOEsVg@mail.gmail.com>
+ <37C860A02101E749A747FA2D3C1E3C504A5DF7@DLEE11.ent.ti.com>
+ <CABb+yY1x4x_A+QtGG9ohsLPgs8c3nEVnd_ExJBGOOR8=6YLPFA@mail.gmail.com>
+ <37C860A02101E749A747FA2D3C1E3C504A63B4@DLEE11.ent.ti.com>
+ <CAJe_ZhehnniZd730jjiOLrHozq8TOJZgFYLqUe4KqgBiQEu8PA@mail.gmail.com>
+ <51779304.4040003@st.com>
+ <CAJe_ZhdZv5LW6kdwyPtJe69mfW6t=WQ4OJnG2H4sUhibattN2A@mail.gmail.com>
+ <517867E1.7050301@ti.com>
+ <CAJe_ZhfDZzq+DzA9XDF3PWFUmwcZnDy-mhE4hLNHmf+V4GhOxw@mail.gmail.com>
+ <5179AE2F.3040403@ti.com>
+Message-ID: <5179C187.509@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/25/13 16:06, Rob Herring wrote:
-> On 04/25/2013 05:48 PM, Stephen Boyd wrote:
->
->> We don't really care about CNTFRQ because it's duplicated into each
->> view. We do care about CNTNSAR. Luckily the spec "just works" there in
->> the sense that we can use CNTTIDR in conjunction with CNTACRn and
->> determine if we have access to a frame we're interested in if the
->> CNTTIDR bits say the frame is present and the CNTACRn register says we
->> can access it. If not then it must be locked down for secure users.
->>
->> Unfortunately hardware doesn't have a way to say that a particular frame
->> is reserved for the hypervisor or the guest kernel/userspace. We need
->> some help from software, so we have the status property express that a
->> particular frame is available. We have to assume the DT is going to be
->> different depending on if you're the hypervisor or the guest. That's a
->> valid assumption right? Otherwise I hope we can do some trapping of the
->> guest's mapping to the control base and then rewrite what they read so
->> that they only see the frame that we want to be available to them.
-> Yeah, I believe the only way to prevent access within non-secure world
-> is with the MMU. So I guess the example is just policy that the
-> hypervisor would/may not create a stage2 mapping. You still have the
-> same issue that the guest should not be passed the control base. You
-> could make the reg property optional, but then what do you do with the
-> node name?
+On 26/04/13 06:29, the mail apparently from Suman Anna included:
 
-I don't follow. Why shouldn't we tell the guest about the hardware
-that's there? Shouldn't they be able to safely assume they can access
-the control base just like a non-guest kernel running in PL1 would be
-able to?
+Hi -
+
+>>> 3. Shareable/exclusive nature of a mailbox. If it is shareable, then
+>>> duplicating the behavior between clients is not worth it, and this
+>>> should be absorbed into the respective controller driver.
+>>>
+>> I think the mailbox should be exclusively held by a client. That makes
+>> many things simpler. Also remote firmwares won't be always robust
+>> enough to handle commands from different subsystems intermixed. The
+>> API only has to make sure the mailbox_get/put operations are very
+>> thin.
+>
+> This might be the case for specific remotes where we expect only one
+> client driver to be responsible for talking to it, but for generic
+> offloading, you do not want to have this restriction. You do not want
+> peer clients to go through a single main client, as the latencies or the
+> infrastructure imposed by the main client may not be suitable for the
+> other clients. The stricter usecase here would be the shareable mailbox,
+> and if it is exclusive, as dictated by a controller or device property,
+> then so be it and things would get simplified for that controller/device.
+
+Knowing why Jassi mentioned this, the situation is a bit different than 
+what you replied to.  There are in fact multiple client drivers that can 
+asynchronously decide to initiate communication on the same mailbox. 
+Some of the client need to perform multi-step sequencing and lock the 
+mailbox for the duration.
+
+Right now we can implement that by having a driver on top to mediate, 
+Jassi is suggesting being able to do the client locking at your layer as 
+a primitive will simplify things, not least get rid of the mediation 
+driver.  Your layer has concept of completion and notifier already so it 
+seems it wouldn't take much more.
+
+-Andy
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Andy Green | Fujitsu Landing Team Leader
+Linaro.org ? Open source software for ARM SoCs | Follow Linaro
+http://facebook.com/pages/Linaro/155974581091106  - 
+http://twitter.com/#!/linaroorg - http://linaro.org/linaro-blog
