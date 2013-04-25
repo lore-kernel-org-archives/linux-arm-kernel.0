@@ -1,110 +1,31 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 25 Apr 2013 09:59:27 +0100
-Subject: [RFC PATCH v3 07/17] ARM: dts: imx: cpus/cpu nodes dts updates
-In-Reply-To: <20130425054426.GG1389@S2101-09.ap.freescale.net>
-References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366824502-19729-8-git-send-email-lorenzo.pieralisi@arm.com>
- <20130425054426.GG1389@S2101-09.ap.freescale.net>
-Message-ID: <20130425085926.GA25870@e102568-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 25 Apr 2013 11:00:22 +0200
+Subject: [PATCH 12/32] ARM: ux500: Remove superfluous 'psize' attribute
+ from Audio platform data
+In-Reply-To: <1366279934-30761-13-git-send-email-lee.jones@linaro.org>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbu-e75rz+BgbfFH7nXMWMTzpFT=k2yhA80jJKv9jpzkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 06:44:28AM +0100, Shawn Guo wrote:
-> On Wed, Apr 24, 2013 at 06:28:12PM +0100, Lorenzo Pieralisi wrote:
-> > This patch updates the in-kernel dts files according to the latest cpus
-> > and cpu bindings updates for ARM.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> >  arch/arm/boot/dts/imx23.dtsi  | 8 ++++++--
-> >  arch/arm/boot/dts/imx28.dtsi  | 8 ++++++--
-> >  arch/arm/boot/dts/imx6dl.dtsi | 2 ++
-> >  arch/arm/boot/dts/imx6q.dtsi  | 1 +
-> >  4 files changed, 15 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
-> > index 56afcf4..0aae18b 100644
-> > --- a/arch/arm/boot/dts/imx23.dtsi
-> > +++ b/arch/arm/boot/dts/imx23.dtsi
-> > @@ -23,8 +23,12 @@
-> >  	};
-> >  
-> >  	cpus {
-> > -		cpu at 0 {
-> > -			compatible = "arm,arm926ejs";
-> > +		#address-cells = <0>;
-> > +		#size-cells = <0>;
-> > +
-> > +		cpu {
-> > +			compatible = "arm,arm926ej-s";
-> > +			device_type = "cpu";
-> >  		};
-> >  	};
-> >  
-> > diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-> > index 7ba4966..07f131fc 100644
-> > --- a/arch/arm/boot/dts/imx28.dtsi
-> > +++ b/arch/arm/boot/dts/imx28.dtsi
-> > @@ -32,8 +32,12 @@
-> >  	};
-> >  
-> >  	cpus {
-> > -		cpu at 0 {
-> > -			compatible = "arm,arm926ejs";
-> > +		#address-cells = <0>;
-> > +		#size-cells = <0>;
-> > +
-> > +		cpu {
-> > +			compatible = "arm,arm926ej-s";
-> > +			device_type = "cpu";
-> >  		};
-> >  	};
-> >  
-> > diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-> > index 63fafe2..b76d85e 100644
-> > --- a/arch/arm/boot/dts/imx6dl.dtsi
-> > +++ b/arch/arm/boot/dts/imx6dl.dtsi
-> > @@ -16,12 +16,14 @@
-> >  
-> >  		cpu at 0 {
-> >  			compatible = "arm,cortex-a9";
-> > +			device_type = "cpu";
-> >  			reg = <0>;
-> >  			next-level-cache = <&L2>;
-> >  		};
-> >  
-> >  		cpu at 1 {
-> >  			compatible = "arm,cortex-a9";
-> > +			device_type = "cpu";
-> >  			reg = <1>;
-> >  			next-level-cache = <&L2>;
-> >  		};
-> > diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> > index cba021e..65c1b62 100644
-> > --- a/arch/arm/boot/dts/imx6q.dtsi
-> > +++ b/arch/arm/boot/dts/imx6q.dtsi
-> > @@ -17,6 +17,7 @@
-> >  
-> >  		cpu at 0 {
-> >  			compatible = "arm,cortex-a9";
-> > +			device_type = "cpu";
-> 
-> Shouldn't this line be added for cpu at 1, cpu at 2 and cpu at 3 too?  Other than
-> that,
+On Thu, Apr 18, 2013 at 12:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Yes, you are right, fixed. Thanks for reviewing.
+> 'psize' is used to calculate the maximum DMA burst size. However it
+> is only taken into consideration when editing the DMA channel's
+> configuration. The Audio DMA platform data is only used to allocate
+> a channel, not configure it. That will be done at a later date within
+> the MSP driver.
+>
+> We're also removing comments which are no longer required, as
+> 'data_width' is no longer set in any device's platform data period.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Lorenzo
+Pls CC patches like this to Ola LILJA.
 
-> 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> >  			reg = <0>;
-> >  			next-level-cache = <&L2>;
-> >  			operating-points = <
-> > -- 
-> > 1.7.12
-> > 
-> > 
-> 
-> 
+So if I understand correctly this is now handled by
+dmaengine_pcm.c, os that right?
+
+Yours,
+Linus Walleij
