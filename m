@@ -1,78 +1,88 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Thu, 25 Apr 2013 14:15:34 +0530
-Subject: [PATCH] ARM: KVM: Allow host virtual timer irq number to be different
- from guest virtual timer irq number
-Message-ID: <1366879534-31578-1-git-send-email-anup.patel@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 25 Apr 2013 09:47:11 +0100
+Subject: [PATCH v8 1/2] arm: introduce psci_smp_ops
+In-Reply-To: <1366828819-10745-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
+ <1366828819-10745-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130425084711.GA12848@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arch_timer irq numbers (or PPI number) are implementation dependent so, the host virtual timer irq number can be different from guest virtual timer irq number.
+Hi Stefano,
 
-Currently, we only have Cortex-A15 guest (for KVM ARMv7) and Cortex-A57 guest (for KVM ARMv8) supported. These guests have virtual timer irq number as 27.
+On Wed, Apr 24, 2013 at 07:40:18PM +0100, Stefano Stabellini wrote:
+> Rename virt_smp_ops to psci_smp_ops and move them to arch/arm/kernel/psci_smp.c.
+> Remove mach-virt/platsmp.c, now unused.
+> Compile psci_smp if CONFIG_ARM_PSCI and CONFIG_SMP.
+> 
+> Add a cpu_die smp_op based on psci_ops.cpu_off.
+> 
+> Initialize PSCI before setting smp_ops in setup_arch.
+> Use psci_smp_ops if the platform doesn't provide its own smp_ops.
+> 
+> If PSCI is available on the platform, prefer psci_smp_ops over the
+> platform smp_ops.
+> 
+> Changes in v8:
+> - merge "prefer psci_smp_ops over mdesc->smp" into this patch.
+> 
+> Changes in v6:
+> - fixed return values for psci_smp_available and psci_init ifndef
+> CONFIG_ARM_PSCI.
+> 
+> Changes in v5:
+> - document psci_operations;
+> - psci_init returns NULL.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> ---
+>  arch/arm/include/asm/psci.h  |   29 ++++++++++++++++++
+>  arch/arm/kernel/Makefile     |    5 ++-
+>  arch/arm/kernel/psci.c       |    7 ++--
+>  arch/arm/kernel/psci_smp.c   |   67 ++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/kernel/setup.c      |    7 ++++-
+>  arch/arm/mach-virt/Makefile  |    1 -
+>  arch/arm/mach-virt/platsmp.c |   58 ------------------------------------
+>  arch/arm/mach-virt/virt.c    |    3 --
+>  8 files changed, 109 insertions(+), 68 deletions(-)
+>  create mode 100644 arch/arm/kernel/psci_smp.c
+>  delete mode 100644 arch/arm/mach-virt/platsmp.c
+> 
+> diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
+> index ce0dbe7..fa44417 100644
+> --- a/arch/arm/include/asm/psci.h
+> +++ b/arch/arm/include/asm/psci.h
+> @@ -23,6 +23,26 @@ struct psci_power_state {
+>  	u8	affinity_level;
+>  };
+>  
+> +/*
+> + * cpu_suspend   Suspend the execution on a CPU
+> + * @state        we don't currently describe affinity levels, so just pass 0.
+> + * @entry_point  the first instruction to be executed on return
+> + * returns 0  success, < 0 on failure
+> + *
+> + * cpu_off       Power down a CPU
+> + * @state        we don't currently describe affinity levels, so just pass 0.
+> + * no return on successful call
+> + *
+> + * cpu_on        Power up a CPU
+> + * @cpuid        cpuid of target CPU, as from MPIDR
+> + * @entry_point  the first instruction to be executed on return
+> + * returns 0  success, < 0 on failure
+> + *
+> + * migrate       Migrate the context to a different CPU
+> + * @cpuid        cpuid of target CPU, as from MPIDR
+> + * returns 0  success, < 0 on failure
+> + *
+> + */
 
-This patch ensures that host virtual timer irq number is read from DTB and guest virtual timer irq is always 27.
+Can you move these comments into psci-smp.c please? They're really specific
+to the implementation there, and if we put them in a header we're lying to
+ourselves about the parameters actually described by the PSCI specification.
 
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
----
- arch/arm/kvm/arch_timer.c |   18 +++++++++++++-----
- 1 file changed, 13 insertions(+), 5 deletions(-)
+With that change:
 
-diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
-index 49a7516..376abf0 100644
---- a/arch/arm/kvm/arch_timer.c
-+++ b/arch/arm/kvm/arch_timer.c
-@@ -30,10 +30,18 @@
- 
- static struct timecounter *timecounter;
- static struct workqueue_struct *wqueue;
--static struct kvm_irq_level timer_irq = {
-+static struct kvm_irq_level host_timer_irq = {
- 	.level	= 1,
- };
- 
-+/* Guest virtual timer irq number will be based on type of guest we emulate. 
-+ * For Cortex-A15 & Cortex-A57 guest, virtual timer irq is 27
-+ */
-+static struct kvm_irq_level guest_timer_irq = {
-+	.irq = 27,
-+	.level = 1,
-+};
-+
- static cycle_t kvm_phys_timer_read(void)
- {
- 	return timecounter->cc->read(timecounter->cc);
-@@ -163,12 +171,12 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
- 	INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
- 	hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
- 	timer->timer.function = kvm_timer_expire;
--	timer->irq = &timer_irq;
-+	timer->irq = &guest_timer_irq;
- }
- 
- static void kvm_timer_init_interrupt(void *info)
- {
--	enable_percpu_irq(timer_irq.irq, 0);
-+	enable_percpu_irq(host_timer_irq.irq, 0);
- }
- 
- 
-@@ -182,7 +190,7 @@ static int kvm_timer_cpu_notify(struct notifier_block *self,
- 		break;
- 	case CPU_DYING:
- 	case CPU_DYING_FROZEN:
--		disable_percpu_irq(timer_irq.irq);
-+		disable_percpu_irq(host_timer_irq.irq);
- 		break;
- 	}
- 
-@@ -230,7 +238,7 @@ int kvm_timer_hyp_init(void)
- 		goto out;
- 	}
- 
--	timer_irq.irq = ppi;
-+	host_timer_irq.irq = ppi;
- 
- 	err = register_cpu_notifier(&kvm_timer_cpu_nb);
- 	if (err) {
--- 
-1.7.9.5
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
