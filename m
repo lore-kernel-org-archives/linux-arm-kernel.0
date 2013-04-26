@@ -1,128 +1,75 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 26 Apr 2013 16:24:55 +0530
-Subject: [PATCH v2 6/6] ARM: OMAP2+: hwmod: Remove sysc slave idle and auto
- idle apis
-In-Reply-To: <1366973695-2088-1-git-send-email-rnayak@ti.com>
-References: <1366973695-2088-1-git-send-email-rnayak@ti.com>
-Message-ID: <1366973695-2088-7-git-send-email-rnayak@ti.com>
+Date: Fri, 26 Apr 2013 16:24:49 +0530
+Subject: [PATCH v2 0/6] ARM;
+ OMAP2+: hwmod and SERIAL: Remove sysc handling from driver
+Message-ID: <1366973695-2088-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-With the OMAP serial driver sysc cleanup patches in this series, we can
-now remove the hwmod external apis for sysc fiddling.
-
-While at this, also remove unused sysc auto idle api from hwmod code.
-
-Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Tested-by: Sourav Poddar <sourav.poddar@ti.com>
-Signed-off-by: Rajendra nayak <rnayak@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+changes in v2:
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   68 --------------------------------------
- arch/arm/mach-omap2/omap_hwmod.h |    3 --
- 2 files changed, 71 deletions(-)
+1. Addressed the concerns from Paul Wamsley around cleanups in
+_enable_wakeup()/_disable_wakeup(), and left them intact
+2. Updates in changelogs in the serial patch about changes
+needed when dma support is added back for serial
+3. Dropped 1/8 from v1 since its already pulled in
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index fdb5bb3..937e349 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2249,42 +2249,6 @@ static int _idle(struct omap_hwmod *oh)
- }
- 
- /**
-- * omap_hwmod_set_ocp_autoidle - set the hwmod's OCP autoidle bit
-- * @oh: struct omap_hwmod *
-- * @autoidle: desired AUTOIDLE bitfield value (0 or 1)
-- *
-- * Sets the IP block's OCP autoidle bit in hardware, and updates our
-- * local copy. Intended to be used by drivers that require
-- * direct manipulation of the AUTOIDLE bits.
-- * Returns -EINVAL if @oh is null or is not in the ENABLED state, or passes
-- * along the return value from _set_module_autoidle().
-- *
-- * Any users of this function should be scrutinized carefully.
-- */
--int omap_hwmod_set_ocp_autoidle(struct omap_hwmod *oh, u8 autoidle)
--{
--	u32 v;
--	int retval = 0;
--	unsigned long flags;
--
--	if (!oh || oh->_state != _HWMOD_STATE_ENABLED)
--		return -EINVAL;
--
--	spin_lock_irqsave(&oh->_lock, flags);
--
--	v = oh->_sysc_cache;
--
--	retval = _set_module_autoidle(oh, autoidle, &v);
--
--	if (!retval)
--		_write_sysconfig(v, oh);
--
--	spin_unlock_irqrestore(&oh->_lock, flags);
--
--	return retval;
--}
--
--/**
-  * _shutdown - shutdown an omap_hwmod
-  * @oh: struct omap_hwmod *
-  *
-@@ -3145,38 +3109,6 @@ error:
- }
- 
- /**
-- * omap_hwmod_set_slave_idlemode - set the hwmod's OCP slave idlemode
-- * @oh: struct omap_hwmod *
-- * @idlemode: SIDLEMODE field bits (shifted to bit 0)
-- *
-- * Sets the IP block's OCP slave idlemode in hardware, and updates our
-- * local copy.  Intended to be used by drivers that have some erratum
-- * that requires direct manipulation of the SIDLEMODE bits.  Returns
-- * -EINVAL if @oh is null, or passes along the return value from
-- * _set_slave_idlemode().
-- *
-- * XXX Does this function have any current users?  If not, we should
-- * remove it; it is better to let the rest of the hwmod code handle this.
-- * Any users of this function should be scrutinized carefully.
-- */
--int omap_hwmod_set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode)
--{
--	u32 v;
--	int retval = 0;
--
--	if (!oh)
--		return -EINVAL;
--
--	v = oh->_sysc_cache;
--
--	retval = _set_slave_idlemode(oh, idlemode, &v);
--	if (!retval)
--		_write_sysconfig(v, oh);
--
--	return retval;
--}
--
--/**
-  * omap_hwmod_lookup - look up a registered omap_hwmod by name
-  * @name: name of the omap_hwmod to look up
-  *
-diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
-index da6b6ce..777710a 100644
---- a/arch/arm/mach-omap2/omap_hwmod.h
-+++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -640,9 +640,6 @@ int omap_hwmod_read_hardreset(struct omap_hwmod *oh, const char *name);
- int omap_hwmod_enable_clocks(struct omap_hwmod *oh);
- int omap_hwmod_disable_clocks(struct omap_hwmod *oh);
- 
--int omap_hwmod_set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode);
--int omap_hwmod_set_ocp_autoidle(struct omap_hwmod *oh, u8 autoidle);
--
- int omap_hwmod_reset(struct omap_hwmod *oh);
- void omap_hwmod_ocp_barrier(struct omap_hwmod *oh);
- 
+The patches are based of 'fixes-non-critical' branch of
+'git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap' tree
+since patch 1/8 from v1 was pulled in here.
+
+Patches can be found here:
+git://github.com/rrnayak/linux.git sysc-cleanups
+---
+
+OMAP UART IP needs manual idle modes based on functional state of the
+IP. Currently this is handled by the driver with function pointers
+implemented in platform code.
+
+This however breaks in case of device tree because of missing
+idle handling. 
+
+The series tries to address the issue and tries to remove complete
+sysc handling from serial driver.
+
+Patches has been tested on OMAP4430 SDP and OMAP5 EVM where the console
+sluggishness was observed without idle mode handling. CPUIDLE and
+suspend tested ok on these devices.
+
+Thanks to Vaibhav Bedia for testing on Beaglebone(AM33XX) with suspend and
+also the UART async wakeup from suspend.
+
+Thanks to Sourav Poddar for Beagle XM(OMAP3630) devices testing with
+retention and offmode in Idle and suspend for non-DT builds.
+
+Serial driver platform code still has one more function pointer
+left which is used to trigger io_ring(). This one needs some
+discussion with pincontrol driver folks on how to implement
+such a feature with generic pincontrol driver.
+
+Rajendra Nayak (2):
+  ARM: OMAP2+: hwmod: Fix sidle programming in
+    _enable_sysc()/_idle_sysc()
+  ARM: OMAP2+: hwmod: Add a new flag to handle SIDLE in SWSUP only in
+    active
+
+Santosh Shilimkar (4):
+  ARM: OMAP2+: hwmod-data: UART IP needs software control to manage
+    sidle modes
+  SERIAL: OMAP: Remove the slave idle handling from the driver
+  ARM: OMAP2+: serial: Remove the un-used slave idle hooks
+  ARM: OMAP2+: hwmod: Remove sysc slave idle and auto idle apis
+
+ arch/arm/mach-omap2/omap_hwmod.c                   |  111 +++++---------------
+ arch/arm/mach-omap2/omap_hwmod.h                   |    7 +-
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    3 +
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    6 ++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    4 +
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 +-
+ arch/arm/mach-omap2/serial.c                       |   31 ------
+ drivers/tty/serial/omap-serial.c                   |   23 ----
+ include/linux/platform_data/serial-omap.h          |    2 -
+ 9 files changed, 48 insertions(+), 145 deletions(-)
+
 -- 
 1.7.9.5
