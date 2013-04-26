@@ -1,217 +1,247 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 26 Apr 2013 14:08:27 +0200
-Subject: [RFC PATCH v4 00/14] sched: packing small tasks
-In-Reply-To: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
-References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <CAKfTPtAekZSMKjVQEzdN1Dhz_TfJwG=6Fw9ZNbcNdQyg5zQuaQ@mail.gmail.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Fri, 26 Apr 2013 14:14:34 +0200
+Subject: dw_apb_timer_of.c: remove parts that were picoxcell-specific
+Message-ID: <20130426121433.GA16249@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+It seems we made a mistake when creating dw_apb_timer_of.c:
+picoxcell sched_clock parts were not related to dw_apb_timer, yet
+we moved them to dw_apb_timer_of, and tried to use them on socfpga.
+    
+This results in system where user/system time is not measured properly,
+as demonstrated by
+    
+    time dd if=/dev/urandom of=/dev/zero bs=100000 count=100
+    
+    .
+    
+So this patch:
+    
+    1) moves picoxcell sched_clock parts back to picoxcell
+    
+    2) adds support to use dw_apb_timer s as sched_clock. Picoxcell could
+    consider switching to these
+    
+    3) adds missing of_node_put() in dw_apb_timer_init().
+    
+Tested on socfpga, soc-next (3.9-rc6) based tree.
+    
+Signed-off-by: Pavel Machek <pavel@denx.de>
+Tested-by: Dinh Nguyen <dinguyen@altera.com>
 
-The patches are available in this git tree:
-git://git.linaro.org/people/vingu/kernel.git sched-pack-small-tasks-v4-fixed
+---
 
-Vincent
+I think this is ready to go to soc-next tree. Please apply,
+									Pavel
 
-On 25 April 2013 19:23, Vincent Guittot <vincent.guittot@linaro.org> wrote:
-> Hi,
->
-> This patchset takes advantage of the new per-task load tracking that is
-> available in the kernel for packing the tasks in as few as possible
-> CPU/Cluster/Core. It has got 2 packing modes:
-> -The 1st mode packs the small tasks when the system is not too busy. The main
-> goal is to reduce the power consumption in the low system load use cases by
-> minimizing the number of power domain that are enabled but it also keeps the
-> default behavior which is performance oriented.
-> -The 2nd mode packs all tasks in as few as possible power domains in order to
-> improve the power consumption of the system but at the cost of possible
-> performance decrease because of the increase of the rate of ressources sharing
-> compared to the default mode.
->
-> The packing is done in 3 steps (the last step is only applicable for the
-> agressive packing mode):
->
-> The 1st step looks for the best place to pack tasks in a system according to
-> its topology and it defines a 1st pack buddy CPU for each CPU if there is one
-> available. The policy for defining a buddy CPU is that we want to pack at
-> levels where a group of CPU can be power gated independently from others. To
-> describe this capability, a new flag SD_SHARE_POWERDOMAIN has been introduced,
-> that is used to indicate whether the groups of CPUs of a scheduling domain
-> share their power state. By default, this flag is set in all sched_domain in
-> order to keep unchanged the current behavior of the scheduler and only ARM
-> platform clears the SD_SHARE_POWERDOMAIN flag for MC and CPU level.
->
-> In a 2nd step, the scheduler checks the load average of a task which wakes up
-> as well as the load average of the buddy CPU and it can decide to migrate the
-> light tasks on a not busy buddy. This check is done during the wake up because
-> small tasks tend to wake up between periodic load balance and asynchronously
-> to each other which prevents the default mechanism to catch and migrate them
-> efficiently. A light task is defined by a runnable_avg_sum that is less than
-> 20% of the runnable_avg_period. In fact, the former condition encloses 2 ones:
-> The average CPU load of the task must be less than 20% and the task must have
-> been runnable less than 10ms when it woke up last time in order to be
-> electable for the packing migration. So, a task than runs 1 ms each 5ms will
-> be considered as a small task but a task that runs 50 ms with a period of
-> 500ms, will not.
-> Then, the business of the buddy CPU depends of the load average for the rq and
-> the number of running tasks. A CPU with a load average greater than 50% will
-> be considered as busy CPU whatever the number of running tasks is and this
-> threshold will be reduced by the number of running tasks in order to not
-> increase too much the wake up latency of a task. When the buddy CPU is busy,
-> the scheduler falls back to default CFS policy.
->
-> The 3rd step is only used when the agressive packing mode is enable. In this
-> case, the CPUs pack their tasks in their buddy until they becomes full. Unlike
-> the previous step, we can't keep the same buddy so we update it during load
-> balance. During the periodic load balance, the scheduler computes the activity
-> of the system thanks the runnable_avg_sum and the cpu_power of all CPUs and
-> then it defines the CPUs that will be used to handle the current activity. The
-> selected CPUs will be their own buddy and will participate to the default
-> load balancing mecanism in order to share the tasks in a fair way, whereas the
-> not selected CPUs will not, and their buddy will be the last selected CPU.
-> The behavior can be summarized as: The scheduler defines how many CPUs are
-> required to handle the current activity, keeps the tasks on these CPUS and
-> perform normal load balancing (or any evolution of the current load balancer
-> like the use of runnable load avg from Alex https://lkml.org/lkml/2013/4/1/580)
-> on this limited number of CPUs . Like the other steps, the CPUs are selected to
-> minimize the number of power domain that must stay on.
->
-> Change since V3:
->
->  - Take into account comments on previous version.
->  - Add an agressive packing mode and a knob to select between the various mode
->
-> Change since V2:
->
->  - Migrate only a task that wakes up
->  - Change the light tasks threshold to 20%
->  - Change the loaded CPU threshold to not pull tasks if the current number of
->    running tasks is null but the load average is already greater than 50%
->  - Fix the algorithm for selecting the buddy CPU.
->
-> Change since V1:
->
-> Patch 2/6
->  - Change the flag name which was not clear. The new name is
->    SD_SHARE_POWERDOMAIN.
->  - Create an architecture dependent function to tune the sched_domain flags
-> Patch 3/6
->  - Fix issues in the algorithm that looks for the best buddy CPU
->  - Use pr_debug instead of pr_info
->  - Fix for uniprocessor
-> Patch 4/6
->  - Remove the use of usage_avg_sum which has not been merged
-> Patch 5/6
->  - Change the way the coherency of runnable_avg_sum and runnable_avg_period is
->    ensured
-> Patch 6/6
->  - Use the arch dependent function to set/clear SD_SHARE_POWERDOMAIN for ARM
->    platform
->
-> Previous results for v3:
->
-> This series has been tested with hackbench on ARM platform and the results
-> don't show any performance regression
->
-> Hackbench             3.9-rc2  +patches
-> Mean Time (10 tests): 2.048    2.015
-> stdev               : 0.047    0.068
->
-> Previous results for V2:
->
-> This series has been tested with MP3 play back on ARM platform:
-> TC2 HMP (dual CA-15 and 3xCA-7 cluster).
->
-> The measurements have been done on an Ubuntu image during 60 seconds of
-> playback and the result has been normalized to 100.
->
->               | CA15 | CA7  | total |
-> -------------------------------------
-> default       |  81  |   97 | 178   |
-> pack          |  13  |  100 | 113   |
-> -------------------------------------
->
-> Previous results for V1:
->
-> The patch-set has been tested on ARM platforms: quad CA-9 SMP and TC2 HMP
-> (dual CA-15 and 3xCA-7 cluster). For ARM platform, the results have
-> demonstrated that it's worth packing small tasks at all topology levels.
->
-> The performance tests have been done on both platforms with sysbench. The
-> results don't show any performance regressions. These results are aligned with
-> the policy which uses the normal behavior with heavy use cases.
->
-> test: sysbench --test=cpu --num-threads=N --max-requests=R run
->
-> Results below is the average duration of 3 tests on the quad CA-9.
-> default is the current scheduler behavior (pack buddy CPU is -1)
-> pack is the scheduler with the pack mechanism
->
->               | default |  pack   |
-> -----------------------------------
-> N=8;  R=200   |  3.1999 |  3.1921 |
-> N=8;  R=2000  | 31.4939 | 31.4844 |
-> N=12; R=200   |  3.2043 |  3.2084 |
-> N=12; R=2000  | 31.4897 | 31.4831 |
-> N=16; R=200   |  3.1774 |  3.1824 |
-> N=16; R=2000  | 31.4899 | 31.4897 |
-> -----------------------------------
->
-> The power consumption tests have been done only on TC2 platform which has got
-> accessible power lines and I have used cyclictest to simulate small tasks. The
-> tests show some power consumption improvements.
->
-> test: cyclictest -t 8 -q -e 1000000 -D 20 & cyclictest -t 8 -q -e 1000000 -D 20
->
-> The measurements have been done during 16 seconds and the result has been
-> normalized to 100
->
->               | CA15 | CA7  | total |
-> -------------------------------------
-> default       | 100  |  40  | 140   |
-> pack          |  <1  |  45  | <46   |
-> -------------------------------------
->
-> The A15 cluster is less power efficient than the A7 cluster but if we assume
-> that the tasks is well spread on both clusters, we can guest estimate that the
-> power consumption on a dual cluster of CA7 would have been for a default
-> kernel:
->
->               | CA7  | CA7  | total |
-> -------------------------------------
-> default       |  40  |  40  |  80   |
-> -------------------------------------
->
-> Vincent Guittot (14):
->   Revert "sched: Introduce temporary FAIR_GROUP_SCHED dependency for
->     load-tracking"
->   sched: add a new SD_SHARE_POWERDOMAIN flag for sched_domain
->   sched: pack small tasks
->   sched: pack the idle load balance
->   ARM: sched: clear SD_SHARE_POWERDOMAIN
->   sched: add a knob to choose the packing level
->   sched: agressively pack at wake/fork/exec
->   sched: trig ILB on an idle buddy
->   sched: evaluate the activity level of the system
->   sched: update the buddy CPU
->   sched: filter task pull request
->   sched: create a new field with available capacity
->   sched: update the cpu_power
->   sched: force migration on buddy CPU
->
->  arch/arm/kernel/topology.c       |    9 +
->  arch/ia64/include/asm/topology.h |    1 +
->  arch/tile/include/asm/topology.h |    1 +
->  include/linux/sched.h            |   11 +-
->  include/linux/sched/sysctl.h     |    8 +
->  include/linux/topology.h         |    4 +
->  kernel/sched/core.c              |   14 +-
->  kernel/sched/fair.c              |  393 +++++++++++++++++++++++++++++++++++---
->  kernel/sched/sched.h             |   15 +-
->  kernel/sysctl.c                  |   13 ++
->  10 files changed, 423 insertions(+), 46 deletions(-)
->
-> --
-> 1.7.9.5
->
+
+diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
+index 70b441a..22759f5 100644
+--- a/arch/arm/mach-picoxcell/common.c
++++ b/arch/arm/mach-picoxcell/common.c
+@@ -84,11 +84,39 @@ static void picoxcell_wdt_restart(char mode, const char *cmd)
+ 	}
+ }
+ 
++static const struct of_device_id picochip_rtc_ids[] __initconst = {
++        { .compatible = "picochip,pc3x2-rtc" },
++        { /* Sentinel */ },
++};
++
++static void __iomem *sched_io_base;
++
++static u32 read_sched_clock(void)
++{
++        return __raw_readl(sched_io_base);
++}
++
++static void __init timer_init(void)
++{
++	u32 rate;
++
++	dw_apb_timer_init(0);
++
++	sched_timer = of_find_matching_node(timer, osctimer_ids);
++	if (!sched_timer)
++		panic("No suitable timer for scheduler clock\n");
++
++	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
++	of_node_put(sched_timer);
++
++	setup_sched_clock(read_sched_clock, 32, rate);
++}
++
+ DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
+ 	.map_io		= picoxcell_map_io,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_irq	= irqchip_init,
+-	.init_time	= dw_apb_timer_init,
++	.init_time	= timer_init,
+ 	.init_machine	= picoxcell_init_machine,
+ 	.dt_compat	= picoxcell_dt_match,
+ 	.restart	= picoxcell_wdt_restart,
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index 46a0513..3a030e5 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -116,11 +116,17 @@ static const char *altera_dt_match[] = {
+ 	NULL
+ };
+ 
++static void __init timer_init(void)
++{
++	dw_apb_timer_init(1);
++}
++
++
+ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
+ 	.smp		= smp_ops(socfpga_smp_ops),
+ 	.map_io		= socfpga_map_io,
+ 	.init_irq	= socfpga_init_irq,
+-	.init_time	= dw_apb_timer_init,
++	.init_time	= timer_init,
+ 	.init_machine	= socfpga_cyclone5_init,
+ 	.restart	= socfpga_cyclone5_restart,
+ 	.dt_compat	= altera_dt_match,
+diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
+index 8c2a35f..460ac99 100644
+--- a/drivers/clocksource/dw_apb_timer.c
++++ b/drivers/clocksource/dw_apb_timer.c
+@@ -21,12 +21,6 @@
+ #define APBT_MIN_PERIOD			4
+ #define APBT_MIN_DELTA_USEC		200
+ 
+-#define APBTMR_N_LOAD_COUNT		0x00
+-#define APBTMR_N_CURRENT_VALUE		0x04
+-#define APBTMR_N_CONTROL		0x08
+-#define APBTMR_N_EOI			0x0c
+-#define APBTMR_N_INT_STATUS		0x10
+-
+ #define APBTMRS_INT_STATUS		0xa0
+ #define APBTMRS_EOI			0xa4
+ #define APBTMRS_RAW_INT_STATUS		0xa8
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index ab09ed3..ac4ea00 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -57,7 +57,16 @@ static void add_clockevent(struct device_node *event_timer)
+ 	dw_apb_clockevent_register(ced);
+ }
+ 
+-static void add_clocksource(struct device_node *source_timer)
++static void __iomem *sched_io_base;
++
++/* This is actually same as __apbt_read_clocksource(), but with
++   different interface */
++static u32 read_sched_clock_sptimer(void)
++{
++	return ~__raw_readl(sched_io_base + APBTMR_N_CURRENT_VALUE);
++}
++
++static void add_clocksource(struct device_node *source_timer, int use_as_scheduler)
+ {
+ 	void __iomem *iobase;
+ 	struct dw_apb_clocksource *cs;
+@@ -71,45 +80,33 @@ static void add_clocksource(struct device_node *source_timer)
+ 
+ 	dw_apb_clocksource_start(cs);
+ 	dw_apb_clocksource_register(cs);
+-}
+ 
+-static void __iomem *sched_io_base;
+-
+-static u32 read_sched_clock(void)
+-{
+-	return __raw_readl(sched_io_base);
++	if (use_as_scheduler) {
++		sched_io_base = iobase;
++		setup_sched_clock(read_sched_clock_sptimer, 32, rate);
++	}
+ }
+ 
+-static const struct of_device_id sptimer_ids[] __initconst = {
+-	{ .compatible = "picochip,pc3x2-rtc" },
++static const struct of_device_id osctimer_ids[] __initconst = {
++	{ .compatible = "picochip,pc3x2-timer" },
++	{ .compatible = "snps,dw-apb-timer-osc" },
+ 	{ .compatible = "snps,dw-apb-timer-sp" },
+-	{ /* Sentinel */ },
++	{  /* Sentinel */ },
+ };
+ 
+-static void init_sched_clock(void)
+-{
+-	struct device_node *sched_timer;
+-	u32 rate;
+-
+-	sched_timer = of_find_matching_node(NULL, sptimer_ids);
+-	if (!sched_timer)
+-		panic("No RTC for sched clock to use");
+-
+-	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
+-	of_node_put(sched_timer);
++/*
++   You don't have to use dw_apb_timer for scheduler clock,
++   this should also work fine on arm:
+ 
+-	setup_sched_clock(read_sched_clock, 32, rate);
+-}
++  twd_local_timer_of_register();
++  arch_timer_of_register();                 
++  arch_timer_sched_clock_init();
++*/
+ 
+-static const struct of_device_id osctimer_ids[] __initconst = {
+-	{ .compatible = "picochip,pc3x2-timer" },
+-	{ .compatible = "snps,dw-apb-timer-osc" },
+-	{},
+-};
+ 
+-void __init dw_apb_timer_init(void)
++void __init dw_apb_timer_init(int use_as_scheduler)
+ {
+ 	struct device_node *event_timer, *source_timer;
+ 
+ 	event_timer = of_find_matching_node(NULL, osctimer_ids);
+ 	if (!event_timer)
+@@ -119,9 +117,8 @@ void __init dw_apb_timer_init(void)
+ 	source_timer = of_find_matching_node(event_timer, osctimer_ids);
+ 	if (!source_timer)
+ 		panic("No timer for clocksource");
+-	add_clocksource(source_timer);
++	add_clocksource(source_timer, use_as_scheduler);
+ 
++	of_node_put(event_timer);
+ 	of_node_put(source_timer);
+-
+-	init_sched_clock();
+ }
+diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
+index dd755ce..d503245 100644
+--- a/include/linux/dw_apb_timer.h
++++ b/include/linux/dw_apb_timer.h
+@@ -17,6 +17,12 @@
+ #include <linux/clocksource.h>
+ #include <linux/interrupt.h>
+ 
++#define APBTMR_N_LOAD_COUNT		0x00
++#define APBTMR_N_CURRENT_VALUE		0x04
++#define APBTMR_N_CONTROL		0x08
++#define APBTMR_N_EOI			0x0c
++#define APBTMR_N_INT_STATUS		0x10
++
+ #define APBTMRS_REG_SIZE       0x14
+ 
+ struct dw_apb_timer {
+@@ -53,5 +59,5 @@ void dw_apb_clocksource_start(struct dw_apb_clocksource *dw_cs);
+ cycle_t dw_apb_clocksource_read(struct dw_apb_clocksource *dw_cs);
+ void dw_apb_clocksource_unregister(struct dw_apb_clocksource *dw_cs);
+ 
+-extern void dw_apb_timer_init(void);
++extern void dw_apb_timer_init(int);
+ #endif /* __DW_APB_TIMER_H__ */
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
