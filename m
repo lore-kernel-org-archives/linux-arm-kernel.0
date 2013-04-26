@@ -1,71 +1,55 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 26 Apr 2013 15:15:32 +0200
-Subject: [PATCH 08/14] sched: trig ILB on an idle buddy
-In-Reply-To: <1366910611-20048-9-git-send-email-vincent.guittot@linaro.org>
-References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
- <1366910611-20048-9-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20130426131532.GB13964@dyad.programming.kicks-ass.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 26 Apr 2013 14:21:30 +0100
+Subject: [PATCH v3] ARM: imx: replicate the diagnostic register of boot
+ cpu into secondary cores
+In-Reply-To: <1366948645-12060-1-git-send-email-shawn.guo@linaro.org>
+References: <1366948645-12060-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130426132130.GE30858@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 07:23:24PM +0200, Vincent Guittot wrote:
-> If the buddy CPU is not full and currently idle, we trigger an Idle Load
-> Balance to give it the opportunity to pull more tasks.
+Hi Shawn,
+
+Thanks for respinning this without the MMU enabled.
+
+On Fri, Apr 26, 2013 at 04:57:25AM +0100, Shawn Guo wrote:
+> The diagnostic register holds the errata bits.  Mostly bootloader
+> does not bring up secondary cores, so that when errata bits are set
+> in bootloader, they are set only for boot cpu.  But on a SMP
+> configuration, it should be equally done on every single core.
+> Set up the diagnostic register for secondary cores by replicating
+> the register from boot cpu.
 > 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
->  kernel/sched/fair.c |   24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
+> Changes since v2:
+>  * Setting secondary cores' diagnostic register before MMU is enabled.
 > 
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index 874f330..954adfd 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -5776,6 +5776,26 @@ end:
->  	clear_bit(NOHZ_BALANCE_KICK, nohz_flags(this_cpu));
->  }
+>  arch/arm/mach-imx/headsmp.S |   12 ++++++++++++
+>  arch/arm/mach-imx/platsmp.c |   14 ++++++++++++++
+>  2 files changed, 26 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
+> index a58c8b0..cd87970 100644
+> --- a/arch/arm/mach-imx/headsmp.S
+> +++ b/arch/arm/mach-imx/headsmp.S
+> @@ -18,8 +18,20 @@
+>  	.section ".text.head", "ax"
 >  
-> +static int check_nohz_buddy(int cpu)
-> +{
-> +	int buddy = per_cpu(sd_pack_buddy, cpu);
+>  #ifdef CONFIG_SMP
+> +diag_reg_offset:
+> +	.word	g_diag_reg - .
 > +
-> +	if (sysctl_sched_packing_mode != SCHED_PACKING_FULL)
-> +		return false;
-> +
-> +	/* No pack buddy for this CPU */
-> +	if (buddy == -1)
-> +		return false;
-> +
-> +	if (is_buddy_full(buddy))
-> +		return false;
-> +
-> +	if (cpumask_test_cpu(buddy, nohz.idle_cpus_mask))
-> +		return true;
-> +
-> +	return false;
+> +	.macro	set_diag_reg
+> +	adr	r0, diag_reg_offset
+> +	ldr	r1, [r0]
+> +	add	r1, r1, r0		@ r1 = physical &g_diag_reg
+> +	ldr	r0, [r1]
+> +	mcr	p15, 0, r0, c15, c0, 1	@ write diagnostic register
+> +	.endm
 
-return cpumask_test_cpu(..); ?
+Why not re-read the register directly, rather than mrc on the current core?
+I feel uneasy about blindly copying one CPU's diagnostic bits into another.
+It would also make the code simpler.
 
-> +}
-> +
->  /*
->   * Current heuristic for kicking the idle load balancer in the presence
->   * of an idle cpu is the system.
-> @@ -5813,6 +5833,10 @@ static inline int nohz_kick_needed(struct rq *rq, int cpu)
->  	if (rq->nr_running >= 2)
->  		goto need_kick;
->  
-> +	/* the buddy is idle and not busy so we can pack */
-> +	if (check_nohz_buddy(cpu))
-> +		goto need_kick;
-> +
->  	rcu_read_lock();
->  	for_each_domain(cpu, sd) {
->  		struct sched_group *sg = sd->groups;
-
-Bah.. this code is so confusing.. nohz_balance_kick(cpu) won't actually kick
-@cpu.
-
-Again.. suppose we're a big cpu (2) and our little buddy cpu (0) is busy, we
-miss an opportunity to kick the other little cpu into gear (1) and maybe take
-the big core out.
+Will
