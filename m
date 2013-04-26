@@ -1,84 +1,237 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 26 Apr 2013 16:52:50 +0200
-Subject: [PATCH 08/14] sched: trig ILB on an idle buddy
-In-Reply-To: <20130426131532.GB13964@dyad.programming.kicks-ass.net>
-References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
- <1366910611-20048-9-git-send-email-vincent.guittot@linaro.org>
- <20130426131532.GB13964@dyad.programming.kicks-ass.net>
-Message-ID: <CAKfTPtCJzoYNEDu4WJWs0LraL59r8ZDuavBv9rypRKJiX4ZL7g@mail.gmail.com>
+From: anup@brainfault.org (Anup Patel)
+Date: Fri, 26 Apr 2013 20:18:54 +0530
+Subject: [PATCH V3] ARM: KVM: Allow host virtual timer irq number to be
+ different from guest virtual timer irq number
+In-Reply-To: <517A8560.6070005@arm.com>
+References: <1366982847-11028-1-git-send-email-anup.patel@linaro.org>
+ <517A8560.6070005@arm.com>
+Message-ID: <CAAhSdy3XVRVp62xeuPp6Dum1OwvgmF1UKqwTqABUp71WS7ronw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 April 2013 15:15, Peter Zijlstra <peterz@infradead.org> wrote:
-> On Thu, Apr 25, 2013 at 07:23:24PM +0200, Vincent Guittot wrote:
->> If the buddy CPU is not full and currently idle, we trigger an Idle Load
->> Balance to give it the opportunity to pull more tasks.
+On Fri, Apr 26, 2013 at 7:17 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 26/04/13 14:27, Anup Patel wrote:
+>> The arch_timer irq numbers (or PPI number) are implementation dependent so, the host virtual timer irq number can be different from guest virtual timer irq number.
 >>
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> This patch ensures that host virtual timer irq number is read from DTB and guest virtual timer irq is determined based on guest vcpu target type.
+>>
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 >> ---
->>  kernel/sched/fair.c |   24 ++++++++++++++++++++++++
->>  1 file changed, 24 insertions(+)
+>>  arch/arm/include/asm/kvm_arch_timer.h |    7 +++++++
+>>  arch/arm/include/asm/kvm_host.h       |    1 +
+>>  arch/arm/kvm/arch_timer.c             |   32 +++++++++++++++++++++++++-------
+>>  arch/arm/kvm/guest.c                  |   15 +++++++++++++++
+>>  arch/arm/kvm/reset.c                  |    4 +++-
+>>  5 files changed, 51 insertions(+), 8 deletions(-)
 >>
->> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
->> index 874f330..954adfd 100644
->> --- a/kernel/sched/fair.c
->> +++ b/kernel/sched/fair.c
->> @@ -5776,6 +5776,26 @@ end:
->>       clear_bit(NOHZ_BALANCE_KICK, nohz_flags(this_cpu));
+>> diff --git a/arch/arm/include/asm/kvm_arch_timer.h b/arch/arm/include/asm/kvm_arch_timer.h
+>> index 68cb9e1..c5c135b 100644
+>> --- a/arch/arm/include/asm/kvm_arch_timer.h
+>> +++ b/arch/arm/include/asm/kvm_arch_timer.h
+>> @@ -61,6 +61,7 @@ struct arch_timer_cpu {
+>>  #ifdef CONFIG_KVM_ARM_TIMER
+>>  int kvm_timer_hyp_init(void);
+>>  int kvm_timer_init(struct kvm *kvm);
+>> +int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu);
+>>  void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+>>  void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
+>>  void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
+>> @@ -76,7 +77,13 @@ static inline int kvm_timer_init(struct kvm *kvm)
+>>       return 0;
 >>  }
 >>
->> +static int check_nohz_buddy(int cpu)
+>> +static int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
 >> +{
->> +     int buddy = per_cpu(sd_pack_buddy, cpu);
->> +
->> +     if (sysctl_sched_packing_mode != SCHED_PACKING_FULL)
->> +             return false;
->> +
->> +     /* No pack buddy for this CPU */
->> +     if (buddy == -1)
->> +             return false;
->> +
->> +     if (is_buddy_full(buddy))
->> +             return false;
->> +
->> +     if (cpumask_test_cpu(buddy, nohz.idle_cpus_mask))
->> +             return true;
->> +
->> +     return false;
->
-> return cpumask_test_cpu(..); ?
-
-right
-
->
+>> +     return 0;
 >> +}
 >> +
->>  /*
->>   * Current heuristic for kicking the idle load balancer in the presence
->>   * of an idle cpu is the system.
->> @@ -5813,6 +5833,10 @@ static inline int nohz_kick_needed(struct rq *rq, int cpu)
->>       if (rq->nr_running >= 2)
->>               goto need_kick;
->>
->> +     /* the buddy is idle and not busy so we can pack */
->> +     if (check_nohz_buddy(cpu))
->> +             goto need_kick;
+>>  static inline void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu) {}
 >> +
->>       rcu_read_lock();
->>       for_each_domain(cpu, sd) {
->>               struct sched_group *sg = sd->groups;
+>>  static inline void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu) {}
+>>  static inline void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu) {}
+>>  static inline void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu) {}
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index 57cb786..cdc0551 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -43,6 +43,7 @@
+>>  struct kvm_vcpu;
+>>  u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
+>>  int kvm_target_cpu(void);
+>> +struct kvm_irq_level *kvm_target_timer_irq(struct kvm_vcpu *vcpu);
+>>  int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+>>  void kvm_reset_coprocs(struct kvm_vcpu *vcpu);
+>>
+>> diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
+>> index 49a7516..e558115 100644
+>> --- a/arch/arm/kvm/arch_timer.c
+>> +++ b/arch/arm/kvm/arch_timer.c
+>> @@ -30,7 +30,7 @@
+>>
+>>  static struct timecounter *timecounter;
+>>  static struct workqueue_struct *wqueue;
+>> -static struct kvm_irq_level timer_irq = {
+>> +static struct kvm_irq_level host_timer_irq = {
+>>       .level  = 1,
+>>  };
+>>
+>> @@ -67,8 +67,8 @@ static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
+>>
+>>       timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
+>>       kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+>> -                         vcpu->arch.timer_cpu.irq->irq,
+>> -                         vcpu->arch.timer_cpu.irq->level);
+>> +                         timer->irq->irq,
+>> +                         timer->irq->level);
+>>  }
+>>
+>>  static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+>> @@ -156,6 +156,24 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+>>       timer_arm(timer, ns);
+>>  }
+>>
+>> +int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
 >
-> Bah.. this code is so confusing.. nohz_balance_kick(cpu) won't actually kick
-> @cpu.
+> If you change this function to:
+> int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu, struct kvm_irq_level *irq)
 >
-> Again.. suppose we're a big cpu (2) and our little buddy cpu (0) is busy, we
-> miss an opportunity to kick the other little cpu into gear (1) and maybe take
-> the big core out.
+> ...
+>
+>> +{
+>> +     struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>> +
+>> +     /*
+>> +      * The vcpu timer irq number cannot be determined in
+>> +      * kvm_timer_vcpu_init() because it is called much before
+>> +      * kvm_vcpu_set_target(). To handle this, we determine
+>> +      * vcpu timer irq number when the vcpu is resetted.
+>> +      */
+>> +     timer->irq = kvm_target_timer_irq(vcpu);
+>> +     if (!timer->irq) {
+>> +             return -ENODEV;
+>> +     }
+>> +
+>> +     return 0;
+>> +}
+>> +
+>>  void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+>>  {
+>>       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>> @@ -163,12 +181,12 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+>>       INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
+>>       hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+>>       timer->timer.function = kvm_timer_expire;
+>> -     timer->irq = &timer_irq;
+>> +     timer->irq = NULL;
+>>  }
+>>
+>>  static void kvm_timer_init_interrupt(void *info)
+>>  {
+>> -     enable_percpu_irq(timer_irq.irq, 0);
+>> +     enable_percpu_irq(host_timer_irq.irq, 0);
+>>  }
+>>
+>>
+>> @@ -182,7 +200,7 @@ static int kvm_timer_cpu_notify(struct notifier_block *self,
+>>               break;
+>>       case CPU_DYING:
+>>       case CPU_DYING_FROZEN:
+>> -             disable_percpu_irq(timer_irq.irq);
+>> +             disable_percpu_irq(host_timer_irq.irq);
+>>               break;
+>>       }
+>>
+>> @@ -230,7 +248,7 @@ int kvm_timer_hyp_init(void)
+>>               goto out;
+>>       }
+>>
+>> -     timer_irq.irq = ppi;
+>> +     host_timer_irq.irq = ppi;
+>>
+>>       err = register_cpu_notifier(&kvm_timer_cpu_nb);
+>>       if (err) {
+>> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+>> index 152d036..6fbc988 100644
+>> --- a/arch/arm/kvm/guest.c
+>> +++ b/arch/arm/kvm/guest.c
+>> @@ -36,6 +36,11 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
+>>       { NULL }
+>>  };
+>>
+>> +static struct kvm_irq_level target_cortex_a15_timer_irq = {
+>> +     .irq = 27,
+>> +     .level = 1,
+>> +};
+>
+> ... Move this to reset.c ...
+>
+>>  int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
+>>  {
+>>       return 0;
+>> @@ -197,6 +202,16 @@ int __attribute_const__ kvm_target_cpu(void)
+>>       }
+>>  }
+>>
+>> +struct kvm_irq_level *kvm_target_timer_irq(struct kvm_vcpu *vcpu)
+>> +{
+>> +     switch (vcpu->arch.target) {
+>> +     case KVM_ARM_TARGET_CORTEX_A15:
+>> +             return &target_cortex_a15_timer_irq;
+>> +     default:
+>> +             return NULL;
+>> +     };
+>> +}
+>
+> ... drop this ...
+>
+>>  int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
+>>                       const struct kvm_vcpu_init *init)
+>>  {
+>> diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+>> index b80256b..655e567 100644
+>> --- a/arch/arm/kvm/reset.c
+>> +++ b/arch/arm/kvm/reset.c
+>> @@ -26,6 +26,7 @@
+>>  #include <asm/cputype.h>
+>>  #include <asm/kvm_arm.h>
+>>  #include <asm/kvm_coproc.h>
+>> +#include <asm/kvm_arch_timer.h>
+>>
+>>  /******************************************************************************
+>>   * Cortex-A15 Reset Values
+>> @@ -70,5 +71,6 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+>
+> ...
+>
+> In      case KVM_ARM_TARGET_CORTEX_A15:
+> [...]
+>         timer_irq = &target_cortex_a15_timer_irq;
+>
+> ...
+>
+>>       /* Reset CP15 registers */
+>>       kvm_reset_coprocs(vcpu);
+>>
+>> -     return 0;
+>> +     /* Reset arch_timer context */
+>> +     return kvm_timer_vcpu_reset(vcpu);
+>
+> ... and call kvm_timer_vcpu_reset(vcpu, timer_irq)
+>
+> it would look much better.
+>
+>         M.
+> --
+> Jazz is not dead. It just smells funny...
+>
+>
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
 
-You're right that we can miss an opportunity but it means that cpus
-allocated to packing effort are full and a new buddy cpu is going to
-be allocated and will pull the task a bit later.
+Sure, I incorporate all above comments and send revised patch.
 
-
->
->
+Regards,
+Anup
