@@ -1,57 +1,79 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Fri, 26 Apr 2013 12:39:38 +0200
-Subject: [PATCH 12/21] irqchip: s3c24xx: add missing __init annotations
-In-Reply-To: <1366910944-3033663-13-git-send-email-arnd@arndb.de>
-References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <1366910944-3033663-13-git-send-email-arnd@arndb.de>
-Message-ID: <201304261239.38737.heiko@sntech.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 26 Apr 2013 11:41:32 +0100
+Subject: [PATCH v5 0/7] xen/arm: move to mach-virt and support SMP
+In-Reply-To: <alpine.DEB.2.02.1304251750160.4180@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304251750160.4180@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1304261134330.4180@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 25. April 2013, 19:28:55 schrieb Arnd Bergmann:
-> The s3c24xx_init_intc and s3c2412_init_irq functions are only called
-> at init time, and they call functions already marked __init, so they
-> should be marked in the same way. This was reported as
-> 
-> WARNING: vmlinux.o(.text+0x19e0b4): Section mismatch in reference from the
-> function s3c2412_init_irq() to the function
-> .init.text:s3c24xx_init_intc.constprop.8() The function s3c2412_init_irq()
-> references
-> the function __init s3c24xx_init_intc.constprop.8().
-> This is often because s3c2412_init_irq lacks a __init
-> annotation or the annotation of s3c24xx_init_intc.constprop.8 is wrong.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
+Arnd, Olof,
+during the last few merge windows Konrad has always sent the Xen ARM
+patches to Linus via his tree, but this time (3.10 merge window), after
+consulting with Konrad I am thinking of sending to Linus the pull
+request myself.
 
-Yeah, it seems "someone" forgot these, thanks for catching this.
+Arnd, are you OK with this patch series?
 
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+It's all very Xen specific and it is already in linux-next.
+The only non-Xen files that are touched are arch/arm/Kconfig, to select
+ARM_PSCI on XEN, and arch/arm/boot/dts/Makefile, to build the xenvm DTB
+if CONFIG_ARCH_VIRT.
+
+Cheers,
+
+Stefano
 
 
-> ---
->  drivers/irqchip/irq-s3c24xx.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+On Thu, 25 Apr 2013, Stefano Stabellini wrote:
+> Hi all,
+> this patch series, based on 3.9-rc3, moves xenvm to mach-virt,
+> introduces SMP support in Xen on ARM and implements machine reboot and
+> power off via Xen sched_op hypercalls.
 > 
-> diff --git a/drivers/irqchip/irq-s3c24xx.c b/drivers/irqchip/irq-s3c24xx.c
-> index c8afd7b..bbcc944 100644
-> --- a/drivers/irqchip/irq-s3c24xx.c
-> +++ b/drivers/irqchip/irq-s3c24xx.c
-> @@ -535,7 +535,7 @@ static void s3c24xx_clear_intc(struct s3c_irq_intc
-> *intc) }
->  }
+> Each patch comes with a detailed changelog.
 > 
-> -static struct s3c_irq_intc *s3c24xx_init_intc(struct device_node *np,
-> +static struct s3c_irq_intc * __init s3c24xx_init_intc(struct device_node
-> *np, struct s3c_irq_data *irq_data,
->  				       struct s3c_irq_intc *parent,
->  				       unsigned long address)
-> @@ -795,7 +795,7 @@ static struct s3c_irq_data init_s3c2412subint[32] = {
->  	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 21 }, /* CF */
->  };
 > 
-> -void s3c2412_init_irq(void)
-> +void __init s3c2412_init_irq(void)
->  {
->  	pr_info("S3C2412: IRQ Support\n");
+> The merge window is approaching, this patch series only contains Xen
+> specific changes for ARM, if anybody has any objections speak now
+> please.
+> 
+> I would like an ack from an ARM maintainer on patch #4 and #5 since they
+> touch generic ARM Makefiles.
+> 
+> 
+> Changes in v5:
+> - allocate xen_vcpu_info dynamically, aligning it to the size of the
+> struct;
+> - use VCPUOP_register_vcpu_info on cpu0 too;
+> - set pm_power_off and arm_pm_restart from the Xen specific
+> intialization code.
+> 
+> 
+> 
+> Stefano Stabellini (7):
+>       xen/arm: actually pass a non-NULL percpu pointer to request_percpu_irq
+>       xen/arm: implement HYPERVISOR_vcpu_op
+>       xen/arm: SMP support
+>       xen: move the xenvm machine to mach-virt
+>       xen/arm: XEN selects ARM_PSCI
+>       xenvm: add a simple PSCI node and a second cpu
+>       xen/arm: use sched_op hypercalls for machine reboot and power off
+> 
+>  arch/arm/Kconfig                     |    1 +
+>  arch/arm/boot/dts/Makefile           |    4 +-
+>  arch/arm/boot/dts/xenvm-4.2.dts      |   13 ++++++
+>  arch/arm/include/asm/xen/hypercall.h |    1 +
+>  arch/arm/mach-vexpress/v2m.c         |    1 -
+>  arch/arm/mach-virt/virt.c            |    1 +
+>  arch/arm/xen/enlighten.c             |   75 ++++++++++++++++++++++++++++++---
+>  arch/arm/xen/hypercall.S             |    1 +
+>  8 files changed, 87 insertions(+), 10 deletions(-)
+> 
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git 3.9-rc3-smp-5-tag
+> 
+> Cheers,
+> 
+> Stefano
+> 
