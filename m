@@ -1,95 +1,67 @@
-From: dborkman@redhat.com (Daniel Borkmann)
-Date: Fri, 26 Apr 2013 21:47:46 +0200
-Subject: [PATCH V3 2/3] ARM: net: bpf_jit: make code generation less
- dependent on struct sk_filter.
-In-Reply-To: <20130426122601.10ec05fcb4860df1b0a5b409@linux-foundation.org>
-References: <1366824429-26652-1-git-send-email-nschichan@freebox.fr>
- <1366824429-26652-3-git-send-email-nschichan@freebox.fr>
- <3592414.M8kQZLCXlW@wuerfel>
- <20130426122601.10ec05fcb4860df1b0a5b409@linux-foundation.org>
-Message-ID: <517AD9E2.2090704@redhat.com>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Fri, 26 Apr 2013 22:02:14 +0200
+Subject: [PATCH 0/9] s3c24xx LCD controller driver cleanup
+Message-ID: <1367006543-5458-1-git-send-email-sylvester.nawrocki@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/26/2013 09:26 PM, Andrew Morton wrote:
-> On Fri, 26 Apr 2013 16:04:44 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
->> On Wednesday 24 April 2013 19:27:08 Nicolas Schichan wrote:
->>> @@ -858,7 +858,7 @@ b_epilogue:
->>>   }
->>>
->>>
->>> -void bpf_jit_compile(struct sk_filter *fp)
->>> +static void __bpf_jit_compile(struct jit_ctx *out_ctx)
->>>   {
->>>          struct jit_ctx ctx;
->>>          unsigned tmp_idx;
->>> @@ -867,11 +867,10 @@ void bpf_jit_compile(struct sk_filter *fp)
->>>          if (!bpf_jit_enable)
->>>                  return;
->>>
->>> -       memset(&ctx, 0, sizeof(ctx));
->>> -       ctx.skf         = fp;
->>> +       ctx = *out_ctx;
->>>          ctx.ret0_fp_idx = -1;
->>>
->>> -       ctx.offsets = kzalloc(4 * (ctx.skf->len + 1), GFP_KERNEL);
->>> +       ctx.offsets = kzalloc(4 * (ctx.prog_len + 1), GFP_KERNEL);
->>>          if (ctx.offsets == NULL)
->>>                  return;
->>>
->>> @@ -921,13 +920,26 @@ void bpf_jit_compile(struct sk_filter *fp)
->>>                  print_hex_dump(KERN_INFO, "BPF JIT code: ",
->>>                                 DUMP_PREFIX_ADDRESS, 16, 4, ctx.target,
->>>                                 alloc_size, false);
->>> -
->>> -       fp->bpf_func = (void *)ctx.target;
->>>   out:
->>>          kfree(ctx.offsets);
->>> +
->>> +       *out_ctx = ctx;
->>>          return;
->>
->> This part of the patch, in combination with 79617801e "filter: bpf_jit_comp:
->> refactor and unify BPF JIT image dump output" is now causing build errors
->> in linux-next:
->>
->> arch/arm/net/bpf_jit_32.c: In function '__bpf_jit_compile':
->> arch/arm/net/bpf_jit_32.c:930:16: error: 'fp' undeclared (first use in this function)
->>     bpf_jit_dump(fp->len, alloc_size, 2, ctx.target);
->
-> Thanks, I did this.  There may be a smarter way...
+This patch series moves the s3c2410fb driver header files from 
+arch/arm/mach-s3c24xx to the driver specific directories. It 
+also includes couple cleanups to the driver itself and a patch 
+actually enabling the display during initialization, so it works
+with FRAMEBUFFER_CONSOLE disabled.
 
-I think also seccomp_jit_compile() would need this change then, otherwise the build
-with CONFIG_SECCOMP_FILTER_JIT might break.
+Patches 6...9 have no dependencies on rest of the series.
 
-I can fix this up for you if not already applied. I presume it's against
-linux-next tree?
+The whole series is also available at:
+git://github.com/snawrocki/linux.git cleanup/s3c2410fb
 
-> --- a/arch/arm/net/bpf_jit_32.c~arm-net-bpf_jit-make-code-generation-less-dependent-on-struct-sk_filter-fix
-> +++ a/arch/arm/net/bpf_jit_32.c
-> @@ -858,7 +858,7 @@ b_epilogue:
->   }
->
->
-> -static void __bpf_jit_compile(struct jit_ctx *out_ctx)
-> +static void __bpf_jit_compile(struct sk_filter *fp, struct jit_ctx *out_ctx)
->   {
->   	struct jit_ctx ctx;
->   	unsigned tmp_idx;
-> @@ -934,7 +934,7 @@ void bpf_jit_compile(struct sk_filter *f
->   	ctx.prog_len = fp->len;
->   	ctx.prog_insns = fp->insns;
->
-> -	__bpf_jit_compile(&ctx);
-> +	__bpf_jit_compile(fp, &ctx);
->   	if (ctx.target)
->   		fp->bpf_func = (void *)ctx.target;
->   }
-> _
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
->
+It has been tested on the Micro2440 board.
+
+Sylwester Nawrocki (9):
+  s3c2410fb: Move platform data declarations to
+    include/linux/platform_data
+  s3c2410fb: Make most of register definitions local
+  ARM: S3C24XX: Remove include/mach/regs-lcd.h header file
+  s3c2410fb: Register single platform driver
+  s3c2410fb: Use dev_pm_ops
+  s3c2410fb: Enable display by default
+  s3c2410fb: Use devm_ioremap_resource()
+  s3c2410fb: Remove redundant platform_set_drvdata()
+  s3c2410fb: Use module parameter instead of a sysfs entry
+
+ arch/arm/mach-s3c24xx/dma-s3c2410.c             |    1 -
+ arch/arm/mach-s3c24xx/dma-s3c2412.c             |    1 -
+ arch/arm/mach-s3c24xx/dma-s3c2440.c             |    1 -
+ arch/arm/mach-s3c24xx/dma-s3c2443.c             |    1 -
+ arch/arm/mach-s3c24xx/include/mach/fb.h         |    1 -
+ arch/arm/mach-s3c24xx/include/mach/regs-lcd.h   |  162 ----------------------
+ arch/arm/mach-s3c24xx/mach-anubis.c             |    1 -
+ arch/arm/mach-s3c24xx/mach-at2440evb.c          |    3 +-
+ arch/arm/mach-s3c24xx/mach-bast.c               |    3 +-
+ arch/arm/mach-s3c24xx/mach-gta02.c              |    2 +-
+ arch/arm/mach-s3c24xx/mach-h1940.c              |    3 +-
+ arch/arm/mach-s3c24xx/mach-jive.c               |    3 +-
+ arch/arm/mach-s3c24xx/mach-mini2440.c           |    3 +-
+ arch/arm/mach-s3c24xx/mach-n30.c                |    3 +-
+ arch/arm/mach-s3c24xx/mach-osiris.c             |    1 -
+ arch/arm/mach-s3c24xx/mach-qt2410.c             |    3 +-
+ arch/arm/mach-s3c24xx/mach-rx1950.c             |    3 +-
+ arch/arm/mach-s3c24xx/mach-smdk2413.c           |    3 +-
+ arch/arm/mach-s3c24xx/mach-smdk2416.c           |    1 -
+ arch/arm/mach-s3c24xx/mach-smdk2440.c           |    3 +-
+ arch/arm/mach-s3c24xx/mach-smdk2443.c           |    3 +-
+ arch/arm/mach-s3c24xx/mach-vstms.c              |    4 +-
+ arch/arm/plat-samsung/devs.c                    |    2 +-
+ arch/arm/plat-samsung/include/plat/fb-s3c2410.h |   72 ----------
+ drivers/video/s3c2410fb.c                       |  165 ++++++-----------------
+ drivers/video/s3c2410fb.h                       |  114 +++++++++++++++-
+ include/linux/platform_data/fb-s3c2410.h        |  106 +++++++++++++++
+ 27 files changed, 272 insertions(+), 396 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c24xx/include/mach/fb.h
+ delete mode 100644 arch/arm/mach-s3c24xx/include/mach/regs-lcd.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/fb-s3c2410.h
+ create mode 100644 include/linux/platform_data/fb-s3c2410.h
+
+-- 
+1.7.4.1
