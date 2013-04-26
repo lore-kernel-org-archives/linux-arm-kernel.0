@@ -1,39 +1,94 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 25 Apr 2013 20:52:07 -0700
-Subject: [PATCH 0/3] WLAN support for omap4 when booted with devicetree
-Message-ID: <20130426034858.26065.65118.stgit@muffinssi.local>
+Date: Thu, 25 Apr 2013 20:52:10 -0700
+Subject: [PATCH 1/3] ARM: OMAP2+: Legacy support for wl12xx when booted with
+ devicetree
+In-Reply-To: <20130426034858.26065.65118.stgit@muffinssi.local>
+References: <20130426034858.26065.65118.stgit@muffinssi.local>
+Message-ID: <20130426035210.26065.39995.stgit@muffinssi.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Without WLAN we cannot switch omap4 to use device tree
+only booting. This patch can be reverted when the
+binding for wl12xx is added.
 
-Here are some patches against linux next to make WLAN to work with
-device tree. Note that we still are initializing wl12xx with pdata,
-but so far it looks like only minimal binding for it is needed.
-
-There are various fixes pending posted recently, but at least the
-fix "[PATCH] mmc: omap_hsmmc: Fix the DT pbias workaround for MMC
-controllers 2 to 5" is needed.
-
-Please test on blaze/sdp if you have a chance, I don't have the
-connectivity card on mine.
-
-Regards,
-
-Tony
-
+Cc: Luciano Coelho <coelho@ti.com>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Rajendra Nayak <rnayak@ti.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
+ arch/arm/mach-omap2/devices.c |   39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-Tony Lindgren (3):
-      ARM: OMAP2+: Legacy support for wl12xx when booted with devicetree
-      ARM: dts: Add muxing for wl12xx on the SDIO bus for pandaboard
-      ARM: dts: Add muxing for wl12xx on the SDIO bus for blaze
-
-
- arch/arm/boot/dts/omap4-panda-common.dtsi |   43 ++++++++++++++++++++++++++++-
- arch/arm/boot/dts/omap4-sdp.dts           |   39 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/devices.c             |   39 ++++++++++++++++++++++++++
- 3 files changed, 119 insertions(+), 2 deletions(-)
-
--- 
-Signature
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index 73762ac..69c520e 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -15,6 +15,7 @@
+ #include <linux/io.h>
+ #include <linux/clk.h>
+ #include <linux/err.h>
++#include <linux/gpio.h>
+ #include <linux/slab.h>
+ #include <linux/of.h>
+ #include <linux/pinctrl/machine.h>
+@@ -22,6 +23,7 @@
+ #include <linux/platform_data/omap_ocp2scp.h>
+ #include <linux/platform_data/mailbox-omap.h>
+ #include <linux/usb/omap_control_usb.h>
++#include <linux/wl12xx.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
+@@ -640,6 +642,40 @@ static void __init omap_init_ocp2scp(void)
+ static inline void omap_init_ocp2scp(void) { }
+ #endif
+ 
++#if IS_ENABLED(CONFIG_WL12XX)
++
++static struct wl12xx_platform_data wl12xx __initdata;
++
++void __init omap_init_wl12xx_of(void)
++{
++	int ret;
++
++	if (!of_have_populated_dt())
++		return;
++
++	if (of_machine_is_compatible("ti,omap4-sdp")) {
++		wl12xx.board_ref_clock = WL12XX_REFCLOCK_26;
++		wl12xx.board_tcxo_clock = WL12XX_TCXOCLOCK_26;
++		wl12xx.irq = gpio_to_irq(53);
++	} else if (of_machine_is_compatible("ti,omap4-panda")) {
++		wl12xx.board_ref_clock = WL12XX_REFCLOCK_38;
++		wl12xx.irq = gpio_to_irq(53);
++	} else {
++		return;
++	}
++
++	ret = wl12xx_set_platform_data(&wl12xx);
++	if (ret) {
++		pr_err("error setting wl12xx data: %d\n", ret);
++		return;
++	}
++}
++#else
++static inline omap_init_wl12xx_of(void)
++{
++}
++#endif
++
+ /*-------------------------------------------------------------------------*/
+ 
+ static int __init omap2_init_devices(void)
+@@ -664,6 +700,9 @@ static int __init omap2_init_devices(void)
+ 		omap_init_mcspi();
+ 		omap_init_sham();
+ 		omap_init_aes();
++	} else {
++		/* These can be removed when bindings are done */
++		omap_init_wl12xx_of();
+ 	}
+ 	omap_init_sti();
+ 	omap_init_rng();
