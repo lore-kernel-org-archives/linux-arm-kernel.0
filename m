@@ -1,98 +1,84 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Fri, 26 Apr 2013 19:02:16 +0530
-Subject: [PATCH] arm64: KVM: Add kvm_target_timer_irq() for arch_timer
-Message-ID: <1366983136-11147-1-git-send-email-anup.patel@linaro.org>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 26 Apr 2013 15:38:20 +0200
+Subject: [PATCH 03/14] sched: pack small tasks
+In-Reply-To: <20130426123827.GB13464@dyad.programming.kicks-ass.net>
+References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
+ <1366910611-20048-4-git-send-email-vincent.guittot@linaro.org>
+ <20130426123827.GB13464@dyad.programming.kicks-ass.net>
+Message-ID: <CAKfTPtBe1Qu7mtao-i=MZj_c2ZBOk-3q7brn5fjx3_feQB4-GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds kvm_target_timer_irq() for KVM ARM64 which determines guest virtual timer ppi number based on vcpu target type.
+On 26 April 2013 14:38, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Thu, Apr 25, 2013 at 07:23:19PM +0200, Vincent Guittot wrote:
+>
+>> +static bool is_buddy_busy(int cpu)
+>> +{
+>> +     struct rq *rq = cpu_rq(cpu);
+>> +     u32 sum = rq->avg.runnable_avg_sum;
+>> +     u32 period = rq->avg.runnable_avg_period;
+>> +
+>> +     /*
+>> +      * If a CPU accesses the runnable_avg_sum and runnable_avg_period
+>> +      * fields of its buddy CPU while the latter updates it, it can get the
+>> +      * new version of a field and the old version of the other one. This
+>> +      * can generate erroneous decisions. We don't want to use a lock
+>> +      * mechanism for ensuring the coherency because of the overhead in
+>> +      * this critical path.
+>> +      * The runnable_avg_period of a runqueue tends to the max value in
+>> +      * less than 345ms after plugging a CPU, which implies that we could
+>> +      * use the max value instead of reading runnable_avg_period after
+>> +      * 345ms. During the starting phase, we must ensure a minimum of
+>> +      * coherency between the fields. A simple rule is runnable_avg_sum <=
+>> +      * runnable_avg_period.
+>> +      */
+>> +     sum = min(sum, period);
+>> +
+>> +     /*
+>> +      * A busy buddy is a CPU with a high load or a small load with a lot of
+>> +      * running tasks.
+>> +      */
+>> +     return (sum > (period / (rq->nr_running + 2)));
+>> +}
+>
+>
+> I'm still not sold on the entire nr_running thing and the comment doesn't say
+> why you're doing it.
 
-The patch also updates kvm_vcpu_reset() so that arch_timer is resetted on every vcpu reset.
+The main goal is really to minimize the scheduling latency of tasks.
+If the cpu already has dozens of task in its runqueue the scheduling
+latency can become quite huge. In this case it's worth using another
+core
 
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
----
- arch/arm64/include/asm/kvm_host.h |    1 +
- arch/arm64/kvm/guest.c            |   17 +++++++++++++++++
- arch/arm64/kvm/reset.c            |   13 +++++++++++++
- 3 files changed, 31 insertions(+)
+>
+> I'm fairly sure there's software out there that wakes a gazillion threads at a
+> time only for a gazillion-1 to go back to sleep immediately. Patterns like that
+> completely defeat your heuristic.
+>
+> Does that matter... I don't know.
+>
+> What happens if you keep this thing simple and only put a cap on utilization
+> (say 80%) and drop the entire nr_running magic? Have you seen it make an actual
+> difference or did it just seem like a good (TM) thing to do?
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 77eec44..23e185d 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -43,6 +43,7 @@
- 
- struct kvm_vcpu;
- int kvm_target_cpu(void);
-+struct kvm_irq_level *kvm_target_timer_irq(struct kvm_vcpu *vcpu);
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
- int kvm_arch_dev_ioctl_check_extension(long ext);
- 
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 8dc349b..ac9ec08 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -36,6 +36,11 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
- 	{ NULL }
- };
- 
-+static struct kvm_irq_level target_cortex_a57_timer_irq = {
-+	.irq = 27,
-+	.level = 1,
-+};
-+
- int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
- {
- 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
-@@ -224,6 +229,18 @@ int __attribute_const__ kvm_target_cpu(void)
- 	}
- }
- 
-+struct kvm_irq_level *kvm_target_timer_irq(struct kvm_vcpu *vcpu)
-+{
-+	switch (vcpu->arch.target) {
-+	case KVM_ARM_TARGET_AEM_V8:
-+	case KVM_ARM_TARGET_FOUNDATION_V8:
-+	case KVM_ARM_TARGET_CORTEX_A57:
-+		return &target_cortex_a57_timer_irq;
-+	default:
-+		return NULL;
-+	};
-+}
-+
- int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
- 			const struct kvm_vcpu_init *init)
- {
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 64e0740..45f1f10 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -28,6 +28,14 @@
- #include <asm/kvm_arm.h>
- #include <asm/kvm_coproc.h>
- 
-+#ifdef CONFIG_KVM_ARM_TIMER
-+/*
-+ * We cannont directly include arm/include/asm/kvm_arch_timer.h here so,
-+ * forward declaring required functions
-+ */
-+extern int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu);
-+#endif
-+
- /*
-  * ARMv8 Reset Values
-  */
-@@ -95,5 +103,10 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	/* Reset system registers */
- 	kvm_reset_sys_regs(vcpu);
- 
-+#ifdef CONFIG_KVM_ARM_TIMER
-+	/* Reset arch_timer context */
-+	return kvm_timer_vcpu_reset(vcpu);
-+#else
- 	return 0;
-+#endif
- }
--- 
-1.7.9.5
+It was a efficient way
+
+>
+>> +static bool is_light_task(struct task_struct *p)
+>> +{
+>> +     /* A light task runs less than 20% in average */
+>> +     return ((p->se.avg.runnable_avg_sum  * 5) <
+>> +                     (p->se.avg.runnable_avg_period));
+>> +}
+>
+> There superfluous () and ' ' in there. Also why 20%.. seemed like a good
+> number? Do we want a SCHED_DEBUG sysctl for that?
+
+I have chosen 20% because it will ensure that the packing mechanism
+will only apply on tasks that match the 2 following conditions:
+- less than 10 ms during the last single run
+- and for those tasks less than 20% of the time in average
+
+These tasks are nearly never catch by the periodic load balance and
+they are so small that the overall scheduling latency is nearly not
+impacted while the cpu is not too busy
