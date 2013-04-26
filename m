@@ -1,46 +1,106 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 26 Apr 2013 17:10:12 +0100
-Subject: [PATCH v8 1/2] arm: introduce psci_smp_ops
-In-Reply-To: <alpine.DEB.2.02.1304261630110.4180@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
- <1366828819-10745-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130425084711.GA12848@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1304251104090.4180@kaball.uk.xensource.com>
- <20130425104508.GG12848@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1304251054420.1258@syhkavp.arg>
- <alpine.DEB.2.02.1304261630110.4180@kaball.uk.xensource.com>
-Message-ID: <20130426161012.GH30858@mudshark.cambridge.arm.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 26 Apr 2013 18:27:44 +0200
+Subject: [PATCH 3/6] ARM: shmobile: sh73a0: remove "0x" prefix from DT node
+ names
+In-Reply-To: <1366993667-23294-1-git-send-email-g.liakhovetski@gmx.de>
+References: <1366993667-23294-1-git-send-email-g.liakhovetski@gmx.de>
+Message-ID: <1366993667-23294-4-git-send-email-g.liakhovetski@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 26, 2013 at 04:36:26PM +0100, Stefano Stabellini wrote:
-> On Thu, 25 Apr 2013, Nicolas Pitre wrote:
-> > On Thu, 25 Apr 2013, Will Deacon wrote:
-> > > I disagree. You're explicitly stating that we pass the `cpuid of target CPU,
-> > > as from MPIDR'. That's simply not true -- the firmware could choose any
-> > > numbering scheme to identify the CPUs. For KVM and Xen, it *is* the mpidr,
-> > > which is why psci-smp.c works at all, but that's where the comment belongs,
-> > > not in this header file.
-> > 
-> > At some point, the _kernel_ API for interfacing with the firmware's PSCI 
-> > will have to ensure uniformity somehow.  The PSCI interface code could 
-> > translate the passed MPIDR into whatever the firmware decided to use for 
-> > identifying CPUs if needed, keeping this issue localized.
-> 
-> That is what I had in mind when I said to keep the comment in psci.h
-> before.
-> We have to draw the line somewhere to expose a uniform internal kernel
-> API. However it is a bit difficult to do now given that we have only one
-> user of the API.
+The convention for Device Tree node names is <device>@<hex-address>, where
+the part after '@' shouldn't contain the "0x" prefix. Fix the sh73a0.dtsi
+DT names.
 
-I see psci.h as representing the firmware interface, and psci-smp.c or
-whatever sits on top as exposing the kernel `API'.
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+---
+ arch/arm/boot/dts/sh73a0.dtsi |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
 
-> I don't feel to strongly about this, please let me know what is the
-> final decision and I'll update the code accordingly. I remind you that
-> the merge window is approaching :-)
-
-I'd still like the comment to be in psci-smp.c, or a header separate from
-the firmware bits.
-
-Will
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 039205c..eaa9171 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -155,7 +155,7 @@
+ 		dma-requests = <256>;
+ 	};
+ 
+-	i2c0: i2c at 0xe6820000 {
++	i2c0: i2c at e6820000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+@@ -167,7 +167,7 @@
+ 			      0 170 0x4>;
+ 	};
+ 
+-	i2c1: i2c at 0xe6822000 {
++	i2c1: i2c at e6822000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+@@ -179,7 +179,7 @@
+ 			      0 54 0x4>;
+ 	};
+ 
+-	i2c2: i2c at 0xe6824000 {
++	i2c2: i2c at e6824000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+@@ -191,7 +191,7 @@
+ 			      0 174 0x4>;
+ 	};
+ 
+-	i2c3: i2c at 0xe6826000 {
++	i2c3: i2c at e6826000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+@@ -203,7 +203,7 @@
+ 			      0 186 0x4>;
+ 	};
+ 
+-	i2c4: i2c at 0xe6828000 {
++	i2c4: i2c at e6828000 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "renesas,rmobile-iic";
+@@ -226,7 +226,7 @@
+ 		renesas,event-quality = <3>;
+ 	};
+ 
+-	mmcif: mmcif at 0x10010000 {
++	mmcif: mmcif at e6bd0000 {
+ 		compatible = "renesas,sh-mmcif";
+ 		reg = <0xe6bd0000 0x100>;
+ 		interrupt-parent = <&gic>;
+@@ -236,7 +236,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	sdhi0: sdhi at 0xee100000 {
++	sdhi0: sdhi at ee100000 {
+ 		compatible = "renesas,r8a7740-sdhi";
+ 		reg = <0xee100000 0x100>;
+ 		interrupt-parent = <&gic>;
+@@ -248,7 +248,7 @@
+ 	};
+ 
+ 	/* SDHI1 and SDHI2 have no CD pins, no need for CD IRQ */
+-	sdhi1: sdhi at 0xee120000 {
++	sdhi1: sdhi at ee120000 {
+ 		compatible = "renesas,r8a7740-sdhi";
+ 		reg = <0xee120000 0x100>;
+ 		interrupt-parent = <&gic>;
+@@ -259,7 +259,7 @@
+ 		status = "disabled";
+ 	};
+ 
+-	sdhi2: sdhi at 0xee140000 {
++	sdhi2: sdhi at ee140000 {
+ 		compatible = "renesas,r8a7740-sdhi";
+ 		reg = <0xee140000 0x100>;
+ 		interrupt-parent = <&gic>;
+-- 
+1.7.2.5
