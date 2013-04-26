@@ -1,73 +1,73 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 26 Apr 2013 14:10:36 +0530
-Subject: Multiple issues with omap4 panda es in linux next
-In-Reply-To: <87obd21zlw.fsf@linaro.org>
-References: <20130419171318.GK10155@atomide.com> <517181B2.9070302@ti.com>
- <20130419174454.GM10155@atomide.com> <517184A2.9020908@ti.com>
- <20130419181825.GN10155@atomide.com> <87obd21zlw.fsf@linaro.org>
-Message-ID: <517A3D84.3000605@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 26 Apr 2013 10:49:12 +0200
+Subject: [PATCH] pinctrl: document the "GPIO mode" pitfall
+In-Reply-To: <1761651.lXztZzrj1S@avalon>
+References: <1363345636-2006-1-git-send-email-linus.walleij@stericsson.com>
+ <2408684.1bsjMDDzMu@avalon>
+ <CACRpkdag=YTeQH=VjW4fQ+G94REWeURhC=ErJxjmSUuP=pKYbA@mail.gmail.com>
+ <1761651.lXztZzrj1S@avalon>
+Message-ID: <CACRpkdaMdU4DHWULnSB_dvGk8pTRbirL1HVTGqJ2rwqXR798uQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 25 April 2013 07:28 PM, Kevin Hilman wrote:
-> Tony Lindgren <tony@atomide.com> writes:
-> 
->> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130419 10:56]:
->>> On Friday 19 April 2013 11:14 PM, Tony Lindgren wrote:
->>>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130419 10:43]:
->>>>> On Friday 19 April 2013 10:43 PM, Tony Lindgren wrote:
->>>>>> Hi all,
->>>>>>
->>>>>> Here's a list of breakage I've noticed so far while trying to
->>>>>> use linux next on my pandaboard es. Probably similar issues exist
->>>>>> on other boards as well.
->>>>>>
->>>>>> Ideally we would not have any breakage by the merge window, so
->>>>>> let's try to get these fixed ASAP:
->>>>>>
->>>>>> 1. Serial console broken on panda es booting with DT
->>>>>>
->>>>>> The symptoms are dmesg output stopping after few lines
->>>>>> and only continuing after pressing a key. Does not seem to
->>>>>> happen on blaze with DT for some reason. And does not happen
->>>>>> on panda es with legacy booting.
->>>>>>
->>>>> This one is known and reported on list along with fix patches and
->>>>> later pull request [1].
->>>>>
->>>>> Unfortunately with all the testing and everything and patches have
->>>>> been on the list for quite some time, feedback on one of the patch
->>>>> received was after pull request and then there was no further
->>>>> clarification. That series address the same exact issue you have
->>>>> mentioned above.
->>>>
->>>> OK thanks. I think Paul picked some of those and the plan was
->>>> to update the branch? Which one(s) should go into v3.10 as fixes?
->>>>
->>> Main in that series was to handle driver sysc handling withing hwmod
->>> layer and that is where the series got stuck [2]. Without that support
->>> other patches won't fix the issue.
->>
->> OK it seems that that is still ongoing discussion. For v3.10 we should
->> probably just disable PM for omap4 for DT booting so people can use
->> it for DT related development.
-> 
-> Disabling PM (and even avoiding WFI using 'nohlt') will not fix this
-> problem, since it's related to the idle-mode of the IP block itself.
-> 
-> What fixes the problem is the series from Santosh for the SYSC removal.
-> 
-> Santosh, it seems that series combined a fix for this problem with some
-> cleanup of the hwmod code that Paul had some concerns with.  Is there
-> any chance you can split up that series into a fix targetted at the
-> DT-boot UART problem and a feature cleanup for hwmod?
-> 
-> Then we hopefully get this fix into v3.10-rc and work on the hwmod
-> changes/cleanup for the following merge window.
-> 
-That was just one patch which was added so that UART async wakeup
-works. Rajendra is cleaning up that patch and post an updated
-series which hopefully make the console issue go away.
+On Fri, Apr 26, 2013 at 1:15 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Thursday 25 April 2013 23:39:18 Linus Walleij wrote:
+>> On Tue, Apr 23, 2013 at 3:33 PM, Laurent Pinchart wrote:
 
-Regards,
-Santosh
+>> > Could you clarify the exact scope of the two configuration parameters ?
+>>
+>> PIN_CONFIG_OUTPUT is left a bit unspecified, but here the idea was a passive
+>> drive, like just connecting the pin to VDD or GND without any driver stage
+>> at all.
+>
+> Isn't that a driver stage ? :-)
+
+OK something that is not a totempole type drive ...
+push/pull surely implies a totempole type design.
+
+> What is unclear to me is the interaction between OUTPUT and DRIVE_*.
+> That's the part I would like to see clarified.
+
+I sent some patch now, check it ... hm reported-by still doesn't add
+you to CC :-/ better patch git-send-email...
+
+> Does DRIVE_* imply that the pin
+> is driven by the selected function, and OUTPUT imply that the pin is driven to
+> a fixed level ?
+
+That is unclear, but I suggest DRIVE* implies that everything on the pin
+is driven according to that configuration. (Else it is getting ignored...)
+
+OUTPUT would be used when you don't know the particulars or when
+the driving cannot be controlled in a fine-grained manner like with the
+DRIVE* configs.
+
+Does this make sense?
+
+> If so, how do you configure the drive type of a pin that will
+> be used through the GPIO API ?
+
+It is possible to use the pinctrl and GPIO APIs orthogonally.
+
+For example the pinctrl can use hogs to reconfigure the pins
+during sleep without intervention from the GPIO API.
+
+So they will be fingering on the same pins registers.
+Maybe even the same register (if access can be protected
+properly) from different APIs.
+
+> What about cases where I want to drive the pin
+> to a fixed level in a non low-power output mode (for instance because I need
+> more current that what the low-power output mode provides) ?
+
+Just use pinconfig for that?
+
+Is the usecase something like a power-supplying GPIO pin
+and then sometimes you want to provide more power from it?
+
+Then use pinconfig to shunt in the driver stages, and GPIO API
+to enable/disable it.
+
+Yours,
+Linus Walleij
