@@ -1,60 +1,48 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Fri, 26 Apr 2013 16:31:24 -0500
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <CACRpkdaA_7Feuui-S65m--2FfvpoUkfn6b9SoWavAstZUS23ag@mail.gmail.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <515319D5.20105@wwwdotorg.org>
- <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
- <5155C902.7080207@wwwdotorg.org>
- <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
- <5165CB9D.1090202@wwwdotorg.org>
- <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
- <51671D7B.5060303@wwwdotorg.org>
- <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
- <51673D70.3010503@wwwdotorg.org>
- <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
- <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
- <516C31C3.9040505@wwwdotorg.org> <516C7C43.3040105@wwwdotorg.org>
- <516C8760.2050500@ti.com> <516D9B05.1000501@wwwdotorg.org>
- <516DA60A.5070000@ti.com> <516DCCA8.3070108@wwwdotorg.org>
- <516DDB4D.9020500@ti.com>
- <CAAwP0s0-VNUoeSKaGbvoDeD7m7kZRdp5rCJ7iVpFoFAaQtXcmQ@mail.gmail.com>
- <CACRpkdaA_7Feuui-S65m--2FfvpoUkfn6b9SoWavAstZUS23ag@mail.gmail.com>
-Message-ID: <517AF22C.9090901@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 26 Apr 2013 16:32:32 -0500
+Subject: [PATCH V3] of: Set the DMA mask to 64 bits when dma_addr_t is
+ 64-bits
+In-Reply-To: <1367008266-1431-1-git-send-email-lauraa@codeaurora.org>
+References: <1367008266-1431-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <517AF270.8040106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 04/26/2013 02:31 AM, Linus Walleij wrote:
-> On Wed, Apr 17, 2013 at 2:41 AM, Javier Martinez Canillas
-> <martinez.javier@gmail.com> wrote:
+On 04/26/2013 03:31 PM, Laura Abbott wrote:
+> Currently, of_platform_device_create_pdata always sets the
+> coherent DMA mask to 32 bits. On ARM systems without CONFIG_ZONE_DMA,
+> arm_dma_limit gets set to ~0 or 0xFFFFFFFFFFFFFFFF on LPAE based
+> systems. Since arm_dma_limit represents the smallest dma_mask
+> on the system, the default of 32 bits prevents any dma_coherent
+> allocation from succeeding unless clients manually set the
+> dma mask first. Rather than make every client on an LPAE system set
+> the mask manually, account for the size of dma_addr_t when setting
+> the coherent mask.
 > 
-> So:
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  drivers/of/platform.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
->> +static int omap_gpio_irq_domain_xlate(struct irq_domain *d,
->> +                                     struct device_node *ctrlr,
->> +                                     const u32 *intspec, unsigned int intsize,
->> +                                     irq_hw_number_t *out_hwirq,
->> +                                     unsigned int *out_type)
->> +{
->> +       int ret;
->> +       struct gpio_bank *bank = d->host_data;
->> +       int gpio = bank->chip.base + intspec[0];
->> +
->> +       if (WARN_ON(intsize < 2))
->> +               return -EINVAL;
->> +
->> +       ret = gpio_request_one(gpio, GPIOF_IN, ctrlr->full_name);
->> +       if (ret)
->> +               return ret;
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 0970505..5f0ba94 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -214,7 +214,7 @@ struct platform_device *of_platform_device_create_pdata(
+>  #if defined(CONFIG_MICROBLAZE)
+>  	dev->archdata.dma_mask = 0xffffffffUL;
+>  #endif
+> -	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> +	dev->dev.coherent_dma_mask = DMA_BIT_MASK(sizeof(dma_addr_t) * 8);
+
+This is going to change the mask from 32 to 64 bits on 64-bit powerpc
+and others possibly. Maybe it doesn't matter. I think it doesn't, but
+I'm not sure enough to apply for 3.10. So I'll queue it for 3.11.
+
+Rob
+
+
+>  	dev->dev.bus = &platform_bus_type;
+>  	dev->dev.platform_data = platform_data;
+>  
 > 
-> So how to figure out if a device is already requesting this GPIO
-> on some orthogonal axis?
-
-I really don't think that is necessary. Hopefully, my other email [1]
-elaborates on why. Let me know if this makes sense.
-
-Cheers
-Jon
-
-[1] http://marc.info/?l=linux-arm-kernel&m=136701158117966&w=1
