@@ -1,33 +1,31 @@
-From: coelho@ti.com (Luciano Coelho)
-Date: Fri, 26 Apr 2013 14:16:26 +0300
-Subject: [PATCH 1/3] ARM: OMAP2+: Legacy support for wl12xx when booted
- with devicetree
-In-Reply-To: <1366974032.4029.31.camel@cumari.coelho.fi>
-References: <20130426034858.26065.65118.stgit@muffinssi.local>
- <20130426035210.26065.39995.stgit@muffinssi.local>
- <0104F687-1726-476D-B2DF-7E72223B127A@dominion.thruhere.net>
- <1366974032.4029.31.camel@cumari.coelho.fi>
-Message-ID: <1366974986.4029.32.camel@cumari.coelho.fi>
+From: agraf@suse.de (Alexander Graf)
+Date: Fri, 26 Apr 2013 13:19:50 +0200
+Subject: [PATCH 0/2] Early printk support for virtio console devices.
+In-Reply-To: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
+References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
+Message-ID: <BA2076A6-0688-4E5C-85F9-A9CA8FD75782@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-04-26 at 14:00 +0300, Luciano Coelho wrote:
-> Hi Koen,
-> 
-> On Fri, 2013-04-26 at 11:33 +0200, Koen Kooi wrote:
-> > Op 26 apr. 2013, om 05:52 heeft Tony Lindgren <tony@atomide.com> het volgende geschreven:
-> > 
-> > > Without WLAN we cannot switch omap4 to use device tree
-> > > only booting. This patch can be reverted when the
-> > > binding for wl12xx is added.
-> > 
-> > How much boards am I allowed to add to this? I need to get the wl12xx wifi expansionboards for beagleboard, beagleboard xM and beaglebone working with DT :)
-> 
-> Do you know where I can get a wl12xx wifi expansion board for
-> beaglebone?
 
-Uhmmm, never mind.  I somehow thought this was with the WiLink 8 chip,
-but you said wl12xx, so it's not. ;)
+On 26.04.2013, at 13:04, Pranavkumar Sawargaonkar wrote:
 
--- 
-Luca.
+> This patch-set implements early printk support for virtio console devices without using any hypercalls.
+> 
+> The current virtio early printk code in kernel expects that hypervisor will provide some mechanism generally a hypercall to support early printk. This patch-set does not break existing hypercall based early print support.
+> 
+> This implementation adds:
+> 1. Early writeonly register named early_wr in virtio console's config space.
+> 2. Host feature flags namely VIRTIO_CONSOLE_F_EARLY_WRITE for telling guest about early-write capability in console device.
+> 
+> Early write mechanism:
+> 1. When a guest wants to out some character, it has to simply write the character to early_wr register in config space of virtio console device.
+
+I won't nack this patch set, but I'll definitely express that I'm not happy with it.
+
+MMIO registers are handled by a different layer than the virtio console itself. After the virtio refactoring in QEMU, they will be completely separate drivers. So we'll be in a similar mess with early printk as we are on the s390-virtio machine, where early printk is done through hypercalls and thus we can't directly link it to the console output.
+
+I still don't see what the issue is with just implementing a small irq-less virtio driver for early printk.
+
+
+Alex
