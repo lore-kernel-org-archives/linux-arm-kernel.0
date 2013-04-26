@@ -1,33 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 26 Apr 2013 08:51:38 -0700
-Subject: [PATCH 1/3] ARM: OMAP2+: Legacy support for wl12xx when booted
- with devicetree
-In-Reply-To: <0104F687-1726-476D-B2DF-7E72223B127A@dominion.thruhere.net>
-References: <20130426034858.26065.65118.stgit@muffinssi.local>
- <20130426035210.26065.39995.stgit@muffinssi.local>
- <0104F687-1726-476D-B2DF-7E72223B127A@dominion.thruhere.net>
-Message-ID: <20130426155138.GB29360@atomide.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 26 Apr 2013 16:36:37 +0100
+Subject: [PATCH v8 2/2] ARM: Enable selection of SMP operations at boot
+ time
+In-Reply-To: <alpine.LFD.2.03.1304251040430.1258@syhkavp.arg>
+References: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
+ <1366828819-10745-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130425084933.GB12848@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1304251040430.1258@syhkavp.arg>
+Message-ID: <alpine.DEB.2.02.1304261629300.4180@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Koen Kooi <koen@dominion.thruhere.net> [130426 02:39]:
+On Thu, 25 Apr 2013, Nicolas Pitre wrote:
+> On Thu, 25 Apr 2013, Will Deacon wrote:
 > 
-> Op 26 apr. 2013, om 05:52 heeft Tony Lindgren <tony@atomide.com> het volgende geschreven:
+> > On Wed, Apr 24, 2013 at 07:40:19PM +0100, Stefano Stabellini wrote:
+> > > From: Jon Medhurst <tixy@linaro.org>
+> > > 
+> > > Add a new 'smp_init' hook to machine_desc so platforms can specify a
+> > > function to be used to setup smp ops instead of having a statically
+> > > defined value.  The hook must return true when smp_ops are initialized.
+> > > If false the static mdesc->smp_ops will be used by default.
+> > > 
+> > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > > ---
+> > >  arch/arm/include/asm/mach/arch.h |    4 ++++
+> > >  arch/arm/kernel/setup.c          |   10 ++++++----
+> > >  2 files changed, 10 insertions(+), 4 deletions(-)
+> > 
+> > [...]
+> > 
+> > >  	if (is_smp()) {
+> > > -		if (psci_smp_available())
+> > > -			smp_set_ops(&psci_smp_ops);
+> > > -		else if (mdesc->smp)
+> > > -			smp_set_ops(mdesc->smp);
+> > > +		if (!mdesc->smp_init || !mdesc->smp_init()) {
+> > 
+> > Minor nit, but this feels backwards to me. We usually return 0 on success,
+> > yet we're saying here that if mdesc->smp_init() returns 0, then we go and
+> > override the smp ops.
 > 
-> > Without WLAN we cannot switch omap4 to use device tree
-> > only booting. This patch can be reverted when the
-> > binding for wl12xx is added.
-> 
-> How much boards am I allowed to add to this? I need to get the wl12xx wifi expansionboards for beagleboard, beagleboard xM and beaglebone working with DT :)
+> It doesn't return 0, but true or false.  So, semantically, if ->smp_init 
+> returns false, that means it didn't initialize anything.
 
-As long as it's trivial changes, go for it. It will be
-gone after we have the binding for wl12xx.
-
-But let's not add the bluetooth serial port hack.. And
-let's not churn the board-*.c files, at this point pretty
-much the next step is to start dropping the board-*.c
-files.
-
-Regards,
-
-Tony
+In absence of other comments, I am going to leave as it is now.
