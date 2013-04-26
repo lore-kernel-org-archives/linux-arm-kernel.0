@@ -1,26 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 26 Apr 2013 21:52:00 +0100
-Subject: [PATCH V3] of: Set the DMA mask to 64 bits when dma_addr_t is
- 64-bits
-In-Reply-To: <1367008266-1431-1-git-send-email-lauraa@codeaurora.org>
-References: <1367008266-1431-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20130426205159.GA48325@MacBook-Pro.local>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Fri, 26 Apr 2013 14:07:02 -0700
+Subject: [PATCH v4 5/7] ARM: KVM: rework HYP page table freeing
+In-Reply-To: <517AAF3F.20500@arm.com>
+References: <1365790327-2138-1-git-send-email-marc.zyngier@arm.com>
+ <1365790327-2138-6-git-send-email-marc.zyngier@arm.com>
+ <20130426110558.GE5007@localhost.cambridge.arm.com>
+ <517AAF3F.20500@arm.com>
+Message-ID: <CAEDV+gKZezvHtRAySvGpOgTsPPtwUEYo9v086U=Hz4QPZXGVSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 26, 2013 at 09:31:06PM +0100, Laura Abbott wrote:
-> Currently, of_platform_device_create_pdata always sets the
-> coherent DMA mask to 32 bits. On ARM systems without CONFIG_ZONE_DMA,
-> arm_dma_limit gets set to ~0 or 0xFFFFFFFFFFFFFFFF on LPAE based
-> systems. Since arm_dma_limit represents the smallest dma_mask
-> on the system, the default of 32 bits prevents any dma_coherent
-> allocation from succeeding unless clients manually set the
-> dma mask first. Rather than make every client on an LPAE system set
-> the mask manually, account for the size of dma_addr_t when setting
-> the coherent mask.
-> 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-
-Looks good.
-
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+On Fri, Apr 26, 2013 at 9:45 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 26/04/13 12:05, Catalin Marinas wrote:
+>> On Fri, Apr 12, 2013 at 07:12:05PM +0100, Marc Zyngier wrote:
+>>> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+>>> index bfc5927..7464824 100644
+>>> --- a/arch/arm/kvm/mmu.c
+>>> +++ b/arch/arm/kvm/mmu.c
+>> ...
+>>> +static void clear_pmd_entry(pmd_t *pmd)
+>>> +{
+>>> +    pte_t *pte_table = pte_offset_kernel(pmd, 0);
+>>> +    pmd_clear(pmd);
+>>> +    pte_free_kernel(NULL, pte_table);
+>>> +    put_page(virt_to_page(pmd));
+>>> +}
+>> ...
+>>>  static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>>
+>> Is there a chance that this function (or the other unmapping function
+>> for Hyp pages) is called on an active stage 2 table (VTTBR pointing to
+>> this pgd)? If yes, than you probably have to follow the mmu_gather
+>> mechanism of freeing page table pages to avoid speculative loads.
+>> Basically flushing the TLB between pmd_clear and pte_free_kernel.
+>
+> Blah. You're right, we got it wrong.
+>
+> We need to move our TLB invalidation out of kvm_unmap_hva_handler, and
+> put it in clear_pmd_entry. I'll cook a patch.
+>
+> Thanks for reviewing.
+>
+Ah, because clean_pmd_entry doesn't  flush stage2 TLB, that's the issue?
