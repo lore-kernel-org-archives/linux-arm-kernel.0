@@ -1,100 +1,73 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Fri, 26 Apr 2013 22:02:23 +0200
-Subject: [PATCH 9/9] s3c2410fb: Use module parameter instead of a sysfs entry
-In-Reply-To: <1367006543-5458-1-git-send-email-sylvester.nawrocki@gmail.com>
-References: <1367006543-5458-1-git-send-email-sylvester.nawrocki@gmail.com>
-Message-ID: <1367006543-5458-10-git-send-email-sylvester.nawrocki@gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 26 Apr 2013 13:09:48 -0700
+Subject: [PATCH V3 2/3] ARM: net: bpf_jit: make code generation less
+ dependent on struct sk_filter.
+In-Reply-To: <517AD9E2.2090704@redhat.com>
+References: <1366824429-26652-1-git-send-email-nschichan@freebox.fr>
+ <1366824429-26652-3-git-send-email-nschichan@freebox.fr>
+ <3592414.M8kQZLCXlW@wuerfel>
+ <20130426122601.10ec05fcb4860df1b0a5b409@linux-foundation.org>
+ <517AD9E2.2090704@redhat.com>
+Message-ID: <20130426130948.cbfd2f6256afc0e3ee7abeed@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use module parameter to set debug level instead of a sysfs
-entry. Replace pr_debug() with pr_info() so we can actually
-control the debug traces without DYNAMIC_PRINTK. This fixes
-a sort of regression introduced in commit 81c1655811e941af2
-video: s3c2410: Use pr_* and dev_* instead of printk
+On Fri, 26 Apr 2013 21:47:46 +0200 Daniel Borkmann <dborkman@redhat.com> wrote:
 
-Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
----
- drivers/video/s3c2410fb.c |   48 +++++++-------------------------------------
- 1 files changed, 8 insertions(+), 40 deletions(-)
+> On 04/26/2013 09:26 PM, Andrew Morton wrote:
+> > On Fri, 26 Apr 2013 16:04:44 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
+> >> On Wednesday 24 April 2013 19:27:08 Nicolas Schichan wrote:
+> >>> @@ -858,7 +858,7 @@ b_epilogue:
+> >>>   }
+> >>>
+> >>>
+> >>> -void bpf_jit_compile(struct sk_filter *fp)
+> >>> +static void __bpf_jit_compile(struct jit_ctx *out_ctx)
+> >>>   {
+> >>>          struct jit_ctx ctx;
+> >>>          unsigned tmp_idx;
+> >>> @@ -867,11 +867,10 @@ void bpf_jit_compile(struct sk_filter *fp)
+> >>>          if (!bpf_jit_enable)
+> >>>                  return;
+> >>>
+> >>> -       memset(&ctx, 0, sizeof(ctx));
+> >>> -       ctx.skf         = fp;
+> >>> +       ctx = *out_ctx;
+> >>>          ctx.ret0_fp_idx = -1;
+> >>>
+> >>> -       ctx.offsets = kzalloc(4 * (ctx.skf->len + 1), GFP_KERNEL);
+> >>> +       ctx.offsets = kzalloc(4 * (ctx.prog_len + 1), GFP_KERNEL);
+> >>>          if (ctx.offsets == NULL)
+> >>>                  return;
+> >>>
+> >>> @@ -921,13 +920,26 @@ void bpf_jit_compile(struct sk_filter *fp)
+> >>>                  print_hex_dump(KERN_INFO, "BPF JIT code: ",
+> >>>                                 DUMP_PREFIX_ADDRESS, 16, 4, ctx.target,
+> >>>                                 alloc_size, false);
+> >>> -
+> >>> -       fp->bpf_func = (void *)ctx.target;
+> >>>   out:
+> >>>          kfree(ctx.offsets);
+> >>> +
+> >>> +       *out_ctx = ctx;
+> >>>          return;
+> >>
+> >> This part of the patch, in combination with 79617801e "filter: bpf_jit_comp:
+> >> refactor and unify BPF JIT image dump output" is now causing build errors
+> >> in linux-next:
+> >>
+> >> arch/arm/net/bpf_jit_32.c: In function '__bpf_jit_compile':
+> >> arch/arm/net/bpf_jit_32.c:930:16: error: 'fp' undeclared (first use in this function)
+> >>     bpf_jit_dump(fp->len, alloc_size, 2, ctx.target);
+> >
+> > Thanks, I did this.  There may be a smarter way...
+> 
+> I think also seccomp_jit_compile() would need this change then, otherwise the build
+> with CONFIG_SECCOMP_FILTER_JIT might break.
 
-diff --git a/drivers/video/s3c2410fb.c b/drivers/video/s3c2410fb.c
-index 0439ed0..c2ee75a 100644
---- a/drivers/video/s3c2410fb.c
-+++ b/drivers/video/s3c2410fb.c
-@@ -46,10 +46,13 @@ static int debug	= 1;
- static int debug;
- #endif
- 
--#define dprintk(msg...) \
--do { \
--	if (debug) \
--		pr_debug(msg); \
-+module_param(debug, int, 0644);
-+MODULE_PARM_DESC(debug, "Debug level (0-1)");
-+
-+#define dprintk(msg...)		\
-+do { 				\
-+	if (debug)		\
-+		pr_info(msg);	\
- } while (0)
- 
- /* useful functions */
-@@ -584,36 +587,6 @@ static int s3c2410fb_blank(int blank_mode, struct fb_info *info)
- 	return 0;
- }
- 
--static int s3c2410fb_debug_show(struct device *dev,
--				struct device_attribute *attr, char *buf)
--{
--	return snprintf(buf, PAGE_SIZE, "%s\n", debug ? "on" : "off");
--}
--
--static int s3c2410fb_debug_store(struct device *dev,
--				 struct device_attribute *attr,
--				 const char *buf, size_t len)
--{
--	if (len < 1)
--		return -EINVAL;
--
--	if (strnicmp(buf, "on", 2) == 0 ||
--	    strnicmp(buf, "1", 1) == 0) {
--		debug = 1;
--		dev_dbg(dev, "s3c2410fb: Debug On");
--	} else if (strnicmp(buf, "off", 3) == 0 ||
--		   strnicmp(buf, "0", 1) == 0) {
--		debug = 0;
--		dev_dbg(dev, "s3c2410fb: Debug Off");
--	} else {
--		return -EINVAL;
--	}
--
--	return len;
--}
--
--static DEVICE_ATTR(debug, 0666, s3c2410fb_debug_show, s3c2410fb_debug_store);
--
- static struct fb_ops s3c2410fb_ops = {
- 	.owner		= THIS_MODULE,
- 	.fb_check_var	= s3c2410fb_check_var,
-@@ -962,17 +935,12 @@ static int s3c2410fb_probe(struct platform_device *pdev)
- 		goto free_cpufreq;
- 	}
- 
--	/* create device files */
--	ret = device_create_file(&pdev->dev, &dev_attr_debug);
--	if (ret)
--		dev_err(&pdev->dev, "failed to add debug attribute\n");
--
- 	dev_info(&pdev->dev, "fb%d: %s frame buffer device\n",
- 		fbinfo->node, fbinfo->fix.id);
- 
- 	return 0;
- 
-- free_cpufreq:
-+free_cpufreq:
- 	s3c2410fb_cpufreq_deregister(info);
- free_video_memory:
- 	s3c2410fb_unmap_video_memory(fbinfo);
--- 
-1.7.4.1
+urgh, that tears it.
+
+> I can fix this up for you if not already applied. I presume it's against
+> linux-next tree?
+
+Yup, please send something.
