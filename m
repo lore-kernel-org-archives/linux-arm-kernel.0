@@ -1,175 +1,90 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 26 Apr 2013 11:47:25 +0200
-Subject: [PATCH V2] ARM: KVM: Allow host virtual timer irq number to be
- different from guest virtual timer irq number
-In-Reply-To: <1366960910-27651-1-git-send-email-anup.patel@linaro.org>
-References: <1366960910-27651-1-git-send-email-anup.patel@linaro.org>
-Message-ID: <3b52361974a390cff0bb0bc26b4a3b54@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 26 Apr 2013 11:00:02 +0100
+Subject: [PATCH] of: Set the DMA mask to 64 bits on ARM LPAE systems
+In-Reply-To: <51796365.5030405@codeaurora.org>
+References: <1366764649-10342-1-git-send-email-lauraa@codeaurora.org>
+ <20130425133315.GA7157@localhost.cambridge.arm.com>
+ <51796365.5030405@codeaurora.org>
+Message-ID: <20130426100001.GB5007@localhost.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Anup,
-
-On Fri, 26 Apr 2013 12:51:50 +0530, Anup Patel <anup.patel@linaro.org>
-wrote:
-> The arch_timer irq numbers (or PPI number) are implementation dependent
-> so, the host virtual timer irq number can be different from guest
-virtual
-> timer irq number.
+On Thu, Apr 25, 2013 at 06:09:57PM +0100, Laura Abbott wrote:
+> On 4/25/2013 6:33 AM, Catalin Marinas wrote:
+> > On Wed, Apr 24, 2013 at 01:50:49AM +0100, Laura Abbott wrote:
+> >> By default on ARM systems, the coherent DMA mask (lowest
+> >> address) is set to ~0 or 0xFFFFFFFFFFFFFFFF. Currently,
+> >> of_platform_device_create_pdata sets the coherent DMA mask to
+> >> 32 bits. This prevents coherent dma allocations from working by default
+> >> without clients setting the DMA mask. Rather than make every client
+> >> on an LPAE system set the mask, set the mask to a 64 bit value on
+> >> ARM LPAE systems.
+> >>
+> >> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> >> ---
+> >>   drivers/of/platform.c |    4 ++++
+> >>   1 files changed, 4 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> >> index 0970505..18b69c1 100644
+> >> --- a/drivers/of/platform.c
+> >> +++ b/drivers/of/platform.c
+> >> @@ -214,7 +214,11 @@ struct platform_device *of_platform_device_create_pdata(
+> >>   #if defined(CONFIG_MICROBLAZE)
+> >>   	dev->archdata.dma_mask = 0xffffffffUL;
+> >>   #endif
+> >> +#ifdef CONFIG_ARM_LPAE
+> >> +	dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
+> >> +#else
+> >>   	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> >> +#endif
+> >
+> > I wouldn't add CONFIG_ARM_LPAE checks in here, you can use
+> > CONFIG_ARCH_DMA_ADDR_T_64BIT (types.h uses this for the dma_addr_t
+> > definition).
+> >
 > 
-> This patch ensures that host virtual timer irq number is read from DTB
-and
-> guest virtual timer irq is determined based on guest vcpu target type.
-
-One word about communication first: Please keep me cc-ed on anything that
-has to do with with vgic and timers. I'm the author of the code, I intend
-to look after it, and this has some direct impact on the arm64 port. Thank
-you.
-
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-
-Who is the author of this patch? You or Pranavkumar? If it is you, then
-your Signed-off line should be present. If not, then there should be a
-"From:" line at the beginning of the commit message.
-
-> ---
->  arch/arm/include/asm/kvm_host.h |    1 +
->  arch/arm/kvm/arch_timer.c       |   25 ++++++++++++++++++-------
->  arch/arm/kvm/guest.c            |   15 +++++++++++++++
->  3 files changed, 34 insertions(+), 7 deletions(-)
+> I thought about this as well but in arch/arm/mm/mm.h:
 > 
-> diff --git a/arch/arm/include/asm/kvm_host.h
-> b/arch/arm/include/asm/kvm_host.h
-> index 57cb786..cdc0551 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -43,6 +43,7 @@
->  struct kvm_vcpu;
->  u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
->  int kvm_target_cpu(void);
-> +struct kvm_irq_level *kvm_target_timer_irq(struct kvm_vcpu *vcpu);
->  int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
->  void kvm_reset_coprocs(struct kvm_vcpu *vcpu);
->  
-> diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
-> index 49a7516..521cdb9 100644
-> --- a/arch/arm/kvm/arch_timer.c
-> +++ b/arch/arm/kvm/arch_timer.c
-> @@ -30,7 +30,7 @@
->  
->  static struct timecounter *timecounter;
->  static struct workqueue_struct *wqueue;
-> -static struct kvm_irq_level timer_irq = {
-> +static struct kvm_irq_level host_timer_irq = {
->  	.level	= 1,
->  };
->  
-> @@ -65,10 +65,21 @@ static void kvm_timer_inject_irq(struct kvm_vcpu
-*vcpu)
->  {
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->  
-> +	/*
-> +	 * The vcpu timer irq number cannont be determined in 
-> +	 * kvm_timer_vcpu_init() because it is called much before
-> +	 * kvm_vcpu_set_target(). To handle this, we determin
-> +	 * vcpu timer irq number when we inject the vcpu timer irq
-> +	 * first time. 
-> +	 */
-> +	if (!timer->irq) {
-> +		timer->irq = kvm_target_timer_irq(vcpu);
-> +	}
+> #ifdef CONFIG_ZONE_DMA
+> extern phys_addr_t arm_dma_limit;
+> #else
+> #define arm_dma_limit ((phys_addr_t)~0)
+> #endif
 
-Please, not yet another of these. We already have kvm_vcpu_first_run_init
-that collects all the "do this on first vcpu run" kind of thing.
+Russell replied already on the meaning of this variable, so I don't
+think its type is relevant here. It is also used when calling
+dma_contiguous_reserve() which takes a phys_addr_t.
 
->  	timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
->  	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
-> -			    vcpu->arch.timer_cpu.irq->irq,
-> -			    vcpu->arch.timer_cpu.irq->level);
-> +			    timer->irq->irq,
-> +			    timer->irq->level);
->  }
->  
->  static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
-> @@ -163,12 +174,12 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
->  	INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
->  	hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
->  	timer->timer.function = kvm_timer_expire;
-> -	timer->irq = &timer_irq;
-> +	timer->irq = NULL;
->  }
+> arm_dma_limit is explicitly cast to phys_addr_t, which means that 
+> arm_dma_limit will be always be sizeof(phys_addr_t) regardless of 
+> sizeof(dma_addr_t). Is it safe to assume that 
+> CONFIG_ARCH_DMA_ADDR_T_64BIT will always be selected if 
+> sizeof(phys_addr_t) == 8? If not, we've defeated the point of the patch.
 
-So with the above in mind, how about moving the call to
-kvm_timer_vcpu_init into kvm_vcpu_first_run_init, and do the init once and
-for all?
+sizeof(dma_addr_t) <= sizeof(phys_addr_t). I had this discussion with
+Russell when upstreaming the LPAE patches and the conclusion was that
+while the phys_addr_t is 64-bit with LPAE, the dma_addr_t size is a
+feature of the SoC and must be selected independently. However, I think
+with multi-platform support and LPAE enabled, we should probably set the
+dma_addr_t to 64-bit.
 
->  static void kvm_timer_init_interrupt(void *info)
->  {
-> -	enable_percpu_irq(timer_irq.irq, 0);
-> +	enable_percpu_irq(host_timer_irq.irq, 0);
->  }
->  
->  
-> @@ -182,7 +193,7 @@ static int kvm_timer_cpu_notify(struct
-notifier_block
-> *self,
->  		break;
->  	case CPU_DYING:
->  	case CPU_DYING_FROZEN:
-> -		disable_percpu_irq(timer_irq.irq);
-> +		disable_percpu_irq(host_timer_irq.irq);
->  		break;
->  	}
->  
-> @@ -230,7 +241,7 @@ int kvm_timer_hyp_init(void)
->  		goto out;
->  	}
->  
-> -	timer_irq.irq = ppi;
-> +	host_timer_irq.irq = ppi;
->  
->  	err = register_cpu_notifier(&kvm_timer_cpu_nb);
->  	if (err) {
-> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-> index 152d036..d87b05d 100644
-> --- a/arch/arm/kvm/guest.c
-> +++ b/arch/arm/kvm/guest.c
-> @@ -36,6 +36,11 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
->  	{ NULL }
->  };
->  
-> +struct kvm_irq_level target_default_timer_irq = {
-> +	.irq = 27,
-> +	.level = 1,
-> +};
+> Alternatively, should the type of arm_dma_limit be dma_addr_t instead of 
+> phys_addr_t?
 
-Don't call it default, as it is A15 specific. Also make it static.
+arm_dma_limit should be phys_addr_t since this is an address as seen by
+the CPU. dma_addr_t OTOH is a bus address as seen by the device. You can
+in theory have a DMA buffer with physical address beyond 32-bit (from a
+CPU perspective) but with a bus address withing 32-bit as seen by the
+device.
 
->  int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
->  {
->  	return 0;
-> @@ -197,6 +202,16 @@ int __attribute_const__ kvm_target_cpu(void)
->  	}
->  }
->  
-> +struct kvm_irq_level *kvm_target_timer_irq(struct kvm_vcpu *vcpu)
-> +{
-> +	switch (vcpu->arch.target) {
-> +	case KVM_ARM_TARGET_CORTEX_A15:
-> +		return &target_default_timer_irq;
-> +	default:
-> +		return NULL;
+There is some confusion in the kernel (you can google for past
+discussions) around the meaning of the DMA mask. If your RAM starts at
+0, it doesn't matter much and there are several such assumptions in the
+kernel.
 
-And what do you do once you've returned NULL? Let the kernel crash?
-Also, we now have a second path that tests the target (the first one is in
-reset.c
+So I still consider that you should use #ifdef
+CONFIG_ARCH_DMA_ADDR_T_64BIT and select this option on your platform.
 
-Actually, scratch all the above, and move the irq assignment to reset.c.
-It is probably the best place for it.
-
-Thanks,
-
-        M.
 -- 
-Fast, cheap, reliable. Pick two.
+Catalin
