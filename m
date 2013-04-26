@@ -1,31 +1,82 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Fri, 26 Apr 2013 15:49:15 +0200
-Subject: [PATCH 00/10] usb: musb: ux500: pathe the way for Device Tree
- enablement
-In-Reply-To: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
-References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130426134915.GA19558@balto.lan>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 26 Apr 2013 15:56:45 +0200
+Subject: [PATCH 05/23 v2] pinctrl: coh901: add device tree support
+Message-ID: <1366984605-23951-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-On Tue, Apr 23, 2013 at 04:03:04PM +0100, Lee Jones wrote:
-> In this patch-set we firstly ease the burden on data being passed from
-> platform data, then start to build up support to finally enable Device
-> Tree.
+This makes it possible to probe the COH901 pinctrl driver from
+the device tree, and assigned the device tree node in the
+gpio_chip so we can look up cross-references from the device
+tree. Start grabbing the per-port (bank) IRQs by index instead
+of by name so we don't have to look up the IRQs by name going
+forward.
 
-The whole series looks good to me, nice job!!
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Alter the driver to look up IRQ by index.
+- Alter the bindings accordingly.
+---
+ .../devicetree/bindings/gpio/gpio-stericsson-coh901.txt      |  7 +++++++
+ drivers/pinctrl/pinctrl-coh901.c                             | 12 ++++++++++--
+ 2 files changed, 17 insertions(+), 2 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-stericsson-coh901.txt
 
-Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
-
-I was not able to apply the patches though, as I can imagine that there
-are some dependencies with your other dma40 series.  If you can provide a
-tree I would be happy to run some test for both host and device mode.
-I still have a bunch of USB cables and adapters tangled together on my
-desk ready for that.
-
-Fabio
-
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-stericsson-coh901.txt b/Documentation/devicetree/bindings/gpio/gpio-stericsson-coh901.txt
+new file mode 100644
+index 0000000..fd665b4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-stericsson-coh901.txt
+@@ -0,0 +1,7 @@
++ST-Ericsson COH 901 571/3 GPIO controller
++
++Required properties:
++- compatible: Compatible property value should be "stericsson,gpio-coh901"
++- reg: Physical base address of the controller and length of memory mapped
++  region.
++- interrupts: the 0...n interrupts assigned to the different GPIO ports/banks.
+diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
+index 8b7e7bc..4152ca2 100644
+--- a/drivers/pinctrl/pinctrl-coh901.c
++++ b/drivers/pinctrl/pinctrl-coh901.c
+@@ -770,8 +770,7 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
+ 		port->number = portno;
+ 		port->gpio = gpio;
+ 
+-		port->irq = platform_get_irq_byname(pdev,
+-						    port->name);
++		port->irq = platform_get_irq(pdev, portno);
+ 
+ 		dev_dbg(gpio->dev, "register IRQ %d for port %s\n", port->irq,
+ 			port->name);
+@@ -808,6 +807,9 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
+ 	}
+ 	dev_dbg(gpio->dev, "initialized %d GPIO ports\n", portno);
+ 
++#ifdef CONFIG_OF_GPIO
++	gpio->chip.of_node = pdev->dev.of_node;
++#endif
+ 	err = gpiochip_add(&gpio->chip);
+ 	if (err) {
+ 		dev_err(gpio->dev, "unable to add gpiochip: %d\n", err);
+@@ -861,9 +863,15 @@ static int __exit u300_gpio_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct of_device_id u300_gpio_match[] = {
++	{ .compatible = "stericsson,gpio-coh901" },
++	{},
++};
++
+ static struct platform_driver u300_gpio_driver = {
+ 	.driver		= {
+ 		.name	= "u300-gpio",
++		.of_match_table = u300_gpio_match,
+ 	},
+ 	.remove		= __exit_p(u300_gpio_remove),
+ };
 -- 
-Fabio Baltieri
+1.7.11.3
