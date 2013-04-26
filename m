@@ -1,112 +1,65 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 26 Apr 2013 19:01:58 +0200
-Subject: [V2 PATCH] cpuidle: add maintainer entry
-In-Reply-To: <1366974344-26064-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1366974344-26064-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <20130426170158.GA24282@game.jcrosoft.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 26 Apr 2013 18:11:07 +0100
+Subject: [PATCH v3 02/32] arm64: KVM: define HYP and Stage-2 translation
+ page flags
+In-Reply-To: <20130426170152.GD11311@arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-3-git-send-email-marc.zyngier@arm.com>
+ <20130426170152.GD11311@arm.com>
+Message-ID: <517AB52B.7000006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13:05 Fri 26 Apr     , Daniel Lezcano wrote:
-> Currently the cpuidle drivers are spread across the different archs.
+On 26/04/13 18:01, Catalin Marinas wrote:
+> On Mon, Apr 08, 2013 at 05:17:04PM +0100, Marc Zyngier wrote:
+>> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+>> index 75fd13d..acb4ee5 100644
+>> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+>> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+>> @@ -68,6 +69,18 @@
+>>  #define PTE_ATTRINDX_MASK	(_AT(pteval_t, 7) << 2)
+>>  
+>>  /*
+>> + * 2nd stage PTE definitions
+>> + */
+>> +#define PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+>> +#define PTE_S2_RDWR		 (_AT(pteval_t, 2) << 6)   /* HAP[2:1] */
 > 
-> The patch submission for cpuidle are following different path: the cpuidle core
-> code goes to linux-pm, the ARM drivers goes to arm-soc or the SoC specific
-> tree, sh goes through sh arch tree, pseries goes through PowerPC and
-> finally intel goes through Len's tree while acpi_idle goes under linux-pm.
-> 
-> That makes difficult to consolidate the code and to propagate modifications
-> from the cpuidle core to the different drivers.
-> 
-> Hopefully, a movement has initiated to put the cpuidle drivers into the
-> drivers/cpuidle directory like cpuidle-calxeda.c and cpuidle-kirkwood.c
-> 
-> Add an explicit maintainer entry in the MAINTAINER to clarify the situation
-> and prevent new cpuidle drivers to goes to an arch directory.
-> 
-> The upstreaming process is unchanged: Rafael takes the patches to merge them
-> into its tree but with the acked-by from the driver's maintainer. So the header
-> must contains the name of the maintainer.
-> 
-> This organization will be the same than cpufreq.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Acked-by: Andrew Lunn <andrew@lunn.ch>  #for kirkwood
-> Acked-by: Jason Cooper <jason@lakedaemon.net> #for kirkwood
-> ---
->  MAINTAINERS                        |    9 +++++++++
->  drivers/cpuidle/cpuidle-calxeda.c  |    4 +++-
->  drivers/cpuidle/cpuidle-kirkwood.c |    5 +++--
->  3 files changed, 15 insertions(+), 3 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 61677c3..45ee6dc 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -2217,6 +2217,15 @@ F:	drivers/cpufreq/arm_big_little.h
->  F:	drivers/cpufreq/arm_big_little.c
->  F:	drivers/cpufreq/arm_big_little_dt.c
->  
-> +CPUIDLE DRIVERS
-> +M:	Rafael J. Wysocki <rjw@sisk.pl>
-> +M:	Daniel Lezcano <daniel.lezcano@linaro.org>
-> +L:	linux-pm at vger.kernel.org
-> +S:	Maintained
-> +T:	git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git
-> +F:	drivers/cpuidle/*
-> +F:	include/linux/cpuidle.h
-> +
->  CPUID/MSR DRIVER
->  M:	"H. Peter Anvin" <hpa@zytor.com>
->  S:	Maintained
-> diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-> index e344b56..2233791 100644
-> --- a/drivers/cpuidle/cpuidle-calxeda.c
-> +++ b/drivers/cpuidle/cpuidle-calxeda.c
-> @@ -1,7 +1,7 @@
->  /*
->   * Copyright 2012 Calxeda, Inc.
->   *
-> - * Based on arch/arm/plat-mxc/cpuidle.c:
-> + * Based on arch/arm/plat-mxc/cpuidle.c: #v3.7
->   * Copyright 2012 Freescale Semiconductor, Inc.
->   * Copyright 2012 Linaro Ltd.
->   *
-> @@ -16,6 +16,8 @@
->   *
->   * You should have received a copy of the GNU General Public License along with
->   * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + *
-> + * Maintainer: Rob Herring <rob.herring@calxeda.com>
-this need to move to the MAINTAINER file
+> RDWR should be 3 here (already the case in arch/arm). BTW, I would use
 
-so we get the e-mail get get_maintainer.pl
->   */
->  
->  #include <linux/cpuidle.h>
-> diff --git a/drivers/cpuidle/cpuidle-kirkwood.c b/drivers/cpuidle/cpuidle-kirkwood.c
-> index 53290e1..521b0a7 100644
-> --- a/drivers/cpuidle/cpuidle-kirkwood.c
-> +++ b/drivers/cpuidle/cpuidle-kirkwood.c
-> @@ -1,6 +1,4 @@
->  /*
-> - * arch/arm/mach-kirkwood/cpuidle.c
-> - *
->   * CPU idle Marvell Kirkwood SoCs
->   *
->   * This file is licensed under the terms of the GNU General Public
-> @@ -11,6 +9,9 @@
->   * to implement two idle states -
->   * #1 wait-for-interrupt
->   * #2 wait-for-interrupt and DDR self refresh
-> + *
-> + * Maintainer: Jason Cooper <jason@lakedaemon.net>
-> + * Maintainer: Andrew Lunn <andrew@lunn.ch>
-ditto
->   */
->  
->  #include <linux/kernel.h>
-> -- 
-> 1.7.9.5
+Yes, Will spotted this one already, and it is now fixed in my tree.
+
+> HAP[2:1] comment in both cases since that's the attribute field.
+
+Indeed.
+
+>> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+>> index e333a24..7c84ab4 100644
+>> --- a/arch/arm64/include/asm/pgtable.h
+>> +++ b/arch/arm64/include/asm/pgtable.h
+>> @@ -76,6 +76,12 @@ extern pgprot_t pgprot_default;
+>>  #define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY)
+>>  #define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY)
+>>  
+>> +#define PAGE_HYP		_MOD_PROT(pgprot_default, PTE_HYP)
+>> +#define PAGE_HYP_DEVICE		_MOD_PROT(__pgprot(PROT_DEVICE_nGnRE), PTE_HYP)
+>> +
+>> +#define PAGE_S2			_MOD_PROT(pgprot_default, PTE_USER | PTE_S2_RDONLY)
 > 
+> Why is this one read-only by default?
+
+Because the guest pages start their life mapped RO. Only on the first
+write access they become writeable.
+
+>> +#define PAGE_S2_DEVICE		_MOD_PROT(__pgprot(PROT_DEVICE_nGnRE), PTE_USER | PTE_S2_RDWR)
+> 
+> You could write it directly as __pgprot(PROT_DEVICE_nGnRE | PTE_USER | PTE_S2_RDWR)
+
+Good point! This code as changed a bit anyway, as it contains some other
+odd things... ;-)
+
+Thanks for reviewing,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
