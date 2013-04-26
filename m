@@ -1,53 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 26 Apr 2013 12:18:59 +0200
-Subject: [PATCH] ARM: Adds pin config API to set all configs in one
- function
-In-Reply-To: <1366841010-2823-1-git-send-email-syin@broadcom.com>
-References: <1366841010-2823-1-git-send-email-syin@broadcom.com>
-Message-ID: <CACRpkdbT7f8ujCHZxKg26iMKcrAb+_yHW_2YsZwkoo892rkgTA@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 26 Apr 2013 12:18:49 +0200
+Subject: [RFC PATCH v3 3/6] sched: pack small tasks
+In-Reply-To: <5152C83F.6060509@linux.vnet.ibm.com>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
+ <1364300782.5053.6.camel@laptop>
+ <5152C83F.6060509@linux.vnet.ibm.com>
+Message-ID: <20130426101849.GD8669@dyad.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 12:03 AM, Sherman Yin <syin@broadcom.com> wrote:
+On Wed, Mar 27, 2013 at 03:51:51PM +0530, Preeti U Murthy wrote:
+> Hi,
+> 
+> On 03/26/2013 05:56 PM, Peter Zijlstra wrote:
+> > On Fri, 2013-03-22 at 13:25 +0100, Vincent Guittot wrote:
+> >> +static bool is_buddy_busy(int cpu)
+> >> +{
+> >> +       struct rq *rq = cpu_rq(cpu);
+> >> +
+> >> +       /*
+> >> +        * A busy buddy is a CPU with a high load or a small load with
+> >> a lot of
+> >> +        * running tasks.
+> >> +        */
+> >> +       return (rq->avg.runnable_avg_sum >
+> >> +                       (rq->avg.runnable_avg_period / (rq->nr_running
+> >> + 2)));
+> >> +}
+> > 
+> > Why does the comment talk about load but we don't see it in the
+> > equation. Also, why does nr_running matter at all? I thought we'd
+> > simply bother with utilization, if fully utilized we're done etc..
+> > 
+> 
+> Peter, lets say the run-queue has 50% utilization and is running 2
+> tasks. And we wish to find out if it is busy. We would compare this
+> metric with the cpu power, which lets say is 100.
+> 
+> rq->util * 100 < cpu_of(rq)->power.
+> 
+> In the above scenario would we declare the cpu _not_busy? Or would we do
+> the following:
+> 
+> (rq->util * 100) * #nr_running <  cpu_of(rq)->power and conclude that it
+> is just enough _busy_ to not take on more processes?
 
-> Currently, when setting pin configuration in the pinctrl framework,
-> pin_config_set() or pin_config_group_set() is called in a loop to set one
-> configuration at a time for the specified pin or group.
->
-> pin_config_set_all() and pin_config_group_set_all() are defined to set all
-> configurations for the specified pin or group at the same time.  These optional
-> APIs allow pinctrl drivers to optimize and combine pin configurations to reduce
-> the number of register writes required to configure a pin.
->
-> If both pin_config_set() and pin_config_set_all() are defined by a driver, the
-> latter takes precedence.  Similarly for pin_config_group_set_all().
->
-> Signed-off-by: Sherman Yin <syin@broadcom.com>
+That is just confused... ->power doesn't have anything to do with a per-cpu
+measure. ->power is a inter-cpu measure of relative compute capacity.
 
-NAK, sorry.
+Mixing in nr_running confuses things even more; it doesn't matter how many
+tasks it takes to push utilization up to 100%; once its there the cpu simply
+cannot run more.
 
-We discussed this already at the creation of the pinctrl framework.
-
-What you should do is to add an optional pin_config_set_complete()
-and pin_config_group_set_complete()
-callback that is called after the framework has iterated over all
-configs.
-
-This way the responsibility to resolve the sequence of config
-calls and validate the validity of that sequence is pushed down
-to the driver, it may do this incrementally or at pin_config_set_complete()
-and then write the resulting config to the hardware as an
-effect of pin_config_set_complete().
-
-The driver takes care of caching intermediate settings for the pin
-until the complete() callback is called.
-
-Can you devise a patch like this instead?
-
-I am also very hesitant to merge this if there is no code using
-it, i.e. if you don't have a corresponding driver to submit
-at the same time, it will not be merged, as I don't like to
-maintain dead code.
-
-Yours,
-Linus Walleij
+So colour me properly confused..
