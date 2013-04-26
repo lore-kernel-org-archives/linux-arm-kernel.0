@@ -1,79 +1,93 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 26 Apr 2013 16:24:54 +0530
-Subject: [PATCH v2 5/6] ARM: OMAP2+: serial: Remove the un-used slave idle
- hooks
+Date: Fri, 26 Apr 2013 16:24:53 +0530
+Subject: [PATCH v2 4/6] SERIAL: OMAP: Remove the slave idle handling from the
+ driver
 In-Reply-To: <1366973695-2088-1-git-send-email-rnayak@ti.com>
 References: <1366973695-2088-1-git-send-email-rnayak@ti.com>
-Message-ID: <1366973695-2088-6-git-send-email-rnayak@ti.com>
+Message-ID: <1366973695-2088-5-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-UART IP idle handling now taken care by runtime pm backend(hwmod) indirectly
-and OMAP serial driver is also cleaned up accordingly.
+UART IP slave idle handling now taken care by runtime pm backend(hwmod layer)
+so remove the hackery from the driver.
 
-So remove the un-used slave idle platforms hooks now.
+As discussed on the list, in future if dma mode needs to be brought
+back to this driver, UART sysc handling needs to be updated in
+framework such a way that no-idle/force idle profile can be supported.
+Given the broken dma mode for OMAP uarts, its very unlikely.
 
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
 Tested-by: Sourav Poddar <sourav.poddar@ti.com>
 Signed-off-by: Rajendra nayak <rnayak@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/serial.c |   31 -------------------------------
- 1 file changed, 31 deletions(-)
+ drivers/tty/serial/omap-serial.c          |   23 -----------------------
+ include/linux/platform_data/serial-omap.h |    2 --
+ 2 files changed, 25 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 8396b5b..f660156 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -95,38 +95,9 @@ static void omap_uart_enable_wakeup(struct device *dev, bool enable)
- 		omap_hwmod_disable_wakeup(od->hwmods[0]);
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 4dc4140..08332f3 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -202,26 +202,6 @@ static int serial_omap_get_context_loss_count(struct uart_omap_port *up)
+ 	return pdata->get_context_loss_count(up->dev);
  }
  
--/*
-- * Errata i291: [UART]:Cannot Acknowledge Idle Requests
-- * in Smartidle Mode When Configured for DMA Operations.
-- * WA: configure uart in force idle mode.
-- */
--static void omap_uart_set_noidle(struct device *dev)
+-static void serial_omap_set_forceidle(struct uart_omap_port *up)
 -{
--	struct platform_device *pdev = to_platform_device(dev);
--	struct omap_device *od = to_omap_device(pdev);
+-	struct omap_uart_port_info *pdata = up->dev->platform_data;
 -
--	omap_hwmod_set_slave_idlemode(od->hwmods[0], HWMOD_IDLEMODE_NO);
+-	if (!pdata || !pdata->set_forceidle)
+-		return;
+-
+-	pdata->set_forceidle(up->dev);
 -}
 -
--static void omap_uart_set_smartidle(struct device *dev)
+-static void serial_omap_set_noidle(struct uart_omap_port *up)
 -{
--	struct platform_device *pdev = to_platform_device(dev);
--	struct omap_device *od = to_omap_device(pdev);
--	u8 idlemode;
+-	struct omap_uart_port_info *pdata = up->dev->platform_data;
 -
--	if (od->hwmods[0]->class->sysc->idlemodes & SIDLE_SMART_WKUP)
--		idlemode = HWMOD_IDLEMODE_SMART_WKUP;
--	else
--		idlemode = HWMOD_IDLEMODE_SMART;
+-	if (!pdata || !pdata->set_noidle)
+-		return;
 -
--	omap_hwmod_set_slave_idlemode(od->hwmods[0], idlemode);
+-	pdata->set_noidle(up->dev);
 -}
 -
- #else
- static void omap_uart_enable_wakeup(struct device *dev, bool enable)
- {}
--static void omap_uart_set_noidle(struct device *dev) {}
--static void omap_uart_set_smartidle(struct device *dev) {}
- #endif /* CONFIG_PM */
+ static void serial_omap_enable_wakeup(struct uart_omap_port *up, bool enable)
+ {
+ 	struct omap_uart_port_info *pdata = up->dev->platform_data;
+@@ -298,8 +278,6 @@ static void serial_omap_stop_tx(struct uart_port *port)
+ 		serial_out(up, UART_IER, up->ier);
+ 	}
  
- #ifdef CONFIG_OMAP_MUX
-@@ -299,8 +270,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
- 	omap_up.uartclk = OMAP24XX_BASE_BAUD * 16;
- 	omap_up.flags = UPF_BOOT_AUTOCONF;
- 	omap_up.get_context_loss_count = omap_pm_get_dev_context_loss_count;
--	omap_up.set_forceidle = omap_uart_set_smartidle;
--	omap_up.set_noidle = omap_uart_set_noidle;
- 	omap_up.enable_wakeup = omap_uart_enable_wakeup;
- 	omap_up.dma_rx_buf_size = info->dma_rx_buf_size;
- 	omap_up.dma_rx_timeout = info->dma_rx_timeout;
+-	serial_omap_set_forceidle(up);
+-
+ 	pm_runtime_mark_last_busy(up->dev);
+ 	pm_runtime_put_autosuspend(up->dev);
+ }
+@@ -364,7 +342,6 @@ static void serial_omap_start_tx(struct uart_port *port)
+ 
+ 	pm_runtime_get_sync(up->dev);
+ 	serial_omap_enable_ier_thri(up);
+-	serial_omap_set_noidle(up);
+ 	pm_runtime_mark_last_busy(up->dev);
+ 	pm_runtime_put_autosuspend(up->dev);
+ }
+diff --git a/include/linux/platform_data/serial-omap.h b/include/linux/platform_data/serial-omap.h
+index ff9b0aa..c860c1b 100644
+--- a/include/linux/platform_data/serial-omap.h
++++ b/include/linux/platform_data/serial-omap.h
+@@ -43,8 +43,6 @@ struct omap_uart_port_info {
+ 	int			DTR_present;
+ 
+ 	int (*get_context_loss_count)(struct device *);
+-	void (*set_forceidle)(struct device *);
+-	void (*set_noidle)(struct device *);
+ 	void (*enable_wakeup)(struct device *, bool);
+ };
+ 
 -- 
 1.7.9.5
