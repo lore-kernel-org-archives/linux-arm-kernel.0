@@ -1,160 +1,95 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Fri, 26 Apr 2013 23:43:14 +0200
-Subject: dw_apb_timer_of.c: remove parts that were picoxcell-specific
-In-Reply-To: <20130426213723.GA24891@amd.pavel.ucw.cz>
-References: <20130426121433.GA16249@amd.pavel.ucw.cz>
- <20130426124128.GB6946@page>
- <20130426213723.GA24891@amd.pavel.ucw.cz>
-Message-ID: <20130426214313.GB24891@amd.pavel.ucw.cz>
+From: dborkman@redhat.com (Daniel Borkmann)
+Date: Sat, 27 Apr 2013 00:01:10 +0200
+Subject: [PATCH V3 2/3] ARM: net: bpf_jit: make code generation less
+ dependent on struct sk_filter.
+In-Reply-To: <20130426130948.cbfd2f6256afc0e3ee7abeed@linux-foundation.org>
+References: <1366824429-26652-1-git-send-email-nschichan@freebox.fr>
+ <1366824429-26652-3-git-send-email-nschichan@freebox.fr>
+ <3592414.M8kQZLCXlW@wuerfel>
+ <20130426122601.10ec05fcb4860df1b0a5b409@linux-foundation.org>
+ <517AD9E2.2090704@redhat.com>
+ <20130426130948.cbfd2f6256afc0e3ee7abeed@linux-foundation.org>
+Message-ID: <517AF926.3020302@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems we made a mistake when creating dw_apb_timer_of.c:
-picoxcell sched_clock had parts that were not related to
-dw_apb_timer, yet we moved them to dw_apb_timer_of, and tried to
-use them on socfpga.
+On 04/26/2013 10:09 PM, Andrew Morton wrote:
+> On Fri, 26 Apr 2013 21:47:46 +0200 Daniel Borkmann <dborkman@redhat.com> wrote:
+>> On 04/26/2013 09:26 PM, Andrew Morton wrote:
+>>> On Fri, 26 Apr 2013 16:04:44 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> On Wednesday 24 April 2013 19:27:08 Nicolas Schichan wrote:
+>>>>> @@ -858,7 +858,7 @@ b_epilogue:
+>>>>>    }
+>>>>>
+>>>>>
+>>>>> -void bpf_jit_compile(struct sk_filter *fp)
+>>>>> +static void __bpf_jit_compile(struct jit_ctx *out_ctx)
+>>>>>    {
+>>>>>           struct jit_ctx ctx;
+>>>>>           unsigned tmp_idx;
+>>>>> @@ -867,11 +867,10 @@ void bpf_jit_compile(struct sk_filter *fp)
+>>>>>           if (!bpf_jit_enable)
+>>>>>                   return;
+>>>>>
+>>>>> -       memset(&ctx, 0, sizeof(ctx));
+>>>>> -       ctx.skf         = fp;
+>>>>> +       ctx = *out_ctx;
+>>>>>           ctx.ret0_fp_idx = -1;
+>>>>>
+>>>>> -       ctx.offsets = kzalloc(4 * (ctx.skf->len + 1), GFP_KERNEL);
+>>>>> +       ctx.offsets = kzalloc(4 * (ctx.prog_len + 1), GFP_KERNEL);
+>>>>>           if (ctx.offsets == NULL)
+>>>>>                   return;
+>>>>>
+>>>>> @@ -921,13 +920,26 @@ void bpf_jit_compile(struct sk_filter *fp)
+>>>>>                   print_hex_dump(KERN_INFO, "BPF JIT code: ",
+>>>>>                                  DUMP_PREFIX_ADDRESS, 16, 4, ctx.target,
+>>>>>                                  alloc_size, false);
+>>>>> -
+>>>>> -       fp->bpf_func = (void *)ctx.target;
+>>>>>    out:
+>>>>>           kfree(ctx.offsets);
+>>>>> +
+>>>>> +       *out_ctx = ctx;
+>>>>>           return;
+>>>>
+>>>> This part of the patch, in combination with 79617801e "filter: bpf_jit_comp:
+>>>> refactor and unify BPF JIT image dump output" is now causing build errors
+>>>> in linux-next:
+>>>>
+>>>> arch/arm/net/bpf_jit_32.c: In function '__bpf_jit_compile':
+>>>> arch/arm/net/bpf_jit_32.c:930:16: error: 'fp' undeclared (first use in this function)
+>>>>      bpf_jit_dump(fp->len, alloc_size, 2, ctx.target);
+>>>
+>>> Thanks, I did this.  There may be a smarter way...
+>>
+>> I think also seccomp_jit_compile() would need this change then, otherwise the build
+>> with CONFIG_SECCOMP_FILTER_JIT might break.
+>
+> urgh, that tears it.
+>
+>> I can fix this up for you if not already applied. I presume it's against
+>> linux-next tree?
+>
+> Yup, please send something.
 
-This results in system where user/system time is not measured
-properly, as demonstrated by
-    
-    time dd if=/dev/urandom of=/dev/zero bs=100000 count=100
-    
-So this patch switches sched_clock to hardware that exists on both
-platforms, and adds missing of_node_put() in dw_apb_timer_init().
-    
-Signed-off-by: Pavel Machek <pavel@denx.de>
+Patch is attached. However, I currently don't have an ARM toolchain at hand, so
+uncompiled, untested.
 
-diff --git a/arch/arm/mach-picoxcell/common.h b/arch/arm/mach-picoxcell/common.h
-index 481b42a..237fb3b 100644
---- a/arch/arm/mach-picoxcell/common.h
-+++ b/arch/arm/mach-picoxcell/common.h
-@@ -12,6 +12,4 @@
- 
- #include <asm/mach/time.h>
- 
--extern void dw_apb_timer_init(void);
--
- #endif /* __PICOXCELL_COMMON_H__ */
-diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-index 8c2a35f..460ac99 100644
---- a/drivers/clocksource/dw_apb_timer.c
-+++ b/drivers/clocksource/dw_apb_timer.c
-@@ -21,12 +21,6 @@
- #define APBT_MIN_PERIOD			4
- #define APBT_MIN_DELTA_USEC		200
- 
--#define APBTMR_N_LOAD_COUNT		0x00
--#define APBTMR_N_CURRENT_VALUE		0x04
--#define APBTMR_N_CONTROL		0x08
--#define APBTMR_N_EOI			0x0c
--#define APBTMR_N_INT_STATUS		0x10
--
- #define APBTMRS_INT_STATUS		0xa0
- #define APBTMRS_EOI			0xa4
- #define APBTMRS_RAW_INT_STATUS		0xa8
-diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-index ab09ed3..0fa3104 100644
---- a/drivers/clocksource/dw_apb_timer_of.c
-+++ b/drivers/clocksource/dw_apb_timer_of.c
-@@ -57,6 +57,15 @@ static void add_clockevent(struct device_node *event_timer)
- 	dw_apb_clockevent_register(ced);
- }
- 
-+static void __iomem *sched_io_base;
-+
-+/* This is actually same as __apbt_read_clocksource(), but with
-+   different interface */
-+static u32 read_sched_clock_sptimer(void)
-+{
-+	return ~__raw_readl(sched_io_base + APBTMR_N_CURRENT_VALUE);
-+}
-+
- static void add_clocksource(struct device_node *source_timer)
- {
- 	void __iomem *iobase;
-@@ -71,41 +80,27 @@ static void add_clocksource(struct device_node *source_timer)
- 
- 	dw_apb_clocksource_start(cs);
- 	dw_apb_clocksource_register(cs);
--}
- 
--static void __iomem *sched_io_base;
--
--static u32 read_sched_clock(void)
--{
--	return __raw_readl(sched_io_base);
-+	sched_io_base = iobase;
-+	setup_sched_clock(read_sched_clock_sptimer, 32, rate);
- }
- 
--static const struct of_device_id sptimer_ids[] __initconst = {
--	{ .compatible = "picochip,pc3x2-rtc" },
-+static const struct of_device_id osctimer_ids[] __initconst = {
-+	{ .compatible = "picochip,pc3x2-timer" },
-+	{ .compatible = "snps,dw-apb-timer-osc" },
- 	{ .compatible = "snps,dw-apb-timer-sp" },
--	{ /* Sentinel */ },
-+	{  /* Sentinel */ },
- };
- 
--static void init_sched_clock(void)
--{
--	struct device_node *sched_timer;
--	u32 rate;
--
--	sched_timer = of_find_matching_node(NULL, sptimer_ids);
--	if (!sched_timer)
--		panic("No RTC for sched clock to use");
-+/*
-+   You don't have to use dw_apb_timer for scheduler clock,
-+   this should also work fine on arm:
- 
--	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
--	of_node_put(sched_timer);
-+  twd_local_timer_of_register();
-+  arch_timer_of_register();                 
-+  arch_timer_sched_clock_init();
-+*/
- 
--	setup_sched_clock(read_sched_clock, 32, rate);
--}
--
--static const struct of_device_id osctimer_ids[] __initconst = {
--	{ .compatible = "picochip,pc3x2-timer" },
--	{ .compatible = "snps,dw-apb-timer-osc" },
--	{},
--};
- 
- void __init dw_apb_timer_init(void)
- {
-@@ -121,7 +116,6 @@ void __init dw_apb_timer_init(void)
- 		panic("No timer for clocksource");
- 	add_clocksource(source_timer);
- 
-+	of_node_put(event_timer);
- 	of_node_put(source_timer);
--
--	init_sched_clock();
- }
-diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
-index dd755ce..a64c987 100644
---- a/include/linux/dw_apb_timer.h
-+++ b/include/linux/dw_apb_timer.h
-@@ -17,6 +17,12 @@
- #include <linux/clocksource.h>
- #include <linux/interrupt.h>
- 
-+#define APBTMR_N_LOAD_COUNT		0x00
-+#define APBTMR_N_CURRENT_VALUE		0x04
-+#define APBTMR_N_CONTROL		0x08
-+#define APBTMR_N_EOI			0x0c
-+#define APBTMR_N_INT_STATUS		0x10
-+
- #define APBTMRS_REG_SIZE       0x14
- 
- struct dw_apb_timer {
+@Nicolas, Xi (cc, ref: http://thread.gmane.org/gmane.linux.kernel/1481464):
 
+If there is someday support for other archs as well, it would be nice if we
+do not have each time duplicated seccomp_jit_compile() etc functions in each
+JIT implementation, i.e. because they do basically the same. So follow-up
+{fix,clean}up is appreciated.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Also, I find it a bit weird that seccomp_filter_get_len() and some other
+_one-line_ functions from kernel/seccomp.c are not placed into the
+corresponding header file as inlines.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-bpf_jit-seccomp-filtering-fixup-merge-conflict.patch
+Type: text/x-patch
+Size: 1668 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130427/0d0a4f93/attachment-0001.bin>
