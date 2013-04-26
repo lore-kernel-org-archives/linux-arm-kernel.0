@@ -1,14 +1,16 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 26 Apr 2013 12:38:13 +0100
-Subject: [PATCH 4/6] dmaengine: ste_dma40_ll: Use the BIT macro to replace
- ugly '(1 << x)'s
+Date: Fri, 26 Apr 2013 12:38:15 +0100
+Subject: [PATCH 6/6] dmaengine: ste_dma40_ll: Replace meaningless register set
+ with comment
 In-Reply-To: <1366976295-11728-1-git-send-email-lee.jones@linaro.org>
 References: <1366976295-11728-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1366976295-11728-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1366976295-11728-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aim is to make the code that little more readable.
+Unsure of the author's intentions, rather than just removing the nop,
+we're replacing it with a comment containing the possible intention
+of the statement OR:ing with 0.
 
 Cc: Vinod Koul <vinod.koul@intel.com>
 Cc: Dan Williams <djbw@fb.com>
@@ -16,145 +18,25 @@ Cc: Per Forlin <per.forlin@stericsson.com>
 Cc: Rabin Vincent <rabin@rab.in>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/dma/ste_dma40_ll.c |   48 ++++++++++++++++++++++----------------------
- 1 file changed, 24 insertions(+), 24 deletions(-)
+ drivers/dma/ste_dma40_ll.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/dma/ste_dma40_ll.c b/drivers/dma/ste_dma40_ll.c
-index 1e4b571..dd7eb66 100644
+index ec03000..f2e15ac 100644
 --- a/drivers/dma/ste_dma40_ll.c
 +++ b/drivers/dma/ste_dma40_ll.c
-@@ -20,28 +20,28 @@ void d40_log_cfg(struct stedma40_chan_cfg *cfg,
- 	/* src is mem? -> increase address pos */
- 	if (cfg->dir ==  DMA_MEM_TO_DEV ||
- 	    cfg->dir ==  DMA_MEM_TO_MEM)
--		l1 |= 1 << D40_MEM_LCSP1_SCFG_INCR_POS;
-+		l1 |= BIT(D40_MEM_LCSP1_SCFG_INCR_POS);
+@@ -189,8 +189,10 @@ static int d40_phy_fill_lli(struct d40_phy_lli *lli,
+ 	else
+ 		lli->reg_cfg &= ~BIT(D40_SREG_CFG_TIM_POS);
  
- 	/* dst is mem? -> increase address pos */
- 	if (cfg->dir ==  DMA_DEV_TO_MEM ||
- 	    cfg->dir ==  DMA_MEM_TO_MEM)
--		l3 |= 1 << D40_MEM_LCSP3_DCFG_INCR_POS;
-+		l3 |= BIT(D40_MEM_LCSP3_DCFG_INCR_POS);
+-	/* Post link */
+-	lli->reg_lnk |= 0 << D40_SREG_LNK_PHY_PRE_POS;
++	/*
++	 * Post link - D40_SREG_LNK_PHY_PRE_POS = 0
++	 * Relink happens after transfer completion.
++	 */
  
- 	/* src is hw? -> master port 1 */
- 	if (cfg->dir ==  DMA_DEV_TO_MEM ||
- 	    cfg->dir ==  DMA_DEV_TO_DEV)
--		l1 |= 1 << D40_MEM_LCSP1_SCFG_MST_POS;
-+		l1 |= BIT(D40_MEM_LCSP1_SCFG_MST_POS);
- 
- 	/* dst is hw? -> master port 1 */
- 	if (cfg->dir ==  DMA_MEM_TO_DEV ||
- 	    cfg->dir ==  DMA_DEV_TO_DEV)
--		l3 |= 1 << D40_MEM_LCSP3_DCFG_MST_POS;
-+		l3 |= BIT(D40_MEM_LCSP3_DCFG_MST_POS);
- 
--	l3 |= 1 << D40_MEM_LCSP3_DCFG_EIM_POS;
-+	l3 |= BIT(D40_MEM_LCSP3_DCFG_EIM_POS);
- 	l3 |= cfg->dst_info.psize << D40_MEM_LCSP3_DCFG_PSIZE_POS;
- 	l3 |= cfg->dst_info.data_width << D40_MEM_LCSP3_DCFG_ESIZE_POS;
- 
--	l1 |= 1 << D40_MEM_LCSP1_SCFG_EIM_POS;
-+	l1 |= BIT(D40_MEM_LCSP1_SCFG_EIM_POS);
- 	l1 |= cfg->src_info.psize << D40_MEM_LCSP1_SCFG_PSIZE_POS;
- 	l1 |= cfg->src_info.data_width << D40_MEM_LCSP1_SCFG_ESIZE_POS;
- 
-@@ -52,8 +52,8 @@ void d40_log_cfg(struct stedma40_chan_cfg *cfg,
- 
- void d40_log_gim_unmask(u32 *src_cfg, u32 *dst_cfg) {
- 
--	*src_cfg |= 1 << D40_SREG_CFG_LOG_GIM_POS;
--	*dst_cfg |= 1 << D40_SREG_CFG_LOG_GIM_POS;
-+	*src_cfg |= BIT(D40_SREG_CFG_LOG_GIM_POS);
-+	*dst_cfg |= BIT(D40_SREG_CFG_LOG_GIM_POS);
+ 	return 0;
  }
- 
- void d40_phy_cfg(struct stedma40_chan_cfg *cfg, u32 *src_cfg, u32 *dst_cfg)
-@@ -64,39 +64,39 @@ void d40_phy_cfg(struct stedma40_chan_cfg *cfg, u32 *src_cfg, u32 *dst_cfg)
- 	if ((cfg->dir == DMA_DEV_TO_MEM) ||
- 	    (cfg->dir == DMA_DEV_TO_DEV)) {
- 		/* Set master port to 1 */
--		src |= 1 << D40_SREG_CFG_MST_POS;
-+		src |= BIT(D40_SREG_CFG_MST_POS);
- 		src |= D40_TYPE_TO_EVENT(cfg->dev_type);
- 
- 		if (cfg->src_info.flow_ctrl == STEDMA40_NO_FLOW_CTRL)
--			src |= 1 << D40_SREG_CFG_PHY_TM_POS;
-+			src |= BIT(D40_SREG_CFG_PHY_TM_POS);
- 		else
- 			src |= 3 << D40_SREG_CFG_PHY_TM_POS;
- 	}
- 	if ((cfg->dir == DMA_MEM_TO_DEV) ||
- 	    (cfg->dir == DMA_DEV_TO_DEV)) {
- 		/* Set master port to 1 */
--		dst |= 1 << D40_SREG_CFG_MST_POS;
-+		dst |= BIT(D40_SREG_CFG_MST_POS);
- 		dst |= D40_TYPE_TO_EVENT(cfg->dev_type);
- 
- 		if (cfg->dst_info.flow_ctrl == STEDMA40_NO_FLOW_CTRL)
--			dst |= 1 << D40_SREG_CFG_PHY_TM_POS;
-+			dst |= BIT(D40_SREG_CFG_PHY_TM_POS);
- 		else
- 			dst |= 3 << D40_SREG_CFG_PHY_TM_POS;
- 	}
- 	/* Interrupt on end of transfer for destination */
--	dst |= 1 << D40_SREG_CFG_TIM_POS;
-+	dst |= BIT(D40_SREG_CFG_TIM_POS);
- 
- 	/* Generate interrupt on error */
--	src |= 1 << D40_SREG_CFG_EIM_POS;
--	dst |= 1 << D40_SREG_CFG_EIM_POS;
-+	src |= BIT(D40_SREG_CFG_EIM_POS);
-+	dst |= BIT(D40_SREG_CFG_EIM_POS);
- 
- 	/* PSIZE */
- 	if (cfg->src_info.psize != STEDMA40_PSIZE_PHY_1) {
--		src |= 1 << D40_SREG_CFG_PHY_PEN_POS;
-+		src |= BIT(D40_SREG_CFG_PHY_PEN_POS);
- 		src |= cfg->src_info.psize << D40_SREG_CFG_PSIZE_POS;
- 	}
- 	if (cfg->dst_info.psize != STEDMA40_PSIZE_PHY_1) {
--		dst |= 1 << D40_SREG_CFG_PHY_PEN_POS;
-+		dst |= BIT(D40_SREG_CFG_PHY_PEN_POS);
- 		dst |= cfg->dst_info.psize << D40_SREG_CFG_PSIZE_POS;
- 	}
- 
-@@ -106,14 +106,14 @@ void d40_phy_cfg(struct stedma40_chan_cfg *cfg, u32 *src_cfg, u32 *dst_cfg)
- 
- 	/* Set the priority bit to high for the physical channel */
- 	if (cfg->high_priority) {
--		src |= 1 << D40_SREG_CFG_PRI_POS;
--		dst |= 1 << D40_SREG_CFG_PRI_POS;
-+		src |= BIT(D40_SREG_CFG_PRI_POS);
-+		dst |= BIT(D40_SREG_CFG_PRI_POS);
- 	}
- 
- 	if (cfg->src_info.big_endian)
--		src |= 1 << D40_SREG_CFG_LBE_POS;
-+		src |= BIT(D40_SREG_CFG_LBE_POS);
- 	if (cfg->dst_info.big_endian)
--		dst |= 1 << D40_SREG_CFG_LBE_POS;
-+		dst |= BIT(D40_SREG_CFG_LBE_POS);
- 
- 	*src_cfg = src;
- 	*dst_cfg = dst;
-@@ -163,15 +163,15 @@ static int d40_phy_fill_lli(struct d40_phy_lli *lli,
- 
- 	/* If this scatter list entry is the last one, no next link */
- 	if (next_lli == 0)
--		lli->reg_lnk = 0x1 << D40_SREG_LNK_PHY_TCP_POS;
-+		lli->reg_lnk = BIT(D40_SREG_LNK_PHY_TCP_POS);
- 	else
- 		lli->reg_lnk = next_lli;
- 
- 	/* Set/clear interrupt generation on this link item.*/
- 	if (term_int)
--		lli->reg_cfg |= 0x1 << D40_SREG_CFG_TIM_POS;
-+		lli->reg_cfg |= BIT(D40_SREG_CFG_TIM_POS);
- 	else
--		lli->reg_cfg &= ~(0x1 << D40_SREG_CFG_TIM_POS);
-+		lli->reg_cfg &= ~BIT(D40_SREG_CFG_TIM_POS);
- 
- 	/* Post link */
- 	lli->reg_lnk |= 0 << D40_SREG_LNK_PHY_PRE_POS;
 -- 
 1.7.10.4
