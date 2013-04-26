@@ -1,73 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 26 Apr 2013 10:49:12 +0200
-Subject: [PATCH] pinctrl: document the "GPIO mode" pitfall
-In-Reply-To: <1761651.lXztZzrj1S@avalon>
-References: <1363345636-2006-1-git-send-email-linus.walleij@stericsson.com>
- <2408684.1bsjMDDzMu@avalon>
- <CACRpkdag=YTeQH=VjW4fQ+G94REWeURhC=ErJxjmSUuP=pKYbA@mail.gmail.com>
- <1761651.lXztZzrj1S@avalon>
-Message-ID: <CACRpkdaMdU4DHWULnSB_dvGk8pTRbirL1HVTGqJ2rwqXR798uQ@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 26 Apr 2013 13:46:46 +0530
+Subject: [PATCH 6/9] crypto: ux500/cryp - Set DMA configuration though
+ dma_slave_config()
+In-Reply-To: <CACRpkdaBf++gy3sghC-t33uio2+eHp1MrQ2FM0XXBazZTtm3kA@mail.gmail.com>
+References: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbFgW6bGYt59WtN4r2izuN09AJw4J1cqir82uzFsuMmWQ@mail.gmail.com>
+ <20130425134402.GN4623@gmail.com>
+ <201304251611.39667.arnd@arndb.de>
+ <CACRpkdaBf++gy3sghC-t33uio2+eHp1MrQ2FM0XXBazZTtm3kA@mail.gmail.com>
+Message-ID: <20130426081646.GD24632@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 26, 2013 at 1:15 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Thursday 25 April 2013 23:39:18 Linus Walleij wrote:
->> On Tue, Apr 23, 2013 at 3:33 PM, Laurent Pinchart wrote:
+On Fri, Apr 26, 2013 at 10:28:39AM +0200, Linus Walleij wrote:
+> On Thu, Apr 25, 2013 at 4:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > The dma engine driver must know the address in its dma space, while the
+> > slave driver has it available in physical space. These two are often the
+> > same, but there is no generic way to convert between the two, especially
+> > if the dma engine resides behind an IOMMU.
+> >
+> > The best assumption we can make is that the dma engine driver knows
+> > how to convert between the two. Interestingly the documentation for
+> > dma_slave_config talks about "physical address", while the structure
+> > itself uses a dma_addr_t. Linus Walleij introduced the structure in
+> > c156d0a5b0 "DMAENGINE: generic slave channel control v3", so I assume
+> > he can shed some light on what he was thinking. I assume the documentation
+> > is right but the structure is not and should be converted to use
+> > phys_add_t or resource_size_t.
+> 
+> OK I could cook a patch for that, but I think I need some input from
+> Vinod and/or Russell on this.
+the dma_slave_config is physical address that should be passed directly to the
+controller. Obviosuly it should phys_addr_t :)
 
->> > Could you clarify the exact scope of the two configuration parameters ?
->>
->> PIN_CONFIG_OUTPUT is left a bit unspecified, but here the idea was a passive
->> drive, like just connecting the pin to VDD or GND without any driver stage
->> at all.
->
-> Isn't that a driver stage ? :-)
+The mapping & unmapping of dma buffer (memcpy and memory buffer in this txn) is
+required to be performed by the client driver. The dmanegine or dmaengine driver
+will not do that for you...
 
-OK something that is not a totempole type drive ...
-push/pull surely implies a totempole type design.
-
-> What is unclear to me is the interaction between OUTPUT and DRIVE_*.
-> That's the part I would like to see clarified.
-
-I sent some patch now, check it ... hm reported-by still doesn't add
-you to CC :-/ better patch git-send-email...
-
-> Does DRIVE_* imply that the pin
-> is driven by the selected function, and OUTPUT imply that the pin is driven to
-> a fixed level ?
-
-That is unclear, but I suggest DRIVE* implies that everything on the pin
-is driven according to that configuration. (Else it is getting ignored...)
-
-OUTPUT would be used when you don't know the particulars or when
-the driving cannot be controlled in a fine-grained manner like with the
-DRIVE* configs.
-
-Does this make sense?
-
-> If so, how do you configure the drive type of a pin that will
-> be used through the GPIO API ?
-
-It is possible to use the pinctrl and GPIO APIs orthogonally.
-
-For example the pinctrl can use hogs to reconfigure the pins
-during sleep without intervention from the GPIO API.
-
-So they will be fingering on the same pins registers.
-Maybe even the same register (if access can be protected
-properly) from different APIs.
-
-> What about cases where I want to drive the pin
-> to a fixed level in a non low-power output mode (for instance because I need
-> more current that what the low-power output mode provides) ?
-
-Just use pinconfig for that?
-
-Is the usecase something like a power-supplying GPIO pin
-and then sometimes you want to provide more power from it?
-
-Then use pinconfig to shunt in the driver stages, and GPIO API
-to enable/disable it.
-
-Yours,
-Linus Walleij
+This is true for slave usage and not for async case.
+> 
+> It does make sense to me that if anything knows how to map a physical
+> address into the DMA address space it'll be the DMA engine.
+> 
+> However this rings a bell that there may be a possible relation to
+> DMA-API, since that API syncs memory buffers to the DMA
+> address space if there is some MMU inbetween the DMA and the
+> (ordinary, non-device) memory.
+> 
+> So if we think one step ahead, assuming the DMAC is actually behind
+> an MMU making it see the device in some other address than the
+> physical (bus) space, where would the address be resolved?
+> 
+> Yours,
+> Linus Walleij
