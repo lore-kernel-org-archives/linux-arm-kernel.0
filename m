@@ -1,41 +1,35 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Fri, 26 Apr 2013 11:06:05 -0700
-Subject: [PATCH v2] of: Set the DMA mask to 64 bits when dma_addr_t is 64-bits
-Message-ID: <1366999565-19498-1-git-send-email-lauraa@codeaurora.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 26 Apr 2013 11:09:33 -0700
+Subject: [PATCH v2 0/6] ARM;
+ OMAP2+: hwmod and SERIAL: Remove sysc handling from driver
+In-Reply-To: <1366973695-2088-1-git-send-email-rnayak@ti.com> (Rajendra
+ Nayak's message of "Fri, 26 Apr 2013 16:24:49 +0530")
+References: <1366973695-2088-1-git-send-email-rnayak@ti.com>
+Message-ID: <87ppxhxixu.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, of_platform_device_create_pdata always sets the
-coherent DMA mask to 32 bits. On ARM systems without CONFIG_ZONE_DMA,
-arm_dma_limit gets set to ~0 or 0xFFFFFFFFFFFFFFFF on LPAE based
-systems. Since arm_dma_limit represents the smallest dma_mask
-on the system, the default of 32 bits prevents any dma_coherent
-allocation from succeeding unless clients manually set the
-dma mask first. Rather than make every client on an LPAE system set
-the mask, set the mask to a 64 bit value on systems with 64-bit
-dma addresses.
+Rajendra Nayak <rnayak@ti.com> writes:
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- drivers/of/platform.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+[...]
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 0970505..c669ab4 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -214,7 +214,11 @@ struct platform_device *of_platform_device_create_pdata(
- #if defined(CONFIG_MICROBLAZE)
- 	dev->archdata.dma_mask = 0xffffffffUL;
- #endif
-+#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
-+	dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
-+#else
- 	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-+#endif
- 	dev->dev.bus = &platform_bus_type;
- 	dev->dev.platform_data = platform_data;
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> OMAP UART IP needs manual idle modes based on functional state of the
+> IP. Currently this is handled by the driver with function pointers
+> implemented in platform code.
+>
+> This however breaks in case of device tree because of missing
+> idle handling. 
+>
+> The series tries to address the issue and tries to remove complete
+> sysc handling from serial driver.
+
+Other than the minor nit about the order of the series for bisect, 
+
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+
+Also tested this on OMAP4/Panda where I was having the sluggish console
+issues using DT boot, and and can confirm that this fixes the problem:
+
+Tested-by: Kevin Hilman <khilman@linaro.org>  # OMAP4/Panda
+
+Kevin
