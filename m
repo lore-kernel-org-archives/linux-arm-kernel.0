@@ -1,52 +1,41 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Fri, 26 Apr 2013 18:29:45 +0530
-Subject: [PATCH 0/2] Early printk support for virtio console devices.
-In-Reply-To: <1577576.O1Cm2pf5KD@wuerfel>
-References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
- <CAFEAcA_xmrHTvR7FxUr3PCKBJY-hZnkeBcqyHksTB4-hqOZS0w@mail.gmail.com>
- <CALrVBkuOmu4u9egdzzfn1tU9B-CFe3w85HZQ9s2gpKvYnaSqvA@mail.gmail.com>
- <1577576.O1Cm2pf5KD@wuerfel>
-Message-ID: <CALrVBkuyby_KY_M+yp0e=PLk=7_W_kSxxm62YYSwwp8rwLsCAQ@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 26 Apr 2013 15:08:35 +0200
+Subject: [PATCH 07/14] sched: agressively pack at wake/fork/exec
+In-Reply-To: <1366910611-20048-8-git-send-email-vincent.guittot@linaro.org>
+References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
+ <1366910611-20048-8-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20130426130835.GA13964@dyad.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 April 2013 18:03, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 26 April 2013 17:36:16 Anup Patel wrote:
->> On 26 April 2013 17:03, Peter Maydell <peter.maydell@linaro.org> wrote:
->> > On 26 April 2013 12:19, Alexander Graf <agraf@suse.de> wrote:
->> >> MMIO registers are handled by a different layer than the virtio
->> >> console itself. After the virtio refactoring in QEMU, they will
->> >> be completely separate drivers.
->> >
->> > Good point -- we don't really want to be mixing up the
->> > transport and the backend. You can see it in the kvmtool
->> > patch, in fact -- it introduces an "if this is virtio-console"
->> > special case into the mmio.c file which previously was
->> > entirely backend agnostic.
->>
->> Well, we can always have virtio device specific config registers
->> handle by virtio device backends and generic virtio config register
->> handled by transport.
->>
->> kvmtool patch is hacky because it does not provide virtio device
->> specific config read/write callbacks.
->
-> Couldn't kvmtool implement the interface used by smh_printch()
-> for early output instead?
->
-> Or if that's not a fitting inteface, maybe a psci call for writing
-> a character to the console?
->
->         Arnd
+On Thu, Apr 25, 2013 at 07:23:23PM +0200, Vincent Guittot wrote:
+> According to the packing policy, the scheduler can pack tasks at different
+> step:
+> -SCHED_PACKING_NONE level: we don't pack any task.
+> -SCHED_PACKING_DEFAULT: we only pack small tasks at wake up when system is not
+> busy.
+> -SCHED_PACKING_FULL: we pack tasks at wake up until a CPU becomes full. During
+> a fork or a exec, we assume that the new task is a full running one and we
+> look for an idle CPU close to the buddy CPU.
 
-I am curious about how smh-based or hypercall-based early prints would
-be handled in following scenario:
+This changelog is very short on explaining how it will go about achieving these
+goals.
 
-"A board is running KVM ARM enabled kernel and linux console on serial
-port. Now a user remotely connects to the board via telnet/ssh and
-launches a VM with smh-based or hypercall-based earlyprintk."
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> ---
+>  kernel/sched/fair.c |   47 ++++++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 42 insertions(+), 5 deletions(-)
+> 
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index 98166aa..874f330 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -3259,13 +3259,16 @@ static struct sched_group *
+>  find_idlest_group(struct sched_domain *sd, struct task_struct *p,
 
-In the above scenario, will smh-based or hypercall-based earlyprints
-appear to user on remote shell or not ?
 
---Anup
+So for packing into power domains, wouldn't you typically pick the busiest non-
+full domain to fill from other non-full?
+
+Picking the idlest non-full seems like it would generate a ping-pong or not
+actually pack anything.
