@@ -1,44 +1,21 @@
-From: gotom@sanori.org (Masanori Goto)
-Date: Thu, 25 Apr 2013 17:42:38 -0700
-Subject: [PATCH 10/21] [SCSI] nsp32: use mdelay instead of large udelay
- constants
-In-Reply-To: <1366910944-3033663-11-git-send-email-arnd@arndb.de>
-References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <1366910944-3033663-11-git-send-email-arnd@arndb.de>
-Message-ID: <CALZLnaFeLcaGM7_McTZ=pKBRnpXk0AvqOTF=1YCqJv-53yk4XQ@mail.gmail.com>
+From: syin@broadcom.com (Sherman Yin)
+Date: Fri, 26 Apr 2013 00:42:53 +0000
+Subject: Adding a void * to pinctrl_pin_desc
+Message-ID: <051069C10411E24D9749790C498526FA1BCF4FC6@SJEXCHMB12.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/4/25 Arnd Bergmann <arnd@arndb.de>
->
-> ARM cannot handle udelay for more than 2 miliseconds, so we
-> should use mdelay instead for those.
->
+Hi Stephen and LinusW,
 
-Singed-off-by: GOTO Masanori <gotom@debian.or.jp>
+As I'm writing my pinctrl driver, I find myself creating an array to hold extra pin-specific information.  In the chip I'm working on, there is a pincfg register for each pin, but the fields of the register are slightly different for different pin types (eg. normal pins vs i2c pins).  I can simply create an array in my driver to hold this information, so I would have a list of PINCTRL_PIN(...) macros to define the pins, and another array to define the pin types - this works perfectly fine.  However, I thought this kind of per-pin data would fit nicely into the pinctrl_pin_desc structure.  Pin groups and pin functions are defined by the driver, so I thought it would be nice if the pin desc have this flexibility as well.  What do you think about expanding the struct to something like this:
 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: GOTO Masanori <gotom@debian.or.jp>
-> Cc: YOKOTA Hiroshi <yokota@netlab.is.tsukuba.ac.jp>
-> Cc: "James E.J. Bottomley" <JBottomley@parallels.com>
-> Cc: linux-scsi at vger.kernel.org
-> ---
->  drivers/scsi/nsp32.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/scsi/nsp32.c b/drivers/scsi/nsp32.c
-> index 1e3879d..0665f9c 100644
-> --- a/drivers/scsi/nsp32.c
-> +++ b/drivers/scsi/nsp32.c
-> @@ -2899,7 +2899,7 @@ static void nsp32_do_bus_reset(nsp32_hw_data *data)
->          * reset SCSI bus
->          */
->         nsp32_write1(base, SCSI_BUS_CONTROL, BUSCTL_RST);
-> -       udelay(RESET_HOLD_TIME);
-> +       mdelay(RESET_HOLD_TIME / 1000);
->         nsp32_write1(base, SCSI_BUS_CONTROL, 0);
->         for(i = 0; i < 5; i++) {
->                 intrdat = nsp32_read2(base, IRQ_STATUS); /* dummy read */
-> --
-> 1.8.1.2
->
+struct pinctrl_pin_desc {
+	unsigned number;
+	const char *name;
+	void * pin_data;
+};
+
+so that drivers can optionally use pin_data to hold other pin-specific information?  The down side is that with a void *, it may not be too useful if the pin-specific data is very different for each pin.  
+
+Thanks,
+Sherman
