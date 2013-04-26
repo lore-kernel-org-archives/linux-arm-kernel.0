@@ -1,67 +1,57 @@
-From: preeti@linux.vnet.ibm.com (Preeti U Murthy)
-Date: Fri, 26 Apr 2013 16:02:27 +0530
-Subject: [RFC PATCH v3 3/6] sched: pack small tasks
-In-Reply-To: <20130426101849.GD8669@dyad.programming.kicks-ass.net>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
- <1364300782.5053.6.camel@laptop> <5152C83F.6060509@linux.vnet.ibm.com>
- <20130426101849.GD8669@dyad.programming.kicks-ass.net>
-Message-ID: <517A57BB.8000009@linux.vnet.ibm.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Fri, 26 Apr 2013 12:39:38 +0200
+Subject: [PATCH 12/21] irqchip: s3c24xx: add missing __init annotations
+In-Reply-To: <1366910944-3033663-13-git-send-email-arnd@arndb.de>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <1366910944-3033663-13-git-send-email-arnd@arndb.de>
+Message-ID: <201304261239.38737.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On 04/26/2013 03:48 PM, Peter Zijlstra wrote:
-> On Wed, Mar 27, 2013 at 03:51:51PM +0530, Preeti U Murthy wrote:
->> Hi,
->>
->> On 03/26/2013 05:56 PM, Peter Zijlstra wrote:
->>> On Fri, 2013-03-22 at 13:25 +0100, Vincent Guittot wrote:
->>>> +static bool is_buddy_busy(int cpu)
->>>> +{
->>>> +       struct rq *rq = cpu_rq(cpu);
->>>> +
->>>> +       /*
->>>> +        * A busy buddy is a CPU with a high load or a small load with
->>>> a lot of
->>>> +        * running tasks.
->>>> +        */
->>>> +       return (rq->avg.runnable_avg_sum >
->>>> +                       (rq->avg.runnable_avg_period / (rq->nr_running
->>>> + 2)));
->>>> +}
->>>
->>> Why does the comment talk about load but we don't see it in the
->>> equation. Also, why does nr_running matter at all? I thought we'd
->>> simply bother with utilization, if fully utilized we're done etc..
->>>
->>
->> Peter, lets say the run-queue has 50% utilization and is running 2
->> tasks. And we wish to find out if it is busy. We would compare this
->> metric with the cpu power, which lets say is 100.
->>
->> rq->util * 100 < cpu_of(rq)->power.
->>
->> In the above scenario would we declare the cpu _not_busy? Or would we do
->> the following:
->>
->> (rq->util * 100) * #nr_running <  cpu_of(rq)->power and conclude that it
->> is just enough _busy_ to not take on more processes?
+Am Donnerstag, 25. April 2013, 19:28:55 schrieb Arnd Bergmann:
+> The s3c24xx_init_intc and s3c2412_init_irq functions are only called
+> at init time, and they call functions already marked __init, so they
+> should be marked in the same way. This was reported as
 > 
-> That is just confused... ->power doesn't have anything to do with a per-cpu
-> measure. ->power is a inter-cpu measure of relative compute capacity.
-
-Ok.
-
+> WARNING: vmlinux.o(.text+0x19e0b4): Section mismatch in reference from the
+> function s3c2412_init_irq() to the function
+> .init.text:s3c24xx_init_intc.constprop.8() The function s3c2412_init_irq()
+> references
+> the function __init s3c24xx_init_intc.constprop.8().
+> This is often because s3c2412_init_irq lacks a __init
+> annotation or the annotation of s3c24xx_init_intc.constprop.8 is wrong.
 > 
-> Mixing in nr_running confuses things even more; it doesn't matter how many
-> tasks it takes to push utilization up to 100%; once its there the cpu simply
-> cannot run more.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
 
-True, this is from the perspective of the CPU. But will not the tasks on
-this CPU get throttled if, you find the utilization of this CPU < 100%
-and decide to put more tasks on it?
+Yeah, it seems "someone" forgot these, thanks for catching this.
 
-Regards
-Preeti U Murthy
+Acked-by: Heiko Stuebner <heiko@sntech.de>
+
+
+> ---
+>  drivers/irqchip/irq-s3c24xx.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-s3c24xx.c b/drivers/irqchip/irq-s3c24xx.c
+> index c8afd7b..bbcc944 100644
+> --- a/drivers/irqchip/irq-s3c24xx.c
+> +++ b/drivers/irqchip/irq-s3c24xx.c
+> @@ -535,7 +535,7 @@ static void s3c24xx_clear_intc(struct s3c_irq_intc
+> *intc) }
+>  }
+> 
+> -static struct s3c_irq_intc *s3c24xx_init_intc(struct device_node *np,
+> +static struct s3c_irq_intc * __init s3c24xx_init_intc(struct device_node
+> *np, struct s3c_irq_data *irq_data,
+>  				       struct s3c_irq_intc *parent,
+>  				       unsigned long address)
+> @@ -795,7 +795,7 @@ static struct s3c_irq_data init_s3c2412subint[32] = {
+>  	{ .type = S3C_IRQTYPE_LEVEL, .parent_irq = 21 }, /* CF */
+>  };
+> 
+> -void s3c2412_init_irq(void)
+> +void __init s3c2412_init_irq(void)
+>  {
+>  	pr_info("S3C2412: IRQ Support\n");
