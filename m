@@ -1,21 +1,76 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Fri, 26 Apr 2013 00:42:53 +0000
-Subject: Adding a void * to pinctrl_pin_desc
-Message-ID: <051069C10411E24D9749790C498526FA1BCF4FC6@SJEXCHMB12.corp.ad.broadcom.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 26 Apr 2013 09:48:35 +0900
+Subject: [PATCH 03/21] ARM: shmobile: don't call irqchip_init
+ unconditionally
+In-Reply-To: <1366910944-3033663-4-git-send-email-arnd@arndb.de>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <1366910944-3033663-4-git-send-email-arnd@arndb.de>
+Message-ID: <20130426004835.GA20070@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen and LinusW,
+On Thu, Apr 25, 2013 at 07:28:46PM +0200, Arnd Bergmann wrote:
+> The irqchip_init function is only available when building
+> with CONFIG_OF enabled, which causes this build failure for
+> bonito_defconfig:
+> 
+> arch/arm/mach-shmobile/built-in.o: In function `r8a7740_init_irq_of':
+> :(.init.text+0x580): undefined reference to `irqchip_init'
+> 
+> This makes both the OF and the ATAGS portion of the driver
+> conditional, which avoids the build error and also results
+> in smaller object code if not both are enabled, without the
+> need for an #ifdef.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Bastian Hecht <hechtb+renesas@gmail.com>
+> Cc: Simon Horman <horms+renesas@verge.net.au>
+> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> ---
+>  arch/arm/mach-shmobile/intc-r8a7740.c | 13 +++++++++++--
+>  1 file changed, 11 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/intc-r8a7740.c b/arch/arm/mach-shmobile/intc-r8a7740.c
+> index 8871f77..5dc57f1 100644
+> --- a/arch/arm/mach-shmobile/intc-r8a7740.c
+> +++ b/arch/arm/mach-shmobile/intc-r8a7740.c
+> @@ -53,14 +53,23 @@ static void __init r8a7740_init_irq_common(void)
+>  
+>  void __init r8a7740_init_irq_of(void)
+>  {
+> +	if (!IS_ENABLED(CONFIG_OF))
+> +		return;
+> +
 
-As I'm writing my pinctrl driver, I find myself creating an array to hold extra pin-specific information.  In the chip I'm working on, there is a pincfg register for each pin, but the fields of the register are slightly different for different pin types (eg. normal pins vs i2c pins).  I can simply create an array in my driver to hold this information, so I would have a list of PINCTRL_PIN(...) macros to define the pins, and another array to define the pin types - this works perfectly fine.  However, I thought this kind of per-pin data would fit nicely into the pinctrl_pin_desc structure.  Pin groups and pin functions are defined by the driver, so I thought it would be nice if the pin desc have this flexibility as well.  What do you think about expanding the struct to something like this:
+In other parts of the shmobile I believe that such code is
+guarded by #ifdef CONFIG_OF and I believe not guarding this code in
+some way was an oversight.
 
-struct pinctrl_pin_desc {
-	unsigned number;
-	const char *name;
-	void * pin_data;
-};
+The above change seems fine to me.
 
-so that drivers can optionally use pin_data to hold other pin-specific information?  The down side is that with a void *, it may not be too useful if the pin-specific data is very different for each pin.  
+>  	irqchip_init();
+>  	r8a7740_init_irq_common();
+>  }
+>  
+>  void __init r8a7740_init_irq(void)
+>  {
+> -	void __iomem *gic_dist_base = ioremap_nocache(0xc2800000, 0x1000);
+> -	void __iomem *gic_cpu_base = ioremap_nocache(0xc2000000, 0x1000);
+> +	void __iomem *gic_dist_base;
+> +	void __iomem *gic_cpu_base;
+> +
+> +	if (!IS_ENABLED(CONFIG_ATAGS))
+> +		return;
+> +
+> +	gic_dist_base = ioremap_nocache(0xc2800000, 0x1000);
+> +	gic_cpu_base = ioremap_nocache(0xc2000000, 0x1000);
+>  
+>  	/* initialize the Generic Interrupt Controller PL390 r0p0 */
+>  	gic_init(0, 29, gic_dist_base, gic_cpu_base);
 
-Thanks,
-Sherman
+This one seems broken as the armadillo800eva board currently uses
+it to initialise GIC even if CONFIG_ATAGS is not defined.
+
+I did test the above change on the armadillo800eva board
+with the above change and CONFIG_ATAGS disabled, the result was
+a boot failure. With the change reverted booting seems fine.
