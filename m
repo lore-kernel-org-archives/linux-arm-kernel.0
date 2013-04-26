@@ -1,90 +1,76 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 26 Apr 2013 11:00:02 +0100
-Subject: [PATCH] of: Set the DMA mask to 64 bits on ARM LPAE systems
-In-Reply-To: <51796365.5030405@codeaurora.org>
-References: <1366764649-10342-1-git-send-email-lauraa@codeaurora.org>
- <20130425133315.GA7157@localhost.cambridge.arm.com>
- <51796365.5030405@codeaurora.org>
-Message-ID: <20130426100001.GB5007@localhost.cambridge.arm.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 26 Apr 2013 12:00:58 +0200
+Subject: [PATCH 11/14] sched: filter task pull request
+In-Reply-To: <1366910611-20048-12-git-send-email-vincent.guittot@linaro.org>
+References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
+ <1366910611-20048-12-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <CAKfTPtCUvKmTHzyVRCkGyM-nWOSWP8OUzMgyCyzPEXf1NoxsQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 06:09:57PM +0100, Laura Abbott wrote:
-> On 4/25/2013 6:33 AM, Catalin Marinas wrote:
-> > On Wed, Apr 24, 2013 at 01:50:49AM +0100, Laura Abbott wrote:
-> >> By default on ARM systems, the coherent DMA mask (lowest
-> >> address) is set to ~0 or 0xFFFFFFFFFFFFFFFF. Currently,
-> >> of_platform_device_create_pdata sets the coherent DMA mask to
-> >> 32 bits. This prevents coherent dma allocations from working by default
-> >> without clients setting the DMA mask. Rather than make every client
-> >> on an LPAE system set the mask, set the mask to a 64 bit value on
-> >> ARM LPAE systems.
-> >>
-> >> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> >> ---
-> >>   drivers/of/platform.c |    4 ++++
-> >>   1 files changed, 4 insertions(+), 0 deletions(-)
-> >>
-> >> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> >> index 0970505..18b69c1 100644
-> >> --- a/drivers/of/platform.c
-> >> +++ b/drivers/of/platform.c
-> >> @@ -214,7 +214,11 @@ struct platform_device *of_platform_device_create_pdata(
-> >>   #if defined(CONFIG_MICROBLAZE)
-> >>   	dev->archdata.dma_mask = 0xffffffffUL;
-> >>   #endif
-> >> +#ifdef CONFIG_ARM_LPAE
-> >> +	dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
-> >> +#else
-> >>   	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> >> +#endif
-> >
-> > I wouldn't add CONFIG_ARM_LPAE checks in here, you can use
-> > CONFIG_ARCH_DMA_ADDR_T_64BIT (types.h uses this for the dma_addr_t
-> > definition).
-> >
-> 
-> I thought about this as well but in arch/arm/mm/mm.h:
-> 
-> #ifdef CONFIG_ZONE_DMA
-> extern phys_addr_t arm_dma_limit;
-> #else
-> #define arm_dma_limit ((phys_addr_t)~0)
-> #endif
+Part of this patch is missing, the fix below is needed
 
-Russell replied already on the meaning of this variable, so I don't
-think its type is relevant here. It is also used when calling
-dma_contiguous_reserve() which takes a phys_addr_t.
+@@ -3497,7 +3497,9 @@ static bool is_buddy_full(int cpu)
+ static bool is_my_buddy(int cpu, int buddy)
+ {
+  int my_buddy = per_cpu(sd_pack_buddy, cpu);
+- return (my_buddy == -1) || (buddy == my_buddy);
++
++ return ((sysctl_sched_packing_mode == SCHED_PACKING_FULL) &&
++               ((my_buddy == -1) || (buddy == my_buddy)));
+ }
 
-> arm_dma_limit is explicitly cast to phys_addr_t, which means that 
-> arm_dma_limit will be always be sizeof(phys_addr_t) regardless of 
-> sizeof(dma_addr_t). Is it safe to assume that 
-> CONFIG_ARCH_DMA_ADDR_T_64BIT will always be selected if 
-> sizeof(phys_addr_t) == 8? If not, we've defeated the point of the patch.
+ static bool is_light_task(struct task_struct *p)
 
-sizeof(dma_addr_t) <= sizeof(phys_addr_t). I had this discussion with
-Russell when upstreaming the LPAE patches and the conclusion was that
-while the phys_addr_t is 64-bit with LPAE, the dma_addr_t size is a
-feature of the SoC and must be selected independently. However, I think
-with multi-platform support and LPAE enabled, we should probably set the
-dma_addr_t to 64-bit.
 
-> Alternatively, should the type of arm_dma_limit be dma_addr_t instead of 
-> phys_addr_t?
-
-arm_dma_limit should be phys_addr_t since this is an address as seen by
-the CPU. dma_addr_t OTOH is a bus address as seen by the device. You can
-in theory have a DMA buffer with physical address beyond 32-bit (from a
-CPU perspective) but with a bus address withing 32-bit as seen by the
-device.
-
-There is some confusion in the kernel (you can google for past
-discussions) around the meaning of the DMA mask. If your RAM starts at
-0, it doesn't matter much and there are several such assumptions in the
-kernel.
-
-So I still consider that you should use #ifdef
-CONFIG_ARCH_DMA_ADDR_T_64BIT and select this option on your platform.
-
--- 
-Catalin
+On 25 April 2013 19:23, Vincent Guittot <vincent.guittot@linaro.org> wrote:
+> Only CPUs that participates to the packing effort can pull tasks on a busiest
+> group.
+>
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> ---
+>  kernel/sched/fair.c |   14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+>
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index 28f8ea7..6f63fb9 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -3494,6 +3494,12 @@ static bool is_buddy_full(int cpu)
+>         return (sum * 1024 >= period * 1000);
+>  }
+>
+> +static bool is_my_buddy(int cpu, int buddy)
+> +{
+> +       int my_buddy = per_cpu(sd_pack_buddy, cpu);
+> +       return (my_buddy == -1) || (buddy == my_buddy);
+> +}
+> +
+>  static bool is_light_task(struct task_struct *p)
+>  {
+>         /* A light task runs less than 20% in average */
+> @@ -4688,8 +4694,8 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+>
+>                 /* Bias balancing toward cpus of our domain */
+>                 if (local_group) {
+> -                       if (idle_cpu(i) && !first_idle_cpu &&
+> -                                       cpumask_test_cpu(i, sched_group_mask(group))) {
+> +                       if (is_my_buddy(i, i) && idle_cpu(i) && !first_idle_cpu
+> +                        && cpumask_test_cpu(i, sched_group_mask(group))) {
+>                                 first_idle_cpu = 1;
+>                                 balance_cpu = i;
+>                         }
+> @@ -4817,6 +4823,10 @@ static void update_plb_buddy(int cpu, int *balance, struct sd_lb_stats *sds,
+>
+>         /* Get my new buddy */
+>         buddy = per_cpu(sd_pack_buddy, cpu);
+> +
+> +       /* This CPU doesn't act for agressive packing */
+> +       if (buddy != cpu)
+> +               sds->busiest = 0;
+>  }
+>
+>  /**
+> --
+> 1.7.9.5
+>
