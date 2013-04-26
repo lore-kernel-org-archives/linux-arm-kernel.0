@@ -1,44 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 26 Apr 2013 17:45:51 +0100
-Subject: [PATCH v4 5/7] ARM: KVM: rework HYP page table freeing
-In-Reply-To: <20130426110558.GE5007@localhost.cambridge.arm.com>
-References: <1365790327-2138-1-git-send-email-marc.zyngier@arm.com>
- <1365790327-2138-6-git-send-email-marc.zyngier@arm.com>
- <20130426110558.GE5007@localhost.cambridge.arm.com>
-Message-ID: <517AAF3F.20500@arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 26 Apr 2013 09:49:46 -0700
+Subject: [V2 PATCH] cpuidle: add maintainer entry
+In-Reply-To: <1366974344-26064-1-git-send-email-daniel.lezcano@linaro.org>
+ (Daniel Lezcano's message of "Fri, 26 Apr 2013 13:05:44 +0200")
+References: <1366974344-26064-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <87txmtz179.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/04/13 12:05, Catalin Marinas wrote:
-> On Fri, Apr 12, 2013 at 07:12:05PM +0100, Marc Zyngier wrote:
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index bfc5927..7464824 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
-> ...
->> +static void clear_pmd_entry(pmd_t *pmd)
->> +{
->> +	pte_t *pte_table = pte_offset_kernel(pmd, 0);
->> +	pmd_clear(pmd);
->> +	pte_free_kernel(NULL, pte_table);
->> +	put_page(virt_to_page(pmd));
->> +}
-> ...
->>  static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
-> 
-> Is there a chance that this function (or the other unmapping function
-> for Hyp pages) is called on an active stage 2 table (VTTBR pointing to
-> this pgd)? If yes, than you probably have to follow the mmu_gather
-> mechanism of freeing page table pages to avoid speculative loads.
-> Basically flushing the TLB between pmd_clear and pte_free_kernel.
+Daniel Lezcano <daniel.lezcano@linaro.org> writes:
 
-Blah. You're right, we got it wrong.
+> Currently the cpuidle drivers are spread across the different archs.
+>
+> The patch submission for cpuidle are following different path: the cpuidle core
+> code goes to linux-pm, the ARM drivers goes to arm-soc or the SoC specific
+> tree, sh goes through sh arch tree, pseries goes through PowerPC and
+> finally intel goes through Len's tree while acpi_idle goes under linux-pm.
+>
+> That makes difficult to consolidate the code and to propagate modifications
+> from the cpuidle core to the different drivers.
+>
+> Hopefully, a movement has initiated to put the cpuidle drivers into the
+> drivers/cpuidle directory like cpuidle-calxeda.c and cpuidle-kirkwood.c
+>
+> Add an explicit maintainer entry in the MAINTAINER to clarify the situation
+> and prevent new cpuidle drivers to goes to an arch directory.
+>
+> The upstreaming process is unchanged: Rafael takes the patches to merge them
+> into its tree but with the acked-by from the driver's maintainer. So the header
+> must contains the name of the maintainer.
+>
+> This organization will be the same than cpufreq.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Andrew Lunn <andrew@lunn.ch>  #for kirkwood
+> Acked-by: Jason Cooper <jason@lakedaemon.net> #for kirkwood
 
-We need to move our TLB invalidation out of kvm_unmap_hva_handler, and
-put it in clear_pmd_entry. I'll cook a patch.
-
-Thanks for reviewing.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Acked-by: Kevin Hilman <khilman@linaro.org>
