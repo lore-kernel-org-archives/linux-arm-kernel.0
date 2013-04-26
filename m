@@ -1,41 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Apr 2013 16:43:32 +0200
-Subject: [PATCH v2] pinctrl: move subsystem mutex to pinctrl_dev struct
-In-Reply-To: <1366794119-766-1-git-send-email-linus.walleij@stericsson.com>
-References: <1366794119-766-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <2852417.oyEN2DhaoE@wuerfel>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 26 Apr 2013 16:52:50 +0200
+Subject: [PATCH 08/14] sched: trig ILB on an idle buddy
+In-Reply-To: <20130426131532.GB13964@dyad.programming.kicks-ass.net>
+References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
+ <1366910611-20048-9-git-send-email-vincent.guittot@linaro.org>
+ <20130426131532.GB13964@dyad.programming.kicks-ass.net>
+Message-ID: <CAKfTPtCJzoYNEDu4WJWs0LraL59r8ZDuavBv9rypRKJiX4ZL7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 April 2013 11:01:59 Linus Walleij wrote:
->  /**
-> - * pinctrl_lookup_state() - retrieves a state handle from a pinctrl handle
-> - * @p: the pinctrl handle to retrieve the state from
-> - * @name: the state name to retrieve
-> + * pinctrl_select_state() - select/activate/program a pinctrl state to HW
-> + * @p: the pinctrl handle for the device that requests configuration
-> + * @state: the state handle to select/activate/program
->   */
-> -struct pinctrl_state *pinctrl_lookup_state(struct pinctrl *p, const char *name)
-> -{
-> -       struct pinctrl_state *s;
-> -
-> -       mutex_lock(&pinctrl_mutex);
-> -       s = pinctrl_lookup_state_locked(p, name);
-> -       mutex_unlock(&pinctrl_mutex);
-> -
-> -       return s;
-> -}
-> -EXPORT_SYMBOL_GPL(pinctrl_lookup_state);
-> -
-> -static int pinctrl_select_state_locked(struct pinctrl *p,
-> -                                      struct pinctrl_state *state)
-> +int pinctrl_select_state(struct pinctrl *p, struct pinctrl_state *state)
->  {
->         struct p
+On 26 April 2013 15:15, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Thu, Apr 25, 2013 at 07:23:24PM +0200, Vincent Guittot wrote:
+>> If the buddy CPU is not full and currently idle, we trigger an Idle Load
+>> Balance to give it the opportunity to pull more tasks.
+>>
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> ---
+>>  kernel/sched/fair.c |   24 ++++++++++++++++++++++++
+>>  1 file changed, 24 insertions(+)
+>>
+>> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+>> index 874f330..954adfd 100644
+>> --- a/kernel/sched/fair.c
+>> +++ b/kernel/sched/fair.c
+>> @@ -5776,6 +5776,26 @@ end:
+>>       clear_bit(NOHZ_BALANCE_KICK, nohz_flags(this_cpu));
+>>  }
+>>
+>> +static int check_nohz_buddy(int cpu)
+>> +{
+>> +     int buddy = per_cpu(sd_pack_buddy, cpu);
+>> +
+>> +     if (sysctl_sched_packing_mode != SCHED_PACKING_FULL)
+>> +             return false;
+>> +
+>> +     /* No pack buddy for this CPU */
+>> +     if (buddy == -1)
+>> +             return false;
+>> +
+>> +     if (is_buddy_full(buddy))
+>> +             return false;
+>> +
+>> +     if (cpumask_test_cpu(buddy, nohz.idle_cpus_mask))
+>> +             return true;
+>> +
+>> +     return false;
+>
+> return cpumask_test_cpu(..); ?
+
+right
+
+>
+>> +}
+>> +
+>>  /*
+>>   * Current heuristic for kicking the idle load balancer in the presence
+>>   * of an idle cpu is the system.
+>> @@ -5813,6 +5833,10 @@ static inline int nohz_kick_needed(struct rq *rq, int cpu)
+>>       if (rq->nr_running >= 2)
+>>               goto need_kick;
+>>
+>> +     /* the buddy is idle and not busy so we can pack */
+>> +     if (check_nohz_buddy(cpu))
+>> +             goto need_kick;
+>> +
+>>       rcu_read_lock();
+>>       for_each_domain(cpu, sd) {
+>>               struct sched_group *sg = sd->groups;
+>
+> Bah.. this code is so confusing.. nohz_balance_kick(cpu) won't actually kick
+> @cpu.
+>
+> Again.. suppose we're a big cpu (2) and our little buddy cpu (0) is busy, we
+> miss an opportunity to kick the other little cpu into gear (1) and maybe take
+> the big core out.
+
+You're right that we can miss an opportunity but it means that cpus
+allocated to packing effort are full and a new buddy cpu is going to
+be allocated and will pull the task a bit later.
 
 
-This showed up in linux-next and broke a lot of driver modules, since you
-remove the EXPORT_SYMBOL_GPL(pinctrl_lookup_state) line.
-
-	Arnd
+>
+>
