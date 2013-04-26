@@ -1,31 +1,65 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 26 Apr 2013 16:13:23 +0200
-Subject: [PATCH v2] mfd: vexpress: Handle pending config transactions
-In-Reply-To: <1366910091-17971-1-git-send-email-pawel.moll@arm.com>
-References: <1366821084-12815-1-git-send-email-pawel.moll@arm.com>
- <1366910091-17971-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <20130426141323.GA4796@zurbaran>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 26 Apr 2013 16:23:10 +0200
+Subject: [PATCH 07/14] sched: agressively pack at wake/fork/exec
+In-Reply-To: <20130426130835.GA13964@dyad.programming.kicks-ass.net>
+References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
+ <1366910611-20048-8-git-send-email-vincent.guittot@linaro.org>
+ <20130426130835.GA13964@dyad.programming.kicks-ass.net>
+Message-ID: <CAKfTPtCCX+wue+EupB=0firvaA8mZAFpGwtPOb43BUCNKOfJxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
+On 26 April 2013 15:08, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Thu, Apr 25, 2013 at 07:23:23PM +0200, Vincent Guittot wrote:
+>> According to the packing policy, the scheduler can pack tasks at different
+>> step:
+>> -SCHED_PACKING_NONE level: we don't pack any task.
+>> -SCHED_PACKING_DEFAULT: we only pack small tasks at wake up when system is not
+>> busy.
+>> -SCHED_PACKING_FULL: we pack tasks at wake up until a CPU becomes full. During
+>> a fork or a exec, we assume that the new task is a full running one and we
+>> look for an idle CPU close to the buddy CPU.
+>
+> This changelog is very short on explaining how it will go about achieving these
+> goals.
 
-On Thu, Apr 25, 2013 at 06:14:51PM +0100, Pawel Moll wrote:
-> The config transactions "scheduler" was hopelessly broken,
-> repeating completed transaction instead of picking up
-> next pending one.
-> 
-> Fixed now. Also improved debug messages.
-> 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-> ---
->  drivers/mfd/vexpress-config.c |   35 +++++++++++++++++++++--------------
->  1 file changed, 21 insertions(+), 14 deletions(-)
-Applied and pushed, thanks.
+I could move some explanation of the cover letter inside the commit :
+ In this case, the CPUs pack their tasks in their buddy until they
+becomes full. Unlike
+the previous step, we can't keep the same buddy so we update it during load
+balance. During the periodic load balance, the scheduler computes the activity
+of the system thanks the runnable_avg_sum and the cpu_power of all CPUs and
+then it defines the CPUs that will be used to handle the current activity. The
+selected CPUs will be their own buddy and will participate to the default
+load balancing mecanism in order to share the tasks in a fair way, whereas the
+not selected CPUs will not, and their buddy will be the last selected CPU.
+The behavior can be summarized as: The scheduler defines how many CPUs are
+required to handle the current activity, keeps the tasks on these CPUS and
+perform normal load balancing
 
-Cheers,
-Samuel.
+>
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> ---
+>>  kernel/sched/fair.c |   47 ++++++++++++++++++++++++++++++++++++++++++-----
+>>  1 file changed, 42 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+>> index 98166aa..874f330 100644
+>> --- a/kernel/sched/fair.c
+>> +++ b/kernel/sched/fair.c
+>> @@ -3259,13 +3259,16 @@ static struct sched_group *
+>>  find_idlest_group(struct sched_domain *sd, struct task_struct *p,
+>
+>
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+A task that wakes up will be caught by the function check_pack_buddy
+in order to stay in the CPUs that participates to the packing effort.
+We will use the find_idlest_group only for fork/exec tasks which are
+considered as full running tasks so we looks for the idlest CPU close
+to the buddy.
+
+> So for packing into power domains, wouldn't you typically pick the busiest non-
+> full domain to fill from other non-full?
+>
+> Picking the idlest non-full seems like it would generate a ping-pong or not
+> actually pack anything.
