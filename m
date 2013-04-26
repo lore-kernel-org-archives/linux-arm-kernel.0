@@ -1,79 +1,47 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 26 Apr 2013 11:23:40 +0900
-Subject: [PATCH] ARM: shmobile: lager: Add GPIO LEDs
-In-Reply-To: <2538127.Zp8aiG0hQe@avalon>
-References: <1366599990-31751-1-git-send-email-horms+renesas@verge.net.au>
- <1761228.8meccMO5Km@avalon> <20130423011524.GE12017@verge.net.au>
- <2538127.Zp8aiG0hQe@avalon>
-Message-ID: <20130426022340.GA31993@verge.net.au>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 25 Apr 2013 21:51:10 -0500
+Subject: [RFC PATCH v3 02/17] Documentation: devicetree: arm: cpus/cpu
+ nodes bindings updates
+In-Reply-To: <1366824502-19729-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366824502-19729-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <CAL_JsqL2QOjTffogB6g7VK7oRUwDAmJpr=36uvFXjd+hpBL89A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 12:48:03PM +0200, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> On Tuesday 23 April 2013 10:15:25 Simon Horman wrote:
-> > On Mon, Apr 22, 2013 at 12:00:02PM +0200, Laurent Pinchart wrote:
-> > > Hi Simon,
-> > > 
-> > > Thank you for the patch.
-> > > 
-> > > On Monday 22 April 2013 12:06:30 Simon Horman wrote:
-> > > > The board has 3 LEDs connected to GPIOs. Add a led-gpio device to
-> > > > support them.
-> > > > 
-> > > > Based on "ARM: shmobile: marzen: Add GPIO LEDs" by Laurent Pinchart.
-> > > > 
-> > > > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > > ---
-> > > > 
-> > > >  arch/arm/mach-shmobile/board-lager.c | 37 +++++++++++++++++++++++++++++
-> > > >  1 file changed, 37 insertions(+)
-> > > > 
-> > > > Tested on lager board.
-> > > > Based on the tag renesas-next-20130419 of my renesas tree.
-> > > > 
-> > > > diff --git a/arch/arm/mach-shmobile/board-lager.c
-> > > > b/arch/arm/mach-shmobile/board-lager.c index 6114edd..a8aa04f 100644
-> > > > --- a/arch/arm/mach-shmobile/board-lager.c
-> > > > +++ b/arch/arm/mach-shmobile/board-lager.c
-> > > > @@ -21,13 +21,49 @@
-> > > >  #include <linux/interrupt.h>
-> > > >  #include <linux/irqchip.h>
-> > > >  #include <linux/kernel.h>
-> > > > +#include <linux/leds.h>
-> > > >  #include <linux/pinctrl/machine.h>
-> > > > +#include <linux/platform_data/gpio-rcar.h>
-> > > >  #include <linux/platform_device.h>
-> > > >  #include <mach/common.h>
-> > > >  #include <mach/r8a7790.h>
-> > > >  #include <asm/mach-types.h>
-> > > >  #include <asm/mach/arch.h>
-> > > > 
-> > > > +/* LEDS */
-> > > > +static struct gpio_led lager_leds[] = {
-> > > > +	{
-> > > > +		.name		= "led8",
-> > > > +		.gpio		= RCAR_GP_PIN(5, 17),
-> > > > +		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-> > > > +	}, {
-> > > > +		.name		= "led7",
-> > > > +		.gpio		= RCAR_GP_PIN(4, 23),
-> > > > +		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-> > > > +	}, {
-> > > > +		.name		= "led6",
-> > > > +		.gpio		= RCAR_GP_PIN(4, 22),
-> > > > +		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-> > > 
-> > > Just out of curiosity, why is the default state on ?
-> > 
-> > Only because thats what the marzen code does.
-> > Would off be a better choice?
-> 
-> It would save a little bit of power by default :-)
+On Wed, Apr 24, 2013 at 12:28 PM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> In order to extend the current cpu nodes bindings to newer CPUs
+> inclusive of AArch64 and to update support for older ARM CPUs this
+> patch updates device tree documentation for the cpu nodes bindings.
+>
+> Main changes:
+>     - adds 64-bit bindings
+>     - define usage of #address-cells
+>     - define 32/64 dts compatibility settings
+>     - defines behaviour on pre and post v7 uniprocessor systems
+>     - adds ARM 11MPcore specific reg property definition
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
 
-:^)
+[...]
 
-I think that I would rather leave it _ON for consistency with
-other shmobile board code.
+> +       - enable-method
+> +               Value type: <stringlist>
+> +               Usage and definition depend on ARM architecture version and
+> +               configuration:
+> +                       # On ARM v8 64-bit systems running the OS in AArch64,
+> +                         this property is required and must be "spin-table".
+
+What about PSCI?
+
+I don't think the ePAPR spin-table definition is sufficient for ARM.
+How do you define wake up by SGI or sev instruction.
+
+> +                       # On ARM 32-bit systems or ARM v8 systems running
+> +                         the OS in AArch32 this property is prohibited.
+
+Why?
+
+Rob
