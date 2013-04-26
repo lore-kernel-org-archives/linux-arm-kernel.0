@@ -1,31 +1,57 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Fri, 26 Apr 2013 13:19:50 +0200
-Subject: [PATCH 0/2] Early printk support for virtio console devices.
-In-Reply-To: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
-References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
-Message-ID: <BA2076A6-0688-4E5C-85F9-A9CA8FD75782@suse.de>
+From: cb@sgoc.de (Christoph G. Baumann)
+Date: Fri, 26 Apr 2013 13:20:15 +0200
+Subject: [PATCH 2/2] crypto: added support for fsl-dcp on iMX23,28,50
+In-Reply-To: <1366975215-5420-1-git-send-email-cb@sgoc.de>
+References: <1366975215-5420-1-git-send-email-cb@sgoc.de>
+Message-ID: <1366975215-5420-3-git-send-email-cb@sgoc.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: "Christoph G. Baumann" <cb@sgoc.de>
 
-On 26.04.2013, at 13:04, Pranavkumar Sawargaonkar wrote:
+This patch contains modified files.
 
-> This patch-set implements early printk support for virtio console devices without using any hypercalls.
-> 
-> The current virtio early printk code in kernel expects that hypervisor will provide some mechanism generally a hypercall to support early printk. This patch-set does not break existing hypercall based early print support.
-> 
-> This implementation adds:
-> 1. Early writeonly register named early_wr in virtio console's config space.
-> 2. Host feature flags namely VIRTIO_CONSOLE_F_EARLY_WRITE for telling guest about early-write capability in console device.
-> 
-> Early write mechanism:
-> 1. When a guest wants to out some character, it has to simply write the character to early_wr register in config space of virtio console device.
+Signed-off-by: "Christoph G. Baumann" <cb@sgoc.de>
+---
+ arch/arm/boot/dts/imx28.dtsi |    2 +-
+ drivers/staging/Kconfig      |    2 ++
+ drivers/staging/Makefile     |    1 +
+ 3 files changed, 4 insertions(+), 1 deletion(-)
 
-I won't nack this patch set, but I'll definitely express that I'm not happy with it.
-
-MMIO registers are handled by a different layer than the virtio console itself. After the virtio refactoring in QEMU, they will be completely separate drivers. So we'll be in a similar mess with early printk as we are on the s390-virtio machine, where early printk is done through hypercalls and thus we can't directly link it to the console output.
-
-I still don't see what the issue is with just implementing a small irq-less virtio driver for early printk.
-
-
-Alex
+diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+index 7ba4966..2bec573 100644
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -664,9 +664,9 @@
+ 			};
+ 
+ 			dcp at 80028000 {
++                                compatible = "fsl,fsl-dcp";
+ 				reg = <0x80028000 0x2000>;
+ 				interrupts = <52 53 54>;
+-				status = "disabled";
+ 			};
+ 
+ 			pxp at 8002a000 {
+diff --git a/drivers/staging/Kconfig b/drivers/staging/Kconfig
+index 093f10c..b3cf08b 100644
+--- a/drivers/staging/Kconfig
++++ b/drivers/staging/Kconfig
+@@ -140,4 +140,6 @@ source "drivers/staging/zcache/Kconfig"
+ 
+ source "drivers/staging/goldfish/Kconfig"
+ 
++source "drivers/staging/crypto/Kconfig"
++
+ endif # STAGING
+diff --git a/drivers/staging/Makefile b/drivers/staging/Makefile
+index fa41b04..6875e3e 100644
+--- a/drivers/staging/Makefile
++++ b/drivers/staging/Makefile
+@@ -62,3 +62,4 @@ obj-$(CONFIG_SB105X)		+= sb105x/
+ obj-$(CONFIG_FIREWIRE_SERIAL)	+= fwserial/
+ obj-$(CONFIG_ZCACHE)		+= zcache/
+ obj-$(CONFIG_GOLDFISH)		+= goldfish/
++obj-$(CONFIG_CRYPTO_HW)		+= crypto/
+-- 
+1.7.9.5
