@@ -1,73 +1,57 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 26 Apr 2013 13:09:48 -0700
-Subject: [PATCH V3 2/3] ARM: net: bpf_jit: make code generation less
- dependent on struct sk_filter.
-In-Reply-To: <517AD9E2.2090704@redhat.com>
-References: <1366824429-26652-1-git-send-email-nschichan@freebox.fr>
- <1366824429-26652-3-git-send-email-nschichan@freebox.fr>
- <3592414.M8kQZLCXlW@wuerfel>
- <20130426122601.10ec05fcb4860df1b0a5b409@linux-foundation.org>
- <517AD9E2.2090704@redhat.com>
-Message-ID: <20130426130948.cbfd2f6256afc0e3ee7abeed@linux-foundation.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri, 26 Apr 2013 13:14:49 -0700
+Subject: [PATCH v2] of: Set the DMA mask to 64 bits when dma_addr_t is
+ 64-bits
+In-Reply-To: <517ADDA9.7020701@gmail.com>
+References: <1366999565-19498-1-git-send-email-lauraa@codeaurora.org>
+ <517ADDA9.7020701@gmail.com>
+Message-ID: <517AE039.8070804@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Apr 2013 21:47:46 +0200 Daniel Borkmann <dborkman@redhat.com> wrote:
+On 4/26/2013 1:03 PM, Rob Herring wrote:
+> On 04/26/2013 01:06 PM, Laura Abbott wrote:
+>> Currently, of_platform_device_create_pdata always sets the
+>> coherent DMA mask to 32 bits. On ARM systems without CONFIG_ZONE_DMA,
+>> arm_dma_limit gets set to ~0 or 0xFFFFFFFFFFFFFFFF on LPAE based
+>> systems. Since arm_dma_limit represents the smallest dma_mask
+>> on the system, the default of 32 bits prevents any dma_coherent
+>> allocation from succeeding unless clients manually set the
+>> dma mask first. Rather than make every client on an LPAE system set
+>> the mask, set the mask to a 64 bit value on systems with 64-bit
+>> dma addresses.
+>>
+>> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+>> ---
+>>   drivers/of/platform.c |    4 ++++
+>>   1 files changed, 4 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+>> index 0970505..c669ab4 100644
+>> --- a/drivers/of/platform.c
+>> +++ b/drivers/of/platform.c
+>> @@ -214,7 +214,11 @@ struct platform_device *of_platform_device_create_pdata(
+>>   #if defined(CONFIG_MICROBLAZE)
+>>   	dev->archdata.dma_mask = 0xffffffffUL;
+>>   #endif
+>> +#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
+>> +	dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
+>> +#else
+>>   	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+>> +#endif
+>
+> How about "DMA_BIT_MASK(sizeof(dma_addr_t) * 8))" and avoid the ifdef.
+>
 
-> On 04/26/2013 09:26 PM, Andrew Morton wrote:
-> > On Fri, 26 Apr 2013 16:04:44 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
-> >> On Wednesday 24 April 2013 19:27:08 Nicolas Schichan wrote:
-> >>> @@ -858,7 +858,7 @@ b_epilogue:
-> >>>   }
-> >>>
-> >>>
-> >>> -void bpf_jit_compile(struct sk_filter *fp)
-> >>> +static void __bpf_jit_compile(struct jit_ctx *out_ctx)
-> >>>   {
-> >>>          struct jit_ctx ctx;
-> >>>          unsigned tmp_idx;
-> >>> @@ -867,11 +867,10 @@ void bpf_jit_compile(struct sk_filter *fp)
-> >>>          if (!bpf_jit_enable)
-> >>>                  return;
-> >>>
-> >>> -       memset(&ctx, 0, sizeof(ctx));
-> >>> -       ctx.skf         = fp;
-> >>> +       ctx = *out_ctx;
-> >>>          ctx.ret0_fp_idx = -1;
-> >>>
-> >>> -       ctx.offsets = kzalloc(4 * (ctx.skf->len + 1), GFP_KERNEL);
-> >>> +       ctx.offsets = kzalloc(4 * (ctx.prog_len + 1), GFP_KERNEL);
-> >>>          if (ctx.offsets == NULL)
-> >>>                  return;
-> >>>
-> >>> @@ -921,13 +920,26 @@ void bpf_jit_compile(struct sk_filter *fp)
-> >>>                  print_hex_dump(KERN_INFO, "BPF JIT code: ",
-> >>>                                 DUMP_PREFIX_ADDRESS, 16, 4, ctx.target,
-> >>>                                 alloc_size, false);
-> >>> -
-> >>> -       fp->bpf_func = (void *)ctx.target;
-> >>>   out:
-> >>>          kfree(ctx.offsets);
-> >>> +
-> >>> +       *out_ctx = ctx;
-> >>>          return;
-> >>
-> >> This part of the patch, in combination with 79617801e "filter: bpf_jit_comp:
-> >> refactor and unify BPF JIT image dump output" is now causing build errors
-> >> in linux-next:
-> >>
-> >> arch/arm/net/bpf_jit_32.c: In function '__bpf_jit_compile':
-> >> arch/arm/net/bpf_jit_32.c:930:16: error: 'fp' undeclared (first use in this function)
-> >>     bpf_jit_dump(fp->len, alloc_size, 2, ctx.target);
-> >
-> > Thanks, I did this.  There may be a smarter way...
-> 
-> I think also seccomp_jit_compile() would need this change then, otherwise the build
-> with CONFIG_SECCOMP_FILTER_JIT might break.
+Sounds good.
 
-urgh, that tears it.
 
-> I can fix this up for you if not already applied. I presume it's against
-> linux-next tree?
+> Rob
+>
 
-Yup, please send something.
+Thanks,
+Laura
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
