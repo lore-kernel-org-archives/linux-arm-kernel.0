@@ -1,41 +1,61 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 26 Apr 2013 15:08:35 +0200
-Subject: [PATCH 07/14] sched: agressively pack at wake/fork/exec
-In-Reply-To: <1366910611-20048-8-git-send-email-vincent.guittot@linaro.org>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 26 Apr 2013 15:16:33 +0200
+Subject: [PATCH 03/14] sched: pack small tasks
+In-Reply-To: <20130426123002.GA13464@dyad.programming.kicks-ass.net>
 References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
- <1366910611-20048-8-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20130426130835.GA13964@dyad.programming.kicks-ass.net>
+ <1366910611-20048-4-git-send-email-vincent.guittot@linaro.org>
+ <20130426123002.GA13464@dyad.programming.kicks-ass.net>
+Message-ID: <CAKfTPtBTs17yc_Ff9Es2m6kmvsqidwFjAxYbR0sMJSFBeGGA6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 07:23:23PM +0200, Vincent Guittot wrote:
-> According to the packing policy, the scheduler can pack tasks at different
-> step:
-> -SCHED_PACKING_NONE level: we don't pack any task.
-> -SCHED_PACKING_DEFAULT: we only pack small tasks at wake up when system is not
-> busy.
-> -SCHED_PACKING_FULL: we pack tasks at wake up until a CPU becomes full. During
-> a fork or a exec, we assume that the new task is a full running one and we
-> look for an idle CPU close to the buddy CPU.
+On 26 April 2013 14:30, Peter Zijlstra <peterz@infradead.org> wrote:
+> On Thu, Apr 25, 2013 at 07:23:19PM +0200, Vincent Guittot wrote:
+>> During the creation of sched_domain, we define a pack buddy CPU for each CPU
+>> when one is available. We want to pack at all levels where a group of CPUs can
+>> be power gated independently from others.
+>> On a system that can't power gate a group of CPUs independently, the flag is
+>> set at all sched_domain level and the buddy is set to -1. This is the default
+>> behavior.
+>>
+>> On a dual clusters / dual cores system which can power gate each core and
+>> cluster independently, the buddy configuration will be :
+>>
+>>       | Cluster 0   | Cluster 1   |
+>>       | CPU0 | CPU1 | CPU2 | CPU3 |
+>> -----------------------------------
+>> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
+>>
+>> If the cores in a cluster can't be power gated independently, the buddy
+>> configuration becomes:
+>>
+>>       | Cluster 0   | Cluster 1   |
+>>       | CPU0 | CPU1 | CPU2 | CPU3 |
+>> -----------------------------------
+>> buddy | CPU0 | CPU1 | CPU0 | CPU0 |
+>>
+>> Small tasks tend to slip out of the periodic load balance so the best place
+>> to choose to migrate them is during their wake up. The decision is in O(1) as
+>> we only check again one buddy CPU
+>
+>
+> So I really don't get the point of this buddy stuff, even for light load non
+> performance impact stuff you want to do.
+>
+> The moment you judge cpu0 busy you'll bail, even though its perfectly doable
+> (and desirable afaict) to continue stacking light tasks on cpu1 instead of
+> waking up cpu2/3.
+>
+> So what's wrong with keeping a single light-wake target cpu selection and
+> updating it appropriately?
 
-This changelog is very short on explaining how it will go about achieving these
-goals.
+I have tried to follow the same kind of tasks migration as during load
+balance: 1 CPU in a power domain group migrates tasks with other
+groups.
 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  kernel/sched/fair.c |   47 ++++++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 42 insertions(+), 5 deletions(-)
-> 
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index 98166aa..874f330 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -3259,13 +3259,16 @@ static struct sched_group *
->  find_idlest_group(struct sched_domain *sd, struct task_struct *p,
+>
+> Also where/how does the nohz balance cpu criteria not match the light-wake
+> target criteria?
 
-
-So for packing into power domains, wouldn't you typically pick the busiest non-
-full domain to fill from other non-full?
-
-Picking the idlest non-full seems like it would generate a ping-pong or not
-actually pack anything.
+The nohz balance cpu is an idle cpu but it doesn't mean that it's the
+target cpu which will be sometime busy with the light tasks.
