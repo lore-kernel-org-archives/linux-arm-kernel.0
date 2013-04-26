@@ -1,36 +1,33 @@
 From: csd@broadcom.com (Christian Daudt)
-Date: Fri, 26 Apr 2013 08:41:55 -0700
-Subject: [PATCH] ARM: bcm: mark bcm_kona_smc_init as __init
-In-Reply-To: <201304231744.40614.arnd@arndb.de>
-References: <201304231744.40614.arnd@arndb.de>
-Message-ID: <517AA043.30005@broadcom.com>
+Date: Fri, 26 Apr 2013 08:42:58 -0700
+Subject: [PATCH] clocksource: kona: adapt to CLOCKSOURCE_OF_DECLARE change
+In-Reply-To: <1366732475-479886-5-git-send-email-arnd@arndb.de>
+References: <1366732475-479886-1-git-send-email-arnd@arndb.de>
+ <1366732475-479886-5-git-send-email-arnd@arndb.de>
+Message-ID: <517AA082.8070806@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-04-23 08:44 AM, Arnd Bergmann wrote:
-> The bcm_kona_smc_init function references the bcm_kona_smc_ids variable
-> that is marked __initconst, so the function itself has to be __init
-> to avoid this build error:
->
-> WARNING: arch/arm/mach-bcm/built-in.o(.text+0x12c): Section mismatch in reference from the function bcm_kona_smc_init() to the (unknown reference) .init.rodata:(unknown)
+On 13-04-23 08:54 AM, Arnd Bergmann wrote:
+> The CLOCKSOURCE_OF_DECLARE functions now take a device_node pointer
+> as their argument, as of the clksrc/cleanup branch in arm-soc.
+> This patch adapts the bcm_kona_timer driver to the new interface.
 >
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > Cc: Christian Daudt <csd@broadcom.com>
+> Cc: John Stultz <john.stultz@linaro.org>
 > ---
-> I have applied this trivial fix to the next/firmware branch
+>   drivers/clocksource/bcm_kona_timer.c | 15 ++++-----------
+>   1 file changed, 4 insertions(+), 11 deletions(-)
 >
-> diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
-> index 5f1d131..56d9d19 100644
-> --- a/arch/arm/mach-bcm/bcm_kona_smc.c
-> +++ b/arch/arm/mach-bcm/bcm_kona_smc.c
-> @@ -41,7 +41,7 @@ static const struct of_device_id bcm_kona_smc_ids[] __initconst = {
->   };
+> diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
+> ...
 >   
->   /* Map in the bounce area */
-> -void bcm_kona_smc_init(void)
-> +void __init bcm_kona_smc_init(void)
->   {
->   	struct device_node *node;
->   
->
+> -CLOCKSOURCE_OF_DECLARE(bcm_kona, "bcm,kona-timer",
+> -	kona_timer_init);
+> +CLOCKSOURCE_OF_DECLARE(bcm_kona, "bcm,kona-timer", kona_timer_init);
 acked-by: Christian Daudt <csd@broadcom.com>
+tested-by: Christian Daudt <csd@broadcom.com>
+
+  thanks,
+    csd
