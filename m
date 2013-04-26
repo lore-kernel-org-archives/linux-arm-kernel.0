@@ -1,205 +1,52 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Fri, 26 Apr 2013 15:42:57 +0530
-Subject: [PATCH V2] ARM: KVM: Allow host virtual timer irq number to be
- different from guest virtual timer irq number
-In-Reply-To: <3b52361974a390cff0bb0bc26b4a3b54@localhost>
-References: <1366960910-27651-1-git-send-email-anup.patel@linaro.org>
- <3b52361974a390cff0bb0bc26b4a3b54@localhost>
-Message-ID: <CALrVBktcs+Zwmqdi3JfCudF9TN1rSRSRokB=BJJh60jEmJna-A@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 26 Apr 2013 11:27:00 +0100
+Subject: [PATCH v4 2/7] xen/arm: SMP support
+In-Reply-To: <1366966304.3142.33.camel@zakaz.uk.xensource.com>
+References: <alpine.DEB.2.02.1304242012590.4180@kaball.uk.xensource.com>
+ <1366831695-13214-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1366897221.20256.544.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.02.1304251503100.4180@kaball.uk.xensource.com>
+ <1366909184.3142.0.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.02.1304251945290.4180@kaball.uk.xensource.com>
+ <1366966304.3142.33.camel@zakaz.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1304261125440.4180@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Fri, 26 Apr 2013, Ian Campbell wrote:
+> On Thu, 2013-04-25 at 19:45 +0100, Stefano Stabellini wrote:
+> > On Thu, 25 Apr 2013, Ian Campbell wrote:
+> > > > > > @@ -216,6 +245,8 @@ static int __init xen_guest_init(void)
+> > > > > >  	 * is required to use VCPUOP_register_vcpu_info to place vcpu info
+> > > > > >  	 * for secondary CPUs as they are brought up. */
+> > > > > >  	per_cpu(xen_vcpu, 0) = &HYPERVISOR_shared_info->vcpu_info[0];
+> > > > > > +	for_each_online_cpu(i)
+> > > > > > +		xen_secondary_init(i);
+> > > > > >  
+> > > > > >  	gnttab_init();
+> > > > > >  	if (!xen_initial_domain())
+> > > > > [...]
+> > > > > > @@ -244,7 +280,7 @@ static int __init xen_init_events(void)
+> > > > > >  		return -EINVAL;
+> > > > > >  	}
+> > > > > >  
+> > > > > > -	enable_percpu_irq(xen_events_irq, 0);
+> > > > > > +	on_each_cpu(xen_percpu_enable_events, NULL, 0);
+> > > > > 
+> > > > > It feels like there ought to be some sort of per-cpu bringup callback
+> > > > > which takes care of these dynamically. Maybe that doesn't matter until
+> > > > > we get vcpu hotplug going?
+> > > > 
+> > > > I suspect there isn't one, considering that on_each_cpu is also used by 
+> > > > kvm_vgic_hyp_init, kvm_timer_hyp_init and others.
+> > > 
+> > > Could we use cpu_notifiers for this?
+> > 
+> > cpu_notifiers are for cpu hotplug, not for secondary cpu bringup
+> 
+> Are you sure they don't also trigger during bringup, because the
+> distinction is a little bit academic...
 
-On 26 April 2013 15:17, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Hi Anup,
->
-> On Fri, 26 Apr 2013 12:51:50 +0530, Anup Patel <anup.patel@linaro.org>
-> wrote:
->> The arch_timer irq numbers (or PPI number) are implementation dependent
->> so, the host virtual timer irq number can be different from guest
-> virtual
->> timer irq number.
->>
->> This patch ensures that host virtual timer irq number is read from DTB
-> and
->> guest virtual timer irq is determined based on guest vcpu target type.
->
-> One word about communication first: Please keep me cc-ed on anything that
-> has to do with with vgic and timers. I'm the author of the code, I intend
-> to look after it, and this has some direct impact on the arm64 port. Thank
-> you.
-
-Sure, I'll CC you for arch_timer and vgic changes.
-
->
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->
-> Who is the author of this patch? You or Pranavkumar? If it is you, then
-> your Signed-off line should be present. If not, then there should be a
-> "From:" line at the beginning of the commit message.
-
-I really thought "From" is implicit and the sender of the email is the author.
-
-Pranav has co-authored this patch hence his signed-off by him.
-
-Anyways, I will put signed-off by me and Pranav both.
-
->
->> ---
->>  arch/arm/include/asm/kvm_host.h |    1 +
->>  arch/arm/kvm/arch_timer.c       |   25 ++++++++++++++++++-------
->>  arch/arm/kvm/guest.c            |   15 +++++++++++++++
->>  3 files changed, 34 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h
->> b/arch/arm/include/asm/kvm_host.h
->> index 57cb786..cdc0551 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -43,6 +43,7 @@
->>  struct kvm_vcpu;
->>  u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
->>  int kvm_target_cpu(void);
->> +struct kvm_irq_level *kvm_target_timer_irq(struct kvm_vcpu *vcpu);
->>  int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
->>  void kvm_reset_coprocs(struct kvm_vcpu *vcpu);
->>
->> diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
->> index 49a7516..521cdb9 100644
->> --- a/arch/arm/kvm/arch_timer.c
->> +++ b/arch/arm/kvm/arch_timer.c
->> @@ -30,7 +30,7 @@
->>
->>  static struct timecounter *timecounter;
->>  static struct workqueue_struct *wqueue;
->> -static struct kvm_irq_level timer_irq = {
->> +static struct kvm_irq_level host_timer_irq = {
->>       .level  = 1,
->>  };
->>
->> @@ -65,10 +65,21 @@ static void kvm_timer_inject_irq(struct kvm_vcpu
-> *vcpu)
->>  {
->>       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->>
->> +     /*
->> +      * The vcpu timer irq number cannont be determined in
->> +      * kvm_timer_vcpu_init() because it is called much before
->> +      * kvm_vcpu_set_target(). To handle this, we determin
->> +      * vcpu timer irq number when we inject the vcpu timer irq
->> +      * first time.
->> +      */
->> +     if (!timer->irq) {
->> +             timer->irq = kvm_target_timer_irq(vcpu);
->> +     }
->
-> Please, not yet another of these. We already have kvm_vcpu_first_run_init
-> that collects all the "do this on first vcpu run" kind of thing.
->
->>       timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
->>       kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
->> -                         vcpu->arch.timer_cpu.irq->irq,
->> -                         vcpu->arch.timer_cpu.irq->level);
->> +                         timer->irq->irq,
->> +                         timer->irq->level);
->>  }
->>
->>  static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
->> @@ -163,12 +174,12 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
->>       INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
->>       hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
->>       timer->timer.function = kvm_timer_expire;
->> -     timer->irq = &timer_irq;
->> +     timer->irq = NULL;
->>  }
->
-> So with the above in mind, how about moving the call to
-> kvm_timer_vcpu_init into kvm_vcpu_first_run_init, and do the init once and
-> for all?
-
-Yes, this would be even more cleaner.
-
->
->>  static void kvm_timer_init_interrupt(void *info)
->>  {
->> -     enable_percpu_irq(timer_irq.irq, 0);
->> +     enable_percpu_irq(host_timer_irq.irq, 0);
->>  }
->>
->>
->> @@ -182,7 +193,7 @@ static int kvm_timer_cpu_notify(struct
-> notifier_block
->> *self,
->>               break;
->>       case CPU_DYING:
->>       case CPU_DYING_FROZEN:
->> -             disable_percpu_irq(timer_irq.irq);
->> +             disable_percpu_irq(host_timer_irq.irq);
->>               break;
->>       }
->>
->> @@ -230,7 +241,7 @@ int kvm_timer_hyp_init(void)
->>               goto out;
->>       }
->>
->> -     timer_irq.irq = ppi;
->> +     host_timer_irq.irq = ppi;
->>
->>       err = register_cpu_notifier(&kvm_timer_cpu_nb);
->>       if (err) {
->> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
->> index 152d036..d87b05d 100644
->> --- a/arch/arm/kvm/guest.c
->> +++ b/arch/arm/kvm/guest.c
->> @@ -36,6 +36,11 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
->>       { NULL }
->>  };
->>
->> +struct kvm_irq_level target_default_timer_irq = {
->> +     .irq = 27,
->> +     .level = 1,
->> +};
->
-> Don't call it default, as it is A15 specific. Also make it static.
-
-Sure, will update this.
-
->
->>  int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
->>  {
->>       return 0;
->> @@ -197,6 +202,16 @@ int __attribute_const__ kvm_target_cpu(void)
->>       }
->>  }
->>
->> +struct kvm_irq_level *kvm_target_timer_irq(struct kvm_vcpu *vcpu)
->> +{
->> +     switch (vcpu->arch.target) {
->> +     case KVM_ARM_TARGET_CORTEX_A15:
->> +             return &target_default_timer_irq;
->> +     default:
->> +             return NULL;
->
-> And what do you do once you've returned NULL? Let the kernel crash?
-> Also, we now have a second path that tests the target (the first one is in
-> reset.c
-
-Actually, this function is expected to be called as part of VCPU init
-and if we get NULL then we should fail the VCPU init.
-
->
-> Actually, scratch all the above, and move the irq assignment to reset.c.
-> It is probably the best place for it.
-
-Sure, I will try this and send another patch which addresses all comments.
-
->
-> Thanks,
->
->         M.
-> --
-> Fast, cheap, reliable. Pick two.
-
-Regards,
-Anup
+My mistake, they do run on secondary cpus, but not in our case because
+xen_guest_init is called *after* cpu_notifiers are called.
+So, they are too early for Xen.
