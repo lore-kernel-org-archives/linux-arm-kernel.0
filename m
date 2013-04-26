@@ -1,36 +1,35 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 26 Apr 2013 15:29:55 +0200
-Subject: [PATCH] ARM: u300: fix ages old copy/paste bug
-Message-ID: <1366982995-10870-1-git-send-email-linus.walleij@stericsson.com>
+From: chas@cmf.nrl.navy.mil (chas williams - CONTRACTOR)
+Date: Fri, 26 Apr 2013 09:12:20 -0400
+Subject: [PATCH 05/21] atm: he: use mdelay instead of large udelay
+ constants
+In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B7203@saturn3.aculab.com>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <1366910944-3033663-6-git-send-email-arnd@arndb.de>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B7203@saturn3.aculab.com>
+Message-ID: <20130426091220.468cf59e@thirdoffive.cmf.nrl.navy.mil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Fri, 26 Apr 2013 09:21:59 +0100
+"David Laight" <David.Laight@ACULAB.COM> wrote:
 
-The UART1 is on the fast AHB bridge, not on the slow bus.
+> > ARM cannot handle udelay for more than 2 miliseconds, so we
+> > should use mdelay instead for those.
+> ...
+> > @@ -1055,7 +1055,7 @@ static int he_start(struct atm_dev *dev)
+> >  	he_writel(he_dev, 0x0, RESET_CNTL);
+> >  	he_writel(he_dev, 0xff, RESET_CNTL);
+> > 
+> > -	udelay(16*1000);	/* 16 ms */
+> > +	mdelay(16);	/* 16 ms */
+> >  	status = he_readl(he_dev, RESET_CNTL);
+> 
+> 16ms seems a long time to spin.
+> I'd have thought a sleep would be more appropriate.
+> Since this looks like timing a hardware reset pulse
+> it can't matter if it is somewhat longer.
 
-Cc: stable at vger.kernel.org
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Hi ARM SoC folks, as discussed with Arnd, please apply
-this patch directly for fixes.
----
- arch/arm/mach-u300/include/mach/u300-regs.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-u300/include/mach/u300-regs.h b/arch/arm/mach-u300/include/mach/u300-regs.h
-index 1e49d90..0320495 100644
---- a/arch/arm/mach-u300/include/mach/u300-regs.h
-+++ b/arch/arm/mach-u300/include/mach/u300-regs.h
-@@ -95,7 +95,7 @@
- #define U300_SPI_BASE			(U300_FAST_PER_PHYS_BASE+0x6000)
- 
- /* Fast UART1 on U335 only */
--#define U300_UART1_BASE			(U300_SLOW_PER_PHYS_BASE+0x7000)
-+#define U300_UART1_BASE			(U300_FAST_PER_PHYS_BASE+0x7000)
- 
- /*
-  * SLOW peripherals
--- 
-1.7.11.3
+Yes, I wrote this bit some time ago when I was less wise. The
+programmer's guide doesn't say how long to sleep, so the value isn't
+critical.  It just has to be "long enough".  An msleep() would be fine
+here.
