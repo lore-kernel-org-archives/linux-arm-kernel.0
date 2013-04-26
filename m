@@ -1,93 +1,25 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Fri, 26 Apr 2013 16:24:53 +0530
-Subject: [PATCH v2 4/6] SERIAL: OMAP: Remove the slave idle handling from the
- driver
-In-Reply-To: <1366973695-2088-1-git-send-email-rnayak@ti.com>
-References: <1366973695-2088-1-git-send-email-rnayak@ti.com>
-Message-ID: <1366973695-2088-5-git-send-email-rnayak@ti.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 26 Apr 2013 12:54:31 +0200
+Subject: [RFC PATCH v3 5/6] sched: pack the idle load balance
+In-Reply-To: <5176A932.5050506@linux.intel.com>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-6-git-send-email-vincent.guittot@linaro.org>
+ <1364302359.5053.21.camel@laptop>
+ <CAKfTPtD=_oS5gJeynUG=ft-Y1zEdxZEMhUPH9hSXx+H2pi4xgA@mail.gmail.com>
+ <1364308932.5053.46.camel@laptop>
+ <CAKfTPtArtgkH5MU_xFAKjLDS-i32g2qQMdvyW=LLkG84tH8Hhg@mail.gmail.com>
+ <5174CE96.3060805@linux.vnet.ibm.com>
+ <CAKfTPtCCCifC=c+xjjnAH_HSqkR80PiQoddQKXPHuZwZawbvcA@mail.gmail.com>
+ <5175F09E.1000304@intel.com> <5176A932.5050506@linux.intel.com>
+Message-ID: <20130426105431.GF8669@dyad.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Tue, Apr 23, 2013 at 08:30:58AM -0700, Arjan van de Ven wrote:
+> For x86 we should not be setting such flag then; we don't have a way for some cpu packages to
+> go to an extra deep power state if they're completely idle.
+> (this afaik is true for both Intel and AMD)
 
-UART IP slave idle handling now taken care by runtime pm backend(hwmod layer)
-so remove the hackery from the driver.
+You say 'some'; this implies we do for others, right?
 
-As discussed on the list, in future if dma mode needs to be brought
-back to this driver, UART sysc handling needs to be updated in
-framework such a way that no-idle/force idle profile can be supported.
-Given the broken dma mode for OMAP uarts, its very unlikely.
-
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Tested-by: Sourav Poddar <sourav.poddar@ti.com>
-Signed-off-by: Rajendra nayak <rnayak@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- drivers/tty/serial/omap-serial.c          |   23 -----------------------
- include/linux/platform_data/serial-omap.h |    2 --
- 2 files changed, 25 deletions(-)
-
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index 4dc4140..08332f3 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -202,26 +202,6 @@ static int serial_omap_get_context_loss_count(struct uart_omap_port *up)
- 	return pdata->get_context_loss_count(up->dev);
- }
- 
--static void serial_omap_set_forceidle(struct uart_omap_port *up)
--{
--	struct omap_uart_port_info *pdata = up->dev->platform_data;
--
--	if (!pdata || !pdata->set_forceidle)
--		return;
--
--	pdata->set_forceidle(up->dev);
--}
--
--static void serial_omap_set_noidle(struct uart_omap_port *up)
--{
--	struct omap_uart_port_info *pdata = up->dev->platform_data;
--
--	if (!pdata || !pdata->set_noidle)
--		return;
--
--	pdata->set_noidle(up->dev);
--}
--
- static void serial_omap_enable_wakeup(struct uart_omap_port *up, bool enable)
- {
- 	struct omap_uart_port_info *pdata = up->dev->platform_data;
-@@ -298,8 +278,6 @@ static void serial_omap_stop_tx(struct uart_port *port)
- 		serial_out(up, UART_IER, up->ier);
- 	}
- 
--	serial_omap_set_forceidle(up);
--
- 	pm_runtime_mark_last_busy(up->dev);
- 	pm_runtime_put_autosuspend(up->dev);
- }
-@@ -364,7 +342,6 @@ static void serial_omap_start_tx(struct uart_port *port)
- 
- 	pm_runtime_get_sync(up->dev);
- 	serial_omap_enable_ier_thri(up);
--	serial_omap_set_noidle(up);
- 	pm_runtime_mark_last_busy(up->dev);
- 	pm_runtime_put_autosuspend(up->dev);
- }
-diff --git a/include/linux/platform_data/serial-omap.h b/include/linux/platform_data/serial-omap.h
-index ff9b0aa..c860c1b 100644
---- a/include/linux/platform_data/serial-omap.h
-+++ b/include/linux/platform_data/serial-omap.h
-@@ -43,8 +43,6 @@ struct omap_uart_port_info {
- 	int			DTR_present;
- 
- 	int (*get_context_loss_count)(struct device *);
--	void (*set_forceidle)(struct device *);
--	void (*set_noidle)(struct device *);
- 	void (*enable_wakeup)(struct device *, bool);
- };
- 
--- 
-1.7.9.5
+We can dynamically set the required flags in the arch setup when it makes sense.
