@@ -1,104 +1,29 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 26 Apr 2013 13:05:44 +0200
-Subject: [V2 PATCH] cpuidle: add maintainer entry
-Message-ID: <1366974344-26064-1-git-send-email-daniel.lezcano@linaro.org>
+From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
+Date: Fri, 26 Apr 2013 16:34:54 +0530
+Subject: [PATCH 0/2] Early printk support for virtio console devices.
+Message-ID: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the cpuidle drivers are spread across the different archs.
+This patch-set implements early printk support for virtio console devices without using any hypercalls.
 
-The patch submission for cpuidle are following different path: the cpuidle core
-code goes to linux-pm, the ARM drivers goes to arm-soc or the SoC specific
-tree, sh goes through sh arch tree, pseries goes through PowerPC and
-finally intel goes through Len's tree while acpi_idle goes under linux-pm.
+The current virtio early printk code in kernel expects that hypervisor will provide some mechanism generally a hypercall to support early printk. This patch-set does not break existing hypercall based early print support.
 
-That makes difficult to consolidate the code and to propagate modifications
-from the cpuidle core to the different drivers.
+This implementation adds:
+1. Early writeonly register named early_wr in virtio console's config space.
+2. Host feature flags namely VIRTIO_CONSOLE_F_EARLY_WRITE for telling guest about early-write capability in console device.
 
-Hopefully, a movement has initiated to put the cpuidle drivers into the
-drivers/cpuidle directory like cpuidle-calxeda.c and cpuidle-kirkwood.c
+Early write mechanism:
+1. When a guest wants to out some character, it has to simply write the character to early_wr register in config space of virtio console device.
 
-Add an explicit maintainer entry in the MAINTAINER to clarify the situation
-and prevent new cpuidle drivers to goes to an arch directory.
+Pranavkumar Sawargaonkar (2):
+  virtio: console: Add early writeonly register to config space
+  arm64: earlyprintk support for virtio-mmio console
 
-The upstreaming process is unchanged: Rafael takes the patches to merge them
-into its tree but with the acked-by from the driver's maintainer. So the header
-must contains the name of the maintainer.
+ Documentation/virtual/virtio-spec.txt |   13 ++++++++++--
+ arch/arm64/kernel/early_printk.c      |   35 +++++++++++++++++++++++++++++++++
+ include/uapi/linux/virtio_console.h   |    3 +++
+ 3 files changed, 49 insertions(+), 2 deletions(-)
 
-This organization will be the same than cpufreq.
-
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: Andrew Lunn <andrew@lunn.ch>  #for kirkwood
-Acked-by: Jason Cooper <jason@lakedaemon.net> #for kirkwood
----
- MAINTAINERS                        |    9 +++++++++
- drivers/cpuidle/cpuidle-calxeda.c  |    4 +++-
- drivers/cpuidle/cpuidle-kirkwood.c |    5 +++--
- 3 files changed, 15 insertions(+), 3 deletions(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 61677c3..45ee6dc 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2217,6 +2217,15 @@ F:	drivers/cpufreq/arm_big_little.h
- F:	drivers/cpufreq/arm_big_little.c
- F:	drivers/cpufreq/arm_big_little_dt.c
- 
-+CPUIDLE DRIVERS
-+M:	Rafael J. Wysocki <rjw@sisk.pl>
-+M:	Daniel Lezcano <daniel.lezcano@linaro.org>
-+L:	linux-pm at vger.kernel.org
-+S:	Maintained
-+T:	git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git
-+F:	drivers/cpuidle/*
-+F:	include/linux/cpuidle.h
-+
- CPUID/MSR DRIVER
- M:	"H. Peter Anvin" <hpa@zytor.com>
- S:	Maintained
-diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-index e344b56..2233791 100644
---- a/drivers/cpuidle/cpuidle-calxeda.c
-+++ b/drivers/cpuidle/cpuidle-calxeda.c
-@@ -1,7 +1,7 @@
- /*
-  * Copyright 2012 Calxeda, Inc.
-  *
-- * Based on arch/arm/plat-mxc/cpuidle.c:
-+ * Based on arch/arm/plat-mxc/cpuidle.c: #v3.7
-  * Copyright 2012 Freescale Semiconductor, Inc.
-  * Copyright 2012 Linaro Ltd.
-  *
-@@ -16,6 +16,8 @@
-  *
-  * You should have received a copy of the GNU General Public License along with
-  * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ * Maintainer: Rob Herring <rob.herring@calxeda.com>
-  */
- 
- #include <linux/cpuidle.h>
-diff --git a/drivers/cpuidle/cpuidle-kirkwood.c b/drivers/cpuidle/cpuidle-kirkwood.c
-index 53290e1..521b0a7 100644
---- a/drivers/cpuidle/cpuidle-kirkwood.c
-+++ b/drivers/cpuidle/cpuidle-kirkwood.c
-@@ -1,6 +1,4 @@
- /*
-- * arch/arm/mach-kirkwood/cpuidle.c
-- *
-  * CPU idle Marvell Kirkwood SoCs
-  *
-  * This file is licensed under the terms of the GNU General Public
-@@ -11,6 +9,9 @@
-  * to implement two idle states -
-  * #1 wait-for-interrupt
-  * #2 wait-for-interrupt and DDR self refresh
-+ *
-+ * Maintainer: Jason Cooper <jason@lakedaemon.net>
-+ * Maintainer: Andrew Lunn <andrew@lunn.ch>
-  */
- 
- #include <linux/kernel.h>
 -- 
 1.7.9.5
