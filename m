@@ -1,50 +1,73 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 26 Apr 2013 16:36:37 +0100
-Subject: [PATCH v8 2/2] ARM: Enable selection of SMP operations at boot
- time
-In-Reply-To: <alpine.LFD.2.03.1304251040430.1258@syhkavp.arg>
+Date: Fri, 26 Apr 2013 16:36:26 +0100
+Subject: [PATCH v8 1/2] arm: introduce psci_smp_ops
+In-Reply-To: <alpine.LFD.2.03.1304251054420.1258@syhkavp.arg>
 References: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
- <1366828819-10745-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130425084933.GB12848@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1304251040430.1258@syhkavp.arg>
-Message-ID: <alpine.DEB.2.02.1304261629300.4180@kaball.uk.xensource.com>
+ <1366828819-10745-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130425084711.GA12848@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1304251104090.4180@kaball.uk.xensource.com>
+ <20130425104508.GG12848@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1304251054420.1258@syhkavp.arg>
+Message-ID: <alpine.DEB.2.02.1304261630110.4180@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 25 Apr 2013, Nicolas Pitre wrote:
 > On Thu, 25 Apr 2013, Will Deacon wrote:
 > 
-> > On Wed, Apr 24, 2013 at 07:40:19PM +0100, Stefano Stabellini wrote:
-> > > From: Jon Medhurst <tixy@linaro.org>
+> > On Thu, Apr 25, 2013 at 11:12:54AM +0100, Stefano Stabellini wrote:
+> > > On Thu, 25 Apr 2013, Will Deacon wrote:
+> > > > > +/*
+> > > > > + * cpu_suspend   Suspend the execution on a CPU
+> > > > > + * @state        we don't currently describe affinity levels, so just pass 0.
+> > > > > + * @entry_point  the first instruction to be executed on return
+> > > > > + * returns 0  success, < 0 on failure
+> > > > > + *
+> > > > > + * cpu_off       Power down a CPU
+> > > > > + * @state        we don't currently describe affinity levels, so just pass 0.
+> > > > > + * no return on successful call
+> > > > > + *
+> > > > > + * cpu_on        Power up a CPU
+> > > > > + * @cpuid        cpuid of target CPU, as from MPIDR
+> > > > > + * @entry_point  the first instruction to be executed on return
+> > > > > + * returns 0  success, < 0 on failure
+> > > > > + *
+> > > > > + * migrate       Migrate the context to a different CPU
+> > > > > + * @cpuid        cpuid of target CPU, as from MPIDR
+> > > > > + * returns 0  success, < 0 on failure
+> > > > > + *
+> > > > > + */
+> > > > 
+> > > > Can you move these comments into psci-smp.c please? They're really specific
+> > > > to the implementation there, and if we put them in a header we're lying to
+> > > > ourselves about the parameters actually described by the PSCI specification.
 > > > 
-> > > Add a new 'smp_init' hook to machine_desc so platforms can specify a
-> > > function to be used to setup smp ops instead of having a statically
-> > > defined value.  The hook must return true when smp_ops are initialized.
-> > > If false the static mdesc->smp_ops will be used by default.
+> > > You have a good point about the PSCI spec.
 > > > 
-> > > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > > ---
-> > >  arch/arm/include/asm/mach/arch.h |    4 ++++
-> > >  arch/arm/kernel/setup.c          |   10 ++++++----
-> > >  2 files changed, 10 insertions(+), 4 deletions(-)
+> > > However from the Linux POV these comments should regard the functions
+> > > exported by psci_operations, not the firmware interface, this is why I
+> > > think it makes sense to keep them in psci.h.
+> > > What we are saying is for example that psci_operations.cpu_on returns 0
+> > > on success and < 0 on failure, and it takes a cpuid and an entry point
+> > > as parameters. We are not saying anything about the firmware interface.
 > > 
-> > [...]
-> > 
-> > >  	if (is_smp()) {
-> > > -		if (psci_smp_available())
-> > > -			smp_set_ops(&psci_smp_ops);
-> > > -		else if (mdesc->smp)
-> > > -			smp_set_ops(mdesc->smp);
-> > > +		if (!mdesc->smp_init || !mdesc->smp_init()) {
-> > 
-> > Minor nit, but this feels backwards to me. We usually return 0 on success,
-> > yet we're saying here that if mdesc->smp_init() returns 0, then we go and
-> > override the smp ops.
+> > I disagree. You're explicitly stating that we pass the `cpuid of target CPU,
+> > as from MPIDR'. That's simply not true -- the firmware could choose any
+> > numbering scheme to identify the CPUs. For KVM and Xen, it *is* the mpidr,
+> > which is why psci-smp.c works at all, but that's where the comment belongs,
+> > not in this header file.
 > 
-> It doesn't return 0, but true or false.  So, semantically, if ->smp_init 
-> returns false, that means it didn't initialize anything.
+> At some point, the _kernel_ API for interfacing with the firmware's PSCI 
+> will have to ensure uniformity somehow.  The PSCI interface code could 
+> translate the passed MPIDR into whatever the firmware decided to use for 
+> identifying CPUs if needed, keeping this issue localized.
 
-In absence of other comments, I am going to leave as it is now.
+That is what I had in mind when I said to keep the comment in psci.h
+before.
+We have to draw the line somewhere to expose a uniform internal kernel
+API. However it is a bit difficult to do now given that we have only one
+user of the API.
+
+I don't feel to strongly about this, please let me know what is the
+final decision and I'll update the code accordingly. I remind you that
+the merge window is approaching :-)
