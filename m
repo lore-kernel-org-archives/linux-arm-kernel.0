@@ -1,119 +1,121 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Fri, 26 Apr 2013 22:02:47 +0000
-Subject: [PATCH] ARM: Adds pin config API to set all configs in one
- function
-In-Reply-To: <CACRpkdbT7f8ujCHZxKg26iMKcrAb+_yHW_2YsZwkoo892rkgTA@mail.gmail.com>
-References: <1366841010-2823-1-git-send-email-syin@broadcom.com>
- <CACRpkdbT7f8ujCHZxKg26iMKcrAb+_yHW_2YsZwkoo892rkgTA@mail.gmail.com>
-Message-ID: <051069C10411E24D9749790C498526FA1BCF5427@SJEXCHMB12.corp.ad.broadcom.com>
+From: xi.wang@gmail.com (Xi Wang)
+Date: Fri, 26 Apr 2013 18:18:58 -0400
+Subject: [PATCH V3 2/3] ARM: net: bpf_jit: make code generation less
+ dependent on struct sk_filter.
+In-Reply-To: <517AF926.3020302@redhat.com>
+References: <1366824429-26652-1-git-send-email-nschichan@freebox.fr>
+ <1366824429-26652-3-git-send-email-nschichan@freebox.fr>
+ <3592414.M8kQZLCXlW@wuerfel>
+ <20130426122601.10ec05fcb4860df1b0a5b409@linux-foundation.org>
+ <517AD9E2.2090704@redhat.com>
+ <20130426130948.cbfd2f6256afc0e3ee7abeed@linux-foundation.org>
+ <517AF926.3020302@redhat.com>
+Message-ID: <CAKU6vyYOZ-24TSyLa8t6Oipib37fE1gtvM8nWj2TDzVw-tv0jA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Thanks for CCing.  One way to clean up this would be to refactor the
+bpf jit interface as:
 
-> We discussed this already at the creation of the pinctrl framework.
-> 
-> What you should do is to add an optional pin_config_set_complete()
-> and pin_config_group_set_complete()
-> callback that is called after the framework has iterated over all
-> configs.
+  bpf_func_t bpf_jit_compile(struct sock_filter *filter, unsigned int flen);
+  void bpf_jit_free(bpf_func_t bpf_func);
 
-Perhaps I have misunderstood you previously, as I thought you are ok with letting
-the driver take care of the loop.  The difference being instead of just moving the for 
-loop inside the driver's pin_config_set(), I followed Stephen's suggestion due to
-concern about drivers duplicating the loop:  
-(quote again here since I didn't send to the mail list last time)
+Then both packet and seccomp filters can share the unified interface.
+Also, we don't need seccomp_filter_get_len() and other helpers.
 
-[quote]
+Do you want me to rebase my patch against linux-next and see how that goes?
 
->>>>> pin_config_set() is called for each element of the array, one at a time:
->>>>>
->>>>> 328int pinconf_apply_setting(struct pinctrl_setting const *setting)
->>>>> ...
->>>>> 345             for (i = 0; i < setting->data.configs.num_configs; i++) {
->>>>> 346                     ret = ops->pin_config_set(pctldev,
->>>>> 347                                     setting->data.configs.group_or_pin,
->>>>> 348                                     setting->data.configs.configs[i]);
->>>>>
->>>>> Wouldn't it be more flexible if the for loop is moved inside the custom
->>>>> pin_config_set() function, and the core code pass in the whole
->>>>> configs[] array and num_configs?  This allows the driver to possibly
->>>>> combine different configs and make less write() calls to the registers.
->>>>
->>>> What you are saying is making a lot of sense.
->>>>
->>>> And I even think I have that problem where the batch of writes
->>>> may cause spurious IRQs that can be suppressed by disabling
->>>> IRQs in the driver when processing a queue of configs.
->>>>
->>>> Stephen what do you think?
->>>>
->>>> Sherman, would you be interested in writing a patch for this?
->>>>
->>>> You would have to patch all current users of the interface in
->>>> the same patch.
->>>>
->>>> You could actually provide a static inline helper to iterate over
->>>> the array to make it hard to do mistakes.
->>>
->>> I can see that applying all the configs at once might be useful.
->>>
->>> However, I don't think it makes sense to force all the drivers to
->>> iterate over all the configs themselves; that would just be duplicating
->>> the for loop in many drivers without any purpose.
->>>
->>> Instead, perhaps add a new "set_configs" operation in the driver
->>> structure. The core can call set_configs once if exists, and if not, the
->>> core can loop over each individual config and call the existing
->>> set_config function. This is just like the set_function operation, which
->>> can either be called once on a group, or once per pin, by the core.
+- xi
+
+On Fri, Apr 26, 2013 at 6:01 PM, Daniel Borkmann <dborkman@redhat.com> wrote:
+> On 04/26/2013 10:09 PM, Andrew Morton wrote:
 >>
->> I don't mind writing the patch, once we agree on the method.  I can't test 
->> the other platforms though.
+>> On Fri, 26 Apr 2013 21:47:46 +0200 Daniel Borkmann <dborkman@redhat.com>
+>> wrote:
+>>>
+>>> On 04/26/2013 09:26 PM, Andrew Morton wrote:
+>>>>
+>>>> On Fri, 26 Apr 2013 16:04:44 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
+>>>>>
+>>>>> On Wednesday 24 April 2013 19:27:08 Nicolas Schichan wrote:
+>>>>>>
+>>>>>> @@ -858,7 +858,7 @@ b_epilogue:
+>>>>>>    }
+>>>>>>
+>>>>>>
+>>>>>> -void bpf_jit_compile(struct sk_filter *fp)
+>>>>>> +static void __bpf_jit_compile(struct jit_ctx *out_ctx)
+>>>>>>    {
+>>>>>>           struct jit_ctx ctx;
+>>>>>>           unsigned tmp_idx;
+>>>>>> @@ -867,11 +867,10 @@ void bpf_jit_compile(struct sk_filter *fp)
+>>>>>>           if (!bpf_jit_enable)
+>>>>>>                   return;
+>>>>>>
+>>>>>> -       memset(&ctx, 0, sizeof(ctx));
+>>>>>> -       ctx.skf         = fp;
+>>>>>> +       ctx = *out_ctx;
+>>>>>>           ctx.ret0_fp_idx = -1;
+>>>>>>
+>>>>>> -       ctx.offsets = kzalloc(4 * (ctx.skf->len + 1), GFP_KERNEL);
+>>>>>> +       ctx.offsets = kzalloc(4 * (ctx.prog_len + 1), GFP_KERNEL);
+>>>>>>           if (ctx.offsets == NULL)
+>>>>>>                   return;
+>>>>>>
+>>>>>> @@ -921,13 +920,26 @@ void bpf_jit_compile(struct sk_filter *fp)
+>>>>>>                   print_hex_dump(KERN_INFO, "BPF JIT code: ",
+>>>>>>                                  DUMP_PREFIX_ADDRESS, 16, 4,
+>>>>>> ctx.target,
+>>>>>>                                  alloc_size, false);
+>>>>>> -
+>>>>>> -       fp->bpf_func = (void *)ctx.target;
+>>>>>>    out:
+>>>>>>           kfree(ctx.offsets);
+>>>>>> +
+>>>>>> +       *out_ctx = ctx;
+>>>>>>           return;
+>>>>>
+>>>>>
+>>>>> This part of the patch, in combination with 79617801e "filter:
+>>>>> bpf_jit_comp:
+>>>>> refactor and unify BPF JIT image dump output" is now causing build
+>>>>> errors
+>>>>> in linux-next:
+>>>>>
+>>>>> arch/arm/net/bpf_jit_32.c: In function '__bpf_jit_compile':
+>>>>> arch/arm/net/bpf_jit_32.c:930:16: error: 'fp' undeclared (first use in
+>>>>> this function)
+>>>>>      bpf_jit_dump(fp->len, alloc_size, 2, ctx.target);
+>>>>
+>>>>
+>>>> Thanks, I did this.  There may be a smarter way...
+>>>
+>>>
+>>> I think also seccomp_jit_compile() would need this change then, otherwise
+>>> the build
+>>> with CONFIG_SECCOMP_FILTER_JIT might break.
 >>
->> Stephen, I'm not quite sure about duplicating the for loop - I was thinking 
->> just to remove the for loop in pinconf_apply_setting() and add the loop in 
->> the driver-defined function, so in the end there is still only 1 for loop.   
->> Functionally it shouldn't affect existing drivers, but it gives new drivers 
->> an opportunity to optimize based on their register design.
+>>
+>> urgh, that tears it.
+>>
+>>> I can fix this up for you if not already applied. I presume it's against
+>>> linux-next tree?
+>>
+>>
+>> Yup, please send something.
 >
->I understand, but this forces all drivers to implement the loop
->themselves, and hence causes duplication. By making the new feature
->optional, you avoid that except where it's useful.
 >
->But I suppose the loop itself is pretty small either way.
-
-[/quote]
-
-> This way the responsibility to resolve the sequence of config
-> calls and validate the validity of that sequence is pushed down
-> to the driver, it may do this incrementally or at pin_config_set_complete()
-> and then write the resulting config to the hardware as an
-> effect of pin_config_set_complete().
-
-Please correctly if I'm wrong, but I think with the functions in my patch, the 
-driver still have full control of / responsibility to resolve config sequence 
-and perform validation.  The difference is instead of feeding the driver one 
-config at time and telling it to write when the complete() function is called, 
-my patch just gives the driver all configs in one call and expects the driver 
-to parse, validate and write accordingly. 
-
-> The driver takes care of caching intermediate settings for the pin
-> until the complete() callback is called.
-> Can you devise a patch like this instead?
-
-I do have some concerns about the driver caching all the configs until complete()
-is called...  I'm ok either way as long as it provides a way to consolidate pin config register 
-writes.  Just want to clarify things with you before I go ahead and modify
-my patch and driver.
-
-> I am also very hesitant to merge this if there is no code using
-> it, i.e. if you don't have a corresponding driver to submit
-> at the same time, it will not be merged, as I don't like to
-> maintain dead code.
-
-I do plan to upstream a pinctrl driver that makes use of the new function, so I can make
-this patch (or one that implements the pin_config_set_complete()) part of that commit.
-
-Regards,
-Sherman
+> Patch is attached. However, I currently don't have an ARM toolchain at hand,
+> so
+> uncompiled, untested.
+>
+> @Nicolas, Xi (cc, ref: http://thread.gmane.org/gmane.linux.kernel/1481464):
+>
+> If there is someday support for other archs as well, it would be nice if we
+> do not have each time duplicated seccomp_jit_compile() etc functions in each
+> JIT implementation, i.e. because they do basically the same. So follow-up
+> {fix,clean}up is appreciated.
+>
+> Also, I find it a bit weird that seccomp_filter_get_len() and some other
+> _one-line_ functions from kernel/seccomp.c are not placed into the
+> corresponding header file as inlines.
