@@ -1,46 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 26 Apr 2013 10:28:39 +0200
-Subject: [PATCH 6/9] crypto: ux500/cryp - Set DMA configuration though
- dma_slave_config()
-In-Reply-To: <201304251611.39667.arnd@arndb.de>
-References: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdbFgW6bGYt59WtN4r2izuN09AJw4J1cqir82uzFsuMmWQ@mail.gmail.com>
- <20130425134402.GN4623@gmail.com>
- <201304251611.39667.arnd@arndb.de>
-Message-ID: <CACRpkdaBf++gy3sghC-t33uio2+eHp1MrQ2FM0XXBazZTtm3kA@mail.gmail.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Fri, 26 Apr 2013 16:31:44 +0800
+Subject: [PATCH] ARM: OMAP1: DMA: fix error handling in omap1_system_dma_init()
+Message-ID: <CAPgLHd-5cRFtN-rF8c5Jvg9cqE3jvxuOa6KaDgcoYHPM4DhbMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 4:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-> The dma engine driver must know the address in its dma space, while the
-> slave driver has it available in physical space. These two are often the
-> same, but there is no generic way to convert between the two, especially
-> if the dma engine resides behind an IOMMU.
->
-> The best assumption we can make is that the dma engine driver knows
-> how to convert between the two. Interestingly the documentation for
-> dma_slave_config talks about "physical address", while the structure
-> itself uses a dma_addr_t. Linus Walleij introduced the structure in
-> c156d0a5b0 "DMAENGINE: generic slave channel control v3", so I assume
-> he can shed some light on what he was thinking. I assume the documentation
-> is right but the structure is not and should be converted to use
-> phys_add_t or resource_size_t.
+Add the missing iounmap() before return from omap1_system_dma_init()
+in the error handling case.
+Also removed platform_device_del() on add resources error case which
+cause dup device delete.
 
-OK I could cook a patch for that, but I think I need some input from
-Vinod and/or Russell on this.
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+no compile test.
+---
+ arch/arm/mach-omap1/dma.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-It does make sense to me that if anything knows how to map a physical
-address into the DMA address space it'll be the DMA engine.
-
-However this rings a bell that there may be a possible relation to
-DMA-API, since that API syncs memory buffers to the DMA
-address space if there is some MMU inbetween the DMA and the
-(ordinary, non-device) memory.
-
-So if we think one step ahead, assuming the DMAC is actually behind
-an MMU making it see the device in some other address than the
-physical (bus) space, where would the address be resolved?
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
+index 1a4e887..68ab858 100644
+--- a/arch/arm/mach-omap1/dma.c
++++ b/arch/arm/mach-omap1/dma.c
+@@ -301,7 +301,7 @@ static int __init omap1_system_dma_init(void)
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "%s: Unable to add resources for %s%d\n",
+ 			__func__, pdev->name, pdev->id);
+-		goto exit_device_put;
++		goto exit_iounmap;
+ 	}
+ 
+ 	p = kzalloc(sizeof(struct omap_system_dma_plat_info), GFP_KERNEL);
+@@ -309,7 +309,7 @@ static int __init omap1_system_dma_init(void)
+ 		dev_err(&pdev->dev, "%s: Unable to allocate 'p' for %s\n",
+ 			__func__, pdev->name);
+ 		ret = -ENOMEM;
+-		goto exit_device_del;
++		goto exit_iounmap;
+ 	}
+ 
+ 	d = kzalloc(sizeof(struct omap_dma_dev_attr), GFP_KERNEL);
+@@ -402,8 +402,8 @@ exit_release_d:
+ 	kfree(d);
+ exit_release_p:
+ 	kfree(p);
+-exit_device_del:
+-	platform_device_del(pdev);
++exit_iounmap:
++	iounmap(dma_base);
+ exit_device_put:
+ 	platform_device_put(pdev);
+ 
