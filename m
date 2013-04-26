@@ -1,81 +1,120 @@
-From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
-Date: Fri, 26 Apr 2013 16:34:56 +0530
-Subject: [PATCH 2/2] arm64: earlyprintk support for virtio-mmio console
-In-Reply-To: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
-References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
-Message-ID: <1366974299-17877-3-git-send-email-pranavkumar@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 26 Apr 2013 12:09:29 +0100
+Subject: [PATCHv2 1/4] Documentation: Add memory mapped ARM architected
+ timer binding
+In-Reply-To: <5179B6ED.9000301@gmail.com>
+References: <1365812863-5367-1-git-send-email-sboyd@codeaurora.org>
+ <1365812863-5367-2-git-send-email-sboyd@codeaurora.org>
+ <516C6F12.5020208@gmail.com> <516C7231.6060305@codeaurora.org>
+ <5179A488.5050102@gmail.com> <5179B2B2.8000201@codeaurora.org>
+ <5179B6ED.9000301@gmail.com>
+Message-ID: <20130426110929.GB11648@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements earlyprintk based on virtio console using early_wr config register.
+On Fri, Apr 26, 2013 at 12:06:21AM +0100, Rob Herring wrote:
+> On 04/25/2013 05:48 PM, Stephen Boyd wrote:
+> > On 04/25/13 14:47, Rob Herring wrote:
+> >> On 04/15/2013 04:33 PM, Stephen Boyd wrote:
+> >>> On 04/15/13 14:20, Rob Herring wrote:
+> >>>> On Fri, Apr 12, 2013 at 7:27 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >>>>> @@ -26,3 +30,52 @@ Example:
+> >>>>>                              <1 10 0xf08>;
+> >>>>>                 clock-frequency = <100000000>;
+> >>>>>         };
+> >>>>> +
+> >>>>> +** Memory mapped timer node properties
+> >>>>> +
+> >>>>> +- compatible : Should at least contain "arm,armv7-timer-mem".
+> >>>> Everything about this timer is architecturally defined? If not, let's
+> >>>> use a more specific name.
+> >>> I'm not sure I'm following you, but everything described here is part of
+> >>> the ARM definition. What would be a more specific name?
+> >> Something that corresponds to the particular implementation like
+> >> cortex-a15 (obviously not an example that has this). I'm fine with
+> >> leaving this for now, but would like to see that added when specific SOC
+> >> dts are added. Better to be specific in case we need to use it for
+> >> something like errata work-arounds. Of course we haven't done that so
+> >> far with the arch timer bindings...
+> > 
+> > Agreed. I'm under the impression that most of our compatible fields
+> > should be more specific than they currently are so we can workaround hw
+> > bugs like you say. Perhaps the catch all generic one should just be
+> > "arm,arm-timer-mem" since it isn't tied to any particular CPU type?
+> > 
+> >>
+> >>>>> +
+> >>>>> +- clock-frequency : The frequency of the main counter, in Hz. Optional.
+> >>>>> +
+> >>>>> +- reg : The control frame base address.
+> >>>>> +
+> >>>>> +Note that #address-cells, #size-cells, and ranges shall be present to ensure
+> >>>>> +the CPU can address a frame's registers.
+> >>>>> +
+> >>>>> +Frame:
+> >>>>> +
+> >>>>> +- frame-number: 0 to 7.
+> >>>> I'd really like to get rid of the frame numbers and sub-nodes. Is the
+> >>>> frame number significant to software?
+> >>> We need the frame number to read and write registers in the control
+> >>> frame (the first base in the parent node). We currently use it to
+> >>> determine if a frame has support for the virtual timer by reading the
+> >>> CNTTIDR (a register with 4 bits per frame describing capabilities). If
+> >>> we wanted to control access to the second view of a frame we would also
+> >>> need to configure the CNTPL0ACRn register that pertains to the frame
+> >>> we're controlling. Without a frame number we wouldn't know which
+> >>> register to write.
+> >> I've gone thru the memory mapped part of the spec now, so I think I
+> >> understand things better. I see how the frame number is needed, but...
+> >>
+> >> The control base is only accessible in secure or hyp mode. How does a
+> >> guest know that it is a guest and can't map the control base? Seems like
+> >> we need to allow a subset of the binding that is just a reg and
+> >> interrupts properties without the frame sub nodes.
+> > 
+> > I don't see that part. My understanding is that the control base is
+> > accessible in non-secure mode and by the guests. There are certain
+> > registers within that base that are only accessible in secure mode
+> > though: CNTFRQ and CNTNSAR. Also some registers are configurable:
+> > CNTACRn and CNTVOFFN. CNTVOFFN is only accessible in the hypervisor.
+> 
+> The example is section E.8 seems to say otherwise. Perhaps Mark R can
+> comment further.
 
-Kernel args for using this will be: earlyprintk=virtio-console,<phys_address>
+I believe E.8 is an example system, not the general case.
 
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
----
- arch/arm64/kernel/early_printk.c |   35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+However, I don't see anything limiting accesses to CNTVOFFn to the hypervisor.
+As far as I can see, if the guest has access to the CNTCTLBase frame, it has
+the same access privileges as the host (and hypervisor).
 
-diff --git a/arch/arm64/kernel/early_printk.c b/arch/arm64/kernel/early_printk.c
-index ac974f4..52ac6b0 100644
---- a/arch/arm64/kernel/early_printk.c
-+++ b/arch/arm64/kernel/early_printk.c
-@@ -25,6 +25,9 @@
- 
- #include <linux/amba/serial.h>
- #include <linux/serial_reg.h>
-+#include <linux/virtio_ids.h>
-+#include <linux/virtio_mmio.h>
-+#include <linux/virtio_console.h>
- 
- static void __iomem *early_base;
- static void (*printch)(char ch);
-@@ -53,6 +56,37 @@ static void smh_printch(char ch)
- }
- 
- /*
-+ * VIRTIO MMIO console single character Tx.
-+ */
-+static void virtio_console_printch(char ch)
-+{
-+	u32 tmp;
-+	static u32 init_done;
-+	static u32 can_write;
-+	struct virtio_console_config *p = early_base + VIRTIO_MMIO_CONFIG;
-+
-+	if (!init_done) {
-+		tmp = readl_relaxed(early_base + VIRTIO_MMIO_DEVICE_ID);
-+		if (tmp != VIRTIO_ID_CONSOLE) {
-+			init_done = 1;
-+			return;
-+		}
-+
-+		tmp = readl_relaxed(early_base + VIRTIO_MMIO_HOST_FEATURES);
-+		if (!(tmp & (1 << VIRTIO_CONSOLE_F_EARLY_WRITE))) {
-+			init_done = 1;
-+			return;
-+		}
-+
-+		init_done = 1;
-+		can_write = 1;
-+	}
-+
-+	if (can_write)
-+		writeb_relaxed(ch, &p->early_wr);
-+}
-+
-+/*
-  * 8250/16550 (8-bit aligned registers) single character TX.
-  */
- static void uart8250_8bit_printch(char ch)
-@@ -82,6 +116,7 @@ static const struct earlycon_match earlycon_match[] __initconst = {
- 	{ .name = "smh", .printch = smh_printch, },
- 	{ .name = "uart8250-8bit", .printch = uart8250_8bit_printch, },
- 	{ .name = "uart8250-32bit", .printch = uart8250_32bit_printch, },
-+	{ .name = "virtio-console", .printch = virtio_console_printch, },
- 	{}
- };
- 
--- 
-1.7.9.5
+CNTACRn and CNTVOFFn only seem to be configurable with regard to
+secure/non-secure accesses.
+
+> 
+> > We don't really care about CNTFRQ because it's duplicated into each
+> > view. We do care about CNTNSAR. Luckily the spec "just works" there in
+> > the sense that we can use CNTTIDR in conjunction with CNTACRn and
+> > determine if we have access to a frame we're interested in if the
+> > CNTTIDR bits say the frame is present and the CNTACRn register says we
+> > can access it. If not then it must be locked down for secure users.
+> > 
+> > Unfortunately hardware doesn't have a way to say that a particular frame
+> > is reserved for the hypervisor or the guest kernel/userspace. We need
+> > some help from software, so we have the status property express that a
+> > particular frame is available. We have to assume the DT is going to be
+> > different depending on if you're the hypervisor or the guest. That's a
+> > valid assumption right? Otherwise I hope we can do some trapping of the
+> > guest's mapping to the control base and then rewrite what they read so
+> > that they only see the frame that we want to be available to them.
+> 
+> Yeah, I believe the only way to prevent access within non-secure world
+> is with the MMU. So I guess the example is just policy that the
+> hypervisor would/may not create a stage2 mapping. You still have the
+> same issue that the guest should not be passed the control base. You
+> could make the reg property optional, but then what do you do with the
+> node name?
+
+I'm not sure on if and how we'd want to expose this to guests. I'm adding Marc
+Zyngier to Cc, he may have some relevant thoughts.
+
+Mark.
