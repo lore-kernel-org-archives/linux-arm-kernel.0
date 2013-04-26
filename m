@@ -1,34 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 26 Apr 2013 12:05:58 +0100
-Subject: [PATCH v4 5/7] ARM: KVM: rework HYP page table freeing
-In-Reply-To: <1365790327-2138-6-git-send-email-marc.zyngier@arm.com>
-References: <1365790327-2138-1-git-send-email-marc.zyngier@arm.com>
- <1365790327-2138-6-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130426110558.GE5007@localhost.cambridge.arm.com>
+From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
+Date: Fri, 26 Apr 2013 16:34:55 +0530
+Subject: [PATCH 1/2] virtio: console: Add early writeonly register to config
+ space
+In-Reply-To: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
+References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
+Message-ID: <1366974299-17877-2-git-send-email-pranavkumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 12, 2013 at 07:12:05PM +0100, Marc Zyngier wrote:
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index bfc5927..7464824 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-...
-> +static void clear_pmd_entry(pmd_t *pmd)
-> +{
-> +	pte_t *pte_table = pte_offset_kernel(pmd, 0);
-> +	pmd_clear(pmd);
-> +	pte_free_kernel(NULL, pte_table);
-> +	put_page(virt_to_page(pmd));
-> +}
-...
->  static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+This patch adds a early_wr register (writeonly) in config space of virtio console device which can be used for debugging.
 
-Is there a chance that this function (or the other unmapping function
-for Hyp pages) is called on an active stage 2 table (VTTBR pointing to
-this pgd)? If yes, than you probably have to follow the mmu_gather
-mechanism of freeing page table pages to avoid speculative loads.
-Basically flushing the TLB between pmd_clear and pte_free_kernel.
+The patch also updates virtio-spec in Documentation to reflect this feature addition in virtio console.
 
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+---
+ Documentation/virtual/virtio-spec.txt |   13 +++++++++++--
+ include/uapi/linux/virtio_console.h   |    3 +++
+ 2 files changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/virtual/virtio-spec.txt b/Documentation/virtual/virtio-spec.txt
+index 0d6ec85..bc4e8b5 100644
+--- a/Documentation/virtual/virtio-spec.txt
++++ b/Documentation/virtual/virtio-spec.txt
+@@ -1927,11 +1927,18 @@ Ports 2 onwards only if VIRTIO_CONSOLE_F_MULTIPORT is set
+     ports; configuration fields nr_ports and max_nr_ports are
+     valid and control virtqueues will be used.
+ 
++  VIRTIO_CONSOLE_F_EARLY_WRITE(2) Device has support for early
++  write. Configuration field early_wr is valid.
++
+   Device configuration layout The size of the console is supplied
+   in the configuration space if the VIRTIO_CONSOLE_F_SIZE feature
+   is set. Furthermore, if the VIRTIO_CONSOLE_F_MULTIPORT feature
+   is set, the maximum number of ports supported by the device can
+-  be fetched.struct virtio_console_config {
++  be fetched. If VIRTIO_CONSOLE_F_EARLY_WRITE is set then one can
++  use early write to output single character without initializing
++  virtio queues.
++
++  struct virtio_console_config {
+ 
+ 	u16 cols;
+ 
+@@ -1941,7 +1948,9 @@ Ports 2 onwards only if VIRTIO_CONSOLE_F_MULTIPORT is set
+ 
+ 	u32 max_nr_ports;
+ 
+-};
++	u32 early_wr;
++
++  };
+ 
+   Device Initialization
+ 
+diff --git a/include/uapi/linux/virtio_console.h b/include/uapi/linux/virtio_console.h
+index ee13ab6..7cd84b5 100644
+--- a/include/uapi/linux/virtio_console.h
++++ b/include/uapi/linux/virtio_console.h
+@@ -38,6 +38,7 @@
+ /* Feature bits */
+ #define VIRTIO_CONSOLE_F_SIZE	0	/* Does host provide console size? */
+ #define VIRTIO_CONSOLE_F_MULTIPORT 1	/* Does host provide multiple ports? */
++#define VIRTIO_CONSOLE_F_EARLY_WRITE 2	/* Does host support early write? */
+ 
+ #define VIRTIO_CONSOLE_BAD_ID		(~(u32)0)
+ 
+@@ -48,6 +49,8 @@ struct virtio_console_config {
+ 	__u16 rows;
+ 	/* max. number of ports this device can hold */
+ 	__u32 max_nr_ports;
++	/* early write register */
++	__u32 early_wr;
+ } __attribute__((packed));
+ 
+ /*
 -- 
-Catalin
+1.7.9.5
