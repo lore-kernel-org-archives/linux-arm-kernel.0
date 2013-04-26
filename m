@@ -1,47 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 26 Apr 2013 09:54:39 +0200
-Subject: [PATCH] gpio/omap: ensure gpio context is initialised
-In-Reply-To: <51709499.8030208@ti.com>
-References: <1366230707-32681-1-git-send-email-jon-hunter@ti.com>
- <871ua734mv.fsf@linaro.org> <51707D7C.1050600@ti.com>
- <5170911C.6010507@ti.com> <51709499.8030208@ti.com>
-Message-ID: <CACRpkdZ=xdOnVVxEdTALJN-xpsoKGJufirV2EJCbJtGTEmjdVA@mail.gmail.com>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Fri, 26 Apr 2013 16:10:39 +0800
+Subject: [PATCH 15/21] thermal: cooling: avoid uninitialied used gcc
+ warning
+In-Reply-To: <1366910944-3033663-16-git-send-email-arnd@arndb.de>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <1366910944-3033663-16-git-send-email-arnd@arndb.de>
+Message-ID: <1366963839.2189.1.camel@rzhang1-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 19, 2013 at 2:49 AM, Jon Hunter <jon-hunter@ti.com> wrote:
+On Thu, 2013-04-25 at 19:28 +0200, Arnd Bergmann wrote:
+> The newly rewritten get_property() function causes a bogus warning
+> from gcc-3.8, which cannot figure out that "level" is always
+> initialized at the point where it gets evaluated:
+> 
+> drivers/thermal/cpu_cooling.c: In function 'get_property':
+> drivers/thermal/cpu_cooling.c:189:37: warning: 'level' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>    if (property == GET_FREQ && level == j) {
+>                                      ^
+> 
+> Slightly rearranging the code makes this more obvious and
+> avoids the warning.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Amit Daniel kachhap <amit.daniel@samsung.com>
 
-> From d02ef7b7dfcf8e13bf019aedfdecb38ca3c6749f Mon Sep 17 00:00:00 2001
-> From: Jon Hunter <jon-hunter@ti.com>
-> Date: Mon, 15 Apr 2013 13:06:54 -0500
-> Subject: [PATCH] gpio/omap: ensure gpio context is initialised
->
-> Commit a2797be (gpio/omap: force restore if context loss is not
-> detectable) broke gpio support for OMAP when booting with device-tree
-> because a restore of the gpio context being performed without ever
-> initialising the gpio context. In other words, the context restored was
-> bad.
->
-> This problem could also occur in the non device-tree case, however, it
-> is much less likely because when booting without device-tree we can
-> detect context loss via a platform specific API and so context restore
-> is performed less often.
->
-> Nevertheless we should ensure that the gpio context is initialised
-> on the first pm-runtime resume for gpio banks that could lose their
-> state regardless of whether we are booting with device-tree or not.
->
-> The context loss count was being initialised on the first pm-runtime
-> suspend following a resume, by populating the get_count_loss_count()
-> function pointer after the first pm-runtime resume. To make the code
-> more readable and logical, initialise the context loss count on the
-> first pm-runtime resume if the context is not yet valid.
->
-> Reported-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+we already have a fix for this.
+please refer to
+https://patchwork.kernel.org/patch/2454891/
 
-Applied this version with Santosh's and Kevin's ACKs and
-Tony's Tested-by, thanks!
+thanks for your patch, Arnd!
 
-Yours,
-Linus Walleij
+-rui
+> ---
+>  drivers/thermal/cpu_cooling.c | 17 +++++++++--------
+>  1 file changed, 9 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+> index 768b508..34878e6 100644
+> --- a/drivers/thermal/cpu_cooling.c
+> +++ b/drivers/thermal/cpu_cooling.c
+> @@ -165,10 +165,6 @@ static int get_property(unsigned int cpu, unsigned long input,
+>  		return 0;
+>  	}
+>  
+> -	if (property == GET_FREQ)
+> -		level = descend ? input : (max_level - input -1);
+> -
+> -
+>  	for (i = 0, j = 0; table[i].frequency != CPUFREQ_TABLE_END; i++) {
+>  		/* ignore invalid entry */
+>  		if (table[i].frequency == CPUFREQ_ENTRY_INVALID)
+> @@ -186,10 +182,15 @@ static int get_property(unsigned int cpu, unsigned long input,
+>  			*output = descend ? j : (max_level - j - 1);
+>  			return 0;
+>  		}
+> -		if (property == GET_FREQ && level == j) {
+> -			/* get frequency by level */
+> -			*output = freq;
+> -			return 0;
+> +
+> +		if (property == GET_FREQ) {
+> +			level = descend ? input : (max_level - input -1);
+> +
+> +			if (level == j) {
+> +				/* get frequency by level */
+> +				*output = freq;
+> +				return 0;
+> +			}
+>  		}
+>  		j++;
+>  	}
