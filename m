@@ -1,76 +1,49 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 26 Apr 2013 09:48:35 +0900
-Subject: [PATCH 03/21] ARM: shmobile: don't call irqchip_init
- unconditionally
-In-Reply-To: <1366910944-3033663-4-git-send-email-arnd@arndb.de>
+Date: Fri, 26 Apr 2013 09:50:12 +0900
+Subject: [PATCH 11/21] irqdomain: export irq_domain_add_simple
+In-Reply-To: <1366910944-3033663-12-git-send-email-arnd@arndb.de>
 References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <1366910944-3033663-4-git-send-email-arnd@arndb.de>
-Message-ID: <20130426004835.GA20070@verge.net.au>
+ <1366910944-3033663-12-git-send-email-arnd@arndb.de>
+Message-ID: <20130426005012.GB20070@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 07:28:46PM +0200, Arnd Bergmann wrote:
-> The irqchip_init function is only available when building
-> with CONFIG_OF enabled, which causes this build failure for
-> bonito_defconfig:
+On Thu, Apr 25, 2013 at 07:28:54PM +0200, Arnd Bergmann wrote:
+> All other irq_domain_add_* functions are exported already, and apparently
+> this one got left out by mistake, which causes build errors for ARM
+> allmodconfig kernels:
 > 
-> arch/arm/mach-shmobile/built-in.o: In function `r8a7740_init_irq_of':
-> :(.init.text+0x580): undefined reference to `irqchip_init'
-> 
-> This makes both the OF and the ATAGS portion of the driver
-> conditional, which avoids the build error and also results
-> in smaller object code if not both are enabled, without the
-> need for an #ifdef.
+> ERROR: "irq_domain_add_simple" [drivers/gpio/gpio-rcar.ko] undefined!
+> ERROR: "irq_domain_add_simple" [drivers/gpio/gpio-em.ko] undefined!
 > 
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Bastian Hecht <hechtb+renesas@gmail.com>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
 > Cc: Simon Horman <horms+renesas@verge.net.au>
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Cc: Magnus Damm <damm@opensource.se>
+
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
+Grant, could consider taking this one?
+
 > ---
->  arch/arm/mach-shmobile/intc-r8a7740.c | 13 +++++++++++--
->  1 file changed, 11 insertions(+), 2 deletions(-)
+>  kernel/irq/irqdomain.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/mach-shmobile/intc-r8a7740.c b/arch/arm/mach-shmobile/intc-r8a7740.c
-> index 8871f77..5dc57f1 100644
-> --- a/arch/arm/mach-shmobile/intc-r8a7740.c
-> +++ b/arch/arm/mach-shmobile/intc-r8a7740.c
-> @@ -53,14 +53,23 @@ static void __init r8a7740_init_irq_common(void)
->  
->  void __init r8a7740_init_irq_of(void)
->  {
-> +	if (!IS_ENABLED(CONFIG_OF))
-> +		return;
-> +
-
-In other parts of the shmobile I believe that such code is
-guarded by #ifdef CONFIG_OF and I believe not guarding this code in
-some way was an oversight.
-
-The above change seems fine to me.
-
->  	irqchip_init();
->  	r8a7740_init_irq_common();
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index 059a280..c532c15 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -194,6 +194,7 @@ struct irq_domain *irq_domain_add_simple(struct device_node *of_node,
+>  	/* A linear domain is the default */
+>  	return irq_domain_add_linear(of_node, size, ops, host_data);
 >  }
+> +EXPORT_SYMBOL_GPL(irq_domain_add_simple);
 >  
->  void __init r8a7740_init_irq(void)
->  {
-> -	void __iomem *gic_dist_base = ioremap_nocache(0xc2800000, 0x1000);
-> -	void __iomem *gic_cpu_base = ioremap_nocache(0xc2000000, 0x1000);
-> +	void __iomem *gic_dist_base;
-> +	void __iomem *gic_cpu_base;
-> +
-> +	if (!IS_ENABLED(CONFIG_ATAGS))
-> +		return;
-> +
-> +	gic_dist_base = ioremap_nocache(0xc2800000, 0x1000);
-> +	gic_cpu_base = ioremap_nocache(0xc2000000, 0x1000);
->  
->  	/* initialize the Generic Interrupt Controller PL390 r0p0 */
->  	gic_init(0, 29, gic_dist_base, gic_cpu_base);
-
-This one seems broken as the armadillo800eva board currently uses
-it to initialise GIC even if CONFIG_ATAGS is not defined.
-
-I did test the above change on the armadillo800eva board
-with the above change and CONFIG_ATAGS disabled, the result was
-a boot failure. With the change reverted booting seems fine.
+>  /**
+>   * irq_domain_add_legacy() - Allocate and register a legacy revmap irq_domain.
+> -- 
+> 1.8.1.2
+> 
