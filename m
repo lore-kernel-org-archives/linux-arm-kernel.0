@@ -1,35 +1,23 @@
-From: cb@sgoc.de (Christoph G. Baumann)
-Date: Fri, 26 Apr 2013 13:20:13 +0200
-Subject: [PATCH 0/2] crypto: added support for fsl-dcp on iMX23,28,50
-Message-ID: <1366975215-5420-1-git-send-email-cb@sgoc.de>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 26 Apr 2013 12:33:50 +0100
+Subject: [PATCH 0/2] Early printk support for virtio console devices.
+In-Reply-To: <BA2076A6-0688-4E5C-85F9-A9CA8FD75782@suse.de>
+References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
+ <BA2076A6-0688-4E5C-85F9-A9CA8FD75782@suse.de>
+Message-ID: <CAFEAcA_xmrHTvR7FxUr3PCKBJY-hZnkeBcqyHksTB4-hqOZS0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Christoph G. Baumann" <cb@sgoc.de>
+On 26 April 2013 12:19, Alexander Graf <agraf@suse.de> wrote:
+> MMIO registers are handled by a different layer than the virtio
+> console itself. After the virtio refactoring in QEMU, they will
+> be completely separate drivers.
 
-This patch is based on the original driver by Freescale.
-The driver gives access to the DCP crypto core which can accelerate
-AES and SHA operations.
-It was ported to the current API and sanitized to please checkpatch.pl.
+Good point -- we don't really want to be mixing up the
+transport and the backend. You can see it in the kvmtool
+patch, in fact -- it introduces an "if this is virtio-console"
+special case into the mmio.c file which previously was
+entirely backend agnostic.
 
-Christoph G. Baumann (2):
-  crypto: added support for fsl-dcp on iMX23,28,50
-  crypto: added support for fsl-dcp on iMX23,28,50
-
- arch/arm/boot/dts/imx28.dtsi                 |    2 +-
- drivers/staging/Kconfig                      |    2 +
- drivers/staging/Makefile                     |    1 +
- drivers/staging/crypto/Kconfig               |   15 +
- drivers/staging/crypto/Makefile              |    1 +
- drivers/staging/crypto/fsl-dcp.c             | 1790 ++++++++++++++++++++++++++
- drivers/staging/crypto/fsl-dcp.h             |  739 +++++++++++
- include/linux/fsl/fsl-dcp_bootstream_ioctl.h |   32 +
- 8 files changed, 2581 insertions(+), 1 deletion(-)
- create mode 100644 drivers/staging/crypto/Kconfig
- create mode 100644 drivers/staging/crypto/Makefile
- create mode 100644 drivers/staging/crypto/fsl-dcp.c
- create mode 100644 drivers/staging/crypto/fsl-dcp.h
- create mode 100644 include/linux/fsl/fsl-dcp_bootstream_ioctl.h
-
--- 
-1.7.9.5
+thanks
+-- PMM
