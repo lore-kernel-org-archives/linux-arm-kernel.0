@@ -1,82 +1,58 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 26 Apr 2013 15:56:45 +0200
-Subject: [PATCH 05/23 v2] pinctrl: coh901: add device tree support
-Message-ID: <1366984605-23951-1-git-send-email-linus.walleij@stericsson.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Apr 2013 16:04:44 +0200
+Subject: [PATCH V3 2/3] ARM: net: bpf_jit: make code generation less
+ dependent on struct sk_filter.
+In-Reply-To: <1366824429-26652-3-git-send-email-nschichan@freebox.fr>
+References: <1366824429-26652-1-git-send-email-nschichan@freebox.fr>
+ <1366824429-26652-3-git-send-email-nschichan@freebox.fr>
+Message-ID: <3592414.M8kQZLCXlW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Wednesday 24 April 2013 19:27:08 Nicolas Schichan wrote:
+> @@ -858,7 +858,7 @@ b_epilogue:
+>  }
+>  
+>  
+> -void bpf_jit_compile(struct sk_filter *fp)
+> +static void __bpf_jit_compile(struct jit_ctx *out_ctx)
+>  {
+>         struct jit_ctx ctx;
+>         unsigned tmp_idx;
+> @@ -867,11 +867,10 @@ void bpf_jit_compile(struct sk_filter *fp)
+>         if (!bpf_jit_enable)
+>                 return;
+>  
+> -       memset(&ctx, 0, sizeof(ctx));
+> -       ctx.skf         = fp;
+> +       ctx = *out_ctx;
+>         ctx.ret0_fp_idx = -1;
+>  
+> -       ctx.offsets = kzalloc(4 * (ctx.skf->len + 1), GFP_KERNEL);
+> +       ctx.offsets = kzalloc(4 * (ctx.prog_len + 1), GFP_KERNEL);
+>         if (ctx.offsets == NULL)
+>                 return;
+>  
+> @@ -921,13 +920,26 @@ void bpf_jit_compile(struct sk_filter *fp)
+>                 print_hex_dump(KERN_INFO, "BPF JIT code: ",
+>                                DUMP_PREFIX_ADDRESS, 16, 4, ctx.target,
+>                                alloc_size, false);
+> -
+> -       fp->bpf_func = (void *)ctx.target;
+>  out:
+>         kfree(ctx.offsets);
+> +
+> +       *out_ctx = ctx;
+>         return;
 
-This makes it possible to probe the COH901 pinctrl driver from
-the device tree, and assigned the device tree node in the
-gpio_chip so we can look up cross-references from the device
-tree. Start grabbing the per-port (bank) IRQs by index instead
-of by name so we don't have to look up the IRQs by name going
-forward.
+This part of the patch, in combination with 79617801e "filter: bpf_jit_comp:
+refactor and unify BPF JIT image dump output" is now causing build errors
+in linux-next:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Alter the driver to look up IRQ by index.
-- Alter the bindings accordingly.
----
- .../devicetree/bindings/gpio/gpio-stericsson-coh901.txt      |  7 +++++++
- drivers/pinctrl/pinctrl-coh901.c                             | 12 ++++++++++--
- 2 files changed, 17 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-stericsson-coh901.txt
+arch/arm/net/bpf_jit_32.c: In function '__bpf_jit_compile':
+arch/arm/net/bpf_jit_32.c:930:16: error: 'fp' undeclared (first use in this function)
+   bpf_jit_dump(fp->len, alloc_size, 2, ctx.target);
+                ^
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-stericsson-coh901.txt b/Documentation/devicetree/bindings/gpio/gpio-stericsson-coh901.txt
-new file mode 100644
-index 0000000..fd665b4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio-stericsson-coh901.txt
-@@ -0,0 +1,7 @@
-+ST-Ericsson COH 901 571/3 GPIO controller
-+
-+Required properties:
-+- compatible: Compatible property value should be "stericsson,gpio-coh901"
-+- reg: Physical base address of the controller and length of memory mapped
-+  region.
-+- interrupts: the 0...n interrupts assigned to the different GPIO ports/banks.
-diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
-index 8b7e7bc..4152ca2 100644
---- a/drivers/pinctrl/pinctrl-coh901.c
-+++ b/drivers/pinctrl/pinctrl-coh901.c
-@@ -770,8 +770,7 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
- 		port->number = portno;
- 		port->gpio = gpio;
- 
--		port->irq = platform_get_irq_byname(pdev,
--						    port->name);
-+		port->irq = platform_get_irq(pdev, portno);
- 
- 		dev_dbg(gpio->dev, "register IRQ %d for port %s\n", port->irq,
- 			port->name);
-@@ -808,6 +807,9 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
- 	}
- 	dev_dbg(gpio->dev, "initialized %d GPIO ports\n", portno);
- 
-+#ifdef CONFIG_OF_GPIO
-+	gpio->chip.of_node = pdev->dev.of_node;
-+#endif
- 	err = gpiochip_add(&gpio->chip);
- 	if (err) {
- 		dev_err(gpio->dev, "unable to add gpiochip: %d\n", err);
-@@ -861,9 +863,15 @@ static int __exit u300_gpio_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id u300_gpio_match[] = {
-+	{ .compatible = "stericsson,gpio-coh901" },
-+	{},
-+};
-+
- static struct platform_driver u300_gpio_driver = {
- 	.driver		= {
- 		.name	= "u300-gpio",
-+		.of_match_table = u300_gpio_match,
- 	},
- 	.remove		= __exit_p(u300_gpio_remove),
- };
--- 
-1.7.11.3
+
+	Arnd
