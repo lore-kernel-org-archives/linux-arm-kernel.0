@@ -1,55 +1,52 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 26 Apr 2013 14:49:32 +0200
-Subject: [PATCH 04/14] sched: pack the idle load balance
-In-Reply-To: <1366910611-20048-5-git-send-email-vincent.guittot@linaro.org>
-References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
- <1366910611-20048-5-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20130426124931.GC13464@dyad.programming.kicks-ass.net>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Fri, 26 Apr 2013 18:29:45 +0530
+Subject: [PATCH 0/2] Early printk support for virtio console devices.
+In-Reply-To: <1577576.O1Cm2pf5KD@wuerfel>
+References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
+ <CAFEAcA_xmrHTvR7FxUr3PCKBJY-hZnkeBcqyHksTB4-hqOZS0w@mail.gmail.com>
+ <CALrVBkuOmu4u9egdzzfn1tU9B-CFe3w85HZQ9s2gpKvYnaSqvA@mail.gmail.com>
+ <1577576.O1Cm2pf5KD@wuerfel>
+Message-ID: <CALrVBkuyby_KY_M+yp0e=PLk=7_W_kSxxm62YYSwwp8rwLsCAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 07:23:20PM +0200, Vincent Guittot wrote:
-> Look for an idle CPU close to the pack buddy CPU whenever possible.
-> The goal is to prevent the wake up of a CPU which doesn't share the power
-> domain of the pack buddy CPU.
-> 
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> Reviewed-by: Morten Rasmussen <morten.rasmussen@arm.com>
-> ---
->  kernel/sched/fair.c |   19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
-> 
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index 6adc57c..a985c98 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -5469,7 +5469,26 @@ static struct {
->  
->  static inline int find_new_ilb(int call_cpu)
->  {
-> +	struct sched_domain *sd;
->  	int ilb = cpumask_first(nohz.idle_cpus_mask);
-> +	int buddy = per_cpu(sd_pack_buddy, call_cpu);
-> +
-> +	/*
-> +	 * If we have a pack buddy CPU, we try to run load balance on a CPU
-> +	 * that is close to the buddy.
-> +	 */
-> +	if (buddy != -1) {
-> +		for_each_domain(buddy, sd) {
-> +			if (sd->flags & SD_SHARE_CPUPOWER)
-> +				continue;
-> +
-> +			ilb = cpumask_first_and(sched_domain_span(sd),
-> +					nohz.idle_cpus_mask);
-> +
-> +			if (ilb < nr_cpu_ids)
-> +				break;
-> +		}
-> +	}
->  
->  	if (ilb < nr_cpu_ids && idle_cpu(ilb))
->  		return ilb;
+On 26 April 2013 18:03, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 26 April 2013 17:36:16 Anup Patel wrote:
+>> On 26 April 2013 17:03, Peter Maydell <peter.maydell@linaro.org> wrote:
+>> > On 26 April 2013 12:19, Alexander Graf <agraf@suse.de> wrote:
+>> >> MMIO registers are handled by a different layer than the virtio
+>> >> console itself. After the virtio refactoring in QEMU, they will
+>> >> be completely separate drivers.
+>> >
+>> > Good point -- we don't really want to be mixing up the
+>> > transport and the backend. You can see it in the kvmtool
+>> > patch, in fact -- it introduces an "if this is virtio-console"
+>> > special case into the mmio.c file which previously was
+>> > entirely backend agnostic.
+>>
+>> Well, we can always have virtio device specific config registers
+>> handle by virtio device backends and generic virtio config register
+>> handled by transport.
+>>
+>> kvmtool patch is hacky because it does not provide virtio device
+>> specific config read/write callbacks.
+>
+> Couldn't kvmtool implement the interface used by smh_printch()
+> for early output instead?
+>
+> Or if that's not a fitting inteface, maybe a psci call for writing
+> a character to the console?
+>
+>         Arnd
 
-Ha! and here you hope people won't put multiple big-little clusters in a single
-machine? :-)
+I am curious about how smh-based or hypercall-based early prints would
+be handled in following scenario:
+
+"A board is running KVM ARM enabled kernel and linux console on serial
+port. Now a user remotely connects to the board via telnet/ssh and
+launches a VM with smh-based or hypercall-based earlyprintk."
+
+In the above scenario, will smh-based or hypercall-based earlyprints
+appear to user on remote shell or not ?
+
+--Anup
