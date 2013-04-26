@@ -1,56 +1,205 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 26 Apr 2013 12:18:49 +0200
-Subject: [RFC PATCH v3 3/6] sched: pack small tasks
-In-Reply-To: <5152C83F.6060509@linux.vnet.ibm.com>
-References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
- <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
- <1364300782.5053.6.camel@laptop>
- <5152C83F.6060509@linux.vnet.ibm.com>
-Message-ID: <20130426101849.GD8669@dyad.programming.kicks-ass.net>
+From: anup.patel@linaro.org (Anup Patel)
+Date: Fri, 26 Apr 2013 15:42:57 +0530
+Subject: [PATCH V2] ARM: KVM: Allow host virtual timer irq number to be
+ different from guest virtual timer irq number
+In-Reply-To: <3b52361974a390cff0bb0bc26b4a3b54@localhost>
+References: <1366960910-27651-1-git-send-email-anup.patel@linaro.org>
+ <3b52361974a390cff0bb0bc26b4a3b54@localhost>
+Message-ID: <CALrVBktcs+Zwmqdi3JfCudF9TN1rSRSRokB=BJJh60jEmJna-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Mar 27, 2013 at 03:51:51PM +0530, Preeti U Murthy wrote:
-> Hi,
-> 
-> On 03/26/2013 05:56 PM, Peter Zijlstra wrote:
-> > On Fri, 2013-03-22 at 13:25 +0100, Vincent Guittot wrote:
-> >> +static bool is_buddy_busy(int cpu)
-> >> +{
-> >> +       struct rq *rq = cpu_rq(cpu);
-> >> +
-> >> +       /*
-> >> +        * A busy buddy is a CPU with a high load or a small load with
-> >> a lot of
-> >> +        * running tasks.
-> >> +        */
-> >> +       return (rq->avg.runnable_avg_sum >
-> >> +                       (rq->avg.runnable_avg_period / (rq->nr_running
-> >> + 2)));
-> >> +}
-> > 
-> > Why does the comment talk about load but we don't see it in the
-> > equation. Also, why does nr_running matter at all? I thought we'd
-> > simply bother with utilization, if fully utilized we're done etc..
-> > 
-> 
-> Peter, lets say the run-queue has 50% utilization and is running 2
-> tasks. And we wish to find out if it is busy. We would compare this
-> metric with the cpu power, which lets say is 100.
-> 
-> rq->util * 100 < cpu_of(rq)->power.
-> 
-> In the above scenario would we declare the cpu _not_busy? Or would we do
-> the following:
-> 
-> (rq->util * 100) * #nr_running <  cpu_of(rq)->power and conclude that it
-> is just enough _busy_ to not take on more processes?
+Hi Marc,
 
-That is just confused... ->power doesn't have anything to do with a per-cpu
-measure. ->power is a inter-cpu measure of relative compute capacity.
+On 26 April 2013 15:17, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> Hi Anup,
+>
+> On Fri, 26 Apr 2013 12:51:50 +0530, Anup Patel <anup.patel@linaro.org>
+> wrote:
+>> The arch_timer irq numbers (or PPI number) are implementation dependent
+>> so, the host virtual timer irq number can be different from guest
+> virtual
+>> timer irq number.
+>>
+>> This patch ensures that host virtual timer irq number is read from DTB
+> and
+>> guest virtual timer irq is determined based on guest vcpu target type.
+>
+> One word about communication first: Please keep me cc-ed on anything that
+> has to do with with vgic and timers. I'm the author of the code, I intend
+> to look after it, and this has some direct impact on the arm64 port. Thank
+> you.
 
-Mixing in nr_running confuses things even more; it doesn't matter how many
-tasks it takes to push utilization up to 100%; once its there the cpu simply
-cannot run more.
+Sure, I'll CC you for arch_timer and vgic changes.
 
-So colour me properly confused..
+>
+>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>
+> Who is the author of this patch? You or Pranavkumar? If it is you, then
+> your Signed-off line should be present. If not, then there should be a
+> "From:" line at the beginning of the commit message.
+
+I really thought "From" is implicit and the sender of the email is the author.
+
+Pranav has co-authored this patch hence his signed-off by him.
+
+Anyways, I will put signed-off by me and Pranav both.
+
+>
+>> ---
+>>  arch/arm/include/asm/kvm_host.h |    1 +
+>>  arch/arm/kvm/arch_timer.c       |   25 ++++++++++++++++++-------
+>>  arch/arm/kvm/guest.c            |   15 +++++++++++++++
+>>  3 files changed, 34 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_host.h
+>> b/arch/arm/include/asm/kvm_host.h
+>> index 57cb786..cdc0551 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -43,6 +43,7 @@
+>>  struct kvm_vcpu;
+>>  u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
+>>  int kvm_target_cpu(void);
+>> +struct kvm_irq_level *kvm_target_timer_irq(struct kvm_vcpu *vcpu);
+>>  int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+>>  void kvm_reset_coprocs(struct kvm_vcpu *vcpu);
+>>
+>> diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
+>> index 49a7516..521cdb9 100644
+>> --- a/arch/arm/kvm/arch_timer.c
+>> +++ b/arch/arm/kvm/arch_timer.c
+>> @@ -30,7 +30,7 @@
+>>
+>>  static struct timecounter *timecounter;
+>>  static struct workqueue_struct *wqueue;
+>> -static struct kvm_irq_level timer_irq = {
+>> +static struct kvm_irq_level host_timer_irq = {
+>>       .level  = 1,
+>>  };
+>>
+>> @@ -65,10 +65,21 @@ static void kvm_timer_inject_irq(struct kvm_vcpu
+> *vcpu)
+>>  {
+>>       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>>
+>> +     /*
+>> +      * The vcpu timer irq number cannont be determined in
+>> +      * kvm_timer_vcpu_init() because it is called much before
+>> +      * kvm_vcpu_set_target(). To handle this, we determin
+>> +      * vcpu timer irq number when we inject the vcpu timer irq
+>> +      * first time.
+>> +      */
+>> +     if (!timer->irq) {
+>> +             timer->irq = kvm_target_timer_irq(vcpu);
+>> +     }
+>
+> Please, not yet another of these. We already have kvm_vcpu_first_run_init
+> that collects all the "do this on first vcpu run" kind of thing.
+>
+>>       timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
+>>       kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+>> -                         vcpu->arch.timer_cpu.irq->irq,
+>> -                         vcpu->arch.timer_cpu.irq->level);
+>> +                         timer->irq->irq,
+>> +                         timer->irq->level);
+>>  }
+>>
+>>  static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+>> @@ -163,12 +174,12 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+>>       INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
+>>       hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+>>       timer->timer.function = kvm_timer_expire;
+>> -     timer->irq = &timer_irq;
+>> +     timer->irq = NULL;
+>>  }
+>
+> So with the above in mind, how about moving the call to
+> kvm_timer_vcpu_init into kvm_vcpu_first_run_init, and do the init once and
+> for all?
+
+Yes, this would be even more cleaner.
+
+>
+>>  static void kvm_timer_init_interrupt(void *info)
+>>  {
+>> -     enable_percpu_irq(timer_irq.irq, 0);
+>> +     enable_percpu_irq(host_timer_irq.irq, 0);
+>>  }
+>>
+>>
+>> @@ -182,7 +193,7 @@ static int kvm_timer_cpu_notify(struct
+> notifier_block
+>> *self,
+>>               break;
+>>       case CPU_DYING:
+>>       case CPU_DYING_FROZEN:
+>> -             disable_percpu_irq(timer_irq.irq);
+>> +             disable_percpu_irq(host_timer_irq.irq);
+>>               break;
+>>       }
+>>
+>> @@ -230,7 +241,7 @@ int kvm_timer_hyp_init(void)
+>>               goto out;
+>>       }
+>>
+>> -     timer_irq.irq = ppi;
+>> +     host_timer_irq.irq = ppi;
+>>
+>>       err = register_cpu_notifier(&kvm_timer_cpu_nb);
+>>       if (err) {
+>> diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
+>> index 152d036..d87b05d 100644
+>> --- a/arch/arm/kvm/guest.c
+>> +++ b/arch/arm/kvm/guest.c
+>> @@ -36,6 +36,11 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
+>>       { NULL }
+>>  };
+>>
+>> +struct kvm_irq_level target_default_timer_irq = {
+>> +     .irq = 27,
+>> +     .level = 1,
+>> +};
+>
+> Don't call it default, as it is A15 specific. Also make it static.
+
+Sure, will update this.
+
+>
+>>  int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
+>>  {
+>>       return 0;
+>> @@ -197,6 +202,16 @@ int __attribute_const__ kvm_target_cpu(void)
+>>       }
+>>  }
+>>
+>> +struct kvm_irq_level *kvm_target_timer_irq(struct kvm_vcpu *vcpu)
+>> +{
+>> +     switch (vcpu->arch.target) {
+>> +     case KVM_ARM_TARGET_CORTEX_A15:
+>> +             return &target_default_timer_irq;
+>> +     default:
+>> +             return NULL;
+>
+> And what do you do once you've returned NULL? Let the kernel crash?
+> Also, we now have a second path that tests the target (the first one is in
+> reset.c
+
+Actually, this function is expected to be called as part of VCPU init
+and if we get NULL then we should fail the VCPU init.
+
+>
+> Actually, scratch all the above, and move the irq assignment to reset.c.
+> It is probably the best place for it.
+
+Sure, I will try this and send another patch which addresses all comments.
+
+>
+> Thanks,
+>
+>         M.
+> --
+> Fast, cheap, reliable. Pick two.
+
+Regards,
+Anup
