@@ -1,27 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 26 Apr 2013 17:03:17 +0200
-Subject: [PATCH 0/2] Early printk support for virtio console devices.
-In-Reply-To: <CALrVBkuyby_KY_M+yp0e=PLk=7_W_kSxxm62YYSwwp8rwLsCAQ@mail.gmail.com>
-References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
- <1577576.O1Cm2pf5KD@wuerfel>
- <CALrVBkuyby_KY_M+yp0e=PLk=7_W_kSxxm62YYSwwp8rwLsCAQ@mail.gmail.com>
-Message-ID: <201304261703.17798.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 26 Apr 2013 17:04:23 +0200
+Subject: [PATCH 03/32 v4] dmaengine: ste_dma40: Use the BIT macro to
+ replace ugly '(1 << x)'s
+In-Reply-To: <20130426113947.GB31899@gmail.com>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-4-git-send-email-lee.jones@linaro.org>
+ <20130426113947.GB31899@gmail.com>
+Message-ID: <CACRpkdbK+GKMEekKk_bh5oK7NJHMMyQNbgac-D3RKYrg-unwQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 April 2013, Anup Patel wrote:
-> I am curious about how smh-based or hypercall-based early prints would
-> be handled in following scenario:
-> 
-> "A board is running KVM ARM enabled kernel and linux console on serial
-> port. Now a user remotely connects to the board via telnet/ssh and
-> launches a VM with smh-based or hypercall-based earlyprintk."
-> 
-> In the above scenario, will smh-based or hypercall-based earlyprints
-> appear to user on remote shell or not ?
+On Fri, Apr 26, 2013 at 1:39 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-The implementation of the console device would still be done by KVM,
-as for any other virtual device, so it shows up whereever kvm is
-configured to output the console data.
+> The aim is to make the code that little more readable.
+>
+> Acked-by: Vinod Koul <vnod.koul@intel.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-	Arnd
+Fine with me:
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
