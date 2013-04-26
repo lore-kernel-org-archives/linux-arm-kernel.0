@@ -1,37 +1,38 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 26 Apr 2013 12:39:31 -0500
-Subject: [PATCH 0/2] ARM: dts: OMAP36xx/OMAP4460 Fix CPU OPP voltages
-Message-ID: <1366997973-19120-1-git-send-email-nm@ti.com>
+Date: Fri, 26 Apr 2013 12:39:33 -0500
+Subject: [PATCH 2/2] ARM: dts: OMAP4460: Fix CPU OPP voltages
+In-Reply-To: <1366997973-19120-1-git-send-email-nm@ti.com>
+References: <1366997973-19120-1-git-send-email-nm@ti.com>
+Message-ID: <1366997973-19120-3-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-It seems that I have not been paying close attention to
-actual voltage value seen on scope to map it back to verify the validity
-of the voltage value. Even though I did verify[1] that voltage did scale to
-values in DT entries, the values in the case of 3630 and 4460 were lower than
-what the spec voltage was as per opp_data files.
+commit d16fb25 (ARM: dts: OMAP4460: Add CPU OPP table)
+introduced wrong OPP voltages per OPP by mistake. Sync the OPP
+tables with existing OMAP4460 OPP data in
+arch/arm/mach-omap2/opp4xxx_data.c
 
-This series is based off Benoit's tree here:
-http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.10/dts
-
-Commit ID's in the patches to indicate regressions are from there as well.
-Would be good to have this fix merged to 3.10 dts entries.
-I have cross verified that OMAP3430,3630,4430 and 4460 entries now match that
-of corresponding opp*_data.c
-
-My sincere apologies on the oversight.
-
-Nishanth Menon (2):
-  ARM: dts: OMAP36xx: Fix CPU OPP voltages
-  ARM: dts: OMAP4460: Fix CPU OPP voltages
-
- arch/arm/boot/dts/omap36xx.dtsi |    6 +++---
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
  arch/arm/boot/dts/omap4460.dtsi |    6 +++---
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-[1] http://marc.info/?l=linux-arm-kernel&m=136580742724210&w=2
-Regards,
-Nishanth Menon
+diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+index 7c2c23c..2cf227c 100644
+--- a/arch/arm/boot/dts/omap4460.dtsi
++++ b/arch/arm/boot/dts/omap4460.dtsi
+@@ -15,9 +15,9 @@
+ 		cpu at 0 {
+ 			operating-points = <
+ 				/* kHz    uV */
+-				350000   975000
+-				700000  1075000
+-				920000  1200000
++				350000  1025000
++				700000  1200000
++				920000  1313000
+ 			>;
+ 			clock-latency = <300000>; /* From legacy driver */
+ 		};
 -- 
 1.7.9.5
