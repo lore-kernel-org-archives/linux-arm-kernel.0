@@ -1,38 +1,37 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Fri, 26 Apr 2013 12:39:32 -0500
-Subject: [PATCH 1/2] ARM: dts: OMAP36xx: Fix CPU OPP voltages
-In-Reply-To: <1366997973-19120-1-git-send-email-nm@ti.com>
-References: <1366997973-19120-1-git-send-email-nm@ti.com>
-Message-ID: <1366997973-19120-2-git-send-email-nm@ti.com>
+Date: Fri, 26 Apr 2013 12:39:31 -0500
+Subject: [PATCH 0/2] ARM: dts: OMAP36xx/OMAP4460 Fix CPU OPP voltages
+Message-ID: <1366997973-19120-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 3027e26 (ARM: dts: OMAP36xx: Add CPU OPP table)
-introduced wrong OPP voltages per OPP by mistake. Sync the OPP
-tables with existing OMAP36xx OPP data in
-arch/arm/mach-omap2/opp3xxx_data.c
+Hi,
+It seems that I have not been paying close attention to
+actual voltage value seen on scope to map it back to verify the validity
+of the voltage value. Even though I did verify[1] that voltage did scale to
+values in DT entries, the values in the case of 3630 and 4460 were lower than
+what the spec voltage was as per opp_data files.
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
+This series is based off Benoit's tree here:
+http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.10/dts
+
+Commit ID's in the patches to indicate regressions are from there as well.
+Would be good to have this fix merged to 3.10 dts entries.
+I have cross verified that OMAP3430,3630,4430 and 4460 entries now match that
+of corresponding opp*_data.c
+
+My sincere apologies on the oversight.
+
+Nishanth Menon (2):
+  ARM: dts: OMAP36xx: Fix CPU OPP voltages
+  ARM: dts: OMAP4460: Fix CPU OPP voltages
+
  arch/arm/boot/dts/omap36xx.dtsi |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/omap4460.dtsi |    6 +++---
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap36xx.dtsi b/arch/arm/boot/dts/omap36xx.dtsi
-index b89233e..f3447bc 100644
---- a/arch/arm/boot/dts/omap36xx.dtsi
-+++ b/arch/arm/boot/dts/omap36xx.dtsi
-@@ -20,9 +20,9 @@
- 		cpu at 0 {
- 			operating-points = <
- 				/* kHz    uV */
--				300000   975000
--				600000  1075000
--				800000  1200000
-+				300000  1012500
-+				600000  1200000
-+				800000  1325000
- 			>;
- 			clock-latency = <300000>; /* From legacy driver */
- 		};
+[1] http://marc.info/?l=linux-arm-kernel&m=136580742724210&w=2
+Regards,
+Nishanth Menon
 -- 
 1.7.9.5
