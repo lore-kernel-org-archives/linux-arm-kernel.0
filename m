@@ -1,73 +1,39 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 26 Apr 2013 16:36:26 +0100
-Subject: [PATCH v8 1/2] arm: introduce psci_smp_ops
-In-Reply-To: <alpine.LFD.2.03.1304251054420.1258@syhkavp.arg>
-References: <alpine.DEB.2.02.1304241935010.4180@kaball.uk.xensource.com>
- <1366828819-10745-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130425084711.GA12848@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1304251104090.4180@kaball.uk.xensource.com>
- <20130425104508.GG12848@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1304251054420.1258@syhkavp.arg>
-Message-ID: <alpine.DEB.2.02.1304261630110.4180@kaball.uk.xensource.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 26 Apr 2013 16:54:01 +0100
+Subject: [PATCH 0/2] Early printk support for virtio console devices.
+In-Reply-To: <201304261703.17798.arnd@arndb.de>
+References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
+ <1577576.O1Cm2pf5KD@wuerfel>
+ <CALrVBkuyby_KY_M+yp0e=PLk=7_W_kSxxm62YYSwwp8rwLsCAQ@mail.gmail.com>
+ <201304261703.17798.arnd@arndb.de>
+Message-ID: <517AA319.5070709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Apr 2013, Nicolas Pitre wrote:
-> On Thu, 25 Apr 2013, Will Deacon wrote:
+On 26/04/13 16:03, Arnd Bergmann wrote:
+> On Friday 26 April 2013, Anup Patel wrote:
+>> I am curious about how smh-based or hypercall-based early prints would
+>> be handled in following scenario:
+>>
+>> "A board is running KVM ARM enabled kernel and linux console on serial
+>> port. Now a user remotely connects to the board via telnet/ssh and
+>> launches a VM with smh-based or hypercall-based earlyprintk."
+>>
+>> In the above scenario, will smh-based or hypercall-based earlyprints
+>> appear to user on remote shell or not ?
 > 
-> > On Thu, Apr 25, 2013 at 11:12:54AM +0100, Stefano Stabellini wrote:
-> > > On Thu, 25 Apr 2013, Will Deacon wrote:
-> > > > > +/*
-> > > > > + * cpu_suspend   Suspend the execution on a CPU
-> > > > > + * @state        we don't currently describe affinity levels, so just pass 0.
-> > > > > + * @entry_point  the first instruction to be executed on return
-> > > > > + * returns 0  success, < 0 on failure
-> > > > > + *
-> > > > > + * cpu_off       Power down a CPU
-> > > > > + * @state        we don't currently describe affinity levels, so just pass 0.
-> > > > > + * no return on successful call
-> > > > > + *
-> > > > > + * cpu_on        Power up a CPU
-> > > > > + * @cpuid        cpuid of target CPU, as from MPIDR
-> > > > > + * @entry_point  the first instruction to be executed on return
-> > > > > + * returns 0  success, < 0 on failure
-> > > > > + *
-> > > > > + * migrate       Migrate the context to a different CPU
-> > > > > + * @cpuid        cpuid of target CPU, as from MPIDR
-> > > > > + * returns 0  success, < 0 on failure
-> > > > > + *
-> > > > > + */
-> > > > 
-> > > > Can you move these comments into psci-smp.c please? They're really specific
-> > > > to the implementation there, and if we put them in a header we're lying to
-> > > > ourselves about the parameters actually described by the PSCI specification.
-> > > 
-> > > You have a good point about the PSCI spec.
-> > > 
-> > > However from the Linux POV these comments should regard the functions
-> > > exported by psci_operations, not the firmware interface, this is why I
-> > > think it makes sense to keep them in psci.h.
-> > > What we are saying is for example that psci_operations.cpu_on returns 0
-> > > on success and < 0 on failure, and it takes a cpuid and an entry point
-> > > as parameters. We are not saying anything about the firmware interface.
-> > 
-> > I disagree. You're explicitly stating that we pass the `cpuid of target CPU,
-> > as from MPIDR'. That's simply not true -- the firmware could choose any
-> > numbering scheme to identify the CPUs. For KVM and Xen, it *is* the mpidr,
-> > which is why psci-smp.c works at all, but that's where the comment belongs,
-> > not in this header file.
-> 
-> At some point, the _kernel_ API for interfacing with the firmware's PSCI 
-> will have to ensure uniformity somehow.  The PSCI interface code could 
-> translate the passed MPIDR into whatever the firmware decided to use for 
-> identifying CPUs if needed, keeping this issue localized.
+> The implementation of the console device would still be done by KVM,
+> as for any other virtual device, so it shows up whereever kvm is
+> configured to output the console data.
 
-That is what I had in mind when I said to keep the comment in psci.h
-before.
-We have to draw the line somewhere to expose a uniform internal kernel
-API. However it is a bit difficult to do now given that we have only one
-user of the API.
+Actually, at least in the case of smh-based earlyprintk, the output only
+appears in the model console, and never reach the rest of the kernel.
 
-I don't feel to strongly about this, please let me know what is the
-final decision and I'll update the code accordingly. I remind you that
-the merge window is approaching :-)
+And any other non-MMIO approach (like a hypercall) will be very hard to
+feed back to the console, as KVM itself has no idea of what a "console"
+is. You'd need another side channel to userspace, hoping that it will be
+able to merge the multiple streams.
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
