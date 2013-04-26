@@ -1,38 +1,51 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 26 Apr 2013 12:39:33 -0500
-Subject: [PATCH 2/2] ARM: dts: OMAP4460: Fix CPU OPP voltages
-In-Reply-To: <1366997973-19120-1-git-send-email-nm@ti.com>
-References: <1366997973-19120-1-git-send-email-nm@ti.com>
-Message-ID: <1366997973-19120-3-git-send-email-nm@ti.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 26 Apr 2013 19:48:12 +0200
+Subject: gpio-pxa initcall level change and machine init breakage
+In-Reply-To: <CACRpkdYEi7i_kSuUy4dBW-tE4BxifJY5wFdYVyLe6La5=HwEmg@mail.gmail.com>
+ (Linus Walleij's message of "Thu, 25 Apr 2013 23:22:13 +0200")
+References: <5172B398.7060706@newsguy.com>
+ <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
+ <517466F6.3000003@newsguy.com>
+ <CAD6h2NSy0=3P-PHdCiJJQG_jvGaFnr7uex+Uxs=0F-VsUxtPWg@mail.gmail.com>
+ <CACRpkdbk24kR75fanvXVAocnuozNq_=jWDSPHPCWhbZCOrN5_Q@mail.gmail.com>
+ <5176E438.80800@newsguy.com>
+ <CACRpkdYLCKKZZFi6Y-viPUvrwupJGzfxr3f20a1emp-9qE0YBg@mail.gmail.com>
+ <87ppxiz9l5.fsf@free.fr>
+ <CACRpkdYEi7i_kSuUy4dBW-tE4BxifJY5wFdYVyLe6La5=HwEmg@mail.gmail.com>
+Message-ID: <87li85yyhv.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit d16fb25 (ARM: dts: OMAP4460: Add CPU OPP table)
-introduced wrong OPP voltages per OPP by mistake. Sync the OPP
-tables with existing OMAP4460 OPP data in
-arch/arm/mach-omap2/opp4xxx_data.c
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
----
- arch/arm/boot/dts/omap4460.dtsi |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+> On Thu, Apr 25, 2013 at 9:36 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> This was done by pull request to Torvalds yesterday ...
+Thanks, that's a relief.
 
-diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
-index 7c2c23c..2cf227c 100644
---- a/arch/arm/boot/dts/omap4460.dtsi
-+++ b/arch/arm/boot/dts/omap4460.dtsi
-@@ -15,9 +15,9 @@
- 		cpu at 0 {
- 			operating-points = <
- 				/* kHz    uV */
--				350000   975000
--				700000  1075000
--				920000  1200000
-+				350000  1025000
-+				700000  1200000
-+				920000  1313000
- 			>;
- 			clock-latency = <300000>; /* From legacy driver */
- 		};
+>
+>>  (b) inform board maintainers that they must fix their board code (for example
+>>  give them 1 window)
+>>  (c) put back the patch. Board maintainers who did not amend their board
+>>  code cannot say anymore they didn't know it. Board maintainers will also have
+>>  time to rise objections if they think they cannot change their board code
+>>  (which I do not believe is possible, but who knows ...)
+>
+> So when it comes to the PXA there is maybe this list of things that
+> would be nice to change, and this is likely on top of it ... moving the
+> PXA machines over to device tree would be more important if people
+> who like them want them so stay around, because non-device tree
+> platforms will at some point become deprecated, and fixing the platforms
+> to support device tree will inevitably lead to this problem being fixed
+> as well.
+Yeah, probably. That's a good long term goal too.
+Now you reverted, I'm under pressure to fix mioa701 to get rid of gpio calls in
+its board setup code :)
+
+As for device tree conversion, well that's another story.
+For my case for example I'll have to redevelop the bootloader (IPL+SPL) in order
+for suspend to RAM to work ... no world is perfecgt.
+
+Cheers.
+
 -- 
-1.7.9.5
+Robert
