@@ -1,184 +1,140 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 26 Apr 2013 12:31:53 +0530
-Subject: [PATCH 1/4] ARM: davinci: uart: move to dev_id based clk_get
-In-Reply-To: <1365510664-1394-2-git-send-email-prakash.pm@ti.com>
-References: <1365510481-32129-1-git-send-email-prakash.pm@ti.com>
- <1365510664-1394-2-git-send-email-prakash.pm@ti.com>
-Message-ID: <517A2661.3000605@ti.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 26 Apr 2013 17:06:49 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the spi-mb tree
+Message-ID: <20130426170649.d21c2d7a74e56d836ff6f04f@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prakash,
+Hi all,
 
-On 4/9/2013 6:01 PM, Manjunathappa, Prakash wrote:
-> For modules having single clock, clk_get should be done with dev_id.
-> But current davinci implementation handles multiple instances
-> of the UART devices with single platform_device_register. Hence clk_get
-> is based on con_id rather than dev_id, this is not correct. Do
-> platform_device_register for each instance and clk_get on dev_id.
-> 
-> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-> ---
->  arch/arm/mach-davinci/da830.c                  |    8 ++--
->  arch/arm/mach-davinci/da850.c                  |    8 ++--
->  arch/arm/mach-davinci/devices-da8xx.c          |   40 ++++++++++++++++---
->  arch/arm/mach-davinci/devices-tnetv107x.c      |   35 ++++++++++++++---
->  arch/arm/mach-davinci/dm355.c                  |   48 ++++++++++++++++++-----
->  arch/arm/mach-davinci/dm365.c                  |   35 ++++++++++++----
->  arch/arm/mach-davinci/dm644x.c                 |   48 ++++++++++++++++++-----
->  arch/arm/mach-davinci/dm646x.c                 |   49 +++++++++++++++++++-----
->  arch/arm/mach-davinci/include/mach/da8xx.h     |    2 +-
->  arch/arm/mach-davinci/include/mach/tnetv107x.h |    2 +-
->  arch/arm/mach-davinci/serial.c                 |   19 ++++++---
->  arch/arm/mach-davinci/tnetv107x.c              |    8 ++--
->  12 files changed, 230 insertions(+), 72 deletions(-)
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/boot/dts/at91sam9x5.dtsi between commits d50f88a0c304 ("ARM:
+dts: add spi nodes for atmel SoC") and a68b728f7a21 ("ARM: dts: add
+pinctrl property for spi node for atmel SoC") from the spi-mb tree and
+commits e9a72ee81d58 ("ARM: at91: dt: at91sam9x5: add i2c pinctrl"),
+463c9c7bf1f3 ("ARM: at91: dt: at91sam9x5: add i2c-gpio pinctrl") and
+b909c6c94462 ("ARM: at91/at91sam9x5: add RTC node") from the arm-soc tree.
 
-[...]
+I fixed it up (hopefully - see below) and can carry the fix as necessary
+(no action is required).
 
-> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-> index fc50243..eec7132 100644
-> --- a/arch/arm/mach-davinci/devices-da8xx.c
-> +++ b/arch/arm/mach-davinci/devices-da8xx.c
-> @@ -67,7 +67,7 @@
->  void __iomem *da8xx_syscfg0_base;
->  void __iomem *da8xx_syscfg1_base;
->  
-> -static struct plat_serial8250_port da8xx_serial_pdata[] = {
-> +static struct plat_serial8250_port da8xx_serial_pdata0[] = {
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
-da8xx_serial0_pdata is more appropriate. Likewise for other entries below.
-
->  	{
->  		.mapbase	= DA8XX_UART0_BASE,
->  		.irq		= IRQ_DA8XX_UARTINT0,
-> @@ -77,6 +77,11 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
->  		.regshift	= 2,
->  	},
->  	{
-> +		.flags	= 0,
-> +	},
-
-No need of trailing ',' on sentinel. No need of the zero initialization.
-Here and other places below.
-
-> +};
-> +static struct plat_serial8250_port da8xx_serial_pdata1[] = {
-> +	{
->  		.mapbase	= DA8XX_UART1_BASE,
->  		.irq		= IRQ_DA8XX_UARTINT1,
->  		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
-> @@ -85,6 +90,11 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
->  		.regshift	= 2,
->  	},
->  	{
-> +		.flags	= 0,
-> +	},
-> +};
-> +static struct plat_serial8250_port da8xx_serial_pdata2[] = {
-> +	{
->  		.mapbase	= DA8XX_UART2_BASE,
->  		.irq		= IRQ_DA8XX_UARTINT2,
->  		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
-> @@ -97,11 +107,29 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
->  	},
->  };
->  
-> -struct platform_device da8xx_serial_device = {
-> -	.name	= "serial8250",
-> -	.id	= PLAT8250_DEV_PLATFORM,
-> -	.dev	= {
-> -		.platform_data	= da8xx_serial_pdata,
-> +struct platform_device da8xx_serial_device[] = {
-> +	{
-> +		.name	= "serial8250",
-> +		.id	= PLAT8250_DEV_PLATFORM,
-> +		.dev	= {
-> +			.platform_data	= da8xx_serial_pdata0,
-> +		},
-> +	},
-> +	{
-> +		.name	= "serial8250",
-> +		.id	= PLAT8250_DEV_PLATFORM1,
-> +		.dev	= {
-> +			.platform_data	= da8xx_serial_pdata1,
-> +		},
-> +	},
-> +	{
-> +		.name	= "serial8250",
-> +		.id	= PLAT8250_DEV_PLATFORM2,
-> +		.dev	= {
-> +			.platform_data	= da8xx_serial_pdata2,
-> +		},
-> +	},
-> +	{
->  	},
->  };
-
-[...]
-
-> diff --git a/arch/arm/mach-davinci/serial.c b/arch/arm/mach-davinci/serial.c
-> index f262581..57e6150 100644
-> --- a/arch/arm/mach-davinci/serial.c
-> +++ b/arch/arm/mach-davinci/serial.c
-> @@ -76,7 +76,7 @@ int __init davinci_serial_setup_clk(unsigned instance, unsigned int *rate)
->  	char name[16];
->  	struct clk *clk;
->  	struct davinci_soc_info *soc_info = &davinci_soc_info;
-> -	struct device *dev = &soc_info->serial_dev->dev;
-> +	struct device *dev = &soc_info->serial_dev[instance].dev;
->  
->  	sprintf(name, "uart%d", instance);
->  	clk = clk_get(dev, name);
-
-Why not pass con_id = NULL now?
-
-> @@ -96,19 +96,25 @@ int __init davinci_serial_setup_clk(unsigned instance, unsigned int *rate)
->  
->  int __init davinci_serial_init(struct davinci_uart_config *info)
->  {
-> -	int i, ret;
-> +	int i, ret = 0;
->  	struct davinci_soc_info *soc_info = &davinci_soc_info;
-> -	struct device *dev = &soc_info->serial_dev->dev;
-> -	struct plat_serial8250_port *p = dev->platform_data;
-> +	struct device *dev;
-> +	struct plat_serial8250_port *p;
->  
->  	/*
->  	 * Make sure the serial ports are muxed on at this point.
->  	 * You have to mux them off in device drivers later on if not needed.
->  	 */
-> -	for (i = 0; p->flags; i++, p++) {
-> +	for (i = 0; soc_info->serial_dev[i].dev.platform_data != NULL; i++) {
-> +		dev = &soc_info->serial_dev[i].dev;
-> +		p = dev->platform_data;
->  		if (!(info->enabled_uarts & (1 << i)))
->  			continue;
->  
-> +		ret = platform_device_register(&soc_info->serial_dev[i]);
-> +		if (ret)
-> +			continue;
-> +
->  		ret = davinci_serial_setup_clk(i, &p->uartclk);
->  		if (ret)
->  			continue;
-> @@ -125,6 +131,5 @@ int __init davinci_serial_init(struct davinci_uart_config *info)
->  		if (p->membase && p->type != PORT_AR7)
->  			davinci_serial_reset(p);
->  	}
-> -
-> -	return platform_device_register(soc_info->serial_dev);
-> +	return ret;
->  }
-
-Now that we are overhauling this part of code, some improvements can be
-done. First, get rid of struct davinci_uart_config. None of the board
-files use it meaningfully and we know we are not going to have more
-board files. Second, make davinci_serial_init() take pointer to serial
-platform device directly. This eliminates need for serial_dev in the
-soc_info structure (yay!). You might also find that
-davinci_serial_setup_clk() can be eliminated as well since there is not
-much to do there now.
-
-Thanks,
-Sekhar
+diff --cc arch/arm/boot/dts/at91sam9x5.dtsi
+index 347b438,284bf24..0000000
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@@ -343,23 -343,53 +343,70 @@@
+  					};
+  				};
+  
+ +				spi0 {
+ +					pinctrl_spi0: spi0-0 {
+ +						atmel,pins =
+ +							<0 11 0x1 0x0	/* PA11 periph A SPI0_MISO pin */
+ +							 0 12 0x1 0x0	/* PA12 periph A SPI0_MOSI pin */
+ +							 0 13 0x1 0x0>;	/* PA13 periph A SPI0_SPCK pin */
+ +					};
+ +				};
+ +
+ +				spi1 {
+ +					pinctrl_spi1: spi1-0 {
+ +						atmel,pins =
+ +							<0 21 0x2 0x0	/* PA21 periph B SPI1_MISO pin */
+ +							 0 22 0x2 0x0	/* PA22 periph B SPI1_MOSI pin */
+ +							 0 23 0x2 0x0>;	/* PA23 periph B SPI1_SPCK pin */
+ +					};
+ +				};
++ 				i2c0 {
++ 					pinctrl_i2c0: i2c0-0 {
++ 						atmel,pins =
++ 							<0 30 0x1 0x0	/* PA30 periph A I2C0 data */
++ 							 0 31 0x1 0x0>;	/* PA31 periph A I2C0 clock */
++ 					};
++ 				};
++ 
++ 				i2c1 {
++ 					pinctrl_i2c1: i2c1-0 {
++ 						atmel,pins =
++ 							<2 0 0x3 0x0	/* PC0 periph C I2C1 data */
++ 							 2 1 0x3 0x0>;	/* PC1 periph C I2C1 clock */
++ 					};
++ 				};
++ 
++ 				i2c2 {
++ 					pinctrl_i2c2: i2c2-0 {
++ 						atmel,pins =
++ 							<1 4 0x2 0x0	/* PB4 periph B I2C2 data */
++ 							 1 5 0x2 0x0>;	/* PB5 periph B I2C2 clock */
++ 					};
++ 				};
++ 
++ 				i2c_gpio0 {
++ 					pinctrl_i2c_gpio0: i2c_gpio0-0 {
++ 						atmel,pins =
++ 							<0 30 0x0 0x2	/* PA30 gpio multidrive I2C0 data */
++ 							 0 31 0x0 0x2>;	/* PA31 gpio multidrive I2C0 clock */
++ 					};
++ 				};
++ 
++ 				i2c_gpio1 {
++ 					pinctrl_i2c_gpio1: i2c_gpio1-0 {
++ 						atmel,pins =
++ 							<2 0 0x0 0x2	/* PC0 gpio multidrive I2C1 data */
++ 							 2 1 0x0 0x2>;	/* PC1 gpio multidrive I2C1 clock */
++ 					};
++ 				};
++ 
++ 				i2c_gpio2 {
++ 					pinctrl_i2c_gpio2: i2c_gpio2-0 {
++ 						atmel,pins =
++ 							<1 4 0x0 0x2	/* PB4 gpio multidrive I2C2 data */
++ 							 1 5 0x0 0x2>;	/* PB5 gpio multidrive I2C2 clock */
++ 					};
++ 				};
+  
+  				pioA: gpio at fffff400 {
+  					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+@@@ -548,27 -587,12 +604,33 @@@
+  				};
+  			};
+  
+ +			spi0: spi at f0000000 {
+ +				#address-cells = <1>;
+ +				#size-cells = <0>;
+ +				compatible = "atmel,at91rm9200-spi";
+ +				reg = <0xf0000000 0x100>;
+ +				interrupts = <13 4 3>;
+ +				pinctrl-names = "default";
+ +				pinctrl-0 = <&pinctrl_spi0>;
+ +				status = "disabled";
+ +			};
+ +
+ +			spi1: spi at f0004000 {
+ +				#address-cells = <1>;
+ +				#size-cells = <0>;
+ +				compatible = "atmel,at91rm9200-spi";
+ +				reg = <0xf0004000 0x100>;
+ +				interrupts = <14 4 3>;
+ +				pinctrl-names = "default";
+ +				pinctrl-0 = <&pinctrl_spi1>;
+ +				status = "disabled";
+ +			};
++ 			rtc at fffffeb0 {
++ 				compatible = "atmel,at91rm9200-rtc";
++ 				reg = <0xfffffeb0 0x40>;
++ 				interrupts = <1 4 7>;
++ 				status = "disabled";
++ 			};
+  		};
+  
+  		nand0: nand at 40000000 {
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130426/00aa3f43/attachment.sig>
