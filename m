@@ -1,44 +1,55 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 26 Apr 2013 10:13:55 +0200
-Subject: [PATCH 1/2] ARM: dts: i.MX6: configure L2 cache data and tag latency
-Message-ID: <1366964036-17275-1-git-send-email-dirk.behme@de.bosch.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Fri, 26 Apr 2013 10:14:52 +0200
+Subject: [PATCH] clk: ux500: abx500-clk: rename ux500 audio codec aliases
+Message-ID: <1366964092-7672-1-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure the data and tag latency for the L2 cache. This improves the
-system performance.
+Change soc-audio related clk_register_clkdev() device names to reflect
+the ones actually used in current snd-soc-mop500 and ab8500-codec
+drivers.
 
-This configuration is taken from Freescale's kernel patch
-
-"ENGR00153601 [MX6]Adjust L2 cache parameter" [1]
-
-which does
-
-writel(0x132, IO_ADDRESS(L2_BASE_ADDR + L2X0_TAG_LATENCY_CTRL));
-writel(0x132, IO_ADDRESS(L2_BASE_ADDR + L2X0_DATA_LATENCY_CTRL));
-
-In this patch we are doing the same via the device tree.
-
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
-CC: Shawn Guo <shawn.guo@linaro.org>
-
-[1] http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/commit/arch/arm/mach-mx6/mm.c?h=imx_3.0.35_12.09.01&id=814656410b40c67a10b25300e51b0477b2bb96d1
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/clk/ux500/abx500-clk.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 281a223..3e8381d 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -100,6 +100,8 @@
- 			interrupts = <0 92 0x04>;
- 			cache-unified;
- 			cache-level = <2>;
-+			arm,tag-latency = <4 2 3>;
-+			arm,data-latency = <4 2 3>;
- 		};
+diff --git a/drivers/clk/ux500/abx500-clk.c b/drivers/clk/ux500/abx500-clk.c
+index a0fca00..e7bd62c 100644
+--- a/drivers/clk/ux500/abx500-clk.c
++++ b/drivers/clk/ux500/abx500-clk.c
+@@ -45,7 +45,7 @@ static int ab8500_reg_clks(struct device *dev)
+ 				CLK_IS_ROOT);
+ 	clk_register_clkdev(clk, "sysclk", "ab8500-usb.0");
+ 	clk_register_clkdev(clk, "sysclk", "ab-iddet.0");
+-	clk_register_clkdev(clk, "sysclk", "ab85xx-codec.0");
++	clk_register_clkdev(clk, "sysclk", "snd-soc-mop500.0");
+ 	clk_register_clkdev(clk, "sysclk", "shrm_bus");
  
- 		aips-bus at 02000000 { /* AIPS1 */
+ 	/* ab8500_sysclk2 */
+@@ -70,19 +70,19 @@ static int ab8500_reg_clks(struct device *dev)
+ 		AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_ULPCLKREQ,
+ 		AB8500_SYSULPCLKCTRL1_ULPCLKREQ,
+ 		38400000, 9000, CLK_IS_ROOT);
+-	clk_register_clkdev(clk, "ulpclk", "ab85xx-codec.0");
++	clk_register_clkdev(clk, "ulpclk", "snd-soc-mop500.0");
+ 
+ 	/* ab8500_intclk */
+ 	clk = clk_reg_sysctrl_set_parent(dev , "intclk", intclk_parents, 2,
+ 		intclk_reg_sel, intclk_reg_mask, intclk_reg_bits, 0);
+-	clk_register_clkdev(clk, "intclk", "ab85xx-codec.0");
++	clk_register_clkdev(clk, "intclk", "snd-soc-mop500.0");
+ 	clk_register_clkdev(clk, NULL, "ab8500-pwm.1");
+ 
+ 	/* ab8500_audioclk */
+ 	clk = clk_reg_sysctrl_gate(dev , "audioclk", "intclk",
+ 		AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_AUDIOCLKENA,
+ 		AB8500_SYSULPCLKCTRL1_AUDIOCLKENA, 0, 0);
+-	clk_register_clkdev(clk, "audioclk", "ab85xx-codec.0");
++	clk_register_clkdev(clk, "audioclk", "ab8500-codec.0");
+ 
+ 	return 0;
+ }
 -- 
-1.8.2
+1.8.1.3
