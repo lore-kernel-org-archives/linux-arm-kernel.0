@@ -1,66 +1,44 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Fri, 26 Apr 2013 07:41:33 +0200
-Subject: [PATCH 07/21] oss/dmabuf: use dma_map_single
-In-Reply-To: <1366910944-3033663-8-git-send-email-arnd@arndb.de>
-References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <1366910944-3033663-8-git-send-email-arnd@arndb.de>
-Message-ID: <s5hwqrp97ci.wl%tiwai@suse.de>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 26 Apr 2013 11:16:28 +0530
+Subject: [PATCH 0/6] Davinci fbdev driver and enable it for DMx platform
+In-Reply-To: <1780031.B4OAypccep@avalon>
+References: <1366804808-22720-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1780031.B4OAypccep@avalon>
+Message-ID: <CA+V-a8sLD2dP1RLb8ibZDOsLCP8hhMNUTr-zzU1zx_2ALDaDrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At Thu, 25 Apr 2013 19:28:50 +0200,
-Arnd Bergmann wrote:
-> 
-> The virt_to_bus/bus_to_virt functions have been deprecated
-> for as long as I can remember, and they are used in very
-> few remaining instances, usually in obscure ISA device
-> drivers. The OSS sound drivers are the only ones that are
-> still used on the ARM architecture, and only on some of
-> the earliest StrongARM machines.
-> 
-> The problem for converting the OSS subsystem to use
-> dma_map_single instead is that the caller of virt_to_bus
-> does not have a device pointer, since the subsystem has
-> never been ported to use the common device infrastructure.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jaroslav Kysela <perex@perex.cz>
-> Cc: Takashi Iwai <tiwai@suse.de>
-> Cc: alsa-devel at alsa-project.org
+Hi Laurent,
 
-Applied now, but the only problem is that it's difficult to test it :)
-Let's see.
+On Thu, Apr 25, 2013 at 2:32 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Prabhakar,
+>
+> Thank you for the patch.
+>
+> On Wednesday 24 April 2013 17:30:02 Prabhakar Lad wrote:
+>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>
+>> This patch series adds an fbdev driver for Texas
+>> Instruments Davinci SoC.The display subsystem consists
+>> of OSD and VENC, with OSD supporting 2 RGb planes and
+>> 2 video planes.
+>> http://focus.ti.com/general/docs/lit/
+>> getliterature.tsp?literatureNumber=sprue37d&fileType=pdf
+>>
+>> A good amount of the OSD and VENC enabling code is
+>> present in the kernel, and this patch series adds the
+>> fbdev interface.
+>>
+>> The fbdev driver exports 4 nodes representing each
+>> plane to the user - from fb0 to fb3.
+>
+> The obvious question is: why not a KMS driver instead ? :-)
+>
+I did go through the KMS model (thanks for pointing to your work and the video)
+and it looks like this would require a fair amount of development, at this point
+of time I would go with the current implementation and revisit on KMS model
+at later point of time.
 
-
-Thanks!
-
-Takashi
-
-> ---
->  sound/oss/dmabuf.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/sound/oss/dmabuf.c b/sound/oss/dmabuf.c
-> index bcc3e8e..a59c888 100644
-> --- a/sound/oss/dmabuf.c
-> +++ b/sound/oss/dmabuf.c
-> @@ -114,7 +114,7 @@ static int sound_alloc_dmap(struct dma_buffparms *dmap)
->  		}
->  	}
->  	dmap->raw_buf = start_addr;
-> -	dmap->raw_buf_phys = virt_to_bus(start_addr);
-> +	dmap->raw_buf_phys = dma_map_single(NULL, start_addr, dmap->buffsize, DMA_BIDIRECTIONAL);
->  
->  	for (page = virt_to_page(start_addr); page <= virt_to_page(end_addr); page++)
->  		SetPageReserved(page);
-> @@ -139,6 +139,7 @@ static void sound_free_dmap(struct dma_buffparms *dmap)
->  	for (page = virt_to_page(start_addr); page <= virt_to_page(end_addr); page++)
->  		ClearPageReserved(page);
->  
-> +	dma_unmap_single(NULL, dmap->raw_buf_phys, dmap->buffsize, DMA_BIDIRECTIONAL);
->  	free_pages((unsigned long) dmap->raw_buf, sz);
->  	dmap->raw_buf = NULL;
->  }
-> -- 
-> 1.8.1.2
-> 
+Regards,
+--Prabhakar
