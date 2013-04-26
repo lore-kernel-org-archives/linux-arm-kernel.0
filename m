@@ -1,54 +1,30 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 26 Apr 2013 16:31:44 +0800
-Subject: [PATCH] ARM: OMAP1: DMA: fix error handling in omap1_system_dma_init()
-Message-ID: <CAPgLHd-5cRFtN-rF8c5Jvg9cqE3jvxuOa6KaDgcoYHPM4DhbMQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 26 Apr 2013 10:32:38 +0200
+Subject: [PATCH] cpuidle: add maintainer entry
+In-Reply-To: <9935265.yXMiRQV8Yo@vostro.rjw.lan>
+References: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
+ <87k3nr50n4.fsf@linaro.org>
+ <CACRpkdaA8uG5jYyYTbuvzZNRr47EhWHFMLLz+jbiE3FPC1vjmA@mail.gmail.com>
+ <9935265.yXMiRQV8Yo@vostro.rjw.lan>
+Message-ID: <CACRpkdbQcxXzySH70NHMQfQXqMc72GUwvj1KQaxmnLSAbJ17rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Thu, Apr 25, 2013 at 8:27 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> On Thursday, April 25, 2013 02:09:11 PM Linus Walleij wrote:
+>> On Wed, Apr 24, 2013 at 6:55 PM, Kevin Hilman <khilman@linaro.org> wrote:
 
-Add the missing iounmap() before return from omap1_system_dma_init()
-in the error handling case.
-Also removed platform_device_del() on add resources error case which
-cause dup device delete.
+>> > What do you think about having Daniel listed here as a co-maintainer?
+>>
+>> I second that. He will bring useful embedded knowledge to the
+>> subsystem.
+>
+> I'd still like to have a say about the core, but if Daniel is willing to
+> maintain ARM cpuidle drivers and all of the relevant ARM people agree with
+> that, that'll be great.
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
-no compile test.
----
- arch/arm/mach-omap1/dma.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+OK Daniel can you post a v2 adding yourself as co-maintainer as well?
+Add my Acked-by if you wish.
 
-diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
-index 1a4e887..68ab858 100644
---- a/arch/arm/mach-omap1/dma.c
-+++ b/arch/arm/mach-omap1/dma.c
-@@ -301,7 +301,7 @@ static int __init omap1_system_dma_init(void)
- 	if (ret) {
- 		dev_err(&pdev->dev, "%s: Unable to add resources for %s%d\n",
- 			__func__, pdev->name, pdev->id);
--		goto exit_device_put;
-+		goto exit_iounmap;
- 	}
- 
- 	p = kzalloc(sizeof(struct omap_system_dma_plat_info), GFP_KERNEL);
-@@ -309,7 +309,7 @@ static int __init omap1_system_dma_init(void)
- 		dev_err(&pdev->dev, "%s: Unable to allocate 'p' for %s\n",
- 			__func__, pdev->name);
- 		ret = -ENOMEM;
--		goto exit_device_del;
-+		goto exit_iounmap;
- 	}
- 
- 	d = kzalloc(sizeof(struct omap_dma_dev_attr), GFP_KERNEL);
-@@ -402,8 +402,8 @@ exit_release_d:
- 	kfree(d);
- exit_release_p:
- 	kfree(p);
--exit_device_del:
--	platform_device_del(pdev);
-+exit_iounmap:
-+	iounmap(dma_base);
- exit_device_put:
- 	platform_device_put(pdev);
- 
+Yours,
+Linus Walleij
