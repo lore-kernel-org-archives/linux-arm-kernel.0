@@ -1,30 +1,81 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 26 Apr 2013 09:21:36 +0200
-Subject: linux-next: manual merge of the arm-soc tree with the spi-mb tree
-In-Reply-To: <20130426170649.d21c2d7a74e56d836ff6f04f@canb.auug.org.au>
-References: <20130426170649.d21c2d7a74e56d836ff6f04f@canb.auug.org.au>
-Message-ID: <CACQ1gAidYqDm_SHea9jQFGqernZpgT8RuaRSP2N0ZPUX7JYyrA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 26 Apr 2013 09:27:10 +0200
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <516EC2AF.9090905@wwwdotorg.org>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <514CE0AB.6060207@ti.com>
+ <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
+ <515319D5.20105@wwwdotorg.org>
+ <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
+ <5155C902.7080207@wwwdotorg.org>
+ <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
+ <5165CB9D.1090202@wwwdotorg.org>
+ <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
+ <51671D7B.5060303@wwwdotorg.org>
+ <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
+ <51673D70.3010503@wwwdotorg.org>
+ <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
+ <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
+ <516C31C3.9040505@wwwdotorg.org> <516C7C43.3040105@wwwdotorg.org>
+ <516C8760.2050500@ti.com> <516D9B05.1000501@wwwdotorg.org>
+ <516DA60A.5070000@ti.com> <516DCCA8.3070108@wwwdotorg.org>
+ <516DDB4D.9020500@ti.com> <516EC2AF.9090905@wwwdotorg.org>
+Message-ID: <CACRpkdaOOrooK7kff2Y-7gH6L6m-MsiU7PfHnqBkPpc=tk_iWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/4/26 Stephen Rothwell <sfr@canb.auug.org.au>:
-> Hi all,
+On Wed, Apr 17, 2013 at 5:41 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 04/16/2013 05:14 PM, Jon Hunter wrote:
+
+>>> c) I have the feeling that hooking the of_xlate function for this is a
+>>> bit of an abuse of the function.
+>>
+>> I was wondering about that. So I was grep'ing through the various xlate
+>> implementations and found this [1]. Also you may recall that in the
+>> of_dma_simple_xlate() we call the dma_request_channel() to allocate the
+>> channel, which is very similar. However, I don't wish to get a
+>> reputation as abusing APIs so would be good to know if this really is
+>> abuse or not ;-)
+>>
+>> Cheers
+>> Jon
+>>
+>> [1] http://permalink.gmane.org/gmane.linux.ports.arm.kernel/195124
 >
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/boot/dts/at91sam9x5.dtsi between commits d50f88a0c304 ("ARM:
-> dts: add spi nodes for atmel SoC") and a68b728f7a21 ("ARM: dts: add
-> pinctrl property for spi node for atmel SoC") from the spi-mb tree and
-> commits e9a72ee81d58 ("ARM: at91: dt: at91sam9x5: add i2c pinctrl"),
-> 463c9c7bf1f3 ("ARM: at91: dt: at91sam9x5: add i2c-gpio pinctrl") and
-> b909c6c94462 ("ARM: at91/at91sam9x5: add RTC node") from the arm-soc tree.
+> Interesting.
 >
-> I fixed it up (hopefully - see below) and can carry the fix as necessary
-> (no action is required).
+> This is really something that the core DT and GPIO and IRQ maintainers
+> should weigh in on. Hence, changing them from Cc: to To: in this message
+> and/or adding them.
 
-Hi,
+So I guess it is OK for a driver or DT node to use a GPIO as IRQ
+*only*, and then have the GPIO requested implicitly through the
+xlate function in the irqdomain.
 
-It's all ok for me !
+It's the use cases where one and the same driver tries to use the
+same GPIO line *also* by requesting it using gpio_request()
+that madness starts. In such cases the driver deserves to have
+an error thrown back at it, as it definately knows the GPIO pin
+and can be refactored to use gpio_to_irq() to translate it into
+an IRQ rather than having it implicitly done in the xlate function.
 
-Thanks,
+You will just have to give the xlate function information about which
+GPIOs are used as IRQs only, and only request the GPIO on these.
 
-Richard.
+And I recently suggested a mechanism to do that, and that is
+what I called GPIO input-hogs, which means that you mark
+(e.g. from the device tree) at probe() of the gpiochip which GPIOs
+will only be used as inputs, so as to generate IRQs.
+
+This is perfectly OS-neutral information about the how the
+hardware is set up in the system.
+
+If you only allow these hogges inputs to be translated and
+requested in the xlate function, everything goes smooth.
+
+It all comes back to this: keep all applicable knowledge in the
+system, so it can make proper decisions, don't try to create
+mechanisms that will half-guess things.
+
+Yours,
+Linus Walleij
