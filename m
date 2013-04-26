@@ -1,51 +1,38 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 26 Apr 2013 14:30:02 +0200
-Subject: [PATCH 03/14] sched: pack small tasks
-In-Reply-To: <1366910611-20048-4-git-send-email-vincent.guittot@linaro.org>
-References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
- <1366910611-20048-4-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20130426123002.GA13464@dyad.programming.kicks-ass.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Apr 2013 14:33:59 +0200
+Subject: [PATCH 0/2] Early printk support for virtio console devices.
+In-Reply-To: <CALrVBkuOmu4u9egdzzfn1tU9B-CFe3w85HZQ9s2gpKvYnaSqvA@mail.gmail.com>
+References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
+ <CAFEAcA_xmrHTvR7FxUr3PCKBJY-hZnkeBcqyHksTB4-hqOZS0w@mail.gmail.com>
+ <CALrVBkuOmu4u9egdzzfn1tU9B-CFe3w85HZQ9s2gpKvYnaSqvA@mail.gmail.com>
+Message-ID: <1577576.O1Cm2pf5KD@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 07:23:19PM +0200, Vincent Guittot wrote:
-> During the creation of sched_domain, we define a pack buddy CPU for each CPU
-> when one is available. We want to pack at all levels where a group of CPUs can
-> be power gated independently from others.
-> On a system that can't power gate a group of CPUs independently, the flag is
-> set at all sched_domain level and the buddy is set to -1. This is the default
-> behavior.
+On Friday 26 April 2013 17:36:16 Anup Patel wrote:
+> On 26 April 2013 17:03, Peter Maydell <peter.maydell@linaro.org> wrote:
+> > On 26 April 2013 12:19, Alexander Graf <agraf@suse.de> wrote:
+> >> MMIO registers are handled by a different layer than the virtio
+> >> console itself. After the virtio refactoring in QEMU, they will
+> >> be completely separate drivers.
+> >
+> > Good point -- we don't really want to be mixing up the
+> > transport and the backend. You can see it in the kvmtool
+> > patch, in fact -- it introduces an "if this is virtio-console"
+> > special case into the mmio.c file which previously was
+> > entirely backend agnostic.
 > 
-> On a dual clusters / dual cores system which can power gate each core and
-> cluster independently, the buddy configuration will be :
+> Well, we can always have virtio device specific config registers
+> handle by virtio device backends and generic virtio config register
+> handled by transport.
 > 
->       | Cluster 0   | Cluster 1   |
->       | CPU0 | CPU1 | CPU2 | CPU3 |
-> -----------------------------------
-> buddy | CPU0 | CPU0 | CPU0 | CPU2 |
-> 
-> If the cores in a cluster can't be power gated independently, the buddy
-> configuration becomes:
-> 
->       | Cluster 0   | Cluster 1   |
->       | CPU0 | CPU1 | CPU2 | CPU3 |
-> -----------------------------------
-> buddy | CPU0 | CPU1 | CPU0 | CPU0 |
-> 
-> Small tasks tend to slip out of the periodic load balance so the best place
-> to choose to migrate them is during their wake up. The decision is in O(1) as
-> we only check again one buddy CPU
+> kvmtool patch is hacky because it does not provide virtio device
+> specific config read/write callbacks.
 
+Couldn't kvmtool implement the interface used by smh_printch()
+for early output instead?
 
-So I really don't get the point of this buddy stuff, even for light load non
-performance impact stuff you want to do.
+Or if that's not a fitting inteface, maybe a psci call for writing
+a character to the console?
 
-The moment you judge cpu0 busy you'll bail, even though its perfectly doable
-(and desirable afaict) to continue stacking light tasks on cpu1 instead of
-waking up cpu2/3.
-
-So what's wrong with keeping a single light-wake target cpu selection and
-updating it appropriately?
-
-Also where/how does the nohz balance cpu criteria not match the light-wake
-target criteria?
+	Arnd
