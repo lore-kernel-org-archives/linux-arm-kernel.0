@@ -1,55 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 26 Apr 2013 09:11:09 +0200
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <516C73C6.5050409@ti.com>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <51391F41.5000303@ti.com>
- <CAAwP0s1CFRO-rf==p5sYs1n0gigMif7wuT8Yv0N_iLUDMrtcOg@mail.gmail.com>
- <CACRpkdYHj-rEF3Rk_CWnmmMw_Amr7m8SgQ=-2zsDYuLeuu3azw@mail.gmail.com>
- <514C79E1.4090106@wwwdotorg.org> <514CE0AB.6060207@ti.com>
- <CACRpkdZmv-rAoKSQYpkHHSMzKJOn5TixVW_P3=m7ZNagBYCUPw@mail.gmail.com>
- <515319D5.20105@wwwdotorg.org>
- <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
- <5155C902.7080207@wwwdotorg.org>
- <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
- <5165CB9D.1090202@wwwdotorg.org>
- <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
- <51671D7B.5060303@wwwdotorg.org>
- <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
- <51673D70.3010503@wwwdotorg.org>
- <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
- <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
- <516C31C3.9040505@wwwdotorg.org> <516C73C6.5050409@ti.com>
-Message-ID: <CACRpkdaDmnDTE_jfz8cvFOrkAUv0mt3mkULGh71HxpRHGz0qJw@mail.gmail.com>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Fri, 26 Apr 2013 09:21:36 +0200
+Subject: linux-next: manual merge of the arm-soc tree with the spi-mb tree
+In-Reply-To: <20130426170649.d21c2d7a74e56d836ff6f04f@canb.auug.org.au>
+References: <20130426170649.d21c2d7a74e56d836ff6f04f@canb.auug.org.au>
+Message-ID: <CACQ1gAidYqDm_SHea9jQFGqernZpgT8RuaRSP2N0ZPUX7JYyrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 15, 2013 at 11:40 PM, Jon Hunter <jon-hunter@ti.com> wrote:
+2013/4/26 Stephen Rothwell <sfr@canb.auug.org.au>:
+> Hi all,
+>
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/boot/dts/at91sam9x5.dtsi between commits d50f88a0c304 ("ARM:
+> dts: add spi nodes for atmel SoC") and a68b728f7a21 ("ARM: dts: add
+> pinctrl property for spi node for atmel SoC") from the spi-mb tree and
+> commits e9a72ee81d58 ("ARM: at91: dt: at91sam9x5: add i2c pinctrl"),
+> 463c9c7bf1f3 ("ARM: at91: dt: at91sam9x5: add i2c-gpio pinctrl") and
+> b909c6c94462 ("ARM: at91/at91sam9x5: add RTC node") from the arm-soc tree.
+>
+> I fixed it up (hopefully - see below) and can carry the fix as necessary
+> (no action is required).
 
-> I am still concerned about the case where a driver may have already
-> called gpio_request() and then calls request_irq(). I think that the
-> solution needs to handle cases where the driver may or may not call
-> gpio_request() to allocate the gpio.
+Hi,
 
-So take a step back and you see that this is my actual fear and why
-I'm so hesitant about this patch to begin with.
+It's all ok for me !
 
-I wanted drivers to follow the sequence:
-gpio_request(), gpio_to_irq(), request_irq()
+Thanks,
 
-Now if request_irq() can implicitly perform gpio_request(), we end
-up with a semantic confusing mess like this where we are
-uncertain as to whether we should use the irq we obtain elsewhere
-(like from a resource on the platform device)) or maybe use
-gpio_to_irq() to convert it into an IRQ or not or ...
-
-It is certainly true that for some devices we don't want to know if
-the IRQ comes from a hard-wired IRQ line or from a GPIO line
-playing the r?le of IRQ controller, so we need to handle that.
-
-But then the drivers need to be consistent, and relying solely on
-code review to stop people from doing mixtures like the described
-is not working, the subsystem must enforce a proper policy.
-
-Yours,
-Linus Walleij
+Richard.
