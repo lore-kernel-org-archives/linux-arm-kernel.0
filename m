@@ -1,46 +1,89 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 26 Apr 2013 15:28:10 +0100
-Subject: [PATCH 04/32] dmaengine: ste_dma40: Amalgamate DMA source and
- destination channel numbers
-In-Reply-To: <CACRpkdbpbQTCxeQ6cCbAkvvQXJMQUhLv8=qcbBgvBVnMDdysOA@mail.gmail.com>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-5-git-send-email-lee.jones@linaro.org>
- <CACRpkdaauDYTdoBHGG9FO4kKqvCYyCrjY8EGWs5gAQWErGW6_A@mail.gmail.com>
- <20130425090612.GC4623@gmail.com>
- <CACRpkdbV8yEK0470q_-DWv6Q0hAG2wGntXFi5kaLUMgm9b=e-Q@mail.gmail.com>
- <20130425132025.GM4623@gmail.com>
- <CACRpkdbpbQTCxeQ6cCbAkvvQXJMQUhLv8=qcbBgvBVnMDdysOA@mail.gmail.com>
-Message-ID: <20130426142810.GD31899@gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 26 Apr 2013 16:33:53 +0200
+Subject: [PATCH 09/23 v2] watchdog: coh901327: devicetree support
+Message-ID: <1366986833-7158-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 25 Apr 2013, Linus Walleij wrote:
+From: Linus Walleij <linus.walleij@linaro.org>
 
-> On Thu, Apr 25, 2013 at 3:20 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Thu, 25 Apr 2013, Linus Walleij wrote:
-> 
-> >> As we may want to support DEV_TO_DEV at some point.
-> >>
-> >> Then no longer, and that is not related to $SUBJECT.
-> >
-> > That's not why I'm removing it. The statement can never be true due to
-> > the fact that the second evaluation (src_event_group != dst_event_group)
-> > can never be true, which is a direct effect of 'THIS_PATCH'.
-> 
-> OK that is correct, I'm fine with this then ... as part of that other
-> patch dealing with unreacable conditions I keep talking about...
+This adds support for probing the COH 901 327 watchdog from
+the device tree and also adds associated bindings.
 
-Just looking at this now.
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2: augment driver to call watchdog_init_timeout()
+ so we can also set the timeout from the device tree, as per
+ suggestion from Guenter Roeck.
 
-Although I agree that the "dst_event_group == STEDMA40_DEV_DST_MEMORY
-(-16)" issue can/should be split out prior, I don't think this
-"(src_event_group != dst_event_group)" should be, as it is a direct
-result of the code that's being changed in this patch here. It makes
-no sense to remove it before this patch, as it's still valid and
-removing it afterwards violates your break-now, fix-later stipulation.
+Hi Wim, I'm seeking an ACK on this patch to take it into
+ARM SoC along with the patches making use of this new
+binding.
+---
+ .../bindings/watchdog/stericsson-coh901327.txt        | 19 +++++++++++++++++++
+ drivers/watchdog/coh901327_wdt.c                      | 12 +++++++++---
+ 2 files changed, 28 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/stericsson-coh901327.txt
 
+diff --git a/Documentation/devicetree/bindings/watchdog/stericsson-coh901327.txt b/Documentation/devicetree/bindings/watchdog/stericsson-coh901327.txt
+new file mode 100644
+index 0000000..8ffb88e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/stericsson-coh901327.txt
+@@ -0,0 +1,19 @@
++ST-Ericsson COH 901 327 Watchdog timer
++
++Required properties:
++- compatible: must be "stericsson,coh901327".
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: the interrupt used for the watchdog timeout warning.
++
++Optional properties:
++- timeout-sec: contains the watchdog timeout in seconds.
++
++Example:
++
++watchdog: watchdog at c0012000 {
++	compatible = "stericsson,coh901327";
++	reg = <0xc0012000 0x1000>;
++	interrupts = <3>;
++	timeout-sec = <60>;
++};
+diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
+index b9b8a8b..4bd070f 100644
+--- a/drivers/watchdog/coh901327_wdt.c
++++ b/drivers/watchdog/coh901327_wdt.c
+@@ -354,9 +354,9 @@ static int __init coh901327_probe(struct platform_device *pdev)
+ 
+ 	clk_disable(clk);
+ 
+-	if (margin < 1 || margin > 327)
+-		margin = 60;
+-	coh901327_wdt.timeout = margin;
++	ret = watchdog_init_timeout(&coh901327_wdt, margin, &pdev->dev);
++	if (ret < 0)
++		coh901327_wdt.timeout = 60;
+ 
+ 	ret = watchdog_register_device(&coh901327_wdt);
+ 	if (ret == 0)
+@@ -441,10 +441,16 @@ void coh901327_watchdog_reset(void)
+ 	/* Return and await doom */
+ }
+ 
++static const struct of_device_id coh901327_dt_match[] = {
++	{ .compatible = "stericsson,coh901327" },
++	{},
++};
++
+ static struct platform_driver coh901327_driver = {
+ 	.driver = {
+ 		.owner	= THIS_MODULE,
+ 		.name	= "coh901327_wdog",
++		.of_match_table = coh901327_dt_match,
+ 	},
+ 	.remove		= __exit_p(coh901327_remove),
+ 	.suspend	= coh901327_suspend,
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.11.3
