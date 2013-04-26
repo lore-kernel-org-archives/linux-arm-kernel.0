@@ -1,76 +1,66 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 26 Apr 2013 12:00:58 +0200
-Subject: [PATCH 11/14] sched: filter task pull request
-In-Reply-To: <1366910611-20048-12-git-send-email-vincent.guittot@linaro.org>
-References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
- <1366910611-20048-12-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <CAKfTPtCUvKmTHzyVRCkGyM-nWOSWP8OUzMgyCyzPEXf1NoxsQQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 26 Apr 2013 11:18:40 +0100
+Subject: [RFC PATCH v3 02/17] Documentation: devicetree: arm: cpus/cpu
+ nodes bindings updates
+In-Reply-To: <CAL_JsqL2QOjTffogB6g7VK7oRUwDAmJpr=36uvFXjd+hpBL89A@mail.gmail.com>
+References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366824502-19729-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAL_JsqL2QOjTffogB6g7VK7oRUwDAmJpr=36uvFXjd+hpBL89A@mail.gmail.com>
+Message-ID: <20130426101839.GA3093@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Part of this patch is missing, the fix below is needed
+On Fri, Apr 26, 2013 at 03:51:10AM +0100, Rob Herring wrote:
+> On Wed, Apr 24, 2013 at 12:28 PM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > In order to extend the current cpu nodes bindings to newer CPUs
+> > inclusive of AArch64 and to update support for older ARM CPUs this
+> > patch updates device tree documentation for the cpu nodes bindings.
+> >
+> > Main changes:
+> >     - adds 64-bit bindings
+> >     - define usage of #address-cells
+> >     - define 32/64 dts compatibility settings
+> >     - defines behaviour on pre and post v7 uniprocessor systems
+> >     - adds ARM 11MPcore specific reg property definition
+> >
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> 
+> [...]
+> 
+> > +       - enable-method
+> > +               Value type: <stringlist>
+> > +               Usage and definition depend on ARM architecture version and
+> > +               configuration:
+> > +                       # On ARM v8 64-bit systems running the OS in AArch64,
+> > +                         this property is required and must be "spin-table".
+> 
+> What about PSCI?
 
-@@ -3497,7 +3497,9 @@ static bool is_buddy_full(int cpu)
- static bool is_my_buddy(int cpu, int buddy)
- {
-  int my_buddy = per_cpu(sd_pack_buddy, cpu);
-- return (my_buddy == -1) || (buddy == my_buddy);
-+
-+ return ((sysctl_sched_packing_mode == SCHED_PACKING_FULL) &&
-+               ((my_buddy == -1) || (buddy == my_buddy)));
- }
+I should add it, at least for ARM v8.
 
- static bool is_light_task(struct task_struct *p)
+> I don't think the ePAPR spin-table definition is sufficient for ARM.
+> How do you define wake up by SGI or sev instruction.
 
+I think Will described the wfe/sev mechanism in:
 
-On 25 April 2013 19:23, Vincent Guittot <vincent.guittot@linaro.org> wrote:
-> Only CPUs that participates to the packing effort can pull tasks on a busiest
-> group.
->
-> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> ---
->  kernel/sched/fair.c |   14 ++++++++++++--
->  1 file changed, 12 insertions(+), 2 deletions(-)
->
-> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> index 28f8ea7..6f63fb9 100644
-> --- a/kernel/sched/fair.c
-> +++ b/kernel/sched/fair.c
-> @@ -3494,6 +3494,12 @@ static bool is_buddy_full(int cpu)
->         return (sum * 1024 >= period * 1000);
->  }
->
-> +static bool is_my_buddy(int cpu, int buddy)
-> +{
-> +       int my_buddy = per_cpu(sd_pack_buddy, cpu);
-> +       return (my_buddy == -1) || (buddy == my_buddy);
-> +}
-> +
->  static bool is_light_task(struct task_struct *p)
->  {
->         /* A light task runs less than 20% in average */
-> @@ -4688,8 +4694,8 @@ static inline void update_sg_lb_stats(struct lb_env *env,
->
->                 /* Bias balancing toward cpus of our domain */
->                 if (local_group) {
-> -                       if (idle_cpu(i) && !first_idle_cpu &&
-> -                                       cpumask_test_cpu(i, sched_group_mask(group))) {
-> +                       if (is_my_buddy(i, i) && idle_cpu(i) && !first_idle_cpu
-> +                        && cpumask_test_cpu(i, sched_group_mask(group))) {
->                                 first_idle_cpu = 1;
->                                 balance_cpu = i;
->                         }
-> @@ -4817,6 +4823,10 @@ static void update_plb_buddy(int cpu, int *balance, struct sd_lb_stats *sds,
->
->         /* Get my new buddy */
->         buddy = per_cpu(sd_pack_buddy, cpu);
-> +
-> +       /* This CPU doesn't act for agressive packing */
-> +       if (buddy != cpu)
-> +               sds->busiest = 0;
->  }
->
->  /**
-> --
-> 1.7.9.5
->
+Documentation/arm64/booting.txt
+
+and the ePAPR does the same in 5.5.2.2/5.5.2.3. Since this is a document
+describing cpus/cpu nodes bindings I assume that description does not
+belong here. Question is: do we need to specify an ARM implementation
+specific enable-method to describe SGI/sev wake-up (ePAPR 5.5.3) ?
+
+> > +                       # On ARM 32-bit systems or ARM v8 systems running
+> > +                         the OS in AArch32 this property is prohibited.
+> 
+> Why?
+
+Because if we define it optional with no possible set of values basically
+it can be whatever string. I could define it optional with the same
+allowed values as ARM v8 even if it is currently ignored, at least in Linux,
+until PSCI implementations get merged.
+
+Thanks,
+Lorenzo
