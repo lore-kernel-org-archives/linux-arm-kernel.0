@@ -1,51 +1,106 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 26 Apr 2013 19:48:12 +0200
-Subject: gpio-pxa initcall level change and machine init breakage
-In-Reply-To: <CACRpkdYEi7i_kSuUy4dBW-tE4BxifJY5wFdYVyLe6La5=HwEmg@mail.gmail.com>
- (Linus Walleij's message of "Thu, 25 Apr 2013 23:22:13 +0200")
-References: <5172B398.7060706@newsguy.com>
- <CAD6h2NSRA9w7GZLQGgK-+TvEAsxwOHow5_26JyVUA6YQyj3OQg@mail.gmail.com>
- <517466F6.3000003@newsguy.com>
- <CAD6h2NSy0=3P-PHdCiJJQG_jvGaFnr7uex+Uxs=0F-VsUxtPWg@mail.gmail.com>
- <CACRpkdbk24kR75fanvXVAocnuozNq_=jWDSPHPCWhbZCOrN5_Q@mail.gmail.com>
- <5176E438.80800@newsguy.com>
- <CACRpkdYLCKKZZFi6Y-viPUvrwupJGzfxr3f20a1emp-9qE0YBg@mail.gmail.com>
- <87ppxiz9l5.fsf@free.fr>
- <CACRpkdYEi7i_kSuUy4dBW-tE4BxifJY5wFdYVyLe6La5=HwEmg@mail.gmail.com>
-Message-ID: <87li85yyhv.fsf@free.fr>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 26 Apr 2013 11:05:24 -0700
+Subject: [PATCH v2 4/6] SERIAL: OMAP: Remove the slave idle handling from
+ the driver
+In-Reply-To: <1366973695-2088-5-git-send-email-rnayak@ti.com> (Rajendra
+ Nayak's message of "Fri, 26 Apr 2013 16:24:53 +0530")
+References: <1366973695-2088-1-git-send-email-rnayak@ti.com>
+ <1366973695-2088-5-git-send-email-rnayak@ti.com>
+Message-ID: <8761z9yxp7.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+Rajendra Nayak <rnayak@ti.com> writes:
 
-> On Thu, Apr 25, 2013 at 9:36 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> This was done by pull request to Torvalds yesterday ...
-Thanks, that's a relief.
-
+> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 >
->>  (b) inform board maintainers that they must fix their board code (for example
->>  give them 1 window)
->>  (c) put back the patch. Board maintainers who did not amend their board
->>  code cannot say anymore they didn't know it. Board maintainers will also have
->>  time to rise objections if they think they cannot change their board code
->>  (which I do not believe is possible, but who knows ...)
+> UART IP slave idle handling now taken care by runtime pm backend(hwmod layer)
+> so remove the hackery from the driver.
 >
-> So when it comes to the PXA there is maybe this list of things that
-> would be nice to change, and this is likely on top of it ... moving the
-> PXA machines over to device tree would be more important if people
-> who like them want them so stay around, because non-device tree
-> platforms will at some point become deprecated, and fixing the platforms
-> to support device tree will inevitably lead to this problem being fixed
-> as well.
-Yeah, probably. That's a good long term goal too.
-Now you reverted, I'm under pressure to fix mioa701 to get rid of gpio calls in
-its board setup code :)
+> As discussed on the list, in future if dma mode needs to be brought
+> back to this driver, UART sysc handling needs to be updated in
+> framework such a way that no-idle/force idle profile can be supported.
+> Given the broken dma mode for OMAP uarts, its very unlikely.
+>
+> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+> Tested-by: Sourav Poddar <sourav.poddar@ti.com>
+> Signed-off-by: Rajendra nayak <rnayak@ti.com>
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-As for device tree conversion, well that's another story.
-For my case for example I'll have to redevelop the bootloader (IPL+SPL) in order
-for suspend to RAM to work ... no world is perfecgt.
+nit: the ordering of this patch with the following one will break
+bisect.  
 
-Cheers.
+IOW, with this patch applied, but not the following one, compilation
+will be broken because the func pointers are removed from the header,
+but still used in omap-serial.c.
 
--- 
-Robert
+A simple fix is to just apply the other one first.
+
+Kevin
+
+> ---
+>  drivers/tty/serial/omap-serial.c          |   23 -----------------------
+>  include/linux/platform_data/serial-omap.h |    2 --
+>  2 files changed, 25 deletions(-)
+>
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index 4dc4140..08332f3 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -202,26 +202,6 @@ static int serial_omap_get_context_loss_count(struct uart_omap_port *up)
+>  	return pdata->get_context_loss_count(up->dev);
+>  }
+>  
+> -static void serial_omap_set_forceidle(struct uart_omap_port *up)
+> -{
+> -	struct omap_uart_port_info *pdata = up->dev->platform_data;
+> -
+> -	if (!pdata || !pdata->set_forceidle)
+> -		return;
+> -
+> -	pdata->set_forceidle(up->dev);
+> -}
+> -
+> -static void serial_omap_set_noidle(struct uart_omap_port *up)
+> -{
+> -	struct omap_uart_port_info *pdata = up->dev->platform_data;
+> -
+> -	if (!pdata || !pdata->set_noidle)
+> -		return;
+> -
+> -	pdata->set_noidle(up->dev);
+> -}
+> -
+>  static void serial_omap_enable_wakeup(struct uart_omap_port *up, bool enable)
+>  {
+>  	struct omap_uart_port_info *pdata = up->dev->platform_data;
+> @@ -298,8 +278,6 @@ static void serial_omap_stop_tx(struct uart_port *port)
+>  		serial_out(up, UART_IER, up->ier);
+>  	}
+>  
+> -	serial_omap_set_forceidle(up);
+> -
+>  	pm_runtime_mark_last_busy(up->dev);
+>  	pm_runtime_put_autosuspend(up->dev);
+>  }
+> @@ -364,7 +342,6 @@ static void serial_omap_start_tx(struct uart_port *port)
+>  
+>  	pm_runtime_get_sync(up->dev);
+>  	serial_omap_enable_ier_thri(up);
+> -	serial_omap_set_noidle(up);
+>  	pm_runtime_mark_last_busy(up->dev);
+>  	pm_runtime_put_autosuspend(up->dev);
+>  }
+> diff --git a/include/linux/platform_data/serial-omap.h b/include/linux/platform_data/serial-omap.h
+> index ff9b0aa..c860c1b 100644
+> --- a/include/linux/platform_data/serial-omap.h
+> +++ b/include/linux/platform_data/serial-omap.h
+> @@ -43,8 +43,6 @@ struct omap_uart_port_info {
+>  	int			DTR_present;
+>  
+>  	int (*get_context_loss_count)(struct device *);
+> -	void (*set_forceidle)(struct device *);
+> -	void (*set_noidle)(struct device *);
+>  	void (*enable_wakeup)(struct device *, bool);
+>  };
