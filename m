@@ -1,19 +1,24 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 26 Apr 2013 08:07:44 -0700
-Subject: [PATCH 09/23 v2] watchdog: coh901327: devicetree support
-In-Reply-To: <1366986833-7158-1-git-send-email-linus.walleij@stericsson.com>
-References: <1366986833-7158-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130426150744.GA26389@roeck-us.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 26 Apr 2013 17:07:57 +0200
+Subject: [PATCH 01/21] ARM: topology: export cpu_topology
+In-Reply-To: <20130426085333.GA30284@mudshark.cambridge.arm.com>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <1366910944-3033663-2-git-send-email-arnd@arndb.de>
+ <20130426085333.GA30284@mudshark.cambridge.arm.com>
+Message-ID: <201304261707.57328.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 26, 2013 at 04:33:53PM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Friday 26 April 2013, Will Deacon wrote:
+> On Thu, Apr 25, 2013 at 06:28:44PM +0100, Arnd Bergmann wrote:
+> > The cpu_topology symbol is required by any driver using the topology
+> > interfaces, which leads to a couple of build errors:
+> > 
+> > ERROR: "cpu_topology" [drivers/net/ethernet/sfc/sfc.ko] undefined!
+> > ERROR: "cpu_topology" [drivers/cpufreq/arm_big_little.ko] undefined!
 > 
-> This adds support for probing the COH 901 327 watchdog from
-> the device tree and also adds associated bindings.
-> 
-> Cc: Wim Van Sebroeck <wim@iguana.be>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Are these first two in mainline?
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+I think they are both newly added in linux-next.
+
+	Arnd
