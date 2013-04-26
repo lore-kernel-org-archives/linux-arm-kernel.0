@@ -1,140 +1,71 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Fri, 26 Apr 2013 17:06:49 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the spi-mb tree
-Message-ID: <20130426170649.d21c2d7a74e56d836ff6f04f@canb.auug.org.au>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Fri, 26 Apr 2013 12:38:31 +0530
+Subject: [PATCH 2/8] ARM: OMAP2+: hwmod: Cleanup sidle/mstandby programming
+In-Reply-To: <alpine.DEB.2.00.1304230804410.30196@utopia.booyaka.com>
+References: <1361354272-18089-1-git-send-email-santosh.shilimkar@ti.com>
+ <1361354272-18089-3-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.DEB.2.00.1303310053351.6436@utopia.booyaka.com>
+ <515947D3.50904@ti.com> <516FD093.1020607@ti.com>
+ <alpine.DEB.2.00.1304230804410.30196@utopia.booyaka.com>
+Message-ID: <517A27EF.40408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tuesday 23 April 2013 01:49 PM, Paul Walmsley wrote:
+> Hi Rajendra,
+> 
+> On Thu, 18 Apr 2013, Rajendra Nayak wrote:
+> 
+>>>>> _enable_wakeup() and _disable_wakeup() are expected to program the
+>>>>> OCP_SYSCONFIG.ENAWAKEUP bit.
+>>>>
+>>>> These functions were originally intended to take care of everything needed 
+>>>> for the IP block to wake up the chip, including the PRCM WKEN programming.  
+>>>> ENAWAKEUP is simply one part of that.
+>>>>
+>>>>> Get rid of the additional sidle/mstandby programming in them, as its 
+>>>>> confusing (this is expected to be handled elsewhere as part of 
+>>>>> _enable_sysc()/__idle_sysc())
+>>>>
+>>>> Sorry, why does the expectation exist for the code to enable and disable 
+>>>> device wakeup to be part of _enable_sysc()/_idle_sysc(), rather than in 
+>>>> functions called by _enable_sysc()/_idle_sysc()?
+>>>
+>>> It all comes down to if SIDLE_SMART_WKUP/MSTANDBY_SMART_WKUP programming
+>>> be considered as 'idlemode' programming or 'enwakeup' programming.
+>>> If you consider these are being part of 'enwakeup' progrmming, these should
+>>> certainly be handled as part of _enable_wakeup() and _disable_wakeup().
+>>>
+>>> Today, in some cases, these are *also* handled as part of _enable_sysc()
+>>> and _idle_sysc(). The way _enable_wakeup() is invoked from _enable_sysc()
+>>> is also very inconsistent. For instance, for any IP which supports
+>>> SYSC_HAS_MIDLEMODE and SYSC_HAS_ENAWAKEUP, we invoke _enable_wakeup()
+>>> regardless of the MIDLEMODE programmmed.
+>>> While in case of the IP supporting SYSC_HAS_SIDLEMODE, _enable_wakeup() is
+>>> invoked only when the SIDLEMODE programmed is SMART or SMART_WKUP.
+>>>
+>>> I understand the cleanups you are suggesting below as part of the movement
+>>> of some of these things outside of mach-omap2.
+>>> I was more looking at fixing the existing piece so its readable and does
+>>> things more consistently.
+>>
+>> Do you have any further thoughts on how we should do about this?
+> 
+> Is it possible to implement a solution that preserves _enable_wakeup() and 
+> _disable_wakeup() as distinct functions, that can be called by separate 
+> wakeup control entry points?
+> 
+> If it makes sense to change _enable_sysc() so that it doesn't call 
+> _enable_wakeup(), but does similar work itself, that's fine with me, as 
+> long as there's not too much code duplication.
+> 
+> It will be good to have the inconsistencies fixed.
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/boot/dts/at91sam9x5.dtsi between commits d50f88a0c304 ("ARM:
-dts: add spi nodes for atmel SoC") and a68b728f7a21 ("ARM: dts: add
-pinctrl property for spi node for atmel SoC") from the spi-mb tree and
-commits e9a72ee81d58 ("ARM: at91: dt: at91sam9x5: add i2c pinctrl"),
-463c9c7bf1f3 ("ARM: at91: dt: at91sam9x5: add i2c-gpio pinctrl") and
-b909c6c94462 ("ARM: at91/at91sam9x5: add RTC node") from the arm-soc tree.
+Sure, I'll post something on those lines shortly.
 
-I fixed it up (hopefully - see below) and can carry the fix as necessary
-(no action is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/boot/dts/at91sam9x5.dtsi
-index 347b438,284bf24..0000000
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@@ -343,23 -343,53 +343,70 @@@
-  					};
-  				};
-  
- +				spi0 {
- +					pinctrl_spi0: spi0-0 {
- +						atmel,pins =
- +							<0 11 0x1 0x0	/* PA11 periph A SPI0_MISO pin */
- +							 0 12 0x1 0x0	/* PA12 periph A SPI0_MOSI pin */
- +							 0 13 0x1 0x0>;	/* PA13 periph A SPI0_SPCK pin */
- +					};
- +				};
- +
- +				spi1 {
- +					pinctrl_spi1: spi1-0 {
- +						atmel,pins =
- +							<0 21 0x2 0x0	/* PA21 periph B SPI1_MISO pin */
- +							 0 22 0x2 0x0	/* PA22 periph B SPI1_MOSI pin */
- +							 0 23 0x2 0x0>;	/* PA23 periph B SPI1_SPCK pin */
- +					};
- +				};
-+ 				i2c0 {
-+ 					pinctrl_i2c0: i2c0-0 {
-+ 						atmel,pins =
-+ 							<0 30 0x1 0x0	/* PA30 periph A I2C0 data */
-+ 							 0 31 0x1 0x0>;	/* PA31 periph A I2C0 clock */
-+ 					};
-+ 				};
-+ 
-+ 				i2c1 {
-+ 					pinctrl_i2c1: i2c1-0 {
-+ 						atmel,pins =
-+ 							<2 0 0x3 0x0	/* PC0 periph C I2C1 data */
-+ 							 2 1 0x3 0x0>;	/* PC1 periph C I2C1 clock */
-+ 					};
-+ 				};
-+ 
-+ 				i2c2 {
-+ 					pinctrl_i2c2: i2c2-0 {
-+ 						atmel,pins =
-+ 							<1 4 0x2 0x0	/* PB4 periph B I2C2 data */
-+ 							 1 5 0x2 0x0>;	/* PB5 periph B I2C2 clock */
-+ 					};
-+ 				};
-+ 
-+ 				i2c_gpio0 {
-+ 					pinctrl_i2c_gpio0: i2c_gpio0-0 {
-+ 						atmel,pins =
-+ 							<0 30 0x0 0x2	/* PA30 gpio multidrive I2C0 data */
-+ 							 0 31 0x0 0x2>;	/* PA31 gpio multidrive I2C0 clock */
-+ 					};
-+ 				};
-+ 
-+ 				i2c_gpio1 {
-+ 					pinctrl_i2c_gpio1: i2c_gpio1-0 {
-+ 						atmel,pins =
-+ 							<2 0 0x0 0x2	/* PC0 gpio multidrive I2C1 data */
-+ 							 2 1 0x0 0x2>;	/* PC1 gpio multidrive I2C1 clock */
-+ 					};
-+ 				};
-+ 
-+ 				i2c_gpio2 {
-+ 					pinctrl_i2c_gpio2: i2c_gpio2-0 {
-+ 						atmel,pins =
-+ 							<1 4 0x0 0x2	/* PB4 gpio multidrive I2C2 data */
-+ 							 1 5 0x0 0x2>;	/* PB5 gpio multidrive I2C2 clock */
-+ 					};
-+ 				};
-  
-  				pioA: gpio at fffff400 {
-  					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
-@@@ -548,27 -587,12 +604,33 @@@
-  				};
-  			};
-  
- +			spi0: spi at f0000000 {
- +				#address-cells = <1>;
- +				#size-cells = <0>;
- +				compatible = "atmel,at91rm9200-spi";
- +				reg = <0xf0000000 0x100>;
- +				interrupts = <13 4 3>;
- +				pinctrl-names = "default";
- +				pinctrl-0 = <&pinctrl_spi0>;
- +				status = "disabled";
- +			};
- +
- +			spi1: spi at f0004000 {
- +				#address-cells = <1>;
- +				#size-cells = <0>;
- +				compatible = "atmel,at91rm9200-spi";
- +				reg = <0xf0004000 0x100>;
- +				interrupts = <14 4 3>;
- +				pinctrl-names = "default";
- +				pinctrl-0 = <&pinctrl_spi1>;
- +				status = "disabled";
- +			};
-+ 			rtc at fffffeb0 {
-+ 				compatible = "atmel,at91rm9200-rtc";
-+ 				reg = <0xfffffeb0 0x40>;
-+ 				interrupts = <1 4 7>;
-+ 				status = "disabled";
-+ 			};
-  		};
-  
-  		nand0: nand at 40000000 {
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130426/00aa3f43/attachment.sig>
+regards,
+Rajendra
+> 
+> 
+> - Paul
+> 
