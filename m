@@ -1,28 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 26 Apr 2013 15:28:37 +0200
-Subject: [PATCH 01/23] ARM: u300: fix ages old copy/paste bug
-In-Reply-To: <201304221334.04160.arnd@arndb.de>
-References: <1366624283-6122-1-git-send-email-linus.walleij@stericsson.com>
- <201304221334.04160.arnd@arndb.de>
-Message-ID: <CACRpkdYnk1L3z19yQUJciKOOLUGV_rj3f231-jFKYjcE41kRsw@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 26 Apr 2013 15:29:55 +0200
+Subject: [PATCH] ARM: u300: fix ages old copy/paste bug
+Message-ID: <1366982995-10870-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 1:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 22 April 2013, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> The UART1 is on the fast AHB bridge, not on the slow bus.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Do you want to mark this for stable?
->
-> While there are not a lot of people that would need the fix, I think
-> we should do it by habit in cases that fit the stable rules.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-OK you're right. I'm sending this one separately to
-arm at kernel.org as a fix and marked as stable.
+The UART1 is on the fast AHB bridge, not on the slow bus.
 
-Yours,
-Linus Walleij
+Cc: stable at vger.kernel.org
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Hi ARM SoC folks, as discussed with Arnd, please apply
+this patch directly for fixes.
+---
+ arch/arm/mach-u300/include/mach/u300-regs.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-u300/include/mach/u300-regs.h b/arch/arm/mach-u300/include/mach/u300-regs.h
+index 1e49d90..0320495 100644
+--- a/arch/arm/mach-u300/include/mach/u300-regs.h
++++ b/arch/arm/mach-u300/include/mach/u300-regs.h
+@@ -95,7 +95,7 @@
+ #define U300_SPI_BASE			(U300_FAST_PER_PHYS_BASE+0x6000)
+ 
+ /* Fast UART1 on U335 only */
+-#define U300_UART1_BASE			(U300_SLOW_PER_PHYS_BASE+0x7000)
++#define U300_UART1_BASE			(U300_FAST_PER_PHYS_BASE+0x7000)
+ 
+ /*
+  * SLOW peripherals
+-- 
+1.7.11.3
