@@ -1,106 +1,41 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 26 Apr 2013 11:05:24 -0700
-Subject: [PATCH v2 4/6] SERIAL: OMAP: Remove the slave idle handling from
- the driver
-In-Reply-To: <1366973695-2088-5-git-send-email-rnayak@ti.com> (Rajendra
- Nayak's message of "Fri, 26 Apr 2013 16:24:53 +0530")
-References: <1366973695-2088-1-git-send-email-rnayak@ti.com>
- <1366973695-2088-5-git-send-email-rnayak@ti.com>
-Message-ID: <8761z9yxp7.fsf@linaro.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri, 26 Apr 2013 11:06:05 -0700
+Subject: [PATCH v2] of: Set the DMA mask to 64 bits when dma_addr_t is 64-bits
+Message-ID: <1366999565-19498-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@ti.com> writes:
+Currently, of_platform_device_create_pdata always sets the
+coherent DMA mask to 32 bits. On ARM systems without CONFIG_ZONE_DMA,
+arm_dma_limit gets set to ~0 or 0xFFFFFFFFFFFFFFFF on LPAE based
+systems. Since arm_dma_limit represents the smallest dma_mask
+on the system, the default of 32 bits prevents any dma_coherent
+allocation from succeeding unless clients manually set the
+dma mask first. Rather than make every client on an LPAE system set
+the mask, set the mask to a 64 bit value on systems with 64-bit
+dma addresses.
 
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
->
-> UART IP slave idle handling now taken care by runtime pm backend(hwmod layer)
-> so remove the hackery from the driver.
->
-> As discussed on the list, in future if dma mode needs to be brought
-> back to this driver, UART sysc handling needs to be updated in
-> framework such a way that no-idle/force idle profile can be supported.
-> Given the broken dma mode for OMAP uarts, its very unlikely.
->
-> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-> Tested-by: Sourav Poddar <sourav.poddar@ti.com>
-> Signed-off-by: Rajendra nayak <rnayak@ti.com>
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ drivers/of/platform.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-nit: the ordering of this patch with the following one will break
-bisect.  
-
-IOW, with this patch applied, but not the following one, compilation
-will be broken because the func pointers are removed from the header,
-but still used in omap-serial.c.
-
-A simple fix is to just apply the other one first.
-
-Kevin
-
-> ---
->  drivers/tty/serial/omap-serial.c          |   23 -----------------------
->  include/linux/platform_data/serial-omap.h |    2 --
->  2 files changed, 25 deletions(-)
->
-> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-> index 4dc4140..08332f3 100644
-> --- a/drivers/tty/serial/omap-serial.c
-> +++ b/drivers/tty/serial/omap-serial.c
-> @@ -202,26 +202,6 @@ static int serial_omap_get_context_loss_count(struct uart_omap_port *up)
->  	return pdata->get_context_loss_count(up->dev);
->  }
->  
-> -static void serial_omap_set_forceidle(struct uart_omap_port *up)
-> -{
-> -	struct omap_uart_port_info *pdata = up->dev->platform_data;
-> -
-> -	if (!pdata || !pdata->set_forceidle)
-> -		return;
-> -
-> -	pdata->set_forceidle(up->dev);
-> -}
-> -
-> -static void serial_omap_set_noidle(struct uart_omap_port *up)
-> -{
-> -	struct omap_uart_port_info *pdata = up->dev->platform_data;
-> -
-> -	if (!pdata || !pdata->set_noidle)
-> -		return;
-> -
-> -	pdata->set_noidle(up->dev);
-> -}
-> -
->  static void serial_omap_enable_wakeup(struct uart_omap_port *up, bool enable)
->  {
->  	struct omap_uart_port_info *pdata = up->dev->platform_data;
-> @@ -298,8 +278,6 @@ static void serial_omap_stop_tx(struct uart_port *port)
->  		serial_out(up, UART_IER, up->ier);
->  	}
->  
-> -	serial_omap_set_forceidle(up);
-> -
->  	pm_runtime_mark_last_busy(up->dev);
->  	pm_runtime_put_autosuspend(up->dev);
->  }
-> @@ -364,7 +342,6 @@ static void serial_omap_start_tx(struct uart_port *port)
->  
->  	pm_runtime_get_sync(up->dev);
->  	serial_omap_enable_ier_thri(up);
-> -	serial_omap_set_noidle(up);
->  	pm_runtime_mark_last_busy(up->dev);
->  	pm_runtime_put_autosuspend(up->dev);
->  }
-> diff --git a/include/linux/platform_data/serial-omap.h b/include/linux/platform_data/serial-omap.h
-> index ff9b0aa..c860c1b 100644
-> --- a/include/linux/platform_data/serial-omap.h
-> +++ b/include/linux/platform_data/serial-omap.h
-> @@ -43,8 +43,6 @@ struct omap_uart_port_info {
->  	int			DTR_present;
->  
->  	int (*get_context_loss_count)(struct device *);
-> -	void (*set_forceidle)(struct device *);
-> -	void (*set_noidle)(struct device *);
->  	void (*enable_wakeup)(struct device *, bool);
->  };
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 0970505..c669ab4 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -214,7 +214,11 @@ struct platform_device *of_platform_device_create_pdata(
+ #if defined(CONFIG_MICROBLAZE)
+ 	dev->archdata.dma_mask = 0xffffffffUL;
+ #endif
++#ifdef CONFIG_ARCH_DMA_ADDR_T_64BIT
++	dev->dev.coherent_dma_mask = DMA_BIT_MASK(64);
++#else
+ 	dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
++#endif
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
