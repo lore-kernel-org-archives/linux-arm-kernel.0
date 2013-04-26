@@ -1,44 +1,91 @@
-From: arjan@linux.intel.com (Arjan van de Ven)
-Date: Fri, 26 Apr 2013 08:46:21 -0700
-Subject: [RFC PATCH v4 00/14] sched: packing small tasks
-In-Reply-To: <CAKfTPtCwdw1mYpWRFbPo9zT=9vFANpJyubh1eX-0vJLqrqizgA@mail.gmail.com>
-References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
- <517A969B.5040606@linux.intel.com>
- <CAKfTPtCwdw1mYpWRFbPo9zT=9vFANpJyubh1eX-0vJLqrqizgA@mail.gmail.com>
-Message-ID: <517AA14D.7060202@linux.intel.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Fri, 26 Apr 2013 19:47:30 +0400
+Subject: [PATCH v2 3/3] GPIO: clps711x: Add DT support
+In-Reply-To: <1366991250-17130-1-git-send-email-shc_work@mail.ru>
+References: <1366991250-17130-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1366991250-17130-3-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>
->>
->> so I got to ask the hard question; what percentage of system level (not just
->> cpu level)
->> power consumption gain can you measure (pick your favorite workload)...
->>
->
-> I haven't system level figures for my patches but only for the cpu
-> subsystem. If we use the MP3 results in the back of my mail, they show
-> an improvement of 37 % (113/178) for the CPU subsystem of the
-> platform. If we assume that the CPU subsystem contributes 25% of an
-> embedded system power consumption (this can vary across platform
-> depending of the use of HW accelerator but it should be a almost fair
-> percentage), the patch can impact the power consumption on up to 9%.
->
+Add DT support to the CLPS711X GPIO driver.
 
-sadly the math tends to not work quite that easy;
-memory takes significantly more power when the system is not idle than when it is idle for example. [*]
-so while reducing cpu power by making it run a bit longer (at lower frequency or
-slower core or whatever) is a pure win if you only look at the cpu, but it may
-(or may not) be a loss when looking at a whole system level.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ .../devicetree/bindings/gpio/gpio-clps711x.txt     | 28 ++++++++++++++++++++++
+ drivers/gpio/gpio-clps711x.c                       | 14 ++++++++---
+ 2 files changed, 39 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/gpio-clps711x.txt
 
-I've learned the hard way that you cannot just look at the cpu numbers; you must look
-at the whole-system power when playing with such tradeoffs.
-
-That does not mean that your patch is not useful; it very well can be, but
-without having looked at whole-system power that's a very dangerous conclusion to make.
-So.. if you get a chance, I'd love to see data on a whole-system level... even for just one workload
-and one system
-(playing mp3 sounds like a quite reasonable workload for such things indeed)
-
-
-[*] I assume that on your ARM systems, memory goes into self refresh during system idle just as it does on x86
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-clps711x.txt b/Documentation/devicetree/bindings/gpio/gpio-clps711x.txt
+new file mode 100644
+index 0000000..e0d0446
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-clps711x.txt
+@@ -0,0 +1,28 @@
++Cirrus Logic CLPS711X GPIO controller
++
++Required properties:
++- compatible: Should be "cirrus,clps711x-gpio"
++- reg: Physical base GPIO controller registers location and length.
++  There should be two registers, first is DATA register, the second
++  is DIRECTION.
++- gpio-controller: Marks the device node as a gpio controller.
++- #gpio-cells: Should be two. The first cell is the pin number and
++  the second cell is used to specify the gpio polarity:
++    0 = active high
++    1 = active low
++
++Note: Each GPIO port should have an alias correctly numbered in "aliases"
++node.
++
++Example:
++
++aliases {
++	gpio0 = &porta;
++};
++
++porta: gpio at 80000000 {
++	compatible = "cirrus,clps711x-gpio";
++	reg = <0x80000000 0x1>, <0x80000040 0x1>;
++	gpio-controller;
++	#gpio-cells = <2>;
++};
+diff --git a/drivers/gpio/gpio-clps711x.c b/drivers/gpio/gpio-clps711x.c
+index 6ce8a8c..0edaf2c 100644
+--- a/drivers/gpio/gpio-clps711x.c
++++ b/drivers/gpio/gpio-clps711x.c
+@@ -17,10 +17,11 @@
+ 
+ static int clps711x_gpio_probe(struct platform_device *pdev)
+ {
++	struct device_node *np = pdev->dev.of_node;
+ 	void __iomem *dat, *dir;
+ 	struct bgpio_chip *bgc;
+ 	struct resource *res;
+-	int err, id = pdev->id;
++	int err, id = np ? of_alias_get_id(np, "gpio") : pdev->id;
+ 
+ 	if ((id < 0) || (id > 4))
+ 		return -ENODEV;
+@@ -76,10 +77,17 @@ static int clps711x_gpio_remove(struct platform_device *pdev)
+ 	return bgpio_remove(bgc);
+ }
+ 
++static const struct of_device_id clps711x_gpio_ids[] = {
++	{ .compatible = "cirrus,clps711x-gpio" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, clps711x_gpio_ids);
++
+ static struct platform_driver clps711x_gpio_driver = {
+ 	.driver	= {
+-		.name	= "clps711x-gpio",
+-		.owner	= THIS_MODULE,
++		.name		= "clps711x-gpio",
++		.owner		= THIS_MODULE,
++		.of_match_table	= of_match_ptr(clps711x_gpio_ids),
+ 	},
+ 	.probe	= clps711x_gpio_probe,
+ 	.remove	= clps711x_gpio_remove,
+-- 
+1.8.1.5
