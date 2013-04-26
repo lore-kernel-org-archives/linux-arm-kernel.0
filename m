@@ -1,59 +1,57 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Fri, 26 Apr 2013 11:30:56 +0100
-Subject: [PATCH v4 2/7] xen/arm: SMP support
-In-Reply-To: <alpine.DEB.2.02.1304261125440.4180@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304242012590.4180@kaball.uk.xensource.com>
- <1366831695-13214-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <1366897221.20256.544.camel@zakaz.uk.xensource.com>
- <alpine.DEB.2.02.1304251503100.4180@kaball.uk.xensource.com>
- <1366909184.3142.0.camel@zakaz.uk.xensource.com>
- <alpine.DEB.2.02.1304251945290.4180@kaball.uk.xensource.com>
- <1366966304.3142.33.camel@zakaz.uk.xensource.com>
- <alpine.DEB.2.02.1304261125440.4180@kaball.uk.xensource.com>
-Message-ID: <1366972256.3142.60.camel@zakaz.uk.xensource.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 26 Apr 2013 12:30:19 +0200
+Subject: [RFC PATCH v3 3/6] sched: pack small tasks
+In-Reply-To: <CAKfTPtCphgnT6_WSdHJR+_GcdfroL+OFhiqsr_rBFx5=apkTVQ@mail.gmail.com>
+References: <1363955155-18382-1-git-send-email-vincent.guittot@linaro.org>
+ <1363955155-18382-4-git-send-email-vincent.guittot@linaro.org>
+ <1364300782.5053.6.camel@laptop>
+ <5152C83F.6060509@linux.vnet.ibm.com>
+ <CAKfTPtCphgnT6_WSdHJR+_GcdfroL+OFhiqsr_rBFx5=apkTVQ@mail.gmail.com>
+Message-ID: <20130426103019.GE8669@dyad.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-04-26 at 11:27 +0100, Stefano Stabellini wrote:
-> On Fri, 26 Apr 2013, Ian Campbell wrote:
-> > On Thu, 2013-04-25 at 19:45 +0100, Stefano Stabellini wrote:
-> > > On Thu, 25 Apr 2013, Ian Campbell wrote:
-> > > > > > > @@ -216,6 +245,8 @@ static int __init xen_guest_init(void)
-> > > > > > >  	 * is required to use VCPUOP_register_vcpu_info to place vcpu info
-> > > > > > >  	 * for secondary CPUs as they are brought up. */
-> > > > > > >  	per_cpu(xen_vcpu, 0) = &HYPERVISOR_shared_info->vcpu_info[0];
-> > > > > > > +	for_each_online_cpu(i)
-> > > > > > > +		xen_secondary_init(i);
-> > > > > > >  
-> > > > > > >  	gnttab_init();
-> > > > > > >  	if (!xen_initial_domain())
-> > > > > > [...]
-> > > > > > > @@ -244,7 +280,7 @@ static int __init xen_init_events(void)
-> > > > > > >  		return -EINVAL;
-> > > > > > >  	}
-> > > > > > >  
-> > > > > > > -	enable_percpu_irq(xen_events_irq, 0);
-> > > > > > > +	on_each_cpu(xen_percpu_enable_events, NULL, 0);
-> > > > > > 
-> > > > > > It feels like there ought to be some sort of per-cpu bringup callback
-> > > > > > which takes care of these dynamically. Maybe that doesn't matter until
-> > > > > > we get vcpu hotplug going?
-> > > > > 
-> > > > > I suspect there isn't one, considering that on_each_cpu is also used by 
-> > > > > kvm_vgic_hyp_init, kvm_timer_hyp_init and others.
-> > > > 
-> > > > Could we use cpu_notifiers for this?
-> > > 
-> > > cpu_notifiers are for cpu hotplug, not for secondary cpu bringup
-> > 
-> > Are you sure they don't also trigger during bringup, because the
-> > distinction is a little bit academic...
+On Wed, Mar 27, 2013 at 12:00:40PM +0100, Vincent Guittot wrote:
+> On 27 March 2013 11:21, Preeti U Murthy <preeti@linux.vnet.ibm.com> wrote:
+> > Hi,
+> >
+> > On 03/26/2013 05:56 PM, Peter Zijlstra wrote:
+> >> On Fri, 2013-03-22 at 13:25 +0100, Vincent Guittot wrote:
+> >>> +static bool is_buddy_busy(int cpu)
+> >>> +{
+> >>> +       struct rq *rq = cpu_rq(cpu);
+> >>> +
+> >>> +       /*
+> >>> +        * A busy buddy is a CPU with a high load or a small load with
+> >>> a lot of
+> >>> +        * running tasks.
+> >>> +        */
+> >>> +       return (rq->avg.runnable_avg_sum >
+> >>> +                       (rq->avg.runnable_avg_period / (rq->nr_running
+> >>> + 2)));
+> >>> +}
+> >>
+> >> Why does the comment talk about load but we don't see it in the
+> >> equation. Also, why does nr_running matter at all? I thought we'd
+> >> simply bother with utilization, if fully utilized we're done etc..
 > 
-> My mistake, they do run on secondary cpus, but not in our case because
-> xen_guest_init is called *after* cpu_notifiers are called.
-> So, they are too early for Xen.
+> By load, I mean : 100 * avg.runnable_avg_sum / avg.runnable_avg_period
+> In addition, i take into account the number of tasks already in the
+> runqueue in order to define the business of a CPU. A CPU with a load
+> of 50% without any tasks in the runqeue in not busy at this time and
+> we can migrate tasks on it but if the CPU already has 2 tasks in its
+> runqueue, it means that newly wake up task will have to share the CPU
+> with other tasks so we consider that the CPU is already busy and we
+> will fall back to default behavior. The equation considers that a CPU
+> is not busy if
+> 100 * avg.runnable_avg_sum / avg.runnable_avg_period < 100 / (nr_running + 2)
 
-Another reason to consider calling xen_guest_init much earlier then
-IMHO. although we can live with the solution you have now I suppose.
+I'm still somewhat confused by all this. So raising nr_running will lower the
+required utilization to be considered busy. Suppose we have 50 tasks running,
+all@1% utilization (bulk wakeup) we'd consider the cpu busy, even though its
+picking its nose for half the time.
 
-Ian.
+
+I'm assuming it's mean to limit process latency or so? Why are you concerned
+with that? This seems like an arbitrary power vs performance tweak without
+solid effidence its needed or even wanted.
