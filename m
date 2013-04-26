@@ -1,93 +1,55 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 26 Apr 2013 13:41:28 +0100
-Subject: dw_apb_timer_of.c: remove parts that were picoxcell-specific
-In-Reply-To: <20130426121433.GA16249@amd.pavel.ucw.cz>
-References: <20130426121433.GA16249@amd.pavel.ucw.cz>
-Message-ID: <20130426124128.GB6946@page>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 26 Apr 2013 14:49:32 +0200
+Subject: [PATCH 04/14] sched: pack the idle load balance
+In-Reply-To: <1366910611-20048-5-git-send-email-vincent.guittot@linaro.org>
+References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
+ <1366910611-20048-5-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20130426124931.GC13464@dyad.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-
-On Fri, Apr 26, 2013 at 02:14:34PM +0200, Pavel Machek wrote:
-> diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
-> index 70b441a..22759f5 100644
-> --- a/arch/arm/mach-picoxcell/common.c
-> +++ b/arch/arm/mach-picoxcell/common.c
-> @@ -84,11 +84,39 @@ static void picoxcell_wdt_restart(char mode, const char *cmd)
->  	}
->  }
+On Thu, Apr 25, 2013 at 07:23:20PM +0200, Vincent Guittot wrote:
+> Look for an idle CPU close to the pack buddy CPU whenever possible.
+> The goal is to prevent the wake up of a CPU which doesn't share the power
+> domain of the pack buddy CPU.
+> 
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> Reviewed-by: Morten Rasmussen <morten.rasmussen@arm.com>
+> ---
+>  kernel/sched/fair.c |   19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index 6adc57c..a985c98 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -5469,7 +5469,26 @@ static struct {
 >  
-> +static const struct of_device_id picochip_rtc_ids[] __initconst = {
-> +        { .compatible = "picochip,pc3x2-rtc" },
-> +        { /* Sentinel */ },
-> +};
+>  static inline int find_new_ilb(int call_cpu)
+>  {
+> +	struct sched_domain *sd;
+>  	int ilb = cpumask_first(nohz.idle_cpus_mask);
+> +	int buddy = per_cpu(sd_pack_buddy, call_cpu);
 > +
-> +static void __iomem *sched_io_base;
+> +	/*
+> +	 * If we have a pack buddy CPU, we try to run load balance on a CPU
+> +	 * that is close to the buddy.
+> +	 */
+> +	if (buddy != -1) {
+> +		for_each_domain(buddy, sd) {
+> +			if (sd->flags & SD_SHARE_CPUPOWER)
+> +				continue;
 > +
-> +static u32 read_sched_clock(void)
-> +{
-> +        return __raw_readl(sched_io_base);
-> +}
+> +			ilb = cpumask_first_and(sched_domain_span(sd),
+> +					nohz.idle_cpus_mask);
 > +
-> +static void __init timer_init(void)
-> +{
-> +	u32 rate;
-> +
-> +	dw_apb_timer_init(0);
-> +
-> +	sched_timer = of_find_matching_node(timer, osctimer_ids);
-> +	if (!sched_timer)
-> +		panic("No suitable timer for scheduler clock\n");
-> +
-> +	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
-> +	of_node_put(sched_timer);
+> +			if (ilb < nr_cpu_ids)
+> +				break;
+> +		}
+> +	}
+>  
+>  	if (ilb < nr_cpu_ids && idle_cpu(ilb))
+>  		return ilb;
 
-This doesn't work as osctimer_ids is private to the dw_apb_timer files 
-as is timer_get_base_and_rate.  The other timer is unused in picoxcell 
-though so dw_apb_timer_init(1), something like the patch below on top of 
-yours.
-
-Thanks,
-
-Jamie
-
-
-diff --git i/arch/arm/mach-picoxcell/common.c w/arch/arm/mach-picoxcell/common.c
-index 1484841..a92d203 100644
---- i/arch/arm/mach-picoxcell/common.c
-+++ w/arch/arm/mach-picoxcell/common.c
-@@ -82,32 +82,9 @@ static void picoxcell_wdt_restart(char mode, const char *cmd)
- 	}
- }
- 
--static const struct of_device_id picochip_rtc_ids[] __initconst = {
--        { .compatible = "picochip,pc3x2-rtc" },
--        { /* Sentinel */ },
--};
--
--static void __iomem *sched_io_base;
--
--static u32 read_sched_clock(void)
--{
--        return __raw_readl(sched_io_base);
--}
--
- static void __init timer_init(void)
- {
--	u32 rate;
--
--	dw_apb_timer_init(0);
--
--	sched_timer = of_find_matching_node(timer, osctimer_ids);
--	if (!sched_timer)
--		panic("No suitable timer for scheduler clock\n");
--
--	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
--	of_node_put(sched_timer);
--
--	setup_sched_clock(read_sched_clock, 32, rate);
-+	dw_apb_timer_init(1);
- }
- 
- DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
+Ha! and here you hope people won't put multiple big-little clusters in a single
+machine? :-)
