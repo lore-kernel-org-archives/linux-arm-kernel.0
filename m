@@ -1,92 +1,44 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Fri, 26 Apr 2013 11:51:28 +0100
-Subject: [PATCH v2] mfd: vexpress: Handle pending config transactions
-In-Reply-To: <1366910091-17971-1-git-send-email-pawel.moll@arm.com>
-References: <1366821084-12815-1-git-send-email-pawel.moll@arm.com>
- <1366910091-17971-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1366973488.3385.18.camel@linaro1.home>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 26 Apr 2013 12:53:06 +0200
+Subject: [PATCH] cpuidle: add maintainer entry
+In-Reply-To: <CACRpkdbQcxXzySH70NHMQfQXqMc72GUwvj1KQaxmnLSAbJ17rw@mail.gmail.com>
+References: <1366810463-17495-1-git-send-email-daniel.lezcano@linaro.org>
+ <87k3nr50n4.fsf@linaro.org>
+ <CACRpkdaA8uG5jYyYTbuvzZNRr47EhWHFMLLz+jbiE3FPC1vjmA@mail.gmail.com>
+ <9935265.yXMiRQV8Yo@vostro.rjw.lan>
+ <CACRpkdbQcxXzySH70NHMQfQXqMc72GUwvj1KQaxmnLSAbJ17rw@mail.gmail.com>
+Message-ID: <517A5C92.6040800@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-04-25 at 18:14 +0100, Pawel Moll wrote:
-> The config transactions "scheduler" was hopelessly broken,
-> repeating completed transaction instead of picking up
-> next pending one.
+On 04/26/2013 10:32 AM, Linus Walleij wrote:
+> On Thu, Apr 25, 2013 at 8:27 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+>> On Thursday, April 25, 2013 02:09:11 PM Linus Walleij wrote:
+>>> On Wed, Apr 24, 2013 at 6:55 PM, Kevin Hilman <khilman@linaro.org> wrote:
 > 
-> Fixed now. Also improved debug messages.
+>>>> What do you think about having Daniel listed here as a co-maintainer?
+>>>
+>>> I second that. He will bring useful embedded knowledge to the
+>>> subsystem.
+>>
+>> I'd still like to have a say about the core, but if Daniel is willing to
+>> maintain ARM cpuidle drivers and all of the relevant ARM people agree with
+>> that, that'll be great.
 > 
-> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> OK Daniel can you post a v2 adding yourself as co-maintainer as well?
+> Add my Acked-by if you wish.
 
-Yes, looks really fixed now. :-)
+Sure, I can help and ensure the drivers are going to the right
+direction, especially the ARM drivers. I will add also Rafael's git tree
+link.
 
-Reviewed-by: Jon Medhurst <tixy@linaro.org>
+Thanks
+  -- Daniel
 
-> ---
->  drivers/mfd/vexpress-config.c |   35 +++++++++++++++++++++--------------
->  1 file changed, 21 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/mfd/vexpress-config.c b/drivers/mfd/vexpress-config.c
-> index 3c1723aa..84ce6b9 100644
-> --- a/drivers/mfd/vexpress-config.c
-> +++ b/drivers/mfd/vexpress-config.c
-> @@ -184,13 +184,14 @@ static int vexpress_config_schedule(struct vexpress_config_trans *trans)
->  
->  	spin_lock_irqsave(&bridge->transactions_lock, flags);
->  
-> -	vexpress_config_dump_trans("Executing", trans);
-> -
-> -	if (list_empty(&bridge->transactions))
-> +	if (list_empty(&bridge->transactions)) {
-> +		vexpress_config_dump_trans("Executing", trans);
->  		status = bridge->info->func_exec(trans->func->func,
->  				trans->offset, trans->write, trans->data);
-> -	else
-> +	} else {
-> +		vexpress_config_dump_trans("Queuing", trans);
->  		status = VEXPRESS_CONFIG_STATUS_WAIT;
-> +	}
->  
->  	switch (status) {
->  	case VEXPRESS_CONFIG_STATUS_DONE:
-> @@ -212,25 +213,31 @@ void vexpress_config_complete(struct vexpress_config_bridge *bridge,
->  {
->  	struct vexpress_config_trans *trans;
->  	unsigned long flags;
-> +	const char *message = "Completed";
->  
->  	spin_lock_irqsave(&bridge->transactions_lock, flags);
->  
->  	trans = list_first_entry(&bridge->transactions,
->  			struct vexpress_config_trans, list);
-> -	vexpress_config_dump_trans("Completed", trans);
-> -
->  	trans->status = status;
-> -	list_del(&trans->list);
->  
-> -	if (!list_empty(&bridge->transactions)) {
-> -		vexpress_config_dump_trans("Pending", trans);
-> +	do {
-> +		vexpress_config_dump_trans(message, trans);
-> +		list_del(&trans->list);
-> +		complete(&trans->completion);
->  
-> -		bridge->info->func_exec(trans->func->func, trans->offset,
-> -				trans->write, trans->data);
-> -	}
-> -	spin_unlock_irqrestore(&bridge->transactions_lock, flags);
-> +		if (list_empty(&bridge->transactions))
-> +			break;
-> +
-> +		trans = list_first_entry(&bridge->transactions,
-> +				struct vexpress_config_trans, list);
-> +		vexpress_config_dump_trans("Executing pending", trans);
-> +		trans->status = bridge->info->func_exec(trans->func->func,
-> +				trans->offset, trans->write, trans->data);
-> +		message = "Finished pending";
-> +	} while (trans->status == VEXPRESS_CONFIG_STATUS_DONE);
->  
-> -	complete(&trans->completion);
-> +	spin_unlock_irqrestore(&bridge->transactions_lock, flags);
->  }
->  EXPORT_SYMBOL(vexpress_config_complete);
->  
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
