@@ -1,247 +1,91 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Fri, 26 Apr 2013 14:14:34 +0200
-Subject: dw_apb_timer_of.c: remove parts that were picoxcell-specific
-Message-ID: <20130426121433.GA16249@amd.pavel.ucw.cz>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 26 Apr 2013 13:16:12 +0100
+Subject: [RFC PATCH v3 02/17] Documentation: devicetree: arm: cpus/cpu
+ nodes bindings updates
+In-Reply-To: <20130426114811.GD11648@e106331-lin.cambridge.arm.com>
+References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366824502-19729-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAL_JsqL2QOjTffogB6g7VK7oRUwDAmJpr=36uvFXjd+hpBL89A@mail.gmail.com>
+ <20130426101839.GA3093@e102568-lin.cambridge.arm.com>
+ <20130426114811.GD11648@e106331-lin.cambridge.arm.com>
+Message-ID: <517A700C.2030102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems we made a mistake when creating dw_apb_timer_of.c:
-picoxcell sched_clock parts were not related to dw_apb_timer, yet
-we moved them to dw_apb_timer_of, and tried to use them on socfpga.
-    
-This results in system where user/system time is not measured properly,
-as demonstrated by
-    
-    time dd if=/dev/urandom of=/dev/zero bs=100000 count=100
-    
-    .
-    
-So this patch:
-    
-    1) moves picoxcell sched_clock parts back to picoxcell
-    
-    2) adds support to use dw_apb_timer s as sched_clock. Picoxcell could
-    consider switching to these
-    
-    3) adds missing of_node_put() in dw_apb_timer_init().
-    
-Tested on socfpga, soc-next (3.9-rc6) based tree.
-    
-Signed-off-by: Pavel Machek <pavel@denx.de>
-Tested-by: Dinh Nguyen <dinguyen@altera.com>
+On 26/04/13 12:48, Mark Rutland wrote:
+> On Fri, Apr 26, 2013 at 11:18:40AM +0100, Lorenzo Pieralisi wrote:
+>> On Fri, Apr 26, 2013 at 03:51:10AM +0100, Rob Herring wrote:
+>>> On Wed, Apr 24, 2013 at 12:28 PM, Lorenzo Pieralisi
+>>> <lorenzo.pieralisi@arm.com> wrote:
+>>>> In order to extend the current cpu nodes bindings to newer CPUs
+>>>> inclusive of AArch64 and to update support for older ARM CPUs this
+>>>> patch updates device tree documentation for the cpu nodes bindings.
+>>>>
+>>>> Main changes:
+>>>>     - adds 64-bit bindings
+>>>>     - define usage of #address-cells
+>>>>     - define 32/64 dts compatibility settings
+>>>>     - defines behaviour on pre and post v7 uniprocessor systems
+>>>>     - adds ARM 11MPcore specific reg property definition
+>>>>
+>>>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>>> ---
+>>>
+>>> [...]
+>>>
+>>>> +       - enable-method
+>>>> +               Value type: <stringlist>
+>>>> +               Usage and definition depend on ARM architecture version and
+>>>> +               configuration:
+>>>> +                       # On ARM v8 64-bit systems running the OS in AArch64,
+>>>> +                         this property is required and must be "spin-table".
+>>>
+>>> What about PSCI?
+>>
+>> I should add it, at least for ARM v8.
+> 
+> It's worth noting KVM uses it on v7 too, so it should be available for CPUs
+> that are v7+.
+> 
+>>
+>>> I don't think the ePAPR spin-table definition is sufficient for ARM.
+>>> How do you define wake up by SGI or sev instruction.
+>>
+>> I think Will described the wfe/sev mechanism in:
+>>
+>> Documentation/arm64/booting.txt
+>>
+>> and the ePAPR does the same in 5.5.2.2/5.5.2.3. Since this is a document
+>> describing cpus/cpu nodes bindings I assume that description does not
+>> belong here. Question is: do we need to specify an ARM implementation
+>> specific enable-method to describe SGI/sev wake-up (ePAPR 5.5.3) ?
+>>
+>>>> +                       # On ARM 32-bit systems or ARM v8 systems running
+>>>> +                         the OS in AArch32 this property is prohibited.
+>>>
+>>> Why?
+>>
+>> Because if we define it optional with no possible set of values basically
+>> it can be whatever string. I could define it optional with the same
+>> allowed values as ARM v8 even if it is currently ignored, at least in Linux,
+>> until PSCI implementations get merged.
+> 
+> I believe kvmtool sets the enable-method to "psci" on v7, though I may be
+> mistaken. Adding Marc to Cc as he knows better.
 
----
+Indeed, kvmtool feeds the exact same DT to an ARMv7 guest:
 
-I think this is ready to go to soc-next tree. Please apply,
-									Pavel
+[...]
+		cpu at 1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a15";
+			enable-method = "psci";
+			reg = <0x1>;
+		};
+[...]
 
+The 32bit kernel doesn't check it, though.
 
-diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
-index 70b441a..22759f5 100644
---- a/arch/arm/mach-picoxcell/common.c
-+++ b/arch/arm/mach-picoxcell/common.c
-@@ -84,11 +84,39 @@ static void picoxcell_wdt_restart(char mode, const char *cmd)
- 	}
- }
- 
-+static const struct of_device_id picochip_rtc_ids[] __initconst = {
-+        { .compatible = "picochip,pc3x2-rtc" },
-+        { /* Sentinel */ },
-+};
-+
-+static void __iomem *sched_io_base;
-+
-+static u32 read_sched_clock(void)
-+{
-+        return __raw_readl(sched_io_base);
-+}
-+
-+static void __init timer_init(void)
-+{
-+	u32 rate;
-+
-+	dw_apb_timer_init(0);
-+
-+	sched_timer = of_find_matching_node(timer, osctimer_ids);
-+	if (!sched_timer)
-+		panic("No suitable timer for scheduler clock\n");
-+
-+	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
-+	of_node_put(sched_timer);
-+
-+	setup_sched_clock(read_sched_clock, 32, rate);
-+}
-+
- DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
- 	.map_io		= picoxcell_map_io,
- 	.nr_irqs	= NR_IRQS_LEGACY,
- 	.init_irq	= irqchip_init,
--	.init_time	= dw_apb_timer_init,
-+	.init_time	= timer_init,
- 	.init_machine	= picoxcell_init_machine,
- 	.dt_compat	= picoxcell_dt_match,
- 	.restart	= picoxcell_wdt_restart,
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index 46a0513..3a030e5 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -116,11 +116,17 @@ static const char *altera_dt_match[] = {
- 	NULL
- };
- 
-+static void __init timer_init(void)
-+{
-+	dw_apb_timer_init(1);
-+}
-+
-+
- DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
- 	.smp		= smp_ops(socfpga_smp_ops),
- 	.map_io		= socfpga_map_io,
- 	.init_irq	= socfpga_init_irq,
--	.init_time	= dw_apb_timer_init,
-+	.init_time	= timer_init,
- 	.init_machine	= socfpga_cyclone5_init,
- 	.restart	= socfpga_cyclone5_restart,
- 	.dt_compat	= altera_dt_match,
-diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-index 8c2a35f..460ac99 100644
---- a/drivers/clocksource/dw_apb_timer.c
-+++ b/drivers/clocksource/dw_apb_timer.c
-@@ -21,12 +21,6 @@
- #define APBT_MIN_PERIOD			4
- #define APBT_MIN_DELTA_USEC		200
- 
--#define APBTMR_N_LOAD_COUNT		0x00
--#define APBTMR_N_CURRENT_VALUE		0x04
--#define APBTMR_N_CONTROL		0x08
--#define APBTMR_N_EOI			0x0c
--#define APBTMR_N_INT_STATUS		0x10
--
- #define APBTMRS_INT_STATUS		0xa0
- #define APBTMRS_EOI			0xa4
- #define APBTMRS_RAW_INT_STATUS		0xa8
-diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-index ab09ed3..ac4ea00 100644
---- a/drivers/clocksource/dw_apb_timer_of.c
-+++ b/drivers/clocksource/dw_apb_timer_of.c
-@@ -57,7 +57,16 @@ static void add_clockevent(struct device_node *event_timer)
- 	dw_apb_clockevent_register(ced);
- }
- 
--static void add_clocksource(struct device_node *source_timer)
-+static void __iomem *sched_io_base;
-+
-+/* This is actually same as __apbt_read_clocksource(), but with
-+   different interface */
-+static u32 read_sched_clock_sptimer(void)
-+{
-+	return ~__raw_readl(sched_io_base + APBTMR_N_CURRENT_VALUE);
-+}
-+
-+static void add_clocksource(struct device_node *source_timer, int use_as_scheduler)
- {
- 	void __iomem *iobase;
- 	struct dw_apb_clocksource *cs;
-@@ -71,45 +80,33 @@ static void add_clocksource(struct device_node *source_timer)
- 
- 	dw_apb_clocksource_start(cs);
- 	dw_apb_clocksource_register(cs);
--}
- 
--static void __iomem *sched_io_base;
--
--static u32 read_sched_clock(void)
--{
--	return __raw_readl(sched_io_base);
-+	if (use_as_scheduler) {
-+		sched_io_base = iobase;
-+		setup_sched_clock(read_sched_clock_sptimer, 32, rate);
-+	}
- }
- 
--static const struct of_device_id sptimer_ids[] __initconst = {
--	{ .compatible = "picochip,pc3x2-rtc" },
-+static const struct of_device_id osctimer_ids[] __initconst = {
-+	{ .compatible = "picochip,pc3x2-timer" },
-+	{ .compatible = "snps,dw-apb-timer-osc" },
- 	{ .compatible = "snps,dw-apb-timer-sp" },
--	{ /* Sentinel */ },
-+	{  /* Sentinel */ },
- };
- 
--static void init_sched_clock(void)
--{
--	struct device_node *sched_timer;
--	u32 rate;
--
--	sched_timer = of_find_matching_node(NULL, sptimer_ids);
--	if (!sched_timer)
--		panic("No RTC for sched clock to use");
--
--	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
--	of_node_put(sched_timer);
-+/*
-+   You don't have to use dw_apb_timer for scheduler clock,
-+   this should also work fine on arm:
- 
--	setup_sched_clock(read_sched_clock, 32, rate);
--}
-+  twd_local_timer_of_register();
-+  arch_timer_of_register();                 
-+  arch_timer_sched_clock_init();
-+*/
- 
--static const struct of_device_id osctimer_ids[] __initconst = {
--	{ .compatible = "picochip,pc3x2-timer" },
--	{ .compatible = "snps,dw-apb-timer-osc" },
--	{},
--};
- 
--void __init dw_apb_timer_init(void)
-+void __init dw_apb_timer_init(int use_as_scheduler)
- {
- 	struct device_node *event_timer, *source_timer;
- 
- 	event_timer = of_find_matching_node(NULL, osctimer_ids);
- 	if (!event_timer)
-@@ -119,9 +117,8 @@ void __init dw_apb_timer_init(void)
- 	source_timer = of_find_matching_node(event_timer, osctimer_ids);
- 	if (!source_timer)
- 		panic("No timer for clocksource");
--	add_clocksource(source_timer);
-+	add_clocksource(source_timer, use_as_scheduler);
- 
-+	of_node_put(event_timer);
- 	of_node_put(source_timer);
--
--	init_sched_clock();
- }
-diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
-index dd755ce..d503245 100644
---- a/include/linux/dw_apb_timer.h
-+++ b/include/linux/dw_apb_timer.h
-@@ -17,6 +17,12 @@
- #include <linux/clocksource.h>
- #include <linux/interrupt.h>
- 
-+#define APBTMR_N_LOAD_COUNT		0x00
-+#define APBTMR_N_CURRENT_VALUE		0x04
-+#define APBTMR_N_CONTROL		0x08
-+#define APBTMR_N_EOI			0x0c
-+#define APBTMR_N_INT_STATUS		0x10
-+
- #define APBTMRS_REG_SIZE       0x14
- 
- struct dw_apb_timer {
-@@ -53,5 +59,5 @@ void dw_apb_clocksource_start(struct dw_apb_clocksource *dw_cs);
- cycle_t dw_apb_clocksource_read(struct dw_apb_clocksource *dw_cs);
- void dw_apb_clocksource_unregister(struct dw_apb_clocksource *dw_cs);
- 
--extern void dw_apb_timer_init(void);
-+extern void dw_apb_timer_init(int);
- #endif /* __DW_APB_TIMER_H__ */
-
+	M.
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Jazz is not dead. It just smells funny...
