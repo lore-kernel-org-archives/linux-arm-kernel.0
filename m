@@ -1,36 +1,45 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 27 Apr 2013 09:06:38 +0400
-Subject: [PATCH] media: coda: Fix compile breakage
-Message-ID: <1367039198-28639-1-git-send-email-shc_work@mail.ru>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sat, 27 Apr 2013 17:30:15 +1200
+Subject: VIA velocity network driver
+Message-ID: <517B6267.4070404@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch adds GENERIC_ALLOCATOR, if "coda" is selected.
+I would like to add support to this driver for platform devices as found 
+on VIA's APC8750 board. At the moment, I have a standalone platform 
+version that works fine, but wanted to ask a few questions before 
+sending a patch to merge this code into one driver.
 
-drivers/built-in.o: In function `coda_remove':
-:(.text+0x110634): undefined reference to `gen_pool_free'
-drivers/built-in.o: In function `coda_probe':
-:(.text+0x1107d4): undefined reference to `of_get_named_gen_pool'
-:(.text+0x1108b8): undefined reference to `gen_pool_alloc'
-:(.text+0x1108d0): undefined reference to `gen_pool_virt_to_phys'
-:(.text+0x110918): undefined reference to `dev_get_gen_pool'
+The current driver is for PCI network cards, and uses pci dma functions. 
+Most of the pci dma functions are wrappers around other functions which 
+is what I have used for the platform version. For example:
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- drivers/media/platform/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+rd_info->skb_dma = pci_map_single(vptr->pdev, rd_info->skb->data,
+                     vptr->rx.buf_sz, PCI_DMA_FROMDEVICE);
 
-diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-index 0cbe1ff..414a769 100644
---- a/drivers/media/platform/Kconfig
-+++ b/drivers/media/platform/Kconfig
-@@ -145,6 +145,7 @@ config VIDEO_CODA
- 	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MXC
- 	select VIDEOBUF2_DMA_CONTIG
- 	select V4L2_MEM2MEM_DEV
-+	select GENERIC_ALLOCATOR
- 	---help---
- 	   Coda is a range of video codec IPs that supports
- 	   H.264, MPEG-4, and other video formats.
--- 
-1.8.1.5
+is replaced with:
+rd_info->skb_dma = dma_map_single(&vptr->plat_dev->dev, rd_info->skb->data,
+                     vptr->rx.buf_sz, DMA_FROM_DEVICE);
+
+Is it ok to use the non-pci versions (which are basically just the 
+unwrapped pci versions) and pass the struct device *, or will I need to 
+use the correct function for the correct instance.
+
+Other than adding some new probe/remove functions, this is all that is 
+needed to add platform driver support.
+
+One bug/problem that arose is to do with the EEPROM code in 
+velocity_init_registers(), in the case for VELOCITY_INIT_COLD:
+
+         mac_eeprom_reload(regs);
+         for (i = 0; i < 6; i++)
+             writeb(vptr->dev->dev_addr[i], &(regs->PAR[i]));
+
+I assume this is loading something from an EEPROM, but there is no 
+EEPROM on the APC8750. Removing this code, the driver seems to work fine 
+on the APC8750.
+Could it be avoided with a vptr->has_no_eeprom that defaults to 0 to 
+avoid breaking existing support?
+
+Regards
+Tony Prisk
