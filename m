@@ -1,46 +1,38 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sat, 27 Apr 2013 20:55:50 +0200
-Subject: [PATCHv1 1/3] hwmon: Add support for GMT G762/G763 PWM fan
- controller
-In-Reply-To: <20130427165650.GA26415@roeck-us.net> (Guenter Roeck's message of
- "Sat, 27 Apr 2013 09:56:51 -0700")
-References: <cover.1366753420.git.arno@natisbad.org>
- <63961d39aee9db94767f28fd441312bec2029473.1366753420.git.arno@natisbad.org>
- <20130427140331.GL17771@kw.sim.vm.gnt>
- <20130427165650.GA26415@roeck-us.net>
-Message-ID: <87vc77247d.fsf@natisbad.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 27 Apr 2013 13:53:37 -0700
+Subject: [GIT PULL] ARM: arm-soc: one more patch for 3.9
+Message-ID: <20130427205337.GA27352@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter, Jean, Simon,
+Hi Linus,
 
-Guenter Roeck <linux@roeck-us.net> writes:
+The following changes since commit 73053d973dd6f56472309cffa5a5d15a62dd6f96:
 
-> On Sat, Apr 27, 2013 at 04:03:31PM +0200, Simon Guinot wrote:
->> On Wed, Apr 24, 2013 at 12:05:56AM +0200, Arnaud Ebalard wrote:
->> > +	/*
->> > +	 * Set default configuration values before passing the structure
->> > +	 * to OF helpers to overload them using those provided by .dts
->> > +	 * file (if any). Final config is then commited.
->> > +	 */
->> > +	g762_config_init(&conf);
->> > +	g762_config_of_overload(client, &conf);
->> > +	err = g762_config_commit(client, &conf);
->> > +	if (err)
->> > +		goto out;
->> 
->> One more comment... Sorry for the multiple replies :)
->> 
->> I am not sure that applying a configuration anyway is a good idea.
->> I think it could be best to stick with the bootloader configuration if
->> no platform data nor device tree data are given.
->> 
-> Yes, good point. You are absolutely right.
+  ARM: highbank: fix cache flush ordering for cpu hotplug (2013-04-18 09:37:46 -0700)
 
-Thanks you all for your feedback. I will take all your comments into
-account and work on a new version. I am somewhat unavailable next week
-so may not be able to push something before next week end.
+are available in the git repository at:
 
-Cheers,
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
-a+
+for you to fetch changes up to d21be237ffa357e55005e2bf9ffef10b23c184d0:
+
+  Merge tag 'omap-for-v3.9-rc6/fixes-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into fixes (2013-04-26 17:35:21 -0700)
+
+----------------------------------------------------------------
+
+ARM: arm-soc fixes for 3.9
+
+A late-arriving fix for musb on OMAP4, resolving an issue where the musb
+IP won't be clocked and thus not functional. Small in scope, most of the
+lines changed is a longish comment.
+
+----------------------------------------------------------------
+Kishon Vijay Abraham I (1):
+      ARM: OMAP4: hwmod data: make 'ocp2scp_usb_phy_phy_48m" as the main clock
+
+Olof Johansson (1):
+      Merge tag 'omap-for-v3.9-rc6/fixes-signed' of git://git.kernel.org/.../tmlind/linux-omap into fixes
+
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
