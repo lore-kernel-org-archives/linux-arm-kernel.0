@@ -1,25 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 26 Apr 2013 17:08:02 -0700
-Subject: [PATCH] ARM: u300: fix ages old copy/paste bug
-In-Reply-To: <1366982995-10870-1-git-send-email-linus.walleij@stericsson.com>
-References: <1366982995-10870-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130427000802.GA1285@quad.lixom.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 26 Apr 2013 17:08:32 -0700
+Subject: [PATCH] ARM: exynos: dts: cros5250: add cyapa trackpad
+In-Reply-To: <1367019681-31775-1-git-send-email-olof@lixom.net>
+References: <1367019681-31775-1-git-send-email-olof@lixom.net>
+Message-ID: <CAD=FV=Xrud-0DE3VH=Dqf5ZkYLkegCk0j16bzjiEb-GsvhT2MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 26, 2013 at 03:29:55PM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> The UART1 is on the fast AHB bridge, not on the slow bus.
-> 
-> Cc: stable at vger.kernel.org
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Olof,
+
+On Fri, Apr 26, 2013 at 4:41 PM, Olof Johansson <olof@lixom.net> wrote:
+> Trivial patch, adding the i2c Cypress trackpad used on Snow.
+>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
 > ---
-> Hi ARM SoC folks, as discussed with Arnd, please apply
-> this patch directly for fixes.
+>
+> Kukjin, if you don't mind I'll just add this to arm-soc?
+>
+>
+> -Olof
+>
+>  arch/arm/boot/dts/cros5250-common.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-Thanks, applied to next/fixes-non-critical.
+Looks good.
 
-
--Olof
+Reviewed-by: Doug Anderson <dianders@chromium.org>
