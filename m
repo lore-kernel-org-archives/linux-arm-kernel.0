@@ -1,39 +1,25 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 26 Apr 2013 16:56:51 -0700
-Subject: [PATCH] ARM: exynos: dts: cros5250: add EC device
-In-Reply-To: <1367019745-31826-1-git-send-email-olof@lixom.net>
-References: <1367019745-31826-1-git-send-email-olof@lixom.net>
-Message-ID: <CAD=FV=WhoGO8=5pt=VOCT_2j2CMkn8on=N=jK_2RwMOXWat57w@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 26 Apr 2013 17:08:02 -0700
+Subject: [PATCH] ARM: u300: fix ages old copy/paste bug
+In-Reply-To: <1366982995-10870-1-git-send-email-linus.walleij@stericsson.com>
+References: <1366982995-10870-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130427000802.GA1285@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof,
-
-On Fri, Apr 26, 2013 at 4:42 PM, Olof Johansson <olof@lixom.net> wrote:
-> Add basic EC information to device tree, currently only describing the
-> keyboard and keymap.
->
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> Cc: Doug Anderson <dianders@chromium.org>
+On Fri, Apr 26, 2013 at 03:29:55PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> The UART1 is on the fast AHB bridge, not on the slow bus.
+> 
+> Cc: stable at vger.kernel.org
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->
-> Kukjin, I'll apply this too directly if you don't mind.
->
->
-> -Olof
->
->  arch/arm/boot/dts/cros5250-common.dtsi | 99 +++++++++++++++++++++++++++++++++-
->  1 file changed, 98 insertions(+), 1 deletion(-)
+> Hi ARM SoC folks, as discussed with Arnd, please apply
+> this patch directly for fixes.
 
-I'm not a huge fan of this change as I'd rather see my arbitration
-changes land first and see this based atop those.  The arbitration
-driver has landed so all that's left are the device tree bits.
+Thanks, applied to next/fixes-non-critical.
 
-That would be:
 
-https://patchwork.kernel.org/patch/2449961/
-https://patchwork.kernel.org/patch/2449941/
-
-...but other than that this looks good.
-
--Doug
+-Olof
