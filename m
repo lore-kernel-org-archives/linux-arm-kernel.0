@@ -1,44 +1,24 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Sat, 27 Apr 2013 00:54:52 +0000
-Subject: Adding a void * to pinctrl_pin_desc
-In-Reply-To: <CACRpkdYxJOWYMfwmrEGhqgjushVjWyc=FyKMaZNLnn=0jrTs9A@mail.gmail.com>
-References: <051069C10411E24D9749790C498526FA1BCF4FC6@SJEXCHMB12.corp.ad.broadcom.com>
- <CACRpkdYxJOWYMfwmrEGhqgjushVjWyc=FyKMaZNLnn=0jrTs9A@mail.gmail.com>
-Message-ID: <051069C10411E24D9749790C498526FA1BCF54B1@SJEXCHMB12.corp.ad.broadcom.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 26 Apr 2013 18:01:37 -0700
+Subject: [GIT PULL] Samsung fixes-1 for v3.10
+In-Reply-To: <51795C62.8070500@samsung.com>
+References: <51795C62.8070500@samsung.com>
+Message-ID: <20130427010137.GD2350@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >  What do you think about expanding the struct to something like this:
-> >
-> > struct pinctrl_pin_desc {
-> >         unsigned number;
-> >         const char *name;
-> >         void * pin_data;
-> > };
-> >
-> > so that drivers can optionally use pin_data to hold other pin-specific
-> information?
+On Fri, Apr 26, 2013 at 01:40:02AM +0900, Kukjin Kim wrote:
+> The following changes since commit 58a7bbf75442ea439a4d3b7993ad87023e406063:
 > 
-> No don't do this.
-> 
-> Instead:
-> 
-> struct foo_pin_desc {
->       struct pinctrl_pin_desc desc;
->       ....
->       /* Insert my pindata here */
-> };
-> 
-> Then use container_of() to dereference a struct foo_pin_desc pointer from
-> the
-> pointer at &foodesc->desc;
+>   ARM: dts: add PDMA0 changes for exynos5440 (2013-04-09 01:39:27 +0900)
 
-Hmm, while it would be easy to create a macro to fill the static foo_pin_desc array 
-in the driver, this array would not be suitable for use with pinctrl_register().  
-I would have to, in the probe function, loop through the foo_pin_desc array and 
-create another pinctrl_pin_desc array to use for pinctrl_desc.pins.
+So these are fixes based on code that's already staged. We normally
+don't do that -- if you have a fix for a specific branch that introduced
+something, send a fresh pull request for that branch.
 
-I think I'll just use a separate struct in the driver to keep track of other pin-specific data.
+Looks like Doug's fix is for the common clock framework branch, so I'll apply
+it to next/drivers. Thomas' is for the dt branch. I'll cherry-pick it onto
+next/dt2.
 
-Thanks,
-Sherman
+
+-Olof
