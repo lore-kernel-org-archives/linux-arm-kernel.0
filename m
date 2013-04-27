@@ -1,27 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 26 Apr 2013 17:22:03 -0700
-Subject: [PATCH] clk: add option to keep boot clocks on
-In-Reply-To: <517B16FF.6070008@infradead.org>
-References: <1367019591-31685-1-git-send-email-olof@lixom.net>
- <517B16FF.6070008@infradead.org>
-Message-ID: <CAOesGMg0_Awi_b--tuEDFU8tZUqTA46RWuiiBP7=ct00O7zcEw@mail.gmail.com>
+Date: Fri, 26 Apr 2013 17:34:13 -0700
+Subject: [PATCH v3 00/13] ARM: EXYNOS: Fix Universal C210 support
+In-Reply-To: <201304251646.28026.arnd@arndb.de>
+References: <1366731994-7478-1-git-send-email-t.figa@samsung.com>
+ <201304251646.28026.arnd@arndb.de>
+Message-ID: <20130427003413.GA2350@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 26, 2013 at 5:08 PM, Randy Dunlap <rdunlap@infradead.org> wrote:
-> On 04/26/13 16:39, Olof Johansson wrote:
->> This is primarily useful when there's a driver that doesn't claim clocks
->> properly, but the bootloader does. It's not expected to be used in normal
->> cases, but for bringup and debug it's very useful to have the option to
->> not gate unclaimed clocks that are still on.
->>
->> Signed-off-by: Olof Johansson <olof@lixom.net>
->
-> add to Documentation/kernel-parameters.txt or somewhere else?
+On Thu, Apr 25, 2013 at 04:46:27PM +0200, Arnd Bergmann wrote:
+> On Tuesday 23 April 2013, Tomasz Figa wrote:
+> > This series intends to fix support for Universal C210 board in mainline.
+> > Main difference from other boards based on Exynos 4210 is that hardware
+> > revision of the SoC used on Universal C210 does not support MCT timers
+> > and legacy PWM timers must be used instead.
+> > 
+> > First (and the biggest) part of the series deals with cleaning up and
+> > fixing the samsung_pwm_timer clocksource driver, that was posted
+> > recently by Arnd. In addition the driver is prepared to share the
+> > hardware with PWM driver that will be reworked later, since it is not
+> > a component crucial for system operation.
+> > 
+> > Second part fixes ATAGS support of Exynos 4210 rev0 SoC, which needs
+> > different timer initialization, using the new samsung_pwm_timer driver.
+> > 
+> > Third and last part adds Device Tree-based support for Universal C210
+> > board by providing device tree sources for it.
+> > 
+> > On Universal C210 board, both with and without DT:
+> > 
+> > Tested-by: Tomasz Figa <t.figa@samsung.com>
+> 
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Olof, Kgene, I think we should have this one in 3.10 since it fixes
+> a regression. It looks bigger than it really is because I asked Tomasz
+> to do small patches rather than a single combined patch.
 
-Ah, yes, of course. I'll wait for Mike to provide input on the color
-of the shed, since it might change location in the file if it's
-renamed. And then repost with documentation update.
+Ok. Kukjin, I don't mind collecting this in a late/* branch even though time is
+running late, since it's a regression. Do you want to send it to me or should
+I just pick up the patches?
 
 
 -Olof
