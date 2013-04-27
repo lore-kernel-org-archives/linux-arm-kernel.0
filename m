@@ -1,43 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 26 Apr 2013 17:18:38 -0700
-Subject: [PATCH/RESEND] ARM: arch_timer: Silence debug preempt warnings
-In-Reply-To: <1366241178-16626-1-git-send-email-sboyd@codeaurora.org>
-References: <1366241178-16626-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130427001838.GA2134@quad.lixom.net>
+Date: Fri, 26 Apr 2013 17:22:03 -0700
+Subject: [PATCH] clk: add option to keep boot clocks on
+In-Reply-To: <517B16FF.6070008@infradead.org>
+References: <1367019591-31685-1-git-send-email-olof@lixom.net>
+ <517B16FF.6070008@infradead.org>
+Message-ID: <CAOesGMg0_Awi_b--tuEDFU8tZUqTA46RWuiiBP7=ct00O7zcEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 17, 2013 at 04:26:18PM -0700, Stephen Boyd wrote:
-> Hot-plugging with CONFIG_DEBUG_PREEMPT=y on a device with arm
-> architected timers causes a slew of "using smp_processor_id() in
-> preemptible" warnings:
-> 
->   BUG: using smp_processor_id() in preemptible [00000000] code: sh/111
->   caller is arch_timer_cpu_notify+0x14/0xc8
-> 
-> This happens because sometimes the cpu notifier,
-> arch_timer_cpu_notify(), is called in preemptible context and
-> other times in non-preemptible context but we use this_cpu_ptr()
-> to retrieve the clockevent in all cases. We're only going to
-> actually use the pointer in non-preemptible context though, so
-> push the this_cpu_ptr() access down into the cases to force the
-> checks to occur only in non-preemptible contexts.
-> 
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Marc Zyngier <Marc.Zyngier@arm.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> 
-> Resending to arm-soc maintainers instead of timekeeping maintainers. Who
-> maintains this driver?
+On Fri, Apr 26, 2013 at 5:08 PM, Randy Dunlap <rdunlap@infradead.org> wrote:
+> On 04/26/13 16:39, Olof Johansson wrote:
+>> This is primarily useful when there's a driver that doesn't claim clocks
+>> properly, but the bootloader does. It's not expected to be used in normal
+>> cases, but for bringup and debug it's very useful to have the option to
+>> not gate unclaimed clocks that are still on.
+>>
+>> Signed-off-by: Olof Johansson <olof@lixom.net>
+>
+> add to Documentation/kernel-parameters.txt or somewhere else?
 
-Subsystem is maintained by John and Thomas, but given the recent moves of ARM
-drivers there (which mostly has been acked by them), we'll take the patch at
-this time.
-
-Applied on top of late/clksrc in arm-soc. Thanks.
+Ah, yes, of course. I'll wait for Mike to provide input on the color
+of the shed, since it might change location in the file if it's
+renamed. And then repost with documentation update.
 
 
 -Olof
