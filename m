@@ -1,35 +1,58 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 27 Apr 2013 14:13:50 -0300
-Subject: [PATCH] media: coda: Fix compile breakage
-In-Reply-To: <201304271733.54301.arnd@arndb.de>
-References: <1367039198-28639-1-git-send-email-shc_work@mail.ru>
- <201304271733.54301.arnd@arndb.de>
-Message-ID: <CAOMZO5CYZoe9Z_eAWZ5Wit2o-+9hq3xWjHPF_ZLszN7bbDJrBA@mail.gmail.com>
+From: jaswinder.singh@linaro.org (jaswinder.singh at linaro.org)
+Date: Sat, 27 Apr 2013 23:35:53 +0530
+Subject: [PATCH 1/3] mailbox: rename pl320-ipc specific mailbox.h
+In-Reply-To: <CAJe_ZhdH+SCs5crguXrm6y-6bu+eGnTqeJS6cOS5H5Yz=m15Cw@mail.gmail.com>
+References: <CAJe_ZhdH+SCs5crguXrm6y-6bu+eGnTqeJS6cOS5H5Yz=m15Cw@mail.gmail.com>
+Message-ID: <1367085953-28270-1-git-send-email-jaswinder.singh@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexander/Arnd,
+From: Suman Anna <s-anna@ti.com>
 
-On Sat, Apr 27, 2013 at 12:33 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 27 April 2013, Alexander Shiyan wrote:
->> Patch adds GENERIC_ALLOCATOR, if "coda" is selected.
->>
->> drivers/built-in.o: In function `coda_remove':
->> :(.text+0x110634): undefined reference to `gen_pool_free'
->> drivers/built-in.o: In function `coda_probe':
->> :(.text+0x1107d4): undefined reference to `of_get_named_gen_pool'
->> :(.text+0x1108b8): undefined reference to `gen_pool_alloc'
->> :(.text+0x1108d0): undefined reference to `gen_pool_virt_to_phys'
->> :(.text+0x110918): undefined reference to `dev_get_gen_pool'
->>
->> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
-> I noticed the problem as well, but haven't gotten around to create
-> a patch. Thanks for taking care of this!
+The patch 30058677 "ARM / highbank: add support for pl320 IPC"
+added a pl320 IPC specific header file as a generic mailbox.h.
+This file has been renamed appropriately to allow the
+introduction of the generic mailbox API framework.
 
-I fixed this issue in a different way:
-https://patchwork.kernel.org/patch/2432841/
+Signed-off-by: Suman Anna <s-anna@ti.com>
+Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
+Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+---
+ drivers/cpufreq/highbank-cpufreq.c       |    2 +-
+ drivers/mailbox/pl320-ipc.c              |    2 +-
+ include/linux/{mailbox.h => pl320-ipc.h} |    0
+ 3 files changed, 2 insertions(+), 2 deletions(-)
+ rename include/linux/{mailbox.h => pl320-ipc.h} (100%)
 
-And Shawn has already queued it.
+diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
+index b61b5a3..3118b87 100644
+--- a/drivers/cpufreq/highbank-cpufreq.c
++++ b/drivers/cpufreq/highbank-cpufreq.c
+@@ -19,7 +19,7 @@
+ #include <linux/cpu.h>
+ #include <linux/err.h>
+ #include <linux/of.h>
+-#include <linux/mailbox.h>
++#include <linux/pl320-ipc.h>
+ #include <linux/platform_device.h>
+ 
+ #define HB_CPUFREQ_CHANGE_NOTE	0x80000001
+diff --git a/drivers/mailbox/pl320-ipc.c b/drivers/mailbox/pl320-ipc.c
+index d873cba..f3755e0 100644
+--- a/drivers/mailbox/pl320-ipc.c
++++ b/drivers/mailbox/pl320-ipc.c
+@@ -26,7 +26,7 @@
+ #include <linux/device.h>
+ #include <linux/amba/bus.h>
+ 
+-#include <linux/mailbox.h>
++#include <linux/pl320-ipc.h>
+ 
+ #define IPCMxSOURCE(m)		((m) * 0x40)
+ #define IPCMxDSET(m)		(((m) * 0x40) + 0x004)
+diff --git a/include/linux/mailbox.h b/include/linux/pl320-ipc.h
+similarity index 100%
+rename from include/linux/mailbox.h
+rename to include/linux/pl320-ipc.h
+-- 
+1.7.10.4
