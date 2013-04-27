@@ -1,28 +1,62 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Sat, 27 Apr 2013 15:31:02 -0700
-Subject: [PATCH v2] ARM: exynos: dts: cros5250: add EC device
-In-Reply-To: <20130427221410.GA10618@quad.lixom.net>
-References: <1367019745-31826-1-git-send-email-olof@lixom.net>
- <20130427221410.GA10618@quad.lixom.net>
-Message-ID: <CAD=FV=U8889MZVdSxxYtYfVF3bY67URG9anxR1aU2oyLOHwKNg@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sun, 28 Apr 2013 11:29:26 +1200
+Subject: Array subscript above array bounds warning
+Message-ID: <517C5F56.7040106@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof,
+Could someone clarify for me what I am missing here?
 
-On Sat, Apr 27, 2013 at 3:14 PM, Olof Johansson <olof@lixom.net> wrote:
-> Add basic EC information to device tree, currently only describing the
-> keyboard and keymap.
->
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> ---
->
-> This builds on the previous patch from Doug to add arbitration (and the
-> sbs-battery dts patch).
->
->  arch/arm/boot/dts/exynos5250-snow.dts | 96 +++++++++++++++++++++++++++++++++++
->  1 file changed, 96 insertions(+)
 
-Looks good to me.  Thanks!
+in drivers/net/ethernet/via/velocity.h is the following definition:
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+struct mac_regs {
+volatile u8 PAR[6]; /* 0x00 */
+...
+}
+
+I am trying to add the following function but it keeps giving array 
+bounds warnings:
+
+static void velocity_set_power_state(struct velocity_info *vptr, char state)
+{
+struct mac_regs __iomem *regs = vptr->mac_regs;
+
+if (vptr->bustype == BUS_PCI) {
+pci_set_power_state(vptr->pdev, state);
+} else {
+writeb(state, (&regs->PAR[0]) + 0x154);
+}
+}
+
+gives:
+
+/home/sentient/linux-git/server/arch/arm/include/asm/io.h:83:2: warning: 
+array subscript is above array bounds [-Warray-bounds]
+
+
+If I change the function to:
+
+static void velocity_set_power_state(struct velocity_info *vptr, char state)
+{
+void __iomem *addr;
+struct mac_regs __iomem *regs = vptr->mac_regs;
+
+if (vptr->bustype == BUS_PCI)
+pci_set_power_state(vptr->pdev, state);
+else {
+addr = &regs->PAR[0];
+writeb(state, addr + 0x154);
+}
+}
+
+I get the following warning:
+
+drivers/net/ethernet/via/via-velocity.c:99:8: warning: assignment 
+discards ?volatile? qualifier from pointer target type [enabled by default]
+
+
+What is the correct way to go about this?
+
+Regards
+Tony Prisk
