@@ -1,130 +1,28 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 27 Apr 2013 15:14:10 -0700
+From: dianders@chromium.org (Doug Anderson)
+Date: Sat, 27 Apr 2013 15:31:02 -0700
 Subject: [PATCH v2] ARM: exynos: dts: cros5250: add EC device
-In-Reply-To: <1367019745-31826-1-git-send-email-olof@lixom.net>
+In-Reply-To: <20130427221410.GA10618@quad.lixom.net>
 References: <1367019745-31826-1-git-send-email-olof@lixom.net>
-Message-ID: <20130427221410.GA10618@quad.lixom.net>
+ <20130427221410.GA10618@quad.lixom.net>
+Message-ID: <CAD=FV=U8889MZVdSxxYtYfVF3bY67URG9anxR1aU2oyLOHwKNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add basic EC information to device tree, currently only describing the
-keyboard and keymap.
+Olof,
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
+On Sat, Apr 27, 2013 at 3:14 PM, Olof Johansson <olof@lixom.net> wrote:
+> Add basic EC information to device tree, currently only describing the
+> keyboard and keymap.
+>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+>
+> This builds on the previous patch from Doug to add arbitration (and the
+> sbs-battery dts patch).
+>
+>  arch/arm/boot/dts/exynos5250-snow.dts | 96 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 96 insertions(+)
 
-This builds on the previous patch from Doug to add arbitration (and the
-sbs-battery dts patch).
+Looks good to me.  Thanks!
 
- arch/arm/boot/dts/exynos5250-snow.dts | 96 +++++++++++++++++++++++++++++++++++
- 1 file changed, 96 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index c115143..ad25e66 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -72,6 +72,102 @@
- 				reg = <0xb>;
- 				sbs,poll-retry-count = <1>;
- 			};
-+
-+			ec: embedded-controller {
-+				compatible = "google,cros-ec-i2c";
-+				reg = <0x1e>;
-+				interrupts = <6 0>;
-+				interrupt-parent = <&gpx1>;
-+				wakeup-source;
-+
-+				keyboard-controller {
-+				        compatible = "google,cros-ec-keyb";
-+				        keypad,num-rows = <8>;
-+				        keypad,num-columns = <13>;
-+				        google,needs-ghost-filter;
-+					linux,keymap = <0x0001003a	/* CAPSLK */
-+							0x0002003b	/* F1 */
-+							0x00030030	/* B */
-+							0x00040044	/* F10 */
-+							0x00060031	/* N */
-+							0x0008000d	/* = */
-+							0x000a0064	/* R_ALT */
-+
-+							0x01010001	/* ESC */
-+							0x0102003e	/* F4 */
-+							0x01030022	/* G */
-+							0x01040041	/* F7 */
-+							0x01060023	/* H */
-+							0x01080028	/* ' */
-+							0x01090043	/* F9 */
-+							0x010b000e	/* BKSPACE */
-+
-+							0x0200001d	/* L_CTRL */
-+							0x0201000f	/* TAB */
-+							0x0202003d	/* F3 */
-+							0x02030014	/* T */
-+							0x02040040	/* F6 */
-+							0x0205001b	/* ] */
-+							0x02060015	/* Y */
-+							0x02070056	/* 102ND */
-+							0x0208001a	/* [ */
-+							0x02090042	/* F8 */
-+
-+							0x03010029	/* GRAVE */
-+							0x0302003c	/* F2 */
-+							0x03030006	/* 5 */
-+							0x0304003f	/* F5 */
-+							0x03060007	/* 6 */
-+							0x0308000c	/* - */
-+							0x030b002b	/* \ */
-+
-+							0x04000061	/* R_CTRL */
-+							0x0401001e	/* A */
-+							0x04020020	/* D */
-+							0x04030021	/* F */
-+							0x0404001f	/* S */
-+							0x04050025	/* K */
-+							0x04060024	/* J */
-+							0x04080027	/* ; */
-+							0x04090026	/* L */
-+							0x040b001c	/* ENTER */
-+
-+							0x0501002c	/* Z */
-+							0x0502002e	/* C */
-+							0x0503002f	/* V */
-+							0x0504002d	/* X */
-+							0x05050033	/* , */
-+							0x05060032	/* M */
-+							0x0507002a	/* L_SHIFT */
-+							0x05080035	/* / */
-+							0x05090034	/* . */
-+							0x050B0039	/* SPACE */
-+
-+							0x06010002	/* 1 */
-+							0x06020004	/* 3 */
-+							0x06030005	/* 4 */
-+							0x06040003	/* 2 */
-+							0x06050009	/* 8 */
-+							0x06060008	/* 7 */
-+							0x0608000b	/* 0 */
-+							0x0609000a	/* 9 */
-+							0x060a0038	/* L_ALT */
-+							0x060b006c	/* DOWN */
-+							0x060c006a	/* RIGHT */
-+
-+							0x07010010	/* Q */
-+							0x07020012	/* E */
-+							0x07030013	/* R */
-+							0x07040011	/* W */
-+							0x07050017	/* I */
-+							0x07060016	/* U */
-+							0x07070036	/* R_SHIFT */
-+							0x07080019	/* P */
-+							0x07090018	/* O */
-+							0x070b0067	/* UP */
-+							0x070c0069>;	/* LEFT */
-+				};
-+			};
- 		};
- 	};
- 
--- 
-1.8.2.1
+Reviewed-by: Doug Anderson <dianders@chromium.org>
