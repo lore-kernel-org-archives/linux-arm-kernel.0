@@ -1,32 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 26 Apr 2013 17:35:51 -0700
-Subject: [GIT PULL] musb regression on omap4 for v3.9
-In-Reply-To: <20130423214544.GN10155@atomide.com>
-References: <20130423214544.GN10155@atomide.com>
-Message-ID: <20130427003551.GB2350@quad.lixom.net>
+Date: Fri, 26 Apr 2013 17:37:17 -0700
+Subject: Exynos regressions w.r.t. config and debuggability due to
+ multiplatform
+In-Reply-To: <201304251931.25028.arnd@arndb.de>
+References: <CAOesGMgRsa-AvbEZCc1=_ovaZMaG0S-CDok2MDp_zu5yderAYw@mail.gmail.com>
+ <201304241703.49864.arnd@arndb.de> <51794CD3.4080807@samsung.com>
+ <201304251931.25028.arnd@arndb.de>
+Message-ID: <20130427003717.GC2350@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 02:45:45PM -0700, Tony Lindgren wrote:
+On Thu, Apr 25, 2013 at 07:31:24PM +0200, Arnd Bergmann wrote:
+> On Thursday 25 April 2013, Kukjin Kim wrote:
+> > 
+> > On 04/25/13 00:03, Arnd Bergmann wrote:
+> > > On Wednesday 24 April 2013, Olof Johansson wrote:
+> > >> I think we should hold off on multiplatform for exynos until it works
+> > >> better, i.e. 3.11.
+> > >>
+> > I think, this would be better choice for now if it's not urgent...
+> > 
 > 
-> The following changes since commit 31880c37c11e28cb81c70757e38392b42e695dc6:
-> 
->   Linux 3.9-rc6 (2013-04-07 20:49:54 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9-rc6/fixes-signed
-> 
-> for you to fetch changes up to f4d7a536faa43f30d87f701268db76b8433a2a8b:
-> 
->   ARM: OMAP4: hwmod data: make 'ocp2scp_usb_phy_phy_48m" as the main clock (2013-04-10 13:26:07 -0700)
-> 
-> ----------------------------------------------------------------
-> One MUSB regression fix that I forgot to send earlier. Without
-> this MUSB no longer works on omap4 based devices.
+> I spent a lot of time on it because it's a priority for Linaro, but
+> that means I'm biased in the question of whether to merge it or not.
+> It should only get in if you and Olof think it's a good idea.
 
-Pulled into fixes. I'll send a pull request to Linus tonight, hopefully he
-won't cut 3.9-final until later this weekend.
+I've reverted the commit you pointed out as the problematic one now,
+and with that I get a working setup. That means most of the base patches are
+in, just not the final Kconfig shuffling. 3.11 seems more realistic for that.
 
 
 -Olof
