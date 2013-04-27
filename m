@@ -1,58 +1,84 @@
-From: jaswinder.singh@linaro.org (jaswinder.singh at linaro.org)
-Date: Sat, 27 Apr 2013 23:35:53 +0530
-Subject: [PATCH 1/3] mailbox: rename pl320-ipc specific mailbox.h
-In-Reply-To: <CAJe_ZhdH+SCs5crguXrm6y-6bu+eGnTqeJS6cOS5H5Yz=m15Cw@mail.gmail.com>
-References: <CAJe_ZhdH+SCs5crguXrm6y-6bu+eGnTqeJS6cOS5H5Yz=m15Cw@mail.gmail.com>
-Message-ID: <1367085953-28270-1-git-send-email-jaswinder.singh@linaro.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Sat, 27 Apr 2013 11:17:13 -0700
+Subject: [PATCH] clk: add option to keep boot clocks on
+In-Reply-To: <1367019591-31685-1-git-send-email-olof@lixom.net>
+References: <1367019591-31685-1-git-send-email-olof@lixom.net>
+Message-ID: <20130427181713.8923.62611@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suman Anna <s-anna@ti.com>
+Quoting Olof Johansson (2013-04-26 16:39:51)
+> This is primarily useful when there's a driver that doesn't claim clocks
+> properly, but the bootloader does. It's not expected to be used in normal
+> cases, but for bringup and debug it's very useful to have the option to
+> not gate unclaimed clocks that are still on.
+> 
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> ---
+> 
+> Mike, this is a pretty trivial patch that I would love to see in 3.10
+> even though it's getting late. I'm definitely not picky about the naming
+> of the boot option, so feel free to change it.
+> 
 
-The patch 30058677 "ARM / highbank: add support for pl320 IPC"
-added a pl320 IPC specific header file as a generic mailbox.h.
-This file has been renamed appropriately to allow the
-introduction of the generic mailbox API framework.
+This bike shed could be improved with a different color of paint.
+Opinions below:
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
-Cc: Mark Langsdorf <mark.langsdorf@calxeda.com>
-Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
----
- drivers/cpufreq/highbank-cpufreq.c       |    2 +-
- drivers/mailbox/pl320-ipc.c              |    2 +-
- include/linux/{mailbox.h => pl320-ipc.h} |    0
- 3 files changed, 2 insertions(+), 2 deletions(-)
- rename include/linux/{mailbox.h => pl320-ipc.h} (100%)
+> 
+> -Olof
+> 
+>  drivers/clk/clk.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 20ce67f..b22551e 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -499,10 +499,24 @@ out:
+>         return;
+>  }
+>  
+> +
 
-diff --git a/drivers/cpufreq/highbank-cpufreq.c b/drivers/cpufreq/highbank-cpufreq.c
-index b61b5a3..3118b87 100644
---- a/drivers/cpufreq/highbank-cpufreq.c
-+++ b/drivers/cpufreq/highbank-cpufreq.c
-@@ -19,7 +19,7 @@
- #include <linux/cpu.h>
- #include <linux/err.h>
- #include <linux/of.h>
--#include <linux/mailbox.h>
-+#include <linux/pl320-ipc.h>
- #include <linux/platform_device.h>
- 
- #define HB_CPUFREQ_CHANGE_NOTE	0x80000001
-diff --git a/drivers/mailbox/pl320-ipc.c b/drivers/mailbox/pl320-ipc.c
-index d873cba..f3755e0 100644
---- a/drivers/mailbox/pl320-ipc.c
-+++ b/drivers/mailbox/pl320-ipc.c
-@@ -26,7 +26,7 @@
- #include <linux/device.h>
- #include <linux/amba/bus.h>
- 
--#include <linux/mailbox.h>
-+#include <linux/pl320-ipc.h>
- 
- #define IPCMxSOURCE(m)		((m) * 0x40)
- #define IPCMxDSET(m)		(((m) * 0x40) + 0x004)
-diff --git a/include/linux/mailbox.h b/include/linux/pl320-ipc.h
-similarity index 100%
-rename from include/linux/mailbox.h
-rename to include/linux/pl320-ipc.h
--- 
-1.7.10.4
+Remove extra whitespace.
+
+> +static bool keep_boot_clocks;
+> +static int __init clk_keep_boot_clocks(char *__unused)
+> +{
+> +       keep_boot_clocks = true;
+> +       return 1;
+> +}
+> +__setup("clk_keep_boot_clocks", clk_keep_boot_clocks);
+
+s/clk_keep_boot_clocks/clk_ignore_unused/
+
+This matches nicely with the existing CLK_IGNORE_UNUSED flag in
+include/linux/clk-provider.h
+
+In addition to Randy's suggestion to update kernel-parameters.txt,
+please also toss in a note somewhere in Documentation/clk.txt so that
+others bringing up new platforms can more easily find out about this
+boot option.  Don't worry about making it pretty since I plan to rework
+the clock documentation for 3.11.
+
+Otherwise patch looks good to me.  I did some testing and I would be
+comfortable sneaking this in for 3.10.
+
+Regards,
+Mike
+
+> +
+>  static int clk_disable_unused(void)
+>  {
+>         struct clk *clk;
+>  
+> +       if (keep_boot_clocks) {
+> +               pr_warn("clk: Not disabling unused clocks\n");
+> +               return 0;
+> +       }
+> +
+>         clk_prepare_lock();
+>  
+>         hlist_for_each_entry(clk, &clk_root_list, child_node)
+> -- 
+> 1.8.1.192.gc4361b8
