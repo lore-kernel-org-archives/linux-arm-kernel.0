@@ -1,45 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 26 Apr 2013 17:34:13 -0700
-Subject: [PATCH v3 00/13] ARM: EXYNOS: Fix Universal C210 support
-In-Reply-To: <201304251646.28026.arnd@arndb.de>
-References: <1366731994-7478-1-git-send-email-t.figa@samsung.com>
- <201304251646.28026.arnd@arndb.de>
-Message-ID: <20130427003413.GA2350@quad.lixom.net>
+Date: Fri, 26 Apr 2013 17:35:51 -0700
+Subject: [GIT PULL] musb regression on omap4 for v3.9
+In-Reply-To: <20130423214544.GN10155@atomide.com>
+References: <20130423214544.GN10155@atomide.com>
+Message-ID: <20130427003551.GB2350@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 04:46:27PM +0200, Arnd Bergmann wrote:
-> On Tuesday 23 April 2013, Tomasz Figa wrote:
-> > This series intends to fix support for Universal C210 board in mainline.
-> > Main difference from other boards based on Exynos 4210 is that hardware
-> > revision of the SoC used on Universal C210 does not support MCT timers
-> > and legacy PWM timers must be used instead.
-> > 
-> > First (and the biggest) part of the series deals with cleaning up and
-> > fixing the samsung_pwm_timer clocksource driver, that was posted
-> > recently by Arnd. In addition the driver is prepared to share the
-> > hardware with PWM driver that will be reworked later, since it is not
-> > a component crucial for system operation.
-> > 
-> > Second part fixes ATAGS support of Exynos 4210 rev0 SoC, which needs
-> > different timer initialization, using the new samsung_pwm_timer driver.
-> > 
-> > Third and last part adds Device Tree-based support for Universal C210
-> > board by providing device tree sources for it.
-> > 
-> > On Universal C210 board, both with and without DT:
-> > 
-> > Tested-by: Tomasz Figa <t.figa@samsung.com>
+On Tue, Apr 23, 2013 at 02:45:45PM -0700, Tony Lindgren wrote:
 > 
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> The following changes since commit 31880c37c11e28cb81c70757e38392b42e695dc6:
 > 
-> Olof, Kgene, I think we should have this one in 3.10 since it fixes
-> a regression. It looks bigger than it really is because I asked Tomasz
-> to do small patches rather than a single combined patch.
+>   Linux 3.9-rc6 (2013-04-07 20:49:54 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.9-rc6/fixes-signed
+> 
+> for you to fetch changes up to f4d7a536faa43f30d87f701268db76b8433a2a8b:
+> 
+>   ARM: OMAP4: hwmod data: make 'ocp2scp_usb_phy_phy_48m" as the main clock (2013-04-10 13:26:07 -0700)
+> 
+> ----------------------------------------------------------------
+> One MUSB regression fix that I forgot to send earlier. Without
+> this MUSB no longer works on omap4 based devices.
 
-Ok. Kukjin, I don't mind collecting this in a late/* branch even though time is
-running late, since it's a regression. Do you want to send it to me or should
-I just pick up the patches?
+Pulled into fixes. I'll send a pull request to Linus tonight, hopefully he
+won't cut 3.9-final until later this weekend.
 
 
 -Olof
