@@ -1,33 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 26 Apr 2013 17:37:17 -0700
-Subject: Exynos regressions w.r.t. config and debuggability due to
- multiplatform
-In-Reply-To: <201304251931.25028.arnd@arndb.de>
-References: <CAOesGMgRsa-AvbEZCc1=_ovaZMaG0S-CDok2MDp_zu5yderAYw@mail.gmail.com>
- <201304241703.49864.arnd@arndb.de> <51794CD3.4080807@samsung.com>
- <201304251931.25028.arnd@arndb.de>
-Message-ID: <20130427003717.GC2350@quad.lixom.net>
+From: syin@broadcom.com (Sherman Yin)
+Date: Sat, 27 Apr 2013 00:54:52 +0000
+Subject: Adding a void * to pinctrl_pin_desc
+In-Reply-To: <CACRpkdYxJOWYMfwmrEGhqgjushVjWyc=FyKMaZNLnn=0jrTs9A@mail.gmail.com>
+References: <051069C10411E24D9749790C498526FA1BCF4FC6@SJEXCHMB12.corp.ad.broadcom.com>
+ <CACRpkdYxJOWYMfwmrEGhqgjushVjWyc=FyKMaZNLnn=0jrTs9A@mail.gmail.com>
+Message-ID: <051069C10411E24D9749790C498526FA1BCF54B1@SJEXCHMB12.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 07:31:24PM +0200, Arnd Bergmann wrote:
-> On Thursday 25 April 2013, Kukjin Kim wrote:
-> > 
-> > On 04/25/13 00:03, Arnd Bergmann wrote:
-> > > On Wednesday 24 April 2013, Olof Johansson wrote:
-> > >> I think we should hold off on multiplatform for exynos until it works
-> > >> better, i.e. 3.11.
-> > >>
-> > I think, this would be better choice for now if it's not urgent...
-> > 
+> >  What do you think about expanding the struct to something like this:
+> >
+> > struct pinctrl_pin_desc {
+> >         unsigned number;
+> >         const char *name;
+> >         void * pin_data;
+> > };
+> >
+> > so that drivers can optionally use pin_data to hold other pin-specific
+> information?
 > 
-> I spent a lot of time on it because it's a priority for Linaro, but
-> that means I'm biased in the question of whether to merge it or not.
-> It should only get in if you and Olof think it's a good idea.
+> No don't do this.
+> 
+> Instead:
+> 
+> struct foo_pin_desc {
+>       struct pinctrl_pin_desc desc;
+>       ....
+>       /* Insert my pindata here */
+> };
+> 
+> Then use container_of() to dereference a struct foo_pin_desc pointer from
+> the
+> pointer at &foodesc->desc;
 
-I've reverted the commit you pointed out as the problematic one now,
-and with that I get a working setup. That means most of the base patches are
-in, just not the final Kconfig shuffling. 3.11 seems more realistic for that.
+Hmm, while it would be easy to create a macro to fill the static foo_pin_desc array 
+in the driver, this array would not be suitable for use with pinctrl_register().  
+I would have to, in the probe function, loop through the foo_pin_desc array and 
+create another pinctrl_pin_desc array to use for pinctrl_desc.pins.
 
+I think I'll just use a separate struct in the driver to keep track of other pin-specific data.
 
--Olof
+Thanks,
+Sherman
