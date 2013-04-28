@@ -1,33 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 28 Apr 2013 20:19:47 +0800
-Subject: [PATCH] Support fsl-dcp crypto coprocessor
-In-Reply-To: <341422577.566569.1366721757554.open-xchange@email.1und1.de>
-References: <1366710460-11637-1-git-send-email-cb@sgoc.de>
- <20130423123408.GB1366@pengutronix.de>
- <341422577.566569.1366721757554.open-xchange@email.1und1.de>
-Message-ID: <20130428121944.GB15901@S2101-09.ap.freescale.net>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Sun, 28 Apr 2013 15:50:20 +0100
+Subject: [PATCH 0/2 v9] arm: introduce psci_smp_ops
+Message-ID: <alpine.DEB.2.02.1304281544240.5398@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 02:55:57PM +0200, Christoph G. Baumann wrote:
-> 
-> > IMHO it doesn't make any sense to push this into staging. The Freescale
-> > kernel is full of drivers which are not ready for mainline yet.
-> 
-> Indeed the Freescale kernel is a heap of <censored>.
-> 
-> 
-> > Until now, it was a good strategy to wait until some code is needed,
-> > then clean it up, adapt it to the right kernel APIs and push it into
-> > non-staging mainline.
-> 
-> Well, that's what I'm trying to do. I picked a particular driver and
-> adapted it to the current mainline.
+Hi all,
+this is the nineth version of the patch series to move virt_smp_ops out
+of mach-virt and make it a generic set of reusable PSCI based smp_ops.
+psci_smp_ops are preferred over the platform smp_ops.  The last patch
+introduces smp_init.
 
-Then why not put them into drivers/crypto/ rather than
-drivers/staging/crypto/?
+Only one change in this last iteration: the PSCI related comment has
+been moved from psci.h to psci_smp.c.
 
-Shawn
 
-> So if there are concrete proposals or criticism about this patch, please
-> tell me. As I stated the code is from Freescale and I won't be offended.
+Jon Medhurst (1):
+      ARM: Enable selection of SMP operations at boot time
+
+Stefano Stabellini (1):
+      arm: introduce psci_smp_ops
+
+ arch/arm/include/asm/mach/arch.h |    3 +
+ arch/arm/include/asm/psci.h      |    9 ++++
+ arch/arm/kernel/Makefile         |    5 ++-
+ arch/arm/kernel/psci.c           |    7 +--
+ arch/arm/kernel/psci_smp.c       |   90 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/setup.c          |    9 +++-
+ arch/arm/mach-virt/Makefile      |    1 -
+ arch/arm/mach-virt/platsmp.c     |   58 ------------------------
+ arch/arm/mach-virt/virt.c        |    3 -
+ 9 files changed, 117 insertions(+), 68 deletions(-)
+
+git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git 3.9-rc3-psci-ops-9-tag
+
+Cheers,
+
+Stefano
