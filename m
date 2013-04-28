@@ -1,51 +1,71 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 28 Apr 2013 10:59:41 +0200
-Subject: [PATCH 2/2] clk: si5351: Apply rate when clock-frequency is
- defined in devicetree.
-In-Reply-To: <1366698170-31346-2-git-send-email-marek.belisko@streamunlimited.com>
-References: <1366698170-31346-1-git-send-email-marek.belisko@streamunlimited.com>
- <1366698170-31346-2-git-send-email-marek.belisko@streamunlimited.com>
-Message-ID: <517CE4FD.9010406@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 28 Apr 2013 11:35:10 +0200
+Subject: [PATCH] ARM: KVM: Allow host virt timer irq to be different from
+ guest timer virt irq
+In-Reply-To: <CAAhSdy101B=4cK9nnLtQa7rG15D0CT_DsWD6k3FZ1EYz2nAfEw@mail.gmail.com>
+References: <1367050086-2902-1-git-send-email-anup.patel@linaro.org>
+ <73b473edb8a9ea9a09f1df68345903d7@localhost>
+ <CAAhSdy101B=4cK9nnLtQa7rG15D0CT_DsWD6k3FZ1EYz2nAfEw@mail.gmail.com>
+Message-ID: <459ddcd84aa2644e21efbbca56ff6870@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/23/2013 08:22 AM, Marek Belisko wrote:
-> clock-frequency property from devicetree was read but never used. Apply
-> defined rate when clock is registered.
->
-> Signed-off-by: Marek Belisko<marek.belisko@streamunlimited.com>
-> ---
->   drivers/clk/clk-si5351.c |   10 ++++++++++
->   1 file changed, 10 insertions(+)
->
-> diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-> index cf39e53..8323c31 100644
-> --- a/drivers/clk/clk-si5351.c
-> +++ b/drivers/clk/clk-si5351.c
-> @@ -1477,6 +1477,16 @@ static int si5351_i2c_probe(struct i2c_client *client,
->   			return -EINVAL;
->   		}
->   		drvdata->onecell.clks[n] = clk;
-> +
-> +		/* set rate when defined in devicetree */
+On Sat, 27 Apr 2013 17:49:31 +0530, Anup Patel <anup@brainfault.org>
+wrote:
+> On Sat, Apr 27, 2013 at 2:49 PM, Marc Zyngier <marc.zyngier@arm.com>
+wrote:
+>> On Sat, 27 Apr 2013 13:38:06 +0530, Anup Patel <anup.patel@linaro.org>
+>> wrote:
+>>> The arch_timer irq numbers (or PPI numbers) are implementation
+dependent
+>>> so, the host virtual timer irq number can be different from guest
+>> virtual
+>>> timer irq number.
+>>>
+>>> This patch ensures that host virtual timer irq number is read from DTB
+>> and
+>>> guest virtual timer irq is determined based on vcpu target type.
 
-nit: We also set the rate when it is defined in platform_data
-(which is disabled because there is still some CONFIG_OF dependency).
+[...]
 
-Anyway, the above comment and patch subject should refer to platform
-data instead.
+>>>
+>>> +int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>>> +                      const struct kvm_irq_level *irq)
+>>> +{
+>>> +     struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>>> +
+>>> +     /*
+>>> +      * The vcpu timer irq number cannot be determined in
+>>> +      * kvm_timer_vcpu_init() because it is called much before
+>>> +      * kvm_vcpu_set_target(). To handle this, we determine
+>>> +      * vcpu timer irq number when the vcpu is resetted.
+>>> +      */
+>>> +     timer->irq = irq;
+>>> +
+>>> +     /*
+>>> +      * Make sure timer is disarmed.
+>>> +      */
+>>> +     timer_disarm(timer);
+>>
+>> What is that for? Timer has not been started yet, for the lack of an
+IRQ.
+>> Actually, the vcpu has never ran. Why would you need to disarm it?
+> 
+> This is in case a vcpu is resetted  at runtime from user space or psci.
+> Also, since we have named it timer_vcpu_reset(), it made sense to
+> atleast disarm the timer.
 
-If you can send an updated version of this patch you get my
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+I would agree if the timer had a clearly defined reset state. The ARM ARM
+says that the timer register reset values are UNKNOWN. So at CPU reset, the
+timer is allowed to be in any possible state, including having a pending
+interrupt.
 
-> +		if (pdata->clkout[n].rate != 0) {
-> +			int ret;
-> +			ret = clk_set_rate(clk, pdata->clkout[n].rate);
-> +			if (ret != 0) {
-> +				dev_err(&client->dev, "Cannot set rate : %d\n",
-> +					ret);
-> +			}
-> +		}
->   	}
->
->   	ret = of_clk_add_provider(client->dev.of_node, of_clk_src_onecell_get,
+This means the guest already has to deal with the situation, and I'd
+rather not give additional guarantees. Please remove this call from your
+next version of this patch.
+
+Thanks,
+
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
