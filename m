@@ -1,29 +1,36 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 28 Apr 2013 15:34:46 +0900
-Subject: [GIT PULL] Samsung fixes-1 for v3.10
-In-Reply-To: <20130427010137.GD2350@quad.lixom.net>
-References: <51795C62.8070500@samsung.com>
- <20130427010137.GD2350@quad.lixom.net>
-Message-ID: <517CC306.6030508@samsung.com>
+Date: Sun, 28 Apr 2013 15:52:33 +0900
+Subject: [PATCH v3 00/13] ARM: EXYNOS: Fix Universal C210 support
+In-Reply-To: <20130427003413.GA2350@quad.lixom.net>
+References: <1366731994-7478-1-git-send-email-t.figa@samsung.com>
+ <201304251646.28026.arnd@arndb.de> <20130427003413.GA2350@quad.lixom.net>
+Message-ID: <517CC731.2050401@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/13 10:01, Olof Johansson wrote:
-> On Fri, Apr 26, 2013 at 01:40:02AM +0900, Kukjin Kim wrote:
->> The following changes since commit 58a7bbf75442ea439a4d3b7993ad87023e406063:
->>
->>    ARM: dts: add PDMA0 changes for exynos5440 (2013-04-09 01:39:27 +0900)
->
-> So these are fixes based on code that's already staged. We normally
-> don't do that -- if you have a fix for a specific branch that introduced
-> something, send a fresh pull request for that branch.
->
-OK.
+On 04/27/13 09:34, Olof Johansson wrote:
 
-> Looks like Doug's fix is for the common clock framework branch, so I'll apply
-> it to next/drivers. Thomas' is for the dt branch. I'll cherry-pick it onto
-> next/dt2.
+[...]
+
+>>> On Universal C210 board, both with and without DT:
+>>>
+>>> Tested-by: Tomasz Figa<t.figa@samsung.com>
+>>
+>> Reviewed-by: Arnd Bergmann<arnd@arndb.de>
+>>
+>> Olof, Kgene, I think we should have this one in 3.10 since it fixes
+>> a regression. It looks bigger than it really is because I asked Tomasz
+>> to do small patches rather than a single combined patch.
 >
-I'm fine. Thanks.
+> Ok. Kukjin, I don't mind collecting this in a late/* branch even though time is
+> running late, since it's a regression. Do you want to send it to me or should
+> I just pick up the patches?
+>
+Olof, since too late, would be better if you could pick up this series 
+in the late/* branch with my ack:
+
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+
+Thanks.
 
 - Kukjin
