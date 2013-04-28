@@ -1,51 +1,42 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun, 28 Apr 2013 13:37:01 +1200
-Subject: Array subscript above array bounds warning
-In-Reply-To: <517C653B.7050908@elopez.com.ar>
-References: <517C5F56.7040106@prisktech.co.nz> <517C653B.7050908@elopez.com.ar>
-Message-ID: <517C7D3D.50207@prisktech.co.nz>
+Date: Sun, 28 Apr 2013 15:16:42 +1200
+Subject: [PATCH 0/4] Add support for velocity network driver on platform
+ devices
+Message-ID: <1367119006-31280-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/04/13 11:54, Emilio L?pez wrote:
-> El 27/04/13 20:29, Tony Prisk escribi?:
->> Could someone clarify for me what I am missing here?
->>
->>
->> in drivers/net/ethernet/via/velocity.h is the following definition:
->>
->> struct mac_regs {
->> volatile u8 PAR[6]; /* 0x00 */
->> ...
->> }
->>
->> I am trying to add the following function but it keeps giving array
->> bounds warnings:
->>
->> static void velocity_set_power_state(struct velocity_info *vptr, char
->> state)
->> {
->> struct mac_regs __iomem *regs = vptr->mac_regs;
->>
->> if (vptr->bustype == BUS_PCI) {
->> pci_set_power_state(vptr->pdev, state);
->> } else {
->> writeb(state, (&regs->PAR[0]) + 0x154);
-> This would be equivalent to
->
-> writeb(state, regs->PAR + 0x154);
->
-> or
->
-> writeb(state, &regs->PAR[340]);
->
-> Which would be out of bounds, right? As it's an u8 array with just 6
-> elements, not 341+
-Yeah sorry - stupid question.
+The first three patches are general tidyup.
+Patch #1 just alphabetizes the #includes to make it easier to read.
+Patch #2 replaces vptr->dev with vptr->netdev, again for clarity in the code.
+Patch #3 replaces the pci dma functions with the generic versions.
 
-I just thought about the code while out for a walk and realised I should 
-have looked at what the original author was trying to do rather than 
-copy it verbatim.I have solved the issue now.
+I have build tested these patches but don't have a PCI velocity to run-test it.
+I can't see that they should introduce any problems as it is all renames and
+function swapping.
+
+Patch #4 adds support for the velocity driver on devicetree platform devices.
+Binding document included. This patch is compile-tested for PCI, and boot
+tested on a VIA APC8750.
+
+I think it would be pertinent to get some tested-by's for PCI users.
 
 Regards
-Tony P
+Tony Prisk
+
+
+Tony Prisk (4):
+  net: velocity: Alphabetize #includes
+  net: velocity: Rename vptr->dev to vptr->netdev
+  net: velocity: Convert to generic dma functions
+  net: velocity: Add platform device support to VIA velocity driver
+
+ .../devicetree/bindings/net/via-velocity.txt       |   20 +
+ drivers/net/ethernet/via/Kconfig                   |    3 +-
+ drivers/net/ethernet/via/via-velocity.c            |  612 ++++++++++++++------
+ drivers/net/ethernet/via/via-velocity.h            |   35 +-
+ 4 files changed, 480 insertions(+), 190 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/via-velocity.txt
+
+-- 
+1.7.9.5
