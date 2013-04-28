@@ -1,44 +1,29 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 28 Apr 2013 15:33:40 +0900
-Subject: [PATCH] ARM: exynos: dts: cros5250: add EC device
-In-Reply-To: <CAD=FV=VQg=2R_x11xuGiA0kNj1NXHUM3TUzVJC-F0ZWO39JRdw@mail.gmail.com>
-References: <1367019745-31826-1-git-send-email-olof@lixom.net>
- <CAD=FV=WhoGO8=5pt=VOCT_2j2CMkn8on=N=jK_2RwMOXWat57w@mail.gmail.com>
- <20130427010406.GE2350@quad.lixom.net>
- <CAD=FV=VQg=2R_x11xuGiA0kNj1NXHUM3TUzVJC-F0ZWO39JRdw@mail.gmail.com>
-Message-ID: <517CC2C4.4010809@samsung.com>
+Date: Sun, 28 Apr 2013 15:34:46 +0900
+Subject: [GIT PULL] Samsung fixes-1 for v3.10
+In-Reply-To: <20130427010137.GD2350@quad.lixom.net>
+References: <51795C62.8070500@samsung.com>
+ <20130427010137.GD2350@quad.lixom.net>
+Message-ID: <517CC306.6030508@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/27/13 13:04, Doug Anderson wrote:
-> Olof,
+On 04/27/13 10:01, Olof Johansson wrote:
+> On Fri, Apr 26, 2013 at 01:40:02AM +0900, Kukjin Kim wrote:
+>> The following changes since commit 58a7bbf75442ea439a4d3b7993ad87023e406063:
+>>
+>>    ARM: dts: add PDMA0 changes for exynos5440 (2013-04-09 01:39:27 +0900)
 >
-> On Fri, Apr 26, 2013 at 6:04 PM, Olof Johansson<olof@lixom.net>  wrote:
->> Ah, yes, of course. As discussed off-mail, I was mislead by some contents in
->> our local tree. :)
+> So these are fixes based on code that's already staged. We normally
+> don't do that -- if you have a fix for a specific branch that introduced
+> something, send a fresh pull request for that branch.
 >
-> Sorry about that--that was my fault.  Things have landed in a
-> different order in one of our local trees.
->
->
->> Kukjin, I'd really like to pick up these patches for 3.10, since they're
->> isolated to just dts changes and gets keyboard working on the Chromebook. Can
->> you ack them and I'll just collect them this time?
->
-> I'm pretty sure that Kukjin is OK with them.  Kukjin responded earlier and said:
->
-Yes, right.
+OK.
 
-Olof, sorry for late, please go ahead with my ack if you want.
-
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+> Looks like Doug's fix is for the common clock framework branch, so I'll apply
+> it to next/drivers. Thomas' is for the dt branch. I'll cherry-pick it onto
+> next/dt2.
+>
+I'm fine. Thanks.
 
 - Kukjin
-
->> I'm fine on 2nd and 3rd patches. Shall I take only two patches without 1st
->> one in samsung tree?
->
-> At the time we were waiting for Wolfram to get patch 1 into his tree,
-> which is now done.
->
-> ...but waiting for his official Ack is good, too.  ;)
