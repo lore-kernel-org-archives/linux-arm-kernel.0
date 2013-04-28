@@ -1,43 +1,22 @@
-From: emilio@elopez.com.ar (=?windows-1252?Q?Emilio_L=F3pez?=)
-Date: Sat, 27 Apr 2013 20:54:35 -0300
-Subject: Array subscript above array bounds warning
-In-Reply-To: <517C5F56.7040106@prisktech.co.nz>
-References: <517C5F56.7040106@prisktech.co.nz>
-Message-ID: <517C653B.7050908@elopez.com.ar>
+From: broonie@kernel.org (Mark Brown)
+Date: Sun, 28 Apr 2013 02:10:31 +0100
+Subject: [PATCH v2 1/2] regulator: mc13xxx: Add warning of incorrect
+ names of regulators
+In-Reply-To: <1367044165-6373-1-git-send-email-shc_work@mail.ru>
+References: <1367044165-6373-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20130428011031.GB20197@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El 27/04/13 20:29, Tony Prisk escribi?:
-> Could someone clarify for me what I am missing here?
-> 
-> 
-> in drivers/net/ethernet/via/velocity.h is the following definition:
-> 
-> struct mac_regs {
-> volatile u8 PAR[6]; /* 0x00 */
-> ...
-> }
-> 
-> I am trying to add the following function but it keeps giving array
-> bounds warnings:
-> 
-> static void velocity_set_power_state(struct velocity_info *vptr, char
-> state)
-> {
-> struct mac_regs __iomem *regs = vptr->mac_regs;
-> 
-> if (vptr->bustype == BUS_PCI) {
-> pci_set_power_state(vptr->pdev, state);
-> } else {
-> writeb(state, (&regs->PAR[0]) + 0x154);
+On Sat, Apr 27, 2013 at 10:29:24AM +0400, Alexander Shiyan wrote:
+> This patch adds a warning about incorrect regulators instead of
+> printing the names of non-information message about the wrong amount.
 
-This would be equivalent to
-
-writeb(state, regs->PAR + 0x154);
-
-or
-
-writeb(state, &regs->PAR[340]);
-
-Which would be out of bounds, right? As it's an u8 array with just 6
-elements, not 341+
+Applied both, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130428/f7f22f8e/attachment.sig>
