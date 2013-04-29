@@ -1,54 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Apr 2013 16:49:07 +0200
-Subject: [PATCH 03/21] ARM: shmobile: don't call irqchip_init
- unconditionally
-In-Reply-To: <20130426004835.GA20070@verge.net.au>
-References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <1366910944-3033663-4-git-send-email-arnd@arndb.de>
- <20130426004835.GA20070@verge.net.au>
-Message-ID: <201304291649.08084.arnd@arndb.de>
+From: s-anna@ti.com (Suman Anna)
+Date: Mon, 29 Apr 2013 10:32:20 -0500
+Subject: [PATCHv3 00/14] drivers: mailbox: framework creation
+In-Reply-To: <517B2E55.4070708@linaro.org>
+References: <1363145021-14339-1-git-send-email-s-anna@ti.com>
+ <CABb+yY0RYkVeo2Sb4WsDJY0jf17488FEz0d2CB994eQaSOEsVg@mail.gmail.com>
+ <37C860A02101E749A747FA2D3C1E3C504A5DF7@DLEE11.ent.ti.com>
+ <CABb+yY1x4x_A+QtGG9ohsLPgs8c3nEVnd_ExJBGOOR8=6YLPFA@mail.gmail.com>
+ <37C860A02101E749A747FA2D3C1E3C504A63B4@DLEE11.ent.ti.com>
+ <CAJe_ZhehnniZd730jjiOLrHozq8TOJZgFYLqUe4KqgBiQEu8PA@mail.gmail.com>
+ <51779304.4040003@st.com>
+ <CAJe_ZhdZv5LW6kdwyPtJe69mfW6t=WQ4OJnG2H4sUhibattN2A@mail.gmail.com>
+ <517867E1.7050301@ti.com>
+ <CAJe_ZhfDZzq+DzA9XDF3PWFUmwcZnDy-mhE4hLNHmf+V4GhOxw@mail.gmail.com>
+ <5179AE2F.3040403@ti.com>
+ <CAJe_Zhf4miUm4yTyuwc56kpD8Mu4=vsmX4wdQkFDT96JbKR=MQ@mail.gmail.com>
+ <517B242D.7040902@ti.com> <517B2E55.4070708@linaro.org>
+Message-ID: <517E9284.1010209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 26 April 2013, Simon Horman wrote:
-> > diff --git a/arch/arm/mach-shmobile/intc-r8a7740.c b/arch/arm/mach-shmobile/intc-r8a7740.c
-> > index 8871f77..5dc57f1 100644
-> > --- a/arch/arm/mach-shmobile/intc-r8a7740.c
-> > +++ b/arch/arm/mach-shmobile/intc-r8a7740.c
-> > @@ -53,14 +53,23 @@ static void __init r8a7740_init_irq_common(void)
-> >  
-> >  void __init r8a7740_init_irq_of(void)
-> >  {
-> > +     if (!IS_ENABLED(CONFIG_OF))
-> > +             return;
-> > +
-> 
-> In other parts of the shmobile I believe that such code is
-> guarded by #ifdef CONFIG_OF and I believe not guarding this code in
-> some way was an oversight.
-> 
-> The above change seems fine to me.
+Hi Andy,
 
-Ok. The change that broke the code is only present in linux-next from
-one of your trees, but is not in arm-soc. Could you include the change
-in your tree, either by folding into one of your patches or adapting
-my patch appropriately?
-
-> > +
-> > +     gic_dist_base = ioremap_nocache(0xc2800000, 0x1000);
-> > +     gic_cpu_base = ioremap_nocache(0xc2000000, 0x1000);
-> >  
-> >       /* initialize the Generic Interrupt Controller PL390 r0p0 */
-> >       gic_init(0, 29, gic_dist_base, gic_cpu_base);
+On 04/26/2013 08:48 PM, Andy Green wrote:
+> On 27/04/13 09:04, the mail apparently from Suman Anna included:
 > 
-> This one seems broken as the armadillo800eva board currently uses
-> it to initialise GIC even if CONFIG_ATAGS is not defined.
+> Hi Suman -
 > 
-> I did test the above change on the armadillo800eva board
-> with the above change and CONFIG_ATAGS disabled, the result was
-> a boot failure. With the change reverted booting seems fine.
+>> Even though both the scenarios look very similar, I believe there are
+>> some slight differences. All the devices belonging to a controller may
+>> not be of the same type (meaning, intended towards the same remote or be
+>> used interchangeably with one another). It is definitely possible if you
+>> have a similar scenario to the DMA physical channels and your remote
+>> rx interrupt can identify the device/channel to process. This would be
+>> very much dependent on the architecture of a controller. The particular
+>> example that I have in mind is s/w clients between the same set of
+>> remote and host entities using the same device - the send part is anyway
+>> arbitrated by the controller, and the same received message can be
+>> delivered to the clients, with the clients making the decision whether
+>> the packet belongs to them or not. I agree that all remote-ends will not
+>> be able to cope up intermixed requests, but isn't this again a
+>> controller architecture dependent?
+> 
+> Maybe it's helpful to describe our situation more concretely, because
+> the problem is not coming from "the architecture of the [mailbox]
+> controller".
 
-Yes, I see my mistake now. The second change was clearly wrong
-as this function is also used for DT boards, not for ATAGS boards.
+Thanks for explaining the usecase. I do think that similar approaches
+will become more common (TI AM335 has something similar as well - though
+it is related to suspend). The right word should have been "controller
+functional integration", I said it as s/w architecture or usage model.
+In your case, it is clear that you need time-shared exclusive access,
+whereas I am talking about simultaneous-shared usecases.
 
-	Arnd
+> 
+> In the SoC we work on clock and subsystem power control registers, a
+> serial bus, and some other assets are not directly accessible from
+> Linux.  We must ask a coprocessor to operate these for us, using the
+> mailbox.
+> 
+> So at any one time, the clock driver or voltagedomain driver for the SoC
+> may want to own the mailbox and perform one or more operations over it
+> synchronously, in some cases on the remote side involving transactions
+> on a serial bus.  We don't want other transactions to be occurring while
+> we wait for the serial bus to complete what the driver who started that
+> asked for, for example.
+> 
+> We can cope with this by having an outer driver mediate access to the
+> mailbox.  But then there are multiple sync primitives like completions
+> and notifiers per operation, because your core already does this.
+> 
+> In short the FIFO + sync operations approach your core implements
+> doesn't fit our use case.  That can be our problem, in which case we'll
+> live with the outer mediation driver on top of the mailbox, or it can be
+> a sign the fixed choice of FIFO + sync operations in your core did not
+> quite hit the nail on the head to really model all the facets of legit
+> mailbox usage.
+
+I agree that the current code doesn't address this usage. The changes
+(should have them ready in the next couple of days) I am working on
+actually makes this conditional.
+
+> 
+> At least, this real scenario should be interesting to think about before
+> rejecting ^^
+
+No, I didn't reject anything, we are dealing with two contrasting
+usecases dependent on the functional integration, and we have to find a
+middle ground.
+
+regards
+Suman
