@@ -1,144 +1,100 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Mon, 29 Apr 2013 13:25:47 +0530
-Subject: [v2,
- 3/3] ARM: dts: AM33XX: Add NAND flash device tree data to am335x-evm
-Message-ID: <ebfab3e9123b3e50b9a9678c1480191addd86d59.1359007746.git.avinashphilip@ti.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Mon, 29 Apr 2013 16:56:10 +0900
+Subject: [PATCH] module: fix mutiple defined issue
+In-Reply-To: <20130429073518.GZ15233@pengutronix.de>
+References: <1367213521-26795-1-git-send-email-inki.dae@samsung.com>
+ <20130429073518.GZ15233@pengutronix.de>
+Message-ID: <016501ce44af$03129c80$0937d580$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: avinash philip <avinashphilip@ti.com>
+Hi,
 
-NAND flash connected in am335x-evm on GPMC controller. This patch adds
-device tree node in am3355-evm with GPMC contoller timing for NAND flash
-interface, NAND partition table, ECC scheme, elm handle id.
 
-Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-Tested-by: Pekon Gupta <pekon@ti.com>
+> -----Original Message-----
+> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
+> owner at vger.kernel.org] On Behalf Of Uwe Kleine-Konig
+> Sent: Monday, April 29, 2013 4:35 PM
+> To: Inki Dae
+> Cc: gregkh at linuxfoundation.org; linux-kernel at vger.kernel.org; dri-
+> devel at lists.freedesktop.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] module: fix mutiple defined issue
+> 
+> On Mon, Apr 29, 2013 at 02:32:01PM +0900, Inki Dae wrote:
+> > This patch fixes mutiple defined issue to MODULE_DEVICE_TABLE
+> s/mutiple/multiple/, still this sentence doesn't sound right. What is
+> the error message you see?
+> 
+> > The issue could be induced when some framework which includes two
+> > more sub drivers, is built as one moudle because those sub drivers
+> s/moudle/module/
+> 
+> > could have their own MODULE_DEVICE_TABLE.
+> >
+> > And 'struct of_device_id' isn't needed to be determined by type
+> > argument because the definition of 'of_device_id' should be fixed.
+> > So this patch makes 'of_devce_id' definition to be fixed and
+> > only its instance name to be defined by type.
+> include/linux/isapnp.h uses:
+> #define ISAPNP_CARD_TABLE(name) \
+> 		MODULE_GENERIC_TABLE(isapnp_card, name)
+> 
+> and you changed the table's type with your patch. Ditto for all users of
+> 
+> 	MODULE_DEVICE_TABLE(i2c, ...);
+> 	MODULE_DEVICE_TABLE(acpi, ...);
+> 	MODULE_DEVICE_TABLE(platform, ...);
+> 	MODULE_DEVICE_TABLE(pci, ...);
+> 	MODULE_DEVICE_TABLE(sdio, ...);
+> 
+> So I'm pretty sure your patch is wrong and I expect it makes most
+> defconfigs fail to compile.
+>
 
----
-arch/arm/boot/dts/am335x-evm.dts |   98 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 97 insertions(+), 1 deletion(-)
+It might be my big mistake. Maybe xxx_device_id object was created device
+tree internally. Right? Will check it out again. So please ignore it.
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 0423298..1c2fd89 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -26,7 +26,8 @@
- 
- 	am33xx_pinmux: pinmux at 44e10800 {
- 		pinctrl-names = "default";
--		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0>;
-+		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0
-+			&nandflash_pins_s0>;
- 
- 		matrix_keypad_s0: matrix_keypad_s0 {
- 			pinctrl-single,pins = <
-@@ -44,6 +45,26 @@
- 				0x154 0x27	/* spi0_d0.gpio0_3, INPUT | MODE7 */
- 			>;
- 		};
-+
-+		nandflash_pins_s0: nandflash_pins_s0 {
-+			pinctrl-single,pins = <
-+				0x0 0x30	/* gpmc_ad0.gpmc_ad0, INPUT | PULLUP | MODE0 */
-+				0x4 0x30	/* gpmc_ad1.gpmc_ad1, INPUT | PULLUP | MODE0 */
-+				0x8 0x30	/* gpmc_ad2.gpmc_ad2, INPUT | PULLUP | MODE0 */
-+				0xc 0x30	/* gpmc_ad3.gpmc_ad3, INPUT | PULLUP | MODE0 */
-+				0x10 0x30	/* gpmc_ad4.gpmc_ad4, INPUT | PULLUP | MODE0 */
-+				0x14 0x30	/* gpmc_ad5.gpmc_ad5, INPUT | PULLUP | MODE0 */
-+				0x18 0x30	/* gpmc_ad6.gpmc_ad6, INPUT | PULLUP | MODE0 */
-+				0x1c 0x30	/* gpmc_ad7.gpmc_ad7, INPUT | PULLUP | MODE0 */
-+				0x70 0x30	/* gpmc_wait0.gpmc_wait0, INPUT | PULLUP | MODE0 */
-+				0x74 0x37	/* gpmc_wpn.gpio0_30, INPUT | PULLUP | MODE7 */
-+				0x7c 0x8	/* gpmc_csn0.gpmc_csn0,  PULL DISA */
-+				0x90 0x8	/* gpmc_advn_ale.gpmc_advn_ale, PULL DISA */
-+				0x94 0x8	/* gpmc_oen_ren.gpmc_oen_ren, PULL DISA */
-+				0x98 0x8	/* gpmc_wen.gpmc_wen, PULL DISA */
-+				0x9c 0x8	/* gpmc_be0n_cle.gpmc_be0n_cle, PULL DISA */
-+			>;
-+		};
- 	};
- 
- 	ocp {
-@@ -102,6 +123,81 @@
- 				reg = <0x48>;
- 			};
- 		};
-+
-+		elm: elm at 48080000 {
-+			status = "okay";
-+		};
-+
-+		gpmc: gpmc at 50000000 {
-+			status = "okay";
-+			ranges = <0 0 0x08000000 0x10000000>;	/* CS0: NAND */
-+
-+			nand at 0,0 {
-+				reg = <0 0 0>; /* CS0, offset 0 */
-+				nand-bus-width = <8>;
-+				ti,nand-ecc-opt = "bch8";
-+
-+				gpmc,sync-clk = <0>;
-+				gpmc,cs-on = <0>;
-+				gpmc,cs-rd-off = <44>;
-+				gpmc,cs-wr-off = <44>;
-+				gpmc,adv-on = <6>;
-+				gpmc,adv-rd-off = <34>;
-+				gpmc,adv-wr-off = <44>;
-+				gpmc,we-off = <40>;
-+				gpmc,oe-off = <54>;
-+				gpmc,access = <64>;
-+				gpmc,rd-cycle = <82>;
-+				gpmc,wr-cycle = <82>;
-+				gpmc,wr-access = <40>;
-+				gpmc,wr-data-mux-bus = <0>;
-+
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				elm_id = <&elm>;
-+
-+				/* MTD partition table */
-+				partition at 0 {
-+					label = "SPL1";
-+					reg = <0x00000000 0x000020000>;
-+				};
-+
-+				partition at 1 {
-+					label = "SPL2";
-+					reg = <0x00020000 0x00020000>;
-+				};
-+
-+				partition at 2 {
-+					label = "SPL3";
-+					reg = <0x00040000 0x00020000>;
-+				};
-+
-+				partition at 3 {
-+					label = "SPL4";
-+					reg = <0x00060000 0x00020000>;
-+				};
-+
-+				partition at 4 {
-+					label = "U-boot";
-+					reg = <0x00080000 0x001e0000>;
-+				};
-+
-+				partition at 5 {
-+					label = "environment";
-+					reg = <0x00260000 0x00020000>;
-+				};
-+
-+				partition at 6 {
-+					label = "Kernel";
-+					reg = <0x00280000 0x00500000>;
-+				};
-+
-+				partition at 7 {
-+					label = "File-System";
-+					reg = <0x00780000 0x0F880000>;
-+				};
-+			};
-+		};
- 	};
- 
- 	vbat: fixedregulator at 0 {
+Thanks,
+Inki Dae
+
+
+> Best regards
+> Uwe
+> 
+> >
+> > Signed-off-by: Inki Dae <inki.dae@samsung.com>
+> > ---
+> >  include/linux/module.h |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/include/linux/module.h b/include/linux/module.h
+> > index 46f1ea0..ac5d79f 100644
+> > --- a/include/linux/module.h
+> > +++ b/include/linux/module.h
+> > @@ -84,7 +84,7 @@ void trim_init_extable(struct module *m);
+> >
+> >  #ifdef MODULE
+> >  #define MODULE_GENERIC_TABLE(gtype,name)			\
+> > -extern const struct gtype##_id __mod_##gtype##_table		\
+> > +extern const struct of_device_id __mod_##gtype##_table		\
+> >    __attribute__ ((unused, alias(__stringify(name))))
+> >
+> >  #else  /* !MODULE */
+> > --
+> > 1.7.5.4
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
+> 
+> --
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
