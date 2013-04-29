@@ -1,91 +1,57 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 29 Apr 2013 22:56:56 +0200
+Date: Mon, 29 Apr 2013 23:20:43 +0200
 Subject: [PATCH V2] video: implement a simple framebuffer driver
-In-Reply-To: <51671F3D.5040501@wwwdotorg.org>
+In-Reply-To: <2863648.BDvrAG5uPk@flatron>
 References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
- <1828875.4dYa7WRt67@avalon> <51671F3D.5040501@wwwdotorg.org>
-Message-ID: <1803841.rv79ElYKi3@avalon>
+ <2569832.XQDrhUGNaI@avalon> <2863648.BDvrAG5uPk@flatron>
+Message-ID: <1461633.kfcPFxva7x@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Tomasz,
 
-Sorry for the late reply.
-
-On Thursday 11 April 2013 14:38:21 Stephen Warren wrote:
-> On 04/11/2013 02:06 PM, Laurent Pinchart wrote:
-> > On Thursday 11 April 2013 10:06:49 Stephen Warren wrote:
-> >> On 04/11/2013 03:56 AM, Laurent Pinchart wrote:
-> >>> On Monday 08 April 2013 17:16:37 Andrew Morton wrote:
-> >>>> On Wed,  3 Apr 2013 20:39:43 -0600 Stephen Warren wrote:
-> >>>>> A simple frame-buffer describes a raw memory region that may be
-> >>>>> rendered to, with the assumption that the display hardware has already
-> >>>>> been set up to scan out from that buffer.
-> >>>>> 
-> >>>>> This is useful in cases where a bootloader exists and has set up the
-> >>>>> display hardware, but a Linux driver doesn't yet exist for the display
-> >>>>> hardware.
-> >>>>> 
-> >>>>> ...
-> >>>>> 
-> >>>>> +config FB_SIMPLE
-> >>>>> +	bool "Simple framebuffer support"
-> >>>>> +	depends on (FB = y) && OF
-> >>>> 
-> >>>> It's sad that this simple little thing requires Open Firmware.  Could
-> >>>> it be generalised in some way so that the small amount of setup info
-> >>>> could be provided by other means (eg, module_param) or does the
-> >>>> dependency go deeper than that?
-> >>> 
-> >>> I second that request. I like the idea of a simple framebuffer driver if
-> >>> it helps deprecating fbdev in the long term, but I don't want it to
-> >>> offer an excuse not to implement a DRM/KMS driver. In particular adding
-> >>> DT bindings would force us to keep supporting the ABI for a (too) long
-> >>> time.
-> >> 
-> >> The platforms I intend to use this with only support device tree. Adding
-> >> support for platform data right now would just be dead code. If somebody
-> >> wants to use this driver with a board file based system rather than a DT
-> >> based system, it would be trivial do modify the driver to add a platform
-> >> data structure at that time.
+On Monday 29 April 2013 23:15:13 Tomasz Figa wrote:
+> On Thursday 11 of April 2013 11:56:31 Laurent Pinchart wrote:
+> > On Monday 08 April 2013 17:16:37 Andrew Morton wrote:
+> > > On Wed,  3 Apr 2013 20:39:43 -0600 Stephen Warren wrote:
+> > > > A simple frame-buffer describes a raw memory region that may be
+> > > > rendered to, with the assumption that the display hardware has
+> > > > already been set up to scan out from that buffer.
+> > > > 
+> > > > This is useful in cases where a bootloader exists and has set up the
+> > > > display hardware, but a Linux driver doesn't yet exist for the
+> > > > display hardware.
+> > > > 
+> > > > ...
+> > > > 
+> > > > +config FB_SIMPLE
+> > > > +	bool "Simple framebuffer support"
+> > > > +	depends on (FB = y) && OF
+> > > 
+> > > It's sad that this simple little thing requires Open Firmware.  Could
+> > > it be generalised in some way so that the small amount of setup info
+> > > could be provided by other means (eg, module_param) or does the
+> > > dependency go deeper than that?
 > > 
-> > What about using module parameters instead of DT bindings and platform
-> > data ? As this is a hack designed to work around the lack of a proper
-> > display driver the frame buffer address and size could just be passed by
-> > the boot loader through the kernel command line, and the device would
-> > then be instantiated by the driver.
+> > I second that request. I like the idea of a simple framebuffer driver if
+> > it helps deprecating fbdev in the long term, but I don't want it to
+> > offer an excuse not to implement a DRM/KMS driver. In particular adding
+> > DT bindings would force us to keep supporting the ABI for a (too) long
+> > time.
 > 
-> I'm afraid I strongly dislike the idea of using module parameters. One
-> of the things that I dislike the most about NVIDIA's downstream Android
-> kernels is the huge number of random parameters that are required on the
-> kernel command-line just to get it to boot.
+> Well, there is also at least one legitimate use case for this driver.
 > 
-> I'd specifically prefer the configuration for this driver to be a device
-> tree binding so that it /is/ an ABI. That way, arbitrary software that
-> boots the Linux kernel will be able to target a common standard for how
-> to pass this information to the kernel. If we move to module parameters
-> instead, especially with the specific intent that the format of those
-> parameters is no longer an ABI, we run in to issues where a new kernel
-> requires a bootloader update in order to generate the new set of module
-> parameters that are required by the driver. If we say the module
-> parameters will never change except in a backwards-compatible fashion,
-> and hence that issue won't arise, then why not just make it a DT binding?
+> I believe there exist embedded devices on which there is no need to
+> dynamically control the framebuffer. It needs one time initialization,
+> usually in bootloader, and then it is used as is, using constant
+> parameters as long as the system is running.
 > 
-> Do module parameters handle the case of multiple device instances?
+> I doubt there is a need for any KMS (or any other control) driver for such
+> devices - dumb framebuffer driver would be everything needed in such case.
 
-Not well. It can be handled manually by using parameter arrays, but that's a 
-bit hackish.
-
-> Also, I really don't see this driver as a hack. It's a perfectly reasonable
-> situation to have some other SW set up the frame-buffer, and Linux simply
-> continue to use it. Perhaps that other SW even ran on a difference CPU, or
-> the parameters are hard-coded in HW design, and so there's no HW that Linux
-> ever could drive, so it just isn't possible to create any more advanced
-> driver.
-
-I totally agree that this driver would be very useful during board bring-up. 
-My concern is that it would also give an incentive to vendors not to develop a 
-proper KMS driver (or rather remove an incentive to develop one).
+As we want to deprecate the fbdev API we would need to move to KMS at some 
+point anyway, even if the device can't be controlled. I don't think writting 
+such a KMS driver would be that difficult.
 
 -- 
 Regards,
