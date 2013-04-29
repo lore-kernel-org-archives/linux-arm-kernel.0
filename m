@@ -1,53 +1,62 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 29 Apr 2013 15:33:28 +0530
-Subject: [PATCH v6 5/9] ARM: OMAP: USB: Add phy binding information
+Date: Mon, 29 Apr 2013 15:33:31 +0530
+Subject: [PATCH v6 8/9] usb: phy: omap-usb2: remove *set_suspend* callback
+ from omap-usb2
 In-Reply-To: <1367229812-30574-1-git-send-email-kishon@ti.com>
 References: <1367229812-30574-1-git-send-email-kishon@ti.com>
-Message-ID: <1367229812-30574-6-git-send-email-kishon@ti.com>
+Message-ID: <1367229812-30574-9-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for controllers to get PHY in case of non dt boot, the phy
-binding information (phy device name) should be added in the platform
-data of the controller.
+Now that omap-usb2 is adapted to the new generic PHY framework,
+*set_suspend* ops can be removed from omap-usb2 driver.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/mach-omap2/usb-musb.c |    6 +++++-
- include/linux/usb/musb.h       |    3 +++
- 2 files changed, 8 insertions(+), 1 deletion(-)
+ drivers/usb/phy/phy-omap-usb2.c |   24 ------------------------
+ 1 file changed, 24 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-index 3242a55..228288a 100644
---- a/arch/arm/mach-omap2/usb-musb.c
-+++ b/arch/arm/mach-omap2/usb-musb.c
-@@ -85,8 +85,12 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
- 	musb_plat.mode = board_data->mode;
- 	musb_plat.extvbus = board_data->extvbus;
+diff --git a/drivers/usb/phy/phy-omap-usb2.c b/drivers/usb/phy/phy-omap-usb2.c
+index f8291a7..e2523f4 100644
+--- a/drivers/usb/phy/phy-omap-usb2.c
++++ b/drivers/usb/phy/phy-omap-usb2.c
+@@ -97,29 +97,6 @@ static int omap_usb_set_peripheral(struct usb_otg *otg,
+ 	return 0;
+ }
  
--	if (cpu_is_omap44xx())
-+	if (cpu_is_omap44xx()) {
- 		musb_plat.has_mailbox = true;
-+		musb_plat.phy_dev_name = "omap-usb2.3.auto.0";
-+	} else if (cpu_is_omap34xx()) {
-+		musb_plat.phy_dev_name = "twl4030_usb.0";
-+	}
+-static int omap_usb2_suspend(struct usb_phy *x, int suspend)
+-{
+-	u32 ret;
+-	struct omap_usb *phy = phy_to_omapusb(x);
+-
+-	if (suspend && !phy->is_suspended) {
+-		omap_control_usb_phy_power(phy->control_dev, 0);
+-		pm_runtime_put_sync(phy->dev);
+-		phy->is_suspended = 1;
+-	} else if (!suspend && phy->is_suspended) {
+-		ret = pm_runtime_get_sync(phy->dev);
+-		if (ret < 0) {
+-			dev_err(phy->dev, "get_sync failed with err %d\n",
+-									ret);
+-			return ret;
+-		}
+-		omap_control_usb_phy_power(phy->control_dev, 1);
+-		phy->is_suspended = 0;
+-	}
+-
+-	return 0;
+-}
+-
+ static int omap_usb_power_off(struct phy *x)
+ {
+ 	struct omap_usb *phy = dev_get_drvdata(&x->dev);
+@@ -167,7 +144,6 @@ static int omap_usb2_probe(struct platform_device *pdev)
  
- 	if (soc_is_am35xx()) {
- 		oh_name = "am35x_otg_hs";
-diff --git a/include/linux/usb/musb.h b/include/linux/usb/musb.h
-index 053c268..0b733a3 100644
---- a/include/linux/usb/musb.h
-+++ b/include/linux/usb/musb.h
-@@ -104,6 +104,9 @@ struct musb_hdrc_platform_data {
- 	/* for clk_get() */
- 	const char	*clock;
- 
-+	/* phy device name */
-+	const char	*phy_dev_name;
-+
- 	/* (HOST or OTG) switch VBUS on/off */
- 	int		(*set_vbus)(struct device *dev, int is_on);
+ 	phy->phy.dev		= phy->dev;
+ 	phy->phy.label		= "omap-usb2";
+-	phy->phy.set_suspend	= omap_usb2_suspend;
+ 	phy->phy.otg		= otg;
+ 	phy->phy.type		= USB_PHY_TYPE_USB2;
  
 -- 
 1.7.10.4
