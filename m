@@ -1,33 +1,49 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 29 Apr 2013 18:54:48 +0530
-Subject: [PATCH 5/5] cpufreq: ARM big LITTLE: Improve print message
-In-Reply-To: <cover.1367241503.git.viresh.kumar@linaro.org>
-References: <cover.1367241503.git.viresh.kumar@linaro.org>
-Message-ID: <61da22c0f40fb46dc31f0ad5183b4ea51dda518c.1367241503.git.viresh.kumar@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 29 Apr 2013 15:28:41 +0200
+Subject: [PATCH v3 1/6] at_hdmac: move to generic DMA binding
+In-Reply-To: <20130423034407.GY24632@intel.com>
+References: <1366362683-14496-1-git-send-email-ludovic.desroches@atmel.com>
+ <1366362683-14496-2-git-send-email-ludovic.desroches@atmel.com>
+ <51750F68.4040701@atmel.com> <20130423034407.GY24632@intel.com>
+Message-ID: <517E7589.5030205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Print message at the end of driver->init() doesn't carry "cpufreq" string at all
-and so is difficult to find in dmesg. Add function name in message to clearly
-state where the message is coming from.
+On 04/23/2013 05:44 AM, Vinod Koul :
+> On Mon, Apr 22, 2013 at 12:22:32PM +0200, Nicolas Ferre wrote:
+>> On 04/19/2013 11:11 AM, ludovic.desroches at atmel.com :
+>>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+>>> +#ifdef CONFIG_OF
+>>> +static bool at_dma_filter(struct dma_chan *chan, void *slave)
+> this is not defined for else case here. Also this could be CONFIG_DMA_OF...?
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/arm_big_little.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+in fact, at_dma_filter() is only used in corresponding
+dma_request_channel() in at_dma_xlate() function just below and only in
+case of CONFIG_OF.
+As the at_dma_xlate() is an empty function in !CONFIG_OF case, the
+at_dma_filter() is not needed.
 
-diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
-index fd7beed..5d7f53f 100644
---- a/drivers/cpufreq/arm_big_little.c
-+++ b/drivers/cpufreq/arm_big_little.c
-@@ -187,7 +187,7 @@ static int bL_cpufreq_init(struct cpufreq_policy *policy)
- 
- 	cpumask_copy(policy->cpus, topology_core_cpumask(policy->cpu));
- 
--	dev_info(cpu_dev, "CPU %d initialized\n", policy->cpu);
-+	dev_info(cpu_dev, "%s: CPU %d initialized\n", __func__, policy->cpu);
- 	return 0;
- }
- 
+For the use of CONFIG_OF and not CONFIG_OF_DMA, it is simply because it
+it the directive that we currently use in drivers when we have to put
+the device tree condition around a piece of code. It is quite a common
+pattern I think.
+Moreover, it is what is used in dw_dmac.c and mv_xor.c...
+
+>>> +{
+>>> +	struct at_dma_slave *atslave = slave;
+>>> +
+>>> +	if (atslave->dma_dev == chan->device->dev) {
+>>> +		chan->private = atslave;
+>>> +		return true;
+>>> +	} else {
+>>> +		return false;
+>>> +	}
+>>> +}
+> 
+> --
+> ~Vinod
+
+Best regards,
 -- 
-1.7.12.rc2.18.g61b472e
+Nicolas Ferre
