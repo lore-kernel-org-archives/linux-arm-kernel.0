@@ -1,36 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Apr 2013 11:05:35 +0200
-Subject: [PATCH 1/4] clocksource: nomadik-mtu: fix up clocksource/timer
-In-Reply-To: <20130427001210.GA1714@quad.lixom.net>
-References: <1366463287-9922-1-git-send-email-linus.walleij@linaro.org>
- <CACRpkdYWSM0BK77qWbQWh0xsN+Ps95Q70zG-GE98MYvThrky2A@mail.gmail.com>
- <20130427001210.GA1714@quad.lixom.net>
-Message-ID: <CACRpkdZ6hcNtRkAL6a2SWm-5qCoKDW1KepZeJMqVGE6YnVBUng@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 29 Apr 2013 10:50:22 +0100
+Subject: linux-next: manual merge of the arm-soc tree with the xen-arm tree
+In-Reply-To: <20130429082511.GA539@arm.com>
+References: <20130429175426.9423279609437a2d746cbb7b@canb.auug.org.au>
+ <20130429082511.GA539@arm.com>
+Message-ID: <alpine.DEB.2.02.1304291049060.5398@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 27, 2013 at 2:12 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Sat, Apr 20, 2013 at 03:19:43PM +0200, Linus Walleij wrote:
->> On Sat, Apr 20, 2013 at 3:08 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>
->> > The Nomadik clocksource driver has had a bad define making it
->> > impossible to use it for sched_clock() for a while. Fix this
->> > and also enable it for the Nomadik.
->> >
->> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->>
->> This one should go to fixes ASAP, could you pick it to your fixes
->> branch? It could be tagged stable if desired - this only affects the
->> Nomadik which works just OK on jiffies so it's really no big regression.
->> The Ux500 does not use the MTU for sched_clock().
->
-> Ok, applied on top of next/multiplatform, seems to be what it's based on.
->
-> Tagging as stable is up to you as platform owner. :) Since it won't directly
-> apply to older kernels you might be better of submitting it to Greg separately.
+On Mon, 29 Apr 2013, Catalin Marinas wrote:
+> Stephen,
+> 
+> On Mon, Apr 29, 2013 at 08:54:26AM +0100, Stephen Rothwell wrote:
+> > Today's linux-next merge of the arm-soc tree got a conflict in
+> > arch/arm/mach-virt/platsmp.c between commit fe4bff02886b ("arm: introduce
+> > psci_smp_ops") from the xen-arm tree and commit c0114709ed85 ("irqchip:
+> > gic: Perform the gic_secondary_init() call via CPU notifier") from the
+> > arm-soc tree.
+> > 
+> > The former renamed the file (and contents) so I applied the following
+> > patch and can carry the fix as necessary (no action is required).
+> > 
+> > From: Stephen Rothwell <sfr@canb.auug.org.au>
+> > Date: Mon, 29 Apr 2013 17:52:27 +1000
+> > Subject: [PATCH] arm: fix for Perform the gic_secondary_init() call via CPU
+> >  notifier
+> > 
+> > due to code movement.
+> > 
+> > Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> > ---
+> >  arch/arm/kernel/psci_smp.c | 7 -------
+> >  1 file changed, 7 deletions(-)
+> > 
+> > diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+> > index 6ef139d..cd9acc7 100644
+> > --- a/arch/arm/kernel/psci_smp.c
+> > +++ b/arch/arm/kernel/psci_smp.c
+> > @@ -14,7 +14,6 @@
+> >   */
+> >  
+> >  #include <linux/init.h>
+> > -#include <linux/irqchip/arm-gic.h>
+> >  #include <linux/smp.h>
+> >  #include <linux/of.h>
+> >  
+> > @@ -55,11 +54,6 @@ static int __cpuinit psci_boot_secondary(unsigned int cpu,
+> >  	return -ENODEV;
+> >  }
+> >  
+> > -static void __cpuinit psci_secondary_init(unsigned int cpu)
+> > -{
+> > -	gic_secondary_init(0);
+> > -}
+> > -
+> >  #ifdef CONFIG_HOTPLUG_CPU
+> >  void __ref psci_cpu_die(unsigned int cpu)
+> >  {
+> > @@ -84,7 +78,6 @@ bool __init psci_smp_available(void)
+> >  }
+> >  
+> >  struct smp_operations __initdata psci_smp_ops = {
+> > -	.smp_secondary_init	= psci_secondary_init,
+> >  	.smp_boot_secondary	= psci_boot_secondary,
+> >  	.cpu_die		= psci_cpu_die,
+> >  };
+> 
+> The fix looks fine. Thanks.
 
-Oh it's not *that* critical. It is not regressing anything in a bad way,
-jiffies work fine. But this is the proper way for the Nomadik long-term.
-
-Yours,
-Linus Walleij
+Indeed, thanks! I'll add to it to the tree.
