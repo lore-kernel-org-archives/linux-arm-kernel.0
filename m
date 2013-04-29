@@ -1,45 +1,54 @@
-From: kosaki.motohiro@gmail.com (KOSAKI Motohiro)
-Date: Mon, 29 Apr 2013 16:46:17 -0400
-Subject: [PATCH] mm: add an option to disable bounce
-In-Reply-To: <1366644180-6140-1-git-send-email-vinayakm.list@gmail.com>
-References: <1366644180-6140-1-git-send-email-vinayakm.list@gmail.com>
-Message-ID: <517EDC19.7020705@gmail.com>
+From: cooloney@gmail.com (Bryan Wu)
+Date: Mon, 29 Apr 2013 13:54:33 -0700
+Subject: Fwd: Tegra 30 System hangs because of commit "pinctrl: move
+ subsystem mutex to pinctrl_dev struct"
+In-Reply-To: <517ED12B.8080502@wwwdotorg.org>
+References: <CAK5ve-KXdS8az=Gtja-mF=Z3_EeZVA7bLYSU0EE2mf5bHmSUKw@mail.gmail.com>
+ <CAK5ve-KBDyvjNRVMcXgfnhYcajdcGsuAKaepzCBt+epiXoYvSw@mail.gmail.com>
+ <517ED12B.8080502@wwwdotorg.org>
+Message-ID: <CAK5ve-LtQDvAC9nVvvfU3rvF8d=CYGp9T17FcdNEXBNV65ra2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(4/22/13 11:23 AM), vinayakm.list at gmail.com wrote:
-> From: Vinayak Menon <vinayakm.list@gmail.com>
-> 
-> There are times when HIGHMEM is enabled, but
-> we don't prefer CONFIG_BOUNCE to be enabled.
-> CONFIG_BOUNCE can reduce the block device
-> throughput, and this is not ideal for machines
-> where we don't gain much by enabling it. So
-> provide an option to deselect CONFIG_BOUNCE. The
-> observation was made while measuring eMMC throughput
-> using iozone on an ARM device with 1GB RAM.
-> 
-> Signed-off-by: Vinayak Menon <vinayakm.list@gmail.com>
-> ---
->  mm/Kconfig |    6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/mm/Kconfig b/mm/Kconfig
-> index 3bea74f..29f9736 100644
-> --- a/mm/Kconfig
-> +++ b/mm/Kconfig
-> @@ -263,8 +263,14 @@ config ZONE_DMA_FLAG
->  	default "1"
->  
->  config BOUNCE
-> +	bool "Enable bounce buffers"
->  	def_bool y
->  	depends on BLOCK && MMU && (ZONE_DMA || HIGHMEM)
-> +	help
-> +	  Enable bounce buffers for devices that cannot access
-> +	  the full range of memory available to the CPU. Enabled
-> +	  by default when ZONE_DMA or HIGMEM is selected, but you
-> +	  may say n to override this.
+On Mon, Apr 29, 2013 at 12:59 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 04/29/13 12:41, Bryan Wu wrote:
+>>
+>> Forward to ARM and Tegra mail list.
+>>
+>> ---------- Forwarded message ----------
+>> From: Bryan Wu <cooloney@gmail.com>
+>> Date: Mon, Apr 29, 2013 at 11:15 AM
+>> Subject: Tegra 30 System hangs because of commit "pinctrl: move
+>> subsystem mutex to pinctrl_dev struct"
+>> To: patrice.chotard at st.com, Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Stephen Warren <swarren@wwwdotorg.org>,
+>> "linux-next at vger.kernel.org" <linux-next@vger.kernel.org>
+>>
+>>
+>> Hi Patrice and Linus,
+>>
+>> I'm running linux-next on my Tegra 30 system everyday. But since
+>> next-20130426 release, the linux-next kernel will hang on my Tegra 30
+>> boards like Cardhu and Beaver.
+>>
+>> After some bisect and comparing to next-20130424, I found the commit
+>> "pinctrl: move subsystem mutex to pinctrl_dev struct" introduced this
+>> issue. If I simply revert this patch in next-20130429, system boots up
+>> as before.
+>>
+>> Could you please help to check this?
+>
+>
+> I would suggest simply dropping or reverting this patch; I had pointed out a
+> long time ago that it was unlikely to be correct.
+>
+> My guess/suspicion is a recursive lock attempt during processing hogs during
+> pinctrl device registration, or perhaps during dt->map conversion. Bryan,
+> are you able to confirm this?
 
-This should depend on CONFIG_EXPERT. Because this makes typically worse result
-on typical desktop machine.
+Oh, no worries now. It was fixed in pinctrl for-next branch. I guess
+linux-next will be update soon.
+
+I will keep testing this when new linux-next is out.
+
+-Bryan
