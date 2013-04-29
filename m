@@ -1,70 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 29 Apr 2013 09:25:12 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the xen-arm tree
-In-Reply-To: <20130429175426.9423279609437a2d746cbb7b@canb.auug.org.au>
-References: <20130429175426.9423279609437a2d746cbb7b@canb.auug.org.au>
-Message-ID: <20130429082511.GA539@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 29 Apr 2013 09:59:16 +0100
+Subject: [PATCH v9 1/2] arm: introduce psci_smp_ops
+In-Reply-To: <1367160650-4888-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1304281544240.5398@kaball.uk.xensource.com>
+ <1367160650-4888-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130429085916.GB8805@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
+On Sun, Apr 28, 2013 at 03:50:49PM +0100, Stefano Stabellini wrote:
+> Rename virt_smp_ops to psci_smp_ops and move them to arch/arm/kernel/psci_smp.c.
+> Remove mach-virt/platsmp.c, now unused.
+> Compile psci_smp if CONFIG_ARM_PSCI and CONFIG_SMP.
+> 
+> Add a cpu_die smp_op based on psci_ops.cpu_off.
+> 
+> Initialize PSCI before setting smp_ops in setup_arch.
+> 
+> If PSCI is available on the platform, prefer psci_smp_ops over the
+> platform smp_ops.
+> 
+> Changes in v9:
+> - move comment about PSCI interface from psci.h to psci_smp.c.
+> 
+> Changes in v8:
+> - merge "prefer psci_smp_ops over mdesc->smp" into this patch.
+> 
+> Changes in v6:
+> - fixed return values for psci_smp_available and psci_init ifndef
+> CONFIG_ARM_PSCI.
+> 
+> Changes in v5:
+> - document psci_operations;
+> - psci_init returns NULL.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: Nicolas Pitre <nico@linaro.org>
+> CC: Rob Herring <rob.herring@calxeda.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> CC: arnd at arndb.de
+> CC: marc.zyngier at arm.com
+> CC: linux at arm.linux.org.uk
 
-On Mon, Apr 29, 2013 at 08:54:26AM +0100, Stephen Rothwell wrote:
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> arch/arm/mach-virt/platsmp.c between commit fe4bff02886b ("arm: introduce
-> psci_smp_ops") from the xen-arm tree and commit c0114709ed85 ("irqchip:
-> gic: Perform the gic_secondary_init() call via CPU notifier") from the
-> arm-soc tree.
-> 
-> The former renamed the file (and contents) so I applied the following
-> patch and can carry the fix as necessary (no action is required).
-> 
-> From: Stephen Rothwell <sfr@canb.auug.org.au>
-> Date: Mon, 29 Apr 2013 17:52:27 +1000
-> Subject: [PATCH] arm: fix for Perform the gic_secondary_init() call via CPU
->  notifier
-> 
-> due to code movement.
-> 
-> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
-> ---
->  arch/arm/kernel/psci_smp.c | 7 -------
->  1 file changed, 7 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-> index 6ef139d..cd9acc7 100644
-> --- a/arch/arm/kernel/psci_smp.c
-> +++ b/arch/arm/kernel/psci_smp.c
-> @@ -14,7 +14,6 @@
->   */
->  
->  #include <linux/init.h>
-> -#include <linux/irqchip/arm-gic.h>
->  #include <linux/smp.h>
->  #include <linux/of.h>
->  
-> @@ -55,11 +54,6 @@ static int __cpuinit psci_boot_secondary(unsigned int cpu,
->  	return -ENODEV;
->  }
->  
-> -static void __cpuinit psci_secondary_init(unsigned int cpu)
-> -{
-> -	gic_secondary_init(0);
-> -}
-> -
->  #ifdef CONFIG_HOTPLUG_CPU
->  void __ref psci_cpu_die(unsigned int cpu)
->  {
-> @@ -84,7 +78,6 @@ bool __init psci_smp_available(void)
->  }
->  
->  struct smp_operations __initdata psci_smp_ops = {
-> -	.smp_secondary_init	= psci_secondary_init,
->  	.smp_boot_secondary	= psci_boot_secondary,
->  	.cpu_die		= psci_cpu_die,
->  };
 
-The fix looks fine. Thanks.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
--- 
-Catalin
+Will
