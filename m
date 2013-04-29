@@ -1,84 +1,88 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Mon, 29 Apr 2013 12:58:20 +0530
-Subject: [PATCH V2] arm64: KVM: Reset arch_timer upon vcpu reset
-Message-ID: <1367220500-5690-1-git-send-email-anup.patel@linaro.org>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 29 Apr 2013 09:32:30 +0200
+Subject: [PATCH 10/14] sched: update the buddy CPU
+In-Reply-To: <517CDBDB.1020608@gmail.com>
+References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
+ <1366910611-20048-11-git-send-email-vincent.guittot@linaro.org>
+ <517CDBDB.1020608@gmail.com>
+Message-ID: <CAKfTPtAJJc5kcn07HrwB6FQmX+qyGFgMCOYsd3f6SWZP=Rpa5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does arch_timer reset (i.e. kvm_timer_vcpu_reset()) when
-a vcpu resetted by kvm_reset_vcpu().
+On 28 April 2013 10:20, Francesco Lavra <francescolavra.fl@gmail.com> wrote:
+> Hi,
+>
+> On 04/25/2013 07:23 PM, Vincent Guittot wrote:
+>> Periodically updates the buddy of a CPU according to the current activity of
+>> the system. A CPU is its own buddy if it participates to the packing effort.
+>> Otherwise, it points to a CPU that participates to the packing effort.
+>>
+>> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+>> ---
+>>  kernel/sched/fair.c |   91 ++++++++++++++++++++++++++++++++++++++++++++++++---
+>>  1 file changed, 86 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+>> index 234ecdd..28f8ea7 100644
+>> --- a/kernel/sched/fair.c
+>> +++ b/kernel/sched/fair.c
+>> @@ -174,11 +174,17 @@ void sched_init_granularity(void)
+>>
+>>
+>>  #ifdef CONFIG_SMP
+>> +static unsigned long power_of(int cpu)
+>> +{
+>> +     return cpu_rq(cpu)->cpu_power;
+>> +}
+>> +
+>>  /*
+>>   * Save the id of the optimal CPU that should be used to pack small tasks
+>>   * The value -1 is used when no buddy has been found
+>>   */
+>>  DEFINE_PER_CPU(int, sd_pack_buddy);
+>> +DEFINE_PER_CPU(struct sched_domain *, sd_pack_domain);
+>>
+>>  /*
+>>   * Look for the best buddy CPU that can be used to pack small tasks
+>> @@ -237,6 +243,68 @@ void update_packing_domain(int cpu)
+>>       }
+>>
+>>       pr_debug("CPU%d packing on CPU%d\n", cpu, id);
+>> +     per_cpu(sd_pack_domain, cpu) = sd;
+>> +     per_cpu(sd_pack_buddy, cpu) = id;
+>> +}
+>> +
+>> +void update_packing_buddy(int cpu, int activity)
+>> +{
+>> +     struct sched_domain *sd = per_cpu(sd_pack_domain, cpu);
+>> +     struct sched_group *sg, *pack, *tmp;
+>> +     int id = cpu;
+>> +
+>> +     if (!sd)
+>> +             return;
+>> +
+>> +     /*
+>> +      * The sched_domain of a CPU points on the local sched_group
+>> +      * and this CPU of this local group is a good candidate
+>> +      */
+>> +     pack = sg = sd->groups;
+>> +
+>> +     /* loop the sched groups to find the best one */
+>> +     for (tmp = sg->next; tmp != sg; tmp = tmp->next) {
+>> +             if ((tmp->sgp->power * pack->group_weight) >
+>> +                     (pack->sgp->power_available * tmp->group_weight))
+>
+> The power_available struct member is defined in a subsequent patch
+> (12/14), so this patch series would break git bisect.
 
-The kvm_reset_vcpu() also informs guest timer irq number to arch_timer
-code via kvm_timer_vcpu_reset().
+Hi Francesco,
 
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
----
- arch/arm64/include/asm/kvm_arch_timer.h |    2 ++
- arch/arm64/kvm/reset.c                  |   11 +++++++++++
- 2 files changed, 13 insertions(+)
+yes, power_available should have been added in patch 13/14.
+I will correct that
 
-diff --git a/arch/arm64/include/asm/kvm_arch_timer.h b/arch/arm64/include/asm/kvm_arch_timer.h
-index eb02273..0f36603 100644
---- a/arch/arm64/include/asm/kvm_arch_timer.h
-+++ b/arch/arm64/include/asm/kvm_arch_timer.h
-@@ -50,6 +50,8 @@ struct arch_timer_cpu {
- 
- int kvm_timer_hyp_init(void);
- int kvm_timer_init(struct kvm *kvm);
-+void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu, 
-+			  const struct kvm_irq_level *irq);
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
- void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
- void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 64e0740..7c9cebc 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -27,6 +27,7 @@
- #include <asm/ptrace.h>
- #include <asm/kvm_arm.h>
- #include <asm/kvm_coproc.h>
-+#include <asm/kvm_arch_timer.h>
- 
- /*
-  * ARMv8 Reset Values
-@@ -40,6 +41,11 @@ static struct kvm_regs default_regs_reset32 = {
- 			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
- };
- 
-+static const struct kvm_irq_level default_vtimer_irq = {
-+	.irq = 27,
-+	.level = 1,
-+};
-+
- static bool cpu_has_32bit_el1(void)
- {
- 	u64 pfr0;
-@@ -75,6 +81,7 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_regs *cpu_reset;
-+	const struct kvm_irq_level *cpu_vtimer_irq;
- 
- 	switch (vcpu->arch.target) {
- 	default:
-@@ -86,6 +93,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 		} else {
- 			cpu_reset = &default_regs_reset;
- 		}
-+		cpu_vtimer_irq = &default_vtimer_irq;
- 		break;
- 	}
- 
-@@ -95,5 +103,8 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	/* Reset system registers */
- 	kvm_reset_sys_regs(vcpu);
- 
-+	/* Reset arch_timer context */
-+	kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
-+
- 	return 0;
- }
--- 
-1.7.9.5
+Thanks
+Vincent
+
+>
+> --
+> Francesco
