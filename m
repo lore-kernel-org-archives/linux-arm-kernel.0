@@ -1,38 +1,29 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Apr 2013 15:13:26 +0200
-Subject: [PATCH v2 05/21] atm: he: use msleep instead of large udelay constants
-In-Reply-To: <20130426091220.468cf59e@thirdoffive.cmf.nrl.navy.mil>
+Date: Mon, 29 Apr 2013 15:21:14 +0200
+Subject: [PATCH 10/21] [SCSI] nsp32: use mdelay instead of large udelay
+ constants
+In-Reply-To: <CALZLnaFeLcaGM7_McTZ=pKBRnpXk0AvqOTF=1YCqJv-53yk4XQ@mail.gmail.com>
 References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <AE90C24D6B3A694183C094C60CF0A2F6026B7203@saturn3.aculab.com>
- <20130426091220.468cf59e@thirdoffive.cmf.nrl.navy.mil>
-Message-ID: <201304291513.27104.arnd@arndb.de>
+ <1366910944-3033663-11-git-send-email-arnd@arndb.de>
+ <CALZLnaFeLcaGM7_McTZ=pKBRnpXk0AvqOTF=1YCqJv-53yk4XQ@mail.gmail.com>
+Message-ID: <201304291521.14195.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From a0ddf082821b064cc2d6a9bb90861f9b81a559a5 Mon Sep 17 00:00:00 2001
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Thu, 14 Mar 2013 15:21:36 +0100
-Subject: [PATCH] atm: he: use mdelay instead of large udelay constants
+On Friday 26 April 2013, Masanori Goto wrote:
+> 2013/4/25 Arnd Bergmann <arnd@arndb.de>
+> >
+> > ARM cannot handle udelay for more than 2 miliseconds, so we
+> > should use mdelay instead for those.
+> >
+> 
+> Singed-off-by: GOTO Masanori <gotom@debian.or.jp>
 
-ARM cannot handle udelay for more than 2 miliseconds, and
-it is rather bad style to block the cpu for 16ms anyway,
-so let's use msleep instead.
+Thanks. I assume you mean "Acked-by", not "Singed-off" as in "burnt"
+or "Signed-off" as a notification that you have applied it to your
+own git tree.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Chas Williams <chas@cmf.nrl.navy.mil>
-Cc: linux-atm-general at lists.sourceforge.net
-Cc: netdev at vger.kernel.org
----
-diff --git a/drivers/atm/he.c b/drivers/atm/he.c
-index d689126..507362a 100644
---- a/drivers/atm/he.c
-+++ b/drivers/atm/he.c
-@@ -1055,7 +1055,7 @@ static int he_start(struct atm_dev *dev)
- 	he_writel(he_dev, 0x0, RESET_CNTL);
- 	he_writel(he_dev, 0xff, RESET_CNTL);
- 
--	udelay(16*1000);	/* 16 ms */
-+	msleep(16);	/* 16 ms */
- 	status = he_readl(he_dev, RESET_CNTL);
- 	if ((status & BOARD_RST_STATUS) == 0) {
- 		hprintk("reset failed\n");
+I'll keep the patch with an your "Acked-by" line in my tree unless
+James wants to apply to the scsi tree.
+
+	Arnd
