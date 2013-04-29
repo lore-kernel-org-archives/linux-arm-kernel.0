@@ -1,35 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Apr 2013 14:21:15 +0200
-Subject: Adding a void * to pinctrl_pin_desc
-In-Reply-To: <051069C10411E24D9749790C498526FA1BCF54B1@SJEXCHMB12.corp.ad.broadcom.com>
-References: <051069C10411E24D9749790C498526FA1BCF4FC6@SJEXCHMB12.corp.ad.broadcom.com>
- <CACRpkdYxJOWYMfwmrEGhqgjushVjWyc=FyKMaZNLnn=0jrTs9A@mail.gmail.com>
- <051069C10411E24D9749790C498526FA1BCF54B1@SJEXCHMB12.corp.ad.broadcom.com>
-Message-ID: <CACRpkdY2vWvvE_NToQ5rkxGC32hCJgMjNpkF+KEGJ+-o4My4-Q@mail.gmail.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Mon, 29 Apr 2013 14:22:46 +0200
+Subject: [PATCH 0/2] Early printk support for virtio console devices.
+In-Reply-To: <87obcyc9sh.fsf@rustcorp.com.au>
+References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
+ <BA2076A6-0688-4E5C-85F9-A9CA8FD75782@suse.de>
+ <87obcyc9sh.fsf@rustcorp.com.au>
+Message-ID: <336C59AA-D5D7-472E-A8DA-EEB413DD6C68@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 27, 2013 at 2:54 AM, Sherman Yin <syin@broadcom.com> wrote:
-> [Me]
->> Then use container_of() to dereference a struct foo_pin_desc pointer from
->> the
->> pointer at &foodesc->desc;
->
-> Hmm, while it would be easy to create a macro to fill the static foo_pin_desc array
-> in the driver, this array would not be suitable for use with pinctrl_register().
 
-Now I start to change opinion. You're right about this.
 
-> I would have to, in the probe function, loop through the foo_pin_desc array and
-> create another pinctrl_pin_desc array to use for pinctrl_desc.pins.
+Am 29.04.2013 um 05:09 schrieb Rusty Russell <rusty@rustcorp.com.au>:
 
-Yeah that sucks.
+> Alexander Graf <agraf@suse.de> writes:
+>> On 26.04.2013, at 13:04, Pranavkumar Sawargaonkar wrote:
+>> 
+>>> This patch-set implements early printk support for virtio console devices without using any hypercalls.
+>>> 
+>>> The current virtio early printk code in kernel expects that hypervisor will provide some mechanism generally a hypercall to support early printk. This patch-set does not break existing hypercall based early print support.
+>>> 
+>>> This implementation adds:
+>>> 1. Early writeonly register named early_wr in virtio console's config space.
+>>> 2. Host feature flags namely VIRTIO_CONSOLE_F_EARLY_WRITE for telling guest about early-write capability in console device.
+>>> 
+>>> Early write mechanism:
+>>> 1. When a guest wants to out some character, it has to simply write the character to early_wr register in config space of virtio console device.
+>> 
+>> I won't nack this patch set, but I'll definitely express that I'm not happy with it.
+>> 
+>> MMIO registers are handled by a different layer than the virtio console itself. After the virtio refactoring in QEMU, they will be completely separate drivers. So we'll be in a similar mess with early printk as we are on the s390-virtio machine, where early printk is done through hypercalls and thus we can't directly link it to the console output.
+>> 
+>> I still don't see what the issue is with just implementing a small irq-less virtio driver for early printk.
+> 
+> Well, this shouldn't be mmio-specific, but I kind of get what you mean.
+> 
+> I consider this misnamed: it's an emergency write facility.  Linux may
+> use it for an early console,
 
-> I think I'll just use a separate struct in the driver to keep track of other pin-specific data.
+If Linux uses it for early console, you won't see any messages from before the virtio-console driver is initialized, because Linux thinks that it's all been printed out.
 
-No I think I have changed opinion. Can you send a patch adding a void * to
-struct pinctrl_pin_desc  as patch [1/n] when you send your driver, and
-I think I'll be happy with it.
+> but it's also useful for bringup and to
+> give a method of emitting errors like "the console ring is corrupt".
+> 
+> A valid implementation may well be to only offer it with some magic
+> qemu developer-only commandline and dump it to stdout.
 
-Yours,
-Linus Walleij
+Why implement it differently from other machines? There are facilities to call into firmware, so you could use that. There's the special Foundation model call that you could implement and reuse for this.
+
+I don't see why anything like this has to live in virtio-mmio. Oh, and it should default to off.
+
+Alex
+
+> 
+> So I think it has use, but less so if QEMU isn't ever going to implement
+> it.
+> 
+> Cheers,
+> Rusty.
+> 
