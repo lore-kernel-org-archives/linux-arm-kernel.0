@@ -1,32 +1,54 @@
-From: marc.ceeeee@gmail.com (Marc C)
-Date: Mon, 29 Apr 2013 14:21:49 -0700
-Subject: [RFC/PATCH v2 2/2] drivers: dma-contiguous: add initialization
- from device tree
-In-Reply-To: <1365679330-2514-3-git-send-email-m.szyprowski@samsung.com>
-References: <1365679330-2514-1-git-send-email-m.szyprowski@samsung.com>
- <1365679330-2514-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAO1A-8DiZoMVGcjOqK6VYP5Qito55i=gsKApQM=LGbQVx3iCwg@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 29 Apr 2013 23:15:13 +0200
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <2569832.XQDrhUGNaI@avalon>
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+ <20130408171637.98b5ad1f867bcbda883af68b@linux-foundation.org>
+ <2569832.XQDrhUGNaI@avalon>
+Message-ID: <2863648.BDvrAG5uPk@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->  /**
->   * dma_contiguous_reserve() - reserve area(s) for contiguous memory handling
->   * @limit: End address of the reserved memory (optional, 0 for any).
-> @@ -149,6 +200,10 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
->
->         pr_debug("%s(limit %08lx)\n", __func__, (unsigned long)limit);
->
-> +#ifdef CONFIG_OF
-> +       of_scan_flat_dt(cma_fdt_scan, NULL);
-> +#endif
-> +
+Hi Laurent,
 
-What is your expectation with the contention between default region
-setup via the kernel config (CONFIG_CMA_SIZE_SEL_*) and via the DT?
-Could the call to 'of_scan_flat_dt()' be done before the setup of the
-kernel config early regions, followed by a return code check
-'fail-over' scheme, or were you intending for the default region
-setups to be mutually-exclusive?
+On Thursday 11 of April 2013 11:56:31 Laurent Pinchart wrote:
+> On Monday 08 April 2013 17:16:37 Andrew Morton wrote:
+> > On Wed,  3 Apr 2013 20:39:43 -0600 Stephen Warren wrote:
+> > > A simple frame-buffer describes a raw memory region that may be
+> > > rendered to, with the assumption that the display hardware has
+> > > already been set up to scan out from that buffer.
+> > > 
+> > > This is useful in cases where a bootloader exists and has set up the
+> > > display hardware, but a Linux driver doesn't yet exist for the
+> > > display
+> > > hardware.
+> > > 
+> > > ...
+> > > 
+> > > +config FB_SIMPLE
+> > > +	bool "Simple framebuffer support"
+> > > +	depends on (FB = y) && OF
+> > 
+> > It's sad that this simple little thing requires Open Firmware.  Could
+> > it be generalised in some way so that the small amount of setup info
+> > could be provided by other means (eg, module_param) or does the
+> > dependency go deeper than that?
+> 
+> I second that request. I like the idea of a simple framebuffer driver if
+> it helps deprecating fbdev in the long term, but I don't want it to
+> offer an excuse not to implement a DRM/KMS driver. In particular adding
+> DT bindings would force us to keep supporting the ABI for a (too) long
+> time.
 
-Thanks,
-Marc
+Well, there is also at least one legitimate use case for this driver.
+
+I believe there exist embedded devices on which there is no need to 
+dynamically control the framebuffer. It needs one time initialization, 
+usually in bootloader, and then it is used as is, using constant 
+parameters as long as the system is running.
+
+I doubt there is a need for any KMS (or any other control) driver for such 
+devices - dumb framebuffer driver would be everything needed in such case.
+
+Best regards,
+Tomasz
