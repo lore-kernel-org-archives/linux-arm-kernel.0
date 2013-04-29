@@ -1,33 +1,94 @@
-From: romieu@fr.zoreil.com (Francois Romieu)
-Date: Tue, 30 Apr 2013 01:04:50 +0200
-Subject: [PATCHv3 3/3] net: velocity: Add platform device support to VIA
- velocity driver
-In-Reply-To: <1367264772-4557-4-git-send-email-linux@prisktech.co.nz>
-References: <1367264772-4557-1-git-send-email-linux@prisktech.co.nz>
- <1367264772-4557-4-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130429230450.GA2620@electric-eye.fr.zoreil.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 30 Apr 2013 09:18:45 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the xen-arm tree
+In-Reply-To: <alpine.DEB.2.02.1304291049060.5398@kaball.uk.xensource.com>
+References: <20130429175426.9423279609437a2d746cbb7b@canb.auug.org.au>
+ <20130429082511.GA539@arm.com>
+ <alpine.DEB.2.02.1304291049060.5398@kaball.uk.xensource.com>
+Message-ID: <20130430091845.27d8de4935bd33ddb4a3e8c0@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Prisk <linux@prisktech.co.nz> :
-[...]
-> +static int velocity_remove(void *pdev, enum velocity_bus_type bustype)
-> +{
-> +	struct net_device *netdev;
-> +	struct velocity_info *vptr;
-> +	int pci = (bustype == BUS_PCI) ? 1 : 0;
-> +
-> +	if (pci)
-> +		netdev = pci_get_drvdata(pdev);
-> +	else
-> +		netdev = platform_get_drvdata(pdev);
+Hi Stefano,
 
-The caller knows how to retrieve the net_device pointer, whence
-the struct velocity_info pointer, whence any bustype dependent
-function pointer to alleviate the "if (pci)" and CONFIG stuff.
+On Mon, 29 Apr 2013 10:50:22 +0100 Stefano Stabellini <stefano.stabellini@eu.citrix.com> wrote:
+>
+> On Mon, 29 Apr 2013, Catalin Marinas wrote:
+> > 
+> > On Mon, Apr 29, 2013 at 08:54:26AM +0100, Stephen Rothwell wrote:
+> > > Today's linux-next merge of the arm-soc tree got a conflict in
+> > > arch/arm/mach-virt/platsmp.c between commit fe4bff02886b ("arm: introduce
+> > > psci_smp_ops") from the xen-arm tree and commit c0114709ed85 ("irqchip:
+> > > gic: Perform the gic_secondary_init() call via CPU notifier") from the
+> > > arm-soc tree.
+> > > 
+> > > The former renamed the file (and contents) so I applied the following
+> > > patch and can carry the fix as necessary (no action is required).
+> > > 
+> > > From: Stephen Rothwell <sfr@canb.auug.org.au>
+> > > Date: Mon, 29 Apr 2013 17:52:27 +1000
+> > > Subject: [PATCH] arm: fix for Perform the gic_secondary_init() call via CPU
+> > >  notifier
+> > > 
+> > > due to code movement.
+> > > 
+> > > Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> > > ---
+> > >  arch/arm/kernel/psci_smp.c | 7 -------
+> > >  1 file changed, 7 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+> > > index 6ef139d..cd9acc7 100644
+> > > --- a/arch/arm/kernel/psci_smp.c
+> > > +++ b/arch/arm/kernel/psci_smp.c
+> > > @@ -14,7 +14,6 @@
+> > >   */
+> > >  
+> > >  #include <linux/init.h>
+> > > -#include <linux/irqchip/arm-gic.h>
+> > >  #include <linux/smp.h>
+> > >  #include <linux/of.h>
+> > >  
+> > > @@ -55,11 +54,6 @@ static int __cpuinit psci_boot_secondary(unsigned int cpu,
+> > >  	return -ENODEV;
+> > >  }
+> > >  
+> > > -static void __cpuinit psci_secondary_init(unsigned int cpu)
+> > > -{
+> > > -	gic_secondary_init(0);
+> > > -}
+> > > -
+> > >  #ifdef CONFIG_HOTPLUG_CPU
+> > >  void __ref psci_cpu_die(unsigned int cpu)
+> > >  {
+> > > @@ -84,7 +78,6 @@ bool __init psci_smp_available(void)
+> > >  }
+> > >  
+> > >  struct smp_operations __initdata psci_smp_ops = {
+> > > -	.smp_secondary_init	= psci_secondary_init,
+> > >  	.smp_boot_secondary	= psci_boot_secondary,
+> > >  	.cpu_die		= psci_cpu_die,
+> > >  };
+> > 
+> > The fix looks fine. Thanks.
+> 
+> Indeed, thanks! I'll add to it to the tree.
 
-If you are not convinced, please consider turning the void *
-into an union *.
+You should not apply that to your tree as you don't have the rest of the
+change from the arm-soc tree.  It needs to be applied to the merge of the
+two trees i.e. when Linus merges the last of the two trees.
+
+This is why I wrote "no action is required".
+
+And you committed it to your tree without your Signed-off-by ...
 
 -- 
-Ueimor
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130430/d69815ba/attachment.sig>
