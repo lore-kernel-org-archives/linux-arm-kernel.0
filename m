@@ -1,42 +1,89 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 29 Apr 2013 15:33:27 +0530
-Subject: [PATCH v6 4/9] usb: phy: twl4030: twl4030 shouldn't be subsys_initcall
+Date: Mon, 29 Apr 2013 15:33:25 +0530
+Subject: [PATCH v6 2/9] usb: phy: omap-usb2: use the new generic PHY framework
 In-Reply-To: <1367229812-30574-1-git-send-email-kishon@ti.com>
 References: <1367229812-30574-1-git-send-email-kishon@ti.com>
-Message-ID: <1367229812-30574-5-git-send-email-kishon@ti.com>
+Message-ID: <1367229812-30574-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changed the inticall from subsys_initcall to module_init for
-twl4030-usb.
+Used the generic PHY framework API to create the PHY. Now the power off and
+power on are done in omap_usb_power_off and omap_usb_power_on respectively.
+
+However using the old USB PHY library cannot be completely removed
+because OTG is intertwined with PHY and moving to the new framework
+will break OTG. Once we have a separate OTG state machine, we
+can get rid of the USB PHY library.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/usb/phy/phy-twl4030-usb.c |   12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+ drivers/usb/phy/phy-omap-usb2.c |   36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/drivers/usb/phy/phy-twl4030-usb.c b/drivers/usb/phy/phy-twl4030-usb.c
-index ef6eadf..dacbeb1 100644
---- a/drivers/usb/phy/phy-twl4030-usb.c
-+++ b/drivers/usb/phy/phy-twl4030-usb.c
-@@ -820,17 +820,7 @@ static struct platform_driver twl4030_usb_driver = {
- 	},
- };
+diff --git a/drivers/usb/phy/phy-omap-usb2.c b/drivers/usb/phy/phy-omap-usb2.c
+index 844ab68..f8291a7 100644
+--- a/drivers/usb/phy/phy-omap-usb2.c
++++ b/drivers/usb/phy/phy-omap-usb2.c
+@@ -28,6 +28,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/delay.h>
+ #include <linux/usb/omap_control_usb.h>
++#include <linux/phy/phy.h>
  
--static int __init twl4030_usb_init(void)
--{
--	return platform_driver_register(&twl4030_usb_driver);
--}
--subsys_initcall(twl4030_usb_init);
--
--static void __exit twl4030_usb_exit(void)
--{
--	platform_driver_unregister(&twl4030_usb_driver);
--}
--module_exit(twl4030_usb_exit);
-+module_platform_driver(twl4030_usb_driver);
+ /**
+  * omap_usb2_set_comparator - links the comparator present in the sytem with
+@@ -119,10 +120,36 @@ static int omap_usb2_suspend(struct usb_phy *x, int suspend)
+ 	return 0;
+ }
  
- MODULE_ALIAS("platform:twl4030_usb");
- MODULE_AUTHOR("Texas Instruments, Inc, Nokia Corporation");
++static int omap_usb_power_off(struct phy *x)
++{
++	struct omap_usb *phy = dev_get_drvdata(&x->dev);
++
++	omap_control_usb_phy_power(phy->control_dev, 0);
++
++	return 0;
++}
++
++static int omap_usb_power_on(struct phy *x)
++{
++	struct omap_usb *phy = dev_get_drvdata(&x->dev);
++
++	omap_control_usb_phy_power(phy->control_dev, 1);
++
++	return 0;
++}
++
++static struct phy_ops ops = {
++	.power_on	= omap_usb_power_on,
++	.power_off	= omap_usb_power_off,
++	.owner		= THIS_MODULE,
++};
++
+ static int omap_usb2_probe(struct platform_device *pdev)
+ {
+ 	struct omap_usb			*phy;
++	struct phy			*generic_phy;
+ 	struct usb_otg			*otg;
++	struct phy_provider		*phy_provider;
+ 
+ 	phy = devm_kzalloc(&pdev->dev, sizeof(*phy), GFP_KERNEL);
+ 	if (!phy) {
+@@ -144,6 +171,15 @@ static int omap_usb2_probe(struct platform_device *pdev)
+ 	phy->phy.otg		= otg;
+ 	phy->phy.type		= USB_PHY_TYPE_USB2;
+ 
++	phy_provider = devm_of_phy_provider_register(phy->dev, THIS_MODULE,
++		of_phy_simple_xlate);
++	if (IS_ERR(phy_provider))
++		return PTR_ERR(phy_provider);
++
++	generic_phy = devm_phy_create(phy->dev, 0, &ops, phy);
++	if (IS_ERR(generic_phy))
++		return PTR_ERR(generic_phy);
++
+ 	phy->control_dev = omap_get_control_dev();
+ 	if (IS_ERR(phy->control_dev)) {
+ 		dev_dbg(&pdev->dev, "Failed to get control device\n");
 -- 
 1.7.10.4
