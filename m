@@ -1,30 +1,37 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Mon, 29 Apr 2013 14:53:58 +0200
-Subject: [PATCH 0/2] Early printk support for virtio console devices.
-In-Reply-To: <CAFEAcA-qfbMWD4fxLSN5uiBzO4fjqpwnx5pZd2QY=6Q=+dMNPw@mail.gmail.com>
-References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
- <BA2076A6-0688-4E5C-85F9-A9CA8FD75782@suse.de>
- <87obcyc9sh.fsf@rustcorp.com.au>
- <336C59AA-D5D7-472E-A8DA-EEB413DD6C68@suse.de>
- <CAFEAcA-qfbMWD4fxLSN5uiBzO4fjqpwnx5pZd2QY=6Q=+dMNPw@mail.gmail.com>
-Message-ID: <9DCAE29E-A113-4E74-A663-1AB224AD97E0@suse.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Apr 2013 14:58:16 +0200
+Subject: [PATCH 03/21] ARM: shmobile: don't call irqchip_init
+ unconditionallyA
+In-Reply-To: <CABYn4sxjpp3yPkjDM9XhX6fyT-g_OoCjcnD1u=5oyb+Y6y=Nmw@mail.gmail.com>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <20130426004835.GA20070@verge.net.au>
+ <CABYn4sxjpp3yPkjDM9XhX6fyT-g_OoCjcnD1u=5oyb+Y6y=Nmw@mail.gmail.com>
+Message-ID: <201304291458.16634.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 29.04.2013, at 14:50, Peter Maydell wrote:
-
-> On 29 April 2013 13:22, Alexander Graf <agraf@suse.de> wrote:
->> Oh, and it should default to off.
+On Friday 26 April 2013, Bastian Hecht wrote:
+> > This one seems broken as the armadillo800eva board currently uses
+> > it to initialise GIC even if CONFIG_ATAGS is not defined.
+> >
+> > I did test the above change on the armadillo800eva board
+> > with the above change and CONFIG_ATAGS disabled, the result was
+> > a boot failure. With the change reverted booting seems fine.
 > 
-> That would be a pretty unhelpful default. We should default
-> things so that console output from the kernel is available
-> as early as reasonably possible by default IMHO -- this
-> reduces the number of "nothing happens" user complaints
-> where you then have to explain how to enable early printk
-> so you can get some actual information about what happened.
+> CONFIG_ATAGS and CONFIG_ARM_APPENDED_DTB are two ways to pass the
+> device tree information, right?
 
-Users complaining that they only see half of their kernel log are even worse IMHO :)
+No, the two are methods alternative methods for booting from a legacy
+boot loader. CONFIG_ATAGS is the old boot method without a DT, using
+a board file and a MACHINE_START() macro. ARM_APPENDED_DTB means you
+have a DT linked into the kernel but pass ATAGS to the kernel which
+uses the passed data to modify the DT.
 
+> So we run into trouble when we use the later but disable the first.
+> Is there a reason why you wanted to avoid using two times just "if
+> (!IS_ENABLED(CONFIG_OF))", Arnd?
 
-Alex
+I incorrectly assumed that the second one was only used without DT,
+since it uses hardcoded MMIO locations rather than using of_iomap().
+
+	Arnd
