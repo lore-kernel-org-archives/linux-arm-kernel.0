@@ -1,42 +1,20 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 29 Apr 2013 21:24:41 +0300
-Subject: [V9 PATCH 01/12] usb: phy: protect phy init and shutdown for
- mutiple deivces
-In-Reply-To: <1366784606-1813-2-git-send-email-chao.xie@marvell.com>
-References: <1366784606-1813-1-git-send-email-chao.xie@marvell.com>
- <1366784606-1813-2-git-send-email-chao.xie@marvell.com>
-Message-ID: <20130429182441.GA1632@arwen.pp.htv.fi>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 29 Apr 2013 15:15:28 -0400 (EDT)
+Subject: [PATCHv2 0/3] Add support for velocity network driver on
+ platform devices
+In-Reply-To: <1367221841-14563-1-git-send-email-linux@prisktech.co.nz>
+References: <1367221841-14563-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20130429.151528.2251094691456287740.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 24, 2013 at 02:23:15AM -0400, Chao Xie wrote:
-> diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-> index 6b5978f..98d7e60 100644
-> --- a/include/linux/usb/phy.h
-> +++ b/include/linux/usb/phy.h
-> @@ -87,6 +87,14 @@ struct usb_phy {
->  	/* to support controllers that have multiple transceivers */
->  	struct list_head	head;
->  
-> +	/*
-> +	 * PHY may be shared by multiple devices.
-> +	 * mutex and refcount are used to make sure PHY only initialize or
-> +	 * shutdown once.
 
-bad grammar in this sentence.
+You prepared these patches against a net-next tree which is at least
+a week old, I know this because that's when the NETIF_F_* flags for
+VLAN offloading changed their names which causes your third patch
+to fail to apply.
 
-> +	 */
-> +	struct mutex		phy_mutex;
-> +	unsigned int		refcount;
-
-why don't you use an atomic_t ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130429/810dec42/attachment.sig>
+Do not do this, net-next changes every day and rapidly, don't take
+the chance that the driver you're touching is unpopular and thus
+hasn't had changes to it recently.  Tree-wide interface changes
+happen all the time.
