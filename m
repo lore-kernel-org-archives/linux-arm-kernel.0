@@ -1,72 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Apr 2013 15:13:59 +0200
-Subject: [PATCH] ARM: Adds pin config API to set all configs in one
- function
-In-Reply-To: <051069C10411E24D9749790C498526FA1BCF5427@SJEXCHMB12.corp.ad.broadcom.com>
-References: <1366841010-2823-1-git-send-email-syin@broadcom.com>
- <CACRpkdbT7f8ujCHZxKg26iMKcrAb+_yHW_2YsZwkoo892rkgTA@mail.gmail.com>
- <051069C10411E24D9749790C498526FA1BCF5427@SJEXCHMB12.corp.ad.broadcom.com>
-Message-ID: <CACRpkdZ6zQdivtq5wmizovWEGb-Q9xzA6EE8CafnuV13hzX_UA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 29 Apr 2013 15:13:26 +0200
+Subject: [PATCH v2 05/21] atm: he: use msleep instead of large udelay constants
+In-Reply-To: <20130426091220.468cf59e@thirdoffive.cmf.nrl.navy.mil>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B7203@saturn3.aculab.com>
+ <20130426091220.468cf59e@thirdoffive.cmf.nrl.navy.mil>
+Message-ID: <201304291513.27104.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Apr 27, 2013 at 12:02 AM, Sherman Yin <syin@broadcom.com> wrote:
+>From a0ddf082821b064cc2d6a9bb90861f9b81a559a5 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Thu, 14 Mar 2013 15:21:36 +0100
+Subject: [PATCH] atm: he: use mdelay instead of large udelay constants
 
-> Perhaps I have misunderstood you previously, as I thought you are ok with letting
-> the driver take care of the loop.  The difference being instead of just moving the for
-> loop inside the driver's pin_config_set(), I followed Stephen's suggestion due to
-> concern about drivers duplicating the loop:
-(...)
-> Please correctly if I'm wrong, but I think with the functions in my patch, the
-> driver still have full control of / responsibility to resolve config sequence
-> and perform validation.  The difference is instead of feeding the driver one
-> config at time and telling it to write when the complete() function is called,
-> my patch just gives the driver all configs in one call and expects the driver
-> to parse, validate and write accordingly.
-(...)
->> The driver takes care of caching intermediate settings for the pin
->> until the complete() callback is called.
->> Can you devise a patch like this instead?
->
-> I do have some concerns about the driver caching all the configs until complete()
-> is called...  I'm ok either way as long as it provides a way to consolidate pin config register
-> writes.  Just want to clarify things with you before I go ahead and modify
-> my patch and driver.
+ARM cannot handle udelay for more than 2 miliseconds, and
+it is rather bad style to block the cpu for 16ms anyway,
+so let's use msleep instead.
 
-OK I thought a bit about this too and I see the problem.
-
-However I think it's cluttery to have both
-pin_config_set() and pin_config_set_all().
-
-If you want it to be done this way, I think you should modify
-pin_config_set() like so instead:
-
--        int (*pin_config_set) (struct pinctrl_dev *pctldev,
--                               unsigned pin,
--                               unsigned long config);
-+       int (*pin_config_set) (struct pinctrl_dev *pctldev,
-+                                  const struct
-pinctrl_setting_configs *configs, unsigned num_configs);
-
-And then change all the drivers.
-
-(And vice versa mutatis mutandis for the group function.)
-
-Notice especially the added num_configs parameter that was
-missing from pin_config_set_all() in your patch, please tell
-me how else you deduct the size of the configs array.
-
-To the drivers to iterate over the array of configs,
-please introduce a static helper function:
-
-for_each_config() in something like <linux/pinctrl/pinconf.h>
-so it's easy for driver writers to get this right. (You'll be much
-helped by this function when refactoring the existing drivers as well
-I think.)
-
-Doing the same thing with two different functions isn't
-helpful, refactoring like this is much better, it's just more
-work :-D
-
-Yours,
-Linus Walleij
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Chas Williams <chas@cmf.nrl.navy.mil>
+Cc: linux-atm-general at lists.sourceforge.net
+Cc: netdev at vger.kernel.org
+---
+diff --git a/drivers/atm/he.c b/drivers/atm/he.c
+index d689126..507362a 100644
+--- a/drivers/atm/he.c
++++ b/drivers/atm/he.c
+@@ -1055,7 +1055,7 @@ static int he_start(struct atm_dev *dev)
+ 	he_writel(he_dev, 0x0, RESET_CNTL);
+ 	he_writel(he_dev, 0xff, RESET_CNTL);
+ 
+-	udelay(16*1000);	/* 16 ms */
++	msleep(16);	/* 16 ms */
+ 	status = he_readl(he_dev, RESET_CNTL);
+ 	if ((status & BOARD_RST_STATUS) == 0) {
+ 		hprintk("reset failed\n");
