@@ -1,80 +1,62 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 30 Apr 2013 02:37:50 +0400
-Subject: [PATCH] ARM: shmobile: BOCK-W: add Ether support
-Message-ID: <201304300237.50896.sergei.shtylyov@cogentembedded.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 29 Apr 2013 15:40:44 -0700
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <2040099.REU8D4ds1g@avalon>
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+ <6607610.omg016OAvj@avalon> <201304300004.20320.arnd@arndb.de>
+ <2040099.REU8D4ds1g@avalon>
+Message-ID: <CAOesGMiCvBwck0Z6Nyo9zW=1=J=wjhJW68qNGMrN_8iim=8Srg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register Ether device from bockw_init(), passing the platform data to it, adding
-only the RMII pin group to bockw_pinctrl_map[].  Although the LINK signal exists
-on the board, it's connected to the link/activity LED  output of the PHY, thus
-the link disappears and reappears after each packet. We'd be better off ignoring
-such signal and getting the link state from the PHY indirectly.
+On Mon, Apr 29, 2013 at 3:23 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Arnd,
+>
+> On Tuesday 30 April 2013 00:04:20 Arnd Bergmann wrote:
+>> On Monday 29 April 2013, Laurent Pinchart wrote:
+>> > On Monday 29 April 2013 23:31:30 Tomasz Figa wrote:
+>> > > Good point. Stephen, would it be a problem to make this a KMS driver
+>> > > instead? Old fbdev API could be emulated on top of it, until it goes out
+>> > > of use, couldn't it?
+>> >
+>> > There's already an fbdev emulation layer in KMS, for such a simple use
+>> > case it will work fine.
+>>
+>> I suggested the same to Stephen when he first brought up this driver.
+>> Unfortunately his attempt to create a simple KMS driver resulted in a
+>> significantly larger driver than the one he did for the framebuffer
+>> interface. This means that either Stephen did something really wrong in his
+>> attempt, or the KMS interface isn't as good as it should be if we want to
+>> move people away from frame buffer drivers.
+>
+> Implementing a KMS driver requires a fair amount of code. The DRM/KMS
+> subsystem provides helpers that significantly reduce the driver size. Those
+> helpers have been designed around common use cases found in existing KMS
+> drivers.
+>
+> I'm pretty sure we will be able to add useful helpers for existing fbdev
+> drivers that will make porting them to KMS pretty easy, but that first
+> requires starting to port drivers to find out what common code could be
+> factored out.
 
-Also, Ether has pin conflict with VIN1, so the latter is not registered when the
-'sh_eth' driver is enabled now.
+Meanwhile this tiny driver will allow us to use hardware that can't
+otherwise be used (because the proper graphics drivers for said
+hardware is _also_ stuck behind large reworks, i.e. common display
+framework, which has uncertain progress at this time).
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+As Stephen mentioned in the original patch, this particular driver is
+very useful for Raspberry Pi. But it is also the best way forward
+(right now) for getting basic upstream usability out of the Samsung
+ARM-based Chromebook. As a matter of fact, as of this weekend
+linux-next boots on that platform with keyboard, trackpad, framebuffer
+and USB2.0 without a single out-of-tree patch. Getting the same
+functionality out of 3.10 would be very desirable.
 
----
-The patch is atop of Simon Horman's 'renesas.git' repo, 'renesas-next-20130426'
-tag and my recent yet unapplied patches.
+So, I clearly understand the desire to move over to a more modern
+framework. At the same time, there's definite value in merging this
+small driver while that's happening. Holding useful code hostage isn't
+always very productive.
 
-Note that it's compile time dependent on the David Miller's 'net-next.git' repo,
-so probably is not fit for immediate applying. One also needs my  yet unmerged
-patch "sh_eth: use random MAC address if no valid one supplied" in order for the
-driver to work:
 
-http://marc.info/?l=linux-sh&m=136726502117160
-
- arch/arm/mach-shmobile/board-bockw.c |   22 +++++++++++++++++++++-
- 1 file changed, 21 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/mach-shmobile/board-bockw.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
-+++ renesas/arch/arm/mach-shmobile/board-bockw.c
-@@ -67,6 +67,20 @@ static struct sh_mobile_sdhi_info sdhi0_
- 
- static struct rcar_phy_platform_data usb_phy_platform_data __initdata;
- 
-+static struct sh_eth_plat_data ether_platform_data __initdata = {
-+	.phy		= 0x01,
-+	.edmac_endian	= EDMAC_LITTLE_ENDIAN,
-+	.register_type	= SH_ETH_REG_FAST_RCAR,
-+	.phy_interface	= PHY_INTERFACE_MODE_RMII,
-+	/*
-+	 * Although the LINK signal is available on the board, it's connected to
-+	 * the link/activity LED output of the PHY, thus the link disappears and
-+	 * reappears after each packet.  We'd be better off ignoring such signal
-+	 * and getting the link state from the PHY indirectly.
-+	 */
-+	.no_ether_link	= 1,
-+};
-+
- static struct rcar_vin_platform_data vin_platform_data __initdata = {
- 	.flags	= RCAR_VIN_BT656,
- };
-@@ -87,6 +101,9 @@ BOCKW_CAMERA(0);
- BOCKW_CAMERA(1);
- 
- static const struct pinctrl_map bockw_pinctrl_map[] = {
-+	/* Ether */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7778",
-+				  "ether_rmii", "ether"),
- 	/* SCIF0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
- 				  "scif0_data_a", "scif0"),
-@@ -125,8 +142,11 @@ static void __init bockw_init(void)
- 	r8a7778_init_irq_extpin(1);
- 	r8a7778_add_standard_devices();
- 	r8a7778_add_usb_phy_device(&usb_phy_platform_data);
-+	r8a7778_add_ether_device(&ether_platform_data);
- 	r8a7778_add_vin_device(0, &vin_platform_data);
--	r8a7778_add_vin_device(1, &vin_platform_data);
-+	/* VIN1 has a pin conflict with Ether */
-+	if (!IS_ENABLED(CONFIG_SH_ETH))
-+		r8a7778_add_vin_device(1, &vin_platform_data);
- 	platform_device_register_data(&platform_bus, "soc-camera-pdrv", 0,
- 				      &iclink0_ml86v7667,
- 				      sizeof(iclink0_ml86v7667));
+-Olof
