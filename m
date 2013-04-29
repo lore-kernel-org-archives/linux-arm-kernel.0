@@ -1,56 +1,40 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 Apr 2013 15:58:37 +0200
-Subject: [PATCH] mxs: icoll: Add function to register an interrupt as FIQ
- source
-Message-ID: <1367243917-5177-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 29 Apr 2013 16:07:18 +0200
+Subject: [PATCH] gpio: mxs: Use set and clear capabilities of the gpio
+ controller
+Message-ID: <1367244438-5322-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MXS, unlike other ARM platforms, has no way to make a FIQ from an
-interrupt from a driver, without poking directly into the icoll.
+The current driver doesn't use the set and clear registers found on the
+mxs gpio controller.
 
-Add an exported function to do this.
+This leads the generic gpio controller to be using some internal value
+to avoid looking up the value stored in the registers, making it behave
+pretty much like a cache.
+
+This raises some coherency problem when a gpio is not modified by the
+gpio controller, while it can easily be fixed by using the set and clear
+registers.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-mxs/icoll.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/gpio/gpio-mxs.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-mxs/icoll.c b/arch/arm/mach-mxs/icoll.c
-index 8fb23af..1bb16da 100644
---- a/arch/arm/mach-mxs/icoll.c
-+++ b/arch/arm/mach-mxs/icoll.c
-@@ -16,6 +16,7 @@
-  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-  */
+diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+index 25000b0..f8e6af2 100644
+--- a/drivers/gpio/gpio-mxs.c
++++ b/drivers/gpio/gpio-mxs.c
+@@ -326,7 +326,8 @@ static int mxs_gpio_probe(struct platform_device *pdev)
  
-+#include <linux/export.h>
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/irq.h>
-@@ -34,6 +35,7 @@
- #define HW_ICOLL_INTERRUPTn_SET(n)		(0x0124 + (n) * 0x10)
- #define HW_ICOLL_INTERRUPTn_CLR(n)		(0x0128 + (n) * 0x10)
- #define BM_ICOLL_INTERRUPTn_ENABLE		0x00000004
-+#define BM_ICOLL_INTERRUPTn_FIQ_ENABLE		0x00000010
- #define BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0	0x1
- 
- #define ICOLL_NUM_IRQS		128
-@@ -41,6 +43,15 @@
- static void __iomem *icoll_base = MXS_IO_ADDRESS(MXS_ICOLL_BASE_ADDR);
- static struct irq_domain *icoll_domain;
- 
-+void mxs_icoll_set_irq_fiq(unsigned int irq)
-+{
-+	struct irq_data *d = irq_get_irq_data(irq);
-+
-+	__raw_writel(BM_ICOLL_INTERRUPTn_FIQ_ENABLE,
-+		     icoll_base + HW_ICOLL_INTERRUPTn_SET(d->hwirq));
-+}
-+EXPORT_SYMBOL(mxs_icoll_set_irq_fiq);
-+
- static void icoll_ack_irq(struct irq_data *d)
- {
- 	/*
+ 	err = bgpio_init(&port->bgc, &pdev->dev, 4,
+ 			 port->base + PINCTRL_DIN(port),
+-			 port->base + PINCTRL_DOUT(port), NULL,
++			 port->base + PINCTRL_DOUT(port) + MXS_SET,
++			 port->base + PINCTRL_DOUT(port) + MXS_CLR,
+ 			 port->base + PINCTRL_DOE(port), NULL, 0);
+ 	if (err)
+ 		goto out_irqdesc_free;
 -- 
 1.8.1.2
