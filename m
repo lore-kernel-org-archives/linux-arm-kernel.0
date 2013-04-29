@@ -1,41 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 29 Apr 2013 15:34:10 +0200
-Subject: [PATCH 21/21] mtd: omap2: allow bulding as a module
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73E9BCFAE@DBDE04.ent.ti.com>
-References: <1366734653-488286-1-git-send-email-arnd@arndb.de>
- <20130423180320.GJ10155@atomide.com>
- <20980858CB6D3A4BAE95CA194937D5E73E9BCFAE@DBDE04.ent.ti.com>
-Message-ID: <201304291534.10539.arnd@arndb.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 29 Apr 2013 15:58:37 +0200
+Subject: [PATCH] mxs: icoll: Add function to register an interrupt as FIQ
+ source
+Message-ID: <1367243917-5177-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 24 April 2013, Gupta, Pekon wrote:
-> [Pekon]: 
-> ELM module is required in for Hardware based ECC correction for 
-> NAND devices. And this driver has a very small foot-print.
-> 
-> The only cases this drives would not be used are:
-> (a) Using S/W based ECC scheme, which have vey high CPU utilization
-> (b) Using single bit ECC scheme, which are becoming obsolete due to
->  increasing NAND densities.
-> For most of the cases ELM module will be used with nand-driver. So
-> there should be no harm in having this module as built-in, if not used
-> in 10% of the use-cases.
-> 
-> Thus I think it's better to keep this module tied to GPMC module, 
-> rather than independent control via KConfig.
-> And user should just selects which ECC scheme he would like to
-> use via DT, without worrying about KConfig options.
+MXS, unlike other ARM platforms, has no way to make a FIQ from an
+interrupt from a driver, without poking directly into the icoll.
 
-Sorry, I'm lost here and have no idea what you are actually suggesting
-we do. Can you phrase that as a patch?
+Add an exported function to do this.
 
-Unless you come up with a better solution, I would still like to queue
-up my patch since it fixes an annoying bug and seems to have no downsides.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/mach-mxs/icoll.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/arch/arm/mach-mxs/icoll.c b/arch/arm/mach-mxs/icoll.c
+index 8fb23af..1bb16da 100644
+--- a/arch/arm/mach-mxs/icoll.c
++++ b/arch/arm/mach-mxs/icoll.c
+@@ -16,6 +16,7 @@
+  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+  */
  
-> I'm working in cleaning up omap2-nand driver to remove some 
-> redundancies. So would like to know your feedback on same..
-
-Sure, just Cc me on your patches.
-
-	Arnd
++#include <linux/export.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/irq.h>
+@@ -34,6 +35,7 @@
+ #define HW_ICOLL_INTERRUPTn_SET(n)		(0x0124 + (n) * 0x10)
+ #define HW_ICOLL_INTERRUPTn_CLR(n)		(0x0128 + (n) * 0x10)
+ #define BM_ICOLL_INTERRUPTn_ENABLE		0x00000004
++#define BM_ICOLL_INTERRUPTn_FIQ_ENABLE		0x00000010
+ #define BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0	0x1
+ 
+ #define ICOLL_NUM_IRQS		128
+@@ -41,6 +43,15 @@
+ static void __iomem *icoll_base = MXS_IO_ADDRESS(MXS_ICOLL_BASE_ADDR);
+ static struct irq_domain *icoll_domain;
+ 
++void mxs_icoll_set_irq_fiq(unsigned int irq)
++{
++	struct irq_data *d = irq_get_irq_data(irq);
++
++	__raw_writel(BM_ICOLL_INTERRUPTn_FIQ_ENABLE,
++		     icoll_base + HW_ICOLL_INTERRUPTn_SET(d->hwirq));
++}
++EXPORT_SYMBOL(mxs_icoll_set_irq_fiq);
++
+ static void icoll_ack_irq(struct irq_data *d)
+ {
+ 	/*
+-- 
+1.8.1.2
