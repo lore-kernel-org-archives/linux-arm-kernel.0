@@ -1,62 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 29 Apr 2013 15:40:44 -0700
-Subject: [PATCH V2] video: implement a simple framebuffer driver
-In-Reply-To: <2040099.REU8D4ds1g@avalon>
-References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
- <6607610.omg016OAvj@avalon> <201304300004.20320.arnd@arndb.de>
- <2040099.REU8D4ds1g@avalon>
-Message-ID: <CAOesGMiCvBwck0Z6Nyo9zW=1=J=wjhJW68qNGMrN_8iim=8Srg@mail.gmail.com>
+From: romieu@fr.zoreil.com (Francois Romieu)
+Date: Tue, 30 Apr 2013 01:04:50 +0200
+Subject: [PATCHv3 3/3] net: velocity: Add platform device support to VIA
+ velocity driver
+In-Reply-To: <1367264772-4557-4-git-send-email-linux@prisktech.co.nz>
+References: <1367264772-4557-1-git-send-email-linux@prisktech.co.nz>
+ <1367264772-4557-4-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20130429230450.GA2620@electric-eye.fr.zoreil.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 29, 2013 at 3:23 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Arnd,
->
-> On Tuesday 30 April 2013 00:04:20 Arnd Bergmann wrote:
->> On Monday 29 April 2013, Laurent Pinchart wrote:
->> > On Monday 29 April 2013 23:31:30 Tomasz Figa wrote:
->> > > Good point. Stephen, would it be a problem to make this a KMS driver
->> > > instead? Old fbdev API could be emulated on top of it, until it goes out
->> > > of use, couldn't it?
->> >
->> > There's already an fbdev emulation layer in KMS, for such a simple use
->> > case it will work fine.
->>
->> I suggested the same to Stephen when he first brought up this driver.
->> Unfortunately his attempt to create a simple KMS driver resulted in a
->> significantly larger driver than the one he did for the framebuffer
->> interface. This means that either Stephen did something really wrong in his
->> attempt, or the KMS interface isn't as good as it should be if we want to
->> move people away from frame buffer drivers.
->
-> Implementing a KMS driver requires a fair amount of code. The DRM/KMS
-> subsystem provides helpers that significantly reduce the driver size. Those
-> helpers have been designed around common use cases found in existing KMS
-> drivers.
->
-> I'm pretty sure we will be able to add useful helpers for existing fbdev
-> drivers that will make porting them to KMS pretty easy, but that first
-> requires starting to port drivers to find out what common code could be
-> factored out.
+Tony Prisk <linux@prisktech.co.nz> :
+[...]
+> +static int velocity_remove(void *pdev, enum velocity_bus_type bustype)
+> +{
+> +	struct net_device *netdev;
+> +	struct velocity_info *vptr;
+> +	int pci = (bustype == BUS_PCI) ? 1 : 0;
+> +
+> +	if (pci)
+> +		netdev = pci_get_drvdata(pdev);
+> +	else
+> +		netdev = platform_get_drvdata(pdev);
 
-Meanwhile this tiny driver will allow us to use hardware that can't
-otherwise be used (because the proper graphics drivers for said
-hardware is _also_ stuck behind large reworks, i.e. common display
-framework, which has uncertain progress at this time).
+The caller knows how to retrieve the net_device pointer, whence
+the struct velocity_info pointer, whence any bustype dependent
+function pointer to alleviate the "if (pci)" and CONFIG stuff.
 
-As Stephen mentioned in the original patch, this particular driver is
-very useful for Raspberry Pi. But it is also the best way forward
-(right now) for getting basic upstream usability out of the Samsung
-ARM-based Chromebook. As a matter of fact, as of this weekend
-linux-next boots on that platform with keyboard, trackpad, framebuffer
-and USB2.0 without a single out-of-tree patch. Getting the same
-functionality out of 3.10 would be very desirable.
+If you are not convinced, please consider turning the void *
+into an union *.
 
-So, I clearly understand the desire to move over to a more modern
-framework. At the same time, there's definite value in merging this
-small driver while that's happening. Holding useful code hostage isn't
-always very productive.
-
-
--Olof
+-- 
+Ueimor
