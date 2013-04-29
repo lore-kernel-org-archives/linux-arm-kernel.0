@@ -1,58 +1,62 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 29 Apr 2013 11:30:03 +0100
-Subject: [PATCH v9 1/2] arm: introduce psci_smp_ops
-In-Reply-To: <20130429085916.GB8805@mudshark.cambridge.arm.com>
-References: <alpine.DEB.2.02.1304281544240.5398@kaball.uk.xensource.com>
- <1367160650-4888-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130429085916.GB8805@mudshark.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1304291126210.5398@kaball.uk.xensource.com>
+From: inderpal.singh@linaro.org (Inderpal Singh)
+Date: Mon, 29 Apr 2013 17:01:47 +0530
+Subject: [PATCH] ARM: EXYNOS5: Fix kernel dump in AFTR idle mode
+Message-ID: <1367235107-31328-1-git-send-email-inderpal.singh@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-are you OK with this series now?
+The kernel crashes while resuming from AFTR idle mode. It happens
+because L2 cache was not going into retention state.
 
-Olof, Arnd,
-when you merge this series don't forget to include this fix from Stephen
-Rothwell:
+This patch configures the USE_RETENTION bit of ARM_L2_OPTION register
+so that it does not depend on MANUAL_L2RSTDISABLE_CONTROL of
+ARM_COMMON_OPTION register for L2RSTDISABLE signal.
 
-http://marc.info/?l=linux-arm-kernel&m=136722292031420&w=2
+Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
+---
 
+Tested on arndale board on arm-soc next/soc branch.
 
-On Mon, 29 Apr 2013, Will Deacon wrote:
-> On Sun, Apr 28, 2013 at 03:50:49PM +0100, Stefano Stabellini wrote:
-> > Rename virt_smp_ops to psci_smp_ops and move them to arch/arm/kernel/psci_smp.c.
-> > Remove mach-virt/platsmp.c, now unused.
-> > Compile psci_smp if CONFIG_ARM_PSCI and CONFIG_SMP.
-> > 
-> > Add a cpu_die smp_op based on psci_ops.cpu_off.
-> > 
-> > Initialize PSCI before setting smp_ops in setup_arch.
-> > 
-> > If PSCI is available on the platform, prefer psci_smp_ops over the
-> > platform smp_ops.
-> > 
-> > Changes in v9:
-> > - move comment about PSCI interface from psci.h to psci_smp.c.
-> > 
-> > Changes in v8:
-> > - merge "prefer psci_smp_ops over mdesc->smp" into this patch.
-> > 
-> > Changes in v6:
-> > - fixed return values for psci_smp_available and psci_init ifndef
-> > CONFIG_ARM_PSCI.
-> > 
-> > Changes in v5:
-> > - document psci_operations;
-> > - psci_init returns NULL.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > CC: Nicolas Pitre <nico@linaro.org>
-> > CC: Rob Herring <rob.herring@calxeda.com>
-> > CC: Will Deacon <will.deacon@arm.com>
-> > CC: arnd at arndb.de
-> > CC: marc.zyngier at arm.com
-> > CC: linux at arm.linux.org.uk
-> 
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
+ arch/arm/mach-exynos/include/mach/regs-pmu.h |    1 +
+ arch/arm/mach-exynos/pmu.c                   |    5 ++---
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+index 3f30aa1..57344b7 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
++++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+@@ -344,6 +344,7 @@
+ #define EXYNOS5_FSYS_ARM_OPTION					S5P_PMUREG(0x2208)
+ #define EXYNOS5_ISP_ARM_OPTION					S5P_PMUREG(0x2288)
+ #define EXYNOS5_ARM_COMMON_OPTION				S5P_PMUREG(0x2408)
++#define EXYNOS5_ARM_L2_OPTION					S5P_PMUREG(0x2608)
+ #define EXYNOS5_TOP_PWR_OPTION					S5P_PMUREG(0x2C48)
+ #define EXYNOS5_TOP_PWR_SYSMEM_OPTION				S5P_PMUREG(0x2CC8)
+ #define EXYNOS5_JPEG_MEM_OPTION					S5P_PMUREG(0x2F48)
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index daebc1a..97d6885 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -228,6 +228,7 @@ static struct exynos_pmu_conf exynos5250_pmu_config[] = {
+ 	{ EXYNOS5_DIS_IRQ_ISP_ARM_CENTRAL_SYS_PWR_REG,	{ 0x0, 0x0, 0x0} },
+ 	{ EXYNOS5_ARM_COMMON_SYS_PWR_REG,		{ 0x0, 0x0, 0x2} },
+ 	{ EXYNOS5_ARM_L2_SYS_PWR_REG,			{ 0x3, 0x3, 0x3} },
++	{ EXYNOS5_ARM_L2_OPTION,			{ 0x10, 0x10, 0x0 } },
+ 	{ EXYNOS5_CMU_ACLKSTOP_SYS_PWR_REG,		{ 0x1, 0x0, 0x1} },
+ 	{ EXYNOS5_CMU_SCLKSTOP_SYS_PWR_REG,		{ 0x1, 0x0, 0x1} },
+ 	{ EXYNOS5_CMU_RESET_SYS_PWR_REG,		{ 0x1, 0x1, 0x0} },
+@@ -353,11 +354,9 @@ static void exynos5_init_pmu(void)
+ 
+ 	/*
+ 	 * SKIP_DEACTIVATE_ACEACP_IN_PWDN_BITFIELD Enable
+-	 * MANUAL_L2RSTDISABLE_CONTROL_BITFIELD Enable
+ 	 */
+ 	tmp = __raw_readl(EXYNOS5_ARM_COMMON_OPTION);
+-	tmp |= (EXYNOS5_MANUAL_L2RSTDISABLE_CONTROL |
+-		EXYNOS5_SKIP_DEACTIVATE_ACEACP_IN_PWDN);
++	tmp |= EXYNOS5_SKIP_DEACTIVATE_ACEACP_IN_PWDN;
+ 	__raw_writel(tmp, EXYNOS5_ARM_COMMON_OPTION);
+ 
+ 	/*
+-- 
+1.7.9.5
