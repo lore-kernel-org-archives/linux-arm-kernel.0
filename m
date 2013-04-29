@@ -1,52 +1,76 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Mon, 29 Apr 2013 09:37:30 +0530
-Subject: [GIT PULL] mailbox driver framework for v3.10 merge window
-In-Reply-To: <201304091255.03020.arnd@arndb.de>
-References: <37C860A02101E749A747FA2D3C1E3C504A1971@DLEE11.ent.ti.com>
- <201304091255.03020.arnd@arndb.de>
-Message-ID: <CAJe_Zhf5QwQQU5aVtNhbDT3EK9Dof-ZK_boP9WaNghqO8xY7iA@mail.gmail.com>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Sun, 28 Apr 2013 22:29:07 -0700
+Subject: [GIT PULL] KVM/ARM Changes for 3.10
+Message-ID: <CAEDV+gKXcCb11p5YCQRbQ1OwGefxYUr0sh8f4AOfxQSPPo2LMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
+Hi Marcelo and Gleb,
 
-On 9 April 2013 16:25, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 04 April 2013, Anna, Suman wrote:
->> OMAP and ST-Ericsson platforms are both using mailbox to communicate with some coprocessors. This series creates a consolidated framework, living under drivers/mailbox.
->> The changes mainly contain:
->> - create a mailbox framework independent from OMAP h/w
->> - creates dbx500 mailbox driver for ST-Ericsson platforms
->> - move the omap mailbox out of plat-omap/mach-omapX  adapting to the new framework.
->> - minor bug fixes in mailbox code
->
-> Pulled into a new next/mailbox branch, to keep it separate from the
-> existing subsystems.
->
-I am going to be a heavy user of the Mailbox API. And I have reviewed
-this API quite in detail. I pointed out many aspects that might have
-worked for TI's usage but are not going to be work on many platforms
-(including one of mine).  Suman and Loic also acknowledged most (if
-not all) from 'generic' POV.  Here is the thread ...
-   http://www.spinics.net/lists/arm-kernel/msg239433.html
+These are the changes for KVM/ARM for 3.10.
 
-Not to mean only talk and no do, I prepared another proposal that
-addressed all the concerns shared so far in the RFC
-http://www.spinics.net/lists/kernel/msg1523873.html (its not ready for
-primetime yet)  And also converted the PL320 driver to the new API,
-unlike the pulled patchset which leaves that out in the cold.
-http://www.spinics.net/lists/kernel/msg1523874.html
+The patches depend on the cleanup branch, which you've already merged.
 
-Now, we could either call it (effectively the TI's framework with
-quirks for STE) as the "Common API" and then dismantle and convert it
-patch by patch (authors and I seem to agree many things need to be
-changed and implemented).
-  OR we do it reasonably right the first time even if that means yet
-another release. IMHO we should go for slow but steady thing.
+Main thing is the reworking of Hyp idmaps, which is now handled by KVM
+instead of arm/mm and includes several nasty bug fixes from Marc in
+the progress.
 
-Hi Suman, Hi Loic,
-   Please feel free to object to anything you think I might have
-misrepresented. I am OK if you are not sure about my implementation
-either - we could co-work on a new one.
+Thanks!
 
-Regards,
--Jassi
+The following changes since commit 5a2892ce72e010e3cb96b438d7cdddce0c88e0e6:
+
+  KVM: nVMX: Skip PF interception check when queuing during nested run
+(2013-04-28 13:34:39 +0300)
+
+are available in the git repository at:
+
+  git://github.com/columbia/linux-kvm-arm.git kvm-arm-for-3.10
+
+for you to fetch changes up to d4e071ce6acf8d5eddb7615a953193a8b0ad7c38:
+
+  ARM: KVM: iterate over all CPUs for CPU compatibility check
+(2013-04-28 22:23:23 -0700)
+
+----------------------------------------------------------------
+Andre Przywara (1):
+      ARM: KVM: iterate over all CPUs for CPU compatibility check
+
+Arnd Bergmann (1):
+      ARM: KVM: define KVM_ARM_MAX_VCPUS unconditionally
+
+Christoffer Dall (2):
+      KVM: ARM: Fix API documentation for ONE_REG encoding
+      KVM: ARM: Fix spelling in error message
+
+Marc Zyngier (10):
+      ARM: KVM: add support for minimal host vs guest profiling
+      ARM: KVM: simplify HYP mapping population
+      ARM: KVM: fix HYP mapping limitations around zero
+      ARM: KVM: move to a KVM provided HYP idmap
+      ARM: KVM: enforce maximum size for identity mapped code
+      ARM: KVM: rework HYP page table freeing
+      ARM: KVM: switch to a dual-step HYP init code
+      ARM: KVM: perform HYP initilization for hotplugged CPUs
+      ARM: KVM: add architecture specific hook for capabilities
+      ARM: KVM: promote vfp_host pointer to generic host cpu context
+
+Mark Rutland (1):
+      ARM: KVM: arch_timer: use symbolic constants
+
+ Documentation/virtual/kvm/api.txt |   12 +-
+ arch/arm/include/asm/idmap.h      |    1 -
+ arch/arm/include/asm/kvm_host.h   |   47 ++--
+ arch/arm/include/asm/kvm_mmu.h    |   28 ++-
+ arch/arm/kernel/asm-offsets.c     |    2 +-
+ arch/arm/kernel/vmlinux.lds.S     |    7 +-
+ arch/arm/kvm/Kconfig              |    6 +-
+ arch/arm/kvm/Makefile             |    2 +-
+ arch/arm/kvm/arch_timer.c         |    7 +-
+ arch/arm/kvm/arm.c                |  111 +++++----
+ arch/arm/kvm/handle_exit.c        |    2 +-
+ arch/arm/kvm/init.S               |   78 +++++--
+ arch/arm/kvm/mmu.c                |  455 +++++++++++++++++++++----------------
+ arch/arm/kvm/perf.c               |   68 ++++++
+ arch/arm/mm/idmap.c               |   32 +--
+ 15 files changed, 532 insertions(+), 326 deletions(-)
+ create mode 100644 arch/arm/kvm/perf.c
