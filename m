@@ -1,67 +1,40 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 29 Apr 2013 23:40:57 +0200
-Subject: [PATCH V2] video: implement a simple framebuffer driver
-In-Reply-To: <1556968.7tR6KuEIWb@flatron>
-References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
- <1461633.kfcPFxva7x@avalon> <1556968.7tR6KuEIWb@flatron>
-Message-ID: <6607610.omg016OAvj@avalon>
+From: gotom@sanori.org (Masanori Goto)
+Date: Tue, 30 Apr 2013 06:41:38 +0900
+Subject: [PATCH 10/21] [SCSI] nsp32: use mdelay instead of large udelay
+ constants
+In-Reply-To: <201304291521.14195.arnd@arndb.de>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <1366910944-3033663-11-git-send-email-arnd@arndb.de>
+ <CALZLnaFeLcaGM7_McTZ=pKBRnpXk0AvqOTF=1YCqJv-53yk4XQ@mail.gmail.com>
+ <201304291521.14195.arnd@arndb.de>
+Message-ID: <CALZLnaEbXRJY2qntWucm00mNq78CRD8Vhp7KoTw6Me0frxtaDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 29 April 2013 23:31:30 Tomasz Figa wrote:
-> On Monday 29 of April 2013 23:20:43 Laurent Pinchart wrote:
-> > On Monday 29 April 2013 23:15:13 Tomasz Figa wrote:
-> > > On Thursday 11 of April 2013 11:56:31 Laurent Pinchart wrote:
-> > > > On Monday 08 April 2013 17:16:37 Andrew Morton wrote:
-> > > > > On Wed,  3 Apr 2013 20:39:43 -0600 Stephen Warren wrote:
-> > > > > > A simple frame-buffer describes a raw memory region that may be
-> > > > > > rendered to, with the assumption that the display hardware has
-> > > > > > already been set up to scan out from that buffer.
-> > > > > > 
-> > > > > > This is useful in cases where a bootloader exists and has set up
-> > > > > > the display hardware, but a Linux driver doesn't yet exist for the
-> > > > > > display hardware.
-> > > > > > 
-> > > > > > ...
-> > > > > > 
-> > > > > > +config FB_SIMPLE
-> > > > > > +	bool "Simple framebuffer support"
-> > > > > > +	depends on (FB = y) && OF
-> > > > > 
-> > > > > It's sad that this simple little thing requires Open Firmware.
-> > > > > Could it be generalised in some way so that the small amount of
-> > > > > setup info could be provided by other means (eg, module_param) or
-> > > > > does the dependency go deeper than that?
-> > > > 
-> > > > I second that request. I like the idea of a simple framebuffer
-> > > > driver if it helps deprecating fbdev in the long term, but I don't
-> > > > want it to offer an excuse not to implement a DRM/KMS driver. In
-> > > > particular adding DT bindings would force us to keep supporting the
-> > > > ABI for a (too) long time.
-> > > 
-> > > Well, there is also at least one legitimate use case for this driver.
-> > > 
-> > > I believe there exist embedded devices on which there is no need to
-> > > dynamically control the framebuffer. It needs one time initialization,
-> > > usually in bootloader, and then it is used as is, using constant
-> > > parameters as long as the system is running.
-> > > 
-> > > I doubt there is a need for any KMS (or any other control) driver for
-> > > such devices - dumb framebuffer driver would be everything needed in
-> > > such case.
-> > 
-> > As we want to deprecate the fbdev API we would need to move to KMS at
-> > some point anyway, even if the device can't be controlled. I don't
-> > think writting such a KMS driver would be that difficult.
-> 
-> Good point. Stephen, would it be a problem to make this a KMS driver
-> instead? Old fbdev API could be emulated on top of it, until it goes out
-> of use, couldn't it?
+Oops, you're absolutely correct.  Thanks for the follow up!  Please
+change it as follow as you mentioned:
 
-There's already an fbdev emulation layer in KMS, for such a simple use case it 
-will work fine.
+Acked-by: GOTO Masanori <gotom@debian.or.jp>
 
--- 
-Regards,
+Best regrads,
+-- gotom
 
-Laurent Pinchart
+2013/4/29 Arnd Bergmann <arnd@arndb.de>:
+> On Friday 26 April 2013, Masanori Goto wrote:
+>> 2013/4/25 Arnd Bergmann <arnd@arndb.de>
+>> >
+>> > ARM cannot handle udelay for more than 2 miliseconds, so we
+>> > should use mdelay instead for those.
+>> >
+>>
+>> Singed-off-by: GOTO Masanori <gotom@debian.or.jp>
+>
+> Thanks. I assume you mean "Acked-by", not "Singed-off" as in "burnt"
+> or "Signed-off" as a notification that you have applied it to your
+> own git tree.
+>
+> I'll keep the patch with an your "Acked-by" line in my tree unless
+> James wants to apply to the scsi tree.
+>
+>         Arnd
+>
