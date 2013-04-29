@@ -1,71 +1,147 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 29 Apr 2013 10:50:22 +0100
-Subject: linux-next: manual merge of the arm-soc tree with the xen-arm tree
-In-Reply-To: <20130429082511.GA539@arm.com>
-References: <20130429175426.9423279609437a2d746cbb7b@canb.auug.org.au>
- <20130429082511.GA539@arm.com>
-Message-ID: <alpine.DEB.2.02.1304291049060.5398@kaball.uk.xensource.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 29 Apr 2013 11:54:46 +0200
+Subject: [RFC PATCH v3 05/17] ARM: dts: at91: cpus/cpu node dts updates
+In-Reply-To: <1366824502-19729-6-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366824502-19729-6-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <517E4366.4040209@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Apr 2013, Catalin Marinas wrote:
-> Stephen,
+On 04/24/2013 07:28 PM, Lorenzo Pieralisi :
+> This patch updates the in-kernel dts files according to the latest cpus
+> and cpu bindings updates for ARM.
 > 
-> On Mon, Apr 29, 2013 at 08:54:26AM +0100, Stephen Rothwell wrote:
-> > Today's linux-next merge of the arm-soc tree got a conflict in
-> > arch/arm/mach-virt/platsmp.c between commit fe4bff02886b ("arm: introduce
-> > psci_smp_ops") from the xen-arm tree and commit c0114709ed85 ("irqchip:
-> > gic: Perform the gic_secondary_init() call via CPU notifier") from the
-> > arm-soc tree.
-> > 
-> > The former renamed the file (and contents) so I applied the following
-> > patch and can carry the fix as necessary (no action is required).
-> > 
-> > From: Stephen Rothwell <sfr@canb.auug.org.au>
-> > Date: Mon, 29 Apr 2013 17:52:27 +1000
-> > Subject: [PATCH] arm: fix for Perform the gic_secondary_init() call via CPU
-> >  notifier
-> > 
-> > due to code movement.
-> > 
-> > Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
-> > ---
-> >  arch/arm/kernel/psci_smp.c | 7 -------
-> >  1 file changed, 7 deletions(-)
-> > 
-> > diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-> > index 6ef139d..cd9acc7 100644
-> > --- a/arch/arm/kernel/psci_smp.c
-> > +++ b/arch/arm/kernel/psci_smp.c
-> > @@ -14,7 +14,6 @@
-> >   */
-> >  
-> >  #include <linux/init.h>
-> > -#include <linux/irqchip/arm-gic.h>
-> >  #include <linux/smp.h>
-> >  #include <linux/of.h>
-> >  
-> > @@ -55,11 +54,6 @@ static int __cpuinit psci_boot_secondary(unsigned int cpu,
-> >  	return -ENODEV;
-> >  }
-> >  
-> > -static void __cpuinit psci_secondary_init(unsigned int cpu)
-> > -{
-> > -	gic_secondary_init(0);
-> > -}
-> > -
-> >  #ifdef CONFIG_HOTPLUG_CPU
-> >  void __ref psci_cpu_die(unsigned int cpu)
-> >  {
-> > @@ -84,7 +78,6 @@ bool __init psci_smp_available(void)
-> >  }
-> >  
-> >  struct smp_operations __initdata psci_smp_ops = {
-> > -	.smp_secondary_init	= psci_secondary_init,
-> >  	.smp_boot_secondary	= psci_boot_secondary,
-> >  	.cpu_die		= psci_cpu_die,
-> >  };
-> 
-> The fix looks fine. Thanks.
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Indeed, thanks! I'll add to it to the tree.
+With changes in compatible string... ok then.
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+> ---
+>  arch/arm/boot/dts/at91rm9200.dtsi  | 6 +++++-
+>  arch/arm/boot/dts/at91sam9260.dtsi | 8 ++++++--
+>  arch/arm/boot/dts/at91sam9263.dtsi | 8 ++++++--
+>  arch/arm/boot/dts/at91sam9g45.dtsi | 8 ++++++--
+>  arch/arm/boot/dts/at91sam9n12.dtsi | 8 ++++++--
+>  arch/arm/boot/dts/at91sam9x5.dtsi  | 8 ++++++--
+>  6 files changed, 35 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+> index b0268a5..f16b3d4 100644
+> --- a/arch/arm/boot/dts/at91rm9200.dtsi
+> +++ b/arch/arm/boot/dts/at91rm9200.dtsi
+> @@ -34,8 +34,12 @@
+>  		ssc2 = &ssc2;
+>  	};
+>  	cpus {
+> -		cpu at 0 {
+> +		#address-cells = <0>;
+> +		#size-cells = <0>;
+> +
+> +		cpu {
+>  			compatible = "arm,arm920t";
+> +			device_type = "cpu";
+>  		};
+>  	};
+>  
+> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> index cb7bcc5..c4eeef7 100644
+> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> @@ -32,8 +32,12 @@
+>  		ssc0 = &ssc0;
+>  	};
+>  	cpus {
+> -		cpu at 0 {
+> -			compatible = "arm,arm926ejs";
+> +		#address-cells = <0>;
+> +		#size-cells = <0>;
+> +
+> +		cpu {
+> +			compatible = "arm,arm926ej-s";
+> +			device_type = "cpu";
+>  		};
+>  	};
+>  
+> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+> index 271d4de..f3b5c2a 100644
+> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+> @@ -29,8 +29,12 @@
+>  		ssc1 = &ssc1;
+>  	};
+>  	cpus {
+> -		cpu at 0 {
+> -			compatible = "arm,arm926ejs";
+> +		#address-cells = <0>;
+> +		#size-cells = <0>;
+> +
+> +		cpu {
+> +			compatible = "arm,arm926ej-s";
+> +			device_type = "cpu";
+>  		};
+>  	};
+>  
+> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> index 6b1d4ca..6c18bd3 100644
+> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> @@ -35,8 +35,12 @@
+>  		ssc1 = &ssc1;
+>  	};
+>  	cpus {
+> -		cpu at 0 {
+> -			compatible = "arm,arm926ejs";
+> +		#address-cells = <0>;
+> +		#size-cells = <0>;
+> +
+> +		cpu {
+> +			compatible = "arm,arm926ej-s";
+> +			device_type = "cpu";
+>  		};
+>  	};
+>  
+> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+> index 7750f98..c3b11af 100644
+> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+> @@ -31,8 +31,12 @@
+>  		ssc0 = &ssc0;
+>  	};
+>  	cpus {
+> -		cpu at 0 {
+> -			compatible = "arm,arm926ejs";
+> +		#address-cells = <0>;
+> +		#size-cells = <0>;
+> +
+> +		cpu {
+> +			compatible = "arm,arm926ej-s";
+> +			device_type = "cpu";
+>  		};
+>  	};
+>  
+> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> index aa98e64..6c39d0f 100644
+> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> @@ -33,8 +33,12 @@
+>  		ssc0 = &ssc0;
+>  	};
+>  	cpus {
+> -		cpu at 0 {
+> -			compatible = "arm,arm926ejs";
+> +		#address-cells = <0>;
+> +		#size-cells = <0>;
+> +
+> +		cpu {
+> +			compatible = "arm,arm926ej-s";
+> +			device_type = "cpu";
+>  		};
+>  	};
+>  
+> 
+
+
+-- 
+Nicolas Ferre
