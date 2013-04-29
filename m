@@ -1,133 +1,140 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 29 Apr 2013 15:33:32 +0530
-Subject: [PATCH v6 9/9] usb: phy: twl4030-usb: remove *set_suspend* and
- *phy_init* ops
+Date: Mon, 29 Apr 2013 15:33:30 +0530
+Subject: [PATCH v6 7/9] usb: musb: omap2430: use the new generic PHY framework
 In-Reply-To: <1367229812-30574-1-git-send-email-kishon@ti.com>
 References: <1367229812-30574-1-git-send-email-kishon@ti.com>
-Message-ID: <1367229812-30574-10-git-send-email-kishon@ti.com>
+Message-ID: <1367229812-30574-8-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that twl4030-usb is adapted to the new generic PHY framework,
-*set_suspend* and *phy_init* ops can be removed from twl4030-usb driver.
+Use the generic PHY framework API to get the PHY. The usb_phy_set_resume
+and usb_phy_set_suspend is replaced with power_on/get_sync and
+power_off/put_sync to align with the new PHY framework.
+
+musb->xceiv can't be removed as of now because musb core uses xceiv.state and
+xceiv.otg. Once there is a separate state machine to handle otg, these can be
+moved out of xceiv and then we can start using the generic PHY framework.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/usb/phy/phy-twl4030-usb.c |   55 ++++++++-----------------------------
- 1 file changed, 12 insertions(+), 43 deletions(-)
+ drivers/usb/musb/musb_core.c |    1 +
+ drivers/usb/musb/musb_core.h |    3 +++
+ drivers/usb/musb/omap2430.c  |   29 +++++++++++++++++++++--------
+ 3 files changed, 25 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/usb/phy/phy-twl4030-usb.c b/drivers/usb/phy/phy-twl4030-usb.c
-index dacbeb1..c7a2e3b 100644
---- a/drivers/usb/phy/phy-twl4030-usb.c
-+++ b/drivers/usb/phy/phy-twl4030-usb.c
-@@ -422,25 +422,20 @@ static void twl4030_phy_power(struct twl4030_usb *twl, int on)
- 	}
- }
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+index 37a261a..2162148 100644
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -1864,6 +1864,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
+ 	musb->board_set_power = plat->set_power;
+ 	musb->min_power = plat->min_power;
+ 	musb->ops = plat->platform_ops;
++	musb->phy_dev_name = plat->phy_dev_name;
  
--static void twl4030_phy_suspend(struct twl4030_usb *twl, int controller_off)
-+static int twl4030_phy_power_off(struct phy *phy)
- {
-+	struct twl4030_usb *twl = dev_get_drvdata(&phy->dev);
+ 	/* The musb_platform_init() call:
+ 	 *   - adjusts musb->mregs
+diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+index 7fb4819..09ac74c 100644
+--- a/drivers/usb/musb/musb_core.h
++++ b/drivers/usb/musb/musb_core.h
+@@ -46,6 +46,7 @@
+ #include <linux/usb.h>
+ #include <linux/usb/otg.h>
+ #include <linux/usb/musb.h>
++#include <linux/phy/phy.h>
+ 
+ struct musb;
+ struct musb_hw_ep;
+@@ -357,6 +358,7 @@ struct musb {
+ 	u16			int_tx;
+ 
+ 	struct usb_phy		*xceiv;
++	struct phy		*phy;
+ 
+ 	int nIrq;
+ 	unsigned		irq_wake:1;
+@@ -434,6 +436,7 @@ struct musb {
+ 	unsigned                double_buffer_not_ok:1;
+ 
+ 	struct musb_hdrc_config	*config;
++	const char		*phy_dev_name;
+ 
+ #ifdef MUSB_CONFIG_PROC_FS
+ 	struct proc_dir_entry *proc_entry;
+diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+index 3551f1a..56ffe5f 100644
+--- a/drivers/usb/musb/omap2430.c
++++ b/drivers/usb/musb/omap2430.c
+@@ -348,14 +348,24 @@ static int omap2430_musb_init(struct musb *musb)
+ 	 * up through ULPI.  TWL4030-family PMICs include one,
+ 	 * which needs a driver, drivers aren't always needed.
+ 	 */
+-	if (dev->parent->of_node)
++	if (dev->parent->of_node) {
++		musb->phy = devm_phy_get(dev->parent, "usb2-phy");
 +
- 	if (twl->asleep)
--		return;
-+		return 0;
- 
- 	twl4030_phy_power(twl, 0);
- 	twl->asleep = 1;
- 	dev_dbg(twl->dev, "%s\n", __func__);
--}
--
--static int twl4030_phy_power_off(struct phy *phy)
--{
--	struct twl4030_usb *twl = dev_get_drvdata(&phy->dev);
--
--	twl4030_phy_suspend(twl, 0);
- 	return 0;
- }
- 
--static void __twl4030_phy_resume(struct twl4030_usb *twl)
-+static void __twl4030_phy_power_on(struct twl4030_usb *twl)
- {
- 	twl4030_phy_power(twl, 1);
- 	twl4030_i2c_access(twl, 1);
-@@ -449,11 +444,13 @@ static void __twl4030_phy_resume(struct twl4030_usb *twl)
- 		twl4030_i2c_access(twl, 0);
- }
- 
--static void twl4030_phy_resume(struct twl4030_usb *twl)
-+static int twl4030_phy_power_on(struct phy *phy)
- {
-+	struct twl4030_usb *twl = dev_get_drvdata(&phy->dev);
-+
- 	if (!twl->asleep)
--		return;
--	__twl4030_phy_resume(twl);
-+		return 0;
-+	__twl4030_phy_power_on(twl);
- 	twl->asleep = 0;
- 	dev_dbg(twl->dev, "%s\n", __func__);
- 
-@@ -466,13 +463,6 @@ static void twl4030_phy_resume(struct twl4030_usb *twl)
- 		cancel_delayed_work(&twl->id_workaround_work);
- 		schedule_delayed_work(&twl->id_workaround_work, HZ);
- 	}
--}
--
--static int twl4030_phy_power_on(struct phy *phy)
--{
--	struct twl4030_usb *twl = dev_get_drvdata(&phy->dev);
--
--	twl4030_phy_resume(twl);
- 	return 0;
- }
- 
-@@ -604,9 +594,9 @@ static void twl4030_id_workaround_work(struct work_struct *work)
- 	}
- }
- 
--static int twl4030_usb_phy_init(struct usb_phy *phy)
-+static int twl4030_phy_init(struct phy *phy)
- {
--	struct twl4030_usb *twl = phy_to_twl(phy);
-+	struct twl4030_usb *twl = dev_get_drvdata(&phy->dev);
- 	enum omap_musb_vbus_id_status status;
- 
- 	/*
-@@ -626,25 +616,6 @@ static int twl4030_usb_phy_init(struct usb_phy *phy)
- 	return 0;
- }
- 
--static int twl4030_phy_init(struct phy *phy)
--{
--	struct twl4030_usb *twl = dev_get_drvdata(&phy->dev);
--
--	return twl4030_usb_phy_init(&twl->phy);
--}
--
--static int twl4030_set_suspend(struct usb_phy *x, int suspend)
--{
--	struct twl4030_usb *twl = phy_to_twl(x);
--
--	if (suspend)
--		twl4030_phy_suspend(twl, 1);
++		/* We can't totally remove musb->xceiv as of now because
++		 * musb core uses xceiv.state and xceiv.otg. Once we have
++		 * a separate state machine to handle otg, these can be moved
++		 * out of xceiv and then we can start using the generic PHY
++		 * framework
++		 */
+ 		musb->xceiv = devm_usb_get_phy_by_phandle(dev->parent,
+ 		    "usb-phy", 0);
 -	else
--		twl4030_phy_resume(twl);
--
--	return 0;
--}
--
- static int twl4030_set_peripheral(struct usb_otg *otg,
- 					struct usb_gadget *gadget)
- {
-@@ -715,8 +686,6 @@ static int twl4030_usb_probe(struct platform_device *pdev)
- 	twl->phy.label		= "twl4030";
- 	twl->phy.otg		= otg;
- 	twl->phy.type		= USB_PHY_TYPE_USB2;
--	twl->phy.set_suspend	= twl4030_set_suspend;
--	twl->phy.init		= twl4030_usb_phy_init;
++	} else {
+ 		musb->xceiv = devm_usb_get_phy_dev(dev, 0);
++		musb->phy = devm_phy_get(dev, musb->phy_dev_name);
++	}
  
- 	otg->phy		= &twl->phy;
- 	otg->set_host		= twl4030_set_host;
+-	if (IS_ERR(musb->xceiv)) {
+-		status = PTR_ERR(musb->xceiv);
++	if (IS_ERR(musb->xceiv) || IS_ERR(musb->phy)) {
++		status = PTR_ERR(musb->xceiv) | PTR_ERR(musb->phy);
+ 
+ 		if (status == -ENXIO)
+ 			return status;
+@@ -397,9 +407,10 @@ static int omap2430_musb_init(struct musb *musb)
+ 	if (glue->status != OMAP_MUSB_UNKNOWN)
+ 		omap_musb_set_mailbox(glue);
+ 
+-	usb_phy_init(musb->xceiv);
++	phy_init(musb->phy);
+ 
+ 	pm_runtime_put_noidle(musb->controller);
++	phy_pm_runtime_put(musb->phy);
+ 	return 0;
+ 
+ err1:
+@@ -460,6 +471,7 @@ static int omap2430_musb_exit(struct musb *musb)
+ 	del_timer_sync(&musb_idle_timer);
+ 
+ 	omap2430_low_level_exit(musb);
++	phy_exit(musb->phy);
+ 
+ 	return 0;
+ }
+@@ -618,7 +630,8 @@ static int omap2430_runtime_suspend(struct device *dev)
+ 				OTG_INTERFSEL);
+ 
+ 		omap2430_low_level_exit(musb);
+-		usb_phy_set_suspend(musb->xceiv, 1);
++		phy_power_off(musb->phy);
++		phy_pm_runtime_put(musb->phy);
+ 	}
+ 
+ 	return 0;
+@@ -633,8 +646,8 @@ static int omap2430_runtime_resume(struct device *dev)
+ 		omap2430_low_level_init(musb);
+ 		musb_writel(musb->mregs, OTG_INTERFSEL,
+ 				musb->context.otg_interfsel);
+-
+-		usb_phy_set_suspend(musb->xceiv, 0);
++		phy_pm_runtime_get_sync(musb->phy);
++		phy_power_on(musb->phy);
+ 	}
+ 
+ 	return 0;
 -- 
 1.7.10.4
