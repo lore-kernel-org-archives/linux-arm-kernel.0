@@ -1,56 +1,35 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 29 Apr 2013 14:14:55 +0200
-Subject: [PATCH V2 03/12] PM / Domains: Add on-off notifiers
-In-Reply-To: <51767DE2.7050203@stericsson.com>
-References: <1364487098-10319-1-git-send-email-rickard.andersson@stericsson.com>
- <1364487098-10319-4-git-send-email-rickard.andersson@stericsson.com>
- <3261022.s2M99fPNjC@vostro.rjw.lan>
- <51767DE2.7050203@stericsson.com>
-Message-ID: <CACRpkdb+JrnrQgzZ5xdtFDubexNRm2WsrLXv+5zfjN1wdowaNg@mail.gmail.com>
+Date: Mon, 29 Apr 2013 14:21:15 +0200
+Subject: Adding a void * to pinctrl_pin_desc
+In-Reply-To: <051069C10411E24D9749790C498526FA1BCF54B1@SJEXCHMB12.corp.ad.broadcom.com>
+References: <051069C10411E24D9749790C498526FA1BCF4FC6@SJEXCHMB12.corp.ad.broadcom.com>
+ <CACRpkdYxJOWYMfwmrEGhqgjushVjWyc=FyKMaZNLnn=0jrTs9A@mail.gmail.com>
+ <051069C10411E24D9749790C498526FA1BCF54B1@SJEXCHMB12.corp.ad.broadcom.com>
+Message-ID: <CACRpkdY2vWvvE_NToQ5rkxGC32hCJgMjNpkF+KEGJ+-o4My4-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 2:26 PM, Rickard Andersson
-<rickard.andersson@stericsson.com> wrote:
-> On 03/31/2013 12:17 AM, Rafael J. Wysocki wrote:
->> On Thursday, March 28, 2013 05:11:29 PM Rickard Andersson wrote:
-
->>> I believe notifiers are the best solution to the problem of
->>> restoring context early when waking up after sleep.
->>
->> I don't.
+On Sat, Apr 27, 2013 at 2:54 AM, Sherman Yin <syin@broadcom.com> wrote:
+> [Me]
+>> Then use container_of() to dereference a struct foo_pin_desc pointer from
+>> the
+>> pointer at &foodesc->desc;
 >
-> Some motivation would be good.
-(...)
->> Well, quite frankly, it is hard to say what problem this is supposed to
->> address from your description.  Care to give some more details?
->
-> The problem is that some hardware blocks needs to be restored as early as
-> possible after leaving the U8500 CPU coupled sleep state ApSleep (APE power
-> domain being off).
+> Hmm, while it would be easy to create a macro to fill the static foo_pin_desc array
+> in the driver, this array would not be suitable for use with pinctrl_register().
 
-(APE = Application Processor Environment, on embedded)
+Now I start to change opinion. You're right about this.
 
-I just have this vague feeling that this is one of those embedded SoC
-vs desktop things where worlds collide.
+> I would have to, in the probe function, loop through the foo_pin_desc array and
+> create another pinctrl_pin_desc array to use for pinctrl_desc.pins.
 
-Isn't it so that on common x86 (desktop, server, laptop) the context of
-the system is saved by some BIOS/ACPI call, and then the ROM
-takes you back up with all devices put back into context?
+Yeah that sucks.
 
-On embedded SoC's we don't have this, all states in the hardware
-has to be saved and restored with kernel code.
+> I think I'll just use a separate struct in the driver to keep track of other pin-specific data.
 
-Then there is a question about whether this shall be done centrally
-(there is one piece of code that knows all volatile registers of all
-hardware blocks in the system) which is close to what the desktop
-BIOS may do, or whether you want to do this in a distributed manner,
-so that each driver saves and restores the context of it's particular
-hardware.
-
-The suggested mechanism is useful for the latter design pattern,
-where drivers know for themselves how to save and restore their
-contexts.
+No I think I have changed opinion. Can you send a patch adding a void * to
+struct pinctrl_pin_desc  as patch [1/n] when you send your driver, and
+I think I'll be happy with it.
 
 Yours,
 Linus Walleij
