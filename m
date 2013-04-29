@@ -1,48 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 29 Apr 2013 09:59:16 +0100
-Subject: [PATCH v9 1/2] arm: introduce psci_smp_ops
-In-Reply-To: <1367160650-4888-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1304281544240.5398@kaball.uk.xensource.com>
- <1367160650-4888-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130429085916.GB8805@mudshark.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 29 Apr 2013 11:05:35 +0200
+Subject: [PATCH 1/4] clocksource: nomadik-mtu: fix up clocksource/timer
+In-Reply-To: <20130427001210.GA1714@quad.lixom.net>
+References: <1366463287-9922-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdYWSM0BK77qWbQWh0xsN+Ps95Q70zG-GE98MYvThrky2A@mail.gmail.com>
+ <20130427001210.GA1714@quad.lixom.net>
+Message-ID: <CACRpkdZ6hcNtRkAL6a2SWm-5qCoKDW1KepZeJMqVGE6YnVBUng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 28, 2013 at 03:50:49PM +0100, Stefano Stabellini wrote:
-> Rename virt_smp_ops to psci_smp_ops and move them to arch/arm/kernel/psci_smp.c.
-> Remove mach-virt/platsmp.c, now unused.
-> Compile psci_smp if CONFIG_ARM_PSCI and CONFIG_SMP.
-> 
-> Add a cpu_die smp_op based on psci_ops.cpu_off.
-> 
-> Initialize PSCI before setting smp_ops in setup_arch.
-> 
-> If PSCI is available on the platform, prefer psci_smp_ops over the
-> platform smp_ops.
-> 
-> Changes in v9:
-> - move comment about PSCI interface from psci.h to psci_smp.c.
-> 
-> Changes in v8:
-> - merge "prefer psci_smp_ops over mdesc->smp" into this patch.
-> 
-> Changes in v6:
-> - fixed return values for psci_smp_available and psci_init ifndef
-> CONFIG_ARM_PSCI.
-> 
-> Changes in v5:
-> - document psci_operations;
-> - psci_init returns NULL.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: Nicolas Pitre <nico@linaro.org>
-> CC: Rob Herring <rob.herring@calxeda.com>
-> CC: Will Deacon <will.deacon@arm.com>
-> CC: arnd at arndb.de
-> CC: marc.zyngier at arm.com
-> CC: linux at arm.linux.org.uk
+On Sat, Apr 27, 2013 at 2:12 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Sat, Apr 20, 2013 at 03:19:43PM +0200, Linus Walleij wrote:
+>> On Sat, Apr 20, 2013 at 3:08 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>
+>> > The Nomadik clocksource driver has had a bad define making it
+>> > impossible to use it for sched_clock() for a while. Fix this
+>> > and also enable it for the Nomadik.
+>> >
+>> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> This one should go to fixes ASAP, could you pick it to your fixes
+>> branch? It could be tagged stable if desired - this only affects the
+>> Nomadik which works just OK on jiffies so it's really no big regression.
+>> The Ux500 does not use the MTU for sched_clock().
+>
+> Ok, applied on top of next/multiplatform, seems to be what it's based on.
+>
+> Tagging as stable is up to you as platform owner. :) Since it won't directly
+> apply to older kernels you might be better of submitting it to Greg separately.
 
+Oh it's not *that* critical. It is not regressing anything in a bad way,
+jiffies work fine. But this is the proper way for the Nomadik long-term.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Will
+Yours,
+Linus Walleij
