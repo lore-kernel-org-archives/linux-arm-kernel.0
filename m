@@ -1,40 +1,28 @@
-From: gotom@sanori.org (Masanori Goto)
-Date: Tue, 30 Apr 2013 06:41:38 +0900
-Subject: [PATCH 10/21] [SCSI] nsp32: use mdelay instead of large udelay
- constants
-In-Reply-To: <201304291521.14195.arnd@arndb.de>
-References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <1366910944-3033663-11-git-send-email-arnd@arndb.de>
- <CALZLnaFeLcaGM7_McTZ=pKBRnpXk0AvqOTF=1YCqJv-53yk4XQ@mail.gmail.com>
- <201304291521.14195.arnd@arndb.de>
-Message-ID: <CALZLnaEbXRJY2qntWucm00mNq78CRD8Vhp7KoTw6Me0frxtaDw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Apr 2013 00:04:20 +0200
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <6607610.omg016OAvj@avalon>
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+ <1556968.7tR6KuEIWb@flatron> <6607610.omg016OAvj@avalon>
+Message-ID: <201304300004.20320.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oops, you're absolutely correct.  Thanks for the follow up!  Please
-change it as follow as you mentioned:
+On Monday 29 April 2013, Laurent Pinchart wrote:
+> On Monday 29 April 2013 23:31:30 Tomasz Figa wrote:
+>
+> > Good point. Stephen, would it be a problem to make this a KMS driver
+> > instead? Old fbdev API could be emulated on top of it, until it goes out
+> > of use, couldn't it?
+> 
+> There's already an fbdev emulation layer in KMS, for such a simple use case it 
+> will work fine.
 
-Acked-by: GOTO Masanori <gotom@debian.or.jp>
+I suggested the same to Stephen when he first brought up this driver.
+Unfortunately his attempt to create a simple KMS driver resulted in a
+significantly larger driver than the one he did for the framebuffer
+interface. This means that either Stephen did something really wrong
+in his attempt, or the KMS interface isn't as good as it should be
+if we want to move people away from frame buffer drivers.
 
-Best regrads,
--- gotom
-
-2013/4/29 Arnd Bergmann <arnd@arndb.de>:
-> On Friday 26 April 2013, Masanori Goto wrote:
->> 2013/4/25 Arnd Bergmann <arnd@arndb.de>
->> >
->> > ARM cannot handle udelay for more than 2 miliseconds, so we
->> > should use mdelay instead for those.
->> >
->>
->> Singed-off-by: GOTO Masanori <gotom@debian.or.jp>
->
-> Thanks. I assume you mean "Acked-by", not "Singed-off" as in "burnt"
-> or "Signed-off" as a notification that you have applied it to your
-> own git tree.
->
-> I'll keep the patch with an your "Acked-by" line in my tree unless
-> James wants to apply to the scsi tree.
->
->         Arnd
->
+	Arnd
