@@ -1,44 +1,42 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 29 Apr 2013 14:24:07 -0400
-Subject: [PATCH] Kirkwood: Enable PCIe port 1 on QNAP TS-11x/TS-21x
-In-Reply-To: <20130429180338.GE16725@lunn.ch>
-References: <20130421152802.GA1408@jirafa.cyrius.com>
- <20130421154704.GV2824@lunn.ch>
- <20130421161400.GD26943@jirafa.cyrius.com>
- <20130429173022.GS32497@titan.lakedaemon.net>
- <20130429180338.GE16725@lunn.ch>
-Message-ID: <20130429182407.GT32497@titan.lakedaemon.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 29 Apr 2013 21:24:41 +0300
+Subject: [V9 PATCH 01/12] usb: phy: protect phy init and shutdown for
+ mutiple deivces
+In-Reply-To: <1366784606-1813-2-git-send-email-chao.xie@marvell.com>
+References: <1366784606-1813-1-git-send-email-chao.xie@marvell.com>
+ <1366784606-1813-2-git-send-email-chao.xie@marvell.com>
+Message-ID: <20130429182441.GA1632@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 29, 2013 at 08:03:38PM +0200, Andrew Lunn wrote:
-> On Mon, Apr 29, 2013 at 01:30:22PM -0400, Jason Cooper wrote:
-> > On Sun, Apr 21, 2013 at 05:14:00PM +0100, Martin Michlmayr wrote:
-> > > Enable KW_PCIE1 on QNAP TS-11x/TS-21x devices as newer revisions
-> > > (rev 1.3) have a USB 3.0 chip from Etron on PCIe port 1.  Thanks
-> > > to Marek Vasut for identifying this issue!
-> > > 
-> > > Cc: <stable@kernel.org>
-> > > Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
-> > > Tested-by: Marek Vasut <marex@denx.de>
-> > 
-> > Applied to mvebu-next/fixes.  This branch will be rebased onto v3.10-rc1
-> > once it drops.  I'll submit a pull request then.
-> > 
-> > fyi: looks like this can be applied to stable all the way back to
-> > v2.6.36.x, updated stable tag accordingly.
-> 
-> Hi Jason
-> 
-> Once we have v3.10-rc1 with the DT PCI patches, i will also make an
-> update to them to enable both PCI ports where available.
-> 
-> We should also change the kirkwood_defconfig to enable the PCI USB
-> 3.0. driver. I can do that as well.
+On Wed, Apr 24, 2013 at 02:23:15AM -0400, Chao Xie wrote:
+> diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
+> index 6b5978f..98d7e60 100644
+> --- a/include/linux/usb/phy.h
+> +++ b/include/linux/usb/phy.h
+> @@ -87,6 +87,14 @@ struct usb_phy {
+>  	/* to support controllers that have multiple transceivers */
+>  	struct list_head	head;
+>  
+> +	/*
+> +	 * PHY may be shared by multiple devices.
+> +	 * mutex and refcount are used to make sure PHY only initialize or
+> +	 * shutdown once.
 
-Great!  That'll wrap up the other half of the first version of this
-patch.
+bad grammar in this sentence.
 
-thx,
+> +	 */
+> +	struct mutex		phy_mutex;
+> +	unsigned int		refcount;
 
-Jason.
+why don't you use an atomic_t ?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130429/810dec42/attachment.sig>
