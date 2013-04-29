@@ -1,75 +1,206 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 29 Apr 2013 21:36:58 +0200
-Subject: [PATCH 6/6] ARM: sunxi: Add EMAC Controller to Hackberry dt
-In-Reply-To: <1367264218-15235-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1367264218-15235-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1367264218-15235-7-git-send-email-maxime.ripard@free-electrons.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Tue, 30 Apr 2013 07:46:11 +1200
+Subject: [PATCHv3 2/3] net: velocity: Convert to generic dma functions
+In-Reply-To: <1367264772-4557-1-git-send-email-linux@prisktech.co.nz>
+References: <1367264772-4557-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1367264772-4557-3-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Hackberry has a PHY that needs to be powered up through a GPIO, so
-we need to use a fixed regulator here.
+Remove the pci_* dma functions and replace with the more generic
+versions.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+In preparation of adding platform support, a new struct device *dev
+is added to struct velocity_info which can be used by both the pci
+and platform code.
+
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
 ---
- arch/arm/boot/dts/sun4i-a10-hackberry.dts | 41 +++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ drivers/net/ethernet/via/via-velocity.c |   51 +++++++++++++++----------------
+ drivers/net/ethernet/via/via-velocity.h |    1 +
+ 2 files changed, 26 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-index b9efac1..3514b37 100644
---- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-@@ -23,10 +23,51 @@
- 	};
+diff --git a/drivers/net/ethernet/via/via-velocity.c b/drivers/net/ethernet/via/via-velocity.c
+index 187eef3..5996cee 100644
+--- a/drivers/net/ethernet/via/via-velocity.c
++++ b/drivers/net/ethernet/via/via-velocity.c
+@@ -46,6 +46,7 @@
+ #include <linux/types.h>
+ #include <linux/bitops.h>
+ #include <linux/init.h>
++#include <linux/dma-mapping.h>
+ #include <linux/mm.h>
+ #include <linux/errno.h>
+ #include <linux/ioport.h>
+@@ -1459,7 +1460,6 @@ static int velocity_init_dma_rings(struct velocity_info *vptr)
+ 	struct velocity_opt *opt = &vptr->options;
+ 	const unsigned int rx_ring_size = opt->numrx * sizeof(struct rx_desc);
+ 	const unsigned int tx_ring_size = opt->numtx * sizeof(struct tx_desc);
+-	struct pci_dev *pdev = vptr->pdev;
+ 	dma_addr_t pool_dma;
+ 	void *pool;
+ 	unsigned int i;
+@@ -1467,13 +1467,13 @@ static int velocity_init_dma_rings(struct velocity_info *vptr)
+ 	/*
+ 	 * Allocate all RD/TD rings a single pool.
+ 	 *
+-	 * pci_alloc_consistent() fulfills the requirement for 64 bytes
++	 * dma_alloc_coherent() fulfills the requirement for 64 bytes
+ 	 * alignment
+ 	 */
+-	pool = pci_alloc_consistent(pdev, tx_ring_size * vptr->tx.numq +
+-				    rx_ring_size, &pool_dma);
++	pool = dma_alloc_coherent(vptr->dev, tx_ring_size * vptr->tx.numq +
++				    rx_ring_size, &pool_dma, GFP_ATOMIC);
+ 	if (!pool) {
+-		dev_err(&pdev->dev, "%s : DMA memory allocation failed.\n",
++		dev_err(vptr->dev, "%s : DMA memory allocation failed.\n",
+ 			vptr->netdev->name);
+ 		return -ENOMEM;
+ 	}
+@@ -1524,8 +1524,8 @@ static int velocity_alloc_rx_buf(struct velocity_info *vptr, int idx)
+ 	 */
+ 	skb_reserve(rd_info->skb,
+ 			64 - ((unsigned long) rd_info->skb->data & 63));
+-	rd_info->skb_dma = pci_map_single(vptr->pdev, rd_info->skb->data,
+-					vptr->rx.buf_sz, PCI_DMA_FROMDEVICE);
++	rd_info->skb_dma = dma_map_single(vptr->dev, rd_info->skb->data,
++					vptr->rx.buf_sz, DMA_FROM_DEVICE);
  
- 	soc at 01c20000 {
-+		emac: ethernet at 01c0b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&emac_pins_a>;
-+			phy = <&phy0>;
-+			status = "okay";
-+		};
-+
-+		mdio at 01c0b080 {
-+			phy-supply = <&reg_emac_3v3>;
-+			status = "okay";
-+
-+			phy0: ethernet-phy at 0 {
-+				reg = <0>;
-+			};
-+		};
-+
-+		pio: pinctrl at 01c20800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&hackberry_hogs>;
-+
-+			hackberry_hogs: hogs at 0 {
-+				allwinner,pins = "PH19";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_emac_3v3: emac-3v3 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "emac-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			enable-active-high;
-+			gpio = <&pio 7 19 0>;
-+		};
-+	};
- };
+ 	/*
+ 	 *	Fill in the descriptor to match
+@@ -1588,8 +1588,8 @@ static void velocity_free_rd_ring(struct velocity_info *vptr)
+ 
+ 		if (!rd_info->skb)
+ 			continue;
+-		pci_unmap_single(vptr->pdev, rd_info->skb_dma, vptr->rx.buf_sz,
+-				 PCI_DMA_FROMDEVICE);
++		dma_unmap_single(vptr->dev, rd_info->skb_dma, vptr->rx.buf_sz,
++				 DMA_FROM_DEVICE);
+ 		rd_info->skb_dma = 0;
+ 
+ 		dev_kfree_skb(rd_info->skb);
+@@ -1670,7 +1670,7 @@ static void velocity_free_dma_rings(struct velocity_info *vptr)
+ 	const int size = vptr->options.numrx * sizeof(struct rx_desc) +
+ 		vptr->options.numtx * sizeof(struct tx_desc) * vptr->tx.numq;
+ 
+-	pci_free_consistent(vptr->pdev, size, vptr->rx.ring, vptr->rx.pool_dma);
++	dma_free_coherent(vptr->dev, size, vptr->rx.ring, vptr->rx.pool_dma);
+ }
+ 
+ static int velocity_init_rings(struct velocity_info *vptr, int mtu)
+@@ -1727,8 +1727,8 @@ static void velocity_free_tx_buf(struct velocity_info *vptr,
+ 				pktlen = max_t(size_t, pktlen,
+ 						td->td_buf[i].size & ~TD_QUEUE);
+ 
+-			pci_unmap_single(vptr->pdev, tdinfo->skb_dma[i],
+-					le16_to_cpu(pktlen), PCI_DMA_TODEVICE);
++			dma_unmap_single(vptr->dev, tdinfo->skb_dma[i],
++					le16_to_cpu(pktlen), DMA_TO_DEVICE);
+ 		}
+ 	}
+ 	dev_kfree_skb_irq(skb);
+@@ -1750,8 +1750,8 @@ static void velocity_free_td_ring_entry(struct velocity_info *vptr,
+ 	if (td_info->skb) {
+ 		for (i = 0; i < td_info->nskb_dma; i++) {
+ 			if (td_info->skb_dma[i]) {
+-				pci_unmap_single(vptr->pdev, td_info->skb_dma[i],
+-					td_info->skb->len, PCI_DMA_TODEVICE);
++				dma_unmap_single(vptr->dev, td_info->skb_dma[i],
++					td_info->skb->len, DMA_TO_DEVICE);
+ 				td_info->skb_dma[i] = 0;
+ 			}
+ 		}
+@@ -2029,7 +2029,6 @@ static inline void velocity_iph_realign(struct velocity_info *vptr,
+  */
+ static int velocity_receive_frame(struct velocity_info *vptr, int idx)
+ {
+-	void (*pci_action)(struct pci_dev *, dma_addr_t, size_t, int);
+ 	struct net_device_stats *stats = &vptr->netdev->stats;
+ 	struct velocity_rd_info *rd_info = &(vptr->rx.info[idx]);
+ 	struct rx_desc *rd = &(vptr->rx.ring[idx]);
+@@ -2047,8 +2046,8 @@ static int velocity_receive_frame(struct velocity_info *vptr, int idx)
+ 
+ 	skb = rd_info->skb;
+ 
+-	pci_dma_sync_single_for_cpu(vptr->pdev, rd_info->skb_dma,
+-				    vptr->rx.buf_sz, PCI_DMA_FROMDEVICE);
++	dma_sync_single_for_cpu(vptr->dev, rd_info->skb_dma,
++				    vptr->rx.buf_sz, DMA_FROM_DEVICE);
+ 
+ 	/*
+ 	 *	Drop frame not meeting IEEE 802.3
+@@ -2061,19 +2060,18 @@ static int velocity_receive_frame(struct velocity_info *vptr, int idx)
+ 		}
+ 	}
+ 
+-	pci_action = pci_dma_sync_single_for_device;
+-
+ 	velocity_rx_csum(rd, skb);
+ 
+ 	if (velocity_rx_copy(&skb, pkt_len, vptr) < 0) {
+ 		velocity_iph_realign(vptr, skb, pkt_len);
+-		pci_action = pci_unmap_single;
+ 		rd_info->skb = NULL;
++		dma_unmap_single(vptr->dev, rd_info->skb_dma, vptr->rx.buf_sz,
++				 DMA_FROM_DEVICE);
++	} else {
++		dma_sync_single_for_device(vptr->dev, rd_info->skb_dma,
++					   vptr->rx.buf_sz, DMA_FROM_DEVICE);
+ 	}
+ 
+-	pci_action(vptr->pdev, rd_info->skb_dma, vptr->rx.buf_sz,
+-		   PCI_DMA_FROMDEVICE);
+-
+ 	skb_put(skb, pkt_len - 4);
+ 	skb->protocol = eth_type_trans(skb, vptr->netdev);
+ 
+@@ -2550,7 +2548,8 @@ static netdev_tx_t velocity_xmit(struct sk_buff *skb,
+ 	 *	add it to the transmit ring.
+ 	 */
+ 	tdinfo->skb = skb;
+-	tdinfo->skb_dma[0] = pci_map_single(vptr->pdev, skb->data, pktlen, PCI_DMA_TODEVICE);
++	tdinfo->skb_dma[0] = dma_map_single(vptr->dev, skb->data, pktlen,
++								DMA_TO_DEVICE);
+ 	td_ptr->tdesc0.len = cpu_to_le16(pktlen);
+ 	td_ptr->td_buf[0].pa_low = cpu_to_le32(tdinfo->skb_dma[0]);
+ 	td_ptr->td_buf[0].pa_high = 0;
+@@ -2560,7 +2559,7 @@ static netdev_tx_t velocity_xmit(struct sk_buff *skb,
+ 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+ 		const skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
+ 
+-		tdinfo->skb_dma[i + 1] = skb_frag_dma_map(&vptr->pdev->dev,
++		tdinfo->skb_dma[i + 1] = skb_frag_dma_map(vptr->dev,
+ 							  frag, 0,
+ 							  skb_frag_size(frag),
+ 							  DMA_TO_DEVICE);
+@@ -2637,6 +2636,7 @@ static void velocity_init_info(struct pci_dev *pdev, struct velocity_info *vptr,
+ {
+ 	memset(vptr, 0, sizeof(struct velocity_info));
+ 
++	vptr->dev = &pdev->dev;
+ 	vptr->pdev = pdev;
+ 	vptr->chip_id = info->chip_id;
+ 	vptr->tx.numq = info->txqueue;
+@@ -2744,7 +2744,6 @@ static int velocity_found1(struct pci_dev *pdev,
+ 	SET_NETDEV_DEV(dev, &pdev->dev);
+ 	vptr = netdev_priv(dev);
+ 
+-
+ 	if (first) {
+ 		printk(KERN_INFO "%s Ver. %s\n",
+ 			VELOCITY_FULL_DRV_NAM, VELOCITY_VERSION);
+diff --git a/drivers/net/ethernet/via/via-velocity.h b/drivers/net/ethernet/via/via-velocity.h
+index ff8d7828..c38bbae 100644
+--- a/drivers/net/ethernet/via/via-velocity.h
++++ b/drivers/net/ethernet/via/via-velocity.h
+@@ -1434,6 +1434,7 @@ struct velocity_opt {
+ #define GET_RD_BY_IDX(vptr, idx)   (vptr->rd_ring[idx])
+ 
+ struct velocity_info {
++	struct device *dev;
+ 	struct pci_dev *pdev;
+ 	struct net_device *netdev;
+ 
 -- 
-1.8.1.2
+1.7.9.5
