@@ -1,131 +1,53 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 29 Apr 2013 15:33:29 +0530
-Subject: [PATCH v6 6/9] ARM: dts: omap: update usb_otg_hs data
+Date: Mon, 29 Apr 2013 15:33:28 +0530
+Subject: [PATCH v6 5/9] ARM: OMAP: USB: Add phy binding information
 In-Reply-To: <1367229812-30574-1-git-send-email-kishon@ti.com>
 References: <1367229812-30574-1-git-send-email-kishon@ti.com>
-Message-ID: <1367229812-30574-7-git-send-email-kishon@ti.com>
+Message-ID: <1367229812-30574-6-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Updated the usb_otg_hs dt data to include the *phy* and *phy-names*
-binding in order for the driver to use the new generic PHY framework.
-Also updated the Documentation to include the binding information.
-The PHY binding information can be found at
-Documentation/devicetree/bindings/phy/phy-bindings.txt
+In order for controllers to get PHY in case of non dt boot, the phy
+binding information (phy device name) should be added in the platform
+data of the controller.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/devicetree/bindings/usb/omap-usb.txt |    5 +++++
- Documentation/devicetree/bindings/usb/usb-phy.txt  |    6 ++++++
- arch/arm/boot/dts/omap3.dtsi                       |    2 ++
- arch/arm/boot/dts/omap4.dtsi                       |    3 +++
- arch/arm/boot/dts/twl4030.dtsi                     |    1 +
- 5 files changed, 17 insertions(+)
+ arch/arm/mach-omap2/usb-musb.c |    6 +++++-
+ include/linux/usb/musb.h       |    3 +++
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/usb/omap-usb.txt b/Documentation/devicetree/bindings/usb/omap-usb.txt
-index d4769f3..c0871a7 100644
---- a/Documentation/devicetree/bindings/usb/omap-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/omap-usb.txt
-@@ -19,6 +19,9 @@ OMAP MUSB GLUE
-  - power : Should be "50". This signifies the controller can supply upto
-    100mA when operating in host mode.
-  - usb-phy : the phandle for the PHY device
-+ - phys : the phandle for the PHY device (used by generic PHY framework)
-+ - phy-names : the names of the PHY corresponding to the PHYs present in the
-+   *phy* phandle.
+diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
+index 3242a55..228288a 100644
+--- a/arch/arm/mach-omap2/usb-musb.c
++++ b/arch/arm/mach-omap2/usb-musb.c
+@@ -85,8 +85,12 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
+ 	musb_plat.mode = board_data->mode;
+ 	musb_plat.extvbus = board_data->extvbus;
  
- Optional properties:
-  - ctrl-module : phandle of the control module this glue uses to write to
-@@ -33,6 +36,8 @@ usb_otg_hs: usb_otg_hs at 4a0ab000 {
- 	num-eps = <16>;
- 	ram-bits = <12>;
- 	ctrl-module = <&omap_control_usb>;
-+	phys = <&usb2_phy>;
-+	phy-names = "usb2-phy";
- };
+-	if (cpu_is_omap44xx())
++	if (cpu_is_omap44xx()) {
+ 		musb_plat.has_mailbox = true;
++		musb_plat.phy_dev_name = "omap-usb2.3.auto.0";
++	} else if (cpu_is_omap34xx()) {
++		musb_plat.phy_dev_name = "twl4030_usb.0";
++	}
  
- Board specific device node entry
-diff --git a/Documentation/devicetree/bindings/usb/usb-phy.txt b/Documentation/devicetree/bindings/usb/usb-phy.txt
-index 61496f5..c0245c8 100644
---- a/Documentation/devicetree/bindings/usb/usb-phy.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-phy.txt
-@@ -5,6 +5,8 @@ OMAP USB2 PHY
- Required properties:
-  - compatible: Should be "ti,omap-usb2"
-  - reg : Address and length of the register set for the device.
-+ - #phy-cells: determine the number of cells that should be given in the
-+   phandle while referencing this phy.
+ 	if (soc_is_am35xx()) {
+ 		oh_name = "am35x_otg_hs";
+diff --git a/include/linux/usb/musb.h b/include/linux/usb/musb.h
+index 053c268..0b733a3 100644
+--- a/include/linux/usb/musb.h
++++ b/include/linux/usb/musb.h
+@@ -104,6 +104,9 @@ struct musb_hdrc_platform_data {
+ 	/* for clk_get() */
+ 	const char	*clock;
  
- Optional properties:
-  - ctrl-module : phandle of the control module used by PHY driver to power on
-@@ -16,6 +18,7 @@ usb2phy at 4a0ad080 {
- 	compatible = "ti,omap-usb2";
- 	reg = <0x4a0ad080 0x58>;
- 	ctrl-module = <&omap_control_usb>;
-+	#phy-cells = <0>;
- };
++	/* phy device name */
++	const char	*phy_dev_name;
++
+ 	/* (HOST or OTG) switch VBUS on/off */
+ 	int		(*set_vbus)(struct device *dev, int is_on);
  
- OMAP USB3 PHY
-@@ -25,6 +28,8 @@ Required properties:
-  - reg : Address and length of the register set for the device.
-  - reg-names: The names of the register addresses corresponding to the registers
-    filled in "reg".
-+ - #phy-cells: determine the number of cells that should be given in the
-+   phandle while referencing this phy.
- 
- Optional properties:
-  - ctrl-module : phandle of the control module used by PHY driver to power on
-@@ -39,4 +44,5 @@ usb3phy at 4a084400 {
- 	      <0x4a084c00 0x40>;
- 	reg-names = "phy_rx", "phy_tx", "pll_ctrl";
- 	ctrl-module = <&omap_control_usb>;
-+	#phy-cells = <0>;
- };
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 4ad03d9..51b4bee 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -520,6 +520,8 @@
- 			interrupt-names = "mc", "dma";
- 			ti,hwmods = "usb_otg_hs";
- 			usb-phy = <&usb2_phy>;
-+			phys = <&usb2_phy>;
-+			phy-names = "usb2-phy";
- 			multipoint = <1>;
- 			num-eps = <16>;
- 			ram-bits = <12>;
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 2a56428..dae620b 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -517,6 +517,7 @@
- 				compatible = "ti,omap-usb2";
- 				reg = <0x4a0ad080 0x58>;
- 				ctrl-module = <&omap_control_usb>;
-+				#phy-cells = <0>;
- 			};
- 		};
- 
-@@ -655,6 +656,8 @@
- 			interrupt-names = "mc", "dma";
- 			ti,hwmods = "usb_otg_hs";
- 			usb-phy = <&usb2_phy>;
-+			phys = <&usb2_phy>;
-+			phy-names = "usb2-phy";
- 			multipoint = <1>;
- 			num-eps = <16>;
- 			ram-bits = <12>;
-diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
-index b3034da..ce4cd6f 100644
---- a/arch/arm/boot/dts/twl4030.dtsi
-+++ b/arch/arm/boot/dts/twl4030.dtsi
-@@ -80,6 +80,7 @@
- 		usb1v8-supply = <&vusb1v8>;
- 		usb3v1-supply = <&vusb3v1>;
- 		usb_mode = <1>;
-+		#phy-cells = <0>;
- 	};
- 
- 	twl_pwm: pwm {
 -- 
 1.7.10.4
