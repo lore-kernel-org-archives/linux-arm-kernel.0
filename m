@@ -1,147 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 29 Apr 2013 11:54:46 +0200
-Subject: [RFC PATCH v3 05/17] ARM: dts: at91: cpus/cpu node dts updates
-In-Reply-To: <1366824502-19729-6-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366824502-19729-6-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <517E4366.4040209@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 29 Apr 2013 10:51:39 +0100
+Subject: [PATCH] module: fix mutiple defined issue
+In-Reply-To: <1367213521-26795-1-git-send-email-inki.dae@samsung.com>
+References: <1367213521-26795-1-git-send-email-inki.dae@samsung.com>
+Message-ID: <20130429095138.GJ14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/24/2013 07:28 PM, Lorenzo Pieralisi :
-> This patch updates the in-kernel dts files according to the latest cpus
-> and cpu bindings updates for ARM.
+On Mon, Apr 29, 2013 at 02:32:01PM +0900, Inki Dae wrote:
+> This patch fixes mutiple defined issue to MODULE_DEVICE_TABLE
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-With changes in compatible string... ok then.
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
+> The issue could be induced when some framework which includes two
+> more sub drivers, is built as one moudle because those sub drivers
+> could have their own MODULE_DEVICE_TABLE.
+> 
+> And 'struct of_device_id' isn't needed to be determined by type
+> argument because the definition of 'of_device_id' should be fixed.
+> So this patch makes 'of_devce_id' definition to be fixed and
+> only its instance name to be defined by type.
+> 
+> Signed-off-by: Inki Dae <inki.dae@samsung.com>
 > ---
->  arch/arm/boot/dts/at91rm9200.dtsi  | 6 +++++-
->  arch/arm/boot/dts/at91sam9260.dtsi | 8 ++++++--
->  arch/arm/boot/dts/at91sam9263.dtsi | 8 ++++++--
->  arch/arm/boot/dts/at91sam9g45.dtsi | 8 ++++++--
->  arch/arm/boot/dts/at91sam9n12.dtsi | 8 ++++++--
->  arch/arm/boot/dts/at91sam9x5.dtsi  | 8 ++++++--
->  6 files changed, 35 insertions(+), 11 deletions(-)
+>  include/linux/module.h |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-> index b0268a5..f16b3d4 100644
-> --- a/arch/arm/boot/dts/at91rm9200.dtsi
-> +++ b/arch/arm/boot/dts/at91rm9200.dtsi
-> @@ -34,8 +34,12 @@
->  		ssc2 = &ssc2;
->  	};
->  	cpus {
-> -		cpu at 0 {
-> +		#address-cells = <0>;
-> +		#size-cells = <0>;
-> +
-> +		cpu {
->  			compatible = "arm,arm920t";
-> +			device_type = "cpu";
->  		};
->  	};
+> diff --git a/include/linux/module.h b/include/linux/module.h
+> index 46f1ea0..ac5d79f 100644
+> --- a/include/linux/module.h
+> +++ b/include/linux/module.h
+> @@ -84,7 +84,7 @@ void trim_init_extable(struct module *m);
 >  
-> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> index cb7bcc5..c4eeef7 100644
-> --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> @@ -32,8 +32,12 @@
->  		ssc0 = &ssc0;
->  	};
->  	cpus {
-> -		cpu at 0 {
-> -			compatible = "arm,arm926ejs";
-> +		#address-cells = <0>;
-> +		#size-cells = <0>;
-> +
-> +		cpu {
-> +			compatible = "arm,arm926ej-s";
-> +			device_type = "cpu";
->  		};
->  	};
+>  #ifdef MODULE
+>  #define MODULE_GENERIC_TABLE(gtype,name)			\
+> -extern const struct gtype##_id __mod_##gtype##_table		\
+> +extern const struct of_device_id __mod_##gtype##_table		\
+>    __attribute__ ((unused, alias(__stringify(name))))
 >  
-> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> index 271d4de..f3b5c2a 100644
-> --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> @@ -29,8 +29,12 @@
->  		ssc1 = &ssc1;
->  	};
->  	cpus {
-> -		cpu at 0 {
-> -			compatible = "arm,arm926ejs";
-> +		#address-cells = <0>;
-> +		#size-cells = <0>;
-> +
-> +		cpu {
-> +			compatible = "arm,arm926ej-s";
-> +			device_type = "cpu";
->  		};
->  	};
->  
-> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> index 6b1d4ca..6c18bd3 100644
-> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> @@ -35,8 +35,12 @@
->  		ssc1 = &ssc1;
->  	};
->  	cpus {
-> -		cpu at 0 {
-> -			compatible = "arm,arm926ejs";
-> +		#address-cells = <0>;
-> +		#size-cells = <0>;
-> +
-> +		cpu {
-> +			compatible = "arm,arm926ej-s";
-> +			device_type = "cpu";
->  		};
->  	};
->  
-> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> index 7750f98..c3b11af 100644
-> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> @@ -31,8 +31,12 @@
->  		ssc0 = &ssc0;
->  	};
->  	cpus {
-> -		cpu at 0 {
-> -			compatible = "arm,arm926ejs";
-> +		#address-cells = <0>;
-> +		#size-cells = <0>;
-> +
-> +		cpu {
-> +			compatible = "arm,arm926ej-s";
-> +			device_type = "cpu";
->  		};
->  	};
->  
-> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> index aa98e64..6c39d0f 100644
-> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> @@ -33,8 +33,12 @@
->  		ssc0 = &ssc0;
->  	};
->  	cpus {
-> -		cpu at 0 {
-> -			compatible = "arm,arm926ejs";
-> +		#address-cells = <0>;
-> +		#size-cells = <0>;
-> +
-> +		cpu {
-> +			compatible = "arm,arm926ej-s";
-> +			device_type = "cpu";
->  		};
->  	};
->  
-> 
+>  #else  /* !MODULE */
 
-
--- 
-Nicolas Ferre
+This patch (a) looks wrong (why would a generic device table be limited
+to of_device_id when it could be ISAPNP or something else?) and (b) how
+does changing the type fix the "multiple defined issue" ?  (c) include
+the errors that you're fixing in the commit log.
