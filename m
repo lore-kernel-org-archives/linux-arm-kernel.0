@@ -1,27 +1,45 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 30 Apr 2013 14:18:25 +0530
-Subject: [PATCH v3 1/6] at_hdmac: move to generic DMA binding
-In-Reply-To: <51750F68.4040701@atmel.com>
-References: <1366362683-14496-1-git-send-email-ludovic.desroches@atmel.com>
- <1366362683-14496-2-git-send-email-ludovic.desroches@atmel.com>
- <51750F68.4040701@atmel.com>
-Message-ID: <20130430084825.GA1960@intel.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 30 Apr 2013 11:33:40 +0200
+Subject: linux-next build error (at91) - use of bool in mach/arch.h
+Message-ID: <517F8FF4.3050901@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 12:22:32PM +0200, Nicolas Ferre wrote:
-> On 04/19/2013 11:11 AM, ludovic.desroches at atmel.com :
-> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > 
-> > Update at_hdmac driver to support generic DMA device tree binding. Devices
-> > can still request channel with dma_request_channel() then it doesn't break
-> > DMA for non DT boards.
-> > 
-> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-Applied now thanks
+Hi,
 
---
-~Vinod
+Today I discovered an issue while building linux-next for at91:
+
+  CC      arch/arm/mach-at91/at91sam9260_devices.o
+In file included from /home/nferre/dev/lnx_buid_test/arch/arm/mach-at91/at91sam9260_devices.c:12:0:
+/home/nferre/dev/lnx_buid_test/arch/arm/include/asm/mach/arch.h:46:2: error: expected specifier-qualifier-list before ?bool?
+
+It also applies to all non-DT at91 platforms (~ 6 machines).
+
+It seems to be caused by inclusion of commmit
+4dbfa9a25367cfa91aec0e56d75a6905d3242cd3 (ARM: Enable selection of 
+SMP operations at boot time) and its use of the "bool" type.
+
+In fact, we include asm/mach/arch.h file in our at91xxx_devices.c files and
+we include it as the first include directive.
+
+So, I am wondering if the best correction is to add the types.h header file
+in the asm/mach/arch.h file, like this:
+
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -8,6 +8,8 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/types.h>
++
+ #ifndef __ASSEMBLY__
+ 
+ struct tag;
+
+or if a better option would be to re-arrange the include directives in
+various at91xxx_devices.c files?
+
+Thanks, bye,
+-- 
+Nicolas Ferre
