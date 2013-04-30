@@ -1,30 +1,96 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Tue, 30 Apr 2013 18:02:36 +0800
-Subject: [Question] flush_dcache_page() need to flush icache?
-In-Reply-To: <20130430090502.GC29766@arm.com>
-References: <CACVXFVMz3jLEPDYFM-_S_t5TiqikVSRiKf9cBNocH3QhVexwZg@mail.gmail.com>
- <20130430090502.GC29766@arm.com>
-Message-ID: <CACVXFVPz-rMiPyW2EE==v58LF6uTD1M1fKTNcF5a5+Z6-5u+Gg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 30 Apr 2013 11:23:45 +0100
+Subject: [PATCH v3 08/32] arm64: KVM: architecture specific MMU backend
+In-Reply-To: <20130429173521.GB16544@arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-9-git-send-email-marc.zyngier@arm.com>
+ <20130429173521.GB16544@arm.com>
+Message-ID: <517F9BB1.4090906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 30, 2013 at 5:05 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Tue, Apr 30, 2013 at 09:16:16AM +0100, Ming Lei wrote:
->> Looks flush_dcache_page() need to deal with both dcache alias and I/D
->> cache coherency, but set_pte_at() has already run __sync_icache_dcache()
->> to make I/D cache coherency in the path of executable page fault.
->>
->> So could the flushing icache be removed in flush_dcache_page()?
->
-> That's the case for (mapping && mapping_mapped(mapping)) where the
-> kernel modifies a page cache page which is already mapped in user space
-> and we won't get a subsequent set_pte_at() call.
+On 29/04/13 18:35, Catalin Marinas wrote:
+> On Mon, Apr 08, 2013 at 05:17:10PM +0100, Marc Zyngier wrote:
+>> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+>> new file mode 100644
+>> index 0000000..2eb2230
+>> --- /dev/null
+>> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> ...
+>> +/*
+>> + * Align KVM with the kernel's view of physical memory. Should be
+>> + * 40bit IPA, with PGD being 8kB aligned.
+>> + */
+>> +#define KVM_PHYS_SHIFT	PHYS_MASK_SHIFT
+> 
+> Just wondering - do we allow the IPA to be bigger than what qemu/kvmtool
+> can map?
+> 
+>> +#define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
+>> +#define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
+>> +
+>> +#ifdef CONFIG_ARM64_64K_PAGES
+>> +#define PAGE_LEVELS	2
+>> +#define BITS_PER_LEVEL	13
+>> +#else  /* 4kB pages */
+>> +#define PAGE_LEVELS	3
+>> +#define BITS_PER_LEVEL	9
+> 
+> You could use (PAGE_SHIFT - 3) for BITS_PER_LEVEL if that's any clearer
+> but you can get rid of these entirely (see below).
+> 
+>> +#endif
+>> +
+>> +/* Make sure we get the right size, and thus the right alignment */
+>> +#define BITS_PER_S2_PGD (KVM_PHYS_SHIFT - (PAGE_LEVELS - 1) * BITS_PER_LEVEL - PAGE_SHIFT)
+>> +#define PTRS_PER_S2_PGD (1 << max(BITS_PER_LEVEL, BITS_PER_S2_PGD))
+>> +#define S2_PGD_ORDER	get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
+>> +#define S2_PGD_SIZE	(1 << S2_PGD_ORDER)
+> 
+> It looks like lots of calculations which I can't fully follow ;). So we
+> need to map KVM_PHYS_SHIFT (40-bit) with a number of stage 2 pgds. We
+> know that a pgd entry can map PGDIR_SHIFT bits. So the pointers you need
+> in S2 pgd:
+> 
+> #define PTRS_PER_S2_PGD		(1 << (KVM_PHYS_SHIFT - PGDIR_SHIFT))
+> 
+> (no need of PAGE_LEVELS)
 
-OK, I got it, so looks it is only needed in self-modifying-code case, but I am
-wondering why it is always done for all cases of (mapping &&
-mapping_mapped(mapping))......
+Now you're ruining all the fun! ;-) You make it look simple and elegant,
+which sucks in a major way!
+
+> With some more juggling you can probably get rid of get_order as well,
+> though it should be a compile-time constant. Basically KVM_PHYS_SHIFT -
+> PGDIR_SHIFT - PAGE_SHIFT + 3 (and cope with the negative value for the
+> 64K pages).
+
+get_order seems to do the right thing, and I'm now almost convinced I
+can loose the max. Almost. Hmmm.
+
+>> +static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+>> +{
+>> +	unsigned long hva = gfn_to_hva(kvm, gfn);
+>> +	flush_icache_range(hva, hva + PAGE_SIZE);
+> 
+> Even ARMv8 can have aliasing VIPT I-cache. Do we need to flush some more
+> here?
+
+Definitely. We should have something similar to what we have for ARMv7.
+
+>> +#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
+> 
+> I had a brief look at the other hyp reworking patches and this function
+> is used in two situations: (1) flush any data before the Hyp is
+> initialised and (2) page table creation. The first case looks fine but
+> the second is not needed on AArch64 (and SMP AArch32) nor entirely
+> optimal as it should flush to PoU for page table walks. Can we have
+> different functions, at least we can make one a no-op?
+
+Certainly. I think Will has some patches that we could reuse (at least
+in principle) for AArch32, and have a no-op backend for AArch64.
 
 Thanks,
+
+	M.
 -- 
-Ming Lei
+Jazz is not dead. It just smells funny...
