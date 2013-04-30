@@ -1,31 +1,88 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 30 Apr 2013 11:56:21 +0200
-Subject: [PATCH 0/2] ARM: sunxi: Clock fixes for the Allwinner A13
-Message-ID: <1367315783-21345-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue, 30 Apr 2013 11:56:23 +0200
+Subject: [PATCH 2/2] ARM: sun5i: Update the clock compatible strings
+In-Reply-To: <1367315783-21345-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1367315783-21345-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1367315783-21345-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Allwinner A13 has a smaller clock set than the one found in the A10.
+Fix the A13 device tree and documentation to reflect this.
 
-This is a patchset making the current clock code fit for the A13.
-The A13 has less clock gates available, while the logic remains, so
-we need to make very few changes to handle the A13.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun5i-a13.dtsi | 35 ++++++++++++-----------------------
+ 1 file changed, 12 insertions(+), 23 deletions(-)
 
-Thanks,
-Maxime 
-
-Maxime Ripard (2):
-  clk: sun5i: Add compatibles for Allwinner A13
-  ARM: sun5i: Update the clock compatible strings
-
- Documentation/devicetree/bindings/clock/sunxi.txt  | 117 +++------------------
- .../bindings/clock/sunxi/sun4i-a10-gates.txt       |  93 ++++++++++++++++
- .../bindings/clock/sunxi/sun5i-a13-gates.txt       |  58 ++++++++++
- arch/arm/boot/dts/sun5i-a13.dtsi                   |  35 +++---
- drivers/clk/sunxi/clk-sunxi.c                      |  31 ++++--
- 5 files changed, 199 insertions(+), 135 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun4i-a10-gates.txt
- create mode 100644 Documentation/devicetree/bindings/clock/sunxi/sun5i-a13-gates.txt
-
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index 31fa38f..8ba65c1 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -95,20 +95,15 @@
+ 
+ 		ahb_gates: ahb_gates at 01c20060 {
+ 			#clock-cells = <1>;
+-			compatible = "allwinner,sun4i-ahb-gates-clk";
++			compatible = "allwinner,sun5i-a13-ahb-gates-clk";
+ 			reg = <0x01c20060 0x8>;
+ 			clocks = <&ahb>;
+-			clock-output-names = "ahb_usb0", "ahb_ehci0",
+-				"ahb_ohci0", "ahb_ehci1", "ahb_ohci1", "ahb_ss",
+-				"ahb_dma", "ahb_bist", "ahb_mmc0", "ahb_mmc1",
+-				"ahb_mmc2", "ahb_mmc3", "ahb_ms", "ahb_nand",
+-				"ahb_sdram", "ahb_ace",	"ahb_emac", "ahb_ts",
+-				"ahb_spi0", "ahb_spi1", "ahb_spi2", "ahb_spi3",
+-				"ahb_pata", "ahb_sata", "ahb_gps", "ahb_ve",
+-				"ahb_tvd", "ahb_tve0", "ahb_tve1", "ahb_lcd0",
+-				"ahb_lcd1", "ahb_csi0", "ahb_csi1", "ahb_hdmi",
+-				"ahb_de_be0", "ahb_de_be1", "ahb_de_fe0",
+-				"ahb_de_fe1", "ahb_mp", "ahb_mali400";
++			clock-output-names = "ahb_usbotg", "ahb_ehci", "ahb_ohci",
++				"ahb_ss", "ahb_dma", "ahb_bist", "ahb_mmc0",
++				"ahb_mmc1", "ahb_mmc2", "ahb_nand", "ahb_sdram",
++				"ahb_spi0", "ahb_spi1", "ahb_spi2", "ahb_stimer",
++				"ahb_ve", "ahb_lcd", "ahb_csi", "ahb_de_be",
++				"ahb_de_fe", "ahb_iep", "ahb_mali400";
+ 		};
+ 
+ 		apb0: apb0 at 01c20054 {
+@@ -120,15 +115,13 @@
+ 
+ 		apb0_gates: apb0_gates at 01c20068 {
+ 			#clock-cells = <1>;
+-			compatible = "allwinner,sun4i-apb0-gates-clk";
++			compatible = "allwinner,sun5i-a13-apb0-gates-clk";
+ 			reg = <0x01c20068 0x4>;
+ 			clocks = <&apb0>;
+-			clock-output-names = "apb0_codec", "apb0_spdif",
+-				"apb0_ac97", "apb0_iis", "apb0_pio", "apb0_ir0",
+-				"apb0_ir1", "apb0_keypad";
++			clock-output-names = "apb0_codec", "apb0_pio", "apb0_ir";
+ 		};
+ 
+-		/* dummy is pll62 */
++		/* dummy is pll6 */
+ 		apb1_mux: apb1_mux at 01c20058 {
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun4i-apb1-mux-clk";
+@@ -145,15 +138,11 @@
+ 
+ 		apb1_gates: apb1_gates at 01c2006c {
+ 			#clock-cells = <1>;
+-			compatible = "allwinner,sun4i-apb1-gates-clk";
++			compatible = "allwinner,sun5i-a13-apb1-gates-clk";
+ 			reg = <0x01c2006c 0x4>;
+ 			clocks = <&apb1>;
+ 			clock-output-names = "apb1_i2c0", "apb1_i2c1",
+-				"apb1_i2c2", "apb1_can", "apb1_scr",
+-				"apb1_ps20", "apb1_ps21", "apb1_uart0",
+-				"apb1_uart1", "apb1_uart2", "apb1_uart3",
+-				"apb1_uart4", "apb1_uart5", "apb1_uart6",
+-				"apb1_uart7";
++				"apb1_i2c2", "apb1_uart1", "apb1_uart3";
+ 		};
+ 	};
+ 
 -- 
 1.8.1.2
