@@ -1,152 +1,56 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Tue, 30 Apr 2013 07:49:22 -0700
-Subject: [PATCH 01/15] ARM: KVM: add support for minimal host vs guest
- profiling
+Date: Tue, 30 Apr 2013 07:49:23 -0700
+Subject: [PATCH 02/15] ARM: KVM: arch_timer: use symbolic constants
 In-Reply-To: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
 References: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
-Message-ID: <1367333376-30983-2-git-send-email-cdall@cs.columbia.edu>
+Message-ID: <1367333376-30983-3-git-send-email-cdall@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Mark Rutland <mark.rutland@arm.com>
 
-In order to be able to correctly profile what is happening on the
-host, we need to be able to identify when we're running on the guest,
-and log these events differently.
+In clocksource/arm_arch_timer.h we define useful symbolic constants.
+Let's use them to make the KVM arch_timer code clearer.
 
-Perf offers a simple way to register callbacks into KVM. Mimic what
-x86 does and enjoy being able to profile your KVM host.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <cdall@cs.columbia.edu>
 Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
 ---
- arch/arm/include/asm/kvm_host.h |    3 ++
- arch/arm/kvm/Makefile           |    2 +-
- arch/arm/kvm/arm.c              |    4 +++
- arch/arm/kvm/perf.c             |   68 +++++++++++++++++++++++++++++++++++++++
- 4 files changed, 76 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/kvm/perf.c
+ arch/arm/kvm/arch_timer.c |    7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 0c4e643..78813b8 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -207,4 +207,7 @@ static inline void __cpu_init_hyp_mode(unsigned long long pgd_ptr,
- 	kvm_call_hyp((void *)pgd_low, pgd_high, hyp_stack_ptr, vector_ptr);
- }
+diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
+index 6ac938d..c55b608 100644
+--- a/arch/arm/kvm/arch_timer.c
++++ b/arch/arm/kvm/arch_timer.c
+@@ -22,6 +22,7 @@
+ #include <linux/kvm_host.h>
+ #include <linux/interrupt.h>
  
-+int kvm_perf_init(void);
-+int kvm_perf_teardown(void);
-+
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index 8dc5e76..53c5ed8 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -18,6 +18,6 @@ kvm-arm-y = $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o)
++#include <clocksource/arm_arch_timer.h>
+ #include <asm/arch_timer.h>
  
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
--obj-y += coproc.o coproc_a15.o mmio.o psci.o
-+obj-y += coproc.o coproc_a15.o mmio.o psci.o perf.o
- obj-$(CONFIG_KVM_ARM_VGIC) += vgic.o
- obj-$(CONFIG_KVM_ARM_TIMER) += arch_timer.o
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 1497e18..7403f88 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -920,7 +920,10 @@ static int init_hyp_mode(void)
- 	if (err)
- 		goto out_free_mappings;
- 
-+	kvm_perf_init();
-+
- 	kvm_info("Hyp mode initialized successfully\n");
-+
- 	return 0;
- out_free_vfp:
- 	free_percpu(kvm_host_vfp_state);
-@@ -964,6 +967,7 @@ out_err:
- /* NOP: Compiling as a module not supported */
- void kvm_arch_exit(void)
+ #include <asm/kvm_vgic.h>
+@@ -64,7 +65,7 @@ static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
  {
-+	kvm_perf_teardown();
- }
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
  
- static int arm_init(void)
-diff --git a/arch/arm/kvm/perf.c b/arch/arm/kvm/perf.c
-new file mode 100644
-index 0000000..1a3849d
---- /dev/null
-+++ b/arch/arm/kvm/perf.c
-@@ -0,0 +1,68 @@
-+/*
-+ * Based on the x86 implementation.
-+ *
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/perf_event.h>
-+#include <linux/kvm_host.h>
-+
-+#include <asm/kvm_emulate.h>
-+
-+static int kvm_is_in_guest(void)
-+{
-+        return kvm_arm_get_running_vcpu() != NULL;
-+}
-+
-+static int kvm_is_user_mode(void)
-+{
-+	struct kvm_vcpu *vcpu;
-+
-+	vcpu = kvm_arm_get_running_vcpu();
-+
-+	if (vcpu)
-+		return !vcpu_mode_priv(vcpu);
-+
-+	return 0;
-+}
-+
-+static unsigned long kvm_get_guest_ip(void)
-+{
-+	struct kvm_vcpu *vcpu;
-+
-+	vcpu = kvm_arm_get_running_vcpu();
-+
-+	if (vcpu)
-+		return *vcpu_pc(vcpu);
-+
-+	return 0;
-+}
-+
-+static struct perf_guest_info_callbacks kvm_guest_cbs = {
-+	.is_in_guest	= kvm_is_in_guest,
-+	.is_user_mode	= kvm_is_user_mode,
-+	.get_guest_ip	= kvm_get_guest_ip,
-+};
-+
-+int kvm_perf_init(void)
-+{
-+	return perf_register_guest_info_callbacks(&kvm_guest_cbs);
-+}
-+
-+int kvm_perf_teardown(void)
-+{
-+	return perf_unregister_guest_info_callbacks(&kvm_guest_cbs);
-+}
+-	timer->cntv_ctl |= 1 << 1; /* Mask the interrupt in the guest */
++	timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
+ 	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+ 			    vcpu->arch.timer_cpu.irq->irq,
+ 			    vcpu->arch.timer_cpu.irq->level);
+@@ -133,8 +134,8 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	cycle_t cval, now;
+ 	u64 ns;
+ 
+-	/* Check if the timer is enabled and unmasked first */
+-	if ((timer->cntv_ctl & 3) != 1)
++	if ((timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) ||
++		!(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE))
+ 		return;
+ 
+ 	cval = timer->cntv_cval;
 -- 
 1.7.9.5
