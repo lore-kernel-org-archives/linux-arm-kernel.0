@@ -1,333 +1,59 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 30 Apr 2013 17:18:39 +0100
-Subject: [PATCH v10 1/2] arm: introduce psci_smp_ops
-In-Reply-To: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
-Message-ID: <1367338721-29152-1-git-send-email-stefano.stabellini@eu.citrix.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 30 Apr 2013 17:30:39 +0100
+Subject: [RFC PATCH 0/9] HugeTLB and THP support for ARM64.
+Message-ID: <1367339448-21727-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename virt_smp_ops to psci_smp_ops and move them to arch/arm/kernel/psci_smp.c.
-Remove mach-virt/platsmp.c, now unused.
-Compile psci_smp if CONFIG_ARM_PSCI and CONFIG_SMP.
+This series brings huge pages and transparent huge pages to ARM64.
+The functionality is very similar to x86, and a lot of code that can
+be used by both ARM64 and x86 is brought into mm to avoid the need
+for code duplication.
 
-Add a cpu_die smp_op based on psci_ops.cpu_off.
+One notable difference from x86 is that ARM64 supports normal pages
+that are 64KB. When 64KB pages are enabled, huge page and
+transparent huge pages are 512MB only, otherwise the sizes match
+x86.
 
-Initialize PSCI before setting smp_ops in setup_arch.
+This series applies to 3.9, and requires one additional patch
+ARM64: mm: Correct show_pte behaviour
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/164157.html
 
-If PSCI is available on the platform, prefer psci_smp_ops over the
-platform smp_ops.
+I've tested this under the ARMv8 models (Fast and Foundation) and
+the x86 code has been tested in a KVM guest. libhugetlbfs was used
+for testing under both architectures.
 
-Changes in v9:
-- move comment about PSCI interface from psci.h to psci_smp.c.
+Any comments would be greatly appreciated.
 
-Changes in v8:
-- merge "prefer psci_smp_ops over mdesc->smp" into this patch.
+Steve Capper (9):
+  mm: hugetlb: Copy huge_pmd_share from x86 to mm.
+  x86: mm: Remove x86 version of huge_pmd_share.
+  mm: hugetlb: Copy general hugetlb code from x86 to mm.
+  x86: mm: Remove general hugetlb code from x86.
+  ARM64: mm: Add support for flushing huge pages.
+  ARM64: mm: Restore memblock limit when map_mem finished.
+  ARM64: mm: HugeTLB support.
+  ARM64: mm: Introduce MAX_ZONE_ORDER for 64K and THP.
+  ARM64: mm: THP support.
 
-Changes in v6:
-- fixed return values for psci_smp_available and psci_init ifndef
-CONFIG_ARM_PSCI.
+ arch/arm64/Kconfig                     |  29 +++++
+ arch/arm64/include/asm/hugetlb.h       | 121 ++++++++++++++++++
+ arch/arm64/include/asm/pgtable-hwdef.h |   2 +
+ arch/arm64/include/asm/pgtable.h       |  56 +++++++++
+ arch/arm64/include/asm/tlb.h           |   6 +
+ arch/arm64/include/asm/tlbflush.h      |   2 +
+ arch/arm64/mm/Makefile                 |   1 +
+ arch/arm64/mm/fault.c                  |  19 +--
+ arch/arm64/mm/flush.c                  |   3 +-
+ arch/arm64/mm/hugetlbpage.c            |  70 +++++++++++
+ arch/arm64/mm/mmu.c                    |  19 ++-
+ arch/x86/Kconfig                       |   6 +
+ arch/x86/mm/hugetlbpage.c              | 187 ----------------------------
+ include/linux/hugetlb.h                |   4 +
+ mm/hugetlb.c                           | 219 +++++++++++++++++++++++++++++++--
+ 15 files changed, 526 insertions(+), 218 deletions(-)
+ create mode 100644 arch/arm64/include/asm/hugetlb.h
+ create mode 100644 arch/arm64/mm/hugetlbpage.c
 
-Changes in v5:
-- document psci_operations;
-- psci_init returns NULL.
-
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-CC: arnd at arndb.de
-CC: marc.zyngier at arm.com
-CC: linux at arm.linux.org.uk
-CC: nico at linaro.org
-CC: rob.herring at calxeda.com
----
- arch/arm/include/asm/psci.h  |    9 ++++
- arch/arm/kernel/Makefile     |    5 ++-
- arch/arm/kernel/psci.c       |    7 +--
- arch/arm/kernel/psci_smp.c   |   90 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/setup.c      |    7 +++-
- arch/arm/mach-virt/Makefile  |    1 -
- arch/arm/mach-virt/platsmp.c |   58 ---------------------------
- arch/arm/mach-virt/virt.c    |    3 -
- 8 files changed, 112 insertions(+), 68 deletions(-)
- create mode 100644 arch/arm/kernel/psci_smp.c
- delete mode 100644 arch/arm/mach-virt/platsmp.c
-
-diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-index ce0dbe7..c4ae171 100644
---- a/arch/arm/include/asm/psci.h
-+++ b/arch/arm/include/asm/psci.h
-@@ -32,5 +32,14 @@ struct psci_operations {
- };
- 
- extern struct psci_operations psci_ops;
-+extern struct smp_operations psci_smp_ops;
-+
-+#ifdef CONFIG_ARM_PSCI
-+void psci_init(void);
-+bool psci_smp_available(void);
-+#else
-+static inline void psci_init(void) { }
-+static inline bool psci_smp_available(void) { return false; }
-+#endif
- 
- #endif /* __ASM_ARM_PSCI_H */
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 5f3338e..dd9d90a 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -82,6 +82,9 @@ obj-$(CONFIG_DEBUG_LL)	+= debug.o
- obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- 
- obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
--obj-$(CONFIG_ARM_PSCI)		+= psci.o
-+ifeq ($(CONFIG_ARM_PSCI),y)
-+obj-y				+= psci.o
-+obj-$(CONFIG_SMP)		+= psci_smp.o
-+endif
- 
- extra-y := $(head-y) vmlinux.lds
-diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
-index 3653164..4693188 100644
---- a/arch/arm/kernel/psci.c
-+++ b/arch/arm/kernel/psci.c
-@@ -158,7 +158,7 @@ static const struct of_device_id psci_of_match[] __initconst = {
- 	{},
- };
- 
--static int __init psci_init(void)
-+void __init psci_init(void)
- {
- 	struct device_node *np;
- 	const char *method;
-@@ -166,7 +166,7 @@ static int __init psci_init(void)
- 
- 	np = of_find_matching_node(NULL, psci_of_match);
- 	if (!np)
--		return 0;
-+		return;
- 
- 	pr_info("probing function IDs from device-tree\n");
- 
-@@ -206,6 +206,5 @@ static int __init psci_init(void)
- 
- out_put_node:
- 	of_node_put(np);
--	return 0;
-+	return;
- }
--early_initcall(psci_init);
-diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-new file mode 100644
-index 0000000..6ef139d
---- /dev/null
-+++ b/arch/arm/kernel/psci_smp.c
-@@ -0,0 +1,90 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/irqchip/arm-gic.h>
-+#include <linux/smp.h>
-+#include <linux/of.h>
-+
-+#include <asm/psci.h>
-+#include <asm/smp_plat.h>
-+
-+/*
-+ * psci_smp assumes that the following is true about PSCI:
-+ *
-+ * cpu_suspend   Suspend the execution on a CPU
-+ * @state        we don't currently describe affinity levels, so just pass 0.
-+ * @entry_point  the first instruction to be executed on return
-+ * returns 0  success, < 0 on failure
-+ *
-+ * cpu_off       Power down a CPU
-+ * @state        we don't currently describe affinity levels, so just pass 0.
-+ * no return on successful call
-+ *
-+ * cpu_on        Power up a CPU
-+ * @cpuid        cpuid of target CPU, as from MPIDR
-+ * @entry_point  the first instruction to be executed on return
-+ * returns 0  success, < 0 on failure
-+ *
-+ * migrate       Migrate the context to a different CPU
-+ * @cpuid        cpuid of target CPU, as from MPIDR
-+ * returns 0  success, < 0 on failure
-+ *
-+ */
-+
-+extern void secondary_startup(void);
-+
-+static int __cpuinit psci_boot_secondary(unsigned int cpu,
-+					 struct task_struct *idle)
-+{
-+	if (psci_ops.cpu_on)
-+		return psci_ops.cpu_on(cpu_logical_map(cpu),
-+				       __pa(secondary_startup));
-+	return -ENODEV;
-+}
-+
-+static void __cpuinit psci_secondary_init(unsigned int cpu)
-+{
-+	gic_secondary_init(0);
-+}
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+void __ref psci_cpu_die(unsigned int cpu)
-+{
-+       const struct psci_power_state ps = {
-+               .type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-+       };
-+
-+       if (psci_ops.cpu_off)
-+               psci_ops.cpu_off(ps);
-+
-+       /* We should never return */
-+       panic("psci: cpu %d failed to shutdown\n", cpu);
-+}
-+#else
-+#define psci_cpu_die NULL
-+#endif
-+
-+bool __init psci_smp_available(void)
-+{
-+	/* is cpu_on available@least? */
-+	return (psci_ops.cpu_on != NULL);
-+}
-+
-+struct smp_operations __initdata psci_smp_ops = {
-+	.smp_secondary_init	= psci_secondary_init,
-+	.smp_boot_secondary	= psci_boot_secondary,
-+	.cpu_die		= psci_cpu_die,
-+};
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 3f6cbb2..dad3048 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -36,6 +36,7 @@
- #include <asm/cputype.h>
- #include <asm/elf.h>
- #include <asm/procinfo.h>
-+#include <asm/psci.h>
- #include <asm/sections.h>
- #include <asm/setup.h>
- #include <asm/smp_plat.h>
-@@ -766,9 +767,13 @@ void __init setup_arch(char **cmdline_p)
- 	unflatten_device_tree();
- 
- 	arm_dt_init_cpu_maps();
-+	psci_init();
- #ifdef CONFIG_SMP
- 	if (is_smp()) {
--		smp_set_ops(mdesc->smp);
-+		if (psci_smp_available())
-+			smp_set_ops(&psci_smp_ops);
-+		else if (mdesc->smp)
-+			smp_set_ops(mdesc->smp);
- 		smp_init_cpus();
- 	}
- #endif
-diff --git a/arch/arm/mach-virt/Makefile b/arch/arm/mach-virt/Makefile
-index 042afc1..7ddbfa6 100644
---- a/arch/arm/mach-virt/Makefile
-+++ b/arch/arm/mach-virt/Makefile
-@@ -3,4 +3,3 @@
- #
- 
- obj-y					:= virt.o
--obj-$(CONFIG_SMP)			+= platsmp.o
-diff --git a/arch/arm/mach-virt/platsmp.c b/arch/arm/mach-virt/platsmp.c
-deleted file mode 100644
-index 8badaab..0000000
---- a/arch/arm/mach-virt/platsmp.c
-+++ /dev/null
-@@ -1,58 +0,0 @@
--/*
-- * Dummy Virtual Machine - does what it says on the tin.
-- *
-- * Copyright (C) 2012 ARM Ltd
-- * Author: Will Deacon <will.deacon@arm.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#include <linux/init.h>
--#include <linux/smp.h>
--#include <linux/of.h>
--
--#include <linux/irqchip/arm-gic.h>
--
--#include <asm/psci.h>
--#include <asm/smp_plat.h>
--
--extern void secondary_startup(void);
--
--static void __init virt_smp_init_cpus(void)
--{
--}
--
--static void __init virt_smp_prepare_cpus(unsigned int max_cpus)
--{
--}
--
--static int __cpuinit virt_boot_secondary(unsigned int cpu,
--					 struct task_struct *idle)
--{
--	if (psci_ops.cpu_on)
--		return psci_ops.cpu_on(cpu_logical_map(cpu),
--				       __pa(secondary_startup));
--	return -ENODEV;
--}
--
--static void __cpuinit virt_secondary_init(unsigned int cpu)
--{
--	gic_secondary_init(0);
--}
--
--struct smp_operations __initdata virt_smp_ops = {
--	.smp_init_cpus		= virt_smp_init_cpus,
--	.smp_prepare_cpus	= virt_smp_prepare_cpus,
--	.smp_secondary_init	= virt_secondary_init,
--	.smp_boot_secondary	= virt_boot_secondary,
--};
-diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
-index 31666f6..4438ed0 100644
---- a/arch/arm/mach-virt/virt.c
-+++ b/arch/arm/mach-virt/virt.c
-@@ -43,12 +43,9 @@ static const char *virt_dt_match[] = {
- 	NULL
- };
- 
--extern struct smp_operations virt_smp_ops;
--
- DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
- 	.init_irq	= irqchip_init,
- 	.init_time	= virt_timer_init,
- 	.init_machine	= virt_init,
--	.smp		= smp_ops(virt_smp_ops),
- 	.dt_compat	= virt_dt_match,
- MACHINE_END
 -- 
-1.7.2.5
+1.8.1.4
