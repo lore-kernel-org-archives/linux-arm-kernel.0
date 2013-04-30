@@ -1,66 +1,152 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Tue, 30 Apr 2013 07:49:21 -0700
-Subject: [GIT PULL v2] KVM/ARM Changes for 3.10
-Message-ID: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
+Date: Tue, 30 Apr 2013 07:49:22 -0700
+Subject: [PATCH 01/15] ARM: KVM: add support for minimal host vs guest
+ profiling
+In-Reply-To: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
+References: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
+Message-ID: <1367333376-30983-2-git-send-email-cdall@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcelo and Gleb,
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-These are the changes for KVM/ARM for 3.10.
+In order to be able to correctly profile what is happening on the
+host, we need to be able to identify when we're running on the guest,
+and log these events differently.
 
-The patches depend on the cleanup branch, which you've already merged.
+Perf offers a simple way to register callbacks into KVM. Mimic what
+x86 does and enjoy being able to profile your KVM host.
 
-Main thing is the reworking of Hyp idmaps, which is now handled by KVM
-instead of arm/mm and includes several nasty bug fixes from Marc in
-the progress.
-
- [v2] No changes since v1, except sending patch series with this one.
-
-Thanks!
-
-Andre Przywara (1):
-  ARM: KVM: iterate over all CPUs for CPU compatibility check
-
-Arnd Bergmann (1):
-  ARM: KVM: define KVM_ARM_MAX_VCPUS unconditionally
-
-Christoffer Dall (2):
-  KVM: ARM: Fix API documentation for ONE_REG encoding
-  KVM: ARM: Fix spelling in error message
-
-Marc Zyngier (10):
-  ARM: KVM: add support for minimal host vs guest profiling
-  ARM: KVM: simplify HYP mapping population
-  ARM: KVM: fix HYP mapping limitations around zero
-  ARM: KVM: move to a KVM provided HYP idmap
-  ARM: KVM: enforce maximum size for identity mapped code
-  ARM: KVM: rework HYP page table freeing
-  ARM: KVM: switch to a dual-step HYP init code
-  ARM: KVM: perform HYP initilization for hotplugged CPUs
-  ARM: KVM: add architecture specific hook for capabilities
-  ARM: KVM: promote vfp_host pointer to generic host cpu context
-
-Mark Rutland (1):
-  ARM: KVM: arch_timer: use symbolic constants
-
- Documentation/virtual/kvm/api.txt |   12 +-
- arch/arm/include/asm/idmap.h      |    1 -
- arch/arm/include/asm/kvm_host.h   |   47 ++--
- arch/arm/include/asm/kvm_mmu.h    |   28 ++-
- arch/arm/kernel/asm-offsets.c     |    2 +-
- arch/arm/kernel/vmlinux.lds.S     |    7 +-
- arch/arm/kvm/Kconfig              |    6 +-
- arch/arm/kvm/Makefile             |    2 +-
- arch/arm/kvm/arch_timer.c         |    7 +-
- arch/arm/kvm/arm.c                |  111 +++++----
- arch/arm/kvm/handle_exit.c        |    2 +-
- arch/arm/kvm/init.S               |   78 +++++--
- arch/arm/kvm/mmu.c                |  455 +++++++++++++++++++++----------------
- arch/arm/kvm/perf.c               |   68 ++++++
- arch/arm/mm/idmap.c               |   32 +--
- 15 files changed, 532 insertions(+), 326 deletions(-)
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
+---
+ arch/arm/include/asm/kvm_host.h |    3 ++
+ arch/arm/kvm/Makefile           |    2 +-
+ arch/arm/kvm/arm.c              |    4 +++
+ arch/arm/kvm/perf.c             |   68 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 76 insertions(+), 1 deletion(-)
  create mode 100644 arch/arm/kvm/perf.c
 
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 0c4e643..78813b8 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -207,4 +207,7 @@ static inline void __cpu_init_hyp_mode(unsigned long long pgd_ptr,
+ 	kvm_call_hyp((void *)pgd_low, pgd_high, hyp_stack_ptr, vector_ptr);
+ }
+ 
++int kvm_perf_init(void);
++int kvm_perf_teardown(void);
++
+ #endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+index 8dc5e76..53c5ed8 100644
+--- a/arch/arm/kvm/Makefile
++++ b/arch/arm/kvm/Makefile
+@@ -18,6 +18,6 @@ kvm-arm-y = $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o)
+ 
+ obj-y += kvm-arm.o init.o interrupts.o
+ obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+-obj-y += coproc.o coproc_a15.o mmio.o psci.o
++obj-y += coproc.o coproc_a15.o mmio.o psci.o perf.o
+ obj-$(CONFIG_KVM_ARM_VGIC) += vgic.o
+ obj-$(CONFIG_KVM_ARM_TIMER) += arch_timer.o
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 1497e18..7403f88 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -920,7 +920,10 @@ static int init_hyp_mode(void)
+ 	if (err)
+ 		goto out_free_mappings;
+ 
++	kvm_perf_init();
++
+ 	kvm_info("Hyp mode initialized successfully\n");
++
+ 	return 0;
+ out_free_vfp:
+ 	free_percpu(kvm_host_vfp_state);
+@@ -964,6 +967,7 @@ out_err:
+ /* NOP: Compiling as a module not supported */
+ void kvm_arch_exit(void)
+ {
++	kvm_perf_teardown();
+ }
+ 
+ static int arm_init(void)
+diff --git a/arch/arm/kvm/perf.c b/arch/arm/kvm/perf.c
+new file mode 100644
+index 0000000..1a3849d
+--- /dev/null
++++ b/arch/arm/kvm/perf.c
+@@ -0,0 +1,68 @@
++/*
++ * Based on the x86 implementation.
++ *
++ * Copyright (C) 2012 ARM Ltd.
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/perf_event.h>
++#include <linux/kvm_host.h>
++
++#include <asm/kvm_emulate.h>
++
++static int kvm_is_in_guest(void)
++{
++        return kvm_arm_get_running_vcpu() != NULL;
++}
++
++static int kvm_is_user_mode(void)
++{
++	struct kvm_vcpu *vcpu;
++
++	vcpu = kvm_arm_get_running_vcpu();
++
++	if (vcpu)
++		return !vcpu_mode_priv(vcpu);
++
++	return 0;
++}
++
++static unsigned long kvm_get_guest_ip(void)
++{
++	struct kvm_vcpu *vcpu;
++
++	vcpu = kvm_arm_get_running_vcpu();
++
++	if (vcpu)
++		return *vcpu_pc(vcpu);
++
++	return 0;
++}
++
++static struct perf_guest_info_callbacks kvm_guest_cbs = {
++	.is_in_guest	= kvm_is_in_guest,
++	.is_user_mode	= kvm_is_user_mode,
++	.get_guest_ip	= kvm_get_guest_ip,
++};
++
++int kvm_perf_init(void)
++{
++	return perf_register_guest_info_callbacks(&kvm_guest_cbs);
++}
++
++int kvm_perf_teardown(void)
++{
++	return perf_unregister_guest_info_callbacks(&kvm_guest_cbs);
++}
 -- 
 1.7.9.5
