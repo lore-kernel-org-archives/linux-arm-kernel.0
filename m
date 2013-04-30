@@ -1,48 +1,40 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 30 Apr 2013 15:51:33 +0100
-Subject: [GIT PULL] (arm/xen) 3.9-rc3-smp-6-tag
-Message-ID: <alpine.DEB.2.02.1304301515490.5398@kaball.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Apr 2013 17:07:57 +0200
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <1367332685.945287573@f287.mail.ru>
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+ <517F753F.5090909@ti.com> <1367332685.945287573@f287.mail.ru>
+Message-ID: <201304301707.57197.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-this is my first pull request to you, Konrad decided to let me deal
-with the Xen/ARM stuff myself recently.
-Please pull the following tag (based on 3.9-rc3):
+On Tuesday 30 April 2013, Alexander Shiyan wrote:
+> > On 04/04/2013 05:39 AM, Stephen Warren wrote:
+> > > A simple frame-buffer describes a raw memory region that may be rendered
+> > > to, with the assumption that the display hardware has already been set
+> > > up to scan out from that buffer.
+> > > 
+> > > This is useful in cases where a bootloader exists and has set up the
+> > > display hardware, but a Linux driver doesn't yet exist for the display
+> > > hardware.
+> > > 
+> > > Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+> ...
+> > > +   framebuffer {
+> > > +           compatible = "simple-framebuffer";
+> > > +           reg = <0x1d385000 (1600 * 1200 * 2)>;
+> > > +           width = <1600>;
+> > > +           height = <1200>;
+> > > +           stride = <(1600 * 2)>;
+> > > +           format = "r5g6b5";
+> > > +   };
+> > 
+> > I'm not an expert on DT, but I think the point of DT is to describe the
+> > hardware. This doesn't describe the hardware at all.
+> 
+> On my incompetent opinion, "bpp" parameter can replace size of
+> framebuffer and "stride". Is not it?
 
-git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git 3.9-rc3-smp-6-tag
+Not necessarily: you could have a stride that is larger than a line.
 
-It contains a bunch of Xen/ARM specific changes, including some fixes,
-SMP support for Xen on ARM, and moving the xenvm machine from
-mach-vexpress to mach-virt.
-
-The non-Xen files that are touched are arch/arm/Kconfig, to select
-ARM_PSCI on XEN, and arch/arm/boot/dts/Makefile, to build the xenvm DTB
-if CONFIG_ARCH_VIRT.
-
-
-Stefano Stabellini (7):
-      xen/arm: actually pass a non-NULL percpu pointer to request_percpu_irq
-      xen/arm: implement HYPERVISOR_vcpu_op
-      xen/arm: SMP support
-      xen: move the xenvm machine to mach-virt
-      xen/arm: XEN selects ARM_PSCI
-      xenvm: add a simple PSCI node and a second cpu
-      xen/arm: use sched_op hypercalls for machine reboot and power off
-
-Wei Yongjun (1):
-      xen/arm: remove duplicated include from enlighten.c
-
- arch/arm/Kconfig                     |    1 +
- arch/arm/boot/dts/Makefile           |    4 +-
- arch/arm/boot/dts/xenvm-4.2.dts      |   13 ++++++
- arch/arm/include/asm/xen/hypercall.h |    1 +
- arch/arm/mach-vexpress/v2m.c         |    1 -
- arch/arm/mach-virt/virt.c            |    1 +
- arch/arm/xen/enlighten.c             |   74 ++++++++++++++++++++++++++++++---
- arch/arm/xen/hypercall.S             |    1 +
- 8 files changed, 86 insertions(+), 10 deletions(-)
-
-
-Cheers,
-Stefano
+	Arnd
