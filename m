@@ -1,49 +1,50 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Mon, 29 Apr 2013 19:52:41 -0700
-Subject: [GIT PULL] KVM/ARM Changes for 3.10
-In-Reply-To: <20130430021136.GB14088@amt.cnet>
-References: <CAEDV+gKXcCb11p5YCQRbQ1OwGefxYUr0sh8f4AOfxQSPPo2LMQ@mail.gmail.com>
- <20130430021136.GB14088@amt.cnet>
-Message-ID: <CAEDV+gLbqUgzkRoToYKSBTXKzUkY40fO80rcviu-EHcbxYjL4A@mail.gmail.com>
+From: dhobsong@igel.co.jp (Damian Hobson-Garcia)
+Date: Tue, 30 Apr 2013 12:01:39 +0900
+Subject: [PATCH v2 0/4] dma-mapping: Define dma_{alloc,
+ free}_attrs() for all archs
+Message-ID: <1367290899-10410-1-git-send-email-dhobsong@igel.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 29, 2013 at 7:11 PM, Marcelo Tosatti <mtosatti@redhat.com> wrote:
-> On Sun, Apr 28, 2013 at 10:29:07PM -0700, Christoffer Dall wrote:
->> Hi Marcelo and Gleb,
->>
->> These are the changes for KVM/ARM for 3.10.
->>
->> The patches depend on the cleanup branch, which you've already merged.
->>
->> Main thing is the reworking of Hyp idmaps, which is now handled by KVM
->> instead of arm/mm and includes several nasty bug fixes from Marc in
->> the progress.
->>
->> Thanks!
->>
->> The following changes since commit 5a2892ce72e010e3cb96b438d7cdddce0c88e0e6:
->>
->>   KVM: nVMX: Skip PF interception check when queuing during nested run
->> (2013-04-28 13:34:39 +0300)
->>
->> are available in the git repository at:
->>
->>   git://github.com/columbia/linux-kvm-arm.git kvm-arm-for-3.10
->>
->> for you to fetch changes up to d4e071ce6acf8d5eddb7615a953193a8b0ad7c38:
->>
->>   ARM: KVM: iterate over all CPUs for CPU compatibility check
->> (2013-04-28 22:23:23 -0700)
->
-> Christoffer,
->
-> Please email the patches to kvm at vger.
->
->
+Most architectures that define CONFIG_HAVE_DMA=y, have implementations for
+both dma_alloc_attrs() and dma_free_attrs().  All achitectures that do
+not define CONFIG_HAVE_DMA also have both of these definitions provided by
+dma-mapping-broken.h.
 
-each of them were already cc'ed on the kvm mailing list when they were
-reviewed I believe, but would you like to have them re-sent as they
-are not in this pull request even if it means re-sending them?
+Provide a default definition for the archs that define CONFIG_HAVE_DMA=y,
+but have no implementation for dma_{alloc,free}_attrs(). 
 
--Christoffer
+As I don't have hardware for any of these systems, the patches are only
+compile-tested where I could (arm64, s390) and untested for the archs
+where I couldn't find a readily available prebuilt cross-compiler (c6x, parisc).
+
+Changes from v1
+---------------
+
+arm64, s390:
+ * Since these archs are using dma_ops, pass appropirate value for attrs to 
+   dma_ops->alloc().
+ * Indicate that these patches are compile teseted only (I don't have hardware)
+
+
+c6x, parisc:
+ * Indicate that these patches are untested (I don't have cross compilers)
+
+Cheers,
+Damian 
+
+
+Damian Hobson-Garcia (4):
+  arm64: Provide default implementation for dma_{alloc,free}_attrs
+  c6x: Provide default implementation for dma_{alloc,free}_attrs
+  parisc: Provide default implementation for dma_{alloc,free}_attrs
+  s390: Provide default implementation for dma_{alloc,free}_attrs
+
+ arch/arm64/include/asm/dma-mapping.h  |   17 +++++++++++------
+ arch/c6x/include/asm/dma-mapping.h    |    3 +++
+ arch/parisc/include/asm/dma-mapping.h |    3 +++
+ arch/s390/include/asm/dma-mapping.h   |   17 +++++++++++------
+ 4 files changed, 28 insertions(+), 12 deletions(-)
+
+-- 
+1.7.5.4
