@@ -1,210 +1,162 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Tue, 30 Apr 2013 07:49:24 -0700
-Subject: [PATCH 03/15] ARM: KVM: simplify HYP mapping population
+Date: Tue, 30 Apr 2013 07:49:26 -0700
+Subject: [PATCH 05/15] ARM: KVM: move to a KVM provided HYP idmap
 In-Reply-To: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
 References: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
-Message-ID: <1367333376-30983-4-git-send-email-cdall@cs.columbia.edu>
+Message-ID: <1367333376-30983-6-git-send-email-cdall@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-The way we populate HYP mappings is a bit convoluted, to say the least.
-Passing a pointer around to keep track of the current PFN is quite
-odd, and we end-up having two different PTE accessors for no good
-reason.
+After the HYP page table rework, it is pretty easy to let the KVM
+code provide its own idmap, rather than expecting the kernel to
+provide it. It takes actually less code to do so.
 
-Simplify the whole thing by unifying the two PTE accessors, passing
-a pgprot_t around, and moving the various validity checks to the
-upper layers.
-
+Acked-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
 ---
- arch/arm/kvm/mmu.c |  102 ++++++++++++++++++++++------------------------------
- 1 file changed, 42 insertions(+), 60 deletions(-)
+ arch/arm/include/asm/idmap.h   |    1 -
+ arch/arm/include/asm/kvm_mmu.h |    1 -
+ arch/arm/kvm/mmu.c             |   24 +++++++++++++++++++++++-
+ arch/arm/mm/idmap.c            |   32 +-------------------------------
+ 4 files changed, 24 insertions(+), 34 deletions(-)
 
+diff --git a/arch/arm/include/asm/idmap.h b/arch/arm/include/asm/idmap.h
+index 1a66f907..bf863ed 100644
+--- a/arch/arm/include/asm/idmap.h
++++ b/arch/arm/include/asm/idmap.h
+@@ -8,7 +8,6 @@
+ #define __idmap __section(.idmap.text) noinline notrace
+ 
+ extern pgd_t *idmap_pgd;
+-extern pgd_t *hyp_pgd;
+ 
+ void setup_mm_for_reboot(void);
+ 
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 970f3b5..3c71a1d 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -21,7 +21,6 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/pgalloc.h>
+-#include <asm/idmap.h>
+ 
+ /*
+  * We directly use the kernel VA for the HYP, as we can directly share
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 2f12e40..3003321 100644
+index 96d61da..bfc5927 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -125,54 +125,34 @@ void free_hyp_pmds(void)
- }
+@@ -32,6 +32,7 @@
  
- static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
--				    unsigned long end)
-+				    unsigned long end, unsigned long pfn,
-+				    pgprot_t prot)
+ extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+ 
++static pgd_t *hyp_pgd;
+ static DEFINE_MUTEX(kvm_hyp_pgd_mutex);
+ 
+ static void kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
+@@ -715,12 +716,33 @@ phys_addr_t kvm_mmu_get_httbr(void)
+ 
+ int kvm_mmu_init(void)
  {
- 	pte_t *pte;
- 	unsigned long addr;
--	struct page *page;
- 
--	for (addr = start & PAGE_MASK; addr < end; addr += PAGE_SIZE) {
--		unsigned long hyp_addr = KERN_TO_HYP(addr);
--
--		pte = pte_offset_kernel(pmd, hyp_addr);
--		BUG_ON(!virt_addr_valid(addr));
--		page = virt_to_page(addr);
--		kvm_set_pte(pte, mk_pte(page, PAGE_HYP));
--	}
--}
--
--static void create_hyp_io_pte_mappings(pmd_t *pmd, unsigned long start,
--				       unsigned long end,
--				       unsigned long *pfn_base)
--{
--	pte_t *pte;
--	unsigned long addr;
--
--	for (addr = start & PAGE_MASK; addr < end; addr += PAGE_SIZE) {
--		unsigned long hyp_addr = KERN_TO_HYP(addr);
--
--		pte = pte_offset_kernel(pmd, hyp_addr);
--		BUG_ON(pfn_valid(*pfn_base));
--		kvm_set_pte(pte, pfn_pte(*pfn_base, PAGE_HYP_DEVICE));
--		(*pfn_base)++;
-+	for (addr = start; addr < end; addr += PAGE_SIZE) {
-+		pte = pte_offset_kernel(pmd, addr);
-+		kvm_set_pte(pte, pfn_pte(pfn, prot));
-+		pfn++;
- 	}
- }
- 
- static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
--				   unsigned long end, unsigned long *pfn_base)
-+				   unsigned long end, unsigned long pfn,
-+				   pgprot_t prot)
- {
- 	pmd_t *pmd;
- 	pte_t *pte;
- 	unsigned long addr, next;
- 
- 	for (addr = start; addr < end; addr = next) {
--		unsigned long hyp_addr = KERN_TO_HYP(addr);
--		pmd = pmd_offset(pud, hyp_addr);
-+		pmd = pmd_offset(pud, addr);
- 
- 		BUG_ON(pmd_sect(*pmd));
- 
- 		if (pmd_none(*pmd)) {
--			pte = pte_alloc_one_kernel(NULL, hyp_addr);
-+			pte = pte_alloc_one_kernel(NULL, addr);
- 			if (!pte) {
- 				kvm_err("Cannot allocate Hyp pte\n");
- 				return -ENOMEM;
-@@ -182,25 +162,17 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
- 
- 		next = pmd_addr_end(addr, end);
- 
--		/*
--		 * If pfn_base is NULL, we map kernel pages into HYP with the
--		 * virtual address. Otherwise, this is considered an I/O
--		 * mapping and we map the physical region starting at
--		 * *pfn_base to [start, end[.
--		 */
--		if (!pfn_base)
--			create_hyp_pte_mappings(pmd, addr, next);
--		else
--			create_hyp_io_pte_mappings(pmd, addr, next, pfn_base);
-+		create_hyp_pte_mappings(pmd, addr, next, pfn, prot);
-+		pfn += (next - addr) >> PAGE_SHIFT;
++	unsigned long hyp_idmap_start = virt_to_phys(__hyp_idmap_text_start);
++	unsigned long hyp_idmap_end = virt_to_phys(__hyp_idmap_text_end);
++	int err;
++
++	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
+ 	if (!hyp_pgd) {
+ 		kvm_err("Hyp mode PGD not allocated\n");
+-		return -ENOMEM;
++		err = -ENOMEM;
++		goto out;
++	}
++
++	/* Create the idmap in the boot page tables */
++	err = 	__create_hyp_mappings(boot_hyp_pgd,
++				      hyp_idmap_start, hyp_idmap_end,
++				      __phys_to_pfn(hyp_idmap_start),
++				      PAGE_HYP);
++
++	if (err) {
++		kvm_err("Failed to idmap %lx-%lx\n",
++			hyp_idmap_start, hyp_idmap_end);
++		goto out;
  	}
  
  	return 0;
- }
- 
--static int __create_hyp_mappings(void *from, void *to, unsigned long *pfn_base)
-+static int __create_hyp_mappings(pgd_t *pgdp,
-+				 unsigned long start, unsigned long end,
-+				 unsigned long pfn, pgprot_t prot)
- {
--	unsigned long start = (unsigned long)from;
--	unsigned long end = (unsigned long)to;
- 	pgd_t *pgd;
- 	pud_t *pud;
- 	pmd_t *pmd;
-@@ -209,21 +181,14 @@ static int __create_hyp_mappings(void *from, void *to, unsigned long *pfn_base)
- 
- 	if (start >= end)
- 		return -EINVAL;
--	/* Check for a valid kernel memory mapping */
--	if (!pfn_base && (!virt_addr_valid(from) || !virt_addr_valid(to - 1)))
--		return -EINVAL;
--	/* Check for a valid kernel IO mapping */
--	if (pfn_base && (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1)))
--		return -EINVAL;
- 
- 	mutex_lock(&kvm_hyp_pgd_mutex);
--	for (addr = start; addr < end; addr = next) {
--		unsigned long hyp_addr = KERN_TO_HYP(addr);
--		pgd = hyp_pgd + pgd_index(hyp_addr);
--		pud = pud_offset(pgd, hyp_addr);
-+	for (addr = start & PAGE_MASK; addr < end; addr = next) {
-+		pgd = pgdp + pgd_index(addr);
-+		pud = pud_offset(pgd, addr);
- 
- 		if (pud_none_or_clear_bad(pud)) {
--			pmd = pmd_alloc_one(NULL, hyp_addr);
-+			pmd = pmd_alloc_one(NULL, addr);
- 			if (!pmd) {
- 				kvm_err("Cannot allocate Hyp pmd\n");
- 				err = -ENOMEM;
-@@ -233,9 +198,10 @@ static int __create_hyp_mappings(void *from, void *to, unsigned long *pfn_base)
- 		}
- 
- 		next = pgd_addr_end(addr, end);
--		err = create_hyp_pmd_mappings(pud, addr, next, pfn_base);
-+		err = create_hyp_pmd_mappings(pud, addr, next, pfn, prot);
- 		if (err)
- 			goto out;
-+		pfn += (next - addr) >> PAGE_SHIFT;
- 	}
- out:
- 	mutex_unlock(&kvm_hyp_pgd_mutex);
-@@ -255,22 +221,38 @@ out:
-  */
- int create_hyp_mappings(void *from, void *to)
- {
--	return __create_hyp_mappings(from, to, NULL);
-+	unsigned long phys_addr = virt_to_phys(from);
-+	unsigned long start = KERN_TO_HYP((unsigned long)from);
-+	unsigned long end = KERN_TO_HYP((unsigned long)to);
-+
-+	/* Check for a valid kernel memory mapping */
-+	if (!virt_addr_valid(from) || !virt_addr_valid(to - 1))
-+		return -EINVAL;
-+
-+	return __create_hyp_mappings(hyp_pgd, start, end,
-+				     __phys_to_pfn(phys_addr), PAGE_HYP);
++out:
++	kfree(hyp_pgd);
++	return err;
  }
  
  /**
-  * create_hyp_io_mappings - duplicate a kernel IO mapping into Hyp mode
-  * @from:	The kernel start VA of the range
-  * @to:		The kernel end VA of the range (exclusive)
-- * @addr:	The physical start address which gets mapped
-+ * @phys_addr:	The physical start address which gets mapped
-  *
-  * The resulting HYP VA is the same as the kernel VA, modulo
-  * HYP_PAGE_OFFSET.
-  */
--int create_hyp_io_mappings(void *from, void *to, phys_addr_t addr)
-+int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
- {
--	unsigned long pfn = __phys_to_pfn(addr);
--	return __create_hyp_mappings(from, to, &pfn);
-+	unsigned long start = KERN_TO_HYP((unsigned long)from);
-+	unsigned long end = KERN_TO_HYP((unsigned long)to);
-+
-+	/* Check for a valid kernel IO mapping */
-+	if (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1))
-+		return -EINVAL;
-+
-+	return __create_hyp_mappings(hyp_pgd, start, end,
-+				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 5ee505c..83cb3ac 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -8,7 +8,6 @@
+ #include <asm/pgtable.h>
+ #include <asm/sections.h>
+ #include <asm/system_info.h>
+-#include <asm/virt.h>
+ 
+ pgd_t *idmap_pgd;
+ 
+@@ -83,37 +82,10 @@ static void identity_mapping_add(pgd_t *pgd, const char *text_start,
+ 	} while (pgd++, addr = next, addr != end);
  }
  
- /**
+-#if defined(CONFIG_ARM_VIRT_EXT) && defined(CONFIG_ARM_LPAE)
+-pgd_t *hyp_pgd;
+-
+-extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+-
+-static int __init init_static_idmap_hyp(void)
+-{
+-	hyp_pgd = kzalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
+-	if (!hyp_pgd)
+-		return -ENOMEM;
+-
+-	pr_info("Setting up static HYP identity map for 0x%p - 0x%p\n",
+-		__hyp_idmap_text_start, __hyp_idmap_text_end);
+-	identity_mapping_add(hyp_pgd, __hyp_idmap_text_start,
+-			     __hyp_idmap_text_end, PMD_SECT_AP1);
+-
+-	return 0;
+-}
+-#else
+-static int __init init_static_idmap_hyp(void)
+-{
+-	return 0;
+-}
+-#endif
+-
+ extern char  __idmap_text_start[], __idmap_text_end[];
+ 
+ static int __init init_static_idmap(void)
+ {
+-	int ret;
+-
+ 	idmap_pgd = pgd_alloc(&init_mm);
+ 	if (!idmap_pgd)
+ 		return -ENOMEM;
+@@ -123,12 +95,10 @@ static int __init init_static_idmap(void)
+ 	identity_mapping_add(idmap_pgd, __idmap_text_start,
+ 			     __idmap_text_end, 0);
+ 
+-	ret = init_static_idmap_hyp();
+-
+ 	/* Flush L1 for the hardware to see this page table content */
+ 	flush_cache_louis();
+ 
+-	return ret;
++	return 0;
+ }
+ early_initcall(init_static_idmap);
+ 
 -- 
 1.7.9.5
