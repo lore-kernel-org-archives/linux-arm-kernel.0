@@ -1,40 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 30 Apr 2013 09:11:04 -0700
-Subject: Latest build results - errors/warnings - lots of them
-In-Reply-To: <201304301304.20650.arnd@arndb.de>
-References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
- <201304301304.20650.arnd@arndb.de>
-Message-ID: <20130430161104.GB26257@atomide.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 30 Apr 2013 17:17:32 +0100
+Subject: [PATCH v10 0/2] (arm-soc for v3.10) arm: introduce psci_smp_ops
+Message-ID: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [130430 04:10]:
-> On Tuesday 30 April 2013, Russell King - ARM Linux wrote:
-> > Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
-> > great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
-> > arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
-> > source of errors.
-> 
-> Yes, I noticed this but haven't gotten around to prepare a patch. I'll comment
-> below.
-> 
-> > OMAP stuff needs a serious look at too - much Kconfig madness there
-> > caused by over-use of select, which then goes on to cause build errors
-> > because it assumes some stuff is always enabled.
+Hi all,
+this is the tenth version of the patch series to move virt_smp_ops out
+of mach-virt and make it a generic set of reusable PSCI based smp_ops.
+psci_smp_ops are preferred over the platform smp_ops.  The last patch
+introduces smp_init.
 
-I have posted a few randconfig fixes in "[PATCH 0/3] few omap randconfig
-fixes for v3.10" that also remove the select of SERIAL_OMAP that I missed
-while fixing the 8250 issue. I was planning to send a pull request after
-the merge window, but can do it now too if people prefer that.
- 
-> Ack. I have not looked much at randconfig output, but this has certianly
-> grown worse after CONFIG_ARCH_OMAP has gotten included in ARCH_MULTIPLATFORM
+Changes in v10:
+- add include <linux/types.h> to mach/arch.h.
 
-I have a patch coming for the "no SoC selected" randconfig issue as
-discussed in the "linux-next ARM multi-platform randconfig errors"
-thread. I suggest we do the minimal fix I already posted for now,
-then reorganize more of the Makefile as Arnd suggested for v3.11.
 
-Regards,
 
-Tony
+Jon Medhurst (1):
+      ARM: Enable selection of SMP operations at boot time
+
+Stefano Stabellini (1):
+      arm: introduce psci_smp_ops
+
+ arch/arm/include/asm/mach/arch.h |    5 ++
+ arch/arm/include/asm/psci.h      |    9 ++++
+ arch/arm/kernel/Makefile         |    5 ++-
+ arch/arm/kernel/psci.c           |    7 +--
+ arch/arm/kernel/psci_smp.c       |   90 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/setup.c          |    9 +++-
+ arch/arm/mach-virt/Makefile      |    1 -
+ arch/arm/mach-virt/platsmp.c     |   58 ------------------------
+ arch/arm/mach-virt/virt.c        |    3 -
+ 9 files changed, 119 insertions(+), 68 deletions(-)
+ create mode 100644 arch/arm/kernel/psci_smp.c
+ delete mode 100644 arch/arm/mach-virt/platsmp.c
+
+
+git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git 3.9-rc3-psci-ops-10-tag
+
+Cheers,
+
+Stefano
