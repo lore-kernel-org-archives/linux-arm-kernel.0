@@ -1,65 +1,27 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 31 May 2013 20:59:29 -0700
-Subject: [PATCH 1/3] ARM: EXYNOS: uncompress - print debug messages if
- DEBUG_LL is defined
-In-Reply-To: <1370000944-19786-2-git-send-email-tushar.behera@linaro.org>
-References: <1370000944-19786-1-git-send-email-tushar.behera@linaro.org>
- <1370000944-19786-2-git-send-email-tushar.behera@linaro.org>
-Message-ID: <20130601035929.GA3868@quad.lixom.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 1 May 2013 02:42:36 +0400
+Subject: [PATCH v7 0/9] Reorganize R8A7779/Marzen USB code
+Message-ID: <201305010242.37483.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 05:19:02PM +0530, Tushar Behera wrote:
-> Printing low-level debug messages make an assumption that the specified
-> UART port has been preconfigured by the bootloader. Incorrectly
-> specified UART port results in system getting stalled while printing the
-> message "Uncompressing Linux... done, booting the kernel"
-> 
-> This UART port number is specified through S3C_LOWLEVEL_UART_PORT. Since
-> the UART port might different for different board, it is not possible to
-> specify it correctly for every board that use a common defconfig file.
-> 
-> Calling this print subroutine only when DEBUG_LL fixes the problem. By
-> disabling DEBUG_LL in default config file, we would be able to boot
-> multiple boards with different default UART ports.
-> 
-> With this current approach, we miss the print "Uncompressing Linux...
-> done, booting the kernel." when DEBUG_LL is not defined.
-> 
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> ---
->  arch/arm/mach-exynos/include/mach/uncompress.h  |   11 ++++++++---
->  arch/arm/plat-samsung/include/plat/uncompress.h |   10 +++++++++-
->  2 files changed, 17 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/include/mach/uncompress.h b/arch/arm/mach-exynos/include/mach/uncompress.h
-> index 2979995..730f69f 100644
-> --- a/arch/arm/mach-exynos/include/mach/uncompress.h
-> +++ b/arch/arm/mach-exynos/include/mach/uncompress.h
-> @@ -37,11 +37,16 @@ static void arch_detect_cpu(void)
->  	chip_id >>= 20;
->  	chip_id &= 0xf;
->  
-> +#ifdef CONFIG_DEBUG_LL
->  	if (chip_id == 0x5)
-> -		uart_base = (volatile u8 *)EXYNOS5_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
-> +		uart_base = (volatile u8 *)EXYNOS5_PA_UART +
-> +			(S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
->  	else
-> -		uart_base = (volatile u8 *)EXYNOS4_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
-> -
-> +		uart_base = (volatile u8 *)EXYNOS4_PA_UART +
-> +			(S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
-> +#else
-> +	uart_base = NULL;
-> +#endif
+Hello.
 
-You can do:
+   Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
+'renesas-next-20130426' tag.  It was created to fix the shortcomings in the
+R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
+spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
+to touch both subtrees). The patches were conceived with the complete
+bisectability goal in mind.
 
-	if (!config_enabled(CONFIG_DEBUG_LL))
-		return;
+[1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+[2/9] ehci-platform: add pre_setup() method to platform data
+[3/9] ARM: shmobile: r8a7779: setup EHCI internal buffer
+[4/9] rcar-phy: remove EHCI internal buffer setup
+[5/9] ARM: shmobile: r8a7779: remove USB PHY 2nd memory resource
+[6/9] rcar-phy: correct base address
+[7/9] rcar-phy: add platform data
+[8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
+[9/9] rcar-phy: handle platform data
 
-Since uart_base will be set to 0 by being in BSS anyway.
-
-
--Olof
+WBR, Sergei
