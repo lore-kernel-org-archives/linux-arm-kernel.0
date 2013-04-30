@@ -1,38 +1,66 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Tue, 30 Apr 2013 18:38:05 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCBWMl0gdmlkZW86IGltcGxlbWVudCBhIHNpbXBsZSBm?=
- =?UTF-8?B?cmFtZWJ1ZmZlciBkcml2ZXI=?=
-In-Reply-To: <517F753F.5090909@ti.com>
-References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
- <517F753F.5090909@ti.com>
-Message-ID: <1367332685.945287573@f287.mail.ru>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Tue, 30 Apr 2013 07:49:21 -0700
+Subject: [GIT PULL v2] KVM/ARM Changes for 3.10
+Message-ID: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 04/04/2013 05:39 AM, Stephen Warren wrote:
-> > A simple frame-buffer describes a raw memory region that may be rendered
-> > to, with the assumption that the display hardware has already been set
-> > up to scan out from that buffer.
-> > 
-> > This is useful in cases where a bootloader exists and has set up the
-> > display hardware, but a Linux driver doesn't yet exist for the display
-> > hardware.
-> > 
-> > Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
-...
-> > +	framebuffer {
-> > +		compatible = "simple-framebuffer";
-> > +		reg = <0x1d385000 (1600 * 1200 * 2)>;
-> > +		width = <1600>;
-> > +		height = <1200>;
-> > +		stride = <(1600 * 2)>;
-> > +		format = "r5g6b5";
-> > +	};
-> 
-> I'm not an expert on DT, but I think the point of DT is to describe the
-> hardware. This doesn't describe the hardware at all.
+Hi Marcelo and Gleb,
 
-On my incompetent opinion, "bpp" parameter can replace size of
-framebuffer and "stride". Is not it?
+These are the changes for KVM/ARM for 3.10.
 
----
+The patches depend on the cleanup branch, which you've already merged.
+
+Main thing is the reworking of Hyp idmaps, which is now handled by KVM
+instead of arm/mm and includes several nasty bug fixes from Marc in
+the progress.
+
+ [v2] No changes since v1, except sending patch series with this one.
+
+Thanks!
+
+Andre Przywara (1):
+  ARM: KVM: iterate over all CPUs for CPU compatibility check
+
+Arnd Bergmann (1):
+  ARM: KVM: define KVM_ARM_MAX_VCPUS unconditionally
+
+Christoffer Dall (2):
+  KVM: ARM: Fix API documentation for ONE_REG encoding
+  KVM: ARM: Fix spelling in error message
+
+Marc Zyngier (10):
+  ARM: KVM: add support for minimal host vs guest profiling
+  ARM: KVM: simplify HYP mapping population
+  ARM: KVM: fix HYP mapping limitations around zero
+  ARM: KVM: move to a KVM provided HYP idmap
+  ARM: KVM: enforce maximum size for identity mapped code
+  ARM: KVM: rework HYP page table freeing
+  ARM: KVM: switch to a dual-step HYP init code
+  ARM: KVM: perform HYP initilization for hotplugged CPUs
+  ARM: KVM: add architecture specific hook for capabilities
+  ARM: KVM: promote vfp_host pointer to generic host cpu context
+
+Mark Rutland (1):
+  ARM: KVM: arch_timer: use symbolic constants
+
+ Documentation/virtual/kvm/api.txt |   12 +-
+ arch/arm/include/asm/idmap.h      |    1 -
+ arch/arm/include/asm/kvm_host.h   |   47 ++--
+ arch/arm/include/asm/kvm_mmu.h    |   28 ++-
+ arch/arm/kernel/asm-offsets.c     |    2 +-
+ arch/arm/kernel/vmlinux.lds.S     |    7 +-
+ arch/arm/kvm/Kconfig              |    6 +-
+ arch/arm/kvm/Makefile             |    2 +-
+ arch/arm/kvm/arch_timer.c         |    7 +-
+ arch/arm/kvm/arm.c                |  111 +++++----
+ arch/arm/kvm/handle_exit.c        |    2 +-
+ arch/arm/kvm/init.S               |   78 +++++--
+ arch/arm/kvm/mmu.c                |  455 +++++++++++++++++++++----------------
+ arch/arm/kvm/perf.c               |   68 ++++++
+ arch/arm/mm/idmap.c               |   32 +--
+ 15 files changed, 532 insertions(+), 326 deletions(-)
+ create mode 100644 arch/arm/kvm/perf.c
+
+-- 
+1.7.9.5
