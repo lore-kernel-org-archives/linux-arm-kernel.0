@@ -1,23 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 30 Apr 2013 09:17:39 +0100
-Subject: Latest build results - errors/warnings - lots of them
-Message-ID: <20130430081739.GP14496@n2100.arm.linux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 30 Apr 2013 10:53:55 +0200
+Subject: [RFC/PATCH v2 2/2] drivers: dma-contiguous: add initialization
+ from device tree
+In-Reply-To: <CAO1A-8DiZoMVGcjOqK6VYP5Qito55i=gsKApQM=LGbQVx3iCwg@mail.gmail.com>
+References: <1365679330-2514-1-git-send-email-m.szyprowski@samsung.com>
+ <1365679330-2514-3-git-send-email-m.szyprowski@samsung.com>
+ <CAO1A-8DiZoMVGcjOqK6VYP5Qito55i=gsKApQM=LGbQVx3iCwg@mail.gmail.com>
+Message-ID: <517F86A3.6040104@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
-great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
-arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
-source of errors.
+Hello,
 
-OMAP stuff needs a serious look at too - much Kconfig madness there
-caused by over-use of select, which then goes on to cause build errors
-because it assumes some stuff is always enabled.
+On 4/29/2013 11:21 PM, Marc C wrote:
+> >  /**
+> >   * dma_contiguous_reserve() - reserve area(s) for contiguous memory handling
+> >   * @limit: End address of the reserved memory (optional, 0 for any).
+> > @@ -149,6 +200,10 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
+> >
+> >         pr_debug("%s(limit %08lx)\n", __func__, (unsigned long)limit);
+> >
+> > +#ifdef CONFIG_OF
+> > +       of_scan_flat_dt(cma_fdt_scan, NULL);
+> > +#endif
+> > +
+>
+> What is your expectation with the contention between default region
+> setup via the kernel config (CONFIG_CMA_SIZE_SEL_*) and via the DT?
+> Could the call to 'of_scan_flat_dt()' be done before the setup of the
+> kernel config early regions, followed by a return code check
+> 'fail-over' scheme, or were you intending for the default region
+> setups to be mutually-exclusive?
 
-There's also warnings about of_device_id from include/linux/of_platform.h
-via from arch/arm/kernel/setup.c which feature in all the non-OF builds
-too which need addressing.
+In the proposed patch the default/global cma region setup from device tree
+had higher priority than kernel command line parameter and .config saved 
+values,
+but now as I think of this, it looks that it would make more sense to 
+have the
+following priority for setting up the default cma region:
 
-See todays http://www.arm.linux.org.uk/developer/build/ results for all
-the details and configs.  Not pushing my tree until some of this stuff
-gets fixed.
+1. kernel cmd line - if not available, then use:
+2. device tree - if not available, then use:
+3. kernel compiled .config
+
+I will update this in the next version of the CMA DT patches.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
