@@ -1,81 +1,45 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Tue, 30 Apr 2013 12:04:49 +0530
-Subject: [PATCH V3] arm64: KVM: Reset arch_timer upon vcpu reset
-Message-ID: <1367303689-8049-1-git-send-email-anup.patel@linaro.org>
+From: tomi.valkeinen@iki.fi (Tomi Valkeinen)
+Date: Tue, 30 Apr 2013 10:27:01 +0300
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <517F7245.2050606@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reset the arch_timer on vcpu reset and configure guest virtual timer
-irq in the process.
+Hi,
 
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
----
- arch/arm64/include/asm/kvm_arch_timer.h |    2 ++
- arch/arm64/kvm/reset.c                  |   11 +++++++++++
- 2 files changed, 13 insertions(+)
+On 04/04/2013 05:39 AM, Stephen Warren wrote:
+> A simple frame-buffer describes a raw memory region that may be rendered
+> to, with the assumption that the display hardware has already been set
+> up to scan out from that buffer.
+> 
+> This is useful in cases where a bootloader exists and has set up the
+> display hardware, but a Linux driver doesn't yet exist for the display
+> hardware.
 
-diff --git a/arch/arm64/include/asm/kvm_arch_timer.h b/arch/arm64/include/asm/kvm_arch_timer.h
-index eb02273..0f36603 100644
---- a/arch/arm64/include/asm/kvm_arch_timer.h
-+++ b/arch/arm64/include/asm/kvm_arch_timer.h
-@@ -50,6 +50,8 @@ struct arch_timer_cpu {
- 
- int kvm_timer_hyp_init(void);
- int kvm_timer_init(struct kvm *kvm);
-+void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu, 
-+			  const struct kvm_irq_level *irq);
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
- void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
- void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 64e0740..7c9cebc 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -27,6 +27,7 @@
- #include <asm/ptrace.h>
- #include <asm/kvm_arm.h>
- #include <asm/kvm_coproc.h>
-+#include <asm/kvm_arch_timer.h>
- 
- /*
-  * ARMv8 Reset Values
-@@ -40,6 +41,11 @@ static struct kvm_regs default_regs_reset32 = {
- 			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
- };
- 
-+static const struct kvm_irq_level default_vtimer_irq = {
-+	.irq = 27,
-+	.level = 1,
-+};
-+
- static bool cpu_has_32bit_el1(void)
- {
- 	u64 pfr0;
-@@ -75,6 +81,7 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_regs *cpu_reset;
-+	const struct kvm_irq_level *cpu_vtimer_irq;
- 
- 	switch (vcpu->arch.target) {
- 	default:
-@@ -86,6 +93,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 		} else {
- 			cpu_reset = &default_regs_reset;
- 		}
-+		cpu_vtimer_irq = &default_vtimer_irq;
- 		break;
- 	}
- 
-@@ -95,5 +103,8 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	/* Reset system registers */
- 	kvm_reset_sys_regs(vcpu);
- 
-+	/* Reset arch_timer context */
-+	kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
-+
- 	return 0;
- }
--- 
-1.7.9.5
+I had an idea related to this driver. There are two requirements that I
+believe are (or will be) quite common:
+
+On embedded devices quite often the bootloader initializes the display,
+with the purpose of having a valid image on the screen for the whole
+boot up process (company logo, or whatever).
+
+With multi-arch kernels, we'll have display drivers for all platforms
+and panels compiled with the kernel. If all these are built-in, they
+will possibly increase the kernel size quite a bit, so it would be good
+to have the display drivers as modules.
+
+Now, if we have the display drivers as modules, the point when the
+kernel/userspace can update the screen will be pretty late. Also,
+there's no chance to get any early kernel boot messages on the screen.
+
+So how about if we had this kind of simple fb, built-in to the kernel,
+used only for the boot time until the proper driver is loaded. A "bootfb".
+
+The bootloader would init the display hardware, the bootfb would give an
+early /dev/fb0 for the kernel and userspace, and when the real display
+driver is loaded, the bootfb would be unbound and the real driver would
+take over.
+
+ Tomi
