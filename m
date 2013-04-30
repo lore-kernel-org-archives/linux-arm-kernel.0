@@ -1,56 +1,97 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Tue, 30 Apr 2013 07:49:23 -0700
-Subject: [PATCH 02/15] ARM: KVM: arch_timer: use symbolic constants
+Date: Tue, 30 Apr 2013 07:49:25 -0700
+Subject: [PATCH 04/15] ARM: KVM: fix HYP mapping limitations around zero
 In-Reply-To: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
 References: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
-Message-ID: <1367333376-30983-3-git-send-email-cdall@cs.columbia.edu>
+Message-ID: <1367333376-30983-5-git-send-email-cdall@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-In clocksource/arm_arch_timer.h we define useful symbolic constants.
-Let's use them to make the KVM arch_timer code clearer.
+The current code for creating HYP mapping doesn't like to wrap
+around zero, which prevents from mapping anything into the last
+page of the virtual address space.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <cdall@cs.columbia.edu>
+It doesn't take much effort to remove this limitation, making
+the code more consistent with the rest of the kernel in the process.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
 ---
- arch/arm/kvm/arch_timer.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ arch/arm/kvm/mmu.c |   21 ++++++++++-----------
+ 1 file changed, 10 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
-index 6ac938d..c55b608 100644
---- a/arch/arm/kvm/arch_timer.c
-+++ b/arch/arm/kvm/arch_timer.c
-@@ -22,6 +22,7 @@
- #include <linux/kvm_host.h>
- #include <linux/interrupt.h>
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 3003321..96d61da 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -131,11 +131,12 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
+ 	pte_t *pte;
+ 	unsigned long addr;
  
-+#include <clocksource/arm_arch_timer.h>
- #include <asm/arch_timer.h>
+-	for (addr = start; addr < end; addr += PAGE_SIZE) {
++	addr = start;
++	do {
+ 		pte = pte_offset_kernel(pmd, addr);
+ 		kvm_set_pte(pte, pfn_pte(pfn, prot));
+ 		pfn++;
+-	}
++	} while (addr += PAGE_SIZE, addr != end);
+ }
  
- #include <asm/kvm_vgic.h>
-@@ -64,7 +65,7 @@ static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
+ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+@@ -146,7 +147,8 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+ 	pte_t *pte;
+ 	unsigned long addr, next;
+ 
+-	for (addr = start; addr < end; addr = next) {
++	addr = start;
++	do {
+ 		pmd = pmd_offset(pud, addr);
+ 
+ 		BUG_ON(pmd_sect(*pmd));
+@@ -164,7 +166,7 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+ 
+ 		create_hyp_pte_mappings(pmd, addr, next, pfn, prot);
+ 		pfn += (next - addr) >> PAGE_SHIFT;
+-	}
++	} while (addr = next, addr != end);
+ 
+ 	return 0;
+ }
+@@ -179,11 +181,10 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+ 	unsigned long addr, next;
+ 	int err = 0;
+ 
+-	if (start >= end)
+-		return -EINVAL;
+-
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
+-	for (addr = start & PAGE_MASK; addr < end; addr = next) {
++	addr = start & PAGE_MASK;
++	end = PAGE_ALIGN(end);
++	do {
+ 		pgd = pgdp + pgd_index(addr);
+ 		pud = pud_offset(pgd, addr);
+ 
+@@ -202,7 +203,7 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+ 		if (err)
+ 			goto out;
+ 		pfn += (next - addr) >> PAGE_SHIFT;
+-	}
++	} while (addr = next, addr != end);
+ out:
+ 	mutex_unlock(&kvm_hyp_pgd_mutex);
+ 	return err;
+@@ -216,8 +217,6 @@ out:
+  * The same virtual address as the kernel virtual address is also used
+  * in Hyp-mode mapping (modulo HYP_PAGE_OFFSET) to the same underlying
+  * physical pages.
+- *
+- * Note: Wrapping around zero in the "to" address is not supported.
+  */
+ int create_hyp_mappings(void *from, void *to)
  {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 
--	timer->cntv_ctl |= 1 << 1; /* Mask the interrupt in the guest */
-+	timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
- 	kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
- 			    vcpu->arch.timer_cpu.irq->irq,
- 			    vcpu->arch.timer_cpu.irq->level);
-@@ -133,8 +134,8 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
- 	cycle_t cval, now;
- 	u64 ns;
- 
--	/* Check if the timer is enabled and unmasked first */
--	if ((timer->cntv_ctl & 3) != 1)
-+	if ((timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) ||
-+		!(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE))
- 		return;
- 
- 	cval = timer->cntv_cval;
 -- 
 1.7.9.5
