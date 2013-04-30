@@ -1,40 +1,42 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 30 Apr 2013 14:38:07 +0200
-Subject: [PATCH] ARM: add the "bool" type definition to asm/mach/arch.h
-In-Reply-To: <517F8FF4.3050901@atmel.com>
+Date: Tue, 30 Apr 2013 14:40:27 +0200
+Subject: linux-next build error (at91) - use of bool in mach/arch.h
+In-Reply-To: <alpine.DEB.2.02.1304301257200.5398@kaball.uk.xensource.com>
 References: <517F8FF4.3050901@atmel.com>
-Message-ID: <1367325487-8366-1-git-send-email-nicolas.ferre@atmel.com>
+ <CAMuHMdXYaDHYq7CG8ftP+yyF18pMx8qZrvM3AUTAXk+tUruNcA@mail.gmail.com>
+ <alpine.DEB.2.02.1304301257200.5398@kaball.uk.xensource.com>
+Message-ID: <517FBBBB.6060003@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Addition of boolean field to machine_desc structure in commit
-4dbfa9a25367cfa91aec0e56d75a6905d3242cd3 (ARM: Enable selection of
-SMP operations at boot time) was triggering compilation errors like:
+On 04/30/2013 01:58 PM, Stefano Stabellini :
+> On Tue, 30 Apr 2013, Geert Uytterhoeven wrote:
+>> On Tue, Apr 30, 2013 at 11:33 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>>> So, I am wondering if the best correction is to add the types.h header file
+>>> in the asm/mach/arch.h file, like this:
+>>>
+>>> --- a/arch/arm/include/asm/mach/arch.h
+>>> +++ b/arch/arm/include/asm/mach/arch.h
+>>> @@ -8,6 +8,8 @@
+>>>   * published by the Free Software Foundation.
+>>>   */
+>>>
+>>> +#include <linux/types.h>
+>>> +
+>>>  #ifndef __ASSEMBLY__
+>>>
+>>>  struct tag;
+>>>
+>>> or if a better option would be to re-arrange the include directives in
+>>> various at91xxx_devices.c files?
+>>
+>> Include files should be self-contained, so asm/mach/arch.h is the right place.
+> 
+> Nicolas,
+> are you happy to come up with a proper patch to fix the issue?
 
-  CC      arch/arm/mach-at91/at91sam9260_devices.o
-In file included from arch/arm/mach-at91/at91sam9260_devices.c:12:0:
-arch/arm/include/asm/mach/arch.h:46:2: error: expected specifier-qualifier-list before "bool"
+Yep, sent now.
 
-So, we add the definition of "bool" by including the linux/types.h
-file to asm/mach/arch.h and make it self-contained.
-
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/include/asm/mach/arch.h | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index af8c54c..75bf079 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -8,6 +8,8 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/types.h>
-+
- #ifndef __ASSEMBLY__
- 
- struct tag;
+Bye,
 -- 
-1.8.0
+Nicolas Ferre
