@@ -1,82 +1,99 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Tue, 30 Apr 2013 10:39:43 +0300
-Subject: [PATCH V2] video: implement a simple framebuffer driver
-In-Reply-To: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
-References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <517F753F.5090909@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 30 Apr 2013 10:06:07 +0200
+Subject: [PATCH v3 5/6] mci: at91: convert to
+ dma_request_slave_channel_compat()
+In-Reply-To: <1366362683-14496-6-git-send-email-ludovic.desroches@atmel.com>
+References: <1366362683-14496-1-git-send-email-ludovic.desroches@atmel.com>
+ <1366362683-14496-6-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <517F7B6F.4070907@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/04/2013 05:39 AM, Stephen Warren wrote:
-> A simple frame-buffer describes a raw memory region that may be rendered
-> to, with the assumption that the display hardware has already been set
-> up to scan out from that buffer.
+On 04/19/2013 11:11 AM, ludovic.desroches at atmel.com :
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
 > 
-> This is useful in cases where a bootloader exists and has set up the
-> display hardware, but a Linux driver doesn't yet exist for the display
-> hardware.
+> Use generic DMA DT helper. Platforms booting with or without DT populated are
+> both supported.
 > 
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Hi Chris,
+
+As you were not in copy of the patch, I send you a little reminder for
+it. It is part of a series by Ludovic and is adding the generic slave
+DMA request channel function, as we now have the support for DMA bindings.
+
+Here is the only patch of the series that should go through your tree.
+Other maintainers and ourselves have taken the other patches (no strong
+synchronization needed between them).
+
+Here is the Linux arm kernel patchwork reference:
+https://patchwork.kernel.org/patch/2463641/
+
+But for sure, Ludovic or myself can send it again to you if you need.
+
+Thanks, best regards,
+
 > ---
-> v2: s/dumb/simple/ throughout. Provide more details on pixel format.
+>  drivers/mmc/host/atmel-mci.c | 25 ++++++++++++-------------
+>  1 file changed, 12 insertions(+), 13 deletions(-)
 > 
-> I ended up going with a separate FB driver:
-> * DRM/KMS look much more complex, and don't provide any benefit that I can
->   tell for this simple driver.
-> * Creating a separate driver rather than adjusting offb.c to work allows a
->   new clean binding to be defined, and doesn't require removing or ifdefing
->   PPC-isms in offb.c.
-> ---
->  .../bindings/video/simple-framebuffer.txt          |   25 +++
->  drivers/video/Kconfig                              |   17 ++
->  drivers/video/Makefile                             |    1 +
->  drivers/video/simplefb.c                           |  234 ++++++++++++++++++++
->  4 files changed, 277 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/simple-framebuffer.txt
->  create mode 100644 drivers/video/simplefb.c
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index 10f8b73..ffbd0d3 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -2224,10 +2224,15 @@ static void __exit atmci_cleanup_slot(struct atmel_mci_slot *slot,
+>  	mmc_free_host(slot->mmc);
+>  }
+>  
+> -static bool atmci_filter(struct dma_chan *chan, void *slave)
+> +static bool atmci_filter(struct dma_chan *chan, void *pdata)
+>  {
+> -	struct mci_dma_data	*sl = slave;
+> +	struct mci_platform_data *sl_pdata = pdata;
+> +	struct mci_dma_data *sl;
+>  
+> +	if (!sl_pdata)
+> +		return false;
+> +
+> +	sl = sl_pdata->dma_slave;
+>  	if (sl && find_slave_dev(sl) == chan->device->dev) {
+>  		chan->private = slave_data_ptr(sl);
+>  		return true;
+> @@ -2239,24 +2244,18 @@ static bool atmci_filter(struct dma_chan *chan, void *slave)
+>  static bool atmci_configure_dma(struct atmel_mci *host)
+>  {
+>  	struct mci_platform_data	*pdata;
+> +	dma_cap_mask_t mask;
+>  
+>  	if (host == NULL)
+>  		return false;
+>  
+>  	pdata = host->pdev->dev.platform_data;
+>  
+> -	if (!pdata)
+> -		return false;
+> +	dma_cap_zero(mask);
+> +	dma_cap_set(DMA_SLAVE, mask);
+>  
+> -	if (pdata->dma_slave && find_slave_dev(pdata->dma_slave)) {
+> -		dma_cap_mask_t mask;
+> -
+> -		/* Try to grab a DMA channel */
+> -		dma_cap_zero(mask);
+> -		dma_cap_set(DMA_SLAVE, mask);
+> -		host->dma.chan =
+> -			dma_request_channel(mask, atmci_filter, pdata->dma_slave);
+> -	}
+> +	host->dma.chan = dma_request_slave_channel_compat(mask, atmci_filter, pdata,
+> +							  &host->pdev->dev, "rxtx");
+>  	if (!host->dma.chan) {
+>  		dev_warn(&host->pdev->dev, "no DMA channel available\n");
+>  		return false;
 > 
-> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> new file mode 100644
-> index 0000000..3ea4605
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-> @@ -0,0 +1,25 @@
-> +Simple Framebuffer
-> +
-> +A simple frame-buffer describes a raw memory region that may be rendered to,
-> +with the assumption that the display hardware has already been set up to scan
-> +out from that buffer.
-> +
-> +Required properties:
-> +- compatible: "simple-framebuffer"
-> +- reg: Should contain the location and size of the framebuffer memory.
-> +- width: The width of the framebuffer in pixels.
-> +- height: The height of the framebuffer in pixels.
-> +- stride: The number of bytes in each line of the framebuffer.
-> +- format: The format of the framebuffer surface. Valid values are:
-> +  - r5g6b5 (16-bit pixels, d[15:11]=r, d[10:5]=g, d[4:0]=b).
-> +
-> +Example:
-> +
-> +	framebuffer {
-> +		compatible = "simple-framebuffer";
-> +		reg = <0x1d385000 (1600 * 1200 * 2)>;
-> +		width = <1600>;
-> +		height = <1200>;
-> +		stride = <(1600 * 2)>;
-> +		format = "r5g6b5";
-> +	};
-
-I'm not an expert on DT, but I think the point of DT is to describe the
-hardware. This doesn't describe the hardware at all.
-
- Tomi
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130430/f0ef8507/attachment-0001.sig>
+-- 
+Nicolas Ferre
