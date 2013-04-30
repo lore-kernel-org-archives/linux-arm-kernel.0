@@ -1,42 +1,40 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 30 Apr 2013 14:40:27 +0200
-Subject: linux-next build error (at91) - use of bool in mach/arch.h
-In-Reply-To: <alpine.DEB.2.02.1304301257200.5398@kaball.uk.xensource.com>
-References: <517F8FF4.3050901@atmel.com>
- <CAMuHMdXYaDHYq7CG8ftP+yyF18pMx8qZrvM3AUTAXk+tUruNcA@mail.gmail.com>
- <alpine.DEB.2.02.1304301257200.5398@kaball.uk.xensource.com>
-Message-ID: <517FBBBB.6060003@atmel.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Tue, 30 Apr 2013 14:45:06 +0200
+Subject: [PATCH] clk: ux500: clk-sysctrl: handle clocks with no parents
+Message-ID: <1367325906-23045-1-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/30/2013 01:58 PM, Stefano Stabellini :
-> On Tue, 30 Apr 2013, Geert Uytterhoeven wrote:
->> On Tue, Apr 30, 2013 at 11:33 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->>> So, I am wondering if the best correction is to add the types.h header file
->>> in the asm/mach/arch.h file, like this:
->>>
->>> --- a/arch/arm/include/asm/mach/arch.h
->>> +++ b/arch/arm/include/asm/mach/arch.h
->>> @@ -8,6 +8,8 @@
->>>   * published by the Free Software Foundation.
->>>   */
->>>
->>> +#include <linux/types.h>
->>> +
->>>  #ifndef __ASSEMBLY__
->>>
->>>  struct tag;
->>>
->>> or if a better option would be to re-arrange the include directives in
->>> various at91xxx_devices.c files?
->>
->> Include files should be self-contained, so asm/mach/arch.h is the right place.
-> 
-> Nicolas,
-> are you happy to come up with a proper patch to fix the issue?
+Fix clk_reg_sysctrl() to set main clock registers of new struct
+clk_sysctrl even if the registered clock has no parents.
 
-Yep, sent now.
+This fixes an issue where "ulpclk" was registered with all clk->reg_*
+fields uninitialized, causing a -EINVAL error from clk_prepare().
 
-Bye,
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+---
+ drivers/clk/ux500/clk-sysctrl.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/ux500/clk-sysctrl.c b/drivers/clk/ux500/clk-sysctrl.c
+index bc7e9bd..e364c9d 100644
+--- a/drivers/clk/ux500/clk-sysctrl.c
++++ b/drivers/clk/ux500/clk-sysctrl.c
+@@ -145,7 +145,13 @@ static struct clk *clk_reg_sysctrl(struct device *dev,
+ 		return ERR_PTR(-ENOMEM);
+ 	}
+ 
+-	for (i = 0; i < num_parents; i++) {
++	/* set main clock registers */
++	clk->reg_sel[0] = reg_sel[0];
++	clk->reg_bits[0] = reg_bits[0];
++	clk->reg_mask[0] = reg_mask[0];
++
++	/* handle clocks with more than one parent */
++	for (i = 1; i < num_parents; i++) {
+ 		clk->reg_sel[i] = reg_sel[i];
+ 		clk->reg_bits[i] = reg_bits[i];
+ 		clk->reg_mask[i] = reg_mask[i];
 -- 
-Nicolas Ferre
+1.8.2
