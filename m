@@ -1,54 +1,47 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue, 30 Apr 2013 16:57:57 -0700
-Subject: [PATCH 0/7] Zynq: revised CCF code
-Message-ID: <1367366284-28304-1-git-send-email-soren.brinkmann@xilinx.com>
+Date: Tue, 30 Apr 2013 16:57:58 -0700
+Subject: [PATCH 1/7] tty: xuartps: Sort #includes alphabetically
+In-Reply-To: <1367366284-28304-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1367366284-28304-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1367366284-28304-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a first shot a revised version of Zynq's CCF code.
-This should model the whole clock tree and support clock gating for all
-relevant clocks.
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+CC: Jiri Slaby <jslaby@suse.cz>
+CC: linux-serial at vger.kernel.org
+---
+ drivers/tty/serial/xilinx_uartps.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-This follows Tegra and other ARM SOCs in containing the clock tree
-within a single block, which in this case is simply named clock
-controller.
-
-The patch is based on the current Linus tree + armsoc/zynq/smp. A
-branch for testing is available on github:
-https://github.com/sorenb-xlnx/linux-xlnx/tree/zynq/clkc
-
-ps: I hope this thread comes through fine. Corporate email is unwilling
-to cooperate and I have to jump through some hoops. My testmail went
-through fine though.
-
-	S?ren
-
-Soren Brinkmann (7):
-  tty: xuartps: Sort #includes alphabetically
-  tty: xuartps: Remove suspend/resume functions
-  clocksource/cadence_ttc: Sort #includes alphabetically
-  clk: zynq: Factor out PLL driver
-  clk: zynq: Add clock controller driver
-  arm: zynq: Migrate platform to clock controller
-  clk: zynq: Remove deprecated clock code
-
- .../devicetree/bindings/clock/zynq-7000.txt        | 127 +++--
- arch/arm/boot/dts/zynq-7000.dtsi                   |  71 +--
- arch/arm/boot/dts/zynq-zc702.dts                   |   4 -
- arch/arm/mach-zynq/slcr.c                          |   2 +-
- drivers/clk/Makefile                               |   2 +-
- drivers/clk/clk-zynq.c                             | 378 ---------------
- drivers/clk/zynq/Makefile                          |   3 +
- drivers/clk/zynq/clkc.c                            | 533 +++++++++++++++++++++
- drivers/clk/zynq/pll.c                             | 235 +++++++++
- drivers/clocksource/cadence_ttc_timer.c            |  27 +-
- drivers/tty/serial/xilinx_uartps.c                 | 127 ++---
- include/linux/clk/zynq.h                           |   8 +-
- 12 files changed, 982 insertions(+), 535 deletions(-)
- delete mode 100644 drivers/clk/clk-zynq.c
- create mode 100644 drivers/clk/zynq/Makefile
- create mode 100644 drivers/clk/zynq/clkc.c
- create mode 100644 drivers/clk/zynq/pll.c
-
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index 4e5c778..773732b 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -11,17 +11,17 @@
+  *
+  */
+ 
++#include <linux/clk.h>
++#include <linux/console.h>
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/platform_device.h>
+ #include <linux/serial.h>
+ #include <linux/serial_core.h>
+ #include <linux/tty.h>
+ #include <linux/tty_flip.h>
+-#include <linux/console.h>
+-#include <linux/clk.h>
+-#include <linux/irq.h>
+-#include <linux/io.h>
+-#include <linux/of.h>
+-#include <linux/module.h>
+ 
+ #define XUARTPS_TTY_NAME	"ttyPS"
+ #define XUARTPS_NAME		"xuartps"
 -- 
 1.8.2.2
