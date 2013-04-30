@@ -1,62 +1,53 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 30 Apr 2013 15:38:37 +0530
-Subject: [PATCH 6/9] crypto: ux500/cryp - Set DMA configuration though
- dma_slave_config()
-In-Reply-To: <20130426094123.GG14496@n2100.arm.linux.org.uk>
-References: <1366280825-31136-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdbFgW6bGYt59WtN4r2izuN09AJw4J1cqir82uzFsuMmWQ@mail.gmail.com>
- <20130425134402.GN4623@gmail.com>
- <201304251611.39667.arnd@arndb.de>
- <CACRpkdaBf++gy3sghC-t33uio2+eHp1MrQ2FM0XXBazZTtm3kA@mail.gmail.com>
- <20130426081646.GD24632@intel.com>
- <20130426094123.GG14496@n2100.arm.linux.org.uk>
-Message-ID: <20130430100837.GB1960@intel.com>
+From: mtosatti@redhat.com (Marcelo Tosatti)
+Date: Tue, 30 Apr 2013 07:29:53 -0300
+Subject: [GIT PULL] KVM/ARM Changes for 3.10
+In-Reply-To: <CAEDV+gLbqUgzkRoToYKSBTXKzUkY40fO80rcviu-EHcbxYjL4A@mail.gmail.com>
+References: <CAEDV+gKXcCb11p5YCQRbQ1OwGefxYUr0sh8f4AOfxQSPPo2LMQ@mail.gmail.com>
+ <20130430021136.GB14088@amt.cnet>
+ <CAEDV+gLbqUgzkRoToYKSBTXKzUkY40fO80rcviu-EHcbxYjL4A@mail.gmail.com>
+Message-ID: <20130430102953.GA29684@amt.cnet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 26, 2013 at 10:41:23AM +0100, Russell King - ARM Linux wrote:
-> On Fri, Apr 26, 2013 at 01:46:46PM +0530, Vinod Koul wrote:
-> > On Fri, Apr 26, 2013 at 10:28:39AM +0200, Linus Walleij wrote:
-> > > On Thu, Apr 25, 2013 at 4:11 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > > 
-> > > > The dma engine driver must know the address in its dma space, while the
-> > > > slave driver has it available in physical space. These two are often the
-> > > > same, but there is no generic way to convert between the two, especially
-> > > > if the dma engine resides behind an IOMMU.
-> > > >
-> > > > The best assumption we can make is that the dma engine driver knows
-> > > > how to convert between the two. Interestingly the documentation for
-> > > > dma_slave_config talks about "physical address", while the structure
-> > > > itself uses a dma_addr_t. Linus Walleij introduced the structure in
-> > > > c156d0a5b0 "DMAENGINE: generic slave channel control v3", so I assume
-> > > > he can shed some light on what he was thinking. I assume the documentation
-> > > > is right but the structure is not and should be converted to use
-> > > > phys_add_t or resource_size_t.
-> > > 
-> > > OK I could cook a patch for that, but I think I need some input from
-> > > Vinod and/or Russell on this.
-> > the dma_slave_config is physical address that should be passed directly to the
-> > controller. Obviosuly it should phys_addr_t :)
+On Mon, Apr 29, 2013 at 07:52:41PM -0700, Christoffer Dall wrote:
+> On Mon, Apr 29, 2013 at 7:11 PM, Marcelo Tosatti <mtosatti@redhat.com> wrote:
+> > On Sun, Apr 28, 2013 at 10:29:07PM -0700, Christoffer Dall wrote:
+> >> Hi Marcelo and Gleb,
+> >>
+> >> These are the changes for KVM/ARM for 3.10.
+> >>
+> >> The patches depend on the cleanup branch, which you've already merged.
+> >>
+> >> Main thing is the reworking of Hyp idmaps, which is now handled by KVM
+> >> instead of arm/mm and includes several nasty bug fixes from Marc in
+> >> the progress.
+> >>
+> >> Thanks!
+> >>
+> >> The following changes since commit 5a2892ce72e010e3cb96b438d7cdddce0c88e0e6:
+> >>
+> >>   KVM: nVMX: Skip PF interception check when queuing during nested run
+> >> (2013-04-28 13:34:39 +0300)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://github.com/columbia/linux-kvm-arm.git kvm-arm-for-3.10
+> >>
+> >> for you to fetch changes up to d4e071ce6acf8d5eddb7615a953193a8b0ad7c38:
+> >>
+> >>   ARM: KVM: iterate over all CPUs for CPU compatibility check
+> >> (2013-04-28 22:23:23 -0700)
+> >
+> > Christoffer,
+> >
+> > Please email the patches to kvm at vger.
+> >
+> >
 > 
-> What you've just said is actually confusing.
+> each of them were already cc'ed on the kvm mailing list when they were
+> reviewed I believe, but would you like to have them re-sent as they
+> are not in this pull request even if it means re-sending them?
 > 
-> "physical address" is normally the term used to describe the addresses
-> seen to the RAM.  phys_addr_t describes this.  This is not necessarily
-> what needs to be programmed into the DMA controller.
-Yes that would be true when you have MMU
-> 
-> For RAM addresses, they must be mapped via the DMA API - and this gives
-> you a dma_addr_t.
-> 
-> "DMA address" is the address to be programmed into a DMA controller to
-> access a particular address in RAM or device, and has type dma_addr_t.
-> When you're programming a DMA controller to access a device, you are
-> clearly telling it the address on the _DMA controller's bus_ to access
-> that register, which may or may not be the same as the physical address.
-> 
-> There are platforms in existence where phys_addr_t can be 32-bit but
-> dma_addr_t can be 64-bit.  Getting this stuff wrong can cause problems.
-Sure, thanks for pointing, so we wont do this change.
+> -Christoffer
 
---
-~Vinod
+Yes please, send the patches along with the pull request.
