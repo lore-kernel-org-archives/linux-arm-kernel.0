@@ -1,147 +1,211 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Tue, 30 Apr 2013 07:49:32 -0700
-Subject: [PATCH 11/15] ARM: KVM: promote vfp_host pointer to generic host cpu
- context
+Date: Tue, 30 Apr 2013 07:49:30 -0700
+Subject: [PATCH 09/15] ARM: KVM: perform HYP initilization for hotplugged CPUs
 In-Reply-To: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
 References: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
-Message-ID: <1367333376-30983-12-git-send-email-cdall@cs.columbia.edu>
+Message-ID: <1367333376-30983-10-git-send-email-cdall@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-We use the vfp_host pointer to store the host VFP context, should
-the guest start using VFP itself.
+Now that we have the necessary infrastructure to boot a hotplugged CPU
+at any point in time, wire a CPU notifier that will perform the HYP
+init for the incoming CPU.
 
-Actually, we can use this pointer in a more generic way to store
-CPU speficic data, and arm64 is using it to dump the whole host
-state before switching to the guest.
-
-Simply rename the vfp_host field to host_cpu_context, and the
-corresponding type to kvm_cpu_context_t. No change in functionnality.
+Note that this depends on the platform code and/or firmware to boot the
+incoming CPU with HYP mode enabled and return to the kernel by following
+the normal boot path (HYP stub installed).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
 ---
- arch/arm/include/asm/kvm_host.h |    8 +++++---
- arch/arm/kernel/asm-offsets.c   |    2 +-
- arch/arm/kvm/arm.c              |   28 ++++++++++++++--------------
- 3 files changed, 20 insertions(+), 18 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h |    1 +
+ arch/arm/kvm/arm.c             |   49 ++++++++++++++++++++++++++++------------
+ arch/arm/kvm/mmu.c             |   35 ++++++++++++++++++++++------
+ 3 files changed, 63 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index dcfcbf5..57cb786 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -87,7 +87,7 @@ struct kvm_vcpu_fault_info {
- 	u32 hyp_pc;		/* PC when exception was taken from Hyp mode */
- };
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 24b767a..472ac70 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -44,6 +44,7 @@
  
--typedef struct vfp_hard_struct kvm_kernel_vfp_t;
-+typedef struct vfp_hard_struct kvm_cpu_context_t;
+ int create_hyp_mappings(void *from, void *to);
+ int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
++void free_boot_hyp_pgd(void);
+ void free_hyp_pgds(void);
  
- struct kvm_vcpu_arch {
- 	struct kvm_regs regs;
-@@ -105,8 +105,10 @@ struct kvm_vcpu_arch {
- 	struct kvm_vcpu_fault_info fault;
- 
- 	/* Floating point registers (VFP and Advanced SIMD/NEON) */
--	kvm_kernel_vfp_t vfp_guest;
--	kvm_kernel_vfp_t *vfp_host;
-+	struct vfp_hard_struct vfp_guest;
-+
-+	/* Host FP context */
-+	kvm_cpu_context_t *host_cpu_context;
- 
- 	/* VGIC state */
- 	struct vgic_cpu vgic_cpu;
-diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
-index ee1ac39..92562a2 100644
---- a/arch/arm/kernel/asm-offsets.c
-+++ b/arch/arm/kernel/asm-offsets.c
-@@ -154,7 +154,7 @@ int main(void)
-   DEFINE(VCPU_MIDR,		offsetof(struct kvm_vcpu, arch.midr));
-   DEFINE(VCPU_CP15,		offsetof(struct kvm_vcpu, arch.cp15));
-   DEFINE(VCPU_VFP_GUEST,	offsetof(struct kvm_vcpu, arch.vfp_guest));
--  DEFINE(VCPU_VFP_HOST,		offsetof(struct kvm_vcpu, arch.vfp_host));
-+  DEFINE(VCPU_VFP_HOST,		offsetof(struct kvm_vcpu, arch.host_cpu_context));
-   DEFINE(VCPU_REGS,		offsetof(struct kvm_vcpu, arch.regs));
-   DEFINE(VCPU_USR_REGS,		offsetof(struct kvm_vcpu, arch.regs.usr_regs));
-   DEFINE(VCPU_SVC_REGS,		offsetof(struct kvm_vcpu, arch.regs.svc_regs));
+ int kvm_alloc_stage2_pgd(struct kvm *kvm);
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index cc67caf..089c0a4 100644
+index fc47bd7..6ea2aed 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -49,7 +49,7 @@ __asm__(".arch_extension	virt");
- #endif
+@@ -16,6 +16,7 @@
+  * Foundation, 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+  */
  
- static DEFINE_PER_CPU(unsigned long, kvm_arm_hyp_stack_page);
--static kvm_kernel_vfp_t __percpu *kvm_host_vfp_state;
-+static kvm_cpu_context_t __percpu *kvm_host_cpu_state;
- static unsigned long hyp_default_vectors;
++#include <linux/cpu.h>
+ #include <linux/errno.h>
+ #include <linux/err.h>
+ #include <linux/kvm_host.h>
+@@ -785,7 +786,7 @@ long kvm_arch_vm_ioctl(struct file *filp,
+ 	}
+ }
  
- /* Per-CPU variable containing the currently running vcpu. */
-@@ -317,7 +317,7 @@ void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
- void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+-static void cpu_init_hyp_mode(void *vector)
++static void cpu_init_hyp_mode(void *dummy)
  {
- 	vcpu->cpu = cpu;
--	vcpu->arch.vfp_host = this_cpu_ptr(kvm_host_vfp_state);
-+	vcpu->arch.host_cpu_context = this_cpu_ptr(kvm_host_cpu_state);
+ 	unsigned long long boot_pgd_ptr;
+ 	unsigned long long pgd_ptr;
+@@ -805,12 +806,28 @@ static void cpu_init_hyp_mode(void *vector)
+ 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
+ }
  
- 	/*
- 	 * Check whether this vcpu requires the cache to be flushed on
-@@ -882,24 +882,24 @@ static int init_hyp_mode(void)
++static int hyp_init_cpu_notify(struct notifier_block *self,
++			       unsigned long action, void *cpu)
++{
++	switch (action) {
++	case CPU_STARTING:
++	case CPU_STARTING_FROZEN:
++		cpu_init_hyp_mode(NULL);
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block hyp_init_cpu_nb = {
++	.notifier_call = hyp_init_cpu_notify,
++};
++
+ /**
+  * Inits Hyp-mode on all online CPUs
+  */
+ static int init_hyp_mode(void)
+ {
+-	phys_addr_t init_phys_addr;
+ 	int cpu;
+ 	int err = 0;
+ 
+@@ -843,19 +860,6 @@ static int init_hyp_mode(void)
  	}
  
  	/*
--	 * Map the host VFP structures
-+	 * Map the host CPU structures
+-	 * Execute the init code on each CPU.
+-	 *
+-	 * Note: The stack is not mapped yet, so don't do anything else than
+-	 * initializing the hypervisor mode on each CPU using a local stack
+-	 * space for temporary storage.
+-	 */
+-	init_phys_addr = virt_to_phys(__kvm_hyp_init);
+-	for_each_online_cpu(cpu) {
+-		smp_call_function_single(cpu, cpu_init_hyp_mode,
+-					 (void *)(long)init_phys_addr, 1);
+-	}
+-
+-	/*
+ 	 * Map the Hyp-code called directly from the host
  	 */
--	kvm_host_vfp_state = alloc_percpu(kvm_kernel_vfp_t);
--	if (!kvm_host_vfp_state) {
-+	kvm_host_cpu_state = alloc_percpu(kvm_cpu_context_t);
-+	if (!kvm_host_cpu_state) {
- 		err = -ENOMEM;
--		kvm_err("Cannot allocate host VFP state\n");
-+		kvm_err("Cannot allocate host CPU state\n");
- 		goto out_free_mappings;
+ 	err = create_hyp_mappings(__kvm_hyp_code_start, __kvm_hyp_code_end);
+@@ -900,6 +904,11 @@ static int init_hyp_mode(void)
  	}
  
- 	for_each_possible_cpu(cpu) {
--		kvm_kernel_vfp_t *vfp;
-+		kvm_cpu_context_t *cpu_ctxt;
- 
--		vfp = per_cpu_ptr(kvm_host_vfp_state, cpu);
--		err = create_hyp_mappings(vfp, vfp + 1);
-+		cpu_ctxt = per_cpu_ptr(kvm_host_cpu_state, cpu);
-+		err = create_hyp_mappings(cpu_ctxt, cpu_ctxt + 1);
- 
- 		if (err) {
--			kvm_err("Cannot map host VFP state: %d\n", err);
--			goto out_free_vfp;
-+			kvm_err("Cannot map host CPU state: %d\n", err);
-+			goto out_free_context;
- 		}
- 	}
- 
-@@ -913,7 +913,7 @@ static int init_hyp_mode(void)
+ 	/*
++	 * Execute the init code on each CPU.
++	 */
++	on_each_cpu(cpu_init_hyp_mode, NULL, 1);
++
++	/*
+ 	 * Init HYP view of VGIC
  	 */
  	err = kvm_vgic_hyp_init();
+@@ -917,6 +926,10 @@ static int init_hyp_mode(void)
  	if (err)
--		goto out_free_vfp;
-+		goto out_free_context;
+ 		goto out_free_mappings;
  
- #ifdef CONFIG_KVM_ARM_VGIC
- 		vgic_present = true;
-@@ -935,8 +935,8 @@ static int init_hyp_mode(void)
++#ifndef CONFIG_HOTPLUG_CPU
++	free_boot_hyp_pgd();
++#endif
++
+ 	kvm_perf_init();
+ 
  	kvm_info("Hyp mode initialized successfully\n");
+@@ -955,6 +968,12 @@ int kvm_arch_init(void *opaque)
+ 	if (err)
+ 		goto out_err;
  
++	err = register_cpu_notifier(&hyp_init_cpu_nb);
++	if (err) {
++		kvm_err("Cannot register HYP init CPU notifier (%d)\n", err);
++		goto out_err;
++	}
++
+ 	kvm_coproc_table_init();
  	return 0;
--out_free_vfp:
--	free_percpu(kvm_host_vfp_state);
-+out_free_context:
-+	free_percpu(kvm_host_cpu_state);
- out_free_mappings:
- 	free_hyp_pgds();
- out_free_stack_pages:
+ out_err:
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 4646c17..9657065 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -156,6 +156,31 @@ static void unmap_range(pgd_t *pgdp, unsigned long long start, u64 size)
+ }
+ 
+ /**
++ * free_boot_hyp_pgd - free HYP boot page tables
++ *
++ * Free the HYP boot page tables. The bounce page is also freed.
++ */
++void free_boot_hyp_pgd(void)
++{
++	mutex_lock(&kvm_hyp_pgd_mutex);
++
++	if (boot_hyp_pgd) {
++		unmap_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
++		unmap_range(boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
++		kfree(boot_hyp_pgd);
++		boot_hyp_pgd = NULL;
++	}
++
++	if (hyp_pgd)
++		unmap_range(hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
++
++	kfree(init_bounce_page);
++	init_bounce_page = NULL;
++
++	mutex_unlock(&kvm_hyp_pgd_mutex);
++}
++
++/**
+  * free_hyp_pgds - free Hyp-mode page tables
+  *
+  * Assumes hyp_pgd is a page table used strictly in Hyp-mode and
+@@ -169,13 +194,9 @@ void free_hyp_pgds(void)
+ {
+ 	unsigned long addr;
+ 
+-	mutex_lock(&kvm_hyp_pgd_mutex);
++	free_boot_hyp_pgd();
+ 
+-	if (boot_hyp_pgd) {
+-		unmap_range(boot_hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+-		unmap_range(boot_hyp_pgd, TRAMPOLINE_VA, PAGE_SIZE);
+-		kfree(boot_hyp_pgd);
+-	}
++	mutex_lock(&kvm_hyp_pgd_mutex);
+ 
+ 	if (hyp_pgd) {
+ 		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
+@@ -183,9 +204,9 @@ void free_hyp_pgds(void)
+ 		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
+ 			unmap_range(hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+ 		kfree(hyp_pgd);
++		hyp_pgd = NULL;
+ 	}
+ 
+-	kfree(init_bounce_page);
+ 	mutex_unlock(&kvm_hyp_pgd_mutex);
+ }
+ 
 -- 
 1.7.9.5
