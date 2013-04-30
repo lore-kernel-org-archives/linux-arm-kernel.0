@@ -1,26 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 30 Apr 2013 13:54:50 +0200
-Subject: Latest build results - errors/warnings - lots of them
-In-Reply-To: <20130430114229.GA2439@linaro.org>
-References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
- <201304301304.20650.arnd@arndb.de> <20130430114229.GA2439@linaro.org>
-Message-ID: <201304301354.50210.arnd@arndb.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 30 Apr 2013 12:58:40 +0100
+Subject: linux-next build error (at91) - use of bool in mach/arch.h
+In-Reply-To: <CAMuHMdXYaDHYq7CG8ftP+yyF18pMx8qZrvM3AUTAXk+tUruNcA@mail.gmail.com>
+References: <517F8FF4.3050901@atmel.com>
+ <CAMuHMdXYaDHYq7CG8ftP+yyF18pMx8qZrvM3AUTAXk+tUruNcA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1304301257200.5398@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 April 2013, Dave Martin wrote:
-> From 193f254689beaa1612d29bcc5ba004a933b37d95 Mon Sep 17 00:00:00 2001
-> From: Dave Martin <dave.martin@linaro.org>
-> Date: Tue, 30 Apr 2013 12:25:04 +0100
-> Subject: [PATCH 1/3] ARM: mcpm: Add explicit AFLAGS to support v6/v7
->  multiplatform kernels
+On Tue, 30 Apr 2013, Geert Uytterhoeven wrote:
+> On Tue, Apr 30, 2013 at 11:33 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> > So, I am wondering if the best correction is to add the types.h header file
+> > in the asm/mach/arch.h file, like this:
+> >
+> > --- a/arch/arm/include/asm/mach/arch.h
+> > +++ b/arch/arm/include/asm/mach/arch.h
+> > @@ -8,6 +8,8 @@
+> >   * published by the Free Software Foundation.
+> >   */
+> >
+> > +#include <linux/types.h>
+> > +
+> >  #ifndef __ASSEMBLY__
+> >
+> >  struct tag;
+> >
+> > or if a better option would be to re-arrange the include directives in
+> > various at91xxx_devices.c files?
 > 
-> The full mcpm layer is not likely to be relevant to v6 based platforms,
-> so a multiplatform kernel won't use that code if booted on v6 hardware.
-> 
-> This patch modifies the AFLAGS for affected mcpm .S files to specify
-> armv7-a explicitly for that code.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Include files should be self-contained, so asm/mach/arch.h is the right place.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Nicolas,
+are you happy to come up with a proper patch to fix the issue?
