@@ -1,56 +1,130 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 30 Apr 2013 07:10:21 -0400
-Subject: Need help to measure and tune the latency in Linux RT
-In-Reply-To: <CALJd4cbfqRFiGHshv8A+0A8kFo_qW=rvREsdgj3jQ=-0Rix0-g@mail.gmail.com>
-References: <CALJd4cbfqRFiGHshv8A+0A8kFo_qW=rvREsdgj3jQ=-0Rix0-g@mail.gmail.com>
-Message-ID: <20130430111021.GC31290@titan.lakedaemon.net>
+From: marek.belisko@gmail.com (Marek Belisko)
+Date: Tue, 30 Apr 2013 13:16:47 +0200
+Subject: [PATCH] clk: si5351: Allow user to define disabled state for every
+ clock output.
+Message-ID: <1367320607-25657-1-git-send-email-marek.belisko@streamunlimited.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ashoka,
+Add platform data and dt bindings to allow user override disabled state.
 
-linux-embedded is pretty quiet.  I'm not even sure why I'm still
-subscribed to it.  You'll have better luck with your question by asking
-on linux-arm-kernel (added to the cc).  I believe there is also a
-linux-rt-users mailinglist [1].  A few comments below:
+Signed-off-by: Marek Belisko <marek.belisko@streamunlimited.com>
+---
+ .../devicetree/bindings/clock/silabs,si5351.txt    |    5 +++
+ drivers/clk/clk-si5351.c                           |   36 +++++++++++++++++---
+ include/linux/platform_data/si5351.h               |   16 +++++++++
+ 3 files changed, 53 insertions(+), 4 deletions(-)
 
-On Tue, Apr 30, 2013 at 01:57:21PM +0530, Ashoka K wrote:
-> Hi,
-> 
-> I have an embedded system running 2.6.33 cross compiled for ARM OMAP
-> with 1 GHZ uni-processor system.
-
-Wow, this is ancient.  Is this a vanilla kernel?  If it's a vendor
-kernel, you'll need to ask the vendor.
-
-> The application has many threads and processes (around 15 total). In
-> that 1 thread is time critical and must run every interval confiurable
-> as 2, 4 or 8 milli sec etc. There is another thread which transfers
-> Images to a FTP or to HMI etc, whoever requested the image.
-> With this image transfer enabled my critical process misses the
-> deadline and timesout. This critical thread is at RR priority 50. I
-> used a HR timer thread with RR pri 55 to wakeup the critical thread
-> every 1 milli sec to do the job.
-> If image transfer is enabled i see that real time thread misses deadlines.
-> 
-> All traffic is flowing on common ethernet connection. Does it affect
-> in any way ?
-> 
-> How to find out where the kernel is waiting or delaying to schedule
-> the critical thread even though it is at higher RR priority. How to
-> measure the latency ?
-> 
-> I am trying to use Oprofile tool, but got some error in cross
-> compiling. Doesn't these tools add their own latency to the original
-> problem ?
-> 
-> Any tools ? which one is better. Please provide your input on this.
-
-I'm not the guy to answer this ;-)  I'll just forward to the appropriate
-lists.
-
-hth,
-
-Jason.
-
-[1] http://vger.kernel.org/vger-lists.html#linux-rt-users
+diff --git a/Documentation/devicetree/bindings/clock/silabs,si5351.txt b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
+index cc37465..2f24c12 100644
+--- a/Documentation/devicetree/bindings/clock/silabs,si5351.txt
++++ b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
+@@ -44,6 +44,11 @@ Optional child node properties:
+ - silabs,multisynth-source: source pll A(0) or B(1) of corresponding multisynth
+   divider.
+ - silabs,pll-master: boolean, multisynth can change pll frequency.
++- silabs,disable-state : clock disable state (default 0) shall be
++  0 = CLKx is set to a LOW state when disabled
++  1 = CLKx is set to a HIGH state when disabled
++  2 = CLKx is set to a HIGH IMPEDANCE state when disabled
++  3 = CLKx is NEVER DISABLED
+ 
+ ==Example==
+ 
+diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+index 8323c31..bfe92b8 100644
+--- a/drivers/clk/clk-si5351.c
++++ b/drivers/clk/clk-si5351.c
+@@ -1230,6 +1230,21 @@ static int si5351_dt_parse(struct i2c_client *client)
+ 
+ 		pdata->clkout[num].pll_master =
+ 			of_property_read_bool(child, "silabs,pll-master");
++
++		if (!of_property_read_u32(child, "silabs,disable-state",
++					  &val)) {
++			switch (val) {
++			case SI5351_DISABLE_LOW:
++			case SI5351_DISABLE_HIGH:
++			case SI5351_DISABLE_HIGH_IMPEDANCE:
++			case SI5351_NEVER_DISABLED:
++				pdata->clkout[num].disable_state = val;
++				break;
++			default:
++				pdata->clkout[num].disable_state = 0;
++			}
++		}
++
+ 	}
+ 	client->dev.platform_data = pdata;
+ 
+@@ -1250,7 +1265,7 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 	struct clk_init_data init;
+ 	struct clk *clk;
+ 	const char *parent_names[4];
+-	u8 num_parents, num_clocks;
++	u8 num_parents, num_clocks, disabled;
+ 	int ret, n;
+ 
+ 	ret = si5351_dt_parse(client);
+@@ -1281,9 +1296,22 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 
+ 	/* Disable interrupts */
+ 	si5351_reg_write(drvdata, SI5351_INTERRUPT_MASK, 0xf0);
+-	/* Set disabled output drivers to drive low */
+-	si5351_reg_write(drvdata, SI5351_CLK3_0_DISABLE_STATE, 0x00);
+-	si5351_reg_write(drvdata, SI5351_CLK7_4_DISABLE_STATE, 0x00);
++
++	/* Set disabled output states */
++	disabled = (pdata->clkout[0].disable_state & 0x03) |
++		((pdata->clkout[1].disable_state << 2) & 0x0C) |
++		((pdata->clkout[2].disable_state << 4) & 0x30) |
++		((pdata->clkout[3].disable_state << 6) & 0xC0);
++
++	si5351_reg_write(drvdata, SI5351_CLK3_0_DISABLE_STATE, disabled);
++
++	disabled = (pdata->clkout[4].disable_state & 0x03) |
++		((pdata->clkout[5].disable_state << 2) & 0x0C) |
++		((pdata->clkout[6].disable_state << 4) & 0x30) |
++		((pdata->clkout[7].disable_state << 6) & 0xC0);
++
++	si5351_reg_write(drvdata, SI5351_CLK7_4_DISABLE_STATE, disabled);
++
+ 	/* Ensure pll select is on XTAL for Si5351A/B */
+ 	if (drvdata->variant != SI5351_VARIANT_C)
+ 		si5351_set_bits(drvdata, SI5351_PLL_INPUT_SOURCE,
+diff --git a/include/linux/platform_data/si5351.h b/include/linux/platform_data/si5351.h
+index 92dabca..6702991 100644
+--- a/include/linux/platform_data/si5351.h
++++ b/include/linux/platform_data/si5351.h
+@@ -79,6 +79,21 @@ enum si5351_drive_strength {
+ };
+ 
+ /**
++ * enum si5351_disable_state - Si5351 clock output disable state
++ * @SI5351_DISABLE_LOW: CLKx is set to a LOW state when disabled
++ * @SI5351_DISABLE_HIGH: CLKx is set to a HIGH state when disabled
++ * @SI5351_DISABLE_HIGH_IMPEDANCE: CLKx is set to a HIGH IMPEDANCE state
++ *				   when disabled
++ * @SI5351_NEVER_DISABLED: CLKx is NEVER DISABLED
++ */
++enum si5351_disable_state {
++	SI5351_DISABLE_LOW = 0,
++	SI5351_DISABLE_HIGH,
++	SI5351_DISABLE_HIGH_IMPEDANCE,
++	SI5351_NEVER_DISABLED,
++};
++
++/**
+  * struct si5351_clkout_config - Si5351 clock output configuration
+  * @clkout: clkout number
+  * @multisynth_src: multisynth source clock
+@@ -93,6 +108,7 @@ struct si5351_clkout_config {
+ 	enum si5351_drive_strength drive;
+ 	bool pll_master;
+ 	unsigned long rate;
++	enum si5351_disable_state disable_state;
+ };
+ 
+ /**
+-- 
+1.7.9.5
