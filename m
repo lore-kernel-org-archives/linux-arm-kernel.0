@@ -1,66 +1,27 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Tue, 30 Apr 2013 14:46:55 +0530
-Subject: [V4 patch 02/15] ARM: ux500: cpuidle: replace for_each_online_cpu
- by for_each_possible_cpu
-In-Reply-To: <1366707285-12179-3-git-send-email-daniel.lezcano@linaro.org>
-References: <1366707285-12179-1-git-send-email-daniel.lezcano@linaro.org>
- <1366707285-12179-3-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <CANuQgHF9x2g=nybwEKMwihd0M9ps9rOaGw_zJM6a46m5-GKT0w@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 30 Apr 2013 14:18:25 +0530
+Subject: [PATCH v3 1/6] at_hdmac: move to generic DMA binding
+In-Reply-To: <51750F68.4040701@atmel.com>
+References: <1366362683-14496-1-git-send-email-ludovic.desroches@atmel.com>
+ <1366362683-14496-2-git-send-email-ludovic.desroches@atmel.com>
+ <51750F68.4040701@atmel.com>
+Message-ID: <20130430084825.GA1960@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2013 14:24, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
-> All the drivers are using, in their initialization function, the
-> for_each_possible_cpu macro.
->
-> Using for_each_online_cpu means the driver must handle the initialization
-> of the cpuidle device when a cpu is up which is not the case here.
->
-> Change the macro to for_each_possible_cpu as that fix the hotplug
-> initialization and make the initialization routine consistent with the
-> rest of the code in the different drivers.
->
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/mach-ux500/cpuidle.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
-> index c29c1bf..5657d4a 100644
-> --- a/arch/arm/mach-ux500/cpuidle.c
-> +++ b/arch/arm/mach-ux500/cpuidle.c
-> @@ -125,7 +125,7 @@ int __init ux500_idle_init(void)
->                 return ret;
->         }
->
-> -       for_each_online_cpu(cpu) {
-> +       for_each_possible(cpu) {
-
-for_each_possible(cpu) or for_each_possible_cpu(cpu) ?
->                 device = &per_cpu(ux500_cpuidle_device, cpu);
->                 device->cpu = cpu;
->                 ret = cpuidle_register_device(device);
-> @@ -139,7 +139,7 @@ out:
->         return ret;
->
->  out_unregister:
-> -       for_each_online_cpu(cpu) {
-> +       for_each_possible_cpu(cpu) {
->                 device = &per_cpu(ux500_cpuidle_device, cpu);
->                 cpuidle_unregister_device(device);
->         }
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
+On Mon, Apr 22, 2013 at 12:22:32PM +0200, Nicolas Ferre wrote:
+> On 04/19/2013 11:11 AM, ludovic.desroches at atmel.com :
+> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > 
+> > Update at_hdmac driver to support generic DMA device tree binding. Devices
+> > can still request channel with dma_request_channel() then it doesn't break
+> > DMA for non DT boards.
+> > 
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+Applied now thanks
 
 --
-with warm regards,
-Chander Kashyap
+~Vinod
