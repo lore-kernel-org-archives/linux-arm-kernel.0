@@ -1,45 +1,40 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 30 Apr 2013 16:59:26 +0100
-Subject: linux-next build error (at91) - use of bool in mach/arch.h
-In-Reply-To: <alpine.LFD.2.03.1304301114140.17372@syhkavp.arg>
-References: <517F8FF4.3050901@atmel.com>
- <CAMuHMdXYaDHYq7CG8ftP+yyF18pMx8qZrvM3AUTAXk+tUruNcA@mail.gmail.com>
- <alpine.DEB.2.02.1304301257200.5398@kaball.uk.xensource.com>
- <alpine.LFD.2.03.1304301114140.17372@syhkavp.arg>
-Message-ID: <alpine.DEB.2.02.1304301659010.5398@kaball.uk.xensource.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 30 Apr 2013 09:11:04 -0700
+Subject: Latest build results - errors/warnings - lots of them
+In-Reply-To: <201304301304.20650.arnd@arndb.de>
+References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
+ <201304301304.20650.arnd@arndb.de>
+Message-ID: <20130430161104.GB26257@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Apr 2013, Nicolas Pitre wrote:
-> On Tue, 30 Apr 2013, Stefano Stabellini wrote:
+* Arnd Bergmann <arnd@arndb.de> [130430 04:10]:
+> On Tuesday 30 April 2013, Russell King - ARM Linux wrote:
+> > Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
+> > great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
+> > arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
+> > source of errors.
 > 
-> > On Tue, 30 Apr 2013, Geert Uytterhoeven wrote:
-> > > On Tue, Apr 30, 2013 at 11:33 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> > > > So, I am wondering if the best correction is to add the types.h header file
-> > > > in the asm/mach/arch.h file, like this:
-> > > >
-> > > > --- a/arch/arm/include/asm/mach/arch.h
-> > > > +++ b/arch/arm/include/asm/mach/arch.h
-> > > > @@ -8,6 +8,8 @@
-> > > >   * published by the Free Software Foundation.
-> > > >   */
-> > > >
-> > > > +#include <linux/types.h>
-> > > > +
-> > > >  #ifndef __ASSEMBLY__
-> > > >
-> > > >  struct tag;
-> > > >
-> > > > or if a better option would be to re-arrange the include directives in
-> > > > various at91xxx_devices.c files?
-> > > 
-> > > Include files should be self-contained, so asm/mach/arch.h is the right place.
-> > 
-> > Nicolas,
-> > are you happy to come up with a proper patch to fix the issue?
+> Yes, I noticed this but haven't gotten around to prepare a patch. I'll comment
+> below.
 > 
-> I'd prefer if you just folded the above include into the original patch, 
-> unless this has been pulled already.
+> > OMAP stuff needs a serious look at too - much Kconfig madness there
+> > caused by over-use of select, which then goes on to cause build errors
+> > because it assumes some stuff is always enabled.
 
-No, I'll exploit the opportunity to resend the patch series and issue a
-PULL request for the arm-soc tree.
+I have posted a few randconfig fixes in "[PATCH 0/3] few omap randconfig
+fixes for v3.10" that also remove the select of SERIAL_OMAP that I missed
+while fixing the 8250 issue. I was planning to send a pull request after
+the merge window, but can do it now too if people prefer that.
+ 
+> Ack. I have not looked much at randconfig output, but this has certianly
+> grown worse after CONFIG_ARCH_OMAP has gotten included in ARCH_MULTIPLATFORM
+
+I have a patch coming for the "no SoC selected" randconfig issue as
+discussed in the "linux-next ARM multi-platform randconfig errors"
+thread. I suggest we do the minimal fix I already posted for now,
+then reorganize more of the Makefile as Arnd suggested for v3.11.
+
+Regards,
+
+Tony
