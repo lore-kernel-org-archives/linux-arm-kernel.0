@@ -1,90 +1,73 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 30 Apr 2013 19:24:35 +0200
-Subject: [PATCH] ARM: dove: add si5351 clock driver to CuBox DT
-Message-ID: <1367342675-15312-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 30 Apr 2013 18:28:50 +0100
+Subject: Latest build results - errors/warnings - lots of them
+In-Reply-To: <alpine.LFD.2.03.1304301110030.17372@syhkavp.arg>
+References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
+ <201304301304.20650.arnd@arndb.de>
+ <20130430114229.GA2439@linaro.org>
+ <alpine.LFD.2.03.1304301110030.17372@syhkavp.arg>
+Message-ID: <20130430172816.GA31101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree node for si5351 clock generator
-and the corresponding oscillator connected to it. It also limits
-i2c frequency to 100kHz as there are bus locks reported on higher
-frequencies.
+On Tue, Apr 30, 2013 at 11:12:12AM -0400, Nicolas Pitre wrote:
+> On Tue, 30 Apr 2013, Dave Martin wrote:
+> 
+> > On Tue, Apr 30, 2013 at 01:04:20PM +0200, Arnd Bergmann wrote:
+> > > On Tuesday 30 April 2013, Russell King - ARM Linux wrote:
+> > > > Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
+> > > > great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
+> > > > arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
+> > > > source of errors.
+> > 
+> > [...]
+> >  
+> > > >arch/arm/common/mcpm_head.S:39: Error: selected processor does not support ARM mode `ubfx r9,r0,#0,#8'
+> > > >arch/arm/common/mcpm_head.S:40: Error: selected processor does not support ARM mode `ubfx r10,r0,#8,#8'
+> > > >arch/arm/common/mcpm_head.S:100: Error: selected processor does not support ARM mode `dmb'
+> > > >arch/arm/common/mcpm_head.S:115: Error: selected processor does not support ARM mode `dmb'
+> > > >arch/arm/common/mcpm_head.S:127: Error: selected processor does not support ARM mode `dmb'
+> > > >arch/arm/common/mcpm_head.S:131: Error: selected processor does not support ARM mode `dmb'
+> > > >arch/arm/common/mcpm_head.S:138: Error: selected processor does not support ARM mode `dsb'
+> > > >arch/arm/common/mcpm_head.S:152: Error: selected processor does not support ARM mode `dmb'
+> > > >arch/arm/common/mcpm_head.S:161: Error: selected processor does not support ARM mode `dmb'
+> > > >arch/arm/common/mcpm_head.S:175: Error: selected processor does not support ARM mode `dmb'
+> > > >arch/arm/common/vlock.S:62: Error: selected processor does not support ARM mode `dmb'
+> > > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dmb'
+> > > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dsb'
+> > > >arch/arm/common/vlock.S:89: Error: selected processor does not support ARM mode `dmb'
+> > > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dmb'
+> > > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dsb'
+> > > >arch/arm/common/vlock.S:102: Error: selected processor does not support ARM mode `dmb'
+> > > >arch/arm/common/vlock.S:105: Error: selected processor does not support ARM mode `dsb'
+> > > 
+> > > Right, the problem here is that the code was never tested with an ARMv6+ARMv7 config.
+> > > We can either fix it up by adding
+> > > 
+> > > 	.arch	armv7-a
+> > > 
+> > > in the assembly files, or by doing the same in the Makefile:
+> > > 
+> > > AFLAGS_vlock.S += -march=armv7-a
+> > > AFLAGS_mcpm_head.S += -march=armv7-a
+> > 
+> > 
+> > Hmmm, this code was tested with ARCH_MULTIPLATFORM, but it looks like
+> > no v6 boards were configured in when testing that...
+> > 
+> > 
+> > Assuming people are OK with the Makefile route, here's a patch for that,
+> > build-tested with a v6+v7 ARCH_MULTIPLATFORM config.
+> 
+> Isn't the .arch armv7-a route a bit cleaner?  That would have been my 
+> choice, although I don't feel strongly about it.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/dove-cubox.dts |   51 +++++++++++++++++++++++++++++++++++++-
- 1 files changed, 50 insertions(+), 1 deletions(-)
+I don't feel strongly either.  We already have the CFLAGS_DISABLE stuff,
+so it didn't feel that unnatural to add this in the Makefile; but .arch
+would work equally well.
 
-diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
-index 7e3065a..5cae2ab 100644
---- a/arch/arm/boot/dts/dove-cubox.dts
-+++ b/arch/arm/boot/dts/dove-cubox.dts
-@@ -44,11 +44,60 @@
- 			gpio = <&gpio0 1 0>;
- 		};
- 	};
-+
-+	clocks {
-+		/* 25MHz reference crystal */
-+		ref25: oscillator {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <25000000>;
-+		};
-+	};
- };
- 
- &uart0 { status = "okay"; };
- &sata0 { status = "okay"; };
--&i2c0 { status = "okay"; };
-+
-+&i2c0 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+
-+	si5351: clock-generator {
-+		compatible = "silabs,si5351a-msop";
-+		reg = <0x60>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		#clock-cells = <1>;
-+
-+		/* connect xtal input to 25MHz reference */
-+		clocks = <&ref25>;
-+
-+		/* connect xtal input as source of pll0 and pll1 */
-+		silabs,pll-source = <0 0>, <1 0>;
-+
-+		clkout0 {
-+			reg = <0>;
-+			silabs,drive-strength = <8>;
-+			silabs,multisynth-source = <0>;
-+			silabs,clock-source = <0>;
-+			silabs,pll-master;
-+		};
-+
-+		clkout1 {
-+			reg = <1>;
-+			silabs,drive-strength = <8>;
-+			silabs,multisynth-source = <1>;
-+			silabs,clock-source = <0>;
-+			silabs,pll-master;
-+		};
-+
-+		clkout2 {
-+			reg = <2>;
-+			silabs,multisynth-source = <1>;
-+			silabs,clock-source = <0>;
-+		};
-+	};
-+};
- 
- &sdio0 {
- 	status = "okay";
--- 
-1.7.2.5
+If somebody wants to change it, it's not a problem for me, but I didn't
+want to create extra disruption by proposing a different patch...
+
+Cheers
+---Dave
