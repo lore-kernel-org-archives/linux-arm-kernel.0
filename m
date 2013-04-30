@@ -1,44 +1,26 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 30 Apr 2013 13:49:28 +0200
-Subject: [PATCH V2] video: implement a simple framebuffer driver
-In-Reply-To: <517FAF78.1010306@ti.com>
-References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
- <1547536.Us4pVspuI2@avalon> <517FAF78.1010306@ti.com>
-Message-ID: <124304591.tbnLlR41q2@avalon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 30 Apr 2013 13:54:50 +0200
+Subject: Latest build results - errors/warnings - lots of them
+In-Reply-To: <20130430114229.GA2439@linaro.org>
+References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
+ <201304301304.20650.arnd@arndb.de> <20130430114229.GA2439@linaro.org>
+Message-ID: <201304301354.50210.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 30 April 2013 14:48:08 Tomi Valkeinen wrote:
-> On 04/30/2013 02:42 PM, Laurent Pinchart wrote:
-> > On Tuesday 30 April 2013 12:28:42 Arnd Bergmann wrote:
-> >> On Tuesday 30 April 2013, Tomi Valkeinen wrote:
-> >>> The bootloader would init the display hardware, the bootfb would give an
-> >>> early /dev/fb0 for the kernel and userspace, and when the real display
-> >>> driver is loaded, the bootfb would be unbound and the real driver would
-> >>> take over.
-> > 
-> > This could be done with a KMS driver as well ;-)
+On Tuesday 30 April 2013, Dave Martin wrote:
+> From 193f254689beaa1612d29bcc5ba004a933b37d95 Mon Sep 17 00:00:00 2001
+> From: Dave Martin <dave.martin@linaro.org>
+> Date: Tue, 30 Apr 2013 12:25:04 +0100
+> Subject: [PATCH 1/3] ARM: mcpm: Add explicit AFLAGS to support v6/v7
+>  multiplatform kernels
 > 
-> Right, I forgot to mention that. I had it in mind also =).
+> The full mcpm layer is not likely to be relevant to v6 based platforms,
+> so a multiplatform kernel won't use that code if booted on v6 hardware.
 > 
-> DRM has the same problem as fbdev with multi-arch and lots of display
-> and panel drivers.
+> This patch modifies the AFLAGS for affected mcpm .S files to specify
+> armv7-a explicitly for that code.
 > 
-> Probably the same bootfb could be used for DRM also. Or do you see any
-> benefit of having a "bootkms" driver, or such?
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
 
-As part of the (long term) effort to deprecate fbdev I would of course prefer 
-a bootkms driver. The KMS fbdev emulation layer would provide fbdev 
-compatibility for free during the transition.
-
--- 
-Regards,
-
-Laurent Pinchart
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130430/297e1336/attachment.sig>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
