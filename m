@@ -1,35 +1,72 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 30 Apr 2013 15:17:26 +0100
-Subject: [PATCH 4/4] ARM: KVM: fix use of S2_PGD_SIZE
+Date: Tue, 30 Apr 2013 15:17:25 +0100
+Subject: [PATCH 3/4] ARM: KVM: relax cache maintainance when building page
+ pables
 In-Reply-To: <1367331446-28030-1-git-send-email-marc.zyngier@arm.com>
 References: <1367331446-28030-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1367331446-28030-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1367331446-28030-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S2_PGD_SIZE describe the number of pages a used by a stage-2 PGD,
-not the size of the PGD.
+Patch 5a677ce044f1 (ARM: KVM: switch to a dual-step HYP init code)
+introduced code that flushes page tables to the point of coherency.
+This is overkill (point of unification is enough), and actually
+not required if running on a SMP capable platform.
 
-Fix the VM_BUG_ON() call that doesn't check much when S2_PGD_SIZE
-is equal to 1.
+Change this code to use clean_dcache_area(), which is updated by
+ae8a8b9553bd (ARM: 7691/1: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE
+and use ALT_SMP instead) to behave as a no-op on SMP ARMv7.
 
+Reported-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/mmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_mmu.h | 1 +
+ arch/arm/kvm/mmu.c             | 6 +++---
+ 2 files changed, 4 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 472ac70..2459821 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -129,6 +129,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+ }
+ 
+ #define kvm_flush_dcache_to_poc(a,l)	__cpuc_flush_dcache_area((a), (l))
++#define kvm_clean_dcache_to_pou(a,l)	clean_dcache_area((a), (l))
+ 
+ #endif	/* !__ASSEMBLY__ */
+ 
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index b978ebe..09ece5c 100644
+index 71f2a57..b978ebe 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -377,7 +377,7 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
- 		return -ENOMEM;
+@@ -228,7 +228,7 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
+ 		pte = pte_offset_kernel(pmd, addr);
+ 		kvm_set_pte(pte, pfn_pte(pfn, prot));
+ 		get_page(virt_to_page(pte));
+-		kvm_flush_dcache_to_poc(pte, sizeof(*pte));
++		kvm_clean_dcache_to_pou(pte, sizeof(*pte));
+ 		pfn++;
+ 	} while (addr += PAGE_SIZE, addr != end);
+ }
+@@ -255,7 +255,7 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+ 			}
+ 			pmd_populate_kernel(NULL, pmd, pte);
+ 			get_page(virt_to_page(pmd));
+-			kvm_flush_dcache_to_poc(pmd, sizeof(*pmd));
++			kvm_clean_dcache_to_pou(pmd, sizeof(*pmd));
+ 		}
  
- 	/* stage-2 pgd must be aligned to its size */
--	VM_BUG_ON((unsigned long)pgd & (S2_PGD_SIZE - 1));
-+	VM_BUG_ON((unsigned long)pgd & (PAGE_SIZE * S2_PGD_SIZE - 1));
+ 		next = pmd_addr_end(addr, end);
+@@ -293,7 +293,7 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+ 			}
+ 			pud_populate(NULL, pud, pmd);
+ 			get_page(virt_to_page(pud));
+-			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
++			kvm_clean_dcache_to_pou(pud, sizeof(*pud));
+ 		}
  
- 	memset(pgd, 0, PTRS_PER_S2_PGD * sizeof(pgd_t));
- 	kvm_clean_pgd(pgd);
+ 		next = pgd_addr_end(addr, end);
 -- 
 1.8.2.1
