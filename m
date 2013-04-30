@@ -1,63 +1,43 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 30 Apr 2013 11:12:12 -0400 (EDT)
-Subject: Latest build results - errors/warnings - lots of them
-In-Reply-To: <20130430114229.GA2439@linaro.org>
-References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
- <201304301304.20650.arnd@arndb.de> <20130430114229.GA2439@linaro.org>
-Message-ID: <alpine.LFD.2.03.1304301110030.17372@syhkavp.arg>
+Date: Tue, 30 Apr 2013 11:15:25 -0400 (EDT)
+Subject: linux-next build error (at91) - use of bool in mach/arch.h
+In-Reply-To: <alpine.DEB.2.02.1304301257200.5398@kaball.uk.xensource.com>
+References: <517F8FF4.3050901@atmel.com>
+ <CAMuHMdXYaDHYq7CG8ftP+yyF18pMx8qZrvM3AUTAXk+tUruNcA@mail.gmail.com>
+ <alpine.DEB.2.02.1304301257200.5398@kaball.uk.xensource.com>
+Message-ID: <alpine.LFD.2.03.1304301114140.17372@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 30 Apr 2013, Dave Martin wrote:
+On Tue, 30 Apr 2013, Stefano Stabellini wrote:
 
-> On Tue, Apr 30, 2013 at 01:04:20PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 30 April 2013, Russell King - ARM Linux wrote:
-> > > Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
-> > > great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
-> > > arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
-> > > source of errors.
-> 
-> [...]
->  
-> > >arch/arm/common/mcpm_head.S:39: Error: selected processor does not support ARM mode `ubfx r9,r0,#0,#8'
-> > >arch/arm/common/mcpm_head.S:40: Error: selected processor does not support ARM mode `ubfx r10,r0,#8,#8'
-> > >arch/arm/common/mcpm_head.S:100: Error: selected processor does not support ARM mode `dmb'
-> > >arch/arm/common/mcpm_head.S:115: Error: selected processor does not support ARM mode `dmb'
-> > >arch/arm/common/mcpm_head.S:127: Error: selected processor does not support ARM mode `dmb'
-> > >arch/arm/common/mcpm_head.S:131: Error: selected processor does not support ARM mode `dmb'
-> > >arch/arm/common/mcpm_head.S:138: Error: selected processor does not support ARM mode `dsb'
-> > >arch/arm/common/mcpm_head.S:152: Error: selected processor does not support ARM mode `dmb'
-> > >arch/arm/common/mcpm_head.S:161: Error: selected processor does not support ARM mode `dmb'
-> > >arch/arm/common/mcpm_head.S:175: Error: selected processor does not support ARM mode `dmb'
-> > >arch/arm/common/vlock.S:62: Error: selected processor does not support ARM mode `dmb'
-> > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dmb'
-> > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dsb'
-> > >arch/arm/common/vlock.S:89: Error: selected processor does not support ARM mode `dmb'
-> > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dmb'
-> > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dsb'
-> > >arch/arm/common/vlock.S:102: Error: selected processor does not support ARM mode `dmb'
-> > >arch/arm/common/vlock.S:105: Error: selected processor does not support ARM mode `dsb'
+> On Tue, 30 Apr 2013, Geert Uytterhoeven wrote:
+> > On Tue, Apr 30, 2013 at 11:33 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> > > So, I am wondering if the best correction is to add the types.h header file
+> > > in the asm/mach/arch.h file, like this:
+> > >
+> > > --- a/arch/arm/include/asm/mach/arch.h
+> > > +++ b/arch/arm/include/asm/mach/arch.h
+> > > @@ -8,6 +8,8 @@
+> > >   * published by the Free Software Foundation.
+> > >   */
+> > >
+> > > +#include <linux/types.h>
+> > > +
+> > >  #ifndef __ASSEMBLY__
+> > >
+> > >  struct tag;
+> > >
+> > > or if a better option would be to re-arrange the include directives in
+> > > various at91xxx_devices.c files?
 > > 
-> > Right, the problem here is that the code was never tested with an ARMv6+ARMv7 config.
-> > We can either fix it up by adding
-> > 
-> > 	.arch	armv7-a
-> > 
-> > in the assembly files, or by doing the same in the Makefile:
-> > 
-> > AFLAGS_vlock.S += -march=armv7-a
-> > AFLAGS_mcpm_head.S += -march=armv7-a
+> > Include files should be self-contained, so asm/mach/arch.h is the right place.
 > 
-> 
-> Hmmm, this code was tested with ARCH_MULTIPLATFORM, but it looks like
-> no v6 boards were configured in when testing that...
-> 
-> 
-> Assuming people are OK with the Makefile route, here's a patch for that,
-> build-tested with a v6+v7 ARCH_MULTIPLATFORM config.
+> Nicolas,
+> are you happy to come up with a proper patch to fix the issue?
 
-Isn't the .arch armv7-a route a bit cleaner?  That would have been my 
-choice, although I don't feel strongly about it.
+I'd prefer if you just folded the above include into the original patch, 
+unless this has been pulled already.
 
 
 Nicolas
