@@ -1,68 +1,48 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Tue, 30 Apr 2013 07:49:36 -0700
-Subject: [PATCH 15/15] ARM: KVM: iterate over all CPUs for CPU compatibility
- check
-In-Reply-To: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
-References: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
-Message-ID: <1367333376-30983-16-git-send-email-cdall@cs.columbia.edu>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 30 Apr 2013 15:51:33 +0100
+Subject: [GIT PULL] (arm/xen) 3.9-rc3-smp-6-tag
+Message-ID: <alpine.DEB.2.02.1304301515490.5398@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@linaro.org>
+Hi Linus,
+this is my first pull request to you, Konrad decided to let me deal
+with the Xen/ARM stuff myself recently.
+Please pull the following tag (based on 3.9-rc3):
 
-kvm_target_cpus() checks the compatibility of the used CPU with
-KVM, which is currently limited to ARM Cortex-A15 cores.
-However by calling it only once on any random CPU it assumes that
-all cores are the same, which is not necessarily the case (for example
-in Big.Little).
+git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git 3.9-rc3-smp-6-tag
 
-[ I cut some of the commit message and changed the formatting of the
-  code slightly to pass checkpatch and look more like the rest of the
-  kvm/arm init code - Christoffer ]
+It contains a bunch of Xen/ARM specific changes, including some fixes,
+SMP support for Xen on ARM, and moving the xenvm machine from
+mach-vexpress to mach-virt.
 
-Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
-Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
----
- arch/arm/kvm/arm.c |   15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
+The non-Xen files that are touched are arch/arm/Kconfig, to select
+ARM_PSCI on XEN, and arch/arm/boot/dts/Makefile, to build the xenvm DTB
+if CONFIG_ARCH_VIRT.
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 089c0a4..5bc99b4 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -947,21 +947,30 @@ out_err:
- 	return err;
- }
- 
-+static void check_kvm_target_cpu(void *ret)
-+{
-+	*(int *)ret = kvm_target_cpu();
-+}
-+
- /**
-  * Initialize Hyp-mode and memory mappings on all CPUs.
-  */
- int kvm_arch_init(void *opaque)
- {
- 	int err;
-+	int ret, cpu;
- 
- 	if (!is_hyp_mode_available()) {
- 		kvm_err("HYP mode not available\n");
- 		return -ENODEV;
- 	}
- 
--	if (kvm_target_cpu() < 0) {
--		kvm_err("Target CPU not supported!\n");
--		return -ENODEV;
-+	for_each_online_cpu(cpu) {
-+		smp_call_function_single(cpu, check_kvm_target_cpu, &ret, 1);
-+		if (ret < 0) {
-+			kvm_err("Error, CPU %d not supported!\n", cpu);
-+			return -ENODEV;
-+		}
- 	}
- 
- 	err = init_hyp_mode();
--- 
-1.7.9.5
+
+Stefano Stabellini (7):
+      xen/arm: actually pass a non-NULL percpu pointer to request_percpu_irq
+      xen/arm: implement HYPERVISOR_vcpu_op
+      xen/arm: SMP support
+      xen: move the xenvm machine to mach-virt
+      xen/arm: XEN selects ARM_PSCI
+      xenvm: add a simple PSCI node and a second cpu
+      xen/arm: use sched_op hypercalls for machine reboot and power off
+
+Wei Yongjun (1):
+      xen/arm: remove duplicated include from enlighten.c
+
+ arch/arm/Kconfig                     |    1 +
+ arch/arm/boot/dts/Makefile           |    4 +-
+ arch/arm/boot/dts/xenvm-4.2.dts      |   13 ++++++
+ arch/arm/include/asm/xen/hypercall.h |    1 +
+ arch/arm/mach-vexpress/v2m.c         |    1 -
+ arch/arm/mach-virt/virt.c            |    1 +
+ arch/arm/xen/enlighten.c             |   74 ++++++++++++++++++++++++++++++---
+ arch/arm/xen/hypercall.S             |    1 +
+ 8 files changed, 86 insertions(+), 10 deletions(-)
+
+
+Cheers,
+Stefano
