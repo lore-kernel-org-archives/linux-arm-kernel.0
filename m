@@ -1,227 +1,105 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 30 Apr 2013 16:21:05 +0530
-Subject: [PATCH v2 2/2] dma: imx-sdma: move to generic device tree bindings
-In-Reply-To: <1366901008-7593-3-git-send-email-shawn.guo@linaro.org>
-References: <1366901008-7593-1-git-send-email-shawn.guo@linaro.org>
- <1366901008-7593-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130430105105.GG1960@intel.com>
+From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
+Date: Tue, 30 Apr 2013 08:32:10 -0300
+Subject: [PATCH 2/2] ARM: sun5i: Update the clock compatible strings
+In-Reply-To: <1367315783-21345-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1367315783-21345-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1367315783-21345-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <517FABBA.5060902@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 10:43:28PM +0800, Shawn Guo wrote:
-> Update imx-sdma driver to adopt generic DMA device tree bindings.  It
-> calls of_dma_controller_register() with imx-sdma specific of_dma_xlate
-> to get the generic DMA device tree helper support.  The #dma-cells for
-> imx-sdma must be 3, which includes request ID, peripheral type and
-> priority.
-> 
-> The definitions of peripheral type and priority get moved into
-> include/dt-bindings/dma/imx.h, so that the macros can also be used in
-> dts files.
-> 
-> The existing way of requesting channel, clients directly call
-> dma_request_channel(), still work there, and will be removed after
-> all imx-sdma clients get converted to generic DMA device tree helper.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Looks fine to me, Arnd?
+Hi Maxime,
 
---
-~Vinod
+El 30/04/13 06:56, Maxime Ripard escribi?:
+> The Allwinner A13 has a smaller clock set than the one found in the A10.
+> Fix the A13 device tree and documentation to reflect this.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+The patch looks fine to me.
+
+Acked-by: Emilio L?pez <emilio@elopez.com.ar>
+
 > ---
->  .../devicetree/bindings/dma/fsl-imx-sdma.txt       |   22 +++++++++++
->  drivers/dma/imx-sdma.c                             |   40 ++++++++++++++++++++
->  include/dt-bindings/dma/imx.h                      |   29 ++++++++++++++
->  include/linux/platform_data/dma-imx.h              |   31 +--------------
->  4 files changed, 92 insertions(+), 30 deletions(-)
->  create mode 100644 include/dt-bindings/dma/imx.h
+>  arch/arm/boot/dts/sun5i-a13.dtsi | 35 ++++++++++++-----------------------
+>  1 file changed, 12 insertions(+), 23 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-> index d1e3f44..8bd8d35 100644
-> --- a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-> +++ b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
-> @@ -4,6 +4,11 @@ Required properties:
->  - compatible : Should be "fsl,<chip>-sdma"
->  - reg : Should contain SDMA registers location and length
->  - interrupts : Should contain SDMA interrupt
-> +- #dma-cells : Must be <3>.
-> +  The first cell specifies the DMA request/event ID.  The second and
-> +  third cell specifies the peripheral type and priority of DMA transfer
-> +  respectively.  Refer to include/dt-bindings/dma/imx.h for available
-> +  peripheral types and priorities.
->  - fsl,sdma-ram-script-name : Should contain the full path of SDMA RAM
->    scripts firmware
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index 31fa38f..8ba65c1 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -95,20 +95,15 @@
 >  
-> @@ -13,5 +18,22 @@ sdma at 83fb0000 {
->  	compatible = "fsl,imx51-sdma", "fsl,imx35-sdma";
->  	reg = <0x83fb0000 0x4000>;
->  	interrupts = <6>;
-> +	#dma-cells = <3>;
->  	fsl,sdma-ram-script-name = "sdma-imx51.bin";
->  };
-> +
-> +DMA clients connected to the i.MX SDMA controller must use the format
-> +described in the dma.txt file.
-> +
-> +Examples:
-> +
-> +ssi2: ssi at 70014000 {
-> +	compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
-> +	reg = <0x70014000 0x4000>;
-> +	interrupts = <30>;
-> +	clocks = <&clks 49>;
-> +	dmas = <&sdma 24 IMX_DMATYPE_SSI_SP DMA_PRIO_HIGH>,
-> +	       <&sdma 25 IMX_DMATYPE_SSI_SP DMA_PRIO_HIGH>;
-> +	dma-names = "rx", "tx";
-> +	fsl,fifo-depth = <15>;
-> +};
-> diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
-> index e57a0c6..f1324da 100644
-> --- a/drivers/dma/imx-sdma.c
-> +++ b/drivers/dma/imx-sdma.c
-> @@ -36,6 +36,7 @@
->  #include <linux/dmaengine.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> +#include <linux/of_dma.h>
+>  		ahb_gates: ahb_gates at 01c20060 {
+>  			#clock-cells = <1>;
+> -			compatible = "allwinner,sun4i-ahb-gates-clk";
+> +			compatible = "allwinner,sun5i-a13-ahb-gates-clk";
+>  			reg = <0x01c20060 0x8>;
+>  			clocks = <&ahb>;
+> -			clock-output-names = "ahb_usb0", "ahb_ehci0",
+> -				"ahb_ohci0", "ahb_ehci1", "ahb_ohci1", "ahb_ss",
+> -				"ahb_dma", "ahb_bist", "ahb_mmc0", "ahb_mmc1",
+> -				"ahb_mmc2", "ahb_mmc3", "ahb_ms", "ahb_nand",
+> -				"ahb_sdram", "ahb_ace",	"ahb_emac", "ahb_ts",
+> -				"ahb_spi0", "ahb_spi1", "ahb_spi2", "ahb_spi3",
+> -				"ahb_pata", "ahb_sata", "ahb_gps", "ahb_ve",
+> -				"ahb_tvd", "ahb_tve0", "ahb_tve1", "ahb_lcd0",
+> -				"ahb_lcd1", "ahb_csi0", "ahb_csi1", "ahb_hdmi",
+> -				"ahb_de_be0", "ahb_de_be1", "ahb_de_fe0",
+> -				"ahb_de_fe1", "ahb_mp", "ahb_mali400";
+> +			clock-output-names = "ahb_usbotg", "ahb_ehci", "ahb_ohci",
+
+Should we keep the USB and DE names consistent between sun4i and sun5i?
+Nobody should be referencing them by name, however, so it wouldn't cause
+any issues on the long run.
+
+> +				"ahb_ss", "ahb_dma", "ahb_bist", "ahb_mmc0",
+> +				"ahb_mmc1", "ahb_mmc2", "ahb_nand", "ahb_sdram",
+> +				"ahb_spi0", "ahb_spi1", "ahb_spi2", "ahb_stimer",
+> +				"ahb_ve", "ahb_lcd", "ahb_csi", "ahb_de_be",
+> +				"ahb_de_fe", "ahb_iep", "ahb_mali400";
+>  		};
 >  
->  #include <asm/irq.h>
->  #include <linux/platform_data/dma-imx-sdma.h>
-> @@ -1296,6 +1297,35 @@ err_dma_alloc:
->  	return ret;
->  }
+>  		apb0: apb0 at 01c20054 {
+> @@ -120,15 +115,13 @@
 >  
-> +static bool sdma_filter_fn(struct dma_chan *chan, void *fn_param)
-> +{
-> +	struct imx_dma_data *data = fn_param;
-> +
-> +	if (!imx_dma_is_general_purpose(chan))
-> +		return false;
-> +
-> +	chan->private = data;
-> +
-> +	return true;
-> +}
-> +
-> +struct dma_chan *sdma_xlate(struct of_phandle_args *dma_spec,
-> +			    struct of_dma *ofdma)
-> +{
-> +	struct sdma_engine *sdma = ofdma->of_dma_data;
-> +	dma_cap_mask_t mask = sdma->dma_device.cap_mask;
-> +	struct imx_dma_data data;
-> +
-> +	if (dma_spec->args_count != 3)
-> +		return NULL;
-> +
-> +	data.dma_request = dma_spec->args[0];
-> +	data.peripheral_type = dma_spec->args[1];
-> +	data.priority = dma_spec->args[2];
-> +
-> +	return dma_request_channel(mask, sdma_filter_fn, &data);
-> +}
-> +
->  static int __init sdma_probe(struct platform_device *pdev)
->  {
->  	const struct of_device_id *of_id =
-> @@ -1443,10 +1473,20 @@ static int __init sdma_probe(struct platform_device *pdev)
->  		goto err_init;
->  	}
+>  		apb0_gates: apb0_gates at 01c20068 {
+>  			#clock-cells = <1>;
+> -			compatible = "allwinner,sun4i-apb0-gates-clk";
+> +			compatible = "allwinner,sun5i-a13-apb0-gates-clk";
+>  			reg = <0x01c20068 0x4>;
+>  			clocks = <&apb0>;
+> -			clock-output-names = "apb0_codec", "apb0_spdif",
+> -				"apb0_ac97", "apb0_iis", "apb0_pio", "apb0_ir0",
+> -				"apb0_ir1", "apb0_keypad";
+> +			clock-output-names = "apb0_codec", "apb0_pio", "apb0_ir";
+>  		};
 >  
-> +	if (np) {
-> +		ret = of_dma_controller_register(np, sdma_xlate, sdma);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "failed to register controller\n");
-> +			goto err_register;
-> +		}
-> +	}
-> +
->  	dev_info(sdma->dev, "initialized\n");
+> -		/* dummy is pll62 */
+> +		/* dummy is pll6 */
+>  		apb1_mux: apb1_mux at 01c20058 {
+>  			#clock-cells = <0>;
+>  			compatible = "allwinner,sun4i-apb1-mux-clk";
+> @@ -145,15 +138,11 @@
 >  
->  	return 0;
+>  		apb1_gates: apb1_gates at 01c2006c {
+>  			#clock-cells = <1>;
+> -			compatible = "allwinner,sun4i-apb1-gates-clk";
+> +			compatible = "allwinner,sun5i-a13-apb1-gates-clk";
+>  			reg = <0x01c2006c 0x4>;
+>  			clocks = <&apb1>;
+>  			clock-output-names = "apb1_i2c0", "apb1_i2c1",
+> -				"apb1_i2c2", "apb1_can", "apb1_scr",
+> -				"apb1_ps20", "apb1_ps21", "apb1_uart0",
+> -				"apb1_uart1", "apb1_uart2", "apb1_uart3",
+> -				"apb1_uart4", "apb1_uart5", "apb1_uart6",
+> -				"apb1_uart7";
+> +				"apb1_i2c2", "apb1_uart1", "apb1_uart3";
+>  		};
+>  	};
 >  
-> +err_register:
-> +	dma_async_device_unregister(&sdma->dma_device);
->  err_init:
->  	kfree(sdma->script_addrs);
->  err_alloc:
-> diff --git a/include/dt-bindings/dma/imx.h b/include/dt-bindings/dma/imx.h
-> new file mode 100644
-> index 0000000..d5de68c
-> --- /dev/null
-> +++ b/include/dt-bindings/dma/imx.h
-> @@ -0,0 +1,29 @@
-> +/*
-> + * This enumerates peripheral types. Used for SDMA.
-> + */
-> +#define IMX_DMATYPE_SSI		0  /* MCU domain SSI */
-> +#define IMX_DMATYPE_SSI_SP	1  /* Shared SSI */
-> +#define IMX_DMATYPE_MMC		2  /* MMC */
-> +#define IMX_DMATYPE_SDHC	3  /* SDHC */
-> +#define IMX_DMATYPE_UART	4  /* MCU domain UART */
-> +#define IMX_DMATYPE_UART_SP	5  /* Shared UART */
-> +#define IMX_DMATYPE_FIRI	6  /* FIRI */
-> +#define IMX_DMATYPE_CSPI	7  /* MCU domain CSPI */
-> +#define IMX_DMATYPE_CSPI_SP	8  /* Shared CSPI */
-> +#define IMX_DMATYPE_SIM		9  /* SIM */
-> +#define IMX_DMATYPE_ATA		10 /* ATA */
-> +#define IMX_DMATYPE_CCM		11 /* CCM */
-> +#define IMX_DMATYPE_EXT		12 /* External peripheral */
-> +#define IMX_DMATYPE_MSHC	13 /* Memory Stick Host Controller */
-> +#define IMX_DMATYPE_MSHC_SP	14 /* Shared Memory Stick Host Controller */
-> +#define IMX_DMATYPE_DSP		15 /* DSP */
-> +#define IMX_DMATYPE_MEMORY	16 /* Memory */
-> +#define IMX_DMATYPE_FIFO_MEMORY	17 /* FIFO type Memory */
-> +#define IMX_DMATYPE_SPDIF	18 /* SPDIF */
-> +#define IMX_DMATYPE_IPU_MEMORY	19 /* IPU Memory */
-> +#define IMX_DMATYPE_ASRC	20 /* ASRC */
-> +#define IMX_DMATYPE_ESAI	21 /* ESAI */
-> +
-> +#define DMA_PRIO_HIGH		0
-> +#define DMA_PRIO_MEDIUM		1
-> +#define DMA_PRIO_LOW		2
-> diff --git a/include/linux/platform_data/dma-imx.h b/include/linux/platform_data/dma-imx.h
-> index 8a8a684..33f7eda 100644
-> --- a/include/linux/platform_data/dma-imx.h
-> +++ b/include/linux/platform_data/dma-imx.h
-> @@ -12,36 +12,7 @@
->  #include <linux/scatterlist.h>
->  #include <linux/device.h>
->  #include <linux/dmaengine.h>
-> -
-> -/*
-> - * This enumerates peripheral types. Used for SDMA.
-> - */
-> -#define IMX_DMATYPE_SSI		0  /* MCU domain SSI */
-> -#define IMX_DMATYPE_SSI_SP	1  /* Shared SSI */
-> -#define IMX_DMATYPE_MMC		2  /* MMC */
-> -#define IMX_DMATYPE_SDHC	3  /* SDHC */
-> -#define IMX_DMATYPE_UART	4  /* MCU domain UART */
-> -#define IMX_DMATYPE_UART_SP	5  /* Shared UART */
-> -#define IMX_DMATYPE_FIRI	6  /* FIRI */
-> -#define IMX_DMATYPE_CSPI	7  /* MCU domain CSPI */
-> -#define IMX_DMATYPE_CSPI_SP	8  /* Shared CSPI */
-> -#define IMX_DMATYPE_SIM		9  /* SIM */
-> -#define IMX_DMATYPE_ATA		10 /* ATA */
-> -#define IMX_DMATYPE_CCM		11 /* CCM */
-> -#define IMX_DMATYPE_EXT		12 /* External peripheral */
-> -#define IMX_DMATYPE_MSHC	13 /* Memory Stick Host Controller */
-> -#define IMX_DMATYPE_MSHC_SP	14 /* Shared Memory Stick Host Controller */
-> -#define IMX_DMATYPE_DSP		15 /* DSP */
-> -#define IMX_DMATYPE_MEMORY	16 /* Memory */
-> -#define IMX_DMATYPE_FIFO_MEMORY	17 /* FIFO type Memory */
-> -#define IMX_DMATYPE_SPDIF	18 /* SPDIF */
-> -#define IMX_DMATYPE_IPU_MEMORY	19 /* IPU Memory */
-> -#define IMX_DMATYPE_ASRC	20 /* ASRC */
-> -#define IMX_DMATYPE_ESAI	21 /* ESAI */
-> -
-> -#define DMA_PRIO_HIGH		0
-> -#define DMA_PRIO_MEDIUM		1
-> -#define DMA_PRIO_LOW		2
-> +#include <dt-bindings/dma/imx.h>
->  
->  struct imx_dma_data {
->  	int dma_request; /* DMA request line */
-> -- 
-> 1.7.9.5
 > 
-> 
+
+Thanks,
+
+Emilio
