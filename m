@@ -1,40 +1,54 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 30 Apr 2013 11:39:05 +0200
-Subject: linux-next build error (at91) - use of bool in mach/arch.h
-In-Reply-To: <517F8FF4.3050901@atmel.com>
-References: <517F8FF4.3050901@atmel.com>
-Message-ID: <CAMuHMdXYaDHYq7CG8ftP+yyF18pMx8qZrvM3AUTAXk+tUruNcA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 30 Apr 2013 11:45:33 +0200
+Subject: [PATCH] ARM: sunxi: Fix Mini X-plus device tree build
+Message-ID: <1367315134-20977-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 30, 2013 at 11:33 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> So, I am wondering if the best correction is to add the types.h header file
-> in the asm/mach/arch.h file, like this:
->
-> --- a/arch/arm/include/asm/mach/arch.h
-> +++ b/arch/arm/include/asm/mach/arch.h
-> @@ -8,6 +8,8 @@
->   * published by the Free Software Foundation.
->   */
->
-> +#include <linux/types.h>
-> +
->  #ifndef __ASSEMBLY__
->
->  struct tag;
->
-> or if a better option would be to re-arrange the include directives in
-> various at91xxx_devices.c files?
+Commit b00adbe0 ("ARM: sunxi: Rename uart nodes to serial") changed the
+node names in the DTSI, changes that were not accordingly made to the
+Mini X-Plus device tree. This breakage slipped through because it was
+not properly declared in the Makefile.
 
-Include files should be self-contained, so asm/mach/arch.h is the right place.
+Fix both issues.
 
-Gr{oetje,eeting}s,
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ This is 3.10-rc* material.
 
-                        Geert
+ arch/arm/boot/dts/Makefile                 | 4 +++-
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts | 4 ++--
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 9c62558..6d774d0 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -147,7 +147,9 @@ dtb-$(CONFIG_ARCH_SPEAR3XX)+= spear300-evb.dtb \
+ 	spear320-evb.dtb \
+ 	spear320-hmi.dtb
+ dtb-$(CONFIG_ARCH_SPEAR6XX)+= spear600-evb.dtb
+-dtb-$(CONFIG_ARCH_SUNXI) += sun4i-a10-cubieboard.dtb \
++dtb-$(CONFIG_ARCH_SUNXI) += \
++	sun4i-a10-cubieboard.dtb \
++	sun4i-a10-mini-xplus.dtb \
+ 	sun4i-a10-hackberry.dtb \
+ 	sun5i-a13-olinuxino.dtb
+ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+diff --git a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+index 4a7c35d..078ed7f 100644
+--- a/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
++++ b/arch/arm/boot/dts/sun4i-a10-mini-xplus.dts
+@@ -22,8 +22,8 @@
+ 		bootargs = "earlyprintk console=ttyS0,115200";
+ 	};
+ 
+-	soc {
+-		uart0: uart at 01c28000 {
++	soc at 01c20000 {
++		uart0: serial at 01c28000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&uart0_pins_a>;
+ 			status = "okay";
+-- 
+1.8.1.2
