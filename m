@@ -1,22 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 30 Apr 2013 10:05:02 +0100
-Subject: [Question] flush_dcache_page() need to flush icache?
-In-Reply-To: <CACVXFVMz3jLEPDYFM-_S_t5TiqikVSRiKf9cBNocH3QhVexwZg@mail.gmail.com>
-References: <CACVXFVMz3jLEPDYFM-_S_t5TiqikVSRiKf9cBNocH3QhVexwZg@mail.gmail.com>
-Message-ID: <20130430090502.GC29766@arm.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Tue, 30 Apr 2013 14:46:55 +0530
+Subject: [V4 patch 02/15] ARM: ux500: cpuidle: replace for_each_online_cpu
+ by for_each_possible_cpu
+In-Reply-To: <1366707285-12179-3-git-send-email-daniel.lezcano@linaro.org>
+References: <1366707285-12179-1-git-send-email-daniel.lezcano@linaro.org>
+ <1366707285-12179-3-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <CANuQgHF9x2g=nybwEKMwihd0M9ps9rOaGw_zJM6a46m5-GKT0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 30, 2013 at 09:16:16AM +0100, Ming Lei wrote:
-> Looks flush_dcache_page() need to deal with both dcache alias and I/D
-> cache coherency, but set_pte_at() has already run __sync_icache_dcache()
-> to make I/D cache coherency in the path of executable page fault.
-> 
-> So could the flushing icache be removed in flush_dcache_page()?
+On 23 April 2013 14:24, Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
+> All the drivers are using, in their initialization function, the
+> for_each_possible_cpu macro.
+>
+> Using for_each_online_cpu means the driver must handle the initialization
+> of the cpuidle device when a cpu is up which is not the case here.
+>
+> Change the macro to for_each_possible_cpu as that fix the hotplug
+> initialization and make the initialization routine consistent with the
+> rest of the code in the different drivers.
+>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/mach-ux500/cpuidle.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
+> index c29c1bf..5657d4a 100644
+> --- a/arch/arm/mach-ux500/cpuidle.c
+> +++ b/arch/arm/mach-ux500/cpuidle.c
+> @@ -125,7 +125,7 @@ int __init ux500_idle_init(void)
+>                 return ret;
+>         }
+>
+> -       for_each_online_cpu(cpu) {
+> +       for_each_possible(cpu) {
 
-That's the case for (mapping && mapping_mapped(mapping)) where the
-kernel modifies a page cache page which is already mapped in user space
-and we won't get a subsequent set_pte_at() call.
+for_each_possible(cpu) or for_each_possible_cpu(cpu) ?
+>                 device = &per_cpu(ux500_cpuidle_device, cpu);
+>                 device->cpu = cpu;
+>                 ret = cpuidle_register_device(device);
+> @@ -139,7 +139,7 @@ out:
+>         return ret;
+>
+>  out_unregister:
+> -       for_each_online_cpu(cpu) {
+> +       for_each_possible_cpu(cpu) {
+>                 device = &per_cpu(ux500_cpuidle_device, cpu);
+>                 cpuidle_unregister_device(device);
+>         }
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
--- 
-Catalin
+
+
+--
+with warm regards,
+Chander Kashyap
