@@ -1,73 +1,49 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Tue, 30 Apr 2013 23:04:03 +0200
-Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <20130430112225.GD29766@arm.com>
-References: <20121008200216.GA14167@schnuecks.de>
- <20121008202040.GC4625@n2100.arm.linux.org.uk>
- <20121008230733.GA17819@schnuecks.de>
- <20121118211005.GW22106@titan.lakedaemon.net>
- <20130418111608.GF27197@titan.lakedaemon.net>
- <20130418112201.GQ14496@n2100.arm.linux.org.uk>
- <20130418114016.GG27197@titan.lakedaemon.net>
- <20130418135104.GA18616@arm.com>
- <20130421220629.GA25571@schnuecks.de>
- <20130430112225.GD29766@arm.com>
-Message-ID: <20130430210403.GA18076@schnuecks.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 30 Apr 2013 14:49:39 -0700
+Subject: Latest build results - errors/warnings - lots of them
+In-Reply-To: <20130430161104.GB26257@atomide.com>
+References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
+ <201304301304.20650.arnd@arndb.de>
+ <20130430161104.GB26257@atomide.com>
+Message-ID: <20130430214939.GD28721@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On Tue, Apr 30, 2013 at 12:22:25PM +0100, Catalin Marinas wrote:
-> On Sun, Apr 21, 2013 at 11:06:30PM +0100, Simon Baatz wrote:
-> > On Thu, Apr 18, 2013 at 02:51:04PM +0100, Catalin Marinas wrote:
-> > > On Thu, Apr 18, 2013 at 12:40:16PM +0100, Jason Cooper wrote:
-...
+* Tony Lindgren <tony@atomide.com> [130430 09:19]:
+> * Arnd Bergmann <arnd@arndb.de> [130430 04:10]:
+> > On Tuesday 30 April 2013, Russell King - ARM Linux wrote:
+> > > Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
+> > > great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
+> > > arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
+> > > source of errors.
 > > 
-> > It is not the driver itself which is using the API, it is the
-> > generic scatterlist memory iterator. And I don't think that this is
-> > wrong, as I have tried to explain in [1].
+> > Yes, I noticed this but haven't gotten around to prepare a patch. I'll comment
+> > below.
+> > 
+> > > OMAP stuff needs a serious look at too - much Kconfig madness there
+> > > caused by over-use of select, which then goes on to cause build errors
+> > > because it assumes some stuff is always enabled.
 > 
-> Trying to remember what we've discussed over the past months on this
-> topic. It looks like sg_miter_stop() does the right thing in calling
-> flush_kernel_dcache_page(). Commit f8b63c1 (ARM: 6382/1: Remove
-> superfluous flush_kernel_dcache_page()) removed this function entirely.
-> The code previously had this comment - /* highmem pages are always
-> flushed upon kunmap already */ which I think it wasn't fully correct
-> either. The kunmap_atomic() flushes the caches but kunmap() doesn't, so
-> I suspect we only get the flushing if SG_MITER_ATOMIC.
+> I have posted a few randconfig fixes in "[PATCH 0/3] few omap randconfig
+> fixes for v3.10" that also remove the select of SERIAL_OMAP that I missed
+> while fixing the 8250 issue. I was planning to send a pull request after
+> the merge window, but can do it now too if people prefer that.
+
+I'll apply only the SERIAL_OMAP fix into omap-for-v3.10/fixes-randconfig
+against v3.9-rc7 as the two other warning fixes depend on other branches
+and can be merged after -rc1.
+  
+> > Ack. I have not looked much at randconfig output, but this has certianly
+> > grown worse after CONFIG_ARCH_OMAP has gotten included in ARCH_MULTIPLATFORM
 > 
-> So it looks to me like flush_kernel_dcache_page() should be implemented
-> even for highmem pages (with VIVT or aliasing VIPT, at least for non
-> kmap_atomic addresses by checking for FIXADDR_START). If highmem is
-> disabled, I suspect we still need this function since the calling code
-> doesn't care whether kmap/kunmap was a no-op. But can we keep it as a
-> simple call to __cpuc_flush_dcache_area(page_address(page), PAGE_SIZE)?
+> I have a patch coming for the "no SoC selected" randconfig issue as
+> discussed in the "linux-next ARM multi-platform randconfig errors"
+> thread. I suggest we do the minimal fix I already posted for now,
+> then reorganize more of the Makefile as Arnd suggested for v3.11.
 
-My first version ([1]) had:
+Got the fix for "no SoC selected" boiled down to a minimal Makefile only
+fix as Arnd suggested, will post shortly.
 
-	if ((cache_is_vivt() || cache_is_vipt_aliasing()) && !PageHighMem(page))
-		__flush_kernel_dcache_page(page);
+Regards,
 
-If I understand this correctly, you are proposing to remove the
-highmem exclusion.
-
-And then in __flush_kernel_dcache_page():
-
-	mapping = page_mapping(page);
-
-	if (!mapping || mapping_mapped(mapping))
-		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
-
-I still prefer to have this condition here to avoid the flush when
-there is no user mapping at all.  This is handled by lazy flushing
-and is probably the most common case anyway (given how many people
-seem to be affected by this problem).
-
-Additionally, although we can assume that the page is kmapped,
-page_address(page) can still be NULL for a highmem page, right?
-
-- Simon
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2012-May/101794.html
+Tony
