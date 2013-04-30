@@ -1,29 +1,40 @@
-From: stano@meduna.org (Stanislav Meduna)
-Date: Tue, 30 Apr 2013 14:13:07 +0200
-Subject: Need help to measure and tune the latency in Linux RT
-In-Reply-To: <20130430111021.GC31290@titan.lakedaemon.net>
-References: <CALJd4cbfqRFiGHshv8A+0A8kFo_qW=rvREsdgj3jQ=-0Rix0-g@mail.gmail.com>
- <20130430111021.GC31290@titan.lakedaemon.net>
-Message-ID: <517FB553.3000001@meduna.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 30 Apr 2013 14:38:07 +0200
+Subject: [PATCH] ARM: add the "bool" type definition to asm/mach/arch.h
+In-Reply-To: <517F8FF4.3050901@atmel.com>
+References: <517F8FF4.3050901@atmel.com>
+Message-ID: <1367325487-8366-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> This critical thread is at RR priority 50.
+Addition of boolean field to machine_desc structure in commit
+4dbfa9a25367cfa91aec0e56d75a6905d3242cd3 (ARM: Enable selection of
+SMP operations at boot time) was triggering compilation errors like:
 
-Try to put it higher than the irq thread handling your HD hardware.
-I've even encountered hardware where I had to put the ATA thread
-in the SHED_OTHER domain - see [1] for the thread.
+  CC      arch/arm/mach-at91/at91sam9260_devices.o
+In file included from arch/arm/mach-at91/at91sam9260_devices.c:12:0:
+arch/arm/include/asm/mach/arch.h:46:2: error: expected specifier-qualifier-list before "bool"
 
->> I used a HR timer thread with RR pri 55 to wakeup the critical thread
->> every 1 milli sec to do the job.
+So, we add the definition of "bool" by including the linux/types.h
+file to asm/mach/arch.h and make it self-contained.
 
-Which prio is the ksoftirqd running at? The HRTIMER interrupts are
-routed through it so it also has to be high enough.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/include/asm/mach/arch.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-I got burned with this myself [2]
-
-Regards
-                                     Stano
-
-[1] http://www.spinics.net/lists/linux-rt-users/msg08711.html
-[2] http://www.spinics.net/lists/linux-rt-users/msg08745.html
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index af8c54c..75bf079 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -8,6 +8,8 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/types.h>
++
+ #ifndef __ASSEMBLY__
+ 
+ struct tag;
+-- 
+1.8.0
