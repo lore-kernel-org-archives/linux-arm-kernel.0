@@ -1,23 +1,23 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Tue, 30 Apr 2013 16:16:16 +0800
-Subject: [Question] flush_dcache_page() need to flush icache?
-Message-ID: <CACVXFVMz3jLEPDYFM-_S_t5TiqikVSRiKf9cBNocH3QhVexwZg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 30 Apr 2013 09:17:39 +0100
+Subject: Latest build results - errors/warnings - lots of them
+Message-ID: <20130430081739.GP14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
+great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
+arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
+source of errors.
 
-Looks flush_dcache_page() need to deal with both dcache alias and I/D
-cache coherency, but set_pte_at() has already run __sync_icache_dcache()
-to make I/D cache coherency in the path of executable page fault.
+OMAP stuff needs a serious look at too - much Kconfig madness there
+caused by over-use of select, which then goes on to cause build errors
+because it assumes some stuff is always enabled.
 
-So could the flushing icache be removed in flush_dcache_page()?
+There's also warnings about of_device_id from include/linux/of_platform.h
+via from arch/arm/kernel/setup.c which feature in all the non-OF builds
+too which need addressing.
 
-If it is yes for the above question, could the flushing dcache in case of
-vipt nonaliasing be removed in flush_dcache_page() too?
-
-Maybe they are stupid questions, sorry in advance.
-
-Thanks,
--- 
-Ming Lei
+See todays http://www.arm.linux.org.uk/developer/build/ results for all
+the details and configs.  Not pushing my tree until some of this stuff
+gets fixed.
