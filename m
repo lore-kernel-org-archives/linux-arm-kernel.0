@@ -1,51 +1,22 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 30 Apr 2013 10:53:55 +0200
-Subject: [RFC/PATCH v2 2/2] drivers: dma-contiguous: add initialization
- from device tree
-In-Reply-To: <CAO1A-8DiZoMVGcjOqK6VYP5Qito55i=gsKApQM=LGbQVx3iCwg@mail.gmail.com>
-References: <1365679330-2514-1-git-send-email-m.szyprowski@samsung.com>
- <1365679330-2514-3-git-send-email-m.szyprowski@samsung.com>
- <CAO1A-8DiZoMVGcjOqK6VYP5Qito55i=gsKApQM=LGbQVx3iCwg@mail.gmail.com>
-Message-ID: <517F86A3.6040104@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 30 Apr 2013 10:05:02 +0100
+Subject: [Question] flush_dcache_page() need to flush icache?
+In-Reply-To: <CACVXFVMz3jLEPDYFM-_S_t5TiqikVSRiKf9cBNocH3QhVexwZg@mail.gmail.com>
+References: <CACVXFVMz3jLEPDYFM-_S_t5TiqikVSRiKf9cBNocH3QhVexwZg@mail.gmail.com>
+Message-ID: <20130430090502.GC29766@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, Apr 30, 2013 at 09:16:16AM +0100, Ming Lei wrote:
+> Looks flush_dcache_page() need to deal with both dcache alias and I/D
+> cache coherency, but set_pte_at() has already run __sync_icache_dcache()
+> to make I/D cache coherency in the path of executable page fault.
+> 
+> So could the flushing icache be removed in flush_dcache_page()?
 
-On 4/29/2013 11:21 PM, Marc C wrote:
-> >  /**
-> >   * dma_contiguous_reserve() - reserve area(s) for contiguous memory handling
-> >   * @limit: End address of the reserved memory (optional, 0 for any).
-> > @@ -149,6 +200,10 @@ void __init dma_contiguous_reserve(phys_addr_t limit)
-> >
-> >         pr_debug("%s(limit %08lx)\n", __func__, (unsigned long)limit);
-> >
-> > +#ifdef CONFIG_OF
-> > +       of_scan_flat_dt(cma_fdt_scan, NULL);
-> > +#endif
-> > +
->
-> What is your expectation with the contention between default region
-> setup via the kernel config (CONFIG_CMA_SIZE_SEL_*) and via the DT?
-> Could the call to 'of_scan_flat_dt()' be done before the setup of the
-> kernel config early regions, followed by a return code check
-> 'fail-over' scheme, or were you intending for the default region
-> setups to be mutually-exclusive?
+That's the case for (mapping && mapping_mapped(mapping)) where the
+kernel modifies a page cache page which is already mapped in user space
+and we won't get a subsequent set_pte_at() call.
 
-In the proposed patch the default/global cma region setup from device tree
-had higher priority than kernel command line parameter and .config saved 
-values,
-but now as I think of this, it looks that it would make more sense to 
-have the
-following priority for setting up the default cma region:
-
-1. kernel cmd line - if not available, then use:
-2. device tree - if not available, then use:
-3. kernel compiled .config
-
-I will update this in the next version of the CMA DT patches.
-
-Best regards
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Catalin
