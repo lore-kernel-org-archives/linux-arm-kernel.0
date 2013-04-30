@@ -1,105 +1,27 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Tue, 30 Apr 2013 08:32:10 -0300
-Subject: [PATCH 2/2] ARM: sun5i: Update the clock compatible strings
-In-Reply-To: <1367315783-21345-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1367315783-21345-1-git-send-email-maxime.ripard@free-electrons.com>
- <1367315783-21345-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <517FABBA.5060902@elopez.com.ar>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 30 Apr 2013 13:42:50 +0200
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <201304301228.42245.arnd@arndb.de>
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+ <517F7245.2050606@iki.fi> <201304301228.42245.arnd@arndb.de>
+Message-ID: <1547536.Us4pVspuI2@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Tuesday 30 April 2013 12:28:42 Arnd Bergmann wrote:
+> On Tuesday 30 April 2013, Tomi Valkeinen wrote:
+> > The bootloader would init the display hardware, the bootfb would give an
+> > early /dev/fb0 for the kernel and userspace, and when the real display
+> > driver is loaded, the bootfb would be unbound and the real driver would
+> > take over.
 
-El 30/04/13 06:56, Maxime Ripard escribi?:
-> The Allwinner A13 has a smaller clock set than the one found in the A10.
-> Fix the A13 device tree and documentation to reflect this.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+This could be done with a KMS driver as well ;-)
 
-The patch looks fine to me.
+> I think that's a great idea. What I'm not sure about is how that
+> infrastructure for switching frame buffers would work and how hard it's to
+> write.
 
-Acked-by: Emilio L?pez <emilio@elopez.com.ar>
+-- 
+Regards,
 
-> ---
->  arch/arm/boot/dts/sun5i-a13.dtsi | 35 ++++++++++++-----------------------
->  1 file changed, 12 insertions(+), 23 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-> index 31fa38f..8ba65c1 100644
-> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
-> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-> @@ -95,20 +95,15 @@
->  
->  		ahb_gates: ahb_gates at 01c20060 {
->  			#clock-cells = <1>;
-> -			compatible = "allwinner,sun4i-ahb-gates-clk";
-> +			compatible = "allwinner,sun5i-a13-ahb-gates-clk";
->  			reg = <0x01c20060 0x8>;
->  			clocks = <&ahb>;
-> -			clock-output-names = "ahb_usb0", "ahb_ehci0",
-> -				"ahb_ohci0", "ahb_ehci1", "ahb_ohci1", "ahb_ss",
-> -				"ahb_dma", "ahb_bist", "ahb_mmc0", "ahb_mmc1",
-> -				"ahb_mmc2", "ahb_mmc3", "ahb_ms", "ahb_nand",
-> -				"ahb_sdram", "ahb_ace",	"ahb_emac", "ahb_ts",
-> -				"ahb_spi0", "ahb_spi1", "ahb_spi2", "ahb_spi3",
-> -				"ahb_pata", "ahb_sata", "ahb_gps", "ahb_ve",
-> -				"ahb_tvd", "ahb_tve0", "ahb_tve1", "ahb_lcd0",
-> -				"ahb_lcd1", "ahb_csi0", "ahb_csi1", "ahb_hdmi",
-> -				"ahb_de_be0", "ahb_de_be1", "ahb_de_fe0",
-> -				"ahb_de_fe1", "ahb_mp", "ahb_mali400";
-> +			clock-output-names = "ahb_usbotg", "ahb_ehci", "ahb_ohci",
-
-Should we keep the USB and DE names consistent between sun4i and sun5i?
-Nobody should be referencing them by name, however, so it wouldn't cause
-any issues on the long run.
-
-> +				"ahb_ss", "ahb_dma", "ahb_bist", "ahb_mmc0",
-> +				"ahb_mmc1", "ahb_mmc2", "ahb_nand", "ahb_sdram",
-> +				"ahb_spi0", "ahb_spi1", "ahb_spi2", "ahb_stimer",
-> +				"ahb_ve", "ahb_lcd", "ahb_csi", "ahb_de_be",
-> +				"ahb_de_fe", "ahb_iep", "ahb_mali400";
->  		};
->  
->  		apb0: apb0 at 01c20054 {
-> @@ -120,15 +115,13 @@
->  
->  		apb0_gates: apb0_gates at 01c20068 {
->  			#clock-cells = <1>;
-> -			compatible = "allwinner,sun4i-apb0-gates-clk";
-> +			compatible = "allwinner,sun5i-a13-apb0-gates-clk";
->  			reg = <0x01c20068 0x4>;
->  			clocks = <&apb0>;
-> -			clock-output-names = "apb0_codec", "apb0_spdif",
-> -				"apb0_ac97", "apb0_iis", "apb0_pio", "apb0_ir0",
-> -				"apb0_ir1", "apb0_keypad";
-> +			clock-output-names = "apb0_codec", "apb0_pio", "apb0_ir";
->  		};
->  
-> -		/* dummy is pll62 */
-> +		/* dummy is pll6 */
->  		apb1_mux: apb1_mux at 01c20058 {
->  			#clock-cells = <0>;
->  			compatible = "allwinner,sun4i-apb1-mux-clk";
-> @@ -145,15 +138,11 @@
->  
->  		apb1_gates: apb1_gates at 01c2006c {
->  			#clock-cells = <1>;
-> -			compatible = "allwinner,sun4i-apb1-gates-clk";
-> +			compatible = "allwinner,sun5i-a13-apb1-gates-clk";
->  			reg = <0x01c2006c 0x4>;
->  			clocks = <&apb1>;
->  			clock-output-names = "apb1_i2c0", "apb1_i2c1",
-> -				"apb1_i2c2", "apb1_can", "apb1_scr",
-> -				"apb1_ps20", "apb1_ps21", "apb1_uart0",
-> -				"apb1_uart1", "apb1_uart2", "apb1_uart3",
-> -				"apb1_uart4", "apb1_uart5", "apb1_uart6",
-> -				"apb1_uart7";
-> +				"apb1_i2c2", "apb1_uart1", "apb1_uart3";
->  		};
->  	};
->  
-> 
-
-Thanks,
-
-Emilio
+Laurent Pinchart
