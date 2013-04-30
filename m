@@ -1,62 +1,68 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Tue, 30 Apr 2013 07:49:34 -0700
-Subject: [PATCH 13/15] ARM: KVM: define KVM_ARM_MAX_VCPUS unconditionally
+Date: Tue, 30 Apr 2013 07:49:36 -0700
+Subject: [PATCH 15/15] ARM: KVM: iterate over all CPUs for CPU compatibility
+ check
 In-Reply-To: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
 References: <1367333376-30983-1-git-send-email-cdall@cs.columbia.edu>
-Message-ID: <1367333376-30983-14-git-send-email-cdall@cs.columbia.edu>
+Message-ID: <1367333376-30983-16-git-send-email-cdall@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+From: Andre Przywara <andre.przywara@linaro.org>
 
-The CONFIG_KVM_ARM_MAX_VCPUS symbol is needed in order to build the
-kernel/context_tracking.c code, which includes the vgic data structures
-implictly through the kvm headers. Definining the symbol to zero
-on builds without KVM resolves this build error:
+kvm_target_cpus() checks the compatibility of the used CPU with
+KVM, which is currently limited to ARM Cortex-A15 cores.
+However by calling it only once on any random CPU it assumes that
+all cores are the same, which is not necessarily the case (for example
+in Big.Little).
 
-In file included from include/linux/kvm_host.h:33:0,
-                 from kernel/context_tracking.c:18:
-arch/arm/include/asm/kvm_host.h:28:23: warning: "CONFIG_KVM_ARM_MAX_VCPUS" is not defined [-Wundef]
- #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
-                       ^
-arch/arm/include/asm/kvm_vgic.h:34:24: note: in expansion of macro 'KVM_MAX_VCPUS'
- #define VGIC_MAX_CPUS  KVM_MAX_VCPUS
-                        ^
-arch/arm/include/asm/kvm_vgic.h:38:6: note: in expansion of macro 'VGIC_MAX_CPUS'
- #if (VGIC_MAX_CPUS > 8)
-      ^
-In file included from arch/arm/include/asm/kvm_host.h:41:0,
-                 from include/linux/kvm_host.h:33,
-                 from kernel/context_tracking.c:18:
-arch/arm/include/asm/kvm_vgic.h:59:11: error: 'CONFIG_KVM_ARM_MAX_VCPUS' undeclared here (not in a function)
-  } percpu[VGIC_MAX_CPUS];
-           ^
+[ I cut some of the commit message and changed the formatting of the
+  code slightly to pass checkpatch and look more like the rest of the
+  kvm/arm init code - Christoffer ]
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <cdall@cs.columbia.edu>
-Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
 Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
 ---
- arch/arm/kvm/Kconfig |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/kvm/arm.c |   15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 49dd64e..370e1a8 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -41,9 +41,9 @@ config KVM_ARM_HOST
- 	  Provides host support for ARM processors.
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 089c0a4..5bc99b4 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -947,21 +947,30 @@ out_err:
+ 	return err;
+ }
  
- config KVM_ARM_MAX_VCPUS
--	int "Number maximum supported virtual CPUs per VM"
--	depends on KVM_ARM_HOST
--	default 4
-+	int "Number maximum supported virtual CPUs per VM" if KVM_ARM_HOST
-+	default 4 if KVM_ARM_HOST
-+	default 0
- 	help
- 	  Static number of max supported virtual CPUs per VM.
++static void check_kvm_target_cpu(void *ret)
++{
++	*(int *)ret = kvm_target_cpu();
++}
++
+ /**
+  * Initialize Hyp-mode and memory mappings on all CPUs.
+  */
+ int kvm_arch_init(void *opaque)
+ {
+ 	int err;
++	int ret, cpu;
  
+ 	if (!is_hyp_mode_available()) {
+ 		kvm_err("HYP mode not available\n");
+ 		return -ENODEV;
+ 	}
+ 
+-	if (kvm_target_cpu() < 0) {
+-		kvm_err("Target CPU not supported!\n");
+-		return -ENODEV;
++	for_each_online_cpu(cpu) {
++		smp_call_function_single(cpu, check_kvm_target_cpu, &ret, 1);
++		if (ret < 0) {
++			kvm_err("Error, CPU %d not supported!\n", cpu);
++			return -ENODEV;
++		}
+ 	}
+ 
+ 	err = init_hyp_mode();
 -- 
 1.7.9.5
