@@ -1,52 +1,90 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 30 Apr 2013 13:22:11 -0400
-Subject: [PATCH v3 1/4] arm: Move the set_handle_irq and handle_arch_irq
- declarations to asm/irq.h
-In-Reply-To: <1363714703-9629-2-git-send-email-catalin.marinas@arm.com>
-References: <1363714703-9629-1-git-send-email-catalin.marinas@arm.com>
- <1363714703-9629-2-git-send-email-catalin.marinas@arm.com>
-Message-ID: <517FFDC3.5030803@codeaurora.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 30 Apr 2013 19:24:35 +0200
+Subject: [PATCH] ARM: dove: add si5351 clock driver to CuBox DT
+Message-ID: <1367342675-15312-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+This patch adds the device tree node for si5351 clock generator
+and the corresponding oscillator connected to it. It also limits
+i2c frequency to 100kHz as there are bus locks reported on higher
+frequencies.
 
-On 03/19/2013 01:38 PM, Catalin Marinas wrote:
-> This patch prepares the removal of <asm/mach/irq.h> include in the
-> GIC and VIC irqchip drivers.
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/boot/dts/dove-cubox.dts |   51 +++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 50 insertions(+), 1 deletions(-)
 
-[...]
-
-> diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
-> index 3cf97aa..e38cb00 100644
-> --- a/drivers/irqchip/irq-vic.c
-> +++ b/drivers/irqchip/irq-vic.c
-> @@ -33,7 +33,7 @@
->  #include <linux/irqchip/arm-vic.h>
->  
->  #include <asm/exception.h>
-> -#include <asm/mach/irq.h>
-> +#include <asm/irq.h>
->  
->  #include "irqchip.h"
-
-I'm seeing implicit declaration of function issues using your soc-armv8-model
-branch that seem to be caused by this change.
-
-drivers/irqchip/irq-vic.c: In function ?vic_irqdomain_map?:
-drivers/irqchip/irq-vic.c:200:2: error: implicit declaration of function
-?irq_set_chip_and_handler? [-Werror=implicit-function-declaration]
-drivers/irqchip/irq-vic.c:200:43: error: ?handle_level_irq? undeclared (first
-use in this function)
-
-etc.
-
-Explicitly including linux/irq.h fixed the issue for me.
-
-Regards,
-Christopher
-
+diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+index 7e3065a..5cae2ab 100644
+--- a/arch/arm/boot/dts/dove-cubox.dts
++++ b/arch/arm/boot/dts/dove-cubox.dts
+@@ -44,11 +44,60 @@
+ 			gpio = <&gpio0 1 0>;
+ 		};
+ 	};
++
++	clocks {
++		/* 25MHz reference crystal */
++		ref25: oscillator {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <25000000>;
++		};
++	};
+ };
+ 
+ &uart0 { status = "okay"; };
+ &sata0 { status = "okay"; };
+-&i2c0 { status = "okay"; };
++
++&i2c0 {
++	status = "okay";
++	clock-frequency = <100000>;
++
++	si5351: clock-generator {
++		compatible = "silabs,si5351a-msop";
++		reg = <0x60>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		#clock-cells = <1>;
++
++		/* connect xtal input to 25MHz reference */
++		clocks = <&ref25>;
++
++		/* connect xtal input as source of pll0 and pll1 */
++		silabs,pll-source = <0 0>, <1 0>;
++
++		clkout0 {
++			reg = <0>;
++			silabs,drive-strength = <8>;
++			silabs,multisynth-source = <0>;
++			silabs,clock-source = <0>;
++			silabs,pll-master;
++		};
++
++		clkout1 {
++			reg = <1>;
++			silabs,drive-strength = <8>;
++			silabs,multisynth-source = <1>;
++			silabs,clock-source = <0>;
++			silabs,pll-master;
++		};
++
++		clkout2 {
++			reg = <2>;
++			silabs,multisynth-source = <1>;
++			silabs,clock-source = <0>;
++		};
++	};
++};
+ 
+ &sdio0 {
+ 	status = "okay";
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+1.7.2.5
