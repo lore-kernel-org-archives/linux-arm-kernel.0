@@ -1,43 +1,88 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 30 Apr 2013 17:17:32 +0100
-Subject: [PATCH v10 0/2] (arm-soc for v3.10) arm: introduce psci_smp_ops
-Message-ID: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
+Date: Tue, 30 Apr 2013 17:18:40 +0100
+Subject: [PATCH v10 2/2] ARM: Enable selection of SMP operations at boot time
+In-Reply-To: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
+Message-ID: <1367338721-29152-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-this is the tenth version of the patch series to move virt_smp_ops out
-of mach-virt and make it a generic set of reusable PSCI based smp_ops.
-psci_smp_ops are preferred over the platform smp_ops.  The last patch
-introduces smp_init.
+From: Jon Medhurst <tixy@linaro.org>
+
+Add a new 'smp_init' hook to machine_desc so platforms can specify a
+function to be used to setup smp ops instead of having a statically
+defined value.  The hook must return true when smp_ops are initialized.
+If false the static mdesc->smp_ops will be used by default.
+
+Add the definition of "bool" by including the linux/types.h file to
+asm/mach/arch.h and make it self-contained.
+
+Signed-off-by: Jon Medhurst <tixy@linaro.org>
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
 Changes in v10:
 - add include <linux/types.h> to mach/arch.h.
 
+---
+ arch/arm/include/asm/mach/arch.h |    5 +++++
+ arch/arm/kernel/setup.c          |   10 ++++++----
+ 2 files changed, 11 insertions(+), 4 deletions(-)
 
-
-Jon Medhurst (1):
-      ARM: Enable selection of SMP operations at boot time
-
-Stefano Stabellini (1):
-      arm: introduce psci_smp_ops
-
- arch/arm/include/asm/mach/arch.h |    5 ++
- arch/arm/include/asm/psci.h      |    9 ++++
- arch/arm/kernel/Makefile         |    5 ++-
- arch/arm/kernel/psci.c           |    7 +--
- arch/arm/kernel/psci_smp.c       |   90 ++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/setup.c          |    9 +++-
- arch/arm/mach-virt/Makefile      |    1 -
- arch/arm/mach-virt/platsmp.c     |   58 ------------------------
- arch/arm/mach-virt/virt.c        |    3 -
- 9 files changed, 119 insertions(+), 68 deletions(-)
- create mode 100644 arch/arm/kernel/psci_smp.c
- delete mode 100644 arch/arm/mach-virt/platsmp.c
-
-
-git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git 3.9-rc3-psci-ops-10-tag
-
-Cheers,
-
-Stefano
+diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
+index 308ad7d..75bf079 100644
+--- a/arch/arm/include/asm/mach/arch.h
++++ b/arch/arm/include/asm/mach/arch.h
+@@ -8,6 +8,8 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/types.h>
++
+ #ifndef __ASSEMBLY__
+ 
+ struct tag;
+@@ -16,8 +18,10 @@ struct pt_regs;
+ struct smp_operations;
+ #ifdef CONFIG_SMP
+ #define smp_ops(ops) (&(ops))
++#define smp_init_ops(ops) (&(ops))
+ #else
+ #define smp_ops(ops) (struct smp_operations *)NULL
++#define smp_init_ops(ops) (bool (*)(void))NULL
+ #endif
+ 
+ struct machine_desc {
+@@ -41,6 +45,7 @@ struct machine_desc {
+ 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
+ 	char			restart_mode;	/* default restart mode	*/
+ 	struct smp_operations	*smp;		/* SMP operations	*/
++	bool			(*smp_init)(void);
+ 	void			(*fixup)(struct tag *, char **,
+ 					 struct meminfo *);
+ 	void			(*reserve)(void);/* reserve mem blocks	*/
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index dad3048..22cc863 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -770,10 +770,12 @@ void __init setup_arch(char **cmdline_p)
+ 	psci_init();
+ #ifdef CONFIG_SMP
+ 	if (is_smp()) {
+-		if (psci_smp_available())
+-			smp_set_ops(&psci_smp_ops);
+-		else if (mdesc->smp)
+-			smp_set_ops(mdesc->smp);
++		if (!mdesc->smp_init || !mdesc->smp_init()) {
++			if (psci_smp_available())
++				smp_set_ops(&psci_smp_ops);
++			else if (mdesc->smp)
++				smp_set_ops(mdesc->smp);
++		}
+ 		smp_init_cpus();
+ 	}
+ #endif
+-- 
+1.7.2.5
