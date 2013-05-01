@@ -1,49 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  1 May 2013 15:26:38 +0100
-Subject: [PATCH] dmaengine: ste_dma40: Rectify incorrect configuration
- validation checking
-Message-ID: <1367418399-30591-1-git-send-email-lee.jones@linaro.org>
+Date: Wed, 1 May 2013 15:28:41 +0100
+Subject: [PATCH 08/32 v2] dmaengine: ste_dma40: Remove home-brew MAX()
+ macro
+In-Reply-To: <CACRpkdaaa+gmsimkJVmhwv+zE+4ZmgZQ=AtHPry9=_EMScMC=w@mail.gmail.com>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-9-git-send-email-lee.jones@linaro.org>
+ <20130424084912.GH17416@gmail.com>
+ <CACRpkdaaa+gmsimkJVmhwv+zE+4ZmgZQ=AtHPry9=_EMScMC=w@mail.gmail.com>
+Message-ID: <20130501142841.GF25256@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we compare an event's group (dev_type / 16) with STEDMA40_DEV_DST_MEMORY
-(-1), the only way we'd obtain a positive result is if we passed -16 as a
-device type, which is unfeasible. Instead, it would be much more sane to
-compare STEDMA40_DEV_DST_MEMORY against the raw dev_type in order to expect
-the expected result.
+> > The current implementation of the DMA40's local MAX() macro evaluates
+> > its arguments more times than is necessary and it not type checked.
+> > This patch strips replaces it with a new, more efficient constant.
+> >
+> > Cc: Vinod Koul <vinod.koul@intel.com>
+> > Cc: Dan Williams <djbw@fb.com>
+> > Cc: Per Forlin <per.forlin@stericsson.com>
+> > Cc: Rabin Vincent <rabin@rab.in>
+> > Reported-by: Harvey Harrison <harvey.harrison@gmail.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Ah this v2 version is OK, atleast it makes the kernel look nicer.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/dma/ste_dma40.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Vinod, poke.
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 3b83dee..c79853f 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -1771,19 +1771,19 @@ static int d40_validate_conf(struct d40_chan *d40c,
- 	}
- 
- 	if (conf->dir == STEDMA40_MEM_TO_PERIPH &&
--	    dst_event_group == STEDMA40_DEV_DST_MEMORY) {
-+	    conf->dst_dev_type == STEDMA40_DEV_DST_MEMORY) {
- 		chan_err(d40c, "Invalid dst\n");
- 		res = -EINVAL;
- 	}
- 
- 	if (conf->dir == STEDMA40_PERIPH_TO_MEM &&
--	    src_event_group == STEDMA40_DEV_SRC_MEMORY) {
-+	    conf->src_dev_type == STEDMA40_DEV_SRC_MEMORY) {
- 		chan_err(d40c, "Invalid src\n");
- 		res = -EINVAL;
- 	}
- 
--	if (src_event_group == STEDMA40_DEV_SRC_MEMORY &&
--	    dst_event_group == STEDMA40_DEV_DST_MEMORY && is_log) {
-+	if (conf->src_dev_type == STEDMA40_DEV_SRC_MEMORY &&
-+	    conf->dst_dev_type == STEDMA40_DEV_DST_MEMORY && is_log) {
- 		chan_err(d40c, "No event line\n");
- 		res = -EINVAL;
- 	}
 -- 
-1.7.10.4
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
