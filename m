@@ -1,42 +1,46 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Wed, 01 May 2013 06:55:54 -0700
-Subject: [PATCH 10/21] [SCSI] nsp32: use mdelay instead of large udelay
- constants
-In-Reply-To: <201304291521.14195.arnd@arndb.de>
-References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <1366910944-3033663-11-git-send-email-arnd@arndb.de>
- <CALZLnaFeLcaGM7_McTZ=pKBRnpXk0AvqOTF=1YCqJv-53yk4XQ@mail.gmail.com>
- <201304291521.14195.arnd@arndb.de>
-Message-ID: <1367416554.4791.8.camel@dabdike.int.hansenpartnership.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed, 1 May 2013 15:16:14 +0100
+Subject: [RFC PATCH 9/9] ARM64: mm: THP support.
+In-Reply-To: <1367339448-21727-10-git-send-email-steve.capper@linaro.org>
+References: <1367339448-21727-1-git-send-email-steve.capper@linaro.org>
+ <1367339448-21727-10-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130501141613.GA23462@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Mon, 2013-04-29 at 15:21 +0200, Arnd Bergmann wrote:
-> On Friday 26 April 2013, Masanori Goto wrote:
-> > 2013/4/25 Arnd Bergmann <arnd@arndb.de>
-> > >
-> > > ARM cannot handle udelay for more than 2 miliseconds, so we
-> > > should use mdelay instead for those.
-> > >
-> > 
-> > Singed-off-by: GOTO Masanori <gotom@debian.or.jp>
+On Tue, Apr 30, 2013 at 05:30:48PM +0100, Steve Capper wrote:
+> Bring Transparent HugePage support to ARM. The size of a
+> transparent huge page depends on the normal page size. A
+> transparent huge page is always represented as a pmd.
 > 
-> Thanks. I assume you mean "Acked-by", not "Singed-off" as in "burnt"
-> or "Signed-off" as a notification that you have applied it to your
-> own git tree.
+> If PAGE_SIZE is 4K, THPs are 2MB.
+> If PAGE_SIZE is 64K, THPs are 512MB.
 > 
-> I'll keep the patch with an your "Acked-by" line in my tree unless
-> James wants to apply to the scsi tree.
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> ---
+>  arch/arm64/Kconfig                     |  3 +++
+>  arch/arm64/include/asm/pgtable-hwdef.h |  1 +
+>  arch/arm64/include/asm/pgtable.h       | 47 ++++++++++++++++++++++++++++++++++
+>  arch/arm64/include/asm/tlb.h           |  6 +++++
+>  arch/arm64/include/asm/tlbflush.h      |  2 ++
+>  5 files changed, 59 insertions(+)
+> 
 
-I can, certainly.  I'll be sending the first scsi set today, but I'll be
-doing another one for just before the close of the merge window.
+[ ... ]
 
-Goto-san, while I have your attention, is the nsp_cs driver orphaned? I
-know it's not your driver, but you did once work with its author (YOKOTA
-Hiroshi <yokota@netlab.is.tsukuba.ac.jp>) and I'm trying to get some
-cleanup on the static functions in the header files.
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 4b7a058..06bfbd6 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
 
-Thanks,
+[ ... ]
 
-James
+> +#define pmd_modify(pmd,newprot)	(__pmd(pmd_val(pmd) | pgprot_val(newprot)))
+> +#define set_pmd_at(mm, addr, pmdp, pmd)	set_pmd(pmdp, pmd)
+
+Apologies, I have over-simplified (and broke) pmd_modify whilst tidying up this
+patch. It should mask off certain bits. I will send out a correction once
+PROT_NONE support has been sorted as this will affect this code path too.
+
+--
+Steve
