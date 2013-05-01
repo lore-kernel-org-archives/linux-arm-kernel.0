@@ -1,76 +1,66 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 1 May 2013 10:54:06 +0100
-Subject: [PATCH 5/5 v2] dmaengine: ste_dma40: Fetch disabled channels from DT
-In-Reply-To: <1367336497-10650-5-git-send-email-lee.jones@linaro.org>
-References: <1367336497-10650-1-git-send-email-lee.jones@linaro.org>
- <1367336497-10650-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130501095406.GE25256@gmail.com>
+From: daniel.vetter@ffwll.ch (Daniel Vetter)
+Date: Wed, 1 May 2013 12:26:01 +0200
+Subject: [Linaro-mm-sig] RFC: Unified DMA allocation algorithms
+In-Reply-To: <51785024.40305@codeaurora.org>
+References: <51785024.40305@codeaurora.org>
+Message-ID: <CAKMK7uE5HQs7JoyVp8HbOzQ4PM=mOW3=WpRtFUzvy3NJ49nYgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-    Some platforms have channels which are not available for normal use.
-    This information is currently passed though platform data in internal
-    BSP kernels. Once those platforms land, they'll need to configure them
-    appropriately, so we may as well add the infrastructure.
-    
-    Cc: Vinod Koul <vinod.koul@intel.com>
-    Cc: Dan Williams <djbw@fb.com>
-    Cc: Per Forlin <per.forlin@stericsson.com>
-    Cc: Rabin Vincent <rabin@rab.in>
-    Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Wed, Apr 24, 2013 at 11:35 PM, Laura Abbott <lauraa@codeaurora.org> wrote:
+> Hi all,
+>
+> I've been looking at a better way to do custom dma allocation algorithms in
+> a similar style to Ion heaps. Most drivers/clients have come up with a
+> series of semi-standard ways to get memory (CMA, memblock_reserve,
+> discontiguous pages etc.) . As these allocation schemes get more and more
+> complex, there needs to be a since place where all clients (Ion based driver
+> vs. DRM driver vs. ???)  can independently take advantage of any
+> optimizations and call a single API for the backing allocations.
+>
+> The dma_map_ops take care of almost everything needed for abstraction
+> but the question is where should new allocation algorithms be located?
+> Most of the work has been added to either arm/mm/dma-mapping.c or
+> dma-contiguous.c . My current thought:
+>
+> 1) split out the dma_map_ops currently in dma-mapping.c into separate files
+> (dma-mapping-common.c, dma-mapping-iommu.c)
+> 2) Extend dma-contiguous.c to support memblock_reserve memory
+> 3) Place additional algorithms in either arch/arm/mm or
+> drivers/base/dma-alloc/ as appropriate to the code. This is the part where
+> I'm most unsure about the direction.
+>
+> I don't have anything written yet but I plan to draft some patches assuming
+> the proposed approach sounds reasonable and no one else has started on
+> something similar already.
+>
+> Thoughts? Opinions?
 
-diff --git a/Documentation/devicetree/bindings/dma/ste-dma40.txt b/Documentation/devicetree/bindings/dma/ste-dma40.txt
-index aa272d8..bea5b73 100644
---- a/Documentation/devicetree/bindings/dma/ste-dma40.txt
-+++ b/Documentation/devicetree/bindings/dma/ste-dma40.txt
-@@ -11,6 +11,7 @@ Required properties:
- Optional properties:
- - dma-channels: Number of channels supported by hardware - if not present
- 		the driver will attempt to obtain the information from H/W
-+- disabled-channels: Channels which can not be used
- 
- Example:
- 
-@@ -23,6 +24,7 @@ Example:
- 
- 		#dma-cells = <2>;
- 		memcpy-channels  = <56 57 58 59 60>;
-+		disabled-channels  = <12>;
- 		dma-channels = <8>;
- 	};
- 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index b14de16..658b53b 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -3464,7 +3464,7 @@ static int __init d40_of_probe(struct platform_device *pdev,
- 			       struct device_node *np)
- {
- 	struct stedma40_platform_data *pdata;
--	int num_phy = 0, num_memcpy = 0;
-+	int num_phy = 0, num_memcpy = 0, num_disabled = 0;
- 	const const __be32 *list;
- 
- 	pdata = devm_kzalloc(&pdev->dev,
-@@ -3493,6 +3493,21 @@ static int __init d40_of_probe(struct platform_device *pdev,
- 				   dma40_memcpy_channels,
- 				   num_memcpy);
- 
-+	list = of_get_property(np, "disabled-channels", &num_disabled);
-+	num_disabled /= sizeof(*list);
-+
-+	if (num_disabled > STEDMA40_MAX_PHYS || num_disabled < 0) {
-+		d40_err(&pdev->dev,
-+			"Invalid number of disabled channels specified (%d)\n",
-+			num_disabled);
-+		return -EINVAL;
-+	}
-+
-+	of_property_read_u32_array(np, "disabled-channels",
-+				   pdata->disabled_channels,
-+				   num_disabled);
-+	pdata->disabled_channels[num_disabled] = -1;
-+
- 	pdev->dev.platform_data = pdata;
- 
- 	return 0;
+>From my (oblivious to all the arm madness) pov the big thing is
+getting dma allocations working for more than one struct device. This
+way we could get rid of to "where do I need to allocate buffers"
+duplication between the kernel and userspace (which needs to know that
+to pick the right ion heap), which is my main gripe with ion ;-)
+
+Rob Clark sent out a quick rfc for that a while back:
+
+http://lists.linaro.org/pipermail/linaro-mm-sig/2012-July/002250.html
+
+But that's by far not good enough for arm, especially now that cma
+gets tightly bound to individual devices with the dt bindings. Also,
+no one really followed up on Rob's patches, and personally I don't
+really care that much since x86 is a bit saner ... But it should be
+good enough for contiguous allocations, which leaves only really crazy
+stuff unsolved.
+
+So I think when you want to rework the various algorithms for
+allocating dma mem and consolidate them it should also solve this
+little multi-dev issue.
+
+Adding tons more people/lists who might be interested.
+
+Cheers, Daniel
+--
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
