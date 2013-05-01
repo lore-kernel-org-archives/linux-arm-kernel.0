@@ -1,35 +1,30 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed,  1 May 2013 14:46:58 +0400
-Subject: [PATCH 2/3] ARM: dts: Add SPI support for i.MX27 Phytec PCM038 module
-In-Reply-To: <1367405219-19078-1-git-send-email-shc_work@mail.ru>
-References: <1367405219-19078-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1367405219-19078-2-git-send-email-shc_work@mail.ru>
+Date: Wed,  1 May 2013 14:46:57 +0400
+Subject: [PATCH 1/3] ARM: dts: Add aliases for i.MX27 SPI controller
+Message-ID: <1367405219-19078-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added SPI node to imx27-phytec-phycore DT file.
+Add aliases to determine the proper SPI bus number.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27-phytec-phycore.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/imx27.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore.dts b/arch/arm/boot/dts/imx27-phytec-phycore.dts
-index fe64e3a..b0e9372 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore.dts
-@@ -72,6 +72,12 @@
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index ff4bd48..cd85828 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -25,6 +25,9 @@
+ 		gpio3 = &gpio4;
+ 		gpio4 = &gpio5;
+ 		gpio5 = &gpio6;
++		spi0 = &cspi1;
++		spi1 = &cspi2;
++		spi2 = &cspi3;
  	};
- };
  
-+&cspi1 {
-+	fsl,spi-num-chipselects = <1>;
-+	cs-gpios = <&gpio4 28 0>;
-+	status = "okay";
-+};
-+
- &nfc {
- 	nand-bus-width = <8>;
- 	nand-ecc-mode = "hw";
+ 	avic: avic-interrupt-controller at e0000000 {
 -- 
 1.8.1.5
