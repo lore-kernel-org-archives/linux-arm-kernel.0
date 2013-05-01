@@ -1,39 +1,97 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed,  1 May 2013 10:00:53 -0700
-Subject: [PATCH] ARM: imx: Change type of ioremap function
-Message-ID: <1367427653-6068-1-git-send-email-lauraa@codeaurora.org>
+From: holt@sgi.com (Robin Holt)
+Date: Wed,  1 May 2013 12:06:47 -0500
+Subject: [PATCH -v7 07/11] unicore32,
+ prepare reboot_mode for moving to generic kernel code.
+In-Reply-To: <1367428011-17123-1-git-send-email-holt@sgi.com>
+References: <1367428011-17123-1-git-send-email-holt@sgi.com>
+Message-ID: <1367428011-17123-8-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit cd024d4245b2bfbd824b911f11a9756d1d6c167d
-(ARM: 7704/1: mm: Use phys_addr_t properly for ioremap functions)
-changed the type of the ioremap functions to actually use phys_addr_t.
+This patch prepares for the moving the parsing of reboot= to the generic
+kernel code by making reboot_mode into a more generic form.
 
-Switch the imx ioremap functions to use phys_addr_t to avoid warnings:
-
-arch/arm/mach-imx/mm-imx3.c: In function 'imx31_init_early':
-arch/arm/mach-imx/mm-imx3.c:142:22: warning: assignment from incompatible pointer type [enabled by default]
-arch/arm/mach-imx/mm-imx3.c: In function 'imx35_init_early':
-arch/arm/mach-imx/mm-imx3.c:221:22: warning: assignment from incompatible pointer type [enabled by default]
-
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Robin Holt <holt@sgi.com>
+To: Andrew Morton <akpm@linux-foundation.org>
+To: Guan Xuetao <gxt@mprc.pku.edu.cn>
+Cc: Russ Anderson <rja@sgi.com>
+Cc: Robin Holt <holt@sgi.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+Cc: the arch/x86 maintainers <x86@kernel.org>
+Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
 ---
- arch/arm/mach-imx/mm-imx3.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/unicore32/kernel/process.c | 10 +++++-----
+ arch/unicore32/kernel/setup.h   |  2 +-
+ arch/unicore32/mm/mmu.c         |  2 +-
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-index cefa047..f019f14 100644
---- a/arch/arm/mach-imx/mm-imx3.c
-+++ b/arch/arm/mach-imx/mm-imx3.c
-@@ -65,7 +65,7 @@ static void imx3_idle(void)
- 		: "=r" (reg));
+diff --git a/arch/unicore32/kernel/process.c b/arch/unicore32/kernel/process.c
+index c944769..9dc6e48 100644
+--- a/arch/unicore32/kernel/process.c
++++ b/arch/unicore32/kernel/process.c
+@@ -51,14 +51,14 @@ void arch_cpu_idle(void)
+ 	local_irq_enable();
  }
  
--static void __iomem *imx3_ioremap_caller(unsigned long phys_addr, size_t size,
-+static void __iomem *imx3_ioremap_caller(phys_addr_t phys_addr, size_t size,
- 					 unsigned int mtype, void *caller)
+-static char reboot_mode = 'h';
++static enum reboot_mode reboot_mode;
+ 
+ int __init reboot_setup(char *str)
  {
- 	if (mtype == MT_DEVICE) {
+-	reboot_mode = str[0];
++	if ('s' == str[0])
++		reboot_mode = REBOOT_WARM;
+ 	return 1;
+ }
+-
+ __setup("reboot=", reboot_setup);
+ 
+ void machine_halt(void)
+@@ -88,7 +88,7 @@ void machine_restart(char *cmd)
+ 	 * we may need it to insert some 1:1 mappings so that
+ 	 * soft boot works.
+ 	 */
+-	setup_mm_for_reboot(reboot_mode);
++	setup_mm_for_reboot();
+ 
+ 	/* Clean and invalidate caches */
+ 	flush_cache_all();
+@@ -102,7 +102,7 @@ void machine_restart(char *cmd)
+ 	/*
+ 	 * Now handle reboot code.
+ 	 */
+-	if (reboot_mode == 's') {
++	if (reboot_mode == REBOOT_WARM) {
+ 		/* Jump into ROM at address 0xffff0000 */
+ 		cpu_reset(VECTORS_BASE);
+ 	} else {
+diff --git a/arch/unicore32/kernel/setup.h b/arch/unicore32/kernel/setup.h
+index 30f749d..f5c51b8 100644
+--- a/arch/unicore32/kernel/setup.h
++++ b/arch/unicore32/kernel/setup.h
+@@ -22,7 +22,7 @@ extern void puv3_ps2_init(void);
+ extern void pci_puv3_preinit(void);
+ extern void __init puv3_init_gpio(void);
+ 
+-extern void setup_mm_for_reboot(char mode);
++extern void setup_mm_for_reboot(void);
+ 
+ extern char __stubs_start[], __stubs_end[];
+ extern char __vectors_start[], __vectors_end[];
+diff --git a/arch/unicore32/mm/mmu.c b/arch/unicore32/mm/mmu.c
+index 43c20b4..4f5a532 100644
+--- a/arch/unicore32/mm/mmu.c
++++ b/arch/unicore32/mm/mmu.c
+@@ -445,7 +445,7 @@ void __init paging_init(void)
+  * the user-mode pages.  This will then ensure that we have predictable
+  * results when turning the mmu off
+  */
+-void setup_mm_for_reboot(char mode)
++void setup_mm_for_reboot(void)
+ {
+ 	unsigned long base_pmdval;
+ 	pgd_t *pgd;
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.2.1
