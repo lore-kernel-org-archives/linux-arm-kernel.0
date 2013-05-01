@@ -1,49 +1,113 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 1 May 2013 10:54:30 -0500
-Subject: [PATCH 03/21] ARM: shmobile: don't call irqchip_init
- unconditionally
-In-Reply-To: <1366910944-3033663-4-git-send-email-arnd@arndb.de>
-References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <1366910944-3033663-4-git-send-email-arnd@arndb.de>
-Message-ID: <CAL_JsqJWJvxezXy0RGFutxzvBhca-8=uRH2GxdJgzbEGw+OL0A@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  1 May 2013 16:59:40 +0100
+Subject: [PATCH] dmaengine: ste_dma40: Only use addresses passed as
+ configuration information
+Message-ID: <1367423980-32716-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 12:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The irqchip_init function is only available when building
-> with CONFIG_OF enabled, which causes this build failure for
-> bonito_defconfig:
->
-> arch/arm/mach-shmobile/built-in.o: In function `r8a7740_init_irq_of':
-> :(.init.text+0x580): undefined reference to `irqchip_init'
->
-> This makes both the OF and the ATAGS portion of the driver
-> conditional, which avoids the build error and also results
-> in smaller object code if not both are enabled, without the
-> need for an #ifdef.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Bastian Hecht <hechtb+renesas@gmail.com>
-> Cc: Simon Horman <horms+renesas@verge.net.au>
-> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> ---
->  arch/arm/mach-shmobile/intc-r8a7740.c | 13 +++++++++++--
->  1 file changed, 11 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-shmobile/intc-r8a7740.c b/arch/arm/mach-shmobile/intc-r8a7740.c
-> index 8871f77..5dc57f1 100644
-> --- a/arch/arm/mach-shmobile/intc-r8a7740.c
-> +++ b/arch/arm/mach-shmobile/intc-r8a7740.c
-> @@ -53,14 +53,23 @@ static void __init r8a7740_init_irq_common(void)
->
->  void __init r8a7740_init_irq_of(void)
->  {
-> +       if (!IS_ENABLED(CONFIG_OF))
-> +               return;
-> +
->         irqchip_init();
+Addresses are passed in from the client's driver via the invocation of
+dmaengine_slave_config(), so there's no need to fetch them from platform
+data too, hardwired or otherwise. This is a great step forward, as it
+elevates a large burden from platform data in the way of a look-up
+table.
 
-Why not have an empty irqchip_init? I'd guess we'll need this on other
-platforms and your default mach.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/dma/ste_dma40.c |   51 ++++++++++-------------------------------------
+ 1 file changed, 11 insertions(+), 40 deletions(-)
 
-Rob
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index a4ce204..f00a428 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -1760,22 +1760,6 @@ static int d40_validate_conf(struct d40_chan *d40c,
+ 		res = -EINVAL;
+ 	}
+ 
+-	if (conf->dir == STEDMA40_MEM_TO_PERIPH &&
+-	    d40c->base->plat_data->dev_tx[conf->dev_type] == 0 &&
+-	    d40c->runtime_addr == 0) {
+-		chan_err(d40c, "Invalid TX channel address (%d)\n",
+-			 conf->dev_type);
+-		res = -EINVAL;
+-	}
+-
+-	if (conf->dir == STEDMA40_PERIPH_TO_MEM &&
+-	    d40c->base->plat_data->dev_rx[conf->dev_type] == 0 &&
+-	    d40c->runtime_addr == 0) {
+-		chan_err(d40c, "Invalid RX channel address (%d)\n",
+-			 conf->dev_type);
+-		res = -EINVAL;
+-	}
+-
+ 	if (conf->dir == STEDMA40_PERIPH_TO_PERIPH) {
+ 		/*
+ 		 * DMAC HW supports it. Will be added to this driver,
+@@ -2310,14 +2294,10 @@ d40_prep_sg(struct dma_chan *dchan, struct scatterlist *sg_src,
+ 	if (sg_next(&sg_src[sg_len - 1]) == sg_src)
+ 		desc->cyclic = true;
+ 
+-	if (direction != DMA_TRANS_NONE) {
+-		dma_addr_t dev_addr = d40_get_dev_addr(chan, direction);
+-
+-		if (direction == DMA_DEV_TO_MEM)
+-			src_dev_addr = dev_addr;
+-		else if (direction == DMA_MEM_TO_DEV)
+-			dst_dev_addr = dev_addr;
+-	}
++	if (direction == DMA_DEV_TO_MEM)
++		src_dev_addr = chan->runtime_addr;
++	else if (direction == DMA_MEM_TO_DEV)
++		dst_dev_addr = chan->runtime_addr;
+ 
+ 	if (chan_is_logical(chan))
+ 		ret = d40_prep_sg_log(chan, desc, sg_src, sg_dst,
+@@ -2764,15 +2744,8 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+ 	dst_maxburst = config->dst_maxburst;
+ 
+ 	if (config->direction == DMA_DEV_TO_MEM) {
+-		dma_addr_t dev_addr_rx =
+-			d40c->base->plat_data->dev_rx[cfg->dev_type];
+-
+ 		config_addr = config->src_addr;
+-		if (dev_addr_rx)
+-			dev_dbg(d40c->base->dev,
+-				"channel has a pre-wired RX address %08x "
+-				"overriding with %08x\n",
+-				dev_addr_rx, config_addr);
++
+ 		if (cfg->dir != STEDMA40_PERIPH_TO_MEM)
+ 			dev_dbg(d40c->base->dev,
+ 				"channel was not configured for peripheral "
+@@ -2787,15 +2760,8 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+ 			dst_maxburst = src_maxburst;
+ 
+ 	} else if (config->direction == DMA_MEM_TO_DEV) {
+-		dma_addr_t dev_addr_tx =
+-			d40c->base->plat_data->dev_tx[cfg->dev_type];
+-
+ 		config_addr = config->dst_addr;
+-		if (dev_addr_tx)
+-			dev_dbg(d40c->base->dev,
+-				"channel has a pre-wired TX address %08x "
+-				"overriding with %08x\n",
+-				dev_addr_tx, config_addr);
++
+ 		if (cfg->dir != STEDMA40_MEM_TO_PERIPH)
+ 			dev_dbg(d40c->base->dev,
+ 				"channel was not configured for memory "
+@@ -2815,6 +2781,11 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+ 		return -EINVAL;
+ 	}
+ 
++	if (config_addr <= 0) {
++		dev_err(d40c->base->dev, "no address supplied\n");
++		return -EINVAL;
++	}
++
+ 	if (src_maxburst * src_addr_width != dst_maxburst * dst_addr_width) {
+ 		dev_err(d40c->base->dev,
+ 			"src/dst width/maxburst mismatch: %d*%d != %d*%d\n",
+-- 
+1.7.10.4
