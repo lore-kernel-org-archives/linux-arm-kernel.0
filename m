@@ -1,48 +1,72 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  1 May 2013 17:01:10 +0100
-Subject: [PATCH] dmaengine: ste_dma40: Remove redundant address fetching
- function
-Message-ID: <1367424070-326-1-git-send-email-lee.jones@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed,  1 May 2013 17:18:27 +0100
+Subject: [RFC PATCH v2] ARM CCI support
+Message-ID: <1367425108-4698-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Addresses are now stored in local data structures and are easy to
-obtain, thus a specialist function used to fetch them is now surplus
-to requirement.
+This patch is an updated of a previous posting:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/dma/ste_dma40.c |   18 ------------------
- 1 file changed, 18 deletions(-)
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/162539.html
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index f00a428..18d9e12 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -2250,24 +2250,6 @@ err:
- 	return NULL;
- }
- 
--static dma_addr_t
--d40_get_dev_addr(struct d40_chan *chan, enum dma_transfer_direction direction)
--{
--	struct stedma40_platform_data *plat = chan->base->plat_data;
--	struct stedma40_chan_cfg *cfg = &chan->dma_cfg;
--	dma_addr_t addr = 0;
--
--	if (chan->runtime_addr)
--		return chan->runtime_addr;
--
--	if (direction == DMA_DEV_TO_MEM)
--		addr = plat->dev_rx[cfg->dev_type];
--	else if (direction == DMA_MEM_TO_DEV)
--		addr = plat->dev_tx[cfg->dev_type];
--
--	return addr;
--}
--
- static struct dma_async_tx_descriptor *
- d40_prep_sg(struct dma_chan *dchan, struct scatterlist *sg_src,
- 	    struct scatterlist *sg_dst, unsigned int sg_len,
+Patch depends on commit:
+
+id: 0c91e7e07ebf08092bf8e28d8cd8d420732fc716
+
+"ARM: cacheflush: add synchronization helpers for mixed cache state accesses"
+
+in RMK tree:
+
+http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-arm.git
+
+branch: devel-stable
+
+main changes in v2:
+ - Changed way masters are connected to CCI slave ports in DT
+   # now every master has to declare a phandle to a CCI control IF
+ - Fixed warning split on different lines
+ - Added comments to disable function
+ - Moved driver to non-hotpluggable API (registration and probing bundled
+   together)
+ - Upgraded cache flushing API
+ - Reworked the driver to use devm primitives
+ - Added disable/enable by index API
+ - Fixed port enable and added macro for snoops/DVM control
+
+ARM multi-cluster systems rely on the cache coherent interconnect (CCI) to
+support inter-cluster cache coherency and distributed virtual memory (DVM)
+messaging.
+
+CCI kernel driver requires tweaks to the kernel and device tree
+bindings in order to link specific resources to groups of logical CPUs
+so that resources can be associated to specific cpu sets (slave ports can
+be associated with a set of CPUs which are part of a cluster).
+
+CCI slave ports must be associated with specific bus masters in the system so
+that whenever a CCI operation is requested for a specific master (ie disable
+its CCI slave port, read its PMU counters) the association can be carried out
+dynamically in the OS through dynamically built data structures.
+Bus masters in the system connected to CCI ports must define device tree
+properties, as described in the documentation contained in the patch, in order
+to explicitly connect ports and allow the OS to build up the required data
+structures.
+
+The current CCI DT bindings define the CCI address space as the same one
+as the root device tree node, which means that the CCI bus can address the
+entire address space visible to CPUs.
+
+Lorenzo Pieralisi (1):
+  drivers: bus: add ARM CCI support
+
+ Documentation/devicetree/bindings/arm/cci.txt | 161 +++++++++++
+ drivers/bus/Kconfig                           |   7 +
+ drivers/bus/Makefile                          |   2 +
+ drivers/bus/arm-cci.c                         | 372 ++++++++++++++++++++++++++
+ include/linux/arm-cci.h                       |  59 ++++
+ 5 files changed, 601 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/cci.txt
+ create mode 100644 drivers/bus/arm-cci.c
+ create mode 100644 include/linux/arm-cci.h
+
 -- 
-1.7.10.4
+1.8.2.2
