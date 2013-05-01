@@ -1,46 +1,35 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 1 May 2013 08:06:56 -0500
-Subject: [PATCH] ARM: smp: call platform's cpu_die in ipi_cpu_stop
-In-Reply-To: <20130418190923.GE14496@n2100.arm.linux.org.uk>
-References: <1365251824-4852-1-git-send-email-kevin@bracey.fi>
- <1365251824-4852-2-git-send-email-kevin@bracey.fi>
- <20130418171801.GC14496@n2100.arm.linux.org.uk>
- <20130418182534.GD14496@n2100.arm.linux.org.uk>
- <20130418190923.GE14496@n2100.arm.linux.org.uk>
-Message-ID: <CAL_JsqLFEF9o7SSCcU5isxRdKA+fQNkqOmAncOmtzeMW7KbMrA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 1 May 2013 06:30:16 -0700
+Subject: [PATCH 1/7] tty: xuartps: Sort #includes alphabetically
+In-Reply-To: <5180BB21.2080306@monstr.eu>
+References: <1367366284-28304-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1367366284-28304-2-git-send-email-soren.brinkmann@xilinx.com>
+ <20130501000048.GA1840@kroah.com>
+ <cbd8c55c-066b-4396-9a4b-97d58a93b573@DB8EHSMHS005.ehs.local>
+ <20130501002321.GB7435@kroah.com> <5180BB21.2080306@monstr.eu>
+Message-ID: <20130501133016.GA2977@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 18, 2013 at 2:09 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Apr 18, 2013 at 07:25:34PM +0100, Russell King - ARM Linux wrote:
->> On Thu, Apr 18, 2013 at 06:18:01PM +0100, Russell King - ARM Linux wrote:
->> > On Sat, Apr 06, 2013 at 03:37:04PM +0300, Kevin Bracey wrote:
+On Wed, May 01, 2013 at 08:50:09AM +0200, Michal Simek wrote:
+> On 05/01/2013 02:23 AM, Greg Kroah-Hartman wrote:
+> > On Tue, Apr 30, 2013 at 05:05:40PM -0700, S?ren Brinkmann wrote:
+> >> On Tue, Apr 30, 2013 at 05:00:48PM -0700, Greg Kroah-Hartman wrote:
+> >>> On Tue, Apr 30, 2013 at 04:57:58PM -0700, Soren Brinkmann wrote:
+> >>>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> >>>> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >>>> CC: Jiri Slaby <jslaby@suse.cz>
+> >>>> CC: linux-serial at vger.kernel.org
+> >>>
+> >>> Why would you need/want to do this?
+> >> I often come across duplicated includes. Having some kind of order helps
+> >> avoiding that, imho.
+> > 
+> > We have a tool to handle duplicated includes, no need to put them in
+> > sorted order for them to be detected.
+> 
+> What's the name of tool which does that?
+> I have seen results from it but have never tried to find it out name and
+> how to use it.
 
-[...]
-
->> Now, with this patch applied, we guarantee that we push out any data
->> that matters from the dying CPU before platform_cpu_kill() is called.
->> That should mean that shmobile can remove that whole cpu_dead thing.
->>
->> I've tested this on OMAP, and it appears to work from a simple test of
->> CPU hotplug.  This patch(set) also kills the cpu_disable() that tegra
->> has which is just a copy of the generic version.
->
-> Okay, last version for tonight, with additional comments too, and a
-> hole plugged if the powering down is done by the platform via
-> cpu_die().
->
->  arch/arm/kernel/smp.c               |   42 +++++++++++++++++++++++++++++++---
->  arch/arm/mach-exynos/hotplug.c      |    1 -
->  arch/arm/mach-highbank/hotplug.c    |    4 ---
-
-Looks like this just landed in -next and it breaks highbank build.
-Run-time will also be broken. See the last commit to this file in
-final 3.9 which will also conflict with this one. The problem is that
-highbank_set_cpu_jump calls outer cache functions which take a
-spinlock and pollute the L1 cache. This all goes away once PCSI
-support goes in, but for now we need another spot to clear the jump
-address or just drop the highbank change.
-
-Rob
+scripts/checkincludes.pl
