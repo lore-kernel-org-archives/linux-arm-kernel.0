@@ -1,18 +1,23 @@
 From: holt@sgi.com (Robin Holt)
-Date: Wed,  1 May 2013 12:06:46 -0500
-Subject: [PATCH -v7 06/11] x86,
- prepare reboot_mode for moving to generic kernel code.
+Date: Wed,  1 May 2013 12:06:41 -0500
+Subject: [PATCH -v7 01/11] CPU hotplug: Provide a generic helper to
+ disable/enable CPU hotplug
 In-Reply-To: <1367428011-17123-1-git-send-email-holt@sgi.com>
 References: <1367428011-17123-1-git-send-email-holt@sgi.com>
-Message-ID: <1367428011-17123-7-git-send-email-holt@sgi.com>
+Message-ID: <1367428011-17123-2-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch prepares for the moving the parsing of reboot= to the generic
-kernel code by making reboot_mode into a more generic form.
+There are instances in the kernel where we would like to disable
+CPU hotplug (from sysfs) during some important operation. Today
+the freezer code depends on this and the code to do it was kinda
+tailor-made for that.
 
+Restructure the code and make it generic enough to be useful for
+other usecases too.
+
+Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 Signed-off-by: Robin Holt <holt@sgi.com>
-To: Miguel Boton <mboton.lkml@gmail.com>
 To: Andrew Morton <akpm@linux-foundation.org>
 To: H. Peter Anvin <hpa@zytor.com>
 Cc: Russ Anderson <rja@sgi.com>
@@ -22,80 +27,93 @@ Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Cc: the arch/x86 maintainers <x86@kernel.org>
 Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
----
- arch/x86/kernel/reboot.c | 12 +++++++-----
- include/linux/reboot.h   |  5 +++++
- 2 files changed, 12 insertions(+), 5 deletions(-)
+Cc: <stable@vger.kernel.org>
 
-diff --git a/arch/x86/kernel/reboot.c b/arch/x86/kernel/reboot.c
-index 76fa1e9..d42e3b2 100644
---- a/arch/x86/kernel/reboot.c
-+++ b/arch/x86/kernel/reboot.c
-@@ -36,7 +36,7 @@ void (*pm_power_off)(void);
- EXPORT_SYMBOL(pm_power_off);
+---
+
+Changes since -v6:
+ - Added a #define for non-hotplug case.
+---
+ include/linux/cpu.h |  3 +++
+ kernel/cpu.c        | 27 +++++++++------------------
+ 2 files changed, 12 insertions(+), 18 deletions(-)
+
+diff --git a/include/linux/cpu.h b/include/linux/cpu.h
+index c6f6e08..3e450c0 100644
+--- a/include/linux/cpu.h
++++ b/include/linux/cpu.h
+@@ -141,6 +141,8 @@ static inline void unregister_cpu_notifier(struct notifier_block *nb)
+ }
+ #endif
  
- static const struct desc_ptr no_idt = {};
--static int reboot_mode;
-+static enum reboot_mode reboot_mode = REBOOT_COLD;
- enum reboot_type reboot_type = BOOT_ACPI;
- int reboot_force;
++extern void cpu_hotplug_disable(void);
++extern void cpu_hotplug_enable(void);
+ int cpu_up(unsigned int cpu);
+ void notify_cpu_starting(unsigned int cpu);
+ extern void cpu_maps_update_begin(void);
+@@ -148,6 +150,7 @@ extern void cpu_maps_update_done(void);
  
-@@ -88,11 +88,11 @@ static int __init reboot_setup(char *str)
+ #else	/* CONFIG_SMP */
  
- 		switch (*str) {
- 		case 'w':
--			reboot_mode = 0x1234;
-+			reboot_mode = REBOOT_WARM;
- 			break;
++#define cpu_hotplug_disable()	do { } while (0)
+ #define cpu_notifier(fn, pri)	do { (void)(fn); } while (0)
  
- 		case 'c':
--			reboot_mode = 0;
-+			reboot_mode = REBOOT_COLD;
- 			break;
+ static inline int register_cpu_notifier(struct notifier_block *nb)
+diff --git a/kernel/cpu.c b/kernel/cpu.c
+index b5e4ab2..28769f5 100644
+--- a/kernel/cpu.c
++++ b/kernel/cpu.c
+@@ -541,29 +541,20 @@ static int __init alloc_frozen_cpus(void)
+ core_initcall(alloc_frozen_cpus);
  
- #ifdef CONFIG_SMP
-@@ -536,6 +536,7 @@ static void native_machine_emergency_restart(void)
- 	int i;
- 	int attempt = 0;
- 	int orig_reboot_type = reboot_type;
-+	unsigned short mode;
+ /*
+- * Prevent regular CPU hotplug from racing with the freezer, by disabling CPU
+- * hotplug when tasks are about to be frozen. Also, don't allow the freezer
+- * to continue until any currently running CPU hotplug operation gets
+- * completed.
+- * To modify the 'cpu_hotplug_disabled' flag, we need to acquire the
+- * 'cpu_add_remove_lock'. And this same lock is also taken by the regular
+- * CPU hotplug path and released only after it is complete. Thus, we
+- * (and hence the freezer) will block here until any currently running CPU
+- * hotplug operation gets completed.
++ * Wait for currently running CPU hotplug operations to complete (if any) and
++ * disable future CPU hotplug (from sysfs). The 'cpu_add_remove_lock' protects
++ * the 'cpu_hotplug_disabled' flag. The same lock is also acquired by the
++ * hotplug path before performing hotplug operations. So acquiring that lock
++ * guarantees mutual exclusion from any currently running hotplug operations.
+  */
+-void cpu_hotplug_disable_before_freeze(void)
++void cpu_hotplug_disable(void)
+ {
+ 	cpu_maps_update_begin();
+ 	cpu_hotplug_disabled = 1;
+ 	cpu_maps_update_done();
+ }
  
- 	if (reboot_emergency)
- 		emergency_vmx_disable_all();
-@@ -543,7 +544,8 @@ static void native_machine_emergency_restart(void)
- 	tboot_shutdown(TB_SHUTDOWN_REBOOT);
+-
+-/*
+- * When tasks have been thawed, re-enable regular CPU hotplug (which had been
+- * disabled while beginning to freeze tasks).
+- */
+-void cpu_hotplug_enable_after_thaw(void)
++void cpu_hotplug_enable(void)
+ {
+ 	cpu_maps_update_begin();
+ 	cpu_hotplug_disabled = 0;
+@@ -589,12 +580,12 @@ cpu_hotplug_pm_callback(struct notifier_block *nb,
  
- 	/* Tell the BIOS if we want cold or warm reboot */
--	*((unsigned short *)__va(0x472)) = reboot_mode;
-+	mode = reboot_mode == REBOOT_WARM ? 0x1234 : 0;
-+	*((unsigned short *)__va(0x472)) = mode;
+ 	case PM_SUSPEND_PREPARE:
+ 	case PM_HIBERNATION_PREPARE:
+-		cpu_hotplug_disable_before_freeze();
++		cpu_hotplug_disable();
+ 		break;
  
- 	for (;;) {
- 		/* Could also try the reset bit in the Hammer NB */
-@@ -585,7 +587,7 @@ static void native_machine_emergency_restart(void)
+ 	case PM_POST_SUSPEND:
+ 	case PM_POST_HIBERNATION:
+-		cpu_hotplug_enable_after_thaw();
++		cpu_hotplug_enable();
+ 		break;
  
- 		case BOOT_EFI:
- 			if (efi_enabled(EFI_RUNTIME_SERVICES))
--				efi.reset_system(reboot_mode ?
-+				efi.reset_system(reboot_mode == REBOOT_WARM ?
- 						 EFI_RESET_WARM :
- 						 EFI_RESET_COLD,
- 						 EFI_SUCCESS, 0, NULL);
-diff --git a/include/linux/reboot.h b/include/linux/reboot.h
-index 23b3630..2ca9ed7 100644
---- a/include/linux/reboot.h
-+++ b/include/linux/reboot.h
-@@ -10,6 +10,11 @@
- #define SYS_HALT	0x0002	/* Notify of system halt */
- #define SYS_POWER_OFF	0x0003	/* Notify of system power off */
- 
-+enum reboot_mode {
-+	REBOOT_COLD = 0,
-+	REBOOT_WARM,
-+};
-+
- extern int register_reboot_notifier(struct notifier_block *);
- extern int unregister_reboot_notifier(struct notifier_block *);
- 
+ 	default:
 -- 
 1.8.2.1
