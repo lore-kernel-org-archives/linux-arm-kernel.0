@@ -1,83 +1,59 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 01 May 2013 19:34:17 +0400
-Subject: [PATCH v3 4/5] ARM: shmobile: BOCK-W: add VIN and ML86V7667
- support
-In-Reply-To: <20130501090909.GA2562@verge.net.au>
-References: <201304232118.43686.sergei.shtylyov@cogentembedded.com>
- <201304232132.52741.sergei.shtylyov@cogentembedded.com>
- <517B06FA.3000303@cogentembedded.com> <20130501090909.GA2562@verge.net.au>
-Message-ID: <518135F9.9010509@cogentembedded.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 1 May 2013 17:36:09 +0200
+Subject: [PATCH 3/3] ARM: dts: Add MC13783 support for i.MX27 Phytec
+ PCM038 module
+In-Reply-To: <1367405219-19078-3-git-send-email-shc_work@mail.ru>
+References: <1367405219-19078-1-git-send-email-shc_work@mail.ru>
+ <1367405219-19078-3-git-send-email-shc_work@mail.ru>
+Message-ID: <20130501153609.GA31135@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, May 01, 2013 at 02:46:59PM +0400, Alexander Shiyan wrote:
+> Added MC13783 node to imx27-phytec-phycore DT file.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/boot/dts/imx27-phytec-phycore.dts | 92 ++++++++++++++++++++++++++++++
+>  1 file changed, 92 insertions(+)
 
-On 01-05-2013 13:09, Simon Horman wrote:
+You can merge this with the previous patch.
 
->> On 04/23/2013 09:32 PM, Sergei Shtylyov wrote:
+> 
+> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore.dts b/arch/arm/boot/dts/imx27-phytec-phycore.dts
+> index b0e9372..5c4fea9 100644
+> --- a/arch/arm/boot/dts/imx27-phytec-phycore.dts
+> +++ b/arch/arm/boot/dts/imx27-phytec-phycore.dts
+> @@ -76,6 +76,98 @@
+>  	fsl,spi-num-chipselects = <1>;
+>  	cs-gpios = <&gpio4 28 0>;
+>  	status = "okay";
+> +
+> +	pmic: mc13783 at 0 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "fsl,mc13783";
+> +		spi-max-frequency = <20000000>;
+> +		reg = <0>;
+> +		interrupt-parent = <&gpio2>;
+> +		interrupts = <23 0x4>;
+> +		fsl,mc13xxx-uses-adc;
+> +
+> +		regulators {
+> +			sw1a_reg: sw1a {
+> +				regulator-min-microvolt = <1200000>;
+> +				regulator-max-microvolt = <1200000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +			sw1b_reg: sw1b {
 
->>> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Please add a blank line after each node.
 
->>> Add ML86V7667 platform devices on BOCK-W board, configure VIN0/1 pins, and
->>> register VIN0/1 devices with the ML86V7667 specific platform data.
+Sascha
 
->>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>> [Sergei: some macro/comment cleanup; updated the copyrights, removed duplicate
->>> #include, annotated all platform data as '__initdata'.]
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
->>> ---
->>> Changes since version 2:
->>> - removed duplicate #include <linux/pinctrl/machine.h>;
->>> - annotated all platform data as '__initdata' since they're kmemdup()'ed while
->>>    registering the platform devices anyway;
->>> - resolved rejects, refreshed the patch.
-
->>>   arch/arm/mach-shmobile/board-bockw.c |   39 +++++++++++++++++++++++++++++++++++
->>>   1 file changed, 39 insertions(+)
-
->>> Index: renesas/arch/arm/mach-shmobile/board-bockw.c
->>> ===================================================================
->>> --- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
->>> +++ renesas/arch/arm/mach-shmobile/board-bockw.c
-
->> [...]
-
->>> @@ -80,6 +101,16 @@ static const struct pinctrl_map bockw_pi
->>>   				  "sdhi0_data4", "sdhi0"),
->>>   	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
->>>   				  "sdhi0_wp", "sdhi0"),
->>> +	/* VIN0 */
->>> +	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.0", "pfc-r8a7778",
->>> +				  "vin0_clk", "vin0"),
->>> +	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.0", "pfc-r8a7778",
->>> +				  "vin0_data8", "vin0"),
->>> +	/* VIN1 */
->>> +	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.1", "pfc-r8a7778",
->>> +				  "vin1_clk", "vin1"),
->>> +	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.1", "pfc-r8a7778",
->>> +				  "vin1_data8", "vin1"),
->>>   };
-
->>      It turned out that VIN1 signal VI1_CLK conflicts with Ether
->> signal ETH_REF_CLK.
->> So I'm a bit at a loss here: whether I should totally remove VIN1
->> device if I'm going
->> to add Ether device, or add a BOCK-W specific submenu to Kconfig, or
->> add driver
->> specific #ifdef's in the code to disable VIN1 if sh_eth driver is
->> enabled?...
-
-> My preference, in order is:
-
-> * Remove VIN1 (is it used?)
-
-    At least video decoders are connected to both VIN0 and VIN1.
-
-> * Kconfig-foo
-> * #ifdef nastiness
-
-    I took the 3rd approach but luckily it was possible without #ifdef, using 
-*if* (!IS_ENABLED(CONFIG_SH_ETH)) statement. Working patch posted on Monday.
-
-WBR, Sergei
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
