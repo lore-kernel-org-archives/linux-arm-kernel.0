@@ -1,121 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 1 May 2013 15:42:13 +0100
-Subject: [PATCH 12/32] ARM: ux500: Remove superfluous 'psize' attribute
- from Audio platform data
-In-Reply-To: <1366279934-30761-13-git-send-email-lee.jones@linaro.org>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-13-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130501144213.GG25256@gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 01 May 2013 10:44:31 -0400
+Subject: [PATCH 6/4] arm64: Move to generic sched_clock infrastructure
+In-Reply-To: <20130501091108.GB10984@arm.com>
+References: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
+ <1367369675-13535-1-git-send-email-sboyd@codeaurora.org>
+ <1367369675-13535-2-git-send-email-sboyd@codeaurora.org>
+ <20130501091108.GB10984@arm.com>
+Message-ID: <51812A4F.7060400@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 18 Apr 2013, Lee Jones wrote:
+On 05/01/2013 05:11 AM, Catalin Marinas wrote:
+> On Wed, May 01, 2013 at 01:54:35AM +0100, Stephen Boyd wrote:
+>> Use the generic sched_clock infrastructure instead of rolling our
+>> own. This has the added benefit of fixing suspend/resume as
+>> outlined in 6a4dae5 (ARM: 7565/1: sched: stop sched_clock()
+>> during suspend, 2012-10-23) and correcting the timestamps when
+>> the hardware returns a value instead of 0 upon the first read.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> Looks ok.
+> 
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-> 'psize' is used to calculate the maximum DMA burst size. However it
-> is only taken into consideration when editing the DMA channel's
-> configuration. The Audio DMA platform data is only used to allocate
-> a channel, not configure it. That will be done at a later date within
-> the MSP driver.
-> 
-> We're also removing comments which are no longer required, as
-> 'data_width' is no longer set in any device's platform data period.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/mach-ux500/board-mop500-audio.c |   38 ------------------------------
->  1 file changed, 38 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/board-mop500-audio.c b/arch/arm/mach-ux500/board-mop500-audio.c
-> index f012cfa..972bec0 100644
-> --- a/arch/arm/mach-ux500/board-mop500-audio.c
-> +++ b/arch/arm/mach-ux500/board-mop500-audio.c
-> @@ -23,25 +23,13 @@
->  static struct stedma40_chan_cfg msp0_dma_rx = {
->  	.high_priority = true,
->  	.dir = STEDMA40_PERIPH_TO_MEM,
-> -
->  	.dev_type = DB8500_DMA_DEV31_MSP0_SLIM0_CH0,
-> -
-> -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-> -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-> -
-> -	/* data_width is set during configuration */
->  };
->  
->  static struct stedma40_chan_cfg msp0_dma_tx = {
->  	.high_priority = true,
->  	.dir = STEDMA40_MEM_TO_PERIPH,
-> -
->  	.dev_type = DB8500_DMA_DEV31_MSP0_SLIM0_CH0,
-> -
-> -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-> -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-> -
-> -	/* data_width is set during configuration */
->  };
->  
->  struct msp_i2s_platform_data msp0_platform_data = {
-> @@ -53,25 +41,13 @@ struct msp_i2s_platform_data msp0_platform_data = {
->  static struct stedma40_chan_cfg msp1_dma_rx = {
->  	.high_priority = true,
->  	.dir = STEDMA40_PERIPH_TO_MEM,
-> -
->  	.dev_type = DB8500_DMA_DEV30_MSP3,
-> -
-> -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-> -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-> -
-> -	/* data_width is set during configuration */
->  };
->  
->  static struct stedma40_chan_cfg msp1_dma_tx = {
->  	.high_priority = true,
->  	.dir = STEDMA40_MEM_TO_PERIPH,
-> -
->  	.dev_type = DB8500_DMA_DEV30_MSP1,
-> -
-> -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-> -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-> -
-> -	/* data_width is set during configuration */
->  };
->  
->  struct msp_i2s_platform_data msp1_platform_data = {
-> @@ -83,29 +59,15 @@ struct msp_i2s_platform_data msp1_platform_data = {
->  static struct stedma40_chan_cfg msp2_dma_rx = {
->  	.high_priority = true,
->  	.dir = STEDMA40_PERIPH_TO_MEM,
-> -
->  	.dev_type = DB8500_DMA_DEV14_MSP2,
-> -
-> -	/* MSP2 DMA doesn't work with PSIZE == 4 on DB8500v2 */
-> -	.src_info.psize = STEDMA40_PSIZE_LOG_1,
-> -	.dst_info.psize = STEDMA40_PSIZE_LOG_1,
-> -
-> -	/* data_width is set during configuration */
->  };
->  
->  static struct stedma40_chan_cfg msp2_dma_tx = {
->  	.high_priority = true,
->  	.dir = STEDMA40_MEM_TO_PERIPH,
-> -
->  	.dev_type = DB8500_DMA_DEV14_MSP2,
-> -
-> -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-> -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-> -
->  	.use_fixed_channel = true,
->  	.phy_channel = 1,
-> -
-> -	/* data_width is set during configuration */
->  };
->  
->  static struct platform_device *db8500_add_msp_i2s(struct device *parent,
+I built and ran this change and dependencies on top of Catalin's
+soc-armv8-model branch [1] and was able to verify that it fixed the printk
+timestamp jump.
 
-Linus, poke.
+1.
+http://git.kernel.org/cgit/linux/kernel/git/cmarinas/linux-aarch64.git/log/?h=soc-armv8-model
+
+Tested-by: Christopher Covington <cov@codeaurora.org>
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
