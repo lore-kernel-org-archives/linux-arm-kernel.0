@@ -1,54 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 30 Apr 2013 17:22:57 -0700
-Subject: Latest build results - errors/warnings - lots of them
-In-Reply-To: <20130430235147.GG28721@atomide.com>
-References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
- <201305010111.14247.arnd@arndb.de>
- <20130430235147.GG28721@atomide.com>
-Message-ID: <20130501002257.GH28721@atomide.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 30 Apr 2013 17:23:21 -0700
+Subject: [PATCH 1/7] tty: xuartps: Sort #includes alphabetically
+In-Reply-To: <cbd8c55c-066b-4396-9a4b-97d58a93b573@DB8EHSMHS005.ehs.local>
+References: <1367366284-28304-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1367366284-28304-2-git-send-email-soren.brinkmann@xilinx.com>
+ <20130501000048.GA1840@kroah.com>
+ <cbd8c55c-066b-4396-9a4b-97d58a93b573@DB8EHSMHS005.ehs.local>
+Message-ID: <20130501002321.GB7435@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130430 16:57]:
-> * Arnd Bergmann <arnd@arndb.de> [130430 16:16]:
+On Tue, Apr 30, 2013 at 05:05:40PM -0700, S?ren Brinkmann wrote:
+> On Tue, Apr 30, 2013 at 05:00:48PM -0700, Greg Kroah-Hartman wrote:
+> > On Tue, Apr 30, 2013 at 04:57:58PM -0700, Soren Brinkmann wrote:
+> > > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > > CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > CC: Jiri Slaby <jslaby@suse.cz>
+> > > CC: linux-serial at vger.kernel.org
 > > 
-> > I've uploaded this to the test-merge-20130430 branch in the arm-soc
-> > tree if anyone is curious. I suppose we should get all the changes
-> > in arch/arm included in the merge window and then work with the
-> > subsystem maintainers on the other bugs.
-> 
-> >  arch/arm/mach-omap2/Kconfig                   | 133 +++++++++++++-------------
-> >  arch/arm/mach-omap2/Makefile                  |   8 +-
-> 
-> Nice, I like your changes to flip ARCH_OMAP2PLUS to be selected
-> by the SoC. That's a better way to fix things than just tinkering
-> with the Makefile like I posted earlier today.
-> 
-> Now you have SOC_OMAP5 selected twice in omap2plus_defconfig though,
-> which causes:
-> 
-> .config:283:warning: override: reassigning to symbol SOC_OMAP5
-> 
-> For the SERIAL_OMAP change, let's just use my earlier patch
-> "ARM: OMAP2+: Fix unmet direct dependencies for SERIAL_OMAP".
-> We should not select optional drivers at all in Kconfig.
+> > Why would you need/want to do this?
+> I often come across duplicated includes. Having some kind of order helps
+> avoiding that, imho.
 
-And looks like also the following should be folded in to allow building
-ARCH_OMAP2. Other than that your branch seems to build & boot
-fine on omaps.
+We have a tool to handle duplicated includes, no need to put them in
+sorted order for them to be detected.
 
-Regards,
+thanks,
 
-Tony
-
-
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -21,6 +21,7 @@ CONFIG_MODVERSIONS=y
- CONFIG_MODULE_SRCVERSION_ALL=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_ARCH_OMAP2=y
-+CONFIG_ARCH_MULTI_V6=y
- CONFIG_ARCH_OMAP3=y
- CONFIG_ARCH_OMAP4=y
- CONFIG_SOC_OMAP5=y
+greg k-h
