@@ -1,113 +1,81 @@
 From: holt@sgi.com (Robin Holt)
-Date: Wed,  1 May 2013 12:06:49 -0500
-Subject: [PATCH -v7 09/11] arm,
- prepare reboot_mode for moving to generic kernel code.
-In-Reply-To: <1367428011-17123-1-git-send-email-holt@sgi.com>
-References: <1367428011-17123-1-git-send-email-holt@sgi.com>
-Message-ID: <1367428011-17123-10-git-send-email-holt@sgi.com>
+Date: Wed,  1 May 2013 12:06:40 -0500
+Subject: [PATCH -v7 0/11] Shutdown from reboot_cpuid without stopping other
+ cpus.
+Message-ID: <1367428011-17123-1-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch prepares for the moving the parsing of reboot= to the generic
-kernel code by making reboot_mode into a more generic form.
+Andrew, Please do _NOT_ take this patch series yet.  I am sending this
+to you because you had comments on my -v6 submission.  If you do take
+any of the patches, I believe patches 1-5 would be considered ready for
+moving on as you had comments and I don't recall any others.  The first
+two would really be nice to get into the stable release.
 
-Signed-off-by: Robin Holt <holt@sgi.com>
+Peter,  I don't think I went too far off the rails on this.  The three
+archs which handle reboot= should have been unified, correct?  I think
+that ends up with essentially this.  I think the unicore and arm functions
+passing around the now-global reboot_mode is probably the wrong way to
+do things, so I would at least want to rework unicore and arm patches
+to remove that parameter.  Otherwise, this patch set was building for
+all the arm defconfigs as well as my x86_64 configs.
+
+We recently noticed that reboot of a 1024 cpu machine takes approx 16
+minutes of just stopping the cpus.  The slowdown was tracked to commit
+f96972f.
+
+The current implementation does all the work of hot removing the cpus
+before halting the system.  We are switching to just migrating to the
+reboot_cpu and then continuing with shutdown/reboot.
+
+The patch set is broken into eleven parts.  The first two are planned for
+the stable release.  The others move the halt/shutdown/reboot related
+functions to their own kernel/reboot.c file and then move the handling
+of the kernel reboot= kernel parameter to generic kernel code.
+
+
+Changes since -v6.
+ - Cross compiled all arm architectures (using v3.9 kernel.  Fails with
+   current).
+
+ - Added a #define for non-hotplug case.
+
+ - Add #define for PF_THREAD_BOUND as compatibility to make stable easier.
+
+ - Fixup s/reboot_cpu_id/reboot_cpu/
+
+ - Add include of linux/uaccess.h to allow building on arm.
+
+ - Removed last remaining checkpatch.pl line length warning on
+   kernel/reboot.c.
+
+ - Fixed the duplicate handling or the reboot= kernel parameter.
+
+Changes since -v5.
+ - Moved the arch/x86 reboot= up to the generic kernel code.
+
+Changes since -v4.
+ - Integrated Srivatsa S. Bhat creating cpu_hotplug_disable()
+   function
+
+ - Integrated comments by Srivatsa S. Bhat.
+
+ - Made one more comment consistent with others in function.
+
+Changes since -v3.
+ - Added a tested-by for the original reporter.
+
+ - Fix compile failure found by Joe Perches.
+
+ - Integrated comments by Joe Perches.
+
+
 To: Andrew Morton <akpm@linux-foundation.org>
-To: Russell King <linux@arm.linux.org.uk>
+To: H. Peter Anvin <hpa@zytor.com>
 Cc: Russ Anderson <rja@sgi.com>
 Cc: Robin Holt <holt@sgi.com>
-Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Cc: the arch/x86 maintainers <x86@kernel.org>
 Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
----
- arch/arm/include/asm/mach/arch.h   | 3 ++-
- arch/arm/kernel/process.c          | 8 ++++----
- arch/arm/kernel/setup.c            | 6 +++---
- arch/arm/mach-footbridge/cats-hw.c | 2 +-
- 4 files changed, 10 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 308ad7d..e2b551e 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -9,6 +9,7 @@
-  */
- 
- #ifndef __ASSEMBLY__
-+#include <linux/reboot.h>
- 
- struct tag;
- struct meminfo;
-@@ -39,7 +40,7 @@ struct machine_desc {
- 	unsigned char		reserve_lp0 :1;	/* never has lp0	*/
- 	unsigned char		reserve_lp1 :1;	/* never has lp1	*/
- 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
--	char			restart_mode;	/* default restart mode	*/
-+	enum reboot_mode	reboot_mode;	/* default restart mode	*/
- 	struct smp_operations	*smp;		/* SMP operations	*/
- 	void			(*fixup)(struct tag *, char **,
- 					 struct meminfo *);
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index ae58d3b..8b4609e 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -174,14 +174,14 @@ void arch_cpu_idle(void)
- 		default_idle();
- }
- 
--static char reboot_mode = 'h';
-+enum reboot_mode reboot_mode;
- 
--int __init reboot_setup(char *str)
-+static int __init reboot_setup(char *str)
- {
--	reboot_mode = str[0];
-+	if ('s' == str[0])
-+		reboot_mode = REBOOT_WARM;
- 	return 1;
- }
--
- __setup("reboot=", reboot_setup);
- 
- void machine_shutdown(void)
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 234e339..624c226 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -72,7 +72,7 @@ __setup("fpe=", fpe_setup);
- 
- extern void paging_init(struct machine_desc *desc);
- extern void sanity_check_meminfo(void);
--extern void reboot_setup(char *str);
-+extern enum reboot_mode reboot_mode;
- extern void setup_dma_zone(struct machine_desc *desc);
- 
- unsigned int processor_id;
-@@ -758,8 +758,8 @@ void __init setup_arch(char **cmdline_p)
- 
- 	setup_dma_zone(mdesc);
- 
--	if (mdesc->restart_mode)
--		reboot_setup(&mdesc->restart_mode);
-+	if (mdesc->reboot_mode != REBOOT_COLD)
-+		reboot_mode = mdesc->reboot_mode;
- 
- 	init_mm.start_code = (unsigned long) _text;
- 	init_mm.end_code   = (unsigned long) _etext;
-diff --git a/arch/arm/mach-footbridge/cats-hw.c b/arch/arm/mach-footbridge/cats-hw.c
-index 6987a09..14c9cb9 100644
---- a/arch/arm/mach-footbridge/cats-hw.c
-+++ b/arch/arm/mach-footbridge/cats-hw.c
-@@ -86,7 +86,7 @@ fixup_cats(struct tag *tags, char **cmdline, struct meminfo *mi)
- MACHINE_START(CATS, "Chalice-CATS")
- 	/* Maintainer: Philip Blundell */
- 	.atag_offset	= 0x100,
--	.restart_mode	= 's',
-+	.reboot_mode	= REBOOT_WARM,
- 	.fixup		= fixup_cats,
- 	.map_io		= footbridge_map_io,
- 	.init_irq	= footbridge_init_irq,
--- 
-1.8.2.1
