@@ -1,24 +1,36 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Thu, 02 May 2013 07:04:55 +1200
-Subject: [PATCHv4 0/3] Add support for velocity network driver on platform
- devices
-In-Reply-To: <20130501.145209.2011460600232631301.davem@davemloft.net>
-References: <1367302620-4620-1-git-send-email-linux@prisktech.co.nz>
- <20130501.145209.2011460600232631301.davem@davemloft.net>
-Message-ID: <51816757.4090801@prisktech.co.nz>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 1 May 2013 21:15:28 +0200
+Subject: [PATCH 3/3] ARM: dts: Add MC13783 support for i.MX27 Phytec
+ PCM038 module
+In-Reply-To: <1367422837.138582176@f94.mail.ru>
+References: <1367405219-19078-1-git-send-email-shc_work@mail.ru>
+ <1367405219-19078-3-git-send-email-shc_work@mail.ru>
+ <20130501153609.GA31135@pengutronix.de>
+ <1367422837.138582176@f94.mail.ru>
+Message-ID: <20130501191528.GB31135@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/13 06:52, David Miller wrote:
-> From: Tony Prisk <linux@prisktech.co.nz>
-> Date: Tue, 30 Apr 2013 18:16:57 +1200
->
->> I think it would be pertinent to get some tested-by's for PCI users.
-> Tony, this came in a bit late, and there hasn't been any PCI test
-> reports so I have to defer this to the next merge window, sorry.
-No problems - I didn't honestly expect it to go in for 3.10 any way.
-I was trying to get in nice and earlier for 3.11 to give people plenty 
-of time to test.
+On Wed, May 01, 2013 at 07:40:37PM +0400, Alexander Shiyan wrote:
+> > On Wed, May 01, 2013 at 02:46:59PM +0400, Alexander Shiyan wrote:
+> > > Added MC13783 node to imx27-phytec-phycore DT file.
+> > > 
+> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > > ---
+> > >  arch/arm/boot/dts/imx27-phytec-phycore.dts | 92 ++++++++++++++++++++++++++++++
+> > >  1 file changed, 92 insertions(+)
+> > 
+> > You can merge this with the previous patch.
+> 
+> Part 2 just adds a SPI host for the target. Is this merge is really necessary?
 
-Regards
-Tony P
+The SPI host does nothing without devices registered on it, so why not
+make 2/3 and 3/3 a single patch?
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
