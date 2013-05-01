@@ -1,46 +1,83 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Wed, 01 May 2013 17:32:14 +0200
-Subject: [PATCH v3] ARM: imx: replicate the diagnostic register of boot
- cpu into secondary cores
-In-Reply-To: <20130426134722.GA1943@S2101-09.ap.freescale.net>
-References: <1366948645-12060-1-git-send-email-shawn.guo@linaro.org>
- <20130426132130.GE30858@mudshark.cambridge.arm.com>
- <20130426134722.GA1943@S2101-09.ap.freescale.net>
-Message-ID: <5181357E.3090805@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 01 May 2013 19:34:17 +0400
+Subject: [PATCH v3 4/5] ARM: shmobile: BOCK-W: add VIN and ML86V7667
+ support
+In-Reply-To: <20130501090909.GA2562@verge.net.au>
+References: <201304232118.43686.sergei.shtylyov@cogentembedded.com>
+ <201304232132.52741.sergei.shtylyov@cogentembedded.com>
+ <517B06FA.3000303@cogentembedded.com> <20130501090909.GA2562@verge.net.au>
+Message-ID: <518135F9.9010509@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 26.04.2013 15:47, schrieb Shawn Guo:
-> On Fri, Apr 26, 2013 at 02:21:30PM +0100, Will Deacon wrote:
->>> diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
->>> index a58c8b0..cd87970 100644
->>> --- a/arch/arm/mach-imx/headsmp.S
->>> +++ b/arch/arm/mach-imx/headsmp.S
->>> @@ -18,8 +18,20 @@
->>>   	.section ".text.head", "ax"
->>>
->>>   #ifdef CONFIG_SMP
->>> +diag_reg_offset:
->>> +	.word	g_diag_reg - .
->>> +
->>> +	.macro	set_diag_reg
->>> +	adr	r0, diag_reg_offset
->>> +	ldr	r1, [r0]
->>> +	add	r1, r1, r0		@ r1 = physical &g_diag_reg
->>> +	ldr	r0, [r1]
->>> +	mcr	p15, 0, r0, c15, c0, 1	@ write diagnostic register
->>> +	.endm
->>
->> Why not re-read the register directly, rather than mrc on the current core?
->
-> I do not understand the comment.  What do you mean by "re-read"?  Read
-> the register on secondary cores will only return us 0, as bootloader
-> only sets up the register on cpu0.  The macro set_diag_reg only runs on
-> secondary cores to copy cpu0's diagnostic bits.  I think it's safe on
-> SMP.
+Hello.
 
-Any news on this?
+On 01-05-2013 13:09, Simon Horman wrote:
 
-Thanks
+>> On 04/23/2013 09:32 PM, Sergei Shtylyov wrote:
 
-Dirk
+>>> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+
+>>> Add ML86V7667 platform devices on BOCK-W board, configure VIN0/1 pins, and
+>>> register VIN0/1 devices with the ML86V7667 specific platform data.
+
+>>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>>> [Sergei: some macro/comment cleanup; updated the copyrights, removed duplicate
+>>> #include, annotated all platform data as '__initdata'.]
+>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+>>> ---
+>>> Changes since version 2:
+>>> - removed duplicate #include <linux/pinctrl/machine.h>;
+>>> - annotated all platform data as '__initdata' since they're kmemdup()'ed while
+>>>    registering the platform devices anyway;
+>>> - resolved rejects, refreshed the patch.
+
+>>>   arch/arm/mach-shmobile/board-bockw.c |   39 +++++++++++++++++++++++++++++++++++
+>>>   1 file changed, 39 insertions(+)
+
+>>> Index: renesas/arch/arm/mach-shmobile/board-bockw.c
+>>> ===================================================================
+>>> --- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
+>>> +++ renesas/arch/arm/mach-shmobile/board-bockw.c
+
+>> [...]
+
+>>> @@ -80,6 +101,16 @@ static const struct pinctrl_map bockw_pi
+>>>   				  "sdhi0_data4", "sdhi0"),
+>>>   	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
+>>>   				  "sdhi0_wp", "sdhi0"),
+>>> +	/* VIN0 */
+>>> +	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.0", "pfc-r8a7778",
+>>> +				  "vin0_clk", "vin0"),
+>>> +	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.0", "pfc-r8a7778",
+>>> +				  "vin0_data8", "vin0"),
+>>> +	/* VIN1 */
+>>> +	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.1", "pfc-r8a7778",
+>>> +				  "vin1_clk", "vin1"),
+>>> +	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.1", "pfc-r8a7778",
+>>> +				  "vin1_data8", "vin1"),
+>>>   };
+
+>>      It turned out that VIN1 signal VI1_CLK conflicts with Ether
+>> signal ETH_REF_CLK.
+>> So I'm a bit at a loss here: whether I should totally remove VIN1
+>> device if I'm going
+>> to add Ether device, or add a BOCK-W specific submenu to Kconfig, or
+>> add driver
+>> specific #ifdef's in the code to disable VIN1 if sh_eth driver is
+>> enabled?...
+
+> My preference, in order is:
+
+> * Remove VIN1 (is it used?)
+
+    At least video decoders are connected to both VIN0 and VIN1.
+
+> * Kconfig-foo
+> * #ifdef nastiness
+
+    I took the 3rd approach but luckily it was possible without #ifdef, using 
+*if* (!IS_ENABLED(CONFIG_SH_ETH)) statement. Working patch posted on Monday.
+
+WBR, Sergei
