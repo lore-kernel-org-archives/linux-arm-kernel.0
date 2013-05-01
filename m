@@ -1,56 +1,46 @@
-From: axel.lin@ingics.com (Axel Lin)
-Date: Wed, 01 May 2013 23:32:05 +0800
-Subject: [RFT][PATCH 2/2] clk: wm831x: Fix wm831x_clkout_get_parent
-In-Reply-To: <1367422261.8160.1.camel@phoenix>
-References: <1367422261.8160.1.camel@phoenix>
-Message-ID: <1367422325.8160.2.camel@phoenix>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Wed, 01 May 2013 17:32:14 +0200
+Subject: [PATCH v3] ARM: imx: replicate the diagnostic register of boot
+ cpu into secondary cores
+In-Reply-To: <20130426134722.GA1943@S2101-09.ap.freescale.net>
+References: <1366948645-12060-1-git-send-email-shawn.guo@linaro.org>
+ <20130426132130.GE30858@mudshark.cambridge.arm.com>
+ <20130426134722.GA1943@S2101-09.ap.freescale.net>
+Message-ID: <5181357E.3090805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current code looks strange because calling wm831x_clkout_set_parent() with 0 as
-parent parameter, wm831x_clkout_get_parent() will return 1.
+Am 26.04.2013 15:47, schrieb Shawn Guo:
+> On Fri, Apr 26, 2013 at 02:21:30PM +0100, Will Deacon wrote:
+>>> diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
+>>> index a58c8b0..cd87970 100644
+>>> --- a/arch/arm/mach-imx/headsmp.S
+>>> +++ b/arch/arm/mach-imx/headsmp.S
+>>> @@ -18,8 +18,20 @@
+>>>   	.section ".text.head", "ax"
+>>>
+>>>   #ifdef CONFIG_SMP
+>>> +diag_reg_offset:
+>>> +	.word	g_diag_reg - .
+>>> +
+>>> +	.macro	set_diag_reg
+>>> +	adr	r0, diag_reg_offset
+>>> +	ldr	r1, [r0]
+>>> +	add	r1, r1, r0		@ r1 = physical &g_diag_reg
+>>> +	ldr	r0, [r1]
+>>> +	mcr	p15, 0, r0, c15, c0, 1	@ write diagnostic register
+>>> +	.endm
+>>
+>> Why not re-read the register directly, rather than mrc on the current core?
+>
+> I do not understand the comment.  What do you mean by "re-read"?  Read
+> the register on secondary cores will only return us 0, as bootloader
+> only sets up the register on cpu0.  The macro set_diag_reg only runs on
+> secondary cores to copy cpu0's diagnostic bits.  I think it's safe on
+> SMP.
 
-According to the datasheet:
-R16528 (4090h) Clock Control1
-        BIT 0: CLKOUT output source select
-                0 = FLL output
-                1 = 32.768kHz oscillator
+Any news on this?
 
-Thus fix the entry order in wm831x_clkout_parents[] to make it has
-the same meaning as the datasheet and make the return value
-of wm831x_clkout_get_parent() consistent with the parent pass to
-wm831x_clkout_set_parent().
+Thanks
 
-Signed-off-by: Axel Lin <axel.lin@ingics.com>
----
- drivers/clk/clk-wm831x.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
-index 4bdf0b0..58d08a6 100644
---- a/drivers/clk/clk-wm831x.c
-+++ b/drivers/clk/clk-wm831x.c
-@@ -299,8 +299,8 @@ static void wm831x_clkout_unprepare(struct clk_hw *hw)
- }
- 
- static const char *wm831x_clkout_parents[] = {
--	"xtal",
- 	"fll",
-+	"xtal",
- };
- 
- static u8 wm831x_clkout_get_parent(struct clk_hw *hw)
-@@ -318,9 +318,9 @@ static u8 wm831x_clkout_get_parent(struct clk_hw *hw)
- 	}
- 
- 	if (ret & WM831X_CLKOUT_SRC)
--		return 0;
--	else
- 		return 1;
-+	else
-+		return 0;
- }
- 
- static int wm831x_clkout_set_parent(struct clk_hw *hw, u8 parent)
--- 
-1.8.1.2
+Dirk
