@@ -1,119 +1,96 @@
 From: holt@sgi.com (Robin Holt)
-Date: Wed,  1 May 2013 12:06:41 -0500
-Subject: [PATCH -v7 01/11] CPU hotplug: Provide a generic helper to
- disable/enable CPU hotplug
+Date: Wed,  1 May 2013 12:06:48 -0500
+Subject: [PATCH -v7 08/11] arm,
+ Remove unused restart_mode fields from some arm subarchs
 In-Reply-To: <1367428011-17123-1-git-send-email-holt@sgi.com>
 References: <1367428011-17123-1-git-send-email-holt@sgi.com>
-Message-ID: <1367428011-17123-2-git-send-email-holt@sgi.com>
+Message-ID: <1367428011-17123-9-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are instances in the kernel where we would like to disable
-CPU hotplug (from sysfs) during some important operation. Today
-the freezer code depends on this and the code to do it was kinda
-tailor-made for that.
+These restart_mode fields are not used at all.  Remove them to make
+moving the reboot= cmdline options to the general kernel easier.
 
-Restructure the code and make it generic enough to be useful for
-other usecases too.
-
-Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 Signed-off-by: Robin Holt <holt@sgi.com>
 To: Andrew Morton <akpm@linux-foundation.org>
-To: H. Peter Anvin <hpa@zytor.com>
+To: Russell King <linux@arm.linux.org.uk>
 Cc: Russ Anderson <rja@sgi.com>
 Cc: Robin Holt <holt@sgi.com>
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: H. Peter Anvin <hpa@zytor.com>
 Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Cc: the arch/x86 maintainers <x86@kernel.org>
 Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
-Cc: <stable@vger.kernel.org>
-
 ---
+ arch/arm/mach-ebsa110/core.c | 1 -
+ arch/arm/mach-pxa/mioa701.c  | 1 -
+ arch/arm/mach-pxa/spitz.c    | 3 ---
+ arch/arm/mach-pxa/tosa.c     | 1 -
+ 4 files changed, 6 deletions(-)
 
-Changes since -v6:
- - Added a #define for non-hotplug case.
----
- include/linux/cpu.h |  3 +++
- kernel/cpu.c        | 27 +++++++++------------------
- 2 files changed, 12 insertions(+), 18 deletions(-)
-
-diff --git a/include/linux/cpu.h b/include/linux/cpu.h
-index c6f6e08..3e450c0 100644
---- a/include/linux/cpu.h
-+++ b/include/linux/cpu.h
-@@ -141,6 +141,8 @@ static inline void unregister_cpu_notifier(struct notifier_block *nb)
+diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
+index b13cc74..69a9d5d 100644
+--- a/arch/arm/mach-ebsa110/core.c
++++ b/arch/arm/mach-ebsa110/core.c
+@@ -321,7 +321,6 @@ MACHINE_START(EBSA110, "EBSA110")
+ 	.atag_offset	= 0x400,
+ 	.reserve_lp0	= 1,
+ 	.reserve_lp2	= 1,
+-	.restart_mode	= 's',
+ 	.map_io		= ebsa110_map_io,
+ 	.init_early	= ebsa110_init_early,
+ 	.init_irq	= ebsa110_init_irq,
+diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+index f8979b9..dbea67a 100644
+--- a/arch/arm/mach-pxa/mioa701.c
++++ b/arch/arm/mach-pxa/mioa701.c
+@@ -756,7 +756,6 @@ static void mioa701_machine_exit(void)
+ 
+ MACHINE_START(MIOA701, "MIO A701")
+ 	.atag_offset	= 0x100,
+-	.restart_mode	= 's',
+ 	.map_io		= &pxa27x_map_io,
+ 	.nr_irqs	= PXA_NR_IRQS,
+ 	.init_irq	= &pxa27x_init_irq,
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index 362726c..c3c0042 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -979,7 +979,6 @@ static void __init spitz_fixup(struct tag *tags, char **cmdline,
+ 
+ #ifdef CONFIG_MACH_SPITZ
+ MACHINE_START(SPITZ, "SHARP Spitz")
+-	.restart_mode	= 'g',
+ 	.fixup		= spitz_fixup,
+ 	.map_io		= pxa27x_map_io,
+ 	.nr_irqs	= PXA_NR_IRQS,
+@@ -993,7 +992,6 @@ MACHINE_END
+ 
+ #ifdef CONFIG_MACH_BORZOI
+ MACHINE_START(BORZOI, "SHARP Borzoi")
+-	.restart_mode	= 'g',
+ 	.fixup		= spitz_fixup,
+ 	.map_io		= pxa27x_map_io,
+ 	.nr_irqs	= PXA_NR_IRQS,
+@@ -1007,7 +1005,6 @@ MACHINE_END
+ 
+ #ifdef CONFIG_MACH_AKITA
+ MACHINE_START(AKITA, "SHARP Akita")
+-	.restart_mode	= 'g',
+ 	.fixup		= spitz_fixup,
+ 	.map_io		= pxa27x_map_io,
+ 	.nr_irqs	= PXA_NR_IRQS,
+diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
+index 3d91d2e..a41992f 100644
+--- a/arch/arm/mach-pxa/tosa.c
++++ b/arch/arm/mach-pxa/tosa.c
+@@ -969,7 +969,6 @@ static void __init fixup_tosa(struct tag *tags, char **cmdline,
  }
- #endif
  
-+extern void cpu_hotplug_disable(void);
-+extern void cpu_hotplug_enable(void);
- int cpu_up(unsigned int cpu);
- void notify_cpu_starting(unsigned int cpu);
- extern void cpu_maps_update_begin(void);
-@@ -148,6 +150,7 @@ extern void cpu_maps_update_done(void);
- 
- #else	/* CONFIG_SMP */
- 
-+#define cpu_hotplug_disable()	do { } while (0)
- #define cpu_notifier(fn, pri)	do { (void)(fn); } while (0)
- 
- static inline int register_cpu_notifier(struct notifier_block *nb)
-diff --git a/kernel/cpu.c b/kernel/cpu.c
-index b5e4ab2..28769f5 100644
---- a/kernel/cpu.c
-+++ b/kernel/cpu.c
-@@ -541,29 +541,20 @@ static int __init alloc_frozen_cpus(void)
- core_initcall(alloc_frozen_cpus);
- 
- /*
-- * Prevent regular CPU hotplug from racing with the freezer, by disabling CPU
-- * hotplug when tasks are about to be frozen. Also, don't allow the freezer
-- * to continue until any currently running CPU hotplug operation gets
-- * completed.
-- * To modify the 'cpu_hotplug_disabled' flag, we need to acquire the
-- * 'cpu_add_remove_lock'. And this same lock is also taken by the regular
-- * CPU hotplug path and released only after it is complete. Thus, we
-- * (and hence the freezer) will block here until any currently running CPU
-- * hotplug operation gets completed.
-+ * Wait for currently running CPU hotplug operations to complete (if any) and
-+ * disable future CPU hotplug (from sysfs). The 'cpu_add_remove_lock' protects
-+ * the 'cpu_hotplug_disabled' flag. The same lock is also acquired by the
-+ * hotplug path before performing hotplug operations. So acquiring that lock
-+ * guarantees mutual exclusion from any currently running hotplug operations.
-  */
--void cpu_hotplug_disable_before_freeze(void)
-+void cpu_hotplug_disable(void)
- {
- 	cpu_maps_update_begin();
- 	cpu_hotplug_disabled = 1;
- 	cpu_maps_update_done();
- }
- 
--
--/*
-- * When tasks have been thawed, re-enable regular CPU hotplug (which had been
-- * disabled while beginning to freeze tasks).
-- */
--void cpu_hotplug_enable_after_thaw(void)
-+void cpu_hotplug_enable(void)
- {
- 	cpu_maps_update_begin();
- 	cpu_hotplug_disabled = 0;
-@@ -589,12 +580,12 @@ cpu_hotplug_pm_callback(struct notifier_block *nb,
- 
- 	case PM_SUSPEND_PREPARE:
- 	case PM_HIBERNATION_PREPARE:
--		cpu_hotplug_disable_before_freeze();
-+		cpu_hotplug_disable();
- 		break;
- 
- 	case PM_POST_SUSPEND:
- 	case PM_POST_HIBERNATION:
--		cpu_hotplug_enable_after_thaw();
-+		cpu_hotplug_enable();
- 		break;
- 
- 	default:
+ MACHINE_START(TOSA, "SHARP Tosa")
+-	.restart_mode	= 'g',
+ 	.fixup          = fixup_tosa,
+ 	.map_io         = pxa25x_map_io,
+ 	.nr_irqs	= TOSA_NR_IRQS,
 -- 
 1.8.2.1
