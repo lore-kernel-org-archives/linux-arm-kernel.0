@@ -1,25 +1,49 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 01 May 2013 19:40:37 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCAzLzNdIEFSTTogZHRzOiBBZGQgTUMxMzc4MyBzdXBw?=
- =?UTF-8?B?b3J0IGZvciBpLk1YMjcgUGh5dGVjIFBDTTAzOCBtb2R1bGU=?=
-In-Reply-To: <20130501153609.GA31135@pengutronix.de>
-References: <1367405219-19078-1-git-send-email-shc_work@mail.ru>
- <1367405219-19078-3-git-send-email-shc_work@mail.ru>
- <20130501153609.GA31135@pengutronix.de>
-Message-ID: <1367422837.138582176@f94.mail.ru>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 1 May 2013 10:54:30 -0500
+Subject: [PATCH 03/21] ARM: shmobile: don't call irqchip_init
+ unconditionally
+In-Reply-To: <1366910944-3033663-4-git-send-email-arnd@arndb.de>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <1366910944-3033663-4-git-send-email-arnd@arndb.de>
+Message-ID: <CAL_JsqJWJvxezXy0RGFutxzvBhca-8=uRH2GxdJgzbEGw+OL0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, May 01, 2013 at 02:46:59PM +0400, Alexander Shiyan wrote:
-> > Added MC13783 node to imx27-phytec-phycore DT file.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
-> >  arch/arm/boot/dts/imx27-phytec-phycore.dts | 92 ++++++++++++++++++++++++++++++
-> >  1 file changed, 92 insertions(+)
-> 
-> You can merge this with the previous patch.
+On Thu, Apr 25, 2013 at 12:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The irqchip_init function is only available when building
+> with CONFIG_OF enabled, which causes this build failure for
+> bonito_defconfig:
+>
+> arch/arm/mach-shmobile/built-in.o: In function `r8a7740_init_irq_of':
+> :(.init.text+0x580): undefined reference to `irqchip_init'
+>
+> This makes both the OF and the ATAGS portion of the driver
+> conditional, which avoids the build error and also results
+> in smaller object code if not both are enabled, without the
+> need for an #ifdef.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Bastian Hecht <hechtb+renesas@gmail.com>
+> Cc: Simon Horman <horms+renesas@verge.net.au>
+> Cc: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> ---
+>  arch/arm/mach-shmobile/intc-r8a7740.c | 13 +++++++++++--
+>  1 file changed, 11 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-shmobile/intc-r8a7740.c b/arch/arm/mach-shmobile/intc-r8a7740.c
+> index 8871f77..5dc57f1 100644
+> --- a/arch/arm/mach-shmobile/intc-r8a7740.c
+> +++ b/arch/arm/mach-shmobile/intc-r8a7740.c
+> @@ -53,14 +53,23 @@ static void __init r8a7740_init_irq_common(void)
+>
+>  void __init r8a7740_init_irq_of(void)
+>  {
+> +       if (!IS_ENABLED(CONFIG_OF))
+> +               return;
+> +
+>         irqchip_init();
 
-Part 2 just adds a SPI host for the target. Is this merge is really necessary?
+Why not have an empty irqchip_init? I'd guess we'll need this on other
+platforms and your default mach.
 
----
+Rob
