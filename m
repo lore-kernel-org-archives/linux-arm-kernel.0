@@ -1,11 +1,10 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 1 May 2013 10:51:11 +0100
-Subject: [PATCH 1/5] dmaengine: ste_dma40: Allow memcpy channels to be
+Date: Wed, 1 May 2013 10:52:43 +0100
+Subject: [PATCH 1/5 v2] dmaengine: ste_dma40: Allow memcpy channels to be
  configured from DT
-In-Reply-To: <201304302242.24002.arnd@arndb.de>
+In-Reply-To: <1367336497-10650-1-git-send-email-lee.jones@linaro.org>
 References: <1367336497-10650-1-git-send-email-lee.jones@linaro.org>
- <201304302242.24002.arnd@arndb.de>
-Message-ID: <20130501095111.GC25256@gmail.com>
+Message-ID: <20130501095243.GD25256@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
