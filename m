@@ -1,16 +1,18 @@
 From: holt@sgi.com (Robin Holt)
-Date: Wed,  1 May 2013 12:06:43 -0500
-Subject: [PATCH -v7 03/11] Remove -stable friendly PF_THREAD_BOUND define
+Date: Wed,  1 May 2013 12:06:46 -0500
+Subject: [PATCH -v7 06/11] x86,
+ prepare reboot_mode for moving to generic kernel code.
 In-Reply-To: <1367428011-17123-1-git-send-email-holt@sgi.com>
 References: <1367428011-17123-1-git-send-email-holt@sgi.com>
-Message-ID: <1367428011-17123-4-git-send-email-holt@sgi.com>
+Message-ID: <1367428011-17123-7-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the prior patch's #define for easier backporting to the stable
-releases.
+This patch prepares for the moving the parsing of reboot= to the generic
+kernel code by making reboot_mode into a more generic form.
 
 Signed-off-by: Robin Holt <holt@sgi.com>
+To: Miguel Boton <mboton.lkml@gmail.com>
 To: Andrew Morton <akpm@linux-foundation.org>
 To: H. Peter Anvin <hpa@zytor.com>
 Cc: Russ Anderson <rja@sgi.com>
@@ -21,24 +23,79 @@ Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Cc: the arch/x86 maintainers <x86@kernel.org>
 Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
 ---
- kernel/sys.c | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/x86/kernel/reboot.c | 12 +++++++-----
+ include/linux/reboot.h   |  5 +++++
+ 2 files changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/kernel/sys.c b/kernel/sys.c
-index dad3c63..79b5f61 100644
---- a/kernel/sys.c
-+++ b/kernel/sys.c
-@@ -362,11 +362,6 @@ int unregister_reboot_notifier(struct notifier_block *nb)
- }
- EXPORT_SYMBOL(unregister_reboot_notifier);
+diff --git a/arch/x86/kernel/reboot.c b/arch/x86/kernel/reboot.c
+index 76fa1e9..d42e3b2 100644
+--- a/arch/x86/kernel/reboot.c
++++ b/arch/x86/kernel/reboot.c
+@@ -36,7 +36,7 @@ void (*pm_power_off)(void);
+ EXPORT_SYMBOL(pm_power_off);
  
--/* Add backwards compatibility for stable trees. */
--#ifndef PF_NO_SETAFFINITY
--#define PF_NO_SETAFFINITY		PF_THREAD_BOUND
--#endif
--
- static void migrate_to_reboot_cpu(void)
- {
- 	/* The boot cpu is always logical cpu 0 */
+ static const struct desc_ptr no_idt = {};
+-static int reboot_mode;
++static enum reboot_mode reboot_mode = REBOOT_COLD;
+ enum reboot_type reboot_type = BOOT_ACPI;
+ int reboot_force;
+ 
+@@ -88,11 +88,11 @@ static int __init reboot_setup(char *str)
+ 
+ 		switch (*str) {
+ 		case 'w':
+-			reboot_mode = 0x1234;
++			reboot_mode = REBOOT_WARM;
+ 			break;
+ 
+ 		case 'c':
+-			reboot_mode = 0;
++			reboot_mode = REBOOT_COLD;
+ 			break;
+ 
+ #ifdef CONFIG_SMP
+@@ -536,6 +536,7 @@ static void native_machine_emergency_restart(void)
+ 	int i;
+ 	int attempt = 0;
+ 	int orig_reboot_type = reboot_type;
++	unsigned short mode;
+ 
+ 	if (reboot_emergency)
+ 		emergency_vmx_disable_all();
+@@ -543,7 +544,8 @@ static void native_machine_emergency_restart(void)
+ 	tboot_shutdown(TB_SHUTDOWN_REBOOT);
+ 
+ 	/* Tell the BIOS if we want cold or warm reboot */
+-	*((unsigned short *)__va(0x472)) = reboot_mode;
++	mode = reboot_mode == REBOOT_WARM ? 0x1234 : 0;
++	*((unsigned short *)__va(0x472)) = mode;
+ 
+ 	for (;;) {
+ 		/* Could also try the reset bit in the Hammer NB */
+@@ -585,7 +587,7 @@ static void native_machine_emergency_restart(void)
+ 
+ 		case BOOT_EFI:
+ 			if (efi_enabled(EFI_RUNTIME_SERVICES))
+-				efi.reset_system(reboot_mode ?
++				efi.reset_system(reboot_mode == REBOOT_WARM ?
+ 						 EFI_RESET_WARM :
+ 						 EFI_RESET_COLD,
+ 						 EFI_SUCCESS, 0, NULL);
+diff --git a/include/linux/reboot.h b/include/linux/reboot.h
+index 23b3630..2ca9ed7 100644
+--- a/include/linux/reboot.h
++++ b/include/linux/reboot.h
+@@ -10,6 +10,11 @@
+ #define SYS_HALT	0x0002	/* Notify of system halt */
+ #define SYS_POWER_OFF	0x0003	/* Notify of system power off */
+ 
++enum reboot_mode {
++	REBOOT_COLD = 0,
++	REBOOT_WARM,
++};
++
+ extern int register_reboot_notifier(struct notifier_block *);
+ extern int unregister_reboot_notifier(struct notifier_block *);
+ 
 -- 
 1.8.2.1
