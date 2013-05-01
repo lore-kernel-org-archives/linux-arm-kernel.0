@@ -1,58 +1,55 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 May 2013 15:46:22 +0100
-Subject: [PATCH 0/2] Early printk support for virtio console devices.
-In-Reply-To: <CAAhSdy14ofVEdrfc2r3PqLFrTA9kvM+oBVWmXNSWBq2xTxMLiQ@mail.gmail.com>
-References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
- <BA2076A6-0688-4E5C-85F9-A9CA8FD75782@suse.de>
- <87obcyc9sh.fsf@rustcorp.com.au>
- <336C59AA-D5D7-472E-A8DA-EEB413DD6C68@suse.de>
- <CAAHg+Hj0tySbzUGnoFE9ybVYP291B-i8-Ck1EkwD57t8yG5wwg@mail.gmail.com>
- <C52CCDD4-D8FB-4AD6-B83D-3B5251A7A0F5@suse.de>
- <87sj27xxjr.fsf@rustcorp.com.au>
- <CAAhSdy14ofVEdrfc2r3PqLFrTA9kvM+oBVWmXNSWBq2xTxMLiQ@mail.gmail.com>
-Message-ID: <20130501144622.GA24055@mudshark.cambridge.arm.com>
+Date: Wed, 1 May 2013 16:24:21 +0100
+Subject: RFC: Unified DMA allocation algorithms
+In-Reply-To: <51785024.40305@codeaurora.org>
+References: <51785024.40305@codeaurora.org>
+Message-ID: <20130501152421.GB24055@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 01, 2013 at 07:53:49AM +0100, Anup Patel wrote:
-> On Wed, May 1, 2013 at 7:37 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
-> > Alexander Graf <agraf@suse.de> writes:
-> >> There are not device specific registers in
-> >> virtio-console. Virtio-console lives behind a virtio bus which doesn't
-> >> know what these registers are.
-> >
-> > You're not going to make coherent arguments without reading that actual
-> > patch we're discussing.  And you're going to just waste everyone else's
-> > time.
-> >
-> >> Even if you shove it into config space,
-> >
-> > Which is what the patch does...
-> >
-> >> it'd be broken because config access happens without intercepts on
-> >> some platforms.
-> >
-> > But people keep assuming it, which is one reason virtio_ccw switched
-> > from passive lguest-style config to active.  Only lguest and the old kvm
-> > virtio use it, and lguest can change.
-> >
-> > An emergency output is a reasonable idea, and this is a reasonable
-> > implementation.  The question is practical: will it be used?  Because we
-> > don't implement reasonable ideas which aren't going to be used.
-> 
-> We are already using it for Guest bring-up on APM ARM64 board using
-> KVMTOOL and so far it has been really helpful in debugging KVM ARM64
-> guest issues.
-> 
-> Also, this is a very useful debugging method for Guest bring-up on
-> other architectures supported by KVM and other Hypervisors that
-> support VirtIO.
+On Wed, Apr 24, 2013 at 10:35:32PM +0100, Laura Abbott wrote:
+> Hi all,
 
-FWIW: I've hacked together a small set of patches allowing us to use the
-x86 ioport peripherals on arm/arm64 in kvmtool. This means you can use the
-8250 for earlyprintk on the latter, and even as the main console if you
-like since it has a device-tree binding.
+Hi Laura,
 
-I'll post the patches as an RFC to the kvm list.
+> I've been looking at a better way to do custom dma allocation algorithms 
+> in a similar style to Ion heaps. Most drivers/clients have come up with 
+> a series of semi-standard ways to get memory (CMA, memblock_reserve, 
+> discontiguous pages etc.) . As these allocation schemes get more and 
+> more complex, there needs to be a since place where all clients (Ion 
+> based driver vs. DRM driver vs. ???)  can independently take advantage 
+> of any optimizations and call a single API for the backing allocations.
+
+Makes sense.
+
+> The dma_map_ops take care of almost everything needed for abstraction
+> but the question is where should new allocation algorithms be located?
+> Most of the work has been added to either arm/mm/dma-mapping.c or
+> dma-contiguous.c . My current thought:
+> 
+> 1) split out the dma_map_ops currently in dma-mapping.c into separate 
+> files (dma-mapping-common.c, dma-mapping-iommu.c)
+> 2) Extend dma-contiguous.c to support memblock_reserve memory
+> 3) Place additional algorithms in either arch/arm/mm or 
+> drivers/base/dma-alloc/ as appropriate to the code. This is the part 
+> where I'm most unsure about the direction.
+> 
+> I don't have anything written yet but I plan to draft some patches 
+> assuming the proposed approach sounds reasonable and no one else has 
+> started on something similar already.
+> 
+> Thoughts? Opinions?
+
+The only thing I'd add (which unfortunately doesn't help to answer your
+questions!) is that it would be good to see the various allocation
+strategies parameterised by IOMMU constraints. For example:
+
+	- Input address sizes / windows
+	- Mapping granules (i.e. not just PAGE_SIZE)
+	- Streaming hints for physically contiguous allocation
+
+dma-mapping does some of this, but it's still not ideal or generalised (for
+example, it allocates a bitmap for the entire virtual space for each
+domain). I'd welcome any generalisation in this area.
 
 Will
