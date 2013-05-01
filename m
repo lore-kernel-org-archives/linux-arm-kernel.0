@@ -1,53 +1,51 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Wed,  1 May 2013 17:49:28 +0100
-Subject: [PATCH] ARM: KVM: Don't handle PSCI calls via SMC
-Message-ID: <1367426968-5577-1-git-send-email-Dave.Martin@arm.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed,  1 May 2013 09:58:46 -0700
+Subject: [PATCH] ARM: nommu: Fix types for ioremap functions
+Message-ID: <1367427526-5475-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, kvmtool unconditionally declares that HVC should be used
-to call PSCI, so the function numbers in the DT tell the guest
-nothing about the function ID namespace or calling convention for
-SMC.
+Commit cd024d4245b2bfbd824b911f11a9756d1d6c167d
+(ARM: 7704/1: mm: Use phys_addr_t properly for ioremap functions)
+changed the type of the ioremap functions to actually use phys_addr_t.
+Change the nommu functions accordingly as well to avoid errors:
 
-We already assume that the guest will examine and honour the DT,
-since there is no way it could possibly guess the KVM-specific PSCI
-function IDs otherwise.  So let's not encourage guests to violate
-what's specified in the DT by using SMC to make the call.
+arch/arm/mm/nommu.c:84:15: error: conflicting types for '__arm_ioremap'
+arch/arm/include/asm/io.h:137:22: note: previous declaration of '__arm_ioremap' was here
+arch/arm/mm/nommu.c:91:18: error: conflicting types for 'arch_ioremap_caller'
+arch/arm/include/asm/io.h:142:25: note: previous declaration of 'arch_ioremap_caller' was here
+arch/arm/mm/nommu.c:93:15: error: conflicting types for '__arm_ioremap_caller'
+arch/arm/include/asm/io.h:133:22: note: previous declaration of '__arm_ioremap_caller' was here
 
-Signed-off-by: Dave P Martin <Dave.Martin@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- arch/arm/kvm/arm.c  |    3 ---
- arch/arm/kvm/psci.c |    2 +-
- 2 files changed, 1 insertion(+), 4 deletions(-)
+ arch/arm/mm/nommu.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 5a93698..32a3495 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -503,9 +503,6 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
--	if (kvm_psci_call(vcpu))
--		return 1;
--
- 	kvm_inject_undefined(vcpu);
- 	return 1;
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index d51225f..31bd77b 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -81,16 +81,16 @@ void __iomem *__arm_ioremap_pfn_caller(unsigned long pfn, unsigned long offset,
+ 	return __arm_ioremap_pfn(pfn, offset, size, mtype);
  }
-diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
-index 7ee5bb7..86a693a 100644
---- a/arch/arm/kvm/psci.c
-+++ b/arch/arm/kvm/psci.c
-@@ -75,7 +75,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
-  * kvm_psci_call - handle PSCI call if r0 value is in range
-  * @vcpu: Pointer to the VCPU struct
-  *
-- * Handle PSCI calls from guests through traps from HVC or SMC instructions.
-+ * Handle PSCI calls from guests through traps from HVC instructions.
-  * The calling convention is similar to SMC calls to the secure world where
-  * the function number is placed in r0 and this function returns true if the
-  * function number specified in r0 is withing the PSCI range, and false
+ 
+-void __iomem *__arm_ioremap(unsigned long phys_addr, size_t size,
++void __iomem *__arm_ioremap(phys_addr_t phys_addr, size_t size,
+ 			    unsigned int mtype)
+ {
+ 	return (void __iomem *)phys_addr;
+ }
+ EXPORT_SYMBOL(__arm_ioremap);
+ 
+-void __iomem * (*arch_ioremap_caller)(unsigned long, size_t, unsigned int, void *);
++void __iomem * (*arch_ioremap_caller)(phys_addr_t, size_t, unsigned int, void *);
+ 
+-void __iomem *__arm_ioremap_caller(unsigned long phys_addr, size_t size,
++void __iomem *__arm_ioremap_caller(phys_addr_t phys_addr, size_t size,
+ 				   unsigned int mtype, void *caller)
+ {
+ 	return __arm_ioremap(phys_addr, size, mtype);
 -- 
-1.7.9.5
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
