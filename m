@@ -1,22 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 May 2013 00:13:47 +0100
-Subject: [PATCH -v7 0/11] Shutdown from reboot_cpuid without stopping
- other cpus.
-In-Reply-To: <1367428011-17123-1-git-send-email-holt@sgi.com>
-References: <1367428011-17123-1-git-send-email-holt@sgi.com>
-Message-ID: <20130501231347.GT14496@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 1 May 2013 16:26:49 -0700
+Subject: [RFC 1/2] ARM: OMAP2+: AM33XX: I2C Sleep/wake sequence support
+In-Reply-To: <1367434947-6442-2-git-send-email-Russ.Dill@ti.com>
+References: <1367434947-6442-1-git-send-email-Russ.Dill@ti.com>
+ <1367434947-6442-2-git-send-email-Russ.Dill@ti.com>
+Message-ID: <20130501232649.GN28721@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 01, 2013 at 12:06:40PM -0500, Robin Holt wrote:
-> Andrew, Please do _NOT_ take this patch series yet.  I am sending this
-> to you because you had comments on my -v6 submission.
+* Russ Dill <Russ.Dill@ti.com> [130501 12:07]:
+> This patch adds the ability to write an I2C sleep sequence from
+> SRAM just before WFI, and a wake sequence just after control is passed
+> from the M3. This is useful for adjusting voltages during sleep that cannot
+> be lowered while SDRAM is active.
+> 
+> Each sequence is a series of I2C transfers in the form:
+> 
+> u8 length | u8 chip address | u8 byte0/reg address | u8 byte 1 | u8 byte n ...
+> 
+> The length indicates the number of bytes to transfer, including the register
+> address. The length of the sequence is limited by the amount of space
+> reserved in SRAM, 127 bytes.
+> 
+> The sequences are taken from the i2c1 node in the device tree. The property
+> name for the sleep sequence is "sleep_sequence" and the property name for
+> the wake sequence is "wake_sequence". Each property should be an array of
+> bytes.
+> 
+> No actions are performed if the properties are not present in the device
+> tree.
 
-Another reason for not applying this is that I believe it wilfully breaks
-a bunch of ARM platforms - such as removing the 'g' reboot mode (for gpio
-based reboot on PXA), and removing the 's' reboot mode off a bunch of ARM
-platforms which have no way to do a hard reboot.
+Looks like you should make that into just a regular device driver that lives
+under drivers/ somewhere?
 
-What scares me is that this is revision 7 of this patch set and this is
-the first it's been noticed on ARM... Maybe this patch set didn't touch
-ARM previously?
+Regards,
+
+Tony
