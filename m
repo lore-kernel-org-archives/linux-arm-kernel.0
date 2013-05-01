@@ -1,79 +1,51 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Wed, 1 May 2013 16:44:23 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the arm tree
-Message-ID: <20130501164423.1233db0b618d0e6b7184c05b@canb.auug.org.au>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 01 May 2013 08:50:09 +0200
+Subject: [PATCH 1/7] tty: xuartps: Sort #includes alphabetically
+In-Reply-To: <20130501002321.GB7435@kroah.com>
+References: <1367366284-28304-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1367366284-28304-2-git-send-email-soren.brinkmann@xilinx.com>
+ <20130501000048.GA1840@kroah.com>
+ <cbd8c55c-066b-4396-9a4b-97d58a93b573@DB8EHSMHS005.ehs.local>
+ <20130501002321.GB7435@kroah.com>
+Message-ID: <5180BB21.2080306@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 05/01/2013 02:23 AM, Greg Kroah-Hartman wrote:
+> On Tue, Apr 30, 2013 at 05:05:40PM -0700, S?ren Brinkmann wrote:
+>> On Tue, Apr 30, 2013 at 05:00:48PM -0700, Greg Kroah-Hartman wrote:
+>>> On Tue, Apr 30, 2013 at 04:57:58PM -0700, Soren Brinkmann wrote:
+>>>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>>>> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>>> CC: Jiri Slaby <jslaby@suse.cz>
+>>>> CC: linux-serial at vger.kernel.org
+>>>
+>>> Why would you need/want to do this?
+>> I often come across duplicated includes. Having some kind of order helps
+>> avoiding that, imho.
+> 
+> We have a tool to handle duplicated includes, no need to put them in
+> sorted order for them to be detected.
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-arch/arm/mach-tegra/hotplug.c between commit da2265b130f6 ("ARM: tegra:
-remove tegra specific cpu_disable()") from the arm tree and commit
-7469688e832e ("ARM: tegra: Unify tegra{20,30,114}_init_early()") from the
-arm-soc tree.
+What's the name of tool which does that?
+I have seen results from it but have never tried to find it out name and
+how to use it.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+Thanks,
+Michal
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-diff --cc arch/arm/mach-tegra/hotplug.c
-index e8323bc,8da9f78..0000000
---- a/arch/arm/mach-tegra/hotplug.c
-+++ b/arch/arm/mach-tegra/hotplug.c
-@@@ -12,8 -11,10 +11,9 @@@
-  #include <linux/smp.h>
-  #include <linux/clk/tegra.h>
-  
- -#include <asm/cacheflush.h>
-  #include <asm/smp_plat.h>
-  
-+ #include "fuse.h"
-  #include "sleep.h"
-  
-  static void (*tegra_hotplug_shutdown)(void);
-@@@ -46,18 -47,22 +46,13 @@@ void __ref tegra_cpu_die(unsigned int c
-  	BUG();
-  }
-  
-- #ifdef CONFIG_ARCH_TEGRA_2x_SOC
-- extern void tegra20_hotplug_shutdown(void);
-- void __init tegra20_hotplug_init(void)
- -int tegra_cpu_disable(unsigned int cpu)
- -{
- -	/*
- -	 * we don't allow CPU 0 to be shutdown (it is still too special
- -	 * e.g. clock tick interrupts)
- -	 */
- -	return cpu == 0 ? -EPERM : 0;
- -}
- -
-+ void __init tegra_hotplug_init(void)
-  {
-- 	tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
-- }
-- #endif
-+ 	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU))
-+ 		return;
-  
-- #ifdef CONFIG_ARCH_TEGRA_3x_SOC
-- extern void tegra30_hotplug_shutdown(void);
-- void __init tegra30_hotplug_init(void)
-- {
-- 	tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
-+ 	if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC) && tegra_chip_id == TEGRA20)
-+ 		tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
-+ 	if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) && tegra_chip_id == TEGRA30)
-+ 		tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
-  }
-- #endif
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
+Name: signature.asc
 Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130501/69c65567/attachment.sig>
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130501/58277851/attachment.sig>
