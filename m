@@ -1,69 +1,157 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Wed, 01 May 2013 18:19:24 +0200
-Subject: [PATCH v3] ARM: imx: replicate the diagnostic register of boot
- cpu into secondary cores
-In-Reply-To: <20130501153828.GC24055@mudshark.cambridge.arm.com>
-References: <1366948645-12060-1-git-send-email-shawn.guo@linaro.org>
- <20130426132130.GE30858@mudshark.cambridge.arm.com>
- <20130426134722.GA1943@S2101-09.ap.freescale.net>
- <5181357E.3090805@gmail.com>
- <20130501153828.GC24055@mudshark.cambridge.arm.com>
-Message-ID: <5181408C.8090606@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 1 May 2013 17:21:11 +0100
+Subject: [RFC PATCH 7/9] ARM64: mm: HugeTLB support.
+In-Reply-To: <1367339448-21727-8-git-send-email-steve.capper@linaro.org>
+References: <1367339448-21727-1-git-send-email-steve.capper@linaro.org>
+ <1367339448-21727-8-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130501162111.GD17387@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 01.05.2013 17:38, schrieb Will Deacon:
-> On Wed, May 01, 2013 at 04:32:14PM +0100, Dirk Behme wrote:
->> Am 26.04.2013 15:47, schrieb Shawn Guo:
->>> On Fri, Apr 26, 2013 at 02:21:30PM +0100, Will Deacon wrote:
->>>>> diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
->>>>> index a58c8b0..cd87970 100644
->>>>> --- a/arch/arm/mach-imx/headsmp.S
->>>>> +++ b/arch/arm/mach-imx/headsmp.S
->>>>> @@ -18,8 +18,20 @@
->>>>>    	.section ".text.head", "ax"
->>>>>
->>>>>    #ifdef CONFIG_SMP
->>>>> +diag_reg_offset:
->>>>> +	.word	g_diag_reg - .
->>>>> +
->>>>> +	.macro	set_diag_reg
->>>>> +	adr	r0, diag_reg_offset
->>>>> +	ldr	r1, [r0]
->>>>> +	add	r1, r1, r0		@ r1 = physical &g_diag_reg
->>>>> +	ldr	r0, [r1]
->>>>> +	mcr	p15, 0, r0, c15, c0, 1	@ write diagnostic register
->>>>> +	.endm
->>>>
->>>> Why not re-read the register directly, rather than mrc on the current core?
->>>
->>> I do not understand the comment.  What do you mean by "re-read"?  Read
->>> the register on secondary cores will only return us 0, as bootloader
->>> only sets up the register on cpu0.  The macro set_diag_reg only runs on
->>> secondary cores to copy cpu0's diagnostic bits.  I think it's safe on
->>> SMP.
->>
->> Any news on this?
->
-> Well, I don't like copying the register value over from CPU0.
+On Tue, Apr 30, 2013 at 05:30:46PM +0100, Steve Capper wrote:
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 43b0e9f..16aa780 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -185,6 +185,15 @@ config HW_PERF_EVENTS
+>  	  Enable hardware performance counter support for perf events. If
+>  	  disabled, perf events will use software events only.
+>  
+> +config SYS_SUPPORTS_HUGETLBFS
+> +	def_bool y if MMU
+> +
+> +config ARCH_WANT_GENERAL_HUGETLB
+> +	def_bool y if MMU
 
-Just for a better understanding: What's wrong with using the same 
-register values on all CPUx? I.e. with copying them from CPU0? 
-Shouldn't all CPUx use the same setting? Or at least the same errata 
-bits enabled?
+We could drop MMU here, I don't plan a uClinux port ;)
 
-> I'd rather we
-> orr'd in the bits we actually need, like we would in __v7_setup. Perhaps the
-> code there should be factored out into arm_errata_xxxx asm macros,
+> diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
+> new file mode 100644
+> index 0000000..d00d72a
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/hugetlb.h
+...
+> +static inline pte_t huge_ptep_get(pte_t *ptep)
+> +{
+> +	return *ptep;
+> +}
+> +
+> +static inline void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
+> +				   pte_t *ptep, pte_t pte)
+> +{
+> +	set_pte_at(mm, addr, ptep, pte);
+> +}
+> +
+> +static inline void huge_ptep_clear_flush(struct vm_area_struct *vma,
+> +					 unsigned long addr, pte_t *ptep)
+> +{
+> +	ptep_clear_flush(vma, addr, ptep);
+> +}
+> +
+> +static inline void huge_ptep_set_wrprotect(struct mm_struct *mm,
+> +					   unsigned long addr, pte_t *ptep)
+> +{
+> +	ptep_set_wrprotect(mm, addr, ptep);
+> +}
+> +
+> +static inline pte_t huge_ptep_get_and_clear(struct mm_struct *mm,
+> +					    unsigned long addr, pte_t *ptep)
+> +{
+> +	return ptep_get_and_clear(mm, addr, ptep);
+> +}
+> +
+> +static inline int huge_ptep_set_access_flags(struct vm_area_struct *vma,
+> +					     unsigned long addr, pte_t *ptep,
+> +					     pte_t pte, int dirty)
+> +{
+> +	return ptep_set_access_flags(vma, addr, ptep, pte, dirty);
+> +}
+> +
+> +static inline void hugetlb_free_pgd_range(struct mmu_gather *tlb,
+> +					  unsigned long addr, unsigned long end,
+> +					  unsigned long floor,
+> +					  unsigned long ceiling)
+> +{
+> +	free_pgd_range(tlb, addr, end, floor, ceiling);
+> +}
+...
+> +static inline int huge_pte_none(pte_t pte)
+> +{
+> +	return pte_none(pte);
+> +}
+> +
+> +static inline pte_t huge_pte_wrprotect(pte_t pte)
+> +{
+> +	return pte_wrprotect(pte);
+> +}
 
-I'm not as much in the details as Shawn and you, but it's my 
-understanding that we moved the errata handling recently from the 
-kernel to the boot loader? After this, we now find that the boot 
-loader does the errata handling only for CPU0, and now we start to 
-discuss to move it back to the kernel?
+Could we make these generic too?
 
-Sorry if my rough understanding is wrong ;)
+> diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
+> new file mode 100644
+> index 0000000..06c74e8
+> --- /dev/null
+> +++ b/arch/arm64/mm/hugetlbpage.c
+> @@ -0,0 +1,70 @@
+> +/*
+> + * arch/arm64/mm/hugetlbpage.c
+> + *
+> + * Copyright (C) 2013 Linaro Ltd.
+> + *
+> + * Based on arch/x86/mm/hugetlbpage.c.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/fs.h>
+> +#include <linux/mm.h>
+> +#include <linux/hugetlb.h>
+> +#include <linux/pagemap.h>
+> +#include <linux/err.h>
+> +#include <linux/sysctl.h>
+> +#include <asm/mman.h>
+> +#include <asm/tlb.h>
+> +#include <asm/tlbflush.h>
+> +#include <asm/pgalloc.h>
+> +
+> +#ifndef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
+> +int huge_pmd_unshare(struct mm_struct *mm, unsigned long *addr, pte_t *ptep)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+> +struct page *follow_huge_addr(struct mm_struct *mm, unsigned long address,
+> +			      int write)
+> +{
+> +	return ERR_PTR(-EINVAL);
+> +}
+> +
+> +int pmd_huge(pmd_t pmd)
+> +{
+> +	return (pmd_val(pmd) & PMD_TYPE_MASK) == PMD_TYPE_SECT;
+> +}
+> +
+> +int pud_huge(pud_t pud)
+> +{
+> +	return (pud_val(pud) & PMD_TYPE_MASK) == PMD_TYPE_SECT;
+> +}
 
-Thanks for your help and best regards
+The types are mismatched here since pud_val() returns a pgd when
+pgtable-nopud.h is used. I think we should defined PGD_TYPE_* in terms
+of pgdval_t and PUD_TYPE_* just an alias for them.
 
-Dirk
+-- 
+Catalin
