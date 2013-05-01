@@ -1,95 +1,79 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Wed, 1 May 2013 10:31:32 +0530
-Subject: [PATCH 0/2] Early printk support for virtio console devices.
-In-Reply-To: <2A4B3F6B-55DA-44F3-87DB-064DB4A8D8F8@suse.de>
-References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
- <BA2076A6-0688-4E5C-85F9-A9CA8FD75782@suse.de>
- <87obcyc9sh.fsf@rustcorp.com.au>
- <336C59AA-D5D7-472E-A8DA-EEB413DD6C68@suse.de>
- <87r4hsameo.fsf@rustcorp.com.au>
- <2A4B3F6B-55DA-44F3-87DB-064DB4A8D8F8@suse.de>
-Message-ID: <CAAhSdy3A_aYKXhGVkWdK4amC14PduccyrGsPNEYKvue=T74_sA@mail.gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 1 May 2013 16:44:23 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the arm tree
+Message-ID: <20130501164423.1233db0b618d0e6b7184c05b@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 1, 2013 at 5:56 AM, Alexander Graf <agraf@suse.de> wrote:
->
-> On 30.04.2013, at 02:32, Rusty Russell wrote:
->
->> Alexander Graf <agraf@suse.de> writes:
->>> Am 29.04.2013 um 05:09 schrieb Rusty Russell <rusty@rustcorp.com.au>:
->>>
->>>> Alexander Graf <agraf@suse.de> writes:
->>>>> On 26.04.2013, at 13:04, Pranavkumar Sawargaonkar wrote:
->>>>>
->>>>>> This patch-set implements early printk support for virtio console devices without using any hypercalls.
->>>>>>
->>>>>> The current virtio early printk code in kernel expects that hypervisor will provide some mechanism generally a hypercall to support early printk. This patch-set does not break existing hypercall based early print support.
->>>>>>
->>>>>> This implementation adds:
->>>>>> 1. Early writeonly register named early_wr in virtio console's config space.
->>>>>> 2. Host feature flags namely VIRTIO_CONSOLE_F_EARLY_WRITE for telling guest about early-write capability in console device.
->>>>>>
->>>>>> Early write mechanism:
->>>>>> 1. When a guest wants to out some character, it has to simply write the character to early_wr register in config space of virtio console device.
->>>>>
->>>>> I won't nack this patch set, but I'll definitely express that I'm not happy with it.
->>>>>
->>>>> MMIO registers are handled by a different layer than the virtio console itself. After the virtio refactoring in QEMU, they will be completely separate drivers. So we'll be in a similar mess with early printk as we are on the s390-virtio machine, where early printk is done through hypercalls and thus we can't directly link it to the console output.
->>>>>
->>>>> I still don't see what the issue is with just implementing a small irq-less virtio driver for early printk.
->>>>
->>>> Well, this shouldn't be mmio-specific, but I kind of get what you mean.
->>>>
->>>> I consider this misnamed: it's an emergency write facility.  Linux may
->>>> use it for an early console,
->>>
->>> If Linux uses it for early console, you won't see any messages from before the virtio-console driver is initialized, because Linux thinks that it's all been printed out.
->>
->> If you can't support it, don't offer the feature.
->
-> Fair enough.
->
->>
->>>> but it's also useful for bringup and to
->>>> give a method of emitting errors like "the console ring is corrupt".
->>>>
->>>> A valid implementation may well be to only offer it with some magic
->>>> qemu developer-only commandline and dump it to stdout.
->>>
->>> Why implement it differently from other machines? There are facilities to call into firmware, so you could use that. There's the special Foundation model call that you could implement and reuse for this.
->>
->> Sure, for ARM.  We *have* a console device.  It's the logical place to
->> provide a simple write mechanism.  eg. consider bhyve on FreeBSD.
->
-> I don't quite see the point. The reason early printk works so well for x86 is that you have a UART at a predefined place.
->
->>
->>> I don't see why anything like this has to live in virtio-mmio. Oh, and it should default to off.
->>
->> virtio-console, not virtio-mmio.
->
-> How will it live in virtio-console? Virtio-console speaks virtio, not register values. If you put this into the config space you break the s390 virtio model.
+Hi all,
 
-This is a small limitation of QEMU VirtIO implementation and it can be
-easily fixed in QEMU VirtIO.
+Today's linux-next merge of the arm-soc tree got a conflict in
+arch/arm/mach-tegra/hotplug.c between commit da2265b130f6 ("ARM: tegra:
+remove tegra specific cpu_disable()") from the arm tree and commit
+7469688e832e ("ARM: tegra: Unify tegra{20,30,114}_init_early()") from the
+arm-soc tree.
 
-The VirtIO spec does not tell that VirtIO device specific config
-registers are to be emulated by VirtIO transport device (MMIO or PCI).
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
-As per VirtIO spec, the only register that should be emulated by
-transport device are the generic VirtIO registers and the VirtIO
-device specific config registers should be emulated by VirtIO device
-backend.
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
 
->
->
-> Alex
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-
---Anup
+diff --cc arch/arm/mach-tegra/hotplug.c
+index e8323bc,8da9f78..0000000
+--- a/arch/arm/mach-tegra/hotplug.c
++++ b/arch/arm/mach-tegra/hotplug.c
+@@@ -12,8 -11,10 +11,9 @@@
+  #include <linux/smp.h>
+  #include <linux/clk/tegra.h>
+  
+ -#include <asm/cacheflush.h>
+  #include <asm/smp_plat.h>
+  
++ #include "fuse.h"
+  #include "sleep.h"
+  
+  static void (*tegra_hotplug_shutdown)(void);
+@@@ -46,18 -47,22 +46,13 @@@ void __ref tegra_cpu_die(unsigned int c
+  	BUG();
+  }
+  
+- #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+- extern void tegra20_hotplug_shutdown(void);
+- void __init tegra20_hotplug_init(void)
+ -int tegra_cpu_disable(unsigned int cpu)
+ -{
+ -	/*
+ -	 * we don't allow CPU 0 to be shutdown (it is still too special
+ -	 * e.g. clock tick interrupts)
+ -	 */
+ -	return cpu == 0 ? -EPERM : 0;
+ -}
+ -
++ void __init tegra_hotplug_init(void)
+  {
+- 	tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
+- }
+- #endif
++ 	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU))
++ 		return;
+  
+- #ifdef CONFIG_ARCH_TEGRA_3x_SOC
+- extern void tegra30_hotplug_shutdown(void);
+- void __init tegra30_hotplug_init(void)
+- {
+- 	tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
++ 	if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC) && tegra_chip_id == TEGRA20)
++ 		tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
++ 	if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) && tegra_chip_id == TEGRA30)
++ 		tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
+  }
+- #endif
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130501/69c65567/attachment.sig>
