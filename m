@@ -1,57 +1,39 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Wed,  1 May 2013 19:59:57 +0300
-Subject: [PATCH] ARM: OMAP: RX-51: change probe order of touchscreen and panel
- SPI devices
-Message-ID: <1367427597-30060-1-git-send-email-aaro.koskinen@iki.fi>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Wed,  1 May 2013 10:00:53 -0700
+Subject: [PATCH] ARM: imx: Change type of ioremap function
+Message-ID: <1367427653-6068-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9fdca9df (spi: omap2-mcspi: convert to module_platform_driver)
-broke the SPI display/panel driver probe on RX-51/N900. The exact cause is
-not fully understood, but it seems to be related to the probe order. SPI
-communication to the panel driver (spi1.2) fails unless the touchscreen
-(spi1.0) has been probed/initialized before. When the omap2-mcspi driver
-was converted to a platform driver, it resulted in that the devices are
-probed immediately after the board registers them in the order they are
-listed in the board file.
+Commit cd024d4245b2bfbd824b911f11a9756d1d6c167d
+(ARM: 7704/1: mm: Use phys_addr_t properly for ioremap functions)
+changed the type of the ioremap functions to actually use phys_addr_t.
 
-Fix the issue by moving the touchscreen before the panel in the SPI
-device list.
+Switch the imx ioremap functions to use phys_addr_t to avoid warnings:
 
-The patch fixes the following failure:
+arch/arm/mach-imx/mm-imx3.c: In function 'imx31_init_early':
+arch/arm/mach-imx/mm-imx3.c:142:22: warning: assignment from incompatible pointer type [enabled by default]
+arch/arm/mach-imx/mm-imx3.c: In function 'imx35_init_early':
+arch/arm/mach-imx/mm-imx3.c:221:22: warning: assignment from incompatible pointer type [enabled by default]
 
-[    1.260955] acx565akm spi1.2: invalid display ID
-[    1.265899] panel-acx565akm display0: acx_panel_probe panel detect error
-[    1.273071] omapdss CORE error: driver probe failed: -19
-
-Tested-by: Sebastian Reichel <sre@debian.org>
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Cc: Pali Roh?r <pali.rohar@gmail.com>
-Cc: Joni Lapilainen <joni.lapilainen@gmail.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: stable at vger.kernel.org
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 ---
- arch/arm/mach-omap2/board-rx51-peripherals.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-imx/mm-imx3.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
-index 1a88467..18ca61e 100644
---- a/arch/arm/mach-omap2/board-rx51-peripherals.c
-+++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-@@ -73,11 +73,11 @@
- #define LIS302_IRQ1_GPIO 181
- #define LIS302_IRQ2_GPIO 180  /* Not yet in use */
+diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+index cefa047..f019f14 100644
+--- a/arch/arm/mach-imx/mm-imx3.c
++++ b/arch/arm/mach-imx/mm-imx3.c
+@@ -65,7 +65,7 @@ static void imx3_idle(void)
+ 		: "=r" (reg));
+ }
  
--/* list all spi devices here */
-+/* List all SPI devices here. Note that the list/probe order seems to matter! */
- enum {
- 	RX51_SPI_WL1251,
--	RX51_SPI_MIPID,		/* LCD panel */
- 	RX51_SPI_TSC2005,	/* Touch Controller */
-+	RX51_SPI_MIPID,		/* LCD panel */
- };
- 
- static struct wl12xx_platform_data wl1251_pdata;
+-static void __iomem *imx3_ioremap_caller(unsigned long phys_addr, size_t size,
++static void __iomem *imx3_ioremap_caller(phys_addr_t phys_addr, size_t size,
+ 					 unsigned int mtype, void *caller)
+ {
+ 	if (mtype == MT_DEVICE) {
 -- 
-1.7.10.4
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
