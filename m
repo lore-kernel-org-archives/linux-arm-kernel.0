@@ -1,39 +1,58 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 01 May 2013 10:44:31 -0400
-Subject: [PATCH 6/4] arm64: Move to generic sched_clock infrastructure
-In-Reply-To: <20130501091108.GB10984@arm.com>
-References: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
- <1367369675-13535-1-git-send-email-sboyd@codeaurora.org>
- <1367369675-13535-2-git-send-email-sboyd@codeaurora.org>
- <20130501091108.GB10984@arm.com>
-Message-ID: <51812A4F.7060400@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 May 2013 15:46:22 +0100
+Subject: [PATCH 0/2] Early printk support for virtio console devices.
+In-Reply-To: <CAAhSdy14ofVEdrfc2r3PqLFrTA9kvM+oBVWmXNSWBq2xTxMLiQ@mail.gmail.com>
+References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
+ <BA2076A6-0688-4E5C-85F9-A9CA8FD75782@suse.de>
+ <87obcyc9sh.fsf@rustcorp.com.au>
+ <336C59AA-D5D7-472E-A8DA-EEB413DD6C68@suse.de>
+ <CAAHg+Hj0tySbzUGnoFE9ybVYP291B-i8-Ck1EkwD57t8yG5wwg@mail.gmail.com>
+ <C52CCDD4-D8FB-4AD6-B83D-3B5251A7A0F5@suse.de>
+ <87sj27xxjr.fsf@rustcorp.com.au>
+ <CAAhSdy14ofVEdrfc2r3PqLFrTA9kvM+oBVWmXNSWBq2xTxMLiQ@mail.gmail.com>
+Message-ID: <20130501144622.GA24055@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/01/2013 05:11 AM, Catalin Marinas wrote:
-> On Wed, May 01, 2013 at 01:54:35AM +0100, Stephen Boyd wrote:
->> Use the generic sched_clock infrastructure instead of rolling our
->> own. This has the added benefit of fixing suspend/resume as
->> outlined in 6a4dae5 (ARM: 7565/1: sched: stop sched_clock()
->> during suspend, 2012-10-23) and correcting the timestamps when
->> the hardware returns a value instead of 0 upon the first read.
->>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On Wed, May 01, 2013 at 07:53:49AM +0100, Anup Patel wrote:
+> On Wed, May 1, 2013 at 7:37 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
+> > Alexander Graf <agraf@suse.de> writes:
+> >> There are not device specific registers in
+> >> virtio-console. Virtio-console lives behind a virtio bus which doesn't
+> >> know what these registers are.
+> >
+> > You're not going to make coherent arguments without reading that actual
+> > patch we're discussing.  And you're going to just waste everyone else's
+> > time.
+> >
+> >> Even if you shove it into config space,
+> >
+> > Which is what the patch does...
+> >
+> >> it'd be broken because config access happens without intercepts on
+> >> some platforms.
+> >
+> > But people keep assuming it, which is one reason virtio_ccw switched
+> > from passive lguest-style config to active.  Only lguest and the old kvm
+> > virtio use it, and lguest can change.
+> >
+> > An emergency output is a reasonable idea, and this is a reasonable
+> > implementation.  The question is practical: will it be used?  Because we
+> > don't implement reasonable ideas which aren't going to be used.
 > 
-> Looks ok.
+> We are already using it for Guest bring-up on APM ARM64 board using
+> KVMTOOL and so far it has been really helpful in debugging KVM ARM64
+> guest issues.
 > 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Also, this is a very useful debugging method for Guest bring-up on
+> other architectures supported by KVM and other Hypervisors that
+> support VirtIO.
 
-I built and ran this change and dependencies on top of Catalin's
-soc-armv8-model branch [1] and was able to verify that it fixed the printk
-timestamp jump.
+FWIW: I've hacked together a small set of patches allowing us to use the
+x86 ioport peripherals on arm/arm64 in kvmtool. This means you can use the
+8250 for earlyprintk on the latter, and even as the main console if you
+like since it has a device-tree binding.
 
-1.
-http://git.kernel.org/cgit/linux/kernel/git/cmarinas/linux-aarch64.git/log/?h=soc-armv8-model
+I'll post the patches as an RFC to the kvm list.
 
-Tested-by: Christopher Covington <cov@codeaurora.org>
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Will
