@@ -1,59 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 1 May 2013 17:36:09 +0200
-Subject: [PATCH 3/3] ARM: dts: Add MC13783 support for i.MX27 Phytec
- PCM038 module
-In-Reply-To: <1367405219-19078-3-git-send-email-shc_work@mail.ru>
-References: <1367405219-19078-1-git-send-email-shc_work@mail.ru>
- <1367405219-19078-3-git-send-email-shc_work@mail.ru>
-Message-ID: <20130501153609.GA31135@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 May 2013 16:38:28 +0100
+Subject: [PATCH v3] ARM: imx: replicate the diagnostic register of boot
+ cpu into secondary cores
+In-Reply-To: <5181357E.3090805@gmail.com>
+References: <1366948645-12060-1-git-send-email-shawn.guo@linaro.org>
+ <20130426132130.GE30858@mudshark.cambridge.arm.com>
+ <20130426134722.GA1943@S2101-09.ap.freescale.net>
+ <5181357E.3090805@gmail.com>
+Message-ID: <20130501153828.GC24055@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 01, 2013 at 02:46:59PM +0400, Alexander Shiyan wrote:
-> Added MC13783 node to imx27-phytec-phycore DT file.
+On Wed, May 01, 2013 at 04:32:14PM +0100, Dirk Behme wrote:
+> Am 26.04.2013 15:47, schrieb Shawn Guo:
+> > On Fri, Apr 26, 2013 at 02:21:30PM +0100, Will Deacon wrote:
+> >>> diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
+> >>> index a58c8b0..cd87970 100644
+> >>> --- a/arch/arm/mach-imx/headsmp.S
+> >>> +++ b/arch/arm/mach-imx/headsmp.S
+> >>> @@ -18,8 +18,20 @@
+> >>>   	.section ".text.head", "ax"
+> >>>
+> >>>   #ifdef CONFIG_SMP
+> >>> +diag_reg_offset:
+> >>> +	.word	g_diag_reg - .
+> >>> +
+> >>> +	.macro	set_diag_reg
+> >>> +	adr	r0, diag_reg_offset
+> >>> +	ldr	r1, [r0]
+> >>> +	add	r1, r1, r0		@ r1 = physical &g_diag_reg
+> >>> +	ldr	r0, [r1]
+> >>> +	mcr	p15, 0, r0, c15, c0, 1	@ write diagnostic register
+> >>> +	.endm
+> >>
+> >> Why not re-read the register directly, rather than mrc on the current core?
+> >
+> > I do not understand the comment.  What do you mean by "re-read"?  Read
+> > the register on secondary cores will only return us 0, as bootloader
+> > only sets up the register on cpu0.  The macro set_diag_reg only runs on
+> > secondary cores to copy cpu0's diagnostic bits.  I think it's safe on
+> > SMP.
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/boot/dts/imx27-phytec-phycore.dts | 92 ++++++++++++++++++++++++++++++
->  1 file changed, 92 insertions(+)
+> Any news on this?
 
-You can merge this with the previous patch.
+Well, I don't like copying the register value over from CPU0. I'd rather we
+orr'd in the bits we actually need, like we would in __v7_setup. Perhaps the
+code there should be factored out into arm_errata_xxxx asm macros, so
+platforms can invoke them if they need to without breaking non-secure boot
+for multi-platform kernels.
 
-> 
-> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore.dts b/arch/arm/boot/dts/imx27-phytec-phycore.dts
-> index b0e9372..5c4fea9 100644
-> --- a/arch/arm/boot/dts/imx27-phytec-phycore.dts
-> +++ b/arch/arm/boot/dts/imx27-phytec-phycore.dts
-> @@ -76,6 +76,98 @@
->  	fsl,spi-num-chipselects = <1>;
->  	cs-gpios = <&gpio4 28 0>;
->  	status = "okay";
-> +
-> +	pmic: mc13783 at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		compatible = "fsl,mc13783";
-> +		spi-max-frequency = <20000000>;
-> +		reg = <0>;
-> +		interrupt-parent = <&gpio2>;
-> +		interrupts = <23 0x4>;
-> +		fsl,mc13xxx-uses-adc;
-> +
-> +		regulators {
-> +			sw1a_reg: sw1a {
-> +				regulator-min-microvolt = <1200000>;
-> +				regulator-max-microvolt = <1200000>;
-> +				regulator-always-on;
-> +				regulator-boot-on;
-> +			};
-> +			sw1b_reg: sw1b {
-
-Please add a blank line after each node.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Will
