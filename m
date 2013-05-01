@@ -1,99 +1,87 @@
-From: tim@krieglstein.org (Tim Sander)
-Date: Thu, 2 May 2013 00:24:46 +0200
-Subject: Pinmuxing with devicetree (beaglebone)
-In-Reply-To: <CAN1soZzz=GRMrmj3rtBkxE74e0JZ4xewR=yVMUeMvp=6Yp34nQ@mail.gmail.com>
-References: <201304211143.50961.tim@krieglstein.org>
- <CAN1soZzz=GRMrmj3rtBkxE74e0JZ4xewR=yVMUeMvp=6Yp34nQ@mail.gmail.com>
-Message-ID: <201305020024.46922.tim@krieglstein.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 2 May 2013 07:35:05 +0900
+Subject: [PATCH v3 4/5] ARM: shmobile: BOCK-W: add VIN and ML86V7667
+ support
+In-Reply-To: <518135F9.9010509@cogentembedded.com>
+References: <201304232118.43686.sergei.shtylyov@cogentembedded.com>
+ <201304232132.52741.sergei.shtylyov@cogentembedded.com>
+ <517B06FA.3000303@cogentembedded.com>
+ <20130501090909.GA2562@verge.net.au>
+ <518135F9.9010509@cogentembedded.com>
+Message-ID: <20130501223501.GA6517@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haojian and Linux-Folks
-
-Thanks for your reply. This is just a short followup how i got it working. But
-as the 3.8.4 kernel on the beaglebone is having no ethernet connectivity i 
-went back to the 3.2 kernel without device tree support for the time beeing.
-So i didn't spent to much time on the device tree stuff.
-> > I am currently trying to get pinmuxing working on a beaglebone board with
-> > an offtree driver. This is for a custom handbuild hardware so i guess
-> > there is no point in bringing this mainline.
-> > 
-> > While this is havyly patched 3.8.4 version running over here i think the
-> > pinmux infrastructure is the new standard way. At least there is a
-> > pinctrl/44e10800.pinmux directory in debugfs?
-> > 
-> > My last aproach was using the devicetree but beeing new to this
-> > devicetree stuff i just got stuck:
-> > http://comments.gmane.org/gmane.linux.ports.arm.kernel/231204
-> > 
-> > Now i tried use the way it is described in Documentation/pinctrl.txt but
-> > still there are the includes missing: #include
-> > <linux/pinctrl/consumer.h>.
-> > 
-> > Also while there is a /sys/kernel/debug/pinctrl/44e10800.pinmux in
-> > debugfs i found that not so intuitive as the omap_mux which disappeared.
-> > Also i didn't find any documentation for this debugfs stuff.
-> > 
-> > So what is the recommended way to get this stupid pinmuxing going. In pre
-> > devicetree days one would just pick the mux.h include of the platform and
-> > initialized the muxers which was pretty straight forward. Now with device
-> > tree its much more complicated. No proper syntax checking as with the c
-> > definitions and no documentation how to get this magic stuff working
-> > :-(.
-> > 
-> > The whole stuff is build by a ptxdist (a embedded buildsystem) and can be
-> > found over here:
-> > https://gitorious.org/ptxdist-beaglebone/ptxdist-beaglebone
+On Wed, May 01, 2013 at 07:34:17PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> "pins" node could dump the register configuration if it's pinctrl-single
-> driver.
+> On 01-05-2013 13:09, Simon Horman wrote:
 > 
-> You can dump this to check whether the right pinmux is set.
+> >>On 04/23/2013 09:32 PM, Sergei Shtylyov wrote:
 > 
-> I checked your patch in the link.  It seems that you only write the pinmux
-> configuration without using them.
+> >>>From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 > 
-> Don't forget to append this in your DTS file.
->      pinctrl-names = "default";
->        pinctrl-0 = <&wind_pins>;
-Thanks for the pointers, but somehow these fragments didn't work. What worked 
-was writing it directly into the included dtb at the proper place eg.:
+> >>>Add ML86V7667 platform devices on BOCK-W board, configure VIN0/1 pins, and
+> >>>register VIN0/1 devices with the ML86V7667 specific platform data.
+> 
+> >>>Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> >>>[Sergei: some macro/comment cleanup; updated the copyrights, removed duplicate
+> >>>#include, annotated all platform data as '__initdata'.]
+> >>>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> >>>---
+> >>>Changes since version 2:
+> >>>- removed duplicate #include <linux/pinctrl/machine.h>;
+> >>>- annotated all platform data as '__initdata' since they're kmemdup()'ed while
+> >>>   registering the platform devices anyway;
+> >>>- resolved rejects, refreshed the patch.
+> 
+> >>>  arch/arm/mach-shmobile/board-bockw.c |   39 +++++++++++++++++++++++++++++++++++
+> >>>  1 file changed, 39 insertions(+)
+> 
+> >>>Index: renesas/arch/arm/mach-shmobile/board-bockw.c
+> >>>===================================================================
+> >>>--- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
+> >>>+++ renesas/arch/arm/mach-shmobile/board-bockw.c
+> 
+> >>[...]
+> 
+> >>>@@ -80,6 +101,16 @@ static const struct pinctrl_map bockw_pi
+> >>>  				  "sdhi0_data4", "sdhi0"),
+> >>>  	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
+> >>>  				  "sdhi0_wp", "sdhi0"),
+> >>>+	/* VIN0 */
+> >>>+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.0", "pfc-r8a7778",
+> >>>+				  "vin0_clk", "vin0"),
+> >>>+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.0", "pfc-r8a7778",
+> >>>+				  "vin0_data8", "vin0"),
+> >>>+	/* VIN1 */
+> >>>+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.1", "pfc-r8a7778",
+> >>>+				  "vin1_clk", "vin1"),
+> >>>+	PIN_MAP_MUX_GROUP_DEFAULT("rcar_vin.1", "pfc-r8a7778",
+> >>>+				  "vin1_data8", "vin1"),
+> >>>  };
+> 
+> >>     It turned out that VIN1 signal VI1_CLK conflicts with Ether
+> >>signal ETH_REF_CLK.
+> >>So I'm a bit at a loss here: whether I should totally remove VIN1
+> >>device if I'm going
+> >>to add Ether device, or add a BOCK-W specific submenu to Kconfig, or
+> >>add driver
+> >>specific #ifdef's in the code to disable VIN1 if sh_eth driver is
+> >>enabled?...
+> 
+> >My preference, in order is:
+> 
+> >* Remove VIN1 (is it used?)
+> 
+>    At least video decoders are connected to both VIN0 and VIN1.
+> 
+> >* Kconfig-foo
+> >* #ifdef nastiness
+> 
+>    I took the 3rd approach but luckily it was possible without
+> #ifdef, using *if* (!IS_ENABLED(CONFIG_SH_ETH)) statement. Working
+> patch posted on Monday.
 
-   am33xx_pinmux: pinmux at 44e10800 {
-      pinctrl-names = "default";
-      pinctrl-0 = <&userleds_pins>;
-
-      userled_pins: pinmux_userled_pins {
-         pinctrl-single,pins = <
-            /* Tims wind pins */
-            0x000  0x27      /* gpmc_ad0 = ad0 = P8-25 = gpio1_0|input, no pullup, gpio mux  */
-            0x004  0x27      /* gpmc_ad1 = ad1 = P8-24 = gpio1_1|input, no pullup, gpio mux  */
-            0x008  0x27      /* gpmc_ad2 = ad2 = P8-5 = gpio1_2|input, no pullup, gpio mux  */
-            0x00c  0x27      /* gpmc_ad3 = ad3 = P8-6 = gpio1_3|input, no pullup, gpio mux  */
-            0x038  0x26      /* gpmc_ad14  = pru_gpio_in14 = P8_16 = gpio1.14|input, no pullup, pru0 gpio 14 */
-
-            0x54 0x7 /* gpmc_a5.gpio1_21, OUTPUT | MODE7 */
-            0x58 0x17   /* gpmc_a6.gpio1_22, OUTPUT_PULLUP | MODE7 */
-            0x5c 0x7 /* gpmc_a7.gpio1_23, OUTPUT | MODE7 */
-            0x60 0x17   /* gpmc_a8.gpio1_24, OUTPUT_PULLUP | MODE7 */
-         >;
-      };
-      i2c0_pins: pinmux_i2c0_pins {
-         pinctrl-single,pins = <
-            0x188 0x70  /* i2c0_sda, SLEWCTRL_SLOW | INPUT_PULLUP | MODE0 */
-            0x18c 0x70  /* i2c0_scl, SLEWCTRL_SLOW | INPUT_PULLUP | MODE0 */
-         >;
-      };
-      i2c2_pins: pinmux_i2c2_pins {
-         pinctrl-single,pins = <
-            0x178 0x73  /* uart1_ctsn.i2c2_sda, SLEWCTRL_SLOW | INPUT_PULLUP | MODE3 */
-            0x17c 0x73  /* uart1_rtsn.i2c2_scl, SLEWCTRL_SLOW | INPUT_PULLUP | MODE3 */
-         >;
-      };
-   };
-
-Also one thing i didn't know is that the dtb can also reverse compile so that the result can be seen.
-This is especially handy with these fragment and include stuff.
-
-Best regards
-Tim
+Thanks.
