@@ -1,55 +1,46 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Wed, 1 May 2013 14:04:03 +0100
-Subject: [RFC PATCH 7/9] ARM64: mm: HugeTLB support.
-In-Reply-To: <20130501114238.GG22796@mudshark.cambridge.arm.com>
-References: <1367339448-21727-1-git-send-email-steve.capper@linaro.org>
- <1367339448-21727-8-git-send-email-steve.capper@linaro.org>
- <20130501114238.GG22796@mudshark.cambridge.arm.com>
-Message-ID: <20130501130401.GA21923@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 1 May 2013 08:06:56 -0500
+Subject: [PATCH] ARM: smp: call platform's cpu_die in ipi_cpu_stop
+In-Reply-To: <20130418190923.GE14496@n2100.arm.linux.org.uk>
+References: <1365251824-4852-1-git-send-email-kevin@bracey.fi>
+ <1365251824-4852-2-git-send-email-kevin@bracey.fi>
+ <20130418171801.GC14496@n2100.arm.linux.org.uk>
+ <20130418182534.GD14496@n2100.arm.linux.org.uk>
+ <20130418190923.GE14496@n2100.arm.linux.org.uk>
+Message-ID: <CAL_JsqLFEF9o7SSCcU5isxRdKA+fQNkqOmAncOmtzeMW7KbMrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 01, 2013 at 12:42:38PM +0100, Will Deacon wrote:
-> Hi Steve,
-> 
-> On Tue, Apr 30, 2013 at 05:30:46PM +0100, Steve Capper wrote:
-> > Add huge page support to ARM64, different huge page sizes are
-> > supported depending on the size of normal pages:
-> > 
-> > PAGE_SIZE is 4K:
-> >    2MB - (pmds) these can be allocated at any time.
-> > 1024MB - (puds) usually allocated on bootup with the command line
-> >          with something like: hugepagesz=1G hugepages=6
-> > 
-> > PAGE_SIZE is 64K:
-> >  512MB - (pmds), usually allocated on bootup via command line.
-> 
-> [...]
-> 
-> > diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> > index 75fd13d..c3cac68 100644
-> > --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> > +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> > @@ -53,6 +53,7 @@
-> >  #define PTE_TYPE_MASK		(_AT(pteval_t, 3) << 0)
-> >  #define PTE_TYPE_FAULT		(_AT(pteval_t, 0) << 0)
-> >  #define PTE_TYPE_PAGE		(_AT(pteval_t, 3) << 0)
-> > +#define PTE_TYPE_HUGEPAGE	(_AT(pmdval_t, 1) << 0)
-> 
-> This breaks PROT_NONE mappings, where you get:
-> 
-> 	pte = pte_mkhuge(pte_modify(pte, newprot));
-> 
-> The pte_modify will clear the valid bit and set the prot_none bit (in order
-> to create a present, faulting entry) but then your pte_mkhuge will come in
-> and clobber that with a valid block entry.
+On Thu, Apr 18, 2013 at 2:09 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Apr 18, 2013 at 07:25:34PM +0100, Russell King - ARM Linux wrote:
+>> On Thu, Apr 18, 2013 at 06:18:01PM +0100, Russell King - ARM Linux wrote:
+>> > On Sat, Apr 06, 2013 at 03:37:04PM +0300, Kevin Bracey wrote:
 
-Thanks Will, I'll re-work the pte_mkhuge/pte_huge logic and get a PROT_NONE
-test case coded up.
+[...]
 
-Cheers,
--- 
-Steve
+>> Now, with this patch applied, we guarantee that we push out any data
+>> that matters from the dying CPU before platform_cpu_kill() is called.
+>> That should mean that shmobile can remove that whole cpu_dead thing.
+>>
+>> I've tested this on OMAP, and it appears to work from a simple test of
+>> CPU hotplug.  This patch(set) also kills the cpu_disable() that tegra
+>> has which is just a copy of the generic version.
+>
+> Okay, last version for tonight, with additional comments too, and a
+> hole plugged if the powering down is done by the platform via
+> cpu_die().
+>
+>  arch/arm/kernel/smp.c               |   42 +++++++++++++++++++++++++++++++---
+>  arch/arm/mach-exynos/hotplug.c      |    1 -
+>  arch/arm/mach-highbank/hotplug.c    |    4 ---
 
-> 
-> Will
+Looks like this just landed in -next and it breaks highbank build.
+Run-time will also be broken. See the last commit to this file in
+final 3.9 which will also conflict with this one. The problem is that
+highbank_set_cpu_jump calls outer cache functions which take a
+spinlock and pollute the L1 cache. This all goes away once PCSI
+support goes in, but for now we need another spot to clear the jump
+address or just drop the highbank change.
+
+Rob
