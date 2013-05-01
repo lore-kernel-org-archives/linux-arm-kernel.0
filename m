@@ -1,52 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 May 2013 16:38:28 +0100
-Subject: [PATCH v3] ARM: imx: replicate the diagnostic register of boot
- cpu into secondary cores
-In-Reply-To: <5181357E.3090805@gmail.com>
-References: <1366948645-12060-1-git-send-email-shawn.guo@linaro.org>
- <20130426132130.GE30858@mudshark.cambridge.arm.com>
- <20130426134722.GA1943@S2101-09.ap.freescale.net>
- <5181357E.3090805@gmail.com>
-Message-ID: <20130501153828.GC24055@mudshark.cambridge.arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 1 May 2013 08:39:35 -0700
+Subject: [PATCH 1/7] tty: xuartps: Sort #includes alphabetically
+In-Reply-To: <20130501002321.GB7435@kroah.com>
+References: <1367366284-28304-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1367366284-28304-2-git-send-email-soren.brinkmann@xilinx.com>
+ <20130501000048.GA1840@kroah.com>
+ <cbd8c55c-066b-4396-9a4b-97d58a93b573@DB8EHSMHS005.ehs.local>
+ <20130501002321.GB7435@kroah.com>
+Message-ID: <79ff34b1-0494-4118-a60d-cd5b536d3daa@VA3EHSMHS006.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 01, 2013 at 04:32:14PM +0100, Dirk Behme wrote:
-> Am 26.04.2013 15:47, schrieb Shawn Guo:
-> > On Fri, Apr 26, 2013 at 02:21:30PM +0100, Will Deacon wrote:
-> >>> diff --git a/arch/arm/mach-imx/headsmp.S b/arch/arm/mach-imx/headsmp.S
-> >>> index a58c8b0..cd87970 100644
-> >>> --- a/arch/arm/mach-imx/headsmp.S
-> >>> +++ b/arch/arm/mach-imx/headsmp.S
-> >>> @@ -18,8 +18,20 @@
-> >>>   	.section ".text.head", "ax"
-> >>>
-> >>>   #ifdef CONFIG_SMP
-> >>> +diag_reg_offset:
-> >>> +	.word	g_diag_reg - .
-> >>> +
-> >>> +	.macro	set_diag_reg
-> >>> +	adr	r0, diag_reg_offset
-> >>> +	ldr	r1, [r0]
-> >>> +	add	r1, r1, r0		@ r1 = physical &g_diag_reg
-> >>> +	ldr	r0, [r1]
-> >>> +	mcr	p15, 0, r0, c15, c0, 1	@ write diagnostic register
-> >>> +	.endm
-> >>
-> >> Why not re-read the register directly, rather than mrc on the current core?
-> >
-> > I do not understand the comment.  What do you mean by "re-read"?  Read
-> > the register on secondary cores will only return us 0, as bootloader
-> > only sets up the register on cpu0.  The macro set_diag_reg only runs on
-> > secondary cores to copy cpu0's diagnostic bits.  I think it's safe on
-> > SMP.
+On Tue, Apr 30, 2013 at 05:23:21PM -0700, Greg Kroah-Hartman wrote:
+> On Tue, Apr 30, 2013 at 05:05:40PM -0700, S?ren Brinkmann wrote:
+> > On Tue, Apr 30, 2013 at 05:00:48PM -0700, Greg Kroah-Hartman wrote:
+> > > On Tue, Apr 30, 2013 at 04:57:58PM -0700, Soren Brinkmann wrote:
+> > > > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > > > CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > > > CC: Jiri Slaby <jslaby@suse.cz>
+> > > > CC: linux-serial at vger.kernel.org
+> > > 
+> > > Why would you need/want to do this?
+> > I often come across duplicated includes. Having some kind of order helps
+> > avoiding that, imho.
 > 
-> Any news on this?
+> We have a tool to handle duplicated includes, no need to put them in
+> sorted order for them to be detected.
+During conflict resolution, I find it easier when there is some order.
+Anyway, consider it dropped.
 
-Well, I don't like copying the register value over from CPU0. I'd rather we
-orr'd in the bits we actually need, like we would in __v7_setup. Perhaps the
-code there should be factored out into arm_errata_xxxx asm macros, so
-platforms can invoke them if they need to without breaking non-secure boot
-for multi-platform kernels.
-
-Will
+	S?ren
