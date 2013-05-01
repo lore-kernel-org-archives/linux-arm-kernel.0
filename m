@@ -1,122 +1,58 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed,  1 May 2013 14:46:59 +0400
-Subject: [PATCH 3/3] ARM: dts: Add MC13783 support for i.MX27 Phytec PCM038
- module
-In-Reply-To: <1367405219-19078-1-git-send-email-shc_work@mail.ru>
-References: <1367405219-19078-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1367405219-19078-3-git-send-email-shc_work@mail.ru>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 May 2013 12:05:34 +0100
+Subject: [RFC PATCH 5/9] ARM64: mm: Add support for flushing huge pages.
+In-Reply-To: <1367339448-21727-6-git-send-email-steve.capper@linaro.org>
+References: <1367339448-21727-1-git-send-email-steve.capper@linaro.org>
+ <1367339448-21727-6-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130501110534.GD22796@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added MC13783 node to imx27-phytec-phycore DT file.
+Hi Steve,
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx27-phytec-phycore.dts | 92 ++++++++++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
+On Tue, Apr 30, 2013 at 05:30:44PM +0100, Steve Capper wrote:
+> The code to flush the dcache of a dirty page, __flush_dcache_page,
+> will only flush the head of a HugeTLB/THP page.
+> 
+> This patch adjusts __flush_dcache_page such that the order of the
+> compound page is used to determine the size of area to flush.
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> ---
+>  arch/arm64/mm/flush.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+> index 88611c3..71c182d 100644
+> --- a/arch/arm64/mm/flush.c
+> +++ b/arch/arm64/mm/flush.c
+> @@ -72,7 +72,8 @@ void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
+>  
+>  void __flush_dcache_page(struct page *page)
+>  {
+> -	__flush_dcache_area(page_address(page), PAGE_SIZE);
+> +	size_t page_size = PAGE_SIZE << compound_order(page);
+> +	__flush_dcache_area(page_address(page), page_size);
+>  }
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore.dts b/arch/arm/boot/dts/imx27-phytec-phycore.dts
-index b0e9372..5c4fea9 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore.dts
-@@ -76,6 +76,98 @@
- 	fsl,spi-num-chipselects = <1>;
- 	cs-gpios = <&gpio4 28 0>;
- 	status = "okay";
-+
-+	pmic: mc13783 at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "fsl,mc13783";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <23 0x4>;
-+		fsl,mc13xxx-uses-adc;
-+
-+		regulators {
-+			sw1a_reg: sw1a {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+			sw1b_reg: sw1b {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1200000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+			sw2a_reg: sw2a {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+			sw2b_reg: sw2b {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+			sw3_reg: sw3 {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5000000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+			vaudio_reg: vaudio {
-+				regulator-min-microvolt = <2775000>;
-+				regulator-max-microvolt = <2775000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+			violo_reg: violo {
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+			viohi_reg: viohi {
-+				regulator-min-microvolt = <2775000>;
-+				regulator-max-microvolt = <2775000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+			vgen_reg: vgen {
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <1500000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+			vcam_reg: vcam {
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+			};
-+			vrf1_reg: vrf1 {
-+				regulator-min-microvolt = <2775000>;
-+				regulator-max-microvolt = <2775000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+			vrf2_reg: vrf2 {
-+				regulator-min-microvolt = <2775000>;
-+				regulator-max-microvolt = <2775000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+			vmmc1_reg: vmmc1 {
-+				regulator-min-microvolt = <1600000>;
-+				regulator-max-microvolt = <3000000>;
-+			};
-+			gpo1_reg: gpo1 {
-+			};
-+			pwgt1spi_reg: pwgt1spi {
-+			};
-+		};
-+	};
- };
- 
- &nfc {
--- 
-1.8.1.5
+This penalises flush_dcache_page, while it might only be required for
+__sync_icache_dcache (called when installing executable ptes).
+
+Now, the job of flush_dcache_page is to deal with D-side aliases between
+concurrent user and kernel mappings. On arm64, D-side aliasing is not a
+problem so in theory flush_dcache_page could be a nop (well, a clear_bit,
+but close enough).
+
+The reason that flush_dcache_page *isn't* currently a nop, is because we
+have harvard caches, so if we end up in a situation where the kernel is
+writing executable text to a page which is also mapped into userspace (i.e.
+there won't be a subsequent call to set_pte), then the user will execute
+junk if we don't flush/invalidate things here.
+
+This might be overkill. I can't think of a scenario where the above is true,
+but I'm no mm expert, so it would be great if somebody else could chime in
+to confirm/rubbish out suspicions...
+
+Cheers,
+
+Will
