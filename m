@@ -1,79 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 May 2013 20:52:43 +0100
-Subject: [PATCH] ARM: OMAP-USB: Fix possible memory leak
-In-Reply-To: <20130502162433.GA10016@kahuna>
-References: <1367510596-27780-1-git-send-email-shc_work@mail.ru>
- <20130502162433.GA10016@kahuna>
-Message-ID: <20130502195243.GE21614@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 2 May 2013 21:53:19 +0200
+Subject: [PATCH, RFC 20/22] media: coda: select GENERIC_ALLOCATOR
+In-Reply-To: <1367515255.447627800@f375.mail.ru>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-21-git-send-email-arnd@arndb.de>
+ <1367515255.447627800@f375.mail.ru>
+Message-ID: <201305022153.19518.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 11:24:33AM -0500, Nishanth Menon wrote:
-> On 20:03-20130502, Alexander Shiyan wrote:
+On Thursday 02 May 2013, Alexander Shiyan wrote:
+> > The coda driver uses the generic allocator to get at the
+> > "iram" memory, so add the necessary dependency to avoid:
 > > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
-> >  arch/arm/mach-omap2/usb-host.c | 21 +++++++++++++++++----
-> >  1 file changed, 17 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
-> > index aa27d7f..8d17a0d 100644
-> > --- a/arch/arm/mach-omap2/usb-host.c
-> > +++ b/arch/arm/mach-omap2/usb-host.c
-> > @@ -570,8 +570,10 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
-> >  	supplies->dev_name = dev_id;
-> >  
-> >  	reg_data = kzalloc(sizeof(*reg_data), GFP_KERNEL);
-> > -	if (!reg_data)
-> > +	if (!reg_data) {
-> > +		kfree(supplies);
-> >  		return -ENOMEM;
-> > +	}
-> >  
-> >  	reg_data->constraints.valid_ops_mask = REGULATOR_CHANGE_STATUS;
-> >  	reg_data->consumer_supplies = supplies;
-> > @@ -579,8 +581,11 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
-> >  
-> >  	config = kmemdup(&hsusb_reg_config, sizeof(hsusb_reg_config),
-> >  			GFP_KERNEL);
-> > -	if (!config)
-> > +	if (!config) {
-> > +		kfree(supplies);
-> > +		kfree(reg_data);
-> >  		return -ENOMEM;
-> > +	}
-> >  
-> >  	config->supply_name = name;
-> >  	config->gpio = gpio;
-> > @@ -589,17 +594,25 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
-> >  
-> >  	/* create a regulator device */
-> >  	pdev = kzalloc(sizeof(*pdev), GFP_KERNEL);
-> > -	if (!pdev)
-> > +	if (!pdev) {
-> > +		kfree(supplies);
-> > +		kfree(reg_data);
-> > +		kfree(config);
-> >  		return -ENOMEM;
-> > +	}
-> >  
-> >  	pdev->id = PLATFORM_DEVID_AUTO;
-> >  	pdev->name = reg_name;
-> >  	pdev->dev.platform_data = config;
-> >  
-> >  	ret = platform_device_register(pdev);
-> > -	if (ret)
-> > +	if (ret) {
-> >  		pr_err("%s: Failed registering regulator %s for %s\n",
-> >  				__func__, name, dev_id);
-> > +		kfree(supplies);
-> > +		kfree(reg_data);
-> > +		kfree(config);
-> > +	}
+
+> > diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+> > index 0494d27..4608d03 100644
+> > --- a/drivers/media/platform/Kconfig
+> > +++ b/drivers/media/platform/Kconfig
+> > @@ -145,6 +145,7 @@ config VIDEO_CODA
+> >       depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MXC
+> >       select VIDEOBUF2_DMA_CONTIG
+> >       select V4L2_MEM2MEM_DEV
+> > +     select GENERIC_ALLOCATOR
+> >       ---help---
+> >          Coda is a range of video codec IPs that supports
+> >          H.264, MPEG-4, and other video formats.
 > 
-> Might be better to switch to devm_XXX managed functions?
+> Again?
+> 
 
-Oh god no.  Stop this madness right now.  Never kmalloc memory for
-platform devices.  EVER.
+Ah, now I remember where I saw this before -- you sent the same patch, and
+Fabio commented that Shawn had already queued up a different solution.
 
-There's an API provided to dynamically create platform devices.  Use it!
+Unfortunately, linux-next as of today is still broken. Shawn, did I
+miss a pull request from you?
+
+	Arnd
