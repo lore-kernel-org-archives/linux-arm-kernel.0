@@ -1,37 +1,41 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Thu, 2 May 2013 16:59:24 +0530
-Subject: [PATCH 3/5] ARM: ux500: Stop passing DMA platform data though
- AUXDATA
-In-Reply-To: <1367336497-10650-3-git-send-email-lee.jones@linaro.org>
-References: <1367336497-10650-1-git-send-email-lee.jones@linaro.org>
- <1367336497-10650-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130502112923.GA22739@bnru10>
+From: alonid@stratoscale.com (Dan Aloni)
+Date: Thu,  2 May 2013 14:52:29 +0300
+Subject: [PATCH] Move the EM_AARCH64 definition to uapi/linux/elf-em.txt
+Message-ID: <1367495549-6293-1-git-send-email-alonid@stratoscale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 30, 2013 at 17:41:35 +0200, Lee Jones wrote:
-> The DMA platform data is now empty due to some recent refactoring,
-> so there is no longer a requirement to pass it though.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/mach-ux500/cpu-db8500.c |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-> index a2c83c2..2b6cbde 100644
-> --- a/arch/arm/mach-ux500/cpu-db8500.c
-> +++ b/arch/arm/mach-ux500/cpu-db8500.c
-> @@ -264,8 +264,7 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
->  	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80125000,
->  		"ux500-msp-i2s.3", &msp3_platform_data),
->  	/* Requires clock name bindings and channel address lookup table. */
-> -	OF_DEV_AUXDATA("stericsson,db8500-dma40", 0x801C0000,
-> -		       "dma40.0", &dma40_plat_data),
-> +	OF_DEV_AUXDATA("stericsson,db8500-dma40", 0x801C0000, "dma40.0", NULL),
->  	{},
->  };
+Signed-off-by: Dan Aloni <alonid@stratoscale.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/include/asm/elf.h |    2 --
+ include/uapi/linux/elf-em.h  |    1 +
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
-Acked-by:srinidhi kasagar <srinidhi.kasagar@stericsson.com>
-
-srinidhi 
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index fe32c0e..b3da1c1 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -33,8 +33,6 @@ typedef unsigned long elf_greg_t;
+ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+ typedef struct user_fpsimd_state elf_fpregset_t;
+ 
+-#define EM_AARCH64		183
+-
+ /*
+  * AArch64 static relocation types.
+  */
+diff --git a/include/uapi/linux/elf-em.h b/include/uapi/linux/elf-em.h
+index 8e2b7ba..bc946e9 100644
+--- a/include/uapi/linux/elf-em.h
++++ b/include/uapi/linux/elf-em.h
+@@ -34,6 +34,7 @@
+ #define EM_MN10300	89	/* Panasonic/MEI MN10300, AM33 */
+ #define EM_BLACKFIN     106     /* ADI Blackfin Processor */
+ #define EM_TI_C6000	140	/* TI C6X DSPs */
++#define EM_AARCH64	183	/* ARM 64 bit */
+ #define EM_FRV		0x5441	/* Fujitsu FR-V */
+ #define EM_AVR32	0x18ad	/* Atmel AVR32 */
+ 
+-- 
+1.7.10.4
