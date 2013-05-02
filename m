@@ -1,36 +1,46 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 2 May 2013 18:20:32 +0100
-Subject: [PATCH v10 0/2] (arm-soc for v3.10) arm: introduce
- psci_smp_ops
-In-Reply-To: <20130502171516.GA3040@mudshark.cambridge.arm.com>
-References: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1305021811560.5398@kaball.uk.xensource.com>
- <20130502171516.GA3040@mudshark.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1305021816490.5398@kaball.uk.xensource.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Thu, 02 May 2013 21:20:55 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSCwgUkZDIDIwLzIyXSBtZWRpYTogY29kYTogc2VsZWN0IEdF?=
+ =?UTF-8?B?TkVSSUNfQUxMT0NBVE9S?=
+In-Reply-To: <1367507786-505303-21-git-send-email-arnd@arndb.de>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-21-git-send-email-arnd@arndb.de>
+Message-ID: <1367515255.447627800@f375.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 May 2013, Will Deacon wrote:
-> Hi Stefano,
+> The coda driver uses the generic allocator to get at the
+> "iram" memory, so add the necessary dependency to avoid:
 > 
-> On Thu, May 02, 2013 at 06:12:12PM +0100, Stefano Stabellini wrote:
-> > ping
+> drivers/built-in.o: In function `coda_remove':
+>  :(.text+0x2ab680): undefined reference to `gen_pool_free'
+> drivers/built-in.o: In function `coda_probe':
+> :(.text+0x2ad168): undefined reference to `of_get_named_gen_pool'
+> :(.text+0x2ad188): undefined reference to `dev_get_gen_pool'
+> :(.text+0x2ad220): undefined reference to `gen_pool_alloc'
+> :(.text+0x2ad2ec): undefined reference to `gen_pool_virt_to_phys'
 > 
-> Is this a ping to have this pulled into Russell's tree?
-
-I thought that we agreed that the patches should go via the arm-soc
-tree, after Russell acks them.
-
-The ping is for Russell to ack them and Arnd to merge them.
-
-
-> If so, might be
-> worth sending a pull request to linux+pull at arm.linux.org.uk.
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/media/platform/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> Has this been in -next?
+> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+> index 0494d27..4608d03 100644
+> --- a/drivers/media/platform/Kconfig
+> +++ b/drivers/media/platform/Kconfig
+> @@ -145,6 +145,7 @@ config VIDEO_CODA
+>  	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MXC
+>  	select VIDEOBUF2_DMA_CONTIG
+>  	select V4L2_MEM2MEM_DEV
+> +	select GENERIC_ALLOCATOR
+>  	---help---
+>  	   Coda is a range of video codec IPs that supports
+>  	   H.264, MPEG-4, and other video formats.
 
-Yes they have, because I temporarily added them to my branch in
-linux-next.
-In fact Stephen found and solved a merge conflict here:
+Again?
 
-http://marc.info/?l=linux-arm-kernel&m=136722292031420&w=2
+---
