@@ -1,32 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 May 2013 21:12:42 +0200
-Subject: [PATCH, RFC 16/22] USB: UHCI: clarify Kconfig dependencies
-In-Reply-To: <Pine.LNX.4.44L0.1305021423450.1436-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1305021423450.1436-100000@iolanthe.rowland.org>
-Message-ID: <201305022112.42583.arnd@arndb.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 2 May 2013 15:19:34 -0400
+Subject: [PATCH 0/3] ARM: dove: prepare and move to orion irqchip driver
+In-Reply-To: <1367519140-19716-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1367519140-19716-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130502191934.GH31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 May 2013, Alan Stern wrote:
-> On Thu, 2 May 2013, Arnd Bergmann wrote:
+On Thu, May 02, 2013 at 08:25:37PM +0200, Sebastian Hesselbarth wrote:
+> This patch set moves Dove to the recently introduced irqchip driver
+> for Marvell Orion SoCs. First, init code for timer and mv643xx_eth
+> is added to prepare legacy non-DT drivers for virtual irqs provided by
+> irqchip drivers. Then DT enabled boards for Dove are moved to the
+> orion irqchip driver.
 > 
-> > > What do you think of my patch as compared to yours? 
-> > 
-> > I think in the end it comes down to the question where you want to
-> > head with your driver. The way I did my version was going towards
-> > making it similar to EHCI, with stand-alone bus glue drivers
-> > and a core that is just a library module but does not register
-> > a device_driver by itself.
-> > 
-> > Given that there are just three bus glues from UHCI, and at most
-> > two of them enabled at the same time, I don't see a direct need
-> > for UHCI to go down the same route as EHCI. If you want to just
-> > leave this driver alone, your patch is simpler and has the same
-> > effect in the end. Otherwise I think my patch avoids changing it
-> > all again once the driver gets reworked.
+> Note: This patch set depends on irqchip driver for Orion SoCs patch.
 > 
-> Okay then, I'll submit my patch to Greg after the merge window closes.
+> Sebastian Hesselbarth (3):
+>   ARM: dove: add DT parsing for legacy mv643xx_eth
+>   ARM: dove: add DT parsing for legacy timer
+>   ARM: dove: move DT boards to orion irqchip driver
+> 
+>  arch/arm/boot/dts/dove.dtsi   |   18 ++++++++-
 
-Ok, thanks!
+In the next version, please send the dtsi changes as separate patches.
+This will reduce merge conflicts on our end.
 
-	Arnd
+Also, and I'll note this on the other thread as well, please put the
+drivers/irqchip patch in the same series as this so the dependency is
+clear.
+
+In it's current state, your driver patch can only conflict with other
+work in drivers/irqchip/{Makefile,Kconfig}.  This easy for us.  So we
+should try to get an Ack from the irqchip folks to keep that patch with
+this series and prevent a cross-tree dependency.
+
+thx,
+
+Jason.
+
+>  arch/arm/mach-dove/Kconfig    |    1 +
+>  arch/arm/mach-dove/Makefile   |    4 +-
+>  arch/arm/mach-dove/board-dt.c |   77 ++++++++++++++++++++++++++++++++++++-----
+>  4 files changed, 87 insertions(+), 13 deletions(-)
+> ---
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Rob Landley <rob@landley.net>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Cc: Jean-Francois Moine <moinejf@free.fr>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: linux-doc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> -- 
+> 1.7.2.5
+> 
