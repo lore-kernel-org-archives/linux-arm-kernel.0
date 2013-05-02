@@ -1,44 +1,65 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 May 2013 19:54:49 +0100
-Subject: Latest build results - errors/warnings - lots of them
-In-Reply-To: <20130502153834.GR28721@atomide.com>
-References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
- <20130502082218.GA21614@n2100.arm.linux.org.uk>
- <20130502153834.GR28721@atomide.com>
-Message-ID: <20130502185449.GD21614@n2100.arm.linux.org.uk>
+Date: Thu, 2 May 2013 19:56:23 +0100
+Subject: [PATCH] irqchip: add support for Marvell Orion SoCs
+In-Reply-To: <5182B65C.8030000@gmail.com>
+References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <5182B18C.4080404@gmail.com> <20130502184514.GE14496@n2100.arm.linux.org.uk>
+ <5182B65C.8030000@gmail.com>
+Message-ID: <20130502185623.GG14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 08:38:34AM -0700, Tony Lindgren wrote:
-> * Russell King - ARM Linux <linux@arm.linux.org.uk> [130502 01:27]:
-> > On Tue, Apr 30, 2013 at 09:17:39AM +0100, Russell King - ARM Linux wrote:
-> > > Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
-> > > great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
-> > > arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
-> > > source of errors.
-> > > 
-> > > OMAP stuff needs a serious look at too - much Kconfig madness there
-> > > caused by over-use of select, which then goes on to cause build errors
-> > > because it assumes some stuff is always enabled.
-> > > 
-> > > There's also warnings about of_device_id from include/linux/of_platform.h
-> > > via from arch/arm/kernel/setup.c which feature in all the non-OF builds
-> > > too which need addressing.
-> > > 
-> > > See todays http://www.arm.linux.org.uk/developer/build/ results for all
-> > > the details and configs.  Not pushing my tree until some of this stuff
-> > > gets fixed.
-> > 
-> > And now we have a new bunch of warnings from OMAP stuff which weren't
-> > previously there...
-> > 
-> > arch/arm/mach-omap2/omap_device.c: In function 'omap_device_get_by_hwmod_name':
-> > arch/arm/mach-omap2/omap_device.c:821:3: warning: return makes pointer from integer without a cast
-> > arch/arm/mach-omap2/omap_device.c:826:3: warning: return makes pointer from integer without a cast
-> 
-> Hmm these I already fixed earlier along with a merge resolution, and
-> I'm not seeing them in next/master or arm-soc/for-next. What do you
-> have merged into your current tree?
+On Thu, May 02, 2013 at 08:54:20PM +0200, Sebastian Hesselbarth wrote:
+> On 05/02/13 20:45, Russell King - ARM Linux wrote:
+>> On Thu, May 02, 2013 at 08:33:48PM +0200, Sebastian Hesselbarth wrote:
+>>> On 05/02/2013 08:25 PM, Sebastian Hesselbarth wrote:
+>>>> This patch adds an irqchip driver for the main interrupt controller found
+>>>> on Marvell Orion SoCs (Kirkwood, Dove, Orion5x, Discovery Innovation).
+>>>> Corresponding device tree documentation is also added.
+>>>>
+>>>> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
+>>>> ---
+>>>> Note: This patch triggers a checkpatch warning for
+>>>>     WARNING: Avoid CamelCase:<handle_IRQ>
+>>>>
+>>> [...]
+>>>> diff --git a/include/linux/irqchip/orion.h b/include/linux/irqchip/orion.h
+>>>> new file mode 100644
+>>>> index 0000000..04f7bab
+>>>> --- /dev/null
+>>>> +++ b/include/linux/irqchip/orion.h
+>>>> @@ -0,0 +1,18 @@
+>>>> +/*
+>>>> + * Marvell Orion SoCs IRQ chip driver header.
+>>>> + *
+>>>> + * Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
+>>>> + *
+>>>> + * This file is licensed under the terms of the GNU General Public
+>>>> + * License version 2.  This program is licensed "as is" without any
+>>>> + * warranty of any kind, whether express or implied.
+>>>> + */
+>>>> +
+>>>> +#ifndef __LINUX_IRQCHIP_ORION_H
+>>>> +#define __LINUX_IRQCHIP_ORION_H
+>>>> +
+>>>> +#include<asm/exception.h>
+>>>
+>>> First review by myself. The above include is a left-over and
+>>> will be removed in a v2.
+>>
+>> You still need your first level IRQ handlers marked with __exception_irq_entry
+>> which is defined in the above file.
+>>
+>
+> Russell,
+>
+> I know and it is marked with __exception_irq_entry. The above is in
+> include/linux/irqchip/orion.h and only used for .init_irq in machine
+> descriptor later.
+>
+> The irq handler is never exposed to the board file itself, but set
+> within orion_init_irq. This approach has been taked by
+> irqchip/irq-gic.c and irqchip/irq-vic.c rather than adding
+> .handle_irq to the machine descriptor.
 
-I just found the cause, and it's my cleanup branch.  Odd that it only
-started appearing a couple of days ago.  Should now be fixed.
+But I don't find an asm/exception.h include in drivers/irqchip/whateveryour.cfileiscalled
