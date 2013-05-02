@@ -1,51 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  2 May 2013 15:39:01 +0100
-Subject: [PATCH v2 4/5] ARM: KVM: get rid of S2_PGD_SIZE
-In-Reply-To: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
-References: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1367505542-2231-5-git-send-email-marc.zyngier@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 2 May 2013 15:38:29 +0100
+Subject: [PATCH v3 19/32] arm64: KVM: Plug the VGIC
+In-Reply-To: <5177C559.9070806@arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-20-git-send-email-marc.zyngier@arm.com>
+ <20130423230012.GG20569@gmail.com> <5177C559.9070806@arm.com>
+Message-ID: <20130502143828.GE20730@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S2_PGD_SIZE defines the number of pages used by a stage-2 PGD
-and is unused, except for a VM_BUG_ON check that missuses the
-define.
+On Wed, Apr 24, 2013 at 12:43:21PM +0100, Marc Zyngier wrote:
+> On 24/04/13 00:00, Christoffer Dall wrote:
+> > On Mon, Apr 08, 2013 at 05:17:21PM +0100, Marc Zyngier wrote:
+> >> Add support for the in-kernel GIC emulation. The include file
+> >> is a complete duplicate of the 32bit one - something to fix
+> >> at one point.
+> > 
+> > seems like something that should be fixed sooner as opposed to later...
+> > Is it hard?
+> 
+> Hard? No. Disgusting? Yes.
+> 
+> You need to find a common location for the files. Something like
+> virt/kvm/arm/vgic.h? The x86/ia64 guys already have virt/kvm/ioapic.h as
+> a (bad) precedent.
 
-As the check is very unlikely to ever triggered except in
-circumstances where KVM is the least of our worries, just kill
-both the define and the VM_BUG_ON check.
+Probably not that bad, we already have include/linux/irqchip/arm-gic.h,
+so you could add virt/kvm/arm-vgic.[ch] (or create an arm subdirectory
+so there will be a tendency to move a lot more in there).
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_arm.h | 1 -
- arch/arm/kvm/mmu.c             | 3 ---
- 2 files changed, 4 deletions(-)
-
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index 124623e..64e9696 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -135,7 +135,6 @@
- #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1ULL)
- #define PTRS_PER_S2_PGD	(1ULL << (KVM_PHYS_SHIFT - 30))
- #define S2_PGD_ORDER	get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
--#define S2_PGD_SIZE	(1 << S2_PGD_ORDER)
- 
- /* Virtualization Translation Control Register (VTCR) bits */
- #define VTCR_SH0	(3 << 12)
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index d79b594..3c506c7 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -379,9 +379,6 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
- 	if (!pgd)
- 		return -ENOMEM;
- 
--	/* stage-2 pgd must be aligned to its size */
--	VM_BUG_ON((unsigned long)pgd & (S2_PGD_SIZE - 1));
--
- 	memset(pgd, 0, PTRS_PER_S2_PGD * sizeof(pgd_t));
- 	kvm_clean_pgd(pgd);
- 	kvm->arch.pgd = pgd;
 -- 
-1.8.2.1
+Catalin
