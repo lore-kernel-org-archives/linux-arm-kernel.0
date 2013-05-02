@@ -1,74 +1,46 @@
-From: syin@broadcom.com (Sherman Yin)
-Date: Thu, 2 May 2013 00:07:05 +0000
-Subject: [PATCH] ARM: Adds pin config API to set all configs in one
- function
-In-Reply-To: <CACRpkdZ6zQdivtq5wmizovWEGb-Q9xzA6EE8CafnuV13hzX_UA@mail.gmail.com>
-References: <1366841010-2823-1-git-send-email-syin@broadcom.com>
- <CACRpkdbT7f8ujCHZxKg26iMKcrAb+_yHW_2YsZwkoo892rkgTA@mail.gmail.com>
- <051069C10411E24D9749790C498526FA1BCF5427@SJEXCHMB12.corp.ad.broadcom.com>
- <CACRpkdZ6zQdivtq5wmizovWEGb-Q9xzA6EE8CafnuV13hzX_UA@mail.gmail.com>
-Message-ID: <051069C10411E24D9749790C498526FA1BCF706F@SJEXCHMB12.corp.ad.broadcom.com>
+From: holt@sgi.com (Robin Holt)
+Date: Wed, 1 May 2013 21:19:23 -0500
+Subject: [PATCH -v7 0/11] Shutdown from reboot_cpuid without stopping
+ other cpus.
+In-Reply-To: <20130501231347.GT14496@n2100.arm.linux.org.uk>
+References: <1367428011-17123-1-git-send-email-holt@sgi.com>
+ <20130501231347.GT14496@n2100.arm.linux.org.uk>
+Message-ID: <20130502021923.GS3672@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->OK I thought a bit about this too and I see the problem.
->
->However I think it's cluttery to have both
->pin_config_set() and pin_config_set_all().
->
->If you want it to be done this way, I think you should modify
->pin_config_set() like so instead:
->
->-        int (*pin_config_set) (struct pinctrl_dev *pctldev,
->-                               unsigned pin,
->-                               unsigned long config);
->+       int (*pin_config_set) (struct pinctrl_dev *pctldev,
->+                                  const struct
->pinctrl_setting_configs *configs, unsigned num_configs);
->
->And then change all the drivers.
->
->(And vice versa mutatis mutandis for the group function.)
+On Thu, May 02, 2013 at 12:13:47AM +0100, Russell King - ARM Linux wrote:
+> On Wed, May 01, 2013 at 12:06:40PM -0500, Robin Holt wrote:
+> > Andrew, Please do _NOT_ take this patch series yet.  I am sending this
+> > to you because you had comments on my -v6 submission.
+> 
+> Another reason for not applying this is that I believe it wilfully breaks
+> a bunch of ARM platforms - such as removing the 'g' reboot mode (for gpio
+> based reboot on PXA), and removing the 's' reboot mode off a bunch of ARM
+> platforms which have no way to do a hard reboot.
+> 
+> What scares me is that this is revision 7 of this patch set and this is
+> the first it's been noticed on ARM... Maybe this patch set didn't touch
+> ARM previously?
 
-So that's basically back to the initial suggestion of moving the 
-loop inside the driver's function instead of creating a separate
-API?  Stephen said he is concerned about the duplicated loop
-but did say it's not a big deal.
+It started with a simple add a CONFIG_ value which eliminated the
+calls to offline all cpus.  That expanded to the migrate to cpu 0.
+Then the suggestion was to make a kernel parameter for selecting which
+cpu to migrate to.  That led to discovering x86's reboot=s## parameter.
+That led to move that to generic code, which led to resolving the conflict
+between arm, unicore32, and x86 and therefore, this patch series.
 
->Notice especially the added num_configs parameter that was
->missing from pin_config_set_all() in your patch, please tell
->me how else you deduct the size of the configs array.
+If I had my preference, I would go back to -v2, polish it a bit,
+and resubmit.  It just put the migrate_to_boot_cpu in kernel/sys.c,
+put the calls in place, and continued with shutdown.
 
-We are passing a pointer to struct pinctrl_setting_configs, 
-which should have the num_configs already:
+Second choice would be -v4 which added a reboot_cpu (actually, then it
+was reboot_cpuid, but I would make it reboot_cpu) core_param, fixed the
+x86 reboot=s## handling to handle more than the first 100 cpus and also
+the documented smp## syntax.  I would not twiddle with unicore32 or arm.
 
-105struct pinctrl_setting_configs {
-106	unsigned group_or_pin;
-107	unsigned long *configs;
-108	unsigned num_configs;
-109};
+Bottom line, the first 5 patches in this series are what I really care
+about.  They get me the ability to shut my machine down in under 15
+minutes.  The rest is just stuff I am doing to gain acceptance for those.
 
-I want to be sure you are ok with exposing this struct to 
-consumers (ie. drivers).  If not, we could pass the 3
-components in the API instead.
-
->To the drivers to iterate over the array of configs,
->please introduce a static helper function:
->
->for_each_config() in something like <linux/pinctrl/pinconf.h>
->so it's easy for driver writers to get this right. (You'll be much
->helped by this function when refactoring the existing drivers as well
->I think.)
-
-Yup ok.
-
->Doing the same thing with two different functions isn't
->helpful, refactoring like this is much better, it's just more
->work :-D
-
-Yes it's more work, and a bit more risk of breaking stuff.  Out of the
-2 methods, I do like this better since there are less APIs.  I will probably
-have to get this patch in after my pinctrl driver since it is almost ready.
-
-Thanks!
-Sherman
+Robin
