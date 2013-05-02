@@ -1,58 +1,56 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 2 May 2013 20:35:45 +0200
-Subject: [PATCH V2] video: implement a simple framebuffer driver
-In-Reply-To: <5182AF83.4080705@wwwdotorg.org>
-References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
- <1556968.7tR6KuEIWb@flatron> <6607610.omg016OAvj@avalon>
- <201304300004.20320.arnd@arndb.de> <5182AF83.4080705@wwwdotorg.org>
-Message-ID: <CAMuHMdV9nv3FA8J4MPPyUjb1T_nDttV_X-KCSKP==K4g9sXj5w@mail.gmail.com>
+From: jjo.braun@gmail.com (Johannes Braun)
+Date: Thu, 2 May 2013 20:40:20 +0200
+Subject: Freescale imx35: sgtl5000 codec not working over i2c
+In-Reply-To: <20130502181821.GC31135@pengutronix.de>
+References: <20130502200024.72c112cc@jobraun>
+ <20130502181821.GC31135@pengutronix.de>
+Message-ID: <20130502204020.0462f080@jobraun>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 2, 2013 at 8:25 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 04/29/2013 04:04 PM, Arnd Bergmann wrote:
->> On Monday 29 April 2013, Laurent Pinchart wrote:
->>> On Monday 29 April 2013 23:31:30 Tomasz Figa wrote:
->>>
->>>> Good point. Stephen, would it be a problem to make this a KMS driver
->>>> instead? Old fbdev API could be emulated on top of it, until it goes out
->>>> of use, couldn't it?
->>>
->>> There's already an fbdev emulation layer in KMS, for such a simple use case it
->>> will work fine.
->>
->> I suggested the same to Stephen when he first brought up this driver.
->> Unfortunately his attempt to create a simple KMS driver resulted in a
->> significantly larger driver than the one he did for the framebuffer
->> interface. This means that either Stephen did something really wrong
->> in his attempt, or the KMS interface isn't as good as it should be
->> if we want to move people away from frame buffer drivers.
->
-> Well, I didn't actually attempt to write the KMS driver; I simply took a
-> look at existing KMS drivers (and perhaps some stub KMS driver; I forget
-> right now) to see what it'd take, and it looked quite scary.
->
-> The other issue is that the KMS semantics appear to desire that the
-> driver allocate FB memory from some pool, and then point the display
-> scanout at the allocated memory. However, this driver's semantics are
-> that some other entity has allocated and reserved some memory region for
-> scanout, and the simple FB driver exists solely to scribble to that
-> memory region. Rob Clark said the thought this could be handled by
-> writing a custom memory allocator to support this, but it seemed a
-> little pointless to write a whole memory allocator when the existing FB
-> interface allows the driver to just set a struct member to the address
-> and be done with it.
+Hello Sascha,
 
-I'm also curious to see the code for the first real simplekms/vesakms/ofkms/...
-driver...
+> On Thu, May 02, 2013 at 08:00:24PM +0200, Johannes Braun wrote:
+> > Hello @all,
+> > 
+> > I hope this is the right place for my problem. Currently I am
+> > trying to get a sigmatel sgtl5000 codec to work on a Freescale
+> > imx35 based board. I am using a vanilla kernel 3.7.10. The codec is
+> > connected via i2c. I configured the i2c device
+> > in /arch/arm/mach-imx/mach-proxmobil2.c. Proxmobil2 is the name of
+> > our device. Here is the part which configures the i2c device and
+> > the bus.
+> > 
+> > static const struct imxi2c_platform_data mx35_prox2_i2c0_data
+> > 	__initconst = {
+> >         .bitrate = 100000,
+> > };
+> > 
+> > imx35_add_imx_i2c0(&mx35_prox2_i2c0_data);
+> > 
+> > static struct i2c_board_info __initdata i2c_devices_prox2[] = {
+> >         {
+> >                 I2C_BOARD_INFO("imx-audio-sgtl5000", 0x0a),
+> >         },
+> 
+> The driver matches "sgtl5000", not "imx-audio-sgtl5000".
 
-Gr{oetje,eeting}s,
+I tried "sgtl5000" and "fsl", both without success.
 
-                        Geert
+> 
+> You should use devicetree support for new boards. The platform support
+> will vanish sooner or later.
+> 
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+As I wrote before, my board is based on the very old imx35 processor
+platform and I think this processor type does not support device tree
+out of the box? Or is it possible to use a device tree with an imx35?
+Haven`t seen this before. Is the problem realy the missing device tree
+support? 
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+There are much reasons why I don`t want to spend that much time with
+this old product. We had so much problems with this board and probably
+in summer there is a new board coming. Maybe an im6q.
+
+---
+Johannes
