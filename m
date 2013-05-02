@@ -1,81 +1,48 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 02 May 2013 20:28:44 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSF0gQVJNOiBPTUFQLVVTQjogRml4IHBvc3NpYmxlIG1l?=
- =?UTF-8?B?bW9yeSBsZWFr?=
-In-Reply-To: <20130502162433.GA10016@kahuna>
-References: <1367510596-27780-1-git-send-email-shc_work@mail.ru>
- <20130502162433.GA10016@kahuna>
-Message-ID: <1367512124.978518915@f372.mail.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 2 May 2013 18:29:37 +0200
+Subject: [PATCH v2] thermal: cpu_cooling: fix stub function
+In-Reply-To: <51828A45.60909@ti.com>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-13-git-send-email-arnd@arndb.de> <51828A45.60909@ti.com>
+Message-ID: <201305021829.37343.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 20:03-20130502, Alexander Shiyan wrote:
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
-> >  arch/arm/mach-omap2/usb-host.c | 21 +++++++++++++++++----
-> >  1 file changed, 17 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
-> > index aa27d7f..8d17a0d 100644
-> > --- a/arch/arm/mach-omap2/usb-host.c
-> > +++ b/arch/arm/mach-omap2/usb-host.c
-> > @@ -570,8 +570,10 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
-> >  	supplies->dev_name = dev_id;
-> >  
-> >  	reg_data = kzalloc(sizeof(*reg_data), GFP_KERNEL);
-> > -	if (!reg_data)
-> > +	if (!reg_data) {
-> > +		kfree(supplies);
-> >  		return -ENOMEM;
-> > +	}
-> >  
-> >  	reg_data->constraints.valid_ops_mask = REGULATOR_CHANGE_STATUS;
-> >  	reg_data->consumer_supplies = supplies;
-> > @@ -579,8 +581,11 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
-> >  
-> >  	config = kmemdup(&hsusb_reg_config, sizeof(hsusb_reg_config),
-> >  			GFP_KERNEL);
-> > -	if (!config)
-> > +	if (!config) {
-> > +		kfree(supplies);
-> > +		kfree(reg_data);
-> >  		return -ENOMEM;
-> > +	}
-> >  
-> >  	config->supply_name = name;
-> >  	config->gpio = gpio;
-> > @@ -589,17 +594,25 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
-> >  
-> >  	/* create a regulator device */
-> >  	pdev = kzalloc(sizeof(*pdev), GFP_KERNEL);
-> > -	if (!pdev)
-> > +	if (!pdev) {
-> > +		kfree(supplies);
-> > +		kfree(reg_data);
-> > +		kfree(config);
-> >  		return -ENOMEM;
-> > +	}
-> >  
-> >  	pdev->id = PLATFORM_DEVID_AUTO;
-> >  	pdev->name = reg_name;
-> >  	pdev->dev.platform_data = config;
-> >  
-> >  	ret = platform_device_register(pdev);
-> > -	if (ret)
-> > +	if (ret) {
-> >  		pr_err("%s: Failed registering regulator %s for %s\n",
-> >  				__func__, name, dev_id);
-> > +		kfree(supplies);
-> > +		kfree(reg_data);
-> > +		kfree(config);
-> > +	}
-> 
-> Might be better to switch to devm_XXX managed functions?
+The function stub for cpufreq_cooling_get_level introduced
+in 57df81069 "Thermal: exynos: fix cooling state translation"
+is not syntactically correct C and needs to be fixed to avoid
+this error:
 
-If anyone can rewrite driver to use devm_xx, it would have been better.
-I'm not going to redo the patch yet, let it be so, I just showed a point
-for OMAP-developers.
-Thanks.
+In file included from drivers/thermal/db8500_thermal.c:20:0:
+ include/linux/cpu_cooling.h: In function 'cpufreq_cooling_get_level':
+include/linux/cpu_cooling.h:57:1:
+ error: parameter name omitted  unsigned long cpufreq_cooling_get_level(unsigned int, unsigned int)  ^
+ include/linux/cpu_cooling.h:57:1: error: parameter name omitted
 
----
+Cc: Eduardo Valentin <eduardo.valentin@ti.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Amit Daniel kachhap <amit.daniel@samsung.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/include/linux/cpu_cooling.h b/include/linux/cpu_cooling.h
+index 282e270..a5d52ee 100644
+--- a/include/linux/cpu_cooling.h
++++ b/include/linux/cpu_cooling.h
+@@ -41,7 +41,7 @@ cpufreq_cooling_register(const struct cpumask *clip_cpus);
+  */
+ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev);
+ 
+-unsigned long cpufreq_cooling_get_level(unsigned int, unsigned int);
++unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq);
+ #else /* !CONFIG_CPU_THERMAL */
+ static inline struct thermal_cooling_device *
+ cpufreq_cooling_register(const struct cpumask *clip_cpus)
+@@ -54,7 +54,7 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
+ 	return;
+ }
+ static inline
+-unsigned long cpufreq_cooling_get_level(unsigned int, unsigned int)
++unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq)
+ {
+ 	return THERMAL_CSTATE_INVALID;
+ }
