@@ -1,26 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 May 2013 18:23:02 +0200
-Subject: [PATCH 0/7] ARM: u300 multiplatform support
-In-Reply-To: <1367511416-4312-1-git-send-email-linus.walleij@stericsson.com>
-References: <1367511416-4312-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <201305021823.02703.arnd@arndb.de>
+Date: Thu, 2 May 2013 18:24:20 +0200
+Subject: [PATCH, RFC 10/22] mfd: ab8500: debugfs code depends on gpadc
+In-Reply-To: <20130502153624.GN25256@gmail.com>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-11-git-send-email-arnd@arndb.de>
+ <20130502153624.GN25256@gmail.com>
+Message-ID: <201305021824.20548.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 May 2013, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Thursday 02 May 2013, Lee Jones wrote:
+> > @@ -580,7 +580,7 @@ config AB8500_CORE
+> >  
+> >  config AB8500_DEBUG
+> >         bool "Enable debug info via debugfs"
+> > -       depends on AB8500_CORE && DEBUG_FS
+> > +       depends on AB8500_GPADC && DEBUG_FS
+> >         default y if DEBUG_FS
+> >         help
+> >           Select this option if you want debug information using the debug
 > 
-> This series builds on top of the recently iterated U300
-> device tree support to convert the platform to multiplatform
-> (a.k.a. single zImage).
-> 
-> This is intended to be pulled on top of the DT support.
-> 
+> Did you find this with ALLCONFIG out of interest.
 
-Very nice! For the patches 2-7:
+I used "make randconfig" with this KCONFIG_ALLCONFIG file:
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+CONFIG_MMU=y
+CONFIG_ARCH_MULTI_V7=y
+CONFIG_PREVENT_FIRMWARE_BUILD=y
+CONFIG_PROC_FS=y
+ 
+> Applied by the way.
 
-For patch 1, I'll wait for your reply. It's probably ok too.
+Thanks!
 
 	Arnd
