@@ -1,23 +1,22 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri,  3 May 2013 01:48:37 +0200
-Subject: [PATCH v2 3/5] ARM: dove: add DT parsing for legacy timer
+Date: Fri,  3 May 2013 01:48:38 +0200
+Subject: [PATCH v2 4/5] ARM: dove: move DT boards to orion irqchip driver
 In-Reply-To: <1367538519-23940-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1367538519-23940-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1367538519-23940-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1367538519-23940-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow to move to orion irqchip driver, existing legacy devices
-have to map their irqs. This patch adds init code to map the
-corresponding irqs. It will vanish as soon as there is true device tree
-support for orion timer.
+With legacy devices mapping their irqs, we can now switch DT enabled
+boards to orion irqchip driver.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Changelog:
 v1->v2:
 - split off DT changes (Suggested by Jason Cooper)
+- use irqchip_init (Suggested by Jason Gunthorpe)
 
 Cc: Grant Likely <grant.likely@linaro.org>
 Cc: Rob Herring <rob.herring@calxeda.com>
@@ -37,93 +36,63 @@ Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mach-dove/board-dt.c |   42 +++++++++++++++++++++++++++++++++++------
- 1 file changed, 36 insertions(+), 6 deletions(-)
+ arch/arm/mach-dove/Kconfig    |    1 +
+ arch/arm/mach-dove/Makefile   |    4 ++--
+ arch/arm/mach-dove/board-dt.c |    4 ++--
+ 3 files changed, 5 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
+index 36469d8..60d72b4 100644
+--- a/arch/arm/mach-dove/Kconfig
++++ b/arch/arm/mach-dove/Kconfig
+@@ -22,6 +22,7 @@ config MACH_CM_A510
+ 
+ config MACH_DOVE_DT
+ 	bool "Marvell Dove Flattened Device Tree"
++	select IRQCHIP_ORION
+ 	select MVEBU_CLK_CORE
+ 	select MVEBU_CLK_GATING
+ 	select REGULATOR
+diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
+index 3f0a858..4780f78 100644
+--- a/arch/arm/mach-dove/Makefile
++++ b/arch/arm/mach-dove/Makefile
+@@ -1,5 +1,5 @@
+-obj-y				+= common.o addr-map.o irq.o
+-obj-$(CONFIG_DOVE_LEGACY)	+= mpp.o
++obj-y				+= common.o addr-map.o
++obj-$(CONFIG_DOVE_LEGACY)	+= irq.o mpp.o
+ obj-$(CONFIG_PCI)		+= pcie.o
+ obj-$(CONFIG_MACH_DOVE_DB)	+= dove-db-setup.o
+ obj-$(CONFIG_MACH_DOVE_DT)	+= board-dt.o
 diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
-index 9df6dd7..cea65b7 100644
+index cea65b7..404c993 100644
 --- a/arch/arm/mach-dove/board-dt.c
 +++ b/arch/arm/mach-dove/board-dt.c
-@@ -12,6 +12,7 @@
+@@ -11,6 +11,7 @@
+ #include <linux/init.h>
  #include <linux/clk-provider.h>
  #include <linux/clk/mvebu.h>
++#include <linux/irqchip.h>
  #include <linux/of.h>
-+#include <linux/of_address.h>
+ #include <linux/of_address.h>
  #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/platform_data/usb-ehci-orion.h>
-@@ -20,6 +21,7 @@
+@@ -20,7 +21,6 @@
+ #include <asm/mach/arch.h>
  #include <mach/pm.h>
  #include <plat/common.h>
- #include <plat/irq.h>
-+#include <plat/time.h>
+-#include <plat/irq.h>
+ #include <plat/time.h>
  #include "common.h"
  
- /*
-@@ -48,10 +50,42 @@ static void __init dove_legacy_clk_init(void)
- 			 of_clk_get_from_provider(&clkspec));
- }
- 
--static void __init dove_of_clk_init(void)
-+#define BRIDGE_INT_TIMER1_CLR	(~0x0004)
-+
-+static void __init dove_legacy_timer_init(void)
- {
-+	struct device_node *np = of_find_compatible_node(NULL, NULL,
-+					 "marvell,orion-timer");
-+	struct clk *clk;
-+	void __iomem *base;
-+	unsigned int tclk, irq;
-+
-+	/* Setup root of clk tree */
- 	mvebu_clocks_init();
- 	dove_legacy_clk_init();
-+
-+	if (!np)
-+		panic("missing timer node\n");
-+
-+	base = of_iomap(np, 0);
-+	if (!base)
-+		panic("%s: missing reg base for timer\n", np->full_name);
-+
-+	irq = irq_of_parse_and_map(np, 0);
-+	if (!irq)
-+		panic("%s: missing irq for timer\n", np->full_name);
-+
-+	clk = of_clk_get(np, 0);
-+	if (IS_ERR(clk))
-+		panic("%s: missing clock for timer\n", np->full_name);
-+
-+	clk_prepare_enable(clk);
-+	tclk = clk_get_rate(clk);
-+	clk_put(clk);
-+
-+	orion_time_set_base(base);
-+	/* legacy timer init gets bridge reg base */
-+	orion_time_init(base - 0x300, BRIDGE_INT_TIMER1_CLR, irq, tclk);
- }
- 
- static struct mv643xx_eth_platform_data dove_dt_ge00_data = {
-@@ -95,9 +129,6 @@ static void __init dove_dt_init(void)
- #endif
- 	dove_setup_cpu_mbus();
- 
--	/* Setup root of clk tree */
--	dove_of_clk_init();
--
- 	/* Internal devices not ported to DT yet */
- 	dove_legacy_ge00_init();
- 	dove_pcie_init(1, 1);
-@@ -112,9 +143,8 @@ static const char * const dove_dt_board_compat[] = {
+@@ -143,7 +143,7 @@ static const char * const dove_dt_board_compat[] = {
  
  DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
  	.map_io		= dove_map_io,
--	.init_early	= dove_init_early,
- 	.init_irq	= orion_dt_init_irq,
--	.init_time	= dove_timer_init,
-+	.init_time	= dove_legacy_timer_init,
+-	.init_irq	= orion_dt_init_irq,
++	.init_irq	= irqchip_init,
+ 	.init_time	= dove_legacy_timer_init,
  	.init_machine	= dove_dt_init,
  	.restart	= dove_restart,
- 	.dt_compat	= dove_dt_board_compat,
 -- 
 1.7.10.4
