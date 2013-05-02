@@ -1,110 +1,37 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 2 May 2013 19:25:11 +0800
-Subject: [PATCH] spi/spi-atmel: BUG: fix doesn' support 16 bits transfers
- using PIO
-In-Reply-To: <1367493801-3037-1-git-send-email-wenyou.yang@atmel.com>
-References: <1367493801-3037-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1367493911-3182-1-git-send-email-wenyou.yang@atmel.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Thu, 2 May 2013 16:59:24 +0530
+Subject: [PATCH 3/5] ARM: ux500: Stop passing DMA platform data though
+ AUXDATA
+In-Reply-To: <1367336497-10650-3-git-send-email-lee.jones@linaro.org>
+References: <1367336497-10650-1-git-send-email-lee.jones@linaro.org>
+ <1367336497-10650-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130502112923.GA22739@bnru10>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Richard Genoud <richard.genoud@gmail.com>
+On Tue, Apr 30, 2013 at 17:41:35 +0200, Lee Jones wrote:
+> The DMA platform data is now empty due to some recent refactoring,
+> so there is no longer a requirement to pass it though.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/mach-ux500/cpu-db8500.c |    3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+> index a2c83c2..2b6cbde 100644
+> --- a/arch/arm/mach-ux500/cpu-db8500.c
+> +++ b/arch/arm/mach-ux500/cpu-db8500.c
+> @@ -264,8 +264,7 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+>  	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80125000,
+>  		"ux500-msp-i2s.3", &msp3_platform_data),
+>  	/* Requires clock name bindings and channel address lookup table. */
+> -	OF_DEV_AUXDATA("stericsson,db8500-dma40", 0x801C0000,
+> -		       "dma40.0", &dma40_plat_data),
+> +	OF_DEV_AUXDATA("stericsson,db8500-dma40", 0x801C0000, "dma40.0", NULL),
+>  	{},
+>  };
 
-Fix using PIO transfer mode only support 8 bits transfer, doesn't support 16 bits.
+Acked-by:srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
-Cc: spi-devel-general at lists.sourceforge.net
-Cc: linux-kernel at vger.kernel.org
-[wenyou.yang at atmel.com: submit the patch]
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- drivers/spi/spi-atmel.c |   47 ++++++++++++++++++++++++++++++++++++++---------
- 1 file changed, 38 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-index 787bd2c..d8cb7da 100644
---- a/drivers/spi/spi-atmel.c
-+++ b/drivers/spi/spi-atmel.c
-@@ -526,13 +526,17 @@ static void atmel_spi_next_xfer_pio(struct spi_master *master,
- 	}
- 
- 	if (xfer->tx_buf)
--		spi_writel(as, TDR, *(u8 *)(xfer->tx_buf));
-+		if (xfer->bits_per_word > 8)
-+			spi_writel(as, TDR, *(u16 *)(xfer->tx_buf));
-+		else
-+			spi_writel(as, TDR, *(u8 *)(xfer->tx_buf));
- 	else
- 		spi_writel(as, TDR, 0);
- 
- 	dev_dbg(master->dev.parent,
--		"  start pio xfer %p: len %u tx %p rx %p\n",
--		xfer, xfer->len, xfer->tx_buf, xfer->rx_buf);
-+		"  start pio xfer %p: len %u tx %p rx %p bitpw %d\n",
-+		xfer, xfer->len, xfer->tx_buf, xfer->rx_buf,
-+		xfer->bits_per_word);
- 
- 	/* Enable relevant interrupts */
- 	spi_writel(as, IER, SPI_BIT(RDRF) | SPI_BIT(OVRES));
-@@ -950,21 +954,39 @@ atmel_spi_pump_pio_data(struct atmel_spi *as, struct spi_transfer *xfer)
- {
- 	u8		*txp;
- 	u8		*rxp;
-+	u16		*txp16;
-+	u16		*rxp16;
- 	unsigned long	xfer_pos = xfer->len - as->current_remaining_bytes;
- 
- 	if (xfer->rx_buf) {
--		rxp = ((u8 *)xfer->rx_buf) + xfer_pos;
--		*rxp = spi_readl(as, RDR);
-+		if (xfer->bits_per_word > 8) {
-+			rxp16 = (u16 *)(((u8 *)xfer->rx_buf) + xfer_pos);
-+			*rxp16 = spi_readl(as, RDR);
-+		} else {
-+			rxp = ((u8 *)xfer->rx_buf) + xfer_pos;
-+			*rxp = spi_readl(as, RDR);
-+		}
- 	} else {
- 		spi_readl(as, RDR);
- 	}
--
--	as->current_remaining_bytes--;
-+	if (xfer->bits_per_word > 8) {
-+		as->current_remaining_bytes -= 2;
-+		if (as->current_remaining_bytes < 0)
-+			as->current_remaining_bytes = 0;
-+	} else {
-+		as->current_remaining_bytes--;
-+	}
- 
- 	if (as->current_remaining_bytes) {
- 		if (xfer->tx_buf) {
--			txp = ((u8 *)xfer->tx_buf) + xfer_pos + 1;
--			spi_writel(as, TDR, *txp);
-+			if (xfer->bits_per_word > 8) {
-+				txp16 = (u16 *)(((u8 *)xfer->tx_buf)
-+							+ xfer_pos + 2);
-+				spi_writel(as, TDR, *txp16);
-+			} else {
-+				txp = ((u8 *)xfer->tx_buf) + xfer_pos + 1;
-+				spi_writel(as, TDR, *txp);
-+			}
- 		} else {
- 			spi_writel(as, TDR, 0);
- 		}
-@@ -1378,6 +1400,13 @@ static int atmel_spi_transfer(struct spi_device *spi, struct spi_message *msg)
- 			}
- 		}
- 
-+		if (xfer->bits_per_word > 8) {
-+			if (xfer->len % 2) {
-+				dev_dbg(&spi->dev, "buffer len should be 16 bits aligned\n");
-+				return -EINVAL;
-+			}
-+		}
-+
- 		/* FIXME implement these protocol options!! */
- 		if (xfer->speed_hz) {
- 			dev_dbg(&spi->dev, "no protocol options yet\n");
--- 
-1.7.9.5
+srinidhi 
