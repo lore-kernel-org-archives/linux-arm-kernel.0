@@ -1,44 +1,117 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 2 May 2013 11:38:12 +0100
-Subject: [Xen-devel] [PATCH 3/3] xen/arm: account for stolen ticks
-In-Reply-To: <1367482862.21869.28.camel@zakaz.uk.xensource.com>
-References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
- <1367436460-10183-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <1367482862.21869.28.camel@zakaz.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1305021134160.5398@kaball.uk.xensource.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 2 May 2013 11:40:18 +0100
+Subject: Latest build results - errors/warnings - lots of them
+In-Reply-To: <20130502094620.GC21614@n2100.arm.linux.org.uk>
+References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
+ <201304301304.20650.arnd@arndb.de>
+ <20130430114229.GA2439@linaro.org>
+ <alpine.LFD.2.03.1304301110030.17372@syhkavp.arg>
+ <20130430172816.GA31101@linaro.org>
+ <alpine.LFD.2.03.1304301418100.17372@syhkavp.arg>
+ <20130502083430.GB21614@n2100.arm.linux.org.uk>
+ <20130502094620.GC21614@n2100.arm.linux.org.uk>
+Message-ID: <20130502104018.GA9879@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 May 2013, Ian Campbell wrote:
-> On Wed, 2013-05-01 at 20:27 +0100, Stefano Stabellini wrote:
-> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > index d30042e..8f040a0 100644
-> > --- a/arch/arm/xen/enlighten.c
-> > +++ b/arch/arm/xen/enlighten.c
-> > @@ -14,6 +14,7 @@
-> >  #include <xen/xen-ops.h>
-> >  #include <asm/xen/hypervisor.h>
-> >  #include <asm/xen/hypercall.h>
-> > +#include <asm/arch_timer.h>
-> >  #include <asm/system_misc.h>
-> >  #include <linux/interrupt.h>
-> >  #include <linux/irqreturn.h>
-> > @@ -172,6 +173,8 @@ static int __init xen_secondary_init(unsigned int cpu)
-> >  		   later ones fail to. */
-> >  		per_cpu(xen_vcpu, cpu) = vcpup;
-> >  	}
-> > +
-> > +	xen_setup_runstate_info(cpu);
+On Thu, May 02, 2013 at 10:46:21AM +0100, Russell King - ARM Linux wrote:
+> On Thu, May 02, 2013 at 09:34:30AM +0100, Russell King - ARM Linux wrote:
+> > On Tue, Apr 30, 2013 at 02:18:42PM -0400, Nicolas Pitre wrote:
+> > > On Tue, 30 Apr 2013, Dave Martin wrote:
+> > > 
+> > > > On Tue, Apr 30, 2013 at 11:12:12AM -0400, Nicolas Pitre wrote:
+> > > > > On Tue, 30 Apr 2013, Dave Martin wrote:
+> > > > > 
+> > > > > > On Tue, Apr 30, 2013 at 01:04:20PM +0200, Arnd Bergmann wrote:
+> > > > > > > On Tuesday 30 April 2013, Russell King - ARM Linux wrote:
+> > > > > > > > Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
+> > > > > > > > great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
+> > > > > > > > arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
+> > > > > > > > source of errors.
+> > > > > > 
+> > > > > > [...]
+> > > > > >  
+> > > > > > > >arch/arm/common/mcpm_head.S:39: Error: selected processor does not support ARM mode `ubfx r9,r0,#0,#8'
+> > > > > > > >arch/arm/common/mcpm_head.S:40: Error: selected processor does not support ARM mode `ubfx r10,r0,#8,#8'
+> > > > > > > >arch/arm/common/mcpm_head.S:100: Error: selected processor does not support ARM mode `dmb'
+> > > > > > > >arch/arm/common/mcpm_head.S:115: Error: selected processor does not support ARM mode `dmb'
+> > > > > > > >arch/arm/common/mcpm_head.S:127: Error: selected processor does not support ARM mode `dmb'
+> > > > > > > >arch/arm/common/mcpm_head.S:131: Error: selected processor does not support ARM mode `dmb'
+> > > > > > > >arch/arm/common/mcpm_head.S:138: Error: selected processor does not support ARM mode `dsb'
+> > > > > > > >arch/arm/common/mcpm_head.S:152: Error: selected processor does not support ARM mode `dmb'
+> > > > > > > >arch/arm/common/mcpm_head.S:161: Error: selected processor does not support ARM mode `dmb'
+> > > > > > > >arch/arm/common/mcpm_head.S:175: Error: selected processor does not support ARM mode `dmb'
+> > > > > > > >arch/arm/common/vlock.S:62: Error: selected processor does not support ARM mode `dmb'
+> > > > > > > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dmb'
+> > > > > > > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dsb'
+> > > > > > > >arch/arm/common/vlock.S:89: Error: selected processor does not support ARM mode `dmb'
+> > > > > > > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dmb'
+> > > > > > > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dsb'
+> > > > > > > >arch/arm/common/vlock.S:102: Error: selected processor does not support ARM mode `dmb'
+> > > > > > > >arch/arm/common/vlock.S:105: Error: selected processor does not support ARM mode `dsb'
+> > > > > > > 
+> > > > > > > Right, the problem here is that the code was never tested with an ARMv6+ARMv7 config.
+> > > > > > > We can either fix it up by adding
+> > > > > > > 
+> > > > > > > 	.arch	armv7-a
+> > > > > > > 
+> > > > > > > in the assembly files, or by doing the same in the Makefile:
+> > > > > > > 
+> > > > > > > AFLAGS_vlock.S += -march=armv7-a
+> > > > > > > AFLAGS_mcpm_head.S += -march=armv7-a
+> > > > > > 
+> > > > > > 
+> > > > > > Hmmm, this code was tested with ARCH_MULTIPLATFORM, but it looks like
+> > > > > > no v6 boards were configured in when testing that...
+> > > > > > 
+> > > > > > 
+> > > > > > Assuming people are OK with the Makefile route, here's a patch for that,
+> > > > > > build-tested with a v6+v7 ARCH_MULTIPLATFORM config.
+> > > > > 
+> > > > > Isn't the .arch armv7-a route a bit cleaner?  That would have been my 
+> > > > > choice, although I don't feel strongly about it.
+> > > > 
+> > > > I don't feel strongly either.  We already have the CFLAGS_DISABLE stuff,
+> > > > so it didn't feel that unnatural to add this in the Makefile; but .arch
+> > > > would work equally well.
+> > > > 
+> > > > If somebody wants to change it, it's not a problem for me, but I didn't
+> > > > want to create extra disruption by proposing a different patch...
+> > > 
+> > > Fair enough.
+> > > 
+> > > Acked-by: Nicolas Pitre <nico@linaro.org>
+> > 
+> > I see Dave Martin has sent a patch for this without your ack.  Was that
+> > a mistake?
+
+My bad -- Nico asked me to send you the patch, but I neglected to add
+his ack.
+ 
+> ... and the patch in the patch system doesn't apply anyway because its
+> against some other tree.  I've no idea what it's against, it's not as
+> the version on the patch advertises (v3.9-rc7) and not even the build
+> tree has the three additional FIQ lines at the end (so it's not in
+> arm-soc):
 > 
-> Is this called for the boot processor too?
+>  obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
+>  obj-$(CONFIG_ARM_TIMER_SP804)  += timer-sp.o
+>  obj-$(CONFIG_MCPM)             += mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock...
+> +AFLAGS_mcpm_head.o             := -march=armv7-a
+> +AFLAGS_vlock.o                 := -march=armv7-a
+>  CFLAGS_REMOVE_mcpm_entry.o     = -pg
+>  obj-$(CONFIG_FIQ_GLUE)         += fiq_glue.o fiq_glue_setup.o
+>  obj-$(CONFIG_FIQ_DEBUGGER)     += fiq_debugger.o
+> 
+> So, this is unapplyable.
 
-Yep.
+...and this was a plain screwup up my part.  v3.9* could not possibly
+contain the relevant patches, but somehow I convinced myself I had test-
+applied the patch on 3.9-rc7, instead of a local tree based on that.
 
-> (do you have a linux-next branch where I can easily find the baseline
-> for this series?)
+I've sent you a patch based on devel-stable which should apply.
 
-git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git lost_ticks_1
+Apologies for the churn.
 
-It's based on my 3.9-rc3-smp-6 branch currently in linux-next (that is
-based on 3.9-rc3).
-However lost_ticks_1 is not in linux-next yet.
+Cheers
+---Dave
