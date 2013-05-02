@@ -1,46 +1,31 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 02 May 2013 21:20:55 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCwgUkZDIDIwLzIyXSBtZWRpYTogY29kYTogc2VsZWN0IEdF?=
- =?UTF-8?B?TkVSSUNfQUxMT0NBVE9S?=
-In-Reply-To: <1367507786-505303-21-git-send-email-arnd@arndb.de>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-21-git-send-email-arnd@arndb.de>
-Message-ID: <1367515255.447627800@f375.mail.ru>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu,  2 May 2013 10:21:00 -0700
+Subject: [PATCH] ARM: iop13xx: change type of ioremap function
+Message-ID: <1367515260-32364-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The coda driver uses the generic allocator to get at the
-> "iram" memory, so add the necessary dependency to avoid:
-> 
-> drivers/built-in.o: In function `coda_remove':
->  :(.text+0x2ab680): undefined reference to `gen_pool_free'
-> drivers/built-in.o: In function `coda_probe':
-> :(.text+0x2ad168): undefined reference to `of_get_named_gen_pool'
-> :(.text+0x2ad188): undefined reference to `dev_get_gen_pool'
-> :(.text+0x2ad220): undefined reference to `gen_pool_alloc'
-> :(.text+0x2ad2ec): undefined reference to `gen_pool_virt_to_phys'
-> 
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Fabio Estevam <fabio.estevam@freescale.com>
-> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/media/platform/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-> index 0494d27..4608d03 100644
-> --- a/drivers/media/platform/Kconfig
-> +++ b/drivers/media/platform/Kconfig
-> @@ -145,6 +145,7 @@ config VIDEO_CODA
->  	depends on VIDEO_DEV && VIDEO_V4L2 && ARCH_MXC
->  	select VIDEOBUF2_DMA_CONTIG
->  	select V4L2_MEM2MEM_DEV
-> +	select GENERIC_ALLOCATOR
->  	---help---
->  	   Coda is a range of video codec IPs that supports
->  	   H.264, MPEG-4, and other video formats.
+Commit cd024d4245b2bfbd824b911f11a9756d1d6c167d
+(ARM: 7704/1: mm: Use phys_addr_t properly for ioremap functions)
+changed the type of the ioremap functions to actually use phys_addr_t
+instead of unsigned long. Change the type of the arch_ioremap function
+to use phys_addr_t as well.
 
-Again?
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 
----
+diff --git a/arch/arm/mach-iop13xx/io.c b/arch/arm/mach-iop13xx/io.c
+index 183dc8b..faaf7d4 100644
+--- a/arch/arm/mach-iop13xx/io.c
++++ b/arch/arm/mach-iop13xx/io.c
+@@ -23,7 +23,7 @@
+ 
+ #include "pci.h"
+ 
+-static void __iomem *__iop13xx_ioremap_caller(unsigned long cookie,
++static void __iomem *__iop13xx_ioremap_caller(phys_addr_t cookie,
+ 	size_t size, unsigned int mtype, void *caller)
+ {
+ 	void __iomem * retval;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
