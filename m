@@ -1,34 +1,58 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 02 May 2013 08:13:44 +0400
-Subject: =?UTF-8?B?UmVbM106IFtQQVRDSCAzLzNdIEFSTTogZHRzOiBBZGQgTUMxMzc4MyBzdXBw?=
- =?UTF-8?B?b3J0IGZvciBpLk1YMjcgUGh5dGVjIFBDTTAzOCBtb2R1bGU=?=
-In-Reply-To: <1367467798.105341722@f164.mail.ru>
-References: <1367405219-19078-1-git-send-email-shc_work@mail.ru>
- <20130501191528.GB31135@pengutronix.de>
- <1367467798.105341722@f164.mail.ru>
-Message-ID: <1367468024.851006021@f164.mail.ru>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 02 May 2013 14:31:43 +0900
+Subject: [PATCH 8/9] s3c2410fb: Remove redundant platform_set_drvdata()
+In-Reply-To: <1367006543-5458-9-git-send-email-sylvester.nawrocki@gmail.com>
+References: <1367006543-5458-1-git-send-email-sylvester.nawrocki@gmail.com>
+ <1367006543-5458-9-git-send-email-sylvester.nawrocki@gmail.com>
+Message-ID: <000001ce46f6$54f27cc0$fed77640$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > On Wed, May 01, 2013 at 07:40:37PM +0400, Alexander Shiyan wrote:
-> > > > On Wed, May 01, 2013 at 02:46:59PM +0400, Alexander Shiyan wrote:
-> > > > > Added MC13783 node to imx27-phytec-phycore DT file.
-> > > > > 
-> > > > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > > > > ---
-> > > > >  arch/arm/boot/dts/imx27-phytec-phycore.dts | 92 ++++++++++++++++++++++++++++++
-> > > > >  1 file changed, 92 insertions(+)
-> > > > 
-> > > > You can merge this with the previous patch.
-> > > 
-> > > Part 2 just adds a SPI host for the target. Is this merge is really necessary?
-> > 
-> > The SPI host does nothing without devices registered on it, so why not
-> > make 2/3 and 3/3 a single patch?
+On Saturday, April 27, 2013 5:02 AM, Sylwester Nawrocki wrote:
+> driver_data field is being cleared by the driver core since
+> commit 0998d0631001288a5974afc0b2a5f568bcdecb4d
+> device-core: Ensure drvdata = NULL when no driver is bound
+> hence there is no need to do it in the driver's remove() callback.
 > 
-> At point of 2/3 user can use SPI0.0 as spidev. And in th
+> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> ---
+>  drivers/video/s3c2410fb.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/video/s3c2410fb.c b/drivers/video/s3c2410fb.c
+> index 11f98ca..0439ed0 100644
+> --- a/drivers/video/s3c2410fb.c
+> +++ b/drivers/video/s3c2410fb.c
+> @@ -1013,7 +1013,6 @@ static int s3c2410fb_remove(struct platform_device *pdev)
+>  	irq = platform_get_irq(pdev, 0);
+>  	free_irq(irq, info);
+> 
+> -	platform_set_drvdata(pdev, NULL);
+>  	framebuffer_release(fbinfo);
 
-Please ignore this message.
-Thanks.
+Hi Sylwester,
 
----
+How about eliminating platform_set_drvdata(pdev, NULL)
+in s3c24xxfb_probe() as well as s3c2410fb_remove()?
+
+@@ -1005,7 +1005,6 @@ release_regs:
+ release_mem:
+        release_mem_region(res->start, size);
+ dealloc_fb:
+-       platform_set_drvdata(pdev, NULL);
+        framebuffer_release(fbinfo);
+        return ret;
+ }
+
+Best regards,
+Jingoo Han
+
+> 
+>  	return 0;
+> --
+> 1.7.4.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
