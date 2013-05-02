@@ -1,71 +1,69 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Thu, 2 May 2013 02:35:16 +0000
-Subject: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
- xfer->speed_hz set
-In-Reply-To: <CAGhQ9VwW18LXY5Jn0FUFCaAzKxP1W3QADG=JBp9JbgaAwo=F2Q@mail.gmail.com>
-References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
- <1362626815-6628-1-git-send-email-wenyou.yang@atmel.com>
- <CAGhQ9VwW18LXY5Jn0FUFCaAzKxP1W3QADG=JBp9JbgaAwo=F2Q@mail.gmail.com>
-Message-ID: <B256D81BAE5131468A838E5D7A24364154236AB5@penmbx02>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 2 May 2013 10:39:00 +0800
+Subject: [PATCH] mxs: icoll: Add function to register an interrupt as FIQ
+ source
+In-Reply-To: <1367243917-5177-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1367243917-5177-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130502023858.GD3442@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Joachim,
+On Mon, Apr 29, 2013 at 03:58:37PM +0200, Maxime Ripard wrote:
+> MXS, unlike other ARM platforms,
 
-> -----Original Message-----
-> From: Joachim Eastwood [mailto:manabian at gmail.com]
-> Sent: 2013?3?7? 20:31
-> To: Yang, Wenyou
-> Cc: linux-arm-kernel at lists.infradead.org; grant.likely at secretlab.ca; Ferre,
-> Nicolas; plagnioj at jcrosoft.com; richard.genoud at gmail.com; Lin, JM;
-> spi-devel-general at lists.sourceforge.net; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
-> xfer->speed_hz set
-> 
-> On 7 March 2013 04:26, Wenyou Yang <wenyou.yang@atmel.com> wrote:
-> > commit: 059b8ffeee5b427949872bb6ed5db5ae0788054e
-> > cause the atmel spi probing failure.
-> >
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > Cc: spi-devel-general at lists.sourceforge.net
-> > Cc: linux-kernel at vger.kernel.org
-> > ---
-> >  drivers/spi/spi-atmel.c |    6 +++---
-> >  1 file changed, 3 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> > index 656d137..1eca815 100644
-> > --- a/drivers/spi/spi-atmel.c
-> > +++ b/drivers/spi/spi-atmel.c
-> > @@ -846,9 +846,9 @@ static int atmel_spi_transfer(struct spi_device *spi,
-> struct spi_message *msg)
-> >                         }
-> >                 }
-> >
-> > -               /* FIXME implement these protocol options!! */
-> > -               if (xfer->speed_hz) {
-> > -                       dev_dbg(&spi->dev, "no protocol options
-> yet\n");
-> > +               if (xfer->speed_hz < spi->max_speed_hz) {
-> > +                       dev_dbg(&spi->dev,
-> > +                               "speed in transfer less than bus
-> speed\n");
-> >                         return -ENOPROTOOPT;
-> >                 }
-> 
-> I sent a similar patch to spi-devl a while ago, which Grant said he applied.
-> https://patchwork.kernel.org/patch/2165301/
-> 
-> Can't find the patch in any upstream git tree so I guess Grant hasn't
-> pushed it yet.
-This patch hasn't still applied in any upstream git tree, so Atmel spi master doesn't work.
-Could you help do some ping it? 
+How are other ARM platforms handling that?
 
-Thanks.
-
+> has no way to make a FIQ from an
+> interrupt from a driver, without poking directly into the icoll.
 > 
-> regards
-> Joachim Eastwood
+> Add an exported function to do this.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/mach-mxs/icoll.c | 11 +++++++++++
 
-Best Regards,
-Wenyou Yang
+This will become drivers/irqchip/irq-mxs.c after the merge window.
+
+Shawn
+
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/mach-mxs/icoll.c b/arch/arm/mach-mxs/icoll.c
+> index 8fb23af..1bb16da 100644
+> --- a/arch/arm/mach-mxs/icoll.c
+> +++ b/arch/arm/mach-mxs/icoll.c
+> @@ -16,6 +16,7 @@
+>   * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+>   */
+>  
+> +#include <linux/export.h>
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/irq.h>
+> @@ -34,6 +35,7 @@
+>  #define HW_ICOLL_INTERRUPTn_SET(n)		(0x0124 + (n) * 0x10)
+>  #define HW_ICOLL_INTERRUPTn_CLR(n)		(0x0128 + (n) * 0x10)
+>  #define BM_ICOLL_INTERRUPTn_ENABLE		0x00000004
+> +#define BM_ICOLL_INTERRUPTn_FIQ_ENABLE		0x00000010
+>  #define BV_ICOLL_LEVELACK_IRQLEVELACK__LEVEL0	0x1
+>  
+>  #define ICOLL_NUM_IRQS		128
+> @@ -41,6 +43,15 @@
+>  static void __iomem *icoll_base = MXS_IO_ADDRESS(MXS_ICOLL_BASE_ADDR);
+>  static struct irq_domain *icoll_domain;
+>  
+> +void mxs_icoll_set_irq_fiq(unsigned int irq)
+> +{
+> +	struct irq_data *d = irq_get_irq_data(irq);
+> +
+> +	__raw_writel(BM_ICOLL_INTERRUPTn_FIQ_ENABLE,
+> +		     icoll_base + HW_ICOLL_INTERRUPTn_SET(d->hwirq));
+> +}
+> +EXPORT_SYMBOL(mxs_icoll_set_irq_fiq);
+> +
+>  static void icoll_ack_irq(struct irq_data *d)
+>  {
+>  	/*
+> -- 
+> 1.8.1.2
+> 
