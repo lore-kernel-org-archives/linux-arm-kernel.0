@@ -1,27 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 May 2013 18:26:41 +0200
-Subject: [PATCH, RFC 08/22] OMAPDSS: DPI needs DSI
-In-Reply-To: <5182896F.90807@ti.com>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-9-git-send-email-arnd@arndb.de> <5182896F.90807@ti.com>
-Message-ID: <201305021826.41263.arnd@arndb.de>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Thu, 02 May 2013 20:28:44 +0400
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSF0gQVJNOiBPTUFQLVVTQjogRml4IHBvc3NpYmxlIG1l?=
+ =?UTF-8?B?bW9yeSBsZWFr?=
+In-Reply-To: <20130502162433.GA10016@kahuna>
+References: <1367510596-27780-1-git-send-email-shc_work@mail.ru>
+ <20130502162433.GA10016@kahuna>
+Message-ID: <1367512124.978518915@f372.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 May 2013, Tomi Valkeinen wrote:
-> On 05/02/2013 06:16 PM, Arnd Bergmann wrote:
-> > The dpi.c file cannot be build correctly when the dsi.c file is
-> > disabled in Kconfig. This clarifies the dependency in Kconfig
-> > to avoid build errors:
+> On 20:03-20130502, Alexander Shiyan wrote:
 > > 
-> > drivers/video/omap2/dss/dpi.c: In function 'dpi_calc_pll_cb':
-> > drivers/video/omap2/dss/dpi.c:181:2: error: implicit declaration of function 'dsi_hsdiv_calc' [-Werror=implicit-function-declaration]
-> > drivers/video/omap2/dss/dpi.c: In function 'dpi_dsi_clk_calc':
-> > drivers/video/omap2/dss/dpi.c:201:2: error: implicit declaration of function 'dsi_get_pll_clkin' [-Werror=implicit-function-declaration]
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+> >  arch/arm/mach-omap2/usb-host.c | 21 +++++++++++++++++----
+> >  1 file changed, 17 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
+> > index aa27d7f..8d17a0d 100644
+> > --- a/arch/arm/mach-omap2/usb-host.c
+> > +++ b/arch/arm/mach-omap2/usb-host.c
+> > @@ -570,8 +570,10 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
+> >  	supplies->dev_name = dev_id;
+> >  
+> >  	reg_data = kzalloc(sizeof(*reg_data), GFP_KERNEL);
+> > -	if (!reg_data)
+> > +	if (!reg_data) {
+> > +		kfree(supplies);
+> >  		return -ENOMEM;
+> > +	}
+> >  
+> >  	reg_data->constraints.valid_ops_mask = REGULATOR_CHANGE_STATUS;
+> >  	reg_data->consumer_supplies = supplies;
+> > @@ -579,8 +581,11 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
+> >  
+> >  	config = kmemdup(&hsusb_reg_config, sizeof(hsusb_reg_config),
+> >  			GFP_KERNEL);
+> > -	if (!config)
+> > +	if (!config) {
+> > +		kfree(supplies);
+> > +		kfree(reg_data);
+> >  		return -ENOMEM;
+> > +	}
+> >  
+> >  	config->supply_name = name;
+> >  	config->gpio = gpio;
+> > @@ -589,17 +594,25 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
+> >  
+> >  	/* create a regulator device */
+> >  	pdev = kzalloc(sizeof(*pdev), GFP_KERNEL);
+> > -	if (!pdev)
+> > +	if (!pdev) {
+> > +		kfree(supplies);
+> > +		kfree(reg_data);
+> > +		kfree(config);
+> >  		return -ENOMEM;
+> > +	}
+> >  
+> >  	pdev->id = PLATFORM_DEVID_AUTO;
+> >  	pdev->name = reg_name;
+> >  	pdev->dev.platform_data = config;
+> >  
+> >  	ret = platform_device_register(pdev);
+> > -	if (ret)
+> > +	if (ret) {
+> >  		pr_err("%s: Failed registering regulator %s for %s\n",
+> >  				__func__, name, dev_id);
+> > +		kfree(supplies);
+> > +		kfree(reg_data);
+> > +		kfree(config);
+> > +	}
 > 
-> I've sent a patch for this to DRM maintainer, hopefully merged soon.
-> 
+> Might be better to switch to devm_XXX managed functions?
 
-Ok, thanks!
+If anyone can rewrite driver to use devm_xx, it would have been better.
+I'm not going to redo the patch yet, let it be so, I just showed a point
+for OMAP-developers.
+Thanks.
 
-	Arnd
+---
