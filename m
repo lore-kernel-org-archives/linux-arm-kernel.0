@@ -1,30 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 2 May 2013 14:02:45 +0800
-Subject: Latest build results - errors/warnings - lots of them
-In-Reply-To: <201304301304.20650.arnd@arndb.de>
-References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
- <201304301304.20650.arnd@arndb.de>
-Message-ID: <20130502060242.GA3616@S2101-09.ap.freescale.net>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 2 May 2013 08:14:59 +0200
+Subject: [PATCH v3] ARM: imx: replicate the diagnostic register of boot
+ cpu into secondary cores
+In-Reply-To: <20130502022147.GC3442@S2101-09.ap.freescale.net>
+References: <1366948645-12060-1-git-send-email-shawn.guo@linaro.org>
+ <20130426132130.GE30858@mudshark.cambridge.arm.com>
+ <20130426134722.GA1943@S2101-09.ap.freescale.net>
+ <5181357E.3090805@gmail.com>
+ <20130501153828.GC24055@mudshark.cambridge.arm.com>
+ <5181408C.8090606@gmail.com>
+ <20130501163817.GD24055@mudshark.cambridge.arm.com>
+ <20130502022147.GC3442@S2101-09.ap.freescale.net>
+Message-ID: <51820463.8050000@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 30, 2013 at 01:04:20PM +0200, Arnd Bergmann wrote:
-> >arch/arm/mach-imx/hotplug.c: In function 'imx_cpu_die':
-> >arch/arm/mach-imx/hotplug.c:53:2: error: implicit declaration of function 'cpu_do_idle'
-> >arch/arm/mach-imx/hotplug.c: In function 'imx_cpu_kill':
-> >arch/arm/mach-imx/hotplug.c:58:26: error: 'jiffies' undeclared (first use in this function)
-> >arch/arm/mach-imx/hotplug.c:58:2: error: implicit declaration of function 'msecs_to_jiffies'
-> >arch/arm/mach-imx/hotplug.c:61:3: error: implicit declaration of function 'time_after'
+On 02.05.2013 04:21, Shawn Guo wrote:
+> On Wed, May 01, 2013 at 05:38:17PM +0100, Will Deacon wrote:
+>> On Wed, May 01, 2013 at 05:19:24PM +0100, Dirk Behme wrote:
+>>> Am 01.05.2013 17:38, schrieb Will Deacon:
+>>>> On Wed, May 01, 2013 at 04:32:14PM +0100, Dirk Behme wrote:
+>>> Just for a better understanding: What's wrong with using the same
+>>> register values on all CPUx? I.e. with copying them from CPU0?
+>>> Shouldn't all CPUx use the same setting? Or at least the same errata
+>>> bits enabled?
+>>
+>> There's this thing called big.LITTLE... In this case, we're all A9s, but it
+>> still feels horrible.
+>
+> It sounds more like a feeling instead of any issue in real.  Unless I
+> hear some convincing technical explanation, I will send the patch for
+> -rc to fix the broken reboot on imx6q.
 
-...
+As v3 of this patch touches only i.MX specific code, we know that i.MX6 
+isn't big.LITTLE and all CPUx are the same, I agree with Shawn that it's 
+ok to do it this way to fix a real bug.
 
-> >In file included from arch/arm/mach-imx/hotplug.c:16:0:
-> >arch/arm/mach-imx/common.h:100:29: warning: 'struct pt_regs' declared inside parameter list
-> >arch/arm/mach-imx/common.h:100:29: warning: its scope is only this definition or declaration, which is probably not what you want
-> >arch/arm/mach-imx/common.h:101:29: warning: 'struct pt_regs' declared inside parameter list
+Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
 
-I just send a patch [1] to fix these.
+Thanks and best regards
 
-Shawn
-
-[1] http://www.spinics.net/lists/arm-kernel/msg241316.html
+Dirk
