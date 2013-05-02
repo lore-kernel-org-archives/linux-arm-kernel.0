@@ -1,100 +1,161 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 May 2013 10:46:21 +0100
-Subject: Latest build results - errors/warnings - lots of them
-In-Reply-To: <20130502083430.GB21614@n2100.arm.linux.org.uk>
-References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
- <201304301304.20650.arnd@arndb.de> <20130430114229.GA2439@linaro.org>
- <alpine.LFD.2.03.1304301110030.17372@syhkavp.arg>
- <20130430172816.GA31101@linaro.org>
- <alpine.LFD.2.03.1304301418100.17372@syhkavp.arg>
- <20130502083430.GB21614@n2100.arm.linux.org.uk>
-Message-ID: <20130502094620.GC21614@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 2 May 2013 10:54:31 +0100
+Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <20130501190441.GA22227@schnuecks.de>
+References: <20121118211005.GW22106@titan.lakedaemon.net>
+ <20130418111608.GF27197@titan.lakedaemon.net>
+ <20130418112201.GQ14496@n2100.arm.linux.org.uk>
+ <20130418114016.GG27197@titan.lakedaemon.net>
+ <20130418135104.GA18616@arm.com>
+ <20130421220629.GA25571@schnuecks.de>
+ <20130430112225.GD29766@arm.com>
+ <20130430210403.GA18076@schnuecks.de>
+ <20130501142206.GB17387@arm.com>
+ <20130501190441.GA22227@schnuecks.de>
+Message-ID: <20130502095431.GA20730@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 09:34:30AM +0100, Russell King - ARM Linux wrote:
-> On Tue, Apr 30, 2013 at 02:18:42PM -0400, Nicolas Pitre wrote:
-> > On Tue, 30 Apr 2013, Dave Martin wrote:
-> > 
-> > > On Tue, Apr 30, 2013 at 11:12:12AM -0400, Nicolas Pitre wrote:
-> > > > On Tue, 30 Apr 2013, Dave Martin wrote:
+On Wed, May 01, 2013 at 08:04:41PM +0100, Simon Baatz wrote:
+> On Wed, May 01, 2013 at 03:22:06PM +0100, Catalin Marinas wrote:
+> > On Tue, Apr 30, 2013 at 10:04:03PM +0100, Simon Baatz wrote:
+> > > On Tue, Apr 30, 2013 at 12:22:25PM +0100, Catalin Marinas wrote:
+> > > > On Sun, Apr 21, 2013 at 11:06:30PM +0100, Simon Baatz wrote:
+> > > > > On Thu, Apr 18, 2013 at 02:51:04PM +0100, Catalin Marinas wrote:
+> > > > > > On Thu, Apr 18, 2013 at 12:40:16PM +0100, Jason Cooper wrote:
+> > > ...
+> > > > > 
+> > > > > It is not the driver itself which is using the API, it is the
+> > > > > generic scatterlist memory iterator. And I don't think that this is
+> > > > > wrong, as I have tried to explain in [1].
 > > > > 
-> > > > > On Tue, Apr 30, 2013 at 01:04:20PM +0200, Arnd Bergmann wrote:
-> > > > > > On Tuesday 30 April 2013, Russell King - ARM Linux wrote:
-> > > > > > > Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
-> > > > > > > great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
-> > > > > > > arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
-> > > > > > > source of errors.
-> > > > > 
-> > > > > [...]
-> > > > >  
-> > > > > > >arch/arm/common/mcpm_head.S:39: Error: selected processor does not support ARM mode `ubfx r9,r0,#0,#8'
-> > > > > > >arch/arm/common/mcpm_head.S:40: Error: selected processor does not support ARM mode `ubfx r10,r0,#8,#8'
-> > > > > > >arch/arm/common/mcpm_head.S:100: Error: selected processor does not support ARM mode `dmb'
-> > > > > > >arch/arm/common/mcpm_head.S:115: Error: selected processor does not support ARM mode `dmb'
-> > > > > > >arch/arm/common/mcpm_head.S:127: Error: selected processor does not support ARM mode `dmb'
-> > > > > > >arch/arm/common/mcpm_head.S:131: Error: selected processor does not support ARM mode `dmb'
-> > > > > > >arch/arm/common/mcpm_head.S:138: Error: selected processor does not support ARM mode `dsb'
-> > > > > > >arch/arm/common/mcpm_head.S:152: Error: selected processor does not support ARM mode `dmb'
-> > > > > > >arch/arm/common/mcpm_head.S:161: Error: selected processor does not support ARM mode `dmb'
-> > > > > > >arch/arm/common/mcpm_head.S:175: Error: selected processor does not support ARM mode `dmb'
-> > > > > > >arch/arm/common/vlock.S:62: Error: selected processor does not support ARM mode `dmb'
-> > > > > > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dmb'
-> > > > > > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dsb'
-> > > > > > >arch/arm/common/vlock.S:89: Error: selected processor does not support ARM mode `dmb'
-> > > > > > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dmb'
-> > > > > > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dsb'
-> > > > > > >arch/arm/common/vlock.S:102: Error: selected processor does not support ARM mode `dmb'
-> > > > > > >arch/arm/common/vlock.S:105: Error: selected processor does not support ARM mode `dsb'
-> > > > > > 
-> > > > > > Right, the problem here is that the code was never tested with an ARMv6+ARMv7 config.
-> > > > > > We can either fix it up by adding
-> > > > > > 
-> > > > > > 	.arch	armv7-a
-> > > > > > 
-> > > > > > in the assembly files, or by doing the same in the Makefile:
-> > > > > > 
-> > > > > > AFLAGS_vlock.S += -march=armv7-a
-> > > > > > AFLAGS_mcpm_head.S += -march=armv7-a
-> > > > > 
-> > > > > 
-> > > > > Hmmm, this code was tested with ARCH_MULTIPLATFORM, but it looks like
-> > > > > no v6 boards were configured in when testing that...
-> > > > > 
-> > > > > 
-> > > > > Assuming people are OK with the Makefile route, here's a patch for that,
-> > > > > build-tested with a v6+v7 ARCH_MULTIPLATFORM config.
+> > > > Trying to remember what we've discussed over the past months on this
+> > > > topic. It looks like sg_miter_stop() does the right thing in calling
+> > > > flush_kernel_dcache_page(). Commit f8b63c1 (ARM: 6382/1: Remove
+> > > > superfluous flush_kernel_dcache_page()) removed this function entirely.
+> > > > The code previously had this comment - /* highmem pages are always
+> > > > flushed upon kunmap already */ which I think it wasn't fully correct
+> > > > either. The kunmap_atomic() flushes the caches but kunmap() doesn't, so
+> > > > I suspect we only get the flushing if SG_MITER_ATOMIC.
 > > > > 
-> > > > Isn't the .arch armv7-a route a bit cleaner?  That would have been my 
-> > > > choice, although I don't feel strongly about it.
+> > > > So it looks to me like flush_kernel_dcache_page() should be implemented
+> > > > even for highmem pages (with VIVT or aliasing VIPT, at least for non
+> > > > kmap_atomic addresses by checking for FIXADDR_START). If highmem is
+> > > > disabled, I suspect we still need this function since the calling code
+> > > > doesn't care whether kmap/kunmap was a no-op. But can we keep it as a
+> > > > simple call to __cpuc_flush_dcache_area(page_address(page), PAGE_SIZE)?
 > > > 
-> > > I don't feel strongly either.  We already have the CFLAGS_DISABLE stuff,
-> > > so it didn't feel that unnatural to add this in the Makefile; but .arch
-> > > would work equally well.
+> > > My first version ([1]) had:
 > > > 
-> > > If somebody wants to change it, it's not a problem for me, but I didn't
-> > > want to create extra disruption by proposing a different patch...
+> > > 	if ((cache_is_vivt() || cache_is_vipt_aliasing()) && !PageHighMem(page))
+> > > 		__flush_kernel_dcache_page(page);
+> > > 
+> > > If I understand this correctly, you are proposing to remove the
+> > > highmem exclusion.
 > > 
-> > Fair enough.
+> > The highmem exclusion may have been there originally because of a
+> > comment suggesting that kunmap() does the flushing. This is the case
+> > only for kunmap_atomic() AFAICT (and maybe we could remove that as well
+> > and rely on flush_kernel_dcache_page() being called).
 > > 
-> > Acked-by: Nicolas Pitre <nico@linaro.org>
+> > > And then in __flush_kernel_dcache_page():
+> > > 
+> > > 	mapping = page_mapping(page);
+> > > 
+> > > 	if (!mapping || mapping_mapped(mapping))
+> > > 		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+> > > 
+> > > I still prefer to have this condition here to avoid the flush when
+> > > there is no user mapping at all.  This is handled by lazy flushing
+> > > and is probably the most common case anyway (given how many people
+> > > seem to be affected by this problem).
+> > 
+> > Looking at the old thread, you said there is a case when this condition
+> > is not true (O_DIRECT case). If that's for a page cache page, then we
+> > can handle it lazily (for anonymous pages I don't think we can rely on
+> > lazy flushing since the kernel does not guarantee the clearing of the
+> > PG_arch_1 bit).
 > 
-> I see Dave Martin has sent a patch for this without your ack.  Was that
-> a mistake?
+> As Russel pointed out in a comment to a later version of the patch,
+> PG_arch_1 makes only sense for page cache pages. The condition above
+> is ok from my point of view (it is based on what flush_dcache_page()
+> uses):
+> 
+> - Page cache page without user space mapping:
+> mapping != NULL and mapping_mapped() == 0
+> 
+> -> no flush here; lazy flush based on PG_arch_1 later if needed (we
+>    rely on the proper initialization of the page to "dirty" here.)
 
-... and the patch in the patch system doesn't apply anyway because its
-against some other tree.  I've no idea what it's against, it's not as
-the version on the patch advertises (v3.9-rc7) and not even the build
-tree has the three additional FIQ lines at the end (so it's not in
-arm-soc):
+Indeed.
 
- obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
- obj-$(CONFIG_ARM_TIMER_SP804)  += timer-sp.o
- obj-$(CONFIG_MCPM)             += mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock...
-+AFLAGS_mcpm_head.o             := -march=armv7-a
-+AFLAGS_vlock.o                 := -march=armv7-a
- CFLAGS_REMOVE_mcpm_entry.o     = -pg
- obj-$(CONFIG_FIQ_GLUE)         += fiq_glue.o fiq_glue_setup.o
- obj-$(CONFIG_FIQ_DEBUGGER)     += fiq_debugger.o
+> - Page cache page with user space mapping:
+> mapping != NULL and mapping_mapped() != 0
+> 
+> -> kernel mapping flushed here (user mapping can be assumed to be clean)
 
-So, this is unapplyable.
+We had similar thoughts for AArch64 here and decided it's not needed, it
+can just clear the PG_arch_1 bit and do it lazily (patches not pushed
+yet, need more testing). This assumes that even if mapping_mapped(), the
+page is not actually mapped in user space and we eventually get a
+set_pte_at() call. That's what powerpc is doing.
+
+> - Anonymous page:
+> mapping == NULL
+> 
+> -> kernel mapping flushed here (user mapping can be assumed to be clean)
+
+I don't think it should care about anonymous pages at all. I put a
+WARN_ON(!mapping) in flush_dcache_page() and it hasn't triggered yet,
+though not intensive testing.
+
+> > > Additionally, although we can assume that the page is kmapped,
+> > > page_address(page) can still be NULL for a highmem page, right?
+> > 
+> > It looks like kmap() always sets page_address(page) but I'm not sure
+> > about kmap_atomic(), it doesn't seem to.
+> 
+> Hmm, in __flush_dcache_page() we have the following code to flush the
+> kernel mapping:
+> 
+> void __flush_dcache_page(struct address_space *mapping, struct page *page)
+> {
+> 	/*
+> 	 * Writeback any data associated with the kernel mapping of this
+> 	 * page.  This ensures that data in the physical page is mutually
+> 	 * coherent with the kernels mapping.
+> 	 */
+> 	if (!PageHighMem(page)) {
+> 		__cpuc_flush_dcache_area(page_address(page), PAGE_SIZE);
+> 	} else {
+> 		void *addr = kmap_high_get(page);
+> 		if (addr) {
+> 			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+> 			kunmap_high(page);
+> 		} else if (cache_is_vipt()) {
+> 			/* unmapped pages might still be cached */
+> 			addr = kmap_atomic(page);
+> 			__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+> 			kunmap_atomic(addr);
+> 		}
+> 	}
+> ...
+> 
+> 
+> We probably should reuse it in flush_kernel_dcache_page() to flush
+> the kernel mapping. (The last else clause looks strange though)
+
+I think it makes sense to reuse this logic in
+flush_kernel_dcache_page(). If the page is already mapped with kmap,
+then kmap_high_get() should return the actual address. If it was mapped
+with kmap_atomic, kmap_high_get() would return NULL, hence the 'else'
+clause and the additional kmap_atomic(). The cache_is_vipt() check is
+useful because kunmap_atomic() would flush VIVT caches anyway.
+
+As for __flush_dcache_page() called from other places like
+flush_dcache_page(), because of this 'else if' clause it looks like it
+misses flushing unmapped highmem pages on VIVT cache.
+
+-- 
+Catalin
