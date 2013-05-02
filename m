@@ -1,68 +1,59 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 2 May 2013 11:52:46 +0100
-Subject: [PATCH 10/10] ARM: ux500: Remove empty function
- u8500_of_init_devices()
-In-Reply-To: <1366729394-11406-11-git-send-email-lee.jones@linaro.org>
-References: <1366729394-11406-1-git-send-email-lee.jones@linaro.org>
- <1366729394-11406-11-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130502105246.GK25256@gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 2 May 2013 11:54:16 +0100
+Subject: [Xen-devel] [PATCH 3/3] xen/arm: account for stolen ticks
+In-Reply-To: <1367491708.21869.77.camel@zakaz.uk.xensource.com>
+References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
+ <1367436460-10183-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1367482862.21869.28.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.02.1305021134160.5398@kaball.uk.xensource.com>
+ <1367491708.21869.77.camel@zakaz.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1305021153220.5398@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 23 Apr 2013, Lee Jones wrote:
-
-> As promised, now all devices which resided in u8500_of_init_devices()
-> have been enabled for Device Tree, we can completely remove it.
+On Thu, 2 May 2013, Ian Campbell wrote:
+> On Thu, 2013-05-02 at 11:38 +0100, Stefano Stabellini wrote:
+> > On Thu, 2 May 2013, Ian Campbell wrote:
+> > > On Wed, 2013-05-01 at 20:27 +0100, Stefano Stabellini wrote:
+> > > > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > > > index d30042e..8f040a0 100644
+> > > > --- a/arch/arm/xen/enlighten.c
+> > > > +++ b/arch/arm/xen/enlighten.c
+> > > > @@ -14,6 +14,7 @@
+> > > >  #include <xen/xen-ops.h>
+> > > >  #include <asm/xen/hypervisor.h>
+> > > >  #include <asm/xen/hypercall.h>
+> > > > +#include <asm/arch_timer.h>
+> > > >  #include <asm/system_misc.h>
+> > > >  #include <linux/interrupt.h>
+> > > >  #include <linux/irqreturn.h>
+> > > > @@ -172,6 +173,8 @@ static int __init xen_secondary_init(unsigned int cpu)
+> > > >  		   later ones fail to. */
+> > > >  		per_cpu(xen_vcpu, cpu) = vcpup;
+> > > >  	}
+> > > > +
+> > > > +	xen_setup_runstate_info(cpu);
+> > > 
+> > > Is this called for the boot processor too?
+> > 
+> > Yep.
+> > 
+> > > (do you have a linux-next branch where I can easily find the baseline
+> > > for this series?)
+> > 
+> > git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git lost_ticks_1
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/mach-ux500/cpu-db8500.c |   14 +-------------
->  1 file changed, 1 insertion(+), 13 deletions(-)
+> Is that your Xen tree, I was after the Linux one...
+
+nope, that's my Linux tree disguised as a Xen tree to confuse the
+maintainers ;-)
+
+> > It's based on my 3.9-rc3-smp-6 branch currently in linux-next (that is
+> > based on 3.9-rc3).
+> > However lost_ticks_1 is not in linux-next yet.
 > 
-> diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-> index 36ef6ed..a2c83c2 100644
-> --- a/arch/arm/mach-ux500/cpu-db8500.c
-> +++ b/arch/arm/mach-ux500/cpu-db8500.c
-> @@ -221,15 +221,6 @@ struct device * __init u8500_init_devices(struct ab8500_platform_data *ab8500)
->  }
->  
->  #ifdef CONFIG_MACH_UX500_DT
-> -
-> -/* TODO: Once all pieces are DT:ed, remove completely. */
-> -static struct device * __init u8500_of_init_devices(void)
-> -{
-> -	struct device *parent = db8500_soc_device_init();
-> -
-> -	return parent;
-> -}
-> -
->  static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
->  	/* Requires call-back bindings. */
->  	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
-> @@ -288,7 +279,7 @@ static const struct of_device_id u8500_local_bus_nodes[] = {
->  
->  static void __init u8500_init_machine(void)
->  {
-> -	struct device *parent = NULL;
-> +	struct device *parent = db8500_soc_device_init();
->  
->  	/* Pinmaps must be in place before devices register */
->  	if (of_machine_is_compatible("st-ericsson,mop500"))
-> @@ -301,9 +292,6 @@ static void __init u8500_init_machine(void)
->  	else if (of_machine_is_compatible("st-ericsson,ccu9540")) {}
->  		/* TODO: Add pinmaps for ccu9540 board. */
->  
-> -	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
-> -	parent = u8500_of_init_devices();
-> -
->  	/* automatically probe child nodes of db8500 device */
->  	of_platform_populate(NULL, u8500_local_bus_nodes, u8500_auxdata_lookup, parent);
->  }
+> Which branch is in Linux next? It doesn't seem to be your linux-next
+> (last commit 2011).
 
-Linus, poke.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+that would be linux-next from
+git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git
