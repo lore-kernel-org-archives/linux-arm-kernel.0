@@ -1,36 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 May 2013 17:27:57 +0200
-Subject: [PATCH] ARM: imx: compile fix for hotplug.c
-In-Reply-To: <1367474331-3479-1-git-send-email-shawn.guo@linaro.org>
-References: <1367474331-3479-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201305021727.57769.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 2 May 2013 16:31:34 +0100
+Subject: [PATCH v3 20/32] arm64: KVM: Plug the arch timer
+In-Reply-To: <5177C577.2050209@arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-21-git-send-email-marc.zyngier@arm.com>
+ <20130423230024.GH20569@gmail.com> <5177C577.2050209@arm.com>
+Message-ID: <20130502153134.GH20730@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 May 2013, Shawn Guo wrote:
-> Commit bca7a5a (ARM: cpu hotplug: remove majority of cache flushing
-> from platforms) removes include of <asm/cacheflush.h> and hence
-> discovers a few indirect inclusion and declaration problems as below.
+On Wed, Apr 24, 2013 at 12:43:51PM +0100, Marc Zyngier wrote:
+> On 24/04/13 00:00, Christoffer Dall wrote:
+> > On Mon, Apr 08, 2013 at 05:17:22PM +0100, Marc Zyngier wrote:
+> >> Add support for the in-kernel timer emulation. The include file
+> >> is a complete duplicate of the 32bit one - something to fix
+> >> at one point.
+> > 
+> > again, I'd really like to see this fixed before we merge the code...
 > 
->   CC      arch/arm/mach-imx/hotplug.o
-> In file included from arch/arm/mach-imx/hotplug.c:16:0:
-> arch/arm/mach-imx/common.h:100:29: warning: ?struct pt_regs? declared inside parameter list [enabled by default]
-> arch/arm/mach-imx/common.h:100:29: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
-> arch/arm/mach-imx/common.h:101:29: warning: ?struct pt_regs? declared inside parameter list [enabled by default]
-> arch/arm/mach-imx/hotplug.c: In function ?imx_cpu_die?:
-> arch/arm/mach-imx/hotplug.c:53:2: error: implicit declaration of function ?cpu_do_idle? [-Werror=implicit-function-declaration]
-> arch/arm/mach-imx/hotplug.c: In function ?imx_cpu_kill?:
-> arch/arm/mach-imx/hotplug.c:58:26: error: ?jiffies? undeclared (first use in this function)
-> arch/arm/mach-imx/hotplug.c:58:26: note: each undeclared identifier is reported only once for each function it appears in
-> arch/arm/mach-imx/hotplug.c:58:2: error: implicit declaration of function ?msecs_to_jiffies? [-Werror=implicit-function-declaration]
-> arch/arm/mach-imx/hotplug.c:61:3: error: implicit declaration of function ?time_after? [-Werror=implicit-function-declaration]
-> 
-> Fix them by adding the needed inclusion and declaration.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Feel free to suggest a solution. None of the one I tried are nice.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Both arch timers and GIC are now drivers outside the arch/ directories.
+To me it makes sense for emulated device drivers to also live outside
+the arch/ directories, something like virt/kvm/drivers? As you said,
+ioapic is already in virt/kvm.
 
-I found the same thing today, and there seems to be a similar problem for highbank.
-
-	Arnd
+-- 
+Catalin
