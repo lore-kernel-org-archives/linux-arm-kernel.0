@@ -1,30 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 2 May 2013 17:09:07 +0100
-Subject: [PATCH v3 24/32] arm64: KVM: 32bit GP register access
-In-Reply-To: <1365437854-30214-25-git-send-email-marc.zyngier@arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-25-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130502160906.GI20730@arm.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 2 May 2013 18:16:48 +0200
+Subject: [PATCH 0/7] ARM: u300 multiplatform support
+Message-ID: <1367511416-4312-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 05:17:26PM +0100, Marc Zyngier wrote:
->  static inline bool kvm_vcpu_reg_is_pc(const struct kvm_vcpu *vcpu, int reg)
->  {
-> -	return false;
-> +	return (vcpu_mode_is_32bit(vcpu)) && reg == 15;
->  }
+From: Linus Walleij <linus.walleij@linaro.org>
 
-On AArch64, would ESR_EL2 have SRT == 15 when the source/destination
-register is PC? The mapping between AArch32 and AArch64 registers
-suggests R13_hyp. Maybe 15 is correct but it's not clear to me from the
-spec.
+This series builds on top of the recently iterated U300
+device tree support to convert the platform to multiplatform
+(a.k.a. single zImage).
 
-BTW, on arch/arm it looks like this is used when you get a data abort
-with PC as the destination register and you inject a prefetch abort in
-this case. Why isn't this a normal data abort? Once you get the
-information, you load it into PC but first you need to sort out the data
-abort (unless I don't understand how the kvm_inject_pabt works).
+This is intended to be pulled on top of the DT support.
+
+Linus Walleij (7):
+  ARM: u300: push down syscon registers
+  ARM: u300: remove deps from debug macro
+  ARM: u300: delete <mach/hardware.h>
+  ARM: u300: delete <mach/irqs.h>
+  ARM: u300: localize <mach/u300-regs.h>
+  ARM: u300: convert to multiplatform
+  ARM: u300: delete remnant machine headers
+
+ arch/arm/Kconfig                                  |  21 +-
+ arch/arm/configs/u300_defconfig                   |  11 +-
+ arch/arm/include/debug/u300.S                     |   9 +-
+ arch/arm/mach-u300/Kconfig                        |  31 +-
+ arch/arm/mach-u300/core.c                         |  29 +-
+ arch/arm/mach-u300/include/mach/hardware.h        |   5 -
+ arch/arm/mach-u300/include/mach/irqs.h            |  80 ---
+ arch/arm/mach-u300/include/mach/syscon.h          | 592 ----------------------
+ arch/arm/mach-u300/include/mach/timex.h           |  17 -
+ arch/arm/mach-u300/include/mach/uncompress.h      |  45 --
+ arch/arm/mach-u300/regulator.c                    |   9 +-
+ arch/arm/mach-u300/timer.c                        |   3 -
+ arch/arm/mach-u300/{include/mach => }/u300-regs.h |   0
+ drivers/clk/clk-u300.c                            | 343 ++++++++++++-
+ 14 files changed, 407 insertions(+), 788 deletions(-)
+ delete mode 100644 arch/arm/mach-u300/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-u300/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-u300/include/mach/syscon.h
+ delete mode 100644 arch/arm/mach-u300/include/mach/timex.h
+ delete mode 100644 arch/arm/mach-u300/include/mach/uncompress.h
+ rename arch/arm/mach-u300/{include/mach => }/u300-regs.h (100%)
 
 -- 
-Catalin
+1.7.11.3
