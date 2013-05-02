@@ -1,42 +1,41 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Thu,  2 May 2013 09:37:46 -0300
-Subject: [PATCH] ARM: sun4i: cubieboard: Enable the i2c controllers
-Message-ID: <1367498266-1246-1-git-send-email-emilio@elopez.com.ar>
+From: holt@sgi.com (Robin Holt)
+Date: Thu, 2 May 2013 07:49:06 -0500
+Subject: [PATCH -v7 10/11] arm, change reboot_mode to use enum reboot_mode
+In-Reply-To: <20130502073020.GC26361@gmail.com>
+References: <1367428011-17123-1-git-send-email-holt@sgi.com>
+ <1367428011-17123-11-git-send-email-holt@sgi.com>
+ <20130502073020.GC26361@gmail.com>
+Message-ID: <20130502124906.GW3658@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cubieboard makes use of the first two i2c controllers found on the
-Allwinner A10; i2c-0 is used internally for the PMIC, while i2c-1
-is exposed on the board headers. This patch enables them in the device
-tree.
+On Thu, May 02, 2013 at 09:30:20AM +0200, Ingo Molnar wrote:
+> 
+> * Robin Holt <holt@sgi.com> wrote:
+> 
+> >  #ifndef __ASSEMBLY__
+> >  
+> >  #include <linux/types.h>
+> > +#include <linux/reboot.h>
+> >  
+> >  void iop3xx_map_io(void);
+> >  void iop_init_cp6_handler(void);
+> >  void iop_init_time(unsigned long tickrate);
+> > -void iop3xx_restart(char, const char *);
+> > +void iop3xx_restart(enum reboot_mode, const char *);
+> 
+> IMO the introduction of the enum is making things cleaner here all around.
+> 
+> As long as it's an equivalent transformation for ARM with no reduction in 
+> functionality (i.e. please fix any bugs Russell found), this all looks 
+> like a nice series.
+> 
+> Is there no parameter namespace clash between reboot modifier strings on 
+> various architectures? I.e. 's' meaning something on x86 and meaning a 
+> different thing on ARM or some other architecture.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
----
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+There is.  I used an #ifdef in kernel/reboot.c.  Also w[arm] | c[old]
+on x86 becomes s[oft] | h[ard] | g[pio] on arm/unicore32. (Well, I just
+added gpio that to the patch set after noticing I missed it earlier).
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index b70fe0d..0e22a28 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -41,6 +41,18 @@
- 			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pins_a>;
-+			status = "okay";
-+		};
- 	};
- 
- 	leds {
--- 
-1.8.2.2
+Robin
