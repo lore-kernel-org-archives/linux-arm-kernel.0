@@ -1,47 +1,142 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 02 May 2013 10:35:19 +0200
-Subject: [PATCH] mxs: icoll: Add function to register an interrupt as
- FIQ source
-In-Reply-To: <20130502023858.GD3442@S2101-09.ap.freescale.net>
-References: <1367243917-5177-1-git-send-email-maxime.ripard@free-electrons.com>
- <20130502023858.GD3442@S2101-09.ap.freescale.net>
-Message-ID: <51822547.20605@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 2 May 2013 09:38:49 +0100
+Subject: [PATCH 12/32] ARM: ux500: Remove superfluous 'psize' attribute
+ from Audio platform data
+In-Reply-To: <20130501144213.GG25256@gmail.com>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-13-git-send-email-lee.jones@linaro.org>
+ <20130501144213.GG25256@gmail.com>
+Message-ID: <20130502083849.GH25256@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Wed, 01 May 2013, Lee Jones wrote:
 
-Le 02/05/2013 04:39, Shawn Guo a ?crit :
-> On Mon, Apr 29, 2013 at 03:58:37PM +0200, Maxime Ripard wrote:
->> MXS, unlike other ARM platforms,
+> On Thu, 18 Apr 2013, Lee Jones wrote:
 > 
-> How are other ARM platforms handling that?
-
-Just like that. You can look at mxc_set_irq_fiq in
-arch/arm/mach-imx/irq-common.c or s3c24xx_set_fiq in
-arch/arm/mach-s3c24xx/irq.c
-
-I've also thought about declaring a IRQ type and using the .irq_set_type
-to register an interrupt as a FIQ source, but since FIQ are
-ARM-specific, it's probably a bad idea.
-
->> has no way to make a FIQ from an
->> interrupt from a driver, without poking directly into the icoll.
->>
->> Add an exported function to do this.
->>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  arch/arm/mach-mxs/icoll.c | 11 +++++++++++
+> > 'psize' is used to calculate the maximum DMA burst size. However it
+> > is only taken into consideration when editing the DMA channel's
+> > configuration. The Audio DMA platform data is only used to allocate
+> > a channel, not configure it. That will be done at a later date within
+> > the MSP driver.
+> > 
+> > We're also removing comments which are no longer required, as
+> > 'data_width' is no longer set in any device's platform data period.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  arch/arm/mach-ux500/board-mop500-audio.c |   38 ------------------------------
+> >  1 file changed, 38 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-ux500/board-mop500-audio.c b/arch/arm/mach-ux500/board-mop500-audio.c
+> > index f012cfa..972bec0 100644
+> > --- a/arch/arm/mach-ux500/board-mop500-audio.c
+> > +++ b/arch/arm/mach-ux500/board-mop500-audio.c
+> > @@ -23,25 +23,13 @@
+> >  static struct stedma40_chan_cfg msp0_dma_rx = {
+> >  	.high_priority = true,
+> >  	.dir = STEDMA40_PERIPH_TO_MEM,
+> > -
+> >  	.dev_type = DB8500_DMA_DEV31_MSP0_SLIM0_CH0,
+> > -
+> > -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
+> > -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
+> > -
+> > -	/* data_width is set during configuration */
+> >  };
+> >  
+> >  static struct stedma40_chan_cfg msp0_dma_tx = {
+> >  	.high_priority = true,
+> >  	.dir = STEDMA40_MEM_TO_PERIPH,
+> > -
+> >  	.dev_type = DB8500_DMA_DEV31_MSP0_SLIM0_CH0,
+> > -
+> > -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
+> > -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
+> > -
+> > -	/* data_width is set during configuration */
+> >  };
+> >  
+> >  struct msp_i2s_platform_data msp0_platform_data = {
+> > @@ -53,25 +41,13 @@ struct msp_i2s_platform_data msp0_platform_data = {
+> >  static struct stedma40_chan_cfg msp1_dma_rx = {
+> >  	.high_priority = true,
+> >  	.dir = STEDMA40_PERIPH_TO_MEM,
+> > -
+> >  	.dev_type = DB8500_DMA_DEV30_MSP3,
+> > -
+> > -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
+> > -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
+> > -
+> > -	/* data_width is set during configuration */
+> >  };
+> >  
+> >  static struct stedma40_chan_cfg msp1_dma_tx = {
+> >  	.high_priority = true,
+> >  	.dir = STEDMA40_MEM_TO_PERIPH,
+> > -
+> >  	.dev_type = DB8500_DMA_DEV30_MSP1,
+> > -
+> > -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
+> > -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
+> > -
+> > -	/* data_width is set during configuration */
+> >  };
+> >  
+> >  struct msp_i2s_platform_data msp1_platform_data = {
+> > @@ -83,29 +59,15 @@ struct msp_i2s_platform_data msp1_platform_data = {
+> >  static struct stedma40_chan_cfg msp2_dma_rx = {
+> >  	.high_priority = true,
+> >  	.dir = STEDMA40_PERIPH_TO_MEM,
+> > -
+> >  	.dev_type = DB8500_DMA_DEV14_MSP2,
+> > -
+> > -	/* MSP2 DMA doesn't work with PSIZE == 4 on DB8500v2 */
+> > -	.src_info.psize = STEDMA40_PSIZE_LOG_1,
+> > -	.dst_info.psize = STEDMA40_PSIZE_LOG_1,
+> > -
+> > -	/* data_width is set during configuration */
+> >  };
+> >  
+> >  static struct stedma40_chan_cfg msp2_dma_tx = {
+> >  	.high_priority = true,
+> >  	.dir = STEDMA40_MEM_TO_PERIPH,
+> > -
+> >  	.dev_type = DB8500_DMA_DEV14_MSP2,
+> > -
+> > -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
+> > -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
+> > -
+> >  	.use_fixed_channel = true,
+> >  	.phy_channel = 1,
+> > -
+> > -	/* data_width is set during configuration */
+> >  };
+> >  
+> >  static struct platform_device *db8500_add_msp_i2s(struct device *parent,
 > 
-> This will become drivers/irqchip/irq-mxs.c after the merge window.
+> Linus, poke.
 
-Ok, I'll rebase and repost then.
+I've just seen this response from you (it didn't make it to my offline
+mail store for some reason):
 
-Thanks,
-Maxime
+> Linus Walleij wrote:
+> So if I understand correctly this is now handled by dmaengine_pcm.c,
+> os that right?
+
+Unfortunately not. At the moment ux500 sound is very broken in
+Mainline. I looked at it recently and the driver is almost completely
+different to the one maintained internally.
+
+There were DMA changes relating to this driver pending for v3.10,
+which I believe have just been taking into -next. I will straighten
+out the DMA issues shortly, but there are other ones remaining still -
+mostly surrounding widgets. Ideally this is something Ola should fix,
+as he has the expertise to do so, but he doesn't appear to have been
+very active upstream of late.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
