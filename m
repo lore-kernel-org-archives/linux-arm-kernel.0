@@ -1,21 +1,31 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 2 May 2013 18:15:16 +0100
-Subject: [PATCH v10 0/2] (arm-soc for v3.10) arm: introduce psci_smp_ops
-In-Reply-To: <alpine.DEB.2.02.1305021811560.5398@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1305021811560.5398@kaball.uk.xensource.com>
-Message-ID: <20130502171516.GA3040@mudshark.cambridge.arm.com>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu,  2 May 2013 10:17:58 -0700
+Subject: [PATCH] ARM: ebsa110: Change the type of ioremap function
+Message-ID: <1367515078-32202-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
+Commit cd024d4245b2bfbd824b911f11a9756d1d6c167d
+(ARM: 7704/1: mm: Use phys_addr_t properly for ioremap functions)
+changed the type of the ioremap functions to actually use phys_addr_t
+instead of unsigned long. Change the type of the arch_ioremap function
+to use phys_addr_t as well.
 
-On Thu, May 02, 2013 at 06:12:12PM +0100, Stefano Stabellini wrote:
-> ping
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
 
-Is this a ping to have this pulled into Russell's tree? If so, might be
-worth sending a pull request to linux+pull at arm.linux.org.uk.
-
-Has this been in -next?
-
-Will
+diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
+index b13cc74..8a53f34 100644
+--- a/arch/arm/mach-ebsa110/core.c
++++ b/arch/arm/mach-ebsa110/core.c
+@@ -116,7 +116,7 @@ static void __init ebsa110_map_io(void)
+ 	iotable_init(ebsa110_io_desc, ARRAY_SIZE(ebsa110_io_desc));
+ }
+ 
+-static void __iomem *ebsa110_ioremap_caller(unsigned long cookie, size_t size,
++static void __iomem *ebsa110_ioremap_caller(phys_addr_t cookie, size_t size,
+ 					    unsigned int flags, void *caller)
+ {
+ 	return (void __iomem *)cookie;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
