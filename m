@@ -1,117 +1,51 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 2 May 2013 11:40:18 +0100
-Subject: Latest build results - errors/warnings - lots of them
-In-Reply-To: <20130502094620.GC21614@n2100.arm.linux.org.uk>
-References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
- <201304301304.20650.arnd@arndb.de>
- <20130430114229.GA2439@linaro.org>
- <alpine.LFD.2.03.1304301110030.17372@syhkavp.arg>
- <20130430172816.GA31101@linaro.org>
- <alpine.LFD.2.03.1304301418100.17372@syhkavp.arg>
- <20130502083430.GB21614@n2100.arm.linux.org.uk>
- <20130502094620.GC21614@n2100.arm.linux.org.uk>
-Message-ID: <20130502104018.GA9879@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu,  2 May 2013 12:45:56 +0200
+Subject: [PATCH 4/5] ARM: sun5i: dt: Add i2c muxing options
+In-Reply-To: <1367491557-6027-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1367491557-6027-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1367491557-6027-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 10:46:21AM +0100, Russell King - ARM Linux wrote:
-> On Thu, May 02, 2013 at 09:34:30AM +0100, Russell King - ARM Linux wrote:
-> > On Tue, Apr 30, 2013 at 02:18:42PM -0400, Nicolas Pitre wrote:
-> > > On Tue, 30 Apr 2013, Dave Martin wrote:
-> > > 
-> > > > On Tue, Apr 30, 2013 at 11:12:12AM -0400, Nicolas Pitre wrote:
-> > > > > On Tue, 30 Apr 2013, Dave Martin wrote:
-> > > > > 
-> > > > > > On Tue, Apr 30, 2013 at 01:04:20PM +0200, Arnd Bergmann wrote:
-> > > > > > > On Tuesday 30 April 2013, Russell King - ARM Linux wrote:
-> > > > > > > > Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
-> > > > > > > > great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
-> > > > > > > > arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
-> > > > > > > > source of errors.
-> > > > > > 
-> > > > > > [...]
-> > > > > >  
-> > > > > > > >arch/arm/common/mcpm_head.S:39: Error: selected processor does not support ARM mode `ubfx r9,r0,#0,#8'
-> > > > > > > >arch/arm/common/mcpm_head.S:40: Error: selected processor does not support ARM mode `ubfx r10,r0,#8,#8'
-> > > > > > > >arch/arm/common/mcpm_head.S:100: Error: selected processor does not support ARM mode `dmb'
-> > > > > > > >arch/arm/common/mcpm_head.S:115: Error: selected processor does not support ARM mode `dmb'
-> > > > > > > >arch/arm/common/mcpm_head.S:127: Error: selected processor does not support ARM mode `dmb'
-> > > > > > > >arch/arm/common/mcpm_head.S:131: Error: selected processor does not support ARM mode `dmb'
-> > > > > > > >arch/arm/common/mcpm_head.S:138: Error: selected processor does not support ARM mode `dsb'
-> > > > > > > >arch/arm/common/mcpm_head.S:152: Error: selected processor does not support ARM mode `dmb'
-> > > > > > > >arch/arm/common/mcpm_head.S:161: Error: selected processor does not support ARM mode `dmb'
-> > > > > > > >arch/arm/common/mcpm_head.S:175: Error: selected processor does not support ARM mode `dmb'
-> > > > > > > >arch/arm/common/vlock.S:62: Error: selected processor does not support ARM mode `dmb'
-> > > > > > > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dmb'
-> > > > > > > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dsb'
-> > > > > > > >arch/arm/common/vlock.S:89: Error: selected processor does not support ARM mode `dmb'
-> > > > > > > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dmb'
-> > > > > > > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dsb'
-> > > > > > > >arch/arm/common/vlock.S:102: Error: selected processor does not support ARM mode `dmb'
-> > > > > > > >arch/arm/common/vlock.S:105: Error: selected processor does not support ARM mode `dsb'
-> > > > > > > 
-> > > > > > > Right, the problem here is that the code was never tested with an ARMv6+ARMv7 config.
-> > > > > > > We can either fix it up by adding
-> > > > > > > 
-> > > > > > > 	.arch	armv7-a
-> > > > > > > 
-> > > > > > > in the assembly files, or by doing the same in the Makefile:
-> > > > > > > 
-> > > > > > > AFLAGS_vlock.S += -march=armv7-a
-> > > > > > > AFLAGS_mcpm_head.S += -march=armv7-a
-> > > > > > 
-> > > > > > 
-> > > > > > Hmmm, this code was tested with ARCH_MULTIPLATFORM, but it looks like
-> > > > > > no v6 boards were configured in when testing that...
-> > > > > > 
-> > > > > > 
-> > > > > > Assuming people are OK with the Makefile route, here's a patch for that,
-> > > > > > build-tested with a v6+v7 ARCH_MULTIPLATFORM config.
-> > > > > 
-> > > > > Isn't the .arch armv7-a route a bit cleaner?  That would have been my 
-> > > > > choice, although I don't feel strongly about it.
-> > > > 
-> > > > I don't feel strongly either.  We already have the CFLAGS_DISABLE stuff,
-> > > > so it didn't feel that unnatural to add this in the Makefile; but .arch
-> > > > would work equally well.
-> > > > 
-> > > > If somebody wants to change it, it's not a problem for me, but I didn't
-> > > > want to create extra disruption by proposing a different patch...
-> > > 
-> > > Fair enough.
-> > > 
-> > > Acked-by: Nicolas Pitre <nico@linaro.org>
-> > 
-> > I see Dave Martin has sent a patch for this without your ack.  Was that
-> > a mistake?
+The i2c controller found on the Allwinner A13 has only one muxing option
+available for each controller. Add them to the dtsi
 
-My bad -- Nico asked me to send you the patch, but I neglected to add
-his ack.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun5i-a13.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index 16df784..450b410 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -182,6 +182,27 @@
+ 				allwinner,drive = <0>;
+ 				allwinner,pull = <0>;
+ 			};
++
++			i2c0_pins_a: i2c0 at 0 {
++				allwinner,pins = "PB0", "PB1";
++				allwinner,function = "i2c0";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++
++			i2c1_pins_a: i2c1 at 0 {
++				allwinner,pins = "PB15", "PB16";
++				allwinner,function = "i2c1";
++				allwinner,drive = <0>;
++				allwinner,pull = <1>;
++			};
++
++			i2c2_pins_a: i2c2 at 0 {
++				allwinner,pins = "PB17", "PB18";
++				allwinner,function = "i2c2";
++				allwinner,drive = <0>;
++				allwinner,pull = <1>;
++			};
+ 		};
  
-> ... and the patch in the patch system doesn't apply anyway because its
-> against some other tree.  I've no idea what it's against, it's not as
-> the version on the patch advertises (v3.9-rc7) and not even the build
-> tree has the three additional FIQ lines at the end (so it's not in
-> arm-soc):
-> 
->  obj-$(CONFIG_PCI_HOST_ITE8152)  += it8152.o
->  obj-$(CONFIG_ARM_TIMER_SP804)  += timer-sp.o
->  obj-$(CONFIG_MCPM)             += mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock...
-> +AFLAGS_mcpm_head.o             := -march=armv7-a
-> +AFLAGS_vlock.o                 := -march=armv7-a
->  CFLAGS_REMOVE_mcpm_entry.o     = -pg
->  obj-$(CONFIG_FIQ_GLUE)         += fiq_glue.o fiq_glue_setup.o
->  obj-$(CONFIG_FIQ_DEBUGGER)     += fiq_debugger.o
-> 
-> So, this is unapplyable.
-
-...and this was a plain screwup up my part.  v3.9* could not possibly
-contain the relevant patches, but somehow I convinced myself I had test-
-applied the patch on 3.9-rc7, instead of a local tree based on that.
-
-I've sent you a patch based on devel-stable which should apply.
-
-Apologies for the churn.
-
-Cheers
----Dave
+ 		timer at 01c20c00 {
+-- 
+1.8.1.2
