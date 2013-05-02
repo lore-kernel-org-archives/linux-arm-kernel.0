@@ -1,37 +1,55 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 May 2013 17:16:22 +0200
-Subject: [PATCH, RFC 18/22] Xen: SWIOTLB is only used on x86
+Date: Thu,  2 May 2013 17:16:25 +0200
+Subject: [PATCH, RFC 21/22] davinci: vpfe_capture needs i2c
 In-Reply-To: <1367507786-505303-1-git-send-email-arnd@arndb.de>
 References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
-Message-ID: <1367507786-505303-19-git-send-email-arnd@arndb.de>
+Message-ID: <1367507786-505303-22-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabling SWIOTLB_XEN on ARM results in build errors because the
-underlying SWIOTLB is only available on X86:
+The vpfe_capture driver is implicitly built for three of the davinci
+capture drivers but depends on i2c, so we need to add the dependency
+in Kconfig for each driver using this.
 
-drivers/xen/swiotlb-xen.c: In function 'is_xen_swiotlb_buffer':
-drivers/xen/swiotlb-xen.c:105:2: error: implicit declaration of function 'mfn_to_local_pfn
+ drivers/media/platform/davinci/vpfe_capture.c: In function 'vpfe_probe':
+ drivers/media/platform/davinci/vpfe_capture.c:1934:2: error: implicit declaration of function 'i2c_get_adapter' [-Werror=implicit-function-declaration]
+ drivers/media/platform/davinci/vpfe_capture.c:1934:11: warning: assignment makes pointer from integer without a cast [enabled by default]
 
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+Cc: Hans Verkuil <hans.verkuil@cisco.com>
+Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/xen/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/media/platform/davinci/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
-index dd4d9cb..f03bf50 100644
---- a/drivers/xen/Kconfig
-+++ b/drivers/xen/Kconfig
-@@ -141,7 +141,7 @@ config XEN_GRANT_DEV_ALLOC
- 
- config SWIOTLB_XEN
- 	def_bool y
--	depends on PCI
-+	depends on PCI && X86
- 	select SWIOTLB
- 
- config XEN_TMEM
+diff --git a/drivers/media/platform/davinci/Kconfig b/drivers/media/platform/davinci/Kconfig
+index afb3aec..02da88b 100644
+--- a/drivers/media/platform/davinci/Kconfig
++++ b/drivers/media/platform/davinci/Kconfig
+@@ -27,6 +27,7 @@ config VIDEO_DAVINCI_VPIF_CAPTURE
+ config VIDEO_DM6446_CCDC
+ 	tristate "TI DM6446 CCDC video capture driver"
+ 	depends on VIDEO_V4L2 && (ARCH_DAVINCI || ARCH_OMAP3)
++	depends on I2C
+ 	select VIDEOBUF_DMA_CONTIG
+ 	help
+ 	   Enables DaVinci CCD hw module. DaVinci CCDC hw interfaces
+@@ -41,6 +42,7 @@ config VIDEO_DM6446_CCDC
+ config VIDEO_DM355_CCDC
+ 	tristate "TI DM355 CCDC video capture driver"
+ 	depends on VIDEO_V4L2 && ARCH_DAVINCI
++	depends on I2C
+ 	select VIDEOBUF_DMA_CONTIG
+ 	help
+ 	   Enables DM355 CCD hw module. DM355 CCDC hw interfaces
+@@ -55,6 +57,7 @@ config VIDEO_DM355_CCDC
+ config VIDEO_DM365_ISIF
+ 	tristate "TI DM365 ISIF video capture driver"
+ 	depends on VIDEO_V4L2 && ARCH_DAVINCI
++	depends on I2C
+ 	select VIDEOBUF_DMA_CONTIG
+ 	help
+ 	   Enables ISIF hw module. This is the hardware module for
 -- 
 1.8.1.2
