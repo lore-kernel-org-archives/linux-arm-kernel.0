@@ -1,22 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 2 May 2013 14:34:05 +0200
-Subject: [PATCH 0/5] various ab8500 fixes
-In-Reply-To: <1366978638-967-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1366978638-967-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <CACRpkdYSf8T8anTgU=rxhhJWdELxN22koQ=Y27uuS4WyxZn4DA@mail.gmail.com>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Thu,  2 May 2013 09:37:46 -0300
+Subject: [PATCH] ARM: sun4i: cubieboard: Enable the i2c controllers
+Message-ID: <1367498266-1246-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 26, 2013 at 2:17 PM, Fabio Baltieri
-<fabio.baltieri@linaro.org> wrote:
+The Cubieboard makes use of the first two i2c controllers found on the
+Allwinner A10; i2c-0 is used internally for the PMIC, while i2c-1
+is exposed on the board headers. This patch enables them in the device
+tree.
 
-> Hi Samuel,
->
-> this series contains various fixes I found on the current -next ab8500
-> driver(s).
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+---
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-The series:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index b70fe0d..0e22a28 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -41,6 +41,18 @@
+ 			pinctrl-0 = <&uart0_pins_a>;
+ 			status = "okay";
+ 		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++		};
++
++		i2c1: i2c at 01c2b000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pins_a>;
++			status = "okay";
++		};
+ 	};
+ 
+ 	leds {
+-- 
+1.8.2.2
