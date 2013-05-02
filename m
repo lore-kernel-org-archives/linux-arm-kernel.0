@@ -1,51 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 May 2013 17:16:05 +0200
-Subject: [PATCH, RFC 01/22] can: move CONFIG_HAVE_CAN_FLEXCAN out of CAN_DEV
+Date: Thu,  2 May 2013 17:16:07 +0200
+Subject: [PATCH, RFC 03/22] cpuidle: calxeda: select ARM_CPU_SUSPEND
 In-Reply-To: <1367507786-505303-1-git-send-email-arnd@arndb.de>
 References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
-Message-ID: <1367507786-505303-2-git-send-email-arnd@arndb.de>
+Message-ID: <1367507786-505303-4-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_HAVE_CAN_FLEXCAN is a silect symbol that is meant to be selected
-by platforms that support this driver, but that is not possible without
-also selecting CAN_DEV, unless we move it out of the "if CAN_DEV"
-section of the Kconfig file.
+Like other ARM specific drivers, this one requires ARM_CPU_SUSPEND,
+as shown by this linker error:
 
-warning: (SOC_IMX28 && SOC_IMX25 && SOC_IMX35 &&
- IMX_HAVE_PLATFORM_FLEXCAN && SOC_IMX53 && SOC_IMX6Q) selects HAVE_CAN_FLEXCAN
- which has unmet direct dependencies (NET && CAN && CAN_DEV)
+drivers/built-in.o: In function `calxeda_pwrdown_idle':
+drivers/cpuidle/cpuidle-calxeda.c:84: undefined reference to `cpu_suspend'
+drivers/cpuidle/cpuidle-calxeda.c:86: undefined reference to `cpu_resume'
 
-Cc: Oliver Hartkopp <socketcan@hartkopp.net>
-Cc: linux-can at vger.kernel.org
+Cc: Rafael J. Wysocki <rjw@sisk.pl>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: linux-pm at vger.kernel.org
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/net/can/Kconfig | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/cpuidle/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/net/can/Kconfig b/drivers/net/can/Kconfig
-index e456b70..3941a7d 100644
---- a/drivers/net/can/Kconfig
-+++ b/drivers/net/can/Kconfig
-@@ -29,6 +29,9 @@ config CAN_SLCAN
- 	  can be changed by the 'maxdev=xx' module option. This driver can
- 	  also be built as a module. If so, the module will be called slcan.
+diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+index c4cc27e..e21cdfa 100644
+--- a/drivers/cpuidle/Kconfig
++++ b/drivers/cpuidle/Kconfig
+@@ -36,6 +36,7 @@ if CPU_IDLE
+ config CPU_IDLE_CALXEDA
+ 	bool "CPU Idle Driver for Calxeda processors"
+ 	depends on ARCH_HIGHBANK
++	select ARM_CPU_SUSPEND
+ 	help
+ 	  Select this to enable cpuidle on Calxeda processors.
  
-+config HAVE_CAN_FLEXCAN
-+	bool
-+
- config CAN_DEV
- 	tristate "Platform CAN drivers with Netlink support"
- 	default y
-@@ -102,9 +105,6 @@ config CAN_JANZ_ICAN3
- 	  This driver can also be built as a module. If so, the module will be
- 	  called janz-ican3.ko.
- 
--config HAVE_CAN_FLEXCAN
--	bool
--
- config CAN_FLEXCAN
- 	tristate "Support for Freescale FLEXCAN based chips"
- 	depends on HAVE_CAN_FLEXCAN
 -- 
 1.8.1.2
