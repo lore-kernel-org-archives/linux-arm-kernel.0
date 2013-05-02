@@ -1,40 +1,60 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  2 May 2013 16:48:10 +0100
-Subject: [PATCH 4/4] =?UTF-8?q?staging:=20ste=5Frmi4:=20Suppress=20'ignoring?=
- =?UTF-8?q?=20return=20value=20of=20=E2=80=98regulator=5Fenable()'=20warning?=
-In-Reply-To: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
-References: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367509690-24022-5-git-send-email-lee.jones@linaro.org>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 2 May 2013 20:49:38 +0530
+Subject: [PATCH] dmaengine: sirf: move driver init from module_init to
+ subsys_initcall
+In-Reply-To: <1365660568-2588-1-git-send-email-Barry.Song@csr.com>
+References: <1365660568-2588-1-git-send-email-Barry.Song@csr.com>
+Message-ID: <20130502151938.GK1960@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:
-        In function ?synaptics_rmi4_resume?:
-drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:1090:18:
-        warning: ignoring return value of ?regulator_enable?, declared
-        with attribute warn_unused_result [-Wunused-result
+On Thu, Apr 11, 2013 at 02:09:28PM +0800, Barry Song wrote:
+> From: Barry Song <Baohua.Song@csr.com>
+> 
+> if we initilize dma driver by module_init, there are still many devices
+> which will be initilized earlier than dma. these devices will fail to
+> get dma channel.
+> this moves dmaengine earlier than device_initcall and make dma available
+> for all devices.
+> 
+> Reported-by: Renwei Wu <Renwei.Wu@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Applied thanks, this is what many drivers in susystem do...
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: devel at driverdev.osuosl.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-index fe667dd..c4d013d 100644
---- a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-+++ b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-@@ -1087,7 +1087,9 @@ static int synaptics_rmi4_resume(struct device *dev)
- 	unsigned char intr_status;
- 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
- 
--	regulator_enable(rmi4_data->regulator);
-+	retval = regulator_enable(rmi4_data->regulator);
-+	if (retval < 0)
-+		return retval;
- 
- 	enable_irq(rmi4_data->i2c_client->irq);
- 	rmi4_data->touch_stopped = false;
--- 
-1.7.10.4
+--
+~Vinod
+> ---
+>  drivers/dma/sirf-dma.c |   13 ++++++++++++-
+>  1 files changed, 12 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+> index 1d627e2..c35fa34 100644
+> --- a/drivers/dma/sirf-dma.c
+> +++ b/drivers/dma/sirf-dma.c
+> @@ -742,7 +742,18 @@ static struct platform_driver sirfsoc_dma_driver = {
+>  	},
+>  };
+>  
+> -module_platform_driver(sirfsoc_dma_driver);
+> +static __init int sirfsoc_dma_init(void)
+> +{
+> +	return platform_driver_register(&sirfsoc_dma_driver);
+> +}
+> +
+> +static void __exit sirfsoc_dma_exit(void)
+> +{
+> +	platform_driver_unregister(&sirfsoc_dma_driver);
+> +}
+> +
+> +subsys_initcall(sirfsoc_dma_init);
+> +module_exit(sirfsoc_dma_exit);
+>  
+>  MODULE_AUTHOR("Rongjun Ying <rongjun.ying@csr.com>, "
+>  	"Barry Song <baohua.song@csr.com>");
+> -- 
+> 1.7.5.4
+> 
+> 
+> 
+> Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+> More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
