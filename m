@@ -1,34 +1,33 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  2 May 2013 15:38:59 +0100
-Subject: [PATCH v2 2/5] ARM: KVM: remove dead prototype for
- __kvm_tlb_flush_vmid
-In-Reply-To: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
-References: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1367505542-2231-3-git-send-email-marc.zyngier@arm.com>
+Date: Thu,  2 May 2013 15:38:57 +0100
+Subject: [PATCH v2 0/5] ARM: KVM: various mmu related fixes for 3.10
+Message-ID: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__kvm_tlb_flush_vmid has been renamed to __kvm_tlb_flush_vmid_ipa,
-and the old prototype should have been removed when the code was
-modified.
+This patch series fixes a number of of KVM/ARM issues that have either
+been spotted during the review of the arm64 code, or while reworking
+related code.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_asm.h | 2 --
- 1 file changed, 2 deletions(-)
+Only the first patch fixes a potential (if unlikely) problem, the
+others are either cosmetic or performance related.
 
-diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-index 18d5032..6ae3d2a 100644
---- a/arch/arm/include/asm/kvm_asm.h
-+++ b/arch/arm/include/asm/kvm_asm.h
-@@ -72,8 +72,6 @@ extern char __kvm_hyp_vector[];
- extern char __kvm_hyp_code_start[];
- extern char __kvm_hyp_code_end[];
- 
--extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
--
- extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
- 
+Tested on TC-2.
+
+Marc Zyngier (5):
+  ARM: KVM: be more thorough when invalidating TLBs
+  ARM: KVM: remove dead prototype for __kvm_tlb_flush_vmid
+  ARM: KVM: relax cache maintainance when building page tables
+  ARM: KVM: get rid of S2_PGD_SIZE
+  ARM: KVM: use phys_addr_t instead of unsigned long long for HYP PGDs
+
+ arch/arm/include/asm/kvm_arm.h  |  1 -
+ arch/arm/include/asm/kvm_asm.h  |  2 --
+ arch/arm/include/asm/kvm_host.h |  4 ++--
+ arch/arm/kvm/arm.c              |  8 +++----
+ arch/arm/kvm/interrupts.S       |  2 ++
+ arch/arm/kvm/mmu.c              | 48 +++++++++++++++++++++++------------------
+ 6 files changed, 35 insertions(+), 30 deletions(-)
+
 -- 
 1.8.2.1
