@@ -1,25 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 May 2013 21:11:40 +0200
-Subject: [PATCH] irqchip: add support for Marvell Orion SoCs
-In-Reply-To: <20130502185322.GA29333@obsidianresearch.com>
-References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130502185322.GA29333@obsidianresearch.com>
-Message-ID: <201305022111.41043.arnd@arndb.de>
+Date: Thu, 2 May 2013 21:12:42 +0200
+Subject: [PATCH, RFC 16/22] USB: UHCI: clarify Kconfig dependencies
+In-Reply-To: <Pine.LNX.4.44L0.1305021423450.1436-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1305021423450.1436-100000@iolanthe.rowland.org>
+Message-ID: <201305022112.42583.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 May 2013, Jason Gunthorpe wrote:
-> > +static struct of_device_id orion_irq_dt_ids[] __initconst = {
-> > +     { .compatible = "marvell,orion-mpic", .data = orion_of_init },
-> > +     { }
+On Thursday 02 May 2013, Alan Stern wrote:
+> On Thu, 2 May 2013, Arnd Bergmann wrote:
 > 
-> Is there a strong reason to change the compatible string? Looks to me
-> like either the new driver or the old driver will bind depending on
-> what is in the machine description. No need for a new string?
+> > > What do you think of my patch as compared to yours? 
+> > 
+> > I think in the end it comes down to the question where you want to
+> > head with your driver. The way I did my version was going towards
+> > making it similar to EHCI, with stand-alone bus glue drivers
+> > and a core that is just a library module but does not register
+> > a device_driver by itself.
+> > 
+> > Given that there are just three bus glues from UHCI, and at most
+> > two of them enabled at the same time, I don't see a direct need
+> > for UHCI to go down the same route as EHCI. If you want to just
+> > leave this driver alone, your patch is simpler and has the same
+> > effect in the end. Otherwise I think my patch avoids changing it
+> > all again once the driver gets reworked.
 > 
+> Okay then, I'll submit my patch to Greg after the merge window closes.
 
-The compatible string should change if the binding changes in an
-incomptible way, and we should try not to change it unless it's
-fundamentally flawed.
+Ok, thanks!
 
 	Arnd
