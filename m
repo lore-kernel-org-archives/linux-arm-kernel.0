@@ -1,41 +1,49 @@
-From: holt@sgi.com (Robin Holt)
-Date: Thu, 2 May 2013 07:49:06 -0500
-Subject: [PATCH -v7 10/11] arm, change reboot_mode to use enum reboot_mode
-In-Reply-To: <20130502073020.GC26361@gmail.com>
-References: <1367428011-17123-1-git-send-email-holt@sgi.com>
- <1367428011-17123-11-git-send-email-holt@sgi.com>
- <20130502073020.GC26361@gmail.com>
-Message-ID: <20130502124906.GW3658@sgi.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 2 May 2013 14:27:56 +0100
+Subject: [PATCH] Move the EM_AARCH64 definition to uapi/linux/elf-em.h
+In-Reply-To: <1367495778-6406-1-git-send-email-alonid@stratoscale.com>
+References: <1367495778-6406-1-git-send-email-alonid@stratoscale.com>
+Message-ID: <20130502132756.GD20730@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 09:30:20AM +0200, Ingo Molnar wrote:
+On Thu, May 02, 2013 at 12:56:18PM +0100, Dan Aloni wrote:
+> Signed-off-by: Dan Aloni <alonid@stratoscale.com>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm64/include/asm/elf.h |    2 --
+>  include/uapi/linux/elf-em.h  |    1 +
+>  2 files changed, 1 insertion(+), 2 deletions(-)
 > 
-> * Robin Holt <holt@sgi.com> wrote:
+> (fixed the commit message)
 > 
-> >  #ifndef __ASSEMBLY__
-> >  
-> >  #include <linux/types.h>
-> > +#include <linux/reboot.h>
-> >  
-> >  void iop3xx_map_io(void);
-> >  void iop_init_cp6_handler(void);
-> >  void iop_init_time(unsigned long tickrate);
-> > -void iop3xx_restart(char, const char *);
-> > +void iop3xx_restart(enum reboot_mode, const char *);
-> 
-> IMO the introduction of the enum is making things cleaner here all around.
-> 
-> As long as it's an equivalent transformation for ARM with no reduction in 
-> functionality (i.e. please fix any bugs Russell found), this all looks 
-> like a nice series.
-> 
-> Is there no parameter namespace clash between reboot modifier strings on 
-> various architectures? I.e. 's' meaning something on x86 and meaning a 
-> different thing on ARM or some other architecture.
+> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+> index fe32c0e..b3da1c1 100644
+> --- a/arch/arm64/include/asm/elf.h
+> +++ b/arch/arm64/include/asm/elf.h
+> @@ -33,8 +33,6 @@ typedef unsigned long elf_greg_t;
+>  typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+>  typedef struct user_fpsimd_state elf_fpregset_t;
+>  
+> -#define EM_AARCH64		183
+> -
+>  /*
+>   * AArch64 static relocation types.
+>   */
+> diff --git a/include/uapi/linux/elf-em.h b/include/uapi/linux/elf-em.h
+> index 8e2b7ba..bc946e9 100644
+> --- a/include/uapi/linux/elf-em.h
+> +++ b/include/uapi/linux/elf-em.h
+> @@ -34,6 +34,7 @@
+>  #define EM_MN10300	89	/* Panasonic/MEI MN10300, AM33 */
+>  #define EM_BLACKFIN     106     /* ADI Blackfin Processor */
+>  #define EM_TI_C6000	140	/* TI C6X DSPs */
+> +#define EM_AARCH64	183	/* ARM 64 bit */
+>  #define EM_FRV		0x5441	/* Fujitsu FR-V */
+>  #define EM_AVR32	0x18ad	/* Atmel AVR32 */
 
-There is.  I used an #ifdef in kernel/reboot.c.  Also w[arm] | c[old]
-on x86 becomes s[oft] | h[ard] | g[pio] on arm/unicore32. (Well, I just
-added gpio that to the patch set after noticing I missed it earlier).
+Will you do the same for arch/arm? There is EM_ARM defined under
+arch/arm and arch/arm64 (elf.h).
 
-Robin
+-- 
+Catalin
