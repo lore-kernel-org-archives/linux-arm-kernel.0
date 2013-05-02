@@ -1,29 +1,43 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 2 May 2013 13:34:54 -0400 (EDT)
-Subject: [PATCH, RFC 15/22] USB: EHCI: remove bogus #error
-In-Reply-To: <1367507786-505303-16-git-send-email-arnd@arndb.de>
-Message-ID: <Pine.LNX.4.44L0.1305021333020.1436-100000@iolanthe.rowland.org>
+From: mchehab@redhat.com (Mauro Carvalho Chehab)
+Date: Thu, 02 May 2013 14:37:18 -0300
+Subject: [PATCH, RFC 22/22] radio-si4713: depend on SND_SOC
+In-Reply-To: <1367507786-505303-23-git-send-email-arnd@arndb.de>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-23-git-send-email-arnd@arndb.de>
+Message-ID: <5182A44E.7080701@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 May 2013, Arnd Bergmann wrote:
-
-> The EHCI host controller driver can be built standalone now,
-> without enabling any of the available bus glue drivers, so
-> there is not really a reason to error out here:
-
-On the other hand, there's no reason to build the driver without any 
-bus glue.  It wouldn't do anything.
-
-> drivers/usb/host/ehci-hcd.c:1303:2: error:
->  #error "missing bus glue for ehci-hcd"  #error "missing bus glue for ehci-hcd"
-> 
-> The alternative would be to change the Kconfig code to build
-> the ehci-hcd module only if any of the symbols below are
-> in fact enabled.
-> 
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Em 02-05-2013 12:16, Arnd Bergmann escreveu:
+> It is not possible to select SND_SOC_SI476X if we have not also
+> enabled SND_SOC.
+>
+> warning: (RADIO_SI476X) selects SND_SOC_SI476X which has unmet
+> 	 direct dependencies (SOUND && !M68K && !UML && SND && SND_SOC)
+>
+> Cc: Hans Verkuil <hverkuil@xs4all.nl>
+> Cc: linux-media at vger.kernel.org
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>   drivers/media/radio/Kconfig | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/media/radio/Kconfig b/drivers/media/radio/Kconfig
+> index c0beee2..d529ba7 100644
+> --- a/drivers/media/radio/Kconfig
+> +++ b/drivers/media/radio/Kconfig
+> @@ -22,6 +22,7 @@ config RADIO_SI476X
+>   	tristate "Silicon Laboratories Si476x I2C FM Radio"
+>   	depends on I2C && VIDEO_V4L2
+>   	depends on MFD_SI476X_CORE
+> +	depends on SND_SOC
+>   	select SND_SOC_SI476X
+>   	---help---
+>   	  Choose Y here if you have this FM radio chip.
+>
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Do you prefer to send it via your tree or via mine? Either way works for me.
+
+If you're willing to send it via your tree:
+
+Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
