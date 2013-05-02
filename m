@@ -1,133 +1,113 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 May 2013 19:23:22 +0200
-Subject: [PATCH 2/4] ARM: fix prototypes for arch_ioremap_caller functions
-In-Reply-To: <1367515404-512212-1-git-send-email-arnd@arndb.de>
-References: <1367515404-512212-1-git-send-email-arnd@arndb.de>
-Message-ID: <1367515404-512212-3-git-send-email-arnd@arndb.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 2 May 2013 13:30:17 -0400 (EDT)
+Subject: [PATCH, RFC 16/22] USB: UHCI: clarify Kconfig dependencies
+In-Reply-To: <1367507786-505303-17-git-send-email-arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1305021304500.1436-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch "ARM: 7704/1: mm: Use phys_addr_t properly for ioremap
-functions" changes the prototype for the arch_ioremap_caller()
-function, a change which was evidently never tested, because
-all functions that get assigned to this pointer still have
-an unchanged prototype:
+On Thu, 2 May 2013, Arnd Bergmann wrote:
 
-arch/arm/mach-ebsa110/core.c: In function 'ebsa110_init_early':
-arch/arm/mach-ebsa110/core.c:130:22: warning: assignment from incompatible pointer type [enabled by default]
-  arch_ioremap_caller = ebsa110_ioremap_caller;
-                      ^
-arch/arm/mach-iop13xx/io.c: In function 'iop13xx_init_early':
-arch/arm/mach-iop13xx/io.c:88:22: warning: assignment from incompatible pointer type [enabled by default]
-  arch_ioremap_caller = __iop13xx_ioremap_caller;
-                      ^
+> The UHCI driver currently gives a build error if the base driver is
+> enabled but none of the three bus glues are turned on:
+> 
+> drivers/usb/host/uhci-hcd.c:857:2: error: #error "missing bus glue for uhci-hcd"
+> 
+> A better solution for this is to change the Kconfig statements to
+> prevent getting into this situation. This adds a new USB_UHCI_CORE
+> symbol in Kconfig, which is selected by each of the three bus glues.
+> This way, the driver never gets built if all three of them are disabled.
 
-This does the trivial change to all the respective functions
-to avoid the build warnings.
+I had already worked out a patch on my own for this (below).  It is
+different from yours in several ways:
 
-Cc: Laura Abbott <lauraa@codeaurora.org>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-ebsa110/core.c  | 2 +-
- arch/arm/mach-imx/mm-imx3.c   | 2 +-
- arch/arm/mach-iop13xx/io.c    | 2 +-
- arch/arm/mach-ixp4xx/common.c | 2 +-
- arch/arm/mach-msm/common.h    | 2 +-
- arch/arm/mach-msm/io.c        | 2 +-
- arch/arm/mm/nommu.c           | 2 +-
- 7 files changed, 7 insertions(+), 7 deletions(-)
+	It relies more on "depends" than "select".  I don't know how 
+	important this is in the end.
 
-diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
-index b13cc74..8a53f34 100644
---- a/arch/arm/mach-ebsa110/core.c
-+++ b/arch/arm/mach-ebsa110/core.c
-@@ -116,7 +116,7 @@ static void __init ebsa110_map_io(void)
- 	iotable_init(ebsa110_io_desc, ARRAY_SIZE(ebsa110_io_desc));
- }
+	It doesn't add a new USB_UHCI_GRLIB symbol; instead it uses
+	SPARC_LEON in several places.  I tend to think the new symbol
+	is nicer.
+
+	It doesn't add a new USB_UHCI_PCI symbol.
+
+	It improves the dependency list for USB_UHCI_HCD.
+
+	It removes the help text for USB_UHCI_PLATFORM, thereby making
+	that symbol not user-configurable.  I don't see any reason why
+	the user should need to worry about this -- the choice should
+	be a very simple one: build UHCI support or don't build it.  If
+	the user chooses to build it then it should include support for
+	all the compatible bus glues.  (This last decision may need to 
+	be changed if more bus glues get added.)
+
+	It prevents situations where USB_UHCI_HCD is enabled but the
+	driver doesn't get built.
+
+	It creates a bunch of USB_UHCI_* symbols even when USB_UHCI_HCD
+	is disabled.  This is a disadvantage, but I don't see any way
+	around it.  Basically, we have to consider two separate but
+	related questions:
+
+		Does the supported hardware configuration allow for 
+		UHCI?
+
+		Which types of UHCI bus glue support should be included 
+		in the kernel?
+
+	If the answer to the first is Yes then creating these symbols
+	seems unavoidable, even when the answer to the second is None.
+
+Maybe the ideal solution is some sort of combination of the two
+patches.
+
+What do you think of my patch as compared to yours?  And what do you
+think of the "depends" vs. "select" issue?
+
+Alan Stern
+
+
+
+Index: usb-3.9/drivers/usb/host/Kconfig
+===================================================================
+--- usb-3.9.orig/drivers/usb/host/Kconfig
++++ usb-3.9/drivers/usb/host/Kconfig
+@@ -507,7 +507,7 @@ endif # USB_OHCI_HCD
  
--static void __iomem *ebsa110_ioremap_caller(unsigned long cookie, size_t size,
-+static void __iomem *ebsa110_ioremap_caller(phys_addr_t cookie, size_t size,
- 					    unsigned int flags, void *caller)
- {
- 	return (void __iomem *)cookie;
-diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-index e0e69a6..eed32ca 100644
---- a/arch/arm/mach-imx/mm-imx3.c
-+++ b/arch/arm/mach-imx/mm-imx3.c
-@@ -65,7 +65,7 @@ static void imx3_idle(void)
- 		: "=r" (reg));
- }
+ config USB_UHCI_HCD
+ 	tristate "UHCI HCD (most Intel and VIA) support"
+-	depends on PCI || SPARC_LEON || ARCH_VT8500
++	depends on PCI || USB_UHCI_SUPPORT_NON_PCI_HC
+ 	---help---
+ 	  The Universal Host Controller Interface is a standard by Intel for
+ 	  accessing the USB hardware in the PC (which is also called the USB
+@@ -524,26 +524,19 @@ config USB_UHCI_HCD
  
--static void __iomem *imx3_ioremap_caller(unsigned long phys_addr, size_t size,
-+static void __iomem *imx3_ioremap_caller(phys_addr_t phys_addr, size_t size,
- 					 unsigned int mtype, void *caller)
- {
- 	if (mtype == MT_DEVICE) {
-diff --git a/arch/arm/mach-iop13xx/io.c b/arch/arm/mach-iop13xx/io.c
-index 183dc8b..faaf7d4 100644
---- a/arch/arm/mach-iop13xx/io.c
-+++ b/arch/arm/mach-iop13xx/io.c
-@@ -23,7 +23,7 @@
+ config USB_UHCI_SUPPORT_NON_PCI_HC
+ 	bool
+-	depends on USB_UHCI_HCD
+-	default y if (SPARC_LEON || ARCH_VT8500)
++	default y if (SPARC_LEON || USB_UHCI_PLATFORM)
  
- #include "pci.h"
+ config USB_UHCI_PLATFORM
+-	bool "Generic UHCI Platform Driver support"
+-	depends on USB_UHCI_SUPPORT_NON_PCI_HC
++	bool
+ 	default y if ARCH_VT8500
+-	---help---
+-	  Enable support for generic UHCI platform devices that require no
+-	  additional configuration.
  
--static void __iomem *__iop13xx_ioremap_caller(unsigned long cookie,
-+static void __iomem *__iop13xx_ioremap_caller(phys_addr_t cookie,
- 	size_t size, unsigned int mtype, void *caller)
- {
- 	void __iomem * retval;
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 6600cff..d7223b3 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -559,7 +559,7 @@ void ixp4xx_restart(char mode, const char *cmd)
-  * fallback to the default.
-  */
+ config USB_UHCI_BIG_ENDIAN_MMIO
+ 	bool
+-	depends on USB_UHCI_SUPPORT_NON_PCI_HC && SPARC_LEON
+-	default y
++	default y if SPARC_LEON
  
--static void __iomem *ixp4xx_ioremap_caller(unsigned long addr, size_t size,
-+static void __iomem *ixp4xx_ioremap_caller(phys_addr_t addr, size_t size,
- 					   unsigned int mtype, void *caller)
- {
- 	if (!is_pci_memory(addr))
-diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
-index ce8215a..421cf77 100644
---- a/arch/arm/mach-msm/common.h
-+++ b/arch/arm/mach-msm/common.h
-@@ -23,7 +23,7 @@ extern void msm_map_msm8x60_io(void);
- extern void msm_map_msm8960_io(void);
- extern void msm_map_qsd8x50_io(void);
+ config USB_UHCI_BIG_ENDIAN_DESC
+ 	bool
+-	depends on USB_UHCI_SUPPORT_NON_PCI_HC && SPARC_LEON
+-	default y
++	default y if SPARC_LEON
  
--extern void __iomem *__msm_ioremap_caller(unsigned long phys_addr, size_t size,
-+extern void __iomem *__msm_ioremap_caller(phys_addr_t phys_addr, size_t size,
- 					  unsigned int mtype, void *caller);
- 
- extern struct smp_operations msm_smp_ops;
-diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
-index 123ef9c..fd65b6d 100644
---- a/arch/arm/mach-msm/io.c
-+++ b/arch/arm/mach-msm/io.c
-@@ -172,7 +172,7 @@ void __init msm_map_msm7x30_io(void)
- }
- #endif /* CONFIG_ARCH_MSM7X30 */
- 
--void __iomem *__msm_ioremap_caller(unsigned long phys_addr, size_t size,
-+void __iomem *__msm_ioremap_caller(phys_addr_t phys_addr, size_t size,
- 				   unsigned int mtype, void *caller)
- {
- 	if (mtype == MT_DEVICE) {
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index dd3a6c6..e9f2e44 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -95,7 +95,7 @@ void __iomem *__arm_ioremap(unsigned long phys_addr, size_t size,
- }
- EXPORT_SYMBOL(__arm_ioremap);
- 
--void __iomem * (*arch_ioremap_caller)(unsigned long, size_t, unsigned int, void *);
-+void __iomem * (*arch_ioremap_caller)(phys_addr_t, size_t, unsigned int, void *);
- 
- void __iomem *__arm_ioremap_caller(unsigned long phys_addr, size_t size,
- 				   unsigned int mtype, void *caller)
--- 
-1.8.1.2
+ config USB_FHCI_HCD
+ 	tristate "Freescale QE USB Host Controller support"
