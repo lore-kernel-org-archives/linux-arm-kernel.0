@@ -1,31 +1,31 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu,  2 May 2013 10:17:58 -0700
-Subject: [PATCH] ARM: ebsa110: Change the type of ioremap function
-Message-ID: <1367515078-32202-1-git-send-email-lauraa@codeaurora.org>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 2 May 2013 18:19:25 +0100
+Subject: [PATCH] ARM: KVM: Don't handle PSCI calls via SMC
+In-Reply-To: <CAEDV+gK27-vw-RhcSrQsrJUfJx_zKQXtc6R6JGVg=YDsQmWZHA@mail.gmail.com>
+References: <1367426968-5577-1-git-send-email-Dave.Martin@arm.com>
+ <CAEDV+gK27-vw-RhcSrQsrJUfJx_zKQXtc6R6JGVg=YDsQmWZHA@mail.gmail.com>
+Message-ID: <20130502171925.GB9879@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit cd024d4245b2bfbd824b911f11a9756d1d6c167d
-(ARM: 7704/1: mm: Use phys_addr_t properly for ioremap functions)
-changed the type of the ioremap functions to actually use phys_addr_t
-instead of unsigned long. Change the type of the arch_ioremap function
-to use phys_addr_t as well.
+On Wed, May 01, 2013 at 10:59:13AM -0700, Christoffer Dall wrote:
+> On Wed, May 1, 2013 at 9:49 AM, Dave P Martin <Dave.Martin@arm.com> wrote:
+> > Currently, kvmtool unconditionally declares that HVC should be used
+> > to call PSCI, so the function numbers in the DT tell the guest
+> > nothing about the function ID namespace or calling convention for
+> > SMC.
+> >
+> > We already assume that the guest will examine and honour the DT,
+> > since there is no way it could possibly guess the KVM-specific PSCI
+> > function IDs otherwise.  So let's not encourage guests to violate
+> > what's specified in the DT by using SMC to make the call.
+> >
+> > Signed-off-by: Dave P Martin <Dave.Martin@arm.com>
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Thanks, applied.
+> 
+> -Christoffer
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-
-diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
-index b13cc74..8a53f34 100644
---- a/arch/arm/mach-ebsa110/core.c
-+++ b/arch/arm/mach-ebsa110/core.c
-@@ -116,7 +116,7 @@ static void __init ebsa110_map_io(void)
- 	iotable_init(ebsa110_io_desc, ARRAY_SIZE(ebsa110_io_desc));
- }
- 
--static void __iomem *ebsa110_ioremap_caller(unsigned long cookie, size_t size,
-+static void __iomem *ebsa110_ioremap_caller(phys_addr_t cookie, size_t size,
- 					    unsigned int flags, void *caller)
- {
- 	return (void __iomem *)cookie;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Thanks
+---Dave
