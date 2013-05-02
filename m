@@ -1,135 +1,125 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Thu, 2 May 2013 14:18:21 +0530
-Subject: [v3,
- 3/3] ARM: dts: AM33XX: Add NAND flash device tree data to am335x-evm
-Message-ID: <1367484501-3623-1-git-send-email-pekon@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu,  2 May 2013 09:51:23 +0100
+Subject: [PATCH] ARM: ux500: Remove DMA address look-up table
+Message-ID: <1367484683-3479-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: avinash philip <avinashphilip@ti.com>
+DMA addresses are now passed as part of the dmaengine API by invoking
+dmaengine_slave_config(). So there's no requirement for the DMA40
+driver to look them up in a table provided by platform data. This
+method does not fit in well using Device Tree either.
 
-NAND flash connected in am335x-evm on GPMC controller. This patch adds
-device tree node in am3355-evm with GPMC contoller timing for NAND flash
-interface, NAND partition table, ECC scheme, elm handle id.
-
-Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-Signed-off-by: Gupta, Pekon <pekon@ti.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/am335x-evm.dts | 95 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 95 insertions(+)
+ arch/arm/mach-ux500/devices-db8500.c        |   80 ---------------------------
+ include/linux/platform_data/dma-ste-dma40.h |    2 -
+ 2 files changed, 82 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index d649644..07761fd 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -44,6 +44,26 @@
- 				0x154 0x27	/* spi0_d0.gpio0_3, INPUT | MODE7 */
- 			>;
- 		};
-+
-+		nandflash_pins_s0: nandflash_pins_s0 {
-+			pinctrl-single,pins = <
-+				0x0 0x30	/* gpmc_ad0.gpmc_ad0, INPUT | PULLUP | MODE0 */
-+				0x4 0x30	/* gpmc_ad1.gpmc_ad1, INPUT | PULLUP | MODE0 */
-+				0x8 0x30	/* gpmc_ad2.gpmc_ad2, INPUT | PULLUP | MODE0 */
-+				0xc 0x30	/* gpmc_ad3.gpmc_ad3, INPUT | PULLUP | MODE0 */
-+				0x10 0x30	/* gpmc_ad4.gpmc_ad4, INPUT | PULLUP | MODE0 */
-+				0x14 0x30	/* gpmc_ad5.gpmc_ad5, INPUT | PULLUP | MODE0 */
-+				0x18 0x30	/* gpmc_ad6.gpmc_ad6, INPUT | PULLUP | MODE0 */
-+				0x1c 0x30	/* gpmc_ad7.gpmc_ad7, INPUT | PULLUP | MODE0 */
-+				0x70 0x30	/* gpmc_wait0.gpmc_wait0, INPUT | PULLUP | MODE0 */
-+				0x74 0x37	/* gpmc_wpn.gpio0_30, INPUT | PULLUP | MODE7 */
-+				0x7c 0x8	/* gpmc_csn0.gpmc_csn0,  PULL DISA */
-+				0x90 0x8	/* gpmc_advn_ale.gpmc_advn_ale, PULL DISA */
-+				0x94 0x8	/* gpmc_oen_ren.gpmc_oen_ren, PULL DISA */
-+				0x98 0x8	/* gpmc_wen.gpmc_wen, PULL DISA */
-+				0x9c 0x8	/* gpmc_be0n_cle.gpmc_be0n_cle, PULL DISA */
-+			>;
-+		};
- 	};
+diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
+index 2bc4b5e..d35a492 100644
+--- a/arch/arm/mach-ux500/devices-db8500.c
++++ b/arch/arm/mach-ux500/devices-db8500.c
+@@ -42,87 +42,7 @@ static struct resource dma40_resources[] = {
+ 	}
+ };
  
- 	ocp {
-@@ -102,6 +122,81 @@
- 				reg = <0x48>;
- 			};
- 		};
-+
-+		elm: elm at 48080000 {
-+			status = "okay";
-+		};
-+
-+		gpmc: gpmc at 50000000 {
-+			status = "okay";
-+			pinctrl-0 = <&nandflash_pins_s0>;
-+			ranges = <0 0 0x08000000 0x10000000>;	/* CS0: NAND */
-+			nand at 0,0 {
-+				reg = <0 0 0>; /* CS0, offset 0 */
-+				nand-bus-width = <8>;
-+				ti,nand-ecc-opt = "bch8";
-+
-+				gpmc,sync-clk = <0>;
-+				gpmc,cs-on = <0>;
-+				gpmc,cs-rd-off = <44>;
-+				gpmc,cs-wr-off = <44>;
-+				gpmc,adv-on = <6>;
-+				gpmc,adv-rd-off = <34>;
-+				gpmc,adv-wr-off = <44>;
-+				gpmc,we-off = <40>;
-+				gpmc,oe-off = <54>;
-+				gpmc,access = <64>;
-+				gpmc,rd-cycle = <82>;
-+				gpmc,wr-cycle = <82>;
-+				gpmc,wr-access = <40>;
-+				gpmc,wr-data-mux-bus = <0>;
-+
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				elm_id = <&elm>;
-+
-+				/* MTD partition table */
-+				partition at 0 {
-+					label = "SPL1";
-+					reg = <0x00000000 0x000020000>;
-+				};
-+
-+				partition at 1 {
-+					label = "SPL2";
-+					reg = <0x00020000 0x00020000>;
-+				};
-+
-+				partition at 2 {
-+					label = "SPL3";
-+					reg = <0x00040000 0x00020000>;
-+				};
-+
-+				partition at 3 {
-+					label = "SPL4";
-+					reg = <0x00060000 0x00020000>;
-+				};
-+
-+				partition at 4 {
-+					label = "U-boot";
-+					reg = <0x00080000 0x001e0000>;
-+				};
-+
-+				partition at 5 {
-+					label = "environment";
-+					reg = <0x00260000 0x00020000>;
-+				};
-+
-+				partition at 6 {
-+					label = "Kernel";
-+					reg = <0x00280000 0x00500000>;
-+				};
-+
-+				partition at 7 {
-+					label = "File-System";
-+					reg = <0x00780000 0x0F880000>;
-+				};
-+			};
-+		};
- 	};
+-/*
+- * Mapping between destination event lines and physical device address.
+- * The event line is tied to a device and therefore the address is constant.
+- * When the address comes from a primecell it will be configured in runtime
+- * and we set the address to -1 as a placeholder.
+- */
+-static const dma_addr_t dma40_tx_map[DB8500_DMA_NR_DEV] = {
+-	/* MUSB - these will be runtime-reconfigured */
+-	[DB8500_DMA_DEV39_USB_OTG_IEP_AND_OEP_8] = -1,
+-	[DB8500_DMA_DEV16_USB_OTG_IEP_AND_OEP_7_15] = -1,
+-	[DB8500_DMA_DEV17_USB_OTG_IEP_AND_OEP_6_14] = -1,
+-	[DB8500_DMA_DEV18_USB_OTG_IEP_AND_OEP_5_13] = -1,
+-	[DB8500_DMA_DEV19_USB_OTG_IEP_AND_OEP_4_12] = -1,
+-	[DB8500_DMA_DEV36_USB_OTG_IEP_AND_OEP_3_11] = -1,
+-	[DB8500_DMA_DEV37_USB_OTG_IEP_AND_OEP_2_10] = -1,
+-	[DB8500_DMA_DEV38_USB_OTG_IEP_AND_OEP_1_9] = -1,
+-	/* PrimeCells - run-time configured */
+-	[DB8500_DMA_DEV0_SPI0] = -1,
+-	[DB8500_DMA_DEV1_SD_MMC0] = -1,
+-	[DB8500_DMA_DEV2_SD_MMC1] = -1,
+-	[DB8500_DMA_DEV3_SD_MMC2] = -1,
+-	[DB8500_DMA_DEV8_SSP0] = -1,
+-	[DB8500_DMA_DEV9_SSP1] = -1,
+-	[DB8500_DMA_DEV11_UART2] = -1,
+-	[DB8500_DMA_DEV12_UART1] = -1,
+-	[DB8500_DMA_DEV13_UART0] = -1,
+-	[DB8500_DMA_DEV28_SD_MM2] = -1,
+-	[DB8500_DMA_DEV29_SD_MM0] = -1,
+-	[DB8500_DMA_DEV32_SD_MM1] = -1,
+-	[DB8500_DMA_DEV33_SPI2] = -1,
+-	[DB8500_DMA_DEV35_SPI1] = -1,
+-	[DB8500_DMA_DEV40_SPI3] = -1,
+-	[DB8500_DMA_DEV41_SD_MM3] = -1,
+-	[DB8500_DMA_DEV42_SD_MM4] = -1,
+-	[DB8500_DMA_DEV43_SD_MM5] = -1,
+-	[DB8500_DMA_DEV14_MSP2] = U8500_MSP2_BASE + MSP_TX_RX_REG_OFFSET,
+-	[DB8500_DMA_DEV30_MSP1] = U8500_MSP1_BASE + MSP_TX_RX_REG_OFFSET,
+-	[DB8500_DMA_DEV31_MSP0_SLIM0_CH0] = U8500_MSP0_BASE + MSP_TX_RX_REG_OFFSET,
+-	[DB8500_DMA_DEV48_CAC1] = U8500_CRYP1_BASE + CRYP1_TX_REG_OFFSET,
+-	[DB8500_DMA_DEV50_HAC1_TX] = U8500_HASH1_BASE + HASH1_TX_REG_OFFSET,
+-};
+-
+-/* Mapping between source event lines and physical device address */
+-static const dma_addr_t dma40_rx_map[DB8500_DMA_NR_DEV] = {
+-	/* MUSB - these will be runtime-reconfigured */
+-	[DB8500_DMA_DEV39_USB_OTG_IEP_AND_OEP_8] = -1,
+-	[DB8500_DMA_DEV16_USB_OTG_IEP_AND_OEP_7_15] = -1,
+-	[DB8500_DMA_DEV17_USB_OTG_IEP_AND_OEP_6_14] = -1,
+-	[DB8500_DMA_DEV18_USB_OTG_IEP_AND_OEP_5_13] = -1,
+-	[DB8500_DMA_DEV19_USB_OTG_IEP_AND_OEP_4_12] = -1,
+-	[DB8500_DMA_DEV36_USB_OTG_IEP_AND_OEP_3_11] = -1,
+-	[DB8500_DMA_DEV37_USB_OTG_IEP_AND_OEP_2_10] = -1,
+-	[DB8500_DMA_DEV38_USB_OTG_IEP_AND_OEP_1_9] = -1,
+-	/* PrimeCells */
+-	[DB8500_DMA_DEV0_SPI0] = -1,
+-	[DB8500_DMA_DEV1_SD_MMC0] = -1,
+-	[DB8500_DMA_DEV2_SD_MMC1] = -1,
+-	[DB8500_DMA_DEV3_SD_MMC2] = -1,
+-	[DB8500_DMA_DEV8_SSP0] = -1,
+-	[DB8500_DMA_DEV9_SSP1] = -1,
+-	[DB8500_DMA_DEV11_UART2] = -1,
+-	[DB8500_DMA_DEV12_UART1] = -1,
+-	[DB8500_DMA_DEV13_UART0] = -1,
+-	[DB8500_DMA_DEV28_SD_MM2] = -1,
+-	[DB8500_DMA_DEV29_SD_MM0] = -1,
+-	[DB8500_DMA_DEV32_SD_MM1] = -1,
+-	[DB8500_DMA_DEV33_SPI2] = -1,
+-	[DB8500_DMA_DEV35_SPI1] = -1,
+-	[DB8500_DMA_DEV40_SPI3] = -1,
+-	[DB8500_DMA_DEV41_SD_MM3] = -1,
+-	[DB8500_DMA_DEV42_SD_MM4] = -1,
+-	[DB8500_DMA_DEV43_SD_MM5] = -1,
+-	[DB8500_DMA_DEV14_MSP2] = U8500_MSP2_BASE + MSP_TX_RX_REG_OFFSET,
+-	[DB8500_DMA_DEV30_MSP3] = U8500_MSP3_BASE + MSP_TX_RX_REG_OFFSET,
+-	[DB8500_DMA_DEV31_MSP0_SLIM0_CH0] = U8500_MSP0_BASE + MSP_TX_RX_REG_OFFSET,
+-	[DB8500_DMA_DEV48_CAC1] = U8500_CRYP1_BASE + CRYP1_RX_REG_OFFSET,
+-};
+-
+ struct stedma40_platform_data dma40_plat_data = {
+-	.dev_rx = dma40_rx_map,
+-	.dev_tx = dma40_tx_map,
+ 	.disabled_channels = {-1},
+ };
  
- 	vbat: fixedregulator at 0 {
+diff --git a/include/linux/platform_data/dma-ste-dma40.h b/include/linux/platform_data/dma-ste-dma40.h
+index c54af61..af0064e 100644
+--- a/include/linux/platform_data/dma-ste-dma40.h
++++ b/include/linux/platform_data/dma-ste-dma40.h
+@@ -152,8 +152,6 @@ struct stedma40_chan_cfg {
+  * for 'multiple of 4' channels, like 8.
+  */
+ struct stedma40_platform_data {
+-	const dma_addr_t		*dev_tx;
+-	const dma_addr_t		*dev_rx;
+ 	int				 disabled_channels[STEDMA40_MAX_PHYS];
+ 	int				*soft_lli_chans;
+ 	int				 num_of_soft_lli_chans;
 -- 
-1.8.1
+1.7.10.4
