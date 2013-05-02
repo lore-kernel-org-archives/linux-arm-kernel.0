@@ -1,54 +1,31 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 2 May 2013 23:34:49 +0200 (CEST)
-Subject: [PATCH] irqchip: add support for Marvell Orion SoCs
-In-Reply-To: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <alpine.LFD.2.02.1305022324371.2891@ionos>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 2 May 2013 23:45:49 +0200
+Subject: [PATCH] ARM: kirkwood: add button for OpenBlock A6
+In-Reply-To: <5182C512.4050102@free-electrons.com>
+References: <1367523802-16372-1-git-send-email-gregory.clement@free-electrons.com>
+ <5182C512.4050102@free-electrons.com>
+Message-ID: <20130502234549.79caecc3@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
+Dear Gregory CLEMENT,
 
-please do not take the rant below personally. You just happen to
-trigger it.
+On Thu, 02 May 2013 21:57:06 +0200, Gregory CLEMENT wrote:
 
-On Thu, 2 May 2013, Sebastian Hesselbarth wrote:
+> Oh, I found that Thomas have already submitted the same patch but I
+> was misleaded because I didn't find anything related to this in v3.9,
+> nor in next-20130502.
+> 
+> You can drop this patch of course, but waht happens to Thomas' patch?
 
-> +static void orion_irq_mask(struct irq_data *irqd)
-> +{
-> +	unsigned int irq = irqd_to_hwirq(irqd);
-> +	unsigned int irq_off = irq % 32;
-> +	int reg = irq / 32;
-> +	u32 val;
-> +
-> +	val = readl(orion_irq_base[reg] + ORION_IRQ_MASK);
-> +	writel(val & ~(1 << irq_off), orion_irq_base[reg] + ORION_IRQ_MASK);
-> +}
-> +
-> +static void orion_irq_unmask(struct irq_data *irqd)
-> +{
-> +	unsigned int irq = irqd_to_hwirq(irqd);
-> +	unsigned int irq_off = irq % 32;
-> +	int reg = irq / 32;
-> +	u32 val;
-> +
-> +	val = readl(orion_irq_base[reg] + ORION_IRQ_MASK);
-> +	writel(val | (1 << irq_off), orion_irq_base[reg] + ORION_IRQ_MASK);
-> +}
-
-I'm really tired of looking at the next incarnation of an OF/DT irq
-chip driver, which reimplements stuff which I have consolidated in the
-generic irq chip implementation with a lot of effort.
-
-Just look at the various implementations in drivers/irqchip/ and find
-out how similar they are. Moving code to drivers/irqchip/ does not
-make an excuse for reestablishing the mess which was addressed by the
-generic irq chip implementation.
-
-Can you - and that means all of you ARM folks - please get your gear
-together and add the missing features to the generic irq chip
-implementation? I'm not going to accept more of that OF/DT frenzy.
+I have to rework it as part as a refactoring of the pinctrl definitions
+on kirkwood. I'll try to work on that soon.
 
 Thanks,
 
-	tglx
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
