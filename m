@@ -1,67 +1,40 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Thu, 2 May 2013 12:02:13 +0100
-Subject: [Xen-devel] [PATCH 3/3] xen/arm: account for stolen ticks
-In-Reply-To: <alpine.DEB.2.02.1305021153220.5398@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
- <1367436460-10183-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <1367482862.21869.28.camel@zakaz.uk.xensource.com>
- <alpine.DEB.2.02.1305021134160.5398@kaball.uk.xensource.com>
- <1367491708.21869.77.camel@zakaz.uk.xensource.com>
- <alpine.DEB.2.02.1305021153220.5398@kaball.uk.xensource.com>
-Message-ID: <1367492533.21869.81.camel@zakaz.uk.xensource.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 2 May 2013 12:03:57 +0100
+Subject: [PATCH v3 16/32] arm64: KVM: hypervisor initialization code
+In-Reply-To: <1365437854-30214-17-git-send-email-marc.zyngier@arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-17-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130502110356.GA10418@localhost.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-05-02 at 11:54 +0100, Stefano Stabellini wrote:
-> On Thu, 2 May 2013, Ian Campbell wrote:
-> > On Thu, 2013-05-02 at 11:38 +0100, Stefano Stabellini wrote:
-> > > On Thu, 2 May 2013, Ian Campbell wrote:
-> > > > On Wed, 2013-05-01 at 20:27 +0100, Stefano Stabellini wrote:
-> > > > > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > > > > index d30042e..8f040a0 100644
-> > > > > --- a/arch/arm/xen/enlighten.c
-> > > > > +++ b/arch/arm/xen/enlighten.c
-> > > > > @@ -14,6 +14,7 @@
-> > > > >  #include <xen/xen-ops.h>
-> > > > >  #include <asm/xen/hypervisor.h>
-> > > > >  #include <asm/xen/hypercall.h>
-> > > > > +#include <asm/arch_timer.h>
-> > > > >  #include <asm/system_misc.h>
-> > > > >  #include <linux/interrupt.h>
-> > > > >  #include <linux/irqreturn.h>
-> > > > > @@ -172,6 +173,8 @@ static int __init xen_secondary_init(unsigned int cpu)
-> > > > >  		   later ones fail to. */
-> > > > >  		per_cpu(xen_vcpu, cpu) = vcpup;
-> > > > >  	}
-> > > > > +
-> > > > > +	xen_setup_runstate_info(cpu);
-> > > > 
-> > > > Is this called for the boot processor too?
-> > > 
-> > > Yep.
-> > > 
-> > > > (do you have a linux-next branch where I can easily find the baseline
-> > > > for this series?)
-> > > 
-> > > git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git lost_ticks_1
-> > 
-> > Is that your Xen tree, I was after the Linux one...
+On Mon, Apr 08, 2013 at 05:17:18PM +0100, Marc Zyngier wrote:
+> Provide EL2 with page tables and stack, and set the vectors
+> to point to the full blown world-switch code.
 > 
-> nope, that's my Linux tree disguised as a Xen tree to confuse the
-> maintainers ;-)
-
-;-)
-
-> > > It's based on my 3.9-rc3-smp-6 branch currently in linux-next (that is
-> > > based on 3.9-rc3).
-> > > However lost_ticks_1 is not in linux-next yet.
-> > 
-> > Which branch is in Linux next? It doesn't seem to be your linux-next
-> > (last commit 2011).
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_host.h |  13 +++++
+>  arch/arm64/kvm/hyp-init.S         | 112 ++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 125 insertions(+)
+>  create mode 100644 arch/arm64/kvm/hyp-init.S
 > 
-> that would be linux-next from
-> git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index a0279ff..8655de4 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -183,4 +183,17 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  int kvm_perf_init(void);
+>  int kvm_perf_teardown(void);
+>  
+> +static inline void __cpu_init_hyp_mode(unsigned long long boot_pgd_ptr,
+> +				       unsigned long long pgd_ptr,
+> +				       unsigned long hyp_stack_ptr,
+> +				       unsigned long vector_ptr)
 
-Ah, I was looking in your xenbits tree -- is that deprecated?
+Why some types are long long other others just long? Is it called from
+arch/arm/ code? I would rather use phys_addr_t where relevant and
+unsigned long where it means a virtual address.
 
-Ian.
+-- 
+Catalin
