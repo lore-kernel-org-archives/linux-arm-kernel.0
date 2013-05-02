@@ -1,48 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 May 2013 18:29:37 +0200
-Subject: [PATCH v2] thermal: cpu_cooling: fix stub function
-In-Reply-To: <51828A45.60909@ti.com>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-13-git-send-email-arnd@arndb.de> <51828A45.60909@ti.com>
-Message-ID: <201305021829.37343.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 2 May 2013 18:38:36 +0200
+Subject: [PATCH 1/7] ARM: u300: push down syscon registers
+In-Reply-To: <201305021821.12008.arnd@arndb.de>
+References: <1367511416-4312-1-git-send-email-linus.walleij@stericsson.com>
+ <1367511416-4312-2-git-send-email-linus.walleij@stericsson.com>
+ <201305021821.12008.arnd@arndb.de>
+Message-ID: <CACRpkdayJCm-PcY_=+NDraEPn0m6BrjNRH+tYp3Abar43RamaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function stub for cpufreq_cooling_get_level introduced
-in 57df81069 "Thermal: exynos: fix cooling state translation"
-is not syntactically correct C and needs to be fixed to avoid
-this error:
+On Thu, May 2, 2013 at 6:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 02 May 2013, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> Get rid of the <mach/syscon.h> header as a prerequisite for
+>> multiplatform support. Do this by pushing the registers down
+>> to their respective drivers and deleting the unused remainder.
+>>
+>> Cc: Mike Turquette <mturquette@linaro.org>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> Mike: I'm seeking an ACK for this to take it through the
+>> ARM SoC tree alongside the big bowl of DT enablement patches.
+>> ---
+>
+> How do those drivers get to the SYSCON base address? Should they
+> be using drivers/mfd/syscon.c as the multiplexor instead?
 
-In file included from drivers/thermal/db8500_thermal.c:20:0:
- include/linux/cpu_cooling.h: In function 'cpufreq_cooling_get_level':
-include/linux/cpu_cooling.h:57:1:
- error: parameter name omitted  unsigned long cpufreq_cooling_get_level(unsigned int, unsigned int)  ^
- include/linux/cpu_cooling.h:57:1: error: parameter name omitted
+No, there is no mutex to be taken. The consecutive range of memory
+addresses are used by different things (mainly the clocks) but there
+is no register that needs to be protected against access from two
+subsystems simultaneously.
 
-Cc: Eduardo Valentin <eduardo.valentin@ti.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Amit Daniel kachhap <amit.daniel@samsung.com>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+As a follow-up to this series I plan to move also the U300 clocks
+to the device tree (similar three-step ladder as used for the Nomadik)
+and then they will (hopefully) get the syscon base address from the
+device tree.
 
-diff --git a/include/linux/cpu_cooling.h b/include/linux/cpu_cooling.h
-index 282e270..a5d52ee 100644
---- a/include/linux/cpu_cooling.h
-+++ b/include/linux/cpu_cooling.h
-@@ -41,7 +41,7 @@ cpufreq_cooling_register(const struct cpumask *clip_cpus);
-  */
- void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev);
- 
--unsigned long cpufreq_cooling_get_level(unsigned int, unsigned int);
-+unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq);
- #else /* !CONFIG_CPU_THERMAL */
- static inline struct thermal_cooling_device *
- cpufreq_cooling_register(const struct cpumask *clip_cpus)
-@@ -54,7 +54,7 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
- 	return;
- }
- static inline
--unsigned long cpufreq_cooling_get_level(unsigned int, unsigned int)
-+unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq)
- {
- 	return THERMAL_CSTATE_INVALID;
- }
+Yours,
+Linus Walleij
