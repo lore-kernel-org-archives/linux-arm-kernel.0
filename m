@@ -1,36 +1,1383 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Thu, 2 May 2013 09:21:02 +0100
-Subject: [Xen-devel] [PATCH 3/3] xen/arm: account for stolen ticks
-In-Reply-To: <1367436460-10183-3-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
- <1367436460-10183-3-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1367482862.21869.28.camel@zakaz.uk.xensource.com>
+From: b35083@freescale.com (Jingchang Lu)
+Date: Thu, 2 May 2013 15:38:05 +0800
+Subject: [PATCH V2 2/2] ARM/DTS/MVF600: add basic device tree source for Vybrid
+In-Reply-To: <1367480285-26159-1-git-send-email-b35083@freescale.com>
+References: <1367480285-26159-1-git-send-email-b35083@freescale.com>
+Message-ID: <1367480285-26159-3-git-send-email-b35083@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-05-01 at 20:27 +0100, Stefano Stabellini wrote:
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index d30042e..8f040a0 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -14,6 +14,7 @@
->  #include <xen/xen-ops.h>
->  #include <asm/xen/hypervisor.h>
->  #include <asm/xen/hypercall.h>
-> +#include <asm/arch_timer.h>
->  #include <asm/system_misc.h>
->  #include <linux/interrupt.h>
->  #include <linux/irqreturn.h>
-> @@ -172,6 +173,8 @@ static int __init xen_secondary_init(unsigned int cpu)
->  		   later ones fail to. */
->  		per_cpu(xen_vcpu, cpu) = vcpup;
->  	}
-> +
-> +	xen_setup_runstate_info(cpu);
+This patch adds basic device tree source for Freescale
+Vybrid Family MVF600 platform and Tower development board.
 
-Is this called for the boot processor too?
+Signed-off-by: Xiaochun Li <b41219@freescale.com>
+Signed-off-by: Jingchang Lu <b35083@freescale.com>
+---
+V2:
+  Add pinctrl support based on IMX new pinctrl framework
 
-(do you have a linux-next branch where I can easily find the baseline
-for this series?)
+ arch/arm/boot/dts/Makefile         |   3 +-
+ arch/arm/boot/dts/mvf600-pinfunc.h | 816 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/mvf600-twr.dts   |  80 ++++
+ arch/arm/boot/dts/mvf600.dtsi      | 426 +++++++++++++++++++
+ 4 files changed, 1324 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/mvf600-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/mvf600-twr.dts
+ create mode 100644 arch/arm/boot/dts/mvf600.dtsi
 
-Ian.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 8fd41b3..6402f21 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -119,7 +119,8 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6q-sabreauto.dtb \
+ 	imx6q-sabrelite.dtb \
+ 	imx6q-sabresd.dtb \
+-	imx6q-sbc6x.dtb
++	imx6q-sbc6x.dtb \
++	mvf600-twr.dtb
+ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+ 	imx23-olinuxino.dtb \
+ 	imx23-stmp378x_devb.dtb \
+diff --git a/arch/arm/boot/dts/mvf600-pinfunc.h b/arch/arm/boot/dts/mvf600-pinfunc.h
+new file mode 100644
+index 0000000..9fbc7a9
+--- /dev/null
++++ b/arch/arm/boot/dts/mvf600-pinfunc.h
+@@ -0,0 +1,816 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++
++#ifndef __DTS_MVF600_PINFUNC_H
++#define __DTS_MVF600_PINFUNC_H
++
++/*
++ * Macro definations for MVF600 pin functions
++ *
++ * On Vybrid,pin's mux mode and pad control are in one 32-bit register.
++ * mux mode bits occupy bit[20:22] and pad config bits occupy bit[[0:15].
++ * So the config word is a combination of mux mode and control config value.
++ * imx common pinctrl driver requires a tuple of six elements to
++ * describe a pin. The tuple for MVF600 is as below:
++ * <mux_reg conf_reg input_reg mux_mode|conf_val input_val mux_mode|conf_val>
++ */
++
++#define ALT0	0x000000
++#define ALT1	0x100000
++#define ALT2	0x200000
++#define ALT3	0x300000
++#define ALT4	0x400000
++#define ALT5	0x500000
++#define ALT6	0x600000
++#define ALT7	0x700000
++
++
++#define MVF600_PAD_PTA6__GPIO_0(c)		0x000 0x000 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA6__RMII_CLKOUT(c)		0x000 0x000 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA6__RMII_CLKIN(c)		0x000 0x000 0x2F0 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA6__DCU1_TCON11(c)		0x000 0x000 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA6__DCU1_R2(c)		0x000 0x000 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA8__GPIO_1(c)		0x004 0x004 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA8__TCLK(c)		0x004 0x004 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA8__DCU0_R0(c)		0x004 0x004 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA8__MLB_CLK(c)		0x004 0x004 0x354 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA9__GPIO_2(c)		0x008 0x008 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA9__TDI(c)			0x008 0x008 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA9__RMII_CLKOUT(c)		0x008 0x008 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA9__RMII_CLKIN(c)		0x008 0x008 0x2F0 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTA9__DCU0_R1(c)		0x008 0x008 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA9__WDOG_B(c)		0x008 0x008 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA10__GPIO_3(c)		0x00C 0x00C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA10__TDO(c)		0x00C 0x00C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA10__EXT_AUDIO_MCLK(c)	0x00C 0x00C 0x2EC (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA10__DCU0_G0(c)		0x00C 0x00C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA10__ENET_TS_CLKIN(c)	0x00C 0x00C 0x2F4 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA10__MLB_SIGNAL(c)		0x00C 0x00C 0x35C (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA11__GPIO_4(c)		0x010 0x010 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA11__TMS(c)		0x010 0x010 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA11__DCU0_G1(c)		0x010 0x010 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA11__MLB_DATA(c)		0x010 0x010 0x358 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA12__GPIO_5(c)		0x014 0x014 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA12__TRACECK(c)		0x014 0x014 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA12__EXT_AUDIO_MCLK(c)	0x014 0x014 0x2EC (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA12__VIU_DATA13(c)		0x014 0x014 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA12__I2C0_SCL(c)		0x014 0x014 0x33C (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA16__GPIO_6(c)		0x018 0x018 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA16__TRACED0(c)		0x018 0x018 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA16__USB0_VBUS_EN(c)	0x018 0x018 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA16__ADC1_SE0(c)		0x018 0x018 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTA16__LCD29(c)		0x018 0x018 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA16__SAI2_TX_BCLK(c)	0x018 0x018 0x370 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA16__VIU_DATA14(c)		0x018 0x018 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA16__I2C0_SDA(c)		0x018 0x018 0x340 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA17__GPIO_7(c)		0x01C 0x01C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA17__TRACED1(c)		0x01C 0x01C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA17__USB0_VBUS_OC(c)	0x01C 0x01C 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA17__ADC1_SE1(c)		0x01C 0x01C 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTA17__LCD30(c)		0x01C 0x01C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA17__USB0_SOF_PULSE(c)	0x01C 0x01C 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA17__VIU_DATA15(c)		0x01C 0x01C 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA17__I2C1_SCL(c)		0x01C 0x01C 0x344 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA18__GPIO_8(c)		0x020 0x020 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA18__TRACED2(c)		0x020 0x020 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA18__ADC0_SE0(c)		0x020 0x020 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA18__FTM1_QD_PHA(c)	0x020 0x020 0x334 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTA18__LCD31(c)		0x020 0x020 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA18__SAI2_TX_DATA(c)	0x020 0x020 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA18__VIU_DATA16(c)		0x020 0x020 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA18__I2C1_SDA(c)		0x020 0x020 0x348 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA19__GPIO_9(c)		0x024 0x024 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA19__TRACED3(c)		0x024 0x024 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA19__ADC0_SE1(c)		0x024 0x024 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA19__FTM1_QD_PHB(c)	0x024 0x024 0x338 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTA19__LCD32(c)		0x024 0x024 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA19__SAI2_TX_SYNC(c)	0x024 0x024 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA19__VIU_DATA17(c)		0x024 0x024 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA19__QSPI1_A_QSCK(c)	0x024 0x024 0x374 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA20__GPIO_10(c)		0x028 0x028 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA20__TRACED4(c)		0x028 0x028 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA20__LCD33(c)		0x028 0x028 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA20__UART3_TX(c)		0x028 0x028 0x394 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA20__DCU1_HSYNC(c)		0x028 0x028 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA21__GPIO_11(c)		0x02C 0x02C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA21__TRACED5(c)		0x02C 0x02C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA21__SAI2_RX_BCLK(c)	0x02C 0x02C 0x364 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA21__UART3_RX(c)		0x02C 0x02C 0x390 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA21__DCU1_VSYNC(c)		0x02C 0x02C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA22__GPIO_12(c)		0x030 0x030 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA22__TRACED6(c)		0x030 0x030 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA22__SAI2_RX_DATA(c)	0x030 0x030 0x368 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA22__I2C2_SCL(c)		0x030 0x030 0x34C (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA22__DCU1_TAG(c)		0x030 0x030 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA23__GPIO_13(c)		0x034 0x034 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA23__TRACED7(c)		0x034 0x034 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA23__SAI2_RX_SYNC(c)	0x034 0x034 0x36C (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA23__I2C2_SDA(c)		0x034 0x034 0x350 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA23__DCU1_DE(c)		0x034 0x034 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA24__GPIO_14(c)		0x038 0x038 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA24__TRACED8(c)		0x038 0x038 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA24__USB1_VBUS_EN(c)	0x038 0x038 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA24__ESDHC1_CLK(c)		0x038 0x038 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA24__DCU1_TCON4(c)		0x038 0x038 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA24__DDR_TEST_PAD_CTRL(c)	0x038 0x038 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA25__GPIO_15(c)		0x03C 0x03C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA25__TRACED9(c)		0x03C 0x03C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA25__USB1_VBUS_OC(c)	0x03C 0x03C 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA25__ESDHC1_CMD(c)		0x03C 0x03C 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA25__DCU1_TCON5(c)		0x03C 0x03C 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA26__GPIO_16(c)		0x040 0x040 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA26__TRACED10(c)		0x040 0x040 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA26__SAI3_TX_BCLK(c)	0x040 0x040 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA26__ESDHC1_DAT0(c)	0x040 0x040 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA26__DCU1_TCON6(c)		0x040 0x040 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA27__GPIO_17(c)		0x044 0x044 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA27__TRACED11(c)		0x044 0x044 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA27__SAI3_RX_BCLK(c)	0x044 0x044 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA27__ESDHC1_DAT1(c)	0x044 0x044 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA27__DCU1_TCON7(c)		0x044 0x044 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA28__GPIO_18(c)		0x048 0x048 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA28__TRACED12(c)		0x048 0x048 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA28__SAI3_RX_DATA(c)	0x048 0x048 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA28__ENET1_1588_TMR0(c)	0x048 0x048 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTA28__UART4_TX(c)		0x048 0x048 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA28__ESDHC1_DATA2(c)	0x048 0x048 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA28__DCU1_TCON8(c)		0x048 0x048 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA29__GPIO_19(c)		0x04C 0x04C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA29__TRACED13(c)		0x04C 0x04C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA29__SAI3_TX_DATA(c)	0x04C 0x04C 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA29__ENET1_1588_TMR1(c)	0x04C 0x04C 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTA29__UART4_RX(c)		0x04C 0x04C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA29__ESDHC1_DAT3(c)	0x04C 0x04C 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA29__DCU1_TCON9(c)		0x04C 0x04C 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTA30__GPIO_20(c)		0x050 0x050 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA30__TRACED14(c)		0x050 0x050 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA30__SAI3_RX_SYNC(c)	0x050 0x050 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA30__ENET1_1588_TMR2(c)	0x050 0x050 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTA30__UART4_RTS(c)		0x050 0x050 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA30__I2C3_SCL(c)		0x050 0x050 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA30__UART3_TX(c)		0x050 0x050 0x394 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA31__GPIO_21(c)		0x054 0x054 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA31__TRACED15(c)		0x054 0x054 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTA31__SAI3_TX_SYNC(c)	0x054 0x054 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTA31__ENET1_1588_TMR3(c)	0x054 0x054 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTA31__UART4_CTS(c)		0x054 0x054 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTA31__I2C3_SDA(c)		0x054 0x054 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTA31__UART3_RX(c)		0x054 0x054 0x390 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB0__GPIO_22(c)		0x058 0x058 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB0__FTM0_CH0(c)		0x058 0x058 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB0__ADC0_SE2(c)		0x058 0x058 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB0__TRACE_CTL(c)		0x058 0x058 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB0__LCD34(c)		0x058 0x058 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB0__SAI2_RX_BCLK(c)	0x058 0x058 0x364 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB0__VIU_DATA18(c)		0x058 0x058 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB0__QSPI1_A_QPCS0(c)	0x058 0x058 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB1__GPIO_23(c)		0x05C 0x05C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB1__FTM0_CH1(c)		0x05C 0x05C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB1__ADC0_SE3(c)		0x05C 0x05C 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB1__SRC_RCON30(c)		0x05C 0x05C 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB1__LCD35(c)		0x05C 0x05C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB1__SAI2_RX_DATA(c)	0x05C 0x05C 0x368 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB1__VIU_DATA19(c)		0x05C 0x05C 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB1__QSPI1_A_DATA3(c)	0x05C 0x05C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB2__GPIO_24(c)		0x060 0x060 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB2__FTM0_CH2(c)		0x060 0x060 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB2__ADC1_SE2(c)		0x060 0x060 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB2__SRC_RCON31(c)		0x060 0x060 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB2__LCD36(c)		0x060 0x060 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB2__SAI2_RX_SYNC(c)	0x060 0x060 0x36C (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB2__VIDEO_IN0_DATA20(c)	0x060 0x060 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB2__QSPI1_A_DATA2(c)	0x060 0x060 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB3__GPIO_25(c)		0x064 0x064 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB3__FTM0_CH3(c)		0x064 0x064 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB3__ADC1_SE3(c)		0x064 0x064 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB3__PDB_EXTRIG(c)		0x064 0x064 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB3__LCD37(c)		0x064 0x064 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB3__VIU_DATA21(c)		0x064 0x064 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB3__QSPI1_A_DATA1(c)	0x064 0x064 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB4__GPIO_26(c)		0x068 0x068 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB4__FTM0_CH4(c)		0x068 0x068 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB4__UART1_TX(c)		0x068 0x068 0x380 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB4__ADC0_SE4(c)		0x068 0x068 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB4__LCD38(c)		0x068 0x068 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB4__VIU_FID(c)		0x068 0x068 0x3A8 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB4__VIU_DATA22(c)		0x068 0x068 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB4__QSPI1_A_DATA0(c)	0x068 0x068 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB5__GPIO_27(c)		0x06C 0x06C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB5__FTM0_CH5(c)		0x06C 0x06C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB5__UART1_RX(c)		0x06C 0x06C 0x37C (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB5__ADC1_SE4(c)		0x06C 0x06C 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB5__LCD39(c)		0x06C 0x06C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB5__VIU_DE(c)		0x06C 0x06C 0x3A4 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB5__QSPI1_A_DQS(c)		0x06C 0x06C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB6__GPIO_28(c)		0x070 0x070 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB6__FTM0_CH6(c)		0x070 0x070 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB6__UART1_RTS(c)		0x070 0x070 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB6__QSPI0_QPCS1_A(c)	0x070 0x070 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB6__LCD_LCD40(c)		0x070 0x070 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB6__FB_CLKOUT(c)		0x070 0x070 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB6__VIU_HSYNC(c)		0x070 0x070 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB6__UART2_TX(c)		0x070 0x070 0x38C (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB7__GPIO_29(c)		0x074 0x074 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB7__FTM0_CH7(c)		0x074 0x074 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB7__UART1_CTS(c)		0x074 0x074 0x378 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB7__QSPI0_B_QPCS1(c)	0x074 0x074 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB7__LCD41(c)		0x074 0x074 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB7__VIU_VSYNC(c)		0x074 0x074 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB7__UART2_RX(c)		0x074 0x074 0x388 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB8__GPIO_30(c)		0x078 0x078 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB8__FTM1_CH0(c)		0x078 0x078 0x32C (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB8__FTM1_QD_PHA(c)		0x078 0x078 0x334 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB8__VIU_DE(c)		0x078 0x078 0x3A4 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB8__DCU1_R6(c)		0x078 0x078 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB9__GPIO_31(c)		0x07C 0x07C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB9__FTM1_CH1(c)		0x07C 0x07C 0x330 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB9__FTM1_QD_PHB(c)		0x07C 0x07C 0x338 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB9__DCU1_R7(c)		0x07C 0x07C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB10__GPIO_32(c)		0x080 0x080 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB10__UART0_TX(c)		0x080 0x080 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB10__DCU0_TCON4(c)		0x080 0x080 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB10__VIU_DE(c)		0x080 0x080 0x3A4 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB10__CKO1(c)		0x080 0x080 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB10__ENET_TS_CLKIN(c)	0x080 0x080 0x2F4 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB11__GPIO_33(c)		0x084 0x084 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB11__UART0_RX(c)		0x084 0x084 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB11__DCU0_TCON5(c)		0x084 0x084 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB11__SNVS_ALARM_OUT_B(c)	0x084 0x084 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB11__CKO2(c)		0x084 0x084 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB11_ENET0_1588_TMR0(c)	0x084 0x084 0x304 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB12__GPIO_34(c)		0x088 0x088 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB12__UART0_RTS(c)		0x088 0x088 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB12__DSPI0_CS5(c)		0x088 0x088 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB12__DCU0_TCON6(c)		0x088 0x088 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB12__FB_AD1(c)		0x088 0x088 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB12__NMI(c)		0x088 0x088 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB12__ENET0_1588_TMR1(c)	0x088 0x088 0x308 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB13__GPIO_35(c)		0x08C 0x08C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB13__UART0_CTS(c)		0x08C 0x08C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB13__DSPI0_CS4(c)		0x08C 0x08C 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB13__DCU0_TCON7(c)		0x08C 0x08C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB13__FB_AD0(c)		0x08C 0x08C 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB13__TRACE_CTL(c)		0x08C 0x08C 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB14__GPIO_36(c)		0x090 0x090 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB14__CAN0_RX(c)		0x090 0x090 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB14__I2C0_SCL(c)		0x090 0x090 0x33C (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB14__DCU0_TCON8(c)		0x090 0x090 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB14__DCU1_PCLK(c)		0x090 0x090 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB15__GPIO_37(c)		0x094 0x094 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB15__CAN0_TX(c)		0x094 0x094 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB15__I2C0_SDA(c)		0x094 0x094 0x340 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB15__DCU0_TCON9(c)		0x094 0x094 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB15__VIU_PIX_CLK(c)	0x094 0x094 0x3AC (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB16__GPIO_38(c)		0x098 0x098 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB16__CAN1_RX(c)		0x098 0x098 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB16__I2C1_SCL(c)		0x098 0x098 0x344 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB16__DCU0_TCON10(c)	0x098 0x098 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB17__GPIO_39(c)		0x09C 0x09C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB17__CAN1_TX(c)		0x09C 0x09C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB17__I2C1_SDA(c)		0x09C 0x09C 0x348 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB17__DCU0_TCON11(c)	0x09C 0x09C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB18__GPIO_40(c)		0x0A0 0x0A0 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB18__DSPI0_CS1(c)		0x0A0 0x0A0 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB18__EXT_AUDIO_MCLK(c)	0x0A0 0x0A0 0x2EC (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB18__VIU_DATA9(c)		0x0A0 0x0A0 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB19__GPIO_41(c)		0x0A4 0x0A4 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB19__DSPI0_CS0(c)		0x0A4 0x0A4 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB19__VIU_DATA10(c)		0x0A4 0x0A4 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB20__GPIO_42(c)		0x0A8 0x0A8 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB20__DSPI0_SIN(c)		0x0A8 0x0A8 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB20__LCD42(c)		0x0A8 0x0A8 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB20__VIU_DATA11(c)		0x0A8 0x0A8 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB21__GPIO_43(c)		0x0AC 0x0AC 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB21__DSPI0_SOUT(c)		0x0AC 0x0AC 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB21__LCD43(c)		0x0AC 0x0AC 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB21__VIU_DATA12(c)		0x0AC 0x0AC 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB21__DCU1_PCLK(c)		0x0AC 0x0AC 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB22__GPIO_44(c)		0x0B0 0x0B0 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB22__DSPI0_SCK(c)		0x0B0 0x0B0 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB22__VLCD(c)		0x0B0 0x0B0 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB22__VIU_FID(c)		0x0B0 0x0B0 0x3A8 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC0__GPIO_45(c)		0x0B4 0x0B4 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC0__ENET_RMII0_MDC(c)	0x0B4 0x0B4 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC0__FTM1_CH0(c)		0x0B4 0x0B4 0x32C (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTC0__DSPI0_CS3(c)		0x0B4 0x0B4 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC0__ESAI_SCKT(c)		0x0B4 0x0B4 0x310 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC0__ESDHC0_CLK(c)		0x0B4 0x0B4 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC0__VIU_DATA0(c)		0x0B4 0x0B4 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC0__SRC_RCON18(c)		0x0B4 0x0B4 0x398 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC1__GPIO_46(c)		0x0B8 0x0B8 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC1__ENET_RMII0_MDIO(c)	0x0B8 0x0B8 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC1__FTM1_CH1(c)		0x0B8 0x0B8 0x330 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTC1__DSPI0_CS2(c)		0x0B8 0x0B8 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC1__ESAI_FST(c)		0x0B8 0x0B8 0x30C (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC1__ESDHC0_CMD(c)		0x0B8 0x0B8 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC1__VIU_DATA1(c)		0x0B8 0x0B8 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC1__SRC_RCON19(c)		0x0B8 0x0B8 0x39C (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC2__GPIO_47(c)		0x0BC 0x0BC 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC2__ENET_RMII0_CRS(c)	0x0BC 0x0BC 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC2__UART1_TX(c)		0x0BC 0x0BC 0x380 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTC2__ESAI_SDO0(c)		0x0BC 0x0BC 0x314 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC2__ESDHC0_DAT0(c)		0x0BC 0x0BC 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC2__VIU_DATA2(c)		0x0BC 0x0BC 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC2__SRC_RCON20(c)		0x0BC 0x0BC 0x3A0 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC3__GPIO_48(c)		0x0C0 0x0C0 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC3__ENET_RMII0_RXD1(c)	0x0C0 0x0C0 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC3__UART1_RX(c)		0x0C0 0x0C0 0x37C (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTC3__ESAI_SDO1(c)		0x0C0 0x0C0 0x318 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC3__ESDHC0_DAT1(c)		0x0C0 0x0C0 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC3__VIU_DATA3(c)		0x0C0 0x0C0 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC3__DCU0_R0(c)		0x0C0 0x0C0 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC4__GPIO_49(c)		0x0C4 0x0C4 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC4__ENET_RMII0_RXD0(c)	0x0C4 0x0C4 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC4__UART1_RTS(c)		0x0C4 0x0C4 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTC4__DSPI1_CS1(c)		0x0C4 0x0C4 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC4__ESAI_SDO2(c)		0x0C4 0x0C4 0x31C (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC4__ESDHC0_DAT2(c)		0x0C4 0x0C4 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC4__VIU_DATA4(c)		0x0C4 0x0C4 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC4__DCU0_R1(c)		0x0C4 0x0C4 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC5__GPIO_50(c)		0x0C8 0x0C8 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC5__ENET_RMII0_RXER(c)	0x0C8 0x0C8 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC5__UART1_CTS(c)		0x0C8 0x0C8 0x378 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTC5__DSPI1_CS0(c)		0x0C8 0x0C8 0x300 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC5__ESAI_SDO3(c)		0x0C8 0x0C8 0x320 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC5__ESDHC0_DAT3(c)		0x0C8 0x0C8 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC5__VIU_DATA5(c)		0x0C8 0x0C8 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC5__DCU0_G0(c)		0x0C8 0x0C8 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC6__GPIO_51(c)		0x0CC 0x0CC 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC6__ENET_RMII0_TXD1(c)	0x0CC 0x0CC 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC6__DSPI1_SIN(c)		0x0CC 0x0CC 0x2FC (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC6__ESAI_SDI0(c)		0x0CC 0x0CC 0x328 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC6__ESDHC0_WP(c)		0x0CC 0x0CC 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC6__VIU_DATA6(c)		0x0CC 0x0CC 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC6__DCU0_G1(c)		0x0CC 0x0CC 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC7__GPIO_52(c)		0x0D0 0x0D0 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC7__ENET_RMII0_TXD0(c)	0x0D0 0x0D0 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC7__DSPI1_SOUT(c)		0x0D0 0x0D0 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC7__ESAI_SDI1(c)		0x0D0 0x0D0 0x324 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC7__VIU_DATA7(c)		0x0D0 0x0D0 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC7__DCU0_B0(c)		0x0D0 0x0D0 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC8__GPIO_53(c)		0x0D4 0x0D4 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC8__ENET_RMII0_TXEN(c)	0x0D4 0x0D4 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC8__DSPI1_SCK(c)		0x0D4 0x0D4 0x2F8 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC8__VIU_DATA8(c)		0x0D4 0x0D4 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC8__DCU0_B1(c)		0x0D4 0x0D4 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC9__GPIO_54(c)		0x0D8 0x0D8 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC9__ENET_RMII1_MDC(c)	0x0D8 0x0D8 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC9__ESAI_SCKT(c)		0x0D8 0x0D8 0x310 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC9__MLB_CLK(c)		0x0D8 0x0D8 0x354 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC9__DEBUG_OUT0(c)		0x0D8 0x0D8 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC10__GPIO_55(c)		0x0DC 0x0DC 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC10__ENET_RMII1_MDIO(c)	0x0DC 0x0DC 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC10__ESAI_FST(c)		0x0DC 0x0DC 0x30C (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC10__MLB_SIGNAL(c)		0x0DC 0x0DC 0x35C (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC10__DEBUG_OUT1(c)		0x0DC 0x0DC 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC11__GPIO_56(c)		0x0E0 0x0E0 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC11__ENET_RMII1_CRS(c)	0x0E0 0x0E0 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC11__ESAI_SDO0(c)		0x0E0 0x0E0 0x314 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC11__MLB_DATA(c)		0x0E0 0x0E0 0x358 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC11__DEBUG_OUT(c)		0x0E0 0x0E0 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC12__GPIO_57(c)		0x0E4 0x0E4 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC12__ENET_RMII_RXD1(c)	0x0E4 0x0E4 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC12__ESAI_SDO1(c)		0x0E4 0x0E4 0x318 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC12__SAI2_TX_BCLK(c)	0x0E4 0x0E4 0x370 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC12__DEBUG_OUT3(c)		0x0E4 0x0E4 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC13__GPIO_58(c)		0x0E8 0x0E8 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC13__ENET_RMII1_RXD0(c)	0x0E8 0x0E8 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC13__ESAI_SDO2(c)		0x0E8 0x0E8 0x31C (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC13__SAI2_RX_BCLK(c)	0x0E8 0x0E8 0x364 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC13__DEBUG_OUT4(c)		0x0E8 0x0E8 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC14__GPIO_59(c)		0x0EC 0x0EC 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC14__ENET_RMII1_RXER(c)	0x0EC 0x0EC 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC14__ESAI_SDO3(c)		0x0EC 0x0EC 0x320 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC14__UART5_TX(c)		0x0EC 0x0EC 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC14__SAI2_RX_DATA(c)	0x0EC 0x0EC 0x368 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC14__ADC0_SE6(c)		0x0EC 0x0EC 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC14__DEBUG_OUT5(c)		0x0EC 0x0EC 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC15__GPIO_60(c)		0x0F0 0x0F0 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC15__ENET_RMII1_TXD1(c)	0x0F0 0x0F0 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC15__ESAI_SDI0(c)		0x0F0 0x0F0 0x328 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC15__UART5_RX(c)		0x0F0 0x0F0 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC15__SAI2_TX_DATA(c)	0x0F0 0x0F0 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC15__ADC0_SE7(c)		0x0F0 0x0F0 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC15__DEBUG_OUT6(c)		0x0F0 0x0F0 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC16__GPIO_61(c)		0x0F4 0x0F4 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC16__ENET_RMII1_TXD0(c)	0x0F4 0x0F4 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC16__ESAI_SDI1(c)		0x0F4 0x0F4 0x324 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC16__UART5_RTS(c)		0x0F4 0x0F4 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC16__SAI2_RX_SYNC(c)	0x0F4 0x0F4 0x36C (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC16__ADC1_SE6(c)		0x0F4 0x0F4 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC16__DEBUG_OUT7(c)		0x0F4 0x0F4 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC17__GPIO_62(c)		0x0F8 0x0F8 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC17__ENET_RMII1_TXEN(c)	0x0F8 0x0F8 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC17__ADC1_SE7(c)		0x0F8 0x0F8 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC17__UART5_CTS(c)		0x0F8 0x0F8 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC17__SAI2_TX_SYNC(c)	0x0F8 0x0F8 0x374 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC17__USB1_SOF_PULSE(c)	0x0F8 0x0F8 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC17__DEBUG_OUT8(c)		0x0F8 0x0F8 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD31__GPIO_63(c)		0x0FC 0x0FC 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD31__FB_AD31(c)		0x0FC 0x0FC 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD31__NF_IO15(c)		0x0FC 0x0FC 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD31__FTM3_CH0(c)		0x0FC 0x0FC 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD31__DSPI2_CS1(c)		0x0FC 0x0FC 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD31__DEBUG_OUT9(c)		0x0FC 0x0FC 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD30__GPIO_64(c)		0x100 0x100 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD30__FB_AD30(c)		0x100 0x100 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD30__NF_IO14(c)		0x100 0x100 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD30__FTM3_CH1(c)		0x100 0x100 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD30__DSPI2_CS0(c)		0x100 0x100 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD30__DEBUG_OUT10(c)	0x100 0x100 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD29__GPIO_65(c)		0x104 0x104 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD29__FB_AD29(c)		0x104 0x104 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD29__NF_IO13(c)		0x104 0x104 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD29__FTM3_CH2(c)		0x104 0x104 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD29__DSPI2_SIN(c)		0x104 0x104 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD29__DEBUG_OUT11(c)	0x104 0x104 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD28__GPIO_66(c)	 	0x108 0x108 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD28__FB_AD28(c)		0x108 0x108 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD28__NF_IO12(c)		0x108 0x108 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD28__I2C2_SCL(c)		0x108 0x108 0x34C (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD28__FTM3_CH3(c)		0x108 0x108 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD28__DSPI2_SOUT(c)		0x108 0x108 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD28__DEBUG_OUT12(c)	0x108 0x108 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD27__GPIO_67(c)		0x10C 0x10C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD27__FB_AD27(c)		0x10C 0x10C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD27__NF_IO11(c)		0x10C 0x10C 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD27__I2C2_SDA(c)		0x10C 0x10C 0x350 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD27__FTM3_CH4(c)		0x10C 0x10C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD27__DSPI2_SCK(c)		0x10C 0x10C 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD27__DEBUG_OUT13(c)	0x10C 0x10C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD26__GPIO_68(c)		0x110 0x110 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD26__FB_AD26(c)		0x110 0x110 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD26__NF_IO10(c)		0x110 0x110 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD26__FTM3_CH5(c)		0x110 0x110 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD26__ESDHC1_WP(c)		0x110 0x110 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD26__DEBUG_OUT14(c)	0x110 0x110 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD25__GPIO_69(c)		0x114 0x114 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD25__FB_AD25(c)		0x114 0x114 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD25__NF_IO9(c)		0x114 0x114 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD25__FTM3_CH6(c)		0x114 0x114 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD25__DEBUG_OUT15(c)	0x114 0x114 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD24__GPIO_70(c)		0x118 0x118 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD24__FB_AD24(c)		0x118 0x118 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD24__NF_IO8(c)		0x118 0x118 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD24__FTM3_CH7(c)		0x118 0x118 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD24__DEBUG_OUT16(c)	0x118 0x118 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD23__GPIO_71(c)		0x11C 0x11C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD23__FB_AD23(c)		0x11C 0x11C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD23__NF_IO7(c)		0x11C 0x11C 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD23__FTM2_CH0(c)		0x11C 0x11C 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD23__ENET0_1588_TMR0(c)	0x11C 0x11C 0x304 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD23__ESDHC0_DAT4(c)	0x11C 0x11C 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD23__UART2_TX(c)		0x11C 0x11C 0x38C (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTD23__DCU1_R3(c)		0x11C 0x11C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD22__GPIO_72(c)		0x120 0x120 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD22__FB_AD22(c)		0x120 0x120 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD22__NF_IO6(c)		0x120 0x120 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD22__FTM2_CH1(c)		0x120 0x120 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD22__ENET0_1588_TMR1(c)	0x120 0x120 0x308 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD22__ESDHC0_DAT5(c)	0x120 0x120 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD22__UART2_RX(c)		0x120 0x120 0x388 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTD22__DCU1_R4(c)		0x120 0x120 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD21__GPIO_73(c)		0x124 0x124 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD21__FB_AD21(c)		0x124 0x124 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD21__NF_IO5(c)		0x124 0x124 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD21__ENET0_1588_TMR2(c)	0x124 0x124 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD21__ESDHC0_DAT6(c)	0x124 0x124 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD21__UART2_RTS(c)		0x124 0x124 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTD21__DCU1_R5(c)		0x124 0x124 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD20__GPIO_74(c)		0x128 0x128 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD20__FB_AD20(c)		0x128 0x128 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD20__NF_IO4(c)		0x128 0x128 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD20__ENET0_1588_TMR3(c)	0x128 0x128 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD20__ESDHC0_DAT7(c)	0x128 0x128 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD20__UART2_CTS(c)		0x128 0x128 0x384 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTD20__DCU1_R0(c)		0x128 0x128 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD19__GPIO_75(c)		0x12C 0x12C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD19__FB_AD19(c)		0x12C 0x12C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD19__NF_IO3(c)		0x12C 0x12C 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD19__ESAI_SCKR(c)		0x12C 0x12C 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD19__I2C0_SCL(c)		0x12C 0x12C 0x33C (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD19__FTM2_QD_PHA(c)	0x12C 0x12C 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD19__DCU1_R1(c)		0x12C 0x12C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD18__GPIO_76(c)		0x130 0x130 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD18__FB_AD18(c)		0x130 0x130 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD18__NF_IO2(c)		0x130 0x130 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD18__ESAI_FSR(c)		0x130 0x130 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD18__I2C0_SDA(c)		0x130 0x130 0x340 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD18__FTM2_QD_PHB(c)	0x130 0x130 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD18__DCU1_G0(c)		0x130 0x130 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD17__GPIO_77(c)		0x134 0x134 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD17__FB_AD17(c)		0x134 0x134 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD17__NF_IO1(c)		0x134 0x134 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD17__ESAI_HCKR(c)		0x134 0x134 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD17__I2C1_SCL(c)		0x134 0x134 0x344 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD17__DCU1_G1(c)		0x134 0x134 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD16__GPIO_78(c)		0x138 0x138 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD16__FB_AD16(c)		0x138 0x138 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD16__NF_IO0(c)		0x138 0x138 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD16__ESAI_HCKT(c)		0x138 0x138 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD16__I2C1_SDA(c)		0x138 0x138 0x348 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD16__DCU1_G2(c)		0x138 0x138 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD0__GPIO_79(c)		0x13C 0x13C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD0__QSPI0_A_QSCK(c)	0x13C 0x13C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD0__UART2_TX(c)		0x13C 0x13C 0x38C (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD0__FB_AD15(c)		0x13C 0x13C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD0__SPDIF_EXTCLK(c)	0x13C 0x13C 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD0__DEBUG_OUT17(c)		0x13C 0x13C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD1__GPIO_80(c)		0x140 0x140 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD1__QSPI0_A_CS0(c)		0x140 0x140 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD1__UART2_RX(c)		0x140 0x140 0x388 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD1__FB_AD14(c)		0x140 0x140 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD1__SPDIF_IN1(c)		0x140 0x140 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD1__DEBUG_OUT18(c)		0x140 0x140 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD2__GPIO_81(c)		0x144 0x144 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD2__QSPI0_A_DATA3(c)	0x144 0x144 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD2__UART2_RTS(c)		0x144 0x144 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD2__DSPI1_CS3(c)		0x144 0x144 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD2__FB_AD13(c)		0x144 0x144 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD2__SPDIF_OUT1(c)		0x144 0x144 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD2__DEBUG_OUT19(c)		0x144 0x144 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD3__GPIO_82(c)		0x148 0x148 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD3__QSPI0_A_DATA2(c)	0x148 0x148 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD3__UART2_CTS(c)		0x148 0x148 0x384 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD3__DSPI1_CS2(c)		0x148 0x148 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD3__FB_AD12(c)		0x148 0x148 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD3__SPDIF_PLOCK(c)		0x148 0x148 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD3__DEBUG_OUT20(c)		0x148 0x148 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD4__GPIO_83(c)		0x14C 0x14C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD4__QSPI0_A_DATA1(c)	0x14C 0x14C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD4__DSPI1_CS1(c)		0x14C 0x14C 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD4__FB_AD11(c)		0x14C 0x14C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD4__SPDIF_SRCLK(c)		0x14C 0x14C 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTD4__DEBUG_OUT21(c)		0x14C 0x14C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD5__GPIO_84(c)		0x150 0x150 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD5__QSPI0_A_DATA0(c)	0x150 0x150 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD5__DSPI1_CS0(c)		0x150 0x150 0x300 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD5__FB_AD10(c)		0x150 0x150 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD5__DEBUG_OUT22(c)		0x150 0x150 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD6__GPIO_85(c)		0x154 0x154 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD6__QSPI1_A_DQS(c)		0x154 0x154 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD6__DSPI1_SIN(c)		0x154 0x154 0x2FC (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD6__FB_AD9(c)		0x154 0x154 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD6__DEBUG_OUT23(c)		0x154 0x154 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD7__GPIO_86(c)		0x158 0x158 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD7__QSPI0_B_QSCK(c)	0x158 0x158 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD7__DSPI1_SOUT(c)		0x158 0x158 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD7__FB_AD8(c)		0x158 0x158 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD7__DEBUG_OUT24(c)		0x158 0x158 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD8__GPIO_87(c)		0x15C 0x15C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD8__QSPI0_B_CS0(c)		0x15C 0x15C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD8__FB_CLKOUT(c)		0x15C 0x15C 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD8__DSPI1_SCK(c)		0x15C 0x15C 0x2F8 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTD8__FB_AD7(c)		0x15C 0x15C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD8__DEBUG_OUT25(c)		0x15C 0x15C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD9__GPIO_88(c)		0x160 0x160 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD9__QSPI0_B_DATA3(c)	0x160 0x160 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD9__DSPI3_CS1(c)		0x160 0x160 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD9__FB_AD6(c)		0x160 0x160 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD9__SAI1_TX_SYNC(c)	0x160 0x160 0x360 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTD9__DCU1_B0(c)		0x160 0x160 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD10__GPIO_89(c)		0x164 0x164 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD10__QSPI0_B_DATA2(c)	0x164 0x164 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD10__DSPI3_CS0(c)		0x164 0x164 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD10__FB_AD5(c)		0x164 0x164 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD10__DCU1_B1(c)		0x164 0x164 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD11__GPIO_90(c)		0x168 0x168 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD11__QSPI0_B_DATA1(c)	0x168 0x168 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD11__DSPI3_SIN(c)		0x168 0x168 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD11__FB_AD4(c)		0x168 0x168 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD11__DEBUG_OUT26(c)	0x168 0x168 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD12__GPIO_91(c)		0x16C 0x16C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD12__QSPI0_B_DATA0(c)	0x16C 0x16C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD12__DSPI3_SOUT(c)		0x16C 0x16C 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD12__FB_AD3(c)		0x16C 0x16C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD12__DEBUG_OUT27(c)	0x16C 0x16C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTD13__GPIO_92(c)		0x170 0x170 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTD13__QSPI0_B_DQS(c)	0x170 0x170 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTD13__DSPI3_SCK(c)		0x170 0x170 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTD13__FB_AD2(c)		0x170 0x170 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTD13__DEBUG_OUT28(c)	0x170 0x170 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB23__GPIO_93(c)		0x174 0x174 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB23__SAI0_TX_BCLK(c)	0x174 0x174 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB23__UART1_TX(c)		0x174 0x174 0x380 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB23__SRC_RCON18(c)		0x174 0x174 0x398 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB23__FB_MUXED_ALE(c)	0x174 0x174 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB23__FB_TS_B(c)		0x174 0x174 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB23__UART3_RTS(c)		0x174 0x174 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB23__DCU1_G3(c)		0x174 0x174 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB24__GPIO_94(c)		0x178 0x178 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB24__SAI0_RX_BCLK(c)	0x178 0x178 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB24__UART1_RX(c)		0x178 0x178 0x37C (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB24__SRC_RCON19(c)		0x178 0x178 0x39C (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB24__FB_MUXED_TSIZ0(c)	0x178 0x178 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB24__NF_WE_B(c)		0x178 0x178 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB24__UART3_CTS(c)		0x178 0x178 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB24__DCU1_G4(c)		0x178 0x178 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB25__GPIO_95(c)		0x17C 0x17C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB25__SAI0_RX_DATA(c)	0x17C 0x17C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB25__UART1_RTS(c)		0x17C 0x17C 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB25__SRC_RCON20(c)		0x17C 0x17C 0x3A0 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB25__FB_CS1_B(c)		0x17C 0x17C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB25__NF_CE0_B(c)		0x17C 0x17C 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB25__DCU1_G5(c)		0x17C 0x17C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB26__GPIO_96(c)		0x180 0x180 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB26__SAI0_TX_DATA(c)	0x180 0x180 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB26__UART1_CTS(c)		0x180 0x180 0x378 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTB26__SRC_RCON21(c)		0x180 0x180 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB26__FB_CS0_B(c)		0x180 0x180 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB26__NF_CE1_B(c)		0x180 0x180 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB26__DCU1_G6(c)		0x180 0x180 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB27__GPIO_97(c)		0x184 0x184 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB27__SAI0_RX_SYNC(c)	0x184 0x184 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB27__SRC_RCON22(c)		0x184 0x184 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB27__FB_OE_B(c)		0x184 0x184 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB27__FB_MUXED_TBST_B(c)	0x184 0x184 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTB27__NF_RE_B(c)		0x184 0x184 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTB27__DCU1_G7(c)		0x184 0x184 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTB28__GPIO_98(c)		0x188 0x188 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTB28__SAI0_TX_SYNC(c)	0x188 0x188 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTB28__SRC_RCON23(c)		0x188 0x188 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTB28__FB_RW_B(c)		0x188 0x188 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTB28__DCU1_B6(c)		0x188 0x188 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC26__GPIO_99(c)		0x18C 0x18C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC26__SAI1_TX_BCLK(c)	0x18C 0x18C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC26__DSPI0_CS5(c)		0x18C 0x18C 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTC26__SRC_RCON24(c)		0x18C 0x18C 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC26__FB_TA_B(c)		0x18C 0x18C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC26__NF_RB_B(c)		0x18C 0x18C 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC26__DCU1_B7(c)		0x18C 0x18C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC27__GPIO_100(c)		0x190 0x190 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC27__SAI1_RX_BCLK(c)	0x190 0x190 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC27__DSPI0_CS4(c)		0x190 0x190 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTC27__SRC_RCON25(c)		0x190 0x190 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC27__FB_BE3_B(c)		0x190 0x190 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC27__FB_CS3_B(c)		0x190 0x190 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC27__NF_ALE(c)		0x190 0x190 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC27__DCU1_B2(c)		0x190 0x190 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC28__GPIO_101(c)		0x194 0x194 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC28__SAI1_RX_DATA(c)	0x194 0x194 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC28__DSPI0_CS3(c)		0x194 0x194 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTC28__SRC_RCON26(c)		0x194 0x194 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC28__FB_BE2_B(c)		0x194 0x194 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC28__FB_CS2_B(c)		0x194 0x194 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC28__NF_CLE(c)		0x194 0x194 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC28__DCU1_B3(c)		0x194 0x194 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC29__GPIO_102(c)		0x198 0x198 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC29__SAI1_TX_DATA(c)	0x198 0x198 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC29__DSPI0_CS2(c)		0x198 0x198 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTC29__SRC_RCON27(c)		0x198 0x198 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC29__FB_BE1_B(c)		0x198 0x198 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC29__FB_MUXED_TSIZE1(c)	0x198 0x198 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC29__DCU1_B4(c)		0x198 0x198 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC30__GPIO_103(c)		0x19C 0x19C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC30__SAI1_RX_SYNC(c)	0x19C 0x19C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC30__DSPI1_CS2(c)		0x19C 0x19C 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTC30__SRC_RCON28(c)		0x19C 0x19C 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC30__FB_MUXED_BE0_B(c)	0x19C 0x19C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTC30__FB_TSIZ0(c)		0x19C 0x19C 0x000 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTC30__ADC0_SE5(c)		0x19C 0x19C 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC30__DCU1_B5(c)		0x19C 0x19C 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTC31__GPIO_104(c)		0x1A0 0x1A0 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTC31__SAI1_TX_SYNC(c)	0x1A0 0x1A0 0x360 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTC31__SRC_RCON29(c)		0x1A0 0x1A0 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTC31__ADC1_SE5(c)		0x1A0 0x1A0 0x000 (ALT6|c) 0 (ALT6|c)
++#define MVF600_PAD_PTC31__DCU1_B6(c)		0x1A0 0x1A0 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE0__GPIO_105(c)		0x1A4 0x1A4 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE0__DCU0_HSYNC(c)		0x1A4 0x1A4 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE0__SRC_BMODE1(c)		0x1A4 0x1A4 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTE0__LCD0(c)		0x1A4 0x1A4 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE0__DEBUG_OUT29(c)		0x1A4 0x1A4 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE1__GPIO_106(c)		0x1A8 0x1A8 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE1__DCU0_VSYNC(c)		0x1A8 0x1A8 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE1__SRC_BMODE0(c)		0x1A8 0x1A8 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTE1__LCD1(c)		0x1A8 0x1A8 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE1__DEBUG_OUT30(c)		0x1A8 0x1A8 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE2__GPIO_107(c)		0x1AC 0x1AC 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE2__DCU0_PCLK(c)		0x1AC 0x1AC 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE2__LCD2(c)		0x1AC 0x1AC 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE2__DEBUG_OUT31(c)		0x1AC 0x1AC 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE3__GPIO_108(c)		0x1B0 0x1B0 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE3__DCU0_TAG(c)		0x1B0 0x1B0 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE3__LCD3(c)		0x1B0 0x1B0 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE3__DEBUG_OUT32(c)		0x1B0 0x1B0 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE4__GPIO_109(c)		0x1B4 0x1B4 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE4__DCU0_DE(c)		0x1B4 0x1B4 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE4__LCD4(c)		0x1B4 0x1B4 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE4__DEBUG_OUT33(c)		0x1B4 0x1B4 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE5__GPIO_110(c)		0x1B8 0x1B8 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE5__DCU0_R0(c)		0x1B8 0x1B8 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE5__LCD5(c)		0x1B8 0x1B8 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE5__DEBUG_OUT34(c)		0x1B8 0x1B8 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE6__GPIO_111(c)		0x1BC 0x1BC 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE6__DCU0_R1(c)		0x1BC 0x1BC 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE6__LCD6(c)		0x1BC 0x1BC 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE6__DEBUG_OUT35(c)		0x1BC 0x1BC 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE7__GPIO_112(c)		0x1C0 0x1C0 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE7__DCU0_R2(c)		0x1C0 0x1C0 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE7__SRC_RCON0(c)		0x1C0 0x1C0 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE7__LCD7(c)		0x1C0 0x1C0 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE7__DEBUG_OUT36(c)		0x1C0 0x1C0 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE8__GPIO_113(c)		0x1C4 0x1C4 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE8__DCU0_R3(c)		0x1C4 0x1C4 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE8__SRC_RCON1(c)		0x1C4 0x1C4 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE8__LCD8(c)		0x1C4 0x1C4 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE8__DEBUG_OUT37(c)		0x1C4 0x1C4 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE9__GPIO_114(c)		0x1C8 0x1C8 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE9__DCU0_R4(c)		0x1C8 0x1C8 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE9__SRC_RCON2(c)		0x1C8 0x1C8 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE9__LCD9(c)		0x1C8 0x1C8 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE9__DEBUG_OUT38(c)		0x1C8 0x1C8 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE10__GPIO_115(c)		0x1CC 0x1CC 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE10__DCU0_R5(c)		0x1CC 0x1CC 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE10__SRC_RCON3(c)		0x1CC 0x1CC 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE10__LCD10(c)		0x1CC 0x1CC 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE10__DEBUG_OUT39(c)	0x1CC 0x1CC 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE11__GPIO_116(c)		0x1D0 0x1D0 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE11__DCU0_R6(c)		0x1D0 0x1D0 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE11__SRC_RCON4(c)		0x1D0 0x1D0 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE11__LCD11(c)		0x1D0 0x1D0 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE11__DEBUG_OUT40(c)	0x1D0 0x1D0 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE12__GPIO_117(c)		0x1D4 0x1D4 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE12__DCU0_R7(c)		0x1D4 0x1D4 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE12__DSPI1_CS3(c)		0x1D4 0x1D4 0x000 (ALT2|c) 0 (ALT2|c)
++#define MVF600_PAD_PTE12__SRC_RCON5(c)		0x1D4 0x1D4 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE12__LCD12(c)		0x1D4 0x1D4 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE12__LPT_ALT0(c)		0x1D4 0x1D4 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE13__GPIO_118(c)		0x1D8 0x1D8 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE13__DCU0_G0(c)		0x1D8 0x1D8 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE13__LCD13(c)		0x1D8 0x1D8 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE13__DEBUG_OUT41(c)	0x1D8 0x1D8 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE14__GPIO_119(c)		0x1DC 0x1DC 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE14__DCU0_G1(c)		0x1DC 0x1DC 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE14__LCD14(c)		0x1DC 0x1DC 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE14__DEBUG_OUT42(c)	0x1DC 0x1DC 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE15__GPIO_120(c)		0x1E0 0x1E0 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE15__DCU0_G2(c)		0x1E0 0x1E0 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE15__SRC_RCON6(c)		0x1E0 0x1E0 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE15__LCD15(c)		0x1E0 0x1E0 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE15__DEBUG_OUT43(c)	0x1E0 0x1E0 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE16__GPIO_121(c)		0x1E4 0x1E4 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE16__DCU0_G3(c)		0x1E4 0x1E4 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE16__SRC_RCON7(c)		0x1E4 0x1E4 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE16__LCD16(c)		0x1E4 0x1E4 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE17__GPIO_122(c)		0x1E8 0x1E8 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE17__DCU0_G4(c)		0x1E8 0x1E8 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE17__SRC_RCON8(c)		0x1E8 0x1E8 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE17__LCD17(c)		0x1E8 0x1E8 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE18__GPIO_123(c)		0x1EC 0x1EC 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE18__DCU0_G5(c)		0x1EC 0x1EC 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE18__SRC_RCON9(c)		0x1EC 0x1EC 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE18__LCD18(c)		0x1EC 0x1EC 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE19__GPIO_124(c)		0x1F0 0x1F0 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE19__DCU0_G6(c)		0x1F0 0x1F0 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE19__SRC_RCON10(c)		0x1F0 0x1F0 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE19__LCD19(c)		0x1F0 0x1F0 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE19__I2C0_SCL(c)		0x1F0 0x1F0 0x33C (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTE20__GPIO_125(c)		0x1F4 0x1F4 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE20__DCU0_G7(c)		0x1F4 0x1F4 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE20__SRC_RCON11(c)		0x1F4 0x1F4 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE20__LCD20(c)		0x1F4 0x1F4 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE20__I2C0_SDA(c)		0x1F4 0x1F4 0x340 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTE20__EWM_IN(c)		0x1F4 0x1F4 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTE21__GPIO_126(c)		0x1F8 0x1F8 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE21__DCU0_B0(c)		0x1F8 0x1F8 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE21__LCD21(c)		0x1F8 0x1F8 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE22__GPIO_127(c)		0x1FC 0x1FC 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE22__DCU0_B1(c)		0x1FC 0x1FC 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE22__LCD22(c)		0x1FC 0x1FC 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE23__GPIO_128(c)		0x200 0x200 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE23__DCU0_B2(c)		0x200 0x200 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE23__SRC_RCON12(c)		0x200 0x200 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE23__LCD23(c)		0x200 0x200 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE24__GPIO_129(c)		0x204 0x204 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE24__DCU0_B3(c)		0x204 0x204 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE24__SRC_RCON13(c)		0x204 0x204 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE24__LCD24(c)		0x204 0x204 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE25__GPIO_130(c)		0x208 0x208 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE25__DCU0_B4(c)		0x208 0x208 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE25__SRC_RCON14(c)		0x208 0x208 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE25__LCD25(c)		0x208 0x208 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE26__GPIO_131(c)		0x20C 0x20C 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE26__DCU0_B5(c)		0x20C 0x20C 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE26__SRC_RCON15(c)		0x20C 0x20C 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE26__LCD26(c)		0x20C 0x20C 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE27__GPIO_132(c)		0x210 0x210 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE27__DCU0_B6(c)		0x210 0x210 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE27__SRC_RCON16(c)		0x210 0x210 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE27__LCD27(c)		0x210 0x210 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE27__I2C1_SCL(c)		0x210 0x210 0x344 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTE28__GPIO_133(c)		0x214 0x214 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTE28__DCU0_B7(c)		0x214 0x214 0x000 (ALT1|c) 0 (ALT1|c)
++#define MVF600_PAD_PTE28__SRC_RCON17(c)		0x214 0x214 0x000 (ALT3|c) 0 (ALT3|c)
++#define MVF600_PAD_PTE28__LCD28(c)		0x214 0x214 0x000 (ALT4|c) 0 (ALT4|c)
++#define MVF600_PAD_PTE28__I2C1_SDA(c)		0x214 0x214 0x348 (ALT5|c) 0 (ALT5|c)
++#define MVF600_PAD_PTE28__EWM_OUT(c)		0x214 0x214 0x000 (ALT7|c) 0 (ALT7|c)
++#define MVF600_PAD_PTA7__GPIO_134(c)		0x218 0x218 0x000 (ALT0|c) 0 (ALT0|c)
++#define MVF600_PAD_PTA7__VIU_PIX_CLK(c)		0x218 0x218 0x3AC (ALT1|c) 0 (ALT1|c)
++
++#endif
+diff --git a/arch/arm/boot/dts/mvf600-twr.dts b/arch/arm/boot/dts/mvf600-twr.dts
+new file mode 100644
+index 0000000..e2dafa2
+--- /dev/null
++++ b/arch/arm/boot/dts/mvf600-twr.dts
+@@ -0,0 +1,80 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++/dts-v1/;
++#include "mvf600.dtsi"
++
++/ {
++	model = "MVF600 Tower Board";
++	compatible = "fsl,mvf600-twr", "fsl,mvf600";
++
++	chosen {
++		bootargs = "console=ttymxc1,115200";
++	};
++
++	memory {
++		reg = <0x80000000 0x8000000>;
++	};
++
++	clocks {
++		osc {
++			compatible = "fsl,mvf-osc", "fixed-clock";
++			clock-frequency = <24000000>;
++		};
++
++		audio_clk {
++			compatible = "fsl,mvf-audio-ext-clk", "fixed-clock";
++			clock-frequency = <24576000>;
++		};
++
++		enet_clk {
++			compatible = "fsl,mvf-enet-ext-clk", "fixed-clock";
++			clock-frequency = <50000000>;
++		};
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_1>;
++	status = "okay";
++};
++
++&fec0 {
++	phy-mode = "rmii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec0_1>;
++};
++
++&fec1 {
++	phy-mode = "rmii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec1_1>;
++};
++
++
++&qspi0 { /* QuadSPI0 */
++	fsl,spi-num-chipselects = <1>;
++	fsl,spi-flash-chipselects = <0>;
++	status = "okay";
++
++	flash: s25fl128s at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "spansion,s25fl128s";
++		spi-max-frequency = <20000000>;
++		reg = <0>;
++		linux,modalias = "m25p80";
++		modal = "s25fl128s";
++		partition at 0 {
++			label = "s25fl128s";
++			reg = <0x0 0x1000000>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/mvf600.dtsi b/arch/arm/boot/dts/mvf600.dtsi
+new file mode 100644
+index 0000000..ca25f80
+--- /dev/null
++++ b/arch/arm/boot/dts/mvf600.dtsi
+@@ -0,0 +1,426 @@
++/*
++ * Copyright 2013 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include "skeleton.dtsi"
++#include "mvf600-pinfunc.h"
++/ {
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++		serial3 = &uart3;
++		serial4 = &uart4;
++		serial5 = &uart5;
++		gpio0 = &gpio1;
++		gpio1 = &gpio2;
++		gpio2 = &gpio3;
++		gpio3 = &gpio4;
++		gpio4 = &gpio5;
++	};
++
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		interrupt-parent = <&intc>;
++		ranges;
++
++		aips0: aips-bus at 40000000 { /* AIPS0 */
++			compatible = "fsl,aips-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			interrupt-parent = <&intc>;
++			reg = <0x40000000 0x70000>;
++			ranges;
++
++			mscm: mscm at 40001000 {
++				compatible = "fsl,mvf-mscm";
++				reg = <0x40001000 0x1000>;
++			};
++
++			intc: interrupt-controller at 40002000 {
++				compatible = "arm,cortex-a9-gic";
++				#interrupt-cells = <3>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				interrupt-controller;
++				reg = <0x40003000 0x1000>,
++				      <0x40002100 0x100>;
++			};
++
++			L2: l2-cache at 40006000 {
++				compatible = "arm,pl310-cache";
++				reg = <0x40006000 0x1000>;
++				interrupts = <0 6 0x04>;
++				cache-unified;
++				cache-level = <2>;
++			};
++
++			uart0: serial at 40027000 { /* UART0 */
++				compatible = "fsl,mvf-uart";
++				reg = <0x40027000 0x1000>;
++				interrupts = <0 61 0x00>;
++				clocks = <&clks 39>;
++				clock-names = "ipg";
++				status = "disabled";
++			};
++
++			uart1: serial at 40028000 { /* UART1 */
++				compatible = "fsl,mvf-uart";
++				reg = <0x40028000 0x1000>;
++				interrupts = <0 62 0x04>;
++				clocks = <&clks 40>;
++				clock-names = "ipg";
++				status = "disabled";
++			};
++
++			uart2: serial at 40029000 { /* UART2 */
++				compatible = "fsl,mvf-uart";
++				reg = <0x40029000 0x1000>;
++				interrupts = <0 63 0x04>;
++				clocks = <&clks 41>;
++				clock-names = "ipg";
++				status = "disabled";
++			};
++
++			uart3: serial at 4002a000 { /* UART3 */
++				compatible = "fsl,mvf-uart";
++				reg = <0x4002a000 0x1000>;
++				interrupts = <0 64 0x04>;
++				clocks = <&clks 42>;
++				clock-names = "ipg";
++				status = "disabled";
++			};
++
++			pit:pit at 40037000 {
++				compatible = "fsl,mvf-pit";
++				reg = <0x40037000 0x1000>;
++				interrupts = <0 39 0x04>;
++				clock-names = "pit";
++				clocks = <&clks 45>;
++			};
++
++			wdog at 4003e000 {
++				compatible = "fsl,mvf-wdt";
++				reg = <0x4003e000 0x1000>;
++				clock-names = "wdog";
++				clocks = <&clks 76>;
++			};
++
++			qspi0: quadspi at 40044000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,mvf-qspi";
++				reg = <0x40044000 0x1000>;
++				interrupts = <0 24 0x04>;
++				status = "disabled";
++			};
++
++			iomuxc: iomuxc at 40048000 {
++				compatible = "fsl,mvf-iomuxc";
++				reg = <0x40048000 0x1000>;
++				#gpio-range-cells = <2>;
++
++				/* functions and groups pins */
++				esdhc1 {
++					pinctrl_esdhc1_1: esdhc1grp_1 {
++						fsl,pins = <
++						MVF600_PAD_PTA24__ESDHC1_CLK(0x31ef)
++						MVF600_PAD_PTA25__ESDHC1_CMD(0x31ef)
++						MVF600_PAD_PTA26__ESDHC1_DAT0(0x31ef)
++						MVF600_PAD_PTA27__ESDHC1_DAT1(0x31ef)
++						MVF600_PAD_PTA28__ESDHC1_DATA2(0x31ef)
++						MVF600_PAD_PTA29__ESDHC1_DAT3(0x31ef)
++						MVF600_PAD_PTA7__GPIO_134(0x219d)
++						>;
++					};
++				};
++
++				i2c0 {
++					pinctrl_i2c0_1: i2c0grp_1 {
++						fsl,pins = <
++						MVF600_PAD_PTB14__I2C0_SCL(0x30d3)
++						MVF600_PAD_PTB15__I2C0_SDA(0x30d3)
++						>;
++					};
++				};
++
++				dspi0 {
++					pinctrl_dspi0_1: dspi0grp_1 {
++						fsl,pins = <
++						MVF600_PAD_PTB19__DSPI0_CS0(0x1182)
++						MVF600_PAD_PTB20__DSPI0_SIN(0x1181)
++						MVF600_PAD_PTB21__DSPI0_SOUT(0x1182)
++						MVF600_PAD_PTB22__DSPI0_SCK(0x1182)
++						>;
++					};
++				};
++
++				fec0 {
++					pinctrl_fec0_1: fec0grp_1 {
++						fsl,pins = <
++						MVF600_PAD_PTA6__RMII_CLKIN(0x30d1)
++						MVF600_PAD_PTC0__ENET_RMII0_MDC(0x30d3)
++						MVF600_PAD_PTC1__ENET_RMII0_MDIO(0x30d1)
++						MVF600_PAD_PTC2__ENET_RMII0_CRS(0x30d1)
++						MVF600_PAD_PTC3__ENET_RMII0_RXD1(0x30d1)
++						MVF600_PAD_PTC4__ENET_RMII0_RXD0(0x30d1)
++						MVF600_PAD_PTC5__ENET_RMII0_RXER(0x30d1)
++						MVF600_PAD_PTC6__ENET_RMII0_TXD1(0x30d2)
++						MVF600_PAD_PTC7__ENET_RMII0_TXD0(0x30d2)
++						MVF600_PAD_PTC8__ENET_RMII0_TXEN(0x30d2)
++						>;
++					};
++				};
++
++				fec1 {
++					pinctrl_fec1_1: fec1grp_1 {
++						fsl,pins = <
++						MVF600_PAD_PTC9__ENET_RMII1_MDC(0x30d2)
++						MVF600_PAD_PTC10__ENET_RMII1_MDIO(0x30d3)
++						MVF600_PAD_PTC11__ENET_RMII1_CRS(0x30d1)
++						MVF600_PAD_PTC12__ENET_RMII_RXD1(0x30d1)
++						MVF600_PAD_PTC13__ENET_RMII1_RXD0(0x30d1)
++						MVF600_PAD_PTC14__ENET_RMII1_RXER(0x30d1)
++						MVF600_PAD_PTC15__ENET_RMII1_TXD1(0x30d2)
++						MVF600_PAD_PTC16__ENET_RMII1_TXD0(0x30d2)
++						MVF600_PAD_PTC17__ENET_RMII1_TXEN(0x30d2)
++						>;
++					};
++				};
++
++				sai2 {
++					pinctrl_sai2_1: sai2grp_1 {
++						fsl,pins = <
++						MVF600_PAD_PTA16__SAI2_TX_BCLK(0x02ed)
++						MVF600_PAD_PTA18__SAI2_TX_DATA(0x02ee)
++						MVF600_PAD_PTA19__SAI2_TX_SYNC(0x02ed)
++						MVF600_PAD_PTA21__SAI2_RX_BCLK(0x02ed)
++						MVF600_PAD_PTA22__SAI2_RX_DATA(0x02ed)
++						MVF600_PAD_PTA23__SAI2_RX_SYNC(0x02ed)
++						MVF600_PAD_PTB18__EXT_AUDIO_MCLK(0x02ed)
++						>;
++					};
++				};
++
++				dcu0 {
++					pinctrl_dcu0_1: dcu0grp_1 {
++						fsl,pins = <
++						MVF600_PAD_PTB8__GPIO_30(0x42)
++						MVF600_PAD_PTE0__DCU0_HSYNC(0x42)
++						MVF600_PAD_PTE1__DCU0_VSYNC(0x42)
++						MVF600_PAD_PTE2__DCU0_PCLK(0x42)
++						MVF600_PAD_PTE4__DCU0_DE(0x42)
++						MVF600_PAD_PTE5__DCU0_R0(0x42)
++						MVF600_PAD_PTE6__DCU0_R1(0x42)
++						MVF600_PAD_PTE7__DCU0_R2(0x42)
++						MVF600_PAD_PTE8__DCU0_R3(0x42)
++						MVF600_PAD_PTE9__DCU0_R4(0x42)
++						MVF600_PAD_PTE10__DCU0_R5(0x42)
++						MVF600_PAD_PTE11__DCU0_R6(0x42)
++						MVF600_PAD_PTE12__DCU0_R7(0x42)
++						MVF600_PAD_PTE13__DCU0_G0(0x42)
++						MVF600_PAD_PTE14__DCU0_G1(0x42)
++						MVF600_PAD_PTE15__DCU0_G2(0x42)
++						MVF600_PAD_PTE16__DCU0_G3(0x42)
++						MVF600_PAD_PTE17__DCU0_G4(0x42)
++						MVF600_PAD_PTE18__DCU0_G5(0x42)
++						MVF600_PAD_PTE19__DCU0_G6(0x42)
++						MVF600_PAD_PTE20__DCU0_G7(0x42)
++						MVF600_PAD_PTE21__DCU0_B0(0x42)
++						MVF600_PAD_PTE22__DCU0_B1(0x42)
++						MVF600_PAD_PTE23__DCU0_B2(0x42)
++						MVF600_PAD_PTE24__DCU0_B3(0x42)
++						MVF600_PAD_PTE25__DCU0_B4(0x42)
++						MVF600_PAD_PTE26__DCU0_B5(0x42)
++						MVF600_PAD_PTE27__DCU0_B6(0x42)
++						MVF600_PAD_PTE28__DCU0_B7(0x42)
++						>;
++					};
++				};
++
++				uart1 {
++					pinctrl_uart1_1: uart1grp_1 {
++						fsl,pins = <
++						MVF600_PAD_PTB4__UART1_TX(0x21a2)
++						MVF600_PAD_PTB5__UART1_RX(0x21a1)
++						>;
++					};
++				};
++
++				usbvbus {
++					pinctrl_usbvbus_1: usbvbusgrp_1 {
++						fsl,pins = <
++						MVF600_PAD_PTA24__USB1_VBUS_EN(0x219c)
++						MVF600_PAD_PTA16__USB0_VBUS_EN(0x219c)
++						>;
++					};
++				};
++
++				pwm0 {
++					pinctrl_pwm0_1: pwm0grp_1 {
++						fsl,pins = <
++						MVF600_PAD_PTB0__FTM0_CH0(0x1582)
++						MVF600_PAD_PTB1__FTM0_CH1(0x1582)
++						MVF600_PAD_PTB2__FTM0_CH2(0x1582)
++						MVF600_PAD_PTB3__FTM0_CH3(0x1582)
++						MVF600_PAD_PTB6__FTM0_CH6(0x1582)
++						MVF600_PAD_PTB7__FTM0_CH7(0x1582)
++						>;
++					};
++				};
++
++				qspi0 {
++					pinctrl_qspi0_1: qspi0grp_1 {
++						fsl,pins = <
++						MVF600_PAD_PTD0__QSPI0_A_QSCK(0x307b)
++						MVF600_PAD_PTD1__QSPI0_A_CS0(0x307f)
++						MVF600_PAD_PTD2__QSPI0_A_DATA3(0x3073)
++						MVF600_PAD_PTD3__QSPI0_A_DATA2(0x3073)
++						MVF600_PAD_PTD4__QSPI0_A_DATA1(0x3073)
++						MVF600_PAD_PTD5__QSPI0_A_DATA0(0x307b)
++						MVF600_PAD_PTD7__QSPI0_B_QSCK(0x307b)
++						MVF600_PAD_PTD8__QSPI0_B_CS0(0x307f)
++						MVF600_PAD_PTD9__QSPI0_B_DATA3(0x3073)
++						MVF600_PAD_PTD10__QSPI0_B_DATA2(0x3073)
++						MVF600_PAD_PTD11__QSPI0_B_DATA1(0x3073)
++						MVF600_PAD_PTD12__QSPI0_B_DATA0(0x307b)
++						>;
++					};
++				};
++
++				touchscreen0 {
++					pinctrl_ts0_1: ts0grp_1 {
++						fsl,pins = <
++						MVF600_PAD_PTA31__GPIO_21(0x219d)
++						>;
++					};
++				};
++
++			};
++
++			gpio1: gpio at 40049000 {
++				compatible = "fsl,mvf-gpio";
++				reg = <0x40049000 0x1000 0x400ff000 0x40>;
++				interrupts = <0 107 0x04>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				gpio-ranges = <&iomuxc 0 32>;
++			};
++
++			gpio2: gpio at 4004a000 {
++				compatible = "fsl,mvf-gpio";
++				reg = <0x4004a000 0x1000 0x400ff040 0x40>;
++				interrupts = <0 108 0x04>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				gpio-ranges = <&iomuxc 32 32>;
++			};
++
++			gpio3: gpio at 4004b000 {
++				compatible = "fsl,mvf-gpio";
++				reg = <0x4004b000 0x1000 0x400ff080 0x40>;
++				interrupts = <0 109 0x04>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				gpio-ranges = <&iomuxc 64 32>;
++			};
++
++			gpio4: gpio at 4004c000 {
++				compatible = "fsl,mvf-gpio";
++				reg = <0x4004c000 0x1000 0x400ff0c0 0x40>;
++				interrupts = <0 110 0x04>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				gpio-ranges = <&iomuxc 96 32>;
++			};
++
++			gpio5: gpio at 4004d000 {
++				compatible = "fsl,mvf-gpio";
++				reg = <0x4004d000 0x1000 0x400ff100 0x40>;
++				interrupts = <0 111 0x04>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				gpio-ranges = <&iomuxc 128 7>;
++			};
++
++			anatop at 40050000 {
++				compatible = "fsl,mvf-anatop";
++				reg = <0x40050000 0x1000>;
++			};
++
++			clks: ccm at 4006b000 {
++				compatible = "fsl,mvf-ccm";
++				reg = <0x4006b000 0x1000>;
++				#clock-cells = <1>;
++			};
++
++		};
++
++		aips1: aips-bus at 40080000 { /* AIPS1 */
++			compatible = "fsl,aips-bus", "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x40080000 0x80000>;
++			ranges;
++
++			uart4: serial at 400a9000 { /* UART4 */
++				compatible = "fsl,mvf-uart";
++				reg = <0x400a9000 0x1000>;
++				interrupts = <0 65 0x04>;
++				clocks = <&clks 43>;
++				clock-names = "ipg";
++				status = "disabled";
++			};
++
++			uart5: serial at 400aa000 { /* UART5 */
++				compatible = "fsl,mvf-uart";
++				reg = <0x400aa000 0x1000>;
++				interrupts = <0 66 0x04>;
++				clocks = <&clks 44>;
++				clock-names = "ipg";
++				status = "disabled";
++			};
++
++			fec0: ethernet at 400d0000 {
++				compatible = "fsl,mvf-fec";
++				reg = <0x400d0000 0x1000>;
++				interrupts = <0 78 0x04>;
++				clocks = <&clks 69>, <&clks 69>, <&clks 69>;
++				clock-names = "ipg", "ahb", "ptp";
++			};
++
++			fec1: ethernet at 400d1000 {
++				compatible = "fsl,mvf-fec";
++				reg = <0x400d1000 0x1000>;
++				interrupts = <0 79 0x04>;
++				clocks = <&clks 69>, <&clks 69>, <&clks 69>;
++				clock-names = "ipg", "ahb", "ptp";
++			};
++
++		};
++	};
++};
+-- 
+1.8.0
