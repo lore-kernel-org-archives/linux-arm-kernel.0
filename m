@@ -1,49 +1,69 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 02 May 2013 09:53:17 -0700
-Subject: [PATCH V2 1/2] ARM/MVF600: add Vybrid Family platform support
-In-Reply-To: <1367480285-26159-2-git-send-email-b35083@freescale.com>
-References: <1367480285-26159-1-git-send-email-b35083@freescale.com>
- <1367480285-26159-2-git-send-email-b35083@freescale.com>
-Message-ID: <20130502165317.7790.1722@quantum>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Thu, 2 May 2013 12:54:29 -0400
+Subject: [PATCH v2] thermal: cpu_cooling: fix stub function
+In-Reply-To: <201305021829.37343.arnd@arndb.de>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-13-git-send-email-arnd@arndb.de> <51828A45.60909@ti.com>
+ <201305021829.37343.arnd@arndb.de>
+Message-ID: <51829A45.7040307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jingchang Lu (2013-05-02 00:38:04)
-> diff --git a/arch/arm/mach-imx/clk-mvf.c b/arch/arm/mach-imx/clk-mvf.c
-> new file mode 100644
-> index 0000000..1467a304
-> --- /dev/null
-> +++ b/arch/arm/mach-imx/clk-mvf.c
-> @@ -0,0 +1,406 @@
-> +/*
-> + * Copyright 2012-2013 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/types.h>
-> +#include <linux/time.h>
-> +#include <linux/hrtimer.h>
-> +#include <linux/mm.h>
-> +#include <linux/errno.h>
-> +#include <linux/delay.h>
-> +#include <linux/clk.h>
-> +#include <linux/device.h>
-> +#include <linux/io.h>
-> +#include <linux/ioport.h>
-> +#include <linux/clkdev.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <asm/div64.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/clk-private.h>
+Rui, Arnd,
 
-Please do not use clk-private.h.  I plan to remove it soon.
+On 02-05-2013 12:29, Arnd Bergmann wrote:
+> The function stub for cpufreq_cooling_get_level introduced
+> in 57df81069 "Thermal: exynos: fix cooling state translation"
+> is not syntactically correct C and needs to be fixed to avoid
+> this error:
+> 
+> In file included from drivers/thermal/db8500_thermal.c:20:0:
+>  include/linux/cpu_cooling.h: In function 'cpufreq_cooling_get_level':
+> include/linux/cpu_cooling.h:57:1:
+>  error: parameter name omitted  unsigned long cpufreq_cooling_get_level(unsigned int, unsigned int)  ^
+>  include/linux/cpu_cooling.h:57:1: error: parameter name omitted
+> 
+> Cc: Eduardo Valentin <eduardo.valentin@ti.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Amit Daniel kachhap <amit.daniel@samsung.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Regards,
-Mike
+Acked-by: Eduardo Valentin <eduardo.valentin@ti.com>
+
+> 
+> diff --git a/include/linux/cpu_cooling.h b/include/linux/cpu_cooling.h
+> index 282e270..a5d52ee 100644
+> --- a/include/linux/cpu_cooling.h
+> +++ b/include/linux/cpu_cooling.h
+> @@ -41,7 +41,7 @@ cpufreq_cooling_register(const struct cpumask *clip_cpus);
+>   */
+>  void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev);
+>  
+> -unsigned long cpufreq_cooling_get_level(unsigned int, unsigned int);
+> +unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq);
+>  #else /* !CONFIG_CPU_THERMAL */
+>  static inline struct thermal_cooling_device *
+>  cpufreq_cooling_register(const struct cpumask *clip_cpus)
+> @@ -54,7 +54,7 @@ void cpufreq_cooling_unregister(struct thermal_cooling_device *cdev)
+>  	return;
+>  }
+>  static inline
+> -unsigned long cpufreq_cooling_get_level(unsigned int, unsigned int)
+> +unsigned long cpufreq_cooling_get_level(unsigned int cpu, unsigned int freq)
+>  {
+>  	return THERMAL_CSTATE_INVALID;
+>  }
+> 
+> 
+> 
+
+> 
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 295 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130502/dbcb6ec2/attachment.sig>
