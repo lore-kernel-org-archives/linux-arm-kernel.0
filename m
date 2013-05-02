@@ -1,35 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 2 May 2013 18:21:30 +0200
-Subject: [PATCH 20/23 v2] ARM: u300: add SPI PL022 to the device tree
-In-Reply-To: <201305021726.49729.arnd@arndb.de>
-References: <1367485952-6212-1-git-send-email-linus.walleij@stericsson.com>
- <201305021726.49729.arnd@arndb.de>
-Message-ID: <CACRpkdbO1H4tpRG5rABVZDDOP0uHFs2Fc4+66TD9kyZauUrkLg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 2 May 2013 18:23:02 +0200
+Subject: [PATCH 0/7] ARM: u300 multiplatform support
+In-Reply-To: <1367511416-4312-1-git-send-email-linus.walleij@stericsson.com>
+References: <1367511416-4312-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <201305021823.02703.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 2, 2013 at 5:26 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 02 May 2013, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> This registers the PL022 PrimeCell from the U300 device
->> tree. We make a new copy of the platform data for the
->> device tree boot path, as the old platform data is in an
->> older file which will be going away.
->>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Why do you need both the platform data and the DT description?
+On Thursday 02 May 2013, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This series builds on top of the recently iterated U300
+> device tree support to convert the platform to multiplatform
+> (a.k.a. single zImage).
+> 
+> This is intended to be pulled on top of the DT support.
+> 
 
-This is because the device-tree DMA support for PL022 has
-not yet been merged upstream, so it still has to come from
-platform data instead.
+Very nice! For the patches 2-7:
 
-If/when there is a branch in ARM SoC that has that patch in place
-(and I remember reviewing and ACKing it) I can rebase on that
-and drop the platform data.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-The same goes for PL011 and MMCI platform data actually...
+For patch 1, I'll wait for your reply. It's probably ok too.
 
-Yours,
-Linus Walleij
+	Arnd
