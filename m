@@ -1,48 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 02 May 2013 14:39:11 -0500
-Subject: [PATCH 4/4] ARM: highbank: fix build after cache flush change
-In-Reply-To: <1367515404-512212-5-git-send-email-arnd@arndb.de>
-References: <1367515404-512212-1-git-send-email-arnd@arndb.de>
- <1367515404-512212-5-git-send-email-arnd@arndb.de>
-Message-ID: <5182C0DF.9000500@gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Thu, 02 May 2013 21:39:24 +0200
+Subject: [PATCH] irqchip: add support for Marvell Orion SoCs
+In-Reply-To: <5182BFC6.3070709@gmail.com>
+References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130502185322.GA29333@obsidianresearch.com>
+ <201305022111.41043.arnd@arndb.de> <5182BFC6.3070709@gmail.com>
+Message-ID: <5182C0EC.7040008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2013 12:23 PM, Arnd Bergmann wrote:
-> Commit "ARM: cpu hotplug: remove majority of cache flushing from
-> platforms" has removed the inclusion of asm/cacheflush.h from
-> a number of files. Highbank still needs it because it calls
-> flush_cache_louis().
+On 05/02/2013 09:34 PM, Sebastian Hesselbarth wrote:
+> On 05/02/2013 09:11 PM, Arnd Bergmann wrote:
+>> On Thursday 02 May 2013, Jason Gunthorpe wrote:
+>>>> +static struct of_device_id orion_irq_dt_ids[] __initconst = {
+>>>> + { .compatible = "marvell,orion-mpic", .data = orion_of_init },
+>>>> + { }
+>>>
+>>> Is there a strong reason to change the compatible string? Looks to me
+>>> like either the new driver or the old driver will bind depending on
+>>> what is in the machine description. No need for a new string?
+>>>
+>>
+>> The compatible string should change if the binding changes in an
+>> incomptible way, and we should try not to change it unless it's
+>> fundamentally flawed.
+>
+> Well, there is no _fundamental_ change in the binding syntax as it
+> is only reg, interrupts, and clocks. But there is a semantic change
+> in reg properties, as current orion irq controller wants the mask
+> registers (0x04,0x08) only while this also needs cause register
+> (0x00).
+>
+> Nothing that couldn't be handled while moving Orion arch to irqchip
+> but if there are no further objections, I'd like to stick with the new
+> compatible string - also having orion-spic in mind.
 
-AFAICT, the commit in question only showed up buried in a reply to
-another thread and was never cc'ed to the relevant platform maintainers...
+Taking Jason Gunthorpe's last reply, I will stick to the _old_
+compatible string and name the bridge irq handler as Jason suggested.
 
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> ---
+I will send a v2 soon.
 
-I'd rather see the highbank changes dropped as this will all go away
-with PSCI in 3.11, but:
-
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-
-Rob
-
->  arch/arm/mach-highbank/hotplug.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-highbank/hotplug.c b/arch/arm/mach-highbank/hotplug.c
-> index 80957f4..a019e4e 100644
-> --- a/arch/arm/mach-highbank/hotplug.c
-> +++ b/arch/arm/mach-highbank/hotplug.c
-> @@ -14,6 +14,7 @@
->   * this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->  #include <linux/kernel.h>
-> +#include <asm/cacheflush.h>
->  
->  #include "core.h"
->  #include "sysregs.h"
-> 
+Sebastian
