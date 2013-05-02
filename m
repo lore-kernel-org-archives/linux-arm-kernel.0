@@ -1,57 +1,67 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  2 May 2013 15:39:00 +0100
-Subject: [PATCH v2 3/5] ARM: KVM: relax cache maintainance when building page
- tables
+Date: Thu,  2 May 2013 15:39:02 +0100
+Subject: [PATCH v2 5/5] ARM: KVM: use phys_addr_t instead of unsigned long
+ long for HYP PGDs
 In-Reply-To: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
 References: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1367505542-2231-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1367505542-2231-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 5a677ce044f1 (ARM: KVM: switch to a dual-step HYP init code)
-introduced code that flushes page tables to the point of coherency.
-This is overkill (point of unification is enough and already done),
-and actually not required if running on a SMP capable platform
-(the HW PTW can snoop other cpus' L1).
+HYP PGDs are passed around as phys_addr_t, except just before calling
+into the hypervisor init code, where they are cast to a rather weird
+unsigned long long.
 
-Remove this code and let ae8a8b9553bd (ARM: 7691/1: mm: kill unused
-TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead) turn it into
-a no-op for SMP ARMv7.
+Just keep them around as phys_addr_t, which is what makes the most
+sense.
 
 Reported-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/mmu.c | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/include/asm/kvm_host.h | 4 ++--
+ arch/arm/kvm/arm.c              | 8 ++++----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 4a838db..d79b594 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -234,7 +234,6 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
- 		pte = pte_offset_kernel(pmd, addr);
- 		kvm_set_pte(pte, pfn_pte(pfn, prot));
- 		get_page(virt_to_page(pte));
--		kvm_flush_dcache_to_poc(pte, sizeof(*pte));
- 		pfn++;
- 	} while (addr += PAGE_SIZE, addr != end);
- }
-@@ -261,7 +260,6 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
- 			}
- 			pmd_populate_kernel(NULL, pmd, pte);
- 			get_page(virt_to_page(pmd));
--			kvm_flush_dcache_to_poc(pmd, sizeof(*pmd));
- 		}
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 57cb786..ff49193 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -190,8 +190,8 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
+ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		int exception_index);
  
- 		next = pmd_addr_end(addr, end);
-@@ -299,7 +297,6 @@ static int __create_hyp_mappings(pgd_t *pgdp,
- 			}
- 			pud_populate(NULL, pud, pmd);
- 			get_page(virt_to_page(pud));
--			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
- 		}
+-static inline void __cpu_init_hyp_mode(unsigned long long boot_pgd_ptr,
+-				       unsigned long long pgd_ptr,
++static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
++				       phys_addr_t pgd_ptr,
+ 				       unsigned long hyp_stack_ptr,
+ 				       unsigned long vector_ptr)
+ {
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index fa177df..801ffce 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -797,8 +797,8 @@ long kvm_arch_vm_ioctl(struct file *filp,
  
- 		next = pgd_addr_end(addr, end);
+ static void cpu_init_hyp_mode(void *dummy)
+ {
+-	unsigned long long boot_pgd_ptr;
+-	unsigned long long pgd_ptr;
++	phys_addr_t boot_pgd_ptr;
++	phys_addr_t pgd_ptr;
+ 	unsigned long hyp_stack_ptr;
+ 	unsigned long stack_page;
+ 	unsigned long vector_ptr;
+@@ -806,8 +806,8 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	/* Switch from the HYP stub to our own HYP init vector */
+ 	__hyp_set_vectors(kvm_get_idmap_vector());
+ 
+-	boot_pgd_ptr = (unsigned long long)kvm_mmu_get_boot_httbr();
+-	pgd_ptr = (unsigned long long)kvm_mmu_get_httbr();
++	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
++	pgd_ptr = kvm_mmu_get_httbr();
+ 	stack_page = __get_cpu_var(kvm_arm_hyp_stack_page);
+ 	hyp_stack_ptr = stack_page + PAGE_SIZE;
+ 	vector_ptr = (unsigned long)__kvm_hyp_vector;
 -- 
 1.8.2.1
