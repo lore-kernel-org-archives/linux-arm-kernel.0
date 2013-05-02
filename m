@@ -1,81 +1,81 @@
-From: b35083@freescale.com (Jingchang Lu)
-Date: Thu, 2 May 2013 15:48:52 +0800
-Subject: [PATCH 2/2] pinctrl/imx: add zero register offset valid for Vybrid
- platform
-In-Reply-To: <1367480932-22318-1-git-send-email-b35083@freescale.com>
-References: <1367480932-22318-1-git-send-email-b35083@freescale.com>
-Message-ID: <1367480932-22318-2-git-send-email-b35083@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 May 2013 09:34:30 +0100
+Subject: Latest build results - errors/warnings - lots of them
+In-Reply-To: <alpine.LFD.2.03.1304301418100.17372@syhkavp.arg>
+References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
+ <201304301304.20650.arnd@arndb.de> <20130430114229.GA2439@linaro.org>
+ <alpine.LFD.2.03.1304301110030.17372@syhkavp.arg>
+ <20130430172816.GA31101@linaro.org>
+ <alpine.LFD.2.03.1304301418100.17372@syhkavp.arg>
+Message-ID: <20130502083430.GB21614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platform such as Vybrid, offset of mux and pad ctrl register
-may be zero. This patch add a platform condition to imx core pinctrl
-framework, making zero register offset valid on setting mux_mode and
-pad config value.
+On Tue, Apr 30, 2013 at 02:18:42PM -0400, Nicolas Pitre wrote:
+> On Tue, 30 Apr 2013, Dave Martin wrote:
+> 
+> > On Tue, Apr 30, 2013 at 11:12:12AM -0400, Nicolas Pitre wrote:
+> > > On Tue, 30 Apr 2013, Dave Martin wrote:
+> > > 
+> > > > On Tue, Apr 30, 2013 at 01:04:20PM +0200, Arnd Bergmann wrote:
+> > > > > On Tuesday 30 April 2013, Russell King - ARM Linux wrote:
+> > > > > > Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
+> > > > > > great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
+> > > > > > arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
+> > > > > > source of errors.
+> > > > 
+> > > > [...]
+> > > >  
+> > > > > >arch/arm/common/mcpm_head.S:39: Error: selected processor does not support ARM mode `ubfx r9,r0,#0,#8'
+> > > > > >arch/arm/common/mcpm_head.S:40: Error: selected processor does not support ARM mode `ubfx r10,r0,#8,#8'
+> > > > > >arch/arm/common/mcpm_head.S:100: Error: selected processor does not support ARM mode `dmb'
+> > > > > >arch/arm/common/mcpm_head.S:115: Error: selected processor does not support ARM mode `dmb'
+> > > > > >arch/arm/common/mcpm_head.S:127: Error: selected processor does not support ARM mode `dmb'
+> > > > > >arch/arm/common/mcpm_head.S:131: Error: selected processor does not support ARM mode `dmb'
+> > > > > >arch/arm/common/mcpm_head.S:138: Error: selected processor does not support ARM mode `dsb'
+> > > > > >arch/arm/common/mcpm_head.S:152: Error: selected processor does not support ARM mode `dmb'
+> > > > > >arch/arm/common/mcpm_head.S:161: Error: selected processor does not support ARM mode `dmb'
+> > > > > >arch/arm/common/mcpm_head.S:175: Error: selected processor does not support ARM mode `dmb'
+> > > > > >arch/arm/common/vlock.S:62: Error: selected processor does not support ARM mode `dmb'
+> > > > > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dmb'
+> > > > > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dsb'
+> > > > > >arch/arm/common/vlock.S:89: Error: selected processor does not support ARM mode `dmb'
+> > > > > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dmb'
+> > > > > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dsb'
+> > > > > >arch/arm/common/vlock.S:102: Error: selected processor does not support ARM mode `dmb'
+> > > > > >arch/arm/common/vlock.S:105: Error: selected processor does not support ARM mode `dsb'
+> > > > > 
+> > > > > Right, the problem here is that the code was never tested with an ARMv6+ARMv7 config.
+> > > > > We can either fix it up by adding
+> > > > > 
+> > > > > 	.arch	armv7-a
+> > > > > 
+> > > > > in the assembly files, or by doing the same in the Makefile:
+> > > > > 
+> > > > > AFLAGS_vlock.S += -march=armv7-a
+> > > > > AFLAGS_mcpm_head.S += -march=armv7-a
+> > > > 
+> > > > 
+> > > > Hmmm, this code was tested with ARCH_MULTIPLATFORM, but it looks like
+> > > > no v6 boards were configured in when testing that...
+> > > > 
+> > > > 
+> > > > Assuming people are OK with the Makefile route, here's a patch for that,
+> > > > build-tested with a v6+v7 ARCH_MULTIPLATFORM config.
+> > > 
+> > > Isn't the .arch armv7-a route a bit cleaner?  That would have been my 
+> > > choice, although I don't feel strongly about it.
+> > 
+> > I don't feel strongly either.  We already have the CFLAGS_DISABLE stuff,
+> > so it didn't feel that unnatural to add this in the Makefile; but .arch
+> > would work equally well.
+> > 
+> > If somebody wants to change it, it's not a problem for me, but I didn't
+> > want to create extra disruption by proposing a different patch...
+> 
+> Fair enough.
+> 
+> Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Signed-off-by: Jingchang Lu <b35083@freescale.com>
----
- drivers/pinctrl/pinctrl-imx.c | 34 ++++++++++++++++++++++------------
- 1 file changed, 22 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
-index 4fcfff92..b4d7c91 100644
---- a/drivers/pinctrl/pinctrl-imx.c
-+++ b/drivers/pinctrl/pinctrl-imx.c
-@@ -221,10 +221,14 @@ static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
- 		pin_id = pins[i];
- 		pin_reg = &info->pin_regs[pin_id];
- 
--		if (!pin_reg->mux_reg) {
--			dev_err(ipctl->dev, "Pin(%s) does not support mux function\n",
--				info->pins[pin_id].name);
--			return -EINVAL;
-+		/* mux_reg offset maybe zero on some platform such as Vybrid */
-+		if (!of_machine_is_compatible("fsl,mvf600")) {
-+			if (!pin_reg->mux_reg) {
-+				dev_err(ipctl->dev,
-+					"Pin(%s) does not support mux function\n",
-+					info->pins[pin_id].name);
-+				return -EINVAL;
-+			}
- 		}
- 
- 		writel(mux[i], ipctl->base + pin_reg->mux_reg);
-@@ -287,10 +291,13 @@ static int imx_pinconf_get(struct pinctrl_dev *pctldev,
- 	const struct imx_pinctrl_soc_info *info = ipctl->info;
- 	const struct imx_pin_reg *pin_reg = &info->pin_regs[pin_id];
- 
--	if (!pin_reg->conf_reg) {
--		dev_err(info->dev, "Pin(%s) does not support config function\n",
--			info->pins[pin_id].name);
--		return -EINVAL;
-+	if (!of_machine_is_compatible("fsl,mvf600")) {
-+		if (!pin_reg->conf_reg) {
-+			dev_err(info->dev,
-+				"Pin(%s) does not support config function\n",
-+				info->pins[pin_id].name);
-+			return -EINVAL;
-+		}
- 	}
- 
- 	*config = readl(ipctl->base + pin_reg->conf_reg);
-@@ -305,10 +312,13 @@ static int imx_pinconf_set(struct pinctrl_dev *pctldev,
- 	const struct imx_pinctrl_soc_info *info = ipctl->info;
- 	const struct imx_pin_reg *pin_reg = &info->pin_regs[pin_id];
- 
--	if (!pin_reg->conf_reg) {
--		dev_err(info->dev, "Pin(%s) does not support config function\n",
--			info->pins[pin_id].name);
--		return -EINVAL;
-+	if (!of_machine_is_compatible("fsl,mvf600")) {
-+		if (!pin_reg->conf_reg) {
-+			dev_err(info->dev,
-+				"Pin(%s) does not support config function\n",
-+				info->pins[pin_id].name);
-+			return -EINVAL;
-+		}
- 	}
- 
- 	dev_dbg(ipctl->dev, "pinconf set pin %s\n",
--- 
-1.8.0
+I see Dave Martin has sent a patch for this without your ack.  Was that
+a mistake?
