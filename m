@@ -1,67 +1,34 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  2 May 2013 15:39:02 +0100
-Subject: [PATCH v2 5/5] ARM: KVM: use phys_addr_t instead of unsigned long
- long for HYP PGDs
+Date: Thu,  2 May 2013 15:38:59 +0100
+Subject: [PATCH v2 2/5] ARM: KVM: remove dead prototype for
+ __kvm_tlb_flush_vmid
 In-Reply-To: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
 References: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1367505542-2231-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1367505542-2231-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HYP PGDs are passed around as phys_addr_t, except just before calling
-into the hypervisor init code, where they are cast to a rather weird
-unsigned long long.
+__kvm_tlb_flush_vmid has been renamed to __kvm_tlb_flush_vmid_ipa,
+and the old prototype should have been removed when the code was
+modified.
 
-Just keep them around as phys_addr_t, which is what makes the most
-sense.
-
-Reported-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h | 4 ++--
- arch/arm/kvm/arm.c              | 8 ++++----
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/kvm_asm.h | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 57cb786..ff49193 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -190,8 +190,8 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
- int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		int exception_index);
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 18d5032..6ae3d2a 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -72,8 +72,6 @@ extern char __kvm_hyp_vector[];
+ extern char __kvm_hyp_code_start[];
+ extern char __kvm_hyp_code_end[];
  
--static inline void __cpu_init_hyp_mode(unsigned long long boot_pgd_ptr,
--				       unsigned long long pgd_ptr,
-+static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
-+				       phys_addr_t pgd_ptr,
- 				       unsigned long hyp_stack_ptr,
- 				       unsigned long vector_ptr)
- {
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index fa177df..801ffce 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -797,8 +797,8 @@ long kvm_arch_vm_ioctl(struct file *filp,
+-extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+-
+ extern void __kvm_flush_vm_context(void);
+ extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
  
- static void cpu_init_hyp_mode(void *dummy)
- {
--	unsigned long long boot_pgd_ptr;
--	unsigned long long pgd_ptr;
-+	phys_addr_t boot_pgd_ptr;
-+	phys_addr_t pgd_ptr;
- 	unsigned long hyp_stack_ptr;
- 	unsigned long stack_page;
- 	unsigned long vector_ptr;
-@@ -806,8 +806,8 @@ static void cpu_init_hyp_mode(void *dummy)
- 	/* Switch from the HYP stub to our own HYP init vector */
- 	__hyp_set_vectors(kvm_get_idmap_vector());
- 
--	boot_pgd_ptr = (unsigned long long)kvm_mmu_get_boot_httbr();
--	pgd_ptr = (unsigned long long)kvm_mmu_get_httbr();
-+	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
-+	pgd_ptr = kvm_mmu_get_httbr();
- 	stack_page = __get_cpu_var(kvm_arm_hyp_stack_page);
- 	hyp_stack_ptr = stack_page + PAGE_SIZE;
- 	vector_ptr = (unsigned long)__kvm_hyp_vector;
 -- 
 1.8.2.1
