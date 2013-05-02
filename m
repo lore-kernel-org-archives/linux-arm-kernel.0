@@ -1,50 +1,73 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 02 May 2013 23:31:01 +0200
-Subject: [PATCH, RFC 03/22] cpuidle: calxeda: select ARM_CPU_SUSPEND
-In-Reply-To: <1367507786-505303-4-git-send-email-arnd@arndb.de>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-4-git-send-email-arnd@arndb.de>
-Message-ID: <5182DB15.2060006@linaro.org>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Thu, 02 May 2013 17:33:29 -0400
+Subject: [Xen-devel] [PATCH 1/3] arm_arch_timer: introduce
+ arch_timer_stolen_ticks
+In-Reply-To: <1367482772.21869.26.camel@zakaz.uk.xensource.com>
+References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
+ <1367436460-10183-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <51817CBE.4050003@codeaurora.org>
+ <1367482772.21869.26.camel@zakaz.uk.xensource.com>
+Message-ID: <5182DBA9.9080609@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2013 05:16 PM, Arnd Bergmann wrote:
-> Like other ARM specific drivers, this one requires ARM_CPU_SUSPEND,
-> as shown by this linker error:
-> 
-> drivers/built-in.o: In function `calxeda_pwrdown_idle':
-> drivers/cpuidle/cpuidle-calxeda.c:84: undefined reference to `cpu_suspend'
-> drivers/cpuidle/cpuidle-calxeda.c:86: undefined reference to `cpu_resume'
-> 
-> Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: linux-pm at vger.kernel.org
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi Ian,
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+On 05/02/2013 04:19 AM, Ian Campbell wrote:
+> On Wed, 2013-05-01 at 21:36 +0100, Christopher Covington wrote:
+>> Hi Stefano,
+>>
+>> On 05/01/2013 03:27 PM, Stefano Stabellini wrote:
+>>> Introduce a function, called arch_timer_stolen_ticks, called from the
+>>> arch_timer interrupt handler to account for stolen ticks.
+>>
+>> [...]
+>>
+>>> diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+>>> index 7ade91d..30db413 100644
+>>> --- a/arch/arm/include/asm/arch_timer.h
+>>> +++ b/arch/arm/include/asm/arch_timer.h
+>>> @@ -13,6 +13,11 @@
+>>>  int arch_timer_of_register(void);
+>>>  int arch_timer_sched_clock_init(void);
+>>>  
+>>> +/* per-platform function to calculate stolen ticks (clock cycles stolen
+>>> + * to the vcpu by the hypervisor).
 
-> ---
->  drivers/cpuidle/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-> index c4cc27e..e21cdfa 100644
-> --- a/drivers/cpuidle/Kconfig
-> +++ b/drivers/cpuidle/Kconfig
-> @@ -36,6 +36,7 @@ if CPU_IDLE
->  config CPU_IDLE_CALXEDA
->  	bool "CPU Idle Driver for Calxeda processors"
->  	depends on ARCH_HIGHBANK
-> +	select ARM_CPU_SUSPEND
->  	help
->  	  Select this to enable cpuidle on Calxeda processors.
->  
-> 
+[...]
 
+>> Is the hypervisor adjusting the Virtual Offset Register?
+> 
+> The virtual offset register is useful when a VCPU is migrated to another
+> system to account for the differences in physical time on the two hosts
+> but isn't useful for accounting for stolen time while running on a
+> single host.
+> 
+> e.g. if a VCPU sets a timer for NOW+5, but 3 are stolen in the middle it
+> would not make sense (from the guests PoV) for NOW'==NOW+2 at the point
+> where the timer goes off. Nor does it make sense to require that the
+> guest actually be running for 5 before injecting the timer because that
+> would mean real time elapsed time for the timer would be 5+3 in the case
+> where 3 are stolen.
+
+This is a bit of an aside, but I think that hiding time spent at higher
+privilege levels can be a quite sensible approach to timekeeping in a
+virtualized environment, but I understand that it's not the approach taken
+with Xen, and as you pointed out above, adjusting the Virtual Offset Register
+by itself isn't enough to implement that approach.
+
+> So the virtual timer should appear to have been running even while time
+> is being stolen and therefore stolen time needs to be accounted via some
+> other means.
+
+Something that's not currently obvious to me is that given that the stolen
+cycle accounting should be done, what makes the architected timer interrupt
+handler the ideal place to do it?
+
+Thanks,
+Christopher
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
