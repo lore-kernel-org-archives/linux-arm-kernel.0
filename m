@@ -1,46 +1,60 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 2 May 2013 13:44:53 +0800
-Subject: [PATCH] ARM: imx: Change type of ioremap function
-In-Reply-To: <1367427653-6068-1-git-send-email-lauraa@codeaurora.org>
-References: <1367427653-6068-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20130502054451.GH3442@S2101-09.ap.freescale.net>
+Date: Thu, 2 May 2013 13:58:51 +0800
+Subject: [PATCH] ARM: imx: compile fix for hotplug.c
+Message-ID: <1367474331-3479-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 01, 2013 at 10:00:53AM -0700, Laura Abbott wrote:
-> Commit cd024d4245b2bfbd824b911f11a9756d1d6c167d
-> (ARM: 7704/1: mm: Use phys_addr_t properly for ioremap functions)
-> changed the type of the ioremap functions to actually use phys_addr_t.
-> 
-> Switch the imx ioremap functions to use phys_addr_t to avoid warnings:
-> 
-> arch/arm/mach-imx/mm-imx3.c: In function 'imx31_init_early':
-> arch/arm/mach-imx/mm-imx3.c:142:22: warning: assignment from incompatible pointer type [enabled by default]
-> arch/arm/mach-imx/mm-imx3.c: In function 'imx35_init_early':
-> arch/arm/mach-imx/mm-imx3.c:221:22: warning: assignment from incompatible pointer type [enabled by default]
-> 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Commit bca7a5a (ARM: cpu hotplug: remove majority of cache flushing
+from platforms) removes include of <asm/cacheflush.h> and hence
+discovers a few indirect inclusion and declaration problems as below.
 
-Applied, thanks.
+  CC      arch/arm/mach-imx/hotplug.o
+In file included from arch/arm/mach-imx/hotplug.c:16:0:
+arch/arm/mach-imx/common.h:100:29: warning: ?struct pt_regs? declared inside parameter list [enabled by default]
+arch/arm/mach-imx/common.h:100:29: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+arch/arm/mach-imx/common.h:101:29: warning: ?struct pt_regs? declared inside parameter list [enabled by default]
+arch/arm/mach-imx/hotplug.c: In function ?imx_cpu_die?:
+arch/arm/mach-imx/hotplug.c:53:2: error: implicit declaration of function ?cpu_do_idle? [-Werror=implicit-function-declaration]
+arch/arm/mach-imx/hotplug.c: In function ?imx_cpu_kill?:
+arch/arm/mach-imx/hotplug.c:58:26: error: ?jiffies? undeclared (first use in this function)
+arch/arm/mach-imx/hotplug.c:58:26: note: each undeclared identifier is reported only once for each function it appears in
+arch/arm/mach-imx/hotplug.c:58:2: error: implicit declaration of function ?msecs_to_jiffies? [-Werror=implicit-function-declaration]
+arch/arm/mach-imx/hotplug.c:61:3: error: implicit declaration of function ?time_after? [-Werror=implicit-function-declaration]
 
-> ---
->  arch/arm/mach-imx/mm-imx3.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-> index cefa047..f019f14 100644
-> --- a/arch/arm/mach-imx/mm-imx3.c
-> +++ b/arch/arm/mach-imx/mm-imx3.c
-> @@ -65,7 +65,7 @@ static void imx3_idle(void)
->  		: "=r" (reg));
->  }
->  
-> -static void __iomem *imx3_ioremap_caller(unsigned long phys_addr, size_t size,
-> +static void __iomem *imx3_ioremap_caller(phys_addr_t phys_addr, size_t size,
->  					 unsigned int mtype, void *caller)
->  {
->  	if (mtype == MT_DEVICE) {
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
+Fix them by adding the needed inclusion and declaration.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/common.h  |    1 +
+ arch/arm/mach-imx/hotplug.c |    2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 4cba7db..c08ae3f 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -12,6 +12,7 @@
+ #define __ASM_ARCH_MXC_COMMON_H__
+ 
+ struct platform_device;
++struct pt_regs;
+ struct clk;
+ enum mxc_cpu_pwr_mode;
+ 
+diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
+index 5e91112..3daf1ed 100644
+--- a/arch/arm/mach-imx/hotplug.c
++++ b/arch/arm/mach-imx/hotplug.c
+@@ -11,7 +11,9 @@
+  */
+ 
+ #include <linux/errno.h>
++#include <linux/jiffies.h>
+ #include <asm/cp15.h>
++#include <asm/proc-fns.h>
+ 
+ #include "common.h"
+ 
+-- 
+1.7.9.5
