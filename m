@@ -1,45 +1,43 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 2 May 2013 19:23:11 +0100
-Subject: [PATCH v10 0/2] (arm-soc for v3.10) arm: introduce
- psci_smp_ops
-In-Reply-To: <20130502181851.GB14496@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1305021811560.5398@kaball.uk.xensource.com>
- <20130502171516.GA3040@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1305021816490.5398@kaball.uk.xensource.com>
- <20130502181851.GB14496@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1305021920070.5398@kaball.uk.xensource.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 02 May 2013 12:25:07 -0600
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <201304300004.20320.arnd@arndb.de>
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+ <1556968.7tR6KuEIWb@flatron> <6607610.omg016OAvj@avalon>
+ <201304300004.20320.arnd@arndb.de>
+Message-ID: <5182AF83.4080705@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 May 2013, Russell King - ARM Linux wrote:
-> On Thu, May 02, 2013 at 06:20:32PM +0100, Stefano Stabellini wrote:
-> > On Thu, 2 May 2013, Will Deacon wrote:
-> > > Hi Stefano,
-> > > 
-> > > On Thu, May 02, 2013 at 06:12:12PM +0100, Stefano Stabellini wrote:
-> > > > ping
-> > > 
-> > > Is this a ping to have this pulled into Russell's tree?
-> > 
-> > I thought that we agreed that the patches should go via the arm-soc
-> > tree, after Russell acks them.
-> > 
-> > The ping is for Russell to ack them and Arnd to merge them.
+On 04/29/2013 04:04 PM, Arnd Bergmann wrote:
+> On Monday 29 April 2013, Laurent Pinchart wrote:
+>> On Monday 29 April 2013 23:31:30 Tomasz Figa wrote:
+>>
+>>> Good point. Stephen, would it be a problem to make this a KMS driver
+>>> instead? Old fbdev API could be emulated on top of it, until it goes out
+>>> of use, couldn't it?
+>>
+>> There's already an fbdev emulation layer in KMS, for such a simple use case it 
+>> will work fine.
 > 
-> Sorry but I tend not to be around on Tuesdays and Wednesdays, which leads
-> to a hell of an email problem on Thursdays.  I haven't looked at them in
-> any great detail (I just paged through them so far and on to the next
-> email.)
+> I suggested the same to Stephen when he first brought up this driver.
+> Unfortunately his attempt to create a simple KMS driver resulted in a
+> significantly larger driver than the one he did for the framebuffer
+> interface. This means that either Stephen did something really wrong
+> in his attempt, or the KMS interface isn't as good as it should be
+> if we want to move people away from frame buffer drivers.
 
-No problems, if there is one person that can understand being flooded by
-emails, that's me.
+Well, I didn't actually attempt to write the KMS driver; I simply took a
+look at existing KMS drivers (and perhaps some stub KMS driver; I forget
+right now) to see what it'd take, and it looked quite scary.
 
-
-> I don't really have sufficient time to properly deal with all the email
-> traffic that is now on this list - even from just flicking through the
-> messages.  It's far too much.
-
-This patches have been discussed in great details, would you be content
-with Will Deacon and Nicolas Pitre's Acks?
-Nobody objected again them so far.
+The other issue is that the KMS semantics appear to desire that the
+driver allocate FB memory from some pool, and then point the display
+scanout at the allocated memory. However, this driver's semantics are
+that some other entity has allocated and reserved some memory region for
+scanout, and the simple FB driver exists solely to scribble to that
+memory region. Rob Clark said the thought this could be handled by
+writing a custom memory allocator to support this, but it seemed a
+little pointless to write a whole memory allocator when the existing FB
+interface allows the driver to just set a struct member to the address
+and be done with it.
