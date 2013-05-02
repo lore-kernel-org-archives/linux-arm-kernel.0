@@ -1,48 +1,53 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  2 May 2013 12:45:57 +0200
-Subject: [PATCH 5/5] ARM: sun5i: olinuxino: Enable the i2c controllers
-In-Reply-To: <1367491557-6027-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1367491557-6027-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1367491557-6027-6-git-send-email-maxime.ripard@free-electrons.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Thu, 2 May 2013 11:48:28 +0100
+Subject: [Xen-devel] [PATCH 3/3] xen/arm: account for stolen ticks
+In-Reply-To: <alpine.DEB.2.02.1305021134160.5398@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
+ <1367436460-10183-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1367482862.21869.28.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.02.1305021134160.5398@kaball.uk.xensource.com>
+Message-ID: <1367491708.21869.77.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A13-Olinuxino makes use of the 3 i2c controllers found on the Allwinner
-A13. Enable them in the device tree.
+On Thu, 2013-05-02 at 11:38 +0100, Stefano Stabellini wrote:
+> On Thu, 2 May 2013, Ian Campbell wrote:
+> > On Wed, 2013-05-01 at 20:27 +0100, Stefano Stabellini wrote:
+> > > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > > index d30042e..8f040a0 100644
+> > > --- a/arch/arm/xen/enlighten.c
+> > > +++ b/arch/arm/xen/enlighten.c
+> > > @@ -14,6 +14,7 @@
+> > >  #include <xen/xen-ops.h>
+> > >  #include <asm/xen/hypervisor.h>
+> > >  #include <asm/xen/hypercall.h>
+> > > +#include <asm/arch_timer.h>
+> > >  #include <asm/system_misc.h>
+> > >  #include <linux/interrupt.h>
+> > >  #include <linux/irqreturn.h>
+> > > @@ -172,6 +173,8 @@ static int __init xen_secondary_init(unsigned int cpu)
+> > >  		   later ones fail to. */
+> > >  		per_cpu(xen_vcpu, cpu) = vcpup;
+> > >  	}
+> > > +
+> > > +	xen_setup_runstate_info(cpu);
+> > 
+> > Is this called for the boot processor too?
+> 
+> Yep.
+> 
+> > (do you have a linux-next branch where I can easily find the baseline
+> > for this series?)
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git lost_ticks_1
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+Is that your Xen tree, I was after the Linux one...
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-index 3ca5506..80497e3 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-@@ -37,6 +37,24 @@
- 			pinctrl-0 = <&uart1_pins_b>;
- 			status = "okay";
- 		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c2_pins_a>;
-+			status = "okay";
-+		};
- 	};
- 
- 	leds {
--- 
-1.8.1.2
+> It's based on my 3.9-rc3-smp-6 branch currently in linux-next (that is
+> based on 3.9-rc3).
+> However lost_ticks_1 is not in linux-next yet.
+
+Which branch is in Linux next? It doesn't seem to be your linux-next
+(last commit 2011).
+
+Ian.
