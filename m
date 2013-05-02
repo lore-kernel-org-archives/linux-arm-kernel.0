@@ -1,56 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 May 2013 17:16:23 +0200
-Subject: [PATCH, RFC 19/22] staging/solo6x10: depend on CONFIG_FONTS
+Date: Thu,  2 May 2013 17:16:18 +0200
+Subject: [PATCH, RFC 14/22] oprofile: always enable IRQ_WORK
 In-Reply-To: <1367507786-505303-1-git-send-email-arnd@arndb.de>
 References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
-Message-ID: <1367507786-505303-20-git-send-email-arnd@arndb.de>
+Message-ID: <1367507786-505303-15-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new SOLO6X10 driver needs the built-in console fonts, specifically
-the VGA8x16 font and building it without console support results in
-a link error error.
+oprofile fails to build if CONFIG_IRQ_WORK is not already enabled,
+because of the dependency on the RING_BUFFER code that now uses
+the irq work library.
 
-drivers/built-in.o: In function `solo_osd_print':
- :(.text+0x7d3424): undefined reference to `find_font'
+kernel/built-in.o: In function `ring_buffer_unlock_commit':
+:(.text+0x5b8f0): undefined reference to `irq_work_queue'
+kernel/built-in.o: In function `ring_buffer_write':
+:(.text+0x5bd10): undefined reference to `irq_work_queue'
 
-This adds a dependency on the CONFIG_FONTS symbol and changes the
-console code to always build the base driver even if there are
-no specific fonts built-in.
-
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Hans Verkuil <hans.verkuil@cisco.com>
-Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
+Cc: Robert Richter <rric@kernel.org>
+Cc: oprofile-list at lists.sf.net
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/staging/media/solo6x10/Kconfig | 1 +
- drivers/video/console/Makefile         | 2 ++
- 2 files changed, 3 insertions(+)
+ arch/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/staging/media/solo6x10/Kconfig b/drivers/staging/media/solo6x10/Kconfig
-index ec32776..df6569b 100644
---- a/drivers/staging/media/solo6x10/Kconfig
-+++ b/drivers/staging/media/solo6x10/Kconfig
-@@ -1,6 +1,7 @@
- config SOLO6X10
- 	tristate "Softlogic 6x10 MPEG codec cards"
- 	depends on PCI && VIDEO_DEV && SND && I2C
-+	depends on FONTS
- 	select VIDEOBUF2_DMA_SG
- 	select VIDEOBUF2_DMA_CONTIG
- 	select SND_PCM
-diff --git a/drivers/video/console/Makefile b/drivers/video/console/Makefile
-index a862e91..48da25c 100644
---- a/drivers/video/console/Makefile
-+++ b/drivers/video/console/Makefile
-@@ -18,6 +18,8 @@ font-objs-$(CONFIG_FONT_MINI_4x6)  += font_mini_4x6.o
- 
- font-objs += $(font-objs-y)
- 
-+obj-$(CONFIG_FONTS) += font.o
-+
- # Each configuration option enables a list of files.
- 
- obj-$(CONFIG_DUMMY_CONSOLE)       += dummycon.o
+diff --git a/arch/Kconfig b/arch/Kconfig
+index a6b1056..434a8dc 100644
+--- a/arch/Kconfig
++++ b/arch/Kconfig
+@@ -8,6 +8,7 @@ config OPROFILE
+ 	depends on HAVE_OPROFILE
+ 	select RING_BUFFER
+ 	select RING_BUFFER_ALLOW_SWAP
++	select IRQ_WORK
+ 	help
+ 	  OProfile is a profiling system capable of profiling the
+ 	  whole system, include the kernel, kernel modules, libraries,
 -- 
 1.8.1.2
