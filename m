@@ -1,38 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 May 2013 17:16:11 +0200
-Subject: [PATCH, RFC 07/22] drm/tilcd: select BACKLIGHT_LCD_SUPPORT
+Date: Thu,  2 May 2013 17:16:06 +0200
+Subject: [PATCH, RFC 02/22] cpufreq: ARM_DT_BL_CPUFREQ needs ARM_CPU_TOPOLOGY
 In-Reply-To: <1367507786-505303-1-git-send-email-arnd@arndb.de>
 References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
-Message-ID: <1367507786-505303-8-git-send-email-arnd@arndb.de>
+Message-ID: <1367507786-505303-3-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dependecies for BACKLIGHT_CLASS_DEVICE are defined a bit
-strange, but it seems one has to always select both BACKLIGHT_CLASS_DEVICE
-and BACKLIGHT_LCD_SUPPORT to avoid this error:
+The big.LITTLE cpufreq driver uses the CPU topology API, which
+needs to be reflected in Kconfig to prevent broken configurations.
 
-drivers/gpu/drm/tilcdc/tilcdc_panel.c:396:
- undefined reference to `of_find_backlight_by_node'
+warning: (ARM_DT_BL_CPUFREQ) selects ARM_BIG_LITTLE_CPUFREQ which
+has unmet direct dependencies (ARCH_HAS_CPUFREQ && CPU_FREQ && ARM && ARM_CPU_TOPOLOGY)
 
-Cc: Rob Clark <robdclark@gmail.com>
-Cc: dri-devel at lists.freedesktop.org
-Cc: Dave Airlie <airlied@redhat.com>
+Cc: Rafael J. Wysocki <rjw@sisk.pl>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: cpufreq at vger.kernel.org
+Cc: linux-pm at vger.kernel.org
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/gpu/drm/tilcdc/Kconfig | 1 +
+ drivers/cpufreq/Kconfig.arm | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/gpu/drm/tilcdc/Kconfig b/drivers/gpu/drm/tilcdc/Kconfig
-index e461e99..7a4d101 100644
---- a/drivers/gpu/drm/tilcdc/Kconfig
-+++ b/drivers/gpu/drm/tilcdc/Kconfig
-@@ -6,6 +6,7 @@ config DRM_TILCDC
- 	select DRM_GEM_CMA_HELPER
- 	select VIDEOMODE_HELPERS
- 	select BACKLIGHT_CLASS_DEVICE
-+	select BACKLIGHT_LCD_SUPPORT
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index f3af18b..3fd6bdf 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -10,6 +10,7 @@ config ARM_DT_BL_CPUFREQ
+ 	tristate "Generic ARM big LITTLE CPUfreq driver probed via DT"
+ 	select ARM_BIG_LITTLE_CPUFREQ
+ 	depends on OF && HAVE_CLK
++	depends on ARM_CPU_TOPOLOGY
  	help
- 	  Choose this option if you have an TI SoC with LCDC display
- 	  controller, for example AM33xx in beagle-bone, DA8xx, or
+ 	  This enables the Generic CPUfreq driver for ARM big.LITTLE platform.
+ 	  This gets frequency tables from DT.
 -- 
 1.8.1.2
