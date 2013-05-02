@@ -1,38 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 May 2013 17:16:12 +0200
-Subject: [PATCH, RFC 08/22] OMAPDSS: DPI needs DSI
+Date: Thu,  2 May 2013 17:16:14 +0200
+Subject: [PATCH, RFC 10/22] mfd: ab8500: debugfs code depends on gpadc
 In-Reply-To: <1367507786-505303-1-git-send-email-arnd@arndb.de>
 References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
-Message-ID: <1367507786-505303-9-git-send-email-arnd@arndb.de>
+Message-ID: <1367507786-505303-11-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dpi.c file cannot be build correctly when the dsi.c file is
-disabled in Kconfig. This clarifies the dependency in Kconfig
-to avoid build errors:
+The AB8500_DEBUG code specifically requires access to the gpadc code,
+not just the common ab8500 driver.
 
-drivers/video/omap2/dss/dpi.c: In function 'dpi_calc_pll_cb':
-drivers/video/omap2/dss/dpi.c:181:2: error: implicit declaration of function 'dsi_hsdiv_calc' [-Werror=implicit-function-declaration]
-drivers/video/omap2/dss/dpi.c: In function 'dpi_dsi_clk_calc':
-drivers/video/omap2/dss/dpi.c:201:2: error: implicit declaration of function 'dsi_get_pll_clkin' [-Werror=implicit-function-declaration]
+drivers/built-in.o: In function `ab8500_gpadc_bat_ctrl_print':
+ mfd/ab8500-debugfs.c:1733: undefined reference to `ab8500_gpadc_get'
+ mfd/ab8500-debugfs.c:1734: undefined reference to `ab8500_gpadc_read_raw'
+ mfd/ab8500-debugfs.c:1736: undefined reference to `ab8500_gpadc_ad_to_voltage'
 
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Linus Walleij <linus.walleij@stericsson.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: Philippe LANGLAIS <philippe.langlais@stericsson.com>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/video/omap2/dss/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/mfd/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/video/omap2/dss/Kconfig b/drivers/video/omap2/dss/Kconfig
-index cb0f145..4b30084 100644
---- a/drivers/video/omap2/dss/Kconfig
-+++ b/drivers/video/omap2/dss/Kconfig
-@@ -35,6 +35,7 @@ config OMAP2_DSS_COLLECT_IRQ_STATS
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index 9b4703e..bf785db 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -580,7 +580,7 @@ config AB8500_CORE
  
- config OMAP2_DSS_DPI
- 	bool "DPI support"
-+	depends on OMAP2_DSS_DSI
- 	default y
- 	help
- 	  DPI Interface. This is the Parallel Display Interface.
+ config AB8500_DEBUG
+        bool "Enable debug info via debugfs"
+-       depends on AB8500_CORE && DEBUG_FS
++       depends on AB8500_GPADC && DEBUG_FS
+        default y if DEBUG_FS
+        help
+          Select this option if you want debug information using the debug
 -- 
 1.8.1.2
