@@ -1,52 +1,54 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 2 May 2013 16:36:24 +0100
-Subject: [PATCH, RFC 10/22] mfd: ab8500: debugfs code depends on gpadc
-In-Reply-To: <1367507786-505303-11-git-send-email-arnd@arndb.de>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-11-git-send-email-arnd@arndb.de>
-Message-ID: <20130502153624.GN25256@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 May 2013 08:38:34 -0700
+Subject: Latest build results - errors/warnings - lots of them
+In-Reply-To: <20130502082218.GA21614@n2100.arm.linux.org.uk>
+References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
+ <20130502082218.GA21614@n2100.arm.linux.org.uk>
+Message-ID: <20130502153834.GR28721@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 02 May 2013, Arnd Bergmann wrote:
-
-> The AB8500_DEBUG code specifically requires access to the gpadc code,
-> not just the common ab8500 driver.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [130502 01:27]:
+> On Tue, Apr 30, 2013 at 09:17:39AM +0100, Russell King - ARM Linux wrote:
+> > Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
+> > great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
+> > arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
+> > source of errors.
+> > 
+> > OMAP stuff needs a serious look at too - much Kconfig madness there
+> > caused by over-use of select, which then goes on to cause build errors
+> > because it assumes some stuff is always enabled.
+> > 
+> > There's also warnings about of_device_id from include/linux/of_platform.h
+> > via from arch/arm/kernel/setup.c which feature in all the non-OF builds
+> > too which need addressing.
+> > 
+> > See todays http://www.arm.linux.org.uk/developer/build/ results for all
+> > the details and configs.  Not pushing my tree until some of this stuff
+> > gets fixed.
 > 
-> drivers/built-in.o: In function `ab8500_gpadc_bat_ctrl_print':
->  mfd/ab8500-debugfs.c:1733: undefined reference to `ab8500_gpadc_get'
->  mfd/ab8500-debugfs.c:1734: undefined reference to `ab8500_gpadc_read_raw'
->  mfd/ab8500-debugfs.c:1736: undefined reference to `ab8500_gpadc_ad_to_voltage'
+> And now we have a new bunch of warnings from OMAP stuff which weren't
+> previously there...
 > 
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Philippe LANGLAIS <philippe.langlais@stericsson.com>
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/mfd/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index 9b4703e..bf785db 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -580,7 +580,7 @@ config AB8500_CORE
->  
->  config AB8500_DEBUG
->         bool "Enable debug info via debugfs"
-> -       depends on AB8500_CORE && DEBUG_FS
-> +       depends on AB8500_GPADC && DEBUG_FS
->         default y if DEBUG_FS
->         help
->           Select this option if you want debug information using the debug
+> arch/arm/mach-omap2/omap_device.c: In function 'omap_device_get_by_hwmod_name':
+> arch/arm/mach-omap2/omap_device.c:821:3: warning: return makes pointer from integer without a cast
+> arch/arm/mach-omap2/omap_device.c:826:3: warning: return makes pointer from integer without a cast
 
-Did you find this with ALLCONFIG out of interest.
+Hmm these I already fixed earlier along with a merge resolution, and
+I'm not seeing them in next/master or arm-soc/for-next. What do you
+have merged into your current tree?
 
-Applied by the way.
+> drivers/power/twl4030_charger.c: In function 'twl4030_charger_enable_usb':
+> drivers/power/twl4030_charger.c:192:20: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Neil, care to provide a fix for this? It's from your commit ab37813
+(twl4030_charger: Allow charger to control the regulator that feeds it).
+
+> include/linux/thermal.h:254:12: warning: 'thermal_generate_netlink_event' defined but not used
+
+Eduardo, can you fix that one? It seems to be from your commit 8ab3e6a
+(thermal: Use thermal zone device id in netlink messages).
+
+Regards,
+
+Tony
