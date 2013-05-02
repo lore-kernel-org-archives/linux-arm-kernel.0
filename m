@@ -1,36 +1,83 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 2 May 2013 19:42:58 +0100
-Subject: [PATCH v10 0/2] (arm-soc for v3.10) arm: introduce
- psci_smp_ops
-In-Reply-To: <20130502182812.GD14496@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1305021811560.5398@kaball.uk.xensource.com>
- <20130502171516.GA3040@mudshark.cambridge.arm.com>
- <alpine.DEB.2.02.1305021816490.5398@kaball.uk.xensource.com>
- <20130502182812.GD14496@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1305021938170.5398@kaball.uk.xensource.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Thu, 02 May 2013 20:53:44 +0200
+Subject: [PATCH, RFC 00/22] ARM randconfig bugs
+In-Reply-To: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+Message-ID: <2710056.LHQ0Ee0x8t@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 May 2013, Russell King - ARM Linux wrote:
-> On Thu, May 02, 2013 at 06:20:32PM +0100, Stefano Stabellini wrote:
-> > On Thu, 2 May 2013, Will Deacon wrote:
-> > > Hi Stefano,
-> > > 
-> > > On Thu, May 02, 2013 at 06:12:12PM +0100, Stefano Stabellini wrote:
-> > > > ping
-> > > 
-> > > Is this a ping to have this pulled into Russell's tree?
-> > 
-> > I thought that we agreed that the patches should go via the arm-soc
-> > tree, after Russell acks them.
+On Thursday, May 02, 2013 05:16:04 PM Arnd Bergmann wrote:
+> Hi subsystem maintainers,
 > 
-> Okay, well, is there a reason for them to go through arm-soc?  They
-> look more like core code to me than SoC specific - they only minimally
-> touch mach-virt.
+> This is a set of patches to to fix build errors I hit while trying to
+> build lots of randconfig kernels on linux-next.
+> 
+> Most of them are simple missing dependencies in Kconfig, but some are
+> more substantial. I would like to see at least the obvious patches
+> get merged for 3.10. If you are happy with the patches, feel free
+> to apply them directly, otherwise please provide feedback.
+> 
+> No single patch out of these is very important though, most of them
+> only concern corner cases and don't matter in practice.
 
-The original reason is that some SoC specific code depends on this
-series (Calxeda I believe).
+For cpufreq and cpuidle:
 
-But you are probably right, if you prefer that I issue a pull request
-for your tree, I have no problems with that.
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+
+> Arnd Bergmann (22):
+>   can: move CONFIG_HAVE_CAN_FLEXCAN out of CAN_DEV
+>   cpufreq: ARM_DT_BL_CPUFREQ needs ARM_CPU_TOPOLOGY
+>   cpuidle: calxeda: select ARM_CPU_SUSPEND
+>   staging/drm: imx: add missing dependencies
+>   drm: always provide debugfs function prototypes
+>   gpu/drm: host1x: add dependency on Tegra
+>   drm/tilcd: select BACKLIGHT_LCD_SUPPORT
+>   OMAPDSS: DPI needs DSI
+>   crypto: lz4: don't build on ARM
+>   mfd: ab8500: debugfs code depends on gpadc
+>   iwlegacy: il_pm_ops is only provided for PM_SLEEP
+>   thermal: cpu_cooling: fix stub function
+>   staging/logger: use kuid_t internally
+>   oprofile: always enable IRQ_WORK
+>   USB: EHCI: remove bogus #error
+>   USB: UHCI: clarify Kconfig dependencies
+>   USB: OHCI: clarify Kconfig dependencies
+>   Xen: SWIOTLB is only used on x86
+>   staging/solo6x10: depend on CONFIG_FONTS
+>   media: coda: select GENERIC_ALLOCATOR
+>   davinci: vpfe_capture needs i2c
+>   radio-si4713: depend on SND_SOC
+> 
+>  arch/Kconfig                           |  1 +
+>  crypto/Kconfig                         |  2 ++
+>  drivers/cpufreq/Kconfig.arm            |  1 +
+>  drivers/cpuidle/Kconfig                |  1 +
+>  drivers/gpu/drm/tilcdc/Kconfig         |  1 +
+>  drivers/gpu/host1x/drm/Kconfig         |  1 +
+>  drivers/media/platform/Kconfig         |  1 +
+>  drivers/media/platform/davinci/Kconfig |  3 ++
+>  drivers/media/radio/Kconfig            |  1 +
+>  drivers/mfd/Kconfig                    |  2 +-
+>  drivers/net/can/Kconfig                |  6 ++--
+>  drivers/net/wireless/iwlegacy/common.h |  2 +-
+>  drivers/staging/android/logger.c       |  4 +--
+>  drivers/staging/android/logger.h       |  2 +-
+>  drivers/staging/imx-drm/Kconfig        |  4 +++
+>  drivers/staging/media/solo6x10/Kconfig |  1 +
+>  drivers/usb/host/Kconfig               | 65 +++++++++++++++++++++++++++++-----
+>  drivers/usb/host/Makefile              |  4 +--
+>  drivers/usb/host/ehci-hcd.c            | 17 ---------
+>  drivers/usb/host/ohci-hcd.c            | 19 ----------
+>  drivers/usb/host/uhci-hcd.c            |  4 +--
+>  drivers/video/console/Makefile         |  2 ++
+>  drivers/video/omap2/dss/Kconfig        |  1 +
+>  drivers/xen/Kconfig                    |  2 +-
+>  include/drm/drmP.h                     |  3 +-
+>  include/linux/cpu_cooling.h            |  2 +-
+>  26 files changed, 91 insertions(+), 61 deletions(-)
+> 
+> 
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
