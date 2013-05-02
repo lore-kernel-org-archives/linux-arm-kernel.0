@@ -1,31 +1,40 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu,  2 May 2013 10:21:00 -0700
-Subject: [PATCH] ARM: iop13xx: change type of ioremap function
-Message-ID: <1367515260-32364-1-git-send-email-lauraa@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  2 May 2013 19:23:20 +0200
+Subject: [PATCH 0/4] ARM architecture fixes
+Message-ID: <1367515404-512212-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit cd024d4245b2bfbd824b911f11a9756d1d6c167d
-(ARM: 7704/1: mm: Use phys_addr_t properly for ioremap functions)
-changed the type of the ioremap functions to actually use phys_addr_t
-instead of unsigned long. Change the type of the arch_ioremap function
-to use phys_addr_t as well.
+Hi Russell,
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+These are four bug fixes that came out of my build testing.
+The first one replaces a patch I put into the patch tracker
+earlier but had to retract because it broke THUMB2_KERNEL.
 
-diff --git a/arch/arm/mach-iop13xx/io.c b/arch/arm/mach-iop13xx/io.c
-index 183dc8b..faaf7d4 100644
---- a/arch/arm/mach-iop13xx/io.c
-+++ b/arch/arm/mach-iop13xx/io.c
-@@ -23,7 +23,7 @@
- 
- #include "pci.h"
- 
--static void __iomem *__iop13xx_ioremap_caller(unsigned long cookie,
-+static void __iomem *__iop13xx_ioremap_caller(phys_addr_t cookie,
- 	size_t size, unsigned int mtype, void *caller)
- {
- 	void __iomem * retval;
+The other three are for recent regressions coming from your
+tree.
+
+	Arnd
+
+Arnd Bergmann (4):
+  ARM: compressed/head.S: work around new binutils warning
+  ARM: fix prototypes for arch_ioremap_caller functions
+  ARM: fix NOMMU __arm_ioremap prototype
+  ARM: highbank: fix build after cache flush change
+
+ arch/arm/boot/compressed/Makefile      | 2 +-
+ arch/arm/boot/compressed/head-sa1100.S | 1 +
+ arch/arm/boot/compressed/head-shark.S  | 1 +
+ arch/arm/boot/compressed/head.S        | 1 +
+ arch/arm/mach-ebsa110/core.c           | 2 +-
+ arch/arm/mach-highbank/hotplug.c       | 1 +
+ arch/arm/mach-imx/mm-imx3.c            | 2 +-
+ arch/arm/mach-iop13xx/io.c             | 2 +-
+ arch/arm/mach-ixp4xx/common.c          | 2 +-
+ arch/arm/mach-msm/common.h             | 2 +-
+ arch/arm/mach-msm/io.c                 | 2 +-
+ arch/arm/mm/nommu.c                    | 4 ++--
+ 12 files changed, 13 insertions(+), 9 deletions(-)
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.1.2
