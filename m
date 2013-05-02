@@ -1,49 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 2 May 2013 14:27:56 +0100
-Subject: [PATCH] Move the EM_AARCH64 definition to uapi/linux/elf-em.h
-In-Reply-To: <1367495778-6406-1-git-send-email-alonid@stratoscale.com>
-References: <1367495778-6406-1-git-send-email-alonid@stratoscale.com>
-Message-ID: <20130502132756.GD20730@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 02 May 2013 14:28:42 +0100
+Subject: [PATCH v3 16/32] arm64: KVM: hypervisor initialization code
+In-Reply-To: <20130502110356.GA10418@localhost.cambridge.arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-17-git-send-email-marc.zyngier@arm.com>
+ <20130502110356.GA10418@localhost.cambridge.arm.com>
+Message-ID: <51826A0A.5040403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 12:56:18PM +0100, Dan Aloni wrote:
-> Signed-off-by: Dan Aloni <alonid@stratoscale.com>
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->  arch/arm64/include/asm/elf.h |    2 --
->  include/uapi/linux/elf-em.h  |    1 +
->  2 files changed, 1 insertion(+), 2 deletions(-)
+On 02/05/13 12:03, Catalin Marinas wrote:
+> On Mon, Apr 08, 2013 at 05:17:18PM +0100, Marc Zyngier wrote:
+>> Provide EL2 with page tables and stack, and set the vectors
+>> to point to the full blown world-switch code.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/include/asm/kvm_host.h |  13 +++++
+>>  arch/arm64/kvm/hyp-init.S         | 112 ++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 125 insertions(+)
+>>  create mode 100644 arch/arm64/kvm/hyp-init.S
+>>
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index a0279ff..8655de4 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -183,4 +183,17 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>>  int kvm_perf_init(void);
+>>  int kvm_perf_teardown(void);
+>>  
+>> +static inline void __cpu_init_hyp_mode(unsigned long long boot_pgd_ptr,
+>> +				       unsigned long long pgd_ptr,
+>> +				       unsigned long hyp_stack_ptr,
+>> +				       unsigned long vector_ptr)
 > 
-> (fixed the commit message)
-> 
-> diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-> index fe32c0e..b3da1c1 100644
-> --- a/arch/arm64/include/asm/elf.h
-> +++ b/arch/arm64/include/asm/elf.h
-> @@ -33,8 +33,6 @@ typedef unsigned long elf_greg_t;
->  typedef elf_greg_t elf_gregset_t[ELF_NGREG];
->  typedef struct user_fpsimd_state elf_fpregset_t;
->  
-> -#define EM_AARCH64		183
-> -
->  /*
->   * AArch64 static relocation types.
->   */
-> diff --git a/include/uapi/linux/elf-em.h b/include/uapi/linux/elf-em.h
-> index 8e2b7ba..bc946e9 100644
-> --- a/include/uapi/linux/elf-em.h
-> +++ b/include/uapi/linux/elf-em.h
-> @@ -34,6 +34,7 @@
->  #define EM_MN10300	89	/* Panasonic/MEI MN10300, AM33 */
->  #define EM_BLACKFIN     106     /* ADI Blackfin Processor */
->  #define EM_TI_C6000	140	/* TI C6X DSPs */
-> +#define EM_AARCH64	183	/* ARM 64 bit */
->  #define EM_FRV		0x5441	/* Fujitsu FR-V */
->  #define EM_AVR32	0x18ad	/* Atmel AVR32 */
+> Why some types are long long other others just long? Is it called from
+> arch/arm/ code? I would rather use phys_addr_t where relevant and
+> unsigned long where it means a virtual address.
 
-Will you do the same for arch/arm? There is EM_ARM defined under
-arch/arm and arch/arm64 (elf.h).
+Indeed. This is my fault for not pushing the idmap rework far enough.
 
+kvm_mmu_get_[boot_]httbr() already return a phys_addr_t, and that should
+be propagated to __cpu_init_hyp_mode().
+
+I'll cook a patch for 32bit, and update the 64bit code.
+
+Thanks for noticing this.
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
