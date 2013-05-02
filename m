@@ -1,53 +1,40 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  2 May 2013 16:48:09 +0100
-Subject: [PATCH 3/4] mmc: mmci: Ensure return value of regulator_enable() is
- checked
+Date: Thu,  2 May 2013 16:48:08 +0100
+Subject: [PATCH 2/4] mfd: ab8500-gpadc: Suppress 'ignoring regulator_enable()
+ return value' warning
 In-Reply-To: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
 References: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367509690-24022-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1367509690-24022-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch suppresses the warning below:
-
-drivers/mmc/host/mmci.c: In function ?mmci_set_ios?:
-drivers/mmc/host/mmci.c:1165:20: warning: ignoring return value of
+drivers/mfd/ab8500-gpadc.c: In function ?ab8500_gpadc_resume?:
+drivers/mfd/ab8500-gpadc.c:911:18: warning: ignoring return value of
         ?regulator_enable?, declared with attribute warn_unused_result
         [-Wunused-result]
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Chris Ball <cjb@laptop.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mmc/host/mmci.c |    9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ drivers/mfd/ab8500-gpadc.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 375c109..f4f3038 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1130,6 +1130,7 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 	struct variant_data *variant = host->variant;
- 	u32 pwr = 0;
- 	unsigned long flags;
+diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
+index 5e65b28..7278e53 100644
+--- a/drivers/mfd/ab8500-gpadc.c
++++ b/drivers/mfd/ab8500-gpadc.c
+@@ -907,8 +907,11 @@ static int ab8500_gpadc_suspend(struct device *dev)
+ static int ab8500_gpadc_resume(struct device *dev)
+ {
+ 	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
 +	int ret;
  
- 	pm_runtime_get_sync(mmc_dev(mmc));
+-	regulator_enable(gpadc->regu);
++	ret = regulator_enable(gpadc->regu);
++	if (ret < 0)
++		return ret;
  
-@@ -1161,8 +1162,12 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		break;
- 	case MMC_POWER_ON:
- 		if (!IS_ERR(mmc->supply.vqmmc) &&
--		    !regulator_is_enabled(mmc->supply.vqmmc))
--			regulator_enable(mmc->supply.vqmmc);
-+		    !regulator_is_enabled(mmc->supply.vqmmc)) {
-+			ret = regulator_enable(mmc->supply.vqmmc);
-+			if (ret < 0)
-+				dev_err(mmc_dev(mmc),
-+					"failed to enable vqmmc regulator\n");
-+		}
- 
- 		pwr |= MCI_PWR_ON;
- 		break;
+ 	pm_runtime_mark_last_busy(gpadc->dev);
+ 	pm_runtime_put_autosuspend(gpadc->dev);
 -- 
 1.7.10.4
