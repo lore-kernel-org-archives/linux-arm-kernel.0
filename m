@@ -1,63 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 May 2013 17:16:17 +0200
-Subject: [PATCH, RFC 13/22] staging/logger: use kuid_t internally
+Date: Thu,  2 May 2013 17:16:22 +0200
+Subject: [PATCH, RFC 18/22] Xen: SWIOTLB is only used on x86
 In-Reply-To: <1367507786-505303-1-git-send-email-arnd@arndb.de>
 References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
-Message-ID: <1367507786-505303-14-git-send-email-arnd@arndb.de>
+Message-ID: <1367507786-505303-19-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is probably wrong but lets us build the driver with
-CONFIG_UIDGID_STRICT_TYPE_CHECKS enabled. Without it, we get
-these errors:
+Enabling SWIOTLB_XEN on ARM results in build errors because the
+underlying SWIOTLB is only available on X86:
 
-drivers/staging/android/logger.c: In function 'logger_read':
-drivers/staging/android/logger.c:316:4: error: incompatible type for argument 3 of 'get_next_entry_by_uid'
-drivers/staging/android/logger.c:244:15: note: expected 'uid_t' but argument is of type 'kuid_t'
-drivers/staging/android/logger.c: In function 'logger_aio_write':
-drivers/staging/android/logger.c:483:14: error: incompatible types when assigning to type 'uid_t' from type 'kuid_t'
+drivers/xen/swiotlb-xen.c: In function 'is_xen_swiotlb_buffer':
+drivers/xen/swiotlb-xen.c:105:2: error: implicit declaration of function 'mfn_to_local_pfn
 
-which tells us that the driver is not compatible with user namespaces.
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/staging/android/logger.c | 4 ++--
- drivers/staging/android/logger.h | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ drivers/xen/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/android/logger.c b/drivers/staging/android/logger.c
-index b040200..9bd8747 100644
---- a/drivers/staging/android/logger.c
-+++ b/drivers/staging/android/logger.c
-@@ -242,7 +242,7 @@ static ssize_t do_read_log_to_user(struct logger_log *log,
-  * 'log->buffer' which contains the first entry readable by 'euid'
-  */
- static size_t get_next_entry_by_uid(struct logger_log *log,
--		size_t off, uid_t euid)
-+		size_t off, kuid_t euid)
- {
- 	while (off != log->w_off) {
- 		struct logger_entry *entry;
-@@ -251,7 +251,7 @@ static size_t get_next_entry_by_uid(struct logger_log *log,
+diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
+index dd4d9cb..f03bf50 100644
+--- a/drivers/xen/Kconfig
++++ b/drivers/xen/Kconfig
+@@ -141,7 +141,7 @@ config XEN_GRANT_DEV_ALLOC
  
- 		entry = get_entry_header(log, off, &scratch);
+ config SWIOTLB_XEN
+ 	def_bool y
+-	depends on PCI
++	depends on PCI && X86
+ 	select SWIOTLB
  
--		if (entry->euid == euid)
-+		if (uid_eq(entry->euid, euid))
- 			return off;
- 
- 		next_len = sizeof(struct logger_entry) + entry->len;
-diff --git a/drivers/staging/android/logger.h b/drivers/staging/android/logger.h
-index cc6bbd9..70af7d8 100644
---- a/drivers/staging/android/logger.h
-+++ b/drivers/staging/android/logger.h
-@@ -66,7 +66,7 @@ struct logger_entry {
- 	__s32		tid;
- 	__s32		sec;
- 	__s32		nsec;
--	uid_t		euid;
-+	kuid_t		euid;
- 	char		msg[0];
- };
- 
+ config XEN_TMEM
 -- 
 1.8.1.2
