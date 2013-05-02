@@ -1,58 +1,46 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Thu, 02 May 2013 14:31:43 +0900
-Subject: [PATCH 8/9] s3c2410fb: Remove redundant platform_set_drvdata()
-In-Reply-To: <1367006543-5458-9-git-send-email-sylvester.nawrocki@gmail.com>
-References: <1367006543-5458-1-git-send-email-sylvester.nawrocki@gmail.com>
- <1367006543-5458-9-git-send-email-sylvester.nawrocki@gmail.com>
-Message-ID: <000001ce46f6$54f27cc0$fed77640$@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 2 May 2013 13:44:53 +0800
+Subject: [PATCH] ARM: imx: Change type of ioremap function
+In-Reply-To: <1367427653-6068-1-git-send-email-lauraa@codeaurora.org>
+References: <1367427653-6068-1-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20130502054451.GH3442@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, April 27, 2013 5:02 AM, Sylwester Nawrocki wrote:
-> driver_data field is being cleared by the driver core since
-> commit 0998d0631001288a5974afc0b2a5f568bcdecb4d
-> device-core: Ensure drvdata = NULL when no driver is bound
-> hence there is no need to do it in the driver's remove() callback.
+On Wed, May 01, 2013 at 10:00:53AM -0700, Laura Abbott wrote:
+> Commit cd024d4245b2bfbd824b911f11a9756d1d6c167d
+> (ARM: 7704/1: mm: Use phys_addr_t properly for ioremap functions)
+> changed the type of the ioremap functions to actually use phys_addr_t.
 > 
-> Signed-off-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> Switch the imx ioremap functions to use phys_addr_t to avoid warnings:
+> 
+> arch/arm/mach-imx/mm-imx3.c: In function 'imx31_init_early':
+> arch/arm/mach-imx/mm-imx3.c:142:22: warning: assignment from incompatible pointer type [enabled by default]
+> arch/arm/mach-imx/mm-imx3.c: In function 'imx35_init_early':
+> arch/arm/mach-imx/mm-imx3.c:221:22: warning: assignment from incompatible pointer type [enabled by default]
+> 
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+
+Applied, thanks.
+
 > ---
->  drivers/video/s3c2410fb.c |    1 -
->  1 files changed, 0 insertions(+), 1 deletions(-)
+>  arch/arm/mach-imx/mm-imx3.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> diff --git a/drivers/video/s3c2410fb.c b/drivers/video/s3c2410fb.c
-> index 11f98ca..0439ed0 100644
-> --- a/drivers/video/s3c2410fb.c
-> +++ b/drivers/video/s3c2410fb.c
-> @@ -1013,7 +1013,6 @@ static int s3c2410fb_remove(struct platform_device *pdev)
->  	irq = platform_get_irq(pdev, 0);
->  	free_irq(irq, info);
+> diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
+> index cefa047..f019f14 100644
+> --- a/arch/arm/mach-imx/mm-imx3.c
+> +++ b/arch/arm/mach-imx/mm-imx3.c
+> @@ -65,7 +65,7 @@ static void imx3_idle(void)
+>  		: "=r" (reg));
+>  }
+>  
+> -static void __iomem *imx3_ioremap_caller(unsigned long phys_addr, size_t size,
+> +static void __iomem *imx3_ioremap_caller(phys_addr_t phys_addr, size_t size,
+>  					 unsigned int mtype, void *caller)
+>  {
+>  	if (mtype == MT_DEVICE) {
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
 > 
-> -	platform_set_drvdata(pdev, NULL);
->  	framebuffer_release(fbinfo);
-
-Hi Sylwester,
-
-How about eliminating platform_set_drvdata(pdev, NULL)
-in s3c24xxfb_probe() as well as s3c2410fb_remove()?
-
-@@ -1005,7 +1005,6 @@ release_regs:
- release_mem:
-        release_mem_region(res->start, size);
- dealloc_fb:
--       platform_set_drvdata(pdev, NULL);
-        framebuffer_release(fbinfo);
-        return ret;
- }
-
-Best regards,
-Jingoo Han
-
-> 
->  	return 0;
-> --
-> 1.7.4.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
