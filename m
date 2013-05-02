@@ -1,125 +1,161 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  2 May 2013 09:51:23 +0100
-Subject: [PATCH] ARM: ux500: Remove DMA address look-up table
-Message-ID: <1367484683-3479-1-git-send-email-lee.jones@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 2 May 2013 10:52:33 +0200
+Subject: [PATCH V2 1/2] ARM/MVF600: add Vybrid Family platform support
+In-Reply-To: <1367480285-26159-2-git-send-email-b35083@freescale.com>
+References: <1367480285-26159-1-git-send-email-b35083@freescale.com>
+ <1367480285-26159-2-git-send-email-b35083@freescale.com>
+Message-ID: <20130502085233.GO32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA addresses are now passed as part of the dmaengine API by invoking
-dmaengine_slave_config(). So there's no requirement for the DMA40
-driver to look them up in a table provided by platform data. This
-method does not fit in well using Device Tree either.
+On Thu, May 02, 2013 at 03:38:04PM +0800, Jingchang Lu wrote:
+> This patch adds Freescale Vybrid Family platform core definitions,
+> core drivers, including clock, period interrupt timer(PIT),
+> and DTS based machine support with MVF600 Tower development board.
+> 
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> ---
+> V2:
+>   Use CLOCKSOURCE_OF_DECLARE init timer
+>   Add ONESHOT mode support
+>   Add more clks definitions on MVF600 soc
+> 
+>  .../devicetree/bindings/clock/mvf600-clock.txt     | 180 +++++++++
+>  arch/arm/mach-imx/Kconfig                          |  15 +
+>  arch/arm/mach-imx/Makefile                         |   3 +
+>  arch/arm/mach-imx/clk-mvf.c                        | 406 +++++++++++++++++++++
+>  arch/arm/mach-imx/common.h                         |   1 +
+>  arch/arm/mach-imx/mach-mvf600.c                    | 118 ++++++
+>  arch/arm/mach-imx/pit.c                            | 244 +++++++++++++
+>  7 files changed, 967 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/mvf600-clock.txt
+>  create mode 100644 arch/arm/mach-imx/clk-mvf.c
+>  create mode 100644 arch/arm/mach-imx/mach-mvf600.c
+>  create mode 100644 arch/arm/mach-imx/pit.c
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/mvf600-clock.txt b/Documentation/devicetree/bindings/clock/mvf600-clock.txt
+> new file mode 100644
+> index 0000000..9f8b20e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/mvf600-clock.txt
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/devices-db8500.c        |   80 ---------------------------
- include/linux/platform_data/dma-ste-dma40.h |    2 -
- 2 files changed, 82 deletions(-)
+[...]
 
-diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
-index 2bc4b5e..d35a492 100644
---- a/arch/arm/mach-ux500/devices-db8500.c
-+++ b/arch/arm/mach-ux500/devices-db8500.c
-@@ -42,87 +42,7 @@ static struct resource dma40_resources[] = {
- 	}
- };
- 
--/*
-- * Mapping between destination event lines and physical device address.
-- * The event line is tied to a device and therefore the address is constant.
-- * When the address comes from a primecell it will be configured in runtime
-- * and we set the address to -1 as a placeholder.
-- */
--static const dma_addr_t dma40_tx_map[DB8500_DMA_NR_DEV] = {
--	/* MUSB - these will be runtime-reconfigured */
--	[DB8500_DMA_DEV39_USB_OTG_IEP_AND_OEP_8] = -1,
--	[DB8500_DMA_DEV16_USB_OTG_IEP_AND_OEP_7_15] = -1,
--	[DB8500_DMA_DEV17_USB_OTG_IEP_AND_OEP_6_14] = -1,
--	[DB8500_DMA_DEV18_USB_OTG_IEP_AND_OEP_5_13] = -1,
--	[DB8500_DMA_DEV19_USB_OTG_IEP_AND_OEP_4_12] = -1,
--	[DB8500_DMA_DEV36_USB_OTG_IEP_AND_OEP_3_11] = -1,
--	[DB8500_DMA_DEV37_USB_OTG_IEP_AND_OEP_2_10] = -1,
--	[DB8500_DMA_DEV38_USB_OTG_IEP_AND_OEP_1_9] = -1,
--	/* PrimeCells - run-time configured */
--	[DB8500_DMA_DEV0_SPI0] = -1,
--	[DB8500_DMA_DEV1_SD_MMC0] = -1,
--	[DB8500_DMA_DEV2_SD_MMC1] = -1,
--	[DB8500_DMA_DEV3_SD_MMC2] = -1,
--	[DB8500_DMA_DEV8_SSP0] = -1,
--	[DB8500_DMA_DEV9_SSP1] = -1,
--	[DB8500_DMA_DEV11_UART2] = -1,
--	[DB8500_DMA_DEV12_UART1] = -1,
--	[DB8500_DMA_DEV13_UART0] = -1,
--	[DB8500_DMA_DEV28_SD_MM2] = -1,
--	[DB8500_DMA_DEV29_SD_MM0] = -1,
--	[DB8500_DMA_DEV32_SD_MM1] = -1,
--	[DB8500_DMA_DEV33_SPI2] = -1,
--	[DB8500_DMA_DEV35_SPI1] = -1,
--	[DB8500_DMA_DEV40_SPI3] = -1,
--	[DB8500_DMA_DEV41_SD_MM3] = -1,
--	[DB8500_DMA_DEV42_SD_MM4] = -1,
--	[DB8500_DMA_DEV43_SD_MM5] = -1,
--	[DB8500_DMA_DEV14_MSP2] = U8500_MSP2_BASE + MSP_TX_RX_REG_OFFSET,
--	[DB8500_DMA_DEV30_MSP1] = U8500_MSP1_BASE + MSP_TX_RX_REG_OFFSET,
--	[DB8500_DMA_DEV31_MSP0_SLIM0_CH0] = U8500_MSP0_BASE + MSP_TX_RX_REG_OFFSET,
--	[DB8500_DMA_DEV48_CAC1] = U8500_CRYP1_BASE + CRYP1_TX_REG_OFFSET,
--	[DB8500_DMA_DEV50_HAC1_TX] = U8500_HASH1_BASE + HASH1_TX_REG_OFFSET,
--};
--
--/* Mapping between source event lines and physical device address */
--static const dma_addr_t dma40_rx_map[DB8500_DMA_NR_DEV] = {
--	/* MUSB - these will be runtime-reconfigured */
--	[DB8500_DMA_DEV39_USB_OTG_IEP_AND_OEP_8] = -1,
--	[DB8500_DMA_DEV16_USB_OTG_IEP_AND_OEP_7_15] = -1,
--	[DB8500_DMA_DEV17_USB_OTG_IEP_AND_OEP_6_14] = -1,
--	[DB8500_DMA_DEV18_USB_OTG_IEP_AND_OEP_5_13] = -1,
--	[DB8500_DMA_DEV19_USB_OTG_IEP_AND_OEP_4_12] = -1,
--	[DB8500_DMA_DEV36_USB_OTG_IEP_AND_OEP_3_11] = -1,
--	[DB8500_DMA_DEV37_USB_OTG_IEP_AND_OEP_2_10] = -1,
--	[DB8500_DMA_DEV38_USB_OTG_IEP_AND_OEP_1_9] = -1,
--	/* PrimeCells */
--	[DB8500_DMA_DEV0_SPI0] = -1,
--	[DB8500_DMA_DEV1_SD_MMC0] = -1,
--	[DB8500_DMA_DEV2_SD_MMC1] = -1,
--	[DB8500_DMA_DEV3_SD_MMC2] = -1,
--	[DB8500_DMA_DEV8_SSP0] = -1,
--	[DB8500_DMA_DEV9_SSP1] = -1,
--	[DB8500_DMA_DEV11_UART2] = -1,
--	[DB8500_DMA_DEV12_UART1] = -1,
--	[DB8500_DMA_DEV13_UART0] = -1,
--	[DB8500_DMA_DEV28_SD_MM2] = -1,
--	[DB8500_DMA_DEV29_SD_MM0] = -1,
--	[DB8500_DMA_DEV32_SD_MM1] = -1,
--	[DB8500_DMA_DEV33_SPI2] = -1,
--	[DB8500_DMA_DEV35_SPI1] = -1,
--	[DB8500_DMA_DEV40_SPI3] = -1,
--	[DB8500_DMA_DEV41_SD_MM3] = -1,
--	[DB8500_DMA_DEV42_SD_MM4] = -1,
--	[DB8500_DMA_DEV43_SD_MM5] = -1,
--	[DB8500_DMA_DEV14_MSP2] = U8500_MSP2_BASE + MSP_TX_RX_REG_OFFSET,
--	[DB8500_DMA_DEV30_MSP3] = U8500_MSP3_BASE + MSP_TX_RX_REG_OFFSET,
--	[DB8500_DMA_DEV31_MSP0_SLIM0_CH0] = U8500_MSP0_BASE + MSP_TX_RX_REG_OFFSET,
--	[DB8500_DMA_DEV48_CAC1] = U8500_CRYP1_BASE + CRYP1_RX_REG_OFFSET,
--};
--
- struct stedma40_platform_data dma40_plat_data = {
--	.dev_rx = dma40_rx_map,
--	.dev_tx = dma40_tx_map,
- 	.disabled_channels = {-1},
- };
- 
-diff --git a/include/linux/platform_data/dma-ste-dma40.h b/include/linux/platform_data/dma-ste-dma40.h
-index c54af61..af0064e 100644
---- a/include/linux/platform_data/dma-ste-dma40.h
-+++ b/include/linux/platform_data/dma-ste-dma40.h
-@@ -152,8 +152,6 @@ struct stedma40_chan_cfg {
-  * for 'multiple of 4' channels, like 8.
-  */
- struct stedma40_platform_data {
--	const dma_addr_t		*dev_tx;
--	const dma_addr_t		*dev_rx;
- 	int				 disabled_channels[STEDMA40_MAX_PHYS];
- 	int				*soft_lli_chans;
- 	int				 num_of_soft_lli_chans;
+> +	sys_bus_clk		36
+> +	platform_bus_clk	37
+> +	ipg_bus_clk		38
+> +	uart0_clk		39
+> +	uart1_clk		40
+> +	uart2_clk		41
+> +	uart3_clk		42
+> +	uart4_clk		43
+> +	uart5_clk		44
+
+remove the _clk. The context makes it clear that it's a clock.
+
+> +
+> +#define CCM_CCGRx_CGn(n)		(n * 2)
+
+Does CCM_CCGRx_CGn(1 + 1) give correct results? Always add braces to
+the usage of macro arguments.
+
+> +int __init mvf_clocks_init(void)
+> +{
+> +	struct device_node *np;
+> +
+> +	clk[dummy] = imx_clk_fixed("dummy", 0);
+> +	clk[sirc_128k] = imx_clk_fixed("sirc_128k", 128000); /* slow internal IRC */
+> +	clk[sirc_32k] = imx_clk_fixed("sirc_32k", 32000); /* slow internal IRC */
+> +	clk[firc] = imx_clk_fixed("firc", 24000000); /* fast internal IRC */
+> +	clk[sxosc] = imx_clk_fixed("sxosc", 32000); /* fixed 32k external osc */
+> +
+> +	for_each_compatible_node(np, NULL, "fixed-clock") {
+> +		u32 rate;
+> +
+> +		if (of_property_read_u32(np, "clock-frequency", &rate))
+> +			continue;
+> +		else if (of_device_is_compatible(np, "fsl,mvf-osc"))
+> +			clk[fxosc] = imx_clk_fixed("fxosc", rate);
+> +		else if (of_device_is_compatible(np, "fsl,mvf-audio-ext-clk"))
+> +			clk[audio_ext] = imx_clk_fixed("audio_ext", rate);
+> +		else if (of_device_is_compatible(np, "fsl,mvf-enet-ext-clk"))
+> +			clk[enet_ext] = imx_clk_fixed("enet_ext", rate);
+> +	}
+
+Please do the same as https://patchwork.kernel.org/patch/2476681/ does
+for i.MX5.
+
+> +
+> +
+> +void mvf_restart(char mode, const char *cmd)
+> +{
+> +	struct device_node *np;
+> +	void __iomem *wdog_base;
+> +	struct clk *wdog_clk;
+> +
+> +	np = of_find_compatible_node(NULL, NULL, "fsl,mvf-wdt");
+> +	wdog_base = of_iomap(np, 0);
+> +	if (!wdog_base)
+> +		goto soft;
+> +
+> +	wdog_clk = of_clk_get_by_name(np, "wdog");
+
+use of_clk_get.
+
+> +
+> +
+> +static int __init pit_clocksource_init(struct clk *pit_clk)
+> +{
+> +	unsigned int c = clk_get_rate(pit_clk);
+> +
+> +	sched_clock_reg = clksrc_base + PITCVAL;
+> +
+> +	setup_sched_clock(mvf_read_sched_clock, 32, c);
+> +	return clocksource_mmio_init(clksrc_base + PITCVAL, "pit", c, 300, 32,
+> +			clocksource_mmio_readl_down);
+> +}
+> +
+> +/* set clock event */
+> +static int pit_set_next_event(unsigned long delta,
+> +				struct clock_event_device *unused)
+> +{
+> +	pit_timer_disable();
+> +	__raw_writel(delta - 1, clkevt_base + PITLDVAL);
+> +	pit_irq_acknowledge();
+> +	pit_timer_enable();
+
+You disable/enable the timer each time here, is this necessary? You will
+get a drift in the timer, that's really not nice.
+
+> +
+> +static void __init pit_timer_init(struct device_node *np)
+> +{
+> +	struct clk *pit_clk;
+> +	void __iomem *timer_base;
+> +	int irq;
+> +
+> +	if (!np) {
+> +		pr_err("Failed to find pit DT node\n");
+> +		BUG();
+> +	}
+> +
+> +	timer_base = of_iomap(np, 0);
+> +	WARN_ON(!timer_base);
+> +
+> +	/* chose PIT2 as clocksource, PIT3 as clockevent dev */
+> +	clksrc_base = timer_base + PITOFFSETx(2);
+> +	clkevt_base = timer_base + PITOFFSETx(3);
+> +
+> +	irq = irq_of_parse_and_map(np, 0);
+> +
+> +	pit_clk = of_clk_get_by_name(np, "pit");
+
+Use of_clk_get
+
+Sascha
+
 -- 
-1.7.10.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
