@@ -1,37 +1,53 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  2 May 2013 16:48:07 +0100
-Subject: [PATCH 1/4] ARM: ux500: Rid ignored return value of
- regulator_enable() compiler warning
+Date: Thu,  2 May 2013 16:48:09 +0100
+Subject: [PATCH 3/4] mmc: mmci: Ensure return value of regulator_enable() is
+ checked
 In-Reply-To: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
 References: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367509690-24022-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1367509690-24022-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arch/arm/mach-ux500/board-mop500.c: In function ?mop500_prox_activate?:
-arch/arm/mach-ux500/board-mop500.c:406:18: warning: ignoring return value of
+This patch suppresses the warning below:
+
+drivers/mmc/host/mmci.c: In function ?mmci_set_ios?:
+drivers/mmc/host/mmci.c:1165:20: warning: ignoring return value of
         ?regulator_enable?, declared with attribute warn_unused_result
         [-Wunused-result]
 
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Chris Ball <cjb@laptop.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/mmc/host/mmci.c |    9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index a15dd6b..9bc762a 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -403,8 +403,8 @@ static int mop500_prox_activate(struct device *dev)
- 			"no regulator\n");
- 		return PTR_ERR(prox_regulator);
- 	}
--	regulator_enable(prox_regulator);
--	return 0;
-+	
-+	return regulator_enable(prox_regulator);
- }
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 375c109..f4f3038 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1130,6 +1130,7 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	struct variant_data *variant = host->variant;
+ 	u32 pwr = 0;
+ 	unsigned long flags;
++	int ret;
  
- static void mop500_prox_deactivate(struct device *dev)
+ 	pm_runtime_get_sync(mmc_dev(mmc));
+ 
+@@ -1161,8 +1162,12 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		break;
+ 	case MMC_POWER_ON:
+ 		if (!IS_ERR(mmc->supply.vqmmc) &&
+-		    !regulator_is_enabled(mmc->supply.vqmmc))
+-			regulator_enable(mmc->supply.vqmmc);
++		    !regulator_is_enabled(mmc->supply.vqmmc)) {
++			ret = regulator_enable(mmc->supply.vqmmc);
++			if (ret < 0)
++				dev_err(mmc_dev(mmc),
++					"failed to enable vqmmc regulator\n");
++		}
+ 
+ 		pwr |= MCI_PWR_ON;
+ 		break;
 -- 
 1.7.10.4
