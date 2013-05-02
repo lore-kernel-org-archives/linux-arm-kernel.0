@@ -1,34 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 May 2013 20:41:26 +0100
-Subject: [PATCH 4/4] ARM: highbank: fix build after cache flush change
-In-Reply-To: <5182C0DF.9000500@gmail.com>
-References: <1367515404-512212-1-git-send-email-arnd@arndb.de>
- <1367515404-512212-5-git-send-email-arnd@arndb.de>
- <5182C0DF.9000500@gmail.com>
-Message-ID: <20130502194125.GH14496@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  2 May 2013 21:43:22 +0200
+Subject: [PATCH] ARM: kirkwood: add button for OpenBlock A6
+Message-ID: <1367523802-16372-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 02:39:11PM -0500, Rob Herring wrote:
-> On 05/02/2013 12:23 PM, Arnd Bergmann wrote:
-> > Commit "ARM: cpu hotplug: remove majority of cache flushing from
-> > platforms" has removed the inclusion of asm/cacheflush.h from
-> > a number of files. Highbank still needs it because it calls
-> > flush_cache_louis().
-> 
-> AFAICT, the commit in question only showed up buried in a reply to
-> another thread and was never cc'ed to the relevant platform maintainers...
-> 
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
-> > ---
-> 
-> I'd rather see the highbank changes dropped as this will all go away
-> with PSCI in 3.11, but:
-> 
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
+The OpenBlocks A6 board has one software-controlled button on the
+front side, labeled "INIT", so we add minimal support for this button
+in the kernel.
 
-I'll drop the removal of asm/cacheflush.h but not the rest of it; I
-believe your existing code to be in error with or without my changes.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/boot/dts/kirkwood-openblocks_a6.dts |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+index d27f724..627d8d0 100644
+--- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
++++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+@@ -209,4 +209,17 @@
+ 			gpios = <&gpio1 11 1>;
+ 		};
+         };
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++			button at 1 {
++			label = "Init Button";
++			linux,code = <116>;
++			gpios = <&gpio1 6 0>;
++		};
++	};
++
+ };
+-- 
+1.7.9.5
