@@ -1,82 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 2 May 2013 12:34:55 +0200
-Subject: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
- xfer->speed_hz set
-In-Reply-To: <CACQ1gAhZO3stjrwf5SiZf7jOO8T5bAJZiz97M7+7vwFmk2e65g@mail.gmail.com>
-References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
- <1362626815-6628-1-git-send-email-wenyou.yang@atmel.com>
- <CAGhQ9VwW18LXY5Jn0FUFCaAzKxP1W3QADG=JBp9JbgaAwo=F2Q@mail.gmail.com>
- <B256D81BAE5131468A838E5D7A24364154236AB5@penmbx02>
- <CACQ1gAhZO3stjrwf5SiZf7jOO8T5bAJZiz97M7+7vwFmk2e65g@mail.gmail.com>
-Message-ID: <5182414F.1000201@atmel.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 2 May 2013 11:38:12 +0100
+Subject: [Xen-devel] [PATCH 3/3] xen/arm: account for stolen ticks
+In-Reply-To: <1367482862.21869.28.camel@zakaz.uk.xensource.com>
+References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
+ <1367436460-10183-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1367482862.21869.28.camel@zakaz.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1305021134160.5398@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/2013 10:12, Richard Genoud :
-> 2013/5/2 Yang, Wenyou <Wenyou.Yang@atmel.com>:
->> Hi, Joachim,
->>
->>> -----Original Message-----
->>> From: Joachim Eastwood [mailto:manabian at gmail.com]
->>> Sent: 2013?3?7? 20:31
->>> To: Yang, Wenyou
->>> Cc: linux-arm-kernel at lists.infradead.org; grant.likely at secretlab.ca; Ferre,
->>> Nicolas; plagnioj at jcrosoft.com; richard.genoud at gmail.com; Lin, JM;
->>> spi-devel-general at lists.sourceforge.net; linux-kernel at vger.kernel.org
->>> Subject: Re: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
->>> xfer->speed_hz set
->>>
->>> On 7 March 2013 04:26, Wenyou Yang <wenyou.yang@atmel.com> wrote:
->>>> commit: 059b8ffeee5b427949872bb6ed5db5ae0788054e
->>>> cause the atmel spi probing failure.
->>>>
->>>> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
->>>> Cc: spi-devel-general at lists.sourceforge.net
->>>> Cc: linux-kernel at vger.kernel.org
->>>> ---
->>>>   drivers/spi/spi-atmel.c |    6 +++---
->>>>   1 file changed, 3 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
->>>> index 656d137..1eca815 100644
->>>> --- a/drivers/spi/spi-atmel.c
->>>> +++ b/drivers/spi/spi-atmel.c
->>>> @@ -846,9 +846,9 @@ static int atmel_spi_transfer(struct spi_device *spi,
->>> struct spi_message *msg)
->>>>                          }
->>>>                  }
->>>>
->>>> -               /* FIXME implement these protocol options!! */
->>>> -               if (xfer->speed_hz) {
->>>> -                       dev_dbg(&spi->dev, "no protocol options
->>> yet\n");
->>>> +               if (xfer->speed_hz < spi->max_speed_hz) {
->>>> +                       dev_dbg(&spi->dev,
->>>> +                               "speed in transfer less than bus
->>> speed\n");
->>>>                          return -ENOPROTOOPT;
->>>>                  }
->>>
->>> I sent a similar patch to spi-devl a while ago, which Grant said he applied.
->>> https://patchwork.kernel.org/patch/2165301/
->>>
->>> Can't find the patch in any upstream git tree so I guess Grant hasn't
->>> pushed it yet.
->> This patch hasn't still applied in any upstream git tree, so Atmel spi master doesn't work.
->> Could you help do some ping it?
->
-> it's in linux-next:
-> 3d3522604a5557e80fdcab61c54bd04eaf15b525
-> merged from spi-current/spi/merge
+On Thu, 2 May 2013, Ian Campbell wrote:
+> On Wed, 2013-05-01 at 20:27 +0100, Stefano Stabellini wrote:
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > index d30042e..8f040a0 100644
+> > --- a/arch/arm/xen/enlighten.c
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -14,6 +14,7 @@
+> >  #include <xen/xen-ops.h>
+> >  #include <asm/xen/hypervisor.h>
+> >  #include <asm/xen/hypercall.h>
+> > +#include <asm/arch_timer.h>
+> >  #include <asm/system_misc.h>
+> >  #include <linux/interrupt.h>
+> >  #include <linux/irqreturn.h>
+> > @@ -172,6 +173,8 @@ static int __init xen_secondary_init(unsigned int cpu)
+> >  		   later ones fail to. */
+> >  		per_cpu(xen_vcpu, cpu) = vcpup;
+> >  	}
+> > +
+> > +	xen_setup_runstate_info(cpu);
+> 
+> Is this called for the boot processor too?
 
-Thanks Richard, yes I can find it here:
-http://git.secretlab.ca/?p=linux.git;a=commit;h=3d3522604a5557e80fdcab61c54bd04eaf15b525
+Yep.
 
-Grant, Mark,
+> (do you have a linux-next branch where I can easily find the baseline
+> for this series?)
 
-Can you tell us if this SPI patch will be merged upstream using one of 
-your paths?
+git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git lost_ticks_1
 
-Best regards,
--- 
-Nicolas Ferre
+It's based on my 3.9-rc3-smp-6 branch currently in linux-next (that is
+based on 3.9-rc3).
+However lost_ticks_1 is not in linux-next yet.
