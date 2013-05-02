@@ -1,33 +1,51 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  2 May 2013 15:38:57 +0100
-Subject: [PATCH v2 0/5] ARM: KVM: various mmu related fixes for 3.10
-Message-ID: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
+Date: Thu,  2 May 2013 15:39:01 +0100
+Subject: [PATCH v2 4/5] ARM: KVM: get rid of S2_PGD_SIZE
+In-Reply-To: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
+References: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1367505542-2231-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series fixes a number of of KVM/ARM issues that have either
-been spotted during the review of the arm64 code, or while reworking
-related code.
+S2_PGD_SIZE defines the number of pages used by a stage-2 PGD
+and is unused, except for a VM_BUG_ON check that missuses the
+define.
 
-Only the first patch fixes a potential (if unlikely) problem, the
-others are either cosmetic or performance related.
+As the check is very unlikely to ever triggered except in
+circumstances where KVM is the least of our worries, just kill
+both the define and the VM_BUG_ON check.
 
-Tested on TC-2.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/kvm_arm.h | 1 -
+ arch/arm/kvm/mmu.c             | 3 ---
+ 2 files changed, 4 deletions(-)
 
-Marc Zyngier (5):
-  ARM: KVM: be more thorough when invalidating TLBs
-  ARM: KVM: remove dead prototype for __kvm_tlb_flush_vmid
-  ARM: KVM: relax cache maintainance when building page tables
-  ARM: KVM: get rid of S2_PGD_SIZE
-  ARM: KVM: use phys_addr_t instead of unsigned long long for HYP PGDs
-
- arch/arm/include/asm/kvm_arm.h  |  1 -
- arch/arm/include/asm/kvm_asm.h  |  2 --
- arch/arm/include/asm/kvm_host.h |  4 ++--
- arch/arm/kvm/arm.c              |  8 +++----
- arch/arm/kvm/interrupts.S       |  2 ++
- arch/arm/kvm/mmu.c              | 48 +++++++++++++++++++++++------------------
- 6 files changed, 35 insertions(+), 30 deletions(-)
-
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+index 124623e..64e9696 100644
+--- a/arch/arm/include/asm/kvm_arm.h
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -135,7 +135,6 @@
+ #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1ULL)
+ #define PTRS_PER_S2_PGD	(1ULL << (KVM_PHYS_SHIFT - 30))
+ #define S2_PGD_ORDER	get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
+-#define S2_PGD_SIZE	(1 << S2_PGD_ORDER)
+ 
+ /* Virtualization Translation Control Register (VTCR) bits */
+ #define VTCR_SH0	(3 << 12)
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index d79b594..3c506c7 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -379,9 +379,6 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+ 	if (!pgd)
+ 		return -ENOMEM;
+ 
+-	/* stage-2 pgd must be aligned to its size */
+-	VM_BUG_ON((unsigned long)pgd & (S2_PGD_SIZE - 1));
+-
+ 	memset(pgd, 0, PTRS_PER_S2_PGD * sizeof(pgd_t));
+ 	kvm_clean_pgd(pgd);
+ 	kvm->arch.pgd = pgd;
 -- 
 1.8.2.1
