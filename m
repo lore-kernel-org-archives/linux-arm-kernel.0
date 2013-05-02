@@ -1,24 +1,23 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 2 May 2013 14:41:23 +0100
-Subject: [PATCH] spi/spi-atmel: BUG: fix doesn' support 16 bits transfers
- using PIO
-In-Reply-To: <1367493911-3182-1-git-send-email-wenyou.yang@atmel.com>
-References: <1367493801-3037-1-git-send-email-wenyou.yang@atmel.com>
- <1367493911-3182-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <20130502134123.GA4945@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 May 2013 15:43:27 +0200
+Subject: [PATCH] ARM: sun4i: cubieboard: Enable the i2c controllers
+In-Reply-To: <1367498266-1246-1-git-send-email-emilio@elopez.com.ar>
+References: <1367498266-1246-1-git-send-email-emilio@elopez.com.ar>
+Message-ID: <2206623.mnYPZ5KTnx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 07:25:11PM +0800, Wenyou Yang wrote:
-> From: Richard Genoud <richard.genoud@gmail.com>
+On Thursday 02 May 2013 09:37:46 Emilio L?pez wrote:
+> The Cubieboard makes use of the first two i2c controllers found on the
+> Allwinner A10; i2c-0 is used internally for the PMIC, while i2c-1
+> is exposed on the board headers. This patch enables them in the device
+> tree.
 > 
-> Fix using PIO transfer mode only support 8 bits transfer, doesn't support 16 bits.
+> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130502/63e5f87e/attachment.sig>
+Shouldn't you list the attached devices in the same patch?
+
+What is the point of enabling the I2C bus if there are no devices
+to be found?
+
+	Arnd
