@@ -1,74 +1,101 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 May 2013 17:16:08 +0200
-Subject: [PATCH, RFC 04/22] staging/drm: imx: add missing dependencies
-In-Reply-To: <1367507786-505303-1-git-send-email-arnd@arndb.de>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
-Message-ID: <1367507786-505303-5-git-send-email-arnd@arndb.de>
+Date: Thu,  2 May 2013 17:16:04 +0200
+Subject: [PATCH, RFC 00/22] ARM randconfig bugs
+Message-ID: <1367507786-505303-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx DRM driver needs a couple of extra Kconfig dependencies
-to avoid random build failures:
+Hi subsystem maintainers,
 
-drivers/staging/imx-drm/ipuv3-crtc.c:448:
- undefined reference to `ipu_idmac_put'
- drivers/staging/imx-drm/ipuv3-crtc.c:450: undefined reference to
- `ipu_dmfc_put' drivers/staging/imx-drm/ipuv3-crtc.c:452:
- undefined reference to `ipu_dp_put'
- drivers/staging/imx-drm/ipuv3-crtc.c:454: undefined reference to
- `ipu_di_put'
-drivers/built-in.o: In function `ipu_probe':
- :(.text+0x4b4174): undefined reference to `device_reset'
-drivers/built-in.o: In function `imx_tve_probe':
- drivers/staging/imx-drm/imx-tve.c:648: undefined reference to
- `devm_regmap_init_mmio_clk'
-drivers/built-in.o: In function
- `imx_pd_connector_get_modes':
- drivers/staging/imx-drm/parallel-display.c:78: undefined
- reference to `of_get_drm_display_mode'
+This is a set of patches to to fix build errors I hit while trying to
+build lots of randconfig kernels on linux-next.
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/staging/imx-drm/Kconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+Most of them are simple missing dependencies in Kconfig, but some are
+more substantial. I would like to see at least the obvious patches
+get merged for 3.10. If you are happy with the patches, feel free
+to apply them directly, otherwise please provide feedback.
 
-diff --git a/drivers/staging/imx-drm/Kconfig b/drivers/staging/imx-drm/Kconfig
-index 8c9e403..35ccda5 100644
---- a/drivers/staging/imx-drm/Kconfig
-+++ b/drivers/staging/imx-drm/Kconfig
-@@ -1,6 +1,7 @@
- config DRM_IMX
- 	tristate "DRM Support for Freescale i.MX"
- 	select DRM_KMS_HELPER
-+	select VIDEOMODE_HELPERS
- 	select DRM_GEM_CMA_HELPER
- 	select DRM_KMS_CMA_HELPER
- 	depends on DRM && (ARCH_MXC || ARCH_MULTIPLATFORM)
-@@ -23,6 +24,7 @@ config DRM_IMX_PARALLEL_DISPLAY
- config DRM_IMX_TVE
- 	tristate "Support for TV and VGA displays"
- 	depends on DRM_IMX
-+	select REGMAP_MMIO
- 	help
- 	  Choose this to enable the internal Television Encoder (TVe)
- 	  found on i.MX53 processors.
-@@ -30,6 +32,7 @@ config DRM_IMX_TVE
- config DRM_IMX_IPUV3_CORE
- 	tristate "IPUv3 core support"
- 	depends on DRM_IMX
-+	depends on RESET_CONTROLLER
- 	help
- 	  Choose this if you have a i.MX5/6 system and want
- 	  to use the IPU. This option only enables IPU base
-@@ -38,5 +41,6 @@ config DRM_IMX_IPUV3_CORE
- config DRM_IMX_IPUV3
- 	tristate "DRM Support for i.MX IPUv3"
- 	depends on DRM_IMX
-+	depends on DRM_IMX_IPUV3_CORE
- 	help
- 	  Choose this if you have a i.MX5 or i.MX6 processor.
+No single patch out of these is very important though, most of them
+only concern corner cases and don't matter in practice.
+
+	Arnd
+
+Arnd Bergmann (22):
+  can: move CONFIG_HAVE_CAN_FLEXCAN out of CAN_DEV
+  cpufreq: ARM_DT_BL_CPUFREQ needs ARM_CPU_TOPOLOGY
+  cpuidle: calxeda: select ARM_CPU_SUSPEND
+  staging/drm: imx: add missing dependencies
+  drm: always provide debugfs function prototypes
+  gpu/drm: host1x: add dependency on Tegra
+  drm/tilcd: select BACKLIGHT_LCD_SUPPORT
+  OMAPDSS: DPI needs DSI
+  crypto: lz4: don't build on ARM
+  mfd: ab8500: debugfs code depends on gpadc
+  iwlegacy: il_pm_ops is only provided for PM_SLEEP
+  thermal: cpu_cooling: fix stub function
+  staging/logger: use kuid_t internally
+  oprofile: always enable IRQ_WORK
+  USB: EHCI: remove bogus #error
+  USB: UHCI: clarify Kconfig dependencies
+  USB: OHCI: clarify Kconfig dependencies
+  Xen: SWIOTLB is only used on x86
+  staging/solo6x10: depend on CONFIG_FONTS
+  media: coda: select GENERIC_ALLOCATOR
+  davinci: vpfe_capture needs i2c
+  radio-si4713: depend on SND_SOC
+
+ arch/Kconfig                           |  1 +
+ crypto/Kconfig                         |  2 ++
+ drivers/cpufreq/Kconfig.arm            |  1 +
+ drivers/cpuidle/Kconfig                |  1 +
+ drivers/gpu/drm/tilcdc/Kconfig         |  1 +
+ drivers/gpu/host1x/drm/Kconfig         |  1 +
+ drivers/media/platform/Kconfig         |  1 +
+ drivers/media/platform/davinci/Kconfig |  3 ++
+ drivers/media/radio/Kconfig            |  1 +
+ drivers/mfd/Kconfig                    |  2 +-
+ drivers/net/can/Kconfig                |  6 ++--
+ drivers/net/wireless/iwlegacy/common.h |  2 +-
+ drivers/staging/android/logger.c       |  4 +--
+ drivers/staging/android/logger.h       |  2 +-
+ drivers/staging/imx-drm/Kconfig        |  4 +++
+ drivers/staging/media/solo6x10/Kconfig |  1 +
+ drivers/usb/host/Kconfig               | 65 +++++++++++++++++++++++++++++-----
+ drivers/usb/host/Makefile              |  4 +--
+ drivers/usb/host/ehci-hcd.c            | 17 ---------
+ drivers/usb/host/ohci-hcd.c            | 19 ----------
+ drivers/usb/host/uhci-hcd.c            |  4 +--
+ drivers/video/console/Makefile         |  2 ++
+ drivers/video/omap2/dss/Kconfig        |  1 +
+ drivers/xen/Kconfig                    |  2 +-
+ include/drm/drmP.h                     |  3 +-
+ include/linux/cpu_cooling.h            |  2 +-
+ 26 files changed, 91 insertions(+), 61 deletions(-)
+
 -- 
 1.8.1.2
+
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Dave Airlie <airlied@redhat.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Hans Verkuil <hverkuil@xs4all.nl>
+Cc: Herbert Xu <herbert@gondor.hengli.com.au>
+Cc: John W. Linville <linville@tuxdriver.com>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
+Cc: Oliver Hartkopp <socketcan@hartkopp.net>
+Cc: Rafael J. Wysocki <rjw@sisk.pl>
+Cc: Robert Richter <rric@kernel.org>
+Cc: Samuel Ortiz <sameo@linux.intel.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Thierry Reding <thierry.reding@avionic-design.de>
+Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: cpufreq at vger.kernel.org
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-can at vger.kernel.org
+Cc: linux-media at vger.kernel.org
+Cc: linux-pm at vger.kernel.org
+Cc: oprofile-list at lists.sf.net
