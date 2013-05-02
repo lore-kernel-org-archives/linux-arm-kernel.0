@@ -1,66 +1,54 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  2 May 2013 11:49:46 +0100
-Subject: [PATCH 4/8] crypto: ux500/cryp - Prepare clock before enabling it
+Date: Thu,  2 May 2013 11:49:49 +0100
+Subject: [PATCH 7/8] crypto: ux500/[cryp|hash] - Show successful start-up in
+ the bootlog
 In-Reply-To: <1367491790-9727-1-git-send-email-lee.jones@linaro.org>
 References: <1367491790-9727-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367491790-9727-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1367491790-9727-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we fail to prepare the ux500-cryp clock before enabling it the
-platform will fail to boot. Here we insure this happens.
+The Cryp driver is currently silent and the Hash driver prints the
+name of its probe function unnecessarily. Let's just put a nice
+descriptive one-liner there instead.
 
 Cc: Herbert Xu <herbert@gondor.apana.org.au>
 Cc: David S. Miller <davem@davemloft.net>
 Cc: Andreas Westin <andreas.westin@stericsson.com>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
 Cc: linux-crypto at vger.kernel.org
 Acked-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/crypto/ux500/cryp/cryp_core.c |   12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+ drivers/crypto/ux500/cryp/cryp_core.c |    2 ++
+ drivers/crypto/ux500/hash/hash_core.c |    2 +-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/crypto/ux500/cryp/cryp_core.c b/drivers/crypto/ux500/cryp/cryp_core.c
-index 22c9063..bf78d60 100644
+index 4b90493..78d7463 100644
 --- a/drivers/crypto/ux500/cryp/cryp_core.c
 +++ b/drivers/crypto/ux500/cryp/cryp_core.c
-@@ -1459,11 +1459,17 @@ static int ux500_cryp_probe(struct platform_device *pdev)
- 		goto out_regulator;
+@@ -1542,6 +1542,8 @@ static int ux500_cryp_probe(struct platform_device *pdev)
+ 		goto out_power;
  	}
  
-+	ret = clk_prepare(device_data->clk);
-+	if (ret) {
-+		dev_err(dev, "[%s]: clk_prepare() failed!", __func__);
-+		goto out_clk;
-+	}
++	dev_info(dev, "successfully registered\n");
 +
- 	/* Enable device power (and clock) */
- 	ret = cryp_enable_power(device_data->dev, device_data, false);
- 	if (ret) {
- 		dev_err(dev, "[%s]: cryp_enable_power() failed!", __func__);
--		goto out_clk;
-+		goto out_clk_unprepare;
- 	}
+ 	return 0;
  
- 	cryp_error = cryp_check(device_data);
-@@ -1524,6 +1530,9 @@ static int ux500_cryp_probe(struct platform_device *pdev)
  out_power:
- 	cryp_disable_power(device_data->dev, device_data, false);
+diff --git a/drivers/crypto/ux500/hash/hash_core.c b/drivers/crypto/ux500/hash/hash_core.c
+index 5d8a7f3..ac606b6 100644
+--- a/drivers/crypto/ux500/hash/hash_core.c
++++ b/drivers/crypto/ux500/hash/hash_core.c
+@@ -1773,7 +1773,7 @@ static int ux500_hash_probe(struct platform_device *pdev)
+ 		goto out_power;
+ 	}
  
-+out_clk_unprepare:
-+	clk_unprepare(device_data->clk);
-+
- out_clk:
- 	clk_put(device_data->clk);
+-	dev_info(dev, "[%s] successfully probed\n", __func__);
++	dev_info(dev, "successfully registered\n");
+ 	return 0;
  
-@@ -1594,6 +1603,7 @@ static int ux500_cryp_remove(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "[%s]: cryp_disable_power() failed",
- 			__func__);
- 
-+	clk_unprepare(device_data->clk);
- 	clk_put(device_data->clk);
- 	regulator_put(device_data->pwr_regulator);
- 
+ out_power:
 -- 
 1.7.10.4
