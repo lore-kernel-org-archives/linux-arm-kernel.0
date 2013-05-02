@@ -1,81 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 May 2013 09:34:30 +0100
-Subject: Latest build results - errors/warnings - lots of them
-In-Reply-To: <alpine.LFD.2.03.1304301418100.17372@syhkavp.arg>
-References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
- <201304301304.20650.arnd@arndb.de> <20130430114229.GA2439@linaro.org>
- <alpine.LFD.2.03.1304301110030.17372@syhkavp.arg>
- <20130430172816.GA31101@linaro.org>
- <alpine.LFD.2.03.1304301418100.17372@syhkavp.arg>
-Message-ID: <20130502083430.GB21614@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 02 May 2013 10:35:19 +0200
+Subject: [PATCH] mxs: icoll: Add function to register an interrupt as
+ FIQ source
+In-Reply-To: <20130502023858.GD3442@S2101-09.ap.freescale.net>
+References: <1367243917-5177-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20130502023858.GD3442@S2101-09.ap.freescale.net>
+Message-ID: <51822547.20605@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 30, 2013 at 02:18:42PM -0400, Nicolas Pitre wrote:
-> On Tue, 30 Apr 2013, Dave Martin wrote:
-> 
-> > On Tue, Apr 30, 2013 at 11:12:12AM -0400, Nicolas Pitre wrote:
-> > > On Tue, 30 Apr 2013, Dave Martin wrote:
-> > > 
-> > > > On Tue, Apr 30, 2013 at 01:04:20PM +0200, Arnd Bergmann wrote:
-> > > > > On Tuesday 30 April 2013, Russell King - ARM Linux wrote:
-> > > > > > Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
-> > > > > > great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
-> > > > > > arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
-> > > > > > source of errors.
-> > > > 
-> > > > [...]
-> > > >  
-> > > > > >arch/arm/common/mcpm_head.S:39: Error: selected processor does not support ARM mode `ubfx r9,r0,#0,#8'
-> > > > > >arch/arm/common/mcpm_head.S:40: Error: selected processor does not support ARM mode `ubfx r10,r0,#8,#8'
-> > > > > >arch/arm/common/mcpm_head.S:100: Error: selected processor does not support ARM mode `dmb'
-> > > > > >arch/arm/common/mcpm_head.S:115: Error: selected processor does not support ARM mode `dmb'
-> > > > > >arch/arm/common/mcpm_head.S:127: Error: selected processor does not support ARM mode `dmb'
-> > > > > >arch/arm/common/mcpm_head.S:131: Error: selected processor does not support ARM mode `dmb'
-> > > > > >arch/arm/common/mcpm_head.S:138: Error: selected processor does not support ARM mode `dsb'
-> > > > > >arch/arm/common/mcpm_head.S:152: Error: selected processor does not support ARM mode `dmb'
-> > > > > >arch/arm/common/mcpm_head.S:161: Error: selected processor does not support ARM mode `dmb'
-> > > > > >arch/arm/common/mcpm_head.S:175: Error: selected processor does not support ARM mode `dmb'
-> > > > > >arch/arm/common/vlock.S:62: Error: selected processor does not support ARM mode `dmb'
-> > > > > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dmb'
-> > > > > >arch/arm/common/vlock.S:72: Error: selected processor does not support ARM mode `dsb'
-> > > > > >arch/arm/common/vlock.S:89: Error: selected processor does not support ARM mode `dmb'
-> > > > > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dmb'
-> > > > > >arch/arm/common/vlock.S:95: Error: selected processor does not support ARM mode `dsb'
-> > > > > >arch/arm/common/vlock.S:102: Error: selected processor does not support ARM mode `dmb'
-> > > > > >arch/arm/common/vlock.S:105: Error: selected processor does not support ARM mode `dsb'
-> > > > > 
-> > > > > Right, the problem here is that the code was never tested with an ARMv6+ARMv7 config.
-> > > > > We can either fix it up by adding
-> > > > > 
-> > > > > 	.arch	armv7-a
-> > > > > 
-> > > > > in the assembly files, or by doing the same in the Makefile:
-> > > > > 
-> > > > > AFLAGS_vlock.S += -march=armv7-a
-> > > > > AFLAGS_mcpm_head.S += -march=armv7-a
-> > > > 
-> > > > 
-> > > > Hmmm, this code was tested with ARCH_MULTIPLATFORM, but it looks like
-> > > > no v6 boards were configured in when testing that...
-> > > > 
-> > > > 
-> > > > Assuming people are OK with the Makefile route, here's a patch for that,
-> > > > build-tested with a v6+v7 ARCH_MULTIPLATFORM config.
-> > > 
-> > > Isn't the .arch armv7-a route a bit cleaner?  That would have been my 
-> > > choice, although I don't feel strongly about it.
-> > 
-> > I don't feel strongly either.  We already have the CFLAGS_DISABLE stuff,
-> > so it didn't feel that unnatural to add this in the Makefile; but .arch
-> > would work equally well.
-> > 
-> > If somebody wants to change it, it's not a problem for me, but I didn't
-> > want to create extra disruption by proposing a different patch...
-> 
-> Fair enough.
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
+Hi Shawn,
 
-I see Dave Martin has sent a patch for this without your ack.  Was that
-a mistake?
+Le 02/05/2013 04:39, Shawn Guo a ?crit :
+> On Mon, Apr 29, 2013 at 03:58:37PM +0200, Maxime Ripard wrote:
+>> MXS, unlike other ARM platforms,
+> 
+> How are other ARM platforms handling that?
+
+Just like that. You can look at mxc_set_irq_fiq in
+arch/arm/mach-imx/irq-common.c or s3c24xx_set_fiq in
+arch/arm/mach-s3c24xx/irq.c
+
+I've also thought about declaring a IRQ type and using the .irq_set_type
+to register an interrupt as a FIQ source, but since FIQ are
+ARM-specific, it's probably a bad idea.
+
+>> has no way to make a FIQ from an
+>> interrupt from a driver, without poking directly into the icoll.
+>>
+>> Add an exported function to do this.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> ---
+>>  arch/arm/mach-mxs/icoll.c | 11 +++++++++++
+> 
+> This will become drivers/irqchip/irq-mxs.c after the merge window.
+
+Ok, I'll rebase and repost then.
+
+Thanks,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
