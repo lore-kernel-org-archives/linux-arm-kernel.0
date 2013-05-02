@@ -1,56 +1,36 @@
-From: jjo.braun@gmail.com (Johannes Braun)
-Date: Thu, 2 May 2013 20:40:20 +0200
-Subject: Freescale imx35: sgtl5000 codec not working over i2c
-In-Reply-To: <20130502181821.GC31135@pengutronix.de>
-References: <20130502200024.72c112cc@jobraun>
- <20130502181821.GC31135@pengutronix.de>
-Message-ID: <20130502204020.0462f080@jobraun>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 2 May 2013 19:42:58 +0100
+Subject: [PATCH v10 0/2] (arm-soc for v3.10) arm: introduce
+ psci_smp_ops
+In-Reply-To: <20130502182812.GD14496@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1305021811560.5398@kaball.uk.xensource.com>
+ <20130502171516.GA3040@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1305021816490.5398@kaball.uk.xensource.com>
+ <20130502182812.GD14496@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1305021938170.5398@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sascha,
-
-> On Thu, May 02, 2013 at 08:00:24PM +0200, Johannes Braun wrote:
-> > Hello @all,
+On Thu, 2 May 2013, Russell King - ARM Linux wrote:
+> On Thu, May 02, 2013 at 06:20:32PM +0100, Stefano Stabellini wrote:
+> > On Thu, 2 May 2013, Will Deacon wrote:
+> > > Hi Stefano,
+> > > 
+> > > On Thu, May 02, 2013 at 06:12:12PM +0100, Stefano Stabellini wrote:
+> > > > ping
+> > > 
+> > > Is this a ping to have this pulled into Russell's tree?
 > > 
-> > I hope this is the right place for my problem. Currently I am
-> > trying to get a sigmatel sgtl5000 codec to work on a Freescale
-> > imx35 based board. I am using a vanilla kernel 3.7.10. The codec is
-> > connected via i2c. I configured the i2c device
-> > in /arch/arm/mach-imx/mach-proxmobil2.c. Proxmobil2 is the name of
-> > our device. Here is the part which configures the i2c device and
-> > the bus.
-> > 
-> > static const struct imxi2c_platform_data mx35_prox2_i2c0_data
-> > 	__initconst = {
-> >         .bitrate = 100000,
-> > };
-> > 
-> > imx35_add_imx_i2c0(&mx35_prox2_i2c0_data);
-> > 
-> > static struct i2c_board_info __initdata i2c_devices_prox2[] = {
-> >         {
-> >                 I2C_BOARD_INFO("imx-audio-sgtl5000", 0x0a),
-> >         },
+> > I thought that we agreed that the patches should go via the arm-soc
+> > tree, after Russell acks them.
 > 
-> The driver matches "sgtl5000", not "imx-audio-sgtl5000".
+> Okay, well, is there a reason for them to go through arm-soc?  They
+> look more like core code to me than SoC specific - they only minimally
+> touch mach-virt.
 
-I tried "sgtl5000" and "fsl", both without success.
+The original reason is that some SoC specific code depends on this
+series (Calxeda I believe).
 
-> 
-> You should use devicetree support for new boards. The platform support
-> will vanish sooner or later.
-> 
-
-As I wrote before, my board is based on the very old imx35 processor
-platform and I think this processor type does not support device tree
-out of the box? Or is it possible to use a device tree with an imx35?
-Haven`t seen this before. Is the problem realy the missing device tree
-support? 
-
-There are much reasons why I don`t want to spend that much time with
-this old product. We had so much problems with this board and probably
-in summer there is a new board coming. Maybe an im6q.
-
----
-Johannes
+But you are probably right, if you prefer that I issue a pull request
+for your tree, I have no problems with that.
