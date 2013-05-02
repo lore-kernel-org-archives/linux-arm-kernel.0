@@ -1,36 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 May 2013 23:02:53 +0200
-Subject: [PATCH 4/9] ARM: SPEAr: conditionalize l2x0 support
+Date: Thu,  2 May 2013 23:02:56 +0200
+Subject: [PATCH 7/9] ARM: OMAP: don't select SERIAL_OMAP unconditionally
 In-Reply-To: <1367528578-518090-1-git-send-email-arnd@arndb.de>
 References: <1367528578-518090-1-git-send-email-arnd@arndb.de>
-Message-ID: <1367528578-518090-5-git-send-email-arnd@arndb.de>
+Message-ID: <1367528578-518090-8-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the cache controller implementation is disabled at build time,
-we must not call any functions related to it.
+It is possible to build a kernel without TTY support, so we must not
+attempt to select SERIAL_OMAP in that case.
 
-arch/arm/mach-spear/built-in.o: In function `spear13xx_l2x0_init':
-arch/arm/mach-spear/spear13xx.c:47: undefined reference to `l2x0_init'
+warning: (ARCH_OMAP2PLUS_TYPICAL) selects SERIAL_OMAP which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS && ARCH_OMAP2PLUS)
 
-Cc: Viresh Kumar <viresh.linux@gmail.com>
+Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-spear/spear13xx.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-omap2/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-spear/spear13xx.c b/arch/arm/mach-spear/spear13xx.c
-index 8e7cb45..5403c01 100644
---- a/arch/arm/mach-spear/spear13xx.c
-+++ b/arch/arm/mach-spear/spear13xx.c
-@@ -35,6 +35,8 @@ void __init spear13xx_l2x0_init(void)
- 	 * write alloc and 'Full line of zero' options
- 	 *
- 	 */
-+	if (!IS_ENABLED(CONFIG_CACHE_L2X0))
-+		return;
- 
- 	writel_relaxed(0x06, VA_L2CC_BASE + L2X0_PREFETCH_CTRL);
- 
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 857b1f0..a95c7af 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -37,8 +37,8 @@ config ARCH_OMAP2PLUS_TYPICAL
+ 	select NEON if ARCH_OMAP3 || ARCH_OMAP4 || SOC_OMAP5
+ 	select PM_RUNTIME
+ 	select REGULATOR
+-	select SERIAL_OMAP
+-	select SERIAL_OMAP_CONSOLE
++	select SERIAL_OMAP if TTY
++	select SERIAL_OMAP_CONSOLE if TTY
+ 	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
+ 	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
+ 	select VFP
 -- 
 1.8.1.2
