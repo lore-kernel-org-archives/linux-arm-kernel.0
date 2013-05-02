@@ -1,43 +1,34 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 2 May 2013 16:38:50 +0100
-Subject: [PATCH, RFC 18/22] Xen: SWIOTLB is only used on x86
-In-Reply-To: <1367507786-505303-19-git-send-email-arnd@arndb.de>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 2 May 2013 18:42:39 +0300
+Subject: [PATCH, RFC 08/22] OMAPDSS: DPI needs DSI
+In-Reply-To: <1367507786-505303-9-git-send-email-arnd@arndb.de>
 References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-19-git-send-email-arnd@arndb.de>
-Message-ID: <alpine.DEB.2.02.1305021638100.5398@kaball.uk.xensource.com>
+ <1367507786-505303-9-git-send-email-arnd@arndb.de>
+Message-ID: <5182896F.90807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 May 2013, Arnd Bergmann wrote:
-> Enabling SWIOTLB_XEN on ARM results in build errors because the
-> underlying SWIOTLB is only available on X86:
-> 
-> drivers/xen/swiotlb-xen.c: In function 'is_xen_swiotlb_buffer':
-> drivers/xen/swiotlb-xen.c:105:2: error: implicit declaration of function 'mfn_to_local_pfn
-> 
-> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi Arnd,
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+On 05/02/2013 06:16 PM, Arnd Bergmann wrote:
+> The dpi.c file cannot be build correctly when the dsi.c file is
+> disabled in Kconfig. This clarifies the dependency in Kconfig
+> to avoid build errors:
+> 
+> drivers/video/omap2/dss/dpi.c: In function 'dpi_calc_pll_cb':
+> drivers/video/omap2/dss/dpi.c:181:2: error: implicit declaration of function 'dsi_hsdiv_calc' [-Werror=implicit-function-declaration]
+> drivers/video/omap2/dss/dpi.c: In function 'dpi_dsi_clk_calc':
+> drivers/video/omap2/dss/dpi.c:201:2: error: implicit declaration of function 'dsi_get_pll_clkin' [-Werror=implicit-function-declaration]
+
+I've sent a patch for this to DRM maintainer, hopefully merged soon.
+
+ Tomi
 
 
->  drivers/xen/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/xen/Kconfig b/drivers/xen/Kconfig
-> index dd4d9cb..f03bf50 100644
-> --- a/drivers/xen/Kconfig
-> +++ b/drivers/xen/Kconfig
-> @@ -141,7 +141,7 @@ config XEN_GRANT_DEV_ALLOC
->  
->  config SWIOTLB_XEN
->  	def_bool y
-> -	depends on PCI
-> +	depends on PCI && X86
->  	select SWIOTLB
->  
->  config XEN_TMEM
-> -- 
-> 1.8.1.2
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130502/f6683893/attachment.sig>
