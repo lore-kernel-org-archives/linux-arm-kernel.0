@@ -1,41 +1,29 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 02 May 2013 23:19:53 +0200
-Subject: [PATCH 0/5] CPUFreq: ARM big LITTLE Fixes
-In-Reply-To: <cover.1367241503.git.viresh.kumar@linaro.org>
-References: <cover.1367241503.git.viresh.kumar@linaro.org>
-Message-ID: <5220775.R7TYxWOgo3@vostro.rjw.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 2 May 2013 23:20:00 +0200
+Subject: [PATCH 0/2] clk: add of_clk_provider stubs to enable clk-si5351
+ on non OF
+In-Reply-To: <1367369910-20402-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1367369910-20402-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <201305022320.00769.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, April 29, 2013 06:54:43 PM Viresh Kumar wrote:
-> Hi Rafael,
+On Wednesday 01 May 2013, Sebastian Hesselbarth wrote:
 > 
-> I know I am late for this merge window and you have already closed the gates :)
-> If you can still take them, its good, otherwise we will push this for v3.10-rc2.
+> Yesterday 02:58:27
+> Enabling drivers that provide clocks on DT on platforms that don't have
+> CONFIG_OF set fails due to compilation errors. This patch set first adds
+> some stubs for of_clk_provider functions if CONFIG_OF is not set. Second
+> it allows those platforms to build and use clk-si5351 i2c clock driver
+> by removing the dependency on CONFIG_OF.
 > 
-> These are minor fixes for ARM big LITTLE cpufreq driver. It doesn't impact any
-> other driver or cpufreq core and are fairly independent.
+> The above approach has been suggested by Arnd Bergmann and replaces the
+> corresponding Kconfig patch for clk-si5351 posted earlier. It has been
+> compile tested with allmodconfig on x86_64 for post v3.9.
 > 
-> Viresh Kumar (5):
->   cpufreq: ARM big LITTLE: Select PM_OPP
->   cpufreq: ARM big LITTLE DT: Return correct transition latency
->   cpufreq: ARM big LITTLE DT: Return CPUFREQ_ETERNAL if clock-latency
->     isn't found
->   cpufreq: ARM big LITTLE: Move cpu_to_cluster() to arm_big_little.h
->   cpufreq: ARM big LITTLE: Improve print message
+> Sebastian Hesselbarth (2):
+>   clk: add non CONFIG_OF routines for clk-provider
+>   clk: si5351: Allow to build without CONFIG_OF
 > 
->  drivers/cpufreq/Kconfig.arm         | 1 +
->  drivers/cpufreq/arm_big_little.c    | 7 +------
->  drivers/cpufreq/arm_big_little.h    | 5 +++++
->  drivers/cpufreq/arm_big_little_dt.c | 9 +++++----
->  4 files changed, 12 insertions(+), 10 deletions(-)
 
-All 5 queued up for the v3.10-rc2 push.
-
-Thanks,
-Rafael
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
