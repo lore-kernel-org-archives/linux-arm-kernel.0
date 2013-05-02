@@ -1,36 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 May 2013 18:24:20 +0200
-Subject: [PATCH, RFC 10/22] mfd: ab8500: debugfs code depends on gpadc
-In-Reply-To: <20130502153624.GN25256@gmail.com>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-11-git-send-email-arnd@arndb.de>
- <20130502153624.GN25256@gmail.com>
-Message-ID: <201305021824.20548.arnd@arndb.de>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 2 May 2013 11:24:33 -0500
+Subject: [PATCH] ARM: OMAP-USB: Fix possible memory leak
+In-Reply-To: <1367510596-27780-1-git-send-email-shc_work@mail.ru>
+References: <1367510596-27780-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20130502162433.GA10016@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 May 2013, Lee Jones wrote:
-> > @@ -580,7 +580,7 @@ config AB8500_CORE
-> >  
-> >  config AB8500_DEBUG
-> >         bool "Enable debug info via debugfs"
-> > -       depends on AB8500_CORE && DEBUG_FS
-> > +       depends on AB8500_GPADC && DEBUG_FS
-> >         default y if DEBUG_FS
-> >         help
-> >           Select this option if you want debug information using the debug
+On 20:03-20130502, Alexander Shiyan wrote:
 > 
-> Did you find this with ALLCONFIG out of interest.
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/mach-omap2/usb-host.c | 21 +++++++++++++++++----
+>  1 file changed, 17 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
+> index aa27d7f..8d17a0d 100644
+> --- a/arch/arm/mach-omap2/usb-host.c
+> +++ b/arch/arm/mach-omap2/usb-host.c
+> @@ -570,8 +570,10 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
+>  	supplies->dev_name = dev_id;
+>  
+>  	reg_data = kzalloc(sizeof(*reg_data), GFP_KERNEL);
+> -	if (!reg_data)
+> +	if (!reg_data) {
+> +		kfree(supplies);
+>  		return -ENOMEM;
+> +	}
+>  
+>  	reg_data->constraints.valid_ops_mask = REGULATOR_CHANGE_STATUS;
+>  	reg_data->consumer_supplies = supplies;
+> @@ -579,8 +581,11 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
+>  
+>  	config = kmemdup(&hsusb_reg_config, sizeof(hsusb_reg_config),
+>  			GFP_KERNEL);
+> -	if (!config)
+> +	if (!config) {
+> +		kfree(supplies);
+> +		kfree(reg_data);
+>  		return -ENOMEM;
+> +	}
+>  
+>  	config->supply_name = name;
+>  	config->gpio = gpio;
+> @@ -589,17 +594,25 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
+>  
+>  	/* create a regulator device */
+>  	pdev = kzalloc(sizeof(*pdev), GFP_KERNEL);
+> -	if (!pdev)
+> +	if (!pdev) {
+> +		kfree(supplies);
+> +		kfree(reg_data);
+> +		kfree(config);
+>  		return -ENOMEM;
+> +	}
+>  
+>  	pdev->id = PLATFORM_DEVID_AUTO;
+>  	pdev->name = reg_name;
+>  	pdev->dev.platform_data = config;
+>  
+>  	ret = platform_device_register(pdev);
+> -	if (ret)
+> +	if (ret) {
+>  		pr_err("%s: Failed registering regulator %s for %s\n",
+>  				__func__, name, dev_id);
+> +		kfree(supplies);
+> +		kfree(reg_data);
+> +		kfree(config);
+> +	}
 
-I used "make randconfig" with this KCONFIG_ALLCONFIG file:
+Might be better to switch to devm_XXX managed functions?
+>  
+>  	return ret;
+>  }
+> -- 
+> 1.8.1.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-CONFIG_MMU=y
-CONFIG_ARCH_MULTI_V7=y
-CONFIG_PREVENT_FIRMWARE_BUILD=y
-CONFIG_PROC_FS=y
- 
-> Applied by the way.
-
-Thanks!
-
-	Arnd
+-- 
+Regards,
+Nishanth Menon
