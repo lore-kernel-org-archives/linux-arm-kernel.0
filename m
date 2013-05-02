@@ -1,48 +1,58 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 02 May 2013 20:33:48 +0200
-Subject: [PATCH] irqchip: add support for Marvell Orion SoCs
-In-Reply-To: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <5182B18C.4080404@gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 2 May 2013 20:35:45 +0200
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <5182AF83.4080705@wwwdotorg.org>
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+ <1556968.7tR6KuEIWb@flatron> <6607610.omg016OAvj@avalon>
+ <201304300004.20320.arnd@arndb.de> <5182AF83.4080705@wwwdotorg.org>
+Message-ID: <CAMuHMdV9nv3FA8J4MPPyUjb1T_nDttV_X-KCSKP==K4g9sXj5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2013 08:25 PM, Sebastian Hesselbarth wrote:
-> This patch adds an irqchip driver for the main interrupt controller found
-> on Marvell Orion SoCs (Kirkwood, Dove, Orion5x, Discovery Innovation).
-> Corresponding device tree documentation is also added.
+On Thu, May 2, 2013 at 8:25 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 04/29/2013 04:04 PM, Arnd Bergmann wrote:
+>> On Monday 29 April 2013, Laurent Pinchart wrote:
+>>> On Monday 29 April 2013 23:31:30 Tomasz Figa wrote:
+>>>
+>>>> Good point. Stephen, would it be a problem to make this a KMS driver
+>>>> instead? Old fbdev API could be emulated on top of it, until it goes out
+>>>> of use, couldn't it?
+>>>
+>>> There's already an fbdev emulation layer in KMS, for such a simple use case it
+>>> will work fine.
+>>
+>> I suggested the same to Stephen when he first brought up this driver.
+>> Unfortunately his attempt to create a simple KMS driver resulted in a
+>> significantly larger driver than the one he did for the framebuffer
+>> interface. This means that either Stephen did something really wrong
+>> in his attempt, or the KMS interface isn't as good as it should be
+>> if we want to move people away from frame buffer drivers.
 >
-> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
-> ---
-> Note: This patch triggers a checkpatch warning for
->    WARNING: Avoid CamelCase:<handle_IRQ>
+> Well, I didn't actually attempt to write the KMS driver; I simply took a
+> look at existing KMS drivers (and perhaps some stub KMS driver; I forget
+> right now) to see what it'd take, and it looked quite scary.
 >
-[...]
-> diff --git a/include/linux/irqchip/orion.h b/include/linux/irqchip/orion.h
-> new file mode 100644
-> index 0000000..04f7bab
-> --- /dev/null
-> +++ b/include/linux/irqchip/orion.h
-> @@ -0,0 +1,18 @@
-> +/*
-> + * Marvell Orion SoCs IRQ chip driver header.
-> + *
-> + * Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#ifndef __LINUX_IRQCHIP_ORION_H
-> +#define __LINUX_IRQCHIP_ORION_H
-> +
-> +#include<asm/exception.h>
+> The other issue is that the KMS semantics appear to desire that the
+> driver allocate FB memory from some pool, and then point the display
+> scanout at the allocated memory. However, this driver's semantics are
+> that some other entity has allocated and reserved some memory region for
+> scanout, and the simple FB driver exists solely to scribble to that
+> memory region. Rob Clark said the thought this could be handled by
+> writing a custom memory allocator to support this, but it seemed a
+> little pointless to write a whole memory allocator when the existing FB
+> interface allows the driver to just set a struct member to the address
+> and be done with it.
 
-First review by myself. The above include is a left-over and
-will be removed in a v2.
+I'm also curious to see the code for the first real simplekms/vesakms/ofkms/...
+driver...
 
-> +
-> +extern void orion_init_irq(void);
-> +
-> +#endif
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
