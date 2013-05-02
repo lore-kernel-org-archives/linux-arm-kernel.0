@@ -1,98 +1,51 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 2 May 2013 19:40:58 +0300
-Subject: [PATCH] ARM: OMAP-USB: Fix possible memory leak
-In-Reply-To: <1367512124.978518915@f372.mail.ru>
-References: <1367510596-27780-1-git-send-email-shc_work@mail.ru>
- <20130502162433.GA10016@kahuna> <1367512124.978518915@f372.mail.ru>
-Message-ID: <20130502164058.GC8577@arwen.pp.htv.fi>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 2 May 2013 18:47:32 +0200
+Subject: [PATCH] ARM: u300: move debugmacro to debug includes
+Message-ID: <1367513252-23384-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Linus Walleij <linus.walleij@linaro.org>
 
-On Thu, May 02, 2013 at 08:28:44PM +0400, Alexander Shiyan wrote:
-> > On 20:03-20130502, Alexander Shiyan wrote:
-> > > 
-> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > > ---
-> > >  arch/arm/mach-omap2/usb-host.c | 21 +++++++++++++++++----
-> > >  1 file changed, 17 insertions(+), 4 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
-> > > index aa27d7f..8d17a0d 100644
-> > > --- a/arch/arm/mach-omap2/usb-host.c
-> > > +++ b/arch/arm/mach-omap2/usb-host.c
-> > > @@ -570,8 +570,10 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
-> > >  	supplies->dev_name = dev_id;
-> > >  
-> > >  	reg_data = kzalloc(sizeof(*reg_data), GFP_KERNEL);
-> > > -	if (!reg_data)
-> > > +	if (!reg_data) {
-> > > +		kfree(supplies);
-> > >  		return -ENOMEM;
-> > > +	}
-> > >  
-> > >  	reg_data->constraints.valid_ops_mask = REGULATOR_CHANGE_STATUS;
-> > >  	reg_data->consumer_supplies = supplies;
-> > > @@ -579,8 +581,11 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
-> > >  
-> > >  	config = kmemdup(&hsusb_reg_config, sizeof(hsusb_reg_config),
-> > >  			GFP_KERNEL);
-> > > -	if (!config)
-> > > +	if (!config) {
-> > > +		kfree(supplies);
-> > > +		kfree(reg_data);
-> > >  		return -ENOMEM;
-> > > +	}
-> > >  
-> > >  	config->supply_name = name;
-> > >  	config->gpio = gpio;
-> > > @@ -589,17 +594,25 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
-> > >  
-> > >  	/* create a regulator device */
-> > >  	pdev = kzalloc(sizeof(*pdev), GFP_KERNEL);
-> > > -	if (!pdev)
-> > > +	if (!pdev) {
-> > > +		kfree(supplies);
-> > > +		kfree(reg_data);
-> > > +		kfree(config);
-> > >  		return -ENOMEM;
-> > > +	}
-> > >  
-> > >  	pdev->id = PLATFORM_DEVID_AUTO;
-> > >  	pdev->name = reg_name;
-> > >  	pdev->dev.platform_data = config;
-> > >  
-> > >  	ret = platform_device_register(pdev);
-> > > -	if (ret)
-> > > +	if (ret) {
-> > >  		pr_err("%s: Failed registering regulator %s for %s\n",
-> > >  				__func__, name, dev_id);
-> > > +		kfree(supplies);
-> > > +		kfree(reg_data);
-> > > +		kfree(config);
-> > > +	}
-> > 
-> > Might be better to switch to devm_XXX managed functions?
+This moves the U300 debug macro to the debug headers to
+make way for multiplatform support.
 
-I don't think it makes sense since the platform_device hasn't been
-registered yet.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/Kconfig.debug                                            | 8 ++++++++
+ .../include/mach/debug-macro.S => include/debug/u300.S}           | 0
+ 2 files changed, 8 insertions(+)
+ rename arch/arm/{mach-u300/include/mach/debug-macro.S => include/debug/u300.S} (100%)
 
-Still, patch can be improved with proper goto labels instead of
-sprinkling different kfree() calls in every single error branch.
-
-> If anyone can rewrite driver to use devm_xx, it would have been better.
-> I'm not going to redo the patch yet, let it be so, I just showed a point
-> for OMAP-developers.
-
-fair enough.
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 9b31f43..ea74618 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -414,6 +414,13 @@ choice
+ 		  Say Y here if you want the debug print routines to direct
+ 		  their output to the uart1 port on SiRFmarco devices.
+ 
++	config DEBUG_U300_UART
++		bool "Kernel low-level debugging messages via U300 UART0"
++		depends on ARCH_U300
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to the uart port on U300 devices.
++
+ 	config DEBUG_VEXPRESS_UART0_DETECT
+ 		bool "Autodetect UART0 on Versatile Express Cortex-A core tiles"
+ 		depends on ARCH_VEXPRESS && CPU_CP15_MMU
+@@ -595,6 +602,7 @@ config DEBUG_LL_INCLUDE
+ 	default "debug/picoxcell.S" if DEBUG_PICOXCELL_UART
+ 	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
+ 	default "debug/sunxi.S" if DEBUG_SUNXI_UART0 || DEBUG_SUNXI_UART1
++	default "debug/u300.S" if DEBUG_U300_UART
+ 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
+ 		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
+ 	default "debug/vt8500.S" if DEBUG_VT8500_UART0
+diff --git a/arch/arm/mach-u300/include/mach/debug-macro.S b/arch/arm/include/debug/u300.S
+similarity index 100%
+rename from arch/arm/mach-u300/include/mach/debug-macro.S
+rename to arch/arm/include/debug/u300.S
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130502/4c5991d0/attachment.sig>
+1.7.11.3
