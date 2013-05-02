@@ -1,26 +1,50 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 02 May 2013 21:48:50 +0200
-Subject: [PATCH] irqchip: add support for Marvell Orion SoCs
-In-Reply-To: <20130502193510.GA29522@obsidianresearch.com>
-References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130502185322.GA29333@obsidianresearch.com> <5182B902.7040908@gmail.com>
- <20130502193510.GA29522@obsidianresearch.com>
-Message-ID: <5182C322.3030304@gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Thu, 2 May 2013 16:53:16 -0300
+Subject: [PATCH] ARM: kirkwood: add button for OpenBlock A6
+In-Reply-To: <1367523802-16372-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1367523802-16372-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130502195315.GA4107@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2013 09:35 PM, Jason Gunthorpe wrote:
-> I have kirkwood HW but I haven't had time to make newer kernels run on
-> it, otherwise I'd test it too :(
+Hi Gregory,
 
-I also have kirkwood HW but that will cut me from email as I use it as
-relay server ;) Maybe I can turn it into a test bed for a while.
+On Thu, May 02, 2013 at 09:43:22PM +0200, Gregory CLEMENT wrote:
+> The OpenBlocks A6 board has one software-controlled button on the
+> front side, labeled "INIT", so we add minimal support for this button
+> in the kernel.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/kirkwood-openblocks_a6.dts |   13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> index d27f724..627d8d0 100644
+> --- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> +++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+> @@ -209,4 +209,17 @@
+>  			gpios = <&gpio1 11 1>;
+>  		};
+>          };
+> +
+> +	gpio_keys {
+> +		compatible = "gpio-keys";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +			button at 1 {
+> +			label = "Init Button";
+> +			linux,code = <116>;
+> +			gpios = <&gpio1 6 0>;
+> +		};
+> +	};
+> +
+>  };
 
-There is also Orion5x and Discovery Innovation (mv78xx0) to be tested.
+Shouldn't you add a proper pinctrl entry for this as well?
 
-@Jason Cooper: I will merge both irqchip and dove patches into one
-patch set. I wasn't earlier because I didn't want the above SoCs to
-slow down patch integration. And I will split dtsi changes into
-separate patches as requested.
-
-Sebastian
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
