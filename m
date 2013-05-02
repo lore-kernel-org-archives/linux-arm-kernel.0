@@ -1,87 +1,66 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Thu, 2 May 2013 14:45:43 -0400
-Subject: Latest build results - errors/warnings - lots of them
-In-Reply-To: <201305022003.27037.arnd@arndb.de>
-References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
- <20130502153834.GR28721@atomide.com> <51829D65.7040109@ti.com>
- <201305022003.27037.arnd@arndb.de>
-Message-ID: <5182B457.5030009@ti.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Fri,  3 May 2013 06:46:02 +1200
+Subject: [PATCHv5 0/3] Add support for velocity network driver on platform
+ devices
+Message-ID: <1367520365-18842-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02-05-2013 14:03, Arnd Bergmann wrote:
-> On Thursday 02 May 2013, Eduardo Valentin wrote:
->> index e3c0ae9..e3f3cba 100644
->> --- a/include/linux/thermal.h
->> +++ b/include/linux/thermal.h
->> @@ -250,12 +250,6 @@ void thermal_unregister_governor(struct
->> thermal_governor *);
->>  #ifdef CONFIG_NET
->>  extern int thermal_generate_netlink_event(struct thermal_zone_device *tz,
->>                                                 enum events event);
->> -#else
->> -static int thermal_generate_netlink_event(struct thermal_zone_device *tz,
->> -                                               enum events event)
->> -{
->> -       return 0;
->> -}
->>  #endif
-> 
-> Actually it seems this bug is already fixed in linux-next:
-> 
-> commit f8b587055a793c7719f0d4f41b7b4aeeef43aa2d
-> Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Date:   Wed Mar 20 21:38:07 2013 +0000
-> 
->     thermal: Fix compiler warning
->     
->     The following warning is obtained when CONFIG_NET is not defined:
->     
->     In file included from drivers/thermal/mvebu_thermal.c:27:0:
->     include/linux/thermal.h:254:12: warning: 'thermal_generate_netlink_event'
->     defined but not used [-Wunused-function]
->     
->     This patch fixes the warning by properly inlining
->     thermal_generate_netlink_event().
->     
->     Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
->     Signed-off-by: Zhang Rui <rui.zhang@intel.com>
-> 
-> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
-> index f0bd7f9..fd7b8f3 100644
-> --- a/include/linux/thermal.h
-> +++ b/include/linux/thermal.h
-> @@ -251,7 +251,7 @@ void thermal_unregister_governor(struct thermal_governor *);
->  extern int thermal_generate_netlink_event(struct thermal_zone_device *tz,
->                                                 enum events event);
->  #else
-> -static int thermal_generate_netlink_event(struct thermal_zone_device *tz,
-> +static inline int thermal_generate_netlink_event(struct thermal_zone_device *tz,
->                                                 enum events event)
->  {
->         return 0;
-> 
-> 
-> Your patch also seems correct, but it would conflict with Ezequiel's.
-> The problem was apparently that you removed the 'inline' keyword
-> in 8ab3e6a08a "thermal: Use thermal zone device id in netlink messages",
-> I assume by accident, since defining a non-inline function in a header
-> file is obviously wrong.
+v5 changes:
+Remove velocity_info union. Change velocity_info->pdev back to struct pci_dev.
+Remove more 'if (pci)' sections.
+Remove 'void *pdev' function parameters.
+Pass correct variable to velocity_choose_state()
 
-Yeah, that was my bad. I am fine with Ezequiel s patch.
+v4 changes:
+Code tidyup as requested by Francois Romieu
+Removed '#ifdef PCI' around PCI code. Compile tested on (!)PCI and (!)PM.
 
-Thanks.
+v3 changes:
+Rebased against net-next.
+Fix errors in pm code.
 
-> 
-> 	Arnd
-> 
-> 
+v2 changes:
+Drop patch #1 as requested by David Miller.
+Correct the PHYID_ICPLUS_IP101A MII bits - should be ON, rather than OFF.
+Read the platform rev_id from the correct register [regs->rev_id]. It's possible
+this would work for the PCI version as well and would remove the need for the
+'if (pci)' test to set vptr->rev_id.
 
+v1:
+The first three patches are general tidyup.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 295 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130502/39ed3af9/attachment.sig>
+[DROPPED] Patch ## just alphabetizes the #includes to make it easier to read.
+
+Patch #1 replaces vptr->dev with vptr->netdev, in preparation of adding a
+struct device *dev in Patch #3
+
+Patch #2 replaces the pci dma functions with the generic versions.
+
+I have build tested these patches but don't have a PCI velocity to run-test it.
+I can't see that they should introduce any problems as it is all renames and
+function swapping.
+
+Patch #3 adds support for the velocity driver on devicetree platform devices.
+Binding document included. This patch is compile-tested for PCI, and boot
+tested on a VIA APC8750.
+
+I think it would be pertinent to get some tested-by's for PCI users.
+
+Regards
+Tony Prisk
+
+Tony Prisk (3):
+  net: velocity: Rename vptr->dev to vptr->netdev
+  net: velocity: Convert to generic dma functions
+  net: velocity: Add platform device support to VIA velocity driver
+
+ .../devicetree/bindings/net/via-velocity.txt       |   20 +
+ drivers/net/ethernet/via/Kconfig                   |    3 +-
+ drivers/net/ethernet/via/via-velocity.c            |  543 +++++++++++++-------
+ drivers/net/ethernet/via/via-velocity.h            |   35 +-
+ 4 files changed, 419 insertions(+), 182 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/via-velocity.txt
+
+-- 
+1.7.9.5
