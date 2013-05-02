@@ -1,472 +1,591 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed,  1 May 2013 23:58:35 -0700
-Subject: [GIT PULL 4/5] ARM: arm-soc platform updates for 3.10, part 1
+Date: Wed,  1 May 2013 23:58:33 -0700
+Subject: [GIT PULL 2/5] ARM: arm-soc cleanup for 3.10
 In-Reply-To: <1367477916-28399-1-git-send-email-olof@lixom.net>
 References: <1367477916-28399-1-git-send-email-olof@lixom.net>
-Message-ID: <1367477916-28399-5-git-send-email-olof@lixom.net>
+Message-ID: <1367477916-28399-3-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This branch contains platform updates for 3.10. Among the highlights:
+Here is a collection of cleanup patches. Among the pieces that stand out are:
 
-- Support for the new Atmel Cortex-A5 based platforms (SAMA5D3)
-- New support for CSR SiRFatlas6 SoCs
-- A handful of updates for NVidia T114 (a.k.a. Tegra 4)
-- A bunch of updates for the shmobile platforms
-- A handful of updates for davinci
-- A few updates for Qualcomm MSM
-- Plus a handful of other patches, defconfig updates, etc.
+- The deletion of h720x platforms
+- Split of at91 non-dt platforms to their own Kconfig file to keep them separate
+- General cleanups and refactoring of i.MX and MXS platforms
+- Some restructuring of clock tables for OMAP
+- Convertion of PMC driver for Tegra to dt-only
+- Some renames of sunxi -> sun4i (Allwinner A10)
+- ... plus a bunch of other stuff that I haven't mentioned
 
 
 Conflicts:
 
-Documentation/kernel-parameters.txt: Trivial add/add conflict
+arch/arm/Kconfig: remove/remove conflict. Both sides should be
+removed. There seems to be some dangling use of the SA11x0 options in
+cpufreq that should be removed though (separate issue).
 
-arch/arm/mach-exynos/cpuidle.c: Add/remove conflict. Take away the
-"en_core_tk_irqen" line but keep the rest of the branch contents.
+drivers/gpio/gpio-pl061.c: Add/add conflict, keep both
+
+drivers/usb/host/ohci-exynos.c: Change/remove. Take out the newline
+and the plat/* include.
+
+arch/arm/mach-imx/cpufreq.c: Remove/remove conflict. Drop the file.
 
 ----------------------------------------------------------------
 
-The following changes since commit 429b8d7cfc7394dd040525e963e3f08df478477c:
+The following changes since commit 300aff2eea4843557709f479a2efa753aa53caf5:
 
-  Merge branch 'next/dt' into HEAD
+  Merge branch 'next/fixes-non-critical' into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/soc-for-linus
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/cleanup-for-linus
 
-for you to fetch changes up to e0d20b69d3fa74a21ec363989612bddd58b930b8:
+for you to fetch changes up to afcf7924ecab726dab0227188783c4a40d9f0eec:
 
-  Merge branch 'gic/cleanup' into next/soc
+  Merge branch 'fixes' into next/cleanup
 
 ----------------------------------------------------------------
 
-Arnd Bergmann (15):
-      Merge branch 'prima2/soc' into next/soc
-      Merge tag 'ux500-defconfig-v3.10' of git://git.kernel.org/.../linusw/linux-stericsson into next/soc
-      Merge tag 'ux500-core-v3.10' of git://git.kernel.org/.../linusw/linux-stericsson into next/soc
-      Merge tag 'renesas-defconfig-for-v3.10' of git://git.kernel.org/.../horms/renesas into next/soc
-      Merge tag 'renesas-soc-for-v3.10' of git://git.kernel.org/.../horms/renesas into next/soc
-      Merge tag 'omap-for-v3.10/crypto-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/soc
-      Merge tag 'bcm2835-for-3.10-defconfig' of git://git.kernel.org/.../swarren/linux-rpi into next/soc
-      Merge tag 'davinci-for-v3.10/soc' of git://git.kernel.org/.../nsekhar/linux-davinci into next/soc
-      Merge tag 'davinci-for-v3.10/dt' of git://git.kernel.org/.../nsekhar/linux-davinci into next/soc
-      Merge branch 'tegra/cleanup' into next/soc
-      Merge tag 'tegra-for-3.10-soc' of git://git.kernel.org/.../swarren/linux-tegra into next/soc
-      Merge tag 'mxs-soc-3.10' of git://git.linaro.org/people/shawnguo/linux-2.6 into next/soc
-      Merge tag 'omap-for-v3.10/soc-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/soc
-      Merge tag 'tegra-for-3.10-defconfig' of git://git.kernel.org/.../swarren/linux-tegra into next/soc
-      Merge tag 'devel-samsung-for-v3.10' of git://git.kernel.org/.../kgene/linux-samsung into next/soc
+Alexander Shiyan (3):
+      ARM: S3C24XX: Removed unneeded dependency on ARCH_S3C24XX for boards
+      ARM: S3C24XX: Removed unneeded dependency on CPU_S3C2410
+      ARM: S3C24XX: Removed unneeded dependency on CPU_S3C2412
 
-Artem Bityutskiy (1):
-      ARM: LPC32xx: defconfig update: Remove the museum NAND option
+Arnd Bergmann (18):
+      ARM: gemini: get platform to build again
+      Merge branch 'next/cleanup-s3c' of git://git.kernel.org/.../kgene/linux-samsung into next/cleanup
+      Merge branch 'next/cleanup-s5p' of git://git.kernel.org/.../kgene/linux-samsung into next/cleanup
+      Merge tag 'clksrc-cleanup-for-3.10' of git://sources.calxeda.com/kernel/linux into next/cleanup
+      Merge tag 'at91-soc' of git://github.com/at91linux/linux-at91 into next/cleanup
+      Merge tag 'cleanup_for_v3.10' of git://git.infradead.org/users/jcooper/linux into next/cleanup
+      ARM: l7200: remove zombie file
+      ARM: kill Hynix h720x platform
+      clocksource: make CLOCKSOURCE_OF_DECLARE type safe
+      Merge tag 'omap-for-v3.10/cleanup-v2-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/cleanup
+      Merge tag 'omap-for-v3.10/fixes-pm-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/cleanup
+      Merge branch 'tegra/fixes' into next/cleanup
+      Merge tag 'tegra-for-3.10-cleanup' of git://git.kernel.org/.../swarren/linux-tegra into next/cleanup
+      Merge tag 'v3.9-rc5' into next/cleanup
+      Merge tag 'mxs-cleanup-3.10' of git://git.linaro.org/people/shawnguo/linux-2.6 into next/cleanup
+      Merge tag 'cleanup-samsung-for-v3.10' of git://git.kernel.org/.../kgene/linux-samsung into next/cleanup
+      Merge tag 'at91-cleanup' of git://github.com/at91linux/linux-at91 into next/cleanup
+      Merge branch 'next/spring-cleaning' into next/cleanup
 
-Barry Song (2):
-      arm: prima2: add new SiRFatlas6 machine in common board
-      ARM/dts: prima2: add .dtsi for atlas6 and .dts for atla6-evb board
+Catalin Marinas (4):
+      arm: Move the set_handle_irq and handle_arch_irq declarations to asm/irq.h
+      arm: Move chained_irq_(enter|exit) to a generic file
+      irqchip: gic: Call handle_bad_irq() directly
+      irqchip: gic: Perform the gic_secondary_init() call via CPU notifier
 
-Bastian Hecht (1):
-      ARM: mach-shmobile: r8a7740: Add DT names to clock list
+Fabio Estevam (3):
+      ARM: imx: avic: Move avic_saved_mask_reg under CONFIG_PM
+      ARM: imx: clk-imx27: Do not register peripheral clock for SSI
+      clocksource: mxs_timer: Add semicolon at end of line
 
-Charles Keepax (2):
-      ARM: S3C64XX: Clear DMA flags on channel request
-      ARM: S3C64XX: Slow down mic detection rate for wm5102
+Heiko Stuebner (3):
+      ARM: S3C24XX: remove plat/irq.h in plat-samsung
+      ARM: S3C24XX: move plat-samsung/s3c24XX headers to local common.h
+      ARM: S3C24XX: cleanup the included soc init functions in common.h
 
-Christian Daudt (1):
-      ARM: bcm281xx: Add timer driver (DT portion)
+Hiroshi Doyu (4):
+      ARM: tegra: Unify tegra{20,30,114}_init_early()
+      ARM: tegra: Rename board-dt-tegra20.c to tegra.c
+      ARM: tegra: Unify Device tree board files
+      ARM: tegra: refactor tegra{20,30}_boot_secondary
 
-Daniel Lezcano (3):
-      ARM: EXYNOS: factor out the idle states
-      ARM: EXYNOS: handle properly the return values
-      ARM: EXYNOS: replace cpumask by the corresponding macro
+J Keerthy (1):
+      ARM: OMAP2+: clock data: Remove CK_* flags
 
-Danny Huang (2):
-      ARM: tegra: expose chip ID and revision
-      ARM: tegra: add speedo-based process id for Tegra114
+Jarkko Nikula (2):
+      ARM: OMAP1: Remove unused DMA channel definitions
+      ARM: OMAP2+: Remove unused DMA channel definitions
 
-Dinh Nguyen (3):
-      ARM: socfpga: Enable soft reset
-      ARM: socfpga: Add clock entries into device tree
-      ARM: socfpga: Upgrade clk driver for socfpga to make use of dts clock entries
+Jean-Christophe PLAGNIOL-VILLARD (3):
+      ARM: at91: move non DT Kconfig to Kconfig.non_dt
+      ARM: at91: rename board-dt to more specific name board-dt-sam9
+      ARM: at91: renamme rm9200 dt file
 
-Fabio Estevam (4):
-      ARM: mxs: Select ARM_CPU_SUSPEND
-      ARM: mxs_defconfig: Build CONFIG_INPUT_EVDEV as built-in
-      ARM: mxs_defconfig: Select CONFIG_MMC_UNSAFE_RESUME
-      ARM: mxs_defconfig: Select watchdog driver
+Jingoo Han (1):
+      ARM: EXYNOS: change the name of USB ohci header
 
-Guennadi Liakhovetski (2):
-      ARM: shmobile: add MMCIF and SDHI DT clock aliases to sh73a0 and r8a7740
-      ARM: shmobile: sh73a0: fix Z and ZG clock hierarchy
+Johan Hovold (2):
+      ARM: at91/setup: fix trivial typos
+      ARM: at91: remove trailing semicolon from macros
 
-Hongbo Zhang (1):
-      ARM: ux500: enable ux500 EXT4_FS and LBDAF support by default
+Joseph Lo (5):
+      ARM: tegra: pmc: add specific compatible DT string for Tegra30 and Tegra114
+      ARM: tegra: fix the PMC compatible string in DT
+      ARM: tegra: pmc: convert PMC driver to support DT only
+      ARM: tegra: pmc: add power on function for secondary CPUs
+      ARM: tegra: replace the CPU power on function with PMC call
 
-Inderpal Singh (2):
-      ARM: EXYNOS: Add support for rtc wakeup
-      ARM: SAMSUNG: check processor type before cache restoration in resume
+Kukjin Kim (4):
+      mmc: s3cmci: moved mach/regs-sdi.h into s3cmci device driver
+      ARM: S3C24XX: plat/common-smdk.h local
+      ARM: S5PC100: remove useless ifdef in common.h
+      ARM: S5PV210: remove useless ifdef in common.h
 
-Jonathan Kliegman (2):
-      ARM: EXYNOS: Remove hardcode wakeup unmask for EINT_0
-      ARM: EXYNOS: Clear ENABLE_WAKEUP_SW bit when entering suspend
+Markus Pargmann (1):
+      ARM: imx: Remove cpufreq driver
 
-Joseph Lo (9):
-      ARM: tegra: bring up secondary CPU for Tegra114
-      ARM: tegra: add clock source of PMC to device trees
-      ARM: tegra: moving the CPU power timer function to PMC driver
-      gpio: tegra: add gpio wakeup source handling
-      ARM: tegra: irq: add wake up handling
-      ARM: dt: tegra: add bindings of power management configurations for PMC
-      ARM: tegra: pm: add platform suspend support
-      ARM: tegra: cpuidle: remove redundant parameters for powered-down mode
-      ARM: tegra: pm: fix build error w/o PM_SLEEP
+Maxime Ripard (10):
+      ARM: at91: Fix typo in restart code panic message
+      ARM: irq: Call irqchip_init if no init_irq function is specified
+      Merge remote-tracking branch 'arm-soc/clksrc/cleanup' into sunxi/core-for-3.10
+      Merge remote-tracking branch 'clk/clk-for-3.10' into sunxi/core-for-3.10
+      clocksource: sunxi: Cleanup the timer code
+      clocksource: sunxi: make use of CLKSRC_OF
+      clocksource: sunxi: Rename sunxi to sun4i
+      irqchip: sunxi: Make use of the IRQCHIP_DECLARE macro
+      irqchip: sunxi: Rename sunxi to sun4i
+      ARM: sunxi: Rework the restart code
 
-Kuninori Morimoto (9):
-      ARM: shmobile: add gic_iid macro for ICCIAR / interrupt ID
-      ARM: shmobile: r8a7779: fixup dtsi typo
-      ARM: shmobile: r8a7779: fixup DT machine name
-      ARM: shmobile: r8a7779: use gic_iid macro
-      ARM: shmobile: tidyup chip series definition order for r8a7740/r8a7779
-      ARM: shmobile: r8a7779: add Thermal support on DT
-      ARM: shmobile: armadillo800eva: enable branch prediction on defconfig
-      ARM: shmobile: armadillo800eva: enable NEON on defconfig
-      ARM: shmobile: armadillo800eva: enable all errata for cache on defconfig
+Nicolas Ferre (1):
+      ARM: at91: remove unused dbgu_readl() macro
 
-Lee Jones (1):
-      ARM: ux500: Turn on the 'heartbeat' LED trigger
+Olof Johansson (9):
+      Merge branch 'gic' of git://git.kernel.org/.../cmarinas/linux-aarch64 into next/cleanup
+      Merge tag 'at91-cleanup' of git://github.com/at91linux/linux-at91 into next/cleanup
+      irqchip: vic: add include of linux/irq.h
+      Merge branch 'gic/cleanup' into next/cleanup
+      Merge tag 'imx-cleanup-3.10' of git://git.linaro.org/people/shawnguo/linux-2.6 into next/cleanup
+      Merge branch 'depends/clk-for-3.10' into next/cleanup
+      Merge tag 'sunxi-cleanup-for-3.10' of git://github.com/mripard/linux into next/cleanup
+      Merge tag 'msm-cleanup-3.10' of git://git.kernel.org/.../davidb/linux-msm into next/cleanup
+      Merge branch 'fixes' into next/cleanup
 
-Linus Walleij (1):
-      ARM: ux500: bump arch nr of GPIOs
+Padmavathi Venna (1):
+      ARM: SAMSUNG: Remove unnecessary code for dma
 
-Ludovic Desroches (6):
-      ARM: at91: change name template in AT91_SOC_START macro
-      ARM: at91: add AT91_SAM9_TIME entry to select at91sam926x_time.c compilation
-      ARM: at91: introduce the core type choice to split ARMv4/5 and ARMv7 arch
-      ARM: at91: introduce SAMA5 support
-      ARM: at91: dt: add device tree files for SAMA5D3 family
-      ARM: at91: add defconfig for SAMA5
+Paul Bolle (12):
+      ARM: S3C24XX: drop "select MACH_N35"
+      ARM: S3C24XX: drop "select MACH_NEO1973"
+      ARM: EXYNOS: drop "select HAVE_SCHED_CLOCK"
+      ARM: EXYNOS: change HAVE_SAMSUNG_KEYPAD to KEYBOARD_SAMSUNG
+      ARM: SAMSUNG: remove "config S3C_BOOT_WATCHDOG"
+      ARM: SAMSUNG: Remove useless Samsung GPIO related CONFIG
+      ARM: S3C24XX: remove unneeded "config SMDK2440_CPU2442"
+      ARM: S3C64XX: remove obsolete Makefile line
+      ARM: S5P64X0: Fix typo "CONFIG_S5P64X0_SETUP_SDHCI"
+      ARM: SAMSUNG: Fix typo "CONFIG_SAMSUNG_DEV_RTC"
+      ARM: EXYNOS: remove "config EXYNOS_DEV_DRM"
+      ARM: i.MX: remove unused ARCH_* configs
 
-Magnus Damm (21):
-      ARM: shmobile: Remove unused headers from hotplug.c
-      ARM: shmobile: Remove partial CPU Hotplug from EMEV2
-      ARM: shmobile: Move EMEV2 CPU boot vector setup code
-      ARM: shmobile: Remove sh73a0_get_core_count()
-      ARM: shmobile: Remove r8a7779_get_core_count()
-      ARM: shmobile: Remove emev2_get_core_count()
-      ARM: shmobile: Kill off sh73a0 scu_base_addr() function
-      ARM: shmobile: Kill off r8a7779 scu_base_addr() function
-      ARM: shmobile: Rework EMEV2 scu_base variable
-      ARM: shmobile: Move headsmp-sh73a0.S to headsmp-scu.S
-      ARM: shmobile: Common shmobile_scu_base in headsmp-scu.S
-      ARM: shmobile: Update EMEV2 to use scu_power_mode()
-      ARM: shmobile: Make EMEV2 setup functions static
-      ARM: shmobile: Fix base address readout in headsmp-scu.S
-      ARM: shmobile: Rework SH73A0_SCU_BASE IOMEM() usage
-      ARM: shmobile: Use R8A7779_SCU_BASE with TWD
-      ARM: shmobile: Update r8a7779 to check SCU for hotplug
-      ARM: shmobile: Update r8a7779 to use scu_power_mode()
-      ARM: shmobile: Use sh73a0-specific cpu disable code
-      ARM: shmobile: Rearrange r8a7779 cpu hotplug code
-      ARM: shmobile: Remove unused hotplug.c
+Peter De Schrijver (1):
+      clocksource: tegra: move to of_clk_get
 
-Manjunathappa, Prakash (4):
-      ARM: davinci: mmc: derive version information from device name
-      mmc: davinci_mmc: add DT support
-      ARM: davinci: da850: add mmc DT entries
-      ARM: davinci: da850: override mmc DT node device name
+Rob Herring (4):
+      clocksource: add empty version of clocksource_of_init
+      clocksource: pass DT node pointer to init functions
+      clocksource: tegra20: use the device_node pointer passed to init
+      ARM: smp_twd: convert to use CLKSRC_OF init
 
-Mark A. Greer (13):
-      ARM: OMAP2xxx: hwmod: Convert SHAM crypto device data to hwmod
-      ARM: OMAP2xxx: hwmod: Add DMA support for SHAM module
-      ARM: OMAP3xxx: hwmod: Convert SHAM crypto device data to hwmod
-      ARM: OMAP2+: Remove unnecessary message when no SHA IP is present
-      ARM: OMAP2+: Only manually add hwmod data when DT not used.
-      ARM: AM33XX: Add sha0 crypto clock data
-      ARM: AM33XX: hwmod: Update and uncomment SHA0 module data
-      ARM: OMAP2xxx: hwmod: Convert AES crypto devcie data to hwmod
-      ARM: OMAP3xxx: hwmod: Convert AES crypto device data to hwmod
-      ARM: OMAP2+: Remove unnecessary message when no AES IP is present
-      ARM: OMAP2+: Only manually add hwmod data when DT not used.
-      ARM: AM33XX: Add aes0 crypto clock data
-      ARM: AM33XX: hwmod: Update and uncomment AES0 module data
+Sachin Kamat (1):
+      irqchip: irq-gic: Fix checkpatch errors
 
-Maxime Coquelin (1):
-      ARM: mach-ux500: enable 128KB way L2 cache on DB8540
+Santosh Shilimkar (9):
+      ARM: OMAP2+: PM: Remove bogus fiq_[enable/disable] tuple
+      ARM: OMAP4+: Remove the un-necessary cache flush from hotplug code
+      ARM: OMAP4+: Remove un-necessary cacheflush in secondary CPU boot path
+      ARM: OMAP4+: Remove out of placed smp_wmb() in secondary wakeup code
+      ARM: OMAP4+: Move the CPU wakeup prepare code under smp_prepare_cpus()
+      ARM: OMAP4: PM: Remove L4 wakeup depedency with MPU since errata fix exist now
+      ARM: OMAP4: PM: Now remove L4 per clockdomain static depedency with MPU
+      ARM: OMAP4: Fix the init code to have OMAP4460 errata available in DT build
+      ARM: OMAP4+: PM: Restore CPU power state to ON with clockdomain force wakeup method
 
-Olof Johansson (6):
-      Merge tag 'at91-soc' of git://github.com/at91linux/linux-at91 into next/soc
-      Merge tag 'renesas-defconfig2-for-v3.10' of git://git.kernel.org/.../horms/renesas into next/soc
-      Merge branch 'lpc32xx/defconfig' of git://git.antcom.de/linux-2.6 into next/soc
-      Merge tag 'msm-core-3.10' of git://git.kernel.org/.../davidb/linux-msm into next/soc
-      Merge tag 'davinci-for-v3.10/soc-2-v2' of git://git.kernel.org/.../nsekhar/linux-davinci into next/soc
-      Merge branch 'gic/cleanup' into next/soc
+Sascha Hauer (1):
+      ARM i.MX53: remove platform ahci support
 
-Paul Bolle (1):
-      ARM: davinci: remove test for undefined Kconfig macro
+Shawn Guo (30):
+      ARM: imx: remove duplicated function declaration
+      ARM: imx: remove pl310_get_save_ptr() declaration
+      Merge remote-tracking branch 'arm-soc/clksrc/cleanup' into mxs/cleanup
+      ARM: mxs: use CLKSRC_OF helper to initialize timer
+      ARM: mxs: look up timrot clock from device tree
+      ARM: mxs: get timrot base address from device tree
+      ARM: mxs: remove cpu_is_mx23() call from timer code
+      ARM: mxs: select STMP_DEVICE and use it for timer code
+      ARM: mxs: move timer driver into drivers/clocksource
+      ARM: mxs: get icoll base address from device tree
+      ARM: mxs: call stmp_reset_block() in icoll
+      ARM: mxs: move icoll driver into drivers/irqchip
+      ARM: mxs: remove unneeded mach-types.h inclusion
+      clk: mxs: get base address from device tree
+      clk: mxs: remove the use of mach level IO accessor
+      rtc: stmp3xxx: use stmp_reset_block() instead
+      iio: mxs-lradc: remove unneeded mach header inclusion
+      ASoC: mxs-saif: remove mach header inclusion
+      ARM: mxs: remove empty hardware.h
+      ARM: mxs: get reset address from device tree
+      ARM: mxs: remove system.c
+      ARM: mxs: get ocotp base address from device tree
+      ARM: mxs: use debug_ll_io_init for low-level debug
+      ARM: mxs: remove mm.c
+      ARM: mxs: move mxs_get_ocotp() into mach-mxs.c
+      ARM: mxs: remove common.h
+      ARM: mxs: merge imx23 and imx28 into one machine_desc
+      ARM: mxs: remove unused headers
+      ARM: imx: remove Makefile.boot
+      ARM: imx: remove mx6q.h
 
-Phil Edworthy (1):
-      r8a7779: Add Display Unit clock support
-
-Philip Avinash (2):
-      ARM: davinci: clk framework support for enable/disable functionality
-      ARM: davinci: da850: add ECAP & EHRPWM clock nodes
-
-Robert Tivy (1):
-      ARM: davinci: da8xx: add remoteproc support
-
-Roland Stigge (3):
-      ARM: LPC32xx: defconfig update: gpio and keys
-      ARM: LPC32xx: defconfig update: Default drivers and cleanup
-      ARM: LPC32xx: defconfig update: Cleanup (EXPERIMENTAL)
-
-Ruslan Bilovol (3):
-      ARM: OMAP2+: Move common part of late init into common function
-      ARM: OMAP2+: SoC name and revision unification
-      ARM: OMAP2+: Export SoC information to userspace
-
-Sekhar Nori (3):
-      ARM: davinci: da8xx dt: make file local symbols static
-      ARM: davinci: sram.c: fix incorrect type in assignment
-      ARM: davinci: ensure global variables are declared
-
-Sergei Shtylyov (1):
-      ARM: shmobile: R8A7779: use gic_iid() in SATA IRQ resource
-
-Simon Horman (17):
-      ARM: mach-shmobile: r8a7779: Allow initialisation of GIC by DT
-      ARM: mach-shmobile: r8a7779: Minimal setup using DT
-      ARM: shmobile: sh73a0: Remove sh73a0_init_irq_dt()
-      ARM: shmobile: sh73a0: Add smp ops to DT_MACHINE_START
-      ARM: shmobile: sh73a0: Remove warning about SMP
-      ARM: shmobile: sh73a0: Do not use early devices with DT reference
-      ARM: shmobile: r8a7779: Do not use early devices with DT reference
-      ARM: shmobile: r8a7779: Do not initialise i2c as an early device
-      ARM: shmobile: r8a7779: Remove lan from dtsi
-      ARM: mach-shmobile: mackerel: enable MMCIF and SDHI in defconfig
-      ARM: mach-shmobile: mackerel: enable REGULATOR in defconfig
-      ARM: mach-shmobile: armadillo800eva: enable REGULATOR in defconfig
-      ARM: shmobile: kzm9g: defconfig: do not enable PREEMPT
-      ARM: mach-shmobile: kzm9g: do not enable REGULATOR_DUMMY in defconfig
-      ARM: shmobile: marzen: defconfig: add GPIO RCAR driver support
-      ARM: shmobile: marzen: defconfig: enable GPIO LEDs driver
-      ARM: shmobile: ape6evm: add defconfig
-
-Sricharan R (1):
-      ARM: OMAP4: Enable fix for Cortex-A9 erratas
-
-Stephen Boyd (2):
-      ARM: msm: Rework timer binding to be more general
-      ARM: msm: Wait for timer clear to complete
-
-Stephen Warren (2):
-      ARM: bcm2835: defconfig updates
-      ARM: tegra: defconfig updates
+Stephen Boyd (4):
+      ARM: msm: Move dma.h #defines that are private to dma.c
+      mmc: msm_sdcc: Remove unnecessary include
+      gpio: Make gpio-msm-v1 into a platform driver
+      ARM: msm: Remove unused cpu.h header file
 
 Sylwester Nawrocki (1):
-      ARM: SAMSUNG: Export MIPI CSIS/DSIM PHY control functions
+      ARM: S3C24XX: Remove unused GPIO drive strength register definitions
 
-Tony Lindgren (1):
-      Merge tag 'omap-devel-a-for-3.10' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.10/crypto
+Tero Kristo (1):
+      ARM: OMAP4+: Use common scratchpad SAR RAM offsets for all architectures
 
-Vishwanathrao Badarkhe, Manish (2):
-      ARM: regulator: add tps6507x device tree data
-      ARM: davinci: da850: add tps6507x regulator DT data
+Thomas Petazzoni (3):
+      arm: plat-orion: only build addr-map.c when needed
+      arm: plat-orion: use mv_mbus_dram_info() in PCIe code
+      arm: mach-orion5x: use mv_mbus_dram_info() in PCI code
 
-Vladimir Barinov (3):
-      ARM: mach-shmobile: r8a7779: SATA DT configuration
-      ARM: mach-shmobile: r8a7779: add SATA support
-      ARM: mach-shmobile: marzen: add SATA support
+Tony Lindgren (3):
+      Merge tag 'omap-cleanup-a-for-3.10' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.10/cleanup
+      Merge branch 'for_3.10/omap_generic_cleanup_v2' of git://git.kernel.org/.../ssantosh/linux into omap-for-v3.10/cleanup-v2
+      Merge tag 'omap-pm-v3.10/fixes/pm' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-for-v3.10/fixes-pm
 
 Wei Yongjun (1):
-      ARM: tegra: pm: remove duplicated include from pm.c
+      ARM: EXYNOS: remove duplicated include from common.c
+
+Will Deacon (1):
+      ARM: tegra: use setup_mm_for_reboot rather than explicit pgd switch
 
 
- .../bindings/arm/altera/socfpga-clk-manager.txt |   11 +
- .../bindings/arm/bcm/bcm,kona-timer.txt         |   19 +
- .../devicetree/bindings/arm/msm/timer.txt       |   41 +-
- .../bindings/arm/tegra/nvidia,tegra20-pmc.txt   |   67 +-
- .../devicetree/bindings/clock/altr_socfpga.txt  |   18 +
- .../devicetree/bindings/mmc/davinci_mmc.txt     |   33 +
- Documentation/kernel-parameters.txt             |    6 +
- arch/arm/Kconfig                                |    3 +-
- arch/arm/boot/dts/Makefile                      |    5 +
- arch/arm/boot/dts/atlas6-evb.dts                |   78 ++
- arch/arm/boot/dts/atlas6.dtsi                   |  668 ++++++++++++
- arch/arm/boot/dts/bcm11351.dtsi                 |    8 +
- arch/arm/boot/dts/da850-evm.dts                 |   70 ++
- arch/arm/boot/dts/da850.dtsi                    |   15 +
- arch/arm/boot/dts/msm8660-surf.dts              |   20 +-
- arch/arm/boot/dts/msm8960-cdp.dts               |   22 +-
- arch/arm/boot/dts/r8a7779.dtsi                  |   98 ++
- arch/arm/boot/dts/sama5d3.dtsi                  | 1031 ++++++++++++++++++
- arch/arm/boot/dts/sama5d31ek.dts                |   51 +
- arch/arm/boot/dts/sama5d33ek.dts                |   44 +
- arch/arm/boot/dts/sama5d34ek.dts                |   61 ++
- arch/arm/boot/dts/sama5d35ek.dts                |   56 +
- arch/arm/boot/dts/sama5d3xcm.dtsi               |   91 ++
- arch/arm/boot/dts/sama5d3xdm.dtsi               |   42 +
- arch/arm/boot/dts/sama5d3xmb.dtsi               |  166 +++
- arch/arm/boot/dts/socfpga.dtsi                  |  157 +++
- arch/arm/boot/dts/socfpga_cyclone5.dts          |    8 +
- arch/arm/boot/dts/socfpga_vt.dts                |    8 +
- arch/arm/boot/dts/tegra114-dalmore.dts          |   13 +
- arch/arm/boot/dts/tegra114-pluto.dts            |   13 +
- arch/arm/boot/dts/tegra114.dtsi                 |    2 +
- arch/arm/boot/dts/tegra20-colibri-512.dtsi      |   13 +
- arch/arm/boot/dts/tegra20-harmony.dts           |   13 +
- arch/arm/boot/dts/tegra20-paz00.dts             |   13 +
- arch/arm/boot/dts/tegra20-seaboard.dts          |   13 +
- arch/arm/boot/dts/tegra20-tamonten.dtsi         |   13 +
- arch/arm/boot/dts/tegra20-trimslice.dts         |   13 +
- arch/arm/boot/dts/tegra20-ventana.dts           |   13 +
- arch/arm/boot/dts/tegra20-whistler.dts          |   13 +
- arch/arm/boot/dts/tegra20.dtsi                  |    2 +
- arch/arm/boot/dts/tegra30-beaver.dts            |   13 +
- arch/arm/boot/dts/tegra30-cardhu.dtsi           |   13 +
- arch/arm/boot/dts/tegra30.dtsi                  |    2 +
- arch/arm/boot/dts/tps6507x.dtsi                 |   47 +
- arch/arm/configs/ape6evm_defconfig              |   95 ++
- arch/arm/configs/armadillo800eva_defconfig      |    8 +-
- arch/arm/configs/bcm2835_defconfig              |    9 +-
- arch/arm/configs/kzm9g_defconfig                |    2 -
- arch/arm/configs/lpc32xx_defconfig              |   21 +-
- arch/arm/configs/mackerel_defconfig             |    4 +
- arch/arm/configs/marzen_defconfig               |    8 +
- arch/arm/configs/mxs_defconfig                  |    5 +-
- arch/arm/configs/sama5_defconfig                |  181 +++
- arch/arm/configs/tegra_defconfig                |   18 +-
- arch/arm/configs/u8500_defconfig                |    4 +-
- arch/arm/mach-at91/Kconfig                      |   59 +-
- arch/arm/mach-at91/Makefile                     |    7 +-
- arch/arm/mach-at91/at91rm9200.c                 |    2 +-
- arch/arm/mach-at91/at91sam9260.c                |    2 +-
- arch/arm/mach-at91/at91sam9261.c                |    2 +-
- arch/arm/mach-at91/at91sam9263.c                |    2 +-
- arch/arm/mach-at91/at91sam9g45.c                |    2 +-
- arch/arm/mach-at91/at91sam9n12.c                |    2 +-
- arch/arm/mach-at91/at91sam9rl.c                 |    2 +-
- arch/arm/mach-at91/at91sam9x5.c                 |    2 +-
- arch/arm/mach-at91/board-dt-sama5.c             |   86 ++
- arch/arm/mach-at91/clock.c                      |  109 +-
- arch/arm/mach-at91/clock.h                      |    2 +
- arch/arm/mach-at91/include/mach/at91_pmc.h      |   18 +-
- arch/arm/mach-at91/include/mach/cpu.h           |   20 +
- arch/arm/mach-at91/include/mach/sama5d3.h       |   73 ++
- arch/arm/mach-at91/sama5d3.c                    |  377 +++++++
- arch/arm/mach-at91/setup.c                      |   27 +
- arch/arm/mach-at91/soc.h                        |    7 +-
- arch/arm/mach-davinci/board-da830-evm.c         |    1 -
- arch/arm/mach-davinci/board-da850-evm.c         |    2 -
- arch/arm/mach-davinci/board-dm355-evm.c         |    1 -
- arch/arm/mach-davinci/board-dm365-evm.c         |    1 -
- arch/arm/mach-davinci/board-dm644x-evm.c        |    1 -
- arch/arm/mach-davinci/board-neuros-osd2.c       |    1 -
- arch/arm/mach-davinci/board-omapl138-hawk.c     |    1 -
- arch/arm/mach-davinci/board-tnetv107x-evm.c     |    1 -
- arch/arm/mach-davinci/clock.c                   |   21 +-
- arch/arm/mach-davinci/clock.h                   |    2 +
- arch/arm/mach-davinci/da830.c                   |    2 +-
- arch/arm/mach-davinci/da850.c                   |   50 +-
- arch/arm/mach-davinci/da8xx-dt.c                |    5 +-
- arch/arm/mach-davinci/devices-da8xx.c           |   92 +-
- arch/arm/mach-davinci/devices-tnetv107x.c       |    4 +-
- arch/arm/mach-davinci/devices.c                 |    6 +-
- arch/arm/mach-davinci/dm355.c                   |    4 +-
- arch/arm/mach-davinci/dm365.c                   |    4 +-
- arch/arm/mach-davinci/dm644x.c                  |    2 +-
- arch/arm/mach-davinci/include/mach/da8xx.h      |    5 +
- .../arm/mach-davinci/include/mach/debug-macro.S |    2 -
- arch/arm/mach-davinci/pm.c                      |    1 +
- arch/arm/mach-davinci/sram.c                    |    4 +-
- arch/arm/mach-davinci/tnetv107x.c               |    4 +-
- arch/arm/mach-davinci/usb.c                     |    1 +
- arch/arm/mach-exynos/common.c                   |    2 +
- arch/arm/mach-exynos/cpuidle.c                  |   58 +-
- arch/arm/mach-exynos/include/mach/pm-core.h     |    9 +-
- arch/arm/mach-msm/timer.c                       |  110 +-
- arch/arm/mach-mxs/Kconfig                       |    2 +
- arch/arm/mach-omap2/Kconfig                     |    3 +
- arch/arm/mach-omap2/cclock2430_data.c           |    4 +-
- arch/arm/mach-omap2/cclock33xx_data.c           |   10 +
- arch/arm/mach-omap2/cclock3xxx_data.c           |    2 +
- arch/arm/mach-omap2/common.h                    |    8 +
- arch/arm/mach-omap2/devices.c                   |  149 +--
- arch/arm/mach-omap2/id.c                        |   95 +-
- arch/arm/mach-omap2/io.c                        |   34 +-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c      |    2 +
- arch/arm/mach-omap2/omap_hwmod_2430_data.c      |    2 +
- .../omap_hwmod_2xxx_interconnect_data.c         |   36 +
- .../mach-omap2/omap_hwmod_2xxx_ipblock_data.c   |   81 ++
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c      |   92 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c      |  172 ++-
- arch/arm/mach-omap2/omap_hwmod_common_data.h    |    4 +
- arch/arm/mach-prima2/Kconfig                    |   10 +-
- arch/arm/mach-prima2/common.c                   |   21 +
- arch/arm/mach-s3c64xx/dma.c                     |    1 +
- arch/arm/mach-s3c64xx/mach-crag6410-module.c    |    1 +
- arch/arm/mach-shmobile/Makefile                 |    7 +-
- arch/arm/mach-shmobile/clock-r8a7740.c          |   13 +
- arch/arm/mach-shmobile/clock-r8a7779.c          |    8 +-
- arch/arm/mach-shmobile/clock-sh73a0.c           |    7 +-
- .../{headsmp-sh73a0.S => headsmp-scu.S}         |   15 +-
- arch/arm/mach-shmobile/hotplug.c                |   68 --
- arch/arm/mach-shmobile/include/mach/common.h    |   21 +-
- arch/arm/mach-shmobile/include/mach/irqs.h      |    1 +
- arch/arm/mach-shmobile/intc-r8a7779.c           |   27 +-
- arch/arm/mach-shmobile/intc-sh73a0.c            |    8 -
- arch/arm/mach-shmobile/setup-emev2.c            |    4 +-
- arch/arm/mach-shmobile/setup-r8a7779.c          |  104 +-
- arch/arm/mach-shmobile/setup-sh73a0.c           |   36 +-
- arch/arm/mach-shmobile/smp-emev2.c              |   86 +-
- arch/arm/mach-shmobile/smp-r8a7779.c            |  129 ++-
- arch/arm/mach-shmobile/smp-sh73a0.c             |   36 +-
- arch/arm/mach-socfpga/core.h                    |   11 +
- arch/arm/mach-socfpga/platsmp.c                 |    3 -
- arch/arm/mach-socfpga/socfpga.c                 |   16 +-
- arch/arm/mach-tegra/Makefile                    |    1 +
- arch/arm/mach-tegra/common.c                    |    5 +-
- arch/arm/mach-tegra/cpuidle-tegra20.c           |    6 +-
- arch/arm/mach-tegra/cpuidle-tegra30.c           |    6 +-
- arch/arm/mach-tegra/fuse.c                      |    4 +
- arch/arm/mach-tegra/fuse.h                      |    7 +
- arch/arm/mach-tegra/irq.c                       |   96 +-
- arch/arm/mach-tegra/irq.h                       |    6 +
- arch/arm/mach-tegra/platsmp.c                   |    8 +
- arch/arm/mach-tegra/pm.c                        |  131 ++-
- arch/arm/mach-tegra/pm.h                        |   17 +-
- arch/arm/mach-tegra/pmc.c                       |  162 +++
- arch/arm/mach-tegra/pmc.h                       |   14 +
- arch/arm/mach-tegra/tegra.c                     |   29 +-
- arch/arm/mach-tegra/tegra114_speedo.c           |  104 ++
- arch/arm/mach-ux500/cache-l2x0.c                |    4 +-
- arch/arm/plat-samsung/s5p-sleep.S               |    9 +
- arch/arm/plat-samsung/setup-mipiphy.c           |    3 +
- drivers/clk/socfpga/clk.c                       |  163 ++-
- drivers/gpio/gpio-tegra.c                       |   21 +-
- drivers/mmc/host/davinci_mmc.c                  |   88 +-
- include/linux/platform_data/mmc-davinci.h       |    3 -
- 164 files changed, 6029 insertions(+), 846 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/bcm,kona-timer.txt
- create mode 100644 Documentation/devicetree/bindings/clock/altr_socfpga.txt
- create mode 100644 Documentation/devicetree/bindings/mmc/davinci_mmc.txt
- create mode 100644 arch/arm/boot/dts/atlas6-evb.dts
- create mode 100644 arch/arm/boot/dts/atlas6.dtsi
- create mode 100644 arch/arm/boot/dts/r8a7779.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d31ek.dts
- create mode 100644 arch/arm/boot/dts/sama5d33ek.dts
- create mode 100644 arch/arm/boot/dts/sama5d34ek.dts
- create mode 100644 arch/arm/boot/dts/sama5d35ek.dts
- create mode 100644 arch/arm/boot/dts/sama5d3xcm.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3xdm.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3xmb.dtsi
- create mode 100644 arch/arm/boot/dts/tps6507x.dtsi
- create mode 100644 arch/arm/configs/ape6evm_defconfig
- create mode 100644 arch/arm/configs/sama5_defconfig
- create mode 100644 arch/arm/mach-at91/board-dt-sama5.c
- create mode 100644 arch/arm/mach-at91/include/mach/sama5d3.h
- create mode 100644 arch/arm/mach-at91/sama5d3.c
- rename arch/arm/mach-shmobile/{headsmp-sh73a0.S => headsmp-scu.S} (85%)
- delete mode 100644 arch/arm/mach-shmobile/hotplug.c
- create mode 100644 arch/arm/mach-tegra/tegra114_speedo.c
+ ...nner,sunxi-ic.txt => allwinner,sun4i-ic.txt} |   4 +-
+ ...unxi-timer.txt => allwinner,sun4i-timer.txt} |   4 +-
+ .../watchdog/{sunxi-wdt.txt => sun4i-wdt.txt}   |   6 +-
+ arch/arm/Kconfig                                |  22 +-
+ arch/arm/Makefile                               |   1 -
+ arch/arm/boot/dts/imx23.dtsi                    |   5 +-
+ arch/arm/boot/dts/imx28.dtsi                    |   5 +-
+ arch/arm/boot/dts/tegra114.dtsi                 |   2 +-
+ arch/arm/boot/dts/tegra20.dtsi                  |   2 +
+ arch/arm/boot/dts/tegra30.dtsi                  |   4 +-
+ arch/arm/configs/at91_dt_defconfig              |   2 +-
+ arch/arm/configs/at91sam9260_defconfig          |   2 +-
+ arch/arm/configs/at91sam9g20_defconfig          |   2 +-
+ arch/arm/configs/at91sam9g45_defconfig          |   2 +-
+ arch/arm/configs/h7201_defconfig                |  27 -
+ arch/arm/configs/h7202_defconfig                |  47 --
+ arch/arm/include/asm/irq.h                      |   5 +
+ arch/arm/include/asm/mach/irq.h                 |  36 -
+ arch/arm/include/asm/smp_twd.h                  |   8 -
+ arch/arm/kernel/irq.c                           |   6 +-
+ arch/arm/kernel/smp_twd.c                       |  17 +-
+ arch/arm/mach-at91/Kconfig                      | 398 +----------
+ arch/arm/mach-at91/Kconfig.non_dt               | 399 +++++++++++
+ arch/arm/mach-at91/Makefile                     |   4 +-
+ arch/arm/mach-at91/at91_rstc.h                  |   2 +-
+ arch/arm/mach-at91/at91_shdwc.h                 |   2 +-
+ arch/arm/mach-at91/at91x40_time.c               |   2 +-
+ .../{board-rm9200-dt.c => board-dt-rm9200.c}    |   0
+ .../mach-at91/{board-dt.c => board-dt-sam9.c}   |   0
+ arch/arm/mach-at91/gpio.c                       |   3 +-
+ arch/arm/mach-at91/include/mach/at91_dbgu.h     |   3 -
+ arch/arm/mach-at91/include/mach/at91_matrix.h   |   2 +-
+ arch/arm/mach-at91/include/mach/at91_st.h       |   2 +-
+ arch/arm/mach-at91/setup.c                      |   8 +-
+ arch/arm/mach-exynos/Kconfig                    |  13 +-
+ arch/arm/mach-exynos/common.c                   |   2 +-
+ arch/arm/mach-exynos/dev-ohci.c                 |   2 +-
+ arch/arm/mach-exynos/mach-origen.c              |   2 +-
+ arch/arm/mach-exynos/mach-smdkv310.c            |   2 +-
+ arch/arm/mach-exynos/platsmp.c                  |   8 -
+ arch/arm/mach-gemini/Makefile                   |   2 +-
+ arch/arm/mach-gemini/board-nas4220b.c           |   1 +
+ arch/arm/mach-gemini/board-rut1xx.c             |   2 +
+ arch/arm/mach-gemini/board-wbd111.c             |   1 +
+ arch/arm/mach-gemini/board-wbd222.c             |   1 +
+ arch/arm/mach-gemini/common.h                   |   2 +
+ arch/arm/mach-gemini/gpio.c                     |  19 +-
+ arch/arm/mach-gemini/include/mach/hardware.h    |   2 +-
+ arch/arm/mach-gemini/irq.c                      |   4 +-
+ arch/arm/mach-gemini/mm.c                       |  22 +-
+ .../{include/mach/system.h => reset.c}          |   2 +-
+ arch/arm/mach-h720x/Kconfig                     |  40 --
+ arch/arm/mach-h720x/Makefile                    |  16 -
+ arch/arm/mach-h720x/Makefile.boot               |   2 -
+ arch/arm/mach-h720x/common.c                    | 268 --------
+ arch/arm/mach-h720x/common.h                    |  30 -
+ arch/arm/mach-h720x/cpu-h7201.c                 |  57 --
+ arch/arm/mach-h720x/cpu-h7202.c                 | 225 ------
+ arch/arm/mach-h720x/h7201-eval.c                |  38 -
+ arch/arm/mach-h720x/h7202-eval.c                |  81 ---
+ arch/arm/mach-h720x/include/mach/boards.h       |  53 --
+ arch/arm/mach-h720x/include/mach/debug-macro.S  |  40 --
+ arch/arm/mach-h720x/include/mach/entry-macro.S  |  57 --
+ arch/arm/mach-h720x/include/mach/h7201-regs.h   |  67 --
+ arch/arm/mach-h720x/include/mach/h7202-regs.h   | 155 -----
+ arch/arm/mach-h720x/include/mach/hardware.h     | 190 -----
+ arch/arm/mach-h720x/include/mach/irqs.h         | 116 ----
+ arch/arm/mach-h720x/include/mach/isa-dma.h      |  19 -
+ arch/arm/mach-h720x/include/mach/uncompress.h   |  36 -
+ arch/arm/mach-highbank/highbank.c               |   5 +-
+ arch/arm/mach-highbank/platsmp.c                |   7 -
+ arch/arm/mach-imx/Kconfig                       |  18 -
+ arch/arm/mach-imx/Makefile                      |   3 +-
+ arch/arm/mach-imx/Makefile.boot                 |  35 -
+ arch/arm/mach-imx/avic.c                        |   4 +-
+ arch/arm/mach-imx/clk-imx27.c                   |   2 -
+ arch/arm/mach-imx/common.h                      |   3 -
+ arch/arm/mach-imx/cpu_op-mx51.c                 |  31 -
+ arch/arm/mach-imx/cpu_op-mx51.h                 |  14 -
+ arch/arm/mach-imx/cpufreq.c                     | 202 ------
+ arch/arm/mach-imx/devices/Kconfig               |   4 -
+ arch/arm/mach-imx/devices/Makefile              |   1 -
+ arch/arm/mach-imx/devices/devices-common.h      |  10 -
+ arch/arm/mach-imx/devices/platform-ahci-imx.c   | 157 -----
+ arch/arm/mach-imx/hardware.h                    |   1 -
+ arch/arm/mach-imx/mach-cpuimx51sd.c             |   5 -
+ arch/arm/mach-imx/mach-imx6q.c                  |   5 +-
+ arch/arm/mach-imx/mach-mx51_babbage.c           |   4 -
+ arch/arm/mach-imx/mx6q.h                        |  31 -
+ arch/arm/mach-imx/platsmp.c                     |  12 -
+ arch/arm/mach-l7200/include/mach/debug-macro.S  |  38 -
+ arch/arm/mach-msm/board-halibut.c               |   1 +
+ arch/arm/mach-msm/board-msm7x30.c               |   1 +
+ arch/arm/mach-msm/board-qsd8x50.c               |   1 +
+ arch/arm/mach-msm/board-trout.c                 |   1 +
+ arch/arm/mach-msm/devices-msm7x00.c             |  31 +
+ arch/arm/mach-msm/devices-msm7x30.c             |  31 +
+ arch/arm/mach-msm/devices-qsd8x50.c             |  31 +
+ arch/arm/mach-msm/devices.h                     |   4 +
+ arch/arm/mach-msm/dma.c                         |  26 +
+ arch/arm/mach-msm/include/mach/cpu.h            |  54 --
+ arch/arm/mach-msm/include/mach/dma.h            |  26 -
+ arch/arm/mach-msm/platsmp.c                     |   8 -
+ arch/arm/mach-mxs/Makefile                      |   4 -
+ arch/arm/mach-mxs/include/mach/common.h         |  29 -
+ arch/arm/mach-mxs/include/mach/debug-macro.S    |   9 +-
+ arch/arm/mach-mxs/include/mach/digctl.h         |  22 -
+ arch/arm/mach-mxs/include/mach/hardware.h       |  23 -
+ arch/arm/mach-mxs/include/mach/mx23.h           | 169 -----
+ arch/arm/mach-mxs/include/mach/mx28.h           | 225 ------
+ arch/arm/mach-mxs/include/mach/mxs.h            | 117 ----
+ arch/arm/mach-mxs/mach-mxs.c                    | 185 ++++-
+ arch/arm/mach-mxs/mm.c                          |  52 --
+ arch/arm/mach-mxs/ocotp.c                       |  93 ---
+ arch/arm/mach-mxs/system.c                      | 139 ----
+ arch/arm/mach-omap1/dma.h                       |  41 --
+ arch/arm/mach-omap2/cclock2420_data.c           | 283 ++++----
+ arch/arm/mach-omap2/cclock2430_data.c           | 311 ++++-----
+ arch/arm/mach-omap2/cclock33xx_data.c           | 165 +++--
+ arch/arm/mach-omap2/cclock3xxx_data.c           | 685 ++++++++++---------
+ arch/arm/mach-omap2/cclock44xx_data.c           | 517 +++++++-------
+ arch/arm/mach-omap2/clock.c                     |  17 +-
+ arch/arm/mach-omap2/clock.h                     |  20 +-
+ arch/arm/mach-omap2/cpuidle34xx.c               |   3 -
+ arch/arm/mach-omap2/cpuidle44xx.c               |   8 +-
+ arch/arm/mach-omap2/dma.h                       |  70 --
+ arch/arm/mach-omap2/omap-hotplug.c              |   6 -
+ arch/arm/mach-omap2/omap-smp.c                  |  76 +-
+ arch/arm/mach-omap2/omap4-common.c              |  16 +
+ arch/arm/mach-omap2/omap4-sar-layout.h          |  14 +-
+ arch/arm/mach-omap2/pm24xx.c                    |  11 +-
+ arch/arm/mach-omap2/pm34xx.c                    |   9 +-
+ arch/arm/mach-omap2/pm44xx.c                    |  20 +-
+ arch/arm/mach-omap2/timer.c                     |   2 +-
+ arch/arm/mach-orion5x/pci.c                     |   7 +-
+ arch/arm/mach-prima2/platsmp.c                  |   8 -
+ arch/arm/mach-s3c24xx/Kconfig                   |  22 +-
+ arch/arm/mach-s3c24xx/bast-irq.c                |   2 -
+ arch/arm/mach-s3c24xx/clock-s3c2410.c           |   1 -
+ arch/arm/mach-s3c24xx/clock-s3c2412.c           |   1 -
+ arch/arm/mach-s3c24xx/clock-s3c2416.c           |   1 -
+ arch/arm/mach-s3c24xx/clock-s3c2443.c           |   1 -
+ arch/arm/mach-s3c24xx/common-smdk.c             |   3 +-
+ .../include/plat => mach-s3c24xx}/common-smdk.h |   3 +-
+ arch/arm/mach-s3c24xx/common.c                  |   7 +-
+ arch/arm/mach-s3c24xx/common.h                  |  90 ++-
+ arch/arm/mach-s3c24xx/dma-s3c2410.c             |   1 -
+ arch/arm/mach-s3c24xx/dma-s3c2412.c             |   1 -
+ arch/arm/mach-s3c24xx/dma-s3c2440.c             |   1 -
+ arch/arm/mach-s3c24xx/dma-s3c2443.c             |   1 -
+ arch/arm/mach-s3c24xx/include/mach/dma.h        |   1 -
+ arch/arm/mach-s3c24xx/include/mach/regs-sdi.h   | 127 ----
+ arch/arm/mach-s3c24xx/irq-pm.c                  |   7 +-
+ arch/arm/mach-s3c24xx/irq.c                     |   9 +-
+ arch/arm/mach-s3c24xx/mach-jive.c               |   2 +-
+ arch/arm/mach-s3c24xx/mach-n30.c                |   1 -
+ arch/arm/mach-s3c24xx/mach-nexcoder.c           |   2 -
+ arch/arm/mach-s3c24xx/mach-otom.c               |   1 -
+ arch/arm/mach-s3c24xx/mach-qt2410.c             |   2 +-
+ arch/arm/mach-s3c24xx/mach-smdk2410.c           |   3 +-
+ arch/arm/mach-s3c24xx/mach-smdk2413.c           |   5 +-
+ arch/arm/mach-s3c24xx/mach-smdk2416.c           |   4 +-
+ arch/arm/mach-s3c24xx/mach-smdk2440.c           |   5 +-
+ arch/arm/mach-s3c24xx/mach-smdk2443.c           |   5 +-
+ arch/arm/mach-s3c24xx/mach-vstms.c              |   3 +-
+ arch/arm/mach-s3c24xx/pm-s3c2412.c              |   1 -
+ arch/arm/mach-s3c24xx/regs-dsc.h                | 203 +-----
+ arch/arm/mach-s3c24xx/s3c2410.c                 |   1 -
+ arch/arm/mach-s3c24xx/s3c2412.c                 |   1 -
+ arch/arm/mach-s3c24xx/s3c2416.c                 |   1 -
+ arch/arm/mach-s3c24xx/s3c2440.c                 |   1 -
+ arch/arm/mach-s3c24xx/s3c2442.c                 |   1 -
+ arch/arm/mach-s3c24xx/s3c2443.c                 |   1 -
+ arch/arm/mach-s3c24xx/s3c244x.c                 |   2 -
+ arch/arm/mach-s3c64xx/Makefile                  |   1 -
+ arch/arm/mach-s3c64xx/include/mach/dma.h        |   1 -
+ arch/arm/mach-s5pc100/common.h                  |   9 -
+ arch/arm/mach-s5pv210/common.h                  |   9 -
+ arch/arm/mach-shmobile/smp-emev2.c              |   7 -
+ arch/arm/mach-shmobile/smp-r8a7779.c            |   7 -
+ arch/arm/mach-shmobile/smp-sh73a0.c             |   7 -
+ arch/arm/mach-socfpga/platsmp.c                 |  12 -
+ arch/arm/mach-spear13xx/platsmp.c               |   8 -
+ arch/arm/mach-spear13xx/spear13xx.c             |   4 +-
+ arch/arm/mach-sunxi/Kconfig                     |   5 +-
+ arch/arm/mach-sunxi/sunxi.c                     |  74 +-
+ arch/arm/mach-tegra/Makefile                    |   4 +-
+ arch/arm/mach-tegra/board-dt-tegra114.c         |  46 --
+ arch/arm/mach-tegra/board-dt-tegra30.c          |  60 --
+ arch/arm/mach-tegra/board.h                     |   4 +-
+ arch/arm/mach-tegra/common.c                    |  26 +-
+ arch/arm/mach-tegra/hotplug.c                   |  23 +-
+ arch/arm/mach-tegra/platsmp.c                   | 118 ++--
+ arch/arm/mach-tegra/pm.c                        |   7 +-
+ arch/arm/mach-tegra/pmc.c                       | 152 +++-
+ arch/arm/mach-tegra/pmc.h                       |   4 +
+ arch/arm/mach-tegra/sleep.h                     |  10 +-
+ .../mach-tegra/{board-dt-tegra20.c => tegra.c}  |  16 +-
+ arch/arm/mach-ux500/platsmp.c                   |   8 -
+ arch/arm/mach-ux500/timer.c                     |   3 +-
+ arch/arm/mach-vexpress/v2m.c                    |   6 +-
+ arch/arm/mach-virt/platsmp.c                    |   8 -
+ arch/arm/plat-orion/Makefile                    |   6 +-
+ arch/arm/plat-orion/pcie.c                      |  10 +-
+ arch/arm/plat-samsung/Kconfig                   |  14 -
+ arch/arm/plat-samsung/dma-ops.c                 |  10 +-
+ arch/arm/plat-samsung/include/plat/dma-ops.h    |   1 -
+ arch/arm/plat-samsung/include/plat/dma-pl330.h  |   1 -
+ arch/arm/plat-samsung/include/plat/irq.h        | 116 ----
+ arch/arm/plat-samsung/include/plat/rtc-core.h   |   2 +-
+ arch/arm/plat-samsung/include/plat/s3c2410.h    |  31 -
+ arch/arm/plat-samsung/include/plat/s3c2412.h    |  32 -
+ arch/arm/plat-samsung/include/plat/s3c2416.h    |  37 -
+ arch/arm/plat-samsung/include/plat/s3c2443.h    |  36 -
+ arch/arm/plat-samsung/include/plat/s3c244x.h    |  42 --
+ arch/arm/plat-samsung/include/plat/sdhci.h      |   4 +-
+ arch/arm/plat-samsung/irq-vic-timer.c           |   3 +-
+ arch/arm/plat-samsung/s5p-irq-gpioint.c         |   3 +-
+ arch/arm/plat-versatile/platsmp.c               |   8 -
+ drivers/clk/mxs/clk-imx23.c                     |  42 +-
+ drivers/clk/mxs/clk-imx28.c                     |  42 +-
+ drivers/clocksource/Kconfig                     |   2 +-
+ drivers/clocksource/Makefile                    |   3 +-
+ drivers/clocksource/bcm2835_timer.c             |  12 +-
+ drivers/clocksource/clksrc-of.c                 |   5 +-
+ .../timer.c => drivers/clocksource/mxs_timer.c  |  36 +-
+ .../{sunxi_timer.c => sun4i_timer.c}            |  94 ++-
+ drivers/clocksource/tegra20_timer.c             |  75 +-
+ drivers/clocksource/vt8500_timer.c              |  16 +-
+ drivers/gpio/gpio-msm-v1.c                      | 220 ++++--
+ drivers/gpio/gpio-msm-v2.c                      |   3 +-
+ drivers/gpio/gpio-mxc.c                         |   2 +-
+ drivers/gpio/gpio-omap.c                        |   3 +-
+ drivers/gpio/gpio-pl061.c                       |   2 +-
+ drivers/gpio/gpio-pxa.c                         |   3 +-
+ drivers/gpio/gpio-tegra.c                       |   3 +-
+ drivers/irqchip/Makefile                        |   3 +-
+ drivers/irqchip/exynos-combiner.c               |   1 +
+ drivers/irqchip/irq-gic.c                       |  36 +-
+ .../icoll.c => drivers/irqchip/irq-mxs.c        |  24 +-
+ drivers/irqchip/irq-sun4i.c                     | 149 ++++
+ drivers/irqchip/irq-sunxi.c                     | 151 ----
+ drivers/irqchip/irq-vic.c                       |   3 +-
+ drivers/mmc/host/msm_sdcc.c                     |   1 -
+ drivers/mmc/host/s3cmci.c                       |  83 ++-
+ drivers/pinctrl/pinctrl-at91.c                  |   3 +-
+ drivers/pinctrl/pinctrl-exynos.c                |   3 +-
+ drivers/pinctrl/pinctrl-nomadik.c               |   2 +-
+ drivers/pinctrl/pinctrl-sirf.c                  |   2 +-
+ drivers/pinctrl/spear/pinctrl-plgpio.c          |   2 +-
+ drivers/rtc/rtc-stmp3xxx.c                      |   6 +-
+ drivers/staging/iio/adc/mxs-lradc.c             |   3 -
+ drivers/staging/imx-drm/ipu-v3/ipu-common.c     |   2 +-
+ drivers/usb/host/ohci-exynos.c                  |   2 +-
+ include/linux/clk/mxs.h                         |  16 +
+ include/linux/clocksource.h                     |  12 +-
+ include/linux/irqchip/arm-gic.h                 |   1 -
+ include/linux/irqchip/chained_irq.h             |  52 ++
+ .../mach/timex.h => include/linux/irqchip/mxs.h |   9 +-
+ include/linux/irqchip/sunxi.h                   |  27 -
+ .../{usb-exynos.h => usb-ohci-exynos.h}         |   0
+ include/linux/sunxi_timer.h                     |  24 -
+ sound/soc/mxs/mxs-saif.c                        |   5 +-
+ 263 files changed, 2919 insertions(+), 6559 deletions(-)
+ rename Documentation/devicetree/bindings/interrupt-controller/{allwinner,sunxi-ic.txt => allwinner,sun4i-ic.txt} (94%)
+ rename Documentation/devicetree/bindings/timer/{allwinner,sunxi-timer.txt => allwinner,sun4i-timer.txt} (78%)
+ rename Documentation/devicetree/bindings/watchdog/{sunxi-wdt.txt => sun4i-wdt.txt} (57%)
+ delete mode 100644 arch/arm/configs/h7201_defconfig
+ delete mode 100644 arch/arm/configs/h7202_defconfig
+ create mode 100644 arch/arm/mach-at91/Kconfig.non_dt
+ rename arch/arm/mach-at91/{board-rm9200-dt.c => board-dt-rm9200.c} (100%)
+ rename arch/arm/mach-at91/{board-dt.c => board-dt-sam9.c} (100%)
+ rename arch/arm/mach-gemini/{include/mach/system.h => reset.c} (91%)
+ delete mode 100644 arch/arm/mach-h720x/Kconfig
+ delete mode 100644 arch/arm/mach-h720x/Makefile
+ delete mode 100644 arch/arm/mach-h720x/Makefile.boot
+ delete mode 100644 arch/arm/mach-h720x/common.c
+ delete mode 100644 arch/arm/mach-h720x/common.h
+ delete mode 100644 arch/arm/mach-h720x/cpu-h7201.c
+ delete mode 100644 arch/arm/mach-h720x/cpu-h7202.c
+ delete mode 100644 arch/arm/mach-h720x/h7201-eval.c
+ delete mode 100644 arch/arm/mach-h720x/h7202-eval.c
+ delete mode 100644 arch/arm/mach-h720x/include/mach/boards.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-h720x/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-h720x/include/mach/h7201-regs.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/h7202-regs.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/isa-dma.h
+ delete mode 100644 arch/arm/mach-h720x/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-imx/Makefile.boot
+ delete mode 100644 arch/arm/mach-imx/cpu_op-mx51.c
+ delete mode 100644 arch/arm/mach-imx/cpu_op-mx51.h
+ delete mode 100644 arch/arm/mach-imx/cpufreq.c
+ delete mode 100644 arch/arm/mach-imx/devices/platform-ahci-imx.c
+ delete mode 100644 arch/arm/mach-imx/mx6q.h
+ delete mode 100644 arch/arm/mach-l7200/include/mach/debug-macro.S
+ delete mode 100644 arch/arm/mach-msm/include/mach/cpu.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/common.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/digctl.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/mx23.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/mx28.h
+ delete mode 100644 arch/arm/mach-mxs/include/mach/mxs.h
+ delete mode 100644 arch/arm/mach-mxs/mm.c
+ delete mode 100644 arch/arm/mach-mxs/ocotp.c
+ delete mode 100644 arch/arm/mach-mxs/system.c
+ rename arch/arm/{plat-samsung/include/plat => mach-s3c24xx}/common-smdk.h (86%)
+ delete mode 100644 arch/arm/mach-s3c24xx/include/mach/regs-sdi.h
+ delete mode 100644 arch/arm/mach-tegra/board-dt-tegra114.c
+ delete mode 100644 arch/arm/mach-tegra/board-dt-tegra30.c
+ rename arch/arm/mach-tegra/{board-dt-tegra20.c => tegra.c} (89%)
+ delete mode 100644 arch/arm/plat-samsung/include/plat/irq.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2410.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2412.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2416.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c2443.h
+ delete mode 100644 arch/arm/plat-samsung/include/plat/s3c244x.h
+ rename arch/arm/mach-mxs/timer.c => drivers/clocksource/mxs_timer.c (91%)
+ rename drivers/clocksource/{sunxi_timer.c => sun4i_timer.c} (50%)
+ rename arch/arm/mach-mxs/icoll.c => drivers/irqchip/irq-mxs.c (89%)
+ create mode 100644 drivers/irqchip/irq-sun4i.c
+ delete mode 100644 drivers/irqchip/irq-sunxi.c
+ create mode 100644 include/linux/clk/mxs.h
+ create mode 100644 include/linux/irqchip/chained_irq.h
+ rename arch/arm/mach-h720x/include/mach/timex.h => include/linux/irqchip/mxs.h (52%)
+ delete mode 100644 include/linux/irqchip/sunxi.h
+ rename include/linux/platform_data/{usb-exynos.h => usb-ohci-exynos.h} (100%)
+ delete mode 100644 include/linux/sunxi_timer.h
