@@ -1,43 +1,34 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 2 May 2013 20:18:21 +0200
-Subject: Freescale imx35: sgtl5000 codec not working over i2c
-In-Reply-To: <20130502200024.72c112cc@jobraun>
-References: <20130502200024.72c112cc@jobraun>
-Message-ID: <20130502181821.GC31135@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 May 2013 19:18:51 +0100
+Subject: [PATCH v10 0/2] (arm-soc for v3.10) arm: introduce psci_smp_ops
+In-Reply-To: <alpine.DEB.2.02.1305021816490.5398@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1305021811560.5398@kaball.uk.xensource.com>
+ <20130502171516.GA3040@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1305021816490.5398@kaball.uk.xensource.com>
+Message-ID: <20130502181851.GB14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 08:00:24PM +0200, Johannes Braun wrote:
-> Hello @all,
+On Thu, May 02, 2013 at 06:20:32PM +0100, Stefano Stabellini wrote:
+> On Thu, 2 May 2013, Will Deacon wrote:
+> > Hi Stefano,
+> > 
+> > On Thu, May 02, 2013 at 06:12:12PM +0100, Stefano Stabellini wrote:
+> > > ping
+> > 
+> > Is this a ping to have this pulled into Russell's tree?
 > 
-> I hope this is the right place for my problem. Currently I am trying to
-> get a sigmatel sgtl5000 codec to work on a Freescale imx35 based board.
-> I am using a vanilla kernel 3.7.10. The codec is connected via i2c. I
-> configured the i2c device in /arch/arm/mach-imx/mach-proxmobil2.c.
-> Proxmobil2 is the name of our device. Here is the part which configures
-> the i2c device and the bus.
+> I thought that we agreed that the patches should go via the arm-soc
+> tree, after Russell acks them.
 > 
-> static const struct imxi2c_platform_data mx35_prox2_i2c0_data
-> 	__initconst = {
->         .bitrate = 100000,
-> };
-> 
-> imx35_add_imx_i2c0(&mx35_prox2_i2c0_data);
-> 
-> static struct i2c_board_info __initdata i2c_devices_prox2[] = {
->         {
->                 I2C_BOARD_INFO("imx-audio-sgtl5000", 0x0a),
->         },
+> The ping is for Russell to ack them and Arnd to merge them.
 
-The driver matches "sgtl5000", not "imx-audio-sgtl5000".
+Sorry but I tend not to be around on Tuesdays and Wednesdays, which leads
+to a hell of an email problem on Thursdays.  I haven't looked at them in
+any great detail (I just paged through them so far and on to the next
+email.)
 
-You should use devicetree support for new boards. The platform support
-will vanish sooner or later.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+I don't really have sufficient time to properly deal with all the email
+traffic that is now on this list - even from just flicking through the
+messages.  It's far too much.
