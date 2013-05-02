@@ -1,142 +1,135 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 2 May 2013 09:38:49 +0100
-Subject: [PATCH 12/32] ARM: ux500: Remove superfluous 'psize' attribute
- from Audio platform data
-In-Reply-To: <20130501144213.GG25256@gmail.com>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-13-git-send-email-lee.jones@linaro.org>
- <20130501144213.GG25256@gmail.com>
-Message-ID: <20130502083849.GH25256@gmail.com>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Thu, 2 May 2013 14:18:21 +0530
+Subject: [v3,
+ 3/3] ARM: dts: AM33XX: Add NAND flash device tree data to am335x-evm
+Message-ID: <1367484501-3623-1-git-send-email-pekon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 01 May 2013, Lee Jones wrote:
+From: avinash philip <avinashphilip@ti.com>
 
-> On Thu, 18 Apr 2013, Lee Jones wrote:
-> 
-> > 'psize' is used to calculate the maximum DMA burst size. However it
-> > is only taken into consideration when editing the DMA channel's
-> > configuration. The Audio DMA platform data is only used to allocate
-> > a channel, not configure it. That will be done at a later date within
-> > the MSP driver.
-> > 
-> > We're also removing comments which are no longer required, as
-> > 'data_width' is no longer set in any device's platform data period.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  arch/arm/mach-ux500/board-mop500-audio.c |   38 ------------------------------
-> >  1 file changed, 38 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-ux500/board-mop500-audio.c b/arch/arm/mach-ux500/board-mop500-audio.c
-> > index f012cfa..972bec0 100644
-> > --- a/arch/arm/mach-ux500/board-mop500-audio.c
-> > +++ b/arch/arm/mach-ux500/board-mop500-audio.c
-> > @@ -23,25 +23,13 @@
-> >  static struct stedma40_chan_cfg msp0_dma_rx = {
-> >  	.high_priority = true,
-> >  	.dir = STEDMA40_PERIPH_TO_MEM,
-> > -
-> >  	.dev_type = DB8500_DMA_DEV31_MSP0_SLIM0_CH0,
-> > -
-> > -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-> > -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-> > -
-> > -	/* data_width is set during configuration */
-> >  };
-> >  
-> >  static struct stedma40_chan_cfg msp0_dma_tx = {
-> >  	.high_priority = true,
-> >  	.dir = STEDMA40_MEM_TO_PERIPH,
-> > -
-> >  	.dev_type = DB8500_DMA_DEV31_MSP0_SLIM0_CH0,
-> > -
-> > -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-> > -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-> > -
-> > -	/* data_width is set during configuration */
-> >  };
-> >  
-> >  struct msp_i2s_platform_data msp0_platform_data = {
-> > @@ -53,25 +41,13 @@ struct msp_i2s_platform_data msp0_platform_data = {
-> >  static struct stedma40_chan_cfg msp1_dma_rx = {
-> >  	.high_priority = true,
-> >  	.dir = STEDMA40_PERIPH_TO_MEM,
-> > -
-> >  	.dev_type = DB8500_DMA_DEV30_MSP3,
-> > -
-> > -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-> > -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-> > -
-> > -	/* data_width is set during configuration */
-> >  };
-> >  
-> >  static struct stedma40_chan_cfg msp1_dma_tx = {
-> >  	.high_priority = true,
-> >  	.dir = STEDMA40_MEM_TO_PERIPH,
-> > -
-> >  	.dev_type = DB8500_DMA_DEV30_MSP1,
-> > -
-> > -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-> > -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-> > -
-> > -	/* data_width is set during configuration */
-> >  };
-> >  
-> >  struct msp_i2s_platform_data msp1_platform_data = {
-> > @@ -83,29 +59,15 @@ struct msp_i2s_platform_data msp1_platform_data = {
-> >  static struct stedma40_chan_cfg msp2_dma_rx = {
-> >  	.high_priority = true,
-> >  	.dir = STEDMA40_PERIPH_TO_MEM,
-> > -
-> >  	.dev_type = DB8500_DMA_DEV14_MSP2,
-> > -
-> > -	/* MSP2 DMA doesn't work with PSIZE == 4 on DB8500v2 */
-> > -	.src_info.psize = STEDMA40_PSIZE_LOG_1,
-> > -	.dst_info.psize = STEDMA40_PSIZE_LOG_1,
-> > -
-> > -	/* data_width is set during configuration */
-> >  };
-> >  
-> >  static struct stedma40_chan_cfg msp2_dma_tx = {
-> >  	.high_priority = true,
-> >  	.dir = STEDMA40_MEM_TO_PERIPH,
-> > -
-> >  	.dev_type = DB8500_DMA_DEV14_MSP2,
-> > -
-> > -	.src_info.psize = STEDMA40_PSIZE_LOG_4,
-> > -	.dst_info.psize = STEDMA40_PSIZE_LOG_4,
-> > -
-> >  	.use_fixed_channel = true,
-> >  	.phy_channel = 1,
-> > -
-> > -	/* data_width is set during configuration */
-> >  };
-> >  
-> >  static struct platform_device *db8500_add_msp_i2s(struct device *parent,
-> 
-> Linus, poke.
+NAND flash connected in am335x-evm on GPMC controller. This patch adds
+device tree node in am3355-evm with GPMC contoller timing for NAND flash
+interface, NAND partition table, ECC scheme, elm handle id.
 
-I've just seen this response from you (it didn't make it to my offline
-mail store for some reason):
+Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+Signed-off-by: Gupta, Pekon <pekon@ti.com>
+---
+ arch/arm/boot/dts/am335x-evm.dts | 95 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 95 insertions(+)
 
-> Linus Walleij wrote:
-> So if I understand correctly this is now handled by dmaengine_pcm.c,
-> os that right?
-
-Unfortunately not. At the moment ux500 sound is very broken in
-Mainline. I looked at it recently and the driver is almost completely
-different to the one maintained internally.
-
-There were DMA changes relating to this driver pending for v3.10,
-which I believe have just been taking into -next. I will straighten
-out the DMA issues shortly, but there are other ones remaining still -
-mostly surrounding widgets. Ideally this is something Ola should fix,
-as he has the expertise to do so, but he doesn't appear to have been
-very active upstream of late.
-
+diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
+index d649644..07761fd 100644
+--- a/arch/arm/boot/dts/am335x-evm.dts
++++ b/arch/arm/boot/dts/am335x-evm.dts
+@@ -44,6 +44,26 @@
+ 				0x154 0x27	/* spi0_d0.gpio0_3, INPUT | MODE7 */
+ 			>;
+ 		};
++
++		nandflash_pins_s0: nandflash_pins_s0 {
++			pinctrl-single,pins = <
++				0x0 0x30	/* gpmc_ad0.gpmc_ad0, INPUT | PULLUP | MODE0 */
++				0x4 0x30	/* gpmc_ad1.gpmc_ad1, INPUT | PULLUP | MODE0 */
++				0x8 0x30	/* gpmc_ad2.gpmc_ad2, INPUT | PULLUP | MODE0 */
++				0xc 0x30	/* gpmc_ad3.gpmc_ad3, INPUT | PULLUP | MODE0 */
++				0x10 0x30	/* gpmc_ad4.gpmc_ad4, INPUT | PULLUP | MODE0 */
++				0x14 0x30	/* gpmc_ad5.gpmc_ad5, INPUT | PULLUP | MODE0 */
++				0x18 0x30	/* gpmc_ad6.gpmc_ad6, INPUT | PULLUP | MODE0 */
++				0x1c 0x30	/* gpmc_ad7.gpmc_ad7, INPUT | PULLUP | MODE0 */
++				0x70 0x30	/* gpmc_wait0.gpmc_wait0, INPUT | PULLUP | MODE0 */
++				0x74 0x37	/* gpmc_wpn.gpio0_30, INPUT | PULLUP | MODE7 */
++				0x7c 0x8	/* gpmc_csn0.gpmc_csn0,  PULL DISA */
++				0x90 0x8	/* gpmc_advn_ale.gpmc_advn_ale, PULL DISA */
++				0x94 0x8	/* gpmc_oen_ren.gpmc_oen_ren, PULL DISA */
++				0x98 0x8	/* gpmc_wen.gpmc_wen, PULL DISA */
++				0x9c 0x8	/* gpmc_be0n_cle.gpmc_be0n_cle, PULL DISA */
++			>;
++		};
+ 	};
+ 
+ 	ocp {
+@@ -102,6 +122,81 @@
+ 				reg = <0x48>;
+ 			};
+ 		};
++
++		elm: elm at 48080000 {
++			status = "okay";
++		};
++
++		gpmc: gpmc at 50000000 {
++			status = "okay";
++			pinctrl-0 = <&nandflash_pins_s0>;
++			ranges = <0 0 0x08000000 0x10000000>;	/* CS0: NAND */
++			nand at 0,0 {
++				reg = <0 0 0>; /* CS0, offset 0 */
++				nand-bus-width = <8>;
++				ti,nand-ecc-opt = "bch8";
++
++				gpmc,sync-clk = <0>;
++				gpmc,cs-on = <0>;
++				gpmc,cs-rd-off = <44>;
++				gpmc,cs-wr-off = <44>;
++				gpmc,adv-on = <6>;
++				gpmc,adv-rd-off = <34>;
++				gpmc,adv-wr-off = <44>;
++				gpmc,we-off = <40>;
++				gpmc,oe-off = <54>;
++				gpmc,access = <64>;
++				gpmc,rd-cycle = <82>;
++				gpmc,wr-cycle = <82>;
++				gpmc,wr-access = <40>;
++				gpmc,wr-data-mux-bus = <0>;
++
++				#address-cells = <1>;
++				#size-cells = <1>;
++				elm_id = <&elm>;
++
++				/* MTD partition table */
++				partition at 0 {
++					label = "SPL1";
++					reg = <0x00000000 0x000020000>;
++				};
++
++				partition at 1 {
++					label = "SPL2";
++					reg = <0x00020000 0x00020000>;
++				};
++
++				partition at 2 {
++					label = "SPL3";
++					reg = <0x00040000 0x00020000>;
++				};
++
++				partition at 3 {
++					label = "SPL4";
++					reg = <0x00060000 0x00020000>;
++				};
++
++				partition at 4 {
++					label = "U-boot";
++					reg = <0x00080000 0x001e0000>;
++				};
++
++				partition at 5 {
++					label = "environment";
++					reg = <0x00260000 0x00020000>;
++				};
++
++				partition at 6 {
++					label = "Kernel";
++					reg = <0x00280000 0x00500000>;
++				};
++
++				partition at 7 {
++					label = "File-System";
++					reg = <0x00780000 0x0F880000>;
++				};
++			};
++		};
+ 	};
+ 
+ 	vbat: fixedregulator at 0 {
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.1
