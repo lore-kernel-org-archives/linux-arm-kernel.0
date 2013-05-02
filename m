@@ -1,106 +1,49 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Thu, 2 May 2013 14:46:31 -0400
-Subject: Latest build results - errors/warnings - lots of them
-In-Reply-To: <20130502180627.GA10672@arwen.pp.htv.fi>
-References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
- <20130502082218.GA21614@n2100.arm.linux.org.uk>
- <20130502153834.GR28721@atomide.com> <51829D65.7040109@ti.com>
- <20130502180627.GA10672@arwen.pp.htv.fi>
-Message-ID: <5182B487.7090801@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 May 2013 19:48:01 +0100
+Subject: [PATCH v10 0/2] (arm-soc for v3.10) arm: introduce psci_smp_ops
+In-Reply-To: <alpine.DEB.2.02.1305021938170.5398@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1305021811560.5398@kaball.uk.xensource.com>
+ <20130502171516.GA3040@mudshark.cambridge.arm.com>
+ <alpine.DEB.2.02.1305021816490.5398@kaball.uk.xensource.com>
+ <20130502182812.GD14496@n2100.arm.linux.org.uk>
+ <alpine.DEB.2.02.1305021938170.5398@kaball.uk.xensource.com>
+Message-ID: <20130502184801.GF14496@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02-05-2013 14:06, Felipe Balbi wrote:
-> Hi,
+On Thu, May 02, 2013 at 07:42:58PM +0100, Stefano Stabellini wrote:
+> On Thu, 2 May 2013, Russell King - ARM Linux wrote:
+> > On Thu, May 02, 2013 at 06:20:32PM +0100, Stefano Stabellini wrote:
+> > > On Thu, 2 May 2013, Will Deacon wrote:
+> > > > Hi Stefano,
+> > > > 
+> > > > On Thu, May 02, 2013 at 06:12:12PM +0100, Stefano Stabellini wrote:
+> > > > > ping
+> > > > 
+> > > > Is this a ping to have this pulled into Russell's tree?
+> > > 
+> > > I thought that we agreed that the patches should go via the arm-soc
+> > > tree, after Russell acks them.
+> > 
+> > Okay, well, is there a reason for them to go through arm-soc?  They
+> > look more like core code to me than SoC specific - they only minimally
+> > touch mach-virt.
 > 
-> On Thu, May 02, 2013 at 01:07:49PM -0400, Eduardo Valentin wrote:
->> Arnd, Tony,
->>
->> On 02-05-2013 11:38, Tony Lindgren wrote:
->>> * Russell King - ARM Linux <linux@arm.linux.org.uk> [130502 01:27]:
->>>> On Tue, Apr 30, 2013 at 09:17:39AM +0100, Russell King - ARM Linux wrote:
->>>>> Latest nightly build of 3.9+my for-next+arm-soc's for-next results in a
->>>>> great load of new warnings and errors.  arch/arm/common/mcpm_head.S,
->>>>> arch/arm/common/mcpm_platsmp.c, arch/arm/common/vlock.S are the biggest
->>>>> source of errors.
->>>>>
->>>>> OMAP stuff needs a serious look at too - much Kconfig madness there
->>>>> caused by over-use of select, which then goes on to cause build errors
->>>>> because it assumes some stuff is always enabled.
->>>>>
->>>>> There's also warnings about of_device_id from include/linux/of_platform.h
->>>>> via from arch/arm/kernel/setup.c which feature in all the non-OF builds
->>>>> too which need addressing.
->>>>>
->>>>> See todays http://www.arm.linux.org.uk/developer/build/ results for all
->>>>> the details and configs.  Not pushing my tree until some of this stuff
->>>>> gets fixed.
->>>>
->>>> And now we have a new bunch of warnings from OMAP stuff which weren't
->>>> previously there...
->>>>
->>>> arch/arm/mach-omap2/omap_device.c: In function 'omap_device_get_by_hwmod_name':
->>>> arch/arm/mach-omap2/omap_device.c:821:3: warning: return makes pointer from integer without a cast
->>>> arch/arm/mach-omap2/omap_device.c:826:3: warning: return makes pointer from integer without a cast
->>>
->>> Hmm these I already fixed earlier along with a merge resolution, and
->>> I'm not seeing them in next/master or arm-soc/for-next. What do you
->>> have merged into your current tree?
->>>
->>>> drivers/power/twl4030_charger.c: In function 'twl4030_charger_enable_usb':
->>>> drivers/power/twl4030_charger.c:192:20: warning: ignoring return value of 'regulator_enable', declared with attribute warn_unused_result
->>>
->>> Neil, care to provide a fix for this? It's from your commit ab37813
->>> (twl4030_charger: Allow charger to control the regulator that feeds it).
->>>
->>>> include/linux/thermal.h:254:12: warning: 'thermal_generate_netlink_event' defined but not used
->>>
->>> Eduardo, can you fix that one? It seems to be from your commit 8ab3e6a
->>> (thermal: Use thermal zone device id in netlink messages).
->>
->> Yeah sure I can fix it. As simple as the following:
->> From c04244c87312f5bfc61d9e12ba3fbaa0fdd81adb Mon Sep 17 00:00:00 2001
->> From: Eduardo Valentin <eduardo.valentin@ti.com>
->> Date: Thu, 2 May 2013 12:58:20 -0400
->> Subject: [PATCH 1/1] thermal: remove stub for thermal_generate_netlink_event
->>
->> This patch removes the stub for thermal_generate_netlink_event
->> because this function is not used anywhere inside the kernel.
->>
->> In case CONFIG_NET is not set we get:
->> include/linux/thermal.h:254:12: warning:
->> 'thermal_generate_netlink_event' defined but not used
->>
->> Thus removing it.
->>
->> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
->> ---
->>  include/linux/thermal.h | 6 ------
->>  1 file changed, 6 deletions(-)
->>
->> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
->> index e3c0ae9..e3f3cba 100644
->> --- a/include/linux/thermal.h
->> +++ b/include/linux/thermal.h
->> @@ -250,12 +250,6 @@ void thermal_unregister_governor(struct
->> thermal_governor *);
->>  #ifdef CONFIG_NET
->>  extern int thermal_generate_netlink_event(struct thermal_zone_device *tz,
->>  						enum events event);
->> -#else
->> -static int thermal_generate_netlink_event(struct thermal_zone_device *tz,
+> The original reason is that some SoC specific code depends on this
+> series (Calxeda I believe).
 > 
-> just adding 'inline' would be an easier patch and lets you compile fine
-> on !CONFIG_NET when you starting using thermal_generate_netlink_event().
-> 
+> But you are probably right, if you prefer that I issue a pull request
+> for your tree, I have no problems with that.
 
-Yeah, that is one thing. But as I pointed, the fix is actually to remove
-the whole netlink thing.
+The only issue that there is is where we are in the development cycle
+(almost mid merge window), and I've yet to push anything to Linus thanks
+to late discovery of various messups in other chunks of code submitted
+via my tree - I'm starting to drop stuff from my tree in the hope that
+I'll get back to something that's going to be suitable for mainline.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 295 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130502/e79404d7/attachment.sig>
+I really don't want to go pulling anything else at the moment in the
+hope of getting what I currently have out the door.
+
+And in any case, we shouldn't be adding any new code to our trees at
+this point in time.
