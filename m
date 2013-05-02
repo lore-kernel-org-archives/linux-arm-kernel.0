@@ -1,33 +1,71 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 2 May 2013 10:21:49 +0800
-Subject: [PATCH v3] ARM: imx: replicate the diagnostic register of boot
- cpu into secondary cores
-In-Reply-To: <20130501163817.GD24055@mudshark.cambridge.arm.com>
-References: <1366948645-12060-1-git-send-email-shawn.guo@linaro.org>
- <20130426132130.GE30858@mudshark.cambridge.arm.com>
- <20130426134722.GA1943@S2101-09.ap.freescale.net>
- <5181357E.3090805@gmail.com>
- <20130501153828.GC24055@mudshark.cambridge.arm.com>
- <5181408C.8090606@gmail.com>
- <20130501163817.GD24055@mudshark.cambridge.arm.com>
-Message-ID: <20130502022147.GC3442@S2101-09.ap.freescale.net>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Thu, 2 May 2013 02:35:16 +0000
+Subject: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
+ xfer->speed_hz set
+In-Reply-To: <CAGhQ9VwW18LXY5Jn0FUFCaAzKxP1W3QADG=JBp9JbgaAwo=F2Q@mail.gmail.com>
+References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
+ <1362626815-6628-1-git-send-email-wenyou.yang@atmel.com>
+ <CAGhQ9VwW18LXY5Jn0FUFCaAzKxP1W3QADG=JBp9JbgaAwo=F2Q@mail.gmail.com>
+Message-ID: <B256D81BAE5131468A838E5D7A24364154236AB5@penmbx02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 01, 2013 at 05:38:17PM +0100, Will Deacon wrote:
-> On Wed, May 01, 2013 at 05:19:24PM +0100, Dirk Behme wrote:
-> > Am 01.05.2013 17:38, schrieb Will Deacon:
-> > > On Wed, May 01, 2013 at 04:32:14PM +0100, Dirk Behme wrote:
-> > Just for a better understanding: What's wrong with using the same 
-> > register values on all CPUx? I.e. with copying them from CPU0? 
-> > Shouldn't all CPUx use the same setting? Or at least the same errata 
-> > bits enabled?
+Hi, Joachim,
+
+> -----Original Message-----
+> From: Joachim Eastwood [mailto:manabian at gmail.com]
+> Sent: 2013?3?7? 20:31
+> To: Yang, Wenyou
+> Cc: linux-arm-kernel at lists.infradead.org; grant.likely at secretlab.ca; Ferre,
+> Nicolas; plagnioj at jcrosoft.com; richard.genoud at gmail.com; Lin, JM;
+> spi-devel-general at lists.sourceforge.net; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
+> xfer->speed_hz set
 > 
-> There's this thing called big.LITTLE... In this case, we're all A9s, but it
-> still feels horrible.
+> On 7 March 2013 04:26, Wenyou Yang <wenyou.yang@atmel.com> wrote:
+> > commit: 059b8ffeee5b427949872bb6ed5db5ae0788054e
+> > cause the atmel spi probing failure.
+> >
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > Cc: spi-devel-general at lists.sourceforge.net
+> > Cc: linux-kernel at vger.kernel.org
+> > ---
+> >  drivers/spi/spi-atmel.c |    6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> > index 656d137..1eca815 100644
+> > --- a/drivers/spi/spi-atmel.c
+> > +++ b/drivers/spi/spi-atmel.c
+> > @@ -846,9 +846,9 @@ static int atmel_spi_transfer(struct spi_device *spi,
+> struct spi_message *msg)
+> >                         }
+> >                 }
+> >
+> > -               /* FIXME implement these protocol options!! */
+> > -               if (xfer->speed_hz) {
+> > -                       dev_dbg(&spi->dev, "no protocol options
+> yet\n");
+> > +               if (xfer->speed_hz < spi->max_speed_hz) {
+> > +                       dev_dbg(&spi->dev,
+> > +                               "speed in transfer less than bus
+> speed\n");
+> >                         return -ENOPROTOOPT;
+> >                 }
+> 
+> I sent a similar patch to spi-devl a while ago, which Grant said he applied.
+> https://patchwork.kernel.org/patch/2165301/
+> 
+> Can't find the patch in any upstream git tree so I guess Grant hasn't
+> pushed it yet.
+This patch hasn't still applied in any upstream git tree, so Atmel spi master doesn't work.
+Could you help do some ping it? 
 
-It sounds more like a feeling instead of any issue in real.  Unless I
-hear some convincing technical explanation, I will send the patch for
--rc to fix the broken reboot on imx6q.
+Thanks.
 
-Shawn
+> 
+> regards
+> Joachim Eastwood
+
+Best Regards,
+Wenyou Yang
