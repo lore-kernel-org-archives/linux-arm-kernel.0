@@ -1,13 +1,13 @@
 From: pekon@ti.com (Gupta, Pekon)
-Date: Thu, 2 May 2013 15:13:21 +0530
-Subject: [PATCH v3,1/3] ARM: dts: AM33XX: Add ELM node
-Message-ID: <7fa7438c9a7c5da575d762423815625d523c4689.1359007746.git.avinashphilip@ti.com>
+Date: Thu, 2 May 2013 15:14:03 +0530
+Subject: [PATCH v3,2/3] ARM: dts: AM33XX: Add GPMC node
+Message-ID: <2645efefa3d36388ff1d4b64255d880b6587770f.1359007746.git.avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Philip, Avinash" <avinashphilip@ti.com>
 
-Add ELM data node to AM33XX device tree file.
+Add GPMC data node to AM33XX device tree file.
 
 Signed-off-by: Philip Avinash <avinashphilip@ti.com>
 Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
@@ -15,26 +15,29 @@ Signed-off-by: Pekon Gupta <pekon@ti.com>
 
 ---
 Changes in v2:
-	- Replace <xx> literals to 52
-	- remove tab
+	- Change number of chip select to 7
 
- arch/arm/boot/dts/am33xx.dtsi |    8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/am33xx.dtsi |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 0957645..24fc835 100644
+index 24fc835..1048795 100644
 --- a/arch/arm/boot/dts/am33xx.dtsi
 +++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -399,5 +399,13 @@
- 			       0x44d80000 0x2000>;	/* M3 DMEM */
- 			ti,hwmods = "wkup_m3";
+@@ -407,5 +407,17 @@
+ 			ti,hwmods = "elm";
+ 			status = "disabled";
  		};
 +
-+		elm: elm at 48080000 {
-+			compatible = "ti,am3352-elm";
-+			reg = <0x48080000 0x2000>;
-+			interrupts = <4>;
-+			ti,hwmods = "elm";
++		gpmc: gpmc at 50000000 {
++			compatible = "ti,am3352-gpmc";
++			ti,hwmods = "gpmc";
++			reg = <0x50000000 0x2000>;
++			interrupts = <100>;
++			num-cs = <7>;
++			num-waitpins = <2>;
++			#address-cells = <2>;
++			#size-cells = <1>;
 +			status = "disabled";
 +		};
  	};
