@@ -1,101 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 May 2013 00:13:53 +0100
-Subject: [PATCH] ARM: OMAP-USB: Fix possible memory leak
-In-Reply-To: <20130502164058.GC8577@arwen.pp.htv.fi>
-References: <1367510596-27780-1-git-send-email-shc_work@mail.ru>
- <20130502162433.GA10016@kahuna> <1367512124.978518915@f372.mail.ru>
- <20130502164058.GC8577@arwen.pp.htv.fi>
-Message-ID: <20130502231353.GF21614@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 May 2013 16:30:11 -0700
+Subject: [PATCH 2/9] ARM: OMAP: build SMP code only for OMAP4/5
+In-Reply-To: <1367528578-518090-3-git-send-email-arnd@arndb.de>
+References: <1367528578-518090-1-git-send-email-arnd@arndb.de>
+ <1367528578-518090-3-git-send-email-arnd@arndb.de>
+Message-ID: <20130502233011.GT28721@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 07:40:58PM +0300, Felipe Balbi wrote:
-> Hi,
+* Arnd Bergmann <arnd@arndb.de> [130502 14:08]:
+> The OMAP platform code assumes that SMP is only ever enabled when
+> CONFIG_ARCH_OMAP4 or CONFIG_SOC_OMAP5 is enabled, which is not
+> necessarirly true in a multiplatform configuration.
 > 
-> On Thu, May 02, 2013 at 08:28:44PM +0400, Alexander Shiyan wrote:
-> > > On 20:03-20130502, Alexander Shiyan wrote:
-> > > > 
-> > > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > > > ---
-> > > >  arch/arm/mach-omap2/usb-host.c | 21 +++++++++++++++++----
-> > > >  1 file changed, 17 insertions(+), 4 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
-> > > > index aa27d7f..8d17a0d 100644
-> > > > --- a/arch/arm/mach-omap2/usb-host.c
-> > > > +++ b/arch/arm/mach-omap2/usb-host.c
-> > > > @@ -570,8 +570,10 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
-> > > >  	supplies->dev_name = dev_id;
-> > > >  
-> > > >  	reg_data = kzalloc(sizeof(*reg_data), GFP_KERNEL);
-> > > > -	if (!reg_data)
-> > > > +	if (!reg_data) {
-> > > > +		kfree(supplies);
-> > > >  		return -ENOMEM;
-> > > > +	}
-> > > >  
-> > > >  	reg_data->constraints.valid_ops_mask = REGULATOR_CHANGE_STATUS;
-> > > >  	reg_data->consumer_supplies = supplies;
-> > > > @@ -579,8 +581,11 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
-> > > >  
-> > > >  	config = kmemdup(&hsusb_reg_config, sizeof(hsusb_reg_config),
-> > > >  			GFP_KERNEL);
-> > > > -	if (!config)
-> > > > +	if (!config) {
-> > > > +		kfree(supplies);
-> > > > +		kfree(reg_data);
-> > > >  		return -ENOMEM;
-> > > > +	}
-> > > >  
-> > > >  	config->supply_name = name;
-> > > >  	config->gpio = gpio;
-> > > > @@ -589,17 +594,25 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
-> > > >  
-> > > >  	/* create a regulator device */
-> > > >  	pdev = kzalloc(sizeof(*pdev), GFP_KERNEL);
-> > > > -	if (!pdev)
-> > > > +	if (!pdev) {
-> > > > +		kfree(supplies);
-> > > > +		kfree(reg_data);
-> > > > +		kfree(config);
-> > > >  		return -ENOMEM;
-> > > > +	}
-> > > >  
-> > > >  	pdev->id = PLATFORM_DEVID_AUTO;
-> > > >  	pdev->name = reg_name;
-> > > >  	pdev->dev.platform_data = config;
-> > > >  
-> > > >  	ret = platform_device_register(pdev);
-> > > > -	if (ret)
-> > > > +	if (ret) {
-> > > >  		pr_err("%s: Failed registering regulator %s for %s\n",
-> > > >  				__func__, name, dev_id);
-> > > > +		kfree(supplies);
-> > > > +		kfree(reg_data);
-> > > > +		kfree(config);
-> > > > +	}
-> > > 
-> > > Might be better to switch to devm_XXX managed functions?
+> arch/arm/mach-omap2/built-in.o: In function `omap4_smp_prepare_cpus':
+>  :(.init.text+0x413c): undefined reference to `omap_get_wakeupgen_base'
+>  :(.init.text+0x415c): undefined reference to `omap_secure_apis_support'
+> arch/arm/mach-omap2/built-in.o: In function `omap4_boot_secondary':
+>  :(.cpuinit.text+0x28): undefined reference to `omap_get_wakeupgen_base'
+>  :(.cpuinit.text+0x3c): undefined reference to `omap_secure_apis_support'
+> arch/arm/mach-omap2/built-in.o: In function `omap4_cpu_die':
+>  :(.ref.text+0x8): undefined reference to `omap_get_wakeupgen_base'
+>  :(.ref.text+0x10): undefined reference to `omap_secure_apis_support'
+>  :(.ref.text+0x4c): undefined reference to `omap4_hotplug_cpu'
+>  :(.ref.text+0x50): undefined reference to `omap_secure_apis_support'
 > 
-> I don't think it makes sense since the platform_device hasn't been
-> registered yet.
-> 
-> Still, patch can be improved with proper goto labels instead of
-> sprinkling different kfree() calls in every single error branch.
-> 
-> > If anyone can rewrite driver to use devm_xx, it would have been better.
-> > I'm not going to redo the patch yet, let it be so, I just showed a point
-> > for OMAP-developers.
-> 
-> fair enough.
 
-Well, as long as this crap violates the driver model by using kfree() on
-a device...  Devices are refcounted and must only be freed when the
-refcount drops to zero.
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-This is exactly why we have platform_device_alloc(),
-platform_device_register_full() and friends - so that people don't have to
-fsck around with kzalloc themselves and get it wrong like the above does.
-
-Would you like me to pass your details to gregkh for another one of his
-public humilation exercises over basic kernel programming stuff? :)
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/mach-omap2/Makefile | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index e50b6da..f2d19af 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -32,12 +32,12 @@ obj-$(CONFIG_SOC_HAS_OMAP2_SDRC)	+= sdrc.o
+>  
+>  # SMP support ONLY available for OMAP4
+>  
+> -obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
+> -obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
+> +smp-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
+> +smp-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
+>  omap-4-5-common				=  omap4-common.o omap-wakeupgen.o \
+>  					   sleep44xx.o
+> -obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common)
+> -obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-common)
+> +obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common) $(smp-y)
+> +obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-common) $(smp-y)
+>  
+>  plus_sec := $(call as-instr,.arch_extension sec,+sec)
+>  AFLAGS_omap-headsmp.o			:=-Wa,-march=armv7-a$(plus_sec)
+> -- 
+> 1.8.1.2
+> 
