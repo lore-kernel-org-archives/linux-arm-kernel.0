@@ -1,24 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 May 2013 19:37:56 +0200
-Subject: [PATCH] ARM: iop13xx: change type of ioremap function
-In-Reply-To: <1367515260-32364-1-git-send-email-lauraa@codeaurora.org>
-References: <1367515260-32364-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <201305021937.56853.arnd@arndb.de>
+Date: Thu, 2 May 2013 19:39:48 +0200
+Subject: [PATCH 1/7] ARM: u300: push down syscon registers
+In-Reply-To: <CACRpkdayJCm-PcY_=+NDraEPn0m6BrjNRH+tYp3Abar43RamaA@mail.gmail.com>
+References: <1367511416-4312-1-git-send-email-linus.walleij@stericsson.com>
+ <201305021821.12008.arnd@arndb.de>
+ <CACRpkdayJCm-PcY_=+NDraEPn0m6BrjNRH+tYp3Abar43RamaA@mail.gmail.com>
+Message-ID: <201305021939.48381.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 May 2013, Laura Abbott wrote:
-> Commit cd024d4245b2bfbd824b911f11a9756d1d6c167d
-> (ARM: 7704/1: mm: Use phys_addr_t properly for ioremap functions)
-> changed the type of the ioremap functions to actually use phys_addr_t
-> instead of unsigned long. Change the type of the arch_ioremap function
-> to use phys_addr_t as well.
+On Thursday 02 May 2013, Linus Walleij wrote:
+> > How do those drivers get to the SYSCON base address? Should they
+> > be using drivers/mfd/syscon.c as the multiplexor instead?
 > 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> No, there is no mutex to be taken. The consecutive range of memory
+> addresses are used by different things (mainly the clocks) but there
+> is no register that needs to be protected against access from two
+> subsystems simultaneously.
+> 
+> As a follow-up to this series I plan to move also the U300 clocks
+> to the device tree (similar three-step ladder as used for the Nomadik)
+> and then they will (hopefully) get the syscon base address from the
+> device tree.
 
-Hi Laura,
-
-I've just sent a patch fixing up the same bug and all others
-that go along with it.
+I was less worried about mutexes than a correct representation
+in the device tree. With the syscon driver, you can have the
+register ranges described exactly once and just use the offsets
+on the regmap in the other drivers.
 
 	Arnd
