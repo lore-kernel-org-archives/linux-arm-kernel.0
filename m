@@ -1,59 +1,47 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 May 2013 16:30:11 -0700
-Subject: [PATCH 2/9] ARM: OMAP: build SMP code only for OMAP4/5
-In-Reply-To: <1367528578-518090-3-git-send-email-arnd@arndb.de>
+Date: Thu, 2 May 2013 16:32:49 -0700
+Subject: [PATCH 7/9] ARM: OMAP: don't select SERIAL_OMAP unconditionally
+In-Reply-To: <1367528578-518090-8-git-send-email-arnd@arndb.de>
 References: <1367528578-518090-1-git-send-email-arnd@arndb.de>
- <1367528578-518090-3-git-send-email-arnd@arndb.de>
-Message-ID: <20130502233011.GT28721@atomide.com>
+ <1367528578-518090-8-git-send-email-arnd@arndb.de>
+Message-ID: <20130502233249.GU28721@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 * Arnd Bergmann <arnd@arndb.de> [130502 14:08]:
-> The OMAP platform code assumes that SMP is only ever enabled when
-> CONFIG_ARCH_OMAP4 or CONFIG_SOC_OMAP5 is enabled, which is not
-> necessarirly true in a multiplatform configuration.
+> It is possible to build a kernel without TTY support, so we must not
+> attempt to select SERIAL_OMAP in that case.
 > 
-> arch/arm/mach-omap2/built-in.o: In function `omap4_smp_prepare_cpus':
->  :(.init.text+0x413c): undefined reference to `omap_get_wakeupgen_base'
->  :(.init.text+0x415c): undefined reference to `omap_secure_apis_support'
-> arch/arm/mach-omap2/built-in.o: In function `omap4_boot_secondary':
->  :(.cpuinit.text+0x28): undefined reference to `omap_get_wakeupgen_base'
->  :(.cpuinit.text+0x3c): undefined reference to `omap_secure_apis_support'
-> arch/arm/mach-omap2/built-in.o: In function `omap4_cpu_die':
->  :(.ref.text+0x8): undefined reference to `omap_get_wakeupgen_base'
->  :(.ref.text+0x10): undefined reference to `omap_secure_apis_support'
->  :(.ref.text+0x4c): undefined reference to `omap4_hotplug_cpu'
->  :(.ref.text+0x50): undefined reference to `omap_secure_apis_support'
+> warning: (ARCH_OMAP2PLUS_TYPICAL) selects SERIAL_OMAP which has unmet direct dependencies (TTY && HAS_IOMEM && GENERIC_HARDIRQS && ARCH_OMAP2PLUS)
 > 
-
-Acked-by: Tony Lindgren <tony@atomide.com>
-
+> Cc: Tony Lindgren <tony@atomide.com>
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm/mach-omap2/Makefile | 8 ++++----
->  1 file changed, 4 insertions(+), 4 deletions(-)
+>  arch/arm/mach-omap2/Kconfig | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-> index e50b6da..f2d19af 100644
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -32,12 +32,12 @@ obj-$(CONFIG_SOC_HAS_OMAP2_SDRC)	+= sdrc.o
->  
->  # SMP support ONLY available for OMAP4
->  
-> -obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
-> -obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
-> +smp-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
-> +smp-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
->  omap-4-5-common				=  omap4-common.o omap-wakeupgen.o \
->  					   sleep44xx.o
-> -obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common)
-> -obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-common)
-> +obj-$(CONFIG_ARCH_OMAP4)		+= $(omap-4-5-common) $(smp-y)
-> +obj-$(CONFIG_SOC_OMAP5)			+= $(omap-4-5-common) $(smp-y)
->  
->  plus_sec := $(call as-instr,.arch_extension sec,+sec)
->  AFLAGS_omap-headsmp.o			:=-Wa,-march=armv7-a$(plus_sec)
-> -- 
-> 1.8.1.2
-> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index 857b1f0..a95c7af 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -37,8 +37,8 @@ config ARCH_OMAP2PLUS_TYPICAL
+>  	select NEON if ARCH_OMAP3 || ARCH_OMAP4 || SOC_OMAP5
+>  	select PM_RUNTIME
+>  	select REGULATOR
+> -	select SERIAL_OMAP
+> -	select SERIAL_OMAP_CONSOLE
+> +	select SERIAL_OMAP if TTY
+> +	select SERIAL_OMAP_CONSOLE if TTY
+>  	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
+>  	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
+>  	select VFP
+
+Please just drop this and pick my earlier fix instead:
+
+[PATCH 1/3] ARM: OMAP2+: Fix unmet direct dependencies for SERIAL_OMAP
+
+Or let me know if you prefer me to queue it.
+
+Regards,
+
+Tony
