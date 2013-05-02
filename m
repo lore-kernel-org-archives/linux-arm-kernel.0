@@ -1,83 +1,87 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Thu, 02 May 2013 20:53:44 +0200
-Subject: [PATCH, RFC 00/22] ARM randconfig bugs
-In-Reply-To: <1367507786-505303-1-git-send-email-arnd@arndb.de>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
-Message-ID: <2710056.LHQ0Ee0x8t@vostro.rjw.lan>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Thu, 2 May 2013 14:45:43 -0400
+Subject: Latest build results - errors/warnings - lots of them
+In-Reply-To: <201305022003.27037.arnd@arndb.de>
+References: <20130430081739.GP14496@n2100.arm.linux.org.uk>
+ <20130502153834.GR28721@atomide.com> <51829D65.7040109@ti.com>
+ <201305022003.27037.arnd@arndb.de>
+Message-ID: <5182B457.5030009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, May 02, 2013 05:16:04 PM Arnd Bergmann wrote:
-> Hi subsystem maintainers,
+On 02-05-2013 14:03, Arnd Bergmann wrote:
+> On Thursday 02 May 2013, Eduardo Valentin wrote:
+>> index e3c0ae9..e3f3cba 100644
+>> --- a/include/linux/thermal.h
+>> +++ b/include/linux/thermal.h
+>> @@ -250,12 +250,6 @@ void thermal_unregister_governor(struct
+>> thermal_governor *);
+>>  #ifdef CONFIG_NET
+>>  extern int thermal_generate_netlink_event(struct thermal_zone_device *tz,
+>>                                                 enum events event);
+>> -#else
+>> -static int thermal_generate_netlink_event(struct thermal_zone_device *tz,
+>> -                                               enum events event)
+>> -{
+>> -       return 0;
+>> -}
+>>  #endif
 > 
-> This is a set of patches to to fix build errors I hit while trying to
-> build lots of randconfig kernels on linux-next.
+> Actually it seems this bug is already fixed in linux-next:
 > 
-> Most of them are simple missing dependencies in Kconfig, but some are
-> more substantial. I would like to see at least the obvious patches
-> get merged for 3.10. If you are happy with the patches, feel free
-> to apply them directly, otherwise please provide feedback.
+> commit f8b587055a793c7719f0d4f41b7b4aeeef43aa2d
+> Author: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> Date:   Wed Mar 20 21:38:07 2013 +0000
 > 
-> No single patch out of these is very important though, most of them
-> only concern corner cases and don't matter in practice.
+>     thermal: Fix compiler warning
+>     
+>     The following warning is obtained when CONFIG_NET is not defined:
+>     
+>     In file included from drivers/thermal/mvebu_thermal.c:27:0:
+>     include/linux/thermal.h:254:12: warning: 'thermal_generate_netlink_event'
+>     defined but not used [-Wunused-function]
+>     
+>     This patch fixes the warning by properly inlining
+>     thermal_generate_netlink_event().
+>     
+>     Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>     Signed-off-by: Zhang Rui <rui.zhang@intel.com>
+> 
+> diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+> index f0bd7f9..fd7b8f3 100644
+> --- a/include/linux/thermal.h
+> +++ b/include/linux/thermal.h
+> @@ -251,7 +251,7 @@ void thermal_unregister_governor(struct thermal_governor *);
+>  extern int thermal_generate_netlink_event(struct thermal_zone_device *tz,
+>                                                 enum events event);
+>  #else
+> -static int thermal_generate_netlink_event(struct thermal_zone_device *tz,
+> +static inline int thermal_generate_netlink_event(struct thermal_zone_device *tz,
+>                                                 enum events event)
+>  {
+>         return 0;
+> 
+> 
+> Your patch also seems correct, but it would conflict with Ezequiel's.
+> The problem was apparently that you removed the 'inline' keyword
+> in 8ab3e6a08a "thermal: Use thermal zone device id in netlink messages",
+> I assume by accident, since defining a non-inline function in a header
+> file is obviously wrong.
 
-For cpufreq and cpuidle:
+Yeah, that was my bad. I am fine with Ezequiel s patch.
 
-Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Thanks.
 
-> Arnd Bergmann (22):
->   can: move CONFIG_HAVE_CAN_FLEXCAN out of CAN_DEV
->   cpufreq: ARM_DT_BL_CPUFREQ needs ARM_CPU_TOPOLOGY
->   cpuidle: calxeda: select ARM_CPU_SUSPEND
->   staging/drm: imx: add missing dependencies
->   drm: always provide debugfs function prototypes
->   gpu/drm: host1x: add dependency on Tegra
->   drm/tilcd: select BACKLIGHT_LCD_SUPPORT
->   OMAPDSS: DPI needs DSI
->   crypto: lz4: don't build on ARM
->   mfd: ab8500: debugfs code depends on gpadc
->   iwlegacy: il_pm_ops is only provided for PM_SLEEP
->   thermal: cpu_cooling: fix stub function
->   staging/logger: use kuid_t internally
->   oprofile: always enable IRQ_WORK
->   USB: EHCI: remove bogus #error
->   USB: UHCI: clarify Kconfig dependencies
->   USB: OHCI: clarify Kconfig dependencies
->   Xen: SWIOTLB is only used on x86
->   staging/solo6x10: depend on CONFIG_FONTS
->   media: coda: select GENERIC_ALLOCATOR
->   davinci: vpfe_capture needs i2c
->   radio-si4713: depend on SND_SOC
 > 
->  arch/Kconfig                           |  1 +
->  crypto/Kconfig                         |  2 ++
->  drivers/cpufreq/Kconfig.arm            |  1 +
->  drivers/cpuidle/Kconfig                |  1 +
->  drivers/gpu/drm/tilcdc/Kconfig         |  1 +
->  drivers/gpu/host1x/drm/Kconfig         |  1 +
->  drivers/media/platform/Kconfig         |  1 +
->  drivers/media/platform/davinci/Kconfig |  3 ++
->  drivers/media/radio/Kconfig            |  1 +
->  drivers/mfd/Kconfig                    |  2 +-
->  drivers/net/can/Kconfig                |  6 ++--
->  drivers/net/wireless/iwlegacy/common.h |  2 +-
->  drivers/staging/android/logger.c       |  4 +--
->  drivers/staging/android/logger.h       |  2 +-
->  drivers/staging/imx-drm/Kconfig        |  4 +++
->  drivers/staging/media/solo6x10/Kconfig |  1 +
->  drivers/usb/host/Kconfig               | 65 +++++++++++++++++++++++++++++-----
->  drivers/usb/host/Makefile              |  4 +--
->  drivers/usb/host/ehci-hcd.c            | 17 ---------
->  drivers/usb/host/ohci-hcd.c            | 19 ----------
->  drivers/usb/host/uhci-hcd.c            |  4 +--
->  drivers/video/console/Makefile         |  2 ++
->  drivers/video/omap2/dss/Kconfig        |  1 +
->  drivers/xen/Kconfig                    |  2 +-
->  include/drm/drmP.h                     |  3 +-
->  include/linux/cpu_cooling.h            |  2 +-
->  26 files changed, 91 insertions(+), 61 deletions(-)
+> 	Arnd
 > 
 > 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 295 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130502/39ed3af9/attachment.sig>
