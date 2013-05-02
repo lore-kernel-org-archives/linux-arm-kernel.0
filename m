@@ -1,7 +1,7 @@
 From: alonid@stratoscale.com (Dan Aloni)
-Date: Thu,  2 May 2013 14:52:29 +0300
-Subject: [PATCH] Move the EM_AARCH64 definition to uapi/linux/elf-em.txt
-Message-ID: <1367495549-6293-1-git-send-email-alonid@stratoscale.com>
+Date: Thu,  2 May 2013 14:56:18 +0300
+Subject: [PATCH] Move the EM_AARCH64 definition to uapi/linux/elf-em.h
+Message-ID: <1367495778-6406-1-git-send-email-alonid@stratoscale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,6 +11,8 @@ CC: Catalin Marinas <catalin.marinas@arm.com>
  arch/arm64/include/asm/elf.h |    2 --
  include/uapi/linux/elf-em.h  |    1 +
  2 files changed, 1 insertion(+), 2 deletions(-)
+
+(fixed the commit message)
 
 diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
 index fe32c0e..b3da1c1 100644
