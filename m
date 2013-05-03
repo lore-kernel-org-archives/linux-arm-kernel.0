@@ -1,34 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 3 May 2013 14:17:54 +0100
-Subject: [PATCH v3 00/32] Port of KVM to arm64
-In-Reply-To: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130503131754.GC21621@localhost.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 03 May 2013 15:25:23 +0200
+Subject: [GIT PULL] mailbox driver framework for v3.10 merge window
+In-Reply-To: <5182E403.1030808@ti.com>
+References: <37C860A02101E749A747FA2D3C1E3C504A1971@DLEE11.ent.ti.com>
+ <CAJe_Zhf5QwQQU5aVtNhbDT3EK9Dof-ZK_boP9WaNghqO8xY7iA@mail.gmail.com>
+ <5182E403.1030808@ti.com>
+Message-ID: <1407180.uGFidLMFHk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 08, 2013 at 05:17:02PM +0100, Marc Zyngier wrote:
-> This series contains the third version of KVM for arm64.
+On Thursday 02 May 2013 17:09:07 Suman Anna wrote:
+> On 04/28/2013 11:07 PM, Jassi Brar wrote:
+> > Now, we could either call it (effectively the TI's framework with
+> > quirks for STE) as the "Common API" and then dismantle and convert it
+> > patch by patch (authors and I seem to agree many things need to be
+> > changed and implemented).
+> >   OR we do it reasonably right the first time even if that means yet
+> > another release. IMHO we should go for slow but steady thing.
 > 
-> It depends on the following branches/series:
-> - git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git soc-armv8-model
->   Catalin's platform support branch for v8 models
+> I think it is your call here, either of the above approaches would
+> definitely involve some rework on the framework as well as both the OMAP
+> & ST mailboxes. Atleast for OMAP, the code exists in kernel but disabled
+> currently due to the multi-platform support. It is pending on the move
+> to drivers/mailbox folder, and can be enabled just with the first 3
+> patches (and another one for renaming generic mailbox.c/.h back to
+> omap_mailbox.c/.h files if we go the RFC approach) in the series
+> (irrespective of the framework). TI DSP/Bridge would remain broken
+> because of the omap dmtimer api dependencies on multi-platform.
+> 
+> I do not know how much of an impact it is for the ST driver as the
+> series adds the driver, and would have to wait until the RFC is sorted
+> out otherwise.
 
-After 3.10-rc1 you should be able to base it on the mainline kernel (or
--rc2 if something breaks).
+I think I'd prefer to drop the branch from the 3.10 queue then
+and let you all work out a common approach for 3.11. Olof, any
+other input?
 
-> The code is unsurprisingly extremely similar to the KVM/arm code, and
-> a lot of it is actually shared with the 32bit version. Some of the
-> include files are duplicated though (I'm definitely willing to fix
-> that).
-
-As it was already commented, some of the commonality could be shared via
-virt/kvm/ (timers, gic).
-
-Apart from the other comments I (and the others) had, the series looks
-fine and in shape for 3.11. Looking forward to see v4...
-
-Thanks.
-
--- 
-Catalin
+	Arnd
