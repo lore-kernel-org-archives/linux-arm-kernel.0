@@ -1,39 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 03 May 2013 15:25:23 +0200
-Subject: [GIT PULL] mailbox driver framework for v3.10 merge window
-In-Reply-To: <5182E403.1030808@ti.com>
-References: <37C860A02101E749A747FA2D3C1E3C504A1971@DLEE11.ent.ti.com>
- <CAJe_Zhf5QwQQU5aVtNhbDT3EK9Dof-ZK_boP9WaNghqO8xY7iA@mail.gmail.com>
- <5182E403.1030808@ti.com>
-Message-ID: <1407180.uGFidLMFHk@wuerfel>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 03 May 2013 09:30:18 -0400
+Subject: [PATCH, RFC 14/22] oprofile: always enable IRQ_WORK
+In-Reply-To: <20130503115332.GT8356@rric.localhost>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-15-git-send-email-arnd@arndb.de>
+ <20130503115332.GT8356@rric.localhost>
+Message-ID: <1367587818.7373.12.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 02 May 2013 17:09:07 Suman Anna wrote:
-> On 04/28/2013 11:07 PM, Jassi Brar wrote:
-> > Now, we could either call it (effectively the TI's framework with
-> > quirks for STE) as the "Common API" and then dismantle and convert it
-> > patch by patch (authors and I seem to agree many things need to be
-> > changed and implemented).
-> >   OR we do it reasonably right the first time even if that means yet
-> > another release. IMHO we should go for slow but steady thing.
+On Fri, 2013-05-03 at 13:53 +0200, Robert Richter wrote:
+> On 02.05.13 17:16:18, Arnd Bergmann wrote:
+> > oprofile fails to build if CONFIG_IRQ_WORK is not already enabled,
+> > because of the dependency on the RING_BUFFER code that now uses
+> > the irq work library.
+> > 
+> > kernel/built-in.o: In function `ring_buffer_unlock_commit':
+> > :(.text+0x5b8f0): undefined reference to `irq_work_queue'
+> > kernel/built-in.o: In function `ring_buffer_write':
+> > :(.text+0x5bd10): undefined reference to `irq_work_queue'
 > 
-> I think it is your call here, either of the above approaches would
-> definitely involve some rework on the framework as well as both the OMAP
-> & ST mailboxes. Atleast for OMAP, the code exists in kernel but disabled
-> currently due to the multi-platform support. It is pending on the move
-> to drivers/mailbox folder, and can be enabled just with the first 3
-> patches (and another one for renaming generic mailbox.c/.h back to
-> omap_mailbox.c/.h files if we go the RFC approach) in the series
-> (irrespective of the framework). TI DSP/Bridge would remain broken
-> because of the omap dmtimer api dependencies on multi-platform.
+> Shouldn't this be fixed in the ring_buffer implementation?
+
+Hmm, I thought I had ring buffer select irq work. I must have not have
+done that.
+
 > 
-> I do not know how much of an impact it is for the ST driver as the
-> series adds the driver, and would have to wait until the RFC is sorted
-> out otherwise.
+> I also do not see, where this comes from. I was successfully compiling
+> a kernel with OPROFILE and RING_BUFFER enabled but IRQ_WORK disabled.
+> Do you have that config still available?
+> 
 
-I think I'd prefer to drop the branch from the 3.10 queue then
-and let you all work out a common approach for 3.11. Olof, any
-other input?
+The ring buffer code can now wake up waiters, and to do so it requires
+irq_work. I'll send a patch.
 
-	Arnd
+Thanks,
+
+-- Steve
