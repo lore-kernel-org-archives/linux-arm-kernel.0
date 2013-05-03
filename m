@@ -1,58 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 May 2013 14:02:59 +0200
-Subject: [PATCH 1/5 v2] dmaengine: ste_dma40: Allow memcpy channels to be
- configured from DT
-In-Reply-To: <20130503115739.GJ24153@gmail.com>
-References: <1367336497-10650-1-git-send-email-lee.jones@linaro.org>
- <20130501095243.GD25256@gmail.com>
- <CACRpkdZtOtnUYvLm7BPA98oMOLAMPHpJ9GLoyMXOKW1nsTDYiQ@mail.gmail.com>
- <20130503115739.GJ24153@gmail.com>
-Message-ID: <CACRpkdb-_pf=9cm_Hy25nzFWKSTKc6OmmG9rhN2T1wR1=2tddg@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 3 May 2013 07:03:50 -0500
+Subject: [PATCH v3 1/5] regulator: Introduce TI Adaptive Body Bias(ABB)
+ on-chip LDO driver
+In-Reply-To: <20130503090258.GG4945@sirena.org.uk>
+References: <1367515215-30753-1-git-send-email-nm@ti.com>
+ <1367515215-30753-2-git-send-email-nm@ti.com>
+ <20130503090258.GG4945@sirena.org.uk>
+Message-ID: <20130503120349.GA2735@snafu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 3, 2013 at 1:57 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Fri, 03 May 2013, Linus Walleij wrote:
->
->> On Wed, May 1, 2013 at 11:52 AM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->> > At this moment in time the memcpy channels which can be used by the D40
->> > are fixed, as each supported platform in Mainline uses the same ones.
->> > However, platforms do exist which don't follow this convention, so
->> > these will need to be tailored. Fortunately, these platforms will be DT
->> > only, so this change has very little impact on platform data.
->> >
->> > Cc: Vinod Koul <vinod.koul@intel.com>
->> > Cc: Dan Williams <djbw@fb.com>
->> > Cc: Per Forlin <per.forlin@stericsson.com>
->> > Cc: Rabin Vincent <rabin@rab.in>
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>
->> Real nice!
->>
->> But can you split this in two patches: one that changes
->> drivers/dma/ste_dma40* and one sequel patch that changes
->> Documentation/* and arch/arm/boot/dts/* so I can merge them
->> out-of-order?
->>
->> I am trying this development cycle to split changes to the
->> device trees and bindings off from the rest of the patches
->> becaused it caused me a mess last cycle.
->
-> I was under the impression that the documentation went with the
-> bindings, rather than the Device Tree. Am I wrong?
+Hi Mark,
+On 10:02-20130503, Mark Brown wrote:
+> On Thu, May 02, 2013 at 12:20:10PM -0500, Nishanth Menon wrote:
+> > From: "Andrii.Tseglytskyi" <andrii.tseglytskyi@ti.com>
+> > 
+> > Adaptive Body Biasing (ABB) modulates transistor bias voltages
+> > dynamically in order to optimize switching speed versus leakage.
+> 
+> I've applied this but please note that I still have deep concerns about
+> some of the discussion about controlling this from other regulators.
+Thanks for the merge.
 
-No you're right. The documentation with the bindings and the
-patch to the driver...
+We don't have any further plans of pursuing the concept of regulator
+chaining for upstream. After an off-line chat with Mike T, we are
+planning on introducing OMAP specific notifier hooks to clock
+framework. This should allow us to do the appropriate sequencing
+necessary to control AVS, regulators for ABB and PMIC in the right
+sequence.
 
-Then just arch/arm/boot/dts/* separately.
-
-The latter is where I have all my trouble and screwup...
-
-(However when we break the devicetree data out of the kernel
-and into its own git we will have to follow the pattern above with
-a patch of bindings+DT changes and another one in parallell
-changing the kernel, but that is for a more advanced age.)
-
-Yours,
-Linus Walleij
+-- 
+Regards,
+Nishanth Menon
