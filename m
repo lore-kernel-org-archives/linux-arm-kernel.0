@@ -1,67 +1,33 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  3 May 2013 15:31:51 +0100
-Subject: [PATCH 05/63] ARM: ux500: Populate the ux500-musb Device Tree entry
+Date: Fri,  3 May 2013 15:31:52 +0100
+Subject: [PATCH 06/63] ARM: ux500: Pass DMA memcpy channels though Device Tree
 In-Reply-To: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
 References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367591569-32197-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1367591569-32197-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides all the information to successfully probe() and
-correctly configure the ux500-musb device driver for DMA.
+It's now possible to configure memcpy channels dynamically with DT.
+We're providing them despite the fact that they're the same as the
+hard-coded channels, as they will be removed once the u8500 platform
+goes DT-only.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi |   31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/dbx5x0.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index 86b35a1..838214c 100644
+index 838214c..c693428 100644
 --- a/arch/arm/boot/dts/dbx5x0.dtsi
 +++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -175,11 +175,40 @@
- 			prcm = <&prcmu>;
+@@ -218,6 +218,7 @@
+ 			interrupts = <0 25 0x4>;
+ 
+ 			#dma-cells = <3>;
++			memcpy-channels = <56 57 58 59 60>;
  		};
  
--		usb at a03e0000 {
-+		usb_per5 at a03e0000 {
- 			compatible = "stericsson,db8500-musb",
- 				"mentor,musb";
- 			reg = <0xa03e0000 0x10000>;
- 			interrupts = <0 23 0x4>;
-+			interrupt-names = "mc";
-+
-+			dr_mode = "otg";
-+
-+			dmas = <&dma 38 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 38 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 37 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 37 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 36 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 36 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 19 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 19 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 18 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 18 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 17 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 17 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 16 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 16 0 0x0>, /* Logical - MemToDev */
-+			       <&dma 39 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 39 0 0x0>; /* Logical - MemToDev */
-+
-+			dma-names = "iep_1_9",  "oep_1_9",
-+				    "iep_2_10", "oep_2_10",
-+				    "iep_3_11", "oep_3_11",
-+				    "iep_4_12", "oep_4_12",
-+				    "iep_5_13", "oep_5_13",
-+				    "iep_6_14", "oep_6_14",
-+				    "iep_7_15", "oep_7_15",
-+				    "iep_8",    "oep_8";
- 		};
- 
- 		dma: dma-controller at 801C0000 {
+ 		prcmu: prcmu at 80157000 {
 -- 
 1.7.10.4
