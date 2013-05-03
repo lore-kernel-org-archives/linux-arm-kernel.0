@@ -1,73 +1,84 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 03 May 2013 14:48:38 +0200
-Subject: [PATCH 9/9] ARM: ux500: always select ABX500_CORE
-In-Reply-To: <CACRpkdYgGVepjaGY=1HP-GxE0mzTozA0aaT=jPe=aCPb5ppi9A@mail.gmail.com>
-References: <1367528578-518090-1-git-send-email-arnd@arndb.de>
- <15723843.9mConxltov@wuerfel>
- <CACRpkdYgGVepjaGY=1HP-GxE0mzTozA0aaT=jPe=aCPb5ppi9A@mail.gmail.com>
-Message-ID: <1883078.Smcmxe7hlB@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 May 2013 13:55:27 +0100
+Subject: [PATCH v2 1/5] irqchip: add support for Marvell Orion SoCs
+In-Reply-To: <1367538519-23940-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1367538519-23940-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1367538519-23940-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130503125527.GE18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 May 2013 14:13:20 Linus Walleij wrote:
-> On Fri, May 3, 2013 at 1:28 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 03 May 2013 10:14:28 Linus Walleij wrote:
+On Fri, May 03, 2013 at 01:48:35AM +0200, Sebastian Hesselbarth wrote:
+> This patch adds an irqchip driver for the main interrupt controller found
+> on Marvell Orion SoCs (Kirkwood, Dove, Orion5x, Discovery Innovation).
+> Corresponding device tree documentation is also added.
 > 
-> >> While I understand that from a compile-time point of view it does
-> >> not seem nice, and all things would be separate units that you
-> >> plug in, from a run-time and system architecture point of view it
-> >> makes a lot of sense to select these. Worlds collide...
-> (...)
-> > My preference would be to make it user-selectable and enable it only in
-> > the defconfig, but if that can damage the hardware, we should not actually
-> > provide a named option.
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Note: This patch triggers a checkpatch warning for
+>   WARNING: Avoid CamelCase: <handle_IRQ>
 > 
-> Hm I'd lean towards the latter. However the AB8500 has subdrivers
-> and *some* of these are optional, such as the RTC. And it'd be
-> strange to have that depend on some totally unrelated config symbol
-> like UX500_SOC_COMMON.
-> 
-> I think that in that case we should make AB8500_CORE a hidden
-> (non-user selectable) bool so it is more logical.
+> Changelog:
+> v1->v2:
+> - rename compatible string to "marvell,orion-intc" (Suggested by Jason Gunthorpe)
+> - request mem regions for irq base registers (Suggested by Jason Gunthorpe)
+> - make orion_handle_irq static (Suggested by Jason Gunthorpe)
+> - make use of IRQCHIP_DECLARE (Suggested by Jason Gunthorpe)
 
-Yes, makes sense.
+It would still be a good idea to convert this to use the generic chip
+stuff which Thomas created, though exactly how is hard to see at the
+moment.
 
-> However any if these approaches will lead to unaestetic menuconfig
-> with AB8500 suboptions appearing right in the MFD menu instead of
-> being ordered under a AB8500_CORE node which is better for
-> anyone actually trying to use menuconfig interactively.
+> +static void orion_irq_mask(struct irq_data *irqd)
+> +{
+> +	unsigned int irq = irqd_to_hwirq(irqd);
+> +	unsigned int irq_off = irq % 32;
+> +	int reg = irq / 32;
+> +	u32 val;
+> +
+> +	val = readl(orion_irq_base[reg] + ORION_IRQ_MASK);
+> +	writel(val & ~(1 << irq_off), orion_irq_base[reg] + ORION_IRQ_MASK);
+> +}
 
-Yes, I can see that. Right now we have:
+This could be replaced with irq_gc_mask_clr_bit().
 
-   -*- ST-Ericsson ABX500 Mixed Signal Circuit register functions 
-   [*]   ST-Ericsson AB3100 Mixed Signal Circuit core functions   
-   [*]     ST-Ericsson AB3100 OTP functions                      
-   -*-   ST-Ericsson AB8500 Mixed Signal Power Management chip
-   [*]     ST-Ericsson AB8500 GPADC driver
-   [*]       Enable debug info via debugfs
-   -*- ST-Ericsson DB8500 Power Reset Control Management Unit
+> +
+> +static void orion_irq_unmask(struct irq_data *irqd)
+> +{
+> +	unsigned int irq = irqd_to_hwirq(irqd);
+> +	unsigned int irq_off = irq % 32;
+> +	int reg = irq / 32;
+> +	u32 val;
+> +
+> +	val = readl(orion_irq_base[reg] + ORION_IRQ_MASK);
+> +	writel(val | (1 << irq_off), orion_irq_base[reg] + ORION_IRQ_MASK);
+> +}
 
-I think we can certainly eliminate the ABX500 option, this one can
-just get selected by AB3100 and AB8500. The PRCMU can also
-be silent because as you say it is always needed.
+This with irq_gc_mask_set_bit().
 
-One possible reason to allow them to be selected is to enable
-build-time coverage on other platforms, but at the moment, they
-all depend on ARCH_U300|ARCH_U8500, presumably because until
-very recently they would not actually build anywhere else.
+> +
+> +static struct irq_chip orion_irq_chip = {
+> +	.name		= "orion_irq",
+> +	.irq_mask	= orion_irq_mask,
+> +	.irq_unmask	= orion_irq_unmask,
+> +};
+> +
+> +static int orion_irq_map(struct irq_domain *d, unsigned int virq,
+> +			 irq_hw_number_t hw)
+> +{
+> +	irq_set_chip_and_handler(virq, &orion_irq_chip,
+> +				 handle_level_irq);
+> +	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
 
-The GPADC driver is interesting: it does not have its own user
-interface (besides the debugging driver) and could just get selected
-by the other drivers using its exported interfaces. It would
-also be better to convert it to the standard IIO ADC interface,
-but I don't know if that's realistic. This leavs the debugging
-interface as the only sub-option. Do you know if that is
-actually being used by developers, or is this one of those interfaces
-that were created during bringup and then never touched again
-after everything worked?
+This is where it starts to get tricky, because I can't see how you'd
+merge the irq_alloc_generic_chip() and irq_setup_generic_chip() with
+this.  Maybe you don't need to do anything here and just do all that
+in orion_of_init() instead?  But then you seem to need to know the
+virq range before hand, and I can't see how that's known.  Maybe Thomas
+can provide some enlightenment about how the gc irqchip stuff works
+with the irq domain stuff...
 
-Regarding AB3100, I assume the relationship to U300 is similar to
-that between DB8500 and AB8500. Are you able to boot a U300 system
-without touching AB3100?
-
-	Arnd
+However, you wouldn't need the statically defined orion_irq_chip nor
+orion_irq_base[] either, because those would be held within the gc
+irqchip stuff and stored in the upper layer.
