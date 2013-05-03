@@ -1,76 +1,136 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 May 2013 10:01:59 +0200
-Subject: [PATCH 1/7] ARM: u300: push down syscon registers
-In-Reply-To: <201305021939.48381.arnd@arndb.de>
-References: <1367511416-4312-1-git-send-email-linus.walleij@stericsson.com>
- <201305021821.12008.arnd@arndb.de>
- <CACRpkdayJCm-PcY_=+NDraEPn0m6BrjNRH+tYp3Abar43RamaA@mail.gmail.com>
- <201305021939.48381.arnd@arndb.de>
-Message-ID: <CACRpkdZHRQqd277Qv8O0dek_jYb=eewhpLYfKtip-YLYx_ukUA@mail.gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Fri,  3 May 2013 12:08:21 +0400
+Subject: [PATCH v2] ARM: dts: Add SPI support for i.MX27 Phytec PCM038 module
+Message-ID: <1367568501-29467-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 2, 2013 at 7:39 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 02 May 2013, Linus Walleij wrote:
->> > How do those drivers get to the SYSCON base address? Should they
->> > be using drivers/mfd/syscon.c as the multiplexor instead?
->>
->> No, there is no mutex to be taken. The consecutive range of memory
->> addresses are used by different things (mainly the clocks) but there
->> is no register that needs to be protected against access from two
->> subsystems simultaneously.
->>
->> As a follow-up to this series I plan to move also the U300 clocks
->> to the device tree (similar three-step ladder as used for the Nomadik)
->> and then they will (hopefully) get the syscon base address from the
->> device tree.
->
-> I was less worried about mutexes than a correct representation
-> in the device tree. With the syscon driver, you can have the
-> register ranges described exactly once and just use the offsets
-> on the regmap in the other drivers.
+Added SPI node and PMIC MC13783 (spi0.0) to imx27-phytec-phycore DT file.
 
-Hm. This sounds a bit like modeling the Linux subsystems after
-the needs of the device tree rather than keeping these two as
-separate concepts.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/boot/dts/imx27-phytec-phycore.dts | 109 +++++++++++++++++++++++++++++
+ 1 file changed, 109 insertions(+)
 
-It is true however that the same register base will appear twice:
-once for the clk driver, and once for the syscon, which is not
-yet in the device tree.
-
-The system controllers on several systems typically share this
-aspect.
-
-For the DBx500 PRCMU we have solved the case where the pinctrl
-is using a few registers inside the PRCMU range like this:
-
-pinctrl {
-        compatible = "stericsson,nmk-pinctrl";
-        prcm = <&prcmu>;
-};
-
-prcmu: prcmu at 80157000 {
-        compatible = "stericsson,db8500-prcmu";
-        reg = <0x80157000 0x2000>, <0x801b0000 0x8000>, <0x801b8000 0x1000>;
-        reg-names = "prcmu", "prcmu-tcpm", "prcmu-tcdm";
-        (...)
-};
-
-Then in the code:
-
-if (np) {
-        prcm_np = of_parse_phandle(np, "prcm", 0);
-        if (prcm_np)
-                npct->prcm_base = of_iomap(prcm_np, 0);
-}
-
-I could do something similar by creating a U300 syscon node
-and referring to it from the clk node, so the clk looks up its
-syscon to find the base.
-
-If so, I can build this on top of the current patch series
-with multiplatform and all, as I convert the clocks to DT
-(which is the next and final step).
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore.dts b/arch/arm/boot/dts/imx27-phytec-phycore.dts
+index fe64e3a..eb7d9fa 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore.dts
+@@ -72,6 +72,115 @@
+ 	};
+ };
+ 
++&cspi1 {
++	fsl,spi-num-chipselects = <1>;
++	cs-gpios = <&gpio4 28 0>;
++	status = "okay";
++
++	pmic: mc13783 at 0 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "fsl,mc13783";
++		spi-max-frequency = <20000000>;
++		reg = <0>;
++		interrupt-parent = <&gpio2>;
++		interrupts = <23 0x4>;
++		fsl,mc13xxx-uses-adc;
++		fsl,mc13xxx-uses-rtc;
++
++		regulators {
++			sw1a_reg: sw1a {
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			sw1b_reg: sw1b {
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			sw2a_reg: sw2a {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			sw2b_reg: sw2b {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			sw3_reg: sw3 {
++				regulator-min-microvolt = <5000000>;
++				regulator-max-microvolt = <5000000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			vaudio_reg: vaudio {
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			violo_reg: violo {
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			viohi_reg: viohi {
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			vgen_reg: vgen {
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			vcam_reg: vcam {
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++			};
++
++			vrf1_reg: vrf1 {
++				regulator-min-microvolt = <2775000>;
++				regulator-max-microvolt = <2775000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			vrf2_reg: vrf2 {
++				regulator-min-microvolt = <2775000>;
++				regulator-max-microvolt = <2775000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++
++			vmmc1_reg: vmmc1 {
++				regulator-min-microvolt = <1600000>;
++				regulator-max-microvolt = <3000000>;
++			};
++
++			gpo1_reg: gpo1 { };
++
++			pwgt1spi_reg: pwgt1spi {
++				regulator-always-on;
++			};
++		};
++	};
++};
++
+ &nfc {
+ 	nand-bus-width = <8>;
+ 	nand-ecc-mode = "hw";
+-- 
+1.8.1.5
