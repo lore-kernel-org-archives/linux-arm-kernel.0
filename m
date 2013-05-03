@@ -1,49 +1,110 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 3 May 2013 11:08:45 +0200
-Subject: [PATCH] ARM: i.MX6: clk: add i.MX6 DualLite differences
-Message-ID: <1367572125-28420-1-git-send-email-dirk.behme@de.bosch.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Fri,  3 May 2013 17:12:45 +0800
+Subject: [PATCH] ARM: DMA-mapping: mark all !DMA_TO_DEVICE pages in unmapping
+ as clean
+Message-ID: <1367572365-18905-1-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CCM_CBCMR register (address 0x02C4018) has different meaning
-between the i.MX6 Quad/Dual and the i.MX6 Solo/DualLite.
+It is common for one sg to include many pages, so mark all these
+pages as clean to avoid unnecessary flushing on them in
+set_pte_at() or update_mmu_cache().
 
-Compared to the i.MX6 Quad/Dual, the CCM_CBCMR register in the
-i.MX6 Solo/DualLite doesn't have a gpu3d_shader configuration and
-moves the gpu2_core configuration at that place.
+The patch might improve loading performance of applciation code a bit.
 
-Handle these i.MX6 Quad/Dual vs. i.MX6 Solo/DualLite clock differences
-by using cpu_is_mx6dl().
+On the below test code to read file(~1GByte size) from usb mass storage
+disk to buffer created with mmap(PROT_READ | PROT_EXEC) on
+Pandaboard, average ~1% improvement can be observed with the patch on
+10 times test.
 
-Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+
+#define _GNU_SOURCE
+
+#include <fcntl.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <assert.h>
+
+unsigned int sum = 0;
+
+static unsigned long tv_diff(struct timeval *tv1, struct timeval *tv2)
+{
+	return (tv2->tv_sec - tv1->tv_sec) * 1000000 +
+		(tv2->tv_usec - tv1->tv_usec);
+}
+
+int main(int argc, char *argv[])
+{
+	char *mbuffer;
+	int fd;
+	int i;
+	unsigned long page_size, size;
+	struct stat stat;
+	struct timeval t1, t2;
+
+	page_size = getpagesize();
+	fd = open(argv[1], O_RDONLY);
+	assert(fd >= 0);
+
+	fstat(fd, &stat);
+	size = stat.st_size;
+	printf("%s: file %s, file size %lu, page size %lu\n", argv[0],
+		read_filename, size, page_size);
+
+	gettimeofday(&t1, NULL);
+	mbuffer = mmap(NULL, size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
+	for (i = 0 ; i < size ; i += page_size)
+		sum += mbuffer[i];
+	munmap(mbuffer, page_size);
+	gettimeofday(&t2, NULL);
+	printf("\tread mmaped time: %luus\n", tv_diff(&t1, &t2));
+
+	close(fd);
+}
+
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Ming Lei <ming.lei@canonical.com>
 ---
+ arch/arm/mm/dma-mapping.c |   19 ++++++++++++++++---
+ 1 file changed, 16 insertions(+), 3 deletions(-)
 
-Note: This patch is against
-      https://git.linaro.org/gitweb?p=people/shawnguo/linux-2.6.git;a=shortlog;h=refs/heads/imx/soc
-      as it needs cpu_is_imx6dl() from the commit "ARM: imx: add initial imx6dl support"
-
- arch/arm/mach-imx/clk-imx6q.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 1512590..32c19c7 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -480,7 +480,14 @@ int __init mx6q_clocks_init(void)
- 	clk[esai]         = imx_clk_gate2("esai",          "esai_podf",         base + 0x6c, 16);
- 	clk[gpt_ipg]      = imx_clk_gate2("gpt_ipg",       "ipg",               base + 0x6c, 20);
- 	clk[gpt_ipg_per]  = imx_clk_gate2("gpt_ipg_per",   "ipg_per",           base + 0x6c, 22);
--	clk[gpu2d_core]   = imx_clk_gate2("gpu2d_core",    "gpu2d_core_podf",   base + 0x6c, 24);
-+	if (cpu_is_imx6dl())
-+		/*
-+		 * The multiplexer and divider of imx6q clock gpu3d_shader get
-+		 * redefined/reused as gpu2d_core_sel and gpu2d_core_podf on imx6dl.
-+		 */
-+		clk[gpu2d_core] = imx_clk_gate2("gpu2d_core", "gpu3d_shader", base + 0x6c, 24);
-+	else
-+		clk[gpu2d_core] = imx_clk_gate2("gpu2d_core", "gpu2d_core_podf", base + 0x6c, 24);
- 	clk[gpu3d_core]   = imx_clk_gate2("gpu3d_core",    "gpu3d_core_podf",   base + 0x6c, 26);
- 	clk[hdmi_iahb]    = imx_clk_gate2("hdmi_iahb",     "ahb",               base + 0x70, 0);
- 	clk[hdmi_isfr]    = imx_clk_gate2("hdmi_isfr",     "pll3_pfd1_540m",    base + 0x70, 4);
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index e9db6b4..e63124a 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -879,10 +879,23 @@ static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+ 	dma_cache_maint_page(page, off, size, dir, dmac_unmap_area);
+ 
+ 	/*
+-	 * Mark the D-cache clean for this page to avoid extra flushing.
++	 * Mark the D-cache clean for these pages to avoid extra flushing.
+ 	 */
+-	if (dir != DMA_TO_DEVICE && off == 0 && size >= PAGE_SIZE)
+-		set_bit(PG_dcache_clean, &page->flags);
++	if (dir != DMA_TO_DEVICE && size >= PAGE_SIZE) {
++		unsigned long pfn;
++		size_t left = size;
++
++		pfn = page_to_pfn(page);
++		if (off) {
++			pfn++;
++			left -= PAGE_SIZE - off % PAGE_SIZE;
++		}
++		while (left >= PAGE_SIZE) {
++			page = pfn_to_page(pfn++);
++			set_bit(PG_dcache_clean, &page->flags);
++			left -= PAGE_SIZE;
++		}
++	}
+ }
+ 
+ /**
 -- 
-1.8.2
+1.7.9.5
