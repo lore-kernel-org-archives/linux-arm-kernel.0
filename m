@@ -1,41 +1,51 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 3 May 2013 09:25:35 +0300
-Subject: [PATCH] ARM: OMAP-USB: Fix possible memory leak
-In-Reply-To: <20130503062506.GC27451@arwen.pp.htv.fi>
-References: <1367510596-27780-1-git-send-email-shc_work@mail.ru>
- <20130502162433.GA10016@kahuna> <1367512124.978518915@f372.mail.ru>
- <20130502164058.GC8577@arwen.pp.htv.fi>
- <20130502231353.GF21614@n2100.arm.linux.org.uk>
- <20130503061931.GB27451@arwen.pp.htv.fi>
- <20130503062506.GC27451@arwen.pp.htv.fi>
-Message-ID: <20130503062535.GD27451@arwen.pp.htv.fi>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Fri, 3 May 2013 08:26:34 +0200
+Subject: [PATCH 4/5] ARM: dts: add device tree source for imx6sl SoC
+In-Reply-To: <1367552995-31777-5-git-send-email-shawn.guo@linaro.org>
+References: <1367552995-31777-1-git-send-email-shawn.guo@linaro.org>
+ <1367552995-31777-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <5183589A.5090109@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 03, 2013 at 09:25:06AM +0300, Felipe Balbi wrote:
-> > > This is exactly why we have platform_device_alloc(),
-> > > platform_device_register_full() and friends - so that people don't have to
-> > > fsck around with kzalloc themselves and get it wrong like the above does.
-> > > 
-> > > Would you like me to pass your details to gregkh for another one of his
-> > > public humilation exercises over basic kernel programming stuff? :)
-> > 
-> > How about we pass yours for not reading the patch before flaming ? Note
-> > that $SUBJECT is *not* touching at all that line which kzallocs a
-> > platform_device. Wrong as it is, it's not part of $SUBJECT.
-> 
-> that line was added by Roger on commit
-> 5ecd52e563f1e14f9cfe06130fbf9fdb73f227e8 (ARM: OMAP2+: omap-usb-host: Add
-> usbhs_init_phys()).
+On 03.05.2013 05:49, Shawn Guo wrote:
+> Add SoC level device tree source for imx6sl.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>   arch/arm/boot/dts/imx6sl.dtsi |  777 +++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 777 insertions(+)
+>   create mode 100644 arch/arm/boot/dts/imx6sl.dtsi
+>
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> new file mode 100644
 
-forgot to add him to Cc, now done.
+Just as a proposal do discuss: What's about to move the existing 
+imx6qdl.dtsi to a imx6.dtsi and include it in
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130503/45651a32/attachment-0001.sig>
+imx6q.dtsi
+imx6dl.dtsi
+imx6sl.dtsi
+
+then?
+
+> +       soc {
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
+> +               compatible = "simple-bus";
+> +               interrupt-parent = <&intc>;
+> +               ranges;
+> +
+> +               L2: l2-cache at 00a02000 {
+> +                       compatible = "arm,pl310-cache";
+> +                       reg = <0x00a02000 0x1000>;
+> +                       interrupts = <0 92 0x04>;
+> +                       cache-unified;
+> +                       cache-level = <2>;
+> +               };
+The arm,tag-latency and arm,data-latency we recently added for the other 
+SoCs are missing here?
+
+Best regards
+
+Dirk
