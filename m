@@ -1,53 +1,14 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  3 May 2013 18:35:47 +0100
-Subject: [RFC PATCH 2/2] init: calibrate: don't print out bogomips value on
- boot
-In-Reply-To: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
-References: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1367602547-19322-3-git-send-email-will.deacon@arm.com>
+From: itooo@itooo.com (Greg)
+Date: Fri, 03 May 2013 19:48:08 +0200
+Subject: MVEBU PCI Express support
+Message-ID: <5183F858.1050804@itooo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-BogoMIPs is a confusing concept, so allow architectures to print it only
-if they find it worthwhile. The delay calibration code should stick to
-lpj and avoid trying to draw any correlation with BogoMIPs, which may be
-a fixed, bogus (geddit?) value.
+Hello guys,
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- init/calibrate.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+this one is targeted to the Free Electrons guys : should I start 
+investigating by myself or are you planning to release a patch for 
+supporting PCI express on Marvell Armada* platforms ?
 
-diff --git a/init/calibrate.c b/init/calibrate.c
-index fda0a7b..cf48068 100644
---- a/init/calibrate.c
-+++ b/init/calibrate.c
-@@ -135,13 +135,13 @@ static unsigned long __cpuinit calibrate_delay_direct(void)
- 		if ((measured_times[max] - estimate) <
- 				(estimate - measured_times[min])) {
- 			printk(KERN_NOTICE "calibrate_delay_direct() dropping "
--					"min bogoMips estimate %d = %lu\n",
-+					"min delay estimate %d = %lu\n",
- 				min, measured_times[min]);
- 			measured_times[min] = 0;
- 			min = max;
- 		} else {
- 			printk(KERN_NOTICE "calibrate_delay_direct() dropping "
--					"max bogoMips estimate %d = %lu\n",
-+					"max delay estimate %d = %lu\n",
- 				max, measured_times[max]);
- 			measured_times[max] = 0;
- 			max = min;
-@@ -292,9 +292,7 @@ void __cpuinit calibrate_delay(void)
- 	}
- 	per_cpu(cpu_loops_per_jiffy, this_cpu) = lpj;
- 	if (!printed)
--		pr_cont("%lu.%02lu BogoMIPS (lpj=%lu)\n",
--			lpj/(500000/HZ),
--			(lpj/(5000/HZ)) % 100, lpj);
-+		pr_cont("lpj=%lu\n", lpj);
- 
- 	loops_per_jiffy = lpj;
- 	printed = true;
--- 
-1.8.2.2
+Cheers,
