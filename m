@@ -1,36 +1,46 @@
-From: holt@sgi.com (Robin Holt)
-Date: Fri, 3 May 2013 14:05:14 -0500
-Subject: [PATCH -v7 0/11] Shutdown from reboot_cpuid without stopping
- other cpus.
-In-Reply-To: <20130502180535.GZ14496@n2100.arm.linux.org.uk>
-References: <1367428011-17123-1-git-send-email-holt@sgi.com>
- <20130501231347.GT14496@n2100.arm.linux.org.uk>
- <20130502033952.GU3658@sgi.com>
- <20130502180535.GZ14496@n2100.arm.linux.org.uk>
-Message-ID: <20130503190514.GH3658@sgi.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 03 May 2013 21:27:12 +0200
+Subject: [PATCH,
+ RFC 02/22] cpufreq: ARM_DT_BL_CPUFREQ needs ARM_CPU_TOPOLOGY
+In-Reply-To: <CAKohpon9qmowJ4PmL-nvnoaCzJSC-ZSPv8EUOyoFcTdRqNRwnw@mail.gmail.com>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <5563691.6kxbXZTjH5@vostro.rjw.lan>
+ <CAKohpon9qmowJ4PmL-nvnoaCzJSC-ZSPv8EUOyoFcTdRqNRwnw@mail.gmail.com>
+Message-ID: <5824559.D65khaWcvS@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 07:05:35PM +0100, Russell King - ARM Linux wrote:
-> On Wed, May 01, 2013 at 10:39:52PM -0500, Robin Holt wrote:
-> > On Thu, May 02, 2013 at 12:13:47AM +0100, Russell King - ARM Linux wrote:
-> > > On Wed, May 01, 2013 at 12:06:40PM -0500, Robin Holt wrote:
-> > > > Andrew, Please do _NOT_ take this patch series yet.  I am sending this
-> > > > to you because you had comments on my -v6 submission.
-> > > 
-> > > Another reason for not applying this is that I believe it wilfully breaks
-> > > a bunch of ARM platforms - such as removing the 'g' reboot mode (for gpio
-> > > based reboot on PXA), and removing the 's' reboot mode off a bunch of ARM
-> > > platforms which have no way to do a hard reboot.
-> > 
-> > I am not sure what your basis for this statement is.
+On Friday, May 03, 2013 06:31:52 PM Viresh Kumar wrote:
+> On 3 May 2013 17:45, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> > In this particular case I think it is OK to make both ARM_DT_BL_CPUFREQ and
+> > ARM_BIG_LITTLE_CPUFREQ depend on ARM_CPU_TOPOLOGY, because (in theory?) the
+> > latter may be set without the former (unless you want to make ARM_DT_BL_CPUFREQ
+> > depend on ARM_BIG_LITTLE_CPUFREQ, but then it may be kind of confusing to
+> > users).
 > 
-> Probably old understanding of the code, and me getting old and getting
-> forgetful. :(
+> ARM_BIG_LITTLE_CPUFREQ is the core cpufreq code for big LITTLE SoC's and every
+> other driver will be a glue providing ops to it. So, ARM_DT_BL_CPUFREQ
+> does depend
+> on ARM_BIG_LITTLE_CPUFREQ and that's why i added depends on
+> ARM_CPU_TOPOLOGY in ARM_BIG_LITTLE_CPUFREQ only and depends on
+> ARM_BIG_LITTLE_CPUFREQ in ARM_DT_BL_CPUFREQ.
 
-Russell,
+I'm seeing "select" in there, which is kind of different from "depends on".
 
-Are you alright with these patches?
+> But the problem is if ARM_DT_BL_CPUFREQ isn't selected then we still get
+> ARM_DT_BL_CPUFREQ enabled in menuconfig but a warning just before compilation.
+> Which Arnd pointed to..
+
+What do you mean by "enabled in menuconfig"?  Does it appear as an option to
+select or is it actually selected?
+
+In any case, I'm afraid adding ARM_CPU_TOPOLOGY to the "depends on" list in
+ARM_DT_BL_CPUFREQ is the only way to avoid that particular warning.
 
 Thanks,
-Robin
+Rafael
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
