@@ -1,183 +1,50 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 3 May 2013 16:09:46 +0200 (CEST)
-Subject: [PATCH v2 1/5] irqchip: add support for Marvell Orion SoCs
-In-Reply-To: <5183B7ED.7030800@gmail.com>
-References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1367538519-23940-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1367538519-23940-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130503125527.GE18614@n2100.arm.linux.org.uk>
- <5183B7ED.7030800@gmail.com>
-Message-ID: <alpine.LFD.2.02.1305031514230.2886@ionos>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 03 May 2013 16:20:29 +0200
+Subject: [PATCH 9/9] ARM: ux500: always select ABX500_CORE
+In-Reply-To: <CACRpkdbDNoQSmFAyOMJRHSrnnuqpEfb0U9a7ZeaEztn1dAr_xA@mail.gmail.com>
+References: <1367528578-518090-1-git-send-email-arnd@arndb.de>
+ <1500795.gEuGziRZET@wuerfel>
+ <CACRpkdbDNoQSmFAyOMJRHSrnnuqpEfb0U9a7ZeaEztn1dAr_xA@mail.gmail.com>
+Message-ID: <2812721.61fsxKBgRj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 May 2013, Sebastian Hesselbarth wrote:
-> On 05/03/13 14:55, Russell King - ARM Linux wrote:
-> > This is where it starts to get tricky, because I can't see how you'd
-> > merge the irq_alloc_generic_chip() and irq_setup_generic_chip() with
-> > this.  Maybe you don't need to do anything here and just do all that
-> > in orion_of_init() instead?  But then you seem to need to know the
-> > virq range before hand, and I can't see how that's known.  Maybe Thomas
-> > can provide some enlightenment about how the gc irqchip stuff works
-> > with the irq domain stuff...
+On Friday 03 May 2013 16:06:57 Linus Walleij wrote:
+> On Fri, May 3, 2013 at 3:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 03 May 2013 15:33:17 Linus Walleij wrote:
 > 
-> Exactly, and that is what I am looking into right now. But hell, I am
-> not an expert in linux irq yet. Moreover, I am not even sure if it is
-> okay to rely on irqdomain or at least irq_data->hw_irq at all.
+> >> I lean toward selecting AB3100 and REGULATOR_AB3100
+> >> for the U300 actually.
+> >
+> > Should we still allow building them on other platforms then?
+> > Right now, these depend on the platforms that actually use
+> > the hardware, but in other places, we just allow everything to
+> > be built that compiles without errors.
+> 
+> Not in my opinion but IIRC in 2008 or so some other
+> subsystem maintainer beat us up for not allowing it
+> to build on every other platform, and the rationale given
+> was that allowin this to build on e.g. x86_64 gives some
+> nice compile coverage.
+> 
+> I don't know which argument wins 
 
-Here is a solution to that problem.
+I know that a certain other Linus frequently complains when ARM specific
+options show up on his x86 machine during "make oldconfig" ;-)
 
-1) It adds a mask field to irq_data so we dont have to compute the
-   mask over and over
+One idea I had is to create a global CONFIG_SOC option that would
+hide all on-chip peripherals when building for a PC-like system.
+On ARM, we would always select CONFIG_SOC, except for a few special
+cases like ARCH_RPC, ARCH_FOOTBRIDGE and ARCH_SHARK.
 
-2) For compability with existing users it populates the mask with 
-   1 << (d->irq - gc->irq_base)
+> > Is it theoretically possible to use the AB in combination with
+> > another (non-ST-Ericsson) digital baseband?
+> 
+> Theoretically (it's just a bunch of regulators etc when all comes
+> around), but it won't happen since these components
+> are not sold separately.
 
-3) It gives you the option to disable that mask setup or let it
-   generate from d->hwirq
+Right, I was specifically asking about the technical possibilities,
+not what people are likely to do. 
 
-I'm still looking into a way how to proper support the generic chip /
-linear domain mapping in the setup path. Will send you a draft patch
-to play with later.
-
-Thanks,
-
-	tglx
-
-
-Index: linux-2.6/include/linux/irq.h
-===================================================================
---- linux-2.6.orig/include/linux/irq.h
-+++ linux-2.6/include/linux/irq.h
-@@ -119,6 +119,7 @@ struct irq_domain;
- 
- /**
-  * struct irq_data - per irq and irq chip data passed down to chip functions
-+ * @mask:		precomputed bitmask for accessing the chip registers
-  * @irq:		interrupt number
-  * @hwirq:		hardware interrupt number, local to the interrupt domain
-  * @node:		node index useful for balancing
-@@ -138,6 +139,7 @@ struct irq_domain;
-  * irq_data.
-  */
- struct irq_data {
-+	u32			mask;
- 	unsigned int		irq;
- 	unsigned long		hwirq;
- 	unsigned int		node;
-@@ -700,10 +702,14 @@ struct irq_chip_generic {
-  * @IRQ_GC_INIT_NESTED_LOCK:	Set the lock class of the irqs to nested for
-  *				irq chips which need to call irq_set_wake() on
-  *				the parent irq. Usually GPIO implementations
-+ * @IRQ_GC_NO_MASK:		Do not calculate irq_data->mask
-+ * @IRQ_GC_MASK_FROM_HWIRQ:	Calculate irq_data->mask from the hwirq number
-  */
- enum irq_gc_flags {
- 	IRQ_GC_INIT_MASK_CACHE		= 1 << 0,
- 	IRQ_GC_INIT_NESTED_LOCK		= 1 << 1,
-+	IRQ_GC_NO_MASK			= 1 << 2,
-+	IRQ_GC_MASK_FROM_HWIRQ		= 1 << 4,
- };
- 
- /* Generic chip callback functions */
-Index: linux-2.6/kernel/irq/generic-chip.c
-===================================================================
---- linux-2.6.orig/kernel/irq/generic-chip.c
-+++ linux-2.6/kernel/irq/generic-chip.c
-@@ -39,7 +39,7 @@ void irq_gc_noop(struct irq_data *d)
- void irq_gc_mask_disable_reg(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->disable);
-@@ -57,7 +57,7 @@ void irq_gc_mask_disable_reg(struct irq_
- void irq_gc_mask_set_bit(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	gc->mask_cache |= mask;
-@@ -75,7 +75,7 @@ void irq_gc_mask_set_bit(struct irq_data
- void irq_gc_mask_clr_bit(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	gc->mask_cache &= ~mask;
-@@ -93,7 +93,7 @@ void irq_gc_mask_clr_bit(struct irq_data
- void irq_gc_unmask_enable_reg(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->enable);
-@@ -108,7 +108,7 @@ void irq_gc_unmask_enable_reg(struct irq
- void irq_gc_ack_set_bit(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->ack);
-@@ -122,7 +122,7 @@ void irq_gc_ack_set_bit(struct irq_data 
- void irq_gc_ack_clr_bit(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = ~(1 << (d->irq - gc->irq_base));
-+	u32 mask = ~d->mask;
- 
- 	irq_gc_lock(gc);
- 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->ack);
-@@ -136,7 +136,7 @@ void irq_gc_ack_clr_bit(struct irq_data 
- void irq_gc_mask_disable_reg_and_ack(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->mask);
-@@ -151,7 +151,7 @@ void irq_gc_mask_disable_reg_and_ack(str
- void irq_gc_eoi(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	irq_gc_lock(gc);
- 	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->eoi);
-@@ -169,7 +169,7 @@ void irq_gc_eoi(struct irq_data *d)
- int irq_gc_set_wake(struct irq_data *d, unsigned int on)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
--	u32 mask = 1 << (d->irq - gc->irq_base);
-+	u32 mask = d->mask;
- 
- 	if (!(mask & gc->wake_enabled))
- 		return -EINVAL;
-@@ -254,6 +254,15 @@ void irq_setup_generic_chip(struct irq_c
- 		if (flags & IRQ_GC_INIT_NESTED_LOCK)
- 			irq_set_lockdep_class(i, &irq_nested_lock_class);
- 
-+		if (!(flags & IRQ_GC_NO_MASK)) {
-+			struct irq_data *d = irq_get_irq_data(i);
-+			u32 mask;
-+
-+			if (flags & IRQ_GC_MASK_FROM_HWIRQ)
-+				d->mask = 1 << (d->hwirq % 32);
-+			else
-+				d->mask = 1 << (i - gc->irq_base);
-+		}
- 		irq_set_chip_and_handler(i, &ct->chip, ct->handler);
- 		irq_set_chip_data(i, gc);
- 		irq_modify_status(i, clr, set);
+	Arnd
