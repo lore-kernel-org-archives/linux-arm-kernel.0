@@ -1,130 +1,114 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 3 May 2013 11:49:53 +0800
-Subject: [PATCH 3/5] ARM: imx: add initial support for imx6sl
+Date: Fri, 3 May 2013 11:49:55 +0800
+Subject: [PATCH 5/5] ARM: dts: imx6sl: add initial imx6sl-evk support
 In-Reply-To: <1367552995-31777-1-git-send-email-shawn.guo@linaro.org>
 References: <1367552995-31777-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1367552995-31777-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1367552995-31777-6-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial support for i.MX6 SoloLite.
+Add initial imx6sl-evk board support with uart, usdhc and fec enabled.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-imx/Kconfig       |   19 ++++++++++++++++
- arch/arm/mach-imx/Makefile      |    1 +
- arch/arm/mach-imx/common.h      |    1 +
- arch/arm/mach-imx/mach-imx6sl.c |   48 +++++++++++++++++++++++++++++++++++++++
- 4 files changed, 69 insertions(+)
- create mode 100644 arch/arm/mach-imx/mach-imx6sl.c
+ arch/arm/boot/dts/Makefile       |    3 +-
+ arch/arm/boot/dts/imx6sl-evk.dts |   74 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 76 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/imx6sl-evk.dts
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index c132f6f..8454221 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -820,6 +820,25 @@ config SOC_IMX6Q
- 	help
- 	  This enables support for Freescale i.MX6 Quad processor.
- 
-+config SOC_IMX6SL
-+	bool "i.MX6 SoloLite support"
-+	select ARM_ERRATA_754322
-+	select ARM_ERRATA_775420
-+	select ARM_GIC
-+	select CPU_V7
-+	select HAVE_IMX_ANATOP
-+	select HAVE_IMX_GPC
-+	select HAVE_IMX_MMDC
-+	select HAVE_IMX_SRC
-+	select PINCTRL
-+	select PINCTRL_IMX6SL
-+	select PL310_ERRATA_588369 if CACHE_PL310
-+	select PL310_ERRATA_727915 if CACHE_PL310
-+	select PL310_ERRATA_769419 if CACHE_PL310
-+
-+	help
-+	  This enables support for Freescale i.MX6 SoloLite processor.
-+
- endif
- 
- source "arch/arm/mach-imx/devices/Kconfig"
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index b16eb39..d6f99e1 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -99,6 +99,7 @@ AFLAGS_headsmp.o :=-Wa,-march=armv7-a
- obj-$(CONFIG_SMP) += headsmp.o platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
- obj-$(CONFIG_SOC_IMX6Q) += clk-imx6q.o mach-imx6q.o
-+obj-$(CONFIG_SOC_IMX6SL) += clk-imx6sl.o mach-imx6sl.o
- 
- ifeq ($(CONFIG_PM),y)
- obj-$(CONFIG_SOC_IMX6Q) += pm-imx6q.o headsmp.o
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 4cba7db..efae60c 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -68,6 +68,7 @@ extern int mx31_clocks_init_dt(void);
- extern int mx51_clocks_init_dt(void);
- extern int mx53_clocks_init_dt(void);
- extern int mx6q_clocks_init(void);
-+extern int imx6sl_clocks_init(void);
- extern struct platform_device *mxc_register_gpio(char *name, int id,
- 	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
- extern void mxc_set_cpu_type(unsigned int type);
-diff --git a/arch/arm/mach-imx/mach-imx6sl.c b/arch/arm/mach-imx/mach-imx6sl.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 2498cba..73794c3 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -106,7 +106,8 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6q-sabreauto.dtb \
+ 	imx6q-sabrelite.dtb \
+ 	imx6q-sabresd.dtb \
+-	imx6q-sbc6x.dtb
++	imx6q-sbc6x.dtb \
++	imx6sl-evk.dtb
+ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+ 	imx23-olinuxino.dtb \
+ 	imx23-stmp378x_devb.dtb \
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
 new file mode 100644
-index 0000000..b044134
+index 0000000..2886a59
 --- /dev/null
-+++ b/arch/arm/mach-imx/mach-imx6sl.c
-@@ -0,0 +1,48 @@
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -0,0 +1,74 @@
 +/*
-+ * Copyright 2013 Freescale Semiconductor, Inc.
++ * Copyright (C) 2013 Freescale Semiconductor, Inc.
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
-+ *
 + */
 +
-+#include <linux/irqchip.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <asm/hardware/cache-l2x0.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
++/dts-v1/;
 +
-+#include "common.h"
++#include "imx6sl.dtsi"
 +
-+static void __init imx6sl_init_machine(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
++/ {
++	model = "Freescale i.MX6 SoloLite EVK Board";
++	compatible = "fsl,imx6sl-evk", "fsl,imx6sl";
 +
-+static void __init imx6sl_init_irq(void)
-+{
-+	l2x0_of_init(0, ~0UL);
-+	imx_src_init();
-+	imx_gpc_init();
-+	irqchip_init();
-+}
-+
-+static void __init imx6sl_timer_init(void)
-+{
-+	imx6sl_clocks_init();
-+}
-+
-+static const char *imx6sl_dt_compat[] __initdata = {
-+	"fsl,imx6sl",
-+	NULL,
++	memory {
++		reg = <0x80000000 0x40000000>;
++	};
 +};
 +
-+DT_MACHINE_START(IMX6SL, "Freescale i.MX6 SoloLite (Device Tree)")
-+	.map_io		= debug_ll_io_init,
-+	.init_irq	= imx6sl_init_irq,
-+	.init_time	= imx6sl_timer_init,
-+	.init_machine	= imx6sl_init_machine,
-+	.dt_compat	= imx6sl_dt_compat,
-+MACHINE_END
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec_1>;
++	phy-mode = "rmii";
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_hog>;
++
++	hog {
++		pinctrl_hog: hoggrp {
++			fsl,pins = <
++				MX6SL_PAD_KEY_ROW7__GPIO4_IO07    0x17059
++				MX6SL_PAD_KEY_COL7__GPIO4_IO06    0x17059
++				MX6SL_PAD_SD2_DAT7__GPIO5_IO00    0x17059
++				MX6SL_PAD_SD2_DAT6__GPIO4_IO29    0x17059
++				MX6SL_PAD_REF_CLK_32K__GPIO3_IO22 0x17059
++			>;
++		};
++	};
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_1>;
++	status = "okay";
++};
++
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1_1>;
++	bus-width = <8>;
++	cd-gpios = <&gpio4 7 0>;
++	wp-gpios = <&gpio4 6 0>;
++	status = "okay";
++};
++
++&usdhc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2_1>;
++	cd-gpios = <&gpio5 0 0>;
++	wp-gpios = <&gpio4 29 0>;
++	status = "okay";
++};
++
++&usdhc3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc3_1>;
++	cd-gpios = <&gpio3 22 0>;
++	status = "okay";
++};
 -- 
 1.7.9.5
