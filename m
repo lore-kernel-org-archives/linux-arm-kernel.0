@@ -1,36 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 03 May 2013 13:20:07 +0200
-Subject: [PATCH 1/9] ARM: tegra: Tegra114 needs CPU_FREQ_TABLE
-In-Reply-To: <CAOh2x==i-_+30mmMp=WkcCQn4qm1-nGfWpPuQnScvRQVd=h+LA@mail.gmail.com>
-References: <1367528578-518090-1-git-send-email-arnd@arndb.de>
- <1367528578-518090-2-git-send-email-arnd@arndb.de>
- <CAOh2x==i-_+30mmMp=WkcCQn4qm1-nGfWpPuQnScvRQVd=h+LA@mail.gmail.com>
-Message-ID: <2416484.HHc7d0zNGR@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 3 May 2013 12:22:29 +0100
+Subject: [PATCH 2/4] mfd: ab8500-gpadc: Suppress 'ignoring
+ regulator_enable() return value' warning
+In-Reply-To: <20130503110424.GG24153@gmail.com>
+References: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
+ <1367509690-24022-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaf75sQduyfw58PFmC1ZyNDMxpwAf0OSyRLPP6vFc+wBQ@mail.gmail.com>
+ <20130503110424.GG24153@gmail.com>
+Message-ID: <20130503112229.GI24153@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 May 2013 10:27:17 Viresh Kumar wrote:
-> > diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-> > index 597e76b..9878503 100644
-> > --- a/arch/arm/mach-tegra/Kconfig
-> > +++ b/arch/arm/mach-tegra/Kconfig
-> > @@ -63,6 +63,7 @@ config ARCH_TEGRA_114_SOC
-> >         select ARM_ARCH_TIMER
-> >         select ARM_GIC
-> >         select ARM_L1_CACHE_SHIFT_6
-> > +       select CPU_FREQ_TABLE if CPU_FREQ
-> >         select CPU_V7
-> >         select PINCTRL
-> >         select PINCTRL_TEGRA114
+On Fri, 03 May 2013, Lee Jones wrote:
+
+> On Fri, 03 May 2013, Linus Walleij wrote:
 > 
-> I doubt which is the best place for doing this? This one or
-> cpufreq/Kconfig.arm with select CPU_FREQ_TABLE for
-> tegra?
+> > On Thu, May 2, 2013 at 5:48 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > > drivers/mfd/ab8500-gpadc.c: In function ?ab8500_gpadc_resume?:
+> > > drivers/mfd/ab8500-gpadc.c:911:18: warning: ignoring return value of
+> > >         ?regulator_enable?, declared with attribute warn_unused_result
+> > >         [-Wunused-result]
+> > >
+> > > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  drivers/mfd/ab8500-gpadc.c |    5 ++++-
+> > >  1 file changed, 4 insertions(+), 1 deletion(-)
+> > >
+> > > diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
+> > > index 5e65b28..7278e53 100644
+> > > --- a/drivers/mfd/ab8500-gpadc.c
+> > > +++ b/drivers/mfd/ab8500-gpadc.c
+> > > @@ -907,8 +907,11 @@ static int ab8500_gpadc_suspend(struct device *dev)
+> > >  static int ab8500_gpadc_resume(struct device *dev)
+> > >  {
+> > >         struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
+> > > +       int ret;
+> > >
+> > > -       regulator_enable(gpadc->regu);
+> > > +       ret = regulator_enable(gpadc->regu);
+> > > +       if (ret < 0)
+> > > +               return ret;
+> > >
+> > >         pm_runtime_mark_last_busy(gpadc->dev);
+> > >         pm_runtime_put_autosuspend(gpadc->dev);
+> > 
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> As it has your Ack, I'm going to add an error print as per Srinidhi's
+> suggestion, test it again and apply this to my MFD tree.
 
-It would be much better IMHO to have an entry for TEGRA_CPUFREQ
-in drivers/cpufreq/Kcofnig.arm and move the select there. However,
-creating that entry has some (small) regression potential and I
-didn't want to do that now but instead just made sure that all
-three Tegra SoCs do the same thing for now.
+Slight change of plan, as I've changed the semantics.
 
-	Arnd
+Would you be kind enough to see v2?
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
