@@ -1,42 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 May 2013 22:41:51 +0200
-Subject: [PATCH 21/63] dmaengine: ste_dma40: Don't configure runtime
- configurable setup during allocate
-In-Reply-To: <1367591569-32197-22-git-send-email-lee.jones@linaro.org>
-References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
- <1367591569-32197-22-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbZmzJhZuST+T+qomK_q3q9wt34CGS6sqk0JkZV-Q6O7A@mail.gmail.com>
+Date: Fri, 3 May 2013 22:43:10 +0200
+Subject: [GIT PULL] Two ux500 fixes for the v3.10 series
+In-Reply-To: <201305032240.46483.arnd@arndb.de>
+References: <CACRpkdYeWi2cx2weXao9=2f78eM0_J=gK-8o6gKjcG7pjYFAxA@mail.gmail.com>
+ <201305032240.46483.arnd@arndb.de>
+Message-ID: <CACRpkdYV26xRiASZ8L3PuPqoqyPKx1Jq-okN6LgD40ffgS6zdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 3, 2013 at 4:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
-
-> Using the dmaengine API, allocating and configuring a channel are two
-> separate actions. Here we're removing logical channel configuration from
-> the channel allocating routines.
+On Fri, May 3, 2013 at 10:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 03 May 2013, Linus Walleij wrote:
+>> Hi ARM SoC folks,
+>>
+>> here are two ux500 fixes for the v3.10 series, please pull
+>> them in. Since -rc1 is not out this is based on Torvald's
+>> HEAD from yesterday.
 >
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-(...)
+> We try hard to avoid doing bug fixes on top of random HEADs.
+> Can you send these on top of the minimum set of branches?
 
-> @@ -2024,6 +2024,9 @@ static int d40_config_memcpy(struct d40_chan *d40c)
->                 d40c->dma_cfg = dma40_memcpy_conf_log;
->                 d40c->dma_cfg.dev_type = dma40_memcpy_channels[d40c->chan.chan_id];
->
-> +               d40_log_cfg(&d40c->dma_cfg,
-> +                           &d40c->log_def.lcsp1, &d40c->log_def.lcsp3);
-> +
+I think I'll just wait for -rc1.
 
-So it only gets configured for memcpy now?
-
-What happens if you use a logical channel for a device transfer?
-
-Where will that be configured?
-
-Have you tested this combo?
+It's not *that* urgent, just wanted to clean my desk.
 
 Yours,
 Linus Walleij
