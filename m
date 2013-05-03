@@ -1,48 +1,110 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 03 May 2013 11:14:55 -0400
-Subject: [PATCH, RFC 14/22] oprofile: always enable IRQ_WORK
-In-Reply-To: <20130503115332.GT8356@rric.localhost>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-15-git-send-email-arnd@arndb.de>
- <20130503115332.GT8356@rric.localhost>
-Message-ID: <1367594095.7373.14.camel@gandalf.local.home>
+From: javi.merino@arm.com (Javi Merino)
+Date: Fri, 3 May 2013 16:17:07 +0100
+Subject: [RFC PATCH v2] drivers: bus: add ARM CCI support
+In-Reply-To: <1367425108-4698-2-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1367425108-4698-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1367425108-4698-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20130503151706.GB2756@e102654-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-05-03 at 13:53 +0200, Robert Richter wrote:
-> On 02.05.13 17:16:18, Arnd Bergmann wrote:
-> > oprofile fails to build if CONFIG_IRQ_WORK is not already enabled,
-> > because of the dependency on the RING_BUFFER code that now uses
-> > the irq work library.
-> > 
-> > kernel/built-in.o: In function `ring_buffer_unlock_commit':
-> > :(.text+0x5b8f0): undefined reference to `irq_work_queue'
-> > kernel/built-in.o: In function `ring_buffer_write':
-> > :(.text+0x5bd10): undefined reference to `irq_work_queue'
+Hi Lorenzo,
+
+On Wed, May 01, 2013 at 05:18:28PM +0100, Lorenzo Pieralisi wrote:
+> On ARM multi-cluster systems coherency between cores running on
+> different clusters is managed by the cache-coherent interconnect (CCI).
+> It allows broadcasting of TLB invalidates and memory barriers and it
+> guarantees cache coherency at system level through snooping of slave
+> interfaces connected to it.
 > 
-> Shouldn't this be fixed in the ring_buffer implementation?
+> This patch enables the basic infrastructure required in Linux to handle and
+> programme the CCI component.
+> 
+> Non-local variables used by the CCI management functions called by power
+> down function calls after disabling the cache must be flushed out to main
+> memory in advance, otherwise incoherency of those values may occur if they
+> are sitting in the cache of some other CPU when power down functions
+> execute. Driver code ensures that relevant data structures are flushed
+> from inner and outer caches after the driver probe is completed.
+> 
+> CCI slave port resources are linked to set of CPUs through bus masters
+> phandle properties that link the interface resources to masters node in
+> the device tree.
+> 
+> Documentation describing the CCI DT bindings is provided with the patch.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
 
-Does this patch fix it?
+[...]
 
--- Steve
+> diff --git a/include/linux/arm-cci.h b/include/linux/arm-cci.h
+> new file mode 100644
+> index 0000000..0e70942
+> --- /dev/null
+> +++ b/include/linux/arm-cci.h
+> @@ -0,0 +1,59 @@
+> +/*
+> + * CCI cache coherent interconnect support
+> + *
+> + * Copyright (C) 2013 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+> + */
+> +
+> +#ifndef __LINUX_ARM_CCI_H
+> +#define __LINUX_ARM_CCI_H
+> +
+> +#include <linux/errno.h>
+> +#include <linux/types.h>
+> +
+> +struct device_node;
+> +
+> +#ifdef CONFIG_ARM_CCI
+> +extern int cci_ace_get_port(struct device_node *dn);
+> +extern int cci_disable_port_by_cpu(u64 mpidr);
+> +extern int __cci_control_port_by_device(struct device_node *dn, bool enable);
+> +extern int __cci_control_port_by_index(u32 port, bool enable);
+> +#else
+> +static inline int cci_ace_get_port(struct device_node *dn, bool cpu)
 
-diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
-index 5e9efd4..015f85a 100644
---- a/kernel/trace/Kconfig
-+++ b/kernel/trace/Kconfig
-@@ -71,6 +71,7 @@ config TRACE_CLOCK
- config RING_BUFFER
- 	bool
- 	select TRACE_CLOCK
-+	select IRQ_WORK
- 
- config FTRACE_NMI_ENTER
-        bool
-@@ -107,7 +108,6 @@ config TRACING
- 	select BINARY_PRINTF
- 	select EVENT_TRACING
- 	select TRACE_CLOCK
--	select IRQ_WORK
- 
- config GENERIC_TRACER
- 	bool
+Builds with !CONFIG_ARM_CCI fail because this definition of
+cci_ace_get_port() takes two arguments whereas the one for
+CONFIG_ARM_CCI takes only one.
+
+> +{
+> +       return -ENODEV;
+> +}
+> +static inline int cci_disable_port_by_cpu(u64 mpidr) { return -ENODEV; }
+> +static inline int __cci_control_port_by_device(struct device_node *dn,
+> +                                              bool enable)
+> +{
+> +       return -ENODEV;
+> +}
+> +static inline int __cci_control_port_by_index(u32 port, bool enable)
+> +{
+> +       return -ENODEV;
+> +}
+> +#endif
+> +#define cci_disable_port_by_device(dev) \
+> +       __cci_control_port_by_device(dev, false)
+> +#define cci_enable_port_by_device(dev) \
+> +       __cci_control_port_by_device(dev, true)
+> +#define cci_disable_port_by_index(dev) \
+> +       __cci_control_port_by_index(dev, false)
+> +#define cci_enable_port_by_index(dev) \
+> +       __cci_control_port_by_index(dev, true)
+> +
+> +#endif
