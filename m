@@ -1,56 +1,56 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 3 May 2013 10:54:09 +0200
-Subject: [PATCH] clk: ux500: clk-sysctrl: handle clocks with no parents
-In-Reply-To: <CAPDyKFpZ+-6b3kPyNacPQ33=Ssdjs=fvFxkr4iSUT_hm1YzVTg@mail.gmail.com>
-References: <1367325906-23045-1-git-send-email-fabio.baltieri@linaro.org>
- <CAPDyKFpZ+-6b3kPyNacPQ33=Ssdjs=fvFxkr4iSUT_hm1YzVTg@mail.gmail.com>
-Message-ID: <CAPDyKFq6iQ21QosEH_WqGCetXfaO1uecvK7+WzjZJDkK8r3SxA@mail.gmail.com>
+From: kyungsik.lee@lge.com (Kyungsik Lee)
+Date: Fri, 3 May 2013 18:02:52 +0900
+Subject: [PATCH v3 -next 3/5] arm: Add support for LZ4-compressed kernel
+In-Reply-To: <20130430135602.2aa0d3b4ec392bf83a9b64d0@linux-foundation.org>
+References: <1362484056-9778-1-git-send-email-kyungsik.lee@lge.com>
+ <1362484056-9778-4-git-send-email-kyungsik.lee@lge.com>
+ <20130430135602.2aa0d3b4ec392bf83a9b64d0@linux-foundation.org>
+Message-ID: <20130503090252.GB3170@Corona>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 May 2013 10:51, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-> On 30 April 2013 14:45, Fabio Baltieri <fabio.baltieri@linaro.org> wrote:
->> Fix clk_reg_sysctrl() to set main clock registers of new struct
->> clk_sysctrl even if the registered clock has no parents.
->>
->> This fixes an issue where "ulpclk" was registered with all clk->reg_*
->> fields uninitialized, causing a -EINVAL error from clk_prepare().
->>
->> Cc: Ulf Hansson <ulf.hansson@linaro.org>
->> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
->> ---
->>  drivers/clk/ux500/clk-sysctrl.c | 8 +++++++-
->>  1 file changed, 7 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/clk/ux500/clk-sysctrl.c b/drivers/clk/ux500/clk-sysctrl.c
->> index bc7e9bd..e364c9d 100644
->> --- a/drivers/clk/ux500/clk-sysctrl.c
->> +++ b/drivers/clk/ux500/clk-sysctrl.c
->> @@ -145,7 +145,13 @@ static struct clk *clk_reg_sysctrl(struct device *dev,
->>                 return ERR_PTR(-ENOMEM);
->>         }
->>
->> -       for (i = 0; i < num_parents; i++) {
->> +       /* set main clock registers */
->> +       clk->reg_sel[0] = reg_sel[0];
->> +       clk->reg_bits[0] = reg_bits[0];
->> +       clk->reg_mask[0] = reg_mask[0];
->> +
->> +       /* handle clocks with more than one parent */
->> +       for (i = 1; i < num_parents; i++) {
->>                 clk->reg_sel[i] = reg_sel[i];
->>                 clk->reg_bits[i] = reg_bits[i];
->>                 clk->reg_mask[i] = reg_mask[i];
->> --
->> 1.8.2
->>
->
-> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
->
-> This is bugfix, should go "stable" as well?
+On Tue, Apr 30, 2013 at 01:56:02PM -0700, Andrew Morton wrote:
+> On Tue,  5 Mar 2013 20:47:34 +0900 Kyungsik Lee <kyungsik.lee@lge.com> wrote:
+> 
+> > This patch integrates the LZ4 decompression code to the arm pre-boot code.
+> > And it depends on two patchs below
+> > 
+> > lib: Add support for LZ4-compressed kernel
+> > decompressor: Add LZ4 decompressor module
+> > 
+> > ...
+> >
+> > - Apply CFLAGS, -Os to decompress.o to improve decompress
+> >   performance during boot-up process
+> >
+> > ...
+> >
+> > --- a/arch/arm/boot/compressed/Makefile
+> > +++ b/arch/arm/boot/compressed/Makefile
+> > @@ -24,6 +24,9 @@ endif
+> >  AFLAGS_head.o += -DTEXT_OFFSET=$(TEXT_OFFSET)
+> >  HEAD	= head.o
+> >  OBJS	+= misc.o decompress.o
+> > +ifeq ($(CONFIG_KERNEL_LZ4),y)
+> > +CFLAGS_decompress.o := -Os
+> > +endif
+> 
+> Surprised.  You found that -Os produces faster code than -O2?  Details,
+> please?
+-Os is enforced here, based on the test result of decompression time
+below, slightly faster than -O2.
+But further tests with UA show that using -O2 will be the right choice
+especially in the case of the unaligned access enabled.
 
-Stable means 3.10 rcs, since the abx500 clk tree was added for 3.10.
+Decompression Time(counts)
+             UA
+-Os  6717    3447
+-O2  6720    2728
 
->
-> Kind regards
-> Ulf Hansson
+Note: ARM v7, Kernel 3.4
+      counter freq. = 32768 HZ
+      UA(Unaligned Access)
+      gcc version 4.6.2 (Ubuntu/Linaro 4.6.2-14ubuntu2~ppa1)
+
+Thanks,
+Kyungsik
