@@ -1,67 +1,124 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 May 2013 10:14:28 +0200
-Subject: [PATCH 9/9] ARM: ux500: always select ABX500_CORE
-In-Reply-To: <1367528578-518090-10-git-send-email-arnd@arndb.de>
-References: <1367528578-518090-1-git-send-email-arnd@arndb.de>
- <1367528578-518090-10-git-send-email-arnd@arndb.de>
-Message-ID: <CACRpkdY+5gdh1G7N+_Spg=iNZ0QMZ=ZXuhsVPuMEt62NxPhRxA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 May 2013 09:15:10 +0100
+Subject: [PATCH] ARM: OMAP-USB: Fix possible memory leak
+In-Reply-To: <20130503061931.GB27451@arwen.pp.htv.fi>
+References: <1367510596-27780-1-git-send-email-shc_work@mail.ru>
+ <20130502162433.GA10016@kahuna> <1367512124.978518915@f372.mail.ru>
+ <20130502164058.GC8577@arwen.pp.htv.fi>
+ <20130502231353.GF21614@n2100.arm.linux.org.uk>
+ <20130503061931.GB27451@arwen.pp.htv.fi>
+Message-ID: <20130503081510.GG21614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 2, 2013 at 11:02 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, May 03, 2013 at 09:21:51AM +0300, Felipe Balbi wrote:
+> Hi,
+> 
+> On Fri, May 03, 2013 at 12:13:53AM +0100, Russell King - ARM Linux wrote:
+> > > > > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > > > > > ---
+> > > > > >  arch/arm/mach-omap2/usb-host.c | 21 +++++++++++++++++----
+> > > > > >  1 file changed, 17 insertions(+), 4 deletions(-)
+> > > > > > 
+> > > > > > diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
+> > > > > > index aa27d7f..8d17a0d 100644
+> > > > > > --- a/arch/arm/mach-omap2/usb-host.c
+> > > > > > +++ b/arch/arm/mach-omap2/usb-host.c
+> > > > > > @@ -570,8 +570,10 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
+> > > > > >  	supplies->dev_name = dev_id;
+> > > > > >  
+> > > > > >  	reg_data = kzalloc(sizeof(*reg_data), GFP_KERNEL);
+> > > > > > -	if (!reg_data)
+> > > > > > +	if (!reg_data) {
+> > > > > > +		kfree(supplies);
+> > > > > >  		return -ENOMEM;
+> > > > > > +	}
+> > > > > >  
+> > > > > >  	reg_data->constraints.valid_ops_mask = REGULATOR_CHANGE_STATUS;
+> > > > > >  	reg_data->consumer_supplies = supplies;
+> > > > > > @@ -579,8 +581,11 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
+> > > > > >  
+> > > > > >  	config = kmemdup(&hsusb_reg_config, sizeof(hsusb_reg_config),
+> > > > > >  			GFP_KERNEL);
+> > > > > > -	if (!config)
+> > > > > > +	if (!config) {
+> > > > > > +		kfree(supplies);
+> > > > > > +		kfree(reg_data);
+> > > > > >  		return -ENOMEM;
+> > > > > > +	}
+> > > > > >  
+> > > > > >  	config->supply_name = name;
+> > > > > >  	config->gpio = gpio;
+> > > > > > @@ -589,17 +594,25 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
+> > > > > >  
+> > > > > >  	/* create a regulator device */
+> > > > > >  	pdev = kzalloc(sizeof(*pdev), GFP_KERNEL);
+> > > > > > -	if (!pdev)
+> > > > > > +	if (!pdev) {
+> > > > > > +		kfree(supplies);
+> > > > > > +		kfree(reg_data);
+> > > > > > +		kfree(config);
+> > > > > >  		return -ENOMEM;
+> > > > > > +	}
+> > > > > >  
+> > > > > >  	pdev->id = PLATFORM_DEVID_AUTO;
+> > > > > >  	pdev->name = reg_name;
+> > > > > >  	pdev->dev.platform_data = config;
+> > > > > >  
+> > > > > >  	ret = platform_device_register(pdev);
+> > > > > > -	if (ret)
+> > > > > > +	if (ret) {
+> > > > > >  		pr_err("%s: Failed registering regulator %s for %s\n",
+> > > > > >  				__func__, name, dev_id);
+> > > > > > +		kfree(supplies);
+> > > > > > +		kfree(reg_data);
+> > > > > > +		kfree(config);
+> > > > > > +	}
+> > > > > 
+> > > > > Might be better to switch to devm_XXX managed functions?
+> > > 
+> > > I don't think it makes sense since the platform_device hasn't been
+> > > registered yet.
+> > > 
+> > > Still, patch can be improved with proper goto labels instead of
+> > > sprinkling different kfree() calls in every single error branch.
+> > > 
+> > > > If anyone can rewrite driver to use devm_xx, it would have been better.
+> > > > I'm not going to redo the patch yet, let it be so, I just showed a point
+> > > > for OMAP-developers.
+> > > 
+> > > fair enough.
+> > 
+> > Well, as long as this crap violates the driver model by using kfree() on
+> > a device...  Devices are refcounted and must only be freed when the
+> > refcount drops to zero.
+> 
+> read the patch again, there's no kfree() on any device. There is a kfree
+> of supplies, reg_data and config.
+> 
+> On top of that, the code being changed here doesn't even exist, so I
+> wonder which tree is this code based off. usb-host.c has always being
+> using omap_device_build() which internally calls
+> platform_device_alloc().
+> 
+> > This is exactly why we have platform_device_alloc(),
+> > platform_device_register_full() and friends - so that people don't have to
+> > fsck around with kzalloc themselves and get it wrong like the above does.
+> > 
+> > Would you like me to pass your details to gregkh for another one of his
+> > public humilation exercises over basic kernel programming stuff? :)
+> 
+> How about we pass yours for not reading the patch before flaming ? Note
+> that $SUBJECT is *not* touching at all that line which kzallocs a
+> platform_device. Wrong as it is, it's not part of $SUBJECT.
 
-> The use of 'select' in the ux500 platform is a huge mess, we should
-> not be selecting most of the drivers that are currently selected
-> there, but rather enable them from the defconfig.
->
-> As a fixup for 3.10, let's at least select the dependencies for
-> the other drivers we already select, to make it consistent.
->
-> warning: (UX500_SOC_COMMON) selects AB8500_CORE which has unmet direct dependencies (HAS_IOMEM && GENERIC_HARDIRQS && ABX500_CORE && MFD_DB8500_PRCMU)
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+It's really simple.  You do not use k*alloc with platform devices.  And
+you reject any patch which contains that, and point it out to the patch
+author.
 
-I do not necessarily agree with this commit message.
+It really doesn't matter if there's a kfree or not.  The fact is you do
+not allow it in any situation, because such bad practises get copied
+and then you end up with kfree's.
 
-The only mess I see is that this very patch is missing...
-
-If we look at this:
-
-config UX500_SOC_DB8500
-        bool
-        select CPU_FREQ_TABLE if CPU_FREQ
-        select MFD_DB8500_PRCMU
-        select PINCTRL_DB8500
-        select PINCTRL_DB8540
-        select PINCTRL_AB8500
-        select PINCTRL_AB8505
-        select PINCTRL_AB9540
-        select PINCTRL_AB8540
-        select REGULATOR
-        select REGULATOR_DB8500_PRCMU
-
-The PRCMU, the PINCTRL drivers, and the PRCMU regulators
-are necessary to boot the system correctly, by which I mean
-necessary so as not to cause potential damage to the hardware.
-
-The PRCMU is a system controller without which the system
-cannot really be brought up, and the ABx500's are the PMICs
-which are developed in pair with the SoC and they are in practice
-Siamese twins, there is no chance you can build a Ux500 system
-without both of them. It just won't even start. There are deep
-dependencies between the PRCMU and the ABx500, as the
-PRCMU firmware will talk directly to the ABx500 without the
-kernel intervening. I.e. the whole set of hardware has to be
-there.
-
-While I understand that from a compile-time point of view it does
-not seem nice, and all things would be separate units that you
-plug in, from a run-time and system architecture point of view it
-makes a lot of sense to select these. Worlds collide...
-
-Apart from that:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+How about you gain an understanding of this stuff and why this stuff is
+soo "hot".
