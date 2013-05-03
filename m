@@ -1,72 +1,53 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  3 May 2013 15:02:53 +0100
-Subject: [RFC PATCH 2/2] ARM: KVM: standalone Makefile for vgic and timers
-In-Reply-To: <1367589773-5609-1-git-send-email-marc.zyngier@arm.com>
-References: <1367589773-5609-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1367589773-5609-3-git-send-email-marc.zyngier@arm.com>
+Date: Fri,  3 May 2013 15:02:51 +0100
+Subject: [RFC PATCH 0/2] ARM: KVM: Moving GIC/timer out of arch/arm
+Message-ID: <1367589773-5609-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the road to turn KVM/arm64 into something more sensible, change
-the way we compile the VGIC and arch_timer code by using local
-Makefiles instead of the very backward method we used before.
+As KVM/arm64 is looming on the horizon, it makes sense to move some
+of the common code to a single location in order to reduce duplication.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- Makefile              | 2 +-
- arch/arm/kvm/Makefile | 2 --
- virt/Makefile         | 1 +
- virt/kvm/Makefile     | 1 +
- virt/kvm/arm/Makefile | 2 ++
- 5 files changed, 5 insertions(+), 3 deletions(-)
+The code could live anywhere. Actually, most of KVM is already built
+with a bunch of ugly ../../.. hacks in the various Makefiles, so we're
+not exactly talking about style here. But maybe it is time to start
+moving into a less ugly direction.
+
+The include files must be in a "public" location, as they are accessed
+from non-KVM files (arch/arm/kernel/asm-offsets.c).
+
+For this purpose, introduce two new locations:
+- virt/kvm/arm/ : x86 and ia64 already share the ioapic code in
+  virt/kvm, so this could be seen as a (very ugly) precedent.
+- include/kvm/  : there is already an include/xen, and while the
+  intent is slightly different, this seems as good a location as
+  any
+
+Once the code has been moved, it becomes easy to build it in a
+less hackish way, which makes the code easily reusable by KVM/arm64.
+
+Marc Zyngier (2):
+  ARM: KVM: move GIC/timer code to a common location
+  ARM: KVM: standalone Makefile for vgic and timers
+
+ Makefile                                               | 2 +-
+ arch/arm/include/asm/kvm_host.h                        | 4 ++--
+ arch/arm/kvm/Makefile                                  | 5 ++---
+ {arch/arm/include/asm => include/kvm}/kvm_arch_timer.h | 0
+ {arch/arm/include/asm => include/kvm}/kvm_vgic.h       | 0
+ virt/Makefile                                          | 1 +
+ virt/kvm/Makefile                                      | 1 +
+ virt/kvm/arm/Makefile                                  | 2 ++
+ {arch/arm/kvm => virt/kvm/arm}/arch_timer.c            | 4 ++--
+ {arch/arm/kvm => virt/kvm/arm}/vgic.c                  | 0
+ 10 files changed, 11 insertions(+), 8 deletions(-)
+ rename {arch/arm/include/asm => include/kvm}/kvm_arch_timer.h (100%)
+ rename {arch/arm/include/asm => include/kvm}/kvm_vgic.h (100%)
  create mode 100644 virt/Makefile
  create mode 100644 virt/kvm/Makefile
  create mode 100644 virt/kvm/arm/Makefile
+ rename {arch/arm/kvm => virt/kvm/arm}/arch_timer.c (99%)
+ rename {arch/arm/kvm => virt/kvm/arm}/vgic.c (100%)
 
-diff --git a/Makefile b/Makefile
-index 6db672b..19d51df 100644
---- a/Makefile
-+++ b/Makefile
-@@ -732,7 +732,7 @@ export mod_sign_cmd
- 
- 
- ifeq ($(KBUILD_EXTMOD),)
--core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/
-+core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/ virt/
- 
- vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
- 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index 110d6da..e0540fd 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -20,5 +20,3 @@ kvm-arm-y = $(addprefix $(KVM)/, kvm_main.o coalesced_mmio.o)
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
- obj-y += coproc.o coproc_a15.o mmio.o psci.o perf.o
--obj-$(CONFIG_KVM_ARM_VGIC) += $(addprefix $(KVM)/arm/, vgic.o)
--obj-$(CONFIG_KVM_ARM_TIMER) += $(addprefix $(KVM)/arm/, arch_timer.o)
-diff --git a/virt/Makefile b/virt/Makefile
-new file mode 100644
-index 0000000..c3b9ad0
---- /dev/null
-+++ b/virt/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_KVM)	+= kvm/
-diff --git a/virt/kvm/Makefile b/virt/kvm/Makefile
-new file mode 100644
-index 0000000..dc87943
---- /dev/null
-+++ b/virt/kvm/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_KVM_ARM_HOST)	+= arm/
-diff --git a/virt/kvm/arm/Makefile b/virt/kvm/arm/Makefile
-new file mode 100644
-index 0000000..4df943b
---- /dev/null
-+++ b/virt/kvm/arm/Makefile
-@@ -0,0 +1,2 @@
-+obj-$(CONFIG_KVM_ARM_VGIC) += vgic.o
-+obj-$(CONFIG_KVM_ARM_TIMER) += arch_timer.o
 -- 
 1.8.2.1
