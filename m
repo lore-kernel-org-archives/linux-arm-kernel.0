@@ -1,76 +1,76 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 03 May 2013 14:15:57 +0200
-Subject: [PATCH,
- RFC 02/22] cpufreq: ARM_DT_BL_CPUFREQ needs ARM_CPU_TOPOLOGY
-In-Reply-To: <CAKohpomBKuaxk+sSF63cu6JKut1uV7J7Sj2o85c3wQ=fodx+Ow@mail.gmail.com>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-3-git-send-email-arnd@arndb.de>
- <CAKohpomBKuaxk+sSF63cu6JKut1uV7J7Sj2o85c3wQ=fodx+Ow@mail.gmail.com>
-Message-ID: <5563691.6kxbXZTjH5@vostro.rjw.lan>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 3 May 2013 13:11:35 +0100
+Subject: [PATCH 1/5 v2] dmaengine: ste_dma40: Allow memcpy channels to be
+ configured from DT
+In-Reply-To: <CACRpkdb-_pf=9cm_Hy25nzFWKSTKc6OmmG9rhN2T1wR1=2tddg@mail.gmail.com>
+References: <1367336497-10650-1-git-send-email-lee.jones@linaro.org>
+ <20130501095243.GD25256@gmail.com>
+ <CACRpkdZtOtnUYvLm7BPA98oMOLAMPHpJ9GLoyMXOKW1nsTDYiQ@mail.gmail.com>
+ <20130503115739.GJ24153@gmail.com>
+ <CACRpkdb-_pf=9cm_Hy25nzFWKSTKc6OmmG9rhN2T1wR1=2tddg@mail.gmail.com>
+Message-ID: <20130503121135.GK24153@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, May 03, 2013 10:21:45 AM Viresh Kumar wrote:
-> On 2 May 2013 20:46, Arnd Bergmann <arnd@arndb.de> wrote:
-> > The big.LITTLE cpufreq driver uses the CPU topology API, which
-> > needs to be reflected in Kconfig to prevent broken configurations.
+On Fri, 03 May 2013, Linus Walleij wrote:
+
+> On Fri, May 3, 2013 at 1:57 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Fri, 03 May 2013, Linus Walleij wrote:
 > >
-> > warning: (ARM_DT_BL_CPUFREQ) selects ARM_BIG_LITTLE_CPUFREQ which
-> > has unmet direct dependencies (ARCH_HAS_CPUFREQ && CPU_FREQ && ARM && ARM_CPU_TOPOLOGY)
+> >> On Wed, May 1, 2013 at 11:52 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> >>
+> >> > At this moment in time the memcpy channels which can be used by the D40
+> >> > are fixed, as each supported platform in Mainline uses the same ones.
+> >> > However, platforms do exist which don't follow this convention, so
+> >> > these will need to be tailored. Fortunately, these platforms will be DT
+> >> > only, so this change has very little impact on platform data.
+> >> >
+> >> > Cc: Vinod Koul <vinod.koul@intel.com>
+> >> > Cc: Dan Williams <djbw@fb.com>
+> >> > Cc: Per Forlin <per.forlin@stericsson.com>
+> >> > Cc: Rabin Vincent <rabin@rab.in>
+> >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >>
+> >> Real nice!
+> >>
+> >> But can you split this in two patches: one that changes
+> >> drivers/dma/ste_dma40* and one sequel patch that changes
+> >> Documentation/* and arch/arm/boot/dts/* so I can merge them
+> >> out-of-order?
+> >>
+> >> I am trying this development cycle to split changes to the
+> >> device trees and bindings off from the rest of the patches
+> >> becaused it caused me a mess last cycle.
 > >
-> > Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> > Cc: cpufreq at vger.kernel.org
-> > Cc: linux-pm at vger.kernel.org
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  drivers/cpufreq/Kconfig.arm | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> > index f3af18b..3fd6bdf 100644
-> > --- a/drivers/cpufreq/Kconfig.arm
-> > +++ b/drivers/cpufreq/Kconfig.arm
-> > @@ -10,6 +10,7 @@ config ARM_DT_BL_CPUFREQ
-> >         tristate "Generic ARM big LITTLE CPUfreq driver probed via DT"
-> >         select ARM_BIG_LITTLE_CPUFREQ
-> >         depends on OF && HAVE_CLK
-> > +       depends on ARM_CPU_TOPOLOGY
-> >         help
-> >           This enables the Generic CPUfreq driver for ARM big.LITTLE platform.
-> >           This gets frequency tables from DT.
+> > I was under the impression that the documentation went with the
+> > bindings, rather than the Device Tree. Am I wrong?
 > 
-> This Kconfig thing has always been confusing to me. This is how the code looks
-> currently.
+> No you're right. The documentation with the bindings and the
+> patch to the driver...
 > 
-> config ARM_BIG_LITTLE_CPUFREQ
->         tristate
->         depends on ARM_CPU_TOPOLOGY
+> Then just arch/arm/boot/dts/* separately.
+
+I'm confused, that's how it is already:
+
+  Documentation/devicetree/bindings/dma/ste-dma40.txt |    2 ++
+  drivers/dma/ste_dma40.c                             |   42 +++++++++++++++++++++++++++++++++---------
+  include/linux/platform_data/dma-ste-dma40.h         |    2 ++
+  3 files changed, 37 insertions(+), 9 deletions(-)
+
+Are you getting enough sleep? ;)
+
+> The latter is where I have all my trouble and screwup...
 > 
-> config ARM_DT_BL_CPUFREQ
->         tristate "Generic ARM big LITTLE CPUfreq driver probed via DT"
->         select ARM_BIG_LITTLE_CPUFREQ
->         depends on OF && HAVE_CLK
->         help
->           This enables the Generic CPUfreq driver for ARM big.LITTLE platform.
->           This gets frequency tables from DT.
+> (However when we break the devicetree data out of the kernel
+> and into its own git we will have to follow the pattern above with
+> a patch of bindings+DT changes and another one in parallell
+> changing the kernel, but that is for a more advanced age.)
 > 
-> Because all ARM big LITTLE cpufreq stuff have dependency on
-> ARM_CPU_TOPOLOGY, i have added dependency at a common place. So that
-> we don't end up adding this in every glue layer driver. How should this be done?
-
-First, there's no rule of thumb here as far as I can say.
-
-In this particular case I think it is OK to make both ARM_DT_BL_CPUFREQ and
-ARM_BIG_LITTLE_CPUFREQ depend on ARM_CPU_TOPOLOGY, because (in theory?) the
-latter may be set without the former (unless you want to make ARM_DT_BL_CPUFREQ
-depend on ARM_BIG_LITTLE_CPUFREQ, but then it may be kind of confusing to
-users).
-
-Thanks,
-Rafael
-
+> Yours,
+> Linus Walleij
 
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
