@@ -1,30 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 03 May 2013 22:47:58 +0200
-Subject: [GIT PULL] Two ux500 fixes for the v3.10 series
-In-Reply-To: <CACRpkdYV26xRiASZ8L3PuPqoqyPKx1Jq-okN6LgD40ffgS6zdg@mail.gmail.com>
-References: <CACRpkdYeWi2cx2weXao9=2f78eM0_J=gK-8o6gKjcG7pjYFAxA@mail.gmail.com>
- <201305032240.46483.arnd@arndb.de>
- <CACRpkdYV26xRiASZ8L3PuPqoqyPKx1Jq-okN6LgD40ffgS6zdg@mail.gmail.com>
-Message-ID: <18485798.NYy1bj12OB@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 3 May 2013 22:48:20 +0200
+Subject: [PATCH 22/63] dmaengine: ste_dma40: Move rev error-check up to
+ revision acquisition
+In-Reply-To: <1367591569-32197-23-git-send-email-lee.jones@linaro.org>
+References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
+ <1367591569-32197-23-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdb7KFfNTZNwzyvh75k1cbjpxfSrxDW9cchM7cfUK3dmEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 May 2013 22:43:10 Linus Walleij wrote:
-> On Fri, May 3, 2013 at 10:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 03 May 2013, Linus Walleij wrote:
-> >> Hi ARM SoC folks,
-> >>
-> >> here are two ux500 fixes for the v3.10 series, please pull
-> >> them in. Since -rc1 is not out this is based on Torvald's
-> >> HEAD from yesterday.
-> >
-> > We try hard to avoid doing bug fixes on top of random HEADs.
-> > Can you send these on top of the minimum set of branches?
-> 
-> I think I'll just wait for -rc1.
-> 
-> It's not *that* urgent, just wanted to clean my desk.
+On Fri, May 3, 2013 at 4:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Ok, sounds good.
+> At the moment we fetch the hardware revision, then do some stuff, then
+> check whether the revision is correct and return in error if it's not.
+> Well we may as well check it as soon as we know what it is, so let's
+> move the check right up underneath where we acquire the version.
+>
+> Acked-by: Vinod Koul <vnod.koul@intel.com>
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-	Arnd
+Applied to my ux500-dm40 branch.
+
+(Notice I didn't apply 20 and 21 so now I'm screwing around.)
+
+Thanks!
+Linus Walleij
