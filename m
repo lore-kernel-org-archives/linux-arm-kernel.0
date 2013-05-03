@@ -1,38 +1,66 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  3 May 2013 15:32:24 +0100
-Subject: [PATCH 38/63] ARM: ux500: Stop passing Hash DMA channel config
- information though pdata
+Date: Fri,  3 May 2013 15:32:25 +0100
+Subject: [PATCH 39/63] crypto: ux500/cryp - Prepare clock before enabling it
 In-Reply-To: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
 References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367591569-32197-39-git-send-email-lee.jones@linaro.org>
+Message-ID: <1367591569-32197-40-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA channel configuration information should be setup in the driver.
-The Ux500 Hash driver now does this, so there's no need to send it
-though here too.
+If we fail to prepare the ux500-cryp clock before enabling it the
+platform will fail to boot. Here we insure this happens.
 
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Andreas Westin <andreas.westin@stericsson.com>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: linux-crypto at vger.kernel.org
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |    4 ----
- 1 file changed, 4 deletions(-)
+ drivers/crypto/ux500/cryp/cryp_core.c |   12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 883dc66..cb7ae23 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -473,11 +473,7 @@ static struct cryp_platform_data u8500_cryp1_platform_data = {
- static struct stedma40_chan_cfg u8500_hash_dma_cfg_tx = {
- 		.dir = STEDMA40_MEM_TO_PERIPH,
- 		.dev_type = DB8500_DMA_DEV50_HAC1_TX,
--		.src_info.data_width = STEDMA40_WORD_WIDTH,
--		.dst_info.data_width = STEDMA40_WORD_WIDTH,
- 		.mode = STEDMA40_MODE_LOGICAL,
--		.src_info.psize = STEDMA40_PSIZE_LOG_16,
--		.dst_info.psize = STEDMA40_PSIZE_LOG_16,
- };
+diff --git a/drivers/crypto/ux500/cryp/cryp_core.c b/drivers/crypto/ux500/cryp/cryp_core.c
+index 22c9063..bf78d60 100644
+--- a/drivers/crypto/ux500/cryp/cryp_core.c
++++ b/drivers/crypto/ux500/cryp/cryp_core.c
+@@ -1459,11 +1459,17 @@ static int ux500_cryp_probe(struct platform_device *pdev)
+ 		goto out_regulator;
+ 	}
  
- static struct hash_platform_data u8500_hash1_platform_data = {
++	ret = clk_prepare(device_data->clk);
++	if (ret) {
++		dev_err(dev, "[%s]: clk_prepare() failed!", __func__);
++		goto out_clk;
++	}
++
+ 	/* Enable device power (and clock) */
+ 	ret = cryp_enable_power(device_data->dev, device_data, false);
+ 	if (ret) {
+ 		dev_err(dev, "[%s]: cryp_enable_power() failed!", __func__);
+-		goto out_clk;
++		goto out_clk_unprepare;
+ 	}
+ 
+ 	cryp_error = cryp_check(device_data);
+@@ -1524,6 +1530,9 @@ static int ux500_cryp_probe(struct platform_device *pdev)
+ out_power:
+ 	cryp_disable_power(device_data->dev, device_data, false);
+ 
++out_clk_unprepare:
++	clk_unprepare(device_data->clk);
++
+ out_clk:
+ 	clk_put(device_data->clk);
+ 
+@@ -1594,6 +1603,7 @@ static int ux500_cryp_remove(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "[%s]: cryp_disable_power() failed",
+ 			__func__);
+ 
++	clk_unprepare(device_data->clk);
+ 	clk_put(device_data->clk);
+ 	regulator_put(device_data->pwr_regulator);
+ 
 -- 
 1.7.10.4
