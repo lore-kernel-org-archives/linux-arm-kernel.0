@@ -1,11 +1,11 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 May 2013 21:33:15 +0200
-Subject: [PATCH 04/63] ARM: ux500: Supply MMC DMA configuration via Device
- Tree
-In-Reply-To: <1367591569-32197-5-git-send-email-lee.jones@linaro.org>
+Date: Fri, 3 May 2013 21:33:54 +0200
+Subject: [PATCH 03/63] ARM: ux500: Supply UART's DMA configuration via
+ Device Tree
+In-Reply-To: <1367591569-32197-4-git-send-email-lee.jones@linaro.org>
 References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
- <1367591569-32197-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZEYKPeutHjs7UfSGmjQQvafp1nV-ZR6DBLWZ0-oVfa_g@mail.gmail.com>
+ <1367591569-32197-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYrb10bVpcm706NmVs7osM=gy4fT3=qZ3__pfndTWM+bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
