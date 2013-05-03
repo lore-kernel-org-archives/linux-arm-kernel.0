@@ -1,126 +1,51 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  3 May 2013 15:31:53 +0100
-Subject: [PATCH 07/63] dmaengine: ste_dma40: Assign memcpy channels in the
- driver
+Date: Fri,  3 May 2013 15:31:55 +0100
+Subject: [PATCH 09/63] dmaengine: ste_dma40: Rectify incorrect configuration
+ validation checking
 In-Reply-To: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
 References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367591569-32197-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1367591569-32197-10-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The channels reserved for memcpy are the same for all currently
-supported platforms. With this in mind, we can ease the platform
-data passing requirement by moving these assignments out from
-platform code and place them directly into the driver.
+If we compare an event's group (dev_type / 16) with STEDMA40_DEV_DST_MEMORY
+(-1), the only way we'd obtain a positive result is if we passed -16 as a
+device type, which is unfeasible. Instead, it would be much more sane to
+compare STEDMA40_DEV_DST_MEMORY against the raw dev_type in order to expect
+the expected result.
 
-Acked-by: Vinod Koul <vnod.koul@intel.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/devices-db8500.c        |   12 ------------
- drivers/dma/ste_dma40.c                     |   12 +++++++-----
- include/linux/platform_data/dma-ste-dma40.h |    4 ----
- 3 files changed, 7 insertions(+), 21 deletions(-)
+ drivers/dma/ste_dma40.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
-index f3d9419..01cfb68 100644
---- a/arch/arm/mach-ux500/devices-db8500.c
-+++ b/arch/arm/mach-ux500/devices-db8500.c
-@@ -146,22 +146,10 @@ static const dma_addr_t dma40_rx_map[DB8500_DMA_NR_DEV] = {
- 	[DB8500_DMA_DEV48_CAC1_RX] = U8500_CRYP1_BASE + CRYP1_RX_REG_OFFSET,
- };
- 
--/* Reserved event lines for memcpy only */
--static int dma40_memcpy_event[] = {
--	DB8500_DMA_MEMCPY_TX_0,
--	DB8500_DMA_MEMCPY_TX_1,
--	DB8500_DMA_MEMCPY_TX_2,
--	DB8500_DMA_MEMCPY_TX_3,
--	DB8500_DMA_MEMCPY_TX_4,
--	DB8500_DMA_MEMCPY_TX_5,
--};
--
- static struct stedma40_platform_data dma40_plat_data = {
- 	.dev_len = DB8500_DMA_NR_DEV,
- 	.dev_rx = dma40_rx_map,
- 	.dev_tx = dma40_tx_map,
--	.memcpy = dma40_memcpy_event,
--	.memcpy_len = ARRAY_SIZE(dma40_memcpy_event),
- 	.memcpy_conf_phy = &dma40_memcpy_conf_phy,
- 	.memcpy_conf_log = &dma40_memcpy_conf_log,
- 	.disabled_channels = {-1},
 diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 1734fee..12de79e 100644
+index 3b83dee..c79853f 100644
 --- a/drivers/dma/ste_dma40.c
 +++ b/drivers/dma/ste_dma40.c
-@@ -55,6 +55,9 @@
- 
- #define MAX(a, b) (((a) < (b)) ? (b) : (a))
- 
-+/* Reserved event lines for memcpy only. */
-+static int dma40_memcpy_channels[] = { 56, 57, 58, 59, 60 };
-+
- /**
-  * enum 40_command - The different commands and/or statuses.
-  *
-@@ -2014,8 +2017,7 @@ static int d40_config_memcpy(struct d40_chan *d40c)
- 	if (dma_has_cap(DMA_MEMCPY, cap) && !dma_has_cap(DMA_SLAVE, cap)) {
- 		d40c->dma_cfg = *d40c->base->plat_data->memcpy_conf_log;
- 		d40c->dma_cfg.src_dev_type = STEDMA40_DEV_SRC_MEMORY;
--		d40c->dma_cfg.dst_dev_type = d40c->base->plat_data->
--			memcpy[d40c->chan.chan_id];
-+		d40c->dma_cfg.dst_dev_type = dma40_memcpy_channels[d40c->chan.chan_id];
- 
- 	} else if (dma_has_cap(DMA_MEMCPY, cap) &&
- 		   dma_has_cap(DMA_SLAVE, cap)) {
-@@ -2927,7 +2929,7 @@ static int __init d40_dmaengine_init(struct d40_base *base,
+@@ -1771,19 +1771,19 @@ static int d40_validate_conf(struct d40_chan *d40c,
  	}
  
- 	d40_chan_init(base, &base->dma_memcpy, base->log_chans,
--		      base->num_log_chans, base->plat_data->memcpy_len);
-+		      base->num_log_chans, ARRAY_SIZE(dma40_memcpy_channels));
+ 	if (conf->dir == STEDMA40_MEM_TO_PERIPH &&
+-	    dst_event_group == STEDMA40_DEV_DST_MEMORY) {
++	    conf->dst_dev_type == STEDMA40_DEV_DST_MEMORY) {
+ 		chan_err(d40c, "Invalid dst\n");
+ 		res = -EINVAL;
+ 	}
  
- 	dma_cap_zero(base->dma_memcpy.cap_mask);
- 	dma_cap_set(DMA_MEMCPY, base->dma_memcpy.cap_mask);
-@@ -3215,7 +3217,7 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
- 			num_log_chans++;
+ 	if (conf->dir == STEDMA40_PERIPH_TO_MEM &&
+-	    src_event_group == STEDMA40_DEV_SRC_MEMORY) {
++	    conf->src_dev_type == STEDMA40_DEV_SRC_MEMORY) {
+ 		chan_err(d40c, "Invalid src\n");
+ 		res = -EINVAL;
+ 	}
  
- 	base = kzalloc(ALIGN(sizeof(struct d40_base), 4) +
--		       (num_phy_chans + num_log_chans + plat_data->memcpy_len) *
-+		       (num_phy_chans + num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) *
- 		       sizeof(struct d40_chan), GFP_KERNEL);
- 
- 	if (base == NULL) {
-@@ -3276,7 +3278,7 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
- 	if (!base->lookup_phy_chans)
- 		goto failure;
- 
--	if (num_log_chans + plat_data->memcpy_len) {
-+	if (num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) {
- 		/*
- 		 * The max number of logical channels are event lines for all
- 		 * src devices and dst devices
-diff --git a/include/linux/platform_data/dma-ste-dma40.h b/include/linux/platform_data/dma-ste-dma40.h
-index 4b78101..a808784 100644
---- a/include/linux/platform_data/dma-ste-dma40.h
-+++ b/include/linux/platform_data/dma-ste-dma40.h
-@@ -141,8 +141,6 @@ struct stedma40_chan_cfg {
-  * @dev_len: length of dev_tx and dev_rx
-  * @dev_tx: mapping between destination event line and io address
-  * @dev_rx: mapping between source event line and io address
-- * @memcpy: list of memcpy event lines
-- * @memcpy_len: length of memcpy
-  * @memcpy_conf_phy: default configuration of physical channel memcpy
-  * @memcpy_conf_log: default configuration of logical channel memcpy
-  * @disabled_channels: A vector, ending with -1, that marks physical channels
-@@ -162,8 +160,6 @@ struct stedma40_platform_data {
- 	u32				 dev_len;
- 	const dma_addr_t		*dev_tx;
- 	const dma_addr_t		*dev_rx;
--	int				*memcpy;
--	u32				 memcpy_len;
- 	struct stedma40_chan_cfg	*memcpy_conf_phy;
- 	struct stedma40_chan_cfg	*memcpy_conf_log;
- 	int				 disabled_channels[STEDMA40_MAX_PHYS];
+-	if (src_event_group == STEDMA40_DEV_SRC_MEMORY &&
+-	    dst_event_group == STEDMA40_DEV_DST_MEMORY && is_log) {
++	if (conf->src_dev_type == STEDMA40_DEV_SRC_MEMORY &&
++	    conf->dst_dev_type == STEDMA40_DEV_DST_MEMORY && is_log) {
+ 		chan_err(d40c, "No event line\n");
+ 		res = -EINVAL;
+ 	}
 -- 
 1.7.10.4
