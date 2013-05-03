@@ -1,53 +1,59 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 03 May 2013 12:05:40 +0200
-Subject: [PATCH v2 2/2] clk: si5351: Set initial clkout rate when defined
- in platform data.
-In-Reply-To: <1367560403-21685-2-git-send-email-marek.belisko@streamunlimited.com>
-References: <1367560403-21685-1-git-send-email-marek.belisko@streamunlimited.com>
- <1367560403-21685-2-git-send-email-marek.belisko@streamunlimited.com>
-Message-ID: <51838BF4.9050207@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 03 May 2013 12:06:24 +0200
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <5182AF83.4080705@wwwdotorg.org>
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+ <201304300004.20320.arnd@arndb.de> <5182AF83.4080705@wwwdotorg.org>
+Message-ID: <1956593.M6NmITdEKh@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2013 07:53 AM, Marek Belisko wrote:
-> Signed-off-by: Marek Belisko<marek.belisko@streamunlimited.com>
-> ---
-> Changes v1->v2:
-> - update commit message and comment to refer to platform data not DT
+Hi Stephen,
 
-Marek,
+On Thursday 02 May 2013 12:25:07 Stephen Warren wrote:
+> On 04/29/2013 04:04 PM, Arnd Bergmann wrote:
+> > On Monday 29 April 2013, Laurent Pinchart wrote:
+> >> On Monday 29 April 2013 23:31:30 Tomasz Figa wrote:
+> >>> Good point. Stephen, would it be a problem to make this a KMS driver
+> >>> instead? Old fbdev API could be emulated on top of it, until it goes out
+> >>> of use, couldn't it?
+> >> 
+> >> There's already an fbdev emulation layer in KMS, for such a simple use
+> >> case it will work fine.
+> > 
+> > I suggested the same to Stephen when he first brought up this driver.
+> > Unfortunately his attempt to create a simple KMS driver resulted in a
+> > significantly larger driver than the one he did for the framebuffer
+> > interface. This means that either Stephen did something really wrong
+> > in his attempt, or the KMS interface isn't as good as it should be
+> > if we want to move people away from frame buffer drivers.
+> 
+> Well, I didn't actually attempt to write the KMS driver; I simply took a
+> look at existing KMS drivers (and perhaps some stub KMS driver; I forget
+> right now) to see what it'd take, and it looked quite scary.
+> 
+> The other issue is that the KMS semantics appear to desire that the
+> driver allocate FB memory from some pool, and then point the display
+> scanout at the allocated memory. However, this driver's semantics are
+> that some other entity has allocated and reserved some memory region for
+> scanout, and the simple FB driver exists solely to scribble to that
+> memory region. Rob Clark said the thought this could be handled by
+> writing a custom memory allocator to support this, but it seemed a
+> little pointless to write a whole memory allocator when the existing FB
+> interface allows the driver to just set a struct member to the address
+> and be done with it.
 
-except that the commit msg itself is very short (there is no!) you can
-add my
+KMS handles frame buffers through two objects, a GEM object that represents a 
+piece of memory and a frame buffer object that represents, well, a frame 
+buffer :-)
 
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+GEM objects management requires an allocator, and frame buffers reference one 
+or more GEM objects to model the frame buffer memory. As allocating new GEM 
+objects isn't possible in this case, the driver could create a GEM object and 
+a frame buffer at initialization time, and implement GEM allocation stubs that 
+would simply return an error unconditionally.
 
-Next time sending patches for clk-si5351, please ensure you are using
-get_maintainers.pl and add me to the list of people to Cc also.
+-- 
+Regards,
 
-Sebastian
-
->   drivers/clk/clk-si5351.c |   10 ++++++++++
->   1 file changed, 10 insertions(+)
->
-> diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-> index cf39e53..24f5536 100644
-> --- a/drivers/clk/clk-si5351.c
-> +++ b/drivers/clk/clk-si5351.c
-> @@ -1477,6 +1477,16 @@ static int si5351_i2c_probe(struct i2c_client *client,
->   			return -EINVAL;
->   		}
->   		drvdata->onecell.clks[n] = clk;
-> +
-> +		/* set initial clkout rate */
-> +		if (pdata->clkout[n].rate != 0) {
-> +			int ret;
-> +			ret = clk_set_rate(clk, pdata->clkout[n].rate);
-> +			if (ret != 0) {
-> +				dev_err(&client->dev, "Cannot set rate : %d\n",
-> +					ret);
-> +			}
-> +		}
->   	}
->
->   	ret = of_clk_add_provider(client->dev.of_node, of_clk_src_onecell_get,
+Laurent Pinchart
