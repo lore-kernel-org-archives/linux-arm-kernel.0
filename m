@@ -1,52 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 May 2013 09:33:20 +0100
-Subject: [PATCH] ARM: OMAP-USB: Fix possible memory leak
-In-Reply-To: <20130503083009.GA19377@arwen.pp.htv.fi>
-References: <1367510596-27780-1-git-send-email-shc_work@mail.ru>
- <20130502162433.GA10016@kahuna> <1367512124.978518915@f372.mail.ru>
- <20130502164058.GC8577@arwen.pp.htv.fi>
- <20130502231353.GF21614@n2100.arm.linux.org.uk>
- <20130503061931.GB27451@arwen.pp.htv.fi>
- <20130503081510.GG21614@n2100.arm.linux.org.uk>
- <20130503083009.GA19377@arwen.pp.htv.fi>
-Message-ID: <20130503083320.GI21614@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 3 May 2013 16:35:36 +0800
+Subject: [PATCH 2/2] pinctrl/imx: add zero register offset valid for
+ Vybrid platform
+In-Reply-To: <20130502182759.GQ32299@pengutronix.de>
+References: <1367480932-22318-1-git-send-email-b35083@freescale.com>
+ <1367480932-22318-2-git-send-email-b35083@freescale.com>
+ <20130502182759.GQ32299@pengutronix.de>
+Message-ID: <20130503083534.GC31873@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 03, 2013 at 11:30:09AM +0300, Felipe Balbi wrote:
-> Hi,
+On Thu, May 02, 2013 at 08:27:59PM +0200, Sascha Hauer wrote:
+> > @@ -221,10 +221,14 @@ static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
+> >  		pin_id = pins[i];
+> >  		pin_reg = &info->pin_regs[pin_id];
+> >  
+> > -		if (!pin_reg->mux_reg) {
+> > -			dev_err(ipctl->dev, "Pin(%s) does not support mux function\n",
+> > -				info->pins[pin_id].name);
+> > -			return -EINVAL;
+> > +		/* mux_reg offset maybe zero on some platform such as Vybrid */
+> > +		if (!of_machine_is_compatible("fsl,mvf600")) {
+> > +			if (!pin_reg->mux_reg) {
 > 
-> On Fri, May 03, 2013 at 09:15:10AM +0100, Russell King - ARM Linux wrote:
-> > > > This is exactly why we have platform_device_alloc(),
-> > > > platform_device_register_full() and friends - so that people don't have to
-> > > > fsck around with kzalloc themselves and get it wrong like the above does.
-> > > > 
-> > > > Would you like me to pass your details to gregkh for another one of his
-> > > > public humilation exercises over basic kernel programming stuff? :)
-> > > 
-> > > How about we pass yours for not reading the patch before flaming ? Note
-> > > that $SUBJECT is *not* touching at all that line which kzallocs a
-> > > platform_device. Wrong as it is, it's not part of $SUBJECT.
-> > 
-> > It's really simple.  You do not use k*alloc with platform devices.  And
-> 
-> agree, no discussions here
-> 
-> > you reject any patch which contains that, and point it out to the patch
-> > author.
-> > 
-> > It really doesn't matter if there's a kfree or not.  The fact is you do
-> > not allow it in any situation, because such bad practises get copied
-> > and then you end up with kfree's.
-> > 
-> > How about you gain an understanding of this stuff and why this stuff is
-> > soo "hot".
-> 
-> how about you look at the git log to figure out I had nothing to do with
-> that original patch which added k*alloc to the pdev ?
+> Please add a zero_offset_valid flag to the drivers private structure
+> instead of using a rather expensive function in a frequently used path.
+> Also the && operator can be used to test for two conditions being true.
 
-How about you realise I haven't got time to fuck around like that at the
-moment, so in the interests of getting people to fix the glaring error
-I commented on it instead in a relevant thread in the hope that some
-prat like you would take notice and ask for it to be fixed by someone
-working on the driver.
+Agreed.  I would suggest that we add a flag member into struct
+imx_pinctrl_soc_info telling the mvf case, and handle the following mvf
+specialties by checking the flag.
+
+* FSL_PIN_SIZE is 20 on mvf, as PIN_FUNC_ID consists of 4 u32 there.
+* Assign mux_reg to conf_reg in imx_pinctrl_parse_groups() for mvf case.
+* In imx_pmx_enable(), write mux_reg[22:20] bit field rather than the
+  whole register for mvf case.
+* In imx_pinconf_set(), write conf_reg[15:0] bit field rather than the
+  whole register for mvf case.
+
+Doing above will ease the defining of the pin function ID in
+mvf600-pinfunc.h.
+
+Shawn
