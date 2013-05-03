@@ -1,28 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 May 2013 16:43:47 +0200
-Subject: [PATCH 1/7] ARM: u300: push down syscon registers
-In-Reply-To: <CACRpkdZHRQqd277Qv8O0dek_jYb=eewhpLYfKtip-YLYx_ukUA@mail.gmail.com>
-References: <1367511416-4312-1-git-send-email-linus.walleij@stericsson.com>
- <201305021939.48381.arnd@arndb.de>
- <CACRpkdZHRQqd277Qv8O0dek_jYb=eewhpLYfKtip-YLYx_ukUA@mail.gmail.com>
-Message-ID: <201305031643.47527.arnd@arndb.de>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 03 May 2013 11:14:55 -0400
+Subject: [PATCH, RFC 14/22] oprofile: always enable IRQ_WORK
+In-Reply-To: <20130503115332.GT8356@rric.localhost>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-15-git-send-email-arnd@arndb.de>
+ <20130503115332.GT8356@rric.localhost>
+Message-ID: <1367594095.7373.14.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 May 2013, Linus Walleij wrote:
-> I could do something similar by creating a U300 syscon node
-> and referring to it from the clk node, so the clk looks up its
-> syscon to find the base.
+On Fri, 2013-05-03 at 13:53 +0200, Robert Richter wrote:
+> On 02.05.13 17:16:18, Arnd Bergmann wrote:
+> > oprofile fails to build if CONFIG_IRQ_WORK is not already enabled,
+> > because of the dependency on the RING_BUFFER code that now uses
+> > the irq work library.
+> > 
+> > kernel/built-in.o: In function `ring_buffer_unlock_commit':
+> > :(.text+0x5b8f0): undefined reference to `irq_work_queue'
+> > kernel/built-in.o: In function `ring_buffer_write':
+> > :(.text+0x5bd10): undefined reference to `irq_work_queue'
 > 
-> If so, I can build this on top of the current patch series
-> with multiplatform and all, as I convert the clocks to DT
-> (which is the next and final step).
+> Shouldn't this be fixed in the ring_buffer implementation?
 
-Yes, I think this is a good plan. If there are just two drivers,
-that is probably the easiest way to do it. Using the syscon
-driver is not very different in the end and avoids mapping the
-same physical address range multiple times (having a static mapping
-avoids this too), and I'd prefer that if you have more drivers
-that need to get to the same registers.
+Does this patch fix it?
 
-	Arnd
+-- Steve
+
+diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
+index 5e9efd4..015f85a 100644
+--- a/kernel/trace/Kconfig
++++ b/kernel/trace/Kconfig
+@@ -71,6 +71,7 @@ config TRACE_CLOCK
+ config RING_BUFFER
+ 	bool
+ 	select TRACE_CLOCK
++	select IRQ_WORK
+ 
+ config FTRACE_NMI_ENTER
+        bool
+@@ -107,7 +108,6 @@ config TRACING
+ 	select BINARY_PRINTF
+ 	select EVENT_TRACING
+ 	select TRACE_CLOCK
+-	select IRQ_WORK
+ 
+ config GENERIC_TRACER
+ 	bool
