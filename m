@@ -1,105 +1,198 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 3 May 2013 07:06:32 +0200
-Subject: [PATCH v2 2/5] ARM: dove: add DT parsing for legacy mv643xx_eth
-In-Reply-To: <1367538519-23940-3-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1367538519-23940-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1367538519-23940-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130503050632.GC24965@lunn.ch>
+From: marek.belisko@gmail.com (Marek Belisko)
+Date: Fri,  3 May 2013 07:33:27 +0200
+Subject: [PATCH v2] clk: si5351: Allow user to define disabled state for every
+ clock output
+Message-ID: <1367559207-20086-1-git-send-email-marek.belisko@streamunlimited.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 03, 2013 at 01:48:36AM +0200, Sebastian Hesselbarth wrote:
-> To allow to move to orion irqchip driver, existing legacy devices
-> have to map their irqs. This patch adds init code to map the
-> corresponding irqs. It will vanish as soon as there is true device tree
-> support for mv643xx_eth.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Changelog:
-> v1->v2:
-> - split off DT changes (Suggested by Jason Cooper)
-> 
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Rob Landley <rob@landley.net>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Jean-Francois Moine <moinejf@free.fr>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/mach-dove/board-dt.c |   31 ++++++++++++++++++++++++++++++-
->  1 file changed, 30 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
-> index fbde1dd..9df6dd7 100644
-> --- a/arch/arm/mach-dove/board-dt.c
-> +++ b/arch/arm/mach-dove/board-dt.c
-> @@ -12,6 +12,7 @@
->  #include <linux/clk-provider.h>
->  #include <linux/clk/mvebu.h>
->  #include <linux/of.h>
-> +#include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/platform_data/usb-ehci-orion.h>
->  #include <asm/hardware/cache-tauros2.h>
-> @@ -57,6 +58,34 @@ static struct mv643xx_eth_platform_data dove_dt_ge00_data = {
->  	.phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT,
->  };
->  
-> +#define DOVE_GE00_PHYS_BASE	0xf1070000
-> +
-> +static void __init dove_legacy_ge00_init(void)
-> +{
-> +	struct device_node *np = of_find_compatible_node(NULL, NULL,
-> +					 "marvell,mv643xx-eth-block");
-> +	int irq_sum, irq_err;
-> +
-> +	if (!np)
-> +		return;
-> +
-> +	irq_sum = irq_of_parse_and_map(np, 0);
-> +	if (!irq_sum) {
-> +		pr_err("%s: missing sum irq\n", np->full_name);
-> +		return;
-> +	}
-> +
-> +	irq_err = irq_of_parse_and_map(np, 1);
-> +	if (!irq_err) {
-> +		pr_err("%s: missing err irq\n", np->full_name);
-> +		return;
-> +	}
-> +
-> +	/* legacy ge00_init wants phys base */
-> +	orion_ge00_init(&dove_dt_ge00_data, DOVE_GE00_PHYS_BASE,
-> +			irq_sum, irq_err, 1600);
-> +}
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 
-Hi Sebastian
+This patch adds platform data and DT bindings to allow to overwrite
+the stored disabled state for each clock output.
 
-I know the above code is throw away, but it might help with getting
-Kirkwood, Orion5x, mv78xx00 supported if we refactor this code and
-move most of it into plat-orion/common.c. I could imaging a function
+Signed-off-by: Marek Belisko <marek.belisko@streamunlimited.com>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Changes from v1->v2:
+Sebastian Hesselbarth send me updated version of patch which was based
+on v1. Resending with updates.
 
-orion_ge00_irq_init(struct mv643xx_eth_platform_data *eth_data,
-                    unsigned long mapbase, unsigned int tx_csum_limit)
+ .../devicetree/bindings/clock/silabs,si5351.txt    |    5 ++
+ drivers/clk/clk-si5351.c                           |   74 +++++++++++++++++++-
+ drivers/clk/clk-si5351.h                           |    1 +
+ include/linux/platform_data/si5351.h               |   18 +++++
+ 4 files changed, 95 insertions(+), 3 deletions(-)
 
-which does the irq lookup and then calls orion_ge00_init().
-
-
-Jason: what is the status of the ethernet driver conversion to DT?
-Will it get merged this week, or is it material for the next merge
-window?
-
-      Andrew
+diff --git a/Documentation/devicetree/bindings/clock/silabs,si5351.txt b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
+index cc37465..66c75b2 100644
+--- a/Documentation/devicetree/bindings/clock/silabs,si5351.txt
++++ b/Documentation/devicetree/bindings/clock/silabs,si5351.txt
+@@ -44,6 +44,11 @@ Optional child node properties:
+ - silabs,multisynth-source: source pll A(0) or B(1) of corresponding multisynth
+   divider.
+ - silabs,pll-master: boolean, multisynth can change pll frequency.
++- silabs,disable-state : clock output disable state, shall be
++  0 = clock output is driven LOW when disabled
++  1 = clock output is driven HIGH when disabled
++  2 = clock output is FLOATING (HIGH-Z) when disabled
++  3 = clock output is NEVER disabled
+ 
+ ==Example==
+ 
+diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+index 8323c31..098f28b 100644
+--- a/drivers/clk/clk-si5351.c
++++ b/drivers/clk/clk-si5351.c
+@@ -851,6 +851,41 @@ static int _si5351_clkout_set_drive_strength(
+ 	return 0;
+ }
+ 
++static int _si5351_clkout_set_disable_state(
++	struct si5351_driver_data *drvdata, int num,
++	enum si5351_disable_state state)
++{
++	u8 reg = (num < 4) ? SI5351_CLK3_0_DISABLE_STATE :
++		SI5351_CLK7_4_DISABLE_STATE;
++	u8 shift = (num < 4) ? (2 * num) : (2 * (num-4));
++	u8 mask = SI5351_CLK_DISABLE_STATE_MASK << shift;
++	u8 val;
++
++	if (num > 8)
++		return -EINVAL;
++
++	switch (state) {
++	case SI5351_DISABLE_LOW:
++		val = SI5351_CLK_DISABLE_STATE_LOW;
++		break;
++	case SI5351_DISABLE_HIGH:
++		val = SI5351_CLK_DISABLE_STATE_HIGH;
++		break;
++	case SI5351_DISABLE_FLOATING:
++		val = SI5351_CLK_DISABLE_STATE_FLOAT;
++		break;
++	case SI5351_DISABLE_NEVER:
++		val = SI5351_CLK_DISABLE_STATE_NEVER;
++		break;
++	default:
++		return 0;
++	}
++
++	si5351_set_bits(drvdata, reg, mask, val << shift);
++
++	return 0;
++}
++
+ static int si5351_clkout_prepare(struct clk_hw *hw)
+ {
+ 	struct si5351_hw_data *hwdata =
+@@ -1225,6 +1260,33 @@ static int si5351_dt_parse(struct i2c_client *client)
+ 			}
+ 		}
+ 
++		if (!of_property_read_u32(child, "silabs,disable-state",
++					  &val)) {
++			switch (val) {
++			case 0:
++				pdata->clkout[num].disable_state =
++					SI5351_DISABLE_LOW;
++				break;
++			case 1:
++				pdata->clkout[num].disable_state =
++					SI5351_DISABLE_HIGH;
++				break;
++			case 2:
++				pdata->clkout[num].disable_state =
++					SI5351_DISABLE_FLOATING;
++				break;
++			case 3:
++				pdata->clkout[num].disable_state =
++					SI5351_DISABLE_NEVER;
++				break;
++			default:
++				dev_err(&client->dev,
++					"invalid disable state %d for clkout %d\n",
++					val, num);
++				return -EINVAL;
++			}
++		}
++
+ 		if (!of_property_read_u32(child, "clock-frequency", &val))
+ 			pdata->clkout[num].rate = val;
+ 
+@@ -1281,9 +1343,6 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 
+ 	/* Disable interrupts */
+ 	si5351_reg_write(drvdata, SI5351_INTERRUPT_MASK, 0xf0);
+-	/* Set disabled output drivers to drive low */
+-	si5351_reg_write(drvdata, SI5351_CLK3_0_DISABLE_STATE, 0x00);
+-	si5351_reg_write(drvdata, SI5351_CLK7_4_DISABLE_STATE, 0x00);
+ 	/* Ensure pll select is on XTAL for Si5351A/B */
+ 	if (drvdata->variant != SI5351_VARIANT_C)
+ 		si5351_set_bits(drvdata, SI5351_PLL_INPUT_SOURCE,
+@@ -1327,6 +1386,15 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 				n, pdata->clkout[n].drive);
+ 			return ret;
+ 		}
++
++		ret = _si5351_clkout_set_disable_state(drvdata, n,
++						pdata->clkout[n].disable_state);
++		if (ret) {
++			dev_err(&client->dev,
++				"failed set disable state of clkout%d to %d\n",
++				n, pdata->clkout[n].disable_state);
++			return ret;
++		}
+ 	}
+ 
+ 	/* register xtal input clock gate */
+diff --git a/drivers/clk/clk-si5351.h b/drivers/clk/clk-si5351.h
+index af41b50..c0dbf26 100644
+--- a/drivers/clk/clk-si5351.h
++++ b/drivers/clk/clk-si5351.h
+@@ -81,6 +81,7 @@
+ 
+ #define SI5351_CLK3_0_DISABLE_STATE		24
+ #define SI5351_CLK7_4_DISABLE_STATE		25
++#define  SI5351_CLK_DISABLE_STATE_MASK		3
+ #define  SI5351_CLK_DISABLE_STATE_LOW		0
+ #define  SI5351_CLK_DISABLE_STATE_HIGH		1
+ #define  SI5351_CLK_DISABLE_STATE_FLOAT		2
+diff --git a/include/linux/platform_data/si5351.h b/include/linux/platform_data/si5351.h
+index 92dabca..5433439 100644
+--- a/include/linux/platform_data/si5351.h
++++ b/include/linux/platform_data/si5351.h
+@@ -79,6 +79,23 @@ enum si5351_drive_strength {
+ };
+ 
+ /**
++ * enum si5351_disable_state - Si5351 clock output disable state
++ * @SI5351_DISABLE_DEFAULT: default, do not change eeprom config
++ * @SI5351_DISABLE_LOW: CLKx is set to a LOW state when disabled
++ * @SI5351_DISABLE_HIGH: CLKx is set to a HIGH state when disabled
++ * @SI5351_DISABLE_FLOATING: CLKx is set to a FLOATING state when
++ *				disabled
++ * @SI5351_DISABLE_NEVER: CLKx is NEVER disabled
++ */
++enum si5351_disable_state {
++	SI5351_DISABLE_DEFAULT = 0,
++	SI5351_DISABLE_LOW,
++	SI5351_DISABLE_HIGH,
++	SI5351_DISABLE_FLOATING,
++	SI5351_DISABLE_NEVER,
++};
++
++/**
+  * struct si5351_clkout_config - Si5351 clock output configuration
+  * @clkout: clkout number
+  * @multisynth_src: multisynth source clock
+@@ -91,6 +108,7 @@ struct si5351_clkout_config {
+ 	enum si5351_multisynth_src multisynth_src;
+ 	enum si5351_clkout_src clkout_src;
+ 	enum si5351_drive_strength drive;
++	enum si5351_disable_state disable_state;
+ 	bool pll_master;
+ 	unsigned long rate;
+ };
+-- 
+1.7.9.5
