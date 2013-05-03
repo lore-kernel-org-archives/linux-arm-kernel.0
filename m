@@ -1,41 +1,37 @@
-From: marek.belisko@gmail.com (Marek Belisko)
-Date: Fri,  3 May 2013 07:53:23 +0200
-Subject: [PATCH v2 2/2] clk: si5351: Set initial clkout rate when defined in
- platform data.
-In-Reply-To: <1367560403-21685-1-git-send-email-marek.belisko@streamunlimited.com>
-References: <1367560403-21685-1-git-send-email-marek.belisko@streamunlimited.com>
-Message-ID: <1367560403-21685-2-git-send-email-marek.belisko@streamunlimited.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Fri, 3 May 2013 08:12:07 +0200
+Subject: [PATCH] ARM: imx: fix typo in gpu3d_shader_sels
+In-Reply-To: <1367549979-31291-1-git-send-email-shawn.guo@linaro.org>
+References: <1367549979-31291-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <51835537.7040604@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marek Belisko <marek.belisko@streamunlimited.com>
----
-Changes v1->v2:
-- update commit message and comment to refer to platform data not DT
+On 03.05.2013 04:59, Shawn Guo wrote:
+> There is no clock pll2_pfd9_720m.  Instead it should be pll3_pfd0_720m.
+> Fix the typo in gpu3d_shader_sels.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>   arch/arm/mach-imx/clk-imx6q.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> index f2e1c62..dda9a2b 100644
+> --- a/arch/arm/mach-imx/clk-imx6q.c
+> +++ b/arch/arm/mach-imx/clk-imx6q.c
+> @@ -186,7 +186,7 @@ static const char *audio_sels[]	= { "pll4_post_div", "pll3_pfd2_508m", "pll3_pfd
+>   static const char *gpu_axi_sels[]	= { "axi", "ahb", };
+>   static const char *gpu2d_core_sels[]	= { "axi", "pll3_usb_otg", "pll2_pfd0_352m", "pll2_pfd2_396m", };
+>   static const char *gpu3d_core_sels[]	= { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll2_pfd2_396m", };
+> -static const char *gpu3d_shader_sels[] = { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll2_pfd9_720m", };
+> +static const char *gpu3d_shader_sels[] = { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll3_pfd0_720m", };
+>   static const char *ipu_sels[]		= { "mmdc_ch0_axi", "pll2_pfd2_396m", "pll3_120m", "pll3_pfd1_540m", };
+>   static const char *ldb_di_sels[]	= { "pll5_video", "pll2_pfd0_352m", "pll2_pfd2_396m", "mmdc_ch1_axi", "pll3_usb_otg", };
+>   static const char *ipu_di_pre_sels[]	= { "mmdc_ch0_axi", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0_352m", "pll2_pfd2_396m", "pll3_pfd1_540m", };
 
- drivers/clk/clk-si5351.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
 
-diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-index cf39e53..24f5536 100644
---- a/drivers/clk/clk-si5351.c
-+++ b/drivers/clk/clk-si5351.c
-@@ -1477,6 +1477,16 @@ static int si5351_i2c_probe(struct i2c_client *client,
- 			return -EINVAL;
- 		}
- 		drvdata->onecell.clks[n] = clk;
-+
-+		/* set initial clkout rate */
-+		if (pdata->clkout[n].rate != 0) {
-+			int ret;
-+			ret = clk_set_rate(clk, pdata->clkout[n].rate);
-+			if (ret != 0) {
-+				dev_err(&client->dev, "Cannot set rate : %d\n",
-+					ret);
-+			}
-+		}
- 	}
- 
- 	ret = of_clk_add_provider(client->dev.of_node, of_clk_src_onecell_get,
--- 
-1.7.9.5
+Thanks
+
+Dirk
