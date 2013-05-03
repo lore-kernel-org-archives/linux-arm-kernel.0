@@ -1,51 +1,31 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 3 May 2013 08:26:34 +0200
-Subject: [PATCH 4/5] ARM: dts: add device tree source for imx6sl SoC
-In-Reply-To: <1367552995-31777-5-git-send-email-shawn.guo@linaro.org>
-References: <1367552995-31777-1-git-send-email-shawn.guo@linaro.org>
- <1367552995-31777-5-git-send-email-shawn.guo@linaro.org>
-Message-ID: <5183589A.5090109@de.bosch.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 3 May 2013 07:53:34 +0100
+Subject: [GIT PULL] Removal of GENERIC_GPIO
+In-Reply-To: <20130503110318.0d30b773852640ee94ba07b5@canb.auug.org.au>
+References: <51823DDA.7010103@nvidia.com>
+ <20130503105234.6e9c8aa5ed2784bbe084caa8@canb.auug.org.au>
+ <20130503110318.0d30b773852640ee94ba07b5@canb.auug.org.au>
+Message-ID: <CACxGe6tdJr22bJ0GZL_18FqYWLdNROMKuH3UQbKciEwRy9v1Wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.05.2013 05:49, Shawn Guo wrote:
-> Add SoC level device tree source for imx6sl.
+On Fri, May 3, 2013 at 2:03 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi Guys,
 >
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->   arch/arm/boot/dts/imx6sl.dtsi |  777 +++++++++++++++++++++++++++++++++++++++++
->   1 file changed, 777 insertions(+)
->   create mode 100644 arch/arm/boot/dts/imx6sl.dtsi
+> On Fri, 3 May 2013 10:52:34 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+>>
+>> I currently have 3 merge fix patches for the gen-cpio tree:
+>>
+>> gen-gpio: GPIOLIB merge fix up
+>> merge fix for Convert selectors of GENERIC_GPIO to GPIOLIB
+>> merge fix 2 for Convert selectors of GENERIC_GPIO to GPIOLIB
+>>
+>> I have attached them.  All three are now applicable to Linus' tree.
 >
-> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-> new file mode 100644
+> Just to absolutely clear, I *do not* expect either of you to rebase your
+> trees or backmerge Linus' tree to fix these, I *do* expect whoever send
+> this stuff to Linus to mention the necessary fixes to him.
 
-Just as a proposal do discuss: What's about to move the existing 
-imx6qdl.dtsi to a imx6.dtsi and include it in
+Yes, that is exactly what I'm going to do
 
-imx6q.dtsi
-imx6dl.dtsi
-imx6sl.dtsi
-
-then?
-
-> +       soc {
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               compatible = "simple-bus";
-> +               interrupt-parent = <&intc>;
-> +               ranges;
-> +
-> +               L2: l2-cache at 00a02000 {
-> +                       compatible = "arm,pl310-cache";
-> +                       reg = <0x00a02000 0x1000>;
-> +                       interrupts = <0 92 0x04>;
-> +                       cache-unified;
-> +                       cache-level = <2>;
-> +               };
-The arm,tag-latency and arm,data-latency we recently added for the other 
-SoCs are missing here?
-
-Best regards
-
-Dirk
+g.
