@@ -1,119 +1,33 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 03 May 2013 11:58:03 +0200
-Subject: [PATCH v2 2/5] ARM: dove: add DT parsing for legacy mv643xx_eth
-In-Reply-To: <20130503050632.GC24965@lunn.ch>
-References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1367538519-23940-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1367538519-23940-3-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130503050632.GC24965@lunn.ch>
-Message-ID: <51838A2B.50302@gmail.com>
+Date: Fri, 03 May 2013 12:02:02 +0200
+Subject: [PATCH v2] clk: si5351: Allow user to define disabled state for
+ every clock output
+In-Reply-To: <1367559207-20086-1-git-send-email-marek.belisko@streamunlimited.com>
+References: <1367559207-20086-1-git-send-email-marek.belisko@streamunlimited.com>
+Message-ID: <51838B1A.4010803@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2013 07:06 AM, Andrew Lunn wrote:
-> On Fri, May 03, 2013 at 01:48:36AM +0200, Sebastian Hesselbarth wrote:
->> To allow to move to orion irqchip driver, existing legacy devices
->> have to map their irqs. This patch adds init code to map the
->> corresponding irqs. It will vanish as soon as there is true device tree
->> support for mv643xx_eth.
->>
->> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
->> ---
->> Changelog:
->> v1->v2:
->> - split off DT changes (Suggested by Jason Cooper)
->>
->> Cc: Grant Likely<grant.likely@linaro.org>
->> Cc: Rob Herring<rob.herring@calxeda.com>
->> Cc: Rob Landley<rob@landley.net>
->> Cc: Thomas Gleixner<tglx@linutronix.de>
->> Cc: Russell King<linux@arm.linux.org.uk>
->> Cc: Arnd Bergmann<arnd@arndb.de>
->> Cc: Jason Cooper<jason@lakedaemon.net>
->> Cc: Andrew Lunn<andrew@lunn.ch>
->> Cc: Jason Gunthorpe<jgunthorpe@obsidianresearch.com>
->> Cc: Thomas Petazzoni<thomas.petazzoni@free-electrons.com>
->> Cc: Gregory Clement<gregory.clement@free-electrons.com>
->> Cc: Ezequiel Garcia<ezequiel.garcia@free-electrons.com>
->> Cc: Jean-Francois Moine<moinejf@free.fr>
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: linux-doc at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> ---
->>   arch/arm/mach-dove/board-dt.c |   31 ++++++++++++++++++++++++++++++-
->>   1 file changed, 30 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
->> index fbde1dd..9df6dd7 100644
->> --- a/arch/arm/mach-dove/board-dt.c
->> +++ b/arch/arm/mach-dove/board-dt.c
->> @@ -12,6 +12,7 @@
->>   #include<linux/clk-provider.h>
->>   #include<linux/clk/mvebu.h>
->>   #include<linux/of.h>
->> +#include<linux/of_irq.h>
->>   #include<linux/of_platform.h>
->>   #include<linux/platform_data/usb-ehci-orion.h>
->>   #include<asm/hardware/cache-tauros2.h>
->> @@ -57,6 +58,34 @@ static struct mv643xx_eth_platform_data dove_dt_ge00_data = {
->>   	.phy_addr = MV643XX_ETH_PHY_ADDR_DEFAULT,
->>   };
->>
->> +#define DOVE_GE00_PHYS_BASE	0xf1070000
->> +
->> +static void __init dove_legacy_ge00_init(void)
->> +{
->> +	struct device_node *np = of_find_compatible_node(NULL, NULL,
->> +					 "marvell,mv643xx-eth-block");
->> +	int irq_sum, irq_err;
->> +
->> +	if (!np)
->> +		return;
->> +
->> +	irq_sum = irq_of_parse_and_map(np, 0);
->> +	if (!irq_sum) {
->> +		pr_err("%s: missing sum irq\n", np->full_name);
->> +		return;
->> +	}
->> +
->> +	irq_err = irq_of_parse_and_map(np, 1);
->> +	if (!irq_err) {
->> +		pr_err("%s: missing err irq\n", np->full_name);
->> +		return;
->> +	}
->> +
->> +	/* legacy ge00_init wants phys base */
->> +	orion_ge00_init(&dove_dt_ge00_data, DOVE_GE00_PHYS_BASE,
->> +			irq_sum, irq_err, 1600);
->> +}
+On 05/03/2013 07:33 AM, Marek Belisko wrote:
+> From: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
 >
-> Hi Sebastian
+> This patch adds platform data and DT bindings to allow to overwrite
+> the stored disabled state for each clock output.
 >
-> I know the above code is throw away, but it might help with getting
-> Kirkwood, Orion5x, mv78xx00 supported if we refactor this code and
-> move most of it into plat-orion/common.c. I could imaging a function
->
-> orion_ge00_irq_init(struct mv643xx_eth_platform_data *eth_data,
->                      unsigned long mapbase, unsigned int tx_csum_limit)
->
-> which does the irq lookup and then calls orion_ge00_init().
+> Signed-off-by: Marek Belisko<marek.belisko@streamunlimited.com>
+> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
+> ---
+> Changes from v1->v2:
+> Sebastian Hesselbarth send me updated version of patch which was based
+> on v1. Resending with updates.
 
-Andrew,
+Marek,
 
-sure. Feel free to move legacy code to where all SoCs can use it.
+it is ok to be a little bit more noisy about changes. But as I took
+your v1 and did it, here is the Changelog:
 
-> Jason: what is the status of the ethernet driver conversion to DT?
-> Will it get merged this week, or is it material for the next merge
-> window?
-
-What I remember from Florian's work it was close to be released. I
-never saw Florian sending an update to his patches, maybe he ran out
-of time?
-
-I guess DT timer will be a quick patch when we have all SoCs running
-on DT irqchip and maybe Florian can update his patches even before we
-sort out Thomas request. Then we could also merge DT timer within this
-patch set and get rid of legacy helpers before we even introduce them.
+- add helper to set disabled state for clkout
+- make disabled-state property behave like other properties, i.e.
+   only overwrite disabled state when set through platform_data or DT
 
 Sebastian
