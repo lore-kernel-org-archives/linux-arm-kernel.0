@@ -1,23 +1,26 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Fri, 3 May 2013 21:23:51 +0200
-Subject: MVEBU PCI Express support
-In-Reply-To: <5183F858.1050804@itooo.com>
-References: <5183F858.1050804@itooo.com>
-Message-ID: <20130503192351.GN10563@1wt.eu>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 3 May 2013 21:27:47 +0200
+Subject: [PATCH 01/63] ARM: ux500: Supply address location names for the
+ DMA40 DMA controller
+In-Reply-To: <1367591569-32197-2-git-send-email-lee.jones@linaro.org>
+References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
+ <1367591569-32197-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdacfGZ5tWiKM_RxbaQv+8QQaU1Wq_7TgYHtHTNqr9BqVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+On Fri, May 3, 2013 at 4:31 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-On Fri, May 03, 2013 at 07:48:08PM +0200, Greg wrote:
-> Hello guys,
-> 
-> this one is targeted to the Free Electrons guys : should I start 
-> investigating by myself or are you planning to release a patch for 
-> supporting PCI express on Marvell Armada* platforms ?
+> The DMA40 controller uses two sets of base addresses. In order to have
+> the resources setup by the of_platform framework so they are searchable
+> by name instead of index, we have to set names for them. The names have
+> to be the same as the ones used to fetch them back out of the resource
+> structure.
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Look at their github, there is a patchset for the PCI-express. I
-managed to get some NICs and the USB3 controller to work in the 
-armada370 using it, I have not tried the armadaXP yet.
+Applied this one to my ux500-devicetree branch.
 
-Willy
+Thanks,
+Linus Walleij
