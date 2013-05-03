@@ -1,81 +1,81 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri,  3 May 2013 01:48:39 +0200
-Subject: [PATCH v2 5/5] ARM: dove: add DT nodes for irqchip conversion
-In-Reply-To: <1367538519-23940-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1367538519-23940-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1367538519-23940-6-git-send-email-sebastian.hesselbarth@gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Fri, 3 May 2013 10:52:34 +1000
+Subject: [GIT PULL] Removal of GENERIC_GPIO
+In-Reply-To: <51823DDA.7010103@nvidia.com>
+References: <51823DDA.7010103@nvidia.com>
+Message-ID: <20130503105234.6e9c8aa5ed2784bbe084caa8@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds required device tree nodes for irqchip conversion
-on Dove. The nodes are named and layed out to allow seamless migration
-to true DT enabled drivers as soon as they are available.
+Hi Grant,
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Changelog:
-v1->v2:
-- merge DT changes into this patch (Suggested by Jason Cooper)
+On Thu, 2 May 2013 19:20:10 +0900 Alex Courbot <acourbot@nvidia.com> wrote:
+>
+> Here is the pull request for the GENERIC_GPIO removal. It is almost 
+> certain that a few fixups will be necessary - while I don't have precise 
+> patches, the following steps should ensure the state of the code is clean:
+> 
+> * "git grep CONFIG_GENERIC_GPIO" should return 0 hits. Matches should be 
+> replaced with CONFIG_GPIOLIB
+> * "git grep '\bGENERIC_GPIO\b'" should return 1 hit in the Chinese 
+> documentation. Selectors of GENERIC_GPIO should be turned into selectors 
+> of GPIOLIB, while definitions of the option in architecture code should 
+> be deleted.
+> 
+> Please let me know if there is something more I can do to ease your task.
+> 
+> Thanks,
+> Alex.
+> 
+> The following changes since commit 10b38669d64c757cfd927e3820292c580ed70aae:
+> 
+>    Merge tag 'for-linus-v3.9-rc4' of git://oss.sgi.com/xfs/xfs 
+> (2013-03-19 15:17:40 -0700)
+> 
+> are available in the git repository at:
+> 
+>    git://github.com/Gnurou/linux.git for_grant
+> 
+> for you to fetch changes up to f4c54050640e7afa4749875cf9b900d42db361c0:
+> 
+>    gpio: update gpio Chinese documentation (2013-04-16 18:47:22 +0900)
 
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Rob Landley <rob@landley.net>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Jean-Francois Moine <moinejf@free.fr>
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: linux-doc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/boot/dts/dove.dtsi |   16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+I currently have 3 merge fix patches for the gen-cpio tree:
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 6cab468..afb719a 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -30,11 +30,18 @@
- 			marvell,tauros2-cache-features = <0>;
- 		};
- 
-+		timer: timer {
-+			compatible = "marvell,orion-timer";
-+			reg = <0x20300 0x20>;
-+			interrupts = <0>;
-+			clocks = <&core_clk 0>;
-+		};
-+
- 		intc: interrupt-controller {
- 			compatible = "marvell,orion-intc";
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
--			reg = <0x20204 0x04>, <0x20214 0x04>;
-+			reg = <0x20200 0x10>, <0x20210 0x10>;
- 		};
- 
- 		core_clk: core-clocks at d0214 {
-@@ -202,6 +209,13 @@
- 			status = "disabled";
- 		};
- 
-+		gbe: ethernet-controller {
-+			compatible = "marvell,mv643xx-eth-block";
-+			reg = <0x72000 0x4000>;
-+			interrupts = <29>, <30>;
-+			status = "disabled";
-+		};
-+
- 		rtc at d8500 {
- 			compatible = "marvell,orion-rtc";
- 			reg = <0xd8500 0x20>;
+gen-gpio: GPIOLIB merge fix up
+merge fix for Convert selectors of GENERIC_GPIO to GPIOLIB
+merge fix 2 for Convert selectors of GENERIC_GPIO to GPIOLIB
+
+I have attached them.  All three are now applicable to Linus' tree.
+
 -- 
-1.7.10.4
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-gen-gpio-GPIOLIB-merge-fix-up.patch
+Type: text/x-diff
+Size: 810 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130503/6f943365/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-merge-fix-for-Convert-selectors-of-GENERIC_GPIO-to-G.patch
+Type: text/x-diff
+Size: 769 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130503/6f943365/attachment-0001.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-merge-fix-2-for-Convert-selectors-of-GENERIC_GPIO-to.patch
+Type: text/x-diff
+Size: 875 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130503/6f943365/attachment-0002.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130503/6f943365/attachment.sig>
