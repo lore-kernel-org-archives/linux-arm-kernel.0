@@ -1,23 +1,21 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 May 2013 21:33:54 +0200
-Subject: [PATCH 03/63] ARM: ux500: Supply UART's DMA configuration via
- Device Tree
-In-Reply-To: <1367591569-32197-4-git-send-email-lee.jones@linaro.org>
+Date: Fri, 3 May 2013 21:35:29 +0200
+Subject: [PATCH 05/63] ARM: ux500: Populate the ux500-musb Device Tree
+ entry
+In-Reply-To: <1367591569-32197-6-git-send-email-lee.jones@linaro.org>
 References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
- <1367591569-32197-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYrb10bVpcm706NmVs7osM=gy4fT3=qZ3__pfndTWM+bQ@mail.gmail.com>
+ <1367591569-32197-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkda_8KZeTfxwutyOD6S8nBe4BVUp+x-LhbMSohdOzyvDTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, May 3, 2013 at 4:31 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> When requesting a channel, a DMA client needs to pass some pieces of
-> information such as; request channel, device type, channel type and
-> direction etc. Normally we do this in the form of platform data, but
-> when DT is enabled we need to pass it using the driver's bindings
-> instead.
+> This patch provides all the information to successfully probe() and
+> correctly configure the ux500-musb device driver for DMA.
 >
 > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
 Applied to my ux500-devicetree branch.
