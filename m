@@ -1,59 +1,54 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 03 May 2013 12:06:24 +0200
-Subject: [PATCH V2] video: implement a simple framebuffer driver
-In-Reply-To: <5182AF83.4080705@wwwdotorg.org>
-References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
- <201304300004.20320.arnd@arndb.de> <5182AF83.4080705@wwwdotorg.org>
-Message-ID: <1956593.M6NmITdEKh@avalon>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 3 May 2013 15:45:44 +0530
+Subject: [PATCH 0/6] Davinci fbdev driver and enable it for DMx platform
+In-Reply-To: <51838994.7070805@ti.com>
+References: <1366804808-22720-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1780031.B4OAypccep@avalon>
+ <CA+V-a8sLD2dP1RLb8ibZDOsLCP8hhMNUTr-zzU1zx_2ALDaDrg@mail.gmail.com>
+ <51838994.7070805@ti.com>
+Message-ID: <CA+V-a8tM=VxvCt5dvbLSJz-pz7OS88QaHJ9r_Y+ysxP_JUzn2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On Fri, May 3, 2013 at 3:25 PM, Sekhar Nori <nsekhar@ti.com> wrote:
+> On 4/26/2013 11:16 AM, Prabhakar Lad wrote:
+>> Hi Laurent,
+>>
+>> On Thu, Apr 25, 2013 at 2:32 AM, Laurent Pinchart
+>> <laurent.pinchart@ideasonboard.com> wrote:
+>>> Hi Prabhakar,
+>>>
+>>> Thank you for the patch.
+>>>
+>>> On Wednesday 24 April 2013 17:30:02 Prabhakar Lad wrote:
+>>>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>>>
+>>>> This patch series adds an fbdev driver for Texas
+>>>> Instruments Davinci SoC.The display subsystem consists
+>>>> of OSD and VENC, with OSD supporting 2 RGb planes and
+>>>> 2 video planes.
+>>>> http://focus.ti.com/general/docs/lit/
+>>>> getliterature.tsp?literatureNumber=sprue37d&fileType=pdf
+>>>>
+>>>> A good amount of the OSD and VENC enabling code is
+>>>> present in the kernel, and this patch series adds the
+>>>> fbdev interface.
+>>>>
+>>>> The fbdev driver exports 4 nodes representing each
+>>>> plane to the user - from fb0 to fb3.
+>>>
+>>> The obvious question is: why not a KMS driver instead ? :-)
+>>>
+>> I did go through the KMS model (thanks for pointing to your work and the video)
+>> and it looks like this would require a fair amount of development, at this point
+>> of time I would go with the current implementation and revisit on KMS model
+>> at later point of time.
+>
+> But I doubt you will be able to sneak a new fbdev driver through. Last
+> time I heard, Andrew is only taking in fixes not new features.
+>
+Then we have no choice left and go with KMS driver itself though it would take
+some time since KMS is a new inclusion into DRM.
 
-On Thursday 02 May 2013 12:25:07 Stephen Warren wrote:
-> On 04/29/2013 04:04 PM, Arnd Bergmann wrote:
-> > On Monday 29 April 2013, Laurent Pinchart wrote:
-> >> On Monday 29 April 2013 23:31:30 Tomasz Figa wrote:
-> >>> Good point. Stephen, would it be a problem to make this a KMS driver
-> >>> instead? Old fbdev API could be emulated on top of it, until it goes out
-> >>> of use, couldn't it?
-> >> 
-> >> There's already an fbdev emulation layer in KMS, for such a simple use
-> >> case it will work fine.
-> > 
-> > I suggested the same to Stephen when he first brought up this driver.
-> > Unfortunately his attempt to create a simple KMS driver resulted in a
-> > significantly larger driver than the one he did for the framebuffer
-> > interface. This means that either Stephen did something really wrong
-> > in his attempt, or the KMS interface isn't as good as it should be
-> > if we want to move people away from frame buffer drivers.
-> 
-> Well, I didn't actually attempt to write the KMS driver; I simply took a
-> look at existing KMS drivers (and perhaps some stub KMS driver; I forget
-> right now) to see what it'd take, and it looked quite scary.
-> 
-> The other issue is that the KMS semantics appear to desire that the
-> driver allocate FB memory from some pool, and then point the display
-> scanout at the allocated memory. However, this driver's semantics are
-> that some other entity has allocated and reserved some memory region for
-> scanout, and the simple FB driver exists solely to scribble to that
-> memory region. Rob Clark said the thought this could be handled by
-> writing a custom memory allocator to support this, but it seemed a
-> little pointless to write a whole memory allocator when the existing FB
-> interface allows the driver to just set a struct member to the address
-> and be done with it.
-
-KMS handles frame buffers through two objects, a GEM object that represents a 
-piece of memory and a frame buffer object that represents, well, a frame 
-buffer :-)
-
-GEM objects management requires an allocator, and frame buffers reference one 
-or more GEM objects to model the frame buffer memory. As allocating new GEM 
-objects isn't possible in this case, the driver could create a GEM object and 
-a frame buffer at initialization time, and implement GEM allocation stubs that 
-would simply return an error unconditionally.
-
--- 
 Regards,
-
-Laurent Pinchart
+--Prabhakar
