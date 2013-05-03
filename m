@@ -1,53 +1,55 @@
-From: rric@kernel.org (Robert Richter)
-Date: Fri, 3 May 2013 13:53:32 +0200
-Subject: [PATCH, RFC 14/22] oprofile: always enable IRQ_WORK
-In-Reply-To: <1367507786-505303-15-git-send-email-arnd@arndb.de>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-15-git-send-email-arnd@arndb.de>
-Message-ID: <20130503115332.GT8356@rric.localhost>
+From: jjo.braun@gmail.com (Johannes Braun)
+Date: Fri, 3 May 2013 13:56:00 +0200
+Subject: Freescale imx35: sgtl5000 codec not working over i2c
+In-Reply-To: <20130503093948.GT32299@pengutronix.de>
+References: <20130502200024.72c112cc@jobraun>
+ <20130502181821.GC31135@pengutronix.de>
+ <20130502204020.0462f080@jobraun>
+ <20130503093948.GT32299@pengutronix.de>
+Message-ID: <CADwvPCtK_4gMHggP0mN2yqCLHzFY7EC9EnK8CpEHr87E=pkMPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.05.13 17:16:18, Arnd Bergmann wrote:
-> oprofile fails to build if CONFIG_IRQ_WORK is not already enabled,
-> because of the dependency on the RING_BUFFER code that now uses
-> the irq work library.
-> 
-> kernel/built-in.o: In function `ring_buffer_unlock_commit':
-> :(.text+0x5b8f0): undefined reference to `irq_work_queue'
-> kernel/built-in.o: In function `ring_buffer_write':
-> :(.text+0x5bd10): undefined reference to `irq_work_queue'
+> With "sgtl5000" at least sgtl5000_i2c_probe should be called.
 
-Shouldn't this be fixed in the ring_buffer implementation?
+Ok my fault. I did not see the i2c probe mehtod. I checked whether
+sgtl5000_i2c_probe is called or not and I can confirm that the method
+was passed successfully. I tested it with several kernel log messages.
 
-I also do not see, where this comes from. I was successfully compiling
-a kernel with OPROFILE and RING_BUFFER enabled but IRQ_WORK disabled.
-Do you have that config still available?
+> Is the i.MX I2C driver registered correctly. What's in /sys/bus/i2c/devices/?
 
-Thanks,
+I think so. The following devices are shown:
+ls -la /sys/bus/i2c/devices/
+lrwxrwxrwx 1 root root 0 Jan  1  1970 0-000a ->
+../../../devices/platform/imx-i2c.0/i2c-0/0-000a/
+lrwxrwxrwx 1 root root 0 Jan  1  1970 i2c-0 ->
+../../../devices/platform/imx-i2c.0/i2c-0/
+lrwxrwxrwx 1 root root 0 Jan  1  1970 i2c-2 ->
+../../../devices/platform/imx-i2c.2/i2c-2/
 
--Robert
+Also I am able to probe the bus via i2cdetect. This is the result:
+root at generic-armv6:~$ i2cdetect 0
+WARNING! This program can confuse your I2C bus, cause data loss and worse!
+I will probe file /dev/i2c-0.
+I will probe address range 0x03-0x77.
+Continue? [Y/n]
+     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+00:          -- -- -- -- -- -- -- UU -- -- -- -- --
+10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+70: -- -- -- -- -- -- -- --
 
-> 
-> Cc: Robert Richter <rric@kernel.org>
-> Cc: oprofile-list at lists.sf.net
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  arch/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/Kconfig b/arch/Kconfig
-> index a6b1056..434a8dc 100644
-> --- a/arch/Kconfig
-> +++ b/arch/Kconfig
-> @@ -8,6 +8,7 @@ config OPROFILE
->  	depends on HAVE_OPROFILE
->  	select RING_BUFFER
->  	select RING_BUFFER_ALLOW_SWAP
-> +	select IRQ_WORK
->  	help
->  	  OProfile is a profiling system capable of profiling the
->  	  whole system, include the kernel, kernel modules, libraries,
-> -- 
-> 1.8.1.2
-> 
+UU shows that this device is use by a driver.
+
+> you won't need much more than something similar to
+> arch/arm/mach-imx/imx25-dt.c and an auxdata table for the clock lookups.
+> There even is pinctrl support.
+
+I will check this out.
+
+---
+Johannes
