@@ -1,39 +1,30 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 3 May 2013 10:40:47 +0800
-Subject: [PATCH V2 0/2] ARM/MVF600: add Freescale Vybrid Family platform
- and development board support This Vybird MVF600 family is a heterogeneous
- dual-core eMPU family combining the ARM Cortex-A5 and Corte-M4 cores. This
- SOC still shares some IPs with Iscale Vybrid Family SOC and Vybrid Tower
- development board.
-In-Reply-To: <1367480285-26159-1-git-send-email-b35083@freescale.com>
-References: <1367480285-26159-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130503024046.GN3442@S2101-09.ap.freescale.net>
+Date: Fri, 3 May 2013 10:59:39 +0800
+Subject: [PATCH] ARM: imx: fix typo in gpu3d_shader_sels
+Message-ID: <1367549979-31291-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I don't know how it gets wrong, but the Subject line apparently contains
-some message that should be put in the email body. 
+There is no clock pll2_pfd9_720m.  Instead it should be pll3_pfd0_720m.
+Fix the typo in gpu3d_shader_sels.
 
-Shawn
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/clk-imx6q.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On Thu, May 02, 2013 at 03:38:03PM +0800, Jingchang Lu wrote:
-> Documentation/devicetree/bindings/clock/mvf600-clock.txt | 180 ++++++++
-> arch/arm/boot/dts/Makefile                               |   3 +-
-> arch/arm/boot/dts/mvf600-pinfunc.h                       | 816 +++++++++++++++++++++++++++++++++++
-> arch/arm/boot/dts/mvf600-twr.dts                         |  80 ++++
-> arch/arm/boot/dts/mvf600.dtsi                            | 426 ++++++++++++++++++
-> arch/arm/mach-imx/Kconfig                                |  15 +
-> arch/arm/mach-imx/Makefile                               |   3 +
-> arch/arm/mach-imx/clk-mvf.c                              | 406 +++++++++++++++++
-> arch/arm/mach-imx/common.h                               |   1 +
-> arch/arm/mach-imx/mach-mvf600.c                          | 118 +++++
-> arch/arm/mach-imx/pit.c                                  | 244 +++++++++++
-> 11 files changed, 2291 insertions(+), 1 deletion(-)
-> create mode 100644 Documentation/devicetree/bindings/clock/mvf600-clock.txt
-> create mode 100644 arch/arm/boot/dts/mvf600-pinfunc.h
-> create mode 100644 arch/arm/boot/dts/mvf600-twr.dts
-> create mode 100644 arch/arm/boot/dts/mvf600.dtsi
-> create mode 100644 arch/arm/mach-imx/clk-mvf.c
-> create mode 100644 arch/arm/mach-imx/mach-mvf600.c
-> create mode 100644 arch/arm/mach-imx/pit.c
-> 
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index f2e1c62..dda9a2b 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -186,7 +186,7 @@ static const char *audio_sels[]	= { "pll4_post_div", "pll3_pfd2_508m", "pll3_pfd
+ static const char *gpu_axi_sels[]	= { "axi", "ahb", };
+ static const char *gpu2d_core_sels[]	= { "axi", "pll3_usb_otg", "pll2_pfd0_352m", "pll2_pfd2_396m", };
+ static const char *gpu3d_core_sels[]	= { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll2_pfd2_396m", };
+-static const char *gpu3d_shader_sels[] = { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll2_pfd9_720m", };
++static const char *gpu3d_shader_sels[] = { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll3_pfd0_720m", };
+ static const char *ipu_sels[]		= { "mmdc_ch0_axi", "pll2_pfd2_396m", "pll3_120m", "pll3_pfd1_540m", };
+ static const char *ldb_di_sels[]	= { "pll5_video", "pll2_pfd0_352m", "pll2_pfd2_396m", "mmdc_ch1_axi", "pll3_usb_otg", };
+ static const char *ipu_di_pre_sels[]	= { "mmdc_ch0_axi", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0_352m", "pll2_pfd2_396m", "pll3_pfd1_540m", };
+-- 
+1.7.9.5
