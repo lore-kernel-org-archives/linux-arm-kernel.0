@@ -1,10 +1,9 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  3 May 2013 15:31:49 +0100
-Subject: [PATCH 03/63] ARM: ux500: Supply UART's DMA configuration via Device
- Tree
+Date: Fri,  3 May 2013 15:31:50 +0100
+Subject: [PATCH 04/63] ARM: ux500: Supply MMC DMA configuration via Device Tree
 In-Reply-To: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
 References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367591569-32197-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1367591569-32197-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,44 +16,56 @@ instead.
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/boot/dts/dbx5x0.dtsi |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index 8a82b18..d595e2c 100644
+index d595e2c..86b35a1 100644
 --- a/arch/arm/boot/dts/dbx5x0.dtsi
 +++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -568,18 +568,35 @@
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x80120000 0x1000>;
- 			interrupts = <0 11 0x4>;
+@@ -604,6 +604,11 @@
+ 			compatible = "arm,pl18x", "arm,primecell";
+ 			reg = <0x80126000 0x1000>;
+ 			interrupts = <0 60 0x4>;
 +
-+			dmas = <&dma 13 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 13 0 0x0>; /* Logical - MemToDev */
++			dmas = <&dma 29 0 0x2>, /* Logical - DevToMem */
++			       <&dma 29 0 0x0>; /* Logical - MemToDev */
 +			dma-names = "rx", "tx";
 +
  			status = "disabled";
  		};
+ 
+@@ -611,6 +616,11 @@
+ 			compatible = "arm,pl18x", "arm,primecell";
+ 			reg = <0x80118000 0x1000>;
+ 			interrupts = <0 50 0x4>;
 +
- 		uart at 80121000 {
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x80121000 0x1000>;
- 			interrupts = <0 19 0x4>;
-+
-+			dmas = <&dma 12 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 12 0 0x0>; /* Logical - MemToDev */
++			dmas = <&dma 32 0 0x2>, /* Logical - DevToMem */
++			       <&dma 32 0 0x0>; /* Logical - MemToDev */
 +			dma-names = "rx", "tx";
 +
  			status = "disabled";
  		};
+ 
+@@ -618,6 +628,11 @@
+ 			compatible = "arm,pl18x", "arm,primecell";
+ 			reg = <0x80005000 0x1000>;
+ 			interrupts = <0 41 0x4>;
 +
- 		uart at 80007000 {
- 			compatible = "arm,pl011", "arm,primecell";
- 			reg = <0x80007000 0x1000>;
- 			interrupts = <0 26 0x4>;
++			dmas = <&dma 28 0 0x2>, /* Logical - DevToMem */
++			       <&dma 28 0 0x0>; /* Logical - MemToDev */
++			dma-names = "rx", "tx";
 +
-+			dmas = <&dma 11 0 0x2>, /* Logical - DevToMem */
-+			       <&dma 11 0 0x0>; /* Logical - MemToDev */
+ 			status = "disabled";
+ 		};
+ 
+@@ -632,6 +647,11 @@
+ 			compatible = "arm,pl18x", "arm,primecell";
+ 			reg = <0x80114000 0x1000>;
+ 			interrupts = <0 99 0x4>;
++
++			dmas = <&dma 42 0 0x2>, /* Logical - DevToMem */
++			       <&dma 42 0 0x0>; /* Logical - MemToDev */
 +			dma-names = "rx", "tx";
 +
  			status = "disabled";
