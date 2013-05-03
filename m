@@ -1,68 +1,39 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 3 May 2013 08:07:54 +0530
-Subject: [GIT PULL] mailbox driver framework for v3.10 merge window
-In-Reply-To: <5182E403.1030808@ti.com>
-References: <37C860A02101E749A747FA2D3C1E3C504A1971@DLEE11.ent.ti.com>
- <201304091255.03020.arnd@arndb.de>
- <CAJe_Zhf5QwQQU5aVtNhbDT3EK9Dof-ZK_boP9WaNghqO8xY7iA@mail.gmail.com>
- <5182E403.1030808@ti.com>
-Message-ID: <CAJe_ZhfA=eqihefgtYGmLt03sNV6arme9t1YgzTFoC8nB6SNkQ@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 3 May 2013 10:40:47 +0800
+Subject: [PATCH V2 0/2] ARM/MVF600: add Freescale Vybrid Family platform
+ and development board support This Vybird MVF600 family is a heterogeneous
+ dual-core eMPU family combining the ARM Cortex-A5 and Corte-M4 cores. This
+ SOC still shares some IPs with Iscale Vybrid Family SOC and Vybrid Tower
+ development board.
+In-Reply-To: <1367480285-26159-1-git-send-email-b35083@freescale.com>
+References: <1367480285-26159-1-git-send-email-b35083@freescale.com>
+Message-ID: <20130503024046.GN3442@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 May 2013 03:39, Suman Anna <s-anna@ti.com> wrote:
-> Hi Arnd,
->
-> On 04/28/2013 11:07 PM, Jassi Brar wrote:
->>
->> Not to mean only talk and no do, I prepared another proposal that
->> addressed all the concerns shared so far in the RFC
->> http://www.spinics.net/lists/kernel/msg1523873.html (its not ready for
->> primetime yet)  And also converted the PL320 driver to the new API,
->> unlike the pulled patchset which leaves that out in the cold.
->> http://www.spinics.net/lists/kernel/msg1523874.html
->
-> Yes, the current code is mainly interrupt-driven and supports only
-> non-atomic context. We have a need to support atomic contexts and ipc
-> controllers that do not have interrupt-based triggering.
->
-Supporting poll and client driven TX and atomic context is going to
-need big chunks of changes which we can avoid by doing them already.
-Plus a bottleneck with PL320, as Mark pointed out they can't afford
-any bigger latency, which will come from RX via notifier path.
+I don't know how it gets wrong, but the Subject line apparently contains
+some message that should be put in the email body. 
 
-> As Jassi
-> pointed out, the RFC is not ready yet and there are still some
-> contention points that needs to be sorted out (especially to maintain
-> OMAP mailbox functionality).
->
-Apart from a few checkpatch fixes, a missing timer delete call and
-some testing with dummy client and controller drivers for various
-usecases, it's ready from my side. It worked at least as good as your
-API in our internal testing.
+Shawn
 
-Please do let me know which OMAP functionality are you worried about,
-I believe it could all still be done above this api.
-
->>
->> Now, we could either call it (effectively the TI's framework with
->> quirks for STE) as the "Common API" and then dismantle and convert it
->> patch by patch (authors and I seem to agree many things need to be
->> changed and implemented).
->>   OR we do it reasonably right the first time even if that means yet
->> another release. IMHO we should go for slow but steady thing.
->
-> I think it is your call here, either of the above approaches would
-> definitely involve some rework on the framework as well as both the OMAP
-> & ST mailboxes.
-
-I am interested to know what changes do you anticipate in my proposed
-API. Not to mean it's perfect, but I thought I provided for all
-practical use-cases.
-
-Yes, TI and STE would need re-work, but then as of now they are their
-own APIs upstream. And even with your proposal they would still need
-to be changed if we are to implement the desired features. What about
-PL320?
-
-Thanks.
+On Thu, May 02, 2013 at 03:38:03PM +0800, Jingchang Lu wrote:
+> Documentation/devicetree/bindings/clock/mvf600-clock.txt | 180 ++++++++
+> arch/arm/boot/dts/Makefile                               |   3 +-
+> arch/arm/boot/dts/mvf600-pinfunc.h                       | 816 +++++++++++++++++++++++++++++++++++
+> arch/arm/boot/dts/mvf600-twr.dts                         |  80 ++++
+> arch/arm/boot/dts/mvf600.dtsi                            | 426 ++++++++++++++++++
+> arch/arm/mach-imx/Kconfig                                |  15 +
+> arch/arm/mach-imx/Makefile                               |   3 +
+> arch/arm/mach-imx/clk-mvf.c                              | 406 +++++++++++++++++
+> arch/arm/mach-imx/common.h                               |   1 +
+> arch/arm/mach-imx/mach-mvf600.c                          | 118 +++++
+> arch/arm/mach-imx/pit.c                                  | 244 +++++++++++
+> 11 files changed, 2291 insertions(+), 1 deletion(-)
+> create mode 100644 Documentation/devicetree/bindings/clock/mvf600-clock.txt
+> create mode 100644 arch/arm/boot/dts/mvf600-pinfunc.h
+> create mode 100644 arch/arm/boot/dts/mvf600-twr.dts
+> create mode 100644 arch/arm/boot/dts/mvf600.dtsi
+> create mode 100644 arch/arm/mach-imx/clk-mvf.c
+> create mode 100644 arch/arm/mach-imx/mach-mvf600.c
+> create mode 100644 arch/arm/mach-imx/pit.c
+> 
