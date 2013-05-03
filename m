@@ -1,26 +1,30 @@
-From: airlied@gmail.com (Dave Airlie)
-Date: Fri, 3 May 2013 15:40:25 +1000
-Subject: [PATCH V2] video: implement a simple framebuffer driver
-In-Reply-To: <517FAF0C.1060901@ti.com>
-References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
- <517F7245.2050606@iki.fi> <201304301228.42245.arnd@arndb.de>
- <517FAF0C.1060901@ti.com>
-Message-ID: <CAPM=9twuLZT=BaGrmE6fvsSXciitG383ZnghP0hOnSfNGq=A5Q@mail.gmail.com>
+From: marek.belisko@gmail.com (Marek Belisko)
+Date: Fri,  3 May 2013 07:53:22 +0200
+Subject: [PATCH v2 1/2] clk: si5351: Fix clkout rate computation.
+Message-ID: <1367560403-21685-1-git-send-email-marek.belisko@streamunlimited.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> I think it would be reasonable to have a restriction of only a single
-> bootfb instance, so one could just use static global variables/funcs to
-> manage the hand-over.
->
-> All this, of course, presumes that nobody else than fbcon is using the
-> fb. But I think it's also a reasonable restriction that the fb device is
-> not used (mmapped) by anyone.
->
+Rate was incorrectly computed because we read from wrong divider register.
 
-We already have this on x86, though the handover isn't great,
+Signed-off-by: Marek Belisko <marek.belisko@streamunlimited.com>
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+ drivers/clk/clk-si5351.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-FBINFO_MISC_FIRMWARE flag, and the aperture tracking stuff.
-
-Dave.
+diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+index 8927284..cf39e53 100644
+--- a/drivers/clk/clk-si5351.c
++++ b/drivers/clk/clk-si5351.c
+@@ -932,7 +932,7 @@ static unsigned long si5351_clkout_recalc_rate(struct clk_hw *hw,
+ 	unsigned char reg;
+ 	unsigned char rdiv;
+ 
+-	if (hwdata->num > 5)
++	if (hwdata->num <= 5)
+ 		reg = si5351_msynth_params_address(hwdata->num) + 2;
+ 	else
+ 		reg = SI5351_CLK6_7_OUTPUT_DIVIDER;
+-- 
+1.7.9.5
