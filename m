@@ -1,94 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri,  3 May 2013 11:17:46 +0200
-Subject: [PATCH 2/5] ARM: sunxi: dt: Add i2c controller nodes to the DTSI
+Date: Fri,  3 May 2013 11:17:49 +0200
+Subject: [PATCH 5/5] ARM: sun5i: olinuxino: Enable the i2c controllers
 In-Reply-To: <1367572669-24354-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1367572669-24354-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1367572669-24354-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1367572669-24354-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A10 and A13 both have 3 i2c controller embedded.
-Add those to the common sunxi dtsi.
+The A13-Olinuxino makes use of the 3 i2c controllers found on the Allwinner
+A13. Enable them in the device tree.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 27 +++++++++++++++++++++++++++
- arch/arm/boot/dts/sun5i-a13.dtsi | 27 +++++++++++++++++++++++++++
- 2 files changed, 54 insertions(+)
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index e7ef619..311dcd4 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -292,5 +292,32 @@
- 			clocks = <&apb1_gates 23>;
- 			status = "disabled";
+diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+index 3ca5506..80497e3 100644
+--- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
++++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+@@ -37,6 +37,24 @@
+ 			pinctrl-0 = <&uart1_pins_b>;
+ 			status = "okay";
  		};
 +
 +		i2c0: i2c at 01c2ac00 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2ac00 0x400>;
-+			interrupts = <7>;
-+			clocks = <&apb1_gates 0>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
 +		};
 +
 +		i2c1: i2c at 01c2b000 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <8>;
-+			clocks = <&apb1_gates 1>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pins_a>;
++			status = "okay";
 +		};
 +
 +		i2c2: i2c at 01c2b400 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2b400 0x400>;
-+			interrupts = <9>;
-+			clocks = <&apb1_gates 2>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c2_pins_a>;
++			status = "okay";
 +		};
  	};
- };
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 8ba65c1..16df784 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -215,5 +215,32 @@
- 			clocks = <&apb1_gates 19>;
- 			status = "disabled";
- 		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2ac00 0x400>;
-+			interrupts = <7>;
-+			clocks = <&apb1_gates 0>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <8>;
-+			clocks = <&apb1_gates 1>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2b400 0x400>;
-+			interrupts = <9>;
-+			clocks = <&apb1_gates 2>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
- 	};
- };
+ 
+ 	leds {
 -- 
 1.8.1.2
