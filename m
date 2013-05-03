@@ -1,49 +1,85 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 02 May 2013 20:51:43 -0500
-Subject: [PATCH v10 0/2] (arm-soc for v3.10) arm: introduce psci_smp_ops
-In-Reply-To: <CAOesGMgtwb5z-LcJNf7Jtnz92T7u3Z9_uzBxYCaD1ahwYa514A@mail.gmail.com>
-References: <alpine.DEB.2.02.1304301707290.5398@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1305021938170.5398@kaball.uk.xensource.com>
- <20130502184801.GF14496@n2100.arm.linux.org.uk>
- <201305022103.58445.arnd@arndb.de>
- <CAOesGMgtwb5z-LcJNf7Jtnz92T7u3Z9_uzBxYCaD1ahwYa514A@mail.gmail.com>
-Message-ID: <5183182F.1050408@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 3 May 2013 10:16:51 +0800
+Subject: [PATCH, RFC 04/22] staging/drm: imx: add missing dependencies
+In-Reply-To: <1367507786-505303-5-git-send-email-arnd@arndb.de>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-5-git-send-email-arnd@arndb.de>
+Message-ID: <20130503021650.GL3442@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2013 03:34 PM, Olof Johansson wrote:
-> Hi,
+On Thu, May 02, 2013 at 05:16:08PM +0200, Arnd Bergmann wrote:
+> The imx DRM driver needs a couple of extra Kconfig dependencies
+> to avoid random build failures:
 > 
-> On Thu, May 2, 2013 at 12:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> On Thursday 02 May 2013, Russell King - ARM Linux wrote:
->>> The only issue that there is is where we are in the development cycle
->>> (almost mid merge window), and I've yet to push anything to Linus thanks
->>> to late discovery of various messups in other chunks of code submitted
->>> via my tree - I'm starting to drop stuff from my tree in the hope that
->>> I'll get back to something that's going to be suitable for mainline.
->>>
->>> I really don't want to go pulling anything else at the moment in the
->>> hope of getting what I currently have out the door.
->>>
->>> And in any case, we shouldn't be adding any new code to our trees at
->>> this point in time.
->>
->> Agreed. I would have like to see the patches in 3.10, but the timing
->> didn't work out.
->>
->> Stefano, I'm sure we can queue it up early for 3.11 if you send them
->> again after the merge window. Sorry you had to go through 10 versions
->> and not getting it merged in time in the end.
-> 
-> Yeah, sorry for being quiet on this; I've seen the patches go by but
-> also haven't looked closely at them since timing was pointing more
-> towards 3.11 material. 3.10 is already a very busy release for us on
-> arm-soc.
-> 
-> If there's SoC code that needs this as a base, we can do a shared
-> branch with Russell. That has worked well in the past -- he merges it
-> but we bring in a copy of the topic in our tree.
+> drivers/staging/imx-drm/ipuv3-crtc.c:448:
+>  undefined reference to `ipu_idmac_put'
+>  drivers/staging/imx-drm/ipuv3-crtc.c:450: undefined reference to
+>  `ipu_dmfc_put' drivers/staging/imx-drm/ipuv3-crtc.c:452:
+>  undefined reference to `ipu_dp_put'
+>  drivers/staging/imx-drm/ipuv3-crtc.c:454: undefined reference to
+>  `ipu_di_put'
+> drivers/built-in.o: In function `ipu_probe':
+>  :(.text+0x4b4174): undefined reference to `device_reset'
+> drivers/built-in.o: In function `imx_tve_probe':
+>  drivers/staging/imx-drm/imx-tve.c:648: undefined reference to
+>  `devm_regmap_init_mmio_clk'
+> drivers/built-in.o: In function
+>  `imx_pd_connector_get_modes':
 
-Yes, there will be. I've got highbank about ready to go.
+>  drivers/staging/imx-drm/parallel-display.c:78: undefined
+>  reference to `of_get_drm_display_mode'
 
-Rob
+There is a patch [1] from Marek fixing this one.
+
+Shawn
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/233449
+
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/staging/imx-drm/Kconfig | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/staging/imx-drm/Kconfig b/drivers/staging/imx-drm/Kconfig
+> index 8c9e403..35ccda5 100644
+> --- a/drivers/staging/imx-drm/Kconfig
+> +++ b/drivers/staging/imx-drm/Kconfig
+> @@ -1,6 +1,7 @@
+>  config DRM_IMX
+>  	tristate "DRM Support for Freescale i.MX"
+>  	select DRM_KMS_HELPER
+> +	select VIDEOMODE_HELPERS
+>  	select DRM_GEM_CMA_HELPER
+>  	select DRM_KMS_CMA_HELPER
+>  	depends on DRM && (ARCH_MXC || ARCH_MULTIPLATFORM)
+> @@ -23,6 +24,7 @@ config DRM_IMX_PARALLEL_DISPLAY
+>  config DRM_IMX_TVE
+>  	tristate "Support for TV and VGA displays"
+>  	depends on DRM_IMX
+> +	select REGMAP_MMIO
+>  	help
+>  	  Choose this to enable the internal Television Encoder (TVe)
+>  	  found on i.MX53 processors.
+> @@ -30,6 +32,7 @@ config DRM_IMX_TVE
+>  config DRM_IMX_IPUV3_CORE
+>  	tristate "IPUv3 core support"
+>  	depends on DRM_IMX
+> +	depends on RESET_CONTROLLER
+>  	help
+>  	  Choose this if you have a i.MX5/6 system and want
+>  	  to use the IPU. This option only enables IPU base
+> @@ -38,5 +41,6 @@ config DRM_IMX_IPUV3_CORE
+>  config DRM_IMX_IPUV3
+>  	tristate "DRM Support for i.MX IPUv3"
+>  	depends on DRM_IMX
+> +	depends on DRM_IMX_IPUV3_CORE
+>  	help
+>  	  Choose this if you have a i.MX5 or i.MX6 processor.
+> -- 
+> 1.8.1.2
+> 
