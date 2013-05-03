@@ -1,31 +1,50 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 3 May 2013 07:53:34 +0100
-Subject: [GIT PULL] Removal of GENERIC_GPIO
-In-Reply-To: <20130503110318.0d30b773852640ee94ba07b5@canb.auug.org.au>
-References: <51823DDA.7010103@nvidia.com>
- <20130503105234.6e9c8aa5ed2784bbe084caa8@canb.auug.org.au>
- <20130503110318.0d30b773852640ee94ba07b5@canb.auug.org.au>
-Message-ID: <CACxGe6tdJr22bJ0GZL_18FqYWLdNROMKuH3UQbKciEwRy9v1Wg@mail.gmail.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Fri, 3 May 2013 12:37:14 +0530
+Subject: [PATCH 4/4] staging: =?utf-8?Q?ste=5Fr?=
+ =?utf-8?Q?mi4=3A_Suppress_'ignoring_return_value_of_=E2=80=98regulator=5F?=
+ =?utf-8?B?ZW5hYmxlKCkn?= warning
+In-Reply-To: <1367509690-24022-5-git-send-email-lee.jones@linaro.org>
+References: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
+ <1367509690-24022-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130503070713.GA27956@bnru09>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 3, 2013 at 2:03 AM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi Guys,
->
-> On Fri, 3 May 2013 10:52:34 +1000 Stephen Rothwell <sfr@canb.auug.org.au> wrote:
->>
->> I currently have 3 merge fix patches for the gen-cpio tree:
->>
->> gen-gpio: GPIOLIB merge fix up
->> merge fix for Convert selectors of GENERIC_GPIO to GPIOLIB
->> merge fix 2 for Convert selectors of GENERIC_GPIO to GPIOLIB
->>
->> I have attached them.  All three are now applicable to Linus' tree.
->
-> Just to absolutely clear, I *do not* expect either of you to rebase your
-> trees or backmerge Linus' tree to fix these, I *do* expect whoever send
-> this stuff to Linus to mention the necessary fixes to him.
+On Thu, May 02, 2013 at 17:48:10 +0200, Lee Jones wrote:
+> drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:
+>         In function ?synaptics_rmi4_resume?:
+> drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:1090:18:
+>         warning: ignoring return value of ?regulator_enable?, declared
+>         with attribute warn_unused_result [-Wunused-result
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: devel at driverdev.osuosl.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
+> index fe667dd..c4d013d 100644
+> --- a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
+> +++ b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
+> @@ -1087,7 +1087,9 @@ static int synaptics_rmi4_resume(struct device *dev)
+>  	unsigned char intr_status;
+>  	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
+>  
+> -	regulator_enable(rmi4_data->regulator);
+> +	retval = regulator_enable(rmi4_data->regulator);
+> +	if (retval < 0)
+> +		return retval;
+Does it make sense to add a dev_err?
 
-Yes, that is exactly what I'm going to do
 
-g.
+Otherwise, you can add my
+Acked-by:srinidhi kasagar <srinidhi.kasagar@stericsson.com> for this series.
+
+>  
+>  	enable_irq(rmi4_data->i2c_client->irq);
+>  	rmi4_data->touch_stopped = false;
+> -- 
+> 1.7.10.4
+> 
