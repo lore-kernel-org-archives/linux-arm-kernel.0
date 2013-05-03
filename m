@@ -1,29 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 03 May 2013 16:01:47 +0200
-Subject: [PATCH] ARM: sun4i: cubieboard: Enable the i2c controllers
-In-Reply-To: <1367498266-1246-1-git-send-email-emilio@elopez.com.ar>
-References: <1367498266-1246-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <5183C34B.8050801@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 3 May 2013 16:01:56 +0200
+Subject: [PATCH] ARM: ux500: Remove DMA address look-up table
+In-Reply-To: <1367484683-3479-1-git-send-email-lee.jones@linaro.org>
+References: <1367484683-3479-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdaeEDHNLFt2z=7L=iFbxbSkbe25mYxCG3+MreLsZZ21SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Emilio,
+On Thu, May 2, 2013 at 10:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Le 02/05/2013 14:37, Emilio L?pez a ?crit :
-> The Cubieboard makes use of the first two i2c controllers found on the
-> Allwinner A10; i2c-0 is used internally for the PMIC, while i2c-1
-> is exposed on the board headers. This patch enables them in the device
-> tree.
-> 
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+> DMA addresses are now passed as part of the dmaengine API by invoking
+> dmaengine_slave_config(). So there's no requirement for the DMA40
+> driver to look them up in a table provided by platform data. This
+> method does not fit in well using Device Tree either.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Thanks for this patch.
+This goes on top of some other changes right?
 
-I'll merge it in my i2c patchset, so that every thing stays together.
+Right now the DMA series is confusing me a bit, there is
+these 6 patches:
+http://marc.info/?l=linux-arm-kernel&m=136698179306642&w=2
 
-Maxime
+Then these 5 patches:
+http://marc.info/?l=linux-arm-kernel&m=136740201416293&w=2
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+And then this single patch.
+
+Where shall I start, i.e. which patches go first?
+
+Can they all be combined into one big series?
+
+Yours,
+Linus Walleij
