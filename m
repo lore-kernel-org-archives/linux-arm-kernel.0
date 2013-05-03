@@ -1,40 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 3 May 2013 15:21:46 +0100
-Subject: [PATCH 4/4 v2] staging: =?utf-8?Q?ste=5Frm?=
- =?utf-8?Q?i4=3A_Suppress_'ignoring_return_value_of_=E2=80=98regulator=5Fe?=
- =?utf-8?Q?nable=28=29'?= warning
-In-Reply-To: <1367509690-24022-5-git-send-email-lee.jones@linaro.org>
-References: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
- <1367509690-24022-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130503142146.GO24153@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 3 May 2013 16:22:41 +0200
+Subject: Fwd: Tegra 30 System hangs because of commit "pinctrl: move
+ subsystem mutex to pinctrl_dev struct"
+In-Reply-To: <517ED12B.8080502@wwwdotorg.org>
+References: <CAK5ve-KXdS8az=Gtja-mF=Z3_EeZVA7bLYSU0EE2mf5bHmSUKw@mail.gmail.com>
+ <CAK5ve-KBDyvjNRVMcXgfnhYcajdcGsuAKaepzCBt+epiXoYvSw@mail.gmail.com>
+ <517ED12B.8080502@wwwdotorg.org>
+Message-ID: <CACRpkdboCQmV_Aam3EDcSG6PRVnpEmGkC78m3h7rXT68V2a9Qg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:
-        In function ?synaptics_rmi4_resume?:
-drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:1090:18:
-        warning: ignoring return value of ?regulator_enable?, declared
-        with attribute warn_unused_result [-Wunused-result
+On Mon, Apr 29, 2013 at 9:59 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: devel at driverdev.osuosl.org
-Acked-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> I would suggest simply dropping or reverting this patch; I had pointed out a
+> long time ago that it was unlikely to be correct.
+>
+> My guess/suspicion is a recursive lock attempt during processing hogs during
+> pinctrl device registration, or perhaps during dt->map conversion. Bryan,
+> are you able to confirm this?
 
-diff --git a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-index fe667dd..386362c 100644
---- a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-+++ b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-@@ -1087,7 +1087,11 @@ static int synaptics_rmi4_resume(struct device *dev)
- 	unsigned char intr_status;
- 	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
- 
--	regulator_enable(rmi4_data->regulator);
-+	retval = regulator_enable(rmi4_data->regulator);
-+	if (retval) {
-+		dev_err(dev, "Regulator enable failed (%d)\n", retval);
-+		return retval;
-+	}
- 
- 	enable_irq(rmi4_data->i2c_client->irq);
- 	rmi4_data->touch_stopped = false;
+This was not the case at all, it was an mutex_unlock misspelled as
+mutex_lock()... totally unrecursive dual locking :-)
+
+I did test the patch quite extensively, albeit not on a system using
+DT to populate the pinctrl tables so I missed this, mea culpa.
+
+I really want to get rid of the big pinctrl lock and make this more
+fine-granular, and that is why the patch is being pushed, bear
+with me.
+
+Yours,
+Linus Walleij
