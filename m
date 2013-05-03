@@ -1,23 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 May 2013 22:34:30 +0200
-Subject: [PATCH 7/9] ARM: OMAP: don't select SERIAL_OMAP unconditionally
-In-Reply-To: <20130502233249.GU28721@atomide.com>
-References: <1367528578-518090-1-git-send-email-arnd@arndb.de>
- <1367528578-518090-8-git-send-email-arnd@arndb.de>
- <20130502233249.GU28721@atomide.com>
-Message-ID: <201305032234.30974.arnd@arndb.de>
+Date: Fri, 3 May 2013 22:40:46 +0200
+Subject: [GIT PULL] Two ux500 fixes for the v3.10 series
+In-Reply-To: <CACRpkdYeWi2cx2weXao9=2f78eM0_J=gK-8o6gKjcG7pjYFAxA@mail.gmail.com>
+References: <CACRpkdYeWi2cx2weXao9=2f78eM0_J=gK-8o6gKjcG7pjYFAxA@mail.gmail.com>
+Message-ID: <201305032240.46483.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 May 2013, Tony Lindgren wrote:
-> Please just drop this and pick my earlier fix instead:
+On Friday 03 May 2013, Linus Walleij wrote:
+> Hi ARM SoC folks,
 > 
-> [PATCH 1/3] ARM: OMAP2+: Fix unmet direct dependencies for SERIAL_OMAP
-> 
-> Or let me know if you prefer me to queue it.
+> here are two ux500 fixes for the v3.10 series, please pull
+> them in. Since -rc1 is not out this is based on Torvald's
+> HEAD from yesterday.
 
-I've applied your patch now. Should I also take the other two of that
-series? I was not on Cc for these patches, but all three seem to be
-required still.
+We try hard to avoid doing bug fixes on top of random HEADs.
+Can you send these on top of the minimum set of branches?
 
 	Arnd
