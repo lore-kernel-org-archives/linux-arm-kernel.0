@@ -1,55 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 May 2013 15:57:27 +0200
-Subject: [PATCH 12/32] ARM: ux500: Remove superfluous 'psize' attribute
- from Audio platform data
-In-Reply-To: <20130502083849.GH25256@gmail.com>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-13-git-send-email-lee.jones@linaro.org>
- <20130501144213.GG25256@gmail.com>
- <20130502083849.GH25256@gmail.com>
-Message-ID: <CACRpkdYbqU=bHrzf6Vpv-KFYN_+z6+y1ocNHtkLEO7ihHEd=dA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 03 May 2013 16:02:04 +0200
+Subject: [PATCH, RFC 06/22] gpu/drm: host1x: add dependency on Tegra
+In-Reply-To: <20130503134539.GA18652@avionic-0098.adnet.avionic-design.de>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-7-git-send-email-arnd@arndb.de>
+ <20130503134539.GA18652@avionic-0098.adnet.avionic-design.de>
+Message-ID: <3432070.tv7Jup0G8r@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 2, 2013 at 10:38 AM, Lee Jones <lee.jones@linaro.org> wrote:
+On Friday 03 May 2013 15:45:39 Thierry Reding wrote:
+> > diff --git a/drivers/gpu/host1x/drm/Kconfig b/drivers/gpu/host1x/drm/Kconfig
+> > index 69853a4..5a6a5cd 100644
+> > --- a/drivers/gpu/host1x/drm/Kconfig
+> > +++ b/drivers/gpu/host1x/drm/Kconfig
+> > @@ -1,6 +1,7 @@
+> >  config DRM_TEGRA
+> >       bool "NVIDIA Tegra DRM"
+> >       depends on DRM
+> > +     depends on ARCH_TEGRA
+> >       select DRM_KMS_HELPER
+> >       select FB_SYS_FILLRECT
+> >       select FB_SYS_COPYAREA
+> 
+> This was solved by a patch that went into Dave's DRM pull request for
+> 3.10 by adding:
+> 
+>         depends on ARCH_TEGRA || ARCH_MULTIPLATFORM
+> 
+> to the Kconfig entry for TEGRA_HOST1X. The plan was to eventually remove
+> ARCH_TEGRA from that condition after 3.10 since ARCH_MULTIPLATFORM will
+> include ARCH_TEGRA anyway. I'm not sure why that patch hasn't made it
+> into linux-next yet, though.
 
->> > 'psize' is used to calculate the maximum DMA burst size. However it
->> > is only taken into consideration when editing the DMA channel's
->> > configuration. The Audio DMA platform data is only used to allocate
->> > a channel, not configure it. That will be done at a later date within
->> > the MSP driver.
->> >
->> > We're also removing comments which are no longer required, as
->> > 'data_width' is no longer set in any device's platform data period.
->> >
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+I saw the problem with ARCH_MULTIPLATFORM enabled, so I don't understand
+how adding the dependency above would help. A possible alternative
+would be to define an empty alternative for the interface used here,
+as the patch below.
 
->> Linus Walleij wrote:
->> So if I understand correctly this is now handled by dmaengine_pcm.c,
->> os that right?
->
-> Unfortunately not. At the moment ux500 sound is very broken in
-> Mainline. I looked at it recently and the driver is almost completely
-> different to the one maintained internally.
+	Arnd
 
-I was more thinking that the dmaengine_pcm.c which appears
-to have its functions called from the ux500 ASoC driver should
-do the calls to slave config to set up proper DMA characteristics
-for the channel.
-
-Maybe that part is in the MSP driver as you say, is that so?
-
-> There were DMA changes relating to this driver pending for v3.10,
-> which I believe have just been taking into -next. I will straighten
-> out the DMA issues shortly, but there are other ones remaining still -
-> mostly surrounding widgets. Ideally this is something Ola should fix,
-> as he has the expertise to do so, but he doesn't appear to have been
-> very active upstream of late.
-
-IIRC there are also patches from Fabio to this stuff so I'm
-a bit confused, but if the intention is to merge this through
-ASoC with some other stuff, by all means:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+diff --git a/include/linux/clk/tegra.h b/include/linux/clk/tegra.h
+index 642789b..1397190 100644
+--- a/include/linux/clk/tegra.h
++++ b/include/linux/clk/tegra.h
+@@ -120,8 +120,13 @@ static inline void tegra_cpu_clock_resume(void)
+ }
+ #endif
+ 
++#ifdef ARCH_TEGRA
+ void tegra_periph_reset_deassert(struct clk *c);
+ void tegra_periph_reset_assert(struct clk *c);
++#else
++static inline void tegra_periph_reset_deassert(struct clk *c) {}
++static inline void tegra_periph_reset_assert(struct clk *c) {}
++#endif
+ void tegra_clocks_init(void);
+ void tegra_clocks_apply_init_table(void);
+ 
