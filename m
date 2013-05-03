@@ -1,54 +1,37 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 3 May 2013 15:45:44 +0530
-Subject: [PATCH 0/6] Davinci fbdev driver and enable it for DMx platform
-In-Reply-To: <51838994.7070805@ti.com>
-References: <1366804808-22720-1-git-send-email-prabhakar.csengg@gmail.com>
- <1780031.B4OAypccep@avalon>
- <CA+V-a8sLD2dP1RLb8ibZDOsLCP8hhMNUTr-zzU1zx_2ALDaDrg@mail.gmail.com>
- <51838994.7070805@ti.com>
-Message-ID: <CA+V-a8tM=VxvCt5dvbLSJz-pz7OS88QaHJ9r_Y+ysxP_JUzn2Q@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 3 May 2013 11:29:14 +0100
+Subject: [Xen-devel] [PATCH 2/3] xen: move do_stolen_accounting to
+ drivers/xen/time.c
+In-Reply-To: <1367569605.28742.28.camel@zakaz.uk.xensource.com>
+References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
+ <1367436460-10183-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <5182B532.10607@codeaurora.org>
+ <1367569605.28742.28.camel@zakaz.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1305031118080.5398@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 3, 2013 at 3:25 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On 4/26/2013 11:16 AM, Prabhakar Lad wrote:
->> Hi Laurent,
->>
->> On Thu, Apr 25, 2013 at 2:32 AM, Laurent Pinchart
->> <laurent.pinchart@ideasonboard.com> wrote:
->>> Hi Prabhakar,
->>>
->>> Thank you for the patch.
->>>
->>> On Wednesday 24 April 2013 17:30:02 Prabhakar Lad wrote:
->>>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->>>>
->>>> This patch series adds an fbdev driver for Texas
->>>> Instruments Davinci SoC.The display subsystem consists
->>>> of OSD and VENC, with OSD supporting 2 RGb planes and
->>>> 2 video planes.
->>>> http://focus.ti.com/general/docs/lit/
->>>> getliterature.tsp?literatureNumber=sprue37d&fileType=pdf
->>>>
->>>> A good amount of the OSD and VENC enabling code is
->>>> present in the kernel, and this patch series adds the
->>>> fbdev interface.
->>>>
->>>> The fbdev driver exports 4 nodes representing each
->>>> plane to the user - from fb0 to fb3.
->>>
->>> The obvious question is: why not a KMS driver instead ? :-)
->>>
->> I did go through the KMS model (thanks for pointing to your work and the video)
->> and it looks like this would require a fair amount of development, at this point
->> of time I would go with the current implementation and revisit on KMS model
->> at later point of time.
->
-> But I doubt you will be able to sneak a new fbdev driver through. Last
-> time I heard, Andrew is only taking in fixes not new features.
->
-Then we have no choice left and go with KMS driver itself though it would take
-some time since KMS is a new inclusion into DRM.
+On Fri, 3 May 2013, Ian Campbell wrote:
+> On Thu, 2013-05-02 at 19:49 +0100, Christopher Covington wrote:
+> > Hi Stefano,
+> > 
+> > On 05/01/2013 03:27 PM, Stefano Stabellini wrote:
+> > > Move do_stolen_accounting, xen_vcpu_stolen and related functions and
+> > > static variables to common code (drivers/xen/time.c).
+> > > 
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > ---
+> > >  arch/x86/xen/time.c   |  127 +-------------------------------------------
+> > 
+> > In going through some of the code, it looked like there might be a few little
+> > bits that you might be interested in pulling out of arch/ia64/xen/time.c as well.
+> 
+> ia64 in the hypervisor was deprecated and with the 4.3 release has been
+> removed.
+> 
+> AFAIK ia64/Xen support has been broken in the mainline kernel for year.
 
-Regards,
---Prabhakar
+Yes, that's why it didn't occur to me to do anything about it.
+
+Also, the ia64 code differs from the x86 code, I can't just replace it
+with the newly introduced common code unfortunately.
