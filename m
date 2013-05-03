@@ -1,49 +1,52 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  3 May 2013 15:32:07 +0100
-Subject: [PATCH 21/63] dmaengine: ste_dma40: Don't configure runtime
- configurable setup during allocate
+Date: Fri,  3 May 2013 15:32:08 +0100
+Subject: [PATCH 22/63] dmaengine: ste_dma40: Move rev error-check up to
+ revision acquisition
 In-Reply-To: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
 References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367591569-32197-22-git-send-email-lee.jones@linaro.org>
+Message-ID: <1367591569-32197-23-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the dmaengine API, allocating and configuring a channel are two
-separate actions. Here we're removing logical channel configuration from
-the channel allocating routines.
+At the moment we fetch the hardware revision, then do some stuff, then
+check whether the revision is correct and return in error if it's not.
+Well we may as well check it as soon as we know what it is, so let's
+move the check right up underneath where we acquire the version.
 
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <djbw@fb.com>
-Cc: Per Forlin <per.forlin@stericsson.com>
-Cc: Rabin Vincent <rabin@rab.in>
+Acked-by: Vinod Koul <vnod.koul@intel.com>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/dma/ste_dma40.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/dma/ste_dma40.c |   10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 8bff463..34e0fb0 100644
+index 34e0fb0..e5f0e3c 100644
 --- a/drivers/dma/ste_dma40.c
 +++ b/drivers/dma/ste_dma40.c
-@@ -2024,6 +2024,9 @@ static int d40_config_memcpy(struct d40_chan *d40c)
- 		d40c->dma_cfg = dma40_memcpy_conf_log;
- 		d40c->dma_cfg.dev_type = dma40_memcpy_channels[d40c->chan.chan_id];
+@@ -3198,6 +3198,10 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
+ 	 * DB8540v1 has revision 4
+ 	 */
+ 	rev = AMBA_REV_BITS(pid);
++	if (rev < 2) {
++		d40_err(&pdev->dev, "hardware revision: %d is not supported", rev);
++		goto failure;
++	}
  
-+		d40_log_cfg(&d40c->dma_cfg,
-+			    &d40c->log_def.lcsp1, &d40c->log_def.lcsp3);
-+
- 	} else if (dma_has_cap(DMA_MEMCPY, cap) &&
- 		   dma_has_cap(DMA_SLAVE, cap)) {
- 		d40c->dma_cfg = dma40_memcpy_conf_phy;
-@@ -2448,9 +2451,6 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
- 	d40_set_prio_realtime(d40c);
+ 	plat_data = pdev->dev.platform_data;
  
- 	if (chan_is_logical(d40c)) {
--		d40_log_cfg(&d40c->dma_cfg,
--			    &d40c->log_def.lcsp1, &d40c->log_def.lcsp3);
+@@ -3212,12 +3216,6 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
+ 	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with %d physical channels\n",
+ 		 rev, res->start, num_phy_chans);
+ 
+-	if (rev < 2) {
+-		d40_err(&pdev->dev, "hardware revision: %d is not supported",
+-			rev);
+-		goto failure;
+-	}
 -
- 		if (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM)
- 			d40c->lcpa = d40c->base->lcpa_base +
- 				d40c->dma_cfg.dev_type * D40_LCPA_CHAN_SIZE;
+ 	base = kzalloc(ALIGN(sizeof(struct d40_base), 4) +
+ 		       (num_phy_chans + num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) *
+ 		       sizeof(struct d40_chan), GFP_KERNEL);
 -- 
 1.7.10.4
