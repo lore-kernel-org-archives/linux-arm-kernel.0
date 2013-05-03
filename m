@@ -1,33 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 May 2013 23:16:13 +0200
-Subject: [PATCH 31/63] dmaengine: ste_dma40: Only use addresses passed as
- configuration information
-In-Reply-To: <1367591569-32197-32-git-send-email-lee.jones@linaro.org>
-References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
- <1367591569-32197-32-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZgPs1i=Lna41di97jZ2h-=_XzfZXMN8z9QFa-U-Avxog@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 3 May 2013 23:26:23 +0200
+Subject: [PATCH, RFC 14/22] oprofile: always enable IRQ_WORK
+In-Reply-To: <1367594095.7373.14.camel@gandalf.local.home>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <20130503115332.GT8356@rric.localhost>
+ <1367594095.7373.14.camel@gandalf.local.home>
+Message-ID: <201305032326.23973.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 3, 2013 at 4:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Friday 03 May 2013, Steven Rostedt wrote:
+> On Fri, 2013-05-03 at 13:53 +0200, Robert Richter wrote:
+> > On 02.05.13 17:16:18, Arnd Bergmann wrote:
+> > > oprofile fails to build if CONFIG_IRQ_WORK is not already enabled,
+> > > because of the dependency on the RING_BUFFER code that now uses
+> > > the irq work library.
+> > > 
+> > > kernel/built-in.o: In function `ring_buffer_unlock_commit':
+> > > :(.text+0x5b8f0): undefined reference to `irq_work_queue'
+> > > kernel/built-in.o: In function `ring_buffer_write':
+> > > :(.text+0x5bd10): undefined reference to `irq_work_queue'
+> > 
+> > Shouldn't this be fixed in the ring_buffer implementation?
+> 
+> Does this patch fix it?
+> 
 
-> Addresses are passed in from the client's driver via the invocation of
-> dmaengine_slave_config(), so there's no need to fetch them from platform
-> data too, hardwired or otherwise. This is a great step forward, as it
-> elevates a large burden from platform data in the way of a look-up
-> table.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-I get uncertain at this point and need Vinod's ACK so I stop
-applying patches here.
+Yes, this works, and looks much nicer than my version. Thanks!
 
-Please base further submissions on my ux500-dma40 branch to
-avoid resending already applied patches, if possible. (Atleast
-that make things convenient for me.)
-
-Is it possible to move patches with hairy dependencies
-toward the end of the series or something?
-
-Yours,
-Linus Walleij
+	Arnd
