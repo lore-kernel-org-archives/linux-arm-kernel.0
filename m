@@ -1,32 +1,54 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 3 May 2013 16:30:30 +0530
-Subject: [PATCH, RFC 21/22] davinci: vpfe_capture needs i2c
-In-Reply-To: <1367507786-505303-22-git-send-email-arnd@arndb.de>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-22-git-send-email-arnd@arndb.de>
-Message-ID: <CA+V-a8sUPwNZq6ed=75_Lq0x_-jy5x4cXcg8BYvZP7b0PQBpcg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 3 May 2013 12:04:24 +0100
+Subject: [PATCH 2/4] mfd: ab8500-gpadc: Suppress 'ignoring
+ regulator_enable() return value' warning
+In-Reply-To: <CACRpkdaf75sQduyfw58PFmC1ZyNDMxpwAf0OSyRLPP6vFc+wBQ@mail.gmail.com>
+References: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
+ <1367509690-24022-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaf75sQduyfw58PFmC1ZyNDMxpwAf0OSyRLPP6vFc+wBQ@mail.gmail.com>
+Message-ID: <20130503110424.GG24153@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Fri, 03 May 2013, Linus Walleij wrote:
 
-Thanks for the patch.
+> On Thu, May 2, 2013 at 5:48 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > drivers/mfd/ab8500-gpadc.c: In function ?ab8500_gpadc_resume?:
+> > drivers/mfd/ab8500-gpadc.c:911:18: warning: ignoring return value of
+> >         ?regulator_enable?, declared with attribute warn_unused_result
+> >         [-Wunused-result]
+> >
+> > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/mfd/ab8500-gpadc.c |    5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
+> > index 5e65b28..7278e53 100644
+> > --- a/drivers/mfd/ab8500-gpadc.c
+> > +++ b/drivers/mfd/ab8500-gpadc.c
+> > @@ -907,8 +907,11 @@ static int ab8500_gpadc_suspend(struct device *dev)
+> >  static int ab8500_gpadc_resume(struct device *dev)
+> >  {
+> >         struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
+> > +       int ret;
+> >
+> > -       regulator_enable(gpadc->regu);
+> > +       ret = regulator_enable(gpadc->regu);
+> > +       if (ret < 0)
+> > +               return ret;
+> >
+> >         pm_runtime_mark_last_busy(gpadc->dev);
+> >         pm_runtime_put_autosuspend(gpadc->dev);
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-On Thu, May 2, 2013 at 8:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The vpfe_capture driver is implicitly built for three of the davinci
-> capture drivers but depends on i2c, so we need to add the dependency
-> in Kconfig for each driver using this.
->
->  drivers/media/platform/davinci/vpfe_capture.c: In function 'vpfe_probe':
->  drivers/media/platform/davinci/vpfe_capture.c:1934:2: error: implicit declaration of function 'i2c_get_adapter' [-Werror=implicit-function-declaration]
->  drivers/media/platform/davinci/vpfe_capture.c:1934:11: warning: assignment makes pointer from integer without a cast [enabled by default]
->
-> Cc: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-> Cc: Hans Verkuil <hans.verkuil@cisco.com>
-> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+As it has your Ack, I'm going to add an error print as per Srinidhi's
+suggestion, test it again and apply this to my MFD tree.
 
-Acked-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
-
-Regards,
---Prabhakar Lad
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
