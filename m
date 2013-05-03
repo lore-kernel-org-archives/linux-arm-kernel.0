@@ -1,87 +1,176 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  3 May 2013 15:32:13 +0100
-Subject: [PATCH 27/63] ARM: ux500: Pass remnant platform data though to DMA40
- driver
+Date: Fri,  3 May 2013 15:32:12 +0100
+Subject: [PATCH 26/63] dmaengine: ste_dma40: Supply full Device Tree parsing
+ support
 In-Reply-To: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
 References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367591569-32197-28-git-send-email-lee.jones@linaro.org>
+Message-ID: <1367591569-32197-27-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ironically, in order to remove lots of the auxdata assignments, we have
-to add just one more. A lot of them require DMA information to be passed
-into clients for DMA channel allocation, but we now have this capability
-in Device Tree. However, the DMA40 driver still relies on a reverse table
-look-up to obtain DMA addresses. Until all of the clients are converted,
-over to the new API, we're stuck with this.
+Using the new DMA DT bindings and API, we can register the DMA40 driver
+as Device Tree capable. Now, when a client attempts to allocate a
+channel using the DMA DT bindings via its own node, we are able to parse
+the request and allocate a channel in the correct manner.
 
-Also, now the DMA40 has been DT:ed, there's no requirement to register
-it using traditional methods, so let's remove it.
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <djbw@fb.com>
+Cc: Per Forlin <per.forlin@stericsson.com>
+Cc: Rabin Vincent <rabin@rab.in>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: devicetree-discuss at lists.ozlabs.org
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.h   |    1 +
- arch/arm/mach-ux500/cpu-db8500.c     |   13 +++----------
- arch/arm/mach-ux500/devices-db8500.c |    2 +-
- 3 files changed, 5 insertions(+), 11 deletions(-)
+ .../devicetree/bindings/dma/ste-dma40.txt          |   62 ++++++++++++++++++++
+ drivers/dma/ste_dma40.c                            |   52 ++++++++++++++++
+ 2 files changed, 114 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/ste-dma40.txt
 
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index d38951b..2c5139d 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -93,6 +93,7 @@ extern struct amba_pl011_data uart0_plat;
- extern struct amba_pl011_data uart1_plat;
- extern struct amba_pl011_data uart2_plat;
- extern struct pl022_ssp_controller ssp0_plat;
-+extern struct stedma40_platform_data dma40_plat_data;
- 
- extern void mop500_sdi_init(struct device *parent);
- extern void snowball_sdi_init(struct device *parent);
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index d769459..b22faa8 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -229,16 +229,6 @@ static struct device * __init u8500_of_init_devices(void)
- 
- 	db8500_add_usb(parent, usb_db8500_dma_cfg, usb_db8500_dma_cfg);
- 
--	u8500_dma40_device.dev.parent = parent;
--
--	/*
--	 * Devices to be DT:ed:
--	 *   u8500_dma40_device  = todo
--	 *   db8500_pmu_device   = done
--	 *   db8500_prcmu_device = done
--	 */
--	platform_device_register(&u8500_dma40_device);
--
- 	return parent;
+diff --git a/Documentation/devicetree/bindings/dma/ste-dma40.txt b/Documentation/devicetree/bindings/dma/ste-dma40.txt
+new file mode 100644
+index 0000000..2679a87
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/ste-dma40.txt
+@@ -0,0 +1,62 @@
++* DMA40 DMA Controller
++
++Required properties:
++- compatible: "stericsson,dma40"
++- reg: Address range of the DMAC registers
++- reg-names: Names of the above areas to use during resource look-up
++- interrupt: Should contain the DMAC interrupt number
++- #dma-cells: must be <3>
++
++Optional properties:
++- dma-channels: Number of channels supported by hardware - if not present
++		the driver will attempt to obtain the information from H/W
++
++Example:
++
++	dma: dma-controller at 801C0000 {
++		compatible = "stericsson,db8500-dma40", "stericsson,dma40";
++		reg = <0x801C0000 0x1000  0x40010000 0x800>;
++		reg-names = "base", "lcpa";
++		interrupt-parent = <&intc>;
++		interrupts = <0 25 0x4>;
++
++		#dma-cells = <2>;
++		dma-channels = <8>;
++	};
++
++Clients
++Required properties:
++- dmas: Comma separated list of dma channel requests
++- dma-names: Names of the aforementioned requested channels
++
++Each dmas request consists of 4 cells:
++  1. A phandle pointing to the DMA controller
++  2. Device Type
++  3. The DMA request line number (only when 'use fixed channel' is set)
++  4. A 32bit mask specifying; mode, direction and endianess [NB: This list will grow]
++        0x00000001: Mode:
++                Logical channel when unset
++                Physical channel when set
++        0x00000002: Direction:
++                Memory to Device when unset
++                Device to Memory when set
++        0x00000004: Endianess:
++                Little endian when unset
++                Big endian when set
++        0x00000008: Use fixed channel:
++                Use automatic channel selection when unset
++                Use DMA request line number when set
++
++Example:
++
++	uart at 80120000 {
++		compatible = "arm,pl011", "arm,primecell";
++		reg = <0x80120000 0x1000>;
++		interrupts = <0 11 0x4>;
++
++		dmas = <&dma 13 0 0x2>, /* Logical - DevToMem */
++		       <&dma 13 0 0x0>; /* Logical - MemToDev */
++		dma-names = "rx", "rx";
++
++		status = "disabled";
++	};
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index d7c2397..b77d508 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -18,6 +18,7 @@
+ #include <linux/pm_runtime.h>
+ #include <linux/err.h>
+ #include <linux/of.h>
++#include <linux/of_dma.h>
+ #include <linux/amba/bus.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/platform_data/dma-ste-dma40.h>
+@@ -2419,6 +2420,50 @@ static void d40_set_prio_realtime(struct d40_chan *d40c)
+ 		__d40_set_prio_rt(d40c, d40c->dma_cfg.dev_type, false);
  }
  
-@@ -283,6 +273,9 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 		"ux500-msp-i2s.2", &msp2_platform_data),
- 	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80125000,
- 		"ux500-msp-i2s.3", &msp3_platform_data),
-+	/* Requires clock name bindings and channel address lookup table. */
-+	OF_DEV_AUXDATA("stericsson,db8500-dma40", 0x801C0000,
-+		       "dma40.0", &dma40_plat_data),
- 	{},
- };
++#define D40_DT_FLAGS_MODE(flags)       ((flags >> 0) & 0x1)
++#define D40_DT_FLAGS_DIR(flags)        ((flags >> 1) & 0x1)
++#define D40_DT_FLAGS_BIG_ENDIAN(flags) ((flags >> 2) & 0x1)
++#define D40_DT_FLAGS_FIXED_CHAN(flags) ((flags >> 3) & 0x1)
++
++static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
++				  struct of_dma *ofdma)
++{
++	struct stedma40_chan_cfg cfg;
++	dma_cap_mask_t cap;
++	u32 flags;
++
++	memset(&cfg, 0, sizeof(struct stedma40_chan_cfg));
++
++	dma_cap_zero(cap);
++	dma_cap_set(DMA_SLAVE, cap);
++
++	cfg.dev_type = dma_spec->args[0];
++	flags = dma_spec->args[2];
++
++	switch (D40_DT_FLAGS_MODE(flags)) {
++	case 0: cfg.mode = STEDMA40_MODE_LOGICAL; break;
++	case 1: cfg.mode = STEDMA40_MODE_PHYSICAL; break;
++	}
++
++	switch (D40_DT_FLAGS_DIR(flags)) {
++	case 0:
++		cfg.dir = STEDMA40_MEM_TO_PERIPH;
++		cfg.dst_info.big_endian = D40_DT_FLAGS_BIG_ENDIAN(flags);
++		break;
++	case 1:
++		cfg.dir = STEDMA40_PERIPH_TO_MEM;
++		cfg.src_info.big_endian = D40_DT_FLAGS_BIG_ENDIAN(flags);
++		break;
++	}
++
++	if (D40_DT_FLAGS_FIXED_CHAN(flags)) {
++		cfg.phy_channel = dma_spec->args[1];
++		cfg.use_fixed_channel = true;
++	}
++
++	return dma_request_channel(cap, stedma40_filter, &cfg);
++}
++
+ /* DMA ENGINE functions */
+ static int d40_alloc_chan_resources(struct dma_chan *chan)
+ {
+@@ -3632,6 +3677,13 @@ static int __init d40_probe(struct platform_device *pdev)
  
-diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
-index 99bc532..2bc4b5e 100644
---- a/arch/arm/mach-ux500/devices-db8500.c
-+++ b/arch/arm/mach-ux500/devices-db8500.c
-@@ -120,7 +120,7 @@ static const dma_addr_t dma40_rx_map[DB8500_DMA_NR_DEV] = {
- 	[DB8500_DMA_DEV48_CAC1] = U8500_CRYP1_BASE + CRYP1_RX_REG_OFFSET,
- };
+ 	d40_hw_init(base);
  
--static struct stedma40_platform_data dma40_plat_data = {
-+struct stedma40_platform_data dma40_plat_data = {
- 	.dev_rx = dma40_rx_map,
- 	.dev_tx = dma40_tx_map,
- 	.disabled_channels = {-1},
++	if (np) {
++		err = of_dma_controller_register(np, d40_xlate, NULL);
++		if (err && err != -ENODEV)
++			dev_err(&pdev->dev,
++				"could not register of_dma_controller\n");
++	}
++
+ 	dev_info(base->dev, "initialized\n");
+ 	return 0;
+ 
 -- 
 1.7.10.4
