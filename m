@@ -1,39 +1,49 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 03 May 2013 11:53:47 +0200
-Subject: [PATCH,
- RFC 01/22] can: move CONFIG_HAVE_CAN_FLEXCAN out of CAN_DEV
-In-Reply-To: <1367507786-505303-2-git-send-email-arnd@arndb.de>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-2-git-send-email-arnd@arndb.de>
-Message-ID: <5183892B.8020400@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 3 May 2013 15:25:32 +0530
+Subject: [PATCH 0/6] Davinci fbdev driver and enable it for DMx platform
+In-Reply-To: <CA+V-a8sLD2dP1RLb8ibZDOsLCP8hhMNUTr-zzU1zx_2ALDaDrg@mail.gmail.com>
+References: <1366804808-22720-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1780031.B4OAypccep@avalon>
+ <CA+V-a8sLD2dP1RLb8ibZDOsLCP8hhMNUTr-zzU1zx_2ALDaDrg@mail.gmail.com>
+Message-ID: <51838994.7070805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/02/2013 05:16 PM, Arnd Bergmann wrote:
-> CONFIG_HAVE_CAN_FLEXCAN is a silect symbol that is meant to be selected
-> by platforms that support this driver, but that is not possible without
-> also selecting CAN_DEV, unless we move it out of the "if CAN_DEV"
-> section of the Kconfig file.
+On 4/26/2013 11:16 AM, Prabhakar Lad wrote:
+> Hi Laurent,
 > 
-> warning: (SOC_IMX28 && SOC_IMX25 && SOC_IMX35 &&
->  IMX_HAVE_PLATFORM_FLEXCAN && SOC_IMX53 && SOC_IMX6Q) selects HAVE_CAN_FLEXCAN
->  which has unmet direct dependencies (NET && CAN && CAN_DEV)
+> On Thu, Apr 25, 2013 at 2:32 AM, Laurent Pinchart
+> <laurent.pinchart@ideasonboard.com> wrote:
+>> Hi Prabhakar,
+>>
+>> Thank you for the patch.
+>>
+>> On Wednesday 24 April 2013 17:30:02 Prabhakar Lad wrote:
+>>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>>
+>>> This patch series adds an fbdev driver for Texas
+>>> Instruments Davinci SoC.The display subsystem consists
+>>> of OSD and VENC, with OSD supporting 2 RGb planes and
+>>> 2 video planes.
+>>> http://focus.ti.com/general/docs/lit/
+>>> getliterature.tsp?literatureNumber=sprue37d&fileType=pdf
+>>>
+>>> A good amount of the OSD and VENC enabling code is
+>>> present in the kernel, and this patch series adds the
+>>> fbdev interface.
+>>>
+>>> The fbdev driver exports 4 nodes representing each
+>>> plane to the user - from fb0 to fb3.
+>>
+>> The obvious question is: why not a KMS driver instead ? :-)
+>>
+> I did go through the KMS model (thanks for pointing to your work and the video)
+> and it looks like this would require a fair amount of development, at this point
+> of time I would go with the current implementation and revisit on KMS model
+> at later point of time.
 
-With the advent of multi platform kernels I like to get rid of
-HAVE_CAN_FLEXCAN completely.
+But I doubt you will be able to sneak a new fbdev driver through. Last
+time I heard, Andrew is only taking in fixes not new features.
 
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130503/0c3ea060/attachment.sig>
+Thanks,
+Sekhar
