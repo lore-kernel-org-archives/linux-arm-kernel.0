@@ -1,44 +1,87 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  3 May 2013 15:32:10 +0100
-Subject: [PATCH 24/63] dmaengine: ste_dma40: Allocate plat_data on declaration
+Date: Fri,  3 May 2013 15:32:13 +0100
+Subject: [PATCH 27/63] ARM: ux500: Pass remnant platform data though to DMA40
+ driver
 In-Reply-To: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
 References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367591569-32197-25-git-send-email-lee.jones@linaro.org>
+Message-ID: <1367591569-32197-28-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's the way that most other drivers do it.
+Ironically, in order to remove lots of the auxdata assignments, we have
+to add just one more. A lot of them require DMA information to be passed
+into clients for DMA channel allocation, but we now have this capability
+in Device Tree. However, the DMA40 driver still relies on a reverse table
+look-up to obtain DMA addresses. Until all of the clients are converted,
+over to the new API, we're stuck with this.
 
-Very trivial clean-up which reduces line count and simplifies code.
+Also, now the DMA40 has been DT:ed, there's no requirement to register
+it using traditional methods, so let's remove it.
 
-Acked-by: Vinod Koul <vnod.koul@intel.com>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/dma/ste_dma40.c |    4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/mach-ux500/board-mop500.h   |    1 +
+ arch/arm/mach-ux500/cpu-db8500.c     |   13 +++----------
+ arch/arm/mach-ux500/devices-db8500.c |    2 +-
+ 3 files changed, 5 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 6d81f44..ba50561 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -3132,7 +3132,7 @@ static int __init d40_phy_res_init(struct d40_base *base)
+diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
+index d38951b..2c5139d 100644
+--- a/arch/arm/mach-ux500/board-mop500.h
++++ b/arch/arm/mach-ux500/board-mop500.h
+@@ -93,6 +93,7 @@ extern struct amba_pl011_data uart0_plat;
+ extern struct amba_pl011_data uart1_plat;
+ extern struct amba_pl011_data uart2_plat;
+ extern struct pl022_ssp_controller ssp0_plat;
++extern struct stedma40_platform_data dma40_plat_data;
  
- static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
- {
--	struct stedma40_platform_data *plat_data;
-+	struct stedma40_platform_data *plat_data = pdev->dev.platform_data;
- 	struct clk *clk = NULL;
- 	void __iomem *virtbase = NULL;
- 	struct resource *res = NULL;
-@@ -3203,8 +3203,6 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
- 		goto failure;
- 	}
+ extern void mop500_sdi_init(struct device *parent);
+ extern void snowball_sdi_init(struct device *parent);
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index d769459..b22faa8 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -229,16 +229,6 @@ static struct device * __init u8500_of_init_devices(void)
  
--	plat_data = pdev->dev.platform_data;
+ 	db8500_add_usb(parent, usb_db8500_dma_cfg, usb_db8500_dma_cfg);
+ 
+-	u8500_dma40_device.dev.parent = parent;
 -
- 	/* The number of physical channels on this HW */
- 	if (plat_data->num_of_phy_chans)
- 		num_phy_chans = plat_data->num_of_phy_chans;
+-	/*
+-	 * Devices to be DT:ed:
+-	 *   u8500_dma40_device  = todo
+-	 *   db8500_pmu_device   = done
+-	 *   db8500_prcmu_device = done
+-	 */
+-	platform_device_register(&u8500_dma40_device);
+-
+ 	return parent;
+ }
+ 
+@@ -283,6 +273,9 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 		"ux500-msp-i2s.2", &msp2_platform_data),
+ 	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80125000,
+ 		"ux500-msp-i2s.3", &msp3_platform_data),
++	/* Requires clock name bindings and channel address lookup table. */
++	OF_DEV_AUXDATA("stericsson,db8500-dma40", 0x801C0000,
++		       "dma40.0", &dma40_plat_data),
+ 	{},
+ };
+ 
+diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
+index 99bc532..2bc4b5e 100644
+--- a/arch/arm/mach-ux500/devices-db8500.c
++++ b/arch/arm/mach-ux500/devices-db8500.c
+@@ -120,7 +120,7 @@ static const dma_addr_t dma40_rx_map[DB8500_DMA_NR_DEV] = {
+ 	[DB8500_DMA_DEV48_CAC1] = U8500_CRYP1_BASE + CRYP1_RX_REG_OFFSET,
+ };
+ 
+-static struct stedma40_platform_data dma40_plat_data = {
++struct stedma40_platform_data dma40_plat_data = {
+ 	.dev_rx = dma40_rx_map,
+ 	.dev_tx = dma40_tx_map,
+ 	.disabled_channels = {-1},
 -- 
 1.7.10.4
