@@ -1,36 +1,48 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 May 2013 23:00:47 +0200
-Subject: [PATCH 26/63] dmaengine: ste_dma40: Supply full Device Tree
- parsing support
-In-Reply-To: <CACRpkdaj0RcZUJ9DX8D1v-MKecFs6ZwGjqD2gqaSFvP9QCbgGA@mail.gmail.com>
+Date: Fri, 3 May 2013 23:04:43 +0200
+Subject: [PATCH 16/63] ARM: ux500: Remove superfluous 'psize' attribute
+ from Audio platform data
+In-Reply-To: <20130503205934.GA20194@balto.lan>
 References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
- <1367591569-32197-27-git-send-email-lee.jones@linaro.org>
- <CACRpkdaj0RcZUJ9DX8D1v-MKecFs6ZwGjqD2gqaSFvP9QCbgGA@mail.gmail.com>
-Message-ID: <CACRpkdbB6mN6XTyceCZO9j6rAPawdTijM11-ws-23tnamGYz5A@mail.gmail.com>
+ <1367591569-32197-17-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYPDnvb+_TEf63NsW8ra0ciWAHmp-VHiXPumFJbL=PNXg@mail.gmail.com>
+ <20130503205934.GA20194@balto.lan>
+Message-ID: <CACRpkdaCtG2B-hJpNGHv=dd9=t+9SqUrQa1OWO3A727otVfuKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 3, 2013 at 10:59 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, May 3, 2013 at 4:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
->
->> Using the new DMA DT bindings and API, we can register the DMA40 driver
->> as Device Tree capable. Now, when a client attempts to allocate a
->> channel using the DMA DT bindings via its own node, we are able to parse
->> the request and allocate a channel in the correct manner.
+On Fri, May 3, 2013 at 10:59 PM, Fabio Baltieri
+<fabio.baltieri@linaro.org> wrote:
+> Hi Linus,
+> On Fri, May 03, 2013 at 10:13:22PM +0200, Linus Walleij wrote:
+>> On Fri, May 3, 2013 at 4:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
 >>
->> Cc: Vinod Koul <vinod.koul@intel.com>
->> Cc: Dan Williams <djbw@fb.com>
->> Cc: Per Forlin <per.forlin@stericsson.com>
->> Cc: Rabin Vincent <rabin@rab.in>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>> > 'psize' is used to calculate the maximum DMA burst size. However it
+>> > is only taken into consideration when editing the DMA channel's
+>> > configuration. The Audio DMA platform data is only used to allocate
+>> > a channel, not configure it. That will be done at a later date within
+>> > the MSP driver.
+>> >
+>> > We're also removing comments which are no longer required, as
+>> > 'data_width' is no longer set in any device's platform data period.
+>> >
+>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> Patch applied.
+>>
+>> Fabio: as I know you have audio working on the ux500
+>> with the mainline driver: could you confirm that this patch
+>> does not disturb the audio playback and provide a
+>> Tested-by?
 >
-> Applied to my ux500-dma40 branch.
+> Sure, I applied just this patch and it still works fine, tested on HREF
+> with speaker-test.
+> I have another non-related hack on dmaengine applied though, but Lee is
+> already aware of it so this is good for me:
+>
+> Tested-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 
-But hmmm would be really nice to have Vinod's ACK on this
-patch as well.
+Thanks! Much appreciated!
 
 Yours,
 Linus Walleij
