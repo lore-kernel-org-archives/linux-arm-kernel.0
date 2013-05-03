@@ -1,35 +1,51 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  3 May 2013 15:32:47 +0100
-Subject: [PATCH 61/63] ARM: ux500: Stop passing DMA platform data though
- AUXDATA
+Date: Fri,  3 May 2013 15:32:48 +0100
+Subject: [PATCH 62/63] dmaengine: ste_dma40: Fetch the number of physical
+ channels from DT
 In-Reply-To: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
 References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367591569-32197-62-git-send-email-lee.jones@linaro.org>
+Message-ID: <1367591569-32197-63-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DMA platform data is now empty due to some recent refactoring,
-so there is no longer a requirement to pass it though.
+Some platforms insist on obscure physical channel availability. This
+information is currently passed though platform data in internal BSP
+kernels. Once those platforms land, they'll need to configure them
+appropriately, so we may as well add the infrastructure.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <djbw@fb.com>
+Cc: Per Forlin <per.forlin@stericsson.com>
+Cc: Rabin Vincent <rabin@rab.in>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/dma/ste_dma40.c |    7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index a2c83c2..2b6cbde 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -264,8 +264,7 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80125000,
- 		"ux500-msp-i2s.3", &msp3_platform_data),
- 	/* Requires clock name bindings and channel address lookup table. */
--	OF_DEV_AUXDATA("stericsson,db8500-dma40", 0x801C0000,
--		       "dma40.0", &dma40_plat_data),
-+	OF_DEV_AUXDATA("stericsson,db8500-dma40", 0x801C0000, "dma40.0", NULL),
- 	{},
- };
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index bd5b156..ee96acb 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -3468,7 +3468,7 @@ static int __init d40_of_probe(struct platform_device *pdev,
+ 			       struct device_node *np)
+ {
+ 	struct stedma40_platform_data *pdata;
+-	int num_memcpy = 0;
++	int num_phy = 0, num_memcpy = 0;
+ 	const const __be32 *list;
+ 
+ 	pdata = devm_kzalloc(&pdev->dev,
+@@ -3477,6 +3477,11 @@ static int __init d40_of_probe(struct platform_device *pdev,
+ 	if (!pdata)
+ 		return -ENOMEM;
+ 
++	/* If absent this value will be obtained from h/w. */
++	of_property_read_u32(np, "dma-channels", &num_phy);
++	if (num_phy > 0)
++		pdata->num_of_phy_chans = num_phy;
++
+ 	list = of_get_property(np, "memcpy-channels", &num_memcpy);
+ 	num_memcpy /= sizeof(*list);
  
 -- 
 1.7.10.4
