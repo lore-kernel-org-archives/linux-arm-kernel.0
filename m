@@ -1,44 +1,53 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  3 May 2013 18:35:45 +0100
-Subject: [RFC PATCH 0/2] ARM: Remove any correlation between IPC and BogoMips
- value
-Message-ID: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
+Date: Fri,  3 May 2013 18:35:47 +0100
+Subject: [RFC PATCH 2/2] init: calibrate: don't print out bogomips value on
+ boot
+In-Reply-To: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
+References: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1367602547-19322-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+BogoMIPs is a confusing concept, so allow architectures to print it only
+if they find it worthwhile. The delay calibration code should stick to
+lpj and avoid trying to draw any correlation with BogoMIPs, which may be
+a fixed, bogus (geddit?) value.
 
-This small patch set may look a little over a month late, but there is a
-serious reason for posting it.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ init/calibrate.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-When I moved the ARM delay loop over to using the architected timers
-rather than the CPU spinning loop (which has all the problems associated
-with cpu frequency scaling and what-not) I thought I was doing something
-useful for the port. However, it turns out that a surprising number of
-people have complained, and continue to complain, about the drop in
-their `BogoMIPs score'.
-
-After some education, they usually give in, but I figured it could be
-solved by removing the reporting of this number to userspace altogether.
-Unfortunately, that affects the output of /proc/cpuinfo, which I'm not
-comfortable changing, so instead I've written this slightly tongue-in-cheek
-series reporting obviously bogus values in those fields in the hope that
-people don't interpret them as anything meaningful.
-
-Comments welcome,
-
-Will
-
-
-Will Deacon (2):
-  ARM: delay: print dummy values for bogomips
-  init: calibrate: don't print out bogomips value on boot
-
- arch/arm/Kconfig.debug  | 48 ++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/setup.c | 16 ++++++++--------
- arch/arm/kernel/smp.c   | 13 ++-----------
- init/calibrate.c        |  8 +++-----
- 4 files changed, 61 insertions(+), 24 deletions(-)
-
+diff --git a/init/calibrate.c b/init/calibrate.c
+index fda0a7b..cf48068 100644
+--- a/init/calibrate.c
++++ b/init/calibrate.c
+@@ -135,13 +135,13 @@ static unsigned long __cpuinit calibrate_delay_direct(void)
+ 		if ((measured_times[max] - estimate) <
+ 				(estimate - measured_times[min])) {
+ 			printk(KERN_NOTICE "calibrate_delay_direct() dropping "
+-					"min bogoMips estimate %d = %lu\n",
++					"min delay estimate %d = %lu\n",
+ 				min, measured_times[min]);
+ 			measured_times[min] = 0;
+ 			min = max;
+ 		} else {
+ 			printk(KERN_NOTICE "calibrate_delay_direct() dropping "
+-					"max bogoMips estimate %d = %lu\n",
++					"max delay estimate %d = %lu\n",
+ 				max, measured_times[max]);
+ 			measured_times[max] = 0;
+ 			max = min;
+@@ -292,9 +292,7 @@ void __cpuinit calibrate_delay(void)
+ 	}
+ 	per_cpu(cpu_loops_per_jiffy, this_cpu) = lpj;
+ 	if (!printed)
+-		pr_cont("%lu.%02lu BogoMIPS (lpj=%lu)\n",
+-			lpj/(500000/HZ),
+-			(lpj/(5000/HZ)) % 100, lpj);
++		pr_cont("lpj=%lu\n", lpj);
+ 
+ 	loops_per_jiffy = lpj;
+ 	printed = true;
 -- 
 1.8.2.2
