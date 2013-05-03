@@ -1,43 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 3 May 2013 12:15:37 +0100
-Subject: [PATCH 2/4 v2] mfd: ab8500-gpadc: Suppress 'ignoring
- regulator_enable() return value' warning
-In-Reply-To: <1367509690-24022-3-git-send-email-lee.jones@linaro.org>
-References: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
- <1367509690-24022-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130503111537.GH24153@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 3 May 2013 13:16:25 +0200
+Subject: [PATCH 1/5 v2] dmaengine: ste_dma40: Allow memcpy channels to be
+ configured from DT
+In-Reply-To: <20130501095243.GD25256@gmail.com>
+References: <1367336497-10650-1-git-send-email-lee.jones@linaro.org>
+ <20130501095243.GD25256@gmail.com>
+Message-ID: <CACRpkdZtOtnUYvLm7BPA98oMOLAMPHpJ9GLoyMXOKW1nsTDYiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/mfd/ab8500-gpadc.c: In function ?ab8500_gpadc_resume?:
-drivers/mfd/ab8500-gpadc.c:911:18: warning: ignoring return value of
-        ?regulator_enable?, declared with attribute warn_unused_result
-        [-Wunused-result]
+On Wed, May 1, 2013 at 11:52 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> At this moment in time the memcpy channels which can be used by the D40
+> are fixed, as each supported platform in Mainline uses the same ones.
+> However, platforms do exist which don't follow this convention, so
+> these will need to be tailored. Fortunately, these platforms will be DT
+> only, so this change has very little impact on platform data.
+>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Per Forlin <per.forlin@stericsson.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-diff --git a/drivers/mfd/ab8500-gpadc.c b/drivers/mfd/ab8500-gpadc.c
-index 5e65b28..13f7866 100644
---- a/drivers/mfd/ab8500-gpadc.c
-+++ b/drivers/mfd/ab8500-gpadc.c
-@@ -907,14 +907,17 @@ static int ab8500_gpadc_suspend(struct device *dev)
- static int ab8500_gpadc_resume(struct device *dev)
- {
- 	struct ab8500_gpadc *gpadc = dev_get_drvdata(dev);
-+	int ret;
- 
--	regulator_enable(gpadc->regu);
-+	ret = regulator_enable(gpadc->regu);
-+	if (ret)
-+		dev_err(dev, "Failed to enable vtvout LDO: %d\n", ret);
- 
- 	pm_runtime_mark_last_busy(gpadc->dev);
- 	pm_runtime_put_autosuspend(gpadc->dev);
- 
- 	mutex_unlock(&gpadc->ab8500_gpadc_lock);
--	return 0;
-+	return ret;
- }
- 
- static int ab8500_gpadc_probe(struct platform_device *pdev)
+Real nice!
+
+But can you split this in two patches: one that changes
+drivers/dma/ste_dma40* and one sequel patch that changes
+Documentation/* and arch/arm/boot/dts/* so I can merge them
+out-of-order?
+
+I am trying this development cycle to split changes to the
+device trees and bindings off from the rest of the patches
+becaused it caused me a mess last cycle.
+
+Yours,
+Linus Walleij
