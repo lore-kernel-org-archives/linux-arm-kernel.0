@@ -1,50 +1,47 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  3 May 2013 15:32:18 +0100
-Subject: [PATCH 32/63] dmaengine: ste_dma40: Remove redundant address fetching
- function
+Date: Fri,  3 May 2013 15:32:21 +0100
+Subject: [PATCH 35/63] ARM: ux500: Remove unnecessary attributes from DMA
+ channel request pdata
 In-Reply-To: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
 References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367591569-32197-33-git-send-email-lee.jones@linaro.org>
+Message-ID: <1367591569-32197-36-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Addresses are now stored in local data structures and are easy to
-obtain, thus a specialist function used to fetch them is now surplus
-to requirement.
+DMA data width and packet size information is only required at channel
+configuration time. Any information passed from platform data is passed
+directly to the DMA40 driver to use during channel allocation, but these
+pieces of information are subsequently ignored by the driver, so we may
+as well remove them.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/dma/ste_dma40.c |   18 ------------------
- 1 file changed, 18 deletions(-)
+ arch/arm/mach-ux500/usb.c |    8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 3ff6ea4..555d851 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -2253,24 +2253,6 @@ err:
- 	return NULL;
- }
+diff --git a/arch/arm/mach-ux500/usb.c b/arch/arm/mach-ux500/usb.c
+index e0ea490..821703d 100644
+--- a/arch/arm/mach-ux500/usb.c
++++ b/arch/arm/mach-ux500/usb.c
+@@ -15,19 +15,11 @@
+ #define MUSB_DMA40_RX_CH { \
+ 		.mode = STEDMA40_MODE_LOGICAL, \
+ 		.dir = STEDMA40_PERIPH_TO_MEM, \
+-		.src_info.data_width = STEDMA40_WORD_WIDTH, \
+-		.dst_info.data_width = STEDMA40_WORD_WIDTH, \
+-		.src_info.psize = STEDMA40_PSIZE_LOG_16, \
+-		.dst_info.psize = STEDMA40_PSIZE_LOG_16, \
+ 	}
  
--static dma_addr_t
--d40_get_dev_addr(struct d40_chan *chan, enum dma_transfer_direction direction)
--{
--	struct stedma40_platform_data *plat = chan->base->plat_data;
--	struct stedma40_chan_cfg *cfg = &chan->dma_cfg;
--	dma_addr_t addr = 0;
--
--	if (chan->runtime_addr)
--		return chan->runtime_addr;
--
--	if (direction == DMA_DEV_TO_MEM)
--		addr = plat->dev_rx[cfg->dev_type];
--	else if (direction == DMA_MEM_TO_DEV)
--		addr = plat->dev_tx[cfg->dev_type];
--
--	return addr;
--}
--
- static struct dma_async_tx_descriptor *
- d40_prep_sg(struct dma_chan *dchan, struct scatterlist *sg_src,
- 	    struct scatterlist *sg_dst, unsigned int sg_len,
+ #define MUSB_DMA40_TX_CH { \
+ 		.mode = STEDMA40_MODE_LOGICAL, \
+ 		.dir = STEDMA40_MEM_TO_PERIPH, \
+-		.src_info.data_width = STEDMA40_WORD_WIDTH, \
+-		.dst_info.data_width = STEDMA40_WORD_WIDTH, \
+-		.src_info.psize = STEDMA40_PSIZE_LOG_16, \
+-		.dst_info.psize = STEDMA40_PSIZE_LOG_16, \
+ 	}
+ 
+ static struct stedma40_chan_cfg musb_dma_rx_ch[UX500_MUSB_DMA_NUM_RX_CHANNELS]
 -- 
 1.7.10.4
