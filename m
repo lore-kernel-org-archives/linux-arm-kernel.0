@@ -1,34 +1,40 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 3 May 2013 07:03:50 -0500
-Subject: [PATCH v3 1/5] regulator: Introduce TI Adaptive Body Bias(ABB)
- on-chip LDO driver
-In-Reply-To: <20130503090258.GG4945@sirena.org.uk>
-References: <1367515215-30753-1-git-send-email-nm@ti.com>
- <1367515215-30753-2-git-send-email-nm@ti.com>
- <20130503090258.GG4945@sirena.org.uk>
-Message-ID: <20130503120349.GA2735@snafu>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 3 May 2013 17:36:53 +0530
+Subject: [PATCH 1/9] ARM: tegra: Tegra114 needs CPU_FREQ_TABLE
+In-Reply-To: <2416484.HHc7d0zNGR@wuerfel>
+References: <1367528578-518090-1-git-send-email-arnd@arndb.de>
+ <1367528578-518090-2-git-send-email-arnd@arndb.de>
+ <CAOh2x==i-_+30mmMp=WkcCQn4qm1-nGfWpPuQnScvRQVd=h+LA@mail.gmail.com>
+ <2416484.HHc7d0zNGR@wuerfel>
+Message-ID: <CAKohpokKGi_nKYbZqvNW64fbEFdbtbmhvcVY93F3ONtWuffvug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-On 10:02-20130503, Mark Brown wrote:
-> On Thu, May 02, 2013 at 12:20:10PM -0500, Nishanth Menon wrote:
-> > From: "Andrii.Tseglytskyi" <andrii.tseglytskyi@ti.com>
-> > 
-> > Adaptive Body Biasing (ABB) modulates transistor bias voltages
-> > dynamically in order to optimize switching speed versus leakage.
-> 
-> I've applied this but please note that I still have deep concerns about
-> some of the discussion about controlling this from other regulators.
-Thanks for the merge.
+On 3 May 2013 16:50, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 03 May 2013 10:27:17 Viresh Kumar wrote:
+>> > diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+>> > index 597e76b..9878503 100644
+>> > --- a/arch/arm/mach-tegra/Kconfig
+>> > +++ b/arch/arm/mach-tegra/Kconfig
+>> > @@ -63,6 +63,7 @@ config ARCH_TEGRA_114_SOC
+>> >         select ARM_ARCH_TIMER
+>> >         select ARM_GIC
+>> >         select ARM_L1_CACHE_SHIFT_6
+>> > +       select CPU_FREQ_TABLE if CPU_FREQ
+>> >         select CPU_V7
+>> >         select PINCTRL
+>> >         select PINCTRL_TEGRA114
+>>
+>> I doubt which is the best place for doing this? This one or
+>> cpufreq/Kconfig.arm with select CPU_FREQ_TABLE for
+>> tegra?
+>
+> It would be much better IMHO to have an entry for TEGRA_CPUFREQ
+> in drivers/cpufreq/Kcofnig.arm and move the select there. However,
+> creating that entry has some (small) regression potential and I
+> didn't want to do that now but instead just made sure that all
+> three Tegra SoCs do the same thing for now.
 
-We don't have any further plans of pursuing the concept of regulator
-chaining for upstream. After an off-line chat with Mike T, we are
-planning on introducing OMAP specific notifier hooks to clock
-framework. This should allow us to do the appropriate sequencing
-necessary to control AVS, regulators for ABB and PMIC in the right
-sequence.
+I was under the impression that this entry is already there.
 
--- 
-Regards,
-Nishanth Menon
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
