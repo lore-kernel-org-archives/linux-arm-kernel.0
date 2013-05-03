@@ -1,55 +1,47 @@
-From: jjo.braun@gmail.com (Johannes Braun)
-Date: Fri, 3 May 2013 13:56:00 +0200
-Subject: Freescale imx35: sgtl5000 codec not working over i2c
-In-Reply-To: <20130503093948.GT32299@pengutronix.de>
-References: <20130502200024.72c112cc@jobraun>
- <20130502181821.GC31135@pengutronix.de>
- <20130502204020.0462f080@jobraun>
- <20130503093948.GT32299@pengutronix.de>
-Message-ID: <CADwvPCtK_4gMHggP0mN2yqCLHzFY7EC9EnK8CpEHr87E=pkMPQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 3 May 2013 12:57:39 +0100
+Subject: [PATCH 1/5 v2] dmaengine: ste_dma40: Allow memcpy channels to be
+ configured from DT
+In-Reply-To: <CACRpkdZtOtnUYvLm7BPA98oMOLAMPHpJ9GLoyMXOKW1nsTDYiQ@mail.gmail.com>
+References: <1367336497-10650-1-git-send-email-lee.jones@linaro.org>
+ <20130501095243.GD25256@gmail.com>
+ <CACRpkdZtOtnUYvLm7BPA98oMOLAMPHpJ9GLoyMXOKW1nsTDYiQ@mail.gmail.com>
+Message-ID: <20130503115739.GJ24153@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> With "sgtl5000" at least sgtl5000_i2c_probe should be called.
+On Fri, 03 May 2013, Linus Walleij wrote:
 
-Ok my fault. I did not see the i2c probe mehtod. I checked whether
-sgtl5000_i2c_probe is called or not and I can confirm that the method
-was passed successfully. I tested it with several kernel log messages.
+> On Wed, May 1, 2013 at 11:52 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > At this moment in time the memcpy channels which can be used by the D40
+> > are fixed, as each supported platform in Mainline uses the same ones.
+> > However, platforms do exist which don't follow this convention, so
+> > these will need to be tailored. Fortunately, these platforms will be DT
+> > only, so this change has very little impact on platform data.
+> >
+> > Cc: Vinod Koul <vinod.koul@intel.com>
+> > Cc: Dan Williams <djbw@fb.com>
+> > Cc: Per Forlin <per.forlin@stericsson.com>
+> > Cc: Rabin Vincent <rabin@rab.in>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Real nice!
+> 
+> But can you split this in two patches: one that changes
+> drivers/dma/ste_dma40* and one sequel patch that changes
+> Documentation/* and arch/arm/boot/dts/* so I can merge them
+> out-of-order?
+> 
+> I am trying this development cycle to split changes to the
+> device trees and bindings off from the rest of the patches
+> becaused it caused me a mess last cycle.
 
-> Is the i.MX I2C driver registered correctly. What's in /sys/bus/i2c/devices/?
+I was under the impression that the documentation went with the
+bindings, rather than the Device Tree. Am I wrong?
 
-I think so. The following devices are shown:
-ls -la /sys/bus/i2c/devices/
-lrwxrwxrwx 1 root root 0 Jan  1  1970 0-000a ->
-../../../devices/platform/imx-i2c.0/i2c-0/0-000a/
-lrwxrwxrwx 1 root root 0 Jan  1  1970 i2c-0 ->
-../../../devices/platform/imx-i2c.0/i2c-0/
-lrwxrwxrwx 1 root root 0 Jan  1  1970 i2c-2 ->
-../../../devices/platform/imx-i2c.2/i2c-2/
-
-Also I am able to probe the bus via i2cdetect. This is the result:
-root at generic-armv6:~$ i2cdetect 0
-WARNING! This program can confuse your I2C bus, cause data loss and worse!
-I will probe file /dev/i2c-0.
-I will probe address range 0x03-0x77.
-Continue? [Y/n]
-     0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-00:          -- -- -- -- -- -- -- UU -- -- -- -- --
-10: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-20: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-30: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-40: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-50: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-60: -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
-70: -- -- -- -- -- -- -- --
-
-UU shows that this device is use by a driver.
-
-> you won't need much more than something similar to
-> arch/arm/mach-imx/imx25-dt.c and an auxdata table for the clock lookups.
-> There even is pinctrl support.
-
-I will check this out.
-
----
-Johannes
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
