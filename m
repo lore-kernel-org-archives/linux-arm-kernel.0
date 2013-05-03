@@ -1,46 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 May 2013 21:04:28 +0200
-Subject: [GIT PULL] Two ux500 fixes for the v3.10 series
-Message-ID: <CACRpkdYeWi2cx2weXao9=2f78eM0_J=gK-8o6gKjcG7pjYFAxA@mail.gmail.com>
+From: holt@sgi.com (Robin Holt)
+Date: Fri, 3 May 2013 14:05:14 -0500
+Subject: [PATCH -v7 0/11] Shutdown from reboot_cpuid without stopping
+ other cpus.
+In-Reply-To: <20130502180535.GZ14496@n2100.arm.linux.org.uk>
+References: <1367428011-17123-1-git-send-email-holt@sgi.com>
+ <20130501231347.GT14496@n2100.arm.linux.org.uk>
+ <20130502033952.GU3658@sgi.com>
+ <20130502180535.GZ14496@n2100.arm.linux.org.uk>
+Message-ID: <20130503190514.GH3658@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+On Thu, May 02, 2013 at 07:05:35PM +0100, Russell King - ARM Linux wrote:
+> On Wed, May 01, 2013 at 10:39:52PM -0500, Robin Holt wrote:
+> > On Thu, May 02, 2013 at 12:13:47AM +0100, Russell King - ARM Linux wrote:
+> > > On Wed, May 01, 2013 at 12:06:40PM -0500, Robin Holt wrote:
+> > > > Andrew, Please do _NOT_ take this patch series yet.  I am sending this
+> > > > to you because you had comments on my -v6 submission.
+> > > 
+> > > Another reason for not applying this is that I believe it wilfully breaks
+> > > a bunch of ARM platforms - such as removing the 'g' reboot mode (for gpio
+> > > based reboot on PXA), and removing the 's' reboot mode off a bunch of ARM
+> > > platforms which have no way to do a hard reboot.
+> > 
+> > I am not sure what your basis for this statement is.
+> 
+> Probably old understanding of the code, and me getting old and getting
+> forgetful. :(
 
-here are two ux500 fixes for the v3.10 series, please pull
-them in. Since -rc1 is not out this is based on Torvald's
-HEAD from yesterday.
+Russell,
 
-Yours,
-Linus Walleij
+Are you alright with these patches?
 
-The following changes since commit ce857229e0c3adc211944a13a5579ef84fd7b4af:
-
-  ipc: fix GETALL/IPC_RM race for sysv semaphores (2013-05-02 19:51:31 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-fixes-for-v3.10-1
-
-for you to fetch changes up to 9b7a2104e7e5dd02210ac26f5dc488ceb29778f7:
-
-  ARM: ux500: Rid ignored return value of regulator_enable() compiler
-warning (2013-05-03 10:27:12 +0200)
-
-----------------------------------------------------------------
-Two ux500 fixes for the v3.10 series:
-- SoC ID fix
-- Fix errorpath for proximity regulator
-
-----------------------------------------------------------------
-Fabio Baltieri (1):
-      ARM: ux500: read the correct soc_id number
-
-Lee Jones (1):
-      ARM: ux500: Rid ignored return value of regulator_enable()
-compiler warning
-
- arch/arm/mach-ux500/board-mop500.c | 4 ++--
- arch/arm/mach-ux500/cpu-db8500.c   | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+Thanks,
+Robin
