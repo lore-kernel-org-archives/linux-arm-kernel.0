@@ -1,51 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 03 May 2013 11:54:34 +0100
-Subject: [Xen-devel] [PATCH 1/3] arm_arch_timer: introduce
- arch_timer_stolen_ticks
-In-Reply-To: <alpine.DEB.2.02.1305031130210.5398@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
- <1367436460-10183-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <51817CBE.4050003@codeaurora.org>
- <1367482772.21869.26.camel@zakaz.uk.xensource.com>
- <5182DBA9.9080609@codeaurora.org>
- <alpine.DEB.2.02.1305031130210.5398@kaball.uk.xensource.com>
-Message-ID: <5183976A.6000703@arm.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 3 May 2013 16:30:30 +0530
+Subject: [PATCH, RFC 21/22] davinci: vpfe_capture needs i2c
+In-Reply-To: <1367507786-505303-22-git-send-email-arnd@arndb.de>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-22-git-send-email-arnd@arndb.de>
+Message-ID: <CA+V-a8sUPwNZq6ed=75_Lq0x_-jy5x4cXcg8BYvZP7b0PQBpcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/05/13 11:43, Stefano Stabellini wrote:
-> On Thu, 2 May 2013, Christopher Covington wrote:
->>> So the virtual timer should appear to have been running even while time
->>> is being stolen and therefore stolen time needs to be accounted via some
->>> other means.
->>
->> Something that's not currently obvious to me is that given that the stolen
->> cycle accounting should be done, what makes the architected timer interrupt
->> handler the ideal place to do it?
-> 
-> That is a good question and I would appreciate suggestions to improve
-> the patch.
-> 
-> Given that Xen x86 and ia64 does stolen time accounting from the timer
-> interrupt handler:
-> 
-> arch/x86/xen/time.c:xen_timer_interrupt
-> arch/ia64/kernel/time.c:timer_interrupt
-> 
-> and given that the arch_timer is the only timer used by Xen on ARM and
-> that it includes a virt_timer that is made on purpose to be used by
-> virtual machines, I thought that it might be a good place for it.
-> 
-> I also thought that doing it this way, KVM should be able to reuse the
-> same hook.
+Hi Arnd,
 
-Indeed. I just need to understand how time stealing works there ;-).
+Thanks for the patch.
 
-Now, KVM is not necessarily limited to arch_timers, and we've run KVM
-using a QEMU-provided timer in the past. Can you think of a more generic
-location for this hook? Possibly something that would satisfy the
-requirements of other architectures while we're at it?
+On Thu, May 2, 2013 at 8:46 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> The vpfe_capture driver is implicitly built for three of the davinci
+> capture drivers but depends on i2c, so we need to add the dependency
+> in Kconfig for each driver using this.
+>
+>  drivers/media/platform/davinci/vpfe_capture.c: In function 'vpfe_probe':
+>  drivers/media/platform/davinci/vpfe_capture.c:1934:2: error: implicit declaration of function 'i2c_get_adapter' [-Werror=implicit-function-declaration]
+>  drivers/media/platform/davinci/vpfe_capture.c:1934:11: warning: assignment makes pointer from integer without a cast [enabled by default]
+>
+> Cc: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> Cc: Hans Verkuil <hans.verkuil@cisco.com>
+> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Acked-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+
+Regards,
+--Prabhakar Lad
