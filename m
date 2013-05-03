@@ -1,111 +1,44 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  3 May 2013 15:32:11 +0100
-Subject: [PATCH 25/63] dmaengine: ste_dma40: Allow driver to be probe()able
- when DT is enabled
+Date: Fri,  3 May 2013 15:32:10 +0100
+Subject: [PATCH 24/63] dmaengine: ste_dma40: Allocate plat_data on declaration
 In-Reply-To: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
 References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1367591569-32197-26-git-send-email-lee.jones@linaro.org>
+Message-ID: <1367591569-32197-25-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting using Device Tree, devices aren't registered in the normal
-way. Instead, they need to be provided with a compatible string which is
-held in an OF Match Table for comparison during start-up. Here we provide
-the compatible string and prepare the driver to not receive a platform
-data pointer.
+It's the way that most other drivers do it.
+
+Very trivial clean-up which reduces line count and simplifies code.
 
 Acked-by: Vinod Koul <vnod.koul@intel.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
 Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/dma/ste_dma40.c |   46 ++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 44 insertions(+), 2 deletions(-)
+ drivers/dma/ste_dma40.c |    4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index ba50561..d7c2397 100644
+index 6d81f44..ba50561 100644
 --- a/drivers/dma/ste_dma40.c
 +++ b/drivers/dma/ste_dma40.c
-@@ -17,6 +17,7 @@
- #include <linux/pm.h>
- #include <linux/pm_runtime.h>
- #include <linux/err.h>
-+#include <linux/of.h>
- #include <linux/amba/bus.h>
- #include <linux/regulator/consumer.h>
- #include <linux/platform_data/dma-ste-dma40.h>
-@@ -3465,17 +3466,52 @@ failure:
- 	return ret;
- }
+@@ -3132,7 +3132,7 @@ static int __init d40_phy_res_init(struct d40_base *base)
  
-+static int __init d40_of_probe(struct platform_device *pdev,
-+			       struct device_node *np)
-+{
-+	struct stedma40_platform_data *pdata;
-+ 
-+	/*
-+	 * FIXME: Fill in this routine as more support is added.
-+	 * First platform enabled (u8500) doens't need any extra
-+	 * properties to run, so this is fairly sparce currently.
-+	 */
-+
-+	pdata = devm_kzalloc(&pdev->dev,
-+			     sizeof(struct stedma40_platform_data),
-+			     GFP_KERNEL);
-+	if (!pdata)
-+		return -ENOMEM;
-+
-+	pdev->dev.platform_data = pdata;
-+
-+	return 0;
-+}
-+
- static int __init d40_probe(struct platform_device *pdev)
+ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
  {
+-	struct stedma40_platform_data *plat_data;
 +	struct stedma40_platform_data *plat_data = pdev->dev.platform_data;
-+	struct device_node *np = pdev->dev.of_node;
- 	int err;
- 	int ret = -ENOENT;
--	struct d40_base *base;
-+	struct d40_base *base = NULL;
+ 	struct clk *clk = NULL;
+ 	void __iomem *virtbase = NULL;
  	struct resource *res = NULL;
- 	int num_reserved_chans;
- 	u32 val;
- 
--	base = d40_hw_detect_init(pdev);
-+	if (!plat_data) {
-+		if (np) {
-+			if(d40_of_probe(pdev, np)) {
-+				ret = -ENOMEM;
-+				goto failure;
-+			}
-+		} else {
-+			d40_err(&pdev->dev, "No pdata or Device Tree provided\n");
-+			goto failure;
-+		}
-+	}
- 
-+	base = d40_hw_detect_init(pdev);
- 	if (!base)
+@@ -3203,8 +3203,6 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
  		goto failure;
+ 	}
  
-@@ -3649,11 +3685,17 @@ failure:
- 	return ret;
- }
- 
-+static const struct of_device_id d40_match[] = {
-+        { .compatible = "stericsson,dma40", },
-+        {}
-+};
-+
- static struct platform_driver d40_driver = {
- 	.driver = {
- 		.owner = THIS_MODULE,
- 		.name  = D40_NAME,
- 		.pm = DMA40_PM_OPS,
-+		.of_match_table = d40_match,
- 	},
- };
- 
+-	plat_data = pdev->dev.platform_data;
+-
+ 	/* The number of physical channels on this HW */
+ 	if (plat_data->num_of_phy_chans)
+ 		num_phy_chans = plat_data->num_of_phy_chans;
 -- 
 1.7.10.4
