@@ -1,31 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 May 2013 17:24:15 +0200
-Subject: [PATCH,
- RFC 01/22] can: move CONFIG_HAVE_CAN_FLEXCAN out of CAN_DEV
-In-Reply-To: <5183892B.8020400@pengutronix.de>
+Date: Fri, 3 May 2013 17:29:17 +0200
+Subject: [PATCH, RFC 09/22] crypto: lz4: don't build on ARM
+In-Reply-To: <OF54831661.2286D403-ON49257B5F.00831E7A-49257B5F.00831E7D@lge.com>
 References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-2-git-send-email-arnd@arndb.de>
- <5183892B.8020400@pengutronix.de>
-Message-ID: <201305031724.15584.arnd@arndb.de>
+ <OF54831661.2286D403-ON49257B5F.00831E7A-49257B5F.00831E7D@lge.com>
+Message-ID: <201305031729.17360.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 May 2013, Marc Kleine-Budde wrote:
-> On 05/02/2013 05:16 PM, Arnd Bergmann wrote:
-> > CONFIG_HAVE_CAN_FLEXCAN is a silect symbol that is meant to be selected
-> > by platforms that support this driver, but that is not possible without
-> > also selecting CAN_DEV, unless we move it out of the "if CAN_DEV"
-> > section of the Kconfig file.
-> > 
-> > warning: (SOC_IMX28 && SOC_IMX25 && SOC_IMX35 &&
-> >  IMX_HAVE_PLATFORM_FLEXCAN && SOC_IMX53 && SOC_IMX6Q) selects HAVE_CAN_FLEXCAN
-> >  which has unmet direct dependencies (NET && CAN && CAN_DEV)
+On Friday 03 May 2013, Chanho Min wrote:
+> >It is not currently possible to build the LZ4 code on ARM, so let's
+> >remove that option in Kconfig for now.
+> >
+> >lib/built-in.o: In function `lz4_compress64kctx':
+> > lib/lz4/lz4_compress.c:339: undefined reference to `__ctzsi2'
+> >lib/built-in.o: In function `lz4_compressctx':
+> > lib/lz4/lz4_compress.c:157: undefined reference to `__ctzsi2'
+> >lib/built-in.o: In function `lz4hc_commonlength':
+> > lib/lz4/lz4hc_compress.c:102: undefined reference to `__ctzsi2'
+> > lib/lz4/lz4hc_compress.c:102: undefined reference to `__ctzsi2'
+> >lib/built-in.o: In function `lz4hc_insertandgetwidermatch':
+> > lib/lz4/lz4hc_compress.c:230: undefined reference to `__ctzsi2'
 > 
-> With the advent of multi platform kernels I like to get rid of
-> HAVE_CAN_FLEXCAN completely.
+> Please, let me know the gcc version and tested defconfig.
+> I didn't have any problem to build with gcc 4.6.4 on armv7.
+> Some architecture need libgcc functions for __builtin_clz/ctz.
+> Porting them to lib is in progress:
+> http://marc.info/?l=linux-kernel&amp;m=136748861811956&amp;w=2
+> But, It doesn't happen on ARM, PowerPC and x86.
 
-Yes, good idea. Are there any other dependencies we need to add then?
-I assume FLEXCAN needs to depend on HAS_IOMEM and OF at least, but
-there might be more.
+I tested with gcc-4.8 and random configurations. I've tried it
+again now and can't reproduce it at the moment. I'll try building
+more random configurations until I have nailed down the problem.
+
+Sorry about this, I should have been more careful about my
+original conclusion here.
 
 	Arnd
