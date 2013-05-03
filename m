@@ -1,75 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 03 May 2013 15:56:42 +0200
-Subject: [PATCH 9/9] ARM: ux500: always select ABX500_CORE
-In-Reply-To: <CACRpkdaNd0Ej-bM0MaXNdyHeWWH0CMi+mKKvtV5-891OFETtEA@mail.gmail.com>
-References: <1367528578-518090-1-git-send-email-arnd@arndb.de>
- <1883078.Smcmxe7hlB@wuerfel>
- <CACRpkdaNd0Ej-bM0MaXNdyHeWWH0CMi+mKKvtV5-891OFETtEA@mail.gmail.com>
-Message-ID: <1500795.gEuGziRZET@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 3 May 2013 15:57:27 +0200
+Subject: [PATCH 12/32] ARM: ux500: Remove superfluous 'psize' attribute
+ from Audio platform data
+In-Reply-To: <20130502083849.GH25256@gmail.com>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-13-git-send-email-lee.jones@linaro.org>
+ <20130501144213.GG25256@gmail.com>
+ <20130502083849.GH25256@gmail.com>
+Message-ID: <CACRpkdYbqU=bHrzf6Vpv-KFYN_+z6+y1ocNHtkLEO7ihHEd=dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 May 2013 15:33:17 Linus Walleij wrote:
-> On Fri, May 3, 2013 at 2:48 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Thu, May 2, 2013 at 10:38 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> > This leavs the debugging
-> > interface as the only sub-option. Do you know if that is
-> > actually being used by developers, or is this one of those interfaces
-> > that were created during bringup and then never touched again
-> > after everything worked?
-> 
-> Something like that, but as long as new platforms using that
-> ASIC is coming out it remains quite usable for this.
-> 
-> It is also used for hardware validation, where you hook up the
-> system with a lot of electric probes and want to set specific
-> bits here and there to validate functionality. There just a minor
-> change to the silicon or packaging triggers such re-validation.
-> 
-> The usecase is similar to the debug interface we invented for
-> pin control recently, however there we managed to make things
-> centralized.
+>> > 'psize' is used to calculate the maximum DMA burst size. However it
+>> > is only taken into consideration when editing the DMA channel's
+>> > configuration. The Audio DMA platform data is only used to allocate
+>> > a channel, not configure it. That will be done at a later date within
+>> > the MSP driver.
+>> >
+>> > We're also removing comments which are no longer required, as
+>> > 'data_width' is no longer set in any device's platform data period.
+>> >
+>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Ok, makes sense.
+>> Linus Walleij wrote:
+>> So if I understand correctly this is now handled by dmaengine_pcm.c,
+>> os that right?
+>
+> Unfortunately not. At the moment ux500 sound is very broken in
+> Mainline. I looked at it recently and the driver is almost completely
+> different to the one maintained internally.
 
-> > Regarding AB3100, I assume the relationship to U300 is similar to
-> > that between DB8500 and AB8500. Are you able to boot a U300 system
-> > without touching AB3100?
-> 
-> I would say no. The system will be in some bootstrap state unless
-> you bring up the AB3100, and especially the regulators.
-> 
-> These are default y but should arguably be selected y
-> instead.
-> 
-> The U300 SoC will bootstrap power in a strange way until the
-> regulators are up, and then hand over to software-controlled
-> regulators for powering the SoC and release that bootstrap.
-> 
-> This is not harmful but a very strange and it's doubtful whether
-> I would call that "fully booted". It's something like booting
-> into "safe mode"
-> http://en.wikipedia.org/wiki/Safe_mode
+I was more thinking that the dmaengine_pcm.c which appears
+to have its functions called from the ux500 ASoC driver should
+do the calls to slave config to set up proper DMA characteristics
+for the channel.
 
-I see.
+Maybe that part is in the MSP driver as you say, is that so?
 
-> Not enabling regulators on the U300 will have other strange
-> effects ... like MMC/SD not working. Yet we can not have
-> depends on REGULATORS in the Kconfig for the MMCI driver
-> since this driver is also used on systems without the regulator
-> framework (hardwired power).
-> 
-> All these run-time "makes sense" is in a bit of flux as compared
-> to config-and-compile-time "makes sense" unfortunately.
-> 
-> I lean toward selecting AB3100 and REGULATOR_AB3100
-> for the U300 actually.
+> There were DMA changes relating to this driver pending for v3.10,
+> which I believe have just been taking into -next. I will straighten
+> out the DMA issues shortly, but there are other ones remaining still -
+> mostly surrounding widgets. Ideally this is something Ola should fix,
+> as he has the expertise to do so, but he doesn't appear to have been
+> very active upstream of late.
 
-Should we still allow building them on other platforms then?
-Right now, these depend on the platforms that actually use
-the hardware, but in other places, we just allow everything to
-be built that compiles without errors.
-Is it theoretically possible to use the AB in combination with
-another (non-ST-Ericsson) digital baseband?
+IIRC there are also patches from Fabio to this stuff so I'm
+a bit confused, but if the intention is to merge this through
+ASoC with some other stuff, by all means:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-	Arnd
+Yours,
+Linus Walleij
