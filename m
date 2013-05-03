@@ -1,48 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 3 May 2013 09:51:00 +0100
-Subject: [PATCH V2] ARM: bcm281xx: Add L2 support for Rev A2 chips
-In-Reply-To: <1367542653-955-1-git-send-email-csd@broadcom.com>
-References: <1367542653-955-1-git-send-email-csd@broadcom.com>
-Message-ID: <20130503085100.GA6188@mudshark.cambridge.arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 3 May 2013 10:51:50 +0200
+Subject: [PATCH] clk: ux500: clk-sysctrl: handle clocks with no parents
+In-Reply-To: <1367325906-23045-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1367325906-23045-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <CAPDyKFpZ+-6b3kPyNacPQ33=Ssdjs=fvFxkr4iSUT_hm1YzVTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christian,
+On 30 April 2013 14:45, Fabio Baltieri <fabio.baltieri@linaro.org> wrote:
+> Fix clk_reg_sysctrl() to set main clock registers of new struct
+> clk_sysctrl even if the registered clock has no parents.
+>
+> This fixes an issue where "ulpclk" was registered with all clk->reg_*
+> fields uninitialized, causing a -EINVAL error from clk_prepare().
+>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> ---
+>  drivers/clk/ux500/clk-sysctrl.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/ux500/clk-sysctrl.c b/drivers/clk/ux500/clk-sysctrl.c
+> index bc7e9bd..e364c9d 100644
+> --- a/drivers/clk/ux500/clk-sysctrl.c
+> +++ b/drivers/clk/ux500/clk-sysctrl.c
+> @@ -145,7 +145,13 @@ static struct clk *clk_reg_sysctrl(struct device *dev,
+>                 return ERR_PTR(-ENOMEM);
+>         }
+>
+> -       for (i = 0; i < num_parents; i++) {
+> +       /* set main clock registers */
+> +       clk->reg_sel[0] = reg_sel[0];
+> +       clk->reg_bits[0] = reg_bits[0];
+> +       clk->reg_mask[0] = reg_mask[0];
+> +
+> +       /* handle clocks with more than one parent */
+> +       for (i = 1; i < num_parents; i++) {
+>                 clk->reg_sel[i] = reg_sel[i];
+>                 clk->reg_bits[i] = reg_bits[i];
+>                 clk->reg_mask[i] = reg_mask[i];
+> --
+> 1.8.2
+>
 
-On Fri, May 03, 2013 at 01:57:33AM +0100, Christian Daudt wrote:
-> Rev A2 SoCs have an unorthodox memory re-mapping and this needs
-> to be reflected in the cache operations.
-> This patch adds new outer cache functions for the l2x0 driver
-> to support this SoC revision. It also adds a new compatible
-> value for the cache to enable this functionality.
-> 
-> Updates from V1:
-> - remove section 1 altogether and note that in comments
-> - simplify section selection caused by section 1 removal
-> - BUG_ON just in case section 1 shows up
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 
-Looking much better now :)
+This is bugfix, should go "stable" as well?
 
-> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-> index c465fac..d70e0ab 100644
-> --- a/arch/arm/mm/cache-l2x0.c
-> +++ b/arch/arm/mm/cache-l2x0.c
-> @@ -523,6 +523,147 @@ static void aurora_flush_range(unsigned long start, unsigned long end)
->  	}
->  }
->  
-> +/*
-> + * For certain Broadcom SoCs, depending on the address range, different offsets
-> + * need to be added to the address before passing it to L2 for
-> + * invalidation/clean/flush
-> + *
-> + * Section Address Range              Offset        EMI
-> + *   1     0x00000000 - 0x3FFFFFFF    0x80000000    VC
-> + *   2     0x40000000 - 0xBFFFFFFF    0x40000000    SYS
-> + *   3     0xC0000000 - 0xFFFFFFFF    0x80000000    VC
-
-I don't think you answered last time (or I missed it) but where is the RAM
-in the physical memory map for boards with this L2 controller? Do you
-actually have 3GB at 0x40000000?
-
-Will
+Kind regards
+Ulf Hansson
