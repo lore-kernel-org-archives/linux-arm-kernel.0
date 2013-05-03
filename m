@@ -1,97 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 3 May 2013 11:38:19 +0100
-Subject: [PATCH 3/4] mmc: mmci: Ensure return value of regulator_enable()
- is checked
-In-Reply-To: <CAPDyKFqKP0sSBwZtcnH4tfPxSik5+GOVE-6tTBYaK5Qhvr3=4A@mail.gmail.com>
-References: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
- <1367509690-24022-4-git-send-email-lee.jones@linaro.org>
- <CAPDyKFr60-nuh-BFsWtFhNeqUmswKC4hL4mw-gDhiqLmarvEDA@mail.gmail.com>
- <20130503081633.GD24153@gmail.com>
- <CAPDyKFqKP0sSBwZtcnH4tfPxSik5+GOVE-6tTBYaK5Qhvr3=4A@mail.gmail.com>
-Message-ID: <20130503103819.GE24153@gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 3 May 2013 11:43:23 +0100
+Subject: [Xen-devel] [PATCH 1/3] arm_arch_timer: introduce
+ arch_timer_stolen_ticks
+In-Reply-To: <5182DBA9.9080609@codeaurora.org>
+References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
+ <1367436460-10183-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <51817CBE.4050003@codeaurora.org>
+ <1367482772.21869.26.camel@zakaz.uk.xensource.com>
+ <5182DBA9.9080609@codeaurora.org>
+Message-ID: <alpine.DEB.2.02.1305031130210.5398@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 03 May 2013, Ulf Hansson wrote:
-
-> On 3 May 2013 10:16, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Fri, 03 May 2013, Ulf Hansson wrote:
-> >
-> >> On 2 May 2013 17:48, Lee Jones <lee.jones@linaro.org> wrote:
-> >> > This patch suppresses the warning below:
-> >> >
-> >> > drivers/mmc/host/mmci.c: In function ?mmci_set_ios?:
-> >> > drivers/mmc/host/mmci.c:1165:20: warning: ignoring return value of
-> >> >         ?regulator_enable?, declared with attribute warn_unused_result
-> >> >         [-Wunused-result]
-> >> >
-> >> > Cc: Russell King <linux@arm.linux.org.uk>
-> >> > Cc: Chris Ball <cjb@laptop.org>
-> >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >> > ---
-> >> >  drivers/mmc/host/mmci.c |    9 +++++++--
-> >> >  1 file changed, 7 insertions(+), 2 deletions(-)
-> >> >
-> >> > diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> >> > index 375c109..f4f3038 100644
-> >> > --- a/drivers/mmc/host/mmci.c
-> >> > +++ b/drivers/mmc/host/mmci.c
-> >> > @@ -1130,6 +1130,7 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
-> >> >         struct variant_data *variant = host->variant;
-> >> >         u32 pwr = 0;
-> >> >         unsigned long flags;
-> >> > +       int ret;
-> >> >
-> >> >         pm_runtime_get_sync(mmc_dev(mmc));
-> >> >
-> >> > @@ -1161,8 +1162,12 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
-> >> >                 break;
-> >> >         case MMC_POWER_ON:
-> >> >                 if (!IS_ERR(mmc->supply.vqmmc) &&
-> >> > -                   !regulator_is_enabled(mmc->supply.vqmmc))
-> >>
-> >> I realize that we actually have a bug here (and in the MMC_POWER_OFF
-> >> mode as well).
-> >>
-> >> We shall not use regulator_is_enabled API as a trigger to enable/fetch
-> >> a reference to the regulator, since it will only tell us if the
-> >> regulator is enabled - hw wise.
-> >> Instead we need a local variable in the mmci host struct keeping track
-> >> if we have enabled the regulator. Do you mind fix this up in this
-> >> patch as well since it is tightly coupled to the regulator handling!?
-> >
-> > IMHO I think that should be taken care of in a separate patch. This
-> > patch only touches the line containing regulator_is_enabled() to
-> > encompass a multi-line comparison result.
-> >
-> > Care to write that patch? I have so much on my TODO already. :|
+On Thu, 2 May 2013, Christopher Covington wrote:
+> > So the virtual timer should appear to have been running even while time
+> > is being stolen and therefore stolen time needs to be accounted via some
+> > other means.
 > 
-> Sure, I can fix it.
-> 
-> I guess this patch will be going through Russell's patch tracker?
+> Something that's not currently obvious to me is that given that the stolen
+> cycle accounting should be done, what makes the architected timer interrupt
+> handler the ideal place to do it?
 
-Yeah, I'll queue this and another one I have in a bit.
+That is a good question and I would appreciate suggestions to improve
+the patch.
 
-> >> Otherwise it looks good to me.
-> >>
-> >> Kind regards
-> >> Ulf Hansson
-> >>
-> >> > -                       regulator_enable(mmc->supply.vqmmc);
-> >> > +                   !regulator_is_enabled(mmc->supply.vqmmc)) {
-> >> > +                       ret = regulator_enable(mmc->supply.vqmmc);
-> >> > +                       if (ret < 0)
-> >> > +                               dev_err(mmc_dev(mmc),
-> >> > +                                       "failed to enable vqmmc regulator\n");
-> >> > +               }
-> >> >
-> >> >                 pwr |= MCI_PWR_ON;
-> >> >                 break;
-> >> >
-> >
+Given that Xen x86 and ia64 does stolen time accounting from the timer
+interrupt handler:
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+arch/x86/xen/time.c:xen_timer_interrupt
+arch/ia64/kernel/time.c:timer_interrupt
+
+and given that the arch_timer is the only timer used by Xen on ARM and
+that it includes a virt_timer that is made on purpose to be used by
+virtual machines, I thought that it might be a good place for it.
+
+I also thought that doing it this way, KVM should be able to reuse the
+same hook.
