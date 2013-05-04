@@ -1,53 +1,54 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Sat, 4 May 2013 16:21:27 +0800
-Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <20130503100242.GB29962@arm.com>
-References: <20130418112201.GQ14496@n2100.arm.linux.org.uk>
- <20130418114016.GG27197@titan.lakedaemon.net>
- <20130418135104.GA18616@arm.com>
- <20130421220629.GA25571@schnuecks.de>
- <20130430112225.GD29766@arm.com>
- <20130430210403.GA18076@schnuecks.de>
- <20130501142206.GB17387@arm.com>
- <20130501190441.GA22227@schnuecks.de>
- <20130502095431.GA20730@arm.com>
- <20130502193835.GA29144@schnuecks.de>
- <20130503100242.GB29962@arm.com>
-Message-ID: <CACVXFVPOuabwAa1VDmSnfDG=M-1Df02_kpbm0UVAVctCAB-U4Q@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 4 May 2013 20:35:56 +0800
+Subject: [PATCH, RFC 04/22] staging/drm: imx: add missing dependencies
+In-Reply-To: <201305031721.37954.arnd@arndb.de>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-5-git-send-email-arnd@arndb.de>
+ <20130503021650.GL3442@S2101-09.ap.freescale.net>
+ <201305031721.37954.arnd@arndb.de>
+Message-ID: <20130504123555.GA1749@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 3, 2013 at 6:02 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->>
->> I assume that you inhibited the call to flush_dcache_page() in
->> __get_user_pages() for anon pages.  Otherwise, you will be flooded
->> with warnings.
->
-> I haven't done any stress testing so I don't think I hit this code path,
-> so no warning. But yes, it should have triggered. Anyway, in this case
-> flush_dcache_page() should have just ignored (clearing PG_arch_1 is
-> harmless anyway if we also ignore this bit in __sync_icache_dcache for
-> non-aliasing caches).
+On Fri, May 03, 2013 at 05:21:37PM +0200, Arnd Bergmann wrote:
+> On Friday 03 May 2013, Shawn Guo wrote:
+> > On Thu, May 02, 2013 at 05:16:08PM +0200, Arnd Bergmann wrote:
+> > > The imx DRM driver needs a couple of extra Kconfig dependencies
+> > > to avoid random build failures:
+> > > 
+> > > drivers/staging/imx-drm/ipuv3-crtc.c:448:
+> > >  undefined reference to `ipu_idmac_put'
+> > >  drivers/staging/imx-drm/ipuv3-crtc.c:450: undefined reference to
+> > >  `ipu_dmfc_put' drivers/staging/imx-drm/ipuv3-crtc.c:452:
+> > >  undefined reference to `ipu_dp_put'
+> > >  drivers/staging/imx-drm/ipuv3-crtc.c:454: undefined reference to
+> > >  `ipu_di_put'
+> > > drivers/built-in.o: In function `ipu_probe':
+> > >  :(.text+0x4b4174): undefined reference to `device_reset'
+> > > drivers/built-in.o: In function `imx_tve_probe':
+> > >  drivers/staging/imx-drm/imx-tve.c:648: undefined reference to
+> > >  `devm_regmap_init_mmio_clk'
+> > > drivers/built-in.o: In function
+> > >  `imx_pd_connector_get_modes':
+> > 
+> > >  drivers/staging/imx-drm/parallel-display.c:78: undefined
+> > >  reference to `of_get_drm_display_mode'
+> > 
+> > There is a patch [1] from Marek fixing this one.
+> > 
+> > Shawn
+> > 
+> > [1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/233449
+> > 
+> 
+> That patch only addresses one of the four missing dependencies.
+> I originally had four separate patches, but did not want to
+> bother everyone with those so I combined them into one.
 
-Yes, maybe we can do a little optimization for O_DIRECT since no
-dcache alias and I/D coherency problem in this case on ARMv7, how
-about below change?
+Yea, I agree we can address all of them in one patch.  But it seems
+people agreed that there is a more correct way [1] to fix
+of_get_drm_display_mode one, and that's how v2 of Marek's patch comes.
 
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index 1c8f7f5..962a657 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -287,6 +287,8 @@ void flush_dcache_page(struct page *page)
- 	    mapping && !mapping_mapped(mapping))
- 		clear_bit(PG_dcache_clean, &page->flags);
- 	else {
-+		if (!mapping && cache_is_vipt_nonaliasing())
-+			return;
- 		__flush_dcache_page(mapping, page);
- 		if (mapping && cache_is_vivt())
- 			__flush_dcache_aliases(mapping, page);
+Shawn
 
-Thanks,
--- 
-Ming Lei
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/232861/focus=232898
