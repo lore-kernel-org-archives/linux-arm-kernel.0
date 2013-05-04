@@ -1,39 +1,39 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sat, 04 May 2013 19:44:42 +0200
-Subject: [PATCH] ARM: ixp4xx: change type of ioremap function
-In-Reply-To: <1367514566-30831-1-git-send-email-lauraa@codeaurora.org> (Laura
- Abbott's message of "Thu, 2 May 2013 10:09:26 -0700")
-References: <1367514566-30831-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <m3sj22prlh.fsf@intrepid.localdomain>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 4 May 2013 13:58:39 -0400
+Subject: [PATCH] irqchip: add support for Marvell Orion SoCs
+In-Reply-To: <5182C322.3030304@gmail.com>
+References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130502185322.GA29333@obsidianresearch.com>
+ <5182B902.7040908@gmail.com>
+ <20130502193510.GA29522@obsidianresearch.com>
+ <5182C322.3030304@gmail.com>
+Message-ID: <20130504175839.GM31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laura Abbott <lauraa@codeaurora.org> writes:
+On Thu, May 02, 2013 at 09:48:50PM +0200, Sebastian Hesselbarth wrote:
+> On 05/02/2013 09:35 PM, Jason Gunthorpe wrote:
+> >I have kirkwood HW but I haven't had time to make newer kernels run on
+> >it, otherwise I'd test it too :(
+> 
+> I also have kirkwood HW but that will cut me from email as I use it as
+> relay server ;) Maybe I can turn it into a test bed for a while.
+> 
+> There is also Orion5x and Discovery Innovation (mv78xx0) to be tested.
+> 
+> @Jason Cooper: I will merge both irqchip and dove patches into one
+> patch set. I wasn't earlier because I didn't want the above SoCs to
+> slow down patch integration. And I will split dtsi changes into
+> separate patches as requested.
 
-> Commit cd024d4245b2bfbd824b911f11a9756d1d6c167d
-> (ARM: 7704/1: mm: Use phys_addr_t properly for ioremap functions)
-> changed the type of the ioremap functions to actually use phys_addr_t
-> instead of unsigned long. Change the type of the arch_ioremap function
-> to use phys_addr_t as well.
->
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Understood.  I'd prefer to keep patches developed together in the same
+series, that way, discussions about who is taking what and which patch
+depends on what are all in the same thread of the archives.
 
-Acked-by: Krzysztof Halasa <khc@pm.waw.pl>
+It's difficult because some series (eg pcie) touch many different areas
+and _need_ to be kept together because of the chain of dependencies.
+Most other series though, aren't in that situation.
 
->
-> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-> index 1dbeb7c..659768b 100644
-> --- a/arch/arm/mach-ixp4xx/common.c
-> +++ b/arch/arm/mach-ixp4xx/common.c
-> @@ -558,7 +558,7 @@ void ixp4xx_restart(char mode, const char *cmd)
->   * fallback to the default.
->   */
->  
-> -static void __iomem *ixp4xx_ioremap_caller(unsigned long addr, size_t size,
-> +static void __iomem *ixp4xx_ioremap_caller(phys_addr_t addr, size_t size,
->  					   unsigned int mtype, void *caller)
->  {
->  	if (!is_pci_memory(addr))
+thx,
 
--- 
-Krzysztof Halasa
+Jason.
