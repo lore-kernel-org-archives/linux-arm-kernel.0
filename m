@@ -1,30 +1,85 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 04 May 2013 04:37:24 +0200
-Subject: [RFC patch 8/8] irqchip: sun4i: Convert to generic irq chip
-In-Reply-To: <20130503214629.880345092@linutronix.de>
-References: <alpine.LFD.2.02.1305031514230.2886@ionos>
- <20130503212258.385818955@linutronix.de>
- <20130503214629.880345092@linutronix.de>
-Message-ID: <51847464.8040802@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sat, 4 May 2013 12:09:40 +0530
+Subject: [PATCH,
+ RFC 02/22] cpufreq: ARM_DT_BL_CPUFREQ needs ARM_CPU_TOPOLOGY
+In-Reply-To: <1367507786-505303-3-git-send-email-arnd@arndb.de>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-3-git-send-email-arnd@arndb.de>
+Message-ID: <CAKohponuYRm+D-FU5_7Ny1PPmwUhFLm9DkAR9iHURur+GFq_kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2013 11:50 PM, Thomas Gleixner wrote:
- > Proof of concept patch to demonstrate the new irqdomain support for
- > the generic irq chip. Untested !!
- >
- > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
- > Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
- > ---
-...
- > +		gc->reg_base = sun4i_irq_base;
- > +		gc->chip_types[0].regs.mask = SUN4I_IRQ_ENABLE_REG(i);
- > +		gc->chip_types[0].regs.ack = SUN4I_IRQ_PENDING_REG(i);
- > +		gc->chip_types[0].chip.mask = irq_gc_mask_clr_bit;
- > +		gc->chip_types[0].chip.ack = irq_gc_ack_set_bit;
- > +		gc->chip_types[0].chip.unmask = irq_gc_mask_set_bit;
+On 2 May 2013 20:46, Arnd Bergmann <arnd@arndb.de> wrote:
+> The big.LITTLE cpufreq driver uses the CPU topology API, which
+> needs to be reflected in Kconfig to prevent broken configurations.
+>
+> warning: (ARM_DT_BL_CPUFREQ) selects ARM_BIG_LITTLE_CPUFREQ which
+> has unmet direct dependencies (ARCH_HAS_CPUFREQ && CPU_FREQ && ARM && ARM_CPU_TOPOLOGY)
+>
+> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: cpufreq at vger.kernel.org
+> Cc: linux-pm at vger.kernel.org
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/cpufreq/Kconfig.arm | 1 +
+>  1 file changed, 1 insertion(+)
 
-To help Maxime debug, the three callbacks must be prepended by irq_,
-i.e. chip.irq_mask, ...
+With all the discussions we had, please see if you can replace your
+patch with this one (Attached too for applying, copy/paste in gmail
+will break it):
 
-Sebastian
+From: Viresh Kumar <viresh.kumar@linaro.org>
+Date: Sat, 4 May 2013 12:03:54 +0530
+Subject: [PATCH] cpufreq: ARM big LITTLE: Fix Kconfig entries
+
+This fixes usage of "depends on" and "select" options in Kconfig for ARM big
+LITTLE cpufreq driver. Otherwise we get these warnings:
+
+warning: (ARM_DT_BL_CPUFREQ) selects ARM_BIG_LITTLE_CPUFREQ which
+has unmet direct dependencies (ARCH_HAS_CPUFREQ && CPU_FREQ && ARM &&
+ARM_CPU_TOPOLOGY)
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/cpufreq/Kconfig.arm | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index 634e992..a924408 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -3,17 +3,17 @@
+ #
+
+ config ARM_BIG_LITTLE_CPUFREQ
+-	tristate
+-	depends on ARM_CPU_TOPOLOGY
+-	select PM_OPP
++	tristate "Generic ARM big LITTLE CPUfreq driver"
++	depends on ARM_CPU_TOPOLOGY && PM_OPP && HAVE_CLK
++	help
++	  This enables the Generic CPUfreq driver for ARM big.LITTLE platforms.
+
+ config ARM_DT_BL_CPUFREQ
+-	tristate "Generic ARM big LITTLE CPUfreq driver probed via DT"
+-	select ARM_BIG_LITTLE_CPUFREQ
+-	depends on OF && HAVE_CLK
++	tristate "Generic probing via DT for ARM big LITTLE CPUfreq driver"
++	depends on ARM_BIG_LITTLE_CPUFREQ && OF
+ 	help
+-	  This enables the Generic CPUfreq driver for ARM big.LITTLE platform.
+-	  This gets frequency tables from DT.
++	  This enables probing via DT for Generic CPUfreq driver for ARM
++	  big.LITTLE platform. This gets frequency tables from DT.
+
+ config ARM_EXYNOS_CPUFREQ
+ 	bool "SAMSUNG EXYNOS SoCs"
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-cpufreq-ARM-big-LITTLE-Fix-Kconfig-entries.patch
+Type: application/octet-stream
+Size: 1866 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130504/984b8769/attachment.obj>
