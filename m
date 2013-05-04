@@ -1,45 +1,41 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 4 May 2013 14:36:24 -0400
-Subject: [PATCH 2/3] ARM: dove: add DT parsing for legacy timer
-In-Reply-To: <1367519140-19716-3-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1367519140-19716-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1367519140-19716-3-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130504183624.GR31290@titan.lakedaemon.net>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Sun, 5 May 2013 00:18:04 +0530
+Subject: [PATCH] ARM: OMAP2+: AM33xx: Add missing reset status info to GFX
+ hwmod
+Message-ID: <1367693284-7870-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 08:25:39PM +0200, Sebastian Hesselbarth wrote:
-> To allow to move to orion irqchip driver, existing legacy devices
-> have to map their irqs. This patch adds a node for orion timer and
-> some init code to map the corresponding irqs. While the device tree
-> node can stay, the init code will vanish as soon as there is true
-> device tree support for orion timer.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Rob Landley <rob@landley.net>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> Cc: Jean-Francois Moine <moinejf@free.fr>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/boot/dts/dove.dtsi   |    7 ++++++
->  arch/arm/mach-dove/board-dt.c |   42 +++++++++++++++++++++++++++++++++++-----
->  2 files changed, 43 insertions(+), 6 deletions(-)
+GFX has a reset status register (PRM_GFX.RM_GFX_RSTST),
+so update the GFX hwmod data with .rstst_off and .st_shift
+information.
 
-Same for the rest of these, please.
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-thx,
-
-Jason.
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index d1cf3ab..38c7b04 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -329,7 +329,7 @@ static struct omap_hwmod_class am33xx_gfx_hwmod_class = {
+ };
+ 
+ static struct omap_hwmod_rst_info am33xx_gfx_resets[] = {
+-	{ .name = "gfx", .rst_shift = 0 },
++	{ .name = "gfx", .rst_shift = 0, .st_shift = 0},
+ };
+ 
+ static struct omap_hwmod_irq_info am33xx_gfx_irqs[] = {
+@@ -347,6 +347,7 @@ static struct omap_hwmod am33xx_gfx_hwmod = {
+ 		.omap4	= {
+ 			.clkctrl_offs	= AM33XX_CM_GFX_GFX_CLKCTRL_OFFSET,
+ 			.rstctrl_offs	= AM33XX_RM_GFX_RSTCTRL_OFFSET,
++			.rstst_offs	= AM33XX_RM_GFX_RSTST_OFFSET,
+ 			.modulemode	= MODULEMODE_SWCTRL,
+ 		},
+ 	},
+-- 
+1.7.0.4
