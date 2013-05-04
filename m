@@ -1,38 +1,39 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 4 May 2013 13:58:39 -0400
+Date: Sat, 4 May 2013 14:12:27 -0400
 Subject: [PATCH] irqchip: add support for Marvell Orion SoCs
-In-Reply-To: <5182C322.3030304@gmail.com>
+In-Reply-To: <5182EAA0.9070208@gmail.com>
 References: <1367519104-19677-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130502185322.GA29333@obsidianresearch.com>
- <5182B902.7040908@gmail.com>
- <20130502193510.GA29522@obsidianresearch.com>
- <5182C322.3030304@gmail.com>
-Message-ID: <20130504175839.GM31290@titan.lakedaemon.net>
+ <alpine.LFD.2.02.1305022324371.2891@ionos>
+ <5182E11E.5010103@gmail.com> <201305030009.57041.arnd@arndb.de>
+ <5182EAA0.9070208@gmail.com>
+Message-ID: <20130504181227.GN31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 09:48:50PM +0200, Sebastian Hesselbarth wrote:
-> On 05/02/2013 09:35 PM, Jason Gunthorpe wrote:
-> >I have kirkwood HW but I haven't had time to make newer kernels run on
-> >it, otherwise I'd test it too :(
-> 
-> I also have kirkwood HW but that will cut me from email as I use it as
-> relay server ;) Maybe I can turn it into a test bed for a while.
-> 
-> There is also Orion5x and Discovery Innovation (mv78xx0) to be tested.
-> 
-> @Jason Cooper: I will merge both irqchip and dove patches into one
-> patch set. I wasn't earlier because I didn't want the above SoCs to
-> slow down patch integration. And I will split dtsi changes into
-> separate patches as requested.
+On Fri, May 03, 2013 at 12:37:20AM +0200, Sebastian Hesselbarth wrote:
+> (@Jason C: Are you sure that I should merge dove and orion
+> irqchip patches? I doubt that anything touching generic irq
+> will not go through irq tree.)
 
-Understood.  I'd prefer to keep patches developed together in the same
-series, that way, discussions about who is taking what and which patch
-depends on what are all in the same thread of the archives.
+Putting them in the same patch series does not imply they have to go
+through the same tree.  But it *does* allow us to see relationships,
+conflicts, etc.
 
-It's difficult because some series (eg pcie) touch many different areas
-and _need_ to be kept together because of the chain of dependencies.
-Most other series though, aren't in that situation.
+Based on how the finally dependencies work out, we may ask the irq
+maintainers for an Ack to take it through arm-soc.  This would happen if
+we can't remove the dependency between the trees.  The resulting
+potential merge conflicts weigh into it, and that's where the irqchip
+maintainer's Ack get decided.
+
+If the changes to irqchip are just Makefile/Kconfig, then it's easy.
+However, if several other files are changed and conflicting, then we let
+it go through irqchip and wait one merge window for the board changes
+depending on it.
+
+The goal here is to identify and remove branch dependencies within
+arm-soc and between arm-soc and other trees.  A secondary goal is to
+identify high-risk series (risk of being dropped), and keep them
+in separate branches from other changes.
 
 thx,
 
