@@ -1,81 +1,53 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 4 May 2013 10:04:32 +0200 (CEST)
-Subject: [RFC patch 7/8] genirq: generic chip: Add linear irq domain
- support
-In-Reply-To: <518472C4.5080209@gmail.com>
-References: <alpine.LFD.2.02.1305031514230.2886@ionos>
- <20130503212258.385818955@linutronix.de>
- <20130503214629.810207749@linutronix.de> <518472C4.5080209@gmail.com>
-Message-ID: <alpine.LFD.2.02.1305040959060.8869@ionos>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Sat, 4 May 2013 16:21:27 +0800
+Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <20130503100242.GB29962@arm.com>
+References: <20130418112201.GQ14496@n2100.arm.linux.org.uk>
+ <20130418114016.GG27197@titan.lakedaemon.net>
+ <20130418135104.GA18616@arm.com>
+ <20130421220629.GA25571@schnuecks.de>
+ <20130430112225.GD29766@arm.com>
+ <20130430210403.GA18076@schnuecks.de>
+ <20130501142206.GB17387@arm.com>
+ <20130501190441.GA22227@schnuecks.de>
+ <20130502095431.GA20730@arm.com>
+ <20130502193835.GA29144@schnuecks.de>
+ <20130503100242.GB29962@arm.com>
+Message-ID: <CACVXFVPOuabwAa1VDmSnfDG=M-1Df02_kpbm0UVAVctCAB-U4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 4 May 2013, Sebastian Hesselbarth wrote:
+On Fri, May 3, 2013 at 6:02 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>>
+>> I assume that you inhibited the call to flush_dcache_page() in
+>> __get_user_pages() for anon pages.  Otherwise, you will be flooded
+>> with warnings.
+>
+> I haven't done any stress testing so I don't think I hit this code path,
+> so no warning. But yes, it should have triggered. Anyway, in this case
+> flush_dcache_page() should have just ignored (clearing PG_arch_1 is
+> harmless anyway if we also ignore this bit in __sync_icache_dcache for
+> non-aliasing caches).
 
-> On 05/03/2013 11:50 PM, Thomas Gleixner wrote:
-> > Provide infrastructure for irq chip implementations which work on
-> > linear irq domains.
-> 
-> Thomas,
-> 
-> I am happy that I put you into rant mode. It took me little more
-> than an hour to read through your patches, prepare orion irqchip
-> driver on top of them and finally got it working.
+Yes, maybe we can do a little optimization for O_DIRECT since no
+dcache alias and I/D coherency problem in this case on ARMv7, how
+about below change?
 
-Cool.
- 
-> Anyway, I found some more issues.
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 1c8f7f5..962a657 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -287,6 +287,8 @@ void flush_dcache_page(struct page *page)
+ 	    mapping && !mapping_mapped(mapping))
+ 		clear_bit(PG_dcache_clean, &page->flags);
+ 	else {
++		if (!mapping && cache_is_vipt_nonaliasing())
++			return;
+ 		__flush_dcache_page(mapping, page);
+ 		if (mapping && cache_is_vivt())
+ 			__flush_dcache_aliases(mapping, page);
 
-That was expected. :)
-
-> > +	for (i = 0; i < numchips; i++, gc++) {
-> 
-> The memory you allocated for gc, num_ct * ct, and dgc doesn't allow
-> to increment through gc. gc is struct irq_chip_generic * but next
-> gc is at sizeof(*gc) + num_ct * sizeof(struct irq_chip_type).
-> This also affects indexing dgc->gc later.
-
-Indeed.
- 
-> I chose to fix it by having an index helper but that first maps
-> dgc-gc to unsigned char * and then adds the correct offset. Not
-
-void * is the preferred over uchar *
-
-> nice but it works. Maybe having real array of ptr to gc is more
-> intuitive here even if we will have to have split kzallocs.
-
-No, you still can have a single kzalloc. It's just a matter of setting
-the pointers correctly.
-
-> > +		irq_init_generic_chip(gc, name, num_ct, i * irqs_per_chip,
-> > +				      NULL, handler);
-> 
-> irq_init_generic_chip does not take care of initalizing ct
-> mask_cache ptr. This should be done here.
-
-Right.
- 
-> > +		gc->domain = d;
-> > +		raw_spin_lock_irqsave(&gc_lock, flags);
-> > +		list_add_tail(&gc->list, &gc_list);
-> > +		raw_spin_unlock_irqrestore(&gc_lock, flags);
-> > +	}
-> > +	d->gc = dgc;
-> 
-> Moving this assignment above the for loop allows to get
-> gc by index as indexing helper relies on domain, not domain
-> generic chip.
-> 
-> You want me to prepare patches for the above? Maybe you can
-
-That'd be nice.
-
-> split your RFC into 1-6 and 7-8. Then you can have 1-6 applied
-> independently of irq_domain_generic_chip stuff.
-
-> Thanks for the RFC again!
-
-Welcome. Have fun!
-
-	 tglx
+Thanks,
+-- 
+Ming Lei
