@@ -1,23 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 4 May 2013 23:20:36 +0800
-Subject: [PATCH] ARM: i.MX6: clk: add i.MX6 DualLite differences
-In-Reply-To: <1367572125-28420-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1367572125-28420-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <20130504152034.GC1749@S2101-09.ap.freescale.net>
+From: nerv@dawncrow.de (=?UTF-8?B?QW5kcsOpIEhlbnRzY2hlbA==?=)
+Date: Sat, 04 May 2013 17:54:37 +0200
+Subject: [PATCHv2] arm: Preserve TPIDRURW on context switch
+In-Reply-To: <5183D6C3.8090402@arm.com>
+References: <517168BB.3070903@dawncrow.de>
+ <20130422143616.GP14496@n2100.arm.linux.org.uk>
+ <20130422151836.GA15665@mudshark.cambridge.arm.com>
+ <5175A697.3080308@dawncrow.de>
+ <20130423091536.GB17593@mudshark.cambridge.arm.com>
+ <51770E4E.2040003@dawncrow.de>
+ <20130424094251.GA21850@mudshark.cambridge.arm.com>
+ <5182C480.3080001@dawncrow.de> <5183819E.50308@arm.com>
+ <20130503095547.GD18614@n2100.arm.linux.org.uk> <5183D6C3.8090402@arm.com>
+Message-ID: <51852F3D.5000802@dawncrow.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 03, 2013 at 11:08:45AM +0200, Dirk Behme wrote:
-> The CCM_CBCMR register (address 0x02C4018) has different meaning
-> between the i.MX6 Quad/Dual and the i.MX6 Solo/DualLite.
+Am 03.05.2013 17:24, schrieb Jonathan Austin:
+> Hi Russell,
 > 
-> Compared to the i.MX6 Quad/Dual, the CCM_CBCMR register in the
-> i.MX6 Solo/DualLite doesn't have a gpu3d_shader configuration and
-> moves the gpu2_core configuration at that place.
+> Thanks for the comments - you're right about the 'switch_tls'
+> being more appropriate - needed to take a step back to see that.
 > 
-> Handle these i.MX6 Quad/Dual vs. i.MX6 Solo/DualLite clock differences
-> by using cpu_is_mx6dl().
+> I've got a few questions, added inline.
 > 
-> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+> Andr?, Assuming I've understood things okay, there's a patch that
+> uses Russell's asm stuff (with minor modifications, see the questions)
+> and includes the C-world changes too. Perhaps you could see that it
+> solves your problem?
 
-Applied, thanks.
+I'll test it tomorrow with my test tool and Wine.
+FWIW i hacked together a test tool and it's available at https://github.com/AndreRH/tpidrurw-test
