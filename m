@@ -1,30 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 5 May 2013 21:57:26 +0200
-Subject: Fwd: Tegra 30 System hangs because of commit "pinctrl: move
- subsystem mutex to pinctrl_dev struct"
-In-Reply-To: <20130505112819.GD24282@game.jcrosoft.org>
-References: <CAK5ve-KXdS8az=Gtja-mF=Z3_EeZVA7bLYSU0EE2mf5bHmSUKw@mail.gmail.com>
- <CAK5ve-KBDyvjNRVMcXgfnhYcajdcGsuAKaepzCBt+epiXoYvSw@mail.gmail.com>
- <517ED12B.8080502@wwwdotorg.org>
- <20130504133004.GC24282@game.jcrosoft.org>
- <CACRpkdbBVJtWrRO+J=pWjfLXTcVKX++x-eeJQXGeQn_WOURUNQ@mail.gmail.com>
- <20130505112819.GD24282@game.jcrosoft.org>
-Message-ID: <CACRpkdZdT8==cUtH4=Y3LC-eVu6ntO2ojFC4bSXNuxa4hMJ=ZA@mail.gmail.com>
+Date: Sun, 5 May 2013 22:04:58 +0200
+Subject: [PATCH v2 1/3] GPIO: clps711x: Rewrite driver for using generic
+ GPIO code
+In-Reply-To: <1366991250-17130-1-git-send-email-shc_work@mail.ru>
+References: <1366991250-17130-1-git-send-email-shc_work@mail.ru>
+Message-ID: <CACRpkdZHYmcD7CS42Gmh=QtSEG4zdpEp+x-Nac3oFcnLdTk-hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 5, 2013 at 1:28 PM, Jean-Christophe PLAGNIOL-VILLARD
-<plagnioj@jcrosoft.com> wrote:
-> On 22:52 Sat 04 May     , Linus Walleij wrote:
->> On Sat, May 4, 2013 at 3:30 PM, Jean-Christophe PLAGNIOL-VILLARD
+On Fri, Apr 26, 2013 at 5:47 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
 
->> > same issue on at91sam9g45ek
->>
->> Is it working with mainline (Torvalds) HEAD?
+> This patch provides rewritten driver for CLPS711X GPIO which uses
+> generic GPIO code.
 >
-> now yes
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Thanks! I had some panic there for a while :-)
+The series:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
