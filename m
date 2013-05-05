@@ -1,37 +1,84 @@
-From: rubini@gnudd.com (Alessandro Rubini)
-Date: Sun, 5 May 2013 22:24:22 +0200
-Subject: [PATCH v4 0/7] enable support for AMBA drivers under x86
-In-Reply-To: <20130505123633.GA14095@pd.tnic>
-References: <20130505123633.GA14095@pd.tnic>  <50C93A83.8040106@zytor.com>
- <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
- <50C93718.2090706@zytor.com>  <20121213181449.GA15966@mail.gnudd.com>
-Message-ID: <20130505202422.GA13758@mail.gnudd.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Sun, 5 May 2013 22:29:46 +0200
+Subject: [PATCH, RFC 11/22] iwlegacy: il_pm_ops is only provided for
+ PM_SLEEP
+In-Reply-To: <1367507786-505303-12-git-send-email-arnd@arndb.de>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-12-git-send-email-arnd@arndb.de>
+Message-ID: <20130505202946.GB12757@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Did this got fixed in some tree in the meantime? Because I still see it on
-> current Linus + tip/master:
+On Thu, May 02, 2013 at 05:16:15PM +0200, Arnd Bergmann wrote:
+> This makes sure the conditionals for the declaration match the
+> definition, so we provide the alternative
 > 
-> arch/x86/pci/sta2x11-fixup.c:186:2: warning: initialization from incompatible pointer type [enabled by default]
-> arch/x86/pci/sta2x11-fixup.c:186:2: warning: (near initialization for ???sta2x11_dma_ops.free???) [enabled by default]
+>  #else
+>  #define IL_LEGACY_PM_OPS NULL
+>  #endif
+> 
+> in the correct cases.
+> 
+> drivers/built-in.o:(.data+0x57974): undefined reference to `il_pm_ops'
 
-Last time I sent the patch was on Feb 22nd:
+Yep, I see this too here.
 
-   The .free field of struct dma_map_ops features a prototype that is
-   different from what lib/swiotlb.c offers. The new "attrs" argument in
-   dma_ops.free is missing from the generic implementation.
+> 
+> Cc: Johannes Berg <johannes.berg@intel.com>
+> Cc: John W. Linville <linville@tuxdriver.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/net/wireless/iwlegacy/common.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/wireless/iwlegacy/common.h b/drivers/net/wireless/iwlegacy/common.h
+> index f8246f2..734f1b4 100644
+> --- a/drivers/net/wireless/iwlegacy/common.h
+> +++ b/drivers/net/wireless/iwlegacy/common.h
+> @@ -1832,7 +1832,7 @@ u32 il_usecs_to_beacons(struct il_priv *il, u32 usec, u32 beacon_interval);
+>  __le32 il_add_beacon_time(struct il_priv *il, u32 base, u32 addon,
+>  			  u32 beacon_interval);
+>  
+> -#ifdef CONFIG_PM
+> +#ifdef CONFIG_PM_SLEEP
+>  extern const struct dev_pm_ops il_pm_ops;
+>  
+>  #define IL_LEGACY_PM_OPS	(&il_pm_ops)
 
-   This removes the build warning by providing a function that just calls
-   swiotlb_free_coherent() without passing "attrs", like others do.
+Btw, you might want to adjust the macro comments for consistency too,
+like so. Alternatively, you could simply remove them since they only
+clutter two-liner and one can see what it encloses.
 
-I got no reply.
+--
+diff --git a/drivers/net/wireless/iwlegacy/common.h b/drivers/net/wireless/iwlegacy/common.h
+index f8246f2d88f9..4caaf52986a4 100644
+--- a/drivers/net/wireless/iwlegacy/common.h
++++ b/drivers/net/wireless/iwlegacy/common.h
+@@ -1832,16 +1832,16 @@ u32 il_usecs_to_beacons(struct il_priv *il, u32 usec, u32 beacon_interval);
+ __le32 il_add_beacon_time(struct il_priv *il, u32 base, u32 addon,
+ 			  u32 beacon_interval);
+ 
+-#ifdef CONFIG_PM
++#ifdef CONFIG_PM_SLEEP
+ extern const struct dev_pm_ops il_pm_ops;
+ 
+ #define IL_LEGACY_PM_OPS	(&il_pm_ops)
+ 
+-#else /* !CONFIG_PM */
++#else /* !CONFIG_PM_SLEEP */
+ 
+ #define IL_LEGACY_PM_OPS	NULL
+ 
+-#endif /* !CONFIG_PM */
++#endif /* !CONFIG_PM_SLEEP */
+ 
+ /*****************************************************
+ *  Error Handling Debugging
+--
 
-This is the link:
+-- 
+Regards/Gruss,
+    Boris.
 
-    http://lkml.org/lkml/2013/2/22/111
-
-It is in patchwork here:
-
-    https://patchwork.kernel.org/patch/2175551/
-
-/alessandro
+Sent from a fat crate under my desk. Formatting is fine.
+--
