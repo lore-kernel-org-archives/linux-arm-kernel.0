@@ -1,59 +1,37 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 5 May 2013 22:20:25 +0200
-Subject: [PATCH 1/1] ARM: at91: rm9200 fix time support
-Message-ID: <20130505202025.GE24282@game.jcrosoft.org>
+From: rubini@gnudd.com (Alessandro Rubini)
+Date: Sun, 5 May 2013 22:24:22 +0200
+Subject: [PATCH v4 0/7] enable support for AMBA drivers under x86
+In-Reply-To: <20130505123633.GA14095@pd.tnic>
+References: <20130505123633.GA14095@pd.tnic>  <50C93A83.8040106@zytor.com>
+ <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
+ <50C93718.2090706@zytor.com>  <20121213181449.GA15966@mail.gnudd.com>
+Message-ID: <20130505202422.GA13758@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-since commit 838a2ae80a6ab52139fb1bf0a93ea8c5eff94488
-Author: Shawn Guo <shawn.guo@linaro.org>
-Date:   Sat Jan 12 11:50:05 2013 +0000
+> Did this got fixed in some tree in the meantime? Because I still see it on
+> current Linus + tip/master:
+> 
+> arch/x86/pci/sta2x11-fixup.c:186:2: warning: initialization from incompatible pointer type [enabled by default]
+> arch/x86/pci/sta2x11-fixup.c:186:2: warning: (near initialization for ???sta2x11_dma_ops.free???) [enabled by default]
 
-ARM: use clockevents_config_and_register() where possible
+Last time I sent the patch was on Feb 22nd:
 
-The timer is wrongly configured and result in since crash
-so revert it on rm9200 timer
+   The .free field of struct dma_map_ops features a prototype that is
+   different from what lib/swiotlb.c offers. The new "attrs" argument in
+   dma_ops.free is missing from the generic implementation.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Hi Greg,
+   This removes the build warning by providing a function that just calls
+   swiotlb_free_coherent() without passing "attrs", like others do.
 
-	if possible apply it to v3.8 and v3.9 stable
+I got no reply.
 
-	I'll apply it for mainline
+This is the link:
 
-Best Regards,
-J.
- arch/arm/mach-at91/at91rm9200_time.c |    7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+    http://lkml.org/lkml/2013/2/22/111
 
-diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-index 2acdff4..180b302 100644
---- a/arch/arm/mach-at91/at91rm9200_time.c
-+++ b/arch/arm/mach-at91/at91rm9200_time.c
-@@ -174,6 +174,7 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
- static struct clock_event_device clkevt = {
- 	.name		= "at91_tick",
- 	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.shift		= 32,
- 	.rating		= 150,
- 	.set_next_event	= clkevt32k_next_event,
- 	.set_mode	= clkevt32k_mode,
-@@ -264,9 +265,11 @@ void __init at91rm9200_timer_init(void)
- 	at91_st_write(AT91_ST_RTMR, 1);
- 
- 	/* Setup timer clockevent, with minimum of two ticks (important!!) */
-+	clkevt.mult = div_sc(AT91_SLOW_CLOCK, NSEC_PER_SEC, clkevt.shift);
-+	clkevt.max_delta_ns = clockevent_delta2ns(AT91_ST_ALMV, &clkevt);
-+	clkevt.min_delta_ns = clockevent_delta2ns(2, &clkevt) + 1;
- 	clkevt.cpumask = cpumask_of(0);
--	clockevents_config_and_register(&clkevt, AT91_SLOW_CLOCK,
--					2, AT91_ST_ALMV);
-+	clockevents_register_device(&clkevt);
- 
- 	/* register clocksource */
- 	clocksource_register_hz(&clk32k, AT91_SLOW_CLOCK);
--- 
-1.7.10.4
+It is in patchwork here:
+
+    https://patchwork.kernel.org/patch/2175551/
+
+/alessandro
