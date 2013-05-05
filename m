@@ -1,28 +1,29 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sun,  5 May 2013 16:18:08 +0400
-Subject: [PATCH] Cpufreq: Fix incorrect dependecies for ARM SA11xx drivers
-Message-ID: <1367756288-13422-1-git-send-email-shc_work@mail.ru>
+From: bp@alien8.de (Borislav Petkov)
+Date: Sun, 5 May 2013 14:36:33 +0200
+Subject: [PATCH v4 0/7] enable support for AMBA drivers under x86
+In-Reply-To: <20121213181449.GA15966@mail.gnudd.com>
+References: <50C93A83.8040106@zytor.com>
+ <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
+ <50C93718.2090706@zytor.com>
+ <20121213181449.GA15966@mail.gnudd.com>
+Message-ID: <20130505123633.GA14095@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Dec 13, 2012 at 07:14:49PM +0100, Alessandro Rubini wrote:
+> This is a long-standing problem, but with not practical effects. I
+> proposed a pair of different fixes quite some months ago. I'll respin
+> the problem tomorrow.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- drivers/cpufreq/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Did this got fixed in some tree in the meantime? Because I still see it on
+current Linus + tip/master:
 
-diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
-index a1488f5..534fcb8 100644
---- a/drivers/cpufreq/Kconfig
-+++ b/drivers/cpufreq/Kconfig
-@@ -47,7 +47,7 @@ config CPU_FREQ_STAT_DETAILS
- 
- choice
- 	prompt "Default CPUFreq governor"
--	default CPU_FREQ_DEFAULT_GOV_USERSPACE if CPU_FREQ_SA1100 || CPU_FREQ_SA1110
-+	default CPU_FREQ_DEFAULT_GOV_USERSPACE if ARM_SA1100_CPUFREQ || ARM_SA1110_CPUFREQ
- 	default CPU_FREQ_DEFAULT_GOV_PERFORMANCE
- 	help
- 	  This option sets which CPUFreq governor shall be loaded at
+arch/x86/pci/sta2x11-fixup.c:186:2: warning: initialization from incompatible pointer type [enabled by default]
+arch/x86/pci/sta2x11-fixup.c:186:2: warning: (near initialization for ?sta2x11_dma_ops.free?) [enabled by default]
+
 -- 
-1.8.1.5
+Regards/Gruss,
+    Boris.
+
+Sent from a fat crate under my desk. Formatting is fine.
+--
