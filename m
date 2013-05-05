@@ -1,7 +1,7 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun,  5 May 2013 22:13:25 +0200
+Date: Sun, 5 May 2013 22:20:25 +0200
 Subject: [PATCH 1/1] ARM: at91: rm9200 fix time support
-Message-ID: <1367784805-12040-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <20130505202025.GE24282@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
