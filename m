@@ -1,51 +1,36 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Sun, 5 May 2013 22:39:32 +0200
-Subject: [PATCH v4 0/7] enable support for AMBA drivers under x86
-In-Reply-To: <20130505202422.GA13758@mail.gnudd.com>
-References: <20130505123633.GA14095@pd.tnic> <50C93A83.8040106@zytor.com>
- <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
- <50C93718.2090706@zytor.com>
- <20121213181449.GA15966@mail.gnudd.com>
- <20130505202422.GA13758@mail.gnudd.com>
-Message-ID: <20130505203932.GA12742@pd.tnic>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sun, 5 May 2013 14:26:55 -0700
+Subject: [PATCH 1/1] ARM: at91: rm9200 fix time support
+In-Reply-To: <20130505202025.GE24282@game.jcrosoft.org>
+References: <20130505202025.GE24282@game.jcrosoft.org>
+Message-ID: <20130505212655.GD12954@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 05, 2013 at 10:24:22PM +0200, Alessandro Rubini wrote:
-> > Did this got fixed in some tree in the meantime? Because I still see it on
-> > current Linus + tip/master:
-> > 
-> > arch/x86/pci/sta2x11-fixup.c:186:2: warning: initialization from incompatible pointer type [enabled by default]
-> > arch/x86/pci/sta2x11-fixup.c:186:2: warning: (near initialization for ???sta2x11_dma_ops.free???) [enabled by default]
+On Sun, May 05, 2013 at 10:20:25PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> since commit 838a2ae80a6ab52139fb1bf0a93ea8c5eff94488
+> Author: Shawn Guo <shawn.guo@linaro.org>
+> Date:   Sat Jan 12 11:50:05 2013 +0000
 > 
-> Last time I sent the patch was on Feb 22nd:
+> ARM: use clockevents_config_and_register() where possible
 > 
->    The .free field of struct dma_map_ops features a prototype that is
->    different from what lib/swiotlb.c offers. The new "attrs" argument in
->    dma_ops.free is missing from the generic implementation.
+> The timer is wrongly configured and result in since crash
+> so revert it on rm9200 timer
 > 
->    This removes the build warning by providing a function that just calls
->    swiotlb_free_coherent() without passing "attrs", like others do.
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> Hi Greg,
 > 
-> I got no reply.
+> 	if possible apply it to v3.8 and v3.9 stable
+> 
+> 	I'll apply it for mainline
 
-It probably fell through the cracks...
+<formletter>
 
-> This is the link:
-> 
->     http://lkml.org/lkml/2013/2/22/111
-> 
-> It is in patchwork here:
-> 
->     https://patchwork.kernel.org/patch/2175551/
+This is not the correct way to submit patches for inclusion in the
+stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
+for how to do this properly.
 
-Ingo, hpa, can you guys pick it up?
-
-Thanks.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+</formletter>
