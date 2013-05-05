@@ -1,56 +1,30 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Sun, 5 May 2013 17:47:12 +0100
-Subject: [Xen-devel] [PATCH 1/3] arm_arch_timer: introduce
- arch_timer_stolen_ticks
-In-Reply-To: <5183976A.6000703@arm.com>
-References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
- <1367436460-10183-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <51817CBE.4050003@codeaurora.org>
- <1367482772.21869.26.camel@zakaz.uk.xensource.com>
- <5182DBA9.9080609@codeaurora.org>
- <alpine.DEB.2.02.1305031130210.5398@kaball.uk.xensource.com>
- <5183976A.6000703@arm.com>
-Message-ID: <alpine.DEB.2.02.1305051745390.4756@kaball.uk.xensource.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 5 May 2013 21:57:26 +0200
+Subject: Fwd: Tegra 30 System hangs because of commit "pinctrl: move
+ subsystem mutex to pinctrl_dev struct"
+In-Reply-To: <20130505112819.GD24282@game.jcrosoft.org>
+References: <CAK5ve-KXdS8az=Gtja-mF=Z3_EeZVA7bLYSU0EE2mf5bHmSUKw@mail.gmail.com>
+ <CAK5ve-KBDyvjNRVMcXgfnhYcajdcGsuAKaepzCBt+epiXoYvSw@mail.gmail.com>
+ <517ED12B.8080502@wwwdotorg.org>
+ <20130504133004.GC24282@game.jcrosoft.org>
+ <CACRpkdbBVJtWrRO+J=pWjfLXTcVKX++x-eeJQXGeQn_WOURUNQ@mail.gmail.com>
+ <20130505112819.GD24282@game.jcrosoft.org>
+Message-ID: <CACRpkdZdT8==cUtH4=Y3LC-eVu6ntO2ojFC4bSXNuxa4hMJ=ZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 May 2013, Marc Zyngier wrote:
-> On 03/05/13 11:43, Stefano Stabellini wrote:
-> > On Thu, 2 May 2013, Christopher Covington wrote:
-> >>> So the virtual timer should appear to have been running even while time
-> >>> is being stolen and therefore stolen time needs to be accounted via some
-> >>> other means.
-> >>
-> >> Something that's not currently obvious to me is that given that the stolen
-> >> cycle accounting should be done, what makes the architected timer interrupt
-> >> handler the ideal place to do it?
-> > 
-> > That is a good question and I would appreciate suggestions to improve
-> > the patch.
-> > 
-> > Given that Xen x86 and ia64 does stolen time accounting from the timer
-> > interrupt handler:
-> > 
-> > arch/x86/xen/time.c:xen_timer_interrupt
-> > arch/ia64/kernel/time.c:timer_interrupt
-> > 
-> > and given that the arch_timer is the only timer used by Xen on ARM and
-> > that it includes a virt_timer that is made on purpose to be used by
-> > virtual machines, I thought that it might be a good place for it.
-> > 
-> > I also thought that doing it this way, KVM should be able to reuse the
-> > same hook.
-> 
-> Indeed. I just need to understand how time stealing works there ;-).
-> 
-> Now, KVM is not necessarily limited to arch_timers, and we've run KVM
-> using a QEMU-provided timer in the past. Can you think of a more generic
-> location for this hook? Possibly something that would satisfy the
-> requirements of other architectures while we're at it?
+On Sun, May 5, 2013 at 1:28 PM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 22:52 Sat 04 May     , Linus Walleij wrote:
+>> On Sat, May 4, 2013 at 3:30 PM, Jean-Christophe PLAGNIOL-VILLARD
 
-Probably the best option would be to reuse
+>> > same issue on at91sam9g45ek
+>>
+>> Is it working with mainline (Torvalds) HEAD?
+>
+> now yes
 
-kernel/sched/cputime.c:steal_account_process_tick
+Thanks! I had some panic there for a while :-)
 
-but that also means introducing CONFIG_PARAVIRT on arm.
-I am up for that, what do you think?
+Yours,
+Linus Walleij
