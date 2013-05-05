@@ -1,28 +1,28 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 5 May 2013 13:28:19 +0200
-Subject: Fwd: Tegra 30 System hangs because of commit "pinctrl: move
- subsystem mutex to pinctrl_dev struct"
-In-Reply-To: <CACRpkdbBVJtWrRO+J=pWjfLXTcVKX++x-eeJQXGeQn_WOURUNQ@mail.gmail.com>
-References: <CAK5ve-KXdS8az=Gtja-mF=Z3_EeZVA7bLYSU0EE2mf5bHmSUKw@mail.gmail.com>
- <CAK5ve-KBDyvjNRVMcXgfnhYcajdcGsuAKaepzCBt+epiXoYvSw@mail.gmail.com>
- <517ED12B.8080502@wwwdotorg.org>
- <20130504133004.GC24282@game.jcrosoft.org>
- <CACRpkdbBVJtWrRO+J=pWjfLXTcVKX++x-eeJQXGeQn_WOURUNQ@mail.gmail.com>
-Message-ID: <20130505112819.GD24282@game.jcrosoft.org>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sun,  5 May 2013 16:18:08 +0400
+Subject: [PATCH] Cpufreq: Fix incorrect dependecies for ARM SA11xx drivers
+Message-ID: <1367756288-13422-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:52 Sat 04 May     , Linus Walleij wrote:
-> On Sat, May 4, 2013 at 3:30 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> 
-> > same issue on at91sam9g45ek
-> 
-> Is it working with mainline (Torvalds) HEAD?
-now yes
 
-Best Regards,
-J.
-> 
-> Yours,
-> Linus Walleij
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ drivers/cpufreq/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+index a1488f5..534fcb8 100644
+--- a/drivers/cpufreq/Kconfig
++++ b/drivers/cpufreq/Kconfig
+@@ -47,7 +47,7 @@ config CPU_FREQ_STAT_DETAILS
+ 
+ choice
+ 	prompt "Default CPUFreq governor"
+-	default CPU_FREQ_DEFAULT_GOV_USERSPACE if CPU_FREQ_SA1100 || CPU_FREQ_SA1110
++	default CPU_FREQ_DEFAULT_GOV_USERSPACE if ARM_SA1100_CPUFREQ || ARM_SA1110_CPUFREQ
+ 	default CPU_FREQ_DEFAULT_GOV_PERFORMANCE
+ 	help
+ 	  This option sets which CPUFreq governor shall be loaded at
+-- 
+1.8.1.5
