@@ -1,45 +1,56 @@
-From: menon.nishanth@gmail.com (Nishanth Menon)
-Date: Sun, 05 May 2013 10:04:52 -0500
-Subject: [PATCH 0/2] ARM: dts: OMAP36xx/OMAP4460 Fix CPU OPP voltages
-In-Reply-To: <1366997973-19120-1-git-send-email-nm@ti.com>
-References: <1366997973-19120-1-git-send-email-nm@ti.com>
-Message-ID: <51867514.9030803@gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Sun, 5 May 2013 17:47:12 +0100
+Subject: [Xen-devel] [PATCH 1/3] arm_arch_timer: introduce
+ arch_timer_stolen_ticks
+In-Reply-To: <5183976A.6000703@arm.com>
+References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
+ <1367436460-10183-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <51817CBE.4050003@codeaurora.org>
+ <1367482772.21869.26.camel@zakaz.uk.xensource.com>
+ <5182DBA9.9080609@codeaurora.org>
+ <alpine.DEB.2.02.1305031130210.5398@kaball.uk.xensource.com>
+ <5183976A.6000703@arm.com>
+Message-ID: <alpine.DEB.2.02.1305051745390.4756@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony/Benoit,
-gentle offline ping for this series?
-https://patchwork.kernel.org/patch/2494481/
-https://patchwork.kernel.org/patch/2494491/
-Regards,
-Nishanth Menon
-On 04/26/2013 12:39 PM, Nishanth Menon wrote:
-> Hi,
-> It seems that I have not been paying close attention to
-> actual voltage value seen on scope to map it back to verify the validity
-> of the voltage value. Even though I did verify[1] that voltage did scale to
-> values in DT entries, the values in the case of 3630 and 4460 were lower than
-> what the spec voltage was as per opp_data files.
->
-> This series is based off Benoit's tree here:
-> http://git.kernel.org/cgit/linux/kernel/git/bcousson/linux-omap-dt.git/log/?h=for_3.10/dts
->
-> Commit ID's in the patches to indicate regressions are from there as well.
-> Would be good to have this fix merged to 3.10 dts entries.
-> I have cross verified that OMAP3430,3630,4430 and 4460 entries now match that
-> of corresponding opp*_data.c
->
-> My sincere apologies on the oversight.
->
-> Nishanth Menon (2):
->    ARM: dts: OMAP36xx: Fix CPU OPP voltages
->    ARM: dts: OMAP4460: Fix CPU OPP voltages
->
->   arch/arm/boot/dts/omap36xx.dtsi |    6 +++---
->   arch/arm/boot/dts/omap4460.dtsi |    6 +++---
->   2 files changed, 6 insertions(+), 6 deletions(-)
->
-> [1] http://marc.info/?l=linux-arm-kernel&m=136580742724210&w=2
-> Regards,
-> Nishanth Menon
->
+On Fri, 3 May 2013, Marc Zyngier wrote:
+> On 03/05/13 11:43, Stefano Stabellini wrote:
+> > On Thu, 2 May 2013, Christopher Covington wrote:
+> >>> So the virtual timer should appear to have been running even while time
+> >>> is being stolen and therefore stolen time needs to be accounted via some
+> >>> other means.
+> >>
+> >> Something that's not currently obvious to me is that given that the stolen
+> >> cycle accounting should be done, what makes the architected timer interrupt
+> >> handler the ideal place to do it?
+> > 
+> > That is a good question and I would appreciate suggestions to improve
+> > the patch.
+> > 
+> > Given that Xen x86 and ia64 does stolen time accounting from the timer
+> > interrupt handler:
+> > 
+> > arch/x86/xen/time.c:xen_timer_interrupt
+> > arch/ia64/kernel/time.c:timer_interrupt
+> > 
+> > and given that the arch_timer is the only timer used by Xen on ARM and
+> > that it includes a virt_timer that is made on purpose to be used by
+> > virtual machines, I thought that it might be a good place for it.
+> > 
+> > I also thought that doing it this way, KVM should be able to reuse the
+> > same hook.
+> 
+> Indeed. I just need to understand how time stealing works there ;-).
+> 
+> Now, KVM is not necessarily limited to arch_timers, and we've run KVM
+> using a QEMU-provided timer in the past. Can you think of a more generic
+> location for this hook? Possibly something that would satisfy the
+> requirements of other architectures while we're at it?
+
+Probably the best option would be to reuse
+
+kernel/sched/cputime.c:steal_account_process_tick
+
+but that also means introducing CONFIG_PARAVIRT on arm.
+I am up for that, what do you think?
