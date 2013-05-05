@@ -1,44 +1,74 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sun, 05 May 2013 12:41:49 +1000
-Subject: [PATCH v8 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
- Microblaze and PowerPC
-In-Reply-To: <1366627295-16964-2-git-send-email-Andrew.Murray@arm.com>
-References: <1366627295-16964-1-git-send-email-Andrew.Murray@arm.com>
- <1366627295-16964-2-git-send-email-Andrew.Murray@arm.com>
-Message-ID: <1367721709.11982.37.camel@pasglop>
+From: alonid@stratoscale.com (Dan Aloni)
+Date: Sun,  5 May 2013 11:24:13 +0300
+Subject: [PATCH] Move the EM_ARM and EM_AARCH64 definitions to
+ uapi/linux/elf-em.h
+In-Reply-To: <20130502132756.GD20730@arm.com>
+References: <20130502132756.GD20730@arm.com>
+Message-ID: <1367742253-22294-1-git-send-email-alonid@stratoscale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-04-22 at 11:41 +0100, Andrew Murray wrote:
-> The pci_process_bridge_OF_ranges function, used to parse the "ranges"
-> property of a PCI host device, is found in both Microblaze and PowerPC
-> architectures. These implementations are nearly identical. This patch
-> moves this common code to a common place.
+Signed-off-by: Dan Aloni <alonid@stratoscale.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/elf.h   |    2 --
+ arch/arm64/include/asm/elf.h |    3 ---
+ include/uapi/linux/elf-em.h  |    2 ++
+ 3 files changed, 2 insertions(+), 5 deletions(-)
 
-What's happening with this ? I'd like to avoid that patch for now
-as I'm doing some changes to pci_process_bridge_OF_ranges
-which are fairly urgent (I might even stick them in the current
-merge window) to deal with memory windows having separate offsets.
-
-There's also a few hacks in there that are really ppc specific...
-
-I think the right long term approach is to change the way powerpc
-(and microblaze ?) initializes PCI host bridges. Move it away from
-setup_arch() (which is a PITA anyway since it's way too early) to
-an early init call of some sort, and encapsulate the new struct
-pci_host_bridge.
-
-We can then directly configure the host bridge windows rather
-than having this "intermediary" set of resources in our pci_controller
-and in fact move most of the fields from pci_controller to
-pci_host_bridge to the point where the former can remain as a
-simple platform specific wrapper if needed.
-
-So for new stuff (hint: DT based ARM PCI) or stuff that has to deal with
-a lot less archaic platforms (hint: Microblaze), I'd recommend going
-straight for that approach rather than perpetuating the PowerPC code
-which I'll try to deal with in the next few monthes.
-
-Cheers,
-Ben.
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index 38050b1..e110a67 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -19,8 +19,6 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
  
+ typedef struct user_fp elf_fpregset_t;
+ 
+-#define EM_ARM	40
+-
+ #define EF_ARM_EABI_MASK	0xff000000
+ #define EF_ARM_EABI_UNKNOWN	0x00000000
+ #define EF_ARM_EABI_VER1	0x01000000
+diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
+index fe32c0e..e7fa87f 100644
+--- a/arch/arm64/include/asm/elf.h
++++ b/arch/arm64/include/asm/elf.h
+@@ -33,8 +33,6 @@ typedef unsigned long elf_greg_t;
+ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
+ typedef struct user_fpsimd_state elf_fpregset_t;
+ 
+-#define EM_AARCH64		183
+-
+ /*
+  * AArch64 static relocation types.
+  */
+@@ -151,7 +149,6 @@ extern unsigned long arch_randomize_brk(struct mm_struct *mm);
+ #define arch_randomize_brk arch_randomize_brk
+ 
+ #ifdef CONFIG_COMPAT
+-#define EM_ARM				40
+ #define COMPAT_ELF_PLATFORM		("v8l")
+ 
+ #define COMPAT_ELF_ET_DYN_BASE		(randomize_et_dyn(2 * TASK_SIZE_32 / 3))
+diff --git a/include/uapi/linux/elf-em.h b/include/uapi/linux/elf-em.h
+index 8e2b7ba..59c17a2 100644
+--- a/include/uapi/linux/elf-em.h
++++ b/include/uapi/linux/elf-em.h
+@@ -22,6 +22,7 @@
+ #define EM_PPC		20	/* PowerPC */
+ #define EM_PPC64	21	 /* PowerPC64 */
+ #define EM_SPU		23	/* Cell BE SPU */
++#define EM_ARM		40	/* ARM 32 bit */
+ #define EM_SH		42	/* SuperH */
+ #define EM_SPARCV9	43	/* SPARC v9 64-bit */
+ #define EM_IA_64	50	/* HP/Intel IA-64 */
+@@ -34,6 +35,7 @@
+ #define EM_MN10300	89	/* Panasonic/MEI MN10300, AM33 */
+ #define EM_BLACKFIN     106     /* ADI Blackfin Processor */
+ #define EM_TI_C6000	140	/* TI C6X DSPs */
++#define EM_AARCH64	183	/* ARM 64 bit */
+ #define EM_FRV		0x5441	/* Fujitsu FR-V */
+ #define EM_AVR32	0x18ad	/* Atmel AVR32 */
+ 
+-- 
+1.7.10.4
