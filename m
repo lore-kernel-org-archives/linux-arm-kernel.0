@@ -1,29 +1,51 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Sun, 5 May 2013 14:36:33 +0200
-Subject: [PATCH v4 0/7] enable support for AMBA drivers under x86
-In-Reply-To: <20121213181449.GA15966@mail.gnudd.com>
-References: <50C93A83.8040106@zytor.com>
- <1355146956-6009-1-git-send-email-ciminaghi@gnudd.com>
- <50C93718.2090706@zytor.com>
- <20121213181449.GA15966@mail.gnudd.com>
-Message-ID: <20130505123633.GA14095@pd.tnic>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Sun, 5 May 2013 17:18:55 +0300
+Subject: [PATCH 4/4] staging: =?utf-8?Q?ste=5Fr?=
+ =?utf-8?Q?mi4=3A_Suppress_'ignoring_return_value_of_=E2=80=98regulator=5F?=
+ =?utf-8?B?ZW5hYmxlKCkn?= warning
+In-Reply-To: <20130503070713.GA27956@bnru09>
+References: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
+ <1367509690-24022-5-git-send-email-lee.jones@linaro.org>
+ <20130503070713.GA27956@bnru09>
+Message-ID: <20130505141855.GB4686@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 13, 2012 at 07:14:49PM +0100, Alessandro Rubini wrote:
-> This is a long-standing problem, but with not practical effects. I
-> proposed a pair of different fixes quite some months ago. I'll respin
-> the problem tomorrow.
+On Fri, May 03, 2013 at 12:37:14PM +0530, Srinidhi Kasagar wrote:
+> On Thu, May 02, 2013 at 17:48:10 +0200, Lee Jones wrote:
+> > drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:
+> >         In function ?synaptics_rmi4_resume?:
+> > drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:1090:18:
+> >         warning: ignoring return value of ?regulator_enable?, declared
+> >         with attribute warn_unused_result [-Wunused-result
+> > 
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Cc: devel at driverdev.osuosl.org
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c |    4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
+> > index fe667dd..c4d013d 100644
+> > --- a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
+> > +++ b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
+> > @@ -1087,7 +1087,9 @@ static int synaptics_rmi4_resume(struct device *dev)
+> >  	unsigned char intr_status;
+> >  	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
+> >  
+> > -	regulator_enable(rmi4_data->regulator);
+> > +	retval = regulator_enable(rmi4_data->regulator);
+> > +	if (retval < 0)
+> > +		return retval;
+> Does it make sense to add a dev_err?
+> 
 
-Did this got fixed in some tree in the meantime? Because I still see it on
-current Linus + tip/master:
+Is that a question?
 
-arch/x86/pci/sta2x11-fixup.c:186:2: warning: initialization from incompatible pointer type [enabled by default]
-arch/x86/pci/sta2x11-fixup.c:186:2: warning: (near initialization for ?sta2x11_dma_ops.free?) [enabled by default]
+regulator_enable() already prints some warnings.  Probably it's not
+going to fail and adding code that is duplicative or will never be
+run is pointless.
 
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+regards,
+dan carpenter
