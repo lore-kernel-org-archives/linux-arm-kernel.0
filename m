@@ -1,24 +1,26 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 6 May 2013 15:31:58 +0200 (CEST)
-Subject: [RFC patch 7/8] fixup 2/2: genirq: generic chip: Add linear irq
- domain support
-In-Reply-To: <1367843533-7117-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <20130503214629.810207749@linutronix.de>
- <1367843533-7117-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1367843533-7117-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <alpine.LFD.2.02.1305061525420.3095@ionos>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 6 May 2013 15:45:22 +0200
+Subject: dw_apb_timer_of.c: remove parts that were picoxcell-specific
+In-Reply-To: <20130506124814.GA28259@amd.pavel.ucw.cz>
+References: <20130426121433.GA16249@amd.pavel.ucw.cz>
+ <20130426214313.GB24891@amd.pavel.ucw.cz>
+ <20130506124814.GA28259@amd.pavel.ucw.cz>
+Message-ID: <201305061545.22587.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 May 2013, Sebastian Hesselbarth wrote:
+On Monday 06 May 2013, Pavel Machek wrote:
+> 
+> Hi!
+> 
+> Ping? Previous version was tested by Dinh, and this one is based on
+> Jamie's updates, so I assume it is acceptable for him, too.
+> 
+> It brings two platforms closer together, and makes time actually work
+> on socfpga. It would be good to get it applied.
 
-> mask_cache pointer also needs to be initialized for domain generic
-> chips.
+Who should apply it? I guess it needs to go through arm-soc with all the
+other clocksource changes already queued up there. Can we have an Ack
+from Jamie and from the clocksource maintainers?
 
-It's not only the mask cache pointer. We also need to initialize the
-mask cache itself. I solved it by spitting out that code from
-irq_setup_generic_chip().
-
-Thanks,
-
-	tglx
+	Arnd
