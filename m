@@ -1,33 +1,33 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Mon, 6 May 2013 07:06:25 +0000
-Subject: mach-omap2/timer.c: Bug introduced while merging patch - ff931c82
-Message-ID: <79CD15C6BA57404B839C016229A409A83EC7C45D@DBDE04.ent.ti.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Mon, 6 May 2013 12:43:56 +0530
+Subject: [PATCH 54/63] ARM: ux500: Replace ST-E's home-brew DMA
+ direction definition with the generic one
+In-Reply-To: <1367591569-32197-55-git-send-email-lee.jones@linaro.org>
+References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
+ <1367591569-32197-55-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130506071355.GA5552@bnru10>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, May 03, 2013 at 16:32:40 +0200, Lee Jones wrote:
+> STEDMA40_*_TO_* direction definitions are identical in all but name to
+> the pre-defined generic DMA_*_TO_* ones. Let's make things easy by not
+> duplicating such things.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/mach-ux500/board-mop500-audio.c |   12 ++++++------
+>  arch/arm/mach-ux500/board-mop500-sdi.c   |   16 ++++++++--------
+>  arch/arm/mach-ux500/board-mop500.c       |   22 +++++++++++-----------
+>  arch/arm/mach-ux500/usb.c                |    4 ++--
+>  4 files changed, 27 insertions(+), 27 deletions(-)
 
-Not sure whether this got discussed and fixed already, but Google didn't give me anything :)
+Hope you have taken care for all other files, because, I see
+few more instances in my tree apart from the above files.
 
-The below commit got merged wrongly to Mainline (Changes from timer.c got missed), and 
-due to this none of omap boards will boot.
+Otherwise..
 
+Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 
->From ff931c821bab6713a52b768b0cd7ee7e90713b36 Mon Sep 17 00:00:00 2001
-From: Rajendra Nayak <rnayak@ti.com>
-Date: Thu, 21 Mar 2013 11:04:52 +0000
-Subject: ARM: OMAP: clocks: Delay clk inits atleast until slab is initialized
-
-
-It seems Linux-omap tree has the fix patch for this, and it should get pushed ASAP. 
-Below are links for Linus's mainline commit [1], the actual patch submitted to the list [2] and
-Commit  present in Linux-omap [3].
-
-
-[1] http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/mach-omap2/io.c?id=ff931c821bab6713a52b768b0cd7ee7e90713b36
-[2] https://patchwork.kernel.org/patch/2300071/
-[3] http://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/commit/arch/arm/mach-omap2/timer.c?id=ff931c821bab6713a52b768b0cd7ee7e90713b36
-
-
-Thanks,
-Vaibhav
+regards,
+srinidhi
