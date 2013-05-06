@@ -1,83 +1,69 @@
-From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
-Date: Mon,  6 May 2013 17:49:51 +0530
-Subject: [PATCH V2 3/3] arm64: earlyprintk support for virtio-mmio console.
-In-Reply-To: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
-References: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
-Message-ID: <1367842791-30285-4-git-send-email-pranavkumar@linaro.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon,  6 May 2013 14:32:13 +0200
+Subject: [RFC patch 7/8] fixup 2/2: genirq: generic chip: Add linear irq
+ domain support
+In-Reply-To: <1367843533-7117-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <20130503214629.810207749@linutronix.de>
+ <1367843533-7117-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1367843533-7117-2-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements earlyprintk based on virtio console
-using emerg_wr config register.
+mask_cache pointer also needs to be initialized for domain generic
+chips.
 
-Kernel args for using this will be:
-earlyprintk=virtio-console,<phys_address>
-
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
- arch/arm64/kernel/early_printk.c |   35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Rob Landley <rob@landley.net>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Jean-Francois Moine <moinejf@free.fr>
+Cc: Gerlando Falauto <gerlando.falauto@keymile.com>
+Cc: Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+Cc: devicetree-discuss at lists.ozlabs.org
+Cc: linux-doc at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ kernel/irq/generic-chip.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/kernel/early_printk.c b/arch/arm64/kernel/early_printk.c
-index ac974f4..ea3d2f5 100644
---- a/arch/arm64/kernel/early_printk.c
-+++ b/arch/arm64/kernel/early_printk.c
-@@ -25,6 +25,9 @@
+diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
+index 3dbfe2e..3e0312f 100644
+--- a/kernel/irq/generic-chip.c
++++ b/kernel/irq/generic-chip.c
+@@ -275,12 +275,22 @@ int irq_alloc_domain_generic_chips(struct irq_domain *d, int irqs_per_chip,
  
- #include <linux/amba/serial.h>
- #include <linux/serial_reg.h>
-+#include <linux/virtio_ids.h>
-+#include <linux/virtio_mmio.h>
-+#include <linux/virtio_console.h>
- 
- static void __iomem *early_base;
- static void (*printch)(char ch);
-@@ -53,6 +56,37 @@ static void smh_printch(char ch)
- }
- 
- /*
-+ * VIRTIO MMIO console single character Tx.
-+ */
-+static void virtio_console_printch(char ch)
-+{
-+	u32 tmp;
-+	static u32 init_done;
-+	static u32 can_write;
-+	struct virtio_console_config *p = early_base + VIRTIO_MMIO_CONFIG;
+ 	p += sizeof(*dgc) + numchips * sizeof(void *);
+ 	for (i = 0; i < numchips; i++) {
++		int k;
 +
-+	if (!init_done) {
-+		tmp = readl_relaxed(early_base + VIRTIO_MMIO_DEVICE_ID);
-+		if (tmp != VIRTIO_ID_CONSOLE) {
-+			init_done = 1;
-+			return;
+ 		gc = (struct irq_chip_generic *)p;
+ 		dgc->gc[i] = gc;
+ 		irq_init_generic_chip(gc, name, num_ct, i * irqs_per_chip,
+ 				      NULL, handler);
+ 		gc->domain = d;
+ 
++		for (k = 0; k < gc->num_ct; k++) {
++			struct irq_chip_type *ct = &gc->chip_types[k];
++			if (gcflags & IRQ_GC_MASK_CACHE_PER_TYPE)
++				ct->mask_cache = &ct->mask_cache_priv;
++			else
++				ct->mask_cache = &gc->mask_cache;
 +		}
 +
-+		tmp = readl_relaxed(early_base + VIRTIO_MMIO_HOST_FEATURES);
-+		if (!(tmp & (1 << VIRTIO_CONSOLE_F_EMERG_WRITE))) {
-+			init_done = 1;
-+			return;
-+		}
-+
-+		init_done = 1;
-+		can_write = 1;
-+	}
-+
-+	if (can_write)
-+		writeb_relaxed(ch, &p->emerg_wr);
-+}
-+
-+/*
-  * 8250/16550 (8-bit aligned registers) single character TX.
-  */
- static void uart8250_8bit_printch(char ch)
-@@ -82,6 +116,7 @@ static const struct earlycon_match earlycon_match[] __initconst = {
- 	{ .name = "smh", .printch = smh_printch, },
- 	{ .name = "uart8250-8bit", .printch = uart8250_8bit_printch, },
- 	{ .name = "uart8250-32bit", .printch = uart8250_32bit_printch, },
-+	{ .name = "virtio-console", .printch = virtio_console_printch, },
- 	{}
- };
- 
+ 		raw_spin_lock_irqsave(&gc_lock, flags);
+ 		list_add_tail(&gc->list, &gc_list);
+ 		raw_spin_unlock_irqrestore(&gc_lock, flags);
 -- 
-1.7.9.5
+1.7.2.5
