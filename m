@@ -1,36 +1,33 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Mon, 6 May 2013 12:25:53 +0530
-Subject: [PATCH 61/63] ARM: ux500: Stop passing DMA platform data
- though AUXDATA
-In-Reply-To: <1367591569-32197-62-git-send-email-lee.jones@linaro.org>
-References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
- <1367591569-32197-62-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130506065552.GA14706@bnru10>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 6 May 2013 07:06:25 +0000
+Subject: mach-omap2/timer.c: Bug introduced while merging patch - ff931c82
+Message-ID: <79CD15C6BA57404B839C016229A409A83EC7C45D@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 03, 2013 at 16:32:47 +0200, Lee Jones wrote:
-> The DMA platform data is now empty due to some recent refactoring,
-> so there is no longer a requirement to pass it though.
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/mach-ux500/cpu-db8500.c |    3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-> index a2c83c2..2b6cbde 100644
-> --- a/arch/arm/mach-ux500/cpu-db8500.c
-> +++ b/arch/arm/mach-ux500/cpu-db8500.c
-> @@ -264,8 +264,7 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
->  	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80125000,
->  		"ux500-msp-i2s.3", &msp3_platform_data),
->  	/* Requires clock name bindings and channel address lookup table. */
-> -	OF_DEV_AUXDATA("stericsson,db8500-dma40", 0x801C0000,
-> -		       "dma40.0", &dma40_plat_data),
-> +	OF_DEV_AUXDATA("stericsson,db8500-dma40", 0x801C0000, "dma40.0", NULL),
+Hi,
 
-Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+Not sure whether this got discussed and fixed already, but Google didn't give me anything :)
 
-srinidhi
+The below commit got merged wrongly to Mainline (Changes from timer.c got missed), and 
+due to this none of omap boards will boot.
+
+
+>From ff931c821bab6713a52b768b0cd7ee7e90713b36 Mon Sep 17 00:00:00 2001
+From: Rajendra Nayak <rnayak@ti.com>
+Date: Thu, 21 Mar 2013 11:04:52 +0000
+Subject: ARM: OMAP: clocks: Delay clk inits atleast until slab is initialized
+
+
+It seems Linux-omap tree has the fix patch for this, and it should get pushed ASAP. 
+Below are links for Linus's mainline commit [1], the actual patch submitted to the list [2] and
+Commit  present in Linux-omap [3].
+
+
+[1] http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/mach-omap2/io.c?id=ff931c821bab6713a52b768b0cd7ee7e90713b36
+[2] https://patchwork.kernel.org/patch/2300071/
+[3] http://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/commit/arch/arm/mach-omap2/timer.c?id=ff931c821bab6713a52b768b0cd7ee7e90713b36
+
+
+Thanks,
+Vaibhav
