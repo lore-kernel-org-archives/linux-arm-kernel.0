@@ -1,48 +1,83 @@
 From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
-Date: Mon,  6 May 2013 17:49:50 +0530
-Subject: [PATCH V2 2/3] Documentation: virtio: Add emergency write (emerg_wr)
- config register in virtio console.
+Date: Mon,  6 May 2013 17:49:51 +0530
+Subject: [PATCH V2 3/3] arm64: earlyprintk support for virtio-mmio console.
 In-Reply-To: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
 References: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
-Message-ID: <1367842791-30285-3-git-send-email-pranavkumar@linaro.org>
+Message-ID: <1367842791-30285-4-git-send-email-pranavkumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+This patch implements earlyprintk based on virtio console
+using emerg_wr config register.
+
+Kernel args for using this will be:
+earlyprintk=virtio-console,<phys_address>
 
 Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
 Signed-off-by: Anup Patel <anup.patel@linaro.org>
 ---
- Documentation/virtual/virtio-spec.txt |    8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/early_printk.c |   35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/Documentation/virtual/virtio-spec.txt b/Documentation/virtual/virtio-spec.txt
-index 0d6ec85..3ca38f8 100644
---- a/Documentation/virtual/virtio-spec.txt
-+++ b/Documentation/virtual/virtio-spec.txt
-@@ -1927,11 +1927,16 @@ Ports 2 onwards only if VIRTIO_CONSOLE_F_MULTIPORT is set
-     ports; configuration fields nr_ports and max_nr_ports are
-     valid and control virtqueues will be used.
+diff --git a/arch/arm64/kernel/early_printk.c b/arch/arm64/kernel/early_printk.c
+index ac974f4..ea3d2f5 100644
+--- a/arch/arm64/kernel/early_printk.c
++++ b/arch/arm64/kernel/early_printk.c
+@@ -25,6 +25,9 @@
  
-+  VIRTIO_CONSOLE_F_EMERG_WRITE(2) Device has support for emergency
-+  write. Configuration filed emerg_wr is valid.
+ #include <linux/amba/serial.h>
+ #include <linux/serial_reg.h>
++#include <linux/virtio_ids.h>
++#include <linux/virtio_mmio.h>
++#include <linux/virtio_console.h>
+ 
+ static void __iomem *early_base;
+ static void (*printch)(char ch);
+@@ -53,6 +56,37 @@ static void smh_printch(char ch)
+ }
+ 
+ /*
++ * VIRTIO MMIO console single character Tx.
++ */
++static void virtio_console_printch(char ch)
++{
++	u32 tmp;
++	static u32 init_done;
++	static u32 can_write;
++	struct virtio_console_config *p = early_base + VIRTIO_MMIO_CONFIG;
 +
-   Device configuration layout The size of the console is supplied
-   in the configuration space if the VIRTIO_CONSOLE_F_SIZE feature
-   is set. Furthermore, if the VIRTIO_CONSOLE_F_MULTIPORT feature
-   is set, the maximum number of ports supported by the device can
--  be fetched.struct virtio_console_config {
-+  be fetched. If VIRTIO_CONSOLE_F_EMERG_WRITE is set then one can
-+  use emergency write to output single character without initializing
-+  virtio queues. struct virtio_console_config {
- 
- 	u16 cols;
- 
-@@ -1941,6 +1946,7 @@ Ports 2 onwards only if VIRTIO_CONSOLE_F_MULTIPORT is set
- 
- 	u32 max_nr_ports;
- 
-+	u32 emerg_wr;
++	if (!init_done) {
++		tmp = readl_relaxed(early_base + VIRTIO_MMIO_DEVICE_ID);
++		if (tmp != VIRTIO_ID_CONSOLE) {
++			init_done = 1;
++			return;
++		}
++
++		tmp = readl_relaxed(early_base + VIRTIO_MMIO_HOST_FEATURES);
++		if (!(tmp & (1 << VIRTIO_CONSOLE_F_EMERG_WRITE))) {
++			init_done = 1;
++			return;
++		}
++
++		init_done = 1;
++		can_write = 1;
++	}
++
++	if (can_write)
++		writeb_relaxed(ch, &p->emerg_wr);
++}
++
++/*
+  * 8250/16550 (8-bit aligned registers) single character TX.
+  */
+ static void uart8250_8bit_printch(char ch)
+@@ -82,6 +116,7 @@ static const struct earlycon_match earlycon_match[] __initconst = {
+ 	{ .name = "smh", .printch = smh_printch, },
+ 	{ .name = "uart8250-8bit", .printch = uart8250_8bit_printch, },
+ 	{ .name = "uart8250-32bit", .printch = uart8250_32bit_printch, },
++	{ .name = "virtio-console", .printch = virtio_console_printch, },
+ 	{}
  };
  
-   Device Initialization
 -- 
 1.7.9.5
