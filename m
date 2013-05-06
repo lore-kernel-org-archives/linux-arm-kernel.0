@@ -1,135 +1,174 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon,  6 May 2013 14:32:12 +0200
-Subject: [RFC patch 7/8] fixup 1/2: genirq: generic chip: Add linear irq
- domain support
-In-Reply-To: <20130503214629.810207749@linutronix.de>
-References: <20130503214629.810207749@linutronix.de>
-Message-ID: <1367843533-7117-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Mon, 6 May 2013 14:48:14 +0200
+Subject: dw_apb_timer_of.c: remove parts that were picoxcell-specific
+In-Reply-To: <20130426214313.GB24891@amd.pavel.ucw.cz>
+References: <20130426121433.GA16249@amd.pavel.ucw.cz>
+ <20130426124128.GB6946@page>
+ <20130426213723.GA24891@amd.pavel.ucw.cz>
+ <20130426214313.GB24891@amd.pavel.ucw.cz>
+Message-ID: <20130506124814.GA28259@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-irq_domain_chip_generic is allocating and indexing irq_chip_generic
-itself. However, the size of irq_chip_generic varies with number of
-irq_chip_types. This fixup moves irq_chip_generic helt by
-irq_domain_chip_generic to array of ptr and fixes the pointer arith
-used by irq_alloc_domain_generic_chip.
+Hi!
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
----
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Rob Landley <rob@landley.net>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Jean-Francois Moine <moinejf@free.fr>
-Cc: Gerlando Falauto <gerlando.falauto@keymile.com>
-Cc: Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: linux-doc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- include/linux/irq.h       |    4 ++--
- kernel/irq/generic-chip.c |   20 +++++++++++++-------
- 2 files changed, 15 insertions(+), 9 deletions(-)
+Ping? Previous version was tested by Dinh, and this one is based on
+Jamie's updates, so I assume it is acceptable for him, too.
 
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 7315155..fd2d7cb 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -730,7 +730,7 @@ enum irq_gc_flags {
-  * @irq_flags_to_set:	IRQ* flags to set on irq setup
-  * @irq_flags_to_clear:	IRQ* flags to clear on irq setup
-  * @gc_flags:		Generic chip specific setup flags
-- * @gc:			Array of generic interrupt chips
-+ * @gc:			Array of pointer to generic interrupt chips
-  */
- struct irq_domain_chip_generic {
- 	unsigned int		irqs_per_chip;
-@@ -738,7 +738,7 @@ struct irq_domain_chip_generic {
- 	unsigned int		irq_flags_to_clear;
- 	unsigned int		irq_flags_to_set;
- 	enum irq_gc_flags	gc_flags;
--	struct irq_chip_generic	gc[0];
-+	struct irq_chip_generic	*gc[0];
- };
- 
- /* Generic chip callback functions */
-diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
-index e212b26..3dbfe2e 100644
---- a/kernel/irq/generic-chip.c
-+++ b/kernel/irq/generic-chip.c
-@@ -247,6 +247,7 @@ int irq_alloc_domain_generic_chips(struct irq_domain *d, int irqs_per_chip,
- 	struct irq_chip_generic *gc;
- 	int numchips, sz, i;
- 	unsigned long flags;
-+	void *p;
- 
- 	if (d->gc)
- 		return -EBUSY;
-@@ -260,9 +261,9 @@ int irq_alloc_domain_generic_chips(struct irq_domain *d, int irqs_per_chip,
- 
- 	sz = sizeof(*gc) + num_ct * sizeof(struct irq_chip_type);
- 	sz *= numchips;
--	sz += sizeof(*dgc);
-+	sz += sizeof(*dgc) + numchips * sizeof(void *);
- 
--	dgc = kzalloc(sz, GFP_KERNEL);
-+	p = dgc = kzalloc(sz, GFP_KERNEL);
- 	if (!dgc)
- 		return -ENOMEM;
- 	dgc->irqs_per_chip = irqs_per_chip;
-@@ -270,17 +271,22 @@ int irq_alloc_domain_generic_chips(struct irq_domain *d, int irqs_per_chip,
- 	dgc->irq_flags_to_set = set;
- 	dgc->irq_flags_to_clear = clr;
- 	dgc->gc_flags = gcflags;
--	gc = dgc->gc;
-+	d->gc = dgc;
- 
--	for (i = 0; i < numchips; i++, gc++) {
-+	p += sizeof(*dgc) + numchips * sizeof(void *);
-+	for (i = 0; i < numchips; i++) {
-+		gc = (struct irq_chip_generic *)p;
-+		dgc->gc[i] = gc;
- 		irq_init_generic_chip(gc, name, num_ct, i * irqs_per_chip,
- 				      NULL, handler);
- 		gc->domain = d;
-+
- 		raw_spin_lock_irqsave(&gc_lock, flags);
- 		list_add_tail(&gc->list, &gc_list);
- 		raw_spin_unlock_irqrestore(&gc_lock, flags);
-+
-+		p += sizeof(*gc) + num_ct * sizeof(struct irq_chip_type);
- 	}
--	d->gc = dgc;
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(irq_alloc_domain_generic_chips);
-@@ -301,7 +307,7 @@ irq_get_domain_generic_chip(struct irq_domain *d, unsigned int hw_irq)
- 	idx = hw_irq / dgc->irqs_per_chip;
- 	if (idx >= dgc->num_chips)
- 		return NULL;
--	return &dgc->gc[idx];
-+	return dgc->gc[idx];
- }
- EXPORT_SYMBOL_GPL(irq_get_domain_generic_chip);
- 
-@@ -331,7 +337,7 @@ static int irq_map_generic_chip(struct irq_domain *d, unsigned int virq,
- 	idx = hw_irq / dgc->irqs_per_chip;
- 	if (idx >= dgc->num_chips)
- 		return -EINVAL;
--	gc = &dgc->gc[idx];
-+	gc = dgc->gc[idx];
- 
- 	idx = hw_irq % dgc->irqs_per_chip;
- 
+It brings two platforms closer together, and makes time actually work
+on socfpga. It would be good to get it applied.
+
+Thanks,
+								Pavel
+
+On Fri 2013-04-26 23:43:13, Pavel Machek wrote:
+> It seems we made a mistake when creating dw_apb_timer_of.c:
+> picoxcell sched_clock had parts that were not related to
+> dw_apb_timer, yet we moved them to dw_apb_timer_of, and tried to
+> use them on socfpga.
+> 
+> This results in system where user/system time is not measured
+> properly, as demonstrated by
+>     
+>     time dd if=/dev/urandom of=/dev/zero bs=100000 count=100
+>     
+> So this patch switches sched_clock to hardware that exists on both
+> platforms, and adds missing of_node_put() in dw_apb_timer_init().
+>     
+> Signed-off-by: Pavel Machek <pavel@denx.de>
+> 
+> diff --git a/arch/arm/mach-picoxcell/common.h b/arch/arm/mach-picoxcell/common.h
+> index 481b42a..237fb3b 100644
+> --- a/arch/arm/mach-picoxcell/common.h
+> +++ b/arch/arm/mach-picoxcell/common.h
+> @@ -12,6 +12,4 @@
+>  
+>  #include <asm/mach/time.h>
+>  
+> -extern void dw_apb_timer_init(void);
+> -
+>  #endif /* __PICOXCELL_COMMON_H__ */
+> diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
+> index 8c2a35f..460ac99 100644
+> --- a/drivers/clocksource/dw_apb_timer.c
+> +++ b/drivers/clocksource/dw_apb_timer.c
+> @@ -21,12 +21,6 @@
+>  #define APBT_MIN_PERIOD			4
+>  #define APBT_MIN_DELTA_USEC		200
+>  
+> -#define APBTMR_N_LOAD_COUNT		0x00
+> -#define APBTMR_N_CURRENT_VALUE		0x04
+> -#define APBTMR_N_CONTROL		0x08
+> -#define APBTMR_N_EOI			0x0c
+> -#define APBTMR_N_INT_STATUS		0x10
+> -
+>  #define APBTMRS_INT_STATUS		0xa0
+>  #define APBTMRS_EOI			0xa4
+>  #define APBTMRS_RAW_INT_STATUS		0xa8
+> diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+> index ab09ed3..0fa3104 100644
+> --- a/drivers/clocksource/dw_apb_timer_of.c
+> +++ b/drivers/clocksource/dw_apb_timer_of.c
+> @@ -57,6 +57,15 @@ static void add_clockevent(struct device_node *event_timer)
+>  	dw_apb_clockevent_register(ced);
+>  }
+>  
+> +static void __iomem *sched_io_base;
+> +
+> +/* This is actually same as __apbt_read_clocksource(), but with
+> +   different interface */
+> +static u32 read_sched_clock_sptimer(void)
+> +{
+> +	return ~__raw_readl(sched_io_base + APBTMR_N_CURRENT_VALUE);
+> +}
+> +
+>  static void add_clocksource(struct device_node *source_timer)
+>  {
+>  	void __iomem *iobase;
+> @@ -71,41 +80,27 @@ static void add_clocksource(struct device_node *source_timer)
+>  
+>  	dw_apb_clocksource_start(cs);
+>  	dw_apb_clocksource_register(cs);
+> -}
+>  
+> -static void __iomem *sched_io_base;
+> -
+> -static u32 read_sched_clock(void)
+> -{
+> -	return __raw_readl(sched_io_base);
+> +	sched_io_base = iobase;
+> +	setup_sched_clock(read_sched_clock_sptimer, 32, rate);
+>  }
+>  
+> -static const struct of_device_id sptimer_ids[] __initconst = {
+> -	{ .compatible = "picochip,pc3x2-rtc" },
+> +static const struct of_device_id osctimer_ids[] __initconst = {
+> +	{ .compatible = "picochip,pc3x2-timer" },
+> +	{ .compatible = "snps,dw-apb-timer-osc" },
+>  	{ .compatible = "snps,dw-apb-timer-sp" },
+> -	{ /* Sentinel */ },
+> +	{  /* Sentinel */ },
+>  };
+>  
+> -static void init_sched_clock(void)
+> -{
+> -	struct device_node *sched_timer;
+> -	u32 rate;
+> -
+> -	sched_timer = of_find_matching_node(NULL, sptimer_ids);
+> -	if (!sched_timer)
+> -		panic("No RTC for sched clock to use");
+> +/*
+> +   You don't have to use dw_apb_timer for scheduler clock,
+> +   this should also work fine on arm:
+>  
+> -	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
+> -	of_node_put(sched_timer);
+> +  twd_local_timer_of_register();
+> +  arch_timer_of_register();                 
+> +  arch_timer_sched_clock_init();
+> +*/
+>  
+> -	setup_sched_clock(read_sched_clock, 32, rate);
+> -}
+> -
+> -static const struct of_device_id osctimer_ids[] __initconst = {
+> -	{ .compatible = "picochip,pc3x2-timer" },
+> -	{ .compatible = "snps,dw-apb-timer-osc" },
+> -	{},
+> -};
+>  
+>  void __init dw_apb_timer_init(void)
+>  {
+> @@ -121,7 +116,6 @@ void __init dw_apb_timer_init(void)
+>  		panic("No timer for clocksource");
+>  	add_clocksource(source_timer);
+>  
+> +	of_node_put(event_timer);
+>  	of_node_put(source_timer);
+> -
+> -	init_sched_clock();
+>  }
+> diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
+> index dd755ce..a64c987 100644
+> --- a/include/linux/dw_apb_timer.h
+> +++ b/include/linux/dw_apb_timer.h
+> @@ -17,6 +17,12 @@
+>  #include <linux/clocksource.h>
+>  #include <linux/interrupt.h>
+>  
+> +#define APBTMR_N_LOAD_COUNT		0x00
+> +#define APBTMR_N_CURRENT_VALUE		0x04
+> +#define APBTMR_N_CONTROL		0x08
+> +#define APBTMR_N_EOI			0x0c
+> +#define APBTMR_N_INT_STATUS		0x10
+> +
+>  #define APBTMRS_REG_SIZE       0x14
+>  
+>  struct dw_apb_timer {
+> 
+> 
+
 -- 
-1.7.2.5
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
