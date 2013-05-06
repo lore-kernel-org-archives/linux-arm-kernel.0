@@ -1,43 +1,33 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Mon, 6 May 2013 17:00:58 -0400
-Subject: [RESEND][PATCH 3/3] arm: add bandgap entry for OMAP4460 devices
-In-Reply-To: <1367874058-2378-1-git-send-email-eduardo.valentin@ti.com>
-References: <1367874058-2378-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1367874058-2378-4-git-send-email-eduardo.valentin@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon,  6 May 2013 15:11:09 -0600
+Subject: [PATCH 0/2] ARM: tegra: a couple clock bug-fixes 
+Message-ID: <1367874671-11474-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include bandgap devices for OMAP4460 devices.
+From: Stephen Warren <swarren@nvidia.com>
 
-Cc: "Beno?t Cousson" <b-cousson@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-omap at vger.kernel.org
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
----
- arch/arm/boot/dts/omap4460.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Arnd, Olof,
 
-diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
-index 7c2c23c..3808b5c 100644
---- a/arch/arm/boot/dts/omap4460.dtsi
-+++ b/arch/arm/boot/dts/omap4460.dtsi
-@@ -29,4 +29,13 @@
- 			     <0 55 0x4>;
- 		ti,hwmods = "debugss";
- 	};
-+
-+	bandgap {
-+		reg = <0x4a002260 0x4
-+			0x4a00232C 0x4
-+			0x4a002378 0x18>;
-+		compatible = "ti,omap4460-bandgap";
-+		interrupts = <0 126 4>; /* talert */
-+		ti,tshut-gpio = <86>;
-+	};
- };
+The following two patches fix a couple issues in the Tegra20 clock driver
+that show up on specific platforms. They were sent a little late for 3.9,
+and I forgot to include them for 3.10 since they weren't reposted:-(
+
+Patch 1 is clearly a bug-fix. Someone pedantic could argue that patch 2
+is a new feature since it's the last piece to enabling AC'97 support, but
+I'd argue that it's a bug in the clock driver that it didn't support this
+clock when it was first written:-)
+
+These patches logically belong to Tegra's for-3.10/clk branch, but feel
+free to apply them where is easiest; it'd be fine to defer them to a post-
+3.10-rc1 fixes branch too if you want.
+
+Lucas Stach (2):
+  clk: tegra: remove USB from clk init table
+  clk: tegra: add ac97 controller clock
+
+ drivers/clk/tegra/clk-tegra20.c |   11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
+
 -- 
-1.8.2.1.342.gfa7285d
+1.7.10.4
