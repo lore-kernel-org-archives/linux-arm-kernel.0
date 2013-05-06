@@ -1,50 +1,46 @@
 From: kyungsik.lee@lge.com (Kyungsik Lee)
-Date: Mon,  6 May 2013 17:42:54 +0900
-Subject: [PATCH -next 1/2] arm: Remove enforced Os flag for LZ4 decompressor
-Message-ID: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+Date: Mon,  6 May 2013 17:42:55 +0900
+Subject: [PATCH -next 2/2] kbuild: fix for updated LZ4 tool with the new
+ streaming format
+In-Reply-To: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+References: <1367829775-4434-1-git-send-email-kyungsik.lee@lge.com>
+Message-ID: <1367829775-4434-2-git-send-email-kyungsik.lee@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
--Os is enforced here, based on the test result of decompression time
-below, slightly faster than -O2.
+LZ4 has been updated with LZ4 Streaming Format specification(v1.3).
+lz4demo is replaced by lz4c. lz4c supports both the new streaming and
+legacy format with -l option.
 
-But further tests with UA show that using -O2 will be the right choice
-especially in the case of the unaligned access enabled and the gap,
-few counts in the normal decompression mode is small enough to remove -Os.
+This patch makes use of lz4c to support legacy format which is
+used for LZ4 De/compression in the linux kernel.
 
-Decompression Time(counts)
-     Normal    UA enabled
--Os  6717      3447
--O2  6720      2728
-
-Note: ARM v7, Kernel 3.4
-      counter freq. = 32768 HZ
-      UA(Unaligned Access)
-      gcc version 4.6.2
-
+Link: https://code.google.com/p/lz4/source/checkout
 Signed-off-by: Kyungsik Lee <kyungsik.lee@lge.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: Ingo Molnar <mingo@elte.hu>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Russell King <rmk@arm.linux.org.uk>
 Cc: Borislav Petkov <bp@alien8.de>
 Cc: Florian Fainelli <florian@openwrt.org>
 Cc: Yann Collet <yann.collet.73@gmail.com>
+Cc: Chanho Min <chanho.min@lge.com>
 ---
- arch/arm/boot/compressed/Makefile | 3 ---
- 1 file changed, 3 deletions(-)
+ scripts/Makefile.lib | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 001a13a..198a4ad 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -27,9 +27,6 @@ OBJS	+= misc.o decompress.o
- ifeq ($(CONFIG_DEBUG_UNCOMPRESS),y)
- OBJS	+= debug.o
- endif
--ifeq ($(CONFIG_KERNEL_LZ4),y)
--CFLAGS_decompress.o := -Os
--endif
- FONTC	= $(srctree)/drivers/video/console/font_acorn_8x8.c
+diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+index a0ab6d7..c9bfbb0 100644
+--- a/scripts/Makefile.lib
++++ b/scripts/Makefile.lib
+@@ -313,7 +313,7 @@ cmd_lzo = (cat $(filter-out FORCE,$^) | \
  
- # string library code (-Os is enforced to keep it much smaller)
+ quiet_cmd_lz4 = LZ4     $@
+ cmd_lz4 = (cat $(filter-out FORCE,$^) | \
+-	lz4demo -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
++	lz4c -l -c1 stdin stdout && $(call size_append, $(filter-out FORCE,$^))) > $@ || \
+ 	(rm -f $@ ; false)
+ 
+ # U-Boot mkimage
 -- 
 1.8.1.1
