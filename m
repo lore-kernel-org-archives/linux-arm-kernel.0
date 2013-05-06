@@ -1,174 +1,37 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Mon, 6 May 2013 14:48:14 +0200
-Subject: dw_apb_timer_of.c: remove parts that were picoxcell-specific
-In-Reply-To: <20130426214313.GB24891@amd.pavel.ucw.cz>
-References: <20130426121433.GA16249@amd.pavel.ucw.cz>
- <20130426124128.GB6946@page>
- <20130426213723.GA24891@amd.pavel.ucw.cz>
- <20130426214313.GB24891@amd.pavel.ucw.cz>
-Message-ID: <20130506124814.GA28259@amd.pavel.ucw.cz>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 6 May 2013 14:52:25 +0200
+Subject: MVEBU PCI Express support
+In-Reply-To: <5183F858.1050804@itooo.com>
+References: <5183F858.1050804@itooo.com>
+Message-ID: <20130506145225.67d04859@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Dear Greg,
 
-Ping? Previous version was tested by Dinh, and this one is based on
-Jamie's updates, so I assume it is acceptable for him, too.
+On Fri, 03 May 2013 19:48:08 +0200, Greg wrote:
 
-It brings two platforms closer together, and makes time actually work
-on socfpga. It would be good to get it applied.
+> this one is targeted to the Free Electrons guys : should I start 
+> investigating by myself or are you planning to release a patch for 
+> supporting PCI express on Marvell Armada* platforms ?
 
-Thanks,
-								Pavel
+We have already posted 8 versions of the PCIe patches on this list. The
+last version is
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/161968.html.
+However, this patch set has a few dependencies, so if you want
+something ready-to-use even if not yet in mainline, I would recommend
+you to have a look at
+https://github.com/MISL-EBU-System-SW/mainline-public/tree/backport-3.8.
+This is a 3.8 vanilla kernel into which we have backported a number of
+features/fixes, including the PCIe support.
 
-On Fri 2013-04-26 23:43:13, Pavel Machek wrote:
-> It seems we made a mistake when creating dw_apb_timer_of.c:
-> picoxcell sched_clock had parts that were not related to
-> dw_apb_timer, yet we moved them to dw_apb_timer_of, and tried to
-> use them on socfpga.
-> 
-> This results in system where user/system time is not measured
-> properly, as demonstrated by
->     
->     time dd if=/dev/urandom of=/dev/zero bs=100000 count=100
->     
-> So this patch switches sched_clock to hardware that exists on both
-> platforms, and adds missing of_node_put() in dw_apb_timer_init().
->     
-> Signed-off-by: Pavel Machek <pavel@denx.de>
-> 
-> diff --git a/arch/arm/mach-picoxcell/common.h b/arch/arm/mach-picoxcell/common.h
-> index 481b42a..237fb3b 100644
-> --- a/arch/arm/mach-picoxcell/common.h
-> +++ b/arch/arm/mach-picoxcell/common.h
-> @@ -12,6 +12,4 @@
->  
->  #include <asm/mach/time.h>
->  
-> -extern void dw_apb_timer_init(void);
-> -
->  #endif /* __PICOXCELL_COMMON_H__ */
-> diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-> index 8c2a35f..460ac99 100644
-> --- a/drivers/clocksource/dw_apb_timer.c
-> +++ b/drivers/clocksource/dw_apb_timer.c
-> @@ -21,12 +21,6 @@
->  #define APBT_MIN_PERIOD			4
->  #define APBT_MIN_DELTA_USEC		200
->  
-> -#define APBTMR_N_LOAD_COUNT		0x00
-> -#define APBTMR_N_CURRENT_VALUE		0x04
-> -#define APBTMR_N_CONTROL		0x08
-> -#define APBTMR_N_EOI			0x0c
-> -#define APBTMR_N_INT_STATUS		0x10
-> -
->  #define APBTMRS_INT_STATUS		0xa0
->  #define APBTMRS_EOI			0xa4
->  #define APBTMRS_RAW_INT_STATUS		0xa8
-> diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-> index ab09ed3..0fa3104 100644
-> --- a/drivers/clocksource/dw_apb_timer_of.c
-> +++ b/drivers/clocksource/dw_apb_timer_of.c
-> @@ -57,6 +57,15 @@ static void add_clockevent(struct device_node *event_timer)
->  	dw_apb_clockevent_register(ced);
->  }
->  
-> +static void __iomem *sched_io_base;
-> +
-> +/* This is actually same as __apbt_read_clocksource(), but with
-> +   different interface */
-> +static u32 read_sched_clock_sptimer(void)
-> +{
-> +	return ~__raw_readl(sched_io_base + APBTMR_N_CURRENT_VALUE);
-> +}
-> +
->  static void add_clocksource(struct device_node *source_timer)
->  {
->  	void __iomem *iobase;
-> @@ -71,41 +80,27 @@ static void add_clocksource(struct device_node *source_timer)
->  
->  	dw_apb_clocksource_start(cs);
->  	dw_apb_clocksource_register(cs);
-> -}
->  
-> -static void __iomem *sched_io_base;
-> -
-> -static u32 read_sched_clock(void)
-> -{
-> -	return __raw_readl(sched_io_base);
-> +	sched_io_base = iobase;
-> +	setup_sched_clock(read_sched_clock_sptimer, 32, rate);
->  }
->  
-> -static const struct of_device_id sptimer_ids[] __initconst = {
-> -	{ .compatible = "picochip,pc3x2-rtc" },
-> +static const struct of_device_id osctimer_ids[] __initconst = {
-> +	{ .compatible = "picochip,pc3x2-timer" },
-> +	{ .compatible = "snps,dw-apb-timer-osc" },
->  	{ .compatible = "snps,dw-apb-timer-sp" },
-> -	{ /* Sentinel */ },
-> +	{  /* Sentinel */ },
->  };
->  
-> -static void init_sched_clock(void)
-> -{
-> -	struct device_node *sched_timer;
-> -	u32 rate;
-> -
-> -	sched_timer = of_find_matching_node(NULL, sptimer_ids);
-> -	if (!sched_timer)
-> -		panic("No RTC for sched clock to use");
-> +/*
-> +   You don't have to use dw_apb_timer for scheduler clock,
-> +   this should also work fine on arm:
->  
-> -	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
-> -	of_node_put(sched_timer);
-> +  twd_local_timer_of_register();
-> +  arch_timer_of_register();                 
-> +  arch_timer_sched_clock_init();
-> +*/
->  
-> -	setup_sched_clock(read_sched_clock, 32, rate);
-> -}
-> -
-> -static const struct of_device_id osctimer_ids[] __initconst = {
-> -	{ .compatible = "picochip,pc3x2-timer" },
-> -	{ .compatible = "snps,dw-apb-timer-osc" },
-> -	{},
-> -};
->  
->  void __init dw_apb_timer_init(void)
->  {
-> @@ -121,7 +116,6 @@ void __init dw_apb_timer_init(void)
->  		panic("No timer for clocksource");
->  	add_clocksource(source_timer);
->  
-> +	of_node_put(event_timer);
->  	of_node_put(source_timer);
-> -
-> -	init_sched_clock();
->  }
-> diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
-> index dd755ce..a64c987 100644
-> --- a/include/linux/dw_apb_timer.h
-> +++ b/include/linux/dw_apb_timer.h
-> @@ -17,6 +17,12 @@
->  #include <linux/clocksource.h>
->  #include <linux/interrupt.h>
->  
-> +#define APBTMR_N_LOAD_COUNT		0x00
-> +#define APBTMR_N_CURRENT_VALUE		0x04
-> +#define APBTMR_N_CONTROL		0x08
-> +#define APBTMR_N_EOI			0x0c
-> +#define APBTMR_N_INT_STATUS		0x10
-> +
->  #define APBTMRS_REG_SIZE       0x14
->  
->  struct dw_apb_timer {
-> 
-> 
+We're hoping to get PCIe support in mainline for 3.11.
 
+Best regards,
+
+Thomas
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
