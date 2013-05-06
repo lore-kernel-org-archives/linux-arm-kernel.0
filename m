@@ -1,67 +1,36 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 06 May 2013 10:55:39 -0400
-Subject: [Xen-devel] [PATCH 1/3] arm_arch_timer: introduce
- arch_timer_stolen_ticks
-In-Reply-To: <alpine.DEB.2.02.1305051745390.4756@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
- <1367436460-10183-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <51817CBE.4050003@codeaurora.org>
- <1367482772.21869.26.camel@zakaz.uk.xensource.com>
- <5182DBA9.9080609@codeaurora.org>
- <alpine.DEB.2.02.1305031130210.5398@kaball.uk.xensource.com>
- <5183976A.6000703@arm.com>
- <alpine.DEB.2.02.1305051745390.4756@kaball.uk.xensource.com>
-Message-ID: <5187C46B.5070309@codeaurora.org>
+From: itooo@itooo.com (Greg)
+Date: Mon, 06 May 2013 16:58:04 +0200
+Subject: MVEBU PCI Express support
+In-Reply-To: <20130506145225.67d04859@skate>
+References: <5183F858.1050804@itooo.com> <20130506145225.67d04859@skate>
+Message-ID: <5187C4FC.20504@itooo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2013 12:47 PM, Stefano Stabellini wrote:
-> On Fri, 3 May 2013, Marc Zyngier wrote:
->> On 03/05/13 11:43, Stefano Stabellini wrote:
->>> On Thu, 2 May 2013, Christopher Covington wrote:
->>>>> So the virtual timer should appear to have been running even while time
->>>>> is being stolen and therefore stolen time needs to be accounted via some
->>>>> other means.
->>>>
->>>> Something that's not currently obvious to me is that given that the stolen
->>>> cycle accounting should be done, what makes the architected timer interrupt
->>>> handler the ideal place to do it?
->>>
->>> That is a good question and I would appreciate suggestions to improve
->>> the patch.
->>>
->>> Given that Xen x86 and ia64 does stolen time accounting from the timer
->>> interrupt handler:
->>>
->>> arch/x86/xen/time.c:xen_timer_interrupt
->>> arch/ia64/kernel/time.c:timer_interrupt
->>>
->>> and given that the arch_timer is the only timer used by Xen on ARM and
->>> that it includes a virt_timer that is made on purpose to be used by
->>> virtual machines, I thought that it might be a good place for it.
->>>
->>> I also thought that doing it this way, KVM should be able to reuse the
->>> same hook.
->>
->> Indeed. I just need to understand how time stealing works there ;-).
->>
->> Now, KVM is not necessarily limited to arch_timers, and we've run KVM
->> using a QEMU-provided timer in the past. Can you think of a more generic
->> location for this hook? Possibly something that would satisfy the
->> requirements of other architectures while we're at it?
-> 
-> Probably the best option would be to reuse
-> 
-> kernel/sched/cputime.c:steal_account_process_tick
-> 
-> but that also means introducing CONFIG_PARAVIRT on arm.
-> I am up for that, what do you think?
+Le 06/05/2013 14:52, Thomas Petazzoni a ?crit :
+> Dear Greg,
+>
+> On Fri, 03 May 2013 19:48:08 +0200, Greg wrote:
+>
+>> this one is targeted to the Free Electrons guys : should I start
+>> investigating by myself or are you planning to release a patch for
+>> supporting PCI express on Marvell Armada* platforms ?
+> We have already posted 8 versions of the PCIe patches on this list. The
+> last version is
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/161968.html.
+> However, this patch set has a few dependencies, so if you want
+> something ready-to-use even if not yet in mainline, I would recommend
+> you to have a look at
+> https://github.com/MISL-EBU-System-SW/mainline-public/tree/backport-3.8.
+> This is a 3.8 vanilla kernel into which we have backported a number of
+> features/fixes, including the PCIe support.
+>
+> We're hoping to get PCIe support in mainline for 3.11.
+> Thanks Thomas,
 
-That sounds like a good move to me.
+Sorry I'm not yet very familiar with all this (patches, repos, 
+backports, branches, ...).
+I'll give a try to the backport you suggest and, hopefully, get back to 
+you with some feedback.
 
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Cheers,
