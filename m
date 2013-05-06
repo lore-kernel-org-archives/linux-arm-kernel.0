@@ -1,31 +1,49 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 06 May 2013 11:38:00 -0400 (EDT)
-Subject: [PATCH 0/7] mv643xx_eth: device tree bindings
-In-Reply-To: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 6 May 2013 17:39:09 +0200
+Subject: [PATCH v3 5/7] ARM: kirkwood: remove legacy mv643xx_eth board
+ setup
+In-Reply-To: <1367854420-8006-6-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
  <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130506.113800.203598940932244298.davem@davemloft.net>
+ <1367854420-8006-6-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130506173909.10dc7c59@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Sebastian Hesselbarth,
 
-Two things:
+On Mon,  6 May 2013 17:33:38 +0200, Sebastian Hesselbarth wrote:
+> With DT support for mv643xx_eth we do not need legacy platform_data
+> based setup for DT enabled boards. This patch removes eth setup
+> for all kirkwood DT board files.
+> 
 
-1) None of your postings make the mailing lists because your CC: line is
-   too large, and we block large ones because those are %99 of SPAM.
+>  arch/arm/mach-kirkwood/board-dnskw.c          |    7 -------
+>  arch/arm/mach-kirkwood/board-dockstar.c       |    9 ---------
+>  arch/arm/mach-kirkwood/board-dreamplug.c      |   14 --------------
+>  arch/arm/mach-kirkwood/board-goflexnet.c      |    9 ---------
+>  arch/arm/mach-kirkwood/board-guruplug.c       |   14 --------------
+>  arch/arm/mach-kirkwood/board-ib62x0.c         |    9 ---------
+>  arch/arm/mach-kirkwood/board-iconnect.c       |    6 ------
+>  arch/arm/mach-kirkwood/board-iomega_ix2_200.c |   16 ----------------
+>  arch/arm/mach-kirkwood/board-km_kirkwood.c    |    7 -------
+>  arch/arm/mach-kirkwood/board-lsxl.c           |   12 ------------
+>  arch/arm/mach-kirkwood/board-mplcec4.c        |   11 -----------
+>  arch/arm/mach-kirkwood/board-ns2.c            |   13 -------------
+>  arch/arm/mach-kirkwood/board-openblocks_a6.c  |    9 ---------
+>  arch/arm/mach-kirkwood/board-readynas.c       |    6 ------
+>  arch/arm/mach-kirkwood/board-ts219.c          |   13 -------------
+>  arch/arm/mach-kirkwood/board-usi_topkick.c    |    9 ---------
 
-   It really isn't reasonable to CC: so many people, and I do understand
-   that you're just sifting email addresses from MAINTAINERS or whatever,
-   but just use the appropriate mailing lists and the absolute most direct
-   developer(s).  Probably just the person who you believe should apply
-   this patch.
+I believe a good number of those files become empty once you've removed
+the registration of the Ethernet devices. Shouldn't such files be
+removed in this patch?
 
-2) Networking feature patch submissions are closed, as per:
+Thanks!
 
-	http://marc.info/?l=linux-netdev&m=136730964130303&w=2
-
-   Therefore please resubmit this after the merge window is closed
-   and I have explicitly announced that the net-next tree is open again
-   for submissions.
-
-Thanks.
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
