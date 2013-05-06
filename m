@@ -1,75 +1,137 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 6 May 2013 15:51:18 +0100
-Subject: [PATCH RFC v2 4/4] xen/arm: account for stolen ticks
+Date: Mon, 6 May 2013 15:51:16 +0100
+Subject: [PATCH RFC v2 2/4] arm: introduce CONFIG_PARAVIRT and pv_time_ops
 In-Reply-To: <alpine.DEB.2.02.1305061532310.4756@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1305061532310.4756@kaball.uk.xensource.com>
-Message-ID: <1367851878-21629-4-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1367851878-21629-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the runstate_memory_area with the hypervisor.
-Use pv_time_ops.steal_clock to account for stolen ticks.
+Introduce CONFIG_PARAVIRT on ARM.
+
+The only paravirt interface supported is pv_time_ops.steal_clock.
+No runtime pvops patching yet.
+
+This allows us to make us of steal_account_process_tick for stolen ticks
+accounting.
+
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+CC: linux at arm.linux.org.uk
+CC: will.deacon at arm.com
+CC: nico at linaro.org
+CC: marc.zyngier at arm.com
+CC: cov at codeaurora.org
+CC: arnd at arndb.de
+CC: olof at lixom.net
 ---
- arch/arm/xen/enlighten.c |   23 +++++++++++++++++++++++
- 1 files changed, 23 insertions(+), 0 deletions(-)
+ arch/arm/Kconfig                |    9 +++++++++
+ arch/arm/include/asm/paravirt.h |   19 +++++++++++++++++++
+ arch/arm/kernel/Makefile        |    1 +
+ arch/arm/kernel/paravirt.c      |   32 ++++++++++++++++++++++++++++++++
+ 4 files changed, 61 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/include/asm/paravirt.h
+ create mode 100644 arch/arm/kernel/paravirt.c
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index ee86bfa..2a5cc82 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -14,7 +14,10 @@
- #include <xen/xen-ops.h>
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/hypercall.h>
-+#include <asm/arch_timer.h>
- #include <asm/system_misc.h>
-+#include <asm/paravirt.h>
-+#include <linux/jump_label.h>
- #include <linux/interrupt.h>
- #include <linux/irqreturn.h>
- #include <linux/module.h>
-@@ -152,6 +155,20 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
- }
- EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 344e299..35cb10a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1887,12 +1887,21 @@ config XEN_DOM0
+ 	def_bool y
+ 	depends on XEN
  
-+unsigned long long xen_stolen_accounting(int cpu)
++config PARAVIRT
++	bool "Enable paravirtualization code"
++	---help---
++	  This changes the kernel so it can modify itself when it is run
++	  under a hypervisor, potentially improving performance significantly
++	  over full virtualization.  However, when run without a hypervisor
++	  the kernel is theoretically slower and slightly larger.
++
+ config XEN
+ 	bool "Xen guest support on ARM (EXPERIMENTAL)"
+ 	depends on ARM && AEABI && OF
+ 	depends on CPU_V7 && !CPU_V6
+ 	depends on !GENERIC_ATOMIC64
+ 	select ARM_PSCI
++	select PARAVIRT
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+ 
+diff --git a/arch/arm/include/asm/paravirt.h b/arch/arm/include/asm/paravirt.h
+new file mode 100644
+index 0000000..3b95bc6
+--- /dev/null
++++ b/arch/arm/include/asm/paravirt.h
+@@ -0,0 +1,19 @@
++#ifndef _ASM_ARM_PARAVIRT_H
++#define _ASM_ARM_PARAVIRT_H
++
++struct static_key;
++extern struct static_key paravirt_steal_enabled;
++extern struct static_key paravirt_steal_rq_enabled;
++
++struct pv_time_ops {
++	unsigned long long (*steal_clock)(int cpu);
++};
++extern struct pv_time_ops pv_time_ops;
++
++static inline u64 paravirt_steal_clock(int cpu)
 +{
-+	struct vcpu_runstate_info state;
-+
-+	if (cpu != get_cpu())
-+		BUG();
-+
-+	xen_get_runstate_snapshot(&state);
-+
-+	WARN_ON(state.state != RUNSTATE_running);
-+
-+	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
++	return pv_time_ops.steal_clock(cpu);
 +}
 +
- static void __init xen_percpu_init(void *unused)
- {
- 	struct vcpu_register_vcpu_info info;
-@@ -170,6 +187,8 @@ static void __init xen_percpu_init(void *unused)
- 		BUG();
- 	per_cpu(xen_vcpu, cpu) = vcpup;
- 
-+	xen_setup_runstate_info(cpu);
 +
- 	enable_percpu_irq(xen_events_irq, 0);
- }
++#endif
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index dd9d90a..6764f60 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -86,5 +86,6 @@ ifeq ($(CONFIG_ARM_PSCI),y)
+ obj-y				+= psci.o
+ obj-$(CONFIG_SMP)		+= psci_smp.o
+ endif
++obj-$(CONFIG_PARAVIRT)	+= paravirt.o
  
-@@ -301,6 +320,10 @@ static int __init xen_init_events(void)
- 
- 	on_each_cpu(xen_percpu_init, NULL, 0);
- 
-+	pv_time_ops.steal_clock = xen_stolen_accounting;
-+	static_key_slow_inc(&paravirt_steal_enabled);
-+	static_key_slow_inc(&paravirt_steal_rq_enabled);
+ extra-y := $(head-y) vmlinux.lds
+diff --git a/arch/arm/kernel/paravirt.c b/arch/arm/kernel/paravirt.c
+new file mode 100644
+index 0000000..3e73fc8
+--- /dev/null
++++ b/arch/arm/kernel/paravirt.c
+@@ -0,0 +1,32 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2013 Citrix Systems
++ *
++ * Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
++ */
 +
- 	return 0;
- }
- postcore_initcall(xen_init_events);
++#include <linux/export.h>
++#include <linux/jump_label.h>
++#include <linux/types.h>
++#include <asm/paravirt.h>
++
++struct static_key paravirt_steal_enabled;
++struct static_key paravirt_steal_rq_enabled;
++
++static u64 native_steal_clock(int cpu)
++{
++	return 0;
++}
++
++struct pv_time_ops pv_time_ops = {
++	.steal_clock = native_steal_clock,
++};
++EXPORT_SYMBOL_GPL(pv_time_ops);
 -- 
 1.7.2.5
