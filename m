@@ -1,56 +1,71 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Mon, 06 May 2013 17:30:25 +0100
-Subject: [PATCH 2/2] staging/iio/mxs-lradc: fix preenable for multiple
- buffers
-In-Reply-To: <ba60ca91ef1d3061b454e518f6026a1157fae5d7.1367671597.git.mirq-linux@rere.qmqm.pl>
-References: <6bb527db65fb20f60bb95814bff3abc513733a7c.1367671597.git.mirq-linux@rere.qmqm.pl>
- <ba60ca91ef1d3061b454e518f6026a1157fae5d7.1367671597.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <5187DAA1.50503@kernel.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 06 May 2013 10:31:04 -0700
+Subject: [RFC PATCH] implement read_cpuid_ext for v7-M (Was: Re: [PATCHv2
+ 2/3] ARM: Detect support for SDIV/UDIV from ISAR0) register
+In-Reply-To: <20130506093059.GH23285@pengutronix.de>
+References: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
+ <1363631337-13816-3-git-send-email-sboyd@codeaurora.org>
+ <20130418091019.GA21099@pengutronix.de>
+ <20130506093059.GH23285@pengutronix.de>
+Message-ID: <5187E8D8.3080708@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2013 02:19 PM, Micha? Miros?aw wrote:
-> This fixes 'preenable failed: -EINVAL' error when using this driver.
-> 
-For future patches, please cleanly separate out (in a different series)
-the bug fixes from the cleanups.  This one has been applied to the
-fixes-togreg branch of iio.git wherease the first patch will go
-through the togreg branch and hit one kernel cycle later.
+On 05/06/13 02:30, Uwe Kleine-K?nig wrote:
+> Hello,
+>
+> On Thu, Apr 18, 2013 at 11:10:19AM +0200, Uwe Kleine-K?nig wrote:
+>> On Mon, Mar 18, 2013 at 11:28:56AM -0700, Stephen Boyd wrote:
+>>> The ISAR0 register indicates support for the SDIV and UDIV
+>>> instructions in both the Thumb and ARM instruction set. Read the
+>>> register to detect the supported instructions and update the
+>>> elf_hwcap mask as appropriate. This is better than adding more
+>>> and more cpuid checks in proc-v7.S for each new cpu variant that
+>>> supports these instructions.
+>> you pointed out yesterday that this could work on v7-m, too. As I based
+>> my patches on 3.9-rc1 this patch (8164f7af88) wasn't included. When
+>> updating this results in a warning, because I have
+>>
+>> 	6ebd4d0 (ARM: stub out read_cpuid and read_cpuid_ext for CPU_CP15=n)
+>>
+>> from rmk's devel-stable branch.
+>>  
+>>> Acked-by: Will Deacon <will.deacon@arm.com>
+>>> Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
+>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>>> ---
+>>>  arch/arm/kernel/setup.c | 20 ++++++++++++++++++++
+>>>  arch/arm/mm/proc-v7.S   |  4 ++--
+>>>  2 files changed, 22 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+>>> index e2c8bbf..f3ac13f 100644
+>>> --- a/arch/arm/kernel/setup.c
+>>> +++ b/arch/arm/kernel/setup.c
+>>> @@ -353,6 +353,23 @@ void __init early_print(const char *str, ...)
+>>>  	printk("%s", buf);
+>>>  }
+>>>  
+>>> +static void __init cpuid_init_hwcaps(void)
+>>> +{
+>>> +	unsigned int divide_instrs;
+>>> +
+>>> +	if (cpu_architecture() < CPU_ARCH_ARMv7)
+>>> +		return;
+>>> +
+>>> +	divide_instrs = (read_cpuid_ext(CPUID_EXT_ISAR0) & 0x0f000000) >> 24;
+>> The problem is that read_cpuid_ext is called which doesn't map to
+>> something useful for v7-m. So maybe add a check:
+>>
+>> 	if (!IS_ENABLED(CONFIG_CPU_CP15))
+>> 		return;
+>>
+>> ?
+> The patch below fixes the issue for me on V7-M. The only drawback is
+> that the list of registers isn't shared. Maybe someone has a nice idea?
 
-Applied to the fixes-togreg
-> Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-> ---
->  drivers/staging/iio/adc/mxs-lradc.c |    5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
-> index 03299ea..d92c97a 100644
-> --- a/drivers/staging/iio/adc/mxs-lradc.c
-> +++ b/drivers/staging/iio/adc/mxs-lradc.c
-> @@ -690,7 +690,6 @@ static void mxs_lradc_trigger_remove(struct iio_dev *iio)
->  static int mxs_lradc_buffer_preenable(struct iio_dev *iio)
->  {
->  	struct mxs_lradc *lradc = iio_priv(iio);
-> -	struct iio_buffer *buffer = iio->buffer;
->  	int ret = 0, chan, ofs = 0;
->  	unsigned long enable = 0;
->  	uint32_t ctrl4_set = 0;
-> @@ -698,7 +697,7 @@ static int mxs_lradc_buffer_preenable(struct iio_dev *iio)
->  	uint32_t ctrl1_irq = 0;
->  	const uint32_t chan_value = LRADC_CH_ACCUMULATE |
->  		((LRADC_DELAY_TIMER_LOOP - 1) << LRADC_CH_NUM_SAMPLES_OFFSET);
-> -	const int len = bitmap_weight(buffer->scan_mask, LRADC_MAX_TOTAL_CHANS);
-> +	const int len = bitmap_weight(iio->active_scan_mask, LRADC_MAX_TOTAL_CHANS);
->  
->  	if (!len)
->  		return -EINVAL;
-> @@ -725,7 +724,7 @@ static int mxs_lradc_buffer_preenable(struct iio_dev *iio)
->  		lradc->base + LRADC_CTRL1 + STMP_OFFSET_REG_CLR);
->  	writel(0xff, lradc->base + LRADC_CTRL0 + STMP_OFFSET_REG_CLR);
->  
-> -	for_each_set_bit(chan, buffer->scan_mask, LRADC_MAX_TOTAL_CHANS) {
-> +	for_each_set_bit(chan, iio->active_scan_mask, LRADC_MAX_TOTAL_CHANS) {
->  		ctrl4_set |= chan << LRADC_CTRL4_LRADCSELECT_OFFSET(ofs);
->  		ctrl4_clr |= LRADC_CTRL4_LRADCSELECT_MASK(ofs);
->  		ctrl1_irq |= LRADC_CTRL1_LRADC_IRQ_EN(ofs);
-> 
+The patch looks ok to me.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
