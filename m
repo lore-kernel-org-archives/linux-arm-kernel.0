@@ -1,13 +1,13 @@
 From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Mon, 6 May 2013 17:00:57 -0400
-Subject: [RESEND][PATCH 2/3] arm: dts: add bandgap entry for OMAP443x devices
+Date: Mon, 6 May 2013 17:00:58 -0400
+Subject: [RESEND][PATCH 3/3] arm: add bandgap entry for OMAP4460 devices
 In-Reply-To: <1367874058-2378-1-git-send-email-eduardo.valentin@ti.com>
 References: <1367874058-2378-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1367874058-2378-3-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <1367874058-2378-4-git-send-email-eduardo.valentin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the bandgap entry for OMAP4430 devices.
+Include bandgap devices for OMAP4460 devices.
 
 Cc: "Beno?t Cousson" <b-cousson@ti.com>
 Cc: Tony Lindgren <tony@atomide.com>
@@ -18,20 +18,25 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
 ---
- arch/arm/boot/dts/omap443x.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/boot/dts/omap4460.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
-index cccf39a..8d6c968 100644
---- a/arch/arm/boot/dts/omap443x.dtsi
-+++ b/arch/arm/boot/dts/omap443x.dtsi
-@@ -24,4 +24,8 @@
- 			clock-latency = <300000>; /* From legacy driver */
- 		};
+diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+index 7c2c23c..3808b5c 100644
+--- a/arch/arm/boot/dts/omap4460.dtsi
++++ b/arch/arm/boot/dts/omap4460.dtsi
+@@ -29,4 +29,13 @@
+ 			     <0 55 0x4>;
+ 		ti,hwmods = "debugss";
  	};
++
 +	bandgap {
-+		reg = <0x4a002260 0x4 0x4a00232C 0x4>;
-+		compatible = "ti,omap4430-bandgap";
++		reg = <0x4a002260 0x4
++			0x4a00232C 0x4
++			0x4a002378 0x18>;
++		compatible = "ti,omap4460-bandgap";
++		interrupts = <0 126 4>; /* talert */
++		ti,tshut-gpio = <86>;
 +	};
  };
 -- 
