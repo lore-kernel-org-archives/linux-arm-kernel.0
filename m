@@ -1,24 +1,29 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 6 May 2013 11:29:57 +0100
-Subject: [RFT][PATCH 1/2] clk: wm831x: Fix update wrong register for
- enable/disable FLL
-In-Reply-To: <1367422261.8160.1.camel@phoenix>
-References: <1367422261.8160.1.camel@phoenix>
-Message-ID: <20130506102957.GA13472@opensource.wolfsonmicro.com>
+Date: Mon, 6 May 2013 11:31:05 +0100
+Subject: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
+ xfer->speed_hz set
+In-Reply-To: <5182414F.1000201@atmel.com>
+References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
+ <1362626815-6628-1-git-send-email-wenyou.yang@atmel.com>
+ <CAGhQ9VwW18LXY5Jn0FUFCaAzKxP1W3QADG=JBp9JbgaAwo=F2Q@mail.gmail.com>
+ <B256D81BAE5131468A838E5D7A24364154236AB5@penmbx02>
+ <CACQ1gAhZO3stjrwf5SiZf7jOO8T5bAJZiz97M7+7vwFmk2e65g@mail.gmail.com>
+ <5182414F.1000201@atmel.com>
+Message-ID: <20130506103105.GB13472@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 01, 2013 at 11:31:01PM +0800, Axel Lin wrote:
-> According to the datasheet, FLL Enable is controlled by
-> R16530 (4092h) FLL Control1
+On Thu, May 02, 2013 at 12:34:55PM +0200, Nicolas Ferre wrote:
 
-Both
+> Can you tell us if this SPI patch will be merged upstream using one
+> of your paths?
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+I have no idea what patch this is but if it's not in my tree -next it's
+unlikely to be merged.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130506/9a94a8a2/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130506/0b07241b/attachment.sig>
