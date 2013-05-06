@@ -1,12 +1,30 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 06 May 2013 14:30:27 -0000
-Subject: [patch 7/8] genirq: generic chip: Add linear irq domain support
-References: <20130503212258.385818955@linutronix.de>
- <20130506142348.321859745@linutronix.de>
-Message-ID: <20130506142539.450634298@linutronix.de>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Mon, 6 May 2013 10:35:33 -0400
+Subject: [Xen-devel] [PATCH 1/3] arm_arch_timer: introduce
+ arch_timer_stolen_ticks
+In-Reply-To: <5182DBA9.9080609@codeaurora.org>
+References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
+ <1367436460-10183-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <51817CBE.4050003@codeaurora.org>
+ <1367482772.21869.26.camel@zakaz.uk.xensource.com>
+ <5182DBA9.9080609@codeaurora.org>
+Message-ID: <20130506143533.GF15278@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An embedded and charset-unspecified text was scrubbed...
-Name: genirq-add-linear-domain-support.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130506/bf05fee4/attachment.ksh>
+> > e.g. if a VCPU sets a timer for NOW+5, but 3 are stolen in the middle it
+> > would not make sense (from the guests PoV) for NOW'==NOW+2 at the point
+> > where the timer goes off. Nor does it make sense to require that the
+> > guest actually be running for 5 before injecting the timer because that
+> > would mean real time elapsed time for the timer would be 5+3 in the case
+> > where 3 are stolen.
+> 
+> This is a bit of an aside, but I think that hiding time spent at higher
+> privilege levels can be a quite sensible approach to timekeeping in a
+> virtualized environment, but I understand that it's not the approach taken
+> with Xen, and as you pointed out above, adjusting the Virtual Offset Register
+> by itself isn't enough to implement that approach.
+
+This is the approach taken by Xen and KVM. Look in CONFIG_PARAVIRT_CLOCK for
+implementation. In the user-space, the entry in 'top' of "stolen" (%st)
+is for this exact value.
