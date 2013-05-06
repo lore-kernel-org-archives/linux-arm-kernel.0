@@ -1,171 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 06 May 2013 10:18:05 -0500
-Subject: [patch 8/8] irqchip: sun4i: Convert to generic irq chip
-In-Reply-To: <20130506142539.523110430@linutronix.de>
-References: <20130503212258.385818955@linutronix.de>
- <20130506142348.321859745@linutronix.de>
- <20130506142539.523110430@linutronix.de>
-Message-ID: <5187C9AD.3080409@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 6 May 2013 08:27:06 -0700
+Subject: mach-omap2/timer.c: Bug introduced while merging patch - ff931c82
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC7C45D@DBDE04.ent.ti.com>
+References: <79CD15C6BA57404B839C016229A409A83EC7C45D@DBDE04.ent.ti.com>
+Message-ID: <20130506152706.GD28721@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2013 09:30 AM, Thomas Gleixner wrote:
-> Proof of concept patch to demonstrate the new irqdomain support for
-> the generic irq chip. Untested !!
+* Hiremath, Vaibhav <hvaibhav@ti.com> [130506 00:12]:
+> Hi,
 > 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/irqchip/irq-sun4i.c |  100 ++++++++++++--------------------------------
->  1 file changed, 29 insertions(+), 71 deletions(-)
+> Not sure whether this got discussed and fixed already, but Google didn't give me anything :)
 > 
-> Index: linux-2.6/drivers/irqchip/irq-sun4i.c
-> ===================================================================
-> --- linux-2.6.orig/drivers/irqchip/irq-sun4i.c
-> +++ linux-2.6/drivers/irqchip/irq-sun4i.c
-> @@ -32,70 +32,43 @@
->  #define SUN4I_IRQ_FIQ_PENDING_REG(x)	(0x20 + 0x4 * x)
->  #define SUN4I_IRQ_ENABLE_REG(x)		(0x40 + 0x4 * x)
->  #define SUN4I_IRQ_MASK_REG(x)		(0x50 + 0x4 * x)
-> +#define SUN4I_NUM_CHIPS			3
-> +#define SUN4I_IRQS_PER_CHIP		32
->  
->  static void __iomem *sun4i_irq_base;
->  static struct irq_domain *sun4i_irq_domain;
->  
->  static asmlinkage void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs);
->  
-> -void sun4i_irq_ack(struct irq_data *irqd)
-> +static int __init sun4i_init_domain_chips(void)
->  {
-> -	unsigned int irq = irqd_to_hwirq(irqd);
-> -	unsigned int irq_off = irq % 32;
-> -	int reg = irq / 32;
-> -	u32 val;
-> -
-> -	val = readl(sun4i_irq_base + SUN4I_IRQ_PENDING_REG(reg));
-> -	writel(val | (1 << irq_off),
-> -	       sun4i_irq_base + SUN4I_IRQ_PENDING_REG(reg));
-> -}
-> -
-> -static void sun4i_irq_mask(struct irq_data *irqd)
-> -{
-> -	unsigned int irq = irqd_to_hwirq(irqd);
-> -	unsigned int irq_off = irq % 32;
-> -	int reg = irq / 32;
-> -	u32 val;
-> -
-> -	val = readl(sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
-> -	writel(val & ~(1 << irq_off),
-> -	       sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
-> -}
-> -
-> -static void sun4i_irq_unmask(struct irq_data *irqd)
-> -{
-> -	unsigned int irq = irqd_to_hwirq(irqd);
-> -	unsigned int irq_off = irq % 32;
-> -	int reg = irq / 32;
-> -	u32 val;
-> -
-> -	val = readl(sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
-> -	writel(val | (1 << irq_off),
-> -	       sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
-> -}
-> -
-> -static struct irq_chip sun4i_irq_chip = {
-> -	.name		= "sun4i_irq",
-> -	.irq_ack	= sun4i_irq_ack,
-> -	.irq_mask	= sun4i_irq_mask,
-> -	.irq_unmask	= sun4i_irq_unmask,
-> -};
-> -
-> -static int sun4i_irq_map(struct irq_domain *d, unsigned int virq,
-> -			 irq_hw_number_t hw)
-> -{
-> -	irq_set_chip_and_handler(virq, &sun4i_irq_chip,
-> -				 handle_level_irq);
-> -	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
-> -
-> +	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
-> +	struct irq_chip_generic *gc;
-> +	int i, ret, base = 0;
-> +
-> +	ret = irq_alloc_domain_generic_chips(d, SUN4I_IRQS_PER_CHIP, 1,
-
-1 should be SUN4I_NUM_CHIPS.
-
-> +					     "sun4i_irq", handle_level_irq,
-> +					     clr, 0, IRQ_GC_INIT_MASK_CACHE);
-> +	if (ret)
-> +		return ret;
-> +
-> +	for (i = 0; i < SUN4I_NUM_CHIPS; i++, base += SUN4I_IRQS_PER_CHIP) {
-> +		gc = irq_get_domain_generic_chip(sun4i_irq_domain, base);
-
-Perhaps this could be an iterator macro.
-
-> +		gc->reg_base = sun4i_irq_base;
-> +		gc->chip_types[0].regs.mask = SUN4I_IRQ_ENABLE_REG(i);
-> +		gc->chip_types[0].regs.ack = SUN4I_IRQ_PENDING_REG(i);
-> +		gc->chip_types[0].chip.mask = irq_gc_mask_clr_bit;
-> +		gc->chip_types[0].chip.ack = irq_gc_ack_set_bit;
-> +		gc->chip_types[0].chip.unmask = irq_gc_mask_set_bit;
-> +
-> +		/* Disable, mask and clear all pending interrupts */
-> +		writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(i));
-> +		writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(i));
-> +		writel(0xffffffff, sun4i_irq_base + SUN4I_IRQ_PENDING_REG(i));
-> +	}
->  	return 0;
->  }
->  
-> -static struct irq_domain_ops sun4i_irq_ops = {
-> -	.map = sun4i_irq_map,
-> -	.xlate = irq_domain_xlate_onecell,
-> -};
-> -
->  static int __init sun4i_of_init(struct device_node *node,
->  				struct device_node *parent)
->  {
-> @@ -104,21 +77,6 @@ static int __init sun4i_of_init(struct d
->  		panic("%s: unable to map IC registers\n",
->  			node->full_name);
->  
-> -	/* Disable all interrupts */
-> -	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(0));
-> -	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(1));
-> -	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(2));
-> -
-> -	/* Mask all the interrupts */
-> -	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(0));
-> -	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(1));
-> -	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(2));
-> -
-> -	/* Clear all the pending interrupts */
-> -	writel(0xffffffff, sun4i_irq_base + SUN4I_IRQ_PENDING_REG(0));
-> -	writel(0xffffffff, sun4i_irq_base + SUN4I_IRQ_PENDING_REG(1));
-> -	writel(0xffffffff, sun4i_irq_base + SUN4I_IRQ_PENDING_REG(2));
-> -
->  	/* Enable protection mode */
->  	writel(0x01, sun4i_irq_base + SUN4I_IRQ_PROTECTION_REG);
->  
-> @@ -126,8 +84,8 @@ static int __init sun4i_of_init(struct d
->  	writel(0x00, sun4i_irq_base + SUN4I_IRQ_NMI_CTRL_REG);
->  
->  	sun4i_irq_domain = irq_domain_add_linear(node, 3 * 32,
-
-s/3 * 32/SUN4I_NUM_CHIPS * SUN4I_IRQS_PER_CHIP/
-
-> -						 &sun4i_irq_ops, NULL);
-> -	if (!sun4i_irq_domain)
-> +						 &irq_generic_chip_ops, NULL);
-> +	if (!sun4i_irq_domain || sun4i_init_domain_chips())
->  		panic("%s: unable to create IRQ domain\n", node->full_name);
->  
->  	set_handle_irq(sun4i_handle_irq);
+> The below commit got merged wrongly to Mainline (Changes from timer.c got missed), and 
+> due to this none of omap boards will boot.
 > 
 > 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> From ff931c821bab6713a52b768b0cd7ee7e90713b36 Mon Sep 17 00:00:00 2001
+> From: Rajendra Nayak <rnayak@ti.com>
+> Date: Thu, 21 Mar 2013 11:04:52 +0000
+> Subject: ARM: OMAP: clocks: Delay clk inits atleast until slab is initialized
+> 
+> 
+> It seems Linux-omap tree has the fix patch for this, and it should get pushed ASAP. 
+> Below are links for Linus's mainline commit [1], the actual patch submitted to the list [2] and
+> Commit  present in Linux-omap [3].
+
+Can you please provide a proper patch for the regression since sounds
+like you already figured out what happened?
+
+Regards,
+
+Tony 
+ 
+> [1] http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/arch/arm/mach-omap2/io.c?id=ff931c821bab6713a52b768b0cd7ee7e90713b36
+> [2] https://patchwork.kernel.org/patch/2300071/
+> [3] http://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/commit/arch/arm/mach-omap2/timer.c?id=ff931c821bab6713a52b768b0cd7ee7e90713b36
