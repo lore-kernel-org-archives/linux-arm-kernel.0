@@ -1,48 +1,39 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Mon, 6 May 2013 15:22:39 +0800
-Subject: [V9 PATCH 01/12] usb: phy: protect phy init and shutdown for
- mutiple deivces
-In-Reply-To: <20130429182441.GA1632@arwen.pp.htv.fi>
-References: <1366784606-1813-1-git-send-email-chao.xie@marvell.com>
- <1366784606-1813-2-git-send-email-chao.xie@marvell.com>
- <20130429182441.GA1632@arwen.pp.htv.fi>
-Message-ID: <CADApbeiKnTSscVrPrCWzZjrJKW9XnyHxNuvy_ReaLEaKgPb+Tg@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon,  6 May 2013 12:52:26 +0530
+Subject: [PATCHv2 0/4] mailbox: Common API
+Message-ID: <1367824946-6160-1-git-send-email-jaswinder.singh@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 30, 2013 at 2:24 AM, Felipe Balbi <balbi@ti.com> wrote:
-> On Wed, Apr 24, 2013 at 02:23:15AM -0400, Chao Xie wrote:
->> diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
->> index 6b5978f..98d7e60 100644
->> --- a/include/linux/usb/phy.h
->> +++ b/include/linux/usb/phy.h
->> @@ -87,6 +87,14 @@ struct usb_phy {
->>       /* to support controllers that have multiple transceivers */
->>       struct list_head        head;
->>
->> +     /*
->> +      * PHY may be shared by multiple devices.
->> +      * mutex and refcount are used to make sure PHY only initialize or
->> +      * shutdown once.
->
-> bad grammar in this sentence.
->
+Hello,
+  I have made the implementation look more proper. Also made some changes
+suggested by Suman. Changes since V1:
 
-I will fix it in the next version.
+* Delete timer upon mailbox release
+* Filled in the stub ipc_links_unregister()
+* Check kzalloc return for errors.
+* Add the controller driver for OMAP2 class. I have taken the patch
+  for mailbox's hwmod from Suman's. The clients are yet to be converted
+  but this should be enough to convey the idea that the API could
+  work for OMAP as well. If I had access to STE documentation, I might
+  have done some implementation for U8500 as well.
 
->> +      */
->> +     struct mutex            phy_mutex;
->> +     unsigned int            refcount;
->
-> why don't you use an atomic_t ?
->
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |   12 +
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |   11 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   11 +
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   13 +
+ drivers/cpufreq/highbank-cpufreq.c         |   22 +-
+ drivers/mailbox/Kconfig                    |    9 +
+ drivers/mailbox/Makefile                   |    7 +-
+ drivers/mailbox/mailbox.c                  |  494 ++++++++++++++++++++++++++++
+ drivers/mailbox/omap2.c                    |  420 +++++++++++++++++++++++
+ drivers/mailbox/pl320-ipc.c                |  198 -----------
+ drivers/mailbox/pl320.c                    |  212 ++++++++++++
+ include/linux/mailbox.h                    |   28 +-
+ include/linux/mailbox_client.h             |   85 +++++
+ include/linux/mailbox_controller.h         |  102 ++++++
+ include/linux/platform_data/mailbox-omap.h |   64 ++++
+ 15 files changed, 1473 insertions(+), 215 deletions(-)
 
-Mutex will protect both ->init and ->shutdown routines. Thanks for
-Russell's explanation.
-
-> --
-> balbi
-
-Can you help to review other patches in this series? So I can fix all
-the errors in the next version.
-Thanks.
+Cheers,
+-Jassi
