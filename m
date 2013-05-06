@@ -1,42 +1,65 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 06 May 2013 15:41:26 -0700
-Subject: [PATCH] clk: remove clock notifier at unregister
-In-Reply-To: <1366633361-28887-1-git-send-email-david.andrey@netmodule.com>
-References: <1366633361-28887-1-git-send-email-david.andrey@netmodule.com>
-Message-ID: <20130506224126.4542.19886@quantum>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 7 May 2013 01:16:14 +0200
+Subject: [RFC PATCH 1/2] ARM: delay: print dummy values for bogomips
+In-Reply-To: <1367602547-19322-2-git-send-email-will.deacon@arm.com>
+References: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
+ <1367602547-19322-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20130506231554.GB16801@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting David Andrey (2013-04-22 05:22:41)
-> Clock notifier node is now removed from the
-> notifier list during unregister
-> 
-> Signed-off-by: David Andrey <david.andrey@netmodule.com>
-> Acked-by: Martin Meuli <martin.meuli@netmodule.com>
+Hi!
 
-This looks good.  I'll take it in after -rc1 comes out.
+> Now that we support a timer-backed delay loop, I'm quickly getting sick
+> and tired of people complaining that their beloved bogomips value has
+> decreased. You know who you are!
 
-Thanks,
-Mike
+> Unfortunately, we can't just remove the entry from /proc/cpuinfo, as it
+> will likely break fragile userspace code which is parsing that stuff, so
+> instead replace it with a dummy value that can be chosen in the
+> Kconfig.
 
-> ---
->  drivers/clk/clk.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 20ce67f..eb66434 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1941,7 +1941,10 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb)
->  
->                 /* XXX the notifier code should handle this better */
->                 if (!cn->notifier_head.head) {
-> +                       if (clk->notifier_count)
-> +                               BUG();
->                         srcu_cleanup_notifier_head(&cn->notifier_head);
-> +                       list_del(&cn->node);
->                         kfree(cn);
->                 }
->  
-> -- 
-> 1.7.4.1
+So, instead of removing it you silently report invalid value? Note
+that there's no cpumhz display in procinfo... at least on OLPC I
+looked.
+
+And whether it is 30MHz or 3GHz cpu might be relevant information for
+userspace, and yes, bogomips used to be good enough for that.
+
+Actually it was mhz, mhz/2 or mhz*2 on pretty much all reasonable systems.
+
+> +choice
+> +	prompt "BogoMIPs setting"
+> +	default BOGOMIPS_MEDIUM
+> +	help
+> +	  The BogoMIPs value reported by Linux is exactly what it sounds
+> +	  like: totally bogus. It is used to calibrate the delay loop,
+> +	  which may be backed by a timer clocked completely independently
+> +	  of the CPU.
+
+This is too ugly to live, sorry.
+
+> +	config BOGOMIPS_SLOW
+> +		bool "Slow (older machines)"
+> +		help
+> +		  If you're comparing a faster machine with a slower machine,
+> +		  then you might want this option selected on one of them.
+> +
+> +	config BOGOMIPS_MEDIUM
+> +		bool "Medium (default)"
+> +		help
+> +		  A BogoMIPS value for the masses.
+> +
+> +	config BOGOMIPS_FAST
+> +		bool "Fast (marketing)"
+> +		help
+> +		  Some people believe that software runs faster with this
+> +		  setting so, if you're one of them, say Y here.
+
+April 1st came late this year?
+
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
