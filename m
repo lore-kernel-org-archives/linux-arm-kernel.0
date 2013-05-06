@@ -1,38 +1,117 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Mon, 6 May 2013 10:43:23 +0300
-Subject: [PATCH 4/4] staging: =?utf-8?Q?ste=5Fr?=
- =?utf-8?Q?mi4=3A_Suppress_'ignoring_return_value_of_=E2=80=98regulator=5F?=
- =?utf-8?B?ZW5hYmxlKCkn?= warning
-In-Reply-To: <20130506065138.GA31763@bnru10>
-References: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
- <1367509690-24022-5-git-send-email-lee.jones@linaro.org>
- <20130503070713.GA27956@bnru09> <20130505141855.GB4686@mwanda>
- <20130506065138.GA31763@bnru10>
-Message-ID: <20130506074323.GH4635@mwanda>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Mon, 06 May 2013 14:41:46 +0930
+Subject: [PATCH 0/2] Early printk support for virtio console devices.
+In-Reply-To: <CAFEAcA9h8iSYfTBtf6n+Vk5sDtBR2yB2oafRxikHoWbKt0VRUw@mail.gmail.com>
+References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
+ <BA2076A6-0688-4E5C-85F9-A9CA8FD75782@suse.de>
+ <87obcyc9sh.fsf@rustcorp.com.au>
+ <336C59AA-D5D7-472E-A8DA-EEB413DD6C68@suse.de>
+ <CAAHg+Hj0tySbzUGnoFE9ybVYP291B-i8-Ck1EkwD57t8yG5wwg@mail.gmail.com>
+ <C52CCDD4-D8FB-4AD6-B83D-3B5251A7A0F5@suse.de>
+ <87sj27xxjr.fsf@rustcorp.com.au>
+ <CAFEAcA9h8iSYfTBtf6n+Vk5sDtBR2yB2oafRxikHoWbKt0VRUw@mail.gmail.com>
+Message-ID: <87ip2wr8tp.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 06, 2013 at 12:21:39PM +0530, Srinidhi Kasagar wrote:
-> > > > -	regulator_enable(rmi4_data->regulator);
-> > > > +	retval = regulator_enable(rmi4_data->regulator);
-> > > > +	if (retval < 0)
-> > > > +		return retval;
-> > > Does it make sense to add a dev_err?
-> > > 
-> > 
-> > Is that a question?
-> > 
-> > regulator_enable() already prints some warnings.  Probably it's not
-> > going to fail and adding code that is duplicative or will never be
-> > run is pointless.
-> 
-> It has become a habit checking the return value and spit some errors.
-> And BTW, there are many drivers which does this way..Anyway if your
-> intention is to avoid them for the new drivers..I dont mind skipping
-> this..
+Peter Maydell <peter.maydell@linaro.org> writes:
+> On 1 May 2013 03:07, Rusty Russell <rusty@rustcorp.com.au> wrote:
+>> An emergency output is a reasonable idea, and this is a reasonable
+>> implementation.  The question is practical: will it be used?  Because we
+>> don't implement reasonable ideas which aren't going to be used.
+>
+> If you think it fits reasonably into the virtio spec (ie doesn't
+> implement things at the wrong level of the transport/backend
+> abstraction) then we can implement it in QEMU, and I think it
+> makes more sense to do this than to throw in a random extra
+> serial port.
+>
+> To be actually useful we need to also specify something in
+> the device tree to say "here is where you will find your
+> emergency output and what it is".
 
-It's not like I'm trying to ban error messages.  There isn't any
-official policy on error messages.
+Hmm, I'm not sure that's true.  It looks like it needs:
 
-regards,
-dan carpenter
+1) An enhancment to the vdev->set_config callback to pass through (at
+   least) an offset, probably offset and length.
+
+2) An emerg_write() function ptr which can be called at any time, set by
+   virtio_console.c's class_init:
+
+static void emerg_write(VirtIOSerialPort *port, char c)
+{
+    VirtConsole *vcon = DO_UPCAST(VirtConsole, port, port);
+
+    if (vcon->chr)
+        qemu_chr_fe_write(vcon->chr, &c, 1);
+}
+
+3) A routine to find an emerg-write-capable console in
+   virtio_serial_bus.c (or just assume port 0?):
+
+static VirtIOSerialPort *find_emerg_write_port(VirtIOSerial *vser)
+{
+    VirtIOSerialPort *port;
+
+    QTAILQ_FOREACH(port, &vser->ports, next) {
+        VirtIOSerialPortClass *vsc;
+        vsc = VIRTIO_SERIAL_PORT_GET_CLASS(port);
+
+        if (vsc->emerg_write) {
+            return port;
+        }
+    }
+    return NULL;
+}
+
+4) set_config in virtio_serial_bus.c to notice emergency writes:
+
+    if (offset == offsetof(struct virtio_console_config, emerg_w) {
+        VirtIOSerial *vser;
+        vser = DO_UPCAST(VirtIOSerial, vdev, vdev);
+        VirtIOSerialPort *port;
+
+        port = find_emerg_write_port(vser);
+        if (port) {
+            vsc->emerg_write(port, config.emerg_w);
+        }
+    }
+
+Amit might have more clue... Amit?
+
+Thanks,
+Rusty.
+
+From: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Subject: virtio: console: Add early writeonly register to config space
+
+This patch adds a emerg_wr register (writeonly) in config space of virtio console device which can be used for debugging.
+
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
+---
+ include/uapi/linux/virtio_console.h | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/include/uapi/linux/virtio_console.h b/include/uapi/linux/virtio_console.h
+index ee13ab6..586678d 100644
+--- a/include/uapi/linux/virtio_console.h
++++ b/include/uapi/linux/virtio_console.h
+@@ -38,6 +38,7 @@
+ /* Feature bits */
+ #define VIRTIO_CONSOLE_F_SIZE	0	/* Does host provide console size? */
+ #define VIRTIO_CONSOLE_F_MULTIPORT 1	/* Does host provide multiple ports? */
++#define VIRTIO_CONSOLE_F_EMERG_WRITE 2	/* Does host support emergency write? */
+ 
+ #define VIRTIO_CONSOLE_BAD_ID		(~(u32)0)
+ 
+@@ -48,6 +49,8 @@ struct virtio_console_config {
+ 	__u16 rows;
+ 	/* max. number of ports this device can hold */
+ 	__u32 max_nr_ports;
++	/* emergency write register */
++	__u32 emerg_wr;
+ } __attribute__((packed));
+ 
+ /*
