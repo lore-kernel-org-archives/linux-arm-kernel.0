@@ -1,25 +1,20 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon,  6 May 2013 17:33:35 +0200
-Subject: [PATCH v3 2/7] net: mv643xx_eth: update Device Tree bindings
- documentation
+Date: Mon,  6 May 2013 17:33:37 +0200
+Subject: [PATCH v3 4/7] ARM: dove: add gigabit ethernet and mvmdio device tree
+ nodes
 In-Reply-To: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
  <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1367854420-8006-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1367854420-8006-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Fainelli <florian@openwrt.org>
+This patch adds mv643xx_eth and mvmdio device tree nodes for DT enabled
+Dove boards. As there is only one ethernet controller on Dove, a default
+phy node is also added with a note to overwrite its reg property on a
+per-board basis.
 
-This patch updates the Device Tree bindings documentation for the
-Marvell MV643xx ethernet controller node and makes the
-"local-mac-address" and "phy" properties optional instead of required.
-The absence of a "phy" node is legal and describes a MAC to switch
-configuration, while not specifying the "local-mac-address" allows for
-reuse of the MAC address already programmed into the Ethernet
-controller.
-
-Signed-off-by: Florian Fainelli <florian@openwrt.org>
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 Cc: Grant Likely <grant.likely@linaro.org>
 Cc: Rob Herring <rob.herring@calxeda.com>
@@ -52,26 +47,73 @@ Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- Documentation/devicetree/bindings/marvell.txt |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/dove-cubox.dts |    8 ++++++++
+ arch/arm/boot/dts/dove.dtsi      |   35 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/marvell.txt b/Documentation/devicetree/bindings/marvell.txt
-index 73ea12f..ed4058c 100644
---- a/Documentation/devicetree/bindings/marvell.txt
-+++ b/Documentation/devicetree/bindings/marvell.txt
-@@ -141,11 +141,11 @@ prefixed with the string "marvell,", for Marvell Technology Group Ltd.
-      - interrupts : <a> where a is the interrupt number for the port.
-      - interrupt-parent : the phandle for the interrupt controller
-        that services interrupts for this device.
+diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+index 7e3065a..a52f016 100644
+--- a/arch/arm/boot/dts/dove-cubox.dts
++++ b/arch/arm/boot/dts/dove-cubox.dts
+@@ -49,6 +49,14 @@
+ &uart0 { status = "okay"; };
+ &sata0 { status = "okay"; };
+ &i2c0 { status = "okay"; };
++&mdio { status = "okay"; };
++&eth { status = "okay"; };
++&eth0 { status = "okay"; };
 +
-+   Optional properties:
-      - phy : the phandle for the PHY connected to this ethernet
-        controller.
-      - local-mac-address : 6 bytes, MAC address
--
--   Optional properties:
-      - clocks : Phandle to the clock control device and gate bit
-      - clock-names : String describing the clock gate bit
-      - speed : Speed to force the link (10, 100, 1000), used when no
++&ethphy {
++	compatible = "marvell,88e1310";
++	reg = <1>;
++};
+ 
+ &sdio0 {
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 6cab468..8bb46c4 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -258,5 +258,40 @@
+ 				dmacap,xor;
+ 			};
+ 		};
++
++		mdio: mdio-bus at 72004 {
++			compatible = "marvell,orion-mdio";
++			reg = <0x72004 0x84>;
++			interrupts = <30>;
++			clocks = <&gate_clk 2>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++
++			ethphy: ethernet-phy {
++				device_type = "ethernet-phy";
++				/* overwrite reg property in board file */
++			};
++		};
++
++		eth: ethernet-controller at 72000 {
++			compatible = "marvell,mv643xx-eth-block";
++			reg = <0x72000 0x4000>;
++			clocks = <&gate_clk 2>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			tx-csum-limit = <1600>;
++			status = "disabled";
++
++			eth0: ethernet-port at 0 {
++				compatible = "marvell,mv643xx-eth";
++				device_type = "network";
++				reg = <0>;
++				interrupts = <29>;
++				clocks = <&gate_clk 2>;
++				phy = <&ethphy>;
++				status = "disabled";
++			};
++		};
+ 	};
+ };
 -- 
 1.7.2.5
