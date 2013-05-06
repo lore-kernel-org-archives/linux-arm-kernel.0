@@ -1,22 +1,12 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 06 May 2013 14:30:16 -0000
-Subject: [patch 0/8] genirq: Support for irq domains in generic irq chip - V2
-In-Reply-To: <20130503212258.385818955@linutronix.de>
-Message-ID: <20130506142348.321859745@linutronix.de>
+Date: Mon, 06 May 2013 14:30:21 -0000
+Subject: [patch 3/8] genirq: generic chip: Handle separate mask registers
+References: <20130503212258.385818955@linutronix.de>
+ <20130506142348.321859745@linutronix.de>
+Message-ID: <20130506142539.152569748@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes vs. V1:
-
-	- Fixed the generic chip pointer thinko (Sebastian Hesselbarth)
-
-	- Proper support for mask cache
-
-	- Read mask hardware only for the first map of an generic chip
-          instance
-
-	- sun4i prefix irq functions proper  
-
-Thanks,
-
-	tglx
+An embedded and charset-unspecified text was scrubbed...
+Name: genirq-handle-separate-mask-registers.patch
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130506/5d841737/attachment.ksh>
