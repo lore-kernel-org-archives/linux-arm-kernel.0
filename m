@@ -1,92 +1,63 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 06 May 2013 18:21:54 +0200
-Subject: [PATCH 0/7] mv643xx_eth: device tree bindings
-In-Reply-To: <20130506160743.GV31290@titan.lakedaemon.net>
-References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
- <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130506160743.GV31290@titan.lakedaemon.net>
-Message-ID: <5187D8A2.5060604@gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Mon, 06 May 2013 17:27:38 +0100
+Subject: [PATCH 1/2] staging/iio/mxs-lradc: cleanup masklength
+In-Reply-To: <6bb527db65fb20f60bb95814bff3abc513733a7c.1367671597.git.mirq-linux@rere.qmqm.pl>
+References: <6bb527db65fb20f60bb95814bff3abc513733a7c.1367671597.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <5187D9FA.8000808@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/13 18:07, Jason Cooper wrote:
-> Sebastian,
->
-> Thanks for picking this up!  A few comments about merging strategy:
->
-> On Mon, May 06, 2013 at 05:33:33PM +0200, Sebastian Hesselbarth wrote:
->> This patch set picks up work by Florian Fainelli bringing full DT
->> support to mv643xx_eth and Marvell SoCs using it.
->>
->> The current patch set drops Florian's device tree conversions for
->> Kirkwood, Dove, and Orion5x in favour of split patches for board
->> files and board descriptor files.
->>
->> Device tree conversion for Dove and Kirkwood is added. Dove has
->> been fully tested, while Kirkwood is compile-tested only.
->>
->> Florian Fainelli (2):
->>    net: mv643xx_eth: add Device Tree bindings
->>    net: mv643xx_eth: update Device Tree bindings documentation
->
-> Obviously, these will go through -net once the submission window opens.
->
->> Sebastian Hesselbarth (5):
-> (reordered for clarity)
->
->>    ARM: dove: remove legacy mv643xx_eth setup
->>    ARM: kirkwood: remove legacy mv643xx_eth board setup
->>    ARM: kirkwood: remove legacy clk alias for mv643xx_eth
->
-> mvebu/boards or /soc.
->
->>    ARM: kirkwood: add gigabit ethernet and mvmdio device tree nodes
->>    ARM: dove: add gigabit ethernet and mvmdio device tree nodes
->
-> mvebu/dt
->
->
-> mvebu/dt and -net are fine.  They have no dependencies.  The problem is
-> mvebu/boards.  To boot with networking, it needs -net *and* mvebu/dt.
-> Otherwise, the board needs to do legacy init.
->
-> I'd like to attempt to remove this dependency-hell with code.  eg some
-> quick pseudo-code:
->
-> 	if (!dt_node_present("marvell,mv643xx_eth") ||
-> 	    !mvebu_dt_bindings_present())
-> 		kirkwood_ge00_init();
->
-> The advantages of figuring this out are:
->   - *no* branch dependencies
->   - whole conversion done in one merge window
->
-> The drawbacks:
->   - need to remember to do a follow-on patch if all branches are
->     successfuly merged, removing the unneeded logic (after -rc1)
->   - considered churn?
->
-> The easy answer is to merge mvebu/dt, and -net, wait one cycle, and
-> merge the board stuff as you have it now (with Thomas' comment).
->
-> If we can figure this out, I'd like to do the same for the kirkwood-pcie
-> series.
+On 05/04/2013 02:19 PM, Micha? Miros?aw wrote:
+> We know the exact iio->masklength = LRADC_MAX_TOTAL_CHANS.
+> Let's use it consistently.
+I guess this gives a small improvement in clarity so
+applied to togreg branch of iio.git.
 
-Jason,
-
-I suggest to take the "easy answer", i.e. merge mvebu/dt and -net and
-take all board merges one cycle later.
-
-Waiting for -net will stall irqchip but will give us enough time to
-add DT timer and get rid of any legacy init code introduced for irqchip.
-Also orion5x and mv78x00 can be added to mv643xx_eth conversion.
-
-I am preparing empty board files removal as Thomas suggested.
-
-Sebastian
-
-P.S.: I was hoping that adding all people scripts/get_maintainers.pl
-throws out, will notice all kirkwood board users ever committed to
-mainline kernel. But as David Miller pointed out, it will not go through
-SPAM filters that way. So have an eye open for v4 on mailing lists as
-soon as -net merge window re-opens.
+Thanks,
+> 
+> Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+> ---
+>  drivers/staging/iio/adc/mxs-lradc.c |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/staging/iio/adc/mxs-lradc.c b/drivers/staging/iio/adc/mxs-lradc.c
+> index 2856b8f..03299ea 100644
+> --- a/drivers/staging/iio/adc/mxs-lradc.c
+> +++ b/drivers/staging/iio/adc/mxs-lradc.c
+> @@ -620,7 +620,7 @@ static irqreturn_t mxs_lradc_trigger_handler(int irq, void *p)
+>  		((LRADC_DELAY_TIMER_LOOP - 1) << LRADC_CH_NUM_SAMPLES_OFFSET);
+>  	unsigned int i, j = 0;
+>  
+> -	for_each_set_bit(i, iio->active_scan_mask, iio->masklength) {
+> +	for_each_set_bit(i, iio->active_scan_mask, LRADC_MAX_TOTAL_CHANS) {
+>  		lradc->buffer[j] = readl(lradc->base + LRADC_CH(j));
+>  		writel(chan_value, lradc->base + LRADC_CH(j));
+>  		lradc->buffer[j] &= LRADC_CH_VALUE_MASK;
+> @@ -775,8 +775,7 @@ static bool mxs_lradc_validate_scan_mask(struct iio_dev *iio,
+>  					const unsigned long *mask)
+>  {
+>  	struct mxs_lradc *lradc = iio_priv(iio);
+> -	const int len = iio->masklength;
+> -	const int map_chans = bitmap_weight(mask, len);
+> +	const int map_chans = bitmap_weight(mask, LRADC_MAX_TOTAL_CHANS);
+>  	int rsvd_chans = 0;
+>  	unsigned long rsvd_mask = 0;
+>  
+> @@ -793,7 +792,7 @@ static bool mxs_lradc_validate_scan_mask(struct iio_dev *iio,
+>  		rsvd_chans++;
+>  
+>  	/* Test for attempts to map channels with special mode of operation. */
+> -	if (bitmap_intersects(mask, &rsvd_mask, len))
+> +	if (bitmap_intersects(mask, &rsvd_mask, LRADC_MAX_TOTAL_CHANS))
+>  		return false;
+>  
+>  	/* Test for attempts to map more channels then available slots. */
+> @@ -969,6 +968,7 @@ static int mxs_lradc_probe(struct platform_device *pdev)
+>  	iio->modes = INDIO_DIRECT_MODE;
+>  	iio->channels = mxs_lradc_chan_spec;
+>  	iio->num_channels = ARRAY_SIZE(mxs_lradc_chan_spec);
+> +	iio->masklength = LRADC_MAX_TOTAL_CHANS;
+>  
+>  	ret = iio_triggered_buffer_setup(iio, &iio_pollfunc_store_time,
+>  				&mxs_lradc_trigger_handler,
+> 
