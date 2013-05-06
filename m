@@ -1,342 +1,67 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Mon, 6 May 2013 15:51:15 +0100
-Subject: [PATCH RFC v2 1/4] xen: move xen_setup_runstate_info and
- get_runstate_snapshot to drivers/xen/time.c
-In-Reply-To: <alpine.DEB.2.02.1305061532310.4756@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1305061532310.4756@kaball.uk.xensource.com>
-Message-ID: <1367851878-21629-1-git-send-email-stefano.stabellini@eu.citrix.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 06 May 2013 10:55:39 -0400
+Subject: [Xen-devel] [PATCH 1/3] arm_arch_timer: introduce
+ arch_timer_stolen_ticks
+In-Reply-To: <alpine.DEB.2.02.1305051745390.4756@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
+ <1367436460-10183-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <51817CBE.4050003@codeaurora.org>
+ <1367482772.21869.26.camel@zakaz.uk.xensource.com>
+ <5182DBA9.9080609@codeaurora.org>
+ <alpine.DEB.2.02.1305031130210.5398@kaball.uk.xensource.com>
+ <5183976A.6000703@arm.com>
+ <alpine.DEB.2.02.1305051745390.4756@kaball.uk.xensource.com>
+Message-ID: <5187C46B.5070309@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v2:
-- leave do_stolen_accounting in arch/x86/xen/time.c;
-- use the new common functions in arch/ia64/xen/time.c.
+On 05/05/2013 12:47 PM, Stefano Stabellini wrote:
+> On Fri, 3 May 2013, Marc Zyngier wrote:
+>> On 03/05/13 11:43, Stefano Stabellini wrote:
+>>> On Thu, 2 May 2013, Christopher Covington wrote:
+>>>>> So the virtual timer should appear to have been running even while time
+>>>>> is being stolen and therefore stolen time needs to be accounted via some
+>>>>> other means.
+>>>>
+>>>> Something that's not currently obvious to me is that given that the stolen
+>>>> cycle accounting should be done, what makes the architected timer interrupt
+>>>> handler the ideal place to do it?
+>>>
+>>> That is a good question and I would appreciate suggestions to improve
+>>> the patch.
+>>>
+>>> Given that Xen x86 and ia64 does stolen time accounting from the timer
+>>> interrupt handler:
+>>>
+>>> arch/x86/xen/time.c:xen_timer_interrupt
+>>> arch/ia64/kernel/time.c:timer_interrupt
+>>>
+>>> and given that the arch_timer is the only timer used by Xen on ARM and
+>>> that it includes a virt_timer that is made on purpose to be used by
+>>> virtual machines, I thought that it might be a good place for it.
+>>>
+>>> I also thought that doing it this way, KVM should be able to reuse the
+>>> same hook.
+>>
+>> Indeed. I just need to understand how time stealing works there ;-).
+>>
+>> Now, KVM is not necessarily limited to arch_timers, and we've run KVM
+>> using a QEMU-provided timer in the past. Can you think of a more generic
+>> location for this hook? Possibly something that would satisfy the
+>> requirements of other architectures while we're at it?
+> 
+> Probably the best option would be to reuse
+> 
+> kernel/sched/cputime.c:steal_account_process_tick
+> 
+> but that also means introducing CONFIG_PARAVIRT on arm.
+> I am up for that, what do you think?
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Ian Campbell <ian.campbell@citrix.com>
-CC: konrad.wilk at oracle.com
----
- arch/ia64/xen/time.c  |   48 +++----------------------
- arch/x86/xen/time.c   |   76 +----------------------------------------
- drivers/xen/Makefile  |    2 +-
- drivers/xen/time.c    |   91 +++++++++++++++++++++++++++++++++++++++++++++++++
- include/xen/xen-ops.h |    5 +++
- 5 files changed, 104 insertions(+), 118 deletions(-)
- create mode 100644 drivers/xen/time.c
+That sounds like a good move to me.
 
-diff --git a/arch/ia64/xen/time.c b/arch/ia64/xen/time.c
-index 1f8244a..79a0b8c 100644
---- a/arch/ia64/xen/time.c
-+++ b/arch/ia64/xen/time.c
-@@ -34,53 +34,17 @@
- 
- #include "../kernel/fsyscall_gtod_data.h"
- 
--static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate);
- static DEFINE_PER_CPU(unsigned long, xen_stolen_time);
- static DEFINE_PER_CPU(unsigned long, xen_blocked_time);
- 
- /* taken from i386/kernel/time-xen.c */
- static void xen_init_missing_ticks_accounting(int cpu)
- {
--	struct vcpu_register_runstate_memory_area area;
--	struct vcpu_runstate_info *runstate = &per_cpu(xen_runstate, cpu);
--	int rc;
-+	xen_setup_runstate_info(&runstate);
- 
--	memset(runstate, 0, sizeof(*runstate));
--
--	area.addr.v = runstate;
--	rc = HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area, cpu,
--				&area);
--	WARN_ON(rc && rc != -ENOSYS);
--
--	per_cpu(xen_blocked_time, cpu) = runstate->time[RUNSTATE_blocked];
--	per_cpu(xen_stolen_time, cpu) = runstate->time[RUNSTATE_runnable]
--					    + runstate->time[RUNSTATE_offline];
--}
--
--/*
-- * Runstate accounting
-- */
--/* stolen from arch/x86/xen/time.c */
--static void get_runstate_snapshot(struct vcpu_runstate_info *res)
--{
--	u64 state_time;
--	struct vcpu_runstate_info *state;
--
--	BUG_ON(preemptible());
--
--	state = &__get_cpu_var(xen_runstate);
--
--	/*
--	 * The runstate info is always updated by the hypervisor on
--	 * the current CPU, so there's no need to use anything
--	 * stronger than a compiler barrier when fetching it.
--	 */
--	do {
--		state_time = state->state_entry_time;
--		rmb();
--		*res = *state;
--		rmb();
--	} while (state->state_entry_time != state_time);
-+	per_cpu(xen_blocked_time, cpu) = runstate.time[RUNSTATE_blocked];
-+	per_cpu(xen_stolen_time, cpu) = runstate.time[RUNSTATE_runnable]
-+					    + runstate.time[RUNSTATE_offline];
- }
- 
- #define NS_PER_TICK (1000000000LL/HZ)
-@@ -94,7 +58,7 @@ consider_steal_time(unsigned long new_itm)
- 	struct vcpu_runstate_info runstate;
- 	struct task_struct *p = current;
- 
--	get_runstate_snapshot(&runstate);
-+	xen_get_runstate_snapshot(&runstate);
- 
- 	/*
- 	 * Check for vcpu migration effect
-@@ -202,7 +166,7 @@ static unsigned long long xen_sched_clock(void)
- 	 */
- 	now = ia64_native_sched_clock();
- 
--	get_runstate_snapshot(&runstate);
-+	xen_get_runstate_snapshot(&runstate);
- 
- 	WARN_ON(runstate.state != RUNSTATE_running);
- 
-diff --git a/arch/x86/xen/time.c b/arch/x86/xen/time.c
-index 0296a95..18d0104 100644
---- a/arch/x86/xen/time.c
-+++ b/arch/x86/xen/time.c
-@@ -30,9 +30,6 @@
- #define TIMER_SLOP	100000
- #define NS_PER_TICK	(1000000000LL / HZ)
- 
--/* runstate info updated by Xen */
--static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate);
--
- /* snapshots of runstate info */
- static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate_snapshot);
- 
-@@ -40,77 +37,6 @@ static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate_snapshot);
- static DEFINE_PER_CPU(u64, xen_residual_stolen);
- static DEFINE_PER_CPU(u64, xen_residual_blocked);
- 
--/* return an consistent snapshot of 64-bit time/counter value */
--static u64 get64(const u64 *p)
--{
--	u64 ret;
--
--	if (BITS_PER_LONG < 64) {
--		u32 *p32 = (u32 *)p;
--		u32 h, l;
--
--		/*
--		 * Read high then low, and then make sure high is
--		 * still the same; this will only loop if low wraps
--		 * and carries into high.
--		 * XXX some clean way to make this endian-proof?
--		 */
--		do {
--			h = p32[1];
--			barrier();
--			l = p32[0];
--			barrier();
--		} while (p32[1] != h);
--
--		ret = (((u64)h) << 32) | l;
--	} else
--		ret = *p;
--
--	return ret;
--}
--
--/*
-- * Runstate accounting
-- */
--static void get_runstate_snapshot(struct vcpu_runstate_info *res)
--{
--	u64 state_time;
--	struct vcpu_runstate_info *state;
--
--	BUG_ON(preemptible());
--
--	state = &__get_cpu_var(xen_runstate);
--
--	/*
--	 * The runstate info is always updated by the hypervisor on
--	 * the current CPU, so there's no need to use anything
--	 * stronger than a compiler barrier when fetching it.
--	 */
--	do {
--		state_time = get64(&state->state_entry_time);
--		barrier();
--		*res = *state;
--		barrier();
--	} while (get64(&state->state_entry_time) != state_time);
--}
--
--/* return true when a vcpu could run but has no real cpu to run on */
--bool xen_vcpu_stolen(int vcpu)
--{
--	return per_cpu(xen_runstate, vcpu).state == RUNSTATE_runnable;
--}
--
--void xen_setup_runstate_info(int cpu)
--{
--	struct vcpu_register_runstate_memory_area area;
--
--	area.addr.v = &per_cpu(xen_runstate, cpu);
--
--	if (HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area,
--			       cpu, &area))
--		BUG();
--}
--
- static void do_stolen_accounting(void)
- {
- 	struct vcpu_runstate_info state;
-@@ -118,7 +44,7 @@ static void do_stolen_accounting(void)
- 	s64 blocked, runnable, offline, stolen;
- 	cputime_t ticks;
- 
--	get_runstate_snapshot(&state);
-+	xen_get_runstate_snapshot(&state);
- 
- 	WARN_ON(state.state != RUNSTATE_running);
- 
-diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-index eabd0ee..2bf461a 100644
---- a/drivers/xen/Makefile
-+++ b/drivers/xen/Makefile
-@@ -3,7 +3,7 @@ obj-y	+= manage.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
- endif
- obj-$(CONFIG_X86)			+= fallback.o
--obj-y	+= grant-table.o features.o events.o balloon.o
-+obj-y	+= grant-table.o features.o events.o balloon.o time.o
- obj-y	+= xenbus/
- 
- nostackp := $(call cc-option, -fno-stack-protector)
-diff --git a/drivers/xen/time.c b/drivers/xen/time.c
-new file mode 100644
-index 0000000..c2e39d3
---- /dev/null
-+++ b/drivers/xen/time.c
-@@ -0,0 +1,91 @@
-+/*
-+ * Xen stolen ticks accounting.
-+ */
-+#include <linux/kernel.h>
-+#include <linux/kernel_stat.h>
-+#include <linux/math64.h>
-+#include <linux/gfp.h>
-+
-+#include <asm/xen/hypervisor.h>
-+#include <asm/xen/hypercall.h>
-+
-+#include <xen/events.h>
-+#include <xen/features.h>
-+#include <xen/interface/xen.h>
-+#include <xen/interface/vcpu.h>
-+#include <xen/xen-ops.h>
-+
-+/* runstate info updated by Xen */
-+static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate);
-+
-+/* return an consistent snapshot of 64-bit time/counter value */
-+static u64 get64(const u64 *p)
-+{
-+	u64 ret;
-+
-+	if (BITS_PER_LONG < 64) {
-+		u32 *p32 = (u32 *)p;
-+		u32 h, l;
-+
-+		/*
-+		 * Read high then low, and then make sure high is
-+		 * still the same; this will only loop if low wraps
-+		 * and carries into high.
-+		 * XXX some clean way to make this endian-proof?
-+		 */
-+		do {
-+			h = p32[1];
-+			barrier();
-+			l = p32[0];
-+			barrier();
-+		} while (p32[1] != h);
-+
-+		ret = (((u64)h) << 32) | l;
-+	} else
-+		ret = *p;
-+
-+	return ret;
-+}
-+
-+/*
-+ * Runstate accounting
-+ */
-+void xen_get_runstate_snapshot(struct vcpu_runstate_info *res)
-+{
-+	u64 state_time;
-+	struct vcpu_runstate_info *state;
-+
-+	BUG_ON(preemptible());
-+
-+	state = &__get_cpu_var(xen_runstate);
-+
-+	/*
-+	 * The runstate info is always updated by the hypervisor on
-+	 * the current CPU, so there's no need to use anything
-+	 * stronger than a compiler barrier when fetching it.
-+	 */
-+	do {
-+		state_time = get64(&state->state_entry_time);
-+		barrier();
-+		*res = *state;
-+		barrier();
-+	} while (get64(&state->state_entry_time) != state_time);
-+}
-+
-+/* return true when a vcpu could run but has no real cpu to run on */
-+bool xen_vcpu_stolen(int vcpu)
-+{
-+	return per_cpu(xen_runstate, vcpu).state == RUNSTATE_runnable;
-+}
-+
-+void xen_setup_runstate_info(int cpu)
-+{
-+	struct vcpu_register_runstate_memory_area area;
-+
-+	area.addr.v = &per_cpu(xen_runstate, cpu);
-+
-+	if (HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area,
-+			       cpu, &area))
-+		BUG();
-+}
-+
-diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
-index d6fe062..4fd4e47 100644
---- a/include/xen/xen-ops.h
-+++ b/include/xen/xen-ops.h
-@@ -3,6 +3,7 @@
- 
- #include <linux/percpu.h>
- #include <asm/xen/interface.h>
-+#include <xen/interface/vcpu.h>
- 
- DECLARE_PER_CPU(struct vcpu_info *, xen_vcpu);
- 
-@@ -16,6 +17,10 @@ void xen_mm_unpin_all(void);
- void xen_timer_resume(void);
- void xen_arch_resume(void);
- 
-+bool xen_vcpu_stolen(int vcpu);
-+void xen_setup_runstate_info(int cpu);
-+void xen_get_runstate_snapshot(struct vcpu_runstate_info *res);
-+
- int xen_setup_shutdown_event(void);
- 
- extern unsigned long *xen_contiguous_bitmap;
+Christopher
+
 -- 
-1.7.2.5
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
