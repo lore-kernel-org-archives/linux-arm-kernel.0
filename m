@@ -1,7 +1,7 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 07 May 2013 11:52:45 -0400
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Tue, 7 May 2013 16:58:23 +0100
 Subject: [PATCH 0/2] Early printk support for virtio console devices.
-In-Reply-To: <CAFEAcA9jBSpN2p9ZaU+_gX41Ke3nvpSKVrWV8Rioy_ioadKCgg@mail.gmail.com>
+In-Reply-To: <5189234D.3040208@codeaurora.org>
 References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
  <BA2076A6-0688-4E5C-85F9-A9CA8FD75782@suse.de>
  <87obcyc9sh.fsf@rustcorp.com.au>
@@ -14,32 +14,31 @@ References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
  <CAFEAcA_=BTXVdkN0WmajxVSjbDrmxc5z65hCbxr=7TqJVsE9EA@mail.gmail.com>
  <87txmfo0rl.fsf@rustcorp.com.au>
  <CAFEAcA9jBSpN2p9ZaU+_gX41Ke3nvpSKVrWV8Rioy_ioadKCgg@mail.gmail.com>
-Message-ID: <5189234D.3040208@codeaurora.org>
+ <5189234D.3040208@codeaurora.org>
+Message-ID: <CAFEAcA-eSB=_UT0-L7o=2o6JGv0WkXZv5UPxPVqLRxjUZQegFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2013 08:19 AM, Peter Maydell wrote:
-> On 7 May 2013 05:46, Rusty Russell <rusty@rustcorp.com.au> wrote:
->> Peter Maydell <peter.maydell@linaro.org> writes:
->>> That all looks like sensible QEMU implementation possibilities
->>> but it seems to be a bit of a non-sequitur from "how do we
->>> tell the kernel to actually use this?"
->>
->> You enable the feature in the virtio console device, and a kernel
->> compiled with EARLY_PRINTK will use it?
-> 
-> Well, at the moment EARLY_PRINTK is hardcoded to
-> "use some specific UART or equivalent selected at
-> compile time". So the equivalent presumably would
-> be to hard-compile "use virtio-console", but then
-> how does that code know where the virtio-console
-> is in the address space?
+On 7 May 2013 16:52, Christopher Covington <cov@codeaurora.org> wrote:
+> On 05/07/2013 08:19 AM, Peter Maydell wrote:
+>> Well, at the moment EARLY_PRINTK is hardcoded to
+>> "use some specific UART or equivalent selected at
+>> compile time". So the equivalent presumably would
+>> be to hard-compile "use virtio-console", but then
+>> how does that code know where the virtio-console
+>> is in the address space?
+>
+> arm64 uses a kernel argument.
 
-arm64 uses a kernel argument.
+This mixes up "information that the user provides to the
+kernel" (ie configuration) with "information that QEMU or
+kvmtool should provide to the kernel" (ie hardware
+description), and would require QEMU/kvmtool to parse
+the user's commandline tool to figure out if they
+needed to override it or edit it (or alternatively,
+would require the user to know internal details of
+QEMU/kvmtool's address map for the guest). I think it
+would be nicer to keep them separate.
 
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+thanks
+-- PMM
