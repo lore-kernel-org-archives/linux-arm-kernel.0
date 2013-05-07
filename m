@@ -1,100 +1,29 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 7 May 2013 12:58:32 +0100
-Subject: [Xen-devel] [PATCH RFC v2 4/4] xen/arm: account for stolen ticks
-In-Reply-To: <1367918270.26321.39.camel@zakaz.uk.xensource.com>
-References: <alpine.DEB.2.02.1305061532310.4756@kaball.uk.xensource.com>
- <1367851878-21629-4-git-send-email-stefano.stabellini@eu.citrix.com>
- <1367918270.26321.39.camel@zakaz.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1305071252350.4147@kaball.uk.xensource.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 7 May 2013 15:04:27 +0300
+Subject: [GIT PULL] hwspinlock for 3.10
+Message-ID: <CAK=WgbbLUya4MQeh3h6v3a8LcTryJ8H4P7uLK3u9vKBvQey=ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 May 2013, Ian Campbell wrote:
-> On Mon, 2013-05-06 at 15:51 +0100, Stefano Stabellini wrote:
-> > Register the runstate_memory_area with the hypervisor.
-> > Use pv_time_ops.steal_clock to account for stolen ticks.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > ---
-> >  arch/arm/xen/enlighten.c |   23 +++++++++++++++++++++++
-> >  1 files changed, 23 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > index ee86bfa..2a5cc82 100644
-> > --- a/arch/arm/xen/enlighten.c
-> > +++ b/arch/arm/xen/enlighten.c
-> > @@ -14,7 +14,10 @@
-> >  #include <xen/xen-ops.h>
-> >  #include <asm/xen/hypervisor.h>
-> >  #include <asm/xen/hypercall.h>
-> > +#include <asm/arch_timer.h>
-> >  #include <asm/system_misc.h>
-> > +#include <asm/paravirt.h>
-> > +#include <linux/jump_label.h>
-> >  #include <linux/interrupt.h>
-> >  #include <linux/irqreturn.h>
-> >  #include <linux/module.h>
-> > @@ -152,6 +155,20 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
-> >  }
-> >  EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
-> >  
-> > +unsigned long long xen_stolen_accounting(int cpu)
-> > +{
-> > +	struct vcpu_runstate_info state;
-> > +
-> > +	if (cpu != get_cpu())
-> 
-> get_cpu disables preempt, so you need a matching put_cpu.
+The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
 
-Oops, thanks.
+  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
 
+are available in the git repository at:
 
-> But actually I think you just want smp_processor_id and you probably
-> want the BUG_ON form to get unlikely etc.
->
-> That said, you don't use cpu for anything else, so why not drop it
-> entirely?
+  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/hwspinlock.git
+tags/hwspinlock-3.10
 
-Ah, that's right, legacy of the past. I'll do that.
+for you to fetch changes up to 8ae053d62e88c400330ebaf27558bf02dde5a1fa:
 
+  hwspinlock/omap: support OMAP5 as well (2013-04-05 09:11:17 +0300)
 
-> > +		BUG();
-> > +
-> > +	xen_get_runstate_snapshot(&state);
-> > +
-> > +	WARN_ON(state.state != RUNSTATE_running);
-> > +
-> > +	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
-> > +}
-> > +
-> >  static void __init xen_percpu_init(void *unused)
-> >  {
-> >  	struct vcpu_register_vcpu_info info;
-> > @@ -170,6 +187,8 @@ static void __init xen_percpu_init(void *unused)
-> >  		BUG();
-> >  	per_cpu(xen_vcpu, cpu) = vcpup;
-> >  
-> > +	xen_setup_runstate_info(cpu);
-> > +
-> >  	enable_percpu_irq(xen_events_irq, 0);
-> >  }
-> >  
-> > @@ -301,6 +320,10 @@ static int __init xen_init_events(void)
-> >  
-> >  	on_each_cpu(xen_percpu_init, NULL, 0);
-> >  
-> > +	pv_time_ops.steal_clock = xen_stolen_accounting;
-> > +	static_key_slow_inc(&paravirt_steal_enabled);
-> > +	static_key_slow_inc(&paravirt_steal_rq_enabled);
-> 
-> We don't seem to do this on x86 -- is that a bug on x86 on Xen?
+----------------------------------------------------------------
+A single patch from Vincent extending OMAP's hwspinlock support to OMAP5.
 
-On x86 we do all the accounting in do_stolen_accounting, called from our
-own interrupt handler (xen_timer_interrupt).
-I don't think we would gain anything by using the common infrastructure,
-we would actually loose the idle ticks accounting we do there.
+----------------------------------------------------------------
+Vincent Stehl? (1):
+      hwspinlock/omap: support OMAP5 as well
 
-Speaking of which, I don't think that pv_time_ops.steal_clock would
-properly increase CPUTIME_IDLE the way we do in do_stolen_accounting.
-
-How much of an issue is that?
+ drivers/hwspinlock/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
