@@ -1,27 +1,38 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 May 2013 08:04:03 -0700
+Date: Tue, 7 May 2013 08:04:38 -0700
 Subject: [GIT PULL] Urgent omap timer fix for current merge window
-In-Reply-To: <20130507120202.GK21614@n2100.arm.linux.org.uk>
+In-Reply-To: <201305071448.19868.arnd@arndb.de>
 References: <20130506234610.GK28721@atomide.com>
- <20130507120202.GK21614@n2100.arm.linux.org.uk>
-Message-ID: <20130507150402.GP28721@atomide.com>
+ <201305071448.19868.arnd@arndb.de>
+Message-ID: <20130507150438.GQ28721@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [130507 05:07]:
-> On Mon, May 06, 2013 at 04:46:11PM -0700, Tony Lindgren wrote:
-> > Vaibhav Hiremath (1):
-> >       ARM: OMAP2+: Fix mismerge for timer.c between ff931c82 and da4a686a
+* Arnd Bergmann <arnd@arndb.de> [130507 05:54]:
+> On Tuesday 07 May 2013, Tony Lindgren wrote:
+> > The following changes since commit dc2d3db8137fba0f62d7517e1bea8a47f69fcbc4:
+> > 
+> >   Merge tag 'omap-for-v3.10/timer-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into next/drivers (2013-04-08 19:30:48 +0200)
+> > 
+> > are available in the git repository at:
+> > 
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/fixes-for-merge-window
+> > 
+> > for you to fetch changes up to 08a48be32ff31d38bcfec7d210c954cb62fd5cd7:
+> > 
+> >   ARM: OMAP4: change the device names in usb_bind_phy (2013-05-06 16:39:16 -0700)
+> > 
+> > ----------------------------------------------------------------
+> > An urgent fix for a timer mismerge for and a regression fix for
+> > musb device naming change.
+> > 
 > 
-> Neither your pull request subject nor the above summary line really
-> sum up what the problem is - the real problem is "fix breakage causing
-> OMAP to fail to boot".
+> Hi Tony,
 > 
-> I've just been chasing this problem and the descriptions given on this
-> just suggest that it's a timer issue not a non-boot issue.
+> Russell also ran into this problem, so I'm including these in the late/cleanup branch,
+> which I'll send to Linus later today.
 
-Oops yes sorry if the description was a bit unclear.
-
-Regards,
+Thanks!
 
 Tony
