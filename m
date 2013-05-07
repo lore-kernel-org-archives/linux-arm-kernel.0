@@ -1,71 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 May 2013 16:19:25 -0700
-Subject: [GIT PULL 4/5] ARM: arm-soc: late cleanups
-In-Reply-To: <1367947574-2934383-5-git-send-email-arnd@arndb.de>
-References: <1367947574-2934383-1-git-send-email-arnd@arndb.de>
- <1367947574-2934383-5-git-send-email-arnd@arndb.de>
-Message-ID: <20130507231925.GR28721@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 May 2013 01:42:11 +0200
+Subject: [PATCH] USB: set device dma_mask without reference to global data
+In-Reply-To: <20130507230445.GC9105@kroah.com>
+References: <1367967232-10128-1-git-send-email-swarren@wwwdotorg.org>
+ <20130507230445.GC9105@kroah.com>
+Message-ID: <201305080142.12025.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+On Wednesday 08 May 2013, Greg Kroah-Hartman wrote:
+> On Tue, May 07, 2013 at 04:53:52PM -0600, Stephen Warren wrote:
+> > From: Stephen Warren <swarren@nvidia.com>
 
-* Arnd Bergmann <arnd@arndb.de> [130507 10:32]:
-> The following changes since commit
+> > Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > 
->    763e6b9 Merge tag 'dt-for-linus-2' into for-next
-> 
-> are available in the git repository at
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/cleanup-for-linus-2
-...
- 
-> Vaibhav Hiremath (1):
->       ARM: OMAP2+: Fix mismerge for timer.c between ff931c82 and da4a686a
+> So this needs to go in for 3.10, right?  Any older kernels as well?  If
+> so, which ones?
 
-Turns out this urgent boot fix got undone in the merge somehow.
-Maybe just reapply it? The following should do it with some fuzz:
+The fix should definitely go into 3.10, but I'd suggest waiting with
+the backport for a couple of -rc releases to avoid possible regressions.
+We know that the current code is broken, but few people fully understand
+what is going on with coherent_dma_mask, so it might cause new problems
+in combination with some other unknown bug, and I don't see this as
+urgent: none of the ARM defconfigs build this driver as a loadable
+module and there is no bug in the built-in case. For some reason, only
+the ARM back-end drivers are broken.
 
-$ git show 626479696d2 | patch -p1
+The first occurence was apparently in 3.3, but only in ehci-tegra.c,
+while the other drivers subsequently copied the bug.
 
-Or let me know if you want me to send you a patch.
-
-Then in addition to the above, I'm also seeing a regression with commit
-8a965b3b (mm, slab_common: Fix bootstrap creation of kmalloc caches),
-but it seems to be related to some kconfig option. Seeing it on at least
-omap and vexpress, I'll post more info on that once I've tracked it down:
-
-[    0.000000] Unable to handle kernel NULL pointer dereference at virtual address 00000054
-[    0.000000] pgd = c0004000
-[    0.000000] [00000054] *pgd=00000000
-[    0.000000] Internal error: Oops: 5 [#1] SMP ARM
-[    0.000000] Modules linked in:
-[    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 3.9.0-11485-gbb9055b #633
-[    0.000000] task: c078d7d0 ti: c0782000 task.ti: c0782000
-[    0.000000] PC is at kmem_cache_alloc_trace+0x50/0x178
-[    0.000000] LR is at kmem_cache_alloc_trace+0x38/0x178
-[    0.000000] pc : [<c010d058>]    lr : [<c010d040>]    psr: 600001d3
-[    0.000000] sp : c0783f70  ip : 600001d3  fp : 00000000
-[    0.000000] r10: 000000c0  r9 : c00a5444  r8 : 000080d0
-[    0.000000] r7 : 00000000  r6 : 600001d3  r5 : 00000000  r4 : 00008000
-[    0.000000] r3 : 00000050  r2 : c0782000  r1 : c078d7d0  r0 : c010d040
-[    0.000000] Flags: nZCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM  Segment kernel
-[    0.000000] Control: 10c5387d  Table: 80004019  DAC: 00000015
-[    0.000000] Process swapper/0 (pid: 0, stack limit = 0xc0782240)
-[    0.000000] Stack: (0xc0783f70 to 0xc0784000)
-[    0.000000] 3f60:                                     00002014 00000010 c07d6510 00000000
-[    0.000000] 3f80: 00000000 00000000 00000000 413fc082 c078a480 c00a5444 c07d6510 00000000
-[    0.000000] 3fa0: 00000010 c0766348 ffffffff c073cfb4 bfffffff c080d78c c080d780 c0720828
-[    0.000000] 3fc0: ffffffff ffffffff c0720478 00000000 00000000 c0766348 00000000 10c5387d
-[    0.000000] 3fe0: c078a4c8 c076674c c078ecb4 80004059 00000000 80008074 00000000 00000000
-[    0.000000] [<c010d058>] (kmem_cache_alloc_trace+0x50/0x178) from [<c00a5444>] (alloc_desc+0x24/0xb4)
-[    0.000000] [<c00a5444>] (alloc_desc+0x24/0xb4) from [<c073cfb4>] (early_irq_init+0x78/0xec)
-[    0.000000] [<c073cfb4>] (early_irq_init+0x78/0xec) from [<c0720828>] (start_kernel+0x17c/0x33c)
-[    0.000000] [<c0720828>] (start_kernel+0x17c/0x33c) from [<80008074>] (0x80008074)
-[    0.000000] Code: e5923014 e2833014 e1a03103 e0873003 (e5931004)
-[    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
-[    0.000000] Kernel panic - not syncing: Attempted to kill the idle task!
-
-Regards,
-
-Tony
+	Arnd
