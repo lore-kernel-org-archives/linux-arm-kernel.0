@@ -1,33 +1,23 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 7 May 2013 10:36:02 +0100
-Subject: dw_apb_timer_of.c: remove parts that were picoxcell-specific
-In-Reply-To: <20130426214313.GB24891@amd.pavel.ucw.cz>
-References: <20130426121433.GA16249@amd.pavel.ucw.cz>
- <20130426124128.GB6946@page>
- <20130426213723.GA24891@amd.pavel.ucw.cz>
- <20130426214313.GB24891@amd.pavel.ucw.cz>
-Message-ID: <20130507093602.GA30902@page>
+From: dhowells@redhat.com (David Howells)
+Date: Tue, 07 May 2013 10:37:30 +0100
+Subject: [PATCH] proc: Use PDE attribute setting accessor functions
+In-Reply-To: <1367918426-7076-1-git-send-email-geert@linux-m68k.org>
+References: <1367918426-7076-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <23761.1367919450@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+Geert Uytterhoeven <geert@linux-m68k.org> wrote:
 
-Apologies for the delay, but this looks good to me.
-
-On Fri, Apr 26, 2013 at 11:43:14PM +0200, Pavel Machek wrote:
-> It seems we made a mistake when creating dw_apb_timer_of.c:
-> picoxcell sched_clock had parts that were not related to
-> dw_apb_timer, yet we moved them to dw_apb_timer_of, and tried to
-> use them on socfpga.
+> arch/arm/mach-msm/last_radio_log.c: In function 'msm_init_last_radio_log':
+> arch/arm/mach-msm/last_radio_log.c:69:7: error: dereferencing pointer to incomplete type
 > 
-> This results in system where user/system time is not measured
-> properly, as demonstrated by
->     
->     time dd if=/dev/urandom of=/dev/zero bs=100000 count=100
->     
-> So this patch switches sched_clock to hardware that exists on both
-> platforms, and adds missing of_node_put() in dw_apb_timer_init().
->     
-> Signed-off-by: Pavel Machek <pavel@denx.de>
+> arch/cris/kernel/profile.c: In function 'init_cris_profile':
+> arch/cris/kernel/profile.c:79:8: error: dereferencing pointer to incomplete type
+> 
+> Use proc_set_size(), cfr. commit 271a15eabe094538d958dc68ccfc9c36b699247a
+> ("proc: Supply PDE attribute setting accessor functions")
+> 
+> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-Acked-by: Jamie Iles <jamie@jamieiles.com>
+Acked-by: David Howells <dhowells@redhat.com>
