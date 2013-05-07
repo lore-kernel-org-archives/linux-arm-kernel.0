@@ -1,188 +1,280 @@
-From: giridhar.maruthy@linaro.org (Giridhar Maruthy)
-Date: Tue, 7 May 2013 11:24:43 +0530
-Subject: [RFC PATCH V2] ARM: EXYNOS: Fix hotplug when CPUs boot in HYP mode
-In-Reply-To: <1367905910-30913-1-git-send-email-giridhar.m@samsung.com>
-References: <1367905910-30913-1-git-send-email-giridhar.m@samsung.com>
-Message-ID: <CAHuqX+HUWcX_sTXKCjSQ9pR1K8obLc+T7vYK_zTn_gqO8ULPVQ@mail.gmail.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Tue, 07 May 2013 11:55:29 +0530
+Subject: [PATCH] ARM: samsung: use #include for all device trees
+Message-ID: <1367907929-5664-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is a modification from the Christoffer Dall's u-boot
-patch. This is required to put the secondary processors in hyp
-mode during cpu hotplug when u-boot is no longer alive.
+Replace /include/ (dtc) with #include (C pre-processor) for all
+Samsung DT files
 
-Marc Zyngier suggested this logic to go into firmware or, u-boot
-putting a trampoline code into a page /memreserve/d by DT. But
-this seemed to have a problem. Once the cpu is hotplugged in
-runtime, the control is in ROM code and waits for event.
-Kernel provides a return address in kernel to which the processor
-jumps once it gets an event. If the control branches to the
-trampoline code here, this trampoline code has no kernel return
-address.
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+---
 
-Someone with better logic or better placement of this logic
-elsewhere is welcome.
+This patch is dependent on below patches by Stephen Warren
+http://www.spinics.net/lists/linux-kbuild/msg07616.html
 
-Regards,
-Giridhar
+ arch/arm/boot/dts/exynos4.dtsi            |    2 +-
+ arch/arm/boot/dts/exynos4210-origen.dts   |    2 +-
+ arch/arm/boot/dts/exynos4210-smdkv310.dts |    2 +-
+ arch/arm/boot/dts/exynos4210-trats.dts    |    2 +-
+ arch/arm/boot/dts/exynos4210.dtsi         |    4 ++--
+ arch/arm/boot/dts/exynos4212.dtsi         |    2 +-
+ arch/arm/boot/dts/exynos4412-odroidx.dts  |    2 +-
+ arch/arm/boot/dts/exynos4412-origen.dts   |    2 +-
+ arch/arm/boot/dts/exynos4412-smdk4412.dts |    2 +-
+ arch/arm/boot/dts/exynos4412.dtsi         |    2 +-
+ arch/arm/boot/dts/exynos4x12.dtsi         |    4 ++--
+ arch/arm/boot/dts/exynos5250-arndale.dts  |    2 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |    2 +-
+ arch/arm/boot/dts/exynos5250-snow.dts     |    4 ++--
+ arch/arm/boot/dts/exynos5250.dtsi         |    4 ++--
+ arch/arm/boot/dts/exynos5440-sd5v1.dts    |    2 +-
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts |    2 +-
+ arch/arm/boot/dts/exynos5440.dtsi         |    2 +-
+ 18 files changed, 22 insertions(+), 22 deletions(-)
 
-On 7 May 2013 11:21,  <giridhar.maruthy@linaro.org> wrote:
-> From: Giridhar Maruthy <giridhar.maruthy@linaro.org>
->
-> In intial boot-up, u-boot commit "3d28a181aab5e... arndale5250: Boot in Hyp
-> mode and enable architected timers" puts the CPUs in HYP mode.
->
-> Hence, the CPUs need to be put in HYP mode when they are hot plugged out and
-> plugged in back.
->
-> This patch is almost same as above u-boot patch, it additionally takes care
-> if the kernel is compiled with thumb-2 option.
->
-> Signed-off-by: Giridhar Maruthy <giridhar.m@samsung.com>
-> Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
-> ---
->  arch/arm/mach-exynos/headsmp.S |  114 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 114 insertions(+)
->
-> diff --git a/arch/arm/mach-exynos/headsmp.S b/arch/arm/mach-exynos/headsmp.S
-> index 5364d4b..a837941 100644
-> --- a/arch/arm/mach-exynos/headsmp.S
-> +++ b/arch/arm/mach-exynos/headsmp.S
-> @@ -12,6 +12,7 @@
->   */
->  #include <linux/linkage.h>
->  #include <linux/init.h>
-> +#include <asm/assembler.h>
->
->         __CPUINIT
->
-> @@ -20,6 +21,98 @@
->   * a "holding pen" into which all secondary cores are held until we're
->   * ready for them to initialise.
->   */
-> +
-> +.arch_extension sec
-> +.arch_extension virt
-> +.text
-> +
-> +.align 5
-> +/* We use the same vector table for Hyp and Monitor mode, since
-> + * we will only use each once and they don't overlap.
-> + */
-> +mon_vectors:
-> +       W(b)    .       /* reset */
-> +       W(b)    .       /* undef */
-> +       W(b)    2f      /* smc */
-> +       W(b)    .       /* pabt */
-> +       W(b)    .       /* dabt */
-> +       W(b)    1f      /* hyp */
-> +       W(b)    .       /* irq */
-> +       W(b)    .       /* fiq */
-> +
-> +/* Return directly back to the caller without leaving Hyp mode: */
-> +1:     mrs     lr, elr_hyp
-> +       mov     pc, lr
-> +
-> +/* In monitor mode, set up HVBAR and SCR then return to caller in NS-SVC. */
-> +2:
-> +       mrc     p15, 0, r1, c1, c1, 0           @ SCR
-> +       /*
-> +        * Set SCR.NS=1(needed for setting HVBAR and also returning to NS state)
-> +        *        .IRQ,FIQ,EA=0 (don't take aborts/exceptions to Monitor mode)
-> +        *        .FW,AW=1 (CPSR.A,F modifiable in NS state)
-> +        *        .nET=0 (early termination OK)
-> +        *        .SCD=0 (SMC in NS mode OK, so we can call secure firmware)
-> +        *        .HCE=1 (HVC does Hyp call)
-> +        */
-> +       bic     r1, r1, #0x07f
-> +       ldr     r2, =0x131
-> +       orr     r1, r1, r2
-> +       mcr     p15, 0, r2, c1, c1, 0           @ SCR
-> +       isb
-> +       ldr     r2, =mon_vectors
-> +
-> +
-> +       adr     r4, 1f
-> +       ldmia   r4, {r5}
-> +       sub     r4, r4, r5
-> +       add     r2, r2, r4
-> +
-> +       mcr     p15, 4, r2, c12, c0, 0          @ set HVBAR
-> +
-> + THUMB(        mrc     p15, 4, r2, c1, c0, 0 )         @ ctrl register
-> + THUMB(        orr     r2, r2, #1 << 30 )              @ HSCTLR.TE (Thumb exceptions)
-> + THUMB(        mcr     p15, 4, r2, c1, c0, 0 )
-> + THUMB(        isb)
-> +
-> +       /* ...and return to calling code in NS state */
-> +       movs    pc, lr
-> +
-> +
-> +       .globl monitor_init
-> +monitor_init:
-> +       ldr     ip, =mon_vectors
-> +
-> +       adr     r4, 1f
-> +       ldmia   r4, {r5}
-> +       sub     r4, r4, r5
-> +       add     ip, ip, r4
-> +       mcr     p15, 0, ip, c12, c0, 1
-> +
-> + THUMB(        mrc     p15, 0, r1, c1, c0, 0 )         @ ctrl register
-> + THUMB( orr     r1, r1, #1 << 30 )             @ SCTLR.TE (Thumb exceptions)
-> + THUMB( mcr     p15, 0, r1, c1, c0, 0 )
-> + THUMB( isb )
-> +
-> +       mov     pc, lr
-> +
-> +       /* Try to go into NS-SVC: void enter_ns(void); */
-> +       .globl enter_ns
-> +enter_ns:
-> +       smc     #0
-> +       mov     pc, lr
-> +
-> +       /* void enter_hyp(void); */
-> +       .globl enter_hyp
-> +enter_hyp:
-> +       /* Now we're in NS-SVC, make a Hyp call to get into Hyp mode */
-> +       mov     r0, lr
-> +       mov     r1, sp
-> +       hvc     #0
-> +       /* We will end up here in NS-Hyp. */
-> +       mov     sp, r1
-> +       mov     pc, r0
-> +
->  ENTRY(exynos4_secondary_startup)
->         mrc     p15, 0, r0, c0, c0, 5
->         and     r0, r0, #15
-> @@ -31,6 +124,27 @@ pen:        ldr     r7, [r6]
->         cmp     r7, r0
->         bne     pen
->
-> +       ldr     r1, =__boot_cpu_mode
-> +       add     r1, r1, r4
-> +       ldr     r2, [r1]
-> +       mrs     r0, cpsr
-> +       ands    r0, r0, #MODE_MASK
-> +       subs    r1, r0, r2
-> +       beq     3f
-> +       subs    r2, r2, #HYP_MODE
-> +       bne     3f
-> +
-> +       /* Setting NSACR to allow coprocessor access from non-secure mode */
-> +       mrc     p15, 0, r0, c1, c1, 2
-> +       movw    r1, #0x3fff
-> +       orr     r0, r0, r1
-> +       mcr     p15, 0, r0, c1, c1, 2
-> +5:
-> +       bl      monitor_init
-> +       bl      enter_ns
-> +       bl      enter_hyp
-> +
-> +3:
->         /*
->          * we've been released from the holding pen: secondary_stack
->          * should now contain the SVC stack for this core
-> --
-> 1.7.9.5
->
+diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
+index efd441a..e6f4261 100644
+--- a/arch/arm/boot/dts/exynos4.dtsi
++++ b/arch/arm/boot/dts/exynos4.dtsi
+@@ -19,7 +19,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
+-/include/ "skeleton.dtsi"
++#include "skeleton.dtsi"
+ 
+ / {
+ 	interrupt-parent = <&gic>;
+diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
+index 8b0a781..8d7a9e5 100644
+--- a/arch/arm/boot/dts/exynos4210-origen.dts
++++ b/arch/arm/boot/dts/exynos4210-origen.dts
+@@ -15,7 +15,7 @@
+ */
+ 
+ /dts-v1/;
+-/include/ "exynos4210.dtsi"
++#include "exynos4210.dtsi"
+ 
+ / {
+ 	model = "Insignal Origen evaluation board based on Exynos4210";
+diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+index 91332b7..9c01b71 100644
+--- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
++++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
+@@ -15,7 +15,7 @@
+ */
+ 
+ /dts-v1/;
+-/include/ "exynos4210.dtsi"
++#include "exynos4210.dtsi"
+ 
+ / {
+ 	model = "Samsung smdkv310 evaluation board based on Exynos4210";
+diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
+index 9a14484..94eebff 100644
+--- a/arch/arm/boot/dts/exynos4210-trats.dts
++++ b/arch/arm/boot/dts/exynos4210-trats.dts
+@@ -13,7 +13,7 @@
+ */
+ 
+ /dts-v1/;
+-/include/ "exynos4210.dtsi"
++#include "exynos4210.dtsi"
+ 
+ / {
+ 	model = "Samsung Trats based on Exynos4210";
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index 5d925ed..e9f878e 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -19,8 +19,8 @@
+  * published by the Free Software Foundation.
+ */
+ 
+-/include/ "exynos4.dtsi"
+-/include/ "exynos4210-pinctrl.dtsi"
++#include "exynos4.dtsi"
++#include "exynos4210-pinctrl.dtsi"
+ 
+ / {
+ 	compatible = "samsung,exynos4210";
+diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+index 36d4299..c7a9193 100644
+--- a/arch/arm/boot/dts/exynos4212.dtsi
++++ b/arch/arm/boot/dts/exynos4212.dtsi
+@@ -17,7 +17,7 @@
+  * published by the Free Software Foundation.
+ */
+ 
+-/include/ "exynos4x12.dtsi"
++#include "exynos4x12.dtsi"
+ 
+ / {
+ 	compatible = "samsung,exynos4212";
+diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+index 15dc0a3..9f7f467 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidx.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+@@ -12,7 +12,7 @@
+ */
+ 
+ /dts-v1/;
+-/include/ "exynos4412.dtsi"
++#include "exynos4412.dtsi"
+ 
+ / {
+ 	model = "Hardkernel ODROID-X board based on Exynos4412";
+diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
+index 65e9c57..cfc6208 100644
+--- a/arch/arm/boot/dts/exynos4412-origen.dts
++++ b/arch/arm/boot/dts/exynos4412-origen.dts
+@@ -13,7 +13,7 @@
+ */
+ 
+ /dts-v1/;
+-/include/ "exynos4412.dtsi"
++#include "exynos4412.dtsi"
+ 
+ / {
+ 	model = "Insignal Origen evaluation board based on Exynos4412";
+diff --git a/arch/arm/boot/dts/exynos4412-smdk4412.dts b/arch/arm/boot/dts/exynos4412-smdk4412.dts
+index c52b01f..1e816fa 100644
+--- a/arch/arm/boot/dts/exynos4412-smdk4412.dts
++++ b/arch/arm/boot/dts/exynos4412-smdk4412.dts
+@@ -13,7 +13,7 @@
+ */
+ 
+ /dts-v1/;
+-/include/ "exynos4412.dtsi"
++#include "exynos4412.dtsi"
+ 
+ / {
+ 	model = "Samsung SMDK evaluation board based on Exynos4412";
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+index 7f42827..fae4f81 100644
+--- a/arch/arm/boot/dts/exynos4412.dtsi
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -17,7 +17,7 @@
+  * published by the Free Software Foundation.
+ */
+ 
+-/include/ "exynos4x12.dtsi"
++#include "exynos4x12.dtsi"
+ 
+ / {
+ 	compatible = "samsung,exynos4412";
+diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
+index e3380a7..8896bb5 100644
+--- a/arch/arm/boot/dts/exynos4x12.dtsi
++++ b/arch/arm/boot/dts/exynos4x12.dtsi
+@@ -17,8 +17,8 @@
+  * published by the Free Software Foundation.
+ */
+ 
+-/include/ "exynos4.dtsi"
+-/include/ "exynos4x12-pinctrl.dtsi"
++#include "exynos4.dtsi"
++#include "exynos4x12-pinctrl.dtsi"
+ 
+ / {
+ 	aliases {
+diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+index 02cfc76..8e27120 100644
+--- a/arch/arm/boot/dts/exynos5250-arndale.dts
++++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+@@ -10,7 +10,7 @@
+ */
+ 
+ /dts-v1/;
+-/include/ "exynos5250.dtsi"
++#include "exynos5250.dtsi"
+ 
+ / {
+ 	model = "Insignal Arndale evaluation board based on EXYNOS5250";
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 26d856b..cea2790 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -10,7 +10,7 @@
+ */
+ 
+ /dts-v1/;
+-/include/ "exynos5250.dtsi"
++#include "exynos5250.dtsi"
+ 
+ / {
+ 	model = "SAMSUNG SMDK5250 board based on EXYNOS5250";
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index 581ffae..be56289 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -9,8 +9,8 @@
+ */
+ 
+ /dts-v1/;
+-/include/ "exynos5250.dtsi"
+-/include/ "cros5250-common.dtsi"
++#include "exynos5250.dtsi"
++#include "cros5250-common.dtsi"
+ 
+ / {
+ 	model = "Google Snow";
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 4bd9e9c..36c9d8d 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -17,8 +17,8 @@
+  * published by the Free Software Foundation.
+ */
+ 
+-/include/ "skeleton.dtsi"
+-/include/ "exynos5250-pinctrl.dtsi"
++#include "skeleton.dtsi"
++#include "exynos5250-pinctrl.dtsi"
+ 
+ / {
+ 	compatible = "samsung,exynos5250";
+diff --git a/arch/arm/boot/dts/exynos5440-sd5v1.dts b/arch/arm/boot/dts/exynos5440-sd5v1.dts
+index ef747b5..5e84c5f 100644
+--- a/arch/arm/boot/dts/exynos5440-sd5v1.dts
++++ b/arch/arm/boot/dts/exynos5440-sd5v1.dts
+@@ -10,7 +10,7 @@
+ */
+ 
+ /dts-v1/;
+-/include/ "exynos5440.dtsi"
++#include "exynos5440.dtsi"
+ 
+ / {
+ 	model = "SAMSUNG SD5v1 board based on EXYNOS5440";
+diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+index d55042b..2fd6646 100644
+--- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
++++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+@@ -10,7 +10,7 @@
+ */
+ 
+ /dts-v1/;
+-/include/ "exynos5440.dtsi"
++#include "exynos5440.dtsi"
+ 
+ / {
+ 	model = "SAMSUNG SSDK5440 board based on EXYNOS5440";
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index f6b1c89..13b40b3 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -9,7 +9,7 @@
+  * published by the Free Software Foundation.
+ */
+ 
+-/include/ "skeleton.dtsi"
++#include "skeleton.dtsi"
+ 
+ / {
+ 	compatible = "samsung,exynos5440";
+-- 
+1.7.4.4
