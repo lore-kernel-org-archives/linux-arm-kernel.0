@@ -1,27 +1,15 @@
 From: holt@sgi.com (Robin Holt)
-Date: Tue,  7 May 2013 09:39:46 -0500
-Subject: [PATCH -v8 02/11] Migrate shutdown/reboot to boot cpu.
+Date: Tue,  7 May 2013 09:39:49 -0500
+Subject: [PATCH -v8 05/11] checkpatch.pl the new kernel/reboot.c file.
 In-Reply-To: <1367937595-32241-1-git-send-email-holt@sgi.com>
 References: <1367937595-32241-1-git-send-email-holt@sgi.com>
-Message-ID: <1367937595-32241-3-git-send-email-holt@sgi.com>
+Message-ID: <1367937595-32241-6-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We recently noticed that reboot of a 1024 cpu machine takes approx 16
-minutes of just stopping the cpus.  The slowdown was tracked to commit
-f96972f.
-
-The current implementation does all the work of hot removing the cpus
-before halting the system.  We are switching to just migrating to the
-boot cpu and then continuing with shutdown/reboot.
-
-This also has the effect of not breaking x86's command line parameter for
-specifying the reboot cpu.  Note, this code was shamelessly copied from
-arch/x86/kernel/reboot.c with bits removed pertaining to the reboot_cpu
-command line parameter.
+Get the new file to pass scripts/checkpatch.pl
 
 Signed-off-by: Robin Holt <holt@sgi.com>
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
 To: Andrew Morton <akpm@linux-foundation.org>
 Cc: H. Peter Anvin <hpa@zytor.com>
 Cc: Russ Anderson <rja@sgi.com>
@@ -31,77 +19,132 @@ Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Cc: the arch/x86 maintainers <x86@kernel.org>
 Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
-Cc: <stable@vger.kernel.org>
 
 ---
 
-Changes since -v6:
- - Add #define for PF_THREAD_BOUND as compatibility to make stable easier.
- - Fixup s/reboot_cpu_id/reboot_cpu/
+Changes since v6:
+ - Removed last remaining line length warning.
 ---
- kernel/sys.c | 29 ++++++++++++++++++++++++++---
- 1 file changed, 26 insertions(+), 3 deletions(-)
+ include/linux/reboot.h |  2 +-
+ kernel/reboot.c        | 28 +++++++++++++---------------
+ 2 files changed, 14 insertions(+), 16 deletions(-)
 
-diff --git a/kernel/sys.c b/kernel/sys.c
-index b95d3c7..14640d7 100644
---- a/kernel/sys.c
-+++ b/kernel/sys.c
-@@ -362,6 +362,29 @@ int unregister_reboot_notifier(struct notifier_block *nb)
- }
- EXPORT_SYMBOL(unregister_reboot_notifier);
+diff --git a/include/linux/reboot.h b/include/linux/reboot.h
+index 23b3630..c6eba21 100644
+--- a/include/linux/reboot.h
++++ b/include/linux/reboot.h
+@@ -26,7 +26,7 @@ extern void machine_shutdown(void);
+ struct pt_regs;
+ extern void machine_crash_shutdown(struct pt_regs *);
  
-+/* Add backwards compatibility for stable trees. */
-+#ifndef PF_NO_SETAFFINITY
-+#define PF_NO_SETAFFINITY		PF_THREAD_BOUND
-+#endif
+-/* 
++/*
+  * Architecture independent implemenations of sys_reboot commands.
+  */
+ 
+diff --git a/kernel/reboot.c b/kernel/reboot.c
+index 169f0b6..0a97794 100644
+--- a/kernel/reboot.c
++++ b/kernel/reboot.c
+@@ -4,6 +4,8 @@
+  *  Copyright (C) 2013  Linus Torvalds
+  */
+ 
++#define pr_fmt(fmt)	"reboot: " fmt
 +
-+static void migrate_to_reboot_cpu(void)
-+{
-+	/* The boot cpu is always logical cpu 0 */
-+	int reboot_cpu = 0;
-+
-+	cpu_hotplug_disable();
-+
-+	/* Make certain the cpu I'm about to reboot on is online */
-+	if (!cpu_online(reboot_cpu))
-+		reboot_cpu = cpumask_first(cpu_online_mask);
-+
-+	/* Prevent races with other tasks migrating this task */
-+	current->flags |= PF_NO_SETAFFINITY;
-+
-+	/* Make certain I only run on the appropriate processor */
-+	set_cpus_allowed_ptr(current, cpumask_of(reboot_cpu));
-+}
-+
- /**
-  *	kernel_restart - reboot the system
-  *	@cmd: pointer to buffer containing command to execute for restart
-@@ -373,7 +396,7 @@ EXPORT_SYMBOL(unregister_reboot_notifier);
- void kernel_restart(char *cmd)
- {
- 	kernel_restart_prepare(cmd);
--	disable_nonboot_cpus();
-+	migrate_to_reboot_cpu();
+ #include <linux/export.h>
+ #include <linux/kexec.h>
+ #include <linux/kmod.h>
+@@ -114,9 +116,9 @@ void kernel_restart(char *cmd)
+ 	migrate_to_reboot_cpu();
  	syscore_shutdown();
  	if (!cmd)
- 		printk(KERN_EMERG "Restarting system.\n");
-@@ -400,7 +423,7 @@ static void kernel_shutdown_prepare(enum system_states state)
- void kernel_halt(void)
+-		printk(KERN_EMERG "Restarting system.\n");
++		pr_emerg("Restarting system\n");
+ 	else
+-		printk(KERN_EMERG "Restarting system with command '%s'.\n", cmd);
++		pr_emerg("Restarting system with command '%s'\n", cmd);
+ 	kmsg_dump(KMSG_DUMP_RESTART);
+ 	machine_restart(cmd);
+ }
+@@ -125,7 +127,7 @@ EXPORT_SYMBOL_GPL(kernel_restart);
+ static void kernel_shutdown_prepare(enum system_states state)
  {
+ 	blocking_notifier_call_chain(&reboot_notifier_list,
+-		(state == SYSTEM_HALT)?SYS_HALT:SYS_POWER_OFF, NULL);
++		(state == SYSTEM_HALT) ? SYS_HALT : SYS_POWER_OFF, NULL);
+ 	system_state = state;
+ 	usermodehelper_disable();
+ 	device_shutdown();
+@@ -140,11 +142,10 @@ void kernel_halt(void)
  	kernel_shutdown_prepare(SYSTEM_HALT);
--	disable_nonboot_cpus();
-+	migrate_to_reboot_cpu();
+ 	migrate_to_reboot_cpu();
  	syscore_shutdown();
- 	printk(KERN_EMERG "System halted.\n");
+-	printk(KERN_EMERG "System halted.\n");
++	pr_emerg("System halted\n");
  	kmsg_dump(KMSG_DUMP_HALT);
-@@ -419,7 +442,7 @@ void kernel_power_off(void)
- 	kernel_shutdown_prepare(SYSTEM_POWER_OFF);
- 	if (pm_power_off_prepare)
+ 	machine_halt();
+ }
+-
+ EXPORT_SYMBOL_GPL(kernel_halt);
+ 
+ /**
+@@ -159,7 +160,7 @@ void kernel_power_off(void)
  		pm_power_off_prepare();
--	disable_nonboot_cpus();
-+	migrate_to_reboot_cpu();
+ 	migrate_to_reboot_cpu();
  	syscore_shutdown();
- 	printk(KERN_EMERG "Power down.\n");
+-	printk(KERN_EMERG "Power down.\n");
++	pr_emerg("Power down\n");
  	kmsg_dump(KMSG_DUMP_POWEROFF);
+ 	machine_power_off();
+ }
+@@ -188,10 +189,10 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
+ 
+ 	/* For safety, we require "magic" arguments. */
+ 	if (magic1 != LINUX_REBOOT_MAGIC1 ||
+-	    (magic2 != LINUX_REBOOT_MAGIC2 &&
+-	                magic2 != LINUX_REBOOT_MAGIC2A &&
++			(magic2 != LINUX_REBOOT_MAGIC2 &&
++			magic2 != LINUX_REBOOT_MAGIC2A &&
+ 			magic2 != LINUX_REBOOT_MAGIC2B &&
+-	                magic2 != LINUX_REBOOT_MAGIC2C))
++			magic2 != LINUX_REBOOT_MAGIC2C))
+ 		return -EINVAL;
+ 
+ 	/*
+@@ -234,7 +235,8 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
+ 		break;
+ 
+ 	case LINUX_REBOOT_CMD_RESTART2:
+-		if (strncpy_from_user(&buffer[0], arg, sizeof(buffer) - 1) < 0) {
++		ret = strncpy_from_user(&buffer[0], arg, sizeof(buffer) - 1);
++		if (ret < 0) {
+ 			ret = -EFAULT;
+ 			break;
+ 		}
+@@ -282,7 +284,6 @@ void ctrl_alt_del(void)
+ 	else
+ 		kill_cad_pid(SIGINT, 1);
+ }
+-	
+ 
+ char poweroff_cmd[POWEROFF_CMD_PATH_LEN] = "/sbin/poweroff";
+ 
+@@ -301,14 +302,11 @@ static int __orderly_poweroff(bool force)
+ 		ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_EXEC);
+ 		argv_free(argv);
+ 	} else {
+-		printk(KERN_WARNING "%s failed to allocate memory for \"%s\"\n",
+-					 __func__, poweroff_cmd);
+ 		ret = -ENOMEM;
+ 	}
+ 
+ 	if (ret && force) {
+-		printk(KERN_WARNING "Failed to start orderly shutdown: "
+-					"forcing the issue\n");
++		pr_warn("Failed to start orderly shutdown: forcing the issue\n");
+ 		/*
+ 		 * I guess this should try to kick off some daemon to sync and
+ 		 * poweroff asap.  Or not even bother syncing if we're doing an
 -- 
 1.8.2.1
