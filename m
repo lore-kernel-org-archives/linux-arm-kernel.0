@@ -1,76 +1,223 @@
-From: ohaugan@codeaurora.org (Olav Haugan)
-Date: Tue, 07 May 2013 13:26:02 -0700
-Subject: [PATCH] documentation: iommu: add description of ARM System MMU
- binding
-In-Reply-To: <20130424095501.GC21850@mudshark.cambridge.arm.com>
-References: <1365094259-24847-1-git-send-email-will.deacon@arm.com>
- <515F37C1.4000109@codeaurora.org>
- <20130408092535.GA17476@mudshark.cambridge.arm.com>
- <5162F87A.7070409@codeaurora.org>
- <20130410173732.GQ26992@mudshark.cambridge.arm.com>
- <5169C7D1.8070300@codeaurora.org>
- <20130415131341.GG9827@mudshark.cambridge.arm.com>
- <516D9602.2010404@codeaurora.org>
- <20130418190131.GA12344@mudshark.cambridge.arm.com>
- <5177113D.7060300@codeaurora.org>
- <20130424095501.GC21850@mudshark.cambridge.arm.com>
-Message-ID: <5189635A.8090504@codeaurora.org>
+From: nerv@dawncrow.de (=?ISO-8859-15?Q?Andr=E9_Hentschel?=)
+Date: Tue, 07 May 2013 22:51:00 +0200
+Subject: [PATCHv3] arm: Preserve the user r/w register TPIDRURW on context
+ switch and fork
+Message-ID: <51896934.5080803@dawncrow.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+From: =?UTF-8?q?Andr=C3=A9=20Hentschel?= <nerv@dawncrow.de>
 
-On 4/24/2013 2:55 AM, Will Deacon wrote:
-> On Tue, Apr 23, 2013 at 11:54:53PM +0100, Olav Haugan wrote:
->> On 4/18/2013 12:01 PM, Will Deacon wrote:
-> Getting phandles has no dependencies on anything -- the only dependency is
-> that the device is added to the bus on which the SMMU sits, just like every
-> other IOMMU driver.
-> 
->>> Why would a page table shared between devices require multiple context
->>> banks? Multiple SMRs and S2CRs, sure, but they would ultimately point at the
->>> same context bank (and hence same address space).
->>
->> What if you want to have 2 different VMID's being generated? Also, what
->> about TLB management? If I have two context banks I can invalidate only
->> entries associated with 1 of the context banks (if VMID differ for the
->> two context banks).
-> 
-> Huh? We allocate one VMID per domain. If you want more VMIDs, use more
-> domains. TLB invalidation is per-domain, so there's no issue there.
+Since commit 6a1c53124aa1 the user writeable TLS register was zeroed to
+prevent it from being used as a covert channel between two tasks.
 
-If we allocate a new domain you would have another address space (page
-table), no? I was just trying to figure out if your binding proposal
-would allow for 2 context banks in one domain which it does not seem to
-support.
+There are more and more applications coming to WinRT, Wine could support them,
+but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
 
->>> If a master needs to be in two address spaces at once, then it will need to
->>> attach it's StreamIDs to different domains. You can't place a single
->>> StreamID in two address spaces (this is an architectural constraint).
->>
->> Yes, you would have a separate domain. I am just wondering how I would
->> model this in DT using the bindings that you are proposing? How does it
->> work? The bindings specify bus masters to StreamIDs. So if I call attach
->> with the master device you will allocate a context bank and program the
->> StreamIDs as specified in the DT. So now if I want to have another
->> context bank associated with the same master device what do I do? I call
->> into attach with a new domain but with the same master device but the
->> master device is already attached to a context/domain.
-> 
-> Why would you want to place a StreamID into two domains? That doesn't make
-> any sense and isn't even supported by the architecture (things like
-> conflicting SMR entries may not even be reported).
+This patch preserves that register per thread instead of clearing it.
+Unlike the TPIDRURO, which is already switched, the TPIDRURW
+can be updated from userspace so needs careful treatment in the case that we
+modify TPIDRURW and call fork(). To avoid this we must always read
+TPIDRURW in copy_thread.
 
-I think you misunderstood me. I am talking about having for example 1
-master with two (2) context banks so that StreamID "1" goes to CB0 and
-StreamID "2" goes to CB1. This means that the master device is attached
-to two different domains. How do I model this with the the device tree
-bindings?
+Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com> 
+
+---
+This patch is against a86d52667d8eda5de39393ce737794403bdce1eb
+
+I could only test it with kernel 3.4.6, beside using Wine for testing i also
+used https://github.com/AndreRH/tpidrurw-test
+
+Why so much Signed-off-bys? Some History:
+The first patch had performance issues pointed out by Russel King,
+so Will Deacon jumped in to help me with that. The second one again
+had performance issues and the missing copy_thread part was uncovered.
+After some iterations by me, Jonathan Austin proposed a patch and
+Russel King sent his idea of the assembler part. All this was finally
+merged and refined into this patch.
+Thanks to everyone!
+
+ arch/arm/include/asm/thread_info.h |    2 +-
+ arch/arm/include/asm/tls.h         |   41 ++++++++++++++++++++++++++++-------------
+ arch/arm/kernel/entry-armv.S       |    4 ++--
+ arch/arm/kernel/process.c          |    4 +++-
+ arch/arm/kernel/ptrace.c           |    2 +-
+ arch/arm/kernel/traps.c            |    4 ++--
+ 6 files changed, 37 insertions(+), 20 deletions(-)
 
 
 
-Olav Haugan
-
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+index cddda1f..d90be6d 100644
+--- a/arch/arm/include/asm/thread_info.h
++++ b/arch/arm/include/asm/thread_info.h
+@@ -58,7 +58,7 @@ struct thread_info {
+ 	struct cpu_context_save	cpu_context;	/* cpu context */
+ 	__u32			syscall;	/* syscall number */
+ 	__u8			used_cp[16];	/* thread used copro */
+-	unsigned long		tp_value;
++	unsigned long		tp_value[2];	/* TLS registers */
+ #ifdef CONFIG_CRUNCH
+ 	struct crunch_state	crunchstate;
+ #endif
+diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
+index 73409e6..22756ab 100644
+--- a/arch/arm/include/asm/tls.h
++++ b/arch/arm/include/asm/tls.h
+@@ -2,27 +2,30 @@
+ #define __ASMARM_TLS_H
+ 
+ #ifdef __ASSEMBLY__
+-	.macro set_tls_none, tp, tmp1, tmp2
++#include <asm/asm-offsets.h>
++	.macro switch_tls_none, base, tp, tpuser, tmp1, tmp2
+ 	.endm
+ 
+-	.macro set_tls_v6k, tp, tmp1, tmp2
++	.macro switch_tls_v6k, base, tp, tpuser, tmp1, tmp2
++	mrc	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
+ 	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
+-	mov	\tmp1, #0
+-	mcr	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
++	mcr	p15, 0, \tpuser, c13, c0, 2	@ and the user r/w register
++	strne	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
+ 	.endm
+ 
+-	.macro set_tls_v6, tp, tmp1, tmp2
++	.macro switch_tls_v6, base, tp, tpuser, tmp1, tmp2
+ 	ldr	\tmp1, =elf_hwcap
+ 	ldr	\tmp1, [\tmp1, #0]
+ 	mov	\tmp2, #0xffff0fff
+ 	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
+-	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
+-	movne	\tmp1, #0
+-	mcrne	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
+ 	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
++	mrcne	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
++	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
++	mcrne	p15, 0, \tpuser, c13, c0, 2	@ set user r/w register
++	strne	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
+ 	.endm
+ 
+-	.macro set_tls_software, tp, tmp1, tmp2
++	.macro switch_tls_software, base, tp, tpuser, tmp1, tmp2
+ 	mov	\tmp1, #0xffff0fff
+ 	str	\tp, [\tmp1, #-15]		@ set TLS value at 0xffff0ff0
+ 	.endm
+@@ -31,19 +34,31 @@
+ #ifdef CONFIG_TLS_REG_EMUL
+ #define tls_emu		1
+ #define has_tls_reg		1
+-#define set_tls		set_tls_none
++#define switch_tls	switch_tls_none
+ #elif defined(CONFIG_CPU_V6)
+ #define tls_emu		0
+ #define has_tls_reg		(elf_hwcap & HWCAP_TLS)
+-#define set_tls		set_tls_v6
++#define switch_tls	switch_tls_v6
+ #elif defined(CONFIG_CPU_32v6K)
+ #define tls_emu		0
+ #define has_tls_reg		1
+-#define set_tls		set_tls_v6k
++#define switch_tls	switch_tls_v6k
+ #else
+ #define tls_emu		0
+ #define has_tls_reg		0
+-#define set_tls		set_tls_software
++#define switch_tls	switch_tls_software
+ #endif
+ 
++#ifndef __ASSEMBLY__
++static inline unsigned long get_tlsuser(void)
++{
++	if (has_tls_reg && !tls_emu)
++	{
++		unsigned long t;
++		__asm__("mrc p15, 0, %0, c13, c0, 2" : "=r" (t));
++		return t;
++	}
++	return 0;
++}
++#endif
+ #endif	/* __ASMARM_TLS_H */
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 0f82098..80f09fe 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -728,15 +728,15 @@ ENTRY(__switch_to)
+  UNWIND(.fnstart	)
+  UNWIND(.cantunwind	)
+ 	add	ip, r1, #TI_CPU_SAVE
+-	ldr	r3, [r2, #TI_TP_VALUE]
+  ARM(	stmia	ip!, {r4 - sl, fp, sp, lr} )	@ Store most regs on stack
+  THUMB(	stmia	ip!, {r4 - sl, fp}	   )	@ Store most regs on stack
+  THUMB(	str	sp, [ip], #4		   )
+  THUMB(	str	lr, [ip], #4		   )
++	ldrd	r4, r5, [r2, #TI_TP_VALUE]
+ #ifdef CONFIG_CPU_USE_DOMAINS
+ 	ldr	r6, [r2, #TI_CPU_DOMAIN]
+ #endif
+-	set_tls	r3, r4, r5
++	switch_tls r1, r4, r5, r3, r7
+ #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
+ 	ldr	r7, [r2, #TI_TASK]
+ 	ldr	r8, =__stack_chk_guard
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 047d3e4..24dbc72 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -39,6 +39,7 @@
+ #include <asm/thread_notify.h>
+ #include <asm/stacktrace.h>
+ #include <asm/mach/time.h>
++#include <asm/tls.h>
+ 
+ #ifdef CONFIG_CC_STACKPROTECTOR
+ #include <linux/stackprotector.h>
+@@ -395,7 +396,8 @@ copy_thread(unsigned long clone_flags, unsigned long stack_start,
+ 	clear_ptrace_hw_breakpoint(p);
+ 
+ 	if (clone_flags & CLONE_SETTLS)
+-		thread->tp_value = childregs->ARM_r3;
++		thread->tp_value[0] = childregs->ARM_r3;
++	thread->tp_value[1] = get_tlsuser();
+ 
+ 	thread_notify(THREAD_NOTIFY_COPY, thread);
+ 
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index 03deeff..2bc1514 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -849,7 +849,7 @@ long arch_ptrace(struct task_struct *child, long request,
+ #endif
+ 
+ 		case PTRACE_GET_THREAD_AREA:
+-			ret = put_user(task_thread_info(child)->tp_value,
++			ret = put_user(task_thread_info(child)->tp_value[0],
+ 				       datap);
+ 			break;
+ 
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 1c08911..f9d6259 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -588,7 +588,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
+ 		return regs->ARM_r0;
+ 
+ 	case NR(set_tls):
+-		thread->tp_value = regs->ARM_r0;
++		thread->tp_value[0] = regs->ARM_r0;
+ 		if (tls_emu)
+ 			return 0;
+ 		if (has_tls_reg) {
+@@ -706,7 +706,7 @@ static int get_tp_trap(struct pt_regs *regs, unsigned int instr)
+ 	int reg = (instr >> 12) & 15;
+ 	if (reg == 15)
+ 		return 1;
+-	regs->uregs[reg] = current_thread_info()->tp_value;
++	regs->uregs[reg] = current_thread_info()->tp_value[0];
+ 	regs->ARM_pc += 4;
+ 	return 0;
+ }
