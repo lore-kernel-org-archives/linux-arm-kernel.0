@@ -1,85 +1,167 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 7 May 2013 10:22:09 +0100
-Subject: [RFC PATCH] implement read_cpuid_ext for v7-M (Was: Re: [PATCHv2
- 2/3] ARM: Detect support for SDIV/UDIV from ISAR0) register
-In-Reply-To: <20130506093059.GH23285@pengutronix.de>
-References: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
- <1363631337-13816-3-git-send-email-sboyd@codeaurora.org>
- <20130418091019.GA21099@pengutronix.de>
- <20130506093059.GH23285@pengutronix.de>
-Message-ID: <20130507092209.GD25387@mudshark.cambridge.arm.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Tue, 7 May 2013 10:23:29 +0100
+Subject: [Xen-devel] [PATCH RFC v2 2/4] arm: introduce CONFIG_PARAVIRT
+ and pv_time_ops
+In-Reply-To: <1367851878-21629-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1305061532310.4756@kaball.uk.xensource.com>
+ <1367851878-21629-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1367918609.26321.43.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 06, 2013 at 10:30:59AM +0100, Uwe Kleine-K?nig wrote:
-> Hello,
+On Mon, 2013-05-06 at 15:51 +0100, Stefano Stabellini wrote:
+> Introduce CONFIG_PARAVIRT on ARM.
 
-Hi Uwe,
+What about PARAVIRT_TIME_ACCOUNTING? I'm not sure what it is but it
+looks like a more lightweight version of pv stolen time?
 
-> On Thu, Apr 18, 2013 at 11:10:19AM +0200, Uwe Kleine-K?nig wrote:
-> The patch below fixes the issue for me on V7-M. The only drawback is
-> that the list of registers isn't shared. Maybe someone has a nice idea?
+> The only paravirt interface supported is pv_time_ops.steal_clock.
+> No runtime pvops patching yet.
+
+Or indeed ever, I think. The use cases for patching on x86 are not
+things which carry over to ARM with virt extensions.
+
+> This allows us to make us of steal_account_process_tick for stolen ticks
+> accounting.
 > 
-> BTW, there doesn't seem to be an equivalent register set for 
-> CPUID_{CACHETYPE,TCM,TLBTYPE,MPIDR} on v7-M.
-
-That make sense: we don't have caches, MMUs or SMP.
-
-> Best regards
-> Uwe
 > 
-> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-> index 4eb94a3..ec635ff 100644
-> --- a/arch/arm/include/asm/cputype.h
-> +++ b/arch/arm/include/asm/cputype.h
-> @@ -10,6 +10,22 @@
->  #define CPUID_TLBTYPE	3
->  #define CPUID_MPIDR	5
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: linux at arm.linux.org.uk
+> CC: will.deacon at arm.com
+> CC: nico at linaro.org
+> CC: marc.zyngier at arm.com
+> CC: cov at codeaurora.org
+> CC: arnd at arndb.de
+> CC: olof at lixom.net
+> ---
+>  arch/arm/Kconfig                |    9 +++++++++
+>  arch/arm/include/asm/paravirt.h |   19 +++++++++++++++++++
+>  arch/arm/kernel/Makefile        |    1 +
+>  arch/arm/kernel/paravirt.c      |   32 ++++++++++++++++++++++++++++++++
+>  4 files changed, 61 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/include/asm/paravirt.h
+>  create mode 100644 arch/arm/kernel/paravirt.c
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 344e299..35cb10a 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1887,12 +1887,21 @@ config XEN_DOM0
+>  	def_bool y
+>  	depends on XEN
 >  
-> +#ifdef CONFIG_CPU_V7M
-> +#define CPUID_EXT_PFR0	0x40
-> +#define CPUID_EXT_PFR1	0x44
-> +#define CPUID_EXT_DFR0	0x48
-> +#define CPUID_EXT_AFR0	0x4c
-> +#define CPUID_EXT_MMFR0	0x50
-> +#define CPUID_EXT_MMFR1	0x54
-> +#define CPUID_EXT_MMFR2	0x58
-> +#define CPUID_EXT_MMFR3	0x5c
-> +#define CPUID_EXT_ISAR0	0x60
-> +#define CPUID_EXT_ISAR1	0x64
-> +#define CPUID_EXT_ISAR2	0x68
-> +#define CPUID_EXT_ISAR3	0x6c
-> +#define CPUID_EXT_ISAR4	0x70
-> +#define CPUID_EXT_ISAR5	0x74
-> +#else
->  #define CPUID_EXT_PFR0	"c1, 0"
->  #define CPUID_EXT_PFR1	"c1, 1"
->  #define CPUID_EXT_DFR0	"c1, 2"
-> @@ -24,6 +40,7 @@
->  #define CPUID_EXT_ISAR3	"c2, 3"
->  #define CPUID_EXT_ISAR4	"c2, 4"
->  #define CPUID_EXT_ISAR5	"c2, 5"
+> +config PARAVIRT
+> +	bool "Enable paravirtualization code"
+> +	---help---
+> +	  This changes the kernel so it can modify itself when it is run
+> +	  under a hypervisor, potentially improving performance significantly
+> +	  over full virtualization.  However, when run without a hypervisor
+> +	  the kernel is theoretically slower and slightly larger.
+
+I'm not sure this description (carried over from x86) are really true
+for ARM. e.g. the downsides there when not virtualised are in the PV MMU
+(pte operations) and interrupt masking stuff, which should never make
+its way onto ARM.
+
+I think it would be a worthwhile change to refactor the stolen time
+handling out from under the rather wide reaching umbrella of the x86
+PARAVIRT option. (assuming PARAVIRT_TIME_ACCOUNTING isn't already that)
+
+> +
+>  config XEN
+>  	bool "Xen guest support on ARM (EXPERIMENTAL)"
+>  	depends on ARM && AEABI && OF
+>  	depends on CPU_V7 && !CPU_V6
+>  	depends on !GENERIC_ATOMIC64
+>  	select ARM_PSCI
+> +	select PARAVIRT
+>  	help
+>  	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
+>  
+> diff --git a/arch/arm/include/asm/paravirt.h b/arch/arm/include/asm/paravirt.h
+> new file mode 100644
+> index 0000000..3b95bc6
+> --- /dev/null
+> +++ b/arch/arm/include/asm/paravirt.h
+> @@ -0,0 +1,19 @@
+> +#ifndef _ASM_ARM_PARAVIRT_H
+> +#define _ASM_ARM_PARAVIRT_H
+> +
+> +struct static_key;
+> +extern struct static_key paravirt_steal_enabled;
+> +extern struct static_key paravirt_steal_rq_enabled;
+> +
+> +struct pv_time_ops {
+> +	unsigned long long (*steal_clock)(int cpu);
+> +};
+> +extern struct pv_time_ops pv_time_ops;
+> +
+> +static inline u64 paravirt_steal_clock(int cpu)
+> +{
+> +	return pv_time_ops.steal_clock(cpu);
+> +}
+> +
+> +
 > +#endif
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index dd9d90a..6764f60 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -86,5 +86,6 @@ ifeq ($(CONFIG_ARM_PSCI),y)
+>  obj-y				+= psci.o
+>  obj-$(CONFIG_SMP)		+= psci_smp.o
+>  endif
+> +obj-$(CONFIG_PARAVIRT)	+= paravirt.o
 >  
->  #define MPIDR_SMP_BITMASK (0x3 << 30)
->  #define MPIDR_SMP_VALUE (0x2 << 30)
-> @@ -79,7 +96,23 @@ extern unsigned int processor_id;
->  		__val;							\
->  	})
->  
-> -#else /* ifdef CONFIG_CPU_CP15 */
-> +#elif defined(CONFIG_CPU_V7M)
+>  extra-y := $(head-y) vmlinux.lds
+> diff --git a/arch/arm/kernel/paravirt.c b/arch/arm/kernel/paravirt.c
+> new file mode 100644
+> index 0000000..3e73fc8
+> --- /dev/null
+> +++ b/arch/arm/kernel/paravirt.c
+> @@ -0,0 +1,32 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * Copyright (C) 2013 Citrix Systems
+> + *
+> + * Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> + */
 > +
-> +#include <asm/io.h>
-> +#include <asm/v7m.h>
+> +#include <linux/export.h>
+> +#include <linux/jump_label.h>
+> +#include <linux/types.h>
+> +#include <asm/paravirt.h>
 > +
-> +#define read_cpuid(reg)							\
-> +	({								\
-> +		WARN_ON_ONCE(1);					\
-> +		0;							\
-> +	})
+> +struct static_key paravirt_steal_enabled;
+> +struct static_key paravirt_steal_rq_enabled;
+> +
+> +static u64 native_steal_clock(int cpu)
+> +{
+> +	return 0;
+> +}
+> +
+> +struct pv_time_ops pv_time_ops = {
+> +	.steal_clock = native_steal_clock,
+> +};
+> +EXPORT_SYMBOL_GPL(pv_time_ops);
 
-We do have an MIDR in PMSAv7 (not to be confused with MPIDR), so why not read
-that here?
+This foo_ops.bar and native_bar thing is a bit of a hangover from the
+paravirt patching infrastructure on x86 and it doesn't really apply
+here.
 
-Will
+Given that the call to paravirt_steal_time call is already protected by
+this static_key stuff I think it would be safe to leave the hook as NULL
+in the case where it is unused.
+
+Given all the different clock sources on ARM is there not an existing
+ops struct where this could live?
+
+Ian.
