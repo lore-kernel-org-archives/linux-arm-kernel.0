@@ -1,39 +1,92 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 07 May 2013 11:56:28 +0100
-Subject: [RFC PATCH] implement read_cpuid_ext for v7-M (Was: Re: [PATCHv2
- 2/3] ARM: Detect support for SDIV/UDIV from ISAR0) register
-In-Reply-To: <20130507092209.GD25387@mudshark.cambridge.arm.com>
-References: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
- <1363631337-13816-3-git-send-email-sboyd@codeaurora.org>
- <20130418091019.GA21099@pengutronix.de>
- <20130506093059.GH23285@pengutronix.de>
- <20130507092209.GD25387@mudshark.cambridge.arm.com>
-Message-ID: <5188DDDC.1000201@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 7 May 2013 11:59:55 +0100
+Subject: [RFC PATCH v2] drivers: bus: add ARM CCI support
+In-Reply-To: <20130503151706.GB2756@e102654-lin.cambridge.arm.com>
+References: <1367425108-4698-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1367425108-4698-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130503151706.GB2756@e102654-lin.cambridge.arm.com>
+Message-ID: <20130507105955.GA19477@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Fri, May 03, 2013 at 04:17:07PM +0100, Javi Merino wrote:
+> Hi Lorenzo,
+> 
+> On Wed, May 01, 2013 at 05:18:28PM +0100, Lorenzo Pieralisi wrote:
+> > On ARM multi-cluster systems coherency between cores running on
+> > different clusters is managed by the cache-coherent interconnect (CCI).
+> > It allows broadcasting of TLB invalidates and memory barriers and it
+> > guarantees cache coherency at system level through snooping of slave
+> > interfaces connected to it.
+> > 
+> > This patch enables the basic infrastructure required in Linux to handle and
+> > programme the CCI component.
+> > 
+> > Non-local variables used by the CCI management functions called by power
+> > down function calls after disabling the cache must be flushed out to main
+> > memory in advance, otherwise incoherency of those values may occur if they
+> > are sitting in the cache of some other CPU when power down functions
+> > execute. Driver code ensures that relevant data structures are flushed
+> > from inner and outer caches after the driver probe is completed.
+> > 
+> > CCI slave port resources are linked to set of CPUs through bus masters
+> > phandle properties that link the interface resources to masters node in
+> > the device tree.
+> > 
+> > Documentation describing the CCI DT bindings is provided with the patch.
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> 
+> [...]
+> 
+> > diff --git a/include/linux/arm-cci.h b/include/linux/arm-cci.h
+> > new file mode 100644
+> > index 0000000..0e70942
+> > --- /dev/null
+> > +++ b/include/linux/arm-cci.h
+> > @@ -0,0 +1,59 @@
+> > +/*
+> > + * CCI cache coherent interconnect support
+> > + *
+> > + * Copyright (C) 2013 ARM Ltd.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License
+> > + * along with this program; if not, write to the Free Software
+> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+> > + */
+> > +
+> > +#ifndef __LINUX_ARM_CCI_H
+> > +#define __LINUX_ARM_CCI_H
+> > +
+> > +#include <linux/errno.h>
+> > +#include <linux/types.h>
+> > +
+> > +struct device_node;
+> > +
+> > +#ifdef CONFIG_ARM_CCI
+> > +extern int cci_ace_get_port(struct device_node *dn);
+> > +extern int cci_disable_port_by_cpu(u64 mpidr);
+> > +extern int __cci_control_port_by_device(struct device_node *dn, bool enable);
+> > +extern int __cci_control_port_by_index(u32 port, bool enable);
+> > +#else
+> > +static inline int cci_ace_get_port(struct device_node *dn, bool cpu)
+> 
+> Builds with !CONFIG_ARM_CCI fail because this definition of
+> cci_ace_get_port() takes two arguments whereas the one for
+> CONFIG_ARM_CCI takes only one.
 
-On 07/05/13 10:22, Will Deacon wrote:
-> On Mon, May 06, 2013 at 10:30:59AM +0100, Uwe Kleine-K?nig wrote:
+Yes, sorry, I missed that while refactoring the interface.
 
->> +
->> +#define read_cpuid(reg)							\
->> +	({								\
->> +		WARN_ON_ONCE(1);					\
->> +		0;							\
->> +	})
->
-> We do have an MIDR in PMSAv7 (not to be confused with MPIDR), so why not read
-> that here?
-We don't need to add/remove anything for PMSAv7 as that's already 
-implemented...
-
-For V7M we have something called CPUID Base Register, not MIDR - the 
-layout looks the same though. That's the only one of the CPUID_X that we 
-have, but it is never requested directly - only via read_cpuid_id (this 
-is to support a hardcoded cpuid from kconfig) so what Uwe's got does 
-work, though I agree that it'd be much nicer to implement the underlying 
-function and have the accessor general for both AR and M.
-
-Jonny
+Thanks,
+Lorenzo
