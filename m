@@ -1,61 +1,107 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Tue, 7 May 2013 09:15:00 -0400
-Subject: [RESEND][PATCH 1/3] arm: dts: introduce config HAS_BANDGAP
-In-Reply-To: <20130507003651.GA26035@obsidianresearch.com>
-References: <1367874058-2378-1-git-send-email-eduardo.valentin@ti.com>
- <1367874058-2378-2-git-send-email-eduardo.valentin@ti.com>
- <20130506213413.GH5634@blackmetal.musicnaut.iki.fi>
- <20130506223653.GA12089@obsidianresearch.com> <51884971.9050508@ti.com>
- <20130507003651.GA26035@obsidianresearch.com>
-Message-ID: <5188FE54.6050200@ti.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Tue, 7 May 2013 09:33:17 -0400
+Subject: [Xen-devel] [PATCH RFC v2 4/4] xen/arm: account for stolen ticks
+In-Reply-To: <alpine.DEB.2.02.1305071252350.4147@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1305061532310.4756@kaball.uk.xensource.com>
+ <1367851878-21629-4-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1367918270.26321.39.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.02.1305071252350.4147@kaball.uk.xensource.com>
+Message-ID: <20130507133317.GD31610@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jason,
+On Tue, May 07, 2013 at 12:58:32PM +0100, Stefano Stabellini wrote:
+> On Tue, 7 May 2013, Ian Campbell wrote:
+> > On Mon, 2013-05-06 at 15:51 +0100, Stefano Stabellini wrote:
+> > > Register the runstate_memory_area with the hypervisor.
+> > > Use pv_time_ops.steal_clock to account for stolen ticks.
+> > > 
+> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > > ---
+> > >  arch/arm/xen/enlighten.c |   23 +++++++++++++++++++++++
+> > >  1 files changed, 23 insertions(+), 0 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > > index ee86bfa..2a5cc82 100644
+> > > --- a/arch/arm/xen/enlighten.c
+> > > +++ b/arch/arm/xen/enlighten.c
+> > > @@ -14,7 +14,10 @@
+> > >  #include <xen/xen-ops.h>
+> > >  #include <asm/xen/hypervisor.h>
+> > >  #include <asm/xen/hypercall.h>
+> > > +#include <asm/arch_timer.h>
+> > >  #include <asm/system_misc.h>
+> > > +#include <asm/paravirt.h>
+> > > +#include <linux/jump_label.h>
+> > >  #include <linux/interrupt.h>
+> > >  #include <linux/irqreturn.h>
+> > >  #include <linux/module.h>
+> > > @@ -152,6 +155,20 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
+> > >  }
+> > >  EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
+> > >  
+> > > +unsigned long long xen_stolen_accounting(int cpu)
+> > > +{
+> > > +	struct vcpu_runstate_info state;
+> > > +
+> > > +	if (cpu != get_cpu())
+> > 
+> > get_cpu disables preempt, so you need a matching put_cpu.
+> 
+> Oops, thanks.
+> 
+> 
+> > But actually I think you just want smp_processor_id and you probably
+> > want the BUG_ON form to get unlikely etc.
+> >
+> > That said, you don't use cpu for anything else, so why not drop it
+> > entirely?
+> 
+> Ah, that's right, legacy of the past. I'll do that.
+> 
+> 
+> > > +		BUG();
+> > > +
+> > > +	xen_get_runstate_snapshot(&state);
+> > > +
+> > > +	WARN_ON(state.state != RUNSTATE_running);
+> > > +
+> > > +	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
+> > > +}
+> > > +
+> > >  static void __init xen_percpu_init(void *unused)
+> > >  {
+> > >  	struct vcpu_register_vcpu_info info;
+> > > @@ -170,6 +187,8 @@ static void __init xen_percpu_init(void *unused)
+> > >  		BUG();
+> > >  	per_cpu(xen_vcpu, cpu) = vcpup;
+> > >  
+> > > +	xen_setup_runstate_info(cpu);
+> > > +
+> > >  	enable_percpu_irq(xen_events_irq, 0);
+> > >  }
+> > >  
+> > > @@ -301,6 +320,10 @@ static int __init xen_init_events(void)
+> > >  
+> > >  	on_each_cpu(xen_percpu_init, NULL, 0);
+> > >  
+> > > +	pv_time_ops.steal_clock = xen_stolen_accounting;
+> > > +	static_key_slow_inc(&paravirt_steal_enabled);
+> > > +	static_key_slow_inc(&paravirt_steal_rq_enabled);
+> > 
+> > We don't seem to do this on x86 -- is that a bug on x86 on Xen?
+> 
+> On x86 we do all the accounting in do_stolen_accounting, called from our
+> own interrupt handler (xen_timer_interrupt).
+> I don't think we would gain anything by using the common infrastructure,
+> we would actually loose the idle ticks accounting we do there.
+> 
+> Speaking of which, I don't think that pv_time_ops.steal_clock would
+> properly increase CPUTIME_IDLE the way we do in do_stolen_accounting.
+> 
+> How much of an issue is that?
 
-On 06-05-2013 20:36, Jason Gunthorpe wrote:
-> On Mon, May 06, 2013 at 08:23:13PM -0400, Eduardo Valentin wrote:
-> 
->>> I get the impression it is desired to minimize driver kconfig
->>> dependencies to the minimum required to compile to increase build
->>> testing coverage, so maybe it would be appropriate to drop this
->>> entirely?
-> 
->> Well, it is also desired to compile things to the correct target
->> right?
-> 
-> There is some of that too..
-> 
-> But broadly the direction seems that drivers should have minimal
-> dependencies so, eg, the thermal maintainer compiling for x86 should
-> be able to compile test/static analyze your driver..
-> 
-
-Well, I do not see much of this attempt actually. Do you have some link
-/ evidene that shows someone who actually cares about compiling drivers
-for targets that they are not used for? On this specific driver, I
-actually have  had exactly the opposite advice [1]. I am not convinced
-people actually want to do that.
-
->> Thats the idea behind this config option. It follows the same design as
->> CONFIG_ARCH_HAS_CPUFREQ, for instance.
-> 
-> That is entirely contained inside arch/arm and doesn't involve
-> drivers.
-
-It actually goes outside arch/arm.
-
-> 
-> Jason
-> 
-> 
-
-[1] - https://patchwork.kernel.org/patch/1185431/
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 295 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130507/97d2e2b2/attachment-0001.sig>
+Well, if you look in https://git.kernel.org/cgit/linux/kernel/git/konrad/xen.git/log/?h=devel/pvtime.v1.1
+I tried to do use those two asm goto keys but it all started complaining
+to me during bootup with some WARNs. Never figured out why, but if somebody
+is interested in taking a look ...
