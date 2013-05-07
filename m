@@ -1,30 +1,34 @@
 From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Tue, 7 May 2013 19:48:22 +0800
-Subject: [PATCH] usb: gadget: s3c2410_udc: fix error return code in
- s3c2410_udc_probe()
-Message-ID: <CAPgLHd9zzFi6dCBH0V=eeqVtd=UstiqM8fDcDsMCfujAfEDHTg@mail.gmail.com>
+Date: Tue, 7 May 2013 19:58:17 +0800
+Subject: [PATCH] [ARM] rpc: acornscsi: fix error return code in
+ acornscsi_probe()
+Message-ID: <CAPgLHd-M=0gj1_-ip51qbhHfBszSBkiW5VD8cp_-AVOjn7XP7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Fix to return a negative error code in the gpio_to_irq() error handling
+Fix to return -ENOMEM in the ecardm_iomap() error handling
 case instead of 0, as done elsewhere in this function.
 
 Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 ---
- drivers/usb/gadget/s3c2410_udc.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/scsi/arm/acornscsi.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
-index d0e75e1..c974776 100644
---- a/drivers/usb/gadget/s3c2410_udc.c
-+++ b/drivers/usb/gadget/s3c2410_udc.c
-@@ -1851,6 +1851,7 @@ static int s3c2410_udc_probe(struct platform_device *pdev)
- 		irq = gpio_to_irq(udc_info->vbus_pin);
- 		if (irq < 0) {
- 			dev_err(dev, "no irq for gpio vbus pin\n");
-+			retval = irq;
- 			goto err_gpio_claim;
- 		}
+diff --git a/drivers/scsi/arm/acornscsi.c b/drivers/scsi/arm/acornscsi.c
+index 09ba186..bee7142 100644
+--- a/drivers/scsi/arm/acornscsi.c
++++ b/drivers/scsi/arm/acornscsi.c
+@@ -2961,8 +2961,10 @@ static int acornscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
  
+ 	ashost->base = ecardm_iomap(ec, ECARD_RES_MEMC, 0, 0);
+ 	ashost->fast = ecardm_iomap(ec, ECARD_RES_IOCFAST, 0, 0);
+-	if (!ashost->base || !ashost->fast)
++	if (!ashost->base || !ashost->fast) {
++		ret = -ENOMEM;
+ 		goto out_put;
++	}
+ 
+ 	host->irq = ec->irq;
+ 	ashost->host = host;
