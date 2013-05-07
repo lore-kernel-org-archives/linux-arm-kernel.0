@@ -1,87 +1,48 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 7 May 2013 10:17:50 +0100
-Subject: [Xen-devel] [PATCH RFC v2 4/4] xen/arm: account for stolen ticks
-In-Reply-To: <1367851878-21629-4-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1305061532310.4756@kaball.uk.xensource.com>
- <1367851878-21629-4-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1367918270.26321.39.camel@zakaz.uk.xensource.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Tue, 07 May 2013 11:18:53 +0200
+Subject: [PATCH,
+ RFC 01/22] can: move CONFIG_HAVE_CAN_FLEXCAN out of CAN_DEV
+In-Reply-To: <201305031724.15584.arnd@arndb.de>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-2-git-send-email-arnd@arndb.de>
+ <5183892B.8020400@pengutronix.de> <201305031724.15584.arnd@arndb.de>
+Message-ID: <5188C6FD.9010903@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-05-06 at 15:51 +0100, Stefano Stabellini wrote:
-> Register the runstate_memory_area with the hypervisor.
-> Use pv_time_ops.steal_clock to account for stolen ticks.
+On 05/03/2013 05:24 PM, Arnd Bergmann wrote:
+> On Friday 03 May 2013, Marc Kleine-Budde wrote:
+>> On 05/02/2013 05:16 PM, Arnd Bergmann wrote:
+>>> CONFIG_HAVE_CAN_FLEXCAN is a silect symbol that is meant to be selected
+>>> by platforms that support this driver, but that is not possible without
+>>> also selecting CAN_DEV, unless we move it out of the "if CAN_DEV"
+>>> section of the Kconfig file.
+>>>
+>>> warning: (SOC_IMX28 && SOC_IMX25 && SOC_IMX35 &&
+>>>  IMX_HAVE_PLATFORM_FLEXCAN && SOC_IMX53 && SOC_IMX6Q) selects HAVE_CAN_FLEXCAN
+>>>  which has unmet direct dependencies (NET && CAN && CAN_DEV)
+>>
+>> With the advent of multi platform kernels I like to get rid of
+>> HAVE_CAN_FLEXCAN completely.
 > 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> ---
->  arch/arm/xen/enlighten.c |   23 +++++++++++++++++++++++
->  1 files changed, 23 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index ee86bfa..2a5cc82 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -14,7 +14,10 @@
->  #include <xen/xen-ops.h>
->  #include <asm/xen/hypervisor.h>
->  #include <asm/xen/hypercall.h>
-> +#include <asm/arch_timer.h>
->  #include <asm/system_misc.h>
-> +#include <asm/paravirt.h>
-> +#include <linux/jump_label.h>
->  #include <linux/interrupt.h>
->  #include <linux/irqreturn.h>
->  #include <linux/module.h>
-> @@ -152,6 +155,20 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
->  }
->  EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
->  
-> +unsigned long long xen_stolen_accounting(int cpu)
-> +{
-> +	struct vcpu_runstate_info state;
-> +
-> +	if (cpu != get_cpu())
+> Yes, good idea. Are there any other dependencies we need to add then?
+> I assume FLEXCAN needs to depend on HAS_IOMEM and OF at least, but
+> there might be more.
 
-get_cpu disables preempt, so you need a matching put_cpu.
+The driver compiles (tested on SH and blacksfin) and works without
+CONFIG_OF (on non DT arm platforms).
 
-But actually I think you just want smp_processor_id and you probably
-want the BUG_ON form to get unlikely etc.
+Marc
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-That said, you don't use cpu for anything else, so why not drop it
-entirely?
-
-> +		BUG();
-> +
-> +	xen_get_runstate_snapshot(&state);
-> +
-> +	WARN_ON(state.state != RUNSTATE_running);
-> +
-> +	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
-> +}
-> +
->  static void __init xen_percpu_init(void *unused)
->  {
->  	struct vcpu_register_vcpu_info info;
-> @@ -170,6 +187,8 @@ static void __init xen_percpu_init(void *unused)
->  		BUG();
->  	per_cpu(xen_vcpu, cpu) = vcpup;
->  
-> +	xen_setup_runstate_info(cpu);
-> +
->  	enable_percpu_irq(xen_events_irq, 0);
->  }
->  
-> @@ -301,6 +320,10 @@ static int __init xen_init_events(void)
->  
->  	on_each_cpu(xen_percpu_init, NULL, 0);
->  
-> +	pv_time_ops.steal_clock = xen_stolen_accounting;
-> +	static_key_slow_inc(&paravirt_steal_enabled);
-> +	static_key_slow_inc(&paravirt_steal_rq_enabled);
-
-We don't seem to do this on x86 -- is that a bug on x86 on Xen?
-
-> +
->  	return 0;
->  }
->  postcore_initcall(xen_init_events);
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130507/697f856d/attachment.sig>
