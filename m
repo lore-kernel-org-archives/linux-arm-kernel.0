@@ -1,27 +1,34 @@
 From: valentin.longchamp@keymile.com (Valentin Longchamp)
-Date: Tue,  7 May 2013 17:52:18 +0200
-Subject: [RFC PATCH] Alternative clk gate ctrl for Kirkwood variants
-Message-ID: <1367941941-19152-1-git-send-email-valentin.longchamp@keymile.com>
+Date: Tue,  7 May 2013 17:52:20 +0200
+Subject: [PATCH 2/3] ARM: kirkwood: look for alternative gate ctrl of node
+In-Reply-To: <1367941941-19152-1-git-send-email-valentin.longchamp@keymile.com>
+References: <1367941941-19152-1-git-send-email-valentin.longchamp@keymile.com>
+Message-ID: <1367941941-19152-3-git-send-email-valentin.longchamp@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series introduces a clk gate ctrl for the kirkwood variants embedded in the
-Prestera SoCs.
+The search for the gate ctrl of node must now also look for the
+introduced compatible node.
 
-This would allow to get rid of the workaround for the km_kirkwood board support
-file that was added previously because of the lack of DT clk gate support.
+Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
+---
+ arch/arm/mach-kirkwood/board-dt.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Valentin Longchamp (3):
-  clk: mvebu: add gate ctrl for Prestera kirkwood variants
-  ARM: kirkwood: look for alternative gate ctrl of node
-  ARM: kirkwood: remove clock gating disabling for km_kirkwood
-
- .../devicetree/bindings/clock/mvebu-gated-clock.txt   | 17 +++++++++++++++++
- arch/arm/boot/dts/kirkwood-98dx4122.dtsi              |  7 +++++++
- arch/arm/mach-kirkwood/board-dt.c                     |  4 ++++
- arch/arm/mach-kirkwood/board-km_kirkwood.c            | 15 ---------------
- drivers/clk/mvebu/clk-gating-ctrl.c                   | 19 +++++++++++++++++++
- 5 files changed, 47 insertions(+), 15 deletions(-)
-
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 7904758..3e607c9 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -44,6 +44,10 @@ static void __init kirkwood_legacy_clk_init(void)
+ 	struct of_phandle_args clkspec;
+ 	struct clk *clk;
+ 
++	if (np == NULL)
++		np = of_find_compatible_node(NULL, NULL,
++			"marvell,prestera-kw-gating-clock");
++
+ 	clkspec.np = np;
+ 	clkspec.args_count = 1;
+ 
 -- 
 1.8.0.1
