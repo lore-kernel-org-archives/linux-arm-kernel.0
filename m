@@ -1,43 +1,36 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Tue, 7 May 2013 15:09:33 +0530
-Subject: [PATCH 1/2] ARM: OMAP AM33XX: clock data: Enable clkout2 as part of
- init
-In-Reply-To: <1367919574-21353-1-git-send-email-hvaibhav@ti.com>
-References: <1367919574-21353-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1367919574-21353-2-git-send-email-hvaibhav@ti.com>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Tue,  7 May 2013 15:18:14 +0530
+Subject: [RFC PATCH 0/2] USB: OHCI: Start splitting up the driver
+In-Reply-To: <y>
+References: <y>
+Message-ID: <1367920096-15137-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clkout2 comes out on the pad and is being used by various
-external on-board peripherals like, Audio codecs and stuff.
-So enable the clkout2 by default during init sequence itself.
+This series of patches begins the process of splitting ohci-hcd up into
+a core library module and independent pci driver modules.
 
-Also, add the missing entry of "clkout2_ck" to the clock table.
+Patch 1/2 prepares the way by exporting a few functions from ohci-hcd
+and adding a new mechanism for platform-specific drivers to initialize
+their hc_driver structures.  This deserves to be done in the core
+because almost all of the entries in these structures are pure
+boilerplate -- practically none of the drivers need to override more
+than three of the standard core values.
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
----
- arch/arm/mach-omap2/cclock33xx_data.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Patch 2/2  separate out ohci-pci into independent driver modules.
 
-diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
-index 6fd0ed1..a8140b6 100644
---- a/arch/arm/mach-omap2/cclock33xx_data.c
-+++ b/arch/arm/mach-omap2/cclock33xx_data.c
-@@ -979,6 +979,7 @@ static struct omap_clk am33xx_clks[] = {
- 	CLK(NULL,	"trace_pmd_clk_mux_ck",	&trace_pmd_clk_mux_ck),
- 	CLK(NULL,	"stm_clk_div_ck",	&stm_clk_div_ck),
- 	CLK(NULL,	"trace_clk_div_ck",	&trace_clk_div_ck),
-+	CLK(NULL,	"clkout2_ck",		&clkout2_ck),
- };
- 
- 
-@@ -989,6 +990,7 @@ static const char *enable_init_clks[] = {
- 	"l4hs_gclk",
- 	"l4fw_gclk",
- 	"l4ls_gclk",
-+	"clkout2_ck",	/* Required for external peripherals like, Audio codecs */
- };
- 
- int __init am33xx_clk_init(void)
+Manjunath Goudar (2):
+  USB: OHCI: prepare to make ohci-hcd a library module
+  USB: OHCI: make ohci-pci a separate driver
+
+ drivers/usb/host/Kconfig         |    9 ++-
+ drivers/usb/host/Makefile        |    3 +
+ drivers/usb/host/ohci-hcd.c      |  142 +++++++++++++++++++++++++++++---------
+ drivers/usb/host/ohci-pci.c      |  129 ++++++++++------------------------
+ drivers/usb/host/ohci-platform.c |    2 +-
+ drivers/usb/host/ohci-q.c        |   13 ++++
+ drivers/usb/host/ohci.h          |   30 +++++++-
+ 7 files changed, 197 insertions(+), 131 deletions(-)
+
 -- 
-1.7.0.4
+1.7.9.5
