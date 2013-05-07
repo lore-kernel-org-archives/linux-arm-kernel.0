@@ -1,34 +1,34 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Tue, 07 May 2013 09:09:01 +0530
-Subject: [PATCH] ASoC: Samsung: i2s: Fix crash in i2s driver
-Message-ID: <1367897941-18439-1-git-send-email-padma.v@samsung.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Tue, 7 May 2013 03:53:13 +0000
+Subject: mach-omap2/timer.c: Bug introduced while merging patch - ff931c82
+In-Reply-To: <20130506233743.GJ28721@atomide.com>
+References: <79CD15C6BA57404B839C016229A409A83EC7C45D@DBDE04.ent.ti.com>
+ <20130506152706.GD28721@atomide.com>
+ <79CD15C6BA57404B839C016229A409A83EC7C93A@DBDE04.ent.ti.com>
+ <20130506233743.GJ28721@atomide.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EC7CB23@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a null pointer deference in i2s driver in DT
-case
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com]
+> Sent: Tuesday, May 07, 2013 5:08 AM
+> To: Hiremath, Vaibhav
+> Cc: linux-omap at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+> arm-kernel at lists.infradead.org
+> Subject: Re: mach-omap2/timer.c: Bug introduced while merging patch -
+> ff931c82
+> 
+> * Hiremath, Vaibhav <hvaibhav@ti.com> [130506 11:35]:
+> >
+> > Ohh yeah, I already have a patch for it -
+> 
+> Thanks, I'll add that into omap-for-v3.10/fixes. I modified
+> the comments a bit trying to figure out where it changed, updated
+> patch below.
+> 
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
+Thanks Tony. 
 
-This patch is dependent on below patch posted by Thomas Abraham.
-https://patchwork.kernel.org/patch/2224801/
-
- sound/soc/samsung/i2s.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-index 7ce7c50..eaf6439 100644
---- a/sound/soc/samsung/i2s.c
-+++ b/sound/soc/samsung/i2s.c
-@@ -1182,7 +1182,7 @@ static int samsung_i2s_probe(struct platform_device *pdev)
- 		pri_dai->sec_dai = sec_dai;
- 	}
- 
--	if (i2s_pdata->cfg_gpio && i2s_pdata->cfg_gpio(pdev)) {
-+	if (i2s_pdata && i2s_pdata->cfg_gpio && i2s_pdata->cfg_gpio(pdev)) {
- 		dev_err(&pdev->dev, "Unable to configure gpio\n");
- 		ret = -EINVAL;
- 		goto err;
--- 
-1.7.4.4
+Thanks,
+Vaibhav
