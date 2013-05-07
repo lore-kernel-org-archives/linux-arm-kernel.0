@@ -1,52 +1,29 @@
-From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
-Date: Tue, 7 May 2013 15:12:06 +0530
-Subject: [PATCH 54/63] ARM: ux500: Replace ST-E's home-brew DMA
- direction definition with the generic one
-In-Reply-To: <20130507073921.GT24153@gmail.com>
-References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
- <1367591569-32197-55-git-send-email-lee.jones@linaro.org>
- <20130506071355.GA5552@bnru10> <20130507073921.GT24153@gmail.com>
-Message-ID: <20130507094205.GA32548@bnru10>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Tue, 7 May 2013 15:09:32 +0530
+Subject: [PATCH 0/2] ARM: OMAP AM33XX: clock data: Enable clkout2 output on
+ SoC pad
+Message-ID: <1367919574-21353-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 07, 2013 at 09:39:21 +0200, Lee Jones wrote:
-> On Mon, 06 May 2013, Srinidhi Kasagar wrote:
-> 
-> > On Fri, May 03, 2013 at 16:32:40 +0200, Lee Jones wrote:
-> > > STEDMA40_*_TO_* direction definitions are identical in all but name to
-> > > the pre-defined generic DMA_*_TO_* ones. Let's make things easy by not
-> > > duplicating such things.
-> > > 
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  arch/arm/mach-ux500/board-mop500-audio.c |   12 ++++++------
-> > >  arch/arm/mach-ux500/board-mop500-sdi.c   |   16 ++++++++--------
-> > >  arch/arm/mach-ux500/board-mop500.c       |   22 +++++++++++-----------
-> > >  arch/arm/mach-ux500/usb.c                |    4 ++--
-> > >  4 files changed, 27 insertions(+), 27 deletions(-)
-> > 
-> > Hope you have taken care for all other files, because, I see
-> > few more instances in my tree apart from the above files.
-> 
-> Would you be kind enough to paste those files please?
+'clkout2' comes out on the device pad and is being used by various
+external on-board peripherals like, Audio codecs, Wilink and stuff.
+So enable the clkout2 by default during init sequence itself
+along with right pinmux configuration clkout2 output.
 
-arch/arm/mach-ux500/board-mop500-audio.c:       .dir = STEDMA40_MEM_TO_PERIPH,
-arch/arm/mach-ux500/board-mop500-audio.c:       .dir = STEDMA40_MEM_TO_PERIPH,
-arch/arm/mach-ux500/board-mop500-audio.c:       .dir = STEDMA40_MEM_TO_PERIPH,
-arch/arm/mach-ux500/board-mop500-sdi.c: .dir = STEDMA40_MEM_TO_PERIPH,
-arch/arm/mach-ux500/board-mop500-sdi.c: .dir = STEDMA40_MEM_TO_PERIPH,
-arch/arm/mach-ux500/board-mop500-sdi.c: .dir = STEDMA40_MEM_TO_PERIPH,
-arch/arm/mach-ux500/board-mop500-sdi.c: .dir = STEDMA40_MEM_TO_PERIPH,
-arch/arm/mach-ux500/board-mop500.c:                             .dir = STEDMA40_MEM_TO_PERIPH,
-arch/arm/mach-ux500/board-mop500.c:             .dir = STEDMA40_MEM_TO_PERIPH,
-arch/arm/mach-ux500/board-mop500.c:     .dir = STEDMA40_MEM_TO_PERIPH,
-arch/arm/mach-ux500/board-mop500.c:     .dir = STEDMA40_MEM_TO_PERIPH,
-arch/arm/mach-ux500/board-mop500.c:     .dir = STEDMA40_MEM_TO_PERIPH,
-arch/arm/mach-ux500/board-mop500.c:     .dir = STEDMA40_MEM_TO_PERIPH,
-arch/arm/mach-ux500/devices-db8500.c:   .dir = STEDMA40_MEM_TO_MEM,
-arch/arm/mach-ux500/devices-db8500.c:   .dir = STEDMA40_MEM_TO_MEM,
-arch/arm/mach-ux500/usb.c:              .dir = STEDMA40_MEM_TO_PERIPH, \
+Also, add the missing entry of "clkout2_ck" to the AM33xx clock table.
 
-regards,
-srinidhi
+As far as enabling of clkout2 during init is concerned,
+we can argue that it can be handled using DT property and enable
+the clock only when specified; but not until OMAP clock-tree
+migration to DT.
+
+Vaibhav Hiremath (2):
+  ARM: OMAP AM33XX: clock data: Enable clkout2 as part of init
+  ARM: dts: AM33XX: Set pinmux for clkout2 pad used for clock output
+
+ arch/arm/boot/dts/am335x-bone.dts     |    8 +++++++-
+ arch/arm/boot/dts/am335x-evm.dts      |    8 +++++++-
+ arch/arm/boot/dts/am335x-evmsk.dts    |    8 +++++++-
+ arch/arm/mach-omap2/cclock33xx_data.c |    2 ++
+ 4 files changed, 23 insertions(+), 3 deletions(-)
