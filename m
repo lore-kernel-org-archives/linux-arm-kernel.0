@@ -1,72 +1,44 @@
-From: itooo@itooo.com (Greg)
-Date: Tue, 07 May 2013 18:33:46 +0200
-Subject: MVNETA irq with backport-3.8
-In-Reply-To: <20130507181823.23342ffb@skate>
-References: <51890C29.8000504@itooo.com> <20130507181823.23342ffb@skate>
-Message-ID: <51892CEA.4050105@itooo.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 07 May 2013 18:36:29 +0200
+Subject: [PATCH 1/3] clk: mvebu: add gate ctrl for Prestera kirkwood
+ variants
+In-Reply-To: <518927C0.6070600@free-electrons.com>
+References: <1367941941-19152-1-git-send-email-valentin.longchamp@keymile.com>
+ <1367941941-19152-2-git-send-email-valentin.longchamp@keymile.com>
+ <518927C0.6070600@free-electrons.com>
+Message-ID: <51892D8D.4060704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 07/05/2013 18:18, Thomas Petazzoni a ?crit :
-> Dear Greg,
->
-> On Tue, 07 May 2013 16:14:01 +0200, Greg wrote:
->
->> I'm trying to boot off the the backport-3.-8 kernel with armada-xp-db DT
->> file.
+On 05/07/2013 06:11 PM, Gregory CLEMENT wrote:
+> On 05/07/2013 05:52 PM, Valentin Longchamp wrote:
+>> The kirkwood device found in the Prestera SoCs does not have all the
+>> peripherals of its the usual kirkwood SoCs. There are hence missing
+>> clocks in the SoCs.
 >>
->> When eth0 is brought up (I'm booting on NFS) the mvneta driver fails in
->> mvneta_open, with the following error :
->>> mvneta d0070000.ethernet eth0: cannot request irq 25
->> The oddness is this is not the actual IRQ to be requested, and the DTS
->> files explicitly specify the IRQ is 8 for this device.
->>
->> I'm not familiar with the DT system, where should I start looking to
->> find the source of the problem ?
-> This issue should be fixed by:
+>> This patch registers another gate controller for the kirkwood that
+>> registers only the available clocks of this kirkwood variant.
 >
-> commit 7f23f62fc31c5c97947414c0937a72e08a947a41
-> Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> Date:   Wed Mar 20 16:09:35 2013 +0100
+> Hi Valentin,
 >
->      arm: mvebu: Use local interrupt only for the timer 0
->      
->      The commit 3a6f08a37 "arm: mvebu: Add support for local interrupt",
->      managed the 28th first interrupts as local interrupt to match the
->      hardware specification. Among these interrupts there are the Gigabits
->      Ethernet ones used by the mvneta driver. Unfortunately the state of
->      the percpu_irq API prevents the driver to use it.
->      
->      Indeed the interrupts have to be freed when the .stop() function is
->      called. As the free_percpu_irq() function don't disable the interrupt
->      line, we have to do it on each CPU before calling this. The function
->      disable_percpu_irq() only disable the percpu on the current CPU and
->      there is no function which allows to disable a percpu irq on a given
->      CPU. Waiting for the extension of the percpu_irq API, this fix allows
->      to use again the mvneta driver.
->      
->      Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->      Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->      Tested-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
->      Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+> Overall the patch set looks OK, however I don't understand why you need
+> to declare a new gate controller. The list you delcared seemed to be
+> just a subset of the Kirkwood one, why can't you use this one?
 >
-> which is part of the backport-3.8 branch, so I'm a bit confused. Are
-> you sure you're using the latest backport-3.8 branch? If so, then I'll
-> do a test here to check this.
->
-Thomas,
+> Note that I am not an expert for the kirkwood hardware, so maybe I
+> missed something.
 
-I could have done something wrong as I am not very familiar with git:
-> root at axp-dev:/opt/linux-3.8-bp# git branch
-> * backport-3.8
->   list
->   master
-I cloned yesterday with :
-> git clone -b backport-3.8 
-> https://github.com/MISL-EBU-System-SW/mainline-public.git
+I just checked my mails from late 2012 and there Valentin and I agreed,
+that not the missing bits in clock gating control registers was the root
+cause of km_kirkwood to hang. It was rather the phy gates (that do not/
+not yet exist on DT) that caused it to hang, i.e. when accessing SATA
+PHY registers.
 
-is that ok ?
+Valentin, I am not against an extra clock-gating-ctrl for Prestera but
+maybe having an kirkwood.dtsi fork without SATA and other peripherals
+will also help?
 
-By the way I do have PCIe support enabled on the source tree I'm using.
+And: Does DT-enabled km_kirkwood ever hang without the hack in it's
+board setup? There should be no PHY gates on DT boards..
 
-Regards,
+Sebastian
