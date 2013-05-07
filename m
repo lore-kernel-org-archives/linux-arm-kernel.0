@@ -1,38 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 7 May 2013 10:08:49 +0100
-Subject: [RFC PATCH 0/2] ARM: Remove any correlation between IPC and
- BogoMips value
-In-Reply-To: <5187EFF3.6010005@codeaurora.org>
-References: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
- <5187EFF3.6010005@codeaurora.org>
-Message-ID: <20130507090849.GC25387@mudshark.cambridge.arm.com>
+From: valentin.longchamp@keymile.com (Valentin Longchamp)
+Date: Tue, 07 May 2013 11:10:24 +0200
+Subject: [PATCH 0/7] mv643xx_eth: device tree bindings
+In-Reply-To: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
+ <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <5188C500.8010209@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 06, 2013 at 07:01:23PM +0100, Christopher Covington wrote:
-> Hi Will,
+Sebastian,
+
+On 05/06/2013 05:33 PM, Sebastian Hesselbarth wrote:
+> This patch set picks up work by Florian Fainelli bringing full DT
+> support to mv643xx_eth and Marvell SoCs using it.
 > 
-> On 05/03/2013 01:35 PM, Will Deacon wrote:
-> > Hi all,
-> > 
-> > This small patch set may look a little over a month late, but there is a
-> > serious reason for posting it.
-> > 
-> > When I moved the ARM delay loop over to using the architected timers
-> > rather than the CPU spinning loop (which has all the problems associated
-> > with cpu frequency scaling and what-not) I thought I was doing something
-> > useful for the port. However, it turns out that a surprising number of
-> > people have complained, and continue to complain, about the drop in
-> > their `BogoMIPs score'.
+> The current patch set drops Florian's device tree conversions for
+> Kirkwood, Dove, and Orion5x in favour of split patches for board
+> files and board descriptor files.
 > 
-> Have you considered adding the old code back in, but in a form that's not at
-> all referenced by the delay loop code and just calculates CPU-based bogomips?
+> Device tree conversion for Dove and Kirkwood is added. Dove has
+> been fully tested, while Kirkwood is compile-tested only.
+> 
+> Florian Fainelli (2):
+>   net: mv643xx_eth: add Device Tree bindings
+>   net: mv643xx_eth: update Device Tree bindings documentation
+> 
+> Sebastian Hesselbarth (5):
+>   ARM: dove: remove legacy mv643xx_eth setup
+>   ARM: dove: add gigabit ethernet and mvmdio device tree nodes
+>   ARM: kirkwood: remove legacy mv643xx_eth board setup
+>   ARM: kirkwood: add gigabit ethernet and mvmdio device tree nodes
+>   ARM: kirkwood: remove legacy clk alias for mv643xx_eth
+> 
 
-That seems like a lot of effort in order to preserve something that isn't
-even meaningful. We might be better just zeroing the value, but then we'll
-inevitably get bug reports of it being `wrong'.
+I have successfully tested these patches on km_kirkwood, you can add my tested-by:
 
-Plus, the calibration during boot introduces a brief delay when onlining
-each core whereas this can be skipped when using a constant timer.
-
-Will
+Tested-by: Valentin Longchamp<valentin.longchamp@keymile.com>
