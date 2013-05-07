@@ -1,62 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 May 2013 10:53:18 +0100
-Subject: [PATCH 54/63] ARM: ux500: Replace ST-E's home-brew DMA direction
- definition with the generic one
-In-Reply-To: <20130507094205.GA32548@bnru10>
-References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
- <1367591569-32197-55-git-send-email-lee.jones@linaro.org>
- <20130506071355.GA5552@bnru10> <20130507073921.GT24153@gmail.com>
- <20130507094205.GA32548@bnru10>
-Message-ID: <20130507095318.GE3102@gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 07 May 2013 11:54:20 +0200
+Subject: [PATCH V2 2/3] ARM: dts: add Exynos audio subsystem clock
+ controller node
+In-Reply-To: <1367909016-19657-3-git-send-email-padma.v@samsung.com>
+References: <1367909016-19657-1-git-send-email-padma.v@samsung.com>
+ <1367909016-19657-3-git-send-email-padma.v@samsung.com>
+Message-ID: <2829319.bZPJnVErnQ@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 07 May 2013, Srinidhi Kasagar wrote:
+Hi Padmavathi,
 
-> On Tue, May 07, 2013 at 09:39:21 +0200, Lee Jones wrote:
-> > On Mon, 06 May 2013, Srinidhi Kasagar wrote:
-> > 
-> > > On Fri, May 03, 2013 at 16:32:40 +0200, Lee Jones wrote:
-> > > > STEDMA40_*_TO_* direction definitions are identical in all but name to
-> > > > the pre-defined generic DMA_*_TO_* ones. Let's make things easy by not
-> > > > duplicating such things.
-> > > > 
-> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > > ---
-> > > >  arch/arm/mach-ux500/board-mop500-audio.c |   12 ++++++------
-> > > >  arch/arm/mach-ux500/board-mop500-sdi.c   |   16 ++++++++--------
-> > > >  arch/arm/mach-ux500/board-mop500.c       |   22 +++++++++++-----------
-> > > >  arch/arm/mach-ux500/usb.c                |    4 ++--
-> > > >  4 files changed, 27 insertions(+), 27 deletions(-)
-> > > 
-> > > Hope you have taken care for all other files, because, I see
-> > > few more instances in my tree apart from the above files.
-> > 
-> > Would you be kind enough to paste those files please?
+On Tuesday 07 of May 2013 12:13:35 Padmavathi Venna wrote:
+> Audio subsystem introduced in s5pv210 and exynos platforms
+> which has a internal clock controller. This patch adds a node
+> for the same on exynos5250.
 > 
-> arch/arm/mach-ux500/board-mop500-audio.c:       .dir = STEDMA40_MEM_TO_PERIPH,
-> arch/arm/mach-ux500/board-mop500-audio.c:       .dir = STEDMA40_MEM_TO_PERIPH,
-> arch/arm/mach-ux500/board-mop500-audio.c:       .dir = STEDMA40_MEM_TO_PERIPH,
-> arch/arm/mach-ux500/board-mop500-sdi.c: .dir = STEDMA40_MEM_TO_PERIPH,
-> arch/arm/mach-ux500/board-mop500-sdi.c: .dir = STEDMA40_MEM_TO_PERIPH,
-> arch/arm/mach-ux500/board-mop500-sdi.c: .dir = STEDMA40_MEM_TO_PERIPH,
-> arch/arm/mach-ux500/board-mop500-sdi.c: .dir = STEDMA40_MEM_TO_PERIPH,
-> arch/arm/mach-ux500/board-mop500.c:                             .dir = STEDMA40_MEM_TO_PERIPH,
-> arch/arm/mach-ux500/board-mop500.c:             .dir = STEDMA40_MEM_TO_PERIPH,
-> arch/arm/mach-ux500/board-mop500.c:     .dir = STEDMA40_MEM_TO_PERIPH,
-> arch/arm/mach-ux500/board-mop500.c:     .dir = STEDMA40_MEM_TO_PERIPH,
-> arch/arm/mach-ux500/board-mop500.c:     .dir = STEDMA40_MEM_TO_PERIPH,
-> arch/arm/mach-ux500/board-mop500.c:     .dir = STEDMA40_MEM_TO_PERIPH,
-> arch/arm/mach-ux500/devices-db8500.c:   .dir = STEDMA40_MEM_TO_MEM,
-> arch/arm/mach-ux500/devices-db8500.c:   .dir = STEDMA40_MEM_TO_MEM,
-> arch/arm/mach-ux500/usb.c:              .dir = STEDMA40_MEM_TO_PERIPH, \
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
+>  arch/arm/boot/dts/exynos5250.dtsi |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> b/arch/arm/boot/dts/exynos5250.dtsi index 36c9d8d..7026de0 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -72,6 +72,12 @@
+>  		#clock-cells = <1>;
+>  	};
+> 
+> +	clock_audss: audss-clock-controller at 0x03810000 {
 
-Yes, all those are dealt with.
+Just a nitpick: this should be @3810000, without the 0x and leading zeroes.
 
-Thanks Srinidhi.
-
+Best regards,
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Kernel and System Framework
+
+> +		compatible = "samsung,exynos5250-audss-clock";
+> +		reg = <0x03810000 0x0C>;
+> +		#clock-cells = <1>;
+> +	};
+> +
+>  	gic:interrupt-controller at 10481000 {
+>  		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+>  		#interrupt-cells = <3>;
