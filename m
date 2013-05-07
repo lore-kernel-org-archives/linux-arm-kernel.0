@@ -1,65 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 7 May 2013 18:18:23 +0200
-Subject: MVNETA irq with backport-3.8
-In-Reply-To: <51890C29.8000504@itooo.com>
-References: <51890C29.8000504@itooo.com>
-Message-ID: <20130507181823.23342ffb@skate>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 07 May 2013 17:28:00 +0100
+Subject: [PATCH v3 24/32] arm64: KVM: 32bit GP register access
+In-Reply-To: <20130502160906.GI20730@arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-25-git-send-email-marc.zyngier@arm.com>
+ <20130502160906.GI20730@arm.com>
+Message-ID: <51892B90.8060706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Greg,
-
-On Tue, 07 May 2013 16:14:01 +0200, Greg wrote:
-
-> I'm trying to boot off the the backport-3.-8 kernel with armada-xp-db DT 
-> file.
+On 02/05/13 17:09, Catalin Marinas wrote:
+> On Mon, Apr 08, 2013 at 05:17:26PM +0100, Marc Zyngier wrote:
+>>  static inline bool kvm_vcpu_reg_is_pc(const struct kvm_vcpu *vcpu, int reg)
+>>  {
+>> -	return false;
+>> +	return (vcpu_mode_is_32bit(vcpu)) && reg == 15;
+>>  }
 > 
-> When eth0 is brought up (I'm booting on NFS) the mvneta driver fails in 
-> mvneta_open, with the following error :
-> > mvneta d0070000.ethernet eth0: cannot request irq 25
-> 
-> The oddness is this is not the actual IRQ to be requested, and the DTS 
-> files explicitly specify the IRQ is 8 for this device.
-> 
-> I'm not familiar with the DT system, where should I start looking to 
-> find the source of the problem ?
+> On AArch64, would ESR_EL2 have SRT == 15 when the source/destination
+> register is PC? The mapping between AArch32 and AArch64 registers
+> suggests R13_hyp. Maybe 15 is correct but it's not clear to me from the
+> spec.
 
-This issue should be fixed by:
+The register reported by ESL_EL2 is indeed r15 when EL1 is in AARch32.
+That's because we don't have PC as a GPR on AARch64.
 
-commit 7f23f62fc31c5c97947414c0937a72e08a947a41
-Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Date:   Wed Mar 20 16:09:35 2013 +0100
+> BTW, on arch/arm it looks like this is used when you get a data abort
+> with PC as the destination register and you inject a prefetch abort in
+> this case. Why isn't this a normal data abort? Once you get the
+> information, you load it into PC but first you need to sort out the data
+> abort (unless I don't understand how the kvm_inject_pabt works).
 
-    arm: mvebu: Use local interrupt only for the timer 0
-    
-    The commit 3a6f08a37 "arm: mvebu: Add support for local interrupt",
-    managed the 28th first interrupts as local interrupt to match the
-    hardware specification. Among these interrupts there are the Gigabits
-    Ethernet ones used by the mvneta driver. Unfortunately the state of
-    the percpu_irq API prevents the driver to use it.
-    
-    Indeed the interrupts have to be freed when the .stop() function is
-    called. As the free_percpu_irq() function don't disable the interrupt
-    line, we have to do it on each CPU before calling this. The function
-    disable_percpu_irq() only disable the percpu on the current CPU and
-    there is no function which allows to disable a percpu irq on a given
-    CPU. Waiting for the extension of the percpu_irq API, this fix allows
-    to use again the mvneta driver.
-    
-    Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-    Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-    Tested-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
-    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+Indeed, it should be a data abort, as we correctly fetched the
+instruction. Now, I wonder why we even bother trying to catch this case.
+Fetching PC from MMIO looks quite silly, but I don't think anything
+really forbids it in the architecture.
 
-which is part of the backport-3.8 branch, so I'm a bit confused. Are
-you sure you're using the latest backport-3.8 branch? If so, then I'll
-do a test here to check this.
-
-Best regards,
-
-Thomas
+	M.
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
