@@ -1,48 +1,49 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 07 May 2013 11:18:53 +0200
-Subject: [PATCH,
- RFC 01/22] can: move CONFIG_HAVE_CAN_FLEXCAN out of CAN_DEV
-In-Reply-To: <201305031724.15584.arnd@arndb.de>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-2-git-send-email-arnd@arndb.de>
- <5183892B.8020400@pengutronix.de> <201305031724.15584.arnd@arndb.de>
-Message-ID: <5188C6FD.9010903@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue,  7 May 2013 11:20:26 +0200
+Subject: [PATCH] proc: Use PDE attribute setting accessor functions
+Message-ID: <1367918426-7076-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2013 05:24 PM, Arnd Bergmann wrote:
-> On Friday 03 May 2013, Marc Kleine-Budde wrote:
->> On 05/02/2013 05:16 PM, Arnd Bergmann wrote:
->>> CONFIG_HAVE_CAN_FLEXCAN is a silect symbol that is meant to be selected
->>> by platforms that support this driver, but that is not possible without
->>> also selecting CAN_DEV, unless we move it out of the "if CAN_DEV"
->>> section of the Kconfig file.
->>>
->>> warning: (SOC_IMX28 && SOC_IMX25 && SOC_IMX35 &&
->>>  IMX_HAVE_PLATFORM_FLEXCAN && SOC_IMX53 && SOC_IMX6Q) selects HAVE_CAN_FLEXCAN
->>>  which has unmet direct dependencies (NET && CAN && CAN_DEV)
->>
->> With the advent of multi platform kernels I like to get rid of
->> HAVE_CAN_FLEXCAN completely.
-> 
-> Yes, good idea. Are there any other dependencies we need to add then?
-> I assume FLEXCAN needs to depend on HAS_IOMEM and OF at least, but
-> there might be more.
+arch/arm/mach-msm/last_radio_log.c: In function 'msm_init_last_radio_log':
+arch/arm/mach-msm/last_radio_log.c:69:7: error: dereferencing pointer to incomplete type
 
-The driver compiles (tested on SH and blacksfin) and works without
-CONFIG_OF (on non DT arm platforms).
+arch/cris/kernel/profile.c: In function 'init_cris_profile':
+arch/cris/kernel/profile.c:79:8: error: dereferencing pointer to incomplete type
 
-Marc
+Use proc_set_size(), cfr. commit 271a15eabe094538d958dc68ccfc9c36b699247a
+("proc: Supply PDE attribute setting accessor functions")
+
+Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+---
+ arch/arm/mach-msm/last_radio_log.c |    2 +-
+ arch/cris/kernel/profile.c         |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-msm/last_radio_log.c b/arch/arm/mach-msm/last_radio_log.c
+index 7777767..9c392a2 100644
+--- a/arch/arm/mach-msm/last_radio_log.c
++++ b/arch/arm/mach-msm/last_radio_log.c
+@@ -66,6 +66,6 @@ void msm_init_last_radio_log(struct module *owner)
+ 	pr_err("%s: last radio log is %d bytes long\n", __func__,
+ 		radio_log_size);
+ 	last_radio_log_fops.owner = owner;
+-	entry->size = radio_log_size;
++	proc_set_size(entry, radio_log_size);
+ }
+ EXPORT_SYMBOL(msm_init_last_radio_log);
+diff --git a/arch/cris/kernel/profile.c b/arch/cris/kernel/profile.c
+index b82e086..cd9f15b 100644
+--- a/arch/cris/kernel/profile.c
++++ b/arch/cris/kernel/profile.c
+@@ -76,7 +76,7 @@ static int __init init_cris_profile(void)
+ 	entry = proc_create("system_profile", S_IWUSR | S_IRUGO, NULL,
+ 			    &cris_proc_profile_operations);
+ 	if (entry) {
+-		entry->size = SAMPLE_BUFFER_SIZE;
++		proc_set_size(entry, SAMPLE_BUFFER_SIZE);
+ 	}
+ 	prof_running = 1;
+ 
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130507/697f856d/attachment.sig>
+1.7.0.4
