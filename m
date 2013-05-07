@@ -1,34 +1,25 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Tue, 7 May 2013 03:53:13 +0000
-Subject: mach-omap2/timer.c: Bug introduced while merging patch - ff931c82
-In-Reply-To: <20130506233743.GJ28721@atomide.com>
-References: <79CD15C6BA57404B839C016229A409A83EC7C45D@DBDE04.ent.ti.com>
- <20130506152706.GD28721@atomide.com>
- <79CD15C6BA57404B839C016229A409A83EC7C93A@DBDE04.ent.ti.com>
- <20130506233743.GJ28721@atomide.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EC7CB23@DBDE04.ent.ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 7 May 2013 06:58:13 +0200
+Subject: [PATCH] ARM: dts: Correct the base address of pinctrl_3
+In-Reply-To: <1367897853-18403-1-git-send-email-padma.v@samsung.com>
+References: <1367897853-18403-1-git-send-email-padma.v@samsung.com>
+Message-ID: <20130507045813.GN32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com]
-> Sent: Tuesday, May 07, 2013 5:08 AM
-> To: Hiremath, Vaibhav
-> Cc: linux-omap at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> arm-kernel at lists.infradead.org
-> Subject: Re: mach-omap2/timer.c: Bug introduced while merging patch -
-> ff931c82
-> 
-> * Hiremath, Vaibhav <hvaibhav@ti.com> [130506 11:35]:
-> >
-> > Ohh yeah, I already have a patch for it -
-> 
-> Thanks, I'll add that into omap-for-v3.10/fixes. I modified
-> the comments a bit trying to figure out where it changed, updated
-> patch below.
-> 
+Hi,
 
-Thanks Tony. 
+On Tue, May 07, 2013 at 09:07:33AM +0530, Padmavathi Venna wrote:
+> This patch corrects the base address of pinctrl_3 on Exynos5250
+> platform.
 
-Thanks,
-Vaibhav
+Exynos5250 should be part of the subject so that other people can know
+whether this patch is interesting for them or not.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
