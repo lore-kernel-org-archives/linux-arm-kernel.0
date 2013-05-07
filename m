@@ -1,52 +1,65 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 07 May 2013 12:17:55 -0400
-Subject: [Xen-devel] [PATCH 1/3] arm_arch_timer: introduce
- arch_timer_stolen_ticks
-In-Reply-To: <20130506143533.GF15278@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
- <1367436460-10183-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <51817CBE.4050003@codeaurora.org>
- <1367482772.21869.26.camel@zakaz.uk.xensource.com>
- <5182DBA9.9080609@codeaurora.org>
- <20130506143533.GF15278@phenom.dumpdata.com>
-Message-ID: <51892933.7090405@codeaurora.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 7 May 2013 18:18:23 +0200
+Subject: MVNETA irq with backport-3.8
+In-Reply-To: <51890C29.8000504@itooo.com>
+References: <51890C29.8000504@itooo.com>
+Message-ID: <20130507181823.23342ffb@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Konrad,
+Dear Greg,
 
-On 05/06/2013 10:35 AM, Konrad Rzeszutek Wilk wrote:
->>> e.g. if a VCPU sets a timer for NOW+5, but 3 are stolen in the middle it
->>> would not make sense (from the guests PoV) for NOW'==NOW+2 at the point
->>> where the timer goes off. Nor does it make sense to require that the
->>> guest actually be running for 5 before injecting the timer because that
->>> would mean real time elapsed time for the timer would be 5+3 in the case
->>> where 3 are stolen.
->>
->> This is a bit of an aside, but I think that hiding time spent at higher
->> privilege levels can be a quite sensible approach to timekeeping in a
->> virtualized environment, but I understand that it's not the approach taken
->> with Xen, and as you pointed out above, adjusting the Virtual Offset Register
->> by itself isn't enough to implement that approach.
+On Tue, 07 May 2013 16:14:01 +0200, Greg wrote:
+
+> I'm trying to boot off the the backport-3.-8 kernel with armada-xp-db DT 
+> file.
 > 
-> This is the approach taken by Xen and KVM. Look in CONFIG_PARAVIRT_CLOCK for
-> implementation. In the user-space, the entry in 'top' of "stolen" (%st)
-> is for this exact value.
+> When eth0 is brought up (I'm booting on NFS) the mvneta driver fails in 
+> mvneta_open, with the following error :
+> > mvneta d0070000.ethernet eth0: cannot request irq 25
+> 
+> The oddness is this is not the actual IRQ to be requested, and the DTS 
+> files explicitly specify the IRQ is 8 for this device.
+> 
+> I'm not familiar with the DT system, where should I start looking to 
+> find the source of the problem ?
 
-I may have been unclear with my terms, sorry. When I refer to time being
-"hidden", I mean that kernel level software (supervisor mode, EL1) cannot
-detect the passage of that time at all. I don't know whether this would really
-work, but I imagine one might be able to get close with the current
-virtualization facilities for ARM.
+This issue should be fixed by:
 
-Am I correct in interpreting that what you're referring to is the deployment
-of paravirtualization code that ensures (observable) "stolen" time is factored
-into kernel decision-making?
+commit 7f23f62fc31c5c97947414c0937a72e08a947a41
+Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Date:   Wed Mar 20 16:09:35 2013 +0100
 
-Thanks,
-Christopher
+    arm: mvebu: Use local interrupt only for the timer 0
+    
+    The commit 3a6f08a37 "arm: mvebu: Add support for local interrupt",
+    managed the 28th first interrupts as local interrupt to match the
+    hardware specification. Among these interrupts there are the Gigabits
+    Ethernet ones used by the mvneta driver. Unfortunately the state of
+    the percpu_irq API prevents the driver to use it.
+    
+    Indeed the interrupts have to be freed when the .stop() function is
+    called. As the free_percpu_irq() function don't disable the interrupt
+    line, we have to do it on each CPU before calling this. The function
+    disable_percpu_irq() only disable the percpu on the current CPU and
+    there is no function which allows to disable a percpu irq on a given
+    CPU. Waiting for the extension of the percpu_irq API, this fix allows
+    to use again the mvneta driver.
+    
+    Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+    Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+    Tested-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 
+which is part of the backport-3.8 branch, so I'm a bit confused. Are
+you sure you're using the latest backport-3.8 branch? If so, then I'll
+do a test here to check this.
+
+Best regards,
+
+Thomas
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
