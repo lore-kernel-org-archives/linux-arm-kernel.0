@@ -1,36 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 07 May 2013 09:55:41 +0100
-Subject: [RFC PATCH V2] ARM: EXYNOS: Fix hotplug when CPUs boot in HYP mode
-In-Reply-To: <CAHuqX+HUWcX_sTXKCjSQ9pR1K8obLc+T7vYK_zTn_gqO8ULPVQ@mail.gmail.com>
-References: <1367905910-30913-1-git-send-email-giridhar.m@samsung.com>
- <CAHuqX+HUWcX_sTXKCjSQ9pR1K8obLc+T7vYK_zTn_gqO8ULPVQ@mail.gmail.com>
-Message-ID: <5188C18D.10103@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 7 May 2013 10:03:36 +0100
+Subject: [PATCH] ASoC: Samsung: i2s: Fix crash in i2s driver
+In-Reply-To: <1367897941-18439-1-git-send-email-padma.v@samsung.com>
+References: <1367897941-18439-1-git-send-email-padma.v@samsung.com>
+Message-ID: <20130507090336.GP7478@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/13 06:54, Giridhar Maruthy wrote:
-> This patch is a modification from the Christoffer Dall's u-boot
-> patch. This is required to put the secondary processors in hyp
-> mode during cpu hotplug when u-boot is no longer alive.
+On Tue, May 07, 2013 at 09:09:01AM +0530, Padmavathi Venna wrote:
+> This patch fixes a null pointer deference in i2s driver in DT
+> case
 > 
-> Marc Zyngier suggested this logic to go into firmware or, u-boot
-> putting a trampoline code into a page /memreserve/d by DT. But
-> this seemed to have a problem. Once the cpu is hotplugged in
-> runtime, the control is in ROM code and waits for event.
-> Kernel provides a return address in kernel to which the processor
-> jumps once it gets an event. If the control branches to the
-> trampoline code here, this trampoline code has no kernel return
-> address.
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
 > 
-> Someone with better logic or better placement of this logic
-> elsewhere is welcome.
+> This patch is dependent on below patch posted by Thomas Abraham.
+> https://patchwork.kernel.org/patch/2224801/
 
-What prevents you from writing the kernel address in the memreserved
-page? Some obvious location, like the last word of the page? You only
-have to do it once (from the boot CPU, for example).
+Please don't submit patches that can't be applied, the two patches need
+to be submitted together.  Please also remember to include human
+readable descriptions of patches in e-mails for the benefit of human
+readers, commit IDs and URLs aren't immediately comprehensible.
 
-Or did I miss something else?
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Please further note my new e-mail address.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130507/79a558c2/attachment.sig>
