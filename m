@@ -1,32 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 7 May 2013 10:03:36 +0100
-Subject: [PATCH] ASoC: Samsung: i2s: Fix crash in i2s driver
-In-Reply-To: <1367897941-18439-1-git-send-email-padma.v@samsung.com>
-References: <1367897941-18439-1-git-send-email-padma.v@samsung.com>
-Message-ID: <20130507090336.GP7478@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 7 May 2013 10:08:49 +0100
+Subject: [RFC PATCH 0/2] ARM: Remove any correlation between IPC and
+ BogoMips value
+In-Reply-To: <5187EFF3.6010005@codeaurora.org>
+References: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
+ <5187EFF3.6010005@codeaurora.org>
+Message-ID: <20130507090849.GC25387@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 07, 2013 at 09:09:01AM +0530, Padmavathi Venna wrote:
-> This patch fixes a null pointer deference in i2s driver in DT
-> case
+On Mon, May 06, 2013 at 07:01:23PM +0100, Christopher Covington wrote:
+> Hi Will,
 > 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
+> On 05/03/2013 01:35 PM, Will Deacon wrote:
+> > Hi all,
+> > 
+> > This small patch set may look a little over a month late, but there is a
+> > serious reason for posting it.
+> > 
+> > When I moved the ARM delay loop over to using the architected timers
+> > rather than the CPU spinning loop (which has all the problems associated
+> > with cpu frequency scaling and what-not) I thought I was doing something
+> > useful for the port. However, it turns out that a surprising number of
+> > people have complained, and continue to complain, about the drop in
+> > their `BogoMIPs score'.
 > 
-> This patch is dependent on below patch posted by Thomas Abraham.
-> https://patchwork.kernel.org/patch/2224801/
+> Have you considered adding the old code back in, but in a form that's not at
+> all referenced by the delay loop code and just calculates CPU-based bogomips?
 
-Please don't submit patches that can't be applied, the two patches need
-to be submitted together.  Please also remember to include human
-readable descriptions of patches in e-mails for the benefit of human
-readers, commit IDs and URLs aren't immediately comprehensible.
+That seems like a lot of effort in order to preserve something that isn't
+even meaningful. We might be better just zeroing the value, but then we'll
+inevitably get bug reports of it being `wrong'.
 
-Please further note my new e-mail address.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130507/79a558c2/attachment.sig>
+Plus, the calibration during boot introduces a brief delay when onlining
+each core whereas this can be skipped when using a constant timer.
+
+Will
