@@ -1,43 +1,42 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 7 May 2013 15:04:54 +0300
-Subject: [GIT PULL] rpmsg for 3.10
-Message-ID: <CAK=WgbbuJt4V2c_hqSzcqDwts6J7EQvD5CkoK95QqxoqboS2Fg@mail.gmail.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Tue, 07 May 2013 14:16:22 +0930
+Subject: [PATCH 0/2] Early printk support for virtio console devices.
+In-Reply-To: <CAFEAcA_=BTXVdkN0WmajxVSjbDrmxc5z65hCbxr=7TqJVsE9EA@mail.gmail.com>
+References: <1366974299-17877-1-git-send-email-pranavkumar@linaro.org>
+ <BA2076A6-0688-4E5C-85F9-A9CA8FD75782@suse.de>
+ <87obcyc9sh.fsf@rustcorp.com.au>
+ <336C59AA-D5D7-472E-A8DA-EEB413DD6C68@suse.de>
+ <CAAHg+Hj0tySbzUGnoFE9ybVYP291B-i8-Ck1EkwD57t8yG5wwg@mail.gmail.com>
+ <C52CCDD4-D8FB-4AD6-B83D-3B5251A7A0F5@suse.de>
+ <87sj27xxjr.fsf@rustcorp.com.au>
+ <CAFEAcA9h8iSYfTBtf6n+Vk5sDtBR2yB2oafRxikHoWbKt0VRUw@mail.gmail.com>
+ <87ip2wr8tp.fsf@rustcorp.com.au>
+ <CAFEAcA_=BTXVdkN0WmajxVSjbDrmxc5z65hCbxr=7TqJVsE9EA@mail.gmail.com>
+Message-ID: <87txmfo0rl.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+Peter Maydell <peter.maydell@linaro.org> writes:
+> On 6 May 2013 06:11, Rusty Russell <rusty@rustcorp.com.au> wrote:
+>> Peter Maydell <peter.maydell@linaro.org> writes:
+>>> To be actually useful we need to also specify something in
+>>> the device tree to say "here is where you will find your
+>>> emergency output and what it is".
+>>
+>> Hmm, I'm not sure that's true.  It looks like it needs:
+>>
+>> 1) An enhancment to the vdev->set_config callback to pass through (at
+>>    least) an offset, probably offset and length.
+>>
+>> 2) An emerg_write() function ptr which can be called at any time, set by
+>>    virtio_console.c's class_init:
+>
+> That all looks like sensible QEMU implementation possibilities
+> but it seems to be a bit of a non-sequitur from "how do we
+> tell the kernel to actually use this?"
 
-  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+You enable the feature in the virtio console device, and a kernel
+compiled with EARLY_PRINTK will use it?
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/rpmsg.git tags/rpmsg-3.10
-
-for you to fetch changes up to 397944df3290ddc46dcc6a08cd71fb560700431b:
-
-  rpmsg: fix kconfig dependencies for VIRTIO (2013-04-21 16:32:29 +0300)
-
-----------------------------------------------------------------
-A small pull request consisting of:
-- Make rpmsg process all pending messages instead of just
-  one, from Robert Tivy
-- Fix Kconfig dependency on VIRTUALIZATION, from Suman.
-  Note: this was submitted late during the 3.9 rc cycle and it
-  seemed appropriate to wait with it for the merge window.
-- Belated addition of an rpmsg entry to the MAINTAINERS file.
-  People seem to look for this.
-
-----------------------------------------------------------------
-Ohad Ben-Cohen (1):
-      MAINTAINERS: add rpmsg entry
-
-Robert Tivy (1):
-      rpmsg: process _all_ pending messages in rpmsg_recv_done
-
-Suman Anna (1):
-      rpmsg: fix kconfig dependencies for VIRTIO
-
- MAINTAINERS                      |  8 +++++++
- drivers/rpmsg/Kconfig            |  1 +
- drivers/rpmsg/virtio_rpmsg_bus.c | 49 ++++++++++++++++++++++++++++------------
- 3 files changed, 44 insertions(+), 14 deletions(-)
+Cheers,
+Rusty.
