@@ -1,34 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 May 2013 20:41:37 +0200
-Subject: [GIT PULL 0/5] ARM: Third batch of arm-soc changes for 3.10, again
-In-Reply-To: <CA+55aFxJB3OG+-tu2SqAOzn9T7zDb0P9jgbUOMHnXs9m_nXNUA@mail.gmail.com>
-References: <1367947574-2934383-1-git-send-email-arnd@arndb.de>
- <CA+55aFxJB3OG+-tu2SqAOzn9T7zDb0P9jgbUOMHnXs9m_nXNUA@mail.gmail.com>
-Message-ID: <201305072041.37493.arnd@arndb.de>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 7 May 2013 22:06:28 +0300
+Subject: [RESEND][PATCH 1/3] arm: dts: introduce config HAS_BANDGAP
+In-Reply-To: <20130507182711.GB28628@obsidianresearch.com>
+References: <1367874058-2378-1-git-send-email-eduardo.valentin@ti.com>
+ <1367874058-2378-2-git-send-email-eduardo.valentin@ti.com>
+ <20130506213413.GH5634@blackmetal.musicnaut.iki.fi>
+ <20130506223653.GA12089@obsidianresearch.com>
+ <51884971.9050508@ti.com>
+ <20130507003651.GA26035@obsidianresearch.com>
+ <5188FE54.6050200@ti.com>
+ <20130507182711.GB28628@obsidianresearch.com>
+Message-ID: <20130507190628.GI5634@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 May 2013, Linus Torvalds wrote:
-> On Tue, May 7, 2013 at 10:26 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > Here are the same pull requests as before, with numbers and distinct
-> > time stamps. I hope I didn't screw up in a different way this time.
+On Tue, May 07, 2013 at 12:27:11PM -0600, Jason Gunthorpe wrote:
+> On Tue, May 07, 2013 at 09:15:00AM -0400, Eduardo Valentin wrote:
+> > > But broadly the direction seems that drivers should have minimal
+> > > dependencies so, eg, the thermal maintainer compiling for x86 should
+> > > be able to compile test/static analyze your driver..
 > 
-> Ok, I notice that you seem to have forgotten the "--summary" flag from
-> your diffstat in your new script.
+> > Well, I do not see much of this attempt actually. Do you have some link
+> > / evidene that shows someone who actually cares about compiling drivers
+> > for targets that they are not used for? On this specific driver, I
+> > actually have  had exactly the opposite advice [1]. I am not convinced
+> > people actually want to do that.
 > 
-> Not a showstopper, but make sure that the diffstat flags are
+> There was a discussion a bit ago, but I can't find a link.. The
+> context was subsystem maintainers are being asked to look after more
+> code with the DT transition moving things out of arch/arm and at least
+> one complained they couldn't even compile test on x86... But again, I
+> can't find a link and you are right, there are lots and lots of
+> 'depends ARCH..' style things in kConfig already.
 > 
->   "git diff -M --stat --summary"
-> 
-> (And yes, I prefer "-M", not "-C", because while copy information is
-> interesting, it tends to hide the fact that the copying added a lot of
-> lines, so the "-C" flag ends up not giving as good line add/del
-> information, even if the data that something looks like a copy of
-> another file is interesting).
+> Lets just call it something to think about.
 
-Right, another thing that I actually knew and then forgot to do. Olof
-has just sent me the script he used the past few times, I'll use that
-in the future.
+Tomi started a thread related to this recently:
 
-	Arnd
+	http://marc.info/?l=linux-kernel&m=136731558332265&w=2
+
+I think there's some good reasons listed there, but I guess up to the
+subsystem maintainers to decide what they prefer.
+
+A.
