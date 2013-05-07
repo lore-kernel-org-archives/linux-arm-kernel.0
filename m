@@ -1,94 +1,33 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 7 May 2013 17:35:28 +0800
-Subject: How does commit 47ec340c not introduce a bug?
-In-Reply-To: <20130507092428.GK23285@pengutronix.de>
-References: <20130507091734.GM3658@sgi.com>
- <20130507092428.GK23285@pengutronix.de>
-Message-ID: <CAN1soZyHx1XZzukunbKsj+v4h93MRQKjPPjJ3+i3u8BeBbhCGw@mail.gmail.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 7 May 2013 10:36:02 +0100
+Subject: dw_apb_timer_of.c: remove parts that were picoxcell-specific
+In-Reply-To: <20130426214313.GB24891@amd.pavel.ucw.cz>
+References: <20130426121433.GA16249@amd.pavel.ucw.cz>
+ <20130426124128.GB6946@page>
+ <20130426213723.GA24891@amd.pavel.ucw.cz>
+ <20130426214313.GB24891@amd.pavel.ucw.cz>
+Message-ID: <20130507093602.GA30902@page>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 7, 2013 at 5:24 PM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello,
->
-> On Tue, May 07, 2013 at 04:17:34AM -0500, Robin Holt wrote:
->> I noticed a warning while cross-compiling all arm defconfigs.
->>
->> The mmp2_defconfig gave this warning:
->>
->> drivers/video/backlight/max8925_bl.c: In function 'max8925_backlight_probe':
->> drivers/video/backlight/max8925_bl.c:177:3: warning: statement with no effect [-Wunused-value]
->>
->> This appears to have been introduced by the above commit when !CONFIG_OF
->>
->> Looking at this more closely, I am not sure how this was ever intended
->> to be handled or how the errors returned in the CONFIG_OF case were
->> intended to be handled as the return from max8925_backlight_dt_init is
->> always ignored.
->>
->> I think this needs some more attention, but do not feel like I know
->> enough about it or have any means to test it to weigh in.
->>
->> Thanks,
->> Robin
->>
->>
->> commit 47ec340cb8e232671e7c4a4689ff32c3bdf329da
->> Author: Qing Xu <qingx@marvell.com>
->> Date:   Mon Feb 4 23:40:45 2013 +0800
->>
->>     mfd: max8925: Support dt for backlight
->>
->>     Add device tree support in max8925 backlight.
->>
->>     Signed-off-by: Qing Xu <qingx@marvell.com>
->>     Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
->>     Signed-off-by: Samuel Ortiz <sameo@linux.intel.com>
->>
->> diff --git a/drivers/video/backlight/max8925_bl.c b/drivers/video/backlight/max8925_bl.c
->> index 2c9bce0..5ca11b0 100644
->> --- a/drivers/video/backlight/max8925_bl.c
->> +++ b/drivers/video/backlight/max8925_bl.c
->> @@ -101,6 +101,29 @@ static const struct backlight_ops max8925_backlight_ops = {
->>       .get_brightness = max8925_backlight_get_brightness,
->>  };
->>
->> +#ifdef CONFIG_OF
->> +static int max8925_backlight_dt_init(struct platform_device *pdev,
->> +                           struct max8925_backlight_pdata *pdata)
->> +{
->> +     struct device_node *nproot = pdev->dev.parent->of_node, *np;
->> +     int dual_string;
->> +
->> +     if (!nproot)
->> +             return -ENODEV;
->> +     np = of_find_node_by_name(nproot, "backlight");
->> +     if (!np) {
->> +             dev_err(&pdev->dev, "failed to find backlight node\n");
->> +             return -ENODEV;
->> +     }
->> +
->> +     of_property_read_u32(np, "maxim,max8925-dual-string", &dual_string);
->> +     pdata->dual_string = dual_string;
->> +     return 0;
->> +}
->> +#else
->> +#define max8925_backlight_dt_init(x, y)      (-1)
-> It's probably best to make this:
->
-> static inline max8925_backlight_dt_init(struct platform_device *pdev,
->                                 struct max8925_backlight_pdata *pdata)
-> {
->         return -ENODEV;
-> }
->
+Hi Pavel,
 
-I've submitted this patch to fix this issue for a long time.
+Apologies for the delay, but this looks good to me.
 
-Samuel,
+On Fri, Apr 26, 2013 at 11:43:14PM +0200, Pavel Machek wrote:
+> It seems we made a mistake when creating dw_apb_timer_of.c:
+> picoxcell sched_clock had parts that were not related to
+> dw_apb_timer, yet we moved them to dw_apb_timer_of, and tried to
+> use them on socfpga.
+> 
+> This results in system where user/system time is not measured
+> properly, as demonstrated by
+>     
+>     time dd if=/dev/urandom of=/dev/zero bs=100000 count=100
+>     
+> So this patch switches sched_clock to hardware that exists on both
+> platforms, and adds missing of_node_put() in dw_apb_timer_init().
+>     
+> Signed-off-by: Pavel Machek <pavel@denx.de>
 
-Should I send it again?
-
-Regards
-Haojian
+Acked-by: Jamie Iles <jamie@jamieiles.com>
