@@ -1,28 +1,51 @@
-From: jesper.nilsson@axis.com (Jesper Nilsson)
-Date: Tue, 7 May 2013 17:31:31 +0200
-Subject: [PATCH] proc: Use PDE attribute setting accessor functions
-In-Reply-To: <1367918426-7076-1-git-send-email-geert@linux-m68k.org>
-References: <1367918426-7076-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <20130507153131.GP8853@axis.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 07 May 2013 11:48:26 -0400
+Subject: [RFC PATCH 0/2] ARM: Remove any correlation between IPC and
+ BogoMips value
+In-Reply-To: <20130507090849.GC25387@mudshark.cambridge.arm.com>
+References: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
+ <5187EFF3.6010005@codeaurora.org>
+ <20130507090849.GC25387@mudshark.cambridge.arm.com>
+Message-ID: <5189224A.70501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 07, 2013 at 11:20:26AM +0200, Geert Uytterhoeven wrote:
-> arch/arm/mach-msm/last_radio_log.c: In function 'msm_init_last_radio_log':
-> arch/arm/mach-msm/last_radio_log.c:69:7: error: dereferencing pointer to incomplete type
+On 05/07/2013 05:08 AM, Will Deacon wrote:
+> On Mon, May 06, 2013 at 07:01:23PM +0100, Christopher Covington wrote:
+>> Hi Will,
+>>
+>> On 05/03/2013 01:35 PM, Will Deacon wrote:
+>>> Hi all,
+>>>
+>>> This small patch set may look a little over a month late, but there is a
+>>> serious reason for posting it.
+>>>
+>>> When I moved the ARM delay loop over to using the architected timers
+>>> rather than the CPU spinning loop (which has all the problems associated
+>>> with cpu frequency scaling and what-not) I thought I was doing something
+>>> useful for the port. However, it turns out that a surprising number of
+>>> people have complained, and continue to complain, about the drop in
+>>> their `BogoMIPs score'.
+>>
+>> Have you considered adding the old code back in, but in a form that's not at
+>> all referenced by the delay loop code and just calculates CPU-based bogomips?
 > 
-> arch/cris/kernel/profile.c: In function 'init_cris_profile':
-> arch/cris/kernel/profile.c:79:8: error: dereferencing pointer to incomplete type
-> 
-> Use proc_set_size(), cfr. commit 271a15eabe094538d958dc68ccfc9c36b699247a
-> ("proc: Supply PDE attribute setting accessor functions")
-> 
-> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> That seems like a lot of effort in order to preserve something that isn't
+> even meaningful. We might be better just zeroing the value, but then we'll
+> inevitably get bug reports of it being `wrong'.
 
-For the CRIS-part:
+If I were in to filing bug reports about bogomips values, I would be just as
+likely to do it for 1, 10000, 99999, and get_random_bytes(...) as for 0.
 
-Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
+> Plus, the calibration during boot introduces a brief delay when onlining
+> each core whereas this can be skipped when using a constant timer.
 
-/^JN - Jesper Nilsson
+If it were configurable, that might give people a reason to weigh whether they
+really cared about knowing bogomips at the cost of boot time.
+
+Christopher
+
 -- 
-               Jesper Nilsson -- jesper.nilsson at axis.com
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
