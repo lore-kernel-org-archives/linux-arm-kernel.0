@@ -1,75 +1,36 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 7 May 2013 14:40:13 +0200
-Subject: [RFC PATCH] implement read_cpuid_ext for v7-M (Was: Re: [PATCHv2
- 2/3] ARM: Detect support for SDIV/UDIV from ISAR0) register
-In-Reply-To: <5188DDDC.1000201@arm.com>
-References: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
- <1363631337-13816-3-git-send-email-sboyd@codeaurora.org>
- <20130418091019.GA21099@pengutronix.de>
- <20130506093059.GH23285@pengutronix.de>
- <20130507092209.GD25387@mudshark.cambridge.arm.com>
- <5188DDDC.1000201@arm.com>
-Message-ID: <20130507124013.GM23285@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 May 2013 14:48:19 +0200
+Subject: [GIT PULL] Urgent omap timer fix for current merge window
+In-Reply-To: <20130506234610.GK28721@atomide.com>
+References: <20130506234610.GK28721@atomide.com>
+Message-ID: <201305071448.19868.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 07, 2013 at 11:56:28AM +0100, Jonathan Austin wrote:
-> Hi Will,
+On Tuesday 07 May 2013, Tony Lindgren wrote:
+> The following changes since commit dc2d3db8137fba0f62d7517e1bea8a47f69fcbc4:
 > 
-> On 07/05/13 10:22, Will Deacon wrote:
-> >On Mon, May 06, 2013 at 10:30:59AM +0100, Uwe Kleine-K?nig wrote:
+>   Merge tag 'omap-for-v3.10/timer-signed' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into next/drivers (2013-04-08 19:30:48 +0200)
 > 
-> >>+
-> >>+#define read_cpuid(reg)							\
-> >>+	({								\
-> >>+		WARN_ON_ONCE(1);					\
-> >>+		0;							\
-> >>+	})
-> >
-> >We do have an MIDR in PMSAv7 (not to be confused with MPIDR), so why not read
-> >that here?
-> We don't need to add/remove anything for PMSAv7 as that's already
-> implemented...
+> are available in the git repository at:
 > 
-> For V7M we have something called CPUID Base Register, not MIDR - the
-> layout looks the same though. That's the only one of the CPUID_X
-> that we have, but it is never requested directly - only via
-> read_cpuid_id (this is to support a hardcoded cpuid from kconfig) so
-> what Uwe's got does work, though I agree that it'd be much nicer to
-> implement the underlying function and have the accessor general for
-> both AR and M.
-The current state (that is next + the patch from this thread) is:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/fixes-for-merge-window
+> 
+> for you to fetch changes up to 08a48be32ff31d38bcfec7d210c954cb62fd5cd7:
+> 
+>   ARM: OMAP4: change the device names in usb_bind_phy (2013-05-06 16:39:16 -0700)
+> 
+> ----------------------------------------------------------------
+> An urgent fix for a timer mismerge for and a regression fix for
+> musb device naming change.
+> 
 
-#ifdef CONFIG_CPU_CP15
-	define read_cpuid and read_cpuid_ext using mrc p15
-	read_cpuid_id = read_cpuid(CPUID_ID)
-#elif defined (CONFIG_CPU_V7M)
-	read_cpuid returns 0 (with a warning)
-	read_cpuid_ext reads from SCB
-	read_cpuid_id reads from V7M_SCB_CPUID
-#else
-	read_cpuid and read_cpuid_ext return 0 (with a warning)
-	read_cpuid_id returns CONFIG_PROCESSOR_ID (a bit simplified)
-#endif
+Hi Tony,
 
-Now, what is the "underlying function" that should be used to implement
-which accessor? I assume you want to have
+Russell also ran into this problem, so I'm including these in the late/cleanup branch,
+which I'll send to Linus later today.
 
-	read_cpuid_id = read_cpuid(CPUID_ID)
+Thanks,
 
-on v7-M, too? So what is the suggestion for read_cpuid?:
-
-	if (reg == CPUID_ID)
-		return readl(V7M_SCB_CPUID);
-	else
-		return 0;
-	
-That doesn't make much sense in my eyes. If I got you wrong, please give
-more details.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+	Arnd
