@@ -1,61 +1,44 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Tue, 07 May 2013 12:13:36 +0530
-Subject: [PATCH V2 3/3] ARM: dts: add clock provider information for i2s
- controllers in Exynos5250
-In-Reply-To: <1367909016-19657-1-git-send-email-padma.v@samsung.com>
-References: <1367909016-19657-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1367909016-19657-4-git-send-email-padma.v@samsung.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 7 May 2013 08:39:21 +0100
+Subject: [PATCH 54/63] ARM: ux500: Replace ST-E's home-brew DMA direction
+ definition with the generic one
+In-Reply-To: <20130506071355.GA5552@bnru10>
+References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
+ <1367591569-32197-55-git-send-email-lee.jones@linaro.org>
+ <20130506071355.GA5552@bnru10>
+Message-ID: <20130507073921.GT24153@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock lookup information for i2s controllers on exynos5250 SoC.
+On Mon, 06 May 2013, Srinidhi Kasagar wrote:
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
- arch/arm/boot/dts/exynos5250.dtsi |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+> On Fri, May 03, 2013 at 16:32:40 +0200, Lee Jones wrote:
+> > STEDMA40_*_TO_* direction definitions are identical in all but name to
+> > the pre-defined generic DMA_*_TO_* ones. Let's make things easy by not
+> > duplicating such things.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  arch/arm/mach-ux500/board-mop500-audio.c |   12 ++++++------
+> >  arch/arm/mach-ux500/board-mop500-sdi.c   |   16 ++++++++--------
+> >  arch/arm/mach-ux500/board-mop500.c       |   22 +++++++++++-----------
+> >  arch/arm/mach-ux500/usb.c                |    4 ++--
+> >  4 files changed, 27 insertions(+), 27 deletions(-)
+> 
+> Hope you have taken care for all other files, because, I see
+> few more instances in my tree apart from the above files.
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 7026de0..13305b9 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -20,6 +20,8 @@
- #include "skeleton.dtsi"
- #include "exynos5250-pinctrl.dtsi"
- 
-+#include <dt-bindings/clk/samsung-audss-clk.h>
-+
- / {
- 	compatible = "samsung,exynos5250";
- 	interrupt-parent = <&gic>;
-@@ -457,6 +459,10 @@
- 			&pdma0 9
- 			&pdma0 8>;
- 		dma-names = "tx", "rx", "tx-sec";
-+		clocks = <&clock_audss SAMSUNG_I2S_BUS>,
-+			<&clock_audss SAMSUNG_I2S_BUS>,
-+			<&clock_audss SAMSUNG_SCLK_I2S>;
-+		clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
- 		samsung,supports-6ch;
- 		samsung,supports-rstclr;
- 		samsung,supports-secdai;
-@@ -471,6 +477,8 @@
- 		dmas = <&pdma1 12
- 			&pdma1 11>;
- 		dma-names = "tx", "rx";
-+		clocks = <&clock 307>;
-+		clock-names = "iis";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2s1_bus>;
- 	};
-@@ -481,6 +489,8 @@
- 		dmas = <&pdma0 12
- 			&pdma0 11>;
- 		dma-names = "tx", "rx";
-+		clocks = <&clock 308>;
-+		clock-names = "iis";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2s2_bus>;
- 	};
+Would you be kind enough to paste those files please?
+
+> Otherwise..
+> 
+> Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
+> 
+> regards,
+> srinidhi
+
 -- 
-1.7.4.4
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
