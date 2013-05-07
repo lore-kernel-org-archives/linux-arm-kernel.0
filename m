@@ -1,74 +1,75 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 7 May 2013 15:19:52 +0300
-Subject: [GIT PULL] remoteproc for 3.10
-Message-ID: <CAK=WgbYBk=ut8M_Mn5hQ8V_b+gUijFz8RrOkyfKaC1Xk8p4+Jg@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 7 May 2013 14:40:13 +0200
+Subject: [RFC PATCH] implement read_cpuid_ext for v7-M (Was: Re: [PATCHv2
+ 2/3] ARM: Detect support for SDIV/UDIV from ISAR0) register
+In-Reply-To: <5188DDDC.1000201@arm.com>
+References: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
+ <1363631337-13816-3-git-send-email-sboyd@codeaurora.org>
+ <20130418091019.GA21099@pengutronix.de>
+ <20130506093059.GH23285@pengutronix.de>
+ <20130507092209.GD25387@mudshark.cambridge.arm.com>
+ <5188DDDC.1000201@arm.com>
+Message-ID: <20130507124013.GM23285@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's a trivial merge conflict with a Kconfig typo that got fixed
-during the rc cycle,
-but otherwise:
+On Tue, May 07, 2013 at 11:56:28AM +0100, Jonathan Austin wrote:
+> Hi Will,
+> 
+> On 07/05/13 10:22, Will Deacon wrote:
+> >On Mon, May 06, 2013 at 10:30:59AM +0100, Uwe Kleine-K?nig wrote:
+> 
+> >>+
+> >>+#define read_cpuid(reg)							\
+> >>+	({								\
+> >>+		WARN_ON_ONCE(1);					\
+> >>+		0;							\
+> >>+	})
+> >
+> >We do have an MIDR in PMSAv7 (not to be confused with MPIDR), so why not read
+> >that here?
+> We don't need to add/remove anything for PMSAv7 as that's already
+> implemented...
+> 
+> For V7M we have something called CPUID Base Register, not MIDR - the
+> layout looks the same though. That's the only one of the CPUID_X
+> that we have, but it is never requested directly - only via
+> read_cpuid_id (this is to support a hardcoded cpuid from kconfig) so
+> what Uwe's got does work, though I agree that it'd be much nicer to
+> implement the underlying function and have the accessor general for
+> both AR and M.
+The current state (that is next + the patch from this thread) is:
 
-The following changes since commit f6161aa153581da4a3867a2d1a7caf4be19b6ec9:
+#ifdef CONFIG_CPU_CP15
+	define read_cpuid and read_cpuid_ext using mrc p15
+	read_cpuid_id = read_cpuid(CPUID_ID)
+#elif defined (CONFIG_CPU_V7M)
+	read_cpuid returns 0 (with a warning)
+	read_cpuid_ext reads from SCB
+	read_cpuid_id reads from V7M_SCB_CPUID
+#else
+	read_cpuid and read_cpuid_ext return 0 (with a warning)
+	read_cpuid_id returns CONFIG_PROCESSOR_ID (a bit simplified)
+#endif
 
-  Linux 3.9-rc2 (2013-03-10 16:54:19 -0700)
+Now, what is the "underlying function" that should be used to implement
+which accessor? I assume you want to have
 
-are available in the git repository at:
+	read_cpuid_id = read_cpuid(CPUID_ID)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/ohad/remoteproc.git
-tags/remoteproc-3.10
+on v7-M, too? So what is the suggestion for read_cpuid?:
 
-for you to fetch changes up to b9777859ec015a78dae1476e317d04f851bfdd0d:
+	if (reg == CPUID_ID)
+		return readl(V7M_SCB_CPUID);
+	else
+		return 0;
+	
+That doesn't make much sense in my eyes. If I got you wrong, please give
+more details.
 
-  remoteproc: fix kconfig dependencies for VIRTIO (2013-04-21 16:30:22 +0300)
+Best regards
+Uwe
 
-----------------------------------------------------------------
-This pull request contains:
-- Some refactoring, cleanups and small improvements
-  from Sjur Br?ndeland. The improvements are mainly
-  about better supporting varios virtio properties
-  (such as virtio's config space, status and features).
-  I now see that I messed up while commiting one of Sjur's
-  patches and erroneously put myself as the author, as well
-  as letting a nasty typo sneak in. I will not fix this in
-  order to avoid rebasing the patches. Sjur - sorry!
-- A new remoteproc driver for OMAP-L13x (technically a
-  DaVinci platform) from Robert Tivy.
-- Extend OMAP support to OMAP5 as well, from Vincent Stehl?.
-- Fix Kconfig VIRTUALIZATION dependency, from Suman Anna
-  (a non-critical fix which arrived late during the rc cycle).
-
-----------------------------------------------------------------
-Ohad Ben-Cohen (1):
-      remoteproc: perserve resource table data
-
-Robert Tivy (2):
-      remoteproc: support default firmware name in rproc_alloc()
-      remoteproc/davinci: add a remoteproc driver for OMAP-L13x DSP
-
-Sjur Br?ndeland (7):
-      remoteproc: refactor rproc_elf_find_rsc_table()
-      remoteproc: add find_loaded_rsc_table firmware ops
-      remoteproc: parse STE-firmware and find resource table address
-      remoteproc: code cleanup of resource parsing
-      remoteproc: calculate max_notifyid by counting vrings
-      remoteproc: support virtio config space.
-      remoteproc: set vring addresses in resource table
-
-Suman Anna (1):
-      remoteproc: fix kconfig dependencies for VIRTIO
-
-Vincent Stehl? (1):
-      remoteproc/omap: support OMAP5 too
-
- drivers/remoteproc/Kconfig                 |  27 ++-
- drivers/remoteproc/Makefile                |   1 +
- drivers/remoteproc/da8xx_remoteproc.c      | 324 +++++++++++++++++++++++++++++
- drivers/remoteproc/remoteproc_core.c       | 211 ++++++++++++-------
- drivers/remoteproc/remoteproc_elf_loader.c | 100 ++++++---
- drivers/remoteproc/remoteproc_internal.h   |  15 +-
- drivers/remoteproc/remoteproc_virtio.c     |  79 +++++--
- drivers/remoteproc/ste_modem_rproc.c       |  45 ++--
- include/linux/remoteproc.h                 |  13 +-
- 9 files changed, 677 insertions(+), 138 deletions(-)
- create mode 100644 drivers/remoteproc/da8xx_remoteproc.c
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
