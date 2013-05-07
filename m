@@ -1,59 +1,30 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Tue, 7 May 2013 16:44:03 +0530
-Subject: [PATCH V2 2/3] ARM: dts: add Exynos audio subsystem clock
- controller node
-In-Reply-To: <2829319.bZPJnVErnQ@amdc1227>
-References: <1367909016-19657-1-git-send-email-padma.v@samsung.com>
- <1367909016-19657-3-git-send-email-padma.v@samsung.com>
- <2829319.bZPJnVErnQ@amdc1227>
-Message-ID: <CAAgF-BdJK9oEVj2fBHTCN5VoGa7eZceW4w=yMMrjnDSdy=P0rA@mail.gmail.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Tue, 7 May 2013 19:48:22 +0800
+Subject: [PATCH] usb: gadget: s3c2410_udc: fix error return code in
+ s3c2410_udc_probe()
+Message-ID: <CAPgLHd9zzFi6dCBH0V=eeqVtd=UstiqM8fDcDsMCfujAfEDHTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-On Tue, May 7, 2013 at 3:24 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Hi Padmavathi,
->
-> On Tuesday 07 of May 2013 12:13:35 Padmavathi Venna wrote:
->> Audio subsystem introduced in s5pv210 and exynos platforms
->> which has a internal clock controller. This patch adds a node
->> for the same on exynos5250.
->>
->> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos5250.dtsi |    6 ++++++
->>  1 files changed, 6 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
->> b/arch/arm/boot/dts/exynos5250.dtsi index 36c9d8d..7026de0 100644
->> --- a/arch/arm/boot/dts/exynos5250.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->> @@ -72,6 +72,12 @@
->>               #clock-cells = <1>;
->>       };
->>
->> +     clock_audss: audss-clock-controller at 0x03810000 {
->
-> Just a nitpick: this should be @3810000, without the 0x and leading zeroes.
+Fix to return a negative error code in the gpio_to_irq() error handling
+case instead of 0, as done elsewhere in this function.
 
-Okey. I will change this.
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/usb/gadget/s3c2410_udc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
->
-> Best regards,
-> --
-> Tomasz Figa
-> Samsung Poland R&D Center
-> SW Solution Development, Kernel and System Framework
->
->> +             compatible = "samsung,exynos5250-audss-clock";
->> +             reg = <0x03810000 0x0C>;
->> +             #clock-cells = <1>;
->> +     };
->> +
->>       gic:interrupt-controller at 10481000 {
->>               compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
->>               #interrupt-cells = <3>;
->
-Thanks
-Padma
+diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
+index d0e75e1..c974776 100644
+--- a/drivers/usb/gadget/s3c2410_udc.c
++++ b/drivers/usb/gadget/s3c2410_udc.c
+@@ -1851,6 +1851,7 @@ static int s3c2410_udc_probe(struct platform_device *pdev)
+ 		irq = gpio_to_irq(udc_info->vbus_pin);
+ 		if (irq < 0) {
+ 			dev_err(dev, "no irq for gpio vbus pin\n");
++			retval = irq;
+ 			goto err_gpio_claim;
+ 		}
+ 
