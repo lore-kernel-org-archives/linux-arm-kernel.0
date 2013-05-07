@@ -1,34 +1,76 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 7 May 2013 14:08:57 -0700
-Subject: [PATCH] clk: Always notify whole subtree when reparenting
-In-Reply-To: <20130507205953.4542.62609@quantum>
-References: <afe397e3-c674-4dc3-9f3e-feea9275bb91@TX2EHSMHS023.ehs.local>
- <20130507205953.4542.62609@quantum>
-Message-ID: <4ee1b52e-8c1d-4161-9034-62fc6c48fd12@CO9EHSMHS026.ehs.local>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 07 May 2013 23:27:48 +0200
+Subject: MVNETA irq with backport-3.8
+In-Reply-To: <51892E87.5020903@itooo.com>
+References: <51890C29.8000504@itooo.com> <20130507181823.23342ffb@skate>
+ <51892E87.5020903@itooo.com>
+Message-ID: <518971D4.5000603@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 07, 2013 at 01:59:53PM -0700, Mike Turquette wrote:
-> Quoting Soren Brinkmann (2013-04-16 10:06:50)
-> > A clock's notifier count only reflects notifiers which are registered
-> > directly for that clock. A reparent operation though affects the whole
-> > subtree because of a potential rate change.
-> > When issuing the pre rate change notifications only the notifier count
-> > for the clock to be changed is considered and notifiers for subclocks
-> > may never be called. Resulting in clocks in the subtree which have
-> > registered notifiers, may receive a POST_- or ABORT_RATE_CHANGE
-> > notification, without a PRE_RATE_CHANGE_NOTIFICATION.
-> > Therefore always traverse the whole subtree when issueing pre rate
-> > change notifications during a reparent operation.
-> > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> > This should probably be considered an RFC. There may be smarter ways to
-> > resolve this issue. E.g. forward notifier counts upstream the way it is done
-> > with enable counts.
-> > 
-> 
-> I've taken this patch for 3.11.
-thank you.
+Hi Greg,
 
-	S?ren
+On 05/07/2013 06:40 PM, Greg wrote:
+> Le 07/05/2013 18:18, Thomas Petazzoni a ?crit :
+>> Dear Greg,
+>>
+>> On Tue, 07 May 2013 16:14:01 +0200, Greg wrote:
+>>
+>>> I'm trying to boot off the the backport-3.-8 kernel with armada-xp-db DT
+>>> file.
+>>>
+>>> When eth0 is brought up (I'm booting on NFS) the mvneta driver fails in
+>>> mvneta_open, with the following error :
+>>>> mvneta d0070000.ethernet eth0: cannot request irq 25
+>>> The oddness is this is not the actual IRQ to be requested, and the DTS
+>>> files explicitly specify the IRQ is 8 for this device.
+>>>
+>>> I'm not familiar with the DT system, where should I start looking to
+>>> find the source of the problem ?
+>> This issue should be fixed by:
+>>
+>> commit 7f23f62fc31c5c97947414c0937a72e08a947a41
+>> Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> Date:   Wed Mar 20 16:09:35 2013 +0100
+>>
+>>      arm: mvebu: Use local interrupt only for the timer 0
+>>      
+>>      The commit 3a6f08a37 "arm: mvebu: Add support for local interrupt",
+>>      managed the 28th first interrupts as local interrupt to match the
+>>      hardware specification. Among these interrupts there are the Gigabits
+>>      Ethernet ones used by the mvneta driver. Unfortunately the state of
+>>      the percpu_irq API prevents the driver to use it.
+>>      
+>>      Indeed the interrupts have to be freed when the .stop() function is
+>>      called. As the free_percpu_irq() function don't disable the interrupt
+>>      line, we have to do it on each CPU before calling this. The function
+>>      disable_percpu_irq() only disable the percpu on the current CPU and
+>>      there is no function which allows to disable a percpu irq on a given
+>>      CPU. Waiting for the extension of the percpu_irq API, this fix allows
+>>      to use again the mvneta driver.
+>>      
+>>      Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>      Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>>      Tested-by: Masami Hiramatsu <masami.hiramatsu.pt@hitachi.com>
+>>      Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+>>
+>> which is part of the backport-3.8 branch, so I'm a bit confused. Are
+>> you sure you're using the latest backport-3.8 branch? If so, then I'll
+>> do a test here to check this.
+>>
+> By the way, the patch IS applied to the source tree I'm compiling.
+> I can see this in arch/arm/mach-mvebu/irq-armada-370-xp.c which is using 
+> ARMADA_370_XP_TIMER0_PER_CPU_IRQ instead of ARMADA_370_XP_MAX_PER_CPU_IRQS
+
+I built and tested backport-3.8 and indeed the Ethernet is broken.
+It was cause by a recent batch of fixes that I added, now I have to
+figure out why they have broken the ethernet whereas they were supposed
+to make it work better!
+
+Regards,
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
