@@ -1,90 +1,94 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 7 May 2013 11:35:08 +0200
-Subject: [RFC PATCH] implement read_cpuid_ext for v7-M (Was: Re: [PATCHv2
- 2/3] ARM: Detect support for SDIV/UDIV from ISAR0) register
-In-Reply-To: <20130507092209.GD25387@mudshark.cambridge.arm.com>
-References: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
- <1363631337-13816-3-git-send-email-sboyd@codeaurora.org>
- <20130418091019.GA21099@pengutronix.de>
- <20130506093059.GH23285@pengutronix.de>
- <20130507092209.GD25387@mudshark.cambridge.arm.com>
-Message-ID: <20130507093508.GL23285@pengutronix.de>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue, 7 May 2013 17:35:28 +0800
+Subject: How does commit 47ec340c not introduce a bug?
+In-Reply-To: <20130507092428.GK23285@pengutronix.de>
+References: <20130507091734.GM3658@sgi.com>
+ <20130507092428.GK23285@pengutronix.de>
+Message-ID: <CAN1soZyHx1XZzukunbKsj+v4h93MRQKjPPjJ3+i3u8BeBbhCGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Will,
+On Tue, May 7, 2013 at 5:24 PM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello,
+>
+> On Tue, May 07, 2013 at 04:17:34AM -0500, Robin Holt wrote:
+>> I noticed a warning while cross-compiling all arm defconfigs.
+>>
+>> The mmp2_defconfig gave this warning:
+>>
+>> drivers/video/backlight/max8925_bl.c: In function 'max8925_backlight_probe':
+>> drivers/video/backlight/max8925_bl.c:177:3: warning: statement with no effect [-Wunused-value]
+>>
+>> This appears to have been introduced by the above commit when !CONFIG_OF
+>>
+>> Looking at this more closely, I am not sure how this was ever intended
+>> to be handled or how the errors returned in the CONFIG_OF case were
+>> intended to be handled as the return from max8925_backlight_dt_init is
+>> always ignored.
+>>
+>> I think this needs some more attention, but do not feel like I know
+>> enough about it or have any means to test it to weigh in.
+>>
+>> Thanks,
+>> Robin
+>>
+>>
+>> commit 47ec340cb8e232671e7c4a4689ff32c3bdf329da
+>> Author: Qing Xu <qingx@marvell.com>
+>> Date:   Mon Feb 4 23:40:45 2013 +0800
+>>
+>>     mfd: max8925: Support dt for backlight
+>>
+>>     Add device tree support in max8925 backlight.
+>>
+>>     Signed-off-by: Qing Xu <qingx@marvell.com>
+>>     Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+>>     Signed-off-by: Samuel Ortiz <sameo@linux.intel.com>
+>>
+>> diff --git a/drivers/video/backlight/max8925_bl.c b/drivers/video/backlight/max8925_bl.c
+>> index 2c9bce0..5ca11b0 100644
+>> --- a/drivers/video/backlight/max8925_bl.c
+>> +++ b/drivers/video/backlight/max8925_bl.c
+>> @@ -101,6 +101,29 @@ static const struct backlight_ops max8925_backlight_ops = {
+>>       .get_brightness = max8925_backlight_get_brightness,
+>>  };
+>>
+>> +#ifdef CONFIG_OF
+>> +static int max8925_backlight_dt_init(struct platform_device *pdev,
+>> +                           struct max8925_backlight_pdata *pdata)
+>> +{
+>> +     struct device_node *nproot = pdev->dev.parent->of_node, *np;
+>> +     int dual_string;
+>> +
+>> +     if (!nproot)
+>> +             return -ENODEV;
+>> +     np = of_find_node_by_name(nproot, "backlight");
+>> +     if (!np) {
+>> +             dev_err(&pdev->dev, "failed to find backlight node\n");
+>> +             return -ENODEV;
+>> +     }
+>> +
+>> +     of_property_read_u32(np, "maxim,max8925-dual-string", &dual_string);
+>> +     pdata->dual_string = dual_string;
+>> +     return 0;
+>> +}
+>> +#else
+>> +#define max8925_backlight_dt_init(x, y)      (-1)
+> It's probably best to make this:
+>
+> static inline max8925_backlight_dt_init(struct platform_device *pdev,
+>                                 struct max8925_backlight_pdata *pdata)
+> {
+>         return -ENODEV;
+> }
+>
 
-On Tue, May 07, 2013 at 10:22:09AM +0100, Will Deacon wrote:
-> On Mon, May 06, 2013 at 10:30:59AM +0100, Uwe Kleine-K?nig wrote:
-> > On Thu, Apr 18, 2013 at 11:10:19AM +0200, Uwe Kleine-K?nig wrote:
-> > The patch below fixes the issue for me on V7-M. The only drawback is
-> > that the list of registers isn't shared. Maybe someone has a nice idea?
-> > 
-> > BTW, there doesn't seem to be an equivalent register set for 
-> > CPUID_{CACHETYPE,TCM,TLBTYPE,MPIDR} on v7-M.
-> 
-> That make sense: we don't have caches, MMUs or SMP.
-IMHO the sensible thing is to implement the registers then and let them
-tell: I don't have these things.
+I've submitted this patch to fix this issue for a long time.
 
-> > diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-> > index 4eb94a3..ec635ff 100644
-> > --- a/arch/arm/include/asm/cputype.h
-> > +++ b/arch/arm/include/asm/cputype.h
-> > @@ -10,6 +10,22 @@
-> >  #define CPUID_TLBTYPE	3
-> >  #define CPUID_MPIDR	5
-> >  
-> > +#ifdef CONFIG_CPU_V7M
-> > +#define CPUID_EXT_PFR0	0x40
-> > +#define CPUID_EXT_PFR1	0x44
-> > +#define CPUID_EXT_DFR0	0x48
-> > +#define CPUID_EXT_AFR0	0x4c
-> > +#define CPUID_EXT_MMFR0	0x50
-> > +#define CPUID_EXT_MMFR1	0x54
-> > +#define CPUID_EXT_MMFR2	0x58
-> > +#define CPUID_EXT_MMFR3	0x5c
-> > +#define CPUID_EXT_ISAR0	0x60
-> > +#define CPUID_EXT_ISAR1	0x64
-> > +#define CPUID_EXT_ISAR2	0x68
-> > +#define CPUID_EXT_ISAR3	0x6c
-> > +#define CPUID_EXT_ISAR4	0x70
-> > +#define CPUID_EXT_ISAR5	0x74
-> > +#else
-> >  #define CPUID_EXT_PFR0	"c1, 0"
-> >  #define CPUID_EXT_PFR1	"c1, 1"
-> >  #define CPUID_EXT_DFR0	"c1, 2"
-> > @@ -24,6 +40,7 @@
-> >  #define CPUID_EXT_ISAR3	"c2, 3"
-> >  #define CPUID_EXT_ISAR4	"c2, 4"
-> >  #define CPUID_EXT_ISAR5	"c2, 5"
-> > +#endif
-> >  
-> >  #define MPIDR_SMP_BITMASK (0x3 << 30)
-> >  #define MPIDR_SMP_VALUE (0x2 << 30)
-> > @@ -79,7 +96,23 @@ extern unsigned int processor_id;
-> >  		__val;							\
-> >  	})
-> >  
-> > -#else /* ifdef CONFIG_CPU_CP15 */
-> > +#elif defined(CONFIG_CPU_V7M)
-> > +
-> > +#include <asm/io.h>
-> > +#include <asm/v7m.h>
-> > +
-> > +#define read_cpuid(reg)							\
-> > +	({								\
-> > +		WARN_ON_ONCE(1);					\
-> > +		0;							\
-> > +	})
-> 
-> We do have an MIDR in PMSAv7 (not to be confused with MPIDR), so why not read
-> that here?
-I don't know it and it's unrelated to this patch. But I will note it and
-check it. In the meantime I'm taking patches of course :-)
+Samuel,
 
-Uwe
+Should I send it again?
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards
+Haojian
