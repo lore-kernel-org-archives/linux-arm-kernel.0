@@ -1,92 +1,66 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 7 May 2013 11:59:55 +0100
-Subject: [RFC PATCH v2] drivers: bus: add ARM CCI support
-In-Reply-To: <20130503151706.GB2756@e102654-lin.cambridge.arm.com>
-References: <1367425108-4698-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1367425108-4698-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20130503151706.GB2756@e102654-lin.cambridge.arm.com>
-Message-ID: <20130507105955.GA19477@e102568-lin.cambridge.arm.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Tue, 7 May 2013 16:42:40 +0530
+Subject: [PATCH] ASoC: Samsung: i2s: Fix crash in i2s driver
+In-Reply-To: <2286960.PxJxnETVLS@amdc1227>
+References: <1367897941-18439-1-git-send-email-padma.v@samsung.com>
+ <2286960.PxJxnETVLS@amdc1227>
+Message-ID: <CAAgF-BcgtjKPoSy8SPsk3WnS8T3P9f=5U2tt3WHb0fFM=M61+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 03, 2013 at 04:17:07PM +0100, Javi Merino wrote:
-> Hi Lorenzo,
-> 
-> On Wed, May 01, 2013 at 05:18:28PM +0100, Lorenzo Pieralisi wrote:
-> > On ARM multi-cluster systems coherency between cores running on
-> > different clusters is managed by the cache-coherent interconnect (CCI).
-> > It allows broadcasting of TLB invalidates and memory barriers and it
-> > guarantees cache coherency at system level through snooping of slave
-> > interfaces connected to it.
-> > 
-> > This patch enables the basic infrastructure required in Linux to handle and
-> > programme the CCI component.
-> > 
-> > Non-local variables used by the CCI management functions called by power
-> > down function calls after disabling the cache must be flushed out to main
-> > memory in advance, otherwise incoherency of those values may occur if they
-> > are sitting in the cache of some other CPU when power down functions
-> > execute. Driver code ensures that relevant data structures are flushed
-> > from inner and outer caches after the driver probe is completed.
-> > 
-> > CCI slave port resources are linked to set of CPUs through bus masters
-> > phandle properties that link the interface resources to masters node in
-> > the device tree.
-> > 
-> > Documentation describing the CCI DT bindings is provided with the patch.
-> > 
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > ---
-> 
-> [...]
-> 
-> > diff --git a/include/linux/arm-cci.h b/include/linux/arm-cci.h
-> > new file mode 100644
-> > index 0000000..0e70942
-> > --- /dev/null
-> > +++ b/include/linux/arm-cci.h
-> > @@ -0,0 +1,59 @@
-> > +/*
-> > + * CCI cache coherent interconnect support
-> > + *
-> > + * Copyright (C) 2013 ARM Ltd.
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License as published by
-> > + * the Free Software Foundation; either version 2 of the License, or
-> > + * (at your option) any later version.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program; if not, write to the Free Software
-> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> > + */
-> > +
-> > +#ifndef __LINUX_ARM_CCI_H
-> > +#define __LINUX_ARM_CCI_H
-> > +
-> > +#include <linux/errno.h>
-> > +#include <linux/types.h>
-> > +
-> > +struct device_node;
-> > +
-> > +#ifdef CONFIG_ARM_CCI
-> > +extern int cci_ace_get_port(struct device_node *dn);
-> > +extern int cci_disable_port_by_cpu(u64 mpidr);
-> > +extern int __cci_control_port_by_device(struct device_node *dn, bool enable);
-> > +extern int __cci_control_port_by_index(u32 port, bool enable);
-> > +#else
-> > +static inline int cci_ace_get_port(struct device_node *dn, bool cpu)
-> 
-> Builds with !CONFIG_ARM_CCI fail because this definition of
-> cci_ace_get_port() takes two arguments whereas the one for
-> CONFIG_ARM_CCI takes only one.
+Hi Tomasz,
 
-Yes, sorry, I missed that while refactoring the interface.
+On Tue, May 7, 2013 at 3:20 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Padmavathi,
+>
+> On Tuesday 07 of May 2013 09:09:01 Padmavathi Venna wrote:
+>> This patch fixes a null pointer deference in i2s driver in DT
+>> case
+>>
+>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>> ---
+>>
+>> This patch is dependent on below patch posted by Thomas Abraham.
+>> https://patchwork.kernel.org/patch/2224801/
+>>
+>>  sound/soc/samsung/i2s.c |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+>> index 7ce7c50..eaf6439 100644
+>> --- a/sound/soc/samsung/i2s.c
+>> +++ b/sound/soc/samsung/i2s.c
+>> @@ -1182,7 +1182,7 @@ static int samsung_i2s_probe(struct platform_device
+>> *pdev) pri_dai->sec_dai = sec_dai;
+>>       }
+>>
+>> -     if (i2s_pdata->cfg_gpio && i2s_pdata->cfg_gpio(pdev)) {
+>> +     if (i2s_pdata && i2s_pdata->cfg_gpio && i2s_pdata->cfg_gpio(pdev)) {
+>
+> This is a problem that needs to be fixed indeed. However the same problem
+> exists in samsung_i2s_remove() as well (at least in latest linux-next).
 
-Thanks,
-Lorenzo
+This will go off once Thomas "ASoC: samsung: let device core setup the
+default pin configuration"
+patch get merged.
+
+>
+> This makes me wonder what happens with i2s_pdata in DT case. Most of drivers
+> allocate a pdata struct anyway and fill it with data parsed from device tree.
+> This allows rest of the code to remain unmodified and consider DT and non-DT
+> cases equal.
+
+This driver doesn't allocate the i2s_pdata in DT case. It directly
+parse the information form DT file
+and assign that information to i2s_dai.
+
+Thanks
+Padma
+
+>
+> Best regards,
+> --
+> Tomasz Figa
+> Samsung Poland R&D Center
+> SW Solution Development, Kernel and System Framework
+>
