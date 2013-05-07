@@ -1,49 +1,44 @@
-From: andre.przywara@linaro.org (Andre Przywara)
-Date: Tue,  7 May 2013 14:55:13 +0200
-Subject: [PATCH] ARM: KVM: prevent NULL pointer dereference with KVM ioctl
-Message-ID: <1367931313-14839-1-git-send-email-andre.przywara@linaro.org>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Tue, 7 May 2013 13:56:16 +0100
+Subject: [Xen-devel] [PATCH RFC v2 2/4] arm: introduce CONFIG_PARAVIRT
+ and pv_time_ops
+In-Reply-To: <alpine.DEB.2.02.1305071301040.4147@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1305061532310.4756@kaball.uk.xensource.com>
+ <1367851878-21629-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1367918609.26321.43.camel@zakaz.uk.xensource.com>
+ <alpine.DEB.2.02.1305071301040.4147@kaball.uk.xensource.com>
+Message-ID: <1367931376.26321.117.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some ARM KVM VCPU ioctls require the vCPU to be properly initialized
-with the KVM_ARM_VCPU_INIT ioctl before being used with further
-requests. KVM_RUN checks whether this initialization has been
-done, but other ioctls do not.
-Namely KVM_GET_REG_LIST will dereference an array with index -1
-without initialization and thus leads to a kernel oops.
-Fix this by adding checks before executing the ioctl handlers.
+On Tue, 2013-05-07 at 13:15 +0100, Stefano Stabellini wrote:
+> On Tue, 7 May 2013, Ian Campbell wrote:
+> > On Mon, 2013-05-06 at 15:51 +0100, Stefano Stabellini wrote:
+> > > Introduce CONFIG_PARAVIRT on ARM.
+> > 
+> > What about PARAVIRT_TIME_ACCOUNTING? I'm not sure what it is but it
+> > looks like a more lightweight version of pv stolen time?
+>  
+> PARAVIRT_TIME_ACCOUNTING selects PARAVIRT on x86 :-)
 
-Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
----
- arch/arm/kvm/arm.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Ah, that's maybe what confused me.
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index c1fe498..0c571ff 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -893,6 +893,11 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 	case KVM_SET_ONE_REG:
- 	case KVM_GET_ONE_REG: {
- 		struct kvm_one_reg reg;
-+
-+		/* Make sure they initialize the vcpu with KVM_ARM_VCPU_INIT */
-+		if (unlikely(vcpu->arch.target < 0))
-+			return -ENOEXEC;
-+
- 		if (copy_from_user(&reg, argp, sizeof(reg)))
- 			return -EFAULT;
- 		if (ioctl == KVM_SET_ONE_REG)
-@@ -905,6 +910,10 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 		struct kvm_reg_list reg_list;
- 		unsigned n;
- 
-+		/* Make sure they initialize the vcpu with KVM_ARM_VCPU_INIT */
-+		if (unlikely(vcpu->arch.target < 0))
-+			return -ENOEXEC;
-+
- 		if (copy_from_user(&reg_list, user_list, sizeof(reg_list)))
- 			return -EFAULT;
- 		n = reg_list.n;
--- 
-1.7.12.1
+TBH its not at all clear to me what distinction the core code is trying
+to make with those two options, but do we not also want/need
+PARAVIRT_TIME_ACCOUNTING? Having reread the help text it seems to be
+some sort of "more accurate" accounting?
+
+> > I think it would be a worthwhile change to refactor the stolen time
+> > handling out from under the rather wide reaching umbrella of the x86
+> > PARAVIRT option. (assuming PARAVIRT_TIME_ACCOUNTING isn't already that)
+> 
+> Actually PARAVIRT doesn't mean much in common code, the only thing it
+> covers is stolen time.
+> What I mean to say is that just because we are introducing something
+> called "PARAVIRT" on ARM, it doesn't mean that it has to come with all
+> sort of baggage.
+
+I was more concerned with perceived baggage than actual trunks full of
+skeletons.
+
+Ian.
