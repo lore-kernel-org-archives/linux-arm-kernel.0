@@ -1,53 +1,42 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue,  7 May 2013 14:39:25 -0700
-Subject: [PATCH] ARM: OMAP2+: omap_device: use late_initcall_sync
-Message-ID: <1367962765-13912-1-git-send-email-khilman@linaro.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 07 May 2013 16:42:07 -0500
+Subject: [PATCH, RFC 03/22] cpuidle: calxeda: select ARM_CPU_SUSPEND
+In-Reply-To: <1367507786-505303-4-git-send-email-arnd@arndb.de>
+References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
+ <1367507786-505303-4-git-send-email-arnd@arndb.de>
+Message-ID: <5189752F.8030405@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If DEBUG_LL and earlyprintk are enabled, and omap-serial.c is compiled
-as a module, the kernel boot hangs early as the clocks for serial port
-are cut while earlyprintk still uses the port.
+On 05/02/2013 10:16 AM, Arnd Bergmann wrote:
+> Like other ARM specific drivers, this one requires ARM_CPU_SUSPEND,
+> as shown by this linker error:
+> 
+> drivers/built-in.o: In function `calxeda_pwrdown_idle':
+> drivers/cpuidle/cpuidle-calxeda.c:84: undefined reference to `cpu_suspend'
+> drivers/cpuidle/cpuidle-calxeda.c:86: undefined reference to `cpu_resume'
+> 
+> Cc: Rafael J. Wysocki <rjw@sisk.pl>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: linux-pm at vger.kernel.org
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-The problem is a race between the late_initcall for omap_device (which
-idles devices that have no drivers) and the late_initcall in
-kernel/printk.c which turns off the earlyconsole.   Any printks
-that happen between this omap_device late initcall and the earlyconsole
-late initcall will crash when accessing the UART.
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-The fix is to ensure the omap_device initcall happens after the
-earlyconsole initcall.
-
-Reported-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
-Based on v3.9-rc8
-
- arch/arm/mach-omap2/omap_device.c | 2 +-
- arch/arm/mach-omap2/soc.h         | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index 381be7a..2d20d69 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -879,4 +879,4 @@ static int __init omap_device_late_init(void)
- 	bus_for_each_dev(&platform_bus_type, NULL, NULL, omap_device_late_idle);
- 	return 0;
- }
--omap_late_initcall(omap_device_late_init);
-+omap_late_initcall_sync(omap_device_late_init);
-diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
-index c62116b..de88611 100644
---- a/arch/arm/mach-omap2/soc.h
-+++ b/arch/arm/mach-omap2/soc.h
-@@ -494,6 +494,7 @@ level(__##fn);
- #define omap_subsys_initcall(fn)	omap_initcall(subsys_initcall, fn)
- #define omap_device_initcall(fn)	omap_initcall(device_initcall, fn)
- #define omap_late_initcall(fn)		omap_initcall(late_initcall, fn)
-+#define omap_late_initcall_sync(fn)	omap_initcall(late_initcall_sync, fn)
- 
- #endif	/* __ASSEMBLY__ */
- 
--- 
-1.8.2
+> ---
+>  drivers/cpuidle/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+> index c4cc27e..e21cdfa 100644
+> --- a/drivers/cpuidle/Kconfig
+> +++ b/drivers/cpuidle/Kconfig
+> @@ -36,6 +36,7 @@ if CPU_IDLE
+>  config CPU_IDLE_CALXEDA
+>  	bool "CPU Idle Driver for Calxeda processors"
+>  	depends on ARCH_HIGHBANK
+> +	select ARM_CPU_SUSPEND
+>  	help
+>  	  Select this to enable cpuidle on Calxeda processors.
+>  
+> 
