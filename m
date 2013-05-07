@@ -1,80 +1,36 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Tue, 7 May 2013 09:01:42 +0100
-Subject: [PATCH v8 1/3] of/pci: Unify pci_process_bridge_OF_ranges from
- Microblaze and PowerPC
-In-Reply-To: <1367721709.11982.37.camel@pasglop>
-References: <1366627295-16964-1-git-send-email-Andrew.Murray@arm.com>
- <1366627295-16964-2-git-send-email-Andrew.Murray@arm.com>
- <1367721709.11982.37.camel@pasglop>
-Message-ID: <20130507080142.GA8808@arm.com>
+From: marek.belisko@gmail.com (Marek Belisko)
+Date: Tue,  7 May 2013 10:14:50 +0200
+Subject: [PATCH 1/2] clk: si5351: Fix msynth_recalc_rate return value when
+ fOUT is 0.
+Message-ID: <1367914491-17445-1-git-send-email-marek.belisko@streamunlimited.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 05, 2013 at 03:41:49AM +0100, Benjamin Herrenschmidt wrote:
-> On Mon, 2013-04-22 at 11:41 +0100, Andrew Murray wrote:
-> > The pci_process_bridge_OF_ranges function, used to parse the "ranges"
-> > property of a PCI host device, is found in both Microblaze and PowerPC
-> > architectures. These implementations are nearly identical. This patch
-> > moves this common code to a common place.
-> 
-> What's happening with this ? I'd like to avoid that patch for now
-> as I'm doing some changes to pci_process_bridge_OF_ranges
-> which are fairly urgent (I might even stick them in the current
-> merge window) to deal with memory windows having separate offsets.
+When p3 is eual to 0 then result for fOUT is 0. In that case we should
+return 0 not parent_rate;
 
-There were no objections to this latest revision until now and it is
-currently sitting with Jason Cooper (mvebu-next/pcie). [1]
+This issue was causing deadlock in si5351 chip when user set_rate for
+ms0->clk0 and then set_rate for ms1->clk1 (both ms sourced from plla).
+After that clk1 was 0 and it wasn't possible to enable it again (try also
+manually with i2cset commands). Only power cycle helps.
 
-> 
-> There's also a few hacks in there that are really ppc specific...
-> 
-> I think the right long term approach is to change the way powerpc
-> (and microblaze ?) initializes PCI host bridges. Move it away from
-> setup_arch() (which is a PITA anyway since it's way too early) to
-> an early init call of some sort, and encapsulate the new struct
-> pci_host_bridge.
-> 
-> We can then directly configure the host bridge windows rather
-> than having this "intermediary" set of resources in our pci_controller
-> and in fact move most of the fields from pci_controller to
-> pci_host_bridge to the point where the former can remain as a
-> simple platform specific wrapper if needed.
+Signed-off-by: Marek Belisko <marek.belisko@streamunlimited.com>
+---
+ drivers/clk/clk-si5351.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This is a view that was also shared by Bjorn [2] when I attempted to
-submit a patchset which moves struct pci_controller to asm-generic.
-
-> 
-> So for new stuff (hint: DT based ARM PCI) or stuff that has to deal with
-> a lot less archaic platforms (hint: Microblaze), I'd recommend going
-> straight for that approach rather than perpetuating the PowerPC code
-> which I'll try to deal with in the next few monthes.
-
-The motativation for my patchsets were to give a way for ARM PCI host
-bridge drivers to parse the DT ranges property, but this snow-balled into
-unifying pci_process_bridge_OF_ranges.
-
-My v8 patchset provides a of_pci_range_parser which is used directly by a
-few ARM PCI DT host bridge drivers, this has been generally accepted and
-tested. I don't see why this can't remain and so I'd really like to keep this
-around. 
-
-Grant, Benjamin would you be happy for me to resubmit this series which provides
-the of_pci_range_parser which will be used by the separate implementations of
-pci_process_bridge_OF_ranges in PowerPC/Microblaze?
-
-Benjamin are you able to still use of_pci_range_parser in your
-'Support per-aperture memory offset' patch?
-
-Thanks,
-
-Andrew Murray
-
-[1] https://lkml.org/lkml/2013/4/22/505
-[2] https://patchwork.kernel.org/patch/2487671
-
-> 
-> Cheers,
-> Ben.
->  
-> 
-> 
+diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+index fc215ce..a8fc0f4 100644
+--- a/drivers/clk/clk-si5351.c
++++ b/drivers/clk/clk-si5351.c
+@@ -607,7 +607,7 @@ static unsigned long si5351_msynth_recalc_rate(struct clk_hw *hw,
+ 		si5351_read_parameters(hwdata->drvdata, reg, &hwdata->params);
+ 
+ 	if (hwdata->params.p3 == 0)
+-		return parent_rate;
++		return 0;
+ 
+ 	/*
+ 	 * multisync0-5: fOUT = (128 * P3 * fIN) / (P1*P3 + P2 + 512*P3)
+-- 
+1.7.9.5
