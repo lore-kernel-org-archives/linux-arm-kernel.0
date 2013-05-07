@@ -1,49 +1,46 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 07 May 2013 11:54:20 +0200
-Subject: [PATCH V2 2/3] ARM: dts: add Exynos audio subsystem clock
- controller node
-In-Reply-To: <1367909016-19657-3-git-send-email-padma.v@samsung.com>
-References: <1367909016-19657-1-git-send-email-padma.v@samsung.com>
- <1367909016-19657-3-git-send-email-padma.v@samsung.com>
-Message-ID: <2829319.bZPJnVErnQ@amdc1227>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 07 May 2013 12:03:32 +0200
+Subject: [PATCH 1/2] clk: si5351: Fix msynth_recalc_rate return value
+ when fOUT is 0.
+In-Reply-To: <1367914491-17445-1-git-send-email-marek.belisko@streamunlimited.com>
+References: <1367914491-17445-1-git-send-email-marek.belisko@streamunlimited.com>
+Message-ID: <5188D174.90400@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Padmavathi,
+On 05/07/2013 10:14 AM, Marek Belisko wrote:
+> When p3 is eual to 0 then result for fOUT is 0. In that case we should
+> return 0 not parent_rate;
+>
+> This issue was causing deadlock in si5351 chip when user set_rate for
+> ms0->clk0 and then set_rate for ms1->clk1 (both ms sourced from plla).
+> After that clk1 was 0 and it wasn't possible to enable it again (try also
+> manually with i2cset commands). Only power cycle helps.
 
-On Tuesday 07 of May 2013 12:13:35 Padmavathi Venna wrote:
-> Audio subsystem introduced in s5pv210 and exynos platforms
-> which has a internal clock controller. This patch adds a node
-> for the same on exynos5250.
-> 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Marek,
+
+does the fix below also affect the behavior above, i.e. not causing
+si5351 to hang?
+
+Anyway, your fix looks very sane to me and you get my
+
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+
+> Signed-off-by: Marek Belisko<marek.belisko@streamunlimited.com>
 > ---
->  arch/arm/boot/dts/exynos5250.dtsi |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
-> b/arch/arm/boot/dts/exynos5250.dtsi index 36c9d8d..7026de0 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -72,6 +72,12 @@
->  		#clock-cells = <1>;
->  	};
-> 
-> +	clock_audss: audss-clock-controller at 0x03810000 {
-
-Just a nitpick: this should be @3810000, without the 0x and leading zeroes.
-
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Kernel and System Framework
-
-> +		compatible = "samsung,exynos5250-audss-clock";
-> +		reg = <0x03810000 0x0C>;
-> +		#clock-cells = <1>;
-> +	};
-> +
->  	gic:interrupt-controller at 10481000 {
->  		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
->  		#interrupt-cells = <3>;
+>   drivers/clk/clk-si5351.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+> index fc215ce..a8fc0f4 100644
+> --- a/drivers/clk/clk-si5351.c
+> +++ b/drivers/clk/clk-si5351.c
+> @@ -607,7 +607,7 @@ static unsigned long si5351_msynth_recalc_rate(struct clk_hw *hw,
+>   		si5351_read_parameters(hwdata->drvdata, reg,&hwdata->params);
+>
+>   	if (hwdata->params.p3 == 0)
+> -		return parent_rate;
+> +		return 0;
+>
+>   	/*
+>   	 * multisync0-5: fOUT = (128 * P3 * fIN) / (P1*P3 + P2 + 512*P3)
