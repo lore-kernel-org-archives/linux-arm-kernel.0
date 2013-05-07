@@ -1,36 +1,45 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 6 May 2013 18:36:51 -0600
-Subject: [RESEND][PATCH 1/3] arm: dts: introduce config HAS_BANDGAP
-In-Reply-To: <51884971.9050508@ti.com>
-References: <1367874058-2378-1-git-send-email-eduardo.valentin@ti.com>
- <1367874058-2378-2-git-send-email-eduardo.valentin@ti.com>
- <20130506213413.GH5634@blackmetal.musicnaut.iki.fi>
- <20130506223653.GA12089@obsidianresearch.com>
- <51884971.9050508@ti.com>
-Message-ID: <20130507003651.GA26035@obsidianresearch.com>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Tue, 7 May 2013 01:11:17 +0000
+Subject: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
+ xfer->speed_hz set
+In-Reply-To: <20130506103105.GB13472@opensource.wolfsonmicro.com>
+References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
+ <1362626815-6628-1-git-send-email-wenyou.yang@atmel.com>
+ <CAGhQ9VwW18LXY5Jn0FUFCaAzKxP1W3QADG=JBp9JbgaAwo=F2Q@mail.gmail.com>
+ <B256D81BAE5131468A838E5D7A24364154236AB5@penmbx02>
+ <CACQ1gAhZO3stjrwf5SiZf7jOO8T5bAJZiz97M7+7vwFmk2e65g@mail.gmail.com>
+ <5182414F.1000201@atmel.com>
+ <20130506103105.GB13472@opensource.wolfsonmicro.com>
+Message-ID: <B256D81BAE5131468A838E5D7A24364154238AF5@penmbx02>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 06, 2013 at 08:23:13PM -0400, Eduardo Valentin wrote:
+Hi, Mark
 
-> > I get the impression it is desired to minimize driver kconfig
-> > dependencies to the minimum required to compile to increase build
-> > testing coverage, so maybe it would be appropriate to drop this
-> > entirely?
+> From: Mark Brown [mailto:broonie at kernel.org]
+> Sent: 2013?5?6? 18:31
+> To: Ferre, Nicolas
+> Cc: grant.likely at secretlab.ca; Grant Likely; Richard Genoud; Yang, Wenyou;
+> Joachim Eastwood; linux-arm-kernel at lists.infradead.org;
+> plagnioj at jcrosoft.com; Lin, JM; spi-devel-general at lists.sourceforge.net;
+> linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
+> xfer->speed_hz set
+> 
+> On Thu, May 02, 2013 at 12:34:55PM +0200, Nicolas Ferre wrote:
+> 
+> > Can you tell us if this SPI patch will be merged upstream using one of
+> > your paths?
+> 
+> I have no idea what patch this is but if it's not in my tree -next it's unlikely to be
+> merged.
+This is dropped patch, no need to be merged.
 
-> Well, it is also desired to compile things to the correct target
-> right?
+We tested Atmel spi in your tree-next , but it doesn't work, the reason is the Joachim Eastwood's patch is not included. 
+https://patchwork.kernel.org/patch/2165301/
+which Joachim said that Grant said he applied.
 
-There is some of that too..
+Thanks
 
-But broadly the direction seems that drivers should have minimal
-dependencies so, eg, the thermal maintainer compiling for x86 should
-be able to compile test/static analyze your driver..
-
-> Thats the idea behind this config option. It follows the same design as
-> CONFIG_ARCH_HAS_CPUFREQ, for instance.
-
-That is entirely contained inside arch/arm and doesn't involve
-drivers.
-
-Jason
+Best Regards,
+Wenyou Yang
