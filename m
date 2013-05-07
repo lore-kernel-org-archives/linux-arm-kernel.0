@@ -1,36 +1,48 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Tue,  7 May 2013 15:20:51 +0530
-Subject: [RFC PATCH 0/2] USB: OHCI: Start splitting up the driver
-In-Reply-To: <1365746856-7772-2-git-send-email-manjunath.goudar@linaro.org>
-References: <1365746856-7772-2-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1367920253-15207-1-git-send-email-manjunath.goudar@linaro.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 07 May 2013 11:50:51 +0200
+Subject: [PATCH] ASoC: Samsung: i2s: Fix crash in i2s driver
+In-Reply-To: <1367897941-18439-1-git-send-email-padma.v@samsung.com>
+References: <1367897941-18439-1-git-send-email-padma.v@samsung.com>
+Message-ID: <2286960.PxJxnETVLS@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of patches begins the process of splitting ohci-hcd up into
-a core library module and independent pci driver modules.
+Hi Padmavathi,
 
-Patch 1/2 prepares the way by exporting a few functions from ohci-hcd
-and adding a new mechanism for platform-specific drivers to initialize
-their hc_driver structures.  This deserves to be done in the core
-because almost all of the entries in these structures are pure
-boilerplate -- practically none of the drivers need to override more
-than three of the standard core values.
+On Tuesday 07 of May 2013 09:09:01 Padmavathi Venna wrote:
+> This patch fixes a null pointer deference in i2s driver in DT
+> case
+> 
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> ---
+> 
+> This patch is dependent on below patch posted by Thomas Abraham.
+> https://patchwork.kernel.org/patch/2224801/
+> 
+>  sound/soc/samsung/i2s.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
+> index 7ce7c50..eaf6439 100644
+> --- a/sound/soc/samsung/i2s.c
+> +++ b/sound/soc/samsung/i2s.c
+> @@ -1182,7 +1182,7 @@ static int samsung_i2s_probe(struct platform_device
+> *pdev) pri_dai->sec_dai = sec_dai;
+>  	}
+> 
+> -	if (i2s_pdata->cfg_gpio && i2s_pdata->cfg_gpio(pdev)) {
+> +	if (i2s_pdata && i2s_pdata->cfg_gpio && i2s_pdata->cfg_gpio(pdev)) {
 
-Patch 2/2  separate out ohci-pci into independent driver modules.
+This is a problem that needs to be fixed indeed. However the same problem 
+exists in samsung_i2s_remove() as well (at least in latest linux-next).
 
-Manjunath Goudar (2):
-  USB: OHCI: prepare to make ohci-hcd a library module
-  USB: OHCI: make ohci-pci a separate driver
+This makes me wonder what happens with i2s_pdata in DT case. Most of drivers 
+allocate a pdata struct anyway and fill it with data parsed from device tree. 
+This allows rest of the code to remain unmodified and consider DT and non-DT 
+cases equal.
 
- drivers/usb/host/Kconfig         |    9 ++-
- drivers/usb/host/Makefile        |    3 +
- drivers/usb/host/ohci-hcd.c      |  142 +++++++++++++++++++++++++++++---------
- drivers/usb/host/ohci-pci.c      |  129 ++++++++++------------------------
- drivers/usb/host/ohci-platform.c |    2 +-
- drivers/usb/host/ohci-q.c        |   13 ++++
- drivers/usb/host/ohci.h          |   30 +++++++-
- 7 files changed, 197 insertions(+), 131 deletions(-)
-
+Best regards,
 -- 
-1.7.9.5
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Kernel and System Framework
