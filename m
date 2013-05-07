@@ -1,28 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 07 May 2013 17:29:37 +0100
-Subject: [PATCH v3 07/32] arm64: KVM: fault injection into a guest
-In-Reply-To: <20130429162652.GA16544@arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-8-git-send-email-marc.zyngier@arm.com>
- <20130429162652.GA16544@arm.com>
-Message-ID: <51892BF1.9070501@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 7 May 2013 18:32:44 +0200
+Subject: [PATCH 1/3] clk: mvebu: add gate ctrl for Prestera kirkwood
+ variants
+In-Reply-To: <518927C0.6070600@free-electrons.com>
+References: <1367941941-19152-1-git-send-email-valentin.longchamp@keymile.com>
+ <1367941941-19152-2-git-send-email-valentin.longchamp@keymile.com>
+ <518927C0.6070600@free-electrons.com>
+Message-ID: <20130507163244.GD9994@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/04/13 17:26, Catalin Marinas wrote:
-> On Mon, Apr 08, 2013 at 05:17:09PM +0100, Marc Zyngier wrote:
->> +static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
->> +{
->> +	unsigned long cpsr = *vcpu_cpsr(vcpu);
->> +	int is_aarch32;
->> +	u32 esr = 0;
->> +
->> +	is_aarch32 = vcpu_mode_is_32bit(vcpu);
+On Tue, May 07, 2013 at 06:11:44PM +0200, Gregory CLEMENT wrote:
+> On 05/07/2013 05:52 PM, Valentin Longchamp wrote:
+> > The kirkwood device found in the Prestera SoCs does not have all the
+> > peripherals of its the usual kirkwood SoCs. There are hence missing
+> > clocks in the SoCs.
+> > 
+> > This patch registers another gate controller for the kirkwood that
+> > registers only the available clocks of this kirkwood variant.
 > 
-> Minor thing - use bool here to match the function definition?
+> Hi Valentin,
+> 
+> Overall the patch set looks OK, however I don't understand why you need
+> to declare a new gate controller. The list you delcared seemed to be
+> just a subset of the Kirkwood one, why can't you use this one?
 
-Sure, will do.
+Hi Gregory
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Take a look at the code which gets deleted in patch 3/3.
+
+       /*
+        * Our variant of kirkwood (integrated in the Bobcat) hangs on accessing
+        * SATA bits (14-15) of the Clock Gating Control Register. Since these
+        * devices are also not present in this variant, their clocks get
+        * disabled because unused when clk_disable_unused() gets called.
+        * That's why we change the flags to these clocks to CLK_IGNORE_UNUSED
+        */
+
+By not defining these clocks in the first place, they never get turned
+off...
+
+	Andrew
