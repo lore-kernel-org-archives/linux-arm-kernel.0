@@ -1,114 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 07 May 2013 18:11:44 +0200
-Subject: [PATCH 1/3] clk: mvebu: add gate ctrl for Prestera kirkwood
- variants
-In-Reply-To: <1367941941-19152-2-git-send-email-valentin.longchamp@keymile.com>
-References: <1367941941-19152-1-git-send-email-valentin.longchamp@keymile.com>
- <1367941941-19152-2-git-send-email-valentin.longchamp@keymile.com>
-Message-ID: <518927C0.6070600@free-electrons.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 07 May 2013 12:17:55 -0400
+Subject: [Xen-devel] [PATCH 1/3] arm_arch_timer: introduce
+ arch_timer_stolen_ticks
+In-Reply-To: <20130506143533.GF15278@phenom.dumpdata.com>
+References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
+ <1367436460-10183-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <51817CBE.4050003@codeaurora.org>
+ <1367482772.21869.26.camel@zakaz.uk.xensource.com>
+ <5182DBA9.9080609@codeaurora.org>
+ <20130506143533.GF15278@phenom.dumpdata.com>
+Message-ID: <51892933.7090405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2013 05:52 PM, Valentin Longchamp wrote:
-> The kirkwood device found in the Prestera SoCs does not have all the
-> peripherals of its the usual kirkwood SoCs. There are hence missing
-> clocks in the SoCs.
+Hi Konrad,
+
+On 05/06/2013 10:35 AM, Konrad Rzeszutek Wilk wrote:
+>>> e.g. if a VCPU sets a timer for NOW+5, but 3 are stolen in the middle it
+>>> would not make sense (from the guests PoV) for NOW'==NOW+2 at the point
+>>> where the timer goes off. Nor does it make sense to require that the
+>>> guest actually be running for 5 before injecting the timer because that
+>>> would mean real time elapsed time for the timer would be 5+3 in the case
+>>> where 3 are stolen.
+>>
+>> This is a bit of an aside, but I think that hiding time spent at higher
+>> privilege levels can be a quite sensible approach to timekeeping in a
+>> virtualized environment, but I understand that it's not the approach taken
+>> with Xen, and as you pointed out above, adjusting the Virtual Offset Register
+>> by itself isn't enough to implement that approach.
 > 
-> This patch registers another gate controller for the kirkwood that
-> registers only the available clocks of this kirkwood variant.
+> This is the approach taken by Xen and KVM. Look in CONFIG_PARAVIRT_CLOCK for
+> implementation. In the user-space, the entry in 'top' of "stolen" (%st)
+> is for this exact value.
 
-Hi Valentin,
+I may have been unclear with my terms, sorry. When I refer to time being
+"hidden", I mean that kernel level software (supervisor mode, EL1) cannot
+detect the passage of that time at all. I don't know whether this would really
+work, but I imagine one might be able to get close with the current
+virtualization facilities for ARM.
 
-Overall the patch set looks OK, however I don't understand why you need
-to declare a new gate controller. The list you delcared seemed to be
-just a subset of the Kirkwood one, why can't you use this one?
+Am I correct in interpreting that what you're referring to is the deployment
+of paravirtualization code that ensures (observable) "stolen" time is factored
+into kernel decision-making?
 
-Note that I am not an expert for the kirkwood hardware, so maybe I
-missed something.
-
-Regards,
-
-> 
-> Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
-> ---
->  .../devicetree/bindings/clock/mvebu-gated-clock.txt   | 17 +++++++++++++++++
->  drivers/clk/mvebu/clk-gating-ctrl.c                   | 19 +++++++++++++++++++
->  2 files changed, 36 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-> index cffc93d..7f494e90 100644
-> --- a/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/mvebu-gated-clock.txt
-> @@ -92,10 +92,27 @@ ID	Clock	Peripheral
->  19	ge1	Gigabit Ethernet 1
->  20	tdm	Time Division Mplx
->  
-> +The following is a list of provided IDs for Kirkwood Prestera variant:
-> +ID	Clock	Peripheral
-> +-----------------------------------
-> +0	ge0	Gigabit Ethernet 0
-> +2	pex0	PCIe Cntrl 0
-> +3	usb0	USB Host 0
-> +4	sdio	SDIO Cntrl
-> +5	tsu	Transp. Stream Unit
-> +6	dunit	SDRAM Cntrl
-> +7	runit	Runit
-> +8	xor0	XOR DMA 0
-> +16	xor1	XOR DMA 1
-> +17	crypto	CESA engine
-> +19	ge1	Gigabit Ethernet 1
-> +
-> +
->  Required properties:
->  - compatible : shall be one of the following:
->  	"marvell,dove-gating-clock" - for Dove SoC clock gating
->  	"marvell,kirkwood-gating-clock" - for Kirkwood SoC clock gating
-> +	"marvell,prestera-kw-gating-clock" - for Preseta SoC clock gating
->  - reg : shall be the register address of the Clock Gating Control register
->  - #clock-cells : from common clock binding; shall be set to 1
->  
-> diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
-> index ebf141d..ba37802 100644
-> --- a/drivers/clk/mvebu/clk-gating-ctrl.c
-> +++ b/drivers/clk/mvebu/clk-gating-ctrl.c
-> @@ -203,6 +203,21 @@ static const struct mvebu_soc_descr __initconst kirkwood_gating_descr[] = {
->  	{ "tdm", NULL, 20 },
->  	{ }
->  };
-> +
-> +static const struct mvebu_soc_descr __initconst prestera_kw_gating_descr[] = {
-> +	{ "ge0", NULL, 0 },
-> +	{ "pex0", NULL, 2 },
-> +	{ "usb0", NULL, 3 },
-> +	{ "sdio", NULL, 4 },
-> +	{ "tsu", NULL, 5 },
-> +	{ "runit", NULL, 7 },
-> +	{ "xor0", NULL, 8 },
-> +	{ "powersave", "cpuclk", 11 },
-> +	{ "xor1", NULL, 16 },
-> +	{ "crypto", NULL, 17 },
-> +	{ "ge1", NULL, 19 },
-> +	{ }
-> +};
->  #endif
->  
->  static const __initdata struct of_device_id clk_gating_match[] = {
-> @@ -232,6 +247,10 @@ static const __initdata struct of_device_id clk_gating_match[] = {
->  		.compatible = "marvell,kirkwood-gating-clock",
->  		.data = kirkwood_gating_descr,
->  	},
-> +	{
-> +		.compatible = "marvell,prestera-kw-gating-clock",
-> +		.data = prestera_kw_gating_descr,
-> +	},
->  #endif
->  
->  	{ }
-> 
-
+Thanks,
+Christopher
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
