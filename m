@@ -1,23 +1,52 @@
-From: dhowells@redhat.com (David Howells)
-Date: Tue, 07 May 2013 10:37:30 +0100
-Subject: [PATCH] proc: Use PDE attribute setting accessor functions
-In-Reply-To: <1367918426-7076-1-git-send-email-geert@linux-m68k.org>
-References: <1367918426-7076-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <23761.1367919450@warthog.procyon.org.uk>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Tue, 7 May 2013 15:12:06 +0530
+Subject: [PATCH 54/63] ARM: ux500: Replace ST-E's home-brew DMA
+ direction definition with the generic one
+In-Reply-To: <20130507073921.GT24153@gmail.com>
+References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
+ <1367591569-32197-55-git-send-email-lee.jones@linaro.org>
+ <20130506071355.GA5552@bnru10> <20130507073921.GT24153@gmail.com>
+Message-ID: <20130507094205.GA32548@bnru10>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+On Tue, May 07, 2013 at 09:39:21 +0200, Lee Jones wrote:
+> On Mon, 06 May 2013, Srinidhi Kasagar wrote:
+> 
+> > On Fri, May 03, 2013 at 16:32:40 +0200, Lee Jones wrote:
+> > > STEDMA40_*_TO_* direction definitions are identical in all but name to
+> > > the pre-defined generic DMA_*_TO_* ones. Let's make things easy by not
+> > > duplicating such things.
+> > > 
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  arch/arm/mach-ux500/board-mop500-audio.c |   12 ++++++------
+> > >  arch/arm/mach-ux500/board-mop500-sdi.c   |   16 ++++++++--------
+> > >  arch/arm/mach-ux500/board-mop500.c       |   22 +++++++++++-----------
+> > >  arch/arm/mach-ux500/usb.c                |    4 ++--
+> > >  4 files changed, 27 insertions(+), 27 deletions(-)
+> > 
+> > Hope you have taken care for all other files, because, I see
+> > few more instances in my tree apart from the above files.
+> 
+> Would you be kind enough to paste those files please?
 
-> arch/arm/mach-msm/last_radio_log.c: In function 'msm_init_last_radio_log':
-> arch/arm/mach-msm/last_radio_log.c:69:7: error: dereferencing pointer to incomplete type
-> 
-> arch/cris/kernel/profile.c: In function 'init_cris_profile':
-> arch/cris/kernel/profile.c:79:8: error: dereferencing pointer to incomplete type
-> 
-> Use proc_set_size(), cfr. commit 271a15eabe094538d958dc68ccfc9c36b699247a
-> ("proc: Supply PDE attribute setting accessor functions")
-> 
-> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+arch/arm/mach-ux500/board-mop500-audio.c:       .dir = STEDMA40_MEM_TO_PERIPH,
+arch/arm/mach-ux500/board-mop500-audio.c:       .dir = STEDMA40_MEM_TO_PERIPH,
+arch/arm/mach-ux500/board-mop500-audio.c:       .dir = STEDMA40_MEM_TO_PERIPH,
+arch/arm/mach-ux500/board-mop500-sdi.c: .dir = STEDMA40_MEM_TO_PERIPH,
+arch/arm/mach-ux500/board-mop500-sdi.c: .dir = STEDMA40_MEM_TO_PERIPH,
+arch/arm/mach-ux500/board-mop500-sdi.c: .dir = STEDMA40_MEM_TO_PERIPH,
+arch/arm/mach-ux500/board-mop500-sdi.c: .dir = STEDMA40_MEM_TO_PERIPH,
+arch/arm/mach-ux500/board-mop500.c:                             .dir = STEDMA40_MEM_TO_PERIPH,
+arch/arm/mach-ux500/board-mop500.c:             .dir = STEDMA40_MEM_TO_PERIPH,
+arch/arm/mach-ux500/board-mop500.c:     .dir = STEDMA40_MEM_TO_PERIPH,
+arch/arm/mach-ux500/board-mop500.c:     .dir = STEDMA40_MEM_TO_PERIPH,
+arch/arm/mach-ux500/board-mop500.c:     .dir = STEDMA40_MEM_TO_PERIPH,
+arch/arm/mach-ux500/board-mop500.c:     .dir = STEDMA40_MEM_TO_PERIPH,
+arch/arm/mach-ux500/devices-db8500.c:   .dir = STEDMA40_MEM_TO_MEM,
+arch/arm/mach-ux500/devices-db8500.c:   .dir = STEDMA40_MEM_TO_MEM,
+arch/arm/mach-ux500/usb.c:              .dir = STEDMA40_MEM_TO_PERIPH, \
 
-Acked-by: David Howells <dhowells@redhat.com>
+regards,
+srinidhi
