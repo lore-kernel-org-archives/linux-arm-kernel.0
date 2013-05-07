@@ -1,39 +1,32 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 6 May 2013 19:02:44 -0500
-Subject: [PATCHv2 0/4] mailbox: Common API
-In-Reply-To: <1367824946-6160-1-git-send-email-jaswinder.singh@linaro.org>
-References: <1367824946-6160-1-git-send-email-jaswinder.singh@linaro.org>
-Message-ID: <518844A4.8040203@ti.com>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Mon, 6 May 2013 20:20:16 -0400
+Subject: [RESEND][PATCH 1/3] arm: dts: introduce config HAS_BANDGAP
+In-Reply-To: <5188212D.3030904@wwwdotorg.org>
+References: <1367874058-2378-1-git-send-email-eduardo.valentin@ti.com>
+ <1367874058-2378-2-git-send-email-eduardo.valentin@ti.com>
+ <5188212D.3030904@wwwdotorg.org>
+Message-ID: <518848C0.2020808@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
-
-On 05/06/2013 02:22 AM, Jassi Brar wrote:
-> Hello,
->   I have made the implementation look more proper. Also made some changes
-> suggested by Suman. Changes since V1:
+On 06-05-2013 17:31, Stephen Warren wrote:
+> On 05/06/2013 03:00 PM, Eduardo Valentin wrote:
+>> Introduce HAS_BANDGAP config entry. This config is a
+>> boolean value so that arch code can flag is they
+>> feature a bandgap device.
 > 
-> * Delete timer upon mailbox release
-> * Filled in the stub ipc_links_unregister()
-> * Check kzalloc return for errors.
-> * Add the controller driver for OMAP2 class. I have taken the patch
->   for mailbox's hwmod from Suman's. The clients are yet to be converted
->   but this should be enough to convey the idea that the API could
->   work for OMAP as well. If I had access to STE documentation, I might
->   have done some implementation for U8500 as well.
+> What does this patch have to do with device tree (there's "dts" in the
+> subject)? What's a BANDGAP device?
+> 
+> 
+In fact, this one has nothing to do with DT. dts in the title is a typo..
 
-The bug fixes in this series look good in general. I have provided my
-design comments in the previous RFC thread [1] still, since the overall
-changes here are not that much different from the RFC.
 
-Thanks for prototyping the OMAP portions, it demonstrates the adaptation
-to the new API, but I have to take a step approach in moving the current
-OMAP mailbox code and making incremental changes on top of it. The
-mailbox driver is the bottom-most layer in our IPC stacks, so changes at
-this layer are very critical to the functional behavior.
 
-regards
-Suman
-
-[1] http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg429678.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 295 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130506/00c6dace/attachment.sig>
