@@ -1,46 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 7 May 2013 20:17:59 -0700
-Subject: [GIT PULL 4/5] ARM: arm-soc: late cleanups
-In-Reply-To: <CA+55aFxHZSYV3UZMf+ezADX5z2psLm5a9Wpp6qcDQho7n2J6SA@mail.gmail.com>
-References: <1367947574-2934383-1-git-send-email-arnd@arndb.de>
- <1367947574-2934383-5-git-send-email-arnd@arndb.de>
- <20130507231925.GR28721@atomide.com>
- <CA+55aFxHZSYV3UZMf+ezADX5z2psLm5a9Wpp6qcDQho7n2J6SA@mail.gmail.com>
-Message-ID: <20130508031758.GT28721@atomide.com>
+From: rob@landley.net (Rob Landley)
+Date: Tue, 07 May 2013 00:02:13 -0500
+Subject: [PATCH V2 2/3] Documentation: virtio: Add emergency write
+ (emerg_wr) config register in virtio console.
+In-Reply-To: <1367842791-30285-3-git-send-email-pranavkumar@linaro.org>
+ (from pranavkumar@linaro.org on Mon May  6 07:19:50 2013)
+References: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
+ <1367842791-30285-3-git-send-email-pranavkumar@linaro.org>
+Message-ID: <1367902933.18069.212@driftwood>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Torvalds <torvalds@linux-foundation.org> [130507 18:05]:
-> On Tue, May 7, 2013 at 4:19 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> >> Vaibhav Hiremath (1):
-> >>       ARM: OMAP2+: Fix mismerge for timer.c between ff931c82 and da4a686a
-> >
-> > Turns out this urgent boot fix got undone in the merge somehow.
+On 05/06/2013 07:19:50 AM, Pranavkumar Sawargaonkar wrote:
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> ---
+>  Documentation/virtual/virtio-spec.txt |    8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
 > 
-> Those lines actually disappeared already much earlier in my merge 6fa52ed33bea:
+> diff --git a/Documentation/virtual/virtio-spec.txt  
+> b/Documentation/virtual/virtio-spec.txt
+> index 0d6ec85..3ca38f8 100644
+> --- a/Documentation/virtual/virtio-spec.txt
+> +++ b/Documentation/virtual/virtio-spec.txt
+> @@ -1927,11 +1927,16 @@ Ports 2 onwards only if  
+> VIRTIO_CONSOLE_F_MULTIPORT is set
+>      ports; configuration fields nr_ports and max_nr_ports are
+>      valid and control virtqueues will be used.
 > 
->     Merge tag 'drivers-for-linus' of
-> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
-> 
-> last Saturday.
+> +  VIRTIO_CONSOLE_F_EMERG_WRITE(2) Device has support for emergency
+> +  write. Configuration filed emerg_wr is valid.
 
-Yes then we patched it on Sunday, and Arnd merged it into his branch.
-But then hose lines disappeared again for the third time :)
- 
-> And it's my bad. I even know how it happened: I ended up doing that
-> merge twice (because I had to go back and fix something else), and
-> then I "optimized" it the second time. With all the omap2 conflicts
-> from that tree came from duplicate commits from the ARM tree, and I
-> ended up just taking the drivers-for-linus side for
-> arch/arm/mach-omap2. Which was correct for the other two files in
-> there (gpmc.c and gpmc-onenand.c). but the timer.c file had changes
-> from the arm tree.
-> 
-> Sorry about that one.
+Emergency?
 
-No problem, thanks for fixing it quickly.
+Really?
 
-Regards, 
+Out of morbid curiosity, what would constitute an _emergency_ in a  
+virtual machine logging context?
 
-Tony
+Rob
