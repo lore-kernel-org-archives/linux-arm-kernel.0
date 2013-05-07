@@ -1,45 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 7 May 2013 16:29:00 +0800
-Subject: [PATCH 1/3] ARM: dts: imx6q: remove the unused pins for gpmi-nand
-In-Reply-To: <1367912360-3283-1-git-send-email-b32955@freescale.com>
-References: <1367912360-3283-1-git-send-email-b32955@freescale.com>
-Message-ID: <20130507082858.GK1749@S2101-09.ap.freescale.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 07 May 2013 09:55:41 +0100
+Subject: [RFC PATCH V2] ARM: EXYNOS: Fix hotplug when CPUs boot in HYP mode
+In-Reply-To: <CAHuqX+HUWcX_sTXKCjSQ9pR1K8obLc+T7vYK_zTn_gqO8ULPVQ@mail.gmail.com>
+References: <1367905910-30913-1-git-send-email-giridhar.m@samsung.com>
+ <CAHuqX+HUWcX_sTXKCjSQ9pR1K8obLc+T7vYK_zTn_gqO8ULPVQ@mail.gmail.com>
+Message-ID: <5188C18D.10103@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 07, 2013 at 03:39:18PM +0800, Huang Shijie wrote:
-> The gpmi does not use the MX6Q_PAD_NANDF_CS2__NAND_CE2_B and
-> MX6Q_PAD_NANDF_CS3__NAND_CE3_B.
+On 07/05/13 06:54, Giridhar Maruthy wrote:
+> This patch is a modification from the Christoffer Dall's u-boot
+> patch. This is required to put the secondary processors in hyp
+> mode during cpu hotplug when u-boot is no longer alive.
 > 
-> Just remove them.
+> Marc Zyngier suggested this logic to go into firmware or, u-boot
+> putting a trampoline code into a page /memreserve/d by DT. But
+> this seemed to have a problem. Once the cpu is hotplugged in
+> runtime, the control is in ROM code and waits for event.
+> Kernel provides a return address in kernel to which the processor
+> jumps once it gets an event. If the control branches to the
+> trampoline code here, this trampoline code has no kernel return
+> address.
 > 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> Someone with better logic or better placement of this logic
+> elsewhere is welcome.
 
-Applied all 3, thanks.
+What prevents you from writing the kernel address in the memreserved
+page? Some obvious location, like the last word of the page? You only
+have to do it once (from the boot CPU, for example).
 
-> ---
->  arch/arm/boot/dts/imx6q.dtsi |    2 --
->  1 files changed, 0 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index 21e6758..ed11bcf 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -168,8 +168,6 @@
->  							MX6Q_PAD_NANDF_RB0__NAND_READY_B 0xb000
->  							MX6Q_PAD_NANDF_CS0__NAND_CE0_B   0xb0b1
->  							MX6Q_PAD_NANDF_CS1__NAND_CE1_B   0xb0b1
-> -							MX6Q_PAD_NANDF_CS2__NAND_CE2_B   0xb0b1
-> -							MX6Q_PAD_NANDF_CS3__NAND_CE3_B   0xb0b1
->  							MX6Q_PAD_SD4_CMD__NAND_RE_B      0xb0b1
->  							MX6Q_PAD_SD4_CLK__NAND_WE_B      0xb0b1
->  							MX6Q_PAD_NANDF_D0__NAND_DATA00   0xb0b1
-> -- 
-> 1.7.1
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Or did I miss something else?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
