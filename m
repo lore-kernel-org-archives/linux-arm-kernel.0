@@ -1,59 +1,90 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 7 May 2013 11:31:24 +0200
-Subject: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
- xfer->speed_hz set
-In-Reply-To: <B256D81BAE5131468A838E5D7A24364154238AF5@penmbx02>
-References: <1362626715-6549-1-git-send-email-wenyou.yang@atmel.com>
- <1362626815-6628-1-git-send-email-wenyou.yang@atmel.com>
- <CAGhQ9VwW18LXY5Jn0FUFCaAzKxP1W3QADG=JBp9JbgaAwo=F2Q@mail.gmail.com>
- <B256D81BAE5131468A838E5D7A24364154236AB5@penmbx02>
- <CACQ1gAhZO3stjrwf5SiZf7jOO8T5bAJZiz97M7+7vwFmk2e65g@mail.gmail.com>
- <5182414F.1000201@atmel.com>
- <20130506103105.GB13472@opensource.wolfsonmicro.com>
- <B256D81BAE5131468A838E5D7A24364154238AF5@penmbx02>
-Message-ID: <5188C9EC.7000303@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 7 May 2013 11:35:08 +0200
+Subject: [RFC PATCH] implement read_cpuid_ext for v7-M (Was: Re: [PATCHv2
+ 2/3] ARM: Detect support for SDIV/UDIV from ISAR0) register
+In-Reply-To: <20130507092209.GD25387@mudshark.cambridge.arm.com>
+References: <1363631337-13816-1-git-send-email-sboyd@codeaurora.org>
+ <1363631337-13816-3-git-send-email-sboyd@codeaurora.org>
+ <20130418091019.GA21099@pengutronix.de>
+ <20130506093059.GH23285@pengutronix.de>
+ <20130507092209.GD25387@mudshark.cambridge.arm.com>
+Message-ID: <20130507093508.GL23285@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/2013 03:11, Yang, Wenyou :
-> Hi, Mark
+Hello Will,
+
+On Tue, May 07, 2013 at 10:22:09AM +0100, Will Deacon wrote:
+> On Mon, May 06, 2013 at 10:30:59AM +0100, Uwe Kleine-K?nig wrote:
+> > On Thu, Apr 18, 2013 at 11:10:19AM +0200, Uwe Kleine-K?nig wrote:
+> > The patch below fixes the issue for me on V7-M. The only drawback is
+> > that the list of registers isn't shared. Maybe someone has a nice idea?
+> > 
+> > BTW, there doesn't seem to be an equivalent register set for 
+> > CPUID_{CACHETYPE,TCM,TLBTYPE,MPIDR} on v7-M.
 > 
->> From: Mark Brown [mailto:broonie at kernel.org]
->> Sent: 2013?5?6? 18:31
->> To: Ferre, Nicolas
->> Cc: grant.likely at secretlab.ca; Grant Likely; Richard Genoud; Yang, Wenyou;
->> Joachim Eastwood; linux-arm-kernel at lists.infradead.org;
->> plagnioj at jcrosoft.com; Lin, JM; spi-devel-general at lists.sourceforge.net;
->> linux-kernel at vger.kernel.org
->> Subject: Re: [PATCH v6 01/16] spi/spi-atmel: fix probing failure after
->> xfer->speed_hz set
->>
->> On Thu, May 02, 2013 at 12:34:55PM +0200, Nicolas Ferre wrote:
->>
->>> Can you tell us if this SPI patch will be merged upstream using one of
->>> your paths?
->>
->> I have no idea what patch this is but if it's not in my tree -next it's unlikely to be
->> merged.
-> This is dropped patch, no need to be merged.
+> That make sense: we don't have caches, MMUs or SMP.
+IMHO the sensible thing is to implement the registers then and let them
+tell: I don't have these things.
+
+> > diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+> > index 4eb94a3..ec635ff 100644
+> > --- a/arch/arm/include/asm/cputype.h
+> > +++ b/arch/arm/include/asm/cputype.h
+> > @@ -10,6 +10,22 @@
+> >  #define CPUID_TLBTYPE	3
+> >  #define CPUID_MPIDR	5
+> >  
+> > +#ifdef CONFIG_CPU_V7M
+> > +#define CPUID_EXT_PFR0	0x40
+> > +#define CPUID_EXT_PFR1	0x44
+> > +#define CPUID_EXT_DFR0	0x48
+> > +#define CPUID_EXT_AFR0	0x4c
+> > +#define CPUID_EXT_MMFR0	0x50
+> > +#define CPUID_EXT_MMFR1	0x54
+> > +#define CPUID_EXT_MMFR2	0x58
+> > +#define CPUID_EXT_MMFR3	0x5c
+> > +#define CPUID_EXT_ISAR0	0x60
+> > +#define CPUID_EXT_ISAR1	0x64
+> > +#define CPUID_EXT_ISAR2	0x68
+> > +#define CPUID_EXT_ISAR3	0x6c
+> > +#define CPUID_EXT_ISAR4	0x70
+> > +#define CPUID_EXT_ISAR5	0x74
+> > +#else
+> >  #define CPUID_EXT_PFR0	"c1, 0"
+> >  #define CPUID_EXT_PFR1	"c1, 1"
+> >  #define CPUID_EXT_DFR0	"c1, 2"
+> > @@ -24,6 +40,7 @@
+> >  #define CPUID_EXT_ISAR3	"c2, 3"
+> >  #define CPUID_EXT_ISAR4	"c2, 4"
+> >  #define CPUID_EXT_ISAR5	"c2, 5"
+> > +#endif
+> >  
+> >  #define MPIDR_SMP_BITMASK (0x3 << 30)
+> >  #define MPIDR_SMP_VALUE (0x2 << 30)
+> > @@ -79,7 +96,23 @@ extern unsigned int processor_id;
+> >  		__val;							\
+> >  	})
+> >  
+> > -#else /* ifdef CONFIG_CPU_CP15 */
+> > +#elif defined(CONFIG_CPU_V7M)
+> > +
+> > +#include <asm/io.h>
+> > +#include <asm/v7m.h>
+> > +
+> > +#define read_cpuid(reg)							\
+> > +	({								\
+> > +		WARN_ON_ONCE(1);					\
+> > +		0;							\
+> > +	})
 > 
-> We tested Atmel spi in your tree-next , but it doesn't work, the reason is the Joachim Eastwood's patch is not included.
-> https://patchwork.kernel.org/patch/2165301/
-> which Joachim said that Grant said he applied.
+> We do have an MIDR in PMSAv7 (not to be confused with MPIDR), so why not read
+> that here?
+I don't know it and it's unrelated to this patch. But I will note it and
+check it. In the meantime I'm taking patches of course :-)
 
-Hi Wenyou,
+Uwe
 
-Sorry for not having communicating with you after Mark told me the story
-about this patch: Mark merged Grant's material in his SPI tree (with is
-the official one nowadays). You can see that by browsing linux-next:
-
- Merge remote-tracking branch 'spi/fix/grant' into spi-linus
-
-Joachim's patch is well included in it. We still have to monitor
-inclusion of it in Linus' tree...
-
-Mark, sorry for the noise.
-
-Bye,
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
