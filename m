@@ -1,37 +1,51 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 7 May 2013 10:56:12 +0800
-Subject: [PATCH v2 2/2] dma: imx-sdma: move to generic device tree bindings
-In-Reply-To: <20130430105105.GG1960@intel.com>
-References: <1366901008-7593-1-git-send-email-shawn.guo@linaro.org>
- <1366901008-7593-3-git-send-email-shawn.guo@linaro.org>
- <20130430105105.GG1960@intel.com>
-Message-ID: <20130507025609.GA10851@S2101-09.ap.freescale.net>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Tue, 07 May 2013 09:07:33 +0530
+Subject: [PATCH] ARM: dts: Correct the base address of pinctrl_3
+Message-ID: <1367897853-18403-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 30, 2013 at 04:21:05PM +0530, Vinod Koul wrote:
-> On Thu, Apr 25, 2013 at 10:43:28PM +0800, Shawn Guo wrote:
-> > Update imx-sdma driver to adopt generic DMA device tree bindings.  It
-> > calls of_dma_controller_register() with imx-sdma specific of_dma_xlate
-> > to get the generic DMA device tree helper support.  The #dma-cells for
-> > imx-sdma must be 3, which includes request ID, peripheral type and
-> > priority.
-> > 
-> > The definitions of peripheral type and priority get moved into
-> > include/dt-bindings/dma/imx.h, so that the macros can also be used in
-> > dts files.
-> > 
-> > The existing way of requesting channel, clients directly call
-> > dma_request_channel(), still work there, and will be removed after
-> > all imx-sdma clients get converted to generic DMA device tree helper.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Looks fine to me, Arnd?
+This patch corrects the base address of pinctrl_3 on Exynos5250
+platform.
 
-ping.
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+---
 
-I was hoping we can get this in with 3.10 merge window, and start
-convert client device drivers to it during 3.11 development cycle.
-Is it still possible?
+This patch is dependent on below patch posted by Thomas Abraham.
+https://patchwork.kernel.org/patch/2225151/
 
-Shawn
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    2 +-
+ arch/arm/boot/dts/exynos5250.dtsi         |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+index d1650fb..ded558b 100644
+--- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
++++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+@@ -763,7 +763,7 @@
+ 		};
+ 	};
+ 
+-	pinctrl at 03680000 {
++	pinctrl at 03860000 {
+ 		gpz: gpz {
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 4bd9e9c..51f0a7e 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -155,9 +155,9 @@
+ 		interrupts = <0 50 0>;
+ 	};
+ 
+-	pinctrl_3: pinctrl at 03680000 {
++	pinctrl_3: pinctrl at 03860000 {
+ 		compatible = "samsung,exynos5250-pinctrl";
+-		reg = <0x0368000 0x1000>;
++		reg = <0x03860000 0x1000>;
+ 		interrupts = <0 47 0>;
+ 	};
+ 
+-- 
+1.7.4.4
