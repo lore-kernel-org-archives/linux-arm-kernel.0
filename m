@@ -1,47 +1,40 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 8 May 2013 13:17:01 +0100
-Subject: [PATCH 2/3] xen/arm: do not handle VCPUOP_register_vcpu_info
- failures
-In-Reply-To: <1368015080-5182-2-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1305081303310.18865@kaball.uk.xensource.com>
- <1368015080-5182-2-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1368015421.26321.263.camel@zakaz.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 May 2013 14:18:04 +0200
+Subject: [PATCH] ARM: shmobile: fix sleep-r8a7740.S miscompiles
+Message-ID: <201305081418.05091.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-05-08 at 13:11 +0100, Stefano Stabellini wrote:
-> We expect VCPUOP_register_vcpu_info to succeed, do not try to handle
-> failures.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> ---
->  arch/arm/xen/enlighten.c |   11 ++++-------
->  1 files changed, 4 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index 83d13b0..519acf9 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -165,13 +165,10 @@ static int __init xen_secondary_init(unsigned int cpu)
->  	info.offset = offset_in_page(vcpup);
->  
->  	err = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_info, cpu, &info);
-> -	if (err) {
-> -		pr_debug("register_vcpu_info failed: err=%d\n", err);
-> -	} else {
-> -		/* This cpu is using the registered vcpu info, even if
-> -		   later ones fail to. */
-> -		per_cpu(xen_vcpu, cpu) = vcpup;
-> -	}
-> +	if (err)
-> +		BUG();
+The newly added sleep-r8a7740.S file in shmobile does not
+actually build because of renamed symbols.
 
-AKA BUG_ON(err);
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Bastian Hecht <hechtb+renesas@gmail.com>
+Cc: Simon Horman <horms+renesas@verge.net.au>
+---
 
-Acked-by: Ian Campbell <ian.campbell@citrix.com>
+Simon, please apply to whichever branch of yours has the broken commit,
+or fold this patch into Bastian's patch.
 
-> +	per_cpu(xen_vcpu, cpu) = vcpup;
-> +
->  	return 0;
->  }
->  
+linux-next doesn't build for me because of this, mainline is still fine.
+
+diff --git a/arch/arm/mach-shmobile/sleep-r8a7740.S b/arch/arm/mach-shmobile/sleep-r8a7740.S
+index 435531b..982eacb 100644
+--- a/arch/arm/mach-shmobile/sleep-r8a7740.S
++++ b/arch/arm/mach-shmobile/sleep-r8a7740.S
+@@ -32,7 +32,7 @@ ENTRY(r8a7740_shutdown)
+ wfi_loop:
+ 	bl	cpu_v7_do_idle
+ 	b wfi_loop
+-ENDPROC(r8a7740)
++ENDPROC(r8a7740_shutdown)
+ 
+ 	.text
+ ENTRY(v7_cpu_resume)
+@@ -53,5 +53,5 @@ ENDPROC(v7_cpu_resume)
+ ENTRY(r8a7740_resume)
+ 	ldr	pc, 1f
+ 1:	.long	v7_cpu_resume - PAGE_OFFSET + PLAT_PHYS_OFFSET
+-ENDPROC(r8a7740_resume_core_standby)
++ENDPROC(r8a7740_resume)
+ #endif
