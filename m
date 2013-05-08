@@ -1,147 +1,38 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 8 May 2013 16:41:53 +0100
-Subject: [PATCH v3 3/4] arm: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <alpine.DEB.2.02.1305081446580.18865@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1305081446580.18865@kaball.uk.xensource.com>
-Message-ID: <1368027714-14506-3-git-send-email-stefano.stabellini@eu.citrix.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 8 May 2013 17:40:57 +0200
+Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
+In-Reply-To: <20130508153459.GA17186@kroah.com>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <1368022248-2153-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305081634.43498.arnd@arndb.de>
+ <20130508153459.GA17186@kroah.com>
+Message-ID: <20130508154057.GB3041@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM.
+On 08:34 Wed 08 May     , Greg KH wrote:
+> On Wed, May 08, 2013 at 04:34:43PM +0200, Arnd Bergmann wrote:
+> > > +#define ASC_MAJOR		204
+> > > +#define ASC_MINOR_START		40
+> > 
+> > I don't know what the current policy is on allocating major/minor numbers,
+> > but I'm sure you cannot just reuse one that is already used.
+> 
+> I agree, why are you trying to create a new tty device name?  Can't you
+> use the existing ttyS name and minor number as you will not have any
+> other type of serial device on this system?
 
-The only paravirt interface supported is pv_time_ops.steal_clock, so no
-runtime pvops patching needed.
+Greg on ST STB for more than 10 years we use ttyASC I'll prefer ttySx
 
-This allows us to make use of steal_account_process_tick for stolen
-ticks accounting.
+on the DTB SoC you have one one IP present the st,asc
 
-Changes in v3:
-- improve commit description and Kconfig help text;
-- no need to initialize pv_time_ops;
-- add PARAVIRT_TIME_ACCOUNTING.
-
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-CC: linux at arm.linux.org.uk
-CC: will.deacon at arm.com
-CC: nico at linaro.org
-CC: marc.zyngier at arm.com
-CC: cov at codeaurora.org
-CC: arnd at arndb.de
-CC: olof at lixom.net
----
- arch/arm/Kconfig                |   20 ++++++++++++++++++++
- arch/arm/include/asm/paravirt.h |   19 +++++++++++++++++++
- arch/arm/kernel/Makefile        |    1 +
- arch/arm/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
- 4 files changed, 65 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/paravirt.h
- create mode 100644 arch/arm/kernel/paravirt.c
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 344e299..89ee2f1 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1887,12 +1887,32 @@ config XEN_DOM0
- 	def_bool y
- 	depends on XEN
- 
-+config PARAVIRT
-+	bool "Enable paravirtualization code"
-+	---help---
-+	  This changes the kernel so it can modify itself when it is run
-+	  under a hypervisor, potentially improving performance significantly
-+	  over full virtualization.
-+
-+config PARAVIRT_TIME_ACCOUNTING
-+	bool "Paravirtual steal time accounting"
-+	select PARAVIRT
-+	default n
-+	---help---
-+	  Select this option to enable fine granularity task steal time
-+	  accounting. Time spent executing other tasks in parallel with
-+	  the current vCPU is discounted from the vCPU power. To account for
-+	  that, there can be a small performance impact.
-+
-+	  If in doubt, say N here.
-+
- config XEN
- 	bool "Xen guest support on ARM (EXPERIMENTAL)"
- 	depends on ARM && AEABI && OF
- 	depends on CPU_V7 && !CPU_V6
- 	depends on !GENERIC_ATOMIC64
- 	select ARM_PSCI
-+	select PARAVIRT
- 	help
- 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
- 
-diff --git a/arch/arm/include/asm/paravirt.h b/arch/arm/include/asm/paravirt.h
-new file mode 100644
-index 0000000..3b95bc6
---- /dev/null
-+++ b/arch/arm/include/asm/paravirt.h
-@@ -0,0 +1,19 @@
-+#ifndef _ASM_ARM_PARAVIRT_H
-+#define _ASM_ARM_PARAVIRT_H
-+
-+struct static_key;
-+extern struct static_key paravirt_steal_enabled;
-+extern struct static_key paravirt_steal_rq_enabled;
-+
-+struct pv_time_ops {
-+	unsigned long long (*steal_clock)(int cpu);
-+};
-+extern struct pv_time_ops pv_time_ops;
-+
-+static inline u64 paravirt_steal_clock(int cpu)
-+{
-+	return pv_time_ops.steal_clock(cpu);
-+}
-+
-+
-+#endif
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 5f3338e..d911db6 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -76,6 +76,7 @@ obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
- ifneq ($(CONFIG_ARCH_EBSA110),y)
-   obj-y		+= io.o
- endif
-+obj-$(CONFIG_PARAVIRT)	+= paravirt.o
- 
- head-y			:= head$(MMUEXT).o
- obj-$(CONFIG_DEBUG_LL)	+= debug.o
-diff --git a/arch/arm/kernel/paravirt.c b/arch/arm/kernel/paravirt.c
-new file mode 100644
-index 0000000..53f371e
---- /dev/null
-+++ b/arch/arm/kernel/paravirt.c
-@@ -0,0 +1,25 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copyright (C) 2013 Citrix Systems
-+ *
-+ * Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-+ */
-+
-+#include <linux/export.h>
-+#include <linux/jump_label.h>
-+#include <linux/types.h>
-+#include <asm/paravirt.h>
-+
-+struct static_key paravirt_steal_enabled;
-+struct static_key paravirt_steal_rq_enabled;
-+
-+struct pv_time_ops pv_time_ops;
-+EXPORT_SYMBOL_GPL(pv_time_ops);
--- 
-1.7.2.5
+Best Regards,
+J.
+> 
+> thanks,
+> 
+> greg k-h
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
