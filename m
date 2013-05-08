@@ -1,32 +1,61 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 8 May 2013 22:38:21 +0800
-Subject: [PATCH V2 1/2] ARM/MVF600: add Vybrid Family platform support
-In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E851B455F@039-SN1MPN1-003.039d.mgd.msft.net>
-References: <1367480285-26159-1-git-send-email-b35083@freescale.com>
- <1367480285-26159-2-git-send-email-b35083@freescale.com>
- <20130503074105.GA31873@S2101-09.ap.freescale.net>
- <B56CDBE15CE27145A4B77D2D24263E851B455F@039-SN1MPN1-003.039d.mgd.msft.net>
-Message-ID: <20130508143819.GE26072@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 May 2013 16:38:22 +0200
+Subject: [RFC 2/8] ARM:global_timer: Add ARM global timer support.
+In-Reply-To: <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <201305081638.23100.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 08, 2013 at 07:26:04AM +0000, Lu Jingchang-B35083 wrote:
-> >If mvf600 uses the same wdt IP block as imx, we should make this restart
-> >routine a common function to be used on mvf600, imx6q and imx6sl etc.
-> >
-> [Lu Jingchang-B35083] 
->     Do you have plan to update the mxc_restart() function in system.c?
-
-Yes, I plan to update it to support DT platforms.
-
-> We once used that common function for mvf600. But now this function cannot be used for mvf600 as the new clock framwork used.
->     On the other hand, even we udpated the clk_get for the the common mxc_restart() funciton. different with i.MX6, the MVF600 need to enable the clock before using the wdt module, we still need some clue code for i.mx and mvf600. So I suggest keep the restart function for mvf600 currently. Thanks.
+On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
+> From: Stuart Menefy <stuart.menefy@st.com>
 > 
-Ok, you can keep it for mvf600 and I will consolidate it to use
-mxc_restart() later.  But please make the compatible looks like the
-following, so that mxc_restart() will look for "fsl,imx21-wdt" to find
-the node in device tree.
+> This is a simple driver for the global timer module found in the Cortex
+> A9-MP cores from revision r1p0 onwards. This should be able to perform
+> the functions of the system timer and the local timer in an SMP system.
+> 
+> The global timer has the following features:
+>     The global timer is a 64-bit incrementing counter with an
+> auto-incrementing feature. It continues incrementing after sending
+> interrupts. The global timer is memory mapped in the private memory
+> region.
+>     The global timer is accessible to all Cortex-A9 processors in the
+> cluster. Each Cortex-A9 processor has a private 64-bit comparator that
+> is used to assert a private interrupt when the global timer has reached
+> the comparator value. All the Cortex-A9 processors in a design use the
+> banked ID, ID27, for this interrupt. ID27 is sent to the Interrupt
+> Controller as a Private Peripheral Interrupt. The global timer is
+> clocked by PERIPHCLK.
+> 
+> Signed-off-by: Stuart Menefy <stuart.menefy@st.com>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>
 
-	compatible = "fsl,mvf600-wdt", "fsl,imx21-wdt"
+Are you sure we don't already have a driver for this? It sounds unlikely
+that you are the first one to do this when the hardware is so common.
 
-Shawn
+>  Documentation/devicetree/bindings/arm/gt.txt |   21 ++
+>  arch/arm/Kconfig                             |    6 +
+>  arch/arm/include/asm/global_timer.h          |   12 +
+>  arch/arm/kernel/Makefile                     |    1 +
+>  arch/arm/kernel/global_timer.c               |  325 ++++++++++++++++++++++++++
+>  5 files changed, 365 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/gt.txt
+>  create mode 100644 arch/arm/include/asm/global_timer.h
+>  create mode 100644 arch/arm/kernel/global_timer.c
+
+Move it into drivers/clocksource?
+ 
+> diff --git a/arch/arm/include/asm/global_timer.h b/arch/arm/include/asm/global_timer.h
+> new file mode 100644
+> index 0000000..46f9188
+> --- /dev/null
+> +++ b/arch/arm/include/asm/global_timer.h
+> @@ -0,0 +1,12 @@
+> +int __init global_timer_init(void __iomem *base, unsigned int timer_irq);
+
+I don't see a need to call this from platform code for non-DT platforms, it
+can easily be used with CLOCKSOURCE_OF_DECLARE() all the time I think.
+
+	Arnd
