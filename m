@@ -1,76 +1,83 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 8 May 2013 12:28:28 -0700
-Subject: [PATCH V2] video: implement a simple framebuffer driver
-In-Reply-To: <5189BA36.9000105@wwwdotorg.org>
-References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
- <201304300004.20320.arnd@arndb.de> <5182AF83.4080705@wwwdotorg.org>
- <1956593.M6NmITdEKh@avalon>
- <20130507143338.79b3d893fcdc3bd79fbe9a57@linux-foundation.org>
- <5189BA36.9000105@wwwdotorg.org>
-Message-ID: <CAOesGMhTu_eO564LCyWa2wL1VfposvsK1fxAu1RXCXLZJ0DSfQ@mail.gmail.com>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Wed, 8 May 2013 21:31:30 +0200
+Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <20130508184354.GQ18614@n2100.arm.linux.org.uk>
+References: <20130430112225.GD29766@arm.com>
+ <20130430210403.GA18076@schnuecks.de>
+ <20130501142206.GB17387@arm.com>
+ <20130501190441.GA22227@schnuecks.de>
+ <20130502095431.GA20730@arm.com>
+ <20130502193835.GA29144@schnuecks.de>
+ <20130503100242.GB29962@arm.com>
+ <CACVXFVPOuabwAa1VDmSnfDG=M-1Df02_kpbm0UVAVctCAB-U4Q@mail.gmail.com>
+ <20130508150800.GI2703@arm.com>
+ <20130508184354.GQ18614@n2100.arm.linux.org.uk>
+Message-ID: <20130508193130.GA31678@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 7, 2013 at 7:36 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/07/2013 03:33 PM, Andrew Morton wrote:
->>
->> We don't seem to have a well-defined path to travel here, and I don't
->> get the feeling that anyone has signed up to walk it?
->>
->> So I'm inclined to merge Stephen's patch as-is into 3.10.  It's pretty
->> simple and standalone.  Any strenuous objections?
->>
->> BTW, Olof told me off-list that this patch is a "critical piece" for
->> running mainline Linux on ARM Chromebooks.  That was important
->> information - more important than anything else we were told about this
->> patch!
->>
->> So Stephen, could I please have a new changelog for this patch which
->> explains this application, and any other interesting/important things
->> which were left out?  Quickly, please.
->
-> OK, how about the version below:
->
-> ----------
-> Subject: drivers/video: implement a simple framebuffer driver
->
-> A simple frame-buffer describes a raw memory region that may be rendered
-> to, with the assumption that the display hardware has already been set
-> up to scan out from that buffer.
->
-> This is useful in cases where a bootloader exists and has set up the
-> display hardware, but a Linux driver doesn't yet exist for the display
-> hardware.
->
-> Examples use-cases include:
->
-> * The built-in LCD panels on the Samsung ARM chromebook, and Tegra
-> devices, and likely many other ARM or embedded systems. These cannot yet
-> be supported using a full graphics driver, since the panel control
-> should be provided by the CDF (Common Display Framework), which has been
-> stuck in design/review for quite some time. One could support these
-> panels using custom SoC-specific code, but there is a desire to use
-> common infra-structure rather than having each SoC vendor invent their
-> own code, hence the desire to wait for CDF.
->
-> * Hardware for which a full graphics driver is not yet available, and
-> the path to obtain one upstream isn't yet clear. For example, the
-> Raspberry Pi.
->
-> * Any hardware in early stages of upstreaming, before a full graphics
-> driver has been tackled. This driver can provide a graphical boot
-> console (even full X support) much earlier in the upstreaming process,
-> thus making new SoC or board support more generally useful earlier.
-> ----------
->
-> I assume you can just edit the patch you have and don't need me to
-> resend with the adjusted description.
+Hi Russel,
 
-Oh, looks like it never got a:
+On Wed, May 08, 2013 at 07:43:54PM +0100, Russell King - ARM Linux wrote:
+> On Wed, May 08, 2013 at 04:08:00PM +0100, Catalin Marinas wrote:
+> > On Sat, May 04, 2013 at 09:21:27AM +0100, Ming Lei wrote:
+> > > On Fri, May 3, 2013 at 6:02 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > > >>
+> > > >> I assume that you inhibited the call to flush_dcache_page() in
+> > > >> __get_user_pages() for anon pages.  Otherwise, you will be flooded
+> > > >> with warnings.
+> > > >
+> > > > I haven't done any stress testing so I don't think I hit this code path,
+> > > > so no warning. But yes, it should have triggered. Anyway, in this case
+> > > > flush_dcache_page() should have just ignored (clearing PG_arch_1 is
+> > > > harmless anyway if we also ignore this bit in __sync_icache_dcache for
+> > > > non-aliasing caches).
+> > > 
+> > > Yes, maybe we can do a little optimization for O_DIRECT since no
+> > > dcache alias and I/D coherency problem in this case on ARMv7, how
+> > > about below change?
+> > > 
+> > > diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> > > index 1c8f7f5..962a657 100644
+> > > --- a/arch/arm/mm/flush.c
+> > > +++ b/arch/arm/mm/flush.c
+> > > @@ -287,6 +287,8 @@ void flush_dcache_page(struct page *page)
+> > >  	    mapping && !mapping_mapped(mapping))
+> > >  		clear_bit(PG_dcache_clean, &page->flags);
+> > >  	else {
+> > > +		if (!mapping && cache_is_vipt_nonaliasing())
+> > > +			return;
+> > >  		__flush_dcache_page(mapping, page);
+> > >  		if (mapping && cache_is_vivt())
+> > >  			__flush_dcache_aliases(mapping, page);
+> > 
+> > I wonder whether we could move the:
+> > 
+> > 	if (!mapping)
+> > 		return
+> > 
+> > at the top of this function, IOW don't touch any anonymous pages. Would
+> > anything be broken (apart from wrong API use)?
+> 
+> I suspect you may be missing something - and I suggest reading the Sparc
+> version, which is where this PG_arch_1 stuff was first dreamed up (by
+> DaveM).
+> 
+> Are you positive that this path can be eliminated?  Totally sure?  Have
+> you checked the arg/env pages that fs/exec.c and the binfmt's insert into
+> the new process?
+> 
+> The comments against the Sparc version suggest that the "else" clause
+> is necessary ensure that case is adequately covered.
 
-Acked-by: Olof Johansson <olof@lixom.net>
+At least the fs/exec.c and the binfmt stuff use
+flush_kernel_dcache_page() for 5 years or so now (see commit b6a2fe). 
+Which makes sense, since flush_dcache_page() is not supposed to
+handle anon pages anyway.
 
-Either. Feel free to add, Andrew.
+The problem are the tons of flush_dcache_page() uses that wrongly
+assume that no anon pages need to be handled (e.g. 
+drivers/block/loop.c and crypto/scatterwalk.c just to name two).
 
-
--Olof
+- Simon
