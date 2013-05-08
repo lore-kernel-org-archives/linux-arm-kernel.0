@@ -1,36 +1,73 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 May 2013 14:29:07 +0100
-Subject: [PATCH 7/9] pinctrl: abx500: Specify failed sub-driver by ID instead
- of driver_data
+Date: Wed,  8 May 2013 14:29:08 +0100
+Subject: [PATCH 8/9] pinctrl: abx500: Rejiggle platform data and DT
+ initialisation
 In-Reply-To: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
 References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1368019749-19455-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <1368019749-19455-9-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a sub-driver has not been specified correctly, there is a good chance
-that plat_id is NULL, hence using an attribute of plat_id in the error
-message is likely to not only fail the driver but Oops the kernel. Use
-the failed ID instead.
+A pointer to GPIO platform data is always passed to the driver now, so
+there's little point in checking for 'pdata' and executing the DT case if
+it's not there. The difference between booting with DT and !DT is when
+booting with DT, plat_id is not populated. Thus, in the DT case we have
+to use a DT match table in order to find out which platform we're
+executing on. So, we're changing the semantics here to only use the
+match table if no plat_id is supplied though platform data.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/pinctrl/pinctrl-abx500.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/pinctrl/pinctrl-abx500.c |   27 +++++++++++++--------------
+ 1 file changed, 13 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/pinctrl/pinctrl-abx500.c b/drivers/pinctrl/pinctrl-abx500.c
-index aa17f75..2a2a9df 100644
+index 2a2a9df..6d45327 100644
 --- a/drivers/pinctrl/pinctrl-abx500.c
 +++ b/drivers/pinctrl/pinctrl-abx500.c
-@@ -900,8 +900,7 @@ static int abx500_gpio_probe(struct platform_device *pdev)
- 		abx500_pinctrl_ab8505_init(&pct->soc);
- 		break;
- 	default:
--		dev_err(&pdev->dev, "Unsupported pinctrl sub driver (%d)\n",
--				(int) platid->driver_data);
-+		dev_err(&pdev->dev, "Unsupported pinctrl sub driver (%d)\n", id);
- 		mutex_destroy(&pct->lock);
- 		return -EINVAL;
+@@ -851,23 +851,12 @@ static int abx500_gpio_probe(struct platform_device *pdev)
+ 
+ 	if (abx500_pdata)
+ 		pdata = abx500_pdata->gpio;
+-	if (!pdata) {
+-		if (np) {
+-			const struct of_device_id *match;
+ 
+-			match = of_match_device(abx500_gpio_match, &pdev->dev);
+-			if (!match)
+-				return -ENODEV;
+-			id = (unsigned long)match->data;
+-		} else {
+-			dev_err(&pdev->dev, "gpio dt and platform data missing\n");
+-			return -ENODEV;
+-		}
++	if (!(pdata || np)) {
++		dev_err(&pdev->dev, "gpio dt and platform data missing\n");
++		return -ENODEV;
  	}
+ 
+-	if (platid)
+-		id = platid->driver_data;
+-
+ 	pct = devm_kzalloc(&pdev->dev, sizeof(struct abx500_pinctrl),
+ 				   GFP_KERNEL);
+ 	if (pct == NULL) {
+@@ -882,6 +871,16 @@ static int abx500_gpio_probe(struct platform_device *pdev)
+ 	pct->chip.dev = &pdev->dev;
+ 	pct->chip.base = (np) ? -1 : pdata->gpio_base;
+ 
++	if (platid)
++		id = platid->driver_data;
++	else if (np) {
++		const struct of_device_id *match;
++
++		match = of_match_device(abx500_gpio_match, &pdev->dev);
++		if (match)
++			id = (unsigned long)match->data;
++	}
++
+ 	/* initialize the lock */
+ 	mutex_init(&pct->lock);
+ 
 -- 
 1.7.10.4
