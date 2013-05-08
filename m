@@ -1,125 +1,57 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 8 May 2013 12:39:56 +0200
-Subject: [PATCH -v8 11/11] Move arch/x86 reboot= handling to generic
- kernel.
-In-Reply-To: <1367937595-32241-12-git-send-email-holt@sgi.com>
-References: <1367937595-32241-1-git-send-email-holt@sgi.com>
- <1367937595-32241-12-git-send-email-holt@sgi.com>
-Message-ID: <20130508103956.GA7677@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 08 May 2013 11:46:25 +0100
+Subject: [PATCH v2 1/5] ARM: KVM: be more thorough when invalidating TLBs
+In-Reply-To: <20130502151302.GG20730@arm.com>
+References: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
+ <1367505542-2231-2-git-send-email-marc.zyngier@arm.com>
+ <20130502151302.GG20730@arm.com>
+Message-ID: <518A2D01.1070904@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 02/05/13 16:13, Catalin Marinas wrote:
+> On Thu, May 02, 2013 at 03:38:58PM +0100, Marc Zyngier wrote:
+>> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+>> index f7793df..9e2d906c 100644
+>> --- a/arch/arm/kvm/interrupts.S
+>> +++ b/arch/arm/kvm/interrupts.S
+> ...
+>> -static void clear_pte_entry(pte_t *pte)
+>> +static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+>>  {
+>>  	if (pte_present(*pte)) {
+>>  		kvm_set_pte(pte, __pte(0));
+>>  		put_page(virt_to_page(pte));
+>> +		kvm_tlb_flush_vmid_ipa(kvm, addr);
+>>  	}
+>>  }
+> ...
+>>  static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
+>>  {
+>> -	unmap_range(kvm->arch.pgd, start, size);
+>> +	unmap_range(kvm, kvm->arch.pgd, start, size);
+>>  }
+>>  
+>>  /**
+>> @@ -413,6 +425,7 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
+>>  		return;
+>>  
+>>  	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
+>> +	kvm_tlb_flush_vmid_ipa(kvm, 0);	/* Invalidate TLB ALL */
+> 
+> Do you still need this here if you invalidated each individual pte in
+> clear_pte_entry()? I think you can remove it from clear_pte_entry() and
+> just leave it here (more efficient probably) since you wouldn't free the
+> actual pages pointed at by the pte before unmapping.
 
-* Robin Holt <holt@sgi.com> wrote:
+There is two cases we're trying to cater for:
+- unmapping a single page from stage2 (page being swapped out, for example)
+- unmapping the whole of stage2 (VM exiting)
 
-> Merge together the unicore32, arm, and x86 reboot= command line
-> parameter handling.
-
-The series still has this CONFIG_X86 dependency that I inquired about 
-previously:
-
-> +static int __init reboot_setup(char *str)
-> +{
-> +	for (;;) {
-> +		/*
-> +		 * Having anything passed on the command line via
-> +		 * reboot= will cause us to disable DMI checking
-> +		 * below.
-> +		 */
-> +		reboot_default = 0;
-> +
-> +		switch (*str) {
-> +#if defined(CONFIG_X86) || defined(CONFIG_X86_64)
-> +		case 'w':
-> +			reboot_mode = REBOOT_WARM;
-> +			break;
-> +
-> +		case 'c':
-> +			reboot_mode = REBOOT_COLD;
-> +			break;
-> +
-> +#ifdef CONFIG_SMP
-> +		case 's':
-> +			if (isdigit(*(str+1))) {
-> +				reboot_cpu = (int) (*(str+1) - '0');
-> +				if (isdigit(*(str+2)))
-> +					reboot_cpu = reboot_cpu*10 + (int)(*(str+2) - '0');
-> +			}
-> +			/*
-> +			 * We will leave sorting out the final value
-> +			 * when we are ready to reboot, since we might not
-> +			 * have detected BSP APIC ID or smp_num_cpu
-> +			 */
-> +			break;
-> +#endif /* CONFIG_SMP */
-> +
-> +#else
-> +		case 's':
-> +			reboot_mode = REBOOT_WARM;
-> +		case 'h':
-> +			reboot_mode = REBOOT_COLD;
-> +		case 'g':
-> +			reboot_mode = REBOOT_GPIO;
-> +#endif
-> +
-> +		case 'b':
-> +		case 'a':
-> +		case 'k':
-> +		case 't':
-> +		case 'e':
-> +		case 'p':
-> +			reboot_type = *str;
-> +			break;
-> +
-> +		case 'f':
-> +			reboot_force = 1;
-> +			break;
-> +		}
-> +
-> +		str = strchr(str, ',');
-> +		if (str)
-> +			str++;
-> +		else
-> +			break;
-> +	}
-> +	return 1;
-
-To explain my concern more verbosely, if we cannot make it 'obviously 
-generic' then there's no point in moving it to kernel/reboot.c ...
-
-And yes, I realize that there's an option clash between architectures - 
-see below for potential solutions to that.
-
-To generalize it, firstly here's a summary of the existing reboot option 
-mappings:
-
- x86-only:  w, c, s
- non-x86:         s, h, g
- generic:                  b, a, k, t, e, p, f
-
-
-it appears that 'w', 'c', 'h', and 'g' could be made generic straight 
-away.
-
-Which leaves 's' as the only truly problematic option:
-
- - it means REBOOT_WARM on some non-x86 platform(s?)
- - while it means the SMP-cpu on x86.
-
-Stupid question: which non-x86 platform(s) use 's'?
-
-I think we should either change that platform to have 'w' as the warm 
-reboot (and hope that no-one actually relies on the old 's' option: it's a 
-truly rare option) - or change the x86 mapping from 's' to 'S' and 
-generalize and unify it thusly.
-
-Another cleanliness problem is the duality of reboot_mode and reboot_type. 
-We should pick one and use it everywhere consistently.
-
-[ Once these problems are solved and there's no objections from others to 
-  this approach, I'd be willing to apply, test and push this series to 
-  Linus. ]
+We cannot loose the "local" operations, but the last one can indeed go.
 
 Thanks,
 
-	Ingo
+	M.
+-- 
+Jazz is not dead. It just smells funny...
