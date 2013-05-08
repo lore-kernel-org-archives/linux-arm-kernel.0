@@ -1,46 +1,54 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Wed,  8 May 2013 11:09:53 +0200
-Subject: [PATCH] ARM: ux500: update MSP1 pinctrl defintions
-Message-ID: <1368004193-21213-1-git-send-email-fabio.baltieri@linaro.org>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 8 May 2013 12:40:04 +0300
+Subject: [PATCH] ARM: tegra: disable LP2 cpuidle state if PCIe is enabled
+In-Reply-To: <518915A7.1020105@wwwdotorg.org>
+References: <1367872744-25002-1-git-send-email-swarren@wwwdotorg.org>
+ <20130507124849.GM7949@tbergstrom-lnx.Nvidia.com>
+ <20130507130850.GA11202@avionic-0098.adnet.avionic-design.de>
+ <518915A7.1020105@wwwdotorg.org>
+Message-ID: <20130508094004.GL7949@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update MSP1 pinctrl definitions in mop500_family_pinmap by removing
-sleep state and setting default ones as pin hogs, as those are used by
-both ux500-msp-i2s.1 and ux500-msp-i2s.3.
+On Tue, May 07, 2013 at 04:54:31PM +0200, Stephen Warren wrote:
+> On 05/07/2013 07:08 AM, Thierry Reding wrote:
+> > On Tue, May 07, 2013 at 03:48:49PM +0300, Peter De Schrijver
+> > wrote:
+> >> On Mon, May 06, 2013 at 10:39:04PM +0200, Stephen Warren wrote:
+> >>> From: Stephen Warren <swarren@nvidia.com>
+> >>> 
+> >>> Tegra20 HW appears to have a bug such that PCIe device
+> >>> interrupts, whether they are legacy IRQs or MSI, are lost when
+> >>> LP2 is enabled. To work around this, simply disable LP2 if the
+> >>> PCI driver and DT node are both enabled.
+> >>> 
+> >> 
+> >> Wouldn't it make more sense to disable LP2 when we actually
+> >> detect a PCIe device?
+> 
+> I did consider that, but rejected the idea for the reasons Thierry
+> mentioned.
+> 
+> > I'm not sure a patch to do so would be as simple as this one. For
+> > one, the cpuidle framework will already have been initialized when
+> > PCIe enumeration completes. So some way of permanently disabling
+> > one state at runtime would be required and I don't think cpuidle
+> > provides an API to do so. I know the latter isn't really a good
+> > reason, but I don't think adding that kind of API just because
+> > Tegra20 seems to have a bug would be appropriate.
+> 
+> There is a way to do this, since it can be done via sysfs, but I don't
+> think it's exposed as an API from cpuidle. I agree it seems a little
+> silly to expose it just to support this HW bug though.
+> 
+> > Furthermore, it is quite likely that the PCIe controller will only
+> > be enabled in DT for devices that actually have a PCIe device
+> > hooked up.
+> 
 
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
- arch/arm/mach-ux500/board-mop500-pins.c | 17 ++++++-----------
- 1 file changed, 6 insertions(+), 11 deletions(-)
+That's not always true though. Eg Harmony has a miniPCIe slot, so it should be
+listed in DT, but there is not necessarily a card present in the slot.
 
-diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index 947bd9e..3f92308 100644
---- a/arch/arm/mach-ux500/board-mop500-pins.c
-+++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -174,17 +174,12 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
- 	DB8500_PIN_SLEEP("GPIO4_AH6", slpm_in_wkup_pdis, "uart1"),
- 	DB8500_PIN_SLEEP("GPIO5_AG6", slpm_out_wkup_pdis, "uart1"),
- 	/* MSP1 for ALSA codec */
--	DB8500_MUX("msp1txrx_a_1", "msp1", "ux500-msp-i2s.1"),
--	DB8500_MUX("msp1_a_1", "msp1", "ux500-msp-i2s.1"),
--	DB8500_PIN("GPIO33_AF2", out_lo_slpm_nowkup, "ux500-msp-i2s.1"),
--	DB8500_PIN("GPIO34_AE1", in_nopull_slpm_nowkup, "ux500-msp-i2s.1"),
--	DB8500_PIN("GPIO35_AE2", in_nopull_slpm_nowkup, "ux500-msp-i2s.1"),
--	DB8500_PIN("GPIO36_AG2", in_nopull_slpm_nowkup, "ux500-msp-i2s.1"),
--	/* MSP1 sleep state */
--	DB8500_PIN_SLEEP("GPIO33_AF2", slpm_out_lo_wkup, "ux500-msp-i2s.1"),
--	DB8500_PIN_SLEEP("GPIO34_AE1", slpm_in_nopull_wkup, "ux500-msp-i2s.1"),
--	DB8500_PIN_SLEEP("GPIO35_AE2", slpm_in_nopull_wkup, "ux500-msp-i2s.1"),
--	DB8500_PIN_SLEEP("GPIO36_AG2", slpm_in_nopull_wkup, "ux500-msp-i2s.1"),
-+	DB8500_MUX_HOG("msp1txrx_a_1", "msp1"),
-+	DB8500_MUX_HOG("msp1_a_1", "msp1"),
-+	DB8500_PIN_HOG("GPIO33_AF2", out_lo_slpm_nowkup),
-+	DB8500_PIN_HOG("GPIO34_AE1", in_nopull_slpm_nowkup),
-+	DB8500_PIN_HOG("GPIO35_AE2", in_nopull_slpm_nowkup),
-+	DB8500_PIN_HOG("GPIO36_AG2", in_nopull_slpm_nowkup),
- 	/* Mux in LCD data lines 8 thru 11 and LCDA CLK for MCDE TVOUT */
- 	DB8500_MUX("lcd_d8_d11_a_1", "lcd", "mcde-tvout"),
- 	DB8500_MUX("lcdaclk_b_1", "lcda", "mcde-tvout"),
--- 
-1.8.2
+Cheers,
+
+Peter.
