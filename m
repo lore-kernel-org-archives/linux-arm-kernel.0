@@ -1,35 +1,58 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Wed, 8 May 2013 15:29:49 -0700
-Subject: Problems while booting a linux system on fast models based
- CortexA15
-In-Reply-To: <CAJ30i6HzvaKrKha7aVcR50=-5zmgivY-82J6NTqFw7Fh+sNzfQ@mail.gmail.com>
-References: <CAJ30i6HzvaKrKha7aVcR50=-5zmgivY-82J6NTqFw7Fh+sNzfQ@mail.gmail.com>
-Message-ID: <CAEDV+gLekd9PrX=YqFpKQyLxFHDuAV8F5NvaMkRKZQvR3q_yNg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 May 2013 15:30:27 -0700
+Subject: [RFC PATCH 0/3] ARM: omap3: add Seagate Wireless Plus board
+In-Reply-To: <20130508215853.GD31290@titan.lakedaemon.net>
+References: <cover.1368038129.git.jason@lakedaemon.net>
+ <20130508195152.GE32546@atomide.com>
+ <20130508215853.GD31290@titan.lakedaemon.net>
+Message-ID: <20130508223027.GN32546@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 8, 2013 at 12:07 AM, Mai Daftedar <mai.daftedar@gmail.com> wrote:
-> Dear All,
->  I am facing a problem with booting a fully working Linux system on the Fast
-> Models based Cortex-A15 simulation platform.
->
-> I'm using the "KVM on ARM guide" to configure KVM on the ARM fast models
-> with CortexA15, however I get the following kernel panic error  when I use
-> NFS to boot the kernel.
->
-> VFS: Unable to mount root fs via NFS, trying floppy.
->
-> Noting that the kernel semi-hosting arguments used are as follows:
-> kernel uImage --fdt host-a15.dtb -- earlyprintk console=ttyAMA0 mem=2048M
-> root=/dev/nfs nfsroot=192.168.x.x:/srv/nfsroot/ rw ip=dhcp
->
-> Where can I be going wrong?
->
-Is that literally the command line you use?
+* Jason Cooper <jason@lakedaemon.net> [130508 15:04]:
+> On Wed, May 08, 2013 at 12:51:53PM -0700, Tony Lindgren wrote:
+> > * Jason Cooper <jason@lakedaemon.net> [130508 12:29]:
+> > > 
+> > > Current Problem:
+> > > 
+> > > There are several gaps in my understanding of how far along TI's conversion to
+> > > DT is.  Should I be doing a separate board file for initializing the legacy
+> > > items?  I was hoping to do it all with DT.
+> > 
+> > Sorry forgot to reply to this.. No seprate board file should be needed,
+> > some devices may still need to be initialized with pdata based on the
+> > compatible flag.
+> 
+> ti,hwmod, right?
 
-You may want to change those x's then to the actual IP address of your
-host machine :)
+Yes.. see mach-omap2/devices.c for the list that's still not initialized
+via DT.
+ 
+> > > Obviously, I don't expect anybody to run out and buy one of these, take it
+> > > apart, and try to boot this code.  But if the omap guys could take a look at
+> > > this and give me a few pointers, I'd appreciate it.  I'm kind of spinning my
+> > > wheels at the moment.
+> > > 
+> > > Primarily, I'd like to get nand and usb working, so that I can read/write,
+> > > mount a rootfs and do better testing.
+> > 
+> > The USB should be doable with device tree. At least both echi and
+> > musb are working properly on pandaboard. I think people have been
+> > using NAND with the gpmc DT patches, but I don't know the current
+> > status for sure.
+> 
+> I'll try your suggestion in your other email for ToT and see if I can
+> get gpmc going.
+> 
+> > Is the hard drive on the EHCI bus or how is it connected to omap?
+> 
+> via ehci.  They brutalized the tps driver to detect if the goflex cable
+> was attached or not.  Once I get something stable, I'll probably write a
+> separate driver for that code.  Or, push it out to userspace.
 
-You also need to make sure that your host machine has NFS configured properly.
+OK. I guess you need to disconnect the drive from EHCI if the goflex
+is attached to avoid disk corruption?
 
--Christoffer
+Regards,
+
+Tony
