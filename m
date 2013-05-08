@@ -1,51 +1,75 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Wed, 8 May 2013 15:22:22 +0200
-Subject: [PATCH 03/21] ARM: shmobile: don't call irqchip_init
- unconditionally
-In-Reply-To: <201305081416.06611.arnd@arndb.de>
-References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <CAL_JsqJWJvxezXy0RGFutxzvBhca-8=uRH2GxdJgzbEGw+OL0A@mail.gmail.com>
- <20130501225748.GD6517@verge.net.au>
- <201305081416.06611.arnd@arndb.de>
-Message-ID: <CABYn4sxrcGmnTAJcQR23nMGy8JvqyDrgPOXF4yBFFU_4C8Pc_g@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 8 May 2013 09:25:53 -0400
+Subject: [PATCH 1/3] clk: mvebu: add gate ctrl for Prestera kirkwood
+ variants
+In-Reply-To: <5189FD04.8090308@gmail.com>
+References: <1367941941-19152-1-git-send-email-valentin.longchamp@keymile.com>
+ <1367941941-19152-2-git-send-email-valentin.longchamp@keymile.com>
+ <518927C0.6070600@free-electrons.com> <51892D8D.4060704@gmail.com>
+ <5189F900.6020809@keymile.com> <5189FD04.8090308@gmail.com>
+Message-ID: <20130508132553.GB31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 08, 2013 at 09:21:40AM +0200, Sebastian Hesselbarth wrote:
+> On 05/08/2013 09:04 AM, Valentin Longchamp wrote:
+> >On 05/07/2013 06:36 PM, Sebastian Hesselbarth wrote:
+> >>I just checked my mails from late 2012 and there Valentin and I agreed,
+> >>that not the missing bits in clock gating control registers was the root
+> >>cause of km_kirkwood to hang. It was rather the phy gates (that do not/
+> >>not yet exist on DT) that caused it to hang, i.e. when accessing SATA
+> >>PHY registers.
+> >
+> >Yeah you are right, I had forgotten about this test. I just had a look at the
+> >board-km_kirkwood.c and I tried to figure out a way to make sure the clock gates
+> >bits never get read/written, so never get initialized. But as you say, that's
+> >not the real cause of the hang but
+> >
+> >>Valentin, I am not against an extra clock-gating-ctrl for Prestera but
+> >>maybe having an kirkwood.dtsi fork without SATA and other peripherals
+> >>will also help?
+> >
+> >Since it's not the real problem having the extra clock-gating-ctrl would me more
+> >consistent with the real Prestera HW, but maybe it's better to keep only one
+> >that works for both as it's already the case, it's less code to maintain.
+> >
+> >A better approach would be to work on the kirkwood.dtsi as you mention it. The
+> >SATA node in kirkwood.dtsi is by default disabled, is this enough or should it
+> >be moved to kirkwood-6281.dtsi for instance ?
+> 
+> Valentin,
+> 
+> I guess for the long run, we will re-introduce phy gates either by
+> abusing clk gates or some other way. But they will depend on existing
+> OF nodes.
+> 
+> Considering this, it would be best to fork kirkwood.dtsi for Prestera
+> and leave out all OF nodes that are not implemented there. We could
+> have
+> 
+> kirkwood.dtsi -+-> kirkwood-kirkwood.dtsi -+-> kirkwood-6281.dtsi
+>                +-> kirkwood-prestera.dtsi  +-> kirkwood-6282.dtsi
 
-2013/5/8 Arnd Bergmann <arnd@arndb.de>:
-> On Thursday 02 May 2013, Simon Horman wrote:
->> > > diff --git a/arch/arm/mach-shmobile/intc-r8a7740.c b/arch/arm/mach-shmobile/intc-r8a7740.c
->> > > index 8871f77..5dc57f1 100644
->> > > --- a/arch/arm/mach-shmobile/intc-r8a7740.c
->> > > +++ b/arch/arm/mach-shmobile/intc-r8a7740.c
->> > > @@ -53,14 +53,23 @@ static void __init r8a7740_init_irq_common(void)
->> > >
->> > >  void __init r8a7740_init_irq_of(void)
->> > >  {
->> > > +       if (!IS_ENABLED(CONFIG_OF))
->> > > +               return;
->> > > +
->> > >         irqchip_init();
->> >
->> > Why not have an empty irqchip_init? I'd guess we'll need this on other
->> > platforms and your default mach.
->>
->> Thanks, I think that could work.
->>
->> I will see about making it so.
->
-> Ping
+or,
 
-I have sent out a patch adding an empty irqchip_init() when
-CONFIG_IRQCHIP is not set with the subject
-[PATCH] irqchip: Add irqchip_init dummy function
+kirkwood.dtsi
+prestera.dtsi
 
-> Linux-next is still broken for me. There is also anothe shmobile build bug,
-> I'll send a separate patch for that, which also needs to go into your tree.
+-pinctrl-
+kirkwood-98dx4122.dtsi (should rename to prestera-, but seems churn-ish)
+kirkwood-6281.dtsi
+kirkwood-6282.dtsi
 
-Oh thanks Arnd for this fix!
+-dts-
+kirkwood-km_kirkwood.dts (rename/churn prestera-?)
+  |-prestera.dtsi
+  \-kirkwood-98dx4122.dtsi
 
-Cheers,
+or, honestly, how many boards are going to be based on prestera?  If
+it's just the one, why not combine all the nodes into
+kirkwood-km_kirkwood.dts?
 
- Bastian
+
+thx,
+
+Jason.
