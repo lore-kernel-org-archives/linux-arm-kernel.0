@@ -1,49 +1,39 @@
-From: jaccon.bastiaansen@gmail.com (Jaccon Bastiaansen)
-Date: Wed, 8 May 2013 14:14:40 +0200
-Subject: [RFC] Bug in ARM v6+ implementation of cmpxchg64() ?
-Message-ID: <CAGzjT4cikbZ4rRJxzMM4P0MZYpWumYC15qVW3OaPd7GESS5mwg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 May 2013 14:16:06 +0200
+Subject: [PATCH 03/21] ARM: shmobile: don't call irqchip_init
+ unconditionally
+In-Reply-To: <20130501225748.GD6517@verge.net.au>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <CAL_JsqJWJvxezXy0RGFutxzvBhca-8=uRH2GxdJgzbEGw+OL0A@mail.gmail.com>
+ <20130501225748.GD6517@verge.net.au>
+Message-ID: <201305081416.06611.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Thursday 02 May 2013, Simon Horman wrote:
+> > > diff --git a/arch/arm/mach-shmobile/intc-r8a7740.c b/arch/arm/mach-shmobile/intc-r8a7740.c
+> > > index 8871f77..5dc57f1 100644
+> > > --- a/arch/arm/mach-shmobile/intc-r8a7740.c
+> > > +++ b/arch/arm/mach-shmobile/intc-r8a7740.c
+> > > @@ -53,14 +53,23 @@ static void __init r8a7740_init_irq_common(void)
+> > >
+> > >  void __init r8a7740_init_irq_of(void)
+> > >  {
+> > > +       if (!IS_ENABLED(CONFIG_OF))
+> > > +               return;
+> > > +
+> > >         irqchip_init();
+> > 
+> > Why not have an empty irqchip_init? I'd guess we'll need this on other
+> > platforms and your default mach.
+> 
+> Thanks, I think that could work.
+> 
+> I will see about making it so.
 
-The ARM implementation of cmpxchg64() for ARM arch v6 and v7 casts
-parameter 2 and 3 (the old and new 64 values) to an unsigned long
-before calling the atomic_cmpxchg64() function:
+Ping
 
-#define cmpxchg64(ptr, o, n) \
-((__typeof__(*(ptr)))atomic64_cmpxchg(container_of((ptr), \
-atomic64_t, \
-counter), \
-     (unsigned long)(o), \
-     (unsigned long)(n)))
+Linux-next is still broken for me. There is also anothe shmobile build bug,
+I'll send a separate patch for that, which also needs to go into your tree.
 
-
-To me it seems that now the top 32 bits of the old and new value are
-stripped before calling atomic64_cmpxchg(), causing incorrect value to
-be "compare-exchanged". Is this correct?
-
-Browsing in the git history, I found commit
-
-3e0f5a15f5003f4576c35498814f0f1567860449
-
-which changed
--#define cmpxchg64(ptr,o,n)                                             \
--       ((__typeof__(*(ptr)))__cmpxchg64_mb((ptr),                      \
--                                           (unsigned long long)(o),    \
--                                           (unsigned long long)(n)))
-
-
-into
-
-+#define cmpxchg64(ptr, o, n)                                           \
-+       ((__typeof__(*(ptr)))atomic64_cmpxchg(container_of((ptr),       \
-+                                               atomic64_t,             \
-+                                               counter),               \
-+                                             (unsigned long)(o),       \
-+                                             (unsigned long)(n)))
-
-
-
-Regards,
-  Jaccon
+	Arnd
