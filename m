@@ -1,27 +1,39 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 8 May 2013 19:13:00 +0100
-Subject: [PATCH v3 1/4] xen: move xen_setup_runstate_info and
- get_runstate_snapshot to drivers/xen/time.c
-In-Reply-To: <20130508175444.GB2800@phenom.dumpdata.com>
-References: <alpine.DEB.2.02.1305081446580.18865@kaball.uk.xensource.com>
- <1368027714-14506-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130508175444.GB2800@phenom.dumpdata.com>
-Message-ID: <alpine.DEB.2.02.1305081858220.18865@kaball.uk.xensource.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 8 May 2013 11:19:38 -0700
+Subject: [PATCH] ARM: exynos: Select PINCTRL_EXYNOS for exynos5
+In-Reply-To: <1368034349-15091-1-git-send-email-dianders@chromium.org>
+References: <1368034349-15091-1-git-send-email-dianders@chromium.org>
+Message-ID: <CAOesGMia9kLGh6B6QJZAKS1UpBg86v32S2um+0fjx5HYjje3cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 May 2013, Konrad Rzeszutek Wilk wrote:
-> On Wed, May 08, 2013 at 04:41:51PM +0100, Stefano Stabellini wrote:
-> > Changes in v2:
-> > - leave do_stolen_accounting in arch/x86/xen/time.c;
-> > - use the new common functions in arch/ia64/xen/time.c.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > Acked-by: Ian Campbell <ian.campbell@citrix.com>
-> > CC: konrad.wilk at oracle.com
-> 
-> On the generic and x86 side it looks OK to me. I presume you did a sanity
-> check on x86 to make sure nothing was off?
+Hi,
 
-Yep, it seems to work.
-However I couldn't even compile test the ia64 code.
+On Wed, May 8, 2013 at 10:32 AM, Doug Anderson <dianders@chromium.org> wrote:
+> If you've got MACH_EXYNOS5_DT but not MACH_EXYNOS4_DT you'll be
+> missing the pincontrol definitions.  Add them for exynos5.
+>
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+>  arch/arm/mach-exynos/Kconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 6e77432..cdcd7fa 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -428,6 +428,8 @@ config MACH_EXYNOS5_DT
+>         depends on ARCH_EXYNOS5
+>         select ARM_AMBA
+>         select CLKSRC_OF
+> +       select PINCTRL
+> +       select PINCTRL_EXYNOS
+
+Nit:
+
+Seems like this should be selected by the SoC (ARCH_EXYNOS5) instead
+of the board. Actually, I'm not sure we need the board Kconfig entry
+long-term; all boards will be dt-only.
+
+
+-Olof
