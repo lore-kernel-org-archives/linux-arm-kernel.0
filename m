@@ -1,33 +1,25 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 8 May 2013 16:28:53 +0100
-Subject: [PATCH 28/63] ARM: ux500: Stop passing UART's platform data for
- Device Tree boots
-In-Reply-To: <CACRpkdYCABo0AULsiUgwm3g=906iKzp_ZDFKLj=HgDbNK9mNUQ@mail.gmail.com>
-References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
- <1367591569-32197-29-git-send-email-lee.jones@linaro.org>
- <CACRpkdYCABo0AULsiUgwm3g=906iKzp_ZDFKLj=HgDbNK9mNUQ@mail.gmail.com>
-Message-ID: <20130508152853.GN3459@gmail.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 8 May 2013 08:34:59 -0700
+Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
+In-Reply-To: <201305081634.43498.arnd@arndb.de>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <1368022248-2153-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305081634.43498.arnd@arndb.de>
+Message-ID: <20130508153459.GA17186@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 03 May 2013, Linus Walleij wrote:
-
-> On Fri, May 3, 2013 at 4:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wed, May 08, 2013 at 04:34:43PM +0200, Arnd Bergmann wrote:
+> > +#define ASC_MAJOR		204
+> > +#define ASC_MINOR_START		40
 > 
-> > It was required to pass DMA channel configuration information to the
-> > UART driver before the new DMA API was in place. Now that it is, and
-> > is fully compatible with Device Tree we can stop doing that.
-> >
-> > Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> I can't apply this as it is clearly dependent on a patch to
-> drivers/tty/serial/amba-pl011.c that is not yet upstream.
+> I don't know what the current policy is on allocating major/minor numbers,
+> but I'm sure you cannot just reuse one that is already used.
 
-Right, I'll move this patch to the end of the patch-set.
+I agree, why are you trying to create a new tty device name?  Can't you
+use the existing ttyS name and minor number as you will not have any
+other type of serial device on this system?
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+thanks,
+
+greg k-h
