@@ -1,36 +1,63 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 08 May 2013 16:42:04 -0600
-Subject: [PATCH] USB: set device dma_mask without reference to global data
-In-Reply-To: <CAL411-pY_i19otiE2pLux6eR_OFHhfhK=+6BF=H6wABDsGCP6Q@mail.gmail.com>
-References: <1367967232-10128-1-git-send-email-swarren@wwwdotorg.org>
- <CAL411-qVnm0_wwdAiAp9eq_hYkXzFSmRMLAmknpSAG7Jb3bM9A@mail.gmail.com>
- <5189B7BF.8070607@wwwdotorg.org>
- <CAL411-pY_i19otiE2pLux6eR_OFHhfhK=+6BF=H6wABDsGCP6Q@mail.gmail.com>
-Message-ID: <518AD4BC.6090009@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 May 2013 16:10:34 -0700
+Subject: [PATCH] ARM: OMAP1: DMA: fix error handling in
+ omap1_system_dma_init()
+In-Reply-To: <CAPgLHd-5cRFtN-rF8c5Jvg9cqE3jvxuOa6KaDgcoYHPM4DhbMQ@mail.gmail.com>
+References: <CAPgLHd-5cRFtN-rF8c5Jvg9cqE3jvxuOa6KaDgcoYHPM4DhbMQ@mail.gmail.com>
+Message-ID: <20130508231034.GP32546@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2013 08:54 PM, Peter Chen wrote:
->>
->> This probably could be initialized from some DT property. However,
->> there's no such property defined right now, and considering that DT is
->> supposed to be an ABI, we'd always need the code in this patch as a
->> fallback for DTs that were created before any such property was defined.
->>
->> Equally, since the data is SoC-specific rather than board-specific, and
->> is even fairly unlikely to vary between SoC versions since these values
->> are all 0xffffffff anyway, I don't really see much point in putting it
->> into DT, rather than just putting the static data into the driver.
+* Wei Yongjun <weiyj.lk@gmail.com> [130426 01:36]:
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 > 
-> I mean there is already dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> at function of_platform_device_create, why can't add
-> dev->dev.dma_mask = &dev->dev.coherent_dma_mask after that?
+> Add the missing iounmap() before return from omap1_system_dma_init()
+> in the error handling case.
+> Also removed platform_device_del() on add resources error case which
+> cause dup device delete.
 > 
-> If DT core can do above things, can we delete dma_mask assignment
-> at every driver?
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> ---
+> no compile test.
 
-Perhaps. However, such a change has a much larger potential for regressions.
+Seems to work, applying into omap-for-v3.10/fixes thanks.
 
-I would suggest going with the current patch for 3.10 and any later
-backports in order to reduce risk. We can revisit better cleanup for
-later kernels.
+Tony
+
+>  arch/arm/mach-omap1/dma.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
+> index 1a4e887..68ab858 100644
+> --- a/arch/arm/mach-omap1/dma.c
+> +++ b/arch/arm/mach-omap1/dma.c
+> @@ -301,7 +301,7 @@ static int __init omap1_system_dma_init(void)
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "%s: Unable to add resources for %s%d\n",
+>  			__func__, pdev->name, pdev->id);
+> -		goto exit_device_put;
+> +		goto exit_iounmap;
+>  	}
+>  
+>  	p = kzalloc(sizeof(struct omap_system_dma_plat_info), GFP_KERNEL);
+> @@ -309,7 +309,7 @@ static int __init omap1_system_dma_init(void)
+>  		dev_err(&pdev->dev, "%s: Unable to allocate 'p' for %s\n",
+>  			__func__, pdev->name);
+>  		ret = -ENOMEM;
+> -		goto exit_device_del;
+> +		goto exit_iounmap;
+>  	}
+>  
+>  	d = kzalloc(sizeof(struct omap_dma_dev_attr), GFP_KERNEL);
+> @@ -402,8 +402,8 @@ exit_release_d:
+>  	kfree(d);
+>  exit_release_p:
+>  	kfree(p);
+> -exit_device_del:
+> -	platform_device_del(pdev);
+> +exit_iounmap:
+> +	iounmap(dma_base);
+>  exit_device_put:
+>  	platform_device_put(pdev);
+>  
+> 
