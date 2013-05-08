@@ -1,46 +1,56 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 9 May 2013 00:39:44 +0800
-Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
-In-Reply-To: <201305081831.48566.arnd@arndb.de>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <B5A00B86-5332-427E-A82A-5B71EC0979A8@jcrosoft.com>
- <20130508161527.GA28080@kroah.com> <201305081831.48566.arnd@arndb.de>
-Message-ID: <0940EFC0-EB16-4C13-A3DE-4A8C4F5C6F4D@jcrosoft.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 8 May 2013 17:43:41 +0100
+Subject: [RFC PATCH v2 07/11] ARM64: mm: Make PAGE_NONE pages read only
+ and no-execute.
+In-Reply-To: <1368006763-30774-8-git-send-email-steve.capper@linaro.org>
+References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
+ <1368006763-30774-8-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130508164341.GG20820@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On May 9, 2013, at 12:31 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Wednesday 08 May 2013, Greg KH wrote:
->>> just mention there is not hardware reason to not use the generic ttySx
->>> in place of ttyAS as we have only one IP that handle serial on this
->>> family of SoC
->>> 
->>> personally I'll switch to ttySx
->> 
->> Great, then you can use the same major/minor range as well, so there's
->> no more objection from me about this :)
+On Wed, May 08, 2013 at 10:52:39AM +0100, Steve Capper wrote:
+> If we consider the following code sequence:
 > 
-> Does that work these days when you have kernel with multiple built-in
-> uart drivers?
+> 	my_pte = pte_modify(entry, myprot);
+> 	x = pte_write(my_pte);
+> 	y = pte_exec(my_pte);
+> 
+> If myprot comes from a PROT_NONE page, then x and y will both be
+> true which is undesireable behaviour.
+> 
+> This patch sets the no-execute and read-only bits for PAGE_NONE
+> such that the code above will return false for both x and y.
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> ---
+>  arch/arm64/include/asm/pgtable.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index e333a24..b1a1b59 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -66,7 +66,7 @@ extern pgprot_t pgprot_default;
+>  
+>  #define _MOD_PROT(p, b)		__pgprot_modify(p, 0, b)
+>  
+> -#define PAGE_NONE		__pgprot_modify(pgprot_default, PTE_TYPE_MASK, PTE_PROT_NONE)
+> +#define PAGE_NONE		__pgprot_modify(pgprot_default, PTE_TYPE_MASK, PTE_PROT_NONE | PTE_RDONLY | PTE_UXN)
+>  #define PAGE_SHARED		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+>  #define PAGE_SHARED_EXEC	_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN)
+>  #define PAGE_COPY		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_RDONLY)
+> @@ -76,7 +76,7 @@ extern pgprot_t pgprot_default;
+>  #define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY)
+>  #define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY)
+>  
+> -#define __PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE)
+> +#define __PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_RDONLY | PTE_UXN)
+>  #define __PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+>  #define __PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+>  #define __PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_RDONLY)
 
-not for very long time and no this family
-> 
-> I think it would be good if all uarts were using the same name space
-> and major/minor numbers, but I think the mess we currently have is
-> the result of the tty_register_driver() interface reserving the
-> device number range at driver load time, independent of the presence
-> of devices.  I would assume that normal distro kernels always ship
-> with an 8250 driver built-in to allow using that as the console,
-> and if I read the code correctly, that currently prevents another
-> uart driver from registering the same major/minor numbers.
+Whilst it's not strictly needed for pte_exec to work, I think you should
+include PTE_PXN in the PAGE_NONE definitions as well.
 
-so we need to fix this
-> 
-> 	Arnd
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Will
