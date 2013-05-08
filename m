@@ -1,45 +1,81 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 08 May 2013 19:15:17 +0400
-Subject: [PATCH] irqchip: Add irqchip_init dummy function
-In-Reply-To: <1368019204-24448-1-git-send-email-hechtb+renesas@gmail.com>
-References: <1368019204-24448-1-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <518A6C05.9030303@cogentembedded.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Wed,  8 May 2013 23:17:00 +0800
+Subject: [PATCH v5,
+ part3 01/15] mm: fix build warnings caused by free_reserved_area()
+In-Reply-To: <1368026235-5976-1-git-send-email-jiang.liu@huawei.com>
+References: <1368026235-5976-1-git-send-email-jiang.liu@huawei.com>
+Message-ID: <1368026235-5976-2-git-send-email-jiang.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Fix following build warnings cuased by free_reserved_area():
 
-On 08-05-2013 17:20, Bastian Hecht wrote:
+arch/arm/mm/init.c: In function 'mem_init':
+arch/arm/mm/init.c:603:2: warning: passing argument 1 of 'free_reserved_area' makes integer from pointer without a cast [enabled by default]
+  free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
+  ^
+In file included from include/linux/mman.h:4:0,
+                 from arch/arm/mm/init.c:15:
+include/linux/mm.h:1301:22: note: expected 'long unsigned int' but argument is of type 'void *'
+ extern unsigned long free_reserved_area(unsigned long start, unsigned long end,
 
-> We add an empty irqchip_init dummy function for cases in which
-> CONFIG_IRQCHIP is not used. In these cases irqchip.c is not compiled,
-> but a funtion call may still be present in architecture code, that in
-> runtime doesn't get hit.
+   mm/page_alloc.c: In function 'free_reserved_area':
+>> mm/page_alloc.c:5134:3: warning: passing argument 1 of 'virt_to_phys' makes pointer from integer without a cast [enabled by default]
+   In file included from arch/mips/include/asm/page.h:49:0,
+                    from include/linux/mmzone.h:20,
+                    from include/linux/gfp.h:4,
+                    from include/linux/mm.h:8,
+                    from mm/page_alloc.c:18:
+   arch/mips/include/asm/io.h:119:29: note: expected 'const volatile void *' but argument is of type 'long unsigned int'
+   mm/page_alloc.c: In function 'free_area_init_nodes':
+   mm/page_alloc.c:5030:34: warning: array subscript is below array bounds [-Warray-bounds]
 
-> E.g. this is needed in the arch/arm/mach-shmobile/intc-r8a7740.c
-> interrupt setup code where OF use and non OF us is both handled in one
-> file.
+Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+Reported-by: Arnd Bergmann <arnd@arndb.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-mm at kvack.org
+---
+ arch/arm/mm/init.c |    6 ++++--
+ mm/page_alloc.c    |    2 +-
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-> ---
->   include/linux/irqchip.h |    4 ++++
->   1 file changed, 4 insertions(+)
-
-> diff --git a/include/linux/irqchip.h b/include/linux/irqchip.h
-> index e0006f1..78527ba 100644
-> --- a/include/linux/irqchip.h
-> +++ b/include/linux/irqchip.h
-> @@ -11,6 +11,10 @@
->   #ifndef _LINUX_IRQCHIP_H
->   #define _LINUX_IRQCHIP_H
->
-> +#ifdef CONFIG_IRQCHIP
->   void irqchip_init(void);
-> +#else
-> +void irqchip_init(void) {};
-
-    Semicolon not needed here.
-
-> +#endif
-
-WBR, Sergei
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 9a5cdc0..7a82fcd 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -600,7 +600,8 @@ void __init mem_init(void)
+ 
+ #ifdef CONFIG_SA1111
+ 	/* now that our DMA memory is actually so designated, we can free it */
+-	free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
++	free_reserved_area((unsigned long)__va(PHYS_PFN_OFFSET),
++			   (unsigned long)swapper_pg_dir, 0, NULL);
+ #endif
+ 
+ 	free_highpages();
+@@ -728,7 +729,8 @@ void free_initmem(void)
+ 	extern char __tcm_start, __tcm_end;
+ 
+ 	poison_init_mem(&__tcm_start, &__tcm_end - &__tcm_start);
+-	free_reserved_area(&__tcm_start, &__tcm_end, 0, "TCM link");
++	free_reserved_area((unsigned long)&__tcm_start,
++			   (unsigned long)&__tcm_end, 0, "TCM link");
+ #endif
+ 
+ 	poison_init_mem(__init_begin, __init_end - __init_begin);
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 843e33d..ce259c8 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -5196,7 +5196,7 @@ unsigned long free_reserved_area(unsigned long start, unsigned long end,
+ 	for (pages = 0; pos < end; pos += PAGE_SIZE, pages++) {
+ 		if (poison)
+ 			memset((void *)pos, poison, PAGE_SIZE);
+-		free_reserved_page(virt_to_page(pos));
++		free_reserved_page(virt_to_page((void *)pos));
+ 	}
+ 
+ 	if (pages && s)
+-- 
+1.7.9.5
