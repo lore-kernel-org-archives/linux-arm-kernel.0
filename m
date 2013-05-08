@@ -1,40 +1,34 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 8 May 2013 18:24:07 +0200
-Subject: [RFC 7/8] ARM:stih41x: Add B2000 board support
-In-Reply-To: <201305081820.23968.arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 May 2013 18:31:48 +0200
+Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
+In-Reply-To: <20130508161527.GA28080@kroah.com>
 References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022329-2424-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081820.23968.arnd@arndb.de>
-Message-ID: <20130508162407.GE3041@game.jcrosoft.org>
+ <B5A00B86-5332-427E-A82A-5B71EC0979A8@jcrosoft.com>
+ <20130508161527.GA28080@kroah.com>
+Message-ID: <201305081831.48566.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:20 Wed 08 May     , Arnd Bergmann wrote:
-> On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
-> > diff --git a/arch/arm/mach-stih41x/board-dt.c b/arch/arm/mach-stih41x/board-dt.c
-> > index 8005f71..1f23aca 100644
-> > --- a/arch/arm/mach-stih41x/board-dt.c
-> > +++ b/arch/arm/mach-stih41x/board-dt.c
-> > @@ -63,6 +63,8 @@ void __init stih41x_dt_init(void)
-> >  }
-> >  
-> >  static const char *stih41x_dt_match[] __initdata = {
-> > +       "st,stih415-b2000",
-> > +       "st,stih416-b2000",
-> >         NULL
-> >  };
+On Wednesday 08 May 2013, Greg KH wrote:
+> > just mention there is not hardware reason to not use the generic ttySx
+> > in place of ttyAS as we have only one IP that handle serial on this
+> > family of SoC
+> > 
+> > personally I'll switch to ttySx
 > 
-> I probably wouldn't bother listing all the boards here. Just make sure
-> the .dts file lists both the name of the board and of the soc in
-> its compatible property, and list all the SoCs here that you can boot on.
+> Great, then you can use the same major/minor range as well, so there's
+> no more objection from me about this :)
 
-was going to do the same comment
+Does that work these days when you have kernel with multiple built-in
+uart drivers?
 
-Best Regards,
-J.
-> 
-> 	Arnd
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+I think it would be good if all uarts were using the same name space
+and major/minor numbers, but I think the mess we currently have is
+the result of the tty_register_driver() interface reserving the
+device number range at driver load time, independent of the presence
+of devices.  I would assume that normal distro kernels always ship
+with an 8250 driver built-in to allow using that as the console,
+and if I read the code correctly, that currently prevents another
+uart driver from registering the same major/minor numbers.
+
+	Arnd
