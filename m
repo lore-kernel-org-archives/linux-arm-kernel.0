@@ -1,63 +1,230 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 08 May 2013 12:17:35 -0400
-Subject: [RFC PATCH v2 08/11] ARM64: mm: Swap PTE_FILE and PTE_PROT_NONE
- bits.
-In-Reply-To: <1368006763-30774-9-git-send-email-steve.capper@linaro.org>
-References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
- <1368006763-30774-9-git-send-email-steve.capper@linaro.org>
-Message-ID: <518A7A9F.9080105@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 May 2013 18:18:01 +0200
+Subject: [RFC 5/8] ARM:stih41x: Add STiH415 SOC support
+In-Reply-To: <1368022297-2334-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <1368022297-2334-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <201305081818.01927.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
-
-On 05/08/2013 05:52 AM, Steve Capper wrote:
-> Under ARM64, PTEs can be broadly categorised as follows:
->    - Present and valid: Bit #0 is set. The PTE is valid and memory
->      access to the region may fault.
+On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 > 
->    - Present and invalid: Bit #0 is clear and bit #1 is set.
->      Represents present memory with PROT_NONE protection. The PTE
->      is an invalid entry, and the user fault handler will raise a
->      SIGSEGV.
+> The STiH415 is the next generation of HD, AVC set-top box processors for
+> satellite, cable, terrestrial and IP-STB markets. It is an ARM Cortex-A9
+> 1.0 GHz, dual-core CPU.
 > 
->    - Not present (file): Bits #0 and #1 are clear, bit #2 is set.
->      Memory represented has been paged out. The PTE is an invalid
->      entry, and the fault handler will try and re-populate the
->      memory where necessary.
-> 
-> Huge PTEs are block descriptors that have bit #1 clear. If we wish
-> to represent PROT_NONE huge PTEs we then run into a problem as
-> there is no way to distinguish between regular and huge PTEs if we
-> set bit #1.
-> 
-> As huge PTEs are always present, the meaning of bits #1 and #2 can
-> be swapped for invalid PTEs. This patch swaps the PTE_FILE and
-> PTE_PROT_NONE constants, allowing us to represent PROT_NONE huge
-> PTEs.
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> CC: Stephen Gallimore <stephen.gallimore@st.com>
+> CC: Stuart Menefy <stuart.menefy@st.com>
+> ---
+>  Documentation/arm/STiH41x/overview.txt         |   39 ++
+>  Documentation/arm/STiH41x/stih415-overview.txt |   12 +
+>  arch/arm/Kconfig                               |    3 +
+>  arch/arm/Kconfig.debug                         |   38 ++
+>  arch/arm/Makefile                              |    2 +
+>  arch/arm/boot/dts/stih415-clock.dtsi           |   38 ++
+>  arch/arm/boot/dts/stih415-pinctrl.dtsi         |  480 ++++++++++++++++++++++++
+>  arch/arm/boot/dts/stih415.dtsi                 |   94 +++++
+>  arch/arm/boot/dts/stih415.h                    |   20 +
+>  arch/arm/boot/dts/stih41x.dtsi                 |   30 ++
+>  arch/arm/boot/dts/stixxxx-pincfg.h             |   95 +++++
+>  arch/arm/configs/stih41x_defconfig             |   94 +++++
+>  arch/arm/include/debug/stixxxx.S               |   61 +++
+>  arch/arm/mach-stih41x/Kconfig                  |   35 ++
+>  arch/arm/mach-stih41x/Makefile                 |    4 +
+>  arch/arm/mach-stih41x/board-dt.c               |   76 ++++
+>  arch/arm/mach-stih41x/stih41x.c                |   82 ++++
+>  arch/arm/mach-stih41x/stih41x.h                |    7 +
+>  arch/arm/plat-stixxxx/Kconfig                  |    2 +
+>  arch/arm/plat-stixxxx/Makefile                 |    2 +
+>  arch/arm/plat-stixxxx/headsmp.S                |   44 +++
+>  arch/arm/plat-stixxxx/include/plat/hardware.h  |   20 +
+>  arch/arm/plat-stixxxx/include/plat/smp.h       |   19 +
+>  arch/arm/plat-stixxxx/platsmp.c                |  144 +++++++
 
-[...]
+I think there is no point in having a separate mach- and plat- directory
+here, given that modern machines require very little code. You can probably
+fold the three files in mach-stih41x (board-dt.c, stih41x.c and stih41x.h)
+into a single file and rename plat-stixxxx to mach-stixxxx
 
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-
-[...]
-
-> @@ -306,8 +306,8 @@ extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 9b31f43..42a5193 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -447,6 +447,16 @@ choice
+>  		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
+>  		  devices, including VT8500, WM8505, WM8650 and WM8850.
 >  
->  /*
->   * Encode and decode a file entry:
-> - *	bits 0-1:	present (must be zero)
-> - *	bit  2:		PTE_FILE
-> + *	bits 0 & 2:	present (must be zero)
+> +	config DEBUG_STIH41X_UART
+> +		depends on ARCH_STIH41X
+> +		bool "Use StiH415/416 ASC for low-level debug"
+> +		help
+> +		  Say Y here if you want kernel low-level debugging support
+> +		  on StiH415/416 based platforms like B2000, B2020.
+> +		  It support UART2 and SBC_UART1.
+> +
+> +		  If unsure, say N.
+> +
+>  	config DEBUG_LL_UART_NONE
+>  		bool "No low-level debugging UART"
+>  		depends on !ARCH_MULTIPLATFORM
 
-Consider using punctuation like "bits 0, 2" here to disambiguate from the
-binary and operation.
+I would split out the debug code into a separate patch though.
 
-[...]
+> @@ -600,6 +637,7 @@ config DEBUG_LL_INCLUDE
+>  	default "debug/vt8500.S" if DEBUG_VT8500_UART0
+>  	default "debug/tegra.S" if DEBUG_TEGRA_UART
+>  	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
+> +	default "debug/stixxxx.S" if DEBUG_STIH41X_UART
+>  	default "mach/debug-macro.S"
 
-Christopher
+Please keep this in alphabetical order.
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+> +	soc {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		#interrupt-cells = <3>;
+> +		interrupt-parent = <&intc>;
+
+The "#interrupt-cells" property doesn't belong here I think.
+
+> +
+> +		uart2: uart at fed32000 {
+> +			compatible	= "st,asc";
+> +			status 		= "disabled";
+> +			reg		= <0xfed32000 0x2c>;
+> +			interrupts	= <0 197 0>;
+> +			pinctrl-names 	= "default";
+> +			pinctrl-0 	= <&pinctrl_uart2>;
+> +			clocks		= <&CLKS_ICN_REG_0>;
+> +		};
+> +
+> +		/* SBC comms block ASCs in SASG1 */
+> +		sbc_uart1: uart at fe531000 {
+> +			compatible	= "st,asc";
+> +			status 		= "disabled";
+> +			reg		= <0xfe531000 0x2c>;
+> +			interrupts	= <0 210 0>;
+> +			clocks		= <&CLK_SYSIN>;
+> +			pinctrl-names 	= "default";
+> +			pinctrl-0	= <&pinctrl_sbc_uart1>;
+> +		};
+> +	};
+
+Please name these devices "serial", not "uart".
+
+> diff --git a/arch/arm/configs/stih41x_defconfig b/arch/arm/configs/stih41x_defconfig
+> new file mode 100644
+> index 0000000..dd9268b
+> --- /dev/null
+> +++ b/arch/arm/configs/stih41x_defconfig
+
+I would prefer to have this be part of multi_v7_defconfig, unless
+you have strong reason why it can't be.
+
+> diff --git a/arch/arm/mach-stih41x/Kconfig b/arch/arm/mach-stih41x/Kconfig
+> new file mode 100644
+> index 0000000..9c40540
+> --- /dev/null
+> +++ b/arch/arm/mach-stih41x/Kconfig
+> @@ -0,0 +1,35 @@
+> +config ARCH_STIH41X
+> +	bool "STMicroelectronics STiH41x SOCs with Flattened Device Tree" if ARCH_MULTI_V7
+> +	select GENERIC_CLOCKEVENTS
+> +	select CLKDEV_LOOKUP
+> +	select ARM_GIC
+
+
+> +if ARCH_STIH41X
+> +menu "STMicroelectronics Consumer Electronics SOCs"
+
+You can use 'menuconfig' to combine these two.
+
+> +static void __init stih41x_timer_init(void)
+> +{
+> +	of_clk_init(NULL);
+> +	clocksource_of_init();
+> +	stih41x_l2x0_init();
+> +}
+
+I'm hoping we can kill make the clk and l2x0 init work by default in 3.11,
+as clocksource_of_init already does, so you won't need this function
+any more.
+
+> +/*
+> + * A basic implementation of irq_set_wake that ensures wakeup source
+> + * interrupts are not disabled during PM_SUSPEND_FREEZE.
+> + */
+> +static int stih41x_set_wake(struct irq_data *d, unsigned int on)
+> +{
+> +	struct irq_desc *desc = irq_to_desc(d->irq);
+> +
+> +	if (on) {
+> +		if (desc->action)
+> +			desc->action->flags |= IRQF_NO_SUSPEND;
+> +	} else {
+> +		if (desc->action)
+> +			desc->action->flags &= ~IRQF_NO_SUSPEND;
+> +	}
+> +	return 0;
+> +}
+> +
+> +static void __init stih41x_irq_init(void)
+> +{
+> +	gic_arch_extn.irq_set_wake = stih41x_set_wake;
+> +	gic_arch_extn.flags = IRQCHIP_MASK_ON_SUSPEND;
+> +
+> +	irqchip_init();
+> +}
+
+This looks like it should be generic. Why do you need this?
+
+> +void __init stih41x_dt_init(void)
+> +{
+> +	of_platform_populate(NULL, of_default_bus_match_table,
+> +				NULL, NULL);
+> +	return;
+> +}
+
+This is already not needed in 3.10.
+
+> +static struct map_desc stih41x_io_desc[] __initdata = {
+> +#ifdef CONFIG_SMP
+> +	{
+> +		.virtual	= IO_ADDRESS(MPE41_SCU_BASE),
+> +		.pfn		= __phys_to_pfn(MPE41_SCU_BASE),
+> +		.length		= SZ_4K,
+> +		.type		= MT_DEVICE,
+> +	},
+> +#endif
+
+> +void __init stih41x_map_io(void)
+> +{
+> +#ifdef CONFIG_SMP
+> +	stixxxx_scu_base_addr = ((void __iomem *)IO_ADDRESS(MPE41_SCU_BASE));
+> +#endif
+> +	iotable_init(stih41x_io_desc, ARRAY_SIZE(stih41x_io_desc));
+> +}
+
+IIRC the SCU no longer needs to be mapped this early, so you can use
+ioremap these days.
+
+> +void __init stih41x_l2x0_init(void)
+> +{
+> +	u32 way_size = 0x4;
+> +	u32 aux_ctrl;
+> +
+> +	aux_ctrl = (0x1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
+> +		(0x1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
+> +		(0x1 << L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT) |
+> +		(way_size << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
+> +
+> +	l2x0_of_init(aux_ctrl, L2X0_AUX_CTRL_MASK);
+> +}
+
+I don't know where we stand on this, but I think we should kill all
+calls like these.
+
+	Arnd
