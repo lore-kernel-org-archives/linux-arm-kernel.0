@@ -1,31 +1,61 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 8 May 2013 13:12:05 -0700
-Subject: [REGRESSION] SLAB allocator (on Zynq)
-In-Reply-To: <20130508193906.GC32546@atomide.com>
-References: <9d9b2266-e09e-4366-80ef-3df5db775f25@TX2EHSMHS033.ehs.local>
- <20130508193906.GC32546@atomide.com>
-Message-ID: <35a77b0e-59cc-4fee-81cf-20c059462d12@DB8EHSMHS016.ehs.local>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 8 May 2013 13:50:29 -0700
+Subject: [PATCH -v8 11/11] Move arch/x86 reboot= handling to generic
+ kernel.
+In-Reply-To: <1367937595-32241-12-git-send-email-holt@sgi.com>
+References: <1367937595-32241-1-git-send-email-holt@sgi.com>
+ <1367937595-32241-12-git-send-email-holt@sgi.com>
+Message-ID: <20130508135029.ffbeefa6b8154bee31e7bbbe@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 08, 2013 at 12:39:07PM -0700, Tony Lindgren wrote:
-> Hi,
-> 
-> * S?ren Brinkmann <soren.brinkmann@xilinx.com> [130508 12:26]:
-> > Hi,
-> > 
-> > I compiled the latest kernel for Zynq and ran into issues when the SLAB
-> > allocator is selected. Booting crashes early with a NULL pointer
-> > dereference (boot log attached).
-> > Switching to the SLUB allocator resolves the issue (boot log attached).
-> 
-> There's a fix for this now in lkml thread
-> "[GIT PULL] SLAB changes for v3.10":
-> 
-> http://lkml.org/lkml/2013/5/8/374#
-Thanks for the quick response and apologies for not having it found
-myself earlier.
-With that patch it works again.
+On Tue,  7 May 2013 09:39:55 -0500 Robin Holt <holt@sgi.com> wrote:
 
-	Thanks,
-	S?ren
+> Merge together the unicore32, arm, and x86 reboot= command line
+> parameter handling.
+> 
+> ...
+>
+> +static int __init reboot_setup(char *str)
+> +{
+> +	for (;;) {
+> +		/*
+> +		 * Having anything passed on the command line via
+> +		 * reboot= will cause us to disable DMI checking
+> +		 * below.
+> +		 */
+> +		reboot_default = 0;
+> +
+> +		switch (*str) {
+> +#if defined(CONFIG_X86) || defined(CONFIG_X86_64)
+> +		case 'w':
+> +			reboot_mode = REBOOT_WARM;
+> +			break;
+> +
+> +		case 'c':
+> +			reboot_mode = REBOOT_COLD;
+> +			break;
+> +
+> +#ifdef CONFIG_SMP
+> +		case 's':
+> +			if (isdigit(*(str+1))) {
+> +				reboot_cpu = (int) (*(str+1) - '0');
+> +				if (isdigit(*(str+2)))
+> +					reboot_cpu = reboot_cpu*10 + (int)(*(str+2) - '0');
+> +			}
+
+Boy, that's some weird stuff.
+
+What's wrong with doing
+
+			if (isdigit(str[1])) {
+				reboot_cpu = str[1] - '0';
+				if (isdigit(str[2]))
+					reboot_cpu = reboot_cpu * 10 +
+							str[2] - '0';
+			}
+
+?
+
+But it's still nonsense - we should eliminate its
+you-have-less-than-101-CPUs restriction by using, you know, atoi().
