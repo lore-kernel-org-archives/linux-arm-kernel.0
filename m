@@ -1,40 +1,19 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 8 May 2013 16:00:03 +0200
-Subject: [PATCH 3/9] clk: ux500: Provide device enumeration number suffix
- for SMSC911x
-In-Reply-To: <1368019749-19455-4-git-send-email-lee.jones@linaro.org>
-References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
- <1368019749-19455-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAPDyKFqsZ=z6OcRs45_DUO1Zpp_C1qUeZ2tsGCjD08H_b4L-jg@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 8 May 2013 22:00:06 +0800
+Subject: [PATCH 2/2] ARM: dts: cfa10036: Change the OLED display to SSD1306
+In-Reply-To: <1366624555-5616-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1366624555-5616-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1366624555-5616-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130508140004.GC26072@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 May 2013 15:29, Lee Jones <lee.jones@linaro.org> wrote:
-> First Ethernet device has a ".0" appended onto the device name. It
-> appears that we need this in order to obtain the correct clock.
->
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/clk/ux500/u8500_clk.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
-> index 0b4f35a..80069c3 100644
-> --- a/drivers/clk/ux500/u8500_clk.c
-> +++ b/drivers/clk/ux500/u8500_clk.c
-> @@ -325,7 +325,7 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
->         clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", clkrst3_base,
->                                 BIT(0), 0);
->         clk_register_clkdev(clk, "fsmc", NULL);
-> -       clk_register_clkdev(clk, NULL, "smsc911x");
-> +       clk_register_clkdev(clk, NULL, "smsc911x.0");
->
->         clk = clk_reg_prcc_pclk("p3_pclk1", "per3clk", clkrst3_base,
->                                 BIT(1), 0);
-> --
-> 1.7.10.4
->
+On Mon, Apr 22, 2013 at 11:55:55AM +0200, Maxime Ripard wrote:
+> The SSD1307 was used in an early prototype that will never get
+> distributed. The final board now has a SSD1306 instead, that has its own
+> power generation unit and thus doesn't need any PWM. The panel attached
+> to it also changed.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Applied, thanks.
