@@ -1,32 +1,30 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Wed, 08 May 2013 18:04:41 +0100
-Subject: [RFC 7/8] ARM:stih41x: Add B2000 board support
-In-Reply-To: <201305081820.23968.arnd@arndb.de>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022329-2424-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081820.23968.arnd@arndb.de>
-Message-ID: <518A85A9.104@st.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed,  8 May 2013 10:32:29 -0700
+Subject: [PATCH] ARM: exynos: Select PINCTRL_EXYNOS for exynos5
+Message-ID: <1368034349-15091-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/13 17:20, Arnd Bergmann wrote:
-> On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
->> diff --git a/arch/arm/mach-stih41x/board-dt.c b/arch/arm/mach-stih41x/board-dt.c
->> index 8005f71..1f23aca 100644
->> --- a/arch/arm/mach-stih41x/board-dt.c
->> +++ b/arch/arm/mach-stih41x/board-dt.c
->> @@ -63,6 +63,8 @@ void __init stih41x_dt_init(void)
->>  }
->>  
->>  static const char *stih41x_dt_match[] __initdata = {
->> +       "st,stih415-b2000",
->> +       "st,stih416-b2000",
->>         NULL
->>  };
-> I probably wouldn't bother listing all the boards here. Just make sure
-> the .dts file lists both the name of the board and of the soc in
-> its compatible property, and list all the SoCs here that you can boot on.
-I like that approach. Will change in the next version.
->
-> 	Arnd
->
+If you've got MACH_EXYNOS5_DT but not MACH_EXYNOS4_DT you'll be
+missing the pincontrol definitions.  Add them for exynos5.
+
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+ arch/arm/mach-exynos/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 6e77432..cdcd7fa 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -428,6 +428,8 @@ config MACH_EXYNOS5_DT
+ 	depends on ARCH_EXYNOS5
+ 	select ARM_AMBA
+ 	select CLKSRC_OF
++	select PINCTRL
++	select PINCTRL_EXYNOS
+ 	select USB_ARCH_HAS_XHCI
+ 	select USE_OF
+ 	help
+-- 
+1.8.2.1
