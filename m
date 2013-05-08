@@ -1,33 +1,46 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Wed, 8 May 2013 10:54:48 +0800
-Subject: [PATCH] USB: set device dma_mask without reference to global data
-In-Reply-To: <5189B7BF.8070607@wwwdotorg.org>
-References: <1367967232-10128-1-git-send-email-swarren@wwwdotorg.org>
- <CAL411-qVnm0_wwdAiAp9eq_hYkXzFSmRMLAmknpSAG7Jb3bM9A@mail.gmail.com>
- <5189B7BF.8070607@wwwdotorg.org>
-Message-ID: <CAL411-pY_i19otiE2pLux6eR_OFHhfhK=+6BF=H6wABDsGCP6Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 May 2013 20:17:59 -0700
+Subject: [GIT PULL 4/5] ARM: arm-soc: late cleanups
+In-Reply-To: <CA+55aFxHZSYV3UZMf+ezADX5z2psLm5a9Wpp6qcDQho7n2J6SA@mail.gmail.com>
+References: <1367947574-2934383-1-git-send-email-arnd@arndb.de>
+ <1367947574-2934383-5-git-send-email-arnd@arndb.de>
+ <20130507231925.GR28721@atomide.com>
+ <CA+55aFxHZSYV3UZMf+ezADX5z2psLm5a9Wpp6qcDQho7n2J6SA@mail.gmail.com>
+Message-ID: <20130508031758.GT28721@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> This probably could be initialized from some DT property. However,
-> there's no such property defined right now, and considering that DT is
-> supposed to be an ABI, we'd always need the code in this patch as a
-> fallback for DTs that were created before any such property was defined.
->
-> Equally, since the data is SoC-specific rather than board-specific, and
-> is even fairly unlikely to vary between SoC versions since these values
-> are all 0xffffffff anyway, I don't really see much point in putting it
-> into DT, rather than just putting the static data into the driver.
+* Linus Torvalds <torvalds@linux-foundation.org> [130507 18:05]:
+> On Tue, May 7, 2013 at 4:19 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> >> Vaibhav Hiremath (1):
+> >>       ARM: OMAP2+: Fix mismerge for timer.c between ff931c82 and da4a686a
+> >
+> > Turns out this urgent boot fix got undone in the merge somehow.
+> 
+> Those lines actually disappeared already much earlier in my merge 6fa52ed33bea:
+> 
+>     Merge tag 'drivers-for-linus' of
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc
+> 
+> last Saturday.
 
-I mean there is already dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-at function of_platform_device_create, why can't add
-dev->dev.dma_mask = &dev->dev.coherent_dma_mask after that?
+Yes then we patched it on Sunday, and Arnd merged it into his branch.
+But then hose lines disappeared again for the third time :)
+ 
+> And it's my bad. I even know how it happened: I ended up doing that
+> merge twice (because I had to go back and fix something else), and
+> then I "optimized" it the second time. With all the omap2 conflicts
+> from that tree came from duplicate commits from the ARM tree, and I
+> ended up just taking the drivers-for-linus side for
+> arch/arm/mach-omap2. Which was correct for the other two files in
+> there (gpmc.c and gpmc-onenand.c). but the timer.c file had changes
+> from the arm tree.
+> 
+> Sorry about that one.
 
-If DT core can do above things, can we delete dma_mask assignment
-at every driver?
+No problem, thanks for fixing it quickly.
 
+Regards, 
 
---
-BR,
-Peter Chen
+Tony
