@@ -1,48 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 08 May 2013 12:41:02 -0600
-Subject: [PATCH] ARM: tegra: disable LP2 cpuidle state if PCIe is enabled
-In-Reply-To: <20130508094004.GL7949@tbergstrom-lnx.Nvidia.com>
-References: <1367872744-25002-1-git-send-email-swarren@wwwdotorg.org>
- <20130507124849.GM7949@tbergstrom-lnx.Nvidia.com>
- <20130507130850.GA11202@avionic-0098.adnet.avionic-design.de>
- <518915A7.1020105@wwwdotorg.org>
- <20130508094004.GL7949@tbergstrom-lnx.Nvidia.com>
-Message-ID: <518A9C3E.2060803@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 May 2013 19:43:54 +0100
+Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <20130508150800.GI2703@arm.com>
+References: <20130421220629.GA25571@schnuecks.de>
+ <20130430112225.GD29766@arm.com> <20130430210403.GA18076@schnuecks.de>
+ <20130501142206.GB17387@arm.com> <20130501190441.GA22227@schnuecks.de>
+ <20130502095431.GA20730@arm.com> <20130502193835.GA29144@schnuecks.de>
+ <20130503100242.GB29962@arm.com>
+ <CACVXFVPOuabwAa1VDmSnfDG=M-1Df02_kpbm0UVAVctCAB-U4Q@mail.gmail.com>
+ <20130508150800.GI2703@arm.com>
+Message-ID: <20130508184354.GQ18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2013 03:40 AM, Peter De Schrijver wrote:
-> On Tue, May 07, 2013 at 04:54:31PM +0200, Stephen Warren wrote:
->> On 05/07/2013 07:08 AM, Thierry Reding wrote:
->>> On Tue, May 07, 2013 at 03:48:49PM +0300, Peter De Schrijver
->>> wrote:
->>>> On Mon, May 06, 2013 at 10:39:04PM +0200, Stephen Warren wrote:
->>>>> From: Stephen Warren <swarren@nvidia.com>
->>>>>
->>>>> Tegra20 HW appears to have a bug such that PCIe device
->>>>> interrupts, whether they are legacy IRQs or MSI, are lost when
->>>>> LP2 is enabled. To work around this, simply disable LP2 if the
->>>>> PCI driver and DT node are both enabled.
->>>>>
->>>>
->>>> Wouldn't it make more sense to disable LP2 when we actually
->>>> detect a PCIe device?
->>
->> I did consider that, but rejected the idea for the reasons Thierry
->> mentioned.
-...
->>> Furthermore, it is quite likely that the PCIe controller will only
->>> be enabled in DT for devices that actually have a PCIe device
->>> hooked up.
+On Wed, May 08, 2013 at 04:08:00PM +0100, Catalin Marinas wrote:
+> On Sat, May 04, 2013 at 09:21:27AM +0100, Ming Lei wrote:
+> > On Fri, May 3, 2013 at 6:02 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > >>
+> > >> I assume that you inhibited the call to flush_dcache_page() in
+> > >> __get_user_pages() for anon pages.  Otherwise, you will be flooded
+> > >> with warnings.
+> > >
+> > > I haven't done any stress testing so I don't think I hit this code path,
+> > > so no warning. But yes, it should have triggered. Anyway, in this case
+> > > flush_dcache_page() should have just ignored (clearing PG_arch_1 is
+> > > harmless anyway if we also ignore this bit in __sync_icache_dcache for
+> > > non-aliasing caches).
+> > 
+> > Yes, maybe we can do a little optimization for O_DIRECT since no
+> > dcache alias and I/D coherency problem in this case on ARMv7, how
+> > about below change?
+> > 
+> > diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> > index 1c8f7f5..962a657 100644
+> > --- a/arch/arm/mm/flush.c
+> > +++ b/arch/arm/mm/flush.c
+> > @@ -287,6 +287,8 @@ void flush_dcache_page(struct page *page)
+> >  	    mapping && !mapping_mapped(mapping))
+> >  		clear_bit(PG_dcache_clean, &page->flags);
+> >  	else {
+> > +		if (!mapping && cache_is_vipt_nonaliasing())
+> > +			return;
+> >  		__flush_dcache_page(mapping, page);
+> >  		if (mapping && cache_is_vivt())
+> >  			__flush_dcache_aliases(mapping, page);
 > 
-> That's not always true though. Eg Harmony has a miniPCIe slot, so it should be
-> listed in DT, but there is not necessarily a card present in the slot.
+> I wonder whether we could move the:
+> 
+> 	if (!mapping)
+> 		return
+> 
+> at the top of this function, IOW don't touch any anonymous pages. Would
+> anything be broken (apart from wrong API use)?
 
-I initially thought that this issue only affected Tegra20, so I was
-prepared to ignore the lack of optimality of this solution, since it
-only affects Harmony. However, initial experimentation with Jay's
-Tegra30 PCIe patches imply the same issue is present on Tegra30. I need
-to do more research to confirm whether it's the same problem or
-something else though. If this turns out to be true, we'll have to come
-up with a more complex solution, since this current solution would
-disable LP2 outright on all currently supported Tegra30 boards:-(
+I suspect you may be missing something - and I suggest reading the Sparc
+version, which is where this PG_arch_1 stuff was first dreamed up (by
+DaveM).
+
+Are you positive that this path can be eliminated?  Totally sure?  Have
+you checked the arg/env pages that fs/exec.c and the binfmt's insert into
+the new process?
+
+The comments against the Sparc version suggest that the "else" clause
+is necessary ensure that case is adequately covered.
