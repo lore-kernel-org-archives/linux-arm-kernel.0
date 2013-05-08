@@ -1,74 +1,63 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 8 May 2013 09:15:27 -0700
-Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
-In-Reply-To: <B5A00B86-5332-427E-A82A-5B71EC0979A8@jcrosoft.com>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022248-2153-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081634.43498.arnd@arndb.de>
- <20130508153459.GA17186@kroah.com>
- <20130508154057.GB3041@game.jcrosoft.org>
- <20130508155301.GB27273@kroah.com>
- <B5A00B86-5332-427E-A82A-5B71EC0979A8@jcrosoft.com>
-Message-ID: <20130508161527.GA28080@kroah.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 08 May 2013 12:17:35 -0400
+Subject: [RFC PATCH v2 08/11] ARM64: mm: Swap PTE_FILE and PTE_PROT_NONE
+ bits.
+In-Reply-To: <1368006763-30774-9-git-send-email-steve.capper@linaro.org>
+References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
+ <1368006763-30774-9-git-send-email-steve.capper@linaro.org>
+Message-ID: <518A7A9F.9080105@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 09, 2013 at 12:03:05AM +0800, Jean-Christophe PLAGNIOL-VILLARD wrote:
+Hi Steve,
+
+On 05/08/2013 05:52 AM, Steve Capper wrote:
+> Under ARM64, PTEs can be broadly categorised as follows:
+>    - Present and valid: Bit #0 is set. The PTE is valid and memory
+>      access to the region may fault.
 > 
-> On May 8, 2013, at 11:53 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
+>    - Present and invalid: Bit #0 is clear and bit #1 is set.
+>      Represents present memory with PROT_NONE protection. The PTE
+>      is an invalid entry, and the user fault handler will raise a
+>      SIGSEGV.
 > 
-> > On Wed, May 08, 2013 at 05:40:57PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >> On 08:34 Wed 08 May     , Greg KH wrote:
-> >>> On Wed, May 08, 2013 at 04:34:43PM +0200, Arnd Bergmann wrote:
-> >>>>> +#define ASC_MAJOR		204
-> >>>>> +#define ASC_MINOR_START		40
-> >>>> 
-> >>>> I don't know what the current policy is on allocating major/minor numbers,
-> >>>> but I'm sure you cannot just reuse one that is already used.
-> >>> 
-> >>> I agree, why are you trying to create a new tty device name?  Can't you
-> >>> use the existing ttyS name and minor number as you will not have any
-> >>> other type of serial device on this system?
-> >> 
-> >> Greg on ST STB for more than 10 years we use ttyASC I'll prefer ttySx
-> > 
-> > For 10+ years you have had an out-of-tree serial driver?
-> yes ST have it out of tree for very long time even I puts them to come mainline
-
-Crazy...
-
-> >  What
-> > major/minor numbers did you use for it?
+>    - Not present (file): Bits #0 and #1 are clear, bit #2 is set.
+>      Memory represented has been paged out. The PTE is an invalid
+>      entry, and the fault handler will try and re-populate the
+>      memory where necessary.
 > 
-> http://git.stlinux.com/?p=havana/com.st.havana.kernel.git;a=blob;f=drivers/serial/stm-asc.h;h=79e003ffeb21df55a6af94774fc9c4b3d8de18e9;hb=HEAD
+> Huge PTEs are block descriptors that have bit #1 clear. If we wish
+> to represent PROT_NONE huge PTEs we then run into a problem as
+> there is no way to distinguish between regular and huge PTEs if we
+> set bit #1.
 > 
->   52 #define ASC_MAJOR               204
->   53 #define ASC_MINOR_START         40
-> 
-> same as in this patch
+> As huge PTEs are always present, the meaning of bits #1 and #2 can
+> be swapped for invalid PTEs. This patch swaps the PTE_FILE and
+> PTE_PROT_NONE constants, allowing us to represent PROT_NONE huge
+> PTEs.
 
-Ok, but just because you have been using an out-of-tree name, and
-non-reserved major/minor, doesn't mean we have to accept it.  As you are
-probably using a tool like udev/devtmpfs on your systems, the
-major/minor number shouldn't matter, only the name.
+[...]
 
-And I'd argue that we should change the name as well.
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
 
-> >> on the DTB SoC you have one one IP present the st,asc
-> > 
-> > I don't understand, what do you mean by this?
-> > 
-> > confused,
-> 
-> just mention there is not hardware reason to not use the generic ttySx
-> in place of ttyAS as we have only one IP that handle serial on this
-> family of SoC
-> 
-> personally I'll switch to ttySx
+[...]
 
-Great, then you can use the same major/minor range as well, so there's
-no more objection from me about this :)
+> @@ -306,8 +306,8 @@ extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
+>  
+>  /*
+>   * Encode and decode a file entry:
+> - *	bits 0-1:	present (must be zero)
+> - *	bit  2:		PTE_FILE
+> + *	bits 0 & 2:	present (must be zero)
 
-thanks,
+Consider using punctuation like "bits 0, 2" here to disambiguate from the
+binary and operation.
 
-greg k-h
+[...]
+
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
