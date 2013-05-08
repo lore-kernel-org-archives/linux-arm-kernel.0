@@ -1,22 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 May 2013 18:23:59 +0200
-Subject: [RFC 2/8] ARM:global_timer: Add ARM global timer support.
-In-Reply-To: <518A73CF.8000309@st.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 8 May 2013 18:21:21 +0200
+Subject: [RFC 5/8] ARM:stih41x: Add STiH415 SOC support
+In-Reply-To: <201305081818.01927.arnd@arndb.de>
 References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <20130508144907.GB20820@mudshark.cambridge.arm.com> <518A73CF.8000309@st.com>
-Message-ID: <201305081823.59938.arnd@arndb.de>
+ <1368022297-2334-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305081818.01927.arnd@arndb.de>
+Message-ID: <20130508162121.GD3041@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 May 2013, Stuart MENEFY wrote:
-> Fortunately the earliest version of these SoCs uses r2p2, so we avoided that
-> particular issue. But as the code doesn't attempt to work around these
-> problems a check on the version number might be a good idea to prevent other
-> people accidentally hitting it.
-> 
+On 18:18 Wed 08 May     , Arnd Bergmann wrote:
+> On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
+> > From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> > 
+> > The STiH415 is the next generation of HD, AVC set-top box processors for
+> > satellite, cable, terrestrial and IP-STB markets. It is an ARM Cortex-A9
+> > 1.0 GHz, dual-core CPU.
+> > 
+> > Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> > CC: Stephen Gallimore <stephen.gallimore@st.com>
+> > CC: Stuart Menefy <stuart.menefy@st.com>
+> > ---
+patch no receive on the ML
 
-Yes, good idea. I would put the version number in the compatible property
-and document both the working and non-working versions in the binding,
-but put a comment explaining the situation into the driver.
+please resend
 
-	Arnd
+Best Regards,
+J.
