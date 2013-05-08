@@ -1,165 +1,75 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 08 May 2013 11:44:02 +0200
-Subject: DMA mapping API abuse in exynos-drm
-In-Reply-To: <CAAQKjZONxDcHzKD3V+sJcM1+mSwqKg+y0Ak9g0ip0P4H937P6Q@mail.gmail.com>
-References: <2146981.l1bUpBI0CH@flatron>
- <CAAQKjZONxDcHzKD3V+sJcM1+mSwqKg+y0Ak9g0ip0P4H937P6Q@mail.gmail.com>
-Message-ID: <518A1E62.6070109@samsung.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed,  8 May 2013 10:52:32 +0100
+Subject: [RFC PATCH v2 00/11] HugeTLB and THP support for ARM64.
+Message-ID: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This series brings huge pages and transparent huge pages to ARM64.
+The functionality is very similar to x86, and a lot of code that can
+be used by both ARM64 and x86 is brought into mm to avoid the need
+for code duplication.
 
-On 5/6/2013 7:59 AM, Inki Dae wrote:
-> 2013/5/5 Tomasz Figa <tomasz.figa@gmail.com 
-> <mailto:tomasz.figa@gmail.com>>
->
->     Hi,
->
->     Recently I've been working a bit on a DRM driver for the GPU of
->     Samsung
->     S3C6410 SoCs, which required me to familiarize a bit with
->     exynos-drm, as
->     it already contains a KMS driver which is compatible with the SoC I'm
->     working with, making it a good place to put my driver in.
->
->     Reading through exynos_drm_buf.c I stumbled across following (a
->     bit long)
->     piece of code:
->
->             dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &buf->dma_attrs);
->
->             nr_pages = buf->size >> PAGE_SHIFT;
->
->             if (!is_drm_iommu_supported(dev)) {
->                     dma_addr_t start_addr;
->                     unsigned int i = 0;
->
->                     buf->pages = kzalloc(sizeof(struct page) * nr_pages,
->                                             GFP_KERNEL);
->                     if (!buf->pages) {
->                             DRM_ERROR("failed to allocate pages.\n");
->                             return -ENOMEM;
->                     }
->
->                     buf->kvaddr = dma_alloc_attrs(dev->dev, buf->size,
->     &buf->dma_addr, GFP_KERNEL,
->     &buf->dma_attrs);
->                     if (!buf->kvaddr) {
->                             DRM_ERROR("failed to allocate buffer.\n");
->                             kfree(buf->pages);
->                             return -ENOMEM;
->                     }
->
->                     start_addr = buf->dma_addr;
->                     while (i < nr_pages) {
->                             buf->pages[i] = phys_to_page(start_addr);
->                             start_addr += PAGE_SIZE;
->                             i++;
->                     }
->             } else {
->
->                     buf->pages = dma_alloc_attrs(dev->dev, buf->size,
->     &buf->dma_addr, GFP_KERNEL,
->     &buf->dma_attrs);
->                     if (!buf->pages) {
->                             DRM_ERROR("failed to allocate buffer.\n");
->                             return -ENOMEM;
->                     }
->             }
->
->             buf->sgt = drm_prime_pages_to_sg(buf->pages, nr_pages);
->             if (!buf->sgt) {
->                     DRM_ERROR("failed to get sg table.\n");
->                     ret = -ENOMEM;
->                     goto err_free_attrs;
->             }
->
->     Notice that the value returned by dma_alloc_attrs() is assumed by this
->     code to be either a kernel virtual address (in
->     !is_drm_iommu_supported()
->     case) or struct pages ** (in is_drm_iommu_supported() case), which
->     seemed
->     a bit worrying to me, making me do a more in depth research on how
->     dma_alloc_attrs works.
->
->     This, in turn, led me to following excerpt of Documentation/DMA-
->     attributes.txt :
->
->     DMA_ATTR_NO_KERNEL_MAPPING
->     --------------------------
->
->     DMA_ATTR_NO_KERNEL_MAPPING lets the platform to avoid creating a
->     kernel
->     virtual mapping for the allocated buffer. On some architectures
->     creating
->     such mapping is non-trivial task and consumes very limited resources
->     (like kernel virtual address space or dma consistent address space).
->     Buffers allocated with this attribute can be only passed to user space
->     by calling dma_mmap_attrs(). By using this API, you are guaranteeing
->     that you won't dereference the pointer returned by
->     dma_alloc_attr(). You
->     can threat it as a cookie that must be passed to dma_mmap_attrs() and
->     dma_free_attrs(). Make sure that both of these also get this attribute
->     set on each call.
->
->     of which the following sentence is the most relevant:
->
->     By using this API, you are guaranteeing that you won't dereference the
->     pointer returned by dma_alloc_attr().
->
->     This statement is obviously ignored by buffer allocation code of
->     exynos-
->     drm.
->
->     A simple git blame revealed that this brokenness has been
->     introduced by
->     commit:
->
->     4744ad2 drm/exynos: use DMA_ATTR_NO_KERNEL_MAPPING attribute
->
->
->     and later fixed a bit by following depending patches (because the
->     original
->     patch apparently broke any allocations without IOMMU):
->
->     c704f1b drm/exynos: consider no iommu support to console framebuffer
->     694be45 drm/exynos: consider buffer allocation without iommu
->
->
->     Now, the real question is whether my reasoning is incorrect (sorry
->     for the
->     noise then) or this is really a bug which needs to be fixed?
->
->
-> Hi Tomasz,
->
-> Your question is reasonable to me. And below is my opinion,
->
-> First, also the below attribute says like below,
->
-> DMA_ATTR_NO_KERNEL_MAPPING
-> --------------------------
-> ...
-> Since it is optional for platforms to implement
-> DMA_ATTR_NO_KERNEL_MAPPING, those that do not will simply ignore the
-> attribute and exhibit default behavior.
->
->
-> In case of ARM SoC, it seems like that it just ignores the attribute
-> without iommu: in case of no iommu, dma_alloc_attr() always maps pages
-> allocated from highmem with kernel space. So I think we make sure that
-> exynos drm driver sets the attribute only with iommu to avoid such
-> confusing. For this, will post it soon.
+One notable difference from x86 is that ARM64 supports normal pages
+that are 64KB. When 64KB pages are enabled, huge page and
+transparent huge pages are 512MB only, otherwise the sizes match
+x86.
 
-IMHO this case simply shows that ExynosDRM driver should manage IO address
-space on it's own, because DMA-mapping api is too limited. ExynosDRM is
-unlikely to be used on a hardware other than Samsung Exynos, so it can
-better use hardware if it access IOMMU and CMA subsystems directly and
-have its own address space manager to avoid hacking in internal structures
-of dma-mapping.
+This series applies to 3.9, and requires one additional patch
+ARM64: mm: Correct show_pte behaviour
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/164157.html
 
-Best regards
+I've tested this under the ARMv8 models (Fast and Foundation) and
+the x86 code has been tested in a KVM guest. libhugetlbfs was used
+for testing under both architectures.
+
+The most significant changes since the first RFC are:
+
+   * PROT_NONE support added for HugeTLB and THP.
+   * pmd_modify implementation fixed.
+   * Superfluous huge dcache flushing code removed.
+   * Simplified (and corrected) MAX_ORDER raise for THP && 64KB
+     pages.
+   * The MAX_ORDER check in huge_mm.h has been corrected.
+
+I would be particularly interested in any feedback regarding the
+first 4 patches in the series (the promotion of some huge page
+code from x86 to mm), as this would also allow me to simplify
+my patches for huge page support in ARM.
+
+--
+
+Steve Capper (11):
+  mm: hugetlb: Copy huge_pmd_share from x86 to mm.
+  x86: mm: Remove x86 version of huge_pmd_share.
+  mm: hugetlb: Copy general hugetlb code from x86 to mm.
+  x86: mm: Remove general hugetlb code from x86.
+  mm: thp: Correct the HPAGE_PMD_ORDER check.
+  ARM64: mm: Restore memblock limit when map_mem finished.
+  ARM64: mm: Make PAGE_NONE pages read only and no-execute.
+  ARM64: mm: Swap PTE_FILE and PTE_PROT_NONE bits.
+  ARM64: mm: HugeTLB support.
+  ARM64: mm: Raise MAX_ORDER for 64KB pages and THP.
+  ARM64: mm: THP support.
+
+ arch/arm64/Kconfig                     |  17 +++
+ arch/arm64/include/asm/hugetlb.h       | 121 ++++++++++++++++++
+ arch/arm64/include/asm/pgtable-hwdef.h |  12 ++
+ arch/arm64/include/asm/pgtable.h       |  80 ++++++++++--
+ arch/arm64/include/asm/tlb.h           |   6 +
+ arch/arm64/include/asm/tlbflush.h      |   2 +
+ arch/arm64/mm/Makefile                 |   1 +
+ arch/arm64/mm/fault.c                  |  19 +--
+ arch/arm64/mm/hugetlbpage.c            |  70 +++++++++++
+ arch/arm64/mm/mmu.c                    |  19 ++-
+ arch/x86/Kconfig                       |   6 +
+ arch/x86/mm/hugetlbpage.c              | 187 ----------------------------
+ include/linux/huge_mm.h                |   2 +-
+ include/linux/hugetlb.h                |   4 +
+ mm/hugetlb.c                           | 219 +++++++++++++++++++++++++++++++--
+ 15 files changed, 539 insertions(+), 226 deletions(-)
+ create mode 100644 arch/arm64/include/asm/hugetlb.h
+ create mode 100644 arch/arm64/mm/hugetlbpage.c
+
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.8.1.4
