@@ -1,37 +1,64 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 8 May 2013 21:05:52 +0800
-Subject: [PATCH 0/3] ARM: imx/mxs: fixes for 3.10-rc1
-Message-ID: <1368018355-26014-1-git-send-email-shawn.guo@linaro.org>
+Date: Wed, 8 May 2013 21:05:53 +0800
+Subject: [PATCH 1/3] ARM: imx: compile fix for hotplug.c
+In-Reply-To: <1368018355-26014-1-git-send-email-shawn.guo@linaro.org>
+References: <1368018355-26014-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1368018355-26014-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+Commit bca7a5a (ARM: cpu hotplug: remove majority of cache flushing
+from platforms) removes include of <asm/cacheflush.h> and hence
+discovers a few indirect inclusion and declaration problems as below.
 
-It seems that you will have a few other fixes to send mainline for
-3.10-rc1 inclusion before merge window closes.  In that case, can you
-please include the following 3 which fix imx/mxs compile errors that
-are currently seen on mainline?
+  CC      arch/arm/mach-imx/hotplug.o
+In file included from arch/arm/mach-imx/hotplug.c:16:0:
+arch/arm/mach-imx/common.h:100:29: warning: ?struct pt_regs? declared inside parameter list [enabled by default]
+arch/arm/mach-imx/common.h:100:29: warning: its scope is only this definition or declaration, which is probably not what you want [enabled by default]
+arch/arm/mach-imx/common.h:101:29: warning: ?struct pt_regs? declared inside parameter list [enabled by default]
+arch/arm/mach-imx/hotplug.c: In function ?imx_cpu_die?:
+arch/arm/mach-imx/hotplug.c:53:2: error: implicit declaration of function ?cpu_do_idle? [-Werror=implicit-function-declaration]
+arch/arm/mach-imx/hotplug.c: In function ?imx_cpu_kill?:
+arch/arm/mach-imx/hotplug.c:58:26: error: ?jiffies? undeclared (first use in this function)
+arch/arm/mach-imx/hotplug.c:58:26: note: each undeclared identifier is reported only once for each function it appears in
+arch/arm/mach-imx/hotplug.c:58:2: error: implicit declaration of function ?msecs_to_jiffies? [-Werror=implicit-function-declaration]
+arch/arm/mach-imx/hotplug.c:61:3: error: implicit declaration of function ?time_after? [-Werror=implicit-function-declaration]
 
-Shawn
+Fix them by adding the needed inclusion and declaration.
 
-Fabio Estevam (2):
-  ARM: imx: Select GENERIC_ALLOCATOR
-  video: mxsfb: Adapt to new videomode API
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/mach-imx/common.h  |    1 +
+ arch/arm/mach-imx/hotplug.c |    2 ++
+ 2 files changed, 3 insertions(+)
 
-Shawn Guo (1):
-  ARM: imx: compile fix for hotplug.c
-
- arch/arm/mach-imx/Kconfig              |    5 +--
- arch/arm/mach-imx/Makefile             |    1 -
- arch/arm/mach-imx/common.h             |    1 +
- arch/arm/mach-imx/hotplug.c            |    2 +
- arch/arm/mach-imx/iram_alloc.c         |   73 --------------------------------
- drivers/video/Kconfig                  |    2 +-
- drivers/video/mxsfb.c                  |    8 ++--
- include/linux/platform_data/imx-iram.h |   41 ------------------
- 8 files changed, 9 insertions(+), 124 deletions(-)
- delete mode 100644 arch/arm/mach-imx/iram_alloc.c
- delete mode 100644 include/linux/platform_data/imx-iram.h
-
+diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
+index 4cba7db..c08ae3f 100644
+--- a/arch/arm/mach-imx/common.h
++++ b/arch/arm/mach-imx/common.h
+@@ -12,6 +12,7 @@
+ #define __ASM_ARCH_MXC_COMMON_H__
+ 
+ struct platform_device;
++struct pt_regs;
+ struct clk;
+ enum mxc_cpu_pwr_mode;
+ 
+diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
+index 5e91112..3daf1ed 100644
+--- a/arch/arm/mach-imx/hotplug.c
++++ b/arch/arm/mach-imx/hotplug.c
+@@ -11,7 +11,9 @@
+  */
+ 
+ #include <linux/errno.h>
++#include <linux/jiffies.h>
+ #include <asm/cp15.h>
++#include <asm/proc-fns.h>
+ 
+ #include "common.h"
+ 
 -- 
 1.7.9.5
