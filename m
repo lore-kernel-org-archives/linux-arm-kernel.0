@@ -1,57 +1,108 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 08 May 2013 11:46:25 +0100
-Subject: [PATCH v2 1/5] ARM: KVM: be more thorough when invalidating TLBs
-In-Reply-To: <20130502151302.GG20730@arm.com>
-References: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
- <1367505542-2231-2-git-send-email-marc.zyngier@arm.com>
- <20130502151302.GG20730@arm.com>
-Message-ID: <518A2D01.1070904@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 08 May 2013 12:53:38 +0200
+Subject: [PATCH] ARM: tegra: disable LP2 cpuidle state if PCIe is enabled
+In-Reply-To: <1367872744-25002-1-git-send-email-swarren@wwwdotorg.org>
+References: <1367872744-25002-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <518A2EB2.70006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/05/13 16:13, Catalin Marinas wrote:
-> On Thu, May 02, 2013 at 03:38:58PM +0100, Marc Zyngier wrote:
->> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
->> index f7793df..9e2d906c 100644
->> --- a/arch/arm/kvm/interrupts.S
->> +++ b/arch/arm/kvm/interrupts.S
-> ...
->> -static void clear_pte_entry(pte_t *pte)
->> +static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
->>  {
->>  	if (pte_present(*pte)) {
->>  		kvm_set_pte(pte, __pte(0));
->>  		put_page(virt_to_page(pte));
->> +		kvm_tlb_flush_vmid_ipa(kvm, addr);
->>  	}
->>  }
-> ...
->>  static void unmap_stage2_range(struct kvm *kvm, phys_addr_t start, u64 size)
->>  {
->> -	unmap_range(kvm->arch.pgd, start, size);
->> +	unmap_range(kvm, kvm->arch.pgd, start, size);
->>  }
->>  
->>  /**
->> @@ -413,6 +425,7 @@ void kvm_free_stage2_pgd(struct kvm *kvm)
->>  		return;
->>  
->>  	unmap_stage2_range(kvm, 0, KVM_PHYS_SIZE);
->> +	kvm_tlb_flush_vmid_ipa(kvm, 0);	/* Invalidate TLB ALL */
+On 05/06/2013 10:39 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> Do you still need this here if you invalidated each individual pte in
-> clear_pte_entry()? I think you can remove it from clear_pte_entry() and
-> just leave it here (more efficient probably) since you wouldn't free the
-> actual pages pointed at by the pte before unmapping.
+> Tegra20 HW appears to have a bug such that PCIe device interrupts, whether
+> they are legacy IRQs or MSI, are lost when LP2 is enabled. To work around
+> this, simply disable LP2 if the PCI driver and DT node are both enabled.
+> 
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> ---
+> Thierry,
+> 
+> This patch is physically based on next-20130506 so that it doesn't
+> conflict with any of the recent cpuidle cleanup work. I'm sending it with
+> the expectation that you'll apply it to your PCIe development branch
+> though. If you do that, you'll see some conflicts unless you rebase your
+> dev branch onto something more recent than next-20130422; I assume you'll
+> do that rebase soon enough anyway, but if you weren't planning to, I can
+> resend the patch based on your current dev branch.
+> 
+>  arch/arm/mach-tegra/cpuidle-tegra20.c |   30 ++++++++++++++++++++++++++++++
+>  1 file changed, 30 insertions(+)
+> 
+> diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
+> index 0cdba8d..d2c9349 100644
+> --- a/arch/arm/mach-tegra/cpuidle-tegra20.c
+> +++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/cpu_pm.h>
+>  #include <linux/clockchips.h>
+>  #include <linux/clk/tegra.h>
+> +#include <linux/of.h>
+>  
+>  #include <asm/cpuidle.h>
+>  #include <asm/proc-fns.h>
+> @@ -212,10 +213,39 @@ static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
+>  }
+>  #endif
+>  
+> +static const struct of_device_id pcie_matches[] __initconst = {
+> +	{ .compatible = "nvidia,tegra20-pcie" },
+> +	{ }
+> +};
+> +
+> +/*
+> + * Tegra20 HW appears to have a bug such that PCIe device interrupts, whether
+> + * they are legacy IRQs or MSI, are lost when LP2 is enabled. To work around
+> + * this, simply disable LP2 if the PCI driver and DT node are both enabled.
+> + */
+> +static void __init tegra20_cpuidle_disable_lp2_with_pcie(void)
+> +{
+> +	struct device_node *np;
+> +
+> +	if (!IS_ENABLED(CONFIG_PCI_TEGRA))
+> +		return;
+> +
+> +	np = of_find_matching_node(NULL, pcie_matches);
+> +	if (!np)
+> +		return;
+> +
+> +	if (!of_device_is_available(np))
+> +		return;
+> +
+> +	pr_info("Disabling LP2 cpuidle state, since PCIe is enabled\n");
+> +	tegra_idle_driver.state_count = 1;
 
-There is two cases we're trying to cater for:
-- unmapping a single page from stage2 (page being swapped out, for example)
-- unmapping the whole of stage2 (VM exiting)
+Won't be more clear to have the state disabled in the init function like
+this ?
 
-We cannot loose the "local" operations, but the last one can indeed go.
+int __init tegra20_cpuidle_init(void)
+{
+	...
+	if (tegra20_has_lp2_pcie_bug(void))
+		tegra_idle_driver.states[1].disabled = true;
+	...
+}
 
-Thanks,
+It is similar than:
 
-	M.
+https://git.kernel.org/cgit/linux/kernel/git/rafael/linux-pm.git/tree/arch/sh/kernel/cpu/shmobile/cpuidle.c
+
+> +}
+> +
+>  int __init tegra20_cpuidle_init(void)
+>  {
+>  #ifdef CONFIG_PM_SLEEP
+>  	tegra_tear_down_cpu = tegra20_tear_down_cpu;
+>  #endif
+> +	tegra20_cpuidle_disable_lp2_with_pcie();
+>  	return cpuidle_register(&tegra_idle_driver, cpu_possible_mask);
+>  }
+> 
+
+
 -- 
-Jazz is not dead. It just smells funny...
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
