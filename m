@@ -1,33 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 May 2013 21:48:10 +0200
-Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
-In-Reply-To: <518A8C1D.3090600@st.com>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081650.23264.arnd@arndb.de> <518A8C1D.3090600@st.com>
-Message-ID: <201305082148.10933.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 May 2013 12:51:53 -0700
+Subject: [RFC PATCH 0/3] ARM: omap3: add Seagate Wireless Plus board
+In-Reply-To: <cover.1368038129.git.jason@lakedaemon.net>
+References: <cover.1368038129.git.jason@lakedaemon.net>
+Message-ID: <20130508195152.GE32546@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
-> the pinctrl driver calls syconf_claim(np, "st,alt-control) to get a
-> field and then do a read/write on the field.
+* Jason Cooper <jason@lakedaemon.net> [130508 12:29]:
 > 
-> Just in pinctrl driver we use around 50-100 sysconf registers scatters
-> across different groups.
+> Current Problem:
 > 
-> Without these new APIs, its very difficult to pass this information to
-> the drivers.
+> There are several gaps in my understanding of how far along TI's conversion to
+> DT is.  Should I be doing a separate board file for initializing the legacy
+> items?  I was hoping to do it all with DT.
 
-But are those necessarily things you would configure using DT?
+Sorry forgot to reply to this.. No seprate board file should be needed,
+some devices may still need to be initialized with pdata based on the
+compatible flag.
+ 
+> Obviously, I don't expect anybody to run out and buy one of these, take it
+> apart, and try to boot this code.  But if the omap guys could take a look at
+> this and give me a few pointers, I'd appreciate it.  I'm kind of spinning my
+> wheels at the moment.
+> 
+> Primarily, I'd like to get nand and usb working, so that I can read/write,
+> mount a rootfs and do better testing.
 
-If there are so many registers that are shared between mutliple
-subsystems, maybe using drivers/mfd/syscon for that is taking things
-further than you should, since it is unlike what any of the other
-SoC families need from syscon.
+The USB should be doable with device tree. At least both echi and
+musb are working properly on pandaboard. I think people have been
+using NAND with the gpmc DT patches, but I don't know the current
+status for sure.
 
-Can you describe how your syscon registers are laid out?
-Which subsystems beside pinctrl need to directly interact
-with it? Is there any logical structure in it or do you just
-have tons of bits scattered around an MMIO area?
+Is the hard drive on the EHCI bus or how is it connected to omap?
 
-	Arnd
+Regards,
+
+Tony
