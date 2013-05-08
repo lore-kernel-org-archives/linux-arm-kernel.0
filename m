@@ -1,177 +1,76 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Wed,  8 May 2013 10:52:33 +0100
-Subject: [RFC PATCH v2 01/11] mm: hugetlb: Copy huge_pmd_share from x86 to mm.
+Date: Wed,  8 May 2013 10:52:38 +0100
+Subject: [RFC PATCH v2 06/11] ARM64: mm: Restore memblock limit when map_mem
+ finished.
 In-Reply-To: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
 References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1368006763-30774-2-git-send-email-steve.capper@linaro.org>
+Message-ID: <1368006763-30774-7-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under x86, multiple puds can be made to reference the same bank of
-huge pmds provided that they represent a full PUD_SIZE of shared
-huge memory that is aligned to a PUD_SIZE boundary.
+In paging_init the memblock limit is set to restrict any addresses
+returned by early_alloc to fit within the initial direct kernel
+mapping in swapper_pg_dir. This allows map_mem to allocate puds,
+pmds and ptes from the initial direct kernel mapping.
 
-The code to share pmds does not require any architecture specific
-knowledge other than the fact that pmds can be indexed, thus can
-be beneficial to some other architectures.
+The limit stays low after paging_init() though, meaning any
+bootmem allocations will be from a restricted subset of memory.
+Gigabyte huge pages, for instance, are normally allocated from
+bootmem as their order (18) is too large for the default buddy
+allocator (MAX_ORDER = 11).
 
-This patch copies the huge pmd sharing (and unsharing) logic from
-x86/ to mm/ and introduces a new config option to activate it:
-CONFIG_ARCH_WANTS_HUGE_PMD_SHARE
+This patch restores the memblock limit when map_mem has finished,
+allowing gigabyte huge pages (and other objects) to be allocated
+from all of bootmem.
 
 Signed-off-by: Steve Capper <steve.capper@linaro.org>
 ---
- include/linux/hugetlb.h |   4 ++
- mm/hugetlb.c            | 122 ++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 126 insertions(+)
+ arch/arm64/mm/mmu.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/hugetlb.h b/include/linux/hugetlb.h
-index 16e4e9a..795c32d 100644
---- a/include/linux/hugetlb.h
-+++ b/include/linux/hugetlb.h
-@@ -68,6 +68,10 @@ void hugetlb_unreserve_pages(struct inode *inode, long offset, long freed);
- int dequeue_hwpoisoned_huge_page(struct page *page);
- void copy_huge_page(struct page *dst, struct page *src);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 70b8cd4..d23188c 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -297,6 +297,16 @@ static void __init map_mem(void)
+ {
+ 	struct memblock_region *reg;
  
-+#ifdef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
-+pte_t *huge_pmd_share(struct mm_struct *mm, unsigned long addr, pud_t *pud);
-+#endif
++	/*
++	 * Temporarily limit the memblock range. We need to do this as
++	 * create_mapping requires puds, pmds and ptes to be allocated from
++	 * memory addressable from the initial direct kernel mapping.
++	 *
++	 * The initial direct kernel mapping, located at swapper_pg_dir,
++	 * gives us PGDIR_SIZE memory starting from PHYS_OFFSET (aligned).
++	 */
++	memblock_set_current_limit((PHYS_OFFSET & PGDIR_MASK) + PGDIR_SIZE);
 +
- extern unsigned long hugepages_treat_as_movable;
- extern const unsigned long hugetlb_zero, hugetlb_infinity;
- extern int sysctl_hugetlb_shm_group;
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index ca9a7c6..41179b0 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -3142,6 +3142,128 @@ void hugetlb_unreserve_pages(struct inode *inode, long offset, long freed)
- 	hugetlb_acct_memory(h, -(chg - freed));
+ 	/* map all the memory banks */
+ 	for_each_memblock(memory, reg) {
+ 		phys_addr_t start = reg->base;
+@@ -307,6 +317,9 @@ static void __init map_mem(void)
+ 
+ 		create_mapping(start, __phys_to_virt(start), end - start);
+ 	}
++
++	/* Limit no longer required. */
++	memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
  }
  
-+#ifdef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
-+static unsigned long page_table_shareable(struct vm_area_struct *svma,
-+				struct vm_area_struct *vma,
-+				unsigned long addr, pgoff_t idx)
-+{
-+	unsigned long saddr = ((idx - svma->vm_pgoff) << PAGE_SHIFT) +
-+				svma->vm_start;
-+	unsigned long sbase = saddr & PUD_MASK;
-+	unsigned long s_end = sbase + PUD_SIZE;
-+
-+	/* Allow segments to share if only one is marked locked */
-+	unsigned long vm_flags = vma->vm_flags & ~VM_LOCKED;
-+	unsigned long svm_flags = svma->vm_flags & ~VM_LOCKED;
-+
-+	/*
-+	 * match the virtual addresses, permission and the alignment of the
-+	 * page table page.
-+	 */
-+	if (pmd_index(addr) != pmd_index(saddr) ||
-+	    vm_flags != svm_flags ||
-+	    sbase < svma->vm_start || svma->vm_end < s_end)
-+		return 0;
-+
-+	return saddr;
-+}
-+
-+static int vma_shareable(struct vm_area_struct *vma, unsigned long addr)
-+{
-+	unsigned long base = addr & PUD_MASK;
-+	unsigned long end = base + PUD_SIZE;
-+
-+	/*
-+	 * check on proper vm_flags and page table alignment
-+	 */
-+	if (vma->vm_flags & VM_MAYSHARE &&
-+	    vma->vm_start <= base && end <= vma->vm_end)
-+		return 1;
-+	return 0;
-+}
-+
-+/*
-+ * Search for a shareable pmd page for hugetlb. In any case calls pmd_alloc()
-+ * and returns the corresponding pte. While this is not necessary for the
-+ * !shared pmd case because we can allocate the pmd later as well, it makes the
-+ * code much cleaner. pmd allocation is essential for the shared case because
-+ * pud has to be populated inside the same i_mmap_mutex section - otherwise
-+ * racing tasks could either miss the sharing (see huge_pte_offset) or select a
-+ * bad pmd for sharing.
-+ */
-+pte_t *huge_pmd_share(struct mm_struct *mm, unsigned long addr, pud_t *pud)
-+{
-+	struct vm_area_struct *vma = find_vma(mm, addr);
-+	struct address_space *mapping = vma->vm_file->f_mapping;
-+	pgoff_t idx = ((addr - vma->vm_start) >> PAGE_SHIFT) +
-+			vma->vm_pgoff;
-+	struct vm_area_struct *svma;
-+	unsigned long saddr;
-+	pte_t *spte = NULL;
-+	pte_t *pte;
-+
-+	if (!vma_shareable(vma, addr))
-+		return (pte_t *)pmd_alloc(mm, pud, addr);
-+
-+	mutex_lock(&mapping->i_mmap_mutex);
-+	vma_interval_tree_foreach(svma, &mapping->i_mmap, idx, idx) {
-+		if (svma == vma)
-+			continue;
-+
-+		saddr = page_table_shareable(svma, vma, addr, idx);
-+		if (saddr) {
-+			spte = huge_pte_offset(svma->vm_mm, saddr);
-+			if (spte) {
-+				get_page(virt_to_page(spte));
-+				break;
-+			}
-+		}
-+	}
-+
-+	if (!spte)
-+		goto out;
-+
-+	spin_lock(&mm->page_table_lock);
-+	if (pud_none(*pud))
-+		pud_populate(mm, pud,
-+				(pmd_t *)((unsigned long)spte & PAGE_MASK));
-+	else
-+		put_page(virt_to_page(spte));
-+	spin_unlock(&mm->page_table_lock);
-+out:
-+	pte = (pte_t *)pmd_alloc(mm, pud, addr);
-+	mutex_unlock(&mapping->i_mmap_mutex);
-+	return pte;
-+}
-+
-+/*
-+ * unmap huge page backed by shared pte.
-+ *
-+ * Hugetlb pte page is ref counted at the time of mapping.  If pte is shared
-+ * indicated by page_count > 1, unmap is achieved by clearing pud and
-+ * decrementing the ref count. If count == 1, the pte page is not shared.
-+ *
-+ * called with vma->vm_mm->page_table_lock held.
-+ *
-+ * returns: 1 successfully unmapped a shared pte page
-+ *	    0 the underlying pte page is not shared, or it is the last user
-+ */
-+int huge_pmd_unshare(struct mm_struct *mm, unsigned long *addr, pte_t *ptep)
-+{
-+	pgd_t *pgd = pgd_offset(mm, *addr);
-+	pud_t *pud = pud_offset(pgd, *addr);
-+
-+	BUG_ON(page_count(virt_to_page(ptep)) == 0);
-+	if (page_count(virt_to_page(ptep)) == 1)
-+		return 0;
-+
-+	pud_clear(pud);
-+	put_page(virt_to_page(ptep));
-+	*addr = ALIGN(*addr, HPAGE_SIZE * PTRS_PER_PTE) - HPAGE_SIZE;
-+	return 1;
-+}
-+#endif /* CONFIG_ARCH_WANT_HUGE_PMD_SHARE */
-+
- #ifdef CONFIG_MEMORY_FAILURE
+ /*
+@@ -317,12 +330,6 @@ void __init paging_init(void)
+ {
+ 	void *zero_page;
  
- /* Should be called in hugetlb_lock */
+-	/*
+-	 * Maximum PGDIR_SIZE addressable via the initial direct kernel
+-	 * mapping in swapper_pg_dir.
+-	 */
+-	memblock_set_current_limit((PHYS_OFFSET & PGDIR_MASK) + PGDIR_SIZE);
+-
+ 	init_mem_pgprot();
+ 	map_mem();
+ 
 -- 
 1.8.1.4
