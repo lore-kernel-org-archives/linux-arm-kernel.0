@@ -1,38 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 May 2013 16:07:54 +0200
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 8 May 2013 10:14:13 -0400 (EDT)
 Subject: [PATCH] USB: set device dma_mask without reference to global data
-In-Reply-To: <518A582C.8070600@gmail.com>
-References: <1367967232-10128-1-git-send-email-swarren@wwwdotorg.org>
- <20130508071137.GM25742@login.drsnuggles.stderr.nl>
- <518A582C.8070600@gmail.com>
-Message-ID: <201305081607.54839.arnd@arndb.de>
+In-Reply-To: <201305080142.12025.arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1305081011480.1450-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 May 2013, Rob Herring wrote:
-> On 05/08/2013 02:11 AM, Matthijs Kooijman wrote:
+On Wed, 8 May 2013, Arnd Bergmann wrote:
 
-> > https://lkml.org/lkml/2012/12/4/54
-> > 
-> > And here's the previous attempt, to which Rob Herring refers in a reply.
-> > 
-> > https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-March/013180.html
+> On Wednesday 08 May 2013, Greg Kroah-Hartman wrote:
+> > On Tue, May 07, 2013 at 04:53:52PM -0600, Stephen Warren wrote:
+> > > From: Stephen Warren <swarren@nvidia.com>
 > 
-> I believe most of the issues have been around supporting ARM LPAE
-> systems. There is a much more simple approach to address this by using
-> the dma_addr_t size to set the coherent_dma_mask which I have queued for
-> 3.11:
+> > > Suggested-by: Arnd Bergmann <arnd@arndb.de>
+> > > Signed-off-by: Stephen Warren <swarren@nvidia.com>
+> > 
+> > So this needs to go in for 3.10, right?  Any older kernels as well?  If
+> > so, which ones?
 > 
-> https://patchwork-mail1.kernel.org/patch/2495861/
+> The fix should definitely go into 3.10, but I'd suggest waiting with
+> the backport for a couple of -rc releases to avoid possible regressions.
+> We know that the current code is broken, but few people fully understand
+> what is going on with coherent_dma_mask, so it might cause new problems
+> in combination with some other unknown bug, and I don't see this as
+> urgent: none of the ARM defconfigs build this driver as a loadable
+> module and there is no bug in the built-in case. For some reason, only
+> the ARM back-end drivers are broken.
+> 
+> The first occurence was apparently in 3.3, but only in ehci-tegra.c,
+> while the other drivers subsequently copied the bug.
 
-Hmm, this approach seems wrong -- a lot of devices I expect cannot
-actually do DMA to addresses beyond 4GB. A better default would
-be to use a 32 bit mask for all devices and override the ones that
-actually matter for performance and are known to be 64-bit DMA
-capable.
+An alternative solution -- perhaps not better but also not relying on
+coherent_dma_mask -- is to clear pdev->dev.dma_mask in the remove
+routine if it points to the static mask value.
 
-Laura, you obviously tried this code on an LPAE-enabled system. Have
-you had a look in the hardware manual which DMA masters in the
-system are actually 64-bit capable?
-
-	Arnd
+Alan Stern
