@@ -1,41 +1,90 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 8 May 2013 14:37:07 +0100
-Subject: [PATCH 0/9] Important ux500 fixups due for the v3.10 -rc:s
-In-Reply-To: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
-References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130508133707.GH3459@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 08 May 2013 08:50:36 -0500
+Subject: [PATCH] USB: set device dma_mask without reference to global data
+In-Reply-To: <20130508071137.GM25742@login.drsnuggles.stderr.nl>
+References: <1367967232-10128-1-git-send-email-swarren@wwwdotorg.org>
+ <CAL411-qVnm0_wwdAiAp9eq_hYkXzFSmRMLAmknpSAG7Jb3bM9A@mail.gmail.com>
+ <5189B7BF.8070607@wwwdotorg.org>
+ <CAL411-pY_i19otiE2pLux6eR_OFHhfhK=+6BF=H6wABDsGCP6Q@mail.gmail.com>
+ <20130508071137.GM25742@login.drsnuggles.stderr.nl>
+Message-ID: <518A582C.8070600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Sam, Mike & Ulf
-
-I see that you weren't on the list for the 0/9 patch, so here FYI:
-
-> This patch-set straightens out some serious errors incurred during
-> the v3.10 merge window, including:
+On 05/08/2013 02:11 AM, Matthijs Kooijman wrote:
+> Hi folks,
 > 
-> Patch 1: Possible over-write of DB8500-PRCMU platform data
-> Patch 2: Fail to register AB8500 GPIO driver
-> Patch 3: Fail to start Ethernet when using ATAGS - Clocks
-> Patch 4: Fail to probe DB8500 Thermal driver - No pdata
-> Patch 5: Fail to use Early Printk - Incorrect virtual addresses
-> Patch 6: Fail to start Ethernet with using Device Tree - Clocks
-> Patch 7: Oops kernel during driver fail - Null pointer
-> Patch 8: Fail to probe AB8500 GPIO driver - Incorrect platform ID
-> Patch 9: Fail to probe AB8500 GPADC driver - Regulators
+> I also bumped into the question of how to set the dma_mask when enabling
+> the dwc2 driver on the ramips target and found there didn't seem to be
+> any clear way to get a dma_mask.
 > 
->  arch/arm/include/debug/ux500.S     |    6 +++---
->  arch/arm/mach-ux500/board-mop500.c |    6 +++---
->  arch/arm/mach-ux500/cpu-db8500.c   |    6 ++----
->  arch/arm/mach-ux500/setup.h        |    2 +-
->  drivers/clk/ux500/u8500_clk.c      |    2 +-
->  drivers/mfd/ab8500-core.c          |    9 ++++++---
->  drivers/mfd/db8500-prcmu.c         |    1 +
->  drivers/pinctrl/pinctrl-abx500.c   |   30 ++++++++++++++----------------
->  8 files changed, 31 insertions(+), 31 deletions(-)
+> It seems to me that in the pre-DT era, a platform_device would get a
+> dma_mask when it was defined in the board / soc code, which makes sense
+> since that code knows if a dma_mask is required and what its value
+> should be (it seems to me that a driver can only know it needs a
+> dma_mask, but not what value it should have?).
+> 
+>>> This probably could be initialized from some DT property. However,
+>>> there's no such property defined right now, and considering that DT is
+>>> supposed to be an ABI, we'd always need the code in this patch as a
+>>> fallback for DTs that were created before any such property was defined.
+> It seems there has already been a patch to implement this. For
+> reference, this seems to be the most recent version:
+> 
+> https://lkml.org/lkml/2012/12/4/54
+> 
+> And here's the previous attempt, to which Rob Herring refers in a reply.
+> 
+> https://lists.ozlabs.org/pipermail/devicetree-discuss/2012-March/013180.html
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+I believe most of the issues have been around supporting ARM LPAE
+systems. There is a much more simple approach to address this by using
+the dma_addr_t size to set the coherent_dma_mask which I have queued for
+3.11:
+
+https://patchwork-mail1.kernel.org/patch/2495861/
+
+This does not set dma_mask though. There's always been some mystery
+around why there are separate masks. I think for most systems dma_mask
+can be set to coherent_dma_mask based on what Arnd found:
+
+http://pastebin.com/E7fFVJyq
+
+This can always be overridden by a platform with a bus notifier or by a
+driver if needed.
+
+Rob
+
+> 
+>>> Equally, since the data is SoC-specific rather than board-specific, and
+>>> is even fairly unlikely to vary between SoC versions since these values
+>>> are all 0xffffffff anyway, I don't really see much point in putting it
+>>> into DT, rather than just putting the static data into the driver.
+>>
+>> I mean there is already dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+>> at function of_platform_device_create, why can't add
+>> dev->dev.dma_mask = &dev->dev.coherent_dma_mask after that?
+> Perhaps it would sense to set the 32-bit mask as a default, but allow to
+> override this mask from the devicetree for boards that need another
+> value? Or perhaps override it from the soc code instead?
+> 
+> For the ramips target, the MIPS folks suggested another approach: The
+> soc code finds the platform_device generated by DT and adds the
+> dma_mask:
+> 
+> http://www.linux-mips.org/archives/linux-mips/2013-04/msg00162.html
+> 
+>> If DT core can do above things, can we delete dma_mask assignment
+>> at every driver?
+> That would seem like a likeably goal to me :-)
+> 
+> 
+> Gr.
+> 
+> Matthijs
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
