@@ -1,76 +1,32 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 8 May 2013 16:51:24 +0200
-Subject: [RFC 2/8] ARM:global_timer: Add ARM global timer support.
-In-Reply-To: <201305081638.23100.arnd@arndb.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 8 May 2013 16:01:41 +0100
+Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
+In-Reply-To: <201305081650.23264.arnd@arndb.de>
 References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081638.23100.arnd@arndb.de>
-Message-ID: <20130508145124.GA29391@pengutronix.de>
+ <1368022272-2241-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305081650.23264.arnd@arndb.de>
+Message-ID: <20130508150141.GA5057@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 08, 2013 at 04:38:22PM +0200, Arnd Bergmann wrote:
-> On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
-> > From: Stuart Menefy <stuart.menefy@st.com>
-> > 
-> > This is a simple driver for the global timer module found in the Cortex
-> > A9-MP cores from revision r1p0 onwards. This should be able to perform
-> > the functions of the system timer and the local timer in an SMP system.
-> > 
-> > The global timer has the following features:
-> >     The global timer is a 64-bit incrementing counter with an
-> > auto-incrementing feature. It continues incrementing after sending
-> > interrupts. The global timer is memory mapped in the private memory
-> > region.
-> >     The global timer is accessible to all Cortex-A9 processors in the
-> > cluster. Each Cortex-A9 processor has a private 64-bit comparator that
-> > is used to assert a private interrupt when the global timer has reached
-> > the comparator value. All the Cortex-A9 processors in a design use the
-> > banked ID, ID27, for this interrupt. ID27 is sent to the Interrupt
-> > Controller as a Private Peripheral Interrupt. The global timer is
-> > clocked by PERIPHCLK.
-> > 
-> > Signed-off-by: Stuart Menefy <stuart.menefy@st.com>
-> > Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> >
-> 
-> Are you sure we don't already have a driver for this? It sounds unlikely
-> that you are the first one to do this when the hardware is so common.
-> 
+On Wed, May 08, 2013 at 04:50:22PM +0200, Arnd Bergmann wrote:
 
-Isn't this the same as arch/arm/kernel/smp_twd.c ?
-That is atleast the timer I used with Cortex-A9. I don't think the core
-has another one. But maybe I'm wrong.
+> > In many cases a single syconf register contains bits related to multiple
+> > devices, and therefore it need to be shared across multiple drivers at
+> > bit level. The same IP block can have different syscon mappings on
+> > different SOCs.
 
-> >  Documentation/devicetree/bindings/arm/gt.txt |   21 ++
-> >  arch/arm/Kconfig                             |    6 +
-> >  arch/arm/include/asm/global_timer.h          |   12 +
-> >  arch/arm/kernel/Makefile                     |    1 +
-> >  arch/arm/kernel/global_timer.c               |  325 ++++++++++++++++++++++++++
-> >  5 files changed, 365 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/gt.txt
-> >  create mode 100644 arch/arm/include/asm/global_timer.h
-> >  create mode 100644 arch/arm/kernel/global_timer.c
-> 
-> Move it into drivers/clocksource?
->  
-> > diff --git a/arch/arm/include/asm/global_timer.h b/arch/arm/include/asm/global_timer.h
-> > new file mode 100644
-> > index 0000000..46f9188
-> > --- /dev/null
-> > +++ b/arch/arm/include/asm/global_timer.h
-> > @@ -0,0 +1,12 @@
-> > +int __init global_timer_init(void __iomem *base, unsigned int timer_irq);
-> 
-> I don't see a need to call this from platform code for non-DT platforms, it
-> can easily be used with CLOCKSOURCE_OF_DECLARE() all the time I think.
-> 
+> My feeling is that syscon is the wrong place for this functionality,
+> since regmap already handles (some of?) these issues. If you need
+> additional synchronization, it's probably best to extend regmap
+> as needed so other code besides syscon can take advantage of that
+> as well.
 
-Regards,
-Steffen
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+This sounds like regmap_update_bits() ought to be all that's needed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130508/7fc89de4/attachment.sig>
