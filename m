@@ -1,22 +1,33 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 May 2013 12:45:04 -0700
-Subject: [RFC PATCH 0/3] ARM: omap3: add Seagate Wireless Plus board
-In-Reply-To: <cover.1368038129.git.jason@lakedaemon.net>
-References: <cover.1368038129.git.jason@lakedaemon.net>
-Message-ID: <20130508194504.GD32546@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 May 2013 21:48:10 +0200
+Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
+In-Reply-To: <518A8C1D.3090600@st.com>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305081650.23264.arnd@arndb.de> <518A8C1D.3090600@st.com>
+Message-ID: <201305082148.10933.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jason Cooper <jason@lakedaemon.net> [130508 12:29]:
+On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
+> the pinctrl driver calls syconf_claim(np, "st,alt-control) to get a
+> field and then do a read/write on the field.
 > 
-> Tony has been helping me out offline with this, and he suggested trying the
-> gpmc against Linus' ToT.  Which locks up before it even has a chance to get
-> going.  So this series is against v3.9.
+> Just in pinctrl driver we use around 50-100 sysconf registers scatters
+> across different groups.
+> 
+> Without these new APIs, its very difficult to pass this information to
+> the drivers.
 
-You may have better luck with today's mainline treeand the following fix:
+But are those necessarily things you would configure using DT?
 
-http://lkml.org/lkml/2013/5/8/374#
+If there are so many registers that are shared between mutliple
+subsystems, maybe using drivers/mfd/syscon for that is taking things
+further than you should, since it is unlike what any of the other
+SoC families need from syscon.
 
-Regards,
+Can you describe how your syscon registers are laid out?
+Which subsystems beside pinctrl need to directly interact
+with it? Is there any logical structure in it or do you just
+have tons of bits scattered around an MMIO area?
 
-Tony
+	Arnd
