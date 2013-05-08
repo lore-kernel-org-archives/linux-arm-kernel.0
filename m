@@ -1,62 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 May 2013 16:17:36 -0700
-Subject: [PATCH] ARM: OMAP2+: omap_device: use late_initcall_sync
-In-Reply-To: <1367962765-13912-1-git-send-email-khilman@linaro.org>
-References: <1367962765-13912-1-git-send-email-khilman@linaro.org>
-Message-ID: <20130508231736.GR32546@atomide.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 9 May 2013 03:32:59 +0400
+Subject: [PATCH v7 0/3] Add USB support to R8A7778/BOCK-W
+Message-ID: <201305090333.00333.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@linaro.org> [130507 14:44]:
-> If DEBUG_LL and earlyprintk are enabled, and omap-serial.c is compiled
-> as a module, the kernel boot hangs early as the clocks for serial port
-> are cut while earlyprintk still uses the port.
-> 
-> The problem is a race between the late_initcall for omap_device (which
-> idles devices that have no drivers) and the late_initcall in
-> kernel/printk.c which turns off the earlyconsole.   Any printks
-> that happen between this omap_device late initcall and the earlyconsole
-> late initcall will crash when accessing the UART.
-> 
-> The fix is to ensure the omap_device initcall happens after the
-> earlyconsole initcall.
-> 
-> Reported-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+Hello.
 
-Thanks applying into omap-for-v3.10/fixes.
+   Here's the set of 3 patches against the Simon Horman's 'renesas.git' repo,
+'renesas-next-20130426' tag, the R8A7779/Marzen and sh-pfc patchset I've posted.
+It was created to add support of R8A7778/BOCK-W USB to the platform code and
+the USB common PHY driver, and so spans both arch/arm/mach-shmobile/ and
+drivers/usb/phy/ subtrees.
 
-Tony
+[1/3] rcar-phy: add R8A7778 support
+[2/3] ARM: shmobile: r8a7778: add USB support
+[3/3] ARM: shmobile: BOCK-W: add USB support
 
-> ---
-> Based on v3.9-rc8
-> 
->  arch/arm/mach-omap2/omap_device.c | 2 +-
->  arch/arm/mach-omap2/soc.h         | 1 +
->  2 files changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> index 381be7a..2d20d69 100644
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -879,4 +879,4 @@ static int __init omap_device_late_init(void)
->  	bus_for_each_dev(&platform_bus_type, NULL, NULL, omap_device_late_idle);
->  	return 0;
->  }
-> -omap_late_initcall(omap_device_late_init);
-> +omap_late_initcall_sync(omap_device_late_init);
-> diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
-> index c62116b..de88611 100644
-> --- a/arch/arm/mach-omap2/soc.h
-> +++ b/arch/arm/mach-omap2/soc.h
-> @@ -494,6 +494,7 @@ level(__##fn);
->  #define omap_subsys_initcall(fn)	omap_initcall(subsys_initcall, fn)
->  #define omap_device_initcall(fn)	omap_initcall(device_initcall, fn)
->  #define omap_late_initcall(fn)		omap_initcall(late_initcall, fn)
-> +#define omap_late_initcall_sync(fn)	omap_initcall(late_initcall_sync, fn)
->  
->  #endif	/* __ASSEMBLY__ */
->  
-> -- 
-> 1.8.2
-> 
+The patch #4 (ARM: shmobile: BOCK-W: enable USB in defconfig) that has been
+already merged, is not reposted.
+
+WBR, Sergei
