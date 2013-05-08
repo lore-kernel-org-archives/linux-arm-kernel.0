@@ -1,57 +1,72 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 9 May 2013 00:03:05 +0800
-Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
-In-Reply-To: <20130508155301.GB27273@kroah.com>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022248-2153-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081634.43498.arnd@arndb.de> <20130508153459.GA17186@kroah.com>
- <20130508154057.GB3041@game.jcrosoft.org> <20130508155301.GB27273@kroah.com>
-Message-ID: <B5A00B86-5332-427E-A82A-5B71EC0979A8@jcrosoft.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 8 May 2013 17:07:06 +0100
+Subject: [PATCH v3 3/4] arm: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+In-Reply-To: <518A7763.4050509@arm.com>
+References: <alpine.DEB.2.02.1305081446580.18865@kaball.uk.xensource.com>
+ <1368027714-14506-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <518A7763.4050509@arm.com>
+Message-ID: <alpine.DEB.2.02.1305081704530.18865@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On May 8, 2013, at 11:53 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-
-> On Wed, May 08, 2013 at 05:40:57PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 08:34 Wed 08 May     , Greg KH wrote:
->>> On Wed, May 08, 2013 at 04:34:43PM +0200, Arnd Bergmann wrote:
->>>>> +#define ASC_MAJOR		204
->>>>> +#define ASC_MINOR_START		40
->>>> 
->>>> I don't know what the current policy is on allocating major/minor numbers,
->>>> but I'm sure you cannot just reuse one that is already used.
->>> 
->>> I agree, why are you trying to create a new tty device name?  Can't you
->>> use the existing ttyS name and minor number as you will not have any
->>> other type of serial device on this system?
->> 
->> Greg on ST STB for more than 10 years we use ttyASC I'll prefer ttySx
+On Wed, 8 May 2013, Marc Zyngier wrote:
+> Hi Stefano,
 > 
-> For 10+ years you have had an out-of-tree serial driver?
-yes ST have it out of tree for very long time even I puts them to come mainline
-
->  What
-> major/minor numbers did you use for it?
-
-http://git.stlinux.com/?p=havana/com.st.havana.kernel.git;a=blob;f=drivers/serial/stm-asc.h;h=79e003ffeb21df55a6af94774fc9c4b3d8de18e9;hb=HEAD
-
-  52 #define ASC_MAJOR               204
-  53 #define ASC_MINOR_START         40
-
-same as in this patch
-
+> On 08/05/13 16:41, Stefano Stabellini wrote:
+> > Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM.
+> > 
+> > The only paravirt interface supported is pv_time_ops.steal_clock, so no
+> > runtime pvops patching needed.
+> > 
+> > This allows us to make use of steal_account_process_tick for stolen
+> > ticks accounting.
+> > 
+> > Changes in v3:
+> > - improve commit description and Kconfig help text;
+> > - no need to initialize pv_time_ops;
+> > - add PARAVIRT_TIME_ACCOUNTING.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > CC: linux at arm.linux.org.uk
+> > CC: will.deacon at arm.com
+> > CC: nico at linaro.org
+> > CC: marc.zyngier at arm.com
+> > CC: cov at codeaurora.org
+> > CC: arnd at arndb.de
+> > CC: olof at lixom.net
+> > ---
+> >  arch/arm/Kconfig                |   20 ++++++++++++++++++++
+> >  arch/arm/include/asm/paravirt.h |   19 +++++++++++++++++++
+> >  arch/arm/kernel/Makefile        |    1 +
+> >  arch/arm/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
+> >  4 files changed, 65 insertions(+), 0 deletions(-)
+> >  create mode 100644 arch/arm/include/asm/paravirt.h
+> >  create mode 100644 arch/arm/kernel/paravirt.c
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 344e299..89ee2f1 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -1887,12 +1887,32 @@ config XEN_DOM0
+> >  	def_bool y
+> >  	depends on XEN
+> >  
+> > +config PARAVIRT
+> > +	bool "Enable paravirtualization code"
+> > +	---help---
+> > +	  This changes the kernel so it can modify itself when it is run
+> > +	  under a hypervisor, potentially improving performance significantly
+> > +	  over full virtualization.
+> > +
+> > +config PARAVIRT_TIME_ACCOUNTING
+> > +	bool "Paravirtual steal time accounting"
+> > +	select PARAVIRT
 > 
->> on the DTB SoC you have one one IP present the st,asc
-> 
-> I don't understand, what do you mean by this?
-> 
-> confused,
+> Surely you meant "depends on" instead of "select" here? Otherwise I
+> don't really see the point of PARAVIRT...
 
-just mention there is not hardware reason to not use the generic ttySx in place of ttyAS
-as we have only one IP that handle serial on this family of SoC
+I agree with you that "depends on" seems to be the right thing here, but
+on x86 is actually select.
 
-personally I'll switch to ttySx
-
-Best Regards,
-J.
+The original commit is 095c0aa83e52d6c3dd7168610746703921f570af.
