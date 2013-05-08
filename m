@@ -1,72 +1,91 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 8 May 2013 17:07:06 +0100
-Subject: [PATCH v3 3/4] arm: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <518A7763.4050509@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 08 May 2013 17:07:18 +0100
+Subject: [PATCH v3 4/4] xen/arm: account for stolen ticks
+In-Reply-To: <1368027714-14506-4-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1305081446580.18865@kaball.uk.xensource.com>
- <1368027714-14506-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <518A7763.4050509@arm.com>
-Message-ID: <alpine.DEB.2.02.1305081704530.18865@kaball.uk.xensource.com>
+ <1368027714-14506-4-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <518A7836.4030705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 May 2013, Marc Zyngier wrote:
-> Hi Stefano,
-> 
-> On 08/05/13 16:41, Stefano Stabellini wrote:
-> > Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM.
-> > 
-> > The only paravirt interface supported is pv_time_ops.steal_clock, so no
-> > runtime pvops patching needed.
-> > 
-> > This allows us to make use of steal_account_process_tick for stolen
-> > ticks accounting.
-> > 
-> > Changes in v3:
-> > - improve commit description and Kconfig help text;
-> > - no need to initialize pv_time_ops;
-> > - add PARAVIRT_TIME_ACCOUNTING.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > CC: linux at arm.linux.org.uk
-> > CC: will.deacon at arm.com
-> > CC: nico at linaro.org
-> > CC: marc.zyngier at arm.com
-> > CC: cov at codeaurora.org
-> > CC: arnd at arndb.de
-> > CC: olof at lixom.net
-> > ---
-> >  arch/arm/Kconfig                |   20 ++++++++++++++++++++
-> >  arch/arm/include/asm/paravirt.h |   19 +++++++++++++++++++
-> >  arch/arm/kernel/Makefile        |    1 +
-> >  arch/arm/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
-> >  4 files changed, 65 insertions(+), 0 deletions(-)
-> >  create mode 100644 arch/arm/include/asm/paravirt.h
-> >  create mode 100644 arch/arm/kernel/paravirt.c
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 344e299..89ee2f1 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1887,12 +1887,32 @@ config XEN_DOM0
-> >  	def_bool y
-> >  	depends on XEN
-> >  
-> > +config PARAVIRT
-> > +	bool "Enable paravirtualization code"
-> > +	---help---
-> > +	  This changes the kernel so it can modify itself when it is run
-> > +	  under a hypervisor, potentially improving performance significantly
-> > +	  over full virtualization.
-> > +
-> > +config PARAVIRT_TIME_ACCOUNTING
-> > +	bool "Paravirtual steal time accounting"
-> > +	select PARAVIRT
-> 
-> Surely you meant "depends on" instead of "select" here? Otherwise I
-> don't really see the point of PARAVIRT...
+Hi Stefano,
 
-I agree with you that "depends on" seems to be the right thing here, but
-on x86 is actually select.
+On 08/05/13 16:41, Stefano Stabellini wrote:
+> Register the runstate_memory_area with the hypervisor.
+> Use pv_time_ops.steal_clock to account for stolen ticks.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> 
+> Changes in v3:
+> - use BUG_ON and smp_processor_id.
+> ---
+>  arch/arm/xen/enlighten.c |   22 ++++++++++++++++++++++
+>  1 files changed, 22 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index 13609e0..dfa7738 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -14,7 +14,10 @@
+>  #include <xen/xen-ops.h>
+>  #include <asm/xen/hypervisor.h>
+>  #include <asm/xen/hypercall.h>
+> +#include <asm/arch_timer.h>
+>  #include <asm/system_misc.h>
+> +#include <asm/paravirt.h>
+> +#include <linux/jump_label.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/irqreturn.h>
+>  #include <linux/module.h>
+> @@ -152,6 +155,19 @@ int xen_unmap_domain_mfn_range(struct vm_area_struct *vma,
+>  }
+>  EXPORT_SYMBOL_GPL(xen_unmap_domain_mfn_range);
+>  
+> +unsigned long long xen_stolen_accounting(int cpu)
+> +{
+> +	struct vcpu_runstate_info state;
+> +
+> +	BUG_ON(cpu != smp_processor_id());
+> +
+> +	xen_get_runstate_snapshot(&state);
+> +
+> +	WARN_ON(state.state != RUNSTATE_running);
+> +
+> +	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
+> +}
+> +
+>  static void __init xen_percpu_init(void *unused)
+>  {
+>  	struct vcpu_register_vcpu_info info;
+> @@ -169,6 +185,8 @@ static void __init xen_percpu_init(void *unused)
+>  	BUG_ON(err);
+>  	per_cpu(xen_vcpu, cpu) = vcpup;
+>  
+> +	xen_setup_runstate_info(cpu);
+> +
+>  	enable_percpu_irq(xen_events_irq, 0);
+>  }
+>  
+> @@ -300,6 +318,10 @@ static int __init xen_init_events(void)
+>  
+>  	on_each_cpu(xen_percpu_init, NULL, 0);
+>  
+> +	pv_time_ops.steal_clock = xen_stolen_accounting;
 
-The original commit is 095c0aa83e52d6c3dd7168610746703921f570af.
+What guarantee do we have that this is done before the rest of the
+kernel calls paravirt_steal_clock()? What if we have Xen support enabled
+but don't run as a Xen guest?
+
+> +	static_key_slow_inc(&paravirt_steal_enabled);
+> +	static_key_slow_inc(&paravirt_steal_rq_enabled);
+> +
+>  	return 0;
+>  }
+>  postcore_initcall(xen_init_events);
+> 
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
