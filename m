@@ -1,38 +1,97 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 8 May 2013 08:53:01 -0700
-Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
-In-Reply-To: <20130508154057.GB3041@game.jcrosoft.org>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022248-2153-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081634.43498.arnd@arndb.de>
- <20130508153459.GA17186@kroah.com>
- <20130508154057.GB3041@game.jcrosoft.org>
-Message-ID: <20130508155301.GB27273@kroah.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Wed,  8 May 2013 23:51:10 +0800
+Subject: [PATCH v5,
+ part4 13/41] mm/ARM: prepare for removing num_physpages and simplify
+ mem_init()
+In-Reply-To: <1368028298-7401-1-git-send-email-jiang.liu@huawei.com>
+References: <1368028298-7401-1-git-send-email-jiang.liu@huawei.com>
+Message-ID: <1368028298-7401-14-git-send-email-jiang.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 08, 2013 at 05:40:57PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 08:34 Wed 08 May     , Greg KH wrote:
-> > On Wed, May 08, 2013 at 04:34:43PM +0200, Arnd Bergmann wrote:
-> > > > +#define ASC_MAJOR		204
-> > > > +#define ASC_MINOR_START		40
-> > > 
-> > > I don't know what the current policy is on allocating major/minor numbers,
-> > > but I'm sure you cannot just reuse one that is already used.
-> > 
-> > I agree, why are you trying to create a new tty device name?  Can't you
-> > use the existing ttyS name and minor number as you will not have any
-> > other type of serial device on this system?
-> 
-> Greg on ST STB for more than 10 years we use ttyASC I'll prefer ttySx
+Prepare for removing num_physpages and simplify mem_init().
 
-For 10+ years you have had an out-of-tree serial driver?  What
-major/minor numbers did you use for it?
+Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/mm/init.c |   47 ++---------------------------------------------
+ 1 file changed, 2 insertions(+), 45 deletions(-)
 
-> on the DTB SoC you have one one IP present the st,asc
-
-I don't understand, what do you mean by this?
-
-confused,
-
-greg k-h
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index add4fcb..7a911d1 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -582,9 +582,6 @@ static void __init free_highpages(void)
+  */
+ void __init mem_init(void)
+ {
+-	unsigned long reserved_pages, free_pages;
+-	struct memblock_region *reg;
+-	int i;
+ #ifdef CONFIG_HAVE_TCM
+ 	/* These pointers are filled in on TCM detection */
+ 	extern u32 dtcm_end;
+@@ -605,47 +602,7 @@ void __init mem_init(void)
+ 
+ 	free_highpages();
+ 
+-	reserved_pages = free_pages = 0;
+-
+-	for_each_bank(i, &meminfo) {
+-		struct membank *bank = &meminfo.bank[i];
+-		unsigned int pfn1, pfn2;
+-		struct page *page, *end;
+-
+-		pfn1 = bank_pfn_start(bank);
+-		pfn2 = bank_pfn_end(bank);
+-
+-		page = pfn_to_page(pfn1);
+-		end  = pfn_to_page(pfn2 - 1) + 1;
+-
+-		do {
+-			if (PageReserved(page))
+-				reserved_pages++;
+-			else if (!page_count(page))
+-				free_pages++;
+-			page++;
+-		} while (page < end);
+-	}
+-
+-	/*
+-	 * Since our memory may not be contiguous, calculate the
+-	 * real number of pages we have in this system
+-	 */
+-	printk(KERN_INFO "Memory:");
+-	num_physpages = 0;
+-	for_each_memblock(memory, reg) {
+-		unsigned long pages = memblock_region_memory_end_pfn(reg) -
+-			memblock_region_memory_base_pfn(reg);
+-		num_physpages += pages;
+-		printk(" %ldMB", pages >> (20 - PAGE_SHIFT));
+-	}
+-	printk(" = %luMB total\n", num_physpages >> (20 - PAGE_SHIFT));
+-
+-	printk(KERN_NOTICE "Memory: %luk/%luk available, %luk reserved, %luK highmem\n",
+-		nr_free_pages() << (PAGE_SHIFT-10),
+-		free_pages << (PAGE_SHIFT-10),
+-		reserved_pages << (PAGE_SHIFT-10),
+-		totalhigh_pages << (PAGE_SHIFT-10));
++	mem_init_print_info(NULL);
+ 
+ #define MLK(b, t) b, t, ((t) - (b)) >> 10
+ #define MLM(b, t) b, t, ((t) - (b)) >> 20
+@@ -711,7 +668,7 @@ void __init mem_init(void)
+ 	BUG_ON(PKMAP_BASE + LAST_PKMAP * PAGE_SIZE	> PAGE_OFFSET);
+ #endif
+ 
+-	if (PAGE_SIZE >= 16384 && num_physpages <= 128) {
++	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
+ 		extern int sysctl_overcommit_memory;
+ 		/*
+ 		 * On a machine this small we won't get
+-- 
+1.7.9.5
