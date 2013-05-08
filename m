@@ -1,40 +1,33 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 May 2013 14:29:05 +0100
-Subject: [PATCH 5/9] ARM: ux500: Fix incorrect DEBUG UART virtual addresses
+Date: Wed,  8 May 2013 14:29:06 +0100
+Subject: [PATCH 6/9] ARM: ux500: Provide device enumeration number suffix for
+ SMSC911x
 In-Reply-To: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
 References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1368019749-19455-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <1368019749-19455-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent move to rid header files which were hindering multiplatform
-support forced address allocations out of the headers and into the
-files which were using them. We also lost some useful macros such as
-IO_ADDRESS(), so physical -> virtual addressing has been carried out
-manually in this case. Unfortunately the incorrect value was converted.
-This patch rectifies the error and ensures earlyprintk works again.
+First Ethernet device has a ".0" appended onto the device name. It
+appears that we need this in order to obtain the correct clock.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/include/debug/ux500.S |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/debug/ux500.S b/arch/arm/include/debug/ux500.S
-index 2848857..fbd24be 100644
---- a/arch/arm/include/debug/ux500.S
-+++ b/arch/arm/include/debug/ux500.S
-@@ -24,9 +24,9 @@
- #define U8500_UART0_PHYS_BASE	(0x80120000)
- #define U8500_UART1_PHYS_BASE	(0x80121000)
- #define U8500_UART2_PHYS_BASE	(0x80007000)
--#define U8500_UART0_VIRT_BASE	(0xa8120000)
--#define U8500_UART1_VIRT_BASE	(0xa8121000)
--#define U8500_UART2_VIRT_BASE	(0xa8007000)
-+#define U8500_UART0_VIRT_BASE	(0xf8120000)
-+#define U8500_UART1_VIRT_BASE	(0xf8121000)
-+#define U8500_UART2_VIRT_BASE	(0xf8007000)
- #define __UX500_PHYS_UART(n)	U8500_UART##n##_PHYS_BASE
- #define __UX500_VIRT_UART(n)	U8500_UART##n##_VIRT_BASE
- #endif
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 8c2590c..718e707 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -276,7 +276,7 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x8012a000, "nmk-i2c.4", NULL),
+ 	OF_DEV_AUXDATA("stericsson,db8500-prcmu", 0x80157000, "db8500-prcmu",
+ 			&db8500_prcmu_pdata),
+-	OF_DEV_AUXDATA("smsc,lan9115", 0x50000000, "smsc911x", NULL),
++	OF_DEV_AUXDATA("smsc,lan9115", 0x50000000, "smsc911x.0", NULL),
+ 	/* Requires device name bindings. */
+ 	OF_DEV_AUXDATA("stericsson,nmk-pinctrl", U8500_PRCMU_BASE,
+ 		"pinctrl-db8500", NULL),
 -- 
 1.7.10.4
