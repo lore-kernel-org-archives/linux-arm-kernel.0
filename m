@@ -1,90 +1,50 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 08 May 2013 02:26:34 +0200
-Subject: [PATCH,
- RFC 02/22] cpufreq: ARM_DT_BL_CPUFREQ needs ARM_CPU_TOPOLOGY
-In-Reply-To: <CAKohponuYRm+D-FU5_7Ny1PPmwUhFLm9DkAR9iHURur+GFq_kA@mail.gmail.com>
-References: <1367507786-505303-1-git-send-email-arnd@arndb.de>
- <1367507786-505303-3-git-send-email-arnd@arndb.de>
- <CAKohponuYRm+D-FU5_7Ny1PPmwUhFLm9DkAR9iHURur+GFq_kA@mail.gmail.com>
-Message-ID: <2500374.5Hpjds0B3f@vostro.rjw.lan>
+From: john.stultz@linaro.org (John Stultz)
+Date: Tue, 07 May 2013 17:30:52 -0700
+Subject: dw_apb_timer_of.c: remove parts that were picoxcell-specific
+In-Reply-To: <20130507201126.GA8169@amd.pavel.ucw.cz>
+References: <20130426121433.GA16249@amd.pavel.ucw.cz>
+ <201305061545.22587.arnd@arndb.de> <20130506155304.GA6645@amd.pavel.ucw.cz>
+ <201305062324.17080.arnd@arndb.de> <20130507135752.GA3500@amd.pavel.ucw.cz>
+ <51892E5E.8090909@linaro.org> <20130507201126.GA8169@amd.pavel.ucw.cz>
+Message-ID: <51899CBC.6020003@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, May 04, 2013 12:09:40 PM Viresh Kumar wrote:
-> On 2 May 2013 20:46, Arnd Bergmann <arnd@arndb.de> wrote:
-> > The big.LITTLE cpufreq driver uses the CPU topology API, which
-> > needs to be reflected in Kconfig to prevent broken configurations.
-> >
-> > warning: (ARM_DT_BL_CPUFREQ) selects ARM_BIG_LITTLE_CPUFREQ which
-> > has unmet direct dependencies (ARCH_HAS_CPUFREQ && CPU_FREQ && ARM && ARM_CPU_TOPOLOGY)
-> >
-> > Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> > Cc: cpufreq at vger.kernel.org
-> > Cc: linux-pm at vger.kernel.org
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> >  drivers/cpufreq/Kconfig.arm | 1 +
-> >  1 file changed, 1 insertion(+)
-> 
-> With all the discussions we had, please see if you can replace your
-> patch with this one (Attached too for applying, copy/paste in gmail
-> will break it):
-> 
-> From: Viresh Kumar <viresh.kumar@linaro.org>
-> Date: Sat, 4 May 2013 12:03:54 +0530
-> Subject: [PATCH] cpufreq: ARM big LITTLE: Fix Kconfig entries
-> 
-> This fixes usage of "depends on" and "select" options in Kconfig for ARM big
-> LITTLE cpufreq driver. Otherwise we get these warnings:
-> 
-> warning: (ARM_DT_BL_CPUFREQ) selects ARM_BIG_LITTLE_CPUFREQ which
-> has unmet direct dependencies (ARCH_HAS_CPUFREQ && CPU_FREQ && ARM &&
-> ARM_CPU_TOPOLOGY)
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+On 05/07/2013 01:11 PM, Pavel Machek wrote:
+> It seems we made a mistake when creating dw_apb_timer_of.c:
+> picoxcell sched_clock had parts that were not related to
+> dw_apb_timer, yet we moved them to dw_apb_timer_of, and tried to
+> use them on socfpga.
+>
+> This results in system where user/system time is not measured
+> properly, as demonstrated by
+>      
+>      time dd if=/dev/urandom of=/dev/zero bs=100000 count=100
+>      
+> So this patch switches sched_clock to hardware that exists on both
+> platforms, and adds missing of_node_put() in dw_apb_timer_init().
+>      
+> Signed-off-by: Pavel Machek <pavel@denx.de>
+> Acked-by: Jamie Iles <jamie@jamieiles.com>
 
-Queued up as a fix for v3.10.
+Ok. I'm still not a happy about the general issue of 
+sched_clock/clockevent code being in drivers/clocksources (I know, 
+everyone is sick of my griping about it :), so reviewing this sucks, but 
+at least this patch technically isn't making that issue worse.
 
-Thanks,
-Rafael
+Additionally, this is an *ugly* driver in my opinion. Its split between 
+arch specific logic in arch/x86/kernel/apb_timer.c, 
+arch/arm/mach-picoxcell/common.c, and arch/arm/mach-socfpga/socfpga.c, 
+and then arch independent logic in drivers/clocksource/dw_apb_timer.c 
+and drivers/clocksource/dw_apb_timer_of.c, but then it seems like much 
+of drivers/clocksource/dw_apb_timer_of.c is actually ARM specific.
 
+Are there any plans to clean this up in the future?
 
-> ---
->  drivers/cpufreq/Kconfig.arm | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 634e992..a924408 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -3,17 +3,17 @@
->  #
-> 
->  config ARM_BIG_LITTLE_CPUFREQ
-> -	tristate
-> -	depends on ARM_CPU_TOPOLOGY
-> -	select PM_OPP
-> +	tristate "Generic ARM big LITTLE CPUfreq driver"
-> +	depends on ARM_CPU_TOPOLOGY && PM_OPP && HAVE_CLK
-> +	help
-> +	  This enables the Generic CPUfreq driver for ARM big.LITTLE platforms.
-> 
->  config ARM_DT_BL_CPUFREQ
-> -	tristate "Generic ARM big LITTLE CPUfreq driver probed via DT"
-> -	select ARM_BIG_LITTLE_CPUFREQ
-> -	depends on OF && HAVE_CLK
-> +	tristate "Generic probing via DT for ARM big LITTLE CPUfreq driver"
-> +	depends on ARM_BIG_LITTLE_CPUFREQ && OF
->  	help
-> -	  This enables the Generic CPUfreq driver for ARM big.LITTLE platform.
-> -	  This gets frequency tables from DT.
-> +	  This enables probing via DT for Generic CPUfreq driver for ARM
-> +	  big.LITTLE platform. This gets frequency tables from DT.
-> 
->  config ARM_EXYNOS_CPUFREQ
->  	bool "SAMSUNG EXYNOS SoCs"
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Also, next time please run checkpatch.pl to catch trivial issues like 
+trailing whitespace. :P
+
+But I've gone ahead and queued this for 3.11.
+
+thanks
+-john
