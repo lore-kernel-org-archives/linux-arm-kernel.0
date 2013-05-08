@@ -1,144 +1,50 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Wed,  8 May 2013 15:09:47 +0100
-Subject: [RFC 0/8] ARM:STiH41x: Add STiH41x platform and board support
-Message-ID: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 8 May 2013 15:17:06 +0100
+Subject: [PATCH 0/2] Early printk support for virtio console devices.
+In-Reply-To: <CAFEAcA-eSB=_UT0-L7o=2o6JGv0WkXZv5UPxPVqLRxjUZQegFA@mail.gmail.com>
+References: <CAAHg+Hj0tySbzUGnoFE9ybVYP291B-i8-Ck1EkwD57t8yG5wwg@mail.gmail.com>
+ <C52CCDD4-D8FB-4AD6-B83D-3B5251A7A0F5@suse.de>
+ <87sj27xxjr.fsf@rustcorp.com.au>
+ <CAFEAcA9h8iSYfTBtf6n+Vk5sDtBR2yB2oafRxikHoWbKt0VRUw@mail.gmail.com>
+ <87ip2wr8tp.fsf@rustcorp.com.au>
+ <CAFEAcA_=BTXVdkN0WmajxVSjbDrmxc5z65hCbxr=7TqJVsE9EA@mail.gmail.com>
+ <87txmfo0rl.fsf@rustcorp.com.au>
+ <CAFEAcA9jBSpN2p9ZaU+_gX41Ke3nvpSKVrWV8Rioy_ioadKCgg@mail.gmail.com>
+ <5189234D.3040208@codeaurora.org>
+ <CAFEAcA-eSB=_UT0-L7o=2o6JGv0WkXZv5UPxPVqLRxjUZQegFA@mail.gmail.com>
+Message-ID: <20130508141706.GF2703@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+On Tue, May 07, 2013 at 04:58:23PM +0100, Peter Maydell wrote:
+> On 7 May 2013 16:52, Christopher Covington <cov@codeaurora.org> wrote:
+> > On 05/07/2013 08:19 AM, Peter Maydell wrote:
+> >> Well, at the moment EARLY_PRINTK is hardcoded to
+> >> "use some specific UART or equivalent selected at
+> >> compile time". So the equivalent presumably would
+> >> be to hard-compile "use virtio-console", but then
+> >> how does that code know where the virtio-console
+> >> is in the address space?
+> >
+> > arm64 uses a kernel argument.
+> 
+> This mixes up "information that the user provides to the
+> kernel" (ie configuration) with "information that QEMU or
+> kvmtool should provide to the kernel" (ie hardware
+> description), and would require QEMU/kvmtool to parse
+> the user's commandline tool to figure out if they
+> needed to override it or edit it (or alternatively,
+> would require the user to know internal details of
+> QEMU/kvmtool's address map for the guest). I think it
+> would be nicer to keep them separate.
 
-This patch-set adds basic support for STMicroelectronics STiH41x SOCs
-which includes STiH415 and STiH416 with B2000 and B2020 board support.
+I'm not sure it's worth it, the earlyprintk is meant for debugging the
+early kernel booting code, not for general use (you have the normal
+console for this). Someone doing platform port should know the address
+of the uart and pass the right information on the kernel command line to
+help debug early booting issues.
 
-STiH415 and STiH416 are dual-core ARM Cortex-A9 CPU, designed for use in
-Set-top-boxes.
-
-The SOC support is divided into two parts which is plat-stixxxx and
-mach-stih41x. plat-stixxxx contains code which is common across all
-STMicroelectronics CE chips, and mach-stih41x contains support code for STiH415
-and STiH416 SOCs.
-
-Only device drivers included in this patch set are UART and pinctrl, other
-drivers will be added in future.
-
-The reason for adding two SOCs at this patch set is to show that no new C code
-is required for second SOC(STiH416) support.
-
-In the process of adding support to these SOCs we have added new code into sycon
-and also added support for a9 global-timer.
-
-I would appreciate any feedback on these patches.
-
-Thanks,
-srini
-
-Srinivas Kandagatla (8):
-  serial:st-asc: Add ST ASC driver.
-  mfd:syscon: Introduce claim/read/write/release APIs
-  pinctrl:stixxxx: Add pinctrl and pinconf support.
-  ARM:stih41x: Add STiH415 SOC support
-  ARM:stih41x: Add STiH416 SOC support
-  ARM:stih41x: Add B2000 board support
-  ARM:stih41x: Add B2020 board support
-
-Stuart Menefy (1):
-  ARM:global_timer: Add ARM global timer support.
-
- Documentation/arm/STiH41x/overview.txt             |   39 +
- Documentation/arm/STiH41x/stih415-overview.txt     |   12 +
- Documentation/arm/STiH41x/stih416-overview.txt     |   12 +
- Documentation/devicetree/bindings/arm/gt.txt       |   21 +
- .../bindings/pinctrl/pinctrl-stixxxx.txt           |  160 +++
- .../devicetree/bindings/tty/serial/st-asc.txt      |   18 +
- arch/arm/Kconfig                                   |    9 +
- arch/arm/Kconfig.debug                             |   38 +
- arch/arm/Makefile                                  |    2 +
- arch/arm/boot/dts/Makefile                         |    4 +
- arch/arm/boot/dts/stih415-b2000.dtsp               |   15 +
- arch/arm/boot/dts/stih415-b2020.dtsp               |   15 +
- arch/arm/boot/dts/stih415-clock.dtsi               |   38 +
- arch/arm/boot/dts/stih415-pinctrl.dtsi             |  480 ++++++++
- arch/arm/boot/dts/stih415.dtsi                     |   94 ++
- arch/arm/boot/dts/stih415.h                        |   20 +
- arch/arm/boot/dts/stih416-b2000.dtsp               |   16 +
- arch/arm/boot/dts/stih416-b2020.dtsp               |   16 +
- arch/arm/boot/dts/stih416-clock.dtsi               |   41 +
- arch/arm/boot/dts/stih416-pinctrl.dtsi             |  718 ++++++++++++
- arch/arm/boot/dts/stih416.dtsi                     |  103 ++
- arch/arm/boot/dts/stih416.h                        |   24 +
- arch/arm/boot/dts/stih41x-b2000.dtsi               |   41 +
- arch/arm/boot/dts/stih41x-b2020.dtsi               |   42 +
- arch/arm/boot/dts/stih41x.dtsi                     |   30 +
- arch/arm/boot/dts/stixxxx-pincfg.h                 |   95 ++
- arch/arm/configs/stih41x_defconfig                 |   95 ++
- arch/arm/include/asm/global_timer.h                |   12 +
- arch/arm/include/debug/stixxxx.S                   |   61 +
- arch/arm/kernel/Makefile                           |    1 +
- arch/arm/kernel/global_timer.c                     |  325 ++++++
- arch/arm/mach-stih41x/Kconfig                      |   44 +
- arch/arm/mach-stih41x/Makefile                     |    4 +
- arch/arm/mach-stih41x/board-dt.c                   |   80 ++
- arch/arm/mach-stih41x/stih41x.c                    |   82 ++
- arch/arm/mach-stih41x/stih41x.h                    |    7 +
- arch/arm/plat-stixxxx/Kconfig                      |    2 +
- arch/arm/plat-stixxxx/Makefile                     |    2 +
- arch/arm/plat-stixxxx/headsmp.S                    |   44 +
- arch/arm/plat-stixxxx/include/plat/hardware.h      |   20 +
- arch/arm/plat-stixxxx/include/plat/smp.h           |   19 +
- arch/arm/plat-stixxxx/platsmp.c                    |  144 +++
- drivers/mfd/syscon.c                               |  199 ++++
- drivers/pinctrl/Kconfig                            |   13 +
- drivers/pinctrl/Makefile                           |    1 +
- drivers/pinctrl/pinctrl-stixxxx.c                  | 1151 ++++++++++++++++++++
- drivers/pinctrl/pinctrl-stixxxx.h                  |  197 ++++
- drivers/tty/serial/Kconfig                         |   19 +
- drivers/tty/serial/Makefile                        |    1 +
- drivers/tty/serial/st-asc.c                        |  821 ++++++++++++++
- drivers/tty/serial/st-asc.h                        |  146 +++
- include/linux/mfd/syscon.h                         |   43 +
- include/uapi/linux/serial_core.h                   |    3 +
- 53 files changed, 5639 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/arm/STiH41x/overview.txt
- create mode 100644 Documentation/arm/STiH41x/stih415-overview.txt
- create mode 100644 Documentation/arm/STiH41x/stih416-overview.txt
- create mode 100644 Documentation/devicetree/bindings/arm/gt.txt
- create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-stixxxx.txt
- create mode 100644 Documentation/devicetree/bindings/tty/serial/st-asc.txt
- create mode 100644 arch/arm/boot/dts/stih415-b2000.dtsp
- create mode 100644 arch/arm/boot/dts/stih415-b2020.dtsp
- create mode 100644 arch/arm/boot/dts/stih415-clock.dtsi
- create mode 100644 arch/arm/boot/dts/stih415-pinctrl.dtsi
- create mode 100644 arch/arm/boot/dts/stih415.dtsi
- create mode 100644 arch/arm/boot/dts/stih415.h
- create mode 100644 arch/arm/boot/dts/stih416-b2000.dtsp
- create mode 100644 arch/arm/boot/dts/stih416-b2020.dtsp
- create mode 100644 arch/arm/boot/dts/stih416-clock.dtsi
- create mode 100644 arch/arm/boot/dts/stih416-pinctrl.dtsi
- create mode 100644 arch/arm/boot/dts/stih416.dtsi
- create mode 100644 arch/arm/boot/dts/stih416.h
- create mode 100644 arch/arm/boot/dts/stih41x-b2000.dtsi
- create mode 100644 arch/arm/boot/dts/stih41x-b2020.dtsi
- create mode 100644 arch/arm/boot/dts/stih41x.dtsi
- create mode 100644 arch/arm/boot/dts/stixxxx-pincfg.h
- create mode 100644 arch/arm/configs/stih41x_defconfig
- create mode 100644 arch/arm/include/asm/global_timer.h
- create mode 100644 arch/arm/include/debug/stixxxx.S
- create mode 100644 arch/arm/kernel/global_timer.c
- create mode 100644 arch/arm/mach-stih41x/Kconfig
- create mode 100644 arch/arm/mach-stih41x/Makefile
- create mode 100644 arch/arm/mach-stih41x/board-dt.c
- create mode 100644 arch/arm/mach-stih41x/stih41x.c
- create mode 100644 arch/arm/mach-stih41x/stih41x.h
- create mode 100644 arch/arm/plat-stixxxx/Kconfig
- create mode 100644 arch/arm/plat-stixxxx/Makefile
- create mode 100644 arch/arm/plat-stixxxx/headsmp.S
- create mode 100644 arch/arm/plat-stixxxx/include/plat/hardware.h
- create mode 100644 arch/arm/plat-stixxxx/include/plat/smp.h
- create mode 100644 arch/arm/plat-stixxxx/platsmp.c
- create mode 100644 drivers/pinctrl/pinctrl-stixxxx.c
- create mode 100644 drivers/pinctrl/pinctrl-stixxxx.h
- create mode 100644 drivers/tty/serial/st-asc.c
- create mode 100644 drivers/tty/serial/st-asc.h
+But if someone comes up with some bindings, I won't reject the patch.
 
 -- 
-1.7.6.5
+Catalin
