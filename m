@@ -1,65 +1,104 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 May 2013 09:24:44 +0200
-Subject: [PATCH] USB: set device dma_mask without reference to global data
-In-Reply-To: <CAL411-pY_i19otiE2pLux6eR_OFHhfhK=+6BF=H6wABDsGCP6Q@mail.gmail.com>
-References: <1367967232-10128-1-git-send-email-swarren@wwwdotorg.org>
- <5189B7BF.8070607@wwwdotorg.org>
- <CAL411-pY_i19otiE2pLux6eR_OFHhfhK=+6BF=H6wABDsGCP6Q@mail.gmail.com>
-Message-ID: <201305080924.44622.arnd@arndb.de>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Wed, 8 May 2013 07:26:04 +0000
+Subject: [PATCH V2 1/2] ARM/MVF600: add Vybrid Family platform support
+In-Reply-To: <20130503074105.GA31873@S2101-09.ap.freescale.net>
+References: <1367480285-26159-1-git-send-email-b35083@freescale.com>
+ <1367480285-26159-2-git-send-email-b35083@freescale.com>
+ <20130503074105.GA31873@S2101-09.ap.freescale.net>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E851B455F@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 May 2013, Peter Chen wrote:
-> >
-> > This probably could be initialized from some DT property. However,
-> > there's no such property defined right now, and considering that DT is
-> > supposed to be an ABI, we'd always need the code in this patch as a
-> > fallback for DTs that were created before any such property was defined.
-> >
-> > Equally, since the data is SoC-specific rather than board-specific, and
-> > is even fairly unlikely to vary between SoC versions since these values
-> > are all 0xffffffff anyway, I don't really see much point in putting it
-> > into DT, rather than just putting the static data into the driver.
-> 
-> I mean there is already dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-> at function of_platform_device_create, why can't add
-> dev->dev.dma_mask = &dev->dev.coherent_dma_mask after that?
-> 
-> If DT core can do above things, can we delete dma_mask assignment
-> at every driver?
-
-It probably should. The main thing is that the dma_mask setting in
-of_platform (and elsewhere) is a mess and that nobody so far had the
-guts to try to get it right for good.
-
-Setting a 32 bit DMA mask is /probably/ the right default on all
-ARM systems, but there are caveats:
-
-- Once you get to systems with larger than 32 bit addressing (powerpc64,
-  arm64, arm32 with LPAE), it's not so obvious: you may have some devices
-  that need a 32 bit mask and some that need a 64 bit mask.
-
-- Some (very rare these days, thankfully) devices require a mask that is
-  less than 32 bits. Since that knowledge is device specific, not platform
-  specific, it should probably stay in the driver.
-
-- There are cases (I know them only on powerpc, but they probably exist
-  on ARM and other places too) where the mapping from bus addresses to
-  physical addresses is not linear. There is a device-tree binding for
-  a "dma-ranges" property that can accurately describe the specific
-  mapping. Actually using this on architecture independent code requires
-  not only setting the dma_mask but also supporting the remapping
-  in the dma_map_ops.
-
-- Things get more interesting in combination with an IOMMU. If we have
-  an IOMMU, I think we should set the dma_mask pointer to the mask of
-  the IOMMU and set the map_ops accordingly.
-
-- Whether we actually need coherent_dma_mask these days is another hard
-  question to answer. I suspect that the only thing really needing it
-  was some version of the Itanium based Altix machine for its PCI
-  devices and we'd be better off finding a simpler solution for platform
-  devices. For all practical purposes I think coherent_dma_mask must be
-  the same as dma_mask.
-
-	Arnd
+>-----Original Message-----
+>From: Shawn Guo [mailto:shawn.guo at linaro.org]
+>Sent: Friday, May 03, 2013 3:41 PM
+>To: Lu Jingchang-B35083
+>Cc: linux-arm-kernel at lists.infradead.org; s.hauer at pengutronix.de
+>Subject: Re: [PATCH V2 1/2] ARM/MVF600: add Vybrid Family platform support
+>
+>> --git a/arch/arm/mach-imx/mach-mvf600.c
+>> b/arch/arm/mach-imx/mach-mvf600.c new file mode 100644 index
+>> 0000000..56d3fb0
+>> --- /dev/null
+>> +++ b/arch/arm/mach-imx/mach-mvf600.c
+>> @@ -0,0 +1,118 @@
+>> +/*
+>> + * Copyright 2012-2013 Freescale Semiconductor, Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> +modify
+>> + * it under the terms of the GNU General Public License as published
+>> +by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + */
+>> +
+>> +#include <linux/types.h>
+>> +#include <linux/sched.h>
+>> +#include <linux/delay.h>
+>> +#include <linux/pm.h>
+>> +#include <linux/interrupt.h>
+>> +#include <linux/io.h>
+>> +#include <linux/irq.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/of_platform.h>
+>> +#include <linux/init.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/clkdev.h>
+>> +#include <linux/clocksource.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/irqchip.h>
+>> +#include <linux/irqchip/arm-gic.h>
+>> +#include <asm/memory.h>
+>> +#include <asm/irq.h>
+>> +#include <asm/setup.h>
+>> +#include <asm/mach-types.h>
+>> +#include <asm/mach/arch.h>
+>> +#include <asm/mach/time.h>
+>> +#include <asm/hardware/cache-l2x0.h>
+>> +#include <asm/system_misc.h>
+>
+>Please check if you really need all these headers.
+>
+>> +
+>> +#include "common.h"
+>> +
+>> +
+>> +void mvf_restart(char mode, const char *cmd) {
+>> +	struct device_node *np;
+>> +	void __iomem *wdog_base;
+>> +	struct clk *wdog_clk;
+>> +
+>> +	np = of_find_compatible_node(NULL, NULL, "fsl,mvf-wdt");
+>> +	wdog_base = of_iomap(np, 0);
+>> +	if (!wdog_base)
+>> +		goto soft;
+>> +
+>> +	wdog_clk = of_clk_get_by_name(np, "wdog");
+>> +	if (!IS_ERR(wdog_clk))
+>> +		clk_prepare_enable(wdog_clk);
+>> +
+>> +	/* enable wdog */
+>> +	writew_relaxed(1 << 2, wdog_base);
+>> +
+>> +	/* wait for reset to assert ... */
+>> +	mdelay(500);
+>> +
+>> +	pr_err("Watchdog reset failed to assert reset\n");
+>> +
+>> +	/* delay to allow the serial port to show the message */
+>> +	mdelay(50);
+>> +
+>> +soft:
+>> +	/* we'll take a jump through zero as a poor second */
+>> +	soft_restart(0);
+>> +}
+>
+>If mvf600 uses the same wdt IP block as imx, we should make this restart
+>routine a common function to be used on mvf600, imx6q and imx6sl etc.
+>
+[Lu Jingchang-B35083] 
+    Do you have plan to update the mxc_restart() function in system.c? We once used that common function for mvf600. But now this function cannot be used for mvf600 as the new clock framwork used.
+    On the other hand, even we udpated the clk_get for the the common mxc_restart() funciton. different with i.MX6, the MVF600 need to enable the clock before using the wdt module, we still need some clue code for i.mx and mvf600. So I suggest keep the restart function for mvf600 currently. Thanks.
