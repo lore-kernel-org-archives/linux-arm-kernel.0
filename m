@@ -1,147 +1,53 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 8 May 2013 19:33:25 +0000 (UTC)
-Subject: OMAP baseline test results for v3.9-rc8
-Message-ID: <alpine.DEB.2.00.1305081931470.19747@utopia.booyaka.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 8 May 2013 12:33:34 -0700
+Subject: [PATCH] ARM: exynos: Select PINCTRL_EXYNOS for exynos5
+In-Reply-To: <CAD=FV=X2n+zHZ3frorwW7L1yybnWWK1=-rWMQJQFus3eNiFFeQ@mail.gmail.com>
+References: <1368034349-15091-1-git-send-email-dianders@chromium.org>
+ <CAOesGMia9kLGh6B6QJZAKS1UpBg86v32S2um+0fjx5HYjje3cw@mail.gmail.com>
+ <CAD=FV=X2n+zHZ3frorwW7L1yybnWWK1=-rWMQJQFus3eNiFFeQ@mail.gmail.com>
+Message-ID: <CAOesGMi=K4iJKjSk3RoynhiCMPPT98v5jADnqZ__TwX_YLw65Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
 
-Here are some basic OMAP test results for Linux v3.9-rc8.
-Logs and other details at:
+On Wed, May 8, 2013 at 11:48 AM, Doug Anderson <dianders@chromium.org> wrote:
+> Olof,
+>
+> On Wed, May 8, 2013 at 11:19 AM, Olof Johansson <olof@lixom.net> wrote:
+>> Seems like this should be selected by the SoC (ARCH_EXYNOS5) instead
+>> of the board. Actually, I'm not sure we need the board Kconfig entry
+>> long-term; all boards will be dt-only.
+>
+> Good point.  Hopefully someone at Samsung can work on removing the
+> board itself?  If you'd like me to take this on then let me know and I
+> can put it on my list.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.9-rc8/20130422154921/
+Nothing stops you from doing that on your own. I tend to push back
+onto the maintainers to get them engaged in their own housekeeping,
+but anyone is free to :)
 
+> I'm happy to resubmit my patch under ARCH_EXYNOS5.  I'll move the
+> exynos4 one at the same time.
 
-Test summary
-------------
+Great.
 
-Build:
-    FAIL ( 2/16): am33xx_only, omap2plus_defconfig_2430sdp_only
-    Pass (14/16): n800_multi_omap2xxx, n800_only_a, omap1_defconfig, 
-                  omap1_defconfig_1510innovator_only, 
-                  omap1_defconfig_5912osk_only, omap2plus_defconfig, 
-                  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm, 
-                  omap2plus_defconfig_omap2_4_only, 
-                  omap2plus_defconfig_omap3_4_only, 
-                  rmk_omap3430_ldp_allnoconfig, 
-                  rmk_omap3430_ldp_oldconfig, 
-                  rmk_omap4430_sdp_allnoconfig, 
-                  rmk_omap4430_sdp_oldconfig
+> I'm going to make the assumption that PINCTRL_EXYNOS and
+> PINCTRL_EXYNOS5440 can happily coexist.  Certainly I've got both
+> defined in my tree right now and nothing blows up.  I haven't tested
+> on 5440 but things ought to be handled by "compatible" checks, right?
 
-Boot to userspace:
-    FAIL ( 1/11): am335xbone
-    Pass (10/11): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
-                  3730beaglexm, 37xxevm, 4430es2panda, 4460pandaes,
-                  5912osk, cmt3517
+Yes, if they can't coexist then that's a bug.
 
-PM ret, suspend:
-    FAIL ( 2/ 6): 2430sdp, 4430es2panda
-    Pass ( 4/ 6): 3530es3beagle, 3730beaglexm, 37xxevm, 4460pandaes
+> I'll also assume that eventually someone will move PINCTRL_EXYNOS5440
+> into PINCTRL_EXYNOS.  If PINCTRL_EXYNOS5440 won't eventually move
+> under PINCTRL_EXYNOS then it makes less sense to define PINCTRL_EXYNOS
+> for all exynos parts.
 
-PM ret, dynamic idle:
-    FAIL ( 3/ 6): 2430sdp, 4430es2panda, 4460pandaes
-    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 37xxevm
-
-PM off, suspend:
-    FAIL ( 2/ 5): 4430es2panda, 4460pandaes
-    Pass ( 3/ 5): 3530es3beagle, 3730beaglexm, 37xxevm
-
-PM off, dynamic idle:
-    FAIL ( 2/ 5): 4430es2panda, 4460pandaes
-    Pass ( 3/ 5): 3530es3beagle, 3730beaglexm, 37xxevm
+Yeah, it should -- this is just in transition since 5440 was first out
+of the gate with pinctrl.
 
 
 
-Failing tests: fixed by posted patches
---------------------------------------
-
-Build:
-
-* am33xx_only, omap2plus_defconfig_2430sdp_only: omap-{smp,hotplug}.c link errors
-  - Discussion & RFC patch: http://www.spinics.net/lists/arm-kernel/msg230017.html
-  - Still needs revision of the patch
-
-
-Failing tests: needing investigation
-------------------------------------
-
-Boot tests:
-
-* 3517EVM & CM-T3517: boot hangs with NFS root
-  - Likely some Kconfig, board file, and PM issues with EMAC
-  - Longstanding bug
-  - Not currently part of the automated test suite
-
-Boot warnings:
-
-* CM-T3517: L3 in-band error with IPSS during boot
-  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
-  - Longstanding issue; does not occur on the 3517EVM
-
-PM tests:
-
-* 2430sdp: power domains not entering retention
-  - Cause unknown
-
-* 4430es2panda, 4460pandaes: pwrdm state mismatch on CAM, DSS, ABE
-
-* 4460pandaes: pwrdm state mismatch on IVAHD, TESLA 
-
-* 4430es2panda: CORE, TESLA, IVAHD, L3INIT didn't enter target state
-  - Probably due to lack of reset code for M3, DSP, SL2IF, FSUSB
-    per discussion with Tero Kristo
-  - Likely dependent on the bootloader version
-    - fails with 2012.07-00136-g755de79
-  - http://marc.info/?l=linux-arm-kernel&m=136432340618226&w=2
-
-* 4460pandaes: chip not entering retention in dynamic idle
-  - Presumably 4430es2panda also fails this
-  - Suspend-to-RAM enters full chip retention
-
-* 3730 Beagle XM: does not serial wake from off-idle suspend when console
-  UART doesn't clock-gate ("debug ignore_loglevel")
-  - Cause unknown
-  - Not yet part of the automated test suite
-  - Re-tested at v3.7; still failing:
-    http://www.pwsan.com/omap/transcripts/20121211-3730beaglexm-3.7-pm-offmode-fail-debug.txt
-
-Other:
-
-* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
-  - Unknown cause; could be due to the lack of hierarchical enable/disable
-    in hwmod code
-  - Jon Hunter and Santosh Shilimkar report this does not appear with
-    the same X-loader/bootloader on his 4430ES2.3 Panda, so could be
-    ES-level dependent
-
-
-Failing tests: reported by others 
----------------------------------
-
-- MUSB broken after v3.9-rc6
-  - due to commit 92702df3570e1ccfa050e135e50c450502251b79
-  - discussion here: http://marc.info/?l=linux-omap&m=136544098331552&w=2
-  - patch pending upstream:
-    http://marc.info/?l=linux-omap&m=136562302329307&w=2
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.9-rc7 
-(41ef2d5678d83af030125550329b6ae8b74618fa)):
-   text     data      bss    total  kernel
-   +408       +8        0     +416  n800_multi_omap2xxx
-   +408       +8        0     +416  n800_only_a
-    +54       -8        0      +46  omap1_defconfig
-    +58       -8        0      +50  omap1_defconfig_1510innovator_only
-    +54      +24        0      +78  omap1_defconfig_5912osk_only
-   +252      +96        0     +348  omap2plus_defconfig
-  +4348      +72        0    +4420  omap2plus_defconfig_cpupm
-   +388      +64        0     +452  omap2plus_defconfig_no_pm
-   +252      +72        0     +324  omap2plus_defconfig_omap2_4_only
-  +4236      +80        0    +4316  omap2plus_defconfig_omap3_4_only
-   +168      +16      -40     +144  rmk_omap3430_ldp_allnoconfig
-  -4040       -8        0    -4048  rmk_omap3430_ldp_oldconfig
-   +168      +16      -40     +144  rmk_omap4430_sdp_allnoconfig
-   +192        0       +8     +200  rmk_omap4430_sdp_oldconfig
+-Olof
