@@ -1,34 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 8 May 2013 10:06:44 +0100
-Subject: [RFC PATCH 0/2] ARM: Remove any correlation between IPC and
- BogoMips value
-In-Reply-To: <5189224A.70501@codeaurora.org>
-References: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
- <5187EFF3.6010005@codeaurora.org>
- <20130507090849.GC25387@mudshark.cambridge.arm.com>
- <5189224A.70501@codeaurora.org>
-Message-ID: <20130508090644.GA15692@mudshark.cambridge.arm.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Wed,  8 May 2013 11:09:53 +0200
+Subject: [PATCH] ARM: ux500: update MSP1 pinctrl defintions
+Message-ID: <1368004193-21213-1-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Christopher,
+Update MSP1 pinctrl definitions in mop500_family_pinmap by removing
+sleep state and setting default ones as pin hogs, as those are used by
+both ux500-msp-i2s.1 and ux500-msp-i2s.3.
 
-On Tue, May 07, 2013 at 04:48:26PM +0100, Christopher Covington wrote:
-> On 05/07/2013 05:08 AM, Will Deacon wrote:
-> > That seems like a lot of effort in order to preserve something that isn't
-> > even meaningful. We might be better just zeroing the value, but then we'll
-> > inevitably get bug reports of it being `wrong'.
-> 
-> If I were in to filing bug reports about bogomips values, I would be just as
-> likely to do it for 1, 10000, 99999, and get_random_bytes(...) as for 0.
+Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500-pins.c | 17 ++++++-----------
+ 1 file changed, 6 insertions(+), 11 deletions(-)
 
-That's a fair point, and one of the reasons I posted this as an RFC. I'd
-basically like an `obviously bogus' value so that people don't think `hey,
-my CPU sure it slow' and instead think `looks like this really is a bogus
-value after all'.
-
-However, you're probably right that there isn't a number which can convey
-that information properly, so how about we just put a string in there along
-the lines of "not reported" and leave it at that?
-
-Will
+diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
+index 947bd9e..3f92308 100644
+--- a/arch/arm/mach-ux500/board-mop500-pins.c
++++ b/arch/arm/mach-ux500/board-mop500-pins.c
+@@ -174,17 +174,12 @@ static struct pinctrl_map __initdata mop500_family_pinmap[] = {
+ 	DB8500_PIN_SLEEP("GPIO4_AH6", slpm_in_wkup_pdis, "uart1"),
+ 	DB8500_PIN_SLEEP("GPIO5_AG6", slpm_out_wkup_pdis, "uart1"),
+ 	/* MSP1 for ALSA codec */
+-	DB8500_MUX("msp1txrx_a_1", "msp1", "ux500-msp-i2s.1"),
+-	DB8500_MUX("msp1_a_1", "msp1", "ux500-msp-i2s.1"),
+-	DB8500_PIN("GPIO33_AF2", out_lo_slpm_nowkup, "ux500-msp-i2s.1"),
+-	DB8500_PIN("GPIO34_AE1", in_nopull_slpm_nowkup, "ux500-msp-i2s.1"),
+-	DB8500_PIN("GPIO35_AE2", in_nopull_slpm_nowkup, "ux500-msp-i2s.1"),
+-	DB8500_PIN("GPIO36_AG2", in_nopull_slpm_nowkup, "ux500-msp-i2s.1"),
+-	/* MSP1 sleep state */
+-	DB8500_PIN_SLEEP("GPIO33_AF2", slpm_out_lo_wkup, "ux500-msp-i2s.1"),
+-	DB8500_PIN_SLEEP("GPIO34_AE1", slpm_in_nopull_wkup, "ux500-msp-i2s.1"),
+-	DB8500_PIN_SLEEP("GPIO35_AE2", slpm_in_nopull_wkup, "ux500-msp-i2s.1"),
+-	DB8500_PIN_SLEEP("GPIO36_AG2", slpm_in_nopull_wkup, "ux500-msp-i2s.1"),
++	DB8500_MUX_HOG("msp1txrx_a_1", "msp1"),
++	DB8500_MUX_HOG("msp1_a_1", "msp1"),
++	DB8500_PIN_HOG("GPIO33_AF2", out_lo_slpm_nowkup),
++	DB8500_PIN_HOG("GPIO34_AE1", in_nopull_slpm_nowkup),
++	DB8500_PIN_HOG("GPIO35_AE2", in_nopull_slpm_nowkup),
++	DB8500_PIN_HOG("GPIO36_AG2", in_nopull_slpm_nowkup),
+ 	/* Mux in LCD data lines 8 thru 11 and LCDA CLK for MCDE TVOUT */
+ 	DB8500_MUX("lcd_d8_d11_a_1", "lcd", "mcde-tvout"),
+ 	DB8500_MUX("lcdaclk_b_1", "lcda", "mcde-tvout"),
+-- 
+1.8.2
