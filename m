@@ -1,122 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 May 2013 16:34:43 +0200
-Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
-In-Reply-To: <1368022248-2153-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022248-2153-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <201305081634.43498.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 8 May 2013 22:38:21 +0800
+Subject: [PATCH V2 1/2] ARM/MVF600: add Vybrid Family platform support
+In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E851B455F@039-SN1MPN1-003.039d.mgd.msft.net>
+References: <1367480285-26159-1-git-send-email-b35083@freescale.com>
+ <1367480285-26159-2-git-send-email-b35083@freescale.com>
+ <20130503074105.GA31873@S2101-09.ap.freescale.net>
+ <B56CDBE15CE27145A4B77D2D24263E851B455F@039-SN1MPN1-003.039d.mgd.msft.net>
+Message-ID: <20130508143819.GE26072@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+On Wed, May 08, 2013 at 07:26:04AM +0000, Lu Jingchang-B35083 wrote:
+> >If mvf600 uses the same wdt IP block as imx, we should make this restart
+> >routine a common function to be used on mvf600, imx6q and imx6sl etc.
+> >
+> [Lu Jingchang-B35083] 
+>     Do you have plan to update the mxc_restart() function in system.c?
 
-> +*st-asc(Serial Port)
-> +
-> +Required properties:
-> +- compatible : Should be "st,asc".
+Yes, I plan to update it to support DT platforms.
 
-Are there any hardware revision numbers for the asc? If there are potentially
-incompatible or backwards-compatible variants, it would be good to include
-the version in this string.
+> We once used that common function for mvf600. But now this function cannot be used for mvf600 as the new clock framwork used.
+>     On the other hand, even we udpated the clk_get for the the common mxc_restart() funciton. different with i.MX6, the MVF600 need to enable the clock before using the wdt module, we still need some clue code for i.mx and mvf600. So I suggest keep the restart function for mvf600 currently. Thanks.
+> 
+Ok, you can keep it for mvf600 and I will consolidate it to use
+mxc_restart() later.  But please make the compatible looks like the
+following, so that mxc_restart() will look for "fsl,imx21-wdt" to find
+the node in device tree.
 
-> +- reg, reg-names, interrupts, interrupt-names	: Standard way to define device
-> +			resources with names. look in
-> +			Documentation/devicetree/bindings/resource-names.txt
-> +
-> +Optional properties:
-> +- st,hw-flow-ctrl	bool flag to enable hardware flow control.
-> +- st,force-m1		bool flat to force asc to be in Mode-1 recommeded
-> +			for high bit rates (above 19.2K)
-> +Example:
-> +serial at fe440000{
-> +    compatible    = "st,asc";
-> +    reg         = <0xfe440000 0x2c>;
-> +    interrupts     =  <0 209 0>;
-> +};
+	compatible = "fsl,mvf600-wdt", "fsl,imx21-wdt"
 
-I would also recommed adding a way to set the default baud rate through
-a property. Following the example of the 8250 driver, you should probably
-call that "current-speed".
-
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 7e7006f..346f325 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -1484,6 +1484,25 @@ config SERIAL_RP2_NR_UARTS
->  	  If multiple cards are present, the default limit of 32 ports may
->  	  need to be increased.
->  
-> +config SERIAL_ST_ASC
-> +	tristate "ST ASC serial port support"
-> +	depends on PLAT_STIXXXX
-> +	default y
-> +	select SERIAL_CORE
-> +	help
-> +	  This driver is for the on-chip Asychronous Serial Controller on
-> +	  STMicroelectronics STixxxx SoCs.
-> +	  ASC is embedded in ST COMMS IP block. It supports Rx & Tx functionality.
-> +	  It support all industry standard baud rates.
-> +
-> +	  If unsure, say N.
-
-I would not make it "default y".
-
-> +config SERIAL_ST_ASC_CONSOLE
-> +	bool "Support for console on ST ASC"
-> +	depends on SERIAL_ST_ASC
-> +	default y
-> +	select SERIAL_CORE_CONSOLE
-> +
->  endmenu
-
-This needs to be "depends on SERIAL_ST_ASC=y". You would get a link error
-if you try to make SERIAL_ST_ASC a loadable module and SERIAL_ST_ASC_CONSOLE
-built-in.
-
-> +
-> +static struct asc_port asc_ports[ASC_MAX_PORTS];
-> +static struct uart_driver asc_uart_driver;
-> +
-> +/*---- Forward function declarations---------------------------*/
-> +static irqreturn_t asc_interrupt(int irq, void *ptr);
-> +static void asc_transmit_chars(struct uart_port *);
-> +static int asc_set_baud(struct asc_port *ascport, int baud);
-> +
-
-Please remove all forward declarations, by reordering the functions in
-the way they are called.
-
-
-> diff --git a/drivers/tty/serial/st-asc.h b/drivers/tty/serial/st-asc.h
-> new file mode 100644
-> index 0000000..e59f818
-> --- /dev/null
-> +++ b/drivers/tty/serial/st-asc.h
-> +#ifndef _ST_ASC_H
-> +#define _ST_ASC_H
-> +
-> +#include <linux/serial_core.h>
-> +#include <linux/clk.h>
-> +
-> +struct asc_port {
-> +	struct uart_port port;
-> +	struct clk *clk;
-> +	unsigned int hw_flow_control:1;
-> +	unsigned int check_parity:1;
-> +	unsigned int force_m1:1;
-> +};
-
-Since this header file is only used in one place, just merge it into
-the driver itself.
-
-> +#define ASC_MAJOR		204
-> +#define ASC_MINOR_START		40
-
-I don't know what the current policy is on allocating major/minor numbers,
-but I'm sure you cannot just reuse one that is already used.
-
-Documentation/devices.txt lists the ones that are officially assigned.
-Can't you use dynamic allocation here?
-
-	Arnd
+Shawn
