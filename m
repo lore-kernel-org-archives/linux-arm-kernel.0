@@ -1,66 +1,349 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 08 May 2013 11:53:24 -0600
-Subject: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
-In-Reply-To: <518A8596.7070702@wwwdotorg.org>
-References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
- <1368010660-31465-4-git-send-email-jagarwal@nvidia.com>
- <518A8596.7070702@wwwdotorg.org>
-Message-ID: <518A9114.1040201@wwwdotorg.org>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Wed, 8 May 2013 13:54:44 -0400
+Subject: [PATCH v3 1/4] xen: move xen_setup_runstate_info and
+ get_runstate_snapshot to drivers/xen/time.c
+In-Reply-To: <1368027714-14506-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1305081446580.18865@kaball.uk.xensource.com>
+ <1368027714-14506-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130508175444.GB2800@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2013 11:04 AM, Stephen Warren wrote:
-> On 05/08/2013 04:57 AM, Jay Agarwal wrote:
->> - Enable PCIe controller on Cardhu
->> - Only port 2 is connected on this board
->> - Add regulators required for Tegra30
->> - Patch is based on remotes/gitorious_thierryreding_linux/tegra/next
->> - and should be applied on top of this.
+On Wed, May 08, 2013 at 04:41:51PM +0100, Stefano Stabellini wrote:
+> Changes in v2:
+> - leave do_stolen_accounting in arch/x86/xen/time.c;
+> - use the new common functions in arch/ia64/xen/time.c.
 > 
->> diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-> 
->> +	pcie-controller {
->> +		status = "okay";
->> +		pex-clk-supply = <&pex_hvdd_3v3_reg>;
->> +		vdd-supply = <&ldo1_reg>;
->> +		avdd-supply = <&ldo2_reg>;
->> +
->> +		pci at 3,0 {
->> +			status = "okay";
->> +		};
->> +	};
-...
-> According to the Cardhu schematics, the PCIe link to the dock is a
-> single lane. Hence, I believe that the Cardhu DT should describe a 411
-> port configuration. However, the Cardhu DT doesn't describe any
-> particular link configuration, but just inherits the default from
-> tegra30.dtsi, which describes a 222 link configuration. I would have
-> expected the following in the Cardhu DT:
-> 
-> 		pci at 1,0 {
-> 			nvidia,num-lanes = <4>;
-> 		};
-> 
-> 		pci at 2,0 {
-> 			nvidia,num-lanes = <1>;
-> 		};
-> 
-> 		pci at 3,0 {
-> 			status = "okay";
-> 			nvidia,num-lanes = <1>;
-> 		};
-> 
-> However, if I put that there, no PCIe links are detected at all. Why
-> does the driver work with the wrong link configuration, but fail with
-> the correct one?
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Acked-by: Ian Campbell <ian.campbell@citrix.com>
+> CC: konrad.wilk at oracle.com
 
-I take this back. Fixing the DT as shown above to represent the correct
-4/1/1 configuration does still yield a working system. Please
-incorporate this into a future patch revision.
+On the generic and x86 side it looks OK to me. I presume you did a sanity
+check on x86 to make sure nothing was off?
 
-The issue is more that PCIe enumeration is only reliable after a cold
-power cycle of the dock (the dock appears to be powered solely by its
-power cable and never the battery in Cardhu, and hence isn't affected by
-the main tablet PMIC's power on/off state like most of the board is). Is
-there some reset signal to the dock that the bootloader or kernel should
-be driving to solve this?
+> ---
+>  arch/ia64/xen/time.c  |   48 +++----------------------
+>  arch/x86/xen/time.c   |   76 +----------------------------------------
+>  drivers/xen/Makefile  |    2 +-
+>  drivers/xen/time.c    |   91 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/xen/xen-ops.h |    5 +++
+>  5 files changed, 104 insertions(+), 118 deletions(-)
+>  create mode 100644 drivers/xen/time.c
+> 
+> diff --git a/arch/ia64/xen/time.c b/arch/ia64/xen/time.c
+> index 1f8244a..79a0b8c 100644
+> --- a/arch/ia64/xen/time.c
+> +++ b/arch/ia64/xen/time.c
+> @@ -34,53 +34,17 @@
+>  
+>  #include "../kernel/fsyscall_gtod_data.h"
+>  
+> -static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate);
+>  static DEFINE_PER_CPU(unsigned long, xen_stolen_time);
+>  static DEFINE_PER_CPU(unsigned long, xen_blocked_time);
+>  
+>  /* taken from i386/kernel/time-xen.c */
+>  static void xen_init_missing_ticks_accounting(int cpu)
+>  {
+> -	struct vcpu_register_runstate_memory_area area;
+> -	struct vcpu_runstate_info *runstate = &per_cpu(xen_runstate, cpu);
+> -	int rc;
+> +	xen_setup_runstate_info(&runstate);
+>  
+> -	memset(runstate, 0, sizeof(*runstate));
+> -
+> -	area.addr.v = runstate;
+> -	rc = HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area, cpu,
+> -				&area);
+> -	WARN_ON(rc && rc != -ENOSYS);
+> -
+> -	per_cpu(xen_blocked_time, cpu) = runstate->time[RUNSTATE_blocked];
+> -	per_cpu(xen_stolen_time, cpu) = runstate->time[RUNSTATE_runnable]
+> -					    + runstate->time[RUNSTATE_offline];
+> -}
+> -
+> -/*
+> - * Runstate accounting
+> - */
+> -/* stolen from arch/x86/xen/time.c */
+> -static void get_runstate_snapshot(struct vcpu_runstate_info *res)
+> -{
+> -	u64 state_time;
+> -	struct vcpu_runstate_info *state;
+> -
+> -	BUG_ON(preemptible());
+> -
+> -	state = &__get_cpu_var(xen_runstate);
+> -
+> -	/*
+> -	 * The runstate info is always updated by the hypervisor on
+> -	 * the current CPU, so there's no need to use anything
+> -	 * stronger than a compiler barrier when fetching it.
+> -	 */
+> -	do {
+> -		state_time = state->state_entry_time;
+> -		rmb();
+> -		*res = *state;
+> -		rmb();
+> -	} while (state->state_entry_time != state_time);
+> +	per_cpu(xen_blocked_time, cpu) = runstate.time[RUNSTATE_blocked];
+> +	per_cpu(xen_stolen_time, cpu) = runstate.time[RUNSTATE_runnable]
+> +					    + runstate.time[RUNSTATE_offline];
+>  }
+>  
+>  #define NS_PER_TICK (1000000000LL/HZ)
+> @@ -94,7 +58,7 @@ consider_steal_time(unsigned long new_itm)
+>  	struct vcpu_runstate_info runstate;
+>  	struct task_struct *p = current;
+>  
+> -	get_runstate_snapshot(&runstate);
+> +	xen_get_runstate_snapshot(&runstate);
+>  
+>  	/*
+>  	 * Check for vcpu migration effect
+> @@ -202,7 +166,7 @@ static unsigned long long xen_sched_clock(void)
+>  	 */
+>  	now = ia64_native_sched_clock();
+>  
+> -	get_runstate_snapshot(&runstate);
+> +	xen_get_runstate_snapshot(&runstate);
+>  
+>  	WARN_ON(runstate.state != RUNSTATE_running);
+>  
+> diff --git a/arch/x86/xen/time.c b/arch/x86/xen/time.c
+> index 0296a95..18d0104 100644
+> --- a/arch/x86/xen/time.c
+> +++ b/arch/x86/xen/time.c
+> @@ -30,9 +30,6 @@
+>  #define TIMER_SLOP	100000
+>  #define NS_PER_TICK	(1000000000LL / HZ)
+>  
+> -/* runstate info updated by Xen */
+> -static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate);
+> -
+>  /* snapshots of runstate info */
+>  static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate_snapshot);
+>  
+> @@ -40,77 +37,6 @@ static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate_snapshot);
+>  static DEFINE_PER_CPU(u64, xen_residual_stolen);
+>  static DEFINE_PER_CPU(u64, xen_residual_blocked);
+>  
+> -/* return an consistent snapshot of 64-bit time/counter value */
+> -static u64 get64(const u64 *p)
+> -{
+> -	u64 ret;
+> -
+> -	if (BITS_PER_LONG < 64) {
+> -		u32 *p32 = (u32 *)p;
+> -		u32 h, l;
+> -
+> -		/*
+> -		 * Read high then low, and then make sure high is
+> -		 * still the same; this will only loop if low wraps
+> -		 * and carries into high.
+> -		 * XXX some clean way to make this endian-proof?
+> -		 */
+> -		do {
+> -			h = p32[1];
+> -			barrier();
+> -			l = p32[0];
+> -			barrier();
+> -		} while (p32[1] != h);
+> -
+> -		ret = (((u64)h) << 32) | l;
+> -	} else
+> -		ret = *p;
+> -
+> -	return ret;
+> -}
+> -
+> -/*
+> - * Runstate accounting
+> - */
+> -static void get_runstate_snapshot(struct vcpu_runstate_info *res)
+> -{
+> -	u64 state_time;
+> -	struct vcpu_runstate_info *state;
+> -
+> -	BUG_ON(preemptible());
+> -
+> -	state = &__get_cpu_var(xen_runstate);
+> -
+> -	/*
+> -	 * The runstate info is always updated by the hypervisor on
+> -	 * the current CPU, so there's no need to use anything
+> -	 * stronger than a compiler barrier when fetching it.
+> -	 */
+> -	do {
+> -		state_time = get64(&state->state_entry_time);
+> -		barrier();
+> -		*res = *state;
+> -		barrier();
+> -	} while (get64(&state->state_entry_time) != state_time);
+> -}
+> -
+> -/* return true when a vcpu could run but has no real cpu to run on */
+> -bool xen_vcpu_stolen(int vcpu)
+> -{
+> -	return per_cpu(xen_runstate, vcpu).state == RUNSTATE_runnable;
+> -}
+> -
+> -void xen_setup_runstate_info(int cpu)
+> -{
+> -	struct vcpu_register_runstate_memory_area area;
+> -
+> -	area.addr.v = &per_cpu(xen_runstate, cpu);
+> -
+> -	if (HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area,
+> -			       cpu, &area))
+> -		BUG();
+> -}
+> -
+>  static void do_stolen_accounting(void)
+>  {
+>  	struct vcpu_runstate_info state;
+> @@ -118,7 +44,7 @@ static void do_stolen_accounting(void)
+>  	s64 blocked, runnable, offline, stolen;
+>  	cputime_t ticks;
+>  
+> -	get_runstate_snapshot(&state);
+> +	xen_get_runstate_snapshot(&state);
+>  
+>  	WARN_ON(state.state != RUNSTATE_running);
+>  
+> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+> index eabd0ee..2bf461a 100644
+> --- a/drivers/xen/Makefile
+> +++ b/drivers/xen/Makefile
+> @@ -3,7 +3,7 @@ obj-y	+= manage.o
+>  obj-$(CONFIG_HOTPLUG_CPU)		+= cpu_hotplug.o
+>  endif
+>  obj-$(CONFIG_X86)			+= fallback.o
+> -obj-y	+= grant-table.o features.o events.o balloon.o
+> +obj-y	+= grant-table.o features.o events.o balloon.o time.o
+>  obj-y	+= xenbus/
+>  
+>  nostackp := $(call cc-option, -fno-stack-protector)
+> diff --git a/drivers/xen/time.c b/drivers/xen/time.c
+> new file mode 100644
+> index 0000000..c2e39d3
+> --- /dev/null
+> +++ b/drivers/xen/time.c
+> @@ -0,0 +1,91 @@
+> +/*
+> + * Xen stolen ticks accounting.
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/kernel_stat.h>
+> +#include <linux/math64.h>
+> +#include <linux/gfp.h>
+> +
+> +#include <asm/xen/hypervisor.h>
+> +#include <asm/xen/hypercall.h>
+> +
+> +#include <xen/events.h>
+> +#include <xen/features.h>
+> +#include <xen/interface/xen.h>
+> +#include <xen/interface/vcpu.h>
+> +#include <xen/xen-ops.h>
+> +
+> +/* runstate info updated by Xen */
+> +static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate);
+> +
+> +/* return an consistent snapshot of 64-bit time/counter value */
+> +static u64 get64(const u64 *p)
+> +{
+> +	u64 ret;
+> +
+> +	if (BITS_PER_LONG < 64) {
+> +		u32 *p32 = (u32 *)p;
+> +		u32 h, l;
+> +
+> +		/*
+> +		 * Read high then low, and then make sure high is
+> +		 * still the same; this will only loop if low wraps
+> +		 * and carries into high.
+> +		 * XXX some clean way to make this endian-proof?
+> +		 */
+> +		do {
+> +			h = p32[1];
+> +			barrier();
+> +			l = p32[0];
+> +			barrier();
+> +		} while (p32[1] != h);
+> +
+> +		ret = (((u64)h) << 32) | l;
+> +	} else
+> +		ret = *p;
+> +
+> +	return ret;
+> +}
+> +
+> +/*
+> + * Runstate accounting
+> + */
+> +void xen_get_runstate_snapshot(struct vcpu_runstate_info *res)
+> +{
+> +	u64 state_time;
+> +	struct vcpu_runstate_info *state;
+> +
+> +	BUG_ON(preemptible());
+> +
+> +	state = &__get_cpu_var(xen_runstate);
+> +
+> +	/*
+> +	 * The runstate info is always updated by the hypervisor on
+> +	 * the current CPU, so there's no need to use anything
+> +	 * stronger than a compiler barrier when fetching it.
+> +	 */
+> +	do {
+> +		state_time = get64(&state->state_entry_time);
+> +		barrier();
+> +		*res = *state;
+> +		barrier();
+> +	} while (get64(&state->state_entry_time) != state_time);
+> +}
+> +
+> +/* return true when a vcpu could run but has no real cpu to run on */
+> +bool xen_vcpu_stolen(int vcpu)
+> +{
+> +	return per_cpu(xen_runstate, vcpu).state == RUNSTATE_runnable;
+> +}
+> +
+> +void xen_setup_runstate_info(int cpu)
+> +{
+> +	struct vcpu_register_runstate_memory_area area;
+> +
+> +	area.addr.v = &per_cpu(xen_runstate, cpu);
+> +
+> +	if (HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area,
+> +			       cpu, &area))
+> +		BUG();
+> +}
+> +
+> diff --git a/include/xen/xen-ops.h b/include/xen/xen-ops.h
+> index d6fe062..4fd4e47 100644
+> --- a/include/xen/xen-ops.h
+> +++ b/include/xen/xen-ops.h
+> @@ -3,6 +3,7 @@
+>  
+>  #include <linux/percpu.h>
+>  #include <asm/xen/interface.h>
+> +#include <xen/interface/vcpu.h>
+>  
+>  DECLARE_PER_CPU(struct vcpu_info *, xen_vcpu);
+>  
+> @@ -16,6 +17,10 @@ void xen_mm_unpin_all(void);
+>  void xen_timer_resume(void);
+>  void xen_arch_resume(void);
+>  
+> +bool xen_vcpu_stolen(int vcpu);
+> +void xen_setup_runstate_info(int cpu);
+> +void xen_get_runstate_snapshot(struct vcpu_runstate_info *res);
+> +
+>  int xen_setup_shutdown_event(void);
+>  
+>  extern unsigned long *xen_contiguous_bitmap;
+> -- 
+> 1.7.2.5
+> 
