@@ -1,25 +1,30 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 8 May 2013 08:34:59 -0700
-Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
-In-Reply-To: <201305081634.43498.arnd@arndb.de>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022248-2153-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081634.43498.arnd@arndb.de>
-Message-ID: <20130508153459.GA17186@kroah.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 8 May 2013 16:41:52 +0100
+Subject: [PATCH v3 2/4] kernel: missing include in cputime.c
+In-Reply-To: <alpine.DEB.2.02.1305081446580.18865@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1305081446580.18865@kaball.uk.xensource.com>
+Message-ID: <1368027714-14506-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 08, 2013 at 04:34:43PM +0200, Arnd Bergmann wrote:
-> > +#define ASC_MAJOR		204
-> > +#define ASC_MINOR_START		40
-> 
-> I don't know what the current policy is on allocating major/minor numbers,
-> but I'm sure you cannot just reuse one that is already used.
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+CC: mingo at redhat.com
+CC: peterz at infradead.org
+---
+ kernel/sched/cputime.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-I agree, why are you trying to create a new tty device name?  Can't you
-use the existing ttyS name and minor number as you will not have any
-other type of serial device on this system?
-
-thanks,
-
-greg k-h
+diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
+index ed12cbb..488a5bf 100644
+--- a/kernel/sched/cputime.c
++++ b/kernel/sched/cputime.c
+@@ -5,6 +5,7 @@
+ #include <linux/static_key.h>
+ #include <linux/context_tracking.h>
+ #include "sched.h"
++#include <asm/paravirt.h>
+ 
+ 
+ #ifdef CONFIG_IRQ_TIME_ACCOUNTING
+-- 
+1.7.2.5
