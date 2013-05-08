@@ -1,44 +1,41 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 8 May 2013 13:11:18 +0100
-Subject: [PATCH 1/3] xen/arm: initialize pm functions later
+Date: Wed, 8 May 2013 13:11:19 +0100
+Subject: [PATCH 2/3] xen/arm: do not handle VCPUOP_register_vcpu_info failures
 In-Reply-To: <alpine.DEB.2.02.1305081303310.18865@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1305081303310.18865@kaball.uk.xensource.com>
-Message-ID: <1368015080-5182-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1368015080-5182-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we are running in dom0, we have to wait for the arch specific code to
-complete the initialization in order for us to successfully reset the
-power_off and pm_restart functions.
+We expect VCPUOP_register_vcpu_info to succeed, do not try to handle
+failures.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/xen/enlighten.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ arch/arm/xen/enlighten.c |   11 ++++-------
+ 1 files changed, 4 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index d30042e..83d13b0 100644
+index 83d13b0..519acf9 100644
 --- a/arch/arm/xen/enlighten.c
 +++ b/arch/arm/xen/enlighten.c
-@@ -272,12 +272,18 @@ static int __init xen_guest_init(void)
- 	if (!xen_initial_domain())
- 		xenbus_probe(NULL);
+@@ -165,13 +165,10 @@ static int __init xen_secondary_init(unsigned int cpu)
+ 	info.offset = offset_in_page(vcpup);
  
-+	return 0;
-+}
-+core_initcall(xen_guest_init);
+ 	err = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_info, cpu, &info);
+-	if (err) {
+-		pr_debug("register_vcpu_info failed: err=%d\n", err);
+-	} else {
+-		/* This cpu is using the registered vcpu info, even if
+-		   later ones fail to. */
+-		per_cpu(xen_vcpu, cpu) = vcpup;
+-	}
++	if (err)
++		BUG();
++	per_cpu(xen_vcpu, cpu) = vcpup;
 +
-+static int __init xen_pm_init(void)
-+{
- 	pm_power_off = xen_power_off;
- 	arm_pm_restart = xen_restart;
- 
  	return 0;
  }
--core_initcall(xen_guest_init);
-+subsys_initcall(xen_pm_init);
  
- static irqreturn_t xen_arm_callback(int irq, void *arg)
- {
 -- 
 1.7.2.5
