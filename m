@@ -1,48 +1,48 @@
 From: nm@ti.com (Nishanth Menon)
-Date: Wed, 8 May 2013 14:06:12 -0500
-Subject: [PATCH V5 2/6] ARM: dts: OMAP3: add clock nodes for CPU
+Date: Wed, 8 May 2013 14:06:13 -0500
+Subject: [PATCH V5 3/6] ARM: dts: OMAP4: add clock nodes for CPU
 In-Reply-To: <1368039976-29648-1-git-send-email-nm@ti.com>
 References: <1368039976-29648-1-git-send-email-nm@ti.com>
-Message-ID: <1368039976-29648-3-git-send-email-nm@ti.com>
+Message-ID: <1368039976-29648-4-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP34xx and OMAP36xx platforms use dpll1 clock. Add same to common
-definition.
+OMAP443x, OMAP446x and OMAP447x platforms use dpll_mpu clock.
+Add same to common definition.
 
 Cc: Benoit Cousson <b-cousson@ti.com>
 Signed-off-by: Nishanth Menon <nm@ti.com>
 ---
 no change in current revision.
-Previous version: http://marc.info/?l=linux-kernel&m=136580740024201&w=2
+Previous version: http://marc.info/?l=linux-kernel&m=136580751024225&w=2
 
- arch/arm/boot/dts/omap3.dtsi |    7 +++++++
+ arch/arm/boot/dts/omap4.dtsi |    7 +++++++
  1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 4ad03d9..4f445ca 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -23,6 +23,8 @@
- 	cpus {
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 2a56428..1c6d969 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -31,6 +31,8 @@
  		cpu at 0 {
- 			compatible = "arm,cortex-a8";
-+			clocks = <&dpll1>;
+ 			compatible = "arm,cortex-a9";
+ 			next-level-cache = <&L2>;
++			clocks = <&dpll_mpu>;
 +			clock-names = "cpu";
  		};
- 	};
- 
-@@ -73,6 +75,11 @@
+ 		cpu at 1 {
+ 			compatible = "arm,cortex-a9";
+@@ -106,6 +108,11 @@
  			ti,hwmods = "counter_32k";
  		};
  
-+		dpll1: dpll1 {
++		dpll_mpu: dpll_mpu {
 +			#clock-cells = <0>;
 +			compatible = "ti,omap-clock";
 +		};
 +
- 		intc: interrupt-controller at 48200000 {
- 			compatible = "ti,omap2-intc";
- 			interrupt-controller;
+ 		omap4_pmx_core: pinmux at 4a100040 {
+ 			compatible = "ti,omap4-padconf", "pinctrl-single";
+ 			reg = <0x4a100040 0x0196>;
 -- 
 1.7.9.5
