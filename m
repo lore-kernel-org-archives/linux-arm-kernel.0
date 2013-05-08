@@ -1,36 +1,66 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 08 May 2013 22:51:38 +0400
-Subject: [PATCH] irqchip: Add irqchip_init dummy function
-In-Reply-To: <201305081833.03716.arnd@arndb.de>
-References: <1368019204-24448-1-git-send-email-hechtb+renesas@gmail.com>
- <518A6C05.9030303@cogentembedded.com> <201305081833.03716.arnd@arndb.de>
-Message-ID: <518A9EBA.6070609@cogentembedded.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed,  8 May 2013 11:52:48 -0700
+Subject: [PATCH v2] ARM: exynos: Select PINCTRL_EXYNOS for exynos4/5 at arch
+ level
+In-Reply-To: <1368034349-15091-1-git-send-email-dianders@chromium.org>
+References: <1368034349-15091-1-git-send-email-dianders@chromium.org>
+Message-ID: <1368039168-24447-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Previously if you had MACH_EXYNOS5_DT but not MACH_EXYNOS4_DT you'd be
+missing the pincontrol definitions.  Move PINCTRL selects to the arch
+level since we should be enabling the code for all exynos variants.
 
-On 05/08/2013 08:33 PM, Arnd Bergmann wrote:
+It's expected that eventually exynos5440 (which seems to have its own
+pinctrl code) will eventually move over to the common code.
 
->
->>> --- a/include/linux/irqchip.h
->>> +++ b/include/linux/irqchip.h
->>> @@ -11,6 +11,10 @@
->>>    #ifndef _LINUX_IRQCHIP_H
->>>    #define _LINUX_IRQCHIP_H
->>>
->>> +#ifdef CONFIG_IRQCHIP
->>>    void irqchip_init(void);
->>> +#else
->>> +void irqchip_init(void) {};
->>      Semicolon not needed here.
->>
->>> +#endif
-> More importantly, the function should be marked as "static inline", otherwise
-> you get a link error if this header is included in more than one place.
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+Changes in v2:
+- Moved to the arch level as suggested by Olof.
 
-     Right, I should have noticed that too. :-)
+ arch/arm/mach-exynos/Kconfig | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-> 	Arnd
-
-WBR, Sergei
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 6e77432..7ee58b0 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -17,6 +17,8 @@ config ARCH_EXYNOS4
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
++	select PINCTRL
++	select PINCTRL_EXYNOS
+ 	help
+ 	  Samsung EXYNOS4 SoCs based systems
+ 
+@@ -24,6 +26,8 @@ config ARCH_EXYNOS5
+ 	bool "SAMSUNG EXYNOS5"
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_SMP
++	select PINCTRL
++	select PINCTRL_EXYNOS
+ 	help
+ 	  Samsung EXYNOS5 (Cortex-A15) SoC based systems
+ 
+@@ -78,7 +82,6 @@ config SOC_EXYNOS5440
+ 	select ARCH_HAS_OPP
+ 	select ARM_ARCH_TIMER
+ 	select AUTO_ZRELADDR
+-	select PINCTRL
+ 	select PINCTRL_EXYNOS5440
+ 	select PM_OPP
+ 	help
+@@ -412,8 +415,6 @@ config MACH_EXYNOS4_DT
+ 	select CLKSRC_OF
+ 	select CPU_EXYNOS4210
+ 	select KEYBOARD_SAMSUNG if INPUT_KEYBOARD
+-	select PINCTRL
+-	select PINCTRL_EXYNOS
+ 	select S5P_DEV_MFC
+ 	select USE_OF
+ 	help
+-- 
+1.8.2.1
