@@ -1,61 +1,33 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 8 May 2013 13:50:29 -0700
-Subject: [PATCH -v8 11/11] Move arch/x86 reboot= handling to generic
- kernel.
-In-Reply-To: <1367937595-32241-12-git-send-email-holt@sgi.com>
-References: <1367937595-32241-1-git-send-email-holt@sgi.com>
- <1367937595-32241-12-git-send-email-holt@sgi.com>
-Message-ID: <20130508135029.ffbeefa6b8154bee31e7bbbe@linux-foundation.org>
+From: rob@landley.net (Rob Landley)
+Date: Wed, 08 May 2013 15:58:30 -0500
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <5189BA36.9000105@wwwdotorg.org> (from swarren@wwwdotorg.org on
+ Tue May  7 21:36:38 2013)
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+ <201304300004.20320.arnd@arndb.de> <5182AF83.4080705@wwwdotorg.org>
+ <1956593.M6NmITdEKh@avalon>
+ <20130507143338.79b3d893fcdc3bd79fbe9a57@linux-foundation.org>
+ <5189BA36.9000105@wwwdotorg.org>
+Message-ID: <1368046710.18069.217@driftwood>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  7 May 2013 09:39:55 -0500 Robin Holt <holt@sgi.com> wrote:
-
-> Merge together the unicore32, arm, and x86 reboot= command line
-> parameter handling.
+On 05/07/2013 09:36:38 PM, Stephen Warren wrote:
+> On 05/07/2013 03:33 PM, Andrew Morton wrote:
+...
+> Subject: drivers/video: implement a simple framebuffer driver
 > 
-> ...
->
-> +static int __init reboot_setup(char *str)
-> +{
-> +	for (;;) {
-> +		/*
-> +		 * Having anything passed on the command line via
-> +		 * reboot= will cause us to disable DMI checking
-> +		 * below.
-> +		 */
-> +		reboot_default = 0;
-> +
-> +		switch (*str) {
-> +#if defined(CONFIG_X86) || defined(CONFIG_X86_64)
-> +		case 'w':
-> +			reboot_mode = REBOOT_WARM;
-> +			break;
-> +
-> +		case 'c':
-> +			reboot_mode = REBOOT_COLD;
-> +			break;
-> +
-> +#ifdef CONFIG_SMP
-> +		case 's':
-> +			if (isdigit(*(str+1))) {
-> +				reboot_cpu = (int) (*(str+1) - '0');
-> +				if (isdigit(*(str+2)))
-> +					reboot_cpu = reboot_cpu*10 + (int)(*(str+2) - '0');
-> +			}
+> A simple frame-buffer describes a raw memory region that may be  
+> rendered
+> to, with the assumption that the display hardware has already been set
+> up to scan out from that buffer.
+> 
+> This is useful in cases where a bootloader exists and has set up the
+> display hardware, but a Linux driver doesn't yet exist for the display
+> hardware.
+> 
+> Examples use-cases include:
 
-Boy, that's some weird stuff.
+Virtual environments such as QEMU.
 
-What's wrong with doing
-
-			if (isdigit(str[1])) {
-				reboot_cpu = str[1] - '0';
-				if (isdigit(str[2]))
-					reboot_cpu = reboot_cpu * 10 +
-							str[2] - '0';
-			}
-
-?
-
-But it's still nonsense - we should eliminate its
-you-have-less-than-101-CPUs restriction by using, you know, atoi().
+Rob
