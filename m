@@ -1,58 +1,38 @@
-From: stuart.menefy@st.com (Stuart MENEFY)
-Date: Wed, 08 May 2013 16:48:31 +0100
-Subject: [RFC 2/8] ARM:global_timer: Add ARM global timer support.
-In-Reply-To: <20130508144907.GB20820@mudshark.cambridge.arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 8 May 2013 08:53:01 -0700
+Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
+In-Reply-To: <20130508154057.GB3041@game.jcrosoft.org>
 References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081638.23100.arnd@arndb.de>
- <20130508144907.GB20820@mudshark.cambridge.arm.com>
-Message-ID: <518A73CF.8000309@st.com>
+ <1368022248-2153-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305081634.43498.arnd@arndb.de>
+ <20130508153459.GA17186@kroah.com>
+ <20130508154057.GB3041@game.jcrosoft.org>
+Message-ID: <20130508155301.GB27273@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/13 15:49, Will Deacon wrote:
-> On Wed, May 08, 2013 at 03:38:22PM +0100, Arnd Bergmann wrote:
->> On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
->>> From: Stuart Menefy <stuart.menefy@st.com>
->>>
->>> This is a simple driver for the global timer module found in the Cortex
->>> A9-MP cores from revision r1p0 onwards. This should be able to perform
->>> the functions of the system timer and the local timer in an SMP system.
->>>
->>> The global timer has the following features:
->>>     The global timer is a 64-bit incrementing counter with an
->>> auto-incrementing feature. It continues incrementing after sending
->>> interrupts. The global timer is memory mapped in the private memory
->>> region.
->>>     The global timer is accessible to all Cortex-A9 processors in the
->>> cluster. Each Cortex-A9 processor has a private 64-bit comparator that
->>> is used to assert a private interrupt when the global timer has reached
->>> the comparator value. All the Cortex-A9 processors in a design use the
->>> banked ID, ID27, for this interrupt. ID27 is sent to the Interrupt
->>> Controller as a Private Peripheral Interrupt. The global timer is
->>> clocked by PERIPHCLK.
->>>
->>> Signed-off-by: Stuart Menefy <stuart.menefy@st.com>
->>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->>>
->>
->> Are you sure we don't already have a driver for this? It sounds unlikely
->> that you are the first one to do this when the hardware is so common.
+On Wed, May 08, 2013 at 05:40:57PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 08:34 Wed 08 May     , Greg KH wrote:
+> > On Wed, May 08, 2013 at 04:34:43PM +0200, Arnd Bergmann wrote:
+> > > > +#define ASC_MAJOR		204
+> > > > +#define ASC_MINOR_START		40
+> > > 
+> > > I don't know what the current policy is on allocating major/minor numbers,
+> > > but I'm sure you cannot just reuse one that is already used.
+> > 
+> > I agree, why are you trying to create a new tty device name?  Can't you
+> > use the existing ttyS name and minor number as you will not have any
+> > other type of serial device on this system?
 > 
-> An additional reason why people don't make use of this timer (on top of the
-> power domain concerns raised by Rob) is due to the following from the A9
-> TRM:
-> 
->   `From r2p0 the comparators for each processor with the global timer fire
->    when the timer value is greater than or equal to. In previous revisions
->    the comparators fired when the timer value was equal to.'
-> 
-> So you'll get into all sorts of horrible races on those older revisions if
-> you're not careful.
+> Greg on ST STB for more than 10 years we use ttyASC I'll prefer ttySx
 
-Fortunately the earliest version of these SoCs uses r2p2, so we avoided that
-particular issue. But as the code doesn't attempt to work around these
-problems a check on the version number might be a good idea to prevent other
-people accidentally hitting it.
+For 10+ years you have had an out-of-tree serial driver?  What
+major/minor numbers did you use for it?
 
-Stuart
+> on the DTB SoC you have one one IP present the st,asc
+
+I don't understand, what do you mean by this?
+
+confused,
+
+greg k-h
