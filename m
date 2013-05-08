@@ -1,65 +1,24 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 08 May 2013 07:48:17 -0400
-Subject: [Xen-devel] [PATCH 1/3] arm_arch_timer: introduce
- arch_timer_stolen_ticks
-In-Reply-To: <alpine.DEB.2.02.1305081217010.18865@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1305011939180.5398@kaball.uk.xensource.com>
- <1367436460-10183-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <51817CBE.4050003@codeaurora.org>
- <1367482772.21869.26.camel@zakaz.uk.xensource.com>
- <5182DBA9.9080609@codeaurora.org>
- <20130506143533.GF15278@phenom.dumpdata.com>
- <51892933.7090405@codeaurora.org>
- <alpine.DEB.2.02.1305081217010.18865@kaball.uk.xensource.com>
-Message-ID: <518A3B81.3080308@codeaurora.org>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Wed, 8 May 2013 15:44:17 +0300
+Subject: [RFC PATCH v2 05/11] mm: thp: Correct the HPAGE_PMD_ORDER check.
+In-Reply-To: <1368006763-30774-6-git-send-email-steve.capper@linaro.org>
+References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
+ <1368006763-30774-6-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130508124417.GA29631@shutemov.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2013 07:19 AM, Stefano Stabellini wrote:
-> On Tue, 7 May 2013, Christopher Covington wrote:
->> Hi Konrad,
->>
->> On 05/06/2013 10:35 AM, Konrad Rzeszutek Wilk wrote:
->>>>> e.g. if a VCPU sets a timer for NOW+5, but 3 are stolen in the middle it
->>>>> would not make sense (from the guests PoV) for NOW'==NOW+2 at the point
->>>>> where the timer goes off. Nor does it make sense to require that the
->>>>> guest actually be running for 5 before injecting the timer because that
->>>>> would mean real time elapsed time for the timer would be 5+3 in the case
->>>>> where 3 are stolen.
->>>>
->>>> This is a bit of an aside, but I think that hiding time spent at higher
->>>> privilege levels can be a quite sensible approach to timekeeping in a
->>>> virtualized environment, but I understand that it's not the approach taken
->>>> with Xen, and as you pointed out above, adjusting the Virtual Offset Register
->>>> by itself isn't enough to implement that approach.
->>>
->>> This is the approach taken by Xen and KVM. Look in CONFIG_PARAVIRT_CLOCK for
->>> implementation. In the user-space, the entry in 'top' of "stolen" (%st)
->>> is for this exact value.
->>
->> I may have been unclear with my terms, sorry. When I refer to time being
->> "hidden", I mean that kernel level software (supervisor mode, EL1) cannot
->> detect the passage of that time at all. I don't know whether this would really
->> work, but I imagine one might be able to get close with the current
->> virtualization facilities for ARM.
->>
->> Am I correct in interpreting that what you're referring to is the deployment
->> of paravirtualization code that ensures (observable) "stolen" time is factored
->> into kernel decision-making?
+On Wed, May 08, 2013 at 10:52:37AM +0100, Steve Capper wrote:
+> All Transparent Huge Pages are allocated by the buddy allocator.
 > 
-> Although it might be possible to hide the real time flow from the VM, it
-> is inadvisable: what would happen when the VM needs to deal with a real
-> hardware device? Or just send packets over the network?  This is why it
-> is much safer and more reliable to expose the stolen ticks to the VM.
+> A compile time check is in place that fails when the order of a
+> transparent huge page is too large to be allocated by the buddy
+> allocator. Unfortunately that compile time check passes when:
+> HPAGE_PMD_ORDER == MAX_ORDER
+> ( which is incorrect as the buddy allocator can only allocate
+> memory of order strictly less than MAX_ORDER. )
 
-One would probably have to emulate all the hardware. I don't mean to imply
-that I think this is useful for everyday virtualization, but I speculate that
-such an approach might enable the analysis of kernels infected with
-VM-detecting malware or other niche use-cases.
-
-Christopher
+It looks confusing to me. Shouldn't we fix what MAX_ORDER means instead?
 
 -- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+ Kirill A. Shutemov
