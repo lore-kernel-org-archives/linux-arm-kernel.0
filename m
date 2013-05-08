@@ -1,71 +1,72 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 08 May 2013 10:36:54 -0600
-Subject: [PATCH 1/4] ARM: tegra30: clocks: Fix pciex clock registration
-In-Reply-To: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
-References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
-Message-ID: <518A7F26.3030605@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 8 May 2013 17:40:19 +0100
+Subject: [RFC PATCH v2 08/11] ARM64: mm: Swap PTE_FILE and PTE_PROT_NONE
+ bits.
+In-Reply-To: <1368006763-30774-9-git-send-email-steve.capper@linaro.org>
+References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
+ <1368006763-30774-9-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130508164018.GF20820@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2013 04:57 AM, Jay Agarwal wrote:
-> Registering pciex as peripheral clock instead of fixed clock
-> as tegra_perih_reset_assert(deassert) api of this clock api 
-> gives warning and ultimately does not succeed to assert(deassert).
+On Wed, May 08, 2013 at 10:52:40AM +0100, Steve Capper wrote:
+> Under ARM64, PTEs can be broadly categorised as follows:
+>    - Present and valid: Bit #0 is set. The PTE is valid and memory
+>      access to the region may fault.
+> 
+>    - Present and invalid: Bit #0 is clear and bit #1 is set.
+>      Represents present memory with PROT_NONE protection. The PTE
+>      is an invalid entry, and the user fault handler will raise a
+>      SIGSEGV.
+> 
+>    - Not present (file): Bits #0 and #1 are clear, bit #2 is set.
+>      Memory represented has been paged out. The PTE is an invalid
+>      entry, and the fault handler will try and re-populate the
+>      memory where necessary.
+> 
+> Huge PTEs are block descriptors that have bit #1 clear. If we wish
+> to represent PROT_NONE huge PTEs we then run into a problem as
+> there is no way to distinguish between regular and huge PTEs if we
+> set bit #1.
+> 
+> As huge PTEs are always present, the meaning of bits #1 and #2 can
+> be swapped for invalid PTEs. This patch swaps the PTE_FILE and
+> PTE_PROT_NONE constants, allowing us to represent PROT_NONE huge
+> PTEs.
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> ---
+>  arch/arm64/include/asm/pgtable.h | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index b1a1b59..e245260 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -25,8 +25,8 @@
+>   * Software defined PTE bits definition.
+>   */
+>  #define PTE_VALID		(_AT(pteval_t, 1) << 0)
+> -#define PTE_PROT_NONE		(_AT(pteval_t, 1) << 1)	/* only when !PTE_VALID */
+> -#define PTE_FILE		(_AT(pteval_t, 1) << 2)	/* only when !pte_present() */
+> +#define PTE_FILE		(_AT(pteval_t, 1) << 1)	/* only when !pte_present() */
+> +#define PTE_PROT_NONE		(_AT(pteval_t, 1) << 2)	/* only when !PTE_VALID */
+>  #define PTE_DIRTY		(_AT(pteval_t, 1) << 55)
+>  #define PTE_SPECIAL		(_AT(pteval_t, 1) << 56)
+>  
+> @@ -306,8 +306,8 @@ extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
+>  
+>  /*
+>   * Encode and decode a file entry:
+> - *	bits 0-1:	present (must be zero)
+> - *	bit  2:		PTE_FILE
+> + *	bits 0 & 2:	present (must be zero)
+> + *	bit  1:		PTE_FILE
+>   *	bits 3-63:	file offset / PAGE_SIZE
+>   */
+>  #define pte_file(pte)		(pte_val(pte) & PTE_FILE)
 
-A few procedural comments: I believe this is at least the second version
-of these patches that have been posted. As such, the email subject
-should say e.e. "PATCH V2" not just "PATCH". You can pass
---subject-prefix='PATCH V2' to git format-patch to achieve this.
+Can you update the comment describing swp entries too please? I *think* the
+__SWP_* defines can remain untouched, but the comment is now wrong.
 
-Since this is an updated version of the patches, each patch should
-describe what changed in the patch, so that people know what issues
-you've fixed in this version. Most people believe that the description
-of changes should be below the --- line, so that it doesn't get included
-in the commit description when the patch is applied.
-
-> Patch is based on remotes/gitorious_thierryreding_linux/tegra/next
-> and should be applied on top of this.
-
-Those two lines should be below the --- line so that they don't get
-included in the commit description when the patch is applied. git
-metadata will provide clues re: who applied the patch and to which
-branch, so there's no need to duplicate this information in the commit
-description itself, but rather include it below --- so that it's still
-present and people can see it.
-
-Some comments on the patch and series below...
-
-> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
-
-> +	/* pciex */
-> +	clk = tegra_clk_register_periph_gate("pciex", "pll_e", 0, clk_base, 0,
-> +				    74, &periph_u_regs, periph_clk_enb_refcnt);
-> +	clk_register_clkdev(clk, "pciex", NULL);
-> +	clks[pciex] = clk;
-
-Hmmm. This change perhaps isn't technically correct, but is the best we
-can do for now, so it's fine. It's also consistent with how the Tegra20
-clock driver is written.
-
-This clock has a "reset" bit in the CLK_RST_* registers, but not an
-"enable" bit in the CLK_ENB_* registers. Hence, representing this as a
-gated clock isn't correct, since there is not gate control in HW. The
-correct way to handle this would be to implement the new reset
-controller API for Tegra, and expose the reset control only, and not
-touch the clock registration at all. However, we do this exact same
-thing for a number of Tegra clocks right now, hence I think this change
-is fine for now; we'll clean this up, along with some other instances of
-the same issue, once the reset API is implemented for Tegra. Of course,
-if that happens before the PCI code is checked in, then my opinion will
-change.
-
-> @@ -1930,7 +1931,6 @@ static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
->  	TEGRA_CLK_DUPLICATE(bsea, "nvavp", "bsea"),
->  	TEGRA_CLK_DUPLICATE(cml1, "tegra_sata_cml", NULL),
->  	TEGRA_CLK_DUPLICATE(cml0, "tegra_pcie", "cml"),
-> -	TEGRA_CLK_DUPLICATE(pciex, "tegra_pcie", "pciex"),
-
-That seems like an unrelated change, and isn't mentioned in the commit
-description. Is the change strictly necessary? Is it cleanup that can
-happen as a separate patch later in the series? Aren't you able to
-remove the CLK_DUPLICATE() entries for other PCIe-related clocks too?
+Will
