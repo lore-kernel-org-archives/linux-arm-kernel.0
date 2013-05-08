@@ -1,28 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 May 2013 21:55:22 +0200
-Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
-In-Reply-To: <518A96DA.5060809@st.com>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <20130508143908.GJ24282@game.jcrosoft.org> <518A96DA.5060809@st.com>
-Message-ID: <201305082155.23088.arnd@arndb.de>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 8 May 2013 13:12:05 -0700
+Subject: [REGRESSION] SLAB allocator (on Zynq)
+In-Reply-To: <20130508193906.GC32546@atomide.com>
+References: <9d9b2266-e09e-4366-80ef-3df5db775f25@TX2EHSMHS033.ehs.local>
+ <20130508193906.GC32546@atomide.com>
+Message-ID: <35a77b0e-59cc-4fee-81cf-20c059462d12@DB8EHSMHS016.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
+On Wed, May 08, 2013 at 12:39:07PM -0700, Tony Lindgren wrote:
+> Hi,
 > 
-> On 08/05/13 15:39, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >>> +
-> >> > 
-> >> > Please remove all forward declarations, by reordering the functions in
-> >> > the way they are called.
-> >> > 
-> > and drop the dummy functions
->
-> We can not remove the dummy functions, as the serial-core does not check
-> it before using them.
+> * S?ren Brinkmann <soren.brinkmann@xilinx.com> [130508 12:26]:
+> > Hi,
+> > 
+> > I compiled the latest kernel for Zynq and ran into issues when the SLAB
+> > allocator is selected. Booting crashes early with a NULL pointer
+> > dereference (boot log attached).
+> > Switching to the SLUB allocator resolves the issue (boot log attached).
+> 
+> There's a fix for this now in lkml thread
+> "[GIT PULL] SLAB changes for v3.10":
+> 
+> http://lkml.org/lkml/2013/5/8/374#
+Thanks for the quick response and apologies for not having it found
+myself earlier.
+With that patch it works again.
 
-None of them seem performance critical, so it sounds reasonable to change
-this in the core so you don't have to provide them. It's up to Greg to decide
-whether he'd like that change or not.
-
-	Arnd
+	Thanks,
+	S?ren
