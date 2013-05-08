@@ -1,35 +1,40 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 May 2013 14:29:03 +0100
-Subject: [PATCH 3/9] clk: ux500: Provide device enumeration number suffix for
- SMSC911x
+Date: Wed,  8 May 2013 14:29:05 +0100
+Subject: [PATCH 5/9] ARM: ux500: Fix incorrect DEBUG UART virtual addresses
 In-Reply-To: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
 References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1368019749-19455-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1368019749-19455-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First Ethernet device has a ".0" appended onto the device name. It
-appears that we need this in order to obtain the correct clock.
+A recent move to rid header files which were hindering multiplatform
+support forced address allocations out of the headers and into the
+files which were using them. We also lost some useful macros such as
+IO_ADDRESS(), so physical -> virtual addressing has been carried out
+manually in this case. Unfortunately the incorrect value was converted.
+This patch rectifies the error and ensures earlyprintk works again.
 
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/clk/ux500/u8500_clk.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/debug/ux500.S |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
-index 0b4f35a..80069c3 100644
---- a/drivers/clk/ux500/u8500_clk.c
-+++ b/drivers/clk/ux500/u8500_clk.c
-@@ -325,7 +325,7 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
- 	clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", clkrst3_base,
- 				BIT(0), 0);
- 	clk_register_clkdev(clk, "fsmc", NULL);
--	clk_register_clkdev(clk, NULL, "smsc911x");
-+	clk_register_clkdev(clk, NULL, "smsc911x.0");
- 
- 	clk = clk_reg_prcc_pclk("p3_pclk1", "per3clk", clkrst3_base,
- 				BIT(1), 0);
+diff --git a/arch/arm/include/debug/ux500.S b/arch/arm/include/debug/ux500.S
+index 2848857..fbd24be 100644
+--- a/arch/arm/include/debug/ux500.S
++++ b/arch/arm/include/debug/ux500.S
+@@ -24,9 +24,9 @@
+ #define U8500_UART0_PHYS_BASE	(0x80120000)
+ #define U8500_UART1_PHYS_BASE	(0x80121000)
+ #define U8500_UART2_PHYS_BASE	(0x80007000)
+-#define U8500_UART0_VIRT_BASE	(0xa8120000)
+-#define U8500_UART1_VIRT_BASE	(0xa8121000)
+-#define U8500_UART2_VIRT_BASE	(0xa8007000)
++#define U8500_UART0_VIRT_BASE	(0xf8120000)
++#define U8500_UART1_VIRT_BASE	(0xf8121000)
++#define U8500_UART2_VIRT_BASE	(0xf8007000)
+ #define __UX500_PHYS_UART(n)	U8500_UART##n##_PHYS_BASE
+ #define __UX500_VIRT_UART(n)	U8500_UART##n##_VIRT_BASE
+ #endif
 -- 
 1.7.10.4
