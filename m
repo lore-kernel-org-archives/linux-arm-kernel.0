@@ -1,58 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 May 2013 15:30:27 -0700
-Subject: [RFC PATCH 0/3] ARM: omap3: add Seagate Wireless Plus board
-In-Reply-To: <20130508215853.GD31290@titan.lakedaemon.net>
-References: <cover.1368038129.git.jason@lakedaemon.net>
- <20130508195152.GE32546@atomide.com>
- <20130508215853.GD31290@titan.lakedaemon.net>
-Message-ID: <20130508223027.GN32546@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 08 May 2013 16:42:04 -0600
+Subject: [PATCH] USB: set device dma_mask without reference to global data
+In-Reply-To: <CAL411-pY_i19otiE2pLux6eR_OFHhfhK=+6BF=H6wABDsGCP6Q@mail.gmail.com>
+References: <1367967232-10128-1-git-send-email-swarren@wwwdotorg.org>
+ <CAL411-qVnm0_wwdAiAp9eq_hYkXzFSmRMLAmknpSAG7Jb3bM9A@mail.gmail.com>
+ <5189B7BF.8070607@wwwdotorg.org>
+ <CAL411-pY_i19otiE2pLux6eR_OFHhfhK=+6BF=H6wABDsGCP6Q@mail.gmail.com>
+Message-ID: <518AD4BC.6090009@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jason Cooper <jason@lakedaemon.net> [130508 15:04]:
-> On Wed, May 08, 2013 at 12:51:53PM -0700, Tony Lindgren wrote:
-> > * Jason Cooper <jason@lakedaemon.net> [130508 12:29]:
-> > > 
-> > > Current Problem:
-> > > 
-> > > There are several gaps in my understanding of how far along TI's conversion to
-> > > DT is.  Should I be doing a separate board file for initializing the legacy
-> > > items?  I was hoping to do it all with DT.
-> > 
-> > Sorry forgot to reply to this.. No seprate board file should be needed,
-> > some devices may still need to be initialized with pdata based on the
-> > compatible flag.
+On 05/07/2013 08:54 PM, Peter Chen wrote:
+>>
+>> This probably could be initialized from some DT property. However,
+>> there's no such property defined right now, and considering that DT is
+>> supposed to be an ABI, we'd always need the code in this patch as a
+>> fallback for DTs that were created before any such property was defined.
+>>
+>> Equally, since the data is SoC-specific rather than board-specific, and
+>> is even fairly unlikely to vary between SoC versions since these values
+>> are all 0xffffffff anyway, I don't really see much point in putting it
+>> into DT, rather than just putting the static data into the driver.
 > 
-> ti,hwmod, right?
-
-Yes.. see mach-omap2/devices.c for the list that's still not initialized
-via DT.
- 
-> > > Obviously, I don't expect anybody to run out and buy one of these, take it
-> > > apart, and try to boot this code.  But if the omap guys could take a look at
-> > > this and give me a few pointers, I'd appreciate it.  I'm kind of spinning my
-> > > wheels at the moment.
-> > > 
-> > > Primarily, I'd like to get nand and usb working, so that I can read/write,
-> > > mount a rootfs and do better testing.
-> > 
-> > The USB should be doable with device tree. At least both echi and
-> > musb are working properly on pandaboard. I think people have been
-> > using NAND with the gpmc DT patches, but I don't know the current
-> > status for sure.
+> I mean there is already dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> at function of_platform_device_create, why can't add
+> dev->dev.dma_mask = &dev->dev.coherent_dma_mask after that?
 > 
-> I'll try your suggestion in your other email for ToT and see if I can
-> get gpmc going.
-> 
-> > Is the hard drive on the EHCI bus or how is it connected to omap?
-> 
-> via ehci.  They brutalized the tps driver to detect if the goflex cable
-> was attached or not.  Once I get something stable, I'll probably write a
-> separate driver for that code.  Or, push it out to userspace.
+> If DT core can do above things, can we delete dma_mask assignment
+> at every driver?
 
-OK. I guess you need to disconnect the drive from EHCI if the goflex
-is attached to avoid disk corruption?
+Perhaps. However, such a change has a much larger potential for regressions.
 
-Regards,
-
-Tony
+I would suggest going with the current patch for 3.10 and any later
+backports in order to reduce risk. We can revisit better cleanup for
+later kernels.
