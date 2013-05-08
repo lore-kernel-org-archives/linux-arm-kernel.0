@@ -1,15 +1,16 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 8 May 2013 15:57:51 +0200
-Subject: [PATCH 4/8] crypto: ux500/cryp - Prepare clock before enabling it
-In-Reply-To: <1367491790-9727-5-git-send-email-lee.jones@linaro.org>
-References: <1367491790-9727-1-git-send-email-lee.jones@linaro.org>
- <1367491790-9727-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAPDyKFrZo7Eg4wmYVfD4MYr=Ae1Z1u6pJQOjv4X1QK+FKPH7FA@mail.gmail.com>
+Date: Wed, 8 May 2013 15:59:08 +0200
+Subject: [PATCH 36/63] crypto: ux500/hash - Prepare clock before enabling
+ it
+In-Reply-To: <1367591569-32197-37-git-send-email-lee.jones@linaro.org>
+References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
+ <1367591569-32197-37-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAPDyKFqD93K_vBKpoWmLjFHaY06seARDpxb-KJJFv4LAzXa1Vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 May 2013 12:49, Lee Jones <lee.jones@linaro.org> wrote:
-> If we fail to prepare the ux500-cryp clock before enabling it the
+On 3 May 2013 16:32, Lee Jones <lee.jones@linaro.org> wrote:
+> If we fail to prepare the ux500-hash clock before enabling it the
 > platform will fail to boot. Here we insure this happens.
 >
 > Cc: Herbert Xu <herbert@gondor.apana.org.au>
@@ -20,35 +21,35 @@ On 2 May 2013 12:49, Lee Jones <lee.jones@linaro.org> wrote:
 > Acked-by: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  drivers/crypto/ux500/cryp/cryp_core.c |   12 +++++++++++-
+>  drivers/crypto/ux500/hash/hash_core.c |   12 +++++++++++-
 >  1 file changed, 11 insertions(+), 1 deletion(-)
 >
-> diff --git a/drivers/crypto/ux500/cryp/cryp_core.c b/drivers/crypto/ux500/cryp/cryp_core.c
-> index 22c9063..bf78d60 100644
-> --- a/drivers/crypto/ux500/cryp/cryp_core.c
-> +++ b/drivers/crypto/ux500/cryp/cryp_core.c
-> @@ -1459,11 +1459,17 @@ static int ux500_cryp_probe(struct platform_device *pdev)
+> diff --git a/drivers/crypto/ux500/hash/hash_core.c b/drivers/crypto/ux500/hash/hash_core.c
+> index 632c333..1e8b2f3 100644
+> --- a/drivers/crypto/ux500/hash/hash_core.c
+> +++ b/drivers/crypto/ux500/hash/hash_core.c
+> @@ -1727,11 +1727,17 @@ static int ux500_hash_probe(struct platform_device *pdev)
 >                 goto out_regulator;
 >         }
 >
 > +       ret = clk_prepare(device_data->clk);
 > +       if (ret) {
-> +               dev_err(dev, "[%s]: clk_prepare() failed!", __func__);
+> +               dev_err(dev, "[%s] clk_prepare() failed!", __func__);
 > +               goto out_clk;
 > +       }
 > +
 >         /* Enable device power (and clock) */
->         ret = cryp_enable_power(device_data->dev, device_data, false);
+>         ret = hash_enable_power(device_data, false);
 >         if (ret) {
->                 dev_err(dev, "[%s]: cryp_enable_power() failed!", __func__);
+>                 dev_err(dev, "[%s]: hash_enable_power() failed!", __func__);
 > -               goto out_clk;
 > +               goto out_clk_unprepare;
 >         }
 >
->         cryp_error = cryp_check(device_data);
-> @@ -1524,6 +1530,9 @@ static int ux500_cryp_probe(struct platform_device *pdev)
+>         ret = hash_check_hw(device_data);
+> @@ -1763,6 +1769,9 @@ static int ux500_hash_probe(struct platform_device *pdev)
 >  out_power:
->         cryp_disable_power(device_data->dev, device_data, false);
+>         hash_disable_power(device_data, false);
 >
 > +out_clk_unprepare:
 > +       clk_unprepare(device_data->clk);
@@ -56,13 +57,13 @@ On 2 May 2013 12:49, Lee Jones <lee.jones@linaro.org> wrote:
 >  out_clk:
 >         clk_put(device_data->clk);
 >
-> @@ -1594,6 +1603,7 @@ static int ux500_cryp_remove(struct platform_device *pdev)
->                 dev_err(&pdev->dev, "[%s]: cryp_disable_power() failed",
+> @@ -1827,6 +1836,7 @@ static int ux500_hash_remove(struct platform_device *pdev)
+>                 dev_err(dev, "[%s]: hash_disable_power() failed",
 >                         __func__);
 >
 > +       clk_unprepare(device_data->clk);
 >         clk_put(device_data->clk);
->         regulator_put(device_data->pwr_regulator);
+>         regulator_put(device_data->regulator);
 >
 > --
 > 1.7.10.4
