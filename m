@@ -1,66 +1,41 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Wed,  8 May 2013 10:52:40 +0100
-Subject: [RFC PATCH v2 08/11] ARM64: mm: Swap PTE_FILE and PTE_PROT_NONE bits.
+Date: Wed,  8 May 2013 10:52:42 +0100
+Subject: [RFC PATCH v2 10/11] ARM64: mm: Raise MAX_ORDER for 64KB pages and
+ THP.
 In-Reply-To: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
 References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1368006763-30774-9-git-send-email-steve.capper@linaro.org>
+Message-ID: <1368006763-30774-11-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Under ARM64, PTEs can be broadly categorised as follows:
-   - Present and valid: Bit #0 is set. The PTE is valid and memory
-     access to the region may fault.
+The buddy allocator has a default MAX_ORDER of 11, which is too
+low to allocate enough memory for 512MB Transparent HugePages if
+our base page size is 64KB.
 
-   - Present and invalid: Bit #0 is clear and bit #1 is set.
-     Represents present memory with PROT_NONE protection. The PTE
-     is an invalid entry, and the user fault handler will raise a
-     SIGSEGV.
-
-   - Not present (file): Bits #0 and #1 are clear, bit #2 is set.
-     Memory represented has been paged out. The PTE is an invalid
-     entry, and the fault handler will try and re-populate the
-     memory where necessary.
-
-Huge PTEs are block descriptors that have bit #1 clear. If we wish
-to represent PROT_NONE huge PTEs we then run into a problem as
-there is no way to distinguish between regular and huge PTEs if we
-set bit #1.
-
-As huge PTEs are always present, the meaning of bits #1 and #2 can
-be swapped for invalid PTEs. This patch swaps the PTE_FILE and
-PTE_PROT_NONE constants, allowing us to represent PROT_NONE huge
-PTEs.
+This patch introduces MAX_ZONE_ORDER and sets it to 14 when 64KB
+pages are used in conjuction with THP, otherwise the default value
+of 11 is used.
 
 Signed-off-by: Steve Capper <steve.capper@linaro.org>
 ---
- arch/arm64/include/asm/pgtable.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/Kconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index b1a1b59..e245260 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -25,8 +25,8 @@
-  * Software defined PTE bits definition.
-  */
- #define PTE_VALID		(_AT(pteval_t, 1) << 0)
--#define PTE_PROT_NONE		(_AT(pteval_t, 1) << 1)	/* only when !PTE_VALID */
--#define PTE_FILE		(_AT(pteval_t, 1) << 2)	/* only when !pte_present() */
-+#define PTE_FILE		(_AT(pteval_t, 1) << 1)	/* only when !pte_present() */
-+#define PTE_PROT_NONE		(_AT(pteval_t, 1) << 2)	/* only when !PTE_VALID */
- #define PTE_DIRTY		(_AT(pteval_t, 1) << 55)
- #define PTE_SPECIAL		(_AT(pteval_t, 1) << 56)
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 053533b..a5f76cf 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -196,6 +196,11 @@ config ARCH_WANT_HUGE_PMD_SHARE
  
-@@ -306,8 +306,8 @@ extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
+ source "mm/Kconfig"
  
- /*
-  * Encode and decode a file entry:
-- *	bits 0-1:	present (must be zero)
-- *	bit  2:		PTE_FILE
-+ *	bits 0 & 2:	present (must be zero)
-+ *	bit  1:		PTE_FILE
-  *	bits 3-63:	file offset / PAGE_SIZE
-  */
- #define pte_file(pte)		(pte_val(pte) & PTE_FILE)
++config FORCE_MAX_ZONEORDER
++	int
++	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
++	default "11"
++
+ endmenu
+ 
+ menu "Boot options"
 -- 
 1.8.1.4
