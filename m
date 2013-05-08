@@ -1,30 +1,45 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed,  8 May 2013 10:32:29 -0700
-Subject: [PATCH] ARM: exynos: Select PINCTRL_EXYNOS for exynos5
-Message-ID: <1368034349-15091-1-git-send-email-dianders@chromium.org>
+Date: Wed,  8 May 2013 10:37:16 -0700
+Subject: [PATCH] ARM: exynos: dts: Fixed vbus-gpios
+Message-ID: <1368034636-15865-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If you've got MACH_EXYNOS5_DT but not MACH_EXYNOS4_DT you'll be
-missing the pincontrol definitions.  Add them for exynos5.
+The 'samsung,vbus-gpio' was submitted before pinmux landed for
+exynos5250 and uses the old-style gpio specifier.  Fix the two
+exynos5250 boards that use it.
 
 Signed-off-by: Doug Anderson <dianders@chromium.org>
 ---
- arch/arm/mach-exynos/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/exynos5250-smdk5250.dts | 2 +-
+ arch/arm/boot/dts/exynos5250-snow.dts     | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 6e77432..cdcd7fa 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -428,6 +428,8 @@ config MACH_EXYNOS5_DT
- 	depends on ARCH_EXYNOS5
- 	select ARM_AMBA
- 	select CLKSRC_OF
-+	select PINCTRL
-+	select PINCTRL_EXYNOS
- 	select USB_ARCH_HAS_XHCI
- 	select USE_OF
- 	help
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index 26d856b..3e0c792 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -214,7 +214,7 @@
+ 	};
+ 
+ 	usb at 12110000 {
+-		samsung,vbus-gpio = <&gpx2 6 1 3 3>;
++		samsung,vbus-gpio = <&gpx2 6 0>;
+ 	};
+ 
+ 	dp-controller {
+diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+index bf4744b..d449feb 100644
+--- a/arch/arm/boot/dts/exynos5250-snow.dts
++++ b/arch/arm/boot/dts/exynos5250-snow.dts
+@@ -183,7 +183,7 @@
+ 	};
+ 
+ 	usb at 12110000 {
+-		samsung,vbus-gpio = <&gpx1 1 1 3 3>;
++		samsung,vbus-gpio = <&gpx1 1 0>;
+ 	};
+ 
+ 	fixed-rate-clocks {
 -- 
 1.8.2.1
