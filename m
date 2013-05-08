@@ -1,65 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 07 May 2013 20:36:38 -0600
-Subject: [PATCH V2] video: implement a simple framebuffer driver
-In-Reply-To: <20130507143338.79b3d893fcdc3bd79fbe9a57@linux-foundation.org>
-References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
- <201304300004.20320.arnd@arndb.de> <5182AF83.4080705@wwwdotorg.org>
- <1956593.M6NmITdEKh@avalon>
- <20130507143338.79b3d893fcdc3bd79fbe9a57@linux-foundation.org>
-Message-ID: <5189BA36.9000105@wwwdotorg.org>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Wed, 8 May 2013 10:54:48 +0800
+Subject: [PATCH] USB: set device dma_mask without reference to global data
+In-Reply-To: <5189B7BF.8070607@wwwdotorg.org>
+References: <1367967232-10128-1-git-send-email-swarren@wwwdotorg.org>
+ <CAL411-qVnm0_wwdAiAp9eq_hYkXzFSmRMLAmknpSAG7Jb3bM9A@mail.gmail.com>
+ <5189B7BF.8070607@wwwdotorg.org>
+Message-ID: <CAL411-pY_i19otiE2pLux6eR_OFHhfhK=+6BF=H6wABDsGCP6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/07/2013 03:33 PM, Andrew Morton wrote:
-> 
-> We don't seem to have a well-defined path to travel here, and I don't
-> get the feeling that anyone has signed up to walk it?
-> 
-> So I'm inclined to merge Stephen's patch as-is into 3.10.  It's pretty
-> simple and standalone.  Any strenuous objections?
-> 
-> BTW, Olof told me off-list that this patch is a "critical piece" for
-> running mainline Linux on ARM Chromebooks.  That was important
-> information - more important than anything else we were told about this
-> patch!
-> 
-> So Stephen, could I please have a new changelog for this patch which
-> explains this application, and any other interesting/important things
-> which were left out?  Quickly, please.
+>
+> This probably could be initialized from some DT property. However,
+> there's no such property defined right now, and considering that DT is
+> supposed to be an ABI, we'd always need the code in this patch as a
+> fallback for DTs that were created before any such property was defined.
+>
+> Equally, since the data is SoC-specific rather than board-specific, and
+> is even fairly unlikely to vary between SoC versions since these values
+> are all 0xffffffff anyway, I don't really see much point in putting it
+> into DT, rather than just putting the static data into the driver.
 
-OK, how about the version below:
+I mean there is already dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+at function of_platform_device_create, why can't add
+dev->dev.dma_mask = &dev->dev.coherent_dma_mask after that?
 
-----------
-Subject: drivers/video: implement a simple framebuffer driver
+If DT core can do above things, can we delete dma_mask assignment
+at every driver?
 
-A simple frame-buffer describes a raw memory region that may be rendered
-to, with the assumption that the display hardware has already been set
-up to scan out from that buffer.
 
-This is useful in cases where a bootloader exists and has set up the
-display hardware, but a Linux driver doesn't yet exist for the display
-hardware.
-
-Examples use-cases include:
-
-* The built-in LCD panels on the Samsung ARM chromebook, and Tegra
-devices, and likely many other ARM or embedded systems. These cannot yet
-be supported using a full graphics driver, since the panel control
-should be provided by the CDF (Common Display Framework), which has been
-stuck in design/review for quite some time. One could support these
-panels using custom SoC-specific code, but there is a desire to use
-common infra-structure rather than having each SoC vendor invent their
-own code, hence the desire to wait for CDF.
-
-* Hardware for which a full graphics driver is not yet available, and
-the path to obtain one upstream isn't yet clear. For example, the
-Raspberry Pi.
-
-* Any hardware in early stages of upstreaming, before a full graphics
-driver has been tackled. This driver can provide a graphical boot
-console (even full X support) much earlier in the upstreaming process,
-thus making new SoC or board support more generally useful earlier.
-----------
-
-I assume you can just edit the patch you have and don't need me to
-resend with the adjusted description.
+--
+BR,
+Peter Chen
