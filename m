@@ -1,39 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 May 2013 12:51:53 -0700
-Subject: [RFC PATCH 0/3] ARM: omap3: add Seagate Wireless Plus board
-In-Reply-To: <cover.1368038129.git.jason@lakedaemon.net>
-References: <cover.1368038129.git.jason@lakedaemon.net>
-Message-ID: <20130508195152.GE32546@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 May 2013 21:55:22 +0200
+Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
+In-Reply-To: <518A96DA.5060809@st.com>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <20130508143908.GJ24282@game.jcrosoft.org> <518A96DA.5060809@st.com>
+Message-ID: <201305082155.23088.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jason Cooper <jason@lakedaemon.net> [130508 12:29]:
+On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
 > 
-> Current Problem:
-> 
-> There are several gaps in my understanding of how far along TI's conversion to
-> DT is.  Should I be doing a separate board file for initializing the legacy
-> items?  I was hoping to do it all with DT.
+> On 08/05/13 15:39, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>> +
+> >> > 
+> >> > Please remove all forward declarations, by reordering the functions in
+> >> > the way they are called.
+> >> > 
+> > and drop the dummy functions
+>
+> We can not remove the dummy functions, as the serial-core does not check
+> it before using them.
 
-Sorry forgot to reply to this.. No seprate board file should be needed,
-some devices may still need to be initialized with pdata based on the
-compatible flag.
- 
-> Obviously, I don't expect anybody to run out and buy one of these, take it
-> apart, and try to boot this code.  But if the omap guys could take a look at
-> this and give me a few pointers, I'd appreciate it.  I'm kind of spinning my
-> wheels at the moment.
-> 
-> Primarily, I'd like to get nand and usb working, so that I can read/write,
-> mount a rootfs and do better testing.
+None of them seem performance critical, so it sounds reasonable to change
+this in the core so you don't have to provide them. It's up to Greg to decide
+whether he'd like that change or not.
 
-The USB should be doable with device tree. At least both echi and
-musb are working properly on pandaboard. I think people have been
-using NAND with the gpmc DT patches, but I don't know the current
-status for sure.
-
-Is the hard drive on the EHCI bus or how is it connected to omap?
-
-Regards,
-
-Tony
+	Arnd
