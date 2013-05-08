@@ -1,130 +1,34 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 8 May 2013 09:57:53 +0100
-Subject: [PATCHv3] arm: Preserve the user r/w register TPIDRURW on
- context switch and fork
-In-Reply-To: <51896934.5080803@dawncrow.de>
-References: <51896934.5080803@dawncrow.de>
-Message-ID: <20130508085753.GA15568@mudshark.cambridge.arm.com>
+Date: Wed, 8 May 2013 10:06:44 +0100
+Subject: [RFC PATCH 0/2] ARM: Remove any correlation between IPC and
+ BogoMips value
+In-Reply-To: <5189224A.70501@codeaurora.org>
+References: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
+ <5187EFF3.6010005@codeaurora.org>
+ <20130507090849.GC25387@mudshark.cambridge.arm.com>
+ <5189224A.70501@codeaurora.org>
+Message-ID: <20130508090644.GA15692@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+Hello Christopher,
 
-On Tue, May 07, 2013 at 09:51:00PM +0100, Andr? Hentschel wrote:
-> From: =?UTF-8?q?Andr=C3=A9=20Hentschel?= <nerv@dawncrow.de>
-
-Might just be my mailer, but you should check that your name is intact here
-otherwise the git log will be mangled.
-
-> Since commit 6a1c53124aa1 the user writeable TLS register was zeroed to
-> prevent it from being used as a covert channel between two tasks.
+On Tue, May 07, 2013 at 04:48:26PM +0100, Christopher Covington wrote:
+> On 05/07/2013 05:08 AM, Will Deacon wrote:
+> > That seems like a lot of effort in order to preserve something that isn't
+> > even meaningful. We might be better just zeroing the value, but then we'll
+> > inevitably get bug reports of it being `wrong'.
 > 
-> There are more and more applications coming to WinRT, Wine could support them,
-> but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
-> 
-> This patch preserves that register per thread instead of clearing it.
-> Unlike the TPIDRURO, which is already switched, the TPIDRURW
-> can be updated from userspace so needs careful treatment in the case that we
-> modify TPIDRURW and call fork(). To avoid this we must always read
-> TPIDRURW in copy_thread.
-> 
-> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com> 
+> If I were in to filing bug reports about bogomips values, I would be just as
+> likely to do it for 1, 10000, 99999, and get_random_bytes(...) as for 0.
 
-[...]
+That's a fair point, and one of the reasons I posted this as an RFC. I'd
+basically like an `obviously bogus' value so that people don't think `hey,
+my CPU sure it slow' and instead think `looks like this really is a bogus
+value after all'.
 
-> diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
-> index 73409e6..22756ab 100644
-> --- a/arch/arm/include/asm/tls.h
-> +++ b/arch/arm/include/asm/tls.h
-> @@ -2,27 +2,30 @@
->  #define __ASMARM_TLS_H
->  
->  #ifdef __ASSEMBLY__
-> -	.macro set_tls_none, tp, tmp1, tmp2
-> +#include <asm/asm-offsets.h>
-> +	.macro switch_tls_none, base, tp, tpuser, tmp1, tmp2
->  	.endm
->  
-> -	.macro set_tls_v6k, tp, tmp1, tmp2
-> +	.macro switch_tls_v6k, base, tp, tpuser, tmp1, tmp2
-> +	mrc	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
->  	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
-> -	mov	\tmp1, #0
-> -	mcr	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
-> +	mcr	p15, 0, \tpuser, c13, c0, 2	@ and the user r/w register
-> +	strne	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
-
-Why is this conditional?
-
->  	.endm
->  
-> -	.macro set_tls_v6, tp, tmp1, tmp2
-> +	.macro switch_tls_v6, base, tp, tpuser, tmp1, tmp2
->  	ldr	\tmp1, =elf_hwcap
->  	ldr	\tmp1, [\tmp1, #0]
->  	mov	\tmp2, #0xffff0fff
->  	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
-> -	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
-> -	movne	\tmp1, #0
-> -	mcrne	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
->  	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
-> +	mrcne	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
-> +	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
-> +	mcrne	p15, 0, \tpuser, c13, c0, 2	@ set user r/w register
-> +	strne	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
->  	.endm
->  
-> -	.macro set_tls_software, tp, tmp1, tmp2
-> +	.macro switch_tls_software, base, tp, tpuser, tmp1, tmp2
->  	mov	\tmp1, #0xffff0fff
->  	str	\tp, [\tmp1, #-15]		@ set TLS value at 0xffff0ff0
->  	.endm
-> @@ -31,19 +34,31 @@
->  #ifdef CONFIG_TLS_REG_EMUL
->  #define tls_emu		1
->  #define has_tls_reg		1
-> -#define set_tls		set_tls_none
-> +#define switch_tls	switch_tls_none
->  #elif defined(CONFIG_CPU_V6)
->  #define tls_emu		0
->  #define has_tls_reg		(elf_hwcap & HWCAP_TLS)
-> -#define set_tls		set_tls_v6
-> +#define switch_tls	switch_tls_v6
->  #elif defined(CONFIG_CPU_32v6K)
->  #define tls_emu		0
->  #define has_tls_reg		1
-> -#define set_tls		set_tls_v6k
-> +#define switch_tls	switch_tls_v6k
->  #else
->  #define tls_emu		0
->  #define has_tls_reg		0
-> -#define set_tls		set_tls_software
-> +#define switch_tls	switch_tls_software
->  #endif
->  
-> +#ifndef __ASSEMBLY__
-> +static inline unsigned long get_tlsuser(void)
-> +{
-> +	if (has_tls_reg && !tls_emu)
-> +	{
-> +		unsigned long t;
-> +		__asm__("mrc p15, 0, %0, c13, c0, 2" : "=r" (t));
-> +		return t;
-> +	}
-> +	return 0;
-
-This isn't standard kernel coding style. Please do something like:
-
-	static inline unsigned long get_tlsuser(void)
-	{
-		unsigned long reg = 0;
-
-		if (has_tls_reg && !tls_emu)
-			asm("mrc p15, 0, %0, c13, c0, 2" : "=r" (reg));
-
-		return reg;
-	}
+However, you're probably right that there isn't a number which can convey
+that information properly, so how about we just put a string in there along
+the lines of "not reported" and leave it at that?
 
 Will
