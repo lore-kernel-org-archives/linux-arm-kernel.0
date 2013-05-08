@@ -1,34 +1,77 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 May 2013 15:23:21 -0700
-Subject: [PATCH] ARM: OMAP: RX-51: change probe order of touchscreen
- and panel SPI devices
-In-Reply-To: <1367427597-30060-1-git-send-email-aaro.koskinen@iki.fi>
-References: <1367427597-30060-1-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <20130508222320.GL32546@atomide.com>
+From: andre.przywara@linaro.org (Andre Przywara)
+Date: Thu,  9 May 2013 00:28:06 +0200
+Subject: [PATCH v2] ARM: KVM: prevent NULL pointer dereferences with KVM VCPU
+ ioctl
+Message-ID: <1368052086-25059-1-git-send-email-andre.przywara@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@iki.fi> [130501 10:06]:
-> Commit 9fdca9df (spi: omap2-mcspi: convert to module_platform_driver)
-> broke the SPI display/panel driver probe on RX-51/N900. The exact cause is
-> not fully understood, but it seems to be related to the probe order. SPI
-> communication to the panel driver (spi1.2) fails unless the touchscreen
-> (spi1.0) has been probed/initialized before. When the omap2-mcspi driver
-> was converted to a platform driver, it resulted in that the devices are
-> probed immediately after the board registers them in the order they are
-> listed in the board file.
-> 
-> Fix the issue by moving the touchscreen before the panel in the SPI
-> device list.
-> 
-> The patch fixes the following failure:
-> 
-> [    1.260955] acx565akm spi1.2: invalid display ID
-> [    1.265899] panel-acx565akm display0: acx_panel_probe panel detect error
-> [    1.273071] omapdss CORE error: driver probe failed: -19
+Some ARM KVM VCPU ioctls require the vCPU to be properly initialized
+with the KVM_ARM_VCPU_INIT ioctl before being used with further
+requests. KVM_RUN checks whether this initialization has been
+done, but other ioctls do not.
+Namely KVM_GET_REG_LIST will dereference an array with index -1
+without initialization and thus leads to a kernel oops.
+Fix this by adding checks before executing the ioctl handlers.
 
-Thanks for updating the description, applying into omap-for-v3.10/fixes.
+Changes from v1:
+ * moved check into a static function with a meaningful name
 
-Regards,
+Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
+---
+ arch/arm/kvm/arm.c | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
 
-Tony
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index c1fe498..b73b587 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -676,6 +676,15 @@ static void vcpu_pause(struct kvm_vcpu *vcpu)
+ 	wait_event_interruptible(*wq, !vcpu->arch.pause);
+ }
+ 
++/*
++ * Some ioctls require initialization by KVM_ARM_VCPU_INIT first, check
++ * this with this function
++ */
++static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
++{
++	return vcpu->arch.target >= 0;
++}
++
+ /**
+  * kvm_arch_vcpu_ioctl_run - the main VCPU run function to execute guest code
+  * @vcpu:	The VCPU pointer
+@@ -692,8 +701,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 	int ret;
+ 	sigset_t sigsaved;
+ 
+-	/* Make sure they initialize the vcpu with KVM_ARM_VCPU_INIT */
+-	if (unlikely(vcpu->arch.target < 0))
++	if (unlikely(!kvm_vcpu_initialized(vcpu)))
+ 		return -ENOEXEC;
+ 
+ 	ret = kvm_vcpu_first_run_init(vcpu);
+@@ -893,6 +901,10 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+ 	case KVM_SET_ONE_REG:
+ 	case KVM_GET_ONE_REG: {
+ 		struct kvm_one_reg reg;
++
++		if (unlikely(!kvm_vcpu_initialized(vcpu)))
++			return -ENOEXEC;
++
+ 		if (copy_from_user(&reg, argp, sizeof(reg)))
+ 			return -EFAULT;
+ 		if (ioctl == KVM_SET_ONE_REG)
+@@ -905,6 +917,9 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+ 		struct kvm_reg_list reg_list;
+ 		unsigned n;
+ 
++		if (unlikely(!kvm_vcpu_initialized(vcpu)))
++			return -ENOEXEC;
++
+ 		if (copy_from_user(&reg_list, user_list, sizeof(reg_list)))
+ 			return -EFAULT;
+ 		n = reg_list.n;
+-- 
+1.7.12.1
