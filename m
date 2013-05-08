@@ -1,23 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 8 May 2013 11:57:32 +0100
-Subject: [PATCH] ARM: ux500: update MSP1 pinctrl defintions
-In-Reply-To: <1368004193-21213-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1368004193-21213-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <20130508105732.GD7478@sirena.org.uk>
+From: jagarwal@nvidia.com (Jay Agarwal)
+Date: Wed, 8 May 2013 16:27:37 +0530
+Subject: [PATCH 1/4] ARM: tegra30: clocks: Fix pciex clock registration
+Message-ID: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 08, 2013 at 11:09:53AM +0200, Fabio Baltieri wrote:
-> Update MSP1 pinctrl definitions in mop500_family_pinmap by removing
-> sleep state and setting default ones as pin hogs, as those are used by
-> both ux500-msp-i2s.1 and ux500-msp-i2s.3.
+Registering pciex as peripheral clock instead of fixed clock
+as tegra_perih_reset_assert(deassert) api of this clock api 
+gives warning and ultimately does not succeed to assert(deassert).
+Patch is based on remotes/gitorious_thierryreding_linux/tegra/next
+and should be applied on top of this.
 
-This presumably needs to go along with the ASoC side of this change but
-as I said in reply to that this isn't an obvious improvement.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130508/9ded3701/attachment.sig>
+Signed-off-by: Jay Agarwal <jagarwal@nvidia.com>
+---
+ drivers/clk/tegra/clk-tegra30.c |   12 ++++++------
+ 1 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+index ba6f51b..6a80b40 100644
+--- a/drivers/clk/tegra/clk-tegra30.c
++++ b/drivers/clk/tegra/clk-tegra30.c
+@@ -1592,6 +1592,12 @@ static void __init tegra30_periph_clk_init(void)
+ 	clk_register_clkdev(clk, "afi", "tegra-pcie");
+ 	clks[afi] = clk;
+ 
++	/* pciex */
++	clk = tegra_clk_register_periph_gate("pciex", "pll_e", 0, clk_base, 0,
++				    74, &periph_u_regs, periph_clk_enb_refcnt);
++	clk_register_clkdev(clk, "pciex", NULL);
++	clks[pciex] = clk;
++
+ 	/* kfuse */
+ 	clk = tegra_clk_register_periph_gate("kfuse", "clk_m",
+ 				    TEGRA_PERIPH_ON_APB,
+@@ -1710,11 +1716,6 @@ static void __init tegra30_fixed_clk_init(void)
+ 				1, 0, &cml_lock);
+ 	clk_register_clkdev(clk, "cml1", NULL);
+ 	clks[cml1] = clk;
+-
+-	/* pciex */
+-	clk = clk_register_fixed_rate(NULL, "pciex", "pll_e", 0, 100000000);
+-	clk_register_clkdev(clk, "pciex", NULL);
+-	clks[pciex] = clk;
+ }
+ 
+ static void __init tegra30_osc_clk_init(void)
+@@ -1930,7 +1931,6 @@ static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
+ 	TEGRA_CLK_DUPLICATE(bsea, "nvavp", "bsea"),
+ 	TEGRA_CLK_DUPLICATE(cml1, "tegra_sata_cml", NULL),
+ 	TEGRA_CLK_DUPLICATE(cml0, "tegra_pcie", "cml"),
+-	TEGRA_CLK_DUPLICATE(pciex, "tegra_pcie", "pciex"),
+ 	TEGRA_CLK_DUPLICATE(vcp, "nvavp", "vcp"),
+ 	TEGRA_CLK_DUPLICATE(clk_max, NULL, NULL), /* MUST be the last entry */
+ };
+-- 
+1.7.0.4
