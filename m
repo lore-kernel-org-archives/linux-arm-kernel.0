@@ -1,35 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 May 2013 14:29:04 +0100
-Subject: [PATCH 4/9] mfd: db8500-prcmu: Supply the pdata_size attribute for
- db8500-thermal
+Date: Wed,  8 May 2013 14:29:07 +0100
+Subject: [PATCH 7/9] pinctrl: abx500: Specify failed sub-driver by ID instead
+ of driver_data
 In-Reply-To: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
 References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1368019749-19455-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1368019749-19455-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MFD subsystem requires drivers to state the size of any platform
-data passed, or it will fail to assign it to the device. This will
-culminate in a NULL platform_data attribute and normally a failure to
-probe() or a kernel Oops.
+If a sub-driver has not been specified correctly, there is a good chance
+that plat_id is NULL, hence using an attribute of plat_id in the error
+message is likely to not only fail the driver but Oops the kernel. Use
+the failed ID instead.
 
-Cc: Samuel Ortiz <sameo@linux.intel.com>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/db8500-prcmu.c |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/pinctrl/pinctrl-abx500.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/mfd/db8500-prcmu.c b/drivers/mfd/db8500-prcmu.c
-index 319b8ab..5389368 100644
---- a/drivers/mfd/db8500-prcmu.c
-+++ b/drivers/mfd/db8500-prcmu.c
-@@ -3095,6 +3095,7 @@ static struct mfd_cell db8500_prcmu_devs[] = {
- 		.num_resources = ARRAY_SIZE(db8500_thsens_resources),
- 		.resources = db8500_thsens_resources,
- 		.platform_data = &db8500_thsens_data,
-+		.pdata_size = sizeof(db8500_thsens_data),
- 	},
- };
- 
+diff --git a/drivers/pinctrl/pinctrl-abx500.c b/drivers/pinctrl/pinctrl-abx500.c
+index aa17f75..2a2a9df 100644
+--- a/drivers/pinctrl/pinctrl-abx500.c
++++ b/drivers/pinctrl/pinctrl-abx500.c
+@@ -900,8 +900,7 @@ static int abx500_gpio_probe(struct platform_device *pdev)
+ 		abx500_pinctrl_ab8505_init(&pct->soc);
+ 		break;
+ 	default:
+-		dev_err(&pdev->dev, "Unsupported pinctrl sub driver (%d)\n",
+-				(int) platid->driver_data);
++		dev_err(&pdev->dev, "Unsupported pinctrl sub driver (%d)\n", id);
+ 		mutex_destroy(&pct->lock);
+ 		return -EINVAL;
+ 	}
 -- 
 1.7.10.4
