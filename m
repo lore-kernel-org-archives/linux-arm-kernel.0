@@ -1,70 +1,38 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 8 May 2013 15:59:35 +0200
-Subject: [PATCH 39/63] crypto: ux500/cryp - Prepare clock before enabling
- it
-In-Reply-To: <1367591569-32197-40-git-send-email-lee.jones@linaro.org>
-References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
- <1367591569-32197-40-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAPDyKFqiLt=xC8NNXxKZpKh49+ewHuLt=0r+HogZ-aFrKh99NQ@mail.gmail.com>
+Date: Wed, 8 May 2013 16:00:03 +0200
+Subject: [PATCH 3/9] clk: ux500: Provide device enumeration number suffix
+ for SMSC911x
+In-Reply-To: <1368019749-19455-4-git-send-email-lee.jones@linaro.org>
+References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
+ <1368019749-19455-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <CAPDyKFqsZ=z6OcRs45_DUO1Zpp_C1qUeZ2tsGCjD08H_b4L-jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 May 2013 16:32, Lee Jones <lee.jones@linaro.org> wrote:
-> If we fail to prepare the ux500-cryp clock before enabling it the
-> platform will fail to boot. Here we insure this happens.
+On 8 May 2013 15:29, Lee Jones <lee.jones@linaro.org> wrote:
+> First Ethernet device has a ".0" appended onto the device name. It
+> appears that we need this in order to obtain the correct clock.
 >
-> Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: Andreas Westin <andreas.westin@stericsson.com>
 > Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: linux-crypto at vger.kernel.org
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Mike Turquette <mturquette@linaro.org>
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > ---
->  drivers/crypto/ux500/cryp/cryp_core.c |   12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
+>  drivers/clk/ux500/u8500_clk.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/drivers/crypto/ux500/cryp/cryp_core.c b/drivers/crypto/ux500/cryp/cryp_core.c
-> index 22c9063..bf78d60 100644
-> --- a/drivers/crypto/ux500/cryp/cryp_core.c
-> +++ b/drivers/crypto/ux500/cryp/cryp_core.c
-> @@ -1459,11 +1459,17 @@ static int ux500_cryp_probe(struct platform_device *pdev)
->                 goto out_regulator;
->         }
+> diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
+> index 0b4f35a..80069c3 100644
+> --- a/drivers/clk/ux500/u8500_clk.c
+> +++ b/drivers/clk/ux500/u8500_clk.c
+> @@ -325,7 +325,7 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+>         clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", clkrst3_base,
+>                                 BIT(0), 0);
+>         clk_register_clkdev(clk, "fsmc", NULL);
+> -       clk_register_clkdev(clk, NULL, "smsc911x");
+> +       clk_register_clkdev(clk, NULL, "smsc911x.0");
 >
-> +       ret = clk_prepare(device_data->clk);
-> +       if (ret) {
-> +               dev_err(dev, "[%s]: clk_prepare() failed!", __func__);
-> +               goto out_clk;
-> +       }
-> +
->         /* Enable device power (and clock) */
->         ret = cryp_enable_power(device_data->dev, device_data, false);
->         if (ret) {
->                 dev_err(dev, "[%s]: cryp_enable_power() failed!", __func__);
-> -               goto out_clk;
-> +               goto out_clk_unprepare;
->         }
->
->         cryp_error = cryp_check(device_data);
-> @@ -1524,6 +1530,9 @@ static int ux500_cryp_probe(struct platform_device *pdev)
->  out_power:
->         cryp_disable_power(device_data->dev, device_data, false);
->
-> +out_clk_unprepare:
-> +       clk_unprepare(device_data->clk);
-> +
->  out_clk:
->         clk_put(device_data->clk);
->
-> @@ -1594,6 +1603,7 @@ static int ux500_cryp_remove(struct platform_device *pdev)
->                 dev_err(&pdev->dev, "[%s]: cryp_disable_power() failed",
->                         __func__);
->
-> +       clk_unprepare(device_data->clk);
->         clk_put(device_data->clk);
->         regulator_put(device_data->pwr_regulator);
->
+>         clk = clk_reg_prcc_pclk("p3_pclk1", "per3clk", clkrst3_base,
+>                                 BIT(1), 0);
 > --
 > 1.7.10.4
 >
