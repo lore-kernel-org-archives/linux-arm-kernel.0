@@ -1,73 +1,130 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 8 May 2013 09:49:20 +0200
-Subject: [PATCH] ARM: imx: fix build breakage in hotplug.c
-In-Reply-To: <1367998391-12801-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1367998391-12801-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20130508074920.GO23285@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 8 May 2013 09:57:53 +0100
+Subject: [PATCHv3] arm: Preserve the user r/w register TPIDRURW on
+ context switch and fork
+In-Reply-To: <51896934.5080803@dawncrow.de>
+References: <51896934.5080803@dawncrow.de>
+Message-ID: <20130508085753.GA15568@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Andre,
 
-On Wed, May 08, 2013 at 09:33:11AM +0200, Uwe Kleine-K?nig wrote:
-> Since commit bca7a5a (ARM: cpu hotplug: remove majority of cache
-> flushing from platforms) hotplug.c fails to compile (e.g. with
-> imx_v6_v7_defconfig) with:
-> 
-> 	arch/arm/mach-imx/common.h:100:29: warning: 'struct pt_regs' declared inside parameter list [enabled by default]
-> 	arch/arm/mach-imx/hotplug.c: In function 'imx_cpu_die':
-> 	arch/arm/mach-imx/hotplug.c:53:2: error: implicit declaration of function 'cpu_do_idle' [-Werror=implicit-function-declaration]
-> 	arch/arm/mach-imx/hotplug.c: In function 'imx_cpu_kill':
-> 	arch/arm/mach-imx/hotplug.c:58:26: error: 'jiffies' undeclared (first use in this function)
-> 	arch/arm/mach-imx/hotplug.c:58:26: note: each undeclared identifier is reported only once for each function it appears in
-> 	arch/arm/mach-imx/hotplug.c:58:2: error: implicit declaration of function 'msecs_to_jiffies' [-Werror=implicit-function-declaration]
-> 	arch/arm/mach-imx/hotplug.c:61:3: error: implicit declaration of function 'time_after' [-Werror=implicit-function-declaration]
-> 	cc1: some warnings being treated as errors
-> 
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello Russell,
-> 
-> This patch applies on top of Linus' or your master branch.
-> 
-> Best regards
-> Uwe
-> 
->  arch/arm/mach-imx/common.h  | 2 ++
->  arch/arm/mach-imx/hotplug.c | 2 ++
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> index 5bf4a97..5241d99b 100644
-> --- a/arch/arm/mach-imx/common.h
-> +++ b/arch/arm/mach-imx/common.h
-> @@ -96,6 +96,8 @@ enum mx3_cpu_pwr_mode {
->  extern void mx3_cpu_lp_set(enum mx3_cpu_pwr_mode mode);
->  extern void imx_print_silicon_rev(const char *cpu, int srev);
->  
-> +struct pt_regs;
-> +
->  void avic_handle_irq(struct pt_regs *);
->  void tzic_handle_irq(struct pt_regs *);
->  
-> diff --git a/arch/arm/mach-imx/hotplug.c b/arch/arm/mach-imx/hotplug.c
-> index 5e91112..3daf1ed 100644
-> --- a/arch/arm/mach-imx/hotplug.c
-> +++ b/arch/arm/mach-imx/hotplug.c
-> @@ -11,7 +11,9 @@
->   */
->  
->  #include <linux/errno.h>
-> +#include <linux/jiffies.h>
->  #include <asm/cp15.h>
-> +#include <asm/proc-fns.h>
->  
->  #include "common.h"
-I just noticed that this patch was already posted by Shawn last week[1].
+On Tue, May 07, 2013 at 09:51:00PM +0100, Andr? Hentschel wrote:
+> From: =?UTF-8?q?Andr=C3=A9=20Hentschel?= <nerv@dawncrow.de>
 
-[1] http://www.spinics.net/lists/arm-kernel/msg241316.html
+Might just be my mailer, but you should check that your name is intact here
+otherwise the git log will be mangled.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Since commit 6a1c53124aa1 the user writeable TLS register was zeroed to
+> prevent it from being used as a covert channel between two tasks.
+> 
+> There are more and more applications coming to WinRT, Wine could support them,
+> but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
+> 
+> This patch preserves that register per thread instead of clearing it.
+> Unlike the TPIDRURO, which is already switched, the TPIDRURW
+> can be updated from userspace so needs careful treatment in the case that we
+> modify TPIDRURW and call fork(). To avoid this we must always read
+> TPIDRURW in copy_thread.
+> 
+> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com> 
+
+[...]
+
+> diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
+> index 73409e6..22756ab 100644
+> --- a/arch/arm/include/asm/tls.h
+> +++ b/arch/arm/include/asm/tls.h
+> @@ -2,27 +2,30 @@
+>  #define __ASMARM_TLS_H
+>  
+>  #ifdef __ASSEMBLY__
+> -	.macro set_tls_none, tp, tmp1, tmp2
+> +#include <asm/asm-offsets.h>
+> +	.macro switch_tls_none, base, tp, tpuser, tmp1, tmp2
+>  	.endm
+>  
+> -	.macro set_tls_v6k, tp, tmp1, tmp2
+> +	.macro switch_tls_v6k, base, tp, tpuser, tmp1, tmp2
+> +	mrc	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
+>  	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
+> -	mov	\tmp1, #0
+> -	mcr	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
+> +	mcr	p15, 0, \tpuser, c13, c0, 2	@ and the user r/w register
+> +	strne	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
+
+Why is this conditional?
+
+>  	.endm
+>  
+> -	.macro set_tls_v6, tp, tmp1, tmp2
+> +	.macro switch_tls_v6, base, tp, tpuser, tmp1, tmp2
+>  	ldr	\tmp1, =elf_hwcap
+>  	ldr	\tmp1, [\tmp1, #0]
+>  	mov	\tmp2, #0xffff0fff
+>  	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
+> -	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
+> -	movne	\tmp1, #0
+> -	mcrne	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
+>  	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
+> +	mrcne	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
+> +	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
+> +	mcrne	p15, 0, \tpuser, c13, c0, 2	@ set user r/w register
+> +	strne	\tmp2, [\base, #TI_TP_VALUE + 4] @ save it
+>  	.endm
+>  
+> -	.macro set_tls_software, tp, tmp1, tmp2
+> +	.macro switch_tls_software, base, tp, tpuser, tmp1, tmp2
+>  	mov	\tmp1, #0xffff0fff
+>  	str	\tp, [\tmp1, #-15]		@ set TLS value at 0xffff0ff0
+>  	.endm
+> @@ -31,19 +34,31 @@
+>  #ifdef CONFIG_TLS_REG_EMUL
+>  #define tls_emu		1
+>  #define has_tls_reg		1
+> -#define set_tls		set_tls_none
+> +#define switch_tls	switch_tls_none
+>  #elif defined(CONFIG_CPU_V6)
+>  #define tls_emu		0
+>  #define has_tls_reg		(elf_hwcap & HWCAP_TLS)
+> -#define set_tls		set_tls_v6
+> +#define switch_tls	switch_tls_v6
+>  #elif defined(CONFIG_CPU_32v6K)
+>  #define tls_emu		0
+>  #define has_tls_reg		1
+> -#define set_tls		set_tls_v6k
+> +#define switch_tls	switch_tls_v6k
+>  #else
+>  #define tls_emu		0
+>  #define has_tls_reg		0
+> -#define set_tls		set_tls_software
+> +#define switch_tls	switch_tls_software
+>  #endif
+>  
+> +#ifndef __ASSEMBLY__
+> +static inline unsigned long get_tlsuser(void)
+> +{
+> +	if (has_tls_reg && !tls_emu)
+> +	{
+> +		unsigned long t;
+> +		__asm__("mrc p15, 0, %0, c13, c0, 2" : "=r" (t));
+> +		return t;
+> +	}
+> +	return 0;
+
+This isn't standard kernel coding style. Please do something like:
+
+	static inline unsigned long get_tlsuser(void)
+	{
+		unsigned long reg = 0;
+
+		if (has_tls_reg && !tls_emu)
+			asm("mrc p15, 0, %0, c13, c0, 2" : "=r" (reg));
+
+		return reg;
+	}
+
+Will
