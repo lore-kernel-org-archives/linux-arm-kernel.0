@@ -1,32 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 8 May 2013 16:01:41 +0100
-Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
-In-Reply-To: <201305081650.23264.arnd@arndb.de>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022272-2241-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081650.23264.arnd@arndb.de>
-Message-ID: <20130508150141.GA5057@opensource.wolfsonmicro.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 8 May 2013 16:02:55 +0100
+Subject: [PATCH 19/63] dmaengine: ste_dma40: Separate Logical Global
+ Interrupt Mask (GIM) unmasking
+In-Reply-To: <CACRpkdZexk6a7yaWEzzOkihcHNGY_UQN3hYiz45LK1cuy0ob=g@mail.gmail.com>
+References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
+ <1367591569-32197-20-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZexk6a7yaWEzzOkihcHNGY_UQN3hYiz45LK1cuy0ob=g@mail.gmail.com>
+Message-ID: <20130508150255.GJ3459@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 08, 2013 at 04:50:22PM +0200, Arnd Bergmann wrote:
+On Fri, 03 May 2013, Linus Walleij wrote:
 
-> > In many cases a single syconf register contains bits related to multiple
-> > devices, and therefore it need to be shared across multiple drivers at
-> > bit level. The same IP block can have different syscon mappings on
-> > different SOCs.
+> On Fri, May 3, 2013 at 4:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > During the initial setup of a logical channel, it is necessary to unmask
+> > the GIM in order to receive generated terminal count and error interrupts.
+> > We're separating out this required code so it will be possible to move
+> > the remaining code in d40_phy_cfg(), which is mostly runtime configuration
+> > into the runtime_config() routine.
+> >
+> > Cc: Vinod Koul <vinod.koul@intel.com>
+> > Cc: Dan Williams <djbw@fb.com>
+> > Cc: Per Forlin <per.forlin@stericsson.com>
+> > Cc: Rabin Vincent <rabin@rab.in>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> These review comments are only partially accounted for:
+> http://marc.info/?l=linux-kernel&m=136688761708399&w=2
+> 
+> Please supply a short changelog in the next submission
+> so I know what was changed and why some things were not
+> changed and if you split out other changes to other patches
+> etc etc.
 
-> My feeling is that syscon is the wrong place for this functionality,
-> since regmap already handles (some of?) these issues. If you need
-> additional synchronization, it's probably best to extend regmap
-> as needed so other code besides syscon can take advantage of that
-> as well.
+All of the comments are accounted for. The is_log argument is actually
+removed in patch 20, as it's still used to only run the code within
+the clause if the channel is physical.
 
-This sounds like regmap_update_bits() ought to be all that's needed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130508/7fc89de4/attachment.sig>
+... and yes, the dmatest works perfectly on patch 19.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
