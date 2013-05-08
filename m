@@ -1,29 +1,92 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 May 2013 14:29:00 +0100
-Subject: [PATCH 0/9] Important ux500 fixups due for the v3.10 -rc:s
-Message-ID: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
+Date: Wed,  8 May 2013 14:29:01 +0100
+Subject: [PATCH 1/9] ARM: ux500: Remove duplicated assignment of
+ ab8500_platdata
+In-Reply-To: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
+References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1368019749-19455-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-set straightens out some serious errors incurred during
-the v3.10 merge window, including:
+Since: "05ec260 mfd: db8500-prcmu: update resource passing", the AB8500's
+platform data 'ab8500_platdata' is passed directly as an attribute to
+'db8500_prcmu_pdata', so there's no requirement to assign it a second
+time. In fact, it's only due to an ordering issue that the entire
+'db8500_prcmu_pdata' data structure isn't completely over-written by the
+assignment in u8500_init_devices().
 
-Patch 1: Possible over-write of DB8500-PRCMU platform data
-Patch 2: Fail to register AB8500 GPIO driver
-Patch 3: Fail to start Ethernet when using ATAGS - Clocks
-Patch 4: Fail to probe DB8500 Thermal driver - No pdata
-Patch 5: Fail to use Early Printk - Incorrect virtual addresses
-Patch 6: Fail to start Ethernet with using Device Tree - Clocks
-Patch 7: Oops kernel during driver fail - Null pointer
-Patch 8: Fail to probe AB8500 GPIO driver - Incorrect platform ID
-Patch 8: Fail to probe AB8500 GPADC driver - Regulators
-
- arch/arm/include/debug/ux500.S     |    6 +++---
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
  arch/arm/mach-ux500/board-mop500.c |    6 +++---
- arch/arm/mach-ux500/cpu-db8500.c   |    6 ++----
+ arch/arm/mach-ux500/cpu-db8500.c   |    4 +---
  arch/arm/mach-ux500/setup.h        |    2 +-
- drivers/clk/ux500/u8500_clk.c      |    2 +-
- drivers/mfd/ab8500-core.c          |    9 ++++++---
- drivers/mfd/db8500-prcmu.c         |    1 +
- drivers/pinctrl/pinctrl-abx500.c   |   30 ++++++++++++++----------------
- 8 files changed, 31 insertions(+), 31 deletions(-)
+ 3 files changed, 5 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
+index 9bc762a..14a3598 100644
+--- a/arch/arm/mach-ux500/board-mop500.c
++++ b/arch/arm/mach-ux500/board-mop500.c
+@@ -623,7 +623,7 @@ static void __init mop500_init_machine(void)
+ 	sdi0_reg_info.gpios[0].gpio = GPIO_SDMMC_1V8_3V_SEL;
+ 
+ 	mop500_pinmaps_init();
+-	parent = u8500_init_devices(&ab8500_platdata);
++	parent = u8500_init_devices();
+ 
+ 	for (i = 0; i < ARRAY_SIZE(mop500_platform_devs); i++)
+ 		mop500_platform_devs[i]->dev.parent = parent;
+@@ -660,7 +660,7 @@ static void __init snowball_init_machine(void)
+ 	sdi0_reg_info.gpios[0].gpio = SNOWBALL_SDMMC_1V8_3V_GPIO;
+ 
+ 	snowball_pinmaps_init();
+-	parent = u8500_init_devices(&ab8500_platdata);
++	parent = u8500_init_devices();
+ 
+ 	for (i = 0; i < ARRAY_SIZE(snowball_platform_devs); i++)
+ 		snowball_platform_devs[i]->dev.parent = parent;
+@@ -698,7 +698,7 @@ static void __init hrefv60_init_machine(void)
+ 	sdi0_reg_info.gpios[0].gpio = HREFV60_SDMMC_1V8_3V_GPIO;
+ 
+ 	hrefv60_pinmaps_init();
+-	parent = u8500_init_devices(&ab8500_platdata);
++	parent = u8500_init_devices();
+ 
+ 	for (i = 0; i < ARRAY_SIZE(mop500_platform_devs); i++)
+ 		mop500_platform_devs[i]->dev.parent = parent;
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 995928b..8c2590c 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -206,7 +206,7 @@ static struct device * __init db8500_soc_device_init(void)
+ /*
+  * This function is called from the board init
+  */
+-struct device * __init u8500_init_devices(struct ab8500_platform_data *ab8500)
++struct device * __init u8500_init_devices(void)
+ {
+ 	struct device *parent;
+ 	int i;
+@@ -220,8 +220,6 @@ struct device * __init u8500_init_devices(struct ab8500_platform_data *ab8500)
+ 	for (i = 0; i < ARRAY_SIZE(platform_devs); i++)
+ 		platform_devs[i]->dev.parent = parent;
+ 
+-	db8500_prcmu_device.dev.platform_data = ab8500;
+-
+ 	platform_add_devices(platform_devs, ARRAY_SIZE(platform_devs));
+ 
+ 	return parent;
+diff --git a/arch/arm/mach-ux500/setup.h b/arch/arm/mach-ux500/setup.h
+index bddce2b..cad3ca8 100644
+--- a/arch/arm/mach-ux500/setup.h
++++ b/arch/arm/mach-ux500/setup.h
+@@ -18,7 +18,7 @@
+ void __init ux500_map_io(void);
+ extern void __init u8500_map_io(void);
+ 
+-extern struct device * __init u8500_init_devices(struct ab8500_platform_data *ab8500);
++extern struct device * __init u8500_init_devices(void);
+ 
+ extern void __init ux500_init_irq(void);
+ extern void __init ux500_init_late(void);
+-- 
+1.7.10.4
