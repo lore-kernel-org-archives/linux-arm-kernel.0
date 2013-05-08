@@ -1,46 +1,34 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 08 May 2013 10:41:37 +0900
-Subject: [PATCH] usb: gadget: s3c2410_udc: fix error return code in
- s3c2410_udc_probe()
-In-Reply-To: <CAPgLHd9zzFi6dCBH0V=eeqVtd=UstiqM8fDcDsMCfujAfEDHTg@mail.gmail.com>
-References: <CAPgLHd9zzFi6dCBH0V=eeqVtd=UstiqM8fDcDsMCfujAfEDHTg@mail.gmail.com>
-Message-ID: <001a01ce4b8d$2e22fd40$8a68f7c0$@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 07 May 2013 20:26:07 -0600
+Subject: [PATCH] USB: set device dma_mask without reference to global data
+In-Reply-To: <CAL411-qVnm0_wwdAiAp9eq_hYkXzFSmRMLAmknpSAG7Jb3bM9A@mail.gmail.com>
+References: <1367967232-10128-1-git-send-email-swarren@wwwdotorg.org>
+ <CAL411-qVnm0_wwdAiAp9eq_hYkXzFSmRMLAmknpSAG7Jb3bM9A@mail.gmail.com>
+Message-ID: <5189B7BF.8070607@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 07, 2013 8:48 PM, Wei Yongjun wrote:
+On 05/07/2013 07:13 PM, Peter Chen wrote:
+> On Wed, May 8, 2013 at 6:53 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> Many USB host drivers contain code such as:
+>>
+>> if (!pdev->dev.dma_mask)
+>>         pdev->dev.dma_mask = &tegra_ehci_dma_mask;
+>>
+>> ... where tegra_ehci_dma_mask is a global. I suspect this code originated
+>> in commit 4a53f4e "USB: ehci-tegra: add probing through device tree" and
+>> was simply copied everywhere else.
 > 
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> 
-> Fix to return a negative error code in the gpio_to_irq() error handling
-> case instead of 0, as done elsewhere in this function.
-> 
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> One question: why device tree can't do this when create device?
 
-Reviewed-by: Jingoo Han <jg1.han@samsung.com>
+This probably could be initialized from some DT property. However,
+there's no such property defined right now, and considering that DT is
+supposed to be an ABI, we'd always need the code in this patch as a
+fallback for DTs that were created before any such property was defined.
 
-Best regards,
-Jingoo Han
-
-
-> ---
->  drivers/usb/gadget/s3c2410_udc.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
-> index d0e75e1..c974776 100644
-> --- a/drivers/usb/gadget/s3c2410_udc.c
-> +++ b/drivers/usb/gadget/s3c2410_udc.c
-> @@ -1851,6 +1851,7 @@ static int s3c2410_udc_probe(struct platform_device *pdev)
->  		irq = gpio_to_irq(udc_info->vbus_pin);
->  		if (irq < 0) {
->  			dev_err(dev, "no irq for gpio vbus pin\n");
-> +			retval = irq;
->  			goto err_gpio_claim;
->  		}
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Equally, since the data is SoC-specific rather than board-specific, and
+is even fairly unlikely to vary between SoC versions since these values
+are all 0xffffffff anyway, I don't really see much point in putting it
+into DT, rather than just putting the static data into the driver.
