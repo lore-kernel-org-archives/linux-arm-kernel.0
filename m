@@ -1,91 +1,64 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 08 May 2013 12:44:26 -0600
-Subject: [PATCH] ARM: tegra: disable LP2 cpuidle state if PCIe is enabled
-In-Reply-To: <518A2EB2.70006@linaro.org>
-References: <1367872744-25002-1-git-send-email-swarren@wwwdotorg.org>
- <518A2EB2.70006@linaro.org>
-Message-ID: <518A9D0A.3010908@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 May 2013 19:45:55 +0100
+Subject: [PATCH v5, part3 01/15] mm: fix build warnings caused by
+ free_reserved_area()
+In-Reply-To: <1368026235-5976-2-git-send-email-jiang.liu@huawei.com>
+References: <1368026235-5976-1-git-send-email-jiang.liu@huawei.com>
+ <1368026235-5976-2-git-send-email-jiang.liu@huawei.com>
+Message-ID: <20130508184555.GR18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2013 04:53 AM, Daniel Lezcano wrote:
-> On 05/06/2013 10:39 PM, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> Tegra20 HW appears to have a bug such that PCIe device interrupts, whether
->> they are legacy IRQs or MSI, are lost when LP2 is enabled. To work around
->> this, simply disable LP2 if the PCI driver and DT node are both enabled.
->>
->> Signed-off-by: Stephen Warren <swarren@nvidia.com>
->> ---
->> Thierry,
->>
->> This patch is physically based on next-20130506 so that it doesn't
->> conflict with any of the recent cpuidle cleanup work. I'm sending it with
->> the expectation that you'll apply it to your PCIe development branch
->> though. If you do that, you'll see some conflicts unless you rebase your
->> dev branch onto something more recent than next-20130422; I assume you'll
->> do that rebase soon enough anyway, but if you weren't planning to, I can
->> resend the patch based on your current dev branch.
->>
->>  arch/arm/mach-tegra/cpuidle-tegra20.c |   30 ++++++++++++++++++++++++++++++
->>  1 file changed, 30 insertions(+)
->>
->> diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
->> index 0cdba8d..d2c9349 100644
->> --- a/arch/arm/mach-tegra/cpuidle-tegra20.c
->> +++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
->> @@ -25,6 +25,7 @@
->>  #include <linux/cpu_pm.h>
->>  #include <linux/clockchips.h>
->>  #include <linux/clk/tegra.h>
->> +#include <linux/of.h>
->>  
->>  #include <asm/cpuidle.h>
->>  #include <asm/proc-fns.h>
->> @@ -212,10 +213,39 @@ static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
->>  }
->>  #endif
->>  
->> +static const struct of_device_id pcie_matches[] __initconst = {
->> +	{ .compatible = "nvidia,tegra20-pcie" },
->> +	{ }
->> +};
->> +
->> +/*
->> + * Tegra20 HW appears to have a bug such that PCIe device interrupts, whether
->> + * they are legacy IRQs or MSI, are lost when LP2 is enabled. To work around
->> + * this, simply disable LP2 if the PCI driver and DT node are both enabled.
->> + */
->> +static void __init tegra20_cpuidle_disable_lp2_with_pcie(void)
->> +{
->> +	struct device_node *np;
->> +
->> +	if (!IS_ENABLED(CONFIG_PCI_TEGRA))
->> +		return;
->> +
->> +	np = of_find_matching_node(NULL, pcie_matches);
->> +	if (!np)
->> +		return;
->> +
->> +	if (!of_device_is_available(np))
->> +		return;
->> +
->> +	pr_info("Disabling LP2 cpuidle state, since PCIe is enabled\n");
->> +	tegra_idle_driver.state_count = 1;
+On Wed, May 08, 2013 at 11:17:00PM +0800, Jiang Liu wrote:
+> Fix following build warnings cuased by free_reserved_area():
 > 
-> Won't be more clear to have the state disabled in the init function like
-> this ?
+> arch/arm/mm/init.c: In function 'mem_init':
+> arch/arm/mm/init.c:603:2: warning: passing argument 1 of 'free_reserved_area' makes integer from pointer without a cast [enabled by default]
+>   free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
+>   ^
+> In file included from include/linux/mman.h:4:0,
+>                  from arch/arm/mm/init.c:15:
+> include/linux/mm.h:1301:22: note: expected 'long unsigned int' but argument is of type 'void *'
+>  extern unsigned long free_reserved_area(unsigned long start, unsigned long end,
 > 
-> int __init tegra20_cpuidle_init(void)
-> {
-> 	...
-> 	if (tegra20_has_lp2_pcie_bug(void))
-> 		tegra_idle_driver.states[1].disabled = true;
-> 	...
-> }
+>    mm/page_alloc.c: In function 'free_reserved_area':
+> >> mm/page_alloc.c:5134:3: warning: passing argument 1 of 'virt_to_phys' makes pointer from integer without a cast [enabled by default]
+>    In file included from arch/mips/include/asm/page.h:49:0,
+>                     from include/linux/mmzone.h:20,
+>                     from include/linux/gfp.h:4,
+>                     from include/linux/mm.h:8,
+>                     from mm/page_alloc.c:18:
+>    arch/mips/include/asm/io.h:119:29: note: expected 'const volatile void *' but argument is of type 'long unsigned int'
+>    mm/page_alloc.c: In function 'free_area_init_nodes':
+>    mm/page_alloc.c:5030:34: warning: array subscript is below array bounds [-Warray-bounds]
+> 
+> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-mm at kvack.org
+> ---
+>  arch/arm/mm/init.c |    6 ++++--
+>  mm/page_alloc.c    |    2 +-
+>  2 files changed, 5 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index 9a5cdc0..7a82fcd 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -600,7 +600,8 @@ void __init mem_init(void)
+>  
+>  #ifdef CONFIG_SA1111
+>  	/* now that our DMA memory is actually so designated, we can free it */
+> -	free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
+> +	free_reserved_area((unsigned long)__va(PHYS_PFN_OFFSET),
+> +			   (unsigned long)swapper_pg_dir, 0, NULL);
 
-I'm not sure that's any clearer on its own. One big advantage of that
-technique is that if we end up with 3 cpuidle states and need to disable
-the one in the middle, this alternative technique does work, whereas the
-one in my patch doesn't. So, I'll convert to this technique.
+*YUCK*.
+
+As I've said before, fixing the arguments on free_reserved_area() would
+be much better than throwing these horrid casts all over the code.
+
+You're casting pointers to integers, and then immediately casting them
+back to pointers in free_reserved_area().  Please fix the function
+argument types to be sane.
