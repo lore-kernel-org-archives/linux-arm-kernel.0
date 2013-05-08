@@ -1,29 +1,40 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 8 May 2013 18:21:21 +0200
-Subject: [RFC 5/8] ARM:stih41x: Add STiH415 SOC support
-In-Reply-To: <201305081818.01927.arnd@arndb.de>
+Date: Wed, 8 May 2013 18:24:07 +0200
+Subject: [RFC 7/8] ARM:stih41x: Add B2000 board support
+In-Reply-To: <201305081820.23968.arnd@arndb.de>
 References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022297-2334-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081818.01927.arnd@arndb.de>
-Message-ID: <20130508162121.GD3041@game.jcrosoft.org>
+ <1368022329-2424-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305081820.23968.arnd@arndb.de>
+Message-ID: <20130508162407.GE3041@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:18 Wed 08 May     , Arnd Bergmann wrote:
+On 18:20 Wed 08 May     , Arnd Bergmann wrote:
 > On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
-> > From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> > 
-> > The STiH415 is the next generation of HD, AVC set-top box processors for
-> > satellite, cable, terrestrial and IP-STB markets. It is an ARM Cortex-A9
-> > 1.0 GHz, dual-core CPU.
-> > 
-> > Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> > CC: Stephen Gallimore <stephen.gallimore@st.com>
-> > CC: Stuart Menefy <stuart.menefy@st.com>
-> > ---
-patch no receive on the ML
+> > diff --git a/arch/arm/mach-stih41x/board-dt.c b/arch/arm/mach-stih41x/board-dt.c
+> > index 8005f71..1f23aca 100644
+> > --- a/arch/arm/mach-stih41x/board-dt.c
+> > +++ b/arch/arm/mach-stih41x/board-dt.c
+> > @@ -63,6 +63,8 @@ void __init stih41x_dt_init(void)
+> >  }
+> >  
+> >  static const char *stih41x_dt_match[] __initdata = {
+> > +       "st,stih415-b2000",
+> > +       "st,stih416-b2000",
+> >         NULL
+> >  };
+> 
+> I probably wouldn't bother listing all the boards here. Just make sure
+> the .dts file lists both the name of the board and of the soc in
+> its compatible property, and list all the SoCs here that you can boot on.
 
-please resend
+was going to do the same comment
 
 Best Regards,
 J.
+> 
+> 	Arnd
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
