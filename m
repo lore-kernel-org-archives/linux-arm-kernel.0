@@ -1,41 +1,123 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Wed,  8 May 2013 10:52:37 +0100
-Subject: [RFC PATCH v2 05/11] mm: thp: Correct the HPAGE_PMD_ORDER check.
+Date: Wed,  8 May 2013 10:52:36 +0100
+Subject: [RFC PATCH v2 04/11] x86: mm: Remove general hugetlb code from x86.
 In-Reply-To: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
 References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1368006763-30774-6-git-send-email-steve.capper@linaro.org>
+Message-ID: <1368006763-30774-5-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All Transparent Huge Pages are allocated by the buddy allocator.
+huge_pte_alloc, huge_pte_offset and follow_huge_p[mu]d have
+already been copied over to mm.
 
-A compile time check is in place that fails when the order of a
-transparent huge page is too large to be allocated by the buddy
-allocator. Unfortunately that compile time check passes when:
-HPAGE_PMD_ORDER == MAX_ORDER
-( which is incorrect as the buddy allocator can only allocate
-memory of order strictly less than MAX_ORDER. )
-
-This patch updates the compile time check to fail in the above
-case.
+This patch removes the x86 copies of these functions and activates
+the general ones by enabling:
+CONFIG_ARCH_WANT_GENERAL_HUGETLB
 
 Signed-off-by: Steve Capper <steve.capper@linaro.org>
 ---
- include/linux/huge_mm.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/x86/Kconfig          |  3 +++
+ arch/x86/mm/hugetlbpage.c | 67 -----------------------------------------------
+ 2 files changed, 3 insertions(+), 67 deletions(-)
 
-diff --git a/include/linux/huge_mm.h b/include/linux/huge_mm.h
-index ee1c244..3d71e5c 100644
---- a/include/linux/huge_mm.h
-+++ b/include/linux/huge_mm.h
-@@ -119,7 +119,7 @@ extern void __split_huge_page_pmd(struct vm_area_struct *vma,
- 	} while (0)
- extern void split_huge_page_pmd_mm(struct mm_struct *mm, unsigned long address,
- 		pmd_t *pmd);
--#if HPAGE_PMD_ORDER > MAX_ORDER
-+#if HPAGE_PMD_ORDER >= MAX_ORDER
- #error "hugepages can't be allocated by the buddy allocator"
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 60e3c402..db1ff87 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -215,6 +215,9 @@ config ARCH_SUSPEND_POSSIBLE
+ config ARCH_WANT_HUGE_PMD_SHARE
+ 	def_bool y
+ 
++config ARCH_WANT_GENERAL_HUGETLB
++	def_bool y
++
+ config ZONE_DMA32
+ 	bool
+ 	default X86_64
+diff --git a/arch/x86/mm/hugetlbpage.c b/arch/x86/mm/hugetlbpage.c
+index 7e522a3..7e73e8c 100644
+--- a/arch/x86/mm/hugetlbpage.c
++++ b/arch/x86/mm/hugetlbpage.c
+@@ -16,49 +16,6 @@
+ #include <asm/tlbflush.h>
+ #include <asm/pgalloc.h>
+ 
+-pte_t *huge_pte_alloc(struct mm_struct *mm,
+-			unsigned long addr, unsigned long sz)
+-{
+-	pgd_t *pgd;
+-	pud_t *pud;
+-	pte_t *pte = NULL;
+-
+-	pgd = pgd_offset(mm, addr);
+-	pud = pud_alloc(mm, pgd, addr);
+-	if (pud) {
+-		if (sz == PUD_SIZE) {
+-			pte = (pte_t *)pud;
+-		} else {
+-			BUG_ON(sz != PMD_SIZE);
+-			if (pud_none(*pud))
+-				pte = huge_pmd_share(mm, addr, pud);
+-			else
+-				pte = (pte_t *)pmd_alloc(mm, pud, addr);
+-		}
+-	}
+-	BUG_ON(pte && !pte_none(*pte) && !pte_huge(*pte));
+-
+-	return pte;
+-}
+-
+-pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
+-{
+-	pgd_t *pgd;
+-	pud_t *pud;
+-	pmd_t *pmd = NULL;
+-
+-	pgd = pgd_offset(mm, addr);
+-	if (pgd_present(*pgd)) {
+-		pud = pud_offset(pgd, addr);
+-		if (pud_present(*pud)) {
+-			if (pud_large(*pud))
+-				return (pte_t *)pud;
+-			pmd = pmd_offset(pud, addr);
+-		}
+-	}
+-	return (pte_t *) pmd;
+-}
+-
+ #if 0	/* This is just for testing */
+ struct page *
+ follow_huge_addr(struct mm_struct *mm, unsigned long address, int write)
+@@ -120,30 +77,6 @@ int pud_huge(pud_t pud)
+ 	return !!(pud_val(pud) & _PAGE_PSE);
+ }
+ 
+-struct page *
+-follow_huge_pmd(struct mm_struct *mm, unsigned long address,
+-		pmd_t *pmd, int write)
+-{
+-	struct page *page;
+-
+-	page = pte_page(*(pte_t *)pmd);
+-	if (page)
+-		page += ((address & ~PMD_MASK) >> PAGE_SHIFT);
+-	return page;
+-}
+-
+-struct page *
+-follow_huge_pud(struct mm_struct *mm, unsigned long address,
+-		pud_t *pud, int write)
+-{
+-	struct page *page;
+-
+-	page = pte_page(*(pte_t *)pud);
+-	if (page)
+-		page += ((address & ~PUD_MASK) >> PAGE_SHIFT);
+-	return page;
+-}
+-
  #endif
- extern int hugepage_madvise(struct vm_area_struct *vma,
+ 
+ /* x86_64 also uses this file */
 -- 
 1.8.1.4
