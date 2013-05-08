@@ -1,80 +1,62 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 9 May 2013 03:39:09 +0400
-Subject: [PATCH v7 3/3] ARM: shmobile: BOCK-W: add USB support
-In-Reply-To: <201305090333.00333.sergei.shtylyov@cogentembedded.com>
-References: <201305090333.00333.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201305090339.10053.sergei.shtylyov@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 May 2013 16:47:46 -0700
+Subject: [PATCHv2] ARM:dts:omap4-panda:Update the LED support for the
+ panda DTS
+In-Reply-To: <51703BEF.6050804@ti.com>
+References: <1366229760-4808-1-git-send-email-dmurphy@ti.com>
+ <516FBD18.3060501@ti.com> <51703BEF.6050804@ti.com>
+Message-ID: <20130508234745.GV32546@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the USB PHY device from bockw_init(), passing the platform  data to it.
-Set machine's init_late() method to r8a7778_init_late() in order for [EO]HCI to
-get registered too...
+* Dan Murphy <dmurphy@ti.com> [130418 11:35]:
+> On 04/18/2013 04:30 AM, Vincent Stehl? wrote:
+> >On 04/17/2013 10:16 PM, Dan Murphy wrote:
+> >>The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+> >>are different.
+> >(..)
+> >>diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> >>index 03bd60d..0c48f6b 100644
+> >>--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> >>+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> >(..)
+> >>@@ -135,6 +136,25 @@
+> >>  			0xf0 0x118     /* i2c4_sda PULLUP | INPUTENABLE | MODE0 */
+> >>  		>;
+> >>  	};
+> >>+
+> >>+	led_gpio_pins: pinmux_leds_pins {
+> >>+		pinctrl-single,pins = <
+> >>+		>;
+> >>+	};
+> >>+};
+> >Hi,
+> >
+> >FYI, there was a recent discussion precisely on this topic, where Tomy
+> >suggested to remove the empty section:
+> >http://marc.info/?l=linux-omap&m=136546635409232&w=2
+> >
+> >Apart from that, I just tested your patch on top of Tomy's
+> >omap-for-v3.10/dt branch and it is working fine for me on PandaBoards
+> >EA3, A4 and ES.
+> >
+> >Tested-by: Vincent Stehl? <v-stehle@ti.com>
+> >
+> >Best regards,
+> >
+> >V.
+> >
+> Thanks for testing Vincent
+> 
+> Is there a way to append the data to an already existing node?
+> I do not see a clean way.
 
-Don't forget to add USB PENC0/1 pins to bockw_pinctrl_map[].
+If you have something in omap4-panda-common.dtsi and the same entry
+in the omap4-panda-es.dts, the entries in omap4-panda-es.dts will
+override and append the entries in omap4-panda-common.dtsi.
 
-The patch has been tested on the BOCK-W board.
+So I think you can avoid the empty entry that way.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Regards,
 
----
-Changes since version 6:
-- added USB PENC0/1 pins to bockw_pinctrl_map[].
-
-Changes since version 4:
-- annotated 'usb_phy_platform_data' as '__initdata' since it's kmemdup()'ed
-  while registering the platform device anyway;
-- refreshed the patch.
-
-Changes since version 3:
-- removed initializer for 'usb_phy_platform_data' letting it be set to all 0s;
-- refreshed the patch.
-
-Changes since version 2:
-- refreshed the patch.
-
-Changes since the original posting:
-- removed initializer for no longer existing field in 'usb_phy_platform_data',
-  modified the comment to the 'ferrite_bead' field initializer.
-
- arch/arm/mach-shmobile/board-bockw.c |    8 ++++++++
- 1 file changed, 8 insertions(+)
-
-Index: renesas/arch/arm/mach-shmobile/board-bockw.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
-+++ renesas/arch/arm/mach-shmobile/board-bockw.c
-@@ -63,6 +63,8 @@ static struct sh_mobile_sdhi_info sdhi0_
- 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
- };
- 
-+static struct rcar_phy_platform_data usb_phy_platform_data __initdata;
-+
- static const struct pinctrl_map bockw_pinctrl_map[] = {
- 	/* SCIF0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
-@@ -78,6 +80,10 @@ static const struct pinctrl_map bockw_pi
- 				  "sdhi0_data4", "sdhi0"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
- 				  "sdhi0_wp", "sdhi0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform", "pfc-r8a7778",
-+				  "usb0", "usb0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform", "pfc-r8a7778",
-+				  "usb1", "usb1"),
- };
- 
- #define FPGA	0x18200000
-@@ -91,6 +97,7 @@ static void __init bockw_init(void)
- 	r8a7778_clock_init();
- 	r8a7778_init_irq_extpin(1);
- 	r8a7778_add_standard_devices();
-+	r8a7778_add_usb_phy_device(&usb_phy_platform_data);
- 
- 	pinctrl_register_mappings(bockw_pinctrl_map,
- 				  ARRAY_SIZE(bockw_pinctrl_map));
-@@ -146,4 +153,5 @@ DT_MACHINE_START(BOCKW_DT, "bockw")
- 	.init_machine	= bockw_init,
- 	.init_time	= shmobile_timer_init,
- 	.dt_compat	= bockw_boards_compat_dt,
-+	.init_late      = r8a7778_init_late,
- MACHINE_END
+Tony
