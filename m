@@ -1,49 +1,44 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 8 May 2013 09:56:08 +0300
-Subject: [PATCHv2 0/2] Add support for the Solomon SSD1306 OLED Controller
-In-Reply-To: <1366624555-5616-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1366624555-5616-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <5189F708.1040508@ti.com>
+From: tomi.valkeinen@iki.fi (Tomi Valkeinen)
+Date: Wed, 08 May 2013 09:57:24 +0300
+Subject: [PATCH 0/4] drivers: video: Optimisations for the ssd1307fb driver
+In-Reply-To: <1366624945-5708-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1366624945-5708-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <5189F754.1030402@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/04/13 12:55, Maxime Ripard wrote:
-> Hi,
+On 22/04/13 13:02, Maxime Ripard wrote:
+> Hi everyone,
 > 
-> This patchset adds the needed bits to the ssd1307fb driver to support the
-> very similar Solomon SSD1306 controller.
+> This is a patchset to improve significantly (by an order of magnitude)
+> the refreshing time of the SSD1306 and SSD1307.
 > 
-> Since the SSD1307 has been replaced by the SSD1306 in the latest CFA-10036
-> production samples, we also need to change the device tree accordingly.
+> We do so by sending the pixels by batches, instead of 8 at a time,
+> combined with some additionnal features found on these controllers
+> that allows to send a whole screen content at once.
+> 
+> This obviously removes the tearing effect that was previously seen
+> with these controllers.
+> 
+> This patchset depends on the "Add support for the Solomon SSD1306 OLED
+> Controller" I sent previously.
 > 
 > Thanks,
 > Maxime
 > 
-> Changes from v1:
->   - Fix style errors
+> Maxime Ripard (4):
+>   ARM: cfa10036: dt: Change i2c0 clock frequency
+>   ssd1307fb: Rework the communication functions
+>   ssd1307fb: Speed up the communication with the controller
+>   ssd1307fb: Make use of horizontal addressing mode
 > 
-> Maxime Ripard (2):
->   video: ssd1307fb: Add support for SSD1306 OLED controller
->   ARM: dts: cfa10036: Change the OLED display to SSD1306
+>  arch/arm/boot/dts/imx28-cfa10036.dts |    1 +
+>  drivers/video/ssd1307fb.c            |  123 ++++++++++++++++++++++++----------
+>  2 files changed, 89 insertions(+), 35 deletions(-)
 > 
->  .../devicetree/bindings/video/ssd1307fb.txt        |   10 +-
->  arch/arm/boot/dts/imx28-cfa10036.dts               |   14 +-
->  arch/arm/boot/dts/imx28-cfa10049.dts               |    4 +-
->  drivers/video/ssd1307fb.c                          |  273 +++++++++++++++-----
->  4 files changed, 216 insertions(+), 85 deletions(-)
 
-I've taken the first patch, "video: ssd1307fb: Add support for SSD1306
-OLED controller" into fbdev 3.11 branch. The dts changes should
-preferably go through arch tree.
+I've taken the patches 2-4 into fbdev 3.11 branch. The first patch "ARM:
+cfa10036: dt: Change i2c0 clock frequency" should preferably go through
+arch tree.
 
  Tomi
-
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130508/0bf96a45/attachment.sig>
