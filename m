@@ -1,36 +1,66 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Wed, 08 May 2013 18:42:04 +0100
-Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
-In-Reply-To: <20130508150141.GA5057@opensource.wolfsonmicro.com>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022272-2241-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081650.23264.arnd@arndb.de>
- <20130508150141.GA5057@opensource.wolfsonmicro.com>
-Message-ID: <518A8E6C.6070907@st.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 08 May 2013 11:53:24 -0600
+Subject: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
+In-Reply-To: <518A8596.7070702@wwwdotorg.org>
+References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
+ <1368010660-31465-4-git-send-email-jagarwal@nvidia.com>
+ <518A8596.7070702@wwwdotorg.org>
+Message-ID: <518A9114.1040201@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thankyou for the comments.
-On 08/05/13 16:01, Mark Brown wrote:
-> On Wed, May 08, 2013 at 04:50:22PM +0200, Arnd Bergmann wrote:
->
->>> In many cases a single syconf register contains bits related to multiple
->>> devices, and therefore it need to be shared across multiple drivers at
->>> bit level. The same IP block can have different syscon mappings on
->>> different SOCs.
->> My feeling is that syscon is the wrong place for this functionality,
->> since regmap already handles (some of?) these issues. If you need
->> additional synchronization, it's probably best to extend regmap
->> as needed so other code besides syscon can take advantage of that
->> as well.
-> This sounds like regmap_update_bits() ought to be all that's needed.
+On 05/08/2013 11:04 AM, Stephen Warren wrote:
+> On 05/08/2013 04:57 AM, Jay Agarwal wrote:
+>> - Enable PCIe controller on Cardhu
+>> - Only port 2 is connected on this board
+>> - Add regulators required for Tegra30
+>> - Patch is based on remotes/gitorious_thierryreding_linux/tegra/next
+>> - and should be applied on top of this.
+> 
+>> diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+> 
+>> +	pcie-controller {
+>> +		status = "okay";
+>> +		pex-clk-supply = <&pex_hvdd_3v3_reg>;
+>> +		vdd-supply = <&ldo1_reg>;
+>> +		avdd-supply = <&ldo2_reg>;
+>> +
+>> +		pci at 3,0 {
+>> +			status = "okay";
+>> +		};
+>> +	};
+...
+> According to the Cardhu schematics, the PCIe link to the dock is a
+> single lane. Hence, I believe that the Cardhu DT should describe a 411
+> port configuration. However, the Cardhu DT doesn't describe any
+> particular link configuration, but just inherits the default from
+> tegra30.dtsi, which describes a 222 link configuration. I would have
+> expected the following in the Cardhu DT:
+> 
+> 		pci at 1,0 {
+> 			nvidia,num-lanes = <4>;
+> 		};
+> 
+> 		pci at 2,0 {
+> 			nvidia,num-lanes = <1>;
+> 		};
+> 
+> 		pci at 3,0 {
+> 			status = "okay";
+> 			nvidia,num-lanes = <1>;
+> 		};
+> 
+> However, if I put that there, no PCIe links are detected at all. Why
+> does the driver work with the wrong link configuration, but fail with
+> the correct one?
 
-Ultimately the syscon_write use the regmap_update_bits, however we really want is the flexibility in using/referring the syscon registers/bits in both device-trees and non-device tree cases.
+I take this back. Fixing the DT as shown above to represent the correct
+4/1/1 configuration does still yield a working system. Please
+incorporate this into a future patch revision.
 
-The reason for these APIs, is the extent of syscon usage is very high in ST set-top-box parts.
-
-Without these new APIs, its very difficult to pass this information to
-the drivers.
-
-Thanks,
-srini
+The issue is more that PCIe enumeration is only reliable after a cold
+power cycle of the dock (the dock appears to be powered solely by its
+power cable and never the battery in Cardhu, and hence isn't affected by
+the main tablet PMIC's power on/off state like most of the board is). Is
+there some reset signal to the dock that the bootloader or kernel should
+be driving to solve this?
