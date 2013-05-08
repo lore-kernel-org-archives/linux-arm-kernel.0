@@ -1,43 +1,71 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 8 May 2013 09:36:13 -0700
-Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
-In-Reply-To: <201305081831.48566.arnd@arndb.de>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <B5A00B86-5332-427E-A82A-5B71EC0979A8@jcrosoft.com>
- <20130508161527.GA28080@kroah.com>
- <201305081831.48566.arnd@arndb.de>
-Message-ID: <20130508163613.GA13761@kroah.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 08 May 2013 10:36:54 -0600
+Subject: [PATCH 1/4] ARM: tegra30: clocks: Fix pciex clock registration
+In-Reply-To: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
+References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
+Message-ID: <518A7F26.3030605@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 08, 2013 at 06:31:48PM +0200, Arnd Bergmann wrote:
-> On Wednesday 08 May 2013, Greg KH wrote:
-> > > just mention there is not hardware reason to not use the generic ttySx
-> > > in place of ttyAS as we have only one IP that handle serial on this
-> > > family of SoC
-> > > 
-> > > personally I'll switch to ttySx
-> > 
-> > Great, then you can use the same major/minor range as well, so there's
-> > no more objection from me about this :)
-> 
-> Does that work these days when you have kernel with multiple built-in
-> uart drivers?
+On 05/08/2013 04:57 AM, Jay Agarwal wrote:
+> Registering pciex as peripheral clock instead of fixed clock
+> as tegra_perih_reset_assert(deassert) api of this clock api 
+> gives warning and ultimately does not succeed to assert(deassert).
 
-It "should", as the major/minor registration should only happen when the
-hardware is found, but I haven't tested it out, so I can't say for sure.
+A few procedural comments: I believe this is at least the second version
+of these patches that have been posted. As such, the email subject
+should say e.e. "PATCH V2" not just "PATCH". You can pass
+--subject-prefix='PATCH V2' to git format-patch to achieve this.
 
-> I think it would be good if all uarts were using the same name space
-> and major/minor numbers, but I think the mess we currently have is
-> the result of the tty_register_driver() interface reserving the
-> device number range at driver load time, independent of the presence
-> of devices.  I would assume that normal distro kernels always ship
-> with an 8250 driver built-in to allow using that as the console,
-> and if I read the code correctly, that currently prevents another
-> uart driver from registering the same major/minor numbers.
+Since this is an updated version of the patches, each patch should
+describe what changed in the patch, so that people know what issues
+you've fixed in this version. Most people believe that the description
+of changes should be below the --- line, so that it doesn't get included
+in the commit description when the patch is applied.
 
-We can always fix this if needed :)
+> Patch is based on remotes/gitorious_thierryreding_linux/tegra/next
+> and should be applied on top of this.
 
-thanks,
+Those two lines should be below the --- line so that they don't get
+included in the commit description when the patch is applied. git
+metadata will provide clues re: who applied the patch and to which
+branch, so there's no need to duplicate this information in the commit
+description itself, but rather include it below --- so that it's still
+present and people can see it.
 
-greg k-h
+Some comments on the patch and series below...
+
+> diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+
+> +	/* pciex */
+> +	clk = tegra_clk_register_periph_gate("pciex", "pll_e", 0, clk_base, 0,
+> +				    74, &periph_u_regs, periph_clk_enb_refcnt);
+> +	clk_register_clkdev(clk, "pciex", NULL);
+> +	clks[pciex] = clk;
+
+Hmmm. This change perhaps isn't technically correct, but is the best we
+can do for now, so it's fine. It's also consistent with how the Tegra20
+clock driver is written.
+
+This clock has a "reset" bit in the CLK_RST_* registers, but not an
+"enable" bit in the CLK_ENB_* registers. Hence, representing this as a
+gated clock isn't correct, since there is not gate control in HW. The
+correct way to handle this would be to implement the new reset
+controller API for Tegra, and expose the reset control only, and not
+touch the clock registration at all. However, we do this exact same
+thing for a number of Tegra clocks right now, hence I think this change
+is fine for now; we'll clean this up, along with some other instances of
+the same issue, once the reset API is implemented for Tegra. Of course,
+if that happens before the PCI code is checked in, then my opinion will
+change.
+
+> @@ -1930,7 +1931,6 @@ static struct tegra_clk_duplicate tegra_clk_duplicates[] = {
+>  	TEGRA_CLK_DUPLICATE(bsea, "nvavp", "bsea"),
+>  	TEGRA_CLK_DUPLICATE(cml1, "tegra_sata_cml", NULL),
+>  	TEGRA_CLK_DUPLICATE(cml0, "tegra_pcie", "cml"),
+> -	TEGRA_CLK_DUPLICATE(pciex, "tegra_pcie", "pciex"),
+
+That seems like an unrelated change, and isn't mentioned in the commit
+description. Is the change strictly necessary? Is it cleanup that can
+happen as a separate patch later in the series? Aren't you able to
+remove the CLK_DUPLICATE() entries for other PCIe-related clocks too?
