@@ -1,62 +1,150 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 08 May 2013 10:53:28 +0100
-Subject: [PATCH] ARM: KVM: prevent NULL pointer dereference with KVM ioctl
-In-Reply-To: <1367931313-14839-1-git-send-email-andre.przywara@linaro.org>
-References: <1367931313-14839-1-git-send-email-andre.przywara@linaro.org>
-Message-ID: <518A2098.9010909@arm.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Wed,  8 May 2013 10:52:43 +0100
+Subject: [RFC PATCH v2 11/11] ARM64: mm: THP support.
+In-Reply-To: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
+References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1368006763-30774-12-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/05/13 13:55, Andre Przywara wrote:
-> Some ARM KVM VCPU ioctls require the vCPU to be properly initialized
-> with the KVM_ARM_VCPU_INIT ioctl before being used with further
-> requests. KVM_RUN checks whether this initialization has been
-> done, but other ioctls do not.
-> Namely KVM_GET_REG_LIST will dereference an array with index -1
-> without initialization and thus leads to a kernel oops.
-> Fix this by adding checks before executing the ioctl handlers.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
-> ---
->  arch/arm/kvm/arm.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index c1fe498..0c571ff 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -893,6 +893,11 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
->  	case KVM_SET_ONE_REG:
->  	case KVM_GET_ONE_REG: {
->  		struct kvm_one_reg reg;
-> +
-> +		/* Make sure they initialize the vcpu with KVM_ARM_VCPU_INIT */
-> +		if (unlikely(vcpu->arch.target < 0))
-> +			return -ENOEXEC;
-> +
->  		if (copy_from_user(&reg, argp, sizeof(reg)))
->  			return -EFAULT;
->  		if (ioctl == KVM_SET_ONE_REG)
-> @@ -905,6 +910,10 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
->  		struct kvm_reg_list reg_list;
->  		unsigned n;
->  
-> +		/* Make sure they initialize the vcpu with KVM_ARM_VCPU_INIT */
-> +		if (unlikely(vcpu->arch.target < 0))
-> +			return -ENOEXEC;
-> +
->  		if (copy_from_user(&reg_list, user_list, sizeof(reg_list)))
->  			return -EFAULT;
->  		n = reg_list.n;
-> 
+Bring Transparent HugePage support to ARM. The size of a
+transparent huge page depends on the normal page size. A
+transparent huge page is always represented as a pmd.
 
-So we also have the same snippet in kvm_arch_vcpu_ioctl_run().
+If PAGE_SIZE is 4KB, THPs are 2MB.
+If PAGE_SIZE is 64KB, THPs are 512MB.
 
-Can you create a static function (kvm_vcpu_initialized?) containing that
-code and make all three sites use it?
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+---
+ arch/arm64/Kconfig                     |  3 ++
+ arch/arm64/include/asm/pgtable-hwdef.h |  4 +++
+ arch/arm64/include/asm/pgtable.h       | 55 ++++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/tlb.h           |  6 ++++
+ arch/arm64/include/asm/tlbflush.h      |  2 ++
+ 5 files changed, 70 insertions(+)
 
-Thanks,
-
-	M.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a5f76cf..93a3b9e 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -194,6 +194,9 @@ config ARCH_WANT_GENERAL_HUGETLB
+ config ARCH_WANT_HUGE_PMD_SHARE
+ 	def_bool y if !ARM64_64K_PAGES
+ 
++config HAVE_ARCH_TRANSPARENT_HUGEPAGE
++	def_bool y
++
+ source "mm/Kconfig"
+ 
+ config FORCE_MAX_ZONEORDER
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index e6e0a0d..63c9d0d 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -42,6 +42,10 @@
+ /*
+  * Section
+  */
++#define PMD_SECT_VALID		(_AT(pmdval_t, 1) << 0)
++#define PMD_SECT_PROT_NONE	(_AT(pmdval_t, 1) << 2)
++#define PMD_SECT_USER		(_AT(pmdval_t, 1) << 6)		/* AP[1] */
++#define PMD_SECT_RDONLY		(_AT(pmdval_t, 1) << 7)		/* AP[2] */
+ #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
+ #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
+ #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 6bcbcfd..fd17e0b 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -188,6 +188,61 @@ static inline void set_pte_at(struct mm_struct *mm, unsigned long addr,
+ #define __HAVE_ARCH_PTE_SPECIAL
+ 
+ /*
++ * Software PMD bits for THP
++ */
++
++#define PMD_SECT_DIRTY		(_AT(pmdval_t, 1) << 55)
++#define PMD_SECT_SPLITTING	(_AT(pmdval_t, 1) << 57)
++
++/*
++ * THP definitions.
++ */
++#define pmd_young(pmd)		(pmd_val(pmd) & PMD_SECT_AF)
++
++#define __HAVE_ARCH_PMD_WRITE
++#define pmd_write(pmd)		(!(pmd_val(pmd) & PMD_SECT_RDONLY))
++
++#ifdef CONFIG_TRANSPARENT_HUGEPAGE
++#define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
++#define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
++#endif
++
++#define PMD_BIT_FUNC(fn,op) \
++static inline pmd_t pmd_##fn(pmd_t pmd) { pmd_val(pmd) op; return pmd; }
++
++PMD_BIT_FUNC(wrprotect,	|= PMD_SECT_RDONLY);
++PMD_BIT_FUNC(mkold,	&= ~PMD_SECT_AF);
++PMD_BIT_FUNC(mksplitting, |= PMD_SECT_SPLITTING);
++PMD_BIT_FUNC(mkwrite,   &= ~PMD_SECT_RDONLY);
++PMD_BIT_FUNC(mkdirty,   |= PMD_SECT_DIRTY);
++PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
++PMD_BIT_FUNC(mknotpresent, &= ~PMD_TYPE_MASK);
++
++#define pmd_mkhuge(pmd)		(__pmd(pmd_val(pmd) & ~PMD_TABLE_BIT))
++
++#define pmd_pfn(pmd)		(((pmd_val(pmd) & PMD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
++#define pfn_pmd(pfn,prot)	(__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
++#define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
++
++#define pmd_page(pmd)           pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
++
++static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
++{
++	const pmdval_t mask = PMD_SECT_USER | PMD_SECT_PXN | PMD_SECT_UXN |
++			      PMD_SECT_RDONLY | PMD_SECT_PROT_NONE |
++			      PMD_SECT_VALID;
++	pmd_val(pmd) = (pmd_val(pmd) & ~mask) | (pgprot_val(newprot) & mask);
++	return pmd;
++}
++
++#define set_pmd_at(mm, addr, pmdp, pmd)	set_pmd(pmdp, pmd)
++
++static inline int has_transparent_hugepage(void)
++{
++	return 1;
++}
++
++/*
+  * Mark the prot value as uncacheable and unbufferable.
+  */
+ #define pgprot_noncached(prot) \
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index 654f096..46b3beb 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -187,4 +187,10 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+ 
+ #define tlb_migrate_finish(mm)		do { } while (0)
+ 
++static inline void
++tlb_remove_pmd_tlb_entry(struct mmu_gather *tlb, pmd_t *pmdp, unsigned long addr)
++{
++	tlb_add_flush(tlb, addr);
++}
++
+ #endif
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 122d632..8b48203 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -117,6 +117,8 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
+ 	dsb();
+ }
+ 
++#define update_mmu_cache_pmd(vma, address, pmd) do { } while (0)
++
+ #endif
+ 
+ #endif
 -- 
-Jazz is not dead. It just smells funny...
+1.8.1.4
