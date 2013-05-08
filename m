@@ -1,40 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 8 May 2013 17:55:00 +0100
-Subject: [PATCH v2] ARM v6/v7 cmpxchg64 shouldn't clear upper 32 bits of
- the old/new value
-In-Reply-To: <1368025614-17820-1-git-send-email-jaccon.bastiaansen@gmail.com>
-References: <20130508143004.GA20820@mudshark.cambridge.arm.com>
- <1368025614-17820-1-git-send-email-jaccon.bastiaansen@gmail.com>
-Message-ID: <20130508165500.GH20820@mudshark.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 08 May 2013 10:56:34 -0600
+Subject: [PATCH 3/4] ARM: dts: tegra: Correct PCIe entry
+In-Reply-To: <1368010660-31465-3-git-send-email-jagarwal@nvidia.com>
+References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
+ <1368010660-31465-3-git-send-email-jagarwal@nvidia.com>
+Message-ID: <518A83C2.3070709@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 08, 2013 at 04:06:54PM +0100, Jaccon Bastiaansen wrote:
-> The implementation of cmpxchg64() for the ARM v6 and v7 architecture
-> casts parameter 2 and 3 (the old and new 64bit values) to an unsigned
-> long before calling the atomic_cmpxchg64() function. This clears
-> the top 32 bits of the old and new values, resulting in the wrong
-> values being compare-exchanged.
-> 
-> This bug is introduced by commit 3e0f5a15f500 (ARM: 7404/1: cmpxchg64: use atomic64
+On 05/08/2013 04:57 AM, Jay Agarwal wrote:
+> - Add interrupt-names property
+> - Correct downstream I/O size
+> - Correct cml clock name for Tegra30
+> - Patch is based on remotes/gitorious_thierryreding_linux/tegra/next
+> - and should be applied on top of this.
 
-Best to line-wrap this at 76 chars.
+Another change that needs to be made to this file (probably as a
+separate change that Thierry can squash into one of his earlier changes)
+is to move the pcie-controller node; it is currently not in the correct
+place in the .dtsi file; it's not sorted by reg addresss.
 
-> and local64 routines for cmpxchg64)
-> 
-> Signed-off-by: Jaccon Bastiaansen <jaccon.bastiaansen@gmail.com>
+> diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
 
-Please add the following above your S-o-B:
+>  		clocks = <&tegra_car 70>, <&tegra_car 72>, <&tegra_car 74>,
+>  			 <&tegra_car 118>, <&tegra_car 215>;
+> -		clock-names = "pex", "afi", "pcie_xclk", "pll_e", "cml";
+> +		clock-names = "pex", "afi", "pcie_xclk", "pll_e", "cml0";
 
-  Cc: <stable@vger.kernel.org>
-  Acked-by: Will Deacon <will.deacon@arm.com>
+You could drop that change if the driver named the clock "cml" rather
+than "cml0", which as I explained in my previous email seems like a good
+idea anyway.
 
-Then below your S-o-B, add:
-
-  KernelVersion: 3.9
-
-and send the patch to patches at arm.linux.org.uk
-
-Cheers,
-
-Will
+Applying the same reasoning, I wonder if for Tegra 20 too, the PCIe
+driver shouldn't expect clock names of just "xclk" and "pll" rather than
+"pcie_xclk" and "pll_e".
