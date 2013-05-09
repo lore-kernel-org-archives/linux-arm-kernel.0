@@ -1,29 +1,68 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Thu, 9 May 2013 10:02:53 +0100
-Subject: [PATCH v2 0/3] clk: implement remuxing during set_rate
-In-Reply-To: <518AE16D.5060501@codeaurora.org>
-References: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
- <518AE16D.5060501@codeaurora.org>
-Message-ID: <518B663D.60806@imgtec.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 May 2013 10:09:11 +0100
+Subject: arch/arm/mach-omap2/id.c - IS_ERR_OR_NULL()
+Message-ID: <20130509090911.GM21614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/13 00:36, Stephen Boyd wrote:
-> On 04/19/13 09:28, James Hogan wrote:
->> This patchset adds support for automatic selection of the best parent
->> for a clock mux, i.e. the one which can provide the closest clock rate
->> to that requested. It can be controlled by a new CLK_SET_RATE_REMUX flag
->> so that it doesn't happen unless explicitly allowed.
->>
->> This works by way of adding a new op, determine_rate, similar to
->> round_rate but with an extra parameter to allow the clock driver to
->> optionally select a different parent clock. This is used in
->> clk_calc_new_rates to decide whether to initiate a set_parent operation.
-> 
-> Which tree is this based on? I get failures with git am on patch 2.
-> 
+So, I eliminated all but a very few of these from arch/arm, and I notice
+today that there's a new couple of instances introduced by:
 
-It was based on v3.9-rc4.
+commit 6770b211432564c562c856d612b43bbd42e4ab5e
+Author: Ruslan Bilovol <ruslan.bilovol@ti.com>
+Date:   Thu Feb 14 13:55:24 2013 +0200
 
-Cheers
-James
+    ARM: OMAP2+: Export SoC information to userspace
+
+    In some situations it is useful for userspace to
+    know some SoC-specific information. For example,
+    this may be used for deciding what kernel module to
+    use or how to better configure some settings etc.
+    This patch exports OMAP SoC information to userspace
+    using existing in Linux kernel SoC infrastructure.
+
+    This information can be read under
+    /sys/devices/socX directory
+
+    Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
+    [tony at atomide.com: updated for multiplatform changes]
+    Signed-off-by: Tony Lindgren <tony@atomide.com>
+
++       soc_dev = soc_device_register(soc_dev_attr);
++       if (IS_ERR_OR_NULL(soc_dev)) {
++               kfree(soc_dev_attr);
++               return;
++       }
++
++       parent = soc_device_to_device(soc_dev);
++       if (!IS_ERR_OR_NULL(parent))
++               device_create_file(parent, &omap_soc_attr);
+
+This is nonsense.  For the first, IS_ERR() is sufficient.  For the second,
+tell me what error checking is required in the return value of this
+function:
+
+struct device *soc_device_to_device(struct soc_device *soc_dev)
+{
+        return &soc_dev->dev;
+}
+
+when you've already determined that the passed soc_dev is a valid pointer.
+If you read the comments against the prototype:
+
+/**
+ * soc_device_to_device - helper function to fetch struct device
+ * @soc: Previously registered SoC device container
+ */
+struct device *soc_device_to_device(struct soc_device *soc);
+
+if "soc" is valid, it means the "previously registered SoC device container"
+must have succeeded and that can only happen if the struct device has been
+registered.  Ergo, there will always be a valid struct device pointer for
+any registered SoC device container.  Therefore, if soc_device_register()
+succeeds, then the return value from soc_device_to_device() will always be
+valid and no error checking of it is required.
+
+Simples.  The rule as ever applies here: get to know the APIs your using
+and don't fumble around in the dark hoping that you'll get this stuff
+right.
