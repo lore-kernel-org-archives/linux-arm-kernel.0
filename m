@@ -1,73 +1,123 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 9 May 2013 15:08:22 +0800
-Subject: [PATCH] net: fec: enable hardware checksum only on imx6q-fec
-Message-ID: <1368083302-12516-1-git-send-email-shawn.guo@linaro.org>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Thu, 9 May 2013 15:21:39 +0800
+Subject: [PATCH 1/3] irqchip: move mmp irq driver
+In-Reply-To: <1366537617-11328-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1366537617-11328-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CAD6h2NQc1YAh9nj6eCK+nkURFkeT6JidxTE7FBtEvk0fuvJ_tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 4c09eed (net: fec: Enable imx6 enet checksum acceleration.)
-enables hardware checksum acceleration unconditionally for all fec
-variants.  This is inappropriate, because some variants like imx5 have
-no such support on hardware.  Consequently, fec is broken on these
-platforms.  Fix it by enabling hardware checksum only on imx6q-fec type
-of controllers.
+On 21 April 2013 17:46, Haojian Zhuang <haojian.zhuang@linaro.org> wrote:
+> Move irq-mmp driver from mach-mmp directory into irqchip directory.
+>
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> ---
+>  arch/arm/mach-mmp/Makefile                           |    2 +-
+>  arch/arm/mach-mmp/common.h                           |    1 -
+>  arch/arm/mach-mmp/include/mach/pxa168.h              |    1 +
+>  arch/arm/mach-mmp/include/mach/pxa910.h              |    1 +
+>  arch/arm/mach-mmp/pxa910.c                           |    1 +
+>  drivers/irqchip/Makefile                             |    1 +
+>  arch/arm/mach-mmp/irq.c => drivers/irqchip/irq-mmp.c |    2 --
+>  7 files changed, 5 insertions(+), 4 deletions(-)
+>  rename arch/arm/mach-mmp/irq.c => drivers/irqchip/irq-mmp.c (99%)
+>
+> diff --git a/arch/arm/mach-mmp/Makefile b/arch/arm/mach-mmp/Makefile
+> index 095c155..9b702a1 100644
+> --- a/arch/arm/mach-mmp/Makefile
+> +++ b/arch/arm/mach-mmp/Makefile
+> @@ -2,7 +2,7 @@
+>  # Makefile for Marvell's PXA168 processors line
+>  #
+>
+> -obj-y                          += common.o devices.o time.o irq.o
+> +obj-y                          += common.o devices.o time.o
+>
+>  # SoC support
+>  obj-$(CONFIG_CPU_PXA168)       += pxa168.o
+> diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
+> index 0bdc50b..9c1c9be 100644
+> --- a/arch/arm/mach-mmp/common.h
+> +++ b/arch/arm/mach-mmp/common.h
+> @@ -2,7 +2,6 @@
+>
+>  extern void timer_init(int irq);
+>
+> -extern void __init icu_init_irq(void);
+>  extern void __init mmp_map_io(void);
+>  extern void mmp_restart(char, const char *);
+>  extern void __init pxa168_clk_init(void);
+> diff --git a/arch/arm/mach-mmp/include/mach/pxa168.h b/arch/arm/mach-mmp/include/mach/pxa168.h
+> index 7ed1df2..e01dc2a 100644
+> --- a/arch/arm/mach-mmp/include/mach/pxa168.h
+> +++ b/arch/arm/mach-mmp/include/mach/pxa168.h
+> @@ -2,6 +2,7 @@
+>  #define __ASM_MACH_PXA168_H
+>
+>  extern void pxa168_timer_init(void);
+> +extern void __init icu_init_irq(void);
+>  extern void __init pxa168_init_irq(void);
+>  extern void pxa168_restart(char, const char *);
+>  extern void pxa168_clear_keypad_wakeup(void);
+> diff --git a/arch/arm/mach-mmp/include/mach/pxa910.h b/arch/arm/mach-mmp/include/mach/pxa910.h
+> index b914afa..9225320 100644
+> --- a/arch/arm/mach-mmp/include/mach/pxa910.h
+> +++ b/arch/arm/mach-mmp/include/mach/pxa910.h
+> @@ -2,6 +2,7 @@
+>  #define __ASM_MACH_PXA910_H
+>
+>  extern void pxa910_timer_init(void);
+> +extern void __init icu_init_irq(void);
+>  extern void __init pxa910_init_irq(void);
+>
+>  #include <linux/i2c.h>
+> diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+> index ce6393a..a586742 100644
+> --- a/arch/arm/mach-mmp/pxa910.c
+> +++ b/arch/arm/mach-mmp/pxa910.c
+> @@ -23,6 +23,7 @@
+>  #include <mach/dma.h>
+>  #include <mach/mfp.h>
+>  #include <mach/devices.h>
+> +#include <mach/pxa910.h>
+>
+>  #include "common.h"
+>
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index 8daa76a..9418f4b 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -6,6 +6,7 @@ obj-$(CONFIG_ARCH_MXS)                  += irq-mxs.o
+>  obj-$(CONFIG_ARCH_S3C24XX)             += irq-s3c24xx.o
+>  obj-$(CONFIG_METAG)                    += irq-metag-ext.o
+>  obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)   += irq-metag.o
+> +obj-$(CONFIG_ARCH_MMP)                 += irq-mmp.o
+>  obj-$(CONFIG_ARCH_SUNXI)               += irq-sun4i.o
+>  obj-$(CONFIG_ARCH_SPEAR3XX)            += spear-shirq.o
+>  obj-$(CONFIG_ARM_GIC)                  += irq-gic.o
+> diff --git a/arch/arm/mach-mmp/irq.c b/drivers/irqchip/irq-mmp.c
+> similarity index 99%
+> rename from arch/arm/mach-mmp/irq.c
+> rename to drivers/irqchip/irq-mmp.c
+> index 3c71246..dab6def 100644
+> --- a/arch/arm/mach-mmp/irq.c
+> +++ b/drivers/irqchip/irq-mmp.c
+> @@ -30,8 +30,6 @@
+>  #include <mach/pm-pxa910.h>
+>  #endif
+>
+> -#include "common.h"
+> -
+>  #define MAX_ICU_NR             16
+>
+>  struct icu_chip_data {
+> --
+> 1.7.10.4
+>
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/net/ethernet/freescale/fec_main.c |   20 +++++++++++++-------
- 1 file changed, 13 insertions(+), 7 deletions(-)
+Hi Thomas,
 
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index e25bf83..9ffa428 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -87,6 +87,8 @@
- #define FEC_QUIRK_HAS_GBIT		(1 << 3)
- /* Controller has extend desc buffer */
- #define FEC_QUIRK_HAS_BUFDESC_EX	(1 << 4)
-+/* Controller has hardware checksum support */
-+#define FEC_QUIRK_HAS_CSUM		(1 << 5)
- 
- static struct platform_device_id fec_devtype[] = {
- 	{
-@@ -105,7 +107,7 @@ static struct platform_device_id fec_devtype[] = {
- 	}, {
- 		.name = "imx6q-fec",
- 		.driver_data = FEC_QUIRK_ENET_MAC | FEC_QUIRK_HAS_GBIT |
--				FEC_QUIRK_HAS_BUFDESC_EX,
-+				FEC_QUIRK_HAS_BUFDESC_EX | FEC_QUIRK_HAS_CSUM,
- 	}, {
- 		.name = "mvf-fec",
- 		.driver_data = FEC_QUIRK_ENET_MAC,
-@@ -1723,6 +1725,8 @@ static const struct net_device_ops fec_netdev_ops = {
- static int fec_enet_init(struct net_device *ndev)
- {
- 	struct fec_enet_private *fep = netdev_priv(ndev);
-+	const struct platform_device_id *id_entry =
-+				platform_get_device_id(fep->pdev);
- 	struct bufdesc *cbd_base;
- 
- 	/* Allocate memory for buffer descriptors. */
-@@ -1755,12 +1759,14 @@ static int fec_enet_init(struct net_device *ndev)
- 	writel(FEC_RX_DISABLED_IMASK, fep->hwp + FEC_IMASK);
- 	netif_napi_add(ndev, &fep->napi, fec_enet_rx_napi, FEC_NAPI_WEIGHT);
- 
--	/* enable hw accelerator */
--	ndev->features |= (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM
--			| NETIF_F_RXCSUM);
--	ndev->hw_features |= (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM
--			| NETIF_F_RXCSUM);
--	fep->csum_flags |= FLAG_RX_CSUM_ENABLED;
-+	if (id_entry->driver_data & FEC_QUIRK_HAS_CSUM) {
-+		/* enable hw accelerator */
-+		ndev->features |= (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM
-+				| NETIF_F_RXCSUM);
-+		ndev->hw_features |= (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM
-+				| NETIF_F_RXCSUM);
-+		fep->csum_flags |= FLAG_RX_CSUM_ENABLED;
-+	}
- 
- 	fec_restart(ndev, 0);
- 
--- 
-1.7.9.5
+Could this patch set be merged?
+
+Regards
+Haojian
