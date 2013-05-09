@@ -1,62 +1,67 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 9 May 2013 09:05:52 -0700
-Subject: [RFC PATCH 0/3] ARM: omap3: add Seagate Wireless Plus board
-In-Reply-To: <20130509155645.GB31554@atomide.com>
-References: <cover.1368038129.git.jason@lakedaemon.net>
- <20130508194504.GD32546@atomide.com>
- <20130509003606.GE31290@titan.lakedaemon.net>
- <20130509155645.GB31554@atomide.com>
-Message-ID: <20130509160551.GC31554@atomide.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 9 May 2013 09:13:08 -0700
+Subject: Fwd: Tegra 30 System hangs because of commit "pinctrl: move
+ subsystem mutex to pinctrl_dev struct"
+In-Reply-To: <CACxGe6uo60OwRd7buPX4382_vE48MLWJYyB_ka+iS2FfVCa8mw@mail.gmail.com>
+References: <CAK5ve-KXdS8az=Gtja-mF=Z3_EeZVA7bLYSU0EE2mf5bHmSUKw@mail.gmail.com>
+ <CAK5ve-KBDyvjNRVMcXgfnhYcajdcGsuAKaepzCBt+epiXoYvSw@mail.gmail.com>
+ <517ED12B.8080502@wwwdotorg.org>
+ <20130504133004.GC24282@game.jcrosoft.org>
+ <CACRpkdbBVJtWrRO+J=pWjfLXTcVKX++x-eeJQXGeQn_WOURUNQ@mail.gmail.com>
+ <20130505112819.GD24282@game.jcrosoft.org>
+ <CACRpkdZdT8==cUtH4=Y3LC-eVu6ntO2ojFC4bSXNuxa4hMJ=ZA@mail.gmail.com>
+ <20130505202236.GF24282@game.jcrosoft.org>
+ <CACRpkda2EG0O-pfZQ5kLFX=cwSmUSVBJkR7Xvye3ROs3tstv9w@mail.gmail.com>
+ <20130506194122.GG24282@game.jcrosoft.org>
+ <20130506195403.GJ18614@n2100.arm.linux.org.uk>
+ <CACRpkdZtPhzLFicYYZF0SZfp4dMJars+Z-7hTUZQ1JjPExXW3A@mail.gmail.com>
+ <CACxGe6uo60OwRd7buPX4382_vE48MLWJYyB_ka+iS2FfVCa8mw@mail.gmail.com>
+Message-ID: <CAOesGMiqrXSPdEtUzGCuAuhdE4K7FVe65zMM962XuOrO555hnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130509 09:03]:
-> * Jason Cooper <jason@lakedaemon.net> [130508 17:41]:
-> > On Wed, May 08, 2013 at 12:45:04PM -0700, Tony Lindgren wrote:
-> > > * Jason Cooper <jason@lakedaemon.net> [130508 12:29]:
-> > > > 
-> > > > Tony has been helping me out offline with this, and he suggested trying the
-> > > > gpmc against Linus' ToT.  Which locks up before it even has a chance to get
-> > > > going.  So this series is against v3.9.
-> > > 
-> > > You may have better luck with today's mainline treeand the following fix:
-> > > 
-> > > http://lkml.org/lkml/2013/5/8/374#
-> > 
-> > Ok, I'm attempting to do that, but got this for 'make dtbs':
-> > 
-> > ERROR (phandle_references): Reference to non-existent node or label "usb2_phy"
-> > 
-> > ERROR: Input tree has errors, aborting (use -f to force output)
-> > make[1]: *** [arch/arm/boot/dts/omap3-wireless_plus.dtb] Error 2
-> > make[1]: *** Waiting for unfinished jobs....
-> > make: *** [dtbs] Error 2
-> > 
-> > which was created by:
-> > 
-> >   ad871c10 ARM: dts: OMAP: Add usb_otg and glue data to OMAP3+ boards
-> > 
-> > It assumes the board has twl4030 (and then includes it).  Bootlogs from
-> > the vendor provided kernel don't show a single message from twl4030, so
-> > I've omitted it.
-> > 
-> > Assuming I did the correct thing by omitting the twl4030, I think the
-> > correct answer is to declare the phy in the dts files, like so:
-> 
-> Thanks, that is correct. We should not assume any PMIC with a processor
-> as it can also be a custom chip. For example, Nokia n8x0 is using their
-> retu + tahvo chips instead of tps chips.
-> 
-> I'll apply your patch into omap-for-v3.10/fixes.
+On Thu, May 9, 2013 at 6:25 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Mon, May 6, 2013 at 9:12 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Mon, May 6, 2013 at 9:54 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>
+>>> My conclusion is that build and boot test systems just don't work in an
+>>> open source environment as no one actively checks the results.  Why would
+>>> they - maintainers already have enough to do with reading 6500+ emails a
+>>> month on mailing lists.  Why bother going to look at a website as well
+>>> which might give even more work.
+>>
+>> Point taken. I was in a discussion some time back with Greg and some
+>> other people and we concluded that unless the system mails you when
+>> something breaks it won't make a difference. And it mustn't flood you,
+>> just be very precise.
+>>
+>> Actually the autobuilder at kernel.org helped me out but then stopped
+>> building my trees at some point, but that was nice and the same thing
+>> doing boots would be great.
+>
+> +1 on what has already been stated on this thread; An autobuilder does
+> work if it emails you when something breaks without spamming you. I've
+> also found the 0day build tester actually effective. It has caught
+> things that I've missed and I immediately was able to go an fix.
 
-I mean omap-for-v3.10/dt-fixes instead of fixes since it's .dts changes.
- 
-> Regards,
-> 
-> Tony
->  
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Yes, a builder is quite useful. Several of us do our own builds as well.
+
+When it comes to boot coverage, I'm not sure how successful a central
+approach would be. It's something where I think Linaro could
+contribute a lot for their member platforms, but I haven't seen much
+engagement there yet.
+
+Beyond there, I'd say the expectation is that each maintainer should
+keep an eye on their own platforms. They _should_ try building and
+booting linux-next on their platforms, to catch regressions early. And
+definitely around now, I'd like to see people boot mainline on their
+platforms to make sure we haven't added any severe regressions in the
+3.10 merge window, etc. Some people are really good at this, others
+less so.
+
+What's the old saying, you can lead a horse to water but you can't
+make him drink? You can build a boot test cluster but you can't make
+anyone pay attention to it. :(
+
+-Olof
