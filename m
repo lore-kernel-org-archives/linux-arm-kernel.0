@@ -1,40 +1,35 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 9 May 2013 15:36:45 +0200
-Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
-In-Reply-To: <201305082035.57154.arnd@arndb.de>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081831.48566.arnd@arndb.de>
- <alpine.LFD.2.03.1305081239260.13109@syhkavp.arg>
- <201305082035.57154.arnd@arndb.de>
-Message-ID: <20130509133645.GG3041@game.jcrosoft.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 9 May 2013 14:50:17 +0100
+Subject: [PATCH 1/3] driver core: Add API to wait for deferred probe to
+ complete during init
+In-Reply-To: <CACxGe6uHBNUcbD9SeRP5c3E8NN-Z2yjVV+9VAhuoJnXoBtTu2w@mail.gmail.com>
+References: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
+ <1368076726-11492-2-git-send-email-skannan@codeaurora.org>
+ <CACVXFVMd_iRtEM8ZLK6Ps66gZO6SCp1mXSgY6JbWtRJjJUh+ag@mail.gmail.com>
+ <CACxGe6uHBNUcbD9SeRP5c3E8NN-Z2yjVV+9VAhuoJnXoBtTu2w@mail.gmail.com>
+Message-ID: <20130509135017.GD3200@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20:35 Wed 08 May     , Arnd Bergmann wrote:
-> On Wednesday 08 May 2013, Nicolas Pitre wrote:
-> > I tried to fix this up over 10 years ago.  RMK tried as well. This 
-> > failed because X86 people insisted on always having COM1 as /dev/ttyS0, 
-> > COM3 as /dev/ttyS2 and so on, even when some of them weren't present.
-> > 
-> > A common and dynamic namespace eventually succeeded for hard disks.
-> > Maybe people are ready to accept it for serial ports as well now?
-> 
-> Unfortunately it only worked for hard disks because the old name
-> space was abandoned entirely. It also caused a lot of surprises
-> for people upgrading their kernels, which is something we probably
-> don't want to repeat.
-> 
-> Now we could add a new dynamic registration facility to the tty
-> layer for drivers that don't already have a name and dev_t
-> associated with the driver, and then use it for all new drivers
-> as well as those that intentionally want to convert.
+On Thu, May 09, 2013 at 12:50:46PM +0100, Grant Likely wrote:
 
-specially that we use devtmpfs and udev
+> However, if a device that shuts down resources after init has
+> completed and then cannot turn those resources back on when another
+> driver requests them then it sounds like there is a bigger design
+> problem. We're in a hotplug world and most of the time a driver cannot
+> assume that a resource will never get requested after initcalls have
+> completed. It sounds like a design bug in the driver if it cannot
+> handle that use case.
 
-we do not care much about minor/major
-> 
-> With DT aliases, we already have a way to enumerate serial ports
-> across device drivers, so if we are going to do something new,
-> we should make sure it works with the numbers defined there.
-> 
-> 	Arnd
+Even if the driver copes fine it can still be desirable to avoid the
+power down/up cycle if it involves some user visible effect - things
+like blinking the display off then on for example.  That said I am a
+little suspicious about this approach, it doesn't feel as robust as it
+should to go round individual callers.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130509/a652d63c/attachment.sig>
