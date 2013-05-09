@@ -1,61 +1,53 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 9 May 2013 11:54:42 -0400 (EDT)
-Subject: [RFC PATCH 1/2] USB: OHCI: prepare to make ohci-hcd a library
- module
-In-Reply-To: <CAJFYCKGSctw1_nXoETYwyVkgAncHyBb8dmZ9aBV-av=8S0rw4A@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1305091108130.1796-100000@iolanthe.rowland.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 9 May 2013 08:56:45 -0700
+Subject: [RFC PATCH 0/3] ARM: omap3: add Seagate Wireless Plus board
+In-Reply-To: <20130509003606.GE31290@titan.lakedaemon.net>
+References: <cover.1368038129.git.jason@lakedaemon.net>
+ <20130508194504.GD32546@atomide.com>
+ <20130509003606.GE31290@titan.lakedaemon.net>
+Message-ID: <20130509155645.GB31554@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 May 2013, Manjunath Goudar wrote:
-
-> > > @@ -767,7 +762,37 @@ retry:
-> > >
-> > >       return 0;
-> > >  }
-> > >
-> > +/*------------------------------------------------------------------------*/
-> > > +
-> > > +/* ohci generic function for all OHCI bus glue */
-> > > +
-> > > +static int ohci_setup(struct usb_hcd *hcd)
-> > > +{
-> > > +     struct ohci_hcd *ohci = hcd_to_ohci(hcd);
-> > > +     int retval;
-> > > +
-> > > +     ohci->sbrn = HCD_USB11;
-> >
-> > What is this doing here?  Why did you add this "sbrn" member to struct
-> > ohci_hcd?
-> >
-> > not required so reverted.
+* Jason Cooper <jason@lakedaemon.net> [130508 17:41]:
+> On Wed, May 08, 2013 at 12:45:04PM -0700, Tony Lindgren wrote:
+> > * Jason Cooper <jason@lakedaemon.net> [130508 12:29]:
+> > > 
+> > > Tony has been helping me out offline with this, and he suggested trying the
+> > > gpmc against Linus' ToT.  Which locks up before it even has a chance to get
+> > > going.  So this series is against v3.9.
+> > 
+> > You may have better luck with today's mainline treeand the following fix:
+> > 
+> > http://lkml.org/lkml/2013/5/8/374#
 > 
-> > > +
-> > > +     /* data structure init */
-> > > +     retval = ohci_init(ohci);
-> > > +     if (retval)
-> > > +             return retval;
-> > > +     ohci_usb_reset(ohci);
-> >
-> > Why is this call here?  Doesn't ohci_init() already call
-> > ohci_usb_reset()?
-> >
-> >
-> ohci_init is not called in ohci_usb_reset() its called in ohci_restart() so
-> I think ohci_init needed.
+> Ok, I'm attempting to do that, but got this for 'make dtbs':
+> 
+> ERROR (phandle_references): Reference to non-existent node or label "usb2_phy"
+> 
+> ERROR: Input tree has errors, aborting (use -f to force output)
+> make[1]: *** [arch/arm/boot/dts/omap3-wireless_plus.dtb] Error 2
+> make[1]: *** Waiting for unfinished jobs....
+> make: *** [dtbs] Error 2
+> 
+> which was created by:
+> 
+>   ad871c10 ARM: dts: OMAP: Add usb_otg and glue data to OMAP3+ boards
+> 
+> It assumes the board has twl4030 (and then includes it).  Bootlogs from
+> the vendor provided kernel don't show a single message from twl4030, so
+> I've omitted it.
+> 
+> Assuming I did the correct thing by omitting the twl4030, I think the
+> correct answer is to declare the phy in the dts files, like so:
 
-It sounds like you did not understand what I wrote.
+Thanks, that is correct. We should not assume any PMIC with a processor
+as it can also be a custom chip. For example, Nokia n8x0 is using their
+retu + tahvo chips instead of tps chips.
 
-ohci_setup does not need to call ohci_usb_reset.  ohci_setup calls
-ohci_init, and ohci_init calls ohci_usb_reset.
+I'll apply your patch into omap-for-v3.10/fixes.
 
+Regards,
 
-> > The #else part of this isn't needed, and I doubt very much that it
-> > would work correctly if it was needed.
-> >
-> > As Arnd suggestion,so I written else part.
-
-The existing code doesn't have a #else part, and I don't think you need 
-to add one.
-
-Alan Stern
+Tony
+ 
