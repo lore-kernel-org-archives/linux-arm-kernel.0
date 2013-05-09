@@ -1,75 +1,82 @@
 From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Thu, 09 May 2013 15:00:16 +0100
-Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
-In-Reply-To: <20130509132600.GA3200@sirena.org.uk>
+Date: Thu, 09 May 2013 15:07:59 +0100
+Subject: [RFC 2/8] ARM:global_timer: Add ARM global timer support.
+In-Reply-To: <201305081638.23100.arnd@arndb.de>
 References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022272-2241-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081650.23264.arnd@arndb.de>
- <20130508150141.GA5057@opensource.wolfsonmicro.com> <518A8E6C.6070907@st.com>
- <20130509095143.GB7478@sirena.org.uk> <518B8F49.5020902@st.com>
- <20130509132600.GA3200@sirena.org.uk>
-Message-ID: <518BABF0.7040201@st.com>
+ <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305081638.23100.arnd@arndb.de>
+Message-ID: <518BADBF.4070303@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/13 14:26, Mark Brown wrote:
-> On Thu, May 09, 2013 at 12:58:01PM +0100, Srinivas KANDAGATLA wrote:
+On 08/05/13 15:38, Arnd Bergmann wrote:
+> On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
+>> From: Stuart Menefy <stuart.menefy@st.com>
+>>
+>> This is a simple driver for the global timer module found in the Cortex
+>> A9-MP cores from revision r1p0 onwards. This should be able to perform
+>> the functions of the system timer and the local timer in an SMP system.
+>>
+>> The global timer has the following features:
+>>     The global timer is a 64-bit incrementing counter with an
+>> auto-incrementing feature. It continues incrementing after sending
+>> interrupts. The global timer is memory mapped in the private memory
+>> region.
+>>     The global timer is accessible to all Cortex-A9 processors in the
+>> cluster. Each Cortex-A9 processor has a private 64-bit comparator that
+>> is used to assert a private interrupt when the global timer has reached
+>> the comparator value. All the Cortex-A9 processors in a design use the
+>> banked ID, ID27, for this interrupt. ID27 is sent to the Interrupt
+>> Controller as a Private Peripheral Interrupt. The global timer is
+>> clocked by PERIPHCLK.
+>>
+>> Signed-off-by: Stuart Menefy <stuart.menefy@st.com>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>>
 > 
->> Currently, we have two bits of information which come from device trees.
->> 1> The syscon bank/group definition itself.
->> 2> syscon register offsets and bits information to the drivers.
+> Are you sure we don't already have a driver for this? It sounds unlikely
+> that you are the first one to do this when the hardware is so common.
+
+Yes, in mainline we do not have support to this.
+
 > 
->> These are the 2 things which keep changing per each SOC.
+>>  Documentation/devicetree/bindings/arm/gt.txt |   21 ++
+>>  arch/arm/Kconfig                             |    6 +
+>>  arch/arm/include/asm/global_timer.h          |   12 +
+>>  arch/arm/kernel/Makefile                     |    1 +
+>>  arch/arm/kernel/global_timer.c               |  325 ++++++++++++++++++++++++++
+>>  5 files changed, 365 insertions(+), 0 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/gt.txt
+>>  create mode 100644 arch/arm/include/asm/global_timer.h
+>>  create mode 100644 arch/arm/kernel/global_timer.c
 > 
->> There is no other way to pass this information to the drivers other than
->> passing them as part of their own device node and syscon node.
+> Move it into drivers/clocksource?
+
+Sure, I will move this in the next version.
+
+>  
+>> diff --git a/arch/arm/include/asm/global_timer.h b/arch/arm/include/asm/global_timer.h
+>> new file mode 100644
+>> index 0000000..46f9188
+>> --- /dev/null
+>> +++ b/arch/arm/include/asm/global_timer.h
+>> @@ -0,0 +1,12 @@
+>> +int __init global_timer_init(void __iomem *base, unsigned int timer_irq);
 > 
-> Sure there is, for example the drivers could have this information
-> internally as part of knowing which device they're working with or they
-> could take advantage of some patterns in the register map to store some
-> higher level information that they use to configure.
+> I don't see a need to call this from platform code for non-DT platforms, it
+> can easily be used with CLOCKSOURCE_OF_DECLARE() all the time I think.
+
+sorry Am confused here.
+How would this work for non-DT?
+
+Looking at the code in clocksource_of_init it just goes through the
+of_device_id table, which is not used in case of non-DT.
 > 
-Some of layouts of the sysconf registers are totally changed for each SOC.
-
-Looking at driver by driver maybe some drivers can take advantage of the
-patterns, but Am not sure if this will be a sustainable solution for all
-the drivers.
-
-The big disadvantage of this approach is that
-- Every driver has to be touched for new SOC,
-- Secondly the drivers will end up having more of such information than
-code over a time.
-
->>>  and to the extent that it is sensible it feels like something
->>> which might be useful with any device using register maps, not just
->>> syscon.
+> 	Arnd
 > 
->> If you think this is going to be useful for other drivers, Am happy to
->> move this out of syscon to regmap something like adding
->> of_regmap_field_claim/regmap_field_claim/regmap_field_read/regmap_field_write/regmap_field_release
->> functions.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
->> so any exiting drivers can still use the old syscon API to get the
->> regmap instance.
->> Alternatively they can use the new regmap APIs directly.
-> 
-> Well, I'd need to see the code to decide if it was sane but I do think
-> that if this is a good approach it's not syscon specific.  Anything like
-> this needs to be independent of DT too since not all architectures use
-> DT.
-In the suggested approach, the API supports, both DT and non-DT style.
-
-for DT style user can use.
-of_regmap_field_claim -> regmap_field_read -> regmap_field_write-
-->regmap_field_release
-
-and for NON-DT user can use
-regmap_field_claim  -> regmap_field_read -> regmap_field_write-
-->regmap_field_release
-
-
-thanks,
-srini
-
-
 > 
