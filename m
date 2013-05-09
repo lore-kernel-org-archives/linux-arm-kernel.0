@@ -1,59 +1,73 @@
-From: fathi.boudra@linaro.org (Fathi Boudra)
-Date: Thu, 9 May 2013 20:51:57 +0300
-Subject: Fwd: Tegra 30 System hangs because of commit "pinctrl: move
- subsystem mutex to pinctrl_dev struct"
-In-Reply-To: <CAOesGMiqrXSPdEtUzGCuAuhdE4K7FVe65zMM962XuOrO555hnQ@mail.gmail.com>
-References: <CAK5ve-KXdS8az=Gtja-mF=Z3_EeZVA7bLYSU0EE2mf5bHmSUKw@mail.gmail.com>
- <CAK5ve-KBDyvjNRVMcXgfnhYcajdcGsuAKaepzCBt+epiXoYvSw@mail.gmail.com>
- <517ED12B.8080502@wwwdotorg.org>
- <20130504133004.GC24282@game.jcrosoft.org>
- <CACRpkdbBVJtWrRO+J=pWjfLXTcVKX++x-eeJQXGeQn_WOURUNQ@mail.gmail.com>
- <20130505112819.GD24282@game.jcrosoft.org>
- <CACRpkdZdT8==cUtH4=Y3LC-eVu6ntO2ojFC4bSXNuxa4hMJ=ZA@mail.gmail.com>
- <20130505202236.GF24282@game.jcrosoft.org>
- <CACRpkda2EG0O-pfZQ5kLFX=cwSmUSVBJkR7Xvye3ROs3tstv9w@mail.gmail.com>
- <20130506194122.GG24282@game.jcrosoft.org>
- <20130506195403.GJ18614@n2100.arm.linux.org.uk>
- <CACRpkdZtPhzLFicYYZF0SZfp4dMJars+Z-7hTUZQ1JjPExXW3A@mail.gmail.com>
- <CACxGe6uo60OwRd7buPX4382_vE48MLWJYyB_ka+iS2FfVCa8mw@mail.gmail.com>
- <CAOesGMiqrXSPdEtUzGCuAuhdE4K7FVe65zMM962XuOrO555hnQ@mail.gmail.com>
-Message-ID: <CAGNsrLDw0_yX9nkLYDg0e8-551P7r43UxziTp1TXyyxdiKR5nA@mail.gmail.com>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Thu, 9 May 2013 13:08:23 -0500
+Subject: [PATCHv2] ARM:dts:omap4-panda:Update the LED support for the
+ panda DTS
+In-Reply-To: <20130508234745.GV32546@atomide.com>
+References: <1366229760-4808-1-git-send-email-dmurphy@ti.com>
+ <516FBD18.3060501@ti.com> <51703BEF.6050804@ti.com>
+ <20130508234745.GV32546@atomide.com>
+Message-ID: <518BE617.1080509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 May 2013 19:13, Olof Johansson <olof@lixom.net> wrote:
-> On Thu, May 9, 2013 at 6:25 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->> On Mon, May 6, 2013 at 9:12 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>> On Mon, May 6, 2013 at 9:54 PM, Russell King - ARM Linux
-> Yes, a builder is quite useful. Several of us do our own builds as well.
+Tony
+On 05/08/2013 06:47 PM, Tony Lindgren wrote:
+> * Dan Murphy <dmurphy@ti.com> [130418 11:35]:
+>> On 04/18/2013 04:30 AM, Vincent Stehl? wrote:
+>>> On 04/17/2013 10:16 PM, Dan Murphy wrote:
+>>>> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+>>>> are different.
+>>> (..)
+>>>> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>>> index 03bd60d..0c48f6b 100644
+>>>> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>>> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>> (..)
+>>>> @@ -135,6 +136,25 @@
+>>>>  			0xf0 0x118     /* i2c4_sda PULLUP | INPUTENABLE | MODE0 */
+>>>>  		>;
+>>>>  	};
+>>>> +
+>>>> +	led_gpio_pins: pinmux_leds_pins {
+>>>> +		pinctrl-single,pins = <
+>>>> +		>;
+>>>> +	};
+>>>> +};
+>>> Hi,
+>>>
+>>> FYI, there was a recent discussion precisely on this topic, where Tomy
+>>> suggested to remove the empty section:
+>>> http://marc.info/?l=linux-omap&m=136546635409232&w=2
+>>>
+>>> Apart from that, I just tested your patch on top of Tomy's
+>>> omap-for-v3.10/dt branch and it is working fine for me on PandaBoards
+>>> EA3, A4 and ES.
+>>>
+>>> Tested-by: Vincent Stehl? <v-stehle@ti.com>
+>>>
+>>> Best regards,
+>>>
+>>> V.
+>>>
+>> Thanks for testing Vincent
+>>
+>> Is there a way to append the data to an already existing node?
+>> I do not see a clean way.
+> If you have something in omap4-panda-common.dtsi and the same entry
+> in the omap4-panda-es.dts, the entries in omap4-panda-es.dts will
+> override and append the entries in omap4-panda-common.dtsi.
 >
-> When it comes to boot coverage, I'm not sure how successful a central
-> approach would be. It's something where I think Linaro could
-> contribute a lot for their member platforms, but I haven't seen much
-> engagement there yet.
-
-My previous post was lost. Sorry to repost..
-
-We've got a jenkins instance doing daily builds on various trees and
-boot testing on the few boards we've got in the lab:
-https://ci.linaro.org/jenkins/view/kernel-ci/
-
-But it hasn't attracted much interest so far... It's been here since a year.
-
-> Beyond there, I'd say the expectation is that each maintainer should
-> keep an eye on their own platforms. They _should_ try building and
-> booting linux-next on their platforms, to catch regressions early. And
-> definitely around now, I'd like to see people boot mainline on their
-> platforms to make sure we haven't added any severe regressions in the
-> 3.10 merge window, etc. Some people are really good at this, others
-> less so.
+> So I think you can avoid the empty entry that way.
 >
-> What's the old saying, you can lead a horse to water but you can't
-> make him drink? You can build a boot test cluster but you can't make
-> anyone pay attention to it. :(
+> Regards,
 >
-> -Olof
+> Tony
+Thanks but the issue is the led entry would not appear in the common file so there is nothing to override.
+Can we cleanly append to omap4_pmx_core without overriding the whole node?
+I don't want to recreate the pmx_core node in the es file.
 
-Cheers,
+Dan
 
-Fathi
+-- 
+------------------
+Dan Murphy
