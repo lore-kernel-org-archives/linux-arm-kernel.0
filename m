@@ -1,96 +1,410 @@
 From: holt@sgi.com (Robin Holt)
-Date: Thu,  9 May 2013 14:23:22 -0500
-Subject: [PATCH -v9 08/11] arm,
- Remove unused restart_mode fields from some arm subarchs
+Date: Thu,  9 May 2013 14:23:25 -0500
+Subject: [PATCH -v9 11/11] Move arch/x86 reboot= handling to generic kernel.
 In-Reply-To: <1368127405-112717-1-git-send-email-holt@sgi.com>
 References: <1368127405-112717-1-git-send-email-holt@sgi.com>
-Message-ID: <1368127405-112717-9-git-send-email-holt@sgi.com>
+Message-ID: <1368127405-112717-12-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These restart_mode fields are not used at all.  Remove them to make
-moving the reboot= cmdline options to the general kernel easier.
+Merge together the unicore32, arm, and x86 reboot= command line
+parameter handling.
 
 Signed-off-by: Robin Holt <holt@sgi.com>
 To: Andrew Morton <akpm@linux-foundation.org>
+Cc: H. Peter Anvin <hpa@zytor.com>
 Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
 Cc: Russ Anderson <rja@sgi.com>
 Cc: Robin Holt <holt@sgi.com>
-Cc: H. Peter Anvin <hpa@zytor.com>
-Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Cc: the arch/x86 maintainers <x86@kernel.org>
 Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
----
- arch/arm/mach-ebsa110/core.c | 1 -
- arch/arm/mach-pxa/mioa701.c  | 1 -
- arch/arm/mach-pxa/spitz.c    | 3 ---
- arch/arm/mach-pxa/tosa.c     | 1 -
- 4 files changed, 6 deletions(-)
 
-diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
-index b13cc74..69a9d5d 100644
---- a/arch/arm/mach-ebsa110/core.c
-+++ b/arch/arm/mach-ebsa110/core.c
-@@ -321,7 +321,6 @@ MACHINE_START(EBSA110, "EBSA110")
- 	.atag_offset	= 0x400,
- 	.reserve_lp0	= 1,
- 	.reserve_lp2	= 1,
--	.restart_mode	= 's',
- 	.map_io		= ebsa110_map_io,
- 	.init_early	= ebsa110_init_early,
- 	.init_irq	= ebsa110_init_irq,
-diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
-index f8979b9..dbea67a 100644
---- a/arch/arm/mach-pxa/mioa701.c
-+++ b/arch/arm/mach-pxa/mioa701.c
-@@ -756,7 +756,6 @@ static void mioa701_machine_exit(void)
+---
+Changes since -v8
+ - Add missing break statements.
+
+ - Change parsing so #ifdef's are no longer needed.
+
+ - Switch to using simple_strtoul to make parsing cleaner.
+
+ - Add handling of REBOOT_HARD/SOFT
+---
+ Documentation/kernel-parameters.txt      | 14 ++++-
+ arch/arm/kernel/process.c                | 10 ----
+ arch/unicore32/kernel/process.c          | 10 ----
+ arch/x86/include/asm/emergency-restart.h | 12 ----
+ arch/x86/kernel/apic/x2apic_uv_x.c       |  2 +-
+ arch/x86/kernel/reboot.c                 | 96 +-------------------------------
+ include/linux/reboot.h                   | 17 ++++++
+ kernel/reboot.c                          | 76 ++++++++++++++++++++++++-
+ 8 files changed, 107 insertions(+), 130 deletions(-)
+
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index c3bfacb..b2945ce 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -2677,9 +2677,17 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			Run specified binary instead of /init from the ramdisk,
+ 			used for early userspace startup. See initrd.
  
- MACHINE_START(MIOA701, "MIO A701")
- 	.atag_offset	= 0x100,
--	.restart_mode	= 's',
- 	.map_io		= &pxa27x_map_io,
- 	.nr_irqs	= PXA_NR_IRQS,
- 	.init_irq	= &pxa27x_init_irq,
-diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-index 362726c..c3c0042 100644
---- a/arch/arm/mach-pxa/spitz.c
-+++ b/arch/arm/mach-pxa/spitz.c
-@@ -979,7 +979,6 @@ static void __init spitz_fixup(struct tag *tags, char **cmdline,
+-	reboot=		[BUGS=X86-32,BUGS=ARM,BUGS=IA-64] Rebooting mode
+-			Format: <reboot_mode>[,<reboot_mode2>[,...]]
+-			See arch/*/kernel/reboot.c or arch/*/kernel/process.c
++	reboot=		[KNL]
++			Format (x86 or x86_64):
++				[w[arm] | c[old] | h[ard] | s[oft] | g[pio]] \
++				[[,]s[mp]#### \
++				[[,]b[ios] | a[cpi] | k[bd] | t[riple] | e[fi] | p[ci]] \
++				[[,]f[orce]
++			Where reboot_mode is one of warm (soft) or cold (hard) or gpio,
++			      reboot_type is one of bios, acpi, kbd, triple, efi, or pci,
++			      reboot_force is either force or not specified,
++			      reboot_cpu is s[mp]#### with #### being the processor
++					to be used for rebooting.
  
- #ifdef CONFIG_MACH_SPITZ
- MACHINE_START(SPITZ, "SHARP Spitz")
--	.restart_mode	= 'g',
- 	.fixup		= spitz_fixup,
- 	.map_io		= pxa27x_map_io,
- 	.nr_irqs	= PXA_NR_IRQS,
-@@ -993,7 +992,6 @@ MACHINE_END
- 
- #ifdef CONFIG_MACH_BORZOI
- MACHINE_START(BORZOI, "SHARP Borzoi")
--	.restart_mode	= 'g',
- 	.fixup		= spitz_fixup,
- 	.map_io		= pxa27x_map_io,
- 	.nr_irqs	= PXA_NR_IRQS,
-@@ -1007,7 +1005,6 @@ MACHINE_END
- 
- #ifdef CONFIG_MACH_AKITA
- MACHINE_START(AKITA, "SHARP Akita")
--	.restart_mode	= 'g',
- 	.fixup		= spitz_fixup,
- 	.map_io		= pxa27x_map_io,
- 	.nr_irqs	= PXA_NR_IRQS,
-diff --git a/arch/arm/mach-pxa/tosa.c b/arch/arm/mach-pxa/tosa.c
-index 3d91d2e..a41992f 100644
---- a/arch/arm/mach-pxa/tosa.c
-+++ b/arch/arm/mach-pxa/tosa.c
-@@ -969,7 +969,6 @@ static void __init fixup_tosa(struct tag *tags, char **cmdline,
+ 	relax_domain_level=
+ 			[KNL, SMP] Set scheduler's default relax_domain_level.
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 42856fc..304b102 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -175,16 +175,6 @@ void arch_cpu_idle(void)
+ 		default_idle();
  }
  
- MACHINE_START(TOSA, "SHARP Tosa")
--	.restart_mode	= 'g',
- 	.fixup          = fixup_tosa,
- 	.map_io         = pxa25x_map_io,
- 	.nr_irqs	= TOSA_NR_IRQS,
+-enum reboot_mode reboot_mode = REBOOT_HARD;
+-
+-static int __init reboot_setup(char *str)
+-{
+-	if ('s' == str[0])
+-		reboot_mode = REBOOT_SOFT;
+-	return 1;
+-}
+-__setup("reboot=", reboot_setup);
+-
+ void machine_shutdown(void)
+ {
+ #ifdef CONFIG_SMP
+diff --git a/arch/unicore32/kernel/process.c b/arch/unicore32/kernel/process.c
+index 93dd035..778ebba 100644
+--- a/arch/unicore32/kernel/process.c
++++ b/arch/unicore32/kernel/process.c
+@@ -51,16 +51,6 @@ void arch_cpu_idle(void)
+ 	local_irq_enable();
+ }
+ 
+-static enum reboot_mode reboot_mode = REBOOT_HARD;
+-
+-int __init reboot_setup(char *str)
+-{
+-	if ('s' == str[0])
+-		reboot_mode = REBOOT_SOFT;
+-	return 1;
+-}
+-__setup("reboot=", reboot_setup);
+-
+ void machine_halt(void)
+ {
+ 	gpio_set_value(GPO_SOFT_OFF, 0);
+diff --git a/arch/x86/include/asm/emergency-restart.h b/arch/x86/include/asm/emergency-restart.h
+index 75ce3f4..77a99ac 100644
+--- a/arch/x86/include/asm/emergency-restart.h
++++ b/arch/x86/include/asm/emergency-restart.h
+@@ -1,18 +1,6 @@
+ #ifndef _ASM_X86_EMERGENCY_RESTART_H
+ #define _ASM_X86_EMERGENCY_RESTART_H
+ 
+-enum reboot_type {
+-	BOOT_TRIPLE = 't',
+-	BOOT_KBD = 'k',
+-	BOOT_BIOS = 'b',
+-	BOOT_ACPI = 'a',
+-	BOOT_EFI = 'e',
+-	BOOT_CF9 = 'p',
+-	BOOT_CF9_COND = 'q',
+-};
+-
+-extern enum reboot_type reboot_type;
+-
+ extern void machine_emergency_restart(void);
+ 
+ #endif /* _ASM_X86_EMERGENCY_RESTART_H */
+diff --git a/arch/x86/kernel/apic/x2apic_uv_x.c b/arch/x86/kernel/apic/x2apic_uv_x.c
+index 794f6eb..958e3e4 100644
+--- a/arch/x86/kernel/apic/x2apic_uv_x.c
++++ b/arch/x86/kernel/apic/x2apic_uv_x.c
+@@ -25,6 +25,7 @@
+ #include <linux/kdebug.h>
+ #include <linux/delay.h>
+ #include <linux/crash_dump.h>
++#include <linux/reboot.h>
+ 
+ #include <asm/uv/uv_mmrs.h>
+ #include <asm/uv/uv_hub.h>
+@@ -36,7 +37,6 @@
+ #include <asm/ipi.h>
+ #include <asm/smp.h>
+ #include <asm/x86_init.h>
+-#include <asm/emergency-restart.h>
+ #include <asm/nmi.h>
+ 
+ /* BMC sets a bit this MMR non-zero before sending an NMI */
+diff --git a/arch/x86/kernel/reboot.c b/arch/x86/kernel/reboot.c
+index f770340..d568dfb 100644
+--- a/arch/x86/kernel/reboot.c
++++ b/arch/x86/kernel/reboot.c
+@@ -36,7 +36,6 @@ void (*pm_power_off)(void);
+ EXPORT_SYMBOL(pm_power_off);
+ 
+ static const struct desc_ptr no_idt = {};
+-static enum reboot_mode reboot_mode;
+ enum reboot_type reboot_type = BOOT_ACPI;
+ int reboot_force;
+ 
+@@ -64,79 +63,6 @@ static int reboot_emergency;
+ bool port_cf9_safe = false;
+ 
+ /*
+- * reboot=b[ios] | s[mp] | t[riple] | k[bd] | e[fi] [, [w]arm | [c]old] | p[ci]
+- * warm   Don't set the cold reboot flag
+- * cold   Set the cold reboot flag
+- * bios   Reboot by jumping through the BIOS
+- * smp    Reboot by executing reset on BSP or other CPU
+- * triple Force a triple fault (init)
+- * kbd    Use the keyboard controller. cold reset (default)
+- * acpi   Use the RESET_REG in the FADT
+- * efi    Use efi reset_system runtime service
+- * pci    Use the so-called "PCI reset register", CF9
+- * force  Avoid anything that could hang.
+- */
+-static int __init reboot_setup(char *str)
+-{
+-	for (;;) {
+-		/*
+-		 * Having anything passed on the command line via
+-		 * reboot= will cause us to disable DMI checking
+-		 * below.
+-		 */
+-		reboot_default = 0;
+-
+-		switch (*str) {
+-		case 'w':
+-			reboot_mode = REBOOT_WARM;
+-			break;
+-
+-		case 'c':
+-			reboot_mode = REBOOT_COLD;
+-			break;
+-
+-#ifdef CONFIG_SMP
+-		case 's':
+-			if (isdigit(*(str+1))) {
+-				reboot_cpu = (int) (*(str+1) - '0');
+-				if (isdigit(*(str+2)))
+-					reboot_cpu = reboot_cpu*10 + (int)(*(str+2) - '0');
+-			}
+-			/*
+-			 * We will leave sorting out the final value
+-			 * when we are ready to reboot, since we might not
+-			 * have detected BSP APIC ID or smp_num_cpu
+-			 */
+-			break;
+-#endif /* CONFIG_SMP */
+-
+-		case 'b':
+-		case 'a':
+-		case 'k':
+-		case 't':
+-		case 'e':
+-		case 'p':
+-			reboot_type = *str;
+-			break;
+-
+-		case 'f':
+-			reboot_force = 1;
+-			break;
+-		}
+-
+-		str = strchr(str, ',');
+-		if (str)
+-			str++;
+-		else
+-			break;
+-	}
+-	return 1;
+-}
+-
+-__setup("reboot=", reboot_setup);
+-
+-
+-/*
+  * Reboot options and system auto-detection code provided by
+  * Dell Inc. so their systems "just work". :-)
+  */
+@@ -616,26 +542,10 @@ void native_machine_shutdown(void)
+ {
+ 	/* Stop the cpus and apics */
+ #ifdef CONFIG_SMP
+-
+-	/* The boot cpu is always logical cpu 0 */
+-	int reboot_cpu_id = 0;
+-
+-	/* See if there has been given a command line override */
+-	if ((reboot_cpu != -1) && (reboot_cpu < nr_cpu_ids) &&
+-		cpu_online(reboot_cpu))
+-		reboot_cpu_id = reboot_cpu;
+-
+-	/* Make certain the cpu I'm about to reboot on is online */
+-	if (!cpu_online(reboot_cpu_id))
+-		reboot_cpu_id = smp_processor_id();
+-
+-	/* Make certain I only run on the appropriate processor */
+-	set_cpus_allowed_ptr(current, cpumask_of(reboot_cpu_id));
+-
+ 	/*
+-	 * O.K Now that I'm on the appropriate processor, stop all of the
+-	 * others. Also disable the local irq to not receive the per-cpu
+-	 * timer interrupt which may trigger scheduler's load balance.
++	 * Stop all of the others. Also disable the local irq to
++	 * not receive the per-cpu timer interrupt which may trigger
++	 * scheduler's load balance.
+ 	 */
+ 	local_irq_disable();
+ 	stop_other_cpus();
+diff --git a/include/linux/reboot.h b/include/linux/reboot.h
+index 5a5d7f7..8e00f9f 100644
+--- a/include/linux/reboot.h
++++ b/include/linux/reboot.h
+@@ -17,6 +17,23 @@ enum reboot_mode {
+ 	REBOOT_SOFT,
+ 	REBOOT_GPIO,
+ };
++extern enum reboot_mode reboot_mode;
++
++enum reboot_type {
++	BOOT_TRIPLE = 't',
++	BOOT_KBD = 'k',
++	BOOT_BIOS = 'b',
++	BOOT_ACPI = 'a',
++	BOOT_EFI = 'e',
++	BOOT_CF9 = 'p',
++	BOOT_CF9_COND = 'q',
++};
++extern enum reboot_type reboot_type;
++
++extern int reboot_default;
++extern int reboot_cpu;
++extern int reboot_force;
++
+ 
+ extern int register_reboot_notifier(struct notifier_block *);
+ extern int unregister_reboot_notifier(struct notifier_block *);
+diff --git a/kernel/reboot.c b/kernel/reboot.c
+index abb6a04..269ed93 100644
+--- a/kernel/reboot.c
++++ b/kernel/reboot.c
+@@ -6,6 +6,7 @@
+ 
+ #define pr_fmt(fmt)	"reboot: " fmt
+ 
++#include <linux/ctype.h>
+ #include <linux/export.h>
+ #include <linux/kexec.h>
+ #include <linux/kmod.h>
+@@ -24,6 +25,18 @@ int C_A_D = 1;
+ struct pid *cad_pid;
+ EXPORT_SYMBOL(cad_pid);
+ 
++#if defined(CONFIG_ARM) || defined(CONFIG_UNICORE32)
++#define DEFAULT_REBOOT_MODE		= REBOOT_HARD
++#else
++#define DEFAULT_REBOOT_MODE
++#endif
++enum reboot_mode reboot_mode DEFAULT_REBOOT_MODE;
++
++int reboot_default;
++int reboot_cpu;
++enum reboot_type reboot_type = BOOT_ACPI;
++int reboot_force;
++
+ /*
+  * If set, this is used for preparing the system to power off.
+  */
+@@ -87,7 +100,7 @@ EXPORT_SYMBOL(unregister_reboot_notifier);
+ static void migrate_to_reboot_cpu(void)
+ {
+ 	/* The boot cpu is always logical cpu 0 */
+-	int cpu = 0;
++	int cpu = reboot_cpu;
+ 
+ 	cpu_hotplug_disable();
+ 
+@@ -343,3 +356,64 @@ int orderly_poweroff(bool force)
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(orderly_poweroff);
++
++static int __init reboot_setup(char *str)
++{
++	for (;;) {
++		/*
++		 * Having anything passed on the command line via
++		 * reboot= will cause us to disable DMI checking
++		 * below.
++		 */
++		reboot_default = 0;
++
++		switch (*str) {
++		case 'w':
++			reboot_mode = REBOOT_WARM;
++			break;
++
++		case 'c':
++			reboot_mode = REBOOT_COLD;
++			break;
++
++		case 'h':
++			reboot_mode = REBOOT_HARD;
++			break;
++
++		case 's':
++			if (isdigit(*(str+1)))
++				reboot_cpu = simple_strtoul(str+1, NULL, 0);
++			else if (str[1] == 'm' && str[2] == 'p' &&
++							isdigit(*(str+3)))
++				reboot_cpu = simple_strtoul(str+3, NULL, 0);
++			else
++				reboot_mode = REBOOT_SOFT;
++			break;
++
++		case 'g':
++			reboot_mode = REBOOT_GPIO;
++			break;
++
++		case 'b':
++		case 'a':
++		case 'k':
++		case 't':
++		case 'e':
++		case 'p':
++			reboot_type = *str;
++			break;
++
++		case 'f':
++			reboot_force = 1;
++			break;
++		}
++
++		str = strchr(str, ',');
++		if (str)
++			str++;
++		else
++			break;
++	}
++	return 1;
++}
++__setup("reboot=", reboot_setup);
 -- 
 1.8.2.1
