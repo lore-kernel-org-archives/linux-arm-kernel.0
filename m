@@ -1,59 +1,134 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 9 May 2013 19:09:47 +0100
-Subject: [PATCH 1/3] driver core: Add API to wait for deferred probe to
- complete during init
-In-Reply-To: <518BD453.2010602@codeaurora.org>
-References: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
- <1368076726-11492-2-git-send-email-skannan@codeaurora.org>
- <CACVXFVMd_iRtEM8ZLK6Ps66gZO6SCp1mXSgY6JbWtRJjJUh+ag@mail.gmail.com>
- <CACxGe6uHBNUcbD9SeRP5c3E8NN-Z2yjVV+9VAhuoJnXoBtTu2w@mail.gmail.com>
- <518BD453.2010602@codeaurora.org>
-Message-ID: <CACxGe6vPHsyacOkyJb9UGCdqPsYbW90sGG8HcZOZ0mJrV7QWkA@mail.gmail.com>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Thu, 9 May 2013 11:11:01 -0700
+Subject: [RFC PATCH 1/2] ARM: KVM: move GIC/timer code to a common location
+In-Reply-To: <1367589773-5609-2-git-send-email-marc.zyngier@arm.com>
+References: <1367589773-5609-1-git-send-email-marc.zyngier@arm.com>
+ <1367589773-5609-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130509181101.GA17253@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 9, 2013 at 5:52 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
-> On 05/09/2013 04:50 AM, Grant Likely wrote:
->>
->> On Thu, May 9, 2013 at 11:07 AM, Ming Lei <tom.leiming@gmail.com> wrote:
->>>
->>> On Thu, May 9, 2013 at 1:18 PM, Saravana Kannan <skannan@codeaurora.org>
->>> wrote:
->>>>
->>>>
->>>> The most obvious fallback of using late_initcall_sync() also doesn't
->>>> work
->>>> since the deferred probing work initated during late_initcall() is done
->>>> in
->>>> a workqueue. So, frameworks that want to wait for all devices to finish
->>>> probing during init will now have to wait for the deferred workqueue to
->>>> finish it's work. This patch adds a wait_for_init_deferred_probe_done()
->>>> API
->>>
->>>
->>> flush_workqueue() has been added in deferred_probe_initcall(), so looks
->>> it
->>> should be OK for your problem, doesn't it?
->>
->>
->> It looks like Saravana is using a kernel that already does that based
->> on object bb5645e from the diff. So if he is still having problem,
->> then there is probably another deferred probe that is triggered after
->> the deferred probe lateinitcall is executed. It would be good to know
->> what driver is getting deferred past clearing the queue. Or has this
->> been rebased from an earlier kernel? It may no longer be necessary.
->
->
-> Sorry, it was mindless rebase late at night. I missed the addition of the
-> flush_workqueue(). That takes care of my immediate needs. Sorry for wasting
-> your time.
->
-> But the other patches to move clock and regulator calls to late_init_sync
-> should still be necessary. Right? Or are we going to depend on the Makefile
-> ordering to determine the order of the lateinit calls? (I would rather not).
+On Fri, May 03, 2013 at 03:02:52PM +0100, Marc Zyngier wrote:
+> As KVM/arm64 is looming on the horizon, it makes sense to move some
+> of the common code to a single location in order to reduce duplication.
+> 
+> The code could live anywhere. Actually, most of KVM is already built
+> with a bunch of ugly ../../.. hacks in the various Makefiles, so we're
+> not exactly talking about style here. But maybe it is time to start
+> moving into a less ugly direction.
+> 
+> The include files must be in a "public" location, as they are accessed
+> from non-KVM files (arch/arm/kernel/asm-offsets.c).
+> 
+> For this purpose, introduce two new locations:
+> - virt/kvm/arm/ : x86 and ia64 already share the ioapic code in
+>   virt/kvm, so this could be seen as a (very ugly) precedent.
+> - include/kvm/  : there is already an include/xen, and while the
+>   intent is slightly different, this seems as good a location as
+>   any
 
-You'll need to make sure the regulator and clocks defer to after all
-the late initcalls are complete. That will ensure that the deferred
-queue has been processed.
+This overall looks ok, just a few points:
 
-g.
+1. Should we have a namespace per arch in the include directory, as in
+   include/kvm/arm?
+
+2. We could drop the kvm_ prefix from the include files now
+
+> 
+> Eventually, we should probably have independant Makefiles at every
+> levels (just like everywhere else in the kernel), but this is just
+> the first step.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_host.h                        | 4 ++--
+>  arch/arm/kvm/Makefile                                  | 7 ++++---
+>  {arch/arm/include/asm => include/kvm}/kvm_arch_timer.h | 0
+>  {arch/arm/include/asm => include/kvm}/kvm_vgic.h       | 0
+>  {arch/arm/kvm => virt/kvm/arm}/arch_timer.c            | 4 ++--
+>  {arch/arm/kvm => virt/kvm/arm}/vgic.c                  | 0
+>  6 files changed, 8 insertions(+), 7 deletions(-)
+>  rename {arch/arm/include/asm => include/kvm}/kvm_arch_timer.h (100%)
+>  rename {arch/arm/include/asm => include/kvm}/kvm_vgic.h (100%)
+>  rename {arch/arm/kvm => virt/kvm/arm}/arch_timer.c (99%)
+>  rename {arch/arm/kvm => virt/kvm/arm}/vgic.c (100%)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index ff49193..4ad51e6 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -23,7 +23,7 @@
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_mmio.h>
+>  #include <asm/fpstate.h>
+> -#include <asm/kvm_arch_timer.h>
+> +#include <kvm/kvm_arch_timer.h>
+>  
+>  #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+>  #define KVM_USER_MEM_SLOTS 32
+> @@ -38,7 +38,7 @@
+>  #define KVM_NR_PAGE_SIZES	1
+>  #define KVM_PAGES_PER_HPAGE(x)	(1UL<<31)
+>  
+> -#include <asm/kvm_vgic.h>
+> +#include <kvm/kvm_vgic.h>
+>  
+>  struct kvm_vcpu;
+>  u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
+> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+> index 53c5ed8..110d6da 100644
+> --- a/arch/arm/kvm/Makefile
+> +++ b/arch/arm/kvm/Makefile
+> @@ -14,10 +14,11 @@ CFLAGS_mmu.o := -I.
+>  AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
+>  AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
+>  
+> -kvm-arm-y = $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o)
+> +KVM := ../../../virt/kvm
+> +kvm-arm-y = $(addprefix $(KVM)/, kvm_main.o coalesced_mmio.o)
+>  
+>  obj-y += kvm-arm.o init.o interrupts.o
+>  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+>  obj-y += coproc.o coproc_a15.o mmio.o psci.o perf.o
+> -obj-$(CONFIG_KVM_ARM_VGIC) += vgic.o
+> -obj-$(CONFIG_KVM_ARM_TIMER) += arch_timer.o
+> +obj-$(CONFIG_KVM_ARM_VGIC) += $(addprefix $(KVM)/arm/, vgic.o)
+> +obj-$(CONFIG_KVM_ARM_TIMER) += $(addprefix $(KVM)/arm/, arch_timer.o)
+> diff --git a/arch/arm/include/asm/kvm_arch_timer.h b/include/kvm/kvm_arch_timer.h
+> similarity index 100%
+> rename from arch/arm/include/asm/kvm_arch_timer.h
+> rename to include/kvm/kvm_arch_timer.h
+> diff --git a/arch/arm/include/asm/kvm_vgic.h b/include/kvm/kvm_vgic.h
+> similarity index 100%
+> rename from arch/arm/include/asm/kvm_vgic.h
+> rename to include/kvm/kvm_vgic.h
+> diff --git a/arch/arm/kvm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> similarity index 99%
+> rename from arch/arm/kvm/arch_timer.c
+> rename to virt/kvm/arm/arch_timer.c
+> index 49a7516..0728904 100644
+> --- a/arch/arm/kvm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -25,8 +25,8 @@
+>  #include <clocksource/arm_arch_timer.h>
+>  #include <asm/arch_timer.h>
+>  
+> -#include <asm/kvm_vgic.h>
+> -#include <asm/kvm_arch_timer.h>
+> +#include <kvm/kvm_vgic.h>
+> +#include <kvm/kvm_arch_timer.h>
+>  
+>  static struct timecounter *timecounter;
+>  static struct workqueue_struct *wqueue;
+> diff --git a/arch/arm/kvm/vgic.c b/virt/kvm/arm/vgic.c
+> similarity index 100%
+> rename from arch/arm/kvm/vgic.c
+> rename to virt/kvm/arm/vgic.c
+> -- 
+> 1.8.2.1
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
