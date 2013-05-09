@@ -1,82 +1,58 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Thu, 09 May 2013 15:07:59 +0100
-Subject: [RFC 2/8] ARM:global_timer: Add ARM global timer support.
-In-Reply-To: <201305081638.23100.arnd@arndb.de>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081638.23100.arnd@arndb.de>
-Message-ID: <518BADBF.4070303@st.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 May 2013 15:14:45 +0100
+Subject: [PATCH 1/3] driver core: Add API to wait for deferred probe to
+ complete during init
+In-Reply-To: <20130509135017.GD3200@sirena.org.uk>
+References: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
+ <1368076726-11492-2-git-send-email-skannan@codeaurora.org>
+ <CACVXFVMd_iRtEM8ZLK6Ps66gZO6SCp1mXSgY6JbWtRJjJUh+ag@mail.gmail.com>
+ <CACxGe6uHBNUcbD9SeRP5c3E8NN-Z2yjVV+9VAhuoJnXoBtTu2w@mail.gmail.com>
+ <20130509135017.GD3200@sirena.org.uk>
+Message-ID: <20130509141444.GV18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/05/13 15:38, Arnd Bergmann wrote:
-> On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
->> From: Stuart Menefy <stuart.menefy@st.com>
->>
->> This is a simple driver for the global timer module found in the Cortex
->> A9-MP cores from revision r1p0 onwards. This should be able to perform
->> the functions of the system timer and the local timer in an SMP system.
->>
->> The global timer has the following features:
->>     The global timer is a 64-bit incrementing counter with an
->> auto-incrementing feature. It continues incrementing after sending
->> interrupts. The global timer is memory mapped in the private memory
->> region.
->>     The global timer is accessible to all Cortex-A9 processors in the
->> cluster. Each Cortex-A9 processor has a private 64-bit comparator that
->> is used to assert a private interrupt when the global timer has reached
->> the comparator value. All the Cortex-A9 processors in a design use the
->> banked ID, ID27, for this interrupt. ID27 is sent to the Interrupt
->> Controller as a Private Peripheral Interrupt. The global timer is
->> clocked by PERIPHCLK.
->>
->> Signed-off-by: Stuart Menefy <stuart.menefy@st.com>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->>
+On Thu, May 09, 2013 at 02:50:17PM +0100, Mark Brown wrote:
+> On Thu, May 09, 2013 at 12:50:46PM +0100, Grant Likely wrote:
 > 
-> Are you sure we don't already have a driver for this? It sounds unlikely
-> that you are the first one to do this when the hardware is so common.
+> > However, if a device that shuts down resources after init has
+> > completed and then cannot turn those resources back on when another
+> > driver requests them then it sounds like there is a bigger design
+> > problem. We're in a hotplug world and most of the time a driver cannot
+> > assume that a resource will never get requested after initcalls have
+> > completed. It sounds like a design bug in the driver if it cannot
+> > handle that use case.
+> 
+> Even if the driver copes fine it can still be desirable to avoid the
+> power down/up cycle if it involves some user visible effect - things
+> like blinking the display off then on for example.  That said I am a
+> little suspicious about this approach, it doesn't feel as robust as it
+> should to go round individual callers.
 
-Yes, in mainline we do not have support to this.
+What if the driver for something like your display is a module which
+needs to be loaded from userland?
 
-> 
->>  Documentation/devicetree/bindings/arm/gt.txt |   21 ++
->>  arch/arm/Kconfig                             |    6 +
->>  arch/arm/include/asm/global_timer.h          |   12 +
->>  arch/arm/kernel/Makefile                     |    1 +
->>  arch/arm/kernel/global_timer.c               |  325 ++++++++++++++++++++++++++
->>  5 files changed, 365 insertions(+), 0 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/arm/gt.txt
->>  create mode 100644 arch/arm/include/asm/global_timer.h
->>  create mode 100644 arch/arm/kernel/global_timer.c
-> 
-> Move it into drivers/clocksource?
+Where the design bug lies is in the "lets probe all the drivers and then
+shut down resources which drivers haven't claimed".  That contains an
+implied assumption: that all drivers have been loaded and probed at the
+point where you shut down those resources.
 
-Sure, I will move this in the next version.
+That simply may not be true in todays kernel - it's not true for a start
+if you have modular drivers, and you have built most of the drivers as
+modules (as a distro would want to with single zImage).  It's
+coincidentally not true if you have deferred probing and some drivers
+defer.
 
->  
->> diff --git a/arch/arm/include/asm/global_timer.h b/arch/arm/include/asm/global_timer.h
->> new file mode 100644
->> index 0000000..46f9188
->> --- /dev/null
->> +++ b/arch/arm/include/asm/global_timer.h
->> @@ -0,0 +1,12 @@
->> +int __init global_timer_init(void __iomem *base, unsigned int timer_irq);
-> 
-> I don't see a need to call this from platform code for non-DT platforms, it
-> can easily be used with CLOCKSOURCE_OF_DECLARE() all the time I think.
+The real problem is this: at what point has the system actually finished
+"booting" in the sense that all drivers for a platform have been
+initialised?  With user loadable modules and deferred probing, that's
+actually a very fuzzy concept.
 
-sorry Am confused here.
-How would this work for non-DT?
+As you can't really tell when that point has been reached, how can you
+decide to shut down resources which "aren't being used" in a sane way
+without avoiding the down/up cycle?  Basically, you can't.
 
-Looking at the code in clocksource_of_init it just goes through the
-of_device_id table, which is not used in case of non-DT.
-> 
-> 	Arnd
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+So, trying to solve the problem may be totally fruitless because you
+can't actually solve it - you can only put a sticky plaster over it and
+hope that it catches most of the problem.  But reality is that you can't
+have both a shutdown of unused resources _and_ avoid the down/up cycle.
