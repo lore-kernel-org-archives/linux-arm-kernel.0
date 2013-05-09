@@ -1,34 +1,68 @@
-From: yefremov.denis@gmail.com (Denis Efremov)
-Date: Thu,  9 May 2013 14:36:59 +0400
-Subject: [PATCH 21/21] ARM: remove inline marking of EXPORT_SYMBOL functions
-In-Reply-To: <1368086241-9357-1-git-send-email-yefremov.denis@gmail.com>
-References: <1368086241-9357-1-git-send-email-yefremov.denis@gmail.com>
-Message-ID: <1368095819-11011-10-git-send-email-yefremov.denis@gmail.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Thu,  9 May 2013 13:08:08 +0200
+Subject: [PATCH] mfd: ab8500-sysctrl: Always enable pm_power_off handler
+Message-ID: <1368097688-17858-1-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EXPORT_SYMBOL and inline directives are contradictory to each other.
-The patch fixes this inconsistency.
+AB8500 sysctrl driver implements a pm_power_off handler, but that is
+currently not registered until a specific platform data field is
+enabled.
 
-Found by Linux Driver Verification project (linuxtesting.org).
+This patch drops the platform data field and always registers
+ab8500_power_off if no other pm_power_off handler was defined before,
+and also introduces the necessary cleanup code in the driver's remove
+function.
 
-Signed-off-by: Denis Efremov <yefremov.denis@gmail.com>
+Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 ---
- arch/arm/mach-sa1100/jornada720_ssp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mfd/ab8500-sysctrl.c      | 6 +++++-
+ include/linux/mfd/abx500/ab8500.h | 2 --
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/jornada720_ssp.c b/arch/arm/mach-sa1100/jornada720_ssp.c
-index b143c46..737842c 100644
---- a/arch/arm/mach-sa1100/jornada720_ssp.c
-+++ b/arch/arm/mach-sa1100/jornada720_ssp.c
-@@ -33,7 +33,7 @@ static unsigned long jornada_ssp_flags;
-  * we need to reverse all data we receive from the mcu due to its physical location
-  * returns : 01110111 -> 11101110
-  */
--u8 inline jornada_ssp_reverse(u8 byte)
-+u8 jornada_ssp_reverse(u8 byte)
+diff --git a/drivers/mfd/ab8500-sysctrl.c b/drivers/mfd/ab8500-sysctrl.c
+index eadae4d..8e0dae5 100644
+--- a/drivers/mfd/ab8500-sysctrl.c
++++ b/drivers/mfd/ab8500-sysctrl.c
+@@ -193,7 +193,7 @@ static int ab8500_sysctrl_probe(struct platform_device *pdev)
+ 
+ 	sysctrl_dev = &pdev->dev;
+ 
+-	if (plat->pm_power_off)
++	if (!pm_power_off)
+ 		pm_power_off = ab8500_power_off;
+ 
+ 	pdata = plat->sysctrl;
+@@ -227,6 +227,10 @@ static int ab8500_sysctrl_probe(struct platform_device *pdev)
+ static int ab8500_sysctrl_remove(struct platform_device *pdev)
  {
- 	return
- 		((0x80 & byte) >> 7) |
+ 	sysctrl_dev = NULL;
++
++	if (pm_power_off == ab8500_power_off)
++		pm_power_off = NULL;
++
+ 	return 0;
+ }
+ 
+diff --git a/include/linux/mfd/abx500/ab8500.h b/include/linux/mfd/abx500/ab8500.h
+index b5780fd..6c119b5 100644
+--- a/include/linux/mfd/abx500/ab8500.h
++++ b/include/linux/mfd/abx500/ab8500.h
+@@ -374,7 +374,6 @@ struct ab8500_sysctrl_platform_data;
+ /**
+  * struct ab8500_platform_data - AB8500 platform data
+  * @irq_base: start of AB8500 IRQs, AB8500_NR_IRQS will be used
+- * @pm_power_off: Should machine pm power off hook be registered or not
+  * @init: board-specific initialization after detection of ab8500
+  * @num_regulator_reg_init: number of regulator init registers
+  * @regulator_reg_init: regulator init registers
+@@ -383,7 +382,6 @@ struct ab8500_sysctrl_platform_data;
+  */
+ struct ab8500_platform_data {
+ 	int irq_base;
+-	bool pm_power_off;
+ 	void (*init) (struct ab8500 *);
+ 	int num_regulator_reg_init;
+ 	struct ab8500_regulator_reg_init *regulator_reg_init;
 -- 
-1.8.1.4
+1.8.2
