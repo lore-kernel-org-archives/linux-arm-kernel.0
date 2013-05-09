@@ -1,43 +1,43 @@
 From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed,  8 May 2013 22:18:45 -0700
-Subject: [PATCH 2/3] clk: Disable unused clocks after deferred probing is done
-In-Reply-To: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
-References: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <1368076726-11492-3-git-send-email-skannan@codeaurora.org>
+Date: Wed,  8 May 2013 22:18:43 -0700
+Subject: [PATCH 0/3] Fix disable of unused clk/regulator with deferred probe
+Message-ID: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With deferred probing, late_initcall() is too soon to declare a clock as
-unused. Wait for deferred probing to finish before declaring a clock as
+Clock and regulator frameworks have support for disabling unused clocks and
+regulators at system init to save power when bootloaders leave them in a less
+than desirable state. If no driver has requested for a clock/regulator to be
+ON by the time kernel init reaches late_initcall level, they were considered
 unused.
 
-Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
----
- drivers/clk/clk.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+This worked well/good enough for compiled in drivers before deferred probe
+was introduced. But with deferred probe, it's quite likely that devices that
+match with compiled in drivers will continue to probe well past late_initcall
+(at least as far as I can understand). So, we need to wait for deferred
+probing during kernel init to complete before we do the disable of unused
+clocks/regulators.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index fe4055f..35de83b 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -516,6 +516,8 @@ static int clk_disable_unused(void)
- 		return 0;
- 	}
- 
-+	wait_for_init_deferred_probe_done();
-+
- 	clk_prepare_lock();
- 
- 	hlist_for_each_entry(clk, &clk_root_list, child_node)
-@@ -534,7 +536,7 @@ static int clk_disable_unused(void)
- 
- 	return 0;
- }
--late_initcall(clk_disable_unused);
-+late_initcall_sync(clk_disable_unused);
- 
- /***    helper functions   ***/
- 
+If there's a better or more obvious solution, I'm all ears. Another approach
+would have been to add a "probe_done_initcall" level. But that seems overkill
+and I don't think adding yet another initcall level is a great idea.
+
+Thanks,
+Saravana
+
+Saravana Kannan (3):
+  driver core: Add API to wait for deferred probe to complete during
+    init
+  clk: Disable unused clocks after deferred probing is done
+  regulator: core: Disable unused regulators after deferred probing is
+    done
+
+ drivers/base/dd.c        |    8 ++++++++
+ drivers/clk/clk.c        |    4 +++-
+ drivers/regulator/core.c |    4 +++-
+ include/linux/device.h   |    1 +
+ 4 files changed, 15 insertions(+), 2 deletions(-)
+
 -- 
 1.7.8.3
 
