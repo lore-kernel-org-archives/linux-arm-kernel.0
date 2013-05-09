@@ -1,122 +1,40 @@
-From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
-Date: Thu,  9 May 2013 17:10:11 +0530
-Subject: [PATCH] arm64: KVM: Fix HCR_EL2 and VTCR_EL2 configuration bits
-Message-ID: <1368099611-4738-1-git-send-email-pranavkumar@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 9 May 2013 12:50:46 +0100
+Subject: [PATCH 1/3] driver core: Add API to wait for deferred probe to
+ complete during init
+In-Reply-To: <CACVXFVMd_iRtEM8ZLK6Ps66gZO6SCp1mXSgY6JbWtRJjJUh+ag@mail.gmail.com>
+References: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
+ <1368076726-11492-2-git-send-email-skannan@codeaurora.org>
+ <CACVXFVMd_iRtEM8ZLK6Ps66gZO6SCp1mXSgY6JbWtRJjJUh+ag@mail.gmail.com>
+Message-ID: <CACxGe6uHBNUcbD9SeRP5c3E8NN-Z2yjVV+9VAhuoJnXoBtTu2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch does following fixes:
+On Thu, May 9, 2013 at 11:07 AM, Ming Lei <tom.leiming@gmail.com> wrote:
+> On Thu, May 9, 2013 at 1:18 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
+>>
+>> The most obvious fallback of using late_initcall_sync() also doesn't work
+>> since the deferred probing work initated during late_initcall() is done in
+>> a workqueue. So, frameworks that want to wait for all devices to finish
+>> probing during init will now have to wait for the deferred workqueue to
+>> finish it's work. This patch adds a wait_for_init_deferred_probe_done() API
+>
+> flush_workqueue() has been added in deferred_probe_initcall(), so looks it
+> should be OK for your problem, doesn't it?
 
-1. Make HCR_* flags as unsigned long long constants
-Reason : By default, compiler assumes numeric constants as
-signed hence sign extending it when assigned to unsigned variable
-such as hcr_el2 (in VCPU context). This accidently sets HCR_ID and
-HCR_CD making entire guest memory non-cacheable. On real HW, this
-breaks Stage2 ttbl walks and also breaks VirtIO.
+It looks like Saravana is using a kernel that already does that based
+on object bb5645e from the diff. So if he is still having problem,
+then there is probably another deferred probe that is triggered after
+the deferred probe lateinitcall is executed. It would be good to know
+what driver is getting deferred past clearing the queue. Or has this
+been rebased from an earlier kernel? It may no longer be necessary.
 
-2. VTCR_EL2_ORGN0_WBWA and VTCR_EL2_IRGN0_WBWA macros.
+However, if a device that shuts down resources after init has
+completed and then cannot turn those resources back on when another
+driver requests them then it sounds like there is a bigger design
+problem. We're in a hotplug world and most of the time a driver cannot
+assume that a resource will never get requested after initcalls have
+completed. It sounds like a design bug in the driver if it cannot
+handle that use case.
 
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
----
- arch/arm64/include/asm/kvm_arm.h |   73 +++++++++++++++++++-------------------
- 1 file changed, 37 insertions(+), 36 deletions(-)
-
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 8ced0ca..0a951db 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -18,44 +18,45 @@
- #ifndef __ARM64_KVM_ARM_H__
- #define __ARM64_KVM_ARM_H__
- 
-+#include <linux/const.h>
- #include <asm/types.h>
- 
- /* Hyp Configuration Register (HCR) bits */
--#define HCR_ID		(1 << 33)
--#define HCR_CD		(1 << 32)
-+#define HCR_ID		(_AC(0x1, ULL) << 33)
-+#define HCR_CD		(_AC(0x1, ULL) << 32)
- #define HCR_RW_SHIFT	31
--#define HCR_RW		(1 << HCR_RW_SHIFT)
--#define HCR_TRVM	(1 << 30)
--#define HCR_HCD		(1 << 29)
--#define HCR_TDZ		(1 << 28)
--#define HCR_TGE		(1 << 27)
--#define HCR_TVM		(1 << 26)
--#define HCR_TTLB	(1 << 25)
--#define HCR_TPU		(1 << 24)
--#define HCR_TPC		(1 << 23)
--#define HCR_TSW		(1 << 22)
--#define HCR_TAC		(1 << 21)
--#define HCR_TIDCP	(1 << 20)
--#define HCR_TSC		(1 << 19)
--#define HCR_TID3	(1 << 18)
--#define HCR_TID2	(1 << 17)
--#define HCR_TID1	(1 << 16)
--#define HCR_TID0	(1 << 15)
--#define HCR_TWE		(1 << 14)
--#define HCR_TWI		(1 << 13)
--#define HCR_DC		(1 << 12)
--#define HCR_BSU		(3 << 10)
--#define HCR_BSU_IS	(1 << 10)
--#define HCR_FB		(1 << 9)
--#define HCR_VA		(1 << 8)
--#define HCR_VI		(1 << 7)
--#define HCR_VF		(1 << 6)
--#define HCR_AMO		(1 << 5)
--#define HCR_IMO		(1 << 4)
--#define HCR_FMO		(1 << 3)
--#define HCR_PTW		(1 << 2)
--#define HCR_SWIO	(1 << 1)
--#define HCR_VM		(1)
-+#define HCR_RW		(_AC(0x1, ULL) << HCR_RW_SHIFT)
-+#define HCR_TRVM	(_AC(0x1, ULL) << 30)
-+#define HCR_HCD		(_AC(0x1, ULL) << 29)
-+#define HCR_TDZ		(_AC(0x1, ULL) << 28)
-+#define HCR_TGE		(_AC(0x1, ULL) << 27)
-+#define HCR_TVM		(_AC(0x1, ULL) << 26)
-+#define HCR_TTLB	(_AC(0x1, ULL) << 25)
-+#define HCR_TPU		(_AC(0x1, ULL) << 24)
-+#define HCR_TPC		(_AC(0x1, ULL) << 23)
-+#define HCR_TSW		(_AC(0x1, ULL) << 22)
-+#define HCR_TAC		(_AC(0x1, ULL) << 21)
-+#define HCR_TIDCP	(_AC(0x1, ULL) << 20)
-+#define HCR_TSC		(_AC(0x1, ULL) << 19)
-+#define HCR_TID3	(_AC(0x1, ULL) << 18)
-+#define HCR_TID2	(_AC(0x1, ULL) << 17)
-+#define HCR_TID1	(_AC(0x1, ULL) << 16)
-+#define HCR_TID0	(_AC(0x1, ULL) << 15)
-+#define HCR_TWE		(_AC(0x1, ULL) << 14)
-+#define HCR_TWI		(_AC(0x1, ULL) << 13)
-+#define HCR_DC		(_AC(0x1, ULL) << 12)
-+#define HCR_BSU		(_AC(0x3, ULL) << 10)
-+#define HCR_BSU_IS	(_AC(0x1, ULL) << 10)
-+#define HCR_FB		(_AC(0x1, ULL) << 9)
-+#define HCR_VA		(_AC(0x1, ULL) << 8)
-+#define HCR_VI		(_AC(0x1, ULL) << 7)
-+#define HCR_VF		(_AC(0x1, ULL) << 6)
-+#define HCR_AMO		(_AC(0x1, ULL) << 5)
-+#define HCR_IMO		(_AC(0x1, ULL) << 4)
-+#define HCR_FMO		(_AC(0x1, ULL) << 3)
-+#define HCR_PTW		(_AC(0x1, ULL) << 2)
-+#define HCR_SWIO	(_AC(0x1, ULL) << 1)
-+#define HCR_VM		(_AC(0x1, ULL))
- 
- /*
-  * The bits we set in HCR:
-@@ -111,9 +112,9 @@
- #define VTCR_EL2_SH0_MASK	(3 << 12)
- #define VTCR_EL2_SH0_INNER	(3 << 12)
- #define VTCR_EL2_ORGN0_MASK	(3 << 10)
--#define VTCR_EL2_ORGN0_WBWA	(3 << 10)
-+#define VTCR_EL2_ORGN0_WBWA	(1 << 10)
- #define VTCR_EL2_IRGN0_MASK	(3 << 8)
--#define VTCR_EL2_IRGN0_WBWA	(3 << 8)
-+#define VTCR_EL2_IRGN0_WBWA	(1 << 8)
- #define VTCR_EL2_SL0_MASK	(3 << 6)
- #define VTCR_EL2_SL0_LVL1	(1 << 6)
- #define VTCR_EL2_T0SZ_MASK	0x3f
--- 
-1.7.9.5
+g.
