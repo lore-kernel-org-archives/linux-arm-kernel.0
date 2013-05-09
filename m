@@ -1,49 +1,80 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 9 May 2013 16:47:54 -0700
-Subject: [GIT PULL] Late Exynos stuff for v3.10
-In-Reply-To: <51794E10.1010205@samsung.com>
-References: <5176B499.1000208@samsung.com> <51770697.7080504@samsung.com>
- <20130424000638.GA9067@quad.lixom.net>
- <51794E10.1010205@samsung.com>
-Message-ID: <CAOesGMjA5_XUXMcCL3roZiLC1S=ypMoVHn2tF7bzUuKr+eLw2A@mail.gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 9 May 2013 18:43:59 -0500
+Subject: [PATCHv2 2/4] mailbox: Introduce a new common API
+In-Reply-To: <CAJe_Zhffm9FOk83dAdX194gN3r5JnG78sdcWNv6WnWCsTF3YuA@mail.gmail.com>
+References: <1367824946-6160-1-git-send-email-jaswinder.singh@linaro.org>
+ <1367825046-6229-1-git-send-email-jaswinder.singh@linaro.org>
+ <518BCF4B.1060504@ti.com>
+ <CAJe_Zhd=FDV3YP=XR8Yay1iy_geAt3tqj+diUxrVkd2BFSfb-g@mail.gmail.com>
+ <518BD197.2030502@ti.com>
+ <CABb+yY2CnO5RiQNdcB_L5ZiGi829Ys0ODH2UmhtZxj=aJo3ioQ@mail.gmail.com>
+ <518BE566.5090504@ti.com>
+ <CAJe_Zhffm9FOk83dAdX194gN3r5JnG78sdcWNv6WnWCsTF3YuA@mail.gmail.com>
+Message-ID: <518C34BF.7080408@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin,
+Jassi,
 
-On Thu, Apr 25, 2013 at 8:38 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-
->> It doesn't have to be something super-elaborate, but I'd like it to be
->> sort of
->> self-documenting in a way that I don't have to look through the series of
->> patches to get an overview of what's in the branch. Of course we'll also
->> do
->> that to review the code, but having the description there makes things
->> easier
->> for us to tell if we should even be looking at it, etc.
+>>>
+>>> Perhaps we should change the following
+>>>
+>>>    void ipc_link_txdone(struct ipc_link *link, enum xfer_result r)
+>>> to
+>>>    void ipc_link_txdone(struct ipc_link *link, enum xfer_result r, void *data)
+>>>
+>>> So that the API could pass that onto clients ?
 >>
+>> That's if the controller needs to pass some data back to client. I am
+>> fine with that as well,
+> No, I misunderstood you wanted request_token_t to be replaced with the
+> pointer of request that was executed.
+> 
+>> but I am talking mainly about providing a client
+>> user data ptr back to it during callbacks.
 >>
-> OK, I see. Let me do it more carefully.
->
-> And let me send pull-request again for fix and late dt branch with separated
-> branches in a couple of hours not including usb stuff...
+>> struct ipc_client {
+>>         char *chan_name;
+>> +       void *cl_data; /* store it to ipc_chan as well */
+>> -       void (*rxcb)(void *data);
+>> -       void (*txcb)(request_token_t t, enum xfer_result r);
+>> +       void (*rxcb)(void *cl_data, void *data);
+>> +       void (*txcb)(request_token_t t, enum xfer_result r, void *cl_data);
+>>         ...
+>> }
+>>
+>> I am obviously interested in the rxcb. The controller implementations do
+>> not see the cl_data.
+>>
+> OK I see what you mean. However the API storing and passing back
+> ad-hoc data to clients doesn't seem very neat.
+> 
+> Such purposes are usually served by :
+> 
+> - void (*rxcb)(void *data);
+> + void (*rxcb)(struct ipc_client *cl, void *data);  /* client for
+> which data was received */
+> 
+> - void (*txcb)(request_token_t t, enum xfer_result r);
+> + void (*txcb)(struct ipc_client *cl, request_token_t t, enum
+> xfer_result r); /* client whose data was sent */
+> 
+> You could then get relevant omap_rproc using container_of() on 'cl',
+> in rxcb() and txcb().
 
-Refresh my memory here, what was the reason for dropping the USB DTS
-updates? (Yes, I am aware it might because I asked you not to send
-them in but I don't remember :-).
+The reason that I didn't suggest that way is because we do not use
+ipc_client for any runtime API, and we would have to store the returned
+handle anyway. I see ipc_client simply as a ipc_channel_request_info
+structure, a one-time usage perspective. I made the suggestion as it
+seemed in line if you had a xxx_register_callback API wherein you would
+use a void *context if you want something back.
 
-Also, when you drop stuff, please, please don't keep it in your own
-for-next branch. The end result is that we'll keep testing something
-on linux-next with the anticipation that it will work when it lands in
-the merge window, when that's not the truth if you're not going to
-send the pull requests up.
+> 
+> Apart from this, in txcb, perhaps we should drop request_token_t in
+> favor of the request's pointer (void *data) that was last executed.
+> That should make things easier for clients.
 
-So, if you decide to keep code like this out of the merge window (or
-if we push back at it and say no to it), then remove it from your
-for-next branch as well.
+Yes, that would be nice too.
 
-In particular, the usb phy node for usb2 would ber very good to get in
-for 3.10, since it's a critical piece to get usb2 working on the
-Chromebook.
-
--Olof
+regards
+Suman
