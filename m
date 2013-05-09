@@ -1,62 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 9 May 2013 11:46:51 -0700
-Subject: [GIT PULL 2/2] omap device tree fixes for v3.10 merge window
-In-Reply-To: <pull-1368125211-439797>
-Message-ID: <mailman.4.1368125244.1125.linux-arm-kernel@lists.infradead.org>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Fri, 10 May 2013 00:19:31 +0530
+Subject: [PATCHv2 2/4] mailbox: Introduce a new common API
+In-Reply-To: <518BE566.5090504@ti.com>
+References: <1367824946-6160-1-git-send-email-jaswinder.singh@linaro.org>
+ <1367825046-6229-1-git-send-email-jaswinder.singh@linaro.org>
+ <518BCF4B.1060504@ti.com>
+ <CAJe_Zhd=FDV3YP=XR8Yay1iy_geAt3tqj+diUxrVkd2BFSfb-g@mail.gmail.com>
+ <518BD197.2030502@ti.com>
+ <CABb+yY2CnO5RiQNdcB_L5ZiGi829Ys0ODH2UmhtZxj=aJo3ioQ@mail.gmail.com>
+ <518BE566.5090504@ti.com>
+Message-ID: <CAJe_Zhffm9FOk83dAdX194gN3r5JnG78sdcWNv6WnWCsTF3YuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit bb9055b2744ada735a2fe555c4196ad39a83ef2a:
+On 9 May 2013 23:35, Suman Anna <s-anna@ti.com> wrote:
 
-  Merge tag 'multiplatform-for-linus-2' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2013-05-07 11:28:42 -0700)
+>>
+>> Perhaps we should change the following
+>>
+>>    void ipc_link_txdone(struct ipc_link *link, enum xfer_result r)
+>> to
+>>    void ipc_link_txdone(struct ipc_link *link, enum xfer_result r, void *data)
+>>
+>> So that the API could pass that onto clients ?
+>
+> That's if the controller needs to pass some data back to client. I am
+> fine with that as well,
+No, I misunderstood you wanted request_token_t to be replaced with the
+pointer of request that was executed.
 
-are available in the git repository at:
+> but I am talking mainly about providing a client
+> user data ptr back to it during callbacks.
+>
+> struct ipc_client {
+>         char *chan_name;
+> +       void *cl_data; /* store it to ipc_chan as well */
+> -       void (*rxcb)(void *data);
+> -       void (*txcb)(request_token_t t, enum xfer_result r);
+> +       void (*rxcb)(void *cl_data, void *data);
+> +       void (*txcb)(request_token_t t, enum xfer_result r, void *cl_data);
+>         ...
+> }
+>
+> I am obviously interested in the rxcb. The controller implementations do
+> not see the cl_data.
+>
+OK I see what you mean. However the API storing and passing back
+ad-hoc data to clients doesn't seem very neat.
+
+Such purposes are usually served by :
+
+- void (*rxcb)(void *data);
++ void (*rxcb)(struct ipc_client *cl, void *data);  /* client for
+which data was received */
+
+- void (*txcb)(request_token_t t, enum xfer_result r);
++ void (*txcb)(struct ipc_client *cl, request_token_t t, enum
+xfer_result r); /* client whose data was sent */
+
+You could then get relevant omap_rproc using container_of() on 'cl',
+in rxcb() and txcb().
 
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/dt-fixes-for-merge-window
+Apart from this, in txcb, perhaps we should drop request_token_t in
+favor of the request's pointer (void *data) that was last executed.
+That should make things easier for clients.
 
-for you to fetch changes up to 914dc329ee11d6b1ecbebef802962dc06e78b942:
-
-  ARM: dts: don't assume boards are using twl4030 for omap3 (2013-05-09 09:06:57 -0700)
-
-----------------------------------------------------------------
-Omap device tree fixes for issue discovered during the merge window:
-
-- Fix triggering for GPIO interrupts that's needed for 4430sdp
-  Ethernet. Otherwise booting with nfsroot won't work.
-
-- Fix CPU operating point values
-
-- Fix wrong assumption that twl PMIC is always connected to omap3
-
-- Add gpmc for am33xx so beaglebone users can use the bus
-
-- Cosmetic fix for mcspi pin muxing to avoid confusion
-
-----------------------------------------------------------------
-Jason Cooper (1):
-      ARM: dts: don't assume boards are using twl4030 for omap3
-
-Jon Hunter (1):
-      ARM: dts: OMAP4: Fix ethernet IRQ for OMAP4 boards
-
-Nishanth Menon (2):
-      ARM: dts: OMAP36xx: Fix CPU OPP voltages
-      ARM: dts: OMAP4460: Fix CPU OPP voltages
-
-Philip Avinash (1):
-      ARM: dts: AM33XX: Add GPMC node
-
-Tony Lindgren (1):
-      ARM: dts: Configure and fix the McSPI pins for 4430sdp
-
- arch/arm/boot/dts/am33xx.dtsi         | 12 ++++++++++++
- arch/arm/boot/dts/omap3-beagle-xm.dts |  1 +
- arch/arm/boot/dts/omap3-evm.dts       |  1 +
- arch/arm/boot/dts/omap3-overo.dtsi    |  1 +
- arch/arm/boot/dts/omap3.dtsi          |  1 -
- arch/arm/boot/dts/omap36xx.dtsi       |  6 +++---
- arch/arm/boot/dts/omap4-sdp.dts       | 14 +++++++++++++-
- arch/arm/boot/dts/omap4-var-som.dts   |  2 +-
- arch/arm/boot/dts/omap4460.dtsi       |  6 +++---
- 9 files changed, 35 insertions(+), 9 deletions(-)
+regards,
+-jassi
