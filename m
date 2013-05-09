@@ -1,33 +1,30 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 9 May 2013 13:11:05 -0700
-Subject: [GIT PULL] Two ux500 fixes for the v3.10 series
-In-Reply-To: <CACRpkdYV26xRiASZ8L3PuPqoqyPKx1Jq-okN6LgD40ffgS6zdg@mail.gmail.com>
-References: <CACRpkdYeWi2cx2weXao9=2f78eM0_J=gK-8o6gKjcG7pjYFAxA@mail.gmail.com>
- <201305032240.46483.arnd@arndb.de>
- <CACRpkdYV26xRiASZ8L3PuPqoqyPKx1Jq-okN6LgD40ffgS6zdg@mail.gmail.com>
-Message-ID: <20130509201105.GB21293@quad.lixom.net>
+Date: Thu, 9 May 2013 13:15:04 -0700
+Subject: [GIT PULL 1/2] omap fixes for v3.10 merge window part2
+In-Reply-To: <518bef23.e79f320a.5202.ffffc873SMTPIN_ADDED_BROKEN@mx.google.com>
+References: <518bef23.e79f320a.5202.ffffc873SMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20130509201504.GA21598@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 03, 2013 at 10:43:10PM +0200, Linus Walleij wrote:
-> On Fri, May 3, 2013 at 10:40 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 03 May 2013, Linus Walleij wrote:
-> >> Hi ARM SoC folks,
-> >>
-> >> here are two ux500 fixes for the v3.10 series, please pull
-> >> them in. Since -rc1 is not out this is based on Torvald's
-> >> HEAD from yesterday.
-> >
-> > We try hard to avoid doing bug fixes on top of random HEADs.
-> > Can you send these on top of the minimum set of branches?
+On Thu, May 09, 2013 at 11:46:51AM -0700, Tony Lindgren wrote:
+> The following changes since commit 956e46efb2478ebff7a871138458fa8124fd18dd:
 > 
-> I think I'll just wait for -rc1.
+>   mm/slab: Fix crash during slab init (2013-05-08 15:02:33 -0700)
 > 
-> It's not *that* urgent, just wanted to clean my desk.
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/fixes-for-merge-window-part2
+> 
+> for you to fetch changes up to b1dd11d60e5357c13d3f3decfb69bd07dde159bd:
+> 
+>   ARM: OMAP2+: Remove bogus IS_ERR_OR_NULL checking from id.c (2013-05-09 09:06:27 -0700)
 
-I've got a branch started at a non-rc for fixes right now, since we want some
-of them in before the first -rc. So I'll cherry-pick these over while I'm at
-it.
+Pulled, thanks.
+
+As Arnd mentioned on an ux500 pull request earlier, we usually don't like
+fixes branches on non-rc bases, but since this is targeting pre-rc1 but
+post-what-we-merged, there's not much else to do.
 
 
 -Olof
