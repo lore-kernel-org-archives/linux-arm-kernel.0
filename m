@@ -1,33 +1,61 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 9 May 2013 13:20:31 +0900
-Subject: [PATCH] ARM: shmobile: fix sleep-r8a7740.S miscompiles
-In-Reply-To: <20130509032544.GB13994@verge.net.au>
-References: <201305081418.05091.arnd@arndb.de>
- <20130509032544.GB13994@verge.net.au>
-Message-ID: <20130509042031.GA7832@verge.net.au>
+Date: Thu, 9 May 2013 13:22:21 +0900
+Subject: [PATCH 03/21] ARM: shmobile: don't call irqchip_init
+ unconditionally
+In-Reply-To: <20130509033819.GC13994@verge.net.au>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <CAL_JsqJWJvxezXy0RGFutxzvBhca-8=uRH2GxdJgzbEGw+OL0A@mail.gmail.com>
+ <20130501225748.GD6517@verge.net.au>
+ <201305081416.06611.arnd@arndb.de>
+ <CABYn4sxrcGmnTAJcQR23nMGy8JvqyDrgPOXF4yBFFU_4C8Pc_g@mail.gmail.com>
+ <20130509033819.GC13994@verge.net.au>
+Message-ID: <20130509042220.GB7832@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 09, 2013 at 12:25:44PM +0900, Simon Horman wrote:
-> On Wed, May 08, 2013 at 02:18:04PM +0200, Arnd Bergmann wrote:
-> > The newly added sleep-r8a7740.S file in shmobile does not
-> > actually build because of renamed symbols.
+On Thu, May 09, 2013 at 12:38:19PM +0900, Simon Horman wrote:
+> On Wed, May 08, 2013 at 03:22:22PM +0200, Bastian Hecht wrote:
+> > Hi,
 > > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Bastian Hecht <hechtb+renesas@gmail.com>
-> > Cc: Simon Horman <horms+renesas@verge.net.au>
-> > ---
+> > 2013/5/8 Arnd Bergmann <arnd@arndb.de>:
+> > > On Thursday 02 May 2013, Simon Horman wrote:
+> > >> > > diff --git a/arch/arm/mach-shmobile/intc-r8a7740.c b/arch/arm/mach-shmobile/intc-r8a7740.c
+> > >> > > index 8871f77..5dc57f1 100644
+> > >> > > --- a/arch/arm/mach-shmobile/intc-r8a7740.c
+> > >> > > +++ b/arch/arm/mach-shmobile/intc-r8a7740.c
+> > >> > > @@ -53,14 +53,23 @@ static void __init r8a7740_init_irq_common(void)
+> > >> > >
+> > >> > >  void __init r8a7740_init_irq_of(void)
+> > >> > >  {
+> > >> > > +       if (!IS_ENABLED(CONFIG_OF))
+> > >> > > +               return;
+> > >> > > +
+> > >> > >         irqchip_init();
+> > >> >
+> > >> > Why not have an empty irqchip_init? I'd guess we'll need this on other
+> > >> > platforms and your default mach.
+> > >>
+> > >> Thanks, I think that could work.
+> > >>
+> > >> I will see about making it so.
+> > >
+> > > Ping
 > > 
-> > Simon, please apply to whichever branch of yours has the broken commit,
-> > or fold this patch into Bastian's patch.
-> > 
-> > linux-next doesn't build for me because of this, mainline is still fine.
+> > I have sent out a patch adding an empty irqchip_init() when
+> > CONFIG_IRQCHIP is not set with the subject
+> > [PATCH] irqchip: Add irqchip_init dummy function
 > 
-> Sure, will do.
+> Thanks.
 > 
-> I am traveling today so I may not be able to deal with this
-> properly until tomorrow.
+> > > Linux-next is still broken for me. There is also anothe shmobile build bug,
+> > > I'll send a separate patch for that, which also needs to go into your tree.
+> 
+> Sorry about that. I though I had pushed your fix (the first hunk of the
+> patch that started this thread), but it seems that I did not.
 
-I have queued this up in the soc-r8a7740 branch, where the problem was
-added. I have pushed this branch along with a refreshed next branch.
-This change should appear in linux-next in the not to distant future.
+Sorry once again for the delay in addressing this.
+I have pushed a refreshed next branch which includes
+both Bastian's fix for irqchip_init() and the patch
+that Arnd posted relating to symbol renames.
+
+These changes should appear in linux-next in the not to distant future.
