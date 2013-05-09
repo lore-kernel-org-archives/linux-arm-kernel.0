@@ -1,72 +1,50 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Thu, 9 May 2013 09:52:27 +0800
-Subject: [PATCH V3 2/2] ARM: Handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <20130508150800.GI2703@arm.com>
-References: <20130418135104.GA18616@arm.com>
- <20130421220629.GA25571@schnuecks.de>
- <20130430112225.GD29766@arm.com>
- <20130430210403.GA18076@schnuecks.de>
- <20130501142206.GB17387@arm.com>
- <20130501190441.GA22227@schnuecks.de>
- <20130502095431.GA20730@arm.com>
- <20130502193835.GA29144@schnuecks.de>
- <20130503100242.GB29962@arm.com>
- <CACVXFVPOuabwAa1VDmSnfDG=M-1Df02_kpbm0UVAVctCAB-U4Q@mail.gmail.com>
- <20130508150800.GI2703@arm.com>
-Message-ID: <CACVXFVMLu=18WyQKy3ucZXHxkHK9cSekrWgTOTt4Er1j46ko-g@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 9 May 2013 12:25:44 +0900
+Subject: [PATCH] ARM: shmobile: fix sleep-r8a7740.S miscompiles
+In-Reply-To: <201305081418.05091.arnd@arndb.de>
+References: <201305081418.05091.arnd@arndb.de>
+Message-ID: <20130509032544.GB13994@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 8, 2013 at 11:08 PM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Sat, May 04, 2013 at 09:21:27AM +0100, Ming Lei wrote:
->> On Fri, May 3, 2013 at 6:02 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> >>
->> >> I assume that you inhibited the call to flush_dcache_page() in
->> >> __get_user_pages() for anon pages.  Otherwise, you will be flooded
->> >> with warnings.
->> >
->> > I haven't done any stress testing so I don't think I hit this code path,
->> > so no warning. But yes, it should have triggered. Anyway, in this case
->> > flush_dcache_page() should have just ignored (clearing PG_arch_1 is
->> > harmless anyway if we also ignore this bit in __sync_icache_dcache for
->> > non-aliasing caches).
->>
->> Yes, maybe we can do a little optimization for O_DIRECT since no
->> dcache alias and I/D coherency problem in this case on ARMv7, how
->> about below change?
->>
->> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
->> index 1c8f7f5..962a657 100644
->> --- a/arch/arm/mm/flush.c
->> +++ b/arch/arm/mm/flush.c
->> @@ -287,6 +287,8 @@ void flush_dcache_page(struct page *page)
->>           mapping && !mapping_mapped(mapping))
->>               clear_bit(PG_dcache_clean, &page->flags);
->>       else {
->> +             if (!mapping && cache_is_vipt_nonaliasing())
->> +                     return;
->>               __flush_dcache_page(mapping, page);
->>               if (mapping && cache_is_vivt())
->>                       __flush_dcache_aliases(mapping, page);
->
-> I wonder whether we could move the:
->
->         if (!mapping)
->                 return
->
-> at the top of this function, IOW don't touch any anonymous pages. Would
-> anything be broken (apart from wrong API use)?
+On Wed, May 08, 2013 at 02:18:04PM +0200, Arnd Bergmann wrote:
+> The newly added sleep-r8a7740.S file in shmobile does not
+> actually build because of renamed symbols.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Bastian Hecht <hechtb+renesas@gmail.com>
+> Cc: Simon Horman <horms+renesas@verge.net.au>
+> ---
+> 
+> Simon, please apply to whichever branch of yours has the broken commit,
+> or fold this patch into Bastian's patch.
+> 
+> linux-next doesn't build for me because of this, mainline is still fine.
 
-In case of O_DIRECT, the anonymous page may be shared, so looks it
-should be flushed for vipt_aliasing cache.
+Sure, will do.
 
-Catalin, btw, would you mind give comments on the patch below(it might
-be a 'fix' on one commit you submitted)?
+I am traveling today so I may not be able to deal with this
+properly until tomorrow.
 
-      http://marc.info/?l=linux-arm-kernel&m=136757247311694&w=2
-
-Thanks
--- 
-Ming Lei
+> 
+> diff --git a/arch/arm/mach-shmobile/sleep-r8a7740.S b/arch/arm/mach-shmobile/sleep-r8a7740.S
+> index 435531b..982eacb 100644
+> --- a/arch/arm/mach-shmobile/sleep-r8a7740.S
+> +++ b/arch/arm/mach-shmobile/sleep-r8a7740.S
+> @@ -32,7 +32,7 @@ ENTRY(r8a7740_shutdown)
+>  wfi_loop:
+>  	bl	cpu_v7_do_idle
+>  	b wfi_loop
+> -ENDPROC(r8a7740)
+> +ENDPROC(r8a7740_shutdown)
+>  
+>  	.text
+>  ENTRY(v7_cpu_resume)
+> @@ -53,5 +53,5 @@ ENDPROC(v7_cpu_resume)
+>  ENTRY(r8a7740_resume)
+>  	ldr	pc, 1f
+>  1:	.long	v7_cpu_resume - PAGE_OFFSET + PLAT_PHYS_OFFSET
+> -ENDPROC(r8a7740_resume_core_standby)
+> +ENDPROC(r8a7740_resume)
+>  #endif
+> 
