@@ -1,32 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 9 May 2013 13:44:34 -0700
-Subject: [PATCH V2] ARM: bcm281xx: Add L2 support for Rev A2 chips
-In-Reply-To: <1367542653-955-1-git-send-email-csd@broadcom.com>
-References: <1367542653-955-1-git-send-email-csd@broadcom.com>
-Message-ID: <20130509204434.GA16724@quad.lixom.net>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 9 May 2013 13:51:00 -0700
+Subject: [PATCH -v9 04/11] Move shutdown/reboot related functions to
+ kernel/reboot.c
+In-Reply-To: <1368127405-112717-5-git-send-email-holt@sgi.com>
+References: <1368127405-112717-1-git-send-email-holt@sgi.com>
+ <1368127405-112717-5-git-send-email-holt@sgi.com>
+Message-ID: <20130509135100.13947d1805a583703ee8488b@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 02, 2013 at 05:57:33PM -0700, Christian Daudt wrote:
-> Rev A2 SoCs have an unorthodox memory re-mapping and this needs
-> to be reflected in the cache operations.
-> This patch adds new outer cache functions for the l2x0 driver
-> to support this SoC revision. It also adds a new compatible
-> value for the cache to enable this functionality.
-> 
-> Updates from V1:
-> - remove section 1 altogether and note that in comments
-> - simplify section selection caused by section 1 removal
-> - BUG_ON just in case section 1 shows up
-> 
-> Signed-off-by: Christian Daudt <csd@broadcom.com>
+On Thu,  9 May 2013 14:23:18 -0500 Robin Holt <holt@sgi.com> wrote:
 
-This patch mostly covers code that is on Russells plate, so please feed
-this to his tracker to be picked up by him. Feel free to add:
+> This patch is preparatory.  It moves reboot related syscall, etc
+> functions from kernel/sys.c to kernel/reboot.c.
 
-Acked-by: Olof Johansson <olof@lixom.net>
+This doesn't apply.
 
+> -static void migrate_to_reboot_cpu(void)
+> -{
+> -	/* The boot cpu is always logical cpu 0 */
+> -	int cpu = 0;
+> -
+> -	cpu_hotplug_disable();
+> -
+> -	/* Make certain the cpu I'm about to reboot on is online */
+> -	if (!cpu_online(cpu))
+> -		cpu = cpumask_first(cpu_online_mask);
 
-Thanks,
+Here it's deleting code which was already modified by "[PATCH -v9
+02/11] Migrate shutdown/reboot to boot cpu.".  So patch [4/11]
+generates rejects when applied on top of [patch 2/11].
 
--Olof
+There are several similar glitches.
