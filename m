@@ -1,165 +1,163 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 9 May 2013 13:54:13 -0700
-Subject: [GIT PULL] ARM: arm-soc fixes and a few straggler patches for 3.10
-Message-ID: <20130509205413.GA16897@quad.lixom.net>
+Date: Thu,  9 May 2013 13:58:19 -0700
+Subject: [PATCH] ARM: exynos: defconfig update
+Message-ID: <1368133099-16997-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+This turns on a number of configs that are useful on the Chromebook, but also
+good to have on in general:
 
-The following changes since commit 8cbc95ee748741939222c3d38584a40c92bedcdd:
+* USB host and MMC drivers(!)
+* I2C GPIO arbitration driver
+* CYAPA trackpad driver
+* simplefb
+* CROS EC and keyboard drivers
+* MAX77686 drivers
+* DEVTMPFS + mount
+* DM_CRYPT (as module)
+* CRYPTOLOOP
+* HIGHMEM
+* PRINTK timestamps
 
-  Merge tag 'nfs-for-3.10-2' of git://git.linux-nfs.org/projects/trondmy/linux-nfs (2013-05-09 10:24:54 -0700)
+This also turns off DEBUG_LL, and switches the hardcoded Samsung lowlevel
+uart to uart 3 (which is only used to show the "uncompressing kernel"
+message at boot, it seems).
 
-are available in the git repository at:
+Signed-off-by: Olof Johansson <olof@lixom.net>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+---
 
+(Note that the simplefb driver is still not merged up for 3.10, but it
+hopefully will be).
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+ arch/arm/configs/exynos_defconfig | 49 ++++++++++++++++++++++++++++++++-------
+ 1 file changed, 41 insertions(+), 8 deletions(-)
 
-for you to fetch changes up to c58c1a4c118ba2ed49f72de9b42ef13bc8ee71e5:
-
-  ARM: exynos: dts: Fixed vbus-gpios (2013-05-09 13:25:23 -0700)
-
-----------------------------------------------------------------
-ARM: arm-soc fixes and straggler patches for 3.10
-
-A collection of fixes for fall out from 3.10 merge window, some build
-fixes and warning cleanups and a small handful of patches that were
-small and contained and made sense to still include in 3.10 (some of
-these have also been in -next since the merge window opened).
-
-Largest continous series is for OMAP, but there's a handful for other
-platforms.
-
-For i.MX, one of the patches are framebuffer fixups due to fallout during
-the merge window, and the other removes some stale and broken code.
-
-----------------------------------------------------------------
-Aaro Koskinen (1):
-      ARM: OMAP: RX-51: change probe order of touchscreen and panel SPI devices
-
-Arnd Bergmann (7):
-      ARM: default machine descriptor for multiplatform
-      ARM: tegra: Tegra114 needs CPU_FREQ_TABLE
-      ARM: OMAP: build SMP code only for OMAP4/5
-      ARM: imx: build CPU suspend code only when needed
-      ARM: SPEAr: conditionalize l2x0 support
-      ARM: SIRF: select SMP_ON_UP only on SMP builds
-      ARM: ux500: always select ABX500_CORE
-
-Christoph Fritz (1):
-      omap: mux: add AM/DM37x gpios
-
-Doug Anderson (1):
-      ARM: exynos: dts: Fixed vbus-gpios
-
-Fabio Baltieri (1):
-      ARM: ux500: read the correct soc_id number
-
-Fabio Estevam (2):
-      ARM: imx: Select GENERIC_ALLOCATOR
-      video: mxsfb: Adapt to new videomode API
-
-Inderpal Singh (1):
-      ARM: EXYNOS5: Fix kernel dump in AFTR idle mode
-
-Jason Cooper (1):
-      ARM: dts: don't assume boards are using twl4030 for omap3
-
-Javier Martinez Canillas (3):
-      Documentation: dt: update TI GPMC ethernet binding properties
-      ARM: OMAP2+: only search for GPMC DT child nodes on probe
-      ARM: OMAP2+: only WARN if a GPMC child probe function fail
-
-Jon Hunter (2):
-      Documentation: dt: update properties in TI GPMC NAND example
-      ARM: dts: OMAP4: Fix ethernet IRQ for OMAP4 boards
-
-Kevin Hilman (1):
-      ARM: OMAP2+: omap_device: use late_initcall_sync
-
-Lee Jones (1):
-      ARM: ux500: Rid ignored return value of regulator_enable() compiler warning
-
-Nishanth Menon (2):
-      ARM: dts: OMAP36xx: Fix CPU OPP voltages
-      ARM: dts: OMAP4460: Fix CPU OPP voltages
-
-Olof Johansson (4):
-      Merge branch 'late/fixes' into fixes
-      ARM: exynos: dts: cros5250: add cyapa trackpad
-      Merge tag 'omap-for-v3.10/fixes-for-merge-window-part2' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-      Merge tag 'omap-for-v3.10/dt-fixes-for-merge-window' of git://git.kernel.org/.../tmlind/linux-omap into fixes
-
-Peter Ujfalusi (1):
-      ARM: OMAP4+: omap2plus_defconfig: Enable audio via TWL6040 as module
-
-Philip Avinash (1):
-      ARM: dts: AM33XX: Add GPMC node
-
-Roger Quadros (1):
-      ARM: OMAP3: Beagle: Fix USB Host on beagle xM Ax/Bx
-
-Shawn Guo (1):
-      ARM: imx: compile fix for hotplug.c
-
-Tony Lindgren (4):
-      ARM: OMAP2+: Fix unmet direct dependencies for SERIAL_OMAP
-      Merge branch 'omap-gpmc-fixes-for-v3.10' of git://github.com/jonhunter/linux into fixes
-      ARM: dts: Configure and fix the McSPI pins for 4430sdp
-      ARM: OMAP2+: Remove bogus IS_ERR_OR_NULL checking from id.c
-
-Vaibhav Hiremath (1):
-      ARM: OMAP2: AM33XX: id: Add support for new AM335x PG2.1 Si
-
-Wei Yongjun (1):
-      ARM: OMAP1: DMA: fix error handling in omap1_system_dma_init()
-
- .../devicetree/bindings/mtd/gpmc-nand.txt          | 28 ++++-----
- Documentation/devicetree/bindings/net/gpmc-eth.txt | 56 ++++++++---------
- arch/arm/Kconfig                                   |  1 -
- arch/arm/boot/dts/am33xx.dtsi                      | 12 ++++
- arch/arm/boot/dts/cros5250-common.dtsi             |  8 +++
- arch/arm/boot/dts/exynos5250-smdk5250.dts          |  2 +-
- arch/arm/boot/dts/exynos5250-snow.dts              |  2 +-
- arch/arm/boot/dts/omap3-beagle-xm.dts              |  1 +
- arch/arm/boot/dts/omap3-evm.dts                    |  1 +
- arch/arm/boot/dts/omap3-overo.dtsi                 |  1 +
- arch/arm/boot/dts/omap3.dtsi                       |  1 -
- arch/arm/boot/dts/omap36xx.dtsi                    |  6 +-
- arch/arm/boot/dts/omap4-sdp.dts                    | 14 ++++-
- arch/arm/boot/dts/omap4-var-som.dts                |  2 +-
- arch/arm/boot/dts/omap4460.dtsi                    |  6 +-
- arch/arm/configs/omap2plus_defconfig               |  4 ++
- arch/arm/kernel/devtree.c                          |  7 +++
- arch/arm/kernel/setup.c                            | 13 +++-
- arch/arm/mach-exynos/include/mach/regs-pmu.h       |  1 +
- arch/arm/mach-exynos/pmu.c                         |  5 +-
- arch/arm/mach-imx/Kconfig                          |  5 +-
- arch/arm/mach-imx/Makefile                         |  1 -
- arch/arm/mach-imx/common.h                         |  1 +
- arch/arm/mach-imx/headsmp.S                        |  2 +-
- arch/arm/mach-imx/hotplug.c                        |  2 +
- arch/arm/mach-imx/iram_alloc.c                     | 73 ----------------------
- arch/arm/mach-omap1/dma.c                          |  8 +--
- arch/arm/mach-omap2/Kconfig                        |  2 -
- arch/arm/mach-omap2/Makefile                       |  8 +--
- arch/arm/mach-omap2/board-omap3beagle.c            |  6 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c       |  4 +-
- arch/arm/mach-omap2/gpmc.c                         | 38 ++++-------
- arch/arm/mach-omap2/id.c                           | 13 ++--
- arch/arm/mach-omap2/mux34xx.h                      |  6 +-
- arch/arm/mach-omap2/omap_device.c                  |  2 +-
- arch/arm/mach-omap2/soc.h                          |  2 +
- arch/arm/mach-prima2/Kconfig                       |  2 +-
- arch/arm/mach-spear/spear13xx.c                    |  2 +
- arch/arm/mach-tegra/Kconfig                        |  1 +
- arch/arm/mach-ux500/Kconfig                        |  2 +
- arch/arm/mach-ux500/board-mop500.c                 |  4 +-
- arch/arm/mach-ux500/cpu-db8500.c                   |  2 +-
- drivers/video/Kconfig                              |  2 +-
- drivers/video/mxsfb.c                              |  8 +--
- include/linux/platform_data/imx-iram.h             | 41 ------------
- 45 files changed, 173 insertions(+), 235 deletions(-)
- delete mode 100644 arch/arm/mach-imx/iram_alloc.c
- delete mode 100644 include/linux/platform_data/imx-iram.h
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index e40b435..469b5cc 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -1,4 +1,4 @@
+-CONFIG_EXPERIMENTAL=y
++CONFIG_SYSVIPC=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_BLK_DEV_INITRD=y
+@@ -7,17 +7,18 @@ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ CONFIG_PARTITION_ADVANCED=y
+-CONFIG_EFI_PARTITION=y
+ CONFIG_ARCH_EXYNOS=y
+-CONFIG_S3C_LOWLEVEL_UART_PORT=1
++CONFIG_S3C_LOWLEVEL_UART_PORT=3
+ CONFIG_S3C24XX_PWM=y
+ CONFIG_ARCH_EXYNOS5=y
+ CONFIG_MACH_EXYNOS4_DT=y
+-CONFIG_MACH_EXYNOS5_DT=y
+ CONFIG_SMP=y
+ CONFIG_NR_CPUS=2
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++CONFIG_ZBOOT_ROM_TEXT=0x0
++CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_CMDLINE="root=/dev/ram0 rw ramdisk=8192 initrd=0x41000000,8M console=ttySAC1,115200 init=/linuxrc mem=256M"
+@@ -30,35 +31,54 @@ CONFIG_NET_KEY=y
+ CONFIG_INET=y
+ CONFIG_RFKILL_REGULATOR=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
+ CONFIG_PROC_DEVICETREE=y
+ CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_CRYPTOLOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=8192
+ CONFIG_SCSI=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_CHR_DEV_SG=y
++CONFIG_MD=y
++CONFIG_BLK_DEV_DM=y
++CONFIG_DM_CRYPT=m
+ CONFIG_NETDEVICES=y
+ CONFIG_SMSC911X=y
+ CONFIG_USB_USBNET=y
+ CONFIG_USB_NET_SMSC75XX=y
+ CONFIG_USB_NET_SMSC95XX=y
+ CONFIG_INPUT_EVDEV=y
+-# CONFIG_INPUT_KEYBOARD is not set
+-# CONFIG_INPUT_MOUSE is not set
++CONFIG_KEYBOARD_CROS_EC=y
++# CONFIG_MOUSE_PS2 is not set
++CONFIG_MOUSE_CYAPA=y
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_SAMSUNG=y
+ CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_HW_RANDOM=y
++CONFIG_TCG_TPM=y
++CONFIG_TCG_TIS_I2C_INFINEON=y
+ CONFIG_I2C=y
++CONFIG_I2C_MUX=y
++CONFIG_I2C_ARB_GPIO_CHALLENGE=y
++CONFIG_I2C_S3C2410=y
++CONFIG_DEBUG_GPIO=y
+ # CONFIG_HWMON is not set
++CONFIG_MFD_CROS_EC=y
++CONFIG_MFD_CROS_EC_I2C=y
++CONFIG_MFD_MAX77686=y
+ CONFIG_MFD_TPS65090=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_GPIO=y
++CONFIG_REGULATOR_MAX77686=y
+ CONFIG_REGULATOR_TPS65090=y
+ CONFIG_FB=y
++CONFIG_FB_MODE_HELPERS=y
++CONFIG_FB_SIMPLE=y
+ CONFIG_EXYNOS_VIDEO=y
+ CONFIG_EXYNOS_MIPI_DSI=y
+ CONFIG_EXYNOS_DP=y
+@@ -67,6 +87,19 @@ CONFIG_FONTS=y
+ CONFIG_FONT_7x14=y
+ CONFIG_LOGO=y
+ CONFIG_USB=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_EHCI_S5P=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_DWC3=y
++CONFIG_USB_PHY=y
++CONFIG_SAMSUNG_USB2PHY=y
++CONFIG_SAMSUNG_USB3PHY=y
++CONFIG_MMC=y
++CONFIG_MMC_DW=y
++CONFIG_MMC_DW_IDMAC=y
++CONFIG_MMC_DW_EXYNOS=y
++CONFIG_COMMON_CLK_MAX77686=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT4_FS=y
+@@ -79,6 +112,7 @@ CONFIG_ROMFS_FS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ASCII=y
+ CONFIG_NLS_ISO8859_1=y
++CONFIG_PRINTK_TIME=y
+ CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+ CONFIG_DETECT_HUNG_TASK=y
+@@ -87,6 +121,5 @@ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_MUTEXES=y
+ CONFIG_DEBUG_INFO=y
+ CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_LL=y
+-CONFIG_EARLY_PRINTK=y
++CONFIG_CRYPTO_SHA256=y
+ CONFIG_CRC_CCITT=y
+-- 
+1.8.2.1
