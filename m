@@ -1,25 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 May 2013 09:49:06 +0100
-Subject: omap3430 fails to boot
-Message-ID: <20130509084906.GL21614@n2100.arm.linux.org.uk>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Thu, 9 May 2013 10:02:53 +0100
+Subject: [PATCH v2 0/3] clk: implement remuxing during set_rate
+In-Reply-To: <518AE16D.5060501@codeaurora.org>
+References: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
+ <518AE16D.5060501@codeaurora.org>
+Message-ID: <518B663D.60806@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've not looked into the reason why yet, so this is a heads-up.  I
-notice this morning that the LDP3430 failed to boot last night,
-whereas it worked the previous night.  However, SDP4430 looks fine.
+On 09/05/13 00:36, Stephen Boyd wrote:
+> On 04/19/13 09:28, James Hogan wrote:
+>> This patchset adds support for automatic selection of the best parent
+>> for a clock mux, i.e. the one which can provide the closest clock rate
+>> to that requested. It can be controlled by a new CLK_SET_RATE_REMUX flag
+>> so that it doesn't happen unless explicitly allowed.
+>>
+>> This works by way of adding a new op, determine_rate, similar to
+>> round_rate but with an extra parameter to allow the clock driver to
+>> optionally select a different parent clock. This is used in
+>> clk_calc_new_rates to decide whether to initiate a set_parent operation.
+> 
+> Which tree is this based on? I get failures with git am on patch 2.
+> 
 
-Nothing obvious in the diffstat between the two... but then the patch
-between the two kernels is almost 1.5MB.  The arch/arm changes are
-quite small though:
+It was based on v3.9-rc4.
 
- arch/arm/Kconfig                                   |    1 +
- arch/arm/boot/dts/Makefile                         |    4 +-
- arch/arm/boot/dts/xenvm-4.2.dts                    |   13 +
- arch/arm/include/asm/xen/hypercall.h               |    1 +
- arch/arm/mach-msm/last_radio_log.c                 |    2 +-
- arch/arm/mach-omap2/board-4430sdp.c                |    2 +-
- arch/arm/mach-omap2/board-omap4panda.c             |    2 +-
- arch/arm/mach-omap2/timer.c                        |    4 +
- arch/arm/mach-vexpress/v2m.c                       |    1 -
- arch/arm/mach-virt/virt.c                          |    1 +
+Cheers
+James
