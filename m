@@ -1,28 +1,24 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 9 May 2013 13:15:15 -0700
-Subject: [GIT PULL 2/2] omap device tree fixes for v3.10 merge window
-In-Reply-To: <E1UaVsF-0001Zt-HW@merlin.infradead.org>
-References: <pull-1368125211-439797> <E1UaVsF-0001Zt-HW@merlin.infradead.org>
-Message-ID: <20130509201515.GB21598@quad.lixom.net>
+Date: Thu, 9 May 2013 13:22:08 -0700
+Subject: [PATCH] ARM: EXYNOS5: Fix kernel dump in AFTR idle mode
+In-Reply-To: <1367235107-31328-1-git-send-email-inderpal.singh@linaro.org>
+References: <1367235107-31328-1-git-send-email-inderpal.singh@linaro.org>
+Message-ID: <20130509202208.GA21831@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 09, 2013 at 11:46:51AM -0700, Tony Lindgren wrote:
-> The following changes since commit bb9055b2744ada735a2fe555c4196ad39a83ef2a:
+On Mon, Apr 29, 2013 at 05:01:47PM +0530, Inderpal Singh wrote:
+> The kernel crashes while resuming from AFTR idle mode. It happens
+> because L2 cache was not going into retention state.
 > 
->   Merge tag 'multiplatform-for-linus-2' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2013-05-07 11:28:42 -0700)
+> This patch configures the USE_RETENTION bit of ARM_L2_OPTION register
+> so that it does not depend on MANUAL_L2RSTDISABLE_CONTROL of
+> ARM_COMMON_OPTION register for L2RSTDISABLE signal.
 > 
-> are available in the git repository at:
-> 
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/dt-fixes-for-merge-window
-> 
-> for you to fetch changes up to 914dc329ee11d6b1ecbebef802962dc06e78b942:
-> 
->   ARM: dts: don't assume boards are using twl4030 for omap3 (2013-05-09 09:06:57 -0700)
+> Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
 
-
-Pulled, thanks.
+I haven't seen any activity from Kgene on this, but it seems reasonably bad
+(and the fix is self-contained). Applying to arm-soc fixes branch.
 
 
 -Olof
