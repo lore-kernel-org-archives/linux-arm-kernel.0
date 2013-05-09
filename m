@@ -1,37 +1,33 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Thu, 9 May 2013 04:12:10 +0000
-Subject: [v2, 3/3] ARM: dts: AM33XX: Add NAND flash device tree data to
- am335x-evm
-In-Reply-To: <20130508235404.GX32546@atomide.com>
-References: <ebfab3e9123b3e50b9a9678c1480191addd86d59.1359007746.git.avinashphilip@ti.com>
- <517F5126.5000509@ti.com> <20130508235404.GX32546@atomide.com>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73E9C320D@DBDE04.ent.ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 9 May 2013 13:20:31 +0900
+Subject: [PATCH] ARM: shmobile: fix sleep-r8a7740.S miscompiles
+In-Reply-To: <20130509032544.GB13994@verge.net.au>
+References: <201305081418.05091.arnd@arndb.de>
+ <20130509032544.GB13994@verge.net.au>
+Message-ID: <20130509042031.GA7832@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > >
-> > >  	am33xx_pinmux: pinmux at 44e10800 {
-> > >  		pinctrl-names = "default";
-> > > -		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0>;
-> > > +		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0
-> > > +			&nandflash_pins_s0>;
-> >
-> > Why add this to the board level fallback (called pinctrl hogs, I think)?
-> > This can be part of nand node you added below so that the pinctrl will
-> > take effect when nand gets probed instead of all the time.
+On Thu, May 09, 2013 at 12:25:44PM +0900, Simon Horman wrote:
+> On Wed, May 08, 2013 at 02:18:04PM +0200, Arnd Bergmann wrote:
+> > The newly added sleep-r8a7740.S file in shmobile does not
+> > actually build because of renamed symbols.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Bastian Hecht <hechtb+renesas@gmail.com>
+> > Cc: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> > 
+> > Simon, please apply to whichever branch of yours has the broken commit,
+> > or fold this patch into Bastian's patch.
+> > 
+> > linux-next doesn't build for me because of this, mainline is still fine.
 > 
-> Yes we should have all the pinctrl entries under the related drivers.
-> This makes it easy remux pins during runtime if needed, and also
-> allows unloading pinctrl-single.ko for development.
+> Sure, will do.
 > 
-Yes, accepted. This has been already fixed in v3 of this patch set.
-If all fine, then please pull this for next merge..
+> I am traveling today so I may not be able to deal with this
+> properly until tomorrow.
 
-http://lists.infradead.org/pipermail/linux-mtd/2013-May/046712.html
-
-http://lists.infradead.org/pipermail/linux-mtd/2013-May/046814.html (already pulled)
-
-http://lists.infradead.org/pipermail/linux-mtd/2013-May/046710.html
-
-
-with regards, pekon
+I have queued this up in the soc-r8a7740 branch, where the problem was
+added. I have pushed this branch along with a refreshed next branch.
+This change should appear in linux-next in the not to distant future.
