@@ -1,97 +1,82 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 9 May 2013 08:39:33 -0700
-Subject: arch/arm/mach-omap2/id.c - IS_ERR_OR_NULL()
-In-Reply-To: <20130509090911.GM21614@n2100.arm.linux.org.uk>
-References: <20130509090911.GM21614@n2100.arm.linux.org.uk>
-Message-ID: <20130509153933.GA31554@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 9 May 2013 16:43:52 +0100
+Subject: [PATCH 1/3] driver core: Add API to wait for deferred probe to
+ complete during init
+In-Reply-To: <20130509150750.GW18614@n2100.arm.linux.org.uk>
+References: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
+ <1368076726-11492-2-git-send-email-skannan@codeaurora.org>
+ <CACVXFVMd_iRtEM8ZLK6Ps66gZO6SCp1mXSgY6JbWtRJjJUh+ag@mail.gmail.com>
+ <CACxGe6uHBNUcbD9SeRP5c3E8NN-Z2yjVV+9VAhuoJnXoBtTu2w@mail.gmail.com>
+ <20130509135017.GD3200@sirena.org.uk>
+ <20130509141444.GV18614@n2100.arm.linux.org.uk>
+ <20130509143702.GE3200@sirena.org.uk>
+ <20130509150750.GW18614@n2100.arm.linux.org.uk>
+Message-ID: <20130509154352.GG3200@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [130509 02:14]:
-> So, I eliminated all but a very few of these from arch/arm, and I notice
-> today that there's a new couple of instances introduced by:
+On Thu, May 09, 2013 at 04:07:50PM +0100, Russell King - ARM Linux wrote:
+> On Thu, May 09, 2013 at 03:37:02PM +0100, Mark Brown wrote:
 
-Sorry I should have noticed that fnord, I had it in my muttrc but had
-a an unnecessary \ in the expression so it did not work.  
+> > That's clearly a "don't do that then" sort of thing; while we don't want
+> > to be unhelpful there's no guarantees with this approach.
 
-Here's a patch to fix the issue.
+> That's not a "don't do that then" thing, because in this case it's
+> unreasonable to say that.  The display subsystems like fbdev and
+> DRM represent quite a sizable chunk:
 
-Hmm maybe we could redefine IS_ERR_OR_NULL as error in some ARM header
-as long as drivers don't include it?
+> - Base DRM is around 200k.
+> - DRM drivers typically around 100k each.
+> - Base FBdev is around 100k.
 
-Regards,
+> It won't take long before you're into the territory of having a
+> significant portion of your kernel being display drivers of one
+> type or other, much of which won't be usable on any one specific
+> platform.  So to say "don't build your display drivers as modules"
+> is an unreasonable position to take.
 
-Tony
+Sure, it's unhelpful for distro style kernels.  Like I say, 90%.
 
+> > Another option here which is more in tune with deferred probing and
+> > hotplugging would be to switch the delay over to be time based rather
+> > than initcall based; do the shutdown at some point based on the time the
+> > last resource was registered.  That still won't cover everything
+> > though we could make the delay tunable.
 
-From: Tony Lindgren <tony@atomide.com>
-Date: Thu, 9 May 2013 08:27:25 -0700
-Subject: [PATCH] ARM: OMAP2+: Remove bogus IS_ERR_OR_NULL checking from id.c
+> Yuck.  That's crap design.  Really, time based stuff is crap.  I've seen
+> this too many times with the gnome crap in Ubuntu 12.04 - where if you
+> boot this off SD card it will complain that some applets fail to start
+> (and sure enough, half your panel is missing.)  Boot it off eSATA and
+> it works 100% reliably.
 
-Commit 6770b211 (ARM: OMAP2+: Export SoC information to userspace)
-had some broken return value handling as noted by Russell King:
+No argument here, there's a reason I immediately went to the "make it
+tunable" fudge factor.
 
-+       soc_dev = soc_device_register(soc_dev_attr);
-+       if (IS_ERR_OR_NULL(soc_dev)) {
-+               kfree(soc_dev_attr);
-+               return;
-+       }
-+
-+       parent = soc_device_to_device(soc_dev);
-+       if (!IS_ERR_OR_NULL(parent))
-+               device_create_file(parent, &omap_soc_attr);
+> A better solution may be to avoid the problem in kernel space altogether.
+> That's already done in the past with the scsi_wait_scan module.  Make the
+> the shutdown of stuff a separate loadable module which userspace can load
+> at the appropriate time to trigger the shutdown of unused resources.  Or
+> provide a different method for userspace to trigger that action.
 
-This is nonsense.  For the first, IS_ERR() is sufficient.  For the second,
-tell me what error checking is required in the return value of this
-function:
+> With that kind of solution, it is possible to know that the system has
+> finished booting (many userspace implementations already do this with
+> stuff like not permitting login via network until after the system has
+> finished booting despite sshd et.al. already being started.)
 
-struct device *soc_device_to_device(struct soc_device *soc_dev)
-{
-        return &soc_dev->dev;
-}
+This works fine for boot but if we're going to solve this properly and
+asking userspace to make changes we probably ought to be trying to
+handle the actual hotplug case (which the current bodge doesn't cope
+with at all) as well.  A similar tactic with asking for handshaking from
+userspace for hotplug notifications should work though it'd be a bit
+more hassle to deploy.
 
-when you've already determined that the passed soc_dev is a valid pointer.
-If you read the comments against the prototype:
-
-/**
- * soc_device_to_device - helper function to fetch struct device
- * @soc: Previously registered SoC device container
- */
-struct device *soc_device_to_device(struct soc_device *soc);
-
-if "soc" is valid, it means the "previously registered SoC device container"
-must have succeeded and that can only happen if the struct device has been
-registered.  Ergo, there will always be a valid struct device pointer for
-any registered SoC device container.  Therefore, if soc_device_register()
-succeeds, then the return value from soc_device_to_device() will always be
-valid and no error checking of it is required.
-
-Simples.  The rule as ever applies here: get to know the APIs your using
-and don't fumble around in the dark hoping that you'll get this stuff
-right.
-
-Fix it as noted by Russell.
-
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index 9bc5a18..1272c41 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -648,13 +648,12 @@ void __init omap_soc_device_init(void)
- 	soc_dev_attr->revision = soc_rev;
- 
- 	soc_dev = soc_device_register(soc_dev_attr);
--	if (IS_ERR_OR_NULL(soc_dev)) {
-+	if (IS_ERR(soc_dev)) {
- 		kfree(soc_dev_attr);
- 		return;
- 	}
- 
- 	parent = soc_device_to_device(soc_dev);
--	if (!IS_ERR_OR_NULL(parent))
--		device_create_file(parent, &omap_soc_attr);
-+	device_create_file(parent, &omap_soc_attr);
- }
- #endif /* CONFIG_SOC_BUS */
+Or perhaps given that it should be simple for userspace and there's
+probably other uses for the information we just put the hook in there
+anyway even if this particular problem gets a better solution later on.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130509/10ea8e4c/attachment-0001.sig>
