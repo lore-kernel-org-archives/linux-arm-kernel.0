@@ -1,77 +1,59 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 9 May 2013 23:18:18 +0530
-Subject: [PATCHv2 2/4] mailbox: Introduce a new common API
-In-Reply-To: <518BD197.2030502@ti.com>
-References: <1367824946-6160-1-git-send-email-jaswinder.singh@linaro.org>
- <1367825046-6229-1-git-send-email-jaswinder.singh@linaro.org>
- <518BCF4B.1060504@ti.com>
- <CAJe_Zhd=FDV3YP=XR8Yay1iy_geAt3tqj+diUxrVkd2BFSfb-g@mail.gmail.com>
- <518BD197.2030502@ti.com>
-Message-ID: <CABb+yY2CnO5RiQNdcB_L5ZiGi829Ys0ODH2UmhtZxj=aJo3ioQ@mail.gmail.com>
+From: fathi.boudra@linaro.org (Fathi Boudra)
+Date: Thu, 9 May 2013 20:51:57 +0300
+Subject: Fwd: Tegra 30 System hangs because of commit "pinctrl: move
+ subsystem mutex to pinctrl_dev struct"
+In-Reply-To: <CAOesGMiqrXSPdEtUzGCuAuhdE4K7FVe65zMM962XuOrO555hnQ@mail.gmail.com>
+References: <CAK5ve-KXdS8az=Gtja-mF=Z3_EeZVA7bLYSU0EE2mf5bHmSUKw@mail.gmail.com>
+ <CAK5ve-KBDyvjNRVMcXgfnhYcajdcGsuAKaepzCBt+epiXoYvSw@mail.gmail.com>
+ <517ED12B.8080502@wwwdotorg.org>
+ <20130504133004.GC24282@game.jcrosoft.org>
+ <CACRpkdbBVJtWrRO+J=pWjfLXTcVKX++x-eeJQXGeQn_WOURUNQ@mail.gmail.com>
+ <20130505112819.GD24282@game.jcrosoft.org>
+ <CACRpkdZdT8==cUtH4=Y3LC-eVu6ntO2ojFC4bSXNuxa4hMJ=ZA@mail.gmail.com>
+ <20130505202236.GF24282@game.jcrosoft.org>
+ <CACRpkda2EG0O-pfZQ5kLFX=cwSmUSVBJkR7Xvye3ROs3tstv9w@mail.gmail.com>
+ <20130506194122.GG24282@game.jcrosoft.org>
+ <20130506195403.GJ18614@n2100.arm.linux.org.uk>
+ <CACRpkdZtPhzLFicYYZF0SZfp4dMJars+Z-7hTUZQ1JjPExXW3A@mail.gmail.com>
+ <CACxGe6uo60OwRd7buPX4382_vE48MLWJYyB_ka+iS2FfVCa8mw@mail.gmail.com>
+ <CAOesGMiqrXSPdEtUzGCuAuhdE4K7FVe65zMM962XuOrO555hnQ@mail.gmail.com>
+Message-ID: <CAGNsrLDw0_yX9nkLYDg0e8-551P7r43UxziTp1TXyyxdiKR5nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 9, 2013 at 10:10 PM, Suman Anna <s-anna@ti.com> wrote:
-> On 05/09/2013 11:41 AM, Jassi Brar wrote:
->> On 9 May 2013 22:01, Suman Anna <s-anna@ti.com> wrote:
->>> Hi Jassi,
->>>
->>> On 05/06/2013 02:24 AM, Jassi Brar wrote:
->>>> +++ b/include/linux/mailbox_client.h
->>>> @@ -0,0 +1,85 @@
->>>> +/*
->>>> + * This program is free software; you can redistribute it and/or modify
->>>> + * it under the terms of the GNU General Public License version 2 as
->>>> + * published by the Free Software Foundation.
->>>> + */
->>>> +
->>>> +#ifndef __MAILBOX_CLIENT_H
->>>> +#define __MAILBOX_CLIENT_H
->>>> +
->>>> +#include <linux/mailbox.h>
->>>> +
->>>> +/**
->>>> + * struct ipc_client - User of a mailbox
->>>> + * @chan_name: the "controller:channel" this client wants
->>>> + * @rxcb: atomic callback to provide client the data received
->>>> + * @txcb: atomic callback to tell client of data transmission
->>>> + * @tx_block: if the ipc_send_message should block until data is transmitted
->>>> + * @tx_tout: Max block period in ms before TX is assumed failure
->>>> + * @knows_txdone: if the client could run the TX state machine. Usually if
->>>> + *    the client receives some ACK packet for transmission. Unused if the
->>>> + *    controller already has TX_Done/RTR IRQ.
->>>> + * @cntlr_data: Optional controller specific parameters during channel request
->>>> + */
->>>> +struct ipc_client {
->>>> +     char *chan_name;
->>>> +     void (*rxcb)(void *data);
->>>> +     void (*txcb)(request_token_t t, enum xfer_result r);
->>>
->>> We have to introduce a callback data pointer, so that the calling
->>> clients can retrieve a context object variable or some other useful
->>> data within the callback functions, just like most normal callback
->>> function declarations and registrations do.
->>>
->> I meant the request_token_t for the purpose. That's how we do with DMAEngine.
+On 9 May 2013 19:13, Olof Johansson <olof@lixom.net> wrote:
+> On Thu, May 9, 2013 at 6:25 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+>> On Mon, May 6, 2013 at 9:12 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>> On Mon, May 6, 2013 at 9:54 PM, Russell King - ARM Linux
+> Yes, a builder is quite useful. Several of us do our own builds as well.
 >
-> I faced this issue on the rxcb while adopting the
-> omap_rproc_mbox_callback. omap_remoteproc is a common driver for all the
-> OMAP co-processors and there can be multiple instances, providing the
-> same set of features. Look at the code in
-> drivers/remoteproc/omap_remoteproc.c and you will get the idea. But in
-> general, the users registering callback functions would prefer to get
-> some context pointer back.
+> When it comes to boot coverage, I'm not sure how successful a central
+> approach would be. It's something where I think Linaro could
+> contribute a lot for their member platforms, but I haven't seen much
+> engagement there yet.
+
+My previous post was lost. Sorry to repost..
+
+We've got a jenkins instance doing daily builds on various trees and
+boot testing on the few boards we've got in the lab:
+https://ci.linaro.org/jenkins/view/kernel-ci/
+
+But it hasn't attracted much interest so far... It's been here since a year.
+
+> Beyond there, I'd say the expectation is that each maintainer should
+> keep an eye on their own platforms. They _should_ try building and
+> booting linux-next on their platforms, to catch regressions early. And
+> definitely around now, I'd like to see people boot mainline on their
+> platforms to make sure we haven't added any severe regressions in the
+> 3.10 merge window, etc. Some people are really good at this, others
+> less so.
 >
-Of course they do. The request_token_t returned corresponds to the
-request they submit via ipc_send_message.
+> What's the old saying, you can lead a horse to water but you can't
+> make him drink? You can build a boot test cluster but you can't make
+> anyone pay attention to it. :(
+>
+> -Olof
 
-Perhaps we should change the following
+Cheers,
 
-   void ipc_link_txdone(struct ipc_link *link, enum xfer_result r)
-to
-   void ipc_link_txdone(struct ipc_link *link, enum xfer_result r, void *data)
-
-So that the API could pass that onto clients ?
-
-regards,
-jassi
+Fathi
