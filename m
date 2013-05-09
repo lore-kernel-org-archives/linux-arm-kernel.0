@@ -1,35 +1,75 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 9 May 2013 14:50:17 +0100
-Subject: [PATCH 1/3] driver core: Add API to wait for deferred probe to
- complete during init
-In-Reply-To: <CACxGe6uHBNUcbD9SeRP5c3E8NN-Z2yjVV+9VAhuoJnXoBtTu2w@mail.gmail.com>
-References: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
- <1368076726-11492-2-git-send-email-skannan@codeaurora.org>
- <CACVXFVMd_iRtEM8ZLK6Ps66gZO6SCp1mXSgY6JbWtRJjJUh+ag@mail.gmail.com>
- <CACxGe6uHBNUcbD9SeRP5c3E8NN-Z2yjVV+9VAhuoJnXoBtTu2w@mail.gmail.com>
-Message-ID: <20130509135017.GD3200@sirena.org.uk>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Thu, 09 May 2013 15:00:16 +0100
+Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
+In-Reply-To: <20130509132600.GA3200@sirena.org.uk>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <1368022272-2241-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305081650.23264.arnd@arndb.de>
+ <20130508150141.GA5057@opensource.wolfsonmicro.com> <518A8E6C.6070907@st.com>
+ <20130509095143.GB7478@sirena.org.uk> <518B8F49.5020902@st.com>
+ <20130509132600.GA3200@sirena.org.uk>
+Message-ID: <518BABF0.7040201@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 09, 2013 at 12:50:46PM +0100, Grant Likely wrote:
+On 09/05/13 14:26, Mark Brown wrote:
+> On Thu, May 09, 2013 at 12:58:01PM +0100, Srinivas KANDAGATLA wrote:
+> 
+>> Currently, we have two bits of information which come from device trees.
+>> 1> The syscon bank/group definition itself.
+>> 2> syscon register offsets and bits information to the drivers.
+> 
+>> These are the 2 things which keep changing per each SOC.
+> 
+>> There is no other way to pass this information to the drivers other than
+>> passing them as part of their own device node and syscon node.
+> 
+> Sure there is, for example the drivers could have this information
+> internally as part of knowing which device they're working with or they
+> could take advantage of some patterns in the register map to store some
+> higher level information that they use to configure.
+> 
+Some of layouts of the sysconf registers are totally changed for each SOC.
 
-> However, if a device that shuts down resources after init has
-> completed and then cannot turn those resources back on when another
-> driver requests them then it sounds like there is a bigger design
-> problem. We're in a hotplug world and most of the time a driver cannot
-> assume that a resource will never get requested after initcalls have
-> completed. It sounds like a design bug in the driver if it cannot
-> handle that use case.
+Looking at driver by driver maybe some drivers can take advantage of the
+patterns, but Am not sure if this will be a sustainable solution for all
+the drivers.
 
-Even if the driver copes fine it can still be desirable to avoid the
-power down/up cycle if it involves some user visible effect - things
-like blinking the display off then on for example.  That said I am a
-little suspicious about this approach, it doesn't feel as robust as it
-should to go round individual callers.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130509/a652d63c/attachment.sig>
+The big disadvantage of this approach is that
+- Every driver has to be touched for new SOC,
+- Secondly the drivers will end up having more of such information than
+code over a time.
+
+>>>  and to the extent that it is sensible it feels like something
+>>> which might be useful with any device using register maps, not just
+>>> syscon.
+> 
+>> If you think this is going to be useful for other drivers, Am happy to
+>> move this out of syscon to regmap something like adding
+>> of_regmap_field_claim/regmap_field_claim/regmap_field_read/regmap_field_write/regmap_field_release
+>> functions.
+> 
+>> so any exiting drivers can still use the old syscon API to get the
+>> regmap instance.
+>> Alternatively they can use the new regmap APIs directly.
+> 
+> Well, I'd need to see the code to decide if it was sane but I do think
+> that if this is a good approach it's not syscon specific.  Anything like
+> this needs to be independent of DT too since not all architectures use
+> DT.
+In the suggested approach, the API supports, both DT and non-DT style.
+
+for DT style user can use.
+of_regmap_field_claim -> regmap_field_read -> regmap_field_write-
+->regmap_field_release
+
+and for NON-DT user can use
+regmap_field_claim  -> regmap_field_read -> regmap_field_write-
+->regmap_field_release
+
+
+thanks,
+srini
+
+
+> 
