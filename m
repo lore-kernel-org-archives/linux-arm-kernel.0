@@ -1,48 +1,51 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 May 2013 17:13:28 -0700
-Subject: [GIT PULL] ARM: OMAP2+: GPMC fixes for v3.10
-In-Reply-To: <517FCCF0.1030105@ti.com>
-References: <517FCCF0.1030105@ti.com>
-Message-ID: <20130509001328.GY32546@atomide.com>
+Date: Wed, 8 May 2013 17:16:07 -0700
+Subject: [PATCH v3,2/3] ARM: dts: AM33XX: Add GPMC node
+In-Reply-To: <2645efefa3d36388ff1d4b64255d880b6587770f.1359007746.git.avinashphilip@ti.com>
+References: <2645efefa3d36388ff1d4b64255d880b6587770f.1359007746.git.avinashphilip@ti.com>
+Message-ID: <20130509001606.GZ32546@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130430 06:59]:
-> The following changes since commit aecb65a34a780cd07fbaa652cc5d640f13f3ed5f:
+* Gupta, Pekon <pekon@ti.com> [130502 02:49]:
+> From: "Philip, Avinash" <avinashphilip@ti.com>
 > 
->   Merge branch 'omap-gpmc-for-v3.10-take2' of git://github.com/jonhunter/linux into omap-for-v3.10/gpmc (2013-04-04 11:22:33 -0700)
+> Add GPMC data node to AM33XX device tree file.
 > 
-> are available in the git repository at:
-> 
->   git://github.com/jonhunter/linux.git omap-gpmc-fixes-for-v3.10
-> 
-> for you to fetch changes up to b327b3627bb428eb7d98f25224532425a673d89e:
-> 
->   ARM: OMAP2+: only WARN if a GPMC child probe function fail (2013-04-30 08:43:05 -0500)
-> 
-> ----------------------------------------------------------------
-> GPMC fixes for v3.10. Main fix is to only search the GPMC node
-> for GPMC child devices and not the entire device-tree (which was
-> breaking ethernet support on some boards where the GPMC does not
-> interface with the ethernet chip). This branch is based upon
-> Tony's omap-for-v3.10/gpmc branch.
+> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
+> Signed-off-by: Pekon Gupta <pekon@ti.com>
 
-Thanks pulling into omap-for-v3.10/fixes.
-
-Regards,
+Thanks adding into omap-for-v3.10/dt-fixes.
 
 Tony
-
-> ----------------------------------------------------------------
-> Javier Martinez Canillas (3):
->       Documentation: dt: update TI GPMC ethernet binding properties
->       ARM: OMAP2+: only search for GPMC DT child nodes on probe
->       ARM: OMAP2+: only WARN if a GPMC child probe function fail
+ 
+> ---
+> Changes in v2:
+> 	- Change number of chip select to 7
 > 
-> Jon Hunter (1):
->       Documentation: dt: update properties in TI GPMC NAND example
+>  arch/arm/boot/dts/am33xx.dtsi |   12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
->  .../devicetree/bindings/mtd/gpmc-nand.txt          |   28 +++++-----
->  Documentation/devicetree/bindings/net/gpmc-eth.txt |   56 ++++++++++----------
->  arch/arm/mach-omap2/gpmc.c                         |   38 +++++--------
->  3 files changed, 54 insertions(+), 68 deletions(-)
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 24fc835..1048795 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -407,5 +407,17 @@
+>  			ti,hwmods = "elm";
+>  			status = "disabled";
+>  		};
+> +
+> +		gpmc: gpmc at 50000000 {
+> +			compatible = "ti,am3352-gpmc";
+> +			ti,hwmods = "gpmc";
+> +			reg = <0x50000000 0x2000>;
+> +			interrupts = <100>;
+> +			num-cs = <7>;
+> +			num-waitpins = <2>;
+> +			#address-cells = <2>;
+> +			#size-cells = <1>;
+> +			status = "disabled";
+> +		};
+>  	};
+>  };
