@@ -1,34 +1,33 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 09 May 2013 14:59:47 +0200
-Subject: GPIO sysfs : set a wake source
-Message-ID: <87fvxwia0s.fsf@free.fr>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 9 May 2013 14:01:00 +0100
+Subject: [PATCH 28/63] ARM: ux500: Stop passing UART's platform data for
+ Device Tree boots
+In-Reply-To: <CACRpkdYCABo0AULsiUgwm3g=906iKzp_ZDFKLj=HgDbNK9mNUQ@mail.gmail.com>
+References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
+ <1367591569-32197-29-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYCABo0AULsiUgwm3g=906iKzp_ZDFKLj=HgDbNK9mNUQ@mail.gmail.com>
+Message-ID: <20130509130100.GA12156@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, 03 May 2013, Linus Walleij wrote:
 
-I was thinking on how to remove all "gpio_request()" from my board code
-(arch/arm/mach-pxa/mioa701.c).
+> On Fri, May 3, 2013 at 4:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > It was required to pass DMA channel configuration information to the
+> > UART driver before the new DMA API was in place. Now that it is, and
+> > is fully compatible with Device Tree we can stop doing that.
+> >
+> > Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> I can't apply this as it is clearly dependent on a patch to
+> drivers/tty/serial/amba-pl011.c that is not yet upstream.
 
-I have a small difficulty with the functionality provided by gpiolib in
-userspace. This is what I need :
- - define a gpio as an input
- - define this gpio to be an interrupt source
- - define this interrupt to be a wake-up source
-
-In kernel, I had : gpio_request(), request_irq(), and gpio_set_wake() (in
-mioa701, this ends up in gsm_on_irq()).
-
-In userspace I have :
- - echo 113 > /sys/class/gpio/export
- - echo in > /sys/class/gpio/gpio113/direction
- - echo both > /sys/class/gpio/gpio113/edge
-
-And here, I don't know how to trigger a call to gpio_set_wake(113, 1). Do you
-provide that API somewhere in sysfs that I didn't find ? Because that's what I
-need to obliterate gpio calls from my board code.
-
-Cheers.
+It is now.
 
 -- 
-Robert
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
