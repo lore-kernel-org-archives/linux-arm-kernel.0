@@ -1,43 +1,97 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 9 May 2013 08:20:48 -0700
-Subject: omap3430 fails to boot
-In-Reply-To: <20130509084906.GL21614@n2100.arm.linux.org.uk>
-References: <20130509084906.GL21614@n2100.arm.linux.org.uk>
-Message-ID: <20130509152047.GA32546@atomide.com>
+Date: Thu, 9 May 2013 08:39:33 -0700
+Subject: arch/arm/mach-omap2/id.c - IS_ERR_OR_NULL()
+In-Reply-To: <20130509090911.GM21614@n2100.arm.linux.org.uk>
+References: <20130509090911.GM21614@n2100.arm.linux.org.uk>
+Message-ID: <20130509153933.GA31554@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [130509 01:54]:
-> I've not looked into the reason why yet, so this is a heads-up.  I
-> notice this morning that the LDP3430 failed to boot last night,
-> whereas it worked the previous night.  However, SDP4430 looks fine.
-> 
-> Nothing obvious in the diffstat between the two... but then the patch
-> between the two kernels is almost 1.5MB.  The arch/arm changes are
-> quite small though:
-> 
->  arch/arm/Kconfig                                   |    1 +
->  arch/arm/boot/dts/Makefile                         |    4 +-
->  arch/arm/boot/dts/xenvm-4.2.dts                    |   13 +
->  arch/arm/include/asm/xen/hypercall.h               |    1 +
->  arch/arm/mach-msm/last_radio_log.c                 |    2 +-
->  arch/arm/mach-omap2/board-4430sdp.c                |    2 +-
->  arch/arm/mach-omap2/board-omap4panda.c             |    2 +-
->  arch/arm/mach-omap2/timer.c                        |    4 +
->  arch/arm/mach-vexpress/v2m.c                       |    1 -
->  arch/arm/mach-virt/virt.c                          |    1 +
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [130509 02:14]:
+> So, I eliminated all but a very few of these from arch/arm, and I notice
+> today that there's a new couple of instances introduced by:
 
-Since one boots and one won't, you're probably missing this one:
+Sorry I should have noticed that fnord, I had it in my muttrc but had
+a an unnecessary \ in the expression so it did not work.  
 
-956e46ef mm/slab: Fix crash during slab init
+Here's a patch to fix the issue.
 
-Looking at your diffstat you probably have this as otherwise
-nothing boots:
-
-9affd6be arm: fix mismerge of arch/arm/mach-omap2/timer.c
-
-Let me know if you still have the issue after updating to 956e46ef.
+Hmm maybe we could redefine IS_ERR_OR_NULL as error in some ARM header
+as long as drivers don't include it?
 
 Regards,
 
 Tony
+
+
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 9 May 2013 08:27:25 -0700
+Subject: [PATCH] ARM: OMAP2+: Remove bogus IS_ERR_OR_NULL checking from id.c
+
+Commit 6770b211 (ARM: OMAP2+: Export SoC information to userspace)
+had some broken return value handling as noted by Russell King:
+
++       soc_dev = soc_device_register(soc_dev_attr);
++       if (IS_ERR_OR_NULL(soc_dev)) {
++               kfree(soc_dev_attr);
++               return;
++       }
++
++       parent = soc_device_to_device(soc_dev);
++       if (!IS_ERR_OR_NULL(parent))
++               device_create_file(parent, &omap_soc_attr);
+
+This is nonsense.  For the first, IS_ERR() is sufficient.  For the second,
+tell me what error checking is required in the return value of this
+function:
+
+struct device *soc_device_to_device(struct soc_device *soc_dev)
+{
+        return &soc_dev->dev;
+}
+
+when you've already determined that the passed soc_dev is a valid pointer.
+If you read the comments against the prototype:
+
+/**
+ * soc_device_to_device - helper function to fetch struct device
+ * @soc: Previously registered SoC device container
+ */
+struct device *soc_device_to_device(struct soc_device *soc);
+
+if "soc" is valid, it means the "previously registered SoC device container"
+must have succeeded and that can only happen if the struct device has been
+registered.  Ergo, there will always be a valid struct device pointer for
+any registered SoC device container.  Therefore, if soc_device_register()
+succeeds, then the return value from soc_device_to_device() will always be
+valid and no error checking of it is required.
+
+Simples.  The rule as ever applies here: get to know the APIs your using
+and don't fumble around in the dark hoping that you'll get this stuff
+right.
+
+Fix it as noted by Russell.
+
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 9bc5a18..1272c41 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -648,13 +648,12 @@ void __init omap_soc_device_init(void)
+ 	soc_dev_attr->revision = soc_rev;
+ 
+ 	soc_dev = soc_device_register(soc_dev_attr);
+-	if (IS_ERR_OR_NULL(soc_dev)) {
++	if (IS_ERR(soc_dev)) {
+ 		kfree(soc_dev_attr);
+ 		return;
+ 	}
+ 
+ 	parent = soc_device_to_device(soc_dev);
+-	if (!IS_ERR_OR_NULL(parent))
+-		device_create_file(parent, &omap_soc_attr);
++	device_create_file(parent, &omap_soc_attr);
+ }
+ #endif /* CONFIG_SOC_BUS */
