@@ -1,43 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 09 May 2013 13:35:14 +0100
-Subject: [PATCH] arm64: KVM: Fix HCR_EL2 and VTCR_EL2 configuration bits
-In-Reply-To: <1368099611-4738-1-git-send-email-pranavkumar@linaro.org>
-References: <1368099611-4738-1-git-send-email-pranavkumar@linaro.org>
-Message-ID: <518B9802.1080505@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu,  9 May 2013 13:50:55 +0100
+Subject: [PATCH] serial: pl011: protect attribute read from NULL platform data
+ struct
+Message-ID: <1368103855-28363-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pranav,
+It's completely feasible that platform data will be empty i.e. when
+booting with Device Tree with no device AUXDATA. So we must protect
+it's use in these use-cases, or risk a kernel Oops.
 
-On 09/05/13 12:40, Pranavkumar Sawargaonkar wrote:
-> This patch does following fixes:
-> 
-> 1. Make HCR_* flags as unsigned long long constants
-> Reason : By default, compiler assumes numeric constants as
-> signed hence sign extending it when assigned to unsigned variable
-> such as hcr_el2 (in VCPU context). This accidently sets HCR_ID and
-> HCR_CD making entire guest memory non-cacheable. On real HW, this
-> breaks Stage2 ttbl walks and also breaks VirtIO.
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: Jiri Slaby <jslaby@suse.cz>
+Cc: linux-serial at vger.kernel.org
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+*******                                                        *******
+If this issue has not already been fixed, this patch should be applied
+during the v3.10 -rc:s, as it fixes a serious bug which was introduced
+in the merge-window.
+*******                                                        *******
 
-Ah. Nice one. I fixed a couple of similar bugs already, but didn't
-notice that one yet, for obvious reasons...
+ drivers/tty/serial/amba-pl011.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I'll probably rewrite that patch to use the UL(x) macro instead of
-_AC(), as we don't need to have an unsigned long long, and that makes
-the code look much nicer (sort of).
-
-> 2. VTCR_EL2_ORGN0_WBWA and VTCR_EL2_IRGN0_WBWA macros.
-
-Blah. Copy paste. Fucks me all the time.
-
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> ---
->  arch/arm64/include/asm/kvm_arm.h |   73 +++++++++++++++++++-------------------
->  1 file changed, 37 insertions(+), 36 deletions(-)
-
-Thanks a lot,
-
-	M.
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 8ab70a6..e2774f9 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -332,7 +332,7 @@ static void pl011_dma_probe_initcall(struct device *dev, struct uart_amba_port *
+ 		dmaengine_slave_config(chan, &rx_conf);
+ 		uap->dmarx.chan = chan;
+ 
+-		if (plat->dma_rx_poll_enable) {
++		if (plat && plat->dma_rx_poll_enable) {
+ 			/* Set poll rate if specified. */
+ 			if (plat->dma_rx_poll_rate) {
+ 				uap->dmarx.auto_poll_rate = false;
 -- 
-Jazz is not dead. It just smells funny...
+1.7.10.4
