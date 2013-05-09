@@ -1,25 +1,27 @@
 From: holt@sgi.com (Robin Holt)
-Date: Thu,  9 May 2013 14:23:15 -0500
-Subject: [PATCH -v9 01/11] CPU hotplug: Provide a generic helper to
- disable/enable CPU hotplug
+Date: Thu,  9 May 2013 14:23:16 -0500
+Subject: [PATCH -v9 02/11] Migrate shutdown/reboot to boot cpu.
 In-Reply-To: <1368127405-112717-1-git-send-email-holt@sgi.com>
 References: <1368127405-112717-1-git-send-email-holt@sgi.com>
-Message-ID: <1368127405-112717-2-git-send-email-holt@sgi.com>
+Message-ID: <1368127405-112717-3-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Srivatsa S. Bhat" <srivatsa.bhat@linux.vnet.ibm.com>
+We recently noticed that reboot of a 1024 cpu machine takes approx 16
+minutes of just stopping the cpus.  The slowdown was tracked to commit
+f96972f.
 
-There are instances in the kernel where we would like to disable
-CPU hotplug (from sysfs) during some important operation. Today
-the freezer code depends on this and the code to do it was kinda
-tailor-made for that.
+The current implementation does all the work of hot removing the cpus
+before halting the system.  We are switching to just migrating to the
+boot cpu and then continuing with shutdown/reboot.
 
-Restructure the code and make it generic enough to be useful for
-other usecases too.
+This also has the effect of not breaking x86's command line parameter for
+specifying the reboot cpu.  Note, this code was shamelessly copied from
+arch/x86/kernel/reboot.c with bits removed pertaining to the reboot_cpu
+command line parameter.
 
-Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
 Signed-off-by: Robin Holt <holt@sgi.com>
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
 To: Andrew Morton <akpm@linux-foundation.org>
 Cc: H. Peter Anvin <hpa@zytor.com>
 Cc: Russ Anderson <rja@sgi.com>
@@ -33,89 +35,76 @@ Cc: <stable@vger.kernel.org>
 
 ---
 
-Changes since -v6:
- - Added a #define for non-hotplug case.
----
- include/linux/cpu.h |  3 +++
- kernel/cpu.c        | 27 +++++++++------------------
- 2 files changed, 12 insertions(+), 18 deletions(-)
+Changes since -v8
+ - Change stack parameter to make future patches cleaner.
 
-diff --git a/include/linux/cpu.h b/include/linux/cpu.h
-index c6f6e08..3e450c0 100644
---- a/include/linux/cpu.h
-+++ b/include/linux/cpu.h
-@@ -141,6 +141,8 @@ static inline void unregister_cpu_notifier(struct notifier_block *nb)
+Changes since -v6:
+ - Add #define for PF_THREAD_BOUND as compatibility to make stable easier.
+ - Fixup s/reboot_cpu_id/reboot_cpu/
+---
+ kernel/sys.c | 29 ++++++++++++++++++++++++++---
+ 1 file changed, 26 insertions(+), 3 deletions(-)
+
+diff --git a/kernel/sys.c b/kernel/sys.c
+index b95d3c7..2bbd9a7 100644
+--- a/kernel/sys.c
++++ b/kernel/sys.c
+@@ -362,6 +362,29 @@ int unregister_reboot_notifier(struct notifier_block *nb)
  }
- #endif
+ EXPORT_SYMBOL(unregister_reboot_notifier);
  
-+extern void cpu_hotplug_disable(void);
-+extern void cpu_hotplug_enable(void);
- int cpu_up(unsigned int cpu);
- void notify_cpu_starting(unsigned int cpu);
- extern void cpu_maps_update_begin(void);
-@@ -148,6 +150,7 @@ extern void cpu_maps_update_done(void);
- 
- #else	/* CONFIG_SMP */
- 
-+#define cpu_hotplug_disable()	do { } while (0)
- #define cpu_notifier(fn, pri)	do { (void)(fn); } while (0)
- 
- static inline int register_cpu_notifier(struct notifier_block *nb)
-diff --git a/kernel/cpu.c b/kernel/cpu.c
-index b5e4ab2..28769f5 100644
---- a/kernel/cpu.c
-+++ b/kernel/cpu.c
-@@ -541,29 +541,20 @@ static int __init alloc_frozen_cpus(void)
- core_initcall(alloc_frozen_cpus);
- 
- /*
-- * Prevent regular CPU hotplug from racing with the freezer, by disabling CPU
-- * hotplug when tasks are about to be frozen. Also, don't allow the freezer
-- * to continue until any currently running CPU hotplug operation gets
-- * completed.
-- * To modify the 'cpu_hotplug_disabled' flag, we need to acquire the
-- * 'cpu_add_remove_lock'. And this same lock is also taken by the regular
-- * CPU hotplug path and released only after it is complete. Thus, we
-- * (and hence the freezer) will block here until any currently running CPU
-- * hotplug operation gets completed.
-+ * Wait for currently running CPU hotplug operations to complete (if any) and
-+ * disable future CPU hotplug (from sysfs). The 'cpu_add_remove_lock' protects
-+ * the 'cpu_hotplug_disabled' flag. The same lock is also acquired by the
-+ * hotplug path before performing hotplug operations. So acquiring that lock
-+ * guarantees mutual exclusion from any currently running hotplug operations.
-  */
--void cpu_hotplug_disable_before_freeze(void)
-+void cpu_hotplug_disable(void)
++/* Add backwards compatibility for stable trees. */
++#ifndef PF_NO_SETAFFINITY
++#define PF_NO_SETAFFINITY		PF_THREAD_BOUND
++#endif
++
++static void migrate_to_reboot_cpu(void)
++{
++	/* The boot cpu is always logical cpu 0 */
++	int cpu = 0;
++
++	cpu_hotplug_disable();
++
++	/* Make certain the cpu I'm about to reboot on is online */
++	if (!cpu_online(cpu))
++		cpu = cpumask_first(cpu_online_mask);
++
++	/* Prevent races with other tasks migrating this task */
++	current->flags |= PF_NO_SETAFFINITY;
++
++	/* Make certain I only run on the appropriate processor */
++	set_cpus_allowed_ptr(current, cpumask_of(cpu));
++}
++
+ /**
+  *	kernel_restart - reboot the system
+  *	@cmd: pointer to buffer containing command to execute for restart
+@@ -373,7 +396,7 @@ EXPORT_SYMBOL(unregister_reboot_notifier);
+ void kernel_restart(char *cmd)
  {
- 	cpu_maps_update_begin();
- 	cpu_hotplug_disabled = 1;
- 	cpu_maps_update_done();
- }
- 
--
--/*
-- * When tasks have been thawed, re-enable regular CPU hotplug (which had been
-- * disabled while beginning to freeze tasks).
-- */
--void cpu_hotplug_enable_after_thaw(void)
-+void cpu_hotplug_enable(void)
+ 	kernel_restart_prepare(cmd);
+-	disable_nonboot_cpus();
++	migrate_to_reboot_cpu();
+ 	syscore_shutdown();
+ 	if (!cmd)
+ 		printk(KERN_EMERG "Restarting system.\n");
+@@ -400,7 +423,7 @@ static void kernel_shutdown_prepare(enum system_states state)
+ void kernel_halt(void)
  {
- 	cpu_maps_update_begin();
- 	cpu_hotplug_disabled = 0;
-@@ -589,12 +580,12 @@ cpu_hotplug_pm_callback(struct notifier_block *nb,
- 
- 	case PM_SUSPEND_PREPARE:
- 	case PM_HIBERNATION_PREPARE:
--		cpu_hotplug_disable_before_freeze();
-+		cpu_hotplug_disable();
- 		break;
- 
- 	case PM_POST_SUSPEND:
- 	case PM_POST_HIBERNATION:
--		cpu_hotplug_enable_after_thaw();
-+		cpu_hotplug_enable();
- 		break;
- 
- 	default:
+ 	kernel_shutdown_prepare(SYSTEM_HALT);
+-	disable_nonboot_cpus();
++	migrate_to_reboot_cpu();
+ 	syscore_shutdown();
+ 	printk(KERN_EMERG "System halted.\n");
+ 	kmsg_dump(KMSG_DUMP_HALT);
+@@ -419,7 +442,7 @@ void kernel_power_off(void)
+ 	kernel_shutdown_prepare(SYSTEM_POWER_OFF);
+ 	if (pm_power_off_prepare)
+ 		pm_power_off_prepare();
+-	disable_nonboot_cpus();
++	migrate_to_reboot_cpu();
+ 	syscore_shutdown();
+ 	printk(KERN_EMERG "Power down.\n");
+ 	kmsg_dump(KMSG_DUMP_POWEROFF);
 -- 
 1.8.2.1
