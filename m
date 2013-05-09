@@ -1,36 +1,122 @@
-From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
-Date: Thu, 9 May 2013 20:12:40 +0200
-Subject: [PATCH 1/2] atmel_nand: at91/avr32/: Replace
- cpu_is_at32ap7000() with a nand platform data
-In-Reply-To: <1368084895-18266-2-git-send-email-josh.wu@atmel.com>
-References: <1368084895-18266-1-git-send-email-josh.wu@atmel.com>
- <1368084895-18266-2-git-send-email-josh.wu@atmel.com>
-Message-ID: <20130509181240.GA4260@samfundet.no>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu,  9 May 2013 11:12:50 -0700
+Subject: [PATCH v3] ARM: exynos: Select PINCTRL_EXYNOS for exynos4/5 at chip
+ level
+In-Reply-To: <1368039168-24447-1-git-send-email-dianders@chromium.org>
+References: <1368039168-24447-1-git-send-email-dianders@chromium.org>
+Message-ID: <1368123170-22906-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Thu 09 May 2013 15:34:54 +0800 or thereabout, Josh Wu wrote:
-> The nand driver use cpu_is_at32ap7000() macro for a workaround. For the
-> multi-platform support, we will remove this cpu_is_xxx() macro.
-> 
-> This patch adds a boolean variable need_reset_workaround in structure
-> atmel_nand_data. Using this variable we can remove cpu_is_at32ap7000() macro.
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+Previously if you had MACH_EXYNOS5_DT but not MACH_EXYNOS4_DT you'd be
+missing the pincontrol definitions.  Move PINCTRL selects to the arch
+level since we should be enabling the code for all exynos variants.
 
-Acked-by: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+Update the PINCTRL descriptions to indicate that PINCTRL_EXYNOS is not
+for exynos5440.  Also add basic dependencies for the PINCTRL_EXYNOS
+kernel config.
 
-> ---
->  arch/avr32/mach-at32ap/at32ap700x.c |    3 +++
->  drivers/mtd/nand/atmel_nand.c       |   13 ++++++-------
->  include/linux/platform_data/atmel.h |    3 +++
->  3 files changed, 12 insertions(+), 7 deletions(-)
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+Changes in v3:
+- Moved to chip level as per Tomasz.
+- Update PINCTRL Kconfig for exynos.
 
-Feel free to push this through the mtd tree, if they won't accept it I'm
-working on getting my workflow up on the linux-avr32.git tree.
+Changes in v2:
+- Moved to the arch level as suggested by Olof.
 
-<snipp diff>
+ arch/arm/mach-exynos/Kconfig | 9 ++++++---
+ drivers/pinctrl/Kconfig      | 5 +++--
+ 2 files changed, 9 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 6e77432..4139d7f 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -17,6 +17,7 @@ config ARCH_EXYNOS4
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_SMP
+ 	select MIGHT_HAVE_CACHE_L2X0
++	select PINCTRL
+ 	help
+ 	  Samsung EXYNOS4 SoCs based systems
+ 
+@@ -24,6 +25,7 @@ config ARCH_EXYNOS5
+ 	bool "SAMSUNG EXYNOS5"
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_SMP
++	select PINCTRL
+ 	help
+ 	  Samsung EXYNOS5 (Cortex-A15) SoC based systems
+ 
+@@ -34,6 +36,7 @@ config CPU_EXYNOS4210
+ 	default y
+ 	depends on ARCH_EXYNOS4
+ 	select ARM_CPU_SUSPEND if PM
++	select PINCTRL_EXYNOS
+ 	select PM_GENERIC_DOMAINS
+ 	select S5P_PM if PM
+ 	select S5P_SLEEP if PM
+@@ -45,6 +48,7 @@ config SOC_EXYNOS4212
+ 	bool "SAMSUNG EXYNOS4212"
+ 	default y
+ 	depends on ARCH_EXYNOS4
++	select PINCTRL_EXYNOS
+ 	select S5P_PM if PM
+ 	select S5P_SLEEP if PM
+ 	select SAMSUNG_DMADEV
+@@ -55,6 +59,7 @@ config SOC_EXYNOS4412
+ 	bool "SAMSUNG EXYNOS4412"
+ 	default y
+ 	depends on ARCH_EXYNOS4
++	select PINCTRL_EXYNOS
+ 	select SAMSUNG_DMADEV
+ 	help
+ 	  Enable EXYNOS4412 SoC support
+@@ -63,6 +68,7 @@ config SOC_EXYNOS5250
+ 	bool "SAMSUNG EXYNOS5250"
+ 	default y
+ 	depends on ARCH_EXYNOS5
++	select PINCTRL_EXYNOS
+ 	select PM_GENERIC_DOMAINS if PM
+ 	select S5P_PM if PM
+ 	select S5P_SLEEP if PM
+@@ -78,7 +84,6 @@ config SOC_EXYNOS5440
+ 	select ARCH_HAS_OPP
+ 	select ARM_ARCH_TIMER
+ 	select AUTO_ZRELADDR
+-	select PINCTRL
+ 	select PINCTRL_EXYNOS5440
+ 	select PM_OPP
+ 	help
+@@ -412,8 +417,6 @@ config MACH_EXYNOS4_DT
+ 	select CLKSRC_OF
+ 	select CPU_EXYNOS4210
+ 	select KEYBOARD_SAMSUNG if INPUT_KEYBOARD
+-	select PINCTRL
+-	select PINCTRL_EXYNOS
+ 	select S5P_DEV_MFC
+ 	select USE_OF
+ 	help
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index 8f66924..a1c6dd3 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -207,12 +207,13 @@ config PINCTRL_SAMSUNG
+ 	select PINCONF
+ 
+ config PINCTRL_EXYNOS
+-	bool "Pinctrl driver data for Samsung EXYNOS SoCs"
+-	depends on OF && GPIOLIB
++	bool "Pinctrl driver data for Samsung EXYNOS SoCs other than 5440"
++	depends on OF && GPIOLIB && ARCH_EXYNOS
+ 	select PINCTRL_SAMSUNG
+ 
+ config PINCTRL_EXYNOS5440
+ 	bool "Samsung EXYNOS5440 SoC pinctrl driver"
++	depends on SOC_EXYNOS5440
+ 	select PINMUX
+ 	select PINCONF
+ 
 -- 
-HcE
+1.8.2.1
