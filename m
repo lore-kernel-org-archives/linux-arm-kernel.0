@@ -1,70 +1,83 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 10 May 2013 00:19:31 +0530
-Subject: [PATCHv2 2/4] mailbox: Introduce a new common API
-In-Reply-To: <518BE566.5090504@ti.com>
-References: <1367824946-6160-1-git-send-email-jaswinder.singh@linaro.org>
- <1367825046-6229-1-git-send-email-jaswinder.singh@linaro.org>
- <518BCF4B.1060504@ti.com>
- <CAJe_Zhd=FDV3YP=XR8Yay1iy_geAt3tqj+diUxrVkd2BFSfb-g@mail.gmail.com>
- <518BD197.2030502@ti.com>
- <CABb+yY2CnO5RiQNdcB_L5ZiGi829Ys0ODH2UmhtZxj=aJo3ioQ@mail.gmail.com>
- <518BE566.5090504@ti.com>
-Message-ID: <CAJe_Zhffm9FOk83dAdX194gN3r5JnG78sdcWNv6WnWCsTF3YuA@mail.gmail.com>
+From: holt@sgi.com (Robin Holt)
+Date: Thu,  9 May 2013 14:23:14 -0500
+Subject: [PATCH -v8 00/11] Shutdown from reboot_cpuid without stopping other
+ cpus.
+Message-ID: <1368127405-112717-1-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 May 2013 23:35, Suman Anna <s-anna@ti.com> wrote:
+We recently noticed that reboot of a 1024 cpu machine takes approx 16
+minutes of just stopping the cpus.  The slowdown was tracked to commit
+f96972f.
 
->>
->> Perhaps we should change the following
->>
->>    void ipc_link_txdone(struct ipc_link *link, enum xfer_result r)
->> to
->>    void ipc_link_txdone(struct ipc_link *link, enum xfer_result r, void *data)
->>
->> So that the API could pass that onto clients ?
->
-> That's if the controller needs to pass some data back to client. I am
-> fine with that as well,
-No, I misunderstood you wanted request_token_t to be replaced with the
-pointer of request that was executed.
+The current implementation does all the work of hot removing the cpus
+before halting the system.  We are switching to just migrating to the
+reboot_cpu and then continuing with shutdown/reboot.
 
-> but I am talking mainly about providing a client
-> user data ptr back to it during callbacks.
->
-> struct ipc_client {
->         char *chan_name;
-> +       void *cl_data; /* store it to ipc_chan as well */
-> -       void (*rxcb)(void *data);
-> -       void (*txcb)(request_token_t t, enum xfer_result r);
-> +       void (*rxcb)(void *cl_data, void *data);
-> +       void (*txcb)(request_token_t t, enum xfer_result r, void *cl_data);
->         ...
-> }
->
-> I am obviously interested in the rxcb. The controller implementations do
-> not see the cl_data.
->
-OK I see what you mean. However the API storing and passing back
-ad-hoc data to clients doesn't seem very neat.
-
-Such purposes are usually served by :
-
-- void (*rxcb)(void *data);
-+ void (*rxcb)(struct ipc_client *cl, void *data);  /* client for
-which data was received */
-
-- void (*txcb)(request_token_t t, enum xfer_result r);
-+ void (*txcb)(struct ipc_client *cl, request_token_t t, enum
-xfer_result r); /* client whose data was sent */
-
-You could then get relevant omap_rproc using container_of() on 'cl',
-in rxcb() and txcb().
+The patch set is broken into eleven parts.  The first two are planned for
+the stable release.  The others move the halt/shutdown/reboot related
+functions to their own kernel/reboot.c file and then move the handling
+of the kernel reboot= kernel parameter to generic kernel code.
 
 
-Apart from this, in txcb, perhaps we should drop request_token_t in
-favor of the request's pointer (void *data) that was last executed.
-That should make things easier for clients.
+Changes since -v8
+ - Changes reboot_cpu on stack to cpu to fix bug noticed by Russell King.
 
-regards,
--jassi
+ - Switched unicore32 and arm from using REBOOT_WARM/COLD to HARD/SOFT.
+
+ - Fixed case statement bug.
+
+ - Went to using simple_strtoul for parsing reboot_cpu=smp###.
+
+ - Made parsing of reboot= not use any #ifdef'd code.
+
+Changes since -v7.
+ - Fixed authorship for first patch.
+
+ - Rebased to Linus' current tree (51a26ae7a).
+
+Changes since -v6.
+ - Cross compiled all arm architectures (using v3.9 kernel.  Fails with
+   current).
+
+ - Added a #define for non-hotplug case.
+
+ - Add #define for PF_THREAD_BOUND as compatibility to make stable easier.
+
+ - Fixup s/reboot_cpu_id/reboot_cpu/
+
+ - Add include of linux/uaccess.h to allow building on arm.
+
+ - Removed last remaining checkpatch.pl line length warning on
+   kernel/reboot.c.
+
+ - Fixed the duplicate handling or the reboot= kernel parameter.
+
+Changes since -v5.
+ - Moved the arch/x86 reboot= up to the generic kernel code.
+
+Changes since -v4.
+ - Integrated Srivatsa S. Bhat creating cpu_hotplug_disable()
+   function
+
+ - Integrated comments by Srivatsa S. Bhat.
+
+ - Made one more comment consistent with others in function.
+
+Changes since -v3.
+ - Added a tested-by for the original reporter.
+
+ - Fix compile failure found by Joe Perches.
+
+ - Integrated comments by Joe Perches.
+
+
+To: Andrew Morton <akpm@linux-foundation.org>
+Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Russ Anderson <rja@sgi.com>
+Cc: Robin Holt <holt@sgi.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+Cc: the arch/x86 maintainers <x86@kernel.org>
+Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
