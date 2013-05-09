@@ -1,37 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 9 May 2013 16:49:58 -0700
-Subject: [PATCH] ARM: EXYNOS5: Fix kernel dump in AFTR idle mode
-In-Reply-To: <044a01ce4d0d$6bf36570$43da3050$%kim@samsung.com>
-References: <1367235107-31328-1-git-send-email-inderpal.singh@linaro.org>
- <20130509202208.GA21831@quad.lixom.net>
- <044a01ce4d0d$6bf36570$43da3050$%kim@samsung.com>
-Message-ID: <CAOesGMi0KnkXt0ihWtvVXpWiAq7WvySDC6Rg0=4PTs8d5tTxig@mail.gmail.com>
+Date: Thu, 9 May 2013 16:55:33 -0700
+Subject: [PATCH 0/2] ARM: tegra: a couple clock bug-fixes
+In-Reply-To: <1367874671-11474-1-git-send-email-swarren@wwwdotorg.org>
+References: <1367874671-11474-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130509235533.GA19697@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 9, 2013 at 4:32 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Olof Johansson wrote:
->>
->> On Mon, Apr 29, 2013 at 05:01:47PM +0530, Inderpal Singh wrote:
->> > The kernel crashes while resuming from AFTR idle mode. It happens
->> > because L2 cache was not going into retention state.
->> >
->> > This patch configures the USE_RETENTION bit of ARM_L2_OPTION register
->> > so that it does not depend on MANUAL_L2RSTDISABLE_CONTROL of
->> > ARM_COMMON_OPTION register for L2RSTDISABLE signal.
->> >
->> > Signed-off-by: Inderpal Singh <inderpal.singh@linaro.org>
->>
->> I haven't seen any activity from Kgene on this, but it seems reasonably
->> bad
->
-> I spent time with my family last week...
->
->> (and the fix is self-contained). Applying to arm-soc fixes branch.
->>
-> Anyway, thanks.
+On Mon, May 06, 2013 at 03:11:09PM -0600, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> Arnd, Olof,
+> 
+> The following two patches fix a couple issues in the Tegra20 clock driver
+> that show up on specific platforms. They were sent a little late for 3.9,
+> and I forgot to include them for 3.10 since they weren't reposted:-(
 
-No worries. :)
+Applied to fixes now, sorry for missing them earlier.
+
+> Patch 1 is clearly a bug-fix. Someone pedantic could argue that patch 2
+> is a new feature since it's the last piece to enabling AC'97 support, but
+> I'd argue that it's a bug in the clock driver that it didn't support this
+> clock when it was first written:-)
+
+For very early -rc we can be a bit more flexible, so this is ok with me at the
+moment.
+
+> These patches logically belong to Tegra's for-3.10/clk branch, but feel
+> free to apply them where is easiest; it'd be fine to defer them to a post-
+> 3.10-rc1 fixes branch too if you want.
+
+Postponed in effect due to missing them earlier.
+
+Btw, since the drivers have moved and most of the churn is completed, fixes
+like these really can go straight to Mike Turquette from here on out.
 
 
 -Olof
