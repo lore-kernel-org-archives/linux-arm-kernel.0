@@ -1,40 +1,109 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 9 May 2013 12:50:46 +0100
-Subject: [PATCH 1/3] driver core: Add API to wait for deferred probe to
- complete during init
-In-Reply-To: <CACVXFVMd_iRtEM8ZLK6Ps66gZO6SCp1mXSgY6JbWtRJjJUh+ag@mail.gmail.com>
-References: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
- <1368076726-11492-2-git-send-email-skannan@codeaurora.org>
- <CACVXFVMd_iRtEM8ZLK6Ps66gZO6SCp1mXSgY6JbWtRJjJUh+ag@mail.gmail.com>
-Message-ID: <CACxGe6uHBNUcbD9SeRP5c3E8NN-Z2yjVV+9VAhuoJnXoBtTu2w@mail.gmail.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Thu, 09 May 2013 12:58:01 +0100
+Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
+In-Reply-To: <20130509095143.GB7478@sirena.org.uk>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <1368022272-2241-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305081650.23264.arnd@arndb.de>
+ <20130508150141.GA5057@opensource.wolfsonmicro.com> <518A8E6C.6070907@st.com>
+ <20130509095143.GB7478@sirena.org.uk>
+Message-ID: <518B8F49.5020902@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 9, 2013 at 11:07 AM, Ming Lei <tom.leiming@gmail.com> wrote:
-> On Thu, May 9, 2013 at 1:18 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
->>
->> The most obvious fallback of using late_initcall_sync() also doesn't work
->> since the deferred probing work initated during late_initcall() is done in
->> a workqueue. So, frameworks that want to wait for all devices to finish
->> probing during init will now have to wait for the deferred workqueue to
->> finish it's work. This patch adds a wait_for_init_deferred_probe_done() API
->
-> flush_workqueue() has been added in deferred_probe_initcall(), so looks it
-> should be OK for your problem, doesn't it?
+On 09/05/13 10:51, Mark Brown wrote:
+> On Wed, May 08, 2013 at 06:42:04PM +0100, Srinivas KANDAGATLA wrote:
+> 
+> Fix your mailer to word wrap within paragraphs.
+> 
+Sorry about that.
+>> Ultimately the syscon_write use the regmap_update_bits, however we
+>> really want is the flexibility in using/referring the syscon
+>> registers/bits in both device-trees and non-device tree cases.
+> 
+> So what you're looking for here is some way to offload discovery of
+> register fields from the driver?
 
-It looks like Saravana is using a kernel that already does that based
-on object bb5645e from the diff. So if he is still having problem,
-then there is probably another deferred probe that is triggered after
-the deferred probe lateinitcall is executed. It would be good to know
-what driver is getting deferred past clearing the queue. Or has this
-been rebased from an earlier kernel? It may no longer be necessary.
+Exactly,
 
-However, if a device that shuts down resources after init has
-completed and then cannot turn those resources back on when another
-driver requests them then it sounds like there is a bigger design
-problem. We're in a hotplug world and most of the time a driver cannot
-assume that a resource will never get requested after initcalls have
-completed. It sounds like a design bug in the driver if it cannot
-handle that use case.
+As the System configuration registers change per each SOC, and the
+logic/code to drive still remain same across SOCs.
 
-g.
+It makes sense to abstract the information of sysconf register and its
+offsets from the driver, as we do not want to change the driver per each
+SOC.
+
+> 
+>> The reason for these APIs, is the extent of syscon usage is very high
+>> in ST set-top-box parts.
+> 
+>> Without these new APIs, its very difficult to pass this information to
+>> the drivers.
+> 
+> I'm not 100% convinced that putting all this information into DT is a
+> good idea,
+
+Currently, we have two bits of information which come from device trees.
+1> The syscon bank/group definition itself.
+2> syscon register offsets and bits information to the drivers.
+
+These are the 2 things which keep changing per each SOC.
+
+There is no other way to pass this information to the drivers other than
+passing them as part of their own device node and syscon node.
+
+>  and to the extent that it is sensible it feels like something
+> which might be useful with any device using register maps, not just
+> syscon.
+
+If you think this is going to be useful for other drivers, Am happy to
+move this out of syscon to regmap something like adding
+of_regmap_field_claim/regmap_field_claim/regmap_field_read/regmap_field_write/regmap_field_release
+functions.
+
+so any exiting drivers can still use the old syscon API to get the
+regmap instance.
+Alternatively they can use the new regmap APIs directly.
+
+regmap_field_claim to claim bits of the register
+of_regmap_field_claim DT version of reg_map_field_claim.
+regmap_field_write to write to bits of register
+regmap_field_read to bit of the register.
+regmap_field_release to release the bits of the register.
+
+For DT version it might involve adding new member to struct
+regmap_config to lookup regmap by phandle, so that regmap can get hold
+of regmap instance from device tree phandle.
+syscon driver already does this in syscon_regmap_lookup_by_phandle()
+
+On the device tree side it will look like:
+syscfg_sbc:syscon at fe600000{
+	compatible	= "syscon";
+	reg		= <0xfe600000 0x1000>;
+};
+
+node {
+	property-1 = <&syscfg_sbc 10 0 31>;
+};
+
+property has "phandle", register_offset, lsb, msb.
+
+On the driver side, it can just use the API's like
+
+field = of_regmap_field_claim(np, "property-1");
+regmap_field_write(field, val);
+regmap_field_release(field);
+
+All this involves is very minimal code change in syscon and a new APIs
+and DT awareness into regmap.
+
+What do you think?
+
+Thanks,
+srini
+
+>  For example many MFDs have similar needs - essentially the
+> system controllers are just a particular kind of MFD.  To me that says
+> that this should be outside syscon so other things can use it.
+
+> 
