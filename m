@@ -1,64 +1,52 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 9 May 2013 11:40:55 -0500
-Subject: [PATCHv2 2/4] mailbox: Introduce a new common API
-In-Reply-To: <CAJe_Zhd=FDV3YP=XR8Yay1iy_geAt3tqj+diUxrVkd2BFSfb-g@mail.gmail.com>
-References: <1367824946-6160-1-git-send-email-jaswinder.singh@linaro.org>
- <1367825046-6229-1-git-send-email-jaswinder.singh@linaro.org>
- <518BCF4B.1060504@ti.com>
- <CAJe_Zhd=FDV3YP=XR8Yay1iy_geAt3tqj+diUxrVkd2BFSfb-g@mail.gmail.com>
-Message-ID: <518BD197.2030502@ti.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Thu, 09 May 2013 09:52:35 -0700
+Subject: [PATCH 1/3] driver core: Add API to wait for deferred probe to
+ complete during init
+In-Reply-To: <CACxGe6uHBNUcbD9SeRP5c3E8NN-Z2yjVV+9VAhuoJnXoBtTu2w@mail.gmail.com>
+References: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
+ <1368076726-11492-2-git-send-email-skannan@codeaurora.org>
+ <CACVXFVMd_iRtEM8ZLK6Ps66gZO6SCp1mXSgY6JbWtRJjJUh+ag@mail.gmail.com>
+ <CACxGe6uHBNUcbD9SeRP5c3E8NN-Z2yjVV+9VAhuoJnXoBtTu2w@mail.gmail.com>
+Message-ID: <518BD453.2010602@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2013 11:41 AM, Jassi Brar wrote:
-> On 9 May 2013 22:01, Suman Anna <s-anna@ti.com> wrote:
->> Hi Jassi,
+On 05/09/2013 04:50 AM, Grant Likely wrote:
+> On Thu, May 9, 2013 at 11:07 AM, Ming Lei <tom.leiming@gmail.com> wrote:
+>> On Thu, May 9, 2013 at 1:18 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
+>>>
+>>> The most obvious fallback of using late_initcall_sync() also doesn't work
+>>> since the deferred probing work initated during late_initcall() is done in
+>>> a workqueue. So, frameworks that want to wait for all devices to finish
+>>> probing during init will now have to wait for the deferred workqueue to
+>>> finish it's work. This patch adds a wait_for_init_deferred_probe_done() API
 >>
->> On 05/06/2013 02:24 AM, Jassi Brar wrote:
->>> +++ b/include/linux/mailbox_client.h
->>> @@ -0,0 +1,85 @@
->>> +/*
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + */
->>> +
->>> +#ifndef __MAILBOX_CLIENT_H
->>> +#define __MAILBOX_CLIENT_H
->>> +
->>> +#include <linux/mailbox.h>
->>> +
->>> +/**
->>> + * struct ipc_client - User of a mailbox
->>> + * @chan_name: the "controller:channel" this client wants
->>> + * @rxcb: atomic callback to provide client the data received
->>> + * @txcb: atomic callback to tell client of data transmission
->>> + * @tx_block: if the ipc_send_message should block until data is transmitted
->>> + * @tx_tout: Max block period in ms before TX is assumed failure
->>> + * @knows_txdone: if the client could run the TX state machine. Usually if
->>> + *    the client receives some ACK packet for transmission. Unused if the
->>> + *    controller already has TX_Done/RTR IRQ.
->>> + * @cntlr_data: Optional controller specific parameters during channel request
->>> + */
->>> +struct ipc_client {
->>> +     char *chan_name;
->>> +     void (*rxcb)(void *data);
->>> +     void (*txcb)(request_token_t t, enum xfer_result r);
->>
->> We have to introduce a callback data pointer, so that the calling
->> clients can retrieve a context object variable or some other useful
->> data within the callback functions, just like most normal callback
->> function declarations and registrations do.
->>
-> I meant the request_token_t for the purpose. That's how we do with DMAEngine.
+>> flush_workqueue() has been added in deferred_probe_initcall(), so looks it
+>> should be OK for your problem, doesn't it?
+>
+> It looks like Saravana is using a kernel that already does that based
+> on object bb5645e from the diff. So if he is still having problem,
+> then there is probably another deferred probe that is triggered after
+> the deferred probe lateinitcall is executed. It would be good to know
+> what driver is getting deferred past clearing the queue. Or has this
+> been rebased from an earlier kernel? It may no longer be necessary.
 
-I faced this issue on the rxcb while adopting the
-omap_rproc_mbox_callback. omap_remoteproc is a common driver for all the
-OMAP co-processors and there can be multiple instances, providing the
-same set of features. Look at the code in
-drivers/remoteproc/omap_remoteproc.c and you will get the idea. But in
-general, the users registering callback functions would prefer to get
-some context pointer back.
+Sorry, it was mindless rebase late at night. I missed the addition of 
+the flush_workqueue(). That takes care of my immediate needs. Sorry for 
+wasting your time.
 
-regards
-Suman
+But the other patches to move clock and regulator calls to 
+late_init_sync should still be necessary. Right? Or are we going to 
+depend on the Makefile ordering to determine the order of the lateinit 
+calls? (I would rather not).
+
+But the rest of the discussion is still interesting and relevant and 
+something I would like to see resolved too. I'll reply to that part of 
+the discussion in one of the later emails.
+
+Thanks,
+Saravana
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
