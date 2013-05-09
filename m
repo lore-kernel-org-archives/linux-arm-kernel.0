@@ -1,25 +1,37 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 9 May 2013 11:28:58 +0800
-Subject: [PATCH 0/5] add SPI/NOR for imx6q{dl}-sabreauto boards
-Message-ID: <1368070143-1655-1-git-send-email-b32955@freescale.com>
+Date: Thu, 9 May 2013 11:29:00 +0800
+Subject: [PATCH 2/5] ARM: dts: imx6dl: add a pinctrl for eCSPI1
+In-Reply-To: <1368070143-1655-1-git-send-email-b32955@freescale.com>
+References: <1368070143-1655-1-git-send-email-b32955@freescale.com>
+Message-ID: <1368070143-1655-3-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch set add the SPI/NOR support for imx6q-sabreauto/imx6dl-sabreauto
-boards.
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ arch/arm/boot/dts/imx6dl.dtsi |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-Tested on both boards.
-
-Huang Shijie (5):
-  ARM: dts: imx6q: add a new device node for ecspi1
-  ARM: dts: imx6dl: add a pinctrl for eCSPI1
-  ARM: dts: imx6dl: add a gpio for hog
-  ARM: dts: imx6q: add a gpio for hog
-  ARM: dts: add SPI/NOR for mx6q{dl}-sabreauto boards
-
- arch/arm/boot/dts/imx6dl-sabreauto.dts   |    1 +
- arch/arm/boot/dts/imx6dl.dtsi            |   10 +++++++++
- arch/arm/boot/dts/imx6q-sabreauto.dts    |    1 +
- arch/arm/boot/dts/imx6q.dtsi             |   11 ++++++++++
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |   32 ++++++++++++++++++++++++++++++
- 5 files changed, 55 insertions(+), 0 deletions(-)
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 24544ed..4b13454 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -35,6 +35,16 @@
+ 				compatible = "fsl,imx6dl-iomuxc";
+ 				reg = <0x020e0000 0x4000>;
+ 
++				ecspi1 {
++					pinctrl_ecspi1_1: ecspi1grp-1 {
++						fsl,pins = <
++							MX6DL_PAD_EIM_D17__ECSPI1_MISO 0x100b1
++							MX6DL_PAD_EIM_D18__ECSPI1_MOSI 0x100b1
++							MX6DL_PAD_EIM_D16__ECSPI1_SCLK 0x100b1
++						>;
++					};
++				};
++
+ 				enet {
+ 					pinctrl_enet_1: enetgrp-1 {
+ 						fsl,pins = <
+-- 
+1.7.1
