@@ -1,95 +1,53 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Thu, 09 May 2013 11:17:37 +0100
-Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
-In-Reply-To: <201305082148.10933.arnd@arndb.de>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081650.23264.arnd@arndb.de> <518A8C1D.3090600@st.com>
- <201305082148.10933.arnd@arndb.de>
-Message-ID: <518B77C1.70107@st.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 9 May 2013 11:26:50 +0100
+Subject: [PATCHv2] net: smsc911x: don't artificially limit build
+In-Reply-To: <1368095027-8448-1-git-send-email-mark.rutland@arm.com>
+References: <1368095027-8448-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20130509102650.GC8258@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-Thankyou for extending the discussion.
+This should of course be PATCH, not PATCHv2.
 
-On 08/05/13 20:48, Arnd Bergmann wrote:
-> On Wednesday 08 May 2013, Srinivas KANDAGATLA wrote:
->> the pinctrl driver calls syconf_claim(np, "st,alt-control) to get a
->> field and then do a read/write on the field.
->>
->> Just in pinctrl driver we use around 50-100 sysconf registers scatters
->> across different groups.
->>
->> Without these new APIs, its very difficult to pass this information to
->> the drivers.
-> But are those necessarily things you would configure using DT?
-In last comment.
->
-> If there are so many registers that are shared between mutliple
-> subsystems, maybe using drivers/mfd/syscon for that is taking things
-> further than you should, since it is unlike what any of the other
-> SoC families need from syscon.
-I agree, my initial approach was having a dedicated driver specific to
-ST syscon, however syscon seems to do things very much similar to what
-we want, so I have integrated those 3 functions in syscon.
-Am happy to go back with my first approach of adding ST specific syscon
-driver if no one is actually going to benefit with such a change to
-syscon driver.
+I blame my shell's command history completion.
 
->
-> Can you describe how your syscon registers are laid out?
-On STiH416 SOC we have 9 SYSCONF(aka System Configuration
-Registers)named banks/groups, each bank has its own memory map.
-Each sysconf bank has number of 32 bit registers which vary from bank to
-bank, like sysconf bank "sbc" has range from SYSTEM_CONFIG0 to
-SYSTEM_CONFIG999 where as  sysconf bank "front" has range of
-SYSTEM_CONFIG1000 to SYSTEM_CONFIG1999 and so on.
+Mark.
 
-Each register is assigned with a unique SYCONF number, example:
-SYSTEM_CONFIG100, SYSTEM_CONFIG101 , .. and so on.
-Each sysconf contains bits of the IP configurations wired-up to the
-sysconf register bits.
-
-As example:
-
-- Each pinctrl entry for set of 8 pins uses around 8-10 sysconfig
-register to control pinconf and pin functions.
-- IPs like Ethernet have few bit like Ethernet-Mode selection external
-or internal phyclk wired up to bits in sysconf registers,
-- Few clocks are controlled by sysconf registers.
-- Reset to IPs are wired up to bits of sysconf same registers.
-- ARM core soft reset is wired up to the sysconf registers...
-And most of the IPs have similar requirements ......
-
-Total layout of the sysconf changes per SOC, and the bit arrangements
-aswell, however the core IP(pinctrl, etherenet ...) and logic to drive
-those bits remains exactly same.
-
-As the code remains the same, the information about the hardware
-configuration and offsets to the registers are passed by device trees
-using the node properties.
-
-In general the requirements of the sysconf support to the SOC/driver
-support is.
-1> It should be able to read/write a sysconf register bits without
-having to "if" each SOC in the code. So that code is totally abstracted.
-Which is currently achieved by passing the information from the device
-trees and the driver just uses the property to get it.
-2> The infrastructure should protect the claimed registers from
-over-writing by other drivers. We do this by claim-read/write-release
-style API.
-3> The driver should be able to set a group of sysconf registers bits to
-a particular values before initialises the IP. I was thinking of doing
-this in a same way as pinctrl state.
-
-Any suggestion is most appreciated?
-
-Thanks,
-srini
-
-> Which subsystems beside pinctrl need to directly interact
-> with it? Is there any logical structure in it or do you just
-> have tons of bits scattered around an MMIO area?
->
-> 	Arnd
->
+On Thu, May 09, 2013 at 11:23:47AM +0100, Mark Rutland wrote:
+> Currently the SMSC911X driver may only be built for a specific set of
+> architectures, being limited to do so by a Kconfig depends line. This
+> means that if a platform wishes to use the driver, its architecture must
+> be added to the list explicitly, introducing pointless churn.
+> 
+> This may have been due to the driver's use of the {read,write}s{b,w,l}
+> functions, which have since been replaced with the more standard
+> io{read,write}{8,16,32}_rep. We can instead depend on HAS_IOMEM, which
+> should prevent build issues while allowing the driver to be built for
+> currently unlisted architectures, including x86 and arm64.
+> 
+> This patch removes the explicit list of architectures from the driver's
+> depend line, and replaces it with a dependency on HAS_IOMEM.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: David S. Miller <davem@davemloft.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/net/ethernet/smsc/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/ethernet/smsc/Kconfig b/drivers/net/ethernet/smsc/Kconfig
+> index bb4c167..ff9e994 100644
+> --- a/drivers/net/ethernet/smsc/Kconfig
+> +++ b/drivers/net/ethernet/smsc/Kconfig
+> @@ -97,7 +97,7 @@ config SMC911X
+>  
+>  config SMSC911X
+>  	tristate "SMSC LAN911x/LAN921x families embedded ethernet support"
+> -	depends on (ARM || SUPERH || BLACKFIN || MIPS || MN10300)
+> +	depends on HAS_IOMEM
+>  	select CRC32
+>  	select NET_CORE
+>  	select MII
+> -- 
+> 1.8.1.1
+> 
