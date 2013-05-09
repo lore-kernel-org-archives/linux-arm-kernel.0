@@ -1,67 +1,43 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 09 May 2013 11:45:10 +0200
-Subject: [PATCH] ARM: exynos: Select PINCTRL_EXYNOS for exynos5
-In-Reply-To: <CAOesGMi=K4iJKjSk3RoynhiCMPPT98v5jADnqZ__TwX_YLw65Q@mail.gmail.com>
-References: <1368034349-15091-1-git-send-email-dianders@chromium.org>
- <CAD=FV=X2n+zHZ3frorwW7L1yybnWWK1=-rWMQJQFus3eNiFFeQ@mail.gmail.com>
- <CAOesGMi=K4iJKjSk3RoynhiCMPPT98v5jADnqZ__TwX_YLw65Q@mail.gmail.com>
-Message-ID: <1614776.P66h1VoFPp@amdc1227>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 9 May 2013 10:51:43 +0100
+Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
+In-Reply-To: <518A8E6C.6070907@st.com>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <1368022272-2241-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305081650.23264.arnd@arndb.de>
+ <20130508150141.GA5057@opensource.wolfsonmicro.com>
+ <518A8E6C.6070907@st.com>
+Message-ID: <20130509095143.GB7478@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug, Olof,
+On Wed, May 08, 2013 at 06:42:04PM +0100, Srinivas KANDAGATLA wrote:
 
-On Wednesday 08 of May 2013 12:33:34 Olof Johansson wrote:
-> Hi,
-> 
-> On Wed, May 8, 2013 at 11:48 AM, Doug Anderson <dianders@chromium.org> 
-wrote:
-> > Olof,
-> > 
-> > On Wed, May 8, 2013 at 11:19 AM, Olof Johansson <olof@lixom.net> wrote:
-> >> Seems like this should be selected by the SoC (ARCH_EXYNOS5) instead
-> >> of the board. Actually, I'm not sure we need the board Kconfig entry
-> >> long-term; all boards will be dt-only.
-> > 
-> > Good point.  Hopefully someone at Samsung can work on removing the
-> > board itself?  If you'd like me to take this on then let me know and I
-> > can put it on my list.
-> 
-> Nothing stops you from doing that on your own. I tend to push back
-> onto the maintainers to get them engaged in their own housekeeping,
-> but anyone is free to :)
-> 
-> > I'm happy to resubmit my patch under ARCH_EXYNOS5.  I'll move the
-> > exynos4 one at the same time.
-> 
-> Great.
-> 
-> > I'm going to make the assumption that PINCTRL_EXYNOS and
-> > PINCTRL_EXYNOS5440 can happily coexist.  Certainly I've got both
-> > defined in my tree right now and nothing blows up.  I haven't tested
-> > on 5440 but things ought to be handled by "compatible" checks, right?
-> 
-> Yes, if they can't coexist then that's a bug.
-> 
-> > I'll also assume that eventually someone will move PINCTRL_EXYNOS5440
-> > into PINCTRL_EXYNOS.  If PINCTRL_EXYNOS5440 won't eventually move
-> > under PINCTRL_EXYNOS then it makes less sense to define PINCTRL_EXYNOS
-> > for all exynos parts.
-> 
-> Yeah, it should -- this is just in transition since 5440 was first out
-> of the gate with pinctrl.
+Fix your mailer to word wrap within paragraphs.
 
-AFAIK, Exynos5440 contains a completely different pin controller block, which 
-is not compatible with pinctrl-samsung driver, so I don't see any point of 
-moving it under PINCTRL_EXYNOS, which is currently used for Exynos 4210, 4x12 
-and 5250, but will be also extended with driver data for S5PV210 as well.
+> Ultimately the syscon_write use the regmap_update_bits, however we
+> really want is the flexibility in using/referring the syscon
+> registers/bits in both device-trees and non-device tree cases.
 
-I'd say that CPU_EXYNOS4210, SOC_EXYNOS4212, SOC_EXYNOS4412 and SOC_EXYNOS5250 
-should select PINCTRL_EXYNOS and SOC_EXYNOS5440 should be left as is, 
-selecting PINCTRL_EXYNOS5440.
+So what you're looking for here is some way to offload discovery of
+register fields from the driver?
 
-Best regards,
--- 
-Tomasz Figa
-Samsung Poland R&D Center
-SW Solution Development, Kernel and System Framework
+> The reason for these APIs, is the extent of syscon usage is very high
+> in ST set-top-box parts.
+
+> Without these new APIs, its very difficult to pass this information to
+> the drivers.
+
+I'm not 100% convinced that putting all this information into DT is a
+good idea, and to the extent that it is sensible it feels like something
+which might be useful with any device using register maps, not just
+syscon.  For example many MFDs have similar needs - essentially the
+system controllers are just a particular kind of MFD.  To me that says
+that this should be outside syscon so other things can use it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130509/204dd9d8/attachment.sig>
