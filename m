@@ -1,134 +1,98 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Thu, 9 May 2013 11:11:01 -0700
-Subject: [RFC PATCH 1/2] ARM: KVM: move GIC/timer code to a common location
-In-Reply-To: <1367589773-5609-2-git-send-email-marc.zyngier@arm.com>
-References: <1367589773-5609-1-git-send-email-marc.zyngier@arm.com>
- <1367589773-5609-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130509181101.GA17253@gmail.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 9 May 2013 13:05:26 -0500
+Subject: [PATCHv2 2/4] mailbox: Introduce a new common API
+In-Reply-To: <CABb+yY2CnO5RiQNdcB_L5ZiGi829Ys0ODH2UmhtZxj=aJo3ioQ@mail.gmail.com>
+References: <1367824946-6160-1-git-send-email-jaswinder.singh@linaro.org>
+ <1367825046-6229-1-git-send-email-jaswinder.singh@linaro.org>
+ <518BCF4B.1060504@ti.com>
+ <CAJe_Zhd=FDV3YP=XR8Yay1iy_geAt3tqj+diUxrVkd2BFSfb-g@mail.gmail.com>
+ <518BD197.2030502@ti.com>
+ <CABb+yY2CnO5RiQNdcB_L5ZiGi829Ys0ODH2UmhtZxj=aJo3ioQ@mail.gmail.com>
+Message-ID: <518BE566.5090504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 03, 2013 at 03:02:52PM +0100, Marc Zyngier wrote:
-> As KVM/arm64 is looming on the horizon, it makes sense to move some
-> of the common code to a single location in order to reduce duplication.
-> 
-> The code could live anywhere. Actually, most of KVM is already built
-> with a bunch of ugly ../../.. hacks in the various Makefiles, so we're
-> not exactly talking about style here. But maybe it is time to start
-> moving into a less ugly direction.
-> 
-> The include files must be in a "public" location, as they are accessed
-> from non-KVM files (arch/arm/kernel/asm-offsets.c).
-> 
-> For this purpose, introduce two new locations:
-> - virt/kvm/arm/ : x86 and ia64 already share the ioapic code in
->   virt/kvm, so this could be seen as a (very ugly) precedent.
-> - include/kvm/  : there is already an include/xen, and while the
->   intent is slightly different, this seems as good a location as
->   any
+Jassi,
 
-This overall looks ok, just a few points:
+On 05/09/2013 12:48 PM, Jassi Brar wrote:
+> On Thu, May 9, 2013 at 10:10 PM, Suman Anna <s-anna@ti.com> wrote:
+>> On 05/09/2013 11:41 AM, Jassi Brar wrote:
+>>> On 9 May 2013 22:01, Suman Anna <s-anna@ti.com> wrote:
+>>>> Hi Jassi,
+>>>>
+>>>> On 05/06/2013 02:24 AM, Jassi Brar wrote:
+>>>>> +++ b/include/linux/mailbox_client.h
+>>>>> @@ -0,0 +1,85 @@
+>>>>> +/*
+>>>>> + * This program is free software; you can redistribute it and/or modify
+>>>>> + * it under the terms of the GNU General Public License version 2 as
+>>>>> + * published by the Free Software Foundation.
+>>>>> + */
+>>>>> +
+>>>>> +#ifndef __MAILBOX_CLIENT_H
+>>>>> +#define __MAILBOX_CLIENT_H
+>>>>> +
+>>>>> +#include <linux/mailbox.h>
+>>>>> +
+>>>>> +/**
+>>>>> + * struct ipc_client - User of a mailbox
+>>>>> + * @chan_name: the "controller:channel" this client wants
+>>>>> + * @rxcb: atomic callback to provide client the data received
+>>>>> + * @txcb: atomic callback to tell client of data transmission
+>>>>> + * @tx_block: if the ipc_send_message should block until data is transmitted
+>>>>> + * @tx_tout: Max block period in ms before TX is assumed failure
+>>>>> + * @knows_txdone: if the client could run the TX state machine. Usually if
+>>>>> + *    the client receives some ACK packet for transmission. Unused if the
+>>>>> + *    controller already has TX_Done/RTR IRQ.
+>>>>> + * @cntlr_data: Optional controller specific parameters during channel request
+>>>>> + */
+>>>>> +struct ipc_client {
+>>>>> +     char *chan_name;
+>>>>> +     void (*rxcb)(void *data);
+>>>>> +     void (*txcb)(request_token_t t, enum xfer_result r);
+>>>>
+>>>> We have to introduce a callback data pointer, so that the calling
+>>>> clients can retrieve a context object variable or some other useful
+>>>> data within the callback functions, just like most normal callback
+>>>> function declarations and registrations do.
+>>>>
+>>> I meant the request_token_t for the purpose. That's how we do with DMAEngine.
+>>
+>> I faced this issue on the rxcb while adopting the
+>> omap_rproc_mbox_callback. omap_remoteproc is a common driver for all the
+>> OMAP co-processors and there can be multiple instances, providing the
+>> same set of features. Look at the code in
+>> drivers/remoteproc/omap_remoteproc.c and you will get the idea. But in
+>> general, the users registering callback functions would prefer to get
+>> some context pointer back.
+>>
+> Of course they do. The request_token_t returned corresponds to the
+> request they submit via ipc_send_message.
+> 
+> Perhaps we should change the following
+> 
+>    void ipc_link_txdone(struct ipc_link *link, enum xfer_result r)
+> to
+>    void ipc_link_txdone(struct ipc_link *link, enum xfer_result r, void *data)
+> 
+> So that the API could pass that onto clients ?
 
-1. Should we have a namespace per arch in the include directory, as in
-   include/kvm/arm?
+That's if the controller needs to pass some data back to client. I am
+fine with that as well, but I am talking mainly about providing a client
+user data ptr back to it during callbacks.
 
-2. We could drop the kvm_ prefix from the include files now
+struct ipc_client {
+	char *chan_name;
++	void *cl_data; /* store it to ipc_chan as well */
+-	void (*rxcb)(void *data);
+-	void (*txcb)(request_token_t t, enum xfer_result r);
++	void (*rxcb)(void *cl_data, void *data);
++	void (*txcb)(request_token_t t, enum xfer_result r, void *cl_data);
+	...
+}
 
-> 
-> Eventually, we should probably have independant Makefiles at every
-> levels (just like everywhere else in the kernel), but this is just
-> the first step.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/kvm_host.h                        | 4 ++--
->  arch/arm/kvm/Makefile                                  | 7 ++++---
->  {arch/arm/include/asm => include/kvm}/kvm_arch_timer.h | 0
->  {arch/arm/include/asm => include/kvm}/kvm_vgic.h       | 0
->  {arch/arm/kvm => virt/kvm/arm}/arch_timer.c            | 4 ++--
->  {arch/arm/kvm => virt/kvm/arm}/vgic.c                  | 0
->  6 files changed, 8 insertions(+), 7 deletions(-)
->  rename {arch/arm/include/asm => include/kvm}/kvm_arch_timer.h (100%)
->  rename {arch/arm/include/asm => include/kvm}/kvm_vgic.h (100%)
->  rename {arch/arm/kvm => virt/kvm/arm}/arch_timer.c (99%)
->  rename {arch/arm/kvm => virt/kvm/arm}/vgic.c (100%)
-> 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index ff49193..4ad51e6 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -23,7 +23,7 @@
->  #include <asm/kvm_asm.h>
->  #include <asm/kvm_mmio.h>
->  #include <asm/fpstate.h>
-> -#include <asm/kvm_arch_timer.h>
-> +#include <kvm/kvm_arch_timer.h>
->  
->  #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
->  #define KVM_USER_MEM_SLOTS 32
-> @@ -38,7 +38,7 @@
->  #define KVM_NR_PAGE_SIZES	1
->  #define KVM_PAGES_PER_HPAGE(x)	(1UL<<31)
->  
-> -#include <asm/kvm_vgic.h>
-> +#include <kvm/kvm_vgic.h>
->  
->  struct kvm_vcpu;
->  u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
-> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-> index 53c5ed8..110d6da 100644
-> --- a/arch/arm/kvm/Makefile
-> +++ b/arch/arm/kvm/Makefile
-> @@ -14,10 +14,11 @@ CFLAGS_mmu.o := -I.
->  AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
->  AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
->  
-> -kvm-arm-y = $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o)
-> +KVM := ../../../virt/kvm
-> +kvm-arm-y = $(addprefix $(KVM)/, kvm_main.o coalesced_mmio.o)
->  
->  obj-y += kvm-arm.o init.o interrupts.o
->  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
->  obj-y += coproc.o coproc_a15.o mmio.o psci.o perf.o
-> -obj-$(CONFIG_KVM_ARM_VGIC) += vgic.o
-> -obj-$(CONFIG_KVM_ARM_TIMER) += arch_timer.o
-> +obj-$(CONFIG_KVM_ARM_VGIC) += $(addprefix $(KVM)/arm/, vgic.o)
-> +obj-$(CONFIG_KVM_ARM_TIMER) += $(addprefix $(KVM)/arm/, arch_timer.o)
-> diff --git a/arch/arm/include/asm/kvm_arch_timer.h b/include/kvm/kvm_arch_timer.h
-> similarity index 100%
-> rename from arch/arm/include/asm/kvm_arch_timer.h
-> rename to include/kvm/kvm_arch_timer.h
-> diff --git a/arch/arm/include/asm/kvm_vgic.h b/include/kvm/kvm_vgic.h
-> similarity index 100%
-> rename from arch/arm/include/asm/kvm_vgic.h
-> rename to include/kvm/kvm_vgic.h
-> diff --git a/arch/arm/kvm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> similarity index 99%
-> rename from arch/arm/kvm/arch_timer.c
-> rename to virt/kvm/arm/arch_timer.c
-> index 49a7516..0728904 100644
-> --- a/arch/arm/kvm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -25,8 +25,8 @@
->  #include <clocksource/arm_arch_timer.h>
->  #include <asm/arch_timer.h>
->  
-> -#include <asm/kvm_vgic.h>
-> -#include <asm/kvm_arch_timer.h>
-> +#include <kvm/kvm_vgic.h>
-> +#include <kvm/kvm_arch_timer.h>
->  
->  static struct timecounter *timecounter;
->  static struct workqueue_struct *wqueue;
-> diff --git a/arch/arm/kvm/vgic.c b/virt/kvm/arm/vgic.c
-> similarity index 100%
-> rename from arch/arm/kvm/vgic.c
-> rename to virt/kvm/arm/vgic.c
-> -- 
-> 1.8.2.1
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+I am obviously interested in the rxcb. The controller implementations do
+not see the cl_data.
+
+regards
+Suman
