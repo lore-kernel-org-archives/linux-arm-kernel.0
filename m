@@ -1,54 +1,64 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 9 May 2013 14:26:00 +0100
-Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
-In-Reply-To: <518B8F49.5020902@st.com>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022272-2241-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081650.23264.arnd@arndb.de>
- <20130508150141.GA5057@opensource.wolfsonmicro.com>
- <518A8E6C.6070907@st.com> <20130509095143.GB7478@sirena.org.uk>
- <518B8F49.5020902@st.com>
-Message-ID: <20130509132600.GA3200@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 May 2013 14:36:43 +0100
+Subject: [PATCH -v8 11/11] Move arch/x86 reboot= handling to generic
+ kernel.
+In-Reply-To: <20130509130120.GW3672@sgi.com>
+References: <1367937595-32241-1-git-send-email-holt@sgi.com>
+ <1367937595-32241-12-git-send-email-holt@sgi.com>
+ <20130508103956.GA7677@gmail.com>
+ <20130508182007.GO18614@n2100.arm.linux.org.uk> <518A9A83.5010306@zytor.com>
+ <20130509112048.GT3672@sgi.com> <20130509130120.GW3672@sgi.com>
+Message-ID: <20130509133643.GU18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 09, 2013 at 12:58:01PM +0100, Srinivas KANDAGATLA wrote:
+On Thu, May 09, 2013 at 08:01:20AM -0500, Robin Holt wrote:
+> diff --git a/include/linux/reboot.h b/include/linux/reboot.h
+> index 26cf11b..bc77231 100644
+> --- a/include/linux/reboot.h
+> +++ b/include/linux/reboot.h
+> @@ -15,6 +15,23 @@ enum reboot_mode {
+> +extern enum reboot_type reboot_type;
+> +
+> +extern int reboot_default;
+> +extern int reboot_cpu;
+> +extern int reboot_force;
 
-> Currently, we have two bits of information which come from device trees.
-> 1> The syscon bank/group definition itself.
-> 2> syscon register offsets and bits information to the drivers.
+Okay, these are globals...
 
-> These are the 2 things which keep changing per each SOC.
+> diff --git a/kernel/reboot.c b/kernel/reboot.c
+> index 0a97794..ff08af2 100644
+> --- a/kernel/reboot.c
+> +++ b/kernel/reboot.c
+> @@ -87,7 +88,7 @@ EXPORT_SYMBOL(unregister_reboot_notifier);
+>  static void migrate_to_reboot_cpu(void)
+>  {
+>  	/* The boot cpu is always logical cpu 0 */
+> -	int reboot_cpu = 0;
+> +	int reboot_cpu = reboot_cpu;
 
-> There is no other way to pass this information to the drivers other than
-> passing them as part of their own device node and syscon node.
+Hmm, are you sure about that?
 
-Sure there is, for example the drivers could have this information
-internally as part of knowing which device they're working with or they
-could take advantage of some patterns in the register map to store some
-higher level information that they use to configure.
+> @@ -343,3 +344,80 @@ int orderly_poweroff(bool force)
+>  	return 0;
+>  }
+>  EXPORT_SYMBOL_GPL(orderly_poweroff);
+> +
+> +int reboot_default;
+> +enum reboot_mode reboot_mode = REBOOT_COLD;
+> +int reboot_cpu;
+> +enum reboot_type reboot_type = BOOT_ACPI;
+> +int reboot_force;
 
-> >  and to the extent that it is sensible it feels like something
-> > which might be useful with any device using register maps, not just
-> > syscon.
+As you seem to want to reference these above, wouldn't it make sense to
+move them higher in the file?
 
-> If you think this is going to be useful for other drivers, Am happy to
-> move this out of syscon to regmap something like adding
-> of_regmap_field_claim/regmap_field_claim/regmap_field_read/regmap_field_write/regmap_field_release
-> functions.
+> +		case 'c':
+> +		case 'h':
+> +			reboot_mode = REBOOT_COLD;
+> +			break;
 
-> so any exiting drivers can still use the old syscon API to get the
-> regmap instance.
-> Alternatively they can use the new regmap APIs directly.
-
-Well, I'd need to see the code to decide if it was sane but I do think
-that if this is a good approach it's not syscon specific.  Anything like
-this needs to be independent of DT too since not all architectures use
-DT.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130509/4d182b81/attachment.sig>
+I'm still not entirely convinced by making "hard" and "cold" mean the
+same thing, likewise "soft" and "warm".  As I previously explained but
+everyone seems to have ignored, solely focusing on the 's' problem
+instead.
