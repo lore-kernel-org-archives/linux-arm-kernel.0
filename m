@@ -1,67 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 9 May 2013 09:13:08 -0700
-Subject: Fwd: Tegra 30 System hangs because of commit "pinctrl: move
- subsystem mutex to pinctrl_dev struct"
-In-Reply-To: <CACxGe6uo60OwRd7buPX4382_vE48MLWJYyB_ka+iS2FfVCa8mw@mail.gmail.com>
-References: <CAK5ve-KXdS8az=Gtja-mF=Z3_EeZVA7bLYSU0EE2mf5bHmSUKw@mail.gmail.com>
- <CAK5ve-KBDyvjNRVMcXgfnhYcajdcGsuAKaepzCBt+epiXoYvSw@mail.gmail.com>
- <517ED12B.8080502@wwwdotorg.org>
- <20130504133004.GC24282@game.jcrosoft.org>
- <CACRpkdbBVJtWrRO+J=pWjfLXTcVKX++x-eeJQXGeQn_WOURUNQ@mail.gmail.com>
- <20130505112819.GD24282@game.jcrosoft.org>
- <CACRpkdZdT8==cUtH4=Y3LC-eVu6ntO2ojFC4bSXNuxa4hMJ=ZA@mail.gmail.com>
- <20130505202236.GF24282@game.jcrosoft.org>
- <CACRpkda2EG0O-pfZQ5kLFX=cwSmUSVBJkR7Xvye3ROs3tstv9w@mail.gmail.com>
- <20130506194122.GG24282@game.jcrosoft.org>
- <20130506195403.GJ18614@n2100.arm.linux.org.uk>
- <CACRpkdZtPhzLFicYYZF0SZfp4dMJars+Z-7hTUZQ1JjPExXW3A@mail.gmail.com>
- <CACxGe6uo60OwRd7buPX4382_vE48MLWJYyB_ka+iS2FfVCa8mw@mail.gmail.com>
-Message-ID: <CAOesGMiqrXSPdEtUzGCuAuhdE4K7FVe65zMM962XuOrO555hnQ@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 09 May 2013 18:35:12 +0200
+Subject: [PATCH 1/2] Revert "drivers/rtc/rtc-pxa.c: fix set time sync time
+ issue"
+In-Reply-To: <1367889447-15619-2-git-send-email-chao.xie@marvell.com> (Chao
+ Xie's message of "Mon, 6 May 2013 21:17:26 -0400")
+References: <1367889447-15619-1-git-send-email-chao.xie@marvell.com>
+ <1367889447-15619-2-git-send-email-chao.xie@marvell.com>
+Message-ID: <877gj8i01r.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 9, 2013 at 6:25 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Mon, May 6, 2013 at 9:12 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Mon, May 6, 2013 at 9:54 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->>
->>> My conclusion is that build and boot test systems just don't work in an
->>> open source environment as no one actively checks the results.  Why would
->>> they - maintainers already have enough to do with reading 6500+ emails a
->>> month on mailing lists.  Why bother going to look at a website as well
->>> which might give even more work.
->>
->> Point taken. I was in a discussion some time back with Greg and some
->> other people and we concluded that unless the system mails you when
->> something breaks it won't make a difference. And it mustn't flood you,
->> just be very precise.
->>
->> Actually the autobuilder at kernel.org helped me out but then stopped
->> building my trees at some point, but that was nice and the same thing
->> doing boots would be great.
+Chao Xie <chao.xie@marvell.com> writes:
+
+> This patch have something wrong.
+> 1.The pxa_sync_time API is not needed. The RTC sync can be done
+> by user space applications, so in kernel this API is not needed.
+> 2.The pxa_rtc_open can not be deleted. This change has been
+> declined during review at the mail list
+> 3.Based on specification and talked with owner of driver, it
+> does not matter to set WOM and DOW.
 >
-> +1 on what has already been stated on this thread; An autobuilder does
-> work if it emails you when something breaks without spamming you. I've
-> also found the 0day build tester actually effective. It has caught
-> things that I've missed and I immediately was able to go an fix.
+> Only need to keep PSBR control for pxa95x
+>
+> This reverts commit 57489fabb7f3fc02483df2125fdbfb8b1bb1fcd8.
 
-Yes, a builder is quite useful. Several of us do our own builds as well.
+This commit doesn't exist in Linus's tree. Maybe in linux-next ?
 
-When it comes to boot coverage, I'm not sure how successful a central
-approach would be. It's something where I think Linaro could
-contribute a lot for their member platforms, but I haven't seen much
-engagement there yet.
+Anyway, as you are reverting, please consider this :
+the commit that exists is : c4243de70f7d536d95196b8a31539298bb15238c
+"drivers/rtc/rtc-pxa.c: drivers/rtc/rtc-pxa.c: fix alarm not match issue".
 
-Beyond there, I'd say the expectation is that each maintainer should
-keep an eye on their own platforms. They _should_ try building and
-booting linux-next on their platforms, to catch regressions early. And
-definitely around now, I'd like to see people boot mainline on their
-platforms to make sure we haven't added any severe regressions in the
-3.10 merge window, etc. Some people are really good at this, others
-less so.
+This commit should be reverted :
+ - because it's wrong :
+   > tm->tm_wday = ((rycr & RDxR_DOW_MASK) >> RDxR_DOW_S) - 1;
+   See how RYCR is used with a RDCR mask ...
 
-What's the old saying, you can lead a horse to water but you can't
-make him drink? You can build a boot test cluster but you can't make
-anyone pay attention to it. :(
+ - because as maintainer I have already nacked this kind of patch :
+   https://patchwork.kernel.org/patch/1819851/
+   The reasons given here are still valid AFAIK.
 
--Olof
+I'm pretty sure I didn't receive this patch in my mailbox. After I refused
+ChaoXie first patch, the second "same approach" patch from Liangs was sent in my
+back. I don't understand how that could happen ...
+
+Liangs, please make sure to add me to the reviewers next time ?
+
+Cheers.
+
+--
+Robert
