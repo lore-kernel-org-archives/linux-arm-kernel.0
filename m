@@ -1,68 +1,91 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 May 2013 10:09:11 +0100
-Subject: arch/arm/mach-omap2/id.c - IS_ERR_OR_NULL()
-Message-ID: <20130509090911.GM21614@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 09 May 2013 10:32:12 +0100
+Subject: [PATCH] arm64: KVM: Add bits for specifying memory type in stage2
+ PTE
+In-Reply-To: <1368078813-16904-1-git-send-email-anup.patel@linaro.org>
+References: <1368078813-16904-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <518B6D1C.3020603@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So, I eliminated all but a very few of these from arch/arm, and I notice
-today that there's a new couple of instances introduced by:
+[Looping in Catalin, as we just had an interesting discussion about this]
 
-commit 6770b211432564c562c856d612b43bbd42e4ab5e
-Author: Ruslan Bilovol <ruslan.bilovol@ti.com>
-Date:   Thu Feb 14 13:55:24 2013 +0200
+Hi Anup,
 
-    ARM: OMAP2+: Export SoC information to userspace
+On 09/05/13 06:53, Anup Patel wrote:
+> We cannot use existing stage1 PTE_ATTRINDX() macro for specifying
+> stage2 memory type because stage1 ATTRINDX = PTE[4:2] and stage2
+> MEMATTR = PTE[5:2].
 
-    In some situations it is useful for userspace to
-    know some SoC-specific information. For example,
-    this may be used for deciding what kernel module to
-    use or how to better configure some settings etc.
-    This patch exports OMAP SoC information to userspace
-    using existing in Linux kernel SoC infrastructure.
+You're right, this is a bug. But...
 
-    This information can be read under
-    /sys/devices/socX directory
+> This patch adds bit definetions for specifying device, noncacheable,
+> writethrough, and writeback memory types in stage2 PTE and also uses
+> it in PAGE_S2 and PAGE_S2_DEVICE.
 
-    Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
-    [tony at atomide.com: updated for multiplatform changes]
-    Signed-off-by: Tony Lindgren <tony@atomide.com>
+... I have the feeling we don't need most of this:
 
-+       soc_dev = soc_device_register(soc_dev_attr);
-+       if (IS_ERR_OR_NULL(soc_dev)) {
-+               kfree(soc_dev_attr);
-+               return;
-+       }
-+
-+       parent = soc_device_to_device(soc_dev);
-+       if (!IS_ERR_OR_NULL(parent))
-+               device_create_file(parent, &omap_soc_attr);
+Stage-2 memory attributes can only restrict what the guest puts in its
+Stage-1. Which means that unless we really need to play some ugly tricks
+on the guest (which we don't), it is probably best to leave everything
+as Normal, Outer Write-Back, Inner Write-Back.
 
-This is nonsense.  For the first, IS_ERR() is sufficient.  For the second,
-tell me what error checking is required in the return value of this
-function:
+So I think the right fix is to get rid of of PAGE_S2_DEVICE, use PAGE_S2
+for everything, and set MemAttr[3:0] to 0b1111.
 
-struct device *soc_device_to_device(struct soc_device *soc_dev)
-{
-        return &soc_dev->dev;
-}
+I'll try that and cook a separate patch if it looks good enough (it is
+likely to impact the 32bit code as well...).
 
-when you've already determined that the passed soc_dev is a valid pointer.
-If you read the comments against the prototype:
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> ---
+>  arch/arm64/include/asm/pgtable-hwdef.h |    4 ++++
+>  arch/arm64/include/asm/pgtable.h       |    6 ++++--
+>  arch/arm64/mm/mmu.c                    |    9 +++++++++
+>  3 files changed, 17 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> index c49cd61..555babb 100644
+> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> @@ -73,6 +73,10 @@
+>   */
+>  #define PTE_S2_RDONLY		 (_AT(pteval_t, 1) << 6)   /* HAP[1]   */
+>  #define PTE_S2_RDWR		 (_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
+> +#define PTE_S2_MT_DEVICE	 (_AT(pteval_t, 0x0) << 2) /* MemAttr[3:0] */
+> +#define PTE_S2_MT_UNCACHED	 (_AT(pteval_t, 0x5) << 2) /* MemAttr[3:0] */
+> +#define PTE_S2_MT_WRITETHROUGH	 (_AT(pteval_t, 0xa) << 2) /* MemAttr[3:0] */
+> +#define PTE_S2_MT_WRITEBACK	 (_AT(pteval_t, 0xf) << 2) /* MemAttr[3:0] */
+>  
+>  /*
+>   * EL2/HYP PTE/PMD definitions
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 43ce724..3003fd0 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -60,6 +60,8 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
+>  #define _PAGE_DEFAULT		PTE_TYPE_PAGE | PTE_AF
+>  
+>  extern pgprot_t pgprot_default;
+> +extern pgprot_t pgprot_s2;
+> +extern pgprot_t pgprot_s2_device;
+>  
+>  #define __pgprot_modify(prot,mask,bits) \
+>  	__pgprot((pgprot_val(prot) & ~(mask)) | (bits))
+> @@ -79,8 +81,8 @@ extern pgprot_t pgprot_default;
+>  #define PAGE_HYP		_MOD_PROT(pgprot_default, PTE_HYP)
+>  #define PAGE_HYP_DEVICE		_MOD_PROT(__pgprot(PROT_DEVICE_nGnRE), PTE_HYP)
+>  
+> -#define PAGE_S2			_MOD_PROT(pgprot_default, PTE_S2_RDONLY)
+> -#define PAGE_S2_DEVICE		__pgprot_modify(__pgprot(PROT_DEVICE_nGnRE), PTE_PXN, PTE_S2_RDWR)
+> +#define PAGE_S2			_MOD_PROT(pgprot_s2, PTE_USER | PTE_S2_RDONLY)
+> +#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, PTE_USER | PTE_S2_RDWR)
 
-/**
- * soc_device_to_device - helper function to fetch struct device
- * @soc: Previously registered SoC device container
- */
-struct device *soc_device_to_device(struct soc_device *soc);
+Beware, you are reintroducing a bug I fixed a while ago (Stage-2 has no
+USER bit).
 
-if "soc" is valid, it means the "previously registered SoC device container"
-must have succeeded and that can only happen if the struct device has been
-registered.  Ergo, there will always be a valid struct device pointer for
-any registered SoC device container.  Therefore, if soc_device_register()
-succeeds, then the return value from soc_device_to_device() will always be
-valid and no error checking of it is required.
+Thanks,
 
-Simples.  The rule as ever applies here: get to know the APIs your using
-and don't fumble around in the dark hoping that you'll get this stuff
-right.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
