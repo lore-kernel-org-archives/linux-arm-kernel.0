@@ -1,32 +1,37 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 08 May 2013 20:50:24 -0700
-Subject: [PATCH v2 0/3] clk: implement remuxing during set_rate
-In-Reply-To: <518AE16D.5060501@codeaurora.org>
-References: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
- <518AE16D.5060501@codeaurora.org>
-Message-ID: <518B1D00.5030700@codeaurora.org>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Thu, 9 May 2013 04:12:10 +0000
+Subject: [v2, 3/3] ARM: dts: AM33XX: Add NAND flash device tree data to
+ am335x-evm
+In-Reply-To: <20130508235404.GX32546@atomide.com>
+References: <ebfab3e9123b3e50b9a9678c1480191addd86d59.1359007746.git.avinashphilip@ti.com>
+ <517F5126.5000509@ti.com> <20130508235404.GX32546@atomide.com>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73E9C320D@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2013 04:36 PM, Stephen Boyd wrote:
-> On 04/19/13 09:28, James Hogan wrote:
->> This patchset adds support for automatic selection of the best parent
->> for a clock mux, i.e. the one which can provide the closest clock rate
->> to that requested. It can be controlled by a new CLK_SET_RATE_REMUX flag
->> so that it doesn't happen unless explicitly allowed.
->>
->> This works by way of adding a new op, determine_rate, similar to
->> round_rate but with an extra parameter to allow the clock driver to
->> optionally select a different parent clock. This is used in
->> clk_calc_new_rates to decide whether to initiate a set_parent operation.
->
-> Which tree is this based on? I get failures with git am on patch 2.
->
+> > >
+> > >  	am33xx_pinmux: pinmux at 44e10800 {
+> > >  		pinctrl-names = "default";
+> > > -		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0>;
+> > > +		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0
+> > > +			&nandflash_pins_s0>;
+> >
+> > Why add this to the board level fallback (called pinctrl hogs, I think)?
+> > This can be part of nand node you added below so that the pinctrl will
+> > take effect when nand gets probed instead of all the time.
+> 
+> Yes we should have all the pinctrl entries under the related drivers.
+> This makes it easy remux pins during runtime if needed, and also
+> allows unloading pinctrl-single.ko for development.
+> 
+Yes, accepted. This has been already fixed in v3 of this patch set.
+If all fine, then please pull this for next merge..
 
-Mike's clk-for-3.10 branch.
+http://lists.infradead.org/pipermail/linux-mtd/2013-May/046712.html
 
--Saravana
+http://lists.infradead.org/pipermail/linux-mtd/2013-May/046814.html (already pulled)
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+http://lists.infradead.org/pipermail/linux-mtd/2013-May/046710.html
+
+
+with regards, pekon
