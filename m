@@ -1,62 +1,83 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 10 May 2013 11:29:24 +0200
-Subject: Fwd: Tegra 30 System hangs because of commit "pinctrl: move
- subsystem mutex to pinctrl_dev struct"
-In-Reply-To: <CAGNsrLDw0_yX9nkLYDg0e8-551P7r43UxziTp1TXyyxdiKR5nA@mail.gmail.com>
-References: <20130505112819.GD24282@game.jcrosoft.org>
- <CACRpkdZdT8==cUtH4=Y3LC-eVu6ntO2ojFC4bSXNuxa4hMJ=ZA@mail.gmail.com>
- <20130505202236.GF24282@game.jcrosoft.org>
- <CACRpkda2EG0O-pfZQ5kLFX=cwSmUSVBJkR7Xvye3ROs3tstv9w@mail.gmail.com>
- <20130506194122.GG24282@game.jcrosoft.org>
- <20130506195403.GJ18614@n2100.arm.linux.org.uk>
- <CACRpkdZtPhzLFicYYZF0SZfp4dMJars+Z-7hTUZQ1JjPExXW3A@mail.gmail.com>
- <CACxGe6uo60OwRd7buPX4382_vE48MLWJYyB_ka+iS2FfVCa8mw@mail.gmail.com>
- <CAOesGMiqrXSPdEtUzGCuAuhdE4K7FVe65zMM962XuOrO555hnQ@mail.gmail.com>
- <CAGNsrLDw0_yX9nkLYDg0e8-551P7r43UxziTp1TXyyxdiKR5nA@mail.gmail.com>
-Message-ID: <20130510092924.GJ3041@game.jcrosoft.org>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 10 May 2013 11:39:32 +0200
+Subject: [RFC PATCH 2/2] ARM: KVM: standalone Makefile for vgic and timers
+In-Reply-To: <1367589773-5609-3-git-send-email-marc.zyngier@arm.com>
+References: <1367589773-5609-1-git-send-email-marc.zyngier@arm.com>
+ <1367589773-5609-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <518CC054.9070002@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Il 03/05/2013 16:02, Marc Zyngier ha scritto:
+> On the road to turn KVM/arm64 into something more sensible, change
+> the way we compile the VGIC and arch_timer code by using local
+> Makefiles instead of the very backward method we used before.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  Makefile              | 2 +-
+>  arch/arm/kvm/Makefile | 2 --
+>  virt/Makefile         | 1 +
+>  virt/kvm/Makefile     | 1 +
+>  virt/kvm/arm/Makefile | 2 ++
+>  5 files changed, 5 insertions(+), 3 deletions(-)
+>  create mode 100644 virt/Makefile
+>  create mode 100644 virt/kvm/Makefile
+>  create mode 100644 virt/kvm/arm/Makefile
+> 
+> diff --git a/Makefile b/Makefile
+> index 6db672b..19d51df 100644
+> --- a/Makefile
+> +++ b/Makefile
+> @@ -732,7 +732,7 @@ export mod_sign_cmd
+>  
+>  
+>  ifeq ($(KBUILD_EXTMOD),)
+> -core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/
+> +core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/ virt/
+>  
+>  vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
+>  		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
+> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+> index 110d6da..e0540fd 100644
+> --- a/arch/arm/kvm/Makefile
+> +++ b/arch/arm/kvm/Makefile
+> @@ -20,5 +20,3 @@ kvm-arm-y = $(addprefix $(KVM)/, kvm_main.o coalesced_mmio.o)
+>  obj-y += kvm-arm.o init.o interrupts.o
+>  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+>  obj-y += coproc.o coproc_a15.o mmio.o psci.o perf.o
+> -obj-$(CONFIG_KVM_ARM_VGIC) += $(addprefix $(KVM)/arm/, vgic.o)
+> -obj-$(CONFIG_KVM_ARM_TIMER) += $(addprefix $(KVM)/arm/, arch_timer.o)
+> diff --git a/virt/Makefile b/virt/Makefile
+> new file mode 100644
+> index 0000000..c3b9ad0
+> --- /dev/null
+> +++ b/virt/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_KVM)	+= kvm/
+> diff --git a/virt/kvm/Makefile b/virt/kvm/Makefile
+> new file mode 100644
+> index 0000000..dc87943
+> --- /dev/null
+> +++ b/virt/kvm/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_KVM_ARM_HOST)	+= arm/
+> diff --git a/virt/kvm/arm/Makefile b/virt/kvm/arm/Makefile
+> new file mode 100644
+> index 0000000..4df943b
+> --- /dev/null
+> +++ b/virt/kvm/arm/Makefile
+> @@ -0,0 +1,2 @@
+> +obj-$(CONFIG_KVM_ARM_VGIC) += vgic.o
+> +obj-$(CONFIG_KVM_ARM_TIMER) += arch_timer.o
+> 
 
-	so we need to consolidate I'll send a proposition during the day
+I'm not sure it is a good idea to do this just for ARM, and I think the
+patch would look quite different if you were to support x86 (because x86
+builds KVM as a module).  So I would hold off this for now.
 
-Best Regards,
-J.
-On 20:51 Thu 09 May     , Fathi Boudra wrote:
-> On 9 May 2013 19:13, Olof Johansson <olof@lixom.net> wrote:
-> > On Thu, May 9, 2013 at 6:25 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> >> On Mon, May 6, 2013 at 9:12 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> >>> On Mon, May 6, 2013 at 9:54 PM, Russell King - ARM Linux
-> > Yes, a builder is quite useful. Several of us do our own builds as well.
-> >
-> > When it comes to boot coverage, I'm not sure how successful a central
-> > approach would be. It's something where I think Linaro could
-> > contribute a lot for their member platforms, but I haven't seen much
-> > engagement there yet.
-> 
-> My previous post was lost. Sorry to repost..
-> 
-> We've got a jenkins instance doing daily builds on various trees and
-> boot testing on the few boards we've got in the lab:
-> https://ci.linaro.org/jenkins/view/kernel-ci/
-> 
-> But it hasn't attracted much interest so far... It's been here since a year.
-> 
-> > Beyond there, I'd say the expectation is that each maintainer should
-> > keep an eye on their own platforms. They _should_ try building and
-> > booting linux-next on their platforms, to catch regressions early. And
-> > definitely around now, I'd like to see people boot mainline on their
-> > platforms to make sure we haven't added any severe regressions in the
-> > 3.10 merge window, etc. Some people are really good at this, others
-> > less so.
-> >
-> > What's the old saying, you can lead a horse to water but you can't
-> > make him drink? You can build a boot test cluster but you can't make
-> > anyone pay attention to it. :(
-> >
-> > -Olof
-> 
-> Cheers,
-> 
-> Fathi
+OTOH, it is a good idea to use the same idiom to access
+../../../virt/kvm from the arch directories.  Can you change
+x86/PPC/s390/ia64 as well to use $(KVM) instead of $(addprefix)?
+
+Paolo
