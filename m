@@ -1,58 +1,74 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 10 May 2013 09:31:11 +0900
-Subject: [GIT PULL] Late Exynos stuff for v3.10
-In-Reply-To: <CAOesGMjA5_XUXMcCL3roZiLC1S=ypMoVHn2tF7bzUuKr+eLw2A@mail.gmail.com>
-References: <5176B499.1000208@samsung.com> <51770697.7080504@samsung.com>
- <20130424000638.GA9067@quad.lixom.net> <51794E10.1010205@samsung.com>
- <CAOesGMjA5_XUXMcCL3roZiLC1S=ypMoVHn2tF7bzUuKr+eLw2A@mail.gmail.com>
-Message-ID: <046301ce4d15$ac1592b0$0440b810$%kim@samsung.com>
+Date: Fri, 10 May 2013 09:32:05 +0900
+Subject: [PATCH v5] pinctrl: Add pinctrl-s3c24xx driver
+In-Reply-To: <201305031552.45410.heiko@sntech.de>
+References: <201305031552.45410.heiko@sntech.de>
+Message-ID: <046401ce4d15$ccba0c80$662e2580$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+Heiko St?bner wrote:
 > 
-> Kukjin,
+> The s3c24xx pins follow a similar pattern as the other Samsung SoCs and
+> can therefore reuse the already introduced infrastructure.
 > 
-Hi Olof,
-
-[...]
-
-> > And let me send pull-request again for fix and late dt branch with
-> separated
-> > branches in a couple of hours not including usb stuff...
+> The s3c24xx SoCs have one design oddity in that the first 4 external
+> interrupts do not reside in the eint pending register but in the main
+> interrupt controller instead. We solve this by forwarding the external
+> interrupt from the main controller into the irq domain of the pin bank.
+> The masking/acking of these interrupts is handled in the same way.
 > 
-> Refresh my memory here, what was the reason for dropping the USB DTS
-> updates? (Yes, I am aware it might because I asked you not to send
-> them in but I don't remember :-).
+> Furthermore the S3C2412/2413 SoCs contain another oddity in that they
+> keep the same 4 eints in the main interrupt controller and eintpend
+> register and requiring ack operations to happen in both. This is solved
+> by using different compatible properties for the wakeup eint node which
+> set a property accordingly.
 > 
-Hmm...let me see, yeah, the USB DTS updates dropped because of late
-pull-request stuff as you concerned.
-http://www.spinics.net/lists/arm-kernel/msg240105.html
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Since I didn't want to make a noise at that time, so I dropped for v3.10, it
-has been included in my tree for some time though.
+Looks good to me.
 
-> Also, when you drop stuff, please, please don't keep it in your own
-
-Ooops, it's my mistake. I didn't updated my tree not in my local :-(
-
-> for-next branch. The end result is that we'll keep testing something
-> on linux-next with the anticipation that it will work when it lands in
-> the merge window, when that's not the truth if you're not going to
-> send the pull requests up.
-> 
-> So, if you decide to keep code like this out of the merge window (or
-> if we push back at it and say no to it), then remove it from your
-> for-next branch as well.
-> 
-Perfectly right and I agree.
-
-> In particular, the usb phy node for usb2 would ber very good to get in
-> for 3.10, since it's a critical piece to get usb2 working on the
-> Chromebook.
-> 
-Yes, I think so, let me sort them out.
+Linus, if you want me to take into samsung tree, please let me know.
 
 Thanks.
 
 - Kukjin
+
+> ---
+> changes since v4:
+> - fix wrong s3c2413 naming
+>   between s3c2412 and s3c2413, the s3c2412 is the base type. Till v4 the
+>   naming was mixed up, with parts being labeled as s3c2412* and others
+>   as s3c2413*. Fix this by renaming the s3c2413* parts to s3c2412.
+>   No functional changes.
+> 
+> changes since v3:
+> - address comments from Sylwester Nawrocki:
+>   (typos, wrong comments, etc)
+> 
+> changes since v2:
+> - address more comments from Tomasz Figa:
+>   * remove obsolete ctrl_type references
+>   * remove redundant check for parent_chip
+>   * update docs and commit message
+> 
+> changes since v1:
+> - address comments from Tomasz Figa:
+>   * split handling functions for eints 0-3 for s3c2412 and all others
+>   * change the handling for s3c2412 eints 0-3 in that they now use
+>     chained_irq_* for the outer parent interrupt
+> 
+>  .../bindings/pinctrl/samsung-pinctrl.txt           |    8 +
+>  drivers/gpio/gpio-samsung.c                        |    4 +
+>  drivers/pinctrl/Kconfig                            |    5 +
+>  drivers/pinctrl/Makefile                           |    1 +
+>  drivers/pinctrl/pinctrl-s3c24xx.c                  |  652 ++++++++++++++++++++
+>  drivers/pinctrl/pinctrl-samsung.c                  |   10 +
+>  drivers/pinctrl/pinctrl-samsung.h                  |    4 +
+>  7 files changed, 684 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/pinctrl/pinctrl-s3c24xx.c
+> 
+[...]
