@@ -1,39 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 9 May 2013 16:55:33 -0700
-Subject: [PATCH 0/2] ARM: tegra: a couple clock bug-fixes
-In-Reply-To: <1367874671-11474-1-git-send-email-swarren@wwwdotorg.org>
-References: <1367874671-11474-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130509235533.GA19697@quad.lixom.net>
+From: holt@sgi.com (Robin Holt)
+Date: Thu, 9 May 2013 19:05:53 -0500
+Subject: [PATCH -v9 04/11] Move shutdown/reboot related functions to
+ kernel/reboot.c
+In-Reply-To: <20130509135100.13947d1805a583703ee8488b@linux-foundation.org>
+References: <1368127405-112717-1-git-send-email-holt@sgi.com>
+ <1368127405-112717-5-git-send-email-holt@sgi.com>
+ <20130509135100.13947d1805a583703ee8488b@linux-foundation.org>
+Message-ID: <20130510000552.GX3658@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 06, 2013 at 03:11:09PM -0600, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Thu, May 09, 2013 at 01:51:00PM -0700, Andrew Morton wrote:
+> On Thu,  9 May 2013 14:23:18 -0500 Robin Holt <holt@sgi.com> wrote:
 > 
-> Arnd, Olof,
+> > This patch is preparatory.  It moves reboot related syscall, etc
+> > functions from kernel/sys.c to kernel/reboot.c.
 > 
-> The following two patches fix a couple issues in the Tegra20 clock driver
-> that show up on specific platforms. They were sent a little late for 3.9,
-> and I forgot to include them for 3.10 since they weren't reposted:-(
+> This doesn't apply.
 
-Applied to fixes now, sorry for missing them earlier.
+Weird, I just grabbed a recent Linus kernel tree and all 11 applied.
+I then did an update to linus' tree to commit 70eba4226 and now I get
+rejects on arm.  I will resubmit a -v10 fixed up shortly.
 
-> Patch 1 is clearly a bug-fix. Someone pedantic could argue that patch 2
-> is a new feature since it's the last piece to enabling AC'97 support, but
-> I'd argue that it's a bug in the clock driver that it didn't support this
-> clock when it was first written:-)
+Robin
 
-For very early -rc we can be a bit more flexible, so this is ok with me at the
-moment.
-
-> These patches logically belong to Tegra's for-3.10/clk branch, but feel
-> free to apply them where is easiest; it'd be fine to defer them to a post-
-> 3.10-rc1 fixes branch too if you want.
-
-Postponed in effect due to missing them earlier.
-
-Btw, since the drivers have moved and most of the churn is completed, fixes
-like these really can go straight to Mike Turquette from here on out.
-
-
--Olof
+> 
+> > -static void migrate_to_reboot_cpu(void)
+> > -{
+> > -	/* The boot cpu is always logical cpu 0 */
+> > -	int cpu = 0;
+> > -
+> > -	cpu_hotplug_disable();
+> > -
+> > -	/* Make certain the cpu I'm about to reboot on is online */
+> > -	if (!cpu_online(cpu))
+> > -		cpu = cpumask_first(cpu_online_mask);
+> 
+> Here it's deleting code which was already modified by "[PATCH -v9
+> 02/11] Migrate shutdown/reboot to boot cpu.".  So patch [4/11]
+> generates rejects when applied on top of [patch 2/11].
+> 
+> There are several similar glitches.
