@@ -1,40 +1,46 @@
 From: marex@denx.de (Marek Vasut)
-Date: Fri, 10 May 2013 14:26:34 +0200
-Subject: [PATCH 1/2] ARM: mxs: Add default AUART2 pinmux
-Message-ID: <1368188795-9114-1-git-send-email-marex@denx.de>
+Date: Fri, 10 May 2013 14:26:35 +0200
+Subject: [PATCH 2/2] ARM: mxs: Fix UARTs on M28EVK
+In-Reply-To: <1368188795-9114-1-git-send-email-marex@denx.de>
+References: <1368188795-9114-1-git-send-email-marex@denx.de>
+Message-ID: <1368188795-9114-2-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinmux for AUART2 pins where they are in mux0.
+Make use of RTS/CTS lines on AUART0 and register AUART1 and AUART2
+which are routed onto a pin header.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Shawn Guo <shawn.guo@linaro.org>
 Cc: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx28.dtsi |   11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/imx28-m28evk.dts |   14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 7ba4966..13799cf 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -308,6 +308,17 @@
- 					fsl,pull-up = <0>;
- 				};
+diff --git a/arch/arm/boot/dts/imx28-m28evk.dts b/arch/arm/boot/dts/imx28-m28evk.dts
+index fd36e1c..ed1f1c0 100644
+--- a/arch/arm/boot/dts/imx28-m28evk.dts
++++ b/arch/arm/boot/dts/imx28-m28evk.dts
+@@ -195,7 +195,19 @@
  
-+				auart2_2pins_b: auart2-2pins at 1 {
-+					reg = <1>;
-+					fsl,pinmux-ids = <
-+						0x3080 /* MX28_PAD_AUART2_RX__AUART2_RX */
-+						0x3090 /* MX28_PAD_AUART2_TX__AUART2_TX */
-+					>;
-+					fsl,drive-strength = <0>;
-+					fsl,voltage = <1>;
-+					fsl,pull-up = <0>;
-+				};
+ 			auart0: serial at 8006a000 {
+ 				pinctrl-names = "default";
+-				pinctrl-0 = <&auart0_2pins_a>;
++				pinctrl-0 = <&auart0_pins_a>;
++				status = "okay";
++			};
 +
- 				auart3_pins_a: auart3 at 0 {
- 					reg = <0>;
- 					fsl,pinmux-ids = <
++			auart1: serial at 8006c000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&auart1_pins_a>;
++				status = "okay";
++			};
++
++			auart2: serial at 8006e000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&auart2_2pins_b>;
+ 				status = "okay";
+ 			};
+ 		};
 -- 
 1.7.10.4
