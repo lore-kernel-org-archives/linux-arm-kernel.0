@@ -1,104 +1,71 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 May 2013 17:05:18 +0900
-Subject: [PATCH 1/2] ARM: shmobile: r8a7790: add Ether support
-In-Reply-To: <1368173119-27345-1-git-send-email-horms+renesas@verge.net.au>
-References: <1368173119-27345-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1368173119-27345-2-git-send-email-horms+renesas@verge.net.au>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 10 May 2013 10:09:08 +0200
+Subject: [RFC PATCH 1/2] ARM: KVM: move GIC/timer code to a common location
+In-Reply-To: <f816c184d2512dad242b383deac7453e@localhost>
+References: <1367589773-5609-1-git-send-email-marc.zyngier@arm.com>
+ <1367589773-5609-2-git-send-email-marc.zyngier@arm.com>
+ <20130509181101.GA17253@gmail.com>
+ <f816c184d2512dad242b383deac7453e@localhost>
+Message-ID: <518CAB24.3040000@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Ether clock and platform device for R8A7779 SoC; add a function to
-register this device with board-specific platform data.
+Il 10/05/2013 09:23, Marc Zyngier ha scritto:
+> On Thu, 9 May 2013 11:11:01 -0700, Christoffer Dall
+> <cdall@cs.columbia.edu>
+> wrote:
+>> On Fri, May 03, 2013 at 03:02:52PM +0100, Marc Zyngier wrote:
+>>> As KVM/arm64 is looming on the horizon, it makes sense to move some
+>>> of the common code to a single location in order to reduce duplication.
+>>>
+>>> The code could live anywhere. Actually, most of KVM is already built
+>>> with a bunch of ugly ../../.. hacks in the various Makefiles, so we're
+>>> not exactly talking about style here. But maybe it is time to start
+>>> moving into a less ugly direction.
+>>>
+>>> The include files must be in a "public" location, as they are accessed
+>>> from non-KVM files (arch/arm/kernel/asm-offsets.c).
+>>>
+>>> For this purpose, introduce two new locations:
+>>> - virt/kvm/arm/ : x86 and ia64 already share the ioapic code in
+>>>   virt/kvm, so this could be seen as a (very ugly) precedent.
+>>> - include/kvm/  : there is already an include/xen, and while the
+>>>   intent is slightly different, this seems as good a location as
+>>>   any
+>>
+>> This overall looks ok, just a few points:
+>>
+>> 1. Should we have a namespace per arch in the include directory, as in
+>>    include/kvm/arm?
+> 
+> So I thought of that at one point, but discarded the idea because it seems
+> to convey the wrong message:
+> We're moving the include files because they are architecture independent,
+> and referring to an architecture name in the path feels a bit odd. Or maybe
+> arm-common?
+> 
+> I don't have strong feelings about it though...
+> 
+>> 2. We could drop the kvm_ prefix from the include files now
+> 
+> Agreed.
+> 
+> It would be interesting to see what the KVM maintainers think of all this.
+> Gleb? Paolo?
 
-Based on a similar change for the r8a7779 by Sergei Shtylyov.
+include/kvm is good, there is no user-level API to care about.  Perhaps
+you can name the includes kvm/arm_vgic.h and kvm/arm_arch_timer.h.  It
+keeps the tree shallow but at the same time it suggests some parallel
+between the source tree and the include tree.
 
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+virt/kvm/arm is certainly better than anything else that comes to mind
+:) but I'm not a big fan of $(addprefix); this looks tidier to me:
 
----
+KVM := ../../../virt/kvm
 
-This patch has a run-time dependency on "sh_eth: add support for r8a7790 SoC".
----
- arch/arm/mach-shmobile/clock-r8a7790.c        |  6 +++++-
- arch/arm/mach-shmobile/include/mach/r8a7790.h |  3 +++
- arch/arm/mach-shmobile/setup-r8a7790.c        | 15 +++++++++++++++
- 3 files changed, 23 insertions(+), 1 deletion(-)
+kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
+...
++obj-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic.o
++obj-$(CONFIG_KVM_ARM_TIMER) += $(KVM)/arm/arch_timer.o
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index bedd20c..2c3123e 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -49,6 +49,7 @@
- 
- #define SMSTPCR2 0xe6150138
- #define SMSTPCR7 0xe615014c
-+#define SMSTPCR8 0xe6150990
- 
- #define MODEMR		0xE6160060
- #define SDCKCR		0xE6150074
-@@ -178,9 +179,11 @@ static struct clk div6_clks[DIV6_NR] = {
- };
- 
- /* MSTP */
--enum { MSTP721, MSTP720,
-+enum { MSTP813, MSTP812, MSTP721, MSTP720,
- 	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202, MSTP_NR };
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
-+	[MSTP812] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 12, 0), /* EtherAVB */
- 	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
- 	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
- 	[MSTP216] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 16, 0), /* SCIFB2 */
-@@ -242,6 +245,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP202]),
- 	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP721]),
- 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
-+	CLKDEV_DEV_ID("sh-eth", &mstp_clks[MSTP813]),
- };
- 
- #define R8A7790_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-index 2e919e6..95b8f7e 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-@@ -1,9 +1,12 @@
- #ifndef __ASM_R8A7790_H__
- #define __ASM_R8A7790_H__
- 
-+#include <linux/sh_eth.h>
-+
- void r8a7790_add_standard_devices(void);
- void r8a7790_clock_init(void);
- void r8a7790_pinmux_init(void);
- void r8a7790_timer_init(void);
-+void r8a7790_add_ether_device(struct sh_eth_plat_data *pdata);
- 
- #endif /* __ASM_R8A7790_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index eeef5f6..8ed0d7b 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -30,6 +30,21 @@
- #include <mach/r8a7790.h>
- #include <asm/mach/arch.h>
- 
-+
-+/* Ether */
-+static struct resource ether_resources[] = {
-+	DEFINE_RES_MEM(0xee700000, 0x400),
-+	DEFINE_RES_IRQ(gic_spi(162)), /* IRQ0 */
-+};
-+
-+void __init r8a7790_add_ether_device(struct sh_eth_plat_data *pdata)
-+{
-+	platform_device_register_resndata(&platform_bus, "sh-eth", -1,
-+					  ether_resources,
-+					  ARRAY_SIZE(ether_resources),
-+					  pdata, sizeof(*pdata));
-+}
-+
- static const struct resource pfc_resources[] = {
- 	DEFINE_RES_MEM(0xe6060000, 0x250),
- };
--- 
-1.8.2.1
+Paolo
