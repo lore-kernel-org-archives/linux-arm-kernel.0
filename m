@@ -1,49 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 10 May 2013 09:46:29 +0100
-Subject: [RFC PATCH 1/2] ARM: KVM: move GIC/timer code to a common location
-In-Reply-To: <518CABBB.7050909@redhat.com>
-References: <1367589773-5609-1-git-send-email-marc.zyngier@arm.com>
- <1367589773-5609-2-git-send-email-marc.zyngier@arm.com>
- <20130509181101.GA17253@gmail.com>
- <f816c184d2512dad242b383deac7453e@localhost> <518CABBB.7050909@redhat.com>
-Message-ID: <518CB3E5.7090504@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 10 May 2013 10:30:07 +0100
+Subject: [PATCH 1/3] driver core: Add API to wait for deferred probe to
+ complete during init
+In-Reply-To: <CACxGe6sO7kEZgg6km4bzP1cq+2MqGb=D4cZbuWELoz+yhaO6KQ@mail.gmail.com>
+References: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
+ <1368076726-11492-2-git-send-email-skannan@codeaurora.org>
+ <CACVXFVMd_iRtEM8ZLK6Ps66gZO6SCp1mXSgY6JbWtRJjJUh+ag@mail.gmail.com>
+ <CACxGe6uHBNUcbD9SeRP5c3E8NN-Z2yjVV+9VAhuoJnXoBtTu2w@mail.gmail.com>
+ <20130509135017.GD3200@sirena.org.uk>
+ <20130509141444.GV18614@n2100.arm.linux.org.uk>
+ <CACxGe6sO7kEZgg6km4bzP1cq+2MqGb=D4cZbuWELoz+yhaO6KQ@mail.gmail.com>
+Message-ID: <20130510093007.GL3200@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/13 09:11, Paolo Bonzini wrote:
-> Il 10/05/2013 09:23, Marc Zyngier ha scritto:
->>>> 1. Should we have a namespace per arch in the include directory, as in
->>>>    include/kvm/arm?
->> So I thought of that at one point, but discarded the idea because it seems
->> to convey the wrong message:
->> We're moving the include files because they are architecture independent,
->> and referring to an architecture name in the path feels a bit odd. Or maybe
->> arm-common?
-> 
-> As I wrote in the other message, Linux in general has a shallow include/
-> tree, so I think putting them in include/kvm/ is good.
-> 
-> Is there any precedent for naming stuff that is common to arm and
-> aarch64?  
+On Thu, May 09, 2013 at 05:39:03PM +0100, Grant Likely wrote:
 
-So far, we have:
-- include/linux/irqchip/arm-gic.h
-- include/clocksource/arm_arch_timer.h
+> +1. You can /minimize/ up-down cycles with the kind of optimization
+> that is being attempted here, but the driver still *must* deal with
+> bringing resources back up if they get requested "later than you would
+> otherwise like".
 
-So the trend seems to use "arm" as a prefix, and I will rename the files
-to match this convention (which you actually suggested in your other email).
-
-> I think to 99% of the world they will both be "arm", but of
-> course the remaining 1% is likely over-represented among KVM-ARM
-> maintainers. :)
-
-Who? What? ;-)
-
-Do you have any comment about patch 2/2? It is a bit more invasive, but
-it is a cleanup in my opinion.
-
-Thanks for the feedback,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Now that I think about it we should probably have a debug option like
+the shared IRQ testing one which does actually disable all resources as
+soon as the kernel gains control of them in order to help with test
+coverage for this.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130510/974fe1f2/attachment.sig>
