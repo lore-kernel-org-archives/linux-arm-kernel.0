@@ -1,23 +1,28 @@
 From: james.hogan@imgtec.com (James Hogan)
-Date: Fri, 10 May 2013 11:41:10 +0100
-Subject: [PATCH v2 2/3] clk: add support for clock reparent on set_rate
-In-Reply-To: <518C0097.50300@codeaurora.org>
+Date: Fri, 10 May 2013 11:43:53 +0100
+Subject: [PATCH v2 0/3] clk: implement remuxing during set_rate
+In-Reply-To: <518BFD99.2010208@codeaurora.org>
 References: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
- <1366388904-13903-3-git-send-email-james.hogan@imgtec.com>
- <518C0097.50300@codeaurora.org>
-Message-ID: <518CCEC6.5050507@imgtec.com>
+ <518AE16D.5060501@codeaurora.org> <518B663D.60806@imgtec.com>
+ <518BFD99.2010208@codeaurora.org>
+Message-ID: <518CCF69.9040200@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/05/13 21:01, Stephen Boyd wrote:
-> I believe we'll need to update the check in __clk_init() to allow you to
-> have either a .round_rate or a .determine_rate op if you have a
-> .recalc_rate op. Right now it fails to register the clock and then
-> oopses later on while setting up clock debugfs.
+On 09/05/13 20:48, Stephen Boyd wrote:
+> On 05/09/13 02:02, James Hogan wrote:
+>> On 09/05/13 00:36, Stephen Boyd wrote:
+>>> Which tree is this based on? I get failures with git am on patch 2.
+>>>
+>> It was based on v3.9-rc4.
+>>
 > 
-> Here's a (probably whitespace damaged) patch for the first one.
+> Thanks. Would it be possible for you to update to Mike's for-next
+> branch? I've done the rebase myself for now and it seems to work well
+> enough. I'll need to add the set_rate_and_parent() op on top.
+> 
 
-Thanks, I'll incorporate that.
+Yes, I will do that before reposting. Thanks for giving it a spin.
 
 Cheers
 James
