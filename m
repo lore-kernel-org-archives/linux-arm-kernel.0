@@ -1,59 +1,58 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 10 May 2013 02:24:38 +0200
-Subject: [PATCH V2 0/3] clk: Samsung: audss: Register audio subsytem
- clocks using common clk framework
-In-Reply-To: <1367909016-19657-1-git-send-email-padma.v@samsung.com>
-References: <1367909016-19657-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1561518.UR9S1ZDj1n@flatron>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 10 May 2013 09:31:11 +0900
+Subject: [GIT PULL] Late Exynos stuff for v3.10
+In-Reply-To: <CAOesGMjA5_XUXMcCL3roZiLC1S=ypMoVHn2tF7bzUuKr+eLw2A@mail.gmail.com>
+References: <5176B499.1000208@samsung.com> <51770697.7080504@samsung.com>
+ <20130424000638.GA9067@quad.lixom.net> <51794E10.1010205@samsung.com>
+ <CAOesGMjA5_XUXMcCL3roZiLC1S=ypMoVHn2tF7bzUuKr+eLw2A@mail.gmail.com>
+Message-ID: <046301ce4d15$ac1592b0$0440b810$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Padmavathi,
-
-On Tuesday 07 of May 2013 12:13:33 Padmavathi Venna wrote:
-> Samsung S5PV210 and Exynos SoC has a separate subsystem for audio. This
-> subsystem has a internal clock controller which controls i2s0 and pcm0
-> clocks. This patch series adds the Samsung audio subsytem clock to the
-> common clock framework and provides the I2S controllers clock
-> information in the dtsi file.
+Olof Johansson wrote:
 > 
-> This patch series is dependent on
-> https://patchwork.kernel.org/patch/2532091/
-> http://www.spinics.net/lists/linux-kbuild/msg07616.html
+> Kukjin,
 > 
-> This patch series is made based on Kukjin Kim for-next branch
+Hi Olof,
+
+[...]
+
+> > And let me send pull-request again for fix and late dt branch with
+> separated
+> > branches in a couple of hours not including usb stuff...
 > 
-> Changes since V1:
-> 	- Reworked on all review comments by Sylwester Nawrocki
-> 	- Added a header file for all clock indexes as requested by 
-Sylwester
-> 	- Added different compatible names for s5pv210, exynos4 and 
-exynos5
-> 	- Registered the pcm clocks with common clock framework
+> Refresh my memory here, what was the reason for dropping the USB DTS
+> updates? (Yes, I am aware it might because I asked you not to send
+> them in but I don't remember :-).
 > 
-> Padmavathi Venna (3):
->   clk: samsung: register audio subsystem clocks using common clock
->     framework
->   ARM: dts: add Exynos audio subsystem clock controller node
->   ARM: dts: add clock provider information for i2s controllers in
->     Exynos5250
+Hmm...let me see, yeah, the USB DTS updates dropped because of late
+pull-request stuff as you concerned.
+http://www.spinics.net/lists/arm-kernel/msg240105.html
+
+Since I didn't want to make a noise at that time, so I dropped for v3.10, it
+has been included in my tree for some time though.
+
+> Also, when you drop stuff, please, please don't keep it in your own
+
+Ooops, it's my mistake. I didn't updated my tree not in my local :-(
+
+> for-next branch. The end result is that we'll keep testing something
+> on linux-next with the anticipation that it will work when it lands in
+> the merge window, when that's not the truth if you're not going to
+> send the pull requests up.
 > 
->  .../bindings/clock/clk-samsung-audss.txt           |   64 +++++++++
->  arch/arm/boot/dts/exynos5250.dtsi                  |   16 +++
->  drivers/clk/samsung/Makefile                       |    1 +
->  drivers/clk/samsung/clk-samsung-audss.c            |  137
-> ++++++++++++++++++++ include/dt-bindings/clk/samsung-audss-clk.h       
-> |   25 ++++ 5 files changed, 243 insertions(+), 0 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/clock/clk-samsung-audss.txt create
-> mode 100644 drivers/clk/samsung/clk-samsung-audss.c
->  create mode 100644 include/dt-bindings/clk/samsung-audss-clk.h
+> So, if you decide to keep code like this out of the merge window (or
+> if we push back at it and say no to it), then remove it from your
+> for-next branch as well.
+> 
+Perfectly right and I agree.
 
-Also, I think that this series lacks
+> In particular, the usb phy node for usb2 would ber very good to get in
+> for 3.10, since it's a critical piece to get usb2 working on the
+> Chromebook.
+> 
+Yes, I think so, let me sort them out.
 
-Cc: Mike Turquette <mturquette@linaro.org>
+Thanks.
 
-as he's the maintainer of the clk subsystem.
-
-Best regards,
-Tomasz
+- Kukjin
