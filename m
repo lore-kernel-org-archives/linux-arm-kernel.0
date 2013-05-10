@@ -1,96 +1,56 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Fri, 10 May 2013 09:06:16 +0200
-Subject: [PATCH -v8 00/11] Shutdown from reboot_cpuid without stopping
- other cpus.
-In-Reply-To: <1368127405-112717-1-git-send-email-holt@sgi.com>
-References: <1368127405-112717-1-git-send-email-holt@sgi.com>
-Message-ID: <20130510070616.GA5763@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 10 May 2013 09:23:56 +0200
+Subject: [RFC PATCH 1/2] ARM: KVM: move GIC/timer code to a common location
+In-Reply-To: <20130509181101.GA17253@gmail.com>
+References: <1367589773-5609-1-git-send-email-marc.zyngier@arm.com>
+ <1367589773-5609-2-git-send-email-marc.zyngier@arm.com>
+ <20130509181101.GA17253@gmail.com>
+Message-ID: <f816c184d2512dad242b383deac7453e@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 9 May 2013 11:11:01 -0700, Christoffer Dall
+<cdall@cs.columbia.edu>
+wrote:
+> On Fri, May 03, 2013 at 03:02:52PM +0100, Marc Zyngier wrote:
+>> As KVM/arm64 is looming on the horizon, it makes sense to move some
+>> of the common code to a single location in order to reduce duplication.
+>> 
+>> The code could live anywhere. Actually, most of KVM is already built
+>> with a bunch of ugly ../../.. hacks in the various Makefiles, so we're
+>> not exactly talking about style here. But maybe it is time to start
+>> moving into a less ugly direction.
+>> 
+>> The include files must be in a "public" location, as they are accessed
+>> from non-KVM files (arch/arm/kernel/asm-offsets.c).
+>> 
+>> For this purpose, introduce two new locations:
+>> - virt/kvm/arm/ : x86 and ia64 already share the ioapic code in
+>>   virt/kvm, so this could be seen as a (very ugly) precedent.
+>> - include/kvm/  : there is already an include/xen, and while the
+>>   intent is slightly different, this seems as good a location as
+>>   any
+> 
+> This overall looks ok, just a few points:
+> 
+> 1. Should we have a namespace per arch in the include directory, as in
+>    include/kvm/arm?
 
-* Robin Holt <holt@sgi.com> wrote:
+So I thought of that at one point, but discarded the idea because it seems
+to convey the wrong message:
+We're moving the include files because they are architecture independent,
+and referring to an architecture name in the path feels a bit odd. Or maybe
+arm-common?
 
-> We recently noticed that reboot of a 1024 cpu machine takes approx 16
-> minutes of just stopping the cpus.  The slowdown was tracked to commit
-> f96972f.
-> 
-> The current implementation does all the work of hot removing the cpus
-> before halting the system.  We are switching to just migrating to the
-> reboot_cpu and then continuing with shutdown/reboot.
-> 
-> The patch set is broken into eleven parts.  The first two are planned for
-> the stable release.  The others move the halt/shutdown/reboot related
-> functions to their own kernel/reboot.c file and then move the handling
-> of the kernel reboot= kernel parameter to generic kernel code.
-> 
-> 
-> Changes since -v8
->  - Changes reboot_cpu on stack to cpu to fix bug noticed by Russell King.
-> 
->  - Switched unicore32 and arm from using REBOOT_WARM/COLD to HARD/SOFT.
-> 
->  - Fixed case statement bug.
-> 
->  - Went to using simple_strtoul for parsing reboot_cpu=smp###.
-> 
->  - Made parsing of reboot= not use any #ifdef'd code.
-> 
-> Changes since -v7.
->  - Fixed authorship for first patch.
-> 
->  - Rebased to Linus' current tree (51a26ae7a).
-> 
-> Changes since -v6.
->  - Cross compiled all arm architectures (using v3.9 kernel.  Fails with
->    current).
-> 
->  - Added a #define for non-hotplug case.
-> 
->  - Add #define for PF_THREAD_BOUND as compatibility to make stable easier.
-> 
->  - Fixup s/reboot_cpu_id/reboot_cpu/
-> 
->  - Add include of linux/uaccess.h to allow building on arm.
-> 
->  - Removed last remaining checkpatch.pl line length warning on
->    kernel/reboot.c.
-> 
->  - Fixed the duplicate handling or the reboot= kernel parameter.
-> 
-> Changes since -v5.
->  - Moved the arch/x86 reboot= up to the generic kernel code.
-> 
-> Changes since -v4.
->  - Integrated Srivatsa S. Bhat creating cpu_hotplug_disable()
->    function
-> 
->  - Integrated comments by Srivatsa S. Bhat.
-> 
->  - Made one more comment consistent with others in function.
-> 
-> Changes since -v3.
->  - Added a tested-by for the original reporter.
-> 
->  - Fix compile failure found by Joe Perches.
-> 
->  - Integrated comments by Joe Perches.
-> 
-> 
-> To: Andrew Morton <akpm@linux-foundation.org>
-> Cc: H. Peter Anvin <hpa@zytor.com>
-> Cc: Russ Anderson <rja@sgi.com>
-> Cc: Robin Holt <holt@sgi.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
-> Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
-> Cc: the arch/x86 maintainers <x86@kernel.org>
-> Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
+I don't have strong feelings about it though...
 
-Looks nice now to me. For the x86 bits:
+> 2. We could drop the kvm_ prefix from the include files now
 
-Acked-by: Ingo Molnar <mingo@kernel.org>
+Agreed.
 
-Thanks,
+It would be interesting to see what the KVM maintainers think of all this.
+Gleb? Paolo?
 
-	Ingo
+        M.
+-- 
+Fast, cheap, reliable. Pick two.
