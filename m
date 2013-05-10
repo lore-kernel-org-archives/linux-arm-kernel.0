@@ -1,49 +1,67 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 11 May 2013 14:04:57 +0100
-Subject: [PATCH -v10 09/11] arm, prepare reboot_mode for moving to
- generic kernel code.
-In-Reply-To: <1368273447-11958-10-git-send-email-holt@sgi.com>
-References: <1368273447-11958-1-git-send-email-holt@sgi.com>
- <1368273447-11958-10-git-send-email-holt@sgi.com>
-Message-ID: <20130511130457.GD18614@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 10 May 2013 22:24:22 +0100
+Subject: [PATCH RFC] clk: Introduce userspace clock driver
+In-Reply-To: <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
+References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <20130510212422.GY3200@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 11, 2013 at 06:57:25AM -0500, Robin Holt wrote:
-> This patch prepares for the moving the parsing of reboot= to the generic
-> kernel code by making reboot_mode into a more generic form.
-> 
-> Signed-off-by: Robin Holt <holt@sgi.com>
-> To: Andrew Morton <akpm@linux-foundation.org>
-> To: Russell King <linux@arm.linux.org.uk>
-> Cc: Russ Anderson <rja@sgi.com>
-> Cc: Robin Holt <holt@sgi.com>
-> Cc: H. Peter Anvin <hpa@zytor.com>
-> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
-> Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
-> Cc: the arch/x86 maintainers <x86@kernel.org>
-> Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
+On Fri, May 10, 2013 at 10:31:31AM -0700, Soren Brinkmann wrote:
 
-Almost-but-not-quite-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk> :)
+> +Example:
+> +	usclk: usclk {
+> +		compatible = "clk-userspace";
+> +		clocks = <&foo 15>, <&bar>;
+> +		clock-count = <2>;
+> +	};
 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index f219703..92b47df 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -174,14 +174,14 @@ void arch_cpu_idle(void)
->  		default_idle();
->  }
->  
-> -static char reboot_mode = 'h';
-> +enum reboot_mode reboot_mode = REBOOT_HARD;
->  
-> -int __init reboot_setup(char *str)
-> +static int __init reboot_setup(char *str)
->  {
-> -	reboot_mode = str[0];
-> +	if ('s' == str[0])
-> +		reboot_mode = REBOOT_SOFT;
+This is clearly *very* Linux specific so needs to be a linux vendor
+thing (everything should have a namespaced name anyway).  It's not at
+all obvious to me that this should be in device tree, though, since it's
+not hardware description but a detail of how the OS is currently
+implemented.
 
-Remember we talked about the 'gpio' mode as well, so you also need here
-+	if ('g' == str[0])
-		reboot_mode = REBOOT_GPIO;
+For your use case should these things be exposed by the FPGA device
+asking for that rather than by having the clocks available separately?
+Or is this part of the DT blob that's loaded incrementally along with
+the FPGA (which does make things more interesting of course...).
+
+> + * Expose clock controls through sysfs to userspace.
+
+> + * By writing 0/1 to 'enable' the clock can be disabled/enabled. Reading
+> + * that file returns the current state - 0 = disabled, 1 = enabled.
+
+> + * Reading 'set_rate' returns the current clock frequency in Hz. Writing
+> + * the file requests setting a new frequency in Hz.
+
+This needs to be covered in Documentation/ABI since it's adding new
+sysfs stuff.
+
+> +	if (enable)
+> +		ret = clk_prepare_enable(pdata->clk);
+> +	else
+> +		clk_disable_unprepare(pdata->clk);
+
+> +	if (ret)
+> +		return -EBUSY;
+
+Why not pass back the actual error?
+
+> +	pdata = kzalloc(clock_count * sizeof(*pdata), GFP_KERNEL);
+> +	if (!pdata)
+> +		return -ENOMEM;
+
+devm?
+
+> +late_initcall(usclk_setup);
+
+Why not just a regular driver?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130510/98d46afb/attachment-0001.sig>
