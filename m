@@ -1,254 +1,37 @@
-From: emilio@elopez.com.ar (=?UTF-8?B?RW1pbGlvIEzDs3Bleg==?=)
-Date: Fri, 10 May 2013 14:44:44 -0300
-Subject: [PATCH RFC] clk: Introduce userspace clock driver
-In-Reply-To: <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
-References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
- <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <518D320C.4010707@elopez.com.ar>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 May 2013 18:43:44 +0100
+Subject: [PATCH V2] ARM: bcm281xx: Add L2 support for Rev A2 chips
+In-Reply-To: <20130509204434.GA16724@quad.lixom.net>
+References: <1367542653-955-1-git-send-email-csd@broadcom.com>
+ <20130509204434.GA16724@quad.lixom.net>
+Message-ID: <20130510174344.GX18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-El 10/05/13 14:31, Soren Brinkmann escribi?:
-> The userspace clock driver can be used to expose clock controls through
-> sysfs to userspace. The driver creates entries in /sys/class/clk.
+On Thu, May 09, 2013 at 01:44:34PM -0700, Olof Johansson wrote:
+> On Thu, May 02, 2013 at 05:57:33PM -0700, Christian Daudt wrote:
+> > Rev A2 SoCs have an unorthodox memory re-mapping and this needs
+> > to be reflected in the cache operations.
+> > This patch adds new outer cache functions for the l2x0 driver
+> > to support this SoC revision. It also adds a new compatible
+> > value for the cache to enable this functionality.
+> > 
+> > Updates from V1:
+> > - remove section 1 altogether and note that in comments
+> > - simplify section selection caused by section 1 removal
+> > - BUG_ON just in case section 1 shows up
+> > 
+> > Signed-off-by: Christian Daudt <csd@broadcom.com>
 > 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
->  .../devicetree/bindings/clock/clk-userspace.txt    |   7 +
->  drivers/clk/Kconfig                                |   9 ++
->  drivers/clk/Makefile                               |   1 +
->  drivers/clk/clk-userspace.c                        | 169 +++++++++++++++++++++
->  4 files changed, 186 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/clk-userspace.txt
->  create mode 100644 drivers/clk/clk-userspace.c
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/clk-userspace.txt b/Documentation/devicetree/bindings/clock/clk-userspace.txt
-> new file mode 100644
-> index 0000000..2d153c7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/clk-userspace.txt
-> @@ -0,0 +1,7 @@
-> +
-> +Example:
-> +	usclk: usclk {
-> +		compatible = "clk-userspace";
-> +		clocks = <&foo 15>, <&bar>;
-> +		clock-count = <2>;
-> +	};
+> This patch mostly covers code that is on Russells plate, so please feed
+> this to his tracker to be picked up by him. Feel free to add:
 
-Does this belong on DT? It isn't describing hardware, is it?
+Yes, but there's a problem.  I don't have bcm11351.dtsi to apply this
+patch to.  This is one of the problems of splitting the SoC stuff
+from core stuff - either I start doing cross-merges (which cause Linus
+and everyone else pain as we've seen this time around) or we have to
+stuff everything through a single tree.
 
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index 0357ac4..b35b62c 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -81,6 +81,15 @@ config COMMON_CLK_AXI_CLKGEN
->  	  Support for the Analog Devices axi-clkgen pcore clock generator for Xilinx
->  	  FPGAs. It is commonly used in Analog Devices' reference designs.
->  
-> +config COMMON_CLK_USERSPACE
-> +	bool "Userspace Clock Controls"
-> +	depends on OF
-> +	depends on SYSFS
-> +	help
-> +	---help---
-> +	  Expose clock controls through sysfs to userspace. Clocks are selected
-> +	  through the device tree and the controls are exposed in
-> +	  /sys/class/clk.
->  endmenu
->  
->  source "drivers/clk/mvebu/Kconfig"
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index fa435bc..f2f68c8 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -8,6 +8,7 @@ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
->  obj-$(CONFIG_COMMON_CLK)	+= clk-gate.o
->  obj-$(CONFIG_COMMON_CLK)	+= clk-mux.o
->  obj-$(CONFIG_COMMON_CLK)	+= clk-composite.o
-> +obj-$(CONFIG_COMMON_CLK_USERSPACE) += clk-userspace.o
->  
->  # SoCs specific
->  obj-$(CONFIG_ARCH_BCM2835)	+= clk-bcm2835.o
-> diff --git a/drivers/clk/clk-userspace.c b/drivers/clk/clk-userspace.c
-> new file mode 100644
-> index 0000000..931cf92
-> --- /dev/null
-> +++ b/drivers/clk/clk-userspace.c
-> @@ -0,0 +1,169 @@
-> +/*
-> + * Userspace clock driver
-> + *
-> + *  Copyright (C) 2013 Xilinx
-> + *
-> + *  S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License v2 as published by
-> + * the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + *
-> + * Expose clock controls through sysfs to userspace.
-> + *
-> + * By writing 0/1 to 'enable' the clock can be disabled/enabled. Reading
-> + * that file returns the current state - 0 = disabled, 1 = enabled.
-> + *
-> + * Reading 'set_rate' returns the current clock frequency in Hz. Writing
-> + * the file requests setting a new frequency in Hz.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/fs.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/device.h>
-> +#include <linux/slab.h>
-> +
-> +#define DRIVER_NAME	"clk-userspace"
-> +
-> +struct usclk_data {
-> +	struct clk *clk;
-> +	int enabled;
-> +};
-> +
-> +static ssize_t enable_show(struct device *dev, struct device_attribute *attr,
-> +		char *buf)
-> +{
-> +	struct usclk_data *pdata = dev_get_drvdata(dev);
-> +
-> +	return scnprintf(buf, PAGE_SIZE, "%u\n", pdata->enabled);
-> +}
-> +
-> +static ssize_t enable_store(struct device *dev, struct device_attribute *attr,
-> +		const char *buf, size_t count)
-> +{
-> +	unsigned long enable;
-> +	int ret;
-> +	struct usclk_data *pdata = dev_get_drvdata(dev);
-> +
-> +	ret = kstrtoul(buf, 0, &enable);
-> +	if (ret)
-> +		return -EINVAL;
-> +
-> +	enable = !!enable;
-> +	if (enable == pdata->enabled)
-> +		return count;
-> +
-> +	if (enable)
-> +		ret = clk_prepare_enable(pdata->clk);
-> +	else
-> +		clk_disable_unprepare(pdata->clk);
-> +
-> +	if (ret)
-> +		return -EBUSY;
-> +
-> +	pdata->enabled = enable;
-> +	return count;
-> +}
-> +
-> +static DEVICE_ATTR(enable, 0644, enable_show, enable_store);
-> +
-> +static ssize_t set_rate_show(struct device *dev, struct device_attribute *attr,
-> +		char *buf)
-> +{
-> +	struct usclk_data *pdata = dev_get_drvdata(dev);
-> +
-> +	return scnprintf(buf, PAGE_SIZE, "%lu\n", clk_get_rate(pdata->clk));
-> +}
-> +
-> +static ssize_t set_rate_store(struct device *dev, struct device_attribute *attr,
-> +		const char *buf, size_t count)
-> +{
-> +	int ret = 0;
-> +	unsigned long rate;
-> +	struct usclk_data *pdata = dev_get_drvdata(dev);
-> +
-> +	ret = kstrtoul(buf, 0, &rate);
-> +	if (ret)
-> +		return -EINVAL;
-> +
-> +	rate = clk_round_rate(pdata->clk, rate);
-> +	ret = clk_set_rate(pdata->clk, rate);
-> +	if (ret)
-> +		return -EBUSY;
-> +
-> +	return count;
-> +}
-> +
-> +static DEVICE_ATTR(set_rate, 0644, set_rate_show, set_rate_store);
-> +
-> +static const struct attribute *usclk_attrs[] = {
-> +	&dev_attr_enable.attr,
-> +	&dev_attr_set_rate.attr,
-> +	NULL
-> +};
+Not happy.
 
-For debugging purposes, being able to change parents would be nice too.
-Maybe this belongs to debugfs instead of sysfs though.
-
-> +
-> +static const struct attribute_group usclk_attr_grp = {
-> +	.attrs = (struct attribute **)usclk_attrs,
-> +};
-> +
-> +static int usclk_setup(void)
-> +{
-> +	int ret;
-> +	int i;
-> +	struct usclk_data *pdata;
-> +	u32 clock_count;
-> +	struct class *clk_class;
-> +	struct device *dev;
-> +	struct device_node *np = of_find_compatible_node(NULL, NULL,
-> +			"clk-userspace");
-> +
-> +	ret = of_property_read_u32(np, "clock-count", &clock_count);
-> +	if (ret || !clock_count)
-> +		return ret;
-> +
-> +	pdata = kzalloc(clock_count * sizeof(*pdata), GFP_KERNEL);
-> +	if (!pdata)
-> +		return -ENOMEM;
-> +
-> +	clk_class = class_create(THIS_MODULE, "clk");
-> +	if (!clk_class) {
-> +		pr_err("unable to create class\n");
-> +		goto err_free;
-> +	}
-> +
-> +	for (i = 0; i < clock_count; i++) {
-> +		pdata[i].clk = of_clk_get(np, i);
-> +		if (IS_ERR(pdata[i].clk)) {
-> +			pr_warn("input clock #%u not found\n", i);
-> +			continue;
-> +		}
-> +
-> +		dev = device_create(clk_class, NULL, MKDEV(0, 0), NULL,
-> +				of_clk_get_parent_name(np, i));
-> +		if (!dev) {
-> +			pr_warn("unable to create device #%d\n", i);
-> +			continue;
-> +		}
-> +
-> +		dev_set_drvdata(dev, &pdata[i]);
-> +		sysfs_create_group(&dev->kobj, &usclk_attr_grp);
-> +	}
-> +
-> +	return 0;
-> +
-> +err_free:
-> +	kfree(pdata);
-> +
-> +	return ret;
-> +}
-> +late_initcall(usclk_setup);
-> 
+Not applying until after -rc1.
