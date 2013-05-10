@@ -1,23 +1,58 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 10 May 2013 11:55:45 +0100
-Subject: [RFC 23/42] drivers/spi: don't check resource with
- devm_ioremap_resource
-In-Reply-To: <1368173847-5661-24-git-send-email-wsa@the-dreams.de>
-References: <1368173847-5661-1-git-send-email-wsa@the-dreams.de>
- <1368173847-5661-24-git-send-email-wsa@the-dreams.de>
-Message-ID: <20130510105545.GO3200@sirena.org.uk>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 10 May 2013 13:11:51 +0200
+Subject: [PATCH -v8 01/11] CPU hotplug: Provide a generic helper to
+ disable/enable CPU hotplug
+In-Reply-To: <20130509150121.8c3ef60b2fc748ce542a1a52@linux-foundation.org>
+References: <1367937595-32241-1-git-send-email-holt@sgi.com>
+ <1367937595-32241-2-git-send-email-holt@sgi.com>
+ <20130509150121.8c3ef60b2fc748ce542a1a52@linux-foundation.org>
+Message-ID: <1651579.orCh9JNVz6@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 10, 2013 at 10:17:08AM +0200, Wolfram Sang wrote:
-> devm_ioremap_resource does sanity checks on the given resource. No need to
-> duplicate this in the driver.
+On Thursday, May 09, 2013 03:01:21 PM Andrew Morton wrote:
+> On Tue,  7 May 2013 09:39:45 -0500 Robin Holt <holt@sgi.com> wrote:
+> 
+> > From: "Srivatsa S. Bhat" <srivatsa.bhat@linux.vnet.ibm.com>
+> > 
+> > There are instances in the kernel where we would like to disable
+> > CPU hotplug (from sysfs) during some important operation. Today
+> > the freezer code depends on this and the code to do it was kinda
+> > tailor-made for that.
+> > 
+> > Restructure the code and make it generic enough to be useful for
+> > other usecases too.
+> > 
+> > ...
+> >
+> > --- a/include/linux/cpu.h
+> > +++ b/include/linux/cpu.h
+> > @@ -141,6 +141,8 @@ static inline void unregister_cpu_notifier(struct notifier_block *nb)
+> >  }
+> >  #endif
+> >  
+> > +extern void cpu_hotplug_disable(void);
+> > +extern void cpu_hotplug_enable(void);
+> >  int cpu_up(unsigned int cpu);
+> >  void notify_cpu_starting(unsigned int cpu);
+> >  extern void cpu_maps_update_begin(void);
+> > @@ -148,6 +150,7 @@ extern void cpu_maps_update_done(void);
+> >  
+> >  #else	/* CONFIG_SMP */
+> >  
+> > +#define cpu_hotplug_disable()	do { } while (0)
+> >  #define cpu_notifier(fn, pri)	do { (void)(fn); } while (0)
+> >  
+> 
+> Breaks alpha allmodconfig because cpu_hotplug_disable() is absent from
+> vmlinux.
+> 
+> cpu_hotplug_disable() doesn't get compiled unless we've defined
+> CONFIG_PM_SLEEP_SMP.  I cannot begin to imagine what the logic is
+> behind that!
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130510/c2f62849/attachment.sig>
+I suppose it was only used by suspend/hibernate code paths when this was
+introduced.
+
+Thanks,
+Rafael
