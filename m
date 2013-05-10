@@ -1,118 +1,126 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 10 May 2013 16:30:34 +0200
-Subject: [RFC 18/42] drivers/pinctrl: don't check resource with
- devm_ioremap_resource
-In-Reply-To: <1368173847-5661-19-git-send-email-wsa@the-dreams.de>
-References: <1368173847-5661-1-git-send-email-wsa@the-dreams.de>
- <1368173847-5661-19-git-send-email-wsa@the-dreams.de>
-Message-ID: <20130510143034.GA22508@game.jcrosoft.org>
+From: gxt@mprc.pku.edu.cn (Xuetao Guan)
+Date: Fri, 10 May 2013 23:05:21 +0800 (CST)
+Subject: [PATCH -v9 07/11] unicore32,
+ prepare reboot_mode for moving to generic kernel code.
+In-Reply-To: <1368127405-112717-8-git-send-email-holt@sgi.com>
+References: <1368127405-112717-1-git-send-email-holt@sgi.com>
+ <1368127405-112717-8-git-send-email-holt@sgi.com>
+Message-ID: <53078.128.237.228.195.1368198321.squirrel@mprc.pku.edu.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:17 Fri 10 May     , Wolfram Sang wrote:
-> devm_ioremap_resource does sanity checks on the given resource. No need to
-> duplicate this in the driver.
-> 
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
-> ---
->  drivers/pinctrl/pinctrl-at91.c       |    7 +------
-for at91
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> This patch prepares for the moving the parsing of reboot= to the generic
+> kernel code by making reboot_mode into a more generic form.
+>
+> Signed-off-by: Robin Holt <holt@sgi.com>
+> To: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+> Cc: Russ Anderson <rja@sgi.com>
+> Cc: Robin Holt <holt@sgi.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: H. Peter Anvin <hpa@zytor.com>
+> Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+> Cc: the arch/x86 maintainers <x86@kernel.org>
+> Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
 
->  drivers/pinctrl/pinctrl-coh901.c     |    5 -----
->  drivers/pinctrl/pinctrl-exynos5440.c |    5 -----
->  drivers/pinctrl/pinctrl-samsung.c    |    5 -----
->  drivers/pinctrl/pinctrl-xway.c       |    4 ----
->  5 files changed, 1 insertion(+), 25 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index 5d7529e..b90a3a0 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -1543,12 +1543,6 @@ static int at91_gpio_probe(struct platform_device *pdev)
->  		goto err;
->  	}
->  
-> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	if (!res) {
-> -		ret = -ENOENT;
-> -		goto err;
-> -	}
+Thanks for your hard work.
+
+For UniCore32 bits: (Though I can't compile and test it in recent months)
+Acked-by: Guan Xuetao <gxt@mprc.pku.edu.cn>
+
+
+>
+> ---
+>
+> Changes since -v8
+>  - Switched from using REBOOT_WARM/COLD to HARD/SOFT.
+> ---
+>  arch/unicore32/kernel/process.c | 10 +++++-----
+>  arch/unicore32/kernel/setup.h   |  2 +-
+>  arch/unicore32/mm/mmu.c         |  2 +-
+>  include/linux/reboot.h          |  2 ++
+>  4 files changed, 9 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/unicore32/kernel/process.c
+> b/arch/unicore32/kernel/process.c
+> index c944769..93dd035 100644
+> --- a/arch/unicore32/kernel/process.c
+> +++ b/arch/unicore32/kernel/process.c
+> @@ -51,14 +51,14 @@ void arch_cpu_idle(void)
+>  	local_irq_enable();
+>  }
+>
+> -static char reboot_mode = 'h';
+> +static enum reboot_mode reboot_mode = REBOOT_HARD;
+>
+>  int __init reboot_setup(char *str)
+>  {
+> -	reboot_mode = str[0];
+> +	if ('s' == str[0])
+> +		reboot_mode = REBOOT_SOFT;
+>  	return 1;
+>  }
 > -
->  	irq = platform_get_irq(pdev, 0);
->  	if (irq < 0) {
->  		ret = irq;
-> @@ -1561,6 +1555,7 @@ static int at91_gpio_probe(struct platform_device *pdev)
->  		goto err;
->  	}
->  
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	at91_chip->regbase = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(at91_chip->regbase)) {
->  		ret = PTR_ERR(at91_chip->regbase);
-> diff --git a/drivers/pinctrl/pinctrl-coh901.c b/drivers/pinctrl/pinctrl-coh901.c
-> index edde3ac..a67af41 100644
-> --- a/drivers/pinctrl/pinctrl-coh901.c
-> +++ b/drivers/pinctrl/pinctrl-coh901.c
-> @@ -713,11 +713,6 @@ static int __init u300_gpio_probe(struct platform_device *pdev)
->  	gpio->dev = &pdev->dev;
->  
->  	memres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	if (!memres) {
-> -		dev_err(gpio->dev, "could not get GPIO memory resource\n");
-> -		return -ENODEV;
-> -	}
-> -
->  	gpio->base = devm_ioremap_resource(&pdev->dev, memres);
->  	if (IS_ERR(gpio->base))
->  		return PTR_ERR(gpio->base);
-> diff --git a/drivers/pinctrl/pinctrl-exynos5440.c b/drivers/pinctrl/pinctrl-exynos5440.c
-> index 6038503..32a48f4 100644
-> --- a/drivers/pinctrl/pinctrl-exynos5440.c
-> +++ b/drivers/pinctrl/pinctrl-exynos5440.c
-> @@ -1000,11 +1000,6 @@ static int exynos5440_pinctrl_probe(struct platform_device *pdev)
->  	}
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	if (!res) {
-> -		dev_err(dev, "cannot find IO resource\n");
-> -		return -ENOENT;
-> -	}
-> -
->  	priv->reg_base = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(priv->reg_base))
->  		return PTR_ERR(priv->reg_base);
-> diff --git a/drivers/pinctrl/pinctrl-samsung.c b/drivers/pinctrl/pinctrl-samsung.c
-> index 9763668..055d016 100644
-> --- a/drivers/pinctrl/pinctrl-samsung.c
-> +++ b/drivers/pinctrl/pinctrl-samsung.c
-> @@ -932,11 +932,6 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
->  	drvdata->dev = dev;
->  
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	if (!res) {
-> -		dev_err(dev, "cannot find IO resource\n");
-> -		return -ENOENT;
-> -	}
-> -
->  	drvdata->virt_base = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(drvdata->virt_base))
->  		return PTR_ERR(drvdata->virt_base);
-> diff --git a/drivers/pinctrl/pinctrl-xway.c b/drivers/pinctrl/pinctrl-xway.c
-> index f2977cf..e92132c 100644
-> --- a/drivers/pinctrl/pinctrl-xway.c
-> +++ b/drivers/pinctrl/pinctrl-xway.c
-> @@ -716,10 +716,6 @@ static int pinmux_xway_probe(struct platform_device *pdev)
->  
->  	/* get and remap our register range */
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	if (!res) {
-> -		dev_err(&pdev->dev, "Failed to get resource\n");
-> -		return -ENOENT;
-> -	}
->  	xway_info.membase[0] = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(xway_info.membase[0]))
->  		return PTR_ERR(xway_info.membase[0]);
-> -- 
-> 1.7.10.4
-> 
+>  __setup("reboot=", reboot_setup);
+>
+>  void machine_halt(void)
+> @@ -88,7 +88,7 @@ void machine_restart(char *cmd)
+>  	 * we may need it to insert some 1:1 mappings so that
+>  	 * soft boot works.
+>  	 */
+> -	setup_mm_for_reboot(reboot_mode);
+> +	setup_mm_for_reboot();
+>
+>  	/* Clean and invalidate caches */
+>  	flush_cache_all();
+> @@ -102,7 +102,7 @@ void machine_restart(char *cmd)
+>  	/*
+>  	 * Now handle reboot code.
+>  	 */
+> -	if (reboot_mode == 's') {
+> +	if (reboot_mode == REBOOT_SOFT) {
+>  		/* Jump into ROM at address 0xffff0000 */
+>  		cpu_reset(VECTORS_BASE);
+>  	} else {
+> diff --git a/arch/unicore32/kernel/setup.h b/arch/unicore32/kernel/setup.h
+> index 30f749d..f5c51b8 100644
+> --- a/arch/unicore32/kernel/setup.h
+> +++ b/arch/unicore32/kernel/setup.h
+> @@ -22,7 +22,7 @@ extern void puv3_ps2_init(void);
+>  extern void pci_puv3_preinit(void);
+>  extern void __init puv3_init_gpio(void);
+>
+> -extern void setup_mm_for_reboot(char mode);
+> +extern void setup_mm_for_reboot(void);
+>
+>  extern char __stubs_start[], __stubs_end[];
+>  extern char __vectors_start[], __vectors_end[];
+> diff --git a/arch/unicore32/mm/mmu.c b/arch/unicore32/mm/mmu.c
+> index 43c20b4..4f5a532 100644
+> --- a/arch/unicore32/mm/mmu.c
+> +++ b/arch/unicore32/mm/mmu.c
+> @@ -445,7 +445,7 @@ void __init paging_init(void)
+>   * the user-mode pages.  This will then ensure that we have predictable
+>   * results when turning the mmu off
+>   */
+> -void setup_mm_for_reboot(char mode)
+> +void setup_mm_for_reboot(void)
+>  {
+>  	unsigned long base_pmdval;
+>  	pgd_t *pgd;
+> diff --git a/include/linux/reboot.h b/include/linux/reboot.h
+> index 37d56c3..ca29a6f 100644
+> --- a/include/linux/reboot.h
+> +++ b/include/linux/reboot.h
+> @@ -13,6 +13,8 @@
+>  enum reboot_mode {
+>  	REBOOT_COLD = 0,
+>  	REBOOT_WARM,
+> +	REBOOT_HARD,
+> +	REBOOT_SOFT,
+>  };
+>
+>  extern int register_reboot_notifier(struct notifier_block *);
+> --
+> 1.8.2.1
+>
