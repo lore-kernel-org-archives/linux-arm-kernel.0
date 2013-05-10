@@ -1,110 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 May 2013 16:28:57 +0100
-Subject: arch/arm/mach-omap2/id.c - IS_ERR_OR_NULL()
-In-Reply-To: <CAB=otbRXPoHWPb3O+AYhdq5BccmLWRE=ZPPPQYQXge6w332+fQ@mail.gmail.com>
-References: <20130509090911.GM21614@n2100.arm.linux.org.uk>
- <CAB=otbRXPoHWPb3O+AYhdq5BccmLWRE=ZPPPQYQXge6w332+fQ@mail.gmail.com>
-Message-ID: <20130510152857.GQ21614@n2100.arm.linux.org.uk>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 10 May 2013 17:31:04 +0200
+Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
+In-Reply-To: <20130510152355.GB11227@kroah.com>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <1368022248-2153-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305081634.43498.arnd@arndb.de> <20130508153459.GA17186@kroah.com>
+ <518D07FB.7010606@codethink.co.uk> <20130510152355.GB11227@kroah.com>
+Message-ID: <518D12B8.9070608@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 10, 2013 at 12:50:42PM +0300, Ruslan Bilovol wrote:
-> Hi Russell,
-> 
-> On Thu, May 9, 2013 at 12:09 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > So, I eliminated all but a very few of these from arch/arm, and I notice
-> > today that there's a new couple of instances introduced by:
-> >
-> > commit 6770b211432564c562c856d612b43bbd42e4ab5e
-> > Author: Ruslan Bilovol <ruslan.bilovol@ti.com>
-> > Date:   Thu Feb 14 13:55:24 2013 +0200
-> >
-> >     ARM: OMAP2+: Export SoC information to userspace
-> >
-> >     In some situations it is useful for userspace to
-> >     know some SoC-specific information. For example,
-> >     this may be used for deciding what kernel module to
-> >     use or how to better configure some settings etc.
-> >     This patch exports OMAP SoC information to userspace
-> >     using existing in Linux kernel SoC infrastructure.
-> >
-> >     This information can be read under
-> >     /sys/devices/socX directory
-> >
-> >     Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
-> >     [tony at atomide.com: updated for multiplatform changes]
-> >     Signed-off-by: Tony Lindgren <tony@atomide.com>
-> >
-> > +       soc_dev = soc_device_register(soc_dev_attr);
-> > +       if (IS_ERR_OR_NULL(soc_dev)) {
-> > +               kfree(soc_dev_attr);
-> > +               return;
-> > +       }
-> > +
-> > +       parent = soc_device_to_device(soc_dev);
-> > +       if (!IS_ERR_OR_NULL(parent))
-> > +               device_create_file(parent, &omap_soc_attr);
-> >
-> > This is nonsense.  For the first, IS_ERR() is sufficient.  For the second,
-> > tell me what error checking is required in the return value of this
-> > function:
-> >
-> > struct device *soc_device_to_device(struct soc_device *soc_dev)
-> > {
-> >         return &soc_dev->dev;
-> > }
-> >
-> > when you've already determined that the passed soc_dev is a valid pointer.
-> > If you read the comments against the prototype:
-> >
-> > /**
-> >  * soc_device_to_device - helper function to fetch struct device
-> >  * @soc: Previously registered SoC device container
-> >  */
-> > struct device *soc_device_to_device(struct soc_device *soc);
-> >
-> > if "soc" is valid, it means the "previously registered SoC device container"
-> > must have succeeded and that can only happen if the struct device has been
-> > registered.  Ergo, there will always be a valid struct device pointer for
-> > any registered SoC device container.  Therefore, if soc_device_register()
-> > succeeds, then the return value from soc_device_to_device() will always be
-> > valid and no error checking of it is required.
-> >
-> > Simples.  The rule as ever applies here: get to know the APIs your using
-> > and don't fumble around in the dark hoping that you'll get this stuff
-> > right.
-> 
-> The interesting thing is that extra IS_ERR_OR_NULL checking was
-> introduced by author
-> of the SoC API in his implementation for the arm/mach-ux500 platform
-> and I used the same checking in my implementation when looked into his
-> implementation for reference.
-> Thanks for pointing on this, I will be more careful in the future.
+On 10/05/13 17:23, Greg KH wrote:
+> On Fri, May 10, 2013 at 04:45:15PM +0200, Ben Dooks wrote:
+>> On 08/05/13 17:34, Greg KH wrote:
+>>> On Wed, May 08, 2013 at 04:34:43PM +0200, Arnd Bergmann wrote:
+>>>>> +#define ASC_MAJOR		204
+>>>>> +#define ASC_MINOR_START		40
+>>>>
+>>>> I don't know what the current policy is on allocating major/minor numbers,
+>>>> but I'm sure you cannot just reuse one that is already used.
+>>>
+>>> I agree, why are you trying to create a new tty device name?  Can't you
+>>> use the existing ttyS name and minor number as you will not have any
+>>> other type of serial device on this system?
+>>
+>> This would be an issue on systems that either accept plug-in cards
+>> such as PCMCIA/CardBus/PCI or have additional off SoC IO spaces
+>> where 8250 compatible UARTS could live.
+>
+> I thought these were set-top box systems that couldn't accept any
+> plug-in cards or anything else?  This is a SoC, right?
 
-Well, the whole reasoning here is that IS_ERR_OR_NULL() is far too easy
-to get wrong - there are too many of this kind of crap in the kernel:
+The comment covers more than just this particular instance.
 
-	foo = some_func();
-	if (IS_ERR_OR_NULL(foo))
-		return PTR_ERR(foo);
+A lot of SoC devices have expansion interfaces which would accept
+such UARTs.
 
-which is wrong, because if foo _is_ NULL, the function doesn't return an
-error, it returns success instead.  Of course, if some_func() never ever
-returns NULL in the first place, that can't happen, but then the additional
-test there for a NULL pointer is, to put it bluntly, total bollocks.
-
-Instead, what it shows is that the author of the code hasn't been bothered
-to really check what the return conditions of the API actually are - and
-yes, this kind of crap really has happened.  Where APIs return NULL on
-failure and the author has used code similar to the above...
-
-So, the general rule is... if you see IS_ERR_OR_NULL(), it probably is a
-bug just waiting to happen in some way.
-
-IS_ERR_OR_NULL() is not a subsitute for putting thought in.
-IS_ERR_OR_NULL() is a trap for the unwary kernel programmer.
-
-And there's moves to eliminate it from the kernel - I have a patch prepared
-which has a lot of support to mark IS_ERR_OR_NULL() deprecated... that can't
-go in until we've eliminated most of the current (probably incorrect) uses.
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
