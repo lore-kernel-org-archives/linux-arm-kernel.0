@@ -1,47 +1,105 @@
-From: stuart.menefy@st.com (Stuart MENEFY)
-Date: Fri, 10 May 2013 16:40:58 +0100
-Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
-In-Reply-To: <20130510152355.GB11227@kroah.com>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022248-2153-1-git-send-email-srinivas.kandagatla@st.com>
- <201305081634.43498.arnd@arndb.de> <20130508153459.GA17186@kroah.com>
- <518D07FB.7010606@codethink.co.uk> <20130510152355.GB11227@kroah.com>
-Message-ID: <518D150A.7030807@st.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Fri, 10 May 2013 08:48:03 -0700
+Subject: [PATCH V2 2/2] ARM: mmc: bcm281xx SDHCI driver (dt mods)
+In-Reply-To: <1368200883-15668-1-git-send-email-csd@broadcom.com>
+References: <1368200883-15668-1-git-send-email-csd@broadcom.com>
+Message-ID: <1368200883-15668-2-git-send-email-csd@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/13 16:23, Greg KH wrote:
-> On Fri, May 10, 2013 at 04:45:15PM +0200, Ben Dooks wrote:
->> On 08/05/13 17:34, Greg KH wrote:
->>> On Wed, May 08, 2013 at 04:34:43PM +0200, Arnd Bergmann wrote:
->>>>> +#define ASC_MAJOR		204
->>>>> +#define ASC_MINOR_START		40
->>>>
->>>> I don't know what the current policy is on allocating major/minor numbers,
->>>> but I'm sure you cannot just reuse one that is already used.
->>>
->>> I agree, why are you trying to create a new tty device name?  Can't you
->>> use the existing ttyS name and minor number as you will not have any
->>> other type of serial device on this system?
->>
->> This would be an issue on systems that either accept plug-in cards
->> such as PCMCIA/CardBus/PCI or have additional off SoC IO spaces
->> where 8250 compatible UARTS could live.
-> 
-> I thought these were set-top box systems that couldn't accept any
-> plug-in cards or anything else?  This is a SoC, right?
+Add SDHCI driver for the Broadcom 281xx SoCs. Also
+add bindings for it into bcm281xx dts files.
 
-Correct, it is a SoC intended for set-top-box systems. But they are also
-expandable and have a PCIe root complex. In the final system this would
-normally be used for things like WiFi, but in development boards these
-are brought out to generic PCIe slots where pretty much anything can be
-plugged in.
+Changes from V1:
+ - split original patch into 2, one for driver and this one for dt
 
-We've also had systems in the dim and distant past which used memory
-mapped external super I/O controllers which had 8250 compatible serial
-ports.
+Signed-off-by: Christian Daudt <csd@broadcom.com>
 
-So while its not usual, we have had systems with both ASC and 8250
-compatible serial ports, which is why we'd like to keep the option open.
-
-Stuart
+diff --git a/Documentation/devicetree/bindings/mmc/bcm,kona-sdhci.txt b/Documentation/devicetree/bindings/mmc/bcm,kona-sdhci.txt
+new file mode 100644
+index 0000000..ad1c4bd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/bcm,kona-sdhci.txt
+@@ -0,0 +1,16 @@
++Broadcom BCM281xx SDHCI driver
++
++This file documents differences between the core properties in mmc.txt
++and the properties in the bcm281xx driver.
++
++Required properties:
++- compatible : Should be "bcm,kona-sdhci"
++
++Example:
++
++sdio2: sdio at 0x3f1a0000 {
++	compatible = "bcm,kona-sdhci";
++	reg = <0x3f1a0000 0x10000>;
++	interrupts = <0x0 74 0x4>;
++};
++
+diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
+index 248067c..9ae3404 100644
+--- a/arch/arm/boot/dts/bcm11351-brt.dts
++++ b/arch/arm/boot/dts/bcm11351-brt.dts
+@@ -27,4 +27,21 @@
+ 		status = "okay";
+ 	};
+ 
++	sdio0: sdio at 0x3f180000 {
++		max-frequency = <48000000>;
++		status = "okay";
++	};
++
++	sdio1: sdio at 0x3f190000 {
++		non-removable;
++		max-frequency = <48000000>;
++		status = "okay";
++	};
++
++	sdio3: sdio at 0x3f1b0000 {
++		max-frequency = <48000000>;
++		status = "okay";
++	};
++
++
+ };
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index ad13588..6606b41 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -47,4 +47,33 @@
+ 		    cache-unified;
+ 		    cache-level = <2>;
+ 	};
++
++	sdio0: sdio at 0x3f180000 {
++		compatible = "bcm,kona-sdhci";
++		reg = <0x3f180000 0x10000>;
++		interrupts = <0x0 77 0x4>;
++		status = "disabled";
++	};
++
++	sdio1: sdio at 0x3f190000 {
++		compatible = "bcm,kona-sdhci";
++		reg = <0x3f190000 0x10000>;
++		interrupts = <0x0 76 0x4>;
++		status = "disabled";
++	};
++
++	sdio2: sdio at 0x3f1a0000 {
++		compatible = "bcm,kona-sdhci";
++		reg = <0x3f1a0000 0x10000>;
++		interrupts = <0x0 74 0x4>;
++		status = "disabled";
++	};
++
++	sdio3: sdio at 0x3f1b0000 {
++		compatible = "bcm,kona-sdhci";
++		reg = <0x3f1b0000 0x10000>;
++		interrupts = <0x0 73 0x4>;
++		status = "disabled";
++	};
++
+ };
+-- 
+1.7.10.4
