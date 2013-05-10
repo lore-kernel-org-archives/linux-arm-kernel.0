@@ -1,89 +1,93 @@
-From: ruslan.bilovol@gmail.com (Ruslan Bilovol)
-Date: Fri, 10 May 2013 12:50:42 +0300
-Subject: arch/arm/mach-omap2/id.c - IS_ERR_OR_NULL()
-In-Reply-To: <20130509090911.GM21614@n2100.arm.linux.org.uk>
-References: <20130509090911.GM21614@n2100.arm.linux.org.uk>
-Message-ID: <CAB=otbRXPoHWPb3O+AYhdq5BccmLWRE=ZPPPQYQXge6w332+fQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 10 May 2013 10:59:10 +0100
+Subject: [RFC PATCH 2/2] ARM: KVM: standalone Makefile for vgic and timers
+In-Reply-To: <518CC054.9070002@redhat.com>
+References: <1367589773-5609-1-git-send-email-marc.zyngier@arm.com>
+ <1367589773-5609-3-git-send-email-marc.zyngier@arm.com>
+ <518CC054.9070002@redhat.com>
+Message-ID: <518CC4EE.5060906@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 10/05/13 10:39, Paolo Bonzini wrote:
+> Il 03/05/2013 16:02, Marc Zyngier ha scritto:
+>> On the road to turn KVM/arm64 into something more sensible, change
+>> the way we compile the VGIC and arch_timer code by using local
+>> Makefiles instead of the very backward method we used before.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  Makefile              | 2 +-
+>>  arch/arm/kvm/Makefile | 2 --
+>>  virt/Makefile         | 1 +
+>>  virt/kvm/Makefile     | 1 +
+>>  virt/kvm/arm/Makefile | 2 ++
+>>  5 files changed, 5 insertions(+), 3 deletions(-)
+>>  create mode 100644 virt/Makefile
+>>  create mode 100644 virt/kvm/Makefile
+>>  create mode 100644 virt/kvm/arm/Makefile
+>>
+>> diff --git a/Makefile b/Makefile
+>> index 6db672b..19d51df 100644
+>> --- a/Makefile
+>> +++ b/Makefile
+>> @@ -732,7 +732,7 @@ export mod_sign_cmd
+>>  
+>>  
+>>  ifeq ($(KBUILD_EXTMOD),)
+>> -core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/
+>> +core-y		+= kernel/ mm/ fs/ ipc/ security/ crypto/ block/ virt/
+>>  
+>>  vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
+>>  		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
+>> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+>> index 110d6da..e0540fd 100644
+>> --- a/arch/arm/kvm/Makefile
+>> +++ b/arch/arm/kvm/Makefile
+>> @@ -20,5 +20,3 @@ kvm-arm-y = $(addprefix $(KVM)/, kvm_main.o coalesced_mmio.o)
+>>  obj-y += kvm-arm.o init.o interrupts.o
+>>  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+>>  obj-y += coproc.o coproc_a15.o mmio.o psci.o perf.o
+>> -obj-$(CONFIG_KVM_ARM_VGIC) += $(addprefix $(KVM)/arm/, vgic.o)
+>> -obj-$(CONFIG_KVM_ARM_TIMER) += $(addprefix $(KVM)/arm/, arch_timer.o)
+>> diff --git a/virt/Makefile b/virt/Makefile
+>> new file mode 100644
+>> index 0000000..c3b9ad0
+>> --- /dev/null
+>> +++ b/virt/Makefile
+>> @@ -0,0 +1 @@
+>> +obj-$(CONFIG_KVM)	+= kvm/
+>> diff --git a/virt/kvm/Makefile b/virt/kvm/Makefile
+>> new file mode 100644
+>> index 0000000..dc87943
+>> --- /dev/null
+>> +++ b/virt/kvm/Makefile
+>> @@ -0,0 +1 @@
+>> +obj-$(CONFIG_KVM_ARM_HOST)	+= arm/
+>> diff --git a/virt/kvm/arm/Makefile b/virt/kvm/arm/Makefile
+>> new file mode 100644
+>> index 0000000..4df943b
+>> --- /dev/null
+>> +++ b/virt/kvm/arm/Makefile
+>> @@ -0,0 +1,2 @@
+>> +obj-$(CONFIG_KVM_ARM_VGIC) += vgic.o
+>> +obj-$(CONFIG_KVM_ARM_TIMER) += arch_timer.o
+>>
+> 
+> I'm not sure it is a good idea to do this just for ARM, and I think the
+> patch would look quite different if you were to support x86 (because x86
+> builds KVM as a module).  So I would hold off this for now.
 
-On Thu, May 9, 2013 at 12:09 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> So, I eliminated all but a very few of these from arch/arm, and I notice
-> today that there's a new couple of instances introduced by:
->
-> commit 6770b211432564c562c856d612b43bbd42e4ab5e
-> Author: Ruslan Bilovol <ruslan.bilovol@ti.com>
-> Date:   Thu Feb 14 13:55:24 2013 +0200
->
->     ARM: OMAP2+: Export SoC information to userspace
->
->     In some situations it is useful for userspace to
->     know some SoC-specific information. For example,
->     this may be used for deciding what kernel module to
->     use or how to better configure some settings etc.
->     This patch exports OMAP SoC information to userspace
->     using existing in Linux kernel SoC infrastructure.
->
->     This information can be read under
->     /sys/devices/socX directory
->
->     Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
->     [tony at atomide.com: updated for multiplatform changes]
->     Signed-off-by: Tony Lindgren <tony@atomide.com>
->
-> +       soc_dev = soc_device_register(soc_dev_attr);
-> +       if (IS_ERR_OR_NULL(soc_dev)) {
-> +               kfree(soc_dev_attr);
-> +               return;
-> +       }
-> +
-> +       parent = soc_device_to_device(soc_dev);
-> +       if (!IS_ERR_OR_NULL(parent))
-> +               device_create_file(parent, &omap_soc_attr);
->
-> This is nonsense.  For the first, IS_ERR() is sufficient.  For the second,
-> tell me what error checking is required in the return value of this
-> function:
->
-> struct device *soc_device_to_device(struct soc_device *soc_dev)
-> {
->         return &soc_dev->dev;
-> }
->
-> when you've already determined that the passed soc_dev is a valid pointer.
-> If you read the comments against the prototype:
->
-> /**
->  * soc_device_to_device - helper function to fetch struct device
->  * @soc: Previously registered SoC device container
->  */
-> struct device *soc_device_to_device(struct soc_device *soc);
->
-> if "soc" is valid, it means the "previously registered SoC device container"
-> must have succeeded and that can only happen if the struct device has been
-> registered.  Ergo, there will always be a valid struct device pointer for
-> any registered SoC device container.  Therefore, if soc_device_register()
-> succeeds, then the return value from soc_device_to_device() will always be
-> valid and no error checking of it is required.
->
-> Simples.  The rule as ever applies here: get to know the APIs your using
-> and don't fumble around in the dark hoping that you'll get this stuff
-> right.
+Fair enough.
 
-The interesting thing is that extra IS_ERR_OR_NULL checking was
-introduced by author
-of the SoC API in his implementation for the arm/mach-ux500 platform
-and I used the same checking in my implementation when looked into his
-implementation for reference.
-Thanks for pointing on this, I will be more careful in the future.
+> OTOH, it is a good idea to use the same idiom to access
+> ../../../virt/kvm from the arch directories.  Can you change
+> x86/PPC/s390/ia64 as well to use $(KVM) instead of $(addprefix)?
 
-Regards,
-Ruslan
+Sure. I'll rework the series to include the other arches.
 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
