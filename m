@@ -1,66 +1,244 @@
 From: elen.song@atmel.com (Elen Song)
-Date: Fri, 10 May 2013 11:00:50 +0800
-Subject: [PATCH 1/2 V4] DMA: AT91: Get transfer width
-Message-ID: <1368154850-9354-1-git-send-email-elen.song@atmel.com>
+Date: Fri, 10 May 2013 11:01:46 +0800
+Subject: [PATCH 2/2 V4] DMA: AT91: Get residual bytes in dma buffer
+Message-ID: <1368154906-9450-1-git-send-email-elen.song@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In one dma transfer, the data transfer width can be configured and it is limited by source or destination peripheral width,
-tx_width will save the transfer width, but for memcpy, either source or destination transfer width is taken as tx_width.
+Add support for returning the residue for current transfer cookie by
+reading the transfered buffer size(BTSIZE) in CTRLA register.
 
+For a single buffer cookie, the descriptor length minus BTSIZE
+can get the residue.
+
+For a lli cookie, remain_desc will record remain descriptor length
+when last descriptor finish, the remain_desc minus BTSIZE can get the
+current residue.
+
+If the cookie has completed successfully, the residue will be zero.
+If the cookie is in progress, it will be the number of bytes yet to be transferred.
+If get residue error, the cookie will be turn into error status.
+
+Check dma fifo to see if data remain, let issue pending finish remain work if there is.
 Signed-off-by: Elen Song <elen.song@atmel.com>
 ---
- drivers/dma/at_hdmac.c      |    3 +++
- drivers/dma/at_hdmac_regs.h |    2 ++
- 2 files changed, 5 insertions(+)
+ drivers/dma/at_hdmac.c      |  130 +++++++++++++++++++++++++++++++++++++------
+ drivers/dma/at_hdmac_regs.h |    3 +
+ 2 files changed, 115 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 6e13f26..a4d427e 100644
+index a4d427e..cd68f8e 100644
 --- a/drivers/dma/at_hdmac.c
 +++ b/drivers/dma/at_hdmac.c
-@@ -613,6 +613,7 @@ atc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
- 	/* First descriptor of the chain embedds additional information */
- 	first->txd.cookie = -EBUSY;
- 	first->len = len;
-+	first->tx_width = src_width;
+@@ -53,6 +53,7 @@ MODULE_PARM_DESC(init_nr_desc_per_channel,
  
- 	/* set end-of-link to the last link descriptor of list*/
- 	set_desc_eol(desc);
-@@ -759,6 +760,7 @@ atc_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 	/* First descriptor of the chain embedds additional information */
- 	first->txd.cookie = -EBUSY;
- 	first->len = total_len;
-+	first->tx_width = reg_width;
+ /* prototypes */
+ static dma_cookie_t atc_tx_submit(struct dma_async_tx_descriptor *tx);
++static void atc_issue_pending(struct dma_chan *chan);
  
- 	/* first link descriptor of list is responsible of flags */
- 	first->txd.flags = flags; /* client is in control of this ack */
-@@ -917,6 +919,7 @@ atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
- 	/* First descriptor of the chain embedds additional information */
- 	first->txd.cookie = -EBUSY;
- 	first->len = buf_len;
-+	first->tx_width = reg_width;
  
- 	return &first->txd;
+ /*----------------------------------------------------------------------*/
+@@ -229,6 +230,94 @@ static void atc_dostart(struct at_dma_chan *atchan, struct at_desc *first)
+ 	vdbg_dump_regs(atchan);
+ }
  
++/*
++ * atc_get_current_descriptors -
++ * locate the descriptor which equal to physical address in DSCR
++ * @atchan: the channel we want to start
++ * @dscr_addr: physical descriptor address in DSCR
++ */
++static struct at_desc *atc_get_current_descriptors(struct at_dma_chan *atchan,
++							u32 dscr_addr)
++{
++	struct at_desc  *desc, *_desc, *child, *desc_cur = NULL;
++
++	list_for_each_entry_safe(desc, _desc, &atchan->active_list, desc_node) {
++		if (desc->lli.dscr == dscr_addr) {
++			desc_cur = desc;
++			break;
++		}
++
++		list_for_each_entry(child, &desc->tx_list, desc_node) {
++			if (child->lli.dscr == dscr_addr) {
++				desc_cur = child;
++				break;
++			}
++		}
++	}
++
++	return desc_cur;
++}
++
++/*
++ * atc_get_bytes_left -
++ * Get the number of bytes residue in dma buffer,
++ * @chan: the channel we want to start
++ */
++static int atc_get_bytes_left(struct dma_chan *chan)
++{
++	struct at_dma_chan      *atchan = to_at_dma_chan(chan);
++	struct at_dma           *atdma = to_at_dma(chan->device);
++	int	chan_id = atchan->chan_common.chan_id;
++	struct at_desc *desc_first = atc_first_active(atchan);
++	struct at_desc *desc_cur;
++	int ret = 0, count = 0;
++
++	/*
++	 * Initialize necessary values in the first time.
++	 * remain_desc record remain desc length.
++	 */
++	if (atchan->remain_desc == 0)
++		/* First descriptor embedds the transaction length */
++		atchan->remain_desc = desc_first->len;
++
++	/*
++	 * This happens when current descriptor transfer complete.
++	 * The residual buffer size should reduce current descriptor length.
++	 */
++	if (unlikely(test_bit(ATC_IS_BTC, &atchan->status))) {
++		clear_bit(ATC_IS_BTC, &atchan->status);
++		desc_cur = atc_get_current_descriptors(atchan,
++						channel_readl(atchan, DSCR));
++		if (!desc_cur) {
++			ret = -EINVAL;
++			goto out;
++		}
++		atchan->remain_desc -= (desc_cur->lli.ctrla & ATC_BTSIZE_MAX)
++						<< (desc_first->tx_width);
++		if (atchan->remain_desc < 0) {
++			ret = -EINVAL;
++			goto out;
++		} else
++			ret = atchan->remain_desc;
++	} else {
++		/*
++		 * Get residual bytes when current
++		 * descriptor transfer in progress.
++		 */
++		count = (channel_readl(atchan, CTRLA) & ATC_BTSIZE_MAX)
++				<< (desc_first->tx_width);
++		ret = atchan->remain_desc - count;
++	}
++	/*
++	 * Check fifo empty.
++	 */
++	if (!(dma_readl(atdma, CHSR) & AT_DMA_EMPT(chan_id)))
++		atc_issue_pending(chan);
++
++out:
++	return ret;
++}
++
+ /**
+  * atc_chain_complete - finish work for one transaction chain
+  * @atchan: channel we work on
+@@ -494,6 +583,8 @@ static irqreturn_t at_dma_interrupt(int irq, void *dev_id)
+ 					/* Give information to tasklet */
+ 					set_bit(ATC_IS_ERROR, &atchan->status);
+ 				}
++				if (pending & AT_DMA_BTC(i))
++					set_bit(ATC_IS_BTC, &atchan->status);
+ 				tasklet_schedule(&atchan->tasklet);
+ 				ret = IRQ_HANDLED;
+ 			}
+@@ -1033,34 +1124,35 @@ atc_tx_status(struct dma_chan *chan,
+ 		struct dma_tx_state *txstate)
+ {
+ 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+-	dma_cookie_t		last_used;
+-	dma_cookie_t		last_complete;
+ 	unsigned long		flags;
+ 	enum dma_status		ret;
+-
+-	spin_lock_irqsave(&atchan->lock, flags);
++	int bytes = 0;
+ 
+ 	ret = dma_cookie_status(chan, cookie, txstate);
+-	if (ret != DMA_SUCCESS) {
+-		atc_cleanup_descriptors(atchan);
++	if (ret == DMA_SUCCESS)
++		return ret;
++	/*
++	 * There's no point calculating the residue if there's
++	 * no txstate to store the value.
++	 */
++	if (!txstate)
++		return DMA_ERROR;
+ 
+-		ret = dma_cookie_status(chan, cookie, txstate);
+-	}
++	spin_lock_irqsave(&atchan->lock, flags);
+ 
+-	last_complete = chan->completed_cookie;
+-	last_used = chan->cookie;
++	/*  Get number of bytes left in the active transactions */
++	bytes = atc_get_bytes_left(chan);
+ 
+ 	spin_unlock_irqrestore(&atchan->lock, flags);
+ 
+-	if (ret != DMA_SUCCESS)
+-		dma_set_residue(txstate, atc_first_active(atchan)->len);
+-
+-	if (atc_chan_is_paused(atchan))
+-		ret = DMA_PAUSED;
++	if (unlikely(bytes < 0)) {
++		dev_vdbg(chan2dev(chan), "get residual bytes error\n");
++		return DMA_ERROR;
++	} else
++		dma_set_residue(txstate, bytes);
+ 
+-	dev_vdbg(chan2dev(chan), "tx_status %d: cookie = %d (d%d, u%d)\n",
+-		 ret, cookie, last_complete ? last_complete : 0,
+-		 last_used ? last_used : 0);
++	dev_vdbg(chan2dev(chan), "tx_status %d: cookie = %d residue = %d\n",
++		 ret, cookie, bytes);
+ 
+ 	return ret;
+ }
+@@ -1146,6 +1238,7 @@ static int atc_alloc_chan_resources(struct dma_chan *chan)
+ 
+ 	spin_lock_irqsave(&atchan->lock, flags);
+ 	atchan->descs_allocated = i;
++	atchan->remain_desc = 0;
+ 	list_splice(&tmp_list, &atchan->free_list);
+ 	dma_cookie_init(chan);
+ 	spin_unlock_irqrestore(&atchan->lock, flags);
+@@ -1188,6 +1281,7 @@ static void atc_free_chan_resources(struct dma_chan *chan)
+ 	list_splice_init(&atchan->free_list, &list);
+ 	atchan->descs_allocated = 0;
+ 	atchan->status = 0;
++	atchan->remain_desc = 0;
+ 
+ 	dev_vdbg(chan2dev(chan), "free_chan_resources: done\n");
+ }
 diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
-index 0eb3c13..d27942f 100644
+index d27942f..443d62b 100644
 --- a/drivers/dma/at_hdmac_regs.h
 +++ b/drivers/dma/at_hdmac_regs.h
-@@ -182,6 +182,7 @@ struct at_lli {
-  * @txd: support for the async_tx api
-  * @desc_node: node on the channed descriptors list
-  * @len: total transaction bytecount
-+ * @tx_width: transfer width
-  */
- struct at_desc {
- 	/* FIRST values the hardware uses */
-@@ -192,6 +193,7 @@ struct at_desc {
- 	struct dma_async_tx_descriptor	txd;
- 	struct list_head		desc_node;
- 	size_t				len;
-+	u32				tx_width;
+@@ -213,6 +213,7 @@ txd_to_at_desc(struct dma_async_tx_descriptor *txd)
+ enum atc_status {
+ 	ATC_IS_ERROR = 0,
+ 	ATC_IS_PAUSED = 1,
++	ATC_IS_BTC = 2,
+ 	ATC_IS_CYCLIC = 24,
  };
  
- static inline struct at_desc *
+@@ -228,6 +229,7 @@ enum atc_status {
+  * @save_cfg: configuration register that is saved on suspend/resume cycle
+  * @save_dscr: for cyclic operations, preserve next descriptor address in
+  *             the cyclic list on suspend/resume cycle
++ * @remain_desc: to save remain desc length
+  * @dma_sconfig: configuration for slave transfers, passed via DMA_SLAVE_CONFIG
+  * @lock: serializes enqueue/dequeue operations to descriptors lists
+  * @active_list: list of descriptors dmaengine is being running on
+@@ -244,6 +246,7 @@ struct at_dma_chan {
+ 	struct tasklet_struct	tasklet;
+ 	u32			save_cfg;
+ 	u32			save_dscr;
++	u32			remain_desc;
+ 	struct dma_slave_config dma_sconfig;
+ 
+ 	spinlock_t		lock;
 -- 
 1.7.9.5
