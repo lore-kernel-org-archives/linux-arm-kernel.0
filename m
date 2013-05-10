@@ -1,92 +1,65 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 10 May 2013 14:26:50 +0400
-Subject: [PATCH 1/2] ARM: shmobile: r8a7790: add Ether support
-In-Reply-To: <1368173119-27345-2-git-send-email-horms+renesas@verge.net.au>
-References: <1368173119-27345-1-git-send-email-horms+renesas@verge.net.au>
- <1368173119-27345-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <518CCB6A.2060303@cogentembedded.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 10 May 2013 12:30:07 +0200
+Subject: [PATCH] ARM: at91: dts: request only spi cs-gpios used on sama5d3x
+ cpu module
+Message-ID: <1368181807-15182-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-On 10-05-2013 12:05, Simon Horman wrote:
+Instead of requesting all available spi cs-gpios, request only the ones used on
+the board, in our case on the cpu module.
 
-> Add Ether clock and platform device for R8A7779 SoC; add a function to
-> register this device with board-specific platform data.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/sama5d3.dtsi    | 10 ----------
+ arch/arm/boot/dts/sama5d3xcm.dtsi |  4 ++++
+ 2 files changed, 4 insertions(+), 10 deletions(-)
 
-> Based on a similar change for the r8a7779 by Sergei Shtylyov.
-
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-> ---
-
-> This patch has a run-time dependency on "sh_eth: add support for r8a7790 SoC".
-> ---
->   arch/arm/mach-shmobile/clock-r8a7790.c        |  6 +++++-
->   arch/arm/mach-shmobile/include/mach/r8a7790.h |  3 +++
->   arch/arm/mach-shmobile/setup-r8a7790.c        | 15 +++++++++++++++
->   3 files changed, 23 insertions(+), 1 deletion(-)
-
-> diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-> index bedd20c..2c3123e 100644
-> --- a/arch/arm/mach-shmobile/clock-r8a7790.c
-> +++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-[...]
-> @@ -178,9 +179,11 @@ static struct clk div6_clks[DIV6_NR] = {
->   };
->
->   /* MSTP */
-> -enum { MSTP721, MSTP720,
-> +enum { MSTP813, MSTP812,
-
-    I think these two should be on a line of their own...
-
-> MSTP721, MSTP720,
->   	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202, MSTP_NR };
->   static struct clk mstp_clks[MSTP_NR] = {
-> +	[MSTP813] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 13, 0), /* Ether */
-> +	[MSTP812] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 12, 0), /* EtherAVB */
->   	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
->   	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
->   	[MSTP216] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 16, 0), /* SCIFB2 */
-[...]
-> diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-> index 2e919e6..95b8f7e 100644
-> --- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
-> +++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
-> @@ -1,9 +1,12 @@
->   #ifndef __ASM_R8A7790_H__
->   #define __ASM_R8A7790_H__
->
-> +#include <linux/sh_eth.h>
-> +
->   void r8a7790_add_standard_devices(void);
->   void r8a7790_clock_init(void);
->   void r8a7790_pinmux_init(void);
->   void r8a7790_timer_init(void);
-> +void r8a7790_add_ether_device(struct sh_eth_plat_data *pdata);
-
-    Perhaps better place is right after r8a7790_add_standard_devices()...
-
->   #endif /* __ASM_R8A7790_H__ */
-> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-> index eeef5f6..8ed0d7b 100644
-> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
-> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-> @@ -30,6 +30,21 @@
->   #include <mach/r8a7790.h>
->   #include <asm/mach/arch.h>
->
-> +
-> +/* Ether */
-> +static struct resource ether_resources[] = {
-
-    You missed the '__initdata' annotation.
-
-> +	DEFINE_RES_MEM(0xee700000, 0x400),
-> +	DEFINE_RES_IRQ(gic_spi(162)), /* IRQ0 */
-> +};
-
-WBR, Sergei
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index 2e643ea..dee5e2f 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -75,11 +75,6 @@
+ 				compatible = "atmel,at91sam9x5-spi";
+ 				reg = <0xf0004000 0x100>;
+ 				interrupts = <24 4 3>;
+-				cs-gpios = <&pioD 13 0
+-					    &pioD 14 0 /* conflicts with SCK0 and CANRX0 */
+-					    &pioD 15 0 /* conflicts with CTS0 and CANTX0 */
+-					    &pioD 16 0 /* conflicts with RTS0 and PWMFI3 */
+-					   >;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi0>;
+ 				status = "disabled";
+@@ -203,11 +198,6 @@
+ 				compatible = "atmel,at91sam9x5-spi";
+ 				reg = <0xf8008000 0x100>;
+ 				interrupts = <25 4 3>;
+-				cs-gpios = <&pioC 25 0
+-					    &pioC 26 0 /* conflitcs with TWD1 and ISI_D11 */
+-					    &pioC 27 0 /* conflitcs with TWCK1 and ISI_D10 */
+-					    &pioC 28 0 /* conflitcs with PWMFI0 and ISI_D9 */
+-					   >;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi1>;
+ 				status = "disabled";
+diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+index 1f8ed40..b336e77 100644
+--- a/arch/arm/boot/dts/sama5d3xcm.dtsi
++++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+@@ -32,6 +32,10 @@
+ 
+ 	ahb {
+ 		apb {
++			spi0: spi at f0004000 {
++				cs-gpios = <&pioD 13 0>, <0>, <0>, <0>;
++			};
++
+ 			macb0: ethernet at f0028000 {
+ 				phy-mode = "rgmii";
+ 			};
+-- 
+1.8.0
