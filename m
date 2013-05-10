@@ -1,47 +1,28 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Fri, 10 May 2013 11:41:42 -0500
-Subject: [RFC 2/3] mailbox: Introduce a new common API
-In-Reply-To: <CAJe_ZhfFs5svKPABHWdKA83+LhxA5+Q3LKuJyqyRj_4SMMm_hg@mail.gmail.com>
-References: <CAJe_ZhdH+SCs5crguXrm6y-6bu+eGnTqeJS6cOS5H5Yz=m15Cw@mail.gmail.com>
- <1367086474-28614-1-git-send-email-jaswinder.singh@linaro.org>
- <51847070.8040400@ti.com>
- <CAJe_Zhdbnpu9n46s6L5KNFuTb2K87j+V4htKkmHYtBJ6w+etxQ@mail.gmail.com>
- <518840A2.5000205@ti.com>
- <CAJe_ZhedTM_wU7NGH_QRrL=O3JSYjt9ENDLYpOEQNSX3f7OgBA@mail.gmail.com>
- <518976B9.2030605@ti.com>
- <CAJe_ZhfpLQzDBSx=2VbD3W-499-g1JOovGDuFwxkE-Cq=HQDww@mail.gmail.com>
- <518AFB1F.7010409@ti.com>
- <CAJe_ZheEZo7Akri40ixBhWzeefABxiJXG1Juc4zQOPNQqyahUw@mail.gmail.com>
- <518C3CE9.1010603@ti.com>
- <CAJe_ZhfFs5svKPABHWdKA83+LhxA5+Q3LKuJyqyRj_4SMMm_hg@mail.gmail.com>
-Message-ID: <518D2346.10805@ti.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Fri, 10 May 2013 10:03:24 -0700
+Subject: [PATCH -v8 01/11] CPU hotplug: Provide a generic helper to
+ disable/enable CPU hotplug
+In-Reply-To: <1651579.orCh9JNVz6@vostro.rjw.lan>
+References: <1367937595-32241-1-git-send-email-holt@sgi.com>
+ <1367937595-32241-2-git-send-email-holt@sgi.com>
+ <20130509150121.8c3ef60b2fc748ce542a1a52@linux-foundation.org>
+ <1651579.orCh9JNVz6@vostro.rjw.lan>
+Message-ID: <20130510100324.e1e066ab.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi,
+On Fri, 10 May 2013 13:11:51 +0200 "Rafael J. Wysocki" <rjw@sisk.pl> wrote:
 
->>> See how mailbox_startup() tries to balance mbox->ops->startup() and
->>> mailbox_fini() the mbox->ops->shutdown()  That's very fragile and the
->>> cause of imbalance between rpm enable/disable, unless your clients are
->>> buggy.
->>
->> Yeah, it is kinda messed up in the existing code, the startup defined
->> there is really for the controller and not the link, and that's why you
->> see all the ref-counting balancing logic. The rpm enable/disable being
->> called is on the controller's dev, not the link's dev - maybe that's
->> what confused you.
->>
-> I wrote the driver for this api, so I do realize the rpm is on
-> controller. Links are not devices anyways.
+> ...
+>
+> > cpu_hotplug_disable() doesn't get compiled unless we've defined
+> > CONFIG_PM_SLEEP_SMP.  I cannot begin to imagine what the logic is
+> > behind that!
 > 
+> I suppose it was only used by suspend/hibernate code paths when this was
+> introduced.
 
-You might be missing the minor detail. The pm_runtime_enable is in
-startup, which is called for every link. So, I get an unbalanced
-warning, when I have
-	ipc_request_channel(client1);  -> link1.startup
-	ipc_request_channel(clinet2);  -> link2.startup
-
-Anyway, it is a non-issue since I understand the context and the fix.
-
-regards
-Suman
+OK, well I suspect that what I have now is simply wrong for Robin's
+application.  Robin, can you please check this?  We probably want to
+make the does-something version of cpu_hotplug_disable/enable available
+if CONFIG_HOTPLUG_CPU.
