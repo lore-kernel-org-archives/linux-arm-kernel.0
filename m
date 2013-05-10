@@ -1,28 +1,38 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Fri, 10 May 2013 10:03:24 -0700
-Subject: [PATCH -v8 01/11] CPU hotplug: Provide a generic helper to
- disable/enable CPU hotplug
-In-Reply-To: <1651579.orCh9JNVz6@vostro.rjw.lan>
-References: <1367937595-32241-1-git-send-email-holt@sgi.com>
- <1367937595-32241-2-git-send-email-holt@sgi.com>
- <20130509150121.8c3ef60b2fc748ce542a1a52@linux-foundation.org>
- <1651579.orCh9JNVz6@vostro.rjw.lan>
-Message-ID: <20130510100324.e1e066ab.akpm@linux-foundation.org>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Fri, 10 May 2013 10:31:30 -0700
+Subject: [PATCH RFC] User space clock driver
+Message-ID: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 May 2013 13:11:51 +0200 "Rafael J. Wysocki" <rjw@sisk.pl> wrote:
+Hi,
 
-> ...
->
-> > cpu_hotplug_disable() doesn't get compiled unless we've defined
-> > CONFIG_PM_SLEEP_SMP.  I cannot begin to imagine what the logic is
-> > behind that!
-> 
-> I suppose it was only used by suspend/hibernate code paths when this was
-> introduced.
+is there any interest in exposing clock controls to userspace?
+On Zynq we need/want this for a couple of clocks which are forwarded to
+the FPGA part of the chip, in case no real device driver is taking care
+of the clocks.
+Additionally I can see this help debugging here and there. E.g. it can
+be used to trigger rate change notifications. Hence I started this as a
+generic driver instead of limiting it to my primary Zynq use-case.
 
-OK, well I suspect that what I have now is simply wrong for Robin's
-application.  Robin, can you please check this?  We probably want to
-make the does-something version of cpu_hotplug_disable/enable available
-if CONFIG_HOTPLUG_CPU.
+The current state allows me to control the FPGA clocks on Zynq (other
+clocks should work as well), so the functionality is basically there,
+but I appreciate all feedback on the implementation. I suspect there
+are better/other ways to do this.
+
+	Thanks,
+	S?ren
+
+Soren Brinkmann (1):
+  clk: Introduce userspace clock driver
+
+ .../devicetree/bindings/clock/clk-userspace.txt    |   7 +
+ drivers/clk/Kconfig                                |   9 ++
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-userspace.c                        | 169 +++++++++++++++++++++
+ 4 files changed, 186 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/clk-userspace.txt
+ create mode 100644 drivers/clk/clk-userspace.c
+
+-- 
+1.8.2.3
