@@ -1,298 +1,181 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 10 May 2013 02:21:19 +0200
-Subject: [PATCH V2 1/3] clk: samsung: register audio subsystem clocks
- using common clock framework
-In-Reply-To: <1367909016-19657-2-git-send-email-padma.v@samsung.com>
-References: <1367909016-19657-1-git-send-email-padma.v@samsung.com>
- <1367909016-19657-2-git-send-email-padma.v@samsung.com>
-Message-ID: <1730722.Al2EYiRntt@flatron>
+From: s-anna@ti.com (Suman Anna)
+Date: Thu, 9 May 2013 19:18:49 -0500
+Subject: [RFC 2/3] mailbox: Introduce a new common API
+In-Reply-To: <CAJe_ZheEZo7Akri40ixBhWzeefABxiJXG1Juc4zQOPNQqyahUw@mail.gmail.com>
+References: <CAJe_ZhdH+SCs5crguXrm6y-6bu+eGnTqeJS6cOS5H5Yz=m15Cw@mail.gmail.com>
+ <1367086474-28614-1-git-send-email-jaswinder.singh@linaro.org>
+ <51847070.8040400@ti.com>
+ <CAJe_Zhdbnpu9n46s6L5KNFuTb2K87j+V4htKkmHYtBJ6w+etxQ@mail.gmail.com>
+ <518840A2.5000205@ti.com>
+ <CAJe_ZhedTM_wU7NGH_QRrL=O3JSYjt9ENDLYpOEQNSX3f7OgBA@mail.gmail.com>
+ <518976B9.2030605@ti.com>
+ <CAJe_ZhfpLQzDBSx=2VbD3W-499-g1JOovGDuFwxkE-Cq=HQDww@mail.gmail.com>
+ <518AFB1F.7010409@ti.com>
+ <CAJe_ZheEZo7Akri40ixBhWzeefABxiJXG1Juc4zQOPNQqyahUw@mail.gmail.com>
+Message-ID: <518C3CE9.1010603@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Padmavathi,
-
-I managed to review the patch a bit more thoroughly and I had few more 
-comments. You can find them inline.
-
-On Tuesday 07 of May 2013 12:13:34 Padmavathi Venna wrote:
-> Audio subsystem is introduced in s5pv210 and exynos platforms.
-> This has seperate clock controller which can control i2s0 and
-> pcm0 clocks. This patch registers the audio subsystem clocks
-> with the common clock framework.
+Hi Jassi,
+>
+> On 9 May 2013 06:55, Suman Anna <s-anna@ti.com> wrote:
 > 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->  .../bindings/clock/clk-samsung-audss.txt           |   64 +++++++++
->  drivers/clk/samsung/Makefile                       |    1 +
->  drivers/clk/samsung/clk-samsung-audss.c            |  137
-> ++++++++++++++++++++ include/dt-bindings/clk/samsung-audss-clk.h       
-> |   25 ++++ 4 files changed, 227 insertions(+), 0 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/clock/clk-samsung-audss.txt create
-> mode 100644 drivers/clk/samsung/clk-samsung-audss.c
->  create mode 100644 include/dt-bindings/clk/samsung-audss-clk.h
+>>> so it can't be driven by the controller. We could make it a Kconfig option.
+>>> What do you suggest?
+>>
+>> I am saying controller/link because they are the ones that knows how the
+>> physical transport is, and it may vary from one to another. I would
+>> think that the client dependencies would become a subset of this.
+>> Kconfig option is fine, but we have to think about the best way of
+>> representing it from a multi-platform kernel support perspective.
+>>
+> Actually it has more to do with clients and less with multiplatform.
+> Even on single platform the client that needs biggest buffer will
+> rule. Ditto on multi-platform.
+> Anyways I get your idea. I'll put a note there to revisit once number
+> of active clients increase on the platform.
+
+OK thanks.
+
+>>>> IMHO. It's calling ipc_links_register twice on the same controller. Idea
+>>>> was that the API would distinguish different controllers, not the same
+>>>> one. Also, see the above example if you were to treat a link as Rx or Tx
+>>>> only (functional behavior differences even though the link is exactly
+>>>> the same type).
+>>>>
+>>> Why is calling ipc_links_register() twice, for a controller with 2
+>>> classes of links, a problem ?
+>>
+>> It will be inelegant, once you start maintaining the list of
+>> ipc_controllers in the core code. You would have to search all the
+>> controllers in the list with the matching name, and their links. You
+>> will need to define multiple controller specific controller structures
+>> and copy most of the elements from the actual h/w device into the
+>> containing ipc_controller definition. As you said, the clients deal with
+>> the links themselves, so making the ops part of the ipc_link definition
+>> makes it easier on the controller implementations. You are anyway
+>> caching the ops in ipc_chan (per link) and that is what you are using in
+>> the core code. Majority of the time, you would be using the same ops for
+>> all the links, but this gives the flexibility to links. You can avoid
+>> having multiple controller instance denoting the h/w block, just because
+>> of the difference in links behavior.
+>>
+> I don't see it as an issue, it's just how the code is designed on the
+> principle that the API works only on links, not controllers. Let us
+> wait for the driver of such a controller to show up. It should be easy
+> to change if we see the need.
+
+OK fine, I brought it up since we are defining the API, and defining it
+the first time with flexibility eliminates the need later on.
+
 > 
-> diff --git
-> a/Documentation/devicetree/bindings/clock/clk-samsung-audss.txt
-> b/Documentation/devicetree/bindings/clock/clk-samsung-audss.txt new
-> file mode 100644
-> index 0000000..ec2cd0b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/clk-samsung-audss.txt
-> @@ -0,0 +1,64 @@
-> +* Samsung Audio Subsystem Clock Controller
-> +
-> +The Samsung Audio Subsystem clock controller generates and supplies
-> clocks +to Audio Subsystem block available in the S5PV210 and Exynos
-> SoCs. The clock +binding described here is applicable to all SoC's in
-> the S5PV210 and Exynos +family.
-> +
-> +Required Properties:
-> +
-> +- compatible: should be one of the following:
-> +  - "samsung,s5pv210-audss-clock" - controller compatible with all
-> S5PV210 SoCs. +  - "samsung,exynos4210-audss-clock" - controller
-> compatible with all Exynos4 SoCs. +  - "samsung,exynos5250-audss-clock"
-> - controller compatible with all Exynos5 SoCs. +
-> +- reg: physical base address and length of the controller's register
-> set. +
-> +- #clock-cells: should be 1.
-> +
-> +The following is the list of clocks generated by the controller. Each
-> clock is +assigned an identifier and client nodes use this identifier
-> to specify the +clock which they consume. Some of the clocks are
-> available only on a particular +Exynos4 SoC and this is specified where
-> applicable.
-> +
-> +Provided clocks:
-> +
-> +Clock           ID      SoC (if specific)
-> +-----------------------------------------------
-> +
-> +mout_audss      0
-> +mout_i2s        1
-> +dout_srp        2
-> +dout_bus        3
-> +dout_i2s        4
-> +srp_clk         5
-> +i2s_bus         6
-> +sclk_i2s        7
-> +pcm_bus         8
-> +sclk_pcm        9
-> +
-> +Example 1: An example of a clock controller node is listed below.
-> +
-> +clock_audss: audss-clock-controller at 03810000 {
-> +	compatible = "samsung,exynos5250-audss-clock";
-> +	reg = <0x03810000 0x0C>;
-> +	#clock-cells = <1>;
-> +};
-> +
-> +Example 2: I2S controller node that consumes the clock generated by the
-> clock +           controller. Refer to the standard clock bindings for
-> information +           about 'clocks' and 'clock-names' property.
-> +
-> + i2s0: i2s at 03830000 {
-> +		compatible = "samsung,i2s-v5";
-> +		reg = <0x03830000 0x100>;
-> +		dmas = <&pdma0 10
-> +			&pdma0 9
-> +			&pdma0 8>;
-> +		dma-names = "tx", "rx", "tx-sec";
-> +		clocks = <&clock_audss SAMSUNG_I2S_BUS>,
-> +			<&clock_audss SAMSUNG_I2S_BUS>,
-> +			<&clock_audss SAMSUNG_SCLK_I2S>;
-> +		clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
-> +};
-> +
-> diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
-> index b7c232e..5425fa8 100644
-> --- a/drivers/clk/samsung/Makefile
-> +++ b/drivers/clk/samsung/Makefile
-> @@ -6,3 +6,4 @@ obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-pll.o
->  obj-$(CONFIG_ARCH_EXYNOS4)	+= clk-exynos4.o
->  obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
->  obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
-> +obj-$(CONFIG_PLAT_SAMSUNG)	+= clk-samsung-audss.o
-> diff --git a/drivers/clk/samsung/clk-samsung-audss.c
-> b/drivers/clk/samsung/clk-samsung-audss.c new file mode 100644
-> index 0000000..97526b7
-> --- /dev/null
-> +++ b/drivers/clk/samsung/clk-samsung-audss.c
-> @@ -0,0 +1,137 @@
-> +/*
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + * Author: Padmavathi Venna <padma.v@samsung.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as +
-> * published by the Free Software Foundation.
-> + *
-> + * Common Clock Framework support for Audio Subsystem Clock Controller.
-> +*/
-> +
-> +#include <linux/clkdev.h>
-> +#include <linux/io.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/of_address.h>
-> +#include <linux/syscore_ops.h>
-> +
-> +#include <dt-bindings/clk/samsung-audss-clk.h>
-> +
-> +static DEFINE_SPINLOCK(lock);
-> +static struct clk **clk_table;
-> +static void __iomem *reg_base;
-> +static struct clk_onecell_data clk_data;
-> +
-> +#define ASS_CLK_SRC 0x0
-> +#define ASS_CLK_DIV 0x4
-> +#define ASS_CLK_GATE 0x8
-> +
-> +static unsigned long reg_save[][2] = {
-> +	{ASS_CLK_SRC,  0},
-> +	{ASS_CLK_DIV,  0},
-> +	{ASS_CLK_GATE, 0},
-> +};
-> +
-> +/* list of all parent clock list */
-> +static const char *mout_audss_p[] = { "fin_pll", "fout_epll" };
-> +static const char *mout_i2s_p[] = { "mout_audss", "cdclk0",
-> "sclk_audio0" }; +
-> +#ifdef CONFIG_PM_SLEEP
-> +static int samsung_audss_clk_suspend(void)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < 3; i++)
-> +		reg_save[i][1] = readl(reg_base + reg_save[i][0]);
-> +
-> +	return 0;
-> +}
-> +
-> +static void samsung_audss_clk_resume(void)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < 3; i++)
-> +		writel(reg_save[i][1], reg_base + reg_save[i][0]);
-> +}
-> +
-> +static struct syscore_ops samsung_audss_clk_syscore_ops = {
-> +	.suspend	= samsung_audss_clk_suspend,
-> +	.resume		= samsung_audss_clk_resume,
-> +};
-> +#endif /* CONFIG_PM_SLEEP */
-> +
-> +/* register samsung_audss clocks */
-> +void __init samsung_audss_clk_init(struct device_node *np)
-> +{
-> +	reg_base = of_iomap(np, 0);
-> +	if (!reg_base) {
-> +		pr_err("%s: failed to map audss registers\n", __func__);
-> +		return;
-> +	}
-> +
-> +	clk_table = kzalloc(sizeof(struct clk *) * SAMSUNG_AUDSS_MAX_CLKS,
-> +				GFP_KERNEL);
-> +	if (!clk_table) {
-> +		pr_err("%s: could not allocate clock lookup table\n", 
-__func__);
-> +		return;
-> +	}
-> +
-> +	clk_data.clks = clk_table;
-> +	clk_data.clk_num = SAMSUNG_AUDSS_MAX_CLKS;
-> +	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-> +
-> +	clk_table[SAMSUNG_MOUT_AUDSS] = clk_register_mux(NULL, 
-"mout_audss",
-> +				mout_audss_p, ARRAY_SIZE(mout_audss_p), 0,
-> +				reg_base + ASS_CLK_SRC, 0, 1, 0, &lock);
-> +	clk_register_clkdev(clk_table[SAMSUNG_MOUT_AUDSS], "mout_audss",
-> NULL); +
+>>>
+>>> And, No, the API need not know if the link is "RX" or "TX", which is
+>>> purely a logical function.
+>>>
+>>> Please do tell me which controller physically limits its links to do
+>>> only "RX" or only "TX"?  It's just the platform's firmware that
+>>> dictates who sends and who receives on which link, thereby giving the
+>>> illusion of a link being a "RX" or "TX" capable only.
+>>> Even if some h/w limits do exist on links of some controller, still
+>>> the API shouldn't try to discern a "RX" from a "TX" link. When a
+>>> client knows which link to open, it will also know if it should read
+>>> or write to it - this assumption already holds true. If the client
+>>> writes on a link that it's supposed to listen to remote on, no amount
+>>> of policing by the API could help.
+>>>
+>>> Even if the API tries to differentiate "RX" and "TX" links, the
+>>> knowledge must come from a client (it's driven by the protocol on the
+>>> platform), and not the controller because each of its links are
+>>> physically equally capable to do RX or TX on each end.
+>>
+>> The API never differentiates, but the controller implementation has to.
+>> From a controller driver implementation perspective, you still have to
+>> make sure that no client is calling an op on which it is not supposed
+>> to. When you have a mixture like this, a common code would include some
+>> dead paths for certain links.
+>>
+> No, please. The controller driver should not implement any policy (of
+> allowing/disallowing requests). It should simply try to do as
+> directed. If the client screwed up even after getting info from
+> platform_data/DT, let it suffer.
 
-Is there are a reason for this clkdev lookup to be registered?
+This would be the same as a client trying to misconfigure a link, you
+cannot blame on a client screw up. The controller driver has to take
+care of what it ought to check for in the startup.
 
-This driver seems to be used only in DT-case, so DT-based lookup should be 
-enough.
+> 
+>>>>> Yes, I have 2 types of controllers and I already thought about
+>>>>> multiple controllers in a platform.
+>>>>>  What do you expect to do in controller startup/shutdown? Since the
+>>>>> API works on individual links, not the controllers, when would it call
+>>>>> controller_start() and controller_shutdown()?  The ipc_link's
+>>>>> startup/shutdown are already non-atomic, if the controller needs any
+>>>>> setup it could do it in the first link's startup and teardown in the
+>>>>> last link's shutdown. Not to forget the resources lke IRQ are usually
+>>>>> per Link which should be acquired/released upon link's use/idle.
+>>>>>  While writing the OMAP2 controller driver, did I miss any controller
+>>>>> startup/shutdown ?
+>>>>
+>>>> It just delineates the code better, and has flexibility later on to
+>>>> extend any controller ops or exposing new controller-specific API. The
+>>>> controller start and stop will be called in the same function as
+>>>> ipc_request_channel.
+>>>>
+>>> Already one call ipc_link_ops.startup() reaches the controller upon
+>>> ipc_request_channel.
+>>>
+>>> Do you mean ?
+>>>        ipc_con_ops.startup();
+>>>        ipc_link_ops.startup();
+>>
+>> Yes.
+>>
+> And let the controller startup()/shutdown() upon every
+> link_request/release? 
 
-> +	clk_table[SAMSUNG_MOUT_I2S] = clk_register_mux(NULL, "mout_i2s",
-> +				mout_i2s_p, ARRAY_SIZE(mout_i2s_p), 0,
-> +				reg_base + ASS_CLK_SRC, 2, 2, 0, &lock);
-> +	clk_register_clkdev(clk_table[SAMSUNG_MOUT_I2S], "mout_i2s", 
-NULL);
+Yes, and the controller driver can take care of any ref-counting or
+whatever other logic it needs to maintain. You see this outside in the
+previous mailbox code, but that is not the responsibility of the core code.
 
-Same here.
+> 
+> BTW, I have seen my 2 controllers, OMAP, PL320 and read the dbx500
+> driver. Unsurprisingly none of these have any use for what you call a
+> special ipc_con_ops.startup().  Lets say if the call were there, what
+> would the OMAP put in it?
 
-> +
-> +	clk_table[SAMSUNG_DOUT_SRP] = clk_register_divider(NULL, 
-"dout_srp",
-> +				"mout_audss", 0, reg_base + ASS_CLK_DIV, 
-0, 4,
-> +				0, &lock);
-> +
-> +	clk_table[SAMSUNG_DOUT_BUS] = clk_register_divider(NULL, 
-"dout_bus",
-> +				"dout_srp", 0, reg_base + ASS_CLK_DIV, 4, 
-4, 0,
-> +				&lock);
-> +
-> +	clk_table[SAMSUNG_DOUT_I2S] = clk_register_divider(NULL, 
-"dout_i2s",
-> +				"mout_i2s", 0, reg_base + ASS_CLK_DIV, 8, 
-4, 0,
-> +				&lock);
-> +
-> +	clk_table[SAMSUNG_SRP_CLK] = clk_register_gate(NULL, "srp_clk",
-> +				"dout_srp", CLK_SET_RATE_PARENT,
-> +				reg_base + ASS_CLK_GATE, 0, 0, &lock);
-> +
-> +	clk_table[SAMSUNG_I2S_BUS] = clk_register_gate(NULL, "i2s_bus",
-> +				"dout_bus", CLK_SET_RATE_PARENT,
-> +				reg_base + ASS_CLK_GATE, 2, 0, &lock);
-> +
-> +	clk_table[SAMSUNG_SCLK_I2S] = clk_register_gate(NULL, "sclk_i2s",
-> +				"dout_i2s", CLK_SET_RATE_PARENT,
-> +				reg_base + ASS_CLK_GATE, 3, 0, &lock);
-> +
-> +	clk_table[SAMSUNG_PCM_BUS] = clk_register_gate(NULL, "pcm_bus",
-> +				 "sclk_pcm", CLK_SET_RATE_PARENT,
-> +				reg_base + ASS_CLK_GATE, 4, 0, &lock);
-> +
-> +	clk_table[SAMSUNG_SCLK_PCM] = clk_register_gate(NULL, "sclk_pcm",
-> +				"div_pcm0", CLK_SET_RATE_PARENT,
-> +				reg_base + ASS_CLK_GATE, 5, 0, &lock);
-> +
-> +#ifdef CONFIG_PM_SLEEP
-> +	register_syscore_ops(&samsung_audss_clk_syscore_ops);
-> +#endif
-> +
-> +	pr_info("Exynos: Audss: clock setup completed\n");
-> +}
-> +CLK_OF_DECLARE(s5pv210_audss_clk, "samsung,s5pv210-audss-clock",
-> +		samsung_audss_clk_init);
+Enabling the clock for the device. The clock is for the entire IP, a
+link has no power/clock dependencies.
 
-I'm wondering if this driver in its current state is really compatible 
-with S5PV210. Quick look at documentation shows that CLK_GATE and CLK_DIV 
-registers on this SoC have different layout than on Exynos SoCs.
+> 
+>>>> Yeah, the pm_runtime_enable cannot be called twice when mailbox is
+>>>> invoked from multiple clients on separate links, so there has to a
+>>>> controller-level logic/ref-counting for that. The clocking for us is on
+>>>> the controller.
+>>>>
+>>> No.  You could call pm_runtime_enable/disable any number of times as
+>>> long as they are balanced. The core does refcounting.
+>>
+>> Exactly, as long as they are balanced. I have two clients dealing with
+>> two remotes (using two links) so pm_runtime_enable on the h/w block
+>> needs to be called only when the first one comes in.
+>>
+> Actually you just gave another reason why the API messing around with
+> controller's power state is a bad idea.
 
-I guess that for now the best choice would be to remove any mentions about 
-S5PV210 from the patch and add them back after the driver gets proper 
-support for this SoC.
+Where do you expect to power up the device (obviously this depends on
+the SoC, and its functional purpose)?
 
-> +CLK_OF_DECLARE(exynos4210_audss_clk, "samsung,exynos4210-audss-clock",
-> +		samsung_audss_clk_init);
-> +CLK_OF_DECLARE(exynos5250_audss_clk, "samsung,exynos5250-audss-clock",
-> +		samsung_audss_clk_init);
+> See how mailbox_startup() tries to balance mbox->ops->startup() and
+> mailbox_fini() the mbox->ops->shutdown()  That's very fragile and the
+> cause of imbalance between rpm enable/disable, unless your clients are
+> buggy.
 
-Also if both Exynos4210 and Exynos5250 have exactly the same audss clock 
-layout, there is no reason to have two compatibles for them - the 
-convention is that just the first model that had this hardware is enough - 
-in this case Exynos4210.
+Yeah, it is kinda messed up in the existing code, the startup defined
+there is really for the controller and not the link, and that's why you
+see all the ref-counting balancing logic. The rpm enable/disable being
+called is on the controller's dev, not the link's dev - maybe that's
+what confused you.
 
-Having two different compatibles suggests that those two SoCs differ in a 
-way that needs special handling, which is misleading, based on the fact 
-that there is no such special handling in the driver.
-
-Best regards,
-Tomasz
+regards
+Suman
