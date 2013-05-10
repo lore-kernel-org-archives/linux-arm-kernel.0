@@ -1,16 +1,16 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 10 May 2013 17:31:04 +0200
+From: stuart.menefy@st.com (Stuart MENEFY)
+Date: Fri, 10 May 2013 16:40:58 +0100
 Subject: [RFC 1/8] serial:st-asc: Add ST ASC driver.
 In-Reply-To: <20130510152355.GB11227@kroah.com>
 References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
  <1368022248-2153-1-git-send-email-srinivas.kandagatla@st.com>
  <201305081634.43498.arnd@arndb.de> <20130508153459.GA17186@kroah.com>
  <518D07FB.7010606@codethink.co.uk> <20130510152355.GB11227@kroah.com>
-Message-ID: <518D12B8.9070608@codethink.co.uk>
+Message-ID: <518D150A.7030807@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/05/13 17:23, Greg KH wrote:
+On 10/05/13 16:23, Greg KH wrote:
 > On Fri, May 10, 2013 at 04:45:15PM +0200, Ben Dooks wrote:
 >> On 08/05/13 17:34, Greg KH wrote:
 >>> On Wed, May 08, 2013 at 04:34:43PM +0200, Arnd Bergmann wrote:
@@ -27,15 +27,21 @@ On 10/05/13 17:23, Greg KH wrote:
 >> This would be an issue on systems that either accept plug-in cards
 >> such as PCMCIA/CardBus/PCI or have additional off SoC IO spaces
 >> where 8250 compatible UARTS could live.
->
+> 
 > I thought these were set-top box systems that couldn't accept any
 > plug-in cards or anything else?  This is a SoC, right?
 
-The comment covers more than just this particular instance.
+Correct, it is a SoC intended for set-top-box systems. But they are also
+expandable and have a PCIe root complex. In the final system this would
+normally be used for things like WiFi, but in development boards these
+are brought out to generic PCIe slots where pretty much anything can be
+plugged in.
 
-A lot of SoC devices have expansion interfaces which would accept
-such UARTs.
+We've also had systems in the dim and distant past which used memory
+mapped external super I/O controllers which had 8250 compatible serial
+ports.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+So while its not usual, we have had systems with both ASC and 8250
+compatible serial ports, which is why we'd like to keep the option open.
+
+Stuart
