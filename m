@@ -1,43 +1,73 @@
-From: holt@sgi.com (Robin Holt)
-Date: Thu, 9 May 2013 19:05:53 -0500
-Subject: [PATCH -v9 04/11] Move shutdown/reboot related functions to
- kernel/reboot.c
-In-Reply-To: <20130509135100.13947d1805a583703ee8488b@linux-foundation.org>
-References: <1368127405-112717-1-git-send-email-holt@sgi.com>
- <1368127405-112717-5-git-send-email-holt@sgi.com>
- <20130509135100.13947d1805a583703ee8488b@linux-foundation.org>
-Message-ID: <20130510000552.GX3658@sgi.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Thu,  9 May 2013 17:10:48 -0700
+Subject: [PATCH 0/3] ARM: KDB FIQ debugger
+Message-ID: <1368144651-11250-1-git-send-email-john.stultz@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 09, 2013 at 01:51:00PM -0700, Andrew Morton wrote:
-> On Thu,  9 May 2013 14:23:18 -0500 Robin Holt <holt@sgi.com> wrote:
-> 
-> > This patch is preparatory.  It moves reboot related syscall, etc
-> > functions from kernel/sys.c to kernel/reboot.c.
-> 
-> This doesn't apply.
+Hey all,
+	Just wanted to try to revive Anton's KDB FIQ patches
+which have been sent out a number of times since last October
+and have gotten almost no response at all.
 
-Weird, I just grabbed a recent Linus kernel tree and all 11 applied.
-I then did an update to linus' tree to commit 70eba4226 and now I get
-rejects on arm.  I will resubmit a -v10 fixed up shortly.
+I've simply updated them to apply to Linus' current HEAD,
+and figured I'd send them out again to try to spur some
+interest.
 
-Robin
+Any feedback would be appreciated!
 
-> 
-> > -static void migrate_to_reboot_cpu(void)
-> > -{
-> > -	/* The boot cpu is always logical cpu 0 */
-> > -	int cpu = 0;
-> > -
-> > -	cpu_hotplug_disable();
-> > -
-> > -	/* Make certain the cpu I'm about to reboot on is online */
-> > -	if (!cpu_online(cpu))
-> > -		cpu = cpumask_first(cpu_online_mask);
-> 
-> Here it's deleting code which was already modified by "[PATCH -v9
-> 02/11] Migrate shutdown/reboot to boot cpu.".  So patch [4/11]
-> generates rejects when applied on top of [patch 2/11].
-> 
-> There are several similar glitches.
+thanks
+-john
+
+Short description of the KDB/FIQ debugger:
+
+ The FIQ debugger is a facility that can be used to debug situations when
+ the kernel stuck in uninterruptable sections, e.g. the kernel infinitely
+ loops or deadlocked in an interrupt or with interrupts disabled. On some
+ development boards there is even a special NMI button, which is very
+ useful for debugging weird kernel hangs.
+
+ And FIQ is basically an NMI, it has a higher priority than IRQs, and upon
+ IRQ exception FIQs are not disabled. It is still possible to disable FIQs
+ (as well as some "NMIs" on other architectures), but via special means.
+
+Old changelogs and a full rationale for these patches can be found here:
+
+	v1-v5, rationale: http://lkml.org/lkml/2012/9/10/2
+	v6: http://lkml.org/lkml/2012/9/10/2
+	v7: http://lkml.org/lkml/2012/9/13/367
+	v8: http://lkml.org/lkml/2012/9/19/525
+	v9: http://lkml.org/lkml/2012/9/24/538
+
+
+Cc: Anton Vorontsov <anton.vorontsov@linaro.org>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Jason Wessel <jason.wessel@windriver.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: kernel-team at android.com
+
+
+Anton Vorontsov (3):
+  ARM: Move some macros from entry-armv to entry-header
+  ARM: Add KGDB/KDB FIQ debugger generic code
+  ARM: versatile: Make able to use UART ports for KGDB FIQ debugger
+
+ arch/arm/Kconfig                   |  19 +++++
+ arch/arm/include/asm/kgdb.h        |   7 ++
+ arch/arm/kernel/Makefile           |   1 +
+ arch/arm/kernel/entry-armv.S       | 169 +-----------------------------------
+ arch/arm/kernel/entry-header.S     | 171 +++++++++++++++++++++++++++++++++++++
+ arch/arm/kernel/kgdb_fiq.c         | 118 +++++++++++++++++++++++++
+ arch/arm/kernel/kgdb_fiq_entry.S   |  87 +++++++++++++++++++
+ arch/arm/mach-versatile/Makefile   |   1 +
+ arch/arm/mach-versatile/kgdb_fiq.c |  55 ++++++++++++
+ 9 files changed, 460 insertions(+), 168 deletions(-)
+ create mode 100644 arch/arm/kernel/kgdb_fiq.c
+ create mode 100644 arch/arm/kernel/kgdb_fiq_entry.S
+ create mode 100644 arch/arm/mach-versatile/kgdb_fiq.c
+
+-- 
+1.8.1.2
