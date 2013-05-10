@@ -1,30 +1,44 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Fri, 10 May 2013 10:11:39 +0200
-Subject: [RFC PATCH 1/2] ARM: KVM: move GIC/timer code to a common location
-In-Reply-To: <f816c184d2512dad242b383deac7453e@localhost>
-References: <1367589773-5609-1-git-send-email-marc.zyngier@arm.com>
- <1367589773-5609-2-git-send-email-marc.zyngier@arm.com>
- <20130509181101.GA17253@gmail.com>
- <f816c184d2512dad242b383deac7453e@localhost>
-Message-ID: <518CABBB.7050909@redhat.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 10 May 2013 17:20:55 +0900
+Subject: [PATCH] ARM: shmobile: r8a7778: correct model name in Kconfig
+In-Reply-To: <201305090405.41053.sergei.shtylyov@cogentembedded.com>
+References: <201305090405.41053.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130510082055.GB27435@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 10/05/2013 09:23, Marc Zyngier ha scritto:
->> > 1. Should we have a namespace per arch in the include directory, as in
->> >    include/kvm/arm?
-> So I thought of that at one point, but discarded the idea because it seems
-> to convey the wrong message:
-> We're moving the include files because they are architecture independent,
-> and referring to an architecture name in the path feels a bit odd. Or maybe
-> arm-common?
+On Thu, May 09, 2013 at 04:05:40AM +0400, Sergei Shtylyov wrote:
+> The correct model name is R-Car M1A or R8A77781; R8A77780 corresponds to R-Car
+> M1S which is a SH based SoC.  
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-As I wrote in the other message, Linux in general has a shallow include/
-tree, so I think putting them in include/kvm/ is good.
+Morimoto-san,
 
-Is there any precedent for naming stuff that is common to arm and
-aarch64?  I think to 99% of the world they will both be "arm", but of
-course the remaining 1% is likely over-represented among KVM-ARM
-maintainers. :)
+please review this change.
 
-Paolo
+> 
+> ---
+> The patch is against the current Linus' tree.
+> 
+>  arch/arm/mach-shmobile/Kconfig |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> Index: linux/arch/arm/mach-shmobile/Kconfig
+> ===================================================================
+> --- linux.orig/arch/arm/mach-shmobile/Kconfig
+> +++ linux/arch/arm/mach-shmobile/Kconfig
+> @@ -36,7 +36,7 @@ config ARCH_R8A7740
+>  	select RENESAS_INTC_IRQPIN
+>  
+>  config ARCH_R8A7778
+> -	bool "R-Car M1 (R8A77780)"
+> +	bool "R-Car M1A (R8A77781)"
+>  	select CPU_V7
+>  	select SH_CLK_CPG
+>  	select ARM_GIC
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
