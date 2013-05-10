@@ -1,35 +1,89 @@
-From: holt@sgi.com (Robin Holt)
-Date: Fri, 10 May 2013 04:50:14 -0500
-Subject: [PATCH -v9 04/11] Move shutdown/reboot related functions to
- kernel/reboot.c
-In-Reply-To: <20130510000552.GX3658@sgi.com>
-References: <1368127405-112717-1-git-send-email-holt@sgi.com>
- <1368127405-112717-5-git-send-email-holt@sgi.com>
- <20130509135100.13947d1805a583703ee8488b@linux-foundation.org>
- <20130510000552.GX3658@sgi.com>
-Message-ID: <20130510095014.GY3658@sgi.com>
+From: ruslan.bilovol@gmail.com (Ruslan Bilovol)
+Date: Fri, 10 May 2013 12:50:42 +0300
+Subject: arch/arm/mach-omap2/id.c - IS_ERR_OR_NULL()
+In-Reply-To: <20130509090911.GM21614@n2100.arm.linux.org.uk>
+References: <20130509090911.GM21614@n2100.arm.linux.org.uk>
+Message-ID: <CAB=otbRXPoHWPb3O+AYhdq5BccmLWRE=ZPPPQYQXge6w332+fQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 09, 2013 at 07:05:53PM -0500, Robin Holt wrote:
-> On Thu, May 09, 2013 at 01:51:00PM -0700, Andrew Morton wrote:
-> > On Thu,  9 May 2013 14:23:18 -0500 Robin Holt <holt@sgi.com> wrote:
-> > 
-> > > This patch is preparatory.  It moves reboot related syscall, etc
-> > > functions from kernel/sys.c to kernel/reboot.c.
-> > 
-> > This doesn't apply.
-> 
-> Weird, I just grabbed a recent Linus kernel tree and all 11 applied.
-> I then did an update to linus' tree to commit 70eba4226 and now I get
-> rejects on arm.  I will resubmit a -v10 fixed up shortly.
+Hi Russell,
 
-I wonder what you are seeing.  I get all 11 to apply fairly cleanly with
-only arch/arm/mach-imx/common.h getting conflicts on a commits after 009e63f
-which are related to context.  Otherwise, they applied cleanly.  I assume
-you removed the earlier version before trying to apply.
+On Thu, May 9, 2013 at 12:09 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> So, I eliminated all but a very few of these from arch/arm, and I notice
+> today that there's a new couple of instances introduced by:
+>
+> commit 6770b211432564c562c856d612b43bbd42e4ab5e
+> Author: Ruslan Bilovol <ruslan.bilovol@ti.com>
+> Date:   Thu Feb 14 13:55:24 2013 +0200
+>
+>     ARM: OMAP2+: Export SoC information to userspace
+>
+>     In some situations it is useful for userspace to
+>     know some SoC-specific information. For example,
+>     this may be used for deciding what kernel module to
+>     use or how to better configure some settings etc.
+>     This patch exports OMAP SoC information to userspace
+>     using existing in Linux kernel SoC infrastructure.
+>
+>     This information can be read under
+>     /sys/devices/socX directory
+>
+>     Signed-off-by: Ruslan Bilovol <ruslan.bilovol@ti.com>
+>     [tony at atomide.com: updated for multiplatform changes]
+>     Signed-off-by: Tony Lindgren <tony@atomide.com>
+>
+> +       soc_dev = soc_device_register(soc_dev_attr);
+> +       if (IS_ERR_OR_NULL(soc_dev)) {
+> +               kfree(soc_dev_attr);
+> +               return;
+> +       }
+> +
+> +       parent = soc_device_to_device(soc_dev);
+> +       if (!IS_ERR_OR_NULL(parent))
+> +               device_create_file(parent, &omap_soc_attr);
+>
+> This is nonsense.  For the first, IS_ERR() is sufficient.  For the second,
+> tell me what error checking is required in the return value of this
+> function:
+>
+> struct device *soc_device_to_device(struct soc_device *soc_dev)
+> {
+>         return &soc_dev->dev;
+> }
+>
+> when you've already determined that the passed soc_dev is a valid pointer.
+> If you read the comments against the prototype:
+>
+> /**
+>  * soc_device_to_device - helper function to fetch struct device
+>  * @soc: Previously registered SoC device container
+>  */
+> struct device *soc_device_to_device(struct soc_device *soc);
+>
+> if "soc" is valid, it means the "previously registered SoC device container"
+> must have succeeded and that can only happen if the struct device has been
+> registered.  Ergo, there will always be a valid struct device pointer for
+> any registered SoC device container.  Therefore, if soc_device_register()
+> succeeds, then the return value from soc_device_to_device() will always be
+> valid and no error checking of it is required.
+>
+> Simples.  The rule as ever applies here: get to know the APIs your using
+> and don't fumble around in the dark hoping that you'll get this stuff
+> right.
 
-I can resubmit (and will add Ingo's Acked-by), but am not sure it is
-going to help the situation.  How would you like me to proceed?
+The interesting thing is that extra IS_ERR_OR_NULL checking was
+introduced by author
+of the SoC API in his implementation for the arm/mach-ux500 platform
+and I used the same checking in my implementation when looked into his
+implementation for reference.
+Thanks for pointing on this, I will be more careful in the future.
 
-Robin
+Regards,
+Ruslan
+
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
