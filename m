@@ -1,181 +1,59 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 9 May 2013 19:18:49 -0500
-Subject: [RFC 2/3] mailbox: Introduce a new common API
-In-Reply-To: <CAJe_ZheEZo7Akri40ixBhWzeefABxiJXG1Juc4zQOPNQqyahUw@mail.gmail.com>
-References: <CAJe_ZhdH+SCs5crguXrm6y-6bu+eGnTqeJS6cOS5H5Yz=m15Cw@mail.gmail.com>
- <1367086474-28614-1-git-send-email-jaswinder.singh@linaro.org>
- <51847070.8040400@ti.com>
- <CAJe_Zhdbnpu9n46s6L5KNFuTb2K87j+V4htKkmHYtBJ6w+etxQ@mail.gmail.com>
- <518840A2.5000205@ti.com>
- <CAJe_ZhedTM_wU7NGH_QRrL=O3JSYjt9ENDLYpOEQNSX3f7OgBA@mail.gmail.com>
- <518976B9.2030605@ti.com>
- <CAJe_ZhfpLQzDBSx=2VbD3W-499-g1JOovGDuFwxkE-Cq=HQDww@mail.gmail.com>
- <518AFB1F.7010409@ti.com>
- <CAJe_ZheEZo7Akri40ixBhWzeefABxiJXG1Juc4zQOPNQqyahUw@mail.gmail.com>
-Message-ID: <518C3CE9.1010603@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 10 May 2013 02:24:38 +0200
+Subject: [PATCH V2 0/3] clk: Samsung: audss: Register audio subsytem
+ clocks using common clk framework
+In-Reply-To: <1367909016-19657-1-git-send-email-padma.v@samsung.com>
+References: <1367909016-19657-1-git-send-email-padma.v@samsung.com>
+Message-ID: <1561518.UR9S1ZDj1n@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
->
-> On 9 May 2013 06:55, Suman Anna <s-anna@ti.com> wrote:
+Hi Padmavathi,
+
+On Tuesday 07 of May 2013 12:13:33 Padmavathi Venna wrote:
+> Samsung S5PV210 and Exynos SoC has a separate subsystem for audio. This
+> subsystem has a internal clock controller which controls i2s0 and pcm0
+> clocks. This patch series adds the Samsung audio subsytem clock to the
+> common clock framework and provides the I2S controllers clock
+> information in the dtsi file.
 > 
->>> so it can't be driven by the controller. We could make it a Kconfig option.
->>> What do you suggest?
->>
->> I am saying controller/link because they are the ones that knows how the
->> physical transport is, and it may vary from one to another. I would
->> think that the client dependencies would become a subset of this.
->> Kconfig option is fine, but we have to think about the best way of
->> representing it from a multi-platform kernel support perspective.
->>
-> Actually it has more to do with clients and less with multiplatform.
-> Even on single platform the client that needs biggest buffer will
-> rule. Ditto on multi-platform.
-> Anyways I get your idea. I'll put a note there to revisit once number
-> of active clients increase on the platform.
-
-OK thanks.
-
->>>> IMHO. It's calling ipc_links_register twice on the same controller. Idea
->>>> was that the API would distinguish different controllers, not the same
->>>> one. Also, see the above example if you were to treat a link as Rx or Tx
->>>> only (functional behavior differences even though the link is exactly
->>>> the same type).
->>>>
->>> Why is calling ipc_links_register() twice, for a controller with 2
->>> classes of links, a problem ?
->>
->> It will be inelegant, once you start maintaining the list of
->> ipc_controllers in the core code. You would have to search all the
->> controllers in the list with the matching name, and their links. You
->> will need to define multiple controller specific controller structures
->> and copy most of the elements from the actual h/w device into the
->> containing ipc_controller definition. As you said, the clients deal with
->> the links themselves, so making the ops part of the ipc_link definition
->> makes it easier on the controller implementations. You are anyway
->> caching the ops in ipc_chan (per link) and that is what you are using in
->> the core code. Majority of the time, you would be using the same ops for
->> all the links, but this gives the flexibility to links. You can avoid
->> having multiple controller instance denoting the h/w block, just because
->> of the difference in links behavior.
->>
-> I don't see it as an issue, it's just how the code is designed on the
-> principle that the API works only on links, not controllers. Let us
-> wait for the driver of such a controller to show up. It should be easy
-> to change if we see the need.
-
-OK fine, I brought it up since we are defining the API, and defining it
-the first time with flexibility eliminates the need later on.
-
+> This patch series is dependent on
+> https://patchwork.kernel.org/patch/2532091/
+> http://www.spinics.net/lists/linux-kbuild/msg07616.html
 > 
->>>
->>> And, No, the API need not know if the link is "RX" or "TX", which is
->>> purely a logical function.
->>>
->>> Please do tell me which controller physically limits its links to do
->>> only "RX" or only "TX"?  It's just the platform's firmware that
->>> dictates who sends and who receives on which link, thereby giving the
->>> illusion of a link being a "RX" or "TX" capable only.
->>> Even if some h/w limits do exist on links of some controller, still
->>> the API shouldn't try to discern a "RX" from a "TX" link. When a
->>> client knows which link to open, it will also know if it should read
->>> or write to it - this assumption already holds true. If the client
->>> writes on a link that it's supposed to listen to remote on, no amount
->>> of policing by the API could help.
->>>
->>> Even if the API tries to differentiate "RX" and "TX" links, the
->>> knowledge must come from a client (it's driven by the protocol on the
->>> platform), and not the controller because each of its links are
->>> physically equally capable to do RX or TX on each end.
->>
->> The API never differentiates, but the controller implementation has to.
->> From a controller driver implementation perspective, you still have to
->> make sure that no client is calling an op on which it is not supposed
->> to. When you have a mixture like this, a common code would include some
->> dead paths for certain links.
->>
-> No, please. The controller driver should not implement any policy (of
-> allowing/disallowing requests). It should simply try to do as
-> directed. If the client screwed up even after getting info from
-> platform_data/DT, let it suffer.
-
-This would be the same as a client trying to misconfigure a link, you
-cannot blame on a client screw up. The controller driver has to take
-care of what it ought to check for in the startup.
-
+> This patch series is made based on Kukjin Kim for-next branch
 > 
->>>>> Yes, I have 2 types of controllers and I already thought about
->>>>> multiple controllers in a platform.
->>>>>  What do you expect to do in controller startup/shutdown? Since the
->>>>> API works on individual links, not the controllers, when would it call
->>>>> controller_start() and controller_shutdown()?  The ipc_link's
->>>>> startup/shutdown are already non-atomic, if the controller needs any
->>>>> setup it could do it in the first link's startup and teardown in the
->>>>> last link's shutdown. Not to forget the resources lke IRQ are usually
->>>>> per Link which should be acquired/released upon link's use/idle.
->>>>>  While writing the OMAP2 controller driver, did I miss any controller
->>>>> startup/shutdown ?
->>>>
->>>> It just delineates the code better, and has flexibility later on to
->>>> extend any controller ops or exposing new controller-specific API. The
->>>> controller start and stop will be called in the same function as
->>>> ipc_request_channel.
->>>>
->>> Already one call ipc_link_ops.startup() reaches the controller upon
->>> ipc_request_channel.
->>>
->>> Do you mean ?
->>>        ipc_con_ops.startup();
->>>        ipc_link_ops.startup();
->>
->> Yes.
->>
-> And let the controller startup()/shutdown() upon every
-> link_request/release? 
-
-Yes, and the controller driver can take care of any ref-counting or
-whatever other logic it needs to maintain. You see this outside in the
-previous mailbox code, but that is not the responsibility of the core code.
-
+> Changes since V1:
+> 	- Reworked on all review comments by Sylwester Nawrocki
+> 	- Added a header file for all clock indexes as requested by 
+Sylwester
+> 	- Added different compatible names for s5pv210, exynos4 and 
+exynos5
+> 	- Registered the pcm clocks with common clock framework
 > 
-> BTW, I have seen my 2 controllers, OMAP, PL320 and read the dbx500
-> driver. Unsurprisingly none of these have any use for what you call a
-> special ipc_con_ops.startup().  Lets say if the call were there, what
-> would the OMAP put in it?
-
-Enabling the clock for the device. The clock is for the entire IP, a
-link has no power/clock dependencies.
-
+> Padmavathi Venna (3):
+>   clk: samsung: register audio subsystem clocks using common clock
+>     framework
+>   ARM: dts: add Exynos audio subsystem clock controller node
+>   ARM: dts: add clock provider information for i2s controllers in
+>     Exynos5250
 > 
->>>> Yeah, the pm_runtime_enable cannot be called twice when mailbox is
->>>> invoked from multiple clients on separate links, so there has to a
->>>> controller-level logic/ref-counting for that. The clocking for us is on
->>>> the controller.
->>>>
->>> No.  You could call pm_runtime_enable/disable any number of times as
->>> long as they are balanced. The core does refcounting.
->>
->> Exactly, as long as they are balanced. I have two clients dealing with
->> two remotes (using two links) so pm_runtime_enable on the h/w block
->> needs to be called only when the first one comes in.
->>
-> Actually you just gave another reason why the API messing around with
-> controller's power state is a bad idea.
+>  .../bindings/clock/clk-samsung-audss.txt           |   64 +++++++++
+>  arch/arm/boot/dts/exynos5250.dtsi                  |   16 +++
+>  drivers/clk/samsung/Makefile                       |    1 +
+>  drivers/clk/samsung/clk-samsung-audss.c            |  137
+> ++++++++++++++++++++ include/dt-bindings/clk/samsung-audss-clk.h       
+> |   25 ++++ 5 files changed, 243 insertions(+), 0 deletions(-)
+>  create mode 100644
+> Documentation/devicetree/bindings/clock/clk-samsung-audss.txt create
+> mode 100644 drivers/clk/samsung/clk-samsung-audss.c
+>  create mode 100644 include/dt-bindings/clk/samsung-audss-clk.h
 
-Where do you expect to power up the device (obviously this depends on
-the SoC, and its functional purpose)?
+Also, I think that this series lacks
 
-> See how mailbox_startup() tries to balance mbox->ops->startup() and
-> mailbox_fini() the mbox->ops->shutdown()  That's very fragile and the
-> cause of imbalance between rpm enable/disable, unless your clients are
-> buggy.
+Cc: Mike Turquette <mturquette@linaro.org>
 
-Yeah, it is kinda messed up in the existing code, the startup defined
-there is really for the controller and not the link, and that's why you
-see all the ref-counting balancing logic. The rpm enable/disable being
-called is on the controller's dev, not the link's dev - maybe that's
-what confused you.
+as he's the maintainer of the clk subsystem.
 
-regards
-Suman
+Best regards,
+Tomasz
