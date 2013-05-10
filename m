@@ -1,34 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 10 May 2013 10:30:07 +0100
-Subject: [PATCH 1/3] driver core: Add API to wait for deferred probe to
- complete during init
-In-Reply-To: <CACxGe6sO7kEZgg6km4bzP1cq+2MqGb=D4cZbuWELoz+yhaO6KQ@mail.gmail.com>
-References: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
- <1368076726-11492-2-git-send-email-skannan@codeaurora.org>
- <CACVXFVMd_iRtEM8ZLK6Ps66gZO6SCp1mXSgY6JbWtRJjJUh+ag@mail.gmail.com>
- <CACxGe6uHBNUcbD9SeRP5c3E8NN-Z2yjVV+9VAhuoJnXoBtTu2w@mail.gmail.com>
- <20130509135017.GD3200@sirena.org.uk>
- <20130509141444.GV18614@n2100.arm.linux.org.uk>
- <CACxGe6sO7kEZgg6km4bzP1cq+2MqGb=D4cZbuWELoz+yhaO6KQ@mail.gmail.com>
-Message-ID: <20130510093007.GL3200@sirena.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 10 May 2013 11:29:24 +0200
+Subject: Fwd: Tegra 30 System hangs because of commit "pinctrl: move
+ subsystem mutex to pinctrl_dev struct"
+In-Reply-To: <CAGNsrLDw0_yX9nkLYDg0e8-551P7r43UxziTp1TXyyxdiKR5nA@mail.gmail.com>
+References: <20130505112819.GD24282@game.jcrosoft.org>
+ <CACRpkdZdT8==cUtH4=Y3LC-eVu6ntO2ojFC4bSXNuxa4hMJ=ZA@mail.gmail.com>
+ <20130505202236.GF24282@game.jcrosoft.org>
+ <CACRpkda2EG0O-pfZQ5kLFX=cwSmUSVBJkR7Xvye3ROs3tstv9w@mail.gmail.com>
+ <20130506194122.GG24282@game.jcrosoft.org>
+ <20130506195403.GJ18614@n2100.arm.linux.org.uk>
+ <CACRpkdZtPhzLFicYYZF0SZfp4dMJars+Z-7hTUZQ1JjPExXW3A@mail.gmail.com>
+ <CACxGe6uo60OwRd7buPX4382_vE48MLWJYyB_ka+iS2FfVCa8mw@mail.gmail.com>
+ <CAOesGMiqrXSPdEtUzGCuAuhdE4K7FVe65zMM962XuOrO555hnQ@mail.gmail.com>
+ <CAGNsrLDw0_yX9nkLYDg0e8-551P7r43UxziTp1TXyyxdiKR5nA@mail.gmail.com>
+Message-ID: <20130510092924.GJ3041@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 09, 2013 at 05:39:03PM +0100, Grant Likely wrote:
+Hi,
 
-> +1. You can /minimize/ up-down cycles with the kind of optimization
-> that is being attempted here, but the driver still *must* deal with
-> bringing resources back up if they get requested "later than you would
-> otherwise like".
+	so we need to consolidate I'll send a proposition during the day
 
-Now that I think about it we should probably have a debug option like
-the shared IRQ testing one which does actually disable all resources as
-soon as the kernel gains control of them in order to help with test
-coverage for this.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130510/974fe1f2/attachment.sig>
+Best Regards,
+J.
+On 20:51 Thu 09 May     , Fathi Boudra wrote:
+> On 9 May 2013 19:13, Olof Johansson <olof@lixom.net> wrote:
+> > On Thu, May 9, 2013 at 6:25 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> >> On Mon, May 6, 2013 at 9:12 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> >>> On Mon, May 6, 2013 at 9:54 PM, Russell King - ARM Linux
+> > Yes, a builder is quite useful. Several of us do our own builds as well.
+> >
+> > When it comes to boot coverage, I'm not sure how successful a central
+> > approach would be. It's something where I think Linaro could
+> > contribute a lot for their member platforms, but I haven't seen much
+> > engagement there yet.
+> 
+> My previous post was lost. Sorry to repost..
+> 
+> We've got a jenkins instance doing daily builds on various trees and
+> boot testing on the few boards we've got in the lab:
+> https://ci.linaro.org/jenkins/view/kernel-ci/
+> 
+> But it hasn't attracted much interest so far... It's been here since a year.
+> 
+> > Beyond there, I'd say the expectation is that each maintainer should
+> > keep an eye on their own platforms. They _should_ try building and
+> > booting linux-next on their platforms, to catch regressions early. And
+> > definitely around now, I'd like to see people boot mainline on their
+> > platforms to make sure we haven't added any severe regressions in the
+> > 3.10 merge window, etc. Some people are really good at this, others
+> > less so.
+> >
+> > What's the old saying, you can lead a horse to water but you can't
+> > make him drink? You can build a boot test cluster but you can't make
+> > anyone pay attention to it. :(
+> >
+> > -Olof
+> 
+> Cheers,
+> 
+> Fathi
