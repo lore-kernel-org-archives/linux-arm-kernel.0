@@ -1,85 +1,53 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 10 May 2013 16:36:55 -0700
-Subject: [PATCH RFC] clk: Introduce userspace clock driver
-In-Reply-To: <518D81F9.1090105@codeaurora.org>
-References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
- <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
- <518D320C.4010707@elopez.com.ar>
- <fe9e603e-a432-4a29-a195-fd393b875a7e@TX2EHSMHS006.ehs.local>
- <518D411D.9070209@elopez.com.ar>
- <CAPtuhTgsP4gvMAFoQb3icXAZw3ucSg4dfrAdJMho-VxNmNTvwg@mail.gmail.com>
- <518D7C45.2090602@codeaurora.org>
- <82612ce3-3be2-46fe-925c-3aa6ca743e7d@CO1EHSMHS004.ehs.local>
- <518D81F9.1090105@codeaurora.org>
-Message-ID: <2f341b13-2a7a-44a2-b31e-7ca0afeaa962@AM1EHSMHS008.ehs.local>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Fri, 10 May 2013 17:36:30 -0700
+Subject: [PATCH v3 24/32] arm64: KVM: 32bit GP register access
+In-Reply-To: <20130507163303.GH29757@arm.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-25-git-send-email-marc.zyngier@arm.com>
+ <20130502160906.GI20730@arm.com> <51892B90.8060706@arm.com>
+ <20130507163303.GH29757@arm.com>
+Message-ID: <20130511003630.GD30999@chazy>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 10, 2013 at 04:25:45PM -0700, Saravana Kannan wrote:
-> On 05/10/2013 04:06 PM, S?ren Brinkmann wrote:
-> >On Fri, May 10, 2013 at 04:01:25PM -0700, Saravana Kannan wrote:
-> >>On 05/10/2013 03:18 PM, Mike Turquette wrote:
+On Tue, May 07, 2013 at 05:33:03PM +0100, Catalin Marinas wrote:
+> On Tue, May 07, 2013 at 05:28:00PM +0100, Marc Zyngier wrote:
+> > On 02/05/13 17:09, Catalin Marinas wrote:
+> > > BTW, on arch/arm it looks like this is used when you get a data abort
+> > > with PC as the destination register and you inject a prefetch abort in
+> > > this case. Why isn't this a normal data abort? Once you get the
+> > > information, you load it into PC but first you need to sort out the data
+> > > abort (unless I don't understand how the kvm_inject_pabt works).
+> > 
+> > Indeed, it should be a data abort, as we correctly fetched the
+> > instruction. Now, I wonder why we even bother trying to catch this case.
+> > Fetching PC from MMIO looks quite silly, but I don't think anything
+> > really forbids it in the architecture.
 > 
-> >>>I think that Soren wants something with a stable interface that he can
-> >>>use for his Zynq use case.  Regarding that, why not write an actual
-> >>>device driver to do what you want to do from userspace?
-> >>
-> >>Exposing clock control to userspace production use is a terrible
-> >>idea. A misbehaving userspace can easily kill the system. This is
-> >>not so try for GPIO. So, exposing GPIOs to userspace is relatively
-> >>less of a concern.
-> >Well, the FPGA clocks are only used by stuff in the FPGA. They cannot
-> >mess up the Linux on the A9s. I my use-case is kinda special. And people
-> >request functionality to easily adjust the frequency for their FPGA
-> >design in SW from Linux.
+> It's not forbidden and you should just treat it as any other data abort,
+> no need to check whether the register is PC. If you do the PC adjustment
+> further down in that function it will be overridden by the instruction
+> emulation anyway. There is no optimisation in checking for PC since such
+> fault is very unlikely in sane code anyway.
 > 
-> How do you talk to the FPGA? What happens if the FPGA clock gets
-> turned off when the Linux is communicating with it? At the least the
-> I2C or whatever bus you used to talk to it could hang. You need to
-> explain more about why it's "special" before people might turn
-> around to give userspace ABI for clock control.
-> 
-> >Nevertheless, there is no real protection from taking the driver I'm
-> >proposing to control the FPGA clocks to control a clock vital to the
-> >system.
-> 
-> If we are talking about changing the kernel to control different
-> clocks, that true for any driver.
-> 
-> If your idea of this driver was something that will take a clock
-> name and rate and change that clock's rate, then that's not a good
-> design. What Mike probably meant was a FPGA specific driver that
-> will only clk_get() the clocks related to the FPGA, and expose
-> options to userspace. Not the actual rate or enable/disable
-> capability.
-How? You do this through device tree. If you give that driver a
-different clock than the one it should get it might mess up. But this
-does apply to all device drivers. Assume you give you ethernet driver
-the wrong clock reference. When it tries to adjust the link speed it
-will mess up the clock. There is no protection against this.
+The reason is simply that it is most likely because of a bug that this
+happens, and we would rather catch such an error in a meaningful way
+than let this go crazy and have users track it down for a long time.
 
-> For example, opening the device could cause clk_prepare_enable() and
-> closing it would cause clk_disable_unprepare().
-In the current state: Enable/disable is explicitly done through the 'enable'
-file in sysfs.  The driver takes care of that all enable/disable is
-balanced. I.e. prepare_enable is called if non-zero is written to enable
-and the driver didn't enable the clock yet and similar for disable.
+Especially, this was relevant when we did io instruction decoding and we
+wanted to catch potential bugs in that when it was development code.
 
-> You might have
-> ioctls to let userspace pick one of different modes of operation
-> with each corresponding to a different clock rate and other
-> corresponding FPGA configuration changes, etc.
-It's an FPGA and therefore fully programmable even during runtime.
+That all being said, we can remove the check.  I don't think, however,
+that it being an unlikely thing is a good argument: if we remove the
+check we need to make sure that the VM does whatever the architecture
+dictates, which I assume is to not skip the MMIO instruction and support
+setting the PC to the value returned from an I/O emulation device in
+QEMU.
 
-> That's just a rough
-> sketch. If you write such a driver, userspace can't misuse it to
-> mess with other clocks or leave the FPGA clock in a bad state.
-Currently, you cannot mess with the enable counts and whether the
-frequency is sane or not is up to the user. Unless you have a known
-design and appropriate DT bindings there is no way of knowing this
-upfront, which is kinda the point of having the driver.
-The first use case in my mind is just some simple bring up. Having the
-clocks let some LEDs blink and now let them blink faster/slower by
-changing the frequency.
+I think the scenario sounds crazy and is more than anything a sign of a
+bug somewhere, and whether it should be a PABT or a DABT is a judgement
+call, but I chose a PABT because the thing that's weird is jumping to an
+I/O address, it's not that the memory address for the load is
+problematic.
 
-	S?ren
+-Christoffer
