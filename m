@@ -1,59 +1,71 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Sat, 11 May 2013 08:47:28 -0700
-Subject: [PATCH -v10 09/11] arm,
- prepare reboot_mode for moving to	generic kernel code.
-In-Reply-To: <20130511130457.GD18614@n2100.arm.linux.org.uk>
-References: <1368273447-11958-1-git-send-email-holt@sgi.com>
- <1368273447-11958-10-git-send-email-holt@sgi.com>
- <20130511130457.GD18614@n2100.arm.linux.org.uk>
-Message-ID: <588ed084-fed7-4bd9-bcd7-a32f40bd404a@email.android.com>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Sat, 11 May 2013 09:26:02 -0700
+Subject: [PATCH v3 30/32] arm64: KVM: enable initialization of a 32bit vcpu
+In-Reply-To: <CAFEAcA-8cHk9Gv5j8XvK9dfkpZJeZ+hNfc4NekKCW_KBeHttKg@mail.gmail.com>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-31-git-send-email-marc.zyngier@arm.com>
+ <20130423230229.GN20569@gmail.com> <5177E303.7050801@arm.com>
+ <CAEDV+g+OL+37w9jA8=0WGea5FgW5y3mazqFzv9GLxDgjCe6dtg@mail.gmail.com>
+ <51892DA4.4050401@arm.com> <20130511003842.GE30999@chazy>
+ <CAFEAcA-8cHk9Gv5j8XvK9dfkpZJeZ+hNfc4NekKCW_KBeHttKg@mail.gmail.com>
+Message-ID: <CAEDV+gKJg9r+fwiqRAKrQdMVooXCUfKMdog-xveLnBkOgE+YUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By the way, do we really need Yoda programming here?
-
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-
->On Sat, May 11, 2013 at 06:57:25AM -0500, Robin Holt wrote:
->> This patch prepares for the moving the parsing of reboot= to the
->generic
->> kernel code by making reboot_mode into a more generic form.
->> 
->> Signed-off-by: Robin Holt <holt@sgi.com>
->> To: Andrew Morton <akpm@linux-foundation.org>
->> To: Russell King <linux@arm.linux.org.uk>
->> Cc: Russ Anderson <rja@sgi.com>
->> Cc: Robin Holt <holt@sgi.com>
->> Cc: H. Peter Anvin <hpa@zytor.com>
->> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
->> Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
->> Cc: the arch/x86 maintainers <x86@kernel.org>
->> Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
+On Sat, May 11, 2013 at 1:04 AM, Peter Maydell <peter.maydell@linaro.org> wrote:
+> On 11 May 2013 01:38, Christoffer Dall <cdall@cs.columbia.edu> wrote:
+>> On Tue, May 07, 2013 at 05:36:52PM +0100, Marc Zyngier wrote:
+>>> Here's what the documentation says:
+>>> <quote>
+>>> 4.77 KVM_ARM_VCPU_INIT
+>>>
+>>> Capability: basic
+>>> Architectures: arm, arm64
+>>> Type: vcpu ioctl
+>>> Parameters: struct struct kvm_vcpu_init (in)
+>>> Returns: 0 on success; -1 on error
+>>> Errors:
+>>>   EINVAL:    the target is unknown, or the combination of features is invalid.
+>>>   ENOENT:    a features bit specified is unknown.
+>>> </quote>
+>>>
+>>> When this call fails, it is because you've requested a feature
+>>> that is invalid for this CPU. To me, that exactly fits the
+>>> EINVAL entry copied above.
+>>>
+>>> Or am I completely misunderstanding it?
+>>>
+>> I read the EINVAL to say that you supplied something which is invalid
+>> for the software interface and you should fix your user space code.
 >
->Almost-but-not-quite-Acked-by: Russell King
-><rmk+kernel@arm.linux.org.uk> :)
+> Well, more likely "tell the user they picked a bad feature combo";
+> I doubt userspace is going to bother specifically trying to track
+> which features don't go together when we can get a reliable answer
+> just by asking the kernel.
 >
->> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
->> index f219703..92b47df 100644
->> --- a/arch/arm/kernel/process.c
->> +++ b/arch/arm/kernel/process.c
->> @@ -174,14 +174,14 @@ void arch_cpu_idle(void)
->>  		default_idle();
->>  }
->>  
->> -static char reboot_mode = 'h';
->> +enum reboot_mode reboot_mode = REBOOT_HARD;
->>  
->> -int __init reboot_setup(char *str)
->> +static int __init reboot_setup(char *str)
->>  {
->> -	reboot_mode = str[0];
->> +	if ('s' == str[0])
->> +		reboot_mode = REBOOT_SOFT;
+>> The fact that you're requesting a feature that your hardware doesn't
+>> support is a different thing IMHO.
 >
->Remember we talked about the 'gpio' mode as well, so you also need here
->+	if ('g' == str[0])
->		reboot_mode = REBOOT_GPIO;
+> My reading of the docs above would be that "ENOENT" is "I have
+> no idea what feature you just asked me for" and "EINVAL" is
+> "I know those features but can't do them". That said, we don't
+> actually do anything with the error return yet so we should
+> feel free to clarify things so that it's clear what error is
+> returned for the cases we care about distinguishing. It seems
+> like it would be useful to have separate errors for:
+>  * the kernel doesn't support this CPU
+>  * the kernel doesn't support this feature bit
+>  * the combination of CPU and features doesn't make sense
+>
+> and at the moment we've shoehorned two of those into one
+> errno, hence the confusion.
+>
+> (do we need to distinguish "I know about but don't support X"
+> from "I have no idea what you mean when you say X" ?)
+>
+I just think that saying "EINVAL: Invalid argument" for a perfectly
+valid argument which is just not supported on this hardware is what's
+wrong, I think ENXIO or ENODEV or whatever is more appropriate of
+this.
 
--- 
-Sent from my mobile phone. Please excuse brevity and lack of formatting.
+-Christoffer
