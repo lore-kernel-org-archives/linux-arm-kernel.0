@@ -1,122 +1,150 @@
 From: holt@sgi.com (Robin Holt)
-Date: Sat, 11 May 2013 09:19:16 -0500
-Subject: [PATCH -v11 09/11] arm,
- prepare reboot_mode for moving to generic kernel code.
+Date: Sat, 11 May 2013 09:19:12 -0500
+Subject: [PATCH -v11 05/11] checkpatch.pl the new kernel/reboot.c file.
 In-Reply-To: <1368281958-26695-1-git-send-email-holt@sgi.com>
 References: <1368281958-26695-1-git-send-email-holt@sgi.com>
-Message-ID: <1368281958-26695-10-git-send-email-holt@sgi.com>
+Message-ID: <1368281958-26695-6-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch prepares for the moving the parsing of reboot= to the generic
-kernel code by making reboot_mode into a more generic form.
+Get the new file to pass scripts/checkpatch.pl
 
 Signed-off-by: Robin Holt <holt@sgi.com>
 To: Andrew Morton <akpm@linux-foundation.org>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: H. Peter Anvin <hpa@zytor.com>
 Cc: Russ Anderson <rja@sgi.com>
 Cc: Robin Holt <holt@sgi.com>
-Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Cc: the arch/x86 maintainers <x86@kernel.org>
 Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
 ---
 
-Changes since -v10
- - Uncommented an accidentally commented out line.
-
-Changes since -v8
- - Switched from using REBOOT_WARM/COLD to HARD/SOFT.
+Changes since v6:
+ - Removed last remaining line length warning.
 ---
- arch/arm/include/asm/mach/arch.h   | 3 ++-
- arch/arm/kernel/process.c          | 8 ++++----
- arch/arm/kernel/setup.c            | 6 +++---
- arch/arm/mach-footbridge/cats-hw.c | 2 +-
- 4 files changed, 10 insertions(+), 9 deletions(-)
+ include/linux/reboot.h |  2 +-
+ kernel/reboot.c        | 28 +++++++++++++---------------
+ 2 files changed, 14 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 308ad7d..e2b551e 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -9,6 +9,7 @@
+diff --git a/include/linux/reboot.h b/include/linux/reboot.h
+index 23b3630..c6eba21 100644
+--- a/include/linux/reboot.h
++++ b/include/linux/reboot.h
+@@ -26,7 +26,7 @@ extern void machine_shutdown(void);
+ struct pt_regs;
+ extern void machine_crash_shutdown(struct pt_regs *);
+ 
+-/* 
++/*
+  * Architecture independent implemenations of sys_reboot commands.
   */
  
- #ifndef __ASSEMBLY__
-+#include <linux/reboot.h>
+diff --git a/kernel/reboot.c b/kernel/reboot.c
+index 0616483..abb6a04 100644
+--- a/kernel/reboot.c
++++ b/kernel/reboot.c
+@@ -4,6 +4,8 @@
+  *  Copyright (C) 2013  Linus Torvalds
+  */
  
- struct tag;
- struct meminfo;
-@@ -39,7 +40,7 @@ struct machine_desc {
- 	unsigned char		reserve_lp0 :1;	/* never has lp0	*/
- 	unsigned char		reserve_lp1 :1;	/* never has lp1	*/
- 	unsigned char		reserve_lp2 :1;	/* never has lp2	*/
--	char			restart_mode;	/* default restart mode	*/
-+	enum reboot_mode	reboot_mode;	/* default restart mode	*/
- 	struct smp_operations	*smp;		/* SMP operations	*/
- 	void			(*fixup)(struct tag *, char **,
- 					 struct meminfo *);
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index f219703..92b47df 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -174,14 +174,14 @@ void arch_cpu_idle(void)
- 		default_idle();
++#define pr_fmt(fmt)	"reboot: " fmt
++
+ #include <linux/export.h>
+ #include <linux/kexec.h>
+ #include <linux/kmod.h>
+@@ -114,9 +116,9 @@ void kernel_restart(char *cmd)
+ 	migrate_to_reboot_cpu();
+ 	syscore_shutdown();
+ 	if (!cmd)
+-		printk(KERN_EMERG "Restarting system.\n");
++		pr_emerg("Restarting system\n");
+ 	else
+-		printk(KERN_EMERG "Restarting system with command '%s'.\n", cmd);
++		pr_emerg("Restarting system with command '%s'\n", cmd);
+ 	kmsg_dump(KMSG_DUMP_RESTART);
+ 	machine_restart(cmd);
  }
- 
--static char reboot_mode = 'h';
-+enum reboot_mode reboot_mode = REBOOT_HARD;
- 
--int __init reboot_setup(char *str)
-+static int __init reboot_setup(char *str)
+@@ -125,7 +127,7 @@ EXPORT_SYMBOL_GPL(kernel_restart);
+ static void kernel_shutdown_prepare(enum system_states state)
  {
--	reboot_mode = str[0];
-+	if ('s' == str[0])
-+		reboot_mode = REBOOT_SOFT;
- 	return 1;
+ 	blocking_notifier_call_chain(&reboot_notifier_list,
+-		(state == SYSTEM_HALT)?SYS_HALT:SYS_POWER_OFF, NULL);
++		(state == SYSTEM_HALT) ? SYS_HALT : SYS_POWER_OFF, NULL);
+ 	system_state = state;
+ 	usermodehelper_disable();
+ 	device_shutdown();
+@@ -140,11 +142,10 @@ void kernel_halt(void)
+ 	kernel_shutdown_prepare(SYSTEM_HALT);
+ 	migrate_to_reboot_cpu();
+ 	syscore_shutdown();
+-	printk(KERN_EMERG "System halted.\n");
++	pr_emerg("System halted\n");
+ 	kmsg_dump(KMSG_DUMP_HALT);
+ 	machine_halt();
  }
 -
- __setup("reboot=", reboot_setup);
+ EXPORT_SYMBOL_GPL(kernel_halt);
  
- void machine_shutdown(void)
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 1522c7a..e05df42 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -73,7 +73,7 @@ __setup("fpe=", fpe_setup);
+ /**
+@@ -159,7 +160,7 @@ void kernel_power_off(void)
+ 		pm_power_off_prepare();
+ 	migrate_to_reboot_cpu();
+ 	syscore_shutdown();
+-	printk(KERN_EMERG "Power down.\n");
++	pr_emerg("Power down\n");
+ 	kmsg_dump(KMSG_DUMP_POWEROFF);
+ 	machine_power_off();
+ }
+@@ -188,10 +189,10 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
  
- extern void paging_init(struct machine_desc *desc);
- extern void sanity_check_meminfo(void);
--extern void reboot_setup(char *str);
-+extern enum reboot_mode reboot_mode;
- extern void setup_dma_zone(struct machine_desc *desc);
+ 	/* For safety, we require "magic" arguments. */
+ 	if (magic1 != LINUX_REBOOT_MAGIC1 ||
+-	    (magic2 != LINUX_REBOOT_MAGIC2 &&
+-	                magic2 != LINUX_REBOOT_MAGIC2A &&
++			(magic2 != LINUX_REBOOT_MAGIC2 &&
++			magic2 != LINUX_REBOOT_MAGIC2A &&
+ 			magic2 != LINUX_REBOOT_MAGIC2B &&
+-	                magic2 != LINUX_REBOOT_MAGIC2C))
++			magic2 != LINUX_REBOOT_MAGIC2C))
+ 		return -EINVAL;
  
- unsigned int processor_id;
-@@ -769,8 +769,8 @@ void __init setup_arch(char **cmdline_p)
+ 	/*
+@@ -234,7 +235,8 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
+ 		break;
  
- 	setup_dma_zone(mdesc);
+ 	case LINUX_REBOOT_CMD_RESTART2:
+-		if (strncpy_from_user(&buffer[0], arg, sizeof(buffer) - 1) < 0) {
++		ret = strncpy_from_user(&buffer[0], arg, sizeof(buffer) - 1);
++		if (ret < 0) {
+ 			ret = -EFAULT;
+ 			break;
+ 		}
+@@ -282,7 +284,6 @@ void ctrl_alt_del(void)
+ 	else
+ 		kill_cad_pid(SIGINT, 1);
+ }
+-	
  
--	if (mdesc->restart_mode)
--		reboot_setup(&mdesc->restart_mode);
-+	if (mdesc->reboot_mode != REBOOT_HARD)
-+		reboot_mode = mdesc->reboot_mode;
+ char poweroff_cmd[POWEROFF_CMD_PATH_LEN] = "/sbin/poweroff";
  
- 	init_mm.start_code = (unsigned long) _text;
- 	init_mm.end_code   = (unsigned long) _etext;
-diff --git a/arch/arm/mach-footbridge/cats-hw.c b/arch/arm/mach-footbridge/cats-hw.c
-index 6987a09..9669cc0 100644
---- a/arch/arm/mach-footbridge/cats-hw.c
-+++ b/arch/arm/mach-footbridge/cats-hw.c
-@@ -86,7 +86,7 @@ fixup_cats(struct tag *tags, char **cmdline, struct meminfo *mi)
- MACHINE_START(CATS, "Chalice-CATS")
- 	/* Maintainer: Philip Blundell */
- 	.atag_offset	= 0x100,
--	.restart_mode	= 's',
-+	.reboot_mode	= REBOOT_SOFT,
- 	.fixup		= fixup_cats,
- 	.map_io		= footbridge_map_io,
- 	.init_irq	= footbridge_init_irq,
+@@ -301,14 +302,11 @@ static int __orderly_poweroff(bool force)
+ 		ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_EXEC);
+ 		argv_free(argv);
+ 	} else {
+-		printk(KERN_WARNING "%s failed to allocate memory for \"%s\"\n",
+-					 __func__, poweroff_cmd);
+ 		ret = -ENOMEM;
+ 	}
+ 
+ 	if (ret && force) {
+-		printk(KERN_WARNING "Failed to start orderly shutdown: "
+-					"forcing the issue\n");
++		pr_warn("Failed to start orderly shutdown: forcing the issue\n");
+ 		/*
+ 		 * I guess this should try to kick off some daemon to sync and
+ 		 * poweroff asap.  Or not even bother syncing if we're doing an
 -- 
 1.8.2.1
