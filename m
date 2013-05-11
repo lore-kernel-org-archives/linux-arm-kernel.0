@@ -1,166 +1,89 @@
-From: srivatsa.bhat@linux.vnet.ibm.com (Srivatsa S. Bhat)
-Date: Sat, 11 May 2013 14:43:20 +0530
-Subject: [PATCH -v8 01/11] CPU hotplug: Provide a generic helper to
- disable/enable CPU hotplug
-In-Reply-To: <20130511041610.GZ3672@sgi.com>
-References: <1367937595-32241-1-git-send-email-holt@sgi.com>
- <1367937595-32241-2-git-send-email-holt@sgi.com>
- <20130509150121.8c3ef60b2fc748ce542a1a52@linux-foundation.org>
- <1651579.orCh9JNVz6@vostro.rjw.lan>
- <20130510100324.e1e066ab.akpm@linux-foundation.org>
- <20130511041610.GZ3672@sgi.com>
-Message-ID: <518E0BB0.2000401@linux.vnet.ibm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 11 May 2013 10:43:37 +0100
+Subject: [PATCH v3 24/32] arm64: KVM: 32bit GP register access
+In-Reply-To: <20130511003630.GD30999@chazy>
+References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
+ <1365437854-30214-25-git-send-email-marc.zyngier@arm.com>
+ <20130502160906.GI20730@arm.com> <51892B90.8060706@arm.com>
+ <20130507163303.GH29757@arm.com> <20130511003630.GD30999@chazy>
+Message-ID: <20130511094336.GA56525@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2013 09:46 AM, Robin Holt wrote:
-> On Fri, May 10, 2013 at 10:03:24AM -0700, Andrew Morton wrote:
->> On Fri, 10 May 2013 13:11:51 +0200 "Rafael J. Wysocki" <rjw@sisk.pl> wrote:
->>
->>> ...
->>>
->>>> cpu_hotplug_disable() doesn't get compiled unless we've defined
->>>> CONFIG_PM_SLEEP_SMP.  I cannot begin to imagine what the logic is
->>>> behind that!
->>>
->>> I suppose it was only used by suspend/hibernate code paths when this was
->>> introduced.
->>
->> OK, well I suspect that what I have now is simply wrong for Robin's
->> application.  Robin, can you please check this?  We probably want to
->> make the does-something version of cpu_hotplug_disable/enable available
->> if CONFIG_HOTPLUG_CPU.
+On Sat, May 11, 2013 at 01:36:30AM +0100, Christoffer Dall wrote:
+> On Tue, May 07, 2013 at 05:33:03PM +0100, Catalin Marinas wrote:
+> > On Tue, May 07, 2013 at 05:28:00PM +0100, Marc Zyngier wrote:
+> > > On 02/05/13 17:09, Catalin Marinas wrote:
+> > > > BTW, on arch/arm it looks like this is used when you get a data abort
+> > > > with PC as the destination register and you inject a prefetch abort in
+> > > > this case. Why isn't this a normal data abort? Once you get the
+> > > > information, you load it into PC but first you need to sort out the data
+> > > > abort (unless I don't understand how the kvm_inject_pabt works).
+> > > 
+> > > Indeed, it should be a data abort, as we correctly fetched the
+> > > instruction. Now, I wonder why we even bother trying to catch this case.
+> > > Fetching PC from MMIO looks quite silly, but I don't think anything
+> > > really forbids it in the architecture.
+> > 
+> > It's not forbidden and you should just treat it as any other data abort,
+> > no need to check whether the register is PC. If you do the PC adjustment
+> > further down in that function it will be overridden by the instruction
+> > emulation anyway. There is no optimisation in checking for PC since such
+> > fault is very unlikely in sane code anyway.
+> > 
+> The reason is simply that it is most likely because of a bug that this
+> happens, and we would rather catch such an error in a meaningful way
+> than let this go crazy and have users track it down for a long time.
+
+It is probably a bug but it is a valid code sequence (and Peter even
+gave an example).
+
+> Especially, this was relevant when we did io instruction decoding and we
+> wanted to catch potential bugs in that when it was development code.
 > 
-> This patch came from "Srivatsa S. Bhat" <srivatsa.bhat@linux.vnet.ibm.com>,
-> I think I need to defer.
+> That all being said, we can remove the check.  I don't think, however,
+> that it being an unlikely thing is a good argument: if we remove the
+> check we need to make sure that the VM does whatever the architecture
+> dictates, which I assume is to not skip the MMIO instruction and support
+> setting the PC to the value returned from an I/O emulation device in
+> QEMU.
+> 
+> I think the scenario sounds crazy and is more than anything a sign of a
+> bug somewhere, and whether it should be a PABT or a DABT is a judgement
+> call, but I chose a PABT because the thing that's weird is jumping to an
+> I/O address, it's not that the memory address for the load is
+> problematic.
 
-Here is a revised patch, which should address all the problems, IMHO.
-Let me know if you face any issues. (And thanks a lot for fixing up the
-!SMP case in the previous version.)
+I think that's where things get confused. You are reading from an I/O
+location with the destination being the PC and it is trapped by KVM.
+This has nothing to do with PABT, it's purely a DABT on the I/O access.
+You should emulate it and store the result in the PC. If the value
+loaded in PC is wrong, you will get a subsequent PABT in the guest but
+you must not translate the DABT on I/O memory (which would be generated
+even if the destination is not PC) into a PABT which confuses the guest
+further. By doing this you try to convince the guest that it really
+branched to the I/O address (since you raise the PABT with the DFAR
+value) when it simply tried to load an address from I/O and branch to
+this new address.
 
---------------------------------------------------------------------->
+IOW, these two are equivalent regarding PC:
 
-From: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
-Subject: [PATCH] CPU hotplug: Provide a generic helper to disable/enable CPU hotplug
+	ldr	pc, [r0]	@ r0 is an I/O address
 
-There are instances in the kernel where we would like to disable
-CPU hotplug (from sysfs) during some important operation. Today
-the freezer code depends on this and the code to do it was kinda
-tailor-made for that.
+and 
 
-Restructure the code and make it generic enough to be useful for
-other usecases too.
+	ldr	r1, [r0]	@ r0 is an I/O address
+	mov	pc, r1
 
-Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
----
+In the second scenario, you don't raise a PABT on the first instruction.
+You may raise one on the second if PC is invalid but that's different
+and most likely it will be a guest-only thing.
 
- include/linux/cpu.h |    4 ++++
- kernel/cpu.c        |   55 +++++++++++++++++++++------------------------------
- 2 files changed, 27 insertions(+), 32 deletions(-)
+So for DABT emulation, checking whether the destination register is PC
+is simply a minimal optimisation (if at all) of that case to avoid
+storing the PC twice. Injecting PABT when you get a DABT is a bug. You
+already catch PABT on I/O address in kvm_handle_guest_abort() and
+correctly inject PABT into guest.
 
-diff --git a/include/linux/cpu.h b/include/linux/cpu.h
-index c6f6e08..9f3c7e8 100644
---- a/include/linux/cpu.h
-+++ b/include/linux/cpu.h
-@@ -175,6 +175,8 @@ extern struct bus_type cpu_subsys;
- 
- extern void get_online_cpus(void);
- extern void put_online_cpus(void);
-+extern void cpu_hotplug_disable(void);
-+extern void cpu_hotplug_enable(void);
- #define hotcpu_notifier(fn, pri)	cpu_notifier(fn, pri)
- #define register_hotcpu_notifier(nb)	register_cpu_notifier(nb)
- #define unregister_hotcpu_notifier(nb)	unregister_cpu_notifier(nb)
-@@ -198,6 +200,8 @@ static inline void cpu_hotplug_driver_unlock(void)
- 
- #define get_online_cpus()	do { } while (0)
- #define put_online_cpus()	do { } while (0)
-+#define cpu_hotplug_disable()	do { } while (0)
-+#define cpu_hotplug_enable()	do { } while (0)
- #define hotcpu_notifier(fn, pri)	do { (void)(fn); } while (0)
- /* These aren't inline functions due to a GCC bug. */
- #define register_hotcpu_notifier(nb)	({ (void)(nb); 0; })
-diff --git a/kernel/cpu.c b/kernel/cpu.c
-index b5e4ab2..198a388 100644
---- a/kernel/cpu.c
-+++ b/kernel/cpu.c
-@@ -133,6 +133,27 @@ static void cpu_hotplug_done(void)
- 	mutex_unlock(&cpu_hotplug.lock);
- }
- 
-+/*
-+ * Wait for currently running CPU hotplug operations to complete (if any) and
-+ * disable future CPU hotplug (from sysfs). The 'cpu_add_remove_lock' protects
-+ * the 'cpu_hotplug_disabled' flag. The same lock is also acquired by the
-+ * hotplug path before performing hotplug operations. So acquiring that lock
-+ * guarantees mutual exclusion from any currently running hotplug operations.
-+ */
-+void cpu_hotplug_disable(void)
-+{
-+	cpu_maps_update_begin();
-+	cpu_hotplug_disabled = 1;
-+	cpu_maps_update_done();
-+}
-+
-+void cpu_hotplug_enable(void)
-+{
-+	cpu_maps_update_begin();
-+	cpu_hotplug_disabled = 0;
-+	cpu_maps_update_done();
-+}
-+
- #else /* #if CONFIG_HOTPLUG_CPU */
- static void cpu_hotplug_begin(void) {}
- static void cpu_hotplug_done(void) {}
-@@ -541,36 +562,6 @@ static int __init alloc_frozen_cpus(void)
- core_initcall(alloc_frozen_cpus);
- 
- /*
-- * Prevent regular CPU hotplug from racing with the freezer, by disabling CPU
-- * hotplug when tasks are about to be frozen. Also, don't allow the freezer
-- * to continue until any currently running CPU hotplug operation gets
-- * completed.
-- * To modify the 'cpu_hotplug_disabled' flag, we need to acquire the
-- * 'cpu_add_remove_lock'. And this same lock is also taken by the regular
-- * CPU hotplug path and released only after it is complete. Thus, we
-- * (and hence the freezer) will block here until any currently running CPU
-- * hotplug operation gets completed.
-- */
--void cpu_hotplug_disable_before_freeze(void)
--{
--	cpu_maps_update_begin();
--	cpu_hotplug_disabled = 1;
--	cpu_maps_update_done();
--}
--
--
--/*
-- * When tasks have been thawed, re-enable regular CPU hotplug (which had been
-- * disabled while beginning to freeze tasks).
-- */
--void cpu_hotplug_enable_after_thaw(void)
--{
--	cpu_maps_update_begin();
--	cpu_hotplug_disabled = 0;
--	cpu_maps_update_done();
--}
--
--/*
-  * When callbacks for CPU hotplug notifications are being executed, we must
-  * ensure that the state of the system with respect to the tasks being frozen
-  * or not, as reported by the notification, remains unchanged *throughout the
-@@ -589,12 +580,12 @@ cpu_hotplug_pm_callback(struct notifier_block *nb,
- 
- 	case PM_SUSPEND_PREPARE:
- 	case PM_HIBERNATION_PREPARE:
--		cpu_hotplug_disable_before_freeze();
-+		cpu_hotplug_disable();
- 		break;
- 
- 	case PM_POST_SUSPEND:
- 	case PM_POST_HIBERNATION:
--		cpu_hotplug_enable_after_thaw();
-+		cpu_hotplug_enable();
- 		break;
- 
- 	default:
+-- 
+Catalin
