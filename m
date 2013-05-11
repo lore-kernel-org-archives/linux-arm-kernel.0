@@ -1,31 +1,55 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Fri, 10 May 2013 22:28:22 -0600
-Subject: [PATCH] ARM: mmc: bcm281xx SDHCI driver
-In-Reply-To: <1368078942-31265-1-git-send-email-csd@broadcom.com>
-References: <1368078942-31265-1-git-send-email-csd@broadcom.com>
-Message-ID: <518DC8E6.5000606@nvidia.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Sat, 11 May 2013 14:07:29 +0900
+Subject: [PATCH] ARM: exynos: dts: Fixed vbus-gpios
+In-Reply-To: <1368034636-15865-1-git-send-email-dianders@chromium.org>
+References: <1368034636-15865-1-git-send-email-dianders@chromium.org>
+Message-ID: <002501ce4e05$6fe4c630$4fae5290$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/08/2013 11:55 PM, Christian Daudt wrote:
-> Add SDHCI driver for the Broadcom 281xx SoCs. Also
-> add bindings for it into bcm281xx dts files.
-> Still missing:
->  - power managemement
+On Thursday, May 09, 2013 2:37 AM, Doug Anderson wrote:
+> 
+> The 'samsung,vbus-gpio' was submitted before pinmux landed for
+> exynos5250 and uses the old-style gpio specifier.  Fix the two
+> exynos5250 boards that use it.
+> 
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
 
-> diff --git a/drivers/mmc/host/sdhci-bcm-kona.c b/drivers/mmc/host/sdhci-bcm-kona.c
+Acked-by: Jingoo Han <jg1.han@samsung.com>
 
-> +	/*
-> +	 * Back-to-Back register write needs a delay of 1ms at bootup (min 10uS)
-> +	 * Back-to-Back writes to same register needs delay when SD bus clock
-> +	 * is very low w.r.t AHB clock, mainly during boot-time and during card
-> +	 * insert-removal.
-> +	 */
-> +	udelay(1000);
-> +	sdhci_writel(host, val, KONA_SDHOST_CORECTRL);
+Best regards,
+Jingoo Han
 
-This sounds very similar to the workaround in
-drivers/mmc/host/sdhci-bcm2835.c. Is this the same IP block supported by
-that driver? Perhaps not, since bcm2835 apparently needs other WARs such
-as always using 32-bit IO and hence needing custom read/write w/b
-functions to do read-modify-write which isn't here?
+> ---
+>  arch/arm/boot/dts/exynos5250-smdk5250.dts | 2 +-
+>  arch/arm/boot/dts/exynos5250-snow.dts     | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> index 26d856b..3e0c792 100644
+> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> @@ -214,7 +214,7 @@
+>  	};
+> 
+>  	usb at 12110000 {
+> -		samsung,vbus-gpio = <&gpx2 6 1 3 3>;
+> +		samsung,vbus-gpio = <&gpx2 6 0>;
+>  	};
+> 
+>  	dp-controller {
+> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+> index bf4744b..d449feb 100644
+> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+> @@ -183,7 +183,7 @@
+>  	};
+> 
+>  	usb at 12110000 {
+> -		samsung,vbus-gpio = <&gpx1 1 1 3 3>;
+> +		samsung,vbus-gpio = <&gpx1 1 0>;
+>  	};
+> 
+>  	fixed-rate-clocks {
+> --
+> 1.8.2.1
