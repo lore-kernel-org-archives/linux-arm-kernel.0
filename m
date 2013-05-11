@@ -1,55 +1,59 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 12 May 2013 00:28:50 +0900
-Subject: [PATCH v5] pinctrl: Add pinctrl-s3c24xx driver
-In-Reply-To: <201305111726.49491.heiko@sntech.de>
-References: <201305031552.45410.heiko@sntech.de>
- <046401ce4d15$ccba0c80$662e2580$%kim@samsung.com>
- <201305111726.49491.heiko@sntech.de>
-Message-ID: <067401ce4e5c$3cee48d0$b6cada70$%kim@samsung.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Sat, 11 May 2013 08:47:28 -0700
+Subject: [PATCH -v10 09/11] arm,
+ prepare reboot_mode for moving to	generic kernel code.
+In-Reply-To: <20130511130457.GD18614@n2100.arm.linux.org.uk>
+References: <1368273447-11958-1-git-send-email-holt@sgi.com>
+ <1368273447-11958-10-git-send-email-holt@sgi.com>
+ <20130511130457.GD18614@n2100.arm.linux.org.uk>
+Message-ID: <588ed084-fed7-4bd9-bcd7-a32f40bd404a@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko St?bner wrote:
-> 
-> Am Freitag, 10. Mai 2013, 02:32:05 schrieb Kukjin Kim:
-> > Heiko St?bner wrote:
-> > > The s3c24xx pins follow a similar pattern as the other Samsung SoCs
-> and
-> > > can therefore reuse the already introduced infrastructure.
-> > >
-> > > The s3c24xx SoCs have one design oddity in that the first 4 external
-> > > interrupts do not reside in the eint pending register but in the main
-> > > interrupt controller instead. We solve this by forwarding the external
-> > > interrupt from the main controller into the irq domain of the pin bank.
-> > > The masking/acking of these interrupts is handled in the same way.
-> > >
-> > > Furthermore the S3C2412/2413 SoCs contain another oddity in that they
-> > > keep the same 4 eints in the main interrupt controller and eintpend
-> > > register and requiring ack operations to happen in both. This is
-> solved
-> > > by using different compatible properties for the wakeup eint node
-> which
-> > > set a property accordingly.
-> > >
-> > > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> > > Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> >
-> > Looks good to me.
-> >
-> > Linus, if you want me to take into samsung tree, please let me know.
-> 
-> in v4 Linus said:
-> 
-> "Are you taking this through the Samsung tree?"
-> 
-> This would also enable me to put the s3c2416 devicetree support on top of
-> it
-> in this cycle, which of course needs the pinctrl driver.
-> 
-OK, will apply into samsung tree.
+By the way, do we really need Yoda programming here?
 
-Thanks.
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-- Kukjin
+>On Sat, May 11, 2013 at 06:57:25AM -0500, Robin Holt wrote:
+>> This patch prepares for the moving the parsing of reboot= to the
+>generic
+>> kernel code by making reboot_mode into a more generic form.
+>> 
+>> Signed-off-by: Robin Holt <holt@sgi.com>
+>> To: Andrew Morton <akpm@linux-foundation.org>
+>> To: Russell King <linux@arm.linux.org.uk>
+>> Cc: Russ Anderson <rja@sgi.com>
+>> Cc: Robin Holt <holt@sgi.com>
+>> Cc: H. Peter Anvin <hpa@zytor.com>
+>> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+>> Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+>> Cc: the arch/x86 maintainers <x86@kernel.org>
+>> Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
+>
+>Almost-but-not-quite-Acked-by: Russell King
+><rmk+kernel@arm.linux.org.uk> :)
+>
+>> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+>> index f219703..92b47df 100644
+>> --- a/arch/arm/kernel/process.c
+>> +++ b/arch/arm/kernel/process.c
+>> @@ -174,14 +174,14 @@ void arch_cpu_idle(void)
+>>  		default_idle();
+>>  }
+>>  
+>> -static char reboot_mode = 'h';
+>> +enum reboot_mode reboot_mode = REBOOT_HARD;
+>>  
+>> -int __init reboot_setup(char *str)
+>> +static int __init reboot_setup(char *str)
+>>  {
+>> -	reboot_mode = str[0];
+>> +	if ('s' == str[0])
+>> +		reboot_mode = REBOOT_SOFT;
+>
+>Remember we talked about the 'gpio' mode as well, so you also need here
+>+	if ('g' == str[0])
+>		reboot_mode = REBOOT_GPIO;
+
+-- 
+Sent from my mobile phone. Please excuse brevity and lack of formatting.
