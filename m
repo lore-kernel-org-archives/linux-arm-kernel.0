@@ -1,175 +1,324 @@
-From: holt@sgi.com (Robin Holt)
-Date: Sat, 11 May 2013 04:49:03 -0500
-Subject: [PATCH -v8 01/11] CPU hotplug: Provide a generic helper to
- disable/enable CPU hotplug
-In-Reply-To: <518E0BB0.2000401@linux.vnet.ibm.com>
-References: <1367937595-32241-1-git-send-email-holt@sgi.com>
- <1367937595-32241-2-git-send-email-holt@sgi.com>
- <20130509150121.8c3ef60b2fc748ce542a1a52@linux-foundation.org>
- <1651579.orCh9JNVz6@vostro.rjw.lan>
- <20130510100324.e1e066ab.akpm@linux-foundation.org>
- <20130511041610.GZ3672@sgi.com>
- <518E0BB0.2000401@linux.vnet.ibm.com>
-Message-ID: <20130511094903.GC3658@sgi.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Sat, 11 May 2013 15:43:42 +0530
+Subject: [PATCH V2 1/3] clk: samsung: register audio subsystem clocks
+ using common clock framework
+In-Reply-To: <1730722.Al2EYiRntt@flatron>
+References: <1367909016-19657-1-git-send-email-padma.v@samsung.com>
+ <1367909016-19657-2-git-send-email-padma.v@samsung.com>
+ <1730722.Al2EYiRntt@flatron>
+Message-ID: <CAAgF-BfeCZn8-_W-QxXw1QhU-Day-TEMtApiykw1mr7_aA=qTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you.  That fixed the alpha allmodconfig case for me.  I am currently
-rebuilding all the arm defconfig files and will resubmit -v10 when that
-is done.
+Hi Tomasz,
 
-Robin
+On Fri, May 10, 2013 at 5:51 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Padmavathi,
+>
+> I managed to review the patch a bit more thoroughly and I had few more
+> comments. You can find them inline.
 
-On Sat, May 11, 2013 at 02:43:20PM +0530, Srivatsa S. Bhat wrote:
-> On 05/11/2013 09:46 AM, Robin Holt wrote:
-> > On Fri, May 10, 2013 at 10:03:24AM -0700, Andrew Morton wrote:
-> >> On Fri, 10 May 2013 13:11:51 +0200 "Rafael J. Wysocki" <rjw@sisk.pl> wrote:
-> >>
-> >>> ...
-> >>>
-> >>>> cpu_hotplug_disable() doesn't get compiled unless we've defined
-> >>>> CONFIG_PM_SLEEP_SMP.  I cannot begin to imagine what the logic is
-> >>>> behind that!
-> >>>
-> >>> I suppose it was only used by suspend/hibernate code paths when this was
-> >>> introduced.
-> >>
-> >> OK, well I suspect that what I have now is simply wrong for Robin's
-> >> application.  Robin, can you please check this?  We probably want to
-> >> make the does-something version of cpu_hotplug_disable/enable available
-> >> if CONFIG_HOTPLUG_CPU.
-> > 
-> > This patch came from "Srivatsa S. Bhat" <srivatsa.bhat@linux.vnet.ibm.com>,
-> > I think I need to defer.
-> 
-> Here is a revised patch, which should address all the problems, IMHO.
-> Let me know if you face any issues. (And thanks a lot for fixing up the
-> !SMP case in the previous version.)
-> 
-> --------------------------------------------------------------------->
-> 
-> From: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
-> Subject: [PATCH] CPU hotplug: Provide a generic helper to disable/enable CPU hotplug
-> 
-> There are instances in the kernel where we would like to disable
-> CPU hotplug (from sysfs) during some important operation. Today
-> the freezer code depends on this and the code to do it was kinda
-> tailor-made for that.
-> 
-> Restructure the code and make it generic enough to be useful for
-> other usecases too.
-> 
-> Signed-off-by: Srivatsa S. Bhat <srivatsa.bhat@linux.vnet.ibm.com>
-> ---
-> 
->  include/linux/cpu.h |    4 ++++
->  kernel/cpu.c        |   55 +++++++++++++++++++++------------------------------
->  2 files changed, 27 insertions(+), 32 deletions(-)
-> 
-> diff --git a/include/linux/cpu.h b/include/linux/cpu.h
-> index c6f6e08..9f3c7e8 100644
-> --- a/include/linux/cpu.h
-> +++ b/include/linux/cpu.h
-> @@ -175,6 +175,8 @@ extern struct bus_type cpu_subsys;
->  
->  extern void get_online_cpus(void);
->  extern void put_online_cpus(void);
-> +extern void cpu_hotplug_disable(void);
-> +extern void cpu_hotplug_enable(void);
->  #define hotcpu_notifier(fn, pri)	cpu_notifier(fn, pri)
->  #define register_hotcpu_notifier(nb)	register_cpu_notifier(nb)
->  #define unregister_hotcpu_notifier(nb)	unregister_cpu_notifier(nb)
-> @@ -198,6 +200,8 @@ static inline void cpu_hotplug_driver_unlock(void)
->  
->  #define get_online_cpus()	do { } while (0)
->  #define put_online_cpus()	do { } while (0)
-> +#define cpu_hotplug_disable()	do { } while (0)
-> +#define cpu_hotplug_enable()	do { } while (0)
->  #define hotcpu_notifier(fn, pri)	do { (void)(fn); } while (0)
->  /* These aren't inline functions due to a GCC bug. */
->  #define register_hotcpu_notifier(nb)	({ (void)(nb); 0; })
-> diff --git a/kernel/cpu.c b/kernel/cpu.c
-> index b5e4ab2..198a388 100644
-> --- a/kernel/cpu.c
-> +++ b/kernel/cpu.c
-> @@ -133,6 +133,27 @@ static void cpu_hotplug_done(void)
->  	mutex_unlock(&cpu_hotplug.lock);
->  }
->  
-> +/*
-> + * Wait for currently running CPU hotplug operations to complete (if any) and
-> + * disable future CPU hotplug (from sysfs). The 'cpu_add_remove_lock' protects
-> + * the 'cpu_hotplug_disabled' flag. The same lock is also acquired by the
-> + * hotplug path before performing hotplug operations. So acquiring that lock
-> + * guarantees mutual exclusion from any currently running hotplug operations.
-> + */
-> +void cpu_hotplug_disable(void)
-> +{
-> +	cpu_maps_update_begin();
-> +	cpu_hotplug_disabled = 1;
-> +	cpu_maps_update_done();
-> +}
-> +
-> +void cpu_hotplug_enable(void)
-> +{
-> +	cpu_maps_update_begin();
-> +	cpu_hotplug_disabled = 0;
-> +	cpu_maps_update_done();
-> +}
-> +
->  #else /* #if CONFIG_HOTPLUG_CPU */
->  static void cpu_hotplug_begin(void) {}
->  static void cpu_hotplug_done(void) {}
-> @@ -541,36 +562,6 @@ static int __init alloc_frozen_cpus(void)
->  core_initcall(alloc_frozen_cpus);
->  
->  /*
-> - * Prevent regular CPU hotplug from racing with the freezer, by disabling CPU
-> - * hotplug when tasks are about to be frozen. Also, don't allow the freezer
-> - * to continue until any currently running CPU hotplug operation gets
-> - * completed.
-> - * To modify the 'cpu_hotplug_disabled' flag, we need to acquire the
-> - * 'cpu_add_remove_lock'. And this same lock is also taken by the regular
-> - * CPU hotplug path and released only after it is complete. Thus, we
-> - * (and hence the freezer) will block here until any currently running CPU
-> - * hotplug operation gets completed.
-> - */
-> -void cpu_hotplug_disable_before_freeze(void)
-> -{
-> -	cpu_maps_update_begin();
-> -	cpu_hotplug_disabled = 1;
-> -	cpu_maps_update_done();
-> -}
-> -
-> -
-> -/*
-> - * When tasks have been thawed, re-enable regular CPU hotplug (which had been
-> - * disabled while beginning to freeze tasks).
-> - */
-> -void cpu_hotplug_enable_after_thaw(void)
-> -{
-> -	cpu_maps_update_begin();
-> -	cpu_hotplug_disabled = 0;
-> -	cpu_maps_update_done();
-> -}
-> -
-> -/*
->   * When callbacks for CPU hotplug notifications are being executed, we must
->   * ensure that the state of the system with respect to the tasks being frozen
->   * or not, as reported by the notification, remains unchanged *throughout the
-> @@ -589,12 +580,12 @@ cpu_hotplug_pm_callback(struct notifier_block *nb,
->  
->  	case PM_SUSPEND_PREPARE:
->  	case PM_HIBERNATION_PREPARE:
-> -		cpu_hotplug_disable_before_freeze();
-> +		cpu_hotplug_disable();
->  		break;
->  
->  	case PM_POST_SUSPEND:
->  	case PM_POST_HIBERNATION:
-> -		cpu_hotplug_enable_after_thaw();
-> +		cpu_hotplug_enable();
->  		break;
->  
->  	default:
-> 
+Thanks for the review.
+
+>
+> On Tuesday 07 of May 2013 12:13:34 Padmavathi Venna wrote:
+>> Audio subsystem is introduced in s5pv210 and exynos platforms.
+>> This has seperate clock controller which can control i2s0 and
+>> pcm0 clocks. This patch registers the audio subsystem clocks
+>> with the common clock framework.
+>>
+>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>> ---
+>>  .../bindings/clock/clk-samsung-audss.txt           |   64 +++++++++
+>>  drivers/clk/samsung/Makefile                       |    1 +
+>>  drivers/clk/samsung/clk-samsung-audss.c            |  137
+>> ++++++++++++++++++++ include/dt-bindings/clk/samsung-audss-clk.h
+>> |   25 ++++ 4 files changed, 227 insertions(+), 0 deletions(-)
+>>  create mode 100644
+>> Documentation/devicetree/bindings/clock/clk-samsung-audss.txt create
+>> mode 100644 drivers/clk/samsung/clk-samsung-audss.c
+>>  create mode 100644 include/dt-bindings/clk/samsung-audss-clk.h
+>>
+>> diff --git
+>> a/Documentation/devicetree/bindings/clock/clk-samsung-audss.txt
+>> b/Documentation/devicetree/bindings/clock/clk-samsung-audss.txt new
+>> file mode 100644
+>> index 0000000..ec2cd0b
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/clk-samsung-audss.txt
+>> @@ -0,0 +1,64 @@
+>> +* Samsung Audio Subsystem Clock Controller
+>> +
+>> +The Samsung Audio Subsystem clock controller generates and supplies
+>> clocks +to Audio Subsystem block available in the S5PV210 and Exynos
+>> SoCs. The clock +binding described here is applicable to all SoC's in
+>> the S5PV210 and Exynos +family.
+>> +
+>> +Required Properties:
+>> +
+>> +- compatible: should be one of the following:
+>> +  - "samsung,s5pv210-audss-clock" - controller compatible with all
+>> S5PV210 SoCs. +  - "samsung,exynos4210-audss-clock" - controller
+>> compatible with all Exynos4 SoCs. +  - "samsung,exynos5250-audss-clock"
+>> - controller compatible with all Exynos5 SoCs. +
+>> +- reg: physical base address and length of the controller's register
+>> set. +
+>> +- #clock-cells: should be 1.
+>> +
+>> +The following is the list of clocks generated by the controller. Each
+>> clock is +assigned an identifier and client nodes use this identifier
+>> to specify the +clock which they consume. Some of the clocks are
+>> available only on a particular +Exynos4 SoC and this is specified where
+>> applicable.
+>> +
+>> +Provided clocks:
+>> +
+>> +Clock           ID      SoC (if specific)
+>> +-----------------------------------------------
+>> +
+>> +mout_audss      0
+>> +mout_i2s        1
+>> +dout_srp        2
+>> +dout_bus        3
+>> +dout_i2s        4
+>> +srp_clk         5
+>> +i2s_bus         6
+>> +sclk_i2s        7
+>> +pcm_bus         8
+>> +sclk_pcm        9
+>> +
+>> +Example 1: An example of a clock controller node is listed below.
+>> +
+>> +clock_audss: audss-clock-controller at 03810000 {
+>> +     compatible = "samsung,exynos5250-audss-clock";
+>> +     reg = <0x03810000 0x0C>;
+>> +     #clock-cells = <1>;
+>> +};
+>> +
+>> +Example 2: I2S controller node that consumes the clock generated by the
+>> clock +           controller. Refer to the standard clock bindings for
+>> information +           about 'clocks' and 'clock-names' property.
+>> +
+>> + i2s0: i2s at 03830000 {
+>> +             compatible = "samsung,i2s-v5";
+>> +             reg = <0x03830000 0x100>;
+>> +             dmas = <&pdma0 10
+>> +                     &pdma0 9
+>> +                     &pdma0 8>;
+>> +             dma-names = "tx", "rx", "tx-sec";
+>> +             clocks = <&clock_audss SAMSUNG_I2S_BUS>,
+>> +                     <&clock_audss SAMSUNG_I2S_BUS>,
+>> +                     <&clock_audss SAMSUNG_SCLK_I2S>;
+>> +             clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
+>> +};
+>> +
+>> diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
+>> index b7c232e..5425fa8 100644
+>> --- a/drivers/clk/samsung/Makefile
+>> +++ b/drivers/clk/samsung/Makefile
+>> @@ -6,3 +6,4 @@ obj-$(CONFIG_COMMON_CLK)      += clk.o clk-pll.o
+>>  obj-$(CONFIG_ARCH_EXYNOS4)   += clk-exynos4.o
+>>  obj-$(CONFIG_SOC_EXYNOS5250) += clk-exynos5250.o
+>>  obj-$(CONFIG_SOC_EXYNOS5440) += clk-exynos5440.o
+>> +obj-$(CONFIG_PLAT_SAMSUNG)   += clk-samsung-audss.o
+>> diff --git a/drivers/clk/samsung/clk-samsung-audss.c
+>> b/drivers/clk/samsung/clk-samsung-audss.c new file mode 100644
+>> index 0000000..97526b7
+>> --- /dev/null
+>> +++ b/drivers/clk/samsung/clk-samsung-audss.c
+>> @@ -0,0 +1,137 @@
+>> +/*
+>> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+>> + * Author: Padmavathi Venna <padma.v@samsung.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as +
+>> * published by the Free Software Foundation.
+>> + *
+>> + * Common Clock Framework support for Audio Subsystem Clock Controller.
+>> +*/
+>> +
+>> +#include <linux/clkdev.h>
+>> +#include <linux/io.h>
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/syscore_ops.h>
+>> +
+>> +#include <dt-bindings/clk/samsung-audss-clk.h>
+>> +
+>> +static DEFINE_SPINLOCK(lock);
+>> +static struct clk **clk_table;
+>> +static void __iomem *reg_base;
+>> +static struct clk_onecell_data clk_data;
+>> +
+>> +#define ASS_CLK_SRC 0x0
+>> +#define ASS_CLK_DIV 0x4
+>> +#define ASS_CLK_GATE 0x8
+>> +
+>> +static unsigned long reg_save[][2] = {
+>> +     {ASS_CLK_SRC,  0},
+>> +     {ASS_CLK_DIV,  0},
+>> +     {ASS_CLK_GATE, 0},
+>> +};
+>> +
+>> +/* list of all parent clock list */
+>> +static const char *mout_audss_p[] = { "fin_pll", "fout_epll" };
+>> +static const char *mout_i2s_p[] = { "mout_audss", "cdclk0",
+>> "sclk_audio0" }; +
+>> +#ifdef CONFIG_PM_SLEEP
+>> +static int samsung_audss_clk_suspend(void)
+>> +{
+>> +     int i;
+>> +
+>> +     for (i = 0; i < 3; i++)
+>> +             reg_save[i][1] = readl(reg_base + reg_save[i][0]);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static void samsung_audss_clk_resume(void)
+>> +{
+>> +     int i;
+>> +
+>> +     for (i = 0; i < 3; i++)
+>> +             writel(reg_save[i][1], reg_base + reg_save[i][0]);
+>> +}
+>> +
+>> +static struct syscore_ops samsung_audss_clk_syscore_ops = {
+>> +     .suspend        = samsung_audss_clk_suspend,
+>> +     .resume         = samsung_audss_clk_resume,
+>> +};
+>> +#endif /* CONFIG_PM_SLEEP */
+>> +
+>> +/* register samsung_audss clocks */
+>> +void __init samsung_audss_clk_init(struct device_node *np)
+>> +{
+>> +     reg_base = of_iomap(np, 0);
+>> +     if (!reg_base) {
+>> +             pr_err("%s: failed to map audss registers\n", __func__);
+>> +             return;
+>> +     }
+>> +
+>> +     clk_table = kzalloc(sizeof(struct clk *) * SAMSUNG_AUDSS_MAX_CLKS,
+>> +                             GFP_KERNEL);
+>> +     if (!clk_table) {
+>> +             pr_err("%s: could not allocate clock lookup table\n",
+> __func__);
+>> +             return;
+>> +     }
+>> +
+>> +     clk_data.clks = clk_table;
+>> +     clk_data.clk_num = SAMSUNG_AUDSS_MAX_CLKS;
+>> +     of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+>> +
+>> +     clk_table[SAMSUNG_MOUT_AUDSS] = clk_register_mux(NULL,
+> "mout_audss",
+>> +                             mout_audss_p, ARRAY_SIZE(mout_audss_p), 0,
+>> +                             reg_base + ASS_CLK_SRC, 0, 1, 0, &lock);
+>> +     clk_register_clkdev(clk_table[SAMSUNG_MOUT_AUDSS], "mout_audss",
+>> NULL); +
+>
+> Is there are a reason for this clkdev lookup to be registered?
+>
+> This driver seems to be used only in DT-case, so DT-based lookup should be
+> enough.
+
+Ok. I will not register these clocks with clkdev. I will add as clock
+entries into i2s0 node.
+
+>
+>> +     clk_table[SAMSUNG_MOUT_I2S] = clk_register_mux(NULL, "mout_i2s",
+>> +                             mout_i2s_p, ARRAY_SIZE(mout_i2s_p), 0,
+>> +                             reg_base + ASS_CLK_SRC, 2, 2, 0, &lock);
+>> +     clk_register_clkdev(clk_table[SAMSUNG_MOUT_I2S], "mout_i2s",
+> NULL);
+>
+> Same here.
+>
+>> +
+>> +     clk_table[SAMSUNG_DOUT_SRP] = clk_register_divider(NULL,
+> "dout_srp",
+>> +                             "mout_audss", 0, reg_base + ASS_CLK_DIV,
+> 0, 4,
+>> +                             0, &lock);
+>> +
+>> +     clk_table[SAMSUNG_DOUT_BUS] = clk_register_divider(NULL,
+> "dout_bus",
+>> +                             "dout_srp", 0, reg_base + ASS_CLK_DIV, 4,
+> 4, 0,
+>> +                             &lock);
+>> +
+>> +     clk_table[SAMSUNG_DOUT_I2S] = clk_register_divider(NULL,
+> "dout_i2s",
+>> +                             "mout_i2s", 0, reg_base + ASS_CLK_DIV, 8,
+> 4, 0,
+>> +                             &lock);
+>> +
+>> +     clk_table[SAMSUNG_SRP_CLK] = clk_register_gate(NULL, "srp_clk",
+>> +                             "dout_srp", CLK_SET_RATE_PARENT,
+>> +                             reg_base + ASS_CLK_GATE, 0, 0, &lock);
+>> +
+>> +     clk_table[SAMSUNG_I2S_BUS] = clk_register_gate(NULL, "i2s_bus",
+>> +                             "dout_bus", CLK_SET_RATE_PARENT,
+>> +                             reg_base + ASS_CLK_GATE, 2, 0, &lock);
+>> +
+>> +     clk_table[SAMSUNG_SCLK_I2S] = clk_register_gate(NULL, "sclk_i2s",
+>> +                             "dout_i2s", CLK_SET_RATE_PARENT,
+>> +                             reg_base + ASS_CLK_GATE, 3, 0, &lock);
+>> +
+>> +     clk_table[SAMSUNG_PCM_BUS] = clk_register_gate(NULL, "pcm_bus",
+>> +                              "sclk_pcm", CLK_SET_RATE_PARENT,
+>> +                             reg_base + ASS_CLK_GATE, 4, 0, &lock);
+>> +
+>> +     clk_table[SAMSUNG_SCLK_PCM] = clk_register_gate(NULL, "sclk_pcm",
+>> +                             "div_pcm0", CLK_SET_RATE_PARENT,
+>> +                             reg_base + ASS_CLK_GATE, 5, 0, &lock);
+>> +
+>> +#ifdef CONFIG_PM_SLEEP
+>> +     register_syscore_ops(&samsung_audss_clk_syscore_ops);
+>> +#endif
+>> +
+>> +     pr_info("Exynos: Audss: clock setup completed\n");
+>> +}
+>> +CLK_OF_DECLARE(s5pv210_audss_clk, "samsung,s5pv210-audss-clock",
+>> +             samsung_audss_clk_init);
+>
+> I'm wondering if this driver in its current state is really compatible
+> with S5PV210. Quick look at documentation shows that CLK_GATE and CLK_DIV
+> registers on this SoC have different layout than on Exynos SoCs.
+
+Yes. There are some differences. As of now I will remove v210.
+
+>
+> I guess that for now the best choice would be to remove any mentions about
+> S5PV210 from the patch and add them back after the driver gets proper
+> support for this SoC.
+>
+>> +CLK_OF_DECLARE(exynos4210_audss_clk, "samsung,exynos4210-audss-clock",
+>> +             samsung_audss_clk_init);
+>> +CLK_OF_DECLARE(exynos5250_audss_clk, "samsung,exynos5250-audss-clock",
+>> +             samsung_audss_clk_init);
+>
+> Also if both Exynos4210 and Exynos5250 have exactly the same audss clock
+> layout, there is no reason to have two compatibles for them - the
+> convention is that just the first model that had this hardware is enough -
+> in this case Exynos4210.
+>
+> Having two different compatibles suggests that those two SoCs differ in a
+> way that needs special handling, which is misleading, based on the fact
+> that there is no such special handling in the driver.
+
+There is only one difference between Exynos4 and Exynos5 is bit 1 of
+CLK_GATE register where in Exynos5 it is reserved and Exynos4 it is
+gate to IntMEM. I am not sure if we use this bit some where? So is it
+okey to have same compatible with this diff?
+
+I will post next version of patches after the dependencies are merged
+into mainline(dtc+cpp patches by Stephen).
+
+>
+> Best regards,
+> Tomasz
+>
+Thanks
+Padma
