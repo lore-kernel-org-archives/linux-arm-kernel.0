@@ -1,55 +1,50 @@
 From: jg1.han@samsung.com (Jingoo Han)
-Date: Sat, 11 May 2013 14:07:29 +0900
-Subject: [PATCH] ARM: exynos: dts: Fixed vbus-gpios
-In-Reply-To: <1368034636-15865-1-git-send-email-dianders@chromium.org>
-References: <1368034636-15865-1-git-send-email-dianders@chromium.org>
-Message-ID: <002501ce4e05$6fe4c630$4fae5290$@samsung.com>
+Date: Sat, 11 May 2013 14:15:05 +0900
+Subject: [RFC 39/42] arch/arm/plat-samsung: don't check resource with
+ devm_ioremap_resource
+In-Reply-To: <1368173847-5661-40-git-send-email-wsa@the-dreams.de>
+References: <1368173847-5661-1-git-send-email-wsa@the-dreams.de>
+ <1368173847-5661-40-git-send-email-wsa@the-dreams.de>
+Message-ID: <002601ce4e06$7f68fbc0$7e3af340$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, May 09, 2013 2:37 AM, Doug Anderson wrote:
+On Friday, May 10, 2013 5:17 PM, Wolfram Sang wrote:
 > 
-> The 'samsung,vbus-gpio' was submitted before pinmux landed for
-> exynos5250 and uses the old-style gpio specifier.  Fix the two
-> exynos5250 boards that use it.
+> devm_ioremap_resource does sanity checks on the given resource. No need to
+> duplicate this in the driver.
 > 
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 
-Acked-by: Jingoo Han <jg1.han@samsung.com>
+Reviewed-by: Jingoo Han <jg1.han@samsung.com>
 
 Best regards,
 Jingoo Han
 
 > ---
->  arch/arm/boot/dts/exynos5250-smdk5250.dts | 2 +-
->  arch/arm/boot/dts/exynos5250-snow.dts     | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/plat-samsung/adc.c |    5 -----
+>  1 file changed, 5 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index 26d856b..3e0c792 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -214,7 +214,7 @@
->  	};
+> diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+> index ca07cb1..79690f2 100644
+> --- a/arch/arm/plat-samsung/adc.c
+> +++ b/arch/arm/plat-samsung/adc.c
+> @@ -381,11 +381,6 @@ static int s3c_adc_probe(struct platform_device *pdev)
+>  	}
 > 
->  	usb at 12110000 {
-> -		samsung,vbus-gpio = <&gpx2 6 1 3 3>;
-> +		samsung,vbus-gpio = <&gpx2 6 0>;
->  	};
-> 
->  	dp-controller {
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index bf4744b..d449feb 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -183,7 +183,7 @@
->  	};
-> 
->  	usb at 12110000 {
-> -		samsung,vbus-gpio = <&gpx1 1 1 3 3>;
-> +		samsung,vbus-gpio = <&gpx1 1 0>;
->  	};
-> 
->  	fixed-rate-clocks {
+>  	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (!regs) {
+> -		dev_err(dev, "failed to find registers\n");
+> -		return -ENXIO;
+> -	}
+> -
+>  	adc->regs = devm_ioremap_resource(dev, regs);
+>  	if (IS_ERR(adc->regs))
+>  		return PTR_ERR(adc->regs);
 > --
-> 1.8.2.1
+> 1.7.10.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
