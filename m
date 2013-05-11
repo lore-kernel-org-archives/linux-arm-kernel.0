@@ -1,62 +1,22 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Sat, 11 May 2013 14:40:34 -0700
-Subject: [PATCH] ARM: dts: add pin state information for DP HPD support to
- Exynos5250
-In-Reply-To: <000001ce4e1e$d1cc5de0$756519a0$@samsung.com>
-References: <000001ce4e1e$d1cc5de0$756519a0$@samsung.com>
-Message-ID: <CAD=FV=V9oBR1ZAEsMs5-x7NaD1fiHJO=9dn1mPAMg0MX6tnxYA@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 11 May 2013 16:12:57 -0700 (PDT)
+Subject: [PATCH] net: fec: enable hardware checksum only on imx6q-fec
+In-Reply-To: <1368083302-12516-1-git-send-email-shawn.guo@linaro.org>
+References: <1368083302-12516-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20130511.161257.1222305719812815291.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jingoo,
+From: Shawn Guo <shawn.guo@linaro.org>
+Date: Thu, 9 May 2013 15:08:22 +0800
 
-On Sat, May 11, 2013 at 1:09 AM, Jingoo Han <jg1.han@samsung.com> wrote:
-> Add pin state information for DP HPD support that requires
-> pin configuration support using pinctrl interface.
->
-> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> ---
-> Tested on Exynos5250
->
->  arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    7 +++++++
->  arch/arm/boot/dts/exynos5250-smdk5250.dts |    3 +++
->  2 files changed, 10 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> index d1650fb..e9cdee3 100644
-> --- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> @@ -553,6 +553,13 @@
->                         samsung,pin-pud = <0>;
->                         samaung,pin-drv = <0>;
->                 };
-> +
-> +               dp_hpd: dp_hpd {
-> +                       samsung,pins = "gpx0-7";
-> +                       samsung,pin-function = <3>;
-> +                       samsung,pin-pud = <0>;
-> +                       samaung,pin-drv = <0>;
-> +               };
->         };
->
->         pinctrl at 13400000 {
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index 3e0c792..d53ea34 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -224,6 +224,9 @@
->                 samsung,color-depth = <1>;
->                 samsung,link-rate = <0x0a>;
->                 samsung,lane-count = <4>;
-> +
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&dp_hpd>;
+> Commit 4c09eed (net: fec: Enable imx6 enet checksum acceleration.)
+> enables hardware checksum acceleration unconditionally for all fec
+> variants.  This is inappropriate, because some variants like imx5 have
+> no such support on hardware.  Consequently, fec is broken on these
+> platforms.  Fix it by enabling hardware checksum only on imx6q-fec type
+> of controllers.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-I was going to suggest moving this to exynos5250.dtsi but then
-realized that I saw a board recently that used a non-standard HPD pin
-recently!  ...so keeping it in the board file (like you've done) is
-good.
-
-...so looks good to me.
-
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+Applied.
