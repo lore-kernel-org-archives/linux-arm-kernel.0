@@ -1,40 +1,31 @@
-From: holt@sgi.com (Robin Holt)
-Date: Fri, 10 May 2013 23:16:10 -0500
-Subject: [PATCH -v8 01/11] CPU hotplug: Provide a generic helper to
- disable/enable CPU hotplug
-In-Reply-To: <20130510100324.e1e066ab.akpm@linux-foundation.org>
-References: <1367937595-32241-1-git-send-email-holt@sgi.com>
- <1367937595-32241-2-git-send-email-holt@sgi.com>
- <20130509150121.8c3ef60b2fc748ce542a1a52@linux-foundation.org>
- <1651579.orCh9JNVz6@vostro.rjw.lan>
- <20130510100324.e1e066ab.akpm@linux-foundation.org>
-Message-ID: <20130511041610.GZ3672@sgi.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 10 May 2013 22:28:22 -0600
+Subject: [PATCH] ARM: mmc: bcm281xx SDHCI driver
+In-Reply-To: <1368078942-31265-1-git-send-email-csd@broadcom.com>
+References: <1368078942-31265-1-git-send-email-csd@broadcom.com>
+Message-ID: <518DC8E6.5000606@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 10, 2013 at 10:03:24AM -0700, Andrew Morton wrote:
-> On Fri, 10 May 2013 13:11:51 +0200 "Rafael J. Wysocki" <rjw@sisk.pl> wrote:
-> 
-> > ...
-> >
-> > > cpu_hotplug_disable() doesn't get compiled unless we've defined
-> > > CONFIG_PM_SLEEP_SMP.  I cannot begin to imagine what the logic is
-> > > behind that!
-> > 
-> > I suppose it was only used by suspend/hibernate code paths when this was
-> > introduced.
-> 
-> OK, well I suspect that what I have now is simply wrong for Robin's
-> application.  Robin, can you please check this?  We probably want to
-> make the does-something version of cpu_hotplug_disable/enable available
-> if CONFIG_HOTPLUG_CPU.
+On 05/08/2013 11:55 PM, Christian Daudt wrote:
+> Add SDHCI driver for the Broadcom 281xx SoCs. Also
+> add bindings for it into bcm281xx dts files.
+> Still missing:
+>  - power managemement
 
-This patch came from "Srivatsa S. Bhat" <srivatsa.bhat@linux.vnet.ibm.com>,
-I think I need to defer.
+> diff --git a/drivers/mmc/host/sdhci-bcm-kona.c b/drivers/mmc/host/sdhci-bcm-kona.c
 
-I spent all day trying to get an alpha cross compiler to build an
-unmodified kernel and modules, only to find I didn't need to go that
-far and could reproduce the failure with just building vmlinux.
+> +	/*
+> +	 * Back-to-Back register write needs a delay of 1ms at bootup (min 10uS)
+> +	 * Back-to-Back writes to same register needs delay when SD bus clock
+> +	 * is very low w.r.t AHB clock, mainly during boot-time and during card
+> +	 * insert-removal.
+> +	 */
+> +	udelay(1000);
+> +	sdhci_writel(host, val, KONA_SDHOST_CORECTRL);
 
-Sorry for my slow response,
-Robin
+This sounds very similar to the workaround in
+drivers/mmc/host/sdhci-bcm2835.c. Is this the same IP block supported by
+that driver? Perhaps not, since bcm2835 apparently needs other WARs such
+as always using 32-bit IO and hence needing custom read/write w/b
+functions to do read-modify-write which isn't here?
