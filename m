@@ -1,10 +1,10 @@
 From: holt@sgi.com (Robin Holt)
-Date: Sat, 11 May 2013 09:19:13 -0500
-Subject: [PATCH -v11 06/11] x86,
+Date: Sat, 11 May 2013 09:19:14 -0500
+Subject: [PATCH -v11 07/11] unicore32,
  prepare reboot_mode for moving to generic kernel code.
 In-Reply-To: <1368281958-26695-1-git-send-email-holt@sgi.com>
 References: <1368281958-26695-1-git-send-email-holt@sgi.com>
-Message-ID: <1368281958-26695-7-git-send-email-holt@sgi.com>
+Message-ID: <1368281958-26695-8-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,90 +13,104 @@ kernel code by making reboot_mode into a more generic form.
 
 Signed-off-by: Robin Holt <holt@sgi.com>
 To: Andrew Morton <akpm@linux-foundation.org>
-Cc: H. Peter Anvin <hpa@zytor.com>
-Cc: Miguel Boton <mboton.lkml@gmail.com>
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
 Cc: Russ Anderson <rja@sgi.com>
 Cc: Robin Holt <holt@sgi.com>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+Cc: H. Peter Anvin <hpa@zytor.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Cc: the arch/x86 maintainers <x86@kernel.org>
 Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
-Acked-by: Ingo Molnar <mingo@kernel.org>
+Acked-by: Guan Xuetao <gxt@mprc.pku.edu.cn>
 ---
- arch/x86/kernel/reboot.c | 12 +++++++-----
- include/linux/reboot.h   |  5 +++++
- 2 files changed, 12 insertions(+), 5 deletions(-)
 
-diff --git a/arch/x86/kernel/reboot.c b/arch/x86/kernel/reboot.c
-index 76fa1e9..f770340 100644
---- a/arch/x86/kernel/reboot.c
-+++ b/arch/x86/kernel/reboot.c
-@@ -36,7 +36,7 @@ void (*pm_power_off)(void);
- EXPORT_SYMBOL(pm_power_off);
+Changes since -v8
+ - Switched from using REBOOT_WARM/COLD to HARD/SOFT.
+---
+ arch/unicore32/kernel/process.c | 10 +++++-----
+ arch/unicore32/kernel/setup.h   |  2 +-
+ arch/unicore32/mm/mmu.c         |  2 +-
+ include/linux/reboot.h          |  2 ++
+ 4 files changed, 9 insertions(+), 7 deletions(-)
+
+diff --git a/arch/unicore32/kernel/process.c b/arch/unicore32/kernel/process.c
+index c944769..93dd035 100644
+--- a/arch/unicore32/kernel/process.c
++++ b/arch/unicore32/kernel/process.c
+@@ -51,14 +51,14 @@ void arch_cpu_idle(void)
+ 	local_irq_enable();
+ }
  
- static const struct desc_ptr no_idt = {};
--static int reboot_mode;
-+static enum reboot_mode reboot_mode;
- enum reboot_type reboot_type = BOOT_ACPI;
- int reboot_force;
+-static char reboot_mode = 'h';
++static enum reboot_mode reboot_mode = REBOOT_HARD;
  
-@@ -88,11 +88,11 @@ static int __init reboot_setup(char *str)
+ int __init reboot_setup(char *str)
+ {
+-	reboot_mode = str[0];
++	if ('s' == str[0])
++		reboot_mode = REBOOT_SOFT;
+ 	return 1;
+ }
+-
+ __setup("reboot=", reboot_setup);
  
- 		switch (*str) {
- 		case 'w':
--			reboot_mode = 0x1234;
-+			reboot_mode = REBOOT_WARM;
- 			break;
+ void machine_halt(void)
+@@ -88,7 +88,7 @@ void machine_restart(char *cmd)
+ 	 * we may need it to insert some 1:1 mappings so that
+ 	 * soft boot works.
+ 	 */
+-	setup_mm_for_reboot(reboot_mode);
++	setup_mm_for_reboot();
  
- 		case 'c':
--			reboot_mode = 0;
-+			reboot_mode = REBOOT_COLD;
- 			break;
+ 	/* Clean and invalidate caches */
+ 	flush_cache_all();
+@@ -102,7 +102,7 @@ void machine_restart(char *cmd)
+ 	/*
+ 	 * Now handle reboot code.
+ 	 */
+-	if (reboot_mode == 's') {
++	if (reboot_mode == REBOOT_SOFT) {
+ 		/* Jump into ROM at address 0xffff0000 */
+ 		cpu_reset(VECTORS_BASE);
+ 	} else {
+diff --git a/arch/unicore32/kernel/setup.h b/arch/unicore32/kernel/setup.h
+index 30f749d..f5c51b8 100644
+--- a/arch/unicore32/kernel/setup.h
++++ b/arch/unicore32/kernel/setup.h
+@@ -22,7 +22,7 @@ extern void puv3_ps2_init(void);
+ extern void pci_puv3_preinit(void);
+ extern void __init puv3_init_gpio(void);
  
- #ifdef CONFIG_SMP
-@@ -536,6 +536,7 @@ static void native_machine_emergency_restart(void)
- 	int i;
- 	int attempt = 0;
- 	int orig_reboot_type = reboot_type;
-+	unsigned short mode;
+-extern void setup_mm_for_reboot(char mode);
++extern void setup_mm_for_reboot(void);
  
- 	if (reboot_emergency)
- 		emergency_vmx_disable_all();
-@@ -543,7 +544,8 @@ static void native_machine_emergency_restart(void)
- 	tboot_shutdown(TB_SHUTDOWN_REBOOT);
- 
- 	/* Tell the BIOS if we want cold or warm reboot */
--	*((unsigned short *)__va(0x472)) = reboot_mode;
-+	mode = reboot_mode == REBOOT_WARM ? 0x1234 : 0;
-+	*((unsigned short *)__va(0x472)) = mode;
- 
- 	for (;;) {
- 		/* Could also try the reset bit in the Hammer NB */
-@@ -585,7 +587,7 @@ static void native_machine_emergency_restart(void)
- 
- 		case BOOT_EFI:
- 			if (efi_enabled(EFI_RUNTIME_SERVICES))
--				efi.reset_system(reboot_mode ?
-+				efi.reset_system(reboot_mode == REBOOT_WARM ?
- 						 EFI_RESET_WARM :
- 						 EFI_RESET_COLD,
- 						 EFI_SUCCESS, 0, NULL);
+ extern char __stubs_start[], __stubs_end[];
+ extern char __vectors_start[], __vectors_end[];
+diff --git a/arch/unicore32/mm/mmu.c b/arch/unicore32/mm/mmu.c
+index 43c20b4..4f5a532 100644
+--- a/arch/unicore32/mm/mmu.c
++++ b/arch/unicore32/mm/mmu.c
+@@ -445,7 +445,7 @@ void __init paging_init(void)
+  * the user-mode pages.  This will then ensure that we have predictable
+  * results when turning the mmu off
+  */
+-void setup_mm_for_reboot(char mode)
++void setup_mm_for_reboot(void)
+ {
+ 	unsigned long base_pmdval;
+ 	pgd_t *pgd;
 diff --git a/include/linux/reboot.h b/include/linux/reboot.h
-index c6eba21..37d56c3 100644
+index 37d56c3..ca29a6f 100644
 --- a/include/linux/reboot.h
 +++ b/include/linux/reboot.h
-@@ -10,6 +10,11 @@
- #define SYS_HALT	0x0002	/* Notify of system halt */
- #define SYS_POWER_OFF	0x0003	/* Notify of system power off */
+@@ -13,6 +13,8 @@
+ enum reboot_mode {
+ 	REBOOT_COLD = 0,
+ 	REBOOT_WARM,
++	REBOOT_HARD,
++	REBOOT_SOFT,
+ };
  
-+enum reboot_mode {
-+	REBOOT_COLD = 0,
-+	REBOOT_WARM,
-+};
-+
  extern int register_reboot_notifier(struct notifier_block *);
- extern int unregister_reboot_notifier(struct notifier_block *);
- 
 -- 
 1.8.2.1
