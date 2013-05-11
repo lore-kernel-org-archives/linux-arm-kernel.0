@@ -1,7 +1,9 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 May 2013 19:35:58 -0700
-Subject: [PATCH] ARM: dts: OMAP: Add usb_otg and glue data to OMAP3+ boards
-Message-ID: <20130511023557.GB28602@atomide.com>
+Date: Fri, 10 May 2013 19:55:59 -0700
+Subject: [PATCH] ARM: dts: Fix musb interrupt for device tree booting
+In-Reply-To: <20130511023557.GB28602@atomide.com>
+References: <20130511023557.GB28602@atomide.com>
+Message-ID: <20130511025558.GC28602@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,6 +20,11 @@ Without this fix MUSB won't work as it is trying to use
 irq0 instead of irq92.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+---
+Sorry had the wrong subject in the previous mail. That was
+for the breaking commit. Here's the patch again with correct
+subject.
 
 --- a/arch/arm/boot/dts/omap3.dtsi
 +++ b/arch/arm/boot/dts/omap3.dtsi
