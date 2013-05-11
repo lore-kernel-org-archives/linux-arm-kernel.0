@@ -1,37 +1,44 @@
-From: chenlibo.3@gmail.com (Libo Chen)
-Date: Sat, 11 May 2013 19:27:48 +0800
-Subject: [PATCH] usb: gadget: s3c2410: fix clk resource leak and update
-In-Reply-To: <1684189.YrZqmJjoym@flatron>
-References: <518DE4FF.1000702@gmail.com> <1684189.YrZqmJjoym@flatron>
-Message-ID: <518E2B34.7080503@gmail.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Sat, 11 May 2013 13:30:04 +0200
+Subject: [RFC 0/4] ARM: S3C24XX: add dmaengine based dma-driver
+Message-ID: <201305111330.05046.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013-5-11 18:15, Tomasz Figa ??:
-> Hi Libo,
->
-> On Saturday 11 of May 2013 14:28:15 Libo Chen wrote:
->> >From: Libo Chen<libo.chen@huawei.com>
-> The patch subject is slightly misleading. It suggests that the patch only
-> changes clock handling, but in fact the biggest part of the patch is
-> conversion to devm_ helpers.
->
-> I think following subject would suit this patch better:
->
-> [PATCH] usb: gadget: s3c2410: Convert to managed resource allocation
->
-> What do you think?
->
-> Also please see my comments inline.
->
+This series tries to provide a basic dmaengine driver for the s3c24xx
+SoCs.
 
-Hi Tomasz,
+The driver currently has some limitations, in that it does not support the
+earlier s3c24xx socs, that cannot use every channel, but have special
+channel requirements for specific slave-targets.
 
-Thank you for your remind. Sorry, I forgeted to add RFC.
+Another limitation is, that it currently does not support scatter-gather
+lists with more than element, due to me not understanding sg at first.
+While it does not hinder the usability, as all applicable Samsung drivers
+currently use only 1-element-lists, I plan to fix this in the next revision.
 
-"Convert to managed resource allocation" is more suitable.
+In any case, I would be thankful for pointers to the obvious mistakes I'll
+probably have made, due to this being my first travel into dmaengine-land.
 
-Your advice is very helpfull for me to understand those interfaces.
-I will be careful in the future patches.
 
-Thanks again
+Heiko Stuebner (4):
+  ARM: S3C24XX: number the dma clocks
+  dma: add dmaengine driver for Samsung s3c24xx SoCs
+  ARM: S3C24XX: add platform-devices for new dma driver for s3c2412 and s3c2443
+  ARM: SAMSUNG: set s3c24xx_dma_filter for s3c64xx-spi0 device
+
+ arch/arm/mach-s3c24xx/clock-s3c2412.c     |    8 +-
+ arch/arm/mach-s3c24xx/common-s3c2443.c    |   12 +-
+ arch/arm/mach-s3c24xx/common.c            |  103 +++
+ arch/arm/mach-s3c24xx/common.h            |    3 +
+ arch/arm/plat-samsung/devs.c              |    5 +-
+ drivers/dma/Kconfig                       |   12 +-
+ drivers/dma/Makefile                      |    1 +
+ drivers/dma/s3c24xx-dma.c                 | 1129 +++++++++++++++++++++++++++++
+ include/linux/platform_data/dma-s3c24xx.h |   54 ++
+ 9 files changed, 1315 insertions(+), 12 deletions(-)
+ create mode 100644 drivers/dma/s3c24xx-dma.c
+ create mode 100644 include/linux/platform_data/dma-s3c24xx.h
+
+-- 
+1.7.2.3
