@@ -1,17 +1,80 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 11 May 2013 03:08:03 +0200
-Subject: [PATCH 03/10] clk: mvebu: add Dove SoC-centric clock init
-In-Reply-To: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1368234490-31416-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Date: Sat, 11 May 2013 03:08:00 +0200
+Subject: [PATCH 00/10] clk: mvebu: restructure SoC clock drivers
+Message-ID: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is moving core clock and clock gating init for Dove to its own
-file and adds a Kconfig option. Also init functions are added and
-declared so they get called on of_clk_init.
+Marvell EBU SoCs share some common clock functions that register core
+clocks or clock gates from SoC specific data. These clock drivers are
+organized by function and over time the drivers filled up with #ifdefs
+to separate different SoC specific code.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+This patch set first adds a new element to clock gate descriptors to
+allow to pass clk flags per clock gate. (Patch 1)
+
+Then it restructures MVEBU clock drivers into common clock setup and
+SoC specific files and Kconfig options. The driver's init functions
+are also registered to get called with of_clk_init. (Patches 2, 3-6)
+
+It then switches Dove, Kirkwood, and Armada 370/XP to make use of
+of_clk_init instead of mvebu_clocks_init. (Patches 7-9)
+
+Finally, all obsolete files and Kconfig options are removed. (Patch 10)
+
+It has been tested on CuBox (Dove) and Dockstar (Kirkwood) by me.
+Armada 370 and XP are compile tested only and should get their Tested-by
+from Thomas and Gregory, respectively.
+
+@Mike: As this only touches MVEBU related code, I suggest to take it
+all through the corresponding ARM branch.
+
+Sebastian Hesselbarth (10):
+  clk: mvebu: introduce per-clock-gate flags
+  clk: mvebu: add common clock functions for core clk and clk gating
+  clk: mvebu: add Dove SoC-centric clock init
+  clk: mvebu: add Kirkwood SoC-centric clock init
+  clk: mvebu: add Armada 370 SoC-centric clock init
+  clk: mvebu: add Armada XP SoC-centric clock init
+  ARM: dove: move DT boards to SoC-centric clock init
+  ARM: kirkwood: move DT boards to SoC-centric clock init
+  ARM: mvebu: move DT boards to SoC-centric clock init
+  clk: mvebu: desintegrate obsolete file
+
+ arch/arm/mach-dove/Kconfig          |    3 +-
+ arch/arm/mach-dove/board-dt.c       |    3 +-
+ arch/arm/mach-dove/common.c         |    1 -
+ arch/arm/mach-kirkwood/Kconfig      |    3 +-
+ arch/arm/mach-kirkwood/board-dt.c   |    3 +-
+ arch/arm/mach-mvebu/Kconfig         |    5 +-
+ arch/arm/mach-mvebu/armada-370-xp.c |    4 +-
+ drivers/clk/mvebu/Kconfig           |   25 +-
+ drivers/clk/mvebu/Makefile          |    8 +-
+ drivers/clk/mvebu/armada-370.c      |  176 +++++++++
+ drivers/clk/mvebu/armada-xp.c       |  204 +++++++++++
+ drivers/clk/mvebu/clk-core.c        |  675 -----------------------------------
+ drivers/clk/mvebu/clk-core.h        |   18 -
+ drivers/clk/mvebu/clk-gating-ctrl.c |  250 -------------
+ drivers/clk/mvebu/clk-gating-ctrl.h |   22 --
+ drivers/clk/mvebu/clk.c             |   23 --
+ drivers/clk/mvebu/common.c          |  163 +++++++++
+ drivers/clk/mvebu/common.h          |   48 +++
+ drivers/clk/mvebu/dove.c            |  194 ++++++++++
+ drivers/clk/mvebu/kirkwood.c        |  247 +++++++++++++
+ include/linux/clk/mvebu.h           |   22 --
+ 21 files changed, 1066 insertions(+), 1031 deletions(-)
+ create mode 100644 drivers/clk/mvebu/armada-370.c
+ create mode 100644 drivers/clk/mvebu/armada-xp.c
+ delete mode 100644 drivers/clk/mvebu/clk-core.c
+ delete mode 100644 drivers/clk/mvebu/clk-core.h
+ delete mode 100644 drivers/clk/mvebu/clk-gating-ctrl.c
+ delete mode 100644 drivers/clk/mvebu/clk-gating-ctrl.h
+ delete mode 100644 drivers/clk/mvebu/clk.c
+ create mode 100644 drivers/clk/mvebu/common.c
+ create mode 100644 drivers/clk/mvebu/common.h
+ create mode 100644 drivers/clk/mvebu/dove.c
+ create mode 100644 drivers/clk/mvebu/kirkwood.c
+ delete mode 100644 include/linux/clk/mvebu.h
 ---
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Andrew Lunn <andrew@lunn.ch>
@@ -21,234 +84,5 @@ Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Cc: Mike Turquette <mturquette@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
----
- drivers/clk/mvebu/Kconfig  |    4 +
- drivers/clk/mvebu/Makefile |    2 +
- drivers/clk/mvebu/dove.c   |  194 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 200 insertions(+)
- create mode 100644 drivers/clk/mvebu/dove.c
-
-diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
-index 2c3cf95..bc5f05e 100644
---- a/drivers/clk/mvebu/Kconfig
-+++ b/drivers/clk/mvebu/Kconfig
-@@ -9,3 +9,7 @@ config MVEBU_CLK_GATING
- 
- config MVEBU_CLK_COMMON
- 	bool
-+
-+config DOVE_CLK
-+	bool
-+	select MVEBU_CLK_COMMON
-diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
-index 2143230..bfc3078 100644
---- a/drivers/clk/mvebu/Makefile
-+++ b/drivers/clk/mvebu/Makefile
-@@ -2,3 +2,5 @@ obj-$(CONFIG_MVEBU_CLK_COMMON)	+= common.o
- obj-$(CONFIG_MVEBU_CLK_CORE) 	+= clk.o clk-core.o
- obj-$(CONFIG_MVEBU_CLK_CPU) 	+= clk-cpu.o
- obj-$(CONFIG_MVEBU_CLK_GATING) 	+= clk-gating-ctrl.o
-+
-+obj-$(CONFIG_DOVE_CLK)		+= dove.o
-diff --git a/drivers/clk/mvebu/dove.c b/drivers/clk/mvebu/dove.c
-new file mode 100644
-index 0000000..79d7aed
---- /dev/null
-+++ b/drivers/clk/mvebu/dove.c
-@@ -0,0 +1,194 @@
-+/*
-+ * Marvell Dove SoC clocks
-+ *
-+ * Copyright (C) 2012 Marvell
-+ *
-+ * Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+ * Andrew Lunn <andrew@lunn.ch>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/clk-provider.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include "common.h"
-+
-+/*
-+ * Core Clocks
-+ *
-+ * Dove PLL sample-at-reset configuration
-+ *
-+ * SAR0[8:5]   : CPU frequency
-+ *		 5  = 1000 MHz
-+ *		 6  =  933 MHz
-+ *		 7  =  933 MHz
-+ *		 8  =  800 MHz
-+ *		 9  =  800 MHz
-+ *		 10 =  800 MHz
-+ *		 11 = 1067 MHz
-+ *		 12 =  667 MHz
-+ *		 13 =  533 MHz
-+ *		 14 =  400 MHz
-+ *		 15 =  333 MHz
-+ *		 others reserved.
-+ *
-+ * SAR0[11:9]  : CPU to L2 Clock divider ratio
-+ *		 0 = (1/1) * CPU
-+ *		 2 = (1/2) * CPU
-+ *		 4 = (1/3) * CPU
-+ *		 6 = (1/4) * CPU
-+ *		 others reserved.
-+ *
-+ * SAR0[15:12] : CPU to DDR DRAM Clock divider ratio
-+ *		 0  = (1/1) * CPU
-+ *		 2  = (1/2) * CPU
-+ *		 3  = (2/5) * CPU
-+ *		 4  = (1/3) * CPU
-+ *		 6  = (1/4) * CPU
-+ *		 8  = (1/5) * CPU
-+ *		 10 = (1/6) * CPU
-+ *		 12 = (1/7) * CPU
-+ *		 14 = (1/8) * CPU
-+ *		 15 = (1/10) * CPU
-+ *		 others reserved.
-+ *
-+ * SAR0[24:23] : TCLK frequency
-+ *		 0 = 166 MHz
-+ *		 1 = 125 MHz
-+ *		 others reserved.
-+ */
-+
-+#define SAR_DOVE_CPU_FREQ		5
-+#define SAR_DOVE_CPU_FREQ_MASK		0xf
-+#define SAR_DOVE_L2_RATIO		9
-+#define SAR_DOVE_L2_RATIO_MASK		0x7
-+#define SAR_DOVE_DDR_RATIO		12
-+#define SAR_DOVE_DDR_RATIO_MASK		0xf
-+#define SAR_DOVE_TCLK_FREQ		23
-+#define SAR_DOVE_TCLK_FREQ_MASK		0x3
-+
-+enum { DOVE_CPU_TO_L2, DOVE_CPU_TO_DDR };
-+
-+static const struct coreclk_ratio __initconst dove_coreclk_ratios[] = {
-+	{ .id = DOVE_CPU_TO_L2, .name = "l2clk", },
-+	{ .id = DOVE_CPU_TO_DDR, .name = "ddrclk", }
-+};
-+
-+static const u32 __initconst dove_tclk_freqs[] = {
-+	166666667,
-+	125000000,
-+	0, 0
-+};
-+
-+static u32 __init dove_get_tclk_freq(void __iomem *sar)
-+{
-+	u32 opt = (readl(sar) >> SAR_DOVE_TCLK_FREQ) &
-+		SAR_DOVE_TCLK_FREQ_MASK;
-+	return dove_tclk_freqs[opt];
-+}
-+
-+static const u32 __initconst dove_cpu_freqs[] = {
-+	0, 0, 0, 0, 0,
-+	1000000000,
-+	933333333, 933333333,
-+	800000000, 800000000, 800000000,
-+	1066666667,
-+	666666667,
-+	533333333,
-+	400000000,
-+	333333333
-+};
-+
-+static u32 __init dove_get_cpu_freq(void __iomem *sar)
-+{
-+	u32 opt = (readl(sar) >> SAR_DOVE_CPU_FREQ) &
-+		SAR_DOVE_CPU_FREQ_MASK;
-+	return dove_cpu_freqs[opt];
-+}
-+
-+static const int __initconst dove_cpu_l2_ratios[8][2] = {
-+	{ 1, 1 }, { 0, 1 }, { 1, 2 }, { 0, 1 },
-+	{ 1, 3 }, { 0, 1 }, { 1, 4 }, { 0, 1 }
-+};
-+
-+static const int __initconst dove_cpu_ddr_ratios[16][2] = {
-+	{ 1, 1 }, { 0, 1 }, { 1, 2 }, { 2, 5 },
-+	{ 1, 3 }, { 0, 1 }, { 1, 4 }, { 0, 1 },
-+	{ 1, 5 }, { 0, 1 }, { 1, 6 }, { 0, 1 },
-+	{ 1, 7 }, { 0, 1 }, { 1, 8 }, { 1, 10 }
-+};
-+
-+static void __init dove_get_clk_ratio(
-+	void __iomem *sar, int id, int *mult, int *div)
-+{
-+	switch (id) {
-+	case DOVE_CPU_TO_L2:
-+	{
-+		u32 opt = (readl(sar) >> SAR_DOVE_L2_RATIO) &
-+			SAR_DOVE_L2_RATIO_MASK;
-+		*mult = dove_cpu_l2_ratios[opt][0];
-+		*div = dove_cpu_l2_ratios[opt][1];
-+		break;
-+	}
-+	case DOVE_CPU_TO_DDR:
-+	{
-+		u32 opt = (readl(sar) >> SAR_DOVE_DDR_RATIO) &
-+			SAR_DOVE_DDR_RATIO_MASK;
-+		*mult = dove_cpu_ddr_ratios[opt][0];
-+		*div = dove_cpu_ddr_ratios[opt][1];
-+		break;
-+	}
-+	}
-+}
-+
-+static const struct coreclk_soc_desc dove_coreclks = {
-+	.get_tclk_freq = dove_get_tclk_freq,
-+	.get_cpu_freq = dove_get_cpu_freq,
-+	.get_clk_ratio = dove_get_clk_ratio,
-+	.ratios = dove_coreclk_ratios,
-+	.num_ratios = ARRAY_SIZE(dove_coreclk_ratios),
-+};
-+
-+static void __init dove_coreclk_init(struct device_node *np)
-+{
-+	mvebu_coreclk_setup(np, &dove_coreclks);
-+}
-+CLK_OF_DECLARE(dove_core_clk, "marvell,dove-core-clock", dove_coreclk_init);
-+
-+/*
-+ * Clock Gating Control
-+ */
-+
-+static const struct clk_gating_soc_desc __initconst dove_gating_desc[] = {
-+	{ "usb0", NULL, 0, 0 },
-+	{ "usb1", NULL, 1, 0 },
-+	{ "ge",	"gephy", 2, 0 },
-+	{ "sata", NULL, 3, 0 },
-+	{ "pex0", NULL, 4, 0 },
-+	{ "pex1", NULL, 5, 0 },
-+	{ "sdio0", NULL, 8, 0 },
-+	{ "sdio1", NULL, 9, 0 },
-+	{ "nand", NULL, 10, 0 },
-+	{ "camera", NULL, 11, 0 },
-+	{ "i2s0", NULL, 12, 0 },
-+	{ "i2s1", NULL, 13, 0 },
-+	{ "crypto", NULL, 15, 0 },
-+	{ "ac97", NULL, 21, 0 },
-+	{ "pdma", NULL, 22, 0 },
-+	{ "xor0", NULL, 23, 0 },
-+	{ "xor1", NULL, 24, 0 },
-+	{ "gephy", NULL, 30, 0 },
-+	{ }
-+};
-+
-+static void __init dove_clk_gating_init(struct device_node *np)
-+{
-+	mvebu_clk_gating_setup(np, dove_gating_desc);
-+}
-+CLK_OF_DECLARE(dove_clk_gating, "marvell,dove-gating-clock",
-+	       dove_clk_gating_init);
 -- 
 1.7.10.4
