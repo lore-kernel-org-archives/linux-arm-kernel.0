@@ -1,69 +1,31 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sun, 12 May 2013 16:43:39 +0200
-Subject: [PATCH 5/5] ARM: dts: add SPI/NOR for mx6q{dl}-sabreauto boards
-In-Reply-To: <1368070143-1655-6-git-send-email-b32955@freescale.com>
-References: <1368070143-1655-1-git-send-email-b32955@freescale.com>
- <1368070143-1655-6-git-send-email-b32955@freescale.com>
-Message-ID: <20130512144339.GD31135@pengutronix.de>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sun, 12 May 2013 20:34:56 +0530
+Subject: [PATCH] Cpufreq: Fix incorrect dependecies for ARM SA11xx drivers
+In-Reply-To: <1367756288-13422-1-git-send-email-shc_work@mail.ru>
+References: <1367756288-13422-1-git-send-email-shc_work@mail.ru>
+Message-ID: <CAOh2x=mL-_fm8pxUCJCM1MWQxca2ygJWpDS_OTnOfcLS4ZHC1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 09, 2013 at 11:29:03AM +0800, Huang Shijie wrote:
-> Since the SPI/NOR has pin conflict with the WEIM NOR,
-> we disable the spi/nor by default.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+On Sun, May 5, 2013 at 5:48 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+>
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 > ---
->  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |   32 ++++++++++++++++++++++++++++++
->  1 files changed, 32 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> index 7b561fb..b6b9e56 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> @@ -16,6 +16,38 @@
->  	};
->  };
->  
-> +&ecspi1 {
-> +	fsl,spi-num-chipselects = <1>;
-> +	cs-gpios = <&gpio3 19 0>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_ecspi1_1>;
-> +	status = "disabled";
-> +
-> +	flash: m25p80 at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "st,m25p32";
-> +		spi-max-frequency = <20000000>;
-> +		reg = <0>;
-> +
-> +		partition at 0 {
-> +			label = "U-Boot";
-> +			reg = <0x0 0x40000>;
-> +		};
-> +
-> +		partition at 40000 {
-> +			label = "U-Boot-ENV";
-> +			reg = <0x40000 0x10000>;
-> +			read-only;
-> +		};
-> +
-> +		partition at 50000 {
-> +			label = "Kernel";
-> +			reg = <0x50000 0x3b0000>;
-> +		};
+>  drivers/cpufreq/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+> index a1488f5..534fcb8 100644
+> --- a/drivers/cpufreq/Kconfig
+> +++ b/drivers/cpufreq/Kconfig
+> @@ -47,7 +47,7 @@ config CPU_FREQ_STAT_DETAILS
+>
+>  choice
+>         prompt "Default CPUFreq governor"
+> -       default CPU_FREQ_DEFAULT_GOV_USERSPACE if CPU_FREQ_SA1100 || CPU_FREQ_SA1110
+> +       default CPU_FREQ_DEFAULT_GOV_USERSPACE if ARM_SA1100_CPUFREQ || ARM_SA1110_CPUFREQ
+>         default CPU_FREQ_DEFAULT_GOV_PERFORMANCE
+>         help
+>           This option sets which CPUFreq governor shall be loaded at
 
-I really object to enforcing partition layouts in the devicetree. That's
-clearly usecase specific and should be filled by the bootloader. Having
-no partitions normally is not harmful, but having the wrong layout just
-because we start a mainline devicetree really can be harmful.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
