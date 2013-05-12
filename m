@@ -1,592 +1,94 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun, 12 May 2013 21:23:54 +1200
-Subject: [PATCH] i2c: vt8500: Add support for I2C bus on Wondermedia SoCs
-Message-ID: <1368350634-12654-1-git-send-email-linux@prisktech.co.nz>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 12 May 2013 11:23:18 +0100
+Subject: [RFC PATCH 0/2] ARM: KVM: Moving GIC/timer out of arch/arm
+In-Reply-To: <20130512090359.GE10830@redhat.com>
+References: <1367589773-5609-1-git-send-email-marc.zyngier@arm.com>
+ <CAAhSdy3s+beJRwh_BzsyHTkjeRFaSm4nac1WFRo6oEWYBQNx_g@mail.gmail.com>
+ <5183DDD5.6000202@arm.com> <20130512090359.GE10830@redhat.com>
+Message-ID: <20130512102317.GA58285@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the I2C bus controllers found on Wondermedia
-8xxx-series SoCs. Only master-mode is supported.
+Hi Gleb,
 
-Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
----
- .../devicetree/bindings/i2c/i2c-vt8500.txt         |   24 +
- MAINTAINERS                                        |    1 +
- drivers/i2c/busses/Kconfig                         |   10 +
- drivers/i2c/busses/Makefile                        |    1 +
- drivers/i2c/busses/i2c-wmt.c                       |  488 ++++++++++++++++++++
- 5 files changed, 524 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-vt8500.txt
- create mode 100644 drivers/i2c/busses/i2c-wmt.c
+On Sun, May 12, 2013 at 10:03:59AM +0100, Gleb Natapov wrote:
+> On Fri, May 03, 2013 at 04:55:01PM +0100, Marc Zyngier wrote:
+> > On 03/05/13 16:31, Anup Patel wrote:
+> > > On Fri, May 3, 2013 at 7:32 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > >> As KVM/arm64 is looming on the horizon, it makes sense to move some
+> > >> of the common code to a single location in order to reduce duplication.
+> > >>
+> > >> The code could live anywhere. Actually, most of KVM is already built
+> > >> with a bunch of ugly ../../.. hacks in the various Makefiles, so we're
+> > >> not exactly talking about style here. But maybe it is time to start
+> > >> moving into a less ugly direction.
+> > >>
+> > >> The include files must be in a "public" location, as they are accessed
+> > >> from non-KVM files (arch/arm/kernel/asm-offsets.c).
+> > >>
+> > >> For this purpose, introduce two new locations:
+> > >> - virt/kvm/arm/ : x86 and ia64 already share the ioapic code in
+> > >>   virt/kvm, so this could be seen as a (very ugly) precedent.
+> > >> - include/kvm/  : there is already an include/xen, and while the
+> > >>   intent is slightly different, this seems as good a location as
+> > >>   any
+> > >>
+> > >> Once the code has been moved, it becomes easy to build it in a
+> > >> less hackish way, which makes the code easily reusable by KVM/arm64.
+> > >>
+> > >> Marc Zyngier (2):
+> > >>   ARM: KVM: move GIC/timer code to a common location
+> > >>   ARM: KVM: standalone Makefile for vgic and timers
+> > >>
+> > >>  Makefile                                               | 2 +-
+> > >>  arch/arm/include/asm/kvm_host.h                        | 4 ++--
+> > >>  arch/arm/kvm/Makefile                                  | 5 ++---
+> > >>  {arch/arm/include/asm => include/kvm}/kvm_arch_timer.h | 0
+> > >>  {arch/arm/include/asm => include/kvm}/kvm_vgic.h       | 0
+> > >>  virt/Makefile                                          | 1 +
+> > >>  virt/kvm/Makefile                                      | 1 +
+> > >>  virt/kvm/arm/Makefile                                  | 2 ++
+> > >>  {arch/arm/kvm => virt/kvm/arm}/arch_timer.c            | 4 ++--
+> > >>  {arch/arm/kvm => virt/kvm/arm}/vgic.c                  | 0
+> > >>  10 files changed, 11 insertions(+), 8 deletions(-)
+> > >>  rename {arch/arm/include/asm => include/kvm}/kvm_arch_timer.h (100%)
+> > >>  rename {arch/arm/include/asm => include/kvm}/kvm_vgic.h (100%)
+> > >>  create mode 100644 virt/Makefile
+> > >>  create mode 100644 virt/kvm/Makefile
+> > >>  create mode 100644 virt/kvm/arm/Makefile
+> > >>  rename {arch/arm/kvm => virt/kvm/arm}/arch_timer.c (99%)
+> > >>  rename {arch/arm/kvm => virt/kvm/arm}/vgic.c (100%)
+> > > 
+> > > The source files arch/arm/kvm/arm.c and arch/arm/kvm/mmu.c are also
+> > > shared between KVM ARM and KVM ARM64.
+> > > 
+> > > Can we move these files in virt/arm ?
+> > 
+> > I suggest we start by finding out if there is an agreement on the
+> > location, method and overall usefulness of this particular patch.
+> > 
+> > Moving core ARM code around is quite different from sharing what is
+> > basically device emulation stuff.
+> > 
+> Yes, so the question in this regard: are there any plans to eventually
+> merge arch/arm and arch/arm64 like it happened with arch/i386
+> and arch/x86_64?  Is it even feasible?  Looking at the dark days of
+> i386/x86_64 split there were a lot of ../../i386/ and -Iarch/i386/kernel
+> in arch/x86_64. Isn't there some code, outside of kvm, that can be shared
+> between arm/arm64? How will it be shared?
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-vt8500.txt b/Documentation/devicetree/bindings/i2c/i2c-vt8500.txt
-new file mode 100644
-index 0000000..94a425e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/i2c-vt8500.txt
-@@ -0,0 +1,24 @@
-+* Wondermedia I2C Controller
-+
-+Required properties :
-+
-+ - compatible : should be "wm,wm8505-i2c"
-+ - reg : Offset and length of the register set for the device
-+ - interrupts : <IRQ> where IRQ is the interrupt number
-+ - clocks : phandle to the I2C clock source
-+
-+Optional properties :
-+
-+ - clock-frequency : desired I2C bus clock frequency in Hz.
-+	Valid values are 100000 and 400000.
-+	Default to 100000 if not specified, or invalid value.
-+
-+Example :
-+
-+	i2c_0: i2c at d8280000 {
-+		compatible = "wm,wm8505-i2c";
-+		reg = <0xd8280000 0x1000>;
-+		interrupts = <19>;
-+		clocks = <&clki2c0>;
-+		clock-frequency = <400000>;
-+	};
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 3d7782b..44ea994 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1285,6 +1285,7 @@ S:	Maintained
- F:	arch/arm/mach-vt8500/
- F:	drivers/clocksource/vt8500_timer.c
- F:	drivers/gpio/gpio-vt8500.c
-+F:	drivers/i2c/busses/i2c-wmt.c
- F:	drivers/mmc/host/wmt-sdmmc.c
- F:	drivers/pwm/pwm-vt8500.c
- F:	drivers/rtc/rtc-vt8500.c
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index 631736e..89e7ec2 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -724,6 +724,16 @@ config I2C_VERSATILE
- 	  This driver can also be built as a module.  If so, the module
- 	  will be called i2c-versatile.
- 
-+config I2C_WMT
-+	tristate "Wondermedia WM8xxx SoC I2C bus support"
-+	depends on ARCH_VT8500
-+	help
-+	  Say yes if you want to support the I2C bus on Wondermedia 8xxx-series
-+	  SoCs.
-+
-+	  This driver can also be built as a module. If so, the module will be
-+	  called i2c-wmt.
-+
- config I2C_OCTEON
- 	tristate "Cavium OCTEON I2C bus support"
- 	depends on CPU_CAVIUM_OCTEON
-diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
-index 8f4fc23..3ba94a9 100644
---- a/drivers/i2c/busses/Makefile
-+++ b/drivers/i2c/busses/Makefile
-@@ -71,6 +71,7 @@ obj-$(CONFIG_I2C_SIRF)		+= i2c-sirf.o
- obj-$(CONFIG_I2C_STU300)	+= i2c-stu300.o
- obj-$(CONFIG_I2C_TEGRA)		+= i2c-tegra.o
- obj-$(CONFIG_I2C_VERSATILE)	+= i2c-versatile.o
-+obj-$(CONFIG_I2C_WMT)		+= i2c-wmt.o
- obj-$(CONFIG_I2C_OCTEON)	+= i2c-octeon.o
- obj-$(CONFIG_I2C_XILINX)	+= i2c-xiic.o
- obj-$(CONFIG_I2C_XLR)		+= i2c-xlr.o
-diff --git a/drivers/i2c/busses/i2c-wmt.c b/drivers/i2c/busses/i2c-wmt.c
-new file mode 100644
-index 0000000..5cebb29
---- /dev/null
-+++ b/drivers/i2c/busses/i2c-wmt.c
-@@ -0,0 +1,488 @@
-+/*
-+ *  Wondermedia I2C Master Mode Driver
-+ *
-+ *  Copyright (C) 2012 Tony Prisk <linux@prisktech.co.nz>
-+ *
-+ *  Derived from GPLv2+ licensed source:
-+ *  - Copyright (C) 2008 WonderMedia Technologies, Inc.
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License version 2, or
-+ *  (at your option) any later version. as published by the Free Software
-+ *  Foundation
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/i2c.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_i2c.h>
-+#include <linux/of_irq.h>
-+#include <linux/platform_device.h>
-+
-+#define REG_CR		0x00
-+#define REG_TCR		0x02
-+#define REG_CSR		0x04
-+#define REG_ISR		0x06
-+#define REG_IMR		0x08
-+#define REG_CDR		0x0A
-+#define REG_TR		0x0C
-+#define REG_MCR		0x0E
-+#define REG_SLAVE_CR	0x10
-+#define REG_SLAVE_SR	0x12
-+#define REG_SLAVE_ISR	0x14
-+#define REG_SLAVE_IMR	0x16
-+#define REG_SLAVE_DR	0x18
-+#define REG_SLAVE_TR	0x1A
-+
-+/* REG_CR Bit fields */
-+#define CR_TX_NEXT_ACK		0x0000
-+#define CR_ENABLE		0x0001
-+#define CR_TX_NEXT_NO_ACK	0x0002
-+#define CR_TX_END		0x0004
-+#define CR_CPU_RDY		0x0008
-+#define SLAV_MODE_SEL		0x8000
-+
-+/* REG_TCR Bit fields */
-+#define TCR_STANDARD_MODE	0x0000
-+#define TCR_MASTER_WRITE	0x0000
-+#define TCR_HS_MODE		0x2000
-+#define TCR_MASTER_READ		0x4000
-+#define TCR_FAST_MODE		0x8000
-+#define TCR_SLAVE_ADDR_MASK	0x007F
-+
-+/* REG_ISR Bit fields */
-+#define ISR_NACK_ADDR		0x0001
-+#define ISR_BYTE_END		0x0002
-+#define ISR_SCL_TIMEOUT		0x0004
-+#define ISR_WRITE_ALL		0x0007
-+
-+/* REG_IMR Bit fields */
-+#define IMR_ENABLE_ALL		0x0007
-+
-+/* REG_CSR Bit fields */
-+#define CSR_RCV_NOT_ACK		0x0001
-+#define CSR_RCV_ACK_MASK	0x0001
-+#define CSR_READY_MASK		0x0002
-+
-+/* REG_TR */
-+#define SCL_TIMEOUT(x)		(((x) & 0xFF) << 16)
-+#define TR_STD			0x0064
-+#define TR_HS			0x0019
-+
-+#define I2C_MODE_STANDARD	0
-+#define I2C_MODE_FAST		1
-+
-+struct wmt_i2c_dev {
-+	struct i2c_adapter	adapter;
-+	struct completion	complete;
-+	struct device		*dev;
-+	void __iomem		*base;
-+	struct clk		*clk;
-+	int			mode;
-+	int			irq;
-+	u16			cmd_status;
-+};
-+
-+static int wmt_i2c_wait_bus_not_busy(struct wmt_i2c_dev *i2c_dev)
-+{
-+	u16 val;
-+	int i;
-+	int ret = 0;
-+
-+	for (i = 0; i < 100000; i++) {
-+		val = readw(i2c_dev->base + REG_CSR);
-+		if (val & CSR_READY_MASK)
-+			break;
-+
-+		udelay(1);
-+	}
-+	if (i >= 9999999)
-+		ret = -EBUSY;
-+
-+	return ret;
-+}
-+
-+static int wmt_check_status(struct wmt_i2c_dev *i2c_dev)
-+{
-+	int ret = 0;
-+
-+	if (i2c_dev->cmd_status & ISR_NACK_ADDR)
-+		ret = -EIO;
-+
-+	if (i2c_dev->cmd_status & ISR_SCL_TIMEOUT)
-+		ret = -ETIMEDOUT;
-+
-+	return ret;
-+}
-+
-+static int wmt_i2c_write(struct i2c_adapter *adap, struct i2c_msg *pmsg,
-+						   int restart, int last)
-+{
-+	struct wmt_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
-+	u16 val, tcr_val;
-+	int ret, wait_result;
-+	int xfer_len = 0;
-+
-+	if (!restart) {
-+		ret = wmt_i2c_wait_bus_not_busy(i2c_dev);
-+		if (ret < 0)
-+			return ret;
-+	}
-+
-+	if (pmsg->len == 0) {
-+		/*
-+		 * We still need to run through the while (..) once, so
-+		 * start at -1 and break out early from the loop
-+		 */
-+		xfer_len = -1;
-+		writew(0, i2c_dev->base + REG_CDR);
-+	} else {
-+		writew(pmsg->buf[0] & 0xFF, i2c_dev->base + REG_CDR);
-+	}
-+
-+	if (!restart) {
-+		val = readw(i2c_dev->base + REG_CR);
-+		val &= ~CR_TX_END;
-+		writew(val, i2c_dev->base + REG_CR);
-+
-+		val = readw(i2c_dev->base + REG_CR);
-+		val |= CR_CPU_RDY;
-+		writew(val, i2c_dev->base + REG_CR);
-+	}
-+
-+	init_completion(&i2c_dev->complete);
-+
-+	if (i2c_dev->mode == I2C_MODE_STANDARD)
-+		tcr_val = TCR_STANDARD_MODE;
-+	else
-+		tcr_val = TCR_FAST_MODE;
-+
-+	tcr_val |= (TCR_MASTER_WRITE | (pmsg->addr & TCR_SLAVE_ADDR_MASK));
-+
-+	writew(tcr_val, i2c_dev->base + REG_TCR);
-+
-+	if (restart) {
-+		val = readw(i2c_dev->base + REG_CR);
-+		val |= CR_CPU_RDY;
-+		writew(val, i2c_dev->base + REG_CR);
-+	}
-+
-+	while (xfer_len < pmsg->len) {
-+		wait_result = wait_for_completion_timeout(&i2c_dev->complete,
-+							  500 * HZ / 1000);
-+
-+		if (wait_result == 0)
-+			return -ETIMEDOUT;
-+
-+		ret = wmt_check_status(i2c_dev);
-+		if (ret)
-+			return ret;
-+
-+		xfer_len++;
-+
-+		val = readw(i2c_dev->base + REG_CSR);
-+		if ((val & CSR_RCV_ACK_MASK) == CSR_RCV_NOT_ACK) {
-+			dev_dbg(i2c_dev->dev, "write RCV NACK error\n");
-+			return -EIO;
-+		}
-+
-+		if (pmsg->len == 0) {
-+			val = CR_TX_END | CR_CPU_RDY | CR_ENABLE;
-+			writew(val, i2c_dev->base + REG_CR);
-+			break;
-+		}
-+
-+		if (xfer_len == pmsg->len) {
-+			if (last != 1)
-+				writew(CR_ENABLE, i2c_dev->base + REG_CR);
-+		} else {
-+			writew(pmsg->buf[xfer_len] & 0xFF, i2c_dev->base +
-+								REG_CDR);
-+			writew(CR_CPU_RDY | CR_ENABLE, i2c_dev->base + REG_CR);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int wmt_i2c_read(struct i2c_adapter *adap, struct i2c_msg *pmsg,
-+						  int restart, int last)
-+{
-+	struct wmt_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
-+	u16 val, tcr_val;
-+	int ret, wait_result;
-+	u32 xfer_len = 0;
-+
-+	if (!restart) {
-+		ret = wmt_i2c_wait_bus_not_busy(i2c_dev);
-+		if (ret < 0)
-+			return ret;
-+	}
-+
-+	val = readw(i2c_dev->base + REG_CR);
-+	val &= ~CR_TX_END;
-+	writew(val, i2c_dev->base + REG_CR);
-+
-+	val = readw(i2c_dev->base + REG_CR);
-+	val &= ~CR_TX_NEXT_NO_ACK;
-+	writew(val, i2c_dev->base + REG_CR);
-+
-+	if (!restart) {
-+		val = readw(i2c_dev->base + REG_CR);
-+		val |= CR_CPU_RDY;
-+		writew(val, i2c_dev->base + REG_CR);
-+	}
-+
-+	if (pmsg->len == 1) {
-+		val = readw(i2c_dev->base + REG_CR);
-+		val |= CR_TX_NEXT_NO_ACK;
-+		writew(val, i2c_dev->base + REG_CR);
-+	}
-+
-+	init_completion(&i2c_dev->complete);
-+
-+	if (i2c_dev->mode == I2C_MODE_STANDARD)
-+		tcr_val = TCR_STANDARD_MODE;
-+	else
-+		tcr_val = TCR_FAST_MODE;
-+
-+	tcr_val |= TCR_MASTER_READ | (pmsg->addr & TCR_SLAVE_ADDR_MASK);
-+
-+	writew(tcr_val, i2c_dev->base + REG_TCR);
-+
-+	if (restart) {
-+		val = readw(i2c_dev->base + REG_CR);
-+		val |= CR_CPU_RDY;
-+		writew(val, i2c_dev->base + REG_CR);
-+	}
-+
-+	while (xfer_len < pmsg->len) {
-+		wait_result = wait_for_completion_timeout(&i2c_dev->complete,
-+							  500 * HZ / 1000);
-+
-+		if (!wait_result)
-+			return -ETIMEDOUT;
-+
-+		ret = wmt_check_status(i2c_dev);
-+		if (ret)
-+			return ret;
-+
-+		pmsg->buf[xfer_len] = readw(i2c_dev->base + REG_CDR) >> 8;
-+		xfer_len++;
-+
-+		if (xfer_len == pmsg->len - 1) {
-+			val = readw(i2c_dev->base + REG_CR);
-+			val |= (CR_TX_NEXT_NO_ACK | CR_CPU_RDY);
-+			writew(val, i2c_dev->base + REG_CR);
-+		} else {
-+			val = readw(i2c_dev->base + REG_CR);
-+			val |= CR_CPU_RDY;
-+			writew(val, i2c_dev->base + REG_CR);
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int wmt_i2c_xfer(struct i2c_adapter *adap,
-+			struct i2c_msg msgs[],
-+			int num)
-+{
-+	struct i2c_msg *pmsg;
-+	int i, is_last, restart;
-+	int ret = 0;
-+
-+	for (i = 0; ret >= 0 && i < num; i++) {
-+		is_last = ((i + 1) == num);
-+		restart = (i != 0);
-+
-+		pmsg = &msgs[i];
-+		if (pmsg->flags & I2C_M_NOSTART)
-+			restart = 1;
-+		if (pmsg->flags & I2C_M_RD)
-+			ret = wmt_i2c_read(adap, pmsg, restart, is_last);
-+		else
-+			ret = wmt_i2c_write(adap, pmsg, restart, is_last);
-+	}
-+
-+	return (ret < 0) ? ret : i;
-+}
-+
-+static u32 wmt_i2c_func(struct i2c_adapter *adap)
-+{
-+	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL | I2C_FUNC_NOSTART;
-+}
-+
-+static const struct i2c_algorithm wmt_i2c_algo = {
-+	.master_xfer	= wmt_i2c_xfer,
-+	.functionality	= wmt_i2c_func,
-+};
-+
-+static irqreturn_t wmt_i2c_isr(int irq, void *data)
-+{
-+	struct wmt_i2c_dev *i2c_dev = data;
-+
-+	/* save the status and write-clear it */
-+	i2c_dev->cmd_status = readw(i2c_dev->base + REG_ISR);
-+	writew(i2c_dev->cmd_status, i2c_dev->base + REG_ISR);
-+
-+	complete(&i2c_dev->complete);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int wmt_i2c_reset_hardware(struct wmt_i2c_dev *i2c_dev)
-+{
-+	int err;
-+
-+	err = clk_prepare_enable(i2c_dev->clk);
-+	if (err) {
-+		dev_err(i2c_dev->dev, "failed to enable clock\n");
-+		return err;
-+	}
-+
-+	err = clk_set_rate(i2c_dev->clk, 20000000);
-+	if (err) {
-+		dev_err(i2c_dev->dev, "failed to set clock = 20Mhz\n");
-+		return err;
-+	}
-+
-+	writew(0, i2c_dev->base + REG_CR);
-+	writew(12, i2c_dev->base + REG_MCR);
-+	writew(ISR_WRITE_ALL, i2c_dev->base + REG_ISR);
-+	writew(IMR_ENABLE_ALL, i2c_dev->base + REG_IMR);
-+	writew(CR_ENABLE, i2c_dev->base + REG_CR);
-+	readw(i2c_dev->base + REG_CSR);		/* read clear */
-+	writew(ISR_WRITE_ALL, i2c_dev->base + REG_ISR);
-+
-+	if (i2c_dev->mode == I2C_MODE_STANDARD)
-+		writew(SCL_TIMEOUT(128) | TR_STD, i2c_dev->base + REG_TR);
-+	else
-+		writew(SCL_TIMEOUT(128) | TR_HS, i2c_dev->base + REG_TR);
-+
-+	return 0;
-+}
-+
-+static int wmt_i2c_probe(struct platform_device *pdev)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	struct wmt_i2c_dev *i2c_dev;
-+	struct i2c_adapter *adap;
-+	struct resource *res;
-+	int err;
-+	u32 clk_rate;
-+
-+	if (!np) {
-+		dev_err(&pdev->dev, "device node not found\n");
-+		return -ENODEV;
-+	}
-+
-+	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
-+	if (!i2c_dev) {
-+		dev_err(&pdev->dev, "device memory allocation failed\n");
-+		return -ENOMEM;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	i2c_dev->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(i2c_dev->base))
-+		return PTR_ERR(i2c_dev->base);
-+
-+	i2c_dev->irq = irq_of_parse_and_map(np, 0);
-+	if (!i2c_dev->irq) {
-+		dev_err(&pdev->dev, "irq missing or invalid\n");
-+		return -EINVAL;
-+	}
-+
-+	i2c_dev->clk = of_clk_get(np, 0);
-+	if (IS_ERR(i2c_dev->clk)) {
-+		dev_err(&pdev->dev, "unable to request clock\n");
-+		return PTR_ERR(i2c_dev->clk);
-+	}
-+
-+	i2c_dev->mode = I2C_MODE_STANDARD;
-+	err = of_property_read_u32(np, "clock-frequency", &clk_rate);
-+	if ((!err) && (clk_rate == 400000))
-+		i2c_dev->mode = I2C_MODE_FAST;
-+
-+	i2c_dev->dev = &pdev->dev;
-+
-+	err = devm_request_irq(&pdev->dev, i2c_dev->irq, wmt_i2c_isr, 0,
-+							"i2c", i2c_dev);
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to request irq %i\n", i2c_dev->irq);
-+		return err;
-+	}
-+
-+	adap = &i2c_dev->adapter;
-+	i2c_set_adapdata(adap, i2c_dev);
-+	strlcpy(adap->name, "WMT I2C adapter", sizeof(adap->name));
-+	adap->owner = THIS_MODULE;
-+	adap->class = I2C_CLASS_HWMON;
-+	adap->algo = &wmt_i2c_algo;
-+	adap->dev.parent = &pdev->dev;
-+	adap->dev.of_node = pdev->dev.of_node;
-+	adap->nr = of_alias_get_id(pdev->dev.of_node, "i2c");
-+
-+	err = wmt_i2c_reset_hardware(i2c_dev);
-+	if (err) {
-+		dev_err(&pdev->dev, "error initializing hardware\n");
-+		return err;
-+	}
-+
-+	if (adap->nr < 0)
-+		err = i2c_add_adapter(adap);
-+	else
-+		err = i2c_add_numbered_adapter(adap);
-+
-+	if (err) {
-+		dev_err(&pdev->dev, "failed to add adapter\n");
-+		return err;
-+	}
-+
-+	platform_set_drvdata(pdev, i2c_dev);
-+
-+	of_i2c_register_devices(adap);
-+
-+	return 0;
-+}
-+
-+static int wmt_i2c_remove(struct platform_device *pdev)
-+{
-+	struct wmt_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
-+
-+	/* Disable interrupts, clock and delete adapter */
-+	writew(0, i2c_dev->base + REG_IMR);
-+	clk_disable_unprepare(i2c_dev->clk);
-+	i2c_del_adapter(&i2c_dev->adapter);
-+
-+	return 0;
-+}
-+
-+static struct of_device_id wmt_i2c_dt_ids[] = {
-+	{ .compatible = "wm,wm8505-i2c" },
-+	{ /* Sentinel */ },
-+};
-+
-+static struct platform_driver wmt_i2c_driver = {
-+	.probe		= wmt_i2c_probe,
-+	.remove		= wmt_i2c_remove,
-+	.driver		= {
-+		.name	= "wmt-i2c",
-+		.owner	= THIS_MODULE,
-+		.of_match_table = wmt_i2c_dt_ids,
-+	},
-+};
-+
-+module_platform_driver(wmt_i2c_driver);
-+
-+MODULE_DESCRIPTION("Wondermedia I2C master-mode bus adapter");
-+MODULE_AUTHOR("Tony Prisk <linux@prisktech.co.nz>");
-+MODULE_LICENSE("GPL v2");
-+MODULE_DEVICE_TABLE(of, wmt_i2c_dt_ids);
+There are similarities between arm and arm64 (especially since the arm64
+port started as a fork of arm) and few other bits that could be shared
+but the benefits of a clean port outweigh a bit of code duplication.
+Most of the SoC support is now going into drivers, so it's pretty much
+architecture code left under arch/arm64.
+
+KVM is the first to make references to ../arm/ from arm64 and I don't
+see an easy solution (and I wouldn't like to see common arm/arm64 code
+under the top kvm directory either, apart form device emulation). Of
+course, a lot of the code like page table maintenance, mapping/unmapping
+ranges is pretty generic and could be shared with other architectures
+(e.g. x86) but it's not a trivial task.
+
 -- 
-1.7.9.5
+Catalin
