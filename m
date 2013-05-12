@@ -1,22 +1,73 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 11 May 2013 16:12:57 -0700 (PDT)
-Subject: [PATCH] net: fec: enable hardware checksum only on imx6q-fec
-In-Reply-To: <1368083302-12516-1-git-send-email-shawn.guo@linaro.org>
-References: <1368083302-12516-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130511.161257.1222305719812815291.davem@davemloft.net>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Sat, 11 May 2013 19:49:20 -0700
+Subject: [PATCH -v10 09/11] arm,
+ prepare reboot_mode for moving to	generic kernel code.
+In-Reply-To: <20130511191051.GE18614@n2100.arm.linux.org.uk>
+References: <1368273447-11958-1-git-send-email-holt@sgi.com>
+ <1368273447-11958-10-git-send-email-holt@sgi.com>
+ <20130511130457.GD18614@n2100.arm.linux.org.uk>
+ <588ed084-fed7-4bd9-bcd7-a32f40bd404a@email.android.com>
+ <20130511191051.GE18614@n2100.arm.linux.org.uk>
+Message-ID: <6ea66d50-a577-4e08-b315-c7a332144f1d@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shawn Guo <shawn.guo@linaro.org>
-Date: Thu, 9 May 2013 15:08:22 +0800
+Sorry.  Yoga programming meaning reversing the arguments to ==.
 
-> Commit 4c09eed (net: fec: Enable imx6 enet checksum acceleration.)
-> enables hardware checksum acceleration unconditionally for all fec
-> variants.  This is inappropriate, because some variants like imx5 have
-> no such support on hardware.  Consequently, fec is broken on these
-> platforms.  Fix it by enabling hardware checksum only on imx6q-fec type
-> of controllers.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Applied.
+>Please, stop this idiotic incomprehensible jargon.
+>
+>On Sat, May 11, 2013 at 08:47:28AM -0700, H. Peter Anvin wrote:
+>> By the way, do we really need Yoda programming here?
+>> 
+>> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+>> 
+>> >On Sat, May 11, 2013 at 06:57:25AM -0500, Robin Holt wrote:
+>> >> This patch prepares for the moving the parsing of reboot= to the
+>> >generic
+>> >> kernel code by making reboot_mode into a more generic form.
+>> >> 
+>> >> Signed-off-by: Robin Holt <holt@sgi.com>
+>> >> To: Andrew Morton <akpm@linux-foundation.org>
+>> >> To: Russell King <linux@arm.linux.org.uk>
+>> >> Cc: Russ Anderson <rja@sgi.com>
+>> >> Cc: Robin Holt <holt@sgi.com>
+>> >> Cc: H. Peter Anvin <hpa@zytor.com>
+>> >> Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+>> >> Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+>> >> Cc: the arch/x86 maintainers <x86@kernel.org>
+>> >> Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
+>> >
+>> >Almost-but-not-quite-Acked-by: Russell King
+>> ><rmk+kernel@arm.linux.org.uk> :)
+>> >
+>> >> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+>> >> index f219703..92b47df 100644
+>> >> --- a/arch/arm/kernel/process.c
+>> >> +++ b/arch/arm/kernel/process.c
+>> >> @@ -174,14 +174,14 @@ void arch_cpu_idle(void)
+>> >>  		default_idle();
+>> >>  }
+>> >>  
+>> >> -static char reboot_mode = 'h';
+>> >> +enum reboot_mode reboot_mode = REBOOT_HARD;
+>> >>  
+>> >> -int __init reboot_setup(char *str)
+>> >> +static int __init reboot_setup(char *str)
+>> >>  {
+>> >> -	reboot_mode = str[0];
+>> >> +	if ('s' == str[0])
+>> >> +		reboot_mode = REBOOT_SOFT;
+>> >
+>> >Remember we talked about the 'gpio' mode as well, so you also need
+>here
+>> >+	if ('g' == str[0])
+>> >		reboot_mode = REBOOT_GPIO;
+>> 
+>> -- 
+>> Sent from my mobile phone. Please excuse brevity and lack of
+>formatting.
+
+-- 
+Sent from my mobile phone. Please excuse brevity and lack of formatting.
