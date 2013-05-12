@@ -1,49 +1,69 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 12 May 2013 18:33:44 +0400
-Subject: [PATCH RFC] clk: Introduce userspace clock driver
-In-Reply-To: <7e18bed3-ae6b-4aa0-bf23-b6c61ba8b85b@CO9EHSMHS030.ehs.local>
-References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
- <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
- <20130510212422.GY3200@sirena.org.uk>
- <7e18bed3-ae6b-4aa0-bf23-b6c61ba8b85b@CO9EHSMHS030.ehs.local>
-Message-ID: <20130512143344.GC3200@sirena.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sun, 12 May 2013 16:43:39 +0200
+Subject: [PATCH 5/5] ARM: dts: add SPI/NOR for mx6q{dl}-sabreauto boards
+In-Reply-To: <1368070143-1655-6-git-send-email-b32955@freescale.com>
+References: <1368070143-1655-1-git-send-email-b32955@freescale.com>
+ <1368070143-1655-6-git-send-email-b32955@freescale.com>
+Message-ID: <20130512144339.GD31135@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 11, 2013 at 09:54:22AM -0700, S?ren Brinkmann wrote:
-> On Fri, May 10, 2013 at 10:24:22PM +0100, Mark Brown wrote:
+On Thu, May 09, 2013 at 11:29:03AM +0800, Huang Shijie wrote:
+> Since the SPI/NOR has pin conflict with the WEIM NOR,
+> we disable the spi/nor by default.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |   32 ++++++++++++++++++++++++++++++
+>  1 files changed, 32 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> index 7b561fb..b6b9e56 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> @@ -16,6 +16,38 @@
+>  	};
+>  };
+>  
+> +&ecspi1 {
+> +	fsl,spi-num-chipselects = <1>;
+> +	cs-gpios = <&gpio3 19 0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi1_1>;
+> +	status = "disabled";
+> +
+> +	flash: m25p80 at 0 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "st,m25p32";
+> +		spi-max-frequency = <20000000>;
+> +		reg = <0>;
+> +
+> +		partition at 0 {
+> +			label = "U-Boot";
+> +			reg = <0x0 0x40000>;
+> +		};
+> +
+> +		partition at 40000 {
+> +			label = "U-Boot-ENV";
+> +			reg = <0x40000 0x10000>;
+> +			read-only;
+> +		};
+> +
+> +		partition at 50000 {
+> +			label = "Kernel";
+> +			reg = <0x50000 0x3b0000>;
+> +		};
 
-> > For your use case should these things be exposed by the FPGA device
-> > asking for that rather than by having the clocks available separately?
-> > Or is this part of the DT blob that's loaded incrementally along with
-> > the FPGA (which does make things more interesting of course...).
+I really object to enforcing partition layouts in the devicetree. That's
+clearly usecase specific and should be filled by the bootloader. Having
+no partitions normally is not harmful, but having the wrong layout just
+because we start a mainline devicetree really can be harmful.
 
-> Here may be some misunderstanding.
-> The clocks are not in the FPGA. The clocks are always there and part of
-> the processing system (PS), they are just routed to the FPGA where they
-> can be used as clocks for the FPGA design.
+Sascha
 
-No, there's no confusion here - the clocks that are being exposed to
-userspace are the clocks which enter the FPGA.  The driver or whatever
-that understands the FPGA can do what is needed to control them,
-including routing them on to subdevices it instantiates or exposing them
-to userspace.
-
-> > > +		clk_disable_unprepare(pdata->clk);
-> > 
-> > > +	if (ret)
-> > > +		return -EBUSY;
-> > 
-> > Why not pass back the actual error?
-
-> Good question. Was there some spec saying, that these sysfs callbacks
-> should return this error? Otherwise this will be fixed.
-
-Not to my knowledge.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130512/e5bcf26c/attachment.sig>
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
