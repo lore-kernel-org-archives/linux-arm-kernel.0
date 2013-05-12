@@ -1,31 +1,46 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Sun, 12 May 2013 20:34:56 +0530
-Subject: [PATCH] Cpufreq: Fix incorrect dependecies for ARM SA11xx drivers
-In-Reply-To: <1367756288-13422-1-git-send-email-shc_work@mail.ru>
-References: <1367756288-13422-1-git-send-email-shc_work@mail.ru>
-Message-ID: <CAOh2x=mL-_fm8pxUCJCM1MWQxca2ygJWpDS_OTnOfcLS4ZHC1g@mail.gmail.com>
+Date: Sun, 12 May 2013 20:40:21 +0530
+Subject: [RFC 19/42] drivers/pinctrl/spear: don't check resource with
+ devm_ioremap_resource
+In-Reply-To: <1368173847-5661-20-git-send-email-wsa@the-dreams.de>
+References: <1368173847-5661-1-git-send-email-wsa@the-dreams.de>
+ <1368173847-5661-20-git-send-email-wsa@the-dreams.de>
+Message-ID: <CAOh2x=koaTpBCKqXUtzzx6HbENfTT=mhZvr03LT_QYbiGKgrmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 5, 2013 at 5:48 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+On Fri, May 10, 2013 at 1:47 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
+> devm_ioremap_resource does sanity checks on the given resource. No need to
+> duplicate this in the driver.
 >
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 > ---
->  drivers/cpufreq/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/pinctrl/spear/pinctrl-plgpio.c |    7 +------
+>  1 file changed, 1 insertion(+), 6 deletions(-)
 >
-> diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
-> index a1488f5..534fcb8 100644
-> --- a/drivers/cpufreq/Kconfig
-> +++ b/drivers/cpufreq/Kconfig
-> @@ -47,7 +47,7 @@ config CPU_FREQ_STAT_DETAILS
+> diff --git a/drivers/pinctrl/spear/pinctrl-plgpio.c b/drivers/pinctrl/spear/pinctrl-plgpio.c
+> index 3e5a887..6b090be 100644
+> --- a/drivers/pinctrl/spear/pinctrl-plgpio.c
+> +++ b/drivers/pinctrl/spear/pinctrl-plgpio.c
+> @@ -528,18 +528,13 @@ static int plgpio_probe(struct platform_device *pdev)
+>         struct resource *res;
+>         int ret, irq, i;
 >
->  choice
->         prompt "Default CPUFreq governor"
-> -       default CPU_FREQ_DEFAULT_GOV_USERSPACE if CPU_FREQ_SA1100 || CPU_FREQ_SA1110
-> +       default CPU_FREQ_DEFAULT_GOV_USERSPACE if ARM_SA1100_CPUFREQ || ARM_SA1110_CPUFREQ
->         default CPU_FREQ_DEFAULT_GOV_PERFORMANCE
->         help
->           This option sets which CPUFreq governor shall be loaded at
+> -       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -       if (!res) {
+> -               dev_err(&pdev->dev, "invalid IORESOURCE_MEM\n");
+> -               return -EBUSY;
+> -       }
+> -
+>         plgpio = devm_kzalloc(&pdev->dev, sizeof(*plgpio), GFP_KERNEL);
+>         if (!plgpio) {
+>                 dev_err(&pdev->dev, "memory allocation fail\n");
+>                 return -ENOMEM;
+>         }
+>
+> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>         plgpio->base = devm_ioremap_resource(&pdev->dev, res);
+>         if (IS_ERR(plgpio->base))
+>                 return PTR_ERR(plgpio->base);
 
 Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
