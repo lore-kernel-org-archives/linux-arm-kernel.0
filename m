@@ -1,38 +1,45 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Sun, 12 May 2013 11:58:55 -0700
-Subject: [PATCH] ARM: KVM: Handle loads from I/O addresses to PC
-Message-ID: <1368385135-60584-1-git-send-email-cdall@cs.columbia.edu>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Sun, 12 May 2013 12:05:04 -0700
+Subject: [PATCH RFC] clk: Introduce userspace clock driver
+In-Reply-To: <20130512143344.GC3200@sirena.org.uk>
+References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
+ <20130510212422.GY3200@sirena.org.uk>
+ <7e18bed3-ae6b-4aa0-bf23-b6c61ba8b85b@CO9EHSMHS030.ehs.local>
+ <20130512143344.GC3200@sirena.org.uk>
+Message-ID: <9e55c552-ce34-4663-9a57-bf2c626d7d58@TX2EHSMHS008.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a VM does something like this:
+On Sun, May 12, 2013 at 06:33:44PM +0400, Mark Brown wrote:
+> On Sat, May 11, 2013 at 09:54:22AM -0700, S?ren Brinkmann wrote:
+> > On Fri, May 10, 2013 at 10:24:22PM +0100, Mark Brown wrote:
+> 
+> > > For your use case should these things be exposed by the FPGA device
+> > > asking for that rather than by having the clocks available separately?
+> > > Or is this part of the DT blob that's loaded incrementally along with
+> > > the FPGA (which does make things more interesting of course...).
+> 
+> > Here may be some misunderstanding.
+> > The clocks are not in the FPGA. The clocks are always there and part of
+> > the processing system (PS), they are just routed to the FPGA where they
+> > can be used as clocks for the FPGA design.
+> 
+> No, there's no confusion here - the clocks that are being exposed to
+> userspace are the clocks which enter the FPGA.  The driver or whatever
+> that understands the FPGA can do what is needed to control them,
+> including routing them on to subdevices it instantiates or exposing them
+> to userspace.
+Such a driver does not exist in general.
+For some IP cores, Linux drivers do exist and then
+they are supposed to directly use the CCF, IMHO, no need to expose
+things to userspace in that case.
+I'm trying to cover cases, in which there is no driver available/needed for
+the FPGA design, other than some simple clock controls.
 
-ldr     pc, [r0]        @ r0 is an I/O address
+As simple example, if you wrote your own HW blinken lights design, you
+wouldn't have nor need a Linux driver for it, but if you used these
+clocks as inputs you could change the blinking speed by adjusting the
+frequency.
 
-Then simply let that value load into the PC on kvm_handle_mmio_return
-overwriting the PC value set from kvm_skip_instr.
-
-Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
----
- arch/arm/kvm/mmio.c |    6 ------
- 1 file changed, 6 deletions(-)
-
-diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-index 72a12f2..b8e06b7 100644
---- a/arch/arm/kvm/mmio.c
-+++ b/arch/arm/kvm/mmio.c
-@@ -86,12 +86,6 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
- 	sign_extend = kvm_vcpu_dabt_issext(vcpu);
- 	rt = kvm_vcpu_dabt_get_rd(vcpu);
- 
--	if (kvm_vcpu_reg_is_pc(vcpu, rt)) {
--		/* IO memory trying to read/write pc */
--		kvm_inject_pabt(vcpu, kvm_vcpu_get_hfar(vcpu));
--		return 1;
--	}
--
- 	mmio->is_write = is_write;
- 	mmio->phys_addr = fault_ipa;
- 	mmio->len = len;
--- 
-1.7.9.5
+	S?ren
