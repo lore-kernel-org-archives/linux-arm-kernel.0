@@ -1,34 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 12 May 2013 16:14:19 +0200
-Subject: [patch 8/8] irqchip: sun4i: Convert to generic irq chip
-In-Reply-To: <518FA24D.80203@free-electrons.com>
-References: <20130503212258.385818955@linutronix.de>
- <20130506142348.321859745@linutronix.de>
- <20130506142539.523110430@linutronix.de> <518FA24D.80203@free-electrons.com>
-Message-ID: <518FA3BB.7060806@free-electrons.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 12 May 2013 22:21:44 +0800
+Subject: [PATCH 5/5] ARM: dts: add SPI/NOR for mx6q{dl}-sabreauto boards
+In-Reply-To: <1368070143-1655-6-git-send-email-b32955@freescale.com>
+References: <1368070143-1655-1-git-send-email-b32955@freescale.com>
+ <1368070143-1655-6-git-send-email-b32955@freescale.com>
+Message-ID: <20130512142142.GA4648@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/05/2013 16:08, Maxime Ripard a ?crit :
-> Hi Thomas,
+On Thu, May 09, 2013 at 11:29:03AM +0800, Huang Shijie wrote:
+> Since the SPI/NOR has pin conflict with the WEIM NOR,
+> we disable the spi/nor by default.
 > 
-> Le 06/05/2013 16:30, Thomas Gleixner a ?crit :
->> Proof of concept patch to demonstrate the new irqdomain support for
->> the generic irq chip. Untested !!
->>
->> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |   32 ++++++++++++++++++++++++++++++
+>  1 files changed, 32 insertions(+), 0 deletions(-)
 > 
-> I just tested it, and with the minor patch I sent, it's working fine.
-> 
-> You can add my
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> index 7b561fb..b6b9e56 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> @@ -16,6 +16,38 @@
+>  	};
+>  };
+>  
+> +&ecspi1 {
+> +	fsl,spi-num-chipselects = <1>;
+> +	cs-gpios = <&gpio3 19 0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi1_1>;
+> +	status = "disabled";
 
-After addressing the comments RobH already made that is.
+I added a comment to it as below, and applied patch #2~5.
 
-Maxime
+	status = "disabled"; /* pin conflict with WEIM NOR */
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Shawn
