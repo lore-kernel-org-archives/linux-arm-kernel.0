@@ -1,37 +1,279 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 13 May 2013 22:44:43 +0400
-Subject: [PATCH RFC] clk: Introduce userspace clock driver
-In-Reply-To: <51912EE2.6040909@gmail.com>
-References: <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
- <20130510212422.GY3200@sirena.org.uk>
- <7e18bed3-ae6b-4aa0-bf23-b6c61ba8b85b@CO9EHSMHS030.ehs.local>
- <20130512143344.GC3200@sirena.org.uk>
- <9e55c552-ce34-4663-9a57-bf2c626d7d58@TX2EHSMHS008.ehs.local>
- <20130513052135.GD6836@sirena.org.uk>
- <0bf5a185-86f7-4a93-a90f-42caefb06a1d@TX2EHSMHS009.ehs.local>
- <519112F9.2010102@gmail.com> <20130513181625.GB14811@sirena.org.uk>
- <51912EE2.6040909@gmail.com>
-Message-ID: <20130513184443.GC14811@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 13 May 2013 21:05:00 +0200
+Subject: [RFC 2/8] ARM:global_timer: Add ARM global timer support.
+In-Reply-To: <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <CACRpkdZCP=w=4Q3bnuMQxm=Oe-uZke+Cc5NgddM5vsQbgr9E-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 08:20:18PM +0200, Sebastian Hesselbarth wrote:
-> On 05/13/13 20:16, Mark Brown wrote:
+On Wed, May 8, 2013 at 4:11 PM, Srinivas KANDAGATLA
+<srinivas.kandagatla@st.com> wrote:
 
-> >Yup, that's part of it.  Though I have to say that if all we can do is
-> >stuff a bitstream in there there is the question about how anything that
-> >does require a real driver gets that driver instantiated...
+Thomas Gleixner and John Stultz should always be included on timer code review.
 
-> Back when I played with Zynq, I remember looking at CONFIG_DYNAMIC_OF
-> discussions. ;)
+This is one reason I really like to move the clocksource/clockevent/etc code out
+of arch/arm, so that people can get their To: line right from MAINTAINERS.
+(Whether it goes to drivers/clocksource or not is another issue.)
 
-Which then goes back to the whole idea of this being a device - and
-possibly that this should be done as part of representing UIO in DT
-rather than anything else.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130513/dcfd88d6/attachment-0001.sig>
+> diff --git a/arch/arm/include/asm/global_timer.h b/arch/arm/include/asm/global_timer.h
+
+Using CLKSRC_OF_INIT() this header goes away entirely I guess.
+
+> diff --git a/arch/arm/kernel/global_timer.c b/arch/arm/kernel/global_timer.c
+
+> +#define GT_COUNTER0    0x00
+> +#define GT_COUNTER1    0x04
+
+So two counters, nice.
+
+> +union gt_counter {
+> +       cycle_t cycles;
+> +       struct {
+> +               uint32_t lower;
+> +               uint32_t upper;
+
+Just u32 is fine.
+
+> +       };
+> +};
+> +
+> +static union gt_counter gt_counter_read(void)
+> +{
+> +       union gt_counter res;
+> +       uint32_t upper;
+
+u32
+
+> +
+> +       upper = readl(gt_base + GT_COUNTER1);
+> +       do {
+> +               res.upper = upper;
+> +               res.lower = readl(gt_base + GT_COUNTER0);
+> +               upper = readl(gt_base + GT_COUNTER1);
+> +       } while (upper != res.upper);
+> +
+> +       return res;
+> +}
+
+I guess this is some cleverness to avoid wrap-around...
+A comment stating what's going on wouldn't hurt.
+
+But why on earth do you need this complicated union
+to hold the result? Have two local u32 variables and return
+a u64 from this function.
+
+Since this will be performance critical, isn't readl_relaxed() suffient
+here, or what's the rationale for just using readl()?
+
+> +static void gt_compare_set(unsigned long delta, int periodic)
+> +{
+> +       union gt_counter counter = gt_counter_read();
+
+So here you get something easy to read like
+
+u64 counter = gt_counter_read();
+
+> +       unsigned long ctrl = readl(gt_base + GT_CONTROL);
+> +
+> +       BUG_ON(!(ctrl & GT_CONTROL_TIMER_ENABLE));
+> +       BUG_ON(ctrl & (GT_CONTROL_COMP_ENABLE |
+> +                      GT_CONTROL_IRQ_ENABLE |
+> +                      GT_CONTROL_AUTO_INC));
+
+Do you really have to check this *whenever the counter is set*?
+
+Will it not suffice to do this once during initialization?
+
+It looks like some leftover debug code. It also looks kind of clock
+dangerous, can you explain exactly why this check is here?
+
+> +
+> +       counter.cycles += delta;
+> +       writel(counter.lower, gt_base + GT_COMP0);
+> +       writel(counter.upper, gt_base + GT_COMP1);
+
+This is another instance of the union struct making things
+complicated. With a u64 just:
+
+counter += delta;
+writel(lower_32_bits(counter), gt_base + GT_COMP0);
+writel(upper_32_bits(counter), gt_base + GT_COMP1);
+
+As you can see <linux/kernel.h> has really nice helpers in place
+to deal with 64 bit arithmetics.
+
+> +
+> +       ctrl |= GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE;
+> +
+> +       if (periodic) {
+> +               writel(delta, gt_base + GT_AUTO_INC);
+> +               ctrl |= GT_CONTROL_AUTO_INC;
+> +       }
+> +
+> +       writel(ctrl, gt_base + GT_CONTROL);
+> +}
+> +
+> +static void gt_clockevent_set_mode(enum clock_event_mode mode,
+> +                                  struct clock_event_device *clk)
+> +{
+> +       switch (mode) {
+> +       case CLOCK_EVT_MODE_PERIODIC:
+> +               gt_compare_set(gt_clk_rate/HZ, 1);
+
+Use
+gt_compare_set(DIV_ROUND_CLOSEST(gt_clk_rate, HZ), 1);
+to get integer arithmetics right.
+
+> +               break;
+> +       case CLOCK_EVT_MODE_ONESHOT:
+> +               /* period set, and timer enabled in 'next_event' hook */
+> +               BUG_ON(readl(gt_base + GT_CONTROL) &
+> +                      (GT_CONTROL_COMP_ENABLE |
+> +                       GT_CONTROL_IRQ_ENABLE |
+> +                       GT_CONTROL_AUTO_INC));
+
+Here is another one of these checks. Why aren't you just
+zeroing these flags if you don't want them, especially since
+you're writing the register at the end of the function? Now it
+looks like instead of setting up the timer the way you want it
+you bug out if it isn't already set up as you want it (hint,
+the name of this function).
+
+> +               /* Fall through */
+> +       case CLOCK_EVT_MODE_UNUSED:
+> +       case CLOCK_EVT_MODE_SHUTDOWN:
+> +       default:
+> +               writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+
+Why are you enabling the timer in unused and shutdown mode?
+
+This doesn't make sense.
+
+> +               break;
+> +       }
+> +}
+> +
+> +static int gt_clockevent_set_next_event(unsigned long evt,
+> +                                       struct clock_event_device *unused)
+> +{
+> +       gt_compare_set(evt, 0);
+> +       return 0;
+> +}
+> +
+> +static irqreturn_t gt_clockevent_interrupt(int irq, void *dev_id)
+> +{
+> +       struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
+> +
+> +       writel(GT_INT_STATUS_EVENT_FLAG, gt_base + GT_INT_STATUS);
+
+You're clearing the flag before checking if it was set. What happens
+if this was a spurious interrupt that should be disregarded?
+
+> +       evt->event_handler(evt);
+> +
+> +       return IRQ_HANDLED;
+> +}
+> +
+> +static int __cpuinit gt_clockevents_init(struct clock_event_device *clk)
+> +{
+> +       struct clock_event_device **this_cpu_clk;
+> +       int cpu = smp_processor_id();
+> +
+> +       clk->name = "Global Timer CE";
+
+Name it after the hardware feature. "ARM global timer clock event"
+there is no need to abbreviate randomly.
+
+> +       clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+> +       clk->set_mode = gt_clockevent_set_mode;
+> +       clk->set_next_event = gt_clockevent_set_next_event;
+> +       this_cpu_clk = __this_cpu_ptr(gt_evt);
+> +       *this_cpu_clk = clk;
+> +       clk->irq = gt_ppi;
+> +       clockevents_config_and_register(clk, gt_clk_rate,
+> +                                       0xf, 0xffffffff);
+
+Why can't this clock event handle anything lower than 0xf?
+Does that come from the datasheet or have you just copied some
+code?
+
+Further, since this clock event hardware *most definately* supports
+using a delta upper bound *beyond* 32 bits, I think the clock event
+core code should be altered to allow for registereing such clock
+events, but TGLX may have some idea here. This will work but will
+not expose the full potential of this 64-bit counter hardware.
+
+> +       per_cpu(percpu_init_called, cpu) = true;
+> +       enable_percpu_irq(clk->irq, IRQ_TYPE_NONE);
+> +       return 0;
+> +}
+> +
+> +static void gt_clockevents_stop(struct clock_event_device *clk)
+> +{
+> +       gt_clockevent_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
+> +       disable_percpu_irq(clk->irq);
+> +}
+> +
+> +static int __cpuinit gt_clockevents_setup(struct clock_event_device *clk)
+> +{
+> +       int cpu = smp_processor_id();
+> +
+> +       /* Use existing clock_event for boot cpu */
+> +       if (per_cpu(percpu_init_called, cpu))
+> +               return 0;
+> +
+> +       writel(0, gt_base + GT_CONTROL);
+> +       writel(0, gt_base + GT_COUNTER0);
+> +       writel(0, gt_base + GT_COUNTER1);
+> +       writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+> +
+> +       return gt_clockevents_init(clk);
+> +}
+> +
+> +static cycle_t gt_clocksource_read(struct clocksource *cs)
+> +{
+> +       union gt_counter res = gt_counter_read();
+> +       return res.cycles;
+> +}
+> +
+> +static struct clocksource gt_clocksource = {
+> +       .name   = "Global Timer CS",
+
+"ARM global timer clock source"
+
+> +       .rating = 300,
+> +       .read   = gt_clocksource_read,
+> +       .mask   = CLOCKSOURCE_MASK(64),
+> +       .flags  = CLOCK_SOURCE_IS_CONTINUOUS,
+> +};
+> +
+> +static void __init gt_clocksource_init(void)
+> +{
+> +       writel(0, gt_base + GT_CONTROL);
+> +       writel(0, gt_base + GT_COUNTER0);
+> +       writel(0, gt_base + GT_COUNTER1);
+> +       writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+> +
+> +       gt_clocksource.shift = 20;
+
+So how did you come up with that?
+
+> +       gt_clocksource.mult =
+> +               clocksource_hz2mult(gt_clk_rate, gt_clocksource.shift);
+> +       clocksource_register(&gt_clocksource);
+
+Why don't you just replace all of this hazzle with:
+
+clocksource_register_hz(&gt_clocksource, gt_clk_rate);
+
+That will calculate mult and shift for you? (Leave these
+unassigned.)
+
+Since the hpet timer does this it's pretty well tested...
+
+No more comments right now...
+
+Yours,
+Linus Walleij
