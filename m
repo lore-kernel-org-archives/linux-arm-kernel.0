@@ -1,70 +1,50 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 13 May 2013 10:24:33 -0700
-Subject: [PATCH RFC] clk: Introduce userspace clock driver
-In-Reply-To: <519112F9.2010102@gmail.com>
-References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
- <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
- <20130510212422.GY3200@sirena.org.uk>
- <7e18bed3-ae6b-4aa0-bf23-b6c61ba8b85b@CO9EHSMHS030.ehs.local>
- <20130512143344.GC3200@sirena.org.uk>
- <9e55c552-ce34-4663-9a57-bf2c626d7d58@TX2EHSMHS008.ehs.local>
- <20130513052135.GD6836@sirena.org.uk>
- <0bf5a185-86f7-4a93-a90f-42caefb06a1d@TX2EHSMHS009.ehs.local>
- <519112F9.2010102@gmail.com>
-Message-ID: <7c5e7537-6ed5-4622-a7a9-bf46820ef695@VA3EHSMHS033.ehs.local>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 13 May 2013 13:30:17 -0400
+Subject: [PATCH 0/3] ARM: Kirkwood: Add DT support for (eSATA) Sheevaplug
+In-Reply-To: <1366660500-26835-1-git-send-email-gmbnomis@gmail.com>
+References: <1366660500-26835-1-git-send-email-gmbnomis@gmail.com>
+Message-ID: <20130513173017.GV31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 06:21:13PM +0200, Sebastian Hesselbarth wrote:
-> On 05/13/13 18:09, S?ren Brinkmann wrote:
-> >On Mon, May 13, 2013 at 09:21:35AM +0400, Mark Brown wrote:
-> >>On Sun, May 12, 2013 at 12:05:04PM -0700, S?ren Brinkmann wrote:
-> >>>On Sun, May 12, 2013 at 06:33:44PM +0400, Mark Brown wrote:
-> >>>>No, there's no confusion here - the clocks that are being exposed to
-> >>>>userspace are the clocks which enter the FPGA.  The driver or whatever
-> >>>>that understands the FPGA can do what is needed to control them,
-> >>>>including routing them on to subdevices it instantiates or exposing them
-> >>>>to userspace.
-> >>
-> >>>Such a driver does not exist in general.
-> >>>For some IP cores, Linux drivers do exist and then
-> >>>they are supposed to directly use the CCF, IMHO, no need to expose
-> >>>things to userspace in that case.
-> >>>I'm trying to cover cases, in which there is no driver available/needed for
-> >>>the FPGA design, other than some simple clock controls.
-> >>
-> >>You're not understanding the point here.  If you've got a
-> >>reprogrammmable FPGA you at least need some way to get the FPGA image in
-> >>there.  This driver is presumably responsible for instantiating whatever
-> >>is needed to control what is on the FPGA, that could include punting the
-> >>clocks to userspace if that's sane.
-> >Well, that driver actually exists. But that just programs a bitstream
-> >you give it to program. It does not know anything about the design it
-> >programs and cannot make any kind of decision whether the clocks should
-> >be userspace controlled or not.
+On Mon, Apr 22, 2013 at 09:54:57PM +0200, Simon Baatz wrote:
+> These patches add DT support for the Sheevaplugs by Globalscale
+> Technologies.  There exists two versions, one with an eSATA port and
+> one without.
 > 
-> Soeren,
+> Surprisingly, the conversion was not straight forward. In the eSATA
+> version (board revision 1.3), the CD and WP pins are connected to GPIO
+> lines, but I could not get this to work.  Apparently, I am not the only
+> one ([1]).  I found that the pins are reversed on my hardware and use
+> different active low/active high settings.
 > 
-> what Mark wants to point out is that you add fabric clocks to the Xilinx
-> driver instead. This way, you will have user-space controllable clocks
-> but only if you loaded the xilinx driver first.
-What "Xilinx driver", are we talking about?
+> Thus, the first patch adds support for the GPIO active low/high flag in
+> DT to the mvsdio driver.
+> 
+> With that, everything except the Gigabit Ethernet can be described in
+> the DTS.  I have split the DTS and the board support files into two
+> patches.  This way, we can drop the last patch once we can describe
+> everything in the DTS or we can squash them together if we don't want
+> to wait.
+> 
+> I could only test on an eSATA Sheevaplug. I found patches with
+> different LEDs for the Sheevaplug.  Thus, I would highly appreciate if
+> someone with the hardware could give this a spin on a non-eSATA
+> version.  Some additional testing of the change detect and write
+> protect behaviour for sdio can't hurt either.  I hope that there aren't
+> board revisions with different CD/WP pins out there.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/062567.html
+> 
+> Simon Baatz (3):
+>   mmc: mvsdio: Support inverted CD and WP GPIO lines
+>   ARM: Kirkwood: Add dts files for Sheevaplug and eSATA Sheevaplug
+>   ARM: Kirkwood: Add DT support for Sheevaplug and Sheevaplug eSATA
 
-> 
-> IIRC the fabric clock controller provided by Zynq _is_ always there and
-> accessible from ARM CPUs. You just don't have a new generic driver
-> allowing to poke with all clocks, but a xilinx only driver allowing you
-> to set the (xilinx only) fabric clocks.
-Right.
+Simon,
 
-> 
-> I've played with Zynq a while ago, did Xilinx mainline the bitfile
-> driver already? If not, why don't you give it a shot?
-The device config driver is not in mainline, AFAIK. And I think it's in
-rather bad shape and needs a lot of work before it is upstreamable. But
-this is probably the right place to put this.
-On the other hand, currently this driver is only required for
-programming the FPGA from Linux, which is not required. One of the
-bootloaders could do this for you earlier.
+Were you able to find any time to work on this?
 
-	S?ren
+thx,
+
+Jason.
