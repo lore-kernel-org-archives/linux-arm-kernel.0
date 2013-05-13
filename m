@@ -1,44 +1,26 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 13 May 2013 17:53:37 +0200
-Subject: [PATCH 09/14] ARM: mvebu: Remove init_irq declaration in machine
- description
-In-Reply-To: <20130513151934.GM31290@titan.lakedaemon.net>
-References: <1368438253-28218-1-git-send-email-maxime.ripard@free-electrons.com>
- <1368438253-28218-10-git-send-email-maxime.ripard@free-electrons.com>
- <20130513151934.GM31290@titan.lakedaemon.net>
-Message-ID: <51910C81.5050501@free-electrons.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 13 May 2013 11:59:51 -0400
+Subject: [PATCHv1 0/5] Marvell EBU irqchip improvements
+In-Reply-To: <20130415194825.GT28693@titan.lakedaemon.net>
+References: <1365542778-27959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130415194825.GT28693@titan.lakedaemon.net>
+Message-ID: <20130513155951.GN31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-Le 13/05/2013 17:19, Jason Cooper a ?crit :
-> On Mon, May 13, 2013 at 11:44:08AM +0200, Maxime Ripard wrote:
->> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
->> specified") removed the need to explictly setup the init_irq field in
->> the machine description when using only irqchip_init. Remove that
->> declaration for mvebu as well.
->>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  arch/arm/mach-mvebu/armada-370-xp.c | 1 -
->>  1 file changed, 1 deletion(-)
+On Mon, Apr 15, 2013 at 03:48:25PM -0400, Jason Cooper wrote:
+> On Tue, Apr 09, 2013 at 11:26:13PM +0200, Thomas Petazzoni wrote:
+...
+> > Thomas Petazzoni (5):
+...
+> >   ARM: mvebu: do not duplicate the mpic alias
 > 
-> Maxime,
-> 
-> Do do want the individual submaintainers to take these?  Or, send one
-> branch to Arnd and Olof?  I'm fine with either one as any merge
-> conflicts should be trivial.
+> I already sent the PR for LPAE, which will conflict with this.  I'll add
+> this to mvebu/fixes once v3.9 drops.
 
-I don't have a strong opinion on this one, I guess both will be fine.
-Arnd, Olof, what do you prefer?
+Obviously, I meant v3.10-rc1.  mvebu-next/fixes is now mvebu/fixes,
+rebased onto v3.10-rc1.  This patch is included.
 
-I'll probably have to send a v2 anyway, I forgot to remove the include
-of the irqchip headers.
+thx,
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jason.
