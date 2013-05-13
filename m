@@ -1,44 +1,74 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 13 May 2013 12:45:36 -0400
-Subject: [PATCH] Kirkwood: Enable PCIe port 1 on QNAP TS-11x/TS-21x
-In-Reply-To: <20130429180338.GE16725@lunn.ch>
-References: <20130421152802.GA1408@jirafa.cyrius.com>
- <20130421154704.GV2824@lunn.ch>
- <20130421161400.GD26943@jirafa.cyrius.com>
- <20130429173022.GS32497@titan.lakedaemon.net>
- <20130429180338.GE16725@lunn.ch>
-Message-ID: <20130513164536.GS31290@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 13 May 2013 10:46:27 -0600
+Subject: [PATCH 1/6] ARM: tegra20: create a DT header defining CLK IDs
+In-Reply-To: <1368443225-16978-2-git-send-email-hdoyu@nvidia.com>
+References: <1368443225-16978-1-git-send-email-hdoyu@nvidia.com>
+ <1368443225-16978-2-git-send-email-hdoyu@nvidia.com>
+Message-ID: <519118E3.4060907@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 29, 2013 at 08:03:38PM +0200, Andrew Lunn wrote:
-> On Mon, Apr 29, 2013 at 01:30:22PM -0400, Jason Cooper wrote:
-> > On Sun, Apr 21, 2013 at 05:14:00PM +0100, Martin Michlmayr wrote:
-> > > Enable KW_PCIE1 on QNAP TS-11x/TS-21x devices as newer revisions
-> > > (rev 1.3) have a USB 3.0 chip from Etron on PCIe port 1.  Thanks
-> > > to Marek Vasut for identifying this issue!
-> > > 
-> > > Cc: <stable@kernel.org>
-> > > Signed-off-by: Martin Michlmayr <tbm@cyrius.com>
-> > > Tested-by: Marek Vasut <marex@denx.de>
-> > 
-> > Applied to mvebu-next/fixes.  This branch will be rebased onto v3.10-rc1
-> > once it drops.  I'll submit a pull request then.
-> > 
-> > fyi: looks like this can be applied to stable all the way back to
-> > v2.6.36.x, updated stable tag accordingly.
+On 05/13/2013 05:07 AM, Hiroshi Doyu wrote:
+> To replace magic number in tegra_car:
 > 
-> Hi Jason
-> 
-> Once we have v3.10-rc1 with the DT PCI patches, i will also make an
-> update to them to enable both PCI ports where available.
-> 
-> We should also change the kirkwood_defconfig to enable the PCI USB
-> 3.0. driver. I can do that as well.
+> -               clocks = <&tegra_car 28>;
+> +               clocks = <&tegra_car CLK_HOST1X>;
 
-Do you have these ready to post?  No rush, just didn't want to see it
-fall off the table...
+I'd like slightly more description of the change here. What about:
 
-thx,
+=====
+Create a header file to define the clock IDs used by the Tegra20 clock
+binding. Remove the list of definitions from the binding documentation,
+and refer the reader to the header file.
 
-Jason.
+This will allow the same header to be used by both device tree files,
+and drivers implementing this binding, which guarantees that the two
+stay in sync. This also makes device trees more readable by using names
+instead of magic numbers.
+=====
+
+I'm not sure exactly how these patches will get merged. For you
+reference, I anticipate one of two things happening:
+
+1)
+
+* Patches 1, 3, 5 get put into a topic branch, and merged into both the
+clk tree and the Tegra tree.
+
+* Patches 2, 4, 6 get merged into the Tegra tree.
+
+* The patches you're going to create for the drivers/clk code get merged
+into Mike's clk tree
+
+2)
+
+* Mike ack's the patches you're going to create for the drivers/clk code.
+
+* Everything gets merged through the Tegra tree.
+
+This shouldn't impact you much, but just be aware that the drivers/clk
+changes you create shouldn't depend on anything beyond patches 1, 3, 5
+here and 3.10-rc1, then I can work out the merging with Mike without any
+constraints.
+
+> diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra20-car.txt
+
+>  This binding uses the common clock binding:
+>  Documentation/devicetree/bindings/clock/clock-bindings.txt
+>  
+> +You can find the actual assignment in "dt-bindings/clk/tegra20-car.h"
+
+Can you move this text down into the description of clock-cells, i.e.
+where you removed the original list of IDs? That'll keep the text in the
+place it's most useful. I would also like to explicitly mention "include
+file" and use <> rather than "", since that matches the syntax that
+should be used in .dts files, i.e.:
+
+=====
+ - #clock-cells : Should be 1.
+   In clock consumers, this cell represents the clock ID exposed by the
+   CAR. The assignments may be found in header file
+   <dt-bindings/clk/tegra20-car.h>.
+=====
+
+Similar comments for patches 3 and 5.
