@@ -1,92 +1,73 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 14 May 2013 00:35:20 +0200
-Subject: [PATCH 3/3] ARM: mach-shmobile: lager: support GPIO switches
-In-Reply-To: <1368435233-8587-4-git-send-email-horms+renesas@verge.net.au>
-References: <1368435233-8587-1-git-send-email-horms+renesas@verge.net.au>
- <1368435233-8587-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <9256981.LFpgU8cctr@avalon>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Mon, 13 May 2013 18:37:40 -0400 (EDT)
+Subject: [PATCH] bcache: Fix link errors on ARM
+In-Reply-To: <5175C06B.4020805@gmail.com>
+References: <5170B4C6.1030300@gmail.com>
+ <Pine.LNX.4.64.1304221318350.22065@file.rdu.redhat.com>
+ <5175C06B.4020805@gmail.com>
+Message-ID: <Pine.LNX.4.64.1305131831110.32345@file.rdu.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
 
-Thank you for the patch.
 
-On Monday 13 May 2013 17:53:53 Simon Horman wrote:
-> The lager board has pins 1 - 4 of SW2 wired up to GPIO pins.
-> This patch allows access to those pins as KEYS 1 - 4 using
-> gpio-keys.
-> 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> ---
-> 
-> This patch has run time dependencies on
-> 1. "gpio-rcar: Add support for IRQ_TYPE_EDGE_BOTH"
-> 2. "ARM: shmobile: r8a7790: Configure R-Car GPIO for IRQ_TYPE_EDGE_BOTH"
-> 
-> Without those dependencies satisfied the gpio-keys driver will
-> fail to be initialise itself. The boot should be otherwise successful
-> and the board otherwise functional.
-> ---
->  arch/arm/mach-shmobile/board-lager.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/arch/arm/mach-shmobile/board-lager.c
-> b/arch/arm/mach-shmobile/board-lager.c index 6a1ba38..4d1b42b 100644
-> --- a/arch/arm/mach-shmobile/board-lager.c
-> +++ b/arch/arm/mach-shmobile/board-lager.c
-> @@ -18,7 +18,10 @@
->   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 
-> USA */
-> 
-> +#include <linux/gpio.h>
-> +#include <linux/gpio_keys.h>
->  #include <linux/interrupt.h>
-> +#include <linux/input.h>
+On Mon, 22 Apr 2013, Rob Herring wrote:
 
-My dictionary lists input before interrupt :-)
-
->  #include <linux/irqchip.h>
->  #include <linux/kernel.h>
->  #include <linux/leds.h>
-> @@ -52,6 +55,22 @@ static struct gpio_led_platform_data lager_leds_pdata = {
-> .num_leds	= ARRAY_SIZE(lager_leds),
->  };
+> On 04/22/2013 12:32 PM, Mikulas Patocka wrote:
+> > 
+> > 
+> > On Thu, 18 Apr 2013, Rob Herring wrote:
+> > 
+> >> Current errors in linux-next for ARM multi-platform randconfig builds.
+> >>
+> >> Rob
+> >>
+> >> drivers/built-in.o:drivers/md/dm-cache-target.c:429: more undefined references to `__udivdi3' follow
+> >> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/md/dm-cache-target.c:429: undefined reference to `__udivdi3'
+> >> /var/lib/jenkins/jobs/linux-randconfig/workspace/drivers/md/dm-cache-target.c:429: undefined reference to `__umoddi3'
+> >> driversdrivers/md/dm-cache-target.c:429: more undefined references to `__udivdi3' follow
+> >> drivers/md/dm-cache-target.c:429: undefined reference to `__udivdi3'
+> >> drivers/md/dm-cache-target.c:429: undefined reference to `__umoddi3'
+> > 
+> > Hi
+> > 
+> > I tried to cross-compile dm-cache on linux-next for arm and there were no 
+> > failures and no references to __udivdi3 and __umoddi3.
+> > 
+> > Please send the .config file that resulted in these faulures.
 > 
-> +/* GPIO KEY */
-> +#define GPIO_KEY(c, g, d, ...) \
-> +	{ .code = c, .gpio = g, .desc = d, .active_low = 1 }
-> +
-> +static struct gpio_keys_button gpio_buttons[] = {
-> +	GPIO_KEY(KEY_4,		RCAR_GP_PIN(1, 28),	"SW2-pin4"),
-> +	GPIO_KEY(KEY_3,		RCAR_GP_PIN(1, 26),	"SW2-pin3"),
-> +	GPIO_KEY(KEY_2,		RCAR_GP_PIN(1, 24),	"SW2-pin2"),
-> +	GPIO_KEY(KEY_1,		RCAR_GP_PIN(1, 14),	"SW2-pin1"),
-> +};
-> +
-> +static struct gpio_keys_platform_data lager_keys_pdata = {
-> +	.buttons	= gpio_buttons,
-> +	.nbuttons	= ARRAY_SIZE(gpio_buttons),
-> +};
-> +
-
-Could you please also update the lager dts file ?
-
->  static const struct pinctrl_map lager_pinctrl_map[] = {
->  	/* SCIF0 (CN19: DEBUG SERIAL0) */
->  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
-> @@ -73,6 +92,9 @@ static void __init lager_add_standard_devices(void)
->  	platform_device_register_data(&platform_bus, "leds-gpio", -1,
->  				      &lager_leds_pdata,
->  				      sizeof(lager_leds_pdata));
-> +	platform_device_register_data(&platform_bus, "gpio-keys", -1,
-> +				      &lager_keys_pdata,
-> +				      sizeof(lager_keys_pdata));
->  }
+> The config is attached. My guess is it might be related to CONFIG_AEABI
+> not set. The compiler is "gcc version 4.6.3 (Ubuntu/Linaro
+> 4.6.3-1ubuntu5)" which is ubuntu 12.04 arm cross compiler.
 > 
->  static const char *lager_boards_compat_dt[] __initdata = {
--- 
-Regards,
+> Rob
 
-Laurent Pinchart
+This is a problem in gcc-4.6. (gcc-4.7 is OK).
+
+---
+
+bcache: Fix link errors on ARM
+
+gcc-4.6 on ARM has some problem, it creates a function block_div.part.8,
+it references __udivdi3 and __umoddi3 and it is never called. The
+references to __udivdi3 and __umoddi3 cause a link failure.
+
+__always_inline works around the bug.
+
+Signed-off-by: Mikulas Patocka <mpatocka@redhat.com>
+
+Index: linux-2.6/drivers/md/dm-cache-target.c
+===================================================================
+--- linux-2.6.orig/drivers/md/dm-cache-target.c	2013-05-14 00:03:53.276986022 +0200
++++ linux-2.6/drivers/md/dm-cache-target.c	2013-05-14 00:34:09.128986023 +0200
+@@ -425,6 +425,10 @@
+ 	return cache->sectors_per_block_shift >= 0;
+ }
+ 
++/* gcc on ARM generates spurious references to __udivdi3 and __umoddi3 */
++#if defined(CONFIG_ARM) && __GNUC__ == 4 && __GNUC_MINOR__ <= 6
++__always_inline
++#endif
+ static dm_block_t block_div(dm_block_t b, uint32_t n)
+ {
+ 	do_div(b, n);
