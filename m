@@ -1,40 +1,83 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 13 May 2013 10:18:31 +0100
-Subject: [PATCH] ARM: KVM: Handle loads from I/O addresses to PC
-In-Reply-To: <1368385135-60584-1-git-send-email-cdall@cs.columbia.edu>
-References: <1368385135-60584-1-git-send-email-cdall@cs.columbia.edu>
-Message-ID: <20130513091830.GA18242@darko.cambridge.arm.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Mon, 13 May 2013 18:21:12 +0900
+Subject: Introduce a new helper framework for buffer synchronization
+In-Reply-To: <51909DB4.2060208@canonical.com>
+References: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
+ <51909DB4.2060208@canonical.com>
+Message-ID: <025201ce4fbb$363d0390$a2b70ab0$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 12, 2013 at 07:58:55PM +0100, Christoffer Dall wrote:
-> If a VM does something like this:
-> 
-> ldr     pc, [r0]        @ r0 is an I/O address
-> 
-> Then simply let that value load into the PC on kvm_handle_mmio_return
-> overwriting the PC value set from kvm_skip_instr.
-> 
-> Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
-> ---
->  arch/arm/kvm/mmio.c |    6 ------
->  1 file changed, 6 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-> index 72a12f2..b8e06b7 100644
-> --- a/arch/arm/kvm/mmio.c
-> +++ b/arch/arm/kvm/mmio.c
-> @@ -86,12 +86,6 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	sign_extend = kvm_vcpu_dabt_issext(vcpu);
->  	rt = kvm_vcpu_dabt_get_rd(vcpu);
->  
-> -	if (kvm_vcpu_reg_is_pc(vcpu, rt)) {
-> -		/* IO memory trying to read/write pc */
-> -		kvm_inject_pabt(vcpu, kvm_vcpu_get_hfar(vcpu));
-> -		return 1;
 
-I haven't checked Marc's patch yet but I would get rid of
-kvm_vcpu_reg_is_pc() as well, that's the only place where it is used.
 
--- 
-Catalin
+> -----Original Message-----
+> From: Maarten Lankhorst [mailto:maarten.lankhorst at canonical.com]
+> Sent: Monday, May 13, 2013 5:01 PM
+> To: Inki Dae
+> Cc: Rob Clark; Daniel Vetter; DRI mailing list; linux-arm-
+> kernel at lists.infradead.org; linux-media at vger.kernel.org; linux-fbdev;
+> Kyungmin Park; myungjoo.ham; YoungJun Cho
+> Subject: Re: Introduce a new helper framework for buffer synchronization
+> 
+> Op 09-05-13 09:33, Inki Dae schreef:
+> > Hi all,
+> >
+> > This post introduces a new helper framework based on dma fence. And the
+> > purpose of this post is to collect other opinions and advices before RFC
+> > posting.
+> >
+> > First of all, this helper framework, called fence helper, is in progress
+> > yet so might not have enough comments in codes and also might need to be
+> > more cleaned up. Moreover, we might be missing some parts of the dma
+> fence.
+> > However, I'd like to say that all things mentioned below has been tested
+> > with Linux platform and worked well.
+> 
+> > ....
+> >
+> > And tutorial for user process.
+> >         just before cpu access
+> >                 struct dma_buf_fence *df;
+> >
+> >                 df->type = DMA_BUF_ACCESS_READ or DMA_BUF_ACCESS_WRITE;
+> >                 ioctl(fd, DMA_BUF_GET_FENCE, &df);
+> >
+> >         after memset or memcpy
+> >                 ioctl(fd, DMA_BUF_PUT_FENCE, &df);
+> NAK.
+> 
+> Userspace doesn't need to trigger fences. It can do a buffer idle wait,
+> and postpone submitting new commands until after it's done using the
+> buffer.
+
+Hi Maarten,
+
+It seems that you say user should wait for a buffer like KDS does: KDS uses
+select() to postpone submitting new commands. But I think this way assumes
+that every data flows a DMA device to a CPU. For example, a CPU should keep
+polling for the completion of a buffer access by a DMA device. This means
+that the this way isn't considered for data flow to opposite case; CPU to
+DMA device.
+
+> Kernel space doesn't need the root hole you created by giving a
+> dereferencing a pointer passed from userspace.
+> Your next exercise should be to write a security exploit from the api you
+> created here. It's the only way to learn how to write safe code. Hint:
+> df.ctx = mmap(..);
+> 
+
+Also I'm not clear to use our way yet and that is why I posted. As you
+mentioned, it seems like that using mmap() is more safe. But there is one
+issue it makes me confusing. For your hint, df.ctx = mmap(..), the issue is
+that dmabuf mmap can be used to map a dmabuf with user space. And the dmabuf
+means a physical memory region allocated by some allocator such as drm gem
+or ion.
+
+There might be my missing point so could you please give me more comments?
+
+Thanks,
+Inki Dae
+
+
+
+> ~Maarten
