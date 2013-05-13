@@ -1,199 +1,169 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 13 May 2013 12:26:11 -0700
-Subject: [PATCHv6 07/11] ARM: PRIMA2: Divorce timer-marco from local timer API
+Date: Mon, 13 May 2013 12:26:10 -0700
+Subject: [PATCHv6 06/11] ARM: EXYNOS4: Divorce mct from local timer API
 In-Reply-To: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
 References: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1368473175-4841-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1368473175-4841-7-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the marco local timers from the local timer API. This
-will allow us to remove ARM local timer support in the near future
-and gets us closer to moving this driver to drivers/clocksource.
+Separate the mct local timers from the local timer API. This will
+allow us to remove ARM local timer support in the near future and
+gets us closer to moving this driver to drivers/clocksource.
 
-Cc: Barry Song <baohua.song@csr.com>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Thomas Abraham <thomas.abraham@linaro.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clocksource/timer-marco.c | 100 ++++++++++++++++++++------------------
- 1 file changed, 54 insertions(+), 46 deletions(-)
+ drivers/clocksource/exynos_mct.c | 60 ++++++++++++++++++++++++++++------------
+ 1 file changed, 43 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-marco.c
-index 97738db..ba97bc1 100644
---- a/drivers/clocksource/timer-marco.c
-+++ b/drivers/clocksource/timer-marco.c
-@@ -10,6 +10,7 @@
- #include <linux/interrupt.h>
- #include <linux/clockchips.h>
- #include <linux/clocksource.h>
-+#include <linux/cpu.h>
- #include <linux/bitops.h>
- #include <linux/irq.h>
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 662fcc0..1c3f5a6 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -16,6 +16,7 @@
+ #include <linux/err.h>
  #include <linux/clk.h>
-@@ -18,7 +19,6 @@
- #include <linux/of_irq.h>
+ #include <linux/clockchips.h>
++#include <linux/cpu.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+ #include <linux/percpu.h>
+@@ -24,7 +25,6 @@
  #include <linux/of_address.h>
- #include <asm/sched_clock.h>
+ #include <linux/clocksource.h>
+ 
 -#include <asm/localtimer.h>
  #include <asm/mach/time.h>
  
- #define SIRFSOC_TIMER_32COUNTER_0_CTRL			0x0000
-@@ -151,13 +151,7 @@ static void sirfsoc_clocksource_resume(struct clocksource *cs)
- 		BIT(1) | BIT(0), sirfsoc_timer_base + SIRFSOC_TIMER_64COUNTER_CTRL);
- }
+ #define EXYNOS4_MCTREG(x)		(x)
+@@ -80,7 +80,7 @@ static unsigned int mct_int_type;
+ static int mct_irqs[MCT_NR_IRQS];
  
--static struct clock_event_device sirfsoc_clockevent = {
--	.name = "sirfsoc_clockevent",
--	.rating = 200,
--	.features = CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode = sirfsoc_timer_set_mode,
--	.set_next_event = sirfsoc_timer_set_next_event,
--};
-+static struct clock_event_device __percpu *sirfsoc_clockevent;
- 
- static struct clocksource sirfsoc_clocksource = {
- 	.name = "sirfsoc_clocksource",
-@@ -173,11 +167,8 @@ static struct irqaction sirfsoc_timer_irq = {
- 	.name = "sirfsoc_timer0",
- 	.flags = IRQF_TIMER | IRQF_NOBALANCING,
- 	.handler = sirfsoc_timer_interrupt,
--	.dev_id = &sirfsoc_clockevent,
+ struct mct_clock_event_device {
+-	struct clock_event_device *evt;
++	struct clock_event_device evt;
+ 	unsigned long base;
+ 	char name[10];
  };
+@@ -295,8 +295,6 @@ static void exynos4_clockevent_init(void)
+ 	setup_irq(mct_irqs[MCT_G0_IRQ], &mct_comp_event_irq);
+ }
  
 -#ifdef CONFIG_LOCAL_TIMERS
 -
- static struct irqaction sirfsoc_timer1_irq = {
- 	.name = "sirfsoc_timer1",
- 	.flags = IRQF_TIMER | IRQF_NOBALANCING,
-@@ -186,56 +177,77 @@ static struct irqaction sirfsoc_timer1_irq = {
+ static DEFINE_PER_CPU(struct mct_clock_event_device, percpu_mct_tick);
  
- static int __cpuinit sirfsoc_local_timer_setup(struct clock_event_device *ce)
+ /* Clock event handling */
+@@ -369,7 +367,7 @@ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
+ 
+ static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
  {
--	/* Use existing clock_event for cpu 0 */
--	if (!smp_processor_id())
--		return 0;
-+	int cpu = smp_processor_id();
-+	struct irqaction *action;
-+
-+	if (cpu == 0)
-+		action = &sirfsoc_timer_irq;
-+	else
-+		action = &sirfsoc_timer1_irq;
+-	struct clock_event_device *evt = mevt->evt;
++	struct clock_event_device *evt = &mevt->evt;
  
--	ce->irq = sirfsoc_timer1_irq.irq;
-+	ce->irq = action->irq;
- 	ce->name = "local_timer";
--	ce->features = sirfsoc_clockevent.features;
--	ce->rating = sirfsoc_clockevent.rating;
-+	ce->features = CLOCK_EVT_FEAT_ONESHOT;
-+	ce->rating = 200;
- 	ce->set_mode = sirfsoc_timer_set_mode;
- 	ce->set_next_event = sirfsoc_timer_set_next_event;
--	ce->shift = sirfsoc_clockevent.shift;
--	ce->mult = sirfsoc_clockevent.mult;
--	ce->max_delta_ns = sirfsoc_clockevent.max_delta_ns;
--	ce->min_delta_ns = sirfsoc_clockevent.min_delta_ns;
-+	clockevents_calc_mult_shift(ce, CLOCK_TICK_RATE, 60);
-+	ce->max_delta_ns = clockevent_delta2ns(-2, ce);
-+	ce->min_delta_ns = clockevent_delta2ns(2, ce);
-+	ce->cpumask = cpumask_of(cpu);
+ 	/*
+ 	 * This is for supporting oneshot mode.
+@@ -391,7 +389,7 @@ static int exynos4_mct_tick_clear(struct mct_clock_event_device *mevt)
+ static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
+ {
+ 	struct mct_clock_event_device *mevt = dev_id;
+-	struct clock_event_device *evt = mevt->evt;
++	struct clock_event_device *evt = &mevt->evt;
  
--	sirfsoc_timer1_irq.dev_id = ce;
--	BUG_ON(setup_irq(ce->irq, &sirfsoc_timer1_irq));
--	irq_set_affinity(sirfsoc_timer1_irq.irq, cpumask_of(1));
-+	action->dev_id = ce;
-+	BUG_ON(setup_irq(ce->irq, action));
-+	irq_set_affinity(action->irq, cpumask_of(cpu));
+ 	exynos4_mct_tick_clear(mevt);
  
- 	clockevents_register_device(ce);
+@@ -417,8 +415,7 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	struct mct_clock_event_device *mevt;
+ 	unsigned int cpu = smp_processor_id();
+ 
+-	mevt = this_cpu_ptr(&percpu_mct_tick);
+-	mevt->evt = evt;
++	mevt = container_of(evt, struct mct_clock_event_device, evt);
+ 
+ 	mevt->base = EXYNOS4_MCT_L_BASE(cpu);
+ 	sprintf(mevt->name, "mct_tick%d", cpu);
+@@ -452,7 +449,7 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
  	return 0;
  }
  
--static void sirfsoc_local_timer_stop(struct clock_event_device *ce)
-+static void __cpuinit sirfsoc_local_timer_stop(struct clock_event_device *ce)
+-static void exynos4_local_timer_stop(struct clock_event_device *evt)
++static void __cpuinit exynos4_local_timer_stop(struct clock_event_device *evt)
  {
-+	int cpu = smp_processor_id();
-+
- 	sirfsoc_timer_count_disable(1);
- 
--	remove_irq(sirfsoc_timer1_irq.irq, &sirfsoc_timer1_irq);
-+	if (cpu == 0)
-+		remove_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq);
-+	else
-+		remove_irq(sirfsoc_timer1_irq.irq, &sirfsoc_timer1_irq);
+ 	unsigned int cpu = smp_processor_id();
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+@@ -465,14 +462,37 @@ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
  }
  
--static struct local_timer_ops sirfsoc_local_timer_ops __cpuinitdata = {
--	.setup	= sirfsoc_local_timer_setup,
--	.stop	= sirfsoc_local_timer_stop,
-+static int __cpuinit sirfsoc_cpu_notify(struct notifier_block *self,
+-static struct local_timer_ops exynos4_mct_tick_ops __cpuinitdata = {
+-	.setup	= exynos4_local_timer_setup,
+-	.stop	= exynos4_local_timer_stop,
++static int __cpuinit exynos4_mct_cpu_notify(struct notifier_block *self,
 +					   unsigned long action, void *hcpu)
 +{
++	struct mct_clock_event_device *mevt;
++
 +	/*
 +	 * Grab cpu pointer in each case to avoid spurious
 +	 * preemptible warnings
 +	 */
 +	switch (action & ~CPU_TASKS_FROZEN) {
 +	case CPU_STARTING:
-+		sirfsoc_local_timer_setup(this_cpu_ptr(sirfsoc_clockevent));
++		mevt = this_cpu_ptr(&percpu_mct_tick);
++		exynos4_local_timer_setup(&mevt->evt);
 +		break;
 +	case CPU_DYING:
-+		sirfsoc_local_timer_stop(this_cpu_ptr(sirfsoc_clockevent));
++		mevt = this_cpu_ptr(&percpu_mct_tick);
++		exynos4_local_timer_stop(&mevt->evt);
 +		break;
 +	}
 +
 +	return NOTIFY_OK;
 +}
 +
-+static struct notifier_block sirfsoc_cpu_nb __cpuinitdata = {
-+	.notifier_call = sirfsoc_cpu_notify,
++static struct notifier_block exynos4_mct_cpu_nb __cpuinitdata = {
++	.notifier_call = exynos4_mct_cpu_notify,
  };
 -#endif /* CONFIG_LOCAL_TIMERS */
  
- static void __init sirfsoc_clockevent_init(void)
+ static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
  {
--	clockevents_calc_mult_shift(&sirfsoc_clockevent, CLOCK_TICK_RATE, 60);
--
--	sirfsoc_clockevent.max_delta_ns =
--		clockevent_delta2ns(-2, &sirfsoc_clockevent);
--	sirfsoc_clockevent.min_delta_ns =
--		clockevent_delta2ns(2, &sirfsoc_clockevent);
--
--	sirfsoc_clockevent.cpumask = cpumask_of(0);
--	clockevents_register_device(&sirfsoc_clockevent);
++	int err;
++	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+ 	struct clk *mct_clk, *tick_clk;
+ 
+ 	tick_clk = np ? of_clk_get_by_name(np, "fin_pll") :
+@@ -490,9 +510,7 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+ 	if (!reg_base)
+ 		panic("%s: unable to ioremap mct address space\n", __func__);
+ 
 -#ifdef CONFIG_LOCAL_TIMERS
--	local_timer_register(&sirfsoc_local_timer_ops);
--#endif
-+	sirfsoc_clockevent = alloc_percpu(struct clock_event_device);
-+	BUG_ON(!sirfsoc_clockevent);
-+
-+	BUG_ON(register_cpu_notifier(&sirfsoc_cpu_nb));
+ 	if (mct_int_type == MCT_INT_PPI) {
+-		int err;
+ 
+ 		err = request_percpu_irq(mct_irqs[MCT_L0_IRQ],
+ 					 exynos4_mct_tick_isr, "MCT",
+@@ -501,8 +519,16 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+ 		     mct_irqs[MCT_L0_IRQ], err);
+ 	}
+ 
+-	local_timer_register(&exynos4_mct_tick_ops);
+-#endif /* CONFIG_LOCAL_TIMERS */
++	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
++	if (err)
++		goto out_irq;
 +
 +	/* Immediately configure the timer on the boot CPU */
-+	sirfsoc_local_timer_setup(this_cpu_ptr(sirfsoc_clockevent));
++	exynos4_local_timer_setup(&mevt->evt);
++	return;
++
++out_irq:
++	free_percpu_irq(mct_irqs[MCT_L0_IRQ], &percpu_mct_tick);
  }
  
- /* initialize the kernel jiffy timer source */
-@@ -273,8 +285,6 @@ static void __init sirfsoc_marco_timer_init(void)
- 
- 	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, CLOCK_TICK_RATE));
- 
--	BUG_ON(setup_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq));
--
- 	sirfsoc_clockevent_init();
- }
- 
-@@ -288,11 +298,9 @@ static void __init sirfsoc_of_timer_init(struct device_node *np)
- 	if (!sirfsoc_timer_irq.irq)
- 		panic("No irq passed for timer0 via DT\n");
- 
--#ifdef CONFIG_LOCAL_TIMERS
- 	sirfsoc_timer1_irq.irq = irq_of_parse_and_map(np, 1);
- 	if (!sirfsoc_timer1_irq.irq)
- 		panic("No irq passed for timer1 via DT\n");
--#endif
- 
- 	sirfsoc_marco_timer_init();
- }
+ void __init mct_init(void __iomem *base, int irq_g0, int irq_l0, int irq_l1)
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
