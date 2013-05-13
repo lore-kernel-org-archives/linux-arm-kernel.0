@@ -1,84 +1,51 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Mon, 13 May 2013 09:56:31 +0800
-Subject: [PATCH] ARM: DMA-mapping: mark all !DMA_TO_DEVICE pages in
- unmapping as clean
-In-Reply-To: <1367572365-18905-1-git-send-email-ming.lei@canonical.com>
-References: <1367572365-18905-1-git-send-email-ming.lei@canonical.com>
-Message-ID: <CACVXFVMSibWd2+QG88QypJC0KYYE0oyyyt4iHpdnK5YR4AN-6g@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 13 May 2013 10:29:21 +0800
+Subject: [PATCH 1/2] ARM: mxs: Add default AUART2 pinmux
+In-Reply-To: <1368188795-9114-1-git-send-email-marex@denx.de>
+References: <1368188795-9114-1-git-send-email-marex@denx.de>
+Message-ID: <20130513022919.GC24494@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, May 10, 2013 at 02:26:34PM +0200, Marek Vasut wrote:
+> Add pinmux for AUART2 pins where they are in mux0.
+> 
+> Signed-off-by: Marek Vasut <marex@denx.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/boot/dts/imx28.dtsi |   11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 7ba4966..13799cf 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -308,6 +308,17 @@
+>  					fsl,pull-up = <0>;
+>  				};
+>  
+> +				auart2_2pins_b: auart2-2pins at 1 {
+> +					reg = <1>;
+> +					fsl,pinmux-ids = <
+> +						0x3080 /* MX28_PAD_AUART2_RX__AUART2_RX */
+> +						0x3090 /* MX28_PAD_AUART2_TX__AUART2_TX */
+> +					>;
+> +					fsl,drive-strength = <0>;
+> +					fsl,voltage = <1>;
+> +					fsl,pull-up = <0>;
+> +				};
+> +
 
-On Fri, May 3, 2013 at 5:12 PM, Ming Lei <ming.lei@canonical.com> wrote:
-> It is common for one sg to include many pages, so mark all these
-> pages as clean to avoid unnecessary flushing on them in
-> set_pte_at() or update_mmu_cache().
->
-> The patch might improve loading performance of applciation code a bit.
->
-> On the below test code to read file(~1GByte size) from usb mass storage
-> disk to buffer created with mmap(PROT_READ | PROT_EXEC) on
-> Pandaboard, average ~1% improvement can be observed with the patch on
-> 10 times test.
->
->
-> #define _GNU_SOURCE
->
-> #include <fcntl.h>
-> #include <stdio.h>
-> #include <unistd.h>
-> #include <stdlib.h>
-> #include <sys/mman.h>
-> #include <sys/stat.h>
-> #include <string.h>
-> #include <assert.h>
->
-> unsigned int sum = 0;
->
-> static unsigned long tv_diff(struct timeval *tv1, struct timeval *tv2)
-> {
->         return (tv2->tv_sec - tv1->tv_sec) * 1000000 +
->                 (tv2->tv_usec - tv1->tv_usec);
-> }
->
-> int main(int argc, char *argv[])
-> {
->         char *mbuffer;
->         int fd;
->         int i;
->         unsigned long page_size, size;
->         struct stat stat;
->         struct timeval t1, t2;
->
->         page_size = getpagesize();
->         fd = open(argv[1], O_RDONLY);
->         assert(fd >= 0);
->
->         fstat(fd, &stat);
->         size = stat.st_size;
->         printf("%s: file %s, file size %lu, page size %lu\n", argv[0],
->                 read_filename, size, page_size);
->
->         gettimeofday(&t1, NULL);
->         mbuffer = mmap(NULL, size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
->         for (i = 0 ; i < size ; i += page_size)
->                 sum += mbuffer[i];
->         munmap(mbuffer, page_size);
->         gettimeofday(&t2, NULL);
->         printf("\tread mmaped time: %luus\n", tv_diff(&t1, &t2));
->
->         close(fd);
-> }
->
-> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Ming Lei <ming.lei@canonical.com>
+I already applied a same patch from Eric B?nard.
 
-Gentle ping, :-)
+Shawn
 
-Thanks,
---
-Ming Lei
+http://thread.gmane.org/gmane.linux.kernel/1471518/
+
+>  				auart3_pins_a: auart3 at 0 {
+>  					reg = <0>;
+>  					fsl,pinmux-ids = <
+> -- 
+> 1.7.10.4
+> 
