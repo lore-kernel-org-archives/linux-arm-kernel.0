@@ -1,21 +1,23 @@
 From: jp.francois@cynove.com (jean-philippe francois)
-Date: Mon, 13 May 2013 11:28:38 +0200
-Subject: [PATCH] ARM: OMAP: fix __init section mismatch for _enable_preprogram
-Message-ID: <CAGGh5h1_-zbe=gw+YtMeddGxGkVzos=siavOv9nbSOVZqk1nVw@mail.gmail.com>
+Date: Mon, 13 May 2013 11:44:04 +0200
+Subject: Board file to device tree migration
+Message-ID: <CAGGh5h3MC=ruocV9u6Cig=oiTtqU8GtpQ6sRKUZmUNk-C7Houw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-_enable_preprogram is marked as __init, but is called from _enable
-which is not. Without this patch, the board oopses after init. Tested
-on custom hardware and on beagle board xM.
+I am maintaining a board file, which i did not submit since the board
+was developped after the decision was taken to move to device tree,
+and I figured no more board file would be accepted.
 
-Signed-off-by: Jean-Philippe Fran?ois <jp.francois@cynove.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: omap_hwmod_fix.patch
-Type: application/octet-stream
-Size: 494 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130513/e9423fe7/attachment.obj>
+I can't move to full device tree, since if my understanding is
+correct, the omap3-isp is not supported yet, and our board is a
+camera, so isp is mandatory.
+
+My question is, is it possible to do a mixed style init, with some of
+the devices coming from a board file, and others from a dts file ? Is
+there any example of board using this kind of mixed init ?
+
+Regards,
+Jean-Philippe Fran?ois
