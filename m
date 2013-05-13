@@ -1,50 +1,69 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 13 May 2013 10:09:00 -0700
-Subject: [PATCH 09/14] ARM: mvebu: Remove init_irq declaration in machine
- description
-In-Reply-To: <51910C81.5050501@free-electrons.com>
-References: <1368438253-28218-1-git-send-email-maxime.ripard@free-electrons.com>
- <1368438253-28218-10-git-send-email-maxime.ripard@free-electrons.com>
- <20130513151934.GM31290@titan.lakedaemon.net>
- <51910C81.5050501@free-electrons.com>
-Message-ID: <CAOesGMgD6j9BE-kVe1rJjNFRtoV=e08B=o9hyhk1xfKLjsRF2g@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 13 May 2013 13:16:51 -0400
+Subject: [PATCH V2] arm64: KVM: Fix HCR_EL2 and VTCR_EL2 configuration bits
+In-Reply-To: <fae8138d41c55928a3c71b7073aea3b0@localhost>
+References: <1368170630-19567-1-git-send-email-pranavkumar@linaro.org>
+ <51910559.6060106@codeaurora.org>
+ <fae8138d41c55928a3c71b7073aea3b0@localhost>
+Message-ID: <51912003.6080406@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 8:53 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Jason,
->
-> Le 13/05/2013 17:19, Jason Cooper a ?crit :
->> On Mon, May 13, 2013 at 11:44:08AM +0200, Maxime Ripard wrote:
->>> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
->>> specified") removed the need to explictly setup the init_irq field in
->>> the machine description when using only irqchip_init. Remove that
->>> declaration for mvebu as well.
+On 05/13/2013 12:02 PM, Marc Zyngier wrote:
+> On Mon, 13 May 2013 11:23:05 -0400, Christopher Covington
+> <cov@codeaurora.org> wrote:
+>> Hi Pranavkumar,
+>>
+>> On 05/10/2013 03:23 AM, Pranavkumar Sawargaonkar wrote:
+>>> This patch does following fixes:
 >>>
->>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> 1. Make HCR_* flags as unsigned long long constants
+>>> Reason : By default, compiler assumes numeric constants as
+>>> signed hence sign extending it when assigned to unsigned variable
+>>> such as hcr_el2 (in VCPU context). This accidently sets HCR_ID and
+>>> HCR_CD making entire guest memory non-cacheable. On real HW, this
+>>> breaks Stage2 ttbl walks and also breaks VirtIO.
+>>>
+>>> 2. VTCR_EL2_ORGN0_WBWA and VTCR_EL2_IRGN0_WBWA macros.
+>>>
+>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
 >>> ---
->>>  arch/arm/mach-mvebu/armada-370-xp.c | 1 -
->>>  1 file changed, 1 deletion(-)
+>>>  arch/arm64/include/asm/kvm_arm.h |   73
+>>>  +++++++++++++++++++-------------------
+>>>  1 file changed, 37 insertions(+), 36 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/include/asm/kvm_arm.h
+>>> b/arch/arm64/include/asm/kvm_arm.h
+>>> index 8ced0ca..14ead69 100644
+>>> --- a/arch/arm64/include/asm/kvm_arm.h
+>>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>>> @@ -18,44 +18,45 @@
+>>>  #ifndef __ARM64_KVM_ARM_H__
+>>>  #define __ARM64_KVM_ARM_H__
+>>>  
+>>> +#include <linux/const.h>
+>>>  #include <asm/types.h>
+>>>  
+>>>  /* Hyp Configuration Register (HCR) bits */
+>>> -#define HCR_ID		(1 << 33)
+>>> -#define HCR_CD		(1 << 32)
+>>> +#define HCR_ID		(UL(0x1) << 33)
+>>> +#define HCR_CD		(UL(0x1) << 32)
 >>
->> Maxime,
->>
->> Do do want the individual submaintainers to take these?  Or, send one
->> branch to Arnd and Olof?  I'm fine with either one as any merge
->> conflicts should be trivial.
->
-> I don't have a strong opinion on this one, I guess both will be fine.
-> Arnd, Olof, what do you prefer?
->
-> I'll probably have to send a v2 anyway, I forgot to remove the include
-> of the irqchip headers.
+>> Consider using the BIT() macro from linux/bitops.h to improve
+> readability.
+> 
+> This would probably cause problems when using these macros from assembly
+> code.
 
-Since each and every patch applies cleanly and things work well both
-before and after, let's have each maintainer that is active apply
-their own. If there are platforms that don't have a significant number
-of patches, i.e. if they're not collecting a branch, then we can apply
-those. Please follow up with us with the stragglers, I'll assume the
-rest will come in through the respective maintainers.
+It does indeed cause problems. What a shame. How about a quick local
+definition, to perhaps be eventually replaced by a more accessible shared
+definition?
 
+Christopher
 
--Olof
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
