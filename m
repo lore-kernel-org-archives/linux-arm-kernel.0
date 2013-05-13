@@ -1,340 +1,66 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 13 May 2013 09:32:07 +0800
-Subject: [PATCH 2/3] ARM: imx: move clk_prepare() out from mxs_restart()
-In-Reply-To: <1368408728-12264-1-git-send-email-shawn.guo@linaro.org>
-References: <1368408728-12264-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1368408728-12264-3-git-send-email-shawn.guo@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 13 May 2013 10:33:22 +0900
+Subject: [PATCH] ARM: shmobile: r8a7778: correct model name in Kconfig
+In-Reply-To: <87obcfn350.wl%kuninori.morimoto.gx@renesas.com>
+References: <201305090405.41053.sergei.shtylyov@cogentembedded.com>
+ <20130510082055.GB27435@verge.net.au>
+ <518D4CCF.5040706@cogentembedded.com>
+ <87obcfn350.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20130513013320.GD7826@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's inappropriate to call clk_prepare() in mxs_restart(), because the
-restart routine could be called in atomic context.  Move clk_get() and
-clk_prepare() into mxc_arch_reset_init() and only have the atomic part
-clk_enable() be called in mxs_restart().
+On Sun, May 12, 2013 at 05:18:41PM -0700, Kuninori Morimoto wrote:
+> 
+> Hi
+> 
+> > >> The correct model name is R-Car M1A or R8A77781; R8A77780 corresponds to R-Car
+> > >> M1S which is a SH based SoC.
+> > >>
+> > >> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > > Morimoto-san,
+> > >
+> > > please review this change.
+> > >
+> > 
+> >     This patch was based on the info found on this official Renesas webpage:
+> > 
+> > http://www.renesas.eu/applications/automotive/cis/cis_highend/rcar_m1as/index.jsp
+> 
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> 
 
-As a result, mxc_arch_reset_init() needs to be called after clk gets
-initialized.
+Thanks, I have queued-up the following in the soc-r8a7778 branch.
+There was a trivial conflict which I resolved. Please let me know
+if I messed it up.
 
-While there, it also changes printk(KERN_ERR ...) to pr_err() and adds
-__init annotation for mxc_arch_reset_init().
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+ARM: shmobile: r8a7778: correct model name in Kconfig
+
+The correct model name is R-Car M1A or R8A77781; R8A77780 corresponds to R-Car
+M1S which is a SH based SoC.
+
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+[horms+renesas at verge.net.au: manually applied to soc-r8a7778 branch]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-imx/imx25-dt.c   |    3 +++
- arch/arm/mach-imx/imx27-dt.c   |    3 +++
- arch/arm/mach-imx/imx31-dt.c   |    3 +++
- arch/arm/mach-imx/imx51-dt.c   |    3 +++
- arch/arm/mach-imx/mach-imx53.c |    3 +++
- arch/arm/mach-imx/mm-imx1.c    |    2 +-
- arch/arm/mach-imx/mm-imx21.c   |    2 +-
- arch/arm/mach-imx/mm-imx25.c   |    2 +-
- arch/arm/mach-imx/mm-imx27.c   |    2 +-
- arch/arm/mach-imx/mm-imx3.c    |    4 ++--
- arch/arm/mach-imx/mm-imx5.c    |    3 +--
- arch/arm/mach-imx/system.c     |   27 +++++++++++++++++----------
- 12 files changed, 39 insertions(+), 18 deletions(-)
+ arch/arm/mach-shmobile/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-imx/imx25-dt.c b/arch/arm/mach-imx/imx25-dt.c
-index 8234839..ec33991 100644
---- a/arch/arm/mach-imx/imx25-dt.c
-+++ b/arch/arm/mach-imx/imx25-dt.c
-@@ -15,10 +15,13 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/time.h>
- #include "common.h"
-+#include "hardware.h"
- #include "mx25.h"
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 3e7ad45..3c463ff 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -36,7 +36,7 @@ config ARCH_R8A7740
+ 	select RENESAS_INTC_IRQPIN
  
- static void __init imx25_dt_init(void)
- {
-+	mxc_arch_reset_init(MX25_IO_ADDRESS(MX25_WDOG_BASE_ADDR));
-+
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-diff --git a/arch/arm/mach-imx/imx27-dt.c b/arch/arm/mach-imx/imx27-dt.c
-index 4aaead0..93aef1a 100644
---- a/arch/arm/mach-imx/imx27-dt.c
-+++ b/arch/arm/mach-imx/imx27-dt.c
-@@ -16,12 +16,15 @@
- #include <asm/mach/time.h>
- 
- #include "common.h"
-+#include "hardware.h"
- #include "mx27.h"
- 
- static void __init imx27_dt_init(void)
- {
- 	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
- 
-+	mxc_arch_reset_init(MX27_IO_ADDRESS(MX27_WDOG_BASE_ADDR));
-+
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 
- 	platform_device_register_full(&devinfo);
-diff --git a/arch/arm/mach-imx/imx31-dt.c b/arch/arm/mach-imx/imx31-dt.c
-index 67de611..d8b3b22 100644
---- a/arch/arm/mach-imx/imx31-dt.c
-+++ b/arch/arm/mach-imx/imx31-dt.c
-@@ -16,10 +16,13 @@
- #include <asm/mach/time.h>
- 
- #include "common.h"
-+#include "hardware.h"
- #include "mx31.h"
- 
- static void __init imx31_dt_init(void)
- {
-+	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
-+
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-diff --git a/arch/arm/mach-imx/imx51-dt.c b/arch/arm/mach-imx/imx51-dt.c
-index ab24cc3..55f47a0 100644
---- a/arch/arm/mach-imx/imx51-dt.c
-+++ b/arch/arm/mach-imx/imx51-dt.c
-@@ -17,12 +17,15 @@
- #include <asm/mach/time.h>
- 
- #include "common.h"
-+#include "hardware.h"
- #include "mx51.h"
- 
- static void __init imx51_dt_init(void)
- {
- 	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", };
- 
-+	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
-+
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- 	platform_device_register_full(&devinfo);
- }
-diff --git a/arch/arm/mach-imx/mach-imx53.c b/arch/arm/mach-imx/mach-imx53.c
-index f579c61..7a56561 100644
---- a/arch/arm/mach-imx/mach-imx53.c
-+++ b/arch/arm/mach-imx/mach-imx53.c
-@@ -21,6 +21,7 @@
- #include <asm/mach/time.h>
- 
- #include "common.h"
-+#include "hardware.h"
- #include "mx53.h"
- 
- static void __init imx53_qsb_init(void)
-@@ -38,6 +39,8 @@ static void __init imx53_qsb_init(void)
- 
- static void __init imx53_dt_init(void)
- {
-+	mxc_arch_reset_init(MX53_IO_ADDRESS(MX53_WDOG1_BASE_ADDR));
-+
- 	if (of_machine_is_compatible("fsl,imx53-qsb"))
- 		imx53_qsb_init();
- 
-diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
-index 3c609c5..e065fed 100644
---- a/arch/arm/mach-imx/mm-imx1.c
-+++ b/arch/arm/mach-imx/mm-imx1.c
-@@ -39,7 +39,6 @@ void __init mx1_map_io(void)
- void __init imx1_init_early(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MX1);
--	mxc_arch_reset_init(MX1_IO_ADDRESS(MX1_WDT_BASE_ADDR));
- 	imx_iomuxv1_init(MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR),
- 			MX1_NUM_GPIO_PORT);
- }
-@@ -51,6 +50,7 @@ void __init mx1_init_irq(void)
- 
- void __init imx1_soc_init(void)
- {
-+	mxc_arch_reset_init(MX1_IO_ADDRESS(MX1_WDT_BASE_ADDR));
- 	mxc_device_init();
- 
- 	mxc_register_gpio("imx1-gpio", 0, MX1_GPIO1_BASE_ADDR, SZ_256,
-diff --git a/arch/arm/mach-imx/mm-imx21.c b/arch/arm/mach-imx/mm-imx21.c
-index d8ccd3a..2e91ab2 100644
---- a/arch/arm/mach-imx/mm-imx21.c
-+++ b/arch/arm/mach-imx/mm-imx21.c
-@@ -66,7 +66,6 @@ void __init mx21_map_io(void)
- void __init imx21_init_early(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MX21);
--	mxc_arch_reset_init(MX21_IO_ADDRESS(MX21_WDOG_BASE_ADDR));
- 	imx_iomuxv1_init(MX21_IO_ADDRESS(MX21_GPIO_BASE_ADDR),
- 			MX21_NUM_GPIO_PORT);
- }
-@@ -82,6 +81,7 @@ static const struct resource imx21_audmux_res[] __initconst = {
- 
- void __init imx21_soc_init(void)
- {
-+	mxc_arch_reset_init(MX21_IO_ADDRESS(MX21_WDOG_BASE_ADDR));
- 	mxc_device_init();
- 
- 	mxc_register_gpio("imx21-gpio", 0, MX21_GPIO1_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
-diff --git a/arch/arm/mach-imx/mm-imx25.c b/arch/arm/mach-imx/mm-imx25.c
-index 9357707..e065c11 100644
---- a/arch/arm/mach-imx/mm-imx25.c
-+++ b/arch/arm/mach-imx/mm-imx25.c
-@@ -54,7 +54,6 @@ void __init imx25_init_early(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MX25);
- 	mxc_iomux_v3_init(MX25_IO_ADDRESS(MX25_IOMUXC_BASE_ADDR));
--	mxc_arch_reset_init(MX25_IO_ADDRESS(MX25_WDOG_BASE_ADDR));
- }
- 
- void __init mx25_init_irq(void)
-@@ -89,6 +88,7 @@ static const struct resource imx25_audmux_res[] __initconst = {
- 
- void __init imx25_soc_init(void)
- {
-+	mxc_arch_reset_init(MX25_IO_ADDRESS(MX25_WDOG_BASE_ADDR));
- 	mxc_device_init();
- 
- 	/* i.mx25 has the i.mx35 type gpio */
-diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
-index 4f1be65..7d82a5a 100644
---- a/arch/arm/mach-imx/mm-imx27.c
-+++ b/arch/arm/mach-imx/mm-imx27.c
-@@ -66,7 +66,6 @@ void __init mx27_map_io(void)
- void __init imx27_init_early(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MX27);
--	mxc_arch_reset_init(MX27_IO_ADDRESS(MX27_WDOG_BASE_ADDR));
- 	imx_iomuxv1_init(MX27_IO_ADDRESS(MX27_GPIO_BASE_ADDR),
- 			MX27_NUM_GPIO_PORT);
- }
-@@ -82,6 +81,7 @@ static const struct resource imx27_audmux_res[] __initconst = {
- 
- void __init imx27_soc_init(void)
- {
-+	mxc_arch_reset_init(MX27_IO_ADDRESS(MX27_WDOG_BASE_ADDR));
- 	mxc_device_init();
- 
- 	/* i.mx27 has the i.mx21 type gpio */
-diff --git a/arch/arm/mach-imx/mm-imx3.c b/arch/arm/mach-imx/mm-imx3.c
-index e0e69a6..8f0f606 100644
---- a/arch/arm/mach-imx/mm-imx3.c
-+++ b/arch/arm/mach-imx/mm-imx3.c
-@@ -138,7 +138,6 @@ void __init mx31_map_io(void)
- void __init imx31_init_early(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MX31);
--	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
- 	arch_ioremap_caller = imx3_ioremap_caller;
- 	arm_pm_idle = imx3_idle;
- 	mx3_ccm_base = MX31_IO_ADDRESS(MX31_CCM_BASE_ADDR);
-@@ -174,6 +173,7 @@ void __init imx31_soc_init(void)
- 
- 	imx3_init_l2x0();
- 
-+	mxc_arch_reset_init(MX31_IO_ADDRESS(MX31_WDOG_BASE_ADDR));
- 	mxc_device_init();
- 
- 	mxc_register_gpio("imx31-gpio", 0, MX31_GPIO1_BASE_ADDR, SZ_16K, MX31_INT_GPIO1, 0);
-@@ -216,7 +216,6 @@ void __init imx35_init_early(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MX35);
- 	mxc_iomux_v3_init(MX35_IO_ADDRESS(MX35_IOMUXC_BASE_ADDR));
--	mxc_arch_reset_init(MX35_IO_ADDRESS(MX35_WDOG_BASE_ADDR));
- 	arm_pm_idle = imx3_idle;
- 	arch_ioremap_caller = imx3_ioremap_caller;
- 	mx3_ccm_base = MX35_IO_ADDRESS(MX35_CCM_BASE_ADDR);
-@@ -272,6 +271,7 @@ void __init imx35_soc_init(void)
- 
- 	imx3_init_l2x0();
- 
-+	mxc_arch_reset_init(MX35_IO_ADDRESS(MX35_WDOG_BASE_ADDR));
- 	mxc_device_init();
- 
- 	mxc_register_gpio("imx35-gpio", 0, MX35_GPIO1_BASE_ADDR, SZ_16K, MX35_INT_GPIO1, 0);
-diff --git a/arch/arm/mach-imx/mm-imx5.c b/arch/arm/mach-imx/mm-imx5.c
-index b7c4e70..cf193d8 100644
---- a/arch/arm/mach-imx/mm-imx5.c
-+++ b/arch/arm/mach-imx/mm-imx5.c
-@@ -83,7 +83,6 @@ void __init imx51_init_early(void)
- 	imx51_ipu_mipi_setup();
- 	mxc_set_cpu_type(MXC_CPU_MX51);
- 	mxc_iomux_v3_init(MX51_IO_ADDRESS(MX51_IOMUXC_BASE_ADDR));
--	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
- 	imx_src_init();
- }
- 
-@@ -91,7 +90,6 @@ void __init imx53_init_early(void)
- {
- 	mxc_set_cpu_type(MXC_CPU_MX53);
- 	mxc_iomux_v3_init(MX53_IO_ADDRESS(MX53_IOMUXC_BASE_ADDR));
--	mxc_arch_reset_init(MX53_IO_ADDRESS(MX53_WDOG1_BASE_ADDR));
- 	imx_src_init();
- }
- 
-@@ -129,6 +127,7 @@ static const struct resource imx51_audmux_res[] __initconst = {
- 
- void __init imx51_soc_init(void)
- {
-+	mxc_arch_reset_init(MX51_IO_ADDRESS(MX51_WDOG1_BASE_ADDR));
- 	mxc_device_init();
- 
- 	/* i.mx51 has the i.mx35 type gpio */
-diff --git a/arch/arm/mach-imx/system.c b/arch/arm/mach-imx/system.c
-index 695e0d7..02cf449 100644
---- a/arch/arm/mach-imx/system.c
-+++ b/arch/arm/mach-imx/system.c
-@@ -30,6 +30,7 @@
- #include "hardware.h"
- 
- static void __iomem *wdog_base;
-+static struct clk *wdog_clk;
- 
- /*
-  * Reset the system. It is called by machine_restart().
-@@ -38,16 +39,13 @@ void mxc_restart(char mode, const char *cmd)
- {
- 	unsigned int wcr_enable;
- 
--	if (cpu_is_mx1()) {
--		wcr_enable = (1 << 0);
--	} else {
--		struct clk *clk;
-+	if (wdog_clk)
-+		clk_enable(wdog_clk);
- 
--		clk = clk_get_sys("imx2-wdt.0", NULL);
--		if (!IS_ERR(clk))
--			clk_prepare_enable(clk);
-+	if (cpu_is_mx1())
-+		wcr_enable = (1 << 0);
-+	else
- 		wcr_enable = (1 << 2);
--	}
- 
- 	/* Assert SRS signal */
- 	__raw_writew(wcr_enable, wdog_base);
-@@ -55,7 +53,7 @@ void mxc_restart(char mode, const char *cmd)
- 	/* wait for reset to assert... */
- 	mdelay(500);
- 
--	printk(KERN_ERR "Watchdog reset failed to assert reset\n");
-+	pr_err("%s: Watchdog reset failed to assert reset\n", __func__);
- 
- 	/* delay to allow the serial port to show the message */
- 	mdelay(50);
-@@ -64,7 +62,16 @@ void mxc_restart(char mode, const char *cmd)
- 	soft_restart(0);
- }
- 
--void mxc_arch_reset_init(void __iomem *base)
-+void __init mxc_arch_reset_init(void __iomem *base)
- {
- 	wdog_base = base;
-+
-+	wdog_clk = clk_get_sys("imx2-wdt.0", NULL);
-+	if (IS_ERR(wdog_clk)) {
-+		pr_warn("%s: failed to get wdog clock\n", __func__);
-+		wdog_clk = NULL;
-+		return;
-+	}
-+
-+	clk_prepare(wdog_clk);
- }
+ config ARCH_R8A7778
+-	bool "R-Car M1 (R8A77780)"
++	bool "R-Car M1A (R8A77781)"
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select CPU_V7
+ 	select SH_CLK_CPG
 -- 
-1.7.9.5
+1.8.2.1
