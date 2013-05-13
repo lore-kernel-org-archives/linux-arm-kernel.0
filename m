@@ -1,24 +1,38 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 13 May 2013 15:47:14 +0200
-Subject: [PATCH 0/3] mmc: mmci: Support ap_sleep in cpuidle for ux500
-Message-ID: <1368452837-31458-1-git-send-email-ulf.hansson@stericsson.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Mon, 13 May 2013 09:48:25 -0400
+Subject: Introduce a new helper framework for buffer synchronization
+In-Reply-To: <028a01ce4fd4$5ec6f000$1c54d000$%dae@samsung.com>
+References: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
+ <51909DB4.2060208@canonical.com>
+ <025201ce4fbb$363d0390$a2b70ab0$%dae@samsung.com>
+ <5190B7D8.3010803@canonical.com>
+ <027a01ce4fcc$5e7c7320$1b755960$%dae@samsung.com>
+ <5190D14A.7050904@canonical.com>
+ <028a01ce4fd4$5ec6f000$1c54d000$%dae@samsung.com>
+Message-ID: <CAF6AEGvWazezZdLDn5=H8wNQdQSWV=EmqE1a4wh7QwrT_h6vKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On Mon, May 13, 2013 at 8:21 AM, Inki Dae <inki.dae@samsung.com> wrote:
+>
+>> In that case you still wouldn't give userspace control over the fences. I
+>> don't see any way that can end well.
+>> What if userspace never signals? What if userspace gets killed by oom
+>> killer. Who keeps track of that?
+>>
+>
+> In all cases, all kernel resources to user fence will be released by kernel
+> once the fence is timed out: never signaling and process killing by oom
+> killer makes the fence timed out. And if we use mmap mechanism you mentioned
+> before, I think user resource could also be freed properly.
 
-To be able to enter ap_sleep state in cpuidle were the APE power domain
-regulator will be cut, a register save and restore mechanism needs to be
-implemented. This patchset adapts to these restrictions.
 
-Ulf Hansson (3):
-  mmc: mmci: Use optional sleep pinctrl state
-  mmc: mmci: Adapt to register write restrictions
-  mmc: mmci: Save and restore register context
+I tend to agree w/ Maarten here.. there is no good reason for
+userspace to be *signaling* fences.  The exception might be some blob
+gpu drivers which don't have enough knowledge in the kernel to figure
+out what to do.  (In which case you can add driver private ioctls for
+that.. still not the right thing to do but at least you don't make a
+public API out of it.)
 
- drivers/mmc/host/mmci.c |   73 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/mmc/host/mmci.h |    1 +
- 2 files changed, 74 insertions(+)
-
--- 
-1.7.10
+BR,
+-R
