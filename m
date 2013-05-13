@@ -1,94 +1,85 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 13 May 2013 01:51:32 -0400
-Subject: [PATCh V10 01/12] usb: phy: protect phy init and shutdown for mutiple
- deivces
-In-Reply-To: <1368424303-10629-1-git-send-email-chao.xie@marvell.com>
-References: <1368424303-10629-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1368424303-10629-2-git-send-email-chao.xie@marvell.com>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Sun, 12 May 2013 22:52:53 -0700
+Subject: [PATCH v2] ARM: KVM: prevent NULL pointer dereferences with KVM
+ VCPU ioctl
+In-Reply-To: <1368052086-25059-1-git-send-email-andre.przywara@linaro.org>
+References: <1368052086-25059-1-git-send-email-andre.przywara@linaro.org>
+Message-ID: <20130513055253.GC64337@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some USB devices will share same phy, so make the ->init
-and ->shutdown to be protected.
-Only first device will initialize the phy, and only last device
-can shutdown phy.
+On Thu, May 09, 2013 at 12:28:06AM +0200, Andre Przywara wrote:
+> Some ARM KVM VCPU ioctls require the vCPU to be properly initialized
+> with the KVM_ARM_VCPU_INIT ioctl before being used with further
+> requests. KVM_RUN checks whether this initialization has been
+> done, but other ioctls do not.
+> Namely KVM_GET_REG_LIST will dereference an array with index -1
+> without initialization and thus leads to a kernel oops.
+> Fix this by adding checks before executing the ioctl handlers.
+> 
+> Changes from v1:
+>  * moved check into a static function with a meaningful name
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
+> ---
+>  arch/arm/kvm/arm.c | 19 +++++++++++++++++--
+>  1 file changed, 17 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index c1fe498..b73b587 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -676,6 +676,15 @@ static void vcpu_pause(struct kvm_vcpu *vcpu)
+>  	wait_event_interruptible(*wq, !vcpu->arch.pause);
+>  }
+>  
+> +/*
+> + * Some ioctls require initialization by KVM_ARM_VCPU_INIT first, check
+> + * this with this function
+> + */
+> +static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
+> +{
+> +	return vcpu->arch.target >= 0;
+> +}
+> +
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- drivers/usb/phy/phy.c   |    6 ++++++
- include/linux/usb/phy.h |   22 ++++++++++++++++++----
- 2 files changed, 24 insertions(+), 4 deletions(-)
+this should probably be a static inline in a header file instead, it's
+likely that it could be called from another file.
 
-diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
-index a9984c7..97dd396 100644
---- a/drivers/usb/phy/phy.c
-+++ b/drivers/usb/phy/phy.c
-@@ -329,6 +329,9 @@ int usb_add_phy(struct usb_phy *x, enum usb_phy_type type)
- 		return -EINVAL;
- 	}
- 
-+	mutex_init(&x->phy_mutex);
-+	x->refcount = 0;
-+
- 	spin_lock_irqsave(&phy_lock, flags);
- 
- 	list_for_each_entry(phy, &phy_list, head) {
-@@ -367,6 +370,9 @@ int usb_add_phy_dev(struct usb_phy *x)
- 		return -EINVAL;
- 	}
- 
-+	mutex_init(&x->phy_mutex);
-+	x->refcount = 0;
-+
- 	spin_lock_irqsave(&phy_lock, flags);
- 	list_for_each_entry(phy_bind, &phy_bind_list, list)
- 		if (!(strcmp(phy_bind->phy_dev_name, dev_name(x->dev))))
-diff --git a/include/linux/usb/phy.h b/include/linux/usb/phy.h
-index 6b5978f..b645520 100644
---- a/include/linux/usb/phy.h
-+++ b/include/linux/usb/phy.h
-@@ -87,6 +87,14 @@ struct usb_phy {
- 	/* to support controllers that have multiple transceivers */
- 	struct list_head	head;
- 
-+	/*
-+	 * PHY may be shared by multiple devices.
-+	 * Being protected by phy_mutex and refcount, PHY is initialized
-+	 * or shut down only once.
-+	 */
-+	struct mutex		phy_mutex;
-+	unsigned int		refcount;
-+
- 	/* initialize/shutdown the OTG controller */
- 	int	(*init)(struct usb_phy *x);
- 	void	(*shutdown)(struct usb_phy *x);
-@@ -150,17 +158,23 @@ static inline int usb_phy_io_write(struct usb_phy *x, u32 val, u32 reg)
- static inline int
- usb_phy_init(struct usb_phy *x)
- {
--	if (x->init)
--		return x->init(x);
-+	int ret = 0;
- 
--	return 0;
-+	mutex_lock(&x->phy_mutex);
-+	if (x->refcount++ == 0 && x->init)
-+		ret = x->init(x);
-+	mutex_unlock(&x->phy_mutex);
-+
-+	return ret;
- }
- 
- static inline void
- usb_phy_shutdown(struct usb_phy *x)
- {
--	if (x->shutdown)
-+	mutex_lock(&x->phy_mutex);
-+	if (--x->refcount == 0 && x->shutdown)
- 		x->shutdown(x);
-+	mutex_unlock(&x->phy_mutex);
- }
- 
- static inline int
--- 
-1.7.4.1
+>  /**
+>   * kvm_arch_vcpu_ioctl_run - the main VCPU run function to execute guest code
+>   * @vcpu:	The VCPU pointer
+> @@ -692,8 +701,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	int ret;
+>  	sigset_t sigsaved;
+>  
+> -	/* Make sure they initialize the vcpu with KVM_ARM_VCPU_INIT */
+> -	if (unlikely(vcpu->arch.target < 0))
+> +	if (unlikely(!kvm_vcpu_initialized(vcpu)))
+>  		return -ENOEXEC;
+>  
+>  	ret = kvm_vcpu_first_run_init(vcpu);
+> @@ -893,6 +901,10 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>  	case KVM_SET_ONE_REG:
+>  	case KVM_GET_ONE_REG: {
+>  		struct kvm_one_reg reg;
+> +
+> +		if (unlikely(!kvm_vcpu_initialized(vcpu)))
+> +			return -ENOEXEC;
+> +
+>  		if (copy_from_user(&reg, argp, sizeof(reg)))
+>  			return -EFAULT;
+>  		if (ioctl == KVM_SET_ONE_REG)
+> @@ -905,6 +917,9 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
+>  		struct kvm_reg_list reg_list;
+>  		unsigned n;
+>  
+> +		if (unlikely(!kvm_vcpu_initialized(vcpu)))
+> +			return -ENOEXEC;
+> +
+>  		if (copy_from_user(&reg_list, user_list, sizeof(reg_list)))
+>  			return -EFAULT;
+>  		n = reg_list.n;
+> -- 
+> 1.7.12.1
+> 
