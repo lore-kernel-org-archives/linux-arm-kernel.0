@@ -1,54 +1,38 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 13 May 2013 17:07:49 +0400
-Subject: [PATCH 1/2] ARM: shmobile: r8a7790: add Ether support
-In-Reply-To: <20130513004314.GD22911@verge.net.au>
-References: <1368173119-27345-1-git-send-email-horms+renesas@verge.net.au>
- <1368173119-27345-2-git-send-email-horms+renesas@verge.net.au>
- <518CCB6A.2060303@cogentembedded.com> <20130513004314.GD22911@verge.net.au>
-Message-ID: <5190E5A5.8030605@cogentembedded.com>
+Date: Mon, 13 May 2013 17:17:48 +0400
+Subject: [PATCH] ARM: shmobile: r8a7778: correct model name in Kconfig
+In-Reply-To: <20130513013320.GD7826@verge.net.au>
+References: <201305090405.41053.sergei.shtylyov@cogentembedded.com>
+ <20130510082055.GB27435@verge.net.au> <518D4CCF.5040706@cogentembedded.com>
+ <87obcfn350.wl%kuninori.morimoto.gx@renesas.com>
+ <20130513013320.GD7826@verge.net.au>
+Message-ID: <5190E7FC.5040809@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 13-05-2013 5:33, Simon Horman wrote:
 
-On 13-05-2013 4:43, Simon Horman wrote:
+>>>>> The correct model name is R-Car M1A or R8A77781; R8A77780 corresponds to R-Car
+>>>>> M1S which is a SH based SoC.
 
->>> Add Ether clock and platform device for R8A7779 SoC; add a function to
->>> register this device with board-specific platform data.
+>>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>> Morimoto-san,
 
->>> Based on a similar change for the r8a7779 by Sergei Shtylyov.
+>>>> please review this change.
 
->>> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-[...]
+>>>      This patch was based on the info found on this official Renesas webpage:
 
->>> diff --git a/arch/arm/mach-shmobile/include/mach/r8a7790.h b/arch/arm/mach-shmobile/include/mach/r8a7790.h
->>> index 2e919e6..95b8f7e 100644
->>> --- a/arch/arm/mach-shmobile/include/mach/r8a7790.h
->>> +++ b/arch/arm/mach-shmobile/include/mach/r8a7790.h
->>> @@ -1,9 +1,12 @@
->>>   #ifndef __ASM_R8A7790_H__
->>>   #define __ASM_R8A7790_H__
->>>
->>> +#include <linux/sh_eth.h>
->>> +
->>>   void r8a7790_add_standard_devices(void);
->>>   void r8a7790_clock_init(void);
->>>   void r8a7790_pinmux_init(void);
->>>   void r8a7790_timer_init(void);
->>> +void r8a7790_add_ether_device(struct sh_eth_plat_data *pdata);
+>>> http://www.renesas.eu/applications/automotive/cis/cis_highend/rcar_m1as/index.jsp
 
->>     Perhaps better place is right after r8a7790_add_standard_devices()...
+>> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-> Is the implication that the struct sh_eth_plat_data can be defined
-> in setup-r8a7790.c?
 
-    No, why?
+> Thanks, I have queued-up the following in the soc-r8a7778 branch.
+> There was a trivial conflict which I resolved. Please let me know
+> if I messed it up.
 
-> Or do you for see adding a struct sh_eth_plat_data
-> parameter to r8a7790_add_standard_devices() ?
-
-    Not at all.
+    It's alright, thanks. I'm just not sure this fix is worth deferring 
+for several more months...
 
 WBR, Sergei
