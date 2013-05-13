@@ -1,41 +1,31 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 13 May 2013 12:16:05 +0200
-Subject: [PATCH 0/4] ARM: Remove boilerplate debug_ll_io_init code
-Message-ID: <1368440169-29088-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 13 May 2013 12:16:07 +0200
+Subject: [PATCH 2/4] ARM: highbank: remove the .map_io declaration
+In-Reply-To: <1368440169-29088-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1368440169-29088-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1368440169-29088-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Now that the ARM core code calls debug_ll_io_init, we can remove it from
+the machine_desc declaration.
 
-The recent introduction of debug_ll_io_init made possible to not rely
-anymore on a custom map_io function but on debug_ll_io_init for the
-early mapping and then on the various drivers to do the needed mappings for
-the kernel to boot.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/mach-highbank/highbank.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-Some architectures begin to use only this function as the map_io callback in
-the machine description.
-
-In order to remove some boilerplate code, make the ARM mm code call
-debug_ll_io_init by itself when no .map_io callback is defined.
-
-This has been tested on the sunxi platform.
-
-Thanks,
-Maxime
-
-Maxime Ripard (4):
-  ARM: mmu: Call debug_ll_io_init if no map_io function is specified
-  ARM: highbank: remove the .map_io declaration
-  ARM: mxs: remove the .map_io declaration
-  ARM: sunxi: Remove the .map_io function declaration
-
- arch/arm/mach-highbank/highbank.c |  1 -
- arch/arm/mach-mxs/mach-mxs.c      |  1 -
- arch/arm/mach-sunxi/sunxi.c       | 17 -----------------
- arch/arm/mach-sunxi/sunxi.h       | 20 --------------------
- arch/arm/mm/mmu.c                 |  2 ++
- 5 files changed, 2 insertions(+), 39 deletions(-)
- delete mode 100644 arch/arm/mach-sunxi/sunxi.h
-
+diff --git a/arch/arm/mach-highbank/highbank.c b/arch/arm/mach-highbank/highbank.c
+index e7df2dd..dc5d6be 100644
+--- a/arch/arm/mach-highbank/highbank.c
++++ b/arch/arm/mach-highbank/highbank.c
+@@ -176,7 +176,6 @@ static const char *highbank_match[] __initconst = {
+ 
+ DT_MACHINE_START(HIGHBANK, "Highbank")
+ 	.smp		= smp_ops(highbank_smp_ops),
+-	.map_io		= debug_ll_io_init,
+ 	.init_irq	= highbank_init_irq,
+ 	.init_time	= highbank_timer_init,
+ 	.init_machine	= highbank_init,
 -- 
 1.8.1.2
