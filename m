@@ -1,68 +1,50 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon, 13 May 2013 21:07:33 +0400
-Subject: [PATCH 11/15] ARM: clps711x: Optimize interrupt handling
-In-Reply-To: <1368464857-5038-1-git-send-email-shc_work@mail.ru>
-References: <1368464857-5038-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1368464857-5038-14-git-send-email-shc_work@mail.ru>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 13 May 2013 10:09:00 -0700
+Subject: [PATCH 09/14] ARM: mvebu: Remove init_irq declaration in machine
+ description
+In-Reply-To: <51910C81.5050501@free-electrons.com>
+References: <1368438253-28218-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1368438253-28218-10-git-send-email-maxime.ripard@free-electrons.com>
+ <20130513151934.GM31290@titan.lakedaemon.net>
+ <51910C81.5050501@free-electrons.com>
+Message-ID: <CAOesGMgD6j9BE-kVe1rJjNFRtoV=e08B=o9hyhk1xfKLjsRF2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modify interrupt handler for processing all penging interrupts
-at once.
+On Mon, May 13, 2013 at 8:53 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Jason,
+>
+> Le 13/05/2013 17:19, Jason Cooper a ?crit :
+>> On Mon, May 13, 2013 at 11:44:08AM +0200, Maxime Ripard wrote:
+>>> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
+>>> specified") removed the need to explictly setup the init_irq field in
+>>> the machine description when using only irqchip_init. Remove that
+>>> declaration for mvebu as well.
+>>>
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> ---
+>>>  arch/arm/mach-mvebu/armada-370-xp.c | 1 -
+>>>  1 file changed, 1 deletion(-)
+>>
+>> Maxime,
+>>
+>> Do do want the individual submaintainers to take these?  Or, send one
+>> branch to Arnd and Olof?  I'm fine with either one as any merge
+>> conflicts should be trivial.
+>
+> I don't have a strong opinion on this one, I guess both will be fine.
+> Arnd, Olof, what do you prefer?
+>
+> I'll probably have to send a v2 anyway, I forgot to remove the include
+> of the irqchip headers.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-clps711x/common.c | 30 ++++++++++++++++++------------
- 1 file changed, 18 insertions(+), 12 deletions(-)
+Since each and every patch applies cleanly and things work well both
+before and after, let's have each maintainer that is active apply
+their own. If there are platforms that don't have a significant number
+of patches, i.e. if they're not collecting a branch, then we can apply
+those. Please follow up with us with the stragglers, I'll assume the
+rest will come in through the respective maintainers.
 
-diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
-index bd65839..f6d1746 100644
---- a/arch/arm/mach-clps711x/common.c
-+++ b/arch/arm/mach-clps711x/common.c
-@@ -215,7 +215,7 @@ void __init clps711x_init_irq(void)
- 	}
- }
- 
--inline u32 fls16(u32 x)
-+static inline u32 fls16(u32 x)
- {
- 	u32 r = 15;
- 
-@@ -239,18 +239,24 @@ inline u32 fls16(u32 x)
- 
- asmlinkage void __exception_irq_entry clps711x_handle_irq(struct pt_regs *regs)
- {
--	u32 irqstat;
--	void __iomem *base = CLPS711X_VIRT_BASE;
-+	do {
-+		u32 irqstat;
-+		void __iomem *base = CLPS711X_VIRT_BASE;
-+
-+		irqstat = readw_relaxed(base + INTSR1) &
-+			  readw_relaxed(base + INTMR1);
-+		if (irqstat)
-+			handle_IRQ(fls16(irqstat), regs);
-+
-+		irqstat = readw_relaxed(base + INTSR2) &
-+			  readw_relaxed(base + INTMR2);
-+		if (irqstat) {
-+			handle_IRQ(fls16(irqstat) + 16, regs);
-+			continue;
-+		}
- 
--	irqstat = readl_relaxed(base + INTSR1) & readl_relaxed(base + INTMR1);
--	if (irqstat) {
--		handle_IRQ(fls16(irqstat), regs);
--		return;
--	}
--
--	irqstat = readl_relaxed(base + INTSR2) & readl_relaxed(base + INTMR2);
--	if (likely(irqstat))
--		handle_IRQ(fls16(irqstat) + 16, regs);
-+		break;
-+	} while (1);
- }
- 
- static u32 notrace clps711x_sched_clock_read(void)
--- 
-1.8.1.5
+
+-Olof
