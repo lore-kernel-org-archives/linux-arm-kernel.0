@@ -1,36 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 May 2013 21:09:38 +0200
-Subject: [PATCH] serial: pl011: protect attribute read from NULL platform
- data struct
-In-Reply-To: <1368103855-28363-1-git-send-email-lee.jones@linaro.org>
-References: <1368103855-28363-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZR3AsGyCUH=cbskcZPs0PVBjH6QXUGkD+KG8SzGMMOKg@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 13 May 2013 13:24:30 -0600
+Subject: [PATCH 2/4] ARM: tegra: create a DT header defining GPIO IDs
+In-Reply-To: <1368473072-10145-1-git-send-email-swarren@wwwdotorg.org>
+References: <1368473072-10145-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1368473072-10145-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 9, 2013 at 2:50 PM, Lee Jones <lee.jones@linaro.org> wrote:
+From: Stephen Warren <swarren@nvidia.com>
 
-> It's completely feasible that platform data will be empty i.e. when
-> booting with Device Tree with no device AUXDATA. So we must protect
-> it's use in these use-cases, or risk a kernel Oops.
->
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Jiri Slaby <jslaby@suse.cz>
-> Cc: linux-serial at vger.kernel.org
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
-> *******                                                        *******
-> If this issue has not already been fixed, this patch should be applied
-> during the v3.10 -rc:s, as it fixes a serious bug which was introduced
-> in the merge-window.
-> *******                                                        *******
+All Tegra GPIOs are named after the GPIO bank and GPIO number within
+the bank. Define a macro to calculate the GPIO ID based on those
+parameters. Make the macro available via all Tegra .dtsip files.
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ include/dt-bindings/gpio/tegra-gpio.h |   50 +++++++++++++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
+ create mode 100644 include/dt-bindings/gpio/tegra-gpio.h
 
-You should probably put Greg on To: so that he picks this up for
-the -rc:s ASAP.
-
-Yours,
-Linus Walleij
+diff --git a/include/dt-bindings/gpio/tegra-gpio.h b/include/dt-bindings/gpio/tegra-gpio.h
+new file mode 100644
+index 0000000..4d179c0
+--- /dev/null
++++ b/include/dt-bindings/gpio/tegra-gpio.h
+@@ -0,0 +1,50 @@
++/*
++ * This header provides constants for binding nvidia,tegra*-gpio.
++ *
++ * The first cell in Tegra's GPIO specifier is the GPIO ID. The macros below
++ * provide names for this.
++ *
++ * The second cell contains standard flag values specified in gpio.h.
++ */
++
++#ifndef _DT_BINDINGS_GPIO_TEGRA_GPIO_H
++#define _DT_BINDINGS_GPIO_TEGRA_GPIO_H
++
++#include <dt-bindings/gpio/gpio.h>
++
++#define TEGRA_GPIO_BANK_ID_A 0
++#define TEGRA_GPIO_BANK_ID_B 1
++#define TEGRA_GPIO_BANK_ID_C 2
++#define TEGRA_GPIO_BANK_ID_D 3
++#define TEGRA_GPIO_BANK_ID_E 4
++#define TEGRA_GPIO_BANK_ID_F 5
++#define TEGRA_GPIO_BANK_ID_G 6
++#define TEGRA_GPIO_BANK_ID_H 7
++#define TEGRA_GPIO_BANK_ID_I 8
++#define TEGRA_GPIO_BANK_ID_J 9
++#define TEGRA_GPIO_BANK_ID_K 10
++#define TEGRA_GPIO_BANK_ID_L 11
++#define TEGRA_GPIO_BANK_ID_M 12
++#define TEGRA_GPIO_BANK_ID_N 13
++#define TEGRA_GPIO_BANK_ID_O 14
++#define TEGRA_GPIO_BANK_ID_P 15
++#define TEGRA_GPIO_BANK_ID_Q 16
++#define TEGRA_GPIO_BANK_ID_R 17
++#define TEGRA_GPIO_BANK_ID_S 18
++#define TEGRA_GPIO_BANK_ID_T 19
++#define TEGRA_GPIO_BANK_ID_U 20
++#define TEGRA_GPIO_BANK_ID_V 21
++#define TEGRA_GPIO_BANK_ID_W 22
++#define TEGRA_GPIO_BANK_ID_X 23
++#define TEGRA_GPIO_BANK_ID_Y 24
++#define TEGRA_GPIO_BANK_ID_Z 25
++#define TEGRA_GPIO_BANK_ID_AA 26
++#define TEGRA_GPIO_BANK_ID_BB 27
++#define TEGRA_GPIO_BANK_ID_CC 28
++#define TEGRA_GPIO_BANK_ID_DD 29
++#define TEGRA_GPIO_BANK_ID_EE 30
++
++#define TEGRA_GPIO(bank, offset) \
++	((TEGRA_GPIO_BANK_ID_##bank * 8) + offset)
++
++#endif
+-- 
+1.7.10.4
