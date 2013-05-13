@@ -1,84 +1,62 @@
-From: andre.przywara@linaro.org (Andre Przywara)
-Date: Tue, 14 May 2013 00:25:08 +0200
-Subject: [PATCH v3] ARM: KVM: prevent NULL pointer dereferences with KVM VCPU
- ioctl
-Message-ID: <1368483908-22274-1-git-send-email-andre.przywara@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 14 May 2013 00:30:27 +0200
+Subject: [PATCH 2/2] ARM: shmobile: lager: enable Ether
+In-Reply-To: <5190E4E9.20100@cogentembedded.com>
+References: <1368173119-27345-1-git-send-email-horms+renesas@verge.net.au>
+ <20130513004001.GC22911@verge.net.au> <5190E4E9.20100@cogentembedded.com>
+Message-ID: <4649393.HiDLOXMspX@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some ARM KVM VCPU ioctls require the vCPU to be properly initialized
-with the KVM_ARM_VCPU_INIT ioctl before being used with further
-requests. KVM_RUN checks whether this initialization has been
-done, but other ioctls do not.
-Namely KVM_GET_REG_LIST will dereference an array with index -1
-without initialization and thus leads to a kernel oops.
-Fix this by adding checks before executing the ioctl handlers.
+On Monday 13 May 2013 17:04:41 Sergei Shtylyov wrote:
+> On 13.05.2013 4:40, Simon Horman wrote:
+> > [ CC Laurent ]
+> > 
+> >>> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >>> 
+> >>> ---
+> >>> 
+> >>> This patch has a run-time dependency on "sh_eth: add support for r8a7790
+> >>> SoC".
+> [...]
+> 
+> >>> diff --git a/arch/arm/mach-shmobile/board-lager.c
+> >>> b/arch/arm/mach-shmobile/board-lager.c index 6a1ba38..0b8112d 100644
+> >>> --- a/arch/arm/mach-shmobile/board-lager.c
+> >>> +++ b/arch/arm/mach-shmobile/board-lager.c
+> >> 
+> >> [...]
+> >> 
+> >>> @@ -59,6 +69,17 @@ static const struct pinctrl_map lager_pinctrl_map[] =
+> >>> {
+> >>> 
+> >>>   	/* SCIF1 (CN20: DEBUG SERIAL1) */
+> >>>   	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.7", "pfc-r8a7790",
+> >>>   	
+> >>>   				  "scif1_data", "scif1"),
+> >>> 
+> >>> +	/* Ether */
+> >>> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
+> >>> +				  "eth_link", "eth"),
+> >>> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
+> >>> +				  "eth_magic", "eth"),
+> >>> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
+> >>> +				  "eth_mdio", "eth"),
+> >>> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
+> >>> +				  "eth_rmii", "eth"),
+> >>> 
+> >>      I thought MDIO bus was a part of RMII. At least Wikipedia told
+> >> 
+> >> me so. :-)
+> > 
+> > Is the implication that you think that the eth_mdio and eth_rmii
+> > groups should be combined?
 
-Changes from v1:
- * moved check into a static function with a meaningful name
-Changes from v2:
- * moved function into a header file and marked it as inline
+MDIO is used by RMII, MII and (R)GMII. Merging eth_mdio and eth_rmii would 
+require duplicating the pins in all those ethernet-related functions.
 
-Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
----
- arch/arm/include/asm/kvm_coproc.h |  9 +++++++++
- arch/arm/kvm/arm.c                | 10 ++++++++--
- 2 files changed, 17 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/include/asm/kvm_coproc.h b/arch/arm/include/asm/kvm_coproc.h
-index 4917c2f7..80d0082 100644
---- a/arch/arm/include/asm/kvm_coproc.h
-+++ b/arch/arm/include/asm/kvm_coproc.h
-@@ -39,6 +39,15 @@ unsigned long kvm_arm_num_guest_msrs(struct kvm_vcpu *vcpu);
- int kvm_arm_copy_msrindices(struct kvm_vcpu *vcpu, u64 __user *uindices);
- void kvm_coproc_table_init(void);
- 
-+/*
-+ * Some ioctls require initialization by KVM_ARM_VCPU_INIT first, check
-+ * this with this function to avoid NULL pointer dereference
-+ */
-+static inline int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
-+{
-+	return vcpu->arch.target >= 0;
-+}
-+
- struct kvm_one_reg;
- int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
- int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 37d216d..6800293 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -508,8 +508,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	int ret;
- 	sigset_t sigsaved;
- 
--	/* Make sure they initialize the vcpu with KVM_ARM_VCPU_INIT */
--	if (unlikely(vcpu->arch.target < 0))
-+	if (unlikely(!kvm_vcpu_initialized(vcpu)))
- 		return -ENOEXEC;
- 
- 	ret = kvm_vcpu_first_run_init(vcpu);
-@@ -710,6 +709,10 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 	case KVM_SET_ONE_REG:
- 	case KVM_GET_ONE_REG: {
- 		struct kvm_one_reg reg;
-+
-+		if (unlikely(!kvm_vcpu_initialized(vcpu)))
-+			return -ENOEXEC;
-+
- 		if (copy_from_user(&reg, argp, sizeof(reg)))
- 			return -EFAULT;
- 		if (ioctl == KVM_SET_ONE_REG)
-@@ -722,6 +725,9 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 		struct kvm_reg_list reg_list;
- 		unsigned n;
- 
-+		if (unlikely(!kvm_vcpu_initialized(vcpu)))
-+			return -ENOEXEC;
-+
- 		if (copy_from_user(&reg_list, user_list, sizeof(reg_list)))
- 			return -EFAULT;
- 		n = reg_list.n;
 -- 
-1.7.12.1
+Regards,
+
+Laurent Pinchart
