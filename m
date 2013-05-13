@@ -1,123 +1,150 @@
 From: gmbnomis@gmail.com (Simon Baatz)
-Date: Mon, 13 May 2013 23:19:01 +0200
-Subject: [PATCH V2 10/10] ARM: Kirkwood: add DT support for Sheevaplug and
- Sheevaplug eSATA
+Date: Mon, 13 May 2013 23:18:59 +0200
+Subject: [PATCH V2 08/10] mmc: mvsdio: use standard MMC device-tree binding
+ parser mmc_of_parse()
 In-Reply-To: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
 References: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
-Message-ID: <1368479941-10084-11-git-send-email-gmbnomis@gmail.com>
+Message-ID: <1368479941-10084-9-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Instead of parsing the DT binding on our own, use the standard parser
+mmc_of_parse(), introduced by commit 6c56e7a.
 
 Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
 ---
- arch/arm/mach-kirkwood/Kconfig            |    7 +++++++
- arch/arm/mach-kirkwood/Makefile           |    1 +
- arch/arm/mach-kirkwood/board-dt.c         |    4 ++++
- arch/arm/mach-kirkwood/board-sheevaplug.c |   27 +++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/common.h           |    5 +++++
- 5 files changed, 44 insertions(+)
- create mode 100644 arch/arm/mach-kirkwood/board-sheevaplug.c
+ drivers/mmc/host/mvsdio.c |   73 +++++++++++++++++++++++++--------------------
+ 1 file changed, 40 insertions(+), 33 deletions(-)
 
-diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
-index 7509a89..58518a2 100644
---- a/arch/arm/mach-kirkwood/Kconfig
-+++ b/arch/arm/mach-kirkwood/Kconfig
-@@ -296,6 +296,13 @@ config MACH_READYNAS_DT
- 	  Say 'Y' here if you want your kernel to support the
- 	  NETGEAR ReadyNAS Duo v2 using Fattened Device Tree.
+diff --git a/drivers/mmc/host/mvsdio.c b/drivers/mmc/host/mvsdio.c
+index 8960fc8..edfc481 100644
+--- a/drivers/mmc/host/mvsdio.c
++++ b/drivers/mmc/host/mvsdio.c
+@@ -35,7 +35,7 @@
  
-+config MACH_SHEEVAPLUG_DT
-+	bool "Marvell (eSATA) SheevaPlug (Flattened Device Tree)"
-+	select ARCH_KIRKWOOD_DT
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  Marvell (eSATA) SheevaPlug (Flattened Device Tree).
-+
- config MACH_TOPKICK_DT
- 	bool "USI Topkick (Flattened Device Tree)"
- 	select ARCH_KIRKWOOD_DT
-diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
-index e1f3735..8846abf 100644
---- a/arch/arm/mach-kirkwood/Makefile
-+++ b/arch/arm/mach-kirkwood/Makefile
-@@ -40,5 +40,6 @@ obj-$(CONFIG_MACH_NETSPACE_V2_DT)	+= board-ns2.o
- obj-$(CONFIG_MACH_NSA310_DT)		+= board-nsa310.o
- obj-$(CONFIG_MACH_OPENBLOCKS_A6_DT)	+= board-openblocks_a6.o
- obj-$(CONFIG_MACH_READYNAS_DT)		+= board-readynas.o
-+obj-$(CONFIG_MACH_SHEEVAPLUG_DT)	+= board-sheevaplug.o
- obj-$(CONFIG_MACH_TOPKICK_DT)		+= board-usi_topkick.o
- obj-$(CONFIG_MACH_TS219_DT)		+= board-ts219.o tsx1x-common.o
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index e9647b8..a09dbac 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -112,6 +112,9 @@ static void __init kirkwood_dt_init(void)
- 	if (of_machine_is_compatible("globalscale,guruplug"))
- 		guruplug_dt_init();
+ #define DRIVER_NAME	"mvsdio"
  
-+	if (of_machine_is_compatible("globalscale,sheevaplug"))
-+		sheevaplug_dt_init();
-+
- 	if (of_machine_is_compatible("dlink,dns-kirkwood"))
- 		dnskw_init();
+-static int maxfreq = MVSD_CLOCKRATE_MAX;
++static int maxfreq;
+ static int nodma;
  
-@@ -165,6 +168,7 @@ static void __init kirkwood_dt_init(void)
- static const char * const kirkwood_dt_board_compat[] = {
- 	"globalscale,dreamplug",
- 	"globalscale,guruplug",
-+	"globalscale,sheevaplug",
- 	"dlink,dns-320",
- 	"dlink,dns-325",
- 	"iom,iconnect",
-diff --git a/arch/arm/mach-kirkwood/board-sheevaplug.c b/arch/arm/mach-kirkwood/board-sheevaplug.c
-new file mode 100644
-index 0000000..fa38937
---- /dev/null
-+++ b/arch/arm/mach-kirkwood/board-sheevaplug.c
-@@ -0,0 +1,27 @@
-+/*
-+ * arch/arm/mach-kirkwood/board-sheevaplug.c
-+ *
-+ * Marvell Sheevaplug Reference Board Init for drivers not converted to
-+ * flattened device tree yet.
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
+ struct mvsd_host {
+@@ -685,7 +685,6 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 	const struct mbus_dram_target_info *dram;
+ 	struct resource *r;
+ 	int ret, irq;
+-	int gpio_card_detect, gpio_write_protect;
+ 	struct pinctrl *pinctrl;
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+@@ -718,6 +717,20 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 	if (!IS_ERR(host->clk))
+ 		clk_prepare_enable(host->clk);
+ 
++	mmc->ops = &mvsd_ops;
 +
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/mv643xx_eth.h>
-+#include "common.h"
++	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
 +
-+static struct mv643xx_eth_platform_data sheevaplug_ge00_data = {
-+	.phy_addr	= MV643XX_ETH_PHY_ADDR(0),
-+};
++	mmc->f_min = DIV_ROUND_UP(host->base_clock, MVSD_BASE_DIV_MAX);
++	mmc->f_max = MVSD_CLOCKRATE_MAX;
 +
-+void __init sheevaplug_dt_init(void)
-+{
-+	/*
-+	 * Basic setup. Needs to be called early.
-+	 */
-+	kirkwood_ge00_init(&sheevaplug_ge00_data);
-+}
-diff --git a/arch/arm/mach-kirkwood/common.h b/arch/arm/mach-kirkwood/common.h
-index 21da3b1..974442e 100644
---- a/arch/arm/mach-kirkwood/common.h
-+++ b/arch/arm/mach-kirkwood/common.h
-@@ -65,6 +65,11 @@ void guruplug_dt_init(void);
- #else
- static inline void guruplug_dt_init(void) {};
- #endif
-+#ifdef CONFIG_MACH_SHEEVAPLUG_DT
-+void sheevaplug_dt_init(void);
-+#else
-+static inline void sheevaplug_dt_init(void) {};
-+#endif
- #ifdef CONFIG_MACH_TS219_DT
- void qnap_dt_ts219_init(void);
- #else
++	mmc->max_blk_size = 2048;
++	mmc->max_blk_count = 65535;
++
++	mmc->max_segs = 1;
++	mmc->max_seg_size = mmc->max_blk_size * mmc->max_blk_count;
++	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
++
+ 	if (np) {
+ 		if (IS_ERR(host->clk)) {
+ 			dev_err(&pdev->dev, "DT platforms must have a clock associated\n");
+@@ -726,35 +739,38 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 		}
+ 
+ 		host->base_clock = clk_get_rate(host->clk) / 2;
+-		gpio_card_detect = of_get_named_gpio(np, "cd-gpios", 0);
+-		gpio_write_protect = of_get_named_gpio(np, "wp-gpios", 0);
++		ret = mmc_of_parse(mmc);
++		if (ret < 0)
++			goto out;
+ 	} else {
+ 		const struct mvsdio_platform_data *mvsd_data;
++
+ 		mvsd_data = pdev->dev.platform_data;
+ 		if (!mvsd_data) {
+ 			ret = -ENXIO;
+ 			goto out;
+ 		}
++		mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ |
++			    MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED;
+ 		host->base_clock = mvsd_data->clock / 2;
+-		gpio_card_detect = mvsd_data->gpio_card_detect ? : -EINVAL;
+-		gpio_write_protect = mvsd_data->gpio_write_protect ? : -EINVAL;
+-	}
+-
+-	mmc->ops = &mvsd_ops;
+-
+-	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+-	mmc->caps = MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ |
+-		    MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED;
+-
+-	mmc->f_min = DIV_ROUND_UP(host->base_clock, MVSD_BASE_DIV_MAX);
+-	mmc->f_max = maxfreq;
++		/* GPIO 0 regarded as invalid for backward compatibility */
++		if (mvsd_data->gpio_card_detect &&
++		    gpio_is_valid(mvsd_data->gpio_card_detect)) {
++			ret = mmc_gpio_request_cd(mmc,
++						  mvsd_data->gpio_card_detect);
++			if (ret)
++				goto out;
++		} else {
++			mmc->caps |= MMC_CAP_NEEDS_POLL;
++		}
+ 
+-	mmc->max_blk_size = 2048;
+-	mmc->max_blk_count = 65535;
++		if (mvsd_data->gpio_write_protect &&
++		    gpio_is_valid(mvsd_data->gpio_write_protect))
++			mmc_gpio_request_ro(mmc, mvsd_data->gpio_write_protect);
++	}
+ 
+-	mmc->max_segs = 1;
+-	mmc->max_seg_size = mmc->max_blk_size * mmc->max_blk_count;
+-	mmc->max_req_size = mmc->max_blk_size * mmc->max_blk_count;
++	if (maxfreq)
++		mmc->f_max = maxfreq;
+ 
+ 	spin_lock_init(&host->lock);
+ 
+@@ -777,15 +793,6 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 		goto out;
+ 	}
+ 
+-	if (gpio_is_valid(gpio_card_detect)) {
+-		ret = mmc_gpio_request_cd(mmc, gpio_card_detect);
+-		if (ret)
+-			goto out;
+-	} else
+-		mmc->caps |= MMC_CAP_NEEDS_POLL;
+-
+-	mmc_gpio_request_ro(mmc, gpio_write_protect);
+-
+ 	setup_timer(&host->timer, mvsd_timeout_timer, (unsigned long)host);
+ 	platform_set_drvdata(pdev, mmc);
+ 	ret = mmc_add_host(mmc);
+@@ -793,10 +800,10 @@ static int __init mvsd_probe(struct platform_device *pdev)
+ 		goto out;
+ 
+ 	if (!(mmc->caps & MMC_CAP_NEEDS_POLL))
+-		dev_notice(&pdev->dev, "using GPIO %d for card detection\n",
+-			   gpio_card_detect);
++		dev_notice(&pdev->dev, "using GPIO for card detection\n");
+ 	else
+-		dev_notice(&pdev->dev, "lacking card detect (fall back to polling)\n");
++		dev_notice(&pdev->dev,
++			   "lacking card detect (fall back to polling)\n");
+ 	return 0;
+ 
+ out:
 -- 
 1.7.9.5
