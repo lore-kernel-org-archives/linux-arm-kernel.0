@@ -1,123 +1,80 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Mon, 13 May 2013 13:58:10 -0400
-Subject: Introduce a new helper framework for buffer synchronization
-In-Reply-To: <CAAQKjZP=iOmHRpHZCbZD3v_RKUFSn0eM_WVZZvhe7F9g3eTmPA@mail.gmail.com>
-References: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
- <51909DB4.2060208@canonical.com>
- <025201ce4fbb$363d0390$a2b70ab0$%dae@samsung.com>
- <5190B7D8.3010803@canonical.com>
- <027a01ce4fcc$5e7c7320$1b755960$%dae@samsung.com>
- <5190D14A.7050904@canonical.com>
- <028a01ce4fd4$5ec6f000$1c54d000$%dae@samsung.com>
- <CAF6AEGvWazezZdLDn5=H8wNQdQSWV=EmqE1a4wh7QwrT_h6vKQ@mail.gmail.com>
- <CAAQKjZP=iOmHRpHZCbZD3v_RKUFSn0eM_WVZZvhe7F9g3eTmPA@mail.gmail.com>
-Message-ID: <CAF6AEGuDih-NR-VZCmQfqbvCOxjxreZRPGfhCyL12FQ1Qd616Q@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 13 May 2013 10:58:49 -0700
+Subject: [PATCH RFC] clk: Introduce userspace clock driver
+In-Reply-To: <519124D3.2040403@gmail.com>
+References: <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
+ <20130510212422.GY3200@sirena.org.uk>
+ <7e18bed3-ae6b-4aa0-bf23-b6c61ba8b85b@CO9EHSMHS030.ehs.local>
+ <20130512143344.GC3200@sirena.org.uk>
+ <9e55c552-ce34-4663-9a57-bf2c626d7d58@TX2EHSMHS008.ehs.local>
+ <20130513052135.GD6836@sirena.org.uk>
+ <0bf5a185-86f7-4a93-a90f-42caefb06a1d@TX2EHSMHS009.ehs.local>
+ <519112F9.2010102@gmail.com>
+ <7c5e7537-6ed5-4622-a7a9-bf46820ef695@VA3EHSMHS033.ehs.local>
+ <519124D3.2040403@gmail.com>
+Message-ID: <af51c63e-7ff1-4e73-9305-08309217ab38@TX2EHSMHS037.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 1:18 PM, Inki Dae <inki.dae@samsung.com> wrote:
->
->
-> 2013/5/13 Rob Clark <robdclark@gmail.com>
->>
->> On Mon, May 13, 2013 at 8:21 AM, Inki Dae <inki.dae@samsung.com> wrote:
->> >
->> >> In that case you still wouldn't give userspace control over the fences.
->> >> I
->> >> don't see any way that can end well.
->> >> What if userspace never signals? What if userspace gets killed by oom
->> >> killer. Who keeps track of that?
->> >>
->> >
->> > In all cases, all kernel resources to user fence will be released by
->> > kernel
->> > once the fence is timed out: never signaling and process killing by oom
->> > killer makes the fence timed out. And if we use mmap mechanism you
->> > mentioned
->> > before, I think user resource could also be freed properly.
->>
->>
->> I tend to agree w/ Maarten here.. there is no good reason for
->> userspace to be *signaling* fences.  The exception might be some blob
->> gpu drivers which don't have enough knowledge in the kernel to figure
->> out what to do.  (In which case you can add driver private ioctls for
->> that.. still not the right thing to do but at least you don't make a
->> public API out of it.)
->>
->
-> Please do not care whether those are generic or not. Let's see the following
-> three things. First, it's cache operation. As you know, ARM SoC has ACP
-> (Accelerator Coherency Port) and can be connected to DMA engine or similar
-> devices. And this port is used for cache coherency between CPU cache and DMA
-> device. However, most devices on ARM based embedded systems don't use the
-> ACP port. So they need proper cache operation before and after of DMA or CPU
-> access in case of using cachable mapping. Actually, I see many Linux based
-> platforms call cache control interfaces directly for that. I think the
-> reason, they do so, is that kernel isn't aware of when and how CPU accessed
-> memory.
+On Mon, May 13, 2013 at 07:37:23PM +0200, Sebastian Hesselbarth wrote:
+> On 05/13/13 19:24, S?ren Brinkmann wrote:
+> >On Mon, May 13, 2013 at 06:21:13PM +0200, Sebastian Hesselbarth wrote:
+> >>>Well, that driver actually exists. But that just programs a bitstream
+> >>>you give it to program. It does not know anything about the design it
+> >>>programs and cannot make any kind of decision whether the clocks should
+> >>>be userspace controlled or not.
+> >>
+> >>what Mark wants to point out is that you add fabric clocks to the Xilinx
+> >>driver instead. This way, you will have user-space controllable clocks
+> >>but only if you loaded the xilinx driver first.
+> >What "Xilinx driver", are we talking about?
+> 
+> The device config driver you mention below.
+> 
+> >>IIRC the fabric clock controller provided by Zynq _is_ always there and
+> >>accessible from ARM CPUs. You just don't have a new generic driver
+> >>allowing to poke with all clocks, but a xilinx only driver allowing you
+> >>to set the (xilinx only) fabric clocks.
+> >Right.
+> >
+> >>I've played with Zynq a while ago, did Xilinx mainline the bitfile
+> >>driver already? If not, why don't you give it a shot?
+> >The device config driver is not in mainline, AFAIK. And I think it's in
+> >rather bad shape and needs a lot of work before it is upstreamable. But
+> >this is probably the right place to put this.
+> 
+> It is, as it will only expose clocks on Zynq and that's what Mark and
+> Mike are worried about. Expose clocks to user space and you will have
+> people mess with it for sure.
+Well, even if you contain it in that driver you can still mess with
+other clocks. Just give it the "wrong" input clock references in DT and
+you are free to control them. As I said before, there is no protection
+against such misuse.
 
-I think we had kicked around the idea of giving dmabuf's a
-prepare/finish ioctl quite some time back.  This is probably something
-that should be at least a bit decoupled from fences.  (Possibly
-'prepare' waits for dma access to complete, but not the other way
-around.)
+> 
+> About the shape of it, I didn't expect that to change at all. Just
+> wondering, if it still requires you to manually end it's endianess
+> mess with the bitfiles. If you go at it, consider reading the magic
+> hidden in the bitfile and swap it when it is required. But that will
+> go OT here.
+It still takes byteswapped, binary images as input, unfortunately.
 
-And I did implement in omapdrm support for simulating coherency via
-page fault-in / shoot-down..  It is one option that makes it
-completely transparent to userspace, although there is some
-performance const, so I suppose it depends a bit on your use-case.
+> 
+> >On the other hand, currently this driver is only required for
+> >programming the FPGA from Linux, which is not required. One of the
+> >bootloaders could do this for you earlier.
+> 
+> Well, exposing clocks to user space is not required _at all_ on all
+> other platforms you can think of. So, if you have a Zynq, you can
+> always load a Zynq driver even if you are not going to use it's
+> bitfile programming capabilities but only to configure clocks.
+> 
+> If you don't want to merge both drivers, have a Zynq-only clock
+> fabric driver instead?
+That was my original intention. But due to the nature of it, it will
+always be possible to use it with other clocks too. Hence my generic
+approach.
+I actually like the idea of making it part of the device config driver.
+The downside of it is, that this driver seems a bit far from mainline.
 
-> And second, user process has to do so many things in case of using shared
-> memory with DMA device. User process should understand how DMA device is
-> operated and when interfaces for controling the DMA device are called. Such
-> things would make user application so complicated.
->
-> And third, it's performance optimization to multimedia and graphics devices.
-> As I mentioned already, we should consider sequential processing for buffer
-> sharing between CPU and DMA device. This means that CPU should stay with
-> idle until DMA device is completed and vise versa.
->
-> That is why I proposed such user interfaces. Of course, these interfaces
-> might be so ugly yet: for this, Maarten pointed already out and I agree with
-> him. But there must be another better way. Aren't you think we need similar
-> thing? With such interfaces, cache control and buffer synchronization can be
-> performed in kernel level. Moreover, user applization doesn't need to
-> consider DMA device controlling anymore. Therefore, one thread can access a
-> shared buffer and the other can control DMA device with the shared buffer in
-> parallel. We can really make the best use of CPU and DMA idle time. In other
-> words, we can really make the best use of multi tasking OS, Linux.
->
-> So could you please tell me about that there is any reason we don't use
-> public API for it? I think we can add and use public API if NECESSARY.
-
-well, for cache management, I think it is a better idea.. I didn't
-really catch that this was the motivation from the initial patch, but
-maybe I read it too quickly.  But cache can be decoupled from
-synchronization, because CPU access is not asynchronous.  For
-userspace/CPU access to buffer, you should:
-
-  1) wait for buffer
-  2) prepare-access
-  3)  ... do whatever cpu access to buffer ...
-  4) finish-access
-  5) submit buffer for new dma-operation
-
-I suppose you could combine the syscall for #1 and #2.. not sure if
-that is a good idea or not.  But you don't need to.  And there is
-never really any need for userspace to signal a fence.
-
-BR,
--R
-
-> Thanks,
-> Inki Dae
->
->>
->> BR,
->> -R
->> _______________________________________________
->> dri-devel mailing list
->> dri-devel at lists.freedesktop.org
->> http://lists.freedesktop.org/mailman/listinfo/dri-devel
->
->
+	S?ren
