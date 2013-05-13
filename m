@@ -1,13 +1,13 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 May 2013 10:08:12 +0100
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 13 May 2013 10:18:31 +0100
 Subject: [PATCH] ARM: KVM: Handle loads from I/O addresses to PC
 In-Reply-To: <1368385135-60584-1-git-send-email-cdall@cs.columbia.edu>
 References: <1368385135-60584-1-git-send-email-cdall@cs.columbia.edu>
-Message-ID: <5190AD7C.2000501@arm.com>
+Message-ID: <20130513091830.GA18242@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/13 19:58, Christoffer Dall wrote:
+On Sun, May 12, 2013 at 07:58:55PM +0100, Christoffer Dall wrote:
 > If a VM does something like this:
 > 
 > ldr     pc, [r0]        @ r0 is an I/O address
@@ -16,10 +16,6 @@ On 12/05/13 19:58, Christoffer Dall wrote:
 > overwriting the PC value set from kvm_skip_instr.
 > 
 > Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
-
-I've had a slightly more complete patch in my tree for a while (look at
-bef0ef01ae75 on the kvm-arm64/kvm-3.10-rc0 branch).
-
 > ---
 >  arch/arm/kvm/mmio.c |    6 ------
 >  1 file changed, 6 deletions(-)
@@ -36,15 +32,9 @@ bef0ef01ae75 on the kvm-arm64/kvm-3.10-rc0 branch).
 > -		/* IO memory trying to read/write pc */
 > -		kvm_inject_pabt(vcpu, kvm_vcpu_get_hfar(vcpu));
 > -		return 1;
-> -	}
-> -
->  	mmio->is_write = is_write;
->  	mmio->phys_addr = fault_ipa;
->  	mmio->len = len;
-> 
 
-Otherwise looks good to me.
+I haven't checked Marc's patch yet but I would get rid of
+kvm_vcpu_reg_is_pc() as well, that's the only place where it is used.
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
