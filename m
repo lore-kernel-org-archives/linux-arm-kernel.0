@@ -1,32 +1,45 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 13 May 2013 01:51:43 -0400
-Subject: [PATCh V10 12/12] usb: mv_usb: remove the phy callbacks in pdata
-In-Reply-To: <1368424303-10629-1-git-send-email-chao.xie@marvell.com>
-References: <1368424303-10629-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1368424303-10629-13-git-send-email-chao.xie@marvell.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 13 May 2013 11:35:22 +0530
+Subject: [PATCH 07/18] cpufreq: s3c24xx: move cpufreq driver to
+ drivers/cpufreq
+In-Reply-To: <5176A807.2090005@samsung.com>
+References: <cover.1365079581.git.viresh.kumar@linaro.org>
+ <2a5901ce31c9$95160980$bf421c80$%kim@samsung.com>
+ <CAKohpokk1Q+0gRpeW=ts0a8D+rGAUpHu62X+7ejdpfom_B6FYA@mail.gmail.com>
+ <1769336.FkfMpuXqqb@vostro.rjw.lan> <5176A807.2090005@samsung.com>
+Message-ID: <CAKohpomV9-JEbuHWdmp6N+bKYt+83hXXcqg4aKXSY1a5zwpW9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phy initialization code will be done by phy driver.
+On 23 April 2013 20:55, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 04/05/13 20:36, Rafael J. Wysocki wrote:
+>>
+>> On Friday, April 05, 2013 12:36:34 PM Viresh Kumar wrote:
+>>>
+>>> On 5 April 2013 12:18, Kukjin Kim<kgene.kim@samsung.com>  wrote:
+>>>>
+>>>> Basically, this moving looks good to me, but should be re-worked based
+>>>> on
+>>>> for-next of samsung tree because this touches too many samsung stuff so
+>>>> this
+>>>> should be sent to upstream via samsung tree.
+>>>
+>>>
+>>> Hmm... Its already applied in Rafael's tree. But it doesn't mean that
+>>> it can't be
+>>> moved to your tree if there is a issue.
+>>
+>>
+>> Well, I'm dropping it.  Please merge via the Samsung tree.
+>>
+>
+> Oops, I missed, maybe I have no more chance to send this to upstream for
+> upcoming merge window :-(
+>
+> Rafael, please take this patch with my ack in your tree, sorry for noise.
+>
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+>
+> If any problems, please kindly let me know.
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- include/linux/platform_data/mv_usb.h |    3 ---
- 1 files changed, 0 insertions(+), 3 deletions(-)
-
-diff --git a/include/linux/platform_data/mv_usb.h b/include/linux/platform_data/mv_usb.h
-index 98b7925..b4b5d6f 100644
---- a/include/linux/platform_data/mv_usb.h
-+++ b/include/linux/platform_data/mv_usb.h
-@@ -45,9 +45,6 @@ struct mv_usb_platform_data {
- 	/* Force a_bus_req to be asserted */
- 	 unsigned int    otg_force_a_bus_req:1;
- 
--	int	(*phy_init)(void __iomem *regbase);
--	void	(*phy_deinit)(void __iomem *regbase);
- 	int	(*set_vbus)(unsigned int vbus);
--	int     (*private_init)(void __iomem *opregs, void __iomem *phyregs);
- };
- #endif
--- 
-1.7.4.1
+Who is going to pick this patch now for next merge window?
