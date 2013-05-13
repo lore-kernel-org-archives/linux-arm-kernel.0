@@ -1,40 +1,29 @@
-From: maarten.lankhorst@canonical.com (Maarten Lankhorst)
-Date: Mon, 13 May 2013 10:00:52 +0200
-Subject: Introduce a new helper framework for buffer synchronization
-In-Reply-To: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
-References: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
-Message-ID: <51909DB4.2060208@canonical.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 13 May 2013 20:20:58 +1200
+Subject: [PATCH 0/2] clk: vt8500: updates for 3.11
+Message-ID: <1368433260-16073-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Op 09-05-13 09:33, Inki Dae schreef:
-> Hi all,
->
-> This post introduces a new helper framework based on dma fence. And the
-> purpose of this post is to collect other opinions and advices before RFC
-> posting.
->
-> First of all, this helper framework, called fence helper, is in progress
-> yet so might not have enough comments in codes and also might need to be
-> more cleaned up. Moreover, we might be missing some parts of the dma fence.
-> However, I'd like to say that all things mentioned below has been tested
-> with Linux platform and worked well.
+Hi Mike,
 
-> ....
->
-> And tutorial for user process.
->         just before cpu access
->                 struct dma_buf_fence *df;
->
->                 df->type = DMA_BUF_ACCESS_READ or DMA_BUF_ACCESS_WRITE;
->                 ioctl(fd, DMA_BUF_GET_FENCE, &df);
->
->         after memset or memcpy
->                 ioctl(fd, DMA_BUF_PUT_FENCE, &df);
-NAK.
+Two updates for the arch-vt8500 clock code:
 
-Userspace doesn't need to trigger fences. It can do a buffer idle wait, and postpone submitting new commands until after it's done using the buffer.
-Kernel space doesn't need the root hole you created by giving a dereferencing a pointer passed from userspace.
-Your next exercise should be to write a security exploit from the api you created here. It's the only way to learn how to write safe code. Hint: df.ctx = mmap(..);
+#1: Add support for the WM8850 PLL.
+#2: Remove a second divisor check in vt8500_dclk_set_rate() which causes the
+divisor to be round-down too low.
 
-~Maarten
+Regards
+Tony Prisk
+
+Tony Prisk (2):
+  clk: vt8500: Add support for clocks on the WM8850 SoCs
+  clk: vt8500: Remove unnecessary divisor adjustment in
+    vtwm_dclk_set_rate()
+
+ Documentation/devicetree/bindings/clock/vt8500.txt |    2 +
+ drivers/clk/clk-vt8500.c                           |   75 ++++++++++++++++++--
+ 2 files changed, 73 insertions(+), 4 deletions(-)
+
+-- 
+1.7.9.5
