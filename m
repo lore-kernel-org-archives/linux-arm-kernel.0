@@ -1,463 +1,307 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon, 13 May 2013 21:07:29 +0400
-Subject: [PATCH 07/15] ARM: clps711x: p720t: Define PLD registers as GPIOs
+Date: Mon, 13 May 2013 21:07:36 +0400
+Subject: [PATCH 14/15] ARM: clps711x: Add support for SYSCON driver
 In-Reply-To: <1368464857-5038-1-git-send-email-shc_work@mail.ru>
 References: <1368464857-5038-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1368464857-5038-10-git-send-email-shc_work@mail.ru>
+Message-ID: <1368464857-5038-17-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds support for SYSCON driver for CLPS711X targets.
+At this time there are no users for this driver, but it is will
+be used as start point to use in CLPS711X drivers and remove
+<mach/xx> dependencies.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/board-p720t.c         | 245 +++++++++++++++++++++------
- arch/arm/mach-clps711x/include/mach/syspld.h | 116 -------------
- 2 files changed, 193 insertions(+), 168 deletions(-)
- delete mode 100644 arch/arm/mach-clps711x/include/mach/syspld.h
+ arch/arm/Kconfig                               |  1 +
+ arch/arm/mach-clps711x/devices.c               | 20 ++++++
+ arch/arm/mach-clps711x/include/mach/clps711x.h | 88 +-----------------------
+ drivers/mfd/syscon.c                           |  3 +
+ include/linux/mfd/syscon/clps711x.h            | 94 ++++++++++++++++++++++++++
+ 5 files changed, 120 insertions(+), 86 deletions(-)
+ create mode 100644 include/linux/mfd/syscon/clps711x.h
 
-diff --git a/arch/arm/mach-clps711x/board-p720t.c b/arch/arm/mach-clps711x/board-p720t.c
-index 48d0737..601ef38 100644
---- a/arch/arm/mach-clps711x/board-p720t.c
-+++ b/arch/arm/mach-clps711x/board-p720t.c
-@@ -23,10 +23,12 @@
- #include <linux/string.h>
- #include <linux/mm.h>
- #include <linux/io.h>
-+#include <linux/gpio.h>
- #include <linux/slab.h>
- #include <linux/leds.h>
- #include <linux/sizes.h>
- #include <linux/backlight.h>
-+#include <linux/basic_mmio_gpio.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2af27f7..6228676 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -371,6 +371,7 @@ config ARCH_CLPS711X
+ 	select COMMON_CLK
+ 	select CPU_ARM720T
+ 	select GENERIC_CLOCKEVENTS
++	select MFD_SYSCON
+ 	select MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
+ 	help
+diff --git a/arch/arm/mach-clps711x/devices.c b/arch/arm/mach-clps711x/devices.c
+index 21161ed..856b81c 100644
+--- a/arch/arm/mach-clps711x/devices.c
++++ b/arch/arm/mach-clps711x/devices.c
+@@ -10,6 +10,7 @@
+  */
+ 
  #include <linux/platform_device.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/nand-gpio.h>
-@@ -38,7 +40,6 @@
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
--#include <mach/syspld.h>
++#include <linux/sizes.h>
  
- #include <video/platform_lcd.h>
+ #include <mach/hardware.h>
  
-@@ -52,6 +53,178 @@
+@@ -42,7 +43,26 @@ static void __init clps711x_add_gpio(void)
+ 	}
+ }
  
- #define P720T_NAND_BASE		(CLPS711X_SDRAM1_BASE)
- 
-+#define P720T_MMGPIO_BASE	(CLPS711X_NR_GPIO)
-+
-+#define SYSPLD_PHYS_BASE	IOMEM(CS1_PHYS_BASE)
-+
-+#define PLD_INT			(SYSPLD_PHYS_BASE + 0x000000)
-+#define PLD_INT_MMGPIO_BASE	(P720T_MMGPIO_BASE + 0)
-+#define PLD_INT_PENIRQ		(PLD_INT_MMGPIO_BASE + 5)
-+#define PLD_INT_UCB_IRQ		(PLD_INT_MMGPIO_BASE + 1)
-+#define PLD_INT_KBD_ATN		(PLD_INT_MMGPIO_BASE + 0) /* EINT1 */
-+
-+#define PLD_PWR			(SYSPLD_PHYS_BASE + 0x000004)
-+#define PLD_PWR_MMGPIO_BASE	(P720T_MMGPIO_BASE + 8)
-+#define PLD_PWR_EXT		(PLD_PWR_MMGPIO_BASE + 5)
-+#define PLD_PWR_MODE		(PLD_PWR_MMGPIO_BASE + 4) /* 1 = PWM, 0 = PFM */
-+#define PLD_S4_ON		(PLD_PWR_MMGPIO_BASE + 3) /* LCD bias voltage enable */
-+#define PLD_S3_ON		(PLD_PWR_MMGPIO_BASE + 2) /* LCD backlight enable */
-+#define PLD_S2_ON		(PLD_PWR_MMGPIO_BASE + 1) /* LCD 3V3 supply enable */
-+#define PLD_S1_ON		(PLD_PWR_MMGPIO_BASE + 0) /* LCD 3V supply enable */
-+
-+#define PLD_KBD			(SYSPLD_PHYS_BASE + 0x000008)
-+#define PLD_KBD_MMGPIO_BASE	(P720T_MMGPIO_BASE + 16)
-+#define PLD_KBD_WAKE		(PLD_KBD_MMGPIO_BASE + 1)
-+#define PLD_KBD_EN		(PLD_KBD_MMGPIO_BASE + 0)
-+
-+#define PLD_SPI			(SYSPLD_PHYS_BASE + 0x00000c)
-+#define PLD_SPI_MMGPIO_BASE	(P720T_MMGPIO_BASE + 24)
-+#define PLD_SPI_EN		(PLD_SPI_MMGPIO_BASE + 0)
-+
-+#define PLD_IO			(SYSPLD_PHYS_BASE + 0x000010)
-+#define PLD_IO_MMGPIO_BASE	(P720T_MMGPIO_BASE + 32)
-+#define PLD_IO_BOOTSEL		(PLD_IO_MMGPIO_BASE + 6) /* Boot sel switch */
-+#define PLD_IO_USER		(PLD_IO_MMGPIO_BASE + 5) /* User defined switch */
-+#define PLD_IO_LED3		(PLD_IO_MMGPIO_BASE + 4)
-+#define PLD_IO_LED2		(PLD_IO_MMGPIO_BASE + 3)
-+#define PLD_IO_LED1		(PLD_IO_MMGPIO_BASE + 2)
-+#define PLD_IO_LED0		(PLD_IO_MMGPIO_BASE + 1)
-+#define PLD_IO_LEDEN		(PLD_IO_MMGPIO_BASE + 0)
-+
-+#define PLD_IRDA		(SYSPLD_PHYS_BASE + 0x000014)
-+#define PLD_IRDA_MMGPIO_BASE	(P720T_MMGPIO_BASE + 40)
-+#define PLD_IRDA_EN		(PLD_IRDA_MMGPIO_BASE + 0)
-+
-+#define PLD_COM2		(SYSPLD_PHYS_BASE + 0x000018)
-+#define PLD_COM2_MMGPIO_BASE	(P720T_MMGPIO_BASE + 48)
-+#define PLD_COM2_EN		(PLD_COM2_MMGPIO_BASE + 0)
-+
-+#define PLD_COM1		(SYSPLD_PHYS_BASE + 0x00001c)
-+#define PLD_COM1_MMGPIO_BASE	(P720T_MMGPIO_BASE + 56)
-+#define PLD_COM1_EN		(PLD_COM1_MMGPIO_BASE + 0)
-+
-+#define PLD_AUD			(SYSPLD_PHYS_BASE + 0x000020)
-+#define PLD_AUD_MMGPIO_BASE	(P720T_MMGPIO_BASE + 64)
-+#define PLD_AUD_DIV1		(PLD_AUD_MMGPIO_BASE + 6)
-+#define PLD_AUD_DIV0		(PLD_AUD_MMGPIO_BASE + 5)
-+#define PLD_AUD_CLK_SEL1	(PLD_AUD_MMGPIO_BASE + 4)
-+#define PLD_AUD_CLK_SEL0	(PLD_AUD_MMGPIO_BASE + 3)
-+#define PLD_AUD_MIC_PWR		(PLD_AUD_MMGPIO_BASE + 2)
-+#define PLD_AUD_MIC_GAIN	(PLD_AUD_MMGPIO_BASE + 1)
-+#define PLD_AUD_CODEC_EN	(PLD_AUD_MMGPIO_BASE + 0)
-+
-+#define PLD_CF			(SYSPLD_PHYS_BASE + 0x000024)
-+#define PLD_CF_MMGPIO_BASE	(P720T_MMGPIO_BASE + 72)
-+#define PLD_CF2_SLEEP		(PLD_CF_MMGPIO_BASE + 5)
-+#define PLD_CF1_SLEEP		(PLD_CF_MMGPIO_BASE + 4)
-+#define PLD_CF2_nPDREQ		(PLD_CF_MMGPIO_BASE + 3)
-+#define PLD_CF1_nPDREQ		(PLD_CF_MMGPIO_BASE + 2)
-+#define PLD_CF2_nIRQ		(PLD_CF_MMGPIO_BASE + 1)
-+#define PLD_CF1_nIRQ		(PLD_CF_MMGPIO_BASE + 0)
-+
-+#define PLD_SDC			(SYSPLD_PHYS_BASE + 0x000028)
-+#define PLD_SDC_MMGPIO_BASE	(P720T_MMGPIO_BASE + 80)
-+#define PLD_SDC_INT_EN		(PLD_SDC_MMGPIO_BASE + 2)
-+#define PLD_SDC_WP		(PLD_SDC_MMGPIO_BASE + 1)
-+#define PLD_SDC_CD		(PLD_SDC_MMGPIO_BASE + 0)
-+
-+#define PLD_CODEC		(SYSPLD_PHYS_BASE + 0x400000)
-+#define PLD_CODEC_MMGPIO_BASE	(P720T_MMGPIO_BASE + 88)
-+#define PLD_CODEC_IRQ3		(PLD_CODEC_MMGPIO_BASE + 4)
-+#define PLD_CODEC_IRQ2		(PLD_CODEC_MMGPIO_BASE + 3)
-+#define PLD_CODEC_IRQ1		(PLD_CODEC_MMGPIO_BASE + 2)
-+#define PLD_CODEC_EN		(PLD_CODEC_MMGPIO_BASE + 0)
-+
-+#define PLD_BRITE		(SYSPLD_PHYS_BASE + 0x400004)
-+#define PLD_BRITE_MMGPIO_BASE	(P720T_MMGPIO_BASE + 96)
-+#define PLD_BRITE_UP		(PLD_BRITE_MMGPIO_BASE + 1)
-+#define PLD_BRITE_DN		(PLD_BRITE_MMGPIO_BASE + 0)
-+
-+#define PLD_LCDEN		(SYSPLD_PHYS_BASE + 0x400008)
-+#define PLD_LCDEN_MMGPIO_BASE	(P720T_MMGPIO_BASE + 104)
-+#define PLD_LCDEN_EN		(PLD_LCDEN_MMGPIO_BASE + 0)
-+
-+#define PLD_TCH			(SYSPLD_PHYS_BASE + 0x400010)
-+#define PLD_TCH_MMGPIO_BASE	(P720T_MMGPIO_BASE + 112)
-+#define PLD_TCH_PENIRQ		(PLD_TCH_MMGPIO_BASE + 1)
-+#define PLD_TCH_EN		(PLD_TCH_MMGPIO_BASE + 0)
-+
-+#define PLD_GPIO		(SYSPLD_PHYS_BASE + 0x400014)
-+#define PLD_GPIO_MMGPIO_BASE	(P720T_MMGPIO_BASE + 120)
-+#define PLD_GPIO2		(PLD_GPIO_MMGPIO_BASE + 2)
-+#define PLD_GPIO1		(PLD_GPIO_MMGPIO_BASE + 1)
-+#define PLD_GPIO0		(PLD_GPIO_MMGPIO_BASE + 0)
-+
-+static struct gpio p720t_gpios[] __initconst = {
-+	{ PLD_S1_ON,	GPIOF_OUT_INIT_LOW,	"PLD_S1_ON" },
-+	{ PLD_S2_ON,	GPIOF_OUT_INIT_LOW,	"PLD_S2_ON" },
-+	{ PLD_S3_ON,	GPIOF_OUT_INIT_LOW,	"PLD_S3_ON" },
-+	{ PLD_S4_ON,	GPIOF_OUT_INIT_LOW,	"PLD_S4_ON" },
-+	{ PLD_KBD_EN,	GPIOF_OUT_INIT_LOW,	"PLD_KBD_EN" },
-+	{ PLD_SPI_EN,	GPIOF_OUT_INIT_LOW,	"PLD_SPI_EN" },
-+	{ PLD_IO_USER,	GPIOF_OUT_INIT_LOW,	"PLD_IO_USER" },
-+	{ PLD_IO_LED0,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LED0" },
-+	{ PLD_IO_LED1,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LED1" },
-+	{ PLD_IO_LED2,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LED2" },
-+	{ PLD_IO_LED3,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LED3" },
-+	{ PLD_IO_LEDEN,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LEDEN" },
-+	{ PLD_IRDA_EN,	GPIOF_OUT_INIT_LOW,	"PLD_IRDA_EN" },
-+	{ PLD_COM1_EN,	GPIOF_OUT_INIT_HIGH,	"PLD_COM1_EN" },
-+	{ PLD_COM2_EN,	GPIOF_OUT_INIT_HIGH,	"PLD_COM2_EN" },
-+	{ PLD_CODEC_EN,	GPIOF_OUT_INIT_LOW,	"PLD_CODEC_EN" },
-+	{ PLD_LCDEN_EN,	GPIOF_OUT_INIT_LOW,	"PLD_LCDEN_EN" },
-+	{ PLD_TCH_EN,	GPIOF_OUT_INIT_LOW,	"PLD_TCH_EN" },
-+	{ P720T_USERLED,GPIOF_OUT_INIT_LOW,	"USER_LED" },
++const struct resource clps711x_syscon_res[] __initconst = {
++	/* SYSCON1, SYSFLG1 */
++	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + SYSCON1, SZ_128),
++	/* SYSCON2, SYSFLG2 */
++	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + SYSCON2, SZ_128),
++	/* SYSCON3 */
++	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + SYSCON3, SZ_64),
 +};
 +
-+static struct resource p720t_mmgpio_resource[] __initdata = {
-+	DEFINE_RES_MEM_NAMED(0, 4, "dat"),
-+};
-+
-+static struct bgpio_pdata p720t_mmgpio_pdata = {
-+	.ngpio	= 8,
-+};
-+
-+static struct platform_device p720t_mmgpio __initdata = {
-+	.name		= "basic-mmio-gpio",
-+	.id		= -1,
-+	.resource	= p720t_mmgpio_resource,
-+	.num_resources	= ARRAY_SIZE(p720t_mmgpio_resource),
-+	.dev		= {
-+		.platform_data	= &p720t_mmgpio_pdata,
-+	},
-+};
-+
-+static void __init p720t_mmgpio_init(void __iomem *addrbase, int gpiobase)
++static void __init clps711x_add_syscon(void)
 +{
-+	p720t_mmgpio_resource[0].start = (unsigned long)addrbase;
-+	p720t_mmgpio_pdata.base = gpiobase;
++	unsigned i;
 +
-+	platform_device_register(&p720t_mmgpio);
++	for (i = 0; i < ARRAY_SIZE(clps711x_syscon_res); i++)
++		platform_device_register_simple("clps711x-syscon", i + 1,
++						&clps711x_syscon_res[i], 1);
 +}
 +
-+static struct {
-+	void __iomem	*addrbase;
-+	int		gpiobase;
-+} mmgpios[] __initconst = {
-+	{ PLD_INT,	PLD_INT_MMGPIO_BASE },
-+	{ PLD_PWR,	PLD_PWR_MMGPIO_BASE },
-+	{ PLD_KBD,	PLD_KBD_MMGPIO_BASE },
-+	{ PLD_SPI,	PLD_SPI_MMGPIO_BASE },
-+	{ PLD_IO,	PLD_IO_MMGPIO_BASE },
-+	{ PLD_IRDA,	PLD_IRDA_MMGPIO_BASE },
-+	{ PLD_COM2,	PLD_COM2_MMGPIO_BASE },
-+	{ PLD_COM1,	PLD_COM1_MMGPIO_BASE },
-+	{ PLD_AUD,	PLD_AUD_MMGPIO_BASE },
-+	{ PLD_CF,	PLD_CF_MMGPIO_BASE },
-+	{ PLD_SDC,	PLD_SDC_MMGPIO_BASE },
-+	{ PLD_CODEC,	PLD_CODEC_MMGPIO_BASE },
-+	{ PLD_BRITE,	PLD_BRITE_MMGPIO_BASE },
-+	{ PLD_LCDEN,	PLD_LCDEN_MMGPIO_BASE },
-+	{ PLD_TCH,	PLD_TCH_MMGPIO_BASE },
-+	{ PLD_GPIO,	PLD_GPIO_MMGPIO_BASE },
-+};
+ void __init clps711x_devices_init(void)
+ {
+ 	clps711x_add_gpio();
++	clps711x_add_syscon();
+ }
+diff --git a/arch/arm/mach-clps711x/include/mach/clps711x.h b/arch/arm/mach-clps711x/include/mach/clps711x.h
+index 01d1b95..0286f4b 100644
+--- a/arch/arm/mach-clps711x/include/mach/clps711x.h
++++ b/arch/arm/mach-clps711x/include/mach/clps711x.h
+@@ -21,6 +21,8 @@
+ #ifndef __MACH_CLPS711X_H
+ #define __MACH_CLPS711X_H
+ 
++#include <linux/mfd/syscon/clps711x.h>
 +
- static struct resource p720t_nand_resource[] __initdata = {
- 	DEFINE_RES_MEM(P720T_NAND_BASE, SZ_4),
+ #define CLPS711X_PHYS_BASE	(0x80000000)
+ 
+ #define PADR		(0x0000)
+@@ -96,83 +98,9 @@
+ #define RANDID2		(0x2708)
+ #define RANDID3		(0x270c)
+ 
+-/* common bits: SYSCON1 / SYSCON2 */
+-#define SYSCON_UARTEN		(1 << 8)
+-
+-#define SYSCON1_KBDSCAN(x)	((x) & 15)
+-#define SYSCON1_KBDSCANMASK	(15)
+-#define SYSCON1_TC1M		(1 << 4)
+-#define SYSCON1_TC1S		(1 << 5)
+-#define SYSCON1_TC2M		(1 << 6)
+-#define SYSCON1_TC2S		(1 << 7)
+-#define SYSCON1_UART1EN		SYSCON_UARTEN
+-#define SYSCON1_BZTOG		(1 << 9)
+-#define SYSCON1_BZMOD		(1 << 10)
+-#define SYSCON1_DBGEN		(1 << 11)
+-#define SYSCON1_LCDEN		(1 << 12)
+-#define SYSCON1_CDENTX		(1 << 13)
+-#define SYSCON1_CDENRX		(1 << 14)
+-#define SYSCON1_SIREN		(1 << 15)
+-#define SYSCON1_ADCKSEL(x)	(((x) & 3) << 16)
+-#define SYSCON1_ADCKSEL_MASK	(3 << 16)
+-#define SYSCON1_EXCKEN		(1 << 18)
+-#define SYSCON1_WAKEDIS		(1 << 19)
+-#define SYSCON1_IRTXM		(1 << 20)
+-
+-/* common bits: SYSFLG1 / SYSFLG2 */
+-#define SYSFLG_UBUSY		(1 << 11)
+-#define SYSFLG_URXFE		(1 << 22)
+-#define SYSFLG_UTXFF		(1 << 23)
+-
+-#define SYSFLG1_MCDR		(1 << 0)
+-#define SYSFLG1_DCDET		(1 << 1)
+-#define SYSFLG1_WUDR		(1 << 2)
+-#define SYSFLG1_WUON		(1 << 3)
+-#define SYSFLG1_CTS		(1 << 8)
+-#define SYSFLG1_DSR		(1 << 9)
+-#define SYSFLG1_DCD		(1 << 10)
+-#define SYSFLG1_UBUSY		SYSFLG_UBUSY
+-#define SYSFLG1_NBFLG		(1 << 12)
+-#define SYSFLG1_RSTFLG		(1 << 13)
+-#define SYSFLG1_PFFLG		(1 << 14)
+-#define SYSFLG1_CLDFLG		(1 << 15)
+-#define SYSFLG1_URXFE		SYSFLG_URXFE
+-#define SYSFLG1_UTXFF		SYSFLG_UTXFF
+-#define SYSFLG1_CRXFE		(1 << 24)
+-#define SYSFLG1_CTXFF		(1 << 25)
+-#define SYSFLG1_SSIBUSY		(1 << 26)
+-#define SYSFLG1_ID		(1 << 29)
+-#define SYSFLG1_VERID(x)	(((x) >> 30) & 3)
+-#define SYSFLG1_VERID_MASK	(3 << 30)
+-
+-#define SYSFLG2_SSRXOF		(1 << 0)
+-#define SYSFLG2_RESVAL		(1 << 1)
+-#define SYSFLG2_RESFRM		(1 << 2)
+-#define SYSFLG2_SS2RXFE		(1 << 3)
+-#define SYSFLG2_SS2TXFF		(1 << 4)
+-#define SYSFLG2_SS2TXUF		(1 << 5)
+-#define SYSFLG2_CKMODE		(1 << 6)
+-#define SYSFLG2_UBUSY		SYSFLG_UBUSY
+-#define SYSFLG2_URXFE		SYSFLG_URXFE
+-#define SYSFLG2_UTXFF		SYSFLG_UTXFF
+-
+ #define LCDCON_GSEN		(1 << 30)
+ #define LCDCON_GSMD		(1 << 31)
+ 
+-#define SYSCON2_SERSEL		(1 << 0)
+-#define SYSCON2_KBD6		(1 << 1)
+-#define SYSCON2_DRAMZ		(1 << 2)
+-#define SYSCON2_KBWEN		(1 << 3)
+-#define SYSCON2_SS2TXEN		(1 << 4)
+-#define SYSCON2_PCCARD1		(1 << 5)
+-#define SYSCON2_PCCARD2		(1 << 6)
+-#define SYSCON2_SS2RXEN		(1 << 7)
+-#define SYSCON2_UART2EN		SYSCON_UARTEN
+-#define SYSCON2_SS2MAEN		(1 << 9)
+-#define SYSCON2_OSTB		(1 << 12)
+-#define SYSCON2_CLKENSL		(1 << 13)
+-#define SYSCON2_BUZFREQ		(1 << 14)
+-
+ /* common bits: UARTDR1 / UARTDR2 */
+ #define UARTDR_FRMERR		(1 << 8)
+ #define UARTDR_PARERR		(1 << 9)
+@@ -228,18 +156,6 @@
+ #define DAI64FS_MCLK256EN	(1 << 3)
+ #define DAI64FS_LOOPBACK	(1 << 5)
+ 
+-#define SYSCON3_ADCCON		(1 << 0)
+-#define SYSCON3_CLKCTL0		(1 << 1)
+-#define SYSCON3_CLKCTL1		(1 << 2)
+-#define SYSCON3_DAISEL		(1 << 3)
+-#define SYSCON3_ADCCKNSEN	(1 << 4)
+-#define SYSCON3_VERSN(x)	(((x) >> 5) & 7)
+-#define SYSCON3_VERSN_MASK	(7 << 5)
+-#define SYSCON3_FASTWAKE	(1 << 8)
+-#define SYSCON3_DAIEN		(1 << 9)
+-#define SYSCON3_128FS		SYSCON3_DAIEN
+-#define SYSCON3_ENPD67		(1 << 10)
+-
+ #define SDCONF_ACTIVE		(1 << 10)
+ #define SDCONF_CLKCTL		(1 << 9)
+ #define SDCONF_WIDTH_4		(0 << 7)
+diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+index 962a6e1..1a31512 100644
+--- a/drivers/mfd/syscon.c
++++ b/drivers/mfd/syscon.c
+@@ -159,6 +159,9 @@ static int syscon_probe(struct platform_device *pdev)
+ 
+ static const struct platform_device_id syscon_ids[] = {
+ 	{ "syscon", },
++#ifdef CONFIG_ARCH_CLPS711X
++	{ "clps711x-syscon", },
++#endif
+ 	{ }
  };
-@@ -93,11 +266,15 @@ static struct platform_device p720t_nand_pdev __initdata = {
- static void p720t_lcd_power_set(struct plat_lcd_data *pd, unsigned int power)
- {
- 	if (power) {
--		PLD_LCDEN = PLD_LCDEN_EN;
--		PLD_PWR |= PLD_S4_ON | PLD_S2_ON | PLD_S1_ON;
-+		gpio_set_value(PLD_LCDEN_EN, 1);
-+		gpio_set_value(PLD_S1_ON, 1);
-+		gpio_set_value(PLD_S2_ON, 1);
-+		gpio_set_value(PLD_S4_ON, 1);
- 	} else {
--		PLD_PWR &= ~(PLD_S4_ON | PLD_S2_ON | PLD_S1_ON);
--		PLD_LCDEN = 0;
-+		gpio_set_value(PLD_S1_ON, 0);
-+		gpio_set_value(PLD_S2_ON, 0);
-+		gpio_set_value(PLD_S4_ON, 0);
-+		gpio_set_value(PLD_LCDEN_EN, 0);
- 	}
- }
  
-@@ -107,10 +284,7 @@ static struct plat_lcd_data p720t_lcd_power_pdata = {
- 
- static void p720t_lcd_backlight_set_intensity(int intensity)
- {
--	if (intensity)
--		PLD_PWR |= PLD_S3_ON;
--	else
--		PLD_PWR = 0;
-+	gpio_set_value(PLD_S3_ON, intensity);
- }
- 
- static struct generic_bl_info p720t_lcd_backlight_pdata = {
-@@ -120,19 +294,6 @@ static struct generic_bl_info p720t_lcd_backlight_pdata = {
- 	.set_bl_intensity	= p720t_lcd_backlight_set_intensity,
- };
- 
--/*
-- * Map the P720T system PLD. It occupies two address spaces:
-- * 0x10000000 and 0x10400000. We map both regions as one.
-- */
--static struct map_desc p720t_io_desc[] __initdata = {
--	{
--		.virtual	= SYSPLD_VIRT_BASE,
--		.pfn		= __phys_to_pfn(SYSPLD_PHYS_BASE),
--		.length		= SZ_8M,
--		.type		= MT_DEVICE,
--	},
--};
--
- static void __init
- fixup_p720t(struct tag *tag, char **cmdline, struct meminfo *mi)
- {
-@@ -158,33 +319,6 @@ fixup_p720t(struct tag *tag, char **cmdline, struct meminfo *mi)
- 	}
- }
- 
--static void __init p720t_map_io(void)
--{
--	clps711x_map_io();
--	iotable_init(p720t_io_desc, ARRAY_SIZE(p720t_io_desc));
--}
--
--static void __init p720t_init_early(void)
--{
--	/*
--	 * Power down as much as possible in case we don't
--	 * have the drivers loaded.
--	 */
--	PLD_LCDEN = 0;
--	PLD_PWR  &= ~(PLD_S4_ON|PLD_S3_ON|PLD_S2_ON|PLD_S1_ON);
--
--	PLD_KBD   = 0;
--	PLD_IO    = 0;
--	PLD_IRDA  = 0;
--	PLD_CODEC = 0;
--	PLD_TCH   = 0;
--	PLD_SPI   = 0;
--	if (!IS_ENABLED(CONFIG_DEBUG_LL)) {
--		PLD_COM2 = 0;
--		PLD_COM1 = 0;
--	}
--}
--
- static struct gpio_led p720t_gpio_leds[] = {
- 	{
- 		.name			= "User LED",
-@@ -200,12 +334,20 @@ static struct gpio_led_platform_data p720t_gpio_led_pdata __initdata = {
- 
- static void __init p720t_init(void)
- {
-+	int i;
+diff --git a/include/linux/mfd/syscon/clps711x.h b/include/linux/mfd/syscon/clps711x.h
+new file mode 100644
+index 0000000..26355ab
+--- /dev/null
++++ b/include/linux/mfd/syscon/clps711x.h
+@@ -0,0 +1,94 @@
++/*
++ *  CLPS711X system register bits definitions
++ *
++ *  Copyright (C) 2013 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
 +
- 	clps711x_devices_init();
++#ifndef _LINUX_MFD_SYSCON_CLPS711X_H_
++#define _LINUX_MFD_SYSCON_CLPS711X_H_
 +
-+	for (i = 0; i < ARRAY_SIZE(mmgpios); i++)
-+		p720t_mmgpio_init(mmgpios[i].addrbase, mmgpios[i].gpiobase);
++#define SYSCON_OFFSET		(0x00)
++#define SYSFLG_OFFSET		(0x40)
 +
-+	platform_device_register(&p720t_nand_pdev);
- }
- 
- static void __init p720t_init_late(void)
- {
--	platform_device_register(&p720t_nand_pdev);
-+	WARN_ON(gpio_request_array(p720t_gpios, ARRAY_SIZE(p720t_gpios)));
++#define SYSCON1_KBDSCAN(x)	((x) & 15)
++#define SYSCON1_KBDSCAN_MASK	(15)
++#define SYSCON1_TC1M		(1 << 4)
++#define SYSCON1_TC1S		(1 << 5)
++#define SYSCON1_TC2M		(1 << 6)
++#define SYSCON1_TC2S		(1 << 7)
++#define SYSCON1_BZTOG		(1 << 9)
++#define SYSCON1_BZMOD		(1 << 10)
++#define SYSCON1_DBGEN		(1 << 11)
++#define SYSCON1_LCDEN		(1 << 12)
++#define SYSCON1_CDENTX		(1 << 13)
++#define SYSCON1_CDENRX		(1 << 14)
++#define SYSCON1_SIREN		(1 << 15)
++#define SYSCON1_ADCKSEL(x)	(((x) & 3) << 16)
++#define SYSCON1_ADCKSEL_MASK	(3 << 16)
++#define SYSCON1_EXCKEN		(1 << 18)
++#define SYSCON1_WAKEDIS		(1 << 19)
++#define SYSCON1_IRTXM		(1 << 20)
 +
- 	platform_device_register_data(&platform_bus, "platform-lcd", 0,
- 				      &p720t_lcd_power_pdata,
- 				      sizeof(p720t_lcd_power_pdata));
-@@ -223,8 +365,7 @@ MACHINE_START(P720T, "ARM-Prospector720T")
- 	.atag_offset	= 0x100,
- 	.nr_irqs	= CLPS711X_NR_IRQS,
- 	.fixup		= fixup_p720t,
--	.map_io		= p720t_map_io,
--	.init_early	= p720t_init_early,
-+	.map_io		= clps711x_map_io,
- 	.init_irq	= clps711x_init_irq,
- 	.init_time	= clps711x_timer_init,
- 	.init_machine	= p720t_init,
-diff --git a/arch/arm/mach-clps711x/include/mach/syspld.h b/arch/arm/mach-clps711x/include/mach/syspld.h
-deleted file mode 100644
-index 9a43315..0000000
---- a/arch/arm/mach-clps711x/include/mach/syspld.h
-+++ /dev/null
-@@ -1,116 +0,0 @@
--/*
-- *  arch/arm/mach-clps711x/include/mach/syspld.h
-- *
-- *  System Control PLD register definitions.
-- *
-- *  Copyright (C) 2000 Deep Blue Solutions Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--#ifndef __ASM_ARCH_SYSPLD_H
--#define __ASM_ARCH_SYSPLD_H
--
--#define SYSPLD_PHYS_BASE	(0x10000000)
--#define SYSPLD_VIRT_BASE	IO_ADDRESS(SYSPLD_PHYS_BASE)
--
--#define SYSPLD_REG(type, off)	(*(volatile type *)(SYSPLD_VIRT_BASE + (off)))
--
--#define PLD_INT		SYSPLD_REG(u32, 0x000000)
--#define PLD_INT_PENIRQ		(1 << 5)
--#define PLD_INT_UCB_IRQ		(1 << 1)
--#define PLD_INT_KBD_ATN		(1 << 0)	/* EINT1 */
--
--#define PLD_PWR		SYSPLD_REG(u32, 0x000004)
--#define PLD_PWR_EXT		(1 << 5)
--#define PLD_PWR_MODE		(1 << 4)	/* 1 = PWM, 0 = PFM */
--#define PLD_S4_ON		(1 << 3)	/* LCD bias voltage enable */
--#define PLD_S3_ON		(1 << 2)	/* LCD backlight enable */
--#define PLD_S2_ON		(1 << 1)	/* LCD 3V3 supply enable */
--#define PLD_S1_ON		(1 << 0)	/* LCD 3V supply enable */
--
--#define PLD_KBD		SYSPLD_REG(u32, 0x000008)
--#define PLD_KBD_WAKE		(1 << 1)
--#define PLD_KBD_EN		(1 << 0)
--
--#define PLD_SPI		SYSPLD_REG(u32, 0x00000c)
--#define PLD_SPI_EN		(1 << 0)
--
--#define PLD_IO		SYSPLD_REG(u32, 0x000010)
--#define PLD_IO_BOOTSEL		(1 << 6)	/* boot sel switch */
--#define PLD_IO_USER		(1 << 5)	/* user defined switch */
--#define PLD_IO_LED3		(1 << 4)
--#define PLD_IO_LED2		(1 << 3)
--#define PLD_IO_LED1		(1 << 2)
--#define PLD_IO_LED0		(1 << 1)
--#define PLD_IO_LEDEN		(1 << 0)
--
--#define PLD_IRDA	SYSPLD_REG(u32, 0x000014)
--#define PLD_IRDA_EN		(1 << 0)
--
--#define PLD_COM2	SYSPLD_REG(u32, 0x000018)
--#define PLD_COM2_EN		(1 << 0)
--
--#define PLD_COM1	SYSPLD_REG(u32, 0x00001c)
--#define PLD_COM1_EN		(1 << 0)
--
--#define PLD_AUD		SYSPLD_REG(u32, 0x000020)
--#define PLD_AUD_DIV1		(1 << 6)
--#define PLD_AUD_DIV0		(1 << 5)
--#define PLD_AUD_CLK_SEL1	(1 << 4)
--#define PLD_AUD_CLK_SEL0	(1 << 3)
--#define PLD_AUD_MIC_PWR		(1 << 2)
--#define PLD_AUD_MIC_GAIN	(1 << 1)
--#define PLD_AUD_CODEC_EN	(1 << 0)
--
--#define PLD_CF		SYSPLD_REG(u32, 0x000024)
--#define PLD_CF2_SLEEP		(1 << 5)
--#define PLD_CF1_SLEEP		(1 << 4)
--#define PLD_CF2_nPDREQ		(1 << 3)
--#define PLD_CF1_nPDREQ		(1 << 2)
--#define PLD_CF2_nIRQ		(1 << 1)
--#define PLD_CF1_nIRQ		(1 << 0)
--
--#define PLD_SDC		SYSPLD_REG(u32, 0x000028)
--#define PLD_SDC_INT_EN		(1 << 2)
--#define PLD_SDC_WP		(1 << 1)
--#define PLD_SDC_CD		(1 << 0)
--
--#define PLD_FPGA	SYSPLD_REG(u32, 0x00002c)
--
--#define PLD_CODEC	SYSPLD_REG(u32, 0x400000)
--#define PLD_CODEC_IRQ3		(1 << 4)
--#define PLD_CODEC_IRQ2		(1 << 3)
--#define PLD_CODEC_IRQ1		(1 << 2)
--#define PLD_CODEC_EN		(1 << 0)
--
--#define PLD_BRITE	SYSPLD_REG(u32, 0x400004)
--#define PLD_BRITE_UP		(1 << 1)
--#define PLD_BRITE_DN		(1 << 0)
--
--#define PLD_LCDEN	SYSPLD_REG(u32, 0x400008)
--#define PLD_LCDEN_EN		(1 << 0)
--
--#define PLD_ID		SYSPLD_REG(u32, 0x40000c)
--
--#define PLD_TCH		SYSPLD_REG(u32, 0x400010)
--#define PLD_TCH_PENIRQ		(1 << 1)
--#define PLD_TCH_EN		(1 << 0)
--
--#define PLD_GPIO	SYSPLD_REG(u32, 0x400014)
--#define PLD_GPIO2		(1 << 2)
--#define PLD_GPIO1		(1 << 1)
--#define PLD_GPIO0		(1 << 0)
--
--#endif
++#define SYSCON2_SERSEL		(1 << 0)
++#define SYSCON2_KBD6		(1 << 1)
++#define SYSCON2_DRAMZ		(1 << 2)
++#define SYSCON2_KBWEN		(1 << 3)
++#define SYSCON2_SS2TXEN		(1 << 4)
++#define SYSCON2_PCCARD1		(1 << 5)
++#define SYSCON2_PCCARD2		(1 << 6)
++#define SYSCON2_SS2RXEN		(1 << 7)
++#define SYSCON2_SS2MAEN		(1 << 9)
++#define SYSCON2_OSTB		(1 << 12)
++#define SYSCON2_CLKENSL		(1 << 13)
++#define SYSCON2_BUZFREQ		(1 << 14)
++
++#define SYSCON3_ADCCON		(1 << 0)
++#define SYSCON3_CLKCTL0		(1 << 1)
++#define SYSCON3_CLKCTL1		(1 << 2)
++#define SYSCON3_DAISEL		(1 << 3)
++#define SYSCON3_ADCCKNSEN	(1 << 4)
++#define SYSCON3_VERSN(x)	(((x) >> 5) & 7)
++#define SYSCON3_VERSN_MASK	(7 << 5)
++#define SYSCON3_FASTWAKE	(1 << 8)
++#define SYSCON3_DAIEN		(1 << 9)
++#define SYSCON3_128FS		SYSCON3_DAIEN
++#define SYSCON3_ENPD67		(1 << 10)
++
++#define SYSCON_UARTEN		(1 << 8)
++
++#define SYSFLG1_MCDR		(1 << 0)
++#define SYSFLG1_DCDET		(1 << 1)
++#define SYSFLG1_WUDR		(1 << 2)
++#define SYSFLG1_WUON		(1 << 3)
++#define SYSFLG1_CTS		(1 << 8)
++#define SYSFLG1_DSR		(1 << 9)
++#define SYSFLG1_DCD		(1 << 10)
++#define SYSFLG1_NBFLG		(1 << 12)
++#define SYSFLG1_RSTFLG		(1 << 13)
++#define SYSFLG1_PFFLG		(1 << 14)
++#define SYSFLG1_CLDFLG		(1 << 15)
++#define SYSFLG1_CRXFE		(1 << 24)
++#define SYSFLG1_CTXFF		(1 << 25)
++#define SYSFLG1_SSIBUSY		(1 << 26)
++#define SYSFLG1_ID		(1 << 29)
++#define SYSFLG1_VERID(x)	(((x) >> 30) & 3)
++#define SYSFLG1_VERID_MASK	(3 << 30)
++
++#define SYSFLG2_SSRXOF		(1 << 0)
++#define SYSFLG2_RESVAL		(1 << 1)
++#define SYSFLG2_RESFRM		(1 << 2)
++#define SYSFLG2_SS2RXFE		(1 << 3)
++#define SYSFLG2_SS2TXFF		(1 << 4)
++#define SYSFLG2_SS2TXUF		(1 << 5)
++#define SYSFLG2_CKMODE		(1 << 6)
++
++#define SYSFLG_UBUSY		(1 << 11)
++#define SYSFLG_URXFE		(1 << 22)
++#define SYSFLG_UTXFF		(1 << 23)
++
++#endif
 -- 
 1.8.1.5
