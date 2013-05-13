@@ -1,34 +1,43 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 13 May 2013 09:17:57 +0800
-Subject: [PATCH 2/2] ARM: dts: imx6qdl: remove redundant ocotp node
-In-Reply-To: <1368407877-12171-1-git-send-email-shawn.guo@linaro.org>
-References: <1368407877-12171-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1368407877-12171-2-git-send-email-shawn.guo@linaro.org>
+Date: Mon, 13 May 2013 09:32:05 +0800
+Subject: [PATCH 0/3] ARM: imx: make mxs_restart() work for DT boot
+Message-ID: <1368408728-12264-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a redundant ocotp node.  Remove it.
+The mxs_restart() currently only works for non-DT platforms.  And per
+Russell's comment, it's not going to work reliably, because the restart
+routine could be called in atomic context while mxs_restart() is calling
+clk_prepare() there.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx6qdl.dtsi |    5 -----
- 1 file changed, 5 deletions(-)
+The series fixes above potential problem by moving clk_prepare() into
+initialization function mxc_arch_reset_init() and only keeping atomic
+part clk_enable() in mxs_restart().
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 92169e6..42e461c 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -754,11 +754,6 @@
- 				reg = <0x021bc000 0x4000>;
- 			};
- 
--			ocotp at 021c0000 {
--				reg = <0x021c0000 0x4000>;
--				interrupts = <0 21 0x04>;
--			};
--
- 			tzasc at 021d0000 { /* TZASC1 */
- 				reg = <0x021d0000 0x4000>;
- 				interrupts = <0 108 0x04>;
+Then a DT variant initialization function imx_arch_reset_init() is
+added, so that DT platforms can use mxs_restart() as well after invoking
+the initialization function.
+
+Shawn Guo (3):
+  ARM: imx: include <asm/io.h> in hardware.h
+  ARM: imx: move clk_prepare() out from mxs_restart()
+  ARM: imx: create imx_arch_reset_init() for DT boot
+
+ arch/arm/mach-imx/common.h     |    1 +
+ arch/arm/mach-imx/hardware.h   |    1 +
+ arch/arm/mach-imx/imx25-dt.c   |    2 ++
+ arch/arm/mach-imx/imx27-dt.c   |    2 ++
+ arch/arm/mach-imx/imx31-dt.c   |    2 ++
+ arch/arm/mach-imx/imx51-dt.c   |    2 ++
+ arch/arm/mach-imx/mach-imx53.c |    3 +++
+ arch/arm/mach-imx/mm-imx1.c    |    2 +-
+ arch/arm/mach-imx/mm-imx21.c   |    2 +-
+ arch/arm/mach-imx/mm-imx25.c   |    2 +-
+ arch/arm/mach-imx/mm-imx27.c   |    2 +-
+ arch/arm/mach-imx/mm-imx3.c    |    4 ++--
+ arch/arm/mach-imx/mm-imx5.c    |    3 +--
+ arch/arm/mach-imx/system.c     |   47 +++++++++++++++++++++++++++++++---------
+ 14 files changed, 57 insertions(+), 18 deletions(-)
+
 -- 
 1.7.9.5
