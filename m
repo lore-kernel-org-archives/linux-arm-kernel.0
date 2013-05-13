@@ -1,279 +1,779 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 May 2013 21:05:00 +0200
-Subject: [RFC 2/8] ARM:global_timer: Add ARM global timer support.
-In-Reply-To: <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <CACRpkdZCP=w=4Q3bnuMQxm=Oe-uZke+Cc5NgddM5vsQbgr9E-Q@mail.gmail.com>
+From: loic.pallardy@st.com (Loic PALLARDY)
+Date: Mon, 13 May 2013 21:09:06 +0200
+Subject: [PATCHv2 2/4] mailbox: Introduce a new common API
+In-Reply-To: <1367825046-6229-1-git-send-email-jaswinder.singh@linaro.org>
+References: <1367824946-6160-1-git-send-email-jaswinder.singh@linaro.org>
+ <1367825046-6229-1-git-send-email-jaswinder.singh@linaro.org>
+Message-ID: <51913A52.1040106@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 8, 2013 at 4:11 PM, Srinivas KANDAGATLA
-<srinivas.kandagatla@st.com> wrote:
+Hi Jassi,
 
-Thomas Gleixner and John Stultz should always be included on timer code review.
+Back at work :)
+Where can I find last version of framework which integrates all
+modifications discussed during the 3 last weeks?
 
-This is one reason I really like to move the clocksource/clockevent/etc code out
-of arch/arm, so that people can get their To: line right from MAINTAINERS.
-(Whether it goes to drivers/clocksource or not is another issue.)
+I would like to review and work on last code version.
 
-> diff --git a/arch/arm/include/asm/global_timer.h b/arch/arm/include/asm/global_timer.h
+Regards,
+Loic
 
-Using CLKSRC_OF_INIT() this header goes away entirely I guess.
-
-> diff --git a/arch/arm/kernel/global_timer.c b/arch/arm/kernel/global_timer.c
-
-> +#define GT_COUNTER0    0x00
-> +#define GT_COUNTER1    0x04
-
-So two counters, nice.
-
-> +union gt_counter {
-> +       cycle_t cycles;
-> +       struct {
-> +               uint32_t lower;
-> +               uint32_t upper;
-
-Just u32 is fine.
-
-> +       };
+On 05/06/2013 09:24 AM, Jassi Brar wrote:
+> Introduce common framework for client/protocol drivers and
+> controller drivers of Inter-Processor-Communication (IPC).
+>
+> Client driver developers should have a look at
+>   include/linux/mailbox_client.h to understand the part of
+> the API exposed to client drivers.
+> Similarly controller driver developers should have a look
+> at include/linux/mailbox_controller.h
+>
+> Signed-off-by: Jassi Brar<jaswinder.singh@linaro.org>
+> ---
+>   drivers/mailbox/Makefile           |    4 +
+>   drivers/mailbox/mailbox.c          |  494 ++++++++++++++++++++++++++++++++++++
+>   include/linux/mailbox.h            |   17 ++
+>   include/linux/mailbox_client.h     |   85 +++++++
+>   include/linux/mailbox_controller.h |  102 ++++++++
+>   5 files changed, 702 insertions(+)
+>   create mode 100644 drivers/mailbox/mailbox.c
+>   create mode 100644 include/linux/mailbox.h
+>   create mode 100644 include/linux/mailbox_client.h
+>   create mode 100644 include/linux/mailbox_controller.h
+>
+> diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
+> index 543ad6a..fefef7e 100644
+> --- a/drivers/mailbox/Makefile
+> +++ b/drivers/mailbox/Makefile
+> @@ -1 +1,5 @@
+> +# Generic MAILBOX API
+> +
+> +obj-$(CONFIG_MAILBOX)          += mailbox.o
+> +
+>   obj-$(CONFIG_PL320_MBOX)       += pl320-ipc.o
+> diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+> new file mode 100644
+> index 0000000..a93c22f
+> --- /dev/null
+> +++ b/drivers/mailbox/mailbox.c
+> @@ -0,0 +1,494 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include<linux/interrupt.h>
+> +#include<linux/spinlock.h>
+> +#include<linux/mutex.h>
+> +#include<linux/delay.h>
+> +#include<linux/slab.h>
+> +#include<linux/err.h>
+> +#include<linux/module.h>
+> +#include<linux/mailbox_client.h>
+> +#include<linux/mailbox_controller.h>
+> +
+> +/*
+> + * The length of circular buffer for queuing messages from a client.
+> + * 'msg_count' tracks the number of buffered messages while 'msg_free'
+> + * is the index where the next message would be buffered.
+> + * We shouldn't need it too big because every transferr is interrupt
+> + * triggered and if we have lots of data to transfer, the interrupt
+> + * latencies are going to be the bottleneck, not the buffer length.
+> + * Besides, ipc_send_message could be called from atomic context and
+> + * the client could also queue another message from the notifier 'txcb'
+> + * of the last transfer done.
+> + */
+> +#define MBOX_TX_QUEUE_LEN      10
+> +
+> +#define TXDONE_BY_IRQ  (1<<  0) /* controller has remote RTR irq */
+> +#define TXDONE_BY_POLL (1<<  1) /* controller can read status of last TX */
+> +#define TXDONE_BY_ACK  (1<<  2) /* S/W ACK recevied by Client ticks the TX */
+> +
+> +struct ipc_chan {
+> +       char chan_name[32]; /* controller_name:link_name */
+> +       unsigned txdone_method;
+> +
+> +       /* Cached values from controller */
+> +       struct ipc_link *link;
+> +       struct ipc_link_ops *link_ops;
+> +
+> +       /* Cached values from client */
+> +       void (*rxcb)(void *data);
+> +       void (*txcb)(request_token_t t, enum xfer_result r);
+> +       bool tx_block;
+> +       unsigned long tx_tout;
+> +       struct completion tx_complete;
+> +
+> +       request_token_t active_token;
+> +       unsigned msg_count, msg_free;
+> +       void *msg_data[MBOX_TX_QUEUE_LEN];
+> +       /* Timer shared by all links of a controller */
+> +       struct tx_poll_timer *timer;
+> +       bool assigned;
+> +       /* Serialize access to the channel */
+> +       spinlock_t lock;
+> +       /* Hook to add to the global list of channels */
+> +       struct list_head node;
+> +       /* Notifier to all clients waiting on aquiring this channel */
+> +       struct blocking_notifier_head avail;
 > +};
 > +
-> +static union gt_counter gt_counter_read(void)
+> +/*
+> + * If the controller supports only TXDONE_BY_POLL, this
+> + * timer polls all the links for txdone.
+> + */
+> +struct tx_poll_timer {
+> +       struct timer_list poll;
+> +       unsigned period;
+> +};
+> +
+> +static LIST_HEAD(ipc_channels);
+> +static DEFINE_MUTEX(chpool_mutex);
+> +
+> +static request_token_t _add_to_rbuf(struct ipc_chan *chan, void *data)
 > +{
-> +       union gt_counter res;
-> +       uint32_t upper;
-
-u32
-
+> +       request_token_t idx;
+> +       unsigned long flags;
 > +
-> +       upper = readl(gt_base + GT_COUNTER1);
-> +       do {
-> +               res.upper = upper;
-> +               res.lower = readl(gt_base + GT_COUNTER0);
-> +               upper = readl(gt_base + GT_COUNTER1);
-> +       } while (upper != res.upper);
+> +       spin_lock_irqsave(&chan->lock, flags);
 > +
-> +       return res;
-> +}
-
-I guess this is some cleverness to avoid wrap-around...
-A comment stating what's going on wouldn't hurt.
-
-But why on earth do you need this complicated union
-to hold the result? Have two local u32 variables and return
-a u64 from this function.
-
-Since this will be performance critical, isn't readl_relaxed() suffient
-here, or what's the rationale for just using readl()?
-
-> +static void gt_compare_set(unsigned long delta, int periodic)
-> +{
-> +       union gt_counter counter = gt_counter_read();
-
-So here you get something easy to read like
-
-u64 counter = gt_counter_read();
-
-> +       unsigned long ctrl = readl(gt_base + GT_CONTROL);
-> +
-> +       BUG_ON(!(ctrl & GT_CONTROL_TIMER_ENABLE));
-> +       BUG_ON(ctrl & (GT_CONTROL_COMP_ENABLE |
-> +                      GT_CONTROL_IRQ_ENABLE |
-> +                      GT_CONTROL_AUTO_INC));
-
-Do you really have to check this *whenever the counter is set*?
-
-Will it not suffice to do this once during initialization?
-
-It looks like some leftover debug code. It also looks kind of clock
-dangerous, can you explain exactly why this check is here?
-
-> +
-> +       counter.cycles += delta;
-> +       writel(counter.lower, gt_base + GT_COMP0);
-> +       writel(counter.upper, gt_base + GT_COMP1);
-
-This is another instance of the union struct making things
-complicated. With a u64 just:
-
-counter += delta;
-writel(lower_32_bits(counter), gt_base + GT_COMP0);
-writel(upper_32_bits(counter), gt_base + GT_COMP1);
-
-As you can see <linux/kernel.h> has really nice helpers in place
-to deal with 64 bit arithmetics.
-
-> +
-> +       ctrl |= GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE;
-> +
-> +       if (periodic) {
-> +               writel(delta, gt_base + GT_AUTO_INC);
-> +               ctrl |= GT_CONTROL_AUTO_INC;
+> +       /* See if there is any space left */
+> +       if (chan->msg_count == MBOX_TX_QUEUE_LEN) {
+> +               spin_unlock_irqrestore(&chan->lock, flags);
+> +               return 0;
 > +       }
 > +
-> +       writel(ctrl, gt_base + GT_CONTROL);
+> +       idx = chan->msg_free;
+> +       chan->msg_data[idx] = data;
+> +       chan->msg_count++;
+> +
+> +       if (idx == MBOX_TX_QUEUE_LEN - 1)
+> +               chan->msg_free = 0;
+> +       else
+> +               chan->msg_free++;
+> +
+> +       spin_unlock_irqrestore(&chan->lock, flags);
+> +
+> +       return idx + 1;
 > +}
 > +
-> +static void gt_clockevent_set_mode(enum clock_event_mode mode,
-> +                                  struct clock_event_device *clk)
+> +static void _msg_submit(struct ipc_chan *chan)
 > +{
-> +       switch (mode) {
-> +       case CLOCK_EVT_MODE_PERIODIC:
-> +               gt_compare_set(gt_clk_rate/HZ, 1);
-
-Use
-gt_compare_set(DIV_ROUND_CLOSEST(gt_clk_rate, HZ), 1);
-to get integer arithmetics right.
-
-> +               break;
-> +       case CLOCK_EVT_MODE_ONESHOT:
-> +               /* period set, and timer enabled in 'next_event' hook */
-> +               BUG_ON(readl(gt_base + GT_CONTROL) &
-> +                      (GT_CONTROL_COMP_ENABLE |
-> +                       GT_CONTROL_IRQ_ENABLE |
-> +                       GT_CONTROL_AUTO_INC));
-
-Here is another one of these checks. Why aren't you just
-zeroing these flags if you don't want them, especially since
-you're writing the register at the end of the function? Now it
-looks like instead of setting up the timer the way you want it
-you bug out if it isn't already set up as you want it (hint,
-the name of this function).
-
-> +               /* Fall through */
-> +       case CLOCK_EVT_MODE_UNUSED:
-> +       case CLOCK_EVT_MODE_SHUTDOWN:
-> +       default:
-> +               writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
-
-Why are you enabling the timer in unused and shutdown mode?
-
-This doesn't make sense.
-
-> +               break;
+> +       struct ipc_link *link = chan->link;
+> +       unsigned count, idx;
+> +       unsigned long flags;
+> +       void *data;
+> +       int err;
+> +
+> +       spin_lock_irqsave(&chan->lock, flags);
+> +
+> +       if (!chan->msg_count || chan->active_token) {
+> +               spin_unlock_irqrestore(&chan->lock, flags);
+> +               return;
 > +       }
+> +
+> +       count = chan->msg_count;
+> +       idx = chan->msg_free;
+> +       if (idx>= count)
+> +               idx -= count;
+> +       else
+> +               idx += MBOX_TX_QUEUE_LEN - count;
+> +
+> +       data = chan->msg_data[idx];
+> +
+> +       /* Try to submit a message to the IPC controller */
+> +       err = chan->link_ops->send_data(link, data);
+> +       if (!err) {
+> +               chan->active_token = idx + 1;
+> +               chan->msg_count--;
+> +       }
+> +
+> +       spin_unlock_irqrestore(&chan->lock, flags);
 > +}
 > +
-> +static int gt_clockevent_set_next_event(unsigned long evt,
-> +                                       struct clock_event_device *unused)
+> +static void tx_tick(struct ipc_chan *chan, enum xfer_result r)
 > +{
-> +       gt_compare_set(evt, 0);
-> +       return 0;
+> +       unsigned long flags;
+> +       request_token_t t;
+> +
+> +       spin_lock_irqsave(&chan->lock, flags);
+> +       t = chan->active_token;
+> +       chan->active_token = 0;
+> +       spin_unlock_irqrestore(&chan->lock, flags);
+> +
+> +       /* Submit next message */
+> +       _msg_submit(chan);
+> +
+> +       /* Notify the client */
+> +       if (chan->tx_block)
+> +               complete(&chan->tx_complete);
+> +       else if (t&&  chan->txcb)
+> +               chan->txcb(t, r);
 > +}
 > +
-> +static irqreturn_t gt_clockevent_interrupt(int irq, void *dev_id)
+> +static void poll_txdone(unsigned long data)
 > +{
-> +       struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
+> +       struct tx_poll_timer *timer = (struct tx_poll_timer *)data;
+> +       bool txdone, resched = false;
+> +       struct ipc_chan *chan;
 > +
-> +       writel(GT_INT_STATUS_EVENT_FLAG, gt_base + GT_INT_STATUS);
-
-You're clearing the flag before checking if it was set. What happens
-if this was a spurious interrupt that should be disregarded?
-
-> +       evt->event_handler(evt);
+> +       list_for_each_entry(chan,&ipc_channels, node) {
+> +               if (chan->timer == timer
+> +&&  chan->active_token&&  chan->assigned) {
+> +                       resched = true;
+> +                       txdone = chan->link_ops->last_tx_done(chan->link);
+> +                       if (txdone)
+> +                               tx_tick(chan, XFER_OK);
+> +               }
+> +       }
 > +
-> +       return IRQ_HANDLED;
+> +       if (resched)
+> +               mod_timer(&timer->poll,
+> +                       jiffies + msecs_to_jiffies(timer->period));
 > +}
 > +
-> +static int __cpuinit gt_clockevents_init(struct clock_event_device *clk)
+> +/*
+> + * After 'startup' and before 'shutdown', the IPC controller driver
+> + * notifies the API of data received over the link.
+> + * The controller driver should make sure the 'RTR' is de-asserted since
+> + * reception of the packet and until after this call returns.
+> + * This call could be made from atomic context.
+> + */
+> +void ipc_link_received_data(struct ipc_link *link, void *data)
 > +{
-> +       struct clock_event_device **this_cpu_clk;
-> +       int cpu = smp_processor_id();
+> +       struct ipc_chan *chan = (struct ipc_chan *)link->api_priv;
 > +
-> +       clk->name = "Global Timer CE";
-
-Name it after the hardware feature. "ARM global timer clock event"
-there is no need to abbreviate randomly.
-
-> +       clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
-> +       clk->set_mode = gt_clockevent_set_mode;
-> +       clk->set_next_event = gt_clockevent_set_next_event;
-> +       this_cpu_clk = __this_cpu_ptr(gt_evt);
-> +       *this_cpu_clk = clk;
-> +       clk->irq = gt_ppi;
-> +       clockevents_config_and_register(clk, gt_clk_rate,
-> +                                       0xf, 0xffffffff);
-
-Why can't this clock event handle anything lower than 0xf?
-Does that come from the datasheet or have you just copied some
-code?
-
-Further, since this clock event hardware *most definately* supports
-using a delta upper bound *beyond* 32 bits, I think the clock event
-core code should be altered to allow for registereing such clock
-events, but TGLX may have some idea here. This will work but will
-not expose the full potential of this 64-bit counter hardware.
-
-> +       per_cpu(percpu_init_called, cpu) = true;
-> +       enable_percpu_irq(clk->irq, IRQ_TYPE_NONE);
-> +       return 0;
+> +       /* No buffering the received data */
+> +       if (chan->rxcb)
+> +               chan->rxcb(data);
 > +}
+> +EXPORT_SYMBOL(ipc_link_received_data);
 > +
-> +static void gt_clockevents_stop(struct clock_event_device *clk)
+> +/*
+> + * The IPC controller driver notifies the API that the remote has
+> + * asserted RTR and it could now send another message on the link.
+> + */
+> +void ipc_link_txdone(struct ipc_link *link, enum xfer_result r)
 > +{
-> +       gt_clockevent_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
-> +       disable_percpu_irq(clk->irq);
+> +       struct ipc_chan *chan = (struct ipc_chan *)link->api_priv;
+> +
+> +       if (unlikely(!(chan->txdone_method&  TXDONE_BY_IRQ))) {
+> +               pr_err("Controller can't run the TX ticker\n");
+> +               return;
+> +       }
+> +
+> +       tx_tick(chan, r);
 > +}
+> +EXPORT_SYMBOL(ipc_link_txdone);
 > +
-> +static int __cpuinit gt_clockevents_setup(struct clock_event_device *clk)
+> +/*
+> + * The client/protocol had received some 'ACK' packet and it notifies
+> + * the API that the last packet was sent successfully. This only works
+> + * if the controller doesn't get IRQ for TX done.
+> + */
+> +void ipc_client_txdone(void *channel, enum xfer_result r)
 > +{
-> +       int cpu = smp_processor_id();
+> +       struct ipc_chan *chan = (struct ipc_chan *)channel;
+> +       bool txdone = true;
 > +
-> +       /* Use existing clock_event for boot cpu */
-> +       if (per_cpu(percpu_init_called, cpu))
+> +       if (unlikely(!(chan->txdone_method&  TXDONE_BY_ACK))) {
+> +               pr_err("Client can't run the TX ticker\n");
+> +               return;
+> +       }
+> +
+> +       if (chan->txdone_method&  TXDONE_BY_POLL)
+> +               txdone = chan->link_ops->last_tx_done(chan->link);
+> +
+> +       if (txdone)
+> +               tx_tick(chan, r);
+> +}
+> +EXPORT_SYMBOL(ipc_client_txdone);
+> +
+> +/*
+> + * Called by a client to "put data on the h/w channel" so that if
+> + * everything else is fine we don't need to do anything more locally
+> + * for the remote to receive the data intact.
+> + * In reality, the remote may receive it intact, corrupted or not at all.
+> + * This could be called from atomic context as it simply
+> + * queues the data and returns a token (request_token_t)
+> + * against the request.
+> + * The client is later notified of successful transmission of
+> + * data over the channel via the 'txcb'. The client could in
+> + * turn queue more messages from txcb.
+> + */
+> +request_token_t ipc_send_message(void *channel, void *data)
+> +{
+> +       struct ipc_chan *chan = (struct ipc_chan *)channel;
+> +       request_token_t t;
+> +
+> +       if (!chan || !chan->assigned)
 > +               return 0;
 > +
-> +       writel(0, gt_base + GT_CONTROL);
-> +       writel(0, gt_base + GT_COUNTER0);
-> +       writel(0, gt_base + GT_COUNTER1);
-> +       writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+> +       t = _add_to_rbuf(chan, data);
+> +       if (!t)
+> +               pr_err("Try increasing MBOX_TX_QUEUE_LEN\n");
 > +
-> +       return gt_clockevents_init(clk);
+> +       _msg_submit(chan);
+> +
+> +       if (chan->txdone_method == TXDONE_BY_POLL)
+> +               poll_txdone((unsigned long)chan->timer);
+> +
+> +       if (chan->tx_block&&  chan->active_token) {
+> +               int ret;
+> +               init_completion(&chan->tx_complete);
+> +               ret = wait_for_completion_timeout(&chan->tx_complete,
+> +                       chan->tx_tout);
+> +               if (ret == 0) {
+> +                       t = 0;
+> +                       tx_tick(chan, XFER_ERR);
+> +               }
+> +       }
+> +
+> +       return t;
 > +}
+> +EXPORT_SYMBOL(ipc_send_message);
 > +
-> +static cycle_t gt_clocksource_read(struct clocksource *cs)
+> +/*
+> + * A client driver asks for exclusive use of a channel/mailbox.
+> + * If assigned, the channel has to be 'freed' before it could
+> + * be assigned to some other client.
+> + * After assignment, any packet received on this channel will be
+> + * handed over to the client via the 'rxcb' callback.
+> + * The 'txcb' callback is used to notify client upon sending the
+> + * packet over the channel, which may or may not have been yet
+> + * read by the remote processor.
+> + */
+> +void *ipc_request_channel(struct ipc_client *cl)
 > +{
-> +       union gt_counter res = gt_counter_read();
-> +       return res.cycles;
+> +       struct ipc_chan *chan;
+> +       unsigned long flags;
+> +       int ret = 0;
+> +
+> +       mutex_lock(&chpool_mutex);
+> +
+> +       list_for_each_entry(chan,&ipc_channels, node)
+> +               if (!chan->assigned
+> +&&  !strcmp(cl->chan_name, chan->chan_name)) {
+> +                       spin_lock_irqsave(&chan->lock, flags);
+> +                       chan->msg_free = 0;
+> +                       chan->msg_count = 0;
+> +                       chan->active_token = 0;
+> +                       chan->rxcb = cl->rxcb;
+> +                       chan->txcb = cl->txcb;
+> +                       chan->assigned = true;
+> +                       chan->tx_block = cl->tx_block;
+> +                       if (!cl->tx_tout)
+> +                               chan->tx_tout = ~0;
+> +                       else
+> +                               chan->tx_tout = msecs_to_jiffies(cl->tx_tout);
+> +                       if (chan->txdone_method == TXDONE_BY_POLL
+> +&&  cl->knows_txdone)
+> +                               chan->txdone_method |= TXDONE_BY_ACK;
+> +                       spin_unlock_irqrestore(&chan->lock, flags);
+> +                       ret = 1;
+> +                       break;
+> +               }
+> +
+> +       mutex_unlock(&chpool_mutex);
+> +
+> +       if (!ret) {
+> +               pr_err("Unable to assign mailbox(%s)\n", cl->chan_name);
+> +               return NULL;
+> +       }
+> +
+> +       ret = chan->link_ops->startup(chan->link, cl->cntlr_data);
+> +       if (ret) {
+> +               pr_err("Unable to startup the link\n");
+> +               ipc_free_channel((void *)chan);
+> +               return NULL;
+> +       }
+> +
+> +       return (void *)chan;
+> +}
+> +EXPORT_SYMBOL(ipc_request_channel);
+> +
+> +/* Drop any messages queued and release the channel */
+> +void ipc_free_channel(void *ch)
+> +{
+> +       struct ipc_chan *chan = (struct ipc_chan *)ch;
+> +       unsigned long flags;
+> +
+> +       if (!chan || !chan->assigned)
+> +               return;
+> +
+> +       chan->link_ops->shutdown(chan->link);
+> +
+> +       /* The queued TX requests are simply aborted, no callbacks are made */
+> +       spin_lock_irqsave(&chan->lock, flags);
+> +       chan->assigned = false;
+> +       chan->active_token = 0;
+> +       if (chan->txdone_method == (TXDONE_BY_POLL | TXDONE_BY_ACK))
+> +               chan->txdone_method = TXDONE_BY_POLL;
+> +       spin_unlock_irqrestore(&chan->lock, flags);
+> +
+> +       del_timer_sync(chan->timer);
+> +
+> +       blocking_notifier_call_chain(&chan->avail, 0, NULL);
+> +}
+> +EXPORT_SYMBOL(ipc_free_channel);
+> +
+> +static struct ipc_chan *name_to_chan(const char *name)
+> +{
+> +       struct ipc_chan *chan;
+> +       int ret = 0;
+> +
+> +       mutex_lock(&chpool_mutex);
+> +       list_for_each_entry(chan,&ipc_channels, node)
+> +               if (!strcmp(name, chan->chan_name)) {
+> +                       ret = 1;
+> +                       break;
+> +               }
+> +       mutex_unlock(&chpool_mutex);
+> +
+> +       if (!ret)
+> +               return NULL;
+> +
+> +       return chan;
 > +}
 > +
-> +static struct clocksource gt_clocksource = {
-> +       .name   = "Global Timer CS",
-
-"ARM global timer clock source"
-
-> +       .rating = 300,
-> +       .read   = gt_clocksource_read,
-> +       .mask   = CLOCKSOURCE_MASK(64),
-> +       .flags  = CLOCK_SOURCE_IS_CONTINUOUS,
+> +int ipc_notify_chan_register(const char *name, struct notifier_block *nb)
+> +{
+> +       struct ipc_chan *chan = name_to_chan(name);
+> +
+> +       if (chan&&  nb)
+> +               return blocking_notifier_chain_register(&chan->avail, nb);
+> +
+> +       return -EINVAL;
+> +}
+> +EXPORT_SYMBOL(ipc_notify_chan_register);
+> +
+> +void ipc_notify_chan_unregister(const char *name, struct notifier_block *nb)
+> +{
+> +       struct ipc_chan *chan = name_to_chan(name);
+> +
+> +       if (chan&&  nb)
+> +               blocking_notifier_chain_unregister(&chan->avail, nb);
+> +}
+> +EXPORT_SYMBOL(ipc_notify_chan_unregister);
+> +
+> +/*
+> + * Call for IPC controller drivers to register a controller, adding
+> + * its channels/mailboxes to the global pool.
+> + */
+> +int ipc_links_register(struct ipc_controller *ipc_con)
+> +{
+> +       struct tx_poll_timer *timer = NULL;
+> +       struct ipc_chan *channel;
+> +       int i, num_links, txdone;
+> +
+> +       /* Are you f***ing with us, sir? */
+> +       if (!ipc_con || !ipc_con->ops)
+> +               return -EINVAL;
+> +
+> +       for (i = 0; ipc_con->links[i]; i++)
+> +               ;
+> +       if (!i)
+> +               return -EINVAL;
+> +       num_links = i;
+> +
+> +       if (ipc_con->txdone_irq)
+> +               txdone = TXDONE_BY_IRQ;
+> +       else if (ipc_con->txdone_poll)
+> +               txdone = TXDONE_BY_POLL;
+> +       else /* It has to be at least ACK */
+> +               txdone = TXDONE_BY_ACK;
+> +
+> +       if (txdone == TXDONE_BY_POLL) {
+> +               timer = kzalloc(sizeof(struct tx_poll_timer), GFP_KERNEL);
+> +               if (!timer)
+> +                       return -ENOMEM;
+> +               timer->period = ipc_con->txpoll_period;
+> +               timer->poll.function =&poll_txdone;
+> +               timer->poll.data = (unsigned long)timer;
+> +               init_timer(&timer->poll);
+> +       }
+> +
+> +       channel = kzalloc(sizeof(struct ipc_chan) * num_links, GFP_KERNEL);
+> +       if (!channel) {
+> +               kfree(timer);
+> +               return -ENOMEM;
+> +       }
+> +
+> +       for (i = 0; i<  num_links; i++) {
+> +               channel[i].timer = timer;
+> +               channel[i].assigned = false;
+> +               channel[i].txdone_method = txdone;
+> +               channel[i].link_ops = ipc_con->ops;
+> +               channel[i].link = ipc_con->links[i];
+> +               channel[i].link->api_priv =&channel[i];
+> +               snprintf(channel[i].chan_name, 32, "%s:%s",
+> +                       ipc_con->controller_name,
+> +                       ipc_con->links[i]->link_name);
+> +               spin_lock_init(&channel[i].lock);
+> +               BLOCKING_INIT_NOTIFIER_HEAD(&channel[i].avail);
+> +               mutex_lock(&chpool_mutex);
+> +               list_add_tail(&channel[i].node,&ipc_channels);
+> +               mutex_unlock(&chpool_mutex);
+> +       }
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL(ipc_links_register);
+> +
+> +void ipc_links_unregister(struct ipc_controller *ipc_con)
+> +{
+> +       struct ipc_chan *chan, *t, *first = NULL;
+> +       struct tx_poll_timer *timer = NULL;
+> +       char *name;
+> +       int i;
+> +
+> +       mutex_lock(&chpool_mutex);
+> +       for (i = 0; ipc_con->links[i]; i++) {
+> +               snprintf(name, 32, "%s:%s",
+> +                       ipc_con->controller_name,
+> +                       ipc_con->links[i]->link_name);
+> +               list_for_each_entry_safe(chan, t,&ipc_channels, node) {
+> +                       if (!strcmp(name, chan->chan_name)) {
+> +                               if (!first)
+> +                                       first = chan;
+> +                               if (!timer)
+> +                                       timer = chan->timer;
+> +                               list_del(&chan->node);
+> +                               ipc_free_channel((void *)chan);
+> +                               break;
+> +                       }
+> +               }
+> +       }
+> +       mutex_unlock(&chpool_mutex);
+> +
+> +       kfree(first);
+> +       kfree(timer);
+> +}
+> +EXPORT_SYMBOL(ipc_links_unregister);
+> diff --git a/include/linux/mailbox.h b/include/linux/mailbox.h
+> new file mode 100644
+> index 0000000..232e2c4
+> --- /dev/null
+> +++ b/include/linux/mailbox.h
+> @@ -0,0 +1,17 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __MAILBOX_H
+> +#define __MAILBOX_H
+> +
+> +enum xfer_result {
+> +       XFER_OK = 0,
+> +       XFER_ERR,
 > +};
 > +
-> +static void __init gt_clocksource_init(void)
-> +{
-> +       writel(0, gt_base + GT_CONTROL);
-> +       writel(0, gt_base + GT_COUNTER0);
-> +       writel(0, gt_base + GT_COUNTER1);
-> +       writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+> +typedef unsigned request_token_t;
 > +
-> +       gt_clocksource.shift = 20;
-
-So how did you come up with that?
-
-> +       gt_clocksource.mult =
-> +               clocksource_hz2mult(gt_clk_rate, gt_clocksource.shift);
-> +       clocksource_register(&gt_clocksource);
-
-Why don't you just replace all of this hazzle with:
-
-clocksource_register_hz(&gt_clocksource, gt_clk_rate);
-
-That will calculate mult and shift for you? (Leave these
-unassigned.)
-
-Since the hpet timer does this it's pretty well tested...
-
-No more comments right now...
-
-Yours,
-Linus Walleij
+> +#endif /* __MAILBOX_H */
+> diff --git a/include/linux/mailbox_client.h b/include/linux/mailbox_client.h
+> new file mode 100644
+> index 0000000..232fdc7
+> --- /dev/null
+> +++ b/include/linux/mailbox_client.h
+> @@ -0,0 +1,85 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __MAILBOX_CLIENT_H
+> +#define __MAILBOX_CLIENT_H
+> +
+> +#include<linux/mailbox.h>
+> +
+> +/**
+> + * struct ipc_client - User of a mailbox
+> + * @chan_name: the "controller:channel" this client wants
+> + * @rxcb: atomic callback to provide client the data received
+> + * @txcb: atomic callback to tell client of data transmission
+> + * @tx_block: if the ipc_send_message should block until data is transmitted
+> + * @tx_tout: Max block period in ms before TX is assumed failure
+> + * @knows_txdone: if the client could run the TX state machine. Usually if
+> + *    the client receives some ACK packet for transmission. Unused if the
+> + *    controller already has TX_Done/RTR IRQ.
+> + * @cntlr_data: Optional controller specific parameters during channel request
+> + */
+> +struct ipc_client {
+> +       char *chan_name;
+> +       void (*rxcb)(void *data);
+> +       void (*txcb)(request_token_t t, enum xfer_result r);
+> +       bool tx_block;
+> +       unsigned long tx_tout;
+> +       bool knows_txdone;
+> +       void *cntlr_data;
+> +};
+> +
+> +/**
+> + * The Client specifies it requirements and capabilities while asking for
+> + * a channel/mailbox by name. It can't be called from atomic context.
+> + * The channel is exclusively allocated and can't be used by another
+> + * client before the owner calls ipc_free_channel.
+> + */
+> +void *ipc_request_channel(struct ipc_client *cl);
+> +
+> +/**
+> + * For client to submit data to the controller destined for a remote
+> + * processor. If the client had set 'tx_block', the call will return
+> + * either when the remote receives the data or when 'tx_tout' millisecs
+> + * run out.
+> + *  In non-blocking mode, the requests are buffered by the API and a
+> + * non-zero token is returned for each queued request. If the queue
+> + * was full the returned token will be 0. Upon failure or successful
+> + * TX, the API calls 'txcb' from atomic context, from which the client
+> + * could submit yet another request.
+> + *  In blocking mode, 'txcb' is not called, effectively making the
+> + * queue length 1. The returned value is 0 if TX timed out, some
+> + * non-zero value upon success.
+> + */
+> +request_token_t ipc_send_message(void *channel, void *data);
+> +
+> +/**
+> + * The way for a client to run the TX state machine. This works
+> + * only if the client sets 'knows_txdone' and the IPC controller
+> + * don't get an IRQ for TX_Done.
+> + */
+> +void ipc_client_txdone(void *channel, enum xfer_result r);
+> +
+> +/**
+> + * The client relinquishes control of a mailbox by this call,
+> + * make it available to other clients.
+> + * The ipc_request/free_channel are light weight calls, so the
+> + * client should avoid holding it when it doesn't need to
+> + * transfer data.
+> + */
+> +void ipc_free_channel(void *ch);
+> +
+> +/**
+> + * The client make ask the API to be notified when a particular channel
+> + * becomes available to be acquired again.
+> + */
+> +int ipc_notify_chan_register(const char *name, struct notifier_block *nb);
+> +
+> +/**
+> + * The client is no more interested in acquiring the channel.
+> + */
+> +void ipc_notify_chan_unregister(const char *name, struct notifier_block *nb);
+> +
+> +#endif /* __MAILBOX_CLIENT_H */
+> diff --git a/include/linux/mailbox_controller.h b/include/linux/mailbox_controller.h
+> new file mode 100644
+> index 0000000..23b80e3
+> --- /dev/null
+> +++ b/include/linux/mailbox_controller.h
+> @@ -0,0 +1,102 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __MAILBOX_CONTROLLER_H
+> +#define __MAILBOX_CONTROLLER_H
+> +
+> +#include<linux/mailbox.h>
+> +
+> +/**
+> + * struct ipc_link - s/w representation of a communication link
+> + * @link_name: Literal name assigned to the link. Physically
+> + *    identical channels may have the same name.
+> + * @api_priv: hook for the API to map its private data on the link
+> + *    Controller driver must not touch it.
+> + */
+> +struct ipc_link {
+> +       char link_name[16];
+> +       void *api_priv;
+> +};
+> +
+> +/**
+> + * struct ipc_link - s/w representation of a communication link
+> + * @send_data: The API asks the IPC controller driver, in atomic
+> + *    context try to transmit a message on the bus. Returns 0 if
+> + *    data is accepted for transmission, -EBUSY while rejecting
+> + *    if the remote hasn't yet read the last data sent. Actual
+> + *    transmission of data is reported by the controller via
+> + *    ipc_link_txdone (if it has some TX ACK irq). It must not
+> + *    block.
+> + * @startup: Called when a client requests the link. The controller
+> + *    could ask clients for additional parameters of communication
+> + *    to be provided via client's cntlr_data. This call may block.
+> + *    After this call the Controller must forward any data received
+> + *    on the link by calling ipc_link_received_data (which won't block)
+> + * @shutdown: Called when a client relinquishes control of a link.
+> + *    This call may block too. The controller must not forwared
+> + *    any received data anymore.
+> + * @last_tx_done: If the controller sets 'txdone_poll', the API calls
+> + *    this to poll status of last TX. The controller must give priority
+> + *    to IRQ method over polling and never set both txdone_poll and
+> + *    txdone_irq. Only in polling mode 'send_data' is expected to
+> + *    return -EBUSY. Used only if txdone_poll:=true&&  txdone_irq:=false
+> + */
+> +struct ipc_link_ops {
+> +       int (*send_data)(struct ipc_link *link, void *data);
+> +       int (*startup)(struct ipc_link *link, void *params);
+> +       void (*shutdown)(struct ipc_link *link);
+> +       bool (*last_tx_done)(struct ipc_link *link);
+> +};
+> +
+> +/**
+> + * struct ipc_controller - Controller of a class of communication links
+> + * @controller_name: Literal name of the controller.
+> + * @ops: Operators that work on each communication link
+> + * @links: Null terminated array of links.
+> + * @txdone_irq: Indicates if the controller can report to API when the
+> + *    last transmitted data was read by the remote. Eg, if it has some
+> + *    TX ACK irq.
+> + * @txdone_poll: If the controller can read but not report the TX done.
+> + *    Eg, is some register shows the TX status but no interrupt rises.
+> + *    Ignored if 'txdone_irq' is set.
+> + * @txpoll_period: If 'txdone_poll' is in effect, the API polls for
+> + *    last TX's status after these many millisecs
+> + */
+> +struct ipc_controller {
+> +       char controller_name[16];
+> +       struct ipc_link_ops *ops;
+> +       struct ipc_link **links;
+> +       bool txdone_irq;
+> +       bool txdone_poll;
+> +       unsigned txpoll_period;
+> +};
+> +
+> +/**
+> + * The controller driver registers its communication links to the
+> + * global pool managed by the API.
+> + */
+> +int ipc_links_register(struct ipc_controller *ipc_con);
+> +
+> +/**
+> + * After startup and before shutdown any data received on the link
+> + * is pused to the API via atomic ipc_link_received_data() API.
+> + * The controller should ACK the RX only after this call returns.
+> + */
+> +void ipc_link_received_data(struct ipc_link *link, void *data);
+> +
+> +/**
+> + * The controller the has IRQ for TX ACK calls this atomic API
+> + * to tick the TX state machine. It works only if txdone_irq
+> + * is set by the controller.
+> + */
+> +void ipc_link_txdone(struct ipc_link *link, enum xfer_result r);
+> +
+> +/**
+> + * Purge the links from the global pool maintained by the API.
+> + */
+> +void ipc_links_unregister(struct ipc_controller *ipc_con);
+> +
+> +#endif /* __MAILBOX_CONTROLLER_H */
+> --
+> 1.7.10.4
+>
