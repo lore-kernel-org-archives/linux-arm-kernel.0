@@ -1,29 +1,44 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Mon, 13 May 2013 20:20:58 +1200
-Subject: [PATCH 0/2] clk: vt8500: updates for 3.11
-Message-ID: <1368433260-16073-1-git-send-email-linux@prisktech.co.nz>
+Date: Mon, 13 May 2013 20:21:00 +1200
+Subject: [PATCH 2/2] clk: vt8500: Remove unnecessary divisor adjustment in
+ vtwm_dclk_set_rate()
+In-Reply-To: <1368433260-16073-1-git-send-email-linux@prisktech.co.nz>
+References: <1368433260-16073-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1368433260-16073-3-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+The divisor adjustment code to ensure that a divisor is not rounded down,
+thereby giving a rate higher than requested, is unnecessary and in some
+instances results in the actual rate being much lower than requested due to
+rounding errors.
 
-Two updates for the arch-vt8500 clock code:
+The test is already performed in vtwm_dclk_round_rate(), which is always
+called when clk_set_rate is called. Due to rounding errors in the line:
+divisor = parent_rate / rate (clk-vt8500.c:160) we will sometimes end up
+adjusting the divisor twice - first in round_rate and then again in set_rate.
 
-#1: Add support for the WM8850 PLL.
-#2: Remove a second divisor check in vt8500_dclk_set_rate() which causes the
-divisor to be round-down too low.
+This patch removes the test/adjustment in vtwm_dclk_set_rate.
 
-Regards
-Tony Prisk
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ drivers/clk/clk-vt8500.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
-Tony Prisk (2):
-  clk: vt8500: Add support for clocks on the WM8850 SoCs
-  clk: vt8500: Remove unnecessary divisor adjustment in
-    vtwm_dclk_set_rate()
-
- Documentation/devicetree/bindings/clock/vt8500.txt |    2 +
- drivers/clk/clk-vt8500.c                           |   75 ++++++++++++++++++--
- 2 files changed, 73 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+index 6d5b6e9..d8fd085 100644
+--- a/drivers/clk/clk-vt8500.c
++++ b/drivers/clk/clk-vt8500.c
+@@ -157,10 +157,6 @@ static int vt8500_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	divisor =  parent_rate / rate;
+ 
+-	/* If prate / rate would be decimal, incr the divisor */
+-	if (rate * divisor < parent_rate)
+-		divisor++;
+-
+ 	if (divisor == cdev->div_mask + 1)
+ 		divisor = 0;
+ 
 -- 
 1.7.9.5
