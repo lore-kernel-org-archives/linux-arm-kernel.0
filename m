@@ -1,178 +1,86 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 May 2013 10:01:57 +0100
-Subject: [PATCH v3 30/32] arm64: KVM: enable initialization of a 32bit vcpu
-In-Reply-To: <20130511003842.GE30999@chazy>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-31-git-send-email-marc.zyngier@arm.com>
- <20130423230229.GN20569@gmail.com> <5177E303.7050801@arm.com>
- <CAEDV+g+OL+37w9jA8=0WGea5FgW5y3mazqFzv9GLxDgjCe6dtg@mail.gmail.com>
- <51892DA4.4050401@arm.com> <20130511003842.GE30999@chazy>
-Message-ID: <5190AC05.5000304@arm.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Mon, 13 May 2013 11:07:24 +0200
+Subject: [PATCH] documentation: iommu: add description of ARM System MMU
+ binding
+In-Reply-To: <5189635A.8090504@codeaurora.org>
+References: <20130408092535.GA17476@mudshark.cambridge.arm.com>
+ <5162F87A.7070409@codeaurora.org>
+ <20130410173732.GQ26992@mudshark.cambridge.arm.com>
+ <5169C7D1.8070300@codeaurora.org>
+ <20130415131341.GG9827@mudshark.cambridge.arm.com>
+ <516D9602.2010404@codeaurora.org>
+ <20130418190131.GA12344@mudshark.cambridge.arm.com>
+ <5177113D.7060300@codeaurora.org>
+ <20130424095501.GC21850@mudshark.cambridge.arm.com>
+ <5189635A.8090504@codeaurora.org>
+Message-ID: <20130513090724.GA10369@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/13 01:38, Christoffer Dall wrote:
-> On Tue, May 07, 2013 at 05:36:52PM +0100, Marc Zyngier wrote:
->> On 24/04/13 18:17, Christoffer Dall wrote:
->>> On Wed, Apr 24, 2013 at 6:49 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> On 24/04/13 00:02, Christoffer Dall wrote:
->>>>> On Mon, Apr 08, 2013 at 05:17:32PM +0100, Marc Zyngier wrote:
->>>>>> Wire the init of a 32bit vcpu by allowing 32bit modes in pstate,
->>>>>> and providing sensible defaults out of reset state.
->>>>>>
->>>>>> This feature is of course conditioned by the presence of 32bit
->>>>>> capability on the physical CPU, and is checked by the KVM_CAP_ARM_EL1_32BIT
->>>>>> capability.
->>>>>>
->>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>>> ---
->>>>>>  arch/arm64/include/asm/kvm_host.h |  2 +-
->>>>>>  arch/arm64/include/uapi/asm/kvm.h |  1 +
->>>>>>  arch/arm64/kvm/guest.c            |  6 ++++++
->>>>>>  arch/arm64/kvm/reset.c            | 25 ++++++++++++++++++++++++-
->>>>>>  include/uapi/linux/kvm.h          |  1 +
->>>>>>  5 files changed, 33 insertions(+), 2 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->>>>>> index d44064d..c3ec107 100644
->>>>>> --- a/arch/arm64/include/asm/kvm_host.h
->>>>>> +++ b/arch/arm64/include/asm/kvm_host.h
->>>>>> @@ -34,7 +34,7 @@
->>>>>>  #include <asm/kvm_vgic.h>
->>>>>>  #include <asm/kvm_arch_timer.h>
->>>>>>
->>>>>> -#define KVM_VCPU_MAX_FEATURES 1
->>>>>> +#define KVM_VCPU_MAX_FEATURES 2
->>>>>>
->>>>>>  /* We don't currently support large pages. */
->>>>>>  #define KVM_HPAGE_GFN_SHIFT(x)      0
->>>>>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
->>>>>> index 5b1110c..5031f42 100644
->>>>>> --- a/arch/arm64/include/uapi/asm/kvm.h
->>>>>> +++ b/arch/arm64/include/uapi/asm/kvm.h
->>>>>> @@ -75,6 +75,7 @@ struct kvm_regs {
->>>>>>  #define KVM_VGIC_V2_CPU_SIZE                0x2000
->>>>>>
->>>>>>  #define KVM_ARM_VCPU_POWER_OFF              0 /* CPU is started in OFF state */
->>>>>> +#define KVM_ARM_VCPU_EL1_32BIT              1 /* CPU running a 32bit VM */
->>>>>>
->>>>>>  struct kvm_vcpu_init {
->>>>>>      __u32 target;
->>>>>> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
->>>>>> index 47d3729..74ef7d5 100644
->>>>>> --- a/arch/arm64/kvm/guest.c
->>>>>> +++ b/arch/arm64/kvm/guest.c
->>>>>> @@ -93,6 +93,12 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->>>>>>      if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
->>>>>>              unsigned long mode = (*(unsigned long *)valp) & COMPAT_PSR_MODE_MASK;
->>>>>>              switch (mode) {
->>>>>> +            case COMPAT_PSR_MODE_USR:
->>>>>> +            case COMPAT_PSR_MODE_FIQ:
->>>>>> +            case COMPAT_PSR_MODE_IRQ:
->>>>>> +            case COMPAT_PSR_MODE_SVC:
->>>>>> +            case COMPAT_PSR_MODE_ABT:
->>>>>> +            case COMPAT_PSR_MODE_UND:
->>>>>>              case PSR_MODE_EL0t:
->>>>>>              case PSR_MODE_EL1t:
->>>>>>              case PSR_MODE_EL1h:
->>>>>> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
->>>>>> index bc33e76..a282d35 100644
->>>>>> --- a/arch/arm64/kvm/reset.c
->>>>>> +++ b/arch/arm64/kvm/reset.c
->>>>>> @@ -35,11 +35,27 @@ static struct kvm_regs default_regs_reset = {
->>>>>>      .regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
->>>>>>  };
->>>>>>
->>>>>> +static struct kvm_regs default_regs_reset32 = {
->>>>>> +    .regs.pstate = (COMPAT_PSR_MODE_SVC | COMPAT_PSR_A_BIT |
->>>>>> +                    COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
->>>>>> +};
->>>>>> +
->>>>>> +static bool cpu_has_32bit_el1(void)
->>>>>> +{
->>>>>> +    u64 pfr0;
->>>>>> +
->>>>>> +    pfr0 = read_cpuid(ID_AA64PFR0_EL1);
->>>>>> +    return !!(pfr0 & 0x20);
->>>>>
->>>>> again we don't need the double negation
->>>>
->>>> I still hold that it makes things more readable.
->>>>
->>>>>> +}
->>>>>> +
->>>>>>  int kvm_arch_dev_ioctl_check_extention(long ext)
->>>>>>  {
->>>>>>      int r;
->>>>>>
->>>>>>      switch (ext) {
->>>>>> +    case KVM_CAP_ARM_EL1_32BIT:
->>>>>> +            r = cpu_has_32bit_el1();
->>>>>> +            break;
->>>>>>      default:
->>>>>>              r = 0;
->>>>>>      }
->>>>>> @@ -62,7 +78,14 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
->>>>>>
->>>>>>      switch (vcpu->arch.target) {
->>>>>>      default:
->>>>>> -            cpu_reset = &default_regs_reset;
->>>>>> +            if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features)) {
->>>>>> +                    if (!cpu_has_32bit_el1())
->>>>>> +                            return -EINVAL;
->>>>>
->>>>> I'm not sure EINVAL is appropriate here, the value specified was not
->>>>> incorrect, it's that the hardware doesn't support it. ENXIO, ENODEV, and
->>>>> add that in Documentation/virtual/kvm/api.txt ?
->>>>
->>>> Not sure. If you ended up here, it means you tried to start a 32bit
->>>> guest on a 64bit-only CPU, despite KVM_CAP_ARM_EL1_32BIT telling you
->>>> that your CPU is not 32bit capable.
->>>>
->>>> This is clearly an invalid input, isn't it?
->>>>
->>> check the API documentation for this ioctl, I don't think that's the
->>> type of invalid input meant when describing the meaning of EINVAL. If
->>> you feel strongly about it of course it's no big deal, but I think
->>> EINVAL is so overloaded anyway that telling the user something more
->>> specific would be great, but I'll leave it up to you.
->>
->> [bit late on this one...]
->>
->> Here's what the documentation says:
->> <quote>
->> 4.77 KVM_ARM_VCPU_INIT
->>
->> Capability: basic
->> Architectures: arm, arm64
->> Type: vcpu ioctl
->> Parameters: struct struct kvm_vcpu_init (in)
->> Returns: 0 on success; -1 on error
->> Errors:
->>   EINVAL:    the target is unknown, or the combination of features is invalid.
->>   ENOENT:    a features bit specified is unknown.
->> </quote>
->>
->> When this call fails, it is because you've requested a feature
->> that is invalid for this CPU. To me, that exactly fits the
->> EINVAL entry copied above.
->>
->> Or am I completely misunderstanding it?
->>
-> I read the EINVAL to say that you supplied something which is invalid
-> for the software interface and you should fix your user space code.
+On Tue, May 07, 2013 at 04:26:02PM -0400, Olav Haugan wrote:
+> Hi Will,
+> 
+> On 4/24/2013 2:55 AM, Will Deacon wrote:
+> > On Tue, Apr 23, 2013 at 11:54:53PM +0100, Olav Haugan wrote:
+> >> On 4/18/2013 12:01 PM, Will Deacon wrote:
+> > Getting phandles has no dependencies on anything -- the only dependency is
+> > that the device is added to the bus on which the SMMU sits, just like every
+> > other IOMMU driver.
+> > 
+> >>> Why would a page table shared between devices require multiple context
+> >>> banks? Multiple SMRs and S2CRs, sure, but they would ultimately point at the
+> >>> same context bank (and hence same address space).
+> >>
+> >> What if you want to have 2 different VMID's being generated? Also, what
+> >> about TLB management? If I have two context banks I can invalidate only
+> >> entries associated with 1 of the context banks (if VMID differ for the
+> >> two context banks).
+> > 
+> > Huh? We allocate one VMID per domain. If you want more VMIDs, use more
+> > domains. TLB invalidation is per-domain, so there's no issue there.
+> 
+> If we allocate a new domain you would have another address space (page
+> table), no? I was just trying to figure out if your binding proposal
+> would allow for 2 context banks in one domain which it does not seem to
+> support.
+> 
+> >>> If a master needs to be in two address spaces at once, then it will need to
+> >>> attach it's StreamIDs to different domains. You can't place a single
+> >>> StreamID in two address spaces (this is an architectural constraint).
+> >>
+> >> Yes, you would have a separate domain. I am just wondering how I would
+> >> model this in DT using the bindings that you are proposing? How does it
+> >> work? The bindings specify bus masters to StreamIDs. So if I call attach
+> >> with the master device you will allocate a context bank and program the
+> >> StreamIDs as specified in the DT. So now if I want to have another
+> >> context bank associated with the same master device what do I do? I call
+> >> into attach with a new domain but with the same master device but the
+> >> master device is already attached to a context/domain.
+> > 
+> > Why would you want to place a StreamID into two domains? That doesn't make
+> > any sense and isn't even supported by the architecture (things like
+> > conflicting SMR entries may not even be reported).
+> 
+> I think you misunderstood me. I am talking about having for example 1
+> master with two (2) context banks so that StreamID "1" goes to CB0 and
+> StreamID "2" goes to CB1. This means that the master device is attached
+> to two different domains. How do I model this with the the device tree
+> bindings?
 
-Exactly. The code should have checked for the corresponding capability
-before blindly requesting that feature. That's exactly why we have
-capabilities.
+Hi Olav,
 
-> The fact that you're requesting a feature that your hardware doesn't
-> support is a different thing IMHO.
+I think with the proposed device tree binding you can't model this.
 
-Well, if you're allowed to call into this without checking the
-capabilities, then I suggest we remove them, because they are clearly
-superfluous.
+Do we have such use cases already? Or what future use cases would
+require this?
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I can imagine of multiple contexts per device for stuff similar to
+what PASID in PCI Express are used for.
+
+But in such a case you probably want to have some configurable bits in
+the StreamID (that should be set by an SMMU driver). And the DT
+binding should contain the number of contexts that a master device can
+support.
+
+
+Andreas
