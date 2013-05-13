@@ -1,67 +1,45 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 13 May 2013 19:37:23 +0200
-Subject: [PATCH RFC] clk: Introduce userspace clock driver
-In-Reply-To: <7c5e7537-6ed5-4622-a7a9-bf46820ef695@VA3EHSMHS033.ehs.local>
-References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
- <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
- <20130510212422.GY3200@sirena.org.uk>
- <7e18bed3-ae6b-4aa0-bf23-b6c61ba8b85b@CO9EHSMHS030.ehs.local>
- <20130512143344.GC3200@sirena.org.uk>
- <9e55c552-ce34-4663-9a57-bf2c626d7d58@TX2EHSMHS008.ehs.local>
- <20130513052135.GD6836@sirena.org.uk>
- <0bf5a185-86f7-4a93-a90f-42caefb06a1d@TX2EHSMHS009.ehs.local>
- <519112F9.2010102@gmail.com>
- <7c5e7537-6ed5-4622-a7a9-bf46820ef695@VA3EHSMHS033.ehs.local>
-Message-ID: <519124D3.2040403@gmail.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Mon, 13 May 2013 10:46:34 -0700
+Subject: [PATCH v2 0/5] Zynq: revised CCF code
+Message-ID: <1368467199-8702-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/13 19:24, S?ren Brinkmann wrote:
-> On Mon, May 13, 2013 at 06:21:13PM +0200, Sebastian Hesselbarth wrote:
->>> Well, that driver actually exists. But that just programs a bitstream
->>> you give it to program. It does not know anything about the design it
->>> programs and cannot make any kind of decision whether the clocks should
->>> be userspace controlled or not.
->>
->> what Mark wants to point out is that you add fabric clocks to the Xilinx
->> driver instead. This way, you will have user-space controllable clocks
->> but only if you loaded the xilinx driver first.
-> What "Xilinx driver", are we talking about?
+I rebased this series on v3.10-rc1 eliminating all dependencies and incorporated
+Greg's feedback.
+I'll push this also to my github repository.
+https://github.com/sorenb-xlnx/linux-xlnx/tree/zynq/clkc
 
-The device config driver you mention below.
+v2:
+ - dropped the 'sort #includes' patches
 
->> IIRC the fabric clock controller provided by Zynq _is_ always there and
->> accessible from ARM CPUs. You just don't have a new generic driver
->> allowing to poke with all clocks, but a xilinx only driver allowing you
->> to set the (xilinx only) fabric clocks.
-> Right.
->
->> I've played with Zynq a while ago, did Xilinx mainline the bitfile
->> driver already? If not, why don't you give it a shot?
-> The device config driver is not in mainline, AFAIK. And I think it's in
-> rather bad shape and needs a lot of work before it is upstreamable. But
-> this is probably the right place to put this.
+	S?ren
 
-It is, as it will only expose clocks on Zynq and that's what Mark and
-Mike are worried about. Expose clocks to user space and you will have
-people mess with it for sure.
 
-About the shape of it, I didn't expect that to change at all. Just
-wondering, if it still requires you to manually end it's endianess
-mess with the bitfiles. If you go at it, consider reading the magic
-hidden in the bitfile and swap it when it is required. But that will
-go OT here.
+Soren Brinkmann (5):
+  tty: xuartps: Remove suspend/resume functions
+  clk: zynq: Factor out PLL driver
+  clk: zynq: Add clock controller driver
+  arm: zynq: Migrate platform to clock controller
+  clk: zynq: Remove deprecated clock code
 
-> On the other hand, currently this driver is only required for
-> programming the FPGA from Linux, which is not required. One of the
-> bootloaders could do this for you earlier.
+ .../devicetree/bindings/clock/zynq-7000.txt        | 127 +++--
+ arch/arm/boot/dts/zynq-7000.dtsi                   |  71 +--
+ arch/arm/boot/dts/zynq-zc702.dts                   |   4 -
+ arch/arm/mach-zynq/slcr.c                          |   2 +-
+ drivers/clk/Makefile                               |   2 +-
+ drivers/clk/clk-zynq.c                             | 378 ---------------
+ drivers/clk/zynq/Makefile                          |   3 +
+ drivers/clk/zynq/clkc.c                            | 533 +++++++++++++++++++++
+ drivers/clk/zynq/pll.c                             | 235 +++++++++
+ drivers/clocksource/cadence_ttc_timer.c            |  23 +-
+ drivers/tty/serial/xilinx_uartps.c                 | 115 +++--
+ include/linux/clk/zynq.h                           |   8 +-
+ 12 files changed, 974 insertions(+), 527 deletions(-)
+ delete mode 100644 drivers/clk/clk-zynq.c
+ create mode 100644 drivers/clk/zynq/Makefile
+ create mode 100644 drivers/clk/zynq/clkc.c
+ create mode 100644 drivers/clk/zynq/pll.c
 
-Well, exposing clocks to user space is not required _at all_ on all
-other platforms you can think of. So, if you have a Zynq, you can
-always load a Zynq driver even if you are not going to use it's
-bitfile programming capabilities but only to configure clocks.
-
-If you don't want to merge both drivers, have a Zynq-only clock
-fabric driver instead?
-
-Sebastian
+-- 
+1.8.2.3
