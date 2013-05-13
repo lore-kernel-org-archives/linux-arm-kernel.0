@@ -1,79 +1,58 @@
-From: maarten.lankhorst@canonical.com (Maarten Lankhorst)
-Date: Mon, 13 May 2013 11:52:24 +0200
-Subject: Introduce a new helper framework for buffer synchronization
-In-Reply-To: <025201ce4fbb$363d0390$a2b70ab0$%dae@samsung.com>
-References: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
- <51909DB4.2060208@canonical.com>
- <025201ce4fbb$363d0390$a2b70ab0$%dae@samsung.com>
-Message-ID: <5190B7D8.3010803@canonical.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 May 2013 10:58:46 +0100
+Subject: [PATCH v2] documentation: iommu: add description of ARM System
+ MMU binding
+In-Reply-To: <20130513095020.GB10369@alberich>
+References: <1365789727-5371-1-git-send-email-will.deacon@arm.com>
+ <20130513095020.GB10369@alberich>
+Message-ID: <20130513095846.GC29814@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Op 13-05-13 11:21, Inki Dae schreef:
->
->> -----Original Message-----
->> From: Maarten Lankhorst [mailto:maarten.lankhorst at canonical.com]
->> Sent: Monday, May 13, 2013 5:01 PM
->> To: Inki Dae
->> Cc: Rob Clark; Daniel Vetter; DRI mailing list; linux-arm-
->> kernel at lists.infradead.org; linux-media at vger.kernel.org; linux-fbdev;
->> Kyungmin Park; myungjoo.ham; YoungJun Cho
->> Subject: Re: Introduce a new helper framework for buffer synchronization
->>
->> Op 09-05-13 09:33, Inki Dae schreef:
->>> Hi all,
->>>
->>> This post introduces a new helper framework based on dma fence. And the
->>> purpose of this post is to collect other opinions and advices before RFC
->>> posting.
->>>
->>> First of all, this helper framework, called fence helper, is in progress
->>> yet so might not have enough comments in codes and also might need to be
->>> more cleaned up. Moreover, we might be missing some parts of the dma
->> fence.
->>> However, I'd like to say that all things mentioned below has been tested
->>> with Linux platform and worked well.
->>> ....
->>>
->>> And tutorial for user process.
->>>         just before cpu access
->>>                 struct dma_buf_fence *df;
->>>
->>>                 df->type = DMA_BUF_ACCESS_READ or DMA_BUF_ACCESS_WRITE;
->>>                 ioctl(fd, DMA_BUF_GET_FENCE, &df);
->>>
->>>         after memset or memcpy
->>>                 ioctl(fd, DMA_BUF_PUT_FENCE, &df);
->> NAK.
->>
->> Userspace doesn't need to trigger fences. It can do a buffer idle wait,
->> and postpone submitting new commands until after it's done using the
->> buffer.
-> Hi Maarten,
->
-> It seems that you say user should wait for a buffer like KDS does: KDS uses
-> select() to postpone submitting new commands. But I think this way assumes
-> that every data flows a DMA device to a CPU. For example, a CPU should keep
-> polling for the completion of a buffer access by a DMA device. This means
-> that the this way isn't considered for data flow to opposite case; CPU to
-> DMA device.
-Not really. You do both things the same way. You first wait for the bo to be idle, this could be implemented by adding poll support to the dma-buf fd.
-Then you either do your read or write. Since userspace is supposed to be the one controlling the bo it should stay idle at that point. If you have another thread queueing
-the buffer againbefore your thread is done that's a bug in the application, and can be solved with userspace locking primitives. No need for the kernel to get involved.
+On Mon, May 13, 2013 at 10:50:20AM +0100, Andreas Herrmann wrote:
+> Hi Will,
 
->> Kernel space doesn't need the root hole you created by giving a
->> dereferencing a pointer passed from userspace.
->> Your next exercise should be to write a security exploit from the api you
->> created here. It's the only way to learn how to write safe code. Hint:
->> df.ctx = mmap(..);
->>
-> Also I'm not clear to use our way yet and that is why I posted. As you
-> mentioned, it seems like that using mmap() is more safe. But there is one
-> issue it makes me confusing. For your hint, df.ctx = mmap(..), the issue is
-> that dmabuf mmap can be used to map a dmabuf with user space. And the dmabuf
-> means a physical memory region allocated by some allocator such as drm gem
-> or ion.
->
-> There might be my missing point so could you please give me more comments?
->
-My point was that userspace could change df.ctx to some mmap'd memory, forcing the kernel to execute some code prepared by userspace.
+Hi Andreas,
+
+> so far, I thought, that this proposal is fine. After I have tried to
+> make use of the binding I have some points that might need further
+> disucssion.
+
+Sure, although I've been using the binding without issues so it would be
+interesting to understand your use-case and why it's raising problems.
+
+> Olav already asked (in another thread) how to model the mapping of
+> stream IDs to contexts for master devices that support multiple
+> contexts.  I doubt that this is fully covered yet.
+
+Yeah, I've been meaning to reply to that. Given the way that the IOMMU API
+is structure in Linux, I don't think having multiple stream IDs per (struct)
+device, where each StreamID points at a different context (and therefore
+address space) makes much sense. It also doesn't solve the more general
+problem where StreamIDs for a device might have different SMMUs downstream.
+
+To solve this, I think it is better to treat the device as having multiple
+struct device instances, and managing the mappings in the device driver.
+
+For most devices, I'd expect a single context to be enough. This is
+certainly the case for device virtualisation at stage-2 and DMA at stage-1.
+
+> I also think that it is more useful to move the stream-id property to
+> the device node of a master device. (It's a characteristic of the
+> master device not of the SMMU.) Currently with multiple stream IDs per
+> master device you have repeated entries in the mmu-master property.
+
+The problem with that approach is how to handle StreamID remastering. This
+can and will happen, so the StreamID for a device is actually a property of
+both the device *and* a particular point in the bus topology. Putting this
+information in the device nodes will drag topology information all over the
+place and I don't think it will make things clearer to read or easier to parse.
+
+> But all that is needed is to point (once) to each mmu-master in the
+> SMMU device node. Then you should be able to look up the corresponding
+> stream IDs in the device node for each mmu-master.
+
+Again, you also need to tie in topology information if you go down this
+route.
+
+Will
