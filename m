@@ -1,45 +1,32 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 13 May 2013 10:54:36 -0600
-Subject: [PATCH 2/6] ARM: tegra20: convert device tree files to use CLK
- defines
-In-Reply-To: <1368443225-16978-3-git-send-email-hdoyu@nvidia.com>
-References: <1368443225-16978-1-git-send-email-hdoyu@nvidia.com>
- <1368443225-16978-3-git-send-email-hdoyu@nvidia.com>
-Message-ID: <51911ACC.5010507@wwwdotorg.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 13 May 2013 17:02:59 +0000 (UTC)
+Subject: [PATCH] ARM: defconfigs: OMAP: omap2plus_defconfig missing
+ CONFIG_ARCH_MULTI_V6=y
+Message-ID: <alpine.DEB.2.00.1305131701270.7156@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2013 05:07 AM, Hiroshi Doyu wrote:
-> Replace magic number in tegra_car:
-> 
-> -               clocks = <&tegra_car 28>;
-> +               clocks = <&tegra_car CLK_HOST1X>;
 
-Patches 2, 4, 6 look basically fine. I'd also like slightly more
-explanation in the commit description here. How about:
+omap2plus_defconfig is missing CONFIG_ARCH_MULTI_V6.  This results in
+undefined instruction traps in u-boot (and boot failures) on OMAP2xxx
+SoCs, which are ARM11-based.  Fix by setting CONFIG_ARCH_MULTI_V7.
 
-=====
-Use the Tegra20 CAR binding header (tegra20-car.h) to replace magic
-numbers in the device tree. For example,
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/configs/omap2plus_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
--               clocks = <&tegra_car 28>;
-+               clocks = <&tegra_car CLK_HOST1X>;
-=====
-
-> diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-
->  #include <dt-bindings/gpio/tegra-gpio.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/clk/tegra20-car.h>
-
-Can we keep the include files sorted?
-
-One dependency issue with patches 2: There is a series of USB patches
-(which Venu posted in the last couple of days) that fix the USB binding
-to be complete. These will change the set of clocks referenced by the
-EHCI and USB PHY nodes. I would like Venu's patches to be applied first,
-since those DT changes will need to be merged into the USB tree so that
-the USB tree can apply the subsequent driver changes. Can you hold off
-on reposting your series until after I've applied Venu's changes, and
-rebase this series on top of them? Hopefully it shouldn't take too long
-to get Venu's series applied. Thanks.
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index c1ef64b..f590902 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -20,6 +20,7 @@ CONFIG_MODULE_FORCE_UNLOAD=y
+ CONFIG_MODVERSIONS=y
+ CONFIG_MODULE_SRCVERSION_ALL=y
+ # CONFIG_BLK_DEV_BSG is not set
++CONFIG_ARCH_MULTI_V6=y
+ CONFIG_ARCH_OMAP2PLUS=y
+ CONFIG_OMAP_RESET_CLOCKS=y
+ CONFIG_OMAP_MUX_DEBUG=y
+-- 
+1.7.10.4
