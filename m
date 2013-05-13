@@ -1,83 +1,21 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Mon, 13 May 2013 18:21:12 +0900
-Subject: Introduce a new helper framework for buffer synchronization
-In-Reply-To: <51909DB4.2060208@canonical.com>
-References: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
- <51909DB4.2060208@canonical.com>
-Message-ID: <025201ce4fbb$363d0390$a2b70ab0$%dae@samsung.com>
+From: jp.francois@cynove.com (jean-philippe francois)
+Date: Mon, 13 May 2013 11:28:38 +0200
+Subject: [PATCH] ARM: OMAP: fix __init section mismatch for _enable_preprogram
+Message-ID: <CAGGh5h1_-zbe=gw+YtMeddGxGkVzos=siavOv9nbSOVZqk1nVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+_enable_preprogram is marked as __init, but is called from _enable
+which is not. Without this patch, the board oopses after init. Tested
+on custom hardware and on beagle board xM.
 
-> -----Original Message-----
-> From: Maarten Lankhorst [mailto:maarten.lankhorst at canonical.com]
-> Sent: Monday, May 13, 2013 5:01 PM
-> To: Inki Dae
-> Cc: Rob Clark; Daniel Vetter; DRI mailing list; linux-arm-
-> kernel at lists.infradead.org; linux-media at vger.kernel.org; linux-fbdev;
-> Kyungmin Park; myungjoo.ham; YoungJun Cho
-> Subject: Re: Introduce a new helper framework for buffer synchronization
-> 
-> Op 09-05-13 09:33, Inki Dae schreef:
-> > Hi all,
-> >
-> > This post introduces a new helper framework based on dma fence. And the
-> > purpose of this post is to collect other opinions and advices before RFC
-> > posting.
-> >
-> > First of all, this helper framework, called fence helper, is in progress
-> > yet so might not have enough comments in codes and also might need to be
-> > more cleaned up. Moreover, we might be missing some parts of the dma
-> fence.
-> > However, I'd like to say that all things mentioned below has been tested
-> > with Linux platform and worked well.
-> 
-> > ....
-> >
-> > And tutorial for user process.
-> >         just before cpu access
-> >                 struct dma_buf_fence *df;
-> >
-> >                 df->type = DMA_BUF_ACCESS_READ or DMA_BUF_ACCESS_WRITE;
-> >                 ioctl(fd, DMA_BUF_GET_FENCE, &df);
-> >
-> >         after memset or memcpy
-> >                 ioctl(fd, DMA_BUF_PUT_FENCE, &df);
-> NAK.
-> 
-> Userspace doesn't need to trigger fences. It can do a buffer idle wait,
-> and postpone submitting new commands until after it's done using the
-> buffer.
-
-Hi Maarten,
-
-It seems that you say user should wait for a buffer like KDS does: KDS uses
-select() to postpone submitting new commands. But I think this way assumes
-that every data flows a DMA device to a CPU. For example, a CPU should keep
-polling for the completion of a buffer access by a DMA device. This means
-that the this way isn't considered for data flow to opposite case; CPU to
-DMA device.
-
-> Kernel space doesn't need the root hole you created by giving a
-> dereferencing a pointer passed from userspace.
-> Your next exercise should be to write a security exploit from the api you
-> created here. It's the only way to learn how to write safe code. Hint:
-> df.ctx = mmap(..);
-> 
-
-Also I'm not clear to use our way yet and that is why I posted. As you
-mentioned, it seems like that using mmap() is more safe. But there is one
-issue it makes me confusing. For your hint, df.ctx = mmap(..), the issue is
-that dmabuf mmap can be used to map a dmabuf with user space. And the dmabuf
-means a physical memory region allocated by some allocator such as drm gem
-or ion.
-
-There might be my missing point so could you please give me more comments?
-
-Thanks,
-Inki Dae
-
-
-
-> ~Maarten
+Signed-off-by: Jean-Philippe Fran?ois <jp.francois@cynove.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: omap_hwmod_fix.patch
+Type: application/octet-stream
+Size: 494 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130513/e9423fe7/attachment.obj>
