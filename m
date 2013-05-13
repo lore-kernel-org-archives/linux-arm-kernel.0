@@ -1,105 +1,97 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon, 13 May 2013 21:07:26 +0400
-Subject: [PATCH 04/15] ARM: clps711x: autcpu12: Add support for NOR flash
+Date: Mon, 13 May 2013 21:07:28 +0400
+Subject: [PATCH 06/15] ARM: clps711x: autcpu12: Move remaining specific
+ definitions to board file
 In-Reply-To: <1368464857-5038-1-git-send-email-shc_work@mail.ru>
 References: <1368464857-5038-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1368464857-5038-7-git-send-email-shc_work@mail.ru>
+Message-ID: <1368464857-5038-9-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/board-autcpu12.c        | 39 ++++++++++++++++++++++++--
- arch/arm/mach-clps711x/include/mach/autcpu12.h |  5 ----
- 2 files changed, 37 insertions(+), 7 deletions(-)
+ arch/arm/mach-clps711x/board-autcpu12.c        |  9 +++++-
+ arch/arm/mach-clps711x/include/mach/autcpu12.h | 44 --------------------------
+ 2 files changed, 8 insertions(+), 45 deletions(-)
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/autcpu12.h
 
 diff --git a/arch/arm/mach-clps711x/board-autcpu12.c b/arch/arm/mach-clps711x/board-autcpu12.c
-index 78b528a..3e22d0b 100644
+index 91a3ab5..cd50314 100644
 --- a/arch/arm/mach-clps711x/board-autcpu12.c
 +++ b/arch/arm/mach-clps711x/board-autcpu12.c
-@@ -26,6 +26,7 @@
- #include <linux/gpio.h>
- #include <linux/ioport.h>
- #include <linux/interrupt.h>
-+#include <linux/mtd/physmap.h>
- #include <linux/mtd/partitions.h>
- #include <linux/mtd/nand-gpio.h>
- #include <linux/platform_device.h>
-@@ -45,12 +46,17 @@
+@@ -42,7 +42,6 @@
+ #include <asm/page.h>
+ 
+ #include <asm/mach/map.h>
+-#include <mach/autcpu12.h>
+ 
  #include "common.h"
  #include "devices.h"
+@@ -50,6 +49,14 @@
+ /* NOR flash */
+ #define AUTCPU12_FLASH_BASE	(CS0_PHYS_BASE)
  
--#define AUTCPU12_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
--#define AUTCPU12_CS8900_IRQ	(IRQ_EINT3)
-+/* NOR flash */
-+#define AUTCPU12_FLASH_BASE	(CS0_PHYS_BASE)
++/* Board specific hardware definitions */
++#define AUTCPU12_CHAR_LCD_BASE	(CS1_PHYS_BASE + 0x00000000)
++#define AUTCPU12_CSAUX1_BASE	(CS1_PHYS_BASE + 0x04000000)
++#define AUTCPU12_CAN_BASE	(CS1_PHYS_BASE + 0x08000000)
++#define AUTCPU12_TOUCH_BASE	(CS1_PHYS_BASE + 0x0a000000)
++#define AUTCPU12_IO_BASE	(CS1_PHYS_BASE + 0x0c000000)
++#define AUTCPU12_LPT_BASE	(CS1_PHYS_BASE + 0x0e000000)
++
+ /* NVRAM */
+ #define AUTCPU12_NVRAM_BASE	(CS1_PHYS_BASE + 0x02000000)
  
-+/* SmartMedia flash */
- #define AUTCPU12_SMC_BASE	(CS1_PHYS_BASE + 0x06000000)
- #define AUTCPU12_SMC_SEL_BASE	(AUTCPU12_SMC_BASE + 0x10)
- 
-+/* Ethernet */
-+#define AUTCPU12_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
-+#define AUTCPU12_CS8900_IRQ	(IRQ_EINT3)
-+
- /* NAND flash */
- #define AUTCPU12_MMGPIO_BASE	(CLPS711X_NR_GPIO)
- #define AUTCPU12_SMC_NCE	(AUTCPU12_MMGPIO_BASE + 0) /* Bit 0 */
-@@ -160,9 +166,38 @@ static const struct gpio autcpu12_gpios[] __initconst = {
- 	{ AUTCPU12_DPOT_UD,	GPIOF_OUT_INIT_LOW,	"DPOT UD" },
- };
- 
-+static struct mtd_partition autcpu12_flash_partitions[] = {
-+	{
-+		.name	= "NOR.0",
-+		.offset	= 0,
-+		.size	= MTDPART_SIZ_FULL,
-+	},
-+};
-+
-+static struct physmap_flash_data autcpu12_flash_pdata = {
-+	.width		= 4,
-+	.parts		= autcpu12_flash_partitions,
-+	.nr_parts	= ARRAY_SIZE(autcpu12_flash_partitions),
-+};
-+
-+static struct resource autcpu12_flash_resources[] __initdata = {
-+	DEFINE_RES_MEM(AUTCPU12_FLASH_BASE, SZ_8M),
-+};
-+
-+static struct platform_device autcpu12_flash_pdev __initdata = {
-+	.name		= "physmap-flash",
-+	.id		= 0,
-+	.resource	= autcpu12_flash_resources,
-+	.num_resources	= ARRAY_SIZE(autcpu12_flash_resources),
-+	.dev		= {
-+		.platform_data	= &autcpu12_flash_pdata,
-+	},
-+};
-+
- static void __init autcpu12_init(void)
- {
- 	clps711x_devices_init();
-+	platform_device_register(&autcpu12_flash_pdev);
- 	platform_device_register_simple("video-clps711x", 0, NULL, 0);
- 	platform_device_register_simple("cs89x0", 0, autcpu12_cs8900_resource,
- 					ARRAY_SIZE(autcpu12_cs8900_resource));
 diff --git a/arch/arm/mach-clps711x/include/mach/autcpu12.h b/arch/arm/mach-clps711x/include/mach/autcpu12.h
-index b95d60a..0db6f18 100644
+deleted file mode 100644
+index 0e00148..0000000
 --- a/arch/arm/mach-clps711x/include/mach/autcpu12.h
-+++ b/arch/arm/mach-clps711x/include/mach/autcpu12.h
-@@ -20,11 +20,6 @@
- #ifndef __ASM_ARCH_AUTCPU12_H
- #define __ASM_ARCH_AUTCPU12_H
- 
++++ /dev/null
+@@ -1,44 +0,0 @@
 -/*
-- * The flash bank is wired to chip select 0
+- * AUTCPU12 specific defines
+- *
+- * (c) 2001 Thomas Gleixner, autronix automation <gleixner@autronix.de>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
--#define AUTCPU12_PHYS_FLASH		CS0_PHYS_BASE		/* physical */
+-#ifndef __ASM_ARCH_AUTCPU12_H
+-#define __ASM_ARCH_AUTCPU12_H
 -
- /* offset for device specific information structure */
- #define AUTCPU12_LCDINFO_OFFS		(0x00010000)	
- 
+-/* offset for device specific information structure */
+-#define AUTCPU12_LCDINFO_OFFS		(0x00010000)	
+-
+-/* Videomemory in the internal SRAM (CS 6) */
+-#define AUTCPU12_PHYS_VIDEO		CS6_PHYS_BASE
+-
+-/*
+-* All special IO's are tied to CS1
+-*/
+-#define AUTCPU12_PHYS_CHAR_LCD         	CS1_PHYS_BASE +0x00000000  /* physical */
+-
+-#define AUTCPU12_PHYS_CSAUX1           	CS1_PHYS_BASE +0x04000000  /* physical */
+-
+-#define AUTCPU12_PHYS_CAN              	CS1_PHYS_BASE +0x08000000  /* physical */
+-
+-#define AUTCPU12_PHYS_TOUCH            	CS1_PHYS_BASE +0x0A000000  /* physical */
+-
+-#define AUTCPU12_PHYS_IO               	CS1_PHYS_BASE +0x0C000000  /* physical */
+-
+-#define AUTCPU12_PHYS_LPT              	CS1_PHYS_BASE +0x0E000000  /* physical */
+-
+-#endif
 -- 
 1.8.1.5
