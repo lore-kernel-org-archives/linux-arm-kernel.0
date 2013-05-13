@@ -1,97 +1,217 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 13 May 2013 12:26:04 -0700
-Subject: [PATCHv6 00/11] Remove ARM local timer API
-Message-ID: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
+Date: Mon, 13 May 2013 12:26:12 -0700
+Subject: [PATCHv6 08/11] ARM: msm: Divorce msm_timer from local timer API
+In-Reply-To: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
+References: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1368473175-4841-9-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In light of Mark Rutland's recent work on divorcing the ARM architected
-timers from the ARM local timer API and introducing a generic arch hook for
-broadcast it seems that we should remove the local timer API entirely.
-Doing so will reduce the architecture dependencies of our timer drivers,
-reduce code in ARM core, and simplify timer drivers because they no longer
-go through an architecture layer that is essentially a hotplug notifier.
+Separate the msm_timer from the local timer API. This will allow
+us to remove ARM local timer support in the near future and gets
+us closer to moving this driver to drivers/clocksource.
 
-Previous attempts have been made[1] unsuccessfully. I'm hoping this can
-be accepted now so that we can clean up the timer drivers that are
-used in both UP and SMP situations. Right now these drivers have to ignore
-the timer setup callback on the boot CPU to avoid registering clockevents
-twice. This is not very symmetric and causes convuluted code that does
-the same thing in two places.
+Acked-by: David Brown <davidb@codeaurora.org>
+Cc: Daniel Walker <dwalker@fifo99.com>
+Cc: Bryan Huntsman <bryanh@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-msm/timer.c | 126 +++++++++++++++++++++++++---------------------
+ 1 file changed, 70 insertions(+), 56 deletions(-)
 
-Patches based on next-20130418
-
-I'm still looking for Acks/Tested-by on EXYNOS and PRIMA2.
-
-[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/145705
-
-Note: A hotplug notifier is used by both x86 for the apb_timer (see 
-apbt_cpuhp_notify) and by metag (see arch_timer_cpu_notify in
-metag_generic.c) so this is not new.
-
-Changes since v5:
- * Rebased onto v3.10-rc1
- * Rebase caused minor updates to mct patch
-
-Changes since v4:
- * Rebased onto next-20130418
- * Rebase caused minor updates to mct patch and twd Kconfig
-
-Changes since v3:
- * New patch to fix SMP with dummy timers registered after a global timer
- * Push this_cpu_ptr lower to avoid preemptible false positive warnings
- * Collected acks/tested-bys
-
-Changes since v2:
- * Bug fixes in smp_twd from Tony Lindgren's testing
- * Move smp_twd to use late_time_init hook
- * Collected Acks
-
-Changes since v1:
- * Picked up Mark's generic dummy timer driver
- * Split out omap changes into new patch
-
-Mark Rutland (1):
-  clocksource: add generic dummy timer driver
-
-Stephen Boyd (10):
-  clockevents: Prefer CPU local devices over global devices
-  ARM: smp: Remove duplicate dummy timer implementation
-  ARM: smp_twd: Divorce smp_twd from local timer API
-  ARM: OMAP2+: Divorce from local timer API
-  ARM: EXYNOS4: Divorce mct from local timer API
-  ARM: PRIMA2: Divorce timer-marco from local timer API
-  ARM: msm: Divorce msm_timer from local timer API
-  clocksource: time-armada-370-xp: Fix sparse warning
-  clocksource: time-armada-370-xp: Divorce from local timer API
-  ARM: smp: Remove local timer API
-
- arch/arm/Kconfig                         |  12 +--
- arch/arm/include/asm/localtimer.h        |  34 ---------
- arch/arm/kernel/smp.c                    |  87 ---------------------
- arch/arm/kernel/smp_twd.c                |  64 ++++++++++------
- arch/arm/mach-highbank/Kconfig           |   2 +-
- arch/arm/mach-imx/Kconfig                |   2 +-
- arch/arm/mach-msm/timer.c                | 126 +++++++++++++++++--------------
- arch/arm/mach-omap2/Kconfig              |   3 +-
- arch/arm/mach-omap2/timer.c              |   7 --
- arch/arm/mach-realview/Kconfig           |   8 +-
- arch/arm/mach-spear/Kconfig              |   2 +-
- arch/arm/mach-tegra/Kconfig              |   2 +-
- arch/arm/mach-ux500/Kconfig              |   2 +-
- arch/arm/mach-vexpress/Kconfig           |   2 +-
- arch/arm/mach-zynq/Kconfig               |   2 +-
- drivers/clocksource/Makefile             |   1 +
- drivers/clocksource/dummy_timer.c        |  69 +++++++++++++++++
- drivers/clocksource/exynos_mct.c         |  60 ++++++++++-----
- drivers/clocksource/time-armada-370-xp.c |  92 +++++++++++-----------
- drivers/clocksource/timer-marco.c        | 100 +++++++++++++-----------
- include/linux/time-armada-370-xp.h       |   4 +-
- kernel/time/tick-common.c                |   5 +-
- 22 files changed, 340 insertions(+), 346 deletions(-)
- delete mode 100644 arch/arm/include/asm/localtimer.h
- create mode 100644 drivers/clocksource/dummy_timer.c
-
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 284313f..df947aa 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -16,6 +16,7 @@
+ 
+ #include <linux/clocksource.h>
+ #include <linux/clockchips.h>
++#include <linux/cpu.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+@@ -25,7 +26,6 @@
+ #include <linux/of_irq.h>
+ 
+ #include <asm/mach/time.h>
+-#include <asm/localtimer.h>
+ #include <asm/sched_clock.h>
+ 
+ #include "common.h"
+@@ -49,7 +49,7 @@ static void __iomem *sts_base;
+ 
+ static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
+ {
+-	struct clock_event_device *evt = *(struct clock_event_device **)dev_id;
++	struct clock_event_device *evt = dev_id;
+ 	/* Stop the timer tick */
+ 	if (evt->mode == CLOCK_EVT_MODE_ONESHOT) {
+ 		u32 ctrl = readl_relaxed(event_base + TIMER_ENABLE);
+@@ -101,18 +101,7 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
+ 	writel_relaxed(ctrl, event_base + TIMER_ENABLE);
+ }
+ 
+-static struct clock_event_device msm_clockevent = {
+-	.name		= "gp_timer",
+-	.features	= CLOCK_EVT_FEAT_ONESHOT,
+-	.rating		= 200,
+-	.set_next_event	= msm_timer_set_next_event,
+-	.set_mode	= msm_timer_set_mode,
+-};
+-
+-static union {
+-	struct clock_event_device *evt;
+-	struct clock_event_device * __percpu *percpu_evt;
+-} msm_evt;
++static struct clock_event_device __percpu *msm_evt;
+ 
+ static void __iomem *source_base;
+ 
+@@ -138,37 +127,65 @@ static struct clocksource msm_clocksource = {
+ 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
++static int msm_timer_irq;
++static int msm_timer_has_ppi;
++
+ static int __cpuinit msm_local_timer_setup(struct clock_event_device *evt)
+ {
+-	/* Use existing clock_event for cpu 0 */
+-	if (!smp_processor_id())
+-		return 0;
+-
+-	evt->irq = msm_clockevent.irq;
+-	evt->name = "local_timer";
+-	evt->features = msm_clockevent.features;
+-	evt->rating = msm_clockevent.rating;
++	int cpu = smp_processor_id();
++	int err;
++
++	evt->irq = msm_timer_irq;
++	evt->name = "msm_timer";
++	evt->features = CLOCK_EVT_FEAT_ONESHOT;
++	evt->rating = 200;
+ 	evt->set_mode = msm_timer_set_mode;
+ 	evt->set_next_event = msm_timer_set_next_event;
++	evt->cpumask = cpumask_of(cpu);
++
++	clockevents_config_and_register(evt, GPT_HZ, 4, 0xffffffff);
++
++	if (msm_timer_has_ppi) {
++		enable_percpu_irq(evt->irq, IRQ_TYPE_EDGE_RISING);
++	} else {
++		err = request_irq(evt->irq, msm_timer_interrupt,
++				IRQF_TIMER | IRQF_NOBALANCING |
++				IRQF_TRIGGER_RISING, "gp_timer", evt);
++		if (err)
++			pr_err("request_irq failed\n");
++	}
+ 
+-	*__this_cpu_ptr(msm_evt.percpu_evt) = evt;
+-	clockevents_config_and_register(evt, GPT_HZ, 4, 0xf0000000);
+-	enable_percpu_irq(evt->irq, IRQ_TYPE_EDGE_RISING);
+ 	return 0;
+ }
+ 
+-static void msm_local_timer_stop(struct clock_event_device *evt)
++static void __cpuinit msm_local_timer_stop(struct clock_event_device *evt)
+ {
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+ 	disable_percpu_irq(evt->irq);
+ }
+ 
+-static struct local_timer_ops msm_local_timer_ops __cpuinitdata = {
+-	.setup	= msm_local_timer_setup,
+-	.stop	= msm_local_timer_stop,
++static int __cpuinit msm_timer_cpu_notify(struct notifier_block *self,
++					   unsigned long action, void *hcpu)
++{
++	/*
++	 * Grab cpu pointer in each case to avoid spurious
++	 * preemptible warnings
++	 */
++	switch (action & ~CPU_TASKS_FROZEN) {
++	case CPU_STARTING:
++		msm_local_timer_setup(this_cpu_ptr(msm_evt));
++		break;
++	case CPU_DYING:
++		msm_local_timer_stop(this_cpu_ptr(msm_evt));
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block msm_timer_cpu_nb __cpuinitdata = {
++	.notifier_call = msm_timer_cpu_notify,
+ };
+-#endif /* CONFIG_LOCAL_TIMERS */
+ 
+ static notrace u32 msm_sched_clock_read(void)
+ {
+@@ -178,38 +195,35 @@ static notrace u32 msm_sched_clock_read(void)
+ static void __init msm_timer_init(u32 dgt_hz, int sched_bits, int irq,
+ 				  bool percpu)
+ {
+-	struct clock_event_device *ce = &msm_clockevent;
+ 	struct clocksource *cs = &msm_clocksource;
+-	int res;
++	int res = 0;
++
++	msm_timer_irq = irq;
++	msm_timer_has_ppi = percpu;
++
++	msm_evt = alloc_percpu(struct clock_event_device);
++	if (!msm_evt) {
++		pr_err("memory allocation failed for clockevents\n");
++		goto err;
++	}
+ 
+-	ce->cpumask = cpumask_of(0);
+-	ce->irq = irq;
++	if (percpu)
++		res = request_percpu_irq(irq, msm_timer_interrupt,
++					 "gp_timer", msm_evt);
+ 
+-	clockevents_config_and_register(ce, GPT_HZ, 4, 0xffffffff);
+-	if (percpu) {
+-		msm_evt.percpu_evt = alloc_percpu(struct clock_event_device *);
+-		if (!msm_evt.percpu_evt) {
+-			pr_err("memory allocation failed for %s\n", ce->name);
++	if (res) {
++		pr_err("request_percpu_irq failed\n");
++	} else {
++		res = register_cpu_notifier(&msm_timer_cpu_nb);
++		if (res) {
++			free_percpu_irq(irq, msm_evt);
+ 			goto err;
+ 		}
+-		*__this_cpu_ptr(msm_evt.percpu_evt) = ce;
+-		res = request_percpu_irq(ce->irq, msm_timer_interrupt,
+-					 ce->name, msm_evt.percpu_evt);
+-		if (!res) {
+-			enable_percpu_irq(ce->irq, IRQ_TYPE_EDGE_RISING);
+-#ifdef CONFIG_LOCAL_TIMERS
+-			local_timer_register(&msm_local_timer_ops);
+-#endif
+-		}
+-	} else {
+-		msm_evt.evt = ce;
+-		res = request_irq(ce->irq, msm_timer_interrupt,
+-				  IRQF_TIMER | IRQF_NOBALANCING |
+-				  IRQF_TRIGGER_RISING, ce->name, &msm_evt.evt);
++
++		/* Immediately configure the timer on the boot CPU */
++		msm_local_timer_setup(__this_cpu_ptr(msm_evt));
+ 	}
+ 
+-	if (res)
+-		pr_err("request_irq failed for %s\n", ce->name);
+ err:
+ 	writel_relaxed(TIMER_ENABLE_EN, source_base + TIMER_ENABLE);
+ 	res = clocksource_register_hz(cs, dgt_hz);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
