@@ -1,76 +1,35 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 13 May 2013 19:14:41 +0900
-Subject: [PATCH 1/3] gpio-rcar: Add support for IRQ_TYPE_EDGE_BOTH
-In-Reply-To: <1368435233-8587-2-git-send-email-horms+renesas@verge.net.au>
-References: <1368435233-8587-1-git-send-email-horms+renesas@verge.net.au>
- <1368435233-8587-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CANqRtoQ2gLVRz-a1PoQeuy_=XVKMR8x+47NDT9FFQWdRu17c7A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 13 May 2013 12:16:06 +0200
+Subject: [PATCH 1/4] ARM: mmu: Call debug_ll_io_init if no map_io function is
+ specified
+In-Reply-To: <1368440169-29088-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1368440169-29088-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1368440169-29088-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 5:53 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> As hardware support for this feature is not universal for all SoCs a flag,
-> has_both_edge_trigger, has been added to the platform data of the driver to
-> allow this feature to be enabled.
->
-> The motivation for this is to allow use of the gpio-keys driver on the
-> lager board which is based on the r8a7790 SoC. This patch has been lightly
-> exercised using that driver on that board.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  drivers/gpio/gpio-rcar.c                | 27 ++++++++++++++++++++++-----
->  include/linux/platform_data/gpio-rcar.h |  1 +
->  2 files changed, 23 insertions(+), 5 deletions(-)
+More and more sub-architectures are using only the debug_ll_io_init
+function as the map_io function. Make the core code call this function
+if no function is specified in the machine description to remove some
+boilerplate code.
 
-Thanks for the patch, Simon!
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/mm/mmu.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> diff --git a/drivers/gpio/gpio-rcar.c b/drivers/gpio/gpio-rcar.c
-> index 0f3d647..33d8f6a 100644
-> --- a/drivers/gpio/gpio-rcar.c
-> +++ b/drivers/gpio/gpio-rcar.c
-> @@ -49,6 +49,7 @@ struct gpio_rcar_priv {
->  #define POSNEG 0x20
->  #define EDGLEVEL 0x24
->  #define FILONOFF 0x28
-> +#define BOTHEDGE 0x4c
->
->  static inline u32 gpio_rcar_read(struct gpio_rcar_priv *p, int offs)
->  {
-> @@ -111,6 +113,11 @@ static void gpio_rcar_config_interrupt_input_mode(struct gpio_rcar_priv *p,
->         /* Select "Interrupt Input Mode" in IOINTSEL */
->         gpio_rcar_modify_bit(p, IOINTSEL, hwirq, true);
->
-> +       if (p->config.has_both_edge_trigger && !level_trigger) {
-> +               /* Select one edge or both edges in BOTHEDGE */
-> +               gpio_rcar_modify_bit(p, IOINTSEL, hwirq, both);
-> +       }
-> +
->         /* Write INTCLR in case of edge trigger */
->         if (!level_trigger)
->                 gpio_rcar_write(p, INTCLR, BIT(hwirq));
-
-In your hunk above I suspect you want to setup the BOTHEDGE register
-instead of IOINTSEL.
-
-Also, I wonder how BOTHEDGE should be set in the case of level
-trigger. Say that the user first selects edge trigger and then
-reconfigures to level, then you probably want to make sure the
-BOTHEDGE register is cleared.
-
-So may want to do something like this (untested):
-
-       if (p->config.has_both_edge_trigger) {
-               /* Select one edge or both edges in BOTHEDGE */
-               gpio_rcar_modify_bit(p, BOTHEDGE, hwirq, both);
-       }
-
-Also, please double check that the register access sequences in the
-documentation are still kept, please see "6.7.1 Setting Edge-Sensitive
-Interrupt Input Mode" in the H2 data sheet. It looks like you want to
-move this setting so it happens before IOINTSEL.
-
-Thanks!
-
-/ magnus
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index e0d8565..faa36d7 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1232,6 +1232,8 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
+ 	 */
+ 	if (mdesc->map_io)
+ 		mdesc->map_io();
++	else
++		debug_ll_io_init();
+ 	fill_pmd_gaps();
+ 
+ 	/* Reserve fixed i/o space in VMALLOC region */
+-- 
+1.8.1.2
