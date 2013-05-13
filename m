@@ -1,84 +1,158 @@
 From: gmbnomis@gmail.com (Simon Baatz)
-Date: Mon, 13 May 2013 23:18:51 +0200
-Subject: [PATCH V2 00/10] mmc_of_parse() adaptations,
- DT support for Sheevaplugs
-Message-ID: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
+Date: Mon, 13 May 2013 23:18:58 +0200
+Subject: [PATCH V2 07/10] ARM: mvebu: Use standard MMC binding for all users
+ of mvsdio
+In-Reply-To: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
+References: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
+Message-ID: <1368479941-10084-8-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While adding DT support for the Sheevaplugs by Globalscale Technologies
-(Kirkwood), it turned out that the DT binding of mvsdio lacked features to
-properly support the hardware (active high/low of CD and WP pins could not
-be described in DT).
+In order to prepare the switch to the standard MMC device tree parser
+for mvsdio, adapt all current uses of mvsdio in the dts files to the
+standard format.
 
-This is standard functionality provided by the mmc_of_parse() helper
-function.  However, mmc_of_parse() may allocate GPIO lines.  If the
-allocation fails, it outputs an error, but does not return an error to its
-caller.  Therefore, a proposal to handle errors in mmc_of_parse() is made.
-
-The patch set is structured as follows:
-
-1   Adapt mmc_of_parse() to return errors
-2-6 Handle errors in current drivers using mmc_of_parse() (compile tested
-    only)
-7-8 Convert mvsdio and respective dts files to mmc_of_parse() (tested on
-    kirkwood)
-9   Add dts files for (eSATA) Sheevaplug
-10  Add DT support for (eSATA) Sheevaplug
-
-
-I could only test on an eSATA Sheevaplug. I found patches with
-different LEDs for the Sheevaplug.  Thus, I would highly appreciate if
-someone with the hardware could give this a spin on a non-eSATA
-version.  Some additional testing of the change detect and write
-protect behaviour for mvsdio can't hurt either.  I hope that there aren't
-board revisions with different CD/WP pins out there.
-
-Simon Baatz (10):
-  mmc: return mmc_of_parse() errors to caller
-  mmc: sh_mmcif: handle mmc_of_parse() errors during probe
-  mmc: tmio-mmc: handle mmc_of_parse() errors during probe
-  mmc: mxcmmc: handle mmc_of_parse() errors during probe
-  mmc: sdhi-pxav3: handle mmc_of_parse() errors during probe
-  mmc: tegra: handle mmc_of_parse() errors during probe
-  ARM: mvebu: Use standard MMC binding for all users of mvsdio
-  mmc: mvsdio: use standard MMC device-tree binding parser
-    mmc_of_parse()
-  ARM: Kirkwood: Add dts files for Sheevaplug and eSATA Sheevaplug
-  ARM: Kirkwood: add DT support for Sheevaplug and Sheevaplug eSATA
-
- arch/arm/boot/dts/Makefile                         |    2 +
+Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+---
  arch/arm/boot/dts/armada-370-db.dts                |    1 +
  arch/arm/boot/dts/armada-370-mirabox.dts           |    1 +
  arch/arm/boot/dts/armada-370-rd.dts                |    1 +
- arch/arm/boot/dts/armada-370-xp.dtsi               |    4 +
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    4 ++++
  arch/arm/boot/dts/armada-xp-db.dts                 |    1 +
  arch/arm/boot/dts/kirkwood-dreamplug.dts           |    1 +
- .../arm/boot/dts/kirkwood-guruplug-server-plus.dts |    2 +
+ .../arm/boot/dts/kirkwood-guruplug-server-plus.dts |    2 ++
  arch/arm/boot/dts/kirkwood-mplcec4.dts             |    2 +-
- arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi  |   97 ++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts    |   40 ++++++++
- arch/arm/boot/dts/kirkwood-sheevaplug.dts          |   45 +++++++++
  arch/arm/boot/dts/kirkwood-topkick.dts             |    1 +
- arch/arm/boot/dts/kirkwood.dtsi                    |    4 +
- arch/arm/mach-kirkwood/Kconfig                     |    7 ++
- arch/arm/mach-kirkwood/Makefile                    |    1 +
- arch/arm/mach-kirkwood/board-dt.c                  |    4 +
- arch/arm/mach-kirkwood/board-sheevaplug.c          |   27 ++++++
- arch/arm/mach-kirkwood/common.h                    |    5 +
- drivers/mmc/core/host.c                            |   24 ++++-
- drivers/mmc/host/mvsdio.c                          |   73 ++++++++-------
- drivers/mmc/host/mxcmmc.c                          |    4 +-
- drivers/mmc/host/sdhci-pxav3.c                     |    7 +-
- drivers/mmc/host/sdhci-tegra.c                     |    9 +-
- drivers/mmc/host/sh_mmcif.c                        |    7 +-
- drivers/mmc/host/tmio_mmc_pio.c                    |    4 +-
- include/linux/mmc/host.h                           |    2 +-
- 27 files changed, 328 insertions(+), 48 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
- create mode 100644 arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-sheevaplug.dts
- create mode 100644 arch/arm/mach-kirkwood/board-sheevaplug.c
+ arch/arm/boot/dts/kirkwood.dtsi                    |    4 ++++
+ 10 files changed, 17 insertions(+), 1 deletion(-)
 
+diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
+index 2353b1f..beee169 100644
+--- a/arch/arm/boot/dts/armada-370-db.dts
++++ b/arch/arm/boot/dts/armada-370-db.dts
+@@ -74,6 +74,7 @@
+ 				 */
+ 				status = "disabled";
+ 				/* No CD or WP GPIOs */
++				broken-cd;
+ 			};
+ 
+ 			usb at 50000 {
+diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
+index 14e36e1..45b1077 100644
+--- a/arch/arm/boot/dts/armada-370-mirabox.dts
++++ b/arch/arm/boot/dts/armada-370-mirabox.dts
+@@ -99,6 +99,7 @@
+ 				 * No CD or WP GPIOs: SDIO interface used for
+ 				 * Wifi/Bluetooth chip
+ 				 */
++				 broken-cd;
+ 			};
+ 
+ 			usb at 50000 {
+diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+index 130f839..89c2110 100644
+--- a/arch/arm/boot/dts/armada-370-rd.dts
++++ b/arch/arm/boot/dts/armada-370-rd.dts
+@@ -64,6 +64,7 @@
+ 				pinctrl-names = "default";
+ 				status = "okay";
+ 				/* No CD or WP GPIOs */
++				broken-cd;
+ 			};
+ 
+ 			usb at 50000 {
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 272bbc6..031894e 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -142,6 +142,10 @@
+ 				reg = <0xd4000 0x200>;
+ 				interrupts = <54>;
+ 				clocks = <&gateclk 17>;
++				bus-width = <4>;
++				cap-sdio-irq;
++				cap-sd-highspeed;
++				cap-mmc-highspeed;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
+index d6cc8bf..7c22a20 100644
+--- a/arch/arm/boot/dts/armada-xp-db.dts
++++ b/arch/arm/boot/dts/armada-xp-db.dts
+@@ -97,6 +97,7 @@
+ 				pinctrl-names = "default";
+ 				status = "okay";
+ 				/* No CD or WP GPIOs */
++				broken-cd;
+ 			};
+ 
+ 			usb at 50000 {
+diff --git a/arch/arm/boot/dts/kirkwood-dreamplug.dts b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+index 289e51d..be16a84 100644
+--- a/arch/arm/boot/dts/kirkwood-dreamplug.dts
++++ b/arch/arm/boot/dts/kirkwood-dreamplug.dts
+@@ -79,6 +79,7 @@
+ 			pinctrl-names = "default";
+ 			status = "okay";
+ 			/* No CD or WP GPIOs */
++			broken-cd;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
+index 44fd97d..484a2a6 100644
+--- a/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
++++ b/arch/arm/boot/dts/kirkwood-guruplug-server-plus.dts
+@@ -72,6 +72,8 @@
+ 
+ 		mvsdio at 90000 {
+ 			status = "okay";
++			/* No CD or WP GPIOs */
++			broken-cd;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+index 7588241..bf3a58c 100644
+--- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
++++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+@@ -136,7 +136,7 @@
+ 			pinctrl-0 = <&pmx_sdio &pmx_sdio_cd>;
+ 			pinctrl-names = "default";
+ 			status = "okay";
+-			cd-gpios = <&gpio1 15 0>;
++			cd-gpios = <&gpio1 15 1>;
+ 			/* No WP GPIO */
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
+index 66eb45b..7dc14f4 100644
+--- a/arch/arm/boot/dts/kirkwood-topkick.dts
++++ b/arch/arm/boot/dts/kirkwood-topkick.dts
+@@ -154,6 +154,7 @@
+ 			pinctrl-names = "default";
+ 			status = "okay";
+ 			/* No CD or WP GPIOs */
++			broken-cd;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index fada7e6..e2a28db 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -200,6 +200,10 @@
+ 			reg = <0x90000 0x200>;
+ 			interrupts = <28>;
+ 			clocks = <&gate_clk 4>;
++			bus-width = <4>;
++			cap-sdio-irq;
++			cap-sd-highspeed;
++			cap-mmc-highspeed;
+ 			status = "disabled";
+ 		};
+ 	};
 -- 
 1.7.9.5
