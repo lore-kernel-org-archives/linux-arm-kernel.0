@@ -1,123 +1,59 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 13 May 2013 12:26:06 -0700
-Subject: [PATCHv6 02/11] clocksource: add generic dummy timer driver
+Date: Mon, 13 May 2013 12:26:05 -0700
+Subject: [PATCHv6 01/11] clockevents: Prefer CPU local devices over global
+ devices
 In-Reply-To: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
 References: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1368473175-4841-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1368473175-4841-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Rutland <mark.rutland@arm.com>
+On an SMP system with only one global clockevent and a dummy
+clockevent per CPU we run into problems. We want the dummy
+clockevents to be registered as the per CPU tick devices, but
+we can only achieve that if we register the dummy clockevents
+before the global clockevent or if we artificially inflate the
+rating of the dummy clockevents to be higher than the rating
+of the global clockevent. Failure to do so leads to boot
+hangs when the dummy timers are registered on all other CPUs
+besides the CPU that accepted the global clockevent as its tick
+device and there is no broadcast timer to poke the dummy
+devices.
 
-Several architectures have a dummy timer driver tightly coupled with
-their broadcast code to support machines without cpu-local timers (or
-where there is a lack of driver support).
+If we're registering multiple clockevents and one clockevent is
+global and the other is local to a particular CPU we should
+choose to use the local clockevent regardless of the rating of
+the device. This way, if the clockevent is a dummy it will take
+the tick device duty as long as there isn't a higher rated tick
+device and any global clockevent will be bumped out into
+broadcast mode, fixing the problem described above.
 
-Since 12ad100046: "clockevents: Add generic timer broadcast function"
-it's been possible to write broadcast-capable timer drivers decoupled
-from the broadcast mechanism. We can use this functionality to implement
-a generic dummy timer driver that can be shared by all architectures
-with generic tick broadcast (ARCH_HAS_TICK_BROADCAST).
-
-This patch implements a generic dummy timer using this facility.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reported-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
 Cc: John Stultz <john.stultz@linaro.org>
 Cc: Thomas Gleixner <tglx@linutronix.de>
-[sboyd: Make percpu data static, use __this_cpu_ptr(), move to
-        early_initcall to properly register on each CPU, only
-	register if more than one CPU possible]
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clocksource/Makefile      |  1 +
- drivers/clocksource/dummy_timer.c | 69 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 70 insertions(+)
- create mode 100644 drivers/clocksource/dummy_timer.c
+ kernel/time/tick-common.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 8d979c7..1a17d76 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -29,3 +29,4 @@ obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
+diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
+index 5d3fb10..3da62de 100644
+--- a/kernel/time/tick-common.c
++++ b/kernel/time/tick-common.c
+@@ -254,9 +254,10 @@ static int tick_check_new_device(struct clock_event_device *newdev)
+ 		    !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
+ 			goto out_bc;
+ 		/*
+-		 * Check the rating
++		 * Check the rating, but prefer CPU local devices
+ 		 */
+-		if (curdev->rating >= newdev->rating)
++		if (curdev->rating >= newdev->rating &&
++		    cpumask_equal(curdev->cpumask, newdev->cpumask))
+ 			goto out_bc;
+ 	}
  
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
- obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
-+obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
-diff --git a/drivers/clocksource/dummy_timer.c b/drivers/clocksource/dummy_timer.c
-new file mode 100644
-index 0000000..1f55f96
---- /dev/null
-+++ b/drivers/clocksource/dummy_timer.c
-@@ -0,0 +1,69 @@
-+/*
-+ *  linux/drivers/clocksource/dummy_timer.c
-+ *
-+ *  Copyright (C) 2013 ARM Ltd.
-+ *  All Rights Reserved
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/clockchips.h>
-+#include <linux/cpu.h>
-+#include <linux/init.h>
-+#include <linux/percpu.h>
-+#include <linux/cpumask.h>
-+
-+static DEFINE_PER_CPU(struct clock_event_device, dummy_timer_evt);
-+
-+static void dummy_timer_set_mode(enum clock_event_mode mode,
-+			   struct clock_event_device *evt)
-+{
-+	/*
-+	 * Core clockevents code will call this when exchanging timer devices.
-+	 * We don't need to do anything here.
-+	 */
-+}
-+
-+static void __cpuinit dummy_timer_setup(void)
-+{
-+	int cpu = smp_processor_id();
-+	struct clock_event_device *evt = __this_cpu_ptr(&dummy_timer_evt);
-+
-+	evt->name	= "dummy_timer";
-+	evt->features	= CLOCK_EVT_FEAT_PERIODIC |
-+			  CLOCK_EVT_FEAT_ONESHOT |
-+			  CLOCK_EVT_FEAT_DUMMY;
-+	evt->rating	= 100;
-+	evt->set_mode	= dummy_timer_set_mode;
-+	evt->cpumask	= cpumask_of(cpu);
-+
-+	clockevents_register_device(evt);
-+}
-+
-+static int __cpuinit dummy_timer_cpu_notify(struct notifier_block *self,
-+				      unsigned long action, void *hcpu)
-+{
-+	if ((action & ~CPU_TASKS_FROZEN) == CPU_STARTING)
-+		dummy_timer_setup();
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block dummy_timer_cpu_nb __cpuinitdata = {
-+	.notifier_call = dummy_timer_cpu_notify,
-+};
-+
-+static int __init dummy_timer_register(void)
-+{
-+	int err = register_cpu_notifier(&dummy_timer_cpu_nb);
-+	if (err)
-+		return err;
-+
-+	/* We won't get a call on the boot CPU, so register immediately */
-+	if (num_possible_cpus() > 1)
-+		dummy_timer_setup();
-+
-+	return 0;
-+}
-+early_initcall(dummy_timer_register);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
