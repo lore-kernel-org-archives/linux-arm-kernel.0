@@ -1,45 +1,78 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 13 May 2013 11:35:22 +0530
-Subject: [PATCH 07/18] cpufreq: s3c24xx: move cpufreq driver to
- drivers/cpufreq
-In-Reply-To: <5176A807.2090005@samsung.com>
-References: <cover.1365079581.git.viresh.kumar@linaro.org>
- <2a5901ce31c9$95160980$bf421c80$%kim@samsung.com>
- <CAKohpokk1Q+0gRpeW=ts0a8D+rGAUpHu62X+7ejdpfom_B6FYA@mail.gmail.com>
- <1769336.FkfMpuXqqb@vostro.rjw.lan> <5176A807.2090005@samsung.com>
-Message-ID: <CAKohpomV9-JEbuHWdmp6N+bKYt+83hXXcqg4aKXSY1a5zwpW9Q@mail.gmail.com>
+From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
+Date: Mon, 13 May 2013 12:26:39 +0530
+Subject: [PATCH V2 2/3] Documentation: virtio: Add emergency write
+ (emerg_wr) config register in virtio console.
+In-Reply-To: <8761yn382w.fsf@rustcorp.com.au>
+References: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
+ <1367842791-30285-3-git-send-email-pranavkumar@linaro.org>
+ <8761yn382w.fsf@rustcorp.com.au>
+Message-ID: <CAAHg+Hi6BHqwOznnC9qxkc5pBWz7r5qpz9Nhh=EeNenhjhHohg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 April 2013 20:55, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> On 04/05/13 20:36, Rafael J. Wysocki wrote:
->>
->> On Friday, April 05, 2013 12:36:34 PM Viresh Kumar wrote:
->>>
->>> On 5 April 2013 12:18, Kukjin Kim<kgene.kim@samsung.com>  wrote:
->>>>
->>>> Basically, this moving looks good to me, but should be re-worked based
->>>> on
->>>> for-next of samsung tree because this touches too many samsung stuff so
->>>> this
->>>> should be sent to upstream via samsung tree.
->>>
->>>
->>> Hmm... Its already applied in Rafael's tree. But it doesn't mean that
->>> it can't be
->>> moved to your tree if there is a issue.
->>
->>
->> Well, I'm dropping it.  Please merge via the Samsung tree.
->>
->
-> Oops, I missed, maybe I have no more chance to send this to upstream for
-> upcoming merge window :-(
->
-> Rafael, please take this patch with my ack in your tree, sorry for noise.
->
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
->
-> If any problems, please kindly let me know.
+Hi Rusty,
 
-Who is going to pick this patch now for next merge window?
+On 13 May 2013 08:22, Rusty Russell <rusty@rustcorp.com.au> wrote:
+> Pranavkumar Sawargaonkar <pranavkumar@linaro.org> writes:
+>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>> ---
+>>  Documentation/virtual/virtio-spec.txt |    8 +++++++-
+>>  1 file changed, 7 insertions(+), 1 deletion(-)
+>
+> OK, I applied this to the lyx master, with three changes:
+> 1) Changed "filed" to "field".
+> 2) Added ", or even acknowledging the feature" after "without
+>    initializing virtio queues".
+> 3) Added an initial point to the Device Initialization section:
+>
+>    1. If the VIRTIO_CONSOLE_F_EMERG_WRITE feature is offered, the
+>    emerg_wr field of the configuration can be written at any time. Thus
+>    it should work for very early boot debugging output as well as
+>    catastophic OS failures (eg. virtio ring corruption).
+
+Thanks for applying this patch.
+Have you also applied first patch ([PATCH V2 1/3] virtio: console: Add
+emergency writeonly register to config space)
+with this?  (https://lkml.org/lkml/2013/5/6/169)
+
+>
+> Thanks,
+> Rusty.
+
+Thanks,
+Pranav
+
+>
+>> diff --git a/Documentation/virtual/virtio-spec.txt b/Documentation/virtual/virtio-spec.txt
+>> index 0d6ec85..3ca38f8 100644
+>> --- a/Documentation/virtual/virtio-spec.txt
+>> +++ b/Documentation/virtual/virtio-spec.txt
+>> @@ -1927,11 +1927,16 @@ Ports 2 onwards only if VIRTIO_CONSOLE_F_MULTIPORT is set
+>>      ports; configuration fields nr_ports and max_nr_ports are
+>>      valid and control virtqueues will be used.
+>>
+>> +  VIRTIO_CONSOLE_F_EMERG_WRITE(2) Device has support for emergency
+>> +  write. Configuration filed emerg_wr is valid.
+>> +
+>>    Device configuration layout The size of the console is supplied
+>>    in the configuration space if the VIRTIO_CONSOLE_F_SIZE feature
+>>    is set. Furthermore, if the VIRTIO_CONSOLE_F_MULTIPORT feature
+>>    is set, the maximum number of ports supported by the device can
+>> -  be fetched.struct virtio_console_config {
+>> +  be fetched. If VIRTIO_CONSOLE_F_EMERG_WRITE is set then one can
+>> +  use emergency write to output single character without initializing
+>> +  virtio queues. struct virtio_console_config {
+>>
+>>       u16 cols;
+>>
+>> @@ -1941,6 +1946,7 @@ Ports 2 onwards only if VIRTIO_CONSOLE_F_MULTIPORT is set
+>>
+>>       u32 max_nr_ports;
+>>
+>> +     u32 emerg_wr;
+>>  };
+>>
+>>    Device Initialization
+>> --
+>> 1.7.9.5
