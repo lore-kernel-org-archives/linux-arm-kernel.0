@@ -1,42 +1,73 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 13 May 2013 09:21:35 +0400
-Subject: [PATCH RFC] clk: Introduce userspace clock driver
-In-Reply-To: <9e55c552-ce34-4663-9a57-bf2c626d7d58@TX2EHSMHS008.ehs.local>
-References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
- <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
- <20130510212422.GY3200@sirena.org.uk>
- <7e18bed3-ae6b-4aa0-bf23-b6c61ba8b85b@CO9EHSMHS030.ehs.local>
- <20130512143344.GC3200@sirena.org.uk>
- <9e55c552-ce34-4663-9a57-bf2c626d7d58@TX2EHSMHS008.ehs.local>
-Message-ID: <20130513052135.GD6836@sirena.org.uk>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Mon, 13 May 2013 17:47:07 +1200
+Subject: [PATCHv6 0/3] Add support for velocity network driver on platform
+ devices
+Message-ID: <1368424030-15348-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 12, 2013 at 12:05:04PM -0700, S?ren Brinkmann wrote:
-> On Sun, May 12, 2013 at 06:33:44PM +0400, Mark Brown wrote:
+v6 changes:
+Remove more bus specific code from velocity_probe()
+Make velocity_(suspend/resume) accept a struct device *
+Simplify PM code to use velocity_(suspend/resume) - remove the individual
+pci and platform functions.
+Add a struct pci_dev variable to velocity_get_pci_info() to reduce churn
 
-> > No, there's no confusion here - the clocks that are being exposed to
-> > userspace are the clocks which enter the FPGA.  The driver or whatever
-> > that understands the FPGA can do what is needed to control them,
-> > including routing them on to subdevices it instantiates or exposing them
-> > to userspace.
+v5 changes:
+Remove velocity_info union. Change velocity_info->pdev back to struct pci_dev.
+Remove more 'if (pci)' sections.
+Remove 'void *pdev' function parameters.
+Pass correct variable to velocity_choose_state()
 
-> Such a driver does not exist in general.
-> For some IP cores, Linux drivers do exist and then
-> they are supposed to directly use the CCF, IMHO, no need to expose
-> things to userspace in that case.
-> I'm trying to cover cases, in which there is no driver available/needed for
-> the FPGA design, other than some simple clock controls.
+v4 changes:
+Code tidyup as requested by Francois Romieu
+Removed '#ifdef PCI' around PCI code. Compile tested on (!)PCI and (!)PM.
 
-You're not understanding the point here.  If you've got a
-reprogrammmable FPGA you at least need some way to get the FPGA image in
-there.  This driver is presumably responsible for instantiating whatever
-is needed to control what is on the FPGA, that could include punting the
-clocks to userspace if that's sane.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130513/adf715bb/attachment.sig>
+v3 changes:
+Rebased against net-next.
+Fix errors in pm code.
+
+v2 changes:
+Drop patch #1 as requested by David Miller.
+Correct the PHYID_ICPLUS_IP101A MII bits - should be ON, rather than OFF.
+Read the platform rev_id from the correct register [regs->rev_id]. It's possible
+this would work for the PCI version as well and would remove the need for the
+'if (pci)' test to set vptr->rev_id.
+
+v1:
+The first three patches are general tidyup.
+
+[DROPPED] Patch ## just alphabetizes the #includes to make it easier to read.
+
+Patch #1 replaces vptr->dev with vptr->netdev, in preparation of adding a
+struct device *dev in Patch #3
+
+Patch #2 replaces the pci dma functions with the generic versions.
+
+I have build tested these patches but don't have a PCI velocity to run-test it.
+I can't see that they should introduce any problems as it is all renames and
+function swapping.
+
+Patch #3 adds support for the velocity driver on devicetree platform devices.
+Binding document included. This patch is compile-tested for PCI, and boot
+tested on a VIA APC8750.
+
+I think it would be pertinent to get some tested-by's for PCI users.
+
+Regards
+Tony Prisk
+
+Tony Prisk (3):
+  net: velocity: Rename vptr->dev to vptr->netdev
+  net: velocity: Convert to generic dma functions
+  net: velocity: Add platform device support to VIA velocity driver
+
+ .../devicetree/bindings/net/via-velocity.txt       |   20 +
+ drivers/net/ethernet/via/Kconfig                   |    3 +-
+ drivers/net/ethernet/via/via-velocity.c            |  497 +++++++++++++-------
+ drivers/net/ethernet/via/via-velocity.h            |   35 +-
+ 4 files changed, 377 insertions(+), 178 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/via-velocity.txt
+
+-- 
+1.7.9.5
