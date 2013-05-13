@@ -1,24 +1,44 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 13 May 2013 10:13:44 -0400 (EDT)
-Subject: [PATCh V10 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
-In-Reply-To: <1368424303-10629-5-git-send-email-chao.xie@marvell.com>
-Message-ID: <Pine.LNX.4.44L0.1305131012090.1389-100000@iolanthe.rowland.org>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 13 May 2013 16:18:39 +0200
+Subject: [PATCH] mmc: mmci: Set actual clock for debug purpose
+Message-ID: <1368454719-16420-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 May 2013, Chao Xie wrote:
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-> Originaly, ehci driver will call the callbacks in platform data
-> for PHY initialization and shut down.
-> With PHY driver, it will call the APIs provided by PHY driver
-> for PHY initialization and shutdown. It removes the callbacks
-> in platform data, and at same time it removes one block in the
-> way of enabling device tree for ehci driver.
+Update cclk to the acutal used value and copy it to the actual_clock
+variable in the mmc host for debug purpose.
 
-I wonder if this is the sort of thing that should be handled in 
-ehci-hcd.c rather than in all the different platform glue drivers.
+Signed-off-by: Fredrik Soderstedt <fredrik.soderstedt@stericsson.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/mmc/host/mmci.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Felipe, what do you think?  Are the required actions now sufficiently 
-generic that a single source file can take care of them?
-
-Alan Stern
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index f4f3038..1170c9c 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -196,6 +196,9 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
+ 	struct variant_data *variant = host->variant;
+ 	u32 clk = variant->clkreg;
+ 
++	/* Make sure cclk reflects the current calculated clock */
++	host->cclk = 0;
++
+ 	if (desired) {
+ 		if (desired >= host->mclk) {
+ 			clk = MCI_CLK_BYPASS;
+@@ -230,6 +233,9 @@ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
+ 		/* clk |= MCI_CLK_PWRSAVE; */
+ 	}
+ 
++	/* Set actual clock for debug */
++	host->mmc->actual_clock = host->cclk;
++
+ 	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_4)
+ 		clk |= MCI_4BIT_BUS;
+ 	if (host->mmc->ios.bus_width == MMC_BUS_WIDTH_8)
+-- 
+1.7.10
