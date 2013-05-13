@@ -1,40 +1,21 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 13 May 2013 13:35:58 +0100
-Subject: [PATCH 12/14] ARM: vexpress: Remove init_irq declaration in
- machine description
-In-Reply-To: <1368438253-28218-13-git-send-email-maxime.ripard@free-electrons.com>
-References: <1368438253-28218-1-git-send-email-maxime.ripard@free-electrons.com>
- <1368438253-28218-13-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1368448558.3425.2.camel@hornet>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 13 May 2013 20:51:12 +0800
+Subject: [PATCH 2/3] ARM: imx: move clk_prepare() out from mxs_restart()
+In-Reply-To: <20130513082535.GM32299@pengutronix.de>
+References: <1368408728-12264-1-git-send-email-shawn.guo@linaro.org>
+ <1368408728-12264-3-git-send-email-shawn.guo@linaro.org>
+ <20130513082535.GM32299@pengutronix.de>
+Message-ID: <20130513125111.GB4440@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-05-13 at 10:44 +0100, Maxime Ripard wrote:
-> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
-> specified") removed the need to explictly setup the init_irq field in
-> the machine description when using only irqchip_init. Remove that
-> declaration for vexpress as well.
+On Mon, May 13, 2013 at 10:25:35AM +0200, Sascha Hauer wrote:
+> Hi Shawn,
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/mach-vexpress/v2m.c | 1 -
->  1 file changed, 1 deletion(-)
+> In the subject:
 > 
-> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-> index 8802030..c419b76 100644
-> --- a/arch/arm/mach-vexpress/v2m.c
-> +++ b/arch/arm/mach-vexpress/v2m.c
-> @@ -458,7 +458,6 @@ DT_MACHINE_START(VEXPRESS_DT, "ARM-Versatile Express")
->  	.smp		= smp_ops(vexpress_smp_ops),
->  	.map_io		= v2m_dt_map_io,
->  	.init_early	= v2m_dt_init_early,
-> -	.init_irq	= irqchip_init,
->  	.init_time	= v2m_dt_timer_init,
->  	.init_machine	= v2m_dt_init,
->  MACHINE_END
+> s/mxs_restart/mxc_restart/
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
+Thanks, Sascha.  Fixed it and commit log as well.
 
-Thanks!
-
-Pawel
+Shawn
