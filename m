@@ -1,30 +1,33 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Mon, 13 May 2013 23:53:02 +0300
-Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
-Message-ID: <20130513205302.GA3157@blackmetal.musicnaut.iki.fi>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Mon, 13 May 2013 23:18:54 +0200
+Subject: [PATCH V2 03/10] mmc: tmio-mmc: handle mmc_of_parse() errors during
+ probe
+In-Reply-To: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
+References: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
+Message-ID: <1368479941-10084-4-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-I tested 3.10-rc1 on OMAP1 / Nokia 770, and Retu MFD probe is broken:
+Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+---
+ drivers/mmc/host/tmio_mmc_pio.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-[    2.264221] retu-mfd 2-0001: Retu v3.2 found
-[    2.281951] retu-mfd 2-0001: Failed to allocate IRQs: -12
-[    2.300140] retu-mfd: probe of 2-0001 failed with error -12
-
-The error is coming from regmap code. According to git bisect, it is
-caused by:
-
-	commit ede4d7a5b9835510fd1f724367f68d2fa4128453
-	Author: Jon Hunter <jon-hunter@ti.com>
-	Date:   Fri Mar 1 11:22:47 2013 -0600
-
-	    gpio/omap: convert gpio irq domain to linear mapping
-
-The commit does not anymore revert cleanly, and I haven't yet tried
-crafting a manual revert, so any fix proposals/ideas are welcome...
-
-Thanks,
-
-A.
+diff --git a/drivers/mmc/host/tmio_mmc_pio.c b/drivers/mmc/host/tmio_mmc_pio.c
+index f508ecb..f1a9d4a 100644
+--- a/drivers/mmc/host/tmio_mmc_pio.c
++++ b/drivers/mmc/host/tmio_mmc_pio.c
+@@ -988,7 +988,9 @@ int tmio_mmc_host_probe(struct tmio_mmc_host **host,
+ 	if (!mmc)
+ 		return -ENOMEM;
+ 
+-	mmc_of_parse(mmc);
++	ret = mmc_of_parse(mmc);
++	if (ret < 0)
++		goto host_free;
+ 
+ 	pdata->dev = &pdev->dev;
+ 	_host = mmc_priv(mmc);
+-- 
+1.7.9.5
