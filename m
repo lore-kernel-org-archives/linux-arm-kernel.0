@@ -1,32 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 13 May 2013 16:31:18 -0400
-Subject: [GIT PULL] ARM: mvebu: dt changes for v3.11 (round 1)
-Message-ID: <20130513203118.GF31290@titan.lakedaemon.net>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Mon, 13 May 2013 23:53:02 +0300
+Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
+Message-ID: <20130513205302.GA3157@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+I tested 3.10-rc1 on OMAP1 / Nokia 770, and Retu MFD probe is broken:
 
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+[    2.264221] retu-mfd 2-0001: Retu v3.2 found
+[    2.281951] retu-mfd 2-0001: Failed to allocate IRQs: -12
+[    2.300140] retu-mfd: probe of 2-0001 failed with error -12
 
-are available in the git repository at:
+The error is coming from regmap code. According to git bisect, it is
+caused by:
 
-  git://git.infradead.org/users/jcooper/linux.git tags/dt-3.11-1
+	commit ede4d7a5b9835510fd1f724367f68d2fa4128453
+	Author: Jon Hunter <jon-hunter@ti.com>
+	Date:   Fri Mar 1 11:22:47 2013 -0600
 
-for you to fetch changes up to 53e9cb1dcde882cc667497328eca776a9835f965:
+	    gpio/omap: convert gpio irq domain to linear mapping
 
-  ARM: dove: add si5351 clock driver to CuBox DT (2013-05-13 20:14:56 +0000)
+The commit does not anymore revert cleanly, and I haven't yet tried
+crafting a manual revert, so any fix proposals/ideas are welcome...
 
-----------------------------------------------------------------
-mvebu dt changes for v3.11 (round 1)
+Thanks,
 
- - dove
-    - CuBox clock driver
-
-----------------------------------------------------------------
-Sebastian Hesselbarth (1):
-      ARM: dove: add si5351 clock driver to CuBox DT
-
- arch/arm/boot/dts/dove-cubox.dts | 51 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 50 insertions(+), 1 deletion(-)
+A.
