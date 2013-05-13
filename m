@@ -1,28 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 May 2013 19:48:48 +0200
-Subject: [PATCH 1/3] mmc: mmci: Use optional sleep pinctrl state
-In-Reply-To: <1368452837-31458-2-git-send-email-ulf.hansson@stericsson.com>
-References: <1368452837-31458-1-git-send-email-ulf.hansson@stericsson.com>
- <1368452837-31458-2-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdarH5FbegyN17n+--hoCgHqzEupUA0pjkXG3juCA9aW5w@mail.gmail.com>
+From: john.tobias.ph@gmail.com (John Tobias)
+Date: Mon, 13 May 2013 10:56:47 -0700
+Subject: Marvel 8797 Wifi module using SDIO 3.0
+Message-ID: <CACUGKYN+OGWOsd7kk68i-mj0QdykWjLJ8Hmmi4XWx8kPnbJx7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 3:47 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+Hi All,
 
-> By optionally putting the pins into sleep state in the .runtime_suspend
-> callback we can accomplish two things. One is to minimize current leakage
-> from pins and thus save power, second we can prevent the IP from driving
-> pins output in an uncontrolled manner, which may happen if the power domain
-> drops the domain regulator.
->
-> When returning from idle, entering .runtime_resume callback, the pins
-> are restored to default state.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+I have a Wifi module based on 8797 Marvell chipset and it using SDIO
+3.0. I am using iMX6 SD board and linux kernel 3.9 stable released
+(https://git.kernel.org/cgit/linux/kernel/git/stable/linux-stable.git/).
+The 8797 module support the 4bit mode and the problem right now, the
+SDHCI controller and the said module couldn't communicate to each
+other (if using 4bit mode). But, If I force to use the 1bit mode, both
+of them can communicate correctly. Also, I force the SDHCI to use ADMA
+or SDMA, but there's no effect output.
 
-Looks straight-forward from a pinctrl point of view.
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+I would like to know if anyone here solved the problem or an idea how
+to deal with it?.
 
-Yours,
-Linus Walleij
+Regards,
+
+John
