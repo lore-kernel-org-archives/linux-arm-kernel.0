@@ -1,173 +1,85 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 13 May 2013 12:56:36 -0700
-Subject: [PATCHv3 3/4] clocksource: arch_timer: Push the read/write wrappers
- deeper
-In-Reply-To: <1368474997-10859-1-git-send-email-sboyd@codeaurora.org>
-References: <1368474997-10859-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1368474997-10859-4-git-send-email-sboyd@codeaurora.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 13 May 2013 12:57:46 -0700
+Subject: [PATCH v2 0/3] clk: implement remuxing during set_rate
+In-Reply-To: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
+References: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
+Message-ID: <20130513195746.10068.92303@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're going to introduce support to read and write the memory
-mapped timer registers in the next patch, so push the cp15
-read/write functions one level deeper. This simplifies the next
-patch and makes it clearer what's going on.
+Quoting James Hogan (2013-04-19 09:28:21)
+> This patchset adds support for automatic selection of the best parent
+> for a clock mux, i.e. the one which can provide the closest clock rate
+> to that requested. It can be controlled by a new CLK_SET_RATE_REMUX flag
+> so that it doesn't happen unless explicitly allowed.
+> 
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Marc Zyngier <Marc.Zyngier@arm.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/include/asm/arch_timer.h    |  5 ++--
- arch/arm64/include/asm/arch_timer.h  |  4 ++--
- drivers/clocksource/arm_arch_timer.c | 44 ++++++++++++++++++++++++------------
- 3 files changed, 34 insertions(+), 19 deletions(-)
+I'm not sure about the new flag.  One of my regrets during the early
+development of the common struct clk is the CLK_SET_RATE_PARENT flag.
+In hindsight I would have preferred to make parent-propagation of rate
+changes the default behavior, and instead provide a flag to prevent that
+behavior, such as CLK_SET_RATE_NO_PROPAGATE.
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index accefe0..6c0e297 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -17,7 +17,8 @@ int arch_timer_arch_init(void);
-  * nicely work out which register we want, and chuck away the rest of
-  * the code. At least it does so with a recent GCC (4.6.3).
-  */
--static inline void arch_timer_reg_write(const int access, const int reg, u32 val)
-+static inline void arch_timer_reg_write_cp15(const int access, const int reg,
-+					  u32 val)
- {
- 	if (access == ARCH_TIMER_PHYS_ACCESS) {
- 		switch (reg) {
-@@ -44,7 +45,7 @@ static inline void arch_timer_reg_write(const int access, const int reg, u32 val
- 	isb();
- }
- 
--static inline u32 arch_timer_reg_read(const int access, const int reg)
-+static inline u32 arch_timer_reg_read_cp15(const int access, const int reg)
- {
- 	u32 val = 0;
- 
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index d56ed11..1cd3c55 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -26,7 +26,7 @@
- 
- #include <clocksource/arm_arch_timer.h>
- 
--static inline void arch_timer_reg_write(int access, int reg, u32 val)
-+static inline void arch_timer_reg_write_cp15(int access, int reg, u32 val)
- {
- 	if (access == ARCH_TIMER_PHYS_ACCESS) {
- 		switch (reg) {
-@@ -57,7 +57,7 @@ static inline void arch_timer_reg_write(int access, int reg, u32 val)
- 	isb();
- }
- 
--static inline u32 arch_timer_reg_read(int access, int reg)
-+static inline u32 arch_timer_reg_read_cp15(int access, int reg)
- {
- 	u32 val;
- 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 220da0c..3de030a 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -43,14 +43,26 @@ static bool arch_timer_use_virtual = true;
-  * Architected system timer support.
-  */
- 
-+static inline void arch_timer_reg_write(int access, int reg, u32 val,
-+					struct clock_event_device *clk)
-+{
-+	arch_timer_reg_write_cp15(access, reg, val);
-+}
-+
-+static inline u32 arch_timer_reg_read(int access, int reg,
-+				      struct clock_event_device *clk)
-+{
-+	return arch_timer_reg_read_cp15(access, reg);
-+}
-+
- static inline irqreturn_t timer_handler(const int access,
- 					struct clock_event_device *evt)
- {
- 	unsigned long ctrl;
--	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL);
-+	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, evt);
- 	if (ctrl & ARCH_TIMER_CTRL_IT_STAT) {
- 		ctrl |= ARCH_TIMER_CTRL_IT_MASK;
--		arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl);
-+		arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, evt);
- 		evt->event_handler(evt);
- 		return IRQ_HANDLED;
- 	}
-@@ -72,15 +84,16 @@ static irqreturn_t arch_timer_handler_phys(int irq, void *dev_id)
- 	return timer_handler(ARCH_TIMER_PHYS_ACCESS, evt);
- }
- 
--static inline void timer_set_mode(const int access, int mode)
-+static inline void timer_set_mode(const int access, int mode,
-+				  struct clock_event_device *clk)
- {
- 	unsigned long ctrl;
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_UNUSED:
- 	case CLOCK_EVT_MODE_SHUTDOWN:
--		ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL);
-+		ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
- 		ctrl &= ~ARCH_TIMER_CTRL_ENABLE;
--		arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl);
-+		arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
- 		break;
- 	default:
- 		break;
-@@ -90,36 +103,37 @@ static inline void timer_set_mode(const int access, int mode)
- static void arch_timer_set_mode_virt(enum clock_event_mode mode,
- 				     struct clock_event_device *clk)
- {
--	timer_set_mode(ARCH_TIMER_VIRT_ACCESS, mode);
-+	timer_set_mode(ARCH_TIMER_VIRT_ACCESS, mode, clk);
- }
- 
- static void arch_timer_set_mode_phys(enum clock_event_mode mode,
- 				     struct clock_event_device *clk)
- {
--	timer_set_mode(ARCH_TIMER_PHYS_ACCESS, mode);
-+	timer_set_mode(ARCH_TIMER_PHYS_ACCESS, mode, clk);
- }
- 
--static inline void set_next_event(const int access, unsigned long evt)
-+static inline void set_next_event(const int access, unsigned long evt,
-+				  struct clock_event_device *clk)
- {
- 	unsigned long ctrl;
--	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL);
-+	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
- 	ctrl |= ARCH_TIMER_CTRL_ENABLE;
- 	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
--	arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL, evt);
--	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl);
-+	arch_timer_reg_write(access, ARCH_TIMER_REG_TVAL, evt, clk);
-+	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
- }
- 
- static int arch_timer_set_next_event_virt(unsigned long evt,
--					  struct clock_event_device *unused)
-+					  struct clock_event_device *clk)
- {
--	set_next_event(ARCH_TIMER_VIRT_ACCESS, evt);
-+	set_next_event(ARCH_TIMER_VIRT_ACCESS, evt, clk);
- 	return 0;
- }
- 
- static int arch_timer_set_next_event_phys(unsigned long evt,
--					  struct clock_event_device *unused)
-+					  struct clock_event_device *clk)
- {
--	set_next_event(ARCH_TIMER_PHYS_ACCESS, evt);
-+	set_next_event(ARCH_TIMER_PHYS_ACCESS, evt, clk);
- 	return 0;
- }
- 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+One reason for this is the difficulty some have had with setting flags
+from DT bindings.  Another reason is that a core goal of the framework
+is to remove topology info from drivers; having to set a flag explicitly
+on each clock to propagate rate changes is an impediment to that goal.
+
+So perhaps CLK_SET_RATE_REMUX is a similar situation.  What do you think
+about making remuxing the default and providing a flag to prevent it?
+And also we can assume for the immediate future that users of
+.determine_rate WANT to remux, since .round_rate won't do it.  Though
+eventually it might be wise to convert all users of .round_rate over to
+.determine_rate and deprecate .round_rate entirely.
+
+Regards,
+Mike
+
+> This works by way of adding a new op, determine_rate, similar to
+> round_rate but with an extra parameter to allow the clock driver to
+> optionally select a different parent clock. This is used in
+> clk_calc_new_rates to decide whether to initiate a set_parent operation.
+> 
+> Changes in v2:
+> 
+> I've moved the mux determine_rate implementation into a core helper, but
+> I haven't pushed it fully into the core, as I think it just wouldn't
+> work correctly for more complex clocks, e.g. if you (theoretically) had
+> a combined mux and divide, you'd want to intercept the determine_rate
+> and ask for a larger rate from the parent clocks, then return the
+> divided rate. This should be possible by wrapping the mux determine_rate
+> helper.
+> 
+> Patch 1 still exports the __clk_get_parent_by_index as it seems like it
+> might be a useful thing for clock implementations to have access to if
+> they ever wanted to do something more fancy with changing clock parents.
+> 
+> I haven't made any attempt to implement the atomic set_parent+set_rate
+> as I don't have hardware that could take proper advantage of it, but it
+> shouldn't be too difficult for others to implement if they wanted since
+> they're fairly close to one another (in clk_change_rate()).
+> 
+> * switched to using new determine_rate op rather than adding an argument
+>   to round_rate.
+> * moved mux implementation into a single helper which should be usable
+>   from more complex clocks which can mux.
+> * rewrite main implementation so that no changes are made until after
+>   the PRE notifications have been sent, and in a way that should ensure
+>   correct notifications without duplicates, and I think should be safe
+>   in the event of a notification failing.
+> * various tidy ups and fixes.
+> 
+> James Hogan (3):
+>   clk: abstract parent cache
+>   clk: add support for clock reparent on set_rate
+>   clk: clk-mux: implement remuxing on set_rate
+> 
+>  Documentation/clk.txt        |   4 +
+>  drivers/clk/clk-mux.c        |   1 +
+>  drivers/clk/clk.c            | 216 +++++++++++++++++++++++++++++++++----------
+>  include/linux/clk-private.h  |   2 +
+>  include/linux/clk-provider.h |  12 +++
+>  5 files changed, 185 insertions(+), 50 deletions(-)
+> 
+> -- 
+> 1.8.1.2
