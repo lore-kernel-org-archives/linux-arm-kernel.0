@@ -1,28 +1,121 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 13 May 2013 15:16:06 +0530
-Subject: [PATCH 07/14] ARM: spear: Remove init_irq declaration in machine
- description
-In-Reply-To: <1368438253-28218-8-git-send-email-maxime.ripard@free-electrons.com>
-References: <1368438253-28218-1-git-send-email-maxime.ripard@free-electrons.com>
- <1368438253-28218-8-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAKohpo=TRXoZ2L0vUor4834QNbf0UxaB9AVYY-r-3mAKYTgjig@mail.gmail.com>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Mon, 13 May 2013 11:50:20 +0200
+Subject: [PATCH v2] documentation: iommu: add description of ARM System
+ MMU binding
+In-Reply-To: <1365789727-5371-1-git-send-email-will.deacon@arm.com>
+References: <1365789727-5371-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20130513095020.GB10369@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 May 2013 15:14, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
-> specified") removed the need to explictly setup the init_irq field in
-> the machine description when using only irqchip_init. Remove that
-> declaration for spear as well.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/mach-spear/spear1310.c | 1 -
->  arch/arm/mach-spear/spear1340.c | 1 -
->  arch/arm/mach-spear/spear300.c  | 1 -
->  arch/arm/mach-spear/spear310.c  | 1 -
->  arch/arm/mach-spear/spear320.c  | 1 -
->  arch/arm/mach-spear/spear6xx.c  | 1 -
->  6 files changed, 6 deletions(-)
+Hi Will,
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+so far, I thought, that this proposal is fine. After I have tried to
+make use of the binding I have some points that might need further
+disucssion.
+
+Olav already asked (in another thread) how to model the mapping of
+stream IDs to contexts for master devices that support multiple
+contexts.  I doubt that this is fully covered yet.
+
+I also think that it is more useful to move the stream-id property to
+the device node of a master device. (It's a characteristic of the
+master device not of the SMMU.) Currently with multiple stream IDs per
+master device you have repeated entries in the mmu-master property.
+
+But all that is needed is to point (once) to each mmu-master in the
+SMMU device node. Then you should be able to look up the corresponding
+stream IDs in the device node for each mmu-master.
+
+
+Regars,
+Andreas
+
+
+On Fri, Apr 12, 2013 at 02:02:07PM -0400, Will Deacon wrote:
+> This patch adds a description of the device tree binding for the ARM
+> System MMU architecture.
+> 
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  .../devicetree/bindings/iommu/arm,smmu.txt         | 66 ++++++++++++++++++++++
+>  1 file changed, 66 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> new file mode 100644
+> index 0000000..56de07c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> @@ -0,0 +1,66 @@
+> +* ARM System MMU Architecture Implementation
+> +
+> +ARM SoCs may contain an implementation of the ARM System Memory
+> +Management Unit Architecture, which can be used to provide 1 or 2 stages
+> +of address translation to bus masters external to the CPU.
+> +
+> +The SMMU may also raise interrupts in response to various fault
+> +conditions.
+> +
+> +** System MMU required properties:
+> +
+> +- compatible    : Should be one of:
+> +
+> +                        "arm,smmu-v1"
+> +                        "arm,smmu-v2"
+> +                        "arm,mmu-400"
+> +
+> +                  depending on the particular implementation and/or the
+> +                  version of the architecture implemented.
+> +
+> +- reg           : Base address and size of the SMMU.
+> +
+> +- #global-interrupts : The number of global interrupts exposed by the
+> +                       device.
+> +
+> +- interrupts    : Interrupt list, with the first #global-irqs entries
+> +                  corresponding to the global interrupts and any
+> +                  following entries corresponding to context interrupts,
+> +                  specified in order of their indexing by the SMMU.
+> +
+> +- mmu-masters   : A list of phandles to device nodes representing bus
+> +                  masters for which the SMMU can provide a translation.
+> +
+> +- stream-ids    : A list of 32-bit values corresponding to the StreamIDs
+> +                  for the devices listed in the mmu-masters property.
+> +                  This list must be same length as mmu-masters, so
+> +                  masters with multiple stream-ids will have multiple
+> +                  entries in mmu-masters.
+> +
+> +** System MMU optional properties:
+> +
+> +- smmu-parent   : When multiple SMMUs are chained together, this
+> +                  property can be used to provide a phandle to the
+> +                  parent SMMU (that is the next SMMU on the path going
+> +                  from the mmu-masters towards memory) node for this
+> +                  SMMU.
+> +
+> +Example:
+> +
+> +        smmu {
+> +                compatible = "arm,smmu-v1";
+> +                reg = <0xba5e0000 0x10000>;
+> +                #global-interrupts = <2>;
+> +                interrupts = <0 32 4>,
+> +                             <0 33 4>,
+> +                             <0 34 4>, /* This is the first context interrupt */
+> +                             <0 35 4>,
+> +                             <0 36 4>,
+> +                             <0 37 4>;
+> +                mmu-masters = <&dma0>,
+> +                              <&dma0>,
+> +                              <&dma1>;
+> +                stream-ids  = <0xd01d>,
+> +                              <0xd01e>,
+> +                              <0xd11c>;
+> +        };
+> -- 
+> 1.8.0
+> 
