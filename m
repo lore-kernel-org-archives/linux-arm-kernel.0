@@ -1,122 +1,43 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 14 May 2013 00:05:56 +0800
-Subject: [PATCH] net/macb: fix ISR clear-on-write behavior only for some
- SoC
-In-Reply-To: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <FE065E51-1EAA-47ED-8C7B-0F2E6418F349@jcrosoft.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 13 May 2013 09:09:47 -0700
+Subject: [PATCH RFC] clk: Introduce userspace clock driver
+In-Reply-To: <20130513052135.GD6836@sirena.org.uk>
+References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
+ <20130510212422.GY3200@sirena.org.uk>
+ <7e18bed3-ae6b-4aa0-bf23-b6c61ba8b85b@CO9EHSMHS030.ehs.local>
+ <20130512143344.GC3200@sirena.org.uk>
+ <9e55c552-ce34-4663-9a57-bf2c626d7d58@TX2EHSMHS008.ehs.local>
+ <20130513052135.GD6836@sirena.org.uk>
+Message-ID: <0bf5a185-86f7-4a93-a90f-42caefb06a1d@TX2EHSMHS009.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, May 13, 2013 at 09:21:35AM +0400, Mark Brown wrote:
+> On Sun, May 12, 2013 at 12:05:04PM -0700, S?ren Brinkmann wrote:
+> > On Sun, May 12, 2013 at 06:33:44PM +0400, Mark Brown wrote:
+> 
+> > > No, there's no confusion here - the clocks that are being exposed to
+> > > userspace are the clocks which enter the FPGA.  The driver or whatever
+> > > that understands the FPGA can do what is needed to control them,
+> > > including routing them on to subdevices it instantiates or exposing them
+> > > to userspace.
+> 
+> > Such a driver does not exist in general.
+> > For some IP cores, Linux drivers do exist and then
+> > they are supposed to directly use the CCF, IMHO, no need to expose
+> > things to userspace in that case.
+> > I'm trying to cover cases, in which there is no driver available/needed for
+> > the FPGA design, other than some simple clock controls.
+> 
+> You're not understanding the point here.  If you've got a
+> reprogrammmable FPGA you at least need some way to get the FPGA image in
+> there.  This driver is presumably responsible for instantiating whatever
+> is needed to control what is on the FPGA, that could include punting the
+> clocks to userspace if that's sane.
+Well, that driver actually exists. But that just programs a bitstream
+you give it to program. It does not know anything about the design it
+programs and cannot make any kind of decision whether the clocks should
+be userspace controlled or not.
 
-On May 14, 2013, at 12:05 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-
-> Commit 749a2b6 (net/macb: clear tx/rx completion flags in ISR)
-> introduces clear-on-write on ISR register. This behavior is not always
-> implemented when using Cadence MACB/GEM and is breaking other platforms.
-> We are using a new Device Tree compatibility string and a capability
-> property to actually activate this clear-on-write behavior on ISR.
-> 
-> Reported-by: Hein Tibosch <hein_tibosch@yahoo.es>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-can we detect it via the IP?
-> ---
-> Documentation/devicetree/bindings/net/macb.txt |  2 ++
-> drivers/net/ethernet/cadence/macb.c            | 15 +++++++++++++--
-> drivers/net/ethernet/cadence/macb.h            |  5 +++++
-> 3 files changed, 20 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
-> index 44afa0e..13ec4f6 100644
-> --- a/Documentation/devicetree/bindings/net/macb.txt
-> +++ b/Documentation/devicetree/bindings/net/macb.txt
-> @@ -6,6 +6,8 @@ Required properties:
->   Use "cdns,at32ap7000-macb" for other 10/100 usage or use the generic form: "cdns,macb".
->   Use "cnds,pc302-gem" for Picochip picoXcell pc302 and later devices based on
->   the Cadence GEM, or the generic form: "cdns,gem".
-> +  Use "cdns,zynq-7000-gem" for devices based on Cadence GEM with alternative
-> +  options enabled (ISR clear on write).
-> - reg: Address and length of the register set for the device
-> - interrupts: Should contain macb interrupt
-> - phy-mode: String, operation mode of the PHY interface.
-> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-> index 6be513d..628f2b0 100644
-> --- a/drivers/net/ethernet/cadence/macb.c
-> +++ b/drivers/net/ethernet/cadence/macb.c
-> @@ -485,7 +485,8 @@ static void macb_tx_interrupt(struct macb *bp)
-> 	status = macb_readl(bp, TSR);
-> 	macb_writel(bp, TSR, status);
-> 
-> -	macb_writel(bp, ISR, MACB_BIT(TCOMP));
-> +	if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
-> +		macb_writel(bp, ISR, MACB_BIT(TCOMP));
-> 
-> 	netdev_vdbg(bp->dev, "macb_tx_interrupt status = 0x%03lx\n",
-> 		(unsigned long)status);
-> @@ -738,7 +739,8 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
-> 			 * now.
-> 			 */
-> 			macb_writel(bp, IDR, MACB_RX_INT_FLAGS);
-> -			macb_writel(bp, ISR, MACB_BIT(RCOMP));
-> +			if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
-> +				macb_writel(bp, ISR, MACB_BIT(RCOMP));
-> 
-> 			if (napi_schedule_prep(&bp->napi)) {
-> 				netdev_vdbg(bp->dev, "scheduling RX softirq\n");
-> @@ -1474,6 +1476,10 @@ static const struct of_device_id macb_dt_ids[] = {
-> 	{ .compatible = "cdns,macb" },
-> 	{ .compatible = "cdns,pc302-gem" },
-> 	{ .compatible = "cdns,gem" },
-> +	{
-> +		.compatible = "cdns,zynq-7000-gem",
-> +		.data = (void *)MACB_CAPS_ISR_CLEAR_ON_WRITE,
-> +	},
-> 	{ /* sentinel */ }
-> };
-> MODULE_DEVICE_TABLE(of, macb_dt_ids);
-> @@ -1484,6 +1490,7 @@ static int __init macb_probe(struct platform_device *pdev)
-> 	struct macb_platform_data *pdata;
-> 	struct resource *regs;
-> 	struct net_device *dev;
-> +	const struct of_device_id *dev_id;
-> 	struct macb *bp;
-> 	struct phy_device *phydev;
-> 	u32 config;
-> @@ -1558,6 +1565,10 @@ static int __init macb_probe(struct platform_device *pdev)
-> 
-> 	dev->base_addr = regs->start;
-> 
-> +	dev_id = of_match_device(macb_dt_ids, &pdev->dev);
-> +	if (dev_id)
-> +		bp->caps = (u32)dev_id->data;
-> +
-> 	/* Set MII management clock divider */
-> 	config = macb_mdc_clk_div(bp);
-> 	config |= macb_dbw(bp);
-> diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-> index 993d703..5d622fe 100644
-> --- a/drivers/net/ethernet/cadence/macb.h
-> +++ b/drivers/net/ethernet/cadence/macb.h
-> @@ -323,6 +323,9 @@
-> #define MACB_MAN_READ				2
-> #define MACB_MAN_CODE				2
-> 
-> +/* Capability mask bits */
-> +#define MACB_CAPS_ISR_CLEAR_ON_WRITE		0x1
-> +
-> /* Bit manipulation macros */
-> #define MACB_BIT(name)					\
-> 	(1 << MACB_##name##_OFFSET)
-> @@ -574,6 +577,8 @@ struct macb {
-> 	unsigned int 		speed;
-> 	unsigned int 		duplex;
-> 
-> +	u32			caps;
-> +
-> 	phy_interface_t		phy_interface;
-> 
-> 	/* AT91RM9200 transmit */
-> -- 
-> 1.8.0
-> 
+	S?ren
