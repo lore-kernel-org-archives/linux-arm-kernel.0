@@ -1,52 +1,46 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 13 May 2013 13:03:25 -0400
-Subject: [GIT PULL] ARM: mvebu: fixes for v3.10 (round 1)
-Message-ID: <20130513170325.GT31290@titan.lakedaemon.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 13 May 2013 17:04:22 +0000 (UTC)
+Subject: [PATCH] ARM: defconfigs: OMAP: omap2plus_defconfig missing
+ CONFIG_ARCH_MULTI_V6=y
+In-Reply-To: <alpine.DEB.2.00.1305131701270.7156@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1305131701270.7156@utopia.booyaka.com>
+Message-ID: <alpine.DEB.2.00.1305131703271.7156@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 13 May 2013, Paul Walmsley wrote:
 
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+> Fix by setting CONFIG_ARCH_MULTI_V7.
 
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+Well, obvious typo here.  Here's the updated version.
 
-are available in the git repository at:
 
-  git://git.infradead.org/users/jcooper/linux.git tags/fixes-3.10-1
+- Paul
 
-for you to fetch changes up to 00ed4a0bd964555fe9276f2299564c384d50ae7d:
+From: Paul Walmsley <paul@pwsan.com>
+Date: Mon, 13 May 2013 10:47:48 -0600
+Subject: [PATCH] ARM: defconfigs: OMAP: omap2plus_defconfig missing CONFIG_ARCH_MULTI_V6=y
 
-  ARM: mvebu: Add a ranges entry to translate devbus childs (2013-05-13 16:23:47 +0000)
+omap2plus_defconfig is missing CONFIG_ARCH_MULTI_V6.  This results in
+undefined instruction traps in u-boot (and boot failures) on OMAP2xxx
+SoCs, which are ARM11-based.  Fix by setting CONFIG_ARCH_MULTI_V6.
 
-----------------------------------------------------------------
-mvebu fixes for v3.10 round 1
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/configs/omap2plus_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
- - mvebu
-    - duplicate alias removal
-    - augment new internal-regs dt node with proper ranges node
-
- - kirkwood
-    - stable fix for QNAP TS-11x/TS-21x enabling PCIe port 1
-
- - plat-orion
-    - missing ehci include in common.h.  needed within common.h.
-
-----------------------------------------------------------------
-Ezequiel Garcia (1):
-      ARM: mvebu: Add a ranges entry to translate devbus childs
-
-Martin Michlmayr (1):
-      Kirkwood: Enable PCIe port 1 on QNAP TS-11x/TS-21x
-
-Sebastian Hesselbarth (1):
-      ARM: plat-orion: add missing ehci include to common.h
-
-Thomas Petazzoni (1):
-      ARM: mvebu: do not duplicate the mpic alias
-
- arch/arm/boot/dts/armada-370.dtsi                | 2 +-
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 3 +++
- arch/arm/boot/dts/armada-xp.dtsi                 | 2 +-
- arch/arm/mach-kirkwood/ts219-setup.c             | 2 +-
- arch/arm/plat-orion/include/plat/common.h        | 1 +
- 5 files changed, 7 insertions(+), 3 deletions(-)
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+index c1ef64b..f590902 100644
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -20,6 +20,7 @@ CONFIG_MODULE_FORCE_UNLOAD=y
+ CONFIG_MODVERSIONS=y
+ CONFIG_MODULE_SRCVERSION_ALL=y
+ # CONFIG_BLK_DEV_BSG is not set
++CONFIG_ARCH_MULTI_V6=y
+ CONFIG_ARCH_OMAP2PLUS=y
+ CONFIG_OMAP_RESET_CLOCKS=y
+ CONFIG_OMAP_MUX_DEBUG=y
+-- 
+1.7.10.4
