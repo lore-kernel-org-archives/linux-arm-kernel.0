@@ -1,35 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 13 May 2013 19:09:18 -0400
-Subject: [PATCH V2 07/10] ARM: mvebu: Use standard MMC binding for all
- users of mvsdio
-In-Reply-To: <1368479941-10084-8-git-send-email-gmbnomis@gmail.com>
-References: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
- <1368479941-10084-8-git-send-email-gmbnomis@gmail.com>
-Message-ID: <20130513230918.GG31290@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 May 2013 00:07:59 +0100
+Subject: rmk not asking Linus to pull for a while...
+Message-ID: <20130513230759.GG18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 11:18:58PM +0200, Simon Baatz wrote:
-> In order to prepare the switch to the standard MMC device tree parser
-> for mvsdio, adapt all current uses of mvsdio in the dts files to the
-> standard format.
-> 
-> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
-> ---
-...
-> diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-> index 7588241..bf3a58c 100644
-> --- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
-> +++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-> @@ -136,7 +136,7 @@
->  			pinctrl-0 = <&pmx_sdio &pmx_sdio_cd>;
->  			pinctrl-names = "default";
->  			status = "okay";
-> -			cd-gpios = <&gpio1 15 0>;
-> +			cd-gpios = <&gpio1 15 1>;
+Hi all,
 
-Is this a bugfix that should be backported?
+In the spirit of keeping people in the picture...
 
-thx,
+I'm afraid that due to the move of git.linaro.org, I've lost access to
+the server, which is where I ask Linus to pull my tree from.  (It was
+only through the good graces of Arnd that I even had a heads-up on the
+server move.)
 
-Jason.
+I've asked folk at Linaro to investigate the situation is, but it seems
+that I need to have something called a "launchpad" account and I've no
+idea what one of those is.  So, I don't know how long it's going to take
+for this to get sorted - but at least it's someone elses problem. :-)
+
+Unfortunately, Linaro support folk seem to want to send me HTML-encoded
+email, which ends up in my little read junk mailboxes, so this will
+take a while to progress.
+
+Luckily, I maintain the one on ftp.arm.linux.org.uk, and with most of
+China blocked due to _severe_ abuse, the machine is seemingly stable,
+albiet rather old and showing its age.  Linux-next hasn't had much
+problems with it recently.  So, if I get desperate, I'll ask Linus to
+pull from there again, but at the moment I don't have a whole lot of
+commits in my tree.
