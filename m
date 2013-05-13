@@ -1,341 +1,135 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 13 May 2013 14:07:05 +0300
-Subject: [PATCH 6/6] ARM: tegra114: convert device tree files to use CLK
- defines
-In-Reply-To: <1368443225-16978-1-git-send-email-hdoyu@nvidia.com>
-References: <1368443225-16978-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1368443225-16978-7-git-send-email-hdoyu@nvidia.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Mon, 13 May 2013 20:24:01 +0900
+Subject: Introduce a new helper framework for buffer synchronization
+In-Reply-To: <5190B7D8.3010803@canonical.com>
+References: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
+ <51909DB4.2060208@canonical.com>
+ <025201ce4fbb$363d0390$a2b70ab0$%dae@samsung.com>
+ <5190B7D8.3010803@canonical.com>
+Message-ID: <027a01ce4fcc$5e7c7320$1b755960$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace magic number in tegra_car:
 
--               clocks = <&tegra_car 28>;
-+               clocks = <&tegra_car CLK_HOST1X>;
 
-Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
----
- arch/arm/boot/dts/tegra114-dalmore.dts |  4 +-
- arch/arm/boot/dts/tegra114.dtsi        | 79 +++++++++++++++++++---------------
- 2 files changed, 47 insertions(+), 36 deletions(-)
+> -----Original Message-----
+> From: Maarten Lankhorst [mailto:maarten.lankhorst at canonical.com]
+> Sent: Monday, May 13, 2013 6:52 PM
+> To: Inki Dae
+> Cc: 'Rob Clark'; 'Daniel Vetter'; 'DRI mailing list'; linux-arm-
+> kernel at lists.infradead.org; linux-media at vger.kernel.org; 'linux-fbdev';
+> 'Kyungmin Park'; 'myungjoo.ham'; 'YoungJun Cho'
+> Subject: Re: Introduce a new helper framework for buffer synchronization
+> 
+> Op 13-05-13 11:21, Inki Dae schreef:
+> >
+> >> -----Original Message-----
+> >> From: Maarten Lankhorst [mailto:maarten.lankhorst at canonical.com]
+> >> Sent: Monday, May 13, 2013 5:01 PM
+> >> To: Inki Dae
+> >> Cc: Rob Clark; Daniel Vetter; DRI mailing list; linux-arm-
+> >> kernel at lists.infradead.org; linux-media at vger.kernel.org; linux-fbdev;
+> >> Kyungmin Park; myungjoo.ham; YoungJun Cho
+> >> Subject: Re: Introduce a new helper framework for buffer
+> synchronization
+> >>
+> >> Op 09-05-13 09:33, Inki Dae schreef:
+> >>> Hi all,
+> >>>
+> >>> This post introduces a new helper framework based on dma fence. And
+> the
+> >>> purpose of this post is to collect other opinions and advices before
+> RFC
+> >>> posting.
+> >>>
+> >>> First of all, this helper framework, called fence helper, is in
+> progress
+> >>> yet so might not have enough comments in codes and also might need to
+> be
+> >>> more cleaned up. Moreover, we might be missing some parts of the dma
+> >> fence.
+> >>> However, I'd like to say that all things mentioned below has been
+> tested
+> >>> with Linux platform and worked well.
+> >>> ....
+> >>>
+> >>> And tutorial for user process.
+> >>>         just before cpu access
+> >>>                 struct dma_buf_fence *df;
+> >>>
+> >>>                 df->type = DMA_BUF_ACCESS_READ or
+DMA_BUF_ACCESS_WRITE;
+> >>>                 ioctl(fd, DMA_BUF_GET_FENCE, &df);
+> >>>
+> >>>         after memset or memcpy
+> >>>                 ioctl(fd, DMA_BUF_PUT_FENCE, &df);
+> >> NAK.
+> >>
+> >> Userspace doesn't need to trigger fences. It can do a buffer idle wait,
+> >> and postpone submitting new commands until after it's done using the
+> >> buffer.
+> > Hi Maarten,
+> >
+> > It seems that you say user should wait for a buffer like KDS does: KDS
+> uses
+> > select() to postpone submitting new commands. But I think this way
+> assumes
+> > that every data flows a DMA device to a CPU. For example, a CPU should
+> keep
+> > polling for the completion of a buffer access by a DMA device. This
+> means
+> > that the this way isn't considered for data flow to opposite case; CPU
+> to
+> > DMA device.
+> Not really. You do both things the same way. You first wait for the bo to
+> be idle, this could be implemented by adding poll support to the dma-buf
+> fd.
+> Then you either do your read or write. Since userspace is supposed to be
+> the one controlling the bo it should stay idle at that point. If you have
+> another thread queueing
+> the buffer againbefore your thread is done that's a bug in the
+application,
+> and can be solved with userspace locking primitives. No need for the
+> kernel to get involved.
+> 
 
-diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
-index 59695f01..cfcb3e2 100644
---- a/arch/arm/boot/dts/tegra114-dalmore.dts
-+++ b/arch/arm/boot/dts/tegra114-dalmore.dts
-@@ -957,7 +957,9 @@
- 
- 		nvidia,hp-det-gpios = <&gpio TEGRA_GPIO(R, 7) GPIO_ACTIVE_HIGH>;
- 
--		clocks = <&tegra_car 216>, <&tegra_car 217>, <&tegra_car 120>;
-+		clocks = <&tegra_car TEGRA114_CLK_PLL_A>,
-+		       	 <&tegra_car TEGRA114_CLK_PLL_A_OUT0>,
-+			 <&tegra_car TEGRA114_CLK_EXTERN1>;
- 		clock-names = "pll_a", "pll_a_out0", "mclk";
- 	};
- };
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index 15d1b58..1d3127e 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -1,5 +1,6 @@
- #include <dt-bindings/gpio/tegra-gpio.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clk/tegra114-car.h>
- 
- #include "skeleton.dtsi"
- 
-@@ -35,7 +36,7 @@
- 			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&tegra_car 5>;
-+		clocks = <&tegra_car TEGRA114_CLK_TIMER>;
- 	};
- 
- 	tegra_car: clock {
-@@ -79,7 +80,7 @@
- 			     <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&tegra_car 34>;
-+		clocks = <&tegra_car TEGRA114_CLK_APBDMA>;
- 	};
- 
- 	ahb: ahb {
-@@ -125,7 +126,7 @@
- 		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 8>;
- 		status = "disabled";
--		clocks = <&tegra_car 6>;
-+		clocks = <&tegra_car TEGRA114_CLK_UARTA>;
- 	};
- 
- 	uartb: serial at 70006040 {
-@@ -135,7 +136,7 @@
- 		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 9>;
- 		status = "disabled";
--		clocks = <&tegra_car 192>;
-+		clocks = <&tegra_car TEGRA114_CLK_UARTB>;
- 	};
- 
- 	uartc: serial at 70006200 {
-@@ -145,7 +146,7 @@
- 		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 10>;
- 		status = "disabled";
--		clocks = <&tegra_car 55>;
-+		clocks = <&tegra_car TEGRA114_CLK_UARTC>;
- 	};
- 
- 	uartd: serial at 70006300 {
-@@ -155,14 +156,14 @@
- 		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
- 		nvidia,dma-request-selector = <&apbdma 19>;
- 		status = "disabled";
--		clocks = <&tegra_car 65>;
-+		clocks = <&tegra_car TEGRA114_CLK_UARTD>;
- 	};
- 
- 	pwm: pwm {
- 		compatible = "nvidia,tegra114-pwm", "nvidia,tegra20-pwm";
- 		reg = <0x7000a000 0x100>;
- 		#pwm-cells = <2>;
--		clocks = <&tegra_car 17>;
-+		clocks = <&tegra_car TEGRA114_CLK_PWM>;
- 		status = "disabled";
- 	};
- 
-@@ -172,7 +173,7 @@
- 		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		clocks = <&tegra_car 12>;
-+		clocks = <&tegra_car TEGRA114_CLK_I2C1>;
- 		clock-names = "div-clk";
- 		status = "disabled";
- 	};
-@@ -183,7 +184,7 @@
- 		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		clocks = <&tegra_car 54>;
-+		clocks = <&tegra_car TEGRA114_CLK_I2C2>;
- 		clock-names = "div-clk";
- 		status = "disabled";
- 	};
-@@ -194,7 +195,7 @@
- 		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		clocks = <&tegra_car 67>;
-+		clocks = <&tegra_car TEGRA114_CLK_I2C3>;
- 		clock-names = "div-clk";
- 		status = "disabled";
- 	};
-@@ -205,7 +206,7 @@
- 		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		clocks = <&tegra_car 103>;
-+		clocks = <&tegra_car TEGRA114_CLK_I2C4>;
- 		clock-names = "div-clk";
- 		status = "disabled";
- 	};
-@@ -216,7 +217,7 @@
- 		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		clocks = <&tegra_car 47>;
-+		clocks = <&tegra_car TEGRA114_CLK_I2C5>;
- 		clock-names = "div-clk";
- 		status = "disabled";
- 	};
-@@ -228,7 +229,7 @@
- 		nvidia,dma-request-selector = <&apbdma 15>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		clocks = <&tegra_car 41>;
-+		clocks = <&tegra_car TEGRA114_CLK_SBC1>;
- 		clock-names = "spi";
- 		status = "disabled";
- 	};
-@@ -240,7 +241,7 @@
- 		nvidia,dma-request-selector = <&apbdma 16>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		clocks = <&tegra_car 44>;
-+		clocks = <&tegra_car TEGRA114_CLK_SBC2>;
- 		clock-names = "spi";
- 		status = "disabled";
- 	};
-@@ -252,7 +253,7 @@
- 		nvidia,dma-request-selector = <&apbdma 17>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		clocks = <&tegra_car 46>;
-+		clocks = <&tegra_car TEGRA114_CLK_SBC3>;
- 		clock-names = "spi";
- 		status = "disabled";
- 	};
-@@ -264,7 +265,7 @@
- 		nvidia,dma-request-selector = <&apbdma 18>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		clocks = <&tegra_car 68>;
-+		clocks = <&tegra_car TEGRA114_CLK_SBC4>;
- 		clock-names = "spi";
- 		status = "disabled";
- 	};
-@@ -276,7 +277,7 @@
- 		nvidia,dma-request-selector = <&apbdma 27>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		clocks = <&tegra_car 104>;
-+		clocks = <&tegra_car TEGRA114_CLK_SBC5>;
- 		clock-names = "spi";
- 		status = "disabled";
- 	};
-@@ -288,7 +289,7 @@
- 		nvidia,dma-request-selector = <&apbdma 28>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--		clocks = <&tegra_car 105>;
-+		clocks = <&tegra_car TEGRA114_CLK_SBC6>;
- 		clock-names = "spi";
- 		status = "disabled";
- 	};
-@@ -297,21 +298,21 @@
- 		compatible = "nvidia,tegra114-rtc", "nvidia,tegra20-rtc";
- 		reg = <0x7000e000 0x100>;
- 		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&tegra_car 4>;
-+		clocks = <&tegra_car TEGRA114_CLK_RTC>;
- 	};
- 
- 	kbc {
- 		compatible = "nvidia,tegra114-kbc";
- 		reg = <0x7000e200 0x100>;
- 		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&tegra_car 36>;
-+		clocks = <&tegra_car TEGRA114_CLK_KBC>;
- 		status = "disabled";
- 	};
- 
- 	pmc {
- 		compatible = "nvidia,tegra114-pmc";
- 		reg = <0x7000e400 0x400>;
--		clocks = <&tegra_car 261>, <&clk32k_in>;
-+		clocks = <&tegra_car TEGRA114_CLK_PCLK>, <&clk32k_in>;
- 		clock-names = "pclk", "clk32k_in";
- 	};
- 
-@@ -336,11 +337,19 @@
- 			<&apbdma 3>, <&apbdma 4>, <&apbdma 6>, <&apbdma 7>,
- 			<&apbdma 12>, <&apbdma 13>, <&apbdma 14>,
- 			<&apbdma 29>;
--		clocks = <&tegra_car 106>, <&tegra_car 107>, <&tegra_car 30>,
--			 <&tegra_car 11>, <&tegra_car 18>, <&tegra_car 101>,
--			 <&tegra_car 102>, <&tegra_car 108>, <&tegra_car 109>,
--			 <&tegra_car 110>, <&tegra_car 194>, <&tegra_car 153>,
--			 <&tegra_car 154>;
-+		clocks = <&tegra_car TEGRA114_CLK_D_AUDIO>,
-+		       	 <&tegra_car TEGRA114_CLK_APBIF>,
-+			 <&tegra_car TEGRA114_CLK_I2S0>,
-+			 <&tegra_car TEGRA114_CLK_I2S1>,
-+			 <&tegra_car TEGRA114_CLK_I2S2>,
-+			 <&tegra_car TEGRA114_CLK_I2S3>,
-+			 <&tegra_car TEGRA114_CLK_I2S4>,
-+			 <&tegra_car TEGRA114_CLK_DAM0>,
-+			 <&tegra_car TEGRA114_CLK_DAM1>,
-+			 <&tegra_car TEGRA114_CLK_DAM2>,
-+			 <&tegra_car TEGRA114_CLK_SPDIF_IN>,
-+			 <&tegra_car TEGRA114_CLK_AMX>,
-+			 <&tegra_car TEGRA114_CLK_ADX>;
- 		clock-names = "d_audio", "apbif", "i2s0", "i2s1", "i2s2",
- 			      "i2s3", "i2s4", "dam0", "dam1", "dam2",
- 			      "spdif_in", "amx", "adx";
-@@ -352,7 +361,7 @@
- 			compatible = "nvidia,tegra114-i2s", "nvidia,tegra30-i2s";
- 			reg = <0x70080300 0x100>;
- 			nvidia,ahub-cif-ids = <4 4>;
--			clocks = <&tegra_car 30>;
-+			clocks = <&tegra_car TEGRA114_CLK_I2S0>;
- 			status = "disabled";
- 		};
- 
-@@ -360,7 +369,7 @@
- 			compatible = "nvidia,tegra114-i2s", "nvidia,tegra30-i2s";
- 			reg = <0x70080400 0x100>;
- 			nvidia,ahub-cif-ids = <5 5>;
--			clocks = <&tegra_car 11>;
-+			clocks = <&tegra_car TEGRA114_CLK_I2S1>;
- 			status = "disabled";
- 		};
- 
-@@ -368,7 +377,7 @@
- 			compatible = "nvidia,tegra114-i2s", "nvidia,tegra30-i2s";
- 			reg = <0x70080500 0x100>;
- 			nvidia,ahub-cif-ids = <6 6>;
--			clocks = <&tegra_car 18>;
-+			clocks = <&tegra_car TEGRA114_CLK_I2S2>;
- 			status = "disabled";
- 		};
- 
-@@ -376,7 +385,7 @@
- 			compatible = "nvidia,tegra114-i2s", "nvidia,tegra30-i2s";
- 			reg = <0x70080600 0x100>;
- 			nvidia,ahub-cif-ids = <7 7>;
--			clocks = <&tegra_car 101>;
-+			clocks = <&tegra_car TEGRA114_CLK_I2S3>;
- 			status = "disabled";
- 		};
- 
-@@ -384,7 +393,7 @@
- 			compatible = "nvidia,tegra114-i2s", "nvidia,tegra30-i2s";
- 			reg = <0x70080700 0x100>;
- 			nvidia,ahub-cif-ids = <8 8>;
--			clocks = <&tegra_car 102>;
-+			clocks = <&tegra_car TEGRA114_CLK_I2S4>;
- 			status = "disabled";
- 		};
- 	};
-@@ -393,7 +402,7 @@
- 		compatible = "nvidia,tegra114-sdhci", "nvidia,tegra30-sdhci";
- 		reg = <0x78000000 0x200>;
- 		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&tegra_car 14>;
-+		clocks = <&tegra_car TEGRA114_CLK_SDMMC1>;
- 		status = "disable";
- 	};
- 
-@@ -401,7 +410,7 @@
- 		compatible = "nvidia,tegra114-sdhci", "nvidia,tegra30-sdhci";
- 		reg = <0x78000200 0x200>;
- 		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&tegra_car 9>;
-+		clocks = <&tegra_car TEGRA114_CLK_SDMMC2>;
- 		status = "disable";
- 	};
- 
-@@ -409,7 +418,7 @@
- 		compatible = "nvidia,tegra114-sdhci", "nvidia,tegra30-sdhci";
- 		reg = <0x78000400 0x200>;
- 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&tegra_car 69>;
-+		clocks = <&tegra_car TEGRA114_CLK_SDMMC3>;
- 		status = "disable";
- 	};
- 
-@@ -417,7 +426,7 @@
- 		compatible = "nvidia,tegra114-sdhci", "nvidia,tegra30-sdhci";
- 		reg = <0x78000600 0x200>;
- 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
--		clocks = <&tegra_car 15>;
-+		clocks = <&tegra_car TEGRA114_CLK_SDMMC4>;
- 		status = "disable";
- 	};
- 
--- 
-1.8.1.5
+Yes, that is how we have synchronized buffer between CPU and DMA device
+until now without buffer synchronization mechanism. I thought that it's best
+to make user not considering anything: user can access a buffer regardless
+of any DMA device controlling and the buffer synchronization is performed in
+kernel level. Moreover, I think we could optimize graphics and multimedia
+hardware performance because hardware can do more works: one thread accesses
+a shared buffer and the other controls DMA device with the shared buffer in
+parallel. Thus, we could avoid sequential processing and that is my
+intention. Aren't you think about that we could improve hardware utilization
+with such way or other? of course, there could be better way.
+
+> >> Kernel space doesn't need the root hole you created by giving a
+> >> dereferencing a pointer passed from userspace.
+> >> Your next exercise should be to write a security exploit from the api
+> you
+> >> created here. It's the only way to learn how to write safe code. Hint:
+> >> df.ctx = mmap(..);
+> >>
+> > Also I'm not clear to use our way yet and that is why I posted. As you
+> > mentioned, it seems like that using mmap() is more safe. But there is
+> one
+> > issue it makes me confusing. For your hint, df.ctx = mmap(..), the issue
+> is
+> > that dmabuf mmap can be used to map a dmabuf with user space. And the
+> dmabuf
+> > means a physical memory region allocated by some allocator such as drm
+> gem
+> > or ion.
+> >
+> > There might be my missing point so could you please give me more
+> comments?
+> >
+> My point was that userspace could change df.ctx to some mmap'd memory,
+> forcing the kernel to execute some code prepared by userspace.
+
+Understood. I have to find a better way. And for this, I'd like to listen
+attentively more opinions and advices.
+
+Thanks for comments,
+Inki Dae
