@@ -1,61 +1,54 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Mon, 13 May 2013 22:30:46 +0100
-Subject: [PATCH v2 0/3] clk: implement remuxing during set_rate
-In-Reply-To: <20130513195746.10068.92303@quantum>
-References: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
- <20130513195746.10068.92303@quantum>
-Message-ID: <CAAG0J991BCziPFddzBrx9vcwRxyRgcCd38A01uKXTDDK9xTnbQ@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 13 May 2013 14:53:27 -0700
+Subject: [PATCH] ARM: OMAP3+: am33xx id: Add new am33xx specific function
+ to check dev_feature
+In-Reply-To: <1367996313-6676-1-git-send-email-hvaibhav@ti.com> (Vaibhav
+ Hiremath's message of "Wed, 8 May 2013 12:28:33 +0530")
+References: <1367996313-6676-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <87bo8e1r8o.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 May 2013 20:57, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting James Hogan (2013-04-19 09:28:21)
->> This patchset adds support for automatic selection of the best parent
->> for a clock mux, i.e. the one which can provide the closest clock rate
->> to that requested. It can be controlled by a new CLK_SET_RATE_REMUX flag
->> so that it doesn't happen unless explicitly allowed.
->>
+Vaibhav Hiremath <hvaibhav@ti.com> writes:
+
+> Layout of DEV_FEATURE register (offset = 0x604) is different
+> between TI81xx and AM33xx device, so create separate function
+> which will check for features available on specific AM33xx SoC
+> and set the flags accordingly.
 >
-> I'm not sure about the new flag.  One of my regrets during the early
-> development of the common struct clk is the CLK_SET_RATE_PARENT flag.
-> In hindsight I would have preferred to make parent-propagation of rate
-> changes the default behavior, and instead provide a flag to prevent that
-> behavior, such as CLK_SET_RATE_NO_PROPAGATE.
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+
+Minor nit below, otherwise...
+
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+
+> ---
+>  arch/arm/mach-omap2/control.h |    5 +++++
+>  arch/arm/mach-omap2/id.c      |   13 +++++++++++++
+>  arch/arm/mach-omap2/io.c      |    2 +-
+>  arch/arm/mach-omap2/soc.h     |    1 +
+>  4 files changed, 20 insertions(+), 1 deletions(-)
 >
-> One reason for this is the difficulty some have had with setting flags
-> from DT bindings.
+> diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+> index e6c3281..4acdfc5 100644
+> --- a/arch/arm/mach-omap2/control.h
+> +++ b/arch/arm/mach-omap2/control.h
+> @@ -358,6 +358,11 @@
+>  #define AM33XX_CONTROL_STATUS_SYSBOOT1_WIDTH		0x2
+>  #define AM33XX_CONTROL_STATUS_SYSBOOT1_MASK		(0x3 << 22)
+>  
+> +/* DEV Feature register to identify AM33XX features */
+> +#define AM33XX_DEV_FEATURE		0x604
+> +#define AM33XX_SGX_SHIFT		29
 
-Could you elaborate on this? I've been adding flags to DT bindings for
-this sort of thing, but it feels a bit like it's in that grey area of
-not really describing the hardware itself. This information needs to
-be specified somehow though.
+You don't need the shift value anywhere in the code, so...
 
-> Another reason is that a core goal of the framework
-> is to remove topology info from drivers; having to set a flag explicitly
-> on each clock to propagate rate changes is an impediment to that goal.
+> +#define AM33XX_SGX_MASK			(1 << AM33XX_SGX_SHIFT)
 
-(Something that I have found also where CLK_SET_RATE_PARENT doesn't
-fit well is when you have a mux where you want the set_rate propagated
-to one possible parent (e.g. a dedicated PLL) but not the other (e.g.
-the system clock - which happens to be a divider). In this case what I
-really want to say is "don't change the rate of this particular
-clock", in fact I added a CLK_DIVIDER_READ_ONLY divider flag locally
-for this purpose. Was there a particular use case of
-CLK_SET_RATE_PARENT where you'd want a clock to be changed from one
-child but not another?)
+#define AM33XX_SGX_MASK		BIT(29)
 
->
-> So perhaps CLK_SET_RATE_REMUX is a similar situation.  What do you think
-> about making remuxing the default and providing a flag to prevent it?
+instead?
 
-Yes, fine by me.
+Otherwise, rest of patch looks fine.
 
-> And also we can assume for the immediate future that users of
-> .determine_rate WANT to remux, since .round_rate won't do it.  Though
-> eventually it might be wise to convert all users of .round_rate over to
-> .determine_rate and deprecate .round_rate entirely.
-
-True.
-
-Cheers
-James
+Kevin
