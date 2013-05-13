@@ -1,26 +1,40 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Mon, 13 May 2013 10:15:08 +0300
-Subject: [PATCH] mtd: devices: added the 16mb winbond device
-In-Reply-To: <516d0c68.e10b420a.287d.ffff894c@mx.google.com>
-References: <516d0c68.e10b420a.287d.ffff894c@mx.google.com>
-Message-ID: <1368429308.5360.6.camel@sauron.fi.intel.com>
+From: maarten.lankhorst@canonical.com (Maarten Lankhorst)
+Date: Mon, 13 May 2013 10:00:52 +0200
+Subject: Introduce a new helper framework for buffer synchronization
+In-Reply-To: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
+References: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
+Message-ID: <51909DB4.2060208@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-04-16 at 14:01 +0530, girishks2000 at gmail.com wrote:
-> From: Girish K S <ks.giri@samsung.com>
-> 
-> added a 16mb winbond devce to the device list
-> erase size = 64k and number of blocks = 256
-> 
-> Signed-off-by: Girish K S <ks.giri@samsung.com>
+Op 09-05-13 09:33, Inki Dae schreef:
+> Hi all,
+>
+> This post introduces a new helper framework based on dma fence. And the
+> purpose of this post is to collect other opinions and advices before RFC
+> posting.
+>
+> First of all, this helper framework, called fence helper, is in progress
+> yet so might not have enough comments in codes and also might need to be
+> more cleaned up. Moreover, we might be missing some parts of the dma fence.
+> However, I'd like to say that all things mentioned below has been tested
+> with Linux platform and worked well.
 
-Pushed to l2-mtd.git, but please, remember to use better suffixes. E.g.,
-mb may mean mega bytes, or mega bits. 16MiB device, 64KiB block size is
-a lot less ambiguous way communicate the sizes.
+> ....
+>
+> And tutorial for user process.
+>         just before cpu access
+>                 struct dma_buf_fence *df;
+>
+>                 df->type = DMA_BUF_ACCESS_READ or DMA_BUF_ACCESS_WRITE;
+>                 ioctl(fd, DMA_BUF_GET_FENCE, &df);
+>
+>         after memset or memcpy
+>                 ioctl(fd, DMA_BUF_PUT_FENCE, &df);
+NAK.
 
-I've amended your commit message.
+Userspace doesn't need to trigger fences. It can do a buffer idle wait, and postpone submitting new commands until after it's done using the buffer.
+Kernel space doesn't need the root hole you created by giving a dereferencing a pointer passed from userspace.
+Your next exercise should be to write a security exploit from the api you created here. It's the only way to learn how to write safe code. Hint: df.ctx = mmap(..);
 
--- 
-Best Regards,
-Artem Bityutskiy
+~Maarten
