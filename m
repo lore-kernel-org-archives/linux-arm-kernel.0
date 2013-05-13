@@ -1,63 +1,65 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Sun, 12 May 2013 22:13:52 -0700
-Subject: [PATCH] ARM: KVM: prevent NULL pointer dereference with KVM ioctl
-In-Reply-To: <518A2098.9010909@arm.com>
-References: <1367931313-14839-1-git-send-email-andre.przywara@linaro.org>
- <518A2098.9010909@arm.com>
-Message-ID: <20130513051352.GA64337@ubuntu>
+Date: Sun, 12 May 2013 22:17:37 -0700
+Subject: [PATCH v2 3/5] ARM: KVM: relax cache maintainance when building
+ page tables
+In-Reply-To: <20130502151753.GB25022@mudshark.cambridge.arm.com>
+References: <1367505542-2231-1-git-send-email-marc.zyngier@arm.com>
+ <1367505542-2231-4-git-send-email-marc.zyngier@arm.com>
+ <20130502150355.GA25022@mudshark.cambridge.arm.com>
+ <CAEDV+gJwYpHzehWZci2bmgYedJoBxMOGZFhjGeGRQ_cT8TKkyw@mail.gmail.com>
+ <20130502151753.GB25022@mudshark.cambridge.arm.com>
+Message-ID: <20130513051737.GB64337@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 08, 2013 at 10:53:28AM +0100, Marc Zyngier wrote:
-> On 07/05/13 13:55, Andre Przywara wrote:
-> > Some ARM KVM VCPU ioctls require the vCPU to be properly initialized
-> > with the KVM_ARM_VCPU_INIT ioctl before being used with further
-> > requests. KVM_RUN checks whether this initialization has been
-> > done, but other ioctls do not.
-> > Namely KVM_GET_REG_LIST will dereference an array with index -1
-> > without initialization and thus leads to a kernel oops.
-> > Fix this by adding checks before executing the ioctl handlers.
-> > 
-> > Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
-> > ---
-> >  arch/arm/kvm/arm.c | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> > 
-> > diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> > index c1fe498..0c571ff 100644
-> > --- a/arch/arm/kvm/arm.c
-> > +++ b/arch/arm/kvm/arm.c
-> > @@ -893,6 +893,11 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
-> >  	case KVM_SET_ONE_REG:
-> >  	case KVM_GET_ONE_REG: {
-> >  		struct kvm_one_reg reg;
-> > +
-> > +		/* Make sure they initialize the vcpu with KVM_ARM_VCPU_INIT */
-> > +		if (unlikely(vcpu->arch.target < 0))
-> > +			return -ENOEXEC;
-> > +
-> >  		if (copy_from_user(&reg, argp, sizeof(reg)))
-> >  			return -EFAULT;
-> >  		if (ioctl == KVM_SET_ONE_REG)
-> > @@ -905,6 +910,10 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
-> >  		struct kvm_reg_list reg_list;
-> >  		unsigned n;
-> >  
-> > +		/* Make sure they initialize the vcpu with KVM_ARM_VCPU_INIT */
-> > +		if (unlikely(vcpu->arch.target < 0))
-> > +			return -ENOEXEC;
-> > +
-> >  		if (copy_from_user(&reg_list, user_list, sizeof(reg_list)))
-> >  			return -EFAULT;
-> >  		n = reg_list.n;
-> > 
+On Thu, May 02, 2013 at 04:17:53PM +0100, Will Deacon wrote:
+> On Thu, May 02, 2013 at 04:15:05PM +0100, Christoffer Dall wrote:
+> > On Thu, May 2, 2013 at 8:03 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > > On Thu, May 02, 2013 at 03:39:00PM +0100, Marc Zyngier wrote:
+> > >> Patch 5a677ce044f1 (ARM: KVM: switch to a dual-step HYP init code)
+> > >> introduced code that flushes page tables to the point of coherency.
+> > >> This is overkill (point of unification is enough and already done),
+> > >> and actually not required if running on a SMP capable platform
+> > >> (the HW PTW can snoop other cpus' L1).
+> > >>
+> > >> Remove this code and let ae8a8b9553bd (ARM: 7691/1: mm: kill unused
+> > >> TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead) turn it into
+> > >> a no-op for SMP ARMv7.
+> > >>
+> > >> Reported-by: Catalin Marinas <catalin.marinas@arm.com>
+> > >> Cc: Will Deacon <will.deacon@arm.com>
+> > >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > >> ---
+> > >>  arch/arm/kvm/mmu.c | 3 ---
+> > >>  1 file changed, 3 deletions(-)
+> > >>
+> > >> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> > >> index 4a838db..d79b594 100644
+> > >> --- a/arch/arm/kvm/mmu.c
+> > >> +++ b/arch/arm/kvm/mmu.c
+> > >> @@ -234,7 +234,6 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
+> > >>               pte = pte_offset_kernel(pmd, addr);
+> > >>               kvm_set_pte(pte, pfn_pte(pfn, prot));
+> > >>               get_page(virt_to_page(pte));
+> > >> -             kvm_flush_dcache_to_poc(pte, sizeof(*pte));
+> > >>               pfn++;
+> > >>       } while (addr += PAGE_SIZE, addr != end);
+> > >
+> > > Could you remove the flushing code out of kvm_set_pte, then flush the range
+> > > after the loop? Then you get one flush and one barrier for the whole range.
+> > >
+> > that would be different from how it's done in the rest of the kernel
+> > where you're expecting set_pte to do the necessary flushing for you,
+> > no?
 > 
-> So we also have the same snippet in kvm_arch_vcpu_ioctl_run().
+> Correct, but since kvm_set_pte seems only to be called from this file, I'm
+> not sure you need to match thes rest of the kernel.
 > 
-> Can you create a static function (kvm_vcpu_initialized?) containing that
-> code and make all three sites use it?
+> > instead, if this optimization is worth it, the code could just use
+> > pte_val(pte) = XX;
 > 
-Andre, will you re-spin your patch as per Marc's comments?
+> or just *pte = XX;
+> 
+That won't work with STRICT_M_TYPECHECKS though will it?
 
-Thanks,
 -Christoffer
