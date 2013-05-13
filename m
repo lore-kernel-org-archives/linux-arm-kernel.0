@@ -1,50 +1,54 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 13 May 2013 13:30:17 -0400
-Subject: [PATCH 0/3] ARM: Kirkwood: Add DT support for (eSATA) Sheevaplug
-In-Reply-To: <1366660500-26835-1-git-send-email-gmbnomis@gmail.com>
-References: <1366660500-26835-1-git-send-email-gmbnomis@gmail.com>
-Message-ID: <20130513173017.GV31290@titan.lakedaemon.net>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 13 May 2013 13:36:59 -0400
+Subject: [PATCH V2 2/3] Documentation: virtio: Add emergency write
+ (emerg_wr) config register in virtio console.
+In-Reply-To: <CAAHg+Hi6BHqwOznnC9qxkc5pBWz7r5qpz9Nhh=EeNenhjhHohg@mail.gmail.com>
+References: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
+ <1367842791-30285-3-git-send-email-pranavkumar@linaro.org>
+ <8761yn382w.fsf@rustcorp.com.au>
+ <CAAHg+Hi6BHqwOznnC9qxkc5pBWz7r5qpz9Nhh=EeNenhjhHohg@mail.gmail.com>
+Message-ID: <519124BB.9030709@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 22, 2013 at 09:54:57PM +0200, Simon Baatz wrote:
-> These patches add DT support for the Sheevaplugs by Globalscale
-> Technologies.  There exists two versions, one with an eSATA port and
-> one without.
-> 
-> Surprisingly, the conversion was not straight forward. In the eSATA
-> version (board revision 1.3), the CD and WP pins are connected to GPIO
-> lines, but I could not get this to work.  Apparently, I am not the only
-> one ([1]).  I found that the pins are reversed on my hardware and use
-> different active low/active high settings.
-> 
-> Thus, the first patch adds support for the GPIO active low/high flag in
-> DT to the mvsdio driver.
-> 
-> With that, everything except the Gigabit Ethernet can be described in
-> the DTS.  I have split the DTS and the board support files into two
-> patches.  This way, we can drop the last patch once we can describe
-> everything in the DTS or we can squash them together if we don't want
-> to wait.
-> 
-> I could only test on an eSATA Sheevaplug. I found patches with
-> different LEDs for the Sheevaplug.  Thus, I would highly appreciate if
-> someone with the hardware could give this a spin on a non-eSATA
-> version.  Some additional testing of the change detect and write
-> protect behaviour for sdio can't hurt either.  I hope that there aren't
-> board revisions with different CD/WP pins out there.
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2011-August/062567.html
-> 
-> Simon Baatz (3):
->   mmc: mvsdio: Support inverted CD and WP GPIO lines
->   ARM: Kirkwood: Add dts files for Sheevaplug and eSATA Sheevaplug
->   ARM: Kirkwood: Add DT support for Sheevaplug and Sheevaplug eSATA
+Hi Pranavkumar,
 
-Simon,
+On 05/13/2013 02:56 AM, Pranavkumar Sawargaonkar wrote:
+> Hi Rusty,
+> 
+> On 13 May 2013 08:22, Rusty Russell <rusty@rustcorp.com.au> wrote:
+>> Pranavkumar Sawargaonkar <pranavkumar@linaro.org> writes:
+>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>>> ---
+>>>  Documentation/virtual/virtio-spec.txt |    8 +++++++-
+>>>  1 file changed, 7 insertions(+), 1 deletion(-)
+>>
+>> OK, I applied this to the lyx master, with three changes:
+>> 1) Changed "filed" to "field".
+>> 2) Added ", or even acknowledging the feature" after "without
+>>    initializing virtio queues".
+>> 3) Added an initial point to the Device Initialization section:
+>>
+>>    1. If the VIRTIO_CONSOLE_F_EMERG_WRITE feature is offered, the
+>>    emerg_wr field of the configuration can be written at any time. Thus
+>>    it should work for very early boot debugging output as well as
+>>    catastophic OS failures (eg. virtio ring corruption).
+> 
+> Thanks for applying this patch.
+> Have you also applied first patch ([PATCH V2 1/3] virtio: console: Add
+> emergency writeonly register to config space)
+> with this?  (https://lkml.org/lkml/2013/5/6/169)
 
-Were you able to find any time to work on this?
+You seem to have omitted copying virtualization at lists.linux-foundation.org,
+the mailing list documented in the MAINTAINERS file as appropriate for changes
+relating to the virtio console driver.
 
-thx,
+[...]
 
-Jason.
+Christopher
+
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
