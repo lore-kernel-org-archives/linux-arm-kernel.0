@@ -1,61 +1,65 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 13 May 2013 17:25:50 +0400
-Subject: [PATCH 3/3] ARM: mach-shmobile: lager: support GPIO switches
-In-Reply-To: <1368435233-8587-4-git-send-email-horms+renesas@verge.net.au>
-References: <1368435233-8587-1-git-send-email-horms+renesas@verge.net.au>
- <1368435233-8587-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <5190E9DE.6000502@cogentembedded.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 13 May 2013 15:47:16 +0200
+Subject: [PATCH 2/3] mmc: mmci: Adapt to register write restrictions
+In-Reply-To: <1368452837-31458-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1368452837-31458-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1368452837-31458-3-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-05-2013 12:53, Simon Horman wrote:
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-> The lager board has pins 1 - 4 of SW2 wired up to GPIO pins.
-> This patch allows access to those pins as KEYS 1 - 4 using
-> gpio-keys.
+After a write to the MMCICLOCK register data cannot be written to this
+register for three feedback clock cycles. Writes to the MMCIPOWER
+register must be separated by three MCLK cycles. Previously no issues
+has been observered, but using higher ARM clock frequencies on STE-
+platforms has triggered this problem.
 
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+The MMCICLOCK register is written to in .set_ios and for some data
+transmissions for SDIO. We do not need a delay at the data transmission
+path, because sending and receiving data will require more than three
+clock cycles. Then we use a simple logic to only delay in .set_ios and
+thus we don't affect throughput performance.
 
-[...]
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Johan Rudholm <jrudholm@gmail.com>
+---
+ drivers/mmc/host/mmci.c |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-> index 6a1ba38..4d1b42b 100644
-> --- a/arch/arm/mach-shmobile/board-lager.c
-> +++ b/arch/arm/mach-shmobile/board-lager.c
-[...]
-> @@ -52,6 +55,22 @@ static struct gpio_led_platform_data lager_leds_pdata = {
->   	.num_leds	= ARRAY_SIZE(lager_leds),
->   };
->
-> +/* GPIO KEY */
-> +#define GPIO_KEY(c, g, d, ...) \
-> +	{ .code = c, .gpio = g, .desc = d, .active_low = 1 }
-> +
-> +static struct gpio_keys_button gpio_buttons[] = {
-> +	GPIO_KEY(KEY_4,		RCAR_GP_PIN(1, 28),	"SW2-pin4"),
-> +	GPIO_KEY(KEY_3,		RCAR_GP_PIN(1, 26),	"SW2-pin3"),
-> +	GPIO_KEY(KEY_2,		RCAR_GP_PIN(1, 24),	"SW2-pin2"),
-> +	GPIO_KEY(KEY_1,		RCAR_GP_PIN(1, 14),	"SW2-pin1"),
-> +};
-> +
-> +static struct gpio_keys_platform_data lager_keys_pdata = {
-
-    You forgot to annotate this with __initdata.
-
-> +	.buttons	= gpio_buttons,
-> +	.nbuttons	= ARRAY_SIZE(gpio_buttons),
-> +};
-> +
->   static const struct pinctrl_map lager_pinctrl_map[] = {
->   	/* SCIF0 (CN19: DEBUG SERIAL0) */
->   	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
-> @@ -73,6 +92,9 @@ static void __init lager_add_standard_devices(void)
->   	platform_device_register_data(&platform_bus, "leds-gpio", -1,
->   				      &lager_leds_pdata,
->   				      sizeof(lager_leds_pdata));
-> +	platform_device_register_data(&platform_bus, "gpio-keys", -1,
-> +				      &lager_keys_pdata,
-> +				      sizeof(lager_keys_pdata));
->   }
-
-WBR, Sergei
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 98b0c16..7815816 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -166,6 +166,21 @@ static int mmci_validate_data(struct mmci_host *host,
+ 	return 0;
+ }
+ 
++static void mmci_reg_delay(struct mmci_host *host)
++{
++	/*
++	 * According to the spec, at least three feedback clock cycles
++	 * of max 52 MHz must pass between two writes to the MMCICLOCK reg.
++	 * Three MCLK clock cycles must pass between two MMCIPOWER reg writes.
++	 * Worst delay time during card init is at 100 kHz => 30 us.
++	 * Worst delay time when up and running is at 25 MHz => 120 ns.
++	 */
++	if (host->cclk < 20000000)
++		udelay(30);
++	else
++		ndelay(120);
++}
++
+ /*
+  * This must be called with host->lock held
+  */
+@@ -1212,6 +1227,7 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 
+ 	mmci_set_clkreg(host, ios->clock);
+ 	mmci_write_pwrreg(host, pwr);
++	mmci_reg_delay(host);
+ 
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ 
+-- 
+1.7.10
