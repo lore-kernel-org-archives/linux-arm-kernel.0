@@ -1,9 +1,8 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 13 May 2013 22:16:25 +0400
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 13 May 2013 20:18:07 +0200
 Subject: [PATCH RFC] clk: Introduce userspace clock driver
-In-Reply-To: <519112F9.2010102@gmail.com>
-References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
- <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
+In-Reply-To: <af51c63e-7ff1-4e73-9305-08309217ab38@TX2EHSMHS037.ehs.local>
+References: <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
  <20130510212422.GY3200@sirena.org.uk>
  <7e18bed3-ae6b-4aa0-bf23-b6c61ba8b85b@CO9EHSMHS030.ehs.local>
  <20130512143344.GC3200@sirena.org.uk>
@@ -11,29 +10,54 @@ References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
  <20130513052135.GD6836@sirena.org.uk>
  <0bf5a185-86f7-4a93-a90f-42caefb06a1d@TX2EHSMHS009.ehs.local>
  <519112F9.2010102@gmail.com>
-Message-ID: <20130513181625.GB14811@sirena.org.uk>
+ <7c5e7537-6ed5-4622-a7a9-bf46820ef695@VA3EHSMHS033.ehs.local>
+ <519124D3.2040403@gmail.com>
+ <af51c63e-7ff1-4e73-9305-08309217ab38@TX2EHSMHS037.ehs.local>
+Message-ID: <51912E5F.9090401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 06:21:13PM +0200, Sebastian Hesselbarth wrote:
-> On 05/13/13 18:09, S?ren Brinkmann wrote:
+On 05/13/13 19:58, S?ren Brinkmann wrote:
+> On Mon, May 13, 2013 at 07:37:23PM +0200, Sebastian Hesselbarth wrote:
+>> It is, as it will only expose clocks on Zynq and that's what Mark and
+>> Mike are worried about. Expose clocks to user space and you will have
+>> people mess with it for sure.
+> Well, even if you contain it in that driver you can still mess with
+> other clocks. Just give it the "wrong" input clock references in DT and
+> you are free to control them. As I said before, there is no protection
+> against such misuse.
 
-> >Well, that driver actually exists. But that just programs a bitstream
-> >you give it to program. It does not know anything about the design it
-> >programs and cannot make any kind of decision whether the clocks should
-> >be userspace controlled or not.
+Put the wrong clock in DT is not "misuse" but "bug" ;) More important,
+it is quite static as you cannot change it easily by echo'ing into some
+sysfs file. And to inject a DT you need access on boot loader level,
+not kernel user space (yet).
 
-> what Mark wants to point out is that you add fabric clocks to the Xilinx
-> driver instead. This way, you will have user-space controllable clocks
-> but only if you loaded the xilinx driver first.
+>> About the shape of it, I didn't expect that to change at all. Just
+>> wondering, if it still requires you to manually end it's endianess
+>> mess with the bitfiles. If you go at it, consider reading the magic
+>> hidden in the bitfile and swap it when it is required. But that will
+>> go OT here.
+> It still takes byteswapped, binary images as input, unfortunately.
 
-Yup, that's part of it.  Though I have to say that if all we can do is
-stuff a bitstream in there there is the question about how anything that
-does require a real driver gets that driver instantiated...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130513/ebf2a680/attachment.sig>
+Please, if you ever mainline any kernel driver for it, make it
+auto-swap.
+
+>> If you don't want to merge both drivers, have a Zynq-only clock
+>> fabric driver instead?
+> That was my original intention. But due to the nature of it, it will
+> always be possible to use it with other clocks too. Hence my generic
+> approach.
+
+I already tried a generic "expose clocks to user space" and failed for
+the very same reasons Mike and Mark are repeating over and over again -
+and I agree with them.
+
+> I actually like the idea of making it part of the device config driver.
+> The downside of it is, that this driver seems a bit far from mainline.
+
+Have a skeleton driver that exposes Zynq clocks first and implement
+device config later? IIRC, device config isn't that complicated to
+implement. Unfortunately, interpreting Xilinx datasheets or source code
+is.
+
+Sebastian
