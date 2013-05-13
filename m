@@ -1,66 +1,84 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 13 May 2013 10:33:22 +0900
-Subject: [PATCH] ARM: shmobile: r8a7778: correct model name in Kconfig
-In-Reply-To: <87obcfn350.wl%kuninori.morimoto.gx@renesas.com>
-References: <201305090405.41053.sergei.shtylyov@cogentembedded.com>
- <20130510082055.GB27435@verge.net.au>
- <518D4CCF.5040706@cogentembedded.com>
- <87obcfn350.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20130513013320.GD7826@verge.net.au>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Mon, 13 May 2013 09:56:31 +0800
+Subject: [PATCH] ARM: DMA-mapping: mark all !DMA_TO_DEVICE pages in
+ unmapping as clean
+In-Reply-To: <1367572365-18905-1-git-send-email-ming.lei@canonical.com>
+References: <1367572365-18905-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <CACVXFVMSibWd2+QG88QypJC0KYYE0oyyyt4iHpdnK5YR4AN-6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 12, 2013 at 05:18:41PM -0700, Kuninori Morimoto wrote:
-> 
-> Hi
-> 
-> > >> The correct model name is R-Car M1A or R8A77781; R8A77780 corresponds to R-Car
-> > >> M1S which is a SH based SoC.
-> > >>
-> > >> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > > Morimoto-san,
-> > >
-> > > please review this change.
-> > >
-> > 
-> >     This patch was based on the info found on this official Renesas webpage:
-> > 
-> > http://www.renesas.eu/applications/automotive/cis/cis_highend/rcar_m1as/index.jsp
-> 
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> 
+Hello,
 
-Thanks, I have queued-up the following in the soc-r8a7778 branch.
-There was a trivial conflict which I resolved. Please let me know
-if I messed it up.
+On Fri, May 3, 2013 at 5:12 PM, Ming Lei <ming.lei@canonical.com> wrote:
+> It is common for one sg to include many pages, so mark all these
+> pages as clean to avoid unnecessary flushing on them in
+> set_pte_at() or update_mmu_cache().
+>
+> The patch might improve loading performance of applciation code a bit.
+>
+> On the below test code to read file(~1GByte size) from usb mass storage
+> disk to buffer created with mmap(PROT_READ | PROT_EXEC) on
+> Pandaboard, average ~1% improvement can be observed with the patch on
+> 10 times test.
+>
+>
+> #define _GNU_SOURCE
+>
+> #include <fcntl.h>
+> #include <stdio.h>
+> #include <unistd.h>
+> #include <stdlib.h>
+> #include <sys/mman.h>
+> #include <sys/stat.h>
+> #include <string.h>
+> #include <assert.h>
+>
+> unsigned int sum = 0;
+>
+> static unsigned long tv_diff(struct timeval *tv1, struct timeval *tv2)
+> {
+>         return (tv2->tv_sec - tv1->tv_sec) * 1000000 +
+>                 (tv2->tv_usec - tv1->tv_usec);
+> }
+>
+> int main(int argc, char *argv[])
+> {
+>         char *mbuffer;
+>         int fd;
+>         int i;
+>         unsigned long page_size, size;
+>         struct stat stat;
+>         struct timeval t1, t2;
+>
+>         page_size = getpagesize();
+>         fd = open(argv[1], O_RDONLY);
+>         assert(fd >= 0);
+>
+>         fstat(fd, &stat);
+>         size = stat.st_size;
+>         printf("%s: file %s, file size %lu, page size %lu\n", argv[0],
+>                 read_filename, size, page_size);
+>
+>         gettimeofday(&t1, NULL);
+>         mbuffer = mmap(NULL, size, PROT_READ | PROT_EXEC, MAP_SHARED, fd, 0);
+>         for (i = 0 ; i < size ; i += page_size)
+>                 sum += mbuffer[i];
+>         munmap(mbuffer, page_size);
+>         gettimeofday(&t2, NULL);
+>         printf("\tread mmaped time: %luus\n", tv_diff(&t1, &t2));
+>
+>         close(fd);
+> }
+>
+> Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Ming Lei <ming.lei@canonical.com>
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Gentle ping, :-)
 
-ARM: shmobile: r8a7778: correct model name in Kconfig
-
-The correct model name is R-Car M1A or R8A77781; R8A77780 corresponds to R-Car
-M1S which is a SH based SoC.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-[horms+renesas at verge.net.au: manually applied to soc-r8a7778 branch]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 3e7ad45..3c463ff 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -36,7 +36,7 @@ config ARCH_R8A7740
- 	select RENESAS_INTC_IRQPIN
- 
- config ARCH_R8A7778
--	bool "R-Car M1 (R8A77780)"
-+	bool "R-Car M1A (R8A77781)"
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select CPU_V7
- 	select SH_CLK_CPG
--- 
-1.8.2.1
+Thanks,
+--
+Ming Lei
