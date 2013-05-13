@@ -1,38 +1,59 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Mon, 13 May 2013 09:48:25 -0400
-Subject: Introduce a new helper framework for buffer synchronization
-In-Reply-To: <028a01ce4fd4$5ec6f000$1c54d000$%dae@samsung.com>
-References: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
- <51909DB4.2060208@canonical.com>
- <025201ce4fbb$363d0390$a2b70ab0$%dae@samsung.com>
- <5190B7D8.3010803@canonical.com>
- <027a01ce4fcc$5e7c7320$1b755960$%dae@samsung.com>
- <5190D14A.7050904@canonical.com>
- <028a01ce4fd4$5ec6f000$1c54d000$%dae@samsung.com>
-Message-ID: <CAF6AEGvWazezZdLDn5=H8wNQdQSWV=EmqE1a4wh7QwrT_h6vKQ@mail.gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 13 May 2013 15:56:33 +0200
+Subject: [PATCH] mmc: mmci: Use devm_clk_get API
+Message-ID: <1368453393-1272-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 8:21 AM, Inki Dae <inki.dae@samsung.com> wrote:
->
->> In that case you still wouldn't give userspace control over the fences. I
->> don't see any way that can end well.
->> What if userspace never signals? What if userspace gets killed by oom
->> killer. Who keeps track of that?
->>
->
-> In all cases, all kernel resources to user fence will be released by kernel
-> once the fence is timed out: never signaling and process killing by oom
-> killer makes the fence timed out. And if we use mmap mechanism you mentioned
-> before, I think user resource could also be freed properly.
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
+Converting to devm_clk_get simplifies error handling in probe
+and we can remove other corresponding calls to clk_put.
 
-I tend to agree w/ Maarten here.. there is no good reason for
-userspace to be *signaling* fences.  The exception might be some blob
-gpu drivers which don't have enough knowledge in the kernel to figure
-out what to do.  (In which case you can add driver private ioctls for
-that.. still not the right thing to do but at least you don't make a
-public API out of it.)
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ drivers/mmc/host/mmci.c |    8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-BR,
--R
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index f4f3038..d57ce43 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -1362,16 +1362,15 @@ static int mmci_probe(struct amba_device *dev,
+ 	dev_dbg(mmc_dev(mmc), "designer ID = 0x%02x\n", host->hw_designer);
+ 	dev_dbg(mmc_dev(mmc), "revision = 0x%01x\n", host->hw_revision);
+ 
+-	host->clk = clk_get(&dev->dev, NULL);
++	host->clk = devm_clk_get(&dev->dev, NULL);
+ 	if (IS_ERR(host->clk)) {
+ 		ret = PTR_ERR(host->clk);
+-		host->clk = NULL;
+ 		goto host_free;
+ 	}
+ 
+ 	ret = clk_prepare_enable(host->clk);
+ 	if (ret)
+-		goto clk_free;
++		goto host_free;
+ 
+ 	host->plat = plat;
+ 	host->variant = variant;
+@@ -1576,8 +1575,6 @@ static int mmci_probe(struct amba_device *dev,
+ 	iounmap(host->base);
+  clk_disable:
+ 	clk_disable_unprepare(host->clk);
+- clk_free:
+-	clk_put(host->clk);
+  host_free:
+ 	mmc_free_host(mmc);
+  rel_regions:
+@@ -1623,7 +1620,6 @@ static int mmci_remove(struct amba_device *dev)
+ 
+ 		iounmap(host->base);
+ 		clk_disable_unprepare(host->clk);
+-		clk_put(host->clk);
+ 
+ 		mmc_free_host(mmc);
+ 
+-- 
+1.7.10
