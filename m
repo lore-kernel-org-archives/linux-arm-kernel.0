@@ -1,86 +1,50 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Mon, 13 May 2013 11:07:24 +0200
-Subject: [PATCH] documentation: iommu: add description of ARM System MMU
- binding
-In-Reply-To: <5189635A.8090504@codeaurora.org>
-References: <20130408092535.GA17476@mudshark.cambridge.arm.com>
- <5162F87A.7070409@codeaurora.org>
- <20130410173732.GQ26992@mudshark.cambridge.arm.com>
- <5169C7D1.8070300@codeaurora.org>
- <20130415131341.GG9827@mudshark.cambridge.arm.com>
- <516D9602.2010404@codeaurora.org>
- <20130418190131.GA12344@mudshark.cambridge.arm.com>
- <5177113D.7060300@codeaurora.org>
- <20130424095501.GC21850@mudshark.cambridge.arm.com>
- <5189635A.8090504@codeaurora.org>
-Message-ID: <20130513090724.GA10369@alberich>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 13 May 2013 10:08:12 +0100
+Subject: [PATCH] ARM: KVM: Handle loads from I/O addresses to PC
+In-Reply-To: <1368385135-60584-1-git-send-email-cdall@cs.columbia.edu>
+References: <1368385135-60584-1-git-send-email-cdall@cs.columbia.edu>
+Message-ID: <5190AD7C.2000501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 07, 2013 at 04:26:02PM -0400, Olav Haugan wrote:
-> Hi Will,
+On 12/05/13 19:58, Christoffer Dall wrote:
+> If a VM does something like this:
 > 
-> On 4/24/2013 2:55 AM, Will Deacon wrote:
-> > On Tue, Apr 23, 2013 at 11:54:53PM +0100, Olav Haugan wrote:
-> >> On 4/18/2013 12:01 PM, Will Deacon wrote:
-> > Getting phandles has no dependencies on anything -- the only dependency is
-> > that the device is added to the bus on which the SMMU sits, just like every
-> > other IOMMU driver.
-> > 
-> >>> Why would a page table shared between devices require multiple context
-> >>> banks? Multiple SMRs and S2CRs, sure, but they would ultimately point at the
-> >>> same context bank (and hence same address space).
-> >>
-> >> What if you want to have 2 different VMID's being generated? Also, what
-> >> about TLB management? If I have two context banks I can invalidate only
-> >> entries associated with 1 of the context banks (if VMID differ for the
-> >> two context banks).
-> > 
-> > Huh? We allocate one VMID per domain. If you want more VMIDs, use more
-> > domains. TLB invalidation is per-domain, so there's no issue there.
+> ldr     pc, [r0]        @ r0 is an I/O address
 > 
-> If we allocate a new domain you would have another address space (page
-> table), no? I was just trying to figure out if your binding proposal
-> would allow for 2 context banks in one domain which it does not seem to
-> support.
+> Then simply let that value load into the PC on kvm_handle_mmio_return
+> overwriting the PC value set from kvm_skip_instr.
 > 
-> >>> If a master needs to be in two address spaces at once, then it will need to
-> >>> attach it's StreamIDs to different domains. You can't place a single
-> >>> StreamID in two address spaces (this is an architectural constraint).
-> >>
-> >> Yes, you would have a separate domain. I am just wondering how I would
-> >> model this in DT using the bindings that you are proposing? How does it
-> >> work? The bindings specify bus masters to StreamIDs. So if I call attach
-> >> with the master device you will allocate a context bank and program the
-> >> StreamIDs as specified in the DT. So now if I want to have another
-> >> context bank associated with the same master device what do I do? I call
-> >> into attach with a new domain but with the same master device but the
-> >> master device is already attached to a context/domain.
-> > 
-> > Why would you want to place a StreamID into two domains? That doesn't make
-> > any sense and isn't even supported by the architecture (things like
-> > conflicting SMR entries may not even be reported).
+> Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
+
+I've had a slightly more complete patch in my tree for a while (look at
+bef0ef01ae75 on the kvm-arm64/kvm-3.10-rc0 branch).
+
+> ---
+>  arch/arm/kvm/mmio.c |    6 ------
+>  1 file changed, 6 deletions(-)
 > 
-> I think you misunderstood me. I am talking about having for example 1
-> master with two (2) context banks so that StreamID "1" goes to CB0 and
-> StreamID "2" goes to CB1. This means that the master device is attached
-> to two different domains. How do I model this with the the device tree
-> bindings?
+> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+> index 72a12f2..b8e06b7 100644
+> --- a/arch/arm/kvm/mmio.c
+> +++ b/arch/arm/kvm/mmio.c
+> @@ -86,12 +86,6 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	sign_extend = kvm_vcpu_dabt_issext(vcpu);
+>  	rt = kvm_vcpu_dabt_get_rd(vcpu);
+>  
+> -	if (kvm_vcpu_reg_is_pc(vcpu, rt)) {
+> -		/* IO memory trying to read/write pc */
+> -		kvm_inject_pabt(vcpu, kvm_vcpu_get_hfar(vcpu));
+> -		return 1;
+> -	}
+> -
+>  	mmio->is_write = is_write;
+>  	mmio->phys_addr = fault_ipa;
+>  	mmio->len = len;
+> 
 
-Hi Olav,
+Otherwise looks good to me.
 
-I think with the proposed device tree binding you can't model this.
-
-Do we have such use cases already? Or what future use cases would
-require this?
-
-I can imagine of multiple contexts per device for stuff similar to
-what PASID in PCI Express are used for.
-
-But in such a case you probably want to have some configurable bits in
-the StreamID (that should be set by an SMMU driver). And the DT
-binding should contain the number of contexts that a master device can
-support.
-
-
-Andreas
+	M.
+-- 
+Jazz is not dead. It just smells funny...
