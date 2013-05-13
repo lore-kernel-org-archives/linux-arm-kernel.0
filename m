@@ -1,28 +1,35 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Mon, 13 May 2013 15:42:57 -0700
-Subject: [PATCH v2] ARM: KVM: prevent NULL pointer dereferences with KVM
- VCPU ioctl
-In-Reply-To: <519167D3.4030600@linaro.org>
-References: <1368052086-25059-1-git-send-email-andre.przywara@linaro.org>
- <20130513055253.GC64337@ubuntu> <519167D3.4030600@linaro.org>
-Message-ID: <CAEDV+gKTYCh8zTPJAxSmwhuyWo7K5Ej75giryR-pv5oqHdURSQ@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 13 May 2013 19:09:18 -0400
+Subject: [PATCH V2 07/10] ARM: mvebu: Use standard MMC binding for all
+ users of mvsdio
+In-Reply-To: <1368479941-10084-8-git-send-email-gmbnomis@gmail.com>
+References: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
+ <1368479941-10084-8-git-send-email-gmbnomis@gmail.com>
+Message-ID: <20130513230918.GG31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 3:23 PM, Andre Przywara
-<andre.przywara@linaro.org> wrote:
-> ooks like a natural candidate, but unfortunately struct kvm_vcpu is opaque
-> here, so dereferencing it does not work without further changes which I do
-> not deem to be justified. I used kvm_coproc.h instead, which is loosely
-> related (KVM_[SG]ET_ONE_REG) and just simply works. If you don't think
-> that's appropriate, just drop me a note. Patch follows in a separate mail.
+On Mon, May 13, 2013 at 11:18:58PM +0200, Simon Baatz wrote:
+> In order to prepare the switch to the standard MMC device tree parser
+> for mvsdio, adapt all current uses of mvsdio in the dts files to the
+> standard format.
+> 
+> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+> ---
+...
+> diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+> index 7588241..bf3a58c 100644
+> --- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
+> +++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+> @@ -136,7 +136,7 @@
+>  			pinctrl-0 = <&pmx_sdio &pmx_sdio_cd>;
+>  			pinctrl-names = "default";
+>  			status = "okay";
+> -			cd-gpios = <&gpio1 15 0>;
+> +			cd-gpios = <&gpio1 15 1>;
 
-eh, not crazy about the idea. x86 has
-arch/x86/include/asm/kvm_guest.h, which may be the most appropriate,
-or this could be generalized to other architectures as well and
-included in include/linux/kvm_host.h.
+Is this a bugfix that should be backported?
 
-we can just stick it in arch/arm/kvm/arm.c for now and move later if
-need be, no need to create a fuzz.
+thx,
 
--Christoffer
+Jason.
