@@ -1,59 +1,24 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Mon, 13 May 2013 15:56:33 +0200
-Subject: [PATCH] mmc: mmci: Use devm_clk_get API
-Message-ID: <1368453393-1272-1-git-send-email-ulf.hansson@stericsson.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 13 May 2013 10:13:44 -0400 (EDT)
+Subject: [PATCh V10 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
+In-Reply-To: <1368424303-10629-5-git-send-email-chao.xie@marvell.com>
+Message-ID: <Pine.LNX.4.44L0.1305131012090.1389-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On Mon, 13 May 2013, Chao Xie wrote:
 
-Converting to devm_clk_get simplifies error handling in probe
-and we can remove other corresponding calls to clk_put.
+> Originaly, ehci driver will call the callbacks in platform data
+> for PHY initialization and shut down.
+> With PHY driver, it will call the APIs provided by PHY driver
+> for PHY initialization and shutdown. It removes the callbacks
+> in platform data, and at same time it removes one block in the
+> way of enabling device tree for ehci driver.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/host/mmci.c |    8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+I wonder if this is the sort of thing that should be handled in 
+ehci-hcd.c rather than in all the different platform glue drivers.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index f4f3038..d57ce43 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1362,16 +1362,15 @@ static int mmci_probe(struct amba_device *dev,
- 	dev_dbg(mmc_dev(mmc), "designer ID = 0x%02x\n", host->hw_designer);
- 	dev_dbg(mmc_dev(mmc), "revision = 0x%01x\n", host->hw_revision);
- 
--	host->clk = clk_get(&dev->dev, NULL);
-+	host->clk = devm_clk_get(&dev->dev, NULL);
- 	if (IS_ERR(host->clk)) {
- 		ret = PTR_ERR(host->clk);
--		host->clk = NULL;
- 		goto host_free;
- 	}
- 
- 	ret = clk_prepare_enable(host->clk);
- 	if (ret)
--		goto clk_free;
-+		goto host_free;
- 
- 	host->plat = plat;
- 	host->variant = variant;
-@@ -1576,8 +1575,6 @@ static int mmci_probe(struct amba_device *dev,
- 	iounmap(host->base);
-  clk_disable:
- 	clk_disable_unprepare(host->clk);
-- clk_free:
--	clk_put(host->clk);
-  host_free:
- 	mmc_free_host(mmc);
-  rel_regions:
-@@ -1623,7 +1620,6 @@ static int mmci_remove(struct amba_device *dev)
- 
- 		iounmap(host->base);
- 		clk_disable_unprepare(host->clk);
--		clk_put(host->clk);
- 
- 		mmc_free_host(mmc);
- 
--- 
-1.7.10
+Felipe, what do you think?  Are the required actions now sufficiently 
+generic that a single source file can take care of them?
+
+Alan Stern
