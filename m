@@ -1,7 +1,7 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 13 May 2013 16:25:29 -0400
-Subject: [GIT PULL] ARM: mvebu: cleanups for v3.11 (round 1)
-Message-ID: <20130513202529.GD31290@titan.lakedaemon.net>
+Date: Mon, 13 May 2013 16:29:32 -0400
+Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.11 (round 1)
+Message-ID: <20130513202932.GE31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,23 +12,21 @@ The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
 are available in the git repository at:
 
-  git://git.infradead.org/users/jcooper/linux.git tags/cleanup-3.11-1
+  git://git.infradead.org/users/jcooper/linux.git tags/defconfig-3.11-1
 
-for you to fetch changes up to 49ed97f751bfaea133ae5c44f1247db09b9ca144:
+for you to fetch changes up to 366c0b76416ed15feb90ba4ef0bd8f03d62d1091:
 
-  ARM: Orion: Remove redundant init_dma_coherent_pool_size() (2013-05-13 19:35:39 +0000)
-
-----------------------------------------------------------------
-mvebu cleanup for v3.11 (round 1)
-
- - orion5x/kirkwood/mvebu
-    - remove init_dma_coherent_pool_size() as it's no longer needed
+  ARM: mvebu: Add support for USB storage class in mvebu_defconfig (2013-05-13 20:06:06 +0000)
 
 ----------------------------------------------------------------
-Andrew Lunn (1):
-      ARM: Orion: Remove redundant init_dma_coherent_pool_size()
+mvebu defconfig changes for v3.11 (round 1)
 
- arch/arm/mach-kirkwood/common.c     | 6 ------
- arch/arm/mach-mvebu/armada-370-xp.c | 7 -------
- arch/arm/mach-orion5x/common.c      | 7 -------
- 3 files changed, 20 deletions(-)
+ - mvebu
+    - add usb-storage to mvebu_defconfig
+
+----------------------------------------------------------------
+Ezequiel Garcia (1):
+      ARM: mvebu: Add support for USB storage class in mvebu_defconfig
+
+ arch/arm/configs/mvebu_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
