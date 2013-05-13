@@ -1,9 +1,10 @@
 From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 13 May 2013 14:07:04 +0300
-Subject: [PATCH 5/6] ARM: tegra114: create a DT header defining CLK IDs
+Date: Mon, 13 May 2013 14:07:05 +0300
+Subject: [PATCH 6/6] ARM: tegra114: convert device tree files to use CLK
+ defines
 In-Reply-To: <1368443225-16978-1-git-send-email-hdoyu@nvidia.com>
 References: <1368443225-16978-1-git-send-email-hdoyu@nvidia.com>
-Message-ID: <1368443225-16978-6-git-send-email-hdoyu@nvidia.com>
+Message-ID: <1368443225-16978-7-git-send-email-hdoyu@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,633 +15,327 @@ Replace magic number in tegra_car:
 
 Signed-off-by: Hiroshi Doyu <hdoyu@nvidia.com>
 ---
- .../bindings/clock/nvidia,tegra114-car.txt         | 250 +--------------
- include/dt-bindings/clk/tegra114-car.h             | 342 +++++++++++++++++++++
- 2 files changed, 345 insertions(+), 247 deletions(-)
- create mode 100644 include/dt-bindings/clk/tegra114-car.h
+ arch/arm/boot/dts/tegra114-dalmore.dts |  4 +-
+ arch/arm/boot/dts/tegra114.dtsi        | 79 +++++++++++++++++++---------------
+ 2 files changed, 47 insertions(+), 36 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt b/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt
-index d6cb083..5177196 100644
---- a/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt
-+++ b/Documentation/devicetree/bindings/clock/nvidia,tegra114-car.txt
-@@ -3,6 +3,8 @@ NVIDIA Tegra114 Clock And Reset Controller
- This binding uses the common clock binding:
- Documentation/devicetree/bindings/clock/clock-bindings.txt
+diff --git a/arch/arm/boot/dts/tegra114-dalmore.dts b/arch/arm/boot/dts/tegra114-dalmore.dts
+index 59695f01..cfcb3e2 100644
+--- a/arch/arm/boot/dts/tegra114-dalmore.dts
++++ b/arch/arm/boot/dts/tegra114-dalmore.dts
+@@ -957,7 +957,9 @@
  
-+You can find the actual assignment in "dt-bindings/clk/tegra114-car.h"
-+
- The CAR (Clock And Reset) Controller on Tegra is the HW module responsible
- for muxing and gating Tegra's clocks, and setting their rates.
+ 		nvidia,hp-det-gpios = <&gpio TEGRA_GPIO(R, 7) GPIO_ACTIVE_HIGH>;
  
-@@ -14,252 +16,6 @@ Required properties :
- - #clock-cells : Should be 1.
-   In clock consumers, this cell represents the clock ID exposed by the CAR.
- 
--  The first 160 clocks are numbered to match the bits in the CAR's CLK_OUT_ENB
--  registers. These IDs often match those in the CAR's RST_DEVICES registers,
--  but not in all cases. Some bits in CLK_OUT_ENB affect multiple clocks. In
--  this case, those clocks are assigned IDs above 160 in order to highlight
--  this issue. Implementations that interpret these clock IDs as bit values
--  within the CLK_OUT_ENB or RST_DEVICES registers should be careful to
--  explicitly handle these special cases.
--
--  The balance of the clocks controlled by the CAR are assigned IDs of 160 and
--  above.
--
--  0	unassigned
--  1	unassigned
--  2	unassigned
--  3	unassigned
--  4	rtc
--  5	timer
--  6	uarta
--  7	unassigned	(register bit affects uartb and vfir)
--  8	unassigned
--  9	sdmmc2
--  10	unassigned	(register bit affects spdif_in and spdif_out)
--  11	i2s1
--  12	i2c1
--  13	ndflash
--  14	sdmmc1
--  15	sdmmc4
--  16	unassigned
--  17	pwm
--  18	i2s2
--  19	epp
--  20	unassigned	(register bit affects vi and vi_sensor)
--  21	2d
--  22	usbd
--  23	isp
--  24	3d
--  25	unassigned
--  26	disp2
--  27	disp1
--  28	host1x
--  29	vcp
--  30	i2s0
--  31	unassigned
--
--  32	unassigned
--  33	unassigned
--  34	apbdma
--  35	unassigned
--  36	kbc
--  37	unassigned
--  38	unassigned
--  39	unassigned	(register bit affects fuse and fuse_burn)
--  40	kfuse
--  41	sbc1
--  42	nor
--  43	unassigned
--  44	sbc2
--  45	unassigned
--  46	sbc3
--  47	i2c5
--  48	dsia
--  49	unassigned
--  50	mipi
--  51	hdmi
--  52	csi
--  53	unassigned
--  54	i2c2
--  55	uartc
--  56	mipi-cal
--  57	emc
--  58	usb2
--  59	usb3
--  60	msenc
--  61	vde
--  62	bsea
--  63	bsev
--
--  64	unassigned
--  65	uartd
--  66	unassigned
--  67	i2c3
--  68	sbc4
--  69	sdmmc3
--  70	unassigned
--  71	owr
--  72	afi
--  73	csite
--  74	unassigned
--  75	unassigned
--  76	la
--  77	trace
--  78	soc_therm
--  79	dtv
--  80	ndspeed
--  81	i2cslow
--  82	dsib
--  83	tsec
--  84	unassigned
--  85	unassigned
--  86	unassigned
--  87	unassigned
--  88	unassigned
--  89	xusb_host
--  90	unassigned
--  91	msenc
--  92	csus
--  93	unassigned
--  94	unassigned
--  95	unassigned	(bit affects xusb_dev and xusb_dev_src)
--
--  96	unassigned
--  97	unassigned
--  98	unassigned
--  99	mselect
--  100	tsensor
--  101	i2s3
--  102	i2s4
--  103	i2c4
--  104	sbc5
--  105	sbc6
--  106	d_audio
--  107	apbif
--  108	dam0
--  109	dam1
--  110	dam2
--  111	hda2codec_2x
--  112	unassigned
--  113	audio0_2x
--  114	audio1_2x
--  115	audio2_2x
--  116	audio3_2x
--  117	audio4_2x
--  118	spdif_2x
--  119	actmon
--  120	extern1
--  121	extern2
--  122	extern3
--  123	unassigned
--  124	unassigned
--  125	hda
--  126	unassigned
--  127	se
--
--  128	hda2hdmi
--  129	unassigned
--  130	unassigned
--  131	unassigned
--  132	unassigned
--  133	unassigned
--  134	unassigned
--  135	unassigned
--  136	unassigned
--  137	unassigned
--  138	unassigned
--  139	unassigned
--  140	unassigned
--  141	unassigned
--  142	unassigned
--  143	unassigned	(bit affects xusb_falcon_src, xusb_fs_src,
--			 xusb_host_src and xusb_ss_src)
--  144	cilab
--  145	cilcd
--  146	cile
--  147	dsialp
--  148	dsiblp
--  149	unassigned
--  150	dds
--  151	unassigned
--  152	dp2
--  153	amx
--  154	adx
--  155	unassigned	(bit affects dfll_ref and dfll_soc)
--  156	xusb_ss
--
--  192	uartb
--  193	vfir
--  194	spdif_in
--  195	spdif_out
--  196	vi
--  197	vi_sensor
--  198	fuse
--  199	fuse_burn
--  200	clk_32k
--  201	clk_m
--  202	clk_m_div2
--  203	clk_m_div4
--  204	pll_ref
--  205	pll_c
--  206	pll_c_out1
--  207	pll_c2
--  208	pll_c3
--  209	pll_m
--  210	pll_m_out1
--  211	pll_p
--  212	pll_p_out1
--  213	pll_p_out2
--  214	pll_p_out3
--  215	pll_p_out4
--  216	pll_a
--  217	pll_a_out0
--  218	pll_d
--  219	pll_d_out0
--  220	pll_d2
--  221	pll_d2_out0
--  222	pll_u
--  223	pll_u_480M
--  224	pll_u_60M
--  225	pll_u_48M
--  226	pll_u_12M
--  227	pll_x
--  228	pll_x_out0
--  229	pll_re_vco
--  230	pll_re_out
--  231	pll_e_out0
--  232	spdif_in_sync
--  233	i2s0_sync
--  234	i2s1_sync
--  235	i2s2_sync
--  236	i2s3_sync
--  237	i2s4_sync
--  238	vimclk_sync
--  239	audio0
--  240	audio1
--  241	audio2
--  242	audio3
--  243	audio4
--  244	spdif
--  245	clk_out_1
--  246	clk_out_2
--  247	clk_out_3
--  248	blink
--  252	xusb_host_src
--  253	xusb_falcon_src
--  254	xusb_fs_src
--  255	xusb_ss_src
--  256	xusb_dev_src
--  257	xusb_dev
--  258	xusb_hs_src
--  259	sclk
--  260	hclk
--  261	pclk
--  262	cclk_g
--  263	cclk_lp
--  264	dfll_ref
--  265	dfll_soc
--
- Example SoC include file:
- 
- / {
-@@ -270,7 +26,7 @@ Example SoC include file:
- 	};
- 
- 	usb at c5004000 {
--		clocks = <&tegra_car 58>; /* usb2 */
-+		clocks = <&tegra_car TEGRA114_CLK_USB2>; /* usb2 */
+-		clocks = <&tegra_car 216>, <&tegra_car 217>, <&tegra_car 120>;
++		clocks = <&tegra_car TEGRA114_CLK_PLL_A>,
++		       	 <&tegra_car TEGRA114_CLK_PLL_A_OUT0>,
++			 <&tegra_car TEGRA114_CLK_EXTERN1>;
+ 		clock-names = "pll_a", "pll_a_out0", "mclk";
  	};
  };
+diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
+index 15d1b58..1d3127e 100644
+--- a/arch/arm/boot/dts/tegra114.dtsi
++++ b/arch/arm/boot/dts/tegra114.dtsi
+@@ -1,5 +1,6 @@
+ #include <dt-bindings/gpio/tegra-gpio.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/clk/tegra114-car.h>
  
-diff --git a/include/dt-bindings/clk/tegra114-car.h b/include/dt-bindings/clk/tegra114-car.h
-new file mode 100644
-index 0000000..83ea208
---- /dev/null
-+++ b/include/dt-bindings/clk/tegra114-car.h
-@@ -0,0 +1,342 @@
-+/*
-+ * This header provides constants for binding nvidia,tegra114-car.
-+ *
-+ * The first 160 clocks are numbered to match the bits in the CAR's CLK_OUT_ENB
-+ * registers. These IDs often match those in the CAR's RST_DEVICES registers,
-+ * but not in all cases. Some bits in CLK_OUT_ENB affect multiple clocks. In
-+ * this case, those clocks are assigned IDs above 160 in order to highlight
-+ * this issue. Implementations that interpret these clock IDs as bit values
-+ * within the CLK_OUT_ENB or RST_DEVICES registers should be careful to
-+ * explicitly handle these special cases.
-+ *
-+ * The balance of the clocks controlled by the CAR are assigned IDs of 160 and
-+ * above.
-+ */
-+
-+#ifndef _DT_BINDINGS_CLK_TEGRA114_CAR_H
-+#define _DT_BINDINGS_CLK_TEGRA114_CAR_H
-+
-+/* 0 */
-+/* 1 */
-+/* 2 */
-+/* 3 */
-+#define TEGRA114_CLK_RTC 4
-+#define TEGRA114_CLK_TIMER 5
-+#define TEGRA114_CLK_UARTA 6
-+/* 7 (register bit affects uartb and vfir) */
-+/* 8 */
-+#define TEGRA114_CLK_SDMMC2 9
-+/* 10 (register bit affects spdif_in and spdif_out) */
-+#define TEGRA114_CLK_I2S1 11
-+#define TEGRA114_CLK_I2C1 12
-+#define TEGRA114_CLK_NDFLASH 13
-+#define TEGRA114_CLK_SDMMC1 14
-+#define TEGRA114_CLK_SDMMC4 15
-+/* 16 */
-+#define TEGRA114_CLK_PWM 17
-+#define TEGRA114_CLK_I2S2 18
-+#define TEGRA114_CLK_EPP 19
-+/* 20 (register bit affects vi and vi_sensor) */
-+#define TEGRA114_CLK_GR_2D 21
-+#define TEGRA114_CLK_USBD 22
-+#define TEGRA114_CLK_ISP 23
-+#define TEGRA114_CLK_GR_3D 24
-+/* 25 */
-+#define TEGRA114_CLK_DISP2 26
-+#define TEGRA114_CLK_DISP1 27
-+#define TEGRA114_CLK_HOST1X 28
-+#define TEGRA114_CLK_VCP 29
-+#define TEGRA114_CLK_I2S0 30
-+/* 31 */
-+
-+/* 32 */
-+/* 33 */
-+#define TEGRA114_CLK_APBDMA 34
-+/* 35 */
-+#define TEGRA114_CLK_KBC 36
-+/* 37 */
-+/* 38 */
-+/* 39 (register bit affects fuse and fuse_burn) */
-+#define TEGRA114_CLK_KFUSE 40
-+#define TEGRA114_CLK_SBC1 41
-+#define TEGRA114_CLK_NOR 42
-+/* 43 */
-+#define TEGRA114_CLK_SBC2 44
-+/* 45 */
-+#define TEGRA114_CLK_SBC3 46
-+#define TEGRA114_CLK_I2C5 47
-+#define TEGRA114_CLK_DSIA 48
-+/* 49 */
-+#define TEGRA114_CLK_MIPI 50
-+#define TEGRA114_CLK_HDMI 51
-+#define TEGRA114_CLK_CSI 52
-+/* 53 */
-+#define TEGRA114_CLK_I2C2 54
-+#define TEGRA114_CLK_UARTC 55
-+#define TEGRA114_CLK_MIPI_CAL 56
-+#define TEGRA114_CLK_EMC 57
-+#define TEGRA114_CLK_USB2 58
-+#define TEGRA114_CLK_USB3 59
-+/* 60 */
-+#define TEGRA114_CLK_VDE 61
-+#define TEGRA114_CLK_BSEA 62
-+#define TEGRA114_CLK_BSEV 63
-+
-+/* 64 */
-+#define TEGRA114_CLK_UARTD 65
-+/* 66 */
-+#define TEGRA114_CLK_I2C3 67
-+#define TEGRA114_CLK_SBC4 68
-+#define TEGRA114_CLK_SDMMC3 69
-+/* 70 */
-+#define TEGRA114_CLK_OWR 71
-+/* 72 */
-+#define TEGRA114_CLK_CSITE 73
-+/* 74 */
-+/* 75 */
-+#define TEGRA114_CLK_LA 76
-+#define TEGRA114_CLK_TRACE 77
-+#define TEGRA114_CLK_SOC_THERM 78
-+#define TEGRA114_CLK_DTV 79
-+#define TEGRA114_CLK_NDSPEED 80
-+#define TEGRA114_CLK_I2CSLOW 81
-+#define TEGRA114_CLK_DSIB 82
-+#define TEGRA114_CLK_TSEC 83
-+/* 84 */
-+/* 85 */
-+/* 86 */
-+/* 87 */
-+/* 88 */
-+#define TEGRA114_CLK_XUSB_HOST 89
-+/* 90 */
-+#define TEGRA114_CLK_MSENC 91
-+#define TEGRA114_CLK_CSUS 92
-+/* 93 */
-+/* 94 */
-+/* 95 (bit affects xusb_dev and xusb_dev_src) */
-+
-+/* 96 */
-+/* 97 */
-+/* 98 */
-+#define TEGRA114_CLK_MSELECT 99
-+#define TEGRA114_CLK_TSENSOR 100
-+#define TEGRA114_CLK_I2S3 101
-+#define TEGRA114_CLK_I2S4 102
-+#define TEGRA114_CLK_I2C4 103
-+#define TEGRA114_CLK_SBC5 104
-+#define TEGRA114_CLK_SBC6 105
-+#define TEGRA114_CLK_D_AUDIO 106
-+#define TEGRA114_CLK_APBIF 107
-+#define TEGRA114_CLK_DAM0 108
-+#define TEGRA114_CLK_DAM1 109
-+#define TEGRA114_CLK_DAM2 110
-+#define TEGRA114_CLK_HDA2CODEC_2X 111
-+/* 112 */
-+#define TEGRA114_CLK_AUDIO0_2X 113
-+#define TEGRA114_CLK_AUDIO1_2X 114
-+#define TEGRA114_CLK_AUDIO2_2X 115
-+#define TEGRA114_CLK_AUDIO3_2X 116
-+#define TEGRA114_CLK_AUDIO4_2X 117
-+#define TEGRA114_CLK_SPDIF_2X 118
-+#define TEGRA114_CLK_ACTMON 119
-+#define TEGRA114_CLK_EXTERN1 120
-+#define TEGRA114_CLK_EXTERN2 121
-+#define TEGRA114_CLK_EXTERN3 122
-+/* 123 */
-+/* 124 */
-+#define TEGRA114_CLK_HDA 125
-+/* 126 */
-+#define TEGRA114_CLK_SE 127
-+
-+#define TEGRA114_CLK_HDA2HDMI 128
-+/* 129 */
-+/* 130 */
-+/* 131 */
-+/* 132 */
-+/* 133 */
-+/* 134 */
-+/* 135 */
-+/* 136 */
-+/* 137 */
-+/* 138 */
-+/* 139 */
-+/* 140 */
-+/* 141 */
-+/* 142 */
-+/* 143 (bit affects xusb_falcon_src, xusb_fs_src, */
-+/*      xusb_host_src and xusb_ss_src) */
-+#define TEGRA114_CLK_CILAB 144
-+#define TEGRA114_CLK_CILCD 145
-+#define TEGRA114_CLK_CILE 146
-+#define TEGRA114_CLK_DSIALP 147
-+#define TEGRA114_CLK_DSIBLP 148
-+/* 149 */
-+#define TEGRA114_CLK_DDS 150
-+/* 151 */
-+#define TEGRA114_CLK_DP2 152
-+#define TEGRA114_CLK_AMX 153
-+#define TEGRA114_CLK_ADX 154
-+/* 155 (bit affects dfll_ref and dfll_soc) */
-+#define TEGRA114_CLK_XUSB_SS 156
-+/* 157 */
-+/* 158 */
-+/* 159 */
-+
-+/* 160 */
-+/* 161 */
-+/* 162 */
-+/* 163 */
-+/* 164 */
-+/* 165 */
-+/* 166 */
-+/* 167 */
-+/* 168 */
-+/* 169 */
-+/* 170 */
-+/* 171 */
-+/* 172 */
-+/* 173 */
-+/* 174 */
-+/* 175 */
-+/* 176 */
-+/* 177 */
-+/* 178 */
-+/* 179 */
-+/* 180 */
-+/* 181 */
-+/* 182 */
-+/* 183 */
-+/* 184 */
-+/* 185 */
-+/* 186 */
-+/* 187 */
-+/* 188 */
-+/* 189 */
-+/* 190 */
-+/* 191 */
-+
-+#define TEGRA114_CLK_UARTB 192
-+#define TEGRA114_CLK_VFIR 193
-+#define TEGRA114_CLK_SPDIF_IN 194
-+#define TEGRA114_CLK_SPDIF_OUT 195
-+#define TEGRA114_CLK_VI 196
-+#define TEGRA114_CLK_VI_SENSOR 197
-+#define TEGRA114_CLK_FUSE 198
-+#define TEGRA114_CLK_FUSE_BURN 199
-+#define TEGRA114_CLK_CLK_32K 200
-+#define TEGRA114_CLK_CLK_M 201
-+#define TEGRA114_CLK_CLK_M_DIV2 202
-+#define TEGRA114_CLK_CLK_M_DIV4 203
-+#define TEGRA114_CLK_PLL_REF 204
-+#define TEGRA114_CLK_PLL_C 205
-+#define TEGRA114_CLK_PLL_C_OUT1 206
-+#define TEGRA114_CLK_PLL_C2 207
-+#define TEGRA114_CLK_PLL_C3 208
-+#define TEGRA114_CLK_PLL_M 209
-+#define TEGRA114_CLK_PLL_M_OUT1 210
-+#define TEGRA114_CLK_PLL_P 211
-+#define TEGRA114_CLK_PLL_P_OUT1 212
-+#define TEGRA114_CLK_PLL_P_OUT2 213
-+#define TEGRA114_CLK_PLL_P_OUT3 214
-+#define TEGRA114_CLK_PLL_P_OUT4 215
-+#define TEGRA114_CLK_PLL_A 216
-+#define TEGRA114_CLK_PLL_A_OUT0 217
-+#define TEGRA114_CLK_PLL_D 218
-+#define TEGRA114_CLK_PLL_D_OUT0 219
-+#define TEGRA114_CLK_PLL_D2 220
-+#define TEGRA114_CLK_PLL_D2_OUT0 221
-+#define TEGRA114_CLK_PLL_U 222
-+#define TEGRA114_CLK_PLL_U_480M 223
-+
-+#define TEGRA114_CLK_PLL_U_60M 224
-+#define TEGRA114_CLK_PLL_U_48M 225
-+#define TEGRA114_CLK_PLL_U_12M 226
-+#define TEGRA114_CLK_PLL_X 227
-+#define TEGRA114_CLK_PLL_X_OUT0 228
-+#define TEGRA114_CLK_PLL_RE_VCO 229
-+#define TEGRA114_CLK_PLL_RE_OUT 230
-+#define TEGRA114_CLK_PLL_E_OUT0 231
-+#define TEGRA114_CLK_SPDIF_IN_SYNC 232
-+#define TEGRA114_CLK_I2S0_SYNC 233
-+#define TEGRA114_CLK_I2S1_SYNC 234
-+#define TEGRA114_CLK_I2S2_SYNC 235
-+#define TEGRA114_CLK_I2S3_SYNC 236
-+#define TEGRA114_CLK_I2S4_SYNC 237
-+#define TEGRA114_CLK_VIMCLK_SYNC 238
-+#define TEGRA114_CLK_AUDIO0 239
-+#define TEGRA114_CLK_AUDIO1 240
-+#define TEGRA114_CLK_AUDIO2 241
-+#define TEGRA114_CLK_AUDIO3 242
-+#define TEGRA114_CLK_AUDIO4 243
-+#define TEGRA114_CLK_SPDIF 244
-+#define TEGRA114_CLK_CLK_OUT_1 245
-+#define TEGRA114_CLK_CLK_OUT_2 246
-+#define TEGRA114_CLK_CLK_OUT_3 247
-+#define TEGRA114_CLK_BLINK 248
-+/* 249 */
-+/* 250 */
-+/* 251 */
-+#define TEGRA114_CLK_XUSB_HOST_SRC 252
-+#define TEGRA114_CLK_XUSB_FALCON_SRC 253
-+#define TEGRA114_CLK_XUSB_FS_SRC 254
-+#define TEGRA114_CLK_XUSB_SS_SRC 255
-+
-+#define TEGRA114_CLK_XUSB_DEV_SRC 256
-+#define TEGRA114_CLK_XUSB_DEV 257
-+#define TEGRA114_CLK_XUSB_HS_SRC 258
-+#define TEGRA114_CLK_SCLK 259
-+#define TEGRA114_CLK_HCLK 260
-+#define TEGRA114_CLK_PCLK 261
-+#define TEGRA114_CLK_CCLK_G 262
-+#define TEGRA114_CLK_CCLK_LP 263
-+/* 264 */
-+/* 265 */
-+/* 266 */
-+/* 267 */
-+/* 268 */
-+/* 269 */
-+/* 270 */
-+/* 271 */
-+/* 272 */
-+/* 273 */
-+/* 274 */
-+/* 275 */
-+/* 276 */
-+/* 277 */
-+/* 278 */
-+/* 279 */
-+/* 280 */
-+/* 281 */
-+/* 282 */
-+/* 283 */
-+/* 284 */
-+/* 285 */
-+/* 286 */
-+/* 287 */
-+
-+/* 288 */
-+/* 289 */
-+/* 290 */
-+/* 291 */
-+/* 292 */
-+/* 293 */
-+/* 294 */
-+/* 295 */
-+/* 296 */
-+/* 297 */
-+/* 298 */
-+/* 299 */
-+#define TEGRA114_CLK_AUDIO0_MUX 300
-+#define TEGRA114_CLK_AUDIO1_MUX 301
-+#define TEGRA114_CLK_AUDIO2_MUX 302
-+#define TEGRA114_CLK_AUDIO3_MUX 303
-+#define TEGRA114_CLK_AUDIO4_MUX 304
-+#define TEGRA114_CLK_SPDIF_MUX 305
-+#define TEGRA114_CLK_CLK_OUT_1_MUX 306
-+#define TEGRA114_CLK_CLK_OUT_2_MUX 307
-+#define TEGRA114_CLK_CLK_OUT_3_MUX 308
-+#define TEGRA114_CLK_DSIA_MUX 309
-+#define TEGRA114_CLK_DSIB_MUX 310
-+#define TEGRA114_CLK_CLK_MAX 311
-+
-+#endif	/* _DT_BINDINGS_CLK_TEGRA114_CAR_H */
+ #include "skeleton.dtsi"
+ 
+@@ -35,7 +36,7 @@
+ 			     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&tegra_car 5>;
++		clocks = <&tegra_car TEGRA114_CLK_TIMER>;
+ 	};
+ 
+ 	tegra_car: clock {
+@@ -79,7 +80,7 @@
+ 			     <GIC_SPI 141 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&tegra_car 34>;
++		clocks = <&tegra_car TEGRA114_CLK_APBDMA>;
+ 	};
+ 
+ 	ahb: ahb {
+@@ -125,7 +126,7 @@
+ 		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+ 		nvidia,dma-request-selector = <&apbdma 8>;
+ 		status = "disabled";
+-		clocks = <&tegra_car 6>;
++		clocks = <&tegra_car TEGRA114_CLK_UARTA>;
+ 	};
+ 
+ 	uartb: serial at 70006040 {
+@@ -135,7 +136,7 @@
+ 		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+ 		nvidia,dma-request-selector = <&apbdma 9>;
+ 		status = "disabled";
+-		clocks = <&tegra_car 192>;
++		clocks = <&tegra_car TEGRA114_CLK_UARTB>;
+ 	};
+ 
+ 	uartc: serial at 70006200 {
+@@ -145,7 +146,7 @@
+ 		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+ 		nvidia,dma-request-selector = <&apbdma 10>;
+ 		status = "disabled";
+-		clocks = <&tegra_car 55>;
++		clocks = <&tegra_car TEGRA114_CLK_UARTC>;
+ 	};
+ 
+ 	uartd: serial at 70006300 {
+@@ -155,14 +156,14 @@
+ 		interrupts = <GIC_SPI 90 IRQ_TYPE_LEVEL_HIGH>;
+ 		nvidia,dma-request-selector = <&apbdma 19>;
+ 		status = "disabled";
+-		clocks = <&tegra_car 65>;
++		clocks = <&tegra_car TEGRA114_CLK_UARTD>;
+ 	};
+ 
+ 	pwm: pwm {
+ 		compatible = "nvidia,tegra114-pwm", "nvidia,tegra20-pwm";
+ 		reg = <0x7000a000 0x100>;
+ 		#pwm-cells = <2>;
+-		clocks = <&tegra_car 17>;
++		clocks = <&tegra_car TEGRA114_CLK_PWM>;
+ 		status = "disabled";
+ 	};
+ 
+@@ -172,7 +173,7 @@
+ 		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&tegra_car 12>;
++		clocks = <&tegra_car TEGRA114_CLK_I2C1>;
+ 		clock-names = "div-clk";
+ 		status = "disabled";
+ 	};
+@@ -183,7 +184,7 @@
+ 		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&tegra_car 54>;
++		clocks = <&tegra_car TEGRA114_CLK_I2C2>;
+ 		clock-names = "div-clk";
+ 		status = "disabled";
+ 	};
+@@ -194,7 +195,7 @@
+ 		interrupts = <GIC_SPI 92 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&tegra_car 67>;
++		clocks = <&tegra_car TEGRA114_CLK_I2C3>;
+ 		clock-names = "div-clk";
+ 		status = "disabled";
+ 	};
+@@ -205,7 +206,7 @@
+ 		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&tegra_car 103>;
++		clocks = <&tegra_car TEGRA114_CLK_I2C4>;
+ 		clock-names = "div-clk";
+ 		status = "disabled";
+ 	};
+@@ -216,7 +217,7 @@
+ 		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&tegra_car 47>;
++		clocks = <&tegra_car TEGRA114_CLK_I2C5>;
+ 		clock-names = "div-clk";
+ 		status = "disabled";
+ 	};
+@@ -228,7 +229,7 @@
+ 		nvidia,dma-request-selector = <&apbdma 15>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&tegra_car 41>;
++		clocks = <&tegra_car TEGRA114_CLK_SBC1>;
+ 		clock-names = "spi";
+ 		status = "disabled";
+ 	};
+@@ -240,7 +241,7 @@
+ 		nvidia,dma-request-selector = <&apbdma 16>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&tegra_car 44>;
++		clocks = <&tegra_car TEGRA114_CLK_SBC2>;
+ 		clock-names = "spi";
+ 		status = "disabled";
+ 	};
+@@ -252,7 +253,7 @@
+ 		nvidia,dma-request-selector = <&apbdma 17>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&tegra_car 46>;
++		clocks = <&tegra_car TEGRA114_CLK_SBC3>;
+ 		clock-names = "spi";
+ 		status = "disabled";
+ 	};
+@@ -264,7 +265,7 @@
+ 		nvidia,dma-request-selector = <&apbdma 18>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&tegra_car 68>;
++		clocks = <&tegra_car TEGRA114_CLK_SBC4>;
+ 		clock-names = "spi";
+ 		status = "disabled";
+ 	};
+@@ -276,7 +277,7 @@
+ 		nvidia,dma-request-selector = <&apbdma 27>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&tegra_car 104>;
++		clocks = <&tegra_car TEGRA114_CLK_SBC5>;
+ 		clock-names = "spi";
+ 		status = "disabled";
+ 	};
+@@ -288,7 +289,7 @@
+ 		nvidia,dma-request-selector = <&apbdma 28>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+-		clocks = <&tegra_car 105>;
++		clocks = <&tegra_car TEGRA114_CLK_SBC6>;
+ 		clock-names = "spi";
+ 		status = "disabled";
+ 	};
+@@ -297,21 +298,21 @@
+ 		compatible = "nvidia,tegra114-rtc", "nvidia,tegra20-rtc";
+ 		reg = <0x7000e000 0x100>;
+ 		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&tegra_car 4>;
++		clocks = <&tegra_car TEGRA114_CLK_RTC>;
+ 	};
+ 
+ 	kbc {
+ 		compatible = "nvidia,tegra114-kbc";
+ 		reg = <0x7000e200 0x100>;
+ 		interrupts = <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&tegra_car 36>;
++		clocks = <&tegra_car TEGRA114_CLK_KBC>;
+ 		status = "disabled";
+ 	};
+ 
+ 	pmc {
+ 		compatible = "nvidia,tegra114-pmc";
+ 		reg = <0x7000e400 0x400>;
+-		clocks = <&tegra_car 261>, <&clk32k_in>;
++		clocks = <&tegra_car TEGRA114_CLK_PCLK>, <&clk32k_in>;
+ 		clock-names = "pclk", "clk32k_in";
+ 	};
+ 
+@@ -336,11 +337,19 @@
+ 			<&apbdma 3>, <&apbdma 4>, <&apbdma 6>, <&apbdma 7>,
+ 			<&apbdma 12>, <&apbdma 13>, <&apbdma 14>,
+ 			<&apbdma 29>;
+-		clocks = <&tegra_car 106>, <&tegra_car 107>, <&tegra_car 30>,
+-			 <&tegra_car 11>, <&tegra_car 18>, <&tegra_car 101>,
+-			 <&tegra_car 102>, <&tegra_car 108>, <&tegra_car 109>,
+-			 <&tegra_car 110>, <&tegra_car 194>, <&tegra_car 153>,
+-			 <&tegra_car 154>;
++		clocks = <&tegra_car TEGRA114_CLK_D_AUDIO>,
++		       	 <&tegra_car TEGRA114_CLK_APBIF>,
++			 <&tegra_car TEGRA114_CLK_I2S0>,
++			 <&tegra_car TEGRA114_CLK_I2S1>,
++			 <&tegra_car TEGRA114_CLK_I2S2>,
++			 <&tegra_car TEGRA114_CLK_I2S3>,
++			 <&tegra_car TEGRA114_CLK_I2S4>,
++			 <&tegra_car TEGRA114_CLK_DAM0>,
++			 <&tegra_car TEGRA114_CLK_DAM1>,
++			 <&tegra_car TEGRA114_CLK_DAM2>,
++			 <&tegra_car TEGRA114_CLK_SPDIF_IN>,
++			 <&tegra_car TEGRA114_CLK_AMX>,
++			 <&tegra_car TEGRA114_CLK_ADX>;
+ 		clock-names = "d_audio", "apbif", "i2s0", "i2s1", "i2s2",
+ 			      "i2s3", "i2s4", "dam0", "dam1", "dam2",
+ 			      "spdif_in", "amx", "adx";
+@@ -352,7 +361,7 @@
+ 			compatible = "nvidia,tegra114-i2s", "nvidia,tegra30-i2s";
+ 			reg = <0x70080300 0x100>;
+ 			nvidia,ahub-cif-ids = <4 4>;
+-			clocks = <&tegra_car 30>;
++			clocks = <&tegra_car TEGRA114_CLK_I2S0>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -360,7 +369,7 @@
+ 			compatible = "nvidia,tegra114-i2s", "nvidia,tegra30-i2s";
+ 			reg = <0x70080400 0x100>;
+ 			nvidia,ahub-cif-ids = <5 5>;
+-			clocks = <&tegra_car 11>;
++			clocks = <&tegra_car TEGRA114_CLK_I2S1>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -368,7 +377,7 @@
+ 			compatible = "nvidia,tegra114-i2s", "nvidia,tegra30-i2s";
+ 			reg = <0x70080500 0x100>;
+ 			nvidia,ahub-cif-ids = <6 6>;
+-			clocks = <&tegra_car 18>;
++			clocks = <&tegra_car TEGRA114_CLK_I2S2>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -376,7 +385,7 @@
+ 			compatible = "nvidia,tegra114-i2s", "nvidia,tegra30-i2s";
+ 			reg = <0x70080600 0x100>;
+ 			nvidia,ahub-cif-ids = <7 7>;
+-			clocks = <&tegra_car 101>;
++			clocks = <&tegra_car TEGRA114_CLK_I2S3>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -384,7 +393,7 @@
+ 			compatible = "nvidia,tegra114-i2s", "nvidia,tegra30-i2s";
+ 			reg = <0x70080700 0x100>;
+ 			nvidia,ahub-cif-ids = <8 8>;
+-			clocks = <&tegra_car 102>;
++			clocks = <&tegra_car TEGRA114_CLK_I2S4>;
+ 			status = "disabled";
+ 		};
+ 	};
+@@ -393,7 +402,7 @@
+ 		compatible = "nvidia,tegra114-sdhci", "nvidia,tegra30-sdhci";
+ 		reg = <0x78000000 0x200>;
+ 		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&tegra_car 14>;
++		clocks = <&tegra_car TEGRA114_CLK_SDMMC1>;
+ 		status = "disable";
+ 	};
+ 
+@@ -401,7 +410,7 @@
+ 		compatible = "nvidia,tegra114-sdhci", "nvidia,tegra30-sdhci";
+ 		reg = <0x78000200 0x200>;
+ 		interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&tegra_car 9>;
++		clocks = <&tegra_car TEGRA114_CLK_SDMMC2>;
+ 		status = "disable";
+ 	};
+ 
+@@ -409,7 +418,7 @@
+ 		compatible = "nvidia,tegra114-sdhci", "nvidia,tegra30-sdhci";
+ 		reg = <0x78000400 0x200>;
+ 		interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&tegra_car 69>;
++		clocks = <&tegra_car TEGRA114_CLK_SDMMC3>;
+ 		status = "disable";
+ 	};
+ 
+@@ -417,7 +426,7 @@
+ 		compatible = "nvidia,tegra114-sdhci", "nvidia,tegra30-sdhci";
+ 		reg = <0x78000600 0x200>;
+ 		interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
+-		clocks = <&tegra_car 15>;
++		clocks = <&tegra_car TEGRA114_CLK_SDMMC4>;
+ 		status = "disable";
+ 	};
+ 
 -- 
 1.8.1.5
