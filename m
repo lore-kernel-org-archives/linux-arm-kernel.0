@@ -1,74 +1,29 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 13 May 2013 11:31:03 +0300
-Subject: [PATCH RFC] clk: Introduce userspace clock driver
-In-Reply-To: <CAPtuhTgsP4gvMAFoQb3icXAZw3ucSg4dfrAdJMho-VxNmNTvwg@mail.gmail.com>
-References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
- <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
- <518D320C.4010707@elopez.com.ar>
- <fe9e603e-a432-4a29-a195-fd393b875a7e@TX2EHSMHS006.ehs.local>
- <518D411D.9070209@elopez.com.ar>
- <CAPtuhTgsP4gvMAFoQb3icXAZw3ucSg4dfrAdJMho-VxNmNTvwg@mail.gmail.com>
-Message-ID: <20130513083103.GC7949@tbergstrom-lnx.Nvidia.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 13 May 2013 10:53:08 +0200
+Subject: [PATCH] ARM: sunxi: select ARCH_REQUIRE_GPIOLIB
+Message-ID: <1368435188-26965-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+CONFIG_SUNXI currently doesn't enable a gpiolib, which causes build
+problems when building a kernel with only the sunxi platform enabled.
+Select ARCH_REQUIRE_GPIOLIB to solve this.
 
-> >>>
-> >>> For debugging purposes, being able to change parents would be nice too.
-> >> This is difficult and I don't have a good solution for it, hence it's
-> >> missing. A clock consumer like a device driver or this driver, just
-> >> knows about it's input clock, but not about the topology further up.
-> >> Therefore it is pretty much impossible to implement reparent operations
-> >> in a clock consumer, IMHO.
-> >> IOW: For a given input clock, how do you figure out it's possible
-> >> parents?
-> >
-> > The parent is just a number
-> >
-> > int (*set_parent)(struct clk_hw *hw, u8 index);
-> > u8 (*get_parent)(struct clk_hw *hw);
-> >
-> > If you are debugging, you know what the possible parents are, and you
-> > can reparent with that information.
-> >
-> > After checking the clk code however, I didn't find any exposed way to
-> > reparent with just the parent indexes. Maybe an interface that takes a n
-> > arbitrary string representing the parent name, and gets that clock and
-> > then sets the parent would fit.
-> >
-> >>
-> >>> Maybe this belongs to debugfs instead of sysfs though.
-> >> Well, the more generic use-case probably. My Zynq use-case rather not,
-> >> IMHO.
-> >
-> > The framework already exposes some information on debugfs, maybe
-> > expanding that instead of implementing it as a consumer on sysfs would
-> > be best for the debugging use case. @Mike, what's your thoughts on this?
-> >
-> 
-> In the previous thread on this topic we discussed a generic approach
-> to exposing clock controls via debugfs.
-> 
-> One way to do it is to introduce a new config option,
-> CONFIG_COMMON_CLK_DEBUG_CONTROL that would expose the controls for
-> every clock in the existing debugfs infrastructure.  The downside to
-> this approach is that it would get abused and ship in millions of
-> Android products using horrible userspace hacks to control clocks.
-> Maybe that's not our problem to solve, maybe it is.
-> 
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/mach-sunxi/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-We are doing the same. I don't think we can prevent people from abusing this.
-If we don't provide it, they will just implement it themselves :)
-
-> If CONFIG_COMMON_CLK_DEBUG_CONTROL existed it might be a good idea to
-> intentionally break the abi compatibility with every new release.
-> That would certainly reinforce that this is not a condoned or stable
-> api (which is true for all debugfs).
-> 
-
-:) I would rather not have to change our automated tests for every new release
-though...
-
-Cheers,
-
-Peter.
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index d259c78..5b045e3 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -1,5 +1,6 @@
+ config ARCH_SUNXI
+ 	bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
++	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKSRC_MMIO
+ 	select CLKSRC_OF
+ 	select COMMON_CLK
+-- 
+1.8.1.2
