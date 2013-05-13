@@ -1,39 +1,102 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 13 May 2013 21:30:30 +0200 (CEST)
-Subject: [RFC 2/8] ARM:global_timer: Add ARM global timer support.
-In-Reply-To: <CACRpkdZCP=w=4Q3bnuMQxm=Oe-uZke+Cc5NgddM5vsQbgr9E-Q@mail.gmail.com>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
- <CACRpkdZCP=w=4Q3bnuMQxm=Oe-uZke+Cc5NgddM5vsQbgr9E-Q@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1305132114490.2863@ionos>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 13 May 2013 15:38:59 -0400
+Subject: [PATCH] ARM: Orion: Remove redundent init_dma_coherent_pool_size()
+In-Reply-To: <516F0AF1.2090905@free-electrons.com>
+References: <1352356737-14413-1-git-send-email-m.szyprowski@samsung.com>
+ <1352655079-1005-1-git-send-email-andrew@lunn.ch>
+ <20130417203806.GE27197@titan.lakedaemon.net>
+ <516F0AF1.2090905@free-electrons.com>
+Message-ID: <20130513193859.GW31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 May 2013, Linus Walleij wrote:
-> On Wed, May 8, 2013 at 4:11 PM, Srinivas KANDAGATLA
-> > +       clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
-> > +       clk->set_mode = gt_clockevent_set_mode;
-> > +       clk->set_next_event = gt_clockevent_set_next_event;
-> > +       this_cpu_clk = __this_cpu_ptr(gt_evt);
-> > +       *this_cpu_clk = clk;
-> > +       clk->irq = gt_ppi;
-> > +       clockevents_config_and_register(clk, gt_clk_rate,
-> > +                                       0xf, 0xffffffff);
+On Wed, Apr 17, 2013 at 10:49:53PM +0200, Gregory CLEMENT wrote:
+> On 04/17/2013 10:38 PM, Jason Cooper wrote:
+> > Andrew,
+> > 
+> > Now that we finally have Soren Moch's (sp? sorry) cache exhaustion
+> > solved, can we respin this for v3.11?  I'd like to include mvebu as well
+> > if possible.
 > 
-> Why can't this clock event handle anything lower than 0xf?
-> Does that come from the datasheet or have you just copied some
-> code?
+> For mvebu, I can do a follow-up patch, or Andrew can directly add it to his
+> patch.
+
+Applied to mvebu/cleanup with a few minor typo corrections and I added
+the hunk for mach-mvebu/.
+
+thx,
+
+Jason.
+
+
+> > On Sun, Nov 11, 2012 at 06:31:19PM +0100, Andrew Lunn wrote:
+> >> The patch:
+> >>
+> >> mm: dmapool: use provided gfp flags for all dma_alloc_coherent() calls
+> >>
+> >> makes these calls on Kirkword and Orion5x redundent. The drivers are
+> >> not making atomic requests for coherent memory and hence the default
+> >> pool size is now sufficient.
+> >>
+> >> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> >> ---
+> >>  arch/arm/mach-kirkwood/common.c |    7 -------
+> >>  arch/arm/mach-orion5x/common.c  |    7 -------
+> >>  2 files changed, 14 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+> >> index 2c6c218..8080ceb 100644
+> >> --- a/arch/arm/mach-kirkwood/common.c
+> >> +++ b/arch/arm/mach-kirkwood/common.c
+> >> @@ -505,13 +505,6 @@ void __init kirkwood_wdt_init(void)
+> >>  void __init kirkwood_init_early(void)
+> >>  {
+> >>  	orion_time_set_base(TIMER_VIRT_BASE);
+> >> -
+> >> -	/*
+> >> -	 * Some Kirkwood devices allocate their coherent buffers from atomic
+> >> -	 * context. Increase size of atomic coherent pool to make sure such
+> >> -	 * the allocations won't fail.
+> >> -	 */
+> >> -	init_dma_coherent_pool_size(SZ_1M);
+> >>  }
+> >>  
+> >>  int kirkwood_tclk;
+> >> diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+> >> index b3eb3da..3e07f52 100644
+> >> --- a/arch/arm/mach-orion5x/common.c
+> >> +++ b/arch/arm/mach-orion5x/common.c
+> >> @@ -194,13 +194,6 @@ void __init orion5x_wdt_init(void)
+> >>  void __init orion5x_init_early(void)
+> >>  {
+> >>  	orion_time_set_base(TIMER_VIRT_BASE);
+> >> -
+> >> -	/*
+> >> -	 * Some Orion5x devices allocate their coherent buffers from atomic
+> >> -	 * context. Increase size of atomic coherent pool to make sure such
+> >> -	 * the allocations won't fail.
+> >> -	 */
+> >> -	init_dma_coherent_pool_size(SZ_1M);
+> >>  }
+> >>  
+> >>  int orion5x_tclk;
+> >> -- 
+> >> 1.7.10.4
+> >>
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> Further, since this clock event hardware *most definately* supports
-> using a delta upper bound *beyond* 32 bits, I think the clock event
-> core code should be altered to allow for registereing such clock
-> events, but TGLX may have some idea here. This will work but will
-> not expose the full potential of this 64-bit counter hardware.
-
-That requires a full source tree sweep to change all set_next_event
-callbacks in one go. Easy to do with coccinelle, but that needs the
-proper timing, i.e. right after a -rc1.
-
-Thanks,
-
-	tglx
+> 
+> -- 
+> Gregory Clement, Free Electrons
+> Kernel, drivers, real-time and embedded Linux
+> development, consulting, training and support.
+> http://free-electrons.com
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
