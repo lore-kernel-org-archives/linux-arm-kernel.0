@@ -1,41 +1,41 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Mon, 13 May 2013 16:54:05 -0300
-Subject: [PATCH] ARM: sunxi: select ARCH_REQUIRE_GPIOLIB
-In-Reply-To: <1368435188-26965-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1368435188-26965-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <519144DD.1090101@elopez.com.ar>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 13 May 2013 12:56:33 -0700
+Subject: [PATCHv3 0/4] Memory mapped architected timers
+Message-ID: <1368474997-10859-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+This patchset adds support for memory mapped architected timers. We
+don't have any other global broadcast timer in our system, so we use the
+mmio timer during low power modes. The first patch is the binding.
+The next two patches lay some groundwork so that the last patch is simpler.
+The final patch adds support for mmio timers.
 
-El 13/05/13 05:53, Maxime Ripard escribi?:
-> CONFIG_SUNXI currently doesn't enable a gpiolib, which causes build
-> problems when building a kernel with only the sunxi platform enabled.
-> Select ARCH_REQUIRE_GPIOLIB to solve this.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  arch/arm/mach-sunxi/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> index d259c78..5b045e3 100644
-> --- a/arch/arm/mach-sunxi/Kconfig
-> +++ b/arch/arm/mach-sunxi/Kconfig
-> @@ -1,5 +1,6 @@
->  config ARCH_SUNXI
->  	bool "Allwinner A1X SOCs" if ARCH_MULTI_V7
-> +	select ARCH_REQUIRE_GPIOLIB
->  	select CLKSRC_MMIO
->  	select CLKSRC_OF
->  	select COMMON_CLK
-> 
+Patches are based on a patch from Mark that removes the
+physical count reading (clocksource: arch_timer: use virtual counter,
+message id <1364404312-4427-4-git-send-email-mark.rutland@arm.com>).
 
-Tested-by: Emilio L?pez <emilio@elopez.com.ar>
+Updates since v2:
+ * Rebased onto v3.10-rc1
 
-This fixes the build breakage I was seeing.
+Updates since v1:
+ * Assigned counter reading function and commented why for arm64
+ * Updated DT binding to replace frame-id with frame-number and use status
+   property
 
-Thanks!
+Stephen Boyd (4):
+  Documentation: Add memory mapped ARM architected timer binding
+  clocksource: arch_timer: Pass clock event to set_mode callback
+  clocksource: arch_timer: Push the read/write wrappers deeper
+  clocksource: arch_timer: Add support for memory mapped timers
 
-Emilio
+ .../devicetree/bindings/arm/arch_timer.txt         |  59 ++-
+ arch/arm/include/asm/arch_timer.h                  |   5 +-
+ arch/arm64/include/asm/arch_timer.h                |   4 +-
+ drivers/clocksource/arm_arch_timer.c               | 452 +++++++++++++++++----
+ include/clocksource/arm_arch_timer.h               |   4 +-
+ 5 files changed, 448 insertions(+), 76 deletions(-)
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
