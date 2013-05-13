@@ -1,181 +1,44 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Mon, 13 May 2013 08:46:44 -0700
-Subject: [PATCH v3 30/32] arm64: KVM: enable initialization of a 32bit vcpu
-In-Reply-To: <5190AC05.5000304@arm.com>
-References: <1365437854-30214-1-git-send-email-marc.zyngier@arm.com>
- <1365437854-30214-31-git-send-email-marc.zyngier@arm.com>
- <20130423230229.GN20569@gmail.com> <5177E303.7050801@arm.com>
- <CAEDV+g+OL+37w9jA8=0WGea5FgW5y3mazqFzv9GLxDgjCe6dtg@mail.gmail.com>
- <51892DA4.4050401@arm.com> <20130511003842.GE30999@chazy>
- <5190AC05.5000304@arm.com>
-Message-ID: <20130513154644.GA3529@ubuntu>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 13 May 2013 17:53:37 +0200
+Subject: [PATCH 09/14] ARM: mvebu: Remove init_irq declaration in machine
+ description
+In-Reply-To: <20130513151934.GM31290@titan.lakedaemon.net>
+References: <1368438253-28218-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1368438253-28218-10-git-send-email-maxime.ripard@free-electrons.com>
+ <20130513151934.GM31290@titan.lakedaemon.net>
+Message-ID: <51910C81.5050501@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 10:01:57AM +0100, Marc Zyngier wrote:
-> On 11/05/13 01:38, Christoffer Dall wrote:
-> > On Tue, May 07, 2013 at 05:36:52PM +0100, Marc Zyngier wrote:
-> >> On 24/04/13 18:17, Christoffer Dall wrote:
-> >>> On Wed, Apr 24, 2013 at 6:49 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >>>> On 24/04/13 00:02, Christoffer Dall wrote:
-> >>>>> On Mon, Apr 08, 2013 at 05:17:32PM +0100, Marc Zyngier wrote:
-> >>>>>> Wire the init of a 32bit vcpu by allowing 32bit modes in pstate,
-> >>>>>> and providing sensible defaults out of reset state.
-> >>>>>>
-> >>>>>> This feature is of course conditioned by the presence of 32bit
-> >>>>>> capability on the physical CPU, and is checked by the KVM_CAP_ARM_EL1_32BIT
-> >>>>>> capability.
-> >>>>>>
-> >>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>>>>> ---
-> >>>>>>  arch/arm64/include/asm/kvm_host.h |  2 +-
-> >>>>>>  arch/arm64/include/uapi/asm/kvm.h |  1 +
-> >>>>>>  arch/arm64/kvm/guest.c            |  6 ++++++
-> >>>>>>  arch/arm64/kvm/reset.c            | 25 ++++++++++++++++++++++++-
-> >>>>>>  include/uapi/linux/kvm.h          |  1 +
-> >>>>>>  5 files changed, 33 insertions(+), 2 deletions(-)
-> >>>>>>
-> >>>>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >>>>>> index d44064d..c3ec107 100644
-> >>>>>> --- a/arch/arm64/include/asm/kvm_host.h
-> >>>>>> +++ b/arch/arm64/include/asm/kvm_host.h
-> >>>>>> @@ -34,7 +34,7 @@
-> >>>>>>  #include <asm/kvm_vgic.h>
-> >>>>>>  #include <asm/kvm_arch_timer.h>
-> >>>>>>
-> >>>>>> -#define KVM_VCPU_MAX_FEATURES 1
-> >>>>>> +#define KVM_VCPU_MAX_FEATURES 2
-> >>>>>>
-> >>>>>>  /* We don't currently support large pages. */
-> >>>>>>  #define KVM_HPAGE_GFN_SHIFT(x)      0
-> >>>>>> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> >>>>>> index 5b1110c..5031f42 100644
-> >>>>>> --- a/arch/arm64/include/uapi/asm/kvm.h
-> >>>>>> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> >>>>>> @@ -75,6 +75,7 @@ struct kvm_regs {
-> >>>>>>  #define KVM_VGIC_V2_CPU_SIZE                0x2000
-> >>>>>>
-> >>>>>>  #define KVM_ARM_VCPU_POWER_OFF              0 /* CPU is started in OFF state */
-> >>>>>> +#define KVM_ARM_VCPU_EL1_32BIT              1 /* CPU running a 32bit VM */
-> >>>>>>
-> >>>>>>  struct kvm_vcpu_init {
-> >>>>>>      __u32 target;
-> >>>>>> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> >>>>>> index 47d3729..74ef7d5 100644
-> >>>>>> --- a/arch/arm64/kvm/guest.c
-> >>>>>> +++ b/arch/arm64/kvm/guest.c
-> >>>>>> @@ -93,6 +93,12 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> >>>>>>      if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
-> >>>>>>              unsigned long mode = (*(unsigned long *)valp) & COMPAT_PSR_MODE_MASK;
-> >>>>>>              switch (mode) {
-> >>>>>> +            case COMPAT_PSR_MODE_USR:
-> >>>>>> +            case COMPAT_PSR_MODE_FIQ:
-> >>>>>> +            case COMPAT_PSR_MODE_IRQ:
-> >>>>>> +            case COMPAT_PSR_MODE_SVC:
-> >>>>>> +            case COMPAT_PSR_MODE_ABT:
-> >>>>>> +            case COMPAT_PSR_MODE_UND:
-> >>>>>>              case PSR_MODE_EL0t:
-> >>>>>>              case PSR_MODE_EL1t:
-> >>>>>>              case PSR_MODE_EL1h:
-> >>>>>> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> >>>>>> index bc33e76..a282d35 100644
-> >>>>>> --- a/arch/arm64/kvm/reset.c
-> >>>>>> +++ b/arch/arm64/kvm/reset.c
-> >>>>>> @@ -35,11 +35,27 @@ static struct kvm_regs default_regs_reset = {
-> >>>>>>      .regs.pstate = PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
-> >>>>>>  };
-> >>>>>>
-> >>>>>> +static struct kvm_regs default_regs_reset32 = {
-> >>>>>> +    .regs.pstate = (COMPAT_PSR_MODE_SVC | COMPAT_PSR_A_BIT |
-> >>>>>> +                    COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
-> >>>>>> +};
-> >>>>>> +
-> >>>>>> +static bool cpu_has_32bit_el1(void)
-> >>>>>> +{
-> >>>>>> +    u64 pfr0;
-> >>>>>> +
-> >>>>>> +    pfr0 = read_cpuid(ID_AA64PFR0_EL1);
-> >>>>>> +    return !!(pfr0 & 0x20);
-> >>>>>
-> >>>>> again we don't need the double negation
-> >>>>
-> >>>> I still hold that it makes things more readable.
-> >>>>
-> >>>>>> +}
-> >>>>>> +
-> >>>>>>  int kvm_arch_dev_ioctl_check_extention(long ext)
-> >>>>>>  {
-> >>>>>>      int r;
-> >>>>>>
-> >>>>>>      switch (ext) {
-> >>>>>> +    case KVM_CAP_ARM_EL1_32BIT:
-> >>>>>> +            r = cpu_has_32bit_el1();
-> >>>>>> +            break;
-> >>>>>>      default:
-> >>>>>>              r = 0;
-> >>>>>>      }
-> >>>>>> @@ -62,7 +78,14 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
-> >>>>>>
-> >>>>>>      switch (vcpu->arch.target) {
-> >>>>>>      default:
-> >>>>>> -            cpu_reset = &default_regs_reset;
-> >>>>>> +            if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features)) {
-> >>>>>> +                    if (!cpu_has_32bit_el1())
-> >>>>>> +                            return -EINVAL;
-> >>>>>
-> >>>>> I'm not sure EINVAL is appropriate here, the value specified was not
-> >>>>> incorrect, it's that the hardware doesn't support it. ENXIO, ENODEV, and
-> >>>>> add that in Documentation/virtual/kvm/api.txt ?
-> >>>>
-> >>>> Not sure. If you ended up here, it means you tried to start a 32bit
-> >>>> guest on a 64bit-only CPU, despite KVM_CAP_ARM_EL1_32BIT telling you
-> >>>> that your CPU is not 32bit capable.
-> >>>>
-> >>>> This is clearly an invalid input, isn't it?
-> >>>>
-> >>> check the API documentation for this ioctl, I don't think that's the
-> >>> type of invalid input meant when describing the meaning of EINVAL. If
-> >>> you feel strongly about it of course it's no big deal, but I think
-> >>> EINVAL is so overloaded anyway that telling the user something more
-> >>> specific would be great, but I'll leave it up to you.
-> >>
-> >> [bit late on this one...]
-> >>
-> >> Here's what the documentation says:
-> >> <quote>
-> >> 4.77 KVM_ARM_VCPU_INIT
-> >>
-> >> Capability: basic
-> >> Architectures: arm, arm64
-> >> Type: vcpu ioctl
-> >> Parameters: struct struct kvm_vcpu_init (in)
-> >> Returns: 0 on success; -1 on error
-> >> Errors:
-> >>   EINVAL:    the target is unknown, or the combination of features is invalid.
-> >>   ENOENT:    a features bit specified is unknown.
-> >> </quote>
-> >>
-> >> When this call fails, it is because you've requested a feature
-> >> that is invalid for this CPU. To me, that exactly fits the
-> >> EINVAL entry copied above.
-> >>
-> >> Or am I completely misunderstanding it?
-> >>
-> > I read the EINVAL to say that you supplied something which is invalid
-> > for the software interface and you should fix your user space code.
-> 
-> Exactly. The code should have checked for the corresponding capability
-> before blindly requesting that feature. That's exactly why we have
-> capabilities.
-> 
-> > The fact that you're requesting a feature that your hardware doesn't
-> > support is a different thing IMHO.
-> 
-> Well, if you're allowed to call into this without checking the
-> capabilities, then I suggest we remove them, because they are clearly
-> superfluous.
-> 
-I still see a useful distinction, but I don't care enough to keep
-arguing.
+Hi Jason,
 
--Christoffer
+Le 13/05/2013 17:19, Jason Cooper a ?crit :
+> On Mon, May 13, 2013 at 11:44:08AM +0200, Maxime Ripard wrote:
+>> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
+>> specified") removed the need to explictly setup the init_irq field in
+>> the machine description when using only irqchip_init. Remove that
+>> declaration for mvebu as well.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> ---
+>>  arch/arm/mach-mvebu/armada-370-xp.c | 1 -
+>>  1 file changed, 1 deletion(-)
+> 
+> Maxime,
+> 
+> Do do want the individual submaintainers to take these?  Or, send one
+> branch to Arnd and Olof?  I'm fine with either one as any merge
+> conflicts should be trivial.
+
+I don't have a strong opinion on this one, I guess both will be fine.
+Arnd, Olof, what do you prefer?
+
+I'll probably have to send a v2 anyway, I forgot to remove the include
+of the irqchip headers.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
