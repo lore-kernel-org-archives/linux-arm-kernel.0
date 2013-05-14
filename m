@@ -1,59 +1,111 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 14 May 2013 17:23:35 -0500
-Subject: [RFC PATCH 1/2] ARM: delay: print dummy values for bogomips
-In-Reply-To: <alpine.LFD.2.03.1305141547180.31158@syhkavp.arg>
-References: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
- <1367602547-19322-2-git-send-email-will.deacon@arm.com>
- <20130506231554.GB16801@amd.pavel.ucw.cz>
- <5188B8B2.5030601@arm.com>
- <alpine.LFD.2.03.1305141547180.31158@syhkavp.arg>
-Message-ID: <CAL_Jsq+Q5UMGo3J+vKKCRU+w4Kj0YN0exs7UCWTEOxmFjWfo3g@mail.gmail.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 14 May 2013 15:46:33 -0700
+Subject: [PATCH] clk: Fix race condition between clk_set_parent and
+ clk_enable()
+In-Reply-To: <9066674.E2RzuEn3ap@flatron>
+References: <1367383328-25700-1-git-send-email-skannan@codeaurora.org>
+ <20130514185417.10068.5717@quantum> <9066674.E2RzuEn3ap@flatron>
+Message-ID: <5192BEC9.1040104@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 2:54 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> [ Yes, I'm late to the party ]
+On 05/14/2013 03:10 PM, Tomasz Figa wrote:
+> Hi,
 >
-> On Tue, 7 May 2013, Marc Zyngier wrote:
->
->> On 07/05/13 00:16, Pavel Machek wrote:
+> On Tuesday 14 of May 2013 11:54:17 Mike Turquette wrote:
+>> Quoting Saravana Kannan (2013-04-30 21:42:08)
 >>
->> Hi Pawel,
+>>> Without this patch, the following race conditions are possible.
+>>>
+>>> Race condition 1:
+>>> * clk-A has two parents - clk-X and clk-Y.
+>>> * All three are disabled and clk-X is current parent.
+>>> * Thread A: clk_set_parent(clk-A, clk-Y).
+>>> * Thread A: <snip execution flow>
+>>> * Thread A: Grabs enable lock.
+>>> * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
+>>> * Thread A: Updates clk-A SW parent to clk-Y
+>>> * Thread A: Releases enable lock.
+>>> * Thread B: clk_enable(clk-A).
+>>> * Thread B: clk_enable() enables clk-Y, then enabled clk-A and
+>>> returns.
+>>>
+>>> clk-A is now enabled in software, but not clocking in hardware since
+>>> the hardware parent is still clk-X.
+>>>
+>>> The only way to avoid race conditions between clk_set_parent() and
+>>> clk_enable/disable() is to ensure that clk_enable/disable() calls
+>>> don't
+>>> require changes to hardware enable state between changes to software
+>>> clock topology and hardware clock topology.
+>>>
+>>> There are options to achieve the above:
+>>> 1. Grab the enable lock before changing software/hardware topology and
+>>>
+>>>     release it afterwards.
+>>>
+>>> 2. Keep the clock enabled for the duration of software/hardware
+>>> topology>
+>>>     change so that any additional enable/disable calls don't try to
+>>>     change
+>>>     the hardware state. Once the topology change is complete, the clock
+>>>     can
+>>>     be put back in its original enable state.
+>>>
+>>> Option (1) is not an acceptable solution since the set_parent() ops
+>>> might need to sleep.
+>>>
+>>> Therefore, this patch implements option (2).
+>>>
+>>> This patch doesn't violate any API semantics. clk_disable() doesn't
+>>> guarantee that the clock is actually disabled. So, no clients of a
+>>> clock can assume that a clock is disabled after their last call to
+>>> clk_disable(). So, enabling the clock during a parent change is not a
+>>> violation of any API semantics.
+>>>
+>>> This also has the nice side effect of simplifying the error handling
+>>> code.
+>>>
+>>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
 >>
->> >> Now that we support a timer-backed delay loop, I'm quickly getting sick
->> >> and tired of people complaining that their beloved bogomips value has
->> >> decreased. You know who you are!
->> >
->> >> Unfortunately, we can't just remove the entry from /proc/cpuinfo, as it
->> >> will likely break fragile userspace code which is parsing that stuff, so
->> >> instead replace it with a dummy value that can be chosen in the
->> >> Kconfig.
->> >
->> > So, instead of removing it you silently report invalid value? Note
->>
->> Removing it would be an ABI breakage. Unfortunately.
+>> I've taken this patch into clk-next for testing.  The code itself looks
+>> fine.  The only thing that remains to be seen is if any platforms have a
+>> problem with disabled clocks getting turned on during a reparent
+>> operation.
 >
-> Did you really write this with a straight face?
+> IMHO this behavior should be documented somewhere, with a note that the
+> clock must not be prepared to keep it disabled during reparent operation
+> and possibly also pointing to the CLK_SET_PARENT_GATE flag.
+
+Reasonable request. I can update the documentation of clk_set_parent() 
+to indicate that the clock might get turned on for the duration of the 
+call and if they need a guarantee the GATE flag should be used.
+
 >
->> Name one userspace application that extracts meaningful information out
->> of the BogoMIPS field. Just one.
+>> On platforms that I have worked on this is OK, but I suppose there could
+>> be some platform out there where a clock is prepared and disabled, and
+>> briefly enabling the clock during the reparent operation somehow puts
+>> the hardware in a bad state.
 >
-> Waitaminute... Didn't you just claim this would be an ABI break?
+> Well, on any platform where default clock settings are not completely
+> correct this is likely to cause problems, because some device might get
+> too high frequency for some period of time, which might crash it alone as
+> well as the whole system.
 >
-> So if no application can be found, where is the ABI breakage?
 
-lscpu
+I don't think this is really a problem with this patch. It's present 
+even without this patch.
 
-But that is already "broken" on ARM because x86 uses "bogomips" and
-ARM uses "BogoMIPS". I agree reporting BogoMIPS is silly, but there
-are more differences between x86 and ARM. Somewhat meaningful fields
-like "cpu MHz" are missing on ARM for example. These are mainly useful
-for h/w inventory use which server folks tend to care about.
+The patch doesn't switch to some other unspecified parent. It only 
+switches between the new/old parent. Even without this patch, if a clock 
+is prepared while you reparent it, clk_enable() could be called at 
+anytime between the parent switch and the future clock API calls to set 
+up the new parent correctly. I think that's just crappy driver code to 
+switch to a new parent before setting it up correctly. There's 
+absolutely no good reason to do it that way.
 
-> This thread must be a joke.  Please just kill the damn thing out of
-> /proc/cpuinfo and see if any application notices.  And if some do then
-> they are already broken *today* and should be fixed.
+-Saravana
 
-And please do so for all arches then.
-
-Rob
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
