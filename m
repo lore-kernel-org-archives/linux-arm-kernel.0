@@ -1,99 +1,95 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 14 May 2013 15:51:23 +0200
-Subject: [RFC 2/4] dma: add dmaengine driver for Samsung s3c24xx SoCs
-In-Reply-To: <CACRpkda-wQyo8aYxbW9RJNcR3Kwe2w5AhaAuUHfaxBksa_Pm2A@mail.gmail.com>
-References: <201305111330.05046.heiko@sntech.de>
- <201305111331.25405.heiko@sntech.de>
- <CACRpkda-wQyo8aYxbW9RJNcR3Kwe2w5AhaAuUHfaxBksa_Pm2A@mail.gmail.com>
-Message-ID: <201305141551.24375.heiko@sntech.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 14 May 2013 15:13:32 +0100
+Subject: [PATCH v4 04/32] arm64: KVM: system register definitions for 64bit
+ guests
+In-Reply-To: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
+References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1368540840-26750-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 14. Mai 2013, 14:47:19 schrieb Linus Walleij:
-> On Sat, May 11, 2013 at 1:31 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> > Conceptually the s3c24xx-dma feels like a distant relative of the pl08x
-> > with numerous virtual channels being mapped to a lot less physical ones.
-> > The driver therefore borrows a lot from the amba-pl08x driver in this
-> > regard. Functionality-wise the driver gains a memcpy ability in addition
-> > to the slave_sg one.
-> > 
-> > The driver currently only supports the "newer" SoCs which can use any
-> > physical channel for any dma slave. Support for the older SoCs where
-> > each channel only supports a subset of possible dma slaves will have to
-> > be added later.
-> > 
-> > Tested on a s3c2416-based board, memcpy using the dmatest module and
-> > slave_sg partially using the spi-s3c64xx driver.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> So have I understood correctly if I assume that *some* S3C
-> variants, i.e. this: arch/arm/mach-s3c64xx/dma.c
-> have a vanilla, unmodified, or just slightly modified
-> PL08x block, while this DMAC is something probably based on
-> the PL08x where some ASIC engineer has had a good time hacking
-> around in the VHDL code to meet some feature requirements.
-> Correct? Or plausible guess?
+Define the saved/restored registers for 64bit guests.
 
-You're guess is at good as mine :-) . The public s3c64xx (ARM11 based) 
-documentation says that it is using s PL080 as dma controller while the 
-s3c24xx (ARM9 based) SoCs have this one, which doesn't come with any label in 
-the manuals.
-Similar to the s3c64xx using a vic, while the s3c24xx uses something 
-homegrown.
+Reviewed-by: Christopher Covington <cov@codeaurora.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/kvm_asm.h | 68 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_asm.h
 
-The relationship description was more based on the concepts used, i.e. the 
-virtual channel concept and general handling of dma transfers feel somehow 
-similar - as I said these are my first steps into this, so I still need to 
-understand a lot.
-
-
-> Exactly *how* far away from the pl08x hardware is it?
-> 
-> I guess you have already come to the conclusion that the
-> amba-pl08x.c driver cannot be augmented to handle this hardware
-> after some educated reading of that code?
-> 
-> But are really no parts reusable?
-> 
-> For example, if the LLIs have the same layout, could we split
-> out the LLI handling from amba-pl08x into a separate file and reuse
-> that?
-
-The s3c24xx-dma doesn't have these. You simply put source and destination 
-addresses on the bus, tell it the number of transfers and start it, while the 
-pl080 seems to split these then into the LLIs, which seems to be some kind of 
-hardware feature.
-
-For the rest, the register-layout of the controller is completely different (I 
-checked the PL080 manual), each channel has its own interrupt and the above 
-mentioned missing LLIs.
-
-Both drivers share somehow how they handle end of transfers, i.e. how they 
-reuse the physical channel for a possible waiting virtual channel. But it 
-didn't look like anything worth factoring out.
-
-
-> The more you share with amba-pl08x the better for everyone,
-> I am positively sure. And please include Russell on the review
-> chain, he wrote the virtual channel abstraction.
-
-I think the best feature is already factored out - the virtual channel 
-handling, which was very nice to have.
-
-I used the list from get_maintainer.pl, so sorry for forgetting Russel.
-
-
-> If I was given the option amongst S3C work I would definatley
-> have augmented the amba-pl08x.c to handle the stuff in
-> arch/arm/mach-s3c64xx/dma.c *first* then started to work on
-> this driver, but I guess you might not be working on s3c64xx?
-
-correct, my pet-project is s3c2416-based [0], so I haven't seen any other 
-Samsung stuff at all.
-
-
-Heiko
-
-
-[0] http://www.youtube.com/user/mmind81
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+new file mode 100644
+index 0000000..591ac21
+--- /dev/null
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -0,0 +1,68 @@
++/*
++ * Copyright (C) 2012,2013 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __ARM_KVM_ASM_H__
++#define __ARM_KVM_ASM_H__
++
++/*
++ * 0 is reserved as an invalid value.
++ * Order *must* be kept in sync with the hyp switch code.
++ */
++#define	MPIDR_EL1	1	/* MultiProcessor Affinity Register */
++#define	CSSELR_EL1	2	/* Cache Size Selection Register */
++#define	SCTLR_EL1	3	/* System Control Register */
++#define	ACTLR_EL1	4	/* Auxilliary Control Register */
++#define	CPACR_EL1	5	/* Coprocessor Access Control */
++#define	TTBR0_EL1	6	/* Translation Table Base Register 0 */
++#define	TTBR1_EL1	7	/* Translation Table Base Register 1 */
++#define	TCR_EL1		8	/* Translation Control Register */
++#define	ESR_EL1		9	/* Exception Syndrome Register */
++#define	AFSR0_EL1	10	/* Auxilary Fault Status Register 0 */
++#define	AFSR1_EL1	11	/* Auxilary Fault Status Register 1 */
++#define	FAR_EL1		12	/* Fault Address Register */
++#define	MAIR_EL1	13	/* Memory Attribute Indirection Register */
++#define	VBAR_EL1	14	/* Vector Base Address Register */
++#define	CONTEXTIDR_EL1	15	/* Context ID Register */
++#define	TPIDR_EL0	16	/* Thread ID, User R/W */
++#define	TPIDRRO_EL0	17	/* Thread ID, User R/O */
++#define	TPIDR_EL1	18	/* Thread ID, Privileged */
++#define	AMAIR_EL1	19	/* Aux Memory Attribute Indirection Register */
++#define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
++#define	NR_SYS_REGS	21
++
++#define ARM_EXCEPTION_IRQ	  0
++#define ARM_EXCEPTION_TRAP	  1
++
++#ifndef __ASSEMBLY__
++struct kvm;
++struct kvm_vcpu;
++
++extern char __kvm_hyp_init[];
++extern char __kvm_hyp_init_end[];
++
++extern char __kvm_hyp_vector[];
++
++extern char __kvm_hyp_code_start[];
++extern char __kvm_hyp_code_end[];
++
++extern void __kvm_flush_vm_context(void);
++extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
++
++extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
++#endif
++
++#endif /* __ARM_KVM_ASM_H__ */
+-- 
+1.8.2.3
