@@ -1,37 +1,40 @@
-From: anup.patel@linaro.org (Anup Patel)
-Date: Tue, 14 May 2013 14:56:54 +0530
-Subject: [PATCH] arm64: mm: Fix operands of clz in __flush_dcache_all
-Message-ID: <1368523614-22484-1-git-send-email-anup.patel@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 May 2013 11:29:12 +0200
+Subject: GPIO sysfs : set a wake source
+In-Reply-To: <87fvxwia0s.fsf@free.fr>
+References: <87fvxwia0s.fsf@free.fr>
+Message-ID: <CACRpkdYjQD9phVtWNh2QGkZWOdEJyZENnYatXt7bd23bgqXitw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sukanto Ghosh <sghosh@apm.com>
+On Thu, May 9, 2013 at 2:59 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
 
-The format of the lower 32-bits of the 64-bit operand to 'dc cisw' is
-unchanged from ARMv7 architecture and the upper bits are RES0. This
-implies that the 'way' field of the operand of 'dc cisw' occupies the
-bit-positions [31 .. (32-A)]. Due to the use of 64-bit extended operands
-to 'clz', the existing implementation of __flush_dcache_all is incorrectly
-placing the 'way' field in the bit-positions [63 .. (64-A)].
+> I was thinking on how to remove all "gpio_request()" from my board code
+> (arch/arm/mach-pxa/mioa701.c).
+>
+> I have a small difficulty with the functionality provided by gpiolib in
+> userspace. This is what I need :
+>  - define a gpio as an input
+>  - define this gpio to be an interrupt source
+>  - define this interrupt to be a wake-up source
 
-Signed-off-by: Sukanto Ghosh <sghosh@apm.com>
-Tested-by: Anup Patel <anup.patel@linaro.org>
----
- arch/arm64/mm/cache.S |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This sounds like trying to remove board code by moving it to userspace
+and basically starting to implement stuff that belongs in the kernel
+in userspace just because someone says we should get rid of board
+files :-)
 
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index abe69b8..48a3860 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -52,7 +52,7 @@ loop1:
- 	add	x2, x2, #4			// add 4 (line length offset)
- 	mov	x4, #0x3ff
- 	and	x4, x4, x1, lsr #3		// find maximum number on the way size
--	clz	x5, x4				// find bit position of way size increment
-+	clz	w5, w4				// find bit position of way size increment
- 	mov	x7, #0x7fff
- 	and	x7, x7, x1, lsr #13		// extract max number of the index size
- loop2:
--- 
-1.7.9.5
+Don't go down this path, let the kernel handle this kind of stuff.
+
+Instead figure out how to make the subsystems we have and the
+device trees express what you want to do.
+
+In another thread I suggested that we add a GPIO "hogging"
+mechanism to gpiolib, so that the gpio subsystem can by itself
+"hog" (get) some GPIOs and set them up in certain modes.
+This closely matches what the pin control subsystem will do
+with some such things.
+
+What do you think about this idea?
+
+Yours,
+Linus Walleij
