@@ -1,25 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 May 2013 10:25:58 +0200
-Subject: [PATCH 4/9] mfd: db8500-prcmu: Supply the pdata_size attribute
- for db8500-thermal
-In-Reply-To: <1368019749-19455-5-git-send-email-lee.jones@linaro.org>
+Date: Tue, 14 May 2013 10:27:31 +0200
+Subject: [PATCH 5/9] ARM: ux500: Fix incorrect DEBUG UART virtual addresses
+In-Reply-To: <1368019749-19455-6-git-send-email-lee.jones@linaro.org>
 References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
- <1368019749-19455-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdakF3KSV9QM1E65X+Zipeu2=uA=wpMz2DMGZOCdM--Mdw@mail.gmail.com>
+ <1368019749-19455-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdY669Af-DK9jPkW==u9PtqnL=pipiN9Rx8hi=PHO5mtyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, May 8, 2013 at 3:29 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> The MFD subsystem requires drivers to state the size of any platform
-> data passed, or it will fail to assign it to the device. This will
-> culminate in a NULL platform_data attribute and normally a failure to
-> probe() or a kernel Oops.
+> A recent move to rid header files which were hindering multiplatform
+> support forced address allocations out of the headers and into the
+> files which were using them. We also lost some useful macros such as
+> IO_ADDRESS(), so physical -> virtual addressing has been carried out
+> manually in this case. Unfortunately the incorrect value was converted.
+> This patch rectifies the error and ensures earlyprintk works again.
 >
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Thanks for fixing this!
+
+And sorry for screwing it up :-(
+
+Patch applied!
 
 Yours,
 Linus Walleij
