@@ -1,39 +1,30 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 14 May 2013 15:40:57 +0100
-Subject: [PATCH] mfd: db8500-prcmu: Update stored DSI PLL divider value
-In-Reply-To: <1368537295-23459-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1368537295-23459-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <20130514144057.GH28781@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 14 May 2013 16:42:24 +0200
+Subject: [PATCH] ARM: Kirkwood: Enable USB 3.0 in kirkwood_defconfig
+Message-ID: <1368542544-24743-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 May 2013, Ulf Hansson wrote:
+Some QNAP devices has a USB 3.0 host controller on a PCIe bus.  Enable
+the driver for this in the default configuration.
 
-> From: Ulf Hansson <ulf.hansson@linaro.org>
-> 
-> Previously the DSI PLL divider rate was initialised statically and
-> assumed to be 1. Before the common clock framework were enabled for
-> ux500, a call to clk_set_rate() would always update the HW registers
-> no matter what the current setting was.
-> 
-> This patch makes sure the actual hw settings and the sw assumed
-> settings are matched.
-> 
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Paer-Olof Haakansson <par-olof.hakansson@stericsson.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/mfd/db8500-prcmu.c |    2 ++
->  1 file changed, 2 insertions(+)
+Reported-by: Marek Vasut <marex@denx.de>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/configs/kirkwood_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-I understand that this is causing an issue for the Multimedia guys who
-use this. As it's causing an issue and you are 'the' ST-E clock guru,
-I'll tentatively apply this to my v3.10 -fixes branch.
-
-If anyone has any arguments against it, please step forward.
-
+diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
+index a1d8252..49c9872 100644
+--- a/arch/arm/configs/kirkwood_defconfig
++++ b/arch/arm/configs/kirkwood_defconfig
+@@ -140,6 +140,7 @@ CONFIG_HID_TOPSEED=y
+ CONFIG_HID_THRUSTMASTER=y
+ CONFIG_HID_ZEROPLUS=y
+ CONFIG_USB=y
++CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_EHCI_HCD=y
+ CONFIG_USB_EHCI_ROOT_HUB_TT=y
+ CONFIG_USB_PRINTER=m
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.10.4
