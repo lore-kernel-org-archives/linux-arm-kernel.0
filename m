@@ -1,40 +1,51 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon, 13 May 2013 21:07:35 +0400
-Subject: [PATCH 13/15] ARM: clps711x: edb7211: Control LCD backlight via PWM
-In-Reply-To: <1368464857-5038-1-git-send-email-shc_work@mail.ru>
-References: <1368464857-5038-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1368464857-5038-16-git-send-email-shc_work@mail.ru>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Tue, 14 May 2013 10:19:40 +0900
+Subject: [PATCH] ARM: EXYNOS: add PM dependency to PM_GENERIC_DOMAINS for
+ Exynos4210
+Message-ID: <001a01ce5041$1b9ddd30$52d99790$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provide control LCD backlight via PWM. GPIO is used
-only for switch backlight ON and OFF.
+PM_GENERIC_DOMAINS needs PM dependency.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+Fixed build warning as below:
+
+warning: (PLAT_S3C64XX && CPU_EXYNOS4210) selects PM_GENERIC_DOMAINS which has unmet direct dependencies (PM)
+warning: (PLAT_S3C64XX && CPU_EXYNOS4210) selects PM_GENERIC_DOMAINS which has unmet direct dependencies (PM)
+arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO: return_address should use unwind tables" [-Wcpp]
+drivers/base/power/domain.c: In function '__pm_genpd_add_device':
+drivers/base/power/domain.c:1422:2: error: implicit declaration of function 'genpd_acquire_lock'
+[-Werror=implicit-function-declaration]
+drivers/base/power/domain.c:1466:2: error: implicit declaration of function 'genpd_release_lock'
+[-Werror=implicit-function-declaration]
+drivers/base/power/domain.c: In function 'pm_genpd_add_subdomain':
+drivers/base/power/domain.c:1649:3: error: implicit declaration of function 'genpd_sd_counter_inc'
+[-Werror=implicit-function-declaration]
+drivers/base/power/domain.c: In function 'pm_genpd_remove_subdomain':
+drivers/base/power/domain.c:1721:4: error: implicit declaration of function 'genpd_sd_counter_dec'
+[-Werror=implicit-function-declaration]
+drivers/base/power/domain.c: In function 'pm_genpd_attach_cpuidle':
+drivers/base/power/domain.c:1887:2: error: implicit declaration of function 'genpd_recalc_cpu_exit_latency'
+[-Werror=implicit-function-declaration]
+cc1: some warnings being treated as errors
+
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
 ---
- arch/arm/mach-clps711x/board-edb7211.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/mach-exynos/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-clps711x/board-edb7211.c b/arch/arm/mach-clps711x/board-edb7211.c
-index 970f4e1..9dfb990 100644
---- a/arch/arm/mach-clps711x/board-edb7211.c
-+++ b/arch/arm/mach-clps711x/board-edb7211.c
-@@ -109,13 +109,14 @@ static struct plat_lcd_data edb7211_lcd_power_pdata = {
- 
- static void edb7211_lcd_backlight_set_intensity(int intensity)
- {
--	gpio_set_value(EDB7211_LCDBL, intensity);
-+	gpio_set_value(EDB7211_LCDBL, !!intensity);
-+	clps_writel((clps_readl(PMPCON) & 0xf0ff) | (intensity << 8), PMPCON);
- }
- 
- static struct generic_bl_info edb7211_lcd_backlight_pdata = {
- 	.name			= "lcd-backlight.0",
- 	.default_intensity	= 0x01,
--	.max_intensity		= 0x01,
-+	.max_intensity		= 0x0f,
- 	.set_bl_intensity	= edb7211_lcd_backlight_set_intensity,
- };
- 
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index d19edff..1f7ddb2 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -34,7 +34,7 @@ config CPU_EXYNOS4210
+ 	default y
+ 	depends on ARCH_EXYNOS4
+ 	select ARM_CPU_SUSPEND if PM
+-	select PM_GENERIC_DOMAINS
++	select PM_GENERIC_DOMAINS if PM
+ 	select S5P_PM if PM
+ 	select S5P_SLEEP if PM
+ 	select SAMSUNG_DMADEV
 -- 
-1.8.1.5
+1.7.2.5
