@@ -1,101 +1,115 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 May 2013 12:11:40 +0100
-Subject: [PATCH v3 7/7] ARM: KVM: drop use of PAGE_S2_DEVICE
+Date: Tue, 14 May 2013 12:11:36 +0100
+Subject: [PATCH v3 3/7] ARM: KVM: relax cache maintainance when building page
+ tables
 In-Reply-To: <1368529900-22572-1-git-send-email-marc.zyngier@arm.com>
 References: <1368529900-22572-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1368529900-22572-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1368529900-22572-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At the moment, when mapping a device into Stage-2 for a guest,
-we override whatever the guest uses by forcing a device memory
-type in Stage-2.
+Patch 5a677ce044f1 (ARM: KVM: switch to a dual-step HYP init code)
+introduced code that flushes page tables to the point of coherency.
+This is overkill (point of unification is enough and already done),
+and actually not required if running on a SMP capable platform
+(the HW PTW can snoop other cpus' L1).
 
-While this is not exactly wrong, this isn't really the "spirit" of
-the architecture. The hardware shouldn't have to cope for a broken
-guest mapping to a device as normal memory.
+Remove this code and let ae8a8b9553bd (ARM: 7691/1: mm: kill unused
+TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead) turn it into
+a no-op for SMP ARMv7.
 
-As such, let's get rid of the memory type overrides, and map
-everything as PAGE_S2 in Stage-2. This simplifies the code and
-let the guest do its own thing, whether it is stupid or not.
-
+Reported-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/pgtable.h | 2 --
- arch/arm/kvm/mmu.c             | 2 +-
- arch/arm/mm/mmu.c              | 6 ++----
- 3 files changed, 3 insertions(+), 7 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h | 17 +++++++++++------
+ arch/arm/kvm/mmu.c             |  7 ++++---
+ 2 files changed, 15 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 9bcd262..c3410a8 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -81,7 +81,6 @@ extern pgprot_t		pgprot_user;
- extern pgprot_t		pgprot_kernel;
- extern pgprot_t		pgprot_hyp_device;
- extern pgprot_t		pgprot_s2;
--extern pgprot_t		pgprot_s2_device;
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 472ac70..8c03c96 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -65,11 +65,6 @@ void kvm_clear_hyp_idmap(void);
+ static inline void kvm_set_pte(pte_t *pte, pte_t new_pte)
+ {
+ 	pte_val(*pte) = new_pte;
+-	/*
+-	 * flush_pmd_entry just takes a void pointer and cleans the necessary
+-	 * cache entries, so we can reuse the function for ptes.
+-	 */
+-	flush_pmd_entry(pte);
+ }
  
- #define _MOD_PROT(p, b)	__pgprot(pgprot_val(p) | (b))
+ static inline bool kvm_is_write_fault(unsigned long hsr)
+@@ -83,9 +78,19 @@ static inline bool kvm_is_write_fault(unsigned long hsr)
+ 		return true;
+ }
  
-@@ -97,7 +96,6 @@ extern pgprot_t		pgprot_s2_device;
- #define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
- #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
- #define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
--#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_USER | L_PTE_S2_RDONLY)
++static inline void kvm_clean_dcache_area(void *addr, size_t size)
++{
++	clean_dcache_area(addr, size);
++}
++
++static inline void kvm_clean_pte_entry(pte_t *pte)
++{
++	kvm_clean_dcache_area(pte, sizeof(*pte));
++}
++
+ static inline void kvm_clean_pgd(pgd_t *pgd)
+ {
+-	clean_dcache_area(pgd, PTRS_PER_S2_PGD * sizeof(pgd_t));
++	kvm_clean_dcache_area(pgd, PTRS_PER_S2_PGD * sizeof(pgd_t));
+ }
  
- #define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN | L_PTE_NONE)
- #define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
+ static inline void kvm_clean_pmd_entry(pmd_t *pmd)
 diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 693d16c..f2a8416 100644
+index 84ba67b..451bad3 100644
 --- a/arch/arm/kvm/mmu.c
 +++ b/arch/arm/kvm/mmu.c
-@@ -495,7 +495,7 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 	pfn = __phys_to_pfn(pa);
+@@ -113,6 +113,7 @@ static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+ {
+ 	if (pte_present(*pte)) {
+ 		kvm_set_pte(pte, __pte(0));
++		kvm_clean_pte_entry(pte);
+ 		put_page(virt_to_page(pte));
+ 		kvm_tlb_flush_vmid_ipa(kvm, addr);
+ 	}
+@@ -234,9 +235,10 @@ static void create_hyp_pte_mappings(pmd_t *pmd, unsigned long start,
+ 		pte = pte_offset_kernel(pmd, addr);
+ 		kvm_set_pte(pte, pfn_pte(pfn, prot));
+ 		get_page(virt_to_page(pte));
+-		kvm_flush_dcache_to_poc(pte, sizeof(*pte));
+ 		pfn++;
+ 	} while (addr += PAGE_SIZE, addr != end);
++
++	kvm_clean_dcache_area((void *)start, end - start);
+ }
  
- 	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
--		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
-+		pte_t pte = pfn_pte(pfn, PAGE_S2);
- 		kvm_set_s2pte_writable(&pte);
+ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+@@ -261,7 +263,6 @@ static int create_hyp_pmd_mappings(pud_t *pud, unsigned long start,
+ 			}
+ 			pmd_populate_kernel(NULL, pmd, pte);
+ 			get_page(virt_to_page(pmd));
+-			kvm_flush_dcache_to_poc(pmd, sizeof(*pmd));
+ 		}
  
- 		ret = mmu_topup_memory_cache(&cache, 2, 2);
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e0d8565..bc001f5 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -60,7 +60,6 @@ pgprot_t pgprot_user;
- pgprot_t pgprot_kernel;
- pgprot_t pgprot_hyp_device;
- pgprot_t pgprot_s2;
--pgprot_t pgprot_s2_device;
+ 		next = pmd_addr_end(addr, end);
+@@ -299,7 +300,6 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+ 			}
+ 			pud_populate(NULL, pud, pmd);
+ 			get_page(virt_to_page(pud));
+-			kvm_flush_dcache_to_poc(pud, sizeof(*pud));
+ 		}
  
- EXPORT_SYMBOL(pgprot_user);
- EXPORT_SYMBOL(pgprot_kernel);
-@@ -343,7 +342,7 @@ static void __init build_mem_type_table(void)
- 	struct cachepolicy *cp;
- 	unsigned int cr = get_cr();
- 	pteval_t user_pgprot, kern_pgprot, vecs_pgprot;
--	pteval_t hyp_device_pgprot, s2_pgprot, s2_device_pgprot;
-+	pteval_t hyp_device_pgprot, s2_pgprot;
- 	int cpu_arch = cpu_architecture();
- 	int i;
- 
-@@ -456,7 +455,7 @@ static void __init build_mem_type_table(void)
- 	cp = &cache_policies[cachepolicy];
- 	vecs_pgprot = kern_pgprot = user_pgprot = cp->pte;
- 	s2_pgprot = cp->pte_s2;
--	hyp_device_pgprot = s2_device_pgprot = mem_types[MT_DEVICE].prot_pte;
-+	hyp_device_pgprot = mem_types[MT_DEVICE].prot_pte;
- 
- 	/*
- 	 * ARMv6 and above have extended page tables.
-@@ -536,7 +535,6 @@ static void __init build_mem_type_table(void)
- 	pgprot_kernel = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG |
- 				 L_PTE_DIRTY | kern_pgprot);
- 	pgprot_s2  = __pgprot(L_PTE_PRESENT | L_PTE_YOUNG | s2_pgprot);
--	pgprot_s2_device  = __pgprot(s2_device_pgprot);
- 	pgprot_hyp_device  = __pgprot(hyp_device_pgprot);
- 
- 	mem_types[MT_LOW_VECTORS].prot_l1 |= ecc_mask;
+ 		next = pgd_addr_end(addr, end);
+@@ -469,6 +469,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
+ 	/* Create 2nd stage page table mapping - Level 3 */
+ 	old_pte = *pte;
+ 	kvm_set_pte(pte, *new_pte);
++	kvm_clean_pte_entry(pte);
+ 	if (pte_present(old_pte))
+ 		kvm_tlb_flush_vmid_ipa(kvm, addr);
+ 	else
 -- 
 1.8.2.3
