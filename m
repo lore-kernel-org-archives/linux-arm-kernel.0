@@ -1,165 +1,104 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 May 2013 15:13:35 +0100
-Subject: [PATCH v4 07/32] arm64: KVM: architecture specific MMU backend
+Date: Tue, 14 May 2013 15:13:29 +0100
+Subject: [PATCH v4 01/32] arm64: KVM: define HYP and Stage-2 translation page
+ flags
 In-Reply-To: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
 References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1368540840-26750-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1368540840-26750-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the arm64 specific MMU backend:
-- HYP/kernel VA offset
-- S2 4/64kB definitions
-- S2 page table populating and flushing
-- icache cleaning
+Add HYP and S2 page flags, for both normal and device memory.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_mmu.h | 135 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 135 insertions(+)
- create mode 100644 arch/arm64/include/asm/kvm_mmu.h
+ arch/arm64/include/asm/memory.h        |  5 +++++
+ arch/arm64/include/asm/pgtable-hwdef.h | 19 +++++++++++++++++++
+ arch/arm64/include/asm/pgtable.h       | 11 +++++++++++
+ 3 files changed, 35 insertions(+)
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-new file mode 100644
-index 0000000..efe609c
---- /dev/null
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -0,0 +1,135 @@
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 381f556..15745a7c 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -90,6 +90,11 @@
+ #define MT_NORMAL_NC		3
+ #define MT_NORMAL		4
+ 
 +/*
-+ * Copyright (C) 2012,2013 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * Default memory type for Stage-2 translation
 + */
++#define MT_S2_NORMAL		0xf
 +
-+#ifndef __ARM64_KVM_MMU_H__
-+#define __ARM64_KVM_MMU_H__
-+
-+#include <asm/page.h>
-+#include <asm/memory.h>
-+
-+/*
-+ * As we only have the TTBR0_EL2 register, we cannot express
-+ * "negative" addresses. This makes it impossible to directly share
-+ * mappings with the kernel.
-+ *
-+ * Instead, give the HYP mode its own VA region at a fixed offset from
-+ * the kernel by just masking the top bits (which are all ones for a
-+ * kernel address).
+ #ifndef __ASSEMBLY__
+ 
+ extern phys_addr_t		memstart_addr;
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index 75fd13d..66367c6 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -35,6 +35,7 @@
+ /*
+  * Section
+  */
++#define PMD_SECT_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
+ #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
+ #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
+ #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
+@@ -68,6 +69,24 @@
+ #define PTE_ATTRINDX_MASK	(_AT(pteval_t, 7) << 2)
+ 
+ /*
++ * 2nd stage PTE definitions
 + */
-+#define HYP_PAGE_OFFSET_SHIFT	VA_BITS
-+#define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
-+#define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
++#define PTE_S2_RDONLY		(_AT(pteval_t, 1) << 6)   /* HAP[2:1] */
++#define PTE_S2_RDWR		(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
 +
 +/*
-+ * Our virtual mapping for the idmap-ed MMU-enable code. Must be
-+ * shared across all the page-tables. Conveniently, we use the last
-+ * possible page, where no kernel mapping will ever exist.
++ * Memory Attribute override for Stage-2 (MemAttr[3:0])
 + */
-+#define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
-+
-+#ifdef __ASSEMBLY__
++#define PTE_S2_MEMATTR(t)	(_AT(pteval_t, (t)) << 2)
++#define PTE_S2_MEMATTR_MASK	(_AT(pteval_t, 0xf) << 2)
 +
 +/*
-+ * Convert a kernel VA into a HYP VA.
-+ * reg: VA to be converted.
++ * EL2/HYP PTE/PMD definitions
 + */
-+.macro kern_hyp_va	reg
-+	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
-+.endm
-+
-+#else
-+
-+#include <asm/cachetype.h>
-+#include <asm/cacheflush.h>
-+
-+#define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
++#define PMD_HYP			PMD_SECT_USER
++#define PTE_HYP			PTE_USER
 +
 +/*
-+ * Align KVM with the kernel's view of physical memory. Should be
-+ * 40bit IPA, with PGD being 8kB aligned in the 4KB page configuration.
-+ */
-+#define KVM_PHYS_SHIFT	PHYS_MASK_SHIFT
-+#define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
-+#define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
+  * 40-bit physical address supported.
+  */
+ #define PHYS_MASK_SHIFT		(40)
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index e333a24..34ba9ba 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -76,6 +76,11 @@ extern pgprot_t pgprot_default;
+ #define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY)
+ #define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY)
+ 
++#define PAGE_HYP		_MOD_PROT(pgprot_default, PTE_HYP)
++#define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
 +
-+/* Make sure we get the right size, and thus the right alignment */
-+#define PTRS_PER_S2_PGD (1 << (KVM_PHYS_SHIFT - PGDIR_SHIFT))
-+#define S2_PGD_ORDER	get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
++#define PAGE_S2			__pgprot_modify(pgprot_default, PTE_S2_MEMATTR_MASK, PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
 +
-+int create_hyp_mappings(void *from, void *to);
-+int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
-+void free_boot_hyp_pgd(void);
-+void free_hyp_pgds(void);
+ #define __PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE)
+ #define __PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+ #define __PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+@@ -197,6 +202,12 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+ 
+ #define pmd_bad(pmd)		(!(pmd_val(pmd) & 2))
+ 
++#define pmd_table(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
++				 PMD_TYPE_TABLE)
++#define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
++				 PMD_TYPE_SECT)
 +
-+int kvm_alloc_stage2_pgd(struct kvm *kvm);
-+void kvm_free_stage2_pgd(struct kvm *kvm);
-+int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
-+			  phys_addr_t pa, unsigned long size);
 +
-+int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
-+
-+void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
-+
-+phys_addr_t kvm_mmu_get_httbr(void);
-+phys_addr_t kvm_mmu_get_boot_httbr(void);
-+phys_addr_t kvm_get_idmap_vector(void);
-+int kvm_mmu_init(void);
-+void kvm_clear_hyp_idmap(void);
-+
-+#define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
-+
-+static inline bool kvm_is_write_fault(unsigned long esr)
-+{
-+	unsigned long esr_ec = esr >> ESR_EL2_EC_SHIFT;
-+
-+	if (esr_ec == ESR_EL2_EC_IABT)
-+		return false;
-+
-+	if ((esr & ESR_EL2_ISV) && !(esr & ESR_EL2_WNR))
-+		return false;
-+
-+	return true;
-+}
-+
-+static inline void kvm_clean_dcache_area(void *addr, size_t size) {}
-+static inline void kvm_clean_pgd(pgd_t *pgd) {}
-+static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
-+static inline void kvm_clean_pte(pte_t *pte) {}
-+static inline void kvm_clean_pte_entry(pte_t *pte) {}
-+
-+static inline void kvm_set_s2pte_writable(pte_t *pte)
-+{
-+	pte_val(*pte) |= PTE_S2_RDWR;
-+}
-+
-+struct kvm;
-+
-+static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
-+{
-+	if (!icache_is_aliasing()) {		/* PIPT */
-+		unsigned long hva = gfn_to_hva(kvm, gfn);
-+		flush_icache_range(hva, hva + PAGE_SIZE);
-+	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
-+		/* any kind of VIPT cache */
-+		__flush_icache_all();
-+	}
-+}
-+
-+#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
-+
-+#endif /* __ASSEMBLY__ */
-+#endif /* __ARM64_KVM_MMU_H__ */
+ static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
+ {
+ 	*pmdp = pmd;
 -- 
 1.8.2.3
