@@ -1,76 +1,42 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 14 May 2013 15:39:00 -0500
-Subject: Fwd: Tegra 30 System hangs because of commit "pinctrl: move
- subsystem mutex to pinctrl_dev struct"
-In-Reply-To: <CAGNsrLDw0_yX9nkLYDg0e8-551P7r43UxziTp1TXyyxdiKR5nA@mail.gmail.com>
-References: <CAK5ve-KXdS8az=Gtja-mF=Z3_EeZVA7bLYSU0EE2mf5bHmSUKw@mail.gmail.com>
- <CAK5ve-KBDyvjNRVMcXgfnhYcajdcGsuAKaepzCBt+epiXoYvSw@mail.gmail.com>
- <517ED12B.8080502@wwwdotorg.org> <20130504133004.GC24282@game.jcrosoft.org>
- <CACRpkdbBVJtWrRO+J=pWjfLXTcVKX++x-eeJQXGeQn_WOURUNQ@mail.gmail.com>
- <20130505112819.GD24282@game.jcrosoft.org>
- <CACRpkdZdT8==cUtH4=Y3LC-eVu6ntO2ojFC4bSXNuxa4hMJ=ZA@mail.gmail.com>
- <20130505202236.GF24282@game.jcrosoft.org>
- <CACRpkda2EG0O-pfZQ5kLFX=cwSmUSVBJkR7Xvye3ROs3tstv9w@mail.gmail.com>
- <20130506194122.GG24282@game.jcrosoft.org>
- <20130506195403.GJ18614@n2100.arm.linux.org.uk>
- <CACRpkdZtPhzLFicYYZF0SZfp4dMJars+Z-7hTUZQ1JjPExXW3A@mail.gmail.com>
- <CACxGe6uo60OwRd7buPX4382_vE48MLWJYyB_ka+iS2FfVCa8mw@mail.gmail.com>
- <CAOesGMiqrXSPdEtUzGCuAuhdE4K7FVe65zMM962XuOrO555hnQ@mail.gmail.com>
- <CAGNsrLDw0_yX9nkLYDg0e8-551P7r43UxziTp1TXyyxdiKR5nA@mail.gmail.com>
-Message-ID: <5192A0E4.2070202@gmail.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Tue, 14 May 2013 22:01:18 +0100
+Subject: [PATCH v2 0/3] clk: implement remuxing during set_rate
+In-Reply-To: <20130514165937.10068.18501@quantum>
+References: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
+ <20130513195746.10068.92303@quantum>
+ <CAAG0J991BCziPFddzBrx9vcwRxyRgcCd38A01uKXTDDK9xTnbQ@mail.gmail.com>
+ <20130514165937.10068.18501@quantum>
+Message-ID: <5192A61E.5020605@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2013 12:51 PM, Fathi Boudra wrote:
-> On 9 May 2013 19:13, Olof Johansson <olof@lixom.net> wrote:
->> On Thu, May 9, 2013 at 6:25 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
->>> On Mon, May 6, 2013 at 9:12 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>>> On Mon, May 6, 2013 at 9:54 PM, Russell King - ARM Linux
->> Yes, a builder is quite useful. Several of us do our own builds as well.
+Hi Mike,
+
+On 14/05/13 17:59, Mike Turquette wrote:
+> Quoting James Hogan (2013-05-13 14:30:46)
+>> On 13 May 2013 20:57, Mike Turquette <mturquette@linaro.org> wrote:
+>>> One reason for this is the difficulty some have had with setting flags
+>>> from DT bindings.
 >>
->> When it comes to boot coverage, I'm not sure how successful a central
->> approach would be. It's something where I think Linaro could
->> contribute a lot for their member platforms, but I haven't seen much
->> engagement there yet.
-> 
-> My previous post was lost. Sorry to repost..
-> 
-> We've got a jenkins instance doing daily builds on various trees and
-> boot testing on the few boards we've got in the lab:
-> https://ci.linaro.org/jenkins/view/kernel-ci/
-> 
-> But it hasn't attracted much interest so far... It's been here since a year.
-
-Perhaps because there is no useful information there that I can find.
-Where does it say what failed in the build? I see no artifacts or useful
-console output.
-
-It seems it was designed with Linaro's needs in mind and not kernel
-maintainers' needs.
-
-Rob
-
-> 
->> Beyond there, I'd say the expectation is that each maintainer should
->> keep an eye on their own platforms. They _should_ try building and
->> booting linux-next on their platforms, to catch regressions early. And
->> definitely around now, I'd like to see people boot mainline on their
->> platforms to make sure we haven't added any severe regressions in the
->> 3.10 merge window, etc. Some people are really good at this, others
->> less so.
+>> Could you elaborate on this? I've been adding flags to DT bindings for
+>> this sort of thing, but it feels a bit like it's in that grey area of
+>> not really describing the hardware itself. This information needs to
+>> be specified somehow though.
 >>
->> What's the old saying, you can lead a horse to water but you can't
->> make him drink? You can build a boot test cluster but you can't make
->> anyone pay attention to it. :(
->>
->> -Olof
 > 
-> Cheers,
+> It depends on the flag.  A good example is the CLK_DIVIDER_ONE_BASED
+> flag which does describe the hardware.  It informs the binding that
+> indexing starts at 1, not 0, which is a valid part of the hardware
+> description.
 > 
-> Fathi
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> However flags that deal with software policy do not belong on DT.
+> CLK_SET_RATE_PARENT certainly does not belong in the DT binding since
+> this is a pure Linux-ism.  Every binding just needs to be reviewed on a
+> case-by-case basis to make sure the flags are related only to the
+> hardware.
+
+So given the desire to eliminate platform code, is there a particular
+way that these other flags can be specified instead of DT bindings?
+
+Cheers
+James
