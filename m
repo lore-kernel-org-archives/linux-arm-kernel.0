@@ -1,62 +1,237 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 14 May 2013 15:15:25 -0700
-Subject: [PATCH v2 0/3] clk: implement remuxing during set_rate
-In-Reply-To: <5192A61E.5020605@imgtec.com>
-References: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
- <20130513195746.10068.92303@quantum>
- <CAAG0J991BCziPFddzBrx9vcwRxyRgcCd38A01uKXTDDK9xTnbQ@mail.gmail.com>
- <20130514165937.10068.18501@quantum> <5192A61E.5020605@imgtec.com>
-Message-ID: <20130514221525.10068.86581@quantum>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 15 May 2013 00:10:06 +0200
+Subject: [PATCH] clk: Fix race condition between clk_set_parent and
+ clk_enable()
+In-Reply-To: <20130514185417.10068.5717@quantum>
+References: <1367383328-25700-1-git-send-email-skannan@codeaurora.org>
+ <20130514185417.10068.5717@quantum>
+Message-ID: <9066674.E2RzuEn3ap@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting James Hogan (2013-05-14 14:01:18)
-> Hi Mike,
+Hi,
+
+On Tuesday 14 of May 2013 11:54:17 Mike Turquette wrote:
+> Quoting Saravana Kannan (2013-04-30 21:42:08)
 > 
-> On 14/05/13 17:59, Mike Turquette wrote:
-> > Quoting James Hogan (2013-05-13 14:30:46)
-> >> On 13 May 2013 20:57, Mike Turquette <mturquette@linaro.org> wrote:
-> >>> One reason for this is the difficulty some have had with setting flags
-> >>> from DT bindings.
-> >>
-> >> Could you elaborate on this? I've been adding flags to DT bindings for
-> >> this sort of thing, but it feels a bit like it's in that grey area of
-> >> not really describing the hardware itself. This information needs to
-> >> be specified somehow though.
-> >>
+> > Without this patch, the following race conditions are possible.
 > > 
-> > It depends on the flag.  A good example is the CLK_DIVIDER_ONE_BASED
-> > flag which does describe the hardware.  It informs the binding that
-> > indexing starts at 1, not 0, which is a valid part of the hardware
-> > description.
+> > Race condition 1:
+> > * clk-A has two parents - clk-X and clk-Y.
+> > * All three are disabled and clk-X is current parent.
+> > * Thread A: clk_set_parent(clk-A, clk-Y).
+> > * Thread A: <snip execution flow>
+> > * Thread A: Grabs enable lock.
+> > * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
+> > * Thread A: Updates clk-A SW parent to clk-Y
+> > * Thread A: Releases enable lock.
+> > * Thread B: clk_enable(clk-A).
+> > * Thread B: clk_enable() enables clk-Y, then enabled clk-A and
+> > returns.
 > > 
-> > However flags that deal with software policy do not belong on DT.
-> > CLK_SET_RATE_PARENT certainly does not belong in the DT binding since
-> > this is a pure Linux-ism.  Every binding just needs to be reviewed on a
-> > case-by-case basis to make sure the flags are related only to the
-> > hardware.
+> > clk-A is now enabled in software, but not clocking in hardware since
+> > the hardware parent is still clk-X.
+> > 
+> > The only way to avoid race conditions between clk_set_parent() and
+> > clk_enable/disable() is to ensure that clk_enable/disable() calls
+> > don't
+> > require changes to hardware enable state between changes to software
+> > clock topology and hardware clock topology.
+> > 
+> > There are options to achieve the above:
+> > 1. Grab the enable lock before changing software/hardware topology and
+> > 
+> >    release it afterwards.
+> > 
+> > 2. Keep the clock enabled for the duration of software/hardware
+> > topology> 
+> >    change so that any additional enable/disable calls don't try to
+> >    change
+> >    the hardware state. Once the topology change is complete, the clock
+> >    can
+> >    be put back in its original enable state.
+> > 
+> > Option (1) is not an acceptable solution since the set_parent() ops
+> > might need to sleep.
+> > 
+> > Therefore, this patch implements option (2).
+> > 
+> > This patch doesn't violate any API semantics. clk_disable() doesn't
+> > guarantee that the clock is actually disabled. So, no clients of a
+> > clock can assume that a clock is disabled after their last call to
+> > clk_disable(). So, enabling the clock during a parent change is not a
+> > violation of any API semantics.
+> > 
+> > This also has the nice side effect of simplifying the error handling
+> > code.
+> > 
+> > Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
 > 
-> So given the desire to eliminate platform code, is there a particular
-> way that these other flags can be specified instead of DT bindings?
+> I've taken this patch into clk-next for testing.  The code itself looks
+> fine.  The only thing that remains to be seen is if any platforms have a
+> problem with disabled clocks getting turned on during a reparent
+> operation.
+
+IMHO this behavior should be documented somewhere, with a note that the 
+clock must not be prepared to keep it disabled during reparent operation 
+and possibly also pointing to the CLK_SET_PARENT_GATE flag.
+
+> On platforms that I have worked on this is OK, but I suppose there could
+> be some platform out there where a clock is prepared and disabled, and
+> briefly enabling the clock during the reparent operation somehow puts
+> the hardware in a bad state.
+
+Well, on any platform where default clock settings are not completely 
+correct this is likely to cause problems, because some device might get 
+too high frequency for some period of time, which might crash it alone as 
+well as the whole system.
+
+Best regards,
+Tomasz
+
+> Anyways that's a long shot and this look OK until somebody screams.
 > 
-
-I haven't put too much thought into this.  There have been many
-discussions lately about where to put configuration data, which would
-include the "policy" flags.  Some folks have discussed using DT, but
-keeping the config data separate from the hardware description data (one
-thread I read called the idea "config tree").  Examples of this are
-setting parents for mux clocks, or setting clock rates at boot-time.
-This data is important, but it is a configuration of the hardware.  Not
-a description of it.
-
-Anyways it is a general problem, so I'm hoping someone will find a
-general solution.  For now I've seen a couple instance of clock drivers
-including clk-private.h to modify the flags at registration time, which
-is beyond horrible.  But again those users may not have a better option,
-short of a new clk_set_flags() function, which is also horrible.
-
-Regards,
-Mike
-
-> Cheers
-> James
+> Regards,
+> Mike
+> 
+> > ---
+> > It's been a while since I submitted a patch. So, apologies if I'm
+> > cc'ing people who no longer care about the state of the common clock
+> > framework.> 
+> >  drivers/clk/clk.c |   72
+> >  +++++++++++++++++++++++----------------------------- 1 files
+> >  changed, 32 insertions(+), 40 deletions(-)
+> > 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index 934cfd1..fe4055f 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -1377,67 +1377,59 @@ static int __clk_set_parent(struct clk *clk,
+> > struct clk *parent, u8 p_index)> 
+> >         unsigned long flags;
+> >         int ret = 0;
+> >         struct clk *old_parent = clk->parent;
+> > 
+> > -       bool migrated_enable = false;
+> > 
+> > -       /* migrate prepare */
+> > -       if (clk->prepare_count)
+> > +       /*
+> > +        * Migrate prepare state between parents and prevent race with
+> > +        * clk_enable().
+> > +        *
+> > +        * If the clock is not prepared, then a race with
+> > +        * clk_enable/disable() is impossible since we already have
+> > the
+> > +        * prepare lock (future calls to clk_enable() need to be
+> > preceded by +        * a clk_prepare()).
+> > +        *
+> > +        * If the clock is prepared, migrate the prepared state to the
+> > new +        * parent and also protect against a race with
+> > clk_enable() by +        * forcing the clock and the new parent on. 
+> > This ensures that all +        * future calls to clk_enable() are
+> > practically NOPs with respect to +        * hardware and software
+> > states.
+> > +        */
+> > +       if (clk->prepare_count) {
+> > 
+> >                 __clk_prepare(parent);
+> > 
+> > -
+> > -       flags = clk_enable_lock();
+> > -
+> > -       /* migrate enable */
+> > -       if (clk->enable_count) {
+> > -               __clk_enable(parent);
+> > -               migrated_enable = true;
+> > +               clk_enable(parent);
+> > +               clk_enable(clk);
+> > 
+> >         }
+> >         
+> >         /* update the clk tree topology */
+> > 
+> > +       flags = clk_enable_lock();
+> > 
+> >         clk_reparent(clk, parent);
+> > 
+> > -
+> > 
+> >         clk_enable_unlock(flags);
+> >         
+> >         /* change clock input source */
+> >         if (parent && clk->ops->set_parent)
+> >         
+> >                 ret = clk->ops->set_parent(clk->hw, p_index);
+> > 
+> > -
+> > 
+> >         if (ret) {
+> > 
+> > -               /*
+> > -                * The error handling is tricky due to that we need to
+> > release -                * the spinlock while issuing the .set_parent
+> > callback. This -                * means the new parent might have
+> > been enabled/disabled in -                * between, which must be
+> > considered when doing rollback. -                */
+> > -               flags = clk_enable_lock();
+> > 
+> > +               flags = clk_enable_lock();
+> > 
+> >                 clk_reparent(clk, old_parent);
+> > 
+> > -
+> > -               if (migrated_enable && clk->enable_count) {
+> > -                       __clk_disable(parent);
+> > -               } else if (migrated_enable && (clk->enable_count ==
+> > 0)) { -                       __clk_disable(old_parent);
+> > -               } else if (!migrated_enable && clk->enable_count) {
+> > -                       __clk_disable(parent);
+> > -                       __clk_enable(old_parent);
+> > -               }
+> > -
+> > 
+> >                 clk_enable_unlock(flags);
+> > 
+> > -               if (clk->prepare_count)
+> > +               if (clk->prepare_count) {
+> > +                       clk_disable(clk);
+> > +                       clk_disable(parent);
+> > 
+> >                         __clk_unprepare(parent);
+> > 
+> > -
+> > +               }
+> > 
+> >                 return ret;
+> >         
+> >         }
+> > 
+> > -       /* clean up enable for old parent if migration was done */
+> > -       if (migrated_enable) {
+> > -               flags = clk_enable_lock();
+> > -               __clk_disable(old_parent);
+> > -               clk_enable_unlock(flags);
+> > -       }
+> > -
+> > -       /* clean up prepare for old parent if migration was done */
+> > -       if (clk->prepare_count)
+> > +       /*
+> > +        * Finish the migration of prepare state and undo the changes
+> > done +        * for preventing a race with clk_enable().
+> > +        */
+> > +       if (clk->prepare_count) {
+> > +               clk_disable(clk);
+> > +               clk_disable(old_parent);
+> > 
+> >                 __clk_unprepare(old_parent);
+> > 
+> > +       }
+> > 
+> >         /* update debugfs with new clk tree topology */
+> >         clk_debug_reparent(clk, parent);
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
