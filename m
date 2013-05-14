@@ -1,384 +1,163 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 14 May 2013 21:07:52 +0800
-Subject: [PATCH] watchdog: sirf: add watchdog driver of CSR SiRFprimaII and
- SiRFatlasVI
-Message-ID: <1368536872-2189-1-git-send-email-21cnbao@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 14 May 2013 14:09:13 +0100
+Subject: [PATCH v2 2/2] KVM: get rid of $(addprefix ../../../virt/kvm/,
+ ...) in Makefiles
+In-Reply-To: <51922FF3.4060300@redhat.com>
+References: <1368534653-23133-1-git-send-email-marc.zyngier@arm.com>
+ <1368534653-23133-3-git-send-email-marc.zyngier@arm.com>
+ <51922FF3.4060300@redhat.com>
+Message-ID: <51923779.7030304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xianglong Du <Xianglong.Du@csr.com>
+On 14/05/13 13:37, Paolo Bonzini wrote:
+> Il 14/05/2013 14:30, Marc Zyngier ha scritto:
+>> As requested by the KVM maintainers, remove the addprefix used to
+>> refer to the main KVM code from the arch code, and replace it with
+>> a KVM variable that does the same thing.
+>>
+>> Cc: Paolo Bonzini <pbonzini@redhat.com>
+>> Cc: Gleb Natapov <gleb@redhat.com>
+>> Cc: Christoffer Dall <cdall@cs.columbia.edu>
+>> Cc: Xiantao Zhang <xiantao.zhang@intel.com>
+>> Cc: Tony Luck <tony.luck@intel.com>
+>> Cc: Fenghua Yu <fenghua.yu@intel.com>
+>> Cc: Alexander Graf <agraf@suse.de>
+>> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+>> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+>> Cc: Cornelia Huck <cornelia.huck@de.ibm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Thanks,
+> 
+> Reviewed-by: Paolo Bonzini <pbonzini@redhat.com>
 
-On CSR SiRFprimaII and SiRFatlasVI, the 6th timer can act as a Watchdog timer
-when the Watchdog mode is enabled.
+Actually, there's a catch (see below)...
 
-watchdog occur when TIMER watchdog counter matches the value software set, when
-this event occur, the effect is the same as system software reset.
+>> ---
+>>  arch/arm/kvm/Makefile     |  2 +-
+>>  arch/ia64/kvm/Makefile    |  7 ++++---
+>>  arch/powerpc/kvm/Makefile | 13 +++++++------
+>>  arch/s390/kvm/Makefile    |  3 ++-
+>>  arch/x86/kvm/Makefile     | 13 +++++++------
+>>  5 files changed, 21 insertions(+), 17 deletions(-)
+>>
+>> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+>> index 9184a49..d99bee4 100644
+>> --- a/arch/arm/kvm/Makefile
+>> +++ b/arch/arm/kvm/Makefile
+>> @@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
+>>  AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
+>>  
+>>  KVM := ../../../virt/kvm
+>> -kvm-arm-y = $(addprefix $(KVM)/, kvm_main.o coalesced_mmio.o)
+>> +kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
+>>  
+>>  obj-y += kvm-arm.o init.o interrupts.o
+>>  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+>> diff --git a/arch/ia64/kvm/Makefile b/arch/ia64/kvm/Makefile
+>> index 1a40537..18e45ec 100644
+>> --- a/arch/ia64/kvm/Makefile
+>> +++ b/arch/ia64/kvm/Makefile
+>> @@ -47,12 +47,13 @@ FORCE : $(obj)/$(offsets-file)
+>>  
+>>  ccflags-y := -Ivirt/kvm -Iarch/ia64/kvm/
+>>  asflags-y := -Ivirt/kvm -Iarch/ia64/kvm/
+>> +KVM := ../../../virt/kvm
+>>  
+>> -common-objs = $(addprefix ../../../virt/kvm/, kvm_main.o ioapic.o \
+>> -		coalesced_mmio.o irq_comm.o)
+>> +common-objs = $(KVM)/kvm_main.o $(KVM)/ioapic.o \
+>> +		$(KVM)/coalesced_mmio.o $(KVM)/irq_comm.o
+>>  
+>>  ifeq ($(CONFIG_KVM_DEVICE_ASSIGNMENT),y)
+>> -common-objs += $(addprefix ../../../virt/kvm/, assigned-dev.o iommu.o)
+>> +common-objs += $(KVM)/assigned-dev.o $(KVM)/iommu.o
+>>  endif
+>>  
+>>  kvm-objs := $(common-objs) kvm-ia64.o kvm_fw.o
+>> diff --git a/arch/powerpc/kvm/Makefile b/arch/powerpc/kvm/Makefile
+>> index 422de3f..008cd85 100644
+>> --- a/arch/powerpc/kvm/Makefile
+>> +++ b/arch/powerpc/kvm/Makefile
+>> @@ -5,9 +5,10 @@
+>>  subdir-ccflags-$(CONFIG_PPC_WERROR) := -Werror
+>>  
+>>  ccflags-y := -Ivirt/kvm -Iarch/powerpc/kvm
+>> +KVM := ../../../virt/kvm
+>>  
+>> -common-objs-y = $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o \
+>> -						eventfd.o)
+>> +common-objs-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o \
+>> +		$(KVM)/eventfd.o
+>>  
+>>  CFLAGS_44x_tlb.o  := -I.
+>>  CFLAGS_e500_mmu.o := -I.
+>> @@ -53,7 +54,7 @@ kvm-e500mc-objs := \
+>>  kvm-objs-$(CONFIG_KVM_E500MC) := $(kvm-e500mc-objs)
+>>  
+>>  kvm-book3s_64-objs-$(CONFIG_KVM_BOOK3S_64_PR) := \
+>> -	../../../virt/kvm/coalesced_mmio.o \
+>> +	$(KVM)/coalesced_mmio.o \
+>>  	fpu.o \
+>>  	book3s_paired_singles.o \
+>>  	book3s_pr.o \
+>> @@ -86,8 +87,8 @@ kvm-book3s_64-objs-$(CONFIG_KVM_XICS) += \
+>>  	book3s_xics.o
+>>  
+>>  kvm-book3s_64-module-objs := \
+>> -	../../../virt/kvm/kvm_main.o \
+>> -	../../../virt/kvm/eventfd.o \
+>> +	$(KVM)/kvm_main.o \
+>> +	$(KVM)/eventfd.o \
+>>  	powerpc.o \
+>>  	emulate.o \
+>>  	book3s.o \
+>> @@ -111,7 +112,7 @@ kvm-book3s_32-objs := \
+>>  kvm-objs-$(CONFIG_KVM_BOOK3S_32) := $(kvm-book3s_32-objs)
+>>  
+>>  kvm-objs-$(CONFIG_KVM_MPIC) += mpic.o
+>> -kvm-objs-$(CONFIG_HAVE_KVM_IRQ_ROUTING) += $(addprefix ../../../virt/kvm/, irqchip.o)
+>> +kvm-objs-$(CONFIG_HAVE_KVM_IRQ_ROUTING) += $(KVM)/irqchip.o
+>>  
+>>  kvm-objs := $(kvm-objs-m) $(kvm-objs-y)
+>>  
+>> diff --git a/arch/s390/kvm/Makefile b/arch/s390/kvm/Makefile
+>> index 8fe9d65..40b4c64 100644
+>> --- a/arch/s390/kvm/Makefile
+>> +++ b/arch/s390/kvm/Makefile
+>> @@ -6,7 +6,8 @@
+>>  # it under the terms of the GNU General Public License (version 2 only)
+>>  # as published by the Free Software Foundation.
+>>  
+>> -common-objs = $(addprefix ../../../virt/kvm/, kvm_main.o eventfd.o)
+>> +KVM := ../../../virt/kvm
+>> +common-objs = $(KVM)/kvm_main.o $(KVM)/eventfd.o
+>>  
+>>  ccflags-y := -Ivirt/kvm -Iarch/s390/kvm
+>>  
+>> diff --git a/arch/x86/kvm/Makefile b/arch/x86/kvm/Makefile
+>> index d609e1d..21d5703 100644
+>> --- a/arch/x86/kvm/Makefile
+>> +++ b/arch/x86/kvm/Makefile
+>> @@ -5,12 +5,13 @@ CFLAGS_x86.o := -I.
+>>  CFLAGS_svm.o := -I.
+>>  CFLAGS_vmx.o := -I.
+>>  
+>> -kvm-y			+= $(addprefix ../../../virt/kvm/, kvm_main.o ioapic.o \
+>> -				coalesced_mmio.o irq_comm.o eventfd.o \
+>> -				irqchip.o)
+>> -kvm-$(CONFIG_KVM_DEVICE_ASSIGNMENT)	+= $(addprefix ../../../virt/kvm/, \
+>> -				assigned-dev.o iommu.o)
+>> -kvm-$(CONFIG_KVM_ASYNC_PF)	+= $(addprefix ../../../virt/kvm/, async_pf.o)
+>> +KVM := ../../../virt/kvm
+>> +
+>> +kvm-y			+= $(KVM)/kvm_main.o $(KVM)/ioapic.o \
+>> +				$(KVM)/coalesced_mmio.o $(KVM)/irq_comm.o
 
-Signed-off-by: Xianglong Du <Xianglong.Du@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- .../devicetree/bindings/watchdog/sirfsoc_wdt.txt   |   15 ++
- arch/arm/boot/dts/atlas6.dtsi                      |    2 +-
- arch/arm/boot/dts/prima2.dtsi                      |    2 +-
- arch/arm/configs/prima2_defconfig                  |    3 +-
- drivers/watchdog/Kconfig                           |    8 +
- drivers/watchdog/Makefile                          |    1 +
- drivers/watchdog/sirfsoc_wdt.c                     |  250 ++++++++++++++++++++
- 7 files changed, 278 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt
- create mode 100644 drivers/watchdog/sirfsoc_wdt.c
+... there's a missing backslash here, causing x86 to break. Sorry about
+that. I'll resend the patch.
 
-diff --git a/Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt b/Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt
-new file mode 100644
-index 0000000..b2af5fb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/watchdog/sirfsoc_wdt.txt
-@@ -0,0 +1,15 @@
-+SiRFSoC Timer and Watchdog Timer(WDT) Controller
-+
-+Required properties:
-+- compatible: "sirf,prima2-tick", "sirf,prima2-wdt"
-+- reg: Address range of tick timer/WDT register set
-+- interrupts: interrupt number to the cpu
-+
-+Example:
-+
-+timer at b0020000 {
-+	compatible = "sirf,prima2-tick", "sirf,prima2-wdt";
-+	reg = <0xb0020000 0x1000>;
-+	interrupts = <0>;
-+};
-+
-diff --git a/arch/arm/boot/dts/atlas6.dtsi b/arch/arm/boot/dts/atlas6.dtsi
-index 7d1a279..c101f3e 100644
---- a/arch/arm/boot/dts/atlas6.dtsi
-+++ b/arch/arm/boot/dts/atlas6.dtsi
-@@ -155,7 +155,7 @@
- 			       <0x56000000 0x56000000 0x1b00000>;
- 
- 			timer at b0020000 {
--				compatible = "sirf,prima2-tick";
-+				compatible = "sirf,prima2-tick", "sirf,prima2-wdt";
- 				reg = <0xb0020000 0x1000>;
- 				interrupts = <0>;
- 			};
-diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
-index 3329719..3c76dc2 100644
---- a/arch/arm/boot/dts/prima2.dtsi
-+++ b/arch/arm/boot/dts/prima2.dtsi
-@@ -172,7 +172,7 @@
- 			ranges = <0xb0000000 0xb0000000 0x180000>;
- 
- 			timer at b0020000 {
--				compatible = "sirf,prima2-tick";
-+				compatible = "sirf,prima2-tick", "sirf,prima2-wdt";
- 				reg = <0xb0020000 0x1000>;
- 				interrupts = <0>;
- 			};
-diff --git a/arch/arm/configs/prima2_defconfig b/arch/arm/configs/prima2_defconfig
-index 002a1ce..a1d7c67 100644
---- a/arch/arm/configs/prima2_defconfig
-+++ b/arch/arm/configs/prima2_defconfig
-@@ -1,4 +1,3 @@
--CONFIG_EXPERIMENTAL=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_RELAY=y
-@@ -39,6 +38,8 @@ CONFIG_SPI=y
- CONFIG_SPI_SIRF=y
- CONFIG_SPI_SPIDEV=y
- # CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_WATCHDOG_CORE=y
- CONFIG_USB_GADGET=y
- CONFIG_USB_MASS_STORAGE=m
- CONFIG_MMC=y
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index e89fc31..fe005a8 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -391,6 +391,14 @@ config RETU_WATCHDOG
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called retu_wdt.
- 
-+config SIRFSOC_WATCHDOG
-+	tristate "SiRFSOC watchdog"
-+	depends on ARCH_SIRF
-+	default y
-+	help
-+	  Support for CSR SiRFprimaII and SiRFatlasVI watchdog. When
-+	  the watchdog triggers the system will be reset.
-+
- # AVR32 Architecture
- 
- config AT32AP700X_WDT
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index a300b94..9064f6a 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -54,6 +54,7 @@ obj-$(CONFIG_TS72XX_WATCHDOG) += ts72xx_wdt.o
- obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
- obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
- obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
-+obj-$(CONFIG_SIRFSOC_WATCHDOG) += sirfsoc_wdt.o
- 
- # AVR32 Architecture
- obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-diff --git a/drivers/watchdog/sirfsoc_wdt.c b/drivers/watchdog/sirfsoc_wdt.c
-new file mode 100644
-index 0000000..ab3dd42
---- /dev/null
-+++ b/drivers/watchdog/sirfsoc_wdt.c
-@@ -0,0 +1,250 @@
-+/*
-+ * Watchdog driver for CSR SiRFprimaII and SiRFatlasVI
-+ *
-+ * Copyright (c) 2013 Cambridge Silicon Radio Limited, a CSR plc group company.
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/miscdevice.h>
-+#include <linux/watchdog.h>
-+#include <linux/platform_device.h>
-+#include <linux/moduleparam.h>
-+#include <linux/of.h>
-+#include <linux/io.h>
-+#include <linux/uaccess.h>
-+
-+#define SIRFSOC_TIMER_COUNTER_LO	0x0000
-+#define SIRFSOC_TIMER_MATCH_0		0x0008
-+#define SIRFSOC_TIMER_INT_EN		0x0024
-+#define SIRFSOC_TIMER_WATCHDOG_EN	0x0028
-+#define SIRFSOC_TIMER_LATCH		0x0030
-+#define SIRFSOC_TIMER_LATCHED_LO	0x0034
-+
-+#define SIRFSOC_TIMER_WDT_INDEX		5
-+
-+#define SIRFSOC_WDT_MIN_TIMEOUT		30		/* 30 secs */
-+#define SIRFSOC_WDT_MAX_TIMEOUT		(10 * 60)	/* 10 mins */
-+#define SIRFSOC_WDT_DEFAULT_TIMEOUT	30		/* 30 secs */
-+
-+
-+static unsigned int default_timeout = SIRFSOC_WDT_DEFAULT_TIMEOUT;
-+module_param(default_timeout, uint, 0);
-+MODULE_PARM_DESC(default_timeout, "Default watchdog timeout (in seconds)");
-+
-+static unsigned int sirfsoc_wdt_gettimeleft(struct watchdog_device *wdd)
-+{
-+	u32 counter, match;
-+	int time_left;
-+
-+	counter = readl(watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_COUNTER_LO);
-+	match = readl(watchdog_get_drvdata(wdd) +
-+		SIRFSOC_TIMER_MATCH_0 + (SIRFSOC_TIMER_WDT_INDEX << 2));
-+
-+	if (match >= counter) {
-+		time_left = match-counter;
-+	} else {
-+		/* rollover */
-+		time_left = (0xffffffffUL - counter) + match;
-+	}
-+
-+	return time_left / CLOCK_TICK_RATE;
-+}
-+
-+static int sirfsoc_wdt_updatetimeout(struct watchdog_device *wdd)
-+{
-+	u32 counter, timeout_ticks;
-+
-+	timeout_ticks = wdd->timeout * CLOCK_TICK_RATE;
-+
-+	/* Enable the latch before reading the LATCH_LO register */
-+	writel(1, watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_LATCH);
-+
-+	/* Set the TO value */
-+	counter = readl(watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_LATCHED_LO);
-+
-+	if ((0xffffffffUL - counter) >= timeout_ticks) {
-+		counter += timeout_ticks;
-+	} else {
-+		/* Rollover */
-+		counter = timeout_ticks - (0xffffffffUL - counter);
-+	}
-+	writel(counter, watchdog_get_drvdata(wdd) +
-+		SIRFSOC_TIMER_MATCH_0 + (SIRFSOC_TIMER_WDT_INDEX << 2));
-+
-+	return 0;
-+}
-+
-+static int sirfsoc_wdt_enable(struct watchdog_device *wdd)
-+{
-+	sirfsoc_wdt_updatetimeout(wdd);
-+
-+	/*
-+	 * NOTE: If interrupt is not enabled
-+	 * then WD-Reset doesn't get generated@all.
-+	 */
-+	writel(readl(watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_INT_EN)
-+		| (1 << SIRFSOC_TIMER_WDT_INDEX),
-+		watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_INT_EN);
-+	writel(1, watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_WATCHDOG_EN);
-+
-+	return 0;
-+}
-+
-+static int sirfsoc_wdt_disable(struct watchdog_device *wdd)
-+{
-+	writel(0, watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_WATCHDOG_EN);
-+	writel(readl(watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_INT_EN)
-+		& (~(1 << SIRFSOC_TIMER_WDT_INDEX)),
-+		watchdog_get_drvdata(wdd) + SIRFSOC_TIMER_INT_EN);
-+
-+	return 0;
-+}
-+
-+static int sirfsoc_wdt_settimeout(struct watchdog_device *wdd, unsigned int to)
-+{
-+	if (to < SIRFSOC_WDT_MIN_TIMEOUT)
-+		to = SIRFSOC_WDT_MIN_TIMEOUT;
-+	if (to > SIRFSOC_WDT_MAX_TIMEOUT)
-+		to = SIRFSOC_WDT_MAX_TIMEOUT;
-+	wdd->timeout = to;
-+	sirfsoc_wdt_updatetimeout(wdd);
-+
-+	return 0;
-+}
-+
-+#define OPTIONS (WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE)
-+
-+static const struct watchdog_info sirfsoc_wdt_ident = {
-+	.options          =     OPTIONS,
-+	.firmware_version =	0,
-+	.identity         =	"SiRFSOC Watchdog",
-+};
-+
-+static struct watchdog_ops sirfsoc_wdt_ops = {
-+	.owner = THIS_MODULE,
-+	.start = sirfsoc_wdt_enable,
-+	.stop = sirfsoc_wdt_disable,
-+	.get_timeleft = sirfsoc_wdt_gettimeleft,
-+	.ping = sirfsoc_wdt_updatetimeout,
-+	.set_timeout = sirfsoc_wdt_settimeout,
-+};
-+
-+static struct watchdog_device sirfsoc_wdd = {
-+	.info = &sirfsoc_wdt_ident,
-+	.ops = &sirfsoc_wdt_ops,
-+	.timeout = SIRFSOC_WDT_DEFAULT_TIMEOUT,
-+	.min_timeout = SIRFSOC_WDT_MIN_TIMEOUT,
-+	.max_timeout = SIRFSOC_WDT_MAX_TIMEOUT,
-+};
-+
-+static int sirfsoc_wdt_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	int ret;
-+	void __iomem *base;
-+
-+	/* reserve static register mappings */
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "sirfsoc wdt: could not get mem resources\n");
-+		ret = -ENOMEM;
-+		goto out;
-+	}
-+
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (!base) {
-+		dev_err(&pdev->dev, "sirfsoc wdt: could not remap the mem\n");
-+		ret = -EADDRNOTAVAIL;
-+		goto out;
-+	}
-+	watchdog_set_drvdata(&sirfsoc_wdd, base);
-+
-+	sirfsoc_wdd.timeout = default_timeout;
-+
-+	ret = watchdog_register_device(&sirfsoc_wdd);
-+	if (!!ret)
-+		goto out;
-+
-+	platform_set_drvdata(pdev, &sirfsoc_wdd);
-+
-+	return 0;
-+
-+out:
-+	return ret;
-+}
-+
-+static int sirfsoc_wdt_remove(struct platform_device *pdev)
-+{
-+	struct watchdog_device *wdd = platform_get_drvdata(pdev);
-+
-+	sirfsoc_wdt_disable(wdd);
-+
-+	return 0;
-+}
-+
-+static void sirfsoc_wdt_shutdown(struct platform_device *pdev)
-+{
-+	struct watchdog_device *wdd = platform_get_drvdata(pdev);
-+
-+	sirfsoc_wdt_disable(wdd);
-+}
-+
-+#ifdef	CONFIG_PM
-+
-+static int sirfsoc_wdt_suspend(struct device *dev)
-+{
-+	return 0;
-+}
-+
-+static int sirfsoc_wdt_resume(struct device *dev)
-+{
-+	struct watchdog_device *wdd = dev_get_drvdata(dev);
-+
-+	/*
-+	 * NOTE: Since timer controller registers settings are saved
-+	 * and restored back by the timer-prima2.c, so we need not
-+	 * update WD settings except refreshing timeout.
-+	 */
-+	sirfsoc_wdt_updatetimeout(wdd);
-+
-+	return 0;
-+}
-+
-+#else
-+#define	sirfsoc_wdt_suspend		NULL
-+#define	sirfsoc_wdt_resume		NULL
-+#endif
-+
-+static const struct dev_pm_ops sirfsoc_wdt_pm_ops = {
-+	.suspend = sirfsoc_wdt_suspend,
-+	.resume = sirfsoc_wdt_resume,
-+};
-+
-+static const struct of_device_id sirfsoc_wdt_of_match[] = {
-+	{ .compatible = "sirf,prima2-wdt"},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, sirfsoc_wdt_of_match);
-+
-+static struct platform_driver sirfsoc_wdt_driver = {
-+	.driver = {
-+		.name = "sirfsoc-wdt",
-+		.owner = THIS_MODULE,
-+#ifdef CONFIG_PM
-+		.pm = &sirfsoc_wdt_pm_ops,
-+#endif
-+		.of_match_table	= of_match_ptr(sirfsoc_wdt_of_match),
-+	},
-+	.probe = sirfsoc_wdt_probe,
-+	.remove = sirfsoc_wdt_remove,
-+	.shutdown = sirfsoc_wdt_shutdown,
-+};
-+module_platform_driver(sirfsoc_wdt_driver);
-+
-+MODULE_DESCRIPTION("SiRF SoC watchdog driver");
-+MODULE_AUTHOR("Xianglong Du <Xianglong.Du@csr.com>");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS_MISCDEV(WATCHDOG_MINOR);
-+MODULE_ALIAS("platform:sirfsoc-wdt");
+	M.
 -- 
-1.7.4.1
+Jazz is not dead. It just smells funny...
