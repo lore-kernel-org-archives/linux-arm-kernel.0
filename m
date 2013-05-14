@@ -1,39 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 14 May 2013 10:32:49 +0200
-Subject: [PATCH 08/14] ARM: msm: Remove init_irq declaration in machine
- description
-In-Reply-To: <20130513182648.GA26913@codeaurora.org>
-References: <1368438253-28218-1-git-send-email-maxime.ripard@free-electrons.com>
- <1368438253-28218-9-git-send-email-maxime.ripard@free-electrons.com>
- <20130513182648.GA26913@codeaurora.org>
-Message-ID: <5191F6B1.9080000@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 May 2013 10:35:45 +0200
+Subject: [PATCH 7/9] pinctrl: abx500: Specify failed sub-driver by ID
+ instead of driver_data
+In-Reply-To: <1368019749-19455-8-git-send-email-lee.jones@linaro.org>
+References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
+ <1368019749-19455-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYTBdtRkY1e-Qnzdk27wpKFkNKTtmXazjTDxTh1hmXmgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Wed, May 8, 2013 at 3:29 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Le 13/05/2013 20:26, David Brown a ?crit :
-> On Mon, May 13, 2013 at 11:44:07AM +0200, Maxime Ripard wrote:
->> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
->> specified") removed the need to explictly setup the init_irq field in
->> the machine description when using only irqchip_init. Remove that
->> declaration for msm as well.
->>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  arch/arm/mach-msm/board-dt-8660.c | 1 -
->>  arch/arm/mach-msm/board-dt-8960.c | 1 -
->>  2 files changed, 2 deletions(-)
-> 
-> I'll pull this into my msm-cleanup tree.
+> If a sub-driver has not been specified correctly, there is a good chance
+> that plat_id is NULL, hence using an attribute of plat_id in the error
+> message is likely to not only fail the driver but Oops the kernel. Use
+> the failed ID instead.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Like I said in other mails from this thread, I'll send a v2, so you
-might want to hold off this patch until then.
+Good patch! Applied to the pinctrl fixes.
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
