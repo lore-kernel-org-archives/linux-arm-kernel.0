@@ -1,29 +1,35 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 May 2013 14:02:55 +0200
-Subject: [PATCH] ARM: U300: Add proper ifdef guard to fix build error when
- CONFIG_I2C_STU300=m
-In-Reply-To: <1367824503.6190.1.camel@phoenix>
-References: <1367824503.6190.1.camel@phoenix>
-Message-ID: <CACRpkdYrN78Oae_4DKh6cdOWxiuNEZCQzicKKoN5dv1ws185LA@mail.gmail.com>
+Date: Tue, 14 May 2013 14:07:58 +0200
+Subject: [PATCH v3] ARM: exynos: Select PINCTRL_EXYNOS for exynos4/5 at
+ chip level
+In-Reply-To: <1368123170-22906-1-git-send-email-dianders@chromium.org>
+References: <1368039168-24447-1-git-send-email-dianders@chromium.org>
+ <1368123170-22906-1-git-send-email-dianders@chromium.org>
+Message-ID: <CACRpkdZ3grCyf3x5dEbT6hAVDkpM3mwibVO5kT0Lv=a09-zBPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 6, 2013 at 9:15 AM, Axel Lin <axel.lin@ingics.com> wrote:
+On Thu, May 9, 2013 at 8:12 PM, Doug Anderson <dianders@chromium.org> wrote:
 
-> I got below build error if CONFIG_I2C_STU300=m.
+> Previously if you had MACH_EXYNOS5_DT but not MACH_EXYNOS4_DT you'd be
+> missing the pincontrol definitions.  Move PINCTRL selects to the arch
+> level since we should be enabling the code for all exynos variants.
 >
-> ERROR: "i2c_register_board_info" [arch/arm/mach-u300/i2c.ko] undefined!
-> make[1]: *** [__modpost] Error 1
-> make: *** [modules] Error 2
+> Update the PINCTRL descriptions to indicate that PINCTRL_EXYNOS is not
+> for exynos5440.  Also add basic dependencies for the PINCTRL_EXYNOS
+> kernel config.
 >
-> Fix it by adding proper ifdef guard in i2c.h and Makefile.
-> So arch/arm/mach-u300/i2c.c will be compiled when CONFIG_I2C_STU300 is
-> configured as built-in or as a module.
+> Signed-off-by: Doug Anderson <dianders@chromium.org>
+> ---
+> Changes in v3:
+> - Moved to chip level as per Tomasz.
+> - Update PINCTRL Kconfig for exynos.
 >
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
+> Changes in v2:
+> - Moved to the arch level as suggested by Olof.
 
-This file will be deleted in v3.11, see:
-http://marc.info/?l=linux-arm-kernel&m=136662534118633&w=2
+Acked-by: Linus Walleij <linus.walleij@linaro.org> for the pinctrl
+part, I guess this will be merged through the Samsung tree?
 
 Yours,
 Linus Walleij
