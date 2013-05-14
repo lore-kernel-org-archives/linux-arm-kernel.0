@@ -1,40 +1,29 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Tue, 14 May 2013 07:37:06 +0200
-Subject: [PATCH V2 07/10] ARM: mvebu: Use standard MMC binding for all
- users of mvsdio
-In-Reply-To: <20130513230918.GG31290@titan.lakedaemon.net>
-References: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
- <1368479941-10084-8-git-send-email-gmbnomis@gmail.com>
- <20130513230918.GG31290@titan.lakedaemon.net>
-Message-ID: <20130514053706.GA29922@schnuecks.de>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 14 May 2013 11:10:35 +0530
+Subject: [GIT PULL] Late Exynos stuff for v3.10
+In-Reply-To: <046301ce4d15$ac1592b0$0440b810$%kim@samsung.com>
+References: <5176B499.1000208@samsung.com> <51770697.7080504@samsung.com>
+ <20130424000638.GA9067@quad.lixom.net> <51794E10.1010205@samsung.com>
+ <CAOesGMjA5_XUXMcCL3roZiLC1S=ypMoVHn2tF7bzUuKr+eLw2A@mail.gmail.com>
+ <046301ce4d15$ac1592b0$0440b810$%kim@samsung.com>
+Message-ID: <5191CE53.5050902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-
-On Mon, May 13, 2013 at 07:09:18PM -0400, Jason Cooper wrote:
-> On Mon, May 13, 2013 at 11:18:58PM +0200, Simon Baatz wrote:
-> > In order to prepare the switch to the standard MMC device tree parser
-> > for mvsdio, adapt all current uses of mvsdio in the dts files to the
-> > standard format.
-> > 
-> > Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
-> > ---
-> ...
-> > diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-> > index 7588241..bf3a58c 100644
-> > --- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
-> > +++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-> > @@ -136,7 +136,7 @@
-> >  			pinctrl-0 = <&pmx_sdio &pmx_sdio_cd>;
-> >  			pinctrl-names = "default";
-> >  			status = "okay";
-> > -			cd-gpios = <&gpio1 15 0>;
-> > +			cd-gpios = <&gpio1 15 1>;
+>> Refresh my memory here, what was the reason for dropping the USB DTS
+>> updates? (Yes, I am aware it might because I asked you not to send
+>> them in but I don't remember :-).
+>>
+> Hmm...let me see, yeah, the USB DTS updates dropped because of late
+> pull-request stuff as you concerned.
+> http://www.spinics.net/lists/arm-kernel/msg240105.html
 > 
-> Is this a bugfix that should be backported?
+> Since I didn't want to make a noise at that time, so I dropped for v3.10, it
+> has been included in my tree for some time though.
+> 
 
-No, that should not be necessary. The old code implicitly used "1"
-here regardless of the actual flag value.
+Will it be possible to queue them up for one of the RC releases? They
+are only DTS entries, the drivers have already been merged.
 
-- Simon
+-- 
+Tushar Behera
