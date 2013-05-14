@@ -1,35 +1,45 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 14 May 2013 11:54:20 +0200
-Subject: [PATCHv2] mv643xx_eth: fix NAPI weight being > 64
-Message-ID: <1368525260-17556-1-git-send-email-andrew@lunn.ch>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 14 May 2013 11:25:36 +0100
+Subject: [PATCH] arm64: mm: Fix operands of clz in __flush_dcache_all
+In-Reply-To: <1368523614-22484-1-git-send-email-anup.patel@linaro.org>
+References: <1368523614-22484-1-git-send-email-anup.patel@linaro.org>
+Message-ID: <20130514102536.GD15129@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.10-rc1 issues the following warning:
+On Tue, May 14, 2013 at 10:26:54AM +0100, Anup Patel wrote:
+> From: Sukanto Ghosh <sghosh@apm.com>
+> 
+> The format of the lower 32-bits of the 64-bit operand to 'dc cisw' is
+> unchanged from ARMv7 architecture and the upper bits are RES0. This
+> implies that the 'way' field of the operand of 'dc cisw' occupies the
+> bit-positions [31 .. (32-A)]. Due to the use of 64-bit extended operands
+> to 'clz', the existing implementation of __flush_dcache_all is incorrectly
+> placing the 'way' field in the bit-positions [63 .. (64-A)].
+> 
+> Signed-off-by: Sukanto Ghosh <sghosh@apm.com>
+> Tested-by: Anup Patel <anup.patel@linaro.org>
+> ---
+>  arch/arm64/mm/cache.S |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+> index abe69b8..48a3860 100644
+> --- a/arch/arm64/mm/cache.S
+> +++ b/arch/arm64/mm/cache.S
+> @@ -52,7 +52,7 @@ loop1:
+>  	add	x2, x2, #4			// add 4 (line length offset)
+>  	mov	x4, #0x3ff
+>  	and	x4, x4, x1, lsr #3		// find maximum number on the way size
+> -	clz	x5, x4				// find bit position of way size increment
+> +	clz	w5, w4				// find bit position of way size increment
+>  	mov	x7, #0x7fff
+>  	and	x7, x7, x1, lsr #13		// extract max number of the index size
+>  loop2:
 
-netif_napi_add() called with weight 128 on device eth%d
+Good catch. I'll queue it for 3.10-rc2.
 
-This patch reduce the weight to 64, using NAPI_POLL_WEIGHT.
+Thanks.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
-v1->v2: Use NAPI_POLL_WEIGHT.
-
- drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index d0afeea..8f63c36 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -2745,7 +2745,7 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
- 
- 	INIT_WORK(&mp->tx_timeout_task, tx_timeout_task);
- 
--	netif_napi_add(dev, &mp->napi, mv643xx_eth_poll, 128);
-+	netif_napi_add(dev, &mp->napi, mv643xx_eth_poll, NAPI_POLL_WEIGHT);
- 
- 	init_timer(&mp->rx_oom);
- 	mp->rx_oom.data = (unsigned long)mp;
 -- 
-1.7.10.4
+Catalin
