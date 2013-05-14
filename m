@@ -1,28 +1,18 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 15 May 2013 14:36:40 +0200
-Subject: v3.10-rc1: compile problem in arch/arm/common/mcpm_platsmp.c
-Message-ID: <20130515123640.GA9066@amd.pavel.ucw.cz>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 May 2013 22:23:37 +0200
+Subject: [PATCH] ASoC: remove saarb and tavorevb3 machine drivers
+In-Reply-To: <1368544041.1350.111.camel@x61.thuisdomein>
+References: <1368544041.1350.111.camel@x61.thuisdomein>
+Message-ID: <2843869.zn4rrxyCrZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Tuesday 14 May 2013 17:07:21 Paul Bolle wrote:
+> Support for PXA95x was removed in v3.8. This means that the Kconfig
+> symbols MACH_SAARB and MACH_TAVOREVB3 are no longer available. This
+> leaves the SoC Audio support for Marvell Saarb and Marvell Tavor EVB3
+> unbuildable. Remove these drivers too.
+> 
+> Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 
-I'm trying to switch to v3.10-rc1, and got following:
-
-arch/arm/common/mcpm_platsmp.c: In function 'mcpm_secondary_init':
-arch/arm/common/mcpm_platsmp.c:52:2: error: implicit declaration of
-function 'gic_secondary_init' [-Werror=implicit-function-declaration]
-cc1: some warnings being treated as errors
-make[1]: *** [arch/arm/common/mcpm_platsmp.o] Error 1
-make: *** [arch/arm/common] Error 2
-make: *** Waiting for unfinished jobs....
-
-I do have 
-
-CONFIG_ARM_GIC=y
-
-.
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Acked-by: Arnd Bergmann <arnd@arndb.de>
