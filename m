@@ -1,34 +1,22 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 14 May 2013 21:19:12 +0000 (UTC)
-Subject: OMAP baseline test results for v3.9
-In-Reply-To: <20130514211328.GC5600@atomide.com>
-References: <alpine.DEB.2.00.1305081933270.19747@utopia.booyaka.com>
- <20130514211328.GC5600@atomide.com>
-Message-ID: <alpine.DEB.2.00.1305142116001.4368@utopia.booyaka.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 15 May 2013 00:02:57 +0200
+Subject: hwrng: picoxcell: PICOXCELL_PC3X3?
+Message-ID: <1368568977.1350.142.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 May 2013, Tony Lindgren wrote:
+0) Support for "Picochip picoXcell true random number generator[s]" was
+added in commit 5efb94ee14 ("hwrng: pixocell - add support for picoxcell
+TRNG"). Its Kconfig symbol (HW_RANDOM_PICOXCELL) depends on
+PICOXCELL_PC3X3. But that symbol is not included in mainline. I found no
+trace of it ever since support for this TRNG got added in v2.6.39. This
+means this code has never been buildable in mainline.
 
-> Hi,
-> 
-> * Paul Walmsley <paul@pwsan.com> [130508 12:45]:
-> > 
-> > PM off, dynamic idle:
-> >     FAIL ( 2/ 5): 4430es2panda, 4460pandaes
-> >     Pass ( 3/ 5): 3530es3beagle, 3730beaglexm, 37xxevm
-> 
-> Looking at your pm logs, 3730beaglexm won't hit off-idle.
-> I've pasted the relevant lines from your logs below.
-> 
-> Is this a known issue?
+Why does this code depend on PICOXCELL_PC3X3?
 
-Yes, the Beagle XM in my testbed is a 3630ES1.0.  From the PM logs:
-
-[   63.154418] omap3_pm_off_mode_enable: Core OFF disabled due to errata 
-i583
-
-I should probably clarify how this is reported in the test results.
+1) Slightly related: by what magic are picoxcell-pc7302-pc3x3.dts and
+picoxcell-pc3x3.dtsi hooked into the build system? Or are dts and dtsi
+files, well, special and not directly linked into the build system?
 
 
-- Paul
+Paul Bolle
