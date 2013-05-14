@@ -1,111 +1,116 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Tue, 14 May 2013 15:46:33 -0700
-Subject: [PATCH] clk: Fix race condition between clk_set_parent and
- clk_enable()
-In-Reply-To: <9066674.E2RzuEn3ap@flatron>
-References: <1367383328-25700-1-git-send-email-skannan@codeaurora.org>
- <20130514185417.10068.5717@quantum> <9066674.E2RzuEn3ap@flatron>
-Message-ID: <5192BEC9.1040104@codeaurora.org>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Tue, 14 May 2013 17:52:31 -0500
+Subject: [PATCH 1/5] ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
+Message-ID: <1368571955-6652-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2013 03:10 PM, Tomasz Figa wrote:
-> Hi,
->
-> On Tuesday 14 of May 2013 11:54:17 Mike Turquette wrote:
->> Quoting Saravana Kannan (2013-04-30 21:42:08)
->>
->>> Without this patch, the following race conditions are possible.
->>>
->>> Race condition 1:
->>> * clk-A has two parents - clk-X and clk-Y.
->>> * All three are disabled and clk-X is current parent.
->>> * Thread A: clk_set_parent(clk-A, clk-Y).
->>> * Thread A: <snip execution flow>
->>> * Thread A: Grabs enable lock.
->>> * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
->>> * Thread A: Updates clk-A SW parent to clk-Y
->>> * Thread A: Releases enable lock.
->>> * Thread B: clk_enable(clk-A).
->>> * Thread B: clk_enable() enables clk-Y, then enabled clk-A and
->>> returns.
->>>
->>> clk-A is now enabled in software, but not clocking in hardware since
->>> the hardware parent is still clk-X.
->>>
->>> The only way to avoid race conditions between clk_set_parent() and
->>> clk_enable/disable() is to ensure that clk_enable/disable() calls
->>> don't
->>> require changes to hardware enable state between changes to software
->>> clock topology and hardware clock topology.
->>>
->>> There are options to achieve the above:
->>> 1. Grab the enable lock before changing software/hardware topology and
->>>
->>>     release it afterwards.
->>>
->>> 2. Keep the clock enabled for the duration of software/hardware
->>> topology>
->>>     change so that any additional enable/disable calls don't try to
->>>     change
->>>     the hardware state. Once the topology change is complete, the clock
->>>     can
->>>     be put back in its original enable state.
->>>
->>> Option (1) is not an acceptable solution since the set_parent() ops
->>> might need to sleep.
->>>
->>> Therefore, this patch implements option (2).
->>>
->>> This patch doesn't violate any API semantics. clk_disable() doesn't
->>> guarantee that the clock is actually disabled. So, no clients of a
->>> clock can assume that a clock is disabled after their last call to
->>> clk_disable(). So, enabling the clock during a parent change is not a
->>> violation of any API semantics.
->>>
->>> This also has the nice side effect of simplifying the error handling
->>> code.
->>>
->>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
->>
->> I've taken this patch into clk-next for testing.  The code itself looks
->> fine.  The only thing that remains to be seen is if any platforms have a
->> problem with disabled clocks getting turned on during a reparent
->> operation.
->
-> IMHO this behavior should be documented somewhere, with a note that the
-> clock must not be prepared to keep it disabled during reparent operation
-> and possibly also pointing to the CLK_SET_PARENT_GATE flag.
+From: Dinh Nguyen <dinguyen@altera.com>
 
-Reasonable request. I can update the documentation of clk_set_parent() 
-to indicate that the clock might get turned on for the duration of the 
-call and if they need a guarantee the GATE flag should be used.
+Add entry for 2nd GMAC controller. Add the correct clocks for the GMAC.
 
->
->> On platforms that I have worked on this is OK, but I suppose there could
->> be some platform out there where a clock is prepared and disabled, and
->> briefly enabling the clock during the reparent operation somehow puts
->> the hardware in a bad state.
->
-> Well, on any platform where default clock settings are not completely
-> correct this is likely to cause problems, because some device might get
-> too high frequency for some period of time, which might crash it alone as
-> well as the whole system.
->
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Olof Johansson <olof@lixom.net>
+CC: Pavel Machek <pavel@denx.de>
+CC: <linux@arm.linux.org.uk>
+---
+ arch/arm/boot/dts/socfpga.dtsi         |   16 ++++++++++++++--
+ arch/arm/boot/dts/socfpga_cyclone5.dts |   16 ++++++++++++++++
+ arch/arm/boot/dts/socfpga_vt.dts       |    8 ++++++++
+ 3 files changed, 38 insertions(+), 2 deletions(-)
 
-I don't think this is really a problem with this patch. It's present 
-even without this patch.
-
-The patch doesn't switch to some other unspecified parent. It only 
-switches between the new/old parent. Even without this patch, if a clock 
-is prepared while you reparent it, clk_enable() could be called at 
-anytime between the parent switch and the future clock API calls to set 
-up the new parent correctly. I think that's just crappy driver code to 
-switch to a new parent before setting it up correctly. There's 
-absolutely no good reason to do it that way.
-
--Saravana
-
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 16a6e13..c42f835 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -23,6 +23,7 @@
+ 
+ 	aliases {
+ 		ethernet0 = &gmac0;
++		ethernet1 = &gmac1;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 		timer0 = &timer0;
+@@ -238,13 +239,24 @@
+ 				};
+ 			};
+ 
+-		gmac0: stmmac at ff700000 {
++		gmac0: ethernet at ff700000 {
+ 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
+ 			reg = <0xff700000 0x2000>;
+ 			interrupts = <0 115 4>;
+ 			interrupt-names = "macirq";
+ 			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+-			phy-mode = "gmii";
++			clocks = <&emac0_clk>;
++			clock-names = "stmmaceth";
++		};
++
++		gmac1: ethernet at ff702000 {
++			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
++			reg = <0xff702000 0x2000>;
++			interrupts = <0 120 4>;
++			interrupt-names = "macirq";
++			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
++			clocks = <&emac1_clk>;
++			clock-names = "stmmaceth";
+ 		};
+ 
+ 		L2: l2-cache at fffef000 {
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
+index 2495958..ece1a87 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
+@@ -32,6 +32,13 @@
+ 		reg = <0x0 0x40000000>; /* 1GB */
+ 	};
+ 
++	aliases {
++		/* this allow the ethaddr uboot environmnet variable contents
++		 * to be added to the gmac1 device tree blob.
++		 */
++		ethernet0 = &gmac1;
++	};
++
+ 	soc {
+ 		clkmgr at ffd04000 {
+ 			clocks {
+@@ -41,6 +48,15 @@
+ 			};
+ 		};
+ 
++		ethernet at ff700000 {
++			status = "disabled";
++		};
++
++		ethernet at ff702000 {
++			phy-mode = "rgmii";
++			phy-addr = <0xffffffff>; /* probe for phy addr */
++		};
++
+ 		timer0 at ffc08000 {
+ 			clock-frequency = <100000000>;
+ 		};
+diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+index 0bf035d..f728471 100644
+--- a/arch/arm/boot/dts/socfpga_vt.dts
++++ b/arch/arm/boot/dts/socfpga_vt.dts
+@@ -41,6 +41,14 @@
+ 			};
+ 		};
+ 
++		ethernet at ff700000 {
++			phy-mode = "gmii";
++		};
++
++		ethernet at ff702000 {
++			status = "disabled";
++		};
++
+ 		timer0 at ffc08000 {
+ 			clock-frequency = <7000000>;
+ 		};
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.9.5
