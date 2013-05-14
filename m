@@ -1,45 +1,35 @@
-From: Baohua.Song@csr.com (Barry Song)
-Date: Tue, 14 May 2013 17:32:03 +0800
-Subject: [PATCH] arm: prima2: use of_platform_populate instead of
- of_platform_bus_probe
-Message-ID: <1368523923-27137-1-git-send-email-Baohua.Song@csr.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 14 May 2013 11:34:45 +0200
+Subject: [PATCH] ARM: mach-bcm: drop "select GPIO_BCM"
+Message-ID: <1368524085.1350.102.camel@x61.thuisdomein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use of_platform_populate to populate platform devices, it is suitable
-for creating devices which are children of the root node, then makes
-things like pcm work.
+A select statement for the Kconfig symbol GPIO_BCM was added in v3.8.
+But there's no symbol with that name. It's a nop so we can drop it.
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
-Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
+Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
 ---
- arch/arm/mach-prima2/common.c |    7 +------
- 1 files changed, 1 insertions(+), 6 deletions(-)
+0) Untested.
 
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index 4f94cd8..bb67b90 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -17,14 +17,9 @@
- #include <linux/of_platform.h>
- #include "common.h"
- 
--static struct of_device_id sirfsoc_of_bus_ids[] __initdata = {
--	{ .compatible = "simple-bus", },
--	{},
--};
--
- void __init sirfsoc_mach_init(void)
- {
--	of_platform_bus_probe(NULL, sirfsoc_of_bus_ids, NULL);
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
- void __init sirfsoc_init_late(void)
+1) Patch assumes that https://lkml.org/lkml/2013/3/6/182 ("ARM:
+mach-bcm: drop "select GENERIC_TIME""), which got a Reviewed-by tag from
+Christian, was applied first.
+
+ arch/arm/mach-bcm/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 764273e..322620d 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -8,7 +8,6 @@ config ARCH_BCM
+ 	select CPU_V7
+ 	select CLKSRC_OF
+ 	select GENERIC_CLOCKEVENTS
+-	select GPIO_BCM
+ 	select SPARSE_IRQ
+ 	select TICK_ONESHOT
+ 	help
 -- 
-1.7.4.1
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+1.7.11.7
