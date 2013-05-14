@@ -1,33 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 14 May 2013 07:17:12 +0200
-Subject: [PATCH] mv643xx_eth: fix NAPI weight being > 64
-Message-ID: <1368508632-13742-1-git-send-email-andrew@lunn.ch>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Tue, 14 May 2013 07:37:06 +0200
+Subject: [PATCH V2 07/10] ARM: mvebu: Use standard MMC binding for all
+ users of mvsdio
+In-Reply-To: <20130513230918.GG31290@titan.lakedaemon.net>
+References: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
+ <1368479941-10084-8-git-send-email-gmbnomis@gmail.com>
+ <20130513230918.GG31290@titan.lakedaemon.net>
+Message-ID: <20130514053706.GA29922@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.10-rc1 issues the following warning:
+Hi Jason,
 
-netif_napi_add() called with weight 128 on device eth%d
+On Mon, May 13, 2013 at 07:09:18PM -0400, Jason Cooper wrote:
+> On Mon, May 13, 2013 at 11:18:58PM +0200, Simon Baatz wrote:
+> > In order to prepare the switch to the standard MMC device tree parser
+> > for mvsdio, adapt all current uses of mvsdio in the dts files to the
+> > standard format.
+> > 
+> > Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+> > ---
+> ...
+> > diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+> > index 7588241..bf3a58c 100644
+> > --- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
+> > +++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+> > @@ -136,7 +136,7 @@
+> >  			pinctrl-0 = <&pmx_sdio &pmx_sdio_cd>;
+> >  			pinctrl-names = "default";
+> >  			status = "okay";
+> > -			cd-gpios = <&gpio1 15 0>;
+> > +			cd-gpios = <&gpio1 15 1>;
+> 
+> Is this a bugfix that should be backported?
 
-This patch reduce the weight to 64.
+No, that should not be necessary. The old code implicitly used "1"
+here regardless of the actual flag value.
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
----
- drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index d0afeea..6b5471f 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -2745,7 +2745,7 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
- 
- 	INIT_WORK(&mp->tx_timeout_task, tx_timeout_task);
- 
--	netif_napi_add(dev, &mp->napi, mv643xx_eth_poll, 128);
-+	netif_napi_add(dev, &mp->napi, mv643xx_eth_poll, 64);
- 
- 	init_timer(&mp->rx_oom);
- 	mp->rx_oom.data = (unsigned long)mp;
--- 
-1.7.10.4
+- Simon
