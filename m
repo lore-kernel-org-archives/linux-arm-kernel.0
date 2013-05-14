@@ -1,37 +1,38 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 May 2013 15:13:39 +0100
-Subject: [PATCH v4 11/32] arm64: KVM: virtual CPU reset
+Date: Tue, 14 May 2013 15:13:40 +0100
+Subject: [PATCH v4 12/32] arm64: KVM: kvm_arch and kvm_vcpu_arch definitions
 In-Reply-To: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
 References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1368540840-26750-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1368540840-26750-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the reset code for a virtual CPU booted in 64bit mode.
+Provide the architecture dependent structures for VM and
+vcpu abstractions.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/reset.c | 77 ++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 77 insertions(+)
- create mode 100644 arch/arm64/kvm/reset.c
+ arch/arm64/include/asm/kvm_host.h | 186 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 186 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_host.h
 
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
 new file mode 100644
-index 0000000..84112e0
+index 0000000..4a2622f
 --- /dev/null
-+++ b/arch/arm64/kvm/reset.c
-@@ -0,0 +1,77 @@
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -0,0 +1,186 @@
 +/*
 + * Copyright (C) 2012,2013 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
-+ * Derived from arch/arm/kvm/reset.c
++ * Derived from arch/arm/include/asm/kvm_host.h:
 + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
 + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
++ * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
@@ -43,61 +44,170 @@ index 0000000..84112e0
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/errno.h>
-+#include <linux/kvm_host.h>
-+#include <linux/kvm.h>
++#ifndef __ARM64_KVM_HOST_H__
++#define __ARM64_KVM_HOST_H__
 +
-+#include <asm/cputype.h>
-+#include <asm/ptrace.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_coproc.h>
++#include <asm/kvm.h>
++#include <asm/kvm_asm.h>
++#include <asm/kvm_mmio.h>
 +
-+/*
-+ * ARMv8 Reset Values
-+ */
-+static struct kvm_regs default_regs_reset = {
-+	.regs.pstate = (PSR_MODE_EL1h | PSR_A_BIT | PSR_I_BIT |
-+			PSR_F_BIT | PSR_D_BIT),
++#define KVM_MAX_VCPUS 4
++#define KVM_USER_MEM_SLOTS 32
++#define KVM_PRIVATE_MEM_SLOTS 4
++#define KVM_COALESCED_MMIO_PAGE_OFFSET 1
++
++#include <kvm/arm_vgic.h>
++#include <kvm/arm_arch_timer.h>
++
++#define KVM_VCPU_MAX_FEATURES 0
++
++/* We don't currently support large pages. */
++#define KVM_HPAGE_GFN_SHIFT(x)	0
++#define KVM_NR_PAGE_SIZES	1
++#define KVM_PAGES_PER_HPAGE(x)	(1UL<<31)
++
++struct kvm_vcpu;
++int kvm_target_cpu(void);
++int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
++int kvm_arch_dev_ioctl_check_extension(long ext);
++
++struct kvm_arch {
++	/* The VMID generation used for the virt. memory system */
++	u64    vmid_gen;
++	u32    vmid;
++
++	/* 1-level 2nd stage table and lock */
++	spinlock_t pgd_lock;
++	pgd_t *pgd;
++
++	/* VTTBR value associated with above pgd and vmid */
++	u64    vttbr;
++
++	/* Interrupt controller */
++	struct vgic_dist	vgic;
++
++	/* Timer */
++	struct arch_timer_kvm	timer;
 +};
 +
-+int kvm_arch_dev_ioctl_check_extension(long ext)
-+{
-+	int r;
++#define KVM_NR_MEM_OBJS     40
 +
-+	switch (ext) {
-+	default:
-+		r = 0;
-+	}
-+
-+	return r;
-+}
-+
-+
-+/**
-+ * kvm_reset_vcpu - sets core registers and sys_regs to reset value
-+ * @vcpu: The VCPU pointer
-+ *
-+ * This function finds the right table above and sets the registers on
-+ * the virtual CPU struct to their architectually defined reset
-+ * values.
++/*
++ * We don't want allocation failures within the mmu code, so we preallocate
++ * enough memory for a single page fault in a cache.
 + */
-+int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
++struct kvm_mmu_memory_cache {
++	int nobjs;
++	void *objects[KVM_NR_MEM_OBJS];
++};
++
++struct kvm_vcpu_fault_info {
++	u32 esr_el2;		/* Hyp Syndrom Register */
++	u64 far_el2;		/* Hyp Fault Address Register */
++	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
++};
++
++struct kvm_cpu_context {
++	struct kvm_regs	gp_regs;
++	u64 sys_regs[NR_SYS_REGS];
++};
++
++typedef struct kvm_cpu_context kvm_cpu_context_t;
++
++struct kvm_vcpu_arch {
++	struct kvm_cpu_context ctxt;
++
++	/* HYP configuration */
++	u64 hcr_el2;
++
++	/* Exception Information */
++	struct kvm_vcpu_fault_info fault;
++
++	/* Pointer to host CPU context */
++	kvm_cpu_context_t *host_cpu_context;
++
++	/* VGIC state */
++	struct vgic_cpu vgic_cpu;
++	struct arch_timer_cpu timer_cpu;
++
++	/*
++	 * Anything that is not used directly from assembly code goes
++	 * here.
++	 */
++	/* dcache set/way operation pending */
++	int last_pcpu;
++	cpumask_t require_dcache_flush;
++
++	/* Don't run the guest */
++	bool pause;
++
++	/* IO related fields */
++	struct kvm_decode mmio_decode;
++
++	/* Interrupt related fields */
++	u64 irq_lines;		/* IRQ and FIQ levels */
++
++	/* Cache some mmu pages needed inside spinlock regions */
++	struct kvm_mmu_memory_cache mmu_page_cache;
++
++	/* Target CPU and feature flags */
++	u32 target;
++	DECLARE_BITMAP(features, KVM_VCPU_MAX_FEATURES);
++
++	/* Detect first run of a vcpu */
++	bool has_run_once;
++};
++
++#define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
++#define vcpu_sys_reg(v,r)	((v)->arch.ctxt.sys_regs[(r)])
++#define vcpu_cp15(v,r)		((v)->arch.ctxt.cp15[(r)])
++
++struct kvm_vm_stat {
++	u32 remote_tlb_flush;
++};
++
++struct kvm_vcpu_stat {
++	u32 halt_wakeup;
++};
++
++struct kvm_vcpu_init;
++int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
++			const struct kvm_vcpu_init *init);
++unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
++int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
++struct kvm_one_reg;
++int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
++int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg);
++
++#define KVM_ARCH_WANT_MMU_NOTIFIER
++struct kvm;
++int kvm_unmap_hva(struct kvm *kvm, unsigned long hva);
++int kvm_unmap_hva_range(struct kvm *kvm,
++			unsigned long start, unsigned long end);
++void kvm_set_spte_hva(struct kvm *kvm, unsigned long hva, pte_t pte);
++
++/* We do not have shadow page tables, hence the empty hooks */
++static inline int kvm_age_hva(struct kvm *kvm, unsigned long hva)
 +{
-+	struct kvm_regs *cpu_reset;
-+
-+	switch (vcpu->arch.target) {
-+	default:
-+		cpu_reset = &default_regs_reset;
-+		break;
-+	}
-+
-+	/* Reset core registers */
-+	memcpy(vcpu_gp_regs(vcpu), cpu_reset, sizeof(*cpu_reset));
-+
-+	/* Reset system registers */
-+	kvm_reset_sys_regs(vcpu);
-+
 +	return 0;
 +}
++
++static inline int kvm_test_age_hva(struct kvm *kvm, unsigned long hva)
++{
++	return 0;
++}
++
++struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
++struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
++
++u64 kvm_call_hyp(void *hypfn, ...);
++
++int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
++		int exception_index);
++
++int kvm_perf_init(void);
++int kvm_perf_teardown(void);
++
++#endif /* __ARM64_KVM_HOST_H__ */
 -- 
 1.8.2.3
