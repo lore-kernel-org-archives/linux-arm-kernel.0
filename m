@@ -1,67 +1,47 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 May 2013 12:11:37 +0100
-Subject: [PATCH v3 4/7] ARM: KVM: use phys_addr_t instead of unsigned long
- long for HYP PGDs
-In-Reply-To: <1368529900-22572-1-git-send-email-marc.zyngier@arm.com>
-References: <1368529900-22572-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1368529900-22572-5-git-send-email-marc.zyngier@arm.com>
+Date: Tue, 14 May 2013 12:11:33 +0100
+Subject: [PATCH v3 0/7] ARM: KVM: various mmu related fixes for 3.10
+Message-ID: <1368529900-22572-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HYP PGDs are passed around as phys_addr_t, except just before calling
-into the hypervisor init code, where they are cast to a rather weird
-unsigned long long.
+This patch series fixes a number of of KVM/ARM issues that have either
+been spotted during the review of the arm64 code, or while reworking
+related code.
 
-Just keep them around as phys_addr_t, which is what makes the most
-sense.
+Only the first patch fixes a potential (if unlikely) problem, the
+others are either cosmetic or performance related.
 
-Reported-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_host.h | 4 ++--
- arch/arm/kvm/arm.c              | 8 ++++----
- 2 files changed, 6 insertions(+), 6 deletions(-)
+Tested on TC-2, based on 3.10-rc1.
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 57cb786..ff49193 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -190,8 +190,8 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
- int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		int exception_index);
- 
--static inline void __cpu_init_hyp_mode(unsigned long long boot_pgd_ptr,
--				       unsigned long long pgd_ptr,
-+static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
-+				       phys_addr_t pgd_ptr,
- 				       unsigned long hyp_stack_ptr,
- 				       unsigned long vector_ptr)
- {
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 37d216d..327a1fb 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -789,8 +789,8 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 
- static void cpu_init_hyp_mode(void *dummy)
- {
--	unsigned long long boot_pgd_ptr;
--	unsigned long long pgd_ptr;
-+	phys_addr_t boot_pgd_ptr;
-+	phys_addr_t pgd_ptr;
- 	unsigned long hyp_stack_ptr;
- 	unsigned long stack_page;
- 	unsigned long vector_ptr;
-@@ -798,8 +798,8 @@ static void cpu_init_hyp_mode(void *dummy)
- 	/* Switch from the HYP stub to our own HYP init vector */
- 	__hyp_set_vectors(kvm_get_idmap_vector());
- 
--	boot_pgd_ptr = (unsigned long long)kvm_mmu_get_boot_httbr();
--	pgd_ptr = (unsigned long long)kvm_mmu_get_httbr();
-+	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
-+	pgd_ptr = kvm_mmu_get_httbr();
- 	stack_page = __get_cpu_var(kvm_arm_hyp_stack_page);
- 	hyp_stack_ptr = stack_page + PAGE_SIZE;
- 	vector_ptr = (unsigned long)__kvm_hyp_vector;
+* From v2:
+  - [1/7] Drop the unnecessary "TLB invalidate all", as we already do
+  it on a page-per-page level.
+  - [3/7] Add a cache cleaning primitive, move the cleaning outside of
+  kvm_set_pte(), and clean a range as large as possible when inserting
+  PTEs.
+  - [4,5,7/7] New patches
+
+Marc Zyngier (7):
+  ARM: KVM: be more thorough when invalidating TLBs
+  ARM: KVM: remove dead prototype for __kvm_tlb_flush_vmid
+  ARM: KVM: relax cache maintainance when building page tables
+  ARM: KVM: use phys_addr_t instead of unsigned long long for HYP PGDs
+  ARM: KVM: don't special case PC when doing an MMIO
+  ARM: KVM: get rid of S2_PGD_SIZE
+  ARM: KVM: drop use of PAGE_S2_DEVICE
+
+ arch/arm/include/asm/kvm_arm.h     |  1 -
+ arch/arm/include/asm/kvm_asm.h     |  2 --
+ arch/arm/include/asm/kvm_emulate.h |  5 ----
+ arch/arm/include/asm/kvm_host.h    |  4 +--
+ arch/arm/include/asm/kvm_mmu.h     | 17 +++++++-----
+ arch/arm/include/asm/pgtable.h     |  2 --
+ arch/arm/kvm/arm.c                 |  8 +++---
+ arch/arm/kvm/mmio.c                |  6 -----
+ arch/arm/kvm/mmu.c                 | 53 ++++++++++++++++++++++----------------
+ arch/arm/mm/mmu.c                  |  6 ++---
+ 10 files changed, 50 insertions(+), 54 deletions(-)
+
 -- 
 1.8.2.3
