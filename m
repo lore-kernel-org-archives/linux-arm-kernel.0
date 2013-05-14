@@ -1,167 +1,67 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 14 May 2013 10:34:40 +0100
-Subject: [RFC PATCH v3 05/17] ARM: dts: at91: cpus/cpu node dts updates
-In-Reply-To: <519201C0.2060908@atmel.com>
-References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366824502-19729-6-git-send-email-lorenzo.pieralisi@arm.com>
- <517E4366.4040209@atmel.com> <519201C0.2060908@atmel.com>
-Message-ID: <20130514093440.GA27767@e102568-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 14 May 2013 10:40:36 +0100
+Subject: [PATCH 8/9] pinctrl: abx500: Rejiggle platform data and DT
+ initialisation
+In-Reply-To: <CACRpkdbhHnrN3MGufubyYLNXdcCgZ2OpQ4a2CG6bwPJk88DZRg@mail.gmail.com>
+References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
+ <1368019749-19455-9-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZTU1gv3onjFF4eqxv-o1BQwd48u4gQ9NWqryWoMiKTDQ@mail.gmail.com>
+ <20130514084756.GE3297@gmail.com>
+ <CACRpkdbhHnrN3MGufubyYLNXdcCgZ2OpQ4a2CG6bwPJk88DZRg@mail.gmail.com>
+Message-ID: <20130514094036.GI3297@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 10:20:00AM +0100, Nicolas Ferre wrote:
-> On 29/04/2013 11:54, Nicolas Ferre :
-> > On 04/24/2013 07:28 PM, Lorenzo Pieralisi :
-> >> This patch updates the in-kernel dts files according to the latest cpus
-> >> and cpu bindings updates for ARM.
-> >>
-> >> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >
-> > With changes in compatible string... ok then.
-> >
-> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> Now that our Cortex-A5 is in mainline, can you please update the:
-> 
-> arch/arm/boot/dts/sama5d3.dtsi
-> 
-> as-well?
+On Tue, 14 May 2013, Linus Walleij wrote:
 
-I will, no problems.
-
-> Thanks, best regards,
-
-Cheers,
-Lorenzo
-
-> 
-> >> ---
-> >>   arch/arm/boot/dts/at91rm9200.dtsi  | 6 +++++-
-> >>   arch/arm/boot/dts/at91sam9260.dtsi | 8 ++++++--
-> >>   arch/arm/boot/dts/at91sam9263.dtsi | 8 ++++++--
-> >>   arch/arm/boot/dts/at91sam9g45.dtsi | 8 ++++++--
-> >>   arch/arm/boot/dts/at91sam9n12.dtsi | 8 ++++++--
-> >>   arch/arm/boot/dts/at91sam9x5.dtsi  | 8 ++++++--
-> >>   6 files changed, 35 insertions(+), 11 deletions(-)
-> >>
-> >> diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-> >> index b0268a5..f16b3d4 100644
-> >> --- a/arch/arm/boot/dts/at91rm9200.dtsi
-> >> +++ b/arch/arm/boot/dts/at91rm9200.dtsi
-> >> @@ -34,8 +34,12 @@
-> >>   		ssc2 = &ssc2;
-> >>   	};
-> >>   	cpus {
-> >> -		cpu at 0 {
-> >> +		#address-cells = <0>;
-> >> +		#size-cells = <0>;
-> >> +
-> >> +		cpu {
-> >>   			compatible = "arm,arm920t";
-> >> +			device_type = "cpu";
-> >>   		};
-> >>   	};
-> >>
-> >> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> >> index cb7bcc5..c4eeef7 100644
-> >> --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> >> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> >> @@ -32,8 +32,12 @@
-> >>   		ssc0 = &ssc0;
-> >>   	};
-> >>   	cpus {
-> >> -		cpu at 0 {
-> >> -			compatible = "arm,arm926ejs";
-> >> +		#address-cells = <0>;
-> >> +		#size-cells = <0>;
-> >> +
-> >> +		cpu {
-> >> +			compatible = "arm,arm926ej-s";
-> >> +			device_type = "cpu";
-> >>   		};
-> >>   	};
-> >>
-> >> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-> >> index 271d4de..f3b5c2a 100644
-> >> --- a/arch/arm/boot/dts/at91sam9263.dtsi
-> >> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-> >> @@ -29,8 +29,12 @@
-> >>   		ssc1 = &ssc1;
-> >>   	};
-> >>   	cpus {
-> >> -		cpu at 0 {
-> >> -			compatible = "arm,arm926ejs";
-> >> +		#address-cells = <0>;
-> >> +		#size-cells = <0>;
-> >> +
-> >> +		cpu {
-> >> +			compatible = "arm,arm926ej-s";
-> >> +			device_type = "cpu";
-> >>   		};
-> >>   	};
-> >>
-> >> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-> >> index 6b1d4ca..6c18bd3 100644
-> >> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
-> >> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-> >> @@ -35,8 +35,12 @@
-> >>   		ssc1 = &ssc1;
-> >>   	};
-> >>   	cpus {
-> >> -		cpu at 0 {
-> >> -			compatible = "arm,arm926ejs";
-> >> +		#address-cells = <0>;
-> >> +		#size-cells = <0>;
-> >> +
-> >> +		cpu {
-> >> +			compatible = "arm,arm926ej-s";
-> >> +			device_type = "cpu";
-> >>   		};
-> >>   	};
-> >>
-> >> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> >> index 7750f98..c3b11af 100644
-> >> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> >> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> >> @@ -31,8 +31,12 @@
-> >>   		ssc0 = &ssc0;
-> >>   	};
-> >>   	cpus {
-> >> -		cpu at 0 {
-> >> -			compatible = "arm,arm926ejs";
-> >> +		#address-cells = <0>;
-> >> +		#size-cells = <0>;
-> >> +
-> >> +		cpu {
-> >> +			compatible = "arm,arm926ej-s";
-> >> +			device_type = "cpu";
-> >>   		};
-> >>   	};
-> >>
-> >> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-> >> index aa98e64..6c39d0f 100644
-> >> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
-> >> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-> >> @@ -33,8 +33,12 @@
-> >>   		ssc0 = &ssc0;
-> >>   	};
-> >>   	cpus {
-> >> -		cpu at 0 {
-> >> -			compatible = "arm,arm926ejs";
-> >> +		#address-cells = <0>;
-> >> +		#size-cells = <0>;
-> >> +
-> >> +		cpu {
-> >> +			compatible = "arm,arm926ej-s";
-> >> +			device_type = "cpu";
-> >>   		};
-> >>   	};
-> >>
-> >>
+> On Tue, May 14, 2013 at 10:47 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Tue, 14 May 2013, Linus Walleij wrote:
 > >
+> >> On Wed, May 8, 2013 at 3:29 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> >>
+> >> > A pointer to GPIO platform data is always passed to the driver now, so
+> >> > there's little point in checking for 'pdata' and executing the DT case if
+> >> > it's not there. The difference between booting with DT and !DT is when
+> >> > booting with DT, plat_id is not populated. Thus, in the DT case we have
+> >> > to use a DT match table in order to find out which platform we're
+> >> > executing on. So, we're changing the semantics here to only use the
+> >> > match table if no plat_id is supplied though platform data.
+> >> >
+> >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >>
+> >> Is this really included in the [0/9] fire alarm wrapper statement
+> >> "Important ux500 fixups due for the v3.10 -rc:s"?
+> >>
+> >> It seems more like a random refactoring to me.
+> >>
+> >> The commit message fails to specify which regression this
+> >> is fixing, like if it's causing an oops or so.
+> >>
+> >> So I've tentatively applied it to the pinctrl devel branch for
+> >> v3.11 unless something comes up...
 > >
+> > Perhaps the commit message is a bit weak, but yes, it _needs_ to go
+> > into v3.10, or this driver will be _broken_ when we boot with DT.
+> >
+> > Please apply this to your -fixes branch.
 > 
+> Quting myself from above:
+>   "The commit message fails to specify which regression this
+>   is fixing, like if it's causing an oops or so."
 > 
-> -- 
-> Nicolas Ferre
-> 
+> I'm happy to apply it but what do I write in the commit message?
+
+Platform Data is invariably populated for this driver, even when
+booting with Device Tree. Thus the Device Tree probing code encased
+within the first check for Platform Data will never executed, causing
+the driver to fail when DT is enabled.
+
+This patch fixes the aforementioned regression by rejigging the
+probe() semantics to attempt to extract a platform ID from Device Tree
+if one can not be sourced from platform data.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
