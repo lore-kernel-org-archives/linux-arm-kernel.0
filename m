@@ -1,85 +1,121 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Tue, 14 May 2013 18:26:52 +0200
-Subject: [PATCH V2 00/10] mmc_of_parse() adaptations, DT support for
- Sheevaplugs
-In-Reply-To: <Pine.LNX.4.64.1305140819520.32151@axis700.grange>
-References: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
- <Pine.LNX.4.64.1305140819520.32151@axis700.grange>
-Message-ID: <20130514162652.GA13801@schnuecks.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 14 May 2013 18:24:50 +0200
+Subject: [PATCH v2] net/macb: fix ISR clear-on-write behavior only for
+ some SoC
+In-Reply-To: <1368536416-18364-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
+ <1368536416-18364-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20130514162450.GF22508@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
-
-On Tue, May 14, 2013 at 08:37:47AM +0200, Guennadi Liakhovetski wrote:
-> On Mon, 13 May 2013, Simon Baatz wrote:
+On 15:00 Tue 14 May     , Nicolas Ferre wrote:
+> Commit 749a2b6 (net/macb: clear tx/rx completion flags in ISR)
+> introduces clear-on-write on ISR register. This behavior is not always
+> implemented when using Cadence MACB/GEM and is breaking other platforms.
+> We are using the Design Configuration Register 1 information and a capability
+> property to actually activate this clear-on-write behavior on ISR.
 > 
-> > While adding DT support for the Sheevaplugs by Globalscale Technologies
-> > (Kirkwood), it turned out that the DT binding of mvsdio lacked features to
-> > properly support the hardware (active high/low of CD and WP pins could not
-> > be described in DT).
-> > 
-> > This is standard functionality provided by the mmc_of_parse() helper
-> > function.  However, mmc_of_parse() may allocate GPIO lines.  If the
-> > allocation fails, it outputs an error, but does not return an error to its
-> > caller.  Therefore, a proposal to handle errors in mmc_of_parse() is made.
+> Reported-by: Hein Tibosch <hein_tibosch@yahoo.es>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> ---
+> v2: - use DCFG1 bit 23 integration information instead of device tree
+>       compatibility string to retreive information about c-o-r vs. c-o-w ISR.
+>     - move configuration in macb_init_hw() function instead of probe() - at
+>       "open" time.
 > 
-> Thanks for the patches. In principle I'm fine either way. It is a policy 
-> decision IMHO. E.g. consider a situation. You have a DT with an SD-card 
-> slot, where card-detection is performed by a GPIO. OTOH the same pin is 
-> used on some other (optional) interface on the same board. If that other 
-> competing interface is unused, the driver isn't loaded, you can use the 
-> GPIO for card-detection. However, if that other interface is used, your 
-> attempt to get the card-detect pin will fail, but you still can use the 
-> interface in polling mode. No, I don't think this is a good example of 
-> hardware design :) User experience would depend on driver probing order, 
-> but in principle it is imaginable. So, with the current mmc_of_parse() 
-> you're more tolerant. You get a warning in the log, but the interface 
-> might still be usable. And if you're surprised why your write protection 
-> status hasn't been properly detected - just look in the log.
-
-Yes, there is value in both ways. As should be clear by now, I prefer
-being more strict here :-).  But in the end, it is a policy decision
-as you say.
-
-There is also a "middle way" to split off the gpio allocation. This
-has already been proposed in some other thread IIRC.
-
-For example, split the current mmc_of_parse() into:
-
-- mmc_of_parse(): Parses everything except the cd, wp gpios. It can't
-  return an error and assumes sensible default values in case of a
-  parse error (as it does today).
-
-- mmc_of_gpio_cd(), mmc_of_gpio_wp(): Parses the cd/wp parts and
-  requests the respective gpio (returning an error if that fails).
-
-However, this means up to three calls instead of one in the
-driver (and the respective error checking if needed).
-
-On the other hand, it offers more flexibility: the driver can decide
-whether to ignore the error, fall back to MMC_CAP_NEEDS_POLL or abort
-the probe.
-
-> You're proposing a change in behaviour. After your change any failure to 
-> obtain a resource in mmc_of_parse() will fail interface probing. 
-> Personally I don't think there are any users around, who would notice this 
-> change, still, we have to be aware of it. And I don't know whether we 
-> should do that. You know, we don't break user-space ;-)
+> As I have changed the most of this patch, I will collect your Ack and feedback
+> just like a new patch. Thanks for your help...
 > 
-> So, technically I'm ok with the changes, but policy-wise I'm not sure how 
-> severe this change would be. We could go a bit slower and first add a 
-> return code as in your patch #1, but not fail drivers, like in your 
-> patches #2, 3,... but WARN_ON(mmc_of_parse() < 0); and continue for now. 
-> In 3.12 we could then replace those warnings with real failures. But maybe 
-> I'm just overcautious and we can just go ahead with your patches. You can 
-> add my
+> Bye,
 > 
-> Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+>  drivers/net/ethernet/cadence/macb.c | 18 ++++++++++++++++--
+>  drivers/net/ethernet/cadence/macb.h |  7 +++++++
+>  2 files changed, 23 insertions(+), 2 deletions(-)
 > 
-> for patches 1-3, and let's see what Chris thinks about this change.
-
-Thanks for the review and the ack! Of course, I am fine with a more
-cautious way if that's required.
-
-- Simon
+> diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+> index 6be513d..c89aa41 100644
+> --- a/drivers/net/ethernet/cadence/macb.c
+> +++ b/drivers/net/ethernet/cadence/macb.c
+> @@ -485,7 +485,8 @@ static void macb_tx_interrupt(struct macb *bp)
+>  	status = macb_readl(bp, TSR);
+>  	macb_writel(bp, TSR, status);
+>  
+> -	macb_writel(bp, ISR, MACB_BIT(TCOMP));
+> +	if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
+> +		macb_writel(bp, ISR, MACB_BIT(TCOMP));
+>  
+>  	netdev_vdbg(bp->dev, "macb_tx_interrupt status = 0x%03lx\n",
+>  		(unsigned long)status);
+> @@ -738,7 +739,8 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
+>  			 * now.
+>  			 */
+>  			macb_writel(bp, IDR, MACB_RX_INT_FLAGS);
+> -			macb_writel(bp, ISR, MACB_BIT(RCOMP));
+> +			if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
+> +				macb_writel(bp, ISR, MACB_BIT(RCOMP));
+>  
+>  			if (napi_schedule_prep(&bp->napi)) {
+>  				netdev_vdbg(bp->dev, "scheduling RX softirq\n");
+> @@ -1062,6 +1064,17 @@ static void macb_configure_dma(struct macb *bp)
+>  	}
+>  }
+>  
+> +/*
+> + * Configure peripheral capacities according to integration options used
+> + */
+> +static void macb_configure_caps(struct macb *bp)
+> +{
+> +	if (macb_is_gem(bp)) {
+> +		if (GEM_BF(IRQCOR, gem_readl(bp, DCFG1)) == 0)
+> +			bp->caps |= MACB_CAPS_ISR_CLEAR_ON_WRITE;
+> +	}
+> +}
+> +
+>  static void macb_init_hw(struct macb *bp)
+>  {
+>  	u32 config;
+> @@ -1084,6 +1097,7 @@ static void macb_init_hw(struct macb *bp)
+>  	bp->duplex = DUPLEX_HALF;
+>  
+>  	macb_configure_dma(bp);
+> +	macb_configure_caps(bp);
+>  
+>  	/* Initialize TX and RX buffers */
+>  	macb_writel(bp, RBQP, bp->rx_ring_dma);
+> diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+> index 993d703..548c0ec 100644
+> --- a/drivers/net/ethernet/cadence/macb.h
+> +++ b/drivers/net/ethernet/cadence/macb.h
+> @@ -300,6 +300,8 @@
+>  #define MACB_REV_SIZE				16
+>  
+>  /* Bitfields in DCFG1. */
+> +#define GEM_IRQCOR_OFFSET			23
+> +#define GEM_IRQCOR_SIZE				1
+>  #define GEM_DBWDEF_OFFSET			25
+>  #define GEM_DBWDEF_SIZE				3
+>  
+> @@ -323,6 +325,9 @@
+>  #define MACB_MAN_READ				2
+>  #define MACB_MAN_CODE				2
+>  
+> +/* Capability mask bits */
+> +#define MACB_CAPS_ISR_CLEAR_ON_WRITE		0x1
+> +
+>  /* Bit manipulation macros */
+>  #define MACB_BIT(name)					\
+>  	(1 << MACB_##name##_OFFSET)
+> @@ -574,6 +579,8 @@ struct macb {
+>  	unsigned int 		speed;
+>  	unsigned int 		duplex;
+>  
+> +	u32			caps;
+> +
+>  	phy_interface_t		phy_interface;
+>  
+>  	/* AT91RM9200 transmit */
+> -- 
+> 1.8.0
+> 
