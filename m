@@ -1,122 +1,47 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 14 May 2013 13:08:03 -0400 (EDT)
-Subject: [PATCH] ARM: zImage: Convert 32bits memory size and address from
- ATAG to 64bits DTB
-In-Reply-To: <1368545323-3621-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1368545323-3621-1-git-send-email-gregory.clement@free-electrons.com>
- <1368545323-3621-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <alpine.LFD.2.03.1305141306070.31158@syhkavp.arg>
+From: csd@broadcom.com (Christian Daudt)
+Date: Tue, 14 May 2013 11:04:50 -0700
+Subject: [PATCH 12/20] ARM: bcm281xx: Remove init_irq declaration in
+ machine description
+In-Reply-To: <1368545933-7430-13-git-send-email-maxime.ripard@free-electrons.com>
+References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1368545933-7430-13-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <51927CC2.7080101@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 May 2013, Gregory CLEMENT wrote:
-
-> When CONFIG_ARM_APPENDED_DTB is selected, if the bootloader provides
-> an ATAG_MEM it replaces the memory size and the memory address in the
-> memory node of the device tree. In the case of a system which can
-> handle more than 4GB, the memory node cell size is 4: each data
-> (memory size and memory address) are 64 bits and then use 2 cells.
-> 
-> The current code in atags_to_fdt.c made the assumption of a cell size
-> of 2 (one cell for the memory size and one cell for the memory
-> address), this leads to an improper write of the data and ends with a
-> boot hang.
-> 
-> This patch writes the memory size and the memory address on the memory
-> node in the device tree depending of the size of the memory node (32
-> bits or 64 bits).
-> 
-> It has been tested in the 2 cases:
-> - with a dtb using skeleton.dtsi
-> - and with a dtb using skeleton64.dtsi
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-Please send to RMK's patch system.
-
+On 13-05-14 08:38 AM, Maxime Ripard wrote:
+> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
+> specified") removed the need to explictly setup the init_irq field in
+> the machine description when using only irqchip_init. Remove that
+> declaration for bcm281xx as well.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Christian Daudt <csd@broadcom.com>
 > ---
->  arch/arm/boot/compressed/atags_to_fdt.c | 44 ++++++++++++++++++++++++++++-----
->  1 file changed, 38 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-> index aabc02a..d1153c8 100644
-> --- a/arch/arm/boot/compressed/atags_to_fdt.c
-> +++ b/arch/arm/boot/compressed/atags_to_fdt.c
-> @@ -53,6 +53,17 @@ static const void *getprop(const void *fdt, const char *node_path,
->  	return fdt_getprop(fdt, offset, property, len);
->  }
->  
-> +static uint32_t get_cell_size(const void *fdt)
-> +{
-> +	int len;
-> +	uint32_t cell_size = 1;
-> +	const uint32_t *size_len =  getprop(fdt, "/", "#size-cells", &len);
-> +
-> +	if (size_len)
-> +		cell_size = fdt32_to_cpu(*size_len);
-> +	return cell_size;
-> +}
-> +
->  static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
->  {
->  	char cmdline[COMMAND_LINE_SIZE];
-> @@ -95,9 +106,11 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
->  int atags_to_fdt(void *atag_list, void *fdt, int total_space)
->  {
->  	struct tag *atag = atag_list;
-> -	uint32_t mem_reg_property[2 * NR_BANKS];
-> +	/* In the case of 64 bits memory size, need to reserve 2 cells for
-> +	 * address and size for each bank */
-> +	uint32_t mem_reg_property[2 * 2 * NR_BANKS];
->  	int memcount = 0;
-> -	int ret;
-> +	int ret, memsize;
->  
->  	/* make sure we've got an aligned pointer */
->  	if ((u32)atag_list & 0x3)
-> @@ -137,8 +150,25 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
->  				continue;
->  			if (!atag->u.mem.size)
->  				continue;
-> -			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.start);
-> -			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.size);
-> +			memsize = get_cell_size(fdt);
-> +
-> +			if (memsize == 2) {
-> +				/* if memsize is 2, that means that
-> +				 * each data needs 2 cells of 32 bits,
-> +				 * so the data are 64 bits */
-> +				uint64_t *mem_reg_prop64 =
-> +					(uint64_t *)mem_reg_property;
-> +				mem_reg_prop64[memcount++] =
-> +					cpu_to_fdt64(atag->u.mem.start);
-> +				mem_reg_prop64[memcount++] =
-> +					cpu_to_fdt64(atag->u.mem.size);
-> +			} else {
-> +				mem_reg_property[memcount++] =
-> +					cpu_to_fdt32(atag->u.mem.start);
-> +				mem_reg_property[memcount++] =
-> +					cpu_to_fdt32(atag->u.mem.size);
-> +			}
-> +
->  		} else if (atag->hdr.tag == ATAG_INITRD2) {
->  			uint32_t initrd_start, initrd_size;
->  			initrd_start = atag->u.initrd.start;
-> @@ -150,8 +180,10 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
->  		}
->  	}
->  
-> -	if (memcount)
-> -		setprop(fdt, "/memory", "reg", mem_reg_property, 4*memcount);
-> +	if (memcount) {
-> +		setprop(fdt, "/memory", "reg", mem_reg_property,
-> +			4 * memcount * memsize);
-> +	}
->  
->  	return fdt_pack(fdt);
->  }
-> -- 
-> 1.8.1.2
-> 
+>   arch/arm/mach-bcm/board_bcm.c | 2 --
+>   1 file changed, 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-bcm/board_bcm.c b/arch/arm/mach-bcm/board_bcm.c
+> index 22e8421..2859932 100644
+> --- a/arch/arm/mach-bcm/board_bcm.c
+> +++ b/arch/arm/mach-bcm/board_bcm.c
+> @@ -15,7 +15,6 @@
+>   #include <linux/init.h>
+>   #include <linux/device.h>
+>   #include <linux/platform_device.h>
+> -#include <linux/irqchip.h>
+>   #include <linux/clocksource.h>
+>   
+>   #include <asm/mach/arch.h>
+> @@ -54,7 +53,6 @@ static void __init board_init(void)
+>   static const char * const bcm11351_dt_compat[] = { "bcm,bcm11351", NULL, };
+>   
+>   DT_MACHINE_START(BCM11351_DT, "Broadcom Application Processor")
+> -	.init_irq = irqchip_init,
+>   	.init_time = clocksource_of_init,
+>   	.init_machine = board_init,
+>   	.dt_compat = bcm11351_dt_compat,
+Applied.
+
+  Thanks,
+    csd
