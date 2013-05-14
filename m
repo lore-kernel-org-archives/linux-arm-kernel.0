@@ -1,150 +1,116 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Tue, 14 May 2013 14:00:07 +0100
-Subject: [RFC PATCH v3] drivers: bus: add ARM CCI support
-In-Reply-To: <1368095640-3675-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1368095640-3675-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1368095640-3675-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130514130005.GD29592@e102654-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 14 May 2013 15:00:16 +0200
+Subject: [PATCH v2] net/macb: fix ISR clear-on-write behavior only for some SoC
+In-Reply-To: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1368536416-18364-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 09, 2013 at 11:34:00AM +0100, Lorenzo Pieralisi wrote:
-> On ARM multi-cluster systems coherency between cores running on
-> different clusters is managed by the cache-coherent interconnect (CCI).
-> It allows broadcasting of TLB invalidates and memory barriers and it
-> guarantees cache coherency at system level through snooping of slave
-> interfaces connected to it.
-> 
-> This patch enables the basic infrastructure required in Linux to handle and
-> programme the CCI component.
-> 
-> Non-local variables used by the CCI management functions called by power
-> down function calls after disabling the cache must be flushed out to main
-> memory in advance, otherwise incoherency of those values may occur if they
-> are sitting in the cache of some other CPU when power down functions
-> execute. Driver code ensures that relevant data structures are flushed
-> from inner and outer caches after the driver probe is completed.
-> 
-> CCI slave port resources are linked to set of CPUs through bus masters
-> phandle properties that link the interface resources to masters node in
-> the device tree.
-> 
-> Documentation describing the CCI DT bindings is provided with the patch.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/cci.txt | 161 ++++++++++
->  drivers/bus/Kconfig                           |   7 +
->  drivers/bus/Makefile                          |   2 +
->  drivers/bus/arm-cci.c                         | 420 ++++++++++++++++++++++++++
->  include/linux/arm-cci.h                       |  61 ++++
->  5 files changed, 651 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/cci.txt
->  create mode 100644 drivers/bus/arm-cci.c
->  create mode 100644 include/linux/arm-cci.h
-> 
+Commit 749a2b6 (net/macb: clear tx/rx completion flags in ISR)
+introduces clear-on-write on ISR register. This behavior is not always
+implemented when using Cadence MACB/GEM and is breaking other platforms.
+We are using the Design Configuration Register 1 information and a capability
+property to actually activate this clear-on-write behavior on ISR.
 
-[...]
+Reported-by: Hein Tibosch <hein_tibosch@yahoo.es>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+v2: - use DCFG1 bit 23 integration information instead of device tree
+      compatibility string to retreive information about c-o-r vs. c-o-w ISR.
+    - move configuration in macb_init_hw() function instead of probe() - at
+      "open" time.
 
-> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> new file mode 100644
-> index 0000000..000102f
-> --- /dev/null
-> +++ b/drivers/bus/arm-cci.c
-> @@ -0,0 +1,420 @@
-> +/*
-> + * CCI cache coherent interconnect driver
-> + *
-> + * Copyright (C) 2013 ARM Ltd.
-> + * Author: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/arm-cci.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/slab.h>
-> +
-> +#include <asm/cacheflush.h>
-> +#include <asm/smp_plat.h>
-> +
-> +#define DRIVER_NAME            "CCI"
-> +
-> +#define CCI_PORT_CTRL          0x0
-> +#define CCI_CTRL_STATUS                0xc
-> +
-> +#define CCI_ENABLE_SNOOP_REQ   0x1
-> +#define CCI_ENABLE_DVM_REQ     0x2
-> +#define CCI_ENABLE_REQ         (CCI_ENABLE_SNOOP_REQ | CCI_ENABLE_DVM_REQ)
-> +
-> +struct cci_nb_ports {
-> +       unsigned int nb_ace;
-> +       unsigned int nb_ace_lite;
-> +};
-> +
-> +enum cci_ace_port_type {
-> +       ACE_INVALID_PORT = 0x0,
-> +       ACE_PORT,
-> +       ACE_LITE_PORT,
-> +};
-> +
-> +struct cci_ace_port {
-> +       void __iomem *base;
-> +       enum cci_ace_port_type type;
-> +       struct device_node *dn;
-> +};
-> +
-> +static struct cci_ace_port *ports;
-> +static unsigned int nb_cci_ports;
-> +
-> +static void __iomem *cci_ctrl_base;
-> +
-> +struct cpu_port {
-> +       u64 mpidr;
-> +       u32 port;
-> +};
-> +/*
-> + * Use the port MSB as valid flag, shift can be made dynamic
-> + * by computing number of bits required for port indexes.
-> + * Code disabling CCI cpu ports runs with D-cache invalidated
-> + * and SCTLR bit clear so data accesses must be kept to a minimum
-> + * to improve performance; for now shift is left static to
-> + * avoid one more data access while disabling the CCI port.
-> + */
-> +#define PORT_VALID_SHIFT       31
-> +#define PORT_VALID             (0x1 << PORT_VALID_SHIFT)
-> +
-> +static inline void init_cpu_port(struct cpu_port *port, u32 index, u32 mpidr)
+As I have changed the most of this patch, I will collect your Ack and feedback
+just like a new patch. Thanks for your help...
 
-The mpidr should be u64.
+Bye,
 
-> +{
-> +       port->port = PORT_VALID | index;
-> +       port->mpidr = mpidr;
-> +}
-> +
-> +static inline bool cpu_port_is_valid(struct cpu_port *port)
-> +{
-> +       return !!(port->port & PORT_VALID);
-> +}
-> +
-> +static inline bool cpu_port_match(struct cpu_port *port, u32 mpidr)
+ drivers/net/ethernet/cadence/macb.c | 18 ++++++++++++++++--
+ drivers/net/ethernet/cadence/macb.h |  7 +++++++
+ 2 files changed, 23 insertions(+), 2 deletions(-)
 
-Same here.
-
-> +{
-> +       return port->mpidr == (mpidr & MPIDR_HWID_BITMASK);
-> +}
-> +
-
-Cheers,
-Javi
+diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
+index 6be513d..c89aa41 100644
+--- a/drivers/net/ethernet/cadence/macb.c
++++ b/drivers/net/ethernet/cadence/macb.c
+@@ -485,7 +485,8 @@ static void macb_tx_interrupt(struct macb *bp)
+ 	status = macb_readl(bp, TSR);
+ 	macb_writel(bp, TSR, status);
+ 
+-	macb_writel(bp, ISR, MACB_BIT(TCOMP));
++	if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
++		macb_writel(bp, ISR, MACB_BIT(TCOMP));
+ 
+ 	netdev_vdbg(bp->dev, "macb_tx_interrupt status = 0x%03lx\n",
+ 		(unsigned long)status);
+@@ -738,7 +739,8 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
+ 			 * now.
+ 			 */
+ 			macb_writel(bp, IDR, MACB_RX_INT_FLAGS);
+-			macb_writel(bp, ISR, MACB_BIT(RCOMP));
++			if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
++				macb_writel(bp, ISR, MACB_BIT(RCOMP));
+ 
+ 			if (napi_schedule_prep(&bp->napi)) {
+ 				netdev_vdbg(bp->dev, "scheduling RX softirq\n");
+@@ -1062,6 +1064,17 @@ static void macb_configure_dma(struct macb *bp)
+ 	}
+ }
+ 
++/*
++ * Configure peripheral capacities according to integration options used
++ */
++static void macb_configure_caps(struct macb *bp)
++{
++	if (macb_is_gem(bp)) {
++		if (GEM_BF(IRQCOR, gem_readl(bp, DCFG1)) == 0)
++			bp->caps |= MACB_CAPS_ISR_CLEAR_ON_WRITE;
++	}
++}
++
+ static void macb_init_hw(struct macb *bp)
+ {
+ 	u32 config;
+@@ -1084,6 +1097,7 @@ static void macb_init_hw(struct macb *bp)
+ 	bp->duplex = DUPLEX_HALF;
+ 
+ 	macb_configure_dma(bp);
++	macb_configure_caps(bp);
+ 
+ 	/* Initialize TX and RX buffers */
+ 	macb_writel(bp, RBQP, bp->rx_ring_dma);
+diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
+index 993d703..548c0ec 100644
+--- a/drivers/net/ethernet/cadence/macb.h
++++ b/drivers/net/ethernet/cadence/macb.h
+@@ -300,6 +300,8 @@
+ #define MACB_REV_SIZE				16
+ 
+ /* Bitfields in DCFG1. */
++#define GEM_IRQCOR_OFFSET			23
++#define GEM_IRQCOR_SIZE				1
+ #define GEM_DBWDEF_OFFSET			25
+ #define GEM_DBWDEF_SIZE				3
+ 
+@@ -323,6 +325,9 @@
+ #define MACB_MAN_READ				2
+ #define MACB_MAN_CODE				2
+ 
++/* Capability mask bits */
++#define MACB_CAPS_ISR_CLEAR_ON_WRITE		0x1
++
+ /* Bit manipulation macros */
+ #define MACB_BIT(name)					\
+ 	(1 << MACB_##name##_OFFSET)
+@@ -574,6 +579,8 @@ struct macb {
+ 	unsigned int 		speed;
+ 	unsigned int 		duplex;
+ 
++	u32			caps;
++
+ 	phy_interface_t		phy_interface;
+ 
+ 	/* AT91RM9200 transmit */
+-- 
+1.8.0
