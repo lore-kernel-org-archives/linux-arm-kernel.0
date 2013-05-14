@@ -1,109 +1,72 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Tue, 14 May 2013 09:17:56 -0500
-Subject: [PATCH v3] ARM:dts:omap4-panda:Update the LED support for the panda
- DTS
-Message-ID: <1368541076-6854-1-git-send-email-dmurphy@ti.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 14 May 2013 16:21:36 +0200
+Subject: [RFC 2/4] dma: add dmaengine driver for Samsung s3c24xx SoCs
+In-Reply-To: <CACRpkda-wQyo8aYxbW9RJNcR3Kwe2w5AhaAuUHfaxBksa_Pm2A@mail.gmail.com>
+References: <201305111330.05046.heiko@sntech.de>
+ <201305111331.25405.heiko@sntech.de>
+ <CACRpkda-wQyo8aYxbW9RJNcR3Kwe2w5AhaAuUHfaxBksa_Pm2A@mail.gmail.com>
+Message-ID: <3254712.MAHxRAdAN5@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
-are different.
+Hi Linus, Heiko,
 
-A1-A3 = gpio_wk7
-ES = gpio_110
+On Tuesday 14 of May 2013 14:47:19 Linus Walleij wrote:
+> On Sat, May 11, 2013 at 1:31 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> > Conceptually the s3c24xx-dma feels like a distant relative of the pl08x
+> > with numerous virtual channels being mapped to a lot less physical ones.
+> > The driver therefore borrows a lot from the amba-pl08x driver in this
+> > regard. Functionality-wise the driver gains a memcpy ability in addition
+> > to the slave_sg one.
+> > 
+> > The driver currently only supports the "newer" SoCs which can use any
+> > physical channel for any dma slave. Support for the older SoCs where
+> > each channel only supports a subset of possible dma slaves will have to
+> > be added later.
+> > 
+> > Tested on a s3c2416-based board, memcpy using the dmatest module and
+> > slave_sg partially using the spi-s3c64xx driver.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> So have I understood correctly if I assume that *some* S3C
+> variants, i.e. this: arch/arm/mach-s3c64xx/dma.c
+> have a vanilla, unmodified, or just slightly modified
+> PL08x block, while this DMAC is something probably based on
+> the PL08x where some ASIC engineer has had a good time hacking
+> around in the VHDL code to meet some feature requirements.
+> Correct? Or plausible guess?
+> 
+> Exactly *how* far away from the pl08x hardware is it?
 
-There is no change to LED D2
+AFAIK the DMAC of S3C24xx is completely different from PL08x. I think Heiko 
+just meant that it uses similar concepts, like virtual channels.
 
-Abstract away the pinmux and the LED definitions for the two boards into
-the respective DTS files.
+> I guess you have already come to the conclusion that the
+> amba-pl08x.c driver cannot be augmented to handle this hardware
+> after some educated reading of that code?
+> 
+> But are really no parts reusable?
+> 
+> For example, if the LLIs have the same layout, could we split
+> out the LLI handling from amba-pl08x into a separate file and reuse
+> that?
+> 
+> The more you share with amba-pl08x the better for everyone,
+> I am positively sure. And please include Russell on the review
+> chain, he wrote the virtual channel abstraction.
+> 
+> If I was given the option amongst S3C work I would definatley
+> have augmented the amba-pl08x.c to handle the stuff in
+> arch/arm/mach-s3c64xx/dma.c *first* then started to work on
+> this driver, but I guess you might not be working on s3c64xx?
 
-Signed-off-by: Dan Murphy <dmurphy@ti.com>
----
- arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++-
- arch/arm/boot/dts/omap4-panda-es.dts      |   40 +++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+), 1 deletion(-)
+Well, I still hope that someone will pick up the work on adapting PL08x driver 
+to support PL080s of S3C64xx as well, but most likely it will end up with me 
+doing it, as a part of DT support for S3C64xx.
 
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index 03bd60d..2b516af 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -16,7 +16,7 @@
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
- 	};
- 
--	leds {
-+	leds: leds {
- 		compatible = "gpio-leds";
- 		heartbeat {
- 			label = "pandaboard::status1";
-@@ -137,6 +137,20 @@
- 	};
- };
- 
-+&omap4_pmx_wkup {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+		&led_wkgpio_pins
-+	>;
-+
-+	led_wkgpio_pins: pinmux_leds_wkpins {
-+		pinctrl-single,pins = <
-+			0x1a 0x3	/* gpio_wk7 OUTPUT | MODE 3 */
-+			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
-+		>;
-+	};
-+};
-+
- &i2c1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_pins>;
-diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-index f1d8c21..8d1ba03 100644
---- a/arch/arm/boot/dts/omap4-panda-es.dts
-+++ b/arch/arm/boot/dts/omap4-panda-es.dts
-@@ -34,3 +34,43 @@
- 		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
- 		>;
- };
-+
-+&leds {
-+	compatible = "gpio-leds";
-+	heartbeat {
-+		label = "pandaboard::status1";
-+		gpios = <&gpio4 14 0>;
-+		linux,default-trigger = "heartbeat";
-+	};
-+	mmc {
-+		label = "pandaboard::status2";
-+		gpios = <&gpio1 8 0>;
-+		linux,default-trigger = "gpio";
-+	};
-+};
-+
-+&omap4_pmx_core {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+		&led_gpio_pins
-+	>;
-+
-+	led_gpio_pins: gpio_led_pmx {
-+		pinctrl-single,pins = <
-+			0xb6 0x3	/* gpio_110 OUTPUT | MODE 3 */
-+		>;
-+	};
-+};
-+
-+&omap4_pmx_wkup {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+		&led_wkgpio_pins
-+	>;
-+
-+	led_wkgpio_pins: pinmux_leds_wkpins {
-+		pinctrl-single,pins = <
-+			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
-+		>;
-+	};
-+};
+Best regards,
 -- 
-1.7.9.5
+Tomasz Figa
+Samsung Poland R&D Center
+SW Solution Development, Kernel and System Framework
