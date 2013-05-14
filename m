@@ -1,40 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 May 2013 15:52:21 -0700
-Subject: OMAP baseline test results for v3.9
-In-Reply-To: <alpine.DEB.2.00.1305142116001.4368@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1305081933270.19747@utopia.booyaka.com>
- <20130514211328.GC5600@atomide.com>
- <alpine.DEB.2.00.1305142116001.4368@utopia.booyaka.com>
-Message-ID: <20130514225221.GD5600@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 May 2013 23:50:54 +0100
+Subject: [PATCH] ARM: PL011: add support for extended FIFO-size of
+ PL011-r1p5
+In-Reply-To: <5192A692.4010700@wwwdotorg.org>
+References: <007301ce375e$bcf6d6b0$36e48410$@lge.com>
+ <5191D200.3040604@wwwdotorg.org> <01fd01ce5072$d6b9fcd0$842df670$@lge.com>
+ <5192A692.4010700@wwwdotorg.org>
+Message-ID: <20130514225054.GI18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [130514 14:24]:
-> On Tue, 14 May 2013, Tony Lindgren wrote:
-> 
-> > Hi,
+On Tue, May 14, 2013 at 03:03:14PM -0600, Stephen Warren wrote:
+> On 05/14/2013 01:15 AM, Jongsung Kim wrote:
+> > Stephen Warren <swarren@wwwdotorg.org> :
+> >> For reference, the AMBA periphid of the UART device there is 0x00341011.
+> >> The nibble "3" is the revision being tested in:
 > > 
-> > * Paul Walmsley <paul@pwsan.com> [130508 12:45]:
-> > > 
-> > > PM off, dynamic idle:
-> > >     FAIL ( 2/ 5): 4430es2panda, 4460pandaes
-> > >     Pass ( 3/ 5): 3530es3beagle, 3730beaglexm, 37xxevm
+> > The UART device has periphid 0x00341011, and is compatible with the
+> > original PL011 prior to r1p5. Not with r1p5. It could be a possible
+> > way to specify the compatible periphid (such as 0x00241011) instead
+> > of just 0x0 when initializing the amba_device for the UART.
 > > 
-> > Looking at your pm logs, 3730beaglexm won't hit off-idle.
-> > I've pasted the relevant lines from your logs below.
-> > 
-> > Is this a known issue?
+> >>> +static unsigned int get_fifosize_arm(unsigned int periphid)
+> >>> +{
+> >>> +	unsigned int rev = (periphid >> 20) & 0xf;
+> >>> +	return rev < 3 ? 16 : 32;
+> >>> +}
+> ...
+> > Doesn't the BCM2835 UART have anything different from the ARM PL011?
+> > What about the UARTPCellID registers? They are set to 0xb105f00d with
+> > the ARM PL011.
 > 
-> Yes, the Beagle XM in my testbed is a 3630ES1.0.  From the PM logs:
+> Looking at BCM2835-ARM-Peripherals.pdf (i.e. the public documentation
+> for the BCM2835 chip), I see:
 > 
-> [   63.154418] omap3_pm_off_mode_enable: Core OFF disabled due to errata 
-> i583
+> =====
+> The UART provides:
+> * Separate 16x8 transmit and 16x12 receive FIFO memory.
+> ...
+> For the in-depth UART overview, please, refer to the ARM PrimeCell UART
+> (PL011) Revision: r1p5 Technical Reference Manual.
+> =====
 > 
-> I should probably clarify how this is reported in the test results.
+> That seems to imply that not all r1p5 PL011s actually have a depth-32
+> FIFO. Perhaps this is a configurable property of the IP block, not
+> something that all r1p5 have?
+> 
+> I can't check the UARTPCellID registers right now.
 
-Thanks that explains. BTW, the "PM off" naming might make some
-people think that CONFIG_PM is not set :)
-
-Regards,
-
-Tony
+The PCellID value is a marker for primecells, and is common to all primecells
+which implement the ID scheme.  It's the other ID registers you want. :)
