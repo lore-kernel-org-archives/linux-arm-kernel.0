@@ -1,49 +1,41 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 14 May 2013 17:49:08 +0200
-Subject: [PATCH 02/20] ARM: zynq: Remove init_irq declaration in machine
- description
-In-Reply-To: <1368545933-7430-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
- <1368545933-7430-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <4e7a6946-b165-4440-9785-e0d538b608e0@CO9EHSMHS013.ehs.local>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 14 May 2013 17:50:54 +0200
+Subject: [PATCH] ARM: at91/trivial: typo in GEM compatible string
+Message-ID: <1368546654-20120-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2013 05:38 PM, Maxime Ripard wrote:
-> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
-> specified") removed the need to explictly setup the init_irq field in
-> the machine description when using only irqchip_init. Remove that
-> declaration for zynq as well.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Michal Simek <monstr@monstr.eu>
-> ---
->  arch/arm/mach-zynq/common.c | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> index 5bfe703..4c0199b8 100644
-> --- a/arch/arm/mach-zynq/common.c
-> +++ b/arch/arm/mach-zynq/common.c
-> @@ -25,7 +25,6 @@
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/of.h>
-> -#include <linux/irqchip.h>
->  
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
-> @@ -106,7 +105,6 @@ static const char * const zynq_dt_match[] = {
->  MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
->  	.smp		= smp_ops(zynq_smp_ops),
->  	.map_io		= zynq_map_io,
-> -	.init_irq	= irqchip_init,
->  	.init_machine	= zynq_init_machine,
->  	.init_time	= zynq_timer_init,
->  	.dt_compat	= zynq_dt_match,
-> 
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ Documentation/devicetree/bindings/net/macb.txt | 2 +-
+ arch/arm/boot/dts/sama5d3.dtsi                 | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Subject should contain v2 but anyway I have added it my zynq repo.
-
-Thanks,
-Michal
+diff --git a/Documentation/devicetree/bindings/net/macb.txt b/Documentation/devicetree/bindings/net/macb.txt
+index 44afa0e..4ff6504 100644
+--- a/Documentation/devicetree/bindings/net/macb.txt
++++ b/Documentation/devicetree/bindings/net/macb.txt
+@@ -4,7 +4,7 @@ Required properties:
+ - compatible: Should be "cdns,[<chip>-]{macb|gem}"
+   Use "cdns,at91sam9260-macb" Atmel at91sam9260 and at91sam9263 SoCs.
+   Use "cdns,at32ap7000-macb" for other 10/100 usage or use the generic form: "cdns,macb".
+-  Use "cnds,pc302-gem" for Picochip picoXcell pc302 and later devices based on
++  Use "cdns,pc302-gem" for Picochip picoXcell pc302 and later devices based on
+   the Cadence GEM, or the generic form: "cdns,gem".
+ - reg: Address and length of the register set for the device
+ - interrupts: Should contain macb interrupt
+diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+index 2e643ea..5fce96b 100644
+--- a/arch/arm/boot/dts/sama5d3.dtsi
++++ b/arch/arm/boot/dts/sama5d3.dtsi
+@@ -156,7 +156,7 @@
+ 			};
+ 
+ 			macb0: ethernet at f0028000 {
+-				compatible = "cnds,pc302-gem", "cdns,gem";
++				compatible = "cdns,pc302-gem", "cdns,gem";
+ 				reg = <0xf0028000 0x100>;
+ 				interrupts = <34 4 3>;
+ 				pinctrl-names = "default";
+-- 
+1.8.0
