@@ -1,42 +1,87 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Tue, 14 May 2013 22:01:18 +0100
-Subject: [PATCH v2 0/3] clk: implement remuxing during set_rate
-In-Reply-To: <20130514165937.10068.18501@quantum>
-References: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
- <20130513195746.10068.92303@quantum>
- <CAAG0J991BCziPFddzBrx9vcwRxyRgcCd38A01uKXTDDK9xTnbQ@mail.gmail.com>
- <20130514165937.10068.18501@quantum>
-Message-ID: <5192A61E.5020605@imgtec.com>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Tue, 14 May 2013 14:03:04 -0700
+Subject: [PATCH] clk: Fix race condition between clk_set_parent and
+ clk_enable()
+In-Reply-To: <20130514185417.10068.5717@quantum>
+References: <1367383328-25700-1-git-send-email-skannan@codeaurora.org>
+ <20130514185417.10068.5717@quantum>
+Message-ID: <5192A688.3040007@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On 14/05/13 17:59, Mike Turquette wrote:
-> Quoting James Hogan (2013-05-13 14:30:46)
->> On 13 May 2013 20:57, Mike Turquette <mturquette@linaro.org> wrote:
->>> One reason for this is the difficulty some have had with setting flags
->>> from DT bindings.
+On 05/14/2013 11:54 AM, Mike Turquette wrote:
+> Quoting Saravana Kannan (2013-04-30 21:42:08)
+>> Without this patch, the following race conditions are possible.
 >>
->> Could you elaborate on this? I've been adding flags to DT bindings for
->> this sort of thing, but it feels a bit like it's in that grey area of
->> not really describing the hardware itself. This information needs to
->> be specified somehow though.
+>> Race condition 1:
+>> * clk-A has two parents - clk-X and clk-Y.
+>> * All three are disabled and clk-X is current parent.
+>> * Thread A: clk_set_parent(clk-A, clk-Y).
+>> * Thread A: <snip execution flow>
+>> * Thread A: Grabs enable lock.
+>> * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
+>> * Thread A: Updates clk-A SW parent to clk-Y
+>> * Thread A: Releases enable lock.
+>> * Thread B: clk_enable(clk-A).
+>> * Thread B: clk_enable() enables clk-Y, then enabled clk-A and returns.
 >>
-> 
-> It depends on the flag.  A good example is the CLK_DIVIDER_ONE_BASED
-> flag which does describe the hardware.  It informs the binding that
-> indexing starts at 1, not 0, which is a valid part of the hardware
-> description.
-> 
-> However flags that deal with software policy do not belong on DT.
-> CLK_SET_RATE_PARENT certainly does not belong in the DT binding since
-> this is a pure Linux-ism.  Every binding just needs to be reviewed on a
-> case-by-case basis to make sure the flags are related only to the
-> hardware.
+>> clk-A is now enabled in software, but not clocking in hardware since the
+>> hardware parent is still clk-X.
+>>
+>> The only way to avoid race conditions between clk_set_parent() and
+>> clk_enable/disable() is to ensure that clk_enable/disable() calls don't
+>> require changes to hardware enable state between changes to software clock
+>> topology and hardware clock topology.
+>>
+>> There are options to achieve the above:
+>> 1. Grab the enable lock before changing software/hardware topology and
+>>     release it afterwards.
+>> 2. Keep the clock enabled for the duration of software/hardware topology
+>>     change so that any additional enable/disable calls don't try to change
+>>     the hardware state. Once the topology change is complete, the clock can
+>>     be put back in its original enable state.
+>>
+>> Option (1) is not an acceptable solution since the set_parent() ops might
+>> need to sleep.
+>>
+>> Therefore, this patch implements option (2).
+>>
+>> This patch doesn't violate any API semantics. clk_disable() doesn't
+>> guarantee that the clock is actually disabled. So, no clients of a clock
+>> can assume that a clock is disabled after their last call to clk_disable().
+>> So, enabling the clock during a parent change is not a violation of any API
+>> semantics.
+>>
+>> This also has the nice side effect of simplifying the error handling code.
+>>
+>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+>
+> I've taken this patch into clk-next for testing.  The code itself looks
+> fine.
 
-So given the desire to eliminate platform code, is there a particular
-way that these other flags can be specified instead of DT bindings?
+Thanks Mike. I'll send it out again with some typo/grammar corrections.
 
-Cheers
-James
+> The only thing that remains to be seen is if any platforms have a
+> problem with disabled clocks getting turned on during a reparent
+> operation.
+
+I would think that would be a general issue with the clock APIs since 
+disable doesn't guarantee a disable (since it's ref counted).
+
+Also, those clocks could be marked as CLK_SET_PARENT_GATE if it's a real 
+issue.
+
+> On platforms that I have worked on this is OK, but I suppose there could
+> be some platform out there where a clock is prepared and disabled, and
+> briefly enabling the clock during the reparent operation somehow puts
+> the hardware in a bad state.
+
+I can't think of any either, but as I mentioned, we have 
+CLK_SET_PARENT_GATE for that.
+
+Thanks,
+Saravana
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
