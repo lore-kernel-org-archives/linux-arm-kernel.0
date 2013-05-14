@@ -1,30 +1,34 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 May 2013 15:13:31 +0100
-Subject: [PATCH v4 03/32] arm64: KVM: EL2 register definitions
+Date: Tue, 14 May 2013 15:13:42 +0100
+Subject: [PATCH v4 14/32] arm64: KVM: guest one-reg interface
 In-Reply-To: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
 References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1368540840-26750-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1368540840-26750-15-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define all the useful bitfields for EL2 registers.
+Let userspace play with the guest registers.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_arm.h | 245 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 245 insertions(+)
- create mode 100644 arch/arm64/include/asm/kvm_arm.h
+ arch/arm64/kvm/guest.c | 253 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 253 insertions(+)
+ create mode 100644 arch/arm64/kvm/guest.c
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
 new file mode 100644
-index 0000000..a5f28e2
+index 0000000..c8d48b2
 --- /dev/null
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -0,0 +1,245 @@
++++ b/arch/arm64/kvm/guest.c
+@@ -0,0 +1,253 @@
 +/*
 + * Copyright (C) 2012,2013 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * Derived from arch/arm/kvm/guest.c:
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -39,233 +43,237 @@ index 0000000..a5f28e2
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __ARM64_KVM_ARM_H__
-+#define __ARM64_KVM_ARM_H__
++#include <linux/errno.h>
++#include <linux/err.h>
++#include <linux/kvm_host.h>
++#include <linux/module.h>
++#include <linux/vmalloc.h>
++#include <linux/fs.h>
++#include <asm/cputype.h>
++#include <asm/uaccess.h>
++#include <asm/kvm.h>
++#include <asm/kvm_asm.h>
++#include <asm/kvm_emulate.h>
++#include <asm/kvm_coproc.h>
 +
-+#include <asm/types.h>
++struct kvm_stats_debugfs_item debugfs_entries[] = {
++	{ NULL }
++};
 +
-+/* Hyp Configuration Register (HCR) bits */
-+#define HCR_ID		(UL(1) << 33)
-+#define HCR_CD		(UL(1) << 32)
-+#define HCR_RW_SHIFT	31
-+#define HCR_RW		(UL(1) << HCR_RW_SHIFT)
-+#define HCR_TRVM	(UL(1) << 30)
-+#define HCR_HCD		(UL(1) << 29)
-+#define HCR_TDZ		(UL(1) << 28)
-+#define HCR_TGE		(UL(1) << 27)
-+#define HCR_TVM		(UL(1) << 26)
-+#define HCR_TTLB	(UL(1) << 25)
-+#define HCR_TPU		(UL(1) << 24)
-+#define HCR_TPC		(UL(1) << 23)
-+#define HCR_TSW		(UL(1) << 22)
-+#define HCR_TAC		(UL(1) << 21)
-+#define HCR_TIDCP	(UL(1) << 20)
-+#define HCR_TSC		(UL(1) << 19)
-+#define HCR_TID3	(UL(1) << 18)
-+#define HCR_TID2	(UL(1) << 17)
-+#define HCR_TID1	(UL(1) << 16)
-+#define HCR_TID0	(UL(1) << 15)
-+#define HCR_TWE		(UL(1) << 14)
-+#define HCR_TWI		(UL(1) << 13)
-+#define HCR_DC		(UL(1) << 12)
-+#define HCR_BSU		(3 << 10)
-+#define HCR_BSU_IS	(UL(1) << 10)
-+#define HCR_FB		(UL(1) << 9)
-+#define HCR_VA		(UL(1) << 8)
-+#define HCR_VI		(UL(1) << 7)
-+#define HCR_VF		(UL(1) << 6)
-+#define HCR_AMO		(UL(1) << 5)
-+#define HCR_IMO		(UL(1) << 4)
-+#define HCR_FMO		(UL(1) << 3)
-+#define HCR_PTW		(UL(1) << 2)
-+#define HCR_SWIO	(UL(1) << 1)
-+#define HCR_VM		(UL(1) << 0)
++int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
++{
++	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
++	return 0;
++}
 +
-+/*
-+ * The bits we set in HCR:
-+ * RW:		64bit by default, can be overriden for 32bit VMs
-+ * TAC:		Trap ACTLR
-+ * TSC:		Trap SMC
-+ * TSW:		Trap cache operations by set/way
-+ * TWI:		Trap WFI
-+ * TIDCP:	Trap L2CTLR/L2ECTLR
-+ * BSU_IS:	Upgrade barriers to the inner shareable domain
-+ * FB:		Force broadcast of all maintainance operations
-+ * AMO:		Override CPSR.A and enable signaling with VA
-+ * IMO:		Override CPSR.I and enable signaling with VI
-+ * FMO:		Override CPSR.F and enable signaling with VF
-+ * SWIO:	Turn set/way invalidates into set/way clean+invalidate
++static u64 core_reg_offset_from_id(u64 id)
++{
++	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
++}
++
++static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
++	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
++	int nr_regs = sizeof(*regs) / sizeof(__u32);
++	u32 off;
++
++	/* Our ID is an index into the kvm_regs struct. */
++	off = core_reg_offset_from_id(reg->id);
++	if (off >= nr_regs ||
++	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
++		return -ENOENT;
++
++	if (copy_to_user(uaddr, ((u32 *)regs) + off, KVM_REG_SIZE(reg->id)))
++		return -EFAULT;
++
++	return 0;
++}
++
++static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
++	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
++	int nr_regs = sizeof(*regs) / sizeof(__u32);
++	__uint128_t tmp;
++	void *valp = &tmp;
++	u64 off;
++	int err = 0;
++
++	/* Our ID is an index into the kvm_regs struct. */
++	off = core_reg_offset_from_id(reg->id);
++	if (off >= nr_regs ||
++	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
++		return -ENOENT;
++
++	if (KVM_REG_SIZE(reg->id) > sizeof(tmp))
++		return -EINVAL;
++
++	if (copy_from_user(valp, uaddr, KVM_REG_SIZE(reg->id))) {
++		err = -EFAULT;
++		goto out;
++	}
++
++	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
++		u32 mode = (*(u32 *)valp) & COMPAT_PSR_MODE_MASK;
++		switch (mode) {
++		case PSR_MODE_EL0t:
++		case PSR_MODE_EL1t:
++		case PSR_MODE_EL1h:
++			break;
++		default:
++			err = -EINVAL;
++			goto out;
++		}
++	}
++
++	memcpy((u32 *)regs + off, valp, KVM_REG_SIZE(reg->id));
++out:
++	return err;
++}
++
++int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
++{
++	return -EINVAL;
++}
++
++static unsigned long num_core_regs(void)
++{
++	return sizeof(struct kvm_regs) / sizeof(__u32);
++}
++
++/**
++ * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
++ *
++ * This is for all registers.
 + */
-+#define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
-+			 HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
-+			 HCR_SWIO | HCR_TIDCP | HCR_RW)
-+#define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
++unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
++{
++	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu);
++}
 +
-+/* Hyp System Control Register (SCTLR_EL2) bits */
-+#define SCTLR_EL2_EE	(1 << 25)
-+#define SCTLR_EL2_WXN	(1 << 19)
-+#define SCTLR_EL2_I	(1 << 12)
-+#define SCTLR_EL2_SA	(1 << 3)
-+#define SCTLR_EL2_C	(1 << 2)
-+#define SCTLR_EL2_A	(1 << 1)
-+#define SCTLR_EL2_M	1
-+#define SCTLR_EL2_FLAGS	(SCTLR_EL2_M | SCTLR_EL2_A | SCTLR_EL2_C |	\
-+			 SCTLR_EL2_SA | SCTLR_EL2_I)
-+
-+/* TCR_EL2 Registers bits */
-+#define TCR_EL2_TBI	(1 << 20)
-+#define TCR_EL2_PS	(7 << 16)
-+#define TCR_EL2_PS_40B	(2 << 16)
-+#define TCR_EL2_TG0	(1 << 14)
-+#define TCR_EL2_SH0	(3 << 12)
-+#define TCR_EL2_ORGN0	(3 << 10)
-+#define TCR_EL2_IRGN0	(3 << 8)
-+#define TCR_EL2_T0SZ	0x3f
-+#define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
-+			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
-+
-+#define TCR_EL2_FLAGS	(TCR_EL2_PS_40B)
-+
-+/* VTCR_EL2 Registers bits */
-+#define VTCR_EL2_PS_MASK	(7 << 16)
-+#define VTCR_EL2_PS_40B		(2 << 16)
-+#define VTCR_EL2_TG0_MASK	(1 << 14)
-+#define VTCR_EL2_TG0_4K		(0 << 14)
-+#define VTCR_EL2_TG0_64K	(1 << 14)
-+#define VTCR_EL2_SH0_MASK	(3 << 12)
-+#define VTCR_EL2_SH0_INNER	(3 << 12)
-+#define VTCR_EL2_ORGN0_MASK	(3 << 10)
-+#define VTCR_EL2_ORGN0_WBWA	(1 << 10)
-+#define VTCR_EL2_IRGN0_MASK	(3 << 8)
-+#define VTCR_EL2_IRGN0_WBWA	(1 << 8)
-+#define VTCR_EL2_SL0_MASK	(3 << 6)
-+#define VTCR_EL2_SL0_LVL1	(1 << 6)
-+#define VTCR_EL2_T0SZ_MASK	0x3f
-+#define VTCR_EL2_T0SZ_40B	24
-+
-+#ifdef CONFIG_ARM64_64K_PAGES
-+/*
-+ * Stage2 translation configuration:
-+ * 40bits output (PS = 2)
-+ * 40bits input  (T0SZ = 24)
-+ * 64kB pages (TG0 = 1)
-+ * 2 level page tables (SL = 1)
++/**
++ * kvm_arm_copy_reg_indices - get indices of all registers.
++ *
++ * We do core registers right here, then we apppend system regs.
 + */
-+#define VTCR_EL2_FLAGS		(VTCR_EL2_PS_40B | VTCR_EL2_TG0_64K | \
-+				 VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
-+				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
-+				 VTCR_EL2_T0SZ_40B)
-+#define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
-+#else
-+/*
-+ * Stage2 translation configuration:
-+ * 40bits output (PS = 2)
-+ * 40bits input  (T0SZ = 24)
-+ * 4kB pages (TG0 = 0)
-+ * 3 level page tables (SL = 1)
-+ */
-+#define VTCR_EL2_FLAGS		(VTCR_EL2_PS_40B | VTCR_EL2_TG0_4K | \
-+				 VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
-+				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
-+				 VTCR_EL2_T0SZ_40B)
-+#define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
-+#endif
++int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
++{
++	unsigned int i;
++	const u64 core_reg = KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE;
 +
-+#define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
-+#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-+#define VTTBR_VMID_SHIFT  (48LLU)
-+#define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
++	for (i = 0; i < sizeof(struct kvm_regs) / sizeof(__u32); i++) {
++		if (put_user(core_reg | i, uindices))
++			return -EFAULT;
++		uindices++;
++	}
 +
-+/* Hyp System Trap Register */
-+#define HSTR_EL2_TTEE	(1 << 16)
-+#define HSTR_EL2_T(x)	(1 << x)
++	return kvm_arm_copy_sys_reg_indices(vcpu, uindices);
++}
 +
-+/* Hyp Coprocessor Trap Register */
-+#define CPTR_EL2_TCPAC	(1 << 31)
-+#define CPTR_EL2_TTA	(1 << 20)
-+#define CPTR_EL2_TFP	(1 << 10)
++int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	/* We currently use nothing arch-specific in upper 32 bits */
++	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
++		return -EINVAL;
 +
-+/* Hyp Debug Configuration Register bits */
-+#define MDCR_EL2_TDRA		(1 << 11)
-+#define MDCR_EL2_TDOSA		(1 << 10)
-+#define MDCR_EL2_TDA		(1 << 9)
-+#define MDCR_EL2_TDE		(1 << 8)
-+#define MDCR_EL2_HPME		(1 << 7)
-+#define MDCR_EL2_TPM		(1 << 6)
-+#define MDCR_EL2_TPMCR		(1 << 5)
-+#define MDCR_EL2_HPMN_MASK	(0x1F)
++	/* Register group 16 means we want a core register. */
++	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
++		return get_core_reg(vcpu, reg);
 +
-+/* Exception Syndrome Register (ESR) bits */
-+#define ESR_EL2_EC_SHIFT	(26)
-+#define ESR_EL2_EC		(0x3fU << ESR_EL2_EC_SHIFT)
-+#define ESR_EL2_IL		(1U << 25)
-+#define ESR_EL2_ISS		(ESR_EL2_IL - 1)
-+#define ESR_EL2_ISV_SHIFT	(24)
-+#define ESR_EL2_ISV		(1U << ESR_EL2_ISV_SHIFT)
-+#define ESR_EL2_SAS_SHIFT	(22)
-+#define ESR_EL2_SAS		(3U << ESR_EL2_SAS_SHIFT)
-+#define ESR_EL2_SSE		(1 << 21)
-+#define ESR_EL2_SRT_SHIFT	(16)
-+#define ESR_EL2_SRT_MASK	(0x1f << ESR_EL2_SRT_SHIFT)
-+#define ESR_EL2_SF 		(1 << 15)
-+#define ESR_EL2_AR 		(1 << 14)
-+#define ESR_EL2_EA 		(1 << 9)
-+#define ESR_EL2_CM 		(1 << 8)
-+#define ESR_EL2_S1PTW 		(1 << 7)
-+#define ESR_EL2_WNR		(1 << 6)
-+#define ESR_EL2_FSC		(0x3f)
-+#define ESR_EL2_FSC_TYPE	(0x3c)
++	return kvm_arm_sys_reg_get_reg(vcpu, reg);
++}
 +
-+#define ESR_EL2_CV_SHIFT	(24)
-+#define ESR_EL2_CV		(1U << ESR_EL2_CV_SHIFT)
-+#define ESR_EL2_COND_SHIFT	(20)
-+#define ESR_EL2_COND		(0xfU << ESR_EL2_COND_SHIFT)
++int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	/* We currently use nothing arch-specific in upper 32 bits */
++	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
++		return -EINVAL;
 +
++	/* Register group 16 means we set a core register. */
++	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
++		return set_core_reg(vcpu, reg);
 +
-+#define FSC_FAULT	(0x04)
-+#define FSC_PERM	(0x0c)
++	return kvm_arm_sys_reg_set_reg(vcpu, reg);
++}
 +
-+/* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
-+#define HPFAR_MASK	(~0xFUL)
++int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
++				  struct kvm_sregs *sregs)
++{
++	return -EINVAL;
++}
 +
-+#define ESR_EL2_EC_UNKNOWN	(0x00)
-+#define ESR_EL2_EC_WFI		(0x01)
-+#define ESR_EL2_EC_CP15_32	(0x03)
-+#define ESR_EL2_EC_CP15_64	(0x04)
-+#define ESR_EL2_EC_CP14_MR	(0x05)
-+#define ESR_EL2_EC_CP14_LS	(0x06)
-+#define ESR_EL2_EC_FP_ASIMD	(0x07)
-+#define ESR_EL2_EC_CP10_ID	(0x08)
-+#define ESR_EL2_EC_CP14_64	(0x0C)
-+#define ESR_EL2_EC_ILL_ISS	(0x0E)
-+#define ESR_EL2_EC_SVC32	(0x11)
-+#define ESR_EL2_EC_HVC32	(0x12)
-+#define ESR_EL2_EC_SMC32	(0x13)
-+#define ESR_EL2_EC_SVC64	(0x15)
-+#define ESR_EL2_EC_HVC64	(0x16)
-+#define ESR_EL2_EC_SMC64	(0x17)
-+#define ESR_EL2_EC_SYS64	(0x18)
-+#define ESR_EL2_EC_IABT		(0x20)
-+#define ESR_EL2_EC_IABT_HYP	(0x21)
-+#define ESR_EL2_EC_PC_ALIGN	(0x22)
-+#define ESR_EL2_EC_DABT		(0x24)
-+#define ESR_EL2_EC_DABT_HYP	(0x25)
-+#define ESR_EL2_EC_SP_ALIGN	(0x26)
-+#define ESR_EL2_EC_FP_EXC32	(0x28)
-+#define ESR_EL2_EC_FP_EXC64	(0x2C)
-+#define ESR_EL2_EC_SERRROR	(0x2F)
-+#define ESR_EL2_EC_BREAKPT	(0x30)
-+#define ESR_EL2_EC_BREAKPT_HYP	(0x31)
-+#define ESR_EL2_EC_SOFTSTP	(0x32)
-+#define ESR_EL2_EC_SOFTSTP_HYP	(0x33)
-+#define ESR_EL2_EC_WATCHPT	(0x34)
-+#define ESR_EL2_EC_WATCHPT_HYP	(0x35)
-+#define ESR_EL2_EC_BKPT32	(0x38)
-+#define ESR_EL2_EC_VECTOR32	(0x3A)
-+#define ESR_EL2_EC_BRK64	(0x3C)
++int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
++				  struct kvm_sregs *sregs)
++{
++	return -EINVAL;
++}
 +
-+#define ESR_EL2_EC_xABT_xFSR_EXTABT	0x10
++int __attribute_const__ kvm_target_cpu(void)
++{
++	unsigned long implementor = read_cpuid_implementor();
++	unsigned long part_number = read_cpuid_part_number();
 +
-+#endif /* __ARM64_KVM_ARM_H__ */
++	if (implementor != ARM_CPU_IMP_ARM)
++		return -EINVAL;
++
++	switch (part_number) {
++	case ARM_CPU_PART_AEM_V8:
++		return KVM_ARM_TARGET_AEM_V8;
++	case ARM_CPU_PART_FOUNDATION:
++		return KVM_ARM_TARGET_FOUNDATION_V8;
++	case ARM_CPU_PART_CORTEX_A57:
++		/* Currently handled by the generic backend */
++		return KVM_ARM_TARGET_CORTEX_A57;
++	default:
++		return -EINVAL;
++	}
++}
++
++int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
++			const struct kvm_vcpu_init *init)
++{
++	unsigned int i;
++	int phys_target = kvm_target_cpu();
++
++	if (init->target != phys_target)
++		return -EINVAL;
++
++	vcpu->arch.target = phys_target;
++	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
++
++	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
++	for (i = 0; i < sizeof(init->features) * 8; i++) {
++		if (init->features[i / 32] & (1 << (i % 32))) {
++			if (i >= KVM_VCPU_MAX_FEATURES)
++				return -ENOENT;
++			set_bit(i, vcpu->arch.features);
++		}
++	}
++
++	/* Now we know what it is, we can reset it. */
++	return kvm_reset_vcpu(vcpu);
++}
++
++int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
++{
++	return -EINVAL;
++}
++
++int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
++				  struct kvm_translation *tr)
++{
++	return -EINVAL;
++}
 -- 
 1.8.2.3
