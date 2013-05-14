@@ -1,102 +1,38 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 14 May 2013 11:21:39 +0200
-Subject: [PATCH v2 2/3] ARM: shmobile: lager: enable Ether
-In-Reply-To: <1368499171-22427-3-git-send-email-horms+renesas@verge.net.au>
-References: <1368499171-22427-1-git-send-email-horms+renesas@verge.net.au>
- <1368499171-22427-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <9708378.xkqng7A9dx@avalon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 May 2013 11:23:56 +0200
+Subject: [RFC 2/8] ARM:global_timer: Add ARM global timer support.
+In-Reply-To: <5191F9EE.6070008@st.com>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
+ <CACRpkdZCP=w=4Q3bnuMQxm=Oe-uZke+Cc5NgddM5vsQbgr9E-Q@mail.gmail.com>
+ <5191F9EE.6070008@st.com>
+Message-ID: <CACRpkdYh72hQHSK-a9r8R9qfnQv06412YqVNeYpc_rZhMeiXww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Tue, May 14, 2013 at 10:46 AM, Srinivas KANDAGATLA
+<srinivas.kandagatla@st.com> wrote:
+> On 13/05/13 20:05, Linus Walleij wrote:
 
-Thank you for the patch.
+>> Why are you enabling the timer in unused and shutdown mode?
+>>
+>> This doesn't make sense.
+>
+> It is because we are using the global-timer block for both clocksource
+> and clockevents and we do not want the clocksource to disappear when
+> clockevent is unused/shutdown.
 
-On Tuesday 14 May 2013 11:39:30 Simon Horman wrote:
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+As this is clearly a per-cpu timer (correct? atleast the driver is
+written that way) and say you have 4 CPUs, why would you not shut down
+the timer on cores 1,2,3 and only leave the timer on core 0 on?
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+The kernel will by necessity not shut down the clock event on core
+0 anyway.
 
-Is there any ongoing work on DT bindings for sh-eth ?
+On a related note: don't you want to use the counter in this block as
+sched_clock() as well? (I guess so, as you do not seem to have
+anything else on this system.) It'd probably need to be a separate
+Kconfig option and can surely be done later but keep it in mind.
 
-> ---
-> 
-> This patch has a build-time dependency on "sh_eth: add support for gpio
-> reset". This patch has a run-time dependency on "sh_eth: add support for
-> r8a7790 SoC".
-> 
-> v2
-> * As suggested by Laurent Pinchart
->   - Do not manipilate sh_eth reset GPIO directly,
->     rather, do so through newly proposed support for this in
->     the sh_eth driver.
-> * A suggested by Sergei Shtylyov
->   - Move DTS portion into a separate patch
-> ---
->  arch/arm/mach-shmobile/board-lager.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/mach-shmobile/board-lager.c
-> b/arch/arm/mach-shmobile/board-lager.c index 6a1ba38..c06f0da 100644
-> --- a/arch/arm/mach-shmobile/board-lager.c
-> +++ b/arch/arm/mach-shmobile/board-lager.c
-> @@ -18,6 +18,7 @@
->   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 
-> USA */
-> 
-> +#include <linux/gpio.h>
->  #include <linux/interrupt.h>
->  #include <linux/irqchip.h>
->  #include <linux/kernel.h>
-> @@ -52,6 +53,17 @@ static struct gpio_led_platform_data lager_leds_pdata = {
-> .num_leds	= ARRAY_SIZE(lager_leds),
->  };
-> 
-> +/* Ether */
-> +static struct sh_eth_plat_data ether_platdata = {
-> +	.phy			= 0x1,
-> +	.edmac_endian		= EDMAC_LITTLE_ENDIAN,
-> +	.register_type		= SH_ETH_REG_FAST_RCAR,
-> +	.phy_interface		= PHY_INTERFACE_MODE_RMII,
-> +	.ether_link_active_low	= 1,
-> +	.needs_gpio_reset	= 1,
-> +	.reset_gpio		= RCAR_GP_PIN(5, 31),
-> +};
-> +
->  static const struct pinctrl_map lager_pinctrl_map[] = {
->  	/* SCIF0 (CN19: DEBUG SERIAL0) */
->  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
-> @@ -59,6 +71,17 @@ static const struct pinctrl_map lager_pinctrl_map[] = {
->  	/* SCIF1 (CN20: DEBUG SERIAL1) */
->  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.7", "pfc-r8a7790",
->  				  "scif1_data", "scif1"),
-> +	/* Ether */
-> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
-> +				  "eth_link", "eth"),
-> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
-> +				  "eth_magic", "eth"),
-> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
-> +				  "eth_mdio", "eth"),
-> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
-> +				  "eth_rmii", "eth"),
-> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7790",
-> +				  "intc_irq0", "intc"),
->  };
-> 
->  static void __init lager_add_standard_devices(void)
-> @@ -73,6 +96,8 @@ static void __init lager_add_standard_devices(void)
->  	platform_device_register_data(&platform_bus, "leds-gpio", -1,
->  				      &lager_leds_pdata,
->  				      sizeof(lager_leds_pdata));
-> +
-> +	r8a7790_add_ether_device(&ether_platdata);
->  }
-> 
->  static const char *lager_boards_compat_dt[] __initdata = {
-
--- 
-Regards,
-
-Laurent Pinchart
+Yours,
+Linus Walleij
