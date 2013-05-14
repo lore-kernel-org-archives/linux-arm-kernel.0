@@ -1,42 +1,42 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 14 May 2013 17:38:53 +0200
-Subject: [PATCH 20/20] ARM: vt8500: Remove init_irq declaration in machine
- description
+Date: Tue, 14 May 2013 17:38:43 +0200
+Subject: [PATCH 10/20] ARM: shmobile: r8a7790: Remove init_irq declaration in
+ machine description
 In-Reply-To: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1368545933-7430-21-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1368545933-7430-11-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
 specified") removed the need to explictly setup the init_irq field in
 the machine description when using only irqchip_init. Remove that
-declaration for vt8500 as well.
+declaration for shmobile as well.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-vt8500/vt8500.c | 2 --
+ arch/arm/mach-shmobile/setup-r8a7790.c | 2 --
  1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
-index 1dd281e..70a5ac9 100644
---- a/arch/arm/mach-vt8500/vt8500.c
-+++ b/arch/arm/mach-vt8500/vt8500.c
-@@ -20,7 +20,6 @@
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 49de2d5..2a7a276 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -19,7 +19,6 @@
+  */
  
- #include <linux/clocksource.h>
- #include <linux/io.h>
+ #include <linux/irq.h>
 -#include <linux/irqchip.h>
- #include <linux/pm.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+ #include <linux/serial_sci.h>
+@@ -142,7 +141,6 @@ static const char *r8a7790_boards_compat_dt[] __initdata = {
+ };
  
- #include <asm/mach-types.h>
-@@ -178,7 +177,6 @@ static const char * const vt8500_dt_compat[] = {
- DT_MACHINE_START(WMT_DT, "VIA/Wondermedia SoC (Device Tree Support)")
- 	.dt_compat	= vt8500_dt_compat,
- 	.map_io		= vt8500_map_io,
+ DT_MACHINE_START(R8A7790_DT, "Generic R8A7790 (Flattened Device Tree)")
 -	.init_irq	= irqchip_init,
- 	.init_machine	= vt8500_init,
- 	.init_time	= clocksource_of_init,
- 	.restart	= vt8500_restart,
+ 	.init_machine	= r8a7790_add_standard_devices_dt,
+ 	.init_time	= r8a7790_timer_init,
+ 	.dt_compat	= r8a7790_boards_compat_dt,
 -- 
 1.8.1.2
