@@ -1,40 +1,64 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 14 May 2013 12:16:50 -0700
-Subject: [PATCH v2 1/2] clk: si5351: Fix clkout rate computation.
-In-Reply-To: <1367560403-21685-1-git-send-email-marek.belisko@streamunlimited.com>
-References: <1367560403-21685-1-git-send-email-marek.belisko@streamunlimited.com>
-Message-ID: <20130514191650.10068.92925@quantum>
+Date: Tue, 14 May 2013 12:22:48 -0700
+Subject: [PATCH] clk: ux500: abx500-clk: rename ux500 audio codec aliases
+In-Reply-To: <1366964092-7672-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1366964092-7672-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <20130514192248.10068.29001@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Marek Belisko (2013-05-02 22:53:22)
-> Rate was incorrectly computed because we read from wrong divider register.
+Quoting Fabio Baltieri (2013-04-26 01:14:52)
+> Change soc-audio related clk_register_clkdev() device names to reflect
+> the ones actually used in current snd-soc-mop500 and ab8500-codec
+> drivers.
 > 
-> Signed-off-by: Marek Belisko <marek.belisko@streamunlimited.com>
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 
-Do either of these patches need to go into clk-fixes?  If so please be
-explicit about it in the changelog, the section under the three dashes.
+Taken into clk-next.
 
-Regards,
+Thanks!
 Mike
 
 > ---
->  drivers/clk/clk-si5351.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/clk/ux500/abx500-clk.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-> index 8927284..cf39e53 100644
-> --- a/drivers/clk/clk-si5351.c
-> +++ b/drivers/clk/clk-si5351.c
-> @@ -932,7 +932,7 @@ static unsigned long si5351_clkout_recalc_rate(struct clk_hw *hw,
->         unsigned char reg;
->         unsigned char rdiv;
+> diff --git a/drivers/clk/ux500/abx500-clk.c b/drivers/clk/ux500/abx500-clk.c
+> index a0fca00..e7bd62c 100644
+> --- a/drivers/clk/ux500/abx500-clk.c
+> +++ b/drivers/clk/ux500/abx500-clk.c
+> @@ -45,7 +45,7 @@ static int ab8500_reg_clks(struct device *dev)
+>                                 CLK_IS_ROOT);
+>         clk_register_clkdev(clk, "sysclk", "ab8500-usb.0");
+>         clk_register_clkdev(clk, "sysclk", "ab-iddet.0");
+> -       clk_register_clkdev(clk, "sysclk", "ab85xx-codec.0");
+> +       clk_register_clkdev(clk, "sysclk", "snd-soc-mop500.0");
+>         clk_register_clkdev(clk, "sysclk", "shrm_bus");
 >  
-> -       if (hwdata->num > 5)
-> +       if (hwdata->num <= 5)
->                 reg = si5351_msynth_params_address(hwdata->num) + 2;
->         else
->                 reg = SI5351_CLK6_7_OUTPUT_DIVIDER;
+>         /* ab8500_sysclk2 */
+> @@ -70,19 +70,19 @@ static int ab8500_reg_clks(struct device *dev)
+>                 AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_ULPCLKREQ,
+>                 AB8500_SYSULPCLKCTRL1_ULPCLKREQ,
+>                 38400000, 9000, CLK_IS_ROOT);
+> -       clk_register_clkdev(clk, "ulpclk", "ab85xx-codec.0");
+> +       clk_register_clkdev(clk, "ulpclk", "snd-soc-mop500.0");
+>  
+>         /* ab8500_intclk */
+>         clk = clk_reg_sysctrl_set_parent(dev , "intclk", intclk_parents, 2,
+>                 intclk_reg_sel, intclk_reg_mask, intclk_reg_bits, 0);
+> -       clk_register_clkdev(clk, "intclk", "ab85xx-codec.0");
+> +       clk_register_clkdev(clk, "intclk", "snd-soc-mop500.0");
+>         clk_register_clkdev(clk, NULL, "ab8500-pwm.1");
+>  
+>         /* ab8500_audioclk */
+>         clk = clk_reg_sysctrl_gate(dev , "audioclk", "intclk",
+>                 AB8500_SYSULPCLKCTRL1, AB8500_SYSULPCLKCTRL1_AUDIOCLKENA,
+>                 AB8500_SYSULPCLKCTRL1_AUDIOCLKENA, 0, 0);
+> -       clk_register_clkdev(clk, "audioclk", "ab85xx-codec.0");
+> +       clk_register_clkdev(clk, "audioclk", "ab8500-codec.0");
+>  
+>         return 0;
+>  }
 > -- 
-> 1.7.9.5
+> 1.8.1.3
