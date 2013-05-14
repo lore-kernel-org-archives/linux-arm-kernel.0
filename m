@@ -1,34 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 14 May 2013 10:23:20 +0200
-Subject: [PATCH 05/14] ARM: shmobile: Remove init_irq declaration in
- machine description
-In-Reply-To: <20130514003504.GE12228@verge.net.au>
-References: <1368438253-28218-1-git-send-email-maxime.ripard@free-electrons.com>
- <1368438253-28218-6-git-send-email-maxime.ripard@free-electrons.com>
- <20130514003504.GE12228@verge.net.au>
-Message-ID: <5191F478.4040800@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 May 2013 10:25:15 +0200
+Subject: [PATCH 3/9] clk: ux500: Provide device enumeration number suffix
+ for SMSC911x
+In-Reply-To: <1368019749-19455-4-git-send-email-lee.jones@linaro.org>
+References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
+ <1368019749-19455-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdaWaEct1My5=gZ7Bbbizqsr3BBNSXiahMn3bS7L-SubLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Wed, May 8, 2013 at 3:29 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Le 14/05/2013 02:35, Simon Horman a ?crit :
-> On Mon, May 13, 2013 at 11:44:04AM +0200, Maxime Ripard wrote:
->> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
->> specified") removed the need to explictly setup the init_irq field in
->> the machine description when using only irqchip_init. Remove that
->> declaration for shmobile as well.
-> 
-> Hi Maxime,
-> 
-> If possible, I would prefer separate patches for each board and SoC.
+> First Ethernet device has a ".0" appended onto the device name. It
+> appears that we need this in order to obtain the correct clock.
+>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Ok, I'll split this and send it in the v2.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
