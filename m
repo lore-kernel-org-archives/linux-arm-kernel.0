@@ -1,120 +1,69 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 14 May 2013 09:20:14 +0200
-Subject: [PATCH V2 01/10] mmc: return mmc_of_parse() errors to caller
-In-Reply-To: <1368479941-10084-2-git-send-email-gmbnomis@gmail.com>
-References: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
- <1368479941-10084-2-git-send-email-gmbnomis@gmail.com>
-Message-ID: <CAPDyKFoyVCYDFkXWrj8zL8uGCTx4EYk=rM2i7rKx1+aA7LCbPg@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 14 May 2013 15:22:05 +0800
+Subject: [PATCH] net/macb: fix ISR clear-on-write behavior only for some
+ SoC
+In-Reply-To: <5191E53B.9000106@yahoo.es>
+References: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
+ <FE065E51-1EAA-47ED-8C7B-0F2E6418F349@jcrosoft.com>
+ <51918C23.7040106@yahoo.es> <20130514055256.GD22508@game.jcrosoft.org>
+ <5191E53B.9000106@yahoo.es>
+Message-ID: <C35C1E42-FCD6-4EE7-902B-FE01F362CD40@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 May 2013 23:18, Simon Baatz <gmbnomis@gmail.com> wrote:
-> In addition to just logging errors encountered during DT parsing or
-> allocating GPIO slots for CD/WP, mmc_of_parse() now returns with an
-> error.
->
-> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
-> ---
->  drivers/mmc/core/host.c  |   24 +++++++++++++++++++-----
->  include/linux/mmc/host.h |    2 +-
->  2 files changed, 20 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> index 2a3593d..45122cc 100644
-> --- a/drivers/mmc/core/host.c
-> +++ b/drivers/mmc/core/host.c
-> @@ -306,7 +306,7 @@ static inline void mmc_host_clk_sysfs_init(struct mmc_host *host)
->   * parse the properties and set respective generic mmc-host flags and
->   * parameters.
->   */
-> -void mmc_of_parse(struct mmc_host *host)
-> +int mmc_of_parse(struct mmc_host *host)
->  {
->         struct device_node *np;
->         u32 bus_width;
-> @@ -315,7 +315,7 @@ void mmc_of_parse(struct mmc_host *host)
->         int len, ret, gpio;
->
->         if (!host->parent || !host->parent->of_node)
-> -               return;
-> +               return 0;
->
->         np = host->parent->of_node;
->
-> @@ -338,6 +338,7 @@ void mmc_of_parse(struct mmc_host *host)
->         default:
->                 dev_err(host->parent,
->                         "Invalid \"bus-width\" value %ud!\n", bus_width);
-> +               return -EINVAL;
->         }
->
->         /* f_max is obtained from the optional "max-frequency" property */
-> @@ -372,13 +373,15 @@ void mmc_of_parse(struct mmc_host *host)
->                                 gpio_inv_cd = true;
->
->                         ret = mmc_gpio_request_cd(host, gpio);
-> -                       if (ret < 0)
-> +                       if (ret < 0) {
->                                 dev_err(host->parent,
->                                         "Failed to request CD GPIO #%d: %d!\n",
->                                         gpio, ret);
-> -                       else
-> +                               return ret;
-> +                       } else {
->                                 dev_info(host->parent, "Got CD GPIO #%d.\n",
->                                          gpio);
-> +                       }
->                 }
->
->                 if (explicit_inv_cd ^ gpio_inv_cd)
-> @@ -394,9 +397,14 @@ void mmc_of_parse(struct mmc_host *host)
->                         gpio_inv_wp = true;
->
->                 ret = mmc_gpio_request_ro(host, gpio);
-> -               if (ret < 0)
-> +               if (ret < 0) {
->                         dev_err(host->parent,
->                                 "Failed to request WP GPIO: %d!\n", ret);
-> +                       goto out;
-> +               } else {
-> +                               dev_info(host->parent, "Got WP GPIO #%d.\n",
-> +                                        gpio);
-> +               }
->         }
->         if (explicit_inv_wp ^ gpio_inv_wp)
->                 host->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
-> @@ -413,6 +421,12 @@ void mmc_of_parse(struct mmc_host *host)
->                 host->pm_caps |= MMC_PM_KEEP_POWER;
->         if (of_find_property(np, "enable-sdio-wakeup", &len))
->                 host->pm_caps |= MMC_PM_WAKE_SDIO_IRQ;
+
+On May 14, 2013, at 3:18 PM, Hein Tibosch <hein_tibosch@yahoo.es> wrote:
+
+> 
+> On 5/14/2013 1:52 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> On 08:58 Tue 14 May     , Hein Tibosch wrote:
+>>> On 5/14/2013 12:05 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>> On May 14, 2013, at 12:05 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>>>> 
+>>>>> Commit 749a2b6 (net/macb: clear tx/rx completion flags in ISR)
+>>>>> introduces clear-on-write on ISR register. This behavior is not always
+>>>>> implemented when using Cadence MACB/GEM and is breaking other platforms.
+>>>>> We are using a new Device Tree compatibility string and a capability
+>>>>> property to actually activate this clear-on-write behavior on ISR.
+>>>>> 
+>>>>> Reported-by: Hein Tibosch <hein_tibosch@yahoo.es>
+>>>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>>> can we detect it via the IP?
+>>> This was my first proposal, have it based on the value of MACB's
+>>> register 'MID' (offset 0x00fc, lower 16 bits).
+>>> On avr32 it reads: 0x0000010D, on Zynq it reports 0x00000119
+>>> 
+>>> So for the moment, CAPS_ISR_CLEAR_ON_WRITE could be set if the revision
+>>> equals to 0x00000119?
+>> so no it will not work
+>> 
+>> as the gem on sama5 is 00020119
+>> 
+>> so version 0x119 too
+>> 
+>> nico
+> 
+> All right, that's a pity.
+> 
+> The only issue that remains then is the obligation to use CONFIG_OF,
+> or:
+> 
+> +#if defined(CONFIG_OF)
+> +	dev_id = of_match_device(macb_dt_ids, &pdev->dev);
+> +	if (dev_id)
+> +		bp->caps = (u32)dev_id->data;
 > +
-> +       return 0;
-> +
-> +out:
-> +       mmc_gpio_free_cd(host);
-> +       return ret;
->  }
->
->  EXPORT_SYMBOL(mmc_of_parse);
-> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-> index e326ae2..c8c4fbc 100644
-> --- a/include/linux/mmc/host.h
-> +++ b/include/linux/mmc/host.h
-> @@ -369,7 +369,7 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *);
->  int mmc_add_host(struct mmc_host *);
->  void mmc_remove_host(struct mmc_host *);
->  void mmc_free_host(struct mmc_host *);
-> -void mmc_of_parse(struct mmc_host *host);
-> +int mmc_of_parse(struct mmc_host *host);
->
->  static inline void *mmc_priv(struct mmc_host *host)
->  {
+> +#endif
+> 
+> ?
+
+no need as of_match_device is a inline of !OF
+
+Best Regards,
+J.
+> 
+> Hein
 > --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> To unsubscribe from this list: send the line "unsubscribe netdev" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
