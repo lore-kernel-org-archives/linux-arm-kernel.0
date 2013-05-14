@@ -1,44 +1,26 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 14 May 2013 08:58:35 -0700
-Subject: [PATCH 3/9] clk: ux500: Provide device enumeration number suffix
- for SMSC911x
-In-Reply-To: <1368019749-19455-4-git-send-email-lee.jones@linaro.org>
-References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
- <1368019749-19455-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130514155835.10068.93655@quantum>
+From: jp.francois@cynove.com (jp.francois at cynove.com)
+Date: Tue, 14 May 2013 18:07:01 +0200
+Subject: [PATCH] ARM : omap : remove __init for _enable_preprogram
+Message-ID: <1368547621-8570-1-git-send-email-jp.francois@cynove.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Lee Jones (2013-05-08 06:29:03)
-> First Ethernet device has a ".0" appended onto the device name. It
-> appears that we need this in order to obtain the correct clock.
-> 
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+_enable_preprogram is marked as __init, but is called from _enable which is not.
+This results in oops once init is freed.
+Fix this by removing the __init marker.
 
-Looks good to me.  Can I take this into clk-next or are you looking for
-an Ack?
+Signed-off-by: Jean-Philippe Fran??ois <jp.francois@cynove.com>
 
-Regards,
-Mike
-
-> ---
->  drivers/clk/ux500/u8500_clk.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
-> index 0b4f35a..80069c3 100644
-> --- a/drivers/clk/ux500/u8500_clk.c
-> +++ b/drivers/clk/ux500/u8500_clk.c
-> @@ -325,7 +325,7 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
->         clk = clk_reg_prcc_pclk("p3_pclk0", "per3clk", clkrst3_base,
->                                 BIT(0), 0);
->         clk_register_clkdev(clk, "fsmc", NULL);
-> -       clk_register_clkdev(clk, NULL, "smsc911x");
-> +       clk_register_clkdev(clk, NULL, "smsc911x.0");
->  
->         clk = clk_reg_prcc_pclk("p3_pclk1", "per3clk", clkrst3_base,
->                                 BIT(1), 0);
-> -- 
-> 1.7.10.4
+Index: b/arch/arm/mach-omap2/omap_hwmod.c
+===================================================================
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2066,7 +2066,7 @@
+  * do so is present in the hwmod data, then call it and pass along the
+  * return value; otherwise, return 0.
+  */
+-static int __init _enable_preprogram(struct omap_hwmod *oh)
++static int _enable_preprogram(struct omap_hwmod *oh)
+ {
+ 	if (!oh->class->enable_preprogram)
+ 		return 0;
