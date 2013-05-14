@@ -1,12 +1,12 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 14 May 2013 09:47:56 +0100
-Subject: [PATCH 8/9] pinctrl: abx500: Rejiggle platform data and DT
- initialisation
-In-Reply-To: <CACRpkdZTU1gv3onjFF4eqxv-o1BQwd48u4gQ9NWqryWoMiKTDQ@mail.gmail.com>
+Date: Tue, 14 May 2013 09:48:54 +0100
+Subject: [PATCH 6/9] ARM: ux500: Provide device enumeration number suffix
+ for SMSC911x
+In-Reply-To: <CACRpkdYz0HcdBovoJu6O-4QyRbXz93MaeWwAwCohbE8rv=8O7Q@mail.gmail.com>
 References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
- <1368019749-19455-9-git-send-email-lee.jones@linaro.org>
- <CACRpkdZTU1gv3onjFF4eqxv-o1BQwd48u4gQ9NWqryWoMiKTDQ@mail.gmail.com>
-Message-ID: <20130514084756.GE3297@gmail.com>
+ <1368019749-19455-7-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYz0HcdBovoJu6O-4QyRbXz93MaeWwAwCohbE8rv=8O7Q@mail.gmail.com>
+Message-ID: <20130514084854.GF3297@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,31 +14,23 @@ On Tue, 14 May 2013, Linus Walleij wrote:
 
 > On Wed, May 8, 2013 at 3:29 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> > A pointer to GPIO platform data is always passed to the driver now, so
-> > there's little point in checking for 'pdata' and executing the DT case if
-> > it's not there. The difference between booting with DT and !DT is when
-> > booting with DT, plat_id is not populated. Thus, in the DT case we have
-> > to use a DT match table in order to find out which platform we're
-> > executing on. So, we're changing the semantics here to only use the
-> > match table if no plat_id is supplied though platform data.
+> > First Ethernet device has a ".0" appended onto the device name. It
+> > appears that we need this in order to obtain the correct clock.
 > >
 > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> (...)
+> > -       OF_DEV_AUXDATA("smsc,lan9115", 0x50000000, "smsc911x", NULL),
+> > +       OF_DEV_AUXDATA("smsc,lan9115", 0x50000000, "smsc911x.0", NULL),
 > 
-> Is this really included in the [0/9] fire alarm wrapper statement
-> "Important ux500 fixups due for the v3.10 -rc:s"?
+> I guess what you want to say in the commit message is that
+> on a non-DT boot the ethernet will be named "smsc911x.0"
+> and since the clocks are not converted to device tree these
+> names need to be matched when providing the name from
+> auxdata.
 > 
-> It seems more like a random refactoring to me.
-> 
-> The commit message fails to specify which regression this
-> is fixing, like if it's causing an oops or so.
-> 
-> So I've tentatively applied it to the pinctrl devel branch for
-> v3.11 unless something comes up...
+> Edited the commit message and applied!
 
-Perhaps the commit message is a bit weak, but yes, it _needs_ to go
-into v3.10, or this driver will be _broken_ when we boot with DT.
-
-Please apply this to your -fixes branch.
+Thanks for the effort. :)
 
 -- 
 Lee Jones
