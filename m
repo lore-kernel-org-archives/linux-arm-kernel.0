@@ -1,42 +1,48 @@
 From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 14 May 2013 12:48:56 +0100
-Subject: [PATCH 6/7] ARM: nommu: Don't build smp_tlb.c for !CONFIG_MMU
+Date: Tue, 14 May 2013 12:48:57 +0100
+Subject: [PATCH 7/7] ARM: nommu: add stub local_flush_bp_all() for !CONFIG_MMUU
 In-Reply-To: <1368532137-8871-1-git-send-email-jonathan.austin@arm.com>
 References: <1368532137-8871-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <1368532137-8871-7-git-send-email-jonathan.austin@arm.com>
+Message-ID: <1368532137-8871-8-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without an MMU we don't need to do any TLB maintenance. Until the addition
-of 93dc68876b60 (ARM: 7684/1: errata: Workaround for Cortex-A15 erratum 798181
-(TLBI/DSB operations)) building the tlb maintenance ops in smp_tlb.c worked,
-though none of the contents were used.
+Since the merging of Will's tlb-ops branch, specifically 89c7e4b8bbb3
+(ARM: 7661/1: mm: perform explicit branch predictor maintenance when required),
+building SMP without CONFIG_MMU has been broken.
 
-Since that commit, however, SMP NOMMU has not been able to build. This patch
-restores that ability by making the building of smp_tlb.c dependent on MMU.
+The local_flush_bp_all function is only called for operations related to
+changing the kernel's view of memory and ASID rollover - both of which are
+irrelevant to an !MMU kernel.
+
+This patch adds a stub local_flush_bp_all() function to the other tlb
+maintenance stubs and restores the ability to build an SMP !MMU kernel.
 
 Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-CC: Will Deacon <will.deacon@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/Makefile |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/tlbflush.h |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 5f3338e..9314500 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -32,7 +32,10 @@ obj-$(CONFIG_ARTHUR)		+= arthur.o
- obj-$(CONFIG_ISA_DMA)		+= dma-isa.o
- obj-$(CONFIG_PCI)		+= bios32.o isa.o
- obj-$(CONFIG_ARM_CPU_SUSPEND)	+= sleep.o suspend.o
--obj-$(CONFIG_SMP)		+= smp.o smp_tlb.o
-+obj-$(CONFIG_SMP)		+= smp.o
-+ifdef CONFIG_MMU
-+obj-$(CONFIG_SMP)		+= smp_tlb.o
-+endif
- obj-$(CONFIG_HAVE_ARM_SCU)	+= smp_scu.o
- obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
- obj-$(CONFIG_ARM_ARCH_TIMER)	+= arch_timer.o
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index cc8517e..ded7c16 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -549,6 +549,7 @@ static inline void local_flush_tlb_page(struct vm_area_struct *vma, unsigned lon
+ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)						{ }
+ static inline void local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)	{ }
+ static inline void local_flush_tlb_kernel_range(unsigned long start, unsigned long end)				{ }
++static inline void local_flush_bp_all(void)									{ }
+ 
+ extern void flush_tlb_all(void);
+ extern void flush_tlb_mm(struct mm_struct *mm);
+@@ -556,6 +557,7 @@ extern void flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr);
+ extern void flush_tlb_kernel_page(unsigned long kaddr);
+ extern void flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
+ extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
++extern void flush_bp_all(void);
+ #endif	/* __ASSEMBLY__ */
+ 
+ #endif
 -- 
 1.7.9.5
