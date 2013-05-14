@@ -1,38 +1,50 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Tue, 14 May 2013 07:59:40 +0200
-Subject: [PATCH 1/6] ARM: tegra20: create a DT header defining CLK IDs
-In-Reply-To: <519118E3.4060907@wwwdotorg.org>
-References: <1368443225-16978-1-git-send-email-hdoyu@nvidia.com><1368443225-16978-2-git-send-email-hdoyu@nvidia.com><519118E3.4060907@wwwdotorg.org>
-Message-ID: <20130514.085940.1807211932170883314.hdoyu@nvidia.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 14 May 2013 15:01:01 +0900
+Subject: [PATCH 2/3] ARM: shmobile: r8a7790: Configure R-Car GPIO for
+ IRQ_TYPE_EDGE_BOTH
+In-Reply-To: <20130514024034.GA20239@verge.net.au>
+References: <1368435233-8587-1-git-send-email-horms+renesas@verge.net.au>
+ <1368435233-8587-3-git-send-email-horms+renesas@verge.net.au>
+ <2257564.fgMO2c8G9k@avalon> <20130514024034.GA20239@verge.net.au>
+Message-ID: <CANqRtoR_BGFo+GRgom2WqXnaGtoB1T90S=twO_4G_t-JE8roTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> wrote @ Mon, 13 May 2013 18:46:27 +0200:
+Hi Simon, Laurent,
 
-> I'm not sure exactly how these patches will get merged. For you
-> reference, I anticipate one of two things happening:
-> 
-> 1)
-> 
-> * Patches 1, 3, 5 get put into a topic branch, and merged into both the
-> clk tree and the Tegra tree.
-> 
-> * Patches 2, 4, 6 get merged into the Tegra tree.
-> 
-> * The patches you're going to create for the drivers/clk code get merged
-> into Mike's clk tree
-> 
-> 2)
-> 
-> * Mike ack's the patches you're going to create for the drivers/clk code.
-> 
-> * Everything gets merged through the Tegra tree.
-> 
-> This shouldn't impact you much, but just be aware that the drivers/clk
-> changes you create shouldn't depend on anything beyond patches 1, 3, 5
-> here and 3.10-rc1, then I can work out the merging with Mike without any
-> constraints.
+On Tue, May 14, 2013 at 11:40 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Tue, May 14, 2013 at 12:33:42AM +0200, Laurent Pinchart wrote:
+>> Hi Simon,
+>>
+>> On Monday 13 May 2013 17:53:52 Simon Horman wrote:
+>> > "gpio-rcar: Support IRQ_TYPE_EDGE_BOTH" adds support to the R-Car GPIO
+>> > driver for IRQ_TYPE_EDGE_BOTH. As hardware support for this feature is
+>> > not universal for all SoCs a flag, has_both_edge_trigger, has been
+>> > added to the platform data of the driver to allow this feature to be
+>> > enabled.
+>>
+>> What about moving this information to a platform ID table in the gpio-rcar
+>> driver ?
+>
+> Magnus, do you have an opinion on this?
 
-Either way would work. Once Venu's USB patches are merged, mentioned
-in [2/6], I'll resend the update version of this series.
-drivers/clk/tegra replacement will follow, then.
+I don't mind so much as long as we:
+a) can control things freely per driver instance
+and
+b) don't have to update all drivers for every new SoC
+
+The current approach allows for that, so as an example if we can have
+two slightly different GPIO hardware blocks then we can setup two GPIO
+controller driver instances where the configuration can be selected
+per-instance. Perhaps Laurent's proposal would allow for this too, I'm
+not sure.
+
+On top of that I'd like to avoid doing per-SoC string matching in
+drivers. Those would force us to update every darn driver for every
+new SoC. It is better to try to use a per-hardware device version in
+the drivers and then configure each SoC to use the appropriate
+version.
+
+Thanks,
+
+/ magnus
