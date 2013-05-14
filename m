@@ -1,58 +1,43 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 14 May 2013 17:31:14 +0200
-Subject: [PATCH 2/3] ARM: shmobile: r8a7790: Configure R-Car GPIO for
- IRQ_TYPE_EDGE_BOTH
-In-Reply-To: <CANqRtoR_BGFo+GRgom2WqXnaGtoB1T90S=twO_4G_t-JE8roTQ@mail.gmail.com>
-References: <1368435233-8587-1-git-send-email-horms+renesas@verge.net.au>
- <20130514024034.GA20239@verge.net.au>
- <CANqRtoR_BGFo+GRgom2WqXnaGtoB1T90S=twO_4G_t-JE8roTQ@mail.gmail.com>
-Message-ID: <1536782.qkoVNXIpLR@avalon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 14 May 2013 17:38:35 +0200
+Subject: [PATCH 02/20] ARM: zynq: Remove init_irq declaration in machine
+ description
+In-Reply-To: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1368545933-7430-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
+specified") removed the need to explictly setup the init_irq field in
+the machine description when using only irqchip_init. Remove that
+declaration for zynq as well.
 
-On Tuesday 14 May 2013 15:01:01 Magnus Damm wrote:
-> On Tue, May 14, 2013 at 11:40 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Tue, May 14, 2013 at 12:33:42AM +0200, Laurent Pinchart wrote:
-> >> Hi Simon,
-> >> 
-> >> On Monday 13 May 2013 17:53:52 Simon Horman wrote:
-> >> > "gpio-rcar: Support IRQ_TYPE_EDGE_BOTH" adds support to the R-Car GPIO
-> >> > driver for IRQ_TYPE_EDGE_BOTH. As hardware support for this feature is
-> >> > not universal for all SoCs a flag, has_both_edge_trigger, has been
-> >> > added to the platform data of the driver to allow this feature to be
-> >> > enabled.
-> >> 
-> >> What about moving this information to a platform ID table in the
-> >> gpio-rcar driver ?
-> > 
-> > Magnus, do you have an opinion on this?
-> 
-> I don't mind so much as long as we:
-> a) can control things freely per driver instance
-> and
-> b) don't have to update all drivers for every new SoC
-> 
-> The current approach allows for that, so as an example if we can have
-> two slightly different GPIO hardware blocks then we can setup two GPIO
-> controller driver instances where the configuration can be selected
-> per-instance. Perhaps Laurent's proposal would allow for this too, I'm
-> not sure.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Michal Simek <monstr@monstr.eu>
+---
+ arch/arm/mach-zynq/common.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-I agree that parameters related to the instantiation of a GPIO IP core in a 
-SoC should come from DT. Parameters related to the IP core version (usch as 
-the ability to trigger on both edges) should in my opinion be computed by the 
-GPIO driver based on the IP core version number.
-
-> On top of that I'd like to avoid doing per-SoC string matching in drivers.
-> Those would force us to update every darn driver for every new SoC. It is
-> better to try to use a per-hardware device version in the drivers and then
-> configure each SoC to use the appropriate version.
-
-Agreed. Are the version numbers for the GPIO IP core available ?
-
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 5bfe703..4c0199b8 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -25,7 +25,6 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/of.h>
+-#include <linux/irqchip.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -106,7 +105,6 @@ static const char * const zynq_dt_match[] = {
+ MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
+ 	.smp		= smp_ops(zynq_smp_ops),
+ 	.map_io		= zynq_map_io,
+-	.init_irq	= irqchip_init,
+ 	.init_machine	= zynq_init_machine,
+ 	.init_time	= zynq_timer_init,
+ 	.dt_compat	= zynq_dt_match,
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.1.2
