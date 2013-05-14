@@ -1,46 +1,68 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 14 May 2013 10:08:23 -0600
-Subject: GPIO sysfs : set a wake source
-In-Reply-To: <CACRpkdYjQD9phVtWNh2QGkZWOdEJyZENnYatXt7bd23bgqXitw@mail.gmail.com>
-References: <87fvxwia0s.fsf@free.fr>
- <CACRpkdYjQD9phVtWNh2QGkZWOdEJyZENnYatXt7bd23bgqXitw@mail.gmail.com>
-Message-ID: <51926177.1050600@wwwdotorg.org>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 14 May 2013 17:20:46 +0100
+Subject: [PATCH 04/20] ARM: picoxcell: Remove init_irq declaration in
+ machine description
+In-Reply-To: <1368545933-7430-5-git-send-email-maxime.ripard@free-electrons.com>
+References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1368545933-7430-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130514162046.GA16346@page>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2013 03:29 AM, Linus Walleij wrote:
-> On Thu, May 9, 2013 at 2:59 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> 
->> I was thinking on how to remove all "gpio_request()" from my board code
->> (arch/arm/mach-pxa/mioa701.c).
->>
->> I have a small difficulty with the functionality provided by gpiolib in
->> userspace. This is what I need :
->>  - define a gpio as an input
->>  - define this gpio to be an interrupt source
->>  - define this interrupt to be a wake-up source
-> 
-> This sounds like trying to remove board code by moving it to userspace
-> and basically starting to implement stuff that belongs in the kernel
-> in userspace just because someone says we should get rid of board
-> files :-)
-> 
-> Don't go down this path, let the kernel handle this kind of stuff.
-> 
-> Instead figure out how to make the subsystems we have and the
-> device trees express what you want to do.
-> 
-> In another thread I suggested that we add a GPIO "hogging"
-> mechanism to gpiolib, so that the gpio subsystem can by itself
-> "hog" (get) some GPIOs and set them up in certain modes.
-> This closely matches what the pin control subsystem will do
-> with some such things.
-> 
-> What do you think about this idea?
+Hi Maxime,
 
-There's some merit to discussing the use of "GPIO hogging" for the
-purpose of solving interactions between the IRQ and GPIO subsystems
+Thanks for this, I'll add it to my tree.  I've modified it slightly to 
+kill off the other irq includes, hopefully that's okay with you.
 
-However, the discussion above sounds like simply a list of GPIOs to
-initialize at boot for the sole purpose of GPIO initialization. I
-thought that had been discussed before and nak'd?
+Thanks,
+
+Jamie
+
+8<---
+
+>From 4b83f75a7af388aaf5f79ccf72c37074bc9166da Mon Sep 17 00:00:00 2001
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
+Date: Tue, 14 May 2013 17:38:37 +0200
+Subject: [PATCH] ARM: picoxcell: Remove init_irq declaration in machine
+ description
+
+Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
+specified") removed the need to explictly setup the init_irq field in
+the machine description when using only irqchip_init. Remove that
+declaration for picoxcell as well.
+
+[ jiles: removed other, unused irq includes. ]
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+---
+ arch/arm/mach-picoxcell/common.c | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
+index f6f71bb..b069fa6 100644
+--- a/arch/arm/mach-picoxcell/common.c
++++ b/arch/arm/mach-picoxcell/common.c
+@@ -8,12 +8,8 @@
+  * All enquiries to support at picochip.com
+  */
+ #include <linux/delay.h>
+-#include <linux/irq.h>
+-#include <linux/irqchip.h>
+-#include <linux/irqdomain.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+-#include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/dw_apb_timer.h>
+ 
+@@ -85,7 +81,6 @@ static void picoxcell_wdt_restart(char mode, const char *cmd)
+ DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
+ 	.map_io		= picoxcell_map_io,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+-	.init_irq	= irqchip_init,
+ 	.init_time	= dw_apb_timer_init,
+ 	.init_machine	= picoxcell_init_machine,
+ 	.dt_compat	= picoxcell_dt_match,
+-- 
+1.8.1.2
