@@ -1,115 +1,167 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 May 2013 15:13:55 +0100
-Subject: [PATCH v4 27/32] arm64: KVM: 32bit specific register world switch
+Date: Tue, 14 May 2013 15:13:58 +0100
+Subject: [PATCH v4 30/32] arm64: KVM: userspace API documentation
 In-Reply-To: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
 References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1368540840-26750-28-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1368540840-26750-31-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow registers specific to 32bit guests to be saved/restored
-during the world switch.
+Unsurprisingly, the arm64 userspace API is extremely similar to
+the 32bit one, the only significant difference being the ONE_REG
+register mapping.
 
-Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp.S | 70 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
+ Documentation/virtual/kvm/api.txt | 58 ++++++++++++++++++++++++++-------------
+ 1 file changed, 39 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 926dc7e..e175f84 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -266,6 +266,74 @@ __kvm_hyp_code_start:
- 	msr	cntkctl_el1,	x23
- .endm
+diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+index 5f91eda..9bfadeb 100644
+--- a/Documentation/virtual/kvm/api.txt
++++ b/Documentation/virtual/kvm/api.txt
+@@ -280,7 +280,7 @@ kvm_run' (see below).
+ 4.11 KVM_GET_REGS
  
-+.macro skip_32bit_state tmp, target
-+	// Skip 32bit state if not needed
-+	mrs	\tmp, hcr_el2
-+	tbnz	\tmp, #HCR_RW_SHIFT, \target
-+.endm
-+
-+.macro skip_tee_state tmp, target
-+	// Skip ThumbEE state if not needed
-+	mrs	\tmp, id_pfr0_el1
-+	tbz	\tmp, #12, \target
-+.endm
-+
-+.macro save_guest_32bit_state
-+	skip_32bit_state x3, 1f
-+
-+	add	x3, x2, #CPU_SPSR_OFFSET(KVM_SPSR_ABT)
-+	mrs	x4, spsr_abt
-+	mrs	x5, spsr_und
-+	mrs	x6, spsr_irq
-+	mrs	x7, spsr_fiq
-+	stp	x4, x5, [x3]
-+	stp	x6, x7, [x3, #16]
-+
-+	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
-+	mrs	x4, dacr32_el2
-+	mrs	x5, ifsr32_el2
-+	mrs	x6, fpexc32_el2
-+	mrs	x7, dbgvcr32_el2
-+	stp	x4, x5, [x3]
-+	stp	x6, x7, [x3, #16]
-+
-+	skip_tee_state x8, 1f
-+
-+	add	x3, x2, #CPU_SYSREG_OFFSET(TEECR32_EL1)
-+	mrs	x4, teecr32_el1
-+	mrs	x5, teehbr32_el1
-+	stp	x4, x5, [x3]
-+1:
-+.endm
-+
-+.macro restore_guest_32bit_state
-+	skip_32bit_state x3, 1f
-+
-+	add	x3, x2, #CPU_SPSR_OFFSET(KVM_SPSR_ABT)
-+	ldp	x4, x5, [x3]
-+	ldp	x6, x7, [x3, #16]
-+	msr	spsr_abt, x4
-+	msr	spsr_und, x5
-+	msr	spsr_irq, x6
-+	msr	spsr_fiq, x7
-+
-+	add	x3, x2, #CPU_SYSREG_OFFSET(DACR32_EL2)
-+	ldp	x4, x5, [x3]
-+	ldp	x6, x7, [x3, #16]
-+	msr	dacr32_el2, x4
-+	msr	ifsr32_el2, x5
-+	msr	fpexc32_el2, x6
-+	msr	dbgvcr32_el2, x7
-+
-+	skip_tee_state x8, 1f
-+
-+	add	x3, x2, #CPU_SYSREG_OFFSET(TEECR32_EL1)
-+	ldp	x4, x5, [x3]
-+	msr	teecr32_el1, x4
-+	msr	teehbr32_el1, x5
-+1:
-+.endm
-+
- .macro activate_traps
- 	ldr	x2, [x0, #VCPU_IRQ_LINES]
- 	ldr	x1, [x0, #VCPU_HCR_EL2]
-@@ -494,6 +562,7 @@ ENTRY(__kvm_vcpu_run)
+ Capability: basic
+-Architectures: all except ARM
++Architectures: all except ARM, arm64
+ Type: vcpu ioctl
+ Parameters: struct kvm_regs (out)
+ Returns: 0 on success, -1 on error
+@@ -301,7 +301,7 @@ struct kvm_regs {
+ 4.12 KVM_SET_REGS
  
- 	bl __restore_sysregs
- 	bl __restore_fpsimd
-+	restore_guest_32bit_state
- 	restore_guest_regs
+ Capability: basic
+-Architectures: all except ARM
++Architectures: all except ARM, arm64
+ Type: vcpu ioctl
+ Parameters: struct kvm_regs (in)
+ Returns: 0 on success, -1 on error
+@@ -587,7 +587,7 @@ struct kvm_fpu {
+ 4.24 KVM_CREATE_IRQCHIP
  
- 	// That's it, no more messing around.
-@@ -510,6 +579,7 @@ __kvm_vcpu_return:
- 	save_guest_regs
- 	bl __save_fpsimd
- 	bl __save_sysregs
-+	save_guest_32bit_state
+ Capability: KVM_CAP_IRQCHIP
+-Architectures: x86, ia64, ARM
++Architectures: x86, ia64, ARM, arm64
+ Type: vm ioctl
+ Parameters: none
+ Returns: 0 on success, -1 on error
+@@ -595,14 +595,14 @@ Returns: 0 on success, -1 on error
+ Creates an interrupt controller model in the kernel.  On x86, creates a virtual
+ ioapic, a virtual PIC (two PICs, nested), and sets up future vcpus to have a
+ local APIC.  IRQ routing for GSIs 0-15 is set to both PIC and IOAPIC; GSI 16-23
+-only go to the IOAPIC.  On ia64, a IOSAPIC is created. On ARM, a GIC is
++only go to the IOAPIC.  On ia64, a IOSAPIC is created. On ARM/arm64, a GIC is
+ created.
  
- 	save_timer_state
- 	save_vgic_state
+ 
+ 4.25 KVM_IRQ_LINE
+ 
+ Capability: KVM_CAP_IRQCHIP
+-Architectures: x86, ia64, arm
++Architectures: x86, ia64, arm, arm64
+ Type: vm ioctl
+ Parameters: struct kvm_irq_level
+ Returns: 0 on success, -1 on error
+@@ -612,9 +612,10 @@ On some architectures it is required that an interrupt controller model has
+ been previously created with KVM_CREATE_IRQCHIP.  Note that edge-triggered
+ interrupts require the level to be set to 1 and then back to 0.
+ 
+-ARM can signal an interrupt either at the CPU level, or at the in-kernel irqchip
+-(GIC), and for in-kernel irqchip can tell the GIC to use PPIs designated for
+-specific cpus.  The irq field is interpreted like this:
++ARM/arm64 can signal an interrupt either at the CPU level, or at the
++in-kernel irqchip (GIC), and for in-kernel irqchip can tell the GIC to
++use PPIs designated for specific cpus.  The irq field is interpreted
++like this:
+ 
+  ?bits:  | 31 ... 24 | 23  ... 16 | 15    ...    0 |
+   field: | irq_type  | vcpu_index |     irq_id     |
+@@ -1831,6 +1832,22 @@ ARM 32-bit VFP control registers have the following id bit patterns:
+ ARM 64-bit FP registers have the following id bit patterns:
+   0x4030 0000 0012 0 <regno:12>
+ 
++
++arm64 registers are mapped using the lower 32 bits. The upper 16 of
++that is the register group type, or coprocessor number:
++
++arm64 core/FP-SIMD registers have the following id bit patterns. Note
++that the size of the access is variable, as the kvm_regs structure
++contains elements ranging from 32 to 128 bits. The index is a 32bit
++value in the kvm_regs structure seen as a 32bit array.
++  0x60x0 0000 0010 <index into the kvm_regs struct:16>
++
++arm64 CCSIDR registers are demultiplexed by CSSELR value:
++  0x6020 0000 0011 00 <csselr:8>
++
++arm64 system registers have the following id bit patterns:
++  0x6030 0000 0013 <op0:2> <op1:3> <crn:4> <crm:4> <op2:3>
++
+ 4.69 KVM_GET_ONE_REG
+ 
+ Capability: KVM_CAP_ONE_REG
+@@ -2264,7 +2281,7 @@ current state.  "addr" is ignored.
+ 4.77 KVM_ARM_VCPU_INIT
+ 
+ Capability: basic
+-Architectures: arm
++Architectures: arm, arm64
+ Type: vcpu ioctl
+ Parameters: struct struct kvm_vcpu_init (in)
+ Returns: 0 on success; -1 on error
+@@ -2283,12 +2300,14 @@ should be created before this ioctl is invoked.
+ Possible features:
+ 	- KVM_ARM_VCPU_POWER_OFF: Starts the CPU in a power-off state.
+ 	  Depends on KVM_CAP_ARM_PSCI.
++	- KVM_ARM_VCPU_EL1_32BIT: Starts the CPU in a 32bit mode.
++	  Depends on KVM_CAP_ARM_EL1_32BIT (arm64 only).
+ 
+ 
+ 4.78 KVM_GET_REG_LIST
+ 
+ Capability: basic
+-Architectures: arm
++Architectures: arm, arm64
+ Type: vcpu ioctl
+ Parameters: struct kvm_reg_list (in/out)
+ Returns: 0 on success; -1 on error
+@@ -2308,7 +2327,7 @@ KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
+ 4.80 KVM_ARM_SET_DEVICE_ADDR
+ 
+ Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
+-Architectures: arm
++Architectures: arm, arm64
+ Type: vm ioctl
+ Parameters: struct kvm_arm_device_address (in)
+ Returns: 0 on success, -1 on error
+@@ -2329,18 +2348,19 @@ can access emulated or directly exposed devices, which the host kernel needs
+ to know about. The id field is an architecture specific identifier for a
+ specific device.
+ 
+-ARM divides the id field into two parts, a device id and an address type id
+-specific to the individual device.
++ARM/arm64 divides the id field into two parts, a device id and an
++address type id specific to the individual device.
+ 
+  ?bits:  | 63        ...       32 | 31    ...    16 | 15    ...    0 |
+   field: |        0x00000000      |     device id   |  addr type id  |
+ 
+-ARM currently only require this when using the in-kernel GIC support for the
+-hardware VGIC features, using KVM_ARM_DEVICE_VGIC_V2 as the device id.  When
+-setting the base address for the guest's mapping of the VGIC virtual CPU
+-and distributor interface, the ioctl must be called after calling
+-KVM_CREATE_IRQCHIP, but before calling KVM_RUN on any of the VCPUs.  Calling
+-this ioctl twice for any of the base addresses will return -EEXIST.
++ARM/arm64 currently only require this when using the in-kernel GIC
++support for the hardware VGIC features, using KVM_ARM_DEVICE_VGIC_V2
++as the device id.  When setting the base address for the guest's
++mapping of the VGIC virtual CPU and distributor interface, the ioctl
++must be called after calling KVM_CREATE_IRQCHIP, but before calling
++KVM_RUN on any of the VCPUs.  Calling this ioctl twice for any of the
++base addresses will return -EEXIST.
+ 
+ 4.82 KVM_PPC_RTAS_DEFINE_TOKEN
+ 
 -- 
 1.8.2.3
