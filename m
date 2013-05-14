@@ -1,473 +1,196 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 14 May 2013 17:07:21 +0200
-Subject: [PATCH] ASoC: remove saarb and tavorevb3 machine drivers
-Message-ID: <1368544041.1350.111.camel@x61.thuisdomein>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 14 May 2013 10:07:23 -0500
+Subject: [PATCH v2 1/3] ARM: allow platforms to use generic headers without
+ ARCH_MULTIPLATFORM
+In-Reply-To: <1368530845-7415-2-git-send-email-jonathan.austin@arm.com>
+References: <1368530845-7415-1-git-send-email-jonathan.austin@arm.com>
+ <1368530845-7415-2-git-send-email-jonathan.austin@arm.com>
+Message-ID: <5192532B.1070705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support for PXA95x was removed in v3.8. This means that the Kconfig
-symbols MACH_SAARB and MACH_TAVOREVB3 are no longer available. This
-leaves the SoC Audio support for Marvell Saarb and Marvell Tavor EVB3
-unbuildable. Remove these drivers too.
+On 05/14/2013 06:27 AM, Jonathan Austin wrote:
+> Currently the use of generic mach headers is only is controlled by the same
+> config option as selection of a multiplatform kernel (i.e.
+> ARCH_MULTIPLATFORM). However, there are cases where it is valid to use the
+> generic headers but still build a single platform kernel.
+> 
+> One such example is when using the vexpress platform with a core that does
+> not have an MMU; a multiplatform kernel does not make sense, but use of the
+> generic headers is required by the vexpress platform since 617276307cd4c
+> ("ARM: vexpress: convert to multi-platform").
+> 
+> This patch untangles these two options by introducing a new
+> ARM_GENERIC_HEADERS config option that ARCH_MULTIPLATFORM selects. Other
+> platforms can now select ARM_GENERIC_HEADERS independently.
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-0) Basically untested.
+I find this name confusing. It is no headers you are selecting and
+generic is a bit overused IMHO. So how about something like
+NEED_NO_MACH_HEADERS to somewhat align to the other header related
+config options (e.g. NEED_MACH_GPIO_H).
 
-1) To be specific: it was commit 49ea7fc094 ("ARM: pxa: remove pxa95x
-support") that removed MACH_SAARB and MACH_TAVOREVB3.
+Rob
 
- sound/soc/pxa/Kconfig     |  20 -----
- sound/soc/pxa/Makefile    |   4 -
- sound/soc/pxa/saarb.c     | 190 ----------------------------------------------
- sound/soc/pxa/tavorevb3.c | 189 ---------------------------------------------
- 4 files changed, 403 deletions(-)
- delete mode 100644 sound/soc/pxa/saarb.c
- delete mode 100644 sound/soc/pxa/tavorevb3.c
-
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index 4d2e46f..b358094 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -130,26 +130,6 @@ config SND_PXA2XX_SOC_PALM27X
- 	  Say Y if you want to add support for SoC audio on
- 	  Palm T|X, T5, E2 or LifeDrive handheld computer.
- 
--config SND_SOC_SAARB
--	tristate "SoC Audio support for Marvell Saarb"
--	depends on SND_PXA2XX_SOC && MACH_SAARB
--	select MFD_88PM860X
--	select SND_PXA_SOC_SSP
--	select SND_SOC_88PM860X
--	help
--	  Say Y if you want to add support for SoC audio on the
--	  Marvell Saarb reference platform.
--
--config SND_SOC_TAVOREVB3
--	tristate "SoC Audio support for Marvell Tavor EVB3"
--	depends on SND_PXA2XX_SOC && MACH_TAVOREVB3
--	select MFD_88PM860X
--	select SND_PXA_SOC_SSP
--	select SND_SOC_88PM860X
--	help
--	  Say Y if you want to add support for SoC audio on the
--	  Marvell Saarb reference platform.
--
- config SND_PXA910_SOC
- 	tristate "SoC Audio for Marvell PXA910 chip"
- 	depends on ARCH_MMP && SND
-diff --git a/sound/soc/pxa/Makefile b/sound/soc/pxa/Makefile
-index d8a265d..2cff67b 100644
---- a/sound/soc/pxa/Makefile
-+++ b/sound/soc/pxa/Makefile
-@@ -23,8 +23,6 @@ snd-soc-e800-objs := e800_wm9712.o
- snd-soc-spitz-objs := spitz.o
- snd-soc-em-x270-objs := em-x270.o
- snd-soc-palm27x-objs := palm27x.o
--snd-soc-saarb-objs := saarb.o
--snd-soc-tavorevb3-objs := tavorevb3.o
- snd-soc-zylonite-objs := zylonite.o
- snd-soc-hx4700-objs := hx4700.o
- snd-soc-magician-objs := magician.o
-@@ -48,8 +46,6 @@ obj-$(CONFIG_SND_PXA2XX_SOC_HX4700) += snd-soc-hx4700.o
- obj-$(CONFIG_SND_PXA2XX_SOC_MAGICIAN) += snd-soc-magician.o
- obj-$(CONFIG_SND_PXA2XX_SOC_MIOA701) += snd-soc-mioa701.o
- obj-$(CONFIG_SND_PXA2XX_SOC_Z2) += snd-soc-z2.o
--obj-$(CONFIG_SND_SOC_SAARB) += snd-soc-saarb.o
--obj-$(CONFIG_SND_SOC_TAVOREVB3) += snd-soc-tavorevb3.o
- obj-$(CONFIG_SND_SOC_ZYLONITE) += snd-soc-zylonite.o
- obj-$(CONFIG_SND_PXA2XX_SOC_IMOTE2) += snd-soc-imote2.o
- obj-$(CONFIG_SND_SOC_RAUMFELD) += snd-soc-raumfeld.o
-diff --git a/sound/soc/pxa/saarb.c b/sound/soc/pxa/saarb.c
-deleted file mode 100644
-index c34146b..0000000
---- a/sound/soc/pxa/saarb.c
-+++ /dev/null
-@@ -1,190 +0,0 @@
--/*
-- * saarb.c -- SoC audio for saarb
-- *
-- * Copyright (C) 2010 Marvell International Ltd.
-- * 	Haojian Zhuang <haojian.zhuang@marvell.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/module.h>
--#include <linux/moduleparam.h>
--#include <linux/device.h>
--#include <linux/clk.h>
--#include <linux/i2c.h>
--#include <sound/core.h>
--#include <sound/pcm.h>
--#include <sound/pcm_params.h>
--#include <sound/soc.h>
--#include <sound/jack.h>
--
--#include <asm/mach-types.h>
--
--#include "../codecs/88pm860x-codec.h"
--#include "pxa-ssp.h"
--
--static int saarb_pm860x_init(struct snd_soc_pcm_runtime *rtd);
--
--static struct platform_device *saarb_snd_device;
--
--static struct snd_soc_jack hs_jack, mic_jack;
--
--static struct snd_soc_jack_pin hs_jack_pins[] = {
--	{ .pin = "Headset Stereophone",	.mask = SND_JACK_HEADPHONE, },
--};
--
--static struct snd_soc_jack_pin mic_jack_pins[] = {
--	{ .pin = "Headset Mic 2",	.mask = SND_JACK_MICROPHONE, },
--};
--
--/* saarb machine dapm widgets */
--static const struct snd_soc_dapm_widget saarb_dapm_widgets[] = {
--	SND_SOC_DAPM_HP("Headphone Stereophone", NULL),
--	SND_SOC_DAPM_LINE("Lineout Out 1", NULL),
--	SND_SOC_DAPM_LINE("Lineout Out 2", NULL),
--	SND_SOC_DAPM_SPK("Ext Speaker", NULL),
--	SND_SOC_DAPM_MIC("Ext Mic 1", NULL),
--	SND_SOC_DAPM_MIC("Headset Mic", NULL),
--	SND_SOC_DAPM_MIC("Ext Mic 3", NULL),
--};
--
--/* saarb machine audio map */
--static const struct snd_soc_dapm_route saarb_audio_map[] = {
--	{"Headset Stereophone", NULL, "HS1"},
--	{"Headset Stereophone", NULL, "HS2"},
--
--	{"Ext Speaker", NULL, "LSP"},
--	{"Ext Speaker", NULL, "LSN"},
--
--	{"Lineout Out 1", NULL, "LINEOUT1"},
--	{"Lineout Out 2", NULL, "LINEOUT2"},
--
--	{"MIC1P", NULL, "Mic1 Bias"},
--	{"MIC1N", NULL, "Mic1 Bias"},
--	{"Mic1 Bias", NULL, "Ext Mic 1"},
--
--	{"MIC2P", NULL, "Mic1 Bias"},
--	{"MIC2N", NULL, "Mic1 Bias"},
--	{"Mic1 Bias", NULL, "Headset Mic 2"},
--
--	{"MIC3P", NULL, "Mic3 Bias"},
--	{"MIC3N", NULL, "Mic3 Bias"},
--	{"Mic3 Bias", NULL, "Ext Mic 3"},
--};
--
--static int saarb_i2s_hw_params(struct snd_pcm_substream *substream,
--				struct snd_pcm_hw_params *params)
--{
--	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct snd_soc_dai *codec_dai = rtd->codec_dai;
--	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
--	int width = snd_pcm_format_physical_width(params_format(params));
--	int ret;
--
--	ret = snd_soc_dai_set_sysclk(cpu_dai, PXA_SSP_CLK_NET_PLL, 0,
--				     PM860X_CLK_DIR_OUT);
--	if (ret < 0)
--		return ret;
--
--	ret = snd_soc_dai_set_sysclk(codec_dai, 0, 0, PM860X_CLK_DIR_OUT);
--	if (ret < 0)
--		return ret;
--
--	ret = snd_soc_dai_set_tdm_slot(cpu_dai, 3, 3, 2, width);
--
--	return ret;
--}
--
--static struct snd_soc_ops saarb_i2s_ops = {
--	.hw_params	= saarb_i2s_hw_params,
--};
--
--static struct snd_soc_dai_link saarb_dai[] = {
--	{
--		.name		= "88PM860x I2S",
--		.stream_name	= "I2S Audio",
--		.cpu_dai_name	= "pxa-ssp-dai.1",
--		.codec_dai_name	= "88pm860x-i2s",
--		.platform_name	= "pxa-pcm-audio",
--		.codec_name	= "88pm860x-codec",
--		.init		= saarb_pm860x_init,
--		.dai_fmt	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
--				  SND_SOC_DAIFMT_CBM_CFM,
--		.ops		= &saarb_i2s_ops,
--	},
--};
--
--static struct snd_soc_card snd_soc_card_saarb = {
--	.name = "Saarb",
--	.owner = THIS_MODULE,
--	.dai_link = saarb_dai,
--	.num_links = ARRAY_SIZE(saarb_dai),
--
--	.dapm_widgets = saarb_dapm_widgets,
--	.num_dapm_widgets = ARRAY_SIZE(saarb_dapm_widgets),
--	.dapm_routes = saarb_audio_map,
--	.num_dapm_routes = ARRAY_SIZE(saarb_audio_map),
--};
--
--static int saarb_pm860x_init(struct snd_soc_pcm_runtime *rtd)
--{
--	struct snd_soc_codec *codec = rtd->codec;
--	struct snd_soc_dapm_context *dapm = &codec->dapm;
--
--	/* connected pins */
--	snd_soc_dapm_enable_pin(dapm, "Ext Speaker");
--	snd_soc_dapm_enable_pin(dapm, "Ext Mic 1");
--	snd_soc_dapm_enable_pin(dapm, "Ext Mic 3");
--	snd_soc_dapm_disable_pin(dapm, "Headset Mic 2");
--	snd_soc_dapm_disable_pin(dapm, "Headset Stereophone");
--
--	/* Headset jack detection */
--	snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE
--			| SND_JACK_BTN_0 | SND_JACK_BTN_1 | SND_JACK_BTN_2,
--			&hs_jack);
--	snd_soc_jack_add_pins(&hs_jack, ARRAY_SIZE(hs_jack_pins),
--			      hs_jack_pins);
--	snd_soc_jack_new(codec, "Microphone Jack", SND_JACK_MICROPHONE,
--			 &mic_jack);
--	snd_soc_jack_add_pins(&mic_jack, ARRAY_SIZE(mic_jack_pins),
--			      mic_jack_pins);
--
--	/* headphone, microphone detection & headset short detection */
--	pm860x_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADPHONE,
--			      SND_JACK_BTN_0, SND_JACK_BTN_1, SND_JACK_BTN_2);
--	pm860x_mic_jack_detect(codec, &hs_jack, SND_JACK_MICROPHONE);
--	return 0;
--}
--
--static int __init saarb_init(void)
--{
--	int ret;
--
--	if (!machine_is_saarb())
--		return -ENODEV;
--	saarb_snd_device = platform_device_alloc("soc-audio", -1);
--	if (!saarb_snd_device)
--		return -ENOMEM;
--
--	platform_set_drvdata(saarb_snd_device, &snd_soc_card_saarb);
--
--	ret = platform_device_add(saarb_snd_device);
--	if (ret)
--		platform_device_put(saarb_snd_device);
--
--	return ret;
--}
--
--static void __exit saarb_exit(void)
--{
--	platform_device_unregister(saarb_snd_device);
--}
--
--module_init(saarb_init);
--module_exit(saarb_exit);
--
--MODULE_AUTHOR("Haojian Zhuang <haojian.zhuang@marvell.com>");
--MODULE_DESCRIPTION("ALSA SoC 88PM860x Saarb");
--MODULE_LICENSE("GPL");
-diff --git a/sound/soc/pxa/tavorevb3.c b/sound/soc/pxa/tavorevb3.c
-deleted file mode 100644
-index 8b5ab8f..0000000
---- a/sound/soc/pxa/tavorevb3.c
-+++ /dev/null
-@@ -1,189 +0,0 @@
--/*
-- * tavorevb3.c -- SoC audio for Tavor EVB3
-- *
-- * Copyright (C) 2010 Marvell International Ltd.
-- * 	Haojian Zhuang <haojian.zhuang@marvell.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/module.h>
--#include <linux/moduleparam.h>
--#include <linux/device.h>
--#include <linux/clk.h>
--#include <linux/i2c.h>
--#include <sound/core.h>
--#include <sound/pcm.h>
--#include <sound/pcm_params.h>
--#include <sound/soc.h>
--#include <sound/jack.h>
--
--#include <asm/mach-types.h>
--
--#include "../codecs/88pm860x-codec.h"
--#include "pxa-ssp.h"
--
--static int evb3_pm860x_init(struct snd_soc_pcm_runtime *rtd);
--
--static struct platform_device *evb3_snd_device;
--
--static struct snd_soc_jack hs_jack, mic_jack;
--
--static struct snd_soc_jack_pin hs_jack_pins[] = {
--	{ .pin = "Headset Stereophone",	.mask = SND_JACK_HEADPHONE, },
--};
--
--static struct snd_soc_jack_pin mic_jack_pins[] = {
--	{ .pin = "Headset Mic 2",	.mask = SND_JACK_MICROPHONE, },
--};
--
--/* tavorevb3 machine dapm widgets */
--static const struct snd_soc_dapm_widget evb3_dapm_widgets[] = {
--	SND_SOC_DAPM_HP("Headset Stereophone", NULL),
--	SND_SOC_DAPM_LINE("Lineout Out 1", NULL),
--	SND_SOC_DAPM_LINE("Lineout Out 2", NULL),
--	SND_SOC_DAPM_SPK("Ext Speaker", NULL),
--	SND_SOC_DAPM_MIC("Ext Mic 1", NULL),
--	SND_SOC_DAPM_MIC("Headset Mic 2", NULL),
--	SND_SOC_DAPM_MIC("Ext Mic 3", NULL),
--};
--
--/* tavorevb3 machine audio map */
--static const struct snd_soc_dapm_route evb3_audio_map[] = {
--	{"Headset Stereophone", NULL, "HS1"},
--	{"Headset Stereophone", NULL, "HS2"},
--
--	{"Ext Speaker", NULL, "LSP"},
--	{"Ext Speaker", NULL, "LSN"},
--
--	{"Lineout Out 1", NULL, "LINEOUT1"},
--	{"Lineout Out 2", NULL, "LINEOUT2"},
--
--	{"MIC1P", NULL, "Mic1 Bias"},
--	{"MIC1N", NULL, "Mic1 Bias"},
--	{"Mic1 Bias", NULL, "Ext Mic 1"},
--
--	{"MIC2P", NULL, "Mic1 Bias"},
--	{"MIC2N", NULL, "Mic1 Bias"},
--	{"Mic1 Bias", NULL, "Headset Mic 2"},
--
--	{"MIC3P", NULL, "Mic3 Bias"},
--	{"MIC3N", NULL, "Mic3 Bias"},
--	{"Mic3 Bias", NULL, "Ext Mic 3"},
--};
--
--static int evb3_i2s_hw_params(struct snd_pcm_substream *substream,
--			      struct snd_pcm_hw_params *params)
--{
--	struct snd_soc_pcm_runtime *rtd = substream->private_data;
--	struct snd_soc_dai *codec_dai = rtd->codec_dai;
--	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
--	int width = snd_pcm_format_physical_width(params_format(params));
--	int ret;
--
--	ret = snd_soc_dai_set_sysclk(cpu_dai, PXA_SSP_CLK_NET_PLL, 0,
--				     PM860X_CLK_DIR_OUT);
--	if (ret < 0)
--		return ret;
--
--	ret = snd_soc_dai_set_sysclk(codec_dai, 0, 0, PM860X_CLK_DIR_OUT);
--	if (ret < 0)
--		return ret;
--
--	ret = snd_soc_dai_set_tdm_slot(cpu_dai, 3, 3, 2, width);
--	return ret;
--}
--
--static struct snd_soc_ops evb3_i2s_ops = {
--	.hw_params	= evb3_i2s_hw_params,
--};
--
--static struct snd_soc_dai_link evb3_dai[] = {
--	{
--		.name		= "88PM860x I2S",
--		.stream_name	= "I2S Audio",
--		.cpu_dai_name	= "pxa-ssp-dai.1",
--		.codec_dai_name	= "88pm860x-i2s",
--		.platform_name	= "pxa-pcm-audio",
--		.codec_name	= "88pm860x-codec",
--		.init		= evb3_pm860x_init,
--		.dai_fmt	= SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
--				  SND_SOC_DAIFMT_CBM_CFM,
--		.ops		= &evb3_i2s_ops,
--	},
--};
--
--static struct snd_soc_card snd_soc_card_evb3 = {
--	.name = "Tavor EVB3",
--	.owner = THIS_MODULE,
--	.dai_link = evb3_dai,
--	.num_links = ARRAY_SIZE(evb3_dai),
--
--	.dapm_widgets = evb3_dapm_widgets,
--	.num_dapm_widgets = ARRAY_SIZE(evb3_dapm_widgets),
--	.dapm_routes = evb3_audio_map,
--	.num_dapm_routes = ARRAY_SIZE(evb3_audio_map),
--};
--
--static int evb3_pm860x_init(struct snd_soc_pcm_runtime *rtd)
--{
--	struct snd_soc_codec *codec = rtd->codec;
--	struct snd_soc_dapm_context *dapm = &codec->dapm;
--
--	/* connected pins */
--	snd_soc_dapm_enable_pin(dapm, "Ext Speaker");
--	snd_soc_dapm_enable_pin(dapm, "Ext Mic 1");
--	snd_soc_dapm_enable_pin(dapm, "Ext Mic 3");
--	snd_soc_dapm_disable_pin(dapm, "Headset Mic 2");
--	snd_soc_dapm_disable_pin(dapm, "Headset Stereophone");
--
--	/* Headset jack detection */
--	snd_soc_jack_new(codec, "Headphone Jack", SND_JACK_HEADPHONE
--			| SND_JACK_BTN_0 | SND_JACK_BTN_1 | SND_JACK_BTN_2,
--			&hs_jack);
--	snd_soc_jack_add_pins(&hs_jack, ARRAY_SIZE(hs_jack_pins),
--			      hs_jack_pins);
--	snd_soc_jack_new(codec, "Microphone Jack", SND_JACK_MICROPHONE,
--			 &mic_jack);
--	snd_soc_jack_add_pins(&mic_jack, ARRAY_SIZE(mic_jack_pins),
--			      mic_jack_pins);
--
--	/* headphone, microphone detection & headset short detection */
--	pm860x_hs_jack_detect(codec, &hs_jack, SND_JACK_HEADPHONE,
--			      SND_JACK_BTN_0, SND_JACK_BTN_1, SND_JACK_BTN_2);
--	pm860x_mic_jack_detect(codec, &hs_jack, SND_JACK_MICROPHONE);
--	return 0;
--}
--
--static int __init tavorevb3_init(void)
--{
--	int ret;
--
--	if (!machine_is_tavorevb3())
--		return -ENODEV;
--	evb3_snd_device = platform_device_alloc("soc-audio", -1);
--	if (!evb3_snd_device)
--		return -ENOMEM;
--
--	platform_set_drvdata(evb3_snd_device, &snd_soc_card_evb3);
--
--	ret = platform_device_add(evb3_snd_device);
--	if (ret)
--		platform_device_put(evb3_snd_device);
--
--	return ret;
--}
--
--static void __exit tavorevb3_exit(void)
--{
--	platform_device_unregister(evb3_snd_device);
--}
--
--module_init(tavorevb3_init);
--module_exit(tavorevb3_exit);
--
--MODULE_AUTHOR("Haojian Zhuang <haojian.zhuang@marvell.com>");
--MODULE_DESCRIPTION("ALSA SoC 88PM860x Tavor EVB3");
--MODULE_LICENSE("GPL");
--- 
-1.7.11.7
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+> CC: Rob Herring <rob.herring@calxeda.com>
+> CC: Pawel Moll <pawel.moll@arm.com>
+> CC: Jason Cooper <jason@lakedaemon.net>
+> CC: Andrew Lunn <andrew@lunn.ch>
+> CC: Gregory Clement <gregory.clement@free-electrons.com>
+> CC: Tony Lindgren <tony@atomide.com>
+> CC: Stephen Boyd <sboyd@codeaurora.org>
+> CC: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/Kconfig                 |    4 ++++
+>  arch/arm/Kconfig.debug           |    4 ++--
+>  arch/arm/Makefile                |    2 +-
+>  arch/arm/include/asm/timex.h     |    2 +-
+>  arch/arm/mach-mvebu/Makefile     |    2 +-
+>  arch/arm/mach-omap2/Makefile     |    2 +-
+>  arch/arm/mach-vexpress/Makefile  |    2 +-
+>  arch/arm/plat-omap/Makefile      |    2 +-
+>  arch/arm/plat-orion/Makefile     |    2 +-
+>  arch/arm/plat-versatile/Makefile |    2 +-
+>  10 files changed, 14 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index d423d58..408eb33 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -206,6 +206,9 @@ config NEED_RET_TO_USER
+>  config ARCH_MTD_XIP
+>  	bool
+>  
+> +config ARM_GENERIC_HEADERS
+> +	bool
+> +
+>  config VECTORS_BASE
+>  	hex
+>  	default 0xffff0000 if MMU || CPU_HIGH_VECTOR
+> @@ -295,6 +298,7 @@ config ARCH_MULTIPLATFORM
+>  	select MULTI_IRQ_HANDLER
+>  	select SPARSE_IRQ
+>  	select USE_OF
+> +	select ARM_GENERIC_HEADERS
+>  
+>  config ARCH_INTEGRATOR
+>  	bool "ARM Ltd. Integrator family"
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 1d41908..ede909b 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -652,13 +652,13 @@ config DEBUG_LL_INCLUDE
+>  
+>  config DEBUG_UNCOMPRESS
+>  	bool
+> -	default y if ARCH_MULTIPLATFORM && DEBUG_LL && \
+> +	default y if ARM_GENERIC_HEADERS && DEBUG_LL && \
+>  		     !DEBUG_OMAP2PLUS_UART && \
+>  		     !DEBUG_TEGRA_UART
+>  
+>  config UNCOMPRESS_INCLUDE
+>  	string
+> -	default "debug/uncompress.h" if ARCH_MULTIPLATFORM
+> +	default "debug/uncompress.h" if ARM_GENERIC_HEADERS
+>  	default "mach/uncompress.h"
+>  
+>  config EARLY_PRINTK
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 4737408..ab0416f 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -229,7 +229,7 @@ endif
+>  machdirs := $(patsubst %,arch/arm/mach-%/,$(machine-y))
+>  platdirs := $(patsubst %,arch/arm/plat-%/,$(plat-y))
+>  
+> -ifneq ($(CONFIG_ARCH_MULTIPLATFORM),y)
+> +ifneq ($(CONFIG_ARM_GENERIC_HEADERS),y)
+>  ifeq ($(KBUILD_SRC),)
+>  KBUILD_CPPFLAGS += $(patsubst %,-I%include,$(machdirs) $(platdirs))
+>  else
+> diff --git a/arch/arm/include/asm/timex.h b/arch/arm/include/asm/timex.h
+> index 83f2aa8..586a9c2 100644
+> --- a/arch/arm/include/asm/timex.h
+> +++ b/arch/arm/include/asm/timex.h
+> @@ -12,7 +12,7 @@
+>  #ifndef _ASMARM_TIMEX_H
+>  #define _ASMARM_TIMEX_H
+>  
+> -#ifdef CONFIG_ARCH_MULTIPLATFORM
+> +#ifdef CONFIG_ARM_GENERIC_HEADERS
+>  #define CLOCK_TICK_RATE 1000000
+>  #else
+>  #include <mach/timex.h>
+> diff --git a/arch/arm/mach-mvebu/Makefile b/arch/arm/mach-mvebu/Makefile
+> index 2d04f0e..d3c0e0b 100644
+> --- a/arch/arm/mach-mvebu/Makefile
+> +++ b/arch/arm/mach-mvebu/Makefile
+> @@ -1,4 +1,4 @@
+> -ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+> +ccflags-$(CONFIG_ARM_GENERIC_HEADERS) := -I$(srctree)/$(src)/include \
+>  	-I$(srctree)/arch/arm/plat-orion/include
+>  
+>  AFLAGS_coherency_ll.o		:= -Wa,-march=armv7-a
+> diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+> index 55a9d67..ab204bc 100644
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -2,7 +2,7 @@
+>  # Makefile for the linux kernel.
+>  #
+>  
+> -ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+> +ccflags-$(CONFIG_ARM_GENERIC_HEADERS) := -I$(srctree)/$(src)/include \
+>  	-I$(srctree)/arch/arm/plat-omap/include
+>  
+>  # Common support
+> diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
+> index 42703e8..6768e7f 100644
+> --- a/arch/arm/mach-vexpress/Makefile
+> +++ b/arch/arm/mach-vexpress/Makefile
+> @@ -1,7 +1,7 @@
+>  #
+>  # Makefile for the linux kernel.
+>  #
+> -ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+> +ccflags-$(CONFIG_ARM_GENERIC_HEADERS) := -I$(srctree)/$(src)/include \
+>  	-I$(srctree)/arch/arm/plat-versatile/include
+>  
+>  obj-y					:= v2m.o
+> diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
+> index 3119941..3e1ba10 100644
+> --- a/arch/arm/plat-omap/Makefile
+> +++ b/arch/arm/plat-omap/Makefile
+> @@ -2,7 +2,7 @@
+>  # Makefile for the linux kernel.
+>  #
+>  
+> -ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/arch/arm/plat-omap/include
+> +ccflags-$(CONFIG_ARM_GENERIC_HEADERS) := -I$(srctree)/arch/arm/plat-omap/include
+>  
+>  # Common support
+>  obj-y := sram.o dma.o counter_32k.o
+> diff --git a/arch/arm/plat-orion/Makefile b/arch/arm/plat-orion/Makefile
+> index 9433605..79a042ed 100644
+> --- a/arch/arm/plat-orion/Makefile
+> +++ b/arch/arm/plat-orion/Makefile
+> @@ -1,7 +1,7 @@
+>  #
+>  # Makefile for the linux kernel.
+>  #
+> -ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
+> +ccflags-$(CONFIG_ARM_GENERIC_HEADERS) := -I$(srctree)/$(src)/include
+>  
+>  orion-gpio-$(CONFIG_GPIOLIB)      += gpio.o
+>  obj-$(CONFIG_PLAT_ORION_LEGACY)   += irq.o pcie.o time.o common.o mpp.o
+> diff --git a/arch/arm/plat-versatile/Makefile b/arch/arm/plat-versatile/Makefile
+> index f88d448..19495c6 100644
+> --- a/arch/arm/plat-versatile/Makefile
+> +++ b/arch/arm/plat-versatile/Makefile
+> @@ -1,4 +1,4 @@
+> -ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
+> +ccflags-$(CONFIG_ARM_GENERIC_HEADERS) := -I$(srctree)/$(src)/include
+>  
+>  obj-$(CONFIG_PLAT_VERSATILE_CLOCK) += clock.o
+>  obj-$(CONFIG_PLAT_VERSATILE_CLCD) += clcd.o
+> 
