@@ -1,113 +1,58 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 14 May 2013 17:28:43 +0200
-Subject: [PATCH] ARM: zImage: Convert 32bits memory size and address from ATAG
- to 64bits DTB
-In-Reply-To: <1368545323-3621-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1368545323-3621-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1368545323-3621-2-git-send-email-gregory.clement@free-electrons.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 14 May 2013 17:31:14 +0200
+Subject: [PATCH 2/3] ARM: shmobile: r8a7790: Configure R-Car GPIO for
+ IRQ_TYPE_EDGE_BOTH
+In-Reply-To: <CANqRtoR_BGFo+GRgom2WqXnaGtoB1T90S=twO_4G_t-JE8roTQ@mail.gmail.com>
+References: <1368435233-8587-1-git-send-email-horms+renesas@verge.net.au>
+ <20130514024034.GA20239@verge.net.au>
+ <CANqRtoR_BGFo+GRgom2WqXnaGtoB1T90S=twO_4G_t-JE8roTQ@mail.gmail.com>
+Message-ID: <1536782.qkoVNXIpLR@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_ARM_APPENDED_DTB is selected, if the bootloader provides
-an ATAG_MEM it replaces the memory size and the memory address in the
-memory node of the device tree. In the case of a system which can
-handle more than 4GB, the memory node cell size is 4: each data
-(memory size and memory address) are 64 bits and then use 2 cells.
+Hi Magnus,
 
-The current code in atags_to_fdt.c made the assumption of a cell size
-of 2 (one cell for the memory size and one cell for the memory
-address), this leads to an improper write of the data and ends with a
-boot hang.
+On Tuesday 14 May 2013 15:01:01 Magnus Damm wrote:
+> On Tue, May 14, 2013 at 11:40 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Tue, May 14, 2013 at 12:33:42AM +0200, Laurent Pinchart wrote:
+> >> Hi Simon,
+> >> 
+> >> On Monday 13 May 2013 17:53:52 Simon Horman wrote:
+> >> > "gpio-rcar: Support IRQ_TYPE_EDGE_BOTH" adds support to the R-Car GPIO
+> >> > driver for IRQ_TYPE_EDGE_BOTH. As hardware support for this feature is
+> >> > not universal for all SoCs a flag, has_both_edge_trigger, has been
+> >> > added to the platform data of the driver to allow this feature to be
+> >> > enabled.
+> >> 
+> >> What about moving this information to a platform ID table in the
+> >> gpio-rcar driver ?
+> > 
+> > Magnus, do you have an opinion on this?
+> 
+> I don't mind so much as long as we:
+> a) can control things freely per driver instance
+> and
+> b) don't have to update all drivers for every new SoC
+> 
+> The current approach allows for that, so as an example if we can have
+> two slightly different GPIO hardware blocks then we can setup two GPIO
+> controller driver instances where the configuration can be selected
+> per-instance. Perhaps Laurent's proposal would allow for this too, I'm
+> not sure.
 
-This patch writes the memory size and the memory address on the memory
-node in the device tree depending of the size of the memory node (32
-bits or 64 bits).
+I agree that parameters related to the instantiation of a GPIO IP core in a 
+SoC should come from DT. Parameters related to the IP core version (usch as 
+the ability to trigger on both edges) should in my opinion be computed by the 
+GPIO driver based on the IP core version number.
 
-It has been tested in the 2 cases:
-- with a dtb using skeleton.dtsi
-- and with a dtb using skeleton64.dtsi
+> On top of that I'd like to avoid doing per-SoC string matching in drivers.
+> Those would force us to update every darn driver for every new SoC. It is
+> better to try to use a per-hardware device version in the drivers and then
+> configure each SoC to use the appropriate version.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/compressed/atags_to_fdt.c | 44 ++++++++++++++++++++++++++++-----
- 1 file changed, 38 insertions(+), 6 deletions(-)
+Agreed. Are the version numbers for the GPIO IP core available ?
 
-diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-index aabc02a..d1153c8 100644
---- a/arch/arm/boot/compressed/atags_to_fdt.c
-+++ b/arch/arm/boot/compressed/atags_to_fdt.c
-@@ -53,6 +53,17 @@ static const void *getprop(const void *fdt, const char *node_path,
- 	return fdt_getprop(fdt, offset, property, len);
- }
- 
-+static uint32_t get_cell_size(const void *fdt)
-+{
-+	int len;
-+	uint32_t cell_size = 1;
-+	const uint32_t *size_len =  getprop(fdt, "/", "#size-cells", &len);
-+
-+	if (size_len)
-+		cell_size = fdt32_to_cpu(*size_len);
-+	return cell_size;
-+}
-+
- static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
- {
- 	char cmdline[COMMAND_LINE_SIZE];
-@@ -95,9 +106,11 @@ static void merge_fdt_bootargs(void *fdt, const char *fdt_cmdline)
- int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- {
- 	struct tag *atag = atag_list;
--	uint32_t mem_reg_property[2 * NR_BANKS];
-+	/* In the case of 64 bits memory size, need to reserve 2 cells for
-+	 * address and size for each bank */
-+	uint32_t mem_reg_property[2 * 2 * NR_BANKS];
- 	int memcount = 0;
--	int ret;
-+	int ret, memsize;
- 
- 	/* make sure we've got an aligned pointer */
- 	if ((u32)atag_list & 0x3)
-@@ -137,8 +150,25 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 				continue;
- 			if (!atag->u.mem.size)
- 				continue;
--			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.start);
--			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.size);
-+			memsize = get_cell_size(fdt);
-+
-+			if (memsize == 2) {
-+				/* if memsize is 2, that means that
-+				 * each data needs 2 cells of 32 bits,
-+				 * so the data are 64 bits */
-+				uint64_t *mem_reg_prop64 =
-+					(uint64_t *)mem_reg_property;
-+				mem_reg_prop64[memcount++] =
-+					cpu_to_fdt64(atag->u.mem.start);
-+				mem_reg_prop64[memcount++] =
-+					cpu_to_fdt64(atag->u.mem.size);
-+			} else {
-+				mem_reg_property[memcount++] =
-+					cpu_to_fdt32(atag->u.mem.start);
-+				mem_reg_property[memcount++] =
-+					cpu_to_fdt32(atag->u.mem.size);
-+			}
-+
- 		} else if (atag->hdr.tag == ATAG_INITRD2) {
- 			uint32_t initrd_start, initrd_size;
- 			initrd_start = atag->u.initrd.start;
-@@ -150,8 +180,10 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 		}
- 	}
- 
--	if (memcount)
--		setprop(fdt, "/memory", "reg", mem_reg_property, 4*memcount);
-+	if (memcount) {
-+		setprop(fdt, "/memory", "reg", mem_reg_property,
-+			4 * memcount * memsize);
-+	}
- 
- 	return fdt_pack(fdt);
- }
 -- 
-1.8.1.2
+Regards,
+
+Laurent Pinchart
