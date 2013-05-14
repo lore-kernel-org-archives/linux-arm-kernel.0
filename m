@@ -1,53 +1,120 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 14 May 2013 15:17:36 +0800
-Subject: [PATCH] pinctrl:sirf:re-arch and add support for new SiRFatlas6
- SoC
-In-Reply-To: <CACRpkda+ghKMkXFQzkJ7uauwGWGNrn4aqyYajt9U9RYkmvT-6g@mail.gmail.com>
-References: <1363597988-7409-1-git-send-email-Barry.Song@csr.com>
- <CACRpkdYUTQ_7V1CbKbx05zgBONj6iUi=ekzSwmZz8dqeRx7ZJw@mail.gmail.com>
- <CAGsJ_4wmn-LxxX-JeSJzdkVFSUeJ=vQrKHJr9yUtsoxG2BFHtw@mail.gmail.com>
- <CACRpkdaMYTXpnfg8MhRP5Fs_Qn2gwv=Xuk3YSYejxt+vK9D6+w@mail.gmail.com>
- <CAGsJ_4xSk_fXjhM2kxy0Hd36e9BsGshfmM97KgcU3cC5avmxtQ@mail.gmail.com>
- <CACRpkda+ghKMkXFQzkJ7uauwGWGNrn4aqyYajt9U9RYkmvT-6g@mail.gmail.com>
-Message-ID: <CAGsJ_4xUBHiSkgxXRMZNAm0-6nOrdKwSZi0Am+6Nh5PJRxFGMw@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 14 May 2013 09:20:14 +0200
+Subject: [PATCH V2 01/10] mmc: return mmc_of_parse() errors to caller
+In-Reply-To: <1368479941-10084-2-git-send-email-gmbnomis@gmail.com>
+References: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
+ <1368479941-10084-2-git-send-email-gmbnomis@gmail.com>
+Message-ID: <CAPDyKFoyVCYDFkXWrj8zL8uGCTx4EYk=rM2i7rKx1+aA7LCbPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/4/9 Linus Walleij <linus.walleij@linaro.org>:
-> On Sun, Apr 7, 2013 at 5:03 AM, Barry Song <21cnbao@gmail.com> wrote:
->> 2013/4/3 Linus Walleij <linus.walleij@linaro.org>:
->>> On Thu, Mar 28, 2013 at 7:27 AM, Barry Song <21cnbao@gmail.com> wrote:
->>>> 2013/3/28, Linus Walleij <linus.walleij@linaro.org>:
->>>
->>>>>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->>>>>
->>>>> This is OK but can you please:
->>>>
->>>> ok. one issue is recently Arnd has given another changes in
->>>> pinctrl-sirf in arm-soc multiple platform branch:
->>>> https://git.kernel.org/cgit/linux/kernel/git/arm/arm-soc.git/commit/?h=prima2/multiplatform&id=67d71344fd09223820eb9de39b597ec29f035e89
->>>>
->>>> it makes us easily to get merging conflict. what is your suggestion
->>>> about taking all these changes in 3.10?
->>>
->>> Please send this to where the rest of the patches are with my ACK
->>> (I guess the ARM SoC tree?)
->>
->> unfortunately, this is not in arm soc:
->> Wei Yongjun <yongjun_wei@trendmicro.com.cn>
->> pinctrl: sirf: using for_each_set_bit to simplify the code
->>
->> https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/commit/?h=for-next&id=3dcbd6f5789839c7fea8841088ed3a28688f81ed
->>
->> i think there will still be some merge conflict. so to make people
->> easy, i might wait for 3.11 and resend the patch with your ack, then
->> you apply it on pinctrl tree.
+On 13 May 2013 23:18, Simon Baatz <gmbnomis@gmail.com> wrote:
+> In addition to just logging errors encountered during DT parsing or
+> allocating GPIO slots for CD/WP, mmc_of_parse() now returns with an
+> error.
 >
-> OK let's do it like that.
+> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+> ---
+>  drivers/mmc/core/host.c  |   24 +++++++++++++++++++-----
+>  include/linux/mmc/host.h |    2 +-
+>  2 files changed, 20 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
+> index 2a3593d..45122cc 100644
+> --- a/drivers/mmc/core/host.c
+> +++ b/drivers/mmc/core/host.c
+> @@ -306,7 +306,7 @@ static inline void mmc_host_clk_sysfs_init(struct mmc_host *host)
+>   * parse the properties and set respective generic mmc-host flags and
+>   * parameters.
+>   */
+> -void mmc_of_parse(struct mmc_host *host)
+> +int mmc_of_parse(struct mmc_host *host)
+>  {
+>         struct device_node *np;
+>         u32 bus_width;
+> @@ -315,7 +315,7 @@ void mmc_of_parse(struct mmc_host *host)
+>         int len, ret, gpio;
+>
+>         if (!host->parent || !host->parent->of_node)
+> -               return;
+> +               return 0;
+>
+>         np = host->parent->of_node;
+>
+> @@ -338,6 +338,7 @@ void mmc_of_parse(struct mmc_host *host)
+>         default:
+>                 dev_err(host->parent,
+>                         "Invalid \"bus-width\" value %ud!\n", bus_width);
+> +               return -EINVAL;
+>         }
+>
+>         /* f_max is obtained from the optional "max-frequency" property */
+> @@ -372,13 +373,15 @@ void mmc_of_parse(struct mmc_host *host)
+>                                 gpio_inv_cd = true;
+>
+>                         ret = mmc_gpio_request_cd(host, gpio);
+> -                       if (ret < 0)
+> +                       if (ret < 0) {
+>                                 dev_err(host->parent,
+>                                         "Failed to request CD GPIO #%d: %d!\n",
+>                                         gpio, ret);
+> -                       else
+> +                               return ret;
+> +                       } else {
+>                                 dev_info(host->parent, "Got CD GPIO #%d.\n",
+>                                          gpio);
+> +                       }
+>                 }
+>
+>                 if (explicit_inv_cd ^ gpio_inv_cd)
+> @@ -394,9 +397,14 @@ void mmc_of_parse(struct mmc_host *host)
+>                         gpio_inv_wp = true;
+>
+>                 ret = mmc_gpio_request_ro(host, gpio);
+> -               if (ret < 0)
+> +               if (ret < 0) {
+>                         dev_err(host->parent,
+>                                 "Failed to request WP GPIO: %d!\n", ret);
+> +                       goto out;
+> +               } else {
+> +                               dev_info(host->parent, "Got WP GPIO #%d.\n",
+> +                                        gpio);
+> +               }
+>         }
+>         if (explicit_inv_wp ^ gpio_inv_wp)
+>                 host->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
+> @@ -413,6 +421,12 @@ void mmc_of_parse(struct mmc_host *host)
+>                 host->pm_caps |= MMC_PM_KEEP_POWER;
+>         if (of_find_property(np, "enable-sdio-wakeup", &len))
+>                 host->pm_caps |= MMC_PM_WAKE_SDIO_IRQ;
+> +
+> +       return 0;
+> +
+> +out:
+> +       mmc_gpio_free_cd(host);
+> +       return ret;
+>  }
+>
+>  EXPORT_SYMBOL(mmc_of_parse);
+> diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
+> index e326ae2..c8c4fbc 100644
+> --- a/include/linux/mmc/host.h
+> +++ b/include/linux/mmc/host.h
+> @@ -369,7 +369,7 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *);
+>  int mmc_add_host(struct mmc_host *);
+>  void mmc_remove_host(struct mmc_host *);
+>  void mmc_free_host(struct mmc_host *);
+> -void mmc_of_parse(struct mmc_host *host);
+> +int mmc_of_parse(struct mmc_host *host);
+>
+>  static inline void *mmc_priv(struct mmc_host *host)
+>  {
+> --
+> 1.7.9.5
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-done by "[PATCH RESEND] pinctrl:sirf:re-arch and add support for new
-SiRFatlas6 SoC"
-
-> Linus Walleij
-
--barry
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
