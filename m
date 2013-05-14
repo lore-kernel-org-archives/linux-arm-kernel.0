@@ -1,53 +1,77 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Tue, 14 May 2013 07:05:13 -0400
-Subject: [PATCH 4/4] staging: =?utf-8?Q?ste=5Fr?=
- =?utf-8?Q?mi4=3A_Suppress_'ignoring_return_value_of_=E2=80=98regulator=5F?=
- =?utf-8?B?ZW5hYmxlKCkn?= warning
-In-Reply-To: <20130514104631.GA28781@gmail.com>
-References: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
- <1367509690-24022-5-git-send-email-lee.jones@linaro.org>
- <20130514104631.GA28781@gmail.com>
-Message-ID: <20130514110513.GA10354@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 May 2013 13:06:29 +0200
+Subject: [PATCH 9/9] mfd: ab8500-core: Pass GPADC compatible string to MFD
+ core
+In-Reply-To: <20130514092614.GH3297@gmail.com>
+References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
+ <1368019749-19455-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdY8SLRR0HQvD5AFUeNeeHRVt3XM-MOkwJs_h_EfeRctKw@mail.gmail.com>
+ <20130514092614.GH3297@gmail.com>
+Message-ID: <CACRpkdaiZNeh9u_e7wSkHPmrxfaFQLeQEpZXEV4f+rXCCpW_eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 11:46:31AM +0100, Lee Jones wrote:
-> Hi Greg,
-> 
-> > drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:
-> >         In function ?synaptics_rmi4_resume?:
-> > drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:1090:18:
-> >         warning: ignoring return value of ?regulator_enable?, declared
-> >         with attribute warn_unused_result [-Wunused-result
-> > 
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: devel at driverdev.osuosl.org
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c |    4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-> > index fe667dd..c4d013d 100644
-> > --- a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-> > +++ b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
-> > @@ -1087,7 +1087,9 @@ static int synaptics_rmi4_resume(struct device *dev)
-> >  	unsigned char intr_status;
-> >  	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
-> >  
-> > -	regulator_enable(rmi4_data->regulator);
-> > +	retval = regulator_enable(rmi4_data->regulator);
-> > +	if (retval < 0)
-> > +		return retval;
-> >  
-> >  	enable_irq(rmi4_data->i2c_client->irq);
-> >  	rmi4_data->touch_stopped = false;
-> 
-> Are you planning to take this into the v3.10 -rcs?
+On Tue, May 14, 2013 at 11:26 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Yes, I was, give me some time to catch up on my pending patch queue (644
-patches and counting).  Don't worry, it's not lost.
+>> probing and does not have an .of_match_table defined in it's
+>> driver struct? I mean, what could possibly match that
+>> compatible string? The .name field will take care of naming
+>> the device does it not?
+>
+> You only need that stuff if you require _extra_ bindings. Things like
+> regulators and interrupt numbers are configured behind the scenes.
 
-thanks,
+Sure, but isn't the idea with of_match_table that this should be
+used in drivers when probing from device tree?
 
-greg k-h
+Surely it *works* with other schemes but I always thought about
+them as some kind of rough fallback hacks. I would be way more
+convenient with the patch if it added an of_match_table to
+the ADC driver as well, because then I understand what is
+going on.
+
+>> For non-emergency merging though:
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> If we don't put this into v3.10-rcX, then the GPADC driver will be
+> broken in v3.10 when booting with DT.
+
+OK I think I understand why now...
+
+>> But for this to make sense the AB8500 ADC driver needs
+>> to be augmented for DT probing and preferrably also moved
+>> to drivers/adc and made to utilize that subsystem.
+>
+> Not sure I understand the reasoning for this. It works well as a plain
+> MFD device.
+
+The commit message says:
+ "Without it, the driver won't be able to interrogate the Device Tree or
+  locate suitable regulators and will most likely fail to probe."
+
+That commit message makes it sound like the driver is
+interrogating (hm is that the right term...) the device tree, but
+now you say it isn't (as you say it is a plain MFD device).
+Of course the MFD core and drivers/of/platform.c is doing
+all sorts of magic based on the device tree, and that is
+what the patch fixes, right? Nothing to do with the driver
+really?
+
+I suspect the missing regulators due to how the OF core or
+MFD core uses the device tree is the actual problem
+solved by the patch?
+
+Anyway I think I was after this:
+
+Isn't the idea that all devices that get probed from a device tree
+shall have corresponding bindings documented under
+Documentation/devicetree/bindings/*?
+
+And this driver is definately in the wrong subsystem (not your
+fault) so I suspect the binding doc should be in
+Documentation/devicetree/bindings/adc/ab8500.txt or
+something. I'm not pointing that out as a problem in this
+patch, I'm just discussing the mess we're in ...
+
+Yours,
+Linus Walleij
