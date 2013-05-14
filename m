@@ -1,27 +1,52 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 May 2013 10:49:14 +0200
-Subject: [PATCH] mfd: ab8500-sysctrl: Always enable pm_power_off handler
-In-Reply-To: <1368097688-17858-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1368097688-17858-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <CACRpkdYXAB03=bqAQ8OZ8wZ7Q9j+LwH-Uwtijw49OjXt70yiXQ@mail.gmail.com>
+Date: Tue, 14 May 2013 10:50:51 +0200
+Subject: [PATCH 8/9] pinctrl: abx500: Rejiggle platform data and DT
+ initialisation
+In-Reply-To: <20130514084756.GE3297@gmail.com>
+References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
+ <1368019749-19455-9-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZTU1gv3onjFF4eqxv-o1BQwd48u4gQ9NWqryWoMiKTDQ@mail.gmail.com>
+ <20130514084756.GE3297@gmail.com>
+Message-ID: <CACRpkdbhHnrN3MGufubyYLNXdcCgZ2OpQ4a2CG6bwPJk88DZRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 9, 2013 at 1:08 PM, Fabio Baltieri
-<fabio.baltieri@linaro.org> wrote:
-
-> AB8500 sysctrl driver implements a pm_power_off handler, but that is
-> currently not registered until a specific platform data field is
-> enabled.
+On Tue, May 14, 2013 at 10:47 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, 14 May 2013, Linus Walleij wrote:
 >
-> This patch drops the platform data field and always registers
-> ab8500_power_off if no other pm_power_off handler was defined before,
-> and also introduces the necessary cleanup code in the driver's remove
-> function.
+>> On Wed, May 8, 2013 at 3:29 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>>
+>> > A pointer to GPIO platform data is always passed to the driver now, so
+>> > there's little point in checking for 'pdata' and executing the DT case if
+>> > it's not there. The difference between booting with DT and !DT is when
+>> > booting with DT, plat_id is not populated. Thus, in the DT case we have
+>> > to use a DT match table in order to find out which platform we're
+>> > executing on. So, we're changing the semantics here to only use the
+>> > match table if no plat_id is supplied though platform data.
+>> >
+>> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>
+>> Is this really included in the [0/9] fire alarm wrapper statement
+>> "Important ux500 fixups due for the v3.10 -rc:s"?
+>>
+>> It seems more like a random refactoring to me.
+>>
+>> The commit message fails to specify which regression this
+>> is fixing, like if it's causing an oops or so.
+>>
+>> So I've tentatively applied it to the pinctrl devel branch for
+>> v3.11 unless something comes up...
 >
-> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> Perhaps the commit message is a bit weak, but yes, it _needs_ to go
+> into v3.10, or this driver will be _broken_ when we boot with DT.
+>
+> Please apply this to your -fixes branch.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Quting myself from above:
+  "The commit message fails to specify which regression this
+  is fixing, like if it's causing an oops or so."
+
+I'm happy to apply it but what do I write in the commit message?
 
 Yours,
 Linus Walleij
