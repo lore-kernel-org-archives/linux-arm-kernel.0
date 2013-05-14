@@ -1,34 +1,99 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 14 May 2013 12:31:21 +0100
-Subject: [PATCH v2 2/3] ARM: nommu: re-enable use of vexpress without
- ARCH_MULTIPLATFORM
-In-Reply-To: <1368530845-7415-3-git-send-email-jonathan.austin@arm.com>
-References: <1368530845-7415-1-git-send-email-jonathan.austin@arm.com>
- <1368530845-7415-3-git-send-email-jonathan.austin@arm.com>
-Message-ID: <1368531081.3159.2.camel@hornet>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 14 May 2013 12:34:26 +0100
+Subject: [PATCH 9/9] mfd: ab8500-core: Pass GPADC compatible string to
+ MFD core
+In-Reply-To: <CACRpkdaiZNeh9u_e7wSkHPmrxfaFQLeQEpZXEV4f+rXCCpW_eg@mail.gmail.com>
+References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
+ <1368019749-19455-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdY8SLRR0HQvD5AFUeNeeHRVt3XM-MOkwJs_h_EfeRctKw@mail.gmail.com>
+ <20130514092614.GH3297@gmail.com>
+ <CACRpkdaiZNeh9u_e7wSkHPmrxfaFQLeQEpZXEV4f+rXCCpW_eg@mail.gmail.com>
+Message-ID: <20130514113426.GB28781@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-05-14 at 12:27 +0100, Jonathan Austin wrote:
-> Since 617276307cd4c ("ARM: vexpress: convert to multi-platform") it has been
-> impossible to select ARCH_VEXPRESS without ARCH_MULTIPLATFORM.
+> >> probing and does not have an .of_match_table defined in it's
+> >> driver struct? I mean, what could possibly match that
+> >> compatible string? The .name field will take care of naming
+> >> the device does it not?
+> >
+> > You only need that stuff if you require _extra_ bindings. Things like
+> > regulators and interrupt numbers are configured behind the scenes.
 > 
-> ARCH_MULTIPLATFORM doesn't make sense for NOMMU targets, not least because
-> of the need to hard-code the memory map. However, it should still be
-> possible to run NOMMU kernels on top of the Versatile Express by selecting
-> it as the only platform.
+> Sure, but isn't the idea with of_match_table that this should be
+> used in drivers when probing from device tree?
+
+We're not probing from Device Tree. We're registering from MFD.
+
+> Surely it *works* with other schemes but I always thought about
+> them as some kind of rough fallback hacks. I would be way more
+> convenient with the patch if it added an of_match_table to
+> the ADC driver as well, because then I understand what is
+> going on.
+
+They're not full-back hacks. All drivers obtain their interrupts this
+way when using Device Tree.
+
+> >> For non-emergency merging though:
+> >> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> >
+> > If we don't put this into v3.10-rcX, then the GPADC driver will be
+> > broken in v3.10 when booting with DT.
 > 
-> This patch creates a shim ARCH_VEXPRESS_NOMMU config option in the 'choice'
-> for "ARM system type" to make this possible again.
+> OK I think I understand why now...
 > 
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Acked-by: Nicolas Pitre <nico@fluxnic.net>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> CC: Pawel Moll <pawel.moll@arm.com>
+> >> But for this to make sense the AB8500 ADC driver needs
+> >> to be augmented for DT probing and preferrably also moved
+> >> to drivers/adc and made to utilize that subsystem.
+> >
+> > Not sure I understand the reasoning for this. It works well as a plain
+> > MFD device.
+> 
+> The commit message says:
+>  "Without it, the driver won't be able to interrogate the Device Tree or
+>   locate suitable regulators and will most likely fail to probe."
+> 
+> That commit message makes it sound like the driver is
+> interrogating (hm is that the right term...) the device tree, but
+> now you say it isn't (as you say it is a plain MFD device).
+> Of course the MFD core and drivers/of/platform.c is doing
+> all sorts of magic based on the device tree, and that is
+> what the patch fixes, right? Nothing to do with the driver
+> really?
 
-Acked-by: Pawel Moll <pawel.moll@arm.com>
+I guess you're kind of correct. Yes, it's not the actual driver that's
+interrogating (yes it's the right term) the Device Tree, other
+subsystems are doing it on the driver's behalf. But the driver's node
+is being used, which is why we need the compatible string.
 
-Thanks!
+> I suspect the missing regulators due to how the OF core or
+> MFD core uses the device tree is the actual problem
+> solved by the patch?
+> 
+> Anyway I think I was after this:
+> 
+> Isn't the idea that all devices that get probed from a device tree
+> shall have corresponding bindings documented under
+> Documentation/devicetree/bindings/*?
 
-Pawel
+It has an entry in  Documentation/devicetree/bindings/mfd/ab8500.txt.
+
+> And this driver is definately in the wrong subsystem (not your
+> fault) so I suspect the binding doc should be in
+> Documentation/devicetree/bindings/adc/ab8500.txt or
+> something.
+
+All of the AB8500 devices are covered in the aforementioned file and
+to my knowledge none of them are represented in their respective
+'real' driver type's binding doc folders (except Power).
+
+> I'm not pointing that out as a problem in this
+> patch, I'm just discussing the mess we're in ...
+
+Sure.
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
