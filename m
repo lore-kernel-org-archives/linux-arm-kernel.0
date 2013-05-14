@@ -1,67 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 14 May 2013 10:40:36 +0100
-Subject: [PATCH 8/9] pinctrl: abx500: Rejiggle platform data and DT
- initialisation
-In-Reply-To: <CACRpkdbhHnrN3MGufubyYLNXdcCgZ2OpQ4a2CG6bwPJk88DZRg@mail.gmail.com>
-References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
- <1368019749-19455-9-git-send-email-lee.jones@linaro.org>
- <CACRpkdZTU1gv3onjFF4eqxv-o1BQwd48u4gQ9NWqryWoMiKTDQ@mail.gmail.com>
- <20130514084756.GE3297@gmail.com>
- <CACRpkdbhHnrN3MGufubyYLNXdcCgZ2OpQ4a2CG6bwPJk88DZRg@mail.gmail.com>
-Message-ID: <20130514094036.GI3297@gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 14 May 2013 11:54:20 +0200
+Subject: [PATCHv2] mv643xx_eth: fix NAPI weight being > 64
+Message-ID: <1368525260-17556-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 May 2013, Linus Walleij wrote:
+3.10-rc1 issues the following warning:
 
-> On Tue, May 14, 2013 at 10:47 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Tue, 14 May 2013, Linus Walleij wrote:
-> >
-> >> On Wed, May 8, 2013 at 3:29 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >>
-> >> > A pointer to GPIO platform data is always passed to the driver now, so
-> >> > there's little point in checking for 'pdata' and executing the DT case if
-> >> > it's not there. The difference between booting with DT and !DT is when
-> >> > booting with DT, plat_id is not populated. Thus, in the DT case we have
-> >> > to use a DT match table in order to find out which platform we're
-> >> > executing on. So, we're changing the semantics here to only use the
-> >> > match table if no plat_id is supplied though platform data.
-> >> >
-> >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >>
-> >> Is this really included in the [0/9] fire alarm wrapper statement
-> >> "Important ux500 fixups due for the v3.10 -rc:s"?
-> >>
-> >> It seems more like a random refactoring to me.
-> >>
-> >> The commit message fails to specify which regression this
-> >> is fixing, like if it's causing an oops or so.
-> >>
-> >> So I've tentatively applied it to the pinctrl devel branch for
-> >> v3.11 unless something comes up...
-> >
-> > Perhaps the commit message is a bit weak, but yes, it _needs_ to go
-> > into v3.10, or this driver will be _broken_ when we boot with DT.
-> >
-> > Please apply this to your -fixes branch.
-> 
-> Quting myself from above:
->   "The commit message fails to specify which regression this
->   is fixing, like if it's causing an oops or so."
-> 
-> I'm happy to apply it but what do I write in the commit message?
+netif_napi_add() called with weight 128 on device eth%d
 
-Platform Data is invariably populated for this driver, even when
-booting with Device Tree. Thus the Device Tree probing code encased
-within the first check for Platform Data will never executed, causing
-the driver to fail when DT is enabled.
+This patch reduce the weight to 64, using NAPI_POLL_WEIGHT.
 
-This patch fixes the aforementioned regression by rejigging the
-probe() semantics to attempt to extract a platform ID from Device Tree
-if one can not be sourced from platform data.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+v1->v2: Use NAPI_POLL_WEIGHT.
 
+ drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index d0afeea..8f63c36 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -2745,7 +2745,7 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 
+ 	INIT_WORK(&mp->tx_timeout_task, tx_timeout_task);
+ 
+-	netif_napi_add(dev, &mp->napi, mv643xx_eth_poll, 128);
++	netif_napi_add(dev, &mp->napi, mv643xx_eth_poll, NAPI_POLL_WEIGHT);
+ 
+ 	init_timer(&mp->rx_oom);
+ 	mp->rx_oom.data = (unsigned long)mp;
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.10.4
