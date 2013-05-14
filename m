@@ -1,55 +1,159 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 14 May 2013 17:17:48 +0800
-Subject: [PATCH 11/14] ARM: sirf: Remove init_irq declaration in machine
- description
-In-Reply-To: <1368438253-28218-12-git-send-email-maxime.ripard@free-electrons.com>
-References: <1368438253-28218-1-git-send-email-maxime.ripard@free-electrons.com>
- <1368438253-28218-12-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGsJ_4wH2cEHdvzYUE4eeFbtr427kYdWFPDVR8DZ_-s5=sG7wQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 14 May 2013 11:20:00 +0200
+Subject: [RFC PATCH v3 05/17] ARM: dts: at91: cpus/cpu node dts updates
+In-Reply-To: <517E4366.4040209@atmel.com>
+References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366824502-19729-6-git-send-email-lorenzo.pieralisi@arm.com>
+ <517E4366.4040209@atmel.com>
+Message-ID: <519201C0.2060908@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/5/13 Maxime Ripard <maxime.ripard@free-electrons.com>:
-> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
-> specified") removed the need to explictly setup the init_irq field in
-> the machine description when using only irqchip_init. Remove that
-> declaration for sirf as well.
+On 29/04/2013 11:54, Nicolas Ferre :
+> On 04/24/2013 07:28 PM, Lorenzo Pieralisi :
+>> This patch updates the in-kernel dts files according to the latest cpus
+>> and cpu bindings updates for ARM.
+>>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Acked-by: Barry Song <Baohua.Song@csr.com>
-
-> ---
->  arch/arm/mach-prima2/common.c | 3 ---
->  1 file changed, 3 deletions(-)
+> With changes in compatible string... ok then.
 >
-> diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-> index 4f94cd8..52e28cf 100644
-> --- a/arch/arm/mach-prima2/common.c
-> +++ b/arch/arm/mach-prima2/common.c
-> @@ -55,7 +55,6 @@ DT_MACHINE_START(ATLAS6_DT, "Generic ATLAS6 (Flattened Device Tree)")
->         /* Maintainer: Barry Song <baohua.song@csr.com> */
->         .nr_irqs        = 128,
->         .map_io         = sirfsoc_map_io,
-> -       .init_irq       = irqchip_init,
->         .init_time      = sirfsoc_init_time,
->         .init_machine   = sirfsoc_mach_init,
->         .init_late      = sirfsoc_init_late,
-> @@ -74,7 +73,6 @@ DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
->         /* Maintainer: Barry Song <baohua.song@csr.com> */
->         .nr_irqs        = 128,
->         .map_io         = sirfsoc_map_io,
-> -       .init_irq       = irqchip_init,
->         .init_time      = sirfsoc_init_time,
->         .dma_zone_size  = SZ_256M,
->         .init_machine   = sirfsoc_mach_init,
-> @@ -94,7 +92,6 @@ DT_MACHINE_START(MARCO_DT, "Generic MARCO (Flattened Device Tree)")
->         /* Maintainer: Barry Song <baohua.song@csr.com> */
->         .smp            = smp_ops(sirfsoc_smp_ops),
->         .map_io         = sirfsoc_map_io,
-> -       .init_irq       = irqchip_init,
->         .init_time      = sirfsoc_init_time,
->         .init_machine   = sirfsoc_mach_init,
->         .init_late      = sirfsoc_init_late,
-> --
-> 1.8.1.2
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Now that our Cortex-A5 is in mainline, can you please update the:
+
+arch/arm/boot/dts/sama5d3.dtsi
+
+as-well?
+
+Thanks, best regards,
+
+>> ---
+>>   arch/arm/boot/dts/at91rm9200.dtsi  | 6 +++++-
+>>   arch/arm/boot/dts/at91sam9260.dtsi | 8 ++++++--
+>>   arch/arm/boot/dts/at91sam9263.dtsi | 8 ++++++--
+>>   arch/arm/boot/dts/at91sam9g45.dtsi | 8 ++++++--
+>>   arch/arm/boot/dts/at91sam9n12.dtsi | 8 ++++++--
+>>   arch/arm/boot/dts/at91sam9x5.dtsi  | 8 ++++++--
+>>   6 files changed, 35 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+>> index b0268a5..f16b3d4 100644
+>> --- a/arch/arm/boot/dts/at91rm9200.dtsi
+>> +++ b/arch/arm/boot/dts/at91rm9200.dtsi
+>> @@ -34,8 +34,12 @@
+>>   		ssc2 = &ssc2;
+>>   	};
+>>   	cpus {
+>> -		cpu at 0 {
+>> +		#address-cells = <0>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu {
+>>   			compatible = "arm,arm920t";
+>> +			device_type = "cpu";
+>>   		};
+>>   	};
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+>> index cb7bcc5..c4eeef7 100644
+>> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+>> @@ -32,8 +32,12 @@
+>>   		ssc0 = &ssc0;
+>>   	};
+>>   	cpus {
+>> -		cpu at 0 {
+>> -			compatible = "arm,arm926ejs";
+>> +		#address-cells = <0>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu {
+>> +			compatible = "arm,arm926ej-s";
+>> +			device_type = "cpu";
+>>   		};
+>>   	};
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+>> index 271d4de..f3b5c2a 100644
+>> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+>> @@ -29,8 +29,12 @@
+>>   		ssc1 = &ssc1;
+>>   	};
+>>   	cpus {
+>> -		cpu at 0 {
+>> -			compatible = "arm,arm926ejs";
+>> +		#address-cells = <0>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu {
+>> +			compatible = "arm,arm926ej-s";
+>> +			device_type = "cpu";
+>>   		};
+>>   	};
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+>> index 6b1d4ca..6c18bd3 100644
+>> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+>> @@ -35,8 +35,12 @@
+>>   		ssc1 = &ssc1;
+>>   	};
+>>   	cpus {
+>> -		cpu at 0 {
+>> -			compatible = "arm,arm926ejs";
+>> +		#address-cells = <0>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu {
+>> +			compatible = "arm,arm926ej-s";
+>> +			device_type = "cpu";
+>>   		};
+>>   	};
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+>> index 7750f98..c3b11af 100644
+>> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+>> @@ -31,8 +31,12 @@
+>>   		ssc0 = &ssc0;
+>>   	};
+>>   	cpus {
+>> -		cpu at 0 {
+>> -			compatible = "arm,arm926ejs";
+>> +		#address-cells = <0>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu {
+>> +			compatible = "arm,arm926ej-s";
+>> +			device_type = "cpu";
+>>   		};
+>>   	};
+>>
+>> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+>> index aa98e64..6c39d0f 100644
+>> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+>> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+>> @@ -33,8 +33,12 @@
+>>   		ssc0 = &ssc0;
+>>   	};
+>>   	cpus {
+>> -		cpu at 0 {
+>> -			compatible = "arm,arm926ejs";
+>> +		#address-cells = <0>;
+>> +		#size-cells = <0>;
+>> +
+>> +		cpu {
+>> +			compatible = "arm,arm926ej-s";
+>> +			device_type = "cpu";
+>>   		};
+>>   	};
+>>
+>>
+>
+>
+
+
+-- 
+Nicolas Ferre
