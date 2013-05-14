@@ -1,49 +1,50 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Tue, 14 May 2013 11:26:26 +0100
-Subject: [RFC 2/8] ARM:global_timer: Add ARM global timer support.
-In-Reply-To: <CACRpkdYh72hQHSK-a9r8R9qfnQv06412YqVNeYpc_rZhMeiXww@mail.gmail.com>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
- <CACRpkdZCP=w=4Q3bnuMQxm=Oe-uZke+Cc5NgddM5vsQbgr9E-Q@mail.gmail.com>
- <5191F9EE.6070008@st.com>
- <CACRpkdYh72hQHSK-a9r8R9qfnQv06412YqVNeYpc_rZhMeiXww@mail.gmail.com>
-Message-ID: <51921152.1000600@st.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 14 May 2013 11:46:31 +0100
+Subject: [PATCH 4/4] staging: =?utf-8?Q?ste=5Fr?=
+ =?utf-8?Q?mi4=3A_Suppress_'ignoring_return_value_of_=E2=80=98regulator=5F?=
+ =?utf-8?B?ZW5hYmxlKCkn?= warning
+In-Reply-To: <1367509690-24022-5-git-send-email-lee.jones@linaro.org>
+References: <1367509690-24022-1-git-send-email-lee.jones@linaro.org>
+ <1367509690-24022-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130514104631.GA28781@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/05/13 10:23, Linus Walleij wrote:
-> On Tue, May 14, 2013 at 10:46 AM, Srinivas KANDAGATLA
-> <srinivas.kandagatla@st.com> wrote:
->> On 13/05/13 20:05, Linus Walleij wrote:
-> 
->>> Why are you enabling the timer in unused and shutdown mode?
->>>
->>> This doesn't make sense.
->>
->> It is because we are using the global-timer block for both clocksource
->> and clockevents and we do not want the clocksource to disappear when
->> clockevent is unused/shutdown.
-> 
-> As this is clearly a per-cpu timer (correct? atleast the driver is
-> written that way) and say you have 4 CPUs, why would you not shut down
-> the timer on cores 1,2,3 and only leave the timer on core 0 on?
-> 
-I think it makes sense to shutdown the timer on other cores on request.
-I will fix this.
+Hi Greg,
 
-> The kernel will by necessity not shut down the clock event on core
-> 0 anyway.
+> drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:
+>         In function ?synaptics_rmi4_resume?:
+> drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c:1090:18:
+>         warning: ignoring return value of ?regulator_enable?, declared
+>         with attribute warn_unused_result [-Wunused-result
 > 
-> On a related note: don't you want to use the counter in this block as
-> sched_clock() as well? (I guess so, as you do not seem to have
-> anything else on this system.) It'd probably need to be a separate
-> Kconfig option and can surely be done later but keep it in mind.
-Thankyou for the advice,
-I will definitely try to implement this.
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: devel at driverdev.osuosl.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
+> index fe667dd..c4d013d 100644
+> --- a/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
+> +++ b/drivers/staging/ste_rmi4/synaptics_i2c_rmi4.c
+> @@ -1087,7 +1087,9 @@ static int synaptics_rmi4_resume(struct device *dev)
+>  	unsigned char intr_status;
+>  	struct synaptics_rmi4_data *rmi4_data = dev_get_drvdata(dev);
+>  
+> -	regulator_enable(rmi4_data->regulator);
+> +	retval = regulator_enable(rmi4_data->regulator);
+> +	if (retval < 0)
+> +		return retval;
+>  
+>  	enable_irq(rmi4_data->i2c_client->irq);
+>  	rmi4_data->touch_stopped = false;
 
-Thanks,
-srini
-> 
-> Yours,
-> Linus Walleij
-> 
+Are you planning to take this into the v3.10 -rcs?
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
