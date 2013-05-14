@@ -1,27 +1,29 @@
-From: Benoit.Lecardonnel@synopsys.com (Benoit Lecardonnel)
-Date: Tue, 14 May 2013 12:47:45 +0100
-Subject: arm64: Platform devices populated from a device_initcall
-In-Reply-To: <20130514093108.GA15129@arm.com>
-References: <519112E7.3040309@synopsys.com> <20130514093108.GA15129@arm.com>
-Message-ID: <51922461.1020408@synopsys.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 May 2013 14:02:55 +0200
+Subject: [PATCH] ARM: U300: Add proper ifdef guard to fix build error when
+ CONFIG_I2C_STU300=m
+In-Reply-To: <1367824503.6190.1.camel@phoenix>
+References: <1367824503.6190.1.camel@phoenix>
+Message-ID: <CACRpkdYrN78Oae_4DKh6cdOWxiuNEZCQzicKKoN5dv1ws185LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+On Mon, May 6, 2013 at 9:15 AM, Axel Lin <axel.lin@ingics.com> wrote:
 
-On 2013-05-14 10:31, Catalin Marinas wrote:
-> On Mon, May 13, 2013 at 05:20:55PM +0100, Benoit Lecardonnel wrote:
-> I think we could put of_clk_init() and of_platform_populate() calls
-> under the same arch_initcall() just to keep their relative order.
-> Something like this (could even use arch_initcall_sync in case we get
-> some other arch_initcall in the future)
+> I got below build error if CONFIG_I2C_STU300=m.
 >
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> [...]
+> ERROR: "i2c_register_board_info" [arch/arm/mach-u300/i2c.ko] undefined!
+> make[1]: *** [__modpost] Error 1
+> make: *** [modules] Error 2
+>
+> Fix it by adding proper ifdef guard in i2c.h and Makefile.
+> So arch/arm/mach-u300/i2c.c will be compiled when CONFIG_I2C_STU300 is
+> configured as built-in or as a module.
+>
+> Signed-off-by: Axel Lin <axel.lin@ingics.com>
 
-Thanks for the patch, it works: the device is now probed properly.
+This file will be deleted in v3.11, see:
+http://marc.info/?l=linux-arm-kernel&m=136662534118633&w=2
 
-Tested-by: Benoit Lecardonnel <Benoit.Lecardonnel@synopsys.com>
-
--- 
-Benoit Lecardonnel
+Yours,
+Linus Walleij
