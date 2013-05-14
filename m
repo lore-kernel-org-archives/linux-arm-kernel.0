@@ -1,51 +1,67 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 May 2013 12:11:39 +0100
-Subject: [PATCH v3 6/7] ARM: KVM: get rid of S2_PGD_SIZE
+Date: Tue, 14 May 2013 12:11:37 +0100
+Subject: [PATCH v3 4/7] ARM: KVM: use phys_addr_t instead of unsigned long
+ long for HYP PGDs
 In-Reply-To: <1368529900-22572-1-git-send-email-marc.zyngier@arm.com>
 References: <1368529900-22572-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1368529900-22572-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1368529900-22572-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-S2_PGD_SIZE defines the number of pages used by a stage-2 PGD
-and is unused, except for a VM_BUG_ON check that missuses the
-define.
+HYP PGDs are passed around as phys_addr_t, except just before calling
+into the hypervisor init code, where they are cast to a rather weird
+unsigned long long.
 
-As the check is very unlikely to ever triggered except in
-circumstances where KVM is the least of our worries, just kill
-both the define and the VM_BUG_ON check.
+Just keep them around as phys_addr_t, which is what makes the most
+sense.
 
+Reported-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_arm.h | 1 -
- arch/arm/kvm/mmu.c             | 3 ---
- 2 files changed, 4 deletions(-)
+ arch/arm/include/asm/kvm_host.h | 4 ++--
+ arch/arm/kvm/arm.c              | 8 ++++----
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index 124623e..64e9696 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -135,7 +135,6 @@
- #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1ULL)
- #define PTRS_PER_S2_PGD	(1ULL << (KVM_PHYS_SHIFT - 30))
- #define S2_PGD_ORDER	get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
--#define S2_PGD_SIZE	(1 << S2_PGD_ORDER)
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 57cb786..ff49193 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -190,8 +190,8 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
+ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		int exception_index);
  
- /* Virtualization Translation Control Register (VTCR) bits */
- #define VTCR_SH0	(3 << 12)
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 451bad3..693d16c 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -382,9 +382,6 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
- 	if (!pgd)
- 		return -ENOMEM;
+-static inline void __cpu_init_hyp_mode(unsigned long long boot_pgd_ptr,
+-				       unsigned long long pgd_ptr,
++static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
++				       phys_addr_t pgd_ptr,
+ 				       unsigned long hyp_stack_ptr,
+ 				       unsigned long vector_ptr)
+ {
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 37d216d..327a1fb 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -789,8 +789,8 @@ long kvm_arch_vm_ioctl(struct file *filp,
  
--	/* stage-2 pgd must be aligned to its size */
--	VM_BUG_ON((unsigned long)pgd & (S2_PGD_SIZE - 1));
--
- 	memset(pgd, 0, PTRS_PER_S2_PGD * sizeof(pgd_t));
- 	kvm_clean_pgd(pgd);
- 	kvm->arch.pgd = pgd;
+ static void cpu_init_hyp_mode(void *dummy)
+ {
+-	unsigned long long boot_pgd_ptr;
+-	unsigned long long pgd_ptr;
++	phys_addr_t boot_pgd_ptr;
++	phys_addr_t pgd_ptr;
+ 	unsigned long hyp_stack_ptr;
+ 	unsigned long stack_page;
+ 	unsigned long vector_ptr;
+@@ -798,8 +798,8 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	/* Switch from the HYP stub to our own HYP init vector */
+ 	__hyp_set_vectors(kvm_get_idmap_vector());
+ 
+-	boot_pgd_ptr = (unsigned long long)kvm_mmu_get_boot_httbr();
+-	pgd_ptr = (unsigned long long)kvm_mmu_get_httbr();
++	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
++	pgd_ptr = kvm_mmu_get_httbr();
+ 	stack_page = __get_cpu_var(kvm_arm_hyp_stack_page);
+ 	hyp_stack_ptr = stack_page + PAGE_SIZE;
+ 	vector_ptr = (unsigned long)__kvm_hyp_vector;
 -- 
 1.8.2.3
