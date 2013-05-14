@@ -1,121 +1,59 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 14 May 2013 11:24:48 +0200
-Subject: [PATCH 3/3] ARM: mach-shmobile: lager: support GPIO switches
-In-Reply-To: <CANqRtoTj+FnxrtOayxQYCxkyuP4XGeCaXpNUbPsFV4kyBD_48Q@mail.gmail.com>
-References: <1368435233-8587-1-git-send-email-horms+renesas@verge.net.au>
- <20130514025941.GC20239@verge.net.au>
- <CANqRtoTj+FnxrtOayxQYCxkyuP4XGeCaXpNUbPsFV4kyBD_48Q@mail.gmail.com>
-Message-ID: <18009427.QVeP3MCVSV@avalon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 14 May 2013 10:26:14 +0100
+Subject: [PATCH 9/9] mfd: ab8500-core: Pass GPADC compatible string to
+ MFD core
+In-Reply-To: <CACRpkdY8SLRR0HQvD5AFUeNeeHRVt3XM-MOkwJs_h_EfeRctKw@mail.gmail.com>
+References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
+ <1368019749-19455-10-git-send-email-lee.jones@linaro.org>
+ <CACRpkdY8SLRR0HQvD5AFUeNeeHRVt3XM-MOkwJs_h_EfeRctKw@mail.gmail.com>
+Message-ID: <20130514092614.GH3297@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+On Tue, 14 May 2013, Linus Walleij wrote:
 
-On Tuesday 14 May 2013 15:09:08 Magnus Damm wrote:
-> On Tue, May 14, 2013 at 11:59 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Tue, May 14, 2013 at 12:35:20AM +0200, Laurent Pinchart wrote:
-> >> On Monday 13 May 2013 17:53:53 Simon Horman wrote:
-> >> > The lager board has pins 1 - 4 of SW2 wired up to GPIO pins.
-> >> > This patch allows access to those pins as KEYS 1 - 4 using
-> >> > gpio-keys.
-> >> > 
-> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >> > 
-> >> > ---
-> >> > 
-> >> > This patch has run time dependencies on
-> >> > 1. "gpio-rcar: Add support for IRQ_TYPE_EDGE_BOTH"
-> >> > 2. "ARM: shmobile: r8a7790: Configure R-Car GPIO for
-> >> > IRQ_TYPE_EDGE_BOTH"
-> >> > 
-> >> > Without those dependencies satisfied the gpio-keys driver will
-> >> > fail to be initialise itself. The boot should be otherwise successful
-> >> > and the board otherwise functional.
-> >> > ---
-> >> > 
-> >> >  arch/arm/mach-shmobile/board-lager.c | 22 ++++++++++++++++++++++
-> >> >  1 file changed, 22 insertions(+)
-> >> > 
-> >> > diff --git a/arch/arm/mach-shmobile/board-lager.c
-> >> > b/arch/arm/mach-shmobile/board-lager.c index 6a1ba38..4d1b42b 100644
-> >> > --- a/arch/arm/mach-shmobile/board-lager.c
-> >> > +++ b/arch/arm/mach-shmobile/board-lager.c
-> >> > @@ -18,7 +18,10 @@
-> >> > 
-> >> >   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 
-> >> >   02110-1301
-> >> > 
-> >> > USA */
-> >> > 
-> >> > +#include <linux/gpio.h>
-> >> > +#include <linux/gpio_keys.h>
-> >> > 
-> >> >  #include <linux/interrupt.h>
-> >> > 
-> >> > +#include <linux/input.h>
-> >> 
-> >> My dictionary lists input before interrupt :-)
-> > 
-> > Thanks, I will fix that.
-> > 
-> >> >  #include <linux/irqchip.h>
-> >> >  #include <linux/kernel.h>
-> >> >  #include <linux/leds.h>
-> >> > 
-> >> > @@ -52,6 +55,22 @@ static struct gpio_led_platform_data
-> >> > lager_leds_pdata = { .num_leds   = ARRAY_SIZE(lager_leds),
-> >> > 
-> >> >  };
-> >> > 
-> >> > +/* GPIO KEY */
-> >> > +#define GPIO_KEY(c, g, d, ...) \
-> >> > +   { .code = c, .gpio = g, .desc = d, .active_low = 1 }
-> >> > +
-> >> > +static struct gpio_keys_button gpio_buttons[] = {
-> >> > +   GPIO_KEY(KEY_4,         RCAR_GP_PIN(1, 28),     "SW2-pin4"),
-> >> > +   GPIO_KEY(KEY_3,         RCAR_GP_PIN(1, 26),     "SW2-pin3"),
-> >> > +   GPIO_KEY(KEY_2,         RCAR_GP_PIN(1, 24),     "SW2-pin2"),
-> >> > +   GPIO_KEY(KEY_1,         RCAR_GP_PIN(1, 14),     "SW2-pin1"),
-> >> > +};
-> >> > +
-> >> > +static struct gpio_keys_platform_data lager_keys_pdata = {
-> >> > +   .buttons        = gpio_buttons,
-> >> > +   .nbuttons       = ARRAY_SIZE(gpio_buttons),
-> >> > +};
-> >> > +
-> >> 
-> >> Could you please also update the lager dts file ?
-> > 
-> > I wonder if in that case we can remove the C code above.
-> > And probably the C code for the GPIO leds too.
-> > 
-> > Magnus, could you clarify how you would like
-> > C-code and DTS to look on the lager board?
+> On Wed, May 8, 2013 at 3:29 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> I'd like C and DTS to coexist in parallel until we can ditch C fully.
-> I believe there is a need for us to be able to back port the C code.
-> For the future we want to use DTS.
+> > When booting with Device Tree enabled the MFD core uses each device's
+> > compatible string to find and allocate its associated of_node pointer,
+> > which in turn is passed to the driver via the platform_device struct.
+> > Without it, the driver won't be able to interrogate the Device Tree or
+> > locate suitable regulators and will most likely fail to probe.
+> >
+> > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> To support DTS for Lager I think you should create a -reference DTS
-> file for Lager where you put the DT version of your GPIO LED / switch
-> code. At the time when we can configure the PFC via PINCTRL DT then I
-> believe we should be able to replace most of the platform device code
-> with DT versions.
+> Can you explain what regression this is causing since the GPADC
+> driver (drivers/mfd/ab8500-gpadc.c) does not support device tree
 
-I've sent an RFC for gpio-rcar DT bindings, and I'll send one for sh-pfc in 
-the next few days. DT support for GPIO and PINCTRL should then hopefully be 
-available very soon.
+Yes it does. :)
 
-> At that we should hopefully be able to ditch all the C board code,
+> probing and does not have an .of_match_table defined in it's
+> driver struct? I mean, what could possibly match that
+> compatible string? The .name field will take care of naming
+> the device does it not?
 
-Will we also ditch non-reference board files ?
+You only need that stuff if you require _extra_ bindings. Things like
+regulators and interrupt numbers are configured behind the scenes.
 
-> or maybe we need to keep some around until we have the common clocks
-> going...
+> For non-emergency merging though:
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-What's the status of CCF support development in sh-mobile ?
+If we don't put this into v3.10-rcX, then the GPADC driver will be
+broken in v3.10 when booting with DT.
+
+> Since it matches the example in
+> Documentation/devicetree/bindings/mfd/ab8500.txt
+> 
+> But for this to make sense the AB8500 ADC driver needs
+> to be augmented for DT probing and preferrably also moved
+> to drivers/adc and made to utilize that subsystem.
+
+Not sure I understand the reasoning for this. It works well as a plain
+MFD device.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
