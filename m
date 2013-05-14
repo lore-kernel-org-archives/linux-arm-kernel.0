@@ -1,98 +1,49 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 14 May 2013 11:59:42 +0900
-Subject: [PATCH 3/3] ARM: mach-shmobile: lager: support GPIO switches
-In-Reply-To: <9256981.LFpgU8cctr@avalon>
-References: <1368435233-8587-1-git-send-email-horms+renesas@verge.net.au>
- <1368435233-8587-4-git-send-email-horms+renesas@verge.net.au>
- <9256981.LFpgU8cctr@avalon>
-Message-ID: <20130514025941.GC20239@verge.net.au>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 14 May 2013 08:37:53 +0530
+Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
+In-Reply-To: <87sj1qzaov.fsf@linaro.org>
+References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
+ <87sj1qzaov.fsf@linaro.org>
+Message-ID: <5191AA89.6010901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 12:35:20AM +0200, Laurent Pinchart wrote:
-> Hi Simon,
+On 05/14/2013 05:36 AM, Kevin Hilman wrote:
+> Tushar Behera <tushar.behera@linaro.org> writes:
 > 
-> Thank you for the patch.
+>> It updates following drivers for EXYNOS based DT platform.
+>>
+>> * S5M8767 driver
+>> * MAX8997 driver
+>> * MMC SDHCI driver
+>>
+>> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
 > 
-> On Monday 13 May 2013 17:53:53 Simon Horman wrote:
-> > The lager board has pins 1 - 4 of SW2 wired up to GPIO pins.
-> > This patch allows access to those pins as KEYS 1 - 4 using
-> > gpio-keys.
-> > 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > ---
-> > 
-> > This patch has run time dependencies on
-> > 1. "gpio-rcar: Add support for IRQ_TYPE_EDGE_BOTH"
-> > 2. "ARM: shmobile: r8a7790: Configure R-Car GPIO for IRQ_TYPE_EDGE_BOTH"
-> > 
-> > Without those dependencies satisfied the gpio-keys driver will
-> > fail to be initialise itself. The boot should be otherwise successful
-> > and the board otherwise functional.
-> > ---
-> >  arch/arm/mach-shmobile/board-lager.c | 22 ++++++++++++++++++++++
-> >  1 file changed, 22 insertions(+)
-> > 
-> > diff --git a/arch/arm/mach-shmobile/board-lager.c
-> > b/arch/arm/mach-shmobile/board-lager.c index 6a1ba38..4d1b42b 100644
-> > --- a/arch/arm/mach-shmobile/board-lager.c
-> > +++ b/arch/arm/mach-shmobile/board-lager.c
-> > @@ -18,7 +18,10 @@
-> >   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 
-> > USA */
-> > 
-> > +#include <linux/gpio.h>
-> > +#include <linux/gpio_keys.h>
-> >  #include <linux/interrupt.h>
-> > +#include <linux/input.h>
+> I tested this using v3.10-rc1 on Arndale, but still don't get any
+> support for the wired network.  Do you know if this is a Kconfig issue,
+> or a missing driver?
 > 
-> My dictionary lists input before interrupt :-)
-
-Thanks, I will fix that.
-
-> >  #include <linux/irqchip.h>
-> >  #include <linux/kernel.h>
-> >  #include <linux/leds.h>
-> > @@ -52,6 +55,22 @@ static struct gpio_led_platform_data lager_leds_pdata = {
-> > .num_leds	= ARRAY_SIZE(lager_leds),
-> >  };
-> > 
-> > +/* GPIO KEY */
-> > +#define GPIO_KEY(c, g, d, ...) \
-> > +	{ .code = c, .gpio = g, .desc = d, .active_low = 1 }
-> > +
-> > +static struct gpio_keys_button gpio_buttons[] = {
-> > +	GPIO_KEY(KEY_4,		RCAR_GP_PIN(1, 28),	"SW2-pin4"),
-> > +	GPIO_KEY(KEY_3,		RCAR_GP_PIN(1, 26),	"SW2-pin3"),
-> > +	GPIO_KEY(KEY_2,		RCAR_GP_PIN(1, 24),	"SW2-pin2"),
-> > +	GPIO_KEY(KEY_1,		RCAR_GP_PIN(1, 14),	"SW2-pin1"),
-> > +};
-> > +
-> > +static struct gpio_keys_platform_data lager_keys_pdata = {
-> > +	.buttons	= gpio_buttons,
-> > +	.nbuttons	= ARRAY_SIZE(gpio_buttons),
-> > +};
-> > +
+> I suspect it may be related to the various "unable to find transceiver
+> of type USB2 PHY" messages I'm seeing?
 > 
-> Could you please also update the lager dts file ?
 
-I wonder if in that case we can remove the C code above.
-And probably the C code for the GPIO leds too.
+Yes, right. The missing USB-PHY components are one of the issues (they
+were there in linux-next when I last tested).
 
-Magnus, could you clarify how you would like
-C-code and DTS to look on the lager board?
+Also, on Arndale board, we need to reset the USB hub during EHCI
+initialization (a couple of those patches are required, which I am not
+sure if we would be able to upstream).
 
-> >  static const struct pinctrl_map lager_pinctrl_map[] = {
-> >  	/* SCIF0 (CN19: DEBUG SERIAL0) */
-> >  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
-> > @@ -73,6 +92,9 @@ static void __init lager_add_standard_devices(void)
-> >  	platform_device_register_data(&platform_bus, "leds-gpio", -1,
-> >  				      &lager_leds_pdata,
-> >  				      sizeof(lager_leds_pdata));
-> > +	platform_device_register_data(&platform_bus, "gpio-keys", -1,
-> > +				      &lager_keys_pdata,
-> > +				      sizeof(lager_keys_pdata));
-> >  }
-> > 
-> >  static const char *lager_boards_compat_dt[] __initdata = {
+I am collecting a minimal set of patches that would enable USB and wired
+network on Arndale with 3.10-rc1 kernel. Once done, I will let you know.
+
+> Thanks,
+> 
+> Kevin
+> 
+
+Thanks for testing.
+
+
+-- 
+Tushar Behera
