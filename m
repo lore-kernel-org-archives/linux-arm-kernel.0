@@ -1,44 +1,62 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 15 May 2013 00:07:54 +0200
-Subject: [PATCH 1/3] ARM: shmobile: irqpin: fix handling of spurious
- interrupts in DT case
-In-Reply-To: <20130328053044.GA25938@verge.net.au>
-References: <Pine.LNX.4.64.1303211659580.32438@axis700.grange>
- <20130327104747.GE3040@verge.net.au> <20130328053044.GA25938@verge.net.au>
-Message-ID: <9440947.bdAq5SKB5F@avalon>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 14 May 2013 15:15:25 -0700
+Subject: [PATCH v2 0/3] clk: implement remuxing during set_rate
+In-Reply-To: <5192A61E.5020605@imgtec.com>
+References: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
+ <20130513195746.10068.92303@quantum>
+ <CAAG0J991BCziPFddzBrx9vcwRxyRgcCd38A01uKXTDDK9xTnbQ@mail.gmail.com>
+ <20130514165937.10068.18501@quantum> <5192A61E.5020605@imgtec.com>
+Message-ID: <20130514221525.10068.86581@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 28 March 2013 14:30:45 Simon Horman wrote:
-> On Wed, Mar 27, 2013 at 07:47:47PM +0900, Simon Horman wrote:
-> > On Thu, Mar 21, 2013 at 05:05:36PM +0100, Guennadi Liakhovetski wrote:
-> > > To disable spurious interrupts, that get triggered on certain hardware,
-> > > the irqpin driver masks them on the parent interrupt controller. To
-> > > specify such broken devices a .control_parent parameter can be provided
-> > > in the platform data. In the DT case we need a property, to do the same.
-> > > However, this is not enough to correctly handle spurious interrupts in
-> > > the DT case. In the non-DT case all interrupts get mapped statically
-> > > during probing, therefore, if a spurious interrupt arrives, it can
-> > > easily be mapped back to hardware registers and bits and handled. In the
-> > > DT case interrupts are mapped only when a device, using that interrupt
-> > > is instantiated from DT. So, spurious interrupts occur unmapped and thus
-> > > cannot be handled properly. This patch fixes this by mapping such
-> > > interrupts as they occur.
-> > > 
-> > > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Quoting James Hogan (2013-05-14 14:01:18)
+> Hi Mike,
+> 
+> On 14/05/13 17:59, Mike Turquette wrote:
+> > Quoting James Hogan (2013-05-13 14:30:46)
+> >> On 13 May 2013 20:57, Mike Turquette <mturquette@linaro.org> wrote:
+> >>> One reason for this is the difficulty some have had with setting flags
+> >>> from DT bindings.
+> >>
+> >> Could you elaborate on this? I've been adding flags to DT bindings for
+> >> this sort of thing, but it feels a bit like it's in that grey area of
+> >> not really describing the hardware itself. This information needs to
+> >> be specified somehow though.
+> >>
 > > 
-> > Thanks, queued up for v3.10 in the intc-external-irq branch of the renesas
-> > tree.
->
-> As requested by Magnus I have dropped this patch.
+> > It depends on the flag.  A good example is the CLK_DIVIDER_ONE_BASED
+> > flag which does describe the hardware.  It informs the binding that
+> > indexing starts at 1, not 0, which is a valid part of the hardware
+> > description.
+> > 
+> > However flags that deal with software policy do not belong on DT.
+> > CLK_SET_RATE_PARENT certainly does not belong in the DT binding since
+> > this is a pure Linux-ism.  Every binding just needs to be reviewed on a
+> > case-by-case basis to make sure the flags are related only to the
+> > hardware.
+> 
+> So given the desire to eliminate platform code, is there a particular
+> way that these other flags can be specified instead of DT bindings?
+> 
 
-I'm running into similar spurious interrupt issues on both kzm9g-reference and 
-marzen-reference. Magnus, you've rejected this patch, how would you like the 
-issue to be fixed ? Could you please provide a patch ? This is blocking 
-pinctrl DT testing, as I can't get any board to boot properly through DT with 
-ethernet support.
+I haven't put too much thought into this.  There have been many
+discussions lately about where to put configuration data, which would
+include the "policy" flags.  Some folks have discussed using DT, but
+keeping the config data separate from the hardware description data (one
+thread I read called the idea "config tree").  Examples of this are
+setting parents for mux clocks, or setting clock rates at boot-time.
+This data is important, but it is a configuration of the hardware.  Not
+a description of it.
 
--- 
+Anyways it is a general problem, so I'm hoping someone will find a
+general solution.  For now I've seen a couple instance of clock drivers
+including clk-private.h to modify the flags at registration time, which
+is beyond horrible.  But again those users may not have a better option,
+short of a new clk_set_flags() function, which is also horrible.
+
 Regards,
+Mike
 
-Laurent Pinchart
+> Cheers
+> James
