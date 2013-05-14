@@ -1,48 +1,81 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 14 May 2013 12:48:57 +0100
-Subject: [PATCH 7/7] ARM: nommu: add stub local_flush_bp_all() for !CONFIG_MMUU
-In-Reply-To: <1368532137-8871-1-git-send-email-jonathan.austin@arm.com>
-References: <1368532137-8871-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <1368532137-8871-8-git-send-email-jonathan.austin@arm.com>
+From: dt.tangr@gmail.com (Daniel Tang)
+Date: Tue, 14 May 2013 21:51:10 +1000
+Subject: [RFC PATCHv3 4/6] clocksource: Add TI-Nspire timer drivers
+In-Reply-To: <CACRpkdZBFbOnQ9rCehO0yKDN7fH9VR3VYCa_NkOGJz7KN+02FQ@mail.gmail.com>
+References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
+ <1368332581-94691-5-git-send-email-dt.tangr@gmail.com>
+ <CACRpkdZBFbOnQ9rCehO0yKDN7fH9VR3VYCa_NkOGJz7KN+02FQ@mail.gmail.com>
+Message-ID: <26FBB324-AAA9-4C10-8978-C2EC1C26672E@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the merging of Will's tlb-ops branch, specifically 89c7e4b8bbb3
-(ARM: 7661/1: mm: perform explicit branch predictor maintenance when required),
-building SMP without CONFIG_MMU has been broken.
 
-The local_flush_bp_all function is only called for operations related to
-changing the kernel's view of memory and ASID rollover - both of which are
-irrelevant to an !MMU kernel.
+On 14/05/2013, at 6:03 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-This patch adds a stub local_flush_bp_all() function to the other tlb
-maintenance stubs and restores the ability to build an SMP !MMU kernel.
+>> +
+>> +       timer->interrupt_regs = of_iomap(node, 1);
+> 
+> Check for errors.
+> 
+>> +       timer->irqnr = irq_of_parse_and_map(node, 0);
+> 
+> Check for errors.
+>> +       if (timer->interrupt_regs && timer->irqnr) {
+>> 
 
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/tlbflush.h |    2 ++
- 1 file changed, 2 insertions(+)
+The idea with this is to make these properties optional. Each timer has two sub-timers but only one can generate interrupts. One will be added as a clockevent device and the other as a clocksource. If an IRQ number or interrupt acknowledge address is not passed through the DT, then the clockevents device is not added but the clocksource still is.
 
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index cc8517e..ded7c16 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -549,6 +549,7 @@ static inline void local_flush_tlb_page(struct vm_area_struct *vma, unsigned lon
- static inline void local_flush_tlb_kernel_page(unsigned long kaddr)						{ }
- static inline void local_flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned long end)	{ }
- static inline void local_flush_tlb_kernel_range(unsigned long start, unsigned long end)				{ }
-+static inline void local_flush_bp_all(void)									{ }
- 
- extern void flush_tlb_all(void);
- extern void flush_tlb_mm(struct mm_struct *mm);
-@@ -556,6 +557,7 @@ extern void flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr);
- extern void flush_tlb_kernel_page(unsigned long kaddr);
- extern void flush_tlb_range(struct vm_area_struct *vma, unsigned long start, unsigned long end);
- extern void flush_tlb_kernel_range(unsigned long start, unsigned long end);
-+extern void flush_bp_all(void);
- #endif	/* __ASSEMBLY__ */
- 
- #endif
--- 
-1.7.9.5
+Should I comment it in the code to make it apparent what's happening or is there a better way to express this?
+
+> 
+>> +               writel(0x3F, timer->interrupt_regs + IO_INTR_ACK);
+> 
+> Hm magic number, I guess it's clearing all IRQ lines?
+
+It's a bitmask of bits 0-5. 
+
+> 
+>> +
+>> +               /* Interrupt to occur when timer value matches 0 */
+>> +               writel(0, timer->base + IO_MATCH1);
+>> +
+>> +               timer->clkevt_irq.name  = timer->clockevent_name;
+>> +               timer->clkevt_irq.handler = nspire_timer_interrupt;
+>> +               timer->clkevt_irq.dev_id = timer;
+>> +               timer->clkevt_irq.flags =
+>> +                       IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL;
+>> +
+>> +               setup_irq(timer->irqnr, &timer->clkevt_irq);
+>> +
+>> +               clockevents_config_and_register(&timer->clkevt,
+>> +                               clk_get_rate(timer->clk), 0x0001, 0xfffe);
+>> +               pr_info("Added %s as clockevent\n", timer->clockevent_name);
+>> +       }
+>> +
+>> +       writel(CNTL_RUN_TIMER | CNTL_FOREVER | CNTL_INC,
+>> +                       timer->timer2 + IO_CONTROL);
+>> +
+>> +       clocksource_mmio_init(timer->timer2 + IO_CURRENT_VAL,
+>> +                       timer->clocksource_name,
+>> +                       clk_get_rate(timer->clk),
+>> +                       200, 16,
+>> +                       clocksource_mmio_readw_up);
+> 
+> If this timer is really just 16 bits, it's a *pretty* good idea to use
+> the prescaler (I guess this is what IO_DIVIDER is) beacuse else you
+> will get short sleep times with CONFIG_NO_HZ_IDLE on this system,
+> and wake up unnecessarily often.
+> 
+> The same goes for the clock event.
+
+The clock frequency is 32768Hz. Should I be scaling it down at that frequency?
+
+> 
+> See how we calculate the prescaler in arch/arm/mach-integrator/integrator_ap.c
+> for example.
+> 
+> Yours,
+> Linus Walleij
+
+Cheers,
+Daniel Tang
