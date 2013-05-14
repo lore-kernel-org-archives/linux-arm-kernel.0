@@ -1,39 +1,33 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 May 2013 15:13:38 +0100
-Subject: [PATCH v4 10/32] arm64: KVM: CPU specific system registers handling
+Date: Tue, 14 May 2013 15:13:31 +0100
+Subject: [PATCH v4 03/32] arm64: KVM: EL2 register definitions
 In-Reply-To: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
 References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1368540840-26750-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1368540840-26750-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the support code for CPU specific system registers. Not much
-here yet.
+Define all the useful bitfields for EL2 registers.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/sys_regs_generic_v8.c | 85 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 85 insertions(+)
- create mode 100644 arch/arm64/kvm/sys_regs_generic_v8.c
+ arch/arm64/include/asm/kvm_arm.h | 245 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 245 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_arm.h
 
-diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
 new file mode 100644
-index 0000000..d4e8039
+index 0000000..a5f28e2
 --- /dev/null
-+++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-@@ -0,0 +1,85 @@
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -0,0 +1,245 @@
 +/*
 + * Copyright (C) 2012,2013 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
-+ * Based on arch/arm/kvm/coproc_a15.c:
-+ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Authors: Rusty Russell <rusty@rustcorp.au>
-+ *          Christoffer Dall <c.dall@virtualopensystems.com>
-+ *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
++ * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
@@ -44,69 +38,234 @@ index 0000000..d4e8039
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#include <linux/kvm_host.h>
-+#include <asm/cputype.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_asm.h>
-+#include <asm/kvm_host.h>
-+#include <asm/kvm_emulate.h>
-+#include <asm/kvm_coproc.h>
-+#include <linux/init.h>
 +
-+#include "sys_regs.h"
++#ifndef __ARM64_KVM_ARM_H__
++#define __ARM64_KVM_ARM_H__
 +
-+static bool access_actlr(struct kvm_vcpu *vcpu,
-+			 const struct sys_reg_params *p,
-+			 const struct sys_reg_desc *r)
-+{
-+	if (p->is_write)
-+		return ignore_write(vcpu, p);
++#include <asm/types.h>
 +
-+	*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, ACTLR_EL1);
-+	return true;
-+}
-+
-+static void reset_actlr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-+{
-+	u64 actlr;
-+
-+	asm volatile("mrs %0, actlr_el1\n" : "=r" (actlr));
-+	vcpu_sys_reg(vcpu, ACTLR_EL1) = actlr;
-+}
++/* Hyp Configuration Register (HCR) bits */
++#define HCR_ID		(UL(1) << 33)
++#define HCR_CD		(UL(1) << 32)
++#define HCR_RW_SHIFT	31
++#define HCR_RW		(UL(1) << HCR_RW_SHIFT)
++#define HCR_TRVM	(UL(1) << 30)
++#define HCR_HCD		(UL(1) << 29)
++#define HCR_TDZ		(UL(1) << 28)
++#define HCR_TGE		(UL(1) << 27)
++#define HCR_TVM		(UL(1) << 26)
++#define HCR_TTLB	(UL(1) << 25)
++#define HCR_TPU		(UL(1) << 24)
++#define HCR_TPC		(UL(1) << 23)
++#define HCR_TSW		(UL(1) << 22)
++#define HCR_TAC		(UL(1) << 21)
++#define HCR_TIDCP	(UL(1) << 20)
++#define HCR_TSC		(UL(1) << 19)
++#define HCR_TID3	(UL(1) << 18)
++#define HCR_TID2	(UL(1) << 17)
++#define HCR_TID1	(UL(1) << 16)
++#define HCR_TID0	(UL(1) << 15)
++#define HCR_TWE		(UL(1) << 14)
++#define HCR_TWI		(UL(1) << 13)
++#define HCR_DC		(UL(1) << 12)
++#define HCR_BSU		(3 << 10)
++#define HCR_BSU_IS	(UL(1) << 10)
++#define HCR_FB		(UL(1) << 9)
++#define HCR_VA		(UL(1) << 8)
++#define HCR_VI		(UL(1) << 7)
++#define HCR_VF		(UL(1) << 6)
++#define HCR_AMO		(UL(1) << 5)
++#define HCR_IMO		(UL(1) << 4)
++#define HCR_FMO		(UL(1) << 3)
++#define HCR_PTW		(UL(1) << 2)
++#define HCR_SWIO	(UL(1) << 1)
++#define HCR_VM		(UL(1) << 0)
 +
 +/*
-+ * Implementation specific sys-reg registers.
-+ * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
++ * The bits we set in HCR:
++ * RW:		64bit by default, can be overriden for 32bit VMs
++ * TAC:		Trap ACTLR
++ * TSC:		Trap SMC
++ * TSW:		Trap cache operations by set/way
++ * TWI:		Trap WFI
++ * TIDCP:	Trap L2CTLR/L2ECTLR
++ * BSU_IS:	Upgrade barriers to the inner shareable domain
++ * FB:		Force broadcast of all maintainance operations
++ * AMO:		Override CPSR.A and enable signaling with VA
++ * IMO:		Override CPSR.I and enable signaling with VI
++ * FMO:		Override CPSR.F and enable signaling with VF
++ * SWIO:	Turn set/way invalidates into set/way clean+invalidate
 + */
-+static const struct sys_reg_desc genericv8_sys_regs[] = {
-+	/* ACTLR_EL1 */
-+	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b001),
-+	  access_actlr, reset_actlr, ACTLR_EL1 },
-+};
++#define HCR_GUEST_FLAGS (HCR_TSC | HCR_TSW | HCR_TWI | HCR_VM | HCR_BSU_IS | \
++			 HCR_FB | HCR_TAC | HCR_AMO | HCR_IMO | HCR_FMO | \
++			 HCR_SWIO | HCR_TIDCP | HCR_RW)
++#define HCR_VIRT_EXCP_MASK (HCR_VA | HCR_VI | HCR_VF)
 +
-+static struct kvm_sys_reg_target_table genericv8_target_table = {
-+	.table64 = {
-+		.table = genericv8_sys_regs,
-+		.num = ARRAY_SIZE(genericv8_sys_regs),
-+	},
-+};
++/* Hyp System Control Register (SCTLR_EL2) bits */
++#define SCTLR_EL2_EE	(1 << 25)
++#define SCTLR_EL2_WXN	(1 << 19)
++#define SCTLR_EL2_I	(1 << 12)
++#define SCTLR_EL2_SA	(1 << 3)
++#define SCTLR_EL2_C	(1 << 2)
++#define SCTLR_EL2_A	(1 << 1)
++#define SCTLR_EL2_M	1
++#define SCTLR_EL2_FLAGS	(SCTLR_EL2_M | SCTLR_EL2_A | SCTLR_EL2_C |	\
++			 SCTLR_EL2_SA | SCTLR_EL2_I)
 +
-+static int __init sys_reg_genericv8_init(void)
-+{
-+	unsigned int i;
++/* TCR_EL2 Registers bits */
++#define TCR_EL2_TBI	(1 << 20)
++#define TCR_EL2_PS	(7 << 16)
++#define TCR_EL2_PS_40B	(2 << 16)
++#define TCR_EL2_TG0	(1 << 14)
++#define TCR_EL2_SH0	(3 << 12)
++#define TCR_EL2_ORGN0	(3 << 10)
++#define TCR_EL2_IRGN0	(3 << 8)
++#define TCR_EL2_T0SZ	0x3f
++#define TCR_EL2_MASK	(TCR_EL2_TG0 | TCR_EL2_SH0 | \
++			 TCR_EL2_ORGN0 | TCR_EL2_IRGN0 | TCR_EL2_T0SZ)
 +
-+	for (i = 1; i < ARRAY_SIZE(genericv8_sys_regs); i++)
-+		BUG_ON(cmp_sys_reg(&genericv8_sys_regs[i-1],
-+			       &genericv8_sys_regs[i]) >= 0);
++#define TCR_EL2_FLAGS	(TCR_EL2_PS_40B)
 +
-+	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_AEM_V8,
-+					  &genericv8_target_table);
-+	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_FOUNDATION_V8,
-+					  &genericv8_target_table);
-+	kvm_register_target_sys_reg_table(KVM_ARM_TARGET_CORTEX_A57,
-+					  &genericv8_target_table);
-+	return 0;
-+}
-+late_initcall(sys_reg_genericv8_init);
++/* VTCR_EL2 Registers bits */
++#define VTCR_EL2_PS_MASK	(7 << 16)
++#define VTCR_EL2_PS_40B		(2 << 16)
++#define VTCR_EL2_TG0_MASK	(1 << 14)
++#define VTCR_EL2_TG0_4K		(0 << 14)
++#define VTCR_EL2_TG0_64K	(1 << 14)
++#define VTCR_EL2_SH0_MASK	(3 << 12)
++#define VTCR_EL2_SH0_INNER	(3 << 12)
++#define VTCR_EL2_ORGN0_MASK	(3 << 10)
++#define VTCR_EL2_ORGN0_WBWA	(1 << 10)
++#define VTCR_EL2_IRGN0_MASK	(3 << 8)
++#define VTCR_EL2_IRGN0_WBWA	(1 << 8)
++#define VTCR_EL2_SL0_MASK	(3 << 6)
++#define VTCR_EL2_SL0_LVL1	(1 << 6)
++#define VTCR_EL2_T0SZ_MASK	0x3f
++#define VTCR_EL2_T0SZ_40B	24
++
++#ifdef CONFIG_ARM64_64K_PAGES
++/*
++ * Stage2 translation configuration:
++ * 40bits output (PS = 2)
++ * 40bits input  (T0SZ = 24)
++ * 64kB pages (TG0 = 1)
++ * 2 level page tables (SL = 1)
++ */
++#define VTCR_EL2_FLAGS		(VTCR_EL2_PS_40B | VTCR_EL2_TG0_64K | \
++				 VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
++				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
++				 VTCR_EL2_T0SZ_40B)
++#define VTTBR_X		(38 - VTCR_EL2_T0SZ_40B)
++#else
++/*
++ * Stage2 translation configuration:
++ * 40bits output (PS = 2)
++ * 40bits input  (T0SZ = 24)
++ * 4kB pages (TG0 = 0)
++ * 3 level page tables (SL = 1)
++ */
++#define VTCR_EL2_FLAGS		(VTCR_EL2_PS_40B | VTCR_EL2_TG0_4K | \
++				 VTCR_EL2_SH0_INNER | VTCR_EL2_ORGN0_WBWA | \
++				 VTCR_EL2_IRGN0_WBWA | VTCR_EL2_SL0_LVL1 | \
++				 VTCR_EL2_T0SZ_40B)
++#define VTTBR_X		(37 - VTCR_EL2_T0SZ_40B)
++#endif
++
++#define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
++#define VTTBR_BADDR_MASK  (((1LLU << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
++#define VTTBR_VMID_SHIFT  (48LLU)
++#define VTTBR_VMID_MASK	  (0xffLLU << VTTBR_VMID_SHIFT)
++
++/* Hyp System Trap Register */
++#define HSTR_EL2_TTEE	(1 << 16)
++#define HSTR_EL2_T(x)	(1 << x)
++
++/* Hyp Coprocessor Trap Register */
++#define CPTR_EL2_TCPAC	(1 << 31)
++#define CPTR_EL2_TTA	(1 << 20)
++#define CPTR_EL2_TFP	(1 << 10)
++
++/* Hyp Debug Configuration Register bits */
++#define MDCR_EL2_TDRA		(1 << 11)
++#define MDCR_EL2_TDOSA		(1 << 10)
++#define MDCR_EL2_TDA		(1 << 9)
++#define MDCR_EL2_TDE		(1 << 8)
++#define MDCR_EL2_HPME		(1 << 7)
++#define MDCR_EL2_TPM		(1 << 6)
++#define MDCR_EL2_TPMCR		(1 << 5)
++#define MDCR_EL2_HPMN_MASK	(0x1F)
++
++/* Exception Syndrome Register (ESR) bits */
++#define ESR_EL2_EC_SHIFT	(26)
++#define ESR_EL2_EC		(0x3fU << ESR_EL2_EC_SHIFT)
++#define ESR_EL2_IL		(1U << 25)
++#define ESR_EL2_ISS		(ESR_EL2_IL - 1)
++#define ESR_EL2_ISV_SHIFT	(24)
++#define ESR_EL2_ISV		(1U << ESR_EL2_ISV_SHIFT)
++#define ESR_EL2_SAS_SHIFT	(22)
++#define ESR_EL2_SAS		(3U << ESR_EL2_SAS_SHIFT)
++#define ESR_EL2_SSE		(1 << 21)
++#define ESR_EL2_SRT_SHIFT	(16)
++#define ESR_EL2_SRT_MASK	(0x1f << ESR_EL2_SRT_SHIFT)
++#define ESR_EL2_SF 		(1 << 15)
++#define ESR_EL2_AR 		(1 << 14)
++#define ESR_EL2_EA 		(1 << 9)
++#define ESR_EL2_CM 		(1 << 8)
++#define ESR_EL2_S1PTW 		(1 << 7)
++#define ESR_EL2_WNR		(1 << 6)
++#define ESR_EL2_FSC		(0x3f)
++#define ESR_EL2_FSC_TYPE	(0x3c)
++
++#define ESR_EL2_CV_SHIFT	(24)
++#define ESR_EL2_CV		(1U << ESR_EL2_CV_SHIFT)
++#define ESR_EL2_COND_SHIFT	(20)
++#define ESR_EL2_COND		(0xfU << ESR_EL2_COND_SHIFT)
++
++
++#define FSC_FAULT	(0x04)
++#define FSC_PERM	(0x0c)
++
++/* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
++#define HPFAR_MASK	(~0xFUL)
++
++#define ESR_EL2_EC_UNKNOWN	(0x00)
++#define ESR_EL2_EC_WFI		(0x01)
++#define ESR_EL2_EC_CP15_32	(0x03)
++#define ESR_EL2_EC_CP15_64	(0x04)
++#define ESR_EL2_EC_CP14_MR	(0x05)
++#define ESR_EL2_EC_CP14_LS	(0x06)
++#define ESR_EL2_EC_FP_ASIMD	(0x07)
++#define ESR_EL2_EC_CP10_ID	(0x08)
++#define ESR_EL2_EC_CP14_64	(0x0C)
++#define ESR_EL2_EC_ILL_ISS	(0x0E)
++#define ESR_EL2_EC_SVC32	(0x11)
++#define ESR_EL2_EC_HVC32	(0x12)
++#define ESR_EL2_EC_SMC32	(0x13)
++#define ESR_EL2_EC_SVC64	(0x15)
++#define ESR_EL2_EC_HVC64	(0x16)
++#define ESR_EL2_EC_SMC64	(0x17)
++#define ESR_EL2_EC_SYS64	(0x18)
++#define ESR_EL2_EC_IABT		(0x20)
++#define ESR_EL2_EC_IABT_HYP	(0x21)
++#define ESR_EL2_EC_PC_ALIGN	(0x22)
++#define ESR_EL2_EC_DABT		(0x24)
++#define ESR_EL2_EC_DABT_HYP	(0x25)
++#define ESR_EL2_EC_SP_ALIGN	(0x26)
++#define ESR_EL2_EC_FP_EXC32	(0x28)
++#define ESR_EL2_EC_FP_EXC64	(0x2C)
++#define ESR_EL2_EC_SERRROR	(0x2F)
++#define ESR_EL2_EC_BREAKPT	(0x30)
++#define ESR_EL2_EC_BREAKPT_HYP	(0x31)
++#define ESR_EL2_EC_SOFTSTP	(0x32)
++#define ESR_EL2_EC_SOFTSTP_HYP	(0x33)
++#define ESR_EL2_EC_WATCHPT	(0x34)
++#define ESR_EL2_EC_WATCHPT_HYP	(0x35)
++#define ESR_EL2_EC_BKPT32	(0x38)
++#define ESR_EL2_EC_VECTOR32	(0x3A)
++#define ESR_EL2_EC_BRK64	(0x3C)
++
++#define ESR_EL2_EC_xABT_xFSR_EXTABT	0x10
++
++#endif /* __ARM64_KVM_ARM_H__ */
 -- 
 1.8.2.3
