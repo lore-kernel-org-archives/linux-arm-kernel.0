@@ -1,21 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 May 2013 14:54:50 +0200
-Subject: [PATCH] pinctrl: enable build of pinctrl-imx6sl driver
-In-Reply-To: <1368407762-12084-1-git-send-email-shawn.guo@linaro.org>
-References: <1368407762-12084-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <CACRpkdaKJ-D2FbwSWNeqZrjDJ33nR3P26Yy_1mkPmX9zLTKrfA@mail.gmail.com>
+Date: Tue, 14 May 2013 14:56:31 +0200
+Subject: [RFC 19/42] drivers/pinctrl/spear: don't check resource with
+ devm_ioremap_resource
+In-Reply-To: <1368173847-5661-20-git-send-email-wsa@the-dreams.de>
+References: <1368173847-5661-1-git-send-email-wsa@the-dreams.de>
+ <1368173847-5661-20-git-send-email-wsa@the-dreams.de>
+Message-ID: <CACRpkdYoDqsyE-oX5pBYx6v3txn=OjTLPoQOKkqaSLA5FNjYXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 3:16 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+On Fri, May 10, 2013 at 10:17 AM, Wolfram Sang <wsa@the-dreams.de> wrote:
 
-> The pinctrl-imx6sl is in place.  Enable the build of it.
+> devm_ioremap_resource does sanity checks on the given resource. No need to
+> duplicate this in the driver.
 >
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 
-Applied for devel (v3.11) or is this to be considered a fix,
-i.e. is someone compiling mainline kernels for the
-IMX6SL already in v3.10?
+Patch applied with Viresh's ACK.
 
-Yours,
+Thanks!
 Linus Walleij
