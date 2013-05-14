@@ -1,43 +1,94 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 14 May 2013 11:09:43 +0530
-Subject: [PATCH 0/2 V4] DMA: AT91: Fix get residue function in at_hdmac.c
-In-Reply-To: <1368154798-9279-1-git-send-email-elen.song@atmel.com>
-References: <1368154798-9279-1-git-send-email-elen.song@atmel.com>
-Message-ID: <20130514053943.GD27639@intel.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 14 May 2013 08:37:47 +0200 (CEST)
+Subject: [PATCH V2 00/10] mmc_of_parse() adaptations, DT support for
+ Sheevaplugs
+In-Reply-To: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
+References: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
+Message-ID: <Pine.LNX.4.64.1305140819520.32151@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 10, 2013 at 10:59:58AM +0800, Elen Song wrote:
-> The residue actually means the bytes remain in transfer identified by current cookie.
-> The get residue api did not return the correct values in at_hdmac.c.
-> This patch serial focus on fix the issue.
-> 
-> This patch serials is based on DMA: AT91: Get residual bytes in dma buffer v2.
-> It is split into 3 aimed patch, the first one is to get transmit buswidth,
-> the second one is to get resiude in cookie, it use the buswidth to get residual bytes,
-> the third part is to handle the status that there are still some bytes remain in dma fifo.
-Applied, Thanks
+Hi Simon
 
---
-~Vinod
+On Mon, 13 May 2013, Simon Baatz wrote:
+
+> While adding DT support for the Sheevaplugs by Globalscale Technologies
+> (Kirkwood), it turned out that the DT binding of mvsdio lacked features to
+> properly support the hardware (active high/low of CD and WP pins could not
+> be described in DT).
 > 
-> Compare to v2, this patch serials improve:
-> 1) consider buswidth to get correct residue.
-> 2) handle dma fifo empty status.
+> This is standard functionality provided by the mmc_of_parse() helper
+> function.  However, mmc_of_parse() may allocate GPIO lines.  If the
+> allocation fails, it outputs an error, but does not return an error to its
+> caller.  Therefore, a proposal to handle errors in mmc_of_parse() is made.
+
+Thanks for the patches. In principle I'm fine either way. It is a policy 
+decision IMHO. E.g. consider a situation. You have a DT with an SD-card 
+slot, where card-detection is performed by a GPIO. OTOH the same pin is 
+used on some other (optional) interface on the same board. If that other 
+competing interface is unused, the driver isn't loaded, you can use the 
+GPIO for card-detection. However, if that other interface is used, your 
+attempt to get the card-detect pin will fail, but you still can use the 
+interface in polling mode. No, I don't think this is a good example of 
+hardware design :) User experience would depend on driver probing order, 
+but in principle it is imaginable. So, with the current mmc_of_parse() 
+you're more tolerant. You get a warning in the log, but the interface 
+might still be usable. And if you're surprised why your write protection 
+status hasn't been properly detected - just look in the log.
+
+You're proposing a change in behaviour. After your change any failure to 
+obtain a resource in mmc_of_parse() will fail interface probing. 
+Personally I don't think there are any users around, who would notice this 
+change, still, we have to be aware of it. And I don't know whether we 
+should do that. You know, we don't break user-space ;-)
+
+So, technically I'm ok with the changes, but policy-wise I'm not sure how 
+severe this change would be. We could go a bit slower and first add a 
+return code as in your patch #1, but not fail drivers, like in your 
+patches #2, 3,... but WARN_ON(mmc_of_parse() < 0); and continue for now. 
+In 3.12 we could then replace those warnings with real failures. But maybe 
+I'm just overcautious and we can just go ahead with your patches. You can 
+add my
+
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+
+for patches 1-3, and let's see what Chris thinks about this change.
+
+Thanks
+Guennadi
+
+> The patch set is structured as follows:
 > 
-> Compare to v3, this patch serials improve:
-> 1) To state clearly, replace buswidth with transfer width.
-> 2) Do not pause dma when get residue.
-> 3) Let issue pending handler remain work if data remain in dma fifo, polling empty flag is too time consuming.
+> 1   Adapt mmc_of_parse() to return errors
+> 2-6 Handle errors in current drivers using mmc_of_parse() (compile tested
+>     only)
+> 7-8 Convert mvsdio and respective dts files to mmc_of_parse() (tested on
+>     kirkwood)
+> 9   Add dts files for (eSATA) Sheevaplug
+> 10  Add DT support for (eSATA) Sheevaplug
 > 
-> Elen Song (2):
->   DMA: AT91: Get transfer width
->   DMA: AT91: Get residual bytes in dma buffer
 > 
->  drivers/dma/at_hdmac.c      |  151 ++++++++++++++++++++++++++++++++++++++-----
->  drivers/dma/at_hdmac_regs.h |    5 ++
->  2 files changed, 139 insertions(+), 17 deletions(-)
+> I could only test on an eSATA Sheevaplug. I found patches with
+> different LEDs for the Sheevaplug.  Thus, I would highly appreciate if
+> someone with the hardware could give this a spin on a non-eSATA
+> version.  Some additional testing of the change detect and write
+> protect behaviour for mvsdio can't hurt either.  I hope that there aren't
+> board revisions with different CD/WP pins out there.
 > 
-> -- 
-> 1.7.9.5
-> 
+> Simon Baatz (10):
+>   mmc: return mmc_of_parse() errors to caller
+>   mmc: sh_mmcif: handle mmc_of_parse() errors during probe
+>   mmc: tmio-mmc: handle mmc_of_parse() errors during probe
+>   mmc: mxcmmc: handle mmc_of_parse() errors during probe
+>   mmc: sdhi-pxav3: handle mmc_of_parse() errors during probe
+>   mmc: tegra: handle mmc_of_parse() errors during probe
+>   ARM: mvebu: Use standard MMC binding for all users of mvsdio
+>   mmc: mvsdio: use standard MMC device-tree binding parser
+>     mmc_of_parse()
+>   ARM: Kirkwood: Add dts files for Sheevaplug and eSATA Sheevaplug
+>   ARM: Kirkwood: add DT support for Sheevaplug and Sheevaplug eSATA
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
