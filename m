@@ -1,218 +1,98 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Tue, 14 May 2013 11:52:20 +0900
-Subject: Introduce a new helper framework for buffer synchronization
-In-Reply-To: <CAF6AEGuDih-NR-VZCmQfqbvCOxjxreZRPGfhCyL12FQ1Qd616Q@mail.gmail.com>
-References: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
- <51909DB4.2060208@canonical.com>
- <025201ce4fbb$363d0390$a2b70ab0$%dae@samsung.com>
- <5190B7D8.3010803@canonical.com>
- <027a01ce4fcc$5e7c7320$1b755960$%dae@samsung.com>
- <5190D14A.7050904@canonical.com>
- <028a01ce4fd4$5ec6f000$1c54d000$%dae@samsung.com>
- <CAF6AEGvWazezZdLDn5=H8wNQdQSWV=EmqE1a4wh7QwrT_h6vKQ@mail.gmail.com>
- <CAAQKjZP=iOmHRpHZCbZD3v_RKUFSn0eM_WVZZvhe7F9g3eTmPA@mail.gmail.com>
- <CAF6AEGuDih-NR-VZCmQfqbvCOxjxreZRPGfhCyL12FQ1Qd616Q@mail.gmail.com>
-Message-ID: <006a01ce504e$0de3b0e0$29ab12a0$%dae@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 14 May 2013 11:59:42 +0900
+Subject: [PATCH 3/3] ARM: mach-shmobile: lager: support GPIO switches
+In-Reply-To: <9256981.LFpgU8cctr@avalon>
+References: <1368435233-8587-1-git-send-email-horms+renesas@verge.net.au>
+ <1368435233-8587-4-git-send-email-horms+renesas@verge.net.au>
+ <9256981.LFpgU8cctr@avalon>
+Message-ID: <20130514025941.GC20239@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Rob Clark [mailto:robdclark at gmail.com]
-> Sent: Tuesday, May 14, 2013 2:58 AM
-> To: Inki Dae
-> Cc: linux-fbdev; DRI mailing list; Kyungmin Park; myungjoo.ham; YoungJun
-> Cho; linux-arm-kernel at lists.infradead.org; linux-media at vger.kernel.org
-> Subject: Re: Introduce a new helper framework for buffer synchronization
+On Tue, May 14, 2013 at 12:35:20AM +0200, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> On Mon, May 13, 2013 at 1:18 PM, Inki Dae <inki.dae@samsung.com> wrote:
-> >
-> >
-> > 2013/5/13 Rob Clark <robdclark@gmail.com>
-> >>
-> >> On Mon, May 13, 2013 at 8:21 AM, Inki Dae <inki.dae@samsung.com> wrote:
-> >> >
-> >> >> In that case you still wouldn't give userspace control over the
-> fences.
-> >> >> I
-> >> >> don't see any way that can end well.
-> >> >> What if userspace never signals? What if userspace gets killed by
-> oom
-> >> >> killer. Who keeps track of that?
-> >> >>
-> >> >
-> >> > In all cases, all kernel resources to user fence will be released by
-> >> > kernel
-> >> > once the fence is timed out: never signaling and process killing by
-> oom
-> >> > killer makes the fence timed out. And if we use mmap mechanism you
-> >> > mentioned
-> >> > before, I think user resource could also be freed properly.
-> >>
-> >>
-> >> I tend to agree w/ Maarten here.. there is no good reason for
-> >> userspace to be *signaling* fences.  The exception might be some blob
-> >> gpu drivers which don't have enough knowledge in the kernel to figure
-> >> out what to do.  (In which case you can add driver private ioctls for
-> >> that.. still not the right thing to do but at least you don't make a
-> >> public API out of it.)
-> >>
-> >
-> > Please do not care whether those are generic or not. Let's see the
-> following
-> > three things. First, it's cache operation. As you know, ARM SoC has ACP
-> > (Accelerator Coherency Port) and can be connected to DMA engine or
-> similar
-> > devices. And this port is used for cache coherency between CPU cache and
-> DMA
-> > device. However, most devices on ARM based embedded systems don't use
-> the
-> > ACP port. So they need proper cache operation before and after of DMA or
-> CPU
-> > access in case of using cachable mapping. Actually, I see many Linux
-> based
-> > platforms call cache control interfaces directly for that. I think the
-> > reason, they do so, is that kernel isn't aware of when and how CPU
-> accessed
-> > memory.
+> Thank you for the patch.
 > 
-> I think we had kicked around the idea of giving dmabuf's a
-> prepare/finish ioctl quite some time back.  This is probably something
-> that should be at least a bit decoupled from fences.  (Possibly
-> 'prepare' waits for dma access to complete, but not the other way
-> around.)
+> On Monday 13 May 2013 17:53:53 Simon Horman wrote:
+> > The lager board has pins 1 - 4 of SW2 wired up to GPIO pins.
+> > This patch allows access to those pins as KEYS 1 - 4 using
+> > gpio-keys.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > 
+> > ---
+> > 
+> > This patch has run time dependencies on
+> > 1. "gpio-rcar: Add support for IRQ_TYPE_EDGE_BOTH"
+> > 2. "ARM: shmobile: r8a7790: Configure R-Car GPIO for IRQ_TYPE_EDGE_BOTH"
+> > 
+> > Without those dependencies satisfied the gpio-keys driver will
+> > fail to be initialise itself. The boot should be otherwise successful
+> > and the board otherwise functional.
+> > ---
+> >  arch/arm/mach-shmobile/board-lager.c | 22 ++++++++++++++++++++++
+> >  1 file changed, 22 insertions(+)
+> > 
+> > diff --git a/arch/arm/mach-shmobile/board-lager.c
+> > b/arch/arm/mach-shmobile/board-lager.c index 6a1ba38..4d1b42b 100644
+> > --- a/arch/arm/mach-shmobile/board-lager.c
+> > +++ b/arch/arm/mach-shmobile/board-lager.c
+> > @@ -18,7 +18,10 @@
+> >   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 
+> > USA */
+> > 
+> > +#include <linux/gpio.h>
+> > +#include <linux/gpio_keys.h>
+> >  #include <linux/interrupt.h>
+> > +#include <linux/input.h>
 > 
-> And I did implement in omapdrm support for simulating coherency via
-> page fault-in / shoot-down..  It is one option that makes it
-> completely transparent to userspace, although there is some
-> performance const, so I suppose it depends a bit on your use-case.
+> My dictionary lists input before interrupt :-)
+
+Thanks, I will fix that.
+
+> >  #include <linux/irqchip.h>
+> >  #include <linux/kernel.h>
+> >  #include <linux/leds.h>
+> > @@ -52,6 +55,22 @@ static struct gpio_led_platform_data lager_leds_pdata = {
+> > .num_leds	= ARRAY_SIZE(lager_leds),
+> >  };
+> > 
+> > +/* GPIO KEY */
+> > +#define GPIO_KEY(c, g, d, ...) \
+> > +	{ .code = c, .gpio = g, .desc = d, .active_low = 1 }
+> > +
+> > +static struct gpio_keys_button gpio_buttons[] = {
+> > +	GPIO_KEY(KEY_4,		RCAR_GP_PIN(1, 28),	"SW2-pin4"),
+> > +	GPIO_KEY(KEY_3,		RCAR_GP_PIN(1, 26),	"SW2-pin3"),
+> > +	GPIO_KEY(KEY_2,		RCAR_GP_PIN(1, 24),	"SW2-pin2"),
+> > +	GPIO_KEY(KEY_1,		RCAR_GP_PIN(1, 14),	"SW2-pin1"),
+> > +};
+> > +
+> > +static struct gpio_keys_platform_data lager_keys_pdata = {
+> > +	.buttons	= gpio_buttons,
+> > +	.nbuttons	= ARRAY_SIZE(gpio_buttons),
+> > +};
+> > +
 > 
-> > And second, user process has to do so many things in case of using
-> shared
-> > memory with DMA device. User process should understand how DMA device is
-> > operated and when interfaces for controling the DMA device are called.
-> Such
-> > things would make user application so complicated.
-> >
-> > And third, it's performance optimization to multimedia and graphics
-> devices.
-> > As I mentioned already, we should consider sequential processing for
-> buffer
-> > sharing between CPU and DMA device. This means that CPU should stay with
-> > idle until DMA device is completed and vise versa.
-> >
-> > That is why I proposed such user interfaces. Of course, these interfaces
-> > might be so ugly yet: for this, Maarten pointed already out and I agree
-> with
-> > him. But there must be another better way. Aren't you think we need
-> similar
-> > thing? With such interfaces, cache control and buffer synchronization
-> can be
-> > performed in kernel level. Moreover, user applization doesn't need to
-> > consider DMA device controlling anymore. Therefore, one thread can
-> access a
-> > shared buffer and the other can control DMA device with the shared
-> buffer in
-> > parallel. We can really make the best use of CPU and DMA idle time. In
-> other
-> > words, we can really make the best use of multi tasking OS, Linux.
-> >
-> > So could you please tell me about that there is any reason we don't use
-> > public API for it? I think we can add and use public API if NECESSARY.
-> 
-> well, for cache management, I think it is a better idea.. I didn't
-> really catch that this was the motivation from the initial patch, but
-> maybe I read it too quickly.  But cache can be decoupled from
-> synchronization, because CPU access is not asynchronous.  For
-> userspace/CPU access to buffer, you should:
-> 
->   1) wait for buffer
->   2) prepare-access
->   3)  ... do whatever cpu access to buffer ...
->   4) finish-access
->   5) submit buffer for new dma-operation
-> 
+> Could you please also update the lager dts file ?
 
+I wonder if in that case we can remove the C code above.
+And probably the C code for the GPIO leds too.
 
-For data flow from CPU to DMA device,
-1) wait for buffer
-2) prepare-access (dma_buf_begin_cpu_access)
-3) cpu access to buffer
+Magnus, could you clarify how you would like
+C-code and DTS to look on the lager board?
 
-
-For data flow from DMA device to CPU
-1) wait for buffer
-2) finish-access (dma_buf_end _cpu_access)
-3) dma access to buffer
-
-1) and 2) are coupled with one function: we have implemented
-fence_helper_commit_reserve() for it.
-
-Cache control(cache clean or cache invalidate) is performed properly
-checking previous access type and current access type.
-And the below is actual codes for it,
-
-static void fence_helper_cache_ops(struct fence_helper *fh)
-{
-	struct seqno_fence_dmabuf *sfd;
-
-	list_for_each_entry(sfd, &fh->sf.sync_buf_list, list) {
-		struct dma_buf *dmabuf = sfd->sync_buf;
-
-		if (WARN_ON(!dmabuf))
-			continue;
-
-		/* first time access. */
-		if (!dmabuf->access_type)
-			goto out;
-
-		if (dmabuf->access_type == DMA_BUF_ACCESS_WRITE &&
-				((fh->type == (DMA_BUF_ACCESS_READ |
-						DMA_BUF_ACCESS_DMA)) ||
-				(fh->type == (DMA_BUF_ACCESS_WRITE |
-					     DMA_BUF_ACCESS_DMA))))
-			/* cache clean */
-			dma_buf_end_cpu_access(dmabuf, 0, dmabuf->size,
-						DMA_TO_DEVICE);
-		else if (dmabuf->access_type == (DMA_BUF_ACCESS_WRITE |
-						DMA_BUF_ACCESS_DMA) &&
-				(fh->type == DMA_BUF_ACCESS_READ))
-			/* cache invalidate */
-			dma_buf_begin_cpu_access(dmabuf, 0, dmabuf->size,
-							DMA_FROM_DEVICE);
-
-out:
-		/* Update access type to new one. */
-		dmabuf->access_type = fh->type;
-	}
-}
-
-The above function is called after wait for buffer.
-Thus, we can check who (CPU or DMA) and how (READ or WRITE) accessed and
-accesses buffer with this approach. In other words, now kernel is aware of
-buffer access by CPU also.
-
-
-Thanks,
-Inki Dae
-
-> I suppose you could combine the syscall for #1 and #2.. not sure if
-> that is a good idea or not.  But you don't need to.  And there is
-> never really any need for userspace to signal a fence.
-> 
-> BR,
-> -R
-> 
-> > Thanks,
-> > Inki Dae
-> >
-> >>
-> >> BR,
-> >> -R
-> >> _______________________________________________
-> >> dri-devel mailing list
-> >> dri-devel at lists.freedesktop.org
-> >> http://lists.freedesktop.org/mailman/listinfo/dri-devel
-> >
-> >
+> >  static const struct pinctrl_map lager_pinctrl_map[] = {
+> >  	/* SCIF0 (CN19: DEBUG SERIAL0) */
+> >  	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
+> > @@ -73,6 +92,9 @@ static void __init lager_add_standard_devices(void)
+> >  	platform_device_register_data(&platform_bus, "leds-gpio", -1,
+> >  				      &lager_leds_pdata,
+> >  				      sizeof(lager_leds_pdata));
+> > +	platform_device_register_data(&platform_bus, "gpio-keys", -1,
+> > +				      &lager_keys_pdata,
+> > +				      sizeof(lager_keys_pdata));
+> >  }
+> > 
+> >  static const char *lager_boards_compat_dt[] __initdata = {
