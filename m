@@ -1,23 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 May 2013 13:41:19 +0200
-Subject: [PATCH] pinctrl: generic: Fix typos and clarify comments
-In-Reply-To: <1366723718-5369-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1366723718-5369-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CACRpkdZi2j-q7gtqCUj+XfH_MmrE-qqzrSUVr8h5qBHV_+_Q9w@mail.gmail.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Tue, 14 May 2013 12:48:50 +0100
+Subject: [PATCH 0/7] NOMMU fixes and preparation for NOMMU/SMP
+Message-ID: <1368532137-8871-1-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 23, 2013 at 3:28 PM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
+This patch series, mostly written by Will Deacon, contains fixes for
+!CONFIG_MMU that are required in order to be able to run an SMP/NOMMU system.
 
-> Drive strength controls both sink and source currents, clarify the
-> description accordingly.
->
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+These patches are required for Cortex-R7 and MPU support, that will be posted
+to this list shortly.
 
-All makes perfect sense.
+This series represents my 'nommu' branch, which can be found at
+http://www.linux-arm.org/git?p=linux-ja.git
 
-Patch applied!
+These patches have been tested over the last year on Versatile Express/NOMMU.
 
-Yours,
-Linus Walleij
+Jonathan Austin (2):
+  ARM: nommu: Don't build smp_tlb.c for !CONFIG_MMU
+  ARM: nommu: add stub local_flush_bp_all() for !CONFIG_MMUU
+
+Will Deacon (5):
+  ARM: nommu: add entry point for secondary CPUs to head-nommu.S
+  ARM: nommu: define dummy TLB operations for nommu configurations
+  ARM: nommu: provide dummy cpu_switch_mm implementation
+  ARM: nommu: do not initialise page tables in secondary_data structure
+  ARM: suspend: fix CPU suspend code for !CONFIG_MMU configurations
+
+ arch/arm/include/asm/proc-fns.h |    4 +++
+ arch/arm/include/asm/smp_plat.h |    4 +++
+ arch/arm/include/asm/tlbflush.h |   25 ++++++++++++++-
+ arch/arm/kernel/Makefile        |    5 ++-
+ arch/arm/kernel/head-nommu.S    |   50 +++++++++++++++++++++++++++---
+ arch/arm/kernel/smp.c           |    2 ++
+ arch/arm/kernel/suspend.c       |   64 ++++++++++++++++++++++-----------------
+ arch/arm/mm/proc-v6.S           |    6 +++-
+ arch/arm/mm/proc-v7.S           |   14 ++++++---
+ 9 files changed, 134 insertions(+), 40 deletions(-)
+
+-- 
+1.7.9.5
