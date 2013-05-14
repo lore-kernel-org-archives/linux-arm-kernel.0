@@ -1,159 +1,126 @@
 From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 14 May 2013 14:37:07 +0200
-Subject: [PATCH v2 2/2] KVM: get rid of $(addprefix ../../../virt/kvm/,
- ...) in Makefiles
-In-Reply-To: <1368534653-23133-3-git-send-email-marc.zyngier@arm.com>
+Date: Tue, 14 May 2013 14:38:53 +0200
+Subject: [PATCH v2 1/2] ARM: KVM: move GIC/timer code to a common location
+In-Reply-To: <1368534653-23133-2-git-send-email-marc.zyngier@arm.com>
 References: <1368534653-23133-1-git-send-email-marc.zyngier@arm.com>
- <1368534653-23133-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <51922FF3.4060300@redhat.com>
+ <1368534653-23133-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <5192305D.80804@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Il 14/05/2013 14:30, Marc Zyngier ha scritto:
-> As requested by the KVM maintainers, remove the addprefix used to
-> refer to the main KVM code from the arch code, and replace it with
-> a KVM variable that does the same thing.
+> As KVM/arm64 is looming on the horizon, it makes sense to move some
+> of the common code to a single location in order to reduce duplication.
 > 
-> Cc: Paolo Bonzini <pbonzini@redhat.com>
-> Cc: Gleb Natapov <gleb@redhat.com>
-> Cc: Christoffer Dall <cdall@cs.columbia.edu>
-> Cc: Xiantao Zhang <xiantao.zhang@intel.com>
-> Cc: Tony Luck <tony.luck@intel.com>
-> Cc: Fenghua Yu <fenghua.yu@intel.com>
-> Cc: Alexander Graf <agraf@suse.de>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
-> Cc: Cornelia Huck <cornelia.huck@de.ibm.com>
+> The code could live anywhere. Actually, most of KVM is already built
+> with a bunch of ugly ../../.. hacks in the various Makefiles, so we're
+> not exactly talking about style here. But maybe it is time to start
+> moving into a less ugly direction.
+> 
+> The include files must be in a "public" location, as they are accessed
+> from non-KVM files (arch/arm/kernel/asm-offsets.c).
+> 
+> For this purpose, introduce two new locations:
+> - virt/kvm/arm/ : x86 and ia64 already share the ioapic code in
+>   virt/kvm, so this could be seen as a (very ugly) precedent.
+> - include/kvm/  : there is already an include/xen, and while the
+>   intent is slightly different, this seems as good a location as
+>   any
+> 
+> Eventually, we should probably have independant Makefiles at every
+> levels (just like everywhere else in the kernel), but this is just
+> the first step.
+> 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Looks good.
 
 Thanks,
 
-Reviewed-by: Paolo Bonzini <pbonzini@redhat.com>
+Paolo
 
 > ---
->  arch/arm/kvm/Makefile     |  2 +-
->  arch/ia64/kvm/Makefile    |  7 ++++---
->  arch/powerpc/kvm/Makefile | 13 +++++++------
->  arch/s390/kvm/Makefile    |  3 ++-
->  arch/x86/kvm/Makefile     | 13 +++++++------
->  5 files changed, 21 insertions(+), 17 deletions(-)
+>  arch/arm/include/asm/kvm_host.h                                    | 4 ++--
+>  arch/arm/kvm/Makefile                                              | 7 ++++---
+>  .../include/asm/kvm_arch_timer.h => include/kvm/arm_arch_timer.h   | 0
+>  arch/arm/include/asm/kvm_vgic.h => include/kvm/arm_vgic.h          | 0
+>  {arch/arm/kvm => virt/kvm/arm}/arch_timer.c                        | 4 ++--
+>  {arch/arm/kvm => virt/kvm/arm}/vgic.c                              | 0
+>  6 files changed, 8 insertions(+), 7 deletions(-)
+>  rename arch/arm/include/asm/kvm_arch_timer.h => include/kvm/arm_arch_timer.h (100%)
+>  rename arch/arm/include/asm/kvm_vgic.h => include/kvm/arm_vgic.h (100%)
+>  rename {arch/arm/kvm => virt/kvm/arm}/arch_timer.c (99%)
+>  rename {arch/arm/kvm => virt/kvm/arm}/vgic.c (100%)
 > 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index ff49193..1f3cee2 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -23,7 +23,7 @@
+>  #include <asm/kvm_asm.h>
+>  #include <asm/kvm_mmio.h>
+>  #include <asm/fpstate.h>
+> -#include <asm/kvm_arch_timer.h>
+> +#include <kvm/arm_arch_timer.h>
+>  
+>  #define KVM_MAX_VCPUS CONFIG_KVM_ARM_MAX_VCPUS
+>  #define KVM_USER_MEM_SLOTS 32
+> @@ -38,7 +38,7 @@
+>  #define KVM_NR_PAGE_SIZES	1
+>  #define KVM_PAGES_PER_HPAGE(x)	(1UL<<31)
+>  
+> -#include <asm/kvm_vgic.h>
+> +#include <kvm/arm_vgic.h>
+>  
+>  struct kvm_vcpu;
+>  u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
 > diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-> index 9184a49..d99bee4 100644
+> index 53c5ed8..9184a49 100644
 > --- a/arch/arm/kvm/Makefile
 > +++ b/arch/arm/kvm/Makefile
-> @@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
+> @@ -14,10 +14,11 @@ CFLAGS_mmu.o := -I.
+>  AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
 >  AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
 >  
->  KVM := ../../../virt/kvm
-> -kvm-arm-y = $(addprefix $(KVM)/, kvm_main.o coalesced_mmio.o)
-> +kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
+> -kvm-arm-y = $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o)
+> +KVM := ../../../virt/kvm
+> +kvm-arm-y = $(addprefix $(KVM)/, kvm_main.o coalesced_mmio.o)
 >  
 >  obj-y += kvm-arm.o init.o interrupts.o
 >  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
-> diff --git a/arch/ia64/kvm/Makefile b/arch/ia64/kvm/Makefile
-> index 1a40537..18e45ec 100644
-> --- a/arch/ia64/kvm/Makefile
-> +++ b/arch/ia64/kvm/Makefile
-> @@ -47,12 +47,13 @@ FORCE : $(obj)/$(offsets-file)
+>  obj-y += coproc.o coproc_a15.o mmio.o psci.o perf.o
+> -obj-$(CONFIG_KVM_ARM_VGIC) += vgic.o
+> -obj-$(CONFIG_KVM_ARM_TIMER) += arch_timer.o
+> +obj-$(CONFIG_KVM_ARM_VGIC) += $(KVM)/arm/vgic.o
+> +obj-$(CONFIG_KVM_ARM_TIMER) += $(KVM)/arm/arch_timer.o
+> diff --git a/arch/arm/include/asm/kvm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> similarity index 100%
+> rename from arch/arm/include/asm/kvm_arch_timer.h
+> rename to include/kvm/arm_arch_timer.h
+> diff --git a/arch/arm/include/asm/kvm_vgic.h b/include/kvm/arm_vgic.h
+> similarity index 100%
+> rename from arch/arm/include/asm/kvm_vgic.h
+> rename to include/kvm/arm_vgic.h
+> diff --git a/arch/arm/kvm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> similarity index 99%
+> rename from arch/arm/kvm/arch_timer.c
+> rename to virt/kvm/arm/arch_timer.c
+> index c55b608..2d00b29 100644
+> --- a/arch/arm/kvm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -25,8 +25,8 @@
+>  #include <clocksource/arm_arch_timer.h>
+>  #include <asm/arch_timer.h>
 >  
->  ccflags-y := -Ivirt/kvm -Iarch/ia64/kvm/
->  asflags-y := -Ivirt/kvm -Iarch/ia64/kvm/
-> +KVM := ../../../virt/kvm
+> -#include <asm/kvm_vgic.h>
+> -#include <asm/kvm_arch_timer.h>
+> +#include <kvm/arm_vgic.h>
+> +#include <kvm/arm_arch_timer.h>
 >  
-> -common-objs = $(addprefix ../../../virt/kvm/, kvm_main.o ioapic.o \
-> -		coalesced_mmio.o irq_comm.o)
-> +common-objs = $(KVM)/kvm_main.o $(KVM)/ioapic.o \
-> +		$(KVM)/coalesced_mmio.o $(KVM)/irq_comm.o
->  
->  ifeq ($(CONFIG_KVM_DEVICE_ASSIGNMENT),y)
-> -common-objs += $(addprefix ../../../virt/kvm/, assigned-dev.o iommu.o)
-> +common-objs += $(KVM)/assigned-dev.o $(KVM)/iommu.o
->  endif
->  
->  kvm-objs := $(common-objs) kvm-ia64.o kvm_fw.o
-> diff --git a/arch/powerpc/kvm/Makefile b/arch/powerpc/kvm/Makefile
-> index 422de3f..008cd85 100644
-> --- a/arch/powerpc/kvm/Makefile
-> +++ b/arch/powerpc/kvm/Makefile
-> @@ -5,9 +5,10 @@
->  subdir-ccflags-$(CONFIG_PPC_WERROR) := -Werror
->  
->  ccflags-y := -Ivirt/kvm -Iarch/powerpc/kvm
-> +KVM := ../../../virt/kvm
->  
-> -common-objs-y = $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o \
-> -						eventfd.o)
-> +common-objs-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o \
-> +		$(KVM)/eventfd.o
->  
->  CFLAGS_44x_tlb.o  := -I.
->  CFLAGS_e500_mmu.o := -I.
-> @@ -53,7 +54,7 @@ kvm-e500mc-objs := \
->  kvm-objs-$(CONFIG_KVM_E500MC) := $(kvm-e500mc-objs)
->  
->  kvm-book3s_64-objs-$(CONFIG_KVM_BOOK3S_64_PR) := \
-> -	../../../virt/kvm/coalesced_mmio.o \
-> +	$(KVM)/coalesced_mmio.o \
->  	fpu.o \
->  	book3s_paired_singles.o \
->  	book3s_pr.o \
-> @@ -86,8 +87,8 @@ kvm-book3s_64-objs-$(CONFIG_KVM_XICS) += \
->  	book3s_xics.o
->  
->  kvm-book3s_64-module-objs := \
-> -	../../../virt/kvm/kvm_main.o \
-> -	../../../virt/kvm/eventfd.o \
-> +	$(KVM)/kvm_main.o \
-> +	$(KVM)/eventfd.o \
->  	powerpc.o \
->  	emulate.o \
->  	book3s.o \
-> @@ -111,7 +112,7 @@ kvm-book3s_32-objs := \
->  kvm-objs-$(CONFIG_KVM_BOOK3S_32) := $(kvm-book3s_32-objs)
->  
->  kvm-objs-$(CONFIG_KVM_MPIC) += mpic.o
-> -kvm-objs-$(CONFIG_HAVE_KVM_IRQ_ROUTING) += $(addprefix ../../../virt/kvm/, irqchip.o)
-> +kvm-objs-$(CONFIG_HAVE_KVM_IRQ_ROUTING) += $(KVM)/irqchip.o
->  
->  kvm-objs := $(kvm-objs-m) $(kvm-objs-y)
->  
-> diff --git a/arch/s390/kvm/Makefile b/arch/s390/kvm/Makefile
-> index 8fe9d65..40b4c64 100644
-> --- a/arch/s390/kvm/Makefile
-> +++ b/arch/s390/kvm/Makefile
-> @@ -6,7 +6,8 @@
->  # it under the terms of the GNU General Public License (version 2 only)
->  # as published by the Free Software Foundation.
->  
-> -common-objs = $(addprefix ../../../virt/kvm/, kvm_main.o eventfd.o)
-> +KVM := ../../../virt/kvm
-> +common-objs = $(KVM)/kvm_main.o $(KVM)/eventfd.o
->  
->  ccflags-y := -Ivirt/kvm -Iarch/s390/kvm
->  
-> diff --git a/arch/x86/kvm/Makefile b/arch/x86/kvm/Makefile
-> index d609e1d..21d5703 100644
-> --- a/arch/x86/kvm/Makefile
-> +++ b/arch/x86/kvm/Makefile
-> @@ -5,12 +5,13 @@ CFLAGS_x86.o := -I.
->  CFLAGS_svm.o := -I.
->  CFLAGS_vmx.o := -I.
->  
-> -kvm-y			+= $(addprefix ../../../virt/kvm/, kvm_main.o ioapic.o \
-> -				coalesced_mmio.o irq_comm.o eventfd.o \
-> -				irqchip.o)
-> -kvm-$(CONFIG_KVM_DEVICE_ASSIGNMENT)	+= $(addprefix ../../../virt/kvm/, \
-> -				assigned-dev.o iommu.o)
-> -kvm-$(CONFIG_KVM_ASYNC_PF)	+= $(addprefix ../../../virt/kvm/, async_pf.o)
-> +KVM := ../../../virt/kvm
-> +
-> +kvm-y			+= $(KVM)/kvm_main.o $(KVM)/ioapic.o \
-> +				$(KVM)/coalesced_mmio.o $(KVM)/irq_comm.o
-> +				$(KVM)/eventfd.o $(KVM)/irqchip.o
-> +kvm-$(CONFIG_KVM_DEVICE_ASSIGNMENT)	+= $(KVM)/assigned-dev.o $(KVM)/iommu.o
-> +kvm-$(CONFIG_KVM_ASYNC_PF)	+= $(KVM)/async_pf.o
->  
->  kvm-y			+= x86.o mmu.o emulate.o i8259.o irq.o lapic.o \
->  			   i8254.o cpuid.o pmu.o
+>  static struct timecounter *timecounter;
+>  static struct workqueue_struct *wqueue;
+> diff --git a/arch/arm/kvm/vgic.c b/virt/kvm/arm/vgic.c
+> similarity index 100%
+> rename from arch/arm/kvm/vgic.c
+> rename to virt/kvm/arm/vgic.c
 > 
