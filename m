@@ -1,47 +1,35 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 14 May 2013 15:03:14 -0600
-Subject: [PATCH] ARM: PL011: add support for extended FIFO-size of
- PL011-r1p5
-In-Reply-To: <01fd01ce5072$d6b9fcd0$842df670$@lge.com>
-References: <007301ce375e$bcf6d6b0$36e48410$@lge.com>
- <5191D200.3040604@wwwdotorg.org> <01fd01ce5072$d6b9fcd0$842df670$@lge.com>
-Message-ID: <5192A692.4010700@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 May 2013 14:13:29 -0700
+Subject: OMAP baseline test results for v3.9
+In-Reply-To: <alpine.DEB.2.00.1305081933270.19747@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1305081933270.19747@utopia.booyaka.com>
+Message-ID: <20130514211328.GC5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2013 01:15 AM, Jongsung Kim wrote:
-> Stephen Warren <swarren@wwwdotorg.org> :
->> For reference, the AMBA periphid of the UART device there is 0x00341011.
->> The nibble "3" is the revision being tested in:
+Hi,
+
+* Paul Walmsley <paul@pwsan.com> [130508 12:45]:
 > 
-> The UART device has periphid 0x00341011, and is compatible with the
-> original PL011 prior to r1p5. Not with r1p5. It could be a possible
-> way to specify the compatible periphid (such as 0x00241011) instead
-> of just 0x0 when initializing the amba_device for the UART.
-> 
->>> +static unsigned int get_fifosize_arm(unsigned int periphid)
->>> +{
->>> +	unsigned int rev = (periphid >> 20) & 0xf;
->>> +	return rev < 3 ? 16 : 32;
->>> +}
-...
-> Doesn't the BCM2835 UART have anything different from the ARM PL011?
-> What about the UARTPCellID registers? They are set to 0xb105f00d with
-> the ARM PL011.
+> PM off, dynamic idle:
+>     FAIL ( 2/ 5): 4430es2panda, 4460pandaes
+>     Pass ( 3/ 5): 3530es3beagle, 3730beaglexm, 37xxevm
 
-Looking at BCM2835-ARM-Peripherals.pdf (i.e. the public documentation
-for the BCM2835 chip), I see:
+Looking at your pm logs, 3730beaglexm won't hit off-idle.
+I've pasted the relevant lines from your logs below.
 
-=====
-The UART provides:
-* Separate 16x8 transmit and 16x12 receive FIFO memory.
-...
-For the in-depth UART overview, please, refer to the ARM PrimeCell UART
-(PL011) Revision: r1p5 Technical Reference Manual.
-=====
+Is this a known issue?
 
-That seems to imply that not all r1p5 PL011s actually have a depth-32
-FIFO. Perhaps this is a configurable property of the IP block, not
-something that all r1p5 have?
+Regards,
 
-I can't check the UARTPCellID registers right now.
+Tony
+
+
+3530es3beagle hits OFF:
+core_pwrdm (ON),OFF:24,RET:41,INA:0,ON:66,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+
+3730beaglexm won't hit OFF:
+core_pwrdm (ON),OFF:0,RET:88,INA:0,ON:89,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
+
+37xxevm hits OFF:
+core_pwrdm (ON),OFF:8,RET:10,INA:0,ON:19,RET-LOGIC-OFF:0,RET-MEMBANK1-OFF:0,RET-MEMBANK2-OFF:0
