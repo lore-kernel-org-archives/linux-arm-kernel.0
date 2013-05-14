@@ -1,41 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 May 2013 10:46:58 +0200
-Subject: [PATCH 9/9] mfd: ab8500-core: Pass GPADC compatible string to MFD
- core
-In-Reply-To: <1368019749-19455-10-git-send-email-lee.jones@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 14 May 2013 09:47:56 +0100
+Subject: [PATCH 8/9] pinctrl: abx500: Rejiggle platform data and DT
+ initialisation
+In-Reply-To: <CACRpkdZTU1gv3onjFF4eqxv-o1BQwd48u4gQ9NWqryWoMiKTDQ@mail.gmail.com>
 References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
- <1368019749-19455-10-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdY8SLRR0HQvD5AFUeNeeHRVt3XM-MOkwJs_h_EfeRctKw@mail.gmail.com>
+ <1368019749-19455-9-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZTU1gv3onjFF4eqxv-o1BQwd48u4gQ9NWqryWoMiKTDQ@mail.gmail.com>
+Message-ID: <20130514084756.GE3297@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 8, 2013 at 3:29 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Tue, 14 May 2013, Linus Walleij wrote:
 
-> When booting with Device Tree enabled the MFD core uses each device's
-> compatible string to find and allocate its associated of_node pointer,
-> which in turn is passed to the driver via the platform_device struct.
-> Without it, the driver won't be able to interrogate the Device Tree or
-> locate suitable regulators and will most likely fail to probe.
->
-> Cc: Samuel Ortiz <sameo@linux.intel.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> On Wed, May 8, 2013 at 3:29 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > A pointer to GPIO platform data is always passed to the driver now, so
+> > there's little point in checking for 'pdata' and executing the DT case if
+> > it's not there. The difference between booting with DT and !DT is when
+> > booting with DT, plat_id is not populated. Thus, in the DT case we have
+> > to use a DT match table in order to find out which platform we're
+> > executing on. So, we're changing the semantics here to only use the
+> > match table if no plat_id is supplied though platform data.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Is this really included in the [0/9] fire alarm wrapper statement
+> "Important ux500 fixups due for the v3.10 -rc:s"?
+> 
+> It seems more like a random refactoring to me.
+> 
+> The commit message fails to specify which regression this
+> is fixing, like if it's causing an oops or so.
+> 
+> So I've tentatively applied it to the pinctrl devel branch for
+> v3.11 unless something comes up...
 
-Can you explain what regression this is causing since the GPADC
-driver (drivers/mfd/ab8500-gpadc.c) does not support device tree
-probing and does not have an .of_match_table defined in it's
-driver struct? I mean, what could possibly match that
-compatible string? The .name field will take care of naming
-the device does it not?
+Perhaps the commit message is a bit weak, but yes, it _needs_ to go
+into v3.10, or this driver will be _broken_ when we boot with DT.
 
-For non-emergency merging though:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Please apply this to your -fixes branch.
 
-Since it matches the example in
-Documentation/devicetree/bindings/mfd/ab8500.txt
-
-But for this to make sense the AB8500 ADC driver needs
-to be augmented for DT probing and preferrably also moved
-to drivers/adc and made to utilize that subsystem.
-
-Yours,
-Linus Walleij
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
