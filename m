@@ -1,22 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 May 2013 11:07:14 +0200
-Subject: [PATCH] pinctrl: vt8500: Fix incorrect data in WM8750 pinctrl
- table
-In-Reply-To: <1368207956-32220-1-git-send-email-linux@prisktech.co.nz>
-References: <1368207956-32220-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <CACRpkdZC4RC-OnGJYNooRRoc7q5d1x8PH26+cnwBHw8ppzynEg@mail.gmail.com>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Tue, 14 May 2013 17:08:31 +0800
+Subject: [PATCH v2] mmc: sdhci-sirf: let device core setup the default pin
+ configuration
+Message-ID: <1368522511-26491-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 10, 2013 at 7:45 PM, Tony Prisk <linux@prisktech.co.nz> wrote:
+With device core now able to setup the default pin configuration, the call
+to devm_pinctrl_get_select_default can be removed. And the pin configuration
+code based on the deprecated Samsung specific gpio bindings is also removed.
 
-> WMT_PIN_WAKEUP1 should be declared as WMT_PIN(0, 17) rather than
-> WMT_PIN(0, 16). This currently generates a runtime warning because
-> WMT_PIN_WAKEUP0 is already defined as WMT_PIN(0, 16).
->
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ -v2:
+ delete "#include <linux/pinctrl/consumer.h>"
 
-Applied to my fixes branch.
+ drivers/mmc/host/sdhci-sirf.c |    8 --------
+ 1 files changed, 0 insertions(+), 8 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
+index 09805af..ccf12dd 100644
+--- a/drivers/mmc/host/sdhci-sirf.c
++++ b/drivers/mmc/host/sdhci-sirf.c
+@@ -13,7 +13,6 @@
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
+ #include <linux/mmc/slot-gpio.h>
+-#include <linux/pinctrl/consumer.h>
+ #include "sdhci-pltfm.h"
+ 
+ struct sdhci_sirf_priv {
+@@ -46,15 +45,8 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
+ 	struct sdhci_host *host;
+ 	struct sdhci_pltfm_host *pltfm_host;
+ 	struct sdhci_sirf_priv *priv;
+-	struct pinctrl *pinctrl;
+ 	int ret;
+ 
+-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+-	if (IS_ERR(pinctrl)) {
+-		dev_err(&pdev->dev, "unable to get pinmux");
+-		return PTR_ERR(pinctrl);
+-	}
+-
+ 	priv = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_sirf_priv),
+ 		GFP_KERNEL);
+ 	if (!priv) {
+-- 
+1.7.4.1
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
