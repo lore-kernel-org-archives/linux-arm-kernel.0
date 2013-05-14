@@ -1,83 +1,115 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 14 May 2013 13:26:58 +0100
-Subject: [PATCH 3/3] ARM: vexpress: Add Cortex-R Series UART,
- selectable via DEBUG_LL
-In-Reply-To: <1368534418-11287-1-git-send-email-jonathan.austin@arm.com>
-References: <1368534418-11287-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <1368534418-11287-4-git-send-email-jonathan.austin@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 14 May 2013 14:30:59 +0200
+Subject: [PATCH] net/macb: fix ISR clear-on-write behavior only for some
+ SoC
+In-Reply-To: <5192224A.7090303@monstr.eu>
+References: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
+ <FE065E51-1EAA-47ED-8C7B-0F2E6418F349@jcrosoft.com>
+ <519200DA.8060102@atmel.com> <5192224A.7090303@monstr.eu>
+Message-ID: <51922E83.2060002@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex-R series processors on Versatile Express have a different memory
-map to the RS1 and CA9X4 tiles. Most of the platform difference can be
-expressed in device-trees, but the UART definitions for LL_DEBUG cannot.
+On 14/05/2013 13:38, Michal Simek :
+> On 05/14/2013 11:16 AM, Nicolas Ferre wrote:
+>> On 13/05/2013 18:05, Jean-Christophe PLAGNIOL-VILLARD :
+>>>
+>>> On May 14, 2013, at 12:05 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>>>
+>>>> Commit 749a2b6 (net/macb: clear tx/rx completion flags in ISR)
+>>>> introduces clear-on-write on ISR register. This behavior is not always
+>>>> implemented when using Cadence MACB/GEM and is breaking other platforms.
+>>>> We are using a new Device Tree compatibility string and a capability
+>>>> property to actually activate this clear-on-write behavior on ISR.
+>>>>
+>>>> Reported-by: Hein Tibosch <hein_tibosch@yahoo.es>
+>>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>>
+>>> can we detect it via the IP?
+>>
+>> As said by Hein, we cannot use the IP revision number. *But* we may have the opportunity to read this integration configuration in the Design Configuration Register 1 (DCFG1 already used for determining data bus width).
+>>
+>> So, Michal or Steffen, can you please tell me the value of:
+>> -> bit 23 at register address 0x280: mine is "1" which should mean "IRQ read clear", yours should be "0".
+>
+> here is the whole reg map for zynq.
+> Reg 0x280 is undocumented in our TRM.
+> Please decode it not sure if bit 0 is LSB or MSB.
 
-This patch defines the UART location for R-Series processors on
-versatile-express, allowing low-level debug and output from the decompressor.
-These definitions are selectable via Kconfig
+Bit 0 is LSB.
 
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
-CC: Pawel Moll <pawel.moll@arm.com>
----
- arch/arm/Kconfig.debug            |   10 +++++++++-
- arch/arm/include/debug/vexpress.S |   10 ++++++++++
- 2 files changed, 19 insertions(+), 1 deletion(-)
+Value of DCFG1 is 0x02500111 so I read '0' for this value which should 
+be good.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index ede909b..e2ab50a 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -476,6 +476,13 @@ choice
- 		  of the tiles using the RS1 memory map, including all new A-class
- 		  core tiles, FPGA-based SMMs and software models.
- 
-+	config DEBUG_VEXPRESS_UART0_CRX
-+		bool "Use PL011 UART0 at 0xb0090000 (Cortex-R compliant tiles)"
-+		depends on ARCH_VEXPRESS_NOMMU
-+		help
-+		  This option selects UART0 at 0xb0090000. This is appropriate for
-+		  Cortex-R series tiles and SMMs, such as Cortex-R5 and Cortex-R7
-+
- 	config DEBUG_VT8500_UART0
- 		bool "Use UART0 on VIA/Wondermedia SoCs"
- 		depends on ARCH_VT8500
-@@ -645,7 +652,8 @@ config DEBUG_LL_INCLUDE
- 	default "debug/tegra.S" if DEBUG_TEGRA_UART
- 	default "debug/ux500.S" if DEBUG_UX500_UART
- 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
--		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1
-+		DEBUG_VEXPRESS_UART0_CA9 || DEBUG_VEXPRESS_UART0_RS1 || \
-+		DEBUG_VEXPRESS_UART0_CRX
- 	default "debug/vt8500.S" if DEBUG_VT8500_UART0
- 	default "debug/zynq.S" if DEBUG_ZYNQ_UART0 || DEBUG_ZYNQ_UART1
- 	default "mach/debug-macro.S"
-diff --git a/arch/arm/include/debug/vexpress.S b/arch/arm/include/debug/vexpress.S
-index dc8e882..acafb22 100644
---- a/arch/arm/include/debug/vexpress.S
-+++ b/arch/arm/include/debug/vexpress.S
-@@ -16,6 +16,8 @@
- #define DEBUG_LL_PHYS_BASE_RS1		0x1c000000
- #define DEBUG_LL_UART_OFFSET_RS1	0x00090000
- 
-+#define DEBUG_LL_UART_PHYS_CRX		0xb0090000
-+
- #define DEBUG_LL_VIRT_BASE		0xf8000000
- 
- #if defined(CONFIG_DEBUG_VEXPRESS_UART0_DETECT)
-@@ -67,6 +69,14 @@
- 
- #include <asm/hardware/debug-pl01x.S>
- 
-+#elif defined(CONFIG_DEBUG_VEXPRESS_UART0_CRX)
-+
-+		.macro	addruart,rp,tmp,tmp2
-+		ldr	\rp, =DEBUG_LL_UART_PHYS_CRX
-+		.endm
-+
-+#include <asm/hardware/debug-pl01x.S>
-+
- #else /* CONFIG_DEBUG_LL_UART_NONE */
- 
- 		.macro	addruart, rp, rv, tmp
+I write a new patch immediately.
+
+
+> U-Boot-PetaLinux> md e000b000
+> e000b000: 0000001c 000e0013 00000006 00000000    ................
+> e000b010: 00180704 00000021 3ffba2e4 3ffbd32c    ....!......?,..?
+> e000b020: 00000003 00000000 00000000 00000000    ................
+> e000b030: 07ffffff 63c66f08 00000000 0000ffff    .....o.c........
+> e000b040: 000003ff 000003ff 00000000 00000000    ................
+> e000b050: 00000000 00000000 00000000 00000000    ................
+> e000b060: 00000000 00000000 00000000 00000000    ................
+> e000b070: 00000000 00000000 00000000 00000000    ................
+> e000b080: 00000000 00000000 00350a00 00001c48    ..........5.H...
+> e000b090: 00000000 00000000 00000000 00000000    ................
+> e000b0a0: 00000000 00000000 00000000 00000000    ................
+> e000b0b0: 00000000 00000000 00000000 00000000    ................
+> e000b0c0: 00000000 00000000 00000000 00000000    ................
+> e000b0d0: 00000000 00000000 00000000 00000000    ................
+> e000b0e0: 00000000 00000000 00000000 00000000    ................
+> e000b0f0: 00000000 00000000 00000000 00020118    ................
+> U-Boot-PetaLinux>
+> e000b100: 00014796 00000000 0000051e 00000001    .G..............
+> e000b110: 00000000 00000000 0000051d 00000001    ................
+> e000b120: 00000000 00000000 00000000 00000000    ................
+> e000b130: 00000000 00000000 00000000 00000000    ................
+> e000b140: 00000000 00000000 00000000 00000000    ................
+> e000b150: 001e58b6 00000000 00000526 00000000    .X......&.......
+> e000b160: 00000004 00000000 00000004 00000001    ................
+> e000b170: 00000000 00000004 00000000 0000051d    ................
+> e000b180: 00000000 00000000 00000000 00000000    ................
+> e000b190: 00000000 00000000 00000000 00000000    ................
+> e000b1a0: 00000038 00000000 00000000 00000000    8...............
+> e000b1b0: 00000000 00000000 00000000 00000000    ................
+> e000b1c0: 00000000 00000000 00000000 00000000    ................
+> e000b1d0: 00000000 00000000 00000000 00000000    ................
+> e000b1e0: 00000000 00000000 00000000 00000000    ................
+> e000b1f0: 00000000 00000000 00000000 00000000    ................
+> U-Boot-PetaLinux>
+> e000b200: 00000000 00000000 00000000 00000000    ................
+> e000b210: 00000000 00000000 00000000 00000000    ................
+> e000b220: 00000000 00000000 00000000 00000000    ................
+> e000b230: 00000000 00000000 00000000 00000000    ................
+> e000b240: 00000000 00000000 00000000 00000000    ................
+> e000b250: 00000000 00000000 00000000 00000000    ................
+> e000b260: 00000000 00000000 00000000 00000000    ................
+> e000b270: 00000000 00000000 00000000 00000000    ................
+> e000b280: 02500111 2ab13fff 00000000 00000000    ..P..?.*........
+> e000b290: 002f2145 00000200 00000000 00000000    E!/.............
+> e000b2a0: 00000000 00000000 00000000 00000000    ................
+> e000b2b0: 00000000 00000000 00000000 00000000    ................
+> e000b2c0: 00000000 00000000 00000000 00000000    ................
+> e000b2d0: 00000000 00000000 00000000 00000000    ................
+> e000b2e0: 00000000 00000000 00000000 00000000    ................
+> e000b2f0: 00000000 00000000 00000000 00000000    ................
+> U-Boot-PetaLinux>
+>
+>
+>
+>>
+>> Hein, in case of use of the MACB, we do not have this register included, so I will avoid to run the test when using MACB (we already have this information).
+>>
+>> If it works, I plan to rewrite the patch but taking this information instead of the device tree compatibility string.
+>
+> yep. Will be good to detect it instead of new compatible string.
+>
+> Also is there an option to remove "CONFIG_ARCH_AT91"?
+
+Okay, I have a look at this as-well.
+
+Best regards,
 -- 
-1.7.9.5
+Nicolas Ferre
