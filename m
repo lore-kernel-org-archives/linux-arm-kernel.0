@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 14 May 2013 17:38:39 +0200
-Subject: [PATCH 06/20] ARM: shmobile: kzm9g: Remove init_irq declaration in
+Date: Tue, 14 May 2013 17:38:41 +0200
+Subject: [PATCH 08/20] ARM: shmobile: emev2: Remove init_irq declaration in
  machine description
 In-Reply-To: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1368545933-7430-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1368545933-7430-9-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,28 +15,28 @@ declaration for shmobile as well.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-shmobile/board-kzm9g-reference.c | 2 --
+ arch/arm/mach-shmobile/setup-emev2.c | 2 --
  1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-index aefa50d..b7ee96e 100644
---- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-@@ -24,7 +24,6 @@
- #include <linux/gpio.h>
- #include <linux/io.h>
+diff --git a/arch/arm/mach-shmobile/setup-emev2.c b/arch/arm/mach-shmobile/setup-emev2.c
+index 899a86c..66694e0 100644
+--- a/arch/arm/mach-shmobile/setup-emev2.c
++++ b/arch/arm/mach-shmobile/setup-emev2.c
+@@ -20,7 +20,6 @@
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
  #include <linux/irq.h>
 -#include <linux/irqchip.h>
- #include <linux/input.h>
+ #include <linux/platform_device.h>
+ #include <linux/platform_data/gpio-em.h>
  #include <linux/of_platform.h>
- #include <linux/pinctrl/machine.h>
-@@ -100,7 +99,6 @@ DT_MACHINE_START(KZM9G_DT, "kzm9g-reference")
- 	.map_io		= sh73a0_map_io,
- 	.init_early	= sh73a0_init_delay,
+@@ -454,7 +453,6 @@ DT_MACHINE_START(EMEV2_DT, "Generic Emma Mobile EV2 (Flattened Device Tree)")
+ 	.smp		= smp_ops(emev2_smp_ops),
+ 	.init_early	= emev2_init_delay,
  	.nr_irqs	= NR_IRQS_LEGACY,
 -	.init_irq	= irqchip_init,
- 	.init_machine	= kzm_init,
- 	.init_time	= shmobile_timer_init,
- 	.dt_compat	= kzm9g_boards_compat_dt,
+ 	.init_machine	= emev2_add_standard_devices_dt,
+ 	.dt_compat	= emev2_boards_compat_dt,
+ MACHINE_END
 -- 
 1.8.1.2
