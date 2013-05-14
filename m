@@ -1,38 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 14 May 2013 18:00:12 +0100
-Subject: [PATCH] ARM: vfp: ensure VFP_arch is non-zero when VFP is not
- supported
-Message-ID: <1368550812-30492-1-git-send-email-will.deacon@arm.com>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Tue, 14 May 2013 10:01:51 -0700
+Subject: [PATCH v2] ARM: KVM: prevent NULL pointer dereferences with KVM
+ VCPU ioctl
+In-Reply-To: <5191E2BF.5040102@linaro.org>
+References: <1368052086-25059-1-git-send-email-andre.przywara@linaro.org>
+ <20130513055253.GC64337@ubuntu> <519167D3.4030600@linaro.org>
+ <CAEDV+gKTYCh8zTPJAxSmwhuyWo7K5Ej75giryR-pv5oqHdURSQ@mail.gmail.com>
+ <5191E2BF.5040102@linaro.org>
+Message-ID: <CAEDV+gJJzCB8HNDKhbVuGG7dOvqBS58PWD5McVBq2F5AmLBz2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit d3f79584a8b5 ("ARM: cleanup undefined instruction entry code")
-improved the register scheduling when handling undefined instructions.
-A side effect of this is that r5 is now used as a temporary, whilst the
-VFP probing code relies on r5 containing a non-zero value when VFP is
-not supported.
+On Tue, May 14, 2013 at 12:07 AM, Andre Przywara
+<andre.przywara@linaro.org> wrote:
+> On 05/14/2013 12:42 AM, Christoffer Dall wrote:
+>>
+>> On Mon, May 13, 2013 at 3:23 PM, Andre Przywara
+>> <andre.przywara@linaro.org> wrote:
+>>>
+>>> ooks like a natural candidate, but unfortunately struct kvm_vcpu is
+>>> opaque
+>>> here, so dereferencing it does not work without further changes which I
+>>> do
+>>> not deem to be justified. I used kvm_coproc.h instead, which is loosely
+>>> related (KVM_[SG]ET_ONE_REG) and just simply works. If you don't think
+>>> that's appropriate, just drop me a note. Patch follows in a separate
+>>> mail.
+>>
+>>
+>> eh, not crazy about the idea. x86 has
+>> arch/x86/include/asm/kvm_guest.h, which may be the most appropriate,
+>> or this could be generalized to other architectures as well and
+>> included in include/linux/kvm_host.h.
+>>
+>> we can just stick it in arch/arm/kvm/arm.c for now and move later if
+>> need be, no need to create a fuzz.
+>
+>
+> Ok, would you mind to commit v2 and add the "inline" on the way?
+>
+If it stays in arm.c it shouldn't have an inline on there, I'll commit
+the patch, thanks.
 
-This patch fixes the VFP detection code so that we don't rely on the
-contents of r5. Without this patch, Linux dies loudly on CPUs without
-VFP support.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/vfp/entry.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/vfp/entry.S b/arch/arm/vfp/entry.S
-index 323ce1a..46e1749 100644
---- a/arch/arm/vfp/entry.S
-+++ b/arch/arm/vfp/entry.S
-@@ -60,7 +60,7 @@ ENTRY(vfp_testing_entry)
- 	str	r11, [r10, #TI_PREEMPT]
- #endif
- 	ldr	r0, VFP_arch_address
--	str	r5, [r0]		@ known non-zero value
-+	str	r0, [r0]		@ set to non-zero value
- 	mov	pc, r9			@ we have handled the fault
- ENDPROC(vfp_testing_entry)
- 
--- 
-1.8.2.2
+-Christoffer
