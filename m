@@ -1,159 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 14 May 2013 11:20:00 +0200
-Subject: [RFC PATCH v3 05/17] ARM: dts: at91: cpus/cpu node dts updates
-In-Reply-To: <517E4366.4040209@atmel.com>
-References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1366824502-19729-6-git-send-email-lorenzo.pieralisi@arm.com>
- <517E4366.4040209@atmel.com>
-Message-ID: <519201C0.2060908@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 14 May 2013 10:19:56 +0100
+Subject: [GIT PULL] MFD: Fixes due for the v3.10 -rc:s
+Message-ID: <20130514091956.GG3297@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/04/2013 11:54, Nicolas Ferre :
-> On 04/24/2013 07:28 PM, Lorenzo Pieralisi :
->> This patch updates the in-kernel dts files according to the latest cpus
->> and cpu bindings updates for ARM.
->>
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->
-> With changes in compatible string... ok then.
->
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
-Now that our Cortex-A5 is in mainline, can you please update the:
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
 
-arch/arm/boot/dts/sama5d3.dtsi
+are available in the git repository at:
 
-as-well?
+  git://git.linaro.org/people/ljones/mfd.git for-mfd-fixes
 
-Thanks, best regards,
+for you to fetch changes up to bc475aeb21c85f956c98014cae887f311c68b192:
 
->> ---
->>   arch/arm/boot/dts/at91rm9200.dtsi  | 6 +++++-
->>   arch/arm/boot/dts/at91sam9260.dtsi | 8 ++++++--
->>   arch/arm/boot/dts/at91sam9263.dtsi | 8 ++++++--
->>   arch/arm/boot/dts/at91sam9g45.dtsi | 8 ++++++--
->>   arch/arm/boot/dts/at91sam9n12.dtsi | 8 ++++++--
->>   arch/arm/boot/dts/at91sam9x5.dtsi  | 8 ++++++--
->>   6 files changed, 35 insertions(+), 11 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
->> index b0268a5..f16b3d4 100644
->> --- a/arch/arm/boot/dts/at91rm9200.dtsi
->> +++ b/arch/arm/boot/dts/at91rm9200.dtsi
->> @@ -34,8 +34,12 @@
->>   		ssc2 = &ssc2;
->>   	};
->>   	cpus {
->> -		cpu at 0 {
->> +		#address-cells = <0>;
->> +		#size-cells = <0>;
->> +
->> +		cpu {
->>   			compatible = "arm,arm920t";
->> +			device_type = "cpu";
->>   		};
->>   	};
->>
->> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
->> index cb7bcc5..c4eeef7 100644
->> --- a/arch/arm/boot/dts/at91sam9260.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
->> @@ -32,8 +32,12 @@
->>   		ssc0 = &ssc0;
->>   	};
->>   	cpus {
->> -		cpu at 0 {
->> -			compatible = "arm,arm926ejs";
->> +		#address-cells = <0>;
->> +		#size-cells = <0>;
->> +
->> +		cpu {
->> +			compatible = "arm,arm926ej-s";
->> +			device_type = "cpu";
->>   		};
->>   	};
->>
->> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
->> index 271d4de..f3b5c2a 100644
->> --- a/arch/arm/boot/dts/at91sam9263.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
->> @@ -29,8 +29,12 @@
->>   		ssc1 = &ssc1;
->>   	};
->>   	cpus {
->> -		cpu at 0 {
->> -			compatible = "arm,arm926ejs";
->> +		#address-cells = <0>;
->> +		#size-cells = <0>;
->> +
->> +		cpu {
->> +			compatible = "arm,arm926ej-s";
->> +			device_type = "cpu";
->>   		};
->>   	};
->>
->> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
->> index 6b1d4ca..6c18bd3 100644
->> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
->> @@ -35,8 +35,12 @@
->>   		ssc1 = &ssc1;
->>   	};
->>   	cpus {
->> -		cpu at 0 {
->> -			compatible = "arm,arm926ejs";
->> +		#address-cells = <0>;
->> +		#size-cells = <0>;
->> +
->> +		cpu {
->> +			compatible = "arm,arm926ej-s";
->> +			device_type = "cpu";
->>   		};
->>   	};
->>
->> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
->> index 7750f98..c3b11af 100644
->> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
->> @@ -31,8 +31,12 @@
->>   		ssc0 = &ssc0;
->>   	};
->>   	cpus {
->> -		cpu at 0 {
->> -			compatible = "arm,arm926ejs";
->> +		#address-cells = <0>;
->> +		#size-cells = <0>;
->> +
->> +		cpu {
->> +			compatible = "arm,arm926ej-s";
->> +			device_type = "cpu";
->>   		};
->>   	};
->>
->> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
->> index aa98e64..6c39d0f 100644
->> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
->> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
->> @@ -33,8 +33,12 @@
->>   		ssc0 = &ssc0;
->>   	};
->>   	cpus {
->> -		cpu at 0 {
->> -			compatible = "arm,arm926ejs";
->> +		#address-cells = <0>;
->> +		#size-cells = <0>;
->> +
->> +		cpu {
->> +			compatible = "arm,arm926ej-s";
->> +			device_type = "cpu";
->>   		};
->>   	};
->>
->>
->
->
+  mfd: db8500-prcmu: Supply the pdata_size attribute for db8500-thermal (2013-05-14 09:58:15 +0100)
 
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      mfd: ab8500: Debugfs code depends on gpadc
+
+Fabio Baltieri (4):
+      mfd: abx500-core: Fix sparse warning
+      mfd: ab8500-sysctrl: Fix sparse warning
+      mfd: ab8500-sysctrl: Set sysctrl_dev during probe
+      mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
+
+Lee Jones (3):
+      mfd: ab8500-gpadc: Suppress 'ignoring regulator_enable() return value' warning
+      mfd: ab8500-core: Use the correct driver name when enabling gpio/pinctrl
+      mfd: db8500-prcmu: Supply the pdata_size attribute for db8500-thermal
+
+Linus Walleij (1):
+      mfd: ab8500: Pass AB8500 IRQ to debugfs code by resource
+
+ drivers/mfd/Kconfig          |    2 +-
+ drivers/mfd/ab8500-core.c    |   21 ++++++++++++++++++---
+ drivers/mfd/ab8500-debugfs.c |   16 ++++++++++++----
+ drivers/mfd/ab8500-gpadc.c   |    7 +++++--
+ drivers/mfd/ab8500-sysctrl.c |    9 +++++----
+ drivers/mfd/abx500-core.c    |    2 +-
+ drivers/mfd/db8500-prcmu.c   |    1 +
+ 7 files changed, 43 insertions(+), 15 deletions(-)
 
 -- 
-Nicolas Ferre
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
