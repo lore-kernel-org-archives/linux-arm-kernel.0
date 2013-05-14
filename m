@@ -1,35 +1,34 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 May 2013 15:13:36 +0100
-Subject: [PATCH v4 08/32] arm64: KVM: user space interface
+Date: Tue, 14 May 2013 15:13:35 +0100
+Subject: [PATCH v4 07/32] arm64: KVM: architecture specific MMU backend
 In-Reply-To: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
 References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1368540840-26750-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1368540840-26750-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the kvm.h file that defines the user space visible
-interface.
+Define the arm64 specific MMU backend:
+- HYP/kernel VA offset
+- S2 4/64kB definitions
+- S2 page table populating and flushing
+- icache cleaning
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/uapi/asm/kvm.h | 117 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 117 insertions(+)
- create mode 100644 arch/arm64/include/uapi/asm/kvm.h
+ arch/arm64/include/asm/kvm_mmu.h | 135 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 135 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_mmu.h
 
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
 new file mode 100644
-index 0000000..4e64570
+index 0000000..efe609c
 --- /dev/null
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -0,0 +1,117 @@
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -0,0 +1,135 @@
 +/*
 + * Copyright (C) 2012,2013 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * Derived from arch/arm/include/uapi/asm/kvm.h:
-+ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -44,101 +43,123 @@ index 0000000..4e64570
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#ifndef __ARM_KVM_H__
-+#define __ARM_KVM_H__
++#ifndef __ARM64_KVM_MMU_H__
++#define __ARM64_KVM_MMU_H__
 +
-+#define KVM_SPSR_EL1	0
-+#define KVM_NR_SPSR	1
++#include <asm/page.h>
++#include <asm/memory.h>
 +
-+#ifndef __ASSEMBLY__
-+#include <asm/types.h>
-+#include <asm/ptrace.h>
++/*
++ * As we only have the TTBR0_EL2 register, we cannot express
++ * "negative" addresses. This makes it impossible to directly share
++ * mappings with the kernel.
++ *
++ * Instead, give the HYP mode its own VA region at a fixed offset from
++ * the kernel by just masking the top bits (which are all ones for a
++ * kernel address).
++ */
++#define HYP_PAGE_OFFSET_SHIFT	VA_BITS
++#define HYP_PAGE_OFFSET_MASK	((UL(1) << HYP_PAGE_OFFSET_SHIFT) - 1)
++#define HYP_PAGE_OFFSET		(PAGE_OFFSET & HYP_PAGE_OFFSET_MASK)
 +
-+#define __KVM_HAVE_GUEST_DEBUG
-+#define __KVM_HAVE_IRQ_LINE
++/*
++ * Our virtual mapping for the idmap-ed MMU-enable code. Must be
++ * shared across all the page-tables. Conveniently, we use the last
++ * possible page, where no kernel mapping will ever exist.
++ */
++#define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
 +
-+#define KVM_REG_SIZE(id)						\
-+	(1U << (((id) & KVM_REG_SIZE_MASK) >> KVM_REG_SIZE_SHIFT))
++#ifdef __ASSEMBLY__
 +
-+struct kvm_regs {
-+	struct user_pt_regs regs;	/* sp = sp_el0 */
++/*
++ * Convert a kernel VA into a HYP VA.
++ * reg: VA to be converted.
++ */
++.macro kern_hyp_va	reg
++	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
++.endm
 +
-+	__u64	sp_el1;
-+	__u64	elr_el1;
++#else
 +
-+	__u64	spsr[KVM_NR_SPSR];
++#include <asm/cachetype.h>
++#include <asm/cacheflush.h>
 +
-+	struct user_fpsimd_state fp_regs;
-+};
++#define KERN_TO_HYP(kva)	((unsigned long)kva - PAGE_OFFSET + HYP_PAGE_OFFSET)
 +
-+/* Supported Processor Types */
-+#define KVM_ARM_TARGET_AEM_V8		0
-+#define KVM_ARM_TARGET_FOUNDATION_V8	1
-+#define KVM_ARM_TARGET_CORTEX_A57	2
++/*
++ * Align KVM with the kernel's view of physical memory. Should be
++ * 40bit IPA, with PGD being 8kB aligned in the 4KB page configuration.
++ */
++#define KVM_PHYS_SHIFT	PHYS_MASK_SHIFT
++#define KVM_PHYS_SIZE	(1UL << KVM_PHYS_SHIFT)
++#define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1UL)
 +
-+#define KVM_ARM_NUM_TARGETS		3
++/* Make sure we get the right size, and thus the right alignment */
++#define PTRS_PER_S2_PGD (1 << (KVM_PHYS_SHIFT - PGDIR_SHIFT))
++#define S2_PGD_ORDER	get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
 +
-+/* KVM_ARM_SET_DEVICE_ADDR ioctl id encoding */
-+#define KVM_ARM_DEVICE_TYPE_SHIFT	0
-+#define KVM_ARM_DEVICE_TYPE_MASK	(0xffff << KVM_ARM_DEVICE_TYPE_SHIFT)
-+#define KVM_ARM_DEVICE_ID_SHIFT		16
-+#define KVM_ARM_DEVICE_ID_MASK		(0xffff << KVM_ARM_DEVICE_ID_SHIFT)
++int create_hyp_mappings(void *from, void *to);
++int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
++void free_boot_hyp_pgd(void);
++void free_hyp_pgds(void);
 +
-+/* Supported device IDs */
-+#define KVM_ARM_DEVICE_VGIC_V2		0
++int kvm_alloc_stage2_pgd(struct kvm *kvm);
++void kvm_free_stage2_pgd(struct kvm *kvm);
++int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
++			  phys_addr_t pa, unsigned long size);
 +
-+/* Supported VGIC address types  */
-+#define KVM_VGIC_V2_ADDR_TYPE_DIST	0
-+#define KVM_VGIC_V2_ADDR_TYPE_CPU	1
++int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
 +
-+#define KVM_VGIC_V2_DIST_SIZE		0x1000
-+#define KVM_VGIC_V2_CPU_SIZE		0x2000
++void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
 +
-+struct kvm_vcpu_init {
-+	__u32 target;
-+	__u32 features[7];
-+};
++phys_addr_t kvm_mmu_get_httbr(void);
++phys_addr_t kvm_mmu_get_boot_httbr(void);
++phys_addr_t kvm_get_idmap_vector(void);
++int kvm_mmu_init(void);
++void kvm_clear_hyp_idmap(void);
 +
-+struct kvm_sregs {
-+};
++#define	kvm_set_pte(ptep, pte)		set_pte(ptep, pte)
 +
-+struct kvm_fpu {
-+};
++static inline bool kvm_is_write_fault(unsigned long esr)
++{
++	unsigned long esr_ec = esr >> ESR_EL2_EC_SHIFT;
 +
-+struct kvm_guest_debug_arch {
-+};
++	if (esr_ec == ESR_EL2_EC_IABT)
++		return false;
 +
-+struct kvm_debug_exit_arch {
-+};
++	if ((esr & ESR_EL2_ISV) && !(esr & ESR_EL2_WNR))
++		return false;
 +
-+struct kvm_sync_regs {
-+};
++	return true;
++}
 +
-+struct kvm_arch_memory_slot {
-+};
++static inline void kvm_clean_dcache_area(void *addr, size_t size) {}
++static inline void kvm_clean_pgd(pgd_t *pgd) {}
++static inline void kvm_clean_pmd_entry(pmd_t *pmd) {}
++static inline void kvm_clean_pte(pte_t *pte) {}
++static inline void kvm_clean_pte_entry(pte_t *pte) {}
 +
-+/* KVM_IRQ_LINE irq field index values */
-+#define KVM_ARM_IRQ_TYPE_SHIFT		24
-+#define KVM_ARM_IRQ_TYPE_MASK		0xff
-+#define KVM_ARM_IRQ_VCPU_SHIFT		16
-+#define KVM_ARM_IRQ_VCPU_MASK		0xff
-+#define KVM_ARM_IRQ_NUM_SHIFT		0
-+#define KVM_ARM_IRQ_NUM_MASK		0xffff
++static inline void kvm_set_s2pte_writable(pte_t *pte)
++{
++	pte_val(*pte) |= PTE_S2_RDWR;
++}
 +
-+/* irq_type field */
-+#define KVM_ARM_IRQ_TYPE_CPU		0
-+#define KVM_ARM_IRQ_TYPE_SPI		1
-+#define KVM_ARM_IRQ_TYPE_PPI		2
++struct kvm;
 +
-+/* out-of-kernel GIC cpu interrupt injection irq_number field */
-+#define KVM_ARM_IRQ_CPU_IRQ		0
-+#define KVM_ARM_IRQ_CPU_FIQ		1
++static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
++{
++	if (!icache_is_aliasing()) {		/* PIPT */
++		unsigned long hva = gfn_to_hva(kvm, gfn);
++		flush_icache_range(hva, hva + PAGE_SIZE);
++	} else if (!icache_is_aivivt()) {	/* non ASID-tagged VIVT */
++		/* any kind of VIPT cache */
++		__flush_icache_all();
++	}
++}
 +
-+/* Highest supported SPI, from VGIC_NR_IRQS */
-+#define KVM_ARM_IRQ_GIC_MAX		127
++#define kvm_flush_dcache_to_poc(a,l)	__flush_dcache_area((a), (l))
 +
-+#endif
-+
-+#endif /* __ARM_KVM_H__ */
++#endif /* __ASSEMBLY__ */
++#endif /* __ARM64_KVM_MMU_H__ */
 -- 
 1.8.2.3
