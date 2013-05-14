@@ -1,29 +1,45 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 14 May 2013 11:10:35 +0530
-Subject: [GIT PULL] Late Exynos stuff for v3.10
-In-Reply-To: <046301ce4d15$ac1592b0$0440b810$%kim@samsung.com>
-References: <5176B499.1000208@samsung.com> <51770697.7080504@samsung.com>
- <20130424000638.GA9067@quad.lixom.net> <51794E10.1010205@samsung.com>
- <CAOesGMjA5_XUXMcCL3roZiLC1S=ypMoVHn2tF7bzUuKr+eLw2A@mail.gmail.com>
- <046301ce4d15$ac1592b0$0440b810$%kim@samsung.com>
-Message-ID: <5191CE53.5050902@linaro.org>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Tue, 14 May 2013 13:49:09 +0800
+Subject: [PATCH] mmc: sdhci-sirf: let device core setup the default pin
+ configuration
+Message-ID: <1368510549-7230-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Refresh my memory here, what was the reason for dropping the USB DTS
->> updates? (Yes, I am aware it might because I asked you not to send
->> them in but I don't remember :-).
->>
-> Hmm...let me see, yeah, the USB DTS updates dropped because of late
-> pull-request stuff as you concerned.
-> http://www.spinics.net/lists/arm-kernel/msg240105.html
-> 
-> Since I didn't want to make a noise at that time, so I dropped for v3.10, it
-> has been included in my tree for some time though.
-> 
+With device core now able to setup the default pin configuration, the call
+to devm_pinctrl_get_select_default can be removed. And the pin configuration
+code based on the deprecated Samsung specific gpio bindings is also removed.
 
-Will it be possible to queue them up for one of the RC releases? They
-are only DTS entries, the drivers have already been merged.
+CC: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/mmc/host/sdhci-sirf.c |    7 -------
+ 1 files changed, 0 insertions(+), 7 deletions(-)
 
+diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
+index 09805af..04c81cf 100644
+--- a/drivers/mmc/host/sdhci-sirf.c
++++ b/drivers/mmc/host/sdhci-sirf.c
+@@ -46,15 +46,8 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
+ 	struct sdhci_host *host;
+ 	struct sdhci_pltfm_host *pltfm_host;
+ 	struct sdhci_sirf_priv *priv;
+-	struct pinctrl *pinctrl;
+ 	int ret;
+ 
+-	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+-	if (IS_ERR(pinctrl)) {
+-		dev_err(&pdev->dev, "unable to get pinmux");
+-		return PTR_ERR(pinctrl);
+-	}
+-
+ 	priv = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_sirf_priv),
+ 		GFP_KERNEL);
+ 	if (!priv) {
 -- 
-Tushar Behera
+1.7.4.1
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
