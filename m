@@ -1,10 +1,10 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 14 May 2013 17:38:40 +0200
-Subject: [PATCH 07/20] ARM: shmobile: lager: Remove init_irq declaration in
+Date: Tue, 14 May 2013 17:38:44 +0200
+Subject: [PATCH 11/20] ARM: shmobile: sh73a0: Remove init_irq declaration in
  machine description
 In-Reply-To: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1368545933-7430-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1368545933-7430-12-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,28 +15,28 @@ declaration for shmobile as well.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/mach-shmobile/board-lager.c | 2 --
+ arch/arm/mach-shmobile/setup-sh73a0.c | 2 --
  1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index f587187..b7488b8 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -19,7 +19,6 @@
-  */
- 
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index fdf3894..73dd75b 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -22,7 +22,6 @@
+ #include <linux/init.h>
  #include <linux/interrupt.h>
+ #include <linux/irq.h>
 -#include <linux/irqchip.h>
- #include <linux/kernel.h>
  #include <linux/platform_device.h>
- #include <mach/common.h>
-@@ -39,7 +38,6 @@ static const char *lager_boards_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(LAGER_DT, "lager")
+ #include <linux/of_platform.h>
+ #include <linux/delay.h>
+@@ -1035,7 +1034,6 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
+ 	.map_io		= sh73a0_map_io,
+ 	.init_early	= sh73a0_init_delay,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
 -	.init_irq	= irqchip_init,
- 	.init_time	= r8a7790_timer_init,
- 	.init_machine	= lager_add_standard_devices,
- 	.dt_compat	= lager_boards_compat_dt,
+ 	.init_machine	= sh73a0_add_standard_devices_dt,
+ 	.dt_compat	= sh73a0_boards_compat_dt,
+ MACHINE_END
 -- 
 1.8.1.2
