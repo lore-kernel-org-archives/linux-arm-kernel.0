@@ -1,45 +1,33 @@
-From: Baohua.Song@csr.com (Barry Song)
-Date: Tue, 14 May 2013 13:49:09 +0800
-Subject: [PATCH] mmc: sdhci-sirf: let device core setup the default pin
- configuration
-Message-ID: <1368510549-7230-1-git-send-email-Baohua.Song@csr.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 13 May 2013 23:56:16 -0600
+Subject: [PATCH] ARM: PL011: add support for extended FIFO-size of
+ PL011-r1p5
+In-Reply-To: <007301ce375e$bcf6d6b0$36e48410$@lge.com>
+References: <007301ce375e$bcf6d6b0$36e48410$@lge.com>
+Message-ID: <5191D200.3040604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With device core now able to setup the default pin configuration, the call
-to devm_pinctrl_get_select_default can be removed. And the pin configuration
-code based on the deprecated Samsung specific gpio bindings is also removed.
+On 04/12/2013 03:18 AM, Jongsung Kim wrote:
+> The latest r1p5-revision of the ARM PL011 UART has 32-byte FIFOs, while all
+> earlier ones have 16-byte FIFOs. This patch suggests a way to set the
+> FIFO-size correctly & flexibly by using a
+> function(vendor_data::get_fifosize) rather than using the
+> vendor_data::fifosize variable. The function takes the UARTPeriphID, and
+> returns the correct size.
 
-CC: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/mmc/host/sdhci-sirf.c |    7 -------
- 1 files changed, 0 insertions(+), 7 deletions(-)
+This change (now part of 3.10-rc1) breaks the serial port on the BCM2835
+ARM SoC (part of the Raspberry Pi). Sorry for not noticing this earlier;
+a combination of my vacation and laziness I guess.
 
-diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
-index 09805af..04c81cf 100644
---- a/drivers/mmc/host/sdhci-sirf.c
-+++ b/drivers/mmc/host/sdhci-sirf.c
-@@ -46,15 +46,8 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
- 	struct sdhci_host *host;
- 	struct sdhci_pltfm_host *pltfm_host;
- 	struct sdhci_sirf_priv *priv;
--	struct pinctrl *pinctrl;
- 	int ret;
- 
--	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
--	if (IS_ERR(pinctrl)) {
--		dev_err(&pdev->dev, "unable to get pinmux");
--		return PTR_ERR(pinctrl);
--	}
--
- 	priv = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_sirf_priv),
- 		GFP_KERNEL);
- 	if (!priv) {
--- 
-1.7.4.1
+For reference, the AMBA periphid of the UART device there is 0x00341011.
+The nibble "3" is the revision being tested in:
 
+> +static unsigned int get_fifosize_arm(unsigned int periphid)
+> +{
+> +	unsigned int rev = (periphid >> 20) & 0xf;
+> +	return rev < 3 ? 16 : 32;
+> +}
 
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Should that be <= not <, or is there just something more wrong in the
+patch or bcm2835 HW? I wonder how r1p5 maps to 3 in the test above.
