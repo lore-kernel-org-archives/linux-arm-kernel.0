@@ -1,106 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 14 May 2013 17:38:17 +0900
-Subject: [PATCH 3/3] ARM: mach-shmobile: lager: support GPIO switches
-In-Reply-To: <CANqRtoTj+FnxrtOayxQYCxkyuP4XGeCaXpNUbPsFV4kyBD_48Q@mail.gmail.com>
-References: <1368435233-8587-1-git-send-email-horms+renesas@verge.net.au>
- <1368435233-8587-4-git-send-email-horms+renesas@verge.net.au>
- <9256981.LFpgU8cctr@avalon> <20130514025941.GC20239@verge.net.au>
- <CANqRtoTj+FnxrtOayxQYCxkyuP4XGeCaXpNUbPsFV4kyBD_48Q@mail.gmail.com>
-Message-ID: <20130514083816.GB24811@verge.net.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 May 2013 10:40:10 +0200
+Subject: [PATCH 8/9] pinctrl: abx500: Rejiggle platform data and DT
+ initialisation
+In-Reply-To: <1368019749-19455-9-git-send-email-lee.jones@linaro.org>
+References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
+ <1368019749-19455-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZTU1gv3onjFF4eqxv-o1BQwd48u4gQ9NWqryWoMiKTDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 03:09:08PM +0900, Magnus Damm wrote:
-> Hi Simon and Laurent,
-> 
-> On Tue, May 14, 2013 at 11:59 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Tue, May 14, 2013 at 12:35:20AM +0200, Laurent Pinchart wrote:
-> >> Hi Simon,
-> >>
-> >> Thank you for the patch.
-> >>
-> >> On Monday 13 May 2013 17:53:53 Simon Horman wrote:
-> >> > The lager board has pins 1 - 4 of SW2 wired up to GPIO pins.
-> >> > This patch allows access to those pins as KEYS 1 - 4 using
-> >> > gpio-keys.
-> >> >
-> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >> >
-> >> > ---
-> >> >
-> >> > This patch has run time dependencies on
-> >> > 1. "gpio-rcar: Add support for IRQ_TYPE_EDGE_BOTH"
-> >> > 2. "ARM: shmobile: r8a7790: Configure R-Car GPIO for IRQ_TYPE_EDGE_BOTH"
-> >> >
-> >> > Without those dependencies satisfied the gpio-keys driver will
-> >> > fail to be initialise itself. The boot should be otherwise successful
-> >> > and the board otherwise functional.
-> >> > ---
-> >> >  arch/arm/mach-shmobile/board-lager.c | 22 ++++++++++++++++++++++
-> >> >  1 file changed, 22 insertions(+)
-> >> >
-> >> > diff --git a/arch/arm/mach-shmobile/board-lager.c
-> >> > b/arch/arm/mach-shmobile/board-lager.c index 6a1ba38..4d1b42b 100644
-> >> > --- a/arch/arm/mach-shmobile/board-lager.c
-> >> > +++ b/arch/arm/mach-shmobile/board-lager.c
-> >> > @@ -18,7 +18,10 @@
-> >> >   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301
-> >> > USA */
-> >> >
-> >> > +#include <linux/gpio.h>
-> >> > +#include <linux/gpio_keys.h>
-> >> >  #include <linux/interrupt.h>
-> >> > +#include <linux/input.h>
-> >>
-> >> My dictionary lists input before interrupt :-)
-> >
-> > Thanks, I will fix that.
-> >
-> >> >  #include <linux/irqchip.h>
-> >> >  #include <linux/kernel.h>
-> >> >  #include <linux/leds.h>
-> >> > @@ -52,6 +55,22 @@ static struct gpio_led_platform_data lager_leds_pdata = {
-> >> > .num_leds   = ARRAY_SIZE(lager_leds),
-> >> >  };
-> >> >
-> >> > +/* GPIO KEY */
-> >> > +#define GPIO_KEY(c, g, d, ...) \
-> >> > +   { .code = c, .gpio = g, .desc = d, .active_low = 1 }
-> >> > +
-> >> > +static struct gpio_keys_button gpio_buttons[] = {
-> >> > +   GPIO_KEY(KEY_4,         RCAR_GP_PIN(1, 28),     "SW2-pin4"),
-> >> > +   GPIO_KEY(KEY_3,         RCAR_GP_PIN(1, 26),     "SW2-pin3"),
-> >> > +   GPIO_KEY(KEY_2,         RCAR_GP_PIN(1, 24),     "SW2-pin2"),
-> >> > +   GPIO_KEY(KEY_1,         RCAR_GP_PIN(1, 14),     "SW2-pin1"),
-> >> > +};
-> >> > +
-> >> > +static struct gpio_keys_platform_data lager_keys_pdata = {
-> >> > +   .buttons        = gpio_buttons,
-> >> > +   .nbuttons       = ARRAY_SIZE(gpio_buttons),
-> >> > +};
-> >> > +
-> >>
-> >> Could you please also update the lager dts file ?
-> >
-> > I wonder if in that case we can remove the C code above.
-> > And probably the C code for the GPIO leds too.
-> >
-> > Magnus, could you clarify how you would like
-> > C-code and DTS to look on the lager board?
-> 
-> I'd like C and DTS to coexist in parallel until we can ditch C fully.
-> I believe there is a need for us to be able to back port the C code.
-> For the future we want to use DTS.
-> 
-> To support DTS for Lager I think you should create a -reference DTS
-> file for Lager where you put the DT version of your GPIO LED / switch
-> code. At the time when we can configure the PFC via PINCTRL DT then I
-> believe we should be able to replace most of the platform device code
-> with DT versions. At that we should hopefully be able to ditch all the
-> C board code, or maybe we need to keep some around until we have the
-> common clocks going...
+On Wed, May 8, 2013 at 3:29 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Hi Magnus,
+> A pointer to GPIO platform data is always passed to the driver now, so
+> there's little point in checking for 'pdata' and executing the DT case if
+> it's not there. The difference between booting with DT and !DT is when
+> booting with DT, plat_id is not populated. Thus, in the DT case we have
+> to use a DT match table in order to find out which platform we're
+> executing on. So, we're changing the semantics here to only use the
+> match table if no plat_id is supplied though platform data.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-thanks for the clarification. That all sounds reasonable
-and I will see about making it so.
+Is this really included in the [0/9] fire alarm wrapper statement
+"Important ux500 fixups due for the v3.10 -rc:s"?
+
+It seems more like a random refactoring to me.
+
+The commit message fails to specify which regression this
+is fixing, like if it's causing an oops or so.
+
+So I've tentatively applied it to the pinctrl devel branch for
+v3.11 unless something comes up...
+
+Yours,
+Linus Walleij
