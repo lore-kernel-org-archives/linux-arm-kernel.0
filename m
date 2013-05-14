@@ -1,35 +1,167 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Tue, 14 May 2013 11:34:45 +0200
-Subject: [PATCH] ARM: mach-bcm: drop "select GPIO_BCM"
-Message-ID: <1368524085.1350.102.camel@x61.thuisdomein>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 14 May 2013 10:34:40 +0100
+Subject: [RFC PATCH v3 05/17] ARM: dts: at91: cpus/cpu node dts updates
+In-Reply-To: <519201C0.2060908@atmel.com>
+References: <1366824502-19729-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1366824502-19729-6-git-send-email-lorenzo.pieralisi@arm.com>
+ <517E4366.4040209@atmel.com> <519201C0.2060908@atmel.com>
+Message-ID: <20130514093440.GA27767@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A select statement for the Kconfig symbol GPIO_BCM was added in v3.8.
-But there's no symbol with that name. It's a nop so we can drop it.
+On Tue, May 14, 2013 at 10:20:00AM +0100, Nicolas Ferre wrote:
+> On 29/04/2013 11:54, Nicolas Ferre :
+> > On 04/24/2013 07:28 PM, Lorenzo Pieralisi :
+> >> This patch updates the in-kernel dts files according to the latest cpus
+> >> and cpu bindings updates for ARM.
+> >>
+> >> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >
+> > With changes in compatible string... ok then.
+> >
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Now that our Cortex-A5 is in mainline, can you please update the:
+> 
+> arch/arm/boot/dts/sama5d3.dtsi
+> 
+> as-well?
 
-Signed-off-by: Paul Bolle <pebolle@tiscali.nl>
----
-0) Untested.
+I will, no problems.
 
-1) Patch assumes that https://lkml.org/lkml/2013/3/6/182 ("ARM:
-mach-bcm: drop "select GENERIC_TIME""), which got a Reviewed-by tag from
-Christian, was applied first.
+> Thanks, best regards,
 
- arch/arm/mach-bcm/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+Cheers,
+Lorenzo
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 764273e..322620d 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -8,7 +8,6 @@ config ARCH_BCM
- 	select CPU_V7
- 	select CLKSRC_OF
- 	select GENERIC_CLOCKEVENTS
--	select GPIO_BCM
- 	select SPARSE_IRQ
- 	select TICK_ONESHOT
- 	help
--- 
-1.7.11.7
+> 
+> >> ---
+> >>   arch/arm/boot/dts/at91rm9200.dtsi  | 6 +++++-
+> >>   arch/arm/boot/dts/at91sam9260.dtsi | 8 ++++++--
+> >>   arch/arm/boot/dts/at91sam9263.dtsi | 8 ++++++--
+> >>   arch/arm/boot/dts/at91sam9g45.dtsi | 8 ++++++--
+> >>   arch/arm/boot/dts/at91sam9n12.dtsi | 8 ++++++--
+> >>   arch/arm/boot/dts/at91sam9x5.dtsi  | 8 ++++++--
+> >>   6 files changed, 35 insertions(+), 11 deletions(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+> >> index b0268a5..f16b3d4 100644
+> >> --- a/arch/arm/boot/dts/at91rm9200.dtsi
+> >> +++ b/arch/arm/boot/dts/at91rm9200.dtsi
+> >> @@ -34,8 +34,12 @@
+> >>   		ssc2 = &ssc2;
+> >>   	};
+> >>   	cpus {
+> >> -		cpu at 0 {
+> >> +		#address-cells = <0>;
+> >> +		#size-cells = <0>;
+> >> +
+> >> +		cpu {
+> >>   			compatible = "arm,arm920t";
+> >> +			device_type = "cpu";
+> >>   		};
+> >>   	};
+> >>
+> >> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> >> index cb7bcc5..c4eeef7 100644
+> >> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+> >> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> >> @@ -32,8 +32,12 @@
+> >>   		ssc0 = &ssc0;
+> >>   	};
+> >>   	cpus {
+> >> -		cpu at 0 {
+> >> -			compatible = "arm,arm926ejs";
+> >> +		#address-cells = <0>;
+> >> +		#size-cells = <0>;
+> >> +
+> >> +		cpu {
+> >> +			compatible = "arm,arm926ej-s";
+> >> +			device_type = "cpu";
+> >>   		};
+> >>   	};
+> >>
+> >> diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+> >> index 271d4de..f3b5c2a 100644
+> >> --- a/arch/arm/boot/dts/at91sam9263.dtsi
+> >> +++ b/arch/arm/boot/dts/at91sam9263.dtsi
+> >> @@ -29,8 +29,12 @@
+> >>   		ssc1 = &ssc1;
+> >>   	};
+> >>   	cpus {
+> >> -		cpu at 0 {
+> >> -			compatible = "arm,arm926ejs";
+> >> +		#address-cells = <0>;
+> >> +		#size-cells = <0>;
+> >> +
+> >> +		cpu {
+> >> +			compatible = "arm,arm926ej-s";
+> >> +			device_type = "cpu";
+> >>   		};
+> >>   	};
+> >>
+> >> diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+> >> index 6b1d4ca..6c18bd3 100644
+> >> --- a/arch/arm/boot/dts/at91sam9g45.dtsi
+> >> +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+> >> @@ -35,8 +35,12 @@
+> >>   		ssc1 = &ssc1;
+> >>   	};
+> >>   	cpus {
+> >> -		cpu at 0 {
+> >> -			compatible = "arm,arm926ejs";
+> >> +		#address-cells = <0>;
+> >> +		#size-cells = <0>;
+> >> +
+> >> +		cpu {
+> >> +			compatible = "arm,arm926ej-s";
+> >> +			device_type = "cpu";
+> >>   		};
+> >>   	};
+> >>
+> >> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+> >> index 7750f98..c3b11af 100644
+> >> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+> >> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+> >> @@ -31,8 +31,12 @@
+> >>   		ssc0 = &ssc0;
+> >>   	};
+> >>   	cpus {
+> >> -		cpu at 0 {
+> >> -			compatible = "arm,arm926ejs";
+> >> +		#address-cells = <0>;
+> >> +		#size-cells = <0>;
+> >> +
+> >> +		cpu {
+> >> +			compatible = "arm,arm926ej-s";
+> >> +			device_type = "cpu";
+> >>   		};
+> >>   	};
+> >>
+> >> diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+> >> index aa98e64..6c39d0f 100644
+> >> --- a/arch/arm/boot/dts/at91sam9x5.dtsi
+> >> +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+> >> @@ -33,8 +33,12 @@
+> >>   		ssc0 = &ssc0;
+> >>   	};
+> >>   	cpus {
+> >> -		cpu at 0 {
+> >> -			compatible = "arm,arm926ejs";
+> >> +		#address-cells = <0>;
+> >> +		#size-cells = <0>;
+> >> +
+> >> +		cpu {
+> >> +			compatible = "arm,arm926ej-s";
+> >> +			device_type = "cpu";
+> >>   		};
+> >>   	};
+> >>
+> >>
+> >
+> >
+> 
+> 
+> -- 
+> Nicolas Ferre
+> 
