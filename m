@@ -1,37 +1,56 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 May 2013 15:13:42 +0100
-Subject: [PATCH v4 14/32] arm64: KVM: guest one-reg interface
+Date: Tue, 14 May 2013 15:13:43 +0100
+Subject: [PATCH v4 15/32] arm64: KVM: hypervisor initialization code
 In-Reply-To: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
 References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1368540840-26750-15-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1368540840-26750-16-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let userspace play with the guest registers.
+Provide EL2 with page tables and stack, and set the vectors
+to point to the full blown world-switch code.
 
-Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/guest.c | 253 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 253 insertions(+)
- create mode 100644 arch/arm64/kvm/guest.c
+ arch/arm64/include/asm/kvm_host.h |  13 +++++
+ arch/arm64/kvm/hyp-init.S         | 112 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 125 insertions(+)
+ create mode 100644 arch/arm64/kvm/hyp-init.S
 
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 4a2622f..2500eb6 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -183,4 +183,17 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ int kvm_perf_init(void);
+ int kvm_perf_teardown(void);
+ 
++static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
++				       phys_addr_t pgd_ptr,
++				       unsigned long hyp_stack_ptr,
++				       unsigned long vector_ptr)
++{
++	/*
++	 * Call initialization code, and switch to the full blown
++	 * HYP code.
++	 */
++	kvm_call_hyp((void *)boot_pgd_ptr, pgd_ptr,
++		     hyp_stack_ptr, vector_ptr);
++}
++
+ #endif /* __ARM64_KVM_HOST_H__ */
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
 new file mode 100644
-index 0000000..c8d48b2
+index 0000000..4a9cfd2
 --- /dev/null
-+++ b/arch/arm64/kvm/guest.c
-@@ -0,0 +1,253 @@
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -0,0 +1,112 @@
 +/*
 + * Copyright (C) 2012,2013 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
-+ * Derived from arch/arm/kvm/guest.c:
-+ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
-+ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
-+ *
 + * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
++ * it under the terms of the GNU General Public License, version 2, as
 + * published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
@@ -43,237 +62,100 @@ index 0000000..c8d48b2
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/errno.h>
-+#include <linux/err.h>
-+#include <linux/kvm_host.h>
-+#include <linux/module.h>
-+#include <linux/vmalloc.h>
-+#include <linux/fs.h>
-+#include <asm/cputype.h>
-+#include <asm/uaccess.h>
-+#include <asm/kvm.h>
-+#include <asm/kvm_asm.h>
-+#include <asm/kvm_emulate.h>
-+#include <asm/kvm_coproc.h>
++#include <linux/linkage.h>
 +
-+struct kvm_stats_debugfs_item debugfs_entries[] = {
-+	{ NULL }
-+};
++#include <asm/assembler.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_mmu.h>
 +
-+int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
-+	return 0;
-+}
++	.text
++	.pushsection	.hyp.idmap.text, "ax"
 +
-+static u64 core_reg_offset_from_id(u64 id)
-+{
-+	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
-+}
++	.align	11
 +
-+static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
-+	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
-+	int nr_regs = sizeof(*regs) / sizeof(__u32);
-+	u32 off;
++__kvm_hyp_init:
++	.global	__kvm_hyp_init
 +
-+	/* Our ID is an index into the kvm_regs struct. */
-+	off = core_reg_offset_from_id(reg->id);
-+	if (off >= nr_regs ||
-+	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
-+		return -ENOENT;
++ENTRY(__kvm_hyp_init_vector)
++	ventry	__invalid		// Synchronous EL2t
++	ventry	__invalid		// IRQ EL2t
++	ventry	__invalid		// FIQ EL2t
++	ventry	__invalid		// Error EL2t
 +
-+	if (copy_to_user(uaddr, ((u32 *)regs) + off, KVM_REG_SIZE(reg->id)))
-+		return -EFAULT;
++	ventry	__invalid		// Synchronous EL2h
++	ventry	__invalid		// IRQ EL2h
++	ventry	__invalid		// FIQ EL2h
++	ventry	__invalid		// Error EL2h
 +
-+	return 0;
-+}
++	ventry	__do_hyp_init		// Synchronous 64-bit EL1
++	ventry	__invalid		// IRQ 64-bit EL1
++	ventry	__invalid		// FIQ 64-bit EL1
++	ventry	__invalid		// Error 64-bit EL1
 +
-+static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
-+	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
-+	int nr_regs = sizeof(*regs) / sizeof(__u32);
-+	__uint128_t tmp;
-+	void *valp = &tmp;
-+	u64 off;
-+	int err = 0;
++	ventry	__invalid		// Synchronous 32-bit EL1
++	ventry	__invalid		// IRQ 32-bit EL1
++	ventry	__invalid		// FIQ 32-bit EL1
++	ventry	__invalid		// Error 32-bit EL1
++ENDPROC(__kvm_hyp_init_vector)
 +
-+	/* Our ID is an index into the kvm_regs struct. */
-+	off = core_reg_offset_from_id(reg->id);
-+	if (off >= nr_regs ||
-+	    (off + (KVM_REG_SIZE(reg->id) / sizeof(__u32))) >= nr_regs)
-+		return -ENOENT;
++__invalid:
++	b	.
 +
-+	if (KVM_REG_SIZE(reg->id) > sizeof(tmp))
-+		return -EINVAL;
++	/*
++	 * x0: HYP boot pgd
++	 * x1: HYP pgd
++	 * x2: HYP stack
++	 * x3: HYP vectors
++	 */
++__do_hyp_init:
 +
-+	if (copy_from_user(valp, uaddr, KVM_REG_SIZE(reg->id))) {
-+		err = -EFAULT;
-+		goto out;
-+	}
++	msr	ttbr0_el2, x0
 +
-+	if (off == KVM_REG_ARM_CORE_REG(regs.pstate)) {
-+		u32 mode = (*(u32 *)valp) & COMPAT_PSR_MODE_MASK;
-+		switch (mode) {
-+		case PSR_MODE_EL0t:
-+		case PSR_MODE_EL1t:
-+		case PSR_MODE_EL1h:
-+			break;
-+		default:
-+			err = -EINVAL;
-+			goto out;
-+		}
-+	}
++	mrs	x4, tcr_el1
++	ldr	x5, =TCR_EL2_MASK
++	and	x4, x4, x5
++	ldr	x5, =TCR_EL2_FLAGS
++	orr	x4, x4, x5
++	msr	tcr_el2, x4
 +
-+	memcpy((u32 *)regs + off, valp, KVM_REG_SIZE(reg->id));
-+out:
-+	return err;
-+}
++	ldr	x4, =VTCR_EL2_FLAGS
++	msr	vtcr_el2, x4
 +
-+int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
-+{
-+	return -EINVAL;
-+}
++	mrs	x4, mair_el1
++	msr	mair_el2, x4
++	isb
 +
-+int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
-+{
-+	return -EINVAL;
-+}
++	mov	x4, #SCTLR_EL2_FLAGS
++	msr	sctlr_el2, x4
++	isb
 +
-+static unsigned long num_core_regs(void)
-+{
-+	return sizeof(struct kvm_regs) / sizeof(__u32);
-+}
++	/* MMU is now enabled. Get ready for the trampoline dance */
++	ldr	x4, =TRAMPOLINE_VA
++	adr	x5, target
++	bfi	x4, x5, #0, #PAGE_SHIFT
++	br	x4
 +
-+/**
-+ * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
-+ *
-+ * This is for all registers.
-+ */
-+unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
-+{
-+	return num_core_regs() + kvm_arm_num_sys_reg_descs(vcpu);
-+}
++	nop
 +
-+/**
-+ * kvm_arm_copy_reg_indices - get indices of all registers.
-+ *
-+ * We do core registers right here, then we apppend system regs.
-+ */
-+int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-+{
-+	unsigned int i;
-+	const u64 core_reg = KVM_REG_ARM64 | KVM_REG_SIZE_U64 | KVM_REG_ARM_CORE;
++target: /* We're now in the trampoline code, switch page tables */
++	msr	ttbr0_el2, x1
++	isb
 +
-+	for (i = 0; i < sizeof(struct kvm_regs) / sizeof(__u32); i++) {
-+		if (put_user(core_reg | i, uindices))
-+			return -EFAULT;
-+		uindices++;
-+	}
++	/* Invalidate the old TLBs */
++	tlbi	alle2
++	dsb	sy
 +
-+	return kvm_arm_copy_sys_reg_indices(vcpu, uindices);
-+}
++	/* Set the stack and new vectors */
++	kern_hyp_va	x2
++	mov	sp, x2
++	kern_hyp_va	x3
++	msr	vbar_el2, x3
 +
-+int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	/* We currently use nothing arch-specific in upper 32 bits */
-+	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
-+		return -EINVAL;
++	/* Hello, World! */
++	eret
 +
-+	/* Register group 16 means we want a core register. */
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-+		return get_core_reg(vcpu, reg);
++	.ltorg
 +
-+	return kvm_arm_sys_reg_get_reg(vcpu, reg);
-+}
-+
-+int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	/* We currently use nothing arch-specific in upper 32 bits */
-+	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
-+		return -EINVAL;
-+
-+	/* Register group 16 means we set a core register. */
-+	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-+		return set_core_reg(vcpu, reg);
-+
-+	return kvm_arm_sys_reg_set_reg(vcpu, reg);
-+}
-+
-+int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
-+				  struct kvm_sregs *sregs)
-+{
-+	return -EINVAL;
-+}
-+
-+int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
-+				  struct kvm_sregs *sregs)
-+{
-+	return -EINVAL;
-+}
-+
-+int __attribute_const__ kvm_target_cpu(void)
-+{
-+	unsigned long implementor = read_cpuid_implementor();
-+	unsigned long part_number = read_cpuid_part_number();
-+
-+	if (implementor != ARM_CPU_IMP_ARM)
-+		return -EINVAL;
-+
-+	switch (part_number) {
-+	case ARM_CPU_PART_AEM_V8:
-+		return KVM_ARM_TARGET_AEM_V8;
-+	case ARM_CPU_PART_FOUNDATION:
-+		return KVM_ARM_TARGET_FOUNDATION_V8;
-+	case ARM_CPU_PART_CORTEX_A57:
-+		/* Currently handled by the generic backend */
-+		return KVM_ARM_TARGET_CORTEX_A57;
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
-+int kvm_vcpu_set_target(struct kvm_vcpu *vcpu,
-+			const struct kvm_vcpu_init *init)
-+{
-+	unsigned int i;
-+	int phys_target = kvm_target_cpu();
-+
-+	if (init->target != phys_target)
-+		return -EINVAL;
-+
-+	vcpu->arch.target = phys_target;
-+	bitmap_zero(vcpu->arch.features, KVM_VCPU_MAX_FEATURES);
-+
-+	/* -ENOENT for unknown features, -EINVAL for invalid combinations. */
-+	for (i = 0; i < sizeof(init->features) * 8; i++) {
-+		if (init->features[i / 32] & (1 << (i % 32))) {
-+			if (i >= KVM_VCPU_MAX_FEATURES)
-+				return -ENOENT;
-+			set_bit(i, vcpu->arch.features);
-+		}
-+	}
-+
-+	/* Now we know what it is, we can reset it. */
-+	return kvm_reset_vcpu(vcpu);
-+}
-+
-+int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
-+{
-+	return -EINVAL;
-+}
-+
-+int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
-+{
-+	return -EINVAL;
-+}
-+
-+int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
-+				  struct kvm_translation *tr)
-+{
-+	return -EINVAL;
-+}
++	.popsection
 -- 
 1.8.2.3
