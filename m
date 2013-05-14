@@ -1,116 +1,31 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 14 May 2013 15:00:16 +0200
-Subject: [PATCH v2] net/macb: fix ISR clear-on-write behavior only for some SoC
-In-Reply-To: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1368536416-18364-1-git-send-email-nicolas.ferre@atmel.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 14 May 2013 17:02:15 +0400
+Subject: [PATCH v2 2/3] ARM: shmobile: lager: enable Ether
+In-Reply-To: <9708378.xkqng7A9dx@avalon>
+References: <1368499171-22427-1-git-send-email-horms+renesas@verge.net.au>
+ <1368499171-22427-3-git-send-email-horms+renesas@verge.net.au>
+ <9708378.xkqng7A9dx@avalon>
+Message-ID: <519235D7.1050706@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 749a2b6 (net/macb: clear tx/rx completion flags in ISR)
-introduces clear-on-write on ISR register. This behavior is not always
-implemented when using Cadence MACB/GEM and is breaking other platforms.
-We are using the Design Configuration Register 1 information and a capability
-property to actually activate this clear-on-write behavior on ISR.
+Hello.
 
-Reported-by: Hein Tibosch <hein_tibosch@yahoo.es>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-v2: - use DCFG1 bit 23 integration information instead of device tree
-      compatibility string to retreive information about c-o-r vs. c-o-w ISR.
-    - move configuration in macb_init_hw() function instead of probe() - at
-      "open" time.
+On 14-05-2013 13:21, Laurent Pinchart wrote:
 
-As I have changed the most of this patch, I will collect your Ack and feedback
-just like a new patch. Thanks for your help...
+>> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Bye,
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
- drivers/net/ethernet/cadence/macb.c | 18 ++++++++++++++++--
- drivers/net/ethernet/cadence/macb.h |  7 +++++++
- 2 files changed, 23 insertions(+), 2 deletions(-)
+> Is there any ongoing work on DT bindings for sh-eth ?
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index 6be513d..c89aa41 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -485,7 +485,8 @@ static void macb_tx_interrupt(struct macb *bp)
- 	status = macb_readl(bp, TSR);
- 	macb_writel(bp, TSR, status);
- 
--	macb_writel(bp, ISR, MACB_BIT(TCOMP));
-+	if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
-+		macb_writel(bp, ISR, MACB_BIT(TCOMP));
- 
- 	netdev_vdbg(bp->dev, "macb_tx_interrupt status = 0x%03lx\n",
- 		(unsigned long)status);
-@@ -738,7 +739,8 @@ static irqreturn_t macb_interrupt(int irq, void *dev_id)
- 			 * now.
- 			 */
- 			macb_writel(bp, IDR, MACB_RX_INT_FLAGS);
--			macb_writel(bp, ISR, MACB_BIT(RCOMP));
-+			if (bp->caps & MACB_CAPS_ISR_CLEAR_ON_WRITE)
-+				macb_writel(bp, ISR, MACB_BIT(RCOMP));
- 
- 			if (napi_schedule_prep(&bp->napi)) {
- 				netdev_vdbg(bp->dev, "scheduling RX softirq\n");
-@@ -1062,6 +1064,17 @@ static void macb_configure_dma(struct macb *bp)
- 	}
- }
- 
-+/*
-+ * Configure peripheral capacities according to integration options used
-+ */
-+static void macb_configure_caps(struct macb *bp)
-+{
-+	if (macb_is_gem(bp)) {
-+		if (GEM_BF(IRQCOR, gem_readl(bp, DCFG1)) == 0)
-+			bp->caps |= MACB_CAPS_ISR_CLEAR_ON_WRITE;
-+	}
-+}
-+
- static void macb_init_hw(struct macb *bp)
- {
- 	u32 config;
-@@ -1084,6 +1097,7 @@ static void macb_init_hw(struct macb *bp)
- 	bp->duplex = DUPLEX_HALF;
- 
- 	macb_configure_dma(bp);
-+	macb_configure_caps(bp);
- 
- 	/* Initialize TX and RX buffers */
- 	macb_writel(bp, RBQP, bp->rx_ring_dma);
-diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index 993d703..548c0ec 100644
---- a/drivers/net/ethernet/cadence/macb.h
-+++ b/drivers/net/ethernet/cadence/macb.h
-@@ -300,6 +300,8 @@
- #define MACB_REV_SIZE				16
- 
- /* Bitfields in DCFG1. */
-+#define GEM_IRQCOR_OFFSET			23
-+#define GEM_IRQCOR_SIZE				1
- #define GEM_DBWDEF_OFFSET			25
- #define GEM_DBWDEF_SIZE				3
- 
-@@ -323,6 +325,9 @@
- #define MACB_MAN_READ				2
- #define MACB_MAN_CODE				2
- 
-+/* Capability mask bits */
-+#define MACB_CAPS_ISR_CLEAR_ON_WRITE		0x1
-+
- /* Bit manipulation macros */
- #define MACB_BIT(name)					\
- 	(1 << MACB_##name##_OFFSET)
-@@ -574,6 +579,8 @@ struct macb {
- 	unsigned int 		speed;
- 	unsigned int 		duplex;
- 
-+	u32			caps;
-+
- 	phy_interface_t		phy_interface;
- 
- 	/* AT91RM9200 transmit */
--- 
-1.8.0
+    At least there was -- by Nobuhiro Iwamatsu. I don't think converting 
+platform data to DT properties makes sense since sh_eth have some 
+procedural platform data. I also don't think working on DT makes sense 
+until the driver is cleaned up of all its #ifdef'ery (that work is 
+partly being done by Nobuhiro and I'm planning to start the big #ifdef 
+cleanup this week).
+
+WBR, Sergei
