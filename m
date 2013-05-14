@@ -1,60 +1,83 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 14 May 2013 08:38:20 +0200 (CEST)
-Subject: [PATCH V2 05/10] mmc: sdhi-pxav3: handle mmc_of_parse() errors
- during probe
-In-Reply-To: <1368479941-10084-6-git-send-email-gmbnomis@gmail.com>
-References: <1368479941-10084-1-git-send-email-gmbnomis@gmail.com>
- <1368479941-10084-6-git-send-email-gmbnomis@gmail.com>
-Message-ID: <Pine.LNX.4.64.1305140837540.32151@axis700.grange>
+From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
+Date: Tue, 14 May 2013 12:22:41 +0530
+Subject: [PATCH V2] arm64: KVM: Fix HCR_EL2 and VTCR_EL2 configuration bits
+In-Reply-To: <51912003.6080406@codeaurora.org>
+References: <1368170630-19567-1-git-send-email-pranavkumar@linaro.org>
+ <51910559.6060106@codeaurora.org>
+ <fae8138d41c55928a3c71b7073aea3b0@localhost>
+ <51912003.6080406@codeaurora.org>
+Message-ID: <CAAHg+HhR4gvEs2F7WzbyQBWiDJSh9+s7=QFkmd0OWss1RfS4Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's a typo in the subject line - it's sdhci, not sdhi :)
+Hi Christopher,
 
-Thanks
-Guennadi
+On 13 May 2013 22:46, Christopher Covington <cov@codeaurora.org> wrote:
+> On 05/13/2013 12:02 PM, Marc Zyngier wrote:
+>> On Mon, 13 May 2013 11:23:05 -0400, Christopher Covington
+>> <cov@codeaurora.org> wrote:
+>>> Hi Pranavkumar,
+>>>
+>>> On 05/10/2013 03:23 AM, Pranavkumar Sawargaonkar wrote:
+>>>> This patch does following fixes:
+>>>>
+>>>> 1. Make HCR_* flags as unsigned long long constants
+>>>> Reason : By default, compiler assumes numeric constants as
+>>>> signed hence sign extending it when assigned to unsigned variable
+>>>> such as hcr_el2 (in VCPU context). This accidently sets HCR_ID and
+>>>> HCR_CD making entire guest memory non-cacheable. On real HW, this
+>>>> breaks Stage2 ttbl walks and also breaks VirtIO.
+>>>>
+>>>> 2. VTCR_EL2_ORGN0_WBWA and VTCR_EL2_IRGN0_WBWA macros.
+>>>>
+>>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>>>> ---
+>>>>  arch/arm64/include/asm/kvm_arm.h |   73
+>>>>  +++++++++++++++++++-------------------
+>>>>  1 file changed, 37 insertions(+), 36 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/kvm_arm.h
+>>>> b/arch/arm64/include/asm/kvm_arm.h
+>>>> index 8ced0ca..14ead69 100644
+>>>> --- a/arch/arm64/include/asm/kvm_arm.h
+>>>> +++ b/arch/arm64/include/asm/kvm_arm.h
+>>>> @@ -18,44 +18,45 @@
+>>>>  #ifndef __ARM64_KVM_ARM_H__
+>>>>  #define __ARM64_KVM_ARM_H__
+>>>>
+>>>> +#include <linux/const.h>
+>>>>  #include <asm/types.h>
+>>>>
+>>>>  /* Hyp Configuration Register (HCR) bits */
+>>>> -#define HCR_ID             (1 << 33)
+>>>> -#define HCR_CD             (1 << 32)
+>>>> +#define HCR_ID             (UL(0x1) << 33)
+>>>> +#define HCR_CD             (UL(0x1) << 32)
+>>>
+>>> Consider using the BIT() macro from linux/bitops.h to improve
+>> readability.
+>>
+>> This would probably cause problems when using these macros from assembly
+>> code.
+>
+> It does indeed cause problems. What a shame. How about a quick local
+> definition, to perhaps be eventually replaced by a more accessible shared
+> definition?
 
-On Mon, 13 May 2013, Simon Baatz wrote:
+I have used UL to be synced with current arm64 code style (it has been
+used in other files also).
+Using BIT is good idea (not sure about local definition i.e. how good
+it is when we have one inside bitops.h)
+but if we want to use it is, then better idea is to use it everywhere.
+>
+> Christopher
 
-> 
-> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
-> ---
->  drivers/mmc/host/sdhci-pxav3.c |    7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-pxav3.c b/drivers/mmc/host/sdhci-pxav3.c
-> index 1ae358e..67ea388 100644
-> --- a/drivers/mmc/host/sdhci-pxav3.c
-> +++ b/drivers/mmc/host/sdhci-pxav3.c
-> @@ -252,7 +252,9 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
->  
->  	match = of_match_device(of_match_ptr(sdhci_pxav3_of_match), &pdev->dev);
->  	if (match) {
-> -		mmc_of_parse(host->mmc);
-> +		ret = mmc_of_parse(host->mmc);
-> +		if (ret)
-> +			goto err_of_parse;
->  		sdhci_get_of_property(pdev);
->  		pdata = pxav3_get_mmc_pdata(dev);
->  	} else if (pdata) {
-> @@ -313,10 +315,11 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
->  
->  	return 0;
->  
-> +err_of_parse:
-> +err_cd_req:
->  err_add_host:
->  	clk_disable_unprepare(clk);
->  	clk_put(clk);
-> -err_cd_req:
->  err_clk_get:
->  	sdhci_pltfm_free(pdev);
->  	kfree(pxa);
-> -- 
-> 1.7.9.5
-> 
+Thanks,
+Pranav
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+>
+> --
+> Employee of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by the Linux Foundation.
