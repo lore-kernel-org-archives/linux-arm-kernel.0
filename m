@@ -1,40 +1,33 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 May 2013 15:13:34 +0100
-Subject: [PATCH v4 06/32] arm64: KVM: fault injection into a guest
+Date: Tue, 14 May 2013 15:13:41 +0100
+Subject: [PATCH v4 13/32] arm64: KVM: MMIO access backend
 In-Reply-To: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
 References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1368540840-26750-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1368540840-26750-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the injection of a fault (undefined, data abort or
-prefetch abort) into a 64bit guest.
+Define the necessary structures to perform an MMIO access.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/inject_fault.c | 126 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 126 insertions(+)
- create mode 100644 arch/arm64/kvm/inject_fault.c
+ arch/arm64/include/asm/kvm_mmio.h | 59 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+ create mode 100644 arch/arm64/include/asm/kvm_mmio.h
 
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+diff --git a/arch/arm64/include/asm/kvm_mmio.h b/arch/arm64/include/asm/kvm_mmio.h
 new file mode 100644
-index 0000000..54f6562
+index 0000000..fc2f689
 --- /dev/null
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -0,0 +1,126 @@
++++ b/arch/arm64/include/asm/kvm_mmio.h
+@@ -0,0 +1,59 @@
 +/*
-+ * Fault injection for 64bit guests.
-+ *
-+ * Copyright (C) 2012,2013 - ARM Ltd
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * Based on arch/arm/kvm/emulate.c
 + * Copyright (C) 2012 - Virtual Open Systems and Columbia University
 + * Author: Christoffer Dall <c.dall@virtualopensystems.com>
 + *
-+ * This program is free software: you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
 + * published by the Free Software Foundation.
 + *
 + * This program is distributed in the hope that it will be useful,
@@ -46,108 +39,47 @@ index 0000000..54f6562
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
++#ifndef __ARM64_KVM_MMIO_H__
++#define __ARM64_KVM_MMIO_H__
++
 +#include <linux/kvm_host.h>
-+#include <asm/kvm_emulate.h>
-+#include <asm/esr.h>
++#include <asm/kvm_asm.h>
++#include <asm/kvm_arm.h>
 +
-+#define PSTATE_FAULT_BITS_64 	(PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | \
-+				 PSR_I_BIT | PSR_D_BIT)
-+#define EL1_EXCEPT_SYNC_OFFSET	0x200
-+
-+static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
-+{
-+	unsigned long cpsr = *vcpu_cpsr(vcpu);
-+	bool is_aarch32;
-+	u32 esr = 0;
-+
-+	is_aarch32 = vcpu_mode_is_32bit(vcpu);
-+
-+	*vcpu_spsr(vcpu) = cpsr;
-+	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
-+
-+	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
-+	*vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + EL1_EXCEPT_SYNC_OFFSET;
-+
-+	vcpu_sys_reg(vcpu, FAR_EL1) = addr;
-+
-+	/*
-+	 * Build an {i,d}abort, depending on the level and the
-+	 * instruction set. Report an external synchronous abort.
-+	 */
-+	if (kvm_vcpu_trap_il_is32bit(vcpu))
-+		esr |= ESR_EL1_IL;
-+
-+	/*
-+	 * Here, the guest runs in AArch64 mode when in EL1. If we get
-+	 * an AArch32 fault, it means we managed to trap an EL0 fault.
-+	 */
-+	if (is_aarch32 || (cpsr & PSR_MODE_MASK) == PSR_MODE_EL0t)
-+		esr |= (ESR_EL1_EC_IABT_EL0 << ESR_EL1_EC_SHIFT);
-+	else
-+		esr |= (ESR_EL1_EC_IABT_EL1 << ESR_EL1_EC_SHIFT);
-+
-+	if (!is_iabt)
-+		esr |= ESR_EL1_EC_DABT_EL0;
-+
-+	vcpu_sys_reg(vcpu, ESR_EL1) = esr | ESR_EL2_EC_xABT_xFSR_EXTABT;
-+}
-+
-+static void inject_undef64(struct kvm_vcpu *vcpu)
-+{
-+	unsigned long cpsr = *vcpu_cpsr(vcpu);
-+	u32 esr = (ESR_EL1_EC_UNKNOWN << ESR_EL1_EC_SHIFT);
-+
-+	*vcpu_spsr(vcpu) = cpsr;
-+	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
-+
-+	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
-+	*vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + EL1_EXCEPT_SYNC_OFFSET;
-+
-+	/*
-+	 * Build an unknown exception, depending on the instruction
-+	 * set.
-+	 */
-+	if (kvm_vcpu_trap_il_is32bit(vcpu))
-+		esr |= ESR_EL1_IL;
-+
-+	vcpu_sys_reg(vcpu, ESR_EL1) = esr;
-+}
-+
-+/**
-+ * kvm_inject_dabt - inject a data abort into the guest
-+ * @vcpu: The VCPU to receive the undefined exception
-+ * @addr: The address to report in the DFAR
-+ *
-+ * It is assumed that this code is called from the VCPU thread and that the
-+ * VCPU therefore is not currently executing guest code.
++/*
++ * This is annoying. The mmio code requires this, even if we don't
++ * need any decoding. To be fixed.
 + */
-+void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
++struct kvm_decode {
++	unsigned long rt;
++	bool sign_extend;
++};
++
++/*
++ * The in-kernel MMIO emulation code wants to use a copy of run->mmio,
++ * which is an anonymous type. Use our own type instead.
++ */
++struct kvm_exit_mmio {
++	phys_addr_t	phys_addr;
++	u8		data[8];
++	u32		len;
++	bool		is_write;
++};
++
++static inline void kvm_prepare_mmio(struct kvm_run *run,
++				    struct kvm_exit_mmio *mmio)
 +{
-+	inject_abt64(vcpu, false, addr);
++	run->mmio.phys_addr	= mmio->phys_addr;
++	run->mmio.len		= mmio->len;
++	run->mmio.is_write	= mmio->is_write;
++	memcpy(run->mmio.data, mmio->data, mmio->len);
++	run->exit_reason	= KVM_EXIT_MMIO;
 +}
 +
-+/**
-+ * kvm_inject_pabt - inject a prefetch abort into the guest
-+ * @vcpu: The VCPU to receive the undefined exception
-+ * @addr: The address to report in the DFAR
-+ *
-+ * It is assumed that this code is called from the VCPU thread and that the
-+ * VCPU therefore is not currently executing guest code.
-+ */
-+void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
-+{
-+	inject_abt64(vcpu, true, addr);
-+}
++int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
++int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
++		 phys_addr_t fault_ipa);
 +
-+/**
-+ * kvm_inject_undefined - inject an undefined instruction into the guest
-+ *
-+ * It is assumed that this code is called from the VCPU thread and that the
-+ * VCPU therefore is not currently executing guest code.
-+ */
-+void kvm_inject_undefined(struct kvm_vcpu *vcpu)
-+{
-+	inject_undef64(vcpu);
-+}
++#endif	/* __ARM64_KVM_MMIO_H__ */
 -- 
 1.8.2.3
