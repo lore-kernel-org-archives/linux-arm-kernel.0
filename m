@@ -1,40 +1,78 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 14 May 2013 11:53:34 -0500
-Subject: [PATCH v2] ARM: KVM: prevent NULL pointer dereferences with KVM
- VCPU ioctl
-In-Reply-To: <5191E2BF.5040102@linaro.org>
-References: <1368052086-25059-1-git-send-email-andre.przywara@linaro.org>
- <20130513055253.GC64337@ubuntu> <519167D3.4030600@linaro.org>
- <CAEDV+gKTYCh8zTPJAxSmwhuyWo7K5Ej75giryR-pv5oqHdURSQ@mail.gmail.com>
- <5191E2BF.5040102@linaro.org>
-Message-ID: <51926C0E.2000504@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 14 May 2013 09:59:37 -0700
+Subject: [PATCH v2 0/3] clk: implement remuxing during set_rate
+In-Reply-To: <CAAG0J991BCziPFddzBrx9vcwRxyRgcCd38A01uKXTDDK9xTnbQ@mail.gmail.com>
+References: <1366388904-13903-1-git-send-email-james.hogan@imgtec.com>
+ <20130513195746.10068.92303@quantum>
+ <CAAG0J991BCziPFddzBrx9vcwRxyRgcCd38A01uKXTDDK9xTnbQ@mail.gmail.com>
+Message-ID: <20130514165937.10068.18501@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2013 02:07 AM, Andre Przywara wrote:
-> On 05/14/2013 12:42 AM, Christoffer Dall wrote:
->> On Mon, May 13, 2013 at 3:23 PM, Andre Przywara
->> <andre.przywara@linaro.org> wrote:
->>> ooks like a natural candidate, but unfortunately struct kvm_vcpu is
->>> opaque
->>> here, so dereferencing it does not work without further changes which
->>> I do
->>> not deem to be justified. I used kvm_coproc.h instead, which is loosely
->>> related (KVM_[SG]ET_ONE_REG) and just simply works. If you don't think
->>> that's appropriate, just drop me a note. Patch follows in a separate
->>> mail.
->>
->> eh, not crazy about the idea. x86 has
->> arch/x86/include/asm/kvm_guest.h, which may be the most appropriate,
->> or this could be generalized to other architectures as well and
->> included in include/linux/kvm_host.h.
->>
->> we can just stick it in arch/arm/kvm/arm.c for now and move later if
->> need be, no need to create a fuzz.
+Quoting James Hogan (2013-05-13 14:30:46)
+> On 13 May 2013 20:57, Mike Turquette <mturquette@linaro.org> wrote:
+> > Quoting James Hogan (2013-04-19 09:28:21)
+> >> This patchset adds support for automatic selection of the best parent
+> >> for a clock mux, i.e. the one which can provide the closest clock rate
+> >> to that requested. It can be controlled by a new CLK_SET_RATE_REMUX flag
+> >> so that it doesn't happen unless explicitly allowed.
+> >>
+> >
+> > I'm not sure about the new flag.  One of my regrets during the early
+> > development of the common struct clk is the CLK_SET_RATE_PARENT flag.
+> > In hindsight I would have preferred to make parent-propagation of rate
+> > changes the default behavior, and instead provide a flag to prevent that
+> > behavior, such as CLK_SET_RATE_NO_PROPAGATE.
+> >
+> > One reason for this is the difficulty some have had with setting flags
+> > from DT bindings.
 > 
-> Ok, would you mind to commit v2 and add the "inline" on the way?
+> Could you elaborate on this? I've been adding flags to DT bindings for
+> this sort of thing, but it feels a bit like it's in that grey area of
+> not really describing the hardware itself. This information needs to
+> be specified somehow though.
+> 
 
-You don't really need the inline if it's not in a header. The compiler
-will inline it anyway.
+It depends on the flag.  A good example is the CLK_DIVIDER_ONE_BASED
+flag which does describe the hardware.  It informs the binding that
+indexing starts at 1, not 0, which is a valid part of the hardware
+description.
 
-Rob
+However flags that deal with software policy do not belong on DT.
+CLK_SET_RATE_PARENT certainly does not belong in the DT binding since
+this is a pure Linux-ism.  Every binding just needs to be reviewed on a
+case-by-case basis to make sure the flags are related only to the
+hardware.
+
+Regards,
+Mike
+
+> > Another reason is that a core goal of the framework
+> > is to remove topology info from drivers; having to set a flag explicitly
+> > on each clock to propagate rate changes is an impediment to that goal.
+> 
+> (Something that I have found also where CLK_SET_RATE_PARENT doesn't
+> fit well is when you have a mux where you want the set_rate propagated
+> to one possible parent (e.g. a dedicated PLL) but not the other (e.g.
+> the system clock - which happens to be a divider). In this case what I
+> really want to say is "don't change the rate of this particular
+> clock", in fact I added a CLK_DIVIDER_READ_ONLY divider flag locally
+> for this purpose. Was there a particular use case of
+> CLK_SET_RATE_PARENT where you'd want a clock to be changed from one
+> child but not another?)
+> 
+> >
+> > So perhaps CLK_SET_RATE_REMUX is a similar situation.  What do you think
+> > about making remuxing the default and providing a flag to prevent it?
+> 
+> Yes, fine by me.
+> 
+> > And also we can assume for the immediate future that users of
+> > .determine_rate WANT to remux, since .round_rate won't do it.  Though
+> > eventually it might be wise to convert all users of .round_rate over to
+> > .determine_rate and deprecate .round_rate entirely.
+> 
+> True.
+> 
+> Cheers
+> James
