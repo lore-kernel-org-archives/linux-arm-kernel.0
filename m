@@ -1,99 +1,119 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 14 May 2013 12:34:26 +0100
-Subject: [PATCH 9/9] mfd: ab8500-core: Pass GPADC compatible string to
- MFD core
-In-Reply-To: <CACRpkdaiZNeh9u_e7wSkHPmrxfaFQLeQEpZXEV4f+rXCCpW_eg@mail.gmail.com>
-References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
- <1368019749-19455-10-git-send-email-lee.jones@linaro.org>
- <CACRpkdY8SLRR0HQvD5AFUeNeeHRVt3XM-MOkwJs_h_EfeRctKw@mail.gmail.com>
- <20130514092614.GH3297@gmail.com>
- <CACRpkdaiZNeh9u_e7wSkHPmrxfaFQLeQEpZXEV4f+rXCCpW_eg@mail.gmail.com>
-Message-ID: <20130514113426.GB28781@gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 14 May 2013 13:38:50 +0200
+Subject: [PATCH] net/macb: fix ISR clear-on-write behavior only for some
+ SoC
+In-Reply-To: <519200DA.8060102@atmel.com>
+References: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
+ <FE065E51-1EAA-47ED-8C7B-0F2E6418F349@jcrosoft.com>
+ <519200DA.8060102@atmel.com>
+Message-ID: <5192224A.7090303@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> probing and does not have an .of_match_table defined in it's
-> >> driver struct? I mean, what could possibly match that
-> >> compatible string? The .name field will take care of naming
-> >> the device does it not?
-> >
-> > You only need that stuff if you require _extra_ bindings. Things like
-> > regulators and interrupt numbers are configured behind the scenes.
+On 05/14/2013 11:16 AM, Nicolas Ferre wrote:
+> On 13/05/2013 18:05, Jean-Christophe PLAGNIOL-VILLARD :
+>>
+>> On May 14, 2013, at 12:05 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>>
+>>> Commit 749a2b6 (net/macb: clear tx/rx completion flags in ISR)
+>>> introduces clear-on-write on ISR register. This behavior is not always
+>>> implemented when using Cadence MACB/GEM and is breaking other platforms.
+>>> We are using a new Device Tree compatibility string and a capability
+>>> property to actually activate this clear-on-write behavior on ISR.
+>>>
+>>> Reported-by: Hein Tibosch <hein_tibosch@yahoo.es>
+>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>
+>> can we detect it via the IP?
 > 
-> Sure, but isn't the idea with of_match_table that this should be
-> used in drivers when probing from device tree?
-
-We're not probing from Device Tree. We're registering from MFD.
-
-> Surely it *works* with other schemes but I always thought about
-> them as some kind of rough fallback hacks. I would be way more
-> convenient with the patch if it added an of_match_table to
-> the ADC driver as well, because then I understand what is
-> going on.
-
-They're not full-back hacks. All drivers obtain their interrupts this
-way when using Device Tree.
-
-> >> For non-emergency merging though:
-> >> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> >
-> > If we don't put this into v3.10-rcX, then the GPADC driver will be
-> > broken in v3.10 when booting with DT.
+> As said by Hein, we cannot use the IP revision number. *But* we may have the opportunity to read this integration configuration in the Design Configuration Register 1 (DCFG1 already used for determining data bus width).
 > 
-> OK I think I understand why now...
+> So, Michal or Steffen, can you please tell me the value of:
+> -> bit 23 at register address 0x280: mine is "1" which should mean "IRQ read clear", yours should be "0".
+
+here is the whole reg map for zynq.
+Reg 0x280 is undocumented in our TRM.
+Please decode it not sure if bit 0 is LSB or MSB.
+
+U-Boot-PetaLinux> md e000b000
+e000b000: 0000001c 000e0013 00000006 00000000    ................
+e000b010: 00180704 00000021 3ffba2e4 3ffbd32c    ....!......?,..?
+e000b020: 00000003 00000000 00000000 00000000    ................
+e000b030: 07ffffff 63c66f08 00000000 0000ffff    .....o.c........
+e000b040: 000003ff 000003ff 00000000 00000000    ................
+e000b050: 00000000 00000000 00000000 00000000    ................
+e000b060: 00000000 00000000 00000000 00000000    ................
+e000b070: 00000000 00000000 00000000 00000000    ................
+e000b080: 00000000 00000000 00350a00 00001c48    ..........5.H...
+e000b090: 00000000 00000000 00000000 00000000    ................
+e000b0a0: 00000000 00000000 00000000 00000000    ................
+e000b0b0: 00000000 00000000 00000000 00000000    ................
+e000b0c0: 00000000 00000000 00000000 00000000    ................
+e000b0d0: 00000000 00000000 00000000 00000000    ................
+e000b0e0: 00000000 00000000 00000000 00000000    ................
+e000b0f0: 00000000 00000000 00000000 00020118    ................
+U-Boot-PetaLinux>
+e000b100: 00014796 00000000 0000051e 00000001    .G..............
+e000b110: 00000000 00000000 0000051d 00000001    ................
+e000b120: 00000000 00000000 00000000 00000000    ................
+e000b130: 00000000 00000000 00000000 00000000    ................
+e000b140: 00000000 00000000 00000000 00000000    ................
+e000b150: 001e58b6 00000000 00000526 00000000    .X......&.......
+e000b160: 00000004 00000000 00000004 00000001    ................
+e000b170: 00000000 00000004 00000000 0000051d    ................
+e000b180: 00000000 00000000 00000000 00000000    ................
+e000b190: 00000000 00000000 00000000 00000000    ................
+e000b1a0: 00000038 00000000 00000000 00000000    8...............
+e000b1b0: 00000000 00000000 00000000 00000000    ................
+e000b1c0: 00000000 00000000 00000000 00000000    ................
+e000b1d0: 00000000 00000000 00000000 00000000    ................
+e000b1e0: 00000000 00000000 00000000 00000000    ................
+e000b1f0: 00000000 00000000 00000000 00000000    ................
+U-Boot-PetaLinux>
+e000b200: 00000000 00000000 00000000 00000000    ................
+e000b210: 00000000 00000000 00000000 00000000    ................
+e000b220: 00000000 00000000 00000000 00000000    ................
+e000b230: 00000000 00000000 00000000 00000000    ................
+e000b240: 00000000 00000000 00000000 00000000    ................
+e000b250: 00000000 00000000 00000000 00000000    ................
+e000b260: 00000000 00000000 00000000 00000000    ................
+e000b270: 00000000 00000000 00000000 00000000    ................
+e000b280: 02500111 2ab13fff 00000000 00000000    ..P..?.*........
+e000b290: 002f2145 00000200 00000000 00000000    E!/.............
+e000b2a0: 00000000 00000000 00000000 00000000    ................
+e000b2b0: 00000000 00000000 00000000 00000000    ................
+e000b2c0: 00000000 00000000 00000000 00000000    ................
+e000b2d0: 00000000 00000000 00000000 00000000    ................
+e000b2e0: 00000000 00000000 00000000 00000000    ................
+e000b2f0: 00000000 00000000 00000000 00000000    ................
+U-Boot-PetaLinux>
+
+
+
 > 
-> >> But for this to make sense the AB8500 ADC driver needs
-> >> to be augmented for DT probing and preferrably also moved
-> >> to drivers/adc and made to utilize that subsystem.
-> >
-> > Not sure I understand the reasoning for this. It works well as a plain
-> > MFD device.
+> Hein, in case of use of the MACB, we do not have this register included, so I will avoid to run the test when using MACB (we already have this information).
 > 
-> The commit message says:
->  "Without it, the driver won't be able to interrogate the Device Tree or
->   locate suitable regulators and will most likely fail to probe."
-> 
-> That commit message makes it sound like the driver is
-> interrogating (hm is that the right term...) the device tree, but
-> now you say it isn't (as you say it is a plain MFD device).
-> Of course the MFD core and drivers/of/platform.c is doing
-> all sorts of magic based on the device tree, and that is
-> what the patch fixes, right? Nothing to do with the driver
-> really?
+> If it works, I plan to rewrite the patch but taking this information instead of the device tree compatibility string.
 
-I guess you're kind of correct. Yes, it's not the actual driver that's
-interrogating (yes it's the right term) the Device Tree, other
-subsystems are doing it on the driver's behalf. But the driver's node
-is being used, which is why we need the compatible string.
+yep. Will be good to detect it instead of new compatible string.
 
-> I suspect the missing regulators due to how the OF core or
-> MFD core uses the device tree is the actual problem
-> solved by the patch?
-> 
-> Anyway I think I was after this:
-> 
-> Isn't the idea that all devices that get probed from a device tree
-> shall have corresponding bindings documented under
-> Documentation/devicetree/bindings/*?
+Also is there an option to remove "CONFIG_ARCH_AT91"?
 
-It has an entry in  Documentation/devicetree/bindings/mfd/ab8500.txt.
-
-> And this driver is definately in the wrong subsystem (not your
-> fault) so I suspect the binding doc should be in
-> Documentation/devicetree/bindings/adc/ab8500.txt or
-> something.
-
-All of the AB8500 devices are covered in the aforementioned file and
-to my knowledge none of them are represented in their respective
-'real' driver type's binding doc folders (except Power).
-
-> I'm not pointing that out as a problem in this
-> patch, I'm just discussing the mess we're in ...
-
-Sure.
+Thanks,
+Michal
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130514/f63d2d8f/attachment-0001.sig>
