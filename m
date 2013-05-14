@@ -1,43 +1,43 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 14 May 2013 17:38:35 +0200
-Subject: [PATCH 02/20] ARM: zynq: Remove init_irq declaration in machine
+Date: Tue, 14 May 2013 17:38:37 +0200
+Subject: [PATCH 04/20] ARM: picoxcell: Remove init_irq declaration in machine
  description
 In-Reply-To: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1368545933-7430-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1368545933-7430-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
 specified") removed the need to explictly setup the init_irq field in
 the machine description when using only irqchip_init. Remove that
-declaration for zynq as well.
+declaration for picoxcell as well.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Michal Simek <monstr@monstr.eu>
+Acked-by: Jamie Iles <jamie@jamieiles.com>
 ---
- arch/arm/mach-zynq/common.c | 2 --
+ arch/arm/mach-picoxcell/common.c | 2 --
  1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 5bfe703..4c0199b8 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -25,7 +25,6 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/of.h>
+diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
+index 70b441a..c2721ce 100644
+--- a/arch/arm/mach-picoxcell/common.c
++++ b/arch/arm/mach-picoxcell/common.c
+@@ -9,7 +9,6 @@
+  */
+ #include <linux/delay.h>
+ #include <linux/irq.h>
 -#include <linux/irqchip.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -106,7 +105,6 @@ static const char * const zynq_dt_match[] = {
- MACHINE_START(XILINX_EP107, "Xilinx Zynq Platform")
- 	.smp		= smp_ops(zynq_smp_ops),
- 	.map_io		= zynq_map_io,
+ #include <linux/irqdomain.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+@@ -87,7 +86,6 @@ static void picoxcell_wdt_restart(char mode, const char *cmd)
+ DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
+ 	.map_io		= picoxcell_map_io,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
 -	.init_irq	= irqchip_init,
- 	.init_machine	= zynq_init_machine,
- 	.init_time	= zynq_timer_init,
- 	.dt_compat	= zynq_dt_match,
+ 	.init_time	= dw_apb_timer_init,
+ 	.init_machine	= picoxcell_init_machine,
+ 	.dt_compat	= picoxcell_dt_match,
 -- 
 1.8.1.2
