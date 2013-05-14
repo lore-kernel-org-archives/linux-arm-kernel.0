@@ -1,62 +1,33 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon, 13 May 2013 21:07:34 +0400
-Subject: [PATCH 12/15] ARM: clps711x: edb7211: Add support for I2C
-In-Reply-To: <1368464857-5038-1-git-send-email-shc_work@mail.ru>
-References: <1368464857-5038-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1368464857-5038-15-git-send-email-shc_work@mail.ru>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 14 May 2013 07:17:12 +0200
+Subject: [PATCH] mv643xx_eth: fix NAPI weight being > 64
+Message-ID: <1368508632-13742-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+3.10-rc1 issues the following warning:
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+netif_napi_add() called with weight 128 on device eth%d
+
+This patch reduce the weight to 64.
+
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mach-clps711x/board-edb7211.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/net/ethernet/marvell/mv643xx_eth.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-clps711x/board-edb7211.c b/arch/arm/mach-clps711x/board-edb7211.c
-index db804b4..970f4e1 100644
---- a/arch/arm/mach-clps711x/board-edb7211.c
-+++ b/arch/arm/mach-clps711x/board-edb7211.c
-@@ -12,6 +12,7 @@
- #include <linux/delay.h>
- #include <linux/memblock.h>
- #include <linux/types.h>
-+#include <linux/i2c-gpio.h>
- #include <linux/interrupt.h>
- #include <linux/backlight.h>
- #include <linux/platform_device.h>
-@@ -37,6 +38,9 @@
- #define EDB7211_LCDEN		CLPS711X_GPIO(3, 2)
- #define EDB7211_LCDBL		CLPS711X_GPIO(3, 3)
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index d0afeea..6b5471f 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -2745,7 +2745,7 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
  
-+#define EDB7211_I2C_SDA		CLPS711X_GPIO(3, 4)
-+#define EDB7211_I2C_SCL		CLPS711X_GPIO(3, 5)
-+
- #define EDB7211_FLASH0_BASE	(CS0_PHYS_BASE)
- #define EDB7211_FLASH1_BASE	(CS1_PHYS_BASE)
+ 	INIT_WORK(&mp->tx_timeout_task, tx_timeout_task);
  
-@@ -46,6 +50,12 @@
- /* The extra 8 lines of the keyboard matrix */
- #define EDB7211_EXTKBD_BASE	(CS3_PHYS_BASE)
+-	netif_napi_add(dev, &mp->napi, mv643xx_eth_poll, 128);
++	netif_napi_add(dev, &mp->napi, mv643xx_eth_poll, 64);
  
-+static struct i2c_gpio_platform_data edb7211_i2c_pdata __initdata = {
-+	.sda_pin	= EDB7211_I2C_SDA,
-+	.scl_pin	= EDB7211_I2C_SCL,
-+	.scl_is_output_only = 1,
-+};
-+
- static struct resource edb7211_cs8900_resource[] __initdata = {
- 	DEFINE_RES_MEM(EDB7211_CS8900_BASE, SZ_1K),
- 	DEFINE_RES_IRQ(EDB7211_CS8900_IRQ),
-@@ -173,6 +183,9 @@ static void __init edb7211_init_late(void)
- 	platform_device_register_simple("video-clps711x", 0, NULL, 0);
- 	platform_device_register_simple("cs89x0", 0, edb7211_cs8900_resource,
- 					ARRAY_SIZE(edb7211_cs8900_resource));
-+	platform_device_register_data(&platform_bus, "i2c-gpio", 0,
-+				      &edb7211_i2c_pdata,
-+				      sizeof(edb7211_i2c_pdata));
- }
- 
- MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
+ 	init_timer(&mp->rx_oom);
+ 	mp->rx_oom.data = (unsigned long)mp;
 -- 
-1.8.1.5
+1.7.10.4
