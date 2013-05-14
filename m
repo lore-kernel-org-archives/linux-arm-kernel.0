@@ -1,40 +1,33 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue, 14 May 2013 09:01:47 +0200
-Subject: [PATCH] net/macb: fix ISR clear-on-write behavior only for
- some SoC
-In-Reply-To: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20130514070147.GB29391@pengutronix.de>
+From: andre.przywara@linaro.org (Andre Przywara)
+Date: Tue, 14 May 2013 09:07:43 +0200
+Subject: [PATCH v2] ARM: KVM: prevent NULL pointer dereferences with KVM
+ VCPU ioctl
+In-Reply-To: <CAEDV+gKTYCh8zTPJAxSmwhuyWo7K5Ej75giryR-pv5oqHdURSQ@mail.gmail.com>
+References: <1368052086-25059-1-git-send-email-andre.przywara@linaro.org>
+ <20130513055253.GC64337@ubuntu> <519167D3.4030600@linaro.org>
+ <CAEDV+gKTYCh8zTPJAxSmwhuyWo7K5Ej75giryR-pv5oqHdURSQ@mail.gmail.com>
+Message-ID: <5191E2BF.5040102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 05/14/2013 12:42 AM, Christoffer Dall wrote:
+> On Mon, May 13, 2013 at 3:23 PM, Andre Przywara
+> <andre.przywara@linaro.org> wrote:
+>> ooks like a natural candidate, but unfortunately struct kvm_vcpu is opaque
+>> here, so dereferencing it does not work without further changes which I do
+>> not deem to be justified. I used kvm_coproc.h instead, which is loosely
+>> related (KVM_[SG]ET_ONE_REG) and just simply works. If you don't think
+>> that's appropriate, just drop me a note. Patch follows in a separate mail.
+>
+> eh, not crazy about the idea. x86 has
+> arch/x86/include/asm/kvm_guest.h, which may be the most appropriate,
+> or this could be generalized to other architectures as well and
+> included in include/linux/kvm_host.h.
+>
+> we can just stick it in arch/arm/kvm/arm.c for now and move later if
+> need be, no need to create a fuzz.
 
-On Mon, May 13, 2013 at 06:05:05PM +0200, Nicolas Ferre wrote:
-> Commit 749a2b6 (net/macb: clear tx/rx completion flags in ISR)
-> introduces clear-on-write on ISR register. This behavior is not always
-> implemented when using Cadence MACB/GEM and is breaking other platforms.
-> We are using a new Device Tree compatibility string and a capability
-> property to actually activate this clear-on-write behavior on ISR.
-> 
-> Reported-by: Hein Tibosch <hein_tibosch@yahoo.es>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  Documentation/devicetree/bindings/net/macb.txt |  2 ++
->  drivers/net/ethernet/cadence/macb.c            | 15 +++++++++++++--
->  drivers/net/ethernet/cadence/macb.h            |  5 +++++
->  3 files changed, 20 insertions(+), 2 deletions(-)
-> 
-
-Looks okay to me:
-
-Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+Ok, would you mind to commit v2 and add the "inline" on the way?
 
 Thanks,
-Steffen
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Andre.
