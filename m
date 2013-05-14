@@ -1,38 +1,121 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 May 2013 11:23:56 +0200
-Subject: [RFC 2/8] ARM:global_timer: Add ARM global timer support.
-In-Reply-To: <5191F9EE.6070008@st.com>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022260-2197-1-git-send-email-srinivas.kandagatla@st.com>
- <CACRpkdZCP=w=4Q3bnuMQxm=Oe-uZke+Cc5NgddM5vsQbgr9E-Q@mail.gmail.com>
- <5191F9EE.6070008@st.com>
-Message-ID: <CACRpkdYh72hQHSK-a9r8R9qfnQv06412YqVNeYpc_rZhMeiXww@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 14 May 2013 11:24:48 +0200
+Subject: [PATCH 3/3] ARM: mach-shmobile: lager: support GPIO switches
+In-Reply-To: <CANqRtoTj+FnxrtOayxQYCxkyuP4XGeCaXpNUbPsFV4kyBD_48Q@mail.gmail.com>
+References: <1368435233-8587-1-git-send-email-horms+renesas@verge.net.au>
+ <20130514025941.GC20239@verge.net.au>
+ <CANqRtoTj+FnxrtOayxQYCxkyuP4XGeCaXpNUbPsFV4kyBD_48Q@mail.gmail.com>
+Message-ID: <18009427.QVeP3MCVSV@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 10:46 AM, Srinivas KANDAGATLA
-<srinivas.kandagatla@st.com> wrote:
-> On 13/05/13 20:05, Linus Walleij wrote:
+Hi Magnus,
 
->> Why are you enabling the timer in unused and shutdown mode?
->>
->> This doesn't make sense.
->
-> It is because we are using the global-timer block for both clocksource
-> and clockevents and we do not want the clocksource to disappear when
-> clockevent is unused/shutdown.
+On Tuesday 14 May 2013 15:09:08 Magnus Damm wrote:
+> On Tue, May 14, 2013 at 11:59 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Tue, May 14, 2013 at 12:35:20AM +0200, Laurent Pinchart wrote:
+> >> On Monday 13 May 2013 17:53:53 Simon Horman wrote:
+> >> > The lager board has pins 1 - 4 of SW2 wired up to GPIO pins.
+> >> > This patch allows access to those pins as KEYS 1 - 4 using
+> >> > gpio-keys.
+> >> > 
+> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >> > 
+> >> > ---
+> >> > 
+> >> > This patch has run time dependencies on
+> >> > 1. "gpio-rcar: Add support for IRQ_TYPE_EDGE_BOTH"
+> >> > 2. "ARM: shmobile: r8a7790: Configure R-Car GPIO for
+> >> > IRQ_TYPE_EDGE_BOTH"
+> >> > 
+> >> > Without those dependencies satisfied the gpio-keys driver will
+> >> > fail to be initialise itself. The boot should be otherwise successful
+> >> > and the board otherwise functional.
+> >> > ---
+> >> > 
+> >> >  arch/arm/mach-shmobile/board-lager.c | 22 ++++++++++++++++++++++
+> >> >  1 file changed, 22 insertions(+)
+> >> > 
+> >> > diff --git a/arch/arm/mach-shmobile/board-lager.c
+> >> > b/arch/arm/mach-shmobile/board-lager.c index 6a1ba38..4d1b42b 100644
+> >> > --- a/arch/arm/mach-shmobile/board-lager.c
+> >> > +++ b/arch/arm/mach-shmobile/board-lager.c
+> >> > @@ -18,7 +18,10 @@
+> >> > 
+> >> >   * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 
+> >> >   02110-1301
+> >> > 
+> >> > USA */
+> >> > 
+> >> > +#include <linux/gpio.h>
+> >> > +#include <linux/gpio_keys.h>
+> >> > 
+> >> >  #include <linux/interrupt.h>
+> >> > 
+> >> > +#include <linux/input.h>
+> >> 
+> >> My dictionary lists input before interrupt :-)
+> > 
+> > Thanks, I will fix that.
+> > 
+> >> >  #include <linux/irqchip.h>
+> >> >  #include <linux/kernel.h>
+> >> >  #include <linux/leds.h>
+> >> > 
+> >> > @@ -52,6 +55,22 @@ static struct gpio_led_platform_data
+> >> > lager_leds_pdata = { .num_leds   = ARRAY_SIZE(lager_leds),
+> >> > 
+> >> >  };
+> >> > 
+> >> > +/* GPIO KEY */
+> >> > +#define GPIO_KEY(c, g, d, ...) \
+> >> > +   { .code = c, .gpio = g, .desc = d, .active_low = 1 }
+> >> > +
+> >> > +static struct gpio_keys_button gpio_buttons[] = {
+> >> > +   GPIO_KEY(KEY_4,         RCAR_GP_PIN(1, 28),     "SW2-pin4"),
+> >> > +   GPIO_KEY(KEY_3,         RCAR_GP_PIN(1, 26),     "SW2-pin3"),
+> >> > +   GPIO_KEY(KEY_2,         RCAR_GP_PIN(1, 24),     "SW2-pin2"),
+> >> > +   GPIO_KEY(KEY_1,         RCAR_GP_PIN(1, 14),     "SW2-pin1"),
+> >> > +};
+> >> > +
+> >> > +static struct gpio_keys_platform_data lager_keys_pdata = {
+> >> > +   .buttons        = gpio_buttons,
+> >> > +   .nbuttons       = ARRAY_SIZE(gpio_buttons),
+> >> > +};
+> >> > +
+> >> 
+> >> Could you please also update the lager dts file ?
+> > 
+> > I wonder if in that case we can remove the C code above.
+> > And probably the C code for the GPIO leds too.
+> > 
+> > Magnus, could you clarify how you would like
+> > C-code and DTS to look on the lager board?
+> 
+> I'd like C and DTS to coexist in parallel until we can ditch C fully.
+> I believe there is a need for us to be able to back port the C code.
+> For the future we want to use DTS.
+> 
+> To support DTS for Lager I think you should create a -reference DTS
+> file for Lager where you put the DT version of your GPIO LED / switch
+> code. At the time when we can configure the PFC via PINCTRL DT then I
+> believe we should be able to replace most of the platform device code
+> with DT versions.
 
-As this is clearly a per-cpu timer (correct? atleast the driver is
-written that way) and say you have 4 CPUs, why would you not shut down
-the timer on cores 1,2,3 and only leave the timer on core 0 on?
+I've sent an RFC for gpio-rcar DT bindings, and I'll send one for sh-pfc in 
+the next few days. DT support for GPIO and PINCTRL should then hopefully be 
+available very soon.
 
-The kernel will by necessity not shut down the clock event on core
-0 anyway.
+> At that we should hopefully be able to ditch all the C board code,
 
-On a related note: don't you want to use the counter in this block as
-sched_clock() as well? (I guess so, as you do not seem to have
-anything else on this system.) It'd probably need to be a separate
-Kconfig option and can surely be done later but keep it in mind.
+Will we also ditch non-reference board files ?
 
-Yours,
-Linus Walleij
+> or maybe we need to keep some around until we have the common clocks
+> going...
+
+What's the status of CCF support development in sh-mobile ?
+
+-- 
+Regards,
+
+Laurent Pinchart
