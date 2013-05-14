@@ -1,104 +1,153 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 May 2013 15:13:29 +0100
-Subject: [PATCH v4 01/32] arm64: KVM: define HYP and Stage-2 translation page
- flags
+Date: Tue, 14 May 2013 15:13:34 +0100
+Subject: [PATCH v4 06/32] arm64: KVM: fault injection into a guest
 In-Reply-To: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
 References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1368540840-26750-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1368540840-26750-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add HYP and S2 page flags, for both normal and device memory.
+Implement the injection of a fault (undefined, data abort or
+prefetch abort) into a 64bit guest.
 
 Reviewed-by: Christopher Covington <cov@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/memory.h        |  5 +++++
- arch/arm64/include/asm/pgtable-hwdef.h | 19 +++++++++++++++++++
- arch/arm64/include/asm/pgtable.h       | 11 +++++++++++
- 3 files changed, 35 insertions(+)
+ arch/arm64/kvm/inject_fault.c | 126 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 126 insertions(+)
+ create mode 100644 arch/arm64/kvm/inject_fault.c
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 381f556..15745a7c 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -90,6 +90,11 @@
- #define MT_NORMAL_NC		3
- #define MT_NORMAL		4
- 
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+new file mode 100644
+index 0000000..54f6562
+--- /dev/null
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -0,0 +1,126 @@
 +/*
-+ * Default memory type for Stage-2 translation
++ * Fault injection for 64bit guests.
++ *
++ * Copyright (C) 2012,2013 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * Based on arch/arm/kvm/emulate.c
++ * Copyright (C) 2012 - Virtual Open Systems and Columbia University
++ * Author: Christoffer Dall <c.dall@virtualopensystems.com>
++ *
++ * This program is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#define MT_S2_NORMAL		0xf
 +
- #ifndef __ASSEMBLY__
- 
- extern phys_addr_t		memstart_addr;
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 75fd13d..66367c6 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -35,6 +35,7 @@
- /*
-  * Section
-  */
-+#define PMD_SECT_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
- #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
- #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
- #define PMD_SECT_NG		(_AT(pmdval_t, 1) << 11)
-@@ -68,6 +69,24 @@
- #define PTE_ATTRINDX_MASK	(_AT(pteval_t, 7) << 2)
- 
- /*
-+ * 2nd stage PTE definitions
++#include <linux/kvm_host.h>
++#include <asm/kvm_emulate.h>
++#include <asm/esr.h>
++
++#define PSTATE_FAULT_BITS_64 	(PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | \
++				 PSR_I_BIT | PSR_D_BIT)
++#define EL1_EXCEPT_SYNC_OFFSET	0x200
++
++static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
++{
++	unsigned long cpsr = *vcpu_cpsr(vcpu);
++	bool is_aarch32;
++	u32 esr = 0;
++
++	is_aarch32 = vcpu_mode_is_32bit(vcpu);
++
++	*vcpu_spsr(vcpu) = cpsr;
++	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
++
++	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
++	*vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + EL1_EXCEPT_SYNC_OFFSET;
++
++	vcpu_sys_reg(vcpu, FAR_EL1) = addr;
++
++	/*
++	 * Build an {i,d}abort, depending on the level and the
++	 * instruction set. Report an external synchronous abort.
++	 */
++	if (kvm_vcpu_trap_il_is32bit(vcpu))
++		esr |= ESR_EL1_IL;
++
++	/*
++	 * Here, the guest runs in AArch64 mode when in EL1. If we get
++	 * an AArch32 fault, it means we managed to trap an EL0 fault.
++	 */
++	if (is_aarch32 || (cpsr & PSR_MODE_MASK) == PSR_MODE_EL0t)
++		esr |= (ESR_EL1_EC_IABT_EL0 << ESR_EL1_EC_SHIFT);
++	else
++		esr |= (ESR_EL1_EC_IABT_EL1 << ESR_EL1_EC_SHIFT);
++
++	if (!is_iabt)
++		esr |= ESR_EL1_EC_DABT_EL0;
++
++	vcpu_sys_reg(vcpu, ESR_EL1) = esr | ESR_EL2_EC_xABT_xFSR_EXTABT;
++}
++
++static void inject_undef64(struct kvm_vcpu *vcpu)
++{
++	unsigned long cpsr = *vcpu_cpsr(vcpu);
++	u32 esr = (ESR_EL1_EC_UNKNOWN << ESR_EL1_EC_SHIFT);
++
++	*vcpu_spsr(vcpu) = cpsr;
++	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
++
++	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
++	*vcpu_pc(vcpu) = vcpu_sys_reg(vcpu, VBAR_EL1) + EL1_EXCEPT_SYNC_OFFSET;
++
++	/*
++	 * Build an unknown exception, depending on the instruction
++	 * set.
++	 */
++	if (kvm_vcpu_trap_il_is32bit(vcpu))
++		esr |= ESR_EL1_IL;
++
++	vcpu_sys_reg(vcpu, ESR_EL1) = esr;
++}
++
++/**
++ * kvm_inject_dabt - inject a data abort into the guest
++ * @vcpu: The VCPU to receive the undefined exception
++ * @addr: The address to report in the DFAR
++ *
++ * It is assumed that this code is called from the VCPU thread and that the
++ * VCPU therefore is not currently executing guest code.
 + */
-+#define PTE_S2_RDONLY		(_AT(pteval_t, 1) << 6)   /* HAP[2:1] */
-+#define PTE_S2_RDWR		(_AT(pteval_t, 3) << 6)   /* HAP[2:1] */
++void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
++{
++	inject_abt64(vcpu, false, addr);
++}
 +
-+/*
-+ * Memory Attribute override for Stage-2 (MemAttr[3:0])
++/**
++ * kvm_inject_pabt - inject a prefetch abort into the guest
++ * @vcpu: The VCPU to receive the undefined exception
++ * @addr: The address to report in the DFAR
++ *
++ * It is assumed that this code is called from the VCPU thread and that the
++ * VCPU therefore is not currently executing guest code.
 + */
-+#define PTE_S2_MEMATTR(t)	(_AT(pteval_t, (t)) << 2)
-+#define PTE_S2_MEMATTR_MASK	(_AT(pteval_t, 0xf) << 2)
++void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
++{
++	inject_abt64(vcpu, true, addr);
++}
 +
-+/*
-+ * EL2/HYP PTE/PMD definitions
++/**
++ * kvm_inject_undefined - inject an undefined instruction into the guest
++ *
++ * It is assumed that this code is called from the VCPU thread and that the
++ * VCPU therefore is not currently executing guest code.
 + */
-+#define PMD_HYP			PMD_SECT_USER
-+#define PTE_HYP			PTE_USER
-+
-+/*
-  * 40-bit physical address supported.
-  */
- #define PHYS_MASK_SHIFT		(40)
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index e333a24..34ba9ba 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -76,6 +76,11 @@ extern pgprot_t pgprot_default;
- #define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY)
- #define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY)
- 
-+#define PAGE_HYP		_MOD_PROT(pgprot_default, PTE_HYP)
-+#define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
-+
-+#define PAGE_S2			__pgprot_modify(pgprot_default, PTE_S2_MEMATTR_MASK, PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
-+
- #define __PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE)
- #define __PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
- #define __PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
-@@ -197,6 +202,12 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 
- #define pmd_bad(pmd)		(!(pmd_val(pmd) & 2))
- 
-+#define pmd_table(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
-+				 PMD_TYPE_TABLE)
-+#define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
-+				 PMD_TYPE_SECT)
-+
-+
- static inline void set_pmd(pmd_t *pmdp, pmd_t pmd)
- {
- 	*pmdp = pmd;
++void kvm_inject_undefined(struct kvm_vcpu *vcpu)
++{
++	inject_undef64(vcpu);
++}
 -- 
 1.8.2.3
