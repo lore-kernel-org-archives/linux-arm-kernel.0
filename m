@@ -1,739 +1,422 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue, 14 May 2013 09:30:38 +0800
-Subject: [PATCH 2/5] clk: hi3xxx: add clock support
-In-Reply-To: <20130513194703.10068.4450@quantum>
-References: <1366368567-17322-1-git-send-email-haojian.zhuang@linaro.org>
- <1366368567-17322-2-git-send-email-haojian.zhuang@linaro.org>
- <20130513194703.10068.4450@quantum>
-Message-ID: <CAD6h2NRqR4Qzpj8x7XTZZ+T==yBf3rq_VooAXNO4HOHb74pGZQ@mail.gmail.com>
+From: wlewis569@gmail.com (Walter Lewis)
+Date: Mon, 13 May 2013 21:01:08 -0500
+Subject: owfs hangup on Linux 3.0.4 using DS28EC20 Dallas 1-wire EEPROM
+Message-ID: <40441033-818A-4634-8E02-20567162B98B@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 May 2013 03:47, Mike Turquette <mturquette@linaro.org> wrote:
-> Quoting Haojian Zhuang (2013-04-19 03:49:24)
->> diff --git a/drivers/clk/clk-hi3xxx.c b/drivers/clk/clk-hi3xxx.c
->> new file mode 100644
->> index 0000000..e93e583
->> --- /dev/null
->> +++ b/drivers/clk/clk-hi3xxx.c
->> @@ -0,0 +1,641 @@
->> +/*
->> + * Hisilicon clock driver
->> + *
->> + * Copyright (c) 2012-2013 Hisilicon Limited.
->> + * Copyright (c) 2012-2013 Linaro Limited.
->> + *
->> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
->> + *        Xin Li <li.xin@linaro.org>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License along
->> + * with this program; if not, write to the Free Software Foundation, Inc.,
->> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
->> + *
->> + */
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/clk-provider.h>
->> +#include <linux/clk-private.h>
->
-> clk-private.h is deprecated and can no longer be included by any new
-> clock drivers.  It will hopefully be removed in 3.11.  Please remove it
-> in your next version.
->
-OK. I'll remove it.
+Greetings,
 
->> +#include <linux/clkdev.h>
->> +#include <linux/delay.h>
->> +#include <linux/io.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_device.h>
->> +#include <linux/slab.h>
->> +#include <linux/clk.h>
->> +
->> +#define HI3620_DISABLE_OFF             0x4
->> +#define HI3620_STATUS_OFF              0x8
->> +
->> +#define WIDTH_TO_MASK(width)   ((1 << (width)) - 1)
->> +
->> +/*
->> + * The reverse of DIV_ROUND_UP: The maximum number which
->> + * divided by m is r
->> + */
->> +#define MULT_ROUND_UP(r, m) ((r) * (m) + (m) - 1)
->> +
->> +struct hi3620_periclk {
->> +       struct clk_hw   hw;
->> +       void __iomem    *enable;        /* enable register */
->> +       void __iomem    *reset;         /* reset register */
->> +       u32             ebits;          /* bits in enable/disable register */
->> +       u32             rbits;          /* bits in reset/unreset register */
->> +       spinlock_t      *lock;
->> +};
->> +
->> +struct hi3620_muxclk {
->> +       struct clk_hw   hw;
->> +       void __iomem    *reg;           /* mux register */
->> +       u8              shift;
->> +       u8              width;
->> +       u32             mbits;          /* mask bits in mux register */
->
-> You need shift, width AND a mask?  Normally either shift+width OR a mask
-> would suffice.
+I am implementing a Maxim 1-Wire DS28EC20 EEPROM on an embedded Linux application with the objective of writing identification information and manufacturing data on a removable component.  I have configured the kernel for 1-Wire support, and have applied the patch for the w1-gpio module implementation. When I insert the w1-gpio module, the /sys/bus/w1 directory becomes present and the target EEPROM is reported.  There is a file present named rw which I can cat (looks binary), but when I pipe data to it, and then read it back, it does not change. I suspect the block nature of the device and its control mechanisms require a more sophisticated write operation. I investigated the owfs which supports read and write on the DS_2433 EEPROM, and am attempting to implement it.  When I do not have the device attached, using owfs, I can 'ls' the owfs mount point.  When a device is attached and the Linux w1 directory (/sys/bus/w1/...) shows it, a 'ls' command on the owfs mount point causes the owfs application to become unresponsive and the ls command never completes. owfs in background mode does not respond to a control C and requires a kill -9 to stop, and once stopped, the ownership and permissions of the owfs mountpoint appear corrupted.  A power cycle restores the mount point. owfs in forground mode does respond to control C and leaves the ownership and permissions in a sane state.
 
-No, it's a little different. In their mux registers, there're two
-parts. One is lower
-16 bits that are used to set mux, and the other is higher 16 bits that are
-used to set mux mask.
+In order to isolate the problem, I have attempted this implementation using owfs with the w1_kernel module and a file system mountpoint; owhttpd with the w1 kernel module and a web page display; and with a owserver with w1 kernel module and a socket connection paired with a owhttpd server attached to the socket connection and a web page display. None of these combinations has solved the hang up condition and output is not to the file system or web page. The 'looking for directory and directory not found' errors occur in owfs, owhttpd and owserver when the component becomes visible to the kernel. I have also tried this with DS2431 EEPROM with the same results.
 
-At here, I use mbits for higher 16 bits and shift & width for lower 16 bits.
+Below is my system information.  To get to the place where the error occurs, search for: **** ERROR *** . Also, note that the looking for directory and directory not found errors occur in owhttpd and owserver when the component becomes visible to the kernel.
 
->
->> +       spinlock_t      *lock;
->> +};
->> +
->> +struct hi3620_divclk {
->> +       struct clk_hw   hw;
->> +       void __iomem    *reg;           /* divider register */
->> +       u8              shift;
->> +       u8              width;
->> +       u32             mbits;          /* mask bits in divider register */
->
-> Ditto.
+Thank you in advance for your help and assistance.  Please let me know if you need more information or have something you would like me to try.
 
-I can't replace. There's the same reason in above.
+Walter,
 
->
->> +       const struct clk_div_table      *table;
->> +       spinlock_t      *lock;
->> +};
->> +
->> +struct hs_clk {
->> +       void __iomem    *pmctrl;
->> +       void __iomem    *sctrl;
->> +       spinlock_t      lock;
->> +};
->> +
->> +static struct hs_clk hs_clk;
->> +
->> +static void __init hs_init_clocks(void)
->> +{
->> +       struct device_node *node = NULL;
->> +
->> +       if (!hs_clk.pmctrl) {
->> +               /* map pmctrl registers */
->> +               node = of_find_compatible_node(NULL, NULL, "hisilicon,pmctrl");
->> +               hs_clk.pmctrl = of_iomap(node, 0);
->> +               WARN_ON(!hs_clk.pmctrl);
->> +       }
->> +
->> +       if (!hs_clk.sctrl) {
->> +               node = of_find_compatible_node(NULL, NULL, "hisilicon,sctrl");
->> +               hs_clk.sctrl = of_iomap(node, 0);
->> +       }
->> +}
->> +
->> +static int hi3620_clkgate_prepare(struct clk_hw *hw)
->> +{
->> +       struct hi3620_periclk *pclk;
->> +       unsigned long flags = 0;
->> +
->> +       pclk = container_of(hw, struct hi3620_periclk, hw);
->> +
->> +       if (pclk->lock)
->> +               spin_lock_irqsave(pclk->lock, flags);
->> +       writel_relaxed(pclk->ebits, pclk->enable + HI3620_DISABLE_OFF);
->> +       writel_relaxed(pclk->rbits, pclk->reset + HI3620_DISABLE_OFF);
->> +       readl_relaxed(pclk->reset + HI3620_STATUS_OFF);
->> +       if (pclk->lock)
->> +               spin_unlock_irqrestore(pclk->lock, flags);
->> +       return 0;
->> +}
->> +
->> +static int hi3620_clkgate_enable(struct clk_hw *hw)
->> +{
->> +       struct hi3620_periclk *pclk;
->> +       unsigned long flags = 0;
->> +
->> +       pclk = container_of(hw, struct hi3620_periclk, hw);
->> +       if (pclk->lock)
->> +               spin_lock_irqsave(pclk->lock, flags);
->> +       writel_relaxed(pclk->ebits, pclk->enable);
->> +       readl_relaxed(pclk->enable + HI3620_STATUS_OFF);
->> +       if (pclk->lock)
->> +               spin_unlock_irqrestore(pclk->lock, flags);
->> +       return 0;
->> +}
->> +
->> +static void hi3620_clkgate_disable(struct clk_hw *hw)
->> +{
->> +       struct hi3620_periclk *pclk;
->> +       unsigned long flags = 0;
->> +
->> +       pclk = container_of(hw, struct hi3620_periclk, hw);
->> +       if (pclk->lock)
->> +               spin_lock_irqsave(pclk->lock, flags);
->> +       writel_relaxed(pclk->ebits, pclk->enable + HI3620_DISABLE_OFF);
->> +       readl_relaxed(pclk->enable + HI3620_STATUS_OFF);
->> +       if (pclk->lock)
->> +               spin_unlock_irqrestore(pclk->lock, flags);
->> +}
->> +
->> +static struct clk_ops hi3620_clkgate_ops = {
->> +       .prepare        = hi3620_clkgate_prepare,
->> +       .enable         = hi3620_clkgate_enable,
->> +       .disable        = hi3620_clkgate_disable,
->
-> .unprepare?
+Details:
 
-I didn't implement unprepare at here. Since I find some device controller
-as uart not working if I disable clocks in unprepare(). Now I leave it as
-unimplemented.
+My target system is a Vendor's TI Omap 4460 based System On a Module, running the omap linux kernel version 3.0.4 (uname -a: Linux <HOST> 3.4.0-1489-omap4 #26~Custom SMP PREEMPT Sat May 11 10:56:25 CDT 2013 armv7l armv7l armv7l GNU/Linux.  I cannot advance this kernel revision until our Vendor supports a newer version. This is cross compiled from a Ubuntu development system, (uname -a: Linux <host> 3.2.0-41-generic #66-Ubuntu SMP Thu Apr 25 03:27:11 UTC 2013 x86_64 x86_64 x86_64 GNU/Linux) with the 'arm-linux-gnueabihf' cross compiler.
 
->
->> +};
->> +
->> +static void __init hi3620_clkgate_setup(struct device_node *np)
->> +{
->> +       struct hi3620_periclk *pclk;
->> +       struct clk_init_data *init;
->> +       struct clk *clk;
->> +       const char *clk_name, *name, **parent_names;
->> +       u32 rdata[2], gdata[2];
->> +
->> +       if (!hs_clk.sctrl)
->> +               return;
->> +
->> +       if (of_property_read_string(np, "clock-output-names", &clk_name))
->> +               return;
->> +       if (of_property_read_u32_array(np, "hisilicon,hi3620-clkreset",
->> +                                      &rdata[0], 2))
->> +               return;
->> +       if (of_property_read_u32_array(np, "hisilicon,hi3620-clkgate",
->> +                                      &gdata[0], 2))
->> +               return;
->> +
->> +       /* gate only has the fixed parent */
->> +       parent_names = kzalloc(sizeof(char *), GFP_KERNEL);
->> +       if (!parent_names)
->> +               return;
->> +       parent_names[0] = of_clk_get_parent_name(np, 0);
->> +
->> +       pclk = kzalloc(sizeof(*pclk), GFP_KERNEL);
->> +       if (!pclk)
->> +               goto err_pclk;
->> +
->> +       init = kzalloc(sizeof(*init), GFP_KERNEL);
->> +       if (!init)
->> +               goto err_init;
->> +       init->name = kstrdup(clk_name, GFP_KERNEL);
->> +       init->ops = &hi3620_clkgate_ops;
->> +       init->flags = CLK_SET_RATE_PARENT;
->> +       init->parent_names = parent_names;
->> +       init->num_parents = 1;
->> +
->> +       pclk->reset = hs_clk.sctrl + rdata[0];
->> +       pclk->rbits = rdata[1];
->> +       pclk->enable = hs_clk.sctrl + gdata[0];
->> +       pclk->ebits = gdata[1];
->> +       pclk->lock = &hs_clk.lock;
->> +       pclk->hw.init = init;
->> +
->> +       clk = clk_register(NULL, &pclk->hw);
->> +       if (IS_ERR(clk))
->> +               goto err_clk;
->> +       if (!of_property_read_string(np, "clock-names", &name))
->> +               clk_register_clkdev(clk, name, NULL);
->> +       of_clk_add_provider(np, of_clk_src_simple_get, clk);
->> +       return;
->> +err_clk:
->> +       kfree(init);
->> +err_init:
->> +       kfree(pclk);
->> +err_pclk:
->> +       kfree(parent_names);
->> +}
->> +
->> +static u8 hi3620_clk_get_parent(struct clk_hw *hw)
->> +{
->> +       struct hi3620_muxclk *mclk;
->> +       u32 data;
->> +       unsigned long flags = 0;
->> +
->> +       mclk = container_of(hw, struct hi3620_muxclk, hw);
->> +
->> +       if (mclk->lock)
->> +               spin_lock_irqsave(mclk->lock, flags);
->> +
->> +       data = readl_relaxed(mclk->reg) >> mclk->shift;
->> +       data &= WIDTH_TO_MASK(mclk->width);
->> +
->> +       if (mclk->lock)
->> +               spin_unlock_irqrestore(mclk->lock, flags);
->> +
->> +       if (data >= __clk_get_num_parents(hw->clk))
->> +               return -EINVAL;
->> +
->> +       return (u8)data;
->> +}
->> +
->> +static int hi3620_clk_set_parent(struct clk_hw *hw, u8 index)
->> +{
->> +       struct hi3620_muxclk *mclk;
->> +       u32 data;
->> +       unsigned long flags = 0;
->> +
->> +       mclk = container_of(hw, struct hi3620_muxclk, hw);
->> +
->> +       if (mclk->lock)
->> +               spin_lock_irqsave(mclk->lock, flags);
->> +
->> +       data = readl_relaxed(mclk->reg);
->> +       data &= ~(WIDTH_TO_MASK(mclk->width) << mclk->shift);
->> +       data |= index << mclk->shift;
->> +       writel_relaxed(data, mclk->reg);
->> +       /* set mask enable bits */
->> +       data |= mclk->mbits;
->> +       writel_relaxed(data, mclk->reg);
->
-> Is mclk->mbits equivalent to (mclk->width << mclk->shift)?  If so you
-> can drop shift+width and use only the mask + helpers like ffs().  If
-> that is the case then this clock can probably use the generic clk-mux
-> type.
+My kernel configuration options are:
+(1-Wire)
+    CONFIG_W1=m
+    CONFIG_W1_CON=y
+    CONFIG_W1_MASTER_DS1WM=m
+    CONFIG_W1_MASTER_DS2482=m
+    CONFIG_W1_MASTER_DS2490=m
+    CONFIG_W1_MASTER_GPIO=m
+    CONFIG_W1_SLAVE_BQ27000=m
+    CONFIG_W1_SLAVE_DS2408=m
+    CONFIG_W1_SLAVE_DS2423=m
+    CONFIG_W1_SLAVE_DS2431=m
+    CONFIG_W1_SLAVE_DS2433=m
+    # CONFIG_W1_SLAVE_DS2433_CRC is not set
+    CONFIG_W1_SLAVE_DS2760=m
+    CONFIG_W1_SLAVE_DS2780=m
+    # CONFIG_W1_SLAVE_DS2781 is not set
+    CONFIG_W1_SLAVE_SMEM=m
+    CONFIG_W1_SLAVE_THERM=m
+(Fuse)
+    CONFIG_FUSE_FS=y
 
-No, I can't replace. Since they have higher 16 bits for mask bits.
+I installed owfs by:
+Downloading from SourceForge, the latest version of owfs (owfs-2.9p0.tar.gz), and copied it to the target system.
+Logged in as root on the target system, I:
+    expanded the download package on the target system, ran configure, make, and make install. 
+    owfs was missing because the fuse.h file could not be found. 
+    I ran apt-get install libfuse-dev
+    I deleted the unzipped owfs directory, and performed the installation again.  This was successful.
 
->
->> +
->> +       if (mclk->lock)
->> +               spin_unlock_irqrestore(mclk->lock, flags);
->> +
->> +       return 0;
->> +}
->> +
->> +static struct clk_ops hi3620_clkmux_ops = {
->> +       .get_parent     = hi3620_clk_get_parent,
->> +       .set_parent     = hi3620_clk_set_parent,
->> +};
->> +
->> +static void __init hi3620_clkmux_setup(struct device_node *np)
->> +{
->> +       struct hi3620_muxclk *mclk;
->> +       struct clk_init_data *init;
->> +       struct clk *clk;
->> +       const char *clk_name, **parent_names;
->> +       u32 rdata[2];
->> +       u8 num_parents;
->> +       int i;
->> +
->> +       hs_init_clocks();
->> +       if (!hs_clk.sctrl)
->> +               return;
->> +
->> +       if (of_property_read_string(np, "clock-output-names", &clk_name))
->> +               return;
->> +       if (of_property_read_u32_array(np, "hisilicon,hi3620-clkmux",
->> +                                      &rdata[0], 2))
->> +               return;
->> +       /* get the count of items in mux */
->> +       for (i = 0; ; i++) {
->> +               /* parent's #clock-cells property is always 0 */
->> +               if (!of_parse_phandle(np, "clocks", i))
->> +                       break;
->> +       }
->> +       parent_names = kzalloc(sizeof(char *) * i, GFP_KERNEL);
->> +       if (!parent_names)
->> +               return;
->> +
->> +       for (num_parents = i, i = 0; i < num_parents; i++)
->> +               parent_names[i] = of_clk_get_parent_name(np, i);
->> +
->> +       mclk = kzalloc(sizeof(*mclk), GFP_KERNEL);
->> +       if (!mclk)
->> +               goto err_mclk;
->> +       init = kzalloc(sizeof(*init), GFP_KERNEL);
->> +       if (!init)
->> +               goto err_init;
->> +       init->name = kstrdup(clk_name, GFP_KERNEL);
->> +       init->ops = &hi3620_clkmux_ops;
->> +       init->flags = CLK_SET_RATE_PARENT;
->> +       init->parent_names = parent_names;
->> +       init->num_parents = num_parents;
->> +
->> +       mclk->reg = hs_clk.sctrl + rdata[0];
->> +       /* enable_mask bits are in higher 16bits */
->> +       mclk->mbits = rdata[1] << 16;
->> +       mclk->shift = ffs(rdata[1]) - 1;
->> +       mclk->width = fls(rdata[1]) - ffs(rdata[1]) + 1;
->> +       mclk->lock = &hs_clk.lock;
->> +       mclk->hw.init = init;
->> +
->> +       clk = clk_register(NULL, &mclk->hw);
->> +       if (IS_ERR(clk))
->> +               goto err_clk;
->> +       of_clk_add_provider(np, of_clk_src_simple_get, clk);
->> +
->> +       return;
->> +err_clk:
->> +       kfree(init);
->> +err_init:
->> +       kfree(mclk);
->> +err_mclk:
->> +       kfree(parent_names);
->> +}
->> +
->> +static void __init hs_clkgate_setup(struct device_node *np)
->> +{
->> +       struct clk *clk;
->> +       const char *clk_name, **parent_names, *name;
->> +       unsigned long flags = 0;
->> +       u32 data[2];
->> +
->> +       hs_init_clocks();
->> +       if (!hs_clk.sctrl)
->> +               return;
->> +       if (of_property_read_string(np, "clock-output-names", &clk_name))
->> +               return;
->> +       if (of_property_read_u32_array(np, "hisilicon,clkgate",
->> +                                      &data[0], 2))
->> +               return;
->> +       if (of_property_read_bool(np, "hisilicon,clkgate-inverted"))
->> +               flags = CLK_GATE_SET_TO_DISABLE;
->> +       /* gate only has the fixed parent */
->> +       parent_names = kzalloc(sizeof(char *), GFP_KERNEL);
->> +       if (!parent_names)
->> +               return;
->> +       parent_names[0] = of_clk_get_parent_name(np, 0);
->> +
->> +       clk = clk_register_gate(NULL, clk_name, parent_names[0], 0,
->> +                               hs_clk.sctrl + data[0], (u8)data[1], flags,
->> +                               &hs_clk.lock);
->> +       if (IS_ERR(clk))
->> +               goto err;
->> +       if (!of_property_read_string(np, "clock-names", &name))
->> +               clk_register_clkdev(clk, name, NULL);
->> +       of_clk_add_provider(np, of_clk_src_simple_get, clk);
->> +       return;
->> +err:
->> +       kfree(parent_names);
->> +}
->
-> I'm working on clock bindings for the generic clock types, so hopefully
-> this can be replaced by those instead of using your own compatible
-> string to wrap around clk_register_gate.
+I inserted the w1 modules using modprobe.  I have tried this with w1-gpio (+ wire); w1_ds2433 (+ wire); and w1_gpio and w1_ds2433 (+wire).  According to the Maxim datasheet, the DS28EC20 is highly backwards compatible with the 2433 part.
 
-It's great. Could you cc me when you send patches out?
+As described above, when the part is attached, the kernel shows the part's presence, bit the owfs mount point hangs up when attempting to display it.
 
->
->> +
->> +void __init hs_fixed_factor_setup(struct device_node *np)
->> +{
->> +       struct clk *clk;
->> +       const char *clk_name, **parent_names;
->> +       u32 data[2];
->> +
->> +       if (of_property_read_string(np, "clock-output-names", &clk_name))
->> +               return;
->> +       if (of_property_read_u32_array(np, "hisilicon,fixed-factor",
->> +                                      data, 2))
->> +               return ;
->> +       /* gate only has the fixed parent */
->> +       parent_names = kzalloc(sizeof(char *), GFP_KERNEL);
->> +       if (!parent_names)
->> +               return;
->> +       parent_names[0] = of_clk_get_parent_name(np, 0);
->> +
->> +       clk = clk_register_fixed_factor(NULL, clk_name, parent_names[0], 0,
->> +                                       data[0], data[1]);
->> +       if (IS_ERR(clk))
->> +               goto err;
->> +       of_clk_add_provider(np, of_clk_src_simple_get, clk);
->> +       return;
->> +err:
->> +       kfree(parent_names);
->> +}
->
-> Ditto.
->
->> +
->> +static unsigned int hi3620_get_table_maxdiv(const struct clk_div_table *table)
->> +{
->> +       unsigned int maxdiv = 0;
->> +       const struct clk_div_table *clkt;
->> +
->> +       for (clkt = table; clkt->div; clkt++)
->> +               if (clkt->div > maxdiv)
->> +                       maxdiv = clkt->div;
->> +       return maxdiv;
->> +}
->> +
->> +static unsigned int hi3620_get_table_div(const struct clk_div_table *table,
->> +                                                       unsigned int val)
->> +{
->> +       const struct clk_div_table *clkt;
->> +
->> +       for (clkt = table; clkt->div; clkt++)
->> +               if (clkt->val == val)
->> +                       return clkt->div;
->> +       return 0;
->> +}
->> +
->> +static unsigned int hi3620_get_table_val(const struct clk_div_table *table,
->> +                                        unsigned int div)
->> +{
->> +       const struct clk_div_table *clkt;
->> +
->> +       for (clkt = table; clkt->div; clkt++)
->> +               if (clkt->div == div)
->> +                       return clkt->val;
->> +       return 0;
->> +}
->> +
->> +static unsigned long hi3620_clkdiv_recalc_rate(struct clk_hw *hw,
->> +                                              unsigned long parent_rate)
->> +{
->> +       struct hi3620_divclk *dclk = container_of(hw, struct hi3620_divclk, hw);
->> +       unsigned int div, val;
->> +
->> +       val = readl_relaxed(dclk->reg) >> dclk->shift;
->> +       val &= WIDTH_TO_MASK(dclk->width);
->> +
->> +       div = hi3620_get_table_div(dclk->table, val);
->> +       if (!div) {
->> +               pr_warning("%s: Invalid divisor for clock %s\n", __func__,
->> +                          __clk_get_name(hw->clk));
->> +               return parent_rate;
->> +       }
->> +
->> +       return parent_rate / div;
->> +}
->> +
->> +static bool hi3620_is_valid_table_div(const struct clk_div_table *table,
->> +                                     unsigned int div)
->> +{
->> +       const struct clk_div_table *clkt;
->> +
->> +       for (clkt = table; clkt->div; clkt++)
->> +               if (clkt->div == div)
->> +                       return true;
->> +       return false;
->> +}
->> +
->> +static int hi3620_clkdiv_bestdiv(struct clk_hw *hw, unsigned long rate,
->> +                                unsigned long *best_parent_rate)
->> +{
->> +       struct hi3620_divclk *dclk = container_of(hw, struct hi3620_divclk, hw);
->> +       struct clk *clk_parent = __clk_get_parent(hw->clk);
->> +       int i, bestdiv = 0;
->> +       unsigned long parent_rate, best = 0, now, maxdiv;
->> +
->> +       maxdiv = hi3620_get_table_maxdiv(dclk->table);
->> +
->> +       if (!(__clk_get_flags(hw->clk) & CLK_SET_RATE_PARENT)) {
->> +               parent_rate = *best_parent_rate;
->> +               bestdiv = DIV_ROUND_UP(parent_rate, rate);
->> +               bestdiv = bestdiv == 0 ? 1 : bestdiv;
->> +               bestdiv = bestdiv > maxdiv ? maxdiv : bestdiv;
->> +               return bestdiv;
->> +       }
->> +
->> +       /*
->> +        * The maximum divider we can use without overflowing
->> +        * unsigned long in rate * i below
->> +        */
->> +       maxdiv = min(ULONG_MAX / rate, maxdiv);
->> +
->> +       for (i = 1; i <= maxdiv; i++) {
->> +               if (!hi3620_is_valid_table_div(dclk->table, i))
->> +                       continue;
->> +               parent_rate = __clk_round_rate(clk_parent,
->> +                                              MULT_ROUND_UP(rate, i));
->> +               now = parent_rate / i;
->> +               if (now <= rate && now > best) {
->> +                       bestdiv = i;
->> +                       best = now;
->> +                       *best_parent_rate = parent_rate;
->> +               }
->> +       }
->> +
->> +       if (!bestdiv) {
->> +               bestdiv = hi3620_get_table_maxdiv(dclk->table);
->> +               *best_parent_rate = __clk_round_rate(clk_parent, 1);
->> +       }
->> +
->> +       return bestdiv;
->> +}
->> +
->> +static long hi3620_clkdiv_round_rate(struct clk_hw *hw, unsigned long rate,
->> +                                    unsigned long *prate)
->> +{
->> +       int div;
->> +
->> +       if (!rate)
->> +               rate = 1;
->> +       div = hi3620_clkdiv_bestdiv(hw, rate, prate);
->> +
->> +       return *prate / div;
->> +}
->> +
->> +static int hi3620_clkdiv_set_rate(struct clk_hw *hw, unsigned long rate,
->> +                                 unsigned long parent_rate)
->> +{
->> +       struct hi3620_divclk *dclk = container_of(hw, struct hi3620_divclk, hw);
->> +       unsigned int div, value;
->> +       unsigned long flags = 0;
->> +       u32 data;
->> +
->> +       div = parent_rate / rate;
->> +       value = hi3620_get_table_val(dclk->table, div);
->> +
->> +       if (value > WIDTH_TO_MASK(dclk->width))
->> +               value = WIDTH_TO_MASK(dclk->width);
->> +
->> +       if (dclk->lock)
->> +               spin_lock_irqsave(dclk->lock, flags);
->> +
->> +       data = readl_relaxed(dclk->reg);
->> +       data &= ~(WIDTH_TO_MASK(dclk->width) << dclk->shift);
->> +       data |= value << dclk->shift;
->> +       data |= dclk->mbits;
->> +       writel_relaxed(data, dclk->reg);
->> +
->> +       if (dclk->lock)
->> +               spin_unlock_irqrestore(dclk->lock, flags);
->> +
->> +       return 0;
->> +}
->> +
->> +static struct clk_ops hi3620_clkdiv_ops = {
->> +       .recalc_rate = hi3620_clkdiv_recalc_rate,
->> +       .round_rate = hi3620_clkdiv_round_rate,
->> +       .set_rate = hi3620_clkdiv_set_rate,
->> +};
->> +
->> +void __init hi3620_clkdiv_setup(struct device_node *np)
->> +{
->> +       struct clk *clk;
->> +       const char *clk_name, **parent_names;
->> +       struct clk_init_data *init;
->> +       struct clk_div_table *table;
->> +       struct hi3620_divclk *dclk;
->> +       unsigned int table_num;
->> +       int i;
->> +       u32 data[2];
->> +       const char *propname = "hisilicon,clkdiv-table";
->> +       const char *cellname = "#hisilicon,clkdiv-table-cells";
->> +       struct of_phandle_args div_table;
->> +
->> +       hs_init_clocks();
->> +       if (!hs_clk.sctrl)
->> +               return;
->> +
->> +       if (of_property_read_string(np, "clock-output-names", &clk_name))
->> +               return;
->> +       if (of_property_read_u32_array(np, "hisilicon,clkdiv",
->> +                                      &data[0], 2))
->> +               return;
->> +
->> +       /*process the div_table*/
->> +       for (i = 0; ; i++) {
->> +               if (of_parse_phandle_with_args(np, propname, cellname,
->> +                                              i, &div_table))
->> +                       break;
->> +       }
->> +
->> +       /*table ends with <0, 0>, so plus one to table_num*/
->> +       table_num = i + 1;
->> +
->> +       table = kzalloc(sizeof(struct clk_div_table) * table_num, GFP_KERNEL);
->> +       if (!table)
->> +               return ;
->> +
->> +       for (i = 0; ; i++) {
->> +               if (of_parse_phandle_with_args(np, propname, cellname,
->> +                                              i, &div_table))
->> +                       break;
->> +
->> +               table[i].val = div_table.args[0];
->> +               table[i].div = div_table.args[1];
->> +       }
->> +
->> +       /* gate only has the fixed parent */
->> +       parent_names = kzalloc(sizeof(char *), GFP_KERNEL);
->> +       if (!parent_names)
->> +               goto err_par;
->> +       parent_names[0] = of_clk_get_parent_name(np, 0);
->> +
->> +       dclk = kzalloc(sizeof(*dclk), GFP_KERNEL);
->> +       if (!dclk)
->> +               goto err_dclk;
->> +       init = kzalloc(sizeof(*init), GFP_KERNEL);
->> +       if (!init)
->> +               goto err_init;
->> +       init->name = kstrdup(clk_name, GFP_KERNEL);
->> +       init->ops = &hi3620_clkdiv_ops;
->> +       init->parent_names = parent_names;
->> +       init->num_parents = 1;
->> +
->> +       dclk->reg = hs_clk.sctrl + data[0];
->> +       dclk->shift = ffs(data[1]) - 1;
->> +       dclk->width = fls(data[1]) - ffs(data[1]) + 1;
->> +       dclk->mbits = data[1] << 16;
->> +       dclk->lock = &hs_clk.lock;
->> +       dclk->hw.init = init;
->> +       dclk->table = table;
->> +       clk = clk_register(NULL, &dclk->hw);
->> +       if (IS_ERR(clk))
->> +               goto err_clk;
->> +       of_clk_add_provider(np, of_clk_src_simple_get, clk);
->> +       return;
->> +err_clk:
->> +       kfree(init);
->> +err_init:
->> +       kfree(dclk);
->> +err_dclk:
->> +       kfree(parent_names);
->> +err_par:
->> +       kfree(table);
->> +}
->
-> This looks like it was copy/pasted from the generic clk-divider type.
-> Is there some reason you cannot use that instead of duplicating all of
-> that code here?
+Case 1: owfs implementation
 
-Yes, it's a copy. The registers are not wrapped in their silicon. In most
-vendor's SoC, the registers are read/write.
+Kernel /sys/bus without modules does not include a w1 directory
 
-But they links the read/write to different registers. So one clock divider
-register is split into four registers, and they're set, unset, status & final
-status.
+Load modules ---
+10.20.30.41:/tmp# modprobe w1_gpio
+10.20.30.41:/tmp# modprobe w1_ds2433
+10.20.30.41:/tmp# lsmod | grep w
+w1_ds2433               2233  0
+w1_gpio                 1645  0
+wire                   26865  2 w1_ds2433,w1_gpio
 
-And the other reason is that they use higher 16 bits as mask bits. So
-they're not compatible with other vendor's SoC. Of course, I can also
-use generic clk-divider/clk-mux type, but I need to change a lot in
-common files, such as abstracting read/write. Is it OK for you?
+Kernel /sys/bus after loading modules includes a w1 directory
+10.20.30.41:/tmp# ls /sys/bus/w1
+total 0
+drwxr-xr-x  4 root root    0 May 13 19:32 .
+drwxr-xr-x 21 root root    0 Jan  1  2000 ..
+drwxr-xr-x  2 root root    0 May 13 19:32 devices
+drwxr-xr-x  4 root root    0 May 13 19:32 drivers
+-rw-r--r--  1 root root 4.0K May 13 19:32 drivers_autoprobe
+--w-------  1 root root 4.0K May 13 19:32 drivers_probe
+--w-------  1 root root 4.0K May 13 19:32 uevent
+10.20.30.41:/tmp# ls /sys/bus/w1/devices/
+total 0
+drwxr-xr-x 2 root root 0 May 13 19:32 .
+drwxr-xr-x 4 root root 0 May 13 19:32 ..
+lrwxrwxrwx 1 root root 0 May 13 19:33 w1_bus_master1 -> ../../../devices/w1_bus_master1
 
-Regards
-Haojian
+After attaching the 1-Wire EEPROM
+10.20.30.41:/tmp# ls /sys/bus/w1/devices/
+total 0
+drwxr-xr-x 2 root root 0 May 13 19:32 .
+drwxr-xr-x 4 root root 0 May 13 19:32 ..
+lrwxrwxrwx 1 root root 0 May 13 19:34 43-0000003be97b -> ../../../devices/w1_bus_master1/43-0000003be97b
+lrwxrwxrwx 1 root root 0 May 13 19:33 w1_bus_master1 -> ../../../devices/w1_bus_master1
 
->
-> Thanks,
-> Mike
->
->> +CLK_OF_DECLARE(hi3620_mux, "hisilicon,hi3620-clk-mux", hi3620_clkmux_setup)
->> +CLK_OF_DECLARE(hi3620_gate, "hisilicon,hi3620-clk-gate", hi3620_clkgate_setup)
->> +CLK_OF_DECLARE(hi3620_div, "hisilicon,hi3620-clk-div", hi3620_clkdiv_setup)
->> +CLK_OF_DECLARE(hs_gate, "hisilicon,clk-gate", hs_clkgate_setup)
->> +CLK_OF_DECLARE(hs_fixed, "hisilicon,clk-fixed-factor", hs_fixed_factor_setup)
->> --
->> 1.7.10.4
+Removed the 1-Wire EEPROM
+
+owfs mount point without EEPROM present or owfs running
+
+10.20.30.41:/tmp# ls /mnt
+total 5.0K
+drwxr-xr-x  5 root root 1.0K May 13 19:37 .
+drwxr-xr-x 23 root root 1.0K May 13 11:33 ..
+drwxr-xr-x  2 root root 1.0K Mar 31 19:35 jj
+drwxr-xr-x  2 root root 1.0K Oct  9  2012 sda1
+drwxr-xr-x  2 root root 1.0K May 13 14:31 w1
+10.20.30.41:/tmp# ls /mnt/w1
+total 2.0K
+drwxr-xr-x 2 root root 1.0K May 13 14:31 .
+drwxr-xr-x 5 root root 1.0K May 13 19:37 ..
+
+Run owfs with debugging enabled
+10.20.30.41:/tmp# owfs --foreground --error_level=9 --w1 -m /mnt/w1
+CONNECT: owfs.c:(96) fuse mount point: /mnt/w1
+CONNECT: ow_avahi_link.c:(68) No Avahi support. Library libavahi-client couldn't be loaded
+CONNECT: ow_dnssd.c:(82) Zeroconf/Bonjour is disabled since dnssd library isn't found
+   CALL: ow_parsename.c:(98) path=[]
+  DEBUG: owlib.c:(81) Globals temp limits 0C 100C (for simulated adapters)
+  DEBUG: fuse_line.c:(82) Added FUSE option 0 OWFS
+  DEBUG: fuse_line.c:(82) Added FUSE option 1 /mnt/w1
+  DEBUG: fuse_line.c:(82) Added FUSE option 2 -o
+  DEBUG: fuse_line.c:(82) Added FUSE option 3 direct_io
+  DEBUG: fuse_line.c:(82) Added FUSE option 4 -f
+  DEBUG: fuse_line.c:(82) Added FUSE option 5 -d
+  DEBUG: owfs.c:(121) fuse_mnt_opt=[(null)]
+  DEBUG: owfs.c:(123) fuse_open_opt=[(null)]
+  DEBUG: ow_w1_list.c:(54) Sending w1 bus master list message
+  DEBUG: ow_w1_send.c:(132) Netlink send -----------------
+NLMSGHDR: len=48 type=3 (NLMSG_DONE) flags=5 seq=0|1 pid=2921
+CN_MSG: idx/val=3/1 (CN_W1_IDX) seq=0|1 ack=1 len=12 flags=0
+W1_NETLINK_MSG: type=6 (W1_LIST_MASTERS) len=0 id=0
+W1_NETLINK_CMD: NULL w1c field
+NULL data
+  DEBUG: ow_w1_send.c:(143) NETLINK sent seq=1
+  DEBUG: ow_w1_dispatch.c:(173) Dispatch loop
+  DEBUG: ow_w1_parse.c:(113) Wait to peek at message
+  DEBUG: ow_w1_parse.c:(121) Pre-parse header: 16 bytes len=52 type=3 seq=0|1 pid=0
+  DEBUG: ow_w1_parse.c:(142) Netlink read -----------------
+NLMSGHDR: len=52 type=3 (NLMSG_DONE) flags=0 seq=0|1 pid=0
+CN_MSG: idx/val=3/1 (CN_W1_IDX) seq=0|1 ack=0 len=16 flags=12141
+W1_NETLINK_MSG: type=6 (W1_LIST_MASTERS) len=4 id=1768713839
+W1_NETLINK_CMD: NULL w1c field
+Byte buffer Data, length=4
+--000: 01 00 00 00
+   <....>
+  DEBUG: ow_w1_dispatch.c:(88) Netlink message directed to root W1 master
+  DEBUG: ow_w1_dispatch.c:(126) Sending this packet to root bus
+  DEBUG: ow_w1_dispatch.c:(173) Dispatch loop
+  DEBUG: ow_w1_parse.c:(113) Wait to peek at message
+  DEBUG: ow_w1_parse.c:(121) Pre-parse header: 16 bytes len=48 type=3 seq=0|1 pid=0
+  DEBUG: ow_w1_parse.c:(142) Netlink read -----------------
+NLMSGHDR: len=48 type=3 (NLMSG_DONE) flags=0 seq=0|1 pid=0
+CN_MSG: idx/val=3/1 (CN_W1_IDX) seq=0|1 ack=1 len=12 flags=0
+W1_NETLINK_MSG: type=6 (W1_LIST_MASTERS) len=0 id=0
+W1_NETLINK_CMD: NULL w1c field
+NULL data
+  DEBUG: ow_w1_dispatch.c:(88) Netlink message directed to root W1 master
+  DEBUG: ow_w1_dispatch.c:(126) Sending this packet to root bus
+  DEBUG: ow_w1_dispatch.c:(173) Dispatch loop
+  DEBUG: ow_w1_parse.c:(113) Wait to peek at message
+  DEBUG: ow_w1_scan.c:(54) Netlink (w1) list all bus masters
+  DEBUG: ow_w1_list.c:(64) W1 List 0 masters
+  DEBUG: ow_w1_scan.c:(54) Netlink (w1) list all bus masters
+  DEBUG: ow_w1_list.c:(64) W1 List 1 masters
+  DEBUG: ow_w1_addremove.c:(55) Setup structure for w1_bus_master1
+  DEBUG: ow_w1_addremove.c:(80) Request master be added: w1_bus_master1.
+  DEBUG: ow_add_inflight.c:(26) Request master be added: w1_bus_master1
+FUSE library version: 2.8.6
+nullpath_ok: 0
+unique: 1, opcode: INIT (26), nodeid: 0, insize: 56
+INIT: 7.18
+flags=0x0000047b
+max_readahead=0x00020000
+   INIT: 7.12
+   flags=0x00000011
+   max_readahead=0x00020000
+   max_write=0x00020000
+   unique: 1, success, outsize: 40
+
+owfs mount point without EEPROM present but with owfs running
+
+10.20.30.41:/tmp# ls /mnt
+total 4.0K
+drwxr-xr-x  5 root root 1.0K May 13 19:37 .
+drwxr-xr-x 23 root root 1.0K May 13 11:33 ..
+drwxr-xr-x  2 root root 1.0K Mar 31 19:35 jj
+drwxr-xr-x  2 root root 1.0K Oct  9  2012 sda1
+drwxr-xr-x  1 root root    8 May 13 19:40 w1
+
+Output from owfs during last command
+     unique: 2, opcode: GETATTR (3), nodeid: 1, insize: 56
+     getattr /
+        CALL: ow_fstat.c:(22) path=/
+        CALL: ow_parsename.c:(98) path=[/]
+        CALL: ow_fstat.c:(39) ATTRIBUTES path=/
+      DEBUG: ow_parsename.c:(62) /
+        unique: 2, success, outsize: 120
+     unique: 3, opcode: GETXATTR (22), nodeid: 1, insize: 65
+       unique: 3, error: -38 (Function not implemented), outsize: 16
+
+10.20.30.41:/tmp# ls /mnt/w1
+total 1.0K
+drwxr-xr-x 1 root root    8 May 13 19:40 .
+drwxr-xr-x 5 root root 1.0K May 13 19:37 ..
+drwxr-xr-x 1 root root    8 May 13 19:40 bus.0
+drwxr-xr-x 1 root root    8 May 13 19:40 bus.1
+drwxr-xr-x 1 root root    8 May 13 19:40 settings
+drwxr-xr-x 1 root root    8 May 13 19:40 statistics
+drwxr-xr-x 1 root root   32 May 13 19:40 structure
+drwxr-xr-x 1 root root    8 May 13 19:40 system
+drwxr-xr-x 1 root root    8 May 13 19:40 uncached
+
+Output from owfs during last command
+     unique: 4, opcode: GETATTR (3), nodeid: 1, insize: 56
+     getattr /
+        CALL: ow_fstat.c:(22) path=/
+        CALL: ow_parsename.c:(98) path=[/]
+        CALL: ow_fstat.c:(39) ATTRIBUTES path=/
+       DEBUG: ow_parsename.c:(62) /
+        unique: 4, success, outsize: 120
+     unique: 5, opcode: OPENDIR (27), nodeid: 1, insize: 48
+        unique: 5, success, outsize: 32
+     unique: 6, opcode: READDIR (28), nodeid: 1, insize: 80
+     getdir[0]
+        CALL: ow_parsename.c:(98) path=[/]
+        CALL: owfs_callback.c:(177) GETDIR path=/
+       DEBUG: ow_dir.c:(65) path=/
+        CALL: ow_dir.c:(100) path=/
+       DEBUG: ow_cache.c:(867) Looking for directory 00 00 00 00 00 00 00 00
+       DEBUG: ow_cache.c:(880) Get from cache sn 00 00 00 00 00 00 00 00 pointer=0xb6fa0790 extension=1
+       DEBUG: ow_cache.c:(909) Dir not found in cache
+       DEBUG: ow_search.c:(32) Start of directory path=/ device=00 00 00 00 00 00 00 00
+       DEBUG: ow_w1.c:(125) Sending w1 search (list devices) message
+       DEBUG: ow_w1_send.c:(132) Netlink send -----------------
+     NLMSGHDR: len=52 type=3 (NLMSG_DONE) flags=5 seq=1|1 pid=2921
+     CN_MSG: idx/val=3/1 (CN_W1_IDX) seq=1|1 ack=65537 len=16 flags=0
+     W1_NETLINK_MSG: type=4 (W1_MASTER_CMD) len=4 id=1
+     W1_NETLINK_CMD: cmd=2 (W1_CMD_SEARCH) len=0
+     NULL data
+       EBUG: ow_cache.c:(867) Looking for directory 00 00 00 00 00 00 00 00
+       DEBUG: ow_cache.c:(880) Get from cache sn 00 00 00 00 00 00 00 00 pointer=0xb6fa0790 extension=0
+       DEBUG: ow_cache.c:(909) Dir not found in cache
+       DEBUG: ow_w1_parse.c:(121) Pre-parse header: 16 bytes len=52 type=3 seq=1|1 pid=0
+       DEBUG: ow_w1_parse.c:(142) Netlink read -----------------
+     NLMSGHDR: len=52 type=3 (NLMSG_DONE) flags=0 seq=1|1 pid=0
+     CN_MSG: idx/val=3/1 (CN_W1_IDX) seq=1|1 ack=0 len=16 flags=0
+     W1_NETLINK_MSG: type=4 (W1_MASTER_CMD) len=4 id=1
+     W1_NETLINK_CMD: cmd=2 (W1_CMD_SEARCH) len=0
+     NULL data
+       DEBUG: ow_w1_dispatch.c:(92) Netlink message directed to W1 bus master 1
+       DEBUG: ow_w1_dispatch.c:(149) Sending this packet to w1_bus_master1
+       DEBUG: ow_w1_dispatch.c:(173) Dispatch loop
+       DEBUG: ow_w1_parse.c:(113) Wait to peek at message
+       DEBUG: ow_w1_parse.c:(121) Pre-parse header: 16 bytes len=52 type=3 seq=1|1 pid=0
+       DEBUG: ow_w1_parse.c:(142) Netlink read -----------------
+     NLMSGHDR: len=52 type=3 (NLMSG_DONE) flags=0 seq=1|1 pid=0
+     CN_MSG: idx/val=3/1 (CN_W1_IDX) seq=1|1 ack=65537 len=16 flags=0
+     W1_NETLINK_MSG: type=4 (W1_MASTER_CMD) len=4 id=1
+     W1_NETLINK_CMD: cmd=2 (W1_CMD_SEARCH) len=0
+     NULL data
+       DEBUG: ow_w1_dispatch.c:(92) Netlink message directed to W1 bus master 1
+       DEBUG: ow_w1_dispatch.c:(149) Sending this packet to w1_bus_master1
+       DEBUG: ow_w1_dispatch.c:(173) Dispatch loop
+       EBUG: ow_w1_parse.c:(113) Wait to peek at message
+       DEBUG: ow_w1_send.c:(143) NETLINK sent seq=1
+       DEBUG: ow_w1_parse.c:(225) Loop waiting for netlink piped message
+       DEBUG: ow_w1_parse.c:(163) Pipe header: len=52 type=3 seq=1|1 pid=0
+       DEBUG: ow_w1_parse.c:(191) Pipe read --------------------
+     NLMSGHDR: len=52 type=3 (NLMSG_DONE) flags=0 seq=1|1 pid=0
+     CN_MSG: idx/val=3/1 (CN_W1_IDX) seq=1|1 ack=0 len=16 flags=0
+     W1_NETLINK_MSG: type=4 (W1_MASTER_CMD) len=4 id=1
+     W1_NETLINK_CMD: cmd=2 (W1_CMD_SEARCH) len=0
+     NULL data
+       DEBUG: ow_w1_parse.c:(245) About to call nrs_callback
+       DEBUG: ow_w1_parse.c:(247) Called nrs_callback
+       DEBUG: ow_w1_parse.c:(225) Loop waiting for netlink piped message
+       DEBUG: ow_w1_parse.c:(163) Pipe header: len=52 type=3 seq=1|1 pid=0
+       DEBUG: ow_w1_parse.c:(191) Pipe read --------------------
+     NLMSGHDR: len=52 type=3 (NLMSG_DONE) flags=0 seq=1|1 pid=0
+     CN_MSG: idx/val=3/1 (CN_W1_IDX) seq=1|1 ack=65537 len=16 flags=0
+     W1_NETLINK_MSG: type=4 (W1_MASTER_CMD) len=4 id=1
+     W1_NETLINK_CMD: cmd=2 (W1_CMD_SEARCH) len=0
+     NULL data
+       DEBUG: ow_w1.c:(201) SN finished
+        CALL: ow_parsename.c:(98) path=[/bus.1]
+       DEBUG: ow_parsename.c:(62) /bus.1
+        CALL: ow_parsename.c:(98) path=[/bus.0]
+       DEBUG: ow_parsename.c:(62) /bus.0
+        CALL: ow_parsename.c:(98) path=[/uncached]
+       DEBUG: ow_parsename.c:(62) /uncached
+        CALL: ow_parsename.c:(98) path=[/settings]
+       DEBUG: ow_parsename.c:(62) /settings
+        CALL: ow_parsename.c:(98) path=[/system]
+       DEBUG: ow_parsename.c:(62) /system
+        CALL: ow_parsename.c:(98) path=[/statistics]
+       DEBUG: ow_parsename.c:(62) /statistics
+        CALL: ow_parsename.c:(98) path=[/structure]
+       DEBUG: ow_parsename.c:(62) /structure
+       DEBUG: ow_dir.c:(195) ret=0
+       DEBUG: ow_parsename.c:(62) /
+        unique: 6, success, outsize: 320
+     unique: 7, opcode: LOOKUP (1), nodeid: 1, insize: 46
+     LOOKUP /bus.1
+     getattr /bus.1
+        CALL: ow_fstat.c:(22) path=/bus.1
+        CALL: ow_parsename.c:(98) path=[/bus.1]
+        CALL: ow_fstat.c:(39) ATTRIBUTES path=/bus.1
+       DEBUG: ow_parsename.c:(62) /bus.1
+        NODEID: 2
+        unique: 7, success, outsize: 144
+     unique: 8, opcode: LOOKUP (1), nodeid: 1, insize: 46
+     LOOKUP /bus.0
+     getattr /bus.0
+        CALL: ow_fstat.c:(22) path=/bus.0
+        CALL: ow_parsename.c:(98) path=[/bus.0]
+        CALL: ow_fstat.c:(39) ATTRIBUTES path=/bus.0
+       DEBUG: ow_parsename.c:(62) /bus.0
+        NODEID: 3
+        unique: 8, success, outsize: 144
+     unique: 9, opcode: LOOKUP (1), nodeid: 1, insize: 49
+     LOOKUP /uncached
+     getattr /uncached
+        CALL: ow_fstat.c:(22) path=/uncached
+        CALL: ow_parsename.c:(98) path=[/uncached]
+        CALL: ow_fstat.c:(39) ATTRIBUTES path=/uncached
+       DEBUG: ow_parsename.c:(62) /uncached
+        NODEID: 4
+        unique: 9, success, outsize: 144
+     unique: 10, opcode: LOOKUP (1), nodeid: 1, insize: 49
+     LOOKUP /settings
+     getattr /settings
+        CALL: ow_fstat.c:(22) path=/settings
+        CALL: ow_parsename.c:(98) path=[/settings]
+        ALL: ow_fstat.c:(39) ATTRIBUTES path=/settings
+       DEBUG: ow_parsename.c:(62) /settings
+        NODEID: 5
+        unique: 10, success, outsize: 144
+     unique: 11, opcode: LOOKUP (1), nodeid: 1, insize: 47
+     LOOKUP /system
+     getattr /system
+        CALL: ow_fstat.c:(22) path=/system
+        CALL: ow_parsename.c:(98) path=[/system]
+        CALL: ow_fstat.c:(39) ATTRIBUTES path=/system
+       DEBUG: ow_parsename.c:(62) /system
+        NODEID: 6
+        unique: 11, success, outsize: 144
+     unique: 12, opcode: LOOKUP (1), nodeid: 1, insize: 51
+     LOOKUP /statistics
+     getattr /statistics
+        CALL: ow_fstat.c:(22) path=/statistics
+        CALL: ow_parsename.c:(98) path=[/statistics]
+        CALL: ow_fstat.c:(39) ATTRIBUTES path=/statistics
+       DEBUG: ow_parsename.c:(62) /statistics
+        NODEID: 7
+        unique: 12, success, outsize: 144
+     unique: 13, opcode: LOOKUP (1), nodeid: 1, insize: 50
+     LOOKUP /structure
+     getattr /structure
+        CALL: ow_fstat.c:(22) path=/structure
+        CALL: ow_parsename.c:(98) path=[/structure]
+        CALL: ow_fstat.c:(39) ATTRIBUTES path=/structure
+       DEBUG: ow_parsename.c:(62) /structure
+        NODEID: 8
+        unique: 13, success, outsize: 144
+     unique: 14, opcode: GETATTR (3), nodeid: 1, insize: 56
+     getattr /
+        CALL: ow_fstat.c:(22) path=/
+        CALL: ow_parsename.c:(98) path=[/]
+       CALL: ow_fstat.c:(39) ATTRIBUTES path=/
+       DEBUG: ow_parsename.c:(62) /
+        unique: 14, success, outsize: 120
+     unique: 15, opcode: READDIR (28), nodeid: 1, insize: 80
+        unique: 15, success, outsize: 16
+     unique: 16, opcode: RELEASEDIR (29), nodeid: 1, insize: 64
+        unique: 16, success, outsize: 16
+
+Attaching the 1-wire EEPROM
+     output from owfs
+       DEBUG: ow_w1_parse.c:(121) Pre-parse header: 16 bytes len=48 type=3 seq=0|4 pid=0
+       DEBUG: ow_w1_parse.c:(142) Netlink read -----------------
+     NLMSGHDR: len=48 type=3 (NLMSG_DONE) flags=0 seq=0|4 pid=0
+     CN_MSG: idx/val=3/1 (CN_W1_IDX) seq=0|4 ack=0 len=12 flags=0
+     W1_NETLINK_MSG: type=0 (W1_SLAVE_ADD) len=0 id=1005157187
+     W1_NETLINK_CMD: NULL w1c field
+     NULL data
+       DEBUG: ow_w1_dispatch.c:(88) Netlink message directed to root W1 master
+       DEBUG: ow_w1_dispatch.c:(126) Sending this packet to root bus
+       DEBUG: ow_w1_dispatch.c:(173) Dispatch loop
+       DEBUG: ow_w1_parse.c:(113) Wait to peek at message
+       DEBUG: ow_w1_scan.c:(69) Netlink (w1) Slave announcements (ignored)
+
+ls on owfs mountpoint - **** ERROR *** - no output, hanges
+10.20.30.41:/tmp# ls /mnt/w1
+
+Output from owfs during last command
+     unique: 17, opcode: GETATTR (3), nodeid: 1, insize: 56
+     getattr /
+        CALL: ow_fstat.c:(22) path=/
+        CALL: ow_parsename.c:(98) path=[/]
+        CALL: ow_fstat.c:(39) ATTRIBUTES path=/
+       DEBUG: ow_parsename.c:(62) /
+        unique: 17, success, outsize: 120
+     unique: 18, opcode: OPENDIR (27), nodeid: 1, insize: 48
+        unique: 18, success, outsize: 32
+     unique: 19, opcode: READDIR (28), nodeid: 1, insize: 80
+     getdir[0]
+        CALL: ow_parsename.c:(98) path=[/]
+        CALL: owfs_callback.c:(177) GETDIR path=/
+       DEBUG: ow_dir.c:(65) path=/
+        CALL: ow_dir.c:(100) path=/
+       DEBUG: ow_cache.c:(867) Looking for directory 00 00 00 00 00 00 00 00
+       DEBUG: ow_cache.c:(880) Get from cache sn 00 00 00 00 00 00 00 00 pointer=0xb6fa0790 extension=1
+       DEBUG: ow_cache.c:(867) Looking for directory 00 00 00 00 00 00 00 00
+      DEBUG: ow_cache.c:(880) Get from cache sn 00 00 00 00 00 00 00 00 pointer=0xb6fa0790 extension=0
+      DEBUG: ow_cache.c:(909) Dir not found in cache
+      DEBUG: ow_cache.c:(909) Dir not found in cache
+      DEBUG: ow_search.c:(32) Start of directory path=/ device=00 00 00 00 00 00 00 00
+       DEBUG: ow_w1.c:(125) Sending w1 search (list devices) message
+      DEBUG: ow_w1_send.c:(132) Netlink send -----------------
+     NLMSGHDR: len=52 type=3 (NLMSG_DONE) flags=5 seq=1|2 pid=2921
+     CN_MSG: idx/val=3/1 (CN_W1_IDX) seq=1|2 ack=65538 len=16 flags=0
+     W1_NETLINK_MSG: type=4 (W1_MASTER_CMD) len=4 id=1
+     W1_NETLINK_CMD: cmd=2 (W1_CMD_SEARCH) len=0
+     NULL data
