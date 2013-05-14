@@ -1,187 +1,69 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 14 May 2013 11:54:17 -0700
-Subject: [PATCH] clk: Fix race condition between clk_set_parent and
- clk_enable()
-In-Reply-To: <1367383328-25700-1-git-send-email-skannan@codeaurora.org>
-References: <1367383328-25700-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <20130514185417.10068.5717@quantum>
+Date: Tue, 14 May 2013 12:06:41 -0700
+Subject: [PATCH] clk: ux500: clk-sysctrl: handle clocks with no parents
+In-Reply-To: <20130503090305.GA17733@balto.lan>
+References: <1367325906-23045-1-git-send-email-fabio.baltieri@linaro.org>
+ <CAPDyKFpZ+-6b3kPyNacPQ33=Ssdjs=fvFxkr4iSUT_hm1YzVTg@mail.gmail.com>
+ <CAPDyKFq6iQ21QosEH_WqGCetXfaO1uecvK7+WzjZJDkK8r3SxA@mail.gmail.com>
+ <20130503090305.GA17733@balto.lan>
+Message-ID: <20130514190641.10068.14584@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Saravana Kannan (2013-04-30 21:42:08)
-> Without this patch, the following race conditions are possible.
+Quoting Fabio Baltieri (2013-05-03 02:03:05)
+> On Fri, May 03, 2013 at 10:54:09AM +0200, Ulf Hansson wrote:
+> > On 3 May 2013 10:51, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> > > On 30 April 2013 14:45, Fabio Baltieri <fabio.baltieri@linaro.org> wrote:
+> > >> Fix clk_reg_sysctrl() to set main clock registers of new struct
+> > >> clk_sysctrl even if the registered clock has no parents.
+> > >>
+> > >> This fixes an issue where "ulpclk" was registered with all clk->reg_*
+> > >> fields uninitialized, causing a -EINVAL error from clk_prepare().
+> > >>
+> > >> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> > >> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> > >> ---
+> > >>  drivers/clk/ux500/clk-sysctrl.c | 8 +++++++-
+> > >>  1 file changed, 7 insertions(+), 1 deletion(-)
+> > >>
+> > >> diff --git a/drivers/clk/ux500/clk-sysctrl.c b/drivers/clk/ux500/clk-sysctrl.c
+> > >> index bc7e9bd..e364c9d 100644
+> > >> --- a/drivers/clk/ux500/clk-sysctrl.c
+> > >> +++ b/drivers/clk/ux500/clk-sysctrl.c
+> > >> @@ -145,7 +145,13 @@ static struct clk *clk_reg_sysctrl(struct device *dev,
+> > >>                 return ERR_PTR(-ENOMEM);
+> > >>         }
+> > >>
+> > >> -       for (i = 0; i < num_parents; i++) {
+> > >> +       /* set main clock registers */
+> > >> +       clk->reg_sel[0] = reg_sel[0];
+> > >> +       clk->reg_bits[0] = reg_bits[0];
+> > >> +       clk->reg_mask[0] = reg_mask[0];
+> > >> +
+> > >> +       /* handle clocks with more than one parent */
+> > >> +       for (i = 1; i < num_parents; i++) {
+> > >>                 clk->reg_sel[i] = reg_sel[i];
+> > >>                 clk->reg_bits[i] = reg_bits[i];
+> > >>                 clk->reg_mask[i] = reg_mask[i];
+> > >> --
+> > >> 1.8.2
+> > >>
+> > >
+> > > Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+> > >
+> > > This is bugfix, should go "stable" as well?
+> > 
+> > Stable means 3.10 rcs, since the abx500 clk tree was added for 3.10.
 > 
-> Race condition 1:
-> * clk-A has two parents - clk-X and clk-Y.
-> * All three are disabled and clk-X is current parent.
-> * Thread A: clk_set_parent(clk-A, clk-Y).
-> * Thread A: <snip execution flow>
-> * Thread A: Grabs enable lock.
-> * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
-> * Thread A: Updates clk-A SW parent to clk-Y
-> * Thread A: Releases enable lock.
-> * Thread B: clk_enable(clk-A).
-> * Thread B: clk_enable() enables clk-Y, then enabled clk-A and returns.
+> Thanks!  Yes, it would be great if this could be queued up for an -rc.
 > 
-> clk-A is now enabled in software, but not clocking in hardware since the
-> hardware parent is still clk-X.
-> 
-> The only way to avoid race conditions between clk_set_parent() and
-> clk_enable/disable() is to ensure that clk_enable/disable() calls don't
-> require changes to hardware enable state between changes to software clock
-> topology and hardware clock topology.
-> 
-> There are options to achieve the above:
-> 1. Grab the enable lock before changing software/hardware topology and
->    release it afterwards.
-> 2. Keep the clock enabled for the duration of software/hardware topology
->    change so that any additional enable/disable calls don't try to change
->    the hardware state. Once the topology change is complete, the clock can
->    be put back in its original enable state.
-> 
-> Option (1) is not an acceptable solution since the set_parent() ops might
-> need to sleep.
-> 
-> Therefore, this patch implements option (2).
-> 
-> This patch doesn't violate any API semantics. clk_disable() doesn't
-> guarantee that the clock is actually disabled. So, no clients of a clock
-> can assume that a clock is disabled after their last call to clk_disable().
-> So, enabling the clock during a parent change is not a violation of any API
-> semantics.
-> 
-> This also has the nice side effect of simplifying the error handling code.
-> 
-> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
 
-I've taken this patch into clk-next for testing.  The code itself looks
-fine.  The only thing that remains to be seen is if any platforms have a
-problem with disabled clocks getting turned on during a reparent
-operation.
+Taken into clk-fixes.
 
-On platforms that I have worked on this is OK, but I suppose there could
-be some platform out there where a clock is prepared and disabled, and
-briefly enabling the clock during the reparent operation somehow puts
-the hardware in a bad state.
-
-Anyways that's a long shot and this look OK until somebody screams.
-
-Regards,
+Thanks!
 Mike
 
-> ---
-> It's been a while since I submitted a patch. So, apologies if I'm cc'ing
-> people who no longer care about the state of the common clock framework.
+> Fabio
 > 
->  drivers/clk/clk.c |   72 +++++++++++++++++++++++-----------------------------
->  1 files changed, 32 insertions(+), 40 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 934cfd1..fe4055f 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1377,67 +1377,59 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
->         unsigned long flags;
->         int ret = 0;
->         struct clk *old_parent = clk->parent;
-> -       bool migrated_enable = false;
->  
-> -       /* migrate prepare */
-> -       if (clk->prepare_count)
-> +       /*
-> +        * Migrate prepare state between parents and prevent race with
-> +        * clk_enable().
-> +        *
-> +        * If the clock is not prepared, then a race with
-> +        * clk_enable/disable() is impossible since we already have the
-> +        * prepare lock (future calls to clk_enable() need to be preceded by
-> +        * a clk_prepare()).
-> +        *
-> +        * If the clock is prepared, migrate the prepared state to the new
-> +        * parent and also protect against a race with clk_enable() by
-> +        * forcing the clock and the new parent on.  This ensures that all
-> +        * future calls to clk_enable() are practically NOPs with respect to
-> +        * hardware and software states.
-> +        */
-> +       if (clk->prepare_count) {
->                 __clk_prepare(parent);
-> -
-> -       flags = clk_enable_lock();
-> -
-> -       /* migrate enable */
-> -       if (clk->enable_count) {
-> -               __clk_enable(parent);
-> -               migrated_enable = true;
-> +               clk_enable(parent);
-> +               clk_enable(clk);
->         }
->  
->         /* update the clk tree topology */
-> +       flags = clk_enable_lock();
->         clk_reparent(clk, parent);
-> -
->         clk_enable_unlock(flags);
->  
->         /* change clock input source */
->         if (parent && clk->ops->set_parent)
->                 ret = clk->ops->set_parent(clk->hw, p_index);
-> -
->         if (ret) {
-> -               /*
-> -                * The error handling is tricky due to that we need to release
-> -                * the spinlock while issuing the .set_parent callback. This
-> -                * means the new parent might have been enabled/disabled in
-> -                * between, which must be considered when doing rollback.
-> -                */
-> -               flags = clk_enable_lock();
->  
-> +               flags = clk_enable_lock();
->                 clk_reparent(clk, old_parent);
-> -
-> -               if (migrated_enable && clk->enable_count) {
-> -                       __clk_disable(parent);
-> -               } else if (migrated_enable && (clk->enable_count == 0)) {
-> -                       __clk_disable(old_parent);
-> -               } else if (!migrated_enable && clk->enable_count) {
-> -                       __clk_disable(parent);
-> -                       __clk_enable(old_parent);
-> -               }
-> -
->                 clk_enable_unlock(flags);
->  
-> -               if (clk->prepare_count)
-> +               if (clk->prepare_count) {
-> +                       clk_disable(clk);
-> +                       clk_disable(parent);
->                         __clk_unprepare(parent);
-> -
-> +               }
->                 return ret;
->         }
->  
-> -       /* clean up enable for old parent if migration was done */
-> -       if (migrated_enable) {
-> -               flags = clk_enable_lock();
-> -               __clk_disable(old_parent);
-> -               clk_enable_unlock(flags);
-> -       }
-> -
-> -       /* clean up prepare for old parent if migration was done */
-> -       if (clk->prepare_count)
-> +       /*
-> +        * Finish the migration of prepare state and undo the changes done
-> +        * for preventing a race with clk_enable().
-> +        */
-> +       if (clk->prepare_count) {
-> +               clk_disable(clk);
-> +               clk_disable(old_parent);
->                 __clk_unprepare(old_parent);
-> +       }
->  
->         /* update debugfs with new clk tree topology */
->         clk_debug_reparent(clk, parent);
 > -- 
-> 1.7.8.3
-> 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+> Fabio Baltieri
