@@ -1,34 +1,74 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 15 May 2013 10:51:42 +0100
-Subject: [PATCH 19/39] ARM: ux500: Register Cyrp and Hash platform drivers on
- Snowball
+Date: Wed, 15 May 2013 10:51:44 +0100
+Subject: [PATCH 21/39] usb: musb: ux500: move the MUSB HDRC configuration into
+ the driver
 In-Reply-To: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
 References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1368611522-9984-20-git-send-email-lee.jones@linaro.org>
+Message-ID: <1368611522-9984-22-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These drivers are now operational and even use the latest common clk
-and DMA APIs. There's no reason why we shouldn't start them up now.
+The MUSB HDRC configuration never changes between each of the ux500
+supported platforms, so there's little point passing it though platform
+data. If we set it in the driver instead, we can make good use of it
+when booting with either ATAGs or Device Tree.
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Cc: Felipe Balbi <balbi@ti.com>
+Cc: linux-usb at vger.kernel.org
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-ux500/usb.c |    8 --------
+ drivers/usb/musb/ux500.c  |    8 ++++++++
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 38e321c..ba26ae3 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -637,6 +637,8 @@ static void __init snowball_init_machine(void)
+diff --git a/arch/arm/mach-ux500/usb.c b/arch/arm/mach-ux500/usb.c
+index a21c2e1..49d6e57 100644
+--- a/arch/arm/mach-ux500/usb.c
++++ b/arch/arm/mach-ux500/usb.c
+@@ -76,16 +76,8 @@ static struct ux500_musb_board_data musb_board_data = {
  
- 	mop500_snowball_ethernet_clock_enable();
+ static u64 ux500_musb_dmamask = DMA_BIT_MASK(32);
  
-+	u8500_cryp1_hash1_init(parent);
+-static struct musb_hdrc_config musb_hdrc_config = {
+-	.multipoint	= true,
+-	.dyn_fifo	= true,
+-	.num_eps	= 16,
+-	.ram_bits	= 16,
+-};
+-
+ static struct musb_hdrc_platform_data musb_platform_data = {
+ 	.mode = MUSB_OTG,
+-	.config = &musb_hdrc_config,
+ 	.board_data = &musb_board_data,
+ };
+ 
+diff --git a/drivers/usb/musb/ux500.c b/drivers/usb/musb/ux500.c
+index 2c80004..371776f 100644
+--- a/drivers/usb/musb/ux500.c
++++ b/drivers/usb/musb/ux500.c
+@@ -30,6 +30,13 @@
+ 
+ #include "musb_core.h"
+ 
++static struct musb_hdrc_config ux500_musb_hdrc_config = {
++	.multipoint	= true,
++	.dyn_fifo	= true,
++	.num_eps	= 16,
++	.ram_bits	= 16,
++};
 +
- 	/* This board has full regulator constraints */
- 	regulator_has_full_constraints();
- }
+ struct ux500_glue {
+ 	struct device		*dev;
+ 	struct platform_device	*musb;
+@@ -229,6 +236,7 @@ static int ux500_probe(struct platform_device *pdev)
+ 	glue->clk			= clk;
+ 
+ 	pdata->platform_ops		= &ux500_ops;
++	pdata->config 			= &ux500_musb_hdrc_config;
+ 
+ 	platform_set_drvdata(pdev, glue);
+ 
 -- 
 1.7.10.4
