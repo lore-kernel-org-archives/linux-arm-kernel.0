@@ -1,70 +1,51 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 15 May 2013 12:36:02 +0200
-Subject: [PATCH 1/1] ARM: at91: rm9200 fix time support
-In-Reply-To: <1368612753-32565-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1368612753-32565-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <51936512.9020400@atmel.com>
+Date: Wed, 15 May 2013 12:45:47 +0200
+Subject: [GIT PULL] at91: fixes for 3.10 #1
+Message-ID: <1368614747-1737-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/2013 12:12, Jean-Christophe PLAGNIOL-VILLARD :
-> since commit 838a2ae80a6ab52139fb1bf0a93ea8c5eff94488
-> Author: Shawn Guo <shawn.guo@linaro.org>
-> Date:   Sat Jan 12 11:50:05 2013 +0000
->
-> ARM: use clockevents_config_and_register() where possible
->
-> The timer is wrongly configured and result in a nice crash
-> so revert it on rm9200 timer
->
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: stable <stable@vger.kernel.org> # 3.8+
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Arnd, Olof,
 
-Ok, even if I said that it would have been better to understand the root 
-cause of this, it is also true that we have to move forward in the 
-meantime...
+This is the first AT91 fixes pull-request for 3.10-rc.
 
-So, yes, I take it for at91-3.10-fixes:
+Thanks, best regards,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
-Thanks,
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
 
+are available in the git repository at:
 
-> ---
->   arch/arm/mach-at91/at91rm9200_time.c |    7 +++++--
->   1 file changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-> index 2acdff4..180b302 100644
-> --- a/arch/arm/mach-at91/at91rm9200_time.c
-> +++ b/arch/arm/mach-at91/at91rm9200_time.c
-> @@ -174,6 +174,7 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
->   static struct clock_event_device clkevt = {
->   	.name		= "at91_tick",
->   	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-> +	.shift		= 32,
->   	.rating		= 150,
->   	.set_next_event	= clkevt32k_next_event,
->   	.set_mode	= clkevt32k_mode,
-> @@ -264,9 +265,11 @@ void __init at91rm9200_timer_init(void)
->   	at91_st_write(AT91_ST_RTMR, 1);
->
->   	/* Setup timer clockevent, with minimum of two ticks (important!!) */
-> +	clkevt.mult = div_sc(AT91_SLOW_CLOCK, NSEC_PER_SEC, clkevt.shift);
-> +	clkevt.max_delta_ns = clockevent_delta2ns(AT91_ST_ALMV, &clkevt);
-> +	clkevt.min_delta_ns = clockevent_delta2ns(2, &clkevt) + 1;
->   	clkevt.cpumask = cpumask_of(0);
-> -	clockevents_config_and_register(&clkevt, AT91_SLOW_CLOCK,
-> -					2, AT91_ST_ALMV);
-> +	clockevents_register_device(&clkevt);
->
->   	/* register clocksource */
->   	clocksource_register_hz(&clk32k, AT91_SLOW_CLOCK);
->
+  git://github.com/at91linux/linux-at91.git tags/at91-fixes
 
+for you to fetch changes up to b7a8ca5173ef9aa55fa039d7c216426ff0b25a12:
+
+  ARM: at91: rm9200 fix time support (2013-05-15 12:37:45 +0200)
+
+----------------------------------------------------------------
+An important revert on at91rm9200 platform related
+to timers that prevented the platform to boot properly.
+Then one pinctrl adjustments for SPI CS and a couple of
+trivial typos.
+
+----------------------------------------------------------------
+Jean-Christophe PLAGNIOL-VILLARD (2):
+      ARM: at91/trivial: fix model name for SAM9X25-EK
+      ARM: at91: rm9200 fix time support
+
+Ludovic Desroches (1):
+      ARM: at91: dts: request only spi cs-gpios used on sama5d3x cpu module
+
+Nicolas Ferre (1):
+      ARM: at91/trivial: typo in GEM compatible string
+
+ Documentation/devicetree/bindings/net/macb.txt |  2 +-
+ arch/arm/boot/dts/at91sam9x25ek.dts            |  2 +-
+ arch/arm/boot/dts/sama5d3.dtsi                 | 12 +-----------
+ arch/arm/boot/dts/sama5d3xcm.dtsi              |  4 ++++
+ arch/arm/mach-at91/at91rm9200_time.c           |  7 +++++--
+ 5 files changed, 12 insertions(+), 15 deletions(-)
 
 -- 
 Nicolas Ferre
