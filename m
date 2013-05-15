@@ -1,96 +1,44 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 15 May 2013 11:18:48 +0200
-Subject: [PATCH 3/3 v3] net/macb: Try to optimize struct macb layout
-In-Reply-To: <cover.1368608928.git.nicolas.ferre@atmel.com>
-References: <cover.1368608928.git.nicolas.ferre@atmel.com>
-Message-ID: <d0bc206ace3baaf681e111ba07c4d0b576839bb4.1368608928.git.nicolas.ferre@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 15 May 2013 10:23:22 +0100
+Subject: [PATCH] serial: pl011: protect attribute read from NULL platform
+ data struct
+In-Reply-To: <CACRpkdZR3AsGyCUH=cbskcZPs0PVBjH6QXUGkD+KG8SzGMMOKg@mail.gmail.com>
+References: <1368103855-28363-1-git-send-email-lee.jones@linaro.org>
+ <CACRpkdZR3AsGyCUH=cbskcZPs0PVBjH6QXUGkD+KG8SzGMMOKg@mail.gmail.com>
+Message-ID: <20130515092322.GC3494@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Havard Skinnemoen <havard@skinnemoen.net>
+On Mon, 13 May 2013, Linus Walleij wrote:
 
-Move TX-related fields to the top of the struct so that they end up on
-the same cache line. Move the NAPI struct below that since it is used
-from the interrupt handler. This field is also marked as
-___cacheline_aligned_in_smp.
-RX-related fields go below those.
-Function pointers and capability mask are immediately after that as
-they are also used in the hot path.
+> On Thu, May 9, 2013 at 2:50 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > It's completely feasible that platform data will be empty i.e. when
+> > booting with Device Tree with no device AUXDATA. So we must protect
+> > it's use in these use-cases, or risk a kernel Oops.
+> >
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Cc: Jiri Slaby <jslaby@suse.cz>
+> > Cc: linux-serial at vger.kernel.org
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> > *******                                                        *******
+> > If this issue has not already been fixed, this patch should be applied
+> > during the v3.10 -rc:s, as it fixes a serious bug which was introduced
+> > in the merge-window.
+> > *******                                                        *******
+> 
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> You should probably put Greg on To: so that he picks this up for
+> the -rc:s ASAP.
 
-Move the spinlock before regs since they are usually used together.
+I spoke with Greg yesterday. He's catching up on mail.
 
-Signed-off-by: Havard Skinnemoen <havard@skinnemoen.net>
-[nicolas.ferre at atmel.com: adapt to newer kernel]
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/net/ethernet/cadence/macb.h | 29 +++++++++++++++--------------
- 1 file changed, 15 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index f407615..6c8e38a2 100644
---- a/drivers/net/ethernet/cadence/macb.h
-+++ b/drivers/net/ethernet/cadence/macb.h
-@@ -555,46 +555,47 @@ struct macb_or_gem_ops {
- };
- 
- struct macb {
-+	spinlock_t		lock;
- 	void __iomem		*regs;
- 
-+	unsigned int		tx_head;
-+	unsigned int		tx_tail;
-+	struct macb_dma_desc	*tx_ring;
-+	struct macb_tx_skb	*tx_skb;
-+	dma_addr_t		tx_ring_dma;
-+	struct work_struct	tx_error_task;
-+
-+	struct napi_struct	napi ____cacheline_aligned_in_smp;
-+
- 	unsigned int		rx_tail;
- 	unsigned int		rx_prepared_head;
- 	struct macb_dma_desc	*rx_ring;
- 	struct sk_buff		**rx_skbuff;
- 	void			*rx_buffers;
- 	size_t			rx_buffer_size;
-+	dma_addr_t		rx_ring_dma;
-+	dma_addr_t		rx_buffers_dma;
- 
--	unsigned int		tx_head, tx_tail;
--	struct macb_dma_desc	*tx_ring;
--	struct macb_tx_skb	*tx_skb;
-+	struct macb_or_gem_ops	macbgem_ops;
-+
-+	u32			caps;
- 
--	spinlock_t		lock;
- 	struct platform_device	*pdev;
- 	struct clk		*pclk;
- 	struct clk		*hclk;
- 	struct net_device	*dev;
--	struct napi_struct	napi;
--	struct work_struct	tx_error_task;
- 	struct net_device_stats	stats;
- 	union {
- 		struct macb_stats	macb;
- 		struct gem_stats	gem;
- 	}			hw_stats;
- 
--	dma_addr_t		rx_ring_dma;
--	dma_addr_t		tx_ring_dma;
--	dma_addr_t		rx_buffers_dma;
--
--	struct macb_or_gem_ops	macbgem_ops;
--
- 	struct mii_bus		*mii_bus;
- 	struct phy_device	*phy_dev;
- 	unsigned int 		link;
- 	unsigned int 		speed;
- 	unsigned int 		duplex;
- 
--	u32			caps;
--
- 	phy_interface_t		phy_interface;
- 
- 	/* AT91RM9200 transmit */
 -- 
-1.8.0
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
