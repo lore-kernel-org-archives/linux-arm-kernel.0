@@ -1,43 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 May 2013 10:01:03 +0100
-Subject: [RFC PATCH 1/2] ARM: delay: print dummy values for bogomips
-In-Reply-To: <alpine.LFD.2.03.1305141945160.31158@syhkavp.arg>
-References: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
- <1367602547-19322-2-git-send-email-will.deacon@arm.com>
- <20130506231554.GB16801@amd.pavel.ucw.cz>
- <5188B8B2.5030601@arm.com>
- <alpine.LFD.2.03.1305141547180.31158@syhkavp.arg>
- <CAL_Jsq+Q5UMGo3J+vKKCRU+w4Kj0YN0exs7UCWTEOxmFjWfo3g@mail.gmail.com>
- <alpine.LFD.2.03.1305141945160.31158@syhkavp.arg>
-Message-ID: <20130515090103.GA12907@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 15 May 2013 10:04:49 +0100
+Subject: [GIT PULL v2] MFD: Fixes due for the v3.10 -rc:s
+In-Reply-To: <20130514091956.GG3297@gmail.com>
+References: <20130514091956.GG3297@gmail.com>
+Message-ID: <20130515090449.GA3494@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nico,
+Hi Sam,
 
-On Wed, May 15, 2013 at 12:56:51AM +0100, Nicolas Pitre wrote:
-> On Tue, 14 May 2013, Rob Herring wrote:
-> > On Tue, May 14, 2013 at 2:54 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> > > Waitaminute... Didn't you just claim this would be an ABI break?
-> > >
-> > > So if no application can be found, where is the ABI breakage?
-> > 
-> > lscpu
-> > 
-> > But that is already "broken" on ARM because x86 uses "bogomips" and
-> > ARM uses "BogoMIPS". 
-> 
-> So basically it won't be any more broken if the field disappears 
-> entirely, right?
+Since v1 of my MFD -fixes pull-request, I have applied a few more
+patches which really should be entered into the -rc:s. As it appears
+that you have not yet pulled v1, I figured sending a v2 in its place
+would be appropriate, so here it is.
 
-It's not these sort of tools I was worried about. I was thinking about the
-possibility of badly written parsers which want some other field from
-cpuinfo, but use the bogomips line for context. Do these applications exist?
-No idea.
+-----
 
-My second (less stupid) version of the patch prints "not reported". I'd be
-happy to remove the line altogether if people get behind the decision though.
-In fact, I just tried it and at least my linaro filesystem seems happy
-enough.
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
-Will
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/ljones/mfd.git for-mfd-fixes
+
+for you to fetch changes up to 27df65e061f51f6bd2c8e9ad6b505c8dbab6460c:
+
+  mfd: db8500-prcmu: Update stored DSI PLL divider value (2013-05-14 15:58:04 +0100)
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      mfd: ab8500: Debugfs code depends on gpadc
+
+Fabio Baltieri (5):
+      mfd: abx500-core: Fix sparse warning
+      mfd: ab8500-sysctrl: Fix sparse warning
+      mfd: ab8500-sysctrl: Set sysctrl_dev during probe
+      mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
+      mfd: ab8500-sysctrl: Always enable pm_power_off handler
+
+Lee Jones (4):
+      mfd: ab8500-gpadc: Suppress 'ignoring regulator_enable() return value' warning
+      mfd: ab8500-core: Use the correct driver name when enabling gpio/pinctrl
+      mfd: db8500-prcmu: Supply the pdata_size attribute for db8500-thermal
+      mfd: ab8500-core: Pass GPADC compatible string to MFD core
+
+Linus Walleij (1):
+      mfd: ab8500: Pass AB8500 IRQ to debugfs code by resource
+
+Ulf Hansson (1):
+      mfd: db8500-prcmu: Update stored DSI PLL divider value
+
+ drivers/mfd/Kconfig               |    2 +-
+ drivers/mfd/ab8500-core.c         |   24 +++++++++++++++++++++---
+ drivers/mfd/ab8500-debugfs.c      |   16 ++++++++++++----
+ drivers/mfd/ab8500-gpadc.c        |    7 +++++--
+ drivers/mfd/ab8500-sysctrl.c      |   15 ++++++++++-----
+ drivers/mfd/abx500-core.c         |    2 +-
+ drivers/mfd/db8500-prcmu.c        |    3 +++
+ include/linux/mfd/abx500/ab8500.h |    2 --
+ 8 files changed, 53 insertions(+), 18 deletions(-)
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
