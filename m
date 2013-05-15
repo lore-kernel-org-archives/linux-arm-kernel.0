@@ -1,81 +1,64 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Wed, 15 May 2013 12:36:58 -0400
-Subject: [PATCHv2 3/3] arm: dts: add bandgap entry for OMAP4460 devices
-In-Reply-To: <5193A875.1020000@ti.com>
-References: <1368629928-6723-1-git-send-email-eduardo.valentin@ti.com>
- <1368629928-6723-4-git-send-email-eduardo.valentin@ti.com>
- <5193A875.1020000@ti.com>
-Message-ID: <5193B9AA.7020507@ti.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Wed, 15 May 2013 11:40:12 -0500
+Subject: [PATCH 5/5] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
+In-Reply-To: <201305151525.50005.arnd@arndb.de>
+References: <1368571955-6652-1-git-send-email-dinguyen@altera.com>
+ <1368571955-6652-5-git-send-email-dinguyen@altera.com>
+ <201305151525.50005.arnd@arndb.de>
+Message-ID: <5193BA6C.2050406@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-05-2013 11:23, Benoit Cousson wrote:
-> Hi Eduardo,
-> 
-> On 05/15/2013 04:58 PM, Eduardo Valentin wrote:
->> Include bandgap devices for OMAP4460 devices.
->>
->> Cc: "Beno?t Cousson" <b-cousson@ti.com>
->> Cc: Tony Lindgren <tony@atomide.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: linux-omap at vger.kernel.org
->> Cc: devicetree-discuss at lists.ozlabs.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-kernel at vger.kernel.org
->> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
->> ---
->>  arch/arm/boot/dts/omap4460.dtsi | 9 +++++++++
->>  1 file changed, 9 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
->> index 2cf227c..e5bfbfe 100644
->> --- a/arch/arm/boot/dts/omap4460.dtsi
->> +++ b/arch/arm/boot/dts/omap4460.dtsi
->> @@ -29,4 +29,13 @@
->>  			     <0 55 0x4>;
->>  		ti,hwmods = "debugss";
->>  	};
+Hi Arnd,
+
+Thanks for the review.
+
+On 05/15/2013 08:25 AM, Arnd Bergmann wrote:
+> On Wednesday 15 May 2013, dinguyen at altera.com wrote:
 >> +
->> +	bandgap {
->> +		reg = <0x4a002260 0x4
->> +			0x4a00232C 0x4
->> +			0x4a002378 0x18>;
->> +		compatible = "ti,omap4460-bandgap";
->> +		interrupts = <0 126 4>; /* talert */
->> +		ti,tshut-gpio = <86>;
+>> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET		0x108
+>> +#define DRV_CLK_PHASE_SHIFT_SEL_MASK	0x7
+>> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)		\
+>> +	((((drvsel) << 0) & 0x7) | (((smplsel) << 3) & 0x38))
+>> +
+>> +extern void __iomem *sys_manager_base_addr;
+> 
+> This is not acceptable, you cannot just reference external symbols
+> from one driver in another, without a proper interface.
+> 
+> Please explain what the functionality is that you need here, then
+> we can help you find the proper interface. My guess is that you
+> need either the functionality provided by drivers/reset/
+> or drivers/mfd/syscon.c.
 
-
+Our implementation has the timing controls for the SD/MMC controller in
+another custom IP block(system manager). sys_manager_base_addr was
+mapped in mach-socfpga/socfpga.c. I saw the same approach with
+drivers/clk(clk_mgr_base_addr), so I thought it would be ok with this
+driver. Please advise on another way to do this...
 
 > 
-> Why do you need a custom attribute for GPIO? Cannot you use the standard
-> one?
+>> +       if (of_property_read_u32(dev->of_node, "pwr-en", &pwr_en)) {
+>> +               dev_info(dev, "couldn't determine pwr-en, assuming pwr-en = 0\n");
+>> +               pwr_en = 0;
+>> +       }
+>> +
+>> +       /* Set PWREN bit */
+>> +       mci_writel(host, PWREN, pwr_en);
+> 
+> If you add new properties, you have to document them in
+> Documentations/devicetree/bindings/*.
+> 
+> What is the requirement for this property? Is there no way to 
+> automatically power the card on/off using the normal
+> dw_mci_set_ios function?
 
-I believe it was by your suggestion :-), during the first attempts to
-send this driver. But could not find the thread link :-( sorry.
+Apologies...it wasn't there in 3.8. I will fix...
 
-
-I guess the reasoning to mark it as a ti specific is because it will be
-used as IRQ line to treat thermal shutdown (in SW).
-
+Thanks,
+Dinh
 > 
-> Where is the gpio controller phandle?
+> The rest of this patch looks ok to me.
 > 
-> Usually it looks like this:
+> 	Arnd
 > 
-> 	gpios = <&gpio1 8 0>;
-> 
-> 
-> Regards,
-> Benoit
-> 
-> 
-> 
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 295 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130515/8b26aa1e/attachment.sig>
