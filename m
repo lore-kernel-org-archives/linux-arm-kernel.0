@@ -1,39 +1,56 @@
-From: jagarwal@nvidia.com (Jay Agarwal)
-Date: Wed, 15 May 2013 22:58:22 +0530
-Subject: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
-In-Reply-To: <518A8596.7070702@wwwdotorg.org>
-References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
- <1368010660-31465-4-git-send-email-jagarwal@nvidia.com>
- <518A8596.7070702@wwwdotorg.org>
-Message-ID: <C79B248886DD134989C8FF6B096A91AB91B4886B5D@BGMAIL01.nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 May 2013 20:38:05 +0200
+Subject: [RFC 2/4] dma: add dmaengine driver for Samsung s3c24xx SoCs
+In-Reply-To: <201305141551.24375.heiko@sntech.de>
+References: <201305111330.05046.heiko@sntech.de>
+ <201305111331.25405.heiko@sntech.de>
+ <CACRpkda-wQyo8aYxbW9RJNcR3Kwe2w5AhaAuUHfaxBksa_Pm2A@mail.gmail.com>
+ <201305141551.24375.heiko@sntech.de>
+Message-ID: <CACRpkdY1s7u9Xjzkb+AdFY1xEO1PQOp1ZFPf4r5qPL-=WPkvNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, May 14, 2013 at 3:51 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Dienstag, 14. Mai 2013, 14:47:19 schrieb Linus Walleij:
+>> On Sat, May 11, 2013 at 1:31 PM, Heiko St?bner <heiko@sntech.de> wrote:
+>> > Conceptually the s3c24xx-dma feels like a distant relative of the pl08x
+>> > with numerous virtual channels being mapped to a lot less physical ones.
+>> > The driver therefore borrows a lot from the amba-pl08x driver in this
+>> > regard. Functionality-wise the driver gains a memcpy ability in addition
+>> > to the slave_sg one.
+>> >
+>> > The driver currently only supports the "newer" SoCs which can use any
+>> > physical channel for any dma slave. Support for the older SoCs where
+>> > each channel only supports a subset of possible dma slaves will have to
+>> > be added later.
+>> >
+>> > Tested on a s3c2416-based board, memcpy using the dmatest module and
+>> > slave_sg partially using the spi-s3c64xx driver.
+>> >
+>> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>>
+>> So have I understood correctly if I assume that *some* S3C
+>> variants, i.e. this: arch/arm/mach-s3c64xx/dma.c
+>> have a vanilla, unmodified, or just slightly modified
+>> PL08x block, while this DMAC is something probably based on
+>> the PL08x where some ASIC engineer has had a good time hacking
+>> around in the VHDL code to meet some feature requirements.
+>> Correct? Or plausible guess?
+>
+> You're guess is at good as mine :-) . The public s3c64xx (ARM11 based)
+> documentation says that it is using s PL080 as dma controller while the
+> s3c24xx (ARM9 based) SoCs have this one, which doesn't come with any label in
+> the manuals.
+> Similar to the s3c64xx using a vic, while the s3c24xx uses something
+> homegrown.
+>
+> The relationship description was more based on the concepts used, i.e. the
+> virtual channel concept and general handling of dma transfers feel somehow
+> similar - as I said these are my first steps into this, so I still need to
+> understand a lot.
 
-> On 05/08/2013 04:57 AM, Jay Agarwal wrote:
-> > - Enable PCIe controller on Cardhu
-> > - Only port 2 is connected on this board
-> > - Add regulators required for Tegra30
-> > - Patch is based on remotes/gitorious_thierryreding_linux/tegra/next
-> > - and should be applied on top of this.
-> 
-> > diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-> > b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-> 
-> > +	pcie-controller {
-> > +		status = "okay";
-> > +		pex-clk-supply = <&pex_hvdd_3v3_reg>;
-> > +		vdd-supply = <&ldo1_reg>;
-> > +		avdd-supply = <&ldo2_reg>;
-> > +
-> > +		pci at 3,0 {
-> > +			status = "okay";
-> > +		};
-> > +	};
-> 
-> So, if I apply this series, I do see the PCIe bridge and Ethernet device get
-> enumerated, but I don't see the USB3 controller get enumerated. I believe
-> that is a PCIe device behind the same bridge on the same Tegra PCIe port.
-> Shouldn't this device show up?
-[>]  I have also reproduced this problem. I see somehow no non-prefetchable memory is assigned to any of pcie devices.
-Probably that is the reason for USB3 (pci 0000:04:00.0) not getting enumerated since it uses only non-prefetchable memory.
+OK then, a separate driver seems required, will look a bit closer at
+the patch as such.
+
+Yours,
+Linus Walleij
