@@ -1,94 +1,82 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 15 May 2013 02:18:07 +0200
-Subject: [PATCH v3 07/20] ARM: shmobile: r8a7779: Add GPIO controller devices
- to device tree
+Date: Wed, 15 May 2013 02:18:06 +0200
+Subject: [PATCH v3 06/20] ARM: shmobile: r8a7779: Add pin control device to
+ device tree
 In-Reply-To: <1368577100-3530-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1368577100-3530-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1368577100-3530-8-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1368577100-3530-7-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add GPIO controller nodes to the r8a7779 core device tree.
+Add a pfc node to the r8a7779 device tree and remove manual pinmux
+initialization from the corresponding board files.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/boot/dts/r8a7779.dtsi | 64 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+ arch/arm/boot/dts/r8a7779.dtsi                  |  5 +++++
+ arch/arm/mach-shmobile/board-marzen-reference.c | 17 ++++++++---------
+ 2 files changed, 13 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index 9dfc438..dc78ff7 100644
+index 7f146c6..9dfc438 100644
 --- a/arch/arm/boot/dts/r8a7779.dtsi
 +++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -48,6 +48,70 @@
-                       <0xf0000100 0x100>;
-         };
+@@ -101,6 +101,11 @@
+ 		interrupts = <0 81 0x4>;
+ 	};
  
-+	gpio0: gpio at ffc40000 {
-+		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
-+		reg = <0xffc40000 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 141 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
++	pfc: pfc at fffc0000 {
++		compatible = "renesas,pfc-r8a7779";
++		reg = <0xfffc0000 0x23c>;
 +	};
 +
-+	gpio1: gpio at ffc41000 {
-+		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
-+		reg = <0xffc41000 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 142 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+	};
-+
-+	gpio2: gpio at ffc42000 {
-+		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
-+		reg = <0xffc42000 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 143 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+	};
-+
-+	gpio3: gpio at ffc43000 {
-+		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
-+		reg = <0xffc43000 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 144 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+	};
-+
-+	gpio4: gpio at ffc44000 {
-+		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
-+		reg = <0xffc44000 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 145 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+	};
-+
-+	gpio5: gpio at ffc45000 {
-+		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
-+		reg = <0xffc45000 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 146 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+	};
-+
-+	gpio6: gpio at ffc46000 {
-+		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
-+		reg = <0xffc46000 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 147 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		#gpio-lines = <9>;
-+	};
-+
- 	irqpin0: irqpin at fe780010 {
- 		compatible = "renesas,intc-irqpin";
- 		#interrupt-cells = <2>;
+ 	thermal at ffc48000 {
+ 		compatible = "renesas,rcar-thermal";
+ 		reg = <0xffc48000 0x38>;
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+index 5332e89..fa7fc07 100644
+--- a/arch/arm/mach-shmobile/board-marzen-reference.c
++++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+@@ -28,24 +28,24 @@
+ 
+ static const struct pinctrl_map marzen_pinctrl_map[] = {
+ 	/* SCIF2 (CN18: DEBUG0) */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.2", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.2", "fffc0000.pfc",
+ 				  "scif2_data_c", "scif2"),
+ 	/* SCIF4 (CN19: DEBUG1) */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "fffc0000.pfc",
+ 				  "scif4_data", "scif4"),
+ 	/* SDHI0 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "fffc0000.pfc",
+ 				  "sdhi0_data4", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "fffc0000.pfc",
+ 				  "sdhi0_ctrl", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "fffc0000.pfc",
+ 				  "sdhi0_cd", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "fffc0000.pfc",
+ 				  "sdhi0_wp", "sdhi0"),
+ 	/* SMSC */
+-	PIN_MAP_MUX_GROUP_DEFAULT("18000000.lan0", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("18000000.lan0", "fffc0000.pfc",
+ 				  "intc_irq1_b", "intc"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("18000000.lan0", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("18000000.lan0", "fffc0000.pfc",
+ 				  "lbsc_ex_cs0", "lbsc"),
+ };
+ 
+@@ -53,7 +53,6 @@ static void __init marzen_init(void)
+ {
+ 	pinctrl_register_mappings(marzen_pinctrl_map,
+ 				  ARRAY_SIZE(marzen_pinctrl_map));
+-	r8a7779_pinmux_init();
+ 
+ 	r8a7779_add_standard_devices_dt();
+ }
 -- 
 1.8.1.5
