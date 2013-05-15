@@ -1,162 +1,170 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 15 May 2013 15:55:45 +0200
-Subject: [RFC/PATCH] dma: of: Make of_dma_simple_xlate match on DMA device
- and channel ID
-In-Reply-To: <51938FFD.2020300@metafoo.de>
-References: <1368624449-29003-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <51938FFD.2020300@metafoo.de>
-Message-ID: <3106852.EdI2KVGSEm@avalon>
+From: jagarwal@nvidia.com (Jay Agarwal)
+Date: Wed, 15 May 2013 19:25:50 +0530
+Subject: [PATCH] Move PCIe node to correct place
+Message-ID: <1368626150-25395-1-git-send-email-jagarwal@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lars-Peter,
+Moving PCIe controller node to correct place so
+that it is sorted by register address in .dtsi file
 
-(CC'ing LAKML, I had forgotten to do so when I sent the patch)
+Signed-off-by: Jay Agarwal <jagarwal@nvidia.com>
+---
+This patch is based on remotes/gitorious_thierryreding_linux/tegra/next
+and should be applied on top of this.
 
-On Wednesday 15 May 2013 15:39:09 Lars-Peter Clausen wrote:
-> On 05/15/2013 03:27 PM, Laurent Pinchart wrote:
-> > When translating a DT DMA channel specifier, the most common use case is
-> > to match the DMA channel based on the channel DMA engine and channel ID.
-> > Modify the of_dma_simple_xlate() function to do so, simplifying the API
-> > for DMA engine drivers.
-> > 
-> > There is no need to check the DMA cells count in the filter function as
-> > the check is already performed by the caller in of_dma_get_controller().
-> > 
-> > Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> 
-> Hi,
-> 
-> I've submitted a very similar patch some time ago, see
-> https://lkml.org/lkml/2013/3/25/250
+ arch/arm/boot/dts/tegra30.dtsi |  132 ++++++++++++++++++++--------------------
+ 1 files changed, 66 insertions(+), 66 deletions(-)
 
-Thanks. So my patch makes at least some sense :-)
-
-I had the impression that this is what omap-dma needs as well, hence the 
-modification to the existing xlate function. I'm fine with a separate function 
-as well if the current code covers different use cases.
-
-> > ---
-> > 
-> >  drivers/dma/of-dma.c   | 39 +++++++++++++++++++++++++++++++--------
-> >  drivers/dma/omap-dma.c |  8 +-------
-> >  include/linux/of_dma.h |  5 -----
-> >  3 files changed, 32 insertions(+), 20 deletions(-)
-> > 
-> > I've implemented this function while working on a DMA engine driver, and
-> > realized that it wasn't specific to my driver at all. As I'm new to the
-> > DMA engine API, I'd appreciate feedback on whether this change makes
-> > sense, or if I should instead keep the existing of_dma_simple_xlate()
-> > function and create a separate simple xlate helper.
-> > 
-> > diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
-> > index 7aa0864..702a45d 100644
-> > --- a/drivers/dma/of-dma.c
-> > +++ b/drivers/dma/of-dma.c
-> > @@ -202,6 +202,27 @@ struct dma_chan *of_dma_request_slave_channel(struct
-> > device_node *np,
-> >  	return NULL;
-> >  }
-> > 
-> > +struct of_dma_filter_args {
-> > +	struct dma_device *device;
-> > +	unsigned int chan_id;
-> > +};
-> > +
-> > +/**
-> > + * of_dma_simple_xlate_filter - Channel filter function for
-> > of_dma_simple_xlate + * @dma_chan:	pointer to candidate DMA channel
-> > + * @param:	pointer to filter parameter
-> > + *
-> > + * Filter out candidate DMA channels that don't match the channel ID or
-> > + * DMA engine device passed as arguments.
-> > + */
-> > +static bool of_dma_simple_xlate_filter(struct dma_chan *chan, void
-> > *param)
-> > +{
-> > +	struct of_dma_filter_args *fargs = param;
-> > +
-> > +	return (chan->device == fargs->device) &&
-> > +	       (chan->chan_id == fargs->chan_id);
-> > +}
-> > +
-> >  /**
-> >   * of_dma_simple_xlate - Simple DMA engine translation function
-> >   * @dma_spec:	pointer to DMA specifier as found in the device tree
-> > @@ -216,16 +237,18 @@ struct dma_chan *of_dma_request_slave_channel(struct
-> > device_node *np,> 
-> >  struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
-> >  						struct of_dma *ofdma)
-> >  {
-> > -	int count = dma_spec->args_count;
-> > -	struct of_dma_filter_info *info = ofdma->of_dma_data;
-> > +	struct dma_device *dev = ofdma->of_dma_data;
-> > +	struct of_dma_filter_args fargs;
-> > +	dma_cap_mask_t cap;
-> > 
-> > -	if (!info || !info->filter_fn)
-> > -		return NULL;
-> > +	/* There's no need to specify matching caps as we're going to match a
-> > +	 * specific DMA channel anyway.
-> > +	 */
-> > +	dma_cap_zero(cap);
-> > 
-> > -	if (count != 1)
-> > -		return NULL;
-> > +	fargs.device = dev;
-> > +	fargs.chan_id = dma_spec->args[0];
-> > 
-> > -	return dma_request_channel(info->dma_cap, info->filter_fn,
-> > -			&dma_spec->args[0]);
-> > +	return dma_request_channel(cap, of_dma_simple_xlate_filter, &fargs);
-> >  }
-> >  EXPORT_SYMBOL_GPL(of_dma_simple_xlate);
-> > diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
-> > index ec3fc4f..7e7ff06 100644
-> > --- a/drivers/dma/omap-dma.c
-> > +++ b/drivers/dma/omap-dma.c
-> > @@ -69,10 +69,6 @@ static const unsigned es_bytes[] = {
-> >  	[OMAP_DMA_DATA_TYPE_S32] = 4,
-> >  };
-> > 
-> > -static struct of_dma_filter_info omap_dma_info = {
-> > -	.filter_fn = omap_dma_filter_fn,
-> > -};
-> > -
-> >  static inline struct omap_dmadev *to_omap_dma_dev(struct dma_device *d)
-> >  {
-> >  	return container_of(d, struct omap_dmadev, ddev);
-> > @@ -641,11 +637,9 @@ static int omap_dma_probe(struct platform_device
-> > *pdev)> 
-> >  	platform_set_drvdata(pdev, od);
-> >  	if (pdev->dev.of_node) {
-> > -		omap_dma_info.dma_cap = od->ddev.cap_mask;
-> > -
-> >  		/* Device-tree DMA controller registration */
-> >  		rc = of_dma_controller_register(pdev->dev.of_node,
-> > -				of_dma_simple_xlate, &omap_dma_info);
-> > +				of_dma_simple_xlate, &od->ddev);
-> >  		if (rc) {
-> >  			pr_warn("OMAP-DMA: failed to register DMA controller\n");
-> >  			dma_async_device_unregister(&od->ddev);
-> > diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
-> > index 364dda7..3c0d9ac 100644
-> > --- a/include/linux/of_dma.h
-> > +++ b/include/linux/of_dma.h
-> > @@ -27,11 +27,6 @@ struct of_dma {
-> >  	void			*of_dma_data;
-> >  };
-> > 
-> > -struct of_dma_filter_info {
-> > -	dma_cap_mask_t	dma_cap;
-> > -	dma_filter_fn	filter_fn;
-> > -};
-> > -
-> > 
-> >  #ifdef CONFIG_OF
-> >  extern int of_dma_controller_register(struct device_node *np,
-> >  		struct dma_chan *(*of_dma_xlate)
+diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
+index 5c1f7c0..a242b2e 100644
+--- a/arch/arm/boot/dts/tegra30.dtsi
++++ b/arch/arm/boot/dts/tegra30.dtsi
+@@ -12,6 +12,72 @@
+ 		serial4 = &uarte;
+ 	};
+ 
++	pcie-controller {
++		compatible = "nvidia,tegra30-pcie";
++		device_type = "pci";
++		reg = <0x00003000 0x00000800   /* PADS registers */
++		       0x00003800 0x00000200   /* AFI registers */
++		       0x10000000 0x10000000>; /* configuration space */
++		reg-names = "pads", "afi", "cs";
++		interrupts = <0 98 0x04   /* controller interrupt */
++		              0 99 0x04>; /* MSI interrupt */
++
++		bus-range = <0x00 0xff>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++
++		ranges = <0x82000000 0 0x00000000 0x00000000 0 0x00001000   /* port 0 configuration space */
++			  0x82000000 0 0x00001000 0x00001000 0 0x00001000   /* port 1 configuration space */
++			  0x82000000 0 0x00004000 0x00004000 0 0x00001000   /* port 2 configuration space */
++			  0x81000000 0 0          0x02000000 0 0x00010000   /* downstream I/O */
++			  0x82000000 0 0x20000000 0x20000000 0 0x10000000   /* non-prefetchable memory */
++			  0xc2000000 0 0x30000000 0x30000000 0 0x10000000>; /* prefetchable memory */
++
++		clocks = <&tegra_car 70>, <&tegra_car 72>, <&tegra_car 74>,
++			 <&tegra_car 118>, <&tegra_car 215>;
++		clock-names = "pex", "afi", "pcie_xclk", "pll_e", "cml";
++		status = "disabled";
++
++		pci at 1,0 {
++			device_type = "pci";
++			assigned-addresses = <0x82000800 0 0x00000000 0 0x1000>;
++			reg = <0x000800 0 0 0 0>;
++			status = "disabled";
++
++			#address-cells = <3>;
++			#size-cells = <2>;
++			ranges;
++
++			nvidia,num-lanes = <2>;
++		};
++
++		pci at 2,0 {
++			device_type = "pci";
++			assigned-addresses = <0x82001000 0 0x00001000 0 0x1000>;
++			reg = <0x001000 0 0 0 0>;
++			status = "disabled";
++
++			#address-cells = <3>;
++			#size-cells = <2>;
++			ranges;
++
++			nvidia,num-lanes = <2>;
++		};
++
++		pci at 3,0 {
++			device_type = "pci";
++			assigned-addresses = <0x82001800 0 0x00004000 0 0x1000>;
++			reg = <0x001800 0 0 0 0>;
++			status = "disabled";
++
++			#address-cells = <3>;
++			#size-cells = <2>;
++			ranges;
++
++			nvidia,num-lanes = <2>;
++		};
++	};
++
+ 	host1x {
+ 		compatible = "nvidia,tegra30-host1x", "simple-bus";
+ 		reg = <0x50000000 0x00024000>;
+@@ -115,72 +181,6 @@
+ 		};
+ 	};
+ 
+-	pcie-controller {
+-		compatible = "nvidia,tegra30-pcie";
+-		device_type = "pci";
+-		reg = <0x00003000 0x00000800   /* PADS registers */
+-		       0x00003800 0x00000200   /* AFI registers */
+-		       0x10000000 0x10000000>; /* configuration space */
+-		reg-names = "pads", "afi", "cs";
+-		interrupts = <0 98 0x04   /* controller interrupt */
+-		              0 99 0x04>; /* MSI interrupt */
+-
+-		bus-range = <0x00 0xff>;
+-		#address-cells = <3>;
+-		#size-cells = <2>;
+-
+-		ranges = <0x82000000 0 0x00000000 0x00000000 0 0x00001000   /* port 0 configuration space */
+-			  0x82000000 0 0x00001000 0x00001000 0 0x00001000   /* port 1 configuration space */
+-			  0x82000000 0 0x00004000 0x00004000 0 0x00001000   /* port 2 configuration space */
+-			  0x81000000 0 0          0x02000000 0 0x00010000   /* downstream I/O */
+-			  0x82000000 0 0x20000000 0x20000000 0 0x10000000   /* non-prefetchable memory */
+-			  0xc2000000 0 0x30000000 0x30000000 0 0x10000000>; /* prefetchable memory */
+-
+-		clocks = <&tegra_car 70>, <&tegra_car 72>, <&tegra_car 74>,
+-			 <&tegra_car 118>, <&tegra_car 215>;
+-		clock-names = "pex", "afi", "pcie_xclk", "pll_e", "cml";
+-		status = "disabled";
+-
+-		pci at 1,0 {
+-			device_type = "pci";
+-			assigned-addresses = <0x82000800 0 0x00000000 0 0x1000>;
+-			reg = <0x000800 0 0 0 0>;
+-			status = "disabled";
+-
+-			#address-cells = <3>;
+-			#size-cells = <2>;
+-			ranges;
+-
+-			nvidia,num-lanes = <2>;
+-		};
+-
+-		pci at 2,0 {
+-			device_type = "pci";
+-			assigned-addresses = <0x82001000 0 0x00001000 0 0x1000>;
+-			reg = <0x001000 0 0 0 0>;
+-			status = "disabled";
+-
+-			#address-cells = <3>;
+-			#size-cells = <2>;
+-			ranges;
+-
+-			nvidia,num-lanes = <2>;
+-		};
+-
+-		pci at 3,0 {
+-			device_type = "pci";
+-			assigned-addresses = <0x82001800 0 0x00004000 0 0x1000>;
+-			reg = <0x001800 0 0 0 0>;
+-			status = "disabled";
+-
+-			#address-cells = <3>;
+-			#size-cells = <2>;
+-			ranges;
+-
+-			nvidia,num-lanes = <2>;
+-		};
+-	};
+-
+ 	timer at 50004600 {
+ 		compatible = "arm,cortex-a9-twd-timer";
+ 		reg = <0x50040600 0x20>;
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.0.4
