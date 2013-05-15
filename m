@@ -1,62 +1,55 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 15 May 2013 20:30:52 +0530
-Subject: [PATCH v2 0/6] ARM; OMAP2+: hwmod and SERIAL: Remove sysc handling
- from driver
-In-Reply-To: <20130510140200.GA11267@kahuna>
-References: <1366973695-2088-1-git-send-email-rnayak@ti.com>
- <87ppxhxixu.fsf@linaro.org> <20130510140200.GA11267@kahuna>
-Message-ID: <5193A324.8090703@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 15 May 2013 16:04:02 +0100
+Subject: [PATCH 3/4] ARM: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE and
+ use ALT_SMP instead
+In-Reply-To: <51939FBC.3060705@free-electrons.com>
+References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
+ <1364235581-17900-4-git-send-email-will.deacon@arm.com>
+ <51938B3D.2070508@free-electrons.com>
+ <20130515134117.GH23869@mudshark.cambridge.arm.com>
+ <51939386.7010709@free-electrons.com>
+ <20130515140607.GI23869@mudshark.cambridge.arm.com>
+ <51939FBC.3060705@free-electrons.com>
+Message-ID: <20130515150402.GK23869@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 May 2013 07:32 PM, Nishanth Menon wrote:
-> On 11:09-20130426, Kevin Hilman wrote:
->> Rajendra Nayak <rnayak@ti.com> writes:
->>
->> [...]
->>
->>> OMAP UART IP needs manual idle modes based on functional state of the
->>> IP. Currently this is handled by the driver with function pointers
->>> implemented in platform code.
->>>
->>> This however breaks in case of device tree because of missing
->>> idle handling. 
->>>
->>> The series tries to address the issue and tries to remove complete
->>> sysc handling from serial driver.
->>
->> Other than the minor nit about the order of the series for bisect, 
->>
->> Reviewed-by: Kevin Hilman <khilman@linaro.org>
->>
->> Also tested this on OMAP4/Panda where I was having the sluggish console
->> issues using DT boot, and and can confirm that this fixes the problem:
->>
->> Tested-by: Kevin Hilman <khilman@linaro.org>  # OMAP4/Panda
->>
-> I saw the same let of console sluggishness on SDP4430, Panda, Panda-ES
-> as well on latest linus master.
+On Wed, May 15, 2013 at 03:46:20PM +0100, Gregory CLEMENT wrote:
+> On 05/15/2013 04:06 PM, Will Deacon wrote:
+> > You could also try deleting both of the ALT_* lines and just putting a
+> > W(nop) in there directly.
 > 
-> For reference, I have rebased the series to latest master and fixes the
-> sequencing:
-> https://github.com/nmenon/linux-2.6-playground/commits/push/uart-fixes-sidle-3.10
-> based on:
-> master 70eba42 Merge tag 'please-pull-pstore' of git://git.kernel.org/pub/scm/linux/kernel/git/aegl/linux
+> If I just delete the both of the ALT_* lines it no more hangs.
+> If I put a  W(nop) instead it hangs.
+
+Wow. This doesn't sound good for your CPU and you might want to check with
+the Marvell guys...
+
+Extra things you could try:
+
+	- Try adding a 16-bit nop instead (remove the W, build thumb-2 and
+	  double check in your diasassembly)
+
+	- Try adding the W(nop) to other places in the kernel and see if you
+	  can tickle the lock-up elsewhere.
+
+	- Can you reproduce on the Armada XP? (since I have access to one of
+	  those)
+
+> > Early in boot (head.S:__fixup_smp), we detect whether the CPU has the MP
+> > extensions then, if we're actually UP but the kernel has CONFIG_SMP=y, we
+> > walk over the .alt.smp.init section looking at each entry in there. The
+> > ALT_UP macro spits out an (address, instruction) pair, so in
+> > __do_fixup_smp_on_up, we store the instruction to the address for each pair,
+> > replacing the SMP instruction which sat there in the compiled image.
+> > 
+> > It could be that the CPUID checks are failing on your Marvell part. Can you
+> > tell me what you have in your mpidr (mrc p15, 0, Rd, c0, c0, 5) and also
+> > your midr (mrc p15, 0, Rd, c0, c0) please?
 > 
-> Rajendra,
-> Would you be able to repost this series so that we can get this into
-> 3.10-rc2+?
+> mpidr= 0x0
+> midr= 0x561F5811
 
-Tony/Paul,
+Should be fine, but it doesn't look like the patching is the issue here.
 
-I just posted the v3 of these out [1] based off 3.10-rc1. Can we pull these in into -rc since
-these actually fix the console sluggishness introduced in this merge window (we always had issues
-with UART sidle handling with DT but never saw issues in mainline because of some static deps which got
-removed this merge window  I guess which would otherwise hide the issue).
-
-regards,
-Rajendra
-
-[1] http://marc.info/?l=linux-omap&m=136862939928398&w=2
-
-> 
+Will
