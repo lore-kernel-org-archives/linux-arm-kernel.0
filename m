@@ -1,172 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 May 2013 20:53:32 +0200
-Subject: [RFC 2/4] dma: add dmaengine driver for Samsung s3c24xx SoCs
-In-Reply-To: <201305111331.25405.heiko@sntech.de>
-References: <201305111330.05046.heiko@sntech.de>
- <201305111331.25405.heiko@sntech.de>
-Message-ID: <CACRpkdaT195McX9NeccJYpmWbuYK-AZUTHr9AXKHnJdkf+Qzuw@mail.gmail.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Wed, 15 May 2013 14:18:51 -0500
+Subject: [PATCH 5/5] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
+In-Reply-To: <5336483.qTzEF54m2z@wuerfel>
+References: <1368571955-6652-1-git-send-email-dinguyen@altera.com>
+ <201305151525.50005.arnd@arndb.de> <5193BA6C.2050406@gmail.com>
+ <5336483.qTzEF54m2z@wuerfel>
+Message-ID: <5193DF9B.8030504@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 11, 2013 at 1:31 PM, Heiko St?bner <heiko@sntech.de> wrote:
+Hi Arnd,
 
-> This adds a new driver to support the s3c24xx dma using the dmaengine
-> and make the old one in mach-s3c24xx obsolete in the long run.
->
-> Conceptually the s3c24xx-dma feels like a distant relative of the pl08x
-> with numerous virtual channels being mapped to a lot less physical ones.
-> The driver therefore borrows a lot from the amba-pl08x driver in this
-> regard. Functionality-wise the driver gains a memcpy ability in addition
-> to the slave_sg one.
->
-> The driver currently only supports the "newer" SoCs which can use any
-> physical channel for any dma slave. Support for the older SoCs where
-> each channel only supports a subset of possible dma slaves will have to
-> be added later.
->
-> Tested on a s3c2416-based board, memcpy using the dmatest module and
-> slave_sg partially using the spi-s3c64xx driver.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-(...)
-> +static u32 s3c24xx_dma_getbytes_chan(struct s3c24xx_dma_chan *s3cchan)
-> +{
-> +       struct s3c24xx_dma_phy *phy = s3cchan->phy;
-> +       struct s3c24xx_txd *txd = s3cchan->at;
-> +       u32 tc = readl(phy->base + DSTAT) & DSTAT_CURRTC_MASK;
-> +
-> +       switch (txd->dcon & DCON_DSZ_MASK) {
-> +       case DCON_DSZ_BYTE:
-> +               return tc;
-> +       case DCON_DSZ_HALFWORD:
-> +               return tc * 2;
-> +       case DCON_DSZ_WORD:
-> +               return tc * 4;
-> +       default:
-> +               break;
-> +       }
-> +
-> +       BUG();
+On 05/15/2013 12:11 PM, Arnd Bergmann wrote:
+> On Wednesday 15 May 2013 11:40:12 Dinh Nguyen wrote:
+>> On 05/15/2013 08:25 AM, Arnd Bergmann wrote:
+>>> On Wednesday 15 May 2013, dinguyen at altera.com wrote:
+>>>> +
+>>>> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET         0x108
+>>>> +#define DRV_CLK_PHASE_SHIFT_SEL_MASK        0x7
+>>>> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)              \
+>>>> +    ((((drvsel) << 0) & 0x7) | (((smplsel) << 3) & 0x38))
+>>>> +
+>>>> +extern void __iomem *sys_manager_base_addr;
+>>>
+>>> This is not acceptable, you cannot just reference external symbols
+>>> from one driver in another, without a proper interface.
+>>>
+>>> Please explain what the functionality is that you need here, then
+>>> we can help you find the proper interface. My guess is that you
+>>> need either the functionality provided by drivers/reset/
+>>> or drivers/mfd/syscon.c.
+>>
+>> Our implementation has the timing controls for the SD/MMC controller in
+>> another custom IP block(system manager). sys_manager_base_addr was
+>> mapped in mach-socfpga/socfpga.c. I saw the same approach with
+>> drivers/clk(clk_mgr_base_addr), so I thought it would be ok with this
+>> driver. Please advise on another way to do this...
+> 
+> The clock code is tied more more closely to the platform code, so I
+> was turning a blind eye on that one, under the assumption that it
+> was only used there.
 
-Isn't that a bit nasty. This macro should be used with care and we
-should recover if possible. dev_err()?
+I think I can use the syscon interface for this. Thanks for the pointer.
+I kinda thought that these dw_mmc-<platform> is platform specific
+enough, but I will go the syscon route.
 
-> +/*
-> + * Set the initial DMA register values.
-> + * Put them into the hardware and start the transfer.
-> + */
-> +static void s3c24xx_dma_start_next_txd(struct s3c24xx_dma_chan *s3cchan)
-> +{
-> +       struct s3c24xx_dma_engine *s3cdma = s3cchan->host;
-> +       struct s3c24xx_dma_phy *phy = s3cchan->phy;
-> +       struct virt_dma_desc *vd = vchan_next_desc(&s3cchan->vc);
-> +       struct s3c24xx_txd *txd = to_s3c24xx_txd(&vd->tx);
-> +       u32 dcon = txd->dcon;
-> +       u32 val;
-> +
-> +       list_del(&txd->vd.node);
-> +
-> +       s3cchan->at = txd;
-> +
-> +       /* Wait for channel inactive */
-> +       while (s3c24xx_dma_phy_busy(phy))
-> +               cpu_relax();
-> +
-> +       /* transfer-size and -count from len and width */
-> +       switch (txd->width) {
-> +       case 1:
-> +               dcon |= DCON_DSZ_BYTE | txd->len;
-> +               break;
-> +       case 2:
-> +               dcon |= DCON_DSZ_HALFWORD | (txd->len / 2);
-> +               break;
-> +       case 4:
-> +               dcon |= DCON_DSZ_WORD | (txd->len / 4);
-> +               break;
-> +       }
-> +
-> +       if (s3cchan->slave) {
-> +               if (s3cdma->sdata->has_reqsel) {
-> +                       int reqsel = s3cdma->pdata->reqsel_map[s3cchan->id];
-> +                       writel((reqsel << 1) | DMAREQSEL_HW,
-> +                              phy->base + DMAREQSEL);
-> +               } else {
-> +                       dev_err(&s3cdma->pdev->dev, "non-reqsel unsupported\n");
-> +                       return;
-> +                       dcon |= DCON_HWTRIG;
-> +               }
-> +       } else {
-> +               if (s3cdma->sdata->has_reqsel) {
-> +                       writel(0, phy->base + DMAREQSEL);
-> +               } else {
-> +                       dev_err(&s3cdma->pdev->dev, "non-reqsel unsupported\n");
-> +                       return;
-> +               }
-> +       }
-> +
-> +       writel(txd->src_addr, phy->base + DISRC);
-> +       writel(txd->disrcc, phy->base + DISRCC);
-> +       writel(txd->dst_addr, phy->base + DIDST);
-> +       writel(txd->didstc, phy->base + DIDSTC);
-> +
-> +       writel(dcon, phy->base + DCON);
-> +
-> +       val = readl(phy->base + DMASKTRIG);
-> +       val &= ~DMASKTRIG_STOP;
-> +       val |= DMASKTRIG_ON;
-> +       writel(val, phy->base + DMASKTRIG);
-> +
-> +       /* trigger the dma operation for memcpy transfers */
-> +       if (!s3cchan->slave) {
-> +               val = readl(phy->base + DMASKTRIG);
-> +               val |= DMASKTRIG_SWTRIG;
-> +               writel(val, phy->base + DMASKTRIG);
-> +       }
-> +}
-
-Since you have a few readl() and writel() in potentially
-time-critical code, consider using readl_relaxed() and
-writel_relaxed().
-
-> +static irqreturn_t s3c24xx_dma_irq(int irq, void *data)
-> +{
-> +       struct s3c24xx_dma_phy *phy = data;
-> +       struct s3c24xx_dma_chan *s3cchan = phy->serving;
-> +       struct s3c24xx_txd *txd;
-> +
-> +       dev_dbg(&phy->host->pdev->dev, "interrupt on channel %d\n", phy->id);
-> +
-> +       if (!s3cchan) {
-> +               dev_err(&phy->host->pdev->dev, "interrupt on unused channel %d\n",
-> +                       phy->id);
-> +               return IRQ_NONE;
-> +       }
-> +
-> +       spin_lock(&s3cchan->vc.lock);
-> +       txd = s3cchan->at;
-> +       if (txd) {
-> +               s3cchan->at = NULL;
-> +               vchan_cookie_complete(&txd->vd);
-> +
-> +               /*
-> +                * And start the next descriptor (if any),
-> +                * otherwise free this channel.
-> +                */
-> +               if (vchan_next_desc(&s3cchan->vc))
-> +                       s3c24xx_dma_start_next_txd(s3cchan);
-> +               else
-> +                       s3c24xx_dma_phy_free(s3cchan);
-> +       }
-> +       spin_unlock(&s3cchan->vc.lock);
-> +
-> +       return IRQ_HANDLED;
-> +}
-
-OK so one IRQ per channel. Is there really no status
-register to check or flag to clear on these IRQs?
-
-Apart from these smallish things it looks good to me:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+Dinh
+> 
+> 	Arnd
+> 
