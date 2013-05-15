@@ -1,85 +1,32 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 15 May 2013 11:40:21 +0200
-Subject: [PATCH 3/4] mmc: mmci: Cache MMCIDATACTRL register
-In-Reply-To: <1368610823-14113-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1368610823-14113-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1368610823-14113-4-git-send-email-ulf.hansson@stericsson.com>
+Date: Wed, 15 May 2013 11:40:18 +0200
+Subject: [PATCH 0/4] mmc: mmci: Add support for UHS cards
+Message-ID: <1368610823-14113-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Add a cache variable in the host struct that reflects the current data in
-the MMCIDATACTRL register. This patch will not introduce any functional
-change but instead provide an easy option to keep specific bits in the
-register between each data transfer.
+UHS cards in mode SDR12|25 operates at 1.8V I/O voltage. This patchset
+adds support to handle the corresponding voltage switch from the default
+2.7-3.6 I/O voltage to 1.8V.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/host/mmci.c |   17 ++++++++++++++---
- drivers/mmc/host/mmci.h |    1 +
- 2 files changed, 15 insertions(+), 3 deletions(-)
+The first patch, "Fixup regulator handling for vqmmc" has recently been
+sent as a separate patch, since it is a pure bugfix. Nevertheless this
+patchset depends on this patch, thus I decided to fold it here as well.
 
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 8d4ceb8..4530217 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -191,6 +191,17 @@ static void mmci_write_pwrreg(struct mmci_host *host, u32 pwr)
- /*
-  * This must be called with host->lock held
-  */
-+static void mmci_write_datactrlreg(struct mmci_host *host, u32 datactrl)
-+{
-+	if (host->datactrl_reg != datactrl) {
-+		host->datactrl_reg = datactrl;
-+		writel(datactrl, host->base + MMCIDATACTRL);
-+	}
-+}
-+
-+/*
-+ * This must be called with host->lock held
-+ */
- static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
- {
- 	struct variant_data *variant = host->variant;
-@@ -275,7 +286,7 @@ static void mmci_set_mask1(struct mmci_host *host, unsigned int mask)
- 
- static void mmci_stop_data(struct mmci_host *host)
- {
--	writel(0, host->base + MMCIDATACTRL);
-+	mmci_write_datactrlreg(host, 0);
- 	mmci_set_mask1(host, 0);
- 	host->data = NULL;
- }
-@@ -552,7 +563,7 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
- 	datactrl |= MCI_DPSM_DMAENABLE;
- 
- 	/* Trigger the DMA transfer */
--	writel(datactrl, host->base + MMCIDATACTRL);
-+	mmci_write_datactrlreg(host, datactrl);
- 
- 	/*
- 	 * Let the MMCI say when the data is ended and it's time
-@@ -750,7 +761,7 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
- 		irqmask = MCI_TXFIFOHALFEMPTYMASK;
- 	}
- 
--	writel(datactrl, base + MMCIDATACTRL);
-+	mmci_write_datactrlreg(host, datactrl);
- 	writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
- 	mmci_set_mask1(host, irqmask);
- }
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 1383c9c..0b6cc54 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -183,6 +183,7 @@ struct mmci_host {
- 	unsigned int		cclk;
- 	u32			pwr_reg;
- 	u32			clk_reg;
-+	u32			datactrl_reg;
- 	bool			vqmmc_enabled;
- 	struct mmci_platform_data *plat;
- 	struct variant_data	*variant;
+Host capabilities for SDR12 and SDR25 needs to be set to enable support,
+but that will be handled outside this patchset.
+
+Ulf Hansson (4):
+  mmc: mmci: Fixup regulator handling for vqmmc
+  mmc: mmci: Support signal voltage switch for UHS cards
+  mmc: mmci: Cache MMCIDATACTRL register
+  mmc: mmci: Add card_busy function to improve UHS card support
+
+ drivers/mmc/host/mmci.c |   94 +++++++++++++++++++++++++++++++++++++++++++----
+ drivers/mmc/host/mmci.h |    4 ++
+ 2 files changed, 90 insertions(+), 8 deletions(-)
+
 -- 
 1.7.10
