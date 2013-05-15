@@ -1,33 +1,28 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 15 May 2013 14:43:02 +0200
-Subject: [PATCH 1/5] ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
-In-Reply-To: <1368571955-6652-1-git-send-email-dinguyen@altera.com>
-References: <1368571955-6652-1-git-send-email-dinguyen@altera.com>
-Message-ID: <20130515124302.GB9066@amd.pavel.ucw.cz>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 15 May 2013 13:44:28 +0100
+Subject: v3.10-rc1: compile problem in arch/arm/common/mcpm_platsmp.c
+In-Reply-To: <20130515123640.GA9066@amd.pavel.ucw.cz>
+References: <20130515123640.GA9066@amd.pavel.ucw.cz>
+Message-ID: <1368621868.5583.6.camel@computer5.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2013-05-14 17:52:31, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
+On Wed, 2013-05-15 at 14:36 +0200, Pavel Machek wrote:
+> Hi!
 > 
-> Add entry for 2nd GMAC controller. Add the correct clocks for the GMAC.
+> I'm trying to switch to v3.10-rc1, and got following:
 > 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> CC: Olof Johansson <olof@lixom.net>
-> CC: Pavel Machek <pavel@denx.de>
-> CC: <linux@arm.linux.org.uk>
+> arch/arm/common/mcpm_platsmp.c: In function 'mcpm_secondary_init':
+> arch/arm/common/mcpm_platsmp.c:52:2: error: implicit declaration of
+> function 'gic_secondary_init' [-Werror=implicit-function-declaration]
+> cc1: some warnings being treated as errors
+> make[1]: *** [arch/arm/common/mcpm_platsmp.o] Error 1
+> make: *** [arch/arm/common] Error 2
+> make: *** Waiting for unfinished jobs....
 
-Looks good.
+This has already been hit by others and there is a patch in the
+pipeline, see:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/167586.html
 
-Reviewed-by: Pavel Machek <pavel@denx.de>
-
-...but, this patch is not enough to get ethernet to work with
-3.10-rc1, right? I hoped that applying 1-3 of the series would get me
-ethernet, but no :-(.
-
-Thanks,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Tixy
