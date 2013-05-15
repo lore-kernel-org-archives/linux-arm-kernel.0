@@ -1,37 +1,33 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 15 May 2013 17:09:44 +0200
-Subject: [PATCH] ARM: SAMSUNG: devs: Add names to fimd0 IRQ resources
-Message-ID: <1368630584-30147-1-git-send-email-t.figa@samsung.com>
+Date: Wed, 15 May 2013 17:16:08 +0200
+Subject: [PATCH] rtc: max8998: Check for pdata presence before dereferencing
+Message-ID: <1368630968-30460-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 1977e6d8 (drm/exynos: change the method for getting the
-interrupt) the Exynos DRM FIMD driver requires IRQ resources to be
-named. This patch fixes probe failure in non-DT cases by adding
-appropriate resource names to fimd0 platform device.
+Currently the driver can crash with a NULL pointer dereference if no pdata
+is provided, despite of successful registration of MFD part. This patch
+fixes the problem by adding a NULL check before dereferencing the pdata
+pointer.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/devs.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ drivers/rtc/rtc-max8998.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index 30c2fe2..0f9c3f4 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -311,9 +311,9 @@ struct platform_device s5p_device_jpeg = {
- #ifdef CONFIG_S5P_DEV_FIMD0
- static struct resource s5p_fimd0_resource[] = {
- 	[0] = DEFINE_RES_MEM(S5P_PA_FIMD0, SZ_32K),
--	[1] = DEFINE_RES_IRQ(IRQ_FIMD0_VSYNC),
--	[2] = DEFINE_RES_IRQ(IRQ_FIMD0_FIFO),
--	[3] = DEFINE_RES_IRQ(IRQ_FIMD0_SYSTEM),
-+	[1] = DEFINE_RES_IRQ_NAMED(IRQ_FIMD0_VSYNC, "vsync"),
-+	[2] = DEFINE_RES_IRQ_NAMED(IRQ_FIMD0_FIFO, "fifo"),
-+	[3] = DEFINE_RES_IRQ_NAMED(IRQ_FIMD0_SYSTEM, "lcd_sys"),
- };
+diff --git a/drivers/rtc/rtc-max8998.c b/drivers/rtc/rtc-max8998.c
+index 48b6612..d5af7ba 100644
+--- a/drivers/rtc/rtc-max8998.c
++++ b/drivers/rtc/rtc-max8998.c
+@@ -285,7 +285,7 @@ static int max8998_rtc_probe(struct platform_device *pdev)
+ 			info->irq, ret);
  
- struct platform_device s5p_device_fimd0 = {
+ 	dev_info(&pdev->dev, "RTC CHIP NAME: %s\n", pdev->id_entry->name);
+-	if (pdata->rtc_delay) {
++	if (pdata && pdata->rtc_delay) {
+ 		info->lp3974_bug_workaround = true;
+ 		dev_warn(&pdev->dev, "LP3974 with RTC REGERR option."
+ 				" RTC updates will be extremely slow.\n");
 -- 
 1.8.2.1
