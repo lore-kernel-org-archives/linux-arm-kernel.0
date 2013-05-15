@@ -1,44 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 15 May 2013 10:23:22 +0100
-Subject: [PATCH] serial: pl011: protect attribute read from NULL platform
- data struct
-In-Reply-To: <CACRpkdZR3AsGyCUH=cbskcZPs0PVBjH6QXUGkD+KG8SzGMMOKg@mail.gmail.com>
-References: <1368103855-28363-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdZR3AsGyCUH=cbskcZPs0PVBjH6QXUGkD+KG8SzGMMOKg@mail.gmail.com>
-Message-ID: <20130515092322.GC3494@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 15 May 2013 11:27:00 +0200
+Subject: [PATCH] ARM: crypto: sha1-armv4-large.S: fix SP handling
+Message-ID: <1368610020-29219-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 May 2013, Linus Walleij wrote:
+Make the SHA1 asm code ABI conformant by making sure all stack
+accesses occur above the stack pointer.
 
-> On Thu, May 9, 2013 at 2:50 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > It's completely feasible that platform data will be empty i.e. when
-> > booting with Device Tree with no device AUXDATA. So we must protect
-> > it's use in these use-cases, or risk a kernel Oops.
-> >
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: Jiri Slaby <jslaby@suse.cz>
-> > Cc: linux-serial at vger.kernel.org
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> > *******                                                        *******
-> > If this issue has not already been fixed, this patch should be applied
-> > during the v3.10 -rc:s, as it fixes a serious bug which was introduced
-> > in the merge-window.
-> > *******                                                        *******
-> 
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> You should probably put Greg on To: so that he picks this up for
-> the -rc:s ASAP.
+Origin:
+http://git.openssl.org/gitweb/?p=openssl.git;a=commit;h=1a9d60d2
 
-I spoke with Greg yesterday. He's catching up on mail.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/crypto/sha1-armv4-large.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/crypto/sha1-armv4-large.S b/arch/arm/crypto/sha1-armv4-large.S
+index 92c6eed..99207c4 100644
+--- a/arch/arm/crypto/sha1-armv4-large.S
++++ b/arch/arm/crypto/sha1-armv4-large.S
+@@ -195,6 +195,7 @@ ENTRY(sha1_block_data_order)
+ 	add	r3,r3,r10			@ E+=F_00_19(B,C,D)
+ 	cmp	r14,sp
+ 	bne	.L_00_15		@ [((11+4)*5+2)*3]
++	sub	sp,sp,#25*4
+ #if __ARM_ARCH__<7
+ 	ldrb	r10,[r1,#2]
+ 	ldrb	r9,[r1,#3]
+@@ -290,7 +291,6 @@ ENTRY(sha1_block_data_order)
+ 	add	r3,r3,r10			@ E+=F_00_19(B,C,D)
+ 
+ 	ldr	r8,.LK_20_39		@ [+15+16*4]
+-	sub	sp,sp,#25*4
+ 	cmn	sp,#0			@ [+3], clear carry to denote 20_39
+ .L_20_39_or_60_79:
+ 	ldr	r9,[r14,#15*4]
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.1.2
