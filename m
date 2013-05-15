@@ -1,82 +1,64 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 15 May 2013 18:27:20 +0800
-Subject: [PATCH 2/6] ARM: tegra: skip SCU and PL310 code when CPU is not
- Cortex-A9
+Date: Wed, 15 May 2013 18:27:21 +0800
+Subject: [PATCH 3/6] ARM: tegra: make tegra_resume can work for Tegra114
 In-Reply-To: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
 References: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1368613644-11863-3-git-send-email-josephl@nvidia.com>
+Message-ID: <1368613644-11863-4-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For supporting single image on all Tegra series, we need to skip some HW
-support code for Cortex-A9 only.
+Tegra114 is an ARM Cortex-A15 based SoC and some of the flow controller
+hardware behavior and configurations are different with other Tegra series.
+We fix the common resume function of tegra_resume to make it can work on
+Tegra114 by checking SoC ID. And also checking CPU primary part number to
+isolate the support code for Cortex A9 and A15.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- arch/arm/mach-tegra/sleep.S |  8 +++++---
- arch/arm/mach-tegra/sleep.h | 24 ++++++++++++++++++------
- 2 files changed, 23 insertions(+), 9 deletions(-)
+ arch/arm/mach-tegra/reset-handler.S | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
-index 364d845..9daaef2 100644
---- a/arch/arm/mach-tegra/sleep.S
-+++ b/arch/arm/mach-tegra/sleep.S
-@@ -106,9 +106,11 @@ ENTRY(tegra_shut_off_mmu)
- 	isb
- #ifdef CONFIG_CACHE_L2X0
- 	/* Disable L2 cache */
--	mov32	r4, TEGRA_ARM_PERIF_BASE + 0x3000
--	mov	r5, #0
--	str	r5, [r4, #L2X0_CTRL]
-+	check_cpu_part_num 0xc09, r9, r10
-+	movweq	r4, #:lower16:(TEGRA_ARM_PERIF_BASE + 0x3000)
-+	movteq	r4, #:upper16:(TEGRA_ARM_PERIF_BASE + 0x3000)
-+	moveq	r5, #0
-+	streq	r5, [r4, #L2X0_CTRL]
+diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+index 525f1b9..893f6b7 100644
+--- a/arch/arm/mach-tegra/reset-handler.S
++++ b/arch/arm/mach-tegra/reset-handler.S
+@@ -47,22 +47,25 @@ ENTRY(tegra_resume)
+  THUMB(	it	ne )
+ 	bne	cpu_resume			@ no
+ 
+-#ifdef CONFIG_ARCH_TEGRA_3x_SOC
++#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+ 	/* Are we on Tegra20? */
+ 	tegra_check_soc_id TEGRA20, TEGRA_APB_MISC_BASE, r6, r7
+ 	beq	1f				@ Yes
+ 	/* Clear the flow controller flags for this CPU. */
+-	mov32	r2, TEGRA_FLOW_CTRL_BASE + FLOW_CTRL_CPU0_CSR	@ CPU0 CSR
+-	ldr	r1, [r2]
++	cpu_to_csr_req r1, r0
++	mov32	r2, TEGRA_FLOW_CTRL_BASE
++	ldr	r1, [r2, r1]
+ 	/* Clear event & intr flag */
+ 	orr	r1, r1, \
+ 		#FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
+-	movw	r0, #0x0FFD	@ enable, cluster_switch, immed, & bitmaps
++	movw	r0, #0x3FFD	@ enable, cluster_switch, immed, & bitmaps
+ 	bic	r1, r1, r0
+ 	str	r1, [r2]
+ 1:
  #endif
- 	mov	pc, r0
- ENDPROC(tegra_shut_off_mmu)
-diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
-index 7e9c9fe..c2cac9a 100644
---- a/arch/arm/mach-tegra/sleep.h
-+++ b/arch/arm/mach-tegra/sleep.h
-@@ -70,19 +70,31 @@
- 	movt	\reg, #:upper16:\val
- .endm
  
-+/* Marco to check CPU part num */
-+.macro check_cpu_part_num part_num, tmp1, tmp2
-+	mrc	p15, 0, \tmp1, c0, c0, 0
-+	ubfx	\tmp1, \tmp1, #4, #12
-+	mov32	\tmp2, \part_num
-+	cmp	\tmp1, \tmp2
-+.endm
-+
- /* Macro to exit SMP coherency. */
- .macro exit_smp, tmp1, tmp2
- 	mrc	p15, 0, \tmp1, c1, c0, 1	@ ACTLR
- 	bic	\tmp1, \tmp1, #(1<<6) | (1<<0)	@ clear ACTLR.SMP | ACTLR.FW
- 	mcr	p15, 0, \tmp1, c1, c0, 1	@ ACTLR
- 	isb
--	cpu_id	\tmp1
--	mov	\tmp1, \tmp1, lsl #2
--	mov	\tmp2, #0xf
--	mov	\tmp2, \tmp2, lsl \tmp1
--	mov32	\tmp1, TEGRA_ARM_PERIF_VIRT + 0xC
--	str	\tmp2, [\tmp1]			@ invalidate SCU tags for CPU
-+#ifdef CONFIG_HAVE_ARM_SCU
-+	check_cpu_part_num 0xc09, \tmp1, \tmp2
-+	mrceq	p15, 0, \tmp1, c0, c0, 5
-+	andeq	\tmp1, \tmp1, #0xF
-+	moveq	\tmp1, \tmp1, lsl #2
-+	moveq	\tmp2, #0xf
-+	moveq	\tmp2, \tmp2, lsl \tmp1
-+	ldreq	\tmp1, =(TEGRA_ARM_PERIF_VIRT + 0xC)
-+	streq	\tmp2, [\tmp1]			@ invalidate SCU tags for CPU
- 	dsb
-+#endif
- .endm
++	check_cpu_part_num 0xc09, r8, r9
++	bne	not_ca9
+ #ifdef CONFIG_HAVE_ARM_SCU
+ 	/* enable SCU */
+ 	mov32	r0, TEGRA_ARM_PERIF_BASE
+@@ -73,6 +76,7 @@ ENTRY(tegra_resume)
  
- /* Macro to check Tegra revision */
+ 	/* L2 cache resume & re-enable */
+ 	l2_cache_resume r0, r1, r2, l2x0_saved_regs_addr
++not_ca9:
+ 
+ 	b	cpu_resume
+ ENDPROC(tegra_resume)
 -- 
 1.8.2.2
