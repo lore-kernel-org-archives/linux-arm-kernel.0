@@ -1,52 +1,36 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 15 May 2013 12:12:33 +0200
-Subject: [PATCH 1/1] ARM: at91: rm9200 fix time support
-Message-ID: <1368612753-32565-1-git-send-email-plagnioj@jcrosoft.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Wed, 15 May 2013 18:27:18 +0800
+Subject: [PATCH 0/6] ARM: tegra114: add CPU hotplug support
+Message-ID: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-since commit 838a2ae80a6ab52139fb1bf0a93ea8c5eff94488
-Author: Shawn Guo <shawn.guo@linaro.org>
-Date:   Sat Jan 12 11:50:05 2013 +0000
+Tegra 114 is different with other Tegra SoC chips. It using ARM Cortex-A15
+as CPU core and a enhanced flow controller for CPU power control. So
+we need to skip some code that was for Contex-A9 and some other support
+code that was for other Tegra SoC chips. Then adding the proper power up
+and hot plug control for Tegra114.
 
-ARM: use clockevents_config_and_register() where possible
+Joseph Lo (6):
+  ARM: tegra: add an assembly marco to check Tegra SoC ID
+  ARM: tegra: skip SCU and PL310 code when CPU is not Cortex-A9
+  ARM: tegra: make tegra_resume can work for Tegra114
+  ARM: tegra114: add power up sequence for warm boot CPU
+  clk: tegra114: implement wait_for_reset and disable_clock for
+    tegra_cpu_car_ops
+  ARM: tegra114: add CPU hotplug support
 
-The timer is wrongly configured and result in a nice crash
-so revert it on rm9200 timer
+ arch/arm/mach-tegra/Makefile        |  1 +
+ arch/arm/mach-tegra/flowctrl.h      |  1 +
+ arch/arm/mach-tegra/fuse.h          | 22 +++++++++---------
+ arch/arm/mach-tegra/hotplug.c       |  2 ++
+ arch/arm/mach-tegra/platsmp.c       | 25 ++++++++++++++++++++-
+ arch/arm/mach-tegra/reset-handler.S | 45 ++++++++++++++++++++-----------------
+ arch/arm/mach-tegra/sleep-tegra30.S | 27 ++++++++++++++++++----
+ arch/arm/mach-tegra/sleep.S         |  8 ++++---
+ arch/arm/mach-tegra/sleep.h         | 35 ++++++++++++++++++++++++-----
+ drivers/clk/tegra/clk-tegra114.c    | 23 ++++++++++++++++++-
+ 10 files changed, 143 insertions(+), 46 deletions(-)
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: stable <stable@vger.kernel.org> # 3.8+
-Cc: Shawn Guo <shawn.guo@linaro.org>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/mach-at91/at91rm9200_time.c |    7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-at91/at91rm9200_time.c b/arch/arm/mach-at91/at91rm9200_time.c
-index 2acdff4..180b302 100644
---- a/arch/arm/mach-at91/at91rm9200_time.c
-+++ b/arch/arm/mach-at91/at91rm9200_time.c
-@@ -174,6 +174,7 @@ clkevt32k_next_event(unsigned long delta, struct clock_event_device *dev)
- static struct clock_event_device clkevt = {
- 	.name		= "at91_tick",
- 	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.shift		= 32,
- 	.rating		= 150,
- 	.set_next_event	= clkevt32k_next_event,
- 	.set_mode	= clkevt32k_mode,
-@@ -264,9 +265,11 @@ void __init at91rm9200_timer_init(void)
- 	at91_st_write(AT91_ST_RTMR, 1);
- 
- 	/* Setup timer clockevent, with minimum of two ticks (important!!) */
-+	clkevt.mult = div_sc(AT91_SLOW_CLOCK, NSEC_PER_SEC, clkevt.shift);
-+	clkevt.max_delta_ns = clockevent_delta2ns(AT91_ST_ALMV, &clkevt);
-+	clkevt.min_delta_ns = clockevent_delta2ns(2, &clkevt) + 1;
- 	clkevt.cpumask = cpumask_of(0);
--	clockevents_config_and_register(&clkevt, AT91_SLOW_CLOCK,
--					2, AT91_ST_ALMV);
-+	clockevents_register_device(&clkevt);
- 
- 	/* register clocksource */
- 	clocksource_register_hz(&clk32k, AT91_SLOW_CLOCK);
 -- 
-1.7.10.4
+1.8.2.2
