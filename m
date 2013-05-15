@@ -1,54 +1,34 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 15 May 2013 11:46:31 +0200
-Subject: [RFC PATCH] ARM: SOCFPGA: Enable PMU through the CTI
-In-Reply-To: <1368586682-19848-1-git-send-email-dinguyen@altera.com>
-References: <1368586682-19848-1-git-send-email-dinguyen@altera.com>
-Message-ID: <20130515094631.GA5050@amd.pavel.ucw.cz>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 15 May 2013 10:51:11 +0100
+Subject: hwrng: picoxcell: PICOXCELL_PC3X3?
+In-Reply-To: <1368568977.1350.142.camel@x61.thuisdomein>
+References: <1368568977.1350.142.camel@x61.thuisdomein>
+Message-ID: <20130515095111.GB16346@page>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Paul,
 
-> SOCFPGA has a PMU(Performance Measurement Unit) that has its
-> IRQs routed through Coresight using the CTI(Cross-Trigger Interface).
+On Wed, May 15, 2013 at 12:02:57AM +0200, Paul Bolle wrote:
+> 0) Support for "Picochip picoXcell true random number generator[s]" was
+> added in commit 5efb94ee14 ("hwrng: pixocell - add support for picoxcell
+> TRNG"). Its Kconfig symbol (HW_RANDOM_PICOXCELL) depends on
+> PICOXCELL_PC3X3. But that symbol is not included in mainline. I found no
+> trace of it ever since support for this TRNG got added in v2.6.39. This
+> means this code has never been buildable in mainline.
 > 
-> This patch enables the PMU and initializes the CTI for usage by
-> oprofile/perfmon.
-> 
-> A lot of the code/idea was taken from this:
-> https://patchwork.kernel.org/patch/1432541/
+> Why does this code depend on PICOXCELL_PC3X3?
 
-> --- a/arch/arm/kernel/perf_event.c
-> +++ b/arch/arm/kernel/perf_event.c
-> @@ -305,6 +305,11 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
->  static void
->  armpmu_release_hardware(struct arm_pmu *armpmu)
->  {
-> +	struct platform_device *plat_device = armpmu->plat_device;
-> +	struct arm_pmu_platdata *plat = dev_get_platdata(&plat_device->dev);
-> +
-...
-> @@ -314,6 +319,7 @@ armpmu_reserve_hardware(struct arm_pmu *armpmu)
->  {
->  	int err;
->  	struct platform_device *pmu_device = armpmu->plat_device;
+The driver went in before the machine support itself, which got reworked 
+for device tree.  There's still some work needed to make the clocks work 
+properly so that the driver can use them (they're currently maintained 
+out of tree by Mindspeed, Picochip's new owner).
 
-pmu_device == plat_device, AFAICT. One of them should be renamed for
-consistency. Or maybe even make it "pdev" ... shorter and used in the
-code below...
+> 1) Slightly related: by what magic are picoxcell-pc7302-pc3x3.dts and
+> picoxcell-pc3x3.dtsi hooked into the build system? Or are dts and dtsi
+> files, well, special and not directly linked into the build system?
 
-> +int socfpga_init_cti(struct platform_device *pdev)
-> +{
+There isn't a defconfig at the moment - I've just done my dts builds 
+manually.
 
-> +	/*configure CTI0 for pmu irq routing*/
-
-Comments should normally be "/* word */"...
-
-I'll take a more detailed look later.
-
-Thanks,
-									Pavel
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Jamie
