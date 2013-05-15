@@ -1,216 +1,155 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 May 2013 15:16:52 +0200
-Subject: [PATCH] ARM: mach-moxart: platform port for MOXA ART SoC
-In-Reply-To: <CACmBeS1empYyoaKidgTrYwUFCw447OKndxZjT98TvYfKVWB00A@mail.gmail.com>
-References: <CACmBeS1NLFUYHBOVL28aCCzRrgXYGPZF9t3qj6AdcgaMkrPGoQ@mail.gmail.com>
- <201303181503.49491.arnd@arndb.de>
- <CACmBeS1empYyoaKidgTrYwUFCw447OKndxZjT98TvYfKVWB00A@mail.gmail.com>
-Message-ID: <201305151516.52389.arnd@arndb.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 15 May 2013 15:18:53 +0200
+Subject: [PATCH 3/4] ARM: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE and
+ use ALT_SMP instead
+In-Reply-To: <1364235581-17900-4-git-send-email-will.deacon@arm.com>
+References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
+ <1364235581-17900-4-git-send-email-will.deacon@arm.com>
+Message-ID: <51938B3D.2070508@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 May 2013, Jonas Jensen wrote:
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 29f7623..d534fce 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -429,6 +429,15 @@ choice
->  		  Say Y here if you want kernel low-level debugging support
->  		  on Allwinner A1X based platforms on the UART1.
+Hi Will,
+
+On 03/25/2013 07:19 PM, Will Deacon wrote:
+> Many ARMv7 cores have hardware page table walkers that can read the L1
+> cache. This is discoverable from the ID_MMFR3 register, although this
+> can be expensive to access from the low-level set_pte functions and is a
+> pain to cache, particularly with multi-cluster systems.
 > 
-> +	config DEBUG_MOXART_UART0
-> +        bool "Kernel low-level debugging messages via MOXART UART0"
-> +        depends on ARCH_MOXART
-> +        help
-> +          Say Y here if you want kernel low-level debugging support
-> +          on MOXART based platforms on the UART0.
-> +          select this to make sure "putc" in arch/arm/boot/compressed/debug.S
-> +          uses arch/arm/include/debug/moxart.S:s "addruart" macro
-> +
->  	config DEBUG_TEGRA_UART
->  		depends on ARCH_TEGRA
->  		bool "Use Tegra UART for low-level debug"
-> @@ -651,6 +660,7 @@ config DEBUG_LL_INCLUDE
->  	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
->  	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
->  	default "debug/sunxi.S" if DEBUG_SUNXI_UART0 || DEBUG_SUNXI_UART1
-> +	default "debug/moxart.S" if DEBUG_MOXART_UART0
->  	default "debug/tegra.S" if DEBUG_TEGRA_UART
->  	default "debug/ux500.S" if DEBUG_UX500_UART
->  	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
+> A useful observation is that the multi-processing extensions for ARMv7
+> require coherent table walks, meaning that we can make use of ALT_SMP
+> patching in proc-v7-* to patch away the cache flush safely for these
+> cores.
 
-Please split this patch into separate patches. All the debug stuff can go into
-one patch that is fairly separate from the rest. You can probably find a few
-other things that can be split out, just make sure that the order is so that
-we don't have a broken source tree when only applying a few of them.
+I encountered a regression with 3.10-rc1 on the Armada 370 based boards.
+With the 3.10-rc1 they hang during auto testy of the xor engine which are
+mainly DMA transfers. If I revert this patch, it no more hang. I found this
+by using bisect, it was not obvious at all for me that this patch may have
+cause this regression.
+The issue appear in SMP and in UP. However I think that  the PJ4B-v7 used in
+ the Armada 370 are not MP capable.
 
-You can use git-format-patch and git-send-email to send out a series properly.
-> +
-> +		intc: interrupt-controller at 98800000 {
-> +			compatible = "moxart,moxart-interrupt-controller";
-> +			reg = <0x98800000 0x38>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <2>;
-> +			interrupt-mask = <0x00080000>;		/* single register vector,
-> interrupts 0-31, 1s signify edge */
-> +		};
+I made some investigation. And in UP if I remove the line:
+	ALT_UP(W(nop))
 
-That will also take care of broken line wrapping as above. The current version can not
-be applied.
+at the begining of the cpu_v7_dcache_clean_are macro located in
+arch/arm/mm/proc-v7.S
 
-> +		timer0: timer at 98400000 {
-> +			compatible = "moxart,moxart-timer0";
-> +			reg = <0x98400000 0x10>;
-> +			interrupts = <19 1>;
-> +		};
+Then the kernel boot again. It is not surprising because in this case
+we found the same generated code that before this patch was applied.
 
-"moxart,moxart-timer0" is a strange identifier for a device. First of all, all your
-compatible strings should probably start with "moxa," rather than "moxart,".
+now I don't really understand why a W(nop) will cause this issue.
 
-The part that I don't understand at all is the "timer0" part. Is that a string
-from the data sheet?
+In SMP mode even with this line removed the kernel hang, but in this case
+I am not sure of what happen exactly and how the .alt.smp.init section is
+used.
 
-> +		gpio: gpio at 98700000 {
-> +			compatible = "moxart,moxart-gpio";
-> +			reg =	<0x98700000 0x1000>,
-> +					<0x98100000 0x1000>;		/* PMU */
-> +		};
+I don't know if it is relevant but I tested with these 2 version of gcc:
+gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
+and
+gcc version 4.7.3 (Ubuntu/Linaro 4.7.3-1ubuntu1)
 
-Can you provide some more detail why what PMU registers are used here? Is that
-a "Performance Measurement Unit", "Power Management Unit" or something else?
-Are you sure that those registers are only ever needed for GPIO?
+I hope you will find some explanation and solution to this bug, because currently
+the only solution I have is to revert this patch.
 
-> @@ -0,0 +1,34 @@
-> +config ARCH_MOXART
-> +	bool "MOXA ART SoC" if (ARCH_MULTI_V4)
-> +	select ARCH_REQUIRE_GPIOLIB
-> +	select USE_OF
-> +	help
-> +	  Say Y here if you want to run your kernel on hardware
-> +	  with a MOXA ART SoC.
-> +	  These are DIN-rail / wall-mountable embedded PCs sold by MOXA.
-> +	  http://www.moxa.com/product/Embedded_Computers.htm
-> +
-> +config SOC_MOXART
-> +	bool "MOXART support"
-> +	depends on ARCH_MOXART
-> +	default y
-> +	select CPU_FA526
-> +	select ARM_DMA_MEM_BUFFERABLE
-> +	help
-> +	  Support for the MOXA ART SoC. This is a Faraday FA526 ARMv4 32-bit
-> 192 MHz processor with MMU and 16KB/8KB D/I-cache (UC-7112-LX)
-> +	  This perticular SoC is used on models UC-7101, UC-7112/UC-7110,
-> IA240/IA241, IA3341.
-> +	  These are DIN-rail / wall-mountable embedded PCs sold by MOXA (
-> http://www.moxa.com/product/Embedded_Computers.htm ).
-> +
-> +if ARCH_MOXART
-> +
-> +menu "MOXA ART SoC Implementation"
-> +
-> +config MACH_UC7112LX
-> +	bool "MOXA UC-7112-LX"
-> +	depends on ARCH_MOXART && SOC_MOXART
-> +	help
-> +	  Say Y here if you intend to run this kernel on a MOXA UC-7112-LX
-> embedded computer.
+Thanks,
+Gregory
+> 
+> Reported-by: Albin Tonnerre <Albin.Tonnerre@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/tlbflush.h | 2 +-
+>  arch/arm/mm/proc-v6.S           | 2 --
+>  arch/arm/mm/proc-v7-2level.S    | 3 ++-
+>  arch/arm/mm/proc-v7-3level.S    | 3 ++-
+>  arch/arm/mm/proc-v7.S           | 4 ++--
+>  5 files changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+> index c7cdb59..42d155e 100644
+> --- a/arch/arm/include/asm/tlbflush.h
+> +++ b/arch/arm/include/asm/tlbflush.h
+> @@ -169,7 +169,7 @@
+>  # define v6wbi_always_flags	(-1UL)
+>  #endif
+>  
+> -#define v7wbi_tlb_flags_smp	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
+> +#define v7wbi_tlb_flags_smp	(TLB_WB | TLB_BARRIER | \
+>  				 TLB_V6_U_FULL | TLB_V6_U_PAGE | \
+>  				 TLB_V6_U_ASID | TLB_V6_BP | \
+>  				 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | \
+> diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+> index bcaaa8d..a286d47 100644
+> --- a/arch/arm/mm/proc-v6.S
+> +++ b/arch/arm/mm/proc-v6.S
+> @@ -80,12 +80,10 @@ ENTRY(cpu_v6_do_idle)
+>  	mov	pc, lr
+>  
+>  ENTRY(cpu_v6_dcache_clean_area)
+> -#ifndef TLB_CAN_READ_FROM_L1_CACHE
+>  1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+>  	add	r0, r0, #D_CACHE_LINE_SIZE
+>  	subs	r1, r1, #D_CACHE_LINE_SIZE
+>  	bhi	1b
+> -#endif
+>  	mov	pc, lr
+>  
+>  /*
+> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
+> index 78f520b..9704097 100644
+> --- a/arch/arm/mm/proc-v7-2level.S
+> +++ b/arch/arm/mm/proc-v7-2level.S
+> @@ -110,7 +110,8 @@ ENTRY(cpu_v7_set_pte_ext)
+>   ARM(	str	r3, [r0, #2048]! )
+>   THUMB(	add	r0, r0, #2048 )
+>   THUMB(	str	r3, [r0] )
+> -	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
+> +	ALT_SMP(mov	pc,lr)
+> +	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
+>  #endif
+>  	mov	pc, lr
+>  ENDPROC(cpu_v7_set_pte_ext)
+> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+> index 6ffd78c..363027e 100644
+> --- a/arch/arm/mm/proc-v7-3level.S
+> +++ b/arch/arm/mm/proc-v7-3level.S
+> @@ -73,7 +73,8 @@ ENTRY(cpu_v7_set_pte_ext)
+>  	tst	r3, #1 << (55 - 32)		@ L_PTE_DIRTY
+>  	orreq	r2, #L_PTE_RDONLY
+>  1:	strd	r2, r3, [r0]
+> -	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
+> +	ALT_SMP(mov	pc, lr)
+> +	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
+>  #endif
+>  	mov	pc, lr
+>  ENDPROC(cpu_v7_set_pte_ext)
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 3a3c015..37716b0 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -75,14 +75,14 @@ ENTRY(cpu_v7_do_idle)
+>  ENDPROC(cpu_v7_do_idle)
+>  
+>  ENTRY(cpu_v7_dcache_clean_area)
+> -#ifndef TLB_CAN_READ_FROM_L1_CACHE
+> +	ALT_SMP(mov	pc, lr)			@ MP extensions imply L1 PTW
+> +	ALT_UP(W(nop))
+>  	dcache_line_size r2, r3
+>  1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+>  	add	r0, r0, r2
+>  	subs	r1, r1, r2
+>  	bhi	1b
+>  	dsb
+> -#endif
+>  	mov	pc, lr
+>  ENDPROC(cpu_v7_dcache_clean_area)
+>  
+> 
 
-There should be no need for three separate symbols here. Just fold it
-all into ARCH_MOXART. Note that you messed up the line wrapping above,
-so that should be fixed. Hopefully the UC-7112-LX specific portions
-can remain small to nonexisting so we don't have a need to make that
-a separate option.
 
-> +
-> +ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include
-
-Just leave this out and move all header files into the arch/arm/mach-moxart/
-directory directly.
-
-> diff --git a/arch/arm/mach-moxart/Makefile.boot
-> b/arch/arm/mach-moxart/Makefile.boot
-> new file mode 100644
-> index 0000000..760a0ef
-> --- /dev/null
-> +++ b/arch/arm/mach-moxart/Makefile.boot
-> @@ -0,0 +1,3 @@
-> +   zreladdr-y	+= 0x00008000
-> +params_phys-y	:= 0x00000100
-> +initrd_phys-y	:= 0x00800000
-
-Is this still used?
-
-> diff --git a/arch/arm/mach-moxart/idle.c b/arch/arm/mach-moxart/idle.c
-> new file mode 100644
-> index 0000000..5970c27
-> --- /dev/null
-> +++ b/arch/arm/mach-moxart/idle.c
-
-> +static void moxart_idle(void)
-> +{
-> +	/*
-> +	 * Because of broken hardware we have to enable interrupts or the CPU
-> +	 * will never wakeup... Acctualy it is not very good to enable
-> +	 * interrupts first since scheduler can miss a tick, but there is
-> +	 * no other way around this. Platforms that needs it for power saving
-> +	 * should call enable_hlt() in init code, since by default it is
-> +	 * disabled.
-> +	 */
-> +/*	local_irq_enable();
-> +	cpu_do_idle();*/
-> +}
-> +
-> +static int __init moxart_idle_init(void)
-> +{
-> +	arm_pm_idle = moxart_idle;
-> +	return 0;
-> +}
-> +
-> +arch_initcall(moxart_idle_init);
-
-This does not seem to do anything at this point. Does the comment still
-apply?
-
-> +
-> +static void __init moxart_init(void)
-> +{
-> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +}
-> +
-> +void moxart_restart(char mode, const char *cmd)
-> +{
-> +	writel(1, reg_wdt + 4);
-> +	writel(0x5ab9, reg_wdt + 8);
-> +	writel(0x03, reg_wdt + 12);
-> +}
-> +
-> +static const char * const moxart_board_dt_compat[] = {
-> +	"moxart,moxart-uc-7112-lx",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(MOXART, "MOXA UC-7112-LX")
-> +	.init_irq		= moxart_init_irq,
-> +	.init_time		= moxart_timer_init,
-> +	.init_machine	= moxart_init,
-> +	.handle_irq		= moxart_handle_irq,
-> +	.restart        = moxart_restart,
-> +	.dt_compat		= moxart_board_dt_compat,
-> +	.nr_irqs		= 32,
-> +MACHINE_END
-
-You can leave out moxart_init() now, it's the default implementation.
-moxart_init_irq, moxart_handle_irq and nr_irqs should be obsolete if
-you did the irqchip driver correctly, same for moxart_timer_init and
-the clocksource driver.
-
-I think the only part remaining here is moxart_restart, but that is
-broken as long as reg_wdt does not get initialized. I think you could
-move that function into the watchdog driver and assign it to 
-arm_pm_restart when you add that driver.
-
-That would in fact make moxart the first platform that can run without
-any platform specific code whatsoever.
-
-	Arnd
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
