@@ -1,31 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 May 2013 19:11:46 +0200
-Subject: [PATCH 15/39] crypto: ux500/cryp - Prepare clock before enabling
- it
-In-Reply-To: <1368611522-9984-16-git-send-email-lee.jones@linaro.org>
-References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-16-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdY_9=OO_E9pFLuihVmE4YvLmydk_b+jsGr_R0sELt0UvA@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 15 May 2013 10:12:06 -0700
+Subject: [PATCH 14/20] ARM: msm: Remove init_irq declaration in machine
+ description
+In-Reply-To: <1368545933-7430-15-git-send-email-maxime.ripard@free-electrons.com>
+References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1368545933-7430-15-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130515171206.GA3799@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
+On Tue, May 14, 2013 at 05:38:47PM +0200, Maxime Ripard wrote:
+> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
+> specified") removed the need to explictly setup the init_irq field in
+> the machine description when using only irqchip_init. Remove that
+> declaration for msm as well.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/mach-msm/board-dt-8660.c | 2 --
+>  arch/arm/mach-msm/board-dt-8960.c | 2 --
+>  2 files changed, 4 deletions(-)
 
-> If we fail to prepare the ux500-cryp clock before enabling it the
-> platform will fail to boot. Here we insure this happens.
->
-> Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: Andreas Westin <andreas.westin@stericsson.com>
-> Cc: linux-crypto at vger.kernel.org
-> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+I've replaced the patch in my msm-cleanup tree with this one.  I'll
+push this out once the support goes into the arm soc tree.
 
-This patch also looks like -rc series stuff for the crypto tree.
+David
 
-BTW: these two clk_prepare_enable() patches are
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
