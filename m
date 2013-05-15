@@ -1,51 +1,51 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 15 May 2013 12:45:47 +0200
-Subject: [GIT PULL] at91: fixes for 3.10 #1
-Message-ID: <1368614747-1737-1-git-send-email-nicolas.ferre@atmel.com>
+From: tomi.valkeinen@iki.fi (Tomi Valkeinen)
+Date: Wed, 15 May 2013 13:53:58 +0300
+Subject: [PATCH] ARM: OMAP4: change the device names in usb_bind_phy
+In-Reply-To: <1366697656-14315-1-git-send-email-kishon@ti.com>
+References: <1366697656-14315-1-git-send-email-kishon@ti.com>
+Message-ID: <51936946.3030507@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On 23/04/13 09:14, Kishon Vijay Abraham I wrote:
+> After the device names are created using PLATFORM_DEVID_AUTO, the old
+> device names given in usb_bind_phy are no longer valid causing the musb
+> controller not to get the phy reference. Updated the usb_bind_phy with
+> the new device names to get MUSB functional in omap4 panda.
+> 
+> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> ---
+> Tested in OMAP4 PANDA.
+>  arch/arm/mach-omap2/board-4430sdp.c    |    2 +-
+>  arch/arm/mach-omap2/board-omap4panda.c |    2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+> index 00d7290..56a9a4f 100644
+> --- a/arch/arm/mach-omap2/board-4430sdp.c
+> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> @@ -730,7 +730,7 @@ static void __init omap_4430sdp_init(void)
+>  	omap4_sdp4430_wifi_init();
+>  	omap4_twl6030_hsmmc_init(mmc);
+>  
+> -	usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
+> +	usb_bind_phy("musb-hdrc.2.auto", 0, "omap-usb2.3.auto");
+>  	usb_musb_init(&musb_board_data);
+>  
+>  	status = omap_ethernet_init();
 
-This is the first AT91 fixes pull-request for 3.10-rc.
+I'm seeing
 
-Thanks, best regards,
+[    2.190155] unable to find transceiver
+[    2.190155] HS USB OTG: no transceiver configured
+[    2.190155] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed
+with status -517
+[    2.207458] platform musb-hdrc.0.auto: Driver musb-hdrc requests
+probe deferral
 
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+on 4430sdp with v3.10-rc1. Does that mean that the musb-hdrc.0.auto was
+indeed correct, and the new value of musb-hdrc.2.auto is not?
 
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+The musb-hdrc id is wrong on overo also.
 
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
-
-for you to fetch changes up to b7a8ca5173ef9aa55fa039d7c216426ff0b25a12:
-
-  ARM: at91: rm9200 fix time support (2013-05-15 12:37:45 +0200)
-
-----------------------------------------------------------------
-An important revert on at91rm9200 platform related
-to timers that prevented the platform to boot properly.
-Then one pinctrl adjustments for SPI CS and a couple of
-trivial typos.
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (2):
-      ARM: at91/trivial: fix model name for SAM9X25-EK
-      ARM: at91: rm9200 fix time support
-
-Ludovic Desroches (1):
-      ARM: at91: dts: request only spi cs-gpios used on sama5d3x cpu module
-
-Nicolas Ferre (1):
-      ARM: at91/trivial: typo in GEM compatible string
-
- Documentation/devicetree/bindings/net/macb.txt |  2 +-
- arch/arm/boot/dts/at91sam9x25ek.dts            |  2 +-
- arch/arm/boot/dts/sama5d3.dtsi                 | 12 +-----------
- arch/arm/boot/dts/sama5d3xcm.dtsi              |  4 ++++
- arch/arm/mach-at91/at91rm9200_time.c           |  7 +++++--
- 5 files changed, 12 insertions(+), 15 deletions(-)
-
--- 
-Nicolas Ferre
+ Tomi
