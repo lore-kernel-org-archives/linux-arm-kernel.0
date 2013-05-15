@@ -1,34 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 May 2013 18:44:26 +0200
-Subject: [PATCH 03/39] dmaengine: ste_dma40: Don't configure runtime
- configurable setup during allocate
-In-Reply-To: <1368611522-9984-4-git-send-email-lee.jones@linaro.org>
-References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbvhB=7QScU1bCN8wXr7ZOuPX9XYoCjX_a8gFSMCkbm-w@mail.gmail.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Wed, 15 May 2013 11:44:47 -0500
+Subject: [PATCH 1/5] ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
+In-Reply-To: <201305151519.08598.arnd@arndb.de>
+References: <1368571955-6652-1-git-send-email-dinguyen@altera.com>
+ <201305151519.08598.arnd@arndb.de>
+Message-ID: <5193BB7F.8030404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
+Hi Arnd,
 
-> Using the dmaengine API, allocating and configuring a channel are two
-> separate actions. Here we're removing logical channel configuration from
-> the channel allocating routines.
+On 05/15/2013 08:19 AM, Arnd Bergmann wrote:
+> On Wednesday 15 May 2013, dinguyen at altera.com wrote:
+>>                 };
+>>  
+>> +               ethernet at ff700000 {
+>> +                       phy-mode = "gmii";
+>> +               };
+>> +
+>> +               ethernet at ff702000 {
+>> +                       status = "disabled";
+>> +               };
+> 
+> By convention, please mark the controllers as "disabled" in the main .dtsi file
+> and only enable them in the board specific files when used, rather than the
+> other way round.
 
-This commit message is also incorrect, but I amended it.
+Thanks for the review. Will fix.
 
-Besides, when I amend commit messages I make sure I really
-understand what is going on so no big deal...
-
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-I still need Vinod's ACK on this before I send it anywhere.
-
-Patch applied!
-
-Yours,
-Linus Walleij
+Dinh
+> 
+> 	Arnd
+> 
