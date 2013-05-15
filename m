@@ -1,68 +1,43 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Wed, 15 May 2013 06:56:26 -0500
-Subject: [PATCH v3] ARM:dts:omap4-panda:Update the LED support for the
- panda DTS
-In-Reply-To: <20130515052916.GA15607@kahuna>
-References: <1368541076-6854-1-git-send-email-dmurphy@ti.com>
- <20130515052916.GA15607@kahuna>
-Message-ID: <519377EA.8070105@ti.com>
+From: prabhakar.csengg@gmail.com (Lad Prabhakar)
+Date: Wed, 15 May 2013 17:27:18 +0530
+Subject: [PATCH 2/6] ARM: davinci: dm365 evm: remove init_enable from ths7303
+ pdata
+In-Reply-To: <1368619042-28252-1-git-send-email-prabhakar.csengg@gmail.com>
+References: <1368619042-28252-1-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <1368619042-28252-3-git-send-email-prabhakar.csengg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NM
-On 05/15/2013 12:29 AM, Nishanth Menon wrote:
-> $subject - add a space?
-> s/ARM:dts:omap4-panda:Update/ARM: dts: omap4-panda: Update/ ?
-Will fix.
-> On 09:17-20130514, Dan Murphy wrote:
->> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
->> are different.
->>
->> A1-A3 = gpio_wk7
-> Thanks for fixing this - this is a key fix else, GPIO_7 which controls
-> VSEL for VDD_MPU on PandaBoard-ES will create all kind of ruckus (change
-> voltage on heartbeat)!
->> ES = gpio_110
->>
->> There is no change to LED D2
->>
->> Abstract away the pinmux and the LED definitions for the two boards into
->> the respective DTS files.
->>
->> Signed-off-by: Dan Murphy <dmurphy@ti.com>
->> ---
-> [...]
->> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
->> index f1d8c21..8d1ba03 100644
->> --- a/arch/arm/boot/dts/omap4-panda-es.dts
->> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
->> @@ -34,3 +34,43 @@
->>  		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
->>  		>;
->>  };
->> +
->> +&leds {
->> +	compatible = "gpio-leds";
->> +	heartbeat {
->> +		label = "pandaboard::status1";
->> +		gpios = <&gpio4 14 0>;
->> +		linux,default-trigger = "heartbeat";
->> +	};
->> +	mmc {
->> +		label = "pandaboard::status2";
->> +		gpios = <&gpio1 8 0>;
->> +		linux,default-trigger = "gpio";
-> mmc0?
-Good point why would I call it mmc and then set the trigger to gpio.
+From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
-Will fix it.
->> +	};
->> +};
->> +
-> Other that that,
-> Tested-by: Nishanth Menon <nm@ti.com>
+remove init_enable from ths7303 pdata as it is no longer exists.
 
+Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Hans Verkuil <hans.verkuil@cisco.com>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+Cc: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Sakari Ailus <sakari.ailus@iki.fi>
+Cc: linux-kernel at vger.kernel.org
+Cc: davinci-linux-open-source at linux.davincidsp.com
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/mach-davinci/board-dm365-evm.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
+index 2a66743..4e02ae7 100644
+--- a/arch/arm/mach-davinci/board-dm365-evm.c
++++ b/arch/arm/mach-davinci/board-dm365-evm.c
+@@ -510,7 +510,6 @@ struct ths7303_platform_data ths7303_pdata = {
+ 	.ch_1 = 3,
+ 	.ch_2 = 3,
+ 	.ch_3 = 3,
+-	.init_enable = 1,
+ };
+ 
+ static struct amp_config_info vpbe_amp = {
 -- 
-------------------
-Dan Murphy
+1.7.4.1
