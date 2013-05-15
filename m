@@ -1,38 +1,69 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 15 May 2013 10:07:21 +0100
-Subject: [PATCH 3/9] clk: ux500: Provide device enumeration number suffix
- for SMSC911x
-In-Reply-To: <CACRpkdZjvQF9e_isiuUgmcH0RgoGGF=dmg_E7oQjs4oY9f+dFQ@mail.gmail.com>
-References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
- <1368019749-19455-4-git-send-email-lee.jones@linaro.org>
- <20130514155835.10068.93655@quantum>
- <CACRpkdZjvQF9e_isiuUgmcH0RgoGGF=dmg_E7oQjs4oY9f+dFQ@mail.gmail.com>
-Message-ID: <20130515090721.GB3494@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 15 May 2013 10:12:05 +0100
+Subject: [RFC PATCH] ARM: SOCFPGA: Enable PMU through the CTI
+In-Reply-To: <1368586682-19848-1-git-send-email-dinguyen@altera.com>
+References: <1368586682-19848-1-git-send-email-dinguyen@altera.com>
+Message-ID: <20130515091205.GB12907@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 May 2013, Linus Walleij wrote:
+Hello,
 
-> On Tue, May 14, 2013 at 5:58 PM, Mike Turquette <mturquette@linaro.org> wrote:
-> > Quoting Lee Jones (2013-05-08 06:29:03)
-> >> First Ethernet device has a ".0" appended onto the device name. It
-> >> appears that we need this in order to obtain the correct clock.
-> >>
-> >> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> >> Cc: Mike Turquette <mturquette@linaro.org>
-> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> >
-> > Looks good to me.  Can I take this into clk-next or are you looking for
-> > an Ack?
+[adding Jon Hunter]
+
+On Wed, May 15, 2013 at 03:58:02AM +0100, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> You can probably take it through the clk tree, but this series
-> deals with regression fixes so it should go into the -rc series
-> I think.
+> SOCFPGA has a PMU(Performance Measurement Unit) that has its
+> IRQs routed through Coresight using the CTI(Cross-Trigger Interface).
+> 
+> This patch enables the PMU and initializes the CTI for usage by
+> oprofile/perfmon.
+> 
+> A lot of the code/idea was taken from this:
+> https://patchwork.kernel.org/patch/1432541/
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> CC: Ming Lei <ming.lei@canonical.com>
+> CC: Will Deacon <will.deacon@arm.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Olof Johansson <olof@lixom.net>
+> Cc: Pavel Machek <pavel@denx.de>
+> ---
+>  arch/arm/boot/dts/socfpga.dtsi      |   18 +++++
+>  arch/arm/include/asm/pmu.h          |    3 +
+>  arch/arm/kernel/perf_event.c        |   16 +++++
+>  arch/arm/mach-socfpga/Makefile      |    1 +
+>  arch/arm/mach-socfpga/socfpga.c     |   21 +++++-
+>  arch/arm/mach-socfpga/socfpga_cti.c |  125 +++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-socfpga/socfpga_cti.h |   16 +++++
+>  7 files changed, 199 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/mach-socfpga/socfpga_cti.c
+>  create mode 100644 arch/arm/mach-socfpga/socfpga_cti.h
 
-That's what Mike has done.
+Whilst it's great to see somebody else making use of CTI, I think this would
+benefit from Jon's separate CTI driver that he posted once:
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137156.html
+
+Jon -- would you be interested in reviving that work so the socfpga guys can
+make use of it?
+
+> diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
+> index f24edad..60324b3 100644
+> --- a/arch/arm/include/asm/pmu.h
+> +++ b/arch/arm/include/asm/pmu.h
+> @@ -38,6 +38,9 @@ struct arm_pmu_platdata {
+>  				  irq_handler_t pmu_handler);
+>  	int (*runtime_resume)(struct device *dev);
+>  	int (*runtime_suspend)(struct device *dev);
+> +	int (*init)(struct platform_device *pdev);
+> +	int (*start)(struct platform_device *pdev);
+> +	int (*stop)(struct platform_device *pdev);
+
+For omap4, we were planning to use the runtime PM callbacks for managing the
+CTI iirc.
+
+Will
