@@ -1,91 +1,222 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 15 May 2013 15:30:44 -0500
-Subject: ux500 breaking multi-platform kernels
-Message-ID: <CAL_JsqJzf8Aj6+K_qEYo3JbAoeJn36EerBfaGYT9EQj-zPaHUw@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Wed, 15 May 2013 22:31:52 +0200
+Subject: [RFC 2/4] dma: add dmaengine driver for Samsung s3c24xx SoCs
+In-Reply-To: <CACRpkdaT195McX9NeccJYpmWbuYK-AZUTHr9AXKHnJdkf+Qzuw@mail.gmail.com>
+References: <201305111330.05046.heiko@sntech.de>
+ <201305111331.25405.heiko@sntech.de>
+ <CACRpkdaT195McX9NeccJYpmWbuYK-AZUTHr9AXKHnJdkf+Qzuw@mail.gmail.com>
+Message-ID: <201305152231.52423.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lee, Linus,
+Am Mittwoch, 15. Mai 2013, 20:53:32 schrieb Linus Walleij:
+> On Sat, May 11, 2013 at 1:31 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> > This adds a new driver to support the s3c24xx dma using the dmaengine
+> > and make the old one in mach-s3c24xx obsolete in the long run.
+> > 
+> > Conceptually the s3c24xx-dma feels like a distant relative of the pl08x
+> > with numerous virtual channels being mapped to a lot less physical ones.
+> > The driver therefore borrows a lot from the amba-pl08x driver in this
+> > regard. Functionality-wise the driver gains a memcpy ability in addition
+> > to the slave_sg one.
+> > 
+> > The driver currently only supports the "newer" SoCs which can use any
+> > physical channel for any dma slave. Support for the older SoCs where
+> > each channel only supports a subset of possible dma slaves will have to
+> > be added later.
+> > 
+> > Tested on a s3c2416-based board, memcpy using the dmatest module and
+> > slave_sg partially using the spi-s3c64xx driver.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> (...)
+> 
+> > +static u32 s3c24xx_dma_getbytes_chan(struct s3c24xx_dma_chan *s3cchan)
+> > +{
+> > +       struct s3c24xx_dma_phy *phy = s3cchan->phy;
+> > +       struct s3c24xx_txd *txd = s3cchan->at;
+> > +       u32 tc = readl(phy->base + DSTAT) & DSTAT_CURRTC_MASK;
+> > +
+> > +       switch (txd->dcon & DCON_DSZ_MASK) {
+> > +       case DCON_DSZ_BYTE:
+> > +               return tc;
+> > +       case DCON_DSZ_HALFWORD:
+> > +               return tc * 2;
+> > +       case DCON_DSZ_WORD:
+> > +               return tc * 4;
+> > +       default:
+> > +               break;
+> > +       }
+> > +
+> > +       BUG();
+> 
+> Isn't that a bit nasty. This macro should be used with care and we
+> should recover if possible. dev_err()?
 
-There are some initcalls on ux500 that are not properly
-conditionalized. The first is in ux500_l2x0_init and here is a fix:
+runtime_config already denies any settings not in the 1,2 or 4bytes range - 
+the default-part should therefore never be reached. So if any other value 
+magically appears in the register and triggers the default-part, something is 
+seriously wrong. So my guess is, the BUG might be appropriate.
 
-diff --git a/arch/arm/mach-ux500/cache-l2x0.c b/arch/arm/mach-ux500/cache-l2x0.c
-index f58615b..e066d32 100644
---- a/arch/arm/mach-ux500/cache-l2x0.c
-+++ b/arch/arm/mach-ux500/cache-l2x0.c
-@@ -39,10 +39,10 @@ static int __init ux500_l2x0_init(void)
- {
-        u32 aux_val = 0x3e000000;
-
--       if (cpu_is_u8500_family() || cpu_is_ux540_family())
--               l2x0_base = __io_address(U8500_L2CC_BASE);
--       else
--               ux500_unknown_soc();
-+       if (!(cpu_is_u8500_family() || cpu_is_ux540_family()))
-+               return -ENODEV;
-+
-+       l2x0_base = __io_address(U8500_L2CC_BASE);
-
-        /* Unlock before init */
-        ux500_l2x0_unlock();
+On the other hand the whole default+BUG part could also simply go away, for 
+the same reasons.
 
 
-Here is the second problem with cpuidle driver:
+> > +/*
+> > + * Set the initial DMA register values.
+> > + * Put them into the hardware and start the transfer.
+> > + */
+> > +static void s3c24xx_dma_start_next_txd(struct s3c24xx_dma_chan *s3cchan)
+> > +{
+> > +       struct s3c24xx_dma_engine *s3cdma = s3cchan->host;
+> > +       struct s3c24xx_dma_phy *phy = s3cchan->phy;
+> > +       struct virt_dma_desc *vd = vchan_next_desc(&s3cchan->vc);
+> > +       struct s3c24xx_txd *txd = to_s3c24xx_txd(&vd->tx);
+> > +       u32 dcon = txd->dcon;
+> > +       u32 val;
+> > +
+> > +       list_del(&txd->vd.node);
+> > +
+> > +       s3cchan->at = txd;
+> > +
+> > +       /* Wait for channel inactive */
+> > +       while (s3c24xx_dma_phy_busy(phy))
+> > +               cpu_relax();
+> > +
+> > +       /* transfer-size and -count from len and width */
+> > +       switch (txd->width) {
+> > +       case 1:
+> > +               dcon |= DCON_DSZ_BYTE | txd->len;
+> > +               break;
+> > +       case 2:
+> > +               dcon |= DCON_DSZ_HALFWORD | (txd->len / 2);
+> > +               break;
+> > +       case 4:
+> > +               dcon |= DCON_DSZ_WORD | (txd->len / 4);
+> > +               break;
+> > +       }
+> > +
+> > +       if (s3cchan->slave) {
+> > +               if (s3cdma->sdata->has_reqsel) {
+> > +                       int reqsel =
+> > s3cdma->pdata->reqsel_map[s3cchan->id]; +                      
+> > writel((reqsel << 1) | DMAREQSEL_HW,
+> > +                              phy->base + DMAREQSEL);
+> > +               } else {
+> > +                       dev_err(&s3cdma->pdev->dev, "non-reqsel
+> > unsupported\n"); +                       return;
+> > +                       dcon |= DCON_HWTRIG;
+> > +               }
+> > +       } else {
+> > +               if (s3cdma->sdata->has_reqsel) {
+> > +                       writel(0, phy->base + DMAREQSEL);
+> > +               } else {
+> > +                       dev_err(&s3cdma->pdev->dev, "non-reqsel
+> > unsupported\n"); +                       return;
+> > +               }
+> > +       }
+> > +
+> > +       writel(txd->src_addr, phy->base + DISRC);
+> > +       writel(txd->disrcc, phy->base + DISRCC);
+> > +       writel(txd->dst_addr, phy->base + DIDST);
+> > +       writel(txd->didstc, phy->base + DIDSTC);
+> > +
+> > +       writel(dcon, phy->base + DCON);
+> > +
+> > +       val = readl(phy->base + DMASKTRIG);
+> > +       val &= ~DMASKTRIG_STOP;
+> > +       val |= DMASKTRIG_ON;
+> > +       writel(val, phy->base + DMASKTRIG);
+> > +
+> > +       /* trigger the dma operation for memcpy transfers */
+> > +       if (!s3cchan->slave) {
+> > +               val = readl(phy->base + DMASKTRIG);
+> > +               val |= DMASKTRIG_SWTRIG;
+> > +               writel(val, phy->base + DMASKTRIG);
+> > +       }
+> > +}
+> 
+> Since you have a few readl() and writel() in potentially
+> time-critical code, consider using readl_relaxed() and
+> writel_relaxed().
 
-[    4.514645] Unable to handle kernel NULL pointer dereference at
-virtual address 000000fc
-[    4.522729] pgd = c0004000
-[    4.525429] [000000fc] *pgd=00000000
-[    4.529009] Internal error: Oops: 5 [#1] SMP ARM
-[    4.533620] Modules linked in:
-[    4.536679] CPU: 0 PID: 1 Comm: swapper/0 Tainted: G        W
-3.10.0-rc1-00013-g5d170cd-dirty #527
-[    4.545893] task: ed888000 ti: ed884000 task.ti: ed884000
-[    4.551297] PC is at config_wakeups+0x6c/0x14c
-[    4.555740] LR is at db8500_prcmu_enable_wakeups+0x64/0x7c
-[    4.561223] pc : [<c06f4948>]    lr : [<c06f64f4>]    psr: 20000193
-[    4.561223] sp : ed885ec8  ip : ed885ef8  fp : ed885ef4
-[    4.572693] r10: c2d69494  r9 : 00000000  r8 : c31d92bc
-[    4.577911] r7 : 00028881  r6 : 00000000  r5 : c31d92bc  r4 : 00000000
-[    4.584431] r3 : 00000000  r2 : 00000000  r1 : 00000000  r0 : 60000113
-[    4.590954] Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM
-Segment kernel
-[    4.598342] Control: 10c53c7d  Table: 0000404a  DAC: 00000017
-[    4.604082] Process swapper/0 (pid: 1, stack limit = 0xed884240)
-[    4.610083] Stack: (0xed885ec8 to 0xed886000)
-[    4.614436] 5ec0:                   00000000 04019494 c31d92bc
-00020081 60000113 c3137440
-[    4.622611] 5ee0: 00000000 c2d69494 ed885f14 ed885ef8 c06f64f4
-c06f48e8 ed884000 00000006
-[    4.630786] 5f00: c2d69488 c2c9abdc ed885f24 ed885f18 c2c9abf0
-c06f649c ed885f5c ed885f28
-[    4.638960] 5f20: c0008a78 c2c9abe8 00000be1 c2a527f4 ed885f5c
-00000006 c2d69484 00000006
-[    4.647134] 5f40: c2d69488 c2df9efc c3137440 00000be1 ed885f94
-ed885f60 c2c71a98 c00089bc
-[    4.655307] 5f60: 00000006 00000006 c2c711ac c010ed98 00000000
-c1c95000 00000000 00000000
-[    4.663479] 5f80: 00000000 00000000 ed885fac ed885f98 c1c95018
-c2c718f8 00000000 00000000
-[    4.671651] 5fa0: 00000000 ed885fb0 c000ed98 c1c9500c 00000000
-00000000 00000000 00000000
-[    4.679824] 5fc0: 00000000 00000000 00000000 00000000 00000000
-00000000 00000000 00000000
-[    4.687997] 5fe0: 00000000 00000000 00000000 00000000 00000013
-00000000 00000000 00000000
-[    4.696183] [<c06f4948>] (config_wakeups+0x6c/0x14c) from
-[<c06f64f4>] (db8500_prcmu_enable_wakeups+0x64/0x7c)
-[    4.706189] [<c06f64f4>] (db8500_prcmu_enable_wakeups+0x64/0x7c)
-from [<c2c9abf0>] (ux500_idle_init+0x14/0x2c)
-[    4.716195] [<c2c9abf0>] (ux500_idle_init+0x14/0x2c) from
-[<c0008a78>] (do_one_initcall+0xc8/0x184)
-[    4.725247] [<c0008a78>] (do_one_initcall+0xc8/0x184) from
-[<c2c71a98>] (kernel_init_freeable+0x1ac/0x284)
-[    4.734906] [<c2c71a98>] (kernel_init_freeable+0x1ac/0x284) from
-[<c1c95018>] (kernel_init+0x18/0xf4)
-[    4.744128] [<c1c95018>] (kernel_init+0x18/0xf4) from [<c000ed98>]
-(ret_from_fork+0x14/0x20)
-[    4.752565] Code: ea000001 e59f50dc e1a08005 e5953054 (e59320fc)
-[    4.758656] ---[ end trace 47a577e4e96d6f0b ]---
-[    4.763269] Kernel panic - not syncing: Fatal exception
+You're right of course.
+
+If I understand the writel semantics and the thread from you from 2011 [0] 
+correctly, only the writel to DMASKTRIG mustn't be relaxed to make sure the 
+settings registers are written to before, so like:
+
+       writel_relaxed(txd->src_addr, phy->base + DISRC);
+       writel_relaxed(txd->disrcc, phy->base + DISRCC);
+       writel_relaxed(txd->dst_addr, phy->base + DIDST);
+       writel_relaxed(txd->didstc, phy->base + DIDSTC);
+       writel_relaxed(dcon, phy->base + DCON);
+
+       val = readl_relaxed(phy->base + DMASKTRIG);
+       val &= ~DMASKTRIG_STOP;
+       val |= DMASKTRIG_ON;
+       writel(val, phy->base + DMASKTRIG);
+
+
+And note to self: check if the memcpy-speciality can move into the first 
+DMASKTRIG write.
+
+> > +static irqreturn_t s3c24xx_dma_irq(int irq, void *data)
+> > +{
+> > +       struct s3c24xx_dma_phy *phy = data;
+> > +       struct s3c24xx_dma_chan *s3cchan = phy->serving;
+> > +       struct s3c24xx_txd *txd;
+> > +
+> > +       dev_dbg(&phy->host->pdev->dev, "interrupt on channel %d\n",
+> > phy->id); +
+> > +       if (!s3cchan) {
+> > +               dev_err(&phy->host->pdev->dev, "interrupt on unused
+> > channel %d\n", +                       phy->id);
+> > +               return IRQ_NONE;
+> > +       }
+> > +
+> > +       spin_lock(&s3cchan->vc.lock);
+> > +       txd = s3cchan->at;
+> > +       if (txd) {
+> > +               s3cchan->at = NULL;
+> > +               vchan_cookie_complete(&txd->vd);
+> > +
+> > +               /*
+> > +                * And start the next descriptor (if any),
+> > +                * otherwise free this channel.
+> > +                */
+> > +               if (vchan_next_desc(&s3cchan->vc))
+> > +                       s3c24xx_dma_start_next_txd(s3cchan);
+> > +               else
+> > +                       s3c24xx_dma_phy_free(s3cchan);
+> > +       }
+> > +       spin_unlock(&s3cchan->vc.lock);
+> > +
+> > +       return IRQ_HANDLED;
+> > +}
+> 
+> OK so one IRQ per channel. Is there really no status
+> register to check or flag to clear on these IRQs?
+
+Nope there are none. The only status you get from the controller is busy/non-
+busy and remaining transfers for the transaction - the DSTAT register in the 
+code. And not listed in the code the current memory addresses (source and 
+destination) in use. There are no other registers at all.
+
+And the irq itself only triggers when all transfers of the transaction are 
+done (transfer_count is 0).
+
+
+> Apart from these smallish things it looks good to me:
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+really? Cool.
+Part of me was expecting tomatoes or other vegetables to be thrown ;-) .
+
+
+Thanks for looking thru the driver.
+Heiko
+
+
+[0] http://comments.gmane.org/gmane.linux.ports.arm.kernel/117626
