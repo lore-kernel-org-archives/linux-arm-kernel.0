@@ -1,120 +1,69 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 15 May 2013 20:59:47 +0800
-Subject: [PATCH] spi: sirf: fix the issue while transferring more than 256
- words
-In-Reply-To: <1363592828-6347-1-git-send-email-Barry.Song@csr.com>
-References: <1363592828-6347-1-git-send-email-Barry.Song@csr.com>
-Message-ID: <CAGsJ_4wamqzwLZkUz4h6ex=oVQZhzhw7S6r41wt9tTUoMR=aXw@mail.gmail.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Wed, 15 May 2013 15:05:35 +0200
+Subject: [PATCH 4/5] ARM: socfpga: dts: Add support for SD/MMC
+In-Reply-To: <1368571955-6652-4-git-send-email-dinguyen@altera.com>
+References: <1368571955-6652-1-git-send-email-dinguyen@altera.com>
+ <1368571955-6652-4-git-send-email-dinguyen@altera.com>
+Message-ID: <20130515130535.GC9066@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping Mark, Ping Grant.
+Hi!
 
-2013/3/18 Barry Song <Barry.Song@csr.com>:
-> From: Qipan Li <Qipan.Li@csr.com>
->
-> currently, spi irq handler only does rx processing and  fetching data from rx
-> fifo when "FRM_END" irq happens. FRM_END indicates one transfer completes. if
-> rx size is less than 256, it works well.
-> but the problem is that spi rx fifo size is only 256 bytes, then if data size
-> of one frame is more than 256, before FRM_END comes, rx fifo will be filled with
-> RXFIFO_OFLOW overflow interrupt, it will make us lose some data due to fifo
-> overflow.
-> Explicitly we need do fetch work from device rx fifo in irq handler not only in
-> "FRM_END" irq but also in "THD_REACH" irq. THD_REACH means rx fifo has come to
-> its threshold and will come to overflow if we don't take data from it in time.
->
-> In this patch, we fix this issue. we take data from rx fifo when either FRM_END
-> or RX_THD_REACH irq comes, we put data into tx fifo when either TX_FIFO_EMPTY
-> or TX_THD_REACH irq comes.
->
-> Signed-off-by: Qipan Li <Qipan.Li@csr.com>
-> Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  drivers/spi/spi-sirf.c |   43 +++++++++++++------------------------------
->  1 files changed, 13 insertions(+), 30 deletions(-)
->
-> diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
-> index f59d417..d2bd1e5 100644
-> --- a/drivers/spi/spi-sirf.c
-> +++ b/drivers/spi/spi-sirf.c
-> @@ -142,9 +142,6 @@ struct sirfsoc_spi {
->         unsigned int left_tx_cnt;
->         unsigned int left_rx_cnt;
->
-> -       /* tasklet to push tx msg into FIFO */
-> -       struct tasklet_struct tasklet_tx;
-> -
->         int chipselect[0];
->  };
->
-> @@ -236,17 +233,6 @@ static void spi_sirfsoc_tx_word_u32(struct sirfsoc_spi *sspi)
->         sspi->left_tx_cnt--;
->  }
->
-> -static void spi_sirfsoc_tasklet_tx(unsigned long arg)
-> -{
-> -       struct sirfsoc_spi *sspi = (struct sirfsoc_spi *)arg;
-> -
-> -       /* Fill Tx FIFO while there are left words to be transmitted */
-> -       while (!((readl(sspi->base + SIRFSOC_SPI_TXFIFO_STATUS) &
-> -                       SIRFSOC_SPI_FIFO_FULL)) &&
-> -                       sspi->left_tx_cnt)
-> -               sspi->tx_word(sspi);
-> -}
-> -
->  static irqreturn_t spi_sirfsoc_irq(int irq, void *dev_id)
->  {
->         struct sirfsoc_spi *sspi = dev_id;
-> @@ -261,25 +247,25 @@ static irqreturn_t spi_sirfsoc_irq(int irq, void *dev_id)
->                 writel(0x0, sspi->base + SIRFSOC_SPI_INT_EN);
->         }
->
-> -       if (spi_stat & SIRFSOC_SPI_FRM_END) {
-> +       if (spi_stat & (SIRFSOC_SPI_FRM_END
-> +                       | SIRFSOC_SPI_RXFIFO_THD_REACH))
->                 while (!((readl(sspi->base + SIRFSOC_SPI_RXFIFO_STATUS)
->                                 & SIRFSOC_SPI_FIFO_EMPTY)) &&
->                                 sspi->left_rx_cnt)
->                         sspi->rx_word(sspi);
->
-> -               /* Received all words */
-> -               if ((sspi->left_rx_cnt == 0) && (sspi->left_tx_cnt == 0)) {
-> -                       complete(&sspi->done);
-> -                       writel(0x0, sspi->base + SIRFSOC_SPI_INT_EN);
-> -               }
-> -       }
-> -
-> -       if (spi_stat & SIRFSOC_SPI_RXFIFO_THD_REACH ||
-> -               spi_stat & SIRFSOC_SPI_TXFIFO_THD_REACH ||
-> -               spi_stat & SIRFSOC_SPI_RX_FIFO_FULL ||
-> -               spi_stat & SIRFSOC_SPI_TXFIFO_EMPTY)
-> -               tasklet_schedule(&sspi->tasklet_tx);
-> +       if (spi_stat & (SIRFSOC_SPI_FIFO_EMPTY
-> +                       | SIRFSOC_SPI_TXFIFO_THD_REACH))
-> +               while (!((readl(sspi->base + SIRFSOC_SPI_TXFIFO_STATUS)
-> +                               & SIRFSOC_SPI_FIFO_FULL)) &&
-> +                               sspi->left_tx_cnt)
-> +                       sspi->tx_word(sspi);
->
-> +       /* Received all words */
-> +       if ((sspi->left_rx_cnt == 0) && (sspi->left_tx_cnt == 0)) {
-> +               complete(&sspi->done);
-> +               writel(0x0, sspi->base + SIRFSOC_SPI_INT_EN);
-> +       }
->         return IRQ_HANDLED;
->  }
->
-> @@ -573,9 +559,6 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
->
->         init_completion(&sspi->done);
->
-> -       tasklet_init(&sspi->tasklet_tx, spi_sirfsoc_tasklet_tx,
-> -                    (unsigned long)sspi);
-> -
->         writel(SIRFSOC_SPI_FIFO_RESET, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
->         writel(SIRFSOC_SPI_FIFO_RESET, sspi->base + SIRFSOC_SPI_TXFIFO_OP);
->         writel(SIRFSOC_SPI_FIFO_START, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
-> --
-> 1.7.5.4
+> From: Dinh Nguyen <dinguyen@altera.com>
+> 
+> Add bindings for SD/MMC for SOCFPGA.
+> 
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> CC: Arnd Bergmann <arnd@arndb.de>
+> CC: Olof Johansson <olof@lixom.net>
+> CC: Pavel Machek <pavel@denx.de>
+> CC: <linux@arm.linux.org.uk>
+
+git says:
+
+[pavel at pollux linux]$ cat /tmp/delme | git apply
+<stdin>:136: space before tab in indent.
+      	     	   altr,dw-mshc-sdr-timing = <0 3>;
+<stdin>:143: new blank line at EOF.
++
+warning: 2 lines add whitespace errors.
+[pavel at pollux linux]$ 
+
+Is this patch series expected to be enough to get MMC to work? I
+applied all 5 patches, and it detects the controller, but mmcblkX
+devices do not show up.
+
+Synopsys Designware Multimedia Card Interface Driver
+dwmmc_socfpga ff704000.dwmmc0: couldn't determine pwr-en, assuming
+pwr-en = 0
+dwmmc_socfpga ff704000.dwmmc0: Using internal DMA controller.
+dwmmc_socfpga ff704000.dwmmc0: Version ID is 240a
+dwmmc_socfpga ff704000.dwmmc0: DW MMC controller at irq 171, 32 bit
+host data width, 1024 deep fifo
+mmc_host mmc0: Bus speed (slot 0) = 100000000Hz (slot req 400000Hz,
+actual 400000HZ div = 125)
+...
+VFS: Unable to mount root fs via NFS, trying floppy.
+VFS: Cannot open root device "nfs" or unknown-block(2,0): error -6
+Please append a correct "root=" boot option; here are the available
+partitions:
+Kernel panic - not syncing: VFS: Unable to mount root fs on
+unknown-block(2,0)
+
+It should be configured in:
+
+CONFIG_MMC_BLOCK=y
+CONFIG_MMC_BLOCK_MINORS=8
+CONFIG_MMC_BLOCK_BOUNCE=y
+
+.
+
+Otherwise, it looks good.
+
+Reviewed-by: Pavel Machek <pavel@denx.de>
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
