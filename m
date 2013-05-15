@@ -1,123 +1,99 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 15 May 2013 02:10:10 +0200
-Subject: [PATCH] clk: Fix race condition between clk_set_parent and
- clk_enable()
-In-Reply-To: <5192BEC9.1040104@codeaurora.org>
-References: <1367383328-25700-1-git-send-email-skannan@codeaurora.org>
- <9066674.E2RzuEn3ap@flatron> <5192BEC9.1040104@codeaurora.org>
-Message-ID: <8297704.vcdTNl69IU@flatron>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 15 May 2013 02:18:00 +0200
+Subject: [PATCH v3 00/20] SH pinctrl DT support
+Message-ID: <1368577100-3530-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 of May 2013 15:46:33 Saravana Kannan wrote:
-> On 05/14/2013 03:10 PM, Tomasz Figa wrote:
-> > Hi,
-> > 
-> > On Tuesday 14 of May 2013 11:54:17 Mike Turquette wrote:
-> >> Quoting Saravana Kannan (2013-04-30 21:42:08)
-> >> 
-> >>> Without this patch, the following race conditions are possible.
-> >>> 
-> >>> Race condition 1:
-> >>> * clk-A has two parents - clk-X and clk-Y.
-> >>> * All three are disabled and clk-X is current parent.
-> >>> * Thread A: clk_set_parent(clk-A, clk-Y).
-> >>> * Thread A: <snip execution flow>
-> >>> * Thread A: Grabs enable lock.
-> >>> * Thread A: Sees enable count of clk-A is 0, so doesn't enable
-> >>> clk-Y.
-> >>> * Thread A: Updates clk-A SW parent to clk-Y
-> >>> * Thread A: Releases enable lock.
-> >>> * Thread B: clk_enable(clk-A).
-> >>> * Thread B: clk_enable() enables clk-Y, then enabled clk-A and
-> >>> returns.
-> >>> 
-> >>> clk-A is now enabled in software, but not clocking in hardware since
-> >>> the hardware parent is still clk-X.
-> >>> 
-> >>> The only way to avoid race conditions between clk_set_parent() and
-> >>> clk_enable/disable() is to ensure that clk_enable/disable() calls
-> >>> don't
-> >>> require changes to hardware enable state between changes to software
-> >>> clock topology and hardware clock topology.
-> >>> 
-> >>> There are options to achieve the above:
-> >>> 1. Grab the enable lock before changing software/hardware topology
-> >>> and
-> >>> 
-> >>>     release it afterwards.
-> >>> 
-> >>> 2. Keep the clock enabled for the duration of software/hardware
-> >>> topology>
-> >>> 
-> >>>     change so that any additional enable/disable calls don't try to
-> >>>     change
-> >>>     the hardware state. Once the topology change is complete, the
-> >>>     clock
-> >>>     can
-> >>>     be put back in its original enable state.
-> >>> 
-> >>> Option (1) is not an acceptable solution since the set_parent() ops
-> >>> might need to sleep.
-> >>> 
-> >>> Therefore, this patch implements option (2).
-> >>> 
-> >>> This patch doesn't violate any API semantics. clk_disable() doesn't
-> >>> guarantee that the clock is actually disabled. So, no clients of a
-> >>> clock can assume that a clock is disabled after their last call to
-> >>> clk_disable(). So, enabling the clock during a parent change is not
-> >>> a
-> >>> violation of any API semantics.
-> >>> 
-> >>> This also has the nice side effect of simplifying the error handling
-> >>> code.
-> >>> 
-> >>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
-> >> 
-> >> I've taken this patch into clk-next for testing.  The code itself
-> >> looks
-> >> fine.  The only thing that remains to be seen is if any platforms
-> >> have a problem with disabled clocks getting turned on during a
-> >> reparent operation.
-> > 
-> > IMHO this behavior should be documented somewhere, with a note that
-> > the
-> > clock must not be prepared to keep it disabled during reparent
-> > operation and possibly also pointing to the CLK_SET_PARENT_GATE flag.
-> 
-> Reasonable request. I can update the documentation of clk_set_parent()
-> to indicate that the clock might get turned on for the duration of the
-> call and if they need a guarantee the GATE flag should be used.
-> 
-> >> On platforms that I have worked on this is OK, but I suppose there
-> >> could be some platform out there where a clock is prepared and
-> >> disabled, and briefly enabling the clock during the reparent
-> >> operation somehow puts the hardware in a bad state.
-> > 
-> > Well, on any platform where default clock settings are not completely
-> > correct this is likely to cause problems, because some device might
-> > get
-> > too high frequency for some period of time, which might crash it alone
-> > as well as the whole system.
-> 
-> I don't think this is really a problem with this patch. It's present
-> even without this patch.
-> 
-> The patch doesn't switch to some other unspecified parent. It only
-> switches between the new/old parent. Even without this patch, if a clock
-> is prepared while you reparent it, clk_enable() could be called at
-> anytime between the parent switch and the future clock API calls to set
-> up the new parent correctly. I think that's just crappy driver code to
-> switch to a new parent before setting it up correctly. There's
-> absolutely no good reason to do it that way.
+Hello,
 
-This is not exactly what I meant. I was just giving an example problem of 
-turning a clock on, if it's not set up correctly yet.
+Here's the third version of the SuperH and SH Mobile pin controllers (PFC) DT
+support patch set.
 
-AFAIK most (if not all) of current code either does necessary reparenting 
-and initial rate setting early, before clk_prepare(), so it is not a 
-problem or already after clk_enable() (in case of reparenting dynamically 
-at runtime), so there shouldn't be any problem.
+The patches are based on tags/renesas-next-20130513 from Simon's tree
+(git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git), the R-Car
+GPIO DT bindings proposal ("[RFC/PATCH 0/2] R-Car GPIO DT bindings") and the
+marzen-reference ethernet patches ("[PATCH 0/2] marzen-reference ethernet
+patches") I've previously posted. The result is available in my tree at
 
-Best regards,
-Tomasz
+        git://linuxtv.org/pinchartl/fbdev.git pinmux/3.9/dt
+
+The series is pretty self-explanatory. DT bindings are added in patch 01/20,
+and the following patches gradually move SoC code and board code over to the
+device tree for the armadilla800eva-reference, kzm9g-reference and
+marzen-reference boards. The code has been tested on the three boards, but
+only kzm9g can currently boot to userspace with network support due to lack of
+DT bindings or other ethernet issues on the two other boards. armadillo800eva
+and marzen have thus received less testing.
+
+Comments will be very appreciated on the DT bindings (01/20). Points I'm a bit
+unsure about include:
+
+- Should the driver support pin configuration subnodes as currently
+  implemented, or should the subnodes be promoted to regular pin configuration
+  nodes, with clients referencing multiple nodes ?
+- Should the driver allow mixing function and configuration properties in a pin
+  configuration node as currently implemented, or should it restrict the pin
+  configuration nodes to either a function or one (or more) configuration(s) ?
+- Should we specify common bindings for pinconf-generic instead of using
+  Renesas-specific properties ? (If the answer to this question is yes, please
+  help :-)).
+
+Changes since v2:
+
+- Added pin configuration properties
+- Rewrote all arch changes
+
+Changes since v1:
+
+- Fixed gpio cell number 2 documentation
+- Added missing gpio-controller and #gpio-cells properties to r8a7740 DT
+- Split kzm9g DT patch into SoC and board patches
+- Dropped pinctrl mappings move to DT
+
+Laurent Pinchart (20):
+  sh-pfc: Add DT support
+  ARM: shmobile: r8a73a4: Add pin control device to device tree
+  ARM: shmobile: r8a7740: Add pin control device to device tree
+  ARM: shmobile: r8a7778: Add pin control device to device tree
+  ARM: shmobile: r8a7778: Add GPIO controller devices to device tree
+  ARM: shmobile: r8a7779: Add pin control device to device tree
+  ARM: shmobile: r8a7779: Add GPIO controller devices to device tree
+  ARM: shmobile: r8a7790: Add pin control device to device tree
+  ARM: shmobile: r8a7790: Add GPIO controller devices to device tree
+  ARM: shmobile: sh7372: Add pin control device to device tree
+  ARM: shmobile: sh73a0: Add pin control device to device tree
+  ARM: shmobile: armadillo-reference: Move pinctrl mappings to device
+    tree
+  ARM: shmobile: armadillo-reference: Add st1232 pin mappings
+  ARM: shmobile: armadillo-reference: Move st1232 reset GPIO to DT
+  ARM: shmobile: armadillo-reference: Add LED1-LED4 to the device tree
+  ARM: shmobile: kzm9g-reference: Move pinctrl mappings to device tree
+  ARM: shmobile: kzm9g-reference: Move SDHI regulators to DT
+  ARM: shmobile: kzm9g-reference: Add LED1-LED4 to the device tree
+  ARM: shmobile: marzen-reference: Move pinctrl mappings to device tree
+  ARM: shmobile: marzen-reference: Add LED2-LED4 to the device tree
+
+ .../bindings/pinctrl/renesas,pfc-pinctrl.txt       | 143 ++++++++++++
+ arch/arm/boot/dts/r8a73a4.dtsi                     |   7 +
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts |  33 +++
+ arch/arm/boot/dts/r8a7740.dtsi                     |   8 +
+ arch/arm/boot/dts/r8a7778.dtsi                     |  50 +++++
+ arch/arm/boot/dts/r8a7779-marzen-reference.dts     |  48 ++++
+ arch/arm/boot/dts/r8a7779.dtsi                     |  69 ++++++
+ arch/arm/boot/dts/r8a7790.dtsi                     |  59 +++++
+ arch/arm/boot/dts/sh7372.dtsi                      |   8 +
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       |  89 +++++++-
+ arch/arm/boot/dts/sh73a0.dtsi                      |   8 +
+ .../board-armadillo800eva-reference.c              |  18 +-
+ arch/arm/mach-shmobile/board-kzm9g-reference.c     |  47 ----
+ arch/arm/mach-shmobile/board-marzen-reference.c    |  28 ---
+ drivers/pinctrl/sh-pfc/core.c                      |  66 +++++-
+ drivers/pinctrl/sh-pfc/pinctrl.c                   | 244 +++++++++++++++++++++
+ 16 files changed, 829 insertions(+), 96 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt
+
+-- 
+Regards,
+
+Laurent Pinchart
