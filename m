@@ -1,74 +1,26 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 15 May 2013 11:40:20 +0200
-Subject: [PATCH 2/4] mmc: mmci: Support signal voltage switch for UHS cards
-In-Reply-To: <1368610823-14113-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1368610823-14113-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1368610823-14113-3-git-send-email-ulf.hansson@stericsson.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 May 2013 10:37:13 +0100
+Subject: [PATCH] ARM: PL011: add support for extended FIFO-size of
+ PL011-r1p5
+In-Reply-To: <5193164E.6050400@wwwdotorg.org>
+References: <007301ce375e$bcf6d6b0$36e48410$@lge.com>
+ <5191D200.3040604@wwwdotorg.org> <01fd01ce5072$d6b9fcd0$842df670$@lge.com>
+ <5192A692.4010700@wwwdotorg.org> <022d01ce5107$8bc668e0$a3533aa0$@lge.com>
+ <5193164E.6050400@wwwdotorg.org>
+Message-ID: <20130515093713.GJ18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+On Tue, May 14, 2013 at 10:59:58PM -0600, Stephen Warren wrote:
+> Well, that certainly isn't true in practice. I think we should revert
+> this commit until we can determine what the problem is.
+> 
+> I validated that the periphid register in HW contains the r1p5 revision
+> (3), and the pcellid register does indeed contain the expected
+> 0xb105f00d value. However, if I run the following hacky code in U-Boot
+> to determine the FIFO depth, it comes out as 16, which explains the
+> symptoms I'm seeing:
 
-Add .start_signal_voltage_switch callback to be able to support UHS cards.
-The voltage switch requires the optional vqmmc regulator to exist since
-the actual voltage switch will be performed directly on it.
-
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- drivers/mmc/host/mmci.c |   34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
-
-diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index 2983c15..8d4ceb8 100644
---- a/drivers/mmc/host/mmci.c
-+++ b/drivers/mmc/host/mmci.c
-@@ -1253,6 +1253,39 @@ static int mmci_get_cd(struct mmc_host *mmc)
- 	return status;
- }
- 
-+static int mmci_sig_volt_switch(struct mmc_host *mmc, struct mmc_ios *ios)
-+{
-+	int ret = 0;
-+
-+	if (!IS_ERR(mmc->supply.vqmmc)) {
-+
-+		pm_runtime_get_sync(mmc_dev(mmc));
-+
-+		switch (ios->signal_voltage) {
-+		case MMC_SIGNAL_VOLTAGE_330:
-+			ret = regulator_set_voltage(mmc->supply.vqmmc,
-+						2700000, 3600000);
-+			break;
-+		case MMC_SIGNAL_VOLTAGE_180:
-+			ret = regulator_set_voltage(mmc->supply.vqmmc,
-+						1700000, 1950000);
-+			break;
-+		case MMC_SIGNAL_VOLTAGE_120:
-+			ret = regulator_set_voltage(mmc->supply.vqmmc,
-+						1100000, 1300000);
-+			break;
-+		}
-+
-+		if (ret)
-+			dev_warn(mmc_dev(mmc), "Voltage switch failed\n");
-+
-+		pm_runtime_mark_last_busy(mmc_dev(mmc));
-+		pm_runtime_put_autosuspend(mmc_dev(mmc));
-+	}
-+
-+	return ret;
-+}
-+
- static irqreturn_t mmci_cd_irq(int irq, void *dev_id)
- {
- 	struct mmci_host *host = dev_id;
-@@ -1269,6 +1302,7 @@ static const struct mmc_host_ops mmci_ops = {
- 	.set_ios	= mmci_set_ios,
- 	.get_ro		= mmci_get_ro,
- 	.get_cd		= mmci_get_cd,
-+	.start_signal_voltage_switch = mmci_sig_volt_switch,
- };
- 
- #ifdef CONFIG_OF
--- 
-1.7.10
+We could do that, just like we do in 8250.c to check the FIFO depth.
+There's not much harm in doing that at boot time, it just needs to be
+done carefully so that it doesn't disrupt any existing use of the UART.
