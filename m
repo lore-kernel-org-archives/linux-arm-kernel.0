@@ -1,51 +1,184 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Wed, 15 May 2013 14:18:51 -0500
-Subject: [PATCH 5/5] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
-In-Reply-To: <5336483.qTzEF54m2z@wuerfel>
-References: <1368571955-6652-1-git-send-email-dinguyen@altera.com>
- <201305151525.50005.arnd@arndb.de> <5193BA6C.2050406@gmail.com>
- <5336483.qTzEF54m2z@wuerfel>
-Message-ID: <5193DF9B.8030504@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 15 May 2013 21:24:48 +0200
+Subject: [PATCH] clk: Fix race condition between clk_set_parent and
+ clk_enable()
+In-Reply-To: <1367383328-25700-1-git-send-email-skannan@codeaurora.org>
+References: <1367383328-25700-1-git-send-email-skannan@codeaurora.org>
+Message-ID: <CAPDyKFpZ6-O-zSyBVgGGFL4W+d=-k-qaXimUS12fgC=9TkUNVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On 1 May 2013 06:42, Saravana Kannan <skannan@codeaurora.org> wrote:
+> Without this patch, the following race conditions are possible.
+>
+> Race condition 1:
+> * clk-A has two parents - clk-X and clk-Y.
+> * All three are disabled and clk-X is current parent.
+> * Thread A: clk_set_parent(clk-A, clk-Y).
+> * Thread A: <snip execution flow>
+> * Thread A: Grabs enable lock.
+> * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
+> * Thread A: Updates clk-A SW parent to clk-Y
+> * Thread A: Releases enable lock.
+> * Thread B: clk_enable(clk-A).
+> * Thread B: clk_enable() enables clk-Y, then enabled clk-A and returns.
+>
+> clk-A is now enabled in software, but not clocking in hardware since the
+> hardware parent is still clk-X.
+>
+> The only way to avoid race conditions between clk_set_parent() and
+> clk_enable/disable() is to ensure that clk_enable/disable() calls don't
+> require changes to hardware enable state between changes to software clock
+> topology and hardware clock topology.
+>
+> There are options to achieve the above:
+> 1. Grab the enable lock before changing software/hardware topology and
+>    release it afterwards.
+> 2. Keep the clock enabled for the duration of software/hardware topology
+>    change so that any additional enable/disable calls don't try to change
+>    the hardware state. Once the topology change is complete, the clock can
+>    be put back in its original enable state.
+>
+> Option (1) is not an acceptable solution since the set_parent() ops might
+> need to sleep.
+>
+> Therefore, this patch implements option (2).
+>
+> This patch doesn't violate any API semantics. clk_disable() doesn't
+> guarantee that the clock is actually disabled. So, no clients of a clock
+> can assume that a clock is disabled after their last call to clk_disable().
+> So, enabling the clock during a parent change is not a violation of any API
+> semantics.
+>
+> This also has the nice side effect of simplifying the error handling code.
+>
+> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+> ---
+> It's been a while since I submitted a patch. So, apologies if I'm cc'ing
+> people who no longer care about the state of the common clock framework.
+>
+>  drivers/clk/clk.c |   72 +++++++++++++++++++++++-----------------------------
+>  1 files changed, 32 insertions(+), 40 deletions(-)
+>
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 934cfd1..fe4055f 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1377,67 +1377,59 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
+>         unsigned long flags;
+>         int ret = 0;
+>         struct clk *old_parent = clk->parent;
+> -       bool migrated_enable = false;
+>
+> -       /* migrate prepare */
+> -       if (clk->prepare_count)
+> +       /*
+> +        * Migrate prepare state between parents and prevent race with
+> +        * clk_enable().
+> +        *
+> +        * If the clock is not prepared, then a race with
+> +        * clk_enable/disable() is impossible since we already have the
+> +        * prepare lock (future calls to clk_enable() need to be preceded by
+> +        * a clk_prepare()).
+> +        *
+> +        * If the clock is prepared, migrate the prepared state to the new
+> +        * parent and also protect against a race with clk_enable() by
+> +        * forcing the clock and the new parent on.  This ensures that all
+> +        * future calls to clk_enable() are practically NOPs with respect to
+> +        * hardware and software states.
+> +        */
 
-On 05/15/2013 12:11 PM, Arnd Bergmann wrote:
-> On Wednesday 15 May 2013 11:40:12 Dinh Nguyen wrote:
->> On 05/15/2013 08:25 AM, Arnd Bergmann wrote:
->>> On Wednesday 15 May 2013, dinguyen at altera.com wrote:
->>>> +
->>>> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET         0x108
->>>> +#define DRV_CLK_PHASE_SHIFT_SEL_MASK        0x7
->>>> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)              \
->>>> +    ((((drvsel) << 0) & 0x7) | (((smplsel) << 3) & 0x38))
->>>> +
->>>> +extern void __iomem *sys_manager_base_addr;
->>>
->>> This is not acceptable, you cannot just reference external symbols
->>> from one driver in another, without a proper interface.
->>>
->>> Please explain what the functionality is that you need here, then
->>> we can help you find the proper interface. My guess is that you
->>> need either the functionality provided by drivers/reset/
->>> or drivers/mfd/syscon.c.
->>
->> Our implementation has the timing controls for the SD/MMC controller in
->> another custom IP block(system manager). sys_manager_base_addr was
->> mapped in mach-socfpga/socfpga.c. I saw the same approach with
->> drivers/clk(clk_mgr_base_addr), so I thought it would be ok with this
->> driver. Please advise on another way to do this...
-> 
-> The clock code is tied more more closely to the platform code, so I
-> was turning a blind eye on that one, under the assumption that it
-> was only used there.
+Maybe an additional note about that since CLK_SET_PARENT_GATE is a
+prerequisite for doing migration of "prepare", we also interpreted
+this flags as it is acceptable to enable the clock(s) in this context.
 
-I think I can use the syscon interface for this. Thanks for the pointer.
-I kinda thought that these dw_mmc-<platform> is platform specific
-enough, but I will go the syscon route.
+> +       if (clk->prepare_count) {
+>                 __clk_prepare(parent);
+> -
+> -       flags = clk_enable_lock();
+> -
+> -       /* migrate enable */
+> -       if (clk->enable_count) {
+> -               __clk_enable(parent);
+> -               migrated_enable = true;
+> +               clk_enable(parent);
+> +               clk_enable(clk);
+>         }
+>
+>         /* update the clk tree topology */
+> +       flags = clk_enable_lock();
+>         clk_reparent(clk, parent);
+> -
+>         clk_enable_unlock(flags);
+>
+>         /* change clock input source */
+>         if (parent && clk->ops->set_parent)
+>                 ret = clk->ops->set_parent(clk->hw, p_index);
+> -
+>         if (ret) {
+> -               /*
+> -                * The error handling is tricky due to that we need to release
+> -                * the spinlock while issuing the .set_parent callback. This
+> -                * means the new parent might have been enabled/disabled in
+> -                * between, which must be considered when doing rollback.
+> -                */
+> -               flags = clk_enable_lock();
+>
+> +               flags = clk_enable_lock();
+>                 clk_reparent(clk, old_parent);
+> -
+> -               if (migrated_enable && clk->enable_count) {
+> -                       __clk_disable(parent);
+> -               } else if (migrated_enable && (clk->enable_count == 0)) {
+> -                       __clk_disable(old_parent);
+> -               } else if (!migrated_enable && clk->enable_count) {
+> -                       __clk_disable(parent);
+> -                       __clk_enable(old_parent);
+> -               }
+> -
 
-Dinh
-> 
-> 	Arnd
-> 
+Really good, that we can remove this awkward error handling!
+
+>                 clk_enable_unlock(flags);
+>
+> -               if (clk->prepare_count)
+> +               if (clk->prepare_count) {
+> +                       clk_disable(clk);
+> +                       clk_disable(parent);
+>                         __clk_unprepare(parent);
+> -
+> +               }
+>                 return ret;
+>         }
+>
+> -       /* clean up enable for old parent if migration was done */
+> -       if (migrated_enable) {
+> -               flags = clk_enable_lock();
+> -               __clk_disable(old_parent);
+> -               clk_enable_unlock(flags);
+> -       }
+> -
+> -       /* clean up prepare for old parent if migration was done */
+> -       if (clk->prepare_count)
+> +       /*
+> +        * Finish the migration of prepare state and undo the changes done
+> +        * for preventing a race with clk_enable().
+> +        */
+> +       if (clk->prepare_count) {
+> +               clk_disable(clk);
+> +               clk_disable(old_parent);
+>                 __clk_unprepare(old_parent);
+> +       }
+>
+>         /* update debugfs with new clk tree topology */
+>         clk_debug_reparent(clk, parent);
+> --
+> 1.7.8.3
+>
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+
+Looks good! Thanks for having another round to fixup this kind of
+tricky code. :-)
+
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
