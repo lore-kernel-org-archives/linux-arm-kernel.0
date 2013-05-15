@@ -1,47 +1,47 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 15 May 2013 10:51:34 +0100
-Subject: [PATCH 11/39] ARM: ux500: Remove unnecessary attributes from DMA
- channel request pdata
+Date: Wed, 15 May 2013 10:51:29 +0100
+Subject: [PATCH 06/39] ARM: ux500: Move SDI (MMC) and UART devices under more
+ descriptive heading
 In-Reply-To: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
 References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1368611522-9984-12-git-send-email-lee.jones@linaro.org>
+Message-ID: <1368611522-9984-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA data width and packet size information is only required at channel
-configuration time. Any information passed from platform data is passed
-directly to the DMA40 driver to use during channel allocation, but these
-pieces of information are subsequently ignored by the driver, so we may
-as well remove them.
+Now DMA DT bindings exist and are in use by he MMC and UART drivers, it
+should be possible to remove them from the auxdata structure. However,
+after doing so the drivers fail. Common clk is still reliant on the
+dev_name() call to do device name matching, which will fail due to the
+fact that Device Tree naming differs somewhat do the more traditional
+conventions.
 
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/usb.c |    8 --------
- 1 file changed, 8 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/usb.c b/arch/arm/mach-ux500/usb.c
-index 45af303..72754e3 100644
---- a/arch/arm/mach-ux500/usb.c
-+++ b/arch/arm/mach-ux500/usb.c
-@@ -15,19 +15,11 @@
- #define MUSB_DMA40_RX_CH { \
- 		.mode = STEDMA40_MODE_LOGICAL, \
- 		.dir = STEDMA40_PERIPH_TO_MEM, \
--		.src_info.data_width = STEDMA40_WORD_WIDTH, \
--		.dst_info.data_width = STEDMA40_WORD_WIDTH, \
--		.src_info.psize = STEDMA40_PSIZE_LOG_16, \
--		.dst_info.psize = STEDMA40_PSIZE_LOG_16, \
- 	}
- 
- #define MUSB_DMA40_TX_CH { \
- 		.mode = STEDMA40_MODE_LOGICAL, \
- 		.dir = STEDMA40_MEM_TO_PERIPH, \
--		.src_info.data_width = STEDMA40_WORD_WIDTH, \
--		.dst_info.data_width = STEDMA40_WORD_WIDTH, \
--		.src_info.psize = STEDMA40_PSIZE_LOG_16, \
--		.dst_info.psize = STEDMA40_PSIZE_LOG_16, \
- 	}
- 
- static struct stedma40_chan_cfg musb_dma_rx_ch[UX500_MUSB_DMA_NUM_RX_CHANNELS]
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 96ddbae..b1c9241 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -230,15 +230,15 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	/* Requires call-back bindings. */
+ 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
+ 	/* Requires DMA bindings. */
++	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
++	/* Requires clock name bindings. */
+ 	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", NULL),
+ 	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", NULL),
+ 	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", NULL),
+-	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  NULL),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  NULL),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  NULL),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  NULL),
+-	/* Requires clock name bindings. */
+ 	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e000, "gpio.0", NULL),
+ 	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e080, "gpio.1", NULL),
+ 	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e000, "gpio.2", NULL),
 -- 
 1.7.10.4
