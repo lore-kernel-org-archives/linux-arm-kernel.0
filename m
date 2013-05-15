@@ -1,36 +1,165 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 15 May 2013 10:51:43 -0400 (EDT)
-Subject: [RFC PATCH v3] drivers: bus: add ARM CCI support
-In-Reply-To: <20130515142441.GA385@e102568-lin.cambridge.arm.com>
-References: <1368095640-3675-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1368095640-3675-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20130514130005.GD29592@e102654-lin.cambridge.arm.com>
- <alpine.LFD.2.03.1305141820280.31158@syhkavp.arg>
- <20130515142441.GA385@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1305151037330.31158@syhkavp.arg>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 15 May 2013 16:52:03 +0200
+Subject: [RFC/PATCH] dma: of: Make of_dma_simple_xlate match on DMA device
+ and channel ID
+In-Reply-To: <3106852.EdI2KVGSEm@avalon>
+References: <1368624449-29003-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <51938FFD.2020300@metafoo.de> <3106852.EdI2KVGSEm@avalon>
+Message-ID: <5193A113.4050301@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 May 2013, Lorenzo Pieralisi wrote:
-
-> On Tue, May 14, 2013 at 11:21:32PM +0100, Nicolas Pitre wrote:
-> > On Tue, 14 May 2013, Javi Merino wrote:
-> > 
-> > > On Thu, May 09, 2013 at 11:34:00AM +0100, Lorenzo Pieralisi wrote:
-> > > 
-> > > > +static inline void init_cpu_port(struct cpu_port *port, u32 index, u32 mpidr)
-> > > 
-> > > The mpidr should be u64.
-> > 
-> > Why?
+On 05/15/2013 03:55 PM, Laurent Pinchart wrote:
+> Hi Lars-Peter,
 > 
-> Since on arm64 MPIDR_EL1 size is 64 bits, we need the driver to work on
-> both arm and arm64.
+> (CC'ing LAKML, I had forgotten to do so when I sent the patch)
+> 
+> On Wednesday 15 May 2013 15:39:09 Lars-Peter Clausen wrote:
+>> On 05/15/2013 03:27 PM, Laurent Pinchart wrote:
+>>> When translating a DT DMA channel specifier, the most common use case is
+>>> to match the DMA channel based on the channel DMA engine and channel ID.
+>>> Modify the of_dma_simple_xlate() function to do so, simplifying the API
+>>> for DMA engine drivers.
+>>>
+>>> There is no need to check the DMA cells count in the filter function as
+>>> the check is already performed by the caller in of_dma_get_controller().
+>>>
+>>> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>>
+>> Hi,
+>>
+>> I've submitted a very similar patch some time ago, see
+>> https://lkml.org/lkml/2013/3/25/250
+> 
+> Thanks. So my patch makes at least some sense :-)
 
-OK.
+> 
+> I had the impression that this is what omap-dma needs as well, hence the 
+> modification to the existing xlate function. I'm fine with a separate function 
+> as well if the current code covers different use cases.
 
-Are you OK for me to carry this patch in the series for MCPM support 
-on RTSM?  I would like to send it to arm-soc ASAP.
+My first attempt was to modify simple_xlate function, but I think it didn't
+work for all users (some of which aren't applied yet), so I added a separate
+function.
 
-
-Nicolas
+> 
+>>> ---
+>>>
+>>>  drivers/dma/of-dma.c   | 39 +++++++++++++++++++++++++++++++--------
+>>>  drivers/dma/omap-dma.c |  8 +-------
+>>>  include/linux/of_dma.h |  5 -----
+>>>  3 files changed, 32 insertions(+), 20 deletions(-)
+>>>
+>>> I've implemented this function while working on a DMA engine driver, and
+>>> realized that it wasn't specific to my driver at all. As I'm new to the
+>>> DMA engine API, I'd appreciate feedback on whether this change makes
+>>> sense, or if I should instead keep the existing of_dma_simple_xlate()
+>>> function and create a separate simple xlate helper.
+>>>
+>>> diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
+>>> index 7aa0864..702a45d 100644
+>>> --- a/drivers/dma/of-dma.c
+>>> +++ b/drivers/dma/of-dma.c
+>>> @@ -202,6 +202,27 @@ struct dma_chan *of_dma_request_slave_channel(struct
+>>> device_node *np,
+>>>  	return NULL;
+>>>  }
+>>>
+>>> +struct of_dma_filter_args {
+>>> +	struct dma_device *device;
+>>> +	unsigned int chan_id;
+>>> +};
+>>> +
+>>> +/**
+>>> + * of_dma_simple_xlate_filter - Channel filter function for
+>>> of_dma_simple_xlate + * @dma_chan:	pointer to candidate DMA channel
+>>> + * @param:	pointer to filter parameter
+>>> + *
+>>> + * Filter out candidate DMA channels that don't match the channel ID or
+>>> + * DMA engine device passed as arguments.
+>>> + */
+>>> +static bool of_dma_simple_xlate_filter(struct dma_chan *chan, void
+>>> *param)
+>>> +{
+>>> +	struct of_dma_filter_args *fargs = param;
+>>> +
+>>> +	return (chan->device == fargs->device) &&
+>>> +	       (chan->chan_id == fargs->chan_id);
+>>> +}
+>>> +
+>>>  /**
+>>>   * of_dma_simple_xlate - Simple DMA engine translation function
+>>>   * @dma_spec:	pointer to DMA specifier as found in the device tree
+>>> @@ -216,16 +237,18 @@ struct dma_chan *of_dma_request_slave_channel(struct
+>>> device_node *np,> 
+>>>  struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
+>>>  						struct of_dma *ofdma)
+>>>  {
+>>> -	int count = dma_spec->args_count;
+>>> -	struct of_dma_filter_info *info = ofdma->of_dma_data;
+>>> +	struct dma_device *dev = ofdma->of_dma_data;
+>>> +	struct of_dma_filter_args fargs;
+>>> +	dma_cap_mask_t cap;
+>>>
+>>> -	if (!info || !info->filter_fn)
+>>> -		return NULL;
+>>> +	/* There's no need to specify matching caps as we're going to match a
+>>> +	 * specific DMA channel anyway.
+>>> +	 */
+>>> +	dma_cap_zero(cap);
+>>>
+>>> -	if (count != 1)
+>>> -		return NULL;
+>>> +	fargs.device = dev;
+>>> +	fargs.chan_id = dma_spec->args[0];
+>>>
+>>> -	return dma_request_channel(info->dma_cap, info->filter_fn,
+>>> -			&dma_spec->args[0]);
+>>> +	return dma_request_channel(cap, of_dma_simple_xlate_filter, &fargs);
+>>>  }
+>>>  EXPORT_SYMBOL_GPL(of_dma_simple_xlate);
+>>> diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+>>> index ec3fc4f..7e7ff06 100644
+>>> --- a/drivers/dma/omap-dma.c
+>>> +++ b/drivers/dma/omap-dma.c
+>>> @@ -69,10 +69,6 @@ static const unsigned es_bytes[] = {
+>>>  	[OMAP_DMA_DATA_TYPE_S32] = 4,
+>>>  };
+>>>
+>>> -static struct of_dma_filter_info omap_dma_info = {
+>>> -	.filter_fn = omap_dma_filter_fn,
+>>> -};
+>>> -
+>>>  static inline struct omap_dmadev *to_omap_dma_dev(struct dma_device *d)
+>>>  {
+>>>  	return container_of(d, struct omap_dmadev, ddev);
+>>> @@ -641,11 +637,9 @@ static int omap_dma_probe(struct platform_device
+>>> *pdev)> 
+>>>  	platform_set_drvdata(pdev, od);
+>>>  	if (pdev->dev.of_node) {
+>>> -		omap_dma_info.dma_cap = od->ddev.cap_mask;
+>>> -
+>>>  		/* Device-tree DMA controller registration */
+>>>  		rc = of_dma_controller_register(pdev->dev.of_node,
+>>> -				of_dma_simple_xlate, &omap_dma_info);
+>>> +				of_dma_simple_xlate, &od->ddev);
+>>>  		if (rc) {
+>>>  			pr_warn("OMAP-DMA: failed to register DMA controller\n");
+>>>  			dma_async_device_unregister(&od->ddev);
+>>> diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
+>>> index 364dda7..3c0d9ac 100644
+>>> --- a/include/linux/of_dma.h
+>>> +++ b/include/linux/of_dma.h
+>>> @@ -27,11 +27,6 @@ struct of_dma {
+>>>  	void			*of_dma_data;
+>>>  };
+>>>
+>>> -struct of_dma_filter_info {
+>>> -	dma_cap_mask_t	dma_cap;
+>>> -	dma_filter_fn	filter_fn;
+>>> -};
+>>> -
+>>>
+>>>  #ifdef CONFIG_OF
+>>>  extern int of_dma_controller_register(struct device_node *np,
+>>>  		struct dma_chan *(*of_dma_xlate)
