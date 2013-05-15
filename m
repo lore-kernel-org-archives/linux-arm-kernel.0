@@ -1,79 +1,36 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 15 May 2013 20:18:40 +0530
-Subject: [PATCH v3 4/6] ARM: OMAP2+: serial: Remove the un-used slave idle
- hooks
-In-Reply-To: <1368629322-3170-1-git-send-email-rnayak@ti.com>
-References: <1368629322-3170-1-git-send-email-rnayak@ti.com>
-Message-ID: <1368629322-3170-5-git-send-email-rnayak@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 15 May 2013 10:51:43 -0400 (EDT)
+Subject: [RFC PATCH v3] drivers: bus: add ARM CCI support
+In-Reply-To: <20130515142441.GA385@e102568-lin.cambridge.arm.com>
+References: <1368095640-3675-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1368095640-3675-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130514130005.GD29592@e102654-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1305141820280.31158@syhkavp.arg>
+ <20130515142441.GA385@e102568-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.03.1305151037330.31158@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Wed, 15 May 2013, Lorenzo Pieralisi wrote:
 
-UART IP idle handling now taken care by runtime pm backend(hwmod) indirectly
-and OMAP serial driver is also cleaned up accordingly.
+> On Tue, May 14, 2013 at 11:21:32PM +0100, Nicolas Pitre wrote:
+> > On Tue, 14 May 2013, Javi Merino wrote:
+> > 
+> > > On Thu, May 09, 2013 at 11:34:00AM +0100, Lorenzo Pieralisi wrote:
+> > > 
+> > > > +static inline void init_cpu_port(struct cpu_port *port, u32 index, u32 mpidr)
+> > > 
+> > > The mpidr should be u64.
+> > 
+> > Why?
+> 
+> Since on arm64 MPIDR_EL1 size is 64 bits, we need the driver to work on
+> both arm and arm64.
 
-So remove the un-used slave idle platforms hooks now.
+OK.
 
-Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
-Tested-by: Sourav Poddar <sourav.poddar@ti.com>
-Signed-off-by: Rajendra nayak <rnayak@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
- arch/arm/mach-omap2/serial.c |   31 -------------------------------
- 1 file changed, 31 deletions(-)
+Are you OK for me to carry this patch in the series for MCPM support 
+on RTSM?  I would like to send it to arm-soc ASAP.
 
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 8396b5b..f660156 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -95,38 +95,9 @@ static void omap_uart_enable_wakeup(struct device *dev, bool enable)
- 		omap_hwmod_disable_wakeup(od->hwmods[0]);
- }
- 
--/*
-- * Errata i291: [UART]:Cannot Acknowledge Idle Requests
-- * in Smartidle Mode When Configured for DMA Operations.
-- * WA: configure uart in force idle mode.
-- */
--static void omap_uart_set_noidle(struct device *dev)
--{
--	struct platform_device *pdev = to_platform_device(dev);
--	struct omap_device *od = to_omap_device(pdev);
--
--	omap_hwmod_set_slave_idlemode(od->hwmods[0], HWMOD_IDLEMODE_NO);
--}
--
--static void omap_uart_set_smartidle(struct device *dev)
--{
--	struct platform_device *pdev = to_platform_device(dev);
--	struct omap_device *od = to_omap_device(pdev);
--	u8 idlemode;
--
--	if (od->hwmods[0]->class->sysc->idlemodes & SIDLE_SMART_WKUP)
--		idlemode = HWMOD_IDLEMODE_SMART_WKUP;
--	else
--		idlemode = HWMOD_IDLEMODE_SMART;
--
--	omap_hwmod_set_slave_idlemode(od->hwmods[0], idlemode);
--}
--
- #else
- static void omap_uart_enable_wakeup(struct device *dev, bool enable)
- {}
--static void omap_uart_set_noidle(struct device *dev) {}
--static void omap_uart_set_smartidle(struct device *dev) {}
- #endif /* CONFIG_PM */
- 
- #ifdef CONFIG_OMAP_MUX
-@@ -299,8 +270,6 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
- 	omap_up.uartclk = OMAP24XX_BASE_BAUD * 16;
- 	omap_up.flags = UPF_BOOT_AUTOCONF;
- 	omap_up.get_context_loss_count = omap_pm_get_dev_context_loss_count;
--	omap_up.set_forceidle = omap_uart_set_smartidle;
--	omap_up.set_noidle = omap_uart_set_noidle;
- 	omap_up.enable_wakeup = omap_uart_enable_wakeup;
- 	omap_up.dma_rx_buf_size = info->dma_rx_buf_size;
- 	omap_up.dma_rx_timeout = info->dma_rx_timeout;
--- 
-1.7.9.5
+
+Nicolas
