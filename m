@@ -1,149 +1,48 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 May 2013 16:23:59 +0100
-Subject: [PATCHv2 3/5] clocksource: arch_timer: use virtual counters
+Date: Wed, 15 May 2013 16:24:01 +0100
+Subject: [PATCHv2 5/5] ARM: arch_timer: stop virtual timer when booted in HYP
+ mode
 In-Reply-To: <1368631441-28434-1-git-send-email-mark.rutland@arm.com>
 References: <1368631441-28434-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1368631441-28434-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <1368631441-28434-6-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switching between reading the virtual or physical counters is
-problematic, as some core code wants a view of time before we're fully
-set up. Using a function pointer and switching the source after the
-first read can make time appear to go backwards, and having a check in
-the read function is an unfortunate block on what we want to be a fast
-path.
+From: Marc Zyngier <Marc.Zyngier@arm.com>
 
-Instead, this patch makes us always use the virtual counters. If we're a
-guest, or don't have hyp mode, we'll use the virtual timers, and as such
-don't care about CNTVOFF as long as it doesn't change in such a way as
-to make time travel backwards. If we do have hyp mode, and might be a
-KVM host, we have to use the physical timers, and require CNTVOFF to be
-zero so as to have a consistent view of time between the physical timers
-and virtual counters.
+When booting the kernel, a bootloader could have left the virtual
+timer ticking away, potentially generating interrupts. This could
+be troublesome if the user of the virtual timer is not careful
+when enabling the interrupt.
 
+In order to avoid any surprise, stop the virtual timer from
+interrupting us when booted in HYP mode, as we'll use the physical
+timer in this case.
+
+Reported-by: Giridhar Maruthy <giridhar.m@samsung.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/include/asm/arch_timer.h    |  9 ---------
- arch/arm64/include/asm/arch_timer.h  | 10 ----------
- drivers/clocksource/arm_arch_timer.c | 23 +++++------------------
- include/clocksource/arm_arch_timer.h |  2 +-
- 4 files changed, 6 insertions(+), 38 deletions(-)
+ arch/arm/kernel/hyp-stub.S | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index 7c1bfc0..accefe0 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -80,15 +80,6 @@ static inline u32 arch_timer_get_cntfrq(void)
- 	return val;
- }
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index dbe2110..4910232 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -155,6 +155,11 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
+ 	mcr	p15, 4, r7, c14, c1, 0	@ CNTHCTL
+ 	mov	r7, #0
+ 	mcrr	p15, 4, r7, r7, c14	@ CNTVOFF
++
++	@ Disable virtual timer in case it was counting
++	mrc	p15, 0, r7, c14, c3, 1	@ CNTV_CTL
++	bic	r7, #1			@ Clear ENABLE
++	mcr	p15, 0, r7, c14, c3, 1	@ CNTV_CTL
+ 1:
+ #endif
  
--static inline u64 arch_counter_get_cntpct(void)
--{
--	u64 cval;
--
--	isb();
--	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
--	return cval;
--}
--
- static inline u64 arch_counter_get_cntvct(void)
- {
- 	u64 cval;
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index bf6ab242..d56ed11 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -110,16 +110,6 @@ static inline void __cpuinit arch_counter_set_user_access(void)
- 	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
- }
- 
--static inline u64 arch_counter_get_cntpct(void)
--{
--	u64 cval;
--
--	isb();
--	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
--
--	return cval;
--}
--
- static inline u64 arch_counter_get_cntvct(void)
- {
- 	u64 cval;
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index a2b2541..053d846 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -186,27 +186,19 @@ u32 arch_timer_get_rate(void)
- 	return arch_timer_rate;
- }
- 
--/*
-- * Some external users of arch_timer_read_counter (e.g. sched_clock) may try to
-- * call it before it has been initialised. Rather than incur a performance
-- * penalty checking for initialisation, provide a default implementation that
-- * won't lead to time appearing to jump backwards.
-- */
--static u64 arch_timer_read_zero(void)
-+u64 arch_timer_read_counter(void)
- {
--	return 0;
-+	return arch_counter_get_cntvct();
- }
- 
--u64 (*arch_timer_read_counter)(void) = arch_timer_read_zero;
--
- static cycle_t arch_counter_read(struct clocksource *cs)
- {
--	return arch_timer_read_counter();
-+	return arch_counter_get_cntvct();
- }
- 
- static cycle_t arch_counter_read_cc(const struct cyclecounter *cc)
- {
--	return arch_timer_read_counter();
-+	return arch_counter_get_cntvct();
- }
- 
- static struct clocksource clocksource_counter = {
-@@ -287,7 +279,7 @@ static int __init arch_timer_register(void)
- 	cyclecounter.mult = clocksource_counter.mult;
- 	cyclecounter.shift = clocksource_counter.shift;
- 	timecounter_init(&timecounter, &cyclecounter,
--			 arch_counter_get_cntpct());
-+			 arch_counter_get_cntvct());
- 
- 	if (arch_timer_use_virtual) {
- 		ppi = arch_timer_ppi[VIRT_PPI];
-@@ -376,11 +368,6 @@ static void __init arch_timer_init(struct device_node *np)
- 		}
- 	}
- 
--	if (arch_timer_use_virtual)
--		arch_timer_read_counter = arch_counter_get_cntvct;
--	else
--		arch_timer_read_counter = arch_counter_get_cntpct;
--
- 	arch_timer_register();
- 	arch_timer_arch_init();
- }
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index e6c9c4c..c463ce9 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -32,7 +32,7 @@
- #ifdef CONFIG_ARM_ARCH_TIMER
- 
- extern u32 arch_timer_get_rate(void);
--extern u64 (*arch_timer_read_counter)(void);
-+extern u64 arch_timer_read_counter(void);
- extern struct timecounter *arch_timer_get_timecounter(void);
- 
- #else
 -- 
 1.8.1.1
