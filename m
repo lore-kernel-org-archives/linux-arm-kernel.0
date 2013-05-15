@@ -1,40 +1,53 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 15 May 2013 15:37:02 +0200
-Subject: [PATCHv4 9/9] arm: kirkwood: update defconfig with PCIe driver and
- board updates
+Date: Wed, 15 May 2013 15:36:58 +0200
+Subject: [PATCHv4 5/9] arm: kirkwood: convert MPL CEC4 to use DT for the PCIe
+ interface
 In-Reply-To: <1368625022-25243-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1368625022-25243-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1368625022-25243-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1368625022-25243-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit enables the mvebu PCIe driver in kirkwood_defconfig and
-updates various options related to Kirkwood boards.
+Now that the PCIe mvebu driver is usable on Kirkwood, use it instead
+of the legacy PCIe code, since it allows to describe the PCIe
+interfaces in the Device Tree.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/configs/kirkwood_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/kirkwood-mplcec4.dts |    8 ++++++++
+ arch/arm/mach-kirkwood/board-mplcec4.c |    1 -
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/kirkwood_defconfig b/arch/arm/configs/kirkwood_defconfig
-index a1d8252..452adec 100644
---- a/arch/arm/configs/kirkwood_defconfig
-+++ b/arch/arm/configs/kirkwood_defconfig
-@@ -31,6 +31,7 @@ CONFIG_MACH_T5325=y
- CONFIG_MACH_TS219=y
- CONFIG_MACH_TS41X=y
- CONFIG_MACH_CLOUDBOX_DT=y
-+CONFIG_MACH_DB88F628X_BP_DT=y
- CONFIG_MACH_DLINK_KIRKWOOD_DT=y
- CONFIG_MACH_DOCKSTAR_DT=y
- CONFIG_MACH_DREAMPLUG_DT=y
-@@ -53,6 +54,7 @@ CONFIG_MACH_READYNAS_DT=y
- CONFIG_MACH_TOPKICK_DT=y
- CONFIG_MACH_TS219_DT=y
- # CONFIG_CPU_FEROCEON_OLD_ID is not set
-+CONFIG_PCI_MVEBU=y
- CONFIG_PREEMPT=y
- CONFIG_AEABI=y
- # CONFIG_OABI_COMPAT is not set
+diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+index 7588241..90501cf 100644
+--- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
++++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
+@@ -139,6 +139,14 @@
+ 			cd-gpios = <&gpio1 15 0>;
+ 			/* No WP GPIO */
+ 		};
++
++		pcie-controller {
++			status = "okay";
++
++			pcie at 1,0 {
++				status = "okay";
++			};
++		};
+ 	};
+ 
+ 	gpio-leds {
+diff --git a/arch/arm/mach-kirkwood/board-mplcec4.c b/arch/arm/mach-kirkwood/board-mplcec4.c
+index 7d6dc66..938712e 100644
+--- a/arch/arm/mach-kirkwood/board-mplcec4.c
++++ b/arch/arm/mach-kirkwood/board-mplcec4.c
+@@ -29,7 +29,6 @@ void __init mplcec4_init(void)
+ 	 */
+ 	kirkwood_ge00_init(&mplcec4_ge00_data);
+ 	kirkwood_ge01_init(&mplcec4_ge01_data);
+-	kirkwood_pcie_init(KW_PCIE0);
+ }
+ 
+ 
 -- 
 1.7.9.5
