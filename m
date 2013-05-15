@@ -1,43 +1,29 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 15 May 2013 15:31:11 -0700
-Subject: [PATCH RFC 0/2] clk: add metag specific gate/mux clocks
-In-Reply-To: <1368198127-1295-1-git-send-email-james.hogan@imgtec.com>
-References: <1368198127-1295-1-git-send-email-james.hogan@imgtec.com>
-Message-ID: <51940CAF.6010808@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 May 2013 00:40:54 +0200
+Subject: [PATCH 0/4] ARM: Remove boilerplate debug_ll_io_init code
+In-Reply-To: <1368440169-29088-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1368440169-29088-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <201305160040.54399.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/13 08:02, James Hogan wrote:
-> This adds a metag architecture specific clk-gate and clk-mux which
-> extends the generic ones to use global lock2 to protect the register
-> fields. It is common with metag to have an RTOS running on a different
-> thread or core with access to different bits in the same register (which
-> contain clock gate/switch bits for other clocks). Access to such
-> registers must be serialised with a global lock such as the one provided
-> by the metag architecture port in <asm/global_lock.h>
->
-> RFC because despite extending the generic clocks there's still a bit of
-> duplicated code necessary. One alternative is to add special cases to
-> the generic clock components for when a global or callback function
-> based lock is desired instead of a spinlock, but I wasn't sure if that
-> sort of hack would really be appreciated in the generic drivers.
->
-> Comments?
+On Monday 13 May 2013, Maxime Ripard wrote:
+> The recent introduction of debug_ll_io_init made possible to not rely
+> anymore on a custom map_io function but on debug_ll_io_init for the
+> early mapping and then on the various drivers to do the needed mappings for
+> the kernel to boot.
+> 
+> Some architectures begin to use only this function as the map_io callback in
+> the machine description.
+> 
+> In order to remove some boilerplate code, make the ARM mm code call
+> debug_ll_io_init by itself when no .map_io callback is defined.
+> 
+> This has been tested on the sunxi platform.
 
-Can you please Cc the devicetree mailing list when proposing new bindings?
+Great stuff!
 
-Your patchset brings up a question I've had which is if we should be
-putting the bits and register width information in devicetree at all. On
-the one hand it's nice to not have anything in C code, just iterate over
-nodes and register clocks. On the other hand, it's the first time I've
-seen anyone put the register interface into devicetree. From what I can
-tell, the regulator bindings have put at most the register base and
-physical properties like enable-time, max voltage, etc., but not what
-bits are needed to enable/disable a regulator. Also I thought I read
-somewhere that reg properties shouldn't overlap each other, so if you
-ever have two clocks living in the same register we're going to violate
-that.
+I didn't notice the addition of debug_ll_io_init, so this is a nice surprise
+for me.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Acked-by: Arnd Bergmann <arnd@arndb.de>
