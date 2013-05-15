@@ -1,28 +1,53 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 15 May 2013 13:44:28 +0100
-Subject: v3.10-rc1: compile problem in arch/arm/common/mcpm_platsmp.c
-In-Reply-To: <20130515123640.GA9066@amd.pavel.ucw.cz>
-References: <20130515123640.GA9066@amd.pavel.ucw.cz>
-Message-ID: <1368621868.5583.6.camel@computer5.home>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 15 May 2013 08:48:45 -0400 (EDT)
+Subject: [PATCH] ARM: crypto: sha1-armv4-large.S: fix SP handling
+In-Reply-To: <1368610020-29219-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1368610020-29219-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <alpine.LFD.2.03.1305150845410.31158@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-05-15 at 14:36 +0200, Pavel Machek wrote:
-> Hi!
-> 
-> I'm trying to switch to v3.10-rc1, and got following:
-> 
-> arch/arm/common/mcpm_platsmp.c: In function 'mcpm_secondary_init':
-> arch/arm/common/mcpm_platsmp.c:52:2: error: implicit declaration of
-> function 'gic_secondary_init' [-Werror=implicit-function-declaration]
-> cc1: some warnings being treated as errors
-> make[1]: *** [arch/arm/common/mcpm_platsmp.o] Error 1
-> make: *** [arch/arm/common] Error 2
-> make: *** Waiting for unfinished jobs....
+On Wed, 15 May 2013, Ard Biesheuvel wrote:
 
-This has already been hit by others and there is a patch in the
-pipeline, see:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/167586.html
+> Make the SHA1 asm code ABI conformant by making sure all stack
+> accesses occur above the stack pointer.
+> 
+> Origin:
+> http://git.openssl.org/gitweb/?p=openssl.git;a=commit;h=1a9d60d2
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
--- 
-Tixy
+Acked-by: Nicolas Pitre <nico@linaro.org>
+
+Please add
+
+Cc: stable at vger.kernel.org
+
+and send it to RMK's patch system.
+
+>  arch/arm/crypto/sha1-armv4-large.S | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/crypto/sha1-armv4-large.S b/arch/arm/crypto/sha1-armv4-large.S
+> index 92c6eed..99207c4 100644
+> --- a/arch/arm/crypto/sha1-armv4-large.S
+> +++ b/arch/arm/crypto/sha1-armv4-large.S
+> @@ -195,6 +195,7 @@ ENTRY(sha1_block_data_order)
+>  	add	r3,r3,r10			@ E+=F_00_19(B,C,D)
+>  	cmp	r14,sp
+>  	bne	.L_00_15		@ [((11+4)*5+2)*3]
+> +	sub	sp,sp,#25*4
+>  #if __ARM_ARCH__<7
+>  	ldrb	r10,[r1,#2]
+>  	ldrb	r9,[r1,#3]
+> @@ -290,7 +291,6 @@ ENTRY(sha1_block_data_order)
+>  	add	r3,r3,r10			@ E+=F_00_19(B,C,D)
+>  
+>  	ldr	r8,.LK_20_39		@ [+15+16*4]
+> -	sub	sp,sp,#25*4
+>  	cmn	sp,#0			@ [+3], clear carry to denote 20_39
+>  .L_20_39_or_60_79:
+>  	ldr	r9,[r14,#15*4]
+> -- 
+> 1.8.1.2
+> 
