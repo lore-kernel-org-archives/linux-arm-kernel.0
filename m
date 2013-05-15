@@ -1,43 +1,33 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 15 May 2013 02:18:20 +0200
-Subject: [PATCH v3 20/20] ARM: shmobile: marzen-reference: Add LED2-LED4 to
- the device tree
-In-Reply-To: <1368577100-3530-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1368577100-3530-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1368577100-3530-21-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 May 2013 17:25:37 -0700
+Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
+Message-ID: <20130515002537.GG5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LED2 to LED4 are GPIO LEDs. Add corresponding DT nodes.
+Commit a819c4f1 (ARM: OMAP3: PM: Only access IVA if one exists)
+changed PM to not access IVA registers on omaps that don't have
+them. Turns out we still need to idle iva2 as otherwise iva2_pwrdm
+will stay on and block deeper idle states.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
 ---
- arch/arm/boot/dts/r8a7779-marzen-reference.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-index 07ef31f..0533c31 100644
---- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-@@ -47,6 +47,19 @@
- 		vddvario-supply = <&fixedregulator3v3>;
- 		vdd33a-supply = <&fixedregulator3v3>;
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		led2 {
-+			gpios = <&gpio4 29 0>;
-+		};
-+		led3 {
-+			gpios = <&gpio4 30 0>;
-+		};
-+		led4 {
-+			gpios = <&gpio4 31 0>;
-+		};
-+	};
- };
+Paul & Kevin, do you have better ideas for fixing this?
+
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -546,8 +546,10 @@ static void __init prcm_setup_regs(void)
+ 	/* Clear any pending PRCM interrupts */
+ 	omap2_prm_write_mod_reg(0, OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
  
- &pfc {
--- 
-1.8.1.5
+-	if (omap3_has_iva())
+-		omap3_iva_idle();
++	/*
++	 * We need to idle iva2_pwrdm even on am3703 with no iva2.
++	 */
++	omap3_iva_idle();
+ 
+ 	omap3_d2d_idle();
+ }
