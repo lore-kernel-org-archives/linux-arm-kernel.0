@@ -1,63 +1,51 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 15 May 2013 10:49:01 +0900
-Subject: [PATCH 05/20] ARM: shmobile: ape6evm: Remove init_irq
- declaration in machine description
-In-Reply-To: <20130515014604.GK12246@verge.net.au>
-References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
- <1368545933-7430-6-git-send-email-maxime.ripard@free-electrons.com>
- <20130515005907.GD12246@verge.net.au>
- <20130515014604.GK12246@verge.net.au>
-Message-ID: <20130515014901.GR12246@verge.net.au>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Tue, 14 May 2013 18:52:12 -0700
+Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
+In-Reply-To: <20130515002537.GG5600@atomide.com>
+References: <20130515002537.GG5600@atomide.com>
+Message-ID: <20130515015212.GB3268@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 10:46:04AM +0900, Simon Horman wrote:
-> On Wed, May 15, 2013 at 09:59:07AM +0900, Simon Horman wrote:
-> > On Tue, May 14, 2013 at 05:38:38PM +0200, Maxime Ripard wrote:
-> > > Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
-> > > specified") removed the need to explictly setup the init_irq field in
-> > > the machine description when using only irqchip_init. Remove that
-> > > declaration for shmobile as well.
-> > > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > ---
-> > >  arch/arm/mach-shmobile/board-ape6evm.c | 2 --
-> > >  1 file changed, 2 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
-> > > index 55b8c9f..8dfbdba 100644
-> > > --- a/arch/arm/mach-shmobile/board-ape6evm.c
-> > > +++ b/arch/arm/mach-shmobile/board-ape6evm.c
-> > > @@ -20,7 +20,6 @@
-> > >  
-> > >  #include <linux/gpio.h>
-> > >  #include <linux/interrupt.h>
-> > > -#include <linux/irqchip.h>
-> > >  #include <linux/kernel.h>
-> > >  #include <linux/pinctrl/machine.h>
-> > >  #include <linux/platform_device.h>
-> > > @@ -87,7 +86,6 @@ static const char *ape6evm_boards_compat_dt[] __initdata = {
-> > >  };
-> > >  
-> > >  DT_MACHINE_START(APE6EVM_DT, "ape6evm")
-> > > -	.init_irq	= irqchip_init,
-> > >  	.init_time	= shmobile_timer_init,
-> > >  	.init_machine	= ape6evm_add_standard_devices,
-> > >  	.dt_compat	= ape6evm_boards_compat_dt,
-> > 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Tue, May 14, 2013 at 05:25:37PM -0700, Tony Lindgren wrote:
+> Commit a819c4f1 (ARM: OMAP3: PM: Only access IVA if one exists)
+> changed PM to not access IVA registers on omaps that don't have
+> them. Turns out we still need to idle iva2 as otherwise iva2_pwrdm
+> will stay on and block deeper idle states.
 > 
-> Sorry, what I should have said is:
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> Queued up for v3.11 in the boards-spe6evm branch of my renesas tree
+> ---
+> 
+> Paul & Kevin, do you have better ideas for fixing this?
+> 
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -546,8 +546,10 @@ static void __init prcm_setup_regs(void)
+>  	/* Clear any pending PRCM interrupts */
+>  	omap2_prm_write_mod_reg(0, OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
+>  
+> -	if (omap3_has_iva())
+> -		omap3_iva_idle();
+> +	/*
+> +	 * We need to idle iva2_pwrdm even on am3703 with no iva2.
+> +	 */
+> +	omap3_iva_idle();
+>  
+>  	omap3_d2d_idle();
+>  }
 
-s/spe6evm/ape6evm/
+[Kevin, Paul, some background: Tony discovered that the am3703 needs
+to have omap3_iva_idle() called even though its not supposed to have
+an IVA.]
 
-> on kernel.org. It is included in the renesas-next-20130515 tag of
-> that tree and should appear in linux-next in the not to distant future.
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+This is potentially bad for other SoC's that don't have an IVA so I don't
+think its the way to go.  My preference would be to set the OMAP3_HAS_IVA
+flag for the am3703 only since its the one with the bug.  Maybe something
+in id.c:omap3xxx_check_features() but I don't see any existing way to check
+for an am3703 vs. other am37xx SoCs.  Any ideas?
+
+Another option, I suppose, is a dts entry but I don't like that at all.
+
+Mark
+--
