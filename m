@@ -1,34 +1,109 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Wed, 15 May 2013 11:44:47 -0500
-Subject: [PATCH 1/5] ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
-In-Reply-To: <201305151519.08598.arnd@arndb.de>
-References: <1368571955-6652-1-git-send-email-dinguyen@altera.com>
- <201305151519.08598.arnd@arndb.de>
-Message-ID: <5193BB7F.8030404@gmail.com>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Wed, 15 May 2013 11:46:26 -0500
+Subject: [PATCH v4] ARM:dts:omap4-panda: Update the LED support for the panda
+ DTS
+Message-ID: <1368636386-17138-1-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+are different.
 
-On 05/15/2013 08:19 AM, Arnd Bergmann wrote:
-> On Wednesday 15 May 2013, dinguyen at altera.com wrote:
->>                 };
->>  
->> +               ethernet at ff700000 {
->> +                       phy-mode = "gmii";
->> +               };
->> +
->> +               ethernet at ff702000 {
->> +                       status = "disabled";
->> +               };
-> 
-> By convention, please mark the controllers as "disabled" in the main .dtsi file
-> and only enable them in the board specific files when used, rather than the
-> other way round.
+A1-A3 = gpio_wk7
+ES = gpio_110
 
-Thanks for the review. Will fix.
+There is no change to LED D2
 
-Dinh
-> 
-> 	Arnd
-> 
+Abstract away the pinmux and the LED definitions for the two boards into
+the respective DTS files.
+
+Signed-off-by: Dan Murphy <dmurphy@ti.com>
+---
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++-
+ arch/arm/boot/dts/omap4-panda-es.dts      |   40 +++++++++++++++++++++++++++++
+ 2 files changed, 55 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index 03bd60d..2b516af 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -16,7 +16,7 @@
+ 		reg = <0x80000000 0x40000000>; /* 1 GB */
+ 	};
+ 
+-	leds {
++	leds: leds {
+ 		compatible = "gpio-leds";
+ 		heartbeat {
+ 			label = "pandaboard::status1";
+@@ -137,6 +137,20 @@
+ 	};
+ };
+ 
++&omap4_pmx_wkup {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++		&led_wkgpio_pins
++	>;
++
++	led_wkgpio_pins: pinmux_leds_wkpins {
++		pinctrl-single,pins = <
++			0x1a 0x3	/* gpio_wk7 OUTPUT | MODE 3 */
++			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
++		>;
++	};
++};
++
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins>;
+diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+index f1d8c21..e6f696d 100644
+--- a/arch/arm/boot/dts/omap4-panda-es.dts
++++ b/arch/arm/boot/dts/omap4-panda-es.dts
+@@ -34,3 +34,43 @@
+ 		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
+ 		>;
+ };
++
++&leds {
++	compatible = "gpio-leds";
++	heartbeat {
++		label = "pandaboard::status1";
++		gpios = <&gpio4 14 0>;
++		linux,default-trigger = "heartbeat";
++	};
++	mmc {
++		label = "pandaboard::status2";
++		gpios = <&gpio1 8 0>;
++		linux,default-trigger = "mmc0";
++	};
++};
++
++&omap4_pmx_core {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++		&led_gpio_pins
++	>;
++
++	led_gpio_pins: gpio_led_pmx {
++		pinctrl-single,pins = <
++			0xb6 0x3	/* gpio_110 OUTPUT | MODE 3 */
++		>;
++	};
++};
++
++&omap4_pmx_wkup {
++	pinctrl-names = "default";
++	pinctrl-0 = <
++		&led_wkgpio_pins
++	>;
++
++	led_wkgpio_pins: pinmux_leds_wkpins {
++		pinctrl-single,pins = <
++			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
++		>;
++	};
++};
+-- 
+1.7.5.4
