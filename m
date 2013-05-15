@@ -1,28 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 15 May 2013 16:48:55 -0600
-Subject: [PATCH 2/6] ARM: tegra: skip SCU and PL310 code when CPU is not
- Cortex-A9
-In-Reply-To: <1368613644-11863-3-git-send-email-josephl@nvidia.com>
-References: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
- <1368613644-11863-3-git-send-email-josephl@nvidia.com>
-Message-ID: <519410D7.9060201@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 May 2013 00:54:20 +0200
+Subject: [PATCH] ARM: mach-moxart: platform port for MOXA ART SoC
+In-Reply-To: <20130515133237.GK18614@n2100.arm.linux.org.uk>
+References: <CACmBeS1NLFUYHBOVL28aCCzRrgXYGPZF9t3qj6AdcgaMkrPGoQ@mail.gmail.com>
+ <201305151516.52389.arnd@arndb.de>
+ <20130515133237.GK18614@n2100.arm.linux.org.uk>
+Message-ID: <201305160054.21064.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2013 04:27 AM, Joseph Lo wrote:
-> For supporting single image on all Tegra series, we need to skip some HW
-> support code for Cortex-A9 only.
+On Wednesday 15 May 2013, Russell King - ARM Linux wrote:
+> Actually, that's probably the whole point of this - to do nothing.
+> This changes the behaviour of the idle loop from using the WFI to
+> just spinning instead with no wait-for-interrupt or anything else.
+> We just keep reading the need_resched flag.
+> 
+> That's much better than the commented out code which opens a mighty
+> big race condition which will then give bad scheduling behaviour,
+> allowing the idle task to sleep in WFI until the next interrupt while
+> the need_resched flag may be set.
+> 
+> Sure, there's better ways to do this, via the disable_hlt() stuff,
+> and whatever its replacement implementation is now called.  But
+> ultimately this workaround really is about "doing nothing" when
+> idle!
 
-> diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
+Ah, I see. I also read the mach-gemini version of the idle code,
+which is apparently the same thing as the code that was commented
+out here, so that has the wakeup race.
 
-> +	check_cpu_part_num 0xc09, r9, r10
-> +	movweq	r4, #:lower16:(TEGRA_ARM_PERIF_BASE + 0x3000)
-> +	movteq	r4, #:upper16:(TEGRA_ARM_PERIF_BASE + 0x3000)
-> +	moveq	r5, #0
-> +	streq	r5, [r4, #L2X0_CTRL]
+Since it seems that WFI is broken on all fa526 cores, or at least
+all the ones we want to support in Linux, maybe it's better to
+not call WFI at all there?
 
-Do those conditional instructions need a Thumb iteq wrapped around them
-in order to compile in Thumb2 mode? Same comment for the other change,
-although IIRC iteq only supports 4 instructions at a time, so maybe a
-branch would be better there. Using branches might also reduce the size
-of the diff, and make the change more obvious.
+	Arnd
