@@ -1,130 +1,60 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Wed, 15 May 2013 10:06:15 -0400
-Subject: Introduce a new helper framework for buffer synchronization
-In-Reply-To: <00cf01ce512b$bacc5540$3064ffc0$%dae@samsung.com>
-References: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
- <51909DB4.2060208@canonical.com>
- <025201ce4fbb$363d0390$a2b70ab0$%dae@samsung.com>
- <5190B7D8.3010803@canonical.com>
- <027a01ce4fcc$5e7c7320$1b755960$%dae@samsung.com>
- <5190D14A.7050904@canonical.com>
- <028a01ce4fd4$5ec6f000$1c54d000$%dae@samsung.com>
- <CAF6AEGvWazezZdLDn5=H8wNQdQSWV=EmqE1a4wh7QwrT_h6vKQ@mail.gmail.com>
- <CAAQKjZP=iOmHRpHZCbZD3v_RKUFSn0eM_WVZZvhe7F9g3eTmPA@mail.gmail.com>
- <CAF6AEGuDih-NR-VZCmQfqbvCOxjxreZRPGfhCyL12FQ1Qd616Q@mail.gmail.com>
- <006a01ce504e$0de3b0e0$29ab12a0$%dae@samsung.com>
- <CAF6AEGv2FiKMUpb5s4zHPdj4uVxnQWdVJWL-i1mOOZRxBvMZ4Q@mail.gmail.com>
- <00cf01ce512b$bacc5540$3064ffc0$%dae@samsung.com>
-Message-ID: <CAF6AEGuBexKUpTwm9cjGjkxCTKgEaDhAakeP0RN=rtLS6Qy=Mg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 15 May 2013 15:06:07 +0100
+Subject: [PATCH 3/4] ARM: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE and
+ use ALT_SMP instead
+In-Reply-To: <51939386.7010709@free-electrons.com>
+References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
+ <1364235581-17900-4-git-send-email-will.deacon@arm.com>
+ <51938B3D.2070508@free-electrons.com>
+ <20130515134117.GH23869@mudshark.cambridge.arm.com>
+ <51939386.7010709@free-electrons.com>
+Message-ID: <20130515140607.GI23869@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 1:19 AM, Inki Dae <inki.dae@samsung.com> wrote:
->
->
->> -----Original Message-----
->> From: Rob Clark [mailto:robdclark at gmail.com]
->> Sent: Tuesday, May 14, 2013 10:39 PM
->> To: Inki Dae
->> Cc: linux-fbdev; DRI mailing list; Kyungmin Park; myungjoo.ham; YoungJun
->> Cho; linux-arm-kernel at lists.infradead.org; linux-media at vger.kernel.org
->> Subject: Re: Introduce a new helper framework for buffer synchronization
->>
->> On Mon, May 13, 2013 at 10:52 PM, Inki Dae <inki.dae@samsung.com> wrote:
->> >> well, for cache management, I think it is a better idea.. I didn't
->> >> really catch that this was the motivation from the initial patch, but
->> >> maybe I read it too quickly.  But cache can be decoupled from
->> >> synchronization, because CPU access is not asynchronous.  For
->> >> userspace/CPU access to buffer, you should:
->> >>
->> >>   1) wait for buffer
->> >>   2) prepare-access
->> >>   3)  ... do whatever cpu access to buffer ...
->> >>   4) finish-access
->> >>   5) submit buffer for new dma-operation
->> >>
->> >
->> >
->> > For data flow from CPU to DMA device,
->> > 1) wait for buffer
->> > 2) prepare-access (dma_buf_begin_cpu_access)
->> > 3) cpu access to buffer
->> >
->> >
->> > For data flow from DMA device to CPU
->> > 1) wait for buffer
->>
->> Right, but CPU access isn't asynchronous (from the point of view of
->> the CPU), so there isn't really any wait step at this point.  And if
->> you do want the CPU to be able to signal a fence from userspace for
->> some reason, you probably what something file/fd based so the
->> refcnting/cleanup when process dies doesn't leave some pending DMA
->> action wedged.  But I don't really see the point of that complexity
->> when the CPU access isn't asynchronous in the first place.
->>
->
-> There was my missing comments, please see the below sequence.
->
-> For data flow from CPU to DMA device and then from DMA device to CPU,
-> 1) wait for buffer <-@user side - ioctl(fd, DMA_BUF_GET_FENCE, ...)
->         - including prepare-access (dma_buf_begin_cpu_access)
-> 2) cpu access to buffer
-> 3) wait for buffer <-@device driver
->         - but CPU is already accessing the buffer so blocked.
-> 4) signal <-@user side - ioctl(fd, DMA_BUF_PUT_FENCE, ...)
-> 5) the thread, blocked at 3), is waked up by 4).
->         - and then finish-access (dma_buf_end_cpu_access)
+On Wed, May 15, 2013 at 02:54:14PM +0100, Gregory CLEMENT wrote:
+> On 05/15/2013 03:41 PM, Will Deacon wrote:
+> > Is this using dmatest.ko, or a different test program?
+> 
+> No they are self-test from the mv_xor driver
 
-right, I understand you can have background threads, etc, in
-userspace.  But there are already plenty of synchronization primitives
-that can be used for cpu->cpu synchronization, either within the same
-process or between multiple processes.  For cpu access, even if it is
-handled by background threads/processes, I think it is better to use
-the traditional pthreads or unix synchronization primitives.  They
-have existed forever, they are well tested, and they work.
+Ok. And the CPU locks up, rather than the DMA master?
 
-So while it seems nice and orthogonal/clean to couple cache and
-synchronization and handle dma->cpu and cpu->cpu and cpu->dma in the
-same generic way, but I think in practice we have to make things more
-complex than they otherwise need to be to do this.  Otherwise I think
-we'll be having problems with badly behaved or crashing userspace.
+> > Ok, so the ALT_UP case should be emitted after patching, correct?
+> 
+> Indeed it was I excepted but I didn't check (I don't know how to do)
 
-BR,
--R
+If you don't have JTAG, that's trickier. Hopefully my other suggestion will
+help.
 
-> 6) dma access to buffer
-> 7) wait for buffer <-@user side - ioctl(fd, DMA_BUF_GET_FENCE, ...)
->         - but DMA is already accessing the buffer so blocked.
-> 8) signal <-@device driver
-> 9) the thread, blocked at 7), is waked up by 8)
->         - and then prepare-access (dma_buf_begin_cpu_access)
-> 10 cpu access to buffer
->
-> Basically, 'wait for buffer' includes buffer synchronization, committing
-> processing, and cache operation. The buffer synchronization means that a
-> current thread should wait for other threads accessing a shared buffer until
-> the completion of their access. And the committing processing means that a
-> current thread possesses the shared buffer so any trying to access the
-> shared buffer by another thread makes the thread to be blocked. However, as
-> I already mentioned before, it seems that these user interfaces are so ugly
-> yet. So we need better way.
->
-> Give me more comments if there is my missing point :)
->
-> Thanks,
-> Inki Dae
->
->> BR,
->> -R
->>
->>
->> > 2) finish-access (dma_buf_end _cpu_access)
->> > 3) dma access to buffer
->> >
->> > 1) and 2) are coupled with one function: we have implemented
->> > fence_helper_commit_reserve() for it.
->> >
->> > Cache control(cache clean or cache invalidate) is performed properly
->> > checking previous access type and current access type.
->> > And the below is actual codes for it,
->
+> >> I made some investigation. And in UP if I remove the line:
+> >> 	ALT_UP(W(nop))
+> > 
+> > Did you remove the ALT_SMP case as well? You could also try making the
+> > ALT_SMP case use W(nop) too and see if it changes anything.
+> 
+> OK I will try it.
+
+You could also try deleting both of the ALT_* lines and just putting a
+W(nop) in there directly.
+
+> > If you don't have both of the alternatives, things will go wrong.
+> 
+> For my own culture, how ALT_UP and ALT_SMP work in SMP case?
+> When I disassembled the proc-v7.o, I saw that the SMP variant of the code were
+> written. How the kernel switch to the UP version of the code?
+
+Early in boot (head.S:__fixup_smp), we detect whether the CPU has the MP
+extensions then, if we're actually UP but the kernel has CONFIG_SMP=y, we
+walk over the .alt.smp.init section looking at each entry in there. The
+ALT_UP macro spits out an (address, instruction) pair, so in
+__do_fixup_smp_on_up, we store the instruction to the address for each pair,
+replacing the SMP instruction which sat there in the compiled image.
+
+It could be that the CPUID checks are failing on your Marvell part. Can you
+tell me what you have in your mpidr (mrc p15, 0, Rd, c0, c0, 5) and also
+your midr (mrc p15, 0, Rd, c0, c0) please?
+
+Cheers,
+
+Will
