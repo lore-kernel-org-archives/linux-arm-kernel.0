@@ -1,50 +1,50 @@
-From: sachin.kamat@linaro.org (Sachin Kamat)
-Date: Wed, 15 May 2013 21:42:53 +0530
-Subject: [PATCH] rtc: max8998: Check for pdata presence before
- dereferencing
-In-Reply-To: <1368630968-30460-1-git-send-email-t.figa@samsung.com>
-References: <1368630968-30460-1-git-send-email-t.figa@samsung.com>
-Message-ID: <CAK9yfHxf6EMFWz0Xg4VzrDLVzKB6WO+PYjtW12Gc+=qHs817Ng@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 May 2013 18:17:21 +0200
+Subject: [GIT PULL] ux500 fixes for v3.10-rc1+
+Message-ID: <CACRpkdY2Pd9o+PMmabKs5Zj56GRsGtva8eQENgu8w-VjZy2hHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CCing Andrew Morton.
+Hi ARM SoC folks,
 
-On 15 May 2013 20:46, Tomasz Figa <t.figa@samsung.com> wrote:
-> Currently the driver can crash with a NULL pointer dereference if no pdata
-> is provided, despite of successful registration of MFD part. This patch
-> fixes the problem by adding a NULL check before dereferencing the pdata
-> pointer.
->
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/rtc/rtc-max8998.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/rtc/rtc-max8998.c b/drivers/rtc/rtc-max8998.c
-> index 48b6612..d5af7ba 100644
-> --- a/drivers/rtc/rtc-max8998.c
-> +++ b/drivers/rtc/rtc-max8998.c
-> @@ -285,7 +285,7 @@ static int max8998_rtc_probe(struct platform_device *pdev)
->                         info->irq, ret);
->
->         dev_info(&pdev->dev, "RTC CHIP NAME: %s\n", pdev->id_entry->name);
-> -       if (pdata->rtc_delay) {
-> +       if (pdata && pdata->rtc_delay) {
->                 info->lp3974_bug_workaround = true;
->                 dev_warn(&pdev->dev, "LP3974 with RTC REGERR option."
->                                 " RTC updates will be extremely slow.\n");
-> --
-> 1.8.2.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+please pull the following ux500 fixes for the v3.10-rc series.
+Brief info in the signed tag.
 
+Yours,
+Linus Walleij
 
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
--- 
-With warm regards,
-Sachin
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-arm-soc-v3.10-fixes
+
+for you to fetch changes up to 74ba4ec7a2036f9dbe5fcc85c7c737222005507f:
+
+  ARM: ux500: select REGULATOR (2013-05-15 15:54:00 +0200)
+
+----------------------------------------------------------------
+Some ux500 fixes for the v3.10-rc series:
+- Fixes up the debug UART
+- Fix dangerous platform data double-assignment
+- Fix auxdata for the ethernet device
+- Select REGULATOR to satisfy Kconfig
+
+----------------------------------------------------------------
+Emilio L??pez (1):
+      ARM: ux500: select REGULATOR
+
+Lee Jones (3):
+      ARM: ux500: Remove duplicated assignment of ab8500_platdata
+      ARM: ux500: Fix incorrect DEBUG UART virtual addresses
+      ARM: ux500: Provide device enumeration number suffix for SMSC911x
+
+ arch/arm/include/debug/ux500.S     | 6 +++---
+ arch/arm/mach-ux500/Kconfig        | 1 +
+ arch/arm/mach-ux500/board-mop500.c | 6 +++---
+ arch/arm/mach-ux500/cpu-db8500.c   | 6 ++----
+ arch/arm/mach-ux500/setup.h        | 2 +-
+ 5 files changed, 10 insertions(+), 11 deletions(-)
