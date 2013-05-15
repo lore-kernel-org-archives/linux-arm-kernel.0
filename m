@@ -1,68 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 May 2013 16:07:54 +0200
-Subject: [RFC PATCHv3 3/6] clk: Add TI-Nspire clock drivers
-In-Reply-To: <1368332581-94691-4-git-send-email-dt.tangr@gmail.com>
-References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
- <1368332581-94691-4-git-send-email-dt.tangr@gmail.com>
-Message-ID: <201305151607.54442.arnd@arndb.de>
+From: jrudholm@gmail.com (Johan Rudholm)
+Date: Wed, 15 May 2013 16:10:09 +0200
+Subject: [PATCH 0/4] mmc: mmci: Add support for UHS cards
+In-Reply-To: <1368610823-14113-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1368610823-14113-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CA+20K0DP1xY1urAsxBFWcaN22AahJ3GVG2dxhACFArfwuZFDZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 12 May 2013, Daniel Tang wrote:
-> 
-> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
-> ---
->  drivers/clk/Makefile     |   1 +
->  drivers/clk/clk-nspire.c | 141 +++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 142 insertions(+)
->  create mode 100644 drivers/clk/clk-nspire.c
+Hi,
 
-You are missing a binding in Documentation/devicetree, same as for some of
-the other drivers in this series.
+2013/5/15 Ulf Hansson <ulf.hansson@stericsson.com>:
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> UHS cards in mode SDR12|25 operates at 1.8V I/O voltage. This patchset
+> adds support to handle the corresponding voltage switch from the default
+> 2.7-3.6 I/O voltage to 1.8V.
+>
+> The first patch, "Fixup regulator handling for vqmmc" has recently been
+> sent as a separate patch, since it is a pure bugfix. Nevertheless this
+> patchset depends on this patch, thus I decided to fold it here as well.
+>
+> Host capabilities for SDR12 and SDR25 needs to be set to enable support,
+> but that will be handled outside this patchset.
+>
+> Ulf Hansson (4):
+>   mmc: mmci: Fixup regulator handling for vqmmc
+>   mmc: mmci: Support signal voltage switch for UHS cards
+>   mmc: mmci: Cache MMCIDATACTRL register
+>   mmc: mmci: Add card_busy function to improve UHS card support
+>
+>  drivers/mmc/host/mmci.c |   94 +++++++++++++++++++++++++++++++++++++++++++----
+>  drivers/mmc/host/mmci.h |    4 ++
+>  2 files changed, 90 insertions(+), 8 deletions(-)
 
-> +static int nspire_clk_read(struct device_node *node,
-> +		struct nspire_clk_info *clk)
-> +{
-> +	u32 val;
-> +	int ret;
-> +	void __iomem *io;
-> +	const char *type = NULL;
-> +
-> +	ret = of_property_read_string(node, "io-type", &type);
-> +	if (ret)
-> +		return ret;
+Looks good! Please add my
 
-Using a string here feels clumsy. Why not use the "compatible" property
-to distinguish the different models?
+Reviewed-by: Johan Rudholm <jrudholm@gmail.com>
 
-> +static void __init nspire_ahbdiv_setup(struct device_node *node)
-> +{
-> +	int ret;
-> +	struct clk *clk;
-> +	const char *clk_name = node->name;
-> +	const char *parent_name;
-> +	struct nspire_clk_info info;
-> +
-> +	ret = nspire_clk_read(node, &info);
-> +	if (WARN_ON(ret))
-> +		return;
-> +
-> +	of_property_read_string(node, "clock-output-names", &clk_name);
+to this patch set.
 
-It seems strange to assign the clk_name variable to node->name
-first and then overriding it with the clock-output-names property.
-Is that intentional? If so, please explain it in a comment.
-
-> +
-> +	pr_info("TI-NSPIRE Base: %uMHz CPU: %uMHz AHB: %uMHz\n",
-> +		info.base_clock / MHZ,
-> +		info.base_clock / info.base_cpu_ratio / MHZ,
-> +		info.base_clock / info.base_ahb_ratio / MHZ);
-> +}
-> +
-> +CLK_OF_DECLARE(nspire_clk, "nspire-clock", nspire_clk_setup);
-> +CLK_OF_DECLARE(nspire_ahbdiv, "nspire-ahb-divider", nspire_ahbdiv_setup);
-
-I would put each of these lines directly under the function it references.
-
-	Arnd
+Kind regards, Johan
