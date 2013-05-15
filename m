@@ -1,37 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 May 2013 19:18:01 +0200
-Subject: [PATCH 20/39] usb: musb: ux500: move channel number knowledge
- into the driver
-In-Reply-To: <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
-References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYjjDp+7hzGtAchyy3+5Vxc8jK5THGCETkAO_V9Hj9Ssw@mail.gmail.com>
+From: jagarwal@nvidia.com (Jay Agarwal)
+Date: Wed, 15 May 2013 22:58:22 +0530
+Subject: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
+In-Reply-To: <518A8596.7070702@wwwdotorg.org>
+References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
+ <1368010660-31465-4-git-send-email-jagarwal@nvidia.com>
+ <518A8596.7070702@wwwdotorg.org>
+Message-ID: <C79B248886DD134989C8FF6B096A91AB91B4886B5D@BGMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> For all ux500 based platforms the maximum number of end-points are used.
-> Move this knowledge into the driver so we can relinquish the burden from
-> platform data. This also removes quite a bit of complexity from the driver
-> and will aid us when we come to enable the driver for Device Tree.
->
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: linux-usb at vger.kernel.org
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-I guess this stuff is dependent on the stuff Fabio has recently sent to
-Felipe for the ux500 musb DMA so these musb patches should
-primarily go through his tree.
-
-It seems like the later changes to the platform code
-(arch/arm/mach-ux500) may be sufficiently orthogonal
-so it can be done out-of-order?
-
-I can't merge any of this without Felipes ACKs in any
-case.
-
-Yours,
-Linus Walleij
+> On 05/08/2013 04:57 AM, Jay Agarwal wrote:
+> > - Enable PCIe controller on Cardhu
+> > - Only port 2 is connected on this board
+> > - Add regulators required for Tegra30
+> > - Patch is based on remotes/gitorious_thierryreding_linux/tegra/next
+> > - and should be applied on top of this.
+> 
+> > diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi
+> > b/arch/arm/boot/dts/tegra30-cardhu.dtsi
+> 
+> > +	pcie-controller {
+> > +		status = "okay";
+> > +		pex-clk-supply = <&pex_hvdd_3v3_reg>;
+> > +		vdd-supply = <&ldo1_reg>;
+> > +		avdd-supply = <&ldo2_reg>;
+> > +
+> > +		pci at 3,0 {
+> > +			status = "okay";
+> > +		};
+> > +	};
+> 
+> So, if I apply this series, I do see the PCIe bridge and Ethernet device get
+> enumerated, but I don't see the USB3 controller get enumerated. I believe
+> that is a PCIe device behind the same bridge on the same Tegra PCIe port.
+> Shouldn't this device show up?
+[>]  I have also reproduced this problem. I see somehow no non-prefetchable memory is assigned to any of pcie devices.
+Probably that is the reason for USB3 (pci 0000:04:00.0) not getting enumerated since it uses only non-prefetchable memory.
