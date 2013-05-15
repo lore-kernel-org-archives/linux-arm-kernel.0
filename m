@@ -1,135 +1,129 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 15 May 2013 15:36:56 +0200
-Subject: [PATCHv4 3/9] arm: kirkwood: add SoC-level Device Tree data for PCIe
- interfaces
-In-Reply-To: <1368625022-25243-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1368625022-25243-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1368625022-25243-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 15 May 2013 15:36:53 +0200
+Subject: [PATCHv4 0/9] Use the mvebu PCIe driver on Kirkwood
+Message-ID: <1368625022-25243-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds Device Tree details to enable the PCIe interfaces on
-Kirkwood. The 6281 has one PCIe interface, the 6282 has two PCIe
-interfaces.
+Hello,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Tested-by: Andrew Lunn <andrew@lunn.ch>
----
- arch/arm/boot/dts/kirkwood-6281.dtsi |   31 ++++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-6282.dtsi |   48 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/kirkwood.dtsi      |    1 +
- 3 files changed, 80 insertions(+)
+Here is a set of patches that migrates adds support for Kirkwood
+platforms to use the mvebu PCIe driver. All the Kirkwood platforms
+that have already been converted to the Device Tree are converted to
+use the new driver, and the DB-88F6281/DB-88F6282 evaluation board
+from Marvell is also converted to the Device Tree and the usage of the
+new PCIe driver.
 
-diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi b/arch/arm/boot/dts/kirkwood-6281.dtsi
-index d6c9d65..5137668 100644
---- a/arch/arm/boot/dts/kirkwood-6281.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
-@@ -40,5 +40,36 @@
- 				marvell,function = "sdio";
- 			};
- 		};
-+
-+		pcie-controller {
-+			compatible = "marvell,kirkwood-pcie";
-+			status = "disabled";
-+			device_type = "pci";
-+
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+
-+			bus-range = <0x00 0xff>;
-+
-+			ranges = <0x82000000 0 0x00040000 0x00040000 0 0x00002000   /* Port 0.0 registers */
-+				  0x82000000 0 0xe0000000 0xe0000000 0 0x08000000   /* non-prefetchable memory */
-+			          0x81000000 0 0          0xe8000000 0 0x00100000>; /* downstream I/O */
-+
-+			pcie at 1,0 {
-+				device_type = "pci";
-+				assigned-addresses = <0x82000800 0 0x00040000 0 0x2000>;
-+				reg = <0x0800 0 0 0 0>;
-+				#address-cells = <3>;
-+				#size-cells = <2>;
-+				#interrupt-cells = <1>;
-+				ranges;
-+				interrupt-map-mask = <0 0 0 0>;
-+				interrupt-map = <0 0 0 0 &intc 9>;
-+				marvell,pcie-port = <0>;
-+				marvell,pcie-lane = <0>;
-+				clocks = <&gate_clk 2>;
-+				status = "disabled";
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
-index 23991e4..66a751a 100644
---- a/arch/arm/boot/dts/kirkwood-6282.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
-@@ -65,5 +65,53 @@
- 			clocks = <&gate_clk 7>;
- 			status = "disabled";
- 		};
-+
-+		pcie-controller {
-+			compatible = "marvell,kirkwood-pcie";
-+			status = "disabled";
-+			device_type = "pci";
-+
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+
-+			bus-range = <0x00 0xff>;
-+
-+			ranges = <0x82000000 0 0x00040000 0x00040000 0 0x00002000   /* Port 0.0 registers */
-+			          0x82000000 0 0x00044000 0x00044000 0 0x00002000   /* Port 1.0 registers */
-+				  0x82000000 0 0xe0000000 0xe0000000 0 0x08000000   /* non-prefetchable memory */
-+			          0x81000000 0 0          0xe8000000 0 0x00100000>; /* downstream I/O */
-+
-+			pcie at 1,0 {
-+				device_type = "pci";
-+				assigned-addresses = <0x82000800 0 0x00040000 0 0x2000>;
-+				reg = <0x0800 0 0 0 0>;
-+				#address-cells = <3>;
-+				#size-cells = <2>;
-+				#interrupt-cells = <1>;
-+				ranges;
-+				interrupt-map-mask = <0 0 0 0>;
-+				interrupt-map = <0 0 0 0 &intc 9>;
-+				marvell,pcie-port = <0>;
-+				marvell,pcie-lane = <0>;
-+				clocks = <&gate_clk 2>;
-+				status = "disabled";
-+			};
-+
-+			pcie at 2,0 {
-+				device_type = "pci";
-+				assigned-addresses = <0x82001000 0 0x00044000 0 0x2000>;
-+				reg = <0x1000 0 0 0 0>;
-+				#address-cells = <3>;
-+				#size-cells = <2>;
-+				#interrupt-cells = <1>;
-+				ranges;
-+				interrupt-map-mask = <0 0 0 0>;
-+				interrupt-map = <0 0 0 0 &intc 10>;
-+				marvell,pcie-port = <1>;
-+				marvell,pcie-lane = <0>;
-+				clocks = <&gate_clk 18>;
-+				status = "disabled";
-+			};
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index fada7e6..7eef88f 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -19,6 +19,7 @@
- 	ocp at f1000000 {
- 		compatible = "simple-bus";
- 		ranges = <0x00000000 0xf1000000 0x4000000
-+		          0xe0000000 0xe0000000 0x8100000 /* PCIE */
- 		          0xf5000000 0xf5000000 0x0000400>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+Only non-DT platforms continue to use the legacy code in
+arch/arm/mach-kirkwood/pcie.c.
+
+This branch depends on the mvebu-pcie driver. I have pushed this
+branch to the following Git repository for easier testing:
+
+  https://github.com/MISL-EBU-System-SW/mainline-public/tree/kirkwood-pcie-dt-v4
+
+# /usr/sbin/lspci
+00:01.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+00:02.0 PCI bridge: Marvell Technology Group Ltd. Device 7846
+01:00.0 SCSI storage controller: Marvell Technology Group Ltd. 88SX7042 PCI-e 4-port SATA-II (rev 02)
+02:00.0 Ethernet controller: Intel Corporation 82572EI Gigabit Ethernet Controller (Copper) (rev 06)
+
+I've tested both the e1000e NIC card and the SATA 4 ports card and
+they work fine.
+
+Changes between v3 and v4:
+
+ * Rebase on top of 3.10-rc1.
+
+ * Change the name of the file and Kconfig options related to the
+   DB-88F6281/DB-88F6282 board to use DB-88F628x, since it handles in
+   fact two different boards using two slightly different SoCs.
+
+Changes between v2 and v3:
+
+ * Integrate a replacement patch from Andrew Lunn for the QNAP changes
+   after he tested on his platforms.
+
+ * Add Andrew Lunn Tested-by tags on the appropriate patches.
+
+Changes between v1 and v2:
+
+ * Remove the 'needs_pcie_win' logic, and instead move the static
+   initialization of PCIe windows into the legacy PCIe code, for the
+   platforms that will still be using it. Platforms that will use the
+   new PCIe driver benefit directly from dynamic allocation of PCIe
+   windows.
+
+ * Move the PCIe interface definitions from kirkwood.dtsi to
+   kirkwood-6281.dtsi and kirkwood-6282.dtsi to take into account the
+   fact that the 6281 has one PCIe interface, and the 6282 has two of
+   them.
+
+ * Convert all DT-platforms that were initializing PCIe using the
+   legacy driver to use the DT to initialize the PCIe interface. This
+   includes the Iomega Iconnect, the MPL CEC4, the ZyXEL NSA310and the
+   QNAP TS219.
+
+ * Fix the conversion to the Device Tree of the DB-88F6181/6282
+   board. We now have two Device Trees, one for the 6281 variant of
+   the board (one PCIe interface) and another for the 6282 variant of
+   the board (two PCIe interfaces).
+
+ * Update the defconfig with PCIe driver enabled and some board
+   updates.
+
+Best regards,
+
+Thomas
+
+Thomas Petazzoni (9):
+  pci: mvebu: enable driver usage on Kirkwood
+  arm: kirkwood: move PCIe window init to legacy driver
+  arm: kirkwood: add SoC-level Device Tree data for PCIe interfaces
+  arm: kirkwood: convert Iomega Iconnect to use DT for the PCIe
+    interface
+  arm: kirkwood: convert MPL CEC4 to use DT for the PCIe interface
+  arm: kirkwood: convert ZyXEL NSA310 to use DT for the PCIe interface
+  arm: kirkwood: convert QNAP TS219 to use DT for the PCIe interface
+  arm: kirkwood: convert db-88f6281/db-88f6282 to the Device Tree
+  arm: kirkwood: update defconfig with PCIe driver and board updates
+
+ .../devicetree/bindings/pci/mvebu-pci.txt          |    1 +
+ arch/arm/boot/dts/Makefile                         |    2 +
+ arch/arm/boot/dts/kirkwood-6281.dtsi               |   31 ++++++
+ arch/arm/boot/dts/kirkwood-6282.dtsi               |   48 +++++++++
+ arch/arm/boot/dts/kirkwood-db-88f6281.dts          |   30 ++++++
+ arch/arm/boot/dts/kirkwood-db-88f6282.dts          |   34 ++++++
+ arch/arm/boot/dts/kirkwood-db.dtsi                 |   89 ++++++++++++++++
+ arch/arm/boot/dts/kirkwood-iconnect.dts            |    8 ++
+ arch/arm/boot/dts/kirkwood-mplcec4.dts             |    8 ++
+ arch/arm/boot/dts/kirkwood-nsa310.dts              |    8 ++
+ arch/arm/boot/dts/kirkwood-ts219-6281.dts          |    3 +-
+ arch/arm/boot/dts/kirkwood-ts219-6282.dts          |    3 +-
+ arch/arm/boot/dts/kirkwood-ts219.dtsi              |    9 +-
+ arch/arm/boot/dts/kirkwood.dtsi                    |    1 +
+ arch/arm/configs/kirkwood_defconfig                |    2 +
+ arch/arm/mach-kirkwood/Kconfig                     |   21 ++--
+ arch/arm/mach-kirkwood/Makefile                    |    3 +-
+ arch/arm/mach-kirkwood/board-db88f628x-bp.c        |   24 +++++
+ arch/arm/mach-kirkwood/board-dt.c                  |    6 ++
+ arch/arm/mach-kirkwood/board-iconnect.c            |    8 --
+ arch/arm/mach-kirkwood/board-mplcec4.c             |    1 -
+ arch/arm/mach-kirkwood/board-nsa310.c              |   25 -----
+ arch/arm/mach-kirkwood/board-ts219.c               |   10 --
+ arch/arm/mach-kirkwood/common.c                    |   24 -----
+ arch/arm/mach-kirkwood/common.h                    |    6 ++
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c        |  108 --------------------
+ arch/arm/mach-kirkwood/pcie.c                      |   22 ++++
+ drivers/pci/host/Kconfig                           |    2 +-
+ drivers/pci/host/pci-mvebu.c                       |    1 +
+ 29 files changed, 341 insertions(+), 197 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-db-88f6281.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-db-88f6282.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-db.dtsi
+ create mode 100644 arch/arm/mach-kirkwood/board-db88f628x-bp.c
+ delete mode 100644 arch/arm/mach-kirkwood/board-nsa310.c
+ delete mode 100644 arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+
 -- 
 1.7.9.5
