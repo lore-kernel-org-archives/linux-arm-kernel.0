@@ -1,72 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 May 2013 14:41:17 +0100
-Subject: [PATCH 3/4] ARM: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE and
- use ALT_SMP instead
-In-Reply-To: <51938B3D.2070508@free-electrons.com>
-References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
- <1364235581-17900-4-git-send-email-will.deacon@arm.com>
- <51938B3D.2070508@free-electrons.com>
-Message-ID: <20130515134117.GH23869@mudshark.cambridge.arm.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Wed, 15 May 2013 14:41:00 +0100
+Subject: [PATCH v3 1/4] clk: abstract parent cache
+In-Reply-To: <1368625263-23136-1-git-send-email-james.hogan@imgtec.com>
+References: <1368625263-23136-1-git-send-email-james.hogan@imgtec.com>
+Message-ID: <1368625263-23136-2-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 02:18:53PM +0100, Gregory CLEMENT wrote:
-> Hi Will,
+Abstract access to the clock parent cache by defining
+clk_get_parent_by_index(clk, index). This allows access to parent
+clocks from clock drivers.
 
-Hi Gregory,
+Signed-off-by: James Hogan <james.hogan@imgtec.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+Changes in v3:
 
-> On 03/25/2013 07:19 PM, Will Deacon wrote:
-> > Many ARMv7 cores have hardware page table walkers that can read the L1
-> > cache. This is discoverable from the ID_MMFR3 register, although this
-> > can be expensive to access from the low-level set_pte functions and is a
-> > pain to cache, particularly with multi-cluster systems.
-> > 
-> > A useful observation is that the multi-processing extensions for ARMv7
-> > require coherent table walks, meaning that we can make use of ALT_SMP
-> > patching in proc-v7-* to patch away the cache flush safely for these
-> > cores.
-> 
-> I encountered a regression with 3.10-rc1 on the Armada 370 based boards.
-> With the 3.10-rc1 they hang during auto testy of the xor engine which are
-> mainly DMA transfers. If I revert this patch, it no more hang. I found this
-> by using bisect, it was not obvious at all for me that this patch may have
-> cause this regression.
+* remove double underscore prefix from clk_get_parent_by_index()
 
-Is this using dmatest.ko, or a different test program?
+ drivers/clk/clk.c            | 21 ++++++++++++++-------
+ include/linux/clk-provider.h |  1 +
+ 2 files changed, 15 insertions(+), 7 deletions(-)
 
-> The issue appear in SMP and in UP. However I think that  the PJ4B-v7 used in
->  the Armada 370 are not MP capable.
-
-Ok, so the ALT_UP case should be emitted after patching, correct?
-
-> I made some investigation. And in UP if I remove the line:
-> 	ALT_UP(W(nop))
-
-Did you remove the ALT_SMP case as well? You could also try making the
-ALT_SMP case use W(nop) too and see if it changes anything.
-
-> at the begining of the cpu_v7_dcache_clean_are macro located in
-> arch/arm/mm/proc-v7.S
-> 
-> Then the kernel boot again. It is not surprising because in this case
-> we found the same generated code that before this patch was applied.
-> 
-> now I don't really understand why a W(nop) will cause this issue.
-
-No, that sounds weird. Can you inspect the functions using JTAG after the smp
-patching code has executed?
-
-> In SMP mode even with this line removed the kernel hang, but in this case
-> I am not sure of what happen exactly and how the .alt.smp.init section is
-> used.
-
-If you don't have both of the alternatives, things will go wrong.
-
-> I hope you will find some explanation and solution to this bug, because currently
-> the only solution I have is to revert this patch.
-
-Let's not jump to that just yet!
-
-Cheers,
-
-Will
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 934cfd1..9bf4167 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -559,6 +559,19 @@ struct clk *__clk_get_parent(struct clk *clk)
+ 	return !clk ? NULL : clk->parent;
+ }
+ 
++struct clk *clk_get_parent_by_index(struct clk *clk, u8 index)
++{
++	if (!clk || index >= clk->num_parents)
++		return NULL;
++	else if (!clk->parents)
++		return __clk_lookup(clk->parent_names[index]);
++	else if (!clk->parents[index])
++		return clk->parents[index] =
++			__clk_lookup(clk->parent_names[index]);
++	else
++		return clk->parents[index];
++}
++
+ unsigned int __clk_get_enable_count(struct clk *clk)
+ {
+ 	return !clk ? 0 : clk->enable_count;
+@@ -1315,13 +1328,7 @@ static struct clk *__clk_init_parent(struct clk *clk)
+ 			kzalloc((sizeof(struct clk*) * clk->num_parents),
+ 					GFP_KERNEL);
+ 
+-	if (!clk->parents)
+-		ret = __clk_lookup(clk->parent_names[index]);
+-	else if (!clk->parents[index])
+-		ret = clk->parents[index] =
+-			__clk_lookup(clk->parent_names[index]);
+-	else
+-		ret = clk->parents[index];
++	ret = clk_get_parent_by_index(clk, index);
+ 
+ out:
+ 	return ret;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 1186098..76b1667 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -403,6 +403,7 @@ const char *__clk_get_name(struct clk *clk);
+ struct clk_hw *__clk_get_hw(struct clk *clk);
+ u8 __clk_get_num_parents(struct clk *clk);
+ struct clk *__clk_get_parent(struct clk *clk);
++struct clk *clk_get_parent_by_index(struct clk *clk, u8 index);
+ unsigned int __clk_get_enable_count(struct clk *clk);
+ unsigned int __clk_get_prepare_count(struct clk *clk);
+ unsigned long __clk_get_rate(struct clk *clk);
+-- 
+1.8.1.2
