@@ -1,71 +1,85 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Wed, 15 May 2013 11:40:19 +0200
-Subject: [PATCH 1/4] mmc: mmci: Fixup regulator handling for vqmmc
+Date: Wed, 15 May 2013 11:40:21 +0200
+Subject: [PATCH 3/4] mmc: mmci: Cache MMCIDATACTRL register
 In-Reply-To: <1368610823-14113-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1368610823-14113-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1368610823-14113-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1368610823-14113-4-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulf Hansson <ulf.hansson@linaro.org>
 
-We can not rely on regulator_is_enabled to decide whether to
-enable|disable the regulator. It would mean that the reference
-counter for it is not balanced properly.
-
-Instead keep track of our internal state by using a new flag in
-the host struct, so we can take correct decisions.
+Add a cache variable in the host struct that reflects the current data in
+the MMCIDATACTRL register. This patch will not introduce any functional
+change but instead provide an easy option to keep specific bits in the
+register between each data transfer.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/mmc/host/mmci.c |   10 ++++++----
+ drivers/mmc/host/mmci.c |   17 ++++++++++++++---
  drivers/mmc/host/mmci.h |    1 +
- 2 files changed, 7 insertions(+), 4 deletions(-)
+ 2 files changed, 15 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index f4f3038..2983c15 100644
+index 8d4ceb8..4530217 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -1143,9 +1143,10 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		if (!IS_ERR(mmc->supply.vmmc))
- 			mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+@@ -191,6 +191,17 @@ static void mmci_write_pwrreg(struct mmci_host *host, u32 pwr)
+ /*
+  * This must be called with host->lock held
+  */
++static void mmci_write_datactrlreg(struct mmci_host *host, u32 datactrl)
++{
++	if (host->datactrl_reg != datactrl) {
++		host->datactrl_reg = datactrl;
++		writel(datactrl, host->base + MMCIDATACTRL);
++	}
++}
++
++/*
++ * This must be called with host->lock held
++ */
+ static void mmci_set_clkreg(struct mmci_host *host, unsigned int desired)
+ {
+ 	struct variant_data *variant = host->variant;
+@@ -275,7 +286,7 @@ static void mmci_set_mask1(struct mmci_host *host, unsigned int mask)
  
--		if (!IS_ERR(mmc->supply.vqmmc) &&
--		    regulator_is_enabled(mmc->supply.vqmmc))
-+		if (!IS_ERR(mmc->supply.vqmmc) && host->vqmmc_enabled) {
- 			regulator_disable(mmc->supply.vqmmc);
-+			host->vqmmc_enabled = false;
-+		}
+ static void mmci_stop_data(struct mmci_host *host)
+ {
+-	writel(0, host->base + MMCIDATACTRL);
++	mmci_write_datactrlreg(host, 0);
+ 	mmci_set_mask1(host, 0);
+ 	host->data = NULL;
+ }
+@@ -552,7 +563,7 @@ static int mmci_dma_start_data(struct mmci_host *host, unsigned int datactrl)
+ 	datactrl |= MCI_DPSM_DMAENABLE;
  
- 		break;
- 	case MMC_POWER_UP:
-@@ -1161,12 +1162,13 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	/* Trigger the DMA transfer */
+-	writel(datactrl, host->base + MMCIDATACTRL);
++	mmci_write_datactrlreg(host, datactrl);
  
- 		break;
- 	case MMC_POWER_ON:
--		if (!IS_ERR(mmc->supply.vqmmc) &&
--		    !regulator_is_enabled(mmc->supply.vqmmc)) {
-+		if (!IS_ERR(mmc->supply.vqmmc) && !host->vqmmc_enabled) {
- 			ret = regulator_enable(mmc->supply.vqmmc);
- 			if (ret < 0)
- 				dev_err(mmc_dev(mmc),
- 					"failed to enable vqmmc regulator\n");
-+			else
-+				host->vqmmc_enabled = true;
- 		}
+ 	/*
+ 	 * Let the MMCI say when the data is ended and it's time
+@@ -750,7 +761,7 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
+ 		irqmask = MCI_TXFIFOHALFEMPTYMASK;
+ 	}
  
- 		pwr |= MCI_PWR_ON;
+-	writel(datactrl, base + MMCIDATACTRL);
++	mmci_write_datactrlreg(host, datactrl);
+ 	writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
+ 	mmci_set_mask1(host, irqmask);
+ }
 diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 1f33ad5..1383c9c 100644
+index 1383c9c..0b6cc54 100644
 --- a/drivers/mmc/host/mmci.h
 +++ b/drivers/mmc/host/mmci.h
 @@ -183,6 +183,7 @@ struct mmci_host {
  	unsigned int		cclk;
  	u32			pwr_reg;
  	u32			clk_reg;
-+	bool			vqmmc_enabled;
++	u32			datactrl_reg;
+ 	bool			vqmmc_enabled;
  	struct mmci_platform_data *plat;
  	struct variant_data	*variant;
- 
 -- 
 1.7.10
