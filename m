@@ -1,43 +1,95 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 May 2013 16:23:58 +0100
-Subject: [PATCHv2 2/5] ARM: KVM: arch_timers: zero CNTVOFF upon return to host
+Date: Wed, 15 May 2013 16:24:00 +0100
+Subject: [PATCHv2 4/5] arm: fix up ARM_ARCH_TIMER selects
 In-Reply-To: <1368631441-28434-1-git-send-email-mark.rutland@arm.com>
 References: <1368631441-28434-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1368631441-28434-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1368631441-28434-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To use the virtual counters from the host, we need to ensure that
-CNTVOFF doesn't change unexpectedly. When we change to a guest, we
-replace the host's CNTVOFF, but we don't restore it when returning to
-the host.
+In 8a4da6e: "arm: arch_timer: move core to drivers/clocksource", the
+selection of ARM_ARCH_TIMER was indirected via HAVE_ARM_ARCH_TIMER,
+though mach-exynos's selection of ARM_ARCH_TIMER was missed, and since
+then mach-shmobile, mach-tegra, and mach-virt have begun selecting
+ARM_ARCH_TIMER. This can lead to architected timer support erroneously
+appearing to not be selected in menuconfig.
 
-As the host sets CNTVOFF to zero, and never changes it, we can simply
-zero CNTVOFF when returning to the host. This patch adds said zeroing to
-the return to host path.
+This patch fixes up the Kconfigs for those platforms to select
+HAVE_ARM_ARCH_TIMER.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Acked-by: Christoffer Dall <cdall@cs.columbia.edu>
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Simon Horman <horms@verge.net.au>
 ---
- arch/arm/kvm/interrupts_head.S | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-exynos/Kconfig   | 2 +-
+ arch/arm/mach-shmobile/Kconfig | 4 ++--
+ arch/arm/mach-tegra/Kconfig    | 2 +-
+ arch/arm/mach-virt/Kconfig     | 2 +-
+ 4 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
-index 3c8f2f0..d43cfb5 100644
---- a/arch/arm/kvm/interrupts_head.S
-+++ b/arch/arm/kvm/interrupts_head.S
-@@ -497,6 +497,10 @@ vcpu	.req	r0		@ vcpu pointer always in r0
- 	add	r5, vcpu, r4
- 	strd	r2, r3, [r5]
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index d19edff..3c3f36a 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -76,7 +76,7 @@ config SOC_EXYNOS5440
+ 	default y
+ 	depends on ARCH_EXYNOS5
+ 	select ARCH_HAS_OPP
+-	select ARM_ARCH_TIMER
++	select HAVE_ARM_ARCH_TIMER
+ 	select AUTO_ZRELADDR
+ 	select PINCTRL
+ 	select PINCTRL_EXYNOS5440
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 1a517e2..767a6c3 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -23,7 +23,7 @@ config ARCH_R8A73A4
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_GIC
+ 	select CPU_V7
+-	select ARM_ARCH_TIMER
++	select HAVE_ARM_ARCH_TIMER
+ 	select SH_CLK_CPG
+ 	select RENESAS_IRQC
  
-+	@ Ensure host CNTVCT == CNTPCT
-+	mov	r2, #0
-+	mcrr	p15, 4, r2, r2, c14	@ CNTVOFF
-+
- 1:
- #endif
- 	@ Allow physical timer/counter access for the host
+@@ -56,7 +56,7 @@ config ARCH_R8A7790
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_GIC
+ 	select CPU_V7
+-	select ARM_ARCH_TIMER
++	select HAVE_ARM_ARCH_TIMER
+ 	select SH_CLK_CPG
+ 	select RENESAS_IRQC
+ 
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 84d72fc..65c5ae6 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -60,7 +60,7 @@ config ARCH_TEGRA_3x_SOC
+ 
+ config ARCH_TEGRA_114_SOC
+ 	bool "Enable support for Tegra114 family"
+-	select ARM_ARCH_TIMER
++	select HAVE_ARM_ARCH_TIMER
+ 	select ARM_GIC
+ 	select ARM_L1_CACHE_SHIFT_6
+ 	select CPU_FREQ_TABLE if CPU_FREQ
+diff --git a/arch/arm/mach-virt/Kconfig b/arch/arm/mach-virt/Kconfig
+index 8958f0d..081d469 100644
+--- a/arch/arm/mach-virt/Kconfig
++++ b/arch/arm/mach-virt/Kconfig
+@@ -2,7 +2,7 @@ config ARCH_VIRT
+ 	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_GIC
+-	select ARM_ARCH_TIMER
++	select HAVE_ARM_ARCH_TIMER
+ 	select ARM_PSCI
+ 	select HAVE_SMP
+ 	select CPU_V7
 -- 
 1.8.1.1
