@@ -1,29 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 May 2013 00:40:54 +0200
-Subject: [PATCH 0/4] ARM: Remove boilerplate debug_ll_io_init code
-In-Reply-To: <1368440169-29088-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1368440169-29088-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <201305160040.54399.arnd@arndb.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 15 May 2013 16:43:48 -0600
+Subject: [PATCH 1/6] ARM: tegra: add an assembly marco to check Tegra
+ SoC ID
+In-Reply-To: <1368613644-11863-2-git-send-email-josephl@nvidia.com>
+References: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
+ <1368613644-11863-2-git-send-email-josephl@nvidia.com>
+Message-ID: <51940FA4.6050609@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 May 2013, Maxime Ripard wrote:
-> The recent introduction of debug_ll_io_init made possible to not rely
-> anymore on a custom map_io function but on debug_ll_io_init for the
-> early mapping and then on the various drivers to do the needed mappings for
-> the kernel to boot.
-> 
-> Some architectures begin to use only this function as the map_io callback in
-> the machine description.
-> 
-> In order to remove some boilerplate code, make the ARM mm code call
-> debug_ll_io_init by itself when no .map_io callback is defined.
-> 
-> This has been tested on the sunxi platform.
+On 05/15/2013 04:27 AM, Joseph Lo wrote:
+> There are some Tegra SoC ID checking code around the low level assembly
+> code. Adding a marco to replace them. For the single image to support all
+> the Tegra series, we may also need the marco in other common code. So we
+> make it become a marco for the usage.
 
-Great stuff!
+I'm not sure this patch doesn't obfuscate the code too much. The big
+issue I see is:
 
-I didn't notice the addition of debug_ll_io_init, so this is a nice surprise
-for me.
+> @@ -115,13 +112,9 @@ ENTRY(__tegra_cpu_reset_handler)
+>  
+>  	cpsid	aif, 0x13			@ SVC mode, interrupts disabled
+>  
+> -	mov32	r6, TEGRA_APB_MISC_BASE
+> -	ldr	r6, [r6, #APB_MISC_GP_HIDREV]
+> -	and	r6, r6, #0xff00
+> -#ifdef CONFIG_ARCH_TEGRA_2x_SOC
+> -t20_check:
+> -	cmp	r6, #(0x20 << 8)
+> +	tegra_check_soc_id TEGRA20, TEGRA_APB_MISC_BASE, r6, r5
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Here, we replace all the code with the new macro, ...
+
+>  #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+>  	/* Are we on Tegra20? */
+> -	cmp	r6, #(0x20 << 8)
+> +	cmp	r6, #(TEGRA20 << 8)
+
+But here we still have to write out the cmp instructions.
+
+It may be reasonable to create a macro to read/mask/shift the SoC ID,
+similar to the existing cpu_id macro, i.e. roughly:
+
+/* Macro to check Tegra revision */
++#define APB_MISC_GP_HIDREV	0x804
++.macro tegra_soc_id base, tmp1, tmp2
++	mov32	\tmp2, \base
++	ldr	\tmp1, [\tmp2, #APB_MISC_GP_HIDREV]
++	and	\tmp1, \tmp1, #0xff00
++.endm
+
+Also, I wonder:
+
+(a) why the need to pass TEGRA_APB_MISC_BASE into the macro; can't the
+macro just hard-code that value since it's always the same?
+
+(b) Why need two registers passed to the macro. At least one of the code
+segments you've replaced with the macro uses a single register instead:
+
+-	mov32	r6, TEGRA_APB_MISC_BASE
+-	ldr	r6, [r6, #APB_MISC_GP_HIDREV]
+-	and	r6, r6, #0xff00
+
+Wouldn't that be a better implementation of the macro? I don't think
+relying on \tmp2 containing "base" after the macro invocation would be a
+good idea, since that's rather like looking inside the black box.
