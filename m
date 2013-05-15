@@ -1,292 +1,283 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Wed, 15 May 2013 15:58:04 +0200
-Subject: [PATCH 3/5] ARM: socfpga: Add support to gate peripheral clocks
-In-Reply-To: <1368571955-6652-3-git-send-email-dinguyen@altera.com>
-References: <1368571955-6652-1-git-send-email-dinguyen@altera.com>
- <1368571955-6652-3-git-send-email-dinguyen@altera.com>
-Message-ID: <20130515135804.GE9066@amd.pavel.ucw.cz>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 15 May 2013 16:03:10 +0200 (CEST)
+Subject: [PATCH v3 01/20] sh-pfc: Add DT support
+In-Reply-To: <1368577100-3530-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1368577100-3530-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1368577100-3530-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <Pine.LNX.4.64.1305151417300.10596@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Laurent
 
-> Add support to gate the clocks that directly feed peripherals. For clocks
-> with multiple parents, add the ability to determine the correct parent,
-> and also set parents. Also add support to calculate and set the clocks'
-> rate.
+Thanks for your work on this! Sorry for jumping in so late in the game. 
+Let's do it this way: I don't think my comments are serious enough to 
+enforce a v4. If noone else complains, I'm fine with addressing them in an 
+incremental patch. If you get more comments and have to do a v4, you can 
+address mine too, otherwise I'm fine with this version going in and 
+improving it slightly afterwards.
+
+On Wed, 15 May 2013, Laurent Pinchart wrote:
+
+> Support device instantiation through the device tree. The compatible
+> property is used to select the SoC pinmux information.
 > 
-> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> CC: Mike Turquette <mturquette@linaro.org>
-> CC: Arnd Bergmann <arnd@arndb.de>
-> CC: Olof Johansson <olof@lixom.net>
-> CC: Pavel Machek <pavel@denx.de>
-> CC: <linux@arm.linux.org.uk>
+> Set the gpio_chip device field to the PFC device to enable automatic
+> GPIO OF support.
+> 
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>  .../bindings/pinctrl/renesas,pfc-pinctrl.txt       | 143 ++++++++++++
+>  drivers/pinctrl/sh-pfc/core.c                      |  66 +++++-
+>  drivers/pinctrl/sh-pfc/pinctrl.c                   | 244 +++++++++++++++++++++
+>  3 files changed, 451 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt
+> new file mode 100644
+> index 0000000..e7aae39
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt
+> @@ -0,0 +1,143 @@
+> +* Renesas Pin Function Controller (GPIO and Pin Mux/Config)
+> +
+> +The Pin Function Controller (PFC) is a Pin Mux/Config controller. On SH7372,
+> +SH73A0, R8A73A4 and R8A7740 it also acts as a GPIO controller.
+> +
+> +
+> +Pin Control
+> +-----------
+> +
+> +Required Properties:
+> +
+> +  - compatible: should be one of the following.
+> +    - "renesas,pfc-r8a73a4": for R8A73A4 (R-Mobile APE6) compatible pin-controller.
+> +    - "renesas,pfc-r8a7740": for R8A7740 (R-Mobile A1) compatible pin-controller.
+> +    - "renesas,pfc-r8a7778": for R8A7778 (R-Mobile M1) compatible pin-controller.
+> +    - "renesas,pfc-r8a7779": for R8A7779 (R-Car H1) compatible pin-controller.
+> +    - "renesas,pfc-r8a7790": for R8A7790 (R-Car H2) compatible pin-controller.
+> +    - "renesas,pfc-sh7372": for SH7372 (SH-Mobile AP4) compatible pin-controller.
+> +    - "renesas,pfc-sh73a0": for SH73A0 (SH-Mobile AG5) compatible pin-controller.
+> +
+> +  - reg: Base address and length of each memory resource used by the pin
+> +    controller hardware module.
+> +
+> +The PFC node also acts as a container for pin configuration nodes. Please refer
+> +to pinctrl-bindings.txt in this directory for the definition of the term "pin
+> +configuration node" and for the common pinctrl bindings used by client devices.
+> +
+> +Each pin configuration node represents a desired configuration for a pin, a
+> +pin group, or a list of pins or pin groups. The configuration can include the
+> +function to select on those pin(s) and pin configuration parameters (such as
+> +pull-up and pull-down).
+> +
+> +Pin configuration nodes contain pin configuration properties, either directly
+> +or grouped in child subnodes. Both pin muxing and configuration parameters can
+> +be grouped in that way and referenced as a single pin configuration node by
+> +client devices.
+> +
+> +A configuration node or subnode must reference at least one pin (through the
+> +pins or pin groups properties) and contain at least a function or one
+> +configuration parameter. When the function is present only pin groups can be
+> +used to reference pins.
+> +
+> +All pin configuration nodes and subnodes names are ignored. All of those nodes
+> +are parsed through phandles and processed purely based on their content.
+> +
+> +Pin Configuration Node Properties:
+> +
+> +- renesas,pins : An array of strings, each string containing the name of a pin.
+> +- renesas,groups : An array of strings, each string containing the name of a pin
+> +  group.
+> +
+> +- renesas,function: A string containing the name of the function to mux to the
+> +  pin group(s) specified by the renesas,groups property
+> +
+> +  Valid values for pin, group and function names can be found in the group and
+> +  function arrays of the PFC data file corresponding to the SoC
+> +  (drivers/pinctrl/sh-pfc/pfc-*.c)
+> +
+> +- renesas,pull-up: An integer representing the pull-up strength to be applied
+> +  to all pins specified by the renesas,pins and renesas-groups properties.
+> +  0 disables the pull-up, 1 enables it. Other values should not be used.
+> +- renesas,pull-down: An integer representing the pull-down strength to be
+> +  applied to all pins specified by the renesas,pins and renesas-groups
+> +  properties. 0 disables the pull-down, 1 enables it. Other values should not
+> +  be used.
+> +
+> +
+> +GPIO
+> +----
+> +
+> +Required Properties:
+> +
+> +  - gpio-controller: Marks the device node as a gpio controller.
+> +
+> +  - #gpio-cells: Should be 2. The first cell is the pin number and the second
+> +    cell is used to specify optional parameters as bit flags. Only the GPIO
+> +    active low flag (bit 0) is currently supported.
+> +
+> +The syntax of the gpio specifier used by client nodes should be the following
+> +with values derived from the SoC user manual.
+> +
+> +  <[phandle of the gpio controller node]
+> +   [pin number within the gpio controller]
+> +   [flags and pull up/down]>
 
-> @@ -132,8 +147,9 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
+How should pull up / down be specified? Above you say only "active low" is 
+supported so far.
+
+Actually, I'm a bit confused by how pinctrl and GPIO DT nodes should be 
+implemented:
+
+> +
+> +
+> +Examples
+> +--------
+> +
+> +Example 1: SH73A0 (SH-Mobile AG5) pin controller node
+> +
+> +	pfc: pfc at e6050000 {
+> +		compatible = "renesas,pfc-sh73a0";
+> +		reg = <0xe6050000 0x8000>,
+> +		      <0xe605801c 0x1c>;
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +	};
+
+In this example you add one node, that implements both - a pinctrl and a 
+GPIO controller. However, on some platforms you add two DT nodes: one for 
+pinctrl and one for GPIO. While doing that your GPIO node has a compatible 
+string like
+
+		compatible = "renesas,gpio-r8a7778", "renesas,gpio-rcar";
+
+Do I understand it right, that a separate DT node is used for a GPIO 
+controller if the controllers are really well separated on the hardware, 
+probably, don't share register address ranges? Is there a driver in the 
+kernel, that actually probes those compatible strings? Or the driver for 
+those GPIO controllers isn't DT based? Maybe at least a short explanation 
+and an example with two DT nodes here, or a reference to another 
+documentation would help.
+
+[snip]
+
+> diff --git a/drivers/pinctrl/sh-pfc/core.c b/drivers/pinctrl/sh-pfc/core.c
+> index 3b2fd43..5fa1c6b 100644
+> --- a/drivers/pinctrl/sh-pfc/core.c
+> +++ b/drivers/pinctrl/sh-pfc/core.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/ioport.h>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+> +#include <linux/of_device.h>
+>  #include <linux/pinctrl/machine.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/slab.h>
+> @@ -348,14 +349,74 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
+>  	return 0;
+>  }
 >  
->  	socfpga_clk->hw.hw.init = &init;
+> +#ifdef CONFIG_OF
+
+Not sure, is it really a good idea to use this #ifdef here? I think you 
+could drop all 3 of them in this hunk:
+
+[snip]
+
+>  static int sh_pfc_probe(struct platform_device *pdev)
+>  {
+> +	const struct platform_device_id *platid = platform_get_device_id(pdev);
+> +#ifdef CONFIG_OF
+
+also here
+
+> +	struct device_node *np = pdev->dev.of_node;
+> +#endif
+>  	const struct sh_pfc_soc_info *info;
+>  	struct sh_pfc *pfc;
+>  	int ret;
 >  
-> -	if (strcmp(clk_name, "main_pll") || strcmp(clk_name, "periph_pll") ||
-> -			strcmp(clk_name, "sdram_pll")) {
-> +	if (strcmp(clk_name, "main_pll") == 0 ||
-> +			strcmp(clk_name, "periph_pll") == 0 ||
-> +			strcmp(clk_name, "sdram_pll") == 0) {
->  		socfpga_clk->hw.bit_idx = SOCFPGA_PLL_EXT_ENA;
->  		clk_pll_ops.enable = clk_gate_ops.enable;
->  		clk_pll_ops.disable = clk_gate_ops.disable;
+> -	info = pdev->id_entry->driver_data
+> -	      ? (void *)pdev->id_entry->driver_data : pdev->dev.platform_data;
+> +	if (platid)
+> +		info = (const void *)platid->driver_data;
+> +#ifdef CONFIG_OF
 
-Perhaps do
+and here.
 
-#define streq(a, b)   (strcmp((a), (b)) == 0)
+> +	else if (np)
+> +		info = of_match_device(sh_pfc_of_table, &pdev->dev)->data;
+> +#endif
+> +	else
+> +		info = pdev->dev.platform_data;
+> +
+>  	if (info == NULL)
+>  		return -ENODEV;
+>  
 
-and use that to simplify the conditions?
+[snip]
 
-Actually, here are suggested cleanups. Note that there are two FIXMEs
--- I could not understand why the code is safe, and that the BUG_ON()s
-are commented on. AFAICT I got them correct, but for some reason they
-seem to trigger.
+> +static int sh_pfc_dt_node_to_map(struct pinctrl_dev *pctldev,
+> +				 struct device_node *np,
+> +				 struct pinctrl_map **map, unsigned *num_maps)
+> +{
+> +	struct sh_pfc_pinctrl *pmx = pinctrl_dev_get_drvdata(pctldev);
+> +	struct device *dev = pmx->pfc->dev;
+> +	struct device_node *child;
+> +	unsigned int index;
+> +	int ret;
+> +
+> +	*map = NULL;
+> +	*num_maps = 0;
+> +	index = 0;
+> +
+> +	for_each_child_of_node(np, child) {
+> +		ret = sh_pfc_dt_subnode_to_map(dev, child, map, num_maps,
+> +					       &index);
+> +		if (ret < 0)
+> +			goto done;
+> +	}
+> +
+> +	/* If no mapping has been found in child nodes try the config node. */
+> +	if (*num_maps == 0) {
+> +		ret = sh_pfc_dt_subnode_to_map(dev, np, map, num_maps, &index);
+> +		if (ret < 0)
+> +			goto done;
+> +	}
+> +
+> +	if (*num_maps == 0) {
+> +		dev_err(dev, "no mapping found in node %s\n", np->full_name);
+> +		ret = -EINVAL;
+> +		goto done;
+> +	}
+> +
+> +	ret = 0;
+> +
+> +done:
+> +	if (ret < 0)
+> +		sh_pfc_dt_free_map(pctldev, *map, *num_maps);
+> +
+> +	return ret;
+> +}
 
-Thanks,
-								Pavel
+Maybe simpler
 
-diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-index a0551f2..ddb340d 100644
---- a/drivers/clk/socfpga/clk.c
-+++ b/drivers/clk/socfpga/clk.c
-@@ -24,17 +24,17 @@
- #include <linux/of.h>
- 
- /* Clock Manager offsets */
--#define CLKMGR_CTRL    0x0
--#define CLKMGR_BYPASS 0x4
-+#define CLKMGR_CTRL	0x0
-+#define CLKMGR_BYPASS	0x4
- #define CLKMGR_L4SRC	0x70
- #define CLKMGR_PERPLL_SRC	0xAC
- 
- /* Clock bypass bits */
--#define MAINPLL_BYPASS (1<<0)
--#define SDRAMPLL_BYPASS (1<<1)
--#define SDRAMPLL_SRC_BYPASS (1<<2)
--#define PERPLL_BYPASS (1<<3)
--#define PERPLL_SRC_BYPASS (1<<4)
-+#define MAINPLL_BYPASS		(1<<0)
-+#define SDRAMPLL_BYPASS		(1<<1)
-+#define SDRAMPLL_SRC_BYPASS	(1<<2)
-+#define PERPLL_BYPASS		(1<<3)
-+#define PERPLL_SRC_BYPASS	(1<<4)
- 
- #define SOCFPGA_PLL_BG_PWRDWN		0
- #define SOCFPGA_PLL_EXT_ENA		1
-@@ -45,14 +45,16 @@
- #define SOCFPGA_PLL_DIVQ_SHIFT	16
- #define SOCFGPA_MAX_PARENTS	3
- 
--#define SOCFPGA_L4_MP_CLK			"l4_mp_clk"
--#define SOCFPGA_L4_SP_CLK			"l4_sp_clk"
-+#define SOCFPGA_L4_MP_CLK		"l4_mp_clk"
-+#define SOCFPGA_L4_SP_CLK		"l4_sp_clk"
- #define SOCFPGA_NAND_CLK		"nand_clk"
- #define SOCFPGA_NAND_X_CLK		"nand_x_clk"
- #define SOCFPGA_MMC_CLK			"mmc_clk"
- #define SOCFPGA_DB_CLK			"gpio_db_clk"
-+#define SOCFPGA_QSPI_CLK		"qspi_clk"
- 
- #define div_mask(width)	((1 << (width)) - 1)
-+#define streq(a, b) (strcmp((a), (b)) == 0)
- 
- extern void __iomem *clk_mgr_base_addr;
- 
-@@ -62,8 +64,8 @@ struct socfpga_clk {
- 	char *clk_name;
- 	u32 fixed_div;
- 	void __iomem *div_reg;
--	u32 width;
--	u32 shift;
-+	u32 width;	/* only valid if div_reg != 0 */
-+	u32 shift;	/* only valid if div_reg != 0 */
- };
- #define to_socfpga_clk(p) container_of(p, struct socfpga_clk, hw.hw)
- 
-@@ -145,11 +147,12 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
- 	init.parent_names = &parent_name;
- 	init.num_parents = 1;
- 
-+	// FIXME: assigning automatic variable ptr into malloced structure?
- 	socfpga_clk->hw.hw.init = &init;
- 
--	if (strcmp(clk_name, "main_pll") == 0 ||
--			strcmp(clk_name, "periph_pll") == 0 ||
--			strcmp(clk_name, "sdram_pll") == 0) {
-+	if (streq(clk_name, "main_pll") ||
-+	    streq(clk_name, "periph_pll") ||
-+	    streq(clk_name, "sdram_pll")) {
- 		socfpga_clk->hw.bit_idx = SOCFPGA_PLL_EXT_ENA;
- 		clk_pll_ops.enable = clk_gate_ops.enable;
- 		clk_pll_ops.disable = clk_gate_ops.disable;
-@@ -168,61 +171,57 @@ static u8 socfpga_clk_get_parent(struct clk_hw *hwclk)
- {
- 	u32 l4_src;
- 	u32 perpll_src;
--	u8 parent;
- 
--	if (strcmp(hwclk->init->name, SOCFPGA_L4_MP_CLK) == 0) {
-+	if (streq(hwclk->init->name, SOCFPGA_L4_MP_CLK)) {
- 		l4_src = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
--		l4_src &= 0x1;
--		parent = l4_src;
--	} else if (strcmp(hwclk->init->name, SOCFPGA_L4_SP_CLK) == 0) {
-+		return l4_src & 1;
-+	}
-+	if (streq(hwclk->init->name, SOCFPGA_L4_SP_CLK)) {
- 		l4_src = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
--		l4_src = ((l4_src & 0x2) >> 1);
--		parent = l4_src;
--	} else {
--		perpll_src = readl(clk_mgr_base_addr + CLKMGR_PERPLL_SRC);
--		if (strcmp(hwclk->init->name, SOCFPGA_MMC_CLK) == 0)
--			perpll_src &= 0x3;
--		else if (strcmp(hwclk->init->name, SOCFPGA_NAND_CLK) == 0 ||
--			strcmp(hwclk->init->name, SOCFPGA_NAND_X_CLK) == 0)
--			perpll_src = ((perpll_src & 0xC) >> 2);
--		else /*QSPI clock */
--			perpll_src = ((perpll_src & 0x30) >> 4);
--		parent = perpll_src;
-+		return !!(l4_src & 2);
- 	}
-+	perpll_src = readl(clk_mgr_base_addr + CLKMGR_PERPLL_SRC);
-+	if (streq(hwclk->init->name, SOCFPGA_MMC_CLK))
-+		return perpll_src & 3;
-+	if (streq(hwclk->init->name, SOCFPGA_NAND_CLK) ||
-+	    streq(hwclk->init->name, SOCFPGA_NAND_X_CLK))
-+		return (perpll_src >> 2) & 3;
++	if (*num_maps)
++		return 0;
 +
-+	/* else QSPI clock */
-+//	BUG_ON(!streq(hwclk->init->name, SOCFPGA_QSPI_CLK));
-+	return (perpll_src >> 4) & 3;
-+}
- 
--	return parent;
-+static int clrsetbits(u32 adr, u32 clr, u32 set)
-+{
-+	u32 reg;
++	dev_err(dev, "no mapping found in node %s\n", np->full_name);
++	ret = -EINVAL;
 +
-+	reg = readl(adr);
-+	reg &= ~clr;
-+	reg |= set;
-+	writel(reg, adr);
-+	return 0;
- }
- 
- static int socfpga_clk_set_parent(struct clk_hw *hwclk, u8 parent)
- {
--	u32 src_reg;
--
--	if (strcmp(hwclk->init->name, SOCFPGA_L4_MP_CLK) == 0) {
--		src_reg = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
--		src_reg &= ~0x1;
--		src_reg |= parent;
--		writel(src_reg, clk_mgr_base_addr + CLKMGR_L4SRC);
--	} else if (strcmp(hwclk->init->name, SOCFPGA_L4_SP_CLK) == 0) {
--		src_reg = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
--		src_reg &= ~0x2;
--		src_reg |= (parent << 1);
--		writel(src_reg, clk_mgr_base_addr + CLKMGR_L4SRC);
--	} else {
--		src_reg = readl(clk_mgr_base_addr + CLKMGR_PERPLL_SRC);
--		if (strcmp(hwclk->init->name, SOCFPGA_MMC_CLK) == 0) {
--			src_reg &= ~0x3;
--			src_reg |= parent;
--		} else if (strcmp(hwclk->init->name, SOCFPGA_NAND_CLK) == 0 ||
--			strcmp(hwclk->init->name, SOCFPGA_NAND_X_CLK) == 0) {
--			src_reg &= ~0xC;
--			src_reg |= (parent << 2);
--		} else {/*QSPI clock */
--			src_reg &= ~0x30;
--			src_reg |= (parent << 4);
--		}
--		writel(src_reg, clk_mgr_base_addr + CLKMGR_PERPLL_SRC);
--	}
-+//	BUG_ON(parent & ~3);
++done:
++	sh_pfc_dt_free_map(pctldev, *map, *num_maps);
 +
-+	if (streq(hwclk->init->name, SOCFPGA_L4_MP_CLK))
-+		return clrsetbits(clk_mgr_base_addr + CLKMGR_L4SRC, 1, parent);
-+	if (streq(hwclk->init->name, SOCFPGA_L4_SP_CLK))
-+		return clrsetbits(clk_mgr_base_addr + CLKMGR_L4SRC, 2, parent << 1);
- 
-+	if (streq(hwclk->init->name, SOCFPGA_MMC_CLK))
-+		return clrsetbits(clk_mgr_base_addr + CLKMGR_PERPLL_SRC, 3, parent);
-+	if (streq(hwclk->init->name, SOCFPGA_NAND_CLK) ||
-+	    streq(hwclk->init->name, SOCFPGA_NAND_X_CLK))
-+		return clrsetbits(clk_mgr_base_addr + CLKMGR_PERPLL_SRC, 0xC, parent << 2);
-+
-+	/* else QSPI clock */
-+//	BUG_ON(!streq(hwclk->init->name, SOCFPGA_QSPI_CLK));
-+
-+	clrsetbits(clk_mgr_base_addr + CLKMGR_PERPLL_SRC, 0x30, parent << 4);
- 	return 0;
- }
- 
-@@ -237,7 +236,7 @@ static unsigned long socfpga_clk_recalc_rate(struct clk_hw *hwclk,
- 	else if (socfpgaclk->div_reg) {
- 		val = readl(socfpgaclk->div_reg) >> socfpgaclk->shift;
- 		val &= div_mask(socfpgaclk->width);
--		if (strcmp(hwclk->init->name, SOCFPGA_DB_CLK) == 0)
-+		if (streq(hwclk->init->name, SOCFPGA_DB_CLK))
- 			div = val + 1;
- 		else
- 			div = (1 << val);
-@@ -273,13 +272,6 @@ static void __init socfpga_gate_clk_init(struct device_node *node,
- 	rc = of_property_read_u32_array(node, "clk-gate", clk_gate, 2);
- 	if (rc)
- 		clk_gate[0] = 0;
--
--	rc = of_property_read_u32(node, "fixed-divider", &fixed_div);
--	if (rc)
--		socfpga_clk->fixed_div = 0;
--	else
--		socfpga_clk->fixed_div = fixed_div;
--
- 	if (clk_gate[0]) {
- 		socfpga_clk->hw.reg = clk_mgr_base_addr + clk_gate[0];
- 		socfpga_clk->hw.bit_idx = clk_gate[1];
-@@ -288,6 +280,12 @@ static void __init socfpga_gate_clk_init(struct device_node *node,
- 		gateclk_ops.disable = clk_gate_ops.disable;
- 	}
- 
-+	rc = of_property_read_u32(node, "fixed-divider", &fixed_div);
-+	if (rc)
-+		socfpga_clk->fixed_div = 0;
-+	else
-+		socfpga_clk->fixed_div = fixed_div;
-+
- 	rc = of_property_read_u32_array(node, "div-reg", div_reg, 3);
- 	if (!rc) {
- 		socfpga_clk->div_reg = clk_mgr_base_addr + div_reg[0];
-@@ -302,12 +300,17 @@ static void __init socfpga_gate_clk_init(struct device_node *node,
- 	init.name = clk_name;
- 	init.ops = ops;
- 	init.flags = 0;
--	while (i < SOCFGPA_MAX_PARENTS && (parent_name[i] =
--			of_clk_get_parent_name(node, i)) != NULL)
-+	while (i < SOCFGPA_MAX_PARENTS) {
-+		char *name = of_clk_get_parent_name(node, i);
-+		parent_name[i] = name;
-+		if (name == NULL)
-+			break;
- 		i++;
-+	}
- 
- 	init.parent_names = parent_name;
- 	init.num_parents = i;
-+	// FIXME: assigning automatic variable ptr into malloced structure?
- 	socfpga_clk->hw.hw.init = &init;
- 
- 	clk = clk_register(NULL, &socfpga_clk->hw.hw);
++	return ret;
 
-
-
-
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
