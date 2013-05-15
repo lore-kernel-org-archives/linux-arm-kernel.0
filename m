@@ -1,40 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 15 May 2013 11:27:00 +0200
-Subject: [PATCH] ARM: crypto: sha1-armv4-large.S: fix SP handling
-Message-ID: <1368610020-29219-1-git-send-email-ard.biesheuvel@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 15 May 2013 11:28:15 +0200
+Subject: [PATCH v2 3/4] ARM: shmobile: marzen-reference: Initialise irqpin
+In-Reply-To: <1368586650-26263-4-git-send-email-horms+renesas@verge.net.au>
+References: <1368586650-26263-1-git-send-email-horms+renesas@verge.net.au>
+ <1368586650-26263-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1482970.xQCySsLs8z@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the SHA1 asm code ABI conformant by making sure all stack
-accesses occur above the stack pointer.
+Hi Simon,
 
-Origin:
-http://git.openssl.org/gitweb/?p=openssl.git;a=commit;h=1a9d60d2
+Thanks for the patch.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/crypto/sha1-armv4-large.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Wednesday 15 May 2013 11:57:29 Simon Horman wrote:
+> Empirically it appears to be necessary to call r8a7779_init_irq_extpin(1)
+> in order to initialise irqpin for use with IRQ1. This is already done in
+> the marzen board code. This adds the call to the marzen-reference board
+> code.
+> 
+> The motivation for this is to allow use of SMSC LAN, which uses IRQ1, with
+> marzen-reference.
 
-diff --git a/arch/arm/crypto/sha1-armv4-large.S b/arch/arm/crypto/sha1-armv4-large.S
-index 92c6eed..99207c4 100644
---- a/arch/arm/crypto/sha1-armv4-large.S
-+++ b/arch/arm/crypto/sha1-armv4-large.S
-@@ -195,6 +195,7 @@ ENTRY(sha1_block_data_order)
- 	add	r3,r3,r10			@ E+=F_00_19(B,C,D)
- 	cmp	r14,sp
- 	bne	.L_00_15		@ [((11+4)*5+2)*3]
-+	sub	sp,sp,#25*4
- #if __ARM_ARCH__<7
- 	ldrb	r10,[r1,#2]
- 	ldrb	r9,[r1,#3]
-@@ -290,7 +291,6 @@ ENTRY(sha1_block_data_order)
- 	add	r3,r3,r10			@ E+=F_00_19(B,C,D)
- 
- 	ldr	r8,.LK_20_39		@ [+15+16*4]
--	sub	sp,sp,#25*4
- 	cmn	sp,#0			@ [+3], clear carry to denote 20_39
- .L_20_39_or_60_79:
- 	ldr	r9,[r14,#15*4]
+This is an acceptable workaround for now, but in the not-so-long term we want 
+to move that code to the irqpin driver.
+
+I've had a brief look at the irq-renesas-intc-irqpin driver, and it definitely 
+looks like some love is needed there. I don't have any free time for that at 
+the moment, but I could provide pointers if anyone wants to work on moving 
+irqpin-related arch code to the driver.
+
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/mach-shmobile/board-marzen-reference.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c
+> b/arch/arm/mach-shmobile/board-marzen-reference.c index 5332e89..f83b6d1
+> 100644
+> --- a/arch/arm/mach-shmobile/board-marzen-reference.c
+> +++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+> @@ -63,12 +63,18 @@ static const char *marzen_boards_compat_dt[] __initdata
+> = { NULL,
+>  };
+> 
+> +void __init marzen_init_irq(void)
+> +{
+> +	r8a7779_init_irq_extpin(1); /* IRQ1 as individual interrupt */
+> +	r8a7779_init_irq_dt();
+> +}
+> +
+>  DT_MACHINE_START(MARZEN, "marzen")
+>  	.smp		= smp_ops(r8a7779_smp_ops),
+>  	.map_io		= r8a7779_map_io,
+>  	.init_early	= r8a7779_init_delay,
+>  	.nr_irqs	= NR_IRQS_LEGACY,
+> -	.init_irq	= r8a7779_init_irq_dt,
+> +	.init_irq	= marzen_init_irq,
+>  	.init_machine	= marzen_init,
+>  	.init_time	= shmobile_timer_init,
+>  	.dt_compat	= marzen_boards_compat_dt,
 -- 
-1.8.1.2
+Regards,
+
+Laurent Pinchart
