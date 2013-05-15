@@ -1,91 +1,28 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Thu, 16 May 2013 00:45:03 +0200
-Subject: [RFC 2/4] dma: add dmaengine driver for Samsung s3c24xx SoCs
-In-Reply-To: <45625193.0y3McEvmiD@flatron>
-References: <201305111330.05046.heiko@sntech.de>
- <201305152348.32171.heiko@sntech.de> <45625193.0y3McEvmiD@flatron>
-Message-ID: <201305160045.03934.heiko@sntech.de>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 15 May 2013 16:48:55 -0600
+Subject: [PATCH 2/6] ARM: tegra: skip SCU and PL310 code when CPU is not
+ Cortex-A9
+In-Reply-To: <1368613644-11863-3-git-send-email-josephl@nvidia.com>
+References: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
+ <1368613644-11863-3-git-send-email-josephl@nvidia.com>
+Message-ID: <519410D7.9060201@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 16. Mai 2013, 00:02:40 schrieb Tomasz Figa:
-> On Wednesday 15 of May 2013 23:48:31 Heiko St?bner wrote:
-> > Am Mittwoch, 15. Mai 2013, 23:20:08 schrieb Sylwester Nawrocki:
-> > > On 05/15/2013 10:31 PM, Heiko St?bner wrote:
-> > > >>> +       BUG();
-> > > >>> 
-> > > >> >  Isn't that a bit nasty. This macro should be used with care and
-> > > >> >  we
-> > > >> >  should recover if possible. dev_err()?
-> > > > 
-> > > > runtime_config already denies any settings not in the 1,2 or 4bytes
-> > > > range - the default-part should therefore never be reached. So if
-> > > > any other value magically appears in the register and triggers the
-> > > > default-part, something is seriously wrong. So my guess is, the BUG
-> > > > might be appropriate.
-> > > > 
-> > > > On the other hand the whole default+BUG part could also simply go
-> > > > away,
-> > > > for the same reasons.
-> > > 
-> > > IMHO BUG() is not needed at all. As Linus suggested dev_err() is such
-> > > case or WARN_ON() would be more appropriate. This has been discussed
-> > > in the past extensively, not sure if you are aware of the other
-> > > Linus' opinion on BUG()/BUG_ON() proliferation:
-> > > https://lkml.org/lkml/2012/9/27/461
-> > 
-> > Very interesting read and I'll keep this in mind in the future. What
-> > about the other option ... i.e. simply getting rid of the whole "error
-> > handling", as the other code paths should already make sure that only
-> > valid values get written into the register.
-> > 
-> > Can the value change in the register somehow on its own without kernel
-> > intervention, or does this not happen?
-> 
-> Hmm, it depends on hardware, I guess. Not sure how it works on this
-> particular IP.
-> 
-> Still, the mentioned BUG() was about a value in a driver-filled struct,
-> wasn't it?
-> 
-> /* Quoting the the code for reference */
-> 
-> > +static u32 s3c24xx_dma_getbytes_chan(struct s3c24xx_dma_chan *s3cchan)
-> > +{
-> > +       struct s3c24xx_dma_phy *phy = s3cchan->phy;
-> > +       struct s3c24xx_txd *txd = s3cchan->at;
-> > +       u32 tc = readl(phy->base + DSTAT) & DSTAT_CURRTC_MASK;
-> > +
-> > +       switch (txd->dcon & DCON_DSZ_MASK) {
-> > +       case DCON_DSZ_BYTE:
-> > +               return tc;
-> > +       case DCON_DSZ_HALFWORD:
-> > +               return tc * 2;
-> > +       case DCON_DSZ_WORD:
-> > +               return tc * 4;
-> > +       default:
-> > +               break;
-> > +       }
-> > +
-> > +       BUG();
-> 
-> (Btw. I don't see anything setting the DCON_DSZ bits in this field. Am I
-> missing something?)
+On 05/15/2013 04:27 AM, Joseph Lo wrote:
+> For supporting single image on all Tegra series, we need to skip some HW
+> support code for Cortex-A9 only.
 
-this is for calculating the remaining bytes of the transaction. which is used 
-in s3c24xx_dma_tx_status. 
+> diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
 
-And when looking at it again, I can't really fathom why I did it this way with 
-decoding the DSZ from the dcon value of the s3c24xx_txd again instead of 
-simply using the width value of the same struct .... 
+> +	check_cpu_part_num 0xc09, r9, r10
+> +	movweq	r4, #:lower16:(TEGRA_ARM_PERIF_BASE + 0x3000)
+> +	movteq	r4, #:upper16:(TEGRA_ARM_PERIF_BASE + 0x3000)
+> +	moveq	r5, #0
+> +	streq	r5, [r4, #L2X0_CTRL]
 
-So it can be much simpler as
-	(...)
-     u32 tc = readl(phy->base + DSTAT) & DSTAT_CURRTC_MASK;
-	return tc * txd->width;
-
-getting rid of this stuff alltogether
-
-
-still puzzled how I came up with this strangeness in the first place
-Heiko
+Do those conditional instructions need a Thumb iteq wrapped around them
+in order to compile in Thumb2 mode? Same comment for the other change,
+although IIRC iteq only supports 4 instructions at a time, so maybe a
+branch would be better there. Using branches might also reduce the size
+of the diff, and make the change more obvious.
