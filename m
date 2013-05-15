@@ -1,56 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 May 2013 20:38:05 +0200
-Subject: [RFC 2/4] dma: add dmaengine driver for Samsung s3c24xx SoCs
-In-Reply-To: <201305141551.24375.heiko@sntech.de>
-References: <201305111330.05046.heiko@sntech.de>
- <201305111331.25405.heiko@sntech.de>
- <CACRpkda-wQyo8aYxbW9RJNcR3Kwe2w5AhaAuUHfaxBksa_Pm2A@mail.gmail.com>
- <201305141551.24375.heiko@sntech.de>
-Message-ID: <CACRpkdY1s7u9Xjzkb+AdFY1xEO1PQOp1ZFPf4r5qPL-=WPkvNQ@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Thu, 16 May 2013 06:52:03 +1200
+Subject: [PATCH 20/20] ARM: vt8500: Remove init_irq declaration in machine
+ description
+In-Reply-To: <1368545933-7430-21-git-send-email-maxime.ripard@free-electrons.com>
+References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1368545933-7430-21-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <5193D953.5040202@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 3:51 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Dienstag, 14. Mai 2013, 14:47:19 schrieb Linus Walleij:
->> On Sat, May 11, 2013 at 1:31 PM, Heiko St?bner <heiko@sntech.de> wrote:
->> > Conceptually the s3c24xx-dma feels like a distant relative of the pl08x
->> > with numerous virtual channels being mapped to a lot less physical ones.
->> > The driver therefore borrows a lot from the amba-pl08x driver in this
->> > regard. Functionality-wise the driver gains a memcpy ability in addition
->> > to the slave_sg one.
->> >
->> > The driver currently only supports the "newer" SoCs which can use any
->> > physical channel for any dma slave. Support for the older SoCs where
->> > each channel only supports a subset of possible dma slaves will have to
->> > be added later.
->> >
->> > Tested on a s3c2416-based board, memcpy using the dmatest module and
->> > slave_sg partially using the spi-s3c64xx driver.
->> >
->> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
->>
->> So have I understood correctly if I assume that *some* S3C
->> variants, i.e. this: arch/arm/mach-s3c64xx/dma.c
->> have a vanilla, unmodified, or just slightly modified
->> PL08x block, while this DMAC is something probably based on
->> the PL08x where some ASIC engineer has had a good time hacking
->> around in the VHDL code to meet some feature requirements.
->> Correct? Or plausible guess?
+On 15/05/13 03:38, Maxime Ripard wrote:
+> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
+> specified") removed the need to explictly setup the init_irq field in
+> the machine description when using only irqchip_init. Remove that
+> declaration for vt8500 as well.
 >
-> You're guess is at good as mine :-) . The public s3c64xx (ARM11 based)
-> documentation says that it is using s PL080 as dma controller while the
-> s3c24xx (ARM9 based) SoCs have this one, which doesn't come with any label in
-> the manuals.
-> Similar to the s3c64xx using a vic, while the s3c24xx uses something
-> homegrown.
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>   arch/arm/mach-vt8500/vt8500.c | 2 --
+>   1 file changed, 2 deletions(-)
 >
-> The relationship description was more based on the concepts used, i.e. the
-> virtual channel concept and general handling of dma transfers feel somehow
-> similar - as I said these are my first steps into this, so I still need to
-> understand a lot.
+> diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
+> index 1dd281e..70a5ac9 100644
+> --- a/arch/arm/mach-vt8500/vt8500.c
+> +++ b/arch/arm/mach-vt8500/vt8500.c
+> @@ -20,7 +20,6 @@
+>   
+>   #include <linux/clocksource.h>
+>   #include <linux/io.h>
+> -#include <linux/irqchip.h>
+>   #include <linux/pm.h>
+>   
+>   #include <asm/mach-types.h>
+> @@ -178,7 +177,6 @@ static const char * const vt8500_dt_compat[] = {
+>   DT_MACHINE_START(WMT_DT, "VIA/Wondermedia SoC (Device Tree Support)")
+>   	.dt_compat	= vt8500_dt_compat,
+>   	.map_io		= vt8500_map_io,
+> -	.init_irq	= irqchip_init,
+>   	.init_machine	= vt8500_init,
+>   	.init_time	= clocksource_of_init,
+>   	.restart	= vt8500_restart,
+I don't have any plans to touch this driver, so please send direct to 
+arm-soc as Arnd
+requested.
 
-OK then, a separate driver seems required, will look a bit closer at
-the patch as such.
+Acked-by: Tony Prisk <linux@prisktech.co.nz>
 
-Yours,
-Linus Walleij
+Regards
+Tony Prisk
