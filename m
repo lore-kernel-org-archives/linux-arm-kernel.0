@@ -1,109 +1,86 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Wed, 15 May 2013 14:19:09 +0900
-Subject: Introduce a new helper framework for buffer synchronization
-In-Reply-To: <CAF6AEGv2FiKMUpb5s4zHPdj4uVxnQWdVJWL-i1mOOZRxBvMZ4Q@mail.gmail.com>
-References: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
- <51909DB4.2060208@canonical.com>
- <025201ce4fbb$363d0390$a2b70ab0$%dae@samsung.com>
- <5190B7D8.3010803@canonical.com>
- <027a01ce4fcc$5e7c7320$1b755960$%dae@samsung.com>
- <5190D14A.7050904@canonical.com>
- <028a01ce4fd4$5ec6f000$1c54d000$%dae@samsung.com>
- <CAF6AEGvWazezZdLDn5=H8wNQdQSWV=EmqE1a4wh7QwrT_h6vKQ@mail.gmail.com>
- <CAAQKjZP=iOmHRpHZCbZD3v_RKUFSn0eM_WVZZvhe7F9g3eTmPA@mail.gmail.com>
- <CAF6AEGuDih-NR-VZCmQfqbvCOxjxreZRPGfhCyL12FQ1Qd616Q@mail.gmail.com>
- <006a01ce504e$0de3b0e0$29ab12a0$%dae@samsung.com>
- <CAF6AEGv2FiKMUpb5s4zHPdj4uVxnQWdVJWL-i1mOOZRxBvMZ4Q@mail.gmail.com>
-Message-ID: <00cf01ce512b$bacc5540$3064ffc0$%dae@samsung.com>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Wed, 15 May 2013 13:59:29 +0930
+Subject: [PATCH V2 2/3] Documentation: virtio: Add emergency write
+ (emerg_wr) config register in virtio console.
+In-Reply-To: <CAAHg+Hi6BHqwOznnC9qxkc5pBWz7r5qpz9Nhh=EeNenhjhHohg@mail.gmail.com>
+References: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
+ <1367842791-30285-3-git-send-email-pranavkumar@linaro.org>
+ <8761yn382w.fsf@rustcorp.com.au>
+ <CAAHg+Hi6BHqwOznnC9qxkc5pBWz7r5qpz9Nhh=EeNenhjhHohg@mail.gmail.com>
+Message-ID: <87hai427di.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Rob Clark [mailto:robdclark at gmail.com]
-> Sent: Tuesday, May 14, 2013 10:39 PM
-> To: Inki Dae
-> Cc: linux-fbdev; DRI mailing list; Kyungmin Park; myungjoo.ham; YoungJun
-> Cho; linux-arm-kernel at lists.infradead.org; linux-media at vger.kernel.org
-> Subject: Re: Introduce a new helper framework for buffer synchronization
-> 
-> On Mon, May 13, 2013 at 10:52 PM, Inki Dae <inki.dae@samsung.com> wrote:
-> >> well, for cache management, I think it is a better idea.. I didn't
-> >> really catch that this was the motivation from the initial patch, but
-> >> maybe I read it too quickly.  But cache can be decoupled from
-> >> synchronization, because CPU access is not asynchronous.  For
-> >> userspace/CPU access to buffer, you should:
-> >>
-> >>   1) wait for buffer
-> >>   2) prepare-access
-> >>   3)  ... do whatever cpu access to buffer ...
-> >>   4) finish-access
-> >>   5) submit buffer for new dma-operation
-> >>
-> >
-> >
-> > For data flow from CPU to DMA device,
-> > 1) wait for buffer
-> > 2) prepare-access (dma_buf_begin_cpu_access)
-> > 3) cpu access to buffer
-> >
-> >
-> > For data flow from DMA device to CPU
-> > 1) wait for buffer
-> 
-> Right, but CPU access isn't asynchronous (from the point of view of
-> the CPU), so there isn't really any wait step at this point.  And if
-> you do want the CPU to be able to signal a fence from userspace for
-> some reason, you probably what something file/fd based so the
-> refcnting/cleanup when process dies doesn't leave some pending DMA
-> action wedged.  But I don't really see the point of that complexity
-> when the CPU access isn't asynchronous in the first place.
+Pranavkumar Sawargaonkar <pranavkumar@linaro.org> writes:
+> Hi Rusty,
 >
+> On 13 May 2013 08:22, Rusty Russell <rusty@rustcorp.com.au> wrote:
+>> Pranavkumar Sawargaonkar <pranavkumar@linaro.org> writes:
+>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>>> ---
+>>>  Documentation/virtual/virtio-spec.txt |    8 +++++++-
+>>>  1 file changed, 7 insertions(+), 1 deletion(-)
+>>
+>> OK, I applied this to the lyx master, with three changes:
+>> 1) Changed "filed" to "field".
+>> 2) Added ", or even acknowledging the feature" after "without
+>>    initializing virtio queues".
+>> 3) Added an initial point to the Device Initialization section:
+>>
+>>    1. If the VIRTIO_CONSOLE_F_EMERG_WRITE feature is offered, the
+>>    emerg_wr field of the configuration can be written at any time. Thus
+>>    it should work for very early boot debugging output as well as
+>>    catastophic OS failures (eg. virtio ring corruption).
+>
+> Thanks for applying this patch.
+> Have you also applied first patch ([PATCH V2 1/3] virtio: console: Add
+> emergency writeonly register to config space)
+> with this?  (https://lkml.org/lkml/2013/5/6/169)
 
-There was my missing comments, please see the below sequence.
+Would like Amit's Ack, since he's de-facto console maintainer.
 
-For data flow from CPU to DMA device and then from DMA device to CPU,
-1) wait for buffer <- at user side - ioctl(fd, DMA_BUF_GET_FENCE, ...)
-	- including prepare-access (dma_buf_begin_cpu_access)
-2) cpu access to buffer
-3) wait for buffer <- at device driver
-	- but CPU is already accessing the buffer so blocked.
-4) signal <- at user side - ioctl(fd, DMA_BUF_PUT_FENCE, ...)
-5) the thread, blocked at 3), is waked up by 4).
-	- and then finish-access (dma_buf_end_cpu_access)
-6) dma access to buffer
-7) wait for buffer <- at user side - ioctl(fd, DMA_BUF_GET_FENCE, ...)
-	- but DMA is already accessing the buffer so blocked.
-8) signal <- at device driver
-9) the thread, blocked@7), is waked up by 8)
-	- and then prepare-access (dma_buf_begin_cpu_access)
-10 cpu access to buffer
+I've reproduced it below.
 
-Basically, 'wait for buffer' includes buffer synchronization, committing
-processing, and cache operation. The buffer synchronization means that a
-current thread should wait for other threads accessing a shared buffer until
-the completion of their access. And the committing processing means that a
-current thread possesses the shared buffer so any trying to access the
-shared buffer by another thread makes the thread to be blocked. However, as
-I already mentioned before, it seems that these user interfaces are so ugly
-yet. So we need better way.
+Cheers,
+Rusty.
 
-Give me more comments if there is my missing point :)
+Subject: [PATCH V2 1/3] virtio: console: Add emergency writeonly register to config space
+Date: Mon,  6 May 2013 17:49:49 +0530
+Message-Id: <1367842791-30285-2-git-send-email-pranavkumar@linaro.org>
+X-Mailer: git-send-email 1.7.9.5
+In-Reply-To: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
+References: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
+X-Gm-Message-State: ALoCoQmDOoCdPmDpT+VgLwYAlJHmkUTB8sEAHVSbrNxWBzYgPHFT9rQ2A9dR8fToM81cHDZDppGx
 
-Thanks,
-Inki Dae
+This patch adds an emerg_wr register (writeonly) in config space
+of virtio console device which can be used for debugging.
 
-> BR,
-> -R
-> 
-> 
-> > 2) finish-access (dma_buf_end _cpu_access)
-> > 3) dma access to buffer
-> >
-> > 1) and 2) are coupled with one function: we have implemented
-> > fence_helper_commit_reserve() for it.
-> >
-> > Cache control(cache clean or cache invalidate) is performed properly
-> > checking previous access type and current access type.
-> > And the below is actual codes for it,
+Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
+---
+ include/uapi/linux/virtio_console.h |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/include/uapi/linux/virtio_console.h b/include/uapi/linux/virtio_console.h
+index ee13ab6..3fd0dce 100644
+--- a/include/uapi/linux/virtio_console.h
++++ b/include/uapi/linux/virtio_console.h
+@@ -38,6 +38,7 @@
+ /* Feature bits */
+ #define VIRTIO_CONSOLE_F_SIZE	0	/* Does host provide console size? */
+ #define VIRTIO_CONSOLE_F_MULTIPORT 1	/* Does host provide multiple ports? */
++#define VIRTIO_CONSOLE_F_EMERG_WRITE 2 /* Does host support emergency write? */
+ 
+ #define VIRTIO_CONSOLE_BAD_ID		(~(u32)0)
+ 
+@@ -48,6 +49,8 @@ struct virtio_console_config {
+ 	__u16 rows;
+ 	/* max. number of ports this device can hold */
+ 	__u32 max_nr_ports;
++	/* emergency write register */
++	__u32 emerg_wr;
+ } __attribute__((packed));
+ 
+ /*
