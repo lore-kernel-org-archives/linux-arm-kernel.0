@@ -1,33 +1,46 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Wed, 15 May 2013 23:20:08 +0200
-Subject: [RFC 2/4] dma: add dmaengine driver for Samsung s3c24xx SoCs
-In-Reply-To: <201305152231.52423.heiko@sntech.de>
-References: <201305111330.05046.heiko@sntech.de>
- <201305111331.25405.heiko@sntech.de>
- <CACRpkdaT195McX9NeccJYpmWbuYK-AZUTHr9AXKHnJdkf+Qzuw@mail.gmail.com>
- <201305152231.52423.heiko@sntech.de>
-Message-ID: <5193FC08.5040002@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 15 May 2013 14:41:54 -0700
+Subject: [PATCHv9 5/9] clk: mvebu: create parent-child relation for PCIe
+ clocks on Armada 370
+In-Reply-To: <1368624323-24311-6-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1368624323-24311-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1368624323-24311-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130515214154.12127.73539@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2013 10:31 PM, Heiko St?bner wrote:
->>> +       BUG();
->> >
->> >  Isn't that a bit nasty. This macro should be used with care and we
->> >  should recover if possible. dev_err()?
->
-> runtime_config already denies any settings not in the 1,2 or 4bytes range -
-> the default-part should therefore never be reached. So if any other value
-> magically appears in the register and triggers the default-part, something is
-> seriously wrong. So my guess is, the BUG might be appropriate.
->
-> On the other hand the whole default+BUG part could also simply go away, for
-> the same reasons.
+Quoting Thomas Petazzoni (2013-05-15 06:25:19)
+> The Armada 370 has two gatable clocks for each PCIe interface, and we
+> want both of them to be enabled. We therefore make one of the two
+> clocks a child of the other, as we did for the sataX and sataXlnk
+> clocks on Armada XP.
+> 
 
-IMHO BUG() is not needed at all. As Linus suggested dev_err() is such case
-or WARN_ON() would be more appropriate. This has been discussed in the past
-extensively, not sure if you are aware of the other Linus' opinion on
-BUG()/BUG_ON() proliferation: https://lkml.org/lkml/2012/9/27/461
+Ack for patches #5 and #6.  Do you want me to take them?
 
 Regards,
-Sylwester
+Mike
+
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> ---
+>  drivers/clk/mvebu/clk-gating-ctrl.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/mvebu/clk-gating-ctrl.c b/drivers/clk/mvebu/clk-gating-ctrl.c
+> index ebf141d..b35785a 100644
+> --- a/drivers/clk/mvebu/clk-gating-ctrl.c
+> +++ b/drivers/clk/mvebu/clk-gating-ctrl.c
+> @@ -119,8 +119,8 @@ static const struct mvebu_soc_descr __initconst armada_370_gating_descr[] = {
+>         { "pex1_en", NULL,  2 },
+>         { "ge1", NULL, 3 },
+>         { "ge0", NULL, 4 },
+> -       { "pex0", NULL, 5 },
+> -       { "pex1", NULL, 9 },
+> +       { "pex0", "pex0_en", 5 },
+> +       { "pex1", "pex1_en", 9 },
+>         { "sata0", NULL, 15 },
+>         { "sdio", NULL, 17 },
+>         { "tdm", NULL, 25 },
+> -- 
+> 1.7.9.5
