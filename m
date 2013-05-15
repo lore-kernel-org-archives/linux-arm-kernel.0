@@ -1,71 +1,65 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Wed, 15 May 2013 18:27:22 +0800
-Subject: [PATCH 4/6] ARM: tegra114: add power up sequence for warm boot CPU
+Date: Wed, 15 May 2013 18:27:23 +0800
+Subject: [PATCH 5/6] clk: tegra114: implement wait_for_reset and disable_clock
+ for tegra_cpu_car_ops
 In-Reply-To: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
 References: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1368613644-11863-5-git-send-email-josephl@nvidia.com>
+Message-ID: <1368613644-11863-6-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For Tegra114, once the CPUs were powered up by PMC in cold boot flow. The
-flow controller will maintain the power state and control power sequence
-for each CPU by setting event trigger (e.g. CPU hotplug ,idle and
-suspend power down/up).
+The conventional CPU hotplug sequence on the other Tegra chips, we will also
+clock gate the CPU in tegra_cpu_kill() after the CPU was power gated. For
+Tegra114, the flow controller will clock gate the CPU after the power down
+sequence. But we still need to implement a empty function for disable_clock
+to avoid kernel warning message.
 
+Cc: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- arch/arm/mach-tegra/flowctrl.h |  1 +
- arch/arm/mach-tegra/platsmp.c  | 25 ++++++++++++++++++++++++-
- 2 files changed, 25 insertions(+), 1 deletion(-)
+ drivers/clk/tegra/clk-tegra114.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-tegra/flowctrl.h b/arch/arm/mach-tegra/flowctrl.h
-index 67eab56..7a29bae 100644
---- a/arch/arm/mach-tegra/flowctrl.h
-+++ b/arch/arm/mach-tegra/flowctrl.h
-@@ -25,6 +25,7 @@
- #define FLOW_CTRL_WAITEVENT		(2 << 29)
- #define FLOW_CTRL_WAIT_FOR_INTERRUPT	(4 << 29)
- #define FLOW_CTRL_JTAG_RESUME		(1 << 28)
-+#define FLOW_CTRL_SCLK_RESUME		(1 << 27)
- #define FLOW_CTRL_HALT_CPU_IRQ		(1 << 10)
- #define	FLOW_CTRL_HALT_CPU_FIQ		(1 << 8)
- #define FLOW_CTRL_CPU0_CSR		0x8
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index fad4226..554aedc 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -140,8 +140,31 @@ remove_clamps:
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index d78e16e..40d939d 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -250,6 +250,9 @@
+ #define CLK_SOURCE_XUSB_DEV_SRC 0x60c
+ #define CLK_SOURCE_EMC 0x19c
  
- static int tegra114_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
-+	int ret = 0;
++/* Tegra CPU clock and reset control regs */
++#define CLK_RST_CONTROLLER_CPU_CMPLX_STATUS	0x470
 +
- 	cpu = cpu_logical_map(cpu);
--	return tegra_pmc_cpu_power_on(cpu);
-+
-+	if (cpumask_test_cpu(cpu, &tegra_cpu_init_mask)) {
-+		/*
-+		 * Warm boot flow
-+		 * The flow controller in charge of the power state and
-+		 * control for each CPU.
-+		 */
-+		/* set SCLK as event trigger for flow controller */
-+		flowctrl_write_cpu_csr(cpu, 1);
-+		flowctrl_write_cpu_halt(cpu,
-+				FLOW_CTRL_WAITEVENT | FLOW_CTRL_SCLK_RESUME);
-+	} else {
-+		/*
-+		 * Cold boot flow
-+		 * The CPU is powered up by toggling PMC directly. It will
-+		 * also initial power state in flow controller. After that,
-+		 * the CPU's power state is maintained by flow controller.
-+		 */
-+		ret = tegra_pmc_cpu_power_on(cpu);
-+	}
-+
-+	return ret;
+ static int periph_clk_enb_refcnt[CLK_OUT_ENB_NUM * 32];
+ 
+ static void __iomem *clk_base;
+@@ -2000,7 +2003,25 @@ static __init void tegra114_periph_clk_init(void __iomem *clk_base)
+ 	}
  }
  
- static int __cpuinit tegra_boot_secondary(unsigned int cpu,
+-static struct tegra_cpu_car_ops tegra114_cpu_car_ops;
++/* Tegra114 CPU clock and reset control functions */
++static void tegra114_wait_cpu_in_reset(u32 cpu)
++{
++	unsigned int reg;
++
++	do {
++		reg = readl(clk_base + CLK_RST_CONTROLLER_CPU_CMPLX_STATUS);
++		cpu_relax();
++	} while (!(reg & (1 << cpu)));  /* check CPU been reset or not */
++}
++static void tegra114_disable_cpu_clock(u32 cpu)
++{
++	/* flow controller would take care in the power sequence. */
++}
++
++static struct tegra_cpu_car_ops tegra114_cpu_car_ops = {
++	.wait_for_reset	= tegra114_wait_cpu_in_reset,
++	.disable_clock	= tegra114_disable_cpu_clock,
++};
+ 
+ static const struct of_device_id pmc_match[] __initconst = {
+ 	{ .compatible = "nvidia,tegra114-pmc" },
 -- 
 1.8.2.2
