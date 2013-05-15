@@ -1,128 +1,68 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Wed, 15 May 2013 20:18:42 +0530
-Subject: [PATCH v3 6/6] ARM: OMAP2+: hwmod: Remove sysc slave idle and auto
- idle apis
+Date: Wed, 15 May 2013 20:18:38 +0530
+Subject: [PATCH v3 2/6] ARM: OMAP2+: hwmod: Add a new flag to handle SIDLE in
+ SWSUP only in active
 In-Reply-To: <1368629322-3170-1-git-send-email-rnayak@ti.com>
 References: <1368629322-3170-1-git-send-email-rnayak@ti.com>
-Message-ID: <1368629322-3170-7-git-send-email-rnayak@ti.com>
+Message-ID: <1368629322-3170-3-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Some IPs (like UART) need the sidle mode to be controlled in SW only
+while they are active. Once they go inactive, they need the IP to be
+put back in HW control so they are also wakeup capable.
 
-With the OMAP serial driver sysc cleanup patches in this series, we can
-now remove the hwmod external apis for sysc fiddling.
+The flag HWMOD_SWSUP_SIDLE takes care of IPs which need the sidle
+mode to be *always* controlled in SWSUP. We now have a need to control
+IPs sidle mode in SWSUP only while its active.
 
-While at this, also remove unused sysc auto idle api from hwmod code.
+So define a new flag 'HWMOD_SWSUP_SIDLE_ACT' to help the framework
+know about these new IP requirements.
 
 Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
 Tested-by: Sourav Poddar <sourav.poddar@ti.com>
-Signed-off-by: Rajendra nayak <rnayak@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c |   68 --------------------------------------
- arch/arm/mach-omap2/omap_hwmod.h |    3 --
- 2 files changed, 71 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |    3 ++-
+ arch/arm/mach-omap2/omap_hwmod.h |    4 ++++
+ 2 files changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 5739429..0393142 100644
+index c28552b..5739429 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.c
 +++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2255,42 +2255,6 @@ static int _idle(struct omap_hwmod *oh)
- }
+@@ -1356,7 +1356,8 @@ static void _enable_sysc(struct omap_hwmod *oh)
  
- /**
-- * omap_hwmod_set_ocp_autoidle - set the hwmod's OCP autoidle bit
-- * @oh: struct omap_hwmod *
-- * @autoidle: desired AUTOIDLE bitfield value (0 or 1)
-- *
-- * Sets the IP block's OCP autoidle bit in hardware, and updates our
-- * local copy. Intended to be used by drivers that require
-- * direct manipulation of the AUTOIDLE bits.
-- * Returns -EINVAL if @oh is null or is not in the ENABLED state, or passes
-- * along the return value from _set_module_autoidle().
-- *
-- * Any users of this function should be scrutinized carefully.
-- */
--int omap_hwmod_set_ocp_autoidle(struct omap_hwmod *oh, u8 autoidle)
--{
--	u32 v;
--	int retval = 0;
--	unsigned long flags;
--
--	if (!oh || oh->_state != _HWMOD_STATE_ENABLED)
--		return -EINVAL;
--
--	spin_lock_irqsave(&oh->_lock, flags);
--
--	v = oh->_sysc_cache;
--
--	retval = _set_module_autoidle(oh, autoidle, &v);
--
--	if (!retval)
--		_write_sysconfig(v, oh);
--
--	spin_unlock_irqrestore(&oh->_lock, flags);
--
--	return retval;
--}
--
--/**
-  * _shutdown - shutdown an omap_hwmod
-  * @oh: struct omap_hwmod *
-  *
-@@ -3189,38 +3153,6 @@ error:
- }
- 
- /**
-- * omap_hwmod_set_slave_idlemode - set the hwmod's OCP slave idlemode
-- * @oh: struct omap_hwmod *
-- * @idlemode: SIDLEMODE field bits (shifted to bit 0)
-- *
-- * Sets the IP block's OCP slave idlemode in hardware, and updates our
-- * local copy.  Intended to be used by drivers that have some erratum
-- * that requires direct manipulation of the SIDLEMODE bits.  Returns
-- * -EINVAL if @oh is null, or passes along the return value from
-- * _set_slave_idlemode().
-- *
-- * XXX Does this function have any current users?  If not, we should
-- * remove it; it is better to let the rest of the hwmod code handle this.
-- * Any users of this function should be scrutinized carefully.
-- */
--int omap_hwmod_set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode)
--{
--	u32 v;
--	int retval = 0;
--
--	if (!oh)
--		return -EINVAL;
--
--	v = oh->_sysc_cache;
--
--	retval = _set_slave_idlemode(oh, idlemode, &v);
--	if (!retval)
--		_write_sysconfig(v, oh);
--
--	return retval;
--}
--
--/**
-  * omap_hwmod_lookup - look up a registered omap_hwmod by name
-  * @name: name of the omap_hwmod to look up
-  *
+ 	clkdm = _get_clkdm(oh);
+ 	if (sf & SYSC_HAS_SIDLEMODE) {
+-		if (oh->flags & HWMOD_SWSUP_SIDLE) {
++		if (oh->flags & HWMOD_SWSUP_SIDLE ||
++		    oh->flags & HWMOD_SWSUP_SIDLE_ACT) {
+ 			idlemode = HWMOD_IDLEMODE_NO;
+ 		} else {
+ 			if (sf & SYSC_HAS_ENAWAKEUP)
 diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
-index 8498774..0c898f5 100644
+index fe59629..8498774 100644
 --- a/arch/arm/mach-omap2/omap_hwmod.h
 +++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -645,9 +645,6 @@ int omap_hwmod_read_hardreset(struct omap_hwmod *oh, const char *name);
- int omap_hwmod_enable_clocks(struct omap_hwmod *oh);
- int omap_hwmod_disable_clocks(struct omap_hwmod *oh);
+@@ -463,6 +463,9 @@ struct omap_hwmod_omap4_prcm {
+  *     is kept in force-standby mode. Failing to do so causes PM problems
+  *     with musb on OMAP3630 at least. Note that musb has a dedicated register
+  *     to control MSTANDBY signal when MIDLEMODE is set to force-standby.
++ * HWMOD_SWSUP_SIDLE_ACT: omap_hwmod code should manually bring the module
++ *     out of idle, but rely on smart-idle to the put it back in idle,
++ *     so the wakeups are still functional (Only known case for now is UART)
+  */
+ #define HWMOD_SWSUP_SIDLE			(1 << 0)
+ #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
+@@ -476,6 +479,7 @@ struct omap_hwmod_omap4_prcm {
+ #define HWMOD_EXT_OPT_MAIN_CLK			(1 << 9)
+ #define HWMOD_BLOCK_WFI				(1 << 10)
+ #define HWMOD_FORCE_MSTANDBY			(1 << 11)
++#define HWMOD_SWSUP_SIDLE_ACT			(1 << 12)
  
--int omap_hwmod_set_slave_idlemode(struct omap_hwmod *oh, u8 idlemode);
--int omap_hwmod_set_ocp_autoidle(struct omap_hwmod *oh, u8 autoidle);
--
- int omap_hwmod_reset(struct omap_hwmod *oh);
- void omap_hwmod_ocp_barrier(struct omap_hwmod *oh);
- 
+ /*
+  * omap_hwmod._int_flags definitions
 -- 
 1.7.9.5
