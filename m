@@ -1,56 +1,47 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 15 May 2013 17:23:33 +0200
-Subject: [PATCHv2 3/3] arm: dts: add bandgap entry for OMAP4460 devices
-In-Reply-To: <1368629928-6723-4-git-send-email-eduardo.valentin@ti.com>
-References: <1368629928-6723-1-git-send-email-eduardo.valentin@ti.com>
- <1368629928-6723-4-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <5193A875.1020000@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 May 2013 16:23:56 +0100
+Subject: [PATCHv2 0/5] arm: arch_timer cleanups and niceties
+Message-ID: <1368631441-28434-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+The following patches clean up some (harmless) fallout from the changes
+in 3.9, and make the driver always use the virtual counter, eliminating
+problems relating to choosing which counters to use (racy
+initialisation, branches in hot paths).
 
-On 05/15/2013 04:58 PM, Eduardo Valentin wrote:
-> Include bandgap devices for OMAP4460 devices.
-> 
-> Cc: "Beno?t Cousson" <b-cousson@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-omap at vger.kernel.org
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-> ---
->  arch/arm/boot/dts/omap4460.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
-> index 2cf227c..e5bfbfe 100644
-> --- a/arch/arm/boot/dts/omap4460.dtsi
-> +++ b/arch/arm/boot/dts/omap4460.dtsi
-> @@ -29,4 +29,13 @@
->  			     <0 55 0x4>;
->  		ti,hwmods = "debugss";
->  	};
-> +
-> +	bandgap {
-> +		reg = <0x4a002260 0x4
-> +			0x4a00232C 0x4
-> +			0x4a002378 0x18>;
-> +		compatible = "ti,omap4460-bandgap";
-> +		interrupts = <0 126 4>; /* talert */
-> +		ti,tshut-gpio = <86>;
+The patches can also be found in my public git tree:
+git://linux-arm.org/git/linux-mr.git clocks/arch-timer-cleanups
 
-Why do you need a custom attribute for GPIO? Cannot you use the standard
-one?
+Since v1 [1]:
+* Rebased to v3.10-rc1
+* Fix up mach-shmobile's selection of ARCH_ARM_TIMER
 
-Where is the gpio controller phandle?
+Thanks,
+Mark.
 
-Usually it looks like this:
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-March/158604.html
 
-	gpios = <&gpio1 8 0>;
+Marc Zyngier (2):
+  ARM: hyp: initialize CNTVOFF to zero
+  ARM: arch_timer: stop virtual timer when booted in HYP mode
 
+Mark Rutland (3):
+  ARM: KVM: arch_timers: zero CNTVOFF upon return to host
+  clocksource: arch_timer: use virtual counters
+  arm: fix up ARM_ARCH_TIMER selects
 
-Regards,
-Benoit
+ arch/arm/include/asm/arch_timer.h    |  9 ---------
+ arch/arm/kernel/hyp-stub.S           |  7 +++++++
+ arch/arm/kvm/interrupts_head.S       |  4 ++++
+ arch/arm/mach-exynos/Kconfig         |  2 +-
+ arch/arm/mach-shmobile/Kconfig       |  4 ++--
+ arch/arm/mach-tegra/Kconfig          |  2 +-
+ arch/arm/mach-virt/Kconfig           |  2 +-
+ arch/arm64/include/asm/arch_timer.h  | 10 ----------
+ drivers/clocksource/arm_arch_timer.c | 23 +++++------------------
+ include/clocksource/arm_arch_timer.h |  2 +-
+ 10 files changed, 22 insertions(+), 43 deletions(-)
+
+-- 
+1.8.1.1
