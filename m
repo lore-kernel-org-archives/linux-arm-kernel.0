@@ -1,39 +1,52 @@
-From: neidhard.kim@lge.com (Jongsung Kim)
-Date: Wed, 15 May 2013 10:00:07 +0900
-Subject: [PATCH] ARM: PL011: add support for extended FIFO-size of
- PL011-r1p5
-In-Reply-To: <5192A692.4010700@wwwdotorg.org>
-References: <007301ce375e$bcf6d6b0$36e48410$@lge.com>
- <5191D200.3040604@wwwdotorg.org> <01fd01ce5072$d6b9fcd0$842df670$@lge.com>
- <5192A692.4010700@wwwdotorg.org>
-Message-ID: <022d01ce5107$8bc668e0$a3533aa0$@lge.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 15 May 2013 10:46:04 +0900
+Subject: [PATCH 05/20] ARM: shmobile: ape6evm: Remove init_irq
+ declaration in machine description
+In-Reply-To: <20130515005907.GD12246@verge.net.au>
+References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1368545933-7430-6-git-send-email-maxime.ripard@free-electrons.com>
+ <20130515005907.GD12246@verge.net.au>
+Message-ID: <20130515014604.GK12246@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> :
-> Looking at BCM2835-ARM-Peripherals.pdf (i.e. the public documentation for
-> the BCM2835 chip), I see:
->
-> =====
-> The UART provides:
-> * Separate 16x8 transmit and 16x12 receive FIFO memory.
-> ...
-> For the in-depth UART overview, please, refer to the ARM PrimeCell UART
-> (PL011) Revision: r1p5 Technical Reference Manual.
-> =====
->
-> That seems to imply that not all r1p5 PL011s actually have a depth-32
-FIFO.
-> Perhaps this is a configurable property of the IP block, not something
-that
-> all r1p5 have?
+On Wed, May 15, 2013 at 09:59:07AM +0900, Simon Horman wrote:
+> On Tue, May 14, 2013 at 05:38:38PM +0200, Maxime Ripard wrote:
+> > Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
+> > specified") removed the need to explictly setup the init_irq field in
+> > the machine description when using only irqchip_init. Remove that
+> > declaration for shmobile as well.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/mach-shmobile/board-ape6evm.c | 2 --
+> >  1 file changed, 2 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
+> > index 55b8c9f..8dfbdba 100644
+> > --- a/arch/arm/mach-shmobile/board-ape6evm.c
+> > +++ b/arch/arm/mach-shmobile/board-ape6evm.c
+> > @@ -20,7 +20,6 @@
+> >  
+> >  #include <linux/gpio.h>
+> >  #include <linux/interrupt.h>
+> > -#include <linux/irqchip.h>
+> >  #include <linux/kernel.h>
+> >  #include <linux/pinctrl/machine.h>
+> >  #include <linux/platform_device.h>
+> > @@ -87,7 +86,6 @@ static const char *ape6evm_boards_compat_dt[] __initdata = {
+> >  };
+> >  
+> >  DT_MACHINE_START(APE6EVM_DT, "ape6evm")
+> > -	.init_irq	= irqchip_init,
+> >  	.init_time	= shmobile_timer_init,
+> >  	.init_machine	= ape6evm_add_standard_devices,
+> >  	.dt_compat	= ape6evm_boards_compat_dt,
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-All r1p5 have 32-byte FIFO depth and it's not configurable. From the PL011
-TRM:
+Sorry, what I should have said is:
 
-r1p4-r1p5	Contains the following differences in functionality:
-		* The receive and transmit FIFOs are increased to a depth of
-32.
-		* The Revision field in the UARTPeriphID2 Register on page
-3-24
-		  bits [7:4] now reads back as 0x3.
+Queued up for v3.11 in the boards-spe6evm branch of my renesas tree
+on kernel.org. It is included in the renesas-next-20130515 tag of
+that tree and should appear in linux-next in the not to distant future.
