@@ -1,105 +1,135 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 15 May 2013 15:36:55 +0200
-Subject: [PATCHv4 2/9] arm: kirkwood: move PCIe window init to legacy driver
+Date: Wed, 15 May 2013 15:36:56 +0200
+Subject: [PATCHv4 3/9] arm: kirkwood: add SoC-level Device Tree data for PCIe
+ interfaces
 In-Reply-To: <1368625022-25243-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1368625022-25243-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1368625022-25243-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1368625022-25243-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we are going to enable the usage of the mvebu PCIe driver on
-Kirkwood, we don't want the PCIe windows to be unconditionally created
-by kirkwood_setup_wins(). Therefore, we move the PCIe window
-initialization into the legacy PCIe driver
-(arch/arm/mach-kirkwood/pcie.c).
-
-The platforms using the legacy driver will see their windows
-statically allocated by
-arch/arm/mach-kirkwood/pcie.c:kirkwood_pcie_init(). The platforms
-using the new driver in drivers/pci/ will see their windows
-dynamically allocated directly by the driver.
+This commit adds Device Tree details to enable the PCIe interfaces on
+Kirkwood. The 6281 has one PCIe interface, the 6282 has two PCIe
+interfaces.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Tested-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mach-kirkwood/common.c |   24 ------------------------
- arch/arm/mach-kirkwood/pcie.c   |   22 ++++++++++++++++++++++
- 2 files changed, 22 insertions(+), 24 deletions(-)
+ arch/arm/boot/dts/kirkwood-6281.dtsi |   31 ++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-6282.dtsi |   48 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood.dtsi      |    1 +
+ 3 files changed, 80 insertions(+)
 
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index c2cae69..9b0b901 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -654,30 +654,6 @@ char * __init kirkwood_id(void)
- 
- void __init kirkwood_setup_wins(void)
- {
--	/*
--	 * The PCIe windows will no longer be statically allocated
--	 * here once Kirkwood is migrated to the pci-mvebu driver.
--	 */
--	mvebu_mbus_add_window_remap_flags("pcie0.0",
--					  KIRKWOOD_PCIE_IO_PHYS_BASE,
--					  KIRKWOOD_PCIE_IO_SIZE,
--					  KIRKWOOD_PCIE_IO_BUS_BASE,
--					  MVEBU_MBUS_PCI_IO);
--	mvebu_mbus_add_window_remap_flags("pcie0.0",
--					  KIRKWOOD_PCIE_MEM_PHYS_BASE,
--					  KIRKWOOD_PCIE_MEM_SIZE,
--					  MVEBU_MBUS_NO_REMAP,
--					  MVEBU_MBUS_PCI_MEM);
--	mvebu_mbus_add_window_remap_flags("pcie1.0",
--					  KIRKWOOD_PCIE1_IO_PHYS_BASE,
--					  KIRKWOOD_PCIE1_IO_SIZE,
--					  KIRKWOOD_PCIE1_IO_BUS_BASE,
--					  MVEBU_MBUS_PCI_IO);
--	mvebu_mbus_add_window_remap_flags("pcie1.0",
--					  KIRKWOOD_PCIE1_MEM_PHYS_BASE,
--					  KIRKWOOD_PCIE1_MEM_SIZE,
--					  MVEBU_MBUS_NO_REMAP,
--					  MVEBU_MBUS_PCI_MEM);
- 	mvebu_mbus_add_window("nand", KIRKWOOD_NAND_MEM_PHYS_BASE,
- 			      KIRKWOOD_NAND_MEM_SIZE);
- 	mvebu_mbus_add_window("sram", KIRKWOOD_SRAM_PHYS_BASE,
-diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
-index 7f43e6c..ddcb09f 100644
---- a/arch/arm/mach-kirkwood/pcie.c
-+++ b/arch/arm/mach-kirkwood/pcie.c
-@@ -12,6 +12,7 @@
- #include <linux/pci.h>
- #include <linux/slab.h>
- #include <linux/clk.h>
-+#include <linux/mbus.h>
- #include <video/vga.h>
- #include <asm/irq.h>
- #include <asm/mach/pci.h>
-@@ -253,6 +254,27 @@ static void __init add_pcie_port(int index, void __iomem *base)
- 
- void __init kirkwood_pcie_init(unsigned int portmask)
- {
-+	mvebu_mbus_add_window_remap_flags("pcie0.0",
-+					  KIRKWOOD_PCIE_IO_PHYS_BASE,
-+					  KIRKWOOD_PCIE_IO_SIZE,
-+					  KIRKWOOD_PCIE_IO_BUS_BASE,
-+					  MVEBU_MBUS_PCI_IO);
-+	mvebu_mbus_add_window_remap_flags("pcie0.0",
-+					  KIRKWOOD_PCIE_MEM_PHYS_BASE,
-+					  KIRKWOOD_PCIE_MEM_SIZE,
-+					  MVEBU_MBUS_NO_REMAP,
-+					  MVEBU_MBUS_PCI_MEM);
-+	mvebu_mbus_add_window_remap_flags("pcie1.0",
-+					  KIRKWOOD_PCIE1_IO_PHYS_BASE,
-+					  KIRKWOOD_PCIE1_IO_SIZE,
-+					  KIRKWOOD_PCIE1_IO_BUS_BASE,
-+					  MVEBU_MBUS_PCI_IO);
-+	mvebu_mbus_add_window_remap_flags("pcie1.0",
-+					  KIRKWOOD_PCIE1_MEM_PHYS_BASE,
-+					  KIRKWOOD_PCIE1_MEM_SIZE,
-+					  MVEBU_MBUS_NO_REMAP,
-+					  MVEBU_MBUS_PCI_MEM);
+diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi b/arch/arm/boot/dts/kirkwood-6281.dtsi
+index d6c9d65..5137668 100644
+--- a/arch/arm/boot/dts/kirkwood-6281.dtsi
++++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
+@@ -40,5 +40,36 @@
+ 				marvell,function = "sdio";
+ 			};
+ 		};
 +
- 	vga_base = KIRKWOOD_PCIE_MEM_PHYS_BASE;
- 
- 	if (portmask & KW_PCIE0)
++		pcie-controller {
++			compatible = "marvell,kirkwood-pcie";
++			status = "disabled";
++			device_type = "pci";
++
++			#address-cells = <3>;
++			#size-cells = <2>;
++
++			bus-range = <0x00 0xff>;
++
++			ranges = <0x82000000 0 0x00040000 0x00040000 0 0x00002000   /* Port 0.0 registers */
++				  0x82000000 0 0xe0000000 0xe0000000 0 0x08000000   /* non-prefetchable memory */
++			          0x81000000 0 0          0xe8000000 0 0x00100000>; /* downstream I/O */
++
++			pcie at 1,0 {
++				device_type = "pci";
++				assigned-addresses = <0x82000800 0 0x00040000 0 0x2000>;
++				reg = <0x0800 0 0 0 0>;
++				#address-cells = <3>;
++				#size-cells = <2>;
++				#interrupt-cells = <1>;
++				ranges;
++				interrupt-map-mask = <0 0 0 0>;
++				interrupt-map = <0 0 0 0 &intc 9>;
++				marvell,pcie-port = <0>;
++				marvell,pcie-lane = <0>;
++				clocks = <&gate_clk 2>;
++				status = "disabled";
++			};
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
+index 23991e4..66a751a 100644
+--- a/arch/arm/boot/dts/kirkwood-6282.dtsi
++++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
+@@ -65,5 +65,53 @@
+ 			clocks = <&gate_clk 7>;
+ 			status = "disabled";
+ 		};
++
++		pcie-controller {
++			compatible = "marvell,kirkwood-pcie";
++			status = "disabled";
++			device_type = "pci";
++
++			#address-cells = <3>;
++			#size-cells = <2>;
++
++			bus-range = <0x00 0xff>;
++
++			ranges = <0x82000000 0 0x00040000 0x00040000 0 0x00002000   /* Port 0.0 registers */
++			          0x82000000 0 0x00044000 0x00044000 0 0x00002000   /* Port 1.0 registers */
++				  0x82000000 0 0xe0000000 0xe0000000 0 0x08000000   /* non-prefetchable memory */
++			          0x81000000 0 0          0xe8000000 0 0x00100000>; /* downstream I/O */
++
++			pcie at 1,0 {
++				device_type = "pci";
++				assigned-addresses = <0x82000800 0 0x00040000 0 0x2000>;
++				reg = <0x0800 0 0 0 0>;
++				#address-cells = <3>;
++				#size-cells = <2>;
++				#interrupt-cells = <1>;
++				ranges;
++				interrupt-map-mask = <0 0 0 0>;
++				interrupt-map = <0 0 0 0 &intc 9>;
++				marvell,pcie-port = <0>;
++				marvell,pcie-lane = <0>;
++				clocks = <&gate_clk 2>;
++				status = "disabled";
++			};
++
++			pcie at 2,0 {
++				device_type = "pci";
++				assigned-addresses = <0x82001000 0 0x00044000 0 0x2000>;
++				reg = <0x1000 0 0 0 0>;
++				#address-cells = <3>;
++				#size-cells = <2>;
++				#interrupt-cells = <1>;
++				ranges;
++				interrupt-map-mask = <0 0 0 0>;
++				interrupt-map = <0 0 0 0 &intc 10>;
++				marvell,pcie-port = <1>;
++				marvell,pcie-lane = <0>;
++				clocks = <&gate_clk 18>;
++				status = "disabled";
++			};
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index fada7e6..7eef88f 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -19,6 +19,7 @@
+ 	ocp at f1000000 {
+ 		compatible = "simple-bus";
+ 		ranges = <0x00000000 0xf1000000 0x4000000
++		          0xe0000000 0xe0000000 0x8100000 /* PCIE */
+ 		          0xf5000000 0xf5000000 0x0000400>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 1.7.9.5
