@@ -1,30 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 May 2013 17:48:54 +0100
-Subject: [PATCHv2] arm: mm: Use phys_addr_t properly for ioremap functions
-In-Reply-To: <201305151615.39752.arnd@arndb.de>
-References: <1368560031-19367-1-git-send-email-lauraa@codeaurora.org>
- <201305151615.39752.arnd@arndb.de>
-Message-ID: <20130515164854.GM18614@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 May 2013 18:50:47 +0200
+Subject: [PATCH 05/39] ARM: ux500: Stop passing MMC's platform data for
+ Device Tree boots
+In-Reply-To: <1368611522-9984-6-git-send-email-lee.jones@linaro.org>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-6-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdbOxzhgR=ugXLrSBJ_Y1rw=0mcrvtuRi=-c5v039xsPWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 04:15:39PM +0200, Arnd Bergmann wrote:
-> On Tuesday 14 May 2013, Laura Abbott wrote:
-> > Several of the ioremap functions use unsigned long in places
-> > resulting in truncation if physical addresses greater than
-> > 4G are passed in. Change the types of the functions and the
-> > callers accordingly.
-> 
-> Looks good to me. I wonder a bit whether resource_size_t or phys_addr_t
-> is the right type here, but they are always defined to the same type
-> these days.
-> 
-> FWIW, x86 and tile use resource_size_t, while a couple of other architectures
-> use phys_addr_t.
+On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Maybe there's a project there for someone to remove phys_addr_t or
-resource_size_t then - but I suspect Linus won't like the churn
-caused by that...
+> It was required to pass DMA channel configuration information to the
+> MMC driver before the new DMA API was in place. Now that it is, and
+> is fully compatible with Device Tree we can stop doing that.
+>
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-So, let's just go by the one which takes less typing and save our
-fingers.  phys_addr_t.
+So since the use of dma_request_slave_channel() is not upstream,
+I guess this will break DMA use (i.e slow down transfers!) on all
+device tree boots?
+
+I'd be happy to apply it once the MMCI patch is in linux-next
+indicating there may just be a window in the merge period
+where it falls back to IRQ mode, but I don't want to disable
+DMA on DT boots for an entire kernel cycle just like that.
+
+Not applied as of yet.
+
+Yours,
+Linus Walleij
