@@ -1,27 +1,81 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 May 2013 18:33:21 +0200
-Subject: [PATCH 02/39] dmaengine: ste_dma40: Remove unnecessary call to
- d40_phy_cfg()
-In-Reply-To: <1368611522-9984-3-git-send-email-lee.jones@linaro.org>
-References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbWPLvPmJz_oHxFVJ9w+8XRJsVVD5v=6LyoDzpYA+JRHA@mail.gmail.com>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Wed, 15 May 2013 12:36:58 -0400
+Subject: [PATCHv2 3/3] arm: dts: add bandgap entry for OMAP4460 devices
+In-Reply-To: <5193A875.1020000@ti.com>
+References: <1368629928-6723-1-git-send-email-eduardo.valentin@ti.com>
+ <1368629928-6723-4-git-send-email-eduardo.valentin@ti.com>
+ <5193A875.1020000@ti.com>
+Message-ID: <5193B9AA.7020507@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
+On 15-05-2013 11:23, Benoit Cousson wrote:
+> Hi Eduardo,
+> 
+> On 05/15/2013 04:58 PM, Eduardo Valentin wrote:
+>> Include bandgap devices for OMAP4460 devices.
+>>
+>> Cc: "Beno?t Cousson" <b-cousson@ti.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: linux-omap at vger.kernel.org
+>> Cc: devicetree-discuss at lists.ozlabs.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+>> ---
+>>  arch/arm/boot/dts/omap4460.dtsi | 9 +++++++++
+>>  1 file changed, 9 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+>> index 2cf227c..e5bfbfe 100644
+>> --- a/arch/arm/boot/dts/omap4460.dtsi
+>> +++ b/arch/arm/boot/dts/omap4460.dtsi
+>> @@ -29,4 +29,13 @@
+>>  			     <0 55 0x4>;
+>>  		ti,hwmods = "debugss";
+>>  	};
+>> +
+>> +	bandgap {
+>> +		reg = <0x4a002260 0x4
+>> +			0x4a00232C 0x4
+>> +			0x4a002378 0x18>;
+>> +		compatible = "ti,omap4460-bandgap";
+>> +		interrupts = <0 126 4>; /* talert */
+>> +		ti,tshut-gpio = <86>;
 
-> All configuration left in d40_phy_cfg() is runtime configurable and
-> there is already a call into it from d40_runtime_config(), so let's
-> rely on that.
->
-> Acked-by: Vinod Koul <vnod.koul@intel.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-You forgot to update the commit message, but I saw that you
-fixed what I asked for so I just went in and edited the commit message
-and applied it.
 
-Yours,
-Linus Walleij
+> 
+> Why do you need a custom attribute for GPIO? Cannot you use the standard
+> one?
+
+I believe it was by your suggestion :-), during the first attempts to
+send this driver. But could not find the thread link :-( sorry.
+
+
+I guess the reasoning to mark it as a ti specific is because it will be
+used as IRQ line to treat thermal shutdown (in SW).
+
+> 
+> Where is the gpio controller phandle?
+> 
+> Usually it looks like this:
+> 
+> 	gpios = <&gpio1 8 0>;
+> 
+> 
+> Regards,
+> Benoit
+> 
+> 
+> 
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 295 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130515/8b26aa1e/attachment.sig>
