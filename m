@@ -1,127 +1,115 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 15 May 2013 10:51:32 +0100
-Subject: [PATCH 09/39] ARM: ux500: Remove DMA address look-up table
+Date: Wed, 15 May 2013 10:51:30 +0100
+Subject: [PATCH 07/39] dmaengine: ste_dma40: Only use addresses passed as
+ configuration information
 In-Reply-To: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
 References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1368611522-9984-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1368611522-9984-8-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA addresses are now passed as part of the dmaengine API by invoking
-dmaengine_slave_config(). So there's no requirement for the DMA40
-driver to look them up in a table provided by platform data. This
-method does not fit in well using Device Tree either.
+Addresses are passed in from the client's driver via the invocation of
+dmaengine_slave_config(), so there's no need to fetch them from platform
+data too, hardwired or otherwise. This is a great step forward, as it
+elevates a large burden from platform data in the way of a look-up
+table.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/devices-db8500.c        |   80 ---------------------------
- include/linux/platform_data/dma-ste-dma40.h |    2 -
- 2 files changed, 82 deletions(-)
+ drivers/dma/ste_dma40.c |   51 ++++++++++-------------------------------------
+ 1 file changed, 11 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
-index bed25a3..e21ffd8 100644
---- a/arch/arm/mach-ux500/devices-db8500.c
-+++ b/arch/arm/mach-ux500/devices-db8500.c
-@@ -42,87 +42,7 @@ static struct resource dma40_resources[] = {
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index ba84df8..57a127e 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -1774,22 +1774,6 @@ static int d40_validate_conf(struct d40_chan *d40c,
+ 		res = -EINVAL;
  	}
- };
  
--/*
-- * Mapping between destination event lines and physical device address.
-- * The event line is tied to a device and therefore the address is constant.
-- * When the address comes from a primecell it will be configured in runtime
-- * and we set the address to -1 as a placeholder.
-- */
--static const dma_addr_t dma40_tx_map[DB8500_DMA_NR_DEV] = {
--	/* MUSB - these will be runtime-reconfigured */
--	[DB8500_DMA_DEV39_USB_OTG_IEP_AND_OEP_8] = -1,
--	[DB8500_DMA_DEV16_USB_OTG_IEP_AND_OEP_7_15] = -1,
--	[DB8500_DMA_DEV17_USB_OTG_IEP_AND_OEP_6_14] = -1,
--	[DB8500_DMA_DEV18_USB_OTG_IEP_AND_OEP_5_13] = -1,
--	[DB8500_DMA_DEV19_USB_OTG_IEP_AND_OEP_4_12] = -1,
--	[DB8500_DMA_DEV36_USB_OTG_IEP_AND_OEP_3_11] = -1,
--	[DB8500_DMA_DEV37_USB_OTG_IEP_AND_OEP_2_10] = -1,
--	[DB8500_DMA_DEV38_USB_OTG_IEP_AND_OEP_1_9] = -1,
--	/* PrimeCells - run-time configured */
--	[DB8500_DMA_DEV0_SPI0] = -1,
--	[DB8500_DMA_DEV1_SD_MMC0] = -1,
--	[DB8500_DMA_DEV2_SD_MMC1] = -1,
--	[DB8500_DMA_DEV3_SD_MMC2] = -1,
--	[DB8500_DMA_DEV8_SSP0] = -1,
--	[DB8500_DMA_DEV9_SSP1] = -1,
--	[DB8500_DMA_DEV11_UART2] = -1,
--	[DB8500_DMA_DEV12_UART1] = -1,
--	[DB8500_DMA_DEV13_UART0] = -1,
--	[DB8500_DMA_DEV28_SD_MM2] = -1,
--	[DB8500_DMA_DEV29_SD_MM0] = -1,
--	[DB8500_DMA_DEV32_SD_MM1] = -1,
--	[DB8500_DMA_DEV33_SPI2] = -1,
--	[DB8500_DMA_DEV35_SPI1] = -1,
--	[DB8500_DMA_DEV40_SPI3] = -1,
--	[DB8500_DMA_DEV41_SD_MM3] = -1,
--	[DB8500_DMA_DEV42_SD_MM4] = -1,
--	[DB8500_DMA_DEV43_SD_MM5] = -1,
--	[DB8500_DMA_DEV14_MSP2] = U8500_MSP2_BASE + MSP_TX_RX_REG_OFFSET,
--	[DB8500_DMA_DEV30_MSP1] = U8500_MSP1_BASE + MSP_TX_RX_REG_OFFSET,
--	[DB8500_DMA_DEV31_MSP0_SLIM0_CH0] = U8500_MSP0_BASE + MSP_TX_RX_REG_OFFSET,
--	[DB8500_DMA_DEV48_CAC1] = U8500_CRYP1_BASE + CRYP1_TX_REG_OFFSET,
--	[DB8500_DMA_DEV50_HAC1_TX] = U8500_HASH1_BASE + HASH1_TX_REG_OFFSET,
--};
+-	if (conf->dir == STEDMA40_MEM_TO_PERIPH &&
+-	    d40c->base->plat_data->dev_tx[conf->dev_type] == 0 &&
+-	    d40c->runtime_addr == 0) {
+-		chan_err(d40c, "Invalid TX channel address (%d)\n",
+-			 conf->dev_type);
+-		res = -EINVAL;
+-	}
 -
--/* Mapping between source event lines and physical device address */
--static const dma_addr_t dma40_rx_map[DB8500_DMA_NR_DEV] = {
--	/* MUSB - these will be runtime-reconfigured */
--	[DB8500_DMA_DEV39_USB_OTG_IEP_AND_OEP_8] = -1,
--	[DB8500_DMA_DEV16_USB_OTG_IEP_AND_OEP_7_15] = -1,
--	[DB8500_DMA_DEV17_USB_OTG_IEP_AND_OEP_6_14] = -1,
--	[DB8500_DMA_DEV18_USB_OTG_IEP_AND_OEP_5_13] = -1,
--	[DB8500_DMA_DEV19_USB_OTG_IEP_AND_OEP_4_12] = -1,
--	[DB8500_DMA_DEV36_USB_OTG_IEP_AND_OEP_3_11] = -1,
--	[DB8500_DMA_DEV37_USB_OTG_IEP_AND_OEP_2_10] = -1,
--	[DB8500_DMA_DEV38_USB_OTG_IEP_AND_OEP_1_9] = -1,
--	/* PrimeCells */
--	[DB8500_DMA_DEV0_SPI0] = -1,
--	[DB8500_DMA_DEV1_SD_MMC0] = -1,
--	[DB8500_DMA_DEV2_SD_MMC1] = -1,
--	[DB8500_DMA_DEV3_SD_MMC2] = -1,
--	[DB8500_DMA_DEV8_SSP0] = -1,
--	[DB8500_DMA_DEV9_SSP1] = -1,
--	[DB8500_DMA_DEV11_UART2] = -1,
--	[DB8500_DMA_DEV12_UART1] = -1,
--	[DB8500_DMA_DEV13_UART0] = -1,
--	[DB8500_DMA_DEV28_SD_MM2] = -1,
--	[DB8500_DMA_DEV29_SD_MM0] = -1,
--	[DB8500_DMA_DEV32_SD_MM1] = -1,
--	[DB8500_DMA_DEV33_SPI2] = -1,
--	[DB8500_DMA_DEV35_SPI1] = -1,
--	[DB8500_DMA_DEV40_SPI3] = -1,
--	[DB8500_DMA_DEV41_SD_MM3] = -1,
--	[DB8500_DMA_DEV42_SD_MM4] = -1,
--	[DB8500_DMA_DEV43_SD_MM5] = -1,
--	[DB8500_DMA_DEV14_MSP2] = U8500_MSP2_BASE + MSP_TX_RX_REG_OFFSET,
--	[DB8500_DMA_DEV30_MSP3] = U8500_MSP3_BASE + MSP_TX_RX_REG_OFFSET,
--	[DB8500_DMA_DEV31_MSP0_SLIM0_CH0] = U8500_MSP0_BASE + MSP_TX_RX_REG_OFFSET,
--	[DB8500_DMA_DEV48_CAC1] = U8500_CRYP1_BASE + CRYP1_RX_REG_OFFSET,
--};
+-	if (conf->dir == STEDMA40_PERIPH_TO_MEM &&
+-	    d40c->base->plat_data->dev_rx[conf->dev_type] == 0 &&
+-	    d40c->runtime_addr == 0) {
+-		chan_err(d40c, "Invalid RX channel address (%d)\n",
+-			 conf->dev_type);
+-		res = -EINVAL;
+-	}
 -
- struct stedma40_platform_data dma40_plat_data = {
--	.dev_rx = dma40_rx_map,
--	.dev_tx = dma40_tx_map,
- 	.disabled_channels = {-1},
- };
+ 	if (conf->dir == STEDMA40_PERIPH_TO_PERIPH) {
+ 		/*
+ 		 * DMAC HW supports it. Will be added to this driver,
+@@ -2327,14 +2311,10 @@ d40_prep_sg(struct dma_chan *dchan, struct scatterlist *sg_src,
+ 	if (sg_next(&sg_src[sg_len - 1]) == sg_src)
+ 		desc->cyclic = true;
  
-diff --git a/include/linux/platform_data/dma-ste-dma40.h b/include/linux/platform_data/dma-ste-dma40.h
-index c54af61..af0064e 100644
---- a/include/linux/platform_data/dma-ste-dma40.h
-+++ b/include/linux/platform_data/dma-ste-dma40.h
-@@ -152,8 +152,6 @@ struct stedma40_chan_cfg {
-  * for 'multiple of 4' channels, like 8.
-  */
- struct stedma40_platform_data {
--	const dma_addr_t		*dev_tx;
--	const dma_addr_t		*dev_rx;
- 	int				 disabled_channels[STEDMA40_MAX_PHYS];
- 	int				*soft_lli_chans;
- 	int				 num_of_soft_lli_chans;
+-	if (direction != DMA_TRANS_NONE) {
+-		dma_addr_t dev_addr = d40_get_dev_addr(chan, direction);
+-
+-		if (direction == DMA_DEV_TO_MEM)
+-			src_dev_addr = dev_addr;
+-		else if (direction == DMA_MEM_TO_DEV)
+-			dst_dev_addr = dev_addr;
+-	}
++	if (direction == DMA_DEV_TO_MEM)
++		src_dev_addr = chan->runtime_addr;
++	else if (direction == DMA_MEM_TO_DEV)
++		dst_dev_addr = chan->runtime_addr;
+ 
+ 	if (chan_is_logical(chan))
+ 		ret = d40_prep_sg_log(chan, desc, sg_src, sg_dst,
+@@ -2782,15 +2762,8 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+ 	dst_maxburst = config->dst_maxburst;
+ 
+ 	if (config->direction == DMA_DEV_TO_MEM) {
+-		dma_addr_t dev_addr_rx =
+-			d40c->base->plat_data->dev_rx[cfg->dev_type];
+-
+ 		config_addr = config->src_addr;
+-		if (dev_addr_rx)
+-			dev_dbg(d40c->base->dev,
+-				"channel has a pre-wired RX address %08x "
+-				"overriding with %08x\n",
+-				dev_addr_rx, config_addr);
++
+ 		if (cfg->dir != STEDMA40_PERIPH_TO_MEM)
+ 			dev_dbg(d40c->base->dev,
+ 				"channel was not configured for peripheral "
+@@ -2805,15 +2778,8 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+ 			dst_maxburst = src_maxburst;
+ 
+ 	} else if (config->direction == DMA_MEM_TO_DEV) {
+-		dma_addr_t dev_addr_tx =
+-			d40c->base->plat_data->dev_tx[cfg->dev_type];
+-
+ 		config_addr = config->dst_addr;
+-		if (dev_addr_tx)
+-			dev_dbg(d40c->base->dev,
+-				"channel has a pre-wired TX address %08x "
+-				"overriding with %08x\n",
+-				dev_addr_tx, config_addr);
++
+ 		if (cfg->dir != STEDMA40_MEM_TO_PERIPH)
+ 			dev_dbg(d40c->base->dev,
+ 				"channel was not configured for memory "
+@@ -2833,6 +2799,11 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+ 		return -EINVAL;
+ 	}
+ 
++	if (config_addr <= 0) {
++		dev_err(d40c->base->dev, "no address supplied\n");
++		return -EINVAL;
++	}
++
+ 	if (src_maxburst * src_addr_width != dst_maxburst * dst_addr_width) {
+ 		dev_err(d40c->base->dev,
+ 			"src/dst width/maxburst mismatch: %d*%d != %d*%d\n",
 -- 
 1.7.10.4
