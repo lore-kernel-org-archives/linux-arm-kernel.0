@@ -1,82 +1,23 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 15 May 2013 16:13:56 +0200
-Subject: Fwd: Tegra 30 System hangs because of commit "pinctrl: move
- subsystem mutex to pinctrl_dev struct"
-In-Reply-To: <5192A0E4.2070202@gmail.com>
-References: <CACRpkdZdT8==cUtH4=Y3LC-eVu6ntO2ojFC4bSXNuxa4hMJ=ZA@mail.gmail.com>
- <20130505202236.GF24282@game.jcrosoft.org>
- <CACRpkda2EG0O-pfZQ5kLFX=cwSmUSVBJkR7Xvye3ROs3tstv9w@mail.gmail.com>
- <20130506194122.GG24282@game.jcrosoft.org>
- <20130506195403.GJ18614@n2100.arm.linux.org.uk>
- <CACRpkdZtPhzLFicYYZF0SZfp4dMJars+Z-7hTUZQ1JjPExXW3A@mail.gmail.com>
- <CACxGe6uo60OwRd7buPX4382_vE48MLWJYyB_ka+iS2FfVCa8mw@mail.gmail.com>
- <CAOesGMiqrXSPdEtUzGCuAuhdE4K7FVe65zMM962XuOrO555hnQ@mail.gmail.com>
- <CAGNsrLDw0_yX9nkLYDg0e8-551P7r43UxziTp1TXyyxdiKR5nA@mail.gmail.com>
- <5192A0E4.2070202@gmail.com>
-Message-ID: <20130515141356.GH22508@game.jcrosoft.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 May 2013 16:20:56 +0200
+Subject: [PATCH] arm: prima2: use of_platform_populate instead of
+ of_platform_bus_probe
+In-Reply-To: <1368523923-27137-1-git-send-email-Baohua.Song@csr.com>
+References: <1368523923-27137-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <201305151620.56677.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:39 Tue 14 May     , Rob Herring wrote:
-> On 05/09/2013 12:51 PM, Fathi Boudra wrote:
-> > On 9 May 2013 19:13, Olof Johansson <olof@lixom.net> wrote:
-> >> On Thu, May 9, 2013 at 6:25 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> >>> On Mon, May 6, 2013 at 9:12 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> >>>> On Mon, May 6, 2013 at 9:54 PM, Russell King - ARM Linux
-> >> Yes, a builder is quite useful. Several of us do our own builds as well.
-> >>
-> >> When it comes to boot coverage, I'm not sure how successful a central
-> >> approach would be. It's something where I think Linaro could
-> >> contribute a lot for their member platforms, but I haven't seen much
-> >> engagement there yet.
-> > 
-> > My previous post was lost. Sorry to repost..
-> > 
-> > We've got a jenkins instance doing daily builds on various trees and
-> > boot testing on the few boards we've got in the lab:
-> > https://ci.linaro.org/jenkins/view/kernel-ci/
-> > 
-> > But it hasn't attracted much interest so far... It's been here since a year.
+On Tuesday 14 May 2013, Barry Song wrote:
 > 
-> Perhaps because there is no useful information there that I can find.
-> Where does it say what failed in the build? I see no artifacts or useful
-> console output.
+> use of_platform_populate to populate platform devices, it is suitable
+> for creating devices which are children of the root node, then makes
+> things like pcm work.
 > 
-> It seems it was designed with Linaro's needs in mind and not kernel
-> maintainers' needs.
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
 
-I was discussing with Fabo and Get in mind to create a Jenkins on kernel.org
-for on our needs (maintainer's)
+With 3.10-rc1 and above, you can just remove the sirfsoc_mach_init
+function entirely for the same effect.
 
-That will allow any one to add more hw for boot testing
-
-Best Regards,
-J.
-> 
-> Rob
-> 
-> > 
-> >> Beyond there, I'd say the expectation is that each maintainer should
-> >> keep an eye on their own platforms. They _should_ try building and
-> >> booting linux-next on their platforms, to catch regressions early. And
-> >> definitely around now, I'd like to see people boot mainline on their
-> >> platforms to make sure we haven't added any severe regressions in the
-> >> 3.10 merge window, etc. Some people are really good at this, others
-> >> less so.
-> >>
-> >> What's the old saying, you can lead a horse to water but you can't
-> >> make him drink? You can build a boot test cluster but you can't make
-> >> anyone pay attention to it. :(
-> >>
-> >> -Olof
-> > 
-> > Cheers,
-> > 
-> > Fathi
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
-> 
+	Arnd
