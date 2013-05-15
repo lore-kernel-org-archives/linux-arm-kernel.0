@@ -1,46 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 May 2013 18:48:12 +0200
-Subject: [PATCH 04/39] ARM: ux500: Stop passing UART's platform data for
- Device Tree boots
-In-Reply-To: <1368611522-9984-5-git-send-email-lee.jones@linaro.org>
-References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbMVQWQpgiG+PcMUY789i+OgRObtH-toDYKdkbn9VtQ5g@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 15 May 2013 17:48:43 +0100
+Subject: [PATCH 3/4] ARM: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE and
+ use ALT_SMP instead
+In-Reply-To: <5193B7CF.2020208@free-electrons.com>
+References: <1364235581-17900-4-git-send-email-will.deacon@arm.com>
+ <51938B3D.2070508@free-electrons.com>
+ <20130515134117.GH23869@mudshark.cambridge.arm.com>
+ <51939386.7010709@free-electrons.com>
+ <20130515140607.GI23869@mudshark.cambridge.arm.com>
+ <51939FBC.3060705@free-electrons.com>
+ <20130515150402.GK23869@mudshark.cambridge.arm.com>
+ <5193AB8B.90100@free-electrons.com>
+ <20130515154113.GM23869@mudshark.cambridge.arm.com>
+ <5193B7CF.2020208@free-electrons.com>
+Message-ID: <20130515164843.GN23869@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wed, May 15, 2013 at 05:29:03PM +0100, Gregory CLEMENT wrote:
+> On 05/15/2013 05:41 PM, Will Deacon wrote:
+> > On Wed, May 15, 2013 at 04:36:43PM +0100, Gregory CLEMENT wrote:
+> >> On 05/15/2013 05:04 PM, Will Deacon wrote:
+> >>> On Wed, May 15, 2013 at 03:46:20PM +0100, Gregory CLEMENT wrote:
+> >>>> On 05/15/2013 04:06 PM, Will Deacon wrote:
+> >>>>> You could also try deleting both of the ALT_* lines and just putting a
+> >>>>> W(nop) in there directly.
+> >>>>
+> >>>> If I just delete the both of the ALT_* lines it no more hangs.
+> >>>> If I put a  W(nop) instead it hangs.
+> >>
+> >> It also hang with a simple nop by the way
+> > 
+> > Ok. Have you tried adding a different instruction (mov r0, r0, for example)?
+> 
+> it hanged again :(
+> 
+> I also try to boot a kernel in Thumb2, it doesn't hang in the same place but the kernel
+> crash latter
 
-> It was required to pass DMA channel configuration information to the
-> UART driver before the new DMA API was in place. Now that it is, and
-> is fully compatible with Device Tree we can stop doing that.
->
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/mach-ux500/cpu-db8500.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-> index 38ebf2b..9b26fe2 100644
-> --- a/arch/arm/mach-ux500/cpu-db8500.c
-> +++ b/arch/arm/mach-ux500/cpu-db8500.c
-> @@ -230,9 +230,9 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
->         /* Requires call-back bindings. */
->         OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
->         /* Requires DMA bindings. */
-> -       OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", &uart0_plat),
-> -       OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", &uart1_plat),
-> -       OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", &uart2_plat),
-> +       OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", NULL),
-> +       OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", NULL),
-> +       OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", NULL),
->         OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
->         OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
->         OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
+Crikey, that's not much fun. My last idea is to try sticking an isb
+instruction in there. Does that make any difference?
 
-OK dma_request_slave_channel() is upstream in the PL011 driver,
-so applied!
+Can you get access to another 370 board and see if the problem reproduces
+there? Is there any possibility of getting JTAG (again, perhaps on a
+different board)?
 
-Yours,
-Linus Walleij
+Failing that, I think you need to pester the CPU guys and/or the board guys
+to help you debug this.
+
+Will
