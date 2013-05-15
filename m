@@ -1,53 +1,27 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 15 May 2013 08:48:45 -0400 (EDT)
-Subject: [PATCH] ARM: crypto: sha1-armv4-large.S: fix SP handling
-In-Reply-To: <1368610020-29219-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1368610020-29219-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <alpine.LFD.2.03.1305150845410.31158@syhkavp.arg>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 May 2013 14:55:12 +0200
+Subject: [PATCHv2 00/20] Cleanup irqchip_init calls
+In-Reply-To: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <201305151455.12603.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 May 2013, Ard Biesheuvel wrote:
-
-> Make the SHA1 asm code ABI conformant by making sure all stack
-> accesses occur above the stack pointer.
+On Tuesday 14 May 2013, Maxime Ripard wrote:
+> This is a splitted up version of the patch I previously sent to
+> remove the explicit declaration of irqchip_init as the init_irq callback in
+> the machine descriptions.
 > 
-> Origin:
-> http://git.openssl.org/gitweb/?p=openssl.git;a=commit;h=1a9d60d2
+> Since it was a pretty tricky patch to merge, since it was touching a lot of
+> different platforms, I splitted it for each platforms, and rebased it on top
+> of 3.10-rc1.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> The best way to merge it is probably that each one of us take into their tree
+> the patches that are relevant for our architecture and send them to arm-soc
+> later on.
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Sounds good to me. I'm sure that some platform maintainers will fail to
+apply this though. Could you send whatever remains as a separate branch
+in a couple of weeks so we can directly apply it to next/cleanup?
 
-Please add
-
-Cc: stable at vger.kernel.org
-
-and send it to RMK's patch system.
-
->  arch/arm/crypto/sha1-armv4-large.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/crypto/sha1-armv4-large.S b/arch/arm/crypto/sha1-armv4-large.S
-> index 92c6eed..99207c4 100644
-> --- a/arch/arm/crypto/sha1-armv4-large.S
-> +++ b/arch/arm/crypto/sha1-armv4-large.S
-> @@ -195,6 +195,7 @@ ENTRY(sha1_block_data_order)
->  	add	r3,r3,r10			@ E+=F_00_19(B,C,D)
->  	cmp	r14,sp
->  	bne	.L_00_15		@ [((11+4)*5+2)*3]
-> +	sub	sp,sp,#25*4
->  #if __ARM_ARCH__<7
->  	ldrb	r10,[r1,#2]
->  	ldrb	r9,[r1,#3]
-> @@ -290,7 +291,6 @@ ENTRY(sha1_block_data_order)
->  	add	r3,r3,r10			@ E+=F_00_19(B,C,D)
->  
->  	ldr	r8,.LK_20_39		@ [+15+16*4]
-> -	sub	sp,sp,#25*4
->  	cmn	sp,#0			@ [+3], clear carry to denote 20_39
->  .L_20_39_or_60_79:
->  	ldr	r9,[r14,#15*4]
-> -- 
-> 1.8.1.2
-> 
+	Arnd
