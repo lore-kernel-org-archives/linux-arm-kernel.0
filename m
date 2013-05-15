@@ -1,67 +1,34 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 15 May 2013 10:51:46 +0100
-Subject: [PATCH 23/39] usb: musb: ux500: harden checks for platform data
+Date: Wed, 15 May 2013 10:51:50 +0100
+Subject: [PATCH 27/39] ARM: ux500: Remove ux500-musb platform registation when
+ booting with DT
 In-Reply-To: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
 References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1368611522-9984-24-git-send-email-lee.jones@linaro.org>
+Message-ID: <1368611522-9984-28-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In its current state, the ux500-musb driver uses platform data pointers
-blindly with no prior checking. If no platform data pointer is passed
-this will Oops the kernel. In this patch we ensure platform data and
-board data are present prior to using them.
+Now the ux500-musb driver has been enabled for Device Tree, there is no
+requirement to register it from platform code.
 
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: linux-usb at vger.kernel.org
 Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/usb/musb/ux500_dma.c |   11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c |    2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/usb/musb/ux500_dma.c b/drivers/usb/musb/ux500_dma.c
-index 382291b..4bd5400 100644
---- a/drivers/usb/musb/ux500_dma.c
-+++ b/drivers/usb/musb/ux500_dma.c
-@@ -289,7 +289,7 @@ static int ux500_dma_controller_start(struct dma_controller *c)
- 	struct musb *musb = controller->private_data;
- 	struct device *dev = musb->controller;
- 	struct musb_hdrc_platform_data *plat = dev->platform_data;
--	struct ux500_musb_board_data *data = plat->board_data;
-+	struct ux500_musb_board_data *data;
- 	struct dma_channel *dma_channel = NULL;
- 	u32 ch_num;
- 	u8 dir;
-@@ -299,14 +299,19 @@ static int ux500_dma_controller_start(struct dma_controller *c)
- 	struct ux500_dma_channel *channel_array;
- 	dma_cap_mask_t mask;
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index e20bc10..f1e7a75 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -221,8 +221,6 @@ static struct device * __init u8500_of_init_devices(void)
+ {
+ 	struct device *parent = db8500_soc_device_init();
  
-+	if (!plat) {
-+		dev_err(musb->controller, "No platform data\n");
-+		return -EINVAL;
-+	}
- 
-+	data = plat->board_data;
- 
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 
- 	/* Prepare the loop for RX channels */
- 	channel_array = controller->rx_channel;
--	param_array = data->dma_rx_param_array;
-+	param_array = data ? data->dma_rx_param_array : NULL;
- 
- 	for (dir = 0; dir < 2; dir++) {
- 		for (ch_num = 0;
-@@ -339,7 +344,7 @@ static int ux500_dma_controller_start(struct dma_controller *c)
- 
- 		/* Prepare the loop for TX channels */
- 		channel_array = controller->tx_channel;
--		param_array = data->dma_tx_param_array;
-+		param_array = data ? data->dma_tx_param_array : NULL;
- 		is_tx = 1;
- 	}
+-	db8500_add_usb(parent, usb_db8500_dma_cfg, usb_db8500_dma_cfg);
+-
+ 	return parent;
+ }
  
 -- 
 1.7.10.4
