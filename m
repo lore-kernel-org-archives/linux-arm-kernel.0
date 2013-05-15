@@ -1,40 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 15 May 2013 15:55:57 +0100
-Subject: [RFC PATCH v3] drivers: bus: add ARM CCI support
-In-Reply-To: <alpine.LFD.2.03.1305151037330.31158@syhkavp.arg>
-References: <1368095640-3675-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1368095640-3675-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20130514130005.GD29592@e102654-lin.cambridge.arm.com>
- <alpine.LFD.2.03.1305141820280.31158@syhkavp.arg>
- <20130515142441.GA385@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.03.1305151037330.31158@syhkavp.arg>
-Message-ID: <20130515145557.GB385@e102568-lin.cambridge.arm.com>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Wed, 15 May 2013 10:58:46 -0400
+Subject: [PATCHv2 1/3] arm: introduce config HAS_BANDGAP
+In-Reply-To: <1368629928-6723-1-git-send-email-eduardo.valentin@ti.com>
+References: <1368629928-6723-1-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <1368629928-6723-2-git-send-email-eduardo.valentin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 03:51:43PM +0100, Nicolas Pitre wrote:
-> On Wed, 15 May 2013, Lorenzo Pieralisi wrote:
-> 
-> > On Tue, May 14, 2013 at 11:21:32PM +0100, Nicolas Pitre wrote:
-> > > On Tue, 14 May 2013, Javi Merino wrote:
-> > > 
-> > > > On Thu, May 09, 2013 at 11:34:00AM +0100, Lorenzo Pieralisi wrote:
-> > > > 
-> > > > > +static inline void init_cpu_port(struct cpu_port *port, u32 index, u32 mpidr)
-> > > > 
-> > > > The mpidr should be u64.
-> > > 
-> > > Why?
-> > 
-> > Since on arm64 MPIDR_EL1 size is 64 bits, we need the driver to work on
-> > both arm and arm64.
-> 
-> OK.
-> 
-> Are you OK for me to carry this patch in the series for MCPM support 
-> on RTSM?  I would like to send it to arm-soc ASAP.
+Introduce HAS_BANDGAP config entry. This config is a
+boolean value so that arch code can flag is they
+feature a bandgap device.
 
-Absolutely, I will apply the latest fixes and send the updated version
-to you for arm-soc inclusion today.
+This config entry follows the same idea behind
+ARCH_HAS_CPUFREQ.
 
-Lorenzo
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-omap at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+---
+ arch/arm/Kconfig            | 3 +++
+ arch/arm/mach-omap2/Kconfig | 1 +
+ 2 files changed, 4 insertions(+)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d423d58..bcbdec9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -174,6 +174,9 @@ config ARCH_HAS_CPUFREQ
+ 	  and that the relevant menu configurations are displayed for
+ 	  it.
+ 
++config ARCH_HAS_BANDGAP
++	bool
++
+ config GENERIC_HWEIGHT
+ 	bool
+ 	default y
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index f49cd51..8620ab5 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -4,6 +4,7 @@ config ARCH_OMAP
+ config ARCH_OMAP2PLUS
+ 	bool "TI OMAP2/3/4/5 SoCs with device tree support" if (ARCH_MULTI_V6 || ARCH_MULTI_V7)
+ 	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_BANDGAP
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_OMAP
+ 	select ARCH_REQUIRE_GPIOLIB
+-- 
+1.8.2.1.342.gfa7285d
