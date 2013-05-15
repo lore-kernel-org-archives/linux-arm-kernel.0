@@ -1,83 +1,192 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 15 May 2013 16:46:20 +0200
-Subject: [PATCH 3/4] ARM: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE and
- use ALT_SMP instead
-In-Reply-To: <20130515140607.GI23869@mudshark.cambridge.arm.com>
-References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
- <1364235581-17900-4-git-send-email-will.deacon@arm.com>
- <51938B3D.2070508@free-electrons.com>
- <20130515134117.GH23869@mudshark.cambridge.arm.com>
- <51939386.7010709@free-electrons.com>
- <20130515140607.GI23869@mudshark.cambridge.arm.com>
-Message-ID: <51939FBC.3060705@free-electrons.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Wed, 15 May 2013 20:18:39 +0530
+Subject: [PATCH v3 3/6] ARM: OMAP2+: hwmod-data: UART IP needs software
+ control to manage sidle modes
+In-Reply-To: <1368629322-3170-1-git-send-email-rnayak@ti.com>
+References: <1368629322-3170-1-git-send-email-rnayak@ti.com>
+Message-ID: <1368629322-3170-4-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2013 04:06 PM, Will Deacon wrote:
-> On Wed, May 15, 2013 at 02:54:14PM +0100, Gregory CLEMENT wrote:
->> On 05/15/2013 03:41 PM, Will Deacon wrote:
->>> Is this using dmatest.ko, or a different test program?
->>
->> No they are self-test from the mv_xor driver
-> 
-> Ok. And the CPU locks up, rather than the DMA master?
-> 
->>> Ok, so the ALT_UP case should be emitted after patching, correct?
->>
->> Indeed it was I excepted but I didn't check (I don't know how to do)
-> 
-> If you don't have JTAG, that's trickier. Hopefully my other suggestion will
-> help.
-> 
->>>> I made some investigation. And in UP if I remove the line:
->>>> 	ALT_UP(W(nop))
->>>
->>> Did you remove the ALT_SMP case as well? You could also try making the
->>> ALT_SMP case use W(nop) too and see if it changes anything.
->>
->> OK I will try it.
-> 
-> You could also try deleting both of the ALT_* lines and just putting a
-> W(nop) in there directly.
+From: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-If I just delete the both of the ALT_* lines it no more hangs.
-If I put a  W(nop) instead it hangs.
+OMAP UART IP needs software control for slave idle modes based on functional
+state of the IP. i.e The IP slave idle settings should be set to 'noidle' when
+being used and then put back to 'smart_idle' when unused. Currently this is
+handled by the driver with function pointers implemented in platform code.
+This however breaks in case of device tree because of missing idle handling
+APIs.
 
-> 
->>> If you don't have both of the alternatives, things will go wrong.
->>
->> For my own culture, how ALT_UP and ALT_SMP work in SMP case?
->> When I disassembled the proc-v7.o, I saw that the SMP variant of the code were
->> written. How the kernel switch to the UP version of the code?
-> 
-> Early in boot (head.S:__fixup_smp), we detect whether the CPU has the MP
-> extensions then, if we're actually UP but the kernel has CONFIG_SMP=y, we
-> walk over the .alt.smp.init section looking at each entry in there. The
-> ALT_UP macro spits out an (address, instruction) pair, so in
-> __do_fixup_smp_on_up, we store the instruction to the address for each pair,
-> replacing the SMP instruction which sat there in the compiled image.
-> 
-> It could be that the CPUID checks are failing on your Marvell part. Can you
-> tell me what you have in your mpidr (mrc p15, 0, Rd, c0, c0, 5) and also
-> your midr (mrc p15, 0, Rd, c0, c0) please?
+Previous patches in this series added a flag HWMOD_SWSUP_SIDLE_ACTIVE which
+takes care of the mentioned requirement. Hence add the flag for all UART IPs
+to take advantage of feature supported by framework.
 
-mpidr= 0x0
-midr= 0x561F5811
+Subsequent patches removes the slave idle handling from driver code.
 
-> 
-> Cheers,
-> 
-> Will
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Tested-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+Tested-by: Sourav Poddar <sourav.poddar@ti.com>
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |    3 +++
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |    6 ++++++
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |    4 ++++
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |    6 +++++-
+ 4 files changed, 18 insertions(+), 1 deletion(-)
 
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
+index c8c64b3..d05fc7b 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c
+@@ -512,6 +512,7 @@ struct omap_hwmod omap2xxx_uart1_hwmod = {
+ 	.mpu_irqs	= omap2_uart1_mpu_irqs,
+ 	.sdma_reqs	= omap2_uart1_sdma_reqs,
+ 	.main_clk	= "uart1_fck",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.module_offs = CORE_MOD,
+@@ -531,6 +532,7 @@ struct omap_hwmod omap2xxx_uart2_hwmod = {
+ 	.mpu_irqs	= omap2_uart2_mpu_irqs,
+ 	.sdma_reqs	= omap2_uart2_sdma_reqs,
+ 	.main_clk	= "uart2_fck",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.module_offs = CORE_MOD,
+@@ -550,6 +552,7 @@ struct omap_hwmod omap2xxx_uart3_hwmod = {
+ 	.mpu_irqs	= omap2_uart3_mpu_irqs,
+ 	.sdma_reqs	= omap2_uart3_sdma_reqs,
+ 	.main_clk	= "uart3_fck",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.module_offs = CORE_MOD,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index 01d8f32..075f7cc 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -1995,6 +1995,7 @@ static struct omap_hwmod am33xx_uart1_hwmod = {
+ 	.name		= "uart1",
+ 	.class		= &uart_class,
+ 	.clkdm_name	= "l4_wkup_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.mpu_irqs	= am33xx_uart1_irqs,
+ 	.sdma_reqs	= uart1_edma_reqs,
+ 	.main_clk	= "dpll_per_m2_div4_wkupdm_ck",
+@@ -2015,6 +2016,7 @@ static struct omap_hwmod am33xx_uart2_hwmod = {
+ 	.name		= "uart2",
+ 	.class		= &uart_class,
+ 	.clkdm_name	= "l4ls_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.mpu_irqs	= am33xx_uart2_irqs,
+ 	.sdma_reqs	= uart1_edma_reqs,
+ 	.main_clk	= "dpll_per_m2_div4_ck",
+@@ -2042,6 +2044,7 @@ static struct omap_hwmod am33xx_uart3_hwmod = {
+ 	.name		= "uart3",
+ 	.class		= &uart_class,
+ 	.clkdm_name	= "l4ls_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.mpu_irqs	= am33xx_uart3_irqs,
+ 	.sdma_reqs	= uart3_edma_reqs,
+ 	.main_clk	= "dpll_per_m2_div4_ck",
+@@ -2062,6 +2065,7 @@ static struct omap_hwmod am33xx_uart4_hwmod = {
+ 	.name		= "uart4",
+ 	.class		= &uart_class,
+ 	.clkdm_name	= "l4ls_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.mpu_irqs	= am33xx_uart4_irqs,
+ 	.sdma_reqs	= uart1_edma_reqs,
+ 	.main_clk	= "dpll_per_m2_div4_ck",
+@@ -2082,6 +2086,7 @@ static struct omap_hwmod am33xx_uart5_hwmod = {
+ 	.name		= "uart5",
+ 	.class		= &uart_class,
+ 	.clkdm_name	= "l4ls_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.mpu_irqs	= am33xx_uart5_irqs,
+ 	.sdma_reqs	= uart1_edma_reqs,
+ 	.main_clk	= "dpll_per_m2_div4_ck",
+@@ -2102,6 +2107,7 @@ static struct omap_hwmod am33xx_uart6_hwmod = {
+ 	.name		= "uart6",
+ 	.class		= &uart_class,
+ 	.clkdm_name	= "l4ls_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.mpu_irqs	= am33xx_uart6_irqs,
+ 	.sdma_reqs	= uart1_edma_reqs,
+ 	.main_clk	= "dpll_per_m2_div4_ck",
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 4083606..31c7126 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -490,6 +490,7 @@ static struct omap_hwmod omap3xxx_uart1_hwmod = {
+ 	.mpu_irqs	= omap2_uart1_mpu_irqs,
+ 	.sdma_reqs	= omap2_uart1_sdma_reqs,
+ 	.main_clk	= "uart1_fck",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.module_offs = CORE_MOD,
+@@ -508,6 +509,7 @@ static struct omap_hwmod omap3xxx_uart2_hwmod = {
+ 	.mpu_irqs	= omap2_uart2_mpu_irqs,
+ 	.sdma_reqs	= omap2_uart2_sdma_reqs,
+ 	.main_clk	= "uart2_fck",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.module_offs = CORE_MOD,
+@@ -526,6 +528,7 @@ static struct omap_hwmod omap3xxx_uart3_hwmod = {
+ 	.mpu_irqs	= omap2_uart3_mpu_irqs,
+ 	.sdma_reqs	= omap2_uart3_sdma_reqs,
+ 	.main_clk	= "uart3_fck",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.module_offs = OMAP3430_PER_MOD,
+@@ -555,6 +558,7 @@ static struct omap_hwmod omap36xx_uart4_hwmod = {
+ 	.mpu_irqs	= uart4_mpu_irqs,
+ 	.sdma_reqs	= uart4_sdma_reqs,
+ 	.main_clk	= "uart4_fck",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.prcm		= {
+ 		.omap2 = {
+ 			.module_offs = OMAP3430_PER_MOD,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index eaba9dc..848b6dc 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -3434,6 +3434,7 @@ static struct omap_hwmod omap44xx_uart1_hwmod = {
+ 	.name		= "uart1",
+ 	.class		= &omap44xx_uart_hwmod_class,
+ 	.clkdm_name	= "l4_per_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.mpu_irqs	= omap44xx_uart1_irqs,
+ 	.sdma_reqs	= omap44xx_uart1_sdma_reqs,
+ 	.main_clk	= "func_48m_fclk",
+@@ -3462,6 +3463,7 @@ static struct omap_hwmod omap44xx_uart2_hwmod = {
+ 	.name		= "uart2",
+ 	.class		= &omap44xx_uart_hwmod_class,
+ 	.clkdm_name	= "l4_per_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.mpu_irqs	= omap44xx_uart2_irqs,
+ 	.sdma_reqs	= omap44xx_uart2_sdma_reqs,
+ 	.main_clk	= "func_48m_fclk",
+@@ -3490,7 +3492,8 @@ static struct omap_hwmod omap44xx_uart3_hwmod = {
+ 	.name		= "uart3",
+ 	.class		= &omap44xx_uart_hwmod_class,
+ 	.clkdm_name	= "l4_per_clkdm",
+-	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET,
++	.flags		= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET |
++				HWMOD_SWSUP_SIDLE_ACT,
+ 	.mpu_irqs	= omap44xx_uart3_irqs,
+ 	.sdma_reqs	= omap44xx_uart3_sdma_reqs,
+ 	.main_clk	= "func_48m_fclk",
+@@ -3519,6 +3522,7 @@ static struct omap_hwmod omap44xx_uart4_hwmod = {
+ 	.name		= "uart4",
+ 	.class		= &omap44xx_uart_hwmod_class,
+ 	.clkdm_name	= "l4_per_clkdm",
++	.flags		= HWMOD_SWSUP_SIDLE_ACT,
+ 	.mpu_irqs	= omap44xx_uart4_irqs,
+ 	.sdma_reqs	= omap44xx_uart4_sdma_reqs,
+ 	.main_clk	= "func_48m_fclk",
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
