@@ -1,39 +1,32 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 15 May 2013 11:51:33 +0530
-Subject: [PATCH] ARM: dts: OMAP: Add usb_otg and glue data to OMAP3+ boards
-In-Reply-To: <20130511023557.GB28602@atomide.com>
-References: <20130511023557.GB28602@atomide.com>
-Message-ID: <5193296D.5040001@ti.com>
+Date: Wed, 15 May 2013 12:12:41 +0530
+Subject: [PATCH] ARM: dts: omap3 beagle: Add usb otg hs dt data
+Message-ID: <1368600161-10351-1-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 11 May 2013 08:05 AM, Tony Lindgren wrote:
-> Commit ad871c10 (ARM: dts: OMAP: Add usb_otg and glue data to
-> OMAP3+ boards) added support for MUSB on omap3 for device tree,
-> but added the interrupts the wrong way probably as they were
-> copied from the omap4.dtsi file. On omap3 we have TI specific
-> interrupt controller, not GIC.
->
-> Fix this by specifying the interrupt following the TI INTC
-> binding.
->
-> Without this fix MUSB won't work as it is trying to use
-> irq0 instead of irq92.
->
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-Tested in beagleboard-xm
+Added board specific dt data for omap3 beagle in omap3-beagle.dts
+file.
 
-Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
->
-> --- a/arch/arm/boot/dts/omap3.dtsi
-> +++ b/arch/arm/boot/dts/omap3.dtsi
-> @@ -516,7 +516,7 @@
->   		usb_otg_hs: usb_otg_hs at 480ab000 {
->   			compatible = "ti,omap3-musb";
->   			reg = <0x480ab000 0x1000>;
-> -			interrupts = <0 92 0x4>, <0 93 0x4>;
-> +			interrupts = <92>, <93>;
->   			interrupt-names = "mc", "dma";
->   			ti,hwmods = "usb_otg_hs";
->   			multipoint = <1>;
->
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ arch/arm/boot/dts/omap3-beagle.dts |    7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index 6eec699..02bf5d0 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -142,3 +142,10 @@
+ 	 */
+ 	ti,pulldowns = <0x03a1c4>;
+ };
++
++&usb_otg_hs {
++        interface-type = <0>;
++        usb-phy = <&usb2_phy>;
++        mode = <3>;
++        power = <50>;
++};
+-- 
+1.7.10.4
