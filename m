@@ -1,95 +1,149 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 May 2013 16:24:00 +0100
-Subject: [PATCHv2 4/5] arm: fix up ARM_ARCH_TIMER selects
+Date: Wed, 15 May 2013 16:23:59 +0100
+Subject: [PATCHv2 3/5] clocksource: arch_timer: use virtual counters
 In-Reply-To: <1368631441-28434-1-git-send-email-mark.rutland@arm.com>
 References: <1368631441-28434-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1368631441-28434-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <1368631441-28434-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In 8a4da6e: "arm: arch_timer: move core to drivers/clocksource", the
-selection of ARM_ARCH_TIMER was indirected via HAVE_ARM_ARCH_TIMER,
-though mach-exynos's selection of ARM_ARCH_TIMER was missed, and since
-then mach-shmobile, mach-tegra, and mach-virt have begun selecting
-ARM_ARCH_TIMER. This can lead to architected timer support erroneously
-appearing to not be selected in menuconfig.
+Switching between reading the virtual or physical counters is
+problematic, as some core code wants a view of time before we're fully
+set up. Using a function pointer and switching the source after the
+first read can make time appear to go backwards, and having a check in
+the read function is an unfortunate block on what we want to be a fast
+path.
 
-This patch fixes up the Kconfigs for those platforms to select
-HAVE_ARM_ARCH_TIMER.
+Instead, this patch makes us always use the virtual counters. If we're a
+guest, or don't have hyp mode, we'll use the virtual timers, and as such
+don't care about CNTVOFF as long as it doesn't change in such a way as
+to make time travel backwards. If we do have hyp mode, and might be a
+KVM host, we have to use the physical timers, and require CNTVOFF to be
+zero so as to have a consistent view of time between the physical timers
+and virtual counters.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Simon Horman <horms@verge.net.au>
+Cc: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-exynos/Kconfig   | 2 +-
- arch/arm/mach-shmobile/Kconfig | 4 ++--
- arch/arm/mach-tegra/Kconfig    | 2 +-
- arch/arm/mach-virt/Kconfig     | 2 +-
- 4 files changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/arch_timer.h    |  9 ---------
+ arch/arm64/include/asm/arch_timer.h  | 10 ----------
+ drivers/clocksource/arm_arch_timer.c | 23 +++++------------------
+ include/clocksource/arm_arch_timer.h |  2 +-
+ 4 files changed, 6 insertions(+), 38 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index d19edff..3c3f36a 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -76,7 +76,7 @@ config SOC_EXYNOS5440
- 	default y
- 	depends on ARCH_EXYNOS5
- 	select ARCH_HAS_OPP
--	select ARM_ARCH_TIMER
-+	select HAVE_ARM_ARCH_TIMER
- 	select AUTO_ZRELADDR
- 	select PINCTRL
- 	select PINCTRL_EXYNOS5440
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 1a517e2..767a6c3 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -23,7 +23,7 @@ config ARCH_R8A73A4
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
- 	select CPU_V7
--	select ARM_ARCH_TIMER
-+	select HAVE_ARM_ARCH_TIMER
- 	select SH_CLK_CPG
- 	select RENESAS_IRQC
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index 7c1bfc0..accefe0 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -80,15 +80,6 @@ static inline u32 arch_timer_get_cntfrq(void)
+ 	return val;
+ }
  
-@@ -56,7 +56,7 @@ config ARCH_R8A7790
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
- 	select CPU_V7
--	select ARM_ARCH_TIMER
-+	select HAVE_ARM_ARCH_TIMER
- 	select SH_CLK_CPG
- 	select RENESAS_IRQC
+-static inline u64 arch_counter_get_cntpct(void)
+-{
+-	u64 cval;
+-
+-	isb();
+-	asm volatile("mrrc p15, 0, %Q0, %R0, c14" : "=r" (cval));
+-	return cval;
+-}
+-
+ static inline u64 arch_counter_get_cntvct(void)
+ {
+ 	u64 cval;
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index bf6ab242..d56ed11 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -110,16 +110,6 @@ static inline void __cpuinit arch_counter_set_user_access(void)
+ 	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+ }
  
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 84d72fc..65c5ae6 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -60,7 +60,7 @@ config ARCH_TEGRA_3x_SOC
+-static inline u64 arch_counter_get_cntpct(void)
+-{
+-	u64 cval;
+-
+-	isb();
+-	asm volatile("mrs %0, cntpct_el0" : "=r" (cval));
+-
+-	return cval;
+-}
+-
+ static inline u64 arch_counter_get_cntvct(void)
+ {
+ 	u64 cval;
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index a2b2541..053d846 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -186,27 +186,19 @@ u32 arch_timer_get_rate(void)
+ 	return arch_timer_rate;
+ }
  
- config ARCH_TEGRA_114_SOC
- 	bool "Enable support for Tegra114 family"
--	select ARM_ARCH_TIMER
-+	select HAVE_ARM_ARCH_TIMER
- 	select ARM_GIC
- 	select ARM_L1_CACHE_SHIFT_6
- 	select CPU_FREQ_TABLE if CPU_FREQ
-diff --git a/arch/arm/mach-virt/Kconfig b/arch/arm/mach-virt/Kconfig
-index 8958f0d..081d469 100644
---- a/arch/arm/mach-virt/Kconfig
-+++ b/arch/arm/mach-virt/Kconfig
-@@ -2,7 +2,7 @@ config ARCH_VIRT
- 	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
--	select ARM_ARCH_TIMER
-+	select HAVE_ARM_ARCH_TIMER
- 	select ARM_PSCI
- 	select HAVE_SMP
- 	select CPU_V7
+-/*
+- * Some external users of arch_timer_read_counter (e.g. sched_clock) may try to
+- * call it before it has been initialised. Rather than incur a performance
+- * penalty checking for initialisation, provide a default implementation that
+- * won't lead to time appearing to jump backwards.
+- */
+-static u64 arch_timer_read_zero(void)
++u64 arch_timer_read_counter(void)
+ {
+-	return 0;
++	return arch_counter_get_cntvct();
+ }
+ 
+-u64 (*arch_timer_read_counter)(void) = arch_timer_read_zero;
+-
+ static cycle_t arch_counter_read(struct clocksource *cs)
+ {
+-	return arch_timer_read_counter();
++	return arch_counter_get_cntvct();
+ }
+ 
+ static cycle_t arch_counter_read_cc(const struct cyclecounter *cc)
+ {
+-	return arch_timer_read_counter();
++	return arch_counter_get_cntvct();
+ }
+ 
+ static struct clocksource clocksource_counter = {
+@@ -287,7 +279,7 @@ static int __init arch_timer_register(void)
+ 	cyclecounter.mult = clocksource_counter.mult;
+ 	cyclecounter.shift = clocksource_counter.shift;
+ 	timecounter_init(&timecounter, &cyclecounter,
+-			 arch_counter_get_cntpct());
++			 arch_counter_get_cntvct());
+ 
+ 	if (arch_timer_use_virtual) {
+ 		ppi = arch_timer_ppi[VIRT_PPI];
+@@ -376,11 +368,6 @@ static void __init arch_timer_init(struct device_node *np)
+ 		}
+ 	}
+ 
+-	if (arch_timer_use_virtual)
+-		arch_timer_read_counter = arch_counter_get_cntvct;
+-	else
+-		arch_timer_read_counter = arch_counter_get_cntpct;
+-
+ 	arch_timer_register();
+ 	arch_timer_arch_init();
+ }
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index e6c9c4c..c463ce9 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -32,7 +32,7 @@
+ #ifdef CONFIG_ARM_ARCH_TIMER
+ 
+ extern u32 arch_timer_get_rate(void);
+-extern u64 (*arch_timer_read_counter)(void);
++extern u64 arch_timer_read_counter(void);
+ extern struct timecounter *arch_timer_get_timecounter(void);
+ 
+ #else
 -- 
 1.8.1.1
