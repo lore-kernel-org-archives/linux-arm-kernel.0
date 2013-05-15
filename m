@@ -1,49 +1,41 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 15 May 2013 10:51:26 +0100
-Subject: [PATCH 03/39] dmaengine: ste_dma40: Don't configure runtime
- configurable setup during allocate
+Date: Wed, 15 May 2013 10:51:28 +0100
+Subject: [PATCH 05/39] ARM: ux500: Stop passing MMC's platform data for Device
+ Tree boots
 In-Reply-To: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
 References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1368611522-9984-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1368611522-9984-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the dmaengine API, allocating and configuring a channel are two
-separate actions. Here we're removing logical channel configuration from
-the channel allocating routines.
+It was required to pass DMA channel configuration information to the
+MMC driver before the new DMA API was in place. Now that it is, and
+is fully compatible with Device Tree we can stop doing that.
 
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <djbw@fb.com>
-Cc: Per Forlin <per.forlin@stericsson.com>
-Cc: Rabin Vincent <rabin@rab.in>
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/dma/ste_dma40.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index b7fe46b..ba84df8 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -2040,6 +2040,9 @@ static int d40_config_memcpy(struct d40_chan *d40c)
- 		d40c->dma_cfg = dma40_memcpy_conf_log;
- 		d40c->dma_cfg.dev_type = dma40_memcpy_channels[d40c->chan.chan_id];
- 
-+		d40_log_cfg(&d40c->dma_cfg,
-+			    &d40c->log_def.lcsp1, &d40c->log_def.lcsp3);
-+
- 	} else if (dma_has_cap(DMA_MEMCPY, cap) &&
- 		   dma_has_cap(DMA_SLAVE, cap)) {
- 		d40c->dma_cfg = dma40_memcpy_conf_phy;
-@@ -2508,9 +2511,6 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
- 	d40_set_prio_realtime(d40c);
- 
- 	if (chan_is_logical(d40c)) {
--		d40_log_cfg(&d40c->dma_cfg,
--			    &d40c->log_def.lcsp1, &d40c->log_def.lcsp3);
--
- 		if (d40c->dma_cfg.dir == STEDMA40_PERIPH_TO_MEM)
- 			d40c->lcpa = d40c->base->lcpa_base +
- 				d40c->dma_cfg.dev_type * D40_LCPA_CHAN_SIZE;
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 9b26fe2..96ddbae 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -234,10 +234,10 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", NULL),
+ 	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", NULL),
+ 	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
+-	OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
+-	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
+-	OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  &mop500_sdi2_data),
+-	OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  &mop500_sdi4_data),
++	OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  NULL),
++	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  NULL),
++	OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  NULL),
++	OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  NULL),
+ 	/* Requires clock name bindings. */
+ 	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e000, "gpio.0", NULL),
+ 	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e080, "gpio.1", NULL),
 -- 
 1.7.10.4
