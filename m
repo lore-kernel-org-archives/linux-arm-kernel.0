@@ -1,37 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 15 May 2013 11:57:26 +0900
-Subject: [PATCH v2 0/4] marzen-reference ethernet patches
-Message-ID: <1368586650-26263-1-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 15 May 2013 11:57:28 +0900
+Subject: [PATCH v2 2/4] ARM: shmobile: marzen-reference: Update lan device
+ name in pinctrl maps
+In-Reply-To: <1368586650-26263-1-git-send-email-horms+renesas@verge.net.au>
+References: <1368586650-26263-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1368586650-26263-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-this series builds on work by Laurent Pinchart and in turn
-prior work by Guennadi Liakhovetski and myself.
+The ethernet device is instantiated from the device tree, use the
+correct name in the pinctrl mappings.
 
-The four small patches attepts to fix SMSC ethernet support for
-the marzen-reference board. It does seem to be sufficient in order
-to initialise the NIC and complete a boot using nfsroot.
-However, as reported by Laurent earlier, there appear to be
-some issues with spurious interrupts.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-marzen-reference.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-This series is based on the renesas-next-20130515v2 tag of
-my renesas branch.
-
-Laurent Pinchart (2):
-  ARM: shmobile: marzen-reference: Reference the correct IRQ for
-    ethernet
-  ARM: shmobile: marzen-reference: Update lan device name in pinctrl
-    maps
-
-Simon Horman (2):
-  ARM: shmobile: marzen-reference: Initialise irqpin
-  ARM: shmobile: marzen-reference: Set SMSC lan to use irq-push-pull
-
- arch/arm/boot/dts/r8a7779-marzen-reference.dts  |  5 +++--
- arch/arm/mach-shmobile/board-marzen-reference.c | 12 +++++++++---
- 2 files changed, 12 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+index 480d882..5332e89 100644
+--- a/arch/arm/mach-shmobile/board-marzen-reference.c
++++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+@@ -43,9 +43,9 @@ static const struct pinctrl_map marzen_pinctrl_map[] = {
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7779",
+ 				  "sdhi0_wp", "sdhi0"),
+ 	/* SMSC */
+-	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("18000000.lan0", "pfc-r8a7779",
+ 				  "intc_irq1_b", "intc"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x", "pfc-r8a7779",
++	PIN_MAP_MUX_GROUP_DEFAULT("18000000.lan0", "pfc-r8a7779",
+ 				  "lbsc_ex_cs0", "lbsc"),
+ };
+ 
 -- 
 1.8.2.1
