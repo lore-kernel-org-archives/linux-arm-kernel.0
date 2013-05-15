@@ -1,25 +1,162 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 May 2013 15:54:55 +0200
-Subject: [PATCH] ARM: ux500: select REGULATOR
-In-Reply-To: <1368621401-18569-1-git-send-email-emilio@elopez.com.ar>
-References: <1368621401-18569-1-git-send-email-emilio@elopez.com.ar>
-Message-ID: <CACRpkdaDLJk5UE_10FQuFNishY4+bnKShJyeC0JOF33hUq2nqQ@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 15 May 2013 15:55:45 +0200
+Subject: [RFC/PATCH] dma: of: Make of_dma_simple_xlate match on DMA device
+ and channel ID
+In-Reply-To: <51938FFD.2020300@metafoo.de>
+References: <1368624449-29003-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <51938FFD.2020300@metafoo.de>
+Message-ID: <3106852.EdI2KVGSEm@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 2:36 PM, Emilio L?pez <emilio@elopez.com.ar> wrote:
+Hi Lars-Peter,
 
-> MACH_MOP500 selects REGULATOR_FIXED_VOLTAGE but not REGULATOR. This
-> patch makes it select the latter too.
->
-> Seen as:
->     warning: (MACH_DOVE_DT && ARCH_KIRKWOOD_DT && MACH_AMS_DELTA &&
->     MACH_MOP500 && TPS6105X) selects REGULATOR_FIXED_VOLTAGE which has
->     unmet direct dependencies (REGULATOR)
->
-> Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+(CC'ing LAKML, I had forgotten to do so when I sent the patch)
 
-Applied for ux500 fixes.
+On Wednesday 15 May 2013 15:39:09 Lars-Peter Clausen wrote:
+> On 05/15/2013 03:27 PM, Laurent Pinchart wrote:
+> > When translating a DT DMA channel specifier, the most common use case is
+> > to match the DMA channel based on the channel DMA engine and channel ID.
+> > Modify the of_dma_simple_xlate() function to do so, simplifying the API
+> > for DMA engine drivers.
+> > 
+> > There is no need to check the DMA cells count in the filter function as
+> > the check is already performed by the caller in of_dma_get_controller().
+> > 
+> > Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> 
+> Hi,
+> 
+> I've submitted a very similar patch some time ago, see
+> https://lkml.org/lkml/2013/3/25/250
 
-Thanks!
-Linus Walleij
+Thanks. So my patch makes at least some sense :-)
+
+I had the impression that this is what omap-dma needs as well, hence the 
+modification to the existing xlate function. I'm fine with a separate function 
+as well if the current code covers different use cases.
+
+> > ---
+> > 
+> >  drivers/dma/of-dma.c   | 39 +++++++++++++++++++++++++++++++--------
+> >  drivers/dma/omap-dma.c |  8 +-------
+> >  include/linux/of_dma.h |  5 -----
+> >  3 files changed, 32 insertions(+), 20 deletions(-)
+> > 
+> > I've implemented this function while working on a DMA engine driver, and
+> > realized that it wasn't specific to my driver at all. As I'm new to the
+> > DMA engine API, I'd appreciate feedback on whether this change makes
+> > sense, or if I should instead keep the existing of_dma_simple_xlate()
+> > function and create a separate simple xlate helper.
+> > 
+> > diff --git a/drivers/dma/of-dma.c b/drivers/dma/of-dma.c
+> > index 7aa0864..702a45d 100644
+> > --- a/drivers/dma/of-dma.c
+> > +++ b/drivers/dma/of-dma.c
+> > @@ -202,6 +202,27 @@ struct dma_chan *of_dma_request_slave_channel(struct
+> > device_node *np,
+> >  	return NULL;
+> >  }
+> > 
+> > +struct of_dma_filter_args {
+> > +	struct dma_device *device;
+> > +	unsigned int chan_id;
+> > +};
+> > +
+> > +/**
+> > + * of_dma_simple_xlate_filter - Channel filter function for
+> > of_dma_simple_xlate + * @dma_chan:	pointer to candidate DMA channel
+> > + * @param:	pointer to filter parameter
+> > + *
+> > + * Filter out candidate DMA channels that don't match the channel ID or
+> > + * DMA engine device passed as arguments.
+> > + */
+> > +static bool of_dma_simple_xlate_filter(struct dma_chan *chan, void
+> > *param)
+> > +{
+> > +	struct of_dma_filter_args *fargs = param;
+> > +
+> > +	return (chan->device == fargs->device) &&
+> > +	       (chan->chan_id == fargs->chan_id);
+> > +}
+> > +
+> >  /**
+> >   * of_dma_simple_xlate - Simple DMA engine translation function
+> >   * @dma_spec:	pointer to DMA specifier as found in the device tree
+> > @@ -216,16 +237,18 @@ struct dma_chan *of_dma_request_slave_channel(struct
+> > device_node *np,> 
+> >  struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
+> >  						struct of_dma *ofdma)
+> >  {
+> > -	int count = dma_spec->args_count;
+> > -	struct of_dma_filter_info *info = ofdma->of_dma_data;
+> > +	struct dma_device *dev = ofdma->of_dma_data;
+> > +	struct of_dma_filter_args fargs;
+> > +	dma_cap_mask_t cap;
+> > 
+> > -	if (!info || !info->filter_fn)
+> > -		return NULL;
+> > +	/* There's no need to specify matching caps as we're going to match a
+> > +	 * specific DMA channel anyway.
+> > +	 */
+> > +	dma_cap_zero(cap);
+> > 
+> > -	if (count != 1)
+> > -		return NULL;
+> > +	fargs.device = dev;
+> > +	fargs.chan_id = dma_spec->args[0];
+> > 
+> > -	return dma_request_channel(info->dma_cap, info->filter_fn,
+> > -			&dma_spec->args[0]);
+> > +	return dma_request_channel(cap, of_dma_simple_xlate_filter, &fargs);
+> >  }
+> >  EXPORT_SYMBOL_GPL(of_dma_simple_xlate);
+> > diff --git a/drivers/dma/omap-dma.c b/drivers/dma/omap-dma.c
+> > index ec3fc4f..7e7ff06 100644
+> > --- a/drivers/dma/omap-dma.c
+> > +++ b/drivers/dma/omap-dma.c
+> > @@ -69,10 +69,6 @@ static const unsigned es_bytes[] = {
+> >  	[OMAP_DMA_DATA_TYPE_S32] = 4,
+> >  };
+> > 
+> > -static struct of_dma_filter_info omap_dma_info = {
+> > -	.filter_fn = omap_dma_filter_fn,
+> > -};
+> > -
+> >  static inline struct omap_dmadev *to_omap_dma_dev(struct dma_device *d)
+> >  {
+> >  	return container_of(d, struct omap_dmadev, ddev);
+> > @@ -641,11 +637,9 @@ static int omap_dma_probe(struct platform_device
+> > *pdev)> 
+> >  	platform_set_drvdata(pdev, od);
+> >  	if (pdev->dev.of_node) {
+> > -		omap_dma_info.dma_cap = od->ddev.cap_mask;
+> > -
+> >  		/* Device-tree DMA controller registration */
+> >  		rc = of_dma_controller_register(pdev->dev.of_node,
+> > -				of_dma_simple_xlate, &omap_dma_info);
+> > +				of_dma_simple_xlate, &od->ddev);
+> >  		if (rc) {
+> >  			pr_warn("OMAP-DMA: failed to register DMA controller\n");
+> >  			dma_async_device_unregister(&od->ddev);
+> > diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
+> > index 364dda7..3c0d9ac 100644
+> > --- a/include/linux/of_dma.h
+> > +++ b/include/linux/of_dma.h
+> > @@ -27,11 +27,6 @@ struct of_dma {
+> >  	void			*of_dma_data;
+> >  };
+> > 
+> > -struct of_dma_filter_info {
+> > -	dma_cap_mask_t	dma_cap;
+> > -	dma_filter_fn	filter_fn;
+> > -};
+> > -
+> > 
+> >  #ifdef CONFIG_OF
+> >  extern int of_dma_controller_register(struct device_node *np,
+> >  		struct dma_chan *(*of_dma_xlate)
+-- 
+Regards,
+
+Laurent Pinchart
