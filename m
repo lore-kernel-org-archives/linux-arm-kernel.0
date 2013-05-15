@@ -1,76 +1,125 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Wed, 15 May 2013 14:50:28 -0700
-Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
-In-Reply-To: <20130515170734.GI5600@atomide.com>
-References: <20130515002537.GG5600@atomide.com>
- <20130515015212.GB3268@animalcreek.com>
- <20130515170734.GI5600@atomide.com>
-Message-ID: <20130515215028.GA11883@animalcreek.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 16 May 2013 01:58:07 +0400
+Subject: [PATCH v4 2/3] ARM: shmobile: Marzen: add VIN and ADV7180 support
+In-Reply-To: <201305160153.29827.sergei.shtylyov@cogentembedded.com>
+References: <201305160153.29827.sergei.shtylyov@cogentembedded.com>
+Message-ID: <201305160158.08239.sergei.shtylyov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 10:07:35AM -0700, Tony Lindgren wrote:
-> * Mark A. Greer <mgreer@animalcreek.com> [130514 18:57]:
-> > On Tue, May 14, 2013 at 05:25:37PM -0700, Tony Lindgren wrote:
-> > > Commit a819c4f1 (ARM: OMAP3: PM: Only access IVA if one exists)
-> > > changed PM to not access IVA registers on omaps that don't have
-> > > them. Turns out we still need to idle iva2 as otherwise iva2_pwrdm
-> > > will stay on and block deeper idle states.
-> > > 
-> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > > 
-> > > ---
-> > > 
-> > > Paul & Kevin, do you have better ideas for fixing this?
-> > > 
-> > > --- a/arch/arm/mach-omap2/pm34xx.c
-> > > +++ b/arch/arm/mach-omap2/pm34xx.c
-> > > @@ -546,8 +546,10 @@ static void __init prcm_setup_regs(void)
-> > >  	/* Clear any pending PRCM interrupts */
-> > >  	omap2_prm_write_mod_reg(0, OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
-> > >  
-> > > -	if (omap3_has_iva())
-> > > -		omap3_iva_idle();
-> > > +	/*
-> > > +	 * We need to idle iva2_pwrdm even on am3703 with no iva2.
-> > > +	 */
-> > > +	omap3_iva_idle();
-> > >  
-> > >  	omap3_d2d_idle();
-> > >  }
-> > 
-> > [Kevin, Paul, some background: Tony discovered that the am3703 needs
-> > to have omap3_iva_idle() called even though its not supposed to have
-> > an IVA.]
-> > 
-> > This is potentially bad for other SoC's that don't have an IVA so I don't
-> > think its the way to go.  My preference would be to set the OMAP3_HAS_IVA
-> > flag for the am3703 only since its the one with the bug.  Maybe something
-> > in id.c:omap3xxx_check_features() but I don't see any existing way to check
-> > for an am3703 vs. other am37xx SoCs.  Any ideas?
-> > 
-> > Another option, I suppose, is a dts entry but I don't like that at all.
-> 
-> It seems that iva2_pwrdm is there for all omap3 even if OMAP3_HAS_IVA
-> flag is unset. And if that's the case, iva2 clocks still need to be idled
-> in all cases.
+From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-Ahh, this takes us to the "Great TI Docs Mystery" :) -- its basically
-impossible to tell because despite what their docs may say, the hardware
-can be quite different.  I'm not sure how to proceed other than trial &
-error with as many different SoCs as we can find.
+Add ADV7180 platform devices on the Marzen board, configure VIN1/3 pins, and
+register VIN1/3 devices with the ADV7180 specific platform data.
 
-> It's possible that not all steps in omap3_iva_idle() are needed though.
-> I can debug further to see which part of the omap3_iva_idle() are needed.
-> 
-> Mark, do you have some omap3 with no iva (other than am3703) to test the
-> idle states with?
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+[Sergei: removed superfluous tabulation and inserted empty lines in the  macro
+definition, updated the copyrights, annotated VIN platform data as '__initdata']
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-I have an am35xx which isn't supposed to have an IVA so I can test with it
-(although, I'm not sure how well the kernel works on the am35xx these days).
+---
+Changes since version 3:
+- changed the VIN platform device names to be R8A7779 specific;
 
-I'm a bit busy today but I'll try booting the am35xx tomorrow and if it
-comes up, see what I can figure out.
+Changes since version 2:
+- annotated 'vin_platform_data' as '__initdata' since they're kmemdup()'ed while
+  registering the platform devices anyway.
 
-Mark
---
+Changes since the original posting:
+- used a macro to define the camera platform devices;
+- updated the copyrights;
+- refreshed the patch.
+
+ arch/arm/mach-shmobile/board-marzen.c |   44 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
+
+Index: renesas/arch/arm/mach-shmobile/board-marzen.c
+===================================================================
+--- renesas.orig/arch/arm/mach-shmobile/board-marzen.c
++++ renesas/arch/arm/mach-shmobile/board-marzen.c
+@@ -1,8 +1,9 @@
+ /*
+  * marzen board support
+  *
+- * Copyright (C) 2011  Renesas Solutions Corp.
++ * Copyright (C) 2011, 2013  Renesas Solutions Corp.
+  * Copyright (C) 2011  Magnus Damm
++ * Copyright (C) 2013  Cogent Embedded, Inc.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License as published by
+@@ -37,6 +38,7 @@
+ #include <linux/mmc/host.h>
+ #include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/mfd/tmio.h>
++#include <media/soc_camera.h>
+ #include <mach/hardware.h>
+ #include <mach/r8a7779.h>
+ #include <mach/common.h>
+@@ -178,12 +180,40 @@ static struct platform_device leds_devic
+ 	},
+ };
+ 
++static struct rcar_vin_platform_data vin_platform_data __initdata = {
++	.flags	= RCAR_VIN_BT656,
++};
++
++#define MARZEN_CAMERA(idx)					\
++static struct i2c_board_info camera##idx##_info = {		\
++	I2C_BOARD_INFO("adv7180", 0x20 + (idx)),		\
++};								\
++								\
++static struct soc_camera_link iclink##idx##_adv7180 = {		\
++	.bus_id		= 1 + 2 * (idx),			\
++	.i2c_adapter_id	= 0,					\
++	.board_info	= &camera##idx##_info,			\
++};								\
++								\
++static struct platform_device camera##idx##_device = {		\
++	.name	= "soc-camera-pdrv",				\
++	.id	= idx,						\
++	.dev	= {						\
++		.platform_data	= &iclink##idx##_adv7180,	\
++	},							\
++};
++
++MARZEN_CAMERA(0);
++MARZEN_CAMERA(1);
++
+ static struct platform_device *marzen_devices[] __initdata = {
+ 	&eth_device,
+ 	&sdhi0_device,
+ 	&thermal_device,
+ 	&hspi_device,
+ 	&leds_device,
++	&camera0_device,
++	&camera1_device,
+ };
+ 
+ static const struct pinctrl_map marzen_pinctrl_map[] = {
+@@ -219,6 +249,16 @@ static const struct pinctrl_map marzen_p
+ 	/* USB2 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform.1", "pfc-r8a7779",
+ 				  "usb2", "usb2"),
++	/* VIN1 */
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7779-vin.1", "pfc-r8a7779",
++				  "vin1_clk", "vin1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7779-vin.1", "pfc-r8a7779",
++				  "vin1_data8", "vin1"),
++	/* VIN3 */
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7779-vin.3", "pfc-r8a7779",
++				  "vin3_clk", "vin3"),
++	PIN_MAP_MUX_GROUP_DEFAULT("r8a7779-vin.3", "pfc-r8a7779",
++				  "vin3_data8", "vin3"),
+ };
+ 
+ static void __init marzen_init(void)
+@@ -235,6 +275,8 @@ static void __init marzen_init(void)
+ 
+ 	r8a7779_add_standard_devices();
+ 	r8a7779_add_usb_phy_device(&usb_phy_platform_data);
++	r8a7779_add_vin_device(1, &vin_platform_data);
++	r8a7779_add_vin_device(3, &vin_platform_data);
+ 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
+ }
+ 
