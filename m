@@ -1,74 +1,103 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 15 May 2013 10:51:44 +0100
-Subject: [PATCH 21/39] usb: musb: ux500: move the MUSB HDRC configuration into
- the driver
+Date: Wed, 15 May 2013 10:51:39 +0100
+Subject: [PATCH 16/39] crypto: ux500/cryp - Set DMA configuration though
+ dma_slave_config()
 In-Reply-To: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
 References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1368611522-9984-22-git-send-email-lee.jones@linaro.org>
+Message-ID: <1368611522-9984-17-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MUSB HDRC configuration never changes between each of the ux500
-supported platforms, so there's little point passing it though platform
-data. If we set it in the driver instead, we can make good use of it
-when booting with either ATAGs or Device Tree.
+The DMA controller currently takes configuration information from
+information passed though dma_channel_request(), but it shouldn't.
+Using the API, the DMA channel should only be configured during
+a dma_slave_config() call.
 
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: linux-usb at vger.kernel.org
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Andreas Westin <andreas.westin@stericsson.com>
+Cc: linux-crypto at vger.kernel.org
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/usb.c |    8 --------
- drivers/usb/musb/ux500.c  |    8 ++++++++
- 2 files changed, 8 insertions(+), 8 deletions(-)
+ drivers/crypto/ux500/cryp/cryp.h      |    7 ++++++-
+ drivers/crypto/ux500/cryp/cryp_core.c |   17 +++++++++++++++++
+ 2 files changed, 23 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/usb.c b/arch/arm/mach-ux500/usb.c
-index a21c2e1..49d6e57 100644
---- a/arch/arm/mach-ux500/usb.c
-+++ b/arch/arm/mach-ux500/usb.c
-@@ -76,16 +76,8 @@ static struct ux500_musb_board_data musb_board_data = {
- 
- static u64 ux500_musb_dmamask = DMA_BIT_MASK(32);
- 
--static struct musb_hdrc_config musb_hdrc_config = {
--	.multipoint	= true,
--	.dyn_fifo	= true,
--	.num_eps	= 16,
--	.ram_bits	= 16,
--};
--
- static struct musb_hdrc_platform_data musb_platform_data = {
- 	.mode = MUSB_OTG,
--	.config = &musb_hdrc_config,
- 	.board_data = &musb_board_data,
+diff --git a/drivers/crypto/ux500/cryp/cryp.h b/drivers/crypto/ux500/cryp/cryp.h
+index 14cfd05..d1d6606 100644
+--- a/drivers/crypto/ux500/cryp/cryp.h
++++ b/drivers/crypto/ux500/cryp/cryp.h
+@@ -114,6 +114,9 @@ enum cryp_status_id {
  };
  
-diff --git a/drivers/usb/musb/ux500.c b/drivers/usb/musb/ux500.c
-index 2c80004..371776f 100644
---- a/drivers/usb/musb/ux500.c
-+++ b/drivers/usb/musb/ux500.c
-@@ -30,6 +30,13 @@
- 
- #include "musb_core.h"
- 
-+static struct musb_hdrc_config ux500_musb_hdrc_config = {
-+	.multipoint	= true,
-+	.dyn_fifo	= true,
-+	.num_eps	= 16,
-+	.ram_bits	= 16,
-+};
+ /* Cryp DMA interface */
++#define CRYP_DMA_TX_FIFO	0x08
++#define CRYP_DMA_RX_FIFO	0x10
 +
- struct ux500_glue {
- 	struct device		*dev;
- 	struct platform_device	*musb;
-@@ -229,6 +236,7 @@ static int ux500_probe(struct platform_device *pdev)
- 	glue->clk			= clk;
+ enum cryp_dma_req_type {
+ 	CRYP_DMA_DISABLE_BOTH,
+ 	CRYP_DMA_ENABLE_IN_DATA,
+@@ -217,7 +220,8 @@ struct cryp_dma {
  
- 	pdata->platform_ops		= &ux500_ops;
-+	pdata->config 			= &ux500_musb_hdrc_config;
+ /**
+  * struct cryp_device_data - structure for a cryp device.
+- * @base: Pointer to the hardware base address.
++ * @base: Pointer to virtual base address of the cryp device.
++ * @phybase: Pointer to physical memory location of the cryp device.
+  * @dev: Pointer to the devices dev structure.
+  * @clk: Pointer to the device's clock control.
+  * @pwr_regulator: Pointer to the device's power control.
+@@ -232,6 +236,7 @@ struct cryp_dma {
+  */
+ struct cryp_device_data {
+ 	struct cryp_register __iomem *base;
++	phys_addr_t phybase;
+ 	struct device *dev;
+ 	struct clk *clk;
+ 	struct regulator *pwr_regulator;
+diff --git a/drivers/crypto/ux500/cryp/cryp_core.c b/drivers/crypto/ux500/cryp/cryp_core.c
+index ccdf173..d9c863d 100644
+--- a/drivers/crypto/ux500/cryp/cryp_core.c
++++ b/drivers/crypto/ux500/cryp/cryp_core.c
+@@ -475,6 +475,19 @@ static int cryp_get_device_data(struct cryp_ctx *ctx,
+ static void cryp_dma_setup_channel(struct cryp_device_data *device_data,
+ 				   struct device *dev)
+ {
++	struct dma_slave_config mem2cryp = {
++		.direction = DMA_MEM_TO_DEV,
++		.dst_addr = device_data->phybase + CRYP_DMA_TX_FIFO,
++		.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES,
++		.dst_maxburst = 4,
++        };
++	struct dma_slave_config cryp2mem = {
++		.direction = DMA_DEV_TO_MEM,
++		.src_addr = device_data->phybase + CRYP_DMA_RX_FIFO,
++		.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES,
++		.src_maxburst = 4,
++        };
++
+ 	dma_cap_zero(device_data->dma.mask);
+ 	dma_cap_set(DMA_SLAVE, device_data->dma.mask);
  
- 	platform_set_drvdata(pdev, glue);
+@@ -490,6 +503,9 @@ static void cryp_dma_setup_channel(struct cryp_device_data *device_data,
+ 				    stedma40_filter,
+ 				    device_data->dma.cfg_cryp2mem);
  
++	dmaengine_slave_config(device_data->dma.chan_mem2cryp, &mem2cryp);
++	dmaengine_slave_config(device_data->dma.chan_cryp2mem, &cryp2mem);
++
+ 	init_completion(&device_data->dma.cryp_dma_complete);
+ }
+ 
+@@ -1431,6 +1447,7 @@ static int ux500_cryp_probe(struct platform_device *pdev)
+ 		goto out_kfree;
+ 	}
+ 
++	device_data->phybase = res->start;
+ 	device_data->base = ioremap(res->start, resource_size(res));
+ 	if (!device_data->base) {
+ 		dev_err(dev, "[%s]: ioremap failed!", __func__);
 -- 
 1.7.10.4
