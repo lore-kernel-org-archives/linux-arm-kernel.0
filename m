@@ -1,60 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 May 2013 15:06:07 +0100
-Subject: [PATCH 3/4] ARM: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE and
- use ALT_SMP instead
-In-Reply-To: <51939386.7010709@free-electrons.com>
-References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
- <1364235581-17900-4-git-send-email-will.deacon@arm.com>
- <51938B3D.2070508@free-electrons.com>
- <20130515134117.GH23869@mudshark.cambridge.arm.com>
- <51939386.7010709@free-electrons.com>
-Message-ID: <20130515140607.GI23869@mudshark.cambridge.arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 15 May 2013 16:03:03 +0200
+Subject: [PATCH 3/5] ARM: at91: dt: add pinctrl pre-processor define
+In-Reply-To: <1368626585-24425-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20130515135821.GG22508@game.jcrosoft.org>
+ <1368626585-24425-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1368626585-24425-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 02:54:14PM +0100, Gregory CLEMENT wrote:
-> On 05/15/2013 03:41 PM, Will Deacon wrote:
-> > Is this using dmatest.ko, or a different test program?
-> 
-> No they are self-test from the mv_xor driver
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ include/dt-bindings/pinctrl/at91.h |   35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
+ create mode 100644 include/dt-bindings/pinctrl/at91.h
 
-Ok. And the CPU locks up, rather than the DMA master?
-
-> > Ok, so the ALT_UP case should be emitted after patching, correct?
-> 
-> Indeed it was I excepted but I didn't check (I don't know how to do)
-
-If you don't have JTAG, that's trickier. Hopefully my other suggestion will
-help.
-
-> >> I made some investigation. And in UP if I remove the line:
-> >> 	ALT_UP(W(nop))
-> > 
-> > Did you remove the ALT_SMP case as well? You could also try making the
-> > ALT_SMP case use W(nop) too and see if it changes anything.
-> 
-> OK I will try it.
-
-You could also try deleting both of the ALT_* lines and just putting a
-W(nop) in there directly.
-
-> > If you don't have both of the alternatives, things will go wrong.
-> 
-> For my own culture, how ALT_UP and ALT_SMP work in SMP case?
-> When I disassembled the proc-v7.o, I saw that the SMP variant of the code were
-> written. How the kernel switch to the UP version of the code?
-
-Early in boot (head.S:__fixup_smp), we detect whether the CPU has the MP
-extensions then, if we're actually UP but the kernel has CONFIG_SMP=y, we
-walk over the .alt.smp.init section looking at each entry in there. The
-ALT_UP macro spits out an (address, instruction) pair, so in
-__do_fixup_smp_on_up, we store the instruction to the address for each pair,
-replacing the SMP instruction which sat there in the compiled image.
-
-It could be that the CPUID checks are failing on your Marvell part. Can you
-tell me what you have in your mpidr (mrc p15, 0, Rd, c0, c0, 5) and also
-your midr (mrc p15, 0, Rd, c0, c0) please?
-
-Cheers,
-
-Will
+diff --git a/include/dt-bindings/pinctrl/at91.h b/include/dt-bindings/pinctrl/at91.h
+new file mode 100644
+index 0000000..d7988b4
+--- /dev/null
++++ b/include/dt-bindings/pinctrl/at91.h
+@@ -0,0 +1,35 @@
++/*
++ * This header provides constants for most at91 pinctrl bindings.
++ *
++ * Copyright (C) 2013 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
++ *
++ * GPLv2 only
++ */
++
++#ifndef __DT_BINDINGS_AT91_PINCTRL_H__
++#define __DT_BINDINGS_AT91_PINCTRL_H__
++
++#define AT91_PINCTRL_NONE		(0 << 0)
++#define AT91_PINCTRL_PULL_UP		(1 << 0)
++#define AT91_PINCTRL_MULTI_DRIVE	(1 << 1)
++#define AT91_PINCTRL_DEGLITCH		(1 << 2)
++#define AT91_PINCTRL_PULL_DOWN		(1 << 3)
++#define AT91_PINCTRL_DIS_SCHMIT		(1 << 4)
++#define AT91_PINCTRL_DEBOUNCE		(1 << 16)
++#define AT91_PINCTRL_DEBOUNCE_VA(x)	(x << 17)
++
++#define AT91_PINCTRL_PULL_UP_DEGLITCH	(AT91_PINCTRL_PULL_UP | AT91_PINCTRL_DEGLITCH)
++
++#define AT91_PIOA	0
++#define AT91_PIOB	1
++#define AT91_PIOC	2
++#define AT91_PIOD	3
++#define AT91_PIOE	4
++
++#define AT91_PERIPH_GPIO	0
++#define AT91_PERIPH_A		1
++#define AT91_PERIPH_B		2
++#define AT91_PERIPH_C		3
++#define AT91_PERIPH_D		4
++
++#endif /* __DT_BINDINGS_AT91_PINCTRL_H__ */
+-- 
+1.7.10.4
