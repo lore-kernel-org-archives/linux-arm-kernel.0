@@ -1,86 +1,60 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Wed, 15 May 2013 13:59:29 +0930
-Subject: [PATCH V2 2/3] Documentation: virtio: Add emergency write
- (emerg_wr) config register in virtio console.
-In-Reply-To: <CAAHg+Hi6BHqwOznnC9qxkc5pBWz7r5qpz9Nhh=EeNenhjhHohg@mail.gmail.com>
-References: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
- <1367842791-30285-3-git-send-email-pranavkumar@linaro.org>
- <8761yn382w.fsf@rustcorp.com.au>
- <CAAHg+Hi6BHqwOznnC9qxkc5pBWz7r5qpz9Nhh=EeNenhjhHohg@mail.gmail.com>
-Message-ID: <87hai427di.fsf@rustcorp.com.au>
+From: nm@ti.com (Nishanth Menon)
+Date: Wed, 15 May 2013 00:29:16 -0500
+Subject: [PATCH v3] ARM:dts:omap4-panda:Update the LED support for the
+ panda DTS
+In-Reply-To: <1368541076-6854-1-git-send-email-dmurphy@ti.com>
+References: <1368541076-6854-1-git-send-email-dmurphy@ti.com>
+Message-ID: <20130515052916.GA15607@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pranavkumar Sawargaonkar <pranavkumar@linaro.org> writes:
-> Hi Rusty,
->
-> On 13 May 2013 08:22, Rusty Russell <rusty@rustcorp.com.au> wrote:
->> Pranavkumar Sawargaonkar <pranavkumar@linaro.org> writes:
->>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>> ---
->>>  Documentation/virtual/virtio-spec.txt |    8 +++++++-
->>>  1 file changed, 7 insertions(+), 1 deletion(-)
->>
->> OK, I applied this to the lyx master, with three changes:
->> 1) Changed "filed" to "field".
->> 2) Added ", or even acknowledging the feature" after "without
->>    initializing virtio queues".
->> 3) Added an initial point to the Device Initialization section:
->>
->>    1. If the VIRTIO_CONSOLE_F_EMERG_WRITE feature is offered, the
->>    emerg_wr field of the configuration can be written at any time. Thus
->>    it should work for very early boot debugging output as well as
->>    catastophic OS failures (eg. virtio ring corruption).
->
-> Thanks for applying this patch.
-> Have you also applied first patch ([PATCH V2 1/3] virtio: console: Add
-> emergency writeonly register to config space)
-> with this?  (https://lkml.org/lkml/2013/5/6/169)
+$subject - add a space?
+s/ARM:dts:omap4-panda:Update/ARM: dts: omap4-panda: Update/ ?
 
-Would like Amit's Ack, since he's de-facto console maintainer.
-
-I've reproduced it below.
-
-Cheers,
-Rusty.
-
-Subject: [PATCH V2 1/3] virtio: console: Add emergency writeonly register to config space
-Date: Mon,  6 May 2013 17:49:49 +0530
-Message-Id: <1367842791-30285-2-git-send-email-pranavkumar@linaro.org>
-X-Mailer: git-send-email 1.7.9.5
-In-Reply-To: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
-References: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
-X-Gm-Message-State: ALoCoQmDOoCdPmDpT+VgLwYAlJHmkUTB8sEAHVSbrNxWBzYgPHFT9rQ2A9dR8fToM81cHDZDppGx
-
-This patch adds an emerg_wr register (writeonly) in config space
-of virtio console device which can be used for debugging.
-
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
-Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
----
- include/uapi/linux/virtio_console.h |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/include/uapi/linux/virtio_console.h b/include/uapi/linux/virtio_console.h
-index ee13ab6..3fd0dce 100644
---- a/include/uapi/linux/virtio_console.h
-+++ b/include/uapi/linux/virtio_console.h
-@@ -38,6 +38,7 @@
- /* Feature bits */
- #define VIRTIO_CONSOLE_F_SIZE	0	/* Does host provide console size? */
- #define VIRTIO_CONSOLE_F_MULTIPORT 1	/* Does host provide multiple ports? */
-+#define VIRTIO_CONSOLE_F_EMERG_WRITE 2 /* Does host support emergency write? */
- 
- #define VIRTIO_CONSOLE_BAD_ID		(~(u32)0)
- 
-@@ -48,6 +49,8 @@ struct virtio_console_config {
- 	__u16 rows;
- 	/* max. number of ports this device can hold */
- 	__u32 max_nr_ports;
-+	/* emergency write register */
-+	__u32 emerg_wr;
- } __attribute__((packed));
- 
- /*
+On 09:17-20130514, Dan Murphy wrote:
+> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+> are different.
+> 
+> A1-A3 = gpio_wk7
+Thanks for fixing this - this is a key fix else, GPIO_7 which controls
+VSEL for VDD_MPU on PandaBoard-ES will create all kind of ruckus (change
+voltage on heartbeat)!
+> ES = gpio_110
+> 
+> There is no change to LED D2
+> 
+> Abstract away the pinmux and the LED definitions for the two boards into
+> the respective DTS files.
+> 
+> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+> ---
+[...]
+> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+> index f1d8c21..8d1ba03 100644
+> --- a/arch/arm/boot/dts/omap4-panda-es.dts
+> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
+> @@ -34,3 +34,43 @@
+>  		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
+>  		>;
+>  };
+> +
+> +&leds {
+> +	compatible = "gpio-leds";
+> +	heartbeat {
+> +		label = "pandaboard::status1";
+> +		gpios = <&gpio4 14 0>;
+> +		linux,default-trigger = "heartbeat";
+> +	};
+> +	mmc {
+> +		label = "pandaboard::status2";
+> +		gpios = <&gpio1 8 0>;
+> +		linux,default-trigger = "gpio";
+mmc0?
+> +	};
+> +};
+> +
+Other that that,
+Tested-by: Nishanth Menon <nm@ti.com>
+-- 
+Regards,
+Nishanth Menon
