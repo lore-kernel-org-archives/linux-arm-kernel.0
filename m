@@ -1,44 +1,45 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 15 May 2013 15:25:23 +0200
-Subject: [PATCHv9 9/9] arm: mvebu: update defconfig with PCI and USB support
-In-Reply-To: <1368624323-24311-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1368624323-24311-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1368624323-24311-10-git-send-email-thomas.petazzoni@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 May 2013 15:25:49 +0200
+Subject: [PATCH 5/5] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
+In-Reply-To: <1368571955-6652-5-git-send-email-dinguyen@altera.com>
+References: <1368571955-6652-1-git-send-email-dinguyen@altera.com>
+ <1368571955-6652-5-git-send-email-dinguyen@altera.com>
+Message-ID: <201305151525.50005.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have the necessary drivers and Device Tree informations to
-support PCIe on Armada 370 and Armada XP, enable the CONFIG_PCI
-option.
+On Wednesday 15 May 2013, dinguyen at altera.com wrote:
+> +
+> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET		0x108
+> +#define DRV_CLK_PHASE_SHIFT_SEL_MASK	0x7
+> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)		\
+> +	((((drvsel) << 0) & 0x7) | (((smplsel) << 3) & 0x38))
+> +
+> +extern void __iomem *sys_manager_base_addr;
 
-Also, since the Armada 370 Mirabox has a built-in USB XHCI controller
-connected on the PCIe bus, enable the corresponding options as well.
+This is not acceptable, you cannot just reference external symbols
+from one driver in another, without a proper interface.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/configs/mvebu_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
+Please explain what the functionality is that you need here, then
+we can help you find the proper interface. My guess is that you
+need either the functionality provided by drivers/reset/
+or drivers/mfd/syscon.c.
 
-diff --git a/arch/arm/configs/mvebu_defconfig b/arch/arm/configs/mvebu_defconfig
-index f3e8ae0..966281e 100644
---- a/arch/arm/configs/mvebu_defconfig
-+++ b/arch/arm/configs/mvebu_defconfig
-@@ -13,6 +13,8 @@ CONFIG_MACH_ARMADA_370=y
- CONFIG_MACH_ARMADA_XP=y
- # CONFIG_CACHE_L2X0 is not set
- # CONFIG_SWP_EMULATE is not set
-+CONFIG_PCI=y
-+CONFIG_PCI_MVEBU=y
- CONFIG_SMP=y
- CONFIG_AEABI=y
- CONFIG_HIGHMEM=y
-@@ -60,6 +62,7 @@ CONFIG_USB_SUPPORT=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_ROOT_HUB_TT=y
-+CONFIG_USB_XHCI_HCD=y
- CONFIG_MMC=y
- CONFIG_MMC_MVSDIO=y
- CONFIG_NEW_LEDS=y
--- 
-1.7.9.5
+> +       if (of_property_read_u32(dev->of_node, "pwr-en", &pwr_en)) {
+> +               dev_info(dev, "couldn't determine pwr-en, assuming pwr-en = 0\n");
+> +               pwr_en = 0;
+> +       }
+> +
+> +       /* Set PWREN bit */
+> +       mci_writel(host, PWREN, pwr_en);
+
+If you add new properties, you have to document them in
+Documentations/devicetree/bindings/*.
+
+What is the requirement for this property? Is there no way to 
+automatically power the card on/off using the normal
+dw_mci_set_ios function?
+
+The rest of this patch looks ok to me.
+
+	Arnd
