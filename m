@@ -1,65 +1,35 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 15 May 2013 10:04:49 +0100
-Subject: [GIT PULL v2] MFD: Fixes due for the v3.10 -rc:s
-In-Reply-To: <20130514091956.GG3297@gmail.com>
-References: <20130514091956.GG3297@gmail.com>
-Message-ID: <20130515090449.GA3494@gmail.com>
+Date: Wed, 15 May 2013 10:07:21 +0100
+Subject: [PATCH 3/9] clk: ux500: Provide device enumeration number suffix
+ for SMSC911x
+In-Reply-To: <CACRpkdZjvQF9e_isiuUgmcH0RgoGGF=dmg_E7oQjs4oY9f+dFQ@mail.gmail.com>
+References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
+ <1368019749-19455-4-git-send-email-lee.jones@linaro.org>
+ <20130514155835.10068.93655@quantum>
+ <CACRpkdZjvQF9e_isiuUgmcH0RgoGGF=dmg_E7oQjs4oY9f+dFQ@mail.gmail.com>
+Message-ID: <20130515090721.GB3494@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sam,
+On Wed, 15 May 2013, Linus Walleij wrote:
 
-Since v1 of my MFD -fixes pull-request, I have applied a few more
-patches which really should be entered into the -rc:s. As it appears
-that you have not yet pulled v1, I figured sending a v2 in its place
-would be appropriate, so here it is.
+> On Tue, May 14, 2013 at 5:58 PM, Mike Turquette <mturquette@linaro.org> wrote:
+> > Quoting Lee Jones (2013-05-08 06:29:03)
+> >> First Ethernet device has a ".0" appended onto the device name. It
+> >> appears that we need this in order to obtain the correct clock.
+> >>
+> >> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> >> Cc: Mike Turquette <mturquette@linaro.org>
+> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >
+> > Looks good to me.  Can I take this into clk-next or are you looking for
+> > an Ack?
+> 
+> You can probably take it through the clk tree, but this series
+> deals with regression fixes so it should go into the -rc series
+> I think.
 
------
-
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
-
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/ljones/mfd.git for-mfd-fixes
-
-for you to fetch changes up to 27df65e061f51f6bd2c8e9ad6b505c8dbab6460c:
-
-  mfd: db8500-prcmu: Update stored DSI PLL divider value (2013-05-14 15:58:04 +0100)
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      mfd: ab8500: Debugfs code depends on gpadc
-
-Fabio Baltieri (5):
-      mfd: abx500-core: Fix sparse warning
-      mfd: ab8500-sysctrl: Fix sparse warning
-      mfd: ab8500-sysctrl: Set sysctrl_dev during probe
-      mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
-      mfd: ab8500-sysctrl: Always enable pm_power_off handler
-
-Lee Jones (4):
-      mfd: ab8500-gpadc: Suppress 'ignoring regulator_enable() return value' warning
-      mfd: ab8500-core: Use the correct driver name when enabling gpio/pinctrl
-      mfd: db8500-prcmu: Supply the pdata_size attribute for db8500-thermal
-      mfd: ab8500-core: Pass GPADC compatible string to MFD core
-
-Linus Walleij (1):
-      mfd: ab8500: Pass AB8500 IRQ to debugfs code by resource
-
-Ulf Hansson (1):
-      mfd: db8500-prcmu: Update stored DSI PLL divider value
-
- drivers/mfd/Kconfig               |    2 +-
- drivers/mfd/ab8500-core.c         |   24 +++++++++++++++++++++---
- drivers/mfd/ab8500-debugfs.c      |   16 ++++++++++++----
- drivers/mfd/ab8500-gpadc.c        |    7 +++++--
- drivers/mfd/ab8500-sysctrl.c      |   15 ++++++++++-----
- drivers/mfd/abx500-core.c         |    2 +-
- drivers/mfd/db8500-prcmu.c        |    3 +++
- include/linux/mfd/abx500/ab8500.h |    2 --
- 8 files changed, 53 insertions(+), 18 deletions(-)
+That's what Mike has done.
 
 -- 
 Lee Jones
