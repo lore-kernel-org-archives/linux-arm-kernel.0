@@ -1,32 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 15 May 2013 11:57:30 +0900
-Subject: [PATCH v2 4/4] ARM: shmobile: marzen-reference: Set SMSC lan to use
- irq-push-pull
+Date: Wed, 15 May 2013 11:57:27 +0900
+Subject: [PATCH v2 1/4] ARM: shmobile: marzen-reference: Reference the correct
+ IRQ for ethernet
 In-Reply-To: <1368586650-26263-1-git-send-email-horms+renesas@verge.net.au>
 References: <1368586650-26263-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1368586650-26263-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1368586650-26263-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change makes the DTS consistent with the platform data
-that exists in board-marzen.c.
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Empirically it does not appear to be necessary.
+The SMSC ethernet controller uses an external IRQ line that goes through
+the irqpin controller. Set the interrupt parent to irqpin0 and fix the
+interrupt number.
 
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779-marzen-reference.dts | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/r8a7779-marzen-reference.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-index 10cfc7f..fe32e1a 100644
+index 72be4c8..10cfc7f 100644
 --- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
 +++ b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-@@ -40,6 +40,7 @@
+@@ -38,8 +38,8 @@
+ 		compatible = "smsc,lan9220", "smsc,lan9115";
+ 		reg = <0x18000000 0x100>;
  		phy-mode = "mii";
- 		interrupt-parent = <&irqpin0>;
- 		interrupts = <1 0x4>;
-+		smsc,irq-push-pull;
+-		interrupt-parent = <&gic>;
+-		interrupts = <0 28 0x4>;
++		interrupt-parent = <&irqpin0>;
++		interrupts = <1 0x4>;
  		reg-io-width = <4>;
  		vddvario-supply = <&fixedregulator3v3>;
  		vdd33a-supply = <&fixedregulator3v3>;
