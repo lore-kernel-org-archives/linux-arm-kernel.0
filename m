@@ -1,28 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 May 2013 18:54:18 +0200
-Subject: [PATCH 07/39] dmaengine: ste_dma40: Only use addresses passed as
- configuration information
-In-Reply-To: <1368611522-9984-8-git-send-email-lee.jones@linaro.org>
+Date: Wed, 15 May 2013 18:56:05 +0200
+Subject: [PATCH 08/39] dmaengine: ste_dma40: Remove redundant address
+ fetching function
+In-Reply-To: <1368611522-9984-9-git-send-email-lee.jones@linaro.org>
 References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdY97uS_ckSqy=Ta0SDrXrGmtDB4eL28_ZZPN5j--emr5A@mail.gmail.com>
+ <1368611522-9984-9-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZpx3=8dhGaZ9xW7vXTmvhi=OVE5vFCAW66-AnwV_i=rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> Addresses are passed in from the client's driver via the invocation of
-> dmaengine_slave_config(), so there's no need to fetch them from platform
-> data too, hardwired or otherwise. This is a great step forward, as it
-> elevates a large burden from platform data in the way of a look-up
-> table.
+> Addresses are now stored in local data structures and are easy to
+> obtain, thus a specialist function used to fetch them is now surplus
+> to requirement.
 >
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-This should be the case even without patch 5 & 6 so patch tentatively
-applied.
-
-Waiting for Vinod's ACK on this though.
+Patch tentatively applied, waiting for Vinod's ACK.
 
 Yours,
 Linus Walleij
