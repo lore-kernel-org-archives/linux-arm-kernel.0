@@ -1,76 +1,23 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 14 May 2013 22:59:58 -0600
-Subject: [PATCH] ARM: PL011: add support for extended FIFO-size of
- PL011-r1p5
-In-Reply-To: <022d01ce5107$8bc668e0$a3533aa0$@lge.com>
-References: <007301ce375e$bcf6d6b0$36e48410$@lge.com>
- <5191D200.3040604@wwwdotorg.org> <01fd01ce5072$d6b9fcd0$842df670$@lge.com>
- <5192A692.4010700@wwwdotorg.org> <022d01ce5107$8bc668e0$a3533aa0$@lge.com>
-Message-ID: <5193164E.6050400@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 15 May 2013 08:59:42 +0400
+Subject: [PATCH] ASoC: remove saarb and tavorevb3 machine drivers
+In-Reply-To: <1368544041.1350.111.camel@x61.thuisdomein>
+References: <1368544041.1350.111.camel@x61.thuisdomein>
+Message-ID: <20130515045942.GK24524@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/2013 07:00 PM, Jongsung Kim wrote:
-> Stephen Warren <swarren@wwwdotorg.org> :
->> Looking at BCM2835-ARM-Peripherals.pdf (i.e. the public documentation for
->> the BCM2835 chip), I see:
->>
->> =====
->> The UART provides:
->> * Separate 16x8 transmit and 16x12 receive FIFO memory.
->> ...
->> For the in-depth UART overview, please, refer to the ARM PrimeCell UART
->> (PL011) Revision: r1p5 Technical Reference Manual.
->> =====
->>
->> That seems to imply that not all r1p5 PL011s actually have a depth-32 FIFO.
->> Perhaps this is a configurable property of the IP block, not something that
->> all r1p5 have?
-> 
-> All r1p5 have 32-byte FIFO depth and it's not configurable. From the PL011
-> TRM:
-> 
-> r1p4-r1p5	Contains the following differences in functionality:
-> 		* The receive and transmit FIFOs are increased to a depth of 32.
-> 		* The Revision field in the UARTPeriphID2 Register on page 3-24
-> 		  bits [7:4] now reads back as 0x3.
+On Tue, May 14, 2013 at 05:07:21PM +0200, Paul Bolle wrote:
+> Support for PXA95x was removed in v3.8. This means that the Kconfig
+> symbols MACH_SAARB and MACH_TAVOREVB3 are no longer available. This
+> leaves the SoC Audio support for Marvell Saarb and Marvell Tavor EVB3
+> unbuildable. Remove these drivers too.
 
-Well, that certainly isn't true in practice. I think we should revert
-this commit until we can determine what the problem is.
-
-I validated that the periphid register in HW contains the r1p5 revision
-(3), and the pcellid register does indeed contain the expected
-0xb105f00d value. However, if I run the following hacky code in U-Boot
-to determine the FIFO depth, it comes out as 16, which explains the
-symptoms I'm seeing:
-
-void find_fifo_depth(void)
-{
-	volatile u8 *uart = 0x20201000;
-	int depth = 0;
-
-	/* Wait for TX FIFO empty */
-	while (!(uart[0x18] & 0x80))
-		;
-
-	/* Disable UART */
-	uart[0x30] &= ~1;
-
-	/* Push chars into TX FIFO until full */
-	for (;;) {
-		uart[0] = 'A' + depth;
-		depth++;
-		/* Done if FIFO full */
-		if (uart[0x18] & 0x20)
-			break;
-		if (depth > 64) {
-			depth = -1;
-			break;
-		}
-	}
-
-	/* Re-enable UART */
-	uart[0x30] |= 1;
-
-	printf("FIFO depth: %d\n", depth);
-}
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130515/7030a07d/attachment.sig>
