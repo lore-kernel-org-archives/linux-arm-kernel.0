@@ -1,48 +1,76 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 15 May 2013 08:46:04 +0400
-Subject: [PATCH RFC] clk: Introduce userspace clock driver
-In-Reply-To: <51927DEB.7090001@balister.org>
-References: <20130512143344.GC3200@sirena.org.uk>
- <9e55c552-ce34-4663-9a57-bf2c626d7d58@TX2EHSMHS008.ehs.local>
- <20130513052135.GD6836@sirena.org.uk>
- <0bf5a185-86f7-4a93-a90f-42caefb06a1d@TX2EHSMHS009.ehs.local>
- <519112F9.2010102@gmail.com>
- <7c5e7537-6ed5-4622-a7a9-bf46820ef695@VA3EHSMHS033.ehs.local>
- <519124D3.2040403@gmail.com>
- <af51c63e-7ff1-4e73-9305-08309217ab38@TX2EHSMHS037.ehs.local>
- <20130514164611.10068.46384@quantum>
- <51927DEB.7090001@balister.org>
-Message-ID: <20130515044604.GA24524@sirena.org.uk>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 14 May 2013 22:59:58 -0600
+Subject: [PATCH] ARM: PL011: add support for extended FIFO-size of
+ PL011-r1p5
+In-Reply-To: <022d01ce5107$8bc668e0$a3533aa0$@lge.com>
+References: <007301ce375e$bcf6d6b0$36e48410$@lge.com>
+ <5191D200.3040604@wwwdotorg.org> <01fd01ce5072$d6b9fcd0$842df670$@lge.com>
+ <5192A692.4010700@wwwdotorg.org> <022d01ce5107$8bc668e0$a3533aa0$@lge.com>
+Message-ID: <5193164E.6050400@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 02:09:47PM -0400, Philip Balister wrote:
+On 05/14/2013 07:00 PM, Jongsung Kim wrote:
+> Stephen Warren <swarren@wwwdotorg.org> :
+>> Looking at BCM2835-ARM-Peripherals.pdf (i.e. the public documentation for
+>> the BCM2835 chip), I see:
+>>
+>> =====
+>> The UART provides:
+>> * Separate 16x8 transmit and 16x12 receive FIFO memory.
+>> ...
+>> For the in-depth UART overview, please, refer to the ARM PrimeCell UART
+>> (PL011) Revision: r1p5 Technical Reference Manual.
+>> =====
+>>
+>> That seems to imply that not all r1p5 PL011s actually have a depth-32 FIFO.
+>> Perhaps this is a configurable property of the IP block, not something that
+>> all r1p5 have?
+> 
+> All r1p5 have 32-byte FIFO depth and it's not configurable. From the PL011
+> TRM:
+> 
+> r1p4-r1p5	Contains the following differences in functionality:
+> 		* The receive and transmit FIFOs are increased to a depth of 32.
+> 		* The Revision field in the UARTPeriphID2 Register on page 3-24
+> 		  bits [7:4] now reads back as 0x3.
 
-> First of all, the driver that loads the bitstream into the fpga
-> fabric does not know ANYTHING about what the bitstream does. So it
-> cannot do any setup based on the contents of the file that is
-> loaded. (And this can also be loaded during the SoC bootup,
-> bypassing this driver completely)
+Well, that certainly isn't true in practice. I think we should revert
+this commit until we can determine what the problem is.
 
-This is a problem that is going to need to be fixed - there will be some
-things going on the FPGAs that do need drivers and so there needs to be
-some way to instantiate a driver for a FPGA image.  Things like adding
-extra DT blobs along with the FPGA image have been talked about
+I validated that the periphid register in HW contains the r1p5 revision
+(3), and the pcellid register does indeed contain the expected
+0xb105f00d value. However, if I run the following hacky code in U-Boot
+to determine the FIFO depth, it comes out as 16, which explains the
+symptoms I'm seeing:
 
-> Second, there are four clocks that feed the FPGA fabric. We will
-> want to set these clocks from user space somehow. It is perfectly
-> valid to use a uio driver to interface with logic in the fpga. If we
-> take the approach of using such general purpose techniques to
-> interface with fpga logic, we must have ways for the user to control
-> the fpga clocks.
+void find_fifo_depth(void)
+{
+	volatile u8 *uart = 0x20201000;
+	int depth = 0;
 
-Right, and if the specific device is being controlled by UIO then having
-UIO create some clocks makes sense but then that should be integrated
-into the UIO instantiation rather than done as a separate thing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130515/3adf26fc/attachment.sig>
+	/* Wait for TX FIFO empty */
+	while (!(uart[0x18] & 0x80))
+		;
+
+	/* Disable UART */
+	uart[0x30] &= ~1;
+
+	/* Push chars into TX FIFO until full */
+	for (;;) {
+		uart[0] = 'A' + depth;
+		depth++;
+		/* Done if FIFO full */
+		if (uart[0x18] & 0x20)
+			break;
+		if (depth > 64) {
+			depth = -1;
+			break;
+		}
+	}
+
+	/* Re-enable UART */
+	uart[0x30] |= 1;
+
+	printf("FIFO depth: %d\n", depth);
+}
