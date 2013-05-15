@@ -1,42 +1,37 @@
-From: jrudholm@gmail.com (Johan Rudholm)
-Date: Wed, 15 May 2013 16:10:09 +0200
-Subject: [PATCH 0/4] mmc: mmci: Add support for UHS cards
-In-Reply-To: <1368610823-14113-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1368610823-14113-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CA+20K0DP1xY1urAsxBFWcaN22AahJ3GVG2dxhACFArfwuZFDZw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 May 2013 16:10:22 +0200
+Subject: [RFC PATCHv3 2/6] arm: Add device trees for TI-Nspire
+In-Reply-To: <1368332581-94691-3-git-send-email-dt.tangr@gmail.com>
+References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
+ <1368332581-94691-3-git-send-email-dt.tangr@gmail.com>
+Message-ID: <201305151610.23145.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sunday 12 May 2013, Daniel Tang wrote:
+> +
+> +                       timer0: timer at 900C0000 {
+> +                               reg = <0x900C0000 0x1000>;
+> +
+> +                               clocks = <&timer_clk>;
+> +                               clock-names = "timer_clk";
+> +                       };
+> +
+> +                       timer1: timer at 900D0000 {
+> +                               reg = <0x900D0000 0x1000>;
+> +                               interrupts = <19>;
+> +
+> +                               clocks = <&timer_clk>;
+> +                               clock-names = "timer_clk";
+> +                       };
 
-2013/5/15 Ulf Hansson <ulf.hansson@stericsson.com>:
-> From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> UHS cards in mode SDR12|25 operates at 1.8V I/O voltage. This patchset
-> adds support to handle the corresponding voltage switch from the default
-> 2.7-3.6 I/O voltage to 1.8V.
->
-> The first patch, "Fixup regulator handling for vqmmc" has recently been
-> sent as a separate patch, since it is a pure bugfix. Nevertheless this
-> patchset depends on this patch, thus I decided to fold it here as well.
->
-> Host capabilities for SDR12 and SDR25 needs to be set to enable support,
-> but that will be handled outside this patchset.
->
-> Ulf Hansson (4):
->   mmc: mmci: Fixup regulator handling for vqmmc
->   mmc: mmci: Support signal voltage switch for UHS cards
->   mmc: mmci: Cache MMCIDATACTRL register
->   mmc: mmci: Add card_busy function to improve UHS card support
->
->  drivers/mmc/host/mmci.c |   94 +++++++++++++++++++++++++++++++++++++++++++----
->  drivers/mmc/host/mmci.h |    4 ++
->  2 files changed, 90 insertions(+), 8 deletions(-)
 
-Looks good! Please add my
+> +                               clocks = <&apb_pclk>;
+> +                               clock-names = "apb_pclk";
+> +                       };
 
-Reviewed-by: Johan Rudholm <jrudholm@gmail.com>
+Why do you provide "clock-names" here? Do those devices have multiple
+clock inputs? It's normally easier to just use the default clock
+input.
 
-to this patch set.
-
-Kind regards, Johan
+	Arnd
