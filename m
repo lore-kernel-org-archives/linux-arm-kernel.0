@@ -1,67 +1,91 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 15 May 2013 16:43:48 -0600
-Subject: [PATCH 1/6] ARM: tegra: add an assembly marco to check Tegra
- SoC ID
-In-Reply-To: <1368613644-11863-2-git-send-email-josephl@nvidia.com>
-References: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
- <1368613644-11863-2-git-send-email-josephl@nvidia.com>
-Message-ID: <51940FA4.6050609@wwwdotorg.org>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 16 May 2013 00:45:03 +0200
+Subject: [RFC 2/4] dma: add dmaengine driver for Samsung s3c24xx SoCs
+In-Reply-To: <45625193.0y3McEvmiD@flatron>
+References: <201305111330.05046.heiko@sntech.de>
+ <201305152348.32171.heiko@sntech.de> <45625193.0y3McEvmiD@flatron>
+Message-ID: <201305160045.03934.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2013 04:27 AM, Joseph Lo wrote:
-> There are some Tegra SoC ID checking code around the low level assembly
-> code. Adding a marco to replace them. For the single image to support all
-> the Tegra series, we may also need the marco in other common code. So we
-> make it become a marco for the usage.
+Am Donnerstag, 16. Mai 2013, 00:02:40 schrieb Tomasz Figa:
+> On Wednesday 15 of May 2013 23:48:31 Heiko St?bner wrote:
+> > Am Mittwoch, 15. Mai 2013, 23:20:08 schrieb Sylwester Nawrocki:
+> > > On 05/15/2013 10:31 PM, Heiko St?bner wrote:
+> > > >>> +       BUG();
+> > > >>> 
+> > > >> >  Isn't that a bit nasty. This macro should be used with care and
+> > > >> >  we
+> > > >> >  should recover if possible. dev_err()?
+> > > > 
+> > > > runtime_config already denies any settings not in the 1,2 or 4bytes
+> > > > range - the default-part should therefore never be reached. So if
+> > > > any other value magically appears in the register and triggers the
+> > > > default-part, something is seriously wrong. So my guess is, the BUG
+> > > > might be appropriate.
+> > > > 
+> > > > On the other hand the whole default+BUG part could also simply go
+> > > > away,
+> > > > for the same reasons.
+> > > 
+> > > IMHO BUG() is not needed at all. As Linus suggested dev_err() is such
+> > > case or WARN_ON() would be more appropriate. This has been discussed
+> > > in the past extensively, not sure if you are aware of the other
+> > > Linus' opinion on BUG()/BUG_ON() proliferation:
+> > > https://lkml.org/lkml/2012/9/27/461
+> > 
+> > Very interesting read and I'll keep this in mind in the future. What
+> > about the other option ... i.e. simply getting rid of the whole "error
+> > handling", as the other code paths should already make sure that only
+> > valid values get written into the register.
+> > 
+> > Can the value change in the register somehow on its own without kernel
+> > intervention, or does this not happen?
+> 
+> Hmm, it depends on hardware, I guess. Not sure how it works on this
+> particular IP.
+> 
+> Still, the mentioned BUG() was about a value in a driver-filled struct,
+> wasn't it?
+> 
+> /* Quoting the the code for reference */
+> 
+> > +static u32 s3c24xx_dma_getbytes_chan(struct s3c24xx_dma_chan *s3cchan)
+> > +{
+> > +       struct s3c24xx_dma_phy *phy = s3cchan->phy;
+> > +       struct s3c24xx_txd *txd = s3cchan->at;
+> > +       u32 tc = readl(phy->base + DSTAT) & DSTAT_CURRTC_MASK;
+> > +
+> > +       switch (txd->dcon & DCON_DSZ_MASK) {
+> > +       case DCON_DSZ_BYTE:
+> > +               return tc;
+> > +       case DCON_DSZ_HALFWORD:
+> > +               return tc * 2;
+> > +       case DCON_DSZ_WORD:
+> > +               return tc * 4;
+> > +       default:
+> > +               break;
+> > +       }
+> > +
+> > +       BUG();
+> 
+> (Btw. I don't see anything setting the DCON_DSZ bits in this field. Am I
+> missing something?)
 
-I'm not sure this patch doesn't obfuscate the code too much. The big
-issue I see is:
+this is for calculating the remaining bytes of the transaction. which is used 
+in s3c24xx_dma_tx_status. 
 
-> @@ -115,13 +112,9 @@ ENTRY(__tegra_cpu_reset_handler)
->  
->  	cpsid	aif, 0x13			@ SVC mode, interrupts disabled
->  
-> -	mov32	r6, TEGRA_APB_MISC_BASE
-> -	ldr	r6, [r6, #APB_MISC_GP_HIDREV]
-> -	and	r6, r6, #0xff00
-> -#ifdef CONFIG_ARCH_TEGRA_2x_SOC
-> -t20_check:
-> -	cmp	r6, #(0x20 << 8)
-> +	tegra_check_soc_id TEGRA20, TEGRA_APB_MISC_BASE, r6, r5
+And when looking at it again, I can't really fathom why I did it this way with 
+decoding the DSZ from the dcon value of the s3c24xx_txd again instead of 
+simply using the width value of the same struct .... 
 
-Here, we replace all the code with the new macro, ...
+So it can be much simpler as
+	(...)
+     u32 tc = readl(phy->base + DSTAT) & DSTAT_CURRTC_MASK;
+	return tc * txd->width;
 
->  #ifdef CONFIG_ARCH_TEGRA_2x_SOC
->  	/* Are we on Tegra20? */
-> -	cmp	r6, #(0x20 << 8)
-> +	cmp	r6, #(TEGRA20 << 8)
+getting rid of this stuff alltogether
 
-But here we still have to write out the cmp instructions.
 
-It may be reasonable to create a macro to read/mask/shift the SoC ID,
-similar to the existing cpu_id macro, i.e. roughly:
-
-/* Macro to check Tegra revision */
-+#define APB_MISC_GP_HIDREV	0x804
-+.macro tegra_soc_id base, tmp1, tmp2
-+	mov32	\tmp2, \base
-+	ldr	\tmp1, [\tmp2, #APB_MISC_GP_HIDREV]
-+	and	\tmp1, \tmp1, #0xff00
-+.endm
-
-Also, I wonder:
-
-(a) why the need to pass TEGRA_APB_MISC_BASE into the macro; can't the
-macro just hard-code that value since it's always the same?
-
-(b) Why need two registers passed to the macro. At least one of the code
-segments you've replaced with the macro uses a single register instead:
-
--	mov32	r6, TEGRA_APB_MISC_BASE
--	ldr	r6, [r6, #APB_MISC_GP_HIDREV]
--	and	r6, r6, #0xff00
-
-Wouldn't that be a better implementation of the macro? I don't think
-relying on \tmp2 containing "base" after the macro invocation would be a
-good idea, since that's rather like looking inside the black box.
+still puzzled how I came up with this strangeness in the first place
+Heiko
