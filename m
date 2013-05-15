@@ -1,74 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 May 2013 18:16:11 +0100
-Subject: [PATCH 3/4] ARM: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE
- and use ALT_SMP instead
-In-Reply-To: <20130515164843.GN23869@mudshark.cambridge.arm.com>
-References: <51938B3D.2070508@free-electrons.com>
- <20130515134117.GH23869@mudshark.cambridge.arm.com>
- <51939386.7010709@free-electrons.com>
- <20130515140607.GI23869@mudshark.cambridge.arm.com>
- <51939FBC.3060705@free-electrons.com>
- <20130515150402.GK23869@mudshark.cambridge.arm.com>
- <5193AB8B.90100@free-electrons.com>
- <20130515154113.GM23869@mudshark.cambridge.arm.com>
- <5193B7CF.2020208@free-electrons.com>
- <20130515164843.GN23869@mudshark.cambridge.arm.com>
-Message-ID: <20130515171611.GN18614@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 May 2013 19:18:01 +0200
+Subject: [PATCH 20/39] usb: musb: ux500: move channel number knowledge
+ into the driver
+In-Reply-To: <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYjjDp+7hzGtAchyy3+5Vxc8jK5THGCETkAO_V9Hj9Ssw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 05:48:43PM +0100, Will Deacon wrote:
-> On Wed, May 15, 2013 at 05:29:03PM +0100, Gregory CLEMENT wrote:
-> > On 05/15/2013 05:41 PM, Will Deacon wrote:
-> > > On Wed, May 15, 2013 at 04:36:43PM +0100, Gregory CLEMENT wrote:
-> > >> On 05/15/2013 05:04 PM, Will Deacon wrote:
-> > >>> On Wed, May 15, 2013 at 03:46:20PM +0100, Gregory CLEMENT wrote:
-> > >>>> On 05/15/2013 04:06 PM, Will Deacon wrote:
-> > >>>>> You could also try deleting both of the ALT_* lines and just putting a
-> > >>>>> W(nop) in there directly.
-> > >>>>
-> > >>>> If I just delete the both of the ALT_* lines it no more hangs.
-> > >>>> If I put a  W(nop) instead it hangs.
-> > >>
-> > >> It also hang with a simple nop by the way
-> > > 
-> > > Ok. Have you tried adding a different instruction (mov r0, r0, for example)?
-> > 
-> > it hanged again :(
-> > 
-> > I also try to boot a kernel in Thumb2, it doesn't hang in the same place but the kernel
-> > crash latter
-> 
-> Crikey, that's not much fun. My last idea is to try sticking an isb
-> instruction in there. Does that make any difference?
-> 
-> Can you get access to another 370 board and see if the problem reproduces
-> there? Is there any possibility of getting JTAG (again, perhaps on a
-> different board)?
-> 
-> Failing that, I think you need to pester the CPU guys and/or the board guys
-> to help you debug this.
+On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-I've just tried it on the cubox (Dove, Armada 510) which has the xor
-engines enabled in the config.  I see in the boot messages:
+> For all ux500 based platforms the maximum number of end-points are used.
+> Move this knowledge into the driver so we can relinquish the burden from
+> platform data. This also removes quite a bit of complexity from the driver
+> and will aid us when we come to enable the driver for Device Tree.
+>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: linux-usb at vger.kernel.org
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-mv_xor mv_xor.0: Marvell XOR driver
-mv_xor mv_xor.0: Marvell XOR: ( xor cpy )
-mv_xor mv_xor.0: Marvell XOR: ( xor fill cpy )
-mv_xor mv_xor.1: Marvell XOR driver
-mv_xor mv_xor.1: Marvell XOR: ( xor cpy )
-mv_xor mv_xor.1: Marvell XOR: ( xor fill cpy )
+I guess this stuff is dependent on the stuff Fabio has recently sent to
+Felipe for the ux500 musb DMA so these musb patches should
+primarily go through his tree.
 
-and /proc/interrupts shows that the interrupts have fired:
+It seems like the later changes to the platform code
+(arch/arm/mach-ux500) may be sufficiently orthogonal
+so it can be done out-of-order?
 
- 39:          2  orion_irq  mv_xor.0
- 40:          2  orion_irq  mv_xor.0
- 42:          2  orion_irq  mv_xor.1
- 43:          2  orion_irq  mv_xor.1
+I can't merge any of this without Felipes ACKs in any
+case.
 
-on each boot.  So I assume that they're doing this self-test.
-
-Anyway, I've added the 'nop' to cpu_v7_dcache_clean_area, and it boots
-just fine.  The CPU is:
-
-CPU: ARMv7 Processor [560f5815] revision 5 (ARMv7), cr=10c53c7d
+Yours,
+Linus Walleij
