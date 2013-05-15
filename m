@@ -1,59 +1,57 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 15 May 2013 15:36:54 +0200
-Subject: [PATCHv4 1/9] pci: mvebu: enable driver usage on Kirkwood
+Date: Wed, 15 May 2013 15:36:57 +0200
+Subject: [PATCHv4 4/9] arm: kirkwood: convert Iomega Iconnect to use DT for
+ the PCIe interface
 In-Reply-To: <1368625022-25243-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1368625022-25243-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1368625022-25243-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1368625022-25243-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We allow the pci-mvebu driver to be compiled on the Kirkwood platform,
-and add the 'marvell,kirkwood-pcie' as a compatible string supported
-by the driver.
+Now that the PCIe mvebu driver is usable on Kirkwood, use it instead
+of the legacy PCIe code, since it allows to describe the PCIe
+interfaces in the Device Tree.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Tested-by: Andrew Lunn <andrew@lunn.ch>
 ---
- .../devicetree/bindings/pci/mvebu-pci.txt          |    1 +
- drivers/pci/host/Kconfig                           |    2 +-
- drivers/pci/host/pci-mvebu.c                       |    1 +
- 3 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/kirkwood-iconnect.dts |    8 ++++++++
+ arch/arm/mach-kirkwood/board-iconnect.c |    8 --------
+ 2 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-index eb69d92..f8d4058 100644
---- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-@@ -4,6 +4,7 @@ Mandatory properties:
- - compatible: one of the following values:
-     marvell,armada-370-pcie
-     marvell,armada-xp-pcie
-+    marvell,kirkwood-pcie
- - #address-cells, set to <3>
- - #size-cells, set to <2>
- - #interrupt-cells, set to <1>
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 6918fbc..1f1d67f 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -3,6 +3,6 @@ menu "PCI host controller drivers"
+diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
+index 12ccf74..e591d5d 100644
+--- a/arch/arm/boot/dts/kirkwood-iconnect.dts
++++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
+@@ -109,6 +109,14 @@
+ 				reg = <0x980000 0x1f400000>;
+ 			};
+ 		};
++
++		pcie-controller {
++			status = "okay";
++
++			pcie at 1,0 {
++				status = "okay";
++			};
++		};
+ 	};
  
- config PCI_MVEBU
- 	bool "Marvell EBU PCIe controller"
--	depends on ARCH_MVEBU
-+	depends on ARCH_MVEBU || ARCH_KIRKWOOD
- 
- endmenu
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index b0ee63b..6fe8b90 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -853,6 +853,7 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- static const struct of_device_id mvebu_pcie_of_match_table[] = {
- 	{ .compatible = "marvell,armada-xp-pcie", },
- 	{ .compatible = "marvell,armada-370-pcie", },
-+	{ .compatible = "marvell,kirkwood-pcie", },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
+ 	gpio-leds {
+diff --git a/arch/arm/mach-kirkwood/board-iconnect.c b/arch/arm/mach-kirkwood/board-iconnect.c
+index c8ebde4..98b5ad1 100644
+--- a/arch/arm/mach-kirkwood/board-iconnect.c
++++ b/arch/arm/mach-kirkwood/board-iconnect.c
+@@ -22,11 +22,3 @@ void __init iconnect_init(void)
+ {
+ 	kirkwood_ge00_init(&iconnect_ge00_data);
+ }
+-
+-static int __init iconnect_pci_init(void)
+-{
+-	if (of_machine_is_compatible("iom,iconnect"))
+-		kirkwood_pcie_init(KW_PCIE0);
+-	return 0;
+-}
+-subsys_initcall(iconnect_pci_init);
 -- 
 1.7.9.5
