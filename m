@@ -1,1234 +1,1632 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 15 May 2013 16:03:02 +0200
-Subject: [PATCH 2/5] ARM: at91: dt: switch to standard GPIO flag defines.
+Date: Wed, 15 May 2013 16:03:05 +0200
+Subject: [PATCH 5/5] ARM: at91: dt: switch to standard IRQ flag defines
 In-Reply-To: <1368626585-24425-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20130515135821.GG22508@game.jcrosoft.org>
  <1368626585-24425-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1368626585-24425-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1368626585-24425-5-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/boot/dts/aks-cdu.dts               |   10 ++++-----
- arch/arm/boot/dts/animeo_ip.dts             |   16 +++++++-------
- arch/arm/boot/dts/at91-ariag25.dts          |    4 ++--
- arch/arm/boot/dts/at91rm9200.dtsi           |    9 ++++----
- arch/arm/boot/dts/at91rm9200ek.dts          |    8 +++----
- arch/arm/boot/dts/at91sam9260.dtsi          |    9 ++++----
- arch/arm/boot/dts/at91sam9263.dtsi          |    9 ++++----
- arch/arm/boot/dts/at91sam9263ek.dts         |   18 ++++++++--------
- arch/arm/boot/dts/at91sam9g20ek.dts         |    4 ++--
- arch/arm/boot/dts/at91sam9g20ek_2mmc.dts    |    6 +++---
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi |    8 +++----
- arch/arm/boot/dts/at91sam9g45.dtsi          |    9 ++++----
- arch/arm/boot/dts/at91sam9m10g45ek.dts      |   30 +++++++++++++--------------
- arch/arm/boot/dts/at91sam9n12.dtsi          |    9 ++++----
- arch/arm/boot/dts/at91sam9n12ek.dts         |   10 ++++-----
- arch/arm/boot/dts/at91sam9x5.dtsi           |   17 ++++++++-------
- arch/arm/boot/dts/at91sam9x5cm.dtsi         |    6 +++---
- arch/arm/boot/dts/at91sam9x5ek.dtsi         |    8 +++----
- arch/arm/boot/dts/ethernut5.dts             |    4 ++--
- arch/arm/boot/dts/evk-pro3.dts              |    2 +-
- arch/arm/boot/dts/kizbox.dts                |   12 +++++------
- arch/arm/boot/dts/mpa1600.dts               |    2 +-
- arch/arm/boot/dts/pm9g45.dts                |   14 ++++++-------
- arch/arm/boot/dts/sama5d3.dtsi              |    1 +
- arch/arm/boot/dts/sama5d31ek.dts            |    2 +-
- arch/arm/boot/dts/sama5d34ek.dts            |    2 +-
- arch/arm/boot/dts/sama5d35ek.dts            |    2 +-
- arch/arm/boot/dts/sama5d3xcm.dtsi           |    2 +-
- arch/arm/boot/dts/sama5d3xmb.dtsi           |   12 +++++------
- arch/arm/boot/dts/tny_a9263.dts             |    2 +-
- arch/arm/boot/dts/usb_a9260_common.dtsi     |    6 +++---
- arch/arm/boot/dts/usb_a9263.dts             |    6 +++---
- arch/arm/boot/dts/usb_a9g20-dab-mmx.dtsi    |   22 ++++++++++----------
- 33 files changed, 144 insertions(+), 137 deletions(-)
+ arch/arm/boot/dts/at91rm9200.dtsi  |   45 +++++++++++---------
+ arch/arm/boot/dts/at91sam9260.dtsi |   49 ++++++++++++----------
+ arch/arm/boot/dts/at91sam9263.dtsi |   43 ++++++++++----------
+ arch/arm/boot/dts/at91sam9g45.dtsi |   49 +++++++++++-----------
+ arch/arm/boot/dts/at91sam9n12.dtsi |   41 ++++++++++---------
+ arch/arm/boot/dts/at91sam9x5.dtsi  |   55 +++++++++++++------------
+ arch/arm/boot/dts/sama5d3.dtsi     |   79 ++++++++++++++++++------------------
+ 7 files changed, 188 insertions(+), 173 deletions(-)
 
-diff --git a/arch/arm/boot/dts/aks-cdu.dts b/arch/arm/boot/dts/aks-cdu.dts
-index 08b82a4..54cb5cf 100644
---- a/arch/arm/boot/dts/aks-cdu.dts
-+++ b/arch/arm/boot/dts/aks-cdu.dts
-@@ -46,7 +46,7 @@
- 			};
- 
- 			usb1: gadget at fffa4000 {
--				atmel,vbus-gpio = <&pioC 15 0>;
-+				atmel,vbus-gpio = <&pioC 15 GPIO_ACTIVE_HIGH>;
- 				status = "okay";
- 			};
- 		};
-@@ -90,23 +90,23 @@
- 		compatible = "gpio-leds";
- 
- 		red {
--			gpios = <&pioC 10 0>;
-+			gpios = <&pioC 10 GPIO_ACTIVE_HIGH>;
- 			linux,default-trigger = "none";
- 		};
- 
- 		green {
--			gpios = <&pioA 5 1>;
-+			gpios = <&pioA 5 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "none";
- 			default-state = "on";
- 		};
- 
- 		yellow {
--			gpios = <&pioB 20 1>;
-+			gpios = <&pioB 20 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "none";
- 		};
- 
- 		blue {
--			gpios = <&pioB 21 1>;
-+			gpios = <&pioB 21 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "none";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
-index b765892..3a1de9e 100644
---- a/arch/arm/boot/dts/animeo_ip.dts
-+++ b/arch/arm/boot/dts/animeo_ip.dts
-@@ -123,7 +123,7 @@
- 
- 		usb0: ohci at 00500000 {
- 			num-ports = <2>;
--			atmel,vbus-gpio = <&pioB 15 1>;
-+			atmel,vbus-gpio = <&pioB 15 GPIO_ACTIVE_LOW>;
- 			status = "okay";
- 		};
- 	};
-@@ -133,23 +133,23 @@
- 
- 		power_green {
- 			label = "power_green";
--			gpios = <&pioC 17 0>;
-+			gpios = <&pioC 17 GPIO_ACTIVE_HIGH>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 
- 		power_red {
- 			label = "power_red";
--			gpios = <&pioA 2 0>;
-+			gpios = <&pioA 2 GPIO_ACTIVE_HIGH>;
- 		};
- 
- 		tx_green {
- 			label = "tx_green";
--			gpios = <&pioC 19 0>;
-+			gpios = <&pioC 19 GPIO_ACTIVE_HIGH>;
- 		};
- 
- 		tx_red {
- 			label = "tx_red";
--			gpios = <&pioC 18 0>;
-+			gpios = <&pioC 18 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
- 
-@@ -160,21 +160,21 @@
- 
- 		keyswitch_in {
- 			label = "keyswitch_in";
--			gpios = <&pioB 1 0>;
-+			gpios = <&pioB 1 GPIO_ACTIVE_HIGH>;
- 			linux,code = <28>;
- 			gpio-key,wakeup;
- 		};
- 
- 		error_in {
- 			label = "error_in";
--			gpios = <&pioB 2 0>;
-+			gpios = <&pioB 2 GPIO_ACTIVE_HIGH>;
- 			linux,code = <29>;
- 			gpio-key,wakeup;
- 		};
- 
- 		btn {
- 			label = "btn";
--			gpios = <&pioC 23 0>;
-+			gpios = <&pioC 23 GPIO_ACTIVE_HIGH>;
- 			linux,code = <31>;
- 			gpio-key,wakeup;
- 		};
-diff --git a/arch/arm/boot/dts/at91-ariag25.dts b/arch/arm/boot/dts/at91-ariag25.dts
-index 09beeb4..5ede767 100644
---- a/arch/arm/boot/dts/at91-ariag25.dts
-+++ b/arch/arm/boot/dts/at91-ariag25.dts
-@@ -156,7 +156,7 @@
- 		/* little green LED in middle of Aria G25 module */
- 		aria_led {
- 			label = "aria_led";
--			gpios = <&pioB 8 0>; /* PB8 */
-+			gpios = <&pioB 8 GPIO_ACTIVE_HIGH>; /* PB8 */
- 			linux,default-trigger = "heartbeat";
- 		};
- 
-@@ -164,7 +164,7 @@
- 
- 	onewire at 0 {
- 		compatible = "w1-gpio";
--		gpios = <&pioA 21 1>;
-+		gpios = <&pioA 21 GPIO_ACTIVE_LOW>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_w1_0>;
- 	};
 diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-index 6329679..7ebfe6c 100644
+index 361a957..4aad0d9 100644
 --- a/arch/arm/boot/dts/at91rm9200.dtsi
 +++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -11,6 +11,7 @@
-  */
+@@ -12,6 +12,7 @@
  
  #include "skeleton.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/at91.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/gpio/gpio.h>
  
  / {
- 	model = "Atmel AT91RM9200 family SoC";
-@@ -503,9 +504,9 @@
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_nand>;
- 			nand-ecc-mode = "soft";
--			gpios = <&pioC 2 0
-+			gpios = <&pioC 2 GPIO_ACTIVE_HIGH
- 				 0
--				 &pioB 1 0
-+				 &pioB 1 GPIO_ACTIVE_HIGH
- 				>;
+@@ -79,25 +80,29 @@
+ 			st: timer at fffffd00 {
+ 				compatible = "atmel,at91rm9200-st";
+ 				reg = <0xfffffd00 0x100>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 			};
+ 
+ 			tcb0: timer at fffa0000 {
+ 				compatible = "atmel,at91rm9200-tcb";
+ 				reg = <0xfffa0000 0x100>;
+-				interrupts = <17 4 0 18 4 0 19 4 0>;
++				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0
++					      18 IRQ_TYPE_LEVEL_HIGH 0
++					      19 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
+ 
+ 			tcb1: timer at fffa4000 {
+ 				compatible = "atmel,at91rm9200-tcb";
+ 				reg = <0xfffa4000 0x100>;
+-				interrupts = <20 4 0 21 4 0 22 4 0>;
++				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0
++					      21 IRQ_TYPE_LEVEL_HIGH 0
++					      22 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
+ 
+ 			i2c0: i2c at fffb8000 {
+ 				compatible = "atmel,at91rm9200-i2c";
+ 				reg = <0xfffb8000 0x4000>;
+-				interrupts = <12 4 6>;
++				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_twi>;
+ 				#address-cells = <1>;
+@@ -108,7 +113,7 @@
+ 			mmc0: mmc at fffb4000 {
+ 				compatible = "atmel,hsmci";
+ 				reg = <0xfffb4000 0x4000>;
+-				interrupts = <10 4 0>;
++				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				status = "disabled";
+@@ -117,7 +122,7 @@
+ 			ssc0: ssc at fffd0000 {
+ 				compatible = "atmel,at91rm9200-ssc";
+ 				reg = <0xfffd0000 0x4000>;
+-				interrupts = <14 4 5>;
++				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+ 				status = "disable";
+@@ -126,7 +131,7 @@
+ 			ssc1: ssc at fffd4000 {
+ 				compatible = "atmel,at91rm9200-ssc";
+ 				reg = <0xfffd4000 0x4000>;
+-				interrupts = <15 4 5>;
++				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
+ 				status = "disable";
+@@ -135,7 +140,7 @@
+ 			ssc2: ssc at fffd8000 {
+ 				compatible = "atmel,at91rm9200-ssc";
+ 				reg = <0xfffd8000 0x4000>;
+-				interrupts = <16 4 5>;
++				interrupts = <16 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc2_tx &pinctrl_ssc2_rx>;
+ 				status = "disable";
+@@ -144,7 +149,7 @@
+ 			macb0: ethernet at fffbc000 {
+ 				compatible = "cdns,at91rm9200-emac", "cdns,emac";
+ 				reg = <0xfffbc000 0x4000>;
+-				interrupts = <24 4 3>;
++				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				phy-mode = "rmii";
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_macb_rmii>;
+@@ -396,7 +401,7 @@
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+-					interrupts = <2 4 1>;
++					interrupts = <2 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -406,7 +411,7 @@
+ 				pioB: gpio at fffff600 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff600 0x200>;
+-					interrupts = <3 4 1>;
++					interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -416,7 +421,7 @@
+ 				pioC: gpio at fffff800 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff800 0x200>;
+-					interrupts = <4 4 1>;
++					interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -426,7 +431,7 @@
+ 				pioD: gpio at fffffa00 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffffa00 0x200>;
+-					interrupts = <5 4 1>;
++					interrupts = <5 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -437,7 +442,7 @@
+ 			dbgu: serial at fffff200 {
+ 				compatible = "atmel,at91rm9200-usart";
+ 				reg = <0xfffff200 0x200>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_dbgu>;
+ 				status = "disabled";
+@@ -446,7 +451,7 @@
+ 			usart0: serial at fffc0000 {
+ 				compatible = "atmel,at91rm9200-usart";
+ 				reg = <0xfffc0000 0x200>;
+-				interrupts = <6 4 5>;
++				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -457,7 +462,7 @@
+ 			usart1: serial at fffc4000 {
+ 				compatible = "atmel,at91rm9200-usart";
+ 				reg = <0xfffc4000 0x200>;
+-				interrupts = <7 4 5>;
++				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -468,7 +473,7 @@
+ 			usart2: serial at fffc8000 {
+ 				compatible = "atmel,at91rm9200-usart";
+ 				reg = <0xfffc8000 0x200>;
+-				interrupts = <8 4 5>;
++				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -479,7 +484,7 @@
+ 			usart3: serial at fffcc000 {
+ 				compatible = "atmel,at91rm9200-usart";
+ 				reg = <0xfffcc000 0x200>;
+-				interrupts = <23 4 5>;
++				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -490,7 +495,7 @@
+ 			usb1: gadget at fffb0000 {
+ 				compatible = "atmel,at91rm9200-udc";
+ 				reg = <0xfffb0000 0x4000>;
+-				interrupts = <11 4 2>;
++				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 2>;
+ 				status = "disabled";
+ 			};
+ 		};
+@@ -515,7 +520,7 @@
+ 		usb0: ohci at 00300000 {
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00300000 0x100000>;
+-			interrupts = <23 4 2>;
++			interrupts = <23 IRQ_TYPE_LEVEL_HIGH 2>;
  			status = "disabled";
  		};
-@@ -520,8 +521,8 @@
- 
- 	i2c at 0 {
- 		compatible = "i2c-gpio";
--		gpios = <&pioA 25 0 /* sda */
--			 &pioA 26 0 /* scl */
-+		gpios = <&pioA 25 GPIO_ACTIVE_HIGH /* sda */
-+			 &pioA 26 GPIO_ACTIVE_HIGH /* scl */
- 			>;
- 		i2c-gpio,sda-open-drain;
- 		i2c-gpio,scl-open-drain;
-diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
-index 5dffeb3..1405812 100644
---- a/arch/arm/boot/dts/at91rm9200ek.dts
-+++ b/arch/arm/boot/dts/at91rm9200ek.dts
-@@ -50,7 +50,7 @@
- 			};
- 
- 			usb1: gadget at fffb0000 {
--				atmel,vbus-gpio = <&pioD 4 0>;
-+				atmel,vbus-gpio = <&pioD 4 GPIO_ACTIVE_HIGH>;
- 				status = "okay";
- 			};
- 		};
-@@ -66,19 +66,19 @@
- 
- 		ds2 {
- 			label = "green";
--			gpios = <&pioB 0 0x1>;
-+			gpios = <&pioB 0 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "mmc0";
- 		};
- 
- 		ds4 {
- 			label = "yellow";
--			gpios = <&pioB 1 0x1>;
-+			gpios = <&pioB 1 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 
- 		ds6 {
- 			label = "red";
--			gpios = <&pioB 2 0x1>;
-+			gpios = <&pioB 2 GPIO_ACTIVE_LOW>;
- 		};
  	};
- };
 diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index b130b3e..717625d 100644
+index 7edadf3..a776f50 100644
 --- a/arch/arm/boot/dts/at91sam9260.dtsi
 +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -9,6 +9,7 @@
-  */
+@@ -10,6 +10,7 @@
  
  #include "skeleton.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/at91.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/gpio/gpio.h>
  
  / {
- 	model = "Atmel AT91SAM9260 family SoC";
-@@ -567,8 +568,8 @@
- 			atmel,nand-cmd-offset = <22>;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_nand>;
--			gpios = <&pioC 13 0
--				 &pioC 14 0
-+			gpios = <&pioC 13 GPIO_ACTIVE_HIGH
-+				 &pioC 14 GPIO_ACTIVE_HIGH
- 				 0
- 				>;
- 			status = "disabled";
-@@ -584,8 +585,8 @@
+@@ -86,19 +87,23 @@
+ 			pit: timer at fffffd30 {
+ 				compatible = "atmel,at91sam9260-pit";
+ 				reg = <0xfffffd30 0xf>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 			};
  
- 	i2c at 0 {
- 		compatible = "i2c-gpio";
--		gpios = <&pioA 23 0 /* sda */
--			 &pioA 24 0 /* scl */
-+		gpios = <&pioA 23 GPIO_ACTIVE_HIGH /* sda */
-+			 &pioA 24 GPIO_ACTIVE_HIGH /* scl */
- 			>;
- 		i2c-gpio,sda-open-drain;
- 		i2c-gpio,scl-open-drain;
+ 			tcb0: timer at fffa0000 {
+ 				compatible = "atmel,at91rm9200-tcb";
+ 				reg = <0xfffa0000 0x100>;
+-				interrupts = <17 4 0 18 4 0 19 4 0>;
++				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0
++					      18 IRQ_TYPE_LEVEL_HIGH 0
++					      19 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
+ 
+ 			tcb1: timer at fffdc000 {
+ 				compatible = "atmel,at91rm9200-tcb";
+ 				reg = <0xfffdc000 0x100>;
+-				interrupts = <26 4 0 27 4 0 28 4 0>;
++				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 0
++					      27 IRQ_TYPE_LEVEL_HIGH 0
++					      28 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
+ 
+ 			pinctrl at fffff400 {
+@@ -345,7 +350,7 @@
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+-					interrupts = <2 4 1>;
++					interrupts = <2 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -355,7 +360,7 @@
+ 				pioB: gpio at fffff600 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff600 0x200>;
+-					interrupts = <3 4 1>;
++					interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -365,7 +370,7 @@
+ 				pioC: gpio at fffff800 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff800 0x200>;
+-					interrupts = <4 4 1>;
++					interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -376,7 +381,7 @@
+ 			dbgu: serial at fffff200 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffff200 0x200>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_dbgu>;
+ 				status = "disabled";
+@@ -385,7 +390,7 @@
+ 			usart0: serial at fffb0000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffb0000 0x200>;
+-				interrupts = <6 4 5>;
++				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -396,7 +401,7 @@
+ 			usart1: serial at fffb4000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffb4000 0x200>;
+-				interrupts = <7 4 5>;
++				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -407,7 +412,7 @@
+ 			usart2: serial at fffb8000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffb8000 0x200>;
+-				interrupts = <8 4 5>;
++				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -418,7 +423,7 @@
+ 			usart3: serial at fffd0000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffd0000 0x200>;
+-				interrupts = <23 4 5>;
++				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -429,7 +434,7 @@
+ 			uart0: serial at fffd4000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffd4000 0x200>;
+-				interrupts = <24 4 5>;
++				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -440,7 +445,7 @@
+ 			uart1: serial at fffd8000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffd8000 0x200>;
+-				interrupts = <25 4 5>;
++				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -451,7 +456,7 @@
+ 			macb0: ethernet at fffc4000 {
+ 				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+ 				reg = <0xfffc4000 0x100>;
+-				interrupts = <21 4 3>;
++				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_macb_rmii>;
+ 				status = "disabled";
+@@ -460,14 +465,14 @@
+ 			usb1: gadget at fffa4000 {
+ 				compatible = "atmel,at91rm9200-udc";
+ 				reg = <0xfffa4000 0x4000>;
+-				interrupts = <10 4 2>;
++				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 2>;
+ 				status = "disabled";
+ 			};
+ 
+ 			i2c0: i2c at fffac000 {
+ 				compatible = "atmel,at91sam9260-i2c";
+ 				reg = <0xfffac000 0x100>;
+-				interrupts = <11 4 6>;
++				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				status = "disabled";
+@@ -476,7 +481,7 @@
+ 			mmc0: mmc at fffa8000 {
+ 				compatible = "atmel,hsmci";
+ 				reg = <0xfffa8000 0x600>;
+-				interrupts = <9 4 0>;
++				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				status = "disabled";
+@@ -485,7 +490,7 @@
+ 			ssc0: ssc at fffbc000 {
+ 				compatible = "atmel,at91rm9200-ssc";
+ 				reg = <0xfffbc000 0x4000>;
+-				interrupts = <14 4 5>;
++				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+ 				status = "disabled";
+@@ -496,7 +501,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xfffc8000 0x200>;
+-				interrupts = <12 4 3>;
++				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi0>;
+ 				status = "disabled";
+@@ -507,7 +512,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xfffcc000 0x200>;
+-				interrupts = <13 4 3>;
++				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi1>;
+ 				status = "disabled";
+@@ -516,7 +521,7 @@
+ 			adc0: adc at fffe0000 {
+ 				compatible = "atmel,at91sam9260-adc";
+ 				reg = <0xfffe0000 0x100>;
+-				interrupts = <5 4 0>;
++				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				atmel,adc-use-external-triggers;
+ 				atmel,adc-channels-used = <0xf>;
+ 				atmel,adc-vref = <3300>;
+@@ -579,7 +584,7 @@
+ 		usb0: ohci at 00500000 {
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00500000 0x100000>;
+-			interrupts = <20 4 2>;
++			interrupts = <20 IRQ_TYPE_LEVEL_HIGH 2>;
+ 			status = "disabled";
+ 		};
+ 	};
 diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index 89f4e94..5edfadf 100644
+index bb4d7ca..d9cf51a 100644
 --- a/arch/arm/boot/dts/at91sam9263.dtsi
 +++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -7,6 +7,7 @@
-  */
+@@ -8,6 +8,7 @@
  
  #include "skeleton.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/at91.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/gpio/gpio.h>
  
  / {
- 	model = "Atmel AT91SAM9263 family SoC";
-@@ -515,8 +516,8 @@
- 			atmel,nand-cmd-offset = <22>;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_nand>;
--			gpios = <&pioA 22 0
--				 &pioD 15 0
-+			gpios = <&pioA 22 GPIO_ACTIVE_HIGH
-+				 &pioD 15 GPIO_ACTIVE_HIGH
- 				 0
- 				>;
- 			status = "disabled";
-@@ -532,8 +533,8 @@
- 
- 	i2c at 0 {
- 		compatible = "i2c-gpio";
--		gpios = <&pioB 4 0 /* sda */
--			 &pioB 5 0 /* scl */
-+		gpios = <&pioB 4 GPIO_ACTIVE_HIGH /* sda */
-+			 &pioB 5 GPIO_ACTIVE_HIGH /* scl */
- 			>;
- 		i2c-gpio,sda-open-drain;
- 		i2c-gpio,scl-open-drain;
-diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
-index 6b646d4..e1942ec 100644
---- a/arch/arm/boot/dts/at91sam9263ek.dts
-+++ b/arch/arm/boot/dts/at91sam9263ek.dts
-@@ -51,7 +51,7 @@
+@@ -74,13 +75,13 @@
+ 			pit: timer at fffffd30 {
+ 				compatible = "atmel,at91sam9260-pit";
+ 				reg = <0xfffffd30 0xf>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
  			};
  
+ 			tcb0: timer at fff7c000 {
+ 				compatible = "atmel,at91rm9200-tcb";
+ 				reg = <0xfff7c000 0x100>;
+-				interrupts = <19 4 0>;
++				interrupts = <19 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
+ 
+ 			rstc at fffffd00 {
+@@ -326,7 +327,7 @@
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x200>;
+-					interrupts = <2 4 1>;
++					interrupts = <2 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -336,7 +337,7 @@
+ 				pioB: gpio at fffff400 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+-					interrupts = <3 4 1>;
++					interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -346,7 +347,7 @@
+ 				pioC: gpio at fffff600 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff600 0x200>;
+-					interrupts = <4 4 1>;
++					interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -356,7 +357,7 @@
+ 				pioD: gpio at fffff800 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff800 0x200>;
+-					interrupts = <4 4 1>;
++					interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -366,7 +367,7 @@
+ 				pioE: gpio at fffffa00 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffffa00 0x200>;
+-					interrupts = <4 4 1>;
++					interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -377,7 +378,7 @@
+ 			dbgu: serial at ffffee00 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xffffee00 0x200>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_dbgu>;
+ 				status = "disabled";
+@@ -386,7 +387,7 @@
+ 			usart0: serial at fff8c000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfff8c000 0x200>;
+-				interrupts = <7 4 5>;
++				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -397,7 +398,7 @@
+ 			usart1: serial at fff90000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfff90000 0x200>;
+-				interrupts = <8 4 5>;
++				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -408,7 +409,7 @@
+ 			usart2: serial at fff94000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfff94000 0x200>;
+-				interrupts = <9 4 5>;
++				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -419,7 +420,7 @@
+ 			ssc0: ssc at fff98000 {
+ 				compatible = "atmel,at91rm9200-ssc";
+ 				reg = <0xfff98000 0x4000>;
+-				interrupts = <16 4 5>;
++				interrupts = <16 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+ 				status = "disabled";
+@@ -428,7 +429,7 @@
+ 			ssc1: ssc at fff9c000 {
+ 				compatible = "atmel,at91rm9200-ssc";
+ 				reg = <0xfff9c000 0x4000>;
+-				interrupts = <17 4 5>;
++				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
+ 				status = "disabled";
+@@ -437,7 +438,7 @@
+ 			macb0: ethernet at fffbc000 {
+ 				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+ 				reg = <0xfffbc000 0x100>;
+-				interrupts = <21 4 3>;
++				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_macb_rmii>;
+ 				status = "disabled";
+@@ -446,14 +447,14 @@
  			usb1: gadget at fff78000 {
--				atmel,vbus-gpio = <&pioA 25 0>;
-+				atmel,vbus-gpio = <&pioA 25 GPIO_ACTIVE_HIGH>;
- 				status = "okay";
+ 				compatible = "atmel,at91rm9200-udc";
+ 				reg = <0xfff78000 0x4000>;
+-				interrupts = <24 4 2>;
++				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 2>;
+ 				status = "disabled";
  			};
  
-@@ -65,8 +65,8 @@
- 				slot at 0 {
- 					reg = <0>;
- 					bus-width = <4>;
--					cd-gpios = <&pioE 18 0>;
--					wp-gpios = <&pioE 19 0>;
-+					cd-gpios = <&pioE 18 GPIO_ACTIVE_HIGH>;
-+					wp-gpios = <&pioE 19 GPIO_ACTIVE_HIGH>;
- 				};
- 			};
- 
-@@ -141,8 +141,8 @@
+ 			i2c0: i2c at fff88000 {
+ 				compatible = "atmel,at91sam9263-i2c";
+ 				reg = <0xfff88000 0x100>;
+-				interrupts = <13 4 6>;
++				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				status = "disabled";
+@@ -462,7 +463,7 @@
+ 			mmc0: mmc at fff80000 {
+ 				compatible = "atmel,hsmci";
+ 				reg = <0xfff80000 0x600>;
+-				interrupts = <10 4 0>;
++				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				status = "disabled";
+@@ -471,7 +472,7 @@
+ 			mmc1: mmc at fff84000 {
+ 				compatible = "atmel,hsmci";
+ 				reg = <0xfff84000 0x600>;
+-				interrupts = <11 4 0>;
++				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				status = "disabled";
+@@ -488,7 +489,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xfffa4000 0x200>;
+-				interrupts = <14 4 3>;
++				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi0>;
+ 				status = "disabled";
+@@ -499,7 +500,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xfffa8000 0x200>;
+-				interrupts = <15 4 3>;
++				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi1>;
+ 				status = "disabled";
+@@ -527,7 +528,7 @@
  		usb0: ohci at 00a00000 {
- 			num-ports = <2>;
- 			status = "okay";
--			atmel,vbus-gpio = <&pioA 24 0
--					   &pioA 21 0
-+			atmel,vbus-gpio = <&pioA 24 GPIO_ACTIVE_HIGH
-+					   &pioA 21 GPIO_ACTIVE_HIGH
- 					  >;
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00a00000 0x100000>;
+-			interrupts = <29 4 2>;
++			interrupts = <29 IRQ_TYPE_LEVEL_HIGH 2>;
+ 			status = "disabled";
  		};
  	};
-@@ -152,13 +152,13 @@
- 
- 		d3 {
- 			label = "d3";
--			gpios = <&pioB 7 0>;
-+			gpios = <&pioB 7 GPIO_ACTIVE_HIGH>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 
- 		d2 {
- 			label = "d2";
--			gpios = <&pioC 29 1>;
-+			gpios = <&pioC 29 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "nand-disk";
- 		};
- 	};
-@@ -168,14 +168,14 @@
- 
- 		left_click {
- 			label = "left_click";
--			gpios = <&pioC 5 1>;
-+			gpios = <&pioC 5 GPIO_ACTIVE_LOW>;
- 			linux,code = <272>;
- 			gpio-key,wakeup;
- 		};
- 
- 		right_click {
- 			label = "right_click";
--			gpios = <&pioC 4 1>;
-+			gpios = <&pioC 4 GPIO_ACTIVE_LOW>;
- 			linux,code = <273>;
- 			gpio-key,wakeup;
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9g20ek.dts b/arch/arm/boot/dts/at91sam9g20ek.dts
-index 3f15a3f..bbfd753 100644
---- a/arch/arm/boot/dts/at91sam9g20ek.dts
-+++ b/arch/arm/boot/dts/at91sam9g20ek.dts
-@@ -17,13 +17,13 @@
- 
- 		ds1 {
- 			label = "ds1";
--			gpios = <&pioA 9 0>;
-+			gpios = <&pioA 9 GPIO_ACTIVE_HIGH>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 
- 		ds5 {
- 			label = "ds5";
--			gpios = <&pioA 6 1>;
-+			gpios = <&pioA 6 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts b/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
-index 942aa10..ec108b9 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
-+++ b/arch/arm/boot/dts/at91sam9g20ek_2mmc.dts
-@@ -23,7 +23,7 @@
- 				slot at 0 {
- 					reg = <0>;
- 					bus-width = <4>;
--					cd-gpios = <&pioC 2 0>;
-+					cd-gpios = <&pioC 2 GPIO_ACTIVE_HIGH>;
- 				};
- 			};
- 
-@@ -43,13 +43,13 @@
- 
- 		ds1 {
- 			label = "ds1";
--			gpios = <&pioB 9 0>;
-+			gpios = <&pioB 9 GPIO_ACTIVE_HIGH>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 
- 		ds5 {
- 			label = "ds5";
--			gpios = <&pioB 8 1>;
-+			gpios = <&pioB 8 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-index 253960f..7933839 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-@@ -65,7 +65,7 @@
- 			};
- 
- 			usb1: gadget at fffa4000 {
--				atmel,vbus-gpio = <&pioC 5 0>;
-+				atmel,vbus-gpio = <&pioC 5 GPIO_ACTIVE_HIGH>;
- 				status = "okay";
- 			};
- 
-@@ -79,7 +79,7 @@
- 				slot at 1 {
- 					reg = <1>;
- 					bus-width = <4>;
--					cd-gpios = <&pioC 9 0>;
-+					cd-gpios = <&pioC 9 GPIO_ACTIVE_HIGH>;
- 				};
- 			};
- 
-@@ -180,14 +180,14 @@
- 
- 		btn3 {
- 			label = "Button 3";
--			gpios = <&pioA 30 1>;
-+			gpios = <&pioA 30 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x103>;
- 			gpio-key,wakeup;
- 		};
- 
- 		btn4 {
- 			label = "Button 4";
--			gpios = <&pioA 31 1>;
-+			gpios = <&pioA 31 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x104>;
- 			gpio-key,wakeup;
- 		};
 diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 18ea761..5d7c1f7 100644
+index 8ba4c71..f0091af 100644
 --- a/arch/arm/boot/dts/at91sam9g45.dtsi
 +++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -10,6 +10,7 @@
-  */
+@@ -11,6 +11,7 @@
  
  #include "skeleton.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/at91.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/gpio/gpio.h>
  
  / {
- 	model = "Atmel AT91SAM9G45 family SoC";
-@@ -592,8 +593,8 @@
- 			atmel,nand-cmd-offset = <22>;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_nand>;
--			gpios = <&pioC 8 0
--				 &pioC 14 0
-+			gpios = <&pioC 8 GPIO_ACTIVE_HIGH
-+				 &pioC 14 GPIO_ACTIVE_HIGH
- 				 0
- 				>;
- 			status = "disabled";
-@@ -616,8 +617,8 @@
- 
- 	i2c at 0 {
- 		compatible = "i2c-gpio";
--		gpios = <&pioA 20 0 /* sda */
--			 &pioA 21 0 /* scl */
-+		gpios = <&pioA 20 GPIO_ACTIVE_HIGH /* sda */
-+			 &pioA 21 GPIO_ACTIVE_HIGH /* scl */
- 			>;
- 		i2c-gpio,sda-open-drain;
- 		i2c-gpio,scl-open-drain;
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index ba1205d..85e9c5e 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -68,7 +68,7 @@
- 				slot at 0 {
- 					reg = <0>;
- 					bus-width = <4>;
--					cd-gpios = <&pioD 10 0>;
-+					cd-gpios = <&pioD 10 GPIO_ACTIVE_HIGH>;
- 				};
+@@ -85,7 +86,7 @@
+ 			pit: timer at fffffd30 {
+ 				compatible = "atmel,at91sam9260-pit";
+ 				reg = <0xfffffd30 0xf>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
  			};
  
-@@ -81,8 +81,8 @@
- 				slot at 0 {
- 					reg = <0>;
- 					bus-width = <4>;
--					cd-gpios = <&pioD 11 0>;
--					wp-gpios = <&pioD 29 0>;
-+					cd-gpios = <&pioD 11 GPIO_ACTIVE_HIGH>;
-+					wp-gpios = <&pioD 29 GPIO_ACTIVE_HIGH>;
- 				};
+ 
+@@ -97,19 +98,19 @@
+ 			tcb0: timer at fff7c000 {
+ 				compatible = "atmel,at91rm9200-tcb";
+ 				reg = <0xfff7c000 0x100>;
+-				interrupts = <18 4 0>;
++				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 0>;
  			};
  
-@@ -139,8 +139,8 @@
+ 			tcb1: timer at fffd4000 {
+ 				compatible = "atmel,at91rm9200-tcb";
+ 				reg = <0xfffd4000 0x100>;
+-				interrupts = <18 4 0>;
++				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
+ 
+ 			dma: dma-controller at ffffec00 {
+ 				compatible = "atmel,at91sam9g45-dma";
+ 				reg = <0xffffec00 0x200>;
+-				interrupts = <21 4 0>;
++				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				#dma-cells = <2>;
+ 			};
+ 
+@@ -346,7 +347,7 @@
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x200>;
+-					interrupts = <2 4 1>;
++					interrupts = <2 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -356,7 +357,7 @@
+ 				pioB: gpio at fffff400 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+-					interrupts = <3 4 1>;
++					interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -366,7 +367,7 @@
+ 				pioC: gpio at fffff600 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff600 0x200>;
+-					interrupts = <4 4 1>;
++					interrupts = <4 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -376,7 +377,7 @@
+ 				pioD: gpio at fffff800 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff800 0x200>;
+-					interrupts = <5 4 1>;
++					interrupts = <5 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -386,7 +387,7 @@
+ 				pioE: gpio at fffffa00 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffffa00 0x200>;
+-					interrupts = <5 4 1>;
++					interrupts = <5 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -397,7 +398,7 @@
+ 			dbgu: serial at ffffee00 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xffffee00 0x200>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_dbgu>;
+ 				status = "disabled";
+@@ -406,7 +407,7 @@
+ 			usart0: serial at fff8c000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfff8c000 0x200>;
+-				interrupts = <7 4 5>;
++				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -417,7 +418,7 @@
+ 			usart1: serial at fff90000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfff90000 0x200>;
+-				interrupts = <8 4 5>;
++				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -428,7 +429,7 @@
+ 			usart2: serial at fff94000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfff94000 0x200>;
+-				interrupts = <9 4 5>;
++				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -439,7 +440,7 @@
+ 			usart3: serial at fff98000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfff98000 0x200>;
+-				interrupts = <10 4 5>;
++				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,use-dma-rx;
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+@@ -450,7 +451,7 @@
+ 			macb0: ethernet at fffbc000 {
+ 				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+ 				reg = <0xfffbc000 0x100>;
+-				interrupts = <25 4 3>;
++				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_macb_rmii>;
+ 				status = "disabled";
+@@ -459,7 +460,7 @@
+ 			i2c0: i2c at fff84000 {
+ 				compatible = "atmel,at91sam9g10-i2c";
+ 				reg = <0xfff84000 0x100>;
+-				interrupts = <12 4 6>;
++				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				status = "disabled";
+@@ -468,7 +469,7 @@
+ 			i2c1: i2c at fff88000 {
+ 				compatible = "atmel,at91sam9g10-i2c";
+ 				reg = <0xfff88000 0x100>;
+-				interrupts = <13 4 6>;
++				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				status = "disabled";
+@@ -477,7 +478,7 @@
+ 			ssc0: ssc at fff9c000 {
+ 				compatible = "atmel,at91sam9g45-ssc";
+ 				reg = <0xfff9c000 0x4000>;
+-				interrupts = <16 4 5>;
++				interrupts = <16 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+ 				status = "disabled";
+@@ -486,7 +487,7 @@
+ 			ssc1: ssc at fffa0000 {
+ 				compatible = "atmel,at91sam9g45-ssc";
+ 				reg = <0xfffa0000 0x4000>;
+-				interrupts = <17 4 5>;
++				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
+ 				status = "disabled";
+@@ -495,7 +496,7 @@
+ 			adc0: adc at fffb0000 {
+ 				compatible = "atmel,at91sam9260-adc";
+ 				reg = <0xfffb0000 0x100>;
+-				interrupts = <20 4 0>;
++				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				atmel,adc-use-external-triggers;
+ 				atmel,adc-channels-used = <0xff>;
+ 				atmel,adc-vref = <3300>;
+@@ -535,7 +536,7 @@
+ 			mmc0: mmc at fff80000 {
+ 				compatible = "atmel,hsmci";
+ 				reg = <0xfff80000 0x600>;
+-				interrupts = <11 4 0>;
++				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				dmas = <&dma 1 0>;
+ 				dma-names = "rxtx";
+ 				#address-cells = <1>;
+@@ -546,7 +547,7 @@
+ 			mmc1: mmc at fffd0000 {
+ 				compatible = "atmel,hsmci";
+ 				reg = <0xfffd0000 0x600>;
+-				interrupts = <29 4 0>;
++				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				dmas = <&dma 1 13>;
+ 				dma-names = "rxtx";
+ 				#address-cells = <1>;
+@@ -604,14 +605,14 @@
  		usb0: ohci at 00700000 {
- 			status = "okay";
- 			num-ports = <2>;
--			atmel,vbus-gpio = <&pioD 1 1
--					   &pioD 3 1>;
-+			atmel,vbus-gpio = <&pioD 1 GPIO_ACTIVE_LOW
-+					   &pioD 3 GPIO_ACTIVE_LOW>;
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00700000 0x100000>;
+-			interrupts = <22 4 2>;
++			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+ 			status = "disabled";
  		};
  
  		usb1: ehci at 00800000 {
-@@ -153,19 +153,19 @@
- 
- 		d8 {
- 			label = "d8";
--			gpios = <&pioD 30 0>;
-+			gpios = <&pioD 30 GPIO_ACTIVE_HIGH>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 
- 		d6 {
- 			label = "d6";
--			gpios = <&pioD 0 1>;
-+			gpios = <&pioD 0 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "nand-disk";
- 		};
- 
- 		d7 {
- 			label = "d7";
--			gpios = <&pioD 31 1>;
-+			gpios = <&pioD 31 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "mmc0";
- 		};
- 	};
-@@ -175,45 +175,45 @@
- 
- 		left_click {
- 			label = "left_click";
--			gpios = <&pioB 6 1>;
-+			gpios = <&pioB 6 GPIO_ACTIVE_LOW>;
- 			linux,code = <272>;
- 			gpio-key,wakeup;
- 		};
- 
- 		right_click {
- 			label = "right_click";
--			gpios = <&pioB 7 1>;
-+			gpios = <&pioB 7 GPIO_ACTIVE_LOW>;
- 			linux,code = <273>;
- 			gpio-key,wakeup;
- 		};
- 
- 		left {
- 			label = "Joystick Left";
--			gpios = <&pioB 14 1>;
-+			gpios = <&pioB 14 GPIO_ACTIVE_LOW>;
- 			linux,code = <105>;
- 		};
- 
- 		right {
- 			label = "Joystick Right";
--			gpios = <&pioB 15 1>;
-+			gpios = <&pioB 15 GPIO_ACTIVE_LOW>;
- 			linux,code = <106>;
- 		};
- 
- 		up {
- 			label = "Joystick Up";
--			gpios = <&pioB 16 1>;
-+			gpios = <&pioB 16 GPIO_ACTIVE_LOW>;
- 			linux,code = <103>;
- 		};
- 
- 		down {
- 			label = "Joystick Down";
--			gpios = <&pioB 17 1>;
-+			gpios = <&pioB 17 GPIO_ACTIVE_LOW>;
- 			linux,code = <108>;
- 		};
- 
- 		enter {
- 			label = "Joystick Press";
--			gpios = <&pioB 18 1>;
-+			gpios = <&pioB 18 GPIO_ACTIVE_LOW>;
- 			linux,code = <28>;
+ 			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+ 			reg = <0x00800000 0x100000>;
+-			interrupts = <22 4 2>;
++			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+ 			status = "disabled";
  		};
  	};
 diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index e848870..5205403 100644
+index e166e0c..566af32 100644
 --- a/arch/arm/boot/dts/at91sam9n12.dtsi
 +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -8,6 +8,7 @@
-  */
+@@ -9,6 +9,7 @@
  
  #include "skeleton.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/at91.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/gpio/gpio.h>
  
  / {
- 	model = "Atmel AT91SAM9N12 SoC";
-@@ -438,8 +439,8 @@
- 			atmel,nand-cmd-offset = <22>;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_nand>;
--			gpios = <&pioD 5 0
--				 &pioD 4 0
-+			gpios = <&pioD 5 GPIO_ACTIVE_HIGH
-+				 &pioD 4 GPIO_ACTIVE_HIGH
- 				 0
- 				>;
- 			status = "disabled";
-@@ -455,8 +456,8 @@
- 
- 	i2c at 0 {
- 		compatible = "i2c-gpio";
--		gpios = <&pioA 30 0 /* sda */
--			 &pioA 31 0 /* scl */
-+		gpios = <&pioA 30 GPIO_ACTIVE_HIGH /* sda */
-+			 &pioA 31 GPIO_ACTIVE_HIGH /* scl */
- 			>;
- 		i2c-gpio,sda-open-drain;
- 		i2c-gpio,scl-open-drain;
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index b9e300e..8eece27 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -55,7 +55,7 @@
- 				slot at 0 {
- 					reg = <0>;
- 					bus-width = <4>;
--					cd-gpios = <&pioA 7 0>;
-+					cd-gpios = <&pioA 7 GPIO_ACTIVE_HIGH>;
- 				};
+@@ -79,7 +80,7 @@
+ 			pit: timer at fffffe30 {
+ 				compatible = "atmel,at91sam9260-pit";
+ 				reg = <0xfffffe30 0xf>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
  			};
  
-@@ -95,19 +95,19 @@
+ 			shdwc at fffffe10 {
+@@ -90,7 +91,7 @@
+ 			mmc0: mmc at f0008000 {
+ 				compatible = "atmel,hsmci";
+ 				reg = <0xf0008000 0x600>;
+-				interrupts = <12 4 0>;
++				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				dmas = <&dma 1 0>;
+ 				dma-names = "rxtx";
+ 				#address-cells = <1>;
+@@ -101,19 +102,19 @@
+ 			tcb0: timer at f8008000 {
+ 				compatible = "atmel,at91sam9x5-tcb";
+ 				reg = <0xf8008000 0x100>;
+-				interrupts = <17 4 0>;
++				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
  
- 		d8 {
- 			label = "d8";
--			gpios = <&pioB 4 1>;
-+			gpios = <&pioB 4 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "mmc0";
- 		};
+ 			tcb1: timer at f800c000 {
+ 				compatible = "atmel,at91sam9x5-tcb";
+ 				reg = <0xf800c000 0x100>;
+-				interrupts = <17 4 0>;
++				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
  
- 		d9 {
- 			label = "d6";
--			gpios = <&pioB 5 1>;
-+			gpios = <&pioB 5 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "nand-disk";
- 		};
+ 			dma: dma-controller at ffffec00 {
+ 				compatible = "atmel,at91sam9g45-dma";
+ 				reg = <0xffffec00 0x200>;
+-				interrupts = <20 4 0>;
++				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				#dma-cells = <2>;
+ 			};
  
- 		d10 {
- 			label = "d7";
--			gpios = <&pioB 6 0>;
-+			gpios = <&pioB 6 GPIO_ACTIVE_HIGH>;
- 			linux,default-trigger = "heartbeat";
+@@ -287,7 +288,7 @@
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+-					interrupts = <2 4 1>;
++					interrupts = <2 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -297,7 +298,7 @@
+ 				pioB: gpio at fffff600 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff600 0x200>;
+-					interrupts = <2 4 1>;
++					interrupts = <2 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -307,7 +308,7 @@
+ 				pioC: gpio at fffff800 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff800 0x200>;
+-					interrupts = <3 4 1>;
++					interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -317,7 +318,7 @@
+ 				pioD: gpio at fffffa00 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffffa00 0x200>;
+-					interrupts = <3 4 1>;
++					interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -328,7 +329,7 @@
+ 			dbgu: serial at fffff200 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffff200 0x200>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_dbgu>;
+ 				status = "disabled";
+@@ -337,7 +338,7 @@
+ 			ssc0: ssc at f0010000 {
+ 				compatible = "atmel,at91sam9g45-ssc";
+ 				reg = <0xf0010000 0x4000>;
+-				interrupts = <28 4 5>;
++				interrupts = <28 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+ 				status = "disabled";
+@@ -346,7 +347,7 @@
+ 			usart0: serial at f801c000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf801c000 0x4000>;
+-				interrupts = <5 4 5>;
++				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart0>;
+ 				status = "disabled";
+@@ -355,7 +356,7 @@
+ 			usart1: serial at f8020000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8020000 0x4000>;
+-				interrupts = <6 4 5>;
++				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart1>;
+ 				status = "disabled";
+@@ -364,7 +365,7 @@
+ 			usart2: serial at f8024000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8024000 0x4000>;
+-				interrupts = <7 4 5>;
++				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart2>;
+ 				status = "disabled";
+@@ -373,7 +374,7 @@
+ 			usart3: serial at f8028000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8028000 0x4000>;
+-				interrupts = <8 4 5>;
++				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart3>;
+ 				status = "disabled";
+@@ -382,7 +383,7 @@
+ 			i2c0: i2c at f8010000 {
+ 				compatible = "atmel,at91sam9x5-i2c";
+ 				reg = <0xf8010000 0x100>;
+-				interrupts = <9 4 6>;
++				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				dmas = <&dma 1 13>,
+ 				       <&dma 1 14>;
+ 				dma-names = "tx", "rx";
+@@ -394,7 +395,7 @@
+ 			i2c1: i2c at f8014000 {
+ 				compatible = "atmel,at91sam9x5-i2c";
+ 				reg = <0xf8014000 0x100>;
+-				interrupts = <10 4 6>;
++				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				dmas = <&dma 1 15>,
+ 				       <&dma 1 16>;
+ 				dma-names = "tx", "rx";
+@@ -408,7 +409,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xf0000000 0x100>;
+-				interrupts = <13 4 3>;
++				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi0>;
+ 				status = "disabled";
+@@ -419,7 +420,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xf0004000 0x100>;
+-				interrupts = <14 4 3>;
++				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi1>;
+ 				status = "disabled";
+@@ -450,7 +451,7 @@
+ 		usb0: ohci at 00500000 {
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00500000 0x00100000>;
+-			interrupts = <22 4 2>;
++			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+ 			status = "disabled";
  		};
  	};
-@@ -117,7 +117,7 @@
- 
- 		enter {
- 			label = "Enter";
--			gpios = <&pioB 4 1>;
-+			gpios = <&pioB 4 GPIO_ACTIVE_LOW>;
- 			linux,code = <28>;
- 			gpio-key,wakeup;
- 		};
 diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 69b386f..949b8ea 100644
+index cfbf923..af91599 100644
 --- a/arch/arm/boot/dts/at91sam9x5.dtsi
 +++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -10,6 +10,7 @@
-  */
+@@ -11,6 +11,7 @@
  
  #include "skeleton.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/at91.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/gpio/gpio.h>
  
  / {
- 	model = "Atmel AT91SAM9x5 family SoC";
-@@ -664,8 +665,8 @@
- 			atmel,nand-cmd-offset = <22>;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_nand>;
--			gpios = <&pioD 5 0
--				 &pioD 4 0
-+			gpios = <&pioD 5 GPIO_ACTIVE_HIGH
-+				 &pioD 4 GPIO_ACTIVE_HIGH
- 				 0
- 				>;
- 			status = "disabled";
-@@ -688,8 +689,8 @@
- 
- 	i2c at 0 {
- 		compatible = "i2c-gpio";
--		gpios = <&pioA 30 0 /* sda */
--			 &pioA 31 0 /* scl */
-+		gpios = <&pioA 30 GPIO_ACTIVE_HIGH /* sda */
-+			 &pioA 31 GPIO_ACTIVE_HIGH /* scl */
- 			>;
- 		i2c-gpio,sda-open-drain;
- 		i2c-gpio,scl-open-drain;
-@@ -703,8 +704,8 @@
- 
- 	i2c at 1 {
- 		compatible = "i2c-gpio";
--		gpios = <&pioC 0 0 /* sda */
--			 &pioC 1 0 /* scl */
-+		gpios = <&pioC 0 GPIO_ACTIVE_HIGH /* sda */
-+			 &pioC 1 GPIO_ACTIVE_HIGH /* scl */
- 			>;
- 		i2c-gpio,sda-open-drain;
- 		i2c-gpio,scl-open-drain;
-@@ -718,8 +719,8 @@
- 
- 	i2c at 2 {
- 		compatible = "i2c-gpio";
--		gpios = <&pioB 4 0 /* sda */
--			 &pioB 5 0 /* scl */
-+		gpios = <&pioB 4 GPIO_ACTIVE_HIGH /* sda */
-+			 &pioB 5 GPIO_ACTIVE_HIGH /* scl */
- 			>;
- 		i2c-gpio,sda-open-drain;
- 		i2c-gpio,scl-open-drain;
-diff --git a/arch/arm/boot/dts/at91sam9x5cm.dtsi b/arch/arm/boot/dts/at91sam9x5cm.dtsi
-index 347a74a..94723c3 100644
---- a/arch/arm/boot/dts/at91sam9x5cm.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5cm.dtsi
-@@ -75,19 +75,19 @@
- 
- 		pb18 {
- 			label = "pb18";
--			gpios = <&pioB 18 1>;
-+			gpios = <&pioB 18 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 
- 		pd21 {
- 			label = "pd21";
--			gpios = <&pioD 21 0>;
-+			gpios = <&pioD 21 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
- 
- 	1wire_cm {
- 		compatible = "w1-gpio";
--		gpios = <&pioB 18 0>;
-+		gpios = <&pioB 18 GPIO_ACTIVE_HIGH>;
- 		linux,open-drain;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_1wire_cm>;
-diff --git a/arch/arm/boot/dts/at91sam9x5ek.dtsi b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-index 24781f2..95f88c7 100644
---- a/arch/arm/boot/dts/at91sam9x5ek.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5ek.dtsi
-@@ -27,7 +27,7 @@
- 				slot at 0 {
- 					reg = <0>;
- 					bus-width = <4>;
--					cd-gpios = <&pioD 15 0>;
-+					cd-gpios = <&pioD 15 GPIO_ACTIVE_HIGH>;
- 				};
+@@ -87,32 +88,32 @@
+ 			pit: timer at fffffe30 {
+ 				compatible = "atmel,at91sam9260-pit";
+ 				reg = <0xfffffe30 0xf>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
  			};
  
-@@ -40,7 +40,7 @@
- 				slot at 0 {
- 					reg = <0>;
- 					bus-width = <4>;
--					cd-gpios = <&pioD 14 0>;
-+					cd-gpios = <&pioD 14 GPIO_ACTIVE_HIGH>;
- 				};
+ 			tcb0: timer at f8008000 {
+ 				compatible = "atmel,at91sam9x5-tcb";
+ 				reg = <0xf8008000 0x100>;
+-				interrupts = <17 4 0>;
++				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>;
  			};
  
-@@ -86,8 +86,8 @@
+ 			tcb1: timer at f800c000 {
+ 				compatible = "atmel,at91sam9x5-tcb";
+ 				reg = <0xf800c000 0x100>;
+-				interrupts = <17 4 0>;
++				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
+ 
+ 			dma0: dma-controller at ffffec00 {
+ 				compatible = "atmel,at91sam9g45-dma";
+ 				reg = <0xffffec00 0x200>;
+-				interrupts = <20 4 0>;
++				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				#dma-cells = <2>;
+ 			};
+ 
+ 			dma1: dma-controller at ffffee00 {
+ 				compatible = "atmel,at91sam9g45-dma";
+ 				reg = <0xffffee00 0x200>;
+-				interrupts = <21 4 0>;
++				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				#dma-cells = <2>;
+ 			};
+ 
+@@ -416,7 +417,7 @@
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+-					interrupts = <2 4 1>;
++					interrupts = <2 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -426,7 +427,7 @@
+ 				pioB: gpio at fffff600 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff600 0x200>;
+-					interrupts = <2 4 1>;
++					interrupts = <2 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					#gpio-lines = <19>;
+@@ -437,7 +438,7 @@
+ 				pioC: gpio at fffff800 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff800 0x200>;
+-					interrupts = <3 4 1>;
++					interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -447,7 +448,7 @@
+ 				pioD: gpio at fffffa00 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffffa00 0x200>;
+-					interrupts = <3 4 1>;
++					interrupts = <3 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					#gpio-lines = <22>;
+@@ -459,7 +460,7 @@
+ 			ssc0: ssc at f0010000 {
+ 				compatible = "atmel,at91sam9g45-ssc";
+ 				reg = <0xf0010000 0x4000>;
+-				interrupts = <28 4 5>;
++				interrupts = <28 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+ 				status = "disabled";
+@@ -468,7 +469,7 @@
+ 			mmc0: mmc at f0008000 {
+ 				compatible = "atmel,hsmci";
+ 				reg = <0xf0008000 0x600>;
+-				interrupts = <12 4 0>;
++				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				dmas = <&dma0 1 0>;
+ 				dma-names = "rxtx";
+ 				#address-cells = <1>;
+@@ -479,7 +480,7 @@
+ 			mmc1: mmc at f000c000 {
+ 				compatible = "atmel,hsmci";
+ 				reg = <0xf000c000 0x600>;
+-				interrupts = <26 4 0>;
++				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				dmas = <&dma1 1 0>;
+ 				dma-names = "rxtx";
+ 				#address-cells = <1>;
+@@ -490,7 +491,7 @@
+ 			dbgu: serial at fffff200 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xfffff200 0x200>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_dbgu>;
+ 				status = "disabled";
+@@ -499,7 +500,7 @@
+ 			usart0: serial at f801c000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf801c000 0x200>;
+-				interrupts = <5 4 5>;
++				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart0>;
+ 				status = "disabled";
+@@ -508,7 +509,7 @@
+ 			usart1: serial at f8020000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8020000 0x200>;
+-				interrupts = <6 4 5>;
++				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart1>;
+ 				status = "disabled";
+@@ -517,7 +518,7 @@
+ 			usart2: serial at f8024000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8024000 0x200>;
+-				interrupts = <7 4 5>;
++				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart2>;
+ 				status = "disabled";
+@@ -526,7 +527,7 @@
+ 			macb0: ethernet at f802c000 {
+ 				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+ 				reg = <0xf802c000 0x100>;
+-				interrupts = <24 4 3>;
++				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_macb0_rmii>;
+ 				status = "disabled";
+@@ -535,14 +536,14 @@
+ 			macb1: ethernet at f8030000 {
+ 				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+ 				reg = <0xf8030000 0x100>;
+-				interrupts = <27 4 3>;
++				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				status = "disabled";
+ 			};
+ 
+ 			i2c0: i2c at f8010000 {
+ 				compatible = "atmel,at91sam9x5-i2c";
+ 				reg = <0xf8010000 0x100>;
+-				interrupts = <9 4 6>;
++				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				dmas = <&dma0 1 7>,
+ 				       <&dma0 1 8>;
+ 				dma-names = "tx", "rx";
+@@ -556,7 +557,7 @@
+ 			i2c1: i2c at f8014000 {
+ 				compatible = "atmel,at91sam9x5-i2c";
+ 				reg = <0xf8014000 0x100>;
+-				interrupts = <10 4 6>;
++				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				dmas = <&dma1 1 5>,
+ 				       <&dma1 1 6>;
+ 				dma-names = "tx", "rx";
+@@ -570,7 +571,7 @@
+ 			i2c2: i2c at f8018000 {
+ 				compatible = "atmel,at91sam9x5-i2c";
+ 				reg = <0xf8018000 0x100>;
+-				interrupts = <11 4 6>;
++				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				dmas = <&dma0 1 9>,
+ 				       <&dma0 1 10>;
+ 				dma-names = "tx", "rx";
+@@ -584,7 +585,7 @@
+ 			adc0: adc at f804c000 {
+ 				compatible = "atmel,at91sam9260-adc";
+ 				reg = <0xf804c000 0x100>;
+-				interrupts = <19 4 0>;
++				interrupts = <19 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				atmel,adc-use-external;
+ 				atmel,adc-channels-used = <0xffff>;
+ 				atmel,adc-vref = <3300>;
+@@ -627,7 +628,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xf0000000 0x100>;
+-				interrupts = <13 4 3>;
++				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi0>;
+ 				status = "disabled";
+@@ -638,7 +639,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "atmel,at91rm9200-spi";
+ 				reg = <0xf0004000 0x100>;
+-				interrupts = <14 4 3>;
++				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi1>;
+ 				status = "disabled";
+@@ -647,7 +648,7 @@
+ 			rtc at fffffeb0 {
+ 				compatible = "atmel,at91rm9200-rtc";
+ 				reg = <0xfffffeb0 0x40>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				status = "disabled";
+ 			};
+ 		};
+@@ -676,14 +677,14 @@
  		usb0: ohci at 00600000 {
- 			status = "okay";
- 			num-ports = <2>;
--			atmel,vbus-gpio = <&pioD 19 1
--					   &pioD 20 1
-+			atmel,vbus-gpio = <&pioD 19 GPIO_ACTIVE_LOW
-+					   &pioD 20 GPIO_ACTIVE_LOW
- 					  >;
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00600000 0x100000>;
+-			interrupts = <22 4 2>;
++			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+ 			status = "disabled";
  		};
  
-diff --git a/arch/arm/boot/dts/ethernut5.dts b/arch/arm/boot/dts/ethernut5.dts
-index 2067c66..143b6d2 100644
---- a/arch/arm/boot/dts/ethernut5.dts
-+++ b/arch/arm/boot/dts/ethernut5.dts
-@@ -40,7 +40,7 @@
- 			};
- 
- 			usb1: gadget at fffa4000 {
--				atmel,vbus-gpio = <&pioC 5 0>;
-+				atmel,vbus-gpio = <&pioC 5 GPIO_ACTIVE_HIGH>;
- 				status = "okay";
- 			};
- 		};
-@@ -52,7 +52,7 @@
- 			status = "okay";
- 
- 			gpios = <0
--				 &pioC 14 0
-+				 &pioC 14 GPIO_ACTIVE_HIGH
- 				 0
- 				>;
- 
-diff --git a/arch/arm/boot/dts/evk-pro3.dts b/arch/arm/boot/dts/evk-pro3.dts
-index eae2cd7..4d82968 100644
---- a/arch/arm/boot/dts/evk-pro3.dts
-+++ b/arch/arm/boot/dts/evk-pro3.dts
-@@ -31,7 +31,7 @@
- 			};
- 
- 			usb1: gadget at fffa4000 {
--				atmel,vbus-gpio = <&pioC 5 0>;
-+				atmel,vbus-gpio = <&pioC 5 GPIO_ACTIVE_HIGH>;
- 				status = "okay";
- 			};
- 
-diff --git a/arch/arm/boot/dts/kizbox.dts b/arch/arm/boot/dts/kizbox.dts
-index 8328fed..02df191 100644
---- a/arch/arm/boot/dts/kizbox.dts
-+++ b/arch/arm/boot/dts/kizbox.dts
-@@ -94,26 +94,26 @@
- 
- 		led1g {
- 			label = "led1:green";
--			gpios = <&pioB 0 1>;
-+			gpios = <&pioB 0 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "none";
- 		};
- 
- 		led1r {
- 			label = "led1:red";
--			gpios = <&pioB 1 1>;
-+			gpios = <&pioB 1 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "none";
- 		};
- 
- 		led2g {
- 			label = "led2:green";
--			gpios = <&pioB 2 1>;
-+			gpios = <&pioB 2 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "none";
- 			default-state = "on";
- 		};
- 
- 		led2r {
- 			label = "led2:red";
--			gpios = <&pioB 3 1>;
-+			gpios = <&pioB 3 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "none";
- 		};
- 	};
-@@ -125,14 +125,14 @@
- 
- 		reset {
- 			label = "reset";
--			gpios = <&pioB 30 1>;
-+			gpios = <&pioB 30 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x100>;
- 			gpio-key,wakeup;
- 		};
- 
- 		mode {
- 			label = "mode";
--			gpios = <&pioB 31 1>;
-+			gpios = <&pioB 31 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x101>;
- 			gpio-key,wakeup;
- 		};
-diff --git a/arch/arm/boot/dts/mpa1600.dts b/arch/arm/boot/dts/mpa1600.dts
-index f1b54a2..ccf9ea2 100644
---- a/arch/arm/boot/dts/mpa1600.dts
-+++ b/arch/arm/boot/dts/mpa1600.dts
-@@ -62,7 +62,7 @@
- 
- 		monitor_mute {
- 			label = "Monitor mute";
--			gpios = <&pioC 1 1>;
-+			gpios = <&pioC 1 GPIO_ACTIVE_LOW>;
- 			linux,code = <113>;
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/pm9g45.dts b/arch/arm/boot/dts/pm9g45.dts
-index 639410b..315d927 100644
---- a/arch/arm/boot/dts/pm9g45.dts
-+++ b/arch/arm/boot/dts/pm9g45.dts
-@@ -64,7 +64,7 @@
- 				slot at 0 {
- 					reg = <0>;
- 					bus-width = <4>;
--					cd-gpios = <&pioD 6 0>;
-+					cd-gpios = <&pioD 6 GPIO_ACTIVE_HIGH>;
- 				};
- 			};
- 
-@@ -81,8 +81,8 @@
- 			nand-on-flash-bbt;
- 			pinctrl-0 = <&pinctrl_board_nand>;
- 
--			gpios = <&pioD 3 0
--				 &pioC 14 0
-+			gpios = <&pioD 3 GPIO_ACTIVE_HIGH
-+				 &pioC 14 GPIO_ACTIVE_HIGH
- 				 0
- 				>;
- 
-@@ -134,13 +134,13 @@
- 
- 		led0 {
- 			label = "led0";
--			gpios = <&pioD 0 1>;
-+			gpios = <&pioD 0 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "nand-disk";
- 		};
- 
- 		led1 {
- 			label = "led1";
--			gpios = <&pioD 31 0>;
-+			gpios = <&pioD 31 GPIO_ACTIVE_HIGH>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-@@ -152,13 +152,13 @@
- 
- 		right {
- 			label = "SW4";
--			gpios = <&pioE 7 1>;
-+			gpios = <&pioE 7 GPIO_ACTIVE_LOW>;
- 			linux,code = <106>;
- 		};
- 
- 		up {
- 			label = "SW3";
--			gpios = <&pioE 8 1>;
-+			gpios = <&pioE 8 GPIO_ACTIVE_LOW>;
- 			linux,code = <103>;
+ 		usb1: ehci at 00700000 {
+ 			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+ 			reg = <0x00700000 0x100000>;
+-			interrupts = <22 4 2>;
++			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
+ 			status = "disabled";
  		};
  	};
 diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index 2293fa1..0d65e3d 100644
+index 05a3380..c00e158 100644
 --- a/arch/arm/boot/dts/sama5d3.dtsi
 +++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -9,6 +9,7 @@
-  */
+@@ -10,6 +10,7 @@
  
  #include "skeleton.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/at91.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/gpio/gpio.h>
  
  / {
- 	model = "Atmel SAMA5D3 family SoC";
-diff --git a/arch/arm/boot/dts/sama5d31ek.dts b/arch/arm/boot/dts/sama5d31ek.dts
-index 5bffd66..027bac7 100644
---- a/arch/arm/boot/dts/sama5d31ek.dts
-+++ b/arch/arm/boot/dts/sama5d31ek.dts
-@@ -41,7 +41,7 @@
- 	leds {
- 		d3 {
- 			label = "d3";
--			gpios = <&pioE 24 0>;
-+			gpios = <&pioE 24 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/sama5d34ek.dts b/arch/arm/boot/dts/sama5d34ek.dts
-index d88ff72..fb8ee11 100644
---- a/arch/arm/boot/dts/sama5d34ek.dts
-+++ b/arch/arm/boot/dts/sama5d34ek.dts
-@@ -51,7 +51,7 @@
- 	leds {
- 		d3 {
- 			label = "d3";
--			gpios = <&pioE 24 0>;
-+			gpios = <&pioE 24 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/sama5d35ek.dts b/arch/arm/boot/dts/sama5d35ek.dts
-index 3c364d2..509a53d 100644
---- a/arch/arm/boot/dts/sama5d35ek.dts
-+++ b/arch/arm/boot/dts/sama5d35ek.dts
-@@ -48,7 +48,7 @@
- 
- 		pb_user1 {
- 			label = "pb_user1";
--			gpios = <&pioE 27 0>;
-+			gpios = <&pioE 27 GPIO_ACTIVE_HIGH>;
- 			linux,code = <0x100>;
- 			gpio-key,wakeup;
- 		};
-diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
-index b552917..60637e4 100644
---- a/arch/arm/boot/dts/sama5d3xcm.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
-@@ -85,7 +85,7 @@
- 
- 		d2 {
- 			label = "d2";
--			gpios = <&pioE 25 1>;	/* PE25, conflicts with A25, RXD2 */
-+			gpios = <&pioE 25 GPIO_ACTIVE_LOW>;	/* PE25, conflicts with A25, RXD2 */
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/sama5d3xmb.dtsi b/arch/arm/boot/dts/sama5d3xmb.dtsi
-index a5e7131..205e64c 100644
---- a/arch/arm/boot/dts/sama5d3xmb.dtsi
-+++ b/arch/arm/boot/dts/sama5d3xmb.dtsi
-@@ -20,7 +20,7 @@
- 				slot at 0 {
- 					reg = <0>;
- 					bus-width = <4>;
--					cd-gpios = <&pioD 17 0>;
-+					cd-gpios = <&pioD 17 GPIO_ACTIVE_HIGH>;
- 				};
+@@ -61,7 +62,7 @@
+ 			mmc0: mmc at f0000000 {
+ 				compatible = "atmel,hsmci";
+ 				reg = <0xf0000000 0x600>;
+-				interrupts = <21 4 0>;
++				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				dmas = <&dma0 2 0>;
+ 				dma-names = "rxtx";
+ 				pinctrl-names = "default";
+@@ -76,7 +77,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "atmel,at91sam9x5-spi";
+ 				reg = <0xf0004000 0x100>;
+-				interrupts = <24 4 3>;
++				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				cs-gpios = <&pioD 13 0
+ 					    &pioD 14 0 /* conflicts with SCK0 and CANRX0 */
+ 					    &pioD 15 0 /* conflicts with CTS0 and CANTX0 */
+@@ -90,7 +91,7 @@
+ 			ssc0: ssc@f0008000 {
+ 				compatible = "atmel,at91sam9g45-ssc";
+ 				reg = <0xf0008000 0x4000>;
+-				interrupts = <38 4 4>;
++				interrupts = <38 IRQ_TYPE_LEVEL_HIGH 4>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+ 				status = "disabled";
+@@ -99,7 +100,7 @@
+ 			can0: can at f000c000 {
+ 				compatible = "atmel,at91sam9x5-can";
+ 				reg = <0xf000c000 0x300>;
+-				interrupts = <40 4 3>;
++				interrupts = <40 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_can0_rx_tx>;
+ 				status = "disabled";
+@@ -108,13 +109,13 @@
+ 			tcb0: timer at f0010000 {
+ 				compatible = "atmel,at91sam9x5-tcb";
+ 				reg = <0xf0010000 0x100>;
+-				interrupts = <26 4 0>;
++				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 0>;
  			};
  
-@@ -62,7 +62,7 @@
- 				slot at 0 {
- 					reg = <0>;
- 					bus-width = <4>;
--					cd-gpios = <&pioD 18 0>;
-+					cd-gpios = <&pioD 18 GPIO_ACTIVE_HIGH>;
- 				};
+ 			i2c0: i2c at f0014000 {
+ 				compatible = "atmel,at91sam9x5-i2c";
+ 				reg = <0xf0014000 0x4000>;
+-				interrupts = <18 4 6>;
++				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				dmas = <&dma0 2 7>,
+ 				       <&dma0 2 8>;
+ 				dma-names = "tx", "rx";
+@@ -128,7 +129,7 @@
+ 			i2c1: i2c at f0018000 {
+ 				compatible = "atmel,at91sam9x5-i2c";
+ 				reg = <0xf0018000 0x4000>;
+-				interrupts = <19 4 6>;
++				interrupts = <19 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				dmas = <&dma0 2 9>,
+ 				       <&dma0 2 10>;
+ 				dma-names = "tx", "rx";
+@@ -142,7 +143,7 @@
+ 			usart0: serial at f001c000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf001c000 0x100>;
+-				interrupts = <12 4 5>;
++				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart0>;
+ 				status = "disabled";
+@@ -151,7 +152,7 @@
+ 			usart1: serial at f0020000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf0020000 0x100>;
+-				interrupts = <13 4 5>;
++				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart1>;
+ 				status = "disabled";
+@@ -160,7 +161,7 @@
+ 			macb0: ethernet at f0028000 {
+ 				compatible = "cnds,pc302-gem", "cdns,gem";
+ 				reg = <0xf0028000 0x100>;
+-				interrupts = <34 4 3>;
++				interrupts = <34 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_macb0_data_rgmii &pinctrl_macb0_signal_rgmii>;
+ 				status = "disabled";
+@@ -169,14 +170,14 @@
+ 			isi: isi at f0034000 {
+ 				compatible = "atmel,at91sam9g45-isi";
+ 				reg = <0xf0034000 0x4000>;
+-				interrupts = <37 4 5>;
++				interrupts = <37 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				status = "disabled";
  			};
  
-@@ -127,7 +127,7 @@
+ 			mmc1: mmc at f8000000 {
+ 				compatible = "atmel,hsmci";
+ 				reg = <0xf8000000 0x600>;
+-				interrupts = <22 4 0>;
++				interrupts = <22 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				dmas = <&dma1 2 0>;
+ 				dma-names = "rxtx";
+ 				pinctrl-names = "default";
+@@ -189,7 +190,7 @@
+ 			mmc2: mmc at f8004000 {
+ 				compatible = "atmel,hsmci";
+ 				reg = <0xf8004000 0x600>;
+-				interrupts = <23 4 0>;
++				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				dmas = <&dma1 2 1>;
+ 				dma-names = "rxtx";
+ 				pinctrl-names = "default";
+@@ -204,7 +205,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "atmel,at91sam9x5-spi";
+ 				reg = <0xf8008000 0x100>;
+-				interrupts = <25 4 3>;
++				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				cs-gpios = <&pioC 25 0
+ 					    &pioC 26 0 /* conflitcs with TWD1 and ISI_D11 */
+ 					    &pioC 27 0 /* conflitcs with TWCK1 and ISI_D10 */
+@@ -218,7 +219,7 @@
+ 			ssc1: ssc@f800c000 {
+ 				compatible = "atmel,at91sam9g45-ssc";
+ 				reg = <0xf800c000 0x4000>;
+-				interrupts = <39 4 4>;
++				interrupts = <39 IRQ_TYPE_LEVEL_HIGH 4>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
+ 				status = "disabled";
+@@ -227,7 +228,7 @@
+ 			can1: can at f8010000 {
+ 				compatible = "atmel,at91sam9x5-can";
+ 				reg = <0xf8010000 0x300>;
+-				interrupts = <41 4 3>;
++				interrupts = <41 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_can1_rx_tx>;
+ 			};
+@@ -235,13 +236,13 @@
+ 			tcb1: timer at f8014000 {
+ 				compatible = "atmel,at91sam9x5-tcb";
+ 				reg = <0xf8014000 0x100>;
+-				interrupts = <27 4 0>;
++				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
+ 
+ 			adc0: adc at f8018000 {
+ 				compatible = "atmel,at91sam9260-adc";
+ 				reg = <0xf8018000 0x100>;
+-				interrupts = <29 4 5>;
++				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <
+ 					&pinctrl_adc0_adtrg
+@@ -295,7 +296,7 @@
+ 			tsadcc: tsadcc@f8018000 {
+ 				compatible = "atmel,at91sam9x5-tsadcc";
+ 				reg = <0xf8018000 0x4000>;
+-				interrupts = <29 4 5>;
++				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				atmel,tsadcc_clock = <300000>;
+ 				atmel,filtering_average = <0x03>;
+ 				atmel,pendet_debounce = <0x08>;
+@@ -307,7 +308,7 @@
+ 			i2c2: i2c at f801c000 {
+ 				compatible = "atmel,at91sam9x5-i2c";
+ 				reg = <0xf801c000 0x4000>;
+-				interrupts = <20 4 6>;
++				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				dmas = <&dma1 2 11>,
+ 				       <&dma1 2 12>;
+ 				dma-names = "tx", "rx";
+@@ -319,7 +320,7 @@
+ 			usart2: serial at f8020000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8020000 0x100>;
+-				interrupts = <14 4 5>;
++				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart2>;
+ 				status = "disabled";
+@@ -328,7 +329,7 @@
+ 			usart3: serial at f8024000 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xf8024000 0x100>;
+-				interrupts = <15 4 5>;
++				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart3>;
+ 				status = "disabled";
+@@ -337,7 +338,7 @@
+ 			macb1: ethernet at f802c000 {
+ 				compatible = "cdns,at32ap7000-macb", "cdns,macb";
+ 				reg = <0xf802c000 0x100>;
+-				interrupts = <35 4 3>;
++				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_macb1_rmii>;
+ 				status = "disabled";
+@@ -346,7 +347,7 @@
+ 			sha at f8034000 {
+ 				compatible = "atmel,sam9g46-sha";
+ 				reg = <0xf8034000 0x100>;
+-				interrupts = <42 4 0>;
++				interrupts = <42 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
+ 
+ 			aes at f8038000 {
+@@ -358,20 +359,20 @@
+ 			tdes at f803c000 {
+ 				compatible = "atmel,sam9g46-tdes";
+ 				reg = <0xf803c000 0x100>;
+-				interrupts = <44 4 0>;
++				interrupts = <44 IRQ_TYPE_LEVEL_HIGH 0>;
+ 			};
+ 
+ 			dma0: dma-controller at ffffe600 {
+ 				compatible = "atmel,at91sam9g45-dma";
+ 				reg = <0xffffe600 0x200>;
+-				interrupts = <30 4 0>;
++				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				#dma-cells = <2>;
+ 			};
+ 
+ 			dma1: dma-controller at ffffe800 {
+ 				compatible = "atmel,at91sam9g45-dma";
+ 				reg = <0xffffe800 0x200>;
+-				interrupts = <31 4 0>;
++				interrupts = <31 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				#dma-cells = <2>;
+ 			};
+ 
+@@ -383,7 +384,7 @@
+ 			dbgu: serial at ffffee00 {
+ 				compatible = "atmel,at91sam9260-usart";
+ 				reg = <0xffffee00 0x200>;
+-				interrupts = <2 4 7>;
++				interrupts = <2 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_dbgu>;
+ 				status = "disabled";
+@@ -817,7 +818,7 @@
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x100>;
+-					interrupts = <6 4 1>;
++					interrupts = <6 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -827,7 +828,7 @@
+ 				pioB: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x100>;
+-					interrupts = <7 4 1>;
++					interrupts = <7 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -837,7 +838,7 @@
+ 				pioC: gpio at fffff600 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff600 0x100>;
+-					interrupts = <8 4 1>;
++					interrupts = <8 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -847,7 +848,7 @@
+ 				pioD: gpio at fffff800 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff800 0x100>;
+-					interrupts = <9 4 1>;
++					interrupts = <9 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -857,7 +858,7 @@
+ 				pioE: gpio at fffffa00 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffffa00 0x100>;
+-					interrupts = <10 4 1>;
++					interrupts = <10 IRQ_TYPE_LEVEL_HIGH 1>;
+ 					#gpio-cells = <2>;
+ 					gpio-controller;
+ 					interrupt-controller;
+@@ -878,7 +879,7 @@
+ 			pit: timer at fffffe30 {
+ 				compatible = "atmel,at91sam9260-pit";
+ 				reg = <0xfffffe30 0xf>;
+-				interrupts = <3 4 5>;
++				interrupts = <3 IRQ_TYPE_LEVEL_HIGH 5>;
+ 			};
+ 
+ 			watchdog at fffffe40 {
+@@ -890,7 +891,7 @@
+ 			rtc at fffffeb0 {
+ 				compatible = "atmel,at91rm9200-rtc";
+ 				reg = <0xfffffeb0 0x30>;
+-				interrupts = <1 4 7>;
++				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 			};
  		};
  
- 		usb0: gadget at 00500000 {
--			atmel,vbus-gpio = <&pioD 29 0>;
-+			atmel,vbus-gpio = <&pioD 29 GPIO_ACTIVE_HIGH>;
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&pinctrl_usba_vbus>;
- 			status = "okay";
-@@ -135,9 +135,9 @@
+@@ -900,7 +901,7 @@
+ 			compatible = "atmel,at91sam9rl-udc";
+ 			reg = <0x00500000 0x100000
+ 			       0xf8030000 0x4000>;
+-			interrupts = <33 4 2>;
++			interrupts = <33 IRQ_TYPE_LEVEL_HIGH 2>;
+ 			status = "disabled";
  
+ 			ep0 {
+@@ -1012,14 +1013,14 @@
  		usb1: ohci at 00600000 {
- 			num-ports = <3>;
--			atmel,vbus-gpio = <&pioD 25 0
--					   &pioD 26 1
--					   &pioD 27 1
-+			atmel,vbus-gpio = <&pioD 25 GPIO_ACTIVE_HIGH
-+					   &pioD 26 GPIO_ACTIVE_LOW
-+					   &pioD 27 GPIO_ACTIVE_LOW
- 					  >;
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/tny_a9263.dts b/arch/arm/boot/dts/tny_a9263.dts
-index 45f059b..0751a6a9 100644
---- a/arch/arm/boot/dts/tny_a9263.dts
-+++ b/arch/arm/boot/dts/tny_a9263.dts
-@@ -38,7 +38,7 @@
- 			};
- 
- 			usb1: gadget at fff78000 {
--				atmel,vbus-gpio = <&pioB 11 0>;
-+				atmel,vbus-gpio = <&pioB 11 GPIO_ACTIVE_HIGH>;
- 				status = "okay";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/usb_a9260_common.dtsi b/arch/arm/boot/dts/usb_a9260_common.dtsi
-index e70d229..2859776 100644
---- a/arch/arm/boot/dts/usb_a9260_common.dtsi
-+++ b/arch/arm/boot/dts/usb_a9260_common.dtsi
-@@ -30,7 +30,7 @@
- 			};
- 
- 			usb1: gadget at fffa4000 {
--				atmel,vbus-gpio = <&pioC 5 0>;
-+				atmel,vbus-gpio = <&pioC 5 GPIO_ACTIVE_HIGH>;
- 				status = "okay";
- 			};
- 		};
-@@ -93,7 +93,7 @@
- 
- 		user_led {
- 			label = "user_led";
--			gpios = <&pioB 21 1>;
-+			gpios = <&pioB 21 GPIO_ACTIVE_LOW>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-@@ -105,7 +105,7 @@
- 
- 		user_pb {
- 			label = "user_pb";
--			gpios = <&pioB 10 1>;
-+			gpios = <&pioB 10 GPIO_ACTIVE_LOW>;
- 			linux,code = <28>;
- 			gpio-key,wakeup;
- 		};
-diff --git a/arch/arm/boot/dts/usb_a9263.dts b/arch/arm/boot/dts/usb_a9263.dts
-index 82e204a..f8ec36c 100644
---- a/arch/arm/boot/dts/usb_a9263.dts
-+++ b/arch/arm/boot/dts/usb_a9263.dts
-@@ -43,7 +43,7 @@
- 			};
- 
- 			usb1: gadget at fff78000 {
--				atmel,vbus-gpio = <&pioB 11 0>;
-+				atmel,vbus-gpio = <&pioB 11 GPIO_ACTIVE_HIGH>;
- 				status = "okay";
- 			};
- 
-@@ -107,7 +107,7 @@
- 
- 		user_led {
- 			label = "user_led";
--			gpios = <&pioB 21 0>;
-+			gpios = <&pioB 21 GPIO_ACTIVE_HIGH>;
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-@@ -119,7 +119,7 @@
- 
- 		user_pb {
- 			label = "user_pb";
--			gpios = <&pioB 10 1>;
-+			gpios = <&pioB 10 GPIO_ACTIVE_LOW>;
- 			linux,code = <28>;
- 			gpio-key,wakeup;
- 		};
-diff --git a/arch/arm/boot/dts/usb_a9g20-dab-mmx.dtsi b/arch/arm/boot/dts/usb_a9g20-dab-mmx.dtsi
-index ad3eca1..5b0ffc1 100644
---- a/arch/arm/boot/dts/usb_a9g20-dab-mmx.dtsi
-+++ b/arch/arm/boot/dts/usb_a9g20-dab-mmx.dtsi
-@@ -28,39 +28,39 @@
- 
- 		user_led1 {
- 			label = "user_led1";
--			gpios = <&pioB 20 1>;
-+			gpios = <&pioB 20 GPIO_ACTIVE_LOW>;
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00600000 0x100000>;
+-			interrupts = <32 4 2>;
++			interrupts = <32 IRQ_TYPE_LEVEL_HIGH 2>;
+ 			status = "disabled";
  		};
  
- /*
- * led already used by mother board but active as high
- *		user_led2 {
- *			label = "user_led2";
--*			gpios = <&pioB 21 1>;
-+*			gpios = <&pioB 21 GPIO_ACTIVE_LOW>;
- *		};
- */
- 		user_led3 {
- 			label = "user_led3";
--			gpios = <&pioB 22 1>;
-+			gpios = <&pioB 22 GPIO_ACTIVE_LOW>;
+ 		usb2: ehci at 00700000 {
+ 			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
+ 			reg = <0x00700000 0x100000>;
+-			interrupts = <32 4 2>;
++			interrupts = <32 IRQ_TYPE_LEVEL_HIGH 2>;
+ 			status = "disabled";
  		};
  
- 		user_led4 {
- 			label = "user_led4";
--			gpios = <&pioB 23 1>;
-+			gpios = <&pioB 23 GPIO_ACTIVE_LOW>;
- 		};
- 
- 		red {
- 			label = "red";
--			gpios = <&pioB 24 1>;
-+			gpios = <&pioB 24 GPIO_ACTIVE_LOW>;
- 		};
- 
- 		orange {
- 			label = "orange";
--			gpios = <&pioB 30 1>;
-+			gpios = <&pioB 30 GPIO_ACTIVE_LOW>;
- 		};
- 
- 		green {
- 			label = "green";
--			gpios = <&pioB 31 1>;
-+			gpios = <&pioB 31 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- 
-@@ -71,25 +71,25 @@
- 
- 		user_pb1 {
- 			label = "user_pb1";
--			gpios = <&pioB 25 1>;
-+			gpios = <&pioB 25 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x100>;
- 		};
- 
- 		user_pb2 {
- 			label = "user_pb2";
--			gpios = <&pioB 13 1>;
-+			gpios = <&pioB 13 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x101>;
- 		};
- 
- 		user_pb3 {
- 			label = "user_pb3";
--			gpios = <&pioA 26 1>;
-+			gpios = <&pioA 26 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x102>;
- 		};
- 
- 		user_pb4 {
- 			label = "user_pb4";
--			gpios = <&pioC 9 1>;
-+			gpios = <&pioC 9 GPIO_ACTIVE_LOW>;
- 			linux,code = <0x103>;
- 		};
- 	};
+@@ -1035,7 +1036,7 @@
+ 				0xffffc000 0x00000070	/* NFC HSMC regs */
+ 				0x00200000 0x00100000	/* NFC SRAM banks */
+ 				>;
+-			interrupts = <5 4 6>;
++			interrupts = <5 IRQ_TYPE_LEVEL_HIGH 6>;
+ 			atmel,nand-addr-offset = <21>;
+ 			atmel,nand-cmd-offset = <22>;
+ 			pinctrl-names = "default";
 -- 
 1.7.10.4
