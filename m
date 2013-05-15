@@ -1,42 +1,76 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Wed, 15 May 2013 23:48:31 +0200
-Subject: [RFC 2/4] dma: add dmaengine driver for Samsung s3c24xx SoCs
-In-Reply-To: <5193FC08.5040002@gmail.com>
-References: <201305111330.05046.heiko@sntech.de>
- <201305152231.52423.heiko@sntech.de> <5193FC08.5040002@gmail.com>
-Message-ID: <201305152348.32171.heiko@sntech.de>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Wed, 15 May 2013 14:50:28 -0700
+Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
+In-Reply-To: <20130515170734.GI5600@atomide.com>
+References: <20130515002537.GG5600@atomide.com>
+ <20130515015212.GB3268@animalcreek.com>
+ <20130515170734.GI5600@atomide.com>
+Message-ID: <20130515215028.GA11883@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 15. Mai 2013, 23:20:08 schrieb Sylwester Nawrocki:
-> On 05/15/2013 10:31 PM, Heiko St?bner wrote:
-> >>> +       BUG();
-> >>> 
-> >> >  Isn't that a bit nasty. This macro should be used with care and we
-> >> >  should recover if possible. dev_err()?
+On Wed, May 15, 2013 at 10:07:35AM -0700, Tony Lindgren wrote:
+> * Mark A. Greer <mgreer@animalcreek.com> [130514 18:57]:
+> > On Tue, May 14, 2013 at 05:25:37PM -0700, Tony Lindgren wrote:
+> > > Commit a819c4f1 (ARM: OMAP3: PM: Only access IVA if one exists)
+> > > changed PM to not access IVA registers on omaps that don't have
+> > > them. Turns out we still need to idle iva2 as otherwise iva2_pwrdm
+> > > will stay on and block deeper idle states.
+> > > 
+> > > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > > 
+> > > ---
+> > > 
+> > > Paul & Kevin, do you have better ideas for fixing this?
+> > > 
+> > > --- a/arch/arm/mach-omap2/pm34xx.c
+> > > +++ b/arch/arm/mach-omap2/pm34xx.c
+> > > @@ -546,8 +546,10 @@ static void __init prcm_setup_regs(void)
+> > >  	/* Clear any pending PRCM interrupts */
+> > >  	omap2_prm_write_mod_reg(0, OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
+> > >  
+> > > -	if (omap3_has_iva())
+> > > -		omap3_iva_idle();
+> > > +	/*
+> > > +	 * We need to idle iva2_pwrdm even on am3703 with no iva2.
+> > > +	 */
+> > > +	omap3_iva_idle();
+> > >  
+> > >  	omap3_d2d_idle();
+> > >  }
 > > 
-> > runtime_config already denies any settings not in the 1,2 or 4bytes range
-> > - the default-part should therefore never be reached. So if any other
-> > value magically appears in the register and triggers the default-part,
-> > something is seriously wrong. So my guess is, the BUG might be
-> > appropriate.
+> > [Kevin, Paul, some background: Tony discovered that the am3703 needs
+> > to have omap3_iva_idle() called even though its not supposed to have
+> > an IVA.]
 > > 
-> > On the other hand the whole default+BUG part could also simply go away,
-> > for the same reasons.
+> > This is potentially bad for other SoC's that don't have an IVA so I don't
+> > think its the way to go.  My preference would be to set the OMAP3_HAS_IVA
+> > flag for the am3703 only since its the one with the bug.  Maybe something
+> > in id.c:omap3xxx_check_features() but I don't see any existing way to check
+> > for an am3703 vs. other am37xx SoCs.  Any ideas?
+> > 
+> > Another option, I suppose, is a dts entry but I don't like that at all.
 > 
-> IMHO BUG() is not needed at all. As Linus suggested dev_err() is such case
-> or WARN_ON() would be more appropriate. This has been discussed in the past
-> extensively, not sure if you are aware of the other Linus' opinion on
-> BUG()/BUG_ON() proliferation: https://lkml.org/lkml/2012/9/27/461
+> It seems that iva2_pwrdm is there for all omap3 even if OMAP3_HAS_IVA
+> flag is unset. And if that's the case, iva2 clocks still need to be idled
+> in all cases.
 
-Very interesting read and I'll keep this in mind in the future. What about the 
-other option ... i.e. simply getting rid of the whole "error handling", as the 
-other code paths should already make sure that only valid values get written 
-into the register.
+Ahh, this takes us to the "Great TI Docs Mystery" :) -- its basically
+impossible to tell because despite what their docs may say, the hardware
+can be quite different.  I'm not sure how to proceed other than trial &
+error with as many different SoCs as we can find.
 
-Can the value change in the register somehow on its own without kernel 
-intervention, or does this not happen?
+> It's possible that not all steps in omap3_iva_idle() are needed though.
+> I can debug further to see which part of the omap3_iva_idle() are needed.
+> 
+> Mark, do you have some omap3 with no iva (other than am3703) to test the
+> idle states with?
 
+I have an am35xx which isn't supposed to have an IVA so I can test with it
+(although, I'm not sure how well the kernel works on the am35xx these days).
 
-Thanks
-Heiko
+I'm a bit busy today but I'll try booting the am35xx tomorrow and if it
+comes up, see what I can figure out.
+
+Mark
+--
