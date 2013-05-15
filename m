@@ -1,38 +1,93 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 15 May 2013 10:51:37 +0100
-Subject: [PATCH 14/39] ARM: ux500: Stop passing Hash DMA channel config
- information though pdata
+Date: Wed, 15 May 2013 10:51:36 +0100
+Subject: [PATCH 13/39] crypto: ux500/hash - Set DMA configuration though
+ dma_slave_config()
 In-Reply-To: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
 References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1368611522-9984-15-git-send-email-lee.jones@linaro.org>
+Message-ID: <1368611522-9984-14-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DMA channel configuration information should be setup in the driver.
-The Ux500 Hash driver now does this, so there's no need to send it
-though here too.
+The DMA controller currently takes configuration information from
+information passed though dma_channel_request(), but it shouldn't.
+Using the API, the DMA channel should only be configured during
+a dma_slave_config() call.
 
+Cc: Herbert Xu <herbert@gondor.apana.org.au>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Andreas Westin <andreas.westin@stericsson.com>
+Cc: linux-crypto at vger.kernel.org
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/board-mop500.c |    4 ----
- 1 file changed, 4 deletions(-)
+ drivers/crypto/ux500/hash/hash_alg.h  |    5 ++++-
+ drivers/crypto/ux500/hash/hash_core.c |   10 ++++++++++
+ 2 files changed, 14 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 52ffe1c..ec916ca 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -446,11 +446,7 @@ static struct cryp_platform_data u8500_cryp1_platform_data = {
- static struct stedma40_chan_cfg u8500_hash_dma_cfg_tx = {
- 		.dir = STEDMA40_MEM_TO_PERIPH,
- 		.dev_type = DB8500_DMA_DEV50_HAC1_TX,
--		.src_info.data_width = STEDMA40_WORD_WIDTH,
--		.dst_info.data_width = STEDMA40_WORD_WIDTH,
- 		.mode = STEDMA40_MODE_LOGICAL,
--		.src_info.psize = STEDMA40_PSIZE_LOG_16,
--		.dst_info.psize = STEDMA40_PSIZE_LOG_16,
- };
+diff --git a/drivers/crypto/ux500/hash/hash_alg.h b/drivers/crypto/ux500/hash/hash_alg.h
+index cd9351c..be6eb54 100644
+--- a/drivers/crypto/ux500/hash/hash_alg.h
++++ b/drivers/crypto/ux500/hash/hash_alg.h
+@@ -11,6 +11,7 @@
+ #include <linux/bitops.h>
  
- static struct hash_platform_data u8500_hash1_platform_data = {
+ #define HASH_BLOCK_SIZE			64
++#define HASH_DMA_FIFO			4
+ #define HASH_DMA_ALIGN_SIZE		4
+ #define HASH_DMA_PERFORMANCE_MIN_SIZE	1024
+ #define HASH_BYTES_PER_WORD		4
+@@ -347,7 +348,8 @@ struct hash_req_ctx {
+ 
+ /**
+  * struct hash_device_data - structure for a hash device.
+- * @base:		Pointer to the hardware base address.
++ * @base:		Pointer to virtual base address of the hash device.
++ * @phybase:		Pointer to physical memory location of the hash device.
+  * @list_node:		For inclusion in klist.
+  * @dev:		Pointer to the device dev structure.
+  * @ctx_lock:		Spinlock for current_ctx.
+@@ -361,6 +363,7 @@ struct hash_req_ctx {
+  */
+ struct hash_device_data {
+ 	struct hash_register __iomem	*base;
++	phys_addr_t             phybase;
+ 	struct klist_node	list_node;
+ 	struct device		*dev;
+ 	struct spinlock		ctx_lock;
+diff --git a/drivers/crypto/ux500/hash/hash_core.c b/drivers/crypto/ux500/hash/hash_core.c
+index 4b02428..6269576 100644
+--- a/drivers/crypto/ux500/hash/hash_core.c
++++ b/drivers/crypto/ux500/hash/hash_core.c
+@@ -122,6 +122,13 @@ static void hash_dma_setup_channel(struct hash_device_data *device_data,
+ 				struct device *dev)
+ {
+ 	struct hash_platform_data *platform_data = dev->platform_data;
++	struct dma_slave_config conf = {
++		.direction = DMA_MEM_TO_DEV,
++		.dst_addr = device_data->phybase + HASH_DMA_FIFO,
++		.dst_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES,
++		.dst_maxburst = 16,
++        };
++
+ 	dma_cap_zero(device_data->dma.mask);
+ 	dma_cap_set(DMA_SLAVE, device_data->dma.mask);
+ 
+@@ -131,6 +138,8 @@ static void hash_dma_setup_channel(struct hash_device_data *device_data,
+ 				platform_data->dma_filter,
+ 				device_data->dma.cfg_mem2hash);
+ 
++	dmaengine_slave_config(device_data->dma.chan_mem2hash, &conf);
++
+ 	init_completion(&device_data->dma.complete);
+ }
+ 
+@@ -1699,6 +1708,7 @@ static int ux500_hash_probe(struct platform_device *pdev)
+ 		goto out_kfree;
+ 	}
+ 
++	device_data->phybase = res->start;
+ 	device_data->base = ioremap(res->start, resource_size(res));
+ 	if (!device_data->base) {
+ 		dev_err(dev, "[%s] ioremap() failed!",
 -- 
 1.7.10.4
