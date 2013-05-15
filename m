@@ -1,155 +1,25 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 15 May 2013 15:18:53 +0200
-Subject: [PATCH 3/4] ARM: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE and
- use ALT_SMP instead
-In-Reply-To: <1364235581-17900-4-git-send-email-will.deacon@arm.com>
-References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
- <1364235581-17900-4-git-send-email-will.deacon@arm.com>
-Message-ID: <51938B3D.2070508@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 May 2013 15:19:08 +0200
+Subject: [PATCH 1/5] ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
+In-Reply-To: <1368571955-6652-1-git-send-email-dinguyen@altera.com>
+References: <1368571955-6652-1-git-send-email-dinguyen@altera.com>
+Message-ID: <201305151519.08598.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 03/25/2013 07:19 PM, Will Deacon wrote:
-> Many ARMv7 cores have hardware page table walkers that can read the L1
-> cache. This is discoverable from the ID_MMFR3 register, although this
-> can be expensive to access from the low-level set_pte functions and is a
-> pain to cache, particularly with multi-cluster systems.
-> 
-> A useful observation is that the multi-processing extensions for ARMv7
-> require coherent table walks, meaning that we can make use of ALT_SMP
-> patching in proc-v7-* to patch away the cache flush safely for these
-> cores.
-
-I encountered a regression with 3.10-rc1 on the Armada 370 based boards.
-With the 3.10-rc1 they hang during auto testy of the xor engine which are
-mainly DMA transfers. If I revert this patch, it no more hang. I found this
-by using bisect, it was not obvious at all for me that this patch may have
-cause this regression.
-The issue appear in SMP and in UP. However I think that  the PJ4B-v7 used in
- the Armada 370 are not MP capable.
-
-I made some investigation. And in UP if I remove the line:
-	ALT_UP(W(nop))
-
-at the begining of the cpu_v7_dcache_clean_are macro located in
-arch/arm/mm/proc-v7.S
-
-Then the kernel boot again. It is not surprising because in this case
-we found the same generated code that before this patch was applied.
-
-now I don't really understand why a W(nop) will cause this issue.
-
-In SMP mode even with this line removed the kernel hang, but in this case
-I am not sure of what happen exactly and how the .alt.smp.init section is
-used.
-
-I don't know if it is relevant but I tested with these 2 version of gcc:
-gcc version 4.6.3 (Ubuntu/Linaro 4.6.3-1ubuntu5)
-and
-gcc version 4.7.3 (Ubuntu/Linaro 4.7.3-1ubuntu1)
-
-I hope you will find some explanation and solution to this bug, because currently
-the only solution I have is to revert this patch.
-
-Thanks,
-Gregory
-> 
-> Reported-by: Albin Tonnerre <Albin.Tonnerre@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/tlbflush.h | 2 +-
->  arch/arm/mm/proc-v6.S           | 2 --
->  arch/arm/mm/proc-v7-2level.S    | 3 ++-
->  arch/arm/mm/proc-v7-3level.S    | 3 ++-
->  arch/arm/mm/proc-v7.S           | 4 ++--
->  5 files changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-> index c7cdb59..42d155e 100644
-> --- a/arch/arm/include/asm/tlbflush.h
-> +++ b/arch/arm/include/asm/tlbflush.h
-> @@ -169,7 +169,7 @@
->  # define v6wbi_always_flags	(-1UL)
->  #endif
+On Wednesday 15 May 2013, dinguyen at altera.com wrote:
+>                 };
 >  
-> -#define v7wbi_tlb_flags_smp	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
-> +#define v7wbi_tlb_flags_smp	(TLB_WB | TLB_BARRIER | \
->  				 TLB_V6_U_FULL | TLB_V6_U_PAGE | \
->  				 TLB_V6_U_ASID | TLB_V6_BP | \
->  				 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | \
-> diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
-> index bcaaa8d..a286d47 100644
-> --- a/arch/arm/mm/proc-v6.S
-> +++ b/arch/arm/mm/proc-v6.S
-> @@ -80,12 +80,10 @@ ENTRY(cpu_v6_do_idle)
->  	mov	pc, lr
->  
->  ENTRY(cpu_v6_dcache_clean_area)
-> -#ifndef TLB_CAN_READ_FROM_L1_CACHE
->  1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
->  	add	r0, r0, #D_CACHE_LINE_SIZE
->  	subs	r1, r1, #D_CACHE_LINE_SIZE
->  	bhi	1b
-> -#endif
->  	mov	pc, lr
->  
->  /*
-> diff --git a/arch/arm/mm/proc-v7-2level.S b/arch/arm/mm/proc-v7-2level.S
-> index 78f520b..9704097 100644
-> --- a/arch/arm/mm/proc-v7-2level.S
-> +++ b/arch/arm/mm/proc-v7-2level.S
-> @@ -110,7 +110,8 @@ ENTRY(cpu_v7_set_pte_ext)
->   ARM(	str	r3, [r0, #2048]! )
->   THUMB(	add	r0, r0, #2048 )
->   THUMB(	str	r3, [r0] )
-> -	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-> +	ALT_SMP(mov	pc,lr)
-> +	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
->  #endif
->  	mov	pc, lr
->  ENDPROC(cpu_v7_set_pte_ext)
-> diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-> index 6ffd78c..363027e 100644
-> --- a/arch/arm/mm/proc-v7-3level.S
-> +++ b/arch/arm/mm/proc-v7-3level.S
-> @@ -73,7 +73,8 @@ ENTRY(cpu_v7_set_pte_ext)
->  	tst	r3, #1 << (55 - 32)		@ L_PTE_DIRTY
->  	orreq	r2, #L_PTE_RDONLY
->  1:	strd	r2, r3, [r0]
-> -	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-> +	ALT_SMP(mov	pc, lr)
-> +	ALT_UP (mcr	p15, 0, r0, c7, c10, 1)		@ flush_pte
->  #endif
->  	mov	pc, lr
->  ENDPROC(cpu_v7_set_pte_ext)
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 3a3c015..37716b0 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -75,14 +75,14 @@ ENTRY(cpu_v7_do_idle)
->  ENDPROC(cpu_v7_do_idle)
->  
->  ENTRY(cpu_v7_dcache_clean_area)
-> -#ifndef TLB_CAN_READ_FROM_L1_CACHE
-> +	ALT_SMP(mov	pc, lr)			@ MP extensions imply L1 PTW
-> +	ALT_UP(W(nop))
->  	dcache_line_size r2, r3
->  1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
->  	add	r0, r0, r2
->  	subs	r1, r1, r2
->  	bhi	1b
->  	dsb
-> -#endif
->  	mov	pc, lr
->  ENDPROC(cpu_v7_dcache_clean_area)
->  
-> 
+> +               ethernet at ff700000 {
+> +                       phy-mode = "gmii";
+> +               };
+> +
+> +               ethernet at ff702000 {
+> +                       status = "disabled";
+> +               };
 
+By convention, please mark the controllers as "disabled" in the main .dtsi file
+and only enable them in the board specific files when used, rather than the
+other way round.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
