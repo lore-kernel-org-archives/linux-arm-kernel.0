@@ -1,56 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 May 2013 21:41:01 +0200
-Subject: [RFC 6/8] ARM:stih41x: Add STiH416 SOC support
-In-Reply-To: <1368022318-2380-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <1368022318-2380-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <CACRpkdZ6pdjJe5e7FdZPS-nCgRY3MGh3aewB36KJM7z76O-NQQ@mail.gmail.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Wed, 15 May 2013 22:14:39 +0200
+Subject: [PATCH 20/39] usb: musb: ux500: move channel number knowledge
+ into the driver
+In-Reply-To: <CACRpkdYjjDp+7hzGtAchyy3+5Vxc8jK5THGCETkAO_V9Hj9Ssw@mail.gmail.com>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYjjDp+7hzGtAchyy3+5Vxc8jK5THGCETkAO_V9Hj9Ssw@mail.gmail.com>
+Message-ID: <20130515201439.GA10141@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 8, 2013 at 4:11 PM, Srinivas KANDAGATLA
-<srinivas.kandagatla@st.com> wrote:
+Hello Linus,
 
-> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->
-> The STiH416 is advanced HD AVC processor with 3D graphics acceleration
-> and 1.2-GHz ARM Cortex-A9 SMP CPU.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> CC: Stephen Gallimore <stephen.gallimore@st.com>
-> CC: Stuart Menefy <stuart.menefy@st.com>
+On Wed, May 15, 2013 at 07:18:01PM +0200, Linus Walleij wrote:
+> On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > For all ux500 based platforms the maximum number of end-points are used.
+> > Move this knowledge into the driver so we can relinquish the burden from
+> > platform data. This also removes quite a bit of complexity from the driver
+> > and will aid us when we come to enable the driver for Device Tree.
+> >
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Cc: linux-usb at vger.kernel.org
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> I guess this stuff is dependent on the stuff Fabio has recently sent to
+> Felipe for the ux500 musb DMA so these musb patches should
+> primarily go through his tree.
 
-(...)
+Not really, I only sent some coding style fix for the dma driver, as
+almost all of my work was in the usb phy files.  I also checked my
+latest series against Lee's tree and the two seems to merge without any
+conflict, so as far as I'm concerned it's really up to you and Felipe.
 
-This stuff is looking really good.
+Fabio
 
-> +++ b/arch/arm/boot/dts/stih416.dtsi
-> @@ -0,0 +1,103 @@
-> +/*
-> + * Copyright (C) 2012 STMicroelectronics Limited.
-> + * Author: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * publishhed by the Free Software Foundation.
-> + */
-> +#include "stih41x.dtsi"
-> +#include "stih416-clock.dtsi"
-> +#include "stih416-pinctrl.dtsi"
+> It seems like the later changes to the platform code
+> (arch/arm/mach-ux500) may be sufficiently orthogonal
+> so it can be done out-of-order?
+> 
+> I can't merge any of this without Felipes ACKs in any
+> case.
+> 
+> Yours,
+> Linus Walleij
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-Nice layering here!
-
-> diff --git a/arch/arm/boot/dts/stih416.h b/arch/arm/boot/dts/stih416.h
-> new file mode 100644
-> index 0000000..2e27792
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/stih416.h
-
-I've seen that people start to put these into:
-include/dt-bindings/
-
-With one include per driver subsystem. I suggest you follow
-this pattern.
-
-Yours,
-Linus Walleij
+-- 
+Fabio Baltieri
