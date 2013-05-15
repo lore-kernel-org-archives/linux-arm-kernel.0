@@ -1,48 +1,83 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Wed, 15 May 2013 22:42:33 +0800
-Subject: [PATCH] arm: prima2: use of_platform_populate instead of
- of_platform_bus_probe
-In-Reply-To: <201305151620.56677.arnd@arndb.de>
-References: <1368523923-27137-1-git-send-email-Baohua.Song@csr.com>
- <201305151620.56677.arnd@arndb.de>
-Message-ID: <CAGsJ_4znmN20pCe3yC57ysQve4V1L+euo_3X9Sbn6+z_Gx5tLQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 15 May 2013 16:46:20 +0200
+Subject: [PATCH 3/4] ARM: mm: kill unused TLB_CAN_READ_FROM_L1_CACHE and
+ use ALT_SMP instead
+In-Reply-To: <20130515140607.GI23869@mudshark.cambridge.arm.com>
+References: <1364235581-17900-1-git-send-email-will.deacon@arm.com>
+ <1364235581-17900-4-git-send-email-will.deacon@arm.com>
+ <51938B3D.2070508@free-electrons.com>
+ <20130515134117.GH23869@mudshark.cambridge.arm.com>
+ <51939386.7010709@free-electrons.com>
+ <20130515140607.GI23869@mudshark.cambridge.arm.com>
+Message-ID: <51939FBC.3060705@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/5/15 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday 14 May 2013, Barry Song wrote:
+On 05/15/2013 04:06 PM, Will Deacon wrote:
+> On Wed, May 15, 2013 at 02:54:14PM +0100, Gregory CLEMENT wrote:
+>> On 05/15/2013 03:41 PM, Will Deacon wrote:
+>>> Is this using dmatest.ko, or a different test program?
 >>
->> use of_platform_populate to populate platform devices, it is suitable
->> for creating devices which are children of the root node, then makes
->> things like pcm work.
+>> No they are self-test from the mv_xor driver
+> 
+> Ok. And the CPU locks up, rather than the DMA master?
+> 
+>>> Ok, so the ALT_UP case should be emitted after patching, correct?
 >>
->> Signed-off-by: Barry Song <Baohua.Song@csr.com>
->> Signed-off-by: Rongjun Ying <Rongjun.Ying@csr.com>
->
-> With 3.10-rc1 and above, you can just remove the sirfsoc_mach_init
-> function entirely for the same effect.
+>> Indeed it was I excepted but I didn't check (I don't know how to do)
+> 
+> If you don't have JTAG, that's trickier. Hopefully my other suggestion will
+> help.
+> 
+>>>> I made some investigation. And in UP if I remove the line:
+>>>> 	ALT_UP(W(nop))
+>>>
+>>> Did you remove the ALT_SMP case as well? You could also try making the
+>>> ALT_SMP case use W(nop) too and see if it changes anything.
+>>
+>> OK I will try it.
+> 
+> You could also try deleting both of the ALT_* lines and just putting a
+> W(nop) in there directly.
 
-ok.  since kernel/setup.c does:
+If I just delete the both of the ALT_* lines it no more hangs.
+If I put a  W(nop) instead it hangs.
 
-static int __init customize_machine(void)
-{
-        /*
-         * customizes platform devices, or adds new ones
-         * On DT based machines, we fall back to populating the
-         * machine from the device tree, if no callback is provided,
-         * otherwise we would always need an init_machine callback.
-         */
-        if (machine_desc->init_machine)
-                machine_desc->init_machine();
-#ifdef CONFIG_OF
-        else
-                of_platform_populate(NULL, of_default_bus_match_table,
-                                        NULL, NULL);
-#endif
-        return 0;
-}
+> 
+>>> If you don't have both of the alternatives, things will go wrong.
+>>
+>> For my own culture, how ALT_UP and ALT_SMP work in SMP case?
+>> When I disassembled the proc-v7.o, I saw that the SMP variant of the code were
+>> written. How the kernel switch to the UP version of the code?
+> 
+> Early in boot (head.S:__fixup_smp), we detect whether the CPU has the MP
+> extensions then, if we're actually UP but the kernel has CONFIG_SMP=y, we
+> walk over the .alt.smp.init section looking at each entry in there. The
+> ALT_UP macro spits out an (address, instruction) pair, so in
+> __do_fixup_smp_on_up, we store the instruction to the address for each pair,
+> replacing the SMP instruction which sat there in the compiled image.
+> 
+> It could be that the CPUID checks are failing on your Marvell part. Can you
+> tell me what you have in your mpidr (mrc p15, 0, Rd, c0, c0, 5) and also
+> your midr (mrc p15, 0, Rd, c0, c0) please?
 
->
->         Arnd
+mpidr= 0x0
+midr= 0x561F5811
 
--barry
+> 
+> Cheers,
+> 
+> Will
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
