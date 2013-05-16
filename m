@@ -1,161 +1,64 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Thu, 16 May 2013 13:42:45 +0300
-Subject: [PATCH v3 2/2] KVM: get rid of $(addprefix ../../../virt/kvm/,
- ...) in Makefiles
-In-Reply-To: <1368538262-25546-3-git-send-email-marc.zyngier@arm.com>
-References: <1368538262-25546-1-git-send-email-marc.zyngier@arm.com>
- <1368538262-25546-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130516104245.GR26453@redhat.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 16 May 2013 12:55 +0200
+Subject: [PATCH v3 09/20] ARM: shmobile: r8a7790: Add GPIO controller
+ devices to device tree
+In-Reply-To: <Pine.LNX.4.64.1305160951040.21125@axis700.grange>
+References: <1368577100-3530-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1368577100-3530-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <Pine.LNX.4.64.1305160951040.21125@axis700.grange>
+Message-ID: <1483674.dsLuiHpOf9@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 02:31:02PM +0100, Marc Zyngier wrote:
-> As requested by the KVM maintainers, remove the addprefix used to
-> refer to the main KVM code from the arch code, and replace it with
-> a KVM variable that does the same thing.
-> 
-Thanks, I will wait till next week for arch maintainers to comment and apply.
+Hi Guennadi,
 
-> Cc: Paolo Bonzini <pbonzini@redhat.com>
-> Cc: Gleb Natapov <gleb@redhat.com>
-> Cc: Christoffer Dall <cdall@cs.columbia.edu>
-> Acked-by: Xiantao Zhang <xiantao.zhang@intel.com>
-> Cc: Tony Luck <tony.luck@intel.com>
-> Cc: Fenghua Yu <fenghua.yu@intel.com>
-> Cc: Alexander Graf <agraf@suse.de>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
-> Cc: Cornelia Huck <cornelia.huck@de.ibm.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/Makefile     |  2 +-
->  arch/ia64/kvm/Makefile    |  7 ++++---
->  arch/powerpc/kvm/Makefile | 13 +++++++------
->  arch/s390/kvm/Makefile    |  3 ++-
->  arch/x86/kvm/Makefile     | 13 +++++++------
->  5 files changed, 21 insertions(+), 17 deletions(-)
+On Thursday 16 May 2013 09:57:20 Guennadi Liakhovetski wrote:
+> On Wed, 15 May 2013, Laurent Pinchart wrote:
+> > Add GPIO controller nodes to the r8a7790 core device tree.
+> > 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  arch/arm/boot/dts/r8a7790.dtsi | 54 +++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 54 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi
+> > b/arch/arm/boot/dts/r8a7790.dtsi index ee21061..b5fe51da 100644
+> > --- a/arch/arm/boot/dts/r8a7790.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> > @@ -44,6 +44,60 @@
+> >  		};
+> >  	};
+> > 
+> > +	gpio0: gpio at ffc40000 {
+> > +		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
+> > +		reg = <0xffc40000 0x2c>;
+> > +		interrupt-parent = <&gic>;
+> > +		interrupts = <0 4 0x4>;
+> > +		#gpio-cells = <2>;
+> > +		gpio-controller;
+> > +	};
 > 
-> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-> index 9184a49..d99bee4 100644
-> --- a/arch/arm/kvm/Makefile
-> +++ b/arch/arm/kvm/Makefile
-> @@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
->  AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
->  
->  KVM := ../../../virt/kvm
-> -kvm-arm-y = $(addprefix $(KVM)/, kvm_main.o coalesced_mmio.o)
-> +kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
->  
->  obj-y += kvm-arm.o init.o interrupts.o
->  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
-> diff --git a/arch/ia64/kvm/Makefile b/arch/ia64/kvm/Makefile
-> index 1a40537..18e45ec 100644
-> --- a/arch/ia64/kvm/Makefile
-> +++ b/arch/ia64/kvm/Makefile
-> @@ -47,12 +47,13 @@ FORCE : $(obj)/$(offsets-file)
->  
->  ccflags-y := -Ivirt/kvm -Iarch/ia64/kvm/
->  asflags-y := -Ivirt/kvm -Iarch/ia64/kvm/
-> +KVM := ../../../virt/kvm
->  
-> -common-objs = $(addprefix ../../../virt/kvm/, kvm_main.o ioapic.o \
-> -		coalesced_mmio.o irq_comm.o)
-> +common-objs = $(KVM)/kvm_main.o $(KVM)/ioapic.o \
-> +		$(KVM)/coalesced_mmio.o $(KVM)/irq_comm.o
->  
->  ifeq ($(CONFIG_KVM_DEVICE_ASSIGNMENT),y)
-> -common-objs += $(addprefix ../../../virt/kvm/, assigned-dev.o iommu.o)
-> +common-objs += $(KVM)/assigned-dev.o $(KVM)/iommu.o
->  endif
->  
->  kvm-objs := $(common-objs) kvm-ia64.o kvm_fw.o
-> diff --git a/arch/powerpc/kvm/Makefile b/arch/powerpc/kvm/Makefile
-> index 422de3f..008cd85 100644
-> --- a/arch/powerpc/kvm/Makefile
-> +++ b/arch/powerpc/kvm/Makefile
-> @@ -5,9 +5,10 @@
->  subdir-ccflags-$(CONFIG_PPC_WERROR) := -Werror
->  
->  ccflags-y := -Ivirt/kvm -Iarch/powerpc/kvm
-> +KVM := ../../../virt/kvm
->  
-> -common-objs-y = $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o \
-> -						eventfd.o)
-> +common-objs-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o \
-> +		$(KVM)/eventfd.o
->  
->  CFLAGS_44x_tlb.o  := -I.
->  CFLAGS_e500_mmu.o := -I.
-> @@ -53,7 +54,7 @@ kvm-e500mc-objs := \
->  kvm-objs-$(CONFIG_KVM_E500MC) := $(kvm-e500mc-objs)
->  
->  kvm-book3s_64-objs-$(CONFIG_KVM_BOOK3S_64_PR) := \
-> -	../../../virt/kvm/coalesced_mmio.o \
-> +	$(KVM)/coalesced_mmio.o \
->  	fpu.o \
->  	book3s_paired_singles.o \
->  	book3s_pr.o \
-> @@ -86,8 +87,8 @@ kvm-book3s_64-objs-$(CONFIG_KVM_XICS) += \
->  	book3s_xics.o
->  
->  kvm-book3s_64-module-objs := \
-> -	../../../virt/kvm/kvm_main.o \
-> -	../../../virt/kvm/eventfd.o \
-> +	$(KVM)/kvm_main.o \
-> +	$(KVM)/eventfd.o \
->  	powerpc.o \
->  	emulate.o \
->  	book3s.o \
-> @@ -111,7 +112,7 @@ kvm-book3s_32-objs := \
->  kvm-objs-$(CONFIG_KVM_BOOK3S_32) := $(kvm-book3s_32-objs)
->  
->  kvm-objs-$(CONFIG_KVM_MPIC) += mpic.o
-> -kvm-objs-$(CONFIG_HAVE_KVM_IRQ_ROUTING) += $(addprefix ../../../virt/kvm/, irqchip.o)
-> +kvm-objs-$(CONFIG_HAVE_KVM_IRQ_ROUTING) += $(KVM)/irqchip.o
->  
->  kvm-objs := $(kvm-objs-m) $(kvm-objs-y)
->  
-> diff --git a/arch/s390/kvm/Makefile b/arch/s390/kvm/Makefile
-> index 8fe9d65..40b4c64 100644
-> --- a/arch/s390/kvm/Makefile
-> +++ b/arch/s390/kvm/Makefile
-> @@ -6,7 +6,8 @@
->  # it under the terms of the GNU General Public License (version 2 only)
->  # as published by the Free Software Foundation.
->  
-> -common-objs = $(addprefix ../../../virt/kvm/, kvm_main.o eventfd.o)
-> +KVM := ../../../virt/kvm
-> +common-objs = $(KVM)/kvm_main.o $(KVM)/eventfd.o
->  
->  ccflags-y := -Ivirt/kvm -Iarch/s390/kvm
->  
-> diff --git a/arch/x86/kvm/Makefile b/arch/x86/kvm/Makefile
-> index d609e1d..bf4fb04 100644
-> --- a/arch/x86/kvm/Makefile
-> +++ b/arch/x86/kvm/Makefile
-> @@ -5,12 +5,13 @@ CFLAGS_x86.o := -I.
->  CFLAGS_svm.o := -I.
->  CFLAGS_vmx.o := -I.
->  
-> -kvm-y			+= $(addprefix ../../../virt/kvm/, kvm_main.o ioapic.o \
-> -				coalesced_mmio.o irq_comm.o eventfd.o \
-> -				irqchip.o)
-> -kvm-$(CONFIG_KVM_DEVICE_ASSIGNMENT)	+= $(addprefix ../../../virt/kvm/, \
-> -				assigned-dev.o iommu.o)
-> -kvm-$(CONFIG_KVM_ASYNC_PF)	+= $(addprefix ../../../virt/kvm/, async_pf.o)
-> +KVM := ../../../virt/kvm
-> +
-> +kvm-y			+= $(KVM)/kvm_main.o $(KVM)/ioapic.o \
-> +				$(KVM)/coalesced_mmio.o $(KVM)/irq_comm.o \
-> +				$(KVM)/eventfd.o $(KVM)/irqchip.o
-> +kvm-$(CONFIG_KVM_DEVICE_ASSIGNMENT)	+= $(KVM)/assigned-dev.o $(KVM)/iommu.o
-> +kvm-$(CONFIG_KVM_ASYNC_PF)	+= $(KVM)/async_pf.o
->  
->  kvm-y			+= x86.o mmu.o emulate.o i8259.o irq.o lapic.o \
->  			   i8254.o cpuid.o pmu.o
-> -- 
-> 1.8.2.3
+> I'm testing your patches on Lager and GPIOs don't seem to get registered:
 > 
+> / # ls /sys/class/gpio/
+> export    unexport
+> / #
+> 
+> And this is easy to trace back: sh_pfc_probe() calls
+> sh_pfc_register_gpiochip(), where a check
+> 
+> 	if (pfc->info->data_regs == NULL)
+> 		return 0;
+> 
+> successfully fails GPIO initialisation :) Is this known and there are
+> still some pieces missing, or you weren't aware of this?
 
---
-			Gleb.
+GPIOs are handled by the gpio-rcar driver on R8A7790, not by the sh-pfc 
+driver.
+
+-- 
+Regards,
+
+Laurent Pinchart
