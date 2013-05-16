@@ -1,252 +1,188 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 16 May 2013 11:57:08 +0200
-Subject: [PATCH v2 3/6] usb: phy: samsung: Consolidate reference clock rate
- handling
+Date: Thu, 16 May 2013 11:57:09 +0200
+Subject: [PATCH v2 4/6] usb: phy: samsung: Pass set_isolation callback through
+ driver data
 In-Reply-To: <1368698231-24268-1-git-send-email-t.figa@samsung.com>
 References: <1368698231-24268-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1368698231-24268-4-git-send-email-t.figa@samsung.com>
+Message-ID: <1368698231-24268-5-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up handling of reference clock rate in Samsung USB PHY
-drivers. It is mostly a cosmetic change but improves error handling in
-case of failing to get reference clock or invalid clock rate.
+This patch extends driver data structure with set_isolation callback,
+which allows to remove the need for checking for SoC type in a switch
+statement.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/usb/phy/phy-samsung-usb.c  | 114 ++++++++++++++++++++++---------------
- drivers/usb/phy/phy-samsung-usb.h  |   7 +++
- drivers/usb/phy/phy-samsung-usb2.c |   8 ++-
- drivers/usb/phy/phy-samsung-usb3.c |   6 +-
- 4 files changed, 86 insertions(+), 49 deletions(-)
+ drivers/usb/phy/phy-samsung-usb.c  | 36 ++++++++----------------------------
+ drivers/usb/phy/phy-samsung-usb.h  |  4 +++-
+ drivers/usb/phy/phy-samsung-usb2.c | 11 +++++++----
+ drivers/usb/phy/phy-samsung-usb3.c |  7 +++++--
+ 4 files changed, 23 insertions(+), 35 deletions(-)
 
 diff --git a/drivers/usb/phy/phy-samsung-usb.c b/drivers/usb/phy/phy-samsung-usb.c
-index 62cdb7e..c40ea32 100644
+index c40ea32..7a1ed90 100644
 --- a/drivers/usb/phy/phy-samsung-usb.c
 +++ b/drivers/usb/phy/phy-samsung-usb.c
-@@ -162,13 +162,76 @@ int samsung_usbphy_set_type(struct usb_phy *phy,
- }
- EXPORT_SYMBOL_GPL(samsung_usbphy_set_type);
- 
-+int samsung_usbphy_rate_to_clksel_64xx(struct samsung_usbphy *sphy,
-+							unsigned long rate)
-+{
-+	unsigned int clksel;
-+
-+	switch (rate) {
-+	case 12 * MHZ:
-+		clksel = PHYCLK_CLKSEL_12M;
-+		break;
-+	case 24 * MHZ:
-+		clksel = PHYCLK_CLKSEL_24M;
-+		break;
-+	case 48 * MHZ:
-+		clksel = PHYCLK_CLKSEL_48M;
-+		break;
-+	default:
-+		dev_err(sphy->dev,
-+			"Invalid reference clock frequency: %lu\n", rate);
-+		return -EINVAL;
-+	}
-+
-+	return clksel;
-+}
-+EXPORT_SYMBOL_GPL(samsung_usbphy_rate_to_clksel_64xx);
-+
-+int samsung_usbphy_rate_to_clksel_4x12(struct samsung_usbphy *sphy,
-+							unsigned long rate)
-+{
-+	unsigned int clksel;
-+
-+	switch (rate) {
-+	case 9600 * KHZ:
-+		clksel = FSEL_CLKSEL_9600K;
-+		break;
-+	case 10 * MHZ:
-+		clksel = FSEL_CLKSEL_10M;
-+		break;
-+	case 12 * MHZ:
-+		clksel = FSEL_CLKSEL_12M;
-+		break;
-+	case 19200 * KHZ:
-+		clksel = FSEL_CLKSEL_19200K;
-+		break;
-+	case 20 * MHZ:
-+		clksel = FSEL_CLKSEL_20M;
-+		break;
-+	case 24 * MHZ:
-+		clksel = FSEL_CLKSEL_24M;
-+		break;
-+	case 50 * MHZ:
-+		clksel = FSEL_CLKSEL_50M;
-+		break;
-+	default:
-+		dev_err(sphy->dev,
-+			"Invalid reference clock frequency: %lu\n", rate);
-+		return -EINVAL;
-+	}
-+
-+	return clksel;
-+}
-+EXPORT_SYMBOL_GPL(samsung_usbphy_rate_to_clksel_4x12);
-+
- /*
-  * Returns reference clock frequency selection value
+@@ -73,7 +73,7 @@ EXPORT_SYMBOL_GPL(samsung_usbphy_parse_dt);
+  * Here 'on = true' would mean USB PHY block is isolated, hence
+  * de-activated and vice-versa.
   */
- int samsung_usbphy_get_refclk_freq(struct samsung_usbphy *sphy)
+-void samsung_usbphy_set_isolation(struct samsung_usbphy *sphy, bool on)
++void samsung_usbphy_set_isolation_4210(struct samsung_usbphy *sphy, bool on)
  {
- 	struct clk *ref_clk;
--	int refclk_freq = 0;
-+	unsigned long rate;
-+	int refclk_freq;
- 
- 	/*
- 	 * In exynos5250 USB host and device PHY use
-@@ -183,52 +246,9 @@ int samsung_usbphy_get_refclk_freq(struct samsung_usbphy *sphy)
- 		return PTR_ERR(ref_clk);
+ 	void __iomem *reg = NULL;
+ 	u32 reg_val;
+@@ -84,32 +84,12 @@ void samsung_usbphy_set_isolation(struct samsung_usbphy *sphy, bool on)
+ 		return;
  	}
  
--	if (sphy->drv_data->cpu_type == TYPE_EXYNOS5250) {
--		/* set clock frequency for PLL */
--		switch (clk_get_rate(ref_clk)) {
--		case 9600 * KHZ:
--			refclk_freq = FSEL_CLKSEL_9600K;
--			break;
--		case 10 * MHZ:
--			refclk_freq = FSEL_CLKSEL_10M;
--			break;
--		case 12 * MHZ:
--			refclk_freq = FSEL_CLKSEL_12M;
--			break;
--		case 19200 * KHZ:
--			refclk_freq = FSEL_CLKSEL_19200K;
--			break;
--		case 20 * MHZ:
--			refclk_freq = FSEL_CLKSEL_20M;
--			break;
--		case 50 * MHZ:
--			refclk_freq = FSEL_CLKSEL_50M;
--			break;
--		case 24 * MHZ:
--		default:
--			/* default reference clock */
--			refclk_freq = FSEL_CLKSEL_24M;
--			break;
+-	switch (sphy->drv_data->cpu_type) {
+-	case TYPE_S3C64XX:
+-		/*
+-		 * Do nothing: We will add here once S3C64xx goes for DT support
+-		 */
+-		break;
+-	case TYPE_EXYNOS4210:
+-		/*
+-		 * Fall through since exynos4210 and exynos5250 have similar
+-		 * register architecture: two separate registers for host and
+-		 * device phy control with enable bit at position 0.
+-		 */
+-	case TYPE_EXYNOS5250:
+-		if (sphy->phy_type == USB_PHY_TYPE_DEVICE) {
+-			reg = sphy->pmuregs +
+-				sphy->drv_data->devphy_reg_offset;
+-			en_mask = sphy->drv_data->devphy_en_mask;
+-		} else if (sphy->phy_type == USB_PHY_TYPE_HOST) {
+-			reg = sphy->pmuregs +
+-				sphy->drv_data->hostphy_reg_offset;
+-			en_mask = sphy->drv_data->hostphy_en_mask;
 -		}
--	} else {
--		switch (clk_get_rate(ref_clk)) {
--		case 12 * MHZ:
--			refclk_freq = PHYCLK_CLKSEL_12M;
--			break;
--		case 24 * MHZ:
--			refclk_freq = PHYCLK_CLKSEL_24M;
--			break;
--		case 48 * MHZ:
--			refclk_freq = PHYCLK_CLKSEL_48M;
--			break;
--		default:
--			if (sphy->drv_data->cpu_type == TYPE_S3C64XX)
--				refclk_freq = PHYCLK_CLKSEL_48M;
--			else
--				refclk_freq = PHYCLK_CLKSEL_24M;
--			break;
--		}
--	}
-+	rate = clk_get_rate(ref_clk);
-+	refclk_freq = sphy->drv_data->rate_to_clksel(sphy, rate);
-+
- 	clk_put(ref_clk);
+-		break;
+-	default:
+-		dev_err(sphy->dev, "Invalid SoC type\n");
+-		return;
++	if (sphy->phy_type == USB_PHY_TYPE_DEVICE) {
++		reg = sphy->pmuregs + sphy->drv_data->devphy_reg_offset;
++		en_mask = sphy->drv_data->devphy_en_mask;
++	} else if (sphy->phy_type == USB_PHY_TYPE_HOST) {
++		reg = sphy->pmuregs + sphy->drv_data->hostphy_reg_offset;
++		en_mask = sphy->drv_data->hostphy_en_mask;
+ 	}
  
- 	return refclk_freq;
+ 	reg_val = readl(reg);
+@@ -121,7 +101,7 @@ void samsung_usbphy_set_isolation(struct samsung_usbphy *sphy, bool on)
+ 
+ 	writel(reg_val, reg);
+ }
+-EXPORT_SYMBOL_GPL(samsung_usbphy_set_isolation);
++EXPORT_SYMBOL_GPL(samsung_usbphy_set_isolation_4210);
+ 
+ /*
+  * Configure the mode of working of usb-phy here: HOST/DEVICE.
 diff --git a/drivers/usb/phy/phy-samsung-usb.h b/drivers/usb/phy/phy-samsung-usb.h
-index 70a9cae..0336f6b 100644
+index 0336f6b..5203784 100644
 --- a/drivers/usb/phy/phy-samsung-usb.h
 +++ b/drivers/usb/phy/phy-samsung-usb.h
-@@ -244,6 +244,8 @@ enum samsung_cpu_type {
- 	TYPE_EXYNOS5250,
- };
- 
-+struct samsung_usbphy;
-+
- /*
-  * struct samsung_usbphy_drvdata - driver data for various SoC variants
-  * @cpu_type: machine identifier
-@@ -268,6 +270,7 @@ struct samsung_usbphy_drvdata {
- 	int hostphy_en_mask;
+@@ -271,6 +271,7 @@ struct samsung_usbphy_drvdata {
  	u32 devphy_reg_offset;
  	u32 hostphy_reg_offset;
-+	int (*rate_to_clksel)(struct samsung_usbphy *, unsigned long);
+ 	int (*rate_to_clksel)(struct samsung_usbphy *, unsigned long);
++	void (*set_isolation)(struct samsung_usbphy *, bool);
  };
  
  /*
-@@ -325,3 +328,7 @@ extern void samsung_usbphy_cfg_sel(struct samsung_usbphy *sphy);
+@@ -323,7 +324,8 @@ static inline const struct samsung_usbphy_drvdata
+ }
+ 
+ extern int samsung_usbphy_parse_dt(struct samsung_usbphy *sphy);
+-extern void samsung_usbphy_set_isolation(struct samsung_usbphy *sphy, bool on);
++extern void samsung_usbphy_set_isolation_4210(struct samsung_usbphy *sphy,
++								bool on);
+ extern void samsung_usbphy_cfg_sel(struct samsung_usbphy *sphy);
  extern int samsung_usbphy_set_type(struct usb_phy *phy,
  					enum samsung_usb_phy_type phy_type);
- extern int samsung_usbphy_get_refclk_freq(struct samsung_usbphy *sphy);
-+extern int samsung_usbphy_rate_to_clksel_64xx(struct samsung_usbphy *sphy,
-+							unsigned long rate);
-+extern int samsung_usbphy_rate_to_clksel_4x12(struct samsung_usbphy *sphy,
-+							unsigned long rate);
 diff --git a/drivers/usb/phy/phy-samsung-usb2.c b/drivers/usb/phy/phy-samsung-usb2.c
-index 45ffe03..802e738 100644
+index 802e738..ae6da68 100644
 --- a/drivers/usb/phy/phy-samsung-usb2.c
 +++ b/drivers/usb/phy/phy-samsung-usb2.c
-@@ -413,7 +413,10 @@ static int samsung_usb2phy_probe(struct platform_device *pdev)
- 	sphy->phy.label		= "samsung-usb2phy";
- 	sphy->phy.init		= samsung_usb2phy_init;
- 	sphy->phy.shutdown	= samsung_usb2phy_shutdown;
--	sphy->ref_clk_freq	= samsung_usbphy_get_refclk_freq(sphy);
-+
-+	sphy->ref_clk_freq = samsung_usbphy_get_refclk_freq(sphy);
-+	if (sphy->ref_clk_freq < 0)
-+		return -EINVAL;
+@@ -284,8 +284,8 @@ static int samsung_usb2phy_init(struct usb_phy *phy)
+ 	/* Disable phy isolation */
+ 	if (sphy->plat && sphy->plat->pmu_isolation)
+ 		sphy->plat->pmu_isolation(false);
+-	else
+-		samsung_usbphy_set_isolation(sphy, false);
++	else if (sphy->drv_data->set_isolation)
++		sphy->drv_data->set_isolation(sphy, false);
  
- 	sphy->phy.otg		= otg;
- 	sphy->phy.otg->phy	= &sphy->phy;
-@@ -443,18 +446,21 @@ static int samsung_usb2phy_remove(struct platform_device *pdev)
- static const struct samsung_usbphy_drvdata usb2phy_s3c64xx = {
+ 	/* Selecting Host/OTG mode; After reset USB2.0PHY_CFG: HOST */
+ 	samsung_usbphy_cfg_sel(sphy);
+@@ -342,8 +342,8 @@ static void samsung_usb2phy_shutdown(struct usb_phy *phy)
+ 	/* Enable phy isolation */
+ 	if (sphy->plat && sphy->plat->pmu_isolation)
+ 		sphy->plat->pmu_isolation(true);
+-	else
+-		samsung_usbphy_set_isolation(sphy, true);
++	else if (sphy->drv_data->set_isolation)
++		sphy->drv_data->set_isolation(sphy, true);
+ 
+ 	spin_unlock_irqrestore(&sphy->lock, flags);
+ 
+@@ -447,6 +447,7 @@ static const struct samsung_usbphy_drvdata usb2phy_s3c64xx = {
  	.cpu_type		= TYPE_S3C64XX,
  	.devphy_en_mask		= S3C64XX_USBPHY_ENABLE,
-+	.rate_to_clksel		= samsung_usbphy_rate_to_clksel_64xx,
+ 	.rate_to_clksel		= samsung_usbphy_rate_to_clksel_64xx,
++	.set_isolation		= NULL, /* TODO */
  };
  
  static const struct samsung_usbphy_drvdata usb2phy_exynos4 = {
- 	.cpu_type		= TYPE_EXYNOS4210,
+@@ -454,6 +455,7 @@ static const struct samsung_usbphy_drvdata usb2phy_exynos4 = {
  	.devphy_en_mask		= EXYNOS_USBPHY_ENABLE,
  	.hostphy_en_mask	= EXYNOS_USBPHY_ENABLE,
-+	.rate_to_clksel		= samsung_usbphy_rate_to_clksel_64xx,
+ 	.rate_to_clksel		= samsung_usbphy_rate_to_clksel_64xx,
++	.set_isolation		= samsung_usbphy_set_isolation_4210,
  };
  
  static struct samsung_usbphy_drvdata usb2phy_exynos5 = {
- 	.cpu_type		= TYPE_EXYNOS5250,
+@@ -461,6 +463,7 @@ static struct samsung_usbphy_drvdata usb2phy_exynos5 = {
  	.hostphy_en_mask	= EXYNOS_USBPHY_ENABLE,
  	.hostphy_reg_offset	= EXYNOS_USBHOST_PHY_CTRL_OFFSET,
-+	.rate_to_clksel		= samsung_usbphy_rate_to_clksel_4x12,
+ 	.rate_to_clksel		= samsung_usbphy_rate_to_clksel_4x12,
++	.set_isolation		= samsung_usbphy_set_isolation_4210,
  };
  
  #ifdef CONFIG_OF
 diff --git a/drivers/usb/phy/phy-samsung-usb3.c b/drivers/usb/phy/phy-samsung-usb3.c
-index 133f3d0..c07bc32 100644
+index c07bc32..ae232ad 100644
 --- a/drivers/usb/phy/phy-samsung-usb3.c
 +++ b/drivers/usb/phy/phy-samsung-usb3.c
-@@ -279,7 +279,10 @@ static int samsung_usb3phy_probe(struct platform_device *pdev)
- 	sphy->phy.init		= samsung_usb3phy_init;
- 	sphy->phy.shutdown	= samsung_usb3phy_shutdown;
- 	sphy->drv_data		= samsung_usbphy_get_driver_data(pdev);
--	sphy->ref_clk_freq	= samsung_usbphy_get_refclk_freq(sphy);
-+
-+	sphy->ref_clk_freq = samsung_usbphy_get_refclk_freq(sphy);
-+	if (sphy->ref_clk_freq < 0)
-+		return -EINVAL;
+@@ -184,7 +184,8 @@ static int samsung_usb3phy_init(struct usb_phy *phy)
+ 	samsung_usbphy_set_type(&sphy->phy, USB_PHY_TYPE_DEVICE);
  
- 	spin_lock_init(&sphy->lock);
+ 	/* Disable phy isolation */
+-	samsung_usbphy_set_isolation(sphy, false);
++	if (sphy->drv_data->set_isolation)
++		sphy->drv_data->set_isolation(sphy, false);
  
-@@ -305,6 +308,7 @@ static int samsung_usb3phy_remove(struct platform_device *pdev)
- static struct samsung_usbphy_drvdata usb3phy_exynos5 = {
+ 	/* Initialize usb phy registers */
+ 	samsung_exynos5_usb3phy_enable(sphy);
+@@ -221,7 +222,8 @@ static void samsung_usb3phy_shutdown(struct usb_phy *phy)
+ 	samsung_exynos5_usb3phy_disable(sphy);
+ 
+ 	/* Enable phy isolation */
+-	samsung_usbphy_set_isolation(sphy, true);
++	if (sphy->drv_data->set_isolation)
++		sphy->drv_data->set_isolation(sphy, true);
+ 
+ 	spin_unlock_irqrestore(&sphy->lock, flags);
+ 
+@@ -309,6 +311,7 @@ static struct samsung_usbphy_drvdata usb3phy_exynos5 = {
  	.cpu_type		= TYPE_EXYNOS5250,
  	.devphy_en_mask		= EXYNOS_USBPHY_ENABLE,
-+	.rate_to_clksel		= samsung_usbphy_rate_to_clksel_4x12,
+ 	.rate_to_clksel		= samsung_usbphy_rate_to_clksel_4x12,
++	.set_isolation		= samsung_usbphy_set_isolation_4210,
  };
  
  #ifdef CONFIG_OF
