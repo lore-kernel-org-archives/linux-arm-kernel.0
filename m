@@ -1,45 +1,68 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 16 May 2013 12:15:35 +0100
-Subject: [PATCH] ARM: ux500: Only configure wake-up reasons on ux500 based
- platforms
-Message-ID: <1368702935-25599-1-git-send-email-lee.jones@linaro.org>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Thu, 16 May 2013 14:10:03 +0300
+Subject: [PATCH v2 01/10] asm-generic: uaccess s/might_sleep/might_fault/
+In-Reply-To: <cover.1368702323.git.mst@redhat.com>
+References: <cover.1368702323.git.mst@redhat.com>
+Message-ID: <0138f31b9c0f1764a0d6bbed2ee9aa3aedea6815.1368702323.git.mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multiplatform calls all enabled platforms' initcalls. In the
-ux500_idle_init() initcall we call into the DBx500-PRCMU which in turn
-executes some ux500 specific register reads/writes. When running on
-some !ux500 platforms this ends up causing a kernel Oops. This patch
-ensures the PRCMU call is only invoked when running on ux500 based
-platforms.
+The only reason uaccess routines might sleep
+is if they fault. Make this explicit.
 
-Reported-by: Rob Herring <rob.herring@calxeda.com>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
 ---
- arch/arm/mach-ux500/cpuidle.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ include/asm-generic/uaccess.h | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
-index 317a2be..a45dd09 100644
---- a/arch/arm/mach-ux500/cpuidle.c
-+++ b/arch/arm/mach-ux500/cpuidle.c
-@@ -21,6 +21,7 @@
- #include <asm/proc-fns.h>
+diff --git a/include/asm-generic/uaccess.h b/include/asm-generic/uaccess.h
+index c184aa8..dc1269c 100644
+--- a/include/asm-generic/uaccess.h
++++ b/include/asm-generic/uaccess.h
+@@ -163,7 +163,7 @@ static inline __must_check long __copy_to_user(void __user *to,
  
- #include "db8500-regs.h"
-+#include "id.h"
+ #define put_user(x, ptr)					\
+ ({								\
+-	might_sleep();						\
++	might_fault();						\
+ 	access_ok(VERIFY_WRITE, ptr, sizeof(*ptr)) ?		\
+ 		__put_user(x, ptr) :				\
+ 		-EFAULT;					\
+@@ -225,7 +225,7 @@ extern int __put_user_bad(void) __attribute__((noreturn));
  
- static atomic_t master = ATOMIC_INIT(0);
- static DEFINE_SPINLOCK(master_lock);
-@@ -114,6 +115,9 @@ static struct cpuidle_driver ux500_idle_driver = {
- 
- int __init ux500_idle_init(void)
+ #define get_user(x, ptr)					\
+ ({								\
+-	might_sleep();						\
++	might_fault();						\
+ 	access_ok(VERIFY_READ, ptr, sizeof(*ptr)) ?		\
+ 		__get_user(x, ptr) :				\
+ 		-EFAULT;					\
+@@ -255,7 +255,7 @@ extern int __get_user_bad(void) __attribute__((noreturn));
+ static inline long copy_from_user(void *to,
+ 		const void __user * from, unsigned long n)
  {
-+	if (!(cpu_is_u8500_family() || cpu_is_ux540_family()))
-+		return -ENODEV;
-+
- 	/* Configure wake up reasons */
- 	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
- 			     PRCMU_WAKEUP(ABB));
+-	might_sleep();
++	might_fault();
+ 	if (access_ok(VERIFY_READ, from, n))
+ 		return __copy_from_user(to, from, n);
+ 	else
+@@ -265,7 +265,7 @@ static inline long copy_from_user(void *to,
+ static inline long copy_to_user(void __user *to,
+ 		const void *from, unsigned long n)
+ {
+-	might_sleep();
++	might_fault();
+ 	if (access_ok(VERIFY_WRITE, to, n))
+ 		return __copy_to_user(to, from, n);
+ 	else
+@@ -336,7 +336,7 @@ __clear_user(void __user *to, unsigned long n)
+ static inline __must_check unsigned long
+ clear_user(void __user *to, unsigned long n)
+ {
+-	might_sleep();
++	might_fault();
+ 	if (!access_ok(VERIFY_WRITE, to, n))
+ 		return n;
+ 
 -- 
-1.7.10.4
+MST
