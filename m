@@ -1,40 +1,113 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 16 May 2013 17:49:03 +0200
-Subject: [PATCHv9 7/9] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130516154031.GF6563@titan.lakedaemon.net>
-References: <1368624323-24311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1368624323-24311-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130516093312.GB2459@localhost>
- <20130516154031.GF6563@titan.lakedaemon.net>
-Message-ID: <20130516174903.3a7a07ef@skate>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 May 2013 08:49:52 -0700
+Subject: [PATCH] ARM: OMAP2+: nand: reorganize gpmc timing values
+In-Reply-To: <1366388981.3928.158.camel@mars>
+References: <5170738F.8050305@ti.com> <1366325282.4232.6.camel@lovely>
+ <51708097.6070102@ti.com> <51708131.2040208@ti.com>
+ <1366362081.3928.18.camel@mars> <1366372957.3928.104.camel@mars>
+ <51714E0D.7020304@ti.com> <1366383208.3928.144.camel@mars>
+ <5171647B.9070108@ti.com> <1366388981.3928.158.camel@mars>
+Message-ID: <20130516154952.GT5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
-
-On Thu, 16 May 2013 11:40:31 -0400, Jason Cooper wrote:
-
-> > > +static int mvebu_pcie_init(void)
-> > 
-> > Building this showed a warning here. It seems you forgot
-> > to mark this one as __init.
+* Christoph Fritz <chf.fritz@googlemail.com> [130419 09:34]:
+> This patch removes omap2_nand_gpmc_retime() which was used to quirk
+> some timing values before gpmc_cs_set_timings(). Due to recent changes,
+> gpmc_cs_set_timings() has evolved so that there is no more need for a
+> retime function.
 > 
-> Thomas, I'll fix this up when I pull this in, no need to resend. :)
+> To keep the gpmc configuration consistent for legacy board files, this
+> patch also adds oe_on and we_on to nand_default_timings[] as they
+> would be by the retime function.
+> 
+> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
 
-I'll resend, because beyond this function pointed by Ezequiel, there
-are two other functions that can be marked __init. The one pointed by
-Ezequiel is important because it causes a section mismatch
-when !CONFIG_MODULES, because in this case platform_driver_probe() is
-__init (and this explains what I wasn't seeing the warning, since I'm
-building CONFIG_MODULES=y). The two other functions are more cosmetic,
-but good to have as well.
+Thanks looks safe to me so applying into omap-for-v3.11/gpmc.
 
-It would already been sent if git hadn't decided to do a 'git gc' right
-after my rebase. It's been gc-ing for quite some time now...
+Regards,
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Tony
+
+> ---
+>  arch/arm/mach-omap2/board-flash.c |    3 +++
+>  arch/arm/mach-omap2/gpmc-nand.c   |   40 +------------------------------------
+>  2 files changed, 4 insertions(+), 39 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
+> index c33adea..fc20a61 100644
+> --- a/arch/arm/mach-omap2/board-flash.c
+> +++ b/arch/arm/mach-omap2/board-flash.c
+> @@ -112,6 +112,9 @@ struct gpmc_timings nand_default_timings[1] = {
+>  		.cs_rd_off = 36,
+>  		.cs_wr_off = 36,
+>  
+> +		.we_on = 6,
+> +		.oe_on = 6,
+> +
+>  		.adv_on = 6,
+>  		.adv_rd_off = 24,
+>  		.adv_wr_off = 36,
+> diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
+> index d9c2719..c8044b0 100644
+> --- a/arch/arm/mach-omap2/gpmc-nand.c
+> +++ b/arch/arm/mach-omap2/gpmc-nand.c
+> @@ -43,44 +43,6 @@ static struct platform_device gpmc_nand_device = {
+>  	.resource	= gpmc_nand_resource,
+>  };
+>  
+> -static int omap2_nand_gpmc_retime(
+> -				struct omap_nand_platform_data *gpmc_nand_data,
+> -				struct gpmc_timings *gpmc_t)
+> -{
+> -	struct gpmc_timings t;
+> -	int err;
+> -
+> -	memset(&t, 0, sizeof(t));
+> -	t.sync_clk = gpmc_t->sync_clk;
+> -	t.cs_on = gpmc_t->cs_on;
+> -	t.adv_on = gpmc_t->adv_on;
+> -
+> -	/* Read */
+> -	t.adv_rd_off = gpmc_t->adv_rd_off;
+> -	t.oe_on  = t.adv_on;
+> -	t.access = gpmc_t->access;
+> -	t.oe_off = gpmc_t->oe_off;
+> -	t.cs_rd_off = gpmc_t->cs_rd_off;
+> -	t.rd_cycle = gpmc_t->rd_cycle;
+> -
+> -	/* Write */
+> -	t.adv_wr_off = gpmc_t->adv_wr_off;
+> -	t.we_on  = t.oe_on;
+> -	if (cpu_is_omap34xx()) {
+> -		t.wr_data_mux_bus = gpmc_t->wr_data_mux_bus;
+> -		t.wr_access = gpmc_t->wr_access;
+> -	}
+> -	t.we_off = gpmc_t->we_off;
+> -	t.cs_wr_off = gpmc_t->cs_wr_off;
+> -	t.wr_cycle = gpmc_t->wr_cycle;
+> -
+> -	err = gpmc_cs_set_timings(gpmc_nand_data->cs, &t);
+> -	if (err)
+> -		return err;
+> -
+> -	return 0;
+> -}
+> -
+>  static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
+>  {
+>  	/* support only OMAP3 class */
+> @@ -131,7 +93,7 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
+>  				gpmc_get_client_irq(GPMC_IRQ_COUNT_EVENT);
+>  
+>  	if (gpmc_t) {
+> -		err = omap2_nand_gpmc_retime(gpmc_nand_data, gpmc_t);
+> +		err = gpmc_cs_set_timings(gpmc_nand_data->cs, gpmc_t);
+>  		if (err < 0) {
+>  			dev_err(dev, "Unable to set gpmc timings: %d\n", err);
+>  			return err;
+> -- 
+> 1.7.10.4
+> 
+> 
+> 
