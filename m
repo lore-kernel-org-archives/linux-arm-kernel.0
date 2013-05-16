@@ -1,64 +1,42 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 16 May 2013 12:55 +0200
-Subject: [PATCH v3 09/20] ARM: shmobile: r8a7790: Add GPIO controller
- devices to device tree
-In-Reply-To: <Pine.LNX.4.64.1305160951040.21125@axis700.grange>
-References: <1368577100-3530-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1368577100-3530-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <Pine.LNX.4.64.1305160951040.21125@axis700.grange>
-Message-ID: <1483674.dsLuiHpOf9@avalon>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 16 May 2013 11:59:59 +0100
+Subject: [PATCH 02/39] dmaengine: ste_dma40: Remove unnecessary call to
+ d40_phy_cfg()
+In-Reply-To: <20130516094014.GJ14863@intel.com>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-3-git-send-email-lee.jones@linaro.org>
+ <20130516063546.GD14863@intel.com>
+ <20130516072557.GD3269@gmail.com>
+ <20130516094014.GJ14863@intel.com>
+Message-ID: <20130516105959.GI3269@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guennadi,
+On Thu, 16 May 2013, Vinod Koul wrote:
 
-On Thursday 16 May 2013 09:57:20 Guennadi Liakhovetski wrote:
-> On Wed, 15 May 2013, Laurent Pinchart wrote:
-> > Add GPIO controller nodes to the r8a7790 core device tree.
+> On Thu, May 16, 2013 at 08:25:57AM +0100, Lee Jones wrote:
+> > On Thu, 16 May 2013, Vinod Koul wrote:
 > > 
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
+> > > On Wed, May 15, 2013 at 10:51:25AM +0100, Lee Jones wrote:
+> > > > All configuration left in d40_phy_cfg() is runtime configurable and
+> > > > there is already a call into it from d40_runtime_config(), so let's
+> > > > rely on that.
+> > > > 
+> > > > Acked-by: Vinod Koul <vnod.koul@intel.com>
+> > > That needs up update!
 > > 
-> >  arch/arm/boot/dts/r8a7790.dtsi | 54 +++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 54 insertions(+)
+> > Ah, where did I get that from that?
 > > 
-> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi
-> > b/arch/arm/boot/dts/r8a7790.dtsi index ee21061..b5fe51da 100644
-> > --- a/arch/arm/boot/dts/r8a7790.dtsi
-> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
-> > @@ -44,6 +44,60 @@
-> >  		};
-> >  	};
-> > 
-> > +	gpio0: gpio at ffc40000 {
-> > +		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
-> > +		reg = <0xffc40000 0x2c>;
-> > +		interrupt-parent = <&gic>;
-> > +		interrupts = <0 4 0x4>;
-> > +		#gpio-cells = <2>;
-> > +		gpio-controller;
-> > +	};
-> 
-> I'm testing your patches on Lager and GPIOs don't seem to get registered:
-> 
-> / # ls /sys/class/gpio/
-> export    unexport
-> / #
-> 
-> And this is easy to trace back: sh_pfc_probe() calls
-> sh_pfc_register_gpiochip(), where a check
-> 
-> 	if (pfc->info->data_regs == NULL)
-> 		return 0;
-> 
-> successfully fails GPIO initialisation :) Is this known and there are
-> still some pieces missing, or you weren't aware of this?
+> > Was that my mistake, or was this in the MAINTAINERS file?
+> Certainly not in MAINTAINERS file :)
 
-GPIOs are handled by the gpio-rcar driver on R8A7790, not by the sh-pfc 
-driver.
+My bad then, sorry.
 
+Linus,
+
+Would you be kind enough to fix it please, as it's in your tree now.
 -- 
-Regards,
-
-Laurent Pinchart
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
