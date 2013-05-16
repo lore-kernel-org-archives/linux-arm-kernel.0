@@ -1,147 +1,39 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Thu, 16 May 2013 10:35:57 -0500
-Subject: [PATCH v4] ARM:dts:omap4-panda: Update the LED support for the
- panda DTS
-In-Reply-To: <20130515170516.GA6135@kahuna>
-References: <1368636386-17138-1-git-send-email-dmurphy@ti.com>
- <20130515170516.GA6135@kahuna>
-Message-ID: <5194FCDD.8080209@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 16 May 2013 17:37:44 +0200
+Subject: [PATCH] gpio: mxs: Use set and clear capabilities of the gpio
+ controller
+In-Reply-To: <20130502024443.GE3442@S2101-09.ap.freescale.net>
+References: <1367244438-5322-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20130502024443.GE3442@S2101-09.ap.freescale.net>
+Message-ID: <5194FD48.3010106@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2013 12:05 PM, Nishanth Menon wrote:
-> On 11:46-20130515, Dan Murphy wrote:
->> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
->> are different.
->>
->> A1-A3 = gpio_wk7
->> ES = gpio_110
->>
->> There is no change to LED D2
->>
->> Abstract away the pinmux and the LED definitions for the two boards into
->> the respective DTS files.
->>
->> Signed-off-by: Dan Murphy <dmurphy@ti.com>
->> ---
-> nit: Giving patch history is a nice practise.
->>  arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++-
->>  arch/arm/boot/dts/omap4-panda-es.dts      |   40 +++++++++++++++++++++++++++++
->>  2 files changed, 55 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
->> index 03bd60d..2b516af 100644
->> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
->> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
->> @@ -16,7 +16,7 @@
->>  		reg = <0x80000000 0x40000000>; /* 1 GB */
->>  	};
->>  
->> -	leds {
->> +	leds: leds {
->>  		compatible = "gpio-leds";
->>  		heartbeat {
->>  			label = "pandaboard::status1";
->> @@ -137,6 +137,20 @@
-> I missed noticing this previously, Apologies on the same.
-> Considering that drivers/leds/leds-gpio.c has ability to handle pinctrl,
-> One better option might be to provide pinctrl phandle with leds -
-> Couple of reasons why this might be good:
-> a) one gets the following warning at boot:
-> "leds-gpio leds.8: pins are not configured from the driver"
-> b) you donot need to setup the pins by default at boot - it is not
-> mandatory for the system functionality, instead we do it *if* the driver
-> is enabled.
-> Further, optionally, all you'd have to do in panda-es.dts is the following
-> &led_wkgpio_pins {
-> 		pinctrl-single,pins = <
-> 			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
-> 		>;
-> }
-> Similarly for gpios override for panda-es.
-I am not sure you really want to do this.
-If I make the pinctrl part of the led structure then the only way the gpio_wk7 on a1-a3 to be configured is when
-the CONFIG_LEDS_GPIO flag is set.
+Hi Linus,
 
-Do you really want that dependency?  You did say it was a key fix
-At least this way the pins are configured regardless of that flag.
->>  	};
->>  };
->>  
->> +&omap4_pmx_wkup {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <
->> +		&led_wkgpio_pins
->> +	>;
->> +
->> +	led_wkgpio_pins: pinmux_leds_wkpins {
->> +		pinctrl-single,pins = <
->> +			0x1a 0x3	/* gpio_wk7 OUTPUT | MODE 3 */
->> +			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
->> +		>;
->> +	};
->> +};
->> +
->>  &i2c1 {
->>  	pinctrl-names = "default";
->>  	pinctrl-0 = <&i2c1_pins>;
->> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
->> index f1d8c21..e6f696d 100644
->> --- a/arch/arm/boot/dts/omap4-panda-es.dts
->> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
->> @@ -34,3 +34,43 @@
->>  		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
->>  		>;
->>  };
->> +
->> +&leds {
->> +	compatible = "gpio-leds";
->> +	heartbeat {
->> +		label = "pandaboard::status1";
->> +		gpios = <&gpio4 14 0>;
->> +		linux,default-trigger = "heartbeat";
->> +	};
->> +	mmc {
->> +		label = "pandaboard::status2";
->> +		gpios = <&gpio1 8 0>;
->> +		linux,default-trigger = "mmc0";
->> +	};
->> +};
->> +
->> +&omap4_pmx_core {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <
->> +		&led_gpio_pins
->> +	>;
->> +
->> +	led_gpio_pins: gpio_led_pmx {
->> +		pinctrl-single,pins = <
->> +			0xb6 0x3	/* gpio_110 OUTPUT | MODE 3 */
->> +		>;
->> +	};
->> +};
->> +
->> +&omap4_pmx_wkup {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <
->> +		&led_wkgpio_pins
->> +	>;
->> +
->> +	led_wkgpio_pins: pinmux_leds_wkpins {
->> +		pinctrl-single,pins = <
->> +			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
->> +		>;
->> +	};
->> +};
->> -- 
->> 1.7.5.4
+Le 02/05/2013 04:44, Shawn Guo a ?crit :
+> On Mon, Apr 29, 2013 at 04:07:18PM +0200, Maxime Ripard wrote:
+>> The current driver doesn't use the set and clear registers found on the
+>> mxs gpio controller.
 >>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> This leads the generic gpio controller to be using some internal value
+>> to avoid looking up the value stored in the registers, making it behave
+>> pretty much like a cache.
+>>
+>> This raises some coherency problem when a gpio is not modified by the
+>> gpio controller, while it can easily be fixed by using the set and clear
+>> registers.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
+Would you consider merging this patch?
+
+Thanks,
+Maxime
 
 -- 
-------------------
-Dan Murphy
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
