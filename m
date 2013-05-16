@@ -1,92 +1,35 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 16 May 2013 20:40:41 +0200
-Subject: [PATCH v2 10/10] kernel: might_fault does not imply might_sleep
-In-Reply-To: <1f85dc8e6a0149677563a2dfb4cef9a9c7eaa391.1368702323.git.mst@redhat.com>
-References: <cover.1368702323.git.mst@redhat.com>
- <1f85dc8e6a0149677563a2dfb4cef9a9c7eaa391.1368702323.git.mst@redhat.com>
-Message-ID: <20130516184041.GP19669@dyad.programming.kicks-ass.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 May 2013 11:54:44 -0700
+Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
+In-Reply-To: <20130516183516.GJ5600@atomide.com>
+References: <20130515002537.GG5600@atomide.com>
+ <20130515015212.GB3268@animalcreek.com>
+ <20130515170734.GI5600@atomide.com>
+ <20130515215028.GA11883@animalcreek.com>
+ <5194B2A8.8020608@visionsystems.de>
+ <20130516183516.GJ5600@atomide.com>
+Message-ID: <20130516185444.GK5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 02:16:10PM +0300, Michael S. Tsirkin wrote:
-> There are several ways to make sure might_fault
-> calling function does not sleep.
-> One is to use it on kernel or otherwise locked memory - apparently
-> nfs/sunrpc does this. As noted by Ingo, this is handled by the
-> migh_fault() implementation in mm/memory.c but not the one in
-> linux/kernel.h so in the current code might_fault() schedules
-> differently depending on CONFIG_PROVE_LOCKING, which is an undesired
-> semantical side effect.
+* Tony Lindgren <tony@atomide.com> [130516 11:40]:
+> * Yegor Yefremov <yegor_sub1@visionsystems.de> [130516 05:13]:
+> > 
+> > I think this issue is relevant to am3517 as you can see from this thread: http://thread.gmane.org/gmane.linux.ports.arm.omap/97903
+> > I could boot only with your patch http://www.spinics.net/lists/arm-kernel/msg168865.html
 > 
-> Another is to call pagefault_disable: in this case the page fault
-> handler will go to fixups processing and we get an error instead of
-> sleeping, so the might_sleep annotation is a false positive.
-> vhost driver wants to do this now in order to reuse socket ops
-> under a spinlock (and fall back on slower thread handler
-> on error).
+> OK sounds like Mark's patch as http://www.spinics.net/lists/arm-kernel/msg168865.html
+> is needed as a fix.
 
-Are you using the assumption that spin_lock() implies preempt_disable() implies
-pagefault_disable()? Note that this assumption isn't valid for -rt where the
-spinlock becomes preemptible but we'll not disable pagefaults.
+Yegor, thinking about your boot issue more, I'm thinking that you
+have your board .init_time = omap3_secure_sync32k_timer_init, or
+some non-waking gpt timer. And that means the system won't wake to
+timer events.
 
-> Address both issues by:
-> 	- dropping the unconditional call to might_sleep
-> 	  from the fast might_fault code in linux/kernel.h
-> 	- checking for pagefault_disable() in the
-> 	  CONFIG_PROVE_LOCKING implementation
-> 
-> Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-> ---
->  include/linux/kernel.h |  1 -
->  mm/memory.c            | 14 +++++++++-----
->  2 files changed, 9 insertions(+), 6 deletions(-)
-> 
-> diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-> index e96329c..322b065 100644
-> --- a/include/linux/kernel.h
-> +++ b/include/linux/kernel.h
-> @@ -198,7 +198,6 @@ void might_fault(void);
->  #else
->  static inline void might_fault(void)
->  {
-> -	might_sleep();
+The system should still wake to timer events even if you have no
+wake-up events configred, so Mark's patch probably does not fix
+the right issue for you.
 
-This removes potential resched points for PREEMPT_VOLUNTARY -- was that
-intentional?
+Regards,
 
->  }
->  #endif
->  
-> diff --git a/mm/memory.c b/mm/memory.c
-> index 6dc1882..1b8327b 100644
-> --- a/mm/memory.c
-> +++ b/mm/memory.c
-> @@ -4222,13 +4222,17 @@ void might_fault(void)
->  	if (segment_eq(get_fs(), KERNEL_DS))
->  		return;
->  
-> -	might_sleep();
->  	/*
-> -	 * it would be nicer only to annotate paths which are not under
-> -	 * pagefault_disable, however that requires a larger audit and
-> -	 * providing helpers like get_user_atomic.
-> +	 * It would be nicer to annotate paths which are under preempt_disable
-> +	 * but not under pagefault_disable, however that requires a new flag
-> +	 * for differentiating between the two.
-
--rt has this, pagefault_disable() doesn't change the preempt count but pokes
-at task_struct::pagefault_disable.
-
->  	 */
-> -	if (!in_atomic() && current->mm)
-> +	if (in_atomic())
-> +		return;
-> +
-> +	might_sleep();
-> +
-> +	if (current->mm)
->  		might_lock_read(&current->mm->mmap_sem);
->  }
->  EXPORT_SYMBOL(might_fault);
-> -- 
-> MST
+Tony
