@@ -1,94 +1,37 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 16 May 2013 18:30:13 +0400
-Subject: [PATCH v3 1/1] ARM: shmobile: r8a7778: add I2C support
-In-Reply-To: <5194EC49.9000508@cogentembedded.com>
-References: <201304232012.57619.sergei.shtylyov@cogentembedded.com>
- <201304232015.59697.sergei.shtylyov@cogentembedded.com>
- <87txm3wwzh.wl%kuninori.morimoto.gx@renesas.com>
- <5194EC49.9000508@cogentembedded.com>
-Message-ID: <5194ED75.5000908@cogentembedded.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 May 2013 15:36:38 +0100
+Subject: [PATCH] ARM: remove the .vm_mm value from gate_vma.
+In-Reply-To: <1368702394-1737-1-git-send-email-steve.capper@linaro.org>
+References: <1368702394-1737-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130516143638.GR18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16-05-2013 18:25, I wrote:
+On Thu, May 16, 2013 at 12:06:34PM +0100, Steve Capper wrote:
+> If one reads /proc/$PID/smaps, the mmap_sem belonging to the
+> address space of the task being examined is locked for reading.
+> All the pages of the vmas belonging to the task's address space
+> are then walked with this lock held.
+> 
+> If a gate_vma is present in the architecture, it too is examined
+> by the fs/proc/task_mmu.c code. As gate_vma doesn't belong to the
+> address space of the task though, its pages are not walked.
+> 
+> A recent cleanup (commit f6604efe) of the gate_vma initialisation
+> code set the vm_mm value to &init_mm. Unfortunately a non-NULL
+> vm_mm value in the gate_vma will cause the task_mmu code to attempt
+> to walk the pages of the gate_vma (with no mmap-sem lock held). If
+> one enables Transparent Huge Page support and vm debugging, this
+> will then cause OOPses as pmd_trans_huge_lock is called without
+> mmap_sem being locked.
+> 
+> This patch removes the .vm_mm value from gate_vma, restoring the
+> original behaviour of the task_mmu code.
 
->> Basically, this patch is good for me.
->> But I have some comment.
+This looks fine - x86 also sets .vm_mm to NULL here.  So please put
+it in my patch system.  Does this need to be applied to stable
+kernels as well?  If so, please mark it with Cc: <stable@vger.kernel.org>
+(but do not send it to that address).  Also, it'd be worth checking
+which stable kernels it needs to be applied to.
 
->>> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-
->>> Add I2C clocks and platform devices for R8A7778 SoC.
->>> Don't forget to also add the peripheral clock which the I2C driver uses.
-
->>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->>> [Sergei: changed the registration function to
->>> platform_device_register_simple(),
->>> annotated I2C resources as '__initdata', regrouped MSTPxxx *enum*
->>> members, added
->>> the copyright.]
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->> (snip)
-[...]
-
->>> +/* I2C */
->>> +static struct resource i2c0_resources[] __initdata = {
->>> +    DEFINE_RES_MEM(0xffc70000, 0x1000),
->>> +    DEFINE_RES_IRQ(gic_iid(0x63)),
->>> +};
->>> +
->>> +static struct resource i2c1_resources[] __initdata = {
->>> +    DEFINE_RES_MEM(0xffc71000, 0x1000),
->>> +    DEFINE_RES_IRQ(gic_iid(0x6e)),
->>> +};
->>> +
->>> +static struct resource i2c2_resources[] __initdata = {
->>> +    DEFINE_RES_MEM(0xffc72000, 0x1000),
->>> +    DEFINE_RES_IRQ(gic_iid(0x6c)),
->>> +};
->>> +
->>> +static struct resource i2c3_resources[] __initdata = {
->>> +    DEFINE_RES_MEM(0xffc73000, 0x1000),
->>> +    DEFINE_RES_IRQ(gic_iid(0x6d)),
->>> +};
->>> +
->>> +#define r8a7778_register_i2c(idx)            \
->>> +    platform_device_register_simple(        \
->>> +        "i2c-rcar", idx,            \
->>> +        i2c##idx##_resources,            \
->>> +        ARRAY_SIZE(i2c##idx##_resources))
->>> +
->>>   /* USB PHY */
->>>   static struct resource usb_phy_resources[] __initdata = {
->>>       DEFINE_RES_MEM(0xffe70800, 0x100),
->>> @@ -294,6 +321,11 @@ void __init r8a7778_add_standard_devices
->>>
->>>       r8a7778_register_tmu(0);
->>>       r8a7778_register_tmu(1);
->>> +
->>> +    r8a7778_register_i2c(0);
->>> +    r8a7778_register_i2c(1);
->>> +    r8a7778_register_i2c(2);
->>> +    r8a7778_register_i2c(3);
->>>   }
-
->> i2c1 - i2c3 pins are pin-multi.
-
->     Ah, you mean there should be I2C related entries in the pinmux table
-> in the BOCK-W code?
-
-    On the other hand, we only use I2C0 on BOCK-W which as you say is 
-not pin-multiplexed.
-
->> I guess using r8a7778_add_i2c_devices(idx) from board code is better
->> method
-
->     Why? Not at all, I think, since we don't have the platform data.
-
-    Hm, you may be right here...
-
->> Best regards
->> ---
->> Kuninori Morimoto
-
-WBR, Sergei
+Thanks.
