@@ -1,39 +1,254 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 16 May 2013 11:57:07 +0200
-Subject: [PATCH v2 2/6] usb: phy: samsung: Use clk_get to get reference clock
+Date: Thu, 16 May 2013 11:57:08 +0200
+Subject: [PATCH v2 3/6] usb: phy: samsung: Consolidate reference clock rate
+ handling
 In-Reply-To: <1368698231-24268-1-git-send-email-t.figa@samsung.com>
 References: <1368698231-24268-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1368698231-24268-3-git-send-email-t.figa@samsung.com>
+Message-ID: <1368698231-24268-4-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to use devm_clk_get to get a clock that is being put
-at the end of the function.
-
-This patch changes the code getting reference clock to use clk_get
-instead of useless in this case devm_clk_get.
+This patch cleans up handling of reference clock rate in Samsung USB PHY
+drivers. It is mostly a cosmetic change but improves error handling in
+case of failing to get reference clock or invalid clock rate.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/usb/phy/phy-samsung-usb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/usb/phy/phy-samsung-usb.c  | 114 ++++++++++++++++++++++---------------
+ drivers/usb/phy/phy-samsung-usb.h  |   7 +++
+ drivers/usb/phy/phy-samsung-usb2.c |   8 ++-
+ drivers/usb/phy/phy-samsung-usb3.c |   6 +-
+ 4 files changed, 86 insertions(+), 49 deletions(-)
 
 diff --git a/drivers/usb/phy/phy-samsung-usb.c b/drivers/usb/phy/phy-samsung-usb.c
-index 7b118ee5..62cdb7e 100644
+index 62cdb7e..c40ea32 100644
 --- a/drivers/usb/phy/phy-samsung-usb.c
 +++ b/drivers/usb/phy/phy-samsung-usb.c
-@@ -175,9 +175,9 @@ int samsung_usbphy_get_refclk_freq(struct samsung_usbphy *sphy)
- 	 * external crystal clock XXTI
- 	 */
- 	if (sphy->drv_data->cpu_type == TYPE_EXYNOS5250)
--		ref_clk = devm_clk_get(sphy->dev, "ext_xtal");
-+		ref_clk = clk_get(sphy->dev, "ext_xtal");
- 	else
--		ref_clk = devm_clk_get(sphy->dev, "xusbxti");
-+		ref_clk = clk_get(sphy->dev, "xusbxti");
- 	if (IS_ERR(ref_clk)) {
- 		dev_err(sphy->dev, "Failed to get reference clock\n");
+@@ -162,13 +162,76 @@ int samsung_usbphy_set_type(struct usb_phy *phy,
+ }
+ EXPORT_SYMBOL_GPL(samsung_usbphy_set_type);
+ 
++int samsung_usbphy_rate_to_clksel_64xx(struct samsung_usbphy *sphy,
++							unsigned long rate)
++{
++	unsigned int clksel;
++
++	switch (rate) {
++	case 12 * MHZ:
++		clksel = PHYCLK_CLKSEL_12M;
++		break;
++	case 24 * MHZ:
++		clksel = PHYCLK_CLKSEL_24M;
++		break;
++	case 48 * MHZ:
++		clksel = PHYCLK_CLKSEL_48M;
++		break;
++	default:
++		dev_err(sphy->dev,
++			"Invalid reference clock frequency: %lu\n", rate);
++		return -EINVAL;
++	}
++
++	return clksel;
++}
++EXPORT_SYMBOL_GPL(samsung_usbphy_rate_to_clksel_64xx);
++
++int samsung_usbphy_rate_to_clksel_4x12(struct samsung_usbphy *sphy,
++							unsigned long rate)
++{
++	unsigned int clksel;
++
++	switch (rate) {
++	case 9600 * KHZ:
++		clksel = FSEL_CLKSEL_9600K;
++		break;
++	case 10 * MHZ:
++		clksel = FSEL_CLKSEL_10M;
++		break;
++	case 12 * MHZ:
++		clksel = FSEL_CLKSEL_12M;
++		break;
++	case 19200 * KHZ:
++		clksel = FSEL_CLKSEL_19200K;
++		break;
++	case 20 * MHZ:
++		clksel = FSEL_CLKSEL_20M;
++		break;
++	case 24 * MHZ:
++		clksel = FSEL_CLKSEL_24M;
++		break;
++	case 50 * MHZ:
++		clksel = FSEL_CLKSEL_50M;
++		break;
++	default:
++		dev_err(sphy->dev,
++			"Invalid reference clock frequency: %lu\n", rate);
++		return -EINVAL;
++	}
++
++	return clksel;
++}
++EXPORT_SYMBOL_GPL(samsung_usbphy_rate_to_clksel_4x12);
++
+ /*
+  * Returns reference clock frequency selection value
+  */
+ int samsung_usbphy_get_refclk_freq(struct samsung_usbphy *sphy)
+ {
+ 	struct clk *ref_clk;
+-	int refclk_freq = 0;
++	unsigned long rate;
++	int refclk_freq;
+ 
+ 	/*
+ 	 * In exynos5250 USB host and device PHY use
+@@ -183,52 +246,9 @@ int samsung_usbphy_get_refclk_freq(struct samsung_usbphy *sphy)
  		return PTR_ERR(ref_clk);
+ 	}
+ 
+-	if (sphy->drv_data->cpu_type == TYPE_EXYNOS5250) {
+-		/* set clock frequency for PLL */
+-		switch (clk_get_rate(ref_clk)) {
+-		case 9600 * KHZ:
+-			refclk_freq = FSEL_CLKSEL_9600K;
+-			break;
+-		case 10 * MHZ:
+-			refclk_freq = FSEL_CLKSEL_10M;
+-			break;
+-		case 12 * MHZ:
+-			refclk_freq = FSEL_CLKSEL_12M;
+-			break;
+-		case 19200 * KHZ:
+-			refclk_freq = FSEL_CLKSEL_19200K;
+-			break;
+-		case 20 * MHZ:
+-			refclk_freq = FSEL_CLKSEL_20M;
+-			break;
+-		case 50 * MHZ:
+-			refclk_freq = FSEL_CLKSEL_50M;
+-			break;
+-		case 24 * MHZ:
+-		default:
+-			/* default reference clock */
+-			refclk_freq = FSEL_CLKSEL_24M;
+-			break;
+-		}
+-	} else {
+-		switch (clk_get_rate(ref_clk)) {
+-		case 12 * MHZ:
+-			refclk_freq = PHYCLK_CLKSEL_12M;
+-			break;
+-		case 24 * MHZ:
+-			refclk_freq = PHYCLK_CLKSEL_24M;
+-			break;
+-		case 48 * MHZ:
+-			refclk_freq = PHYCLK_CLKSEL_48M;
+-			break;
+-		default:
+-			if (sphy->drv_data->cpu_type == TYPE_S3C64XX)
+-				refclk_freq = PHYCLK_CLKSEL_48M;
+-			else
+-				refclk_freq = PHYCLK_CLKSEL_24M;
+-			break;
+-		}
+-	}
++	rate = clk_get_rate(ref_clk);
++	refclk_freq = sphy->drv_data->rate_to_clksel(sphy, rate);
++
+ 	clk_put(ref_clk);
+ 
+ 	return refclk_freq;
+diff --git a/drivers/usb/phy/phy-samsung-usb.h b/drivers/usb/phy/phy-samsung-usb.h
+index 70a9cae..0336f6b 100644
+--- a/drivers/usb/phy/phy-samsung-usb.h
++++ b/drivers/usb/phy/phy-samsung-usb.h
+@@ -244,6 +244,8 @@ enum samsung_cpu_type {
+ 	TYPE_EXYNOS5250,
+ };
+ 
++struct samsung_usbphy;
++
+ /*
+  * struct samsung_usbphy_drvdata - driver data for various SoC variants
+  * @cpu_type: machine identifier
+@@ -268,6 +270,7 @@ struct samsung_usbphy_drvdata {
+ 	int hostphy_en_mask;
+ 	u32 devphy_reg_offset;
+ 	u32 hostphy_reg_offset;
++	int (*rate_to_clksel)(struct samsung_usbphy *, unsigned long);
+ };
+ 
+ /*
+@@ -325,3 +328,7 @@ extern void samsung_usbphy_cfg_sel(struct samsung_usbphy *sphy);
+ extern int samsung_usbphy_set_type(struct usb_phy *phy,
+ 					enum samsung_usb_phy_type phy_type);
+ extern int samsung_usbphy_get_refclk_freq(struct samsung_usbphy *sphy);
++extern int samsung_usbphy_rate_to_clksel_64xx(struct samsung_usbphy *sphy,
++							unsigned long rate);
++extern int samsung_usbphy_rate_to_clksel_4x12(struct samsung_usbphy *sphy,
++							unsigned long rate);
+diff --git a/drivers/usb/phy/phy-samsung-usb2.c b/drivers/usb/phy/phy-samsung-usb2.c
+index 45ffe03..802e738 100644
+--- a/drivers/usb/phy/phy-samsung-usb2.c
++++ b/drivers/usb/phy/phy-samsung-usb2.c
+@@ -413,7 +413,10 @@ static int samsung_usb2phy_probe(struct platform_device *pdev)
+ 	sphy->phy.label		= "samsung-usb2phy";
+ 	sphy->phy.init		= samsung_usb2phy_init;
+ 	sphy->phy.shutdown	= samsung_usb2phy_shutdown;
+-	sphy->ref_clk_freq	= samsung_usbphy_get_refclk_freq(sphy);
++
++	sphy->ref_clk_freq = samsung_usbphy_get_refclk_freq(sphy);
++	if (sphy->ref_clk_freq < 0)
++		return -EINVAL;
+ 
+ 	sphy->phy.otg		= otg;
+ 	sphy->phy.otg->phy	= &sphy->phy;
+@@ -443,18 +446,21 @@ static int samsung_usb2phy_remove(struct platform_device *pdev)
+ static const struct samsung_usbphy_drvdata usb2phy_s3c64xx = {
+ 	.cpu_type		= TYPE_S3C64XX,
+ 	.devphy_en_mask		= S3C64XX_USBPHY_ENABLE,
++	.rate_to_clksel		= samsung_usbphy_rate_to_clksel_64xx,
+ };
+ 
+ static const struct samsung_usbphy_drvdata usb2phy_exynos4 = {
+ 	.cpu_type		= TYPE_EXYNOS4210,
+ 	.devphy_en_mask		= EXYNOS_USBPHY_ENABLE,
+ 	.hostphy_en_mask	= EXYNOS_USBPHY_ENABLE,
++	.rate_to_clksel		= samsung_usbphy_rate_to_clksel_64xx,
+ };
+ 
+ static struct samsung_usbphy_drvdata usb2phy_exynos5 = {
+ 	.cpu_type		= TYPE_EXYNOS5250,
+ 	.hostphy_en_mask	= EXYNOS_USBPHY_ENABLE,
+ 	.hostphy_reg_offset	= EXYNOS_USBHOST_PHY_CTRL_OFFSET,
++	.rate_to_clksel		= samsung_usbphy_rate_to_clksel_4x12,
+ };
+ 
+ #ifdef CONFIG_OF
+diff --git a/drivers/usb/phy/phy-samsung-usb3.c b/drivers/usb/phy/phy-samsung-usb3.c
+index 133f3d0..c07bc32 100644
+--- a/drivers/usb/phy/phy-samsung-usb3.c
++++ b/drivers/usb/phy/phy-samsung-usb3.c
+@@ -279,7 +279,10 @@ static int samsung_usb3phy_probe(struct platform_device *pdev)
+ 	sphy->phy.init		= samsung_usb3phy_init;
+ 	sphy->phy.shutdown	= samsung_usb3phy_shutdown;
+ 	sphy->drv_data		= samsung_usbphy_get_driver_data(pdev);
+-	sphy->ref_clk_freq	= samsung_usbphy_get_refclk_freq(sphy);
++
++	sphy->ref_clk_freq = samsung_usbphy_get_refclk_freq(sphy);
++	if (sphy->ref_clk_freq < 0)
++		return -EINVAL;
+ 
+ 	spin_lock_init(&sphy->lock);
+ 
+@@ -305,6 +308,7 @@ static int samsung_usb3phy_remove(struct platform_device *pdev)
+ static struct samsung_usbphy_drvdata usb3phy_exynos5 = {
+ 	.cpu_type		= TYPE_EXYNOS5250,
+ 	.devphy_en_mask		= EXYNOS_USBPHY_ENABLE,
++	.rate_to_clksel		= samsung_usbphy_rate_to_clksel_4x12,
+ };
+ 
+ #ifdef CONFIG_OF
 -- 
 1.8.2.1
