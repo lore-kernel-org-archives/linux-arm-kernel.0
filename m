@@ -1,39 +1,51 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 16 May 2013 12:12:17 +0530
-Subject: [PATCH 10/39] dmaengine: ste_dma40: Correct copy/paste error
-In-Reply-To: <1368611522-9984-11-git-send-email-lee.jones@linaro.org>
+Date: Thu, 16 May 2013 12:13:42 +0530
+Subject: [PATCH 31/39] dmaengine: ste_dma40: Replace ST-E's home-brew
+ DMA direction defs with generic ones
+In-Reply-To: <20130516070638.GC3269@gmail.com>
 References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-11-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130516064217.GH14863@intel.com>
+ <1368611522-9984-32-git-send-email-lee.jones@linaro.org>
+ <20130516051701.GG27639@intel.com>
+ <20130516070638.GC3269@gmail.com>
+Message-ID: <20130516064342.GI14863@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 10:51:33AM +0100, Lee Jones wrote:
-> 'struct stedma40_half_channel_info's header comment says that it's
-> called 'struct stedma40_chan_cfg'. Let's straighten that out.
+On Thu, May 16, 2013 at 08:06:38AM +0100, Lee Jones wrote:
+> On Thu, 16 May 2013, Vinod Koul wrote:
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
+> > On Wed, May 15, 2013 at 10:51:54AM +0100, Lee Jones wrote:
+> > > STEDMA40_*_TO_* direction definitions are identical in all but name to
+> > > the pre-defined generic DMA_*_TO_* ones. Let's make things easy by not
+> > > duplicating such things.
+> > > 
+> > > Cc: Vinod Koul <vinod.koul@intel.com>
+> > > Cc: Dan Williams <djbw@fb.com>
+> > > Cc: Per Forlin <per.forlin@stericsson.com>
+> > > Cc: Rabin Vincent <rabin@rab.in>
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > Nice :)
+> 
+> :)
+> 
+> > 1) I dont see the STE macro getting removed, why do we need it
+> 
+> They are removed later in the set, once their use has been removed
+> from platform code and all the other drivers.
+> 
+> > 2) last i checked the direction values had a bit idfference b/w what you are
+> > using and what dmaengine defines, so hopefully that is taken care of..
+> 
+> Yes, no problem.
+> 
+> <place Ack here> ;)
 Acked-by: Vinod Koul <vinod.koul@intel.com>
 
 --
 ~Vinod
->  include/linux/platform_data/dma-ste-dma40.h |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/include/linux/platform_data/dma-ste-dma40.h b/include/linux/platform_data/dma-ste-dma40.h
-> index af0064e..288dc24 100644
-> --- a/include/linux/platform_data/dma-ste-dma40.h
-> +++ b/include/linux/platform_data/dma-ste-dma40.h
-> @@ -86,7 +86,7 @@ enum stedma40_xfer_dir {
->  
->  
->  /**
-> - * struct stedma40_chan_cfg - dst/src channel configuration
-> + * struct stedma40_half_channel_info - dst/src channel configuration
->   *
->   * @big_endian: true if the src/dst should be read as big endian
->   * @data_width: Data width of the src/dst hardware
 > -- 
-> 1.7.10.4
-> 
+> Lee Jones
+> Linaro ST-Ericsson Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
