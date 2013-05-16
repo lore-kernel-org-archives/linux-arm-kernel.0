@@ -1,58 +1,25 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 May 2013 09:20:35 -0700
-Subject: [PATCH] ARM: OMAP4: change the device names in usb_bind_phy
-In-Reply-To: <519503DA.5070303@iki.fi>
-References: <1366697656-14315-1-git-send-email-kishon@ti.com>
- <51936946.3030507@iki.fi> <20130516155857.GV5600@atomide.com>
- <519503DA.5070303@iki.fi>
-Message-ID: <20130516162034.GX5600@atomide.com>
+Date: Thu, 16 May 2013 09:21:45 -0700
+Subject: [PATCH] ARM: dts: OMAP2+: Simplify NAND support
+In-Reply-To: <1367331082-27944-1-git-send-email-jon-hunter@ti.com>
+References: <1367331082-27944-1-git-send-email-jon-hunter@ti.com>
+Message-ID: <20130516162144.GY5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@iki.fi> [130516 09:11]:
-> On 16/05/13 18:58, Tony Lindgren wrote:
-> > * Tomi Valkeinen <tomi.valkeinen@iki.fi> [130515 03:59]:
-> > 
-> > Just checking.. Do you have CONFIG_OMAP_OCP2SCP=y in your .config? Sounds
-> > like the some transceivers should depend on that for omap4.
+* Jon Hunter <jon-hunter@ti.com> [130430 07:16]:
+> Commit 8c8a777 (ARM: OMAP2+: Add function to read GPMC settings from
+> device-tree) added a device-tree property "gpmc,device-nand" to indicate
+> is the GPMC child device is NAND. This commit should have updated the
+> GPMC NAND documentation (Documentation/devicetree/bindings/mtd/gpmc-nand.txt)
+> to list the property "gpmc,device-nand" as a required property and also
+> updated the example. However, this property is redundant and not needed
+> because the GPMC child device node for NAND is called "nand". Therefore,
+> remove this property.
 > 
-> Yes, I have OCP2SCP=y.
+> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
 
-Hmm well no idea beyond that then. Sounds like Kishon should check it.
- 
-> >> The musb-hdrc id is wrong on overo also.
-> > 
-> > Hmm has there been a fix posted for that?
-> 
-> I couldn't find with a quick look. We debugged and discussed this on an irc
-> channel with Kishon, who said he'll send a patch. Changing the musb-hdrc ID
-> on overo fixed the issue, and it looks very similar to the error on 4430sdp.
-> The overo fix was just:
-> 
-> diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-> index 4ca6b68..a496774 100644
-> --- a/arch/arm/mach-omap2/board-overo.c
-> +++ b/arch/arm/mach-omap2/board-overo.c
-> @@ -472,7 +472,7 @@ static void __init overo_init(void)
->                                   mt46h32m32lf6_sdrc_params);
->         board_nand_init(overo_nand_partitions,
->                         ARRAY_SIZE(overo_nand_partitions), NAND_CS, 0, NULL);
-> -       usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
-> +       usb_bind_phy("musb-hdrc.1.auto", 0, "twl4030_usb");
->         usb_musb_init(NULL);
->  
->         usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
-> 
-> 
-> Is that ID "randomly" chosen? Doesn't that mean that it'll just get broken
-> every now and then?
-
-Yes if so it's not a good solution. For omap4 we'll be flipping over to
-be device tree only for v3.11, but that still leaves earlier omaps to
-worry about.
-
-I'll wait for a proper patch for the above for the -rc series after we
-hear from Kishon.
+Thanks applying into omap-for-v3.11/gpmc.
 
 Regards,
 
