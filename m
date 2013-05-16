@@ -1,52 +1,54 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 16 May 2013 18:07:24 +0200
-Subject: [PATCH] arm: mvebu: enable the third USB interface on OpenBlocks AX3
-Message-ID: <1368720444-29357-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 16 May 2013 18:08:50 +0200
+Subject: [PATCHv9 7/9] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130516155617.GH6563@titan.lakedaemon.net>
+References: <1368624323-24311-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1368624323-24311-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130516093312.GB2459@localhost>
+ <20130516154031.GF6563@titan.lakedaemon.net>
+ <20130516174903.3a7a07ef@skate>
+ <20130516155617.GH6563@titan.lakedaemon.net>
+Message-ID: <20130516180850.3622e1a8@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Besides the two "classic" USB interfaces with normal USB ports on the
-front side, the PlatHome OpenBlocks AX3 uses the third USB interface
-of the Marvell SoC in the mini-PCIe connector. This allows certain
-mini-PCIe cards to expose parts of their functionality as a USB
-peripheral.
+Dear Jason Cooper,
 
-This commit enables this third USB interface in the OpenBlocks AX3
-Device Tree, and also adds comments on top of the two other USB
-interfaces so that the Device Tree makes it clear which USB interface
-at the SoC level matches which USB interface visible on the board.
+On Thu, 16 May 2013 11:56:17 -0400, Jason Cooper wrote:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    9 +++++++++
- 1 file changed, 9 insertions(+)
+> > > > Building this showed a warning here. It seems you forgot
+> > > > to mark this one as __init.
+> > > 
+> > > Thomas, I'll fix this up when I pull this in, no need to resend. :)
+> > 
+> > I'll resend, because beyond this function pointed by Ezequiel, there
+> > are two other functions that can be marked __init. The one pointed by
+> > Ezequiel is important because it causes a section mismatch
+> > when !CONFIG_MODULES, because in this case platform_driver_probe() is
+> > __init (and this explains what I wasn't seeing the warning, since I'm
+> > building CONFIG_MODULES=y). The two other functions are more cosmetic,
+> > but good to have as well.
+> > 
+> > It would already been sent if git hadn't decided to do a 'git gc' right
+> > after my rebase. It's been gc-ing for quite some time now...
+> 
+> Dear boss,
+> 
+> I am in desperate need of a 500GB SSD on which to do my kernel work.
+> 
+> Thanks,
+> 
+> Kranky Kernel Developer
+> 
+> hehehe...
 
-diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index f14d36c..60a79e7 100644
---- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-+++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -134,13 +134,22 @@
- 				nr-ports = <2>;
- 				status = "okay";
- 			};
-+
-+			/* Front side USB 0 */
- 			usb at 50000 {
- 				status = "okay";
- 			};
-+
-+			/* Front side USB 1 */
- 			usb at 51000 {
- 				status = "okay";
- 			};
- 
-+			/* USB interface in the mini-PCIe connector */
-+			usb at 52000 {
-+				status = "okay";
-+			};
-+
- 			devbus-bootcs at 10400 {
- 				status = "okay";
- 				ranges = <0 0xf0000000 0x8000000>; /* @addr 0xf000000, size 0x8000000 */
+Adding boss in the Cc list :-)
+
+Thanks!
+
+Thomas
 -- 
-1.7.9.5
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
