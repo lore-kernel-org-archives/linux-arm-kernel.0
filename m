@@ -1,33 +1,20 @@
-From: gwenhael.goavec-merou@armadeus.com (Gwenhael Goavec-Merou)
-Date: Thu, 16 May 2013 12:25:31 +0200
-Subject: [PATCH] ARM: imx: apf51: add nfc support
-Message-ID: <1368699931-9977-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 16 May 2013 20:22:19 +0800
+Subject: [PATCH 08/33] drivers/i2c/busses: don't check resource with
+ devm_ioremap_resource
+In-Reply-To: <1368702961-4325-9-git-send-email-wsa@the-dreams.de>
+References: <1368702961-4325-1-git-send-email-wsa@the-dreams.de>
+ <1368702961-4325-9-git-send-email-wsa@the-dreams.de>
+Message-ID: <CAGsJ_4zAJpqxjg_rcO1WxS=GLii7YooPnsCgt40frf_5afiY6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2013/5/16 Wolfram Sang <wsa@the-dreams.de>:
+> devm_ioremap_resource does sanity checks on the given resource. No need to
+> duplicate this in the driver.
+>
+> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 
-Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
----
- arch/arm/boot/dts/imx51-apf51.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+Acked-by: Barry Song <Baohua.Song@csr.com>
 
-diff --git a/arch/arm/boot/dts/imx51-apf51.dts b/arch/arm/boot/dts/imx51-apf51.dts
-index 2bcf698..8f7f9ac 100644
---- a/arch/arm/boot/dts/imx51-apf51.dts
-+++ b/arch/arm/boot/dts/imx51-apf51.dts
-@@ -45,6 +45,13 @@
- 	status = "okay";
- };
- 
-+&nfc {
-+	nand-bus-width = <8>;
-+	nand-ecc-mode = "hw";
-+	nand-on-flash-bbt;
-+	status = "okay";
-+};
-+
- &uart3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart3_2>;
--- 
-1.8.1.5
+-barry
