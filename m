@@ -1,110 +1,116 @@
 From: holt@sgi.com (Robin Holt)
-Date: Thu, 16 May 2013 11:14:41 -0500
-Subject: [PATCH -v11 resend 02/11] Migrate shutdown/reboot to boot cpu.
+Date: Thu, 16 May 2013 11:14:46 -0500
+Subject: [PATCH -v11 resend 07/11] unicore32,
+ prepare reboot_mode for moving to generic kernel code.
 In-Reply-To: <1368720890-57711-1-git-send-email-holt@sgi.com>
 References: <1368720890-57711-1-git-send-email-holt@sgi.com>
-Message-ID: <1368720890-57711-3-git-send-email-holt@sgi.com>
+Message-ID: <1368720890-57711-8-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We recently noticed that reboot of a 1024 cpu machine takes approx 16
-minutes of just stopping the cpus.  The slowdown was tracked to commit
-f96972f.
-
-The current implementation does all the work of hot removing the cpus
-before halting the system.  We are switching to just migrating to the
-boot cpu and then continuing with shutdown/reboot.
-
-This also has the effect of not breaking x86's command line parameter for
-specifying the reboot cpu.  Note, this code was shamelessly copied from
-arch/x86/kernel/reboot.c with bits removed pertaining to the reboot_cpu
-command line parameter.
+This patch prepares for the moving the parsing of reboot= to the generic
+kernel code by making reboot_mode into a more generic form.
 
 Signed-off-by: Robin Holt <holt@sgi.com>
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
 To: Andrew Morton <akpm@linux-foundation.org>
-Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
 Cc: Russ Anderson <rja@sgi.com>
 Cc: Robin Holt <holt@sgi.com>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+Cc: H. Peter Anvin <hpa@zytor.com>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Cc: the arch/x86 maintainers <x86@kernel.org>
 Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
-Cc: <stable@vger.kernel.org>
-
+Acked-by: Guan Xuetao <gxt@mprc.pku.edu.cn>
 ---
 
 Changes since -v8
- - Change stack parameter to make future patches cleaner.
-
-Changes since -v6:
- - Add #define for PF_THREAD_BOUND as compatibility to make stable easier.
- - Fixup s/reboot_cpu_id/reboot_cpu/
+ - Switched from using REBOOT_WARM/COLD to HARD/SOFT.
 ---
- kernel/sys.c | 29 ++++++++++++++++++++++++++---
- 1 file changed, 26 insertions(+), 3 deletions(-)
+ arch/unicore32/kernel/process.c | 10 +++++-----
+ arch/unicore32/kernel/setup.h   |  2 +-
+ arch/unicore32/mm/mmu.c         |  2 +-
+ include/linux/reboot.h          |  2 ++
+ 4 files changed, 9 insertions(+), 7 deletions(-)
 
-diff --git a/kernel/sys.c b/kernel/sys.c
-index b95d3c7..2bbd9a7 100644
---- a/kernel/sys.c
-+++ b/kernel/sys.c
-@@ -362,6 +362,29 @@ int unregister_reboot_notifier(struct notifier_block *nb)
+diff --git a/arch/unicore32/kernel/process.c b/arch/unicore32/kernel/process.c
+index c944769..93dd035 100644
+--- a/arch/unicore32/kernel/process.c
++++ b/arch/unicore32/kernel/process.c
+@@ -51,14 +51,14 @@ void arch_cpu_idle(void)
+ 	local_irq_enable();
  }
- EXPORT_SYMBOL(unregister_reboot_notifier);
  
-+/* Add backwards compatibility for stable trees. */
-+#ifndef PF_NO_SETAFFINITY
-+#define PF_NO_SETAFFINITY		PF_THREAD_BOUND
-+#endif
-+
-+static void migrate_to_reboot_cpu(void)
-+{
-+	/* The boot cpu is always logical cpu 0 */
-+	int cpu = 0;
-+
-+	cpu_hotplug_disable();
-+
-+	/* Make certain the cpu I'm about to reboot on is online */
-+	if (!cpu_online(cpu))
-+		cpu = cpumask_first(cpu_online_mask);
-+
-+	/* Prevent races with other tasks migrating this task */
-+	current->flags |= PF_NO_SETAFFINITY;
-+
-+	/* Make certain I only run on the appropriate processor */
-+	set_cpus_allowed_ptr(current, cpumask_of(cpu));
-+}
-+
- /**
-  *	kernel_restart - reboot the system
-  *	@cmd: pointer to buffer containing command to execute for restart
-@@ -373,7 +396,7 @@ EXPORT_SYMBOL(unregister_reboot_notifier);
- void kernel_restart(char *cmd)
+-static char reboot_mode = 'h';
++static enum reboot_mode reboot_mode = REBOOT_HARD;
+ 
+ int __init reboot_setup(char *str)
  {
- 	kernel_restart_prepare(cmd);
--	disable_nonboot_cpus();
-+	migrate_to_reboot_cpu();
- 	syscore_shutdown();
- 	if (!cmd)
- 		printk(KERN_EMERG "Restarting system.\n");
-@@ -400,7 +423,7 @@ static void kernel_shutdown_prepare(enum system_states state)
- void kernel_halt(void)
+-	reboot_mode = str[0];
++	if ('s' == str[0])
++		reboot_mode = REBOOT_SOFT;
+ 	return 1;
+ }
+-
+ __setup("reboot=", reboot_setup);
+ 
+ void machine_halt(void)
+@@ -88,7 +88,7 @@ void machine_restart(char *cmd)
+ 	 * we may need it to insert some 1:1 mappings so that
+ 	 * soft boot works.
+ 	 */
+-	setup_mm_for_reboot(reboot_mode);
++	setup_mm_for_reboot();
+ 
+ 	/* Clean and invalidate caches */
+ 	flush_cache_all();
+@@ -102,7 +102,7 @@ void machine_restart(char *cmd)
+ 	/*
+ 	 * Now handle reboot code.
+ 	 */
+-	if (reboot_mode == 's') {
++	if (reboot_mode == REBOOT_SOFT) {
+ 		/* Jump into ROM at address 0xffff0000 */
+ 		cpu_reset(VECTORS_BASE);
+ 	} else {
+diff --git a/arch/unicore32/kernel/setup.h b/arch/unicore32/kernel/setup.h
+index 30f749d..f5c51b8 100644
+--- a/arch/unicore32/kernel/setup.h
++++ b/arch/unicore32/kernel/setup.h
+@@ -22,7 +22,7 @@ extern void puv3_ps2_init(void);
+ extern void pci_puv3_preinit(void);
+ extern void __init puv3_init_gpio(void);
+ 
+-extern void setup_mm_for_reboot(char mode);
++extern void setup_mm_for_reboot(void);
+ 
+ extern char __stubs_start[], __stubs_end[];
+ extern char __vectors_start[], __vectors_end[];
+diff --git a/arch/unicore32/mm/mmu.c b/arch/unicore32/mm/mmu.c
+index 43c20b4..4f5a532 100644
+--- a/arch/unicore32/mm/mmu.c
++++ b/arch/unicore32/mm/mmu.c
+@@ -445,7 +445,7 @@ void __init paging_init(void)
+  * the user-mode pages.  This will then ensure that we have predictable
+  * results when turning the mmu off
+  */
+-void setup_mm_for_reboot(char mode)
++void setup_mm_for_reboot(void)
  {
- 	kernel_shutdown_prepare(SYSTEM_HALT);
--	disable_nonboot_cpus();
-+	migrate_to_reboot_cpu();
- 	syscore_shutdown();
- 	printk(KERN_EMERG "System halted.\n");
- 	kmsg_dump(KMSG_DUMP_HALT);
-@@ -419,7 +442,7 @@ void kernel_power_off(void)
- 	kernel_shutdown_prepare(SYSTEM_POWER_OFF);
- 	if (pm_power_off_prepare)
- 		pm_power_off_prepare();
--	disable_nonboot_cpus();
-+	migrate_to_reboot_cpu();
- 	syscore_shutdown();
- 	printk(KERN_EMERG "Power down.\n");
- 	kmsg_dump(KMSG_DUMP_POWEROFF);
+ 	unsigned long base_pmdval;
+ 	pgd_t *pgd;
+diff --git a/include/linux/reboot.h b/include/linux/reboot.h
+index 37d56c3..ca29a6f 100644
+--- a/include/linux/reboot.h
++++ b/include/linux/reboot.h
+@@ -13,6 +13,8 @@
+ enum reboot_mode {
+ 	REBOOT_COLD = 0,
+ 	REBOOT_WARM,
++	REBOOT_HARD,
++	REBOOT_SOFT,
+ };
+ 
+ extern int register_reboot_notifier(struct notifier_block *);
 -- 
 1.8.2.1
