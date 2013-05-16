@@ -1,96 +1,30 @@
-From: Baohua.Song@csr.com (Barry Song)
-Date: Thu, 16 May 2013 11:17:09 +0800
-Subject: [PATCH] pinctrl: sirf: save the status in suspend and restore after
- resuming
-Message-ID: <1368674229-11813-1-git-send-email-Baohua.Song@csr.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Thu, 16 May 2013 13:22:53 +1000
+Subject: linux-next: manual merge of the renesas tree with Linus' tree
+Message-ID: <20130516132253.8865ca7b6503bd6fe9e6b05a@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch saves the status of pinctrl registers and restore them while
-resuming. this makes all drivers have coherent status for pinmux after
-suspending and resuming.
+Hi Simon,
 
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/pinctrl/sirf/pinctrl-sirf.c | 56 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+Today's linux-next merge of the renesas tree got a conflict in
+arch/arm/mach-shmobile/board-lager.c between commit 65be2de17aae ("ARM:
+shmobile: use r8a7790 timer setup code on Lager") from Linus' tree and
+commit 993340a1390d ("ARM: shmobile: use r8a7790 timer setup code on
+Lager") from the renesas tree.
 
-diff --git a/drivers/pinctrl/sirf/pinctrl-sirf.c b/drivers/pinctrl/sirf/pinctrl-sirf.c
-index b4727db..0677e19 100644
---- a/drivers/pinctrl/sirf/pinctrl-sirf.c
-+++ b/drivers/pinctrl/sirf/pinctrl-sirf.c
-@@ -390,11 +390,67 @@ out_no_rsc_remap:
- 	return ret;
- }
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int sirfsoc_pinmux_suspend_noirq(struct device *dev)
-+{
-+	int i, j;
-+	struct sirfsoc_pmx *spmx = dev_get_drvdata(dev);
-+
-+	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
-+		for (j = 0; j < SIRFSOC_GPIO_BANK_SIZE; j++) {
-+			spmx->gpio_regs[i][j] = readl(spmx->gpio_virtbase +
-+				SIRFSOC_GPIO_CTRL(i, j));
-+		}
-+		spmx->ints_regs[i] = readl(spmx->gpio_virtbase +
-+			SIRFSOC_GPIO_INT_STATUS(i));
-+		spmx->paden_regs[i] = readl(spmx->gpio_virtbase +
-+			SIRFSOC_GPIO_PAD_EN(i));
-+	}
-+	spmx->dspen_regs = readl(spmx->gpio_virtbase + SIRFSOC_GPIO_DSP_EN0);
-+
-+	for (i = 0; i < 3; i++)
-+		spmx->rsc_regs[i] = readl(spmx->rsc_virtbase + 4 * i);
-+
-+	return 0;
-+}
-+
-+static int sirfsoc_pinmux_resume_noirq(struct device *dev)
-+{
-+	int i, j;
-+	struct sirfsoc_pmx *spmx = dev_get_drvdata(dev);
-+
-+	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
-+		for (j = 0; j < SIRFSOC_GPIO_BANK_SIZE; j++) {
-+			writel(spmx->gpio_regs[i][j], spmx->gpio_virtbase +
-+				SIRFSOC_GPIO_CTRL(i, j));
-+		}
-+		writel(spmx->ints_regs[i], spmx->gpio_virtbase +
-+			SIRFSOC_GPIO_INT_STATUS(i));
-+		writel(spmx->paden_regs[i], spmx->gpio_virtbase +
-+			SIRFSOC_GPIO_PAD_EN(i));
-+	}
-+	writel(spmx->dspen_regs, spmx->gpio_virtbase + SIRFSOC_GPIO_DSP_EN0);
-+
-+	for (i = 0; i < 3; i++)
-+		writel(spmx->rsc_regs[i], spmx->rsc_virtbase + 4 * i);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops sirfsoc_pinmux_pm_ops = {
-+	.suspend_noirq = sirfsoc_pinmux_suspend_noirq,
-+	.resume_noirq = sirfsoc_pinmux_resume_noirq,
-+};
-+#endif
-+
- static struct platform_driver sirfsoc_pinmux_driver = {
- 	.driver = {
- 		.name = DRIVER_NAME,
- 		.owner = THIS_MODULE,
- 		.of_match_table = pinmux_ids,
-+#ifdef CONFIG_PM_SLEEP
-+		.pm = &sirfsoc_pinmux_pm_ops,
-+#endif
- 	},
- 	.probe = sirfsoc_pinmux_probe,
- };
+These are the same patch but different commits :-( and there are further
+commits touching this file in the renesas tree.  Please clean up your
+tree and remove anything that has already gone upstream as different
+patches.  I used the renesas tree version of this file.
+
 -- 
-1.8.2.3
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130516/881fe7fe/attachment.sig>
