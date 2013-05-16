@@ -1,49 +1,158 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 May 2013 14:44:31 -0700
-Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
-In-Reply-To: <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
-References: <20130513205302.GA3157@blackmetal.musicnaut.iki.fi>
- <20130516180933.GG5600@atomide.com>
- <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
-Message-ID: <20130516214430.GN5600@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 May 2013 00:09:46 +0200
+Subject: [PATCH V2 1/2] ARM: mmc: bcm281xx SDHCI driver
+In-Reply-To: <1368200883-15668-1-git-send-email-csd@broadcom.com>
+References: <1368200883-15668-1-git-send-email-csd@broadcom.com>
+Message-ID: <201305170009.46244.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Aaro Koskinen <aaro.koskinen@iki.fi> [130516 14:05]:
-> On Thu, May 16, 2013 at 11:09:34AM -0700, Tony Lindgren wrote:
-> > * Aaro Koskinen <aaro.koskinen@iki.fi> [130513 13:58]:
-> > > I tested 3.10-rc1 on OMAP1 / Nokia 770, and Retu MFD probe is broken:
-> > > 
-> > > [    2.264221] retu-mfd 2-0001: Retu v3.2 found
-> > > [    2.281951] retu-mfd 2-0001: Failed to allocate IRQs: -12
-> > > [    2.300140] retu-mfd: probe of 2-0001 failed with error -12
-> > > 
-> > > The error is coming from regmap code. According to git bisect, it is
-> > > caused by:
-> > > 
-> > > 	commit ede4d7a5b9835510fd1f724367f68d2fa4128453
-> > > 	Author: Jon Hunter <jon-hunter@ti.com>
-> > > 	Date:   Fri Mar 1 11:22:47 2013 -0600
-> > > 
-> > > 	    gpio/omap: convert gpio irq domain to linear mapping
-> > > 
-> > > The commit does not anymore revert cleanly, and I haven't yet tried
-> > > crafting a manual revert, so any fix proposals/ideas are welcome...
-> > 
-> > Hmm this might be a bit trickier to fix. Obviously the real solution
-> > is to convert omap1 to SPARSE_IRQ like we did for omap2+.
-> > 
-> > For the -rc cycle, it might be possible to fix this by adding a
-> > different irq_to_gpio() and gpio_to_irq() functions for omap1.
-> 
-> The commit reverts cleanly if we also revert
-> 3513cdeccc647d41c4a9ff923af17deaaac04a66 (gpio/omap: optimise interrupt
-> service routine), which seems to be just some minor optimization. The
-> result is below, and with it 770 works again.
+On Friday 10 May 2013, Christian Daudt wrote:
+> +
+> +struct sdhci_bcm_kona_cfg {
+> +	unsigned int	max_freq;
+> +	int		is_8bit;
+> +	int		irq;
+> +	int		cd_gpio;
+> +	int		wp_gpio;
+> +	int		non_removable;
+> +};
 
-Hmm in this case it seems that we should just fix it rather than go back
-to the old code, so let's take a look at that first.
+I see no use for this structure to be separate: a lot of the fields are
+duplicated in the sdhci_host, or should just get merged into
+sdhci_bcm_kona_dev.
 
-Regards,
+> +struct sdhci_bcm_kona_dev {
+> +	struct sdhci_bcm_kona_cfg *cfg;
+> +	struct device *dev;
+> +	struct sdhci_host *host;
+> +	struct clk *peri_clk;
+> +	struct clk *sleep_clk;
+> +};
 
-Tony
+The *dev and *host members in this structure are redundant, just
+allocate it together with sdhci_host and use use container_of()
+to get from the sdhci_host back it it.
+
+> +static void sdhci_bcm_kona_sd_init(struct sdhci_host *host)
+> +{
+> +	unsigned int val;
+> +
+> +	/* enable the interrupt from the IP core */
+> +	val = sdhci_readl(host, KONA_SDHOST_COREIMR);
+> +	val |= KONA_SDHOST_IP;
+> +	sdhci_writel(host, val, KONA_SDHOST_COREIMR);
+> +
+> +	/* Enable the AHB clock gating module to the host */
+> +	val = sdhci_readl(host, KONA_SDHOST_CORECTRL);
+> +	val |= KONA_SDHOST_EN;
+> +
+> +	/*
+> +	 * Back-to-Back register write needs a delay of 1ms at bootup (min 10uS)
+> +	 * Back-to-Back writes to same register needs delay when SD bus clock
+> +	 * is very low w.r.t AHB clock, mainly during boot-time and during card
+> +	 * insert-removal.
+> +	 */
+> +	mdelay(1);
+> +	sdhci_writel(host, val, KONA_SDHOST_CORECTRL);
+> +}
+
+Why not use msleep() instead of mdelay() here?
+
+> +static int sdhci_bcm_kona_sd_card_emulate(struct sdhci_host *host, int insert)
+> +{
+> +	struct sdhci_pltfm_host *pltfm_priv = sdhci_priv(host);
+> +	struct sdhci_bcm_kona_dev *kona_dev = pltfm_priv->priv;
+> +	u32 val;
+> +	unsigned long flags;
+> +
+> +	/* this function can be called from various contexts including ISR */
+> +	spin_lock_irqsave(&host->lock, flags);
+> +	/* Ensure SD bus scanning to detect media change */
+> +	host->mmc->rescan_disable = 0;
+> +
+> +	/*
+> +	 * Back-to-Back register write needs a delay of min 10uS.
+> +	 * Back-to-Back writes to same register needs delay when SD bus clock
+> +	 * is very low w.r.t AHB clock, mainly during boot-time and during card
+> +	 * insert-removal.
+> +	 * We keep 20uS
+> +	 */
+> +	udelay(20);
+> +	val = sdhci_readl(host, KONA_SDHOST_CORESTAT);
+
+Does the delay have to be done with interrupts disabled? That is not particularly
+nice.
+
+I hope the hardware designers have been appropriately punished for the creating
+such crap.
+> +static void sdhci_bcm_kona_init_74_clocks(struct sdhci_host *host,
+> +				u8 power_mode)
+> +{
+> +	if (power_mode == MMC_POWER_OFF)
+> +		return;
+> +	else
+> +		mdelay(10);
+> +}
+
+This requires at the minimum a comment about why the mdelay is needed.
+Maybe we can change the set_ios function so we never need to call it
+in atomic context.
+
+> +static struct sdhci_bcm_kona_cfg * __init sdhci_bcm_kona_parse_dt(
+> +			struct platform_device *pdev)
+> +{
+> +	struct sdhci_bcm_kona_cfg *cfg;
+> +	struct device_node *np = pdev->dev.of_node;
+> +	u32 temp;
+
+fold this function into probe()
+
+> +	if (!np)
+> +		return NULL;
+
+impossible
+
+> +	cfg = devm_kzalloc(&pdev->dev, sizeof(*cfg), GFP_KERNEL);
+> +	if (!cfg) {
+> +		dev_err(&pdev->dev, "Can't allocate platform cfg\n");
+> +		return NULL;
+> +	}
+
+Not needed
+
+> +static int __init sdhci_bcm_kona_probe(struct platform_device *pdev)
+> +{
+> +	const struct of_device_id *match;
+
+constant, so not needed.
+
+> +	struct sdhci_bcm_kona_cfg *kona_cfg = NULL;
+
+No need to initialize this.
+
+> +	const struct sdhci_pltfm_data *plat_data;
+
+make it global.
+
+> +	struct sdhci_bcm_kona_dev *kona_dev = NULL;
+
+No need to initialize this.
+
+> +	kona_dev = devm_kzalloc(dev, sizeof(*kona_dev), GFP_KERNEL);
+> +	if (!kona_dev) {
+> +		dev_err(dev, "Can't allocate kona_dev\n");
+> +		ret = -ENOMEM;
+> +		goto err_pltfm_free;
+> +	}
+
+It is rather silly to have the base sdhci code allocate extra
+memory for the platform drivers but then require an extra allocation.
+Better change the sdhci_pltfm_init function to let you pass the extra
+allocation size.
+
+> +MODULE_AUTHOR("Broadcom");
+
+No person?
+
+	Arnd
