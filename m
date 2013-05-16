@@ -1,61 +1,60 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 16 May 2013 14:55:46 +0200
-Subject: [PATCH v2 1/2] clk: Disable unused clocks after deferred probing
- is done
-In-Reply-To: <519461BB.3010209@codeaurora.org>
-References: <1368124502-18830-1-git-send-email-skannan@codeaurora.org>
- <519461BB.3010209@codeaurora.org>
-Message-ID: <CAPDyKFqyvfuttH=rGLxBCemgRMq4N3fVktom+RB2wm72NruaDA@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 16 May 2013 17:17:30 +0400
+Subject: [PATCH] ARM: davinci: dma: Convert to devm_* api
+In-Reply-To: <1368687502-15551-1-git-send-email-prabhakar.csengg@gmail.com>
+References: <1368687502-15551-1-git-send-email-prabhakar.csengg@gmail.com>
+Message-ID: <5194DC6A.8080609@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 May 2013 06:34, Saravana Kannan <skannan@codeaurora.org> wrote:
-> On 05/09/2013 11:35 AM, Saravana Kannan wrote:
->>
->> With deferred probing, late_initcall() is too soon to declare a clock as
->> unused. Wait for deferred probing to finish before declaring a clock as
->> unused. Since deferred probing is done in late_initcall(), do the unused
->> check to late_initcall_sync.
->>
->> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
->> ---
->>   drivers/clk/clk.c |    2 +-
->>   1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index fe4055f..5ecb64c 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -534,7 +534,7 @@ static int clk_disable_unused(void)
->>
->>         return 0;
->>   }
->> -late_initcall(clk_disable_unused);
->> +late_initcall_sync(clk_disable_unused);
+Hello.
 
-Without giving this too much thinking... Will boot time be affected
-with this change?
+On 16-05-2013 10:58, Lad Prabhakar wrote:
 
-Kind regards
-Ulf Hansson
+> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
 
->>
->>   /***    helper functions   ***/
+> Use devm_ioremap_resource instead of reques_mem_region()/ioremap() and
+> devm_request_irq() instead of request_irq().
+
+> This ensures more consistent error values and simplifies error paths.
+
+> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+> ---
+>   NOte:- Boot tested on Logic-PD OMAP-L138 EVM
+
+>   arch/arm/mach-davinci/dma.c |   63 ++++++++++++++++--------------------------
+>   1 files changed, 24 insertions(+), 39 deletions(-)
+
+> diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
+> index 45b7c71..aeda496 100644
+> --- a/arch/arm/mach-davinci/dma.c
+> +++ b/arch/arm/mach-davinci/dma.c
+[...]
+> @@ -1422,25 +1421,16 @@ static int __init edma_probe(struct platform_device *pdev)
+>   			found = 1;
+>   		}
 >
->
-> Mike,
->
-> Thoughts? Picking it up? Removing the existing auto-disable code (I think
-> they are still useful)?
->
-> -Saravana
->
->
-> --
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> -		len[j] = resource_size(r[j]);
+> -
+> -		r[j] = request_mem_region(r[j]->start, len[j],
+> -			dev_name(&pdev->dev));
+> -		if (!r[j]) {
+> -			status = -EBUSY;
+> -			goto fail1;
+> -		}
+> -
+> -		edmacc_regs_base[j] = ioremap(r[j]->start, len[j]);
+> -		if (!edmacc_regs_base[j]) {
+> +		edmacc_regs_base[j] = devm_ioremap_resource(&pdev->dev, r[j]);
+> +		if (IS_ERR(edmacc_regs_base[j])) {
+>   			status = -EBUSY;
+
+    And you call that "more consistent error values"? Why not:
+
+			status = PTR_ERR(edmacc_regs_base[j]);
+
+>  		edma_cc[j] = kzalloc(sizeof(struct edma), GFP_KERNEL);
+
+    Maybe it's worth using devm_kzalloc() too?
+
+WBR, Sergei
