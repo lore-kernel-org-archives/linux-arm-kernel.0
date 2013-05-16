@@ -1,104 +1,24 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Thu, 16 May 2013 08:29:23 -0400
-Subject: [PATCHv2 3/3] arm: dts: add bandgap entry for OMAP4460 devices
-In-Reply-To: <20130515165726.GK22508@game.jcrosoft.org>
-References: <1368629928-6723-1-git-send-email-eduardo.valentin@ti.com>
- <1368629928-6723-4-git-send-email-eduardo.valentin@ti.com>
- <5193A875.1020000@ti.com> <5193B9AA.7020507@ti.com>
- <20130515165726.GK22508@game.jcrosoft.org>
-Message-ID: <5194D123.4060403@ti.com>
+From: amit.shah@redhat.com (Amit Shah)
+Date: Thu, 16 May 2013 18:07:46 +0530
+Subject: [PATCH V2 1/3] virtio: console: Add emergency writeonly register
+ to config space
+In-Reply-To: <1367842791-30285-2-git-send-email-pranavkumar@linaro.org>
+References: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
+ <1367842791-30285-2-git-send-email-pranavkumar@linaro.org>
+Message-ID: <20130516123746.GA4744@amit.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-05-2013 12:57, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 12:36 Wed 15 May     , Eduardo Valentin wrote:
->> On 15-05-2013 11:23, Benoit Cousson wrote:
->>> Hi Eduardo,
->>>
->>> On 05/15/2013 04:58 PM, Eduardo Valentin wrote:
->>>> Include bandgap devices for OMAP4460 devices.
->>>>
->>>> Cc: "Beno?t Cousson" <b-cousson@ti.com>
->>>> Cc: Tony Lindgren <tony@atomide.com>
->>>> Cc: Russell King <linux@arm.linux.org.uk>
->>>> Cc: linux-omap at vger.kernel.org
->>>> Cc: devicetree-discuss at lists.ozlabs.org
->>>> Cc: linux-arm-kernel at lists.infradead.org
->>>> Cc: linux-kernel at vger.kernel.org
->>>> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
->>>> ---
->>>>  arch/arm/boot/dts/omap4460.dtsi | 9 +++++++++
->>>>  1 file changed, 9 insertions(+)
->>>>
->>>> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
->>>> index 2cf227c..e5bfbfe 100644
->>>> --- a/arch/arm/boot/dts/omap4460.dtsi
->>>> +++ b/arch/arm/boot/dts/omap4460.dtsi
->>>> @@ -29,4 +29,13 @@
->>>>  			     <0 55 0x4>;
->>>>  		ti,hwmods = "debugss";
->>>>  	};
->>>> +
->>>> +	bandgap {
->>>> +		reg = <0x4a002260 0x4
->>>> +			0x4a00232C 0x4
->>>> +			0x4a002378 0x18>;
->>>> +		compatible = "ti,omap4460-bandgap";
->>>> +		interrupts = <0 126 4>; /* talert */
->>>> +		ti,tshut-gpio = <86>;
->>
->>
->>
->>>
->>> Why do you need a custom attribute for GPIO? Cannot you use the standard
->>> one?
->>
->> I believe it was by your suggestion :-), during the first attempts to
->> send this driver. But could not find the thread link :-( sorry.
->>
->>
->> I guess the reasoning to mark it as a ti specific is because it will be
->> used as IRQ line to treat thermal shutdown (in SW).
-> so use interrup-parent
-
-
-Jean-Christophe,
-
-That will change the controller and break the configuration for the
-other IRQ line, coming from GIC.
-
->>
->>>
->>> Where is the gpio controller phandle?
->>>
->>> Usually it looks like this:
->>>
->>> 	gpios = <&gpio1 8 0>;
->>>
->>>
->>> Regards,
->>> Benoit
->>>
->>>
->>>
->>
->>
+On (Mon) 06 May 2013 [17:49:49], Pranavkumar Sawargaonkar wrote:
+> This patch adds an emerg_wr register (writeonly) in config space
+> of virtio console device which can be used for debugging.
 > 
-> 
-> 
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-> 
+> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+> Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
 
+OK, this change by itself looks harmless.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 295 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130516/88c47180/attachment.sig>
+Acked-by: Amit Shah <amit.shah@redhat.com>
+
+		Amit
