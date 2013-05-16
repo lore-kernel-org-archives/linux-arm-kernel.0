@@ -1,63 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 16 May 2013 12:17:37 -0600
-Subject: Naming convention DSI + device tree
-In-Reply-To: <20130516071537.GA13573@mail.o2s.ch>
-References: <20130514181745.GA2762@mail.o2s.ch>
- <51940C22.4050802@wwwdotorg.org> <20130516071537.GA13573@mail.o2s.ch>
-Message-ID: <519522C1.5010107@wwwdotorg.org>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 16 May 2013 13:18:10 -0500
+Subject: [PATCH v4] ARM:dts:omap4-panda: Update the LED support for the
+ panda DTS
+In-Reply-To: <5194FCDD.8080209@ti.com>
+References: <1368636386-17138-1-git-send-email-dmurphy@ti.com>
+ <20130515170516.GA6135@kahuna> <5194FCDD.8080209@ti.com>
+Message-ID: <CAGo_u6pX+DdVNWqdPXDChzMr27YAXL_Zvt7DxWBijOCW0rXpkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2013 01:15 AM, David Lanzend?rfer wrote:
-> On Wed, May 15, 2013 at 04:28:50PM -0600, Stephen Warren wrote:
->> On 05/14/2013 12:17 PM, David Lanzend?rfer wrote:
->>> Hello I have the following issue: In order to make the DSI
->>> controller react at all,
->> 
->> Hmm. In the upstream kernel, we don't even have a DSI driver at
->> all for Tegra, so control over the panel itself is likely the
->> least of your worries for now.
-> 
-> Is there a patch set pending for merge into upstream which will
-> provide this support? And if yes, where can I find these pending
-> patches? I'd like to build up my code based on already existing
-> work which is expected to be in upstream at some later point of
-> time.
+On Thu, May 16, 2013 at 10:35 AM, Dan Murphy <dmurphy@ti.com> wrote:
+> I am not sure you really want to do this.
+> If I make the pinctrl part of the led structure then the only way the gpio_wk7 on a1-a3 to be configured is when
+> the CONFIG_LEDS_GPIO flag is set.
+>
+> Do you really want that dependency?  You did say it was a key fix
+> At least this way the pins are configured regardless of that flag.
 
-No, we haven't yet posted DSI support upstream.
+That is better as the system will be left in the pinmux configuration
+handed over from bootloader.
 
->>> I need to pass him a certain combination of pin states. Until
->>> now within the code of the original android kernel which was
->>> using board files this has just been done by doing bit
->>> banging.
->>> 
->>> namely: gpio_set_value(tf201_lvds_shutdown, 1); ... Now with a
->>> device tree comes the question: Where should I put this?
->> 
->> Likely, you will need to create a DT binding that represents the 
->> particular panel model that you have, and make the Tegra display 
->> controller node refer to that panel node. The panel node would
->> need properties to describe the various GPIOs used to control the
->> panel. Then, you'd want to write a panel-specific driver that
->> handles that device tree node.
-> 
-> That was my thought too. Where should I put this panel-specific
-> driver?
+The point being, muxing up pins even when not needed(config switched
+off) has no real benefit - in this case albeit, the default mux was
+causing a bug.
+pinctrl IMHO should be considered as any other resource, if it is not
+mandatory for boot, and needed only for a device functionality when
+probed, it should done there only.
 
-Honestly, I'm not sure. I assume (and it is just an assumption) that
-if you look at the CDF patches, you should find some examples of panel
-drivers that use it, although perhaps there aren't any yet...
-
->> All of this will likely need to be integrated with the upcoming
->> Common Display Framework.
-> 
-> Is this upcoming CDF included within your "linux-next_common"
-> branch?
-
-No. That branch of mine is basd on linux-next, so whatever is in
-linux-next is in my branch, and I certainly haven't applied the CDF
-locally.
-
-I believe the CDF has been posted to various mailing lists a few
-times, but it isn't checked in yet since there isn't a final version.
-I CC'd Alex; he might know the status better than me.
+just my 2 cents.
