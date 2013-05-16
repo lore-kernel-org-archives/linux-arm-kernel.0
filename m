@@ -1,45 +1,48 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 15 May 2013 21:34:03 -0700
-Subject: [PATCH v2 1/2] clk: Disable unused clocks after deferred probing
- is done
-In-Reply-To: <1368124502-18830-1-git-send-email-skannan@codeaurora.org>
-References: <1368124502-18830-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <519461BB.3010209@codeaurora.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 16 May 2013 13:48:01 +0900
+Subject: [PATCH] ARM: shmobile: marzen: Use error values in usb_power_*
+Message-ID: <1368679681-10779-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2013 11:35 AM, Saravana Kannan wrote:
-> With deferred probing, late_initcall() is too soon to declare a clock as
-> unused. Wait for deferred probing to finish before declaring a clock as
-> unused. Since deferred probing is done in late_initcall(), do the unused
-> check to late_initcall_sync.
->
-> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
-> ---
->   drivers/clk/clk.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index fe4055f..5ecb64c 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -534,7 +534,7 @@ static int clk_disable_unused(void)
->
->   	return 0;
->   }
-> -late_initcall(clk_disable_unused);
-> +late_initcall_sync(clk_disable_unused);
->
->   /***    helper functions   ***/
+This patch updates the marzen board code as if USB PHY isn't enabled
+they phy will have a value set by ERR_PTR() rather than be NULL.
 
-Mike,
+Without this patch a NULL pointer dereference  and kernel panic
+occurs on initialisation of USB on marzen.
 
-Thoughts? Picking it up? Removing the existing auto-disable code (I 
-think they are still useful)?
+This resolves a regression introduced in 3.10-rc1 by
+b7fa5c2aec5be083eb2719b405089703608e9bc6
+("usb: phy: return -ENXIO when PHY layer isn't enabled").
 
--Saravana
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/board-marzen.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-
+diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+index 9105285..b9594e9 100644
+--- a/arch/arm/mach-shmobile/board-marzen.c
++++ b/arch/arm/mach-shmobile/board-marzen.c
+@@ -212,8 +212,8 @@ static struct platform_device *marzen_devices[] __initdata = {
+ static struct usb_phy *phy;
+ static int usb_power_on(struct platform_device *pdev)
+ {
+-	if (!phy)
+-		return -EIO;
++	if (IS_ERR(phy))
++		return PTR_ERR(phy);
+ 
+ 	pm_runtime_enable(&pdev->dev);
+ 	pm_runtime_get_sync(&pdev->dev);
+@@ -225,7 +225,7 @@ static int usb_power_on(struct platform_device *pdev)
+ 
+ static void usb_power_off(struct platform_device *pdev)
+ {
+-	if (!phy)
++	if (IS_ERR(phy))
+ 		return;
+ 
+ 	usb_phy_shutdown(phy);
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.2.1
