@@ -1,22 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 May 2013 20:25:10 +0100
-Subject: [RFC 0/8] rmk's Dove DRM/TDA19988 Cubox driver
-Message-ID: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 16 May 2013 21:33:57 +0200
+Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
+In-Reply-To: <CAOMZO5AKKVeTMsXpG9wa-eeLocBStUwPjQEe3n6fRVY2aSc7Nw@mail.gmail.com>
+References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
+ <1368713639-21485-2-git-send-email-fabio.estevam@freescale.com>
+ <CAOMZO5AWBi4gDJCOJf5muFuRXygQAysYCHEL+gb_LwsXiy-knA@mail.gmail.com>
+ <CAOMZO5AKKVeTMsXpG9wa-eeLocBStUwPjQEe3n6fRVY2aSc7Nw@mail.gmail.com>
+Message-ID: <519534A5.2070209@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-What follows is my DRM driver for Dove, which I've been working on with
-the Solid-run Cubox, which only offers HDMI output via the TDA19988
-chip.
+Hi Fabio,
 
-Not everything is finished off perfectly in this driver; there's quite
-a number of ragged edges (particularly with page flipping, which is
-completely untested.)
+On 16/05/2013 19:25, Fabio Estevam wrote:
+> Sorry, the original patch is correct.
+>
+> i2c slowness is a different issue.
 
-I have most of the Xorg driver complete - none of the DRI interfaces
-checked yet (partly because that involves quite an amount of work with
-Mesa).
+Would that be related to the timeouts I'm observing ?
 
-However, graphics, video overlay, interlacing, accelerated GPU via the
-original vivante support all works through this driver, with this driver
-providing the X pixmaps.
+http://www.spinics.net/lists/linux-i2c/msg11985.html
+
+I didn't have the time to have a look at it yet. I was planning to hook
+up a logic analyzer someday in june to debug it. It seems that there is
+a 1 second timeout with each i2c message that are sent.
+
+Don't hesitate to contact me if you need more info.
+
+Regards,
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
