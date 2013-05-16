@@ -1,40 +1,40 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 16 May 2013 17:49:16 +0200
-Subject: [PATCH v2] clk: si5351: declare all device IDs for module loading
-Message-ID: <20130516174916.2daa49b6@armhf>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 16 May 2013 17:49:03 +0200
+Subject: [PATCHv9 7/9] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130516154031.GF6563@titan.lakedaemon.net>
+References: <1368624323-24311-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1368624323-24311-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130516093312.GB2459@localhost>
+ <20130516154031.GF6563@titan.lakedaemon.net>
+Message-ID: <20130516174903.3a7a07ef@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the si5351 driver is a kernel module, it is loaded into memory
-from its i2c device IDs, but not from its DT compatible properties.
+Dear Jason Cooper,
 
-This patch declares the i2c device IDs of all chip variants.
+On Thu, 16 May 2013 11:40:31 -0400, Jason Cooper wrote:
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-v2: subject change - was "ARM: dove: ..."
---- 
- drivers/clk/clk-si5351.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+> > > +static int mvebu_pcie_init(void)
+> > 
+> > Building this showed a warning here. It seems you forgot
+> > to mark this one as __init.
+> 
+> Thomas, I'll fix this up when I pull this in, no need to resend. :)
 
-diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-index 8927284..9ebdddd 100644
---- a/drivers/clk/clk-si5351.c
-+++ b/drivers/clk/clk-si5351.c
-@@ -1490,7 +1490,10 @@ static int si5351_i2c_probe(struct i2c_client *client,
- }
- 
- static const struct i2c_device_id si5351_i2c_ids[] = {
--	{ "silabs,si5351", 0 },
-+	{ "si5351a", 0 },
-+	{ "si5351a-msop", 0 },
-+	{ "si5351b", 0 },
-+	{ "si5351c", 0 },
- 	{ }
- };
- MODULE_DEVICE_TABLE(i2c, si5351_i2c_ids);
+I'll resend, because beyond this function pointed by Ezequiel, there
+are two other functions that can be marked __init. The one pointed by
+Ezequiel is important because it causes a section mismatch
+when !CONFIG_MODULES, because in this case platform_driver_probe() is
+__init (and this explains what I wasn't seeing the warning, since I'm
+building CONFIG_MODULES=y). The two other functions are more cosmetic,
+but good to have as well.
 
+It would already been sent if git hadn't decided to do a 'git gc' right
+after my rebase. It's been gc-ing for quite some time now...
 
+Thomas
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
