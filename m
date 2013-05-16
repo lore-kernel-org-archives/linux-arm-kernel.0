@@ -1,79 +1,69 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 16 May 2013 18:46:58 +0200
-Subject: [PATCH 00/10] clk: mvebu: restructure SoC clock drivers
-In-Reply-To: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130516184658.0650f838@skate>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Thu, 16 May 2013 18:00:20 +0100
+Subject: [PATCH] ARM: prima2: return rather than panic on missing DT nodes
+In-Reply-To: <1368719437-28287-1-git-send-email-robherring2@gmail.com>
+References: <1368719437-28287-1-git-send-email-robherring2@gmail.com>
+Message-ID: <519510A4.8090904@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian, Jason, Andrew, Gregory,
+Hi Rob,
 
-On Sat, 11 May 2013 03:08:00 +0200, Sebastian Hesselbarth wrote:
-> Marvell EBU SoCs share some common clock functions that register core
-> clocks or clock gates from SoC specific data. These clock drivers are
-> organized by function and over time the drivers filled up with #ifdefs
-> to separate different SoC specific code.
+I was just testing multi_v7_defconfig and noticed that the code is still
+doing early_initcall and postcore_initcalls. Which IMO is NOK for
+multiplatforms.
+
+I was just about to send my patch and just noticed your patch.
+
+
+On 16/05/13 16:50, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> This patch set first adds a new element to clock gate descriptors to
-> allow to pass clk flags per clock gate. (Patch 1)
+> Missing nodes is a normal condition in multi-platform kernels when we boot
+> on other platforms. So remove the panic and just return if we don't find
+> a DT node.
 > 
-> Then it restructures MVEBU clock drivers into common clock setup and
-> SoC specific files and Kconfig options. The driver's init functions
-> are also registered to get called with of_clk_init. (Patches 2, 3-6)
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Barry Song <baohua.song@csr.com>
+> ---
+>  arch/arm/mach-prima2/pm.c   | 2 +-
+>  arch/arm/mach-prima2/rstc.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> It then switches Dove, Kirkwood, and Armada 370/XP to make use of
-> of_clk_init instead of mvebu_clocks_init. (Patches 7-9)
+> diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
+> index 9936c18..a8003e2 100644
+> --- a/arch/arm/mach-prima2/pm.c
+> +++ b/arch/arm/mach-prima2/pm.c
+> @@ -102,7 +102,7 @@ static int __init sirfsoc_of_pwrc_init(void)
+>  
+First thing is the mach code should not even attempt to run this
+function in first place.
+
+I think the correct fix for this is to move all the postcore_initcalls
+and early_initcalls to callbacks in MACHINE.
+
+
+Thanks,
+srini
+
+>  	np = of_find_matching_node(NULL, pwrc_ids);
+>  	if (!np)
+> -		panic("unable to find compatible pwrc node in dtb\n");
+> +		return -ENODEV;
+>  
+>  	/*
+>  	 * pwrc behind rtciobrg is not located in memory space
+> diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
+> index 435019c..6d7d9db 100644
+> --- a/arch/arm/mach-prima2/rstc.c
+> +++ b/arch/arm/mach-prima2/rstc.c
+> @@ -29,7 +29,7 @@ static int __init sirfsoc_of_rstc_init(void)
+>  
+>  	np = of_find_matching_node(NULL, rstc_ids);
+>  	if (!np)
+> -		panic("unable to find compatible rstc node in dtb\n");
+> +		return -ENODEV;
+>  
+>  	sirfsoc_rstc_base = of_iomap(np, 0);
+>  	if (!sirfsoc_rstc_base)
 > 
-> Finally, all obsolete files and Kconfig options are removed. (Patch 10)
-> 
-> It has been tested on CuBox (Dove) and Dockstar (Kirkwood) by me.
-> Armada 370 and XP are compile tested only and should get their Tested-by
-> from Thomas and Gregory, respectively.
-> 
-> @Mike: As this only touches MVEBU related code, I suggest to take it
-> all through the corresponding ARM branch.
-> 
-> Sebastian Hesselbarth (10):
->   clk: mvebu: introduce per-clock-gate flags
->   clk: mvebu: add common clock functions for core clk and clk gating
->   clk: mvebu: add Dove SoC-centric clock init
->   clk: mvebu: add Kirkwood SoC-centric clock init
->   clk: mvebu: add Armada 370 SoC-centric clock init
->   clk: mvebu: add Armada XP SoC-centric clock init
->   ARM: dove: move DT boards to SoC-centric clock init
->   ARM: kirkwood: move DT boards to SoC-centric clock init
->   ARM: mvebu: move DT boards to SoC-centric clock init
->   clk: mvebu: desintegrate obsolete file
-
-Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-I've tested on Armada 370 DB (after reverting the ARM core patch that
-prevents this platform from booting) and the Armada XP DB. Both boards
-boot fine, and detect PCIe devices as they should.
-
-There is some conflict between this set of commits and the two commits
-that modify the PCIe clocks in my PCIe series. I've pushed a branch at
-https://github.com/MISL-EBU-System-SW/mainline-public/tree/marvell-pcie-v10-and-seb-clks
-which has the mvebu PCIe stuff + Sebastian patches on top of it, with
-the conflicts resolved. The tricky thing is that since Sebastian is
-adding new clock files, and then removing the old ones, it's pretty
-easy to "loose" the changes the two PCIe clock patches are doing. The
-branch above works on Armada 370/XP, so you can compare the clock files
-if needed.
-
-Of course, I'm willing to do another final test once you've done the
-merged to confirm that everything is alright.
-
-I haven't done a detailed review of the patches, but I definitely agree
-with the principle, and I trust Sebastian for having done the right
-thing in here.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
