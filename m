@@ -1,55 +1,43 @@
 From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 15 May 2013 21:17:03 -0700
-Subject: [PATCH] clk: Fix race condition between clk_set_parent and
- clk_enable()
-In-Reply-To: <CAPDyKFpZ6-O-zSyBVgGGFL4W+d=-k-qaXimUS12fgC=9TkUNVA@mail.gmail.com>
-References: <1367383328-25700-1-git-send-email-skannan@codeaurora.org>
- <CAPDyKFpZ6-O-zSyBVgGGFL4W+d=-k-qaXimUS12fgC=9TkUNVA@mail.gmail.com>
-Message-ID: <51945DBF.60308@codeaurora.org>
+Date: Wed, 15 May 2013 21:23:03 -0700
+Subject: [PATCH RFC] clk: Introduce userspace clock driver
+In-Reply-To: <20130511142132.GA3200@sirena.org.uk>
+References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
+ <518D320C.4010707@elopez.com.ar>
+ <fe9e603e-a432-4a29-a195-fd393b875a7e@TX2EHSMHS006.ehs.local>
+ <518D411D.9070209@elopez.com.ar>
+ <CAPtuhTgsP4gvMAFoQb3icXAZw3ucSg4dfrAdJMho-VxNmNTvwg@mail.gmail.com>
+ <518D7C45.2090602@codeaurora.org> <20130511142132.GA3200@sirena.org.uk>
+Message-ID: <51945F27.7010003@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2013 12:24 PM, Ulf Hansson wrote:
-> On 1 May 2013 06:42, Saravana Kannan <skannan@codeaurora.org> wrote:
-
-<snip>
-
->> -       /* migrate prepare */
->> -       if (clk->prepare_count)
->> +       /*
->> +        * Migrate prepare state between parents and prevent race with
->> +        * clk_enable().
->> +        *
->> +        * If the clock is not prepared, then a race with
->> +        * clk_enable/disable() is impossible since we already have the
->> +        * prepare lock (future calls to clk_enable() need to be preceded by
->> +        * a clk_prepare()).
->> +        *
->> +        * If the clock is prepared, migrate the prepared state to the new
->> +        * parent and also protect against a race with clk_enable() by
->> +        * forcing the clock and the new parent on.  This ensures that all
->> +        * future calls to clk_enable() are practically NOPs with respect to
->> +        * hardware and software states.
->> +        */
+On 05/11/2013 07:21 AM, Mark Brown wrote:
+> On Fri, May 10, 2013 at 04:01:25PM -0700, Saravana Kannan wrote:
+>> On 05/10/2013 03:18 PM, Mike Turquette wrote:
 >
-> Maybe an additional note about that since CLK_SET_PARENT_GATE is a
-> prerequisite for doing migration of "prepare", we also interpreted
-> this flags as it is acceptable to enable the clock(s) in this context.
-
-Done. Sent v2 patch.
-
-<snip>
-
+> Guys please delete irrelevant context from replies...
 >
-> Looks good! Thanks for having another round to fixup this kind of
-> tricky code. :-)
-
-Thanks :-)
-
-> Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+>>> One way to do it is to introduce a new config option,
+>>> CONFIG_COMMON_CLK_DEBUG_CONTROL that would expose the controls for
+>>> every clock in the existing debugfs infrastructure.  The downside to
+>>> this approach is that it would get abused and ship in millions of
+>>> Android products using horrible userspace hacks to control clocks.
+>>> Maybe that's not our problem to solve, maybe it is.
 >
+>> We already have this for MSM. But I seem to have managed to keep our
+>> userspace guys away from abusing it. YMMV.
+>
+> It's much harder when it's in the standard kernel and there's no contact
+> with some of the users.  I've pushed back pretty strongly on some of
+> your equivalent stuff for regulators for this reason.
 
-Thanks again.
+Agreed. I don't really keep up with what's going on with the MSM regulators.
+
+But at some point, I'll start requesting for this for debugfs. It's 
+terribly handy to debug power issues, run unit tests and for debug 
+sessions (debugfs. So, clearly!).
 
 -Saravana
 
