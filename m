@@ -1,42 +1,52 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 16 May 2013 16:34:05 +0100
-Subject: [PATCH 1/3] ARM: DT: kernel: move temporary cpu map stack array to
- static data
-In-Reply-To: <1368718447-19209-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1368718447-19209-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1368718447-19209-2-git-send-email-lorenzo.pieralisi@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 16 May 2013 18:07:24 +0200
+Subject: [PATCH] arm: mvebu: enable the third USB interface on OpenBlocks AX3
+Message-ID: <1368720444-29357-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the number of CPUs increase, the temporary array allocated on the
-stack in arm_dt_init_cpu_maps() can become too big and trigger stack
-issues.
-This patch moves the allocated memory to static __initdata so that stack
-data is not used anymore to allocate the temporary array.
-Memory is marked as __initdata since it need not be persistent after boot.
+Besides the two "classic" USB interfaces with normal USB ports on the
+front side, the PlatHome OpenBlocks AX3 uses the third USB interface
+of the Marvell SoC in the mini-PCIe connector. This allows certain
+mini-PCIe cards to expose parts of their functionality as a USB
+peripheral.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+This commit enables this third USB interface in the OpenBlocks AX3
+Device Tree, and also adds comments on top of the two other USB
+interfaces so that the Device Tree makes it clear which USB interface
+at the SoC level matches which USB interface visible on the board.
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/kernel/devtree.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 5af04f6..3d652e4f 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -78,11 +78,12 @@ void __init arm_dt_init_cpu_maps(void)
- 	 * contain a list of MPIDR[23:0] values where MPIDR[31:24] must
- 	 * read as 0.
- 	 */
-+	static u32 tmp_map[NR_CPUS] __initdata = {
-+				[0 ... NR_CPUS-1] = UINT_MAX };
- 	struct device_node *cpu, *cpus;
- 	u32 i, j, cpuidx = 1;
- 	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
+diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+index f14d36c..60a79e7 100644
+--- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
++++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
+@@ -134,13 +134,22 @@
+ 				nr-ports = <2>;
+ 				status = "okay";
+ 			};
++
++			/* Front side USB 0 */
+ 			usb at 50000 {
+ 				status = "okay";
+ 			};
++
++			/* Front side USB 1 */
+ 			usb at 51000 {
+ 				status = "okay";
+ 			};
  
--	u32 tmp_map[NR_CPUS] = { [0 ... NR_CPUS-1] = UINT_MAX };
- 	bool bootcpu_valid = false;
- 	cpus = of_find_node_by_path("/cpus");
- 
++			/* USB interface in the mini-PCIe connector */
++			usb at 52000 {
++				status = "okay";
++			};
++
+ 			devbus-bootcs at 10400 {
+ 				status = "okay";
+ 				ranges = <0 0xf0000000 0x8000000>; /* @addr 0xf000000, size 0x8000000 */
 -- 
-1.8.2.2
+1.7.9.5
