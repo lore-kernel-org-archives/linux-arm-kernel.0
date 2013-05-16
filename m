@@ -1,38 +1,49 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 May 2013 10:43:56 -0700
-Subject: [PATCH V5 1/6] clk: OMAP: introduce device tree binding to
- kernel clock data
-In-Reply-To: <20130513235119.10068.47040@quantum>
-References: <1368039976-29648-1-git-send-email-nm@ti.com>
- <1368039976-29648-2-git-send-email-nm@ti.com>
- <20130513235119.10068.47040@quantum>
-Message-ID: <20130516174355.GB5600@atomide.com>
+Date: Thu, 16 May 2013 10:46:08 -0700
+Subject: [PATCH] ARM: dts: OMAP: Add usb_otg and glue data to OMAP3+ boards
+In-Reply-To: <5193296D.5040001@ti.com>
+References: <20130511023557.GB28602@atomide.com>
+ <5193296D.5040001@ti.com>
+Message-ID: <20130516174608.GC5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mike Turquette <mturquette@linaro.org> [130513 16:56]:
-> Quoting Nishanth Menon (2013-05-08 12:06:11)
-> <snip>
-> > Overall strategy introduced here is simple: a clock node described in
-> > device tree blob is used to identify the exact clock provided in the
-> > SoC specific data. This is then linked back using of_clk_add_provider
-> > to the device node to be accessible by of_clk_get.
-> > 
+* Kishon Vijay Abraham I <kishon@ti.com> [130514 23:27]:
+> On Saturday 11 May 2013 08:05 AM, Tony Lindgren wrote:
+> >Commit ad871c10 (ARM: dts: OMAP: Add usb_otg and glue data to
+> >OMAP3+ boards) added support for MUSB on omap3 for device tree,
+> >but added the interrupts the wrong way probably as they were
+> >copied from the omap4.dtsi file. On omap3 we have TI specific
+> >interrupt controller, not GIC.
+> >
+> >Fix this by specifying the interrupt following the TI INTC
+> >binding.
+> >
+> >Without this fix MUSB won't work as it is trying to use
+> >irq0 instead of irq92.
+> >
+> >Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Tested in beagleboard-xm
 > 
-> FYI, I'm working on moving the OMAP clocks over to DT which is a better
-> alternative than this patch.  I'll share what I have on the list,
-> hopefully next week.
+> Tested-by: Kishon Vijay Abraham I <kishon@ti.com>
 
-That's good news! What's your plan on using the indexing the clocks?
-
-I'd rather avoid indexing as that's basically same as the old IRQ
-numbering and GPIO numbering schemes that don't work well in the long
-term.
-
-We already have quite a few sets of clocks for omaps, so the indexing
-is already an issue. My thinking is that indexing should only be used
-if the same physical clock has multiple outputs.
+Oops thanks, sorry I already pushed it out into omap-for-v3.10/dt-fixes
+before noticing your tested-by.
 
 Regards,
 
 Tony
+
+> >--- a/arch/arm/boot/dts/omap3.dtsi
+> >+++ b/arch/arm/boot/dts/omap3.dtsi
+> >@@ -516,7 +516,7 @@
+> >  		usb_otg_hs: usb_otg_hs at 480ab000 {
+> >  			compatible = "ti,omap3-musb";
+> >  			reg = <0x480ab000 0x1000>;
+> >-			interrupts = <0 92 0x4>, <0 93 0x4>;
+> >+			interrupts = <92>, <93>;
+> >  			interrupt-names = "mc", "dma";
+> >  			ti,hwmods = "usb_otg_hs";
+> >  			multipoint = <1>;
+> >
+> 
