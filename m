@@ -1,43 +1,105 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 16 May 2013 11:13:59 -0300
-Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
-In-Reply-To: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
-References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1368713639-21485-2-git-send-email-fabio.estevam@freescale.com>
+Date: Thu, 16 May 2013 11:13:58 -0300
+Subject: [PATCH 1/2] ARM: dts: imx: Remove custom dma-channel bindings
+Message-ID: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e5aba13 (i2c: i2c-mxs: move to use generic DMA helper) changed
-i2c-mxs.txt and drivers/i2c/busses/i2c-mxs.c to only use one I2C interrupt.
+Commit f30fb03 (ARM: dts: add generic DMA device tree binding for mxs-dma) added
+the generic DMA dt bindings, but missed to remove the old ones.
 
-Adapt the dtsi bindings with such change.
+Remove the the old dma bindings.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx28.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx23.dtsi   | 3 ---
+ arch/arm/boot/dts/imx28.dtsi   | 5 -----
+ arch/arm/boot/dts/imx6qdl.dtsi | 1 -
+ 3 files changed, 9 deletions(-)
 
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 73fd7d0..be93494 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -78,7 +78,6 @@
+ 				clock-names = "gpmi_io";
+ 				dmas = <&dma_apbh 4>;
+ 				dma-names = "rx-tx";
+-				fsl,gpmi-dma-channel = <4>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -88,7 +87,6 @@
+ 				clocks = <&clks 33>;
+ 				dmas = <&dma_apbh 1>;
+ 				dma-names = "rx-tx";
+-				fsl,ssp-dma-channel = <1>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -366,7 +364,6 @@
+ 				clocks = <&clks 33>;
+ 				dmas = <&dma_apbh 2>;
+ 				dma-names = "rx-tx";
+-				fsl,ssp-dma-channel = <2>;
+ 				status = "disabled";
+ 			};
+ 
 diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 33389b8..2e1ba4b 100644
+index e401dee..33389b8 100644
 --- a/arch/arm/boot/dts/imx28.dtsi
 +++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -878,7 +878,7 @@
- 				#size-cells = <0>;
- 				compatible = "fsl,imx28-i2c";
- 				reg = <0x80058000 0x2000>;
--				interrupts = <111 68>;
-+				interrupts = <111>;
- 				clock-frequency = <100000>;
- 				dmas = <&dma_apbx 6>;
+@@ -100,7 +100,6 @@
+ 				clock-names = "gpmi_io";
+ 				dmas = <&dma_apbh 4>;
  				dma-names = "rx-tx";
-@@ -891,7 +891,7 @@
- 				#size-cells = <0>;
- 				compatible = "fsl,imx28-i2c";
- 				reg = <0x8005a000 0x2000>;
--				interrupts = <110 69>;
-+				interrupts = <110>;
- 				clock-frequency = <100000>;
- 				dmas = <&dma_apbx 7>;
+-				fsl,gpmi-dma-channel = <4>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -112,7 +111,6 @@
+ 				clocks = <&clks 46>;
+ 				dmas = <&dma_apbh 0>;
  				dma-names = "rx-tx";
+-				fsl,ssp-dma-channel = <0>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -124,7 +122,6 @@
+ 				clocks = <&clks 47>;
+ 				dmas = <&dma_apbh 1>;
+ 				dma-names = "rx-tx";
+-				fsl,ssp-dma-channel = <1>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -136,7 +133,6 @@
+ 				clocks = <&clks 48>;
+ 				dmas = <&dma_apbh 2>;
+ 				dma-names = "rx-tx";
+-				fsl,ssp-dma-channel = <2>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -148,7 +144,6 @@
+ 				clocks = <&clks 49>;
+ 				dmas = <&dma_apbh 3>;
+ 				dma-names = "rx-tx";
+-				fsl,ssp-dma-channel = <3>;
+ 				status = "disabled";
+ 			};
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 42e461c..5cc2855 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -89,7 +89,6 @@
+ 				      "gpmi_bch_apb", "per1_bch";
+ 			dmas = <&dma_apbh 0>;
+ 			dma-names = "rx-tx";
+-			fsl,gpmi-dma-channel = <0>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
 1.8.1.2
