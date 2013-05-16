@@ -1,82 +1,83 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 May 2013 16:50:38 +0100
-Subject: [PATCH 3/3] ARM: kernel: fix __cpu_logical_map default
- initialization
-In-Reply-To: <1368718447-19209-4-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1368718447-19209-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1368718447-19209-4-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130516155038.GK11706@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 May 2013 17:39:16 +0100
+Subject: [RFC] ARM: Allow user selection HZ values
+Message-ID: <20130516163916.GU18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 04:34:07PM +0100, Lorenzo Pieralisi wrote:
-> For legacy reasons, the __cpu_logical_map array is initialized to 0.
-> On old pre-DT ARM platforms, smp_setup_processor_id() generates
-> __cpu_logical_map entries at boot before the number of possible CPUs is
-> set-up, with values that can be considered valid MPIDRs even if they are
-> not present in the system booting; this implies that the __cpu_logical_map[]
-> might end up containing MPIDR values that can be considered valid at logical
-> indexes corresponding to CPUs that are not marked as possible.
-> 
-> To prevent issues with the current implementation, this patch defines an
-> MPIDR_INVALID value, statically initializes the __cpu_logical_map[] array to it
-> and allows DT parsing code to overwrite values in the __cpu_logical_map array
-> that were erroneously set-up in smp_setup_processor_id().
+Allow users to configure the Hz rate on implementations which do not have
+a fixed clock rate.
 
-What issues have you actually hit with this?
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+Whenever HZ_FIXED is not set through one of its "default" settings, the
+user is allowed to select a tick rate from 100, 200, 250, 300, 500Hz
+and 1kHz.  This is slightly more choice than with the generic HZ
+selection in kernel/Kconfig.hz (which only does 100, 250, 300Hz and
+1kHz).  The reason for including 200Hz is that a greater number of
+other platforms want that via the fixed rate, and 500Hz just seemed
+to be a better middle value than 300Hz (which is of course stupidly
+close to 250.)
 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> CC: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/cputype.h  |  2 ++
->  arch/arm/include/asm/smp_plat.h |  2 +-
->  arch/arm/kernel/devtree.c       | 10 ++++++----
->  arch/arm/kernel/setup.c         |  2 +-
->  4 files changed, 10 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-> index 7652712..dba62cb 100644
-> --- a/arch/arm/include/asm/cputype.h
-> +++ b/arch/arm/include/asm/cputype.h
-> @@ -32,6 +32,8 @@
->  
->  #define MPIDR_HWID_BITMASK 0xFFFFFF
->  
-> +#define MPIDR_INVALID (~MPIDR_HWID_BITMASK)
-> +
->  #define MPIDR_LEVEL_BITS 8
->  #define MPIDR_LEVEL_MASK ((1 << MPIDR_LEVEL_BITS) - 1)
->  
-> diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-> index aaa61b6..e789832 100644
-> --- a/arch/arm/include/asm/smp_plat.h
-> +++ b/arch/arm/include/asm/smp_plat.h
-> @@ -49,7 +49,7 @@ static inline int cache_ops_need_broadcast(void)
->  /*
->   * Logical CPU mapping.
->   */
-> -extern int __cpu_logical_map[];
-> +extern u32 __cpu_logical_map[];
->  #define cpu_logical_map(cpu)	__cpu_logical_map[cpu]
->  /*
->   * Retrieve logical cpu index corresponding to a given MPIDR[23:0]
-> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> index d2293c0..08f012e 100644
-> --- a/arch/arm/kernel/devtree.c
-> +++ b/arch/arm/kernel/devtree.c
-> @@ -79,12 +79,12 @@ void __init arm_dt_init_cpu_maps(void)
->  	 * read as 0.
->  	 */
->  	static u32 tmp_map[NR_CPUS] __initdata = {
-> -				[0 ... NR_CPUS-1] = UINT_MAX };
-> +				[0 ... NR_CPUS-1] = MPIDR_INVALID };
->  	struct device_node *cpu, *cpus;
->  	u32 i, j, cpuidx = 1;
->  	u32 mpidr = is_smp() ? read_cpuid_mpidr() & MPIDR_HWID_BITMASK : 0;
-> -
->  	bool bootcpu_valid = false;
-> +
+ arch/arm/Kconfig |   40 ++++++++++++++++++++++++++++++++++++++--
+ 1 files changed, 38 insertions(+), 2 deletions(-)
 
-Random whitespace change.
-
-Will
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 67874b8..dcd16ff 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1646,14 +1646,50 @@ config ARCH_NR_GPIO
+ 
+ source kernel/Kconfig.preempt
+ 
+-config HZ
++config HZ_FIXED
+ 	int
+ 	default 200 if ARCH_EBSA110 || ARCH_S3C24XX || ARCH_S5P64X0 || \
+ 		ARCH_S5PV210 || ARCH_EXYNOS4
+ 	default OMAP_32K_TIMER_HZ if ARCH_OMAP && OMAP_32K_TIMER
+ 	default AT91_TIMER_HZ if ARCH_AT91
+ 	default SHMOBILE_TIMER_HZ if ARCH_SHMOBILE
+-	default 100
++
++choice
++	depends on !HZ_FIXED
++	prompt "Timer frequency"
++
++config HZ_100
++	bool "100 Hz"
++
++config HZ_200
++	bool "200 Hz"
++
++config HZ_250
++	bool "250 Hz"
++
++config HZ_300
++	bool "300 Hz"
++
++config HZ_500
++	bool "500 Hz"
++
++config HZ_1000
++	bool "1000 Hz"
++
++endchoice
++
++config HZ
++	int
++	default HZ_FIXED if HZ_FIXED
++	default 100 if HZ_100
++	default 200 if HZ_200
++	default 250 if HZ_250
++	default 300 if HZ_300
++	default 500 if HZ_500
++	default 1000
++
++config SCHED_HRTICK
++	def_bool HIGH_RES_TIMERS
+ 
+ config THUMB2_KERNEL
+ 	bool "Compile the kernel in Thumb-2 mode"
+-- 
+1.7.4.4
