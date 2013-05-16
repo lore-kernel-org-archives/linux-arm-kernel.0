@@ -1,66 +1,33 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 16 May 2013 17:55:19 +0200
-Subject: [PATCHv10 4/9] of/pci: Add of_pci_parse_bus_range() function
+Date: Thu, 16 May 2013 17:55:23 +0200
+Subject: [PATCHv10 8/9] arm: mvebu: PCIe support is now available on mvebu
 In-Reply-To: <1368719725-21265-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1368719725-21265-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1368719725-21265-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1368719725-21265-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <thierry.reding@avionic-design.de>
+Now that the PCIe driver for mvebu has been integrated and all its
+relevant dependencies, we can mark the ARCH_MVEBU platform has
+MIGHT_HAVE_PCI, which allows to select the PCI bus support if needed.
 
-This function can be used to parse a bus-range property as specified by
-device nodes representing PCI bridges.
-
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/of/of_pci.c    |   25 +++++++++++++++++++++++++
- include/linux/of_pci.h |    1 +
- 2 files changed, 26 insertions(+)
+ arch/arm/mach-mvebu/Kconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 4dd7b9b..42c687a 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -64,3 +64,28 @@ int of_pci_get_devfn(struct device_node *np)
- 	return (be32_to_cpup(reg) >> 8) & 0xff;
- }
- EXPORT_SYMBOL_GPL(of_pci_get_devfn);
-+
-+/**
-+ * of_pci_parse_bus_range() - parse the bus-range property of a PCI device
-+ * @node: device node
-+ * @res: address to a struct resource to return the bus-range
-+ *
-+ * Returns 0 on success or a negative error-code on failure.
-+ */
-+int of_pci_parse_bus_range(struct device_node *node, struct resource *res)
-+{
-+	const __be32 *values;
-+	int len;
-+
-+	values = of_get_property(node, "bus-range", &len);
-+	if (!values || len < sizeof(*values) * 2)
-+		return -EINVAL;
-+
-+	res->name = node->name;
-+	res->start = be32_to_cpup(values++);
-+	res->end = be32_to_cpup(values);
-+	res->flags = IORESOURCE_BUS;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(of_pci_parse_bus_range);
-diff --git a/include/linux/of_pci.h b/include/linux/of_pci.h
-index 91ec484..7a04826 100644
---- a/include/linux/of_pci.h
-+++ b/include/linux/of_pci.h
-@@ -11,5 +11,6 @@ struct device_node;
- struct device_node *of_pci_find_child_device(struct device_node *parent,
- 					     unsigned int devfn);
- int of_pci_get_devfn(struct device_node *np);
-+int of_pci_parse_bus_range(struct device_node *node, struct resource *res);
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index e11acbb..381062d 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -15,6 +15,8 @@ config ARCH_MVEBU
+ 	select MVEBU_CLK_GATING
+ 	select MVEBU_MBUS
+ 	select ZONE_DMA if ARM_LPAE
++	select MIGHT_HAVE_PCI
++	select PCI_QUIRKS if PCI
  
- #endif
+ if ARCH_MVEBU
+ 
 -- 
 1.7.9.5
