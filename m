@@ -1,30 +1,45 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 16 May 2013 13:18:10 -0500
-Subject: [PATCH v4] ARM:dts:omap4-panda: Update the LED support for the
- panda DTS
-In-Reply-To: <5194FCDD.8080209@ti.com>
-References: <1368636386-17138-1-git-send-email-dmurphy@ti.com>
- <20130515170516.GA6135@kahuna> <5194FCDD.8080209@ti.com>
-Message-ID: <CAGo_u6pX+DdVNWqdPXDChzMr27YAXL_Zvt7DxWBijOCW0rXpkA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 16 May 2013 12:19:48 -0600
+Subject: [PATCH 0/6] ARM: tegra114: add CPU hotplug support
+In-Reply-To: <1368698019.7403.10.camel@jlo-ubuntu-64.nvidia.com>
+References: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
+ <51941C58.9060002@wwwdotorg.org>
+ <1368698019.7403.10.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <51952344.1090003@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 10:35 AM, Dan Murphy <dmurphy@ti.com> wrote:
-> I am not sure you really want to do this.
-> If I make the pinctrl part of the led structure then the only way the gpio_wk7 on a1-a3 to be configured is when
-> the CONFIG_LEDS_GPIO flag is set.
->
-> Do you really want that dependency?  You did say it was a key fix
-> At least this way the pins are configured regardless of that flag.
+On 05/16/2013 03:53 AM, Joseph Lo wrote:
+> On Thu, 2013-05-16 at 07:38 +0800, Stephen Warren wrote:
+>> On 05/15/2013 04:27 AM, Joseph Lo wrote:
+>>> Tegra 114 is different with other Tegra SoC chips. It using ARM Cortex-A15
+>>> as CPU core and a enhanced flow controller for CPU power control. So
+>>> we need to skip some code that was for Contex-A9 and some other support
+>>> code that was for other Tegra SoC chips. Then adding the proper power up
+>>> and hot plug control for Tegra114.
+>>
+>> This series mostly works OK, but I see one problem: I can't hotunplug
+>> CPU0, which the commit descriptions and code changes imply I should be
+>> able to do:
+>>
+>> root at localhost:~# echo 0 > /sys/devices/system/cpu/cpu0/online
+>> -bash: echo: write error: Operation not permitted
+> 
+> I want to provide this function originally. But I found the
+> tegra_cpu_disable() was removed recently. It was replaced by the common
+> cpu_disable() function that didn't allow CPU0 to be un-plugged.
 
-That is better as the system will be left in the pinmux configuration
-handed over from bootloader.
+Is there a specific reason for that; is there some problem in the core
+ARM code that implies CPU0 should never be disabled?
 
-The point being, muxing up pins even when not needed(config switched
-off) has no real benefit - in this case albeit, the default mux was
-causing a bug.
-pinctrl IMHO should be considered as any other resource, if it is not
-mandatory for boot, and needed only for a device functionality when
-probed, it should done there only.
+> But I had verified the CPU0 is OK to be un-plugged on the older
+> linux-next branch that tegra_cpu_disable() watn't removed yet.
+> 
+> Do you want me to add them back to support this function for Tegra114?
 
-just my 2 cents.
+If there is a problem removing CPU0 in the core code, the functionality
+of this series is OK, although it's probably worth removing the parts
+that attempt to make CPU0 hot-unpluggable to reduce the diff size.
+
+If there's no problem removing CPU0, it'd be good to make it work,
+although that could be done in followon patches.
