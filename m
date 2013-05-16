@@ -1,125 +1,61 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 16 May 2013 12:46:32 -0700
-Subject: [PATCH V5 1/6] clk: OMAP: introduce device tree binding to kernel
- clock data
-In-Reply-To: <20130516174355.GB5600@atomide.com>
-References: <1368039976-29648-1-git-send-email-nm@ti.com>
- <1368039976-29648-2-git-send-email-nm@ti.com>
- <20130513235119.10068.47040@quantum> <20130516174355.GB5600@atomide.com>
-Message-ID: <20130516194632.12127.59935@quantum>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 16 May 2013 13:49:20 -0600
+Subject: GPIO sysfs : set a wake source
+In-Reply-To: <87ip2ig1ez.fsf@free.fr>
+References: <87fvxwia0s.fsf@free.fr>
+ <CACRpkdYjQD9phVtWNh2QGkZWOdEJyZENnYatXt7bd23bgqXitw@mail.gmail.com>
+ <51926177.1050600@wwwdotorg.org> <87ip2ig1ez.fsf@free.fr>
+Message-ID: <51953840.9050106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tony Lindgren (2013-05-16 10:43:56)
-> * Mike Turquette <mturquette@linaro.org> [130513 16:56]:
-> > Quoting Nishanth Menon (2013-05-08 12:06:11)
-> > <snip>
-> > > Overall strategy introduced here is simple: a clock node described in
-> > > device tree blob is used to identify the exact clock provided in the
-> > > SoC specific data. This is then linked back using of_clk_add_provider
-> > > to the device node to be accessible by of_clk_get.
-> > > 
-> > 
-> > FYI, I'm working on moving the OMAP clocks over to DT which is a better
-> > alternative than this patch.  I'll share what I have on the list,
-> > hopefully next week.
+On 05/16/2013 01:39 PM, Robert Jarzmik wrote:
+> Stephen Warren <swarren@wwwdotorg.org> writes:
 > 
-> That's good news! What's your plan on using the indexing the clocks?
+>> On 05/14/2013 03:29 AM, Linus Walleij wrote:
+>>> On Thu, May 9, 2013 at 2:59 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>>>
+>>>> I was thinking on how to remove all "gpio_request()" from my board code
+>>>> (arch/arm/mach-pxa/mioa701.c).
+>>>>
+>>>> I have a small difficulty with the functionality provided by gpiolib in
+>>>> userspace. This is what I need :
+>>>>  - define a gpio as an input
+>>>>  - define this gpio to be an interrupt source
+>>>>  - define this interrupt to be a wake-up source
+>>>
+>>> This sounds like trying to remove board code by moving it to userspace
+>>> and basically starting to implement stuff that belongs in the kernel
+>>> in userspace just because someone says we should get rid of board
+>>> files :-)
+> No, really, even it's true that it comes from someone asking me, now I have
+> though it a bit more through.
 > 
-> I'd rather avoid indexing as that's basically same as the old IRQ
-> numbering and GPIO numbering schemes that don't work well in the long
-> term.
+>>> Don't go down this path, let the kernel handle this kind of stuff.
+> Oh really, where ?
 > 
-> We already have quite a few sets of clocks for omaps, so the indexing
-> is already an issue. My thinking is that indexing should only be used
-> if the same physical clock has multiple outputs.
+> Let me show you why it can't be a module.
+> In my case, I have a 2G modem connected to the soc :
+>  - the modem and 1 SoC UART are connected (TX, RX, CTS, ...)
+>  - the modem and SoC are connected through several gpios
+>    - one or two control to power up and reset the modem
+>    - one connected to the modem "ring" signal (the one I want a wakeup for).
 > 
-
-At present I am actually describing the clock hardware in DT.  Each
-clock is a node (not a device) using the established clock binding in
-Documentation/devicetree/bindings/clocks/clock-bindings.txt.
-
-To do this I am introducing new bindings for the common types: gate, mux
-& divider.  These are the ones I am migrating to DT first.  Eventually
-I'll create bindings for the OMAP-specifc clocks after this.
-
-I currently have this DT approach co-existing with the static data.  As
-a start I have used the fixed-clock and mux-clock bindings to put all of
-the root clocks and sys_clk into arch/arm/boot/dts/omap4-clocks.dtsi.
-This file is included by arch/arm/boot/dts/omap4.dtsi.
-
-The DT clocks are parsed prior to the static clock registration:
-
-diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-index 88e37a4..7cc4cae 100644
---- a/arch/arm/mach-omap2/cclock44xx_data.c
-+++ b/arch/arm/mach-omap2/cclock44xx_data.c
-@@ -27,6 +27,7 @@
- #include <linux/clk-private.h>
- #include <linux/clkdev.h>
- #include <linux/io.h>
-+#include <linux/clk/omap.h>
- 
- #include "soc.h"
- #include "iomap.h"
-@@ -1442,27 +1443,11 @@ static struct omap_clk omap443x_clks[] = {
-  * clocks common to omap44xx
-  */
- static struct omap_clk omap44xx_clks[] = {
--	CLK(NULL,	"extalt_clkin_ck",		&extalt_clkin_ck),
- 	CLK(NULL,	"pad_clks_src_ck",		&pad_clks_src_ck),
- 	CLK(NULL,	"pad_clks_ck",			&pad_clks_ck),
--	CLK(NULL,	"pad_slimbus_core_clks_ck",	&pad_slimbus_core_clks_ck),
--	CLK(NULL,	"secure_32k_clk_src_ck",	&secure_32k_clk_src_ck),
- 	CLK(NULL,	"slimbus_src_clk",		&slimbus_src_clk),
- 	CLK(NULL,	"slimbus_clk",			&slimbus_clk),
- 	CLK(NULL,	"sys_32k_ck",			&sys_32k_ck),
--	CLK(NULL,	"virt_12000000_ck",		&virt_12000000_ck),
--	CLK(NULL,	"virt_13000000_ck",		&virt_13000000_ck),
--	CLK(NULL,	"virt_16800000_ck",		&virt_16800000_ck),
--	CLK(NULL,	"virt_19200000_ck",		&virt_19200000_ck),
--	CLK(NULL,	"virt_26000000_ck",		&virt_26000000_ck),
--	CLK(NULL,	"virt_27000000_ck",		&virt_27000000_ck),
--	CLK(NULL,	"virt_38400000_ck",		&virt_38400000_ck),
--	CLK(NULL,	"sys_clkin_ck",			&sys_clkin_ck),
--	CLK(NULL,	"tie_low_clock_ck",		&tie_low_clock_ck),
--	CLK(NULL,	"utmi_phy_clkout_ck",		&utmi_phy_clkout_ck),
--	CLK(NULL,	"xclk60mhsp1_ck",		&xclk60mhsp1_ck),
--	CLK(NULL,	"xclk60mhsp2_ck",		&xclk60mhsp2_ck),
--	CLK(NULL,	"xclk60motg_ck",		&xclk60motg_ck),
- 	CLK(NULL,	"abe_dpll_bypass_clk_mux_ck",	&abe_dpll_bypass_clk_mux_ck),
- 	CLK(NULL,	"abe_dpll_refclk_mux_ck",	&abe_dpll_refclk_mux_ck),
- 	CLK(NULL,	"dpll_abe_ck",			&dpll_abe_ck),
-@@ -1690,6 +1675,9 @@ int __init omap4xxx_clk_init(void)
- {
- 	int rc;
- 
-+	/* FIXME register clocks from DT first */
-+	dt_omap_clk_init();
-+
- 	if (cpu_is_omap443x()) {
- 		cpu_mask = RATE_IN_4430;
- 		omap_clocks_register(omap443x_clks, ARRAY_SIZE(omap443x_clks));
-
-
-Ideally dt_omap_clk_init() will go away and instead by replaced by the
-probe from drivers/clk/omap/clk.c (new omap clock driver).  However I
-still need to register the root clocks before the PLLs and other
-dividers for now to avoid many issues (divide by zero errors, failed
-reparent operations, etc).  And furthermore I don't think the hwmod code
-will work if the clock tree is not populated before module_init.  So for
-now the omap clock driver does not properly probe or call module_init,
-but some day that might be fixed.
-
-I know that putting all of the data into DT is not a popular idea with
-everybody.  I also know that I am not a DT expert, so I'm sure there are
-some better approaches to the some of the decisions I'm making.  I'll
-post an RFC to the list next week with cleaned-up patches and then we
-can all take it from there.
-
-Regards,
-Mike
-
-> Regards,
+> So I have no module to handle my modem :
+>  - UART is handled by pxa-uart
+>  - control/reset by gpiolib
+>  - ring ... by nobody
 > 
-> Tony
+> So my point is that this ring *should* be handled by gpiolib, just as any casual
+> input gpio. Moreover, the "wake-up" ability should be activable/deactivable on
+> wish by userspace.
+> 
+>>> Instead figure out how to make the subsystems we have and the
+>>> device trees express what you want to do.
+>
+> As I said above, I don't think it's the way to go. I have *no* subsystem to
+> address.
+> Devicetree can't help in the toggle to "activate" or "deactivate" the wakeup
+> upon this GPIO, can it ?
+
+This sounds very similar to WiFi rfkill, although it's a MODEM not WiFi.
