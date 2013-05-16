@@ -1,43 +1,51 @@
 From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 15 May 2013 21:23:03 -0700
+Date: Wed, 15 May 2013 21:28:50 -0700
 Subject: [PATCH RFC] clk: Introduce userspace clock driver
-In-Reply-To: <20130511142132.GA3200@sirena.org.uk>
-References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
- <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
- <518D320C.4010707@elopez.com.ar>
- <fe9e603e-a432-4a29-a195-fd393b875a7e@TX2EHSMHS006.ehs.local>
- <518D411D.9070209@elopez.com.ar>
- <CAPtuhTgsP4gvMAFoQb3icXAZw3ucSg4dfrAdJMho-VxNmNTvwg@mail.gmail.com>
- <518D7C45.2090602@codeaurora.org> <20130511142132.GA3200@sirena.org.uk>
-Message-ID: <51945F27.7010003@codeaurora.org>
+In-Reply-To: <20130515044604.GA24524@sirena.org.uk>
+References: <20130512143344.GC3200@sirena.org.uk>
+ <9e55c552-ce34-4663-9a57-bf2c626d7d58@TX2EHSMHS008.ehs.local>
+ <20130513052135.GD6836@sirena.org.uk>
+ <0bf5a185-86f7-4a93-a90f-42caefb06a1d@TX2EHSMHS009.ehs.local>
+ <519112F9.2010102@gmail.com>
+ <7c5e7537-6ed5-4622-a7a9-bf46820ef695@VA3EHSMHS033.ehs.local>
+ <519124D3.2040403@gmail.com>
+ <af51c63e-7ff1-4e73-9305-08309217ab38@TX2EHSMHS037.ehs.local>
+ <20130514164611.10068.46384@quantum> <51927DEB.7090001@balister.org>
+ <20130515044604.GA24524@sirena.org.uk>
+Message-ID: <51946082.1000606@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2013 07:21 AM, Mark Brown wrote:
-> On Fri, May 10, 2013 at 04:01:25PM -0700, Saravana Kannan wrote:
->> On 05/10/2013 03:18 PM, Mike Turquette wrote:
+On 05/14/2013 09:46 PM, Mark Brown wrote:
+> On Tue, May 14, 2013 at 02:09:47PM -0400, Philip Balister wrote:
 >
-> Guys please delete irrelevant context from replies...
+>> First of all, the driver that loads the bitstream into the fpga
+>> fabric does not know ANYTHING about what the bitstream does. So it
+>> cannot do any setup based on the contents of the file that is
+>> loaded. (And this can also be loaded during the SoC bootup,
+>> bypassing this driver completely)
 >
->>> One way to do it is to introduce a new config option,
->>> CONFIG_COMMON_CLK_DEBUG_CONTROL that would expose the controls for
->>> every clock in the existing debugfs infrastructure.  The downside to
->>> this approach is that it would get abused and ship in millions of
->>> Android products using horrible userspace hacks to control clocks.
->>> Maybe that's not our problem to solve, maybe it is.
+> This is a problem that is going to need to be fixed - there will be some
+> things going on the FPGAs that do need drivers and so there needs to be
+> some way to instantiate a driver for a FPGA image.  Things like adding
+> extra DT blobs along with the FPGA image have been talked about
 >
->> We already have this for MSM. But I seem to have managed to keep our
->> userspace guys away from abusing it. YMMV.
+>> Second, there are four clocks that feed the FPGA fabric. We will
+>> want to set these clocks from user space somehow. It is perfectly
+>> valid to use a uio driver to interface with logic in the fpga. If we
+>> take the approach of using such general purpose techniques to
+>> interface with fpga logic, we must have ways for the user to control
+>> the fpga clocks.
 >
-> It's much harder when it's in the standard kernel and there's no contact
-> with some of the users.  I've pushed back pretty strongly on some of
-> your equivalent stuff for regulators for this reason.
+> Right, and if the specific device is being controlled by UIO then having
+> UIO create some clocks makes sense but then that should be integrated
+> into the UIO instantiation rather than done as a separate thing.
 
-Agreed. I don't really keep up with what's going on with the MSM regulators.
+Agreed. I was about to reply with exactly the same point. I haven't done 
+any UIO coding, but that device file will eventually have to be opened. 
+Turn on the clocks in the open and turn them off at close.
 
-But at some point, I'll start requesting for this for debugfs. It's 
-terribly handy to debug power issues, run unit tests and for debug 
-sessions (debugfs. So, clearly!).
+Rate to request can be a DT property.
 
 -Saravana
 
