@@ -1,113 +1,110 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 May 2013 08:49:52 -0700
-Subject: [PATCH] ARM: OMAP2+: nand: reorganize gpmc timing values
-In-Reply-To: <1366388981.3928.158.camel@mars>
-References: <5170738F.8050305@ti.com> <1366325282.4232.6.camel@lovely>
- <51708097.6070102@ti.com> <51708131.2040208@ti.com>
- <1366362081.3928.18.camel@mars> <1366372957.3928.104.camel@mars>
- <51714E0D.7020304@ti.com> <1366383208.3928.144.camel@mars>
- <5171647B.9070108@ti.com> <1366388981.3928.158.camel@mars>
-Message-ID: <20130516154952.GT5600@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 16 May 2013 12:50:31 -0300
+Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
+In-Reply-To: <1368713639-21485-2-git-send-email-fabio.estevam@freescale.com>
+References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
+ <1368713639-21485-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <CAOMZO5AWBi4gDJCOJf5muFuRXygQAysYCHEL+gb_LwsXiy-knA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Christoph Fritz <chf.fritz@googlemail.com> [130419 09:34]:
-> This patch removes omap2_nand_gpmc_retime() which was used to quirk
-> some timing values before gpmc_cs_set_timings(). Due to recent changes,
-> gpmc_cs_set_timings() has evolved so that there is no more need for a
-> retime function.
-> 
-> To keep the gpmc configuration consistent for legacy board files, this
-> patch also adds oe_on and we_on to nand_default_timings[] as they
-> would be by the retime function.
-> 
-> Signed-off-by: Christoph Fritz <chf.fritz@googlemail.com>
-
-Thanks looks safe to me so applying into omap-for-v3.11/gpmc.
-
-Regards,
-
-Tony
-
+On Thu, May 16, 2013 at 11:13 AM, Fabio Estevam
+<fabio.estevam@freescale.com> wrote:
+> Commit e5aba13 (i2c: i2c-mxs: move to use generic DMA helper) changed
+> i2c-mxs.txt and drivers/i2c/busses/i2c-mxs.c to only use one I2C interrupt.
+>
+> Adapt the dtsi bindings with such change.
+>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  arch/arm/mach-omap2/board-flash.c |    3 +++
->  arch/arm/mach-omap2/gpmc-nand.c   |   40 +------------------------------------
->  2 files changed, 4 insertions(+), 39 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/board-flash.c b/arch/arm/mach-omap2/board-flash.c
-> index c33adea..fc20a61 100644
-> --- a/arch/arm/mach-omap2/board-flash.c
-> +++ b/arch/arm/mach-omap2/board-flash.c
-> @@ -112,6 +112,9 @@ struct gpmc_timings nand_default_timings[1] = {
->  		.cs_rd_off = 36,
->  		.cs_wr_off = 36,
->  
-> +		.we_on = 6,
-> +		.oe_on = 6,
-> +
->  		.adv_on = 6,
->  		.adv_rd_off = 24,
->  		.adv_wr_off = 36,
-> diff --git a/arch/arm/mach-omap2/gpmc-nand.c b/arch/arm/mach-omap2/gpmc-nand.c
-> index d9c2719..c8044b0 100644
-> --- a/arch/arm/mach-omap2/gpmc-nand.c
-> +++ b/arch/arm/mach-omap2/gpmc-nand.c
-> @@ -43,44 +43,6 @@ static struct platform_device gpmc_nand_device = {
->  	.resource	= gpmc_nand_resource,
->  };
->  
-> -static int omap2_nand_gpmc_retime(
-> -				struct omap_nand_platform_data *gpmc_nand_data,
-> -				struct gpmc_timings *gpmc_t)
-> -{
-> -	struct gpmc_timings t;
-> -	int err;
-> -
-> -	memset(&t, 0, sizeof(t));
-> -	t.sync_clk = gpmc_t->sync_clk;
-> -	t.cs_on = gpmc_t->cs_on;
-> -	t.adv_on = gpmc_t->adv_on;
-> -
-> -	/* Read */
-> -	t.adv_rd_off = gpmc_t->adv_rd_off;
-> -	t.oe_on  = t.adv_on;
-> -	t.access = gpmc_t->access;
-> -	t.oe_off = gpmc_t->oe_off;
-> -	t.cs_rd_off = gpmc_t->cs_rd_off;
-> -	t.rd_cycle = gpmc_t->rd_cycle;
-> -
-> -	/* Write */
-> -	t.adv_wr_off = gpmc_t->adv_wr_off;
-> -	t.we_on  = t.oe_on;
-> -	if (cpu_is_omap34xx()) {
-> -		t.wr_data_mux_bus = gpmc_t->wr_data_mux_bus;
-> -		t.wr_access = gpmc_t->wr_access;
-> -	}
-> -	t.we_off = gpmc_t->we_off;
-> -	t.cs_wr_off = gpmc_t->cs_wr_off;
-> -	t.wr_cycle = gpmc_t->wr_cycle;
-> -
-> -	err = gpmc_cs_set_timings(gpmc_nand_data->cs, &t);
-> -	if (err)
-> -		return err;
-> -
-> -	return 0;
-> -}
-> -
->  static bool gpmc_hwecc_bch_capable(enum omap_ecc ecc_opt)
->  {
->  	/* support only OMAP3 class */
-> @@ -131,7 +93,7 @@ int gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data,
->  				gpmc_get_client_irq(GPMC_IRQ_COUNT_EVENT);
->  
->  	if (gpmc_t) {
-> -		err = omap2_nand_gpmc_retime(gpmc_nand_data, gpmc_t);
-> +		err = gpmc_cs_set_timings(gpmc_nand_data->cs, gpmc_t);
->  		if (err < 0) {
->  			dev_err(dev, "Unable to set gpmc timings: %d\n", err);
->  			return err;
-> -- 
-> 1.7.10.4
-> 
-> 
-> 
+>  arch/arm/boot/dts/imx28.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 33389b8..2e1ba4b 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -878,7 +878,7 @@
+>                                 #size-cells = <0>;
+>                                 compatible = "fsl,imx28-i2c";
+>                                 reg = <0x80058000 0x2000>;
+> -                               interrupts = <111 68>;
+> +                               interrupts = <111>;
+>                                 clock-frequency = <100000>;
+>                                 dmas = <&dma_apbx 6>;
+>                                 dma-names = "rx-tx";
+> @@ -891,7 +891,7 @@
+>                                 #size-cells = <0>;
+>                                 compatible = "fsl,imx28-i2c";
+>                                 reg = <0x8005a000 0x2000>;
+> -                               interrupts = <110 69>;
+> +                               interrupts = <110>;
+>                                 clock-frequency = <100000>;
+>                                 dmas = <&dma_apbx 7>;
+>                                 dma-names = "rx-tx";
+
+Actually the correct is:
+
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -878,7 +878,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "fsl,imx28-i2c";
+ 				reg = <0x80058000 0x2000>;
+-				interrupts = <111 68>;
++				interrupts = <68>;
+ 				clock-frequency = <100000>;
+ 				dmas = <&dma_apbx 6>;
+ 				dma-names = "rx-tx";
+@@ -891,7 +891,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "fsl,imx28-i2c";
+ 				reg = <0x8005a000 0x2000>;
+-				interrupts = <110 69>;
++				interrupts = <69>;
+ 				clock-frequency = <100000>;
+ 				dmas = <&dma_apbx 7>;
+ 				dma-names = "rx-tx";
+
+,but then i2c fails to probe.
+
+Has anyone tried mxs i2c dma recently?
+
+Here is what I do on linux-next-20130516:
+
+- Revert  b871f1ad3c8a1ac2 (will send this later to alsa-devel)
+- Booting mx28evk will show:
+
+[    6.378298]  mmcblk0: p1 p2 p3
+[   29.547791] sgtl5000 0-000a: Failed to get supply 'VDDD': -19
+[   29.556308] 0-000a: 1200 mV normal
+[   29.562225] sgtl5000 0-000a: Using internal LDO instead of VDDD
+[   29.573156] sgtl5000 0-000a: sgtl5000 revision 0x11
+
+,ie, i2c is too slow as it takes 13 seconds to read the sgtl5000 codec
+registers. Looks like i2c dma is disabled
+
+Then I apply
+
+--- a/arch/arm/boot/dts/imx28.dtsi
++++ b/arch/arm/boot/dts/imx28.dtsi
+@@ -878,7 +878,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "fsl,imx28-i2c";
+ 				reg = <0x80058000 0x2000>;
+-				interrupts = <111 68>;
++				interrupts = <68>;
+ 				clock-frequency = <100000>;
+ 				dmas = <&dma_apbx 6>;
+ 				dma-names = "rx-tx";
+@@ -891,7 +891,7 @@
+ 				#size-cells = <0>;
+ 				compatible = "fsl,imx28-i2c";
+ 				reg = <0x8005a000 0x2000>;
+-				interrupts = <110 69>;
++				interrupts = <69>;
+ 				clock-frequency = <100000>;
+ 				dmas = <&dma_apbx 7>;
+ 				dma-names = "rx-tx";
+
+and the sgtl5000 probe fails.
