@@ -1,21 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 16 May 2013 16:01:56 +0100
-Subject: [RFC PATCH v2 11/11] ARM64: mm: THP support.
-In-Reply-To: <1368006763-30774-12-git-send-email-steve.capper@linaro.org>
-References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
- <1368006763-30774-12-git-send-email-steve.capper@linaro.org>
-Message-ID: <20130516150155.GG18308@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 May 2013 11:09:34 -0700
+Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
+In-Reply-To: <20130513205302.GA3157@blackmetal.musicnaut.iki.fi>
+References: <20130513205302.GA3157@blackmetal.musicnaut.iki.fi>
+Message-ID: <20130516180933.GG5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 08, 2013 at 10:52:43AM +0100, Steve Capper wrote:
-> Bring Transparent HugePage support to ARM. The size of a
-> transparent huge page depends on the normal page size. A
-> transparent huge page is always represented as a pmd.
+* Aaro Koskinen <aaro.koskinen@iki.fi> [130513 13:58]:
+> Hi,
 > 
-> If PAGE_SIZE is 4KB, THPs are 2MB.
-> If PAGE_SIZE is 64KB, THPs are 512MB.
+> I tested 3.10-rc1 on OMAP1 / Nokia 770, and Retu MFD probe is broken:
 > 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> [    2.264221] retu-mfd 2-0001: Retu v3.2 found
+> [    2.281951] retu-mfd 2-0001: Failed to allocate IRQs: -12
+> [    2.300140] retu-mfd: probe of 2-0001 failed with error -12
+> 
+> The error is coming from regmap code. According to git bisect, it is
+> caused by:
+> 
+> 	commit ede4d7a5b9835510fd1f724367f68d2fa4128453
+> 	Author: Jon Hunter <jon-hunter@ti.com>
+> 	Date:   Fri Mar 1 11:22:47 2013 -0600
+> 
+> 	    gpio/omap: convert gpio irq domain to linear mapping
+> 
+> The commit does not anymore revert cleanly, and I haven't yet tried
+> crafting a manual revert, so any fix proposals/ideas are welcome...
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Hmm this might be a bit trickier to fix. Obviously the real solution
+is to convert omap1 to SPARSE_IRQ like we did for omap2+.
+
+For the -rc cycle, it might be possible to fix this by adding a
+different irq_to_gpio() and gpio_to_irq() functions for omap1.
+
+Regards,
+
+Tony
