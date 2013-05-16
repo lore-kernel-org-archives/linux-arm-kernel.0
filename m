@@ -1,48 +1,29 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 16 May 2013 13:48:01 +0900
-Subject: [PATCH] ARM: shmobile: marzen: Use error values in usb_power_*
-Message-ID: <1368679681-10779-1-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 16 May 2013 14:04:53 +0900
+Subject: linux-next: manual merge of the renesas tree with Linus' tree
+In-Reply-To: <20130516132253.8865ca7b6503bd6fe9e6b05a@canb.auug.org.au>
+References: <20130516132253.8865ca7b6503bd6fe9e6b05a@canb.auug.org.au>
+Message-ID: <20130516050450.GA13842@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the marzen board code as if USB PHY isn't enabled
-they phy will have a value set by ERR_PTR() rather than be NULL.
+On Thu, May 16, 2013 at 01:22:53PM +1000, Stephen Rothwell wrote:
+> Hi Simon,
+> 
+> Today's linux-next merge of the renesas tree got a conflict in
+> arch/arm/mach-shmobile/board-lager.c between commit 65be2de17aae ("ARM:
+> shmobile: use r8a7790 timer setup code on Lager") from Linus' tree and
+> commit 993340a1390d ("ARM: shmobile: use r8a7790 timer setup code on
+> Lager") from the renesas tree.
+> 
+> These are the same patch but different commits :-( and there are further
+> commits touching this file in the renesas tree.  Please clean up your
+> tree and remove anything that has already gone upstream as different
+> patches.  I used the renesas tree version of this file.
 
-Without this patch a NULL pointer dereference  and kernel panic
-occurs on initialisation of USB on marzen.
 
-This resolves a regression introduced in 3.10-rc1 by
-b7fa5c2aec5be083eb2719b405089703608e9bc6
-("usb: phy: return -ENXIO when PHY layer isn't enabled").
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-marzen.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index 9105285..b9594e9 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -212,8 +212,8 @@ static struct platform_device *marzen_devices[] __initdata = {
- static struct usb_phy *phy;
- static int usb_power_on(struct platform_device *pdev)
- {
--	if (!phy)
--		return -EIO;
-+	if (IS_ERR(phy))
-+		return PTR_ERR(phy);
- 
- 	pm_runtime_enable(&pdev->dev);
- 	pm_runtime_get_sync(&pdev->dev);
-@@ -225,7 +225,7 @@ static int usb_power_on(struct platform_device *pdev)
- 
- static void usb_power_off(struct platform_device *pdev)
- {
--	if (!phy)
-+	if (IS_ERR(phy))
- 		return;
- 
- 	usb_phy_shutdown(phy);
--- 
-1.8.2.1
+Sorry about that. I am working on re-basing my branches on
+top of v3.10-rc1 and I have confirmed that in my current local
+branches the problem you describe is no longer present.
+I plan to push the refreshed branches, including a new next branch
+for linux-next, once a few bug-fix patches have been reviewed.
