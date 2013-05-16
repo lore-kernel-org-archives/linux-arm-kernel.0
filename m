@@ -1,45 +1,28 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu, 16 May 2013 10:26:24 +0200
-Subject: [PATCHv9 5/9] clk: mvebu: create parent-child relation for PCIe
- clocks on Armada 370
-In-Reply-To: <20130516094417.24b1ca0d@skate>
-References: <1368624323-24311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1368624323-24311-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130515214154.12127.73539@quantum> <20130516094417.24b1ca0d@skate>
-Message-ID: <51949830.70306@gmail.com>
+From: dt.tangr@gmail.com (Daniel Tang)
+Date: Thu, 16 May 2013 18:31:38 +1000
+Subject: [RFC PATCHv3 3/6] clk: Add TI-Nspire clock drivers
+In-Reply-To: <201305151607.54442.arnd@arndb.de>
+References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
+ <1368332581-94691-4-git-send-email-dt.tangr@gmail.com>
+ <201305151607.54442.arnd@arndb.de>
+Message-ID: <15FD6543-D04A-4953-A56A-40B27F0026E4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2013 09:44 AM, Thomas Petazzoni wrote:
-> Dear Mike Turquette,
->
-> On Wed, 15 May 2013 14:41:54 -0700, Mike Turquette wrote:
->> Quoting Thomas Petazzoni (2013-05-15 06:25:19)
->>> The Armada 370 has two gatable clocks for each PCIe interface, and we
->>> want both of them to be enabled. We therefore make one of the two
->>> clocks a child of the other, as we did for the sataX and sataXlnk
->>> clocks on Armada XP.
->>
->> Ack for patches #5 and #6.  Do you want me to take them?
->
-> I don't know, I guess with your Ack, it would be easier to carry them
-> through the Marvell maintainers and then the arm-soc tree, so that we
-> can test arm-soc and have all the pieces needed in here.
->
-> That said, Sebastian Hesselbarth has submitted a big rework of the
-> mvebu clock drivers, which would conflict with this patch, and
-> Sebastian's rework would most likely go through your tree. If that's
-> the case, I guess it would be better to let you take #5 and #6 in this
-> patch series.
 
-I also requested to take the restructure patches through ARM tree. They
-are only touching files in drivers/clk/mvebu and by taking them through
-ARM, we can update PCIe clock patches easily. The dependency between
-Thomas' and my patches basically is that I renamed files that Thomas
-now commits to. (I switched clk/mvebu from per-function files to per-soc
-files).
+On 16/05/2013, at 12:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> That's something to be discussed with the Marvell maintainers (Jason
-> Cooper, Andrew Lunn, Gregory Clement).
+> You are missing a binding in Documentation/devicetree, same as for some of
+> the other drivers in this series.
 
-Sebastian
+Should we be adding a vendor prefix to it too? If so, we're not sure whether to use "ti," or not since this isn't an official port by TI.
+
+> It seems strange to assign the clk_name variable to node->name
+> first and then overriding it with the clock-output-names property.
+> Is that intentional? If so, please explain it in a comment.
+> 
+
+I copied that bit of boilerplate from drivers/clk/clk-fixed-rate.c but I'm guessing it's to use the node name as the clock name unless there is a property called "clock-output-names"
+
+Cheers,
+Daniel Tang
