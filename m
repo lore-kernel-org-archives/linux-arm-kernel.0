@@ -1,35 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 May 2013 11:54:44 -0700
-Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
-In-Reply-To: <20130516183516.GJ5600@atomide.com>
-References: <20130515002537.GG5600@atomide.com>
- <20130515015212.GB3268@animalcreek.com>
- <20130515170734.GI5600@atomide.com>
- <20130515215028.GA11883@animalcreek.com>
- <5194B2A8.8020608@visionsystems.de>
- <20130516183516.GJ5600@atomide.com>
-Message-ID: <20130516185444.GK5600@atomide.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 16 May 2013 11:55:45 -0700
+Subject: [PATCH RFC] clk: Introduce userspace clock driver
+In-Reply-To: <20130516172605.GB1627@sirena.org.uk>
+References: <519112F9.2010102@gmail.com>
+ <7c5e7537-6ed5-4622-a7a9-bf46820ef695@VA3EHSMHS033.ehs.local>
+ <519124D3.2040403@gmail.com>
+ <af51c63e-7ff1-4e73-9305-08309217ab38@TX2EHSMHS037.ehs.local>
+ <20130514164611.10068.46384@quantum>
+ <51927DEB.7090001@balister.org>
+ <20130515044604.GA24524@sirena.org.uk>
+ <51946082.1000606@codeaurora.org> <5194F0C0.9020609@balister.org>
+ <20130516172605.GB1627@sirena.org.uk>
+Message-ID: <1b69c011-cab5-4fde-a61d-7e2536208920@CH1EHSMHS003.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130516 11:40]:
-> * Yegor Yefremov <yegor_sub1@visionsystems.de> [130516 05:13]:
-> > 
-> > I think this issue is relevant to am3517 as you can see from this thread: http://thread.gmane.org/gmane.linux.ports.arm.omap/97903
-> > I could boot only with your patch http://www.spinics.net/lists/arm-kernel/msg168865.html
+On Thu, May 16, 2013 at 06:26:05PM +0100, Mark Brown wrote:
+> On Thu, May 16, 2013 at 10:44:16AM -0400, Philip Balister wrote:
+> > On 05/16/2013 12:28 AM, Saravana Kannan wrote:
 > 
-> OK sounds like Mark's patch as http://www.spinics.net/lists/arm-kernel/msg168865.html
-> is needed as a fix.
+> > > Agreed. I was about to reply with exactly the same point. I haven't done
+> > > any UIO coding, but that device file will eventually have to be opened.
+> > > Turn on the clocks in the open and turn them off at close.
+> 
+> > > Rate to request can be a DT property.
+> 
+> > But you are assuming each device implemented in the fpga uses one clock.
+> > This assumption is clearly not valid since devices will ahve to share
+> > clocks.
+> 
+> The binding should obviously be defined as a set of clocks rather than a
+> single clock - something like how we specify regulators on PMICs
+> probably makes sense.  Each clock can have its own properties.
+For a device driver as clock consumer, the bindings etc. are well
+defined. Just add the 'clocks' and 'clock-names' props and use the CCF.
 
-Yegor, thinking about your boot issue more, I'm thinking that you
-have your board .init_time = omap3_secure_sync32k_timer_init, or
-some non-waking gpt timer. And that means the system won't wake to
-timer events.
-
-The system should still wake to timer events even if you have no
-wake-up events configred, so Mark's patch probably does not fix
-the right issue for you.
-
-Regards,
-
-Tony
+	S?ren
