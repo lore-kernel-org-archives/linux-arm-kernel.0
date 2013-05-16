@@ -1,27 +1,48 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 16 May 2013 10:19:49 -0500
-Subject: [PATCH] ARM: omap2: remove CONFIG_ARCH_OMAP2PLUS_TYPICAL
-In-Reply-To: <20130516151126.GP5600@atomide.com>
-References: <1368710950-2306-1-git-send-email-robherring2@gmail.com>
- <20130516151126.GP5600@atomide.com>
-Message-ID: <CAL_JsqJgc39YO3-L=-kgJ=wmXhe-dAP5nHngaCLbxfheAEvduA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 16 May 2013 17:20:36 +0200
+Subject: [PATCH 0/4] ARM: Remove boilerplate debug_ll_io_init code
+In-Reply-To: <201305160040.54399.arnd@arndb.de>
+References: <1368440169-29088-1-git-send-email-maxime.ripard@free-electrons.com>
+ <201305160040.54399.arnd@arndb.de>
+Message-ID: <5194F944.2040803@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 10:11 AM, Tony Lindgren <tony@atomide.com> wrote:
-> * Rob Herring <robherring2@gmail.com> [130516 06:34]:
->> From: Rob Herring <rob.herring@calxeda.com>
+Hi Arnd,
+
+Le 16/05/2013 00:40, Arnd Bergmann a ?crit :
+> On Monday 13 May 2013, Maxime Ripard wrote:
+>> The recent introduction of debug_ll_io_init made possible to not rely
+>> anymore on a custom map_io function but on debug_ll_io_init for the
+>> early mapping and then on the various drivers to do the needed mappings for
+>> the kernel to boot.
 >>
->> CONFIG_ARCH_OMAP2PLUS_TYPICAL is selecting user defined features, not h/w
->> required options. This does not play well with multi-platform kernels and
->> belongs in a defconfig.
->
-> Yes we can remove this. But let's update omap2plus_defconfig with these
-> options where needed. I can update this patch for that and queue it
-> if that works for you.
->
+>> Some architectures begin to use only this function as the map_io callback in
+>> the machine description.
+>>
+>> In order to remove some boilerplate code, make the ARM mm code call
+>> debug_ll_io_init by itself when no .map_io callback is defined.
+>>
+>> This has been tested on the sunxi platform.
+> 
+> Great stuff!
+> 
+> I didn't notice the addition of debug_ll_io_init, so this is a nice surprise
+> for me.
 
-Yes, that's fine. You might also want to enable the h/w related
-features to multi_v7_defconfig as well.
+Well, you can thank Rob for that, I wasn't involved in it in the first
+place :)
 
-Rob
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Thanks,
+
+How will we merge this? The first patch would be merged by Russel and
+the 3 others by their respective maintainers?
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
