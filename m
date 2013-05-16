@@ -1,41 +1,38 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Thu, 16 May 2013 14:10:14 +0300
-Subject: [PATCH v2 02/10] arm64: uaccess s/might_sleep/might_fault/
-In-Reply-To: <cover.1368702323.git.mst@redhat.com>
-References: <cover.1368702323.git.mst@redhat.com>
-Message-ID: <90a2283bb84b6ce77c9966d76dbceb5c7edffd18.1368702323.git.mst@redhat.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 16 May 2013 13:12:33 +0200
+Subject: [PATCH] ARM: dove: declare all device IDs for module loading
+Message-ID: <20130516131233.30145f82@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only reason uaccess routines might sleep
-is if they fault. Make this explicit.
+When the si5351 driver is a kernel module, it is loaded into memory
+from its i2c device IDs, but not from its DT compatible properties.
 
-Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
----
- arch/arm64/include/asm/uaccess.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+This patch declares the i2c device IDs of all chip variants.
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 008f848..edb3d5c 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -166,7 +166,7 @@ do {									\
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+--- 
+ drivers/clk/clk-si5351.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+index 8927284..9ebdddd 100644
+--- a/drivers/clk/clk-si5351.c
++++ b/drivers/clk/clk-si5351.c
+@@ -1490,7 +1490,10 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ }
  
- #define get_user(x, ptr)						\
- ({									\
--	might_sleep();							\
-+	might_fault();							\
- 	access_ok(VERIFY_READ, (ptr), sizeof(*(ptr))) ?			\
- 		__get_user((x), (ptr)) :				\
- 		((x) = 0, -EFAULT);					\
-@@ -227,7 +227,7 @@ do {									\
- 
- #define put_user(x, ptr)						\
- ({									\
--	might_sleep();							\
-+	might_fault();							\
- 	access_ok(VERIFY_WRITE, (ptr), sizeof(*(ptr))) ?		\
- 		__put_user((x), (ptr)) :				\
- 		-EFAULT;						\
+ static const struct i2c_device_id si5351_i2c_ids[] = {
+-	{ "silabs,si5351", 0 },
++	{ "si5351a", 0 },
++	{ "si5351a-msop", 0 },
++	{ "si5351b", 0 },
++	{ "si5351c", 0 },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(i2c, si5351_i2c_ids);
+
+
 -- 
-MST
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
