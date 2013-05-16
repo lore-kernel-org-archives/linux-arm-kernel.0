@@ -1,24 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 May 2013 11:04:25 -0700
-Subject: [PATCH] ARM: OMAP: fix __init section mismatch for
- _enable_preprogram
-In-Reply-To: <CAGGh5h1_-zbe=gw+YtMeddGxGkVzos=siavOv9nbSOVZqk1nVw@mail.gmail.com>
-References: <CAGGh5h1_-zbe=gw+YtMeddGxGkVzos=siavOv9nbSOVZqk1nVw@mail.gmail.com>
-Message-ID: <20130516180425.GE5600@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 16 May 2013 16:34:06 +0100
+Subject: [PATCH 2/3] ARM: kernel: fix arm_dt_init_cpu_maps() to skip non-cpu
+ nodes
+In-Reply-To: <1368718447-19209-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1368718447-19209-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1368718447-19209-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* jean-philippe francois <jp.francois@cynove.com> [130513 02:34]:
-> Hi,
-> 
-> _enable_preprogram is marked as __init, but is called from _enable
-> which is not. Without this patch, the board oopses after init. Tested
-> on custom hardware and on beagle board xM.
-> 
-> Signed-off-by: Jean-Philippe Fran?ois <jp.francois@cynove.com>
+The introduction of the cpu-map topology node in the cpus node implies
+that cpus node might have children that are not cpu nodes. The DT
+parsing code needs updating otherwise it would check for cpu nodes
+properties in nodes that are not required to contain them, resulting
+in warnings that have no bearing on bindings defined in the dts source file.
 
-Thanks applying into omap-for-v3.10/fixes.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+---
+ arch/arm/kernel/devtree.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index 3d652e4f..d2293c0 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -93,6 +93,9 @@ void __init arm_dt_init_cpu_maps(void)
+ 	for_each_child_of_node(cpus, cpu) {
+ 		u32 hwid;
+ 
++		if (of_node_cmp(cpu->type, "cpu"))
++			continue;
++
+ 		pr_debug(" * %s...\n", cpu->full_name);
+ 		/*
+ 		 * A device tree containing CPU nodes with missing "reg"
+-- 
+1.8.2.2
