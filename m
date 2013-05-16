@@ -1,43 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 16 May 2013 15:32:36 +0100
-Subject: [RFC PATCH v2 09/11] ARM64: mm: HugeTLB support.
-In-Reply-To: <1368006763-30774-10-git-send-email-steve.capper@linaro.org>
-References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
- <1368006763-30774-10-git-send-email-steve.capper@linaro.org>
-Message-ID: <20130516143236.GD18308@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 16 May 2013 18:35:59 +0100
+Subject: [alsa-devel] [PATCH] ASoC: dfbmcs320: make the driver common for
+ other BT modules
+In-Reply-To: <CAGsJ_4yn2uodRKrFKYrX85XA7A=hQs2w0cyGoEEHsYgCJHD7eQ@mail.gmail.com>
+References: <1368687184-12169-1-git-send-email-Baohua.Song@csr.com>
+ <5194AC3C.4080206@metafoo.de>
+ <CAGsJ_4yoXj+e7A20SM5+ctLvE2QRTp0bzDeKfCZSUHTO8BPq5A@mail.gmail.com>
+ <5194C2FC.70804@metafoo.de>
+ <CAGsJ_4yn2uodRKrFKYrX85XA7A=hQs2w0cyGoEEHsYgCJHD7eQ@mail.gmail.com>
+Message-ID: <20130516173559.GD1627@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 08, 2013 at 10:52:41AM +0100, Steve Capper wrote:
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/hugetlb.h
-...
-> +static inline int pud_large(pud_t pud)
-> +{
-> +	return !(pud_val(pud) & PUD_TABLE_BIT);
-> +}
+On Thu, May 16, 2013 at 08:00:17PM +0800, Barry Song wrote:
 
-I already commented on this - do we really need pud_large() which is
-the same as pud_huge()? It's only defined on x86 and can be safely
-replaced with pud_huge().
+> i did think it is a good idea to have device id list while i sent the
+> last mail. and it matches with the generic device driver engineering
+> sense. the problem is i don't how long the list will be.
+> if you like to keep dfbmcs320 at least for the moment, i would agree.
 
-> --- /dev/null
-> +++ b/arch/arm64/mm/hugetlbpage.c
-> @@ -0,0 +1,70 @@
-...
-> +int pmd_huge(pmd_t pmd)
-> +{
-> +	return !(pmd_val(pmd) & PMD_TABLE_BIT);
-> +}
-> +
-> +int pud_huge(pud_t pud)
-> +{
-> +	return !(pud_val(pud) & PUD_TABLE_BIT);
-> +}
-
-You could even go further and make pud/pmd_huge static inline functions
-for slightly better efficiency (needs changing in the linux/hugetlb.h
-header).
-
--- 
-Catalin
+I'd prefer to see the ID list; we shouldn't be throwing away
+information.  Probably we can go a long way towards cutting down the
+length of the list if it gets silly with use of wildcards in the device
+names listed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130516/b49bd1d4/attachment.sig>
