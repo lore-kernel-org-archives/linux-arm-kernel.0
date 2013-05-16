@@ -1,87 +1,53 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Wed, 15 May 2013 18:10:29 -0700 (PDT)
-Subject: [PATCH v3 1/1] ARM: shmobile: r8a7778: add I2C support
-In-Reply-To: <201304232015.59697.sergei.shtylyov@cogentembedded.com>
-References: <201304232012.57619.sergei.shtylyov@cogentembedded.com>
- <201304232015.59697.sergei.shtylyov@cogentembedded.com>
-Message-ID: <87txm3wwzh.wl%kuninori.morimoto.gx@renesas.com>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Thu, 16 May 2013 10:50:07 +0800
+Subject: [PATCH] i2c: sirf: move driver init from module_init to
+ subsys_initcall
+Message-ID: <1368672607-5536-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Xiaomeng Hou <Xiaomeng.Hou@csr.com>
 
-Hi Sergei
+if we initilize i2c bus by module_init, there are some devices which want
+initialization earlier than i2c and could not do that in time, so move i2c
+driver initilization to subsys_initcall and make i2c ready before devices
+init.
 
-Basically, this patch is good for me.
-But I have some comment.
-
-Sergei Shtylyov wrote:
-> 
-> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> 
-> Add I2C clocks and platform devices for R8A7778 SoC.
-> Don't forget to also add the peripheral clock which the I2C driver uses.
-> 
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> [Sergei: changed the registration function to platform_device_register_simple(),
-> annotated I2C resources as '__initdata', regrouped MSTPxxx *enum* members, added
-> the copyright.]
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-(snip)
-> -	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
-> +	MSTP030, MSTP029,
-> +	MSTP028, MSTP027, MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
-
-It should be
-
-	MSTP30,
-	MSPT029, MSPT028, MSPT027...
-
-> +/* I2C */
-> +static struct resource i2c0_resources[] __initdata = {
-> +	DEFINE_RES_MEM(0xffc70000, 0x1000),
-> +	DEFINE_RES_IRQ(gic_iid(0x63)),
-> +};
-> +
-> +static struct resource i2c1_resources[] __initdata = {
-> +	DEFINE_RES_MEM(0xffc71000, 0x1000),
-> +	DEFINE_RES_IRQ(gic_iid(0x6e)),
-> +};
-> +
-> +static struct resource i2c2_resources[] __initdata = {
-> +	DEFINE_RES_MEM(0xffc72000, 0x1000),
-> +	DEFINE_RES_IRQ(gic_iid(0x6c)),
-> +};
-> +
-> +static struct resource i2c3_resources[] __initdata = {
-> +	DEFINE_RES_MEM(0xffc73000, 0x1000),
-> +	DEFINE_RES_IRQ(gic_iid(0x6d)),
-> +};
-> +
-> +#define r8a7778_register_i2c(idx)			\
-> +	platform_device_register_simple(		\
-> +		"i2c-rcar", idx,			\
-> +		i2c##idx##_resources,			\
-> +		ARRAY_SIZE(i2c##idx##_resources))
-> +
->  /* USB PHY */
->  static struct resource usb_phy_resources[] __initdata = {
->  	DEFINE_RES_MEM(0xffe70800, 0x100),
-> @@ -294,6 +321,11 @@ void __init r8a7778_add_standard_devices
->  
->  	r8a7778_register_tmu(0);
->  	r8a7778_register_tmu(1);
-> +
-> +	r8a7778_register_i2c(0);
-> +	r8a7778_register_i2c(1);
-> +	r8a7778_register_i2c(2);
-> +	r8a7778_register_i2c(3);
->  }
-
-i2c1 - i2c3 pins are pin-multi.
-I guess using r8a7778_add_i2c_devices(idx) from board code is better method
-
-
-Best regards
+Signed-off-by: Xiaomeng Hou <Xiaomeng.Hou@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
-Kuninori Morimoto
+ drivers/i2c/busses/i2c-sirf.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
+index 5a7ad24..e438f48 100644
+--- a/drivers/i2c/busses/i2c-sirf.c
++++ b/drivers/i2c/busses/i2c-sirf.c
+@@ -454,7 +454,19 @@ static struct platform_driver i2c_sirfsoc_driver = {
+ 	.probe = i2c_sirfsoc_probe,
+ 	.remove = i2c_sirfsoc_remove,
+ };
+-module_platform_driver(i2c_sirfsoc_driver);
++
++static __init int i2c_sirfsoc_init(void)
++{
++	return platform_driver_register(&i2c_sirfsoc_driver);
++}
++
++static void __exit i2c_sirfsoc_exit(void)
++{
++	platform_driver_unregister(&i2c_sirfsoc_driver);
++}
++
++subsys_initcall(i2c_sirfsoc_init);
++module_exit(i2c_sirfsoc_exit);
+ 
+ MODULE_DESCRIPTION("SiRF SoC I2C master controller driver");
+ MODULE_AUTHOR("Zhiwu Song <Zhiwu.Song@csr.com>, "
+-- 
+1.8.2.3
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
