@@ -1,54 +1,62 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 16 May 2013 13:13:35 -0700
-Subject: [PATCH v2] clk: si5351: declare all device IDs for module loading
-In-Reply-To: <20130516174916.2daa49b6@armhf>
-References: <20130516174916.2daa49b6@armhf>
-Message-ID: <20130516201335.12127.99310@quantum>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 16 May 2013 16:18:27 -0400
+Subject: [PATCHv9 7/9] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130516161201.GI6563@titan.lakedaemon.net>
+References: <1368624323-24311-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1368624323-24311-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130516093312.GB2459@localhost>
+ <20130516154031.GF6563@titan.lakedaemon.net>
+ <20130516174903.3a7a07ef@skate>
+ <20130516155617.GH6563@titan.lakedaemon.net>
+ <20130516180850.3622e1a8@skate>
+ <20130516161201.GI6563@titan.lakedaemon.net>
+Message-ID: <20130516201827.GA11137@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jean-Francois Moine (2013-05-16 08:49:16)
-> When the si5351 driver is a kernel module, it is loaded into memory
-> from its i2c device IDs, but not from its DT compatible properties.
+On Thu, May 16, 2013 at 12:12:02PM -0400, Jason Cooper wrote:
+> On Thu, May 16, 2013 at 06:08:50PM +0200, Thomas Petazzoni wrote:
+> > Dear Jason Cooper,
+> > 
+> > On Thu, 16 May 2013 11:56:17 -0400, Jason Cooper wrote:
+> > 
+> > > > > > Building this showed a warning here. It seems you forgot
+> > > > > > to mark this one as __init.
+> > > > > 
+> > > > > Thomas, I'll fix this up when I pull this in, no need to resend. :)
+> > > > 
+> > > > I'll resend, because beyond this function pointed by Ezequiel, there
+> > > > are two other functions that can be marked __init. The one pointed by
+> > > > Ezequiel is important because it causes a section mismatch
+> > > > when !CONFIG_MODULES, because in this case platform_driver_probe() is
+> > > > __init (and this explains what I wasn't seeing the warning, since I'm
+> > > > building CONFIG_MODULES=y). The two other functions are more cosmetic,
+> > > > but good to have as well.
+> > > > 
+> > > > It would already been sent if git hadn't decided to do a 'git gc' right
+> > > > after my rebase. It's been gc-ing for quite some time now...
+> > > 
+> > > Dear boss,
+> > > 
+> > > I am in desperate need of a 500GB SSD on which to do my kernel work.
+> > > 
+> > > Thanks,
+> > > 
+> > > Kranky Kernel Developer
+> > > 
+> > > hehehe...
+> > 
+> > Adding boss in the Cc list :-)
 > 
-> This patch declares the i2c device IDs of all chip variants.
-> 
-> Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+> Hey, whatever works for you.  Good luck!
 
-Taken into clk-next.
+Ok, you motivated me, I just ordered this one:
 
-Thanks,
-Mike
+http://www.amazon.com/Crucial-512GB-2-5-Inch-9-5mm-CT512M4SSD2/dp/B004W2JL3Y
 
-> ---
-> v2: subject change - was "ARM: dove: ..."
-> --- 
->  drivers/clk/clk-si5351.c |    5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-> index 8927284..9ebdddd 100644
-> --- a/drivers/clk/clk-si5351.c
-> +++ b/drivers/clk/clk-si5351.c
-> @@ -1490,7 +1490,10 @@ static int si5351_i2c_probe(struct i2c_client *client,
->  }
->  
->  static const struct i2c_device_id si5351_i2c_ids[] = {
-> -       { "silabs,si5351", 0 },
-> +       { "si5351a", 0 },
-> +       { "si5351a-msop", 0 },
-> +       { "si5351b", 0 },
-> +       { "si5351c", 0 },
->         { }
->  };
->  MODULE_DEVICE_TABLE(i2c, si5351_i2c_ids);
-> 
-> 
-> -- 
-> Ken ar c'henta? |             ** Breizh ha Linux atav! **
-> Jef             |               http://moinejf.free.fr/
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I'd've gone with Intel, but it ships in 2 to 5 weeks, and it costs 20%
+more with comparable capacity.
+
+thx,
+
+Jason.
