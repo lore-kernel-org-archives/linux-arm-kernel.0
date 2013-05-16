@@ -1,42 +1,31 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 16 May 2013 15:11:57 +0530
-Subject: [PATCH 34/39] dmaengine: ste_dma40: Convert data_width from
- register bit format to value
-In-Reply-To: <20130516073553.GF3269@gmail.com>
-References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-35-git-send-email-lee.jones@linaro.org>
- <20130516063244.GA14863@intel.com>
- <20130516073553.GF3269@gmail.com>
-Message-ID: <20130516094157.GK14863@intel.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 16 May 2013 18:25:39 +0800
+Subject: [PATCH] i2c: sirf: move driver init from module_init to
+ subsys_initcall
+In-Reply-To: <20130516093846.GA2927@katana>
+References: <1368672607-5536-1-git-send-email-Baohua.Song@csr.com>
+ <20130516093846.GA2927@katana>
+Message-ID: <CAGsJ_4zVOF8-g=emEGgP3atxkWdxMaQQiVZrZkht_WueTriSnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 08:35:53AM +0100, Lee Jones wrote:
-> On Thu, 16 May 2013, Vinod Koul wrote:
-> 
-> > On Wed, May 15, 2013 at 10:51:57AM +0100, Lee Jones wrote:
-> > > +u8 d40_width_to_bits(enum dma_slave_buswidth width)
-> > > +{
-> > > +	if (width == DMA_SLAVE_BUSWIDTH_1_BYTE)
-> > > +		return STEDMA40_ESIZE_8_BIT;
-> > > +	else if (width == DMA_SLAVE_BUSWIDTH_2_BYTES)
-> > > +		return STEDMA40_ESIZE_16_BIT;
-> > > +	else if (width == DMA_SLAVE_BUSWIDTH_8_BYTES)
-> > > +		return STEDMA40_ESIZE_64_BIT;
-> > > +	else
-> > > +		return STEDMA40_ESIZE_32_BIT;
-> > > +}
-> > > +
-> > Switch looks better for this and how about
-> > 	return fls(width);
-> > 
-> > as your defines are 0...3 and dmaengine define 1,2,..8 for same thing
-> > then you can also get rid of STEDMA40_XXX_WIDTH macros!
-> 
-> I like it.
-> 
-> Will you let me do it as a follow-up patch?
-Okay...
+2013/5/16 Wolfram Sang <wsa@the-dreams.de>:
+> On Thu, May 16, 2013 at 10:50:07AM +0800, Barry Song wrote:
+>> From: Xiaomeng Hou <Xiaomeng.Hou@csr.com>
+>>
+>> if we initilize i2c bus by module_init, there are some devices which want
+>> initialization earlier than i2c and could not do that in time, so move i2c
+>> driver initilization to subsys_initcall and make i2c ready before devices
+>> init.
+>>
+>> Signed-off-by: Xiaomeng Hou <Xiaomeng.Hou@csr.com>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>
+> What about deferred probing?
 
---
-~Vinod
+deferred probing could work but could not work for automative.
+what we really want is that devices begin to work as early as
+possible. we want i2c clients like lcd, camera begin to show images as
+early as possible as an automative requirement.
+
+-barry
