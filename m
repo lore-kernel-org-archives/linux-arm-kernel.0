@@ -1,16 +1,13 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Thu, 16 May 2013 14:05:16 -0500
-Subject: [PATCHv2 5/6] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <1368731117-4749-1-git-send-email-dinguyen@altera.com>
-References: <1368731117-4749-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1368731117-4749-5-git-send-email-dinguyen@altera.com>
+Date: Thu, 16 May 2013 14:05:12 -0500
+Subject: [PATCHv2 1/6] ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
+Message-ID: <1368731117-4749-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Add bindings for SD/MMC for SOCFPGA.
-Add "syscon" to the "altr,sys-mgr" binding.
+Add entry for 2nd GMAC controller. Add the correct clocks for the GMAC.
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 Reviewed-by: Pavel Machek <pavel@denx.de>
@@ -20,155 +17,96 @@ Cc: Pavel Machek <pavel@denx.de>
 CC: <linux@arm.linux.org.uk>
 
 v2:
-- Add "syscon" to "altr,sys-mgr"
-- Remove pwr-en field
+- Moved "disabled" status to dtsi file
 ---
- .../devicetree/bindings/mmc/socfpga-dw-mshc.txt    |   60 ++++++++++++++++++++
- arch/arm/boot/dts/socfpga.dtsi                     |   13 ++++-
- arch/arm/boot/dts/socfpga_cyclone5.dts             |   13 +++++
- arch/arm/boot/dts/socfpga_vt.dts                   |   12 ++++
- 4 files changed, 97 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+ arch/arm/boot/dts/socfpga.dtsi         |   18 ++++++++++++++++--
+ arch/arm/boot/dts/socfpga_cyclone5.dts |   13 +++++++++++++
+ arch/arm/boot/dts/socfpga_vt.dts       |    5 +++++
+ 3 files changed, 34 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
-new file mode 100644
-index 0000000..9d7062c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
-@@ -0,0 +1,60 @@
-+* Altera SOCFPGA specific extensions to the Synopsis Designware Mobile
-+  Storage Host Controller
-+
-+Required Properties:
-+
-+* compatible: should be
-+	- "altr,socfpga-dw-mshc": for controllers with Altera SOCFPGA
-+	  specific extentions.
-+
-+* altr,dw-mshc-ciu-div: Specifies the divider value for the card interface
-+  unit (ciu) clock. The value should be (n-1). For Altera's SOCFPGA, the divider
-+  value is fixed at 3, which mean parent_clock/4.
-+
-+* altr,dw-mshc-sdr-timing: Specifies the value of CIU clock phase shift value
-+  in transmit mode and CIU clock phase shift value in receive mode for single
-+  data rate mode operation. Refer notes below for the order of the cells and the
-+  valid values.
-+
-+  Notes for the sdr-timing values:
-+
-+    The order of the cells should be
-+      - First Cell: CIU clock phase shift value for RX mode, smplsel bits in
-+	the system manager SDMMC control group.
-+      - Second Cell: CIU clock phase shift value for TX mode, drvsel bits in
-+	the system manager SDMMC control group.
-+
-+    Valid values for SDR CIU clock timing for SOCFPGA:
-+      - valid value for tx phase shift and rx phase shift is 0 to 7.
-+
-+Required properties for a slot:
-+
-+* bus-width: Data width for card slot. 4-bit or 8-bit data.
-+
-+Example:
-+
-+  The MSHC controller node can be split into two portions, SoC specific and
-+  board specific portions as listed below.
-+
-+	dwmmc0 at ff704000 {
-+		compatible = "altr,socfpga-dw-mshc";
-+		reg = <0xff704000 0x1000>;
-+		interrupts = <0 139 4>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	dwmmc0 at ff704000 {
-+		num-slots = <1>;
-+		supports-highspeed;
-+		broken-cd;
-+		fifo-depth = <0x400>;
-+		altr,dw-mshc-ciu-div = <3>;
-+      		altr,dw-mshc-sdr-timing = <0 3>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <4>;
-+		};
-+	};
-+
 diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index bee62a2..dbf7f22 100644
+index 16a6e13..02bb425 100644
 --- a/arch/arm/boot/dts/socfpga.dtsi
 +++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -468,6 +468,17 @@
- 			cache-level = <2>;
- 		};
+@@ -23,6 +23,7 @@
  
-+		mmc: dwmmc0 at ff704000 {
-+			compatible = "altr,socfpga-dw-mshc";
-+			reg = <0xff704000 0x1000>;
-+			interrupts = <0 139 4>;
-+			fifo-depth = <0x400>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
-+			clock-names = "biu", "ciu";
+ 	aliases {
+ 		ethernet0 = &gmac0;
++		ethernet1 = &gmac1;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 		timer0 = &timer0;
+@@ -238,13 +239,26 @@
+ 				};
+ 			};
+ 
+-		gmac0: stmmac at ff700000 {
++		gmac0: ethernet at ff700000 {
+ 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
+ 			reg = <0xff700000 0x2000>;
+ 			interrupts = <0 115 4>;
+ 			interrupt-names = "macirq";
+ 			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+-			phy-mode = "gmii";
++			clocks = <&emac0_clk>;
++			clock-names = "stmmaceth";
++			status = "disabled";
 +		};
 +
- 		/* Local timer */
- 		timer at fffec600 {
- 			compatible = "arm,cortex-a9-twd-timer";
-@@ -521,7 +532,7 @@
- 			};
- 
- 		sysmgr at ffd08000 {
--				compatible = "altr,sys-mgr";
-+				compatible = "altr,sys-mgr", "syscon";
- 				reg = <0xffd08000 0x4000>;
- 			};
- 	};
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
-index 973999d..1853cb1 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
-@@ -54,6 +54,19 @@
- 			status = "okay";
++		gmac1: ethernet at ff702000 {
++			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
++			reg = <0xff702000 0x2000>;
++			interrupts = <0 120 4>;
++			interrupt-names = "macirq";
++			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
++			clocks = <&emac1_clk>;
++			clock-names = "stmmaceth";
++			status = "disabled";
  		};
  
-+		dwmmc0 at ff704000 {
-+			num-slots = <1>;
-+			supports-highspeed;
-+			broken-cd;
-+			altr,dw-mshc-ciu-div = <3>;
-+			altr,dw-mshc-sdr-timing = <0 3>;
+ 		L2: l2-cache at fffef000 {
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
+index 2495958..973999d 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
+@@ -32,6 +32,13 @@
+ 		reg = <0x0 0x40000000>; /* 1GB */
+ 	};
+ 
++	aliases {
++		/* this allow the ethaddr uboot environmnet variable contents
++		 * to be added to the gmac1 device tree blob.
++		 */
++		ethernet0 = &gmac1;
++	};
 +
-+			slot at 0 {
-+				reg = <0>;
-+				bus-width = <4>;
-+			};
+ 	soc {
+ 		clkmgr at ffd04000 {
+ 			clocks {
+@@ -41,6 +48,12 @@
+ 			};
+ 		};
+ 
++		ethernet at ff702000 {
++			phy-mode = "rgmii";
++			phy-addr = <0xffffffff>; /* probe for phy addr */
++			status = "okay";
 +		};
 +
  		timer0 at ffc08000 {
  			clock-frequency = <100000000>;
  		};
 diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-index d1ec0ca..d93deb0 100644
+index 0bf035d..d1ec0ca 100644
 --- a/arch/arm/boot/dts/socfpga_vt.dts
 +++ b/arch/arm/boot/dts/socfpga_vt.dts
-@@ -46,6 +46,18 @@
- 			status = "okay";
+@@ -41,6 +41,11 @@
+ 			};
  		};
  
-+		dwmmc0 at ff704000 {
-+			num-slots = <1>;
-+			supports-highspeed;
-+			broken-cd;
-+			altr,dw-mshc-ciu-div = <3>;
-+
-+			slot at 0 {
-+				reg = <0>;
-+				bus-width = <4>;
-+			};
++		ethernet at ff700000 {
++			phy-mode = "gmii";
++			status = "okay";
 +		};
 +
  		timer0 at ffc08000 {
