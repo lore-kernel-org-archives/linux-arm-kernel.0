@@ -1,165 +1,32 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Thu, 16 May 2013 06:33:14 -0300
-Subject: [PATCHv9 7/9] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <1368624323-24311-8-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1368624323-24311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1368624323-24311-8-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130516093312.GB2459@localhost>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Thu, 16 May 2013 10:35:39 +0100
+Subject: [PATCH v3 2/4] clk: add support for clock reparent on set_rate
+In-Reply-To: <5193EF34.7070800@codeaurora.org>
+References: <1368625263-23136-1-git-send-email-james.hogan@imgtec.com>
+ <1368625263-23136-3-git-send-email-james.hogan@imgtec.com>
+ <5193EF34.7070800@codeaurora.org>
+Message-ID: <5194A86B.6000207@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 03:25:21PM +0200, Thomas Petazzoni wrote:
-[..]
-> +
-> +static int __init mvebu_pcie_probe(struct platform_device *pdev)
-> +{
-> +	struct mvebu_pcie *pcie;
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct of_pci_range range;
-> +	struct of_pci_range_parser parser;
-> +	struct device_node *child;
-> +	int i, ret;
-> +
-> +	pcie = devm_kzalloc(&pdev->dev, sizeof(struct mvebu_pcie),
-> +			    GFP_KERNEL);
-> +	if (!pcie)
-> +		return -ENOMEM;
-> +
-> +	pcie->pdev = pdev;
-> +
-> +	if (of_pci_range_parser_init(&parser, np))
-> +		return -EINVAL;
-> +
-> +	/* Get the I/O and memory ranges from DT */
-> +	for_each_of_pci_range(&parser, &range) {
-> +		unsigned long restype = range.flags & IORESOURCE_TYPE_BITS;
-> +		if (restype == IORESOURCE_IO) {
-> +			of_pci_range_to_resource(&range, np, &pcie->io);
-> +			of_pci_range_to_resource(&range, np, &pcie->realio);
-> +			pcie->io.name = "I/O";
-> +			pcie->realio.start = max_t(resource_size_t,
-> +						   PCIBIOS_MIN_IO,
-> +						   range.pci_addr);
-> +			pcie->realio.end = min_t(resource_size_t,
-> +						 IO_SPACE_LIMIT,
-> +						 range.pci_addr + range.size);
-> +		}
-> +		if (restype == IORESOURCE_MEM) {
-> +			of_pci_range_to_resource(&range, np, &pcie->mem);
-> +			pcie->mem.name = "MEM";
-> +		}
-> +	}
-> +
-> +	/* Get the bus range */
-> +	ret = of_pci_parse_bus_range(np, &pcie->busn);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to parse bus-range property: %d\n",
-> +			ret);
-> +		return ret;
-> +	}
-> +
-> +	for_each_child_of_node(pdev->dev.of_node, child) {
-> +		if (!of_device_is_available(child))
-> +			continue;
-> +		pcie->nports++;
-> +	}
-> +
-> +	pcie->ports = devm_kzalloc(&pdev->dev, pcie->nports *
-> +				   sizeof(struct mvebu_pcie_port),
-> +				   GFP_KERNEL);
-> +	if (!pcie->ports)
-> +		return -ENOMEM;
-> +
-> +	i = 0;
-> +	for_each_child_of_node(pdev->dev.of_node, child) {
-> +		struct mvebu_pcie_port *port = &pcie->ports[i];
-> +
-> +		if (!of_device_is_available(child))
-> +			continue;
-> +
-> +		port->pcie = pcie;
-> +
-> +		if (of_property_read_u32(child, "marvell,pcie-port",
-> +					 &port->port)) {
-> +			dev_warn(&pdev->dev,
-> +				 "ignoring PCIe DT node, missing pcie-port property\n");
-> +			continue;
-> +		}
-> +
-> +		if (of_property_read_u32(child, "marvell,pcie-lane",
-> +					 &port->lane))
-> +			port->lane = 0;
-> +
-> +		port->name = kasprintf(GFP_KERNEL, "pcie%d.%d",
-> +				       port->port, port->lane);
-> +
-> +		port->devfn = of_pci_get_devfn(child);
-> +		if (port->devfn < 0)
-> +			continue;
-> +
-> +		port->base = mvebu_pcie_map_registers(pdev, child, port);
-> +		if (!port->base) {
-> +			dev_err(&pdev->dev, "PCIe%d.%d: cannot map registers\n",
-> +				port->port, port->lane);
-> +			continue;
-> +		}
-> +
-> +		if (mvebu_pcie_link_up(port)) {
-> +			port->haslink = 1;
-> +			dev_info(&pdev->dev, "PCIe%d.%d: link up\n",
-> +				 port->port, port->lane);
-> +		} else {
-> +			port->haslink = 0;
-> +			dev_info(&pdev->dev, "PCIe%d.%d: link down\n",
-> +				 port->port, port->lane);
-> +		}
-> +
-> +		port->clk = of_clk_get_by_name(child, NULL);
-> +		if (!port->clk) {
-> +			dev_err(&pdev->dev, "PCIe%d.%d: cannot get clock\n",
-> +			       port->port, port->lane);
-> +			iounmap(port->base);
-> +			port->haslink = 0;
-> +			continue;
-> +		}
-> +
-> +		port->dn = child;
-> +
-> +		clk_prepare_enable(port->clk);
-> +		spin_lock_init(&port->conf_lock);
-> +
-> +		mvebu_sw_pci_bridge_init(port);
-> +
-> +		i++;
-> +	}
-> +
-> +	mvebu_pcie_enable(pcie);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id mvebu_pcie_of_match_table[] = {
-> +	{ .compatible = "marvell,armada-xp-pcie", },
-> +	{ .compatible = "marvell,armada-370-pcie", },
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(of, mvebu_pcie_of_match_table);
-> +
-> +static struct platform_driver mvebu_pcie_driver = {
-> +	.driver = {
-> +		.owner = THIS_MODULE,
-> +		.name = "mvebu-pcie",
-> +		.of_match_table =
-> +		   of_match_ptr(mvebu_pcie_of_match_table),
-> +	},
-> +};
-> +
-> +static int mvebu_pcie_init(void)
+On 15/05/13 21:25, Stephen Boyd wrote:
+> On 05/15/13 06:41, James Hogan wrote:
+>> Each place where round_rate() is called, determine_rate is checked first
+>> and called in preference, passing NULL to the new parent argument if not
+>> needed (e.g. in __clk_round_rate).
+> 
+> That's annoying. Even if we don't care about the pointer in
+> clk_round_rate(), this requires the ops to check for NULL before
+> assigning the pointer. Why not just pass an unused pointer that the ops
+> can assign all the time?
 
-Building this showed a warning here. It seems you forgot
-to mark this one as __init.
+True, I'll fix that.
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+> With the above change you can add
+> 
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Thanks for taking the time to review it.
+
+Cheers
+James
