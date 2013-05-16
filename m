@@ -1,51 +1,41 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 16 May 2013 15:18:53 -0500
-Subject: [PATCH] ARM: prima2: return rather than panic on missing DT nodes
-In-Reply-To: <519510A4.8090904@st.com>
-References: <1368719437-28287-1-git-send-email-robherring2@gmail.com>
- <519510A4.8090904@st.com>
-Message-ID: <CAL_JsqL_z99EfT=3E32c0AS6fbwqOyTb7n+AzySmzJNyMCab3w@mail.gmail.com>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Thu, 16 May 2013 15:22:51 -0500
+Subject: [PATCH v4] ARM:dts:omap4-panda: Update the LED support for the
+ panda DTS
+In-Reply-To: <CAGo_u6pX+DdVNWqdPXDChzMr27YAXL_Zvt7DxWBijOCW0rXpkA@mail.gmail.com>
+References: <1368636386-17138-1-git-send-email-dmurphy@ti.com>
+ <20130515170516.GA6135@kahuna> <5194FCDD.8080209@ti.com>
+ <CAGo_u6pX+DdVNWqdPXDChzMr27YAXL_Zvt7DxWBijOCW0rXpkA@mail.gmail.com>
+Message-ID: <5195401B.5070209@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 12:00 PM, Srinivas KANDAGATLA
-<srinivas.kandagatla@st.com> wrote:
-> Hi Rob,
->
-> I was just testing multi_v7_defconfig and noticed that the code is still
-> doing early_initcall and postcore_initcalls. Which IMO is NOK for
-> multiplatforms.
->
-> I was just about to send my patch and just noticed your patch.
->
->
-> On 16/05/13 16:50, Rob Herring wrote:
->> From: Rob Herring <rob.herring@calxeda.com>
+On 05/16/2013 01:18 PM, Nishanth Menon wrote:
+> On Thu, May 16, 2013 at 10:35 AM, Dan Murphy <dmurphy@ti.com> wrote:
+>> I am not sure you really want to do this.
+>> If I make the pinctrl part of the led structure then the only way the gpio_wk7 on a1-a3 to be configured is when
+>> the CONFIG_LEDS_GPIO flag is set.
 >>
->> Missing nodes is a normal condition in multi-platform kernels when we boot
->> on other platforms. So remove the panic and just return if we don't find
->> a DT node.
->>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> Cc: Barry Song <baohua.song@csr.com>
->> ---
->>  arch/arm/mach-prima2/pm.c   | 2 +-
->>  arch/arm/mach-prima2/rstc.c | 2 +-
->>  2 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
->> index 9936c18..a8003e2 100644
->> --- a/arch/arm/mach-prima2/pm.c
->> +++ b/arch/arm/mach-prima2/pm.c
->> @@ -102,7 +102,7 @@ static int __init sirfsoc_of_pwrc_init(void)
->>
-> First thing is the mach code should not even attempt to run this
-> function in first place.
+>> Do you really want that dependency?  You did say it was a key fix
+>> At least this way the pins are configured regardless of that flag.
+> That is better as the system will be left in the pinmux configuration
+> handed over from bootloader.
+So you want to depend on a boot loader to configure pins correctly for the kernel?
+Hmmm seems risky to me.
+> The point being, muxing up pins even when not needed(config switched
+> off) has no real benefit - in this case albeit, the default mux was
+> causing a bug.
+> pinctrl IMHO should be considered as any other resource, if it is not
+> mandatory for boot, and needed only for a device functionality when
+> probed, it should done there only.
 >
-> I think the correct fix for this is to move all the postcore_initcalls
-> and early_initcalls to callbacks in MACHINE.
+> just my 2 cents.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Agreed, but that may cause some init ordering issues. So I'll leave
-that to someone that knows this platform and can test it.
 
-Rob
+-- 
+------------------
+Dan Murphy
