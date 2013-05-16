@@ -1,36 +1,45 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 16 May 2013 13:15:58 +0200
-Subject: [PATCH 30/33] arch/arm/plat-samsung: don't check resource with
- devm_ioremap_resource
-In-Reply-To: <1368702961-4325-1-git-send-email-wsa@the-dreams.de>
-References: <1368702961-4325-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1368702961-4325-31-git-send-email-wsa@the-dreams.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 16 May 2013 12:15:35 +0100
+Subject: [PATCH] ARM: ux500: Only configure wake-up reasons on ux500 based
+ platforms
+Message-ID: <1368702935-25599-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_ioremap_resource does sanity checks on the given resource. No need to
-duplicate this in the driver.
+Multiplatform calls all enabled platforms' initcalls. In the
+ux500_idle_init() initcall we call into the DBx500-PRCMU which in turn
+executes some ux500 specific register reads/writes. When running on
+some !ux500 platforms this ends up causing a kernel Oops. This patch
+ensures the PRCMU call is only invoked when running on ux500 based
+platforms.
 
-Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+Reported-by: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/plat-samsung/adc.c |    5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/mach-ux500/cpuidle.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-index ca07cb1..79690f2 100644
---- a/arch/arm/plat-samsung/adc.c
-+++ b/arch/arm/plat-samsung/adc.c
-@@ -381,11 +381,6 @@ static int s3c_adc_probe(struct platform_device *pdev)
- 	}
+diff --git a/arch/arm/mach-ux500/cpuidle.c b/arch/arm/mach-ux500/cpuidle.c
+index 317a2be..a45dd09 100644
+--- a/arch/arm/mach-ux500/cpuidle.c
++++ b/arch/arm/mach-ux500/cpuidle.c
+@@ -21,6 +21,7 @@
+ #include <asm/proc-fns.h>
  
- 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!regs) {
--		dev_err(dev, "failed to find registers\n");
--		return -ENXIO;
--	}
--
- 	adc->regs = devm_ioremap_resource(dev, regs);
- 	if (IS_ERR(adc->regs))
- 		return PTR_ERR(adc->regs);
+ #include "db8500-regs.h"
++#include "id.h"
+ 
+ static atomic_t master = ATOMIC_INIT(0);
+ static DEFINE_SPINLOCK(master_lock);
+@@ -114,6 +115,9 @@ static struct cpuidle_driver ux500_idle_driver = {
+ 
+ int __init ux500_idle_init(void)
+ {
++	if (!(cpu_is_u8500_family() || cpu_is_ux540_family()))
++		return -ENODEV;
++
+ 	/* Configure wake up reasons */
+ 	prcmu_enable_wakeups(PRCMU_WAKEUP(ARM) | PRCMU_WAKEUP(RTC) |
+ 			     PRCMU_WAKEUP(ABB));
 -- 
 1.7.10.4
