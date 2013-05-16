@@ -1,35 +1,75 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Thu, 16 May 2013 20:26:38 +0100
-Subject: [RFC 4/8] drm/i2c: nxp-tda998x: fix npix/nline programming
+Date: Thu, 16 May 2013 20:25:58 +0100
+Subject: [RFC 2/8] drm/i2c: nxp-tda998x: fix EDID reading on TDA19988 devices
 In-Reply-To: <20130516192510.GV18614@n2100.arm.linux.org.uk>
 References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
-Message-ID: <E1Ud3p0-0001qq-8v@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Ud3oM-0001qg-0c@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The npix/nline registers are supposed to be programmed with the total
-number of pixels/lines, not the displayed pixels/lines, and not minus
-one either.
+TDA19988 devices need their RAM enabled in order to read EDID
+information.  Add support for this.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c |   14 +++++++++++++-
+ 1 files changed, 13 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index 4b4db95..da2917b 100644
+index e68b58a..d71c408 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -586,8 +586,8 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
- 		reg_set(encoder, REG_VIP_CNTRL_3, VIP_CNTRL_3_H_TGL);
+@@ -229,6 +229,8 @@ struct tda998x_priv {
  
- 	reg_write(encoder, REG_VIDFORMAT, 0x00);
--	reg_write16(encoder, REG_NPIX_MSB, mode->hdisplay - 1);
--	reg_write16(encoder, REG_NLINE_MSB, mode->vdisplay - 1);
-+	reg_write16(encoder, REG_NPIX_MSB, mode->htotal);
-+	reg_write16(encoder, REG_NLINE_MSB, mode->vtotal);
- 	reg_write16(encoder, REG_VS_LINE_STRT_1_MSB, line_start);
- 	reg_write16(encoder, REG_VS_LINE_END_1_MSB, line_end);
- 	reg_write16(encoder, REG_VS_PIX_STRT_1_MSB, hs_start);
+ /* Page 12h: HDCP and OTP */
+ #define REG_TX3                   REG(0x12, 0x9a)     /* read/write */
++#define REG_TX4                   REG(0x12, 0x9b)     /* read/write */
++# define TX4_PD_RAM               (1 << 1)
+ #define REG_TX33                  REG(0x12, 0xb8)     /* read/write */
+ # define TX33_HDMI                (1 << 1)
+ 
+@@ -673,6 +675,7 @@ read_edid_block(struct drm_encoder *encoder, uint8_t *buf, int blk)
+ static uint8_t *
+ do_get_edid(struct drm_encoder *encoder)
+ {
++	struct tda998x_priv *priv = to_tda998x_priv(encoder);
+ 	int j = 0, valid_extensions = 0;
+ 	uint8_t *block, *new;
+ 	bool print_bad_edid = drm_debug & DRM_UT_KMS;
+@@ -680,6 +683,9 @@ do_get_edid(struct drm_encoder *encoder)
+ 	if ((block = kmalloc(EDID_LENGTH, GFP_KERNEL)) == NULL)
+ 		return NULL;
+ 
++	if (priv->rev == TDA19988)
++		reg_clear(encoder, REG_TX4, TX4_PD_RAM);
++
+ 	/* base block fetch */
+ 	if (read_edid_block(encoder, block, 0))
+ 		goto fail;
+@@ -689,7 +695,7 @@ do_get_edid(struct drm_encoder *encoder)
+ 
+ 	/* if there's no extensions, we're done */
+ 	if (block[0x7e] == 0)
+-		return block;
++		goto done;
+ 
+ 	new = krealloc(block, (block[0x7e] + 1) * EDID_LENGTH, GFP_KERNEL);
+ 	if (!new)
+@@ -716,9 +722,15 @@ do_get_edid(struct drm_encoder *encoder)
+ 		block = new;
+ 	}
+ 
++done:
++	if (priv->rev == TDA19988)
++		reg_set(encoder, REG_TX4, TX4_PD_RAM);
++
+ 	return block;
+ 
+ fail:
++	if (priv->rev == TDA19988)
++		reg_set(encoder, REG_TX4, TX4_PD_RAM);
+ 	dev_warn(encoder->dev->dev, "failed to read EDID\n");
+ 	kfree(block);
+ 	return NULL;
 -- 
 1.7.4.4
