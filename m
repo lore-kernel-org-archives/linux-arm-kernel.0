@@ -1,20 +1,120 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 16 May 2013 20:22:19 +0800
-Subject: [PATCH 08/33] drivers/i2c/busses: don't check resource with
- devm_ioremap_resource
-In-Reply-To: <1368702961-4325-9-git-send-email-wsa@the-dreams.de>
-References: <1368702961-4325-1-git-send-email-wsa@the-dreams.de>
- <1368702961-4325-9-git-send-email-wsa@the-dreams.de>
-Message-ID: <CAGsJ_4zAJpqxjg_rcO1WxS=GLii7YooPnsCgt40frf_5afiY6g@mail.gmail.com>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Thu, 16 May 2013 08:27:27 -0400
+Subject: [PATCHv2 3/3] arm: dts: add bandgap entry for OMAP4460 devices
+In-Reply-To: <519488D3.5070003@ti.com>
+References: <1368629928-6723-1-git-send-email-eduardo.valentin@ti.com>
+ <1368629928-6723-4-git-send-email-eduardo.valentin@ti.com>
+ <5193A875.1020000@ti.com> <5193B9AA.7020507@ti.com> <519488D3.5070003@ti.com>
+Message-ID: <5194D0AF.3010407@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/5/16 Wolfram Sang <wsa@the-dreams.de>:
-> devm_ioremap_resource does sanity checks on the given resource. No need to
-> duplicate this in the driver.
->
-> Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+On 16-05-2013 03:20, Benoit Cousson wrote:
+> Hi Eduardo,
+> 
+> On 05/15/2013 06:36 PM, Eduardo Valentin wrote:
+>> On 15-05-2013 11:23, Benoit Cousson wrote:
+>>> Hi Eduardo,
+>>>
+>>> On 05/15/2013 04:58 PM, Eduardo Valentin wrote:
+>>>> Include bandgap devices for OMAP4460 devices.
+>>>>
+>>>> Cc: "Beno?t Cousson" <b-cousson@ti.com>
+>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>> Cc: Russell King <linux@arm.linux.org.uk>
+>>>> Cc: linux-omap at vger.kernel.org
+>>>> Cc: devicetree-discuss at lists.ozlabs.org
+>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>> Cc: linux-kernel at vger.kernel.org
+>>>> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/omap4460.dtsi | 9 +++++++++
+>>>>  1 file changed, 9 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+>>>> index 2cf227c..e5bfbfe 100644
+>>>> --- a/arch/arm/boot/dts/omap4460.dtsi
+>>>> +++ b/arch/arm/boot/dts/omap4460.dtsi
+>>>> @@ -29,4 +29,13 @@
+>>>>  			     <0 55 0x4>;
+>>>>  		ti,hwmods = "debugss";
+>>>>  	};
+>>>> +
+>>>> +	bandgap {
+>>>> +		reg = <0x4a002260 0x4
+>>>> +			0x4a00232C 0x4
+>>>> +			0x4a002378 0x18>;
+>>>> +		compatible = "ti,omap4460-bandgap";
+>>>> +		interrupts = <0 126 4>; /* talert */
+>>>> +		ti,tshut-gpio = <86>;
+>>
+>>
+>>
+>>>
+>>> Why do you need a custom attribute for GPIO? Cannot you use the standard
+>>> one?
+>>
+>> I believe it was by your suggestion :-), during the first attempts to
+>> send this driver. But could not find the thread link :-( sorry.
+> 
+> Ooops :-) I do not remember that... maybe it was long time ago, before
+> we had any decent binding available for GPIO and IRQ...
+> 
 
-Acked-by: Barry Song <Baohua.Song@csr.com>
 
--barry
+Probably it was because by that time we didnt have GPIO binding ready, yeah.
+
+>> I guess the reasoning to mark it as a ti specific is because it will be
+>> used as IRQ line to treat thermal shutdown (in SW).
+> 
+> Mmm, ok, so in that case, it is not even a gpio, but an interrupt entry
+> that is needed like that:
+> 
+> 	interrupt-parent = <&gpio3>;
+> 	interrupts = <22>; /* gpio line 86 */
+> 
+> Except that we already have an IRQ line connected to GIC for the
+> Talert... I'm not sure we can have 2 different IRQ controllers for one
+> device :-(
+> 
+> We need to check.
+> 
+
+
+Yeah, I also dont think this will work, because we will reparent the
+interrupt, setting to a different controller. That will break the TALERT
+signal already defined at GIC (check original patch).
+
+I propose keeping the way I sent. Unless there is a way to set two
+different controllers to same device.
+
+> Regards,
+> Benoit
+> 
+> 
+>>> Where is the gpio controller phandle?
+>>>
+>>> Usually it looks like this:
+>>>
+>>> 	gpios = <&gpio1 8 0>;
+>>>
+>>>
+>>> Regards,
+>>> Benoit
+>>>
+>>>
+>>>
+>>
+>>
+> 
+> 
+> 
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 295 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130516/89b66868/attachment-0001.sig>
