@@ -1,48 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 16 May 2013 10:50:37 -0500
-Subject: [PATCH] ARM: prima2: return rather than panic on missing DT nodes
-Message-ID: <1368719437-28287-1-git-send-email-robherring2@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 16 May 2013 17:51:17 +0200
+Subject: parallel-display driver for i.MX53
+In-Reply-To: <CAOkaPuUdugB8+qTakh8-N0bsxfobQymbYtCQ67FfX8CuttPb0A@mail.gmail.com>
+References: <CAOkaPuX7RjwrMiZUCGwXTovgsFf=onRkrGa2U+qUv-tU3t4WWg@mail.gmail.com>
+ <CAOkaPuUdugB8+qTakh8-N0bsxfobQymbYtCQ67FfX8CuttPb0A@mail.gmail.com>
+Message-ID: <201305161751.17405.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Dear Rogerio Pimentel,
 
-Missing nodes is a normal condition in multi-platform kernels when we boot
-on other platforms. So remove the panic and just return if we don't find
-a DT node.
+> Hi Philipp,
+> 
+> I see that reverting patch
+> 
+> 2ea42608ba977bd05ce7b2d8a1f65efacfc84352
+> staging: drm/imx: Add support for VGA via TVE on i.MX53
+> 
+> The display on LCD/i.MX53QSB shows for about 1 second and turn off.
+> Have you noticed any kind of problem on parallel displays after your
+> recent patches?
+> Could you please confirm that imx-parallel display is functional after
+> your tve patches are applied?
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-Cc: Barry Song <baohua.song@csr.com>
----
- arch/arm/mach-prima2/pm.c   | 2 +-
- arch/arm/mach-prima2/rstc.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+You should not do this top-posting ;-)
 
-diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
-index 9936c18..a8003e2 100644
---- a/arch/arm/mach-prima2/pm.c
-+++ b/arch/arm/mach-prima2/pm.c
-@@ -102,7 +102,7 @@ static int __init sirfsoc_of_pwrc_init(void)
- 
- 	np = of_find_matching_node(NULL, pwrc_ids);
- 	if (!np)
--		panic("unable to find compatible pwrc node in dtb\n");
-+		return -ENODEV;
- 
- 	/*
- 	 * pwrc behind rtciobrg is not located in memory space
-diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
-index 435019c..6d7d9db 100644
---- a/arch/arm/mach-prima2/rstc.c
-+++ b/arch/arm/mach-prima2/rstc.c
-@@ -29,7 +29,7 @@ static int __init sirfsoc_of_rstc_init(void)
- 
- 	np = of_find_matching_node(NULL, rstc_ids);
- 	if (!np)
--		panic("unable to find compatible rstc node in dtb\n");
-+		return -ENODEV;
- 
- 	sirfsoc_rstc_base = of_iomap(np, 0);
- 	if (!sirfsoc_rstc_base)
--- 
-1.8.1.2
+> On Thu, May 16, 2013 at 11:02 AM, Rogerio Pimentel
+> 
+> <rpimentel.silva@gmail.com> wrote:
+> > Hi,
+> > 
+> > I'm trying to add the parallel display on i.MX53QSB but it's not
+> > working on current linux next. It was working prior to 3.10-rc1.
+> > 
+> > Does anybody know about any significant change that made this driver
+> > break? Or maybe something else I need to do on imx53-qsb.dtb?
+> > 
+> > Thanks,
+> > Rogerio
+
+Best regards,
+Marek Vasut
