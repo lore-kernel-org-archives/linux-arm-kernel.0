@@ -1,31 +1,88 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 16 May 2013 16:12:19 +1000
-Subject: linux-next: manual merge of the renesas tree with Linus' tree
-In-Reply-To: <20130516050450.GA13842@verge.net.au>
-References: <20130516132253.8865ca7b6503bd6fe9e6b05a@canb.auug.org.au>
- <20130516050450.GA13842@verge.net.au>
-Message-ID: <20130516161219.cc475a1a7a5c3051672e11bd@canb.auug.org.au>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 16 May 2013 11:38:50 +0530
+Subject: [PATCH 39/39] dmaengine: ste_dma40: Fetch disabled channels
+ from DT
+In-Reply-To: <1368611522-9984-40-git-send-email-lee.jones@linaro.org>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-40-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130516060850.GI27639@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Wed, May 15, 2013 at 10:52:02AM +0100, Lee Jones wrote:
+> Some platforms have channels which are not available for normal use.
+> This information is currently passed though platform data in internal
+> BSP kernels. Once those platforms land, they'll need to configure them
+> appropriately, so we may as well add the infrastructure.
+> 
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Per Forlin <per.forlin@stericsson.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
-On Thu, 16 May 2013 14:04:53 +0900 Simon Horman <horms@verge.net.au> wrote:
->
-> Sorry about that. I am working on re-basing my branches on
-> top of v3.10-rc1 and I have confirmed that in my current local
-> branches the problem you describe is no longer present.
-> I plan to push the refreshed branches, including a new next branch
-> for linux-next, once a few bug-fix patches have been reviewed.
-
-Excellent, thanks.
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130516/f35b835d/attachment-0001.sig>
+> ---
+>  Documentation/devicetree/bindings/dma/ste-dma40.txt |    2 ++
+>  drivers/dma/ste_dma40.c                             |   17 ++++++++++++++++-
+>  2 files changed, 18 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/ste-dma40.txt b/Documentation/devicetree/bindings/dma/ste-dma40.txt
+> index aa272d8..bea5b73 100644
+> --- a/Documentation/devicetree/bindings/dma/ste-dma40.txt
+> +++ b/Documentation/devicetree/bindings/dma/ste-dma40.txt
+> @@ -11,6 +11,7 @@ Required properties:
+>  Optional properties:
+>  - dma-channels: Number of channels supported by hardware - if not present
+>  		the driver will attempt to obtain the information from H/W
+> +- disabled-channels: Channels which can not be used
+>  
+>  Example:
+>  
+> @@ -23,6 +24,7 @@ Example:
+>  
+>  		#dma-cells = <2>;
+>  		memcpy-channels  = <56 57 58 59 60>;
+> +		disabled-channels  = <12>;
+>  		dma-channels = <8>;
+>  	};
+>  
+> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+> index 4e528dd..ffac822 100644
+> --- a/drivers/dma/ste_dma40.c
+> +++ b/drivers/dma/ste_dma40.c
+> @@ -3482,7 +3482,7 @@ static int __init d40_of_probe(struct platform_device *pdev,
+>  			       struct device_node *np)
+>  {
+>  	struct stedma40_platform_data *pdata;
+> -	int num_phy = 0, num_memcpy = 0;
+> +	int num_phy = 0, num_memcpy = 0, num_disabled = 0;
+>  	const const __be32 *list;
+>  
+>  	pdata = devm_kzalloc(&pdev->dev,
+> @@ -3511,6 +3511,21 @@ static int __init d40_of_probe(struct platform_device *pdev,
+>  				   dma40_memcpy_channels,
+>  				   num_memcpy);
+>  
+> +	list = of_get_property(np, "disabled-channels", &num_disabled);
+> +	num_disabled /= sizeof(*list);
+> +
+> +	if (num_disabled > STEDMA40_MAX_PHYS || num_disabled < 0) {
+> +		d40_err(&pdev->dev,
+> +			"Invalid number of disabled channels specified (%d)\n",
+> +			num_disabled);
+> +		return -EINVAL;
+> +	}
+> +
+> +	of_property_read_u32_array(np, "disabled-channels",
+> +				   pdata->disabled_channels,
+> +				   num_disabled);
+> +	pdata->disabled_channels[num_disabled] = -1;
+> +
+>  	pdev->dev.platform_data = pdata;
+>  
+>  	return 0;
+> -- 
+> 1.7.10.4
+> 
