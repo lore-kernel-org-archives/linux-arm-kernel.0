@@ -1,37 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 May 2013 15:36:38 +0100
-Subject: [PATCH] ARM: remove the .vm_mm value from gate_vma.
-In-Reply-To: <1368702394-1737-1-git-send-email-steve.capper@linaro.org>
-References: <1368702394-1737-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20130516143638.GR18614@n2100.arm.linux.org.uk>
+From: philip@balister.org (Philip Balister)
+Date: Thu, 16 May 2013 10:44:16 -0400
+Subject: [PATCH RFC] clk: Introduce userspace clock driver
+In-Reply-To: <51946082.1000606@codeaurora.org>
+References: <20130512143344.GC3200@sirena.org.uk>
+ <9e55c552-ce34-4663-9a57-bf2c626d7d58@TX2EHSMHS008.ehs.local>
+ <20130513052135.GD6836@sirena.org.uk>
+ <0bf5a185-86f7-4a93-a90f-42caefb06a1d@TX2EHSMHS009.ehs.local>
+ <519112F9.2010102@gmail.com>
+ <7c5e7537-6ed5-4622-a7a9-bf46820ef695@VA3EHSMHS033.ehs.local>
+ <519124D3.2040403@gmail.com>
+ <af51c63e-7ff1-4e73-9305-08309217ab38@TX2EHSMHS037.ehs.local>
+ <20130514164611.10068.46384@quantum> <51927DEB.7090001@balister.org>
+ <20130515044604.GA24524@sirena.org.uk> <51946082.1000606@codeaurora.org>
+Message-ID: <5194F0C0.9020609@balister.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 12:06:34PM +0100, Steve Capper wrote:
-> If one reads /proc/$PID/smaps, the mmap_sem belonging to the
-> address space of the task being examined is locked for reading.
-> All the pages of the vmas belonging to the task's address space
-> are then walked with this lock held.
+On 05/16/2013 12:28 AM, Saravana Kannan wrote:
+> On 05/14/2013 09:46 PM, Mark Brown wrote:
+>> On Tue, May 14, 2013 at 02:09:47PM -0400, Philip Balister wrote:
+>>
+>>> First of all, the driver that loads the bitstream into the fpga
+>>> fabric does not know ANYTHING about what the bitstream does. So it
+>>> cannot do any setup based on the contents of the file that is
+>>> loaded. (And this can also be loaded during the SoC bootup,
+>>> bypassing this driver completely)
+>>
+>> This is a problem that is going to need to be fixed - there will be some
+>> things going on the FPGAs that do need drivers and so there needs to be
+>> some way to instantiate a driver for a FPGA image.  Things like adding
+>> extra DT blobs along with the FPGA image have been talked about
+>>
+>>> Second, there are four clocks that feed the FPGA fabric. We will
+>>> want to set these clocks from user space somehow. It is perfectly
+>>> valid to use a uio driver to interface with logic in the fpga. If we
+>>> take the approach of using such general purpose techniques to
+>>> interface with fpga logic, we must have ways for the user to control
+>>> the fpga clocks.
+>>
+>> Right, and if the specific device is being controlled by UIO then having
+>> UIO create some clocks makes sense but then that should be integrated
+>> into the UIO instantiation rather than done as a separate thing.
 > 
-> If a gate_vma is present in the architecture, it too is examined
-> by the fs/proc/task_mmu.c code. As gate_vma doesn't belong to the
-> address space of the task though, its pages are not walked.
+> Agreed. I was about to reply with exactly the same point. I haven't done
+> any UIO coding, but that device file will eventually have to be opened.
+> Turn on the clocks in the open and turn them off at close.
 > 
-> A recent cleanup (commit f6604efe) of the gate_vma initialisation
-> code set the vm_mm value to &init_mm. Unfortunately a non-NULL
-> vm_mm value in the gate_vma will cause the task_mmu code to attempt
-> to walk the pages of the gate_vma (with no mmap-sem lock held). If
-> one enables Transparent Huge Page support and vm debugging, this
-> will then cause OOPses as pmd_trans_huge_lock is called without
-> mmap_sem being locked.
-> 
-> This patch removes the .vm_mm value from gate_vma, restoring the
-> original behaviour of the task_mmu code.
+> Rate to request can be a DT property.
 
-This looks fine - x86 also sets .vm_mm to NULL here.  So please put
-it in my patch system.  Does this need to be applied to stable
-kernels as well?  If so, please mark it with Cc: <stable@vger.kernel.org>
-(but do not send it to that address).  Also, it'd be worth checking
-which stable kernels it needs to be applied to.
+But you are assuming each device implemented in the fpga uses one clock.
+This assumption is clearly not valid since devices will ahve to share
+clocks.
 
-Thanks.
+Philip
