@@ -1,53 +1,30 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 16 May 2013 12:27:22 +0100
-Subject: [PATCH 2/6] ARM: ux500: Add Device Tree nodes for the ux500 Hash
- device
+Date: Thu, 16 May 2013 12:27:23 +0100
+Subject: [PATCH 3/6] ARM: ux500: Provide an AUXDATA entry for ux500-cyrpt
 In-Reply-To: <1368703646-26418-1-git-send-email-lee.jones@linaro.org>
 References: <1368703646-26418-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1368703646-26418-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1368703646-26418-4-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides information required to setup ux500-hash when
-booting with DT on the Snowball low-cost development platform.
+This provides a device name which is required by the common clk API.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi  |    8 ++++++++
- arch/arm/boot/dts/snowball.dts |    4 ++++
- 2 files changed, 12 insertions(+)
+ arch/arm/mach-ux500/cpu-db8500.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index 92fd4b74..6c25fbe 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -764,5 +764,13 @@
- 			v-ape-supply = <&db8500_vape_reg>;
- 			status = "disabled";
- 		};
-+
-+		hash at a03c2000 {
-+			compatible = "stericsson,ux500-hash";
-+			reg = <0xa03c2000 0x1000>;
-+
-+			v-ape-supply = <&db8500_vape_reg>;
-+			status = "disabled";
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-index de585fd..3cadb5b 100644
---- a/arch/arm/boot/dts/snowball.dts
-+++ b/arch/arm/boot/dts/snowball.dts
-@@ -354,5 +354,9 @@
- 		cryp at a03cb000 {
- 			status = "okay";
- 		};
-+
-+		hash at a03c2000 {
-+			status = "okay";
-+		};
- 	};
- };
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 3b77e36..4d118d8 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -246,6 +246,7 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("stericsson,db8500-prcmu", 0x80157000, "db8500-prcmu",
+ 			&db8500_prcmu_pdata),
+ 	OF_DEV_AUXDATA("smsc,lan9115", 0x50000000, "smsc911x.0", NULL),
++	OF_DEV_AUXDATA("stericsson,ux500-cryp", 0xa03cb000, "cryp1", NULL),
+ 	/* Requires device name bindings. */
+ 	OF_DEV_AUXDATA("stericsson,nmk-pinctrl", U8500_PRCMU_BASE,
+ 		"pinctrl-db8500", NULL),
 -- 
 1.7.10.4
