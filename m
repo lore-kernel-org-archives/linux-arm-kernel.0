@@ -1,49 +1,92 @@
 From: Baohua.Song@csr.com (Barry Song)
-Date: Thu, 16 May 2013 10:50:07 +0800
-Subject: [PATCH] i2c: sirf: move driver init from module_init to
- subsys_initcall
-Message-ID: <1368672607-5536-1-git-send-email-Baohua.Song@csr.com>
+Date: Thu, 16 May 2013 11:17:09 +0800
+Subject: [PATCH] pinctrl: sirf: save the status in suspend and restore after
+ resuming
+Message-ID: <1368674229-11813-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xiaomeng Hou <Xiaomeng.Hou@csr.com>
+this patch saves the status of pinctrl registers and restore them while
+resuming. this makes all drivers have coherent status for pinmux after
+suspending and resuming.
 
-if we initilize i2c bus by module_init, there are some devices which want
-initialization earlier than i2c and could not do that in time, so move i2c
-driver initilization to subsys_initcall and make i2c ready before devices
-init.
-
-Signed-off-by: Xiaomeng Hou <Xiaomeng.Hou@csr.com>
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- drivers/i2c/busses/i2c-sirf.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ drivers/pinctrl/sirf/pinctrl-sirf.c | 56 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
 
-diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
-index 5a7ad24..e438f48 100644
---- a/drivers/i2c/busses/i2c-sirf.c
-+++ b/drivers/i2c/busses/i2c-sirf.c
-@@ -454,7 +454,19 @@ static struct platform_driver i2c_sirfsoc_driver = {
- 	.probe = i2c_sirfsoc_probe,
- 	.remove = i2c_sirfsoc_remove,
- };
--module_platform_driver(i2c_sirfsoc_driver);
-+
-+static __init int i2c_sirfsoc_init(void)
-+{
-+	return platform_driver_register(&i2c_sirfsoc_driver);
-+}
-+
-+static void __exit i2c_sirfsoc_exit(void)
-+{
-+	platform_driver_unregister(&i2c_sirfsoc_driver);
-+}
-+
-+subsys_initcall(i2c_sirfsoc_init);
-+module_exit(i2c_sirfsoc_exit);
+diff --git a/drivers/pinctrl/sirf/pinctrl-sirf.c b/drivers/pinctrl/sirf/pinctrl-sirf.c
+index b4727db..0677e19 100644
+--- a/drivers/pinctrl/sirf/pinctrl-sirf.c
++++ b/drivers/pinctrl/sirf/pinctrl-sirf.c
+@@ -390,11 +390,67 @@ out_no_rsc_remap:
+ 	return ret;
+ }
  
- MODULE_DESCRIPTION("SiRF SoC I2C master controller driver");
- MODULE_AUTHOR("Zhiwu Song <Zhiwu.Song@csr.com>, "
++#ifdef CONFIG_PM_SLEEP
++static int sirfsoc_pinmux_suspend_noirq(struct device *dev)
++{
++	int i, j;
++	struct sirfsoc_pmx *spmx = dev_get_drvdata(dev);
++
++	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
++		for (j = 0; j < SIRFSOC_GPIO_BANK_SIZE; j++) {
++			spmx->gpio_regs[i][j] = readl(spmx->gpio_virtbase +
++				SIRFSOC_GPIO_CTRL(i, j));
++		}
++		spmx->ints_regs[i] = readl(spmx->gpio_virtbase +
++			SIRFSOC_GPIO_INT_STATUS(i));
++		spmx->paden_regs[i] = readl(spmx->gpio_virtbase +
++			SIRFSOC_GPIO_PAD_EN(i));
++	}
++	spmx->dspen_regs = readl(spmx->gpio_virtbase + SIRFSOC_GPIO_DSP_EN0);
++
++	for (i = 0; i < 3; i++)
++		spmx->rsc_regs[i] = readl(spmx->rsc_virtbase + 4 * i);
++
++	return 0;
++}
++
++static int sirfsoc_pinmux_resume_noirq(struct device *dev)
++{
++	int i, j;
++	struct sirfsoc_pmx *spmx = dev_get_drvdata(dev);
++
++	for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
++		for (j = 0; j < SIRFSOC_GPIO_BANK_SIZE; j++) {
++			writel(spmx->gpio_regs[i][j], spmx->gpio_virtbase +
++				SIRFSOC_GPIO_CTRL(i, j));
++		}
++		writel(spmx->ints_regs[i], spmx->gpio_virtbase +
++			SIRFSOC_GPIO_INT_STATUS(i));
++		writel(spmx->paden_regs[i], spmx->gpio_virtbase +
++			SIRFSOC_GPIO_PAD_EN(i));
++	}
++	writel(spmx->dspen_regs, spmx->gpio_virtbase + SIRFSOC_GPIO_DSP_EN0);
++
++	for (i = 0; i < 3; i++)
++		writel(spmx->rsc_regs[i], spmx->rsc_virtbase + 4 * i);
++
++	return 0;
++}
++
++static const struct dev_pm_ops sirfsoc_pinmux_pm_ops = {
++	.suspend_noirq = sirfsoc_pinmux_suspend_noirq,
++	.resume_noirq = sirfsoc_pinmux_resume_noirq,
++};
++#endif
++
+ static struct platform_driver sirfsoc_pinmux_driver = {
+ 	.driver = {
+ 		.name = DRIVER_NAME,
+ 		.owner = THIS_MODULE,
+ 		.of_match_table = pinmux_ids,
++#ifdef CONFIG_PM_SLEEP
++		.pm = &sirfsoc_pinmux_pm_ops,
++#endif
+ 	},
+ 	.probe = sirfsoc_pinmux_probe,
+ };
 -- 
 1.8.2.3
 
