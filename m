@@ -1,32 +1,38 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 16 May 2013 18:35:59 +0100
-Subject: [alsa-devel] [PATCH] ASoC: dfbmcs320: make the driver common for
- other BT modules
-In-Reply-To: <CAGsJ_4yn2uodRKrFKYrX85XA7A=hQs2w0cyGoEEHsYgCJHD7eQ@mail.gmail.com>
-References: <1368687184-12169-1-git-send-email-Baohua.Song@csr.com>
- <5194AC3C.4080206@metafoo.de>
- <CAGsJ_4yoXj+e7A20SM5+ctLvE2QRTp0bzDeKfCZSUHTO8BPq5A@mail.gmail.com>
- <5194C2FC.70804@metafoo.de>
- <CAGsJ_4yn2uodRKrFKYrX85XA7A=hQs2w0cyGoEEHsYgCJHD7eQ@mail.gmail.com>
-Message-ID: <20130516173559.GD1627@sirena.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 May 2013 10:43:56 -0700
+Subject: [PATCH V5 1/6] clk: OMAP: introduce device tree binding to
+ kernel clock data
+In-Reply-To: <20130513235119.10068.47040@quantum>
+References: <1368039976-29648-1-git-send-email-nm@ti.com>
+ <1368039976-29648-2-git-send-email-nm@ti.com>
+ <20130513235119.10068.47040@quantum>
+Message-ID: <20130516174355.GB5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 08:00:17PM +0800, Barry Song wrote:
+* Mike Turquette <mturquette@linaro.org> [130513 16:56]:
+> Quoting Nishanth Menon (2013-05-08 12:06:11)
+> <snip>
+> > Overall strategy introduced here is simple: a clock node described in
+> > device tree blob is used to identify the exact clock provided in the
+> > SoC specific data. This is then linked back using of_clk_add_provider
+> > to the device node to be accessible by of_clk_get.
+> > 
+> 
+> FYI, I'm working on moving the OMAP clocks over to DT which is a better
+> alternative than this patch.  I'll share what I have on the list,
+> hopefully next week.
 
-> i did think it is a good idea to have device id list while i sent the
-> last mail. and it matches with the generic device driver engineering
-> sense. the problem is i don't how long the list will be.
-> if you like to keep dfbmcs320 at least for the moment, i would agree.
+That's good news! What's your plan on using the indexing the clocks?
 
-I'd prefer to see the ID list; we shouldn't be throwing away
-information.  Probably we can go a long way towards cutting down the
-length of the list if it gets silly with use of wildcards in the device
-names listed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130516/b49bd1d4/attachment.sig>
+I'd rather avoid indexing as that's basically same as the old IRQ
+numbering and GPIO numbering schemes that don't work well in the long
+term.
+
+We already have quite a few sets of clocks for omaps, so the indexing
+is already an issue. My thinking is that indexing should only be used
+if the same physical clock has multiple outputs.
+
+Regards,
+
+Tony
