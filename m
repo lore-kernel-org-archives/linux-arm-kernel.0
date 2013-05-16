@@ -1,53 +1,84 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 16 May 2013 12:12:02 -0400
-Subject: [PATCHv9 7/9] pci: PCIe driver for Marvell Armada 370/XP systems
-In-Reply-To: <20130516180850.3622e1a8@skate>
-References: <1368624323-24311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1368624323-24311-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130516093312.GB2459@localhost>
- <20130516154031.GF6563@titan.lakedaemon.net>
- <20130516174903.3a7a07ef@skate>
- <20130516155617.GH6563@titan.lakedaemon.net>
- <20130516180850.3622e1a8@skate>
-Message-ID: <20130516161201.GI6563@titan.lakedaemon.net>
+From: tomi.valkeinen@iki.fi (Tomi Valkeinen)
+Date: Thu, 16 May 2013 19:05:46 +0300
+Subject: [PATCH] ARM: OMAP4: change the device names in usb_bind_phy
+In-Reply-To: <20130516155857.GV5600@atomide.com>
+References: <1366697656-14315-1-git-send-email-kishon@ti.com>
+ <51936946.3030507@iki.fi> <20130516155857.GV5600@atomide.com>
+Message-ID: <519503DA.5070303@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 06:08:50PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
+On 16/05/13 18:58, Tony Lindgren wrote:
+> * Tomi Valkeinen <tomi.valkeinen@iki.fi> [130515 03:59]:
+>> On 23/04/13 09:14, Kishon Vijay Abraham I wrote:
+>>> After the device names are created using PLATFORM_DEVID_AUTO, the old
+>>> device names given in usb_bind_phy are no longer valid causing the musb
+>>> controller not to get the phy reference. Updated the usb_bind_phy with
+>>> the new device names to get MUSB functional in omap4 panda.
+>>>
+>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>> ---
+>>> Tested in OMAP4 PANDA.
+>>>  arch/arm/mach-omap2/board-4430sdp.c    |    2 +-
+>>>  arch/arm/mach-omap2/board-omap4panda.c |    2 +-
+>>>  2 files changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+>>> index 00d7290..56a9a4f 100644
+>>> --- a/arch/arm/mach-omap2/board-4430sdp.c
+>>> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+>>> @@ -730,7 +730,7 @@ static void __init omap_4430sdp_init(void)
+>>>  	omap4_sdp4430_wifi_init();
+>>>  	omap4_twl6030_hsmmc_init(mmc);
+>>>  
+>>> -	usb_bind_phy("musb-hdrc.0.auto", 0, "omap-usb2.1.auto");
+>>> +	usb_bind_phy("musb-hdrc.2.auto", 0, "omap-usb2.3.auto");
+>>>  	usb_musb_init(&musb_board_data);
+>>>  
+>>>  	status = omap_ethernet_init();
+>>
+>> I'm seeing
+>>
+>> [    2.190155] unable to find transceiver
+>> [    2.190155] HS USB OTG: no transceiver configured
+>> [    2.190155] musb-hdrc musb-hdrc.0.auto: musb_init_controller failed
+>> with status -517
+>> [    2.207458] platform musb-hdrc.0.auto: Driver musb-hdrc requests
+>> probe deferral
+>>
+>> on 4430sdp with v3.10-rc1. Does that mean that the musb-hdrc.0.auto was
+>> indeed correct, and the new value of musb-hdrc.2.auto is not?
 > 
-> On Thu, 16 May 2013 11:56:17 -0400, Jason Cooper wrote:
+> Just checking.. Do you have CONFIG_OMAP_OCP2SCP=y in your .config? Sounds
+> like the some transceivers should depend on that for omap4.
+
+Yes, I have OCP2SCP=y.
+
+>> The musb-hdrc id is wrong on overo also.
 > 
-> > > > > Building this showed a warning here. It seems you forgot
-> > > > > to mark this one as __init.
-> > > > 
-> > > > Thomas, I'll fix this up when I pull this in, no need to resend. :)
-> > > 
-> > > I'll resend, because beyond this function pointed by Ezequiel, there
-> > > are two other functions that can be marked __init. The one pointed by
-> > > Ezequiel is important because it causes a section mismatch
-> > > when !CONFIG_MODULES, because in this case platform_driver_probe() is
-> > > __init (and this explains what I wasn't seeing the warning, since I'm
-> > > building CONFIG_MODULES=y). The two other functions are more cosmetic,
-> > > but good to have as well.
-> > > 
-> > > It would already been sent if git hadn't decided to do a 'git gc' right
-> > > after my rebase. It's been gc-ing for quite some time now...
-> > 
-> > Dear boss,
-> > 
-> > I am in desperate need of a 500GB SSD on which to do my kernel work.
-> > 
-> > Thanks,
-> > 
-> > Kranky Kernel Developer
-> > 
-> > hehehe...
-> 
-> Adding boss in the Cc list :-)
+> Hmm has there been a fix posted for that?
 
-Hey, whatever works for you.  Good luck!
+I couldn't find with a quick look. We debugged and discussed this on an irc
+channel with Kishon, who said he'll send a patch. Changing the musb-hdrc ID
+on overo fixed the issue, and it looks very similar to the error on 4430sdp.
+The overo fix was just:
 
-thx,
+diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+index 4ca6b68..a496774 100644
+--- a/arch/arm/mach-omap2/board-overo.c
++++ b/arch/arm/mach-omap2/board-overo.c
+@@ -472,7 +472,7 @@ static void __init overo_init(void)
+                                  mt46h32m32lf6_sdrc_params);
+        board_nand_init(overo_nand_partitions,
+                        ARRAY_SIZE(overo_nand_partitions), NAND_CS, 0, NULL);
+-       usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
++       usb_bind_phy("musb-hdrc.1.auto", 0, "twl4030_usb");
+        usb_musb_init(NULL);
+ 
+        usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
 
-Jason.
+
+Is that ID "randomly" chosen? Doesn't that mean that it'll just get broken
+every now and then?
+
+ Tomi
