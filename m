@@ -1,57 +1,63 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 16 May 2013 11:06:16 -0400
-Subject: [PATCHv9 5/9] clk: mvebu: create parent-child relation for
- PCIe clocks on Armada 370
-In-Reply-To: <51949830.70306@gmail.com>
-References: <1368624323-24311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1368624323-24311-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130515214154.12127.73539@quantum>
- <20130516094417.24b1ca0d@skate> <51949830.70306@gmail.com>
-Message-ID: <20130516150616.GD6563@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 May 2013 08:11:27 -0700
+Subject: [PATCH] ARM: omap2: remove CONFIG_ARCH_OMAP2PLUS_TYPICAL
+In-Reply-To: <1368710950-2306-1-git-send-email-robherring2@gmail.com>
+References: <1368710950-2306-1-git-send-email-robherring2@gmail.com>
+Message-ID: <20130516151126.GP5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mike, Sebastian,
-
-On Thu, May 16, 2013 at 10:26:24AM +0200, Sebastian Hesselbarth wrote:
-> On 05/16/2013 09:44 AM, Thomas Petazzoni wrote:
-> >Dear Mike Turquette,
-> >
-> >On Wed, 15 May 2013 14:41:54 -0700, Mike Turquette wrote:
-> >>Quoting Thomas Petazzoni (2013-05-15 06:25:19)
-> >>>The Armada 370 has two gatable clocks for each PCIe interface, and we
-> >>>want both of them to be enabled. We therefore make one of the two
-> >>>clocks a child of the other, as we did for the sataX and sataXlnk
-> >>>clocks on Armada XP.
-> >>
-> >>Ack for patches #5 and #6.  Do you want me to take them?
-
-Thanks for the Ack!
-
-> >I don't know, I guess with your Ack, it would be easier to carry them
-> >through the Marvell maintainers and then the arm-soc tree, so that we
-> >can test arm-soc and have all the pieces needed in here.
-> >
-> >That said, Sebastian Hesselbarth has submitted a big rework of the
-> >mvebu clock drivers, which would conflict with this patch, and
-> >Sebastian's rework would most likely go through your tree. If that's
-> >the case, I guess it would be better to let you take #5 and #6 in this
-> >patch series.
+* Rob Herring <robherring2@gmail.com> [130516 06:34]:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> I also requested to take the restructure patches through ARM tree. They
-> are only touching files in drivers/clk/mvebu and by taking them through
-> ARM, we can update PCIe clock patches easily. The dependency between
-> Thomas' and my patches basically is that I renamed files that Thomas
-> now commits to. (I switched clk/mvebu from per-function files to per-soc
-> files).
+> CONFIG_ARCH_OMAP2PLUS_TYPICAL is selecting user defined features, not h/w
+> required options. This does not play well with multi-platform kernels and
+> belongs in a defconfig.
 
-I agree.  My heart jumped into my throat a little there :)  Mike, if
-it's ok with you, I'd prefer to take these through arm-soc.  Any merge
-conflicts should be minimal.  And at any rate, resolving the conflicts
-are *much* easier to handle than having arm-soc depend on an outside
-tree (then Linus has to take care in the order he merges them, no
-rebasing for clk tree, dogs and cats living together, etc ;-) )
+Yes we can remove this. But let's update omap2plus_defconfig with these
+options where needed. I can update this patch for that and queue it
+if that works for you.
 
-thx,
+Regards,
 
-Jason.
+Tony
+
+
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: linux-omap at vger.kernel.org
+> ---
+>  arch/arm/mach-omap2/Kconfig | 17 -----------------
+>  1 file changed, 17 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index f49cd51..9d4b5f7 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -26,23 +26,6 @@ if ARCH_OMAP2PLUS
+>  
+>  menu "TI OMAP2/3/4 Specific Features"
+>  
+> -config ARCH_OMAP2PLUS_TYPICAL
+> -	bool "Typical OMAP configuration"
+> -	default y
+> -	select AEABI
+> -	select HIGHMEM
+> -	select I2C
+> -	select I2C_OMAP
+> -	select MENELAUS if ARCH_OMAP2
+> -	select NEON if ARCH_OMAP3 || ARCH_OMAP4 || SOC_OMAP5
+> -	select PM_RUNTIME
+> -	select REGULATOR
+> -	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
+> -	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
+> -	select VFP
+> -	help
+> -	  Compile a kernel suitable for booting most boards
+> -
+>  config SOC_HAS_OMAP2_SDRC
+>  	bool "OMAP2 SDRAM Controller support"
+>  
+> -- 
+> 1.8.1.2
+> 
