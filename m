@@ -1,40 +1,79 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 May 2013 16:35:53 +0100
-Subject: dmatest regression in 3.10-rc1
-In-Reply-To: <20130515152803.GL23869@mudshark.cambridge.arm.com>
-References: <20130515152803.GL23869@mudshark.cambridge.arm.com>
-Message-ID: <20130516153553.GI11706@mudshark.cambridge.arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 16 May 2013 18:46:58 +0200
+Subject: [PATCH 00/10] clk: mvebu: restructure SoC clock drivers
+In-Reply-To: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130516184658.0650f838@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 04:28:03PM +0100, Will Deacon wrote:
-> I've been observing a regression in the dmatest module with 3.10-rc1. It
-> manifests as either:
+Sebastian, Jason, Andrew, Gregory,
+
+On Sat, 11 May 2013 03:08:00 +0200, Sebastian Hesselbarth wrote:
+> Marvell EBU SoCs share some common clock functions that register core
+> clocks or clock gates from SoC specific data. These clock drivers are
+> organized by function and over time the drivers filled up with #ifdefs
+> to separate different SoC specific code.
 > 
->  - a spurious timeout on one or more of the channel threads
->  - a complete kernel lockup (loss of console)
->  - a panic (see below, noting that the callback [dmatest_callback] is
->    dereferencing a NULL pointer)
+> This patch set first adds a new element to clock gate descriptors to
+> allow to pass clk flags per clock gate. (Patch 1)
 > 
-> If I revert 77101ce578bb ("dmatest: cancel thread immediately when asked
-> for") then things are rosy again, but I'm not sure if this is hiding another
-> problem.
+> Then it restructures MVEBU clock drivers into common clock setup and
+> SoC specific files and Kconfig options. The driver's init functions
+> are also registered to get called with of_clk_init. (Patches 2, 3-6)
+> 
+> It then switches Dove, Kirkwood, and Armada 370/XP to make use of
+> of_clk_init instead of mvebu_clocks_init. (Patches 7-9)
+> 
+> Finally, all obsolete files and Kconfig options are removed. (Patch 10)
+> 
+> It has been tested on CuBox (Dove) and Dockstar (Kirkwood) by me.
+> Armada 370 and XP are compile tested only and should get their Tested-by
+> from Thomas and Gregory, respectively.
+> 
+> @Mike: As this only touches MVEBU related code, I suggest to take it
+> all through the corresponding ARM branch.
+> 
+> Sebastian Hesselbarth (10):
+>   clk: mvebu: introduce per-clock-gate flags
+>   clk: mvebu: add common clock functions for core clk and clk gating
+>   clk: mvebu: add Dove SoC-centric clock init
+>   clk: mvebu: add Kirkwood SoC-centric clock init
+>   clk: mvebu: add Armada 370 SoC-centric clock init
+>   clk: mvebu: add Armada XP SoC-centric clock init
+>   ARM: dove: move DT boards to SoC-centric clock init
+>   ARM: kirkwood: move DT boards to SoC-centric clock init
+>   ARM: mvebu: move DT boards to SoC-centric clock init
+>   clk: mvebu: desintegrate obsolete file
 
-Right, so I think I understand what's causing this, but I'll leave it to
-Andriy to suggest a fix. The problem comes about because the dmatest
-module is now driven from debugfs, making it possible to unload the module
-whilst a test run is in progress. In this case:
+Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-	- The DMA threads will return from wait_event_freezable_timeout(...)
-	  due to kthread_should_stop() returning true, and subsequently
-	  report failure because done.done is false.
+I've tested on Armada 370 DB (after reverting the ARM core patch that
+prevents this platform from booting) and the Armada XP DB. Both boards
+boot fine, and detect PCIe devices as they should.
 
-	- The DMA engines may not be idle, so the asynchronous callback can
-	  be invoked after we've started cleaning up, explaining the NULL
-	  dereference I'm seeing.
+There is some conflict between this set of commits and the two commits
+that modify the PCIe clocks in my PCIe series. I've pushed a branch at
+https://github.com/MISL-EBU-System-SW/mainline-public/tree/marvell-pcie-v10-and-seb-clks
+which has the mvebu PCIe stuff + Sebastian patches on top of it, with
+the conflicts resolved. The tricky thing is that since Sebastian is
+adding new clock files, and then removing the old ones, it's pretty
+easy to "loose" the changes the two PCIe clock patches are doing. The
+branch above works on Armada 370/XP, so you can compare the clock files
+if needed.
 
-The solutions are either fixing the module exit code to cope with concurrent
-DMA transfers or to revert 77101ce578bb and not allow the channel threads to
-return mid-transfer.
+Of course, I'm willing to do another final test once you've done the
+merged to confirm that everything is alright.
 
-Will
+I haven't done a detailed review of the patches, but I definitely agree
+with the principle, and I trust Sebastian for having done the right
+thing in here.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
