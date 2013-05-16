@@ -1,29 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 May 2013 15:35:03 +0200
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Thu, 16 May 2013 15:37:16 +0200
 Subject: [PATCH] ARM: mach-moxart: platform port for MOXA ART SoC
-In-Reply-To: <20130516085711.GP18614@n2100.arm.linux.org.uk>
+In-Reply-To: <201305151516.52389.arnd@arndb.de>
 References: <CACmBeS1NLFUYHBOVL28aCCzRrgXYGPZF9t3qj6AdcgaMkrPGoQ@mail.gmail.com>
- <201305160054.21064.arnd@arndb.de>
- <20130516085711.GP18614@n2100.arm.linux.org.uk>
-Message-ID: <201305161535.03742.arnd@arndb.de>
+ <201303181503.49491.arnd@arndb.de>
+ <CACmBeS1empYyoaKidgTrYwUFCw447OKndxZjT98TvYfKVWB00A@mail.gmail.com>
+ <201305151516.52389.arnd@arndb.de>
+Message-ID: <CACmBeS3JZ8bm6jJbmrKTfmZqshezN6QKdmyPCKdQ2HUwzY7ggA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 May 2013, Russell King - ARM Linux wrote:
-> Well, if its a CPU core thing, then it's even easier - the proc-*.S
-> file can handle it just fine (because that's where the WFI code is.)
-> Just delete the contents of the processor specific idle function, IOW:
-> 
-> /*
->  * cpu_fa526_do_idle()
->  */
->         .align  4
-> ENTRY(cpu_fa526_do_idle)
->         mcr     p15, 0, r0, c7, c0, 4           @ Wait for interrupt
->         mov     pc, lr
-> 
-> remove the WFI from there.
+On 15 May 2013 15:16, Arnd Bergmann <arnd@arndb.de> wrote:
+> The part that I don't understand at all is the "timer0" part. Is that a string
+> from the data sheet?
 
-Yes, that was what I meant.
+I have next to no data sheets or documentation on the SoC itself. What
+I know is from looking at old sources, which suggest there are more
+than one timer (the rest were never implemented).
 
-	Arnd
+It only needs one for timer_tick? Does it make sense to just call it "timer"?
+
+> Can you provide some more detail why what PMU registers are used here? Is that
+> a "Performance Measurement Unit", "Power Management Unit" or something else?
+> Are you sure that those registers are only ever needed for GPIO?
+
+It's "Power Management Unit". The MMC driver uses it to read system
+clock and write it to clock control, but I suspect it can be removed.
+It's code under #ifdef MSD_SUPPORT_GET_CLOCK but I think the else is
+perfectly acceptable.
+GPIO uses it only to enable or disable pins.
+
+>> diff --git a/arch/arm/mach-moxart/Makefile.boot
+>> b/arch/arm/mach-moxart/Makefile.boot
+>> new file mode 100644
+>> index 0000000..760a0ef
+>> --- /dev/null
+>> +++ b/arch/arm/mach-moxart/Makefile.boot
+>> @@ -0,0 +1,3 @@
+>> +   zreladdr-y        += 0x00008000
+>> +params_phys-y        := 0x00000100
+>> +initrd_phys-y        := 0x00800000
+>
+> Is this still used?
+
+Looks like this is no longer needed. Boots without it. Removed.
+
+> You can leave out moxart_init() now, it's the default implementation.
+> moxart_init_irq, moxart_handle_irq and nr_irqs should be obsolete if
+> you did the irqchip driver correctly, same for moxart_timer_init and
+> the clocksource driver.
+>
+> I think the only part remaining here is moxart_restart, but that is
+> broken as long as reg_wdt does not get initialized. I think you could
+> move that function into the watchdog driver and assign it to
+> arm_pm_restart when you add that driver.
+
+All removed. It boots after some additions to clocksource and irqchip.
+arm_pm_restart is set in watchdog.
+
+
+What I haven't commented on should already be fixed @
+https://code.google.com/p/linux-3-10-rc1-moxart/
+
+I'll send new patches.
+
+Best regards,
+Jonas
