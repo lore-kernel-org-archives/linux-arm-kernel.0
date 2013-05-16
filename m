@@ -1,10 +1,10 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 16 May 2013 13:15:57 +0200
-Subject: [PATCH 29/33] arch/arm/mach-tegra: don't check resource with
+Date: Thu, 16 May 2013 13:15:58 +0200
+Subject: [PATCH 30/33] arch/arm/plat-samsung: don't check resource with
  devm_ioremap_resource
 In-Reply-To: <1368702961-4325-1-git-send-email-wsa@the-dreams.de>
 References: <1368702961-4325-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1368702961-4325-30-git-send-email-wsa@the-dreams.de>
+Message-ID: <1368702961-4325-31-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,24 +13,24 @@ duplicate this in the driver.
 
 Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 ---
- arch/arm/mach-tegra/tegra2_emc.c |    5 -----
+ arch/arm/plat-samsung/adc.c |    5 -----
  1 file changed, 5 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/tegra2_emc.c b/arch/arm/mach-tegra/tegra2_emc.c
-index 9e8bdfa..31e69a0 100644
---- a/arch/arm/mach-tegra/tegra2_emc.c
-+++ b/arch/arm/mach-tegra/tegra2_emc.c
-@@ -307,11 +307,6 @@ static int tegra_emc_probe(struct platform_device *pdev)
+diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+index ca07cb1..79690f2 100644
+--- a/arch/arm/plat-samsung/adc.c
++++ b/arch/arm/plat-samsung/adc.c
+@@ -381,11 +381,6 @@ static int s3c_adc_probe(struct platform_device *pdev)
  	}
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		dev_err(&pdev->dev, "missing register base\n");
--		return -ENOMEM;
+ 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!regs) {
+-		dev_err(dev, "failed to find registers\n");
+-		return -ENXIO;
 -	}
 -
- 	emc_regbase = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(emc_regbase))
- 		return PTR_ERR(emc_regbase);
+ 	adc->regs = devm_ioremap_resource(dev, regs);
+ 	if (IS_ERR(adc->regs))
+ 		return PTR_ERR(adc->regs);
 -- 
 1.7.10.4
