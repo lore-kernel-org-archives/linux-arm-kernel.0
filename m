@@ -1,397 +1,47 @@
 From: b35083@freescale.com (Jingchang Lu)
-Date: Thu, 16 May 2013 14:10:45 +0800
-Subject: [PATCH v3 1/4] ARM: imx: add MVF600 clock support
+Date: Thu, 16 May 2013 14:10:48 +0800
+Subject: [PATCH v3 4/4] ARM: dts: add initial MVF600 Tower board dts support
 In-Reply-To: <1368684648-20826-1-git-send-email-b35083@freescale.com>
 References: <1368684648-20826-1-git-send-email-b35083@freescale.com>
-Message-ID: <1368684648-20826-2-git-send-email-b35083@freescale.com>
+Message-ID: <1368684648-20826-5-git-send-email-b35083@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock support for Vybrid MVF600. It uses dtc macro support to
-define all clock IDs in mvf600-clock.h to keep clock IDs coherence
-between kernel and DT.
+Add initial MVF600 Tower board  support with uart, fec,
+i2c, qspi, and sai enabled.
 
+Signed-off-by: Xiaochun Li <b41219@freescale.com>
 Signed-off-by: Jingchang Lu <b35083@freescale.com>
 ---
 v3:
-  use DTC macro support to define these clock IDs.
-  remove unused #include header lines.
-  name clocks close to reference manual.
+  split DTS support to SoC and board patches.
+  sort node by alphabet order of labels.
 
- .../devicetree/bindings/clock/mvf600-clock.txt     |  26 ++
- arch/arm/mach-imx/clk-mvf600.c                     | 322 +++++++++++++++++++++
- include/dt-bindings/clock/mvf600-clock.h           | 163 +++++++++++
- 3 files changed, 511 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/mvf600-clock.txt
- create mode 100644 arch/arm/mach-imx/clk-mvf600.c
- create mode 100644 include/dt-bindings/clock/mvf600-clock.h
+ arch/arm/boot/dts/Makefile       |   3 +-
+ arch/arm/boot/dts/mvf600-twr.dts | 108 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 110 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/mvf600-twr.dts
 
-diff --git a/Documentation/devicetree/bindings/clock/mvf600-clock.txt b/Documentation/devicetree/bindings/clock/mvf600-clock.txt
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 87e603c..968164b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -122,7 +122,8 @@ dtb-$(CONFIG_ARCH_MXC) += \
+ 	imx6q-sabrelite.dtb \
+ 	imx6q-sabresd.dtb \
+ 	imx6q-sbc6x.dtb \
+-	imx6sl-evk.dtb
++	imx6sl-evk.dtb \
++	mvf600-twr.dtb
+ dtb-$(CONFIG_ARCH_MXS) += imx23-evk.dtb \
+ 	imx23-olinuxino.dtb \
+ 	imx23-stmp378x_devb.dtb \
+diff --git a/arch/arm/boot/dts/mvf600-twr.dts b/arch/arm/boot/dts/mvf600-twr.dts
 new file mode 100644
-index 0000000..34c0abb
+index 0000000..fe2e0e6
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/mvf600-clock.txt
-@@ -0,0 +1,26 @@
-+* Clock bindings for Freescale Vybrid MVF600 SOC
-+
-+Required properties:
-+- compatible: Should be "fsl,mvf600-ccm"
-+- reg: Address and length of the register set
-+- #clock-cells: Should be <1>
-+
-+The clock consumer should specify the desired clock by having the clock
-+ID in its "clocks" phandle cell. See include/dt-bindings/clock/mvf600-clock.h
-+for the full list of MVF600 clock IDs.
-+
-+Examples:
-+
-+clks: ccm at 4006b000 {
-+	compatible = "fsl,mvf600-ccm";
-+	reg = <0x4006b000 0x1000>;
-+	#clock-cells = <1>;
-+};
-+
-+uart1: serial at 40028000 {
-+	compatible = "fsl,mvf600-uart";
-+	reg = <0x40028000 0x1000>;
-+	interrupts = <0 62 0x04>;
-+	clocks = <&clks MVF600_CLK_UART1>;
-+	clock-names = "ipg";
-+};
-diff --git a/arch/arm/mach-imx/clk-mvf600.c b/arch/arm/mach-imx/clk-mvf600.c
-new file mode 100644
-index 0000000..58c0065
---- /dev/null
-+++ b/arch/arm/mach-imx/clk-mvf600.c
-@@ -0,0 +1,322 @@
-+/*
-+ * Copyright 2012-2013 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+
-+#include <linux/of_address.h>
-+#include <linux/clk.h>
-+#include <dt-bindings/clock/mvf600-clock.h>
-+
-+#include "clk.h"
-+
-+#define CCM_CCR			(ccm_base + 0x00)
-+#define CCM_CSR			(ccm_base + 0x04)
-+#define CCM_CCSR		(ccm_base + 0x08)
-+#define CCM_CACRR		(ccm_base + 0x0c)
-+#define CCM_CSCMR1		(ccm_base + 0x10)
-+#define CCM_CSCDR1		(ccm_base + 0x14)
-+#define CCM_CSCDR2		(ccm_base + 0x18)
-+#define CCM_CSCDR3		(ccm_base + 0x1c)
-+#define CCM_CSCMR2		(ccm_base + 0x20)
-+#define CCM_CSCDR4		(ccm_base + 0x24)
-+#define CCM_CLPCR		(ccm_base + 0x2c)
-+#define CCM_CISR		(ccm_base + 0x30)
-+#define CCM_CIMR		(ccm_base + 0x34)
-+#define CCM_CGPR		(ccm_base + 0x3c)
-+#define CCM_CCGR0		(ccm_base + 0x40)
-+#define CCM_CCGR1		(ccm_base + 0x44)
-+#define CCM_CCGR2		(ccm_base + 0x48)
-+#define CCM_CCGR3		(ccm_base + 0x4c)
-+#define CCM_CCGR4		(ccm_base + 0x50)
-+#define CCM_CCGR5		(ccm_base + 0x54)
-+#define CCM_CCGR6		(ccm_base + 0x58)
-+#define CCM_CCGR7		(ccm_base + 0x5c)
-+#define CCM_CCGR8		(ccm_base + 0x60)
-+#define CCM_CCGR9		(ccm_base + 0x64)
-+#define CCM_CCGR10		(ccm_base + 0x68)
-+#define CCM_CCGR11		(ccm_base + 0x6c)
-+#define CCM_CMEOR0		(ccm_base + 0x70)
-+#define CCM_CMEOR1		(ccm_base + 0x74)
-+#define CCM_CMEOR2		(ccm_base + 0x78)
-+#define CCM_CMEOR3		(ccm_base + 0x7c)
-+#define CCM_CMEOR4		(ccm_base + 0x80)
-+#define CCM_CMEOR5		(ccm_base + 0x84)
-+#define CCM_CPPDSR		(ccm_base + 0x88)
-+#define CCM_CCOWR		(ccm_base + 0x8c)
-+#define CCM_CCPGR0		(ccm_base + 0x90)
-+#define CCM_CCPGR1		(ccm_base + 0x94)
-+#define CCM_CCPGR2		(ccm_base + 0x98)
-+#define CCM_CCPGR3		(ccm_base + 0x9c)
-+
-+#define CCM_CCGRx_CGn(n)	((n) * 2)
-+
-+#define PFD_PLL1_BASE		(anatop_base + 0x2b0)
-+#define PFD_PLL2_BASE		(anatop_base + 0x100)
-+#define PFD_PLL3_BASE		(anatop_base + 0xf0)
-+
-+static void __iomem *anatop_base;
-+static void __iomem *ccm_base;
-+
-+/* sources for multiplexer clocks, this is used multiple times */
-+static const char const *fast_sels[]	= { "firc", "fxosc", };
-+static const char const *slow_sels[]	= { "sirc_32k", "sxosc", };
-+static const char const *pll1_sels[]	= { "pll1_main", "pll1_pfd1", "pll1_pfd2", "pll1_pfd3", "pll1_pfd4", };
-+static const char const *pll2_sels[]	= { "pll2_main", "pll2_pfd1", "pll2_pfd2", "pll2_pfd3", "pll2_pfd4", };
-+static const char const *sys_sels[]	= { "fast_clk_sel", "slow_clk_sel", "pll2_pfd_sel", "pll2_main", "pll1_pfd_sel", "pll3_main", };
-+static const char const *ddr_sels[]	= { "pll2_pfd2", "sys_sel", };
-+static const char const *rmii_sels[]	= { "enet_ext", "audio_ext", "enet_50m", "enet_25m", };
-+static const char const *enet_ts_sels[]	= { "enet_ext", "fxosc", "audio_ext", "usb", "enet_ts", "enet_25m", "enet_50m", };
-+static const char const *esai_sels[]	= { "audio_ext", "mlb", "spdif_rx", "pll4_main_div", };
-+static const char const *sai_sels[]	= { "audio_ext", "mlb", "spdif_rx", "pll4_main_div", };
-+static const char const *nfc_sels[]	= { "platform_bus", "pll1_pfd1", "pll3_pfd1", "pll3_pfd3", };
-+static const char const *qspi_sels[]	= { "pll3_main", "pll3_pfd4", "pll2_pfd4", "pll1_pfd4", };
-+static const char const *esdhc_sels[]	= { "pll3_main", "pll3_pfd3", "pll1_pfd3", "platform_bus", };
-+static const char const *dcu_sels[]	= { "pll1_pfd2", "pll3_main", };
-+static const char const *gpu_sels[]	= { "pll2_pfd2", "pll3_pfd2", };
-+static const char const *vadc_sels[]	= { "pll6_main_div", "pll3_main_div", "pll3_main", };
-+/* FTM counter clock source, not module clock */
-+static const char const *ftm_ext_sels[]	= {"sirc_128k", "sxosc", "fxosc_half", "audio_ext", };
-+static const char const *ftm_fix_sels[]	= { "sxosc", "ipg_bus", };
-+
-+static struct clk_div_table pll4_main_div_table[] = {
-+	{ .val = 0, .div = 1 },
-+	{ .val = 1, .div = 2 },
-+	{ .val = 2, .div = 6 },
-+	{ .val = 3, .div = 8 },
-+	{ .val = 4, .div = 10 },
-+	{ .val = 5, .div = 12 },
-+	{ .val = 6, .div = 14 },
-+	{ .val = 7, .div = 16 },
-+	{ }
-+};
-+
-+static struct clk *clk[MVF600_CLK_END];
-+static struct clk_onecell_data clk_data;
-+
-+int __init mvf600_clocks_init(void)
-+{
-+	struct device_node *np;
-+
-+	of_clk_init(NULL);
-+
-+	clk[MVF600_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
-+	clk[MVF600_CLK_SIRC_128K] = imx_clk_fixed("sirc_128k", 128000);
-+	clk[MVF600_CLK_SIRC_32K] = imx_clk_fixed("sirc_32k", 32000);
-+	clk[MVF600_CLK_FIRC] = imx_clk_fixed("firc", 24000000);
-+
-+	clk[MVF600_CLK_SXOSC] = imx_obtain_fixed_clock("sxosc", 0);
-+	clk[MVF600_CLK_FXOSC] = imx_obtain_fixed_clock("fxosc", 0);
-+	clk[MVF600_CLK_AUDIO_EXT] = imx_obtain_fixed_clock("audio_ext", 0);
-+	clk[MVF600_CLK_ENET_EXT] = imx_obtain_fixed_clock("enet_ext", 0);
-+
-+	clk[MVF600_CLK_FXOSC_HALF] = imx_clk_fixed_factor("fxosc_half", "fxosc", 1, 2);
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,mvf600-anatop");
-+	anatop_base = of_iomap(np, 0);
-+	WARN_ON(!anatop_base);
-+
-+	np = of_find_compatible_node(NULL, NULL, "fsl,mvf600-ccm");
-+	ccm_base = of_iomap(np, 0);
-+	WARN_ON(!ccm_base);
-+
-+	clk[MVF600_CLK_SLOW_CLK_SEL] = imx_clk_mux("slow_clk_sel", CCM_CCSR, 4, 1, slow_sels, ARRAY_SIZE(slow_sels));
-+	clk[MVF600_CLK_FASK_CLK_SEL] = imx_clk_mux("fast_clk_sel", CCM_CCSR, 5, 1, fast_sels, ARRAY_SIZE(fast_sels));
-+
-+	clk[MVF600_CLK_PLL1_MAIN] = imx_clk_fixed_factor("pll1_main", "fast_clk_sel", 22, 1);
-+	clk[MVF600_CLK_PLL1_PFD1] = imx_clk_pfd("pll1_pfd1", "pll1_main", PFD_PLL1_BASE, 0);
-+	clk[MVF600_CLK_PLL1_PFD2] = imx_clk_pfd("pll1_pfd2", "pll1_main", PFD_PLL1_BASE, 1);
-+	clk[MVF600_CLK_PLL1_PFD3] = imx_clk_pfd("pll1_pfd3", "pll1_main", PFD_PLL1_BASE, 2);
-+	clk[MVF600_CLK_PLL1_PFD4] = imx_clk_pfd("pll1_pfd4", "pll1_main", PFD_PLL1_BASE, 3);
-+
-+	clk[MVF600_CLK_PLL2_MAIN] = imx_clk_fixed_factor("pll2_main", "fast_clk_sel", 22, 1);
-+	clk[MVF600_CLK_PLL2_PFD1] = imx_clk_pfd("pll2_pfd1", "pll2_main", PFD_PLL2_BASE, 0);
-+	clk[MVF600_CLK_PLL2_PFD2] = imx_clk_pfd("pll2_pfd2", "pll2_main", PFD_PLL2_BASE, 1);
-+	clk[MVF600_CLK_PLL2_PFD3] = imx_clk_pfd("pll2_pfd3", "pll2_main", PFD_PLL2_BASE, 2);
-+	clk[MVF600_CLK_PLL2_PFD4] = imx_clk_pfd("pll2_pfd4", "pll2_main", PFD_PLL2_BASE, 3);
-+
-+	clk[MVF600_CLK_PLL3_MAIN] = imx_clk_fixed_factor("pll3_main", "fast_clk_sel", 20, 1);
-+	clk[MVF600_CLK_PLL3_PFD1] = imx_clk_pfd("pll3_pfd1", "pll3_main", PFD_PLL3_BASE, 0);
-+	clk[MVF600_CLK_PLL3_PFD2] = imx_clk_pfd("pll3_pfd2", "pll3_main", PFD_PLL3_BASE, 1);
-+	clk[MVF600_CLK_PLL3_PFD3] = imx_clk_pfd("pll3_pfd3", "pll3_main", PFD_PLL3_BASE, 2);
-+	clk[MVF600_CLK_PLL3_PFD4] = imx_clk_pfd("pll3_pfd4", "pll3_main", PFD_PLL3_BASE, 3);
-+
-+	clk[MVF600_CLK_PLL4_MAIN] = imx_clk_fixed_factor("pll4_main", "fast_clk_sel", 25, 1);
-+	/* Enet pll: fixed 50Mhz */
-+	clk[MVF600_CLK_PLL5_MAIN] = imx_clk_fixed_factor("pll5_main", "fast_clk_sel", 125, 6);
-+	/* pll6: default 960Mhz */
-+	clk[MVF600_CLK_PLL6_MAIN] = imx_clk_fixed_factor("pll6_main", "fast_clk_sel", 40, 1);
-+	clk[MVF600_CLK_PLL1_PFD_SEL] = imx_clk_mux("pll1_pfd_sel", CCM_CCSR, 16, 3, pll1_sels, 5);
-+	clk[MVF600_CLK_PLL2_PFD_SEL] = imx_clk_mux("pll2_pfd_sel", CCM_CCSR, 19, 3, pll2_sels, 5);
-+	clk[MVF600_CLK_SYS_SEL] = imx_clk_mux("sys_sel", CCM_CCSR, 0, 3, sys_sels, ARRAY_SIZE(sys_sels));
-+	clk[MVF600_CLK_DDR_SEL] = imx_clk_mux("ddr_sel", CCM_CCSR, 6, 1, ddr_sels, ARRAY_SIZE(ddr_sels));
-+	clk[MVF600_CLK_SYS_BUS] = imx_clk_divider("sys_bus", "sys_sel", CCM_CACRR, 0, 3);
-+	clk[MVF600_CLK_PLATFORM_BUS] = imx_clk_divider("platform_bus", "sys_bus", CCM_CACRR, 3, 3);
-+	clk[MVF600_CLK_IPG_BUS] = imx_clk_divider("ipg_bus", "platform_bus", CCM_CACRR, 11, 2);
-+
-+	clk[MVF600_CLK_PLL3_MAIN_DIV] = imx_clk_divider("pll3_main_div", "pll3_main", CCM_CACRR, 20, 1);
-+	clk[MVF600_CLK_PLL4_MAIN_DIV] = clk_register_divider_table(NULL, "pll4_main_div", "pll4_main", 0, CCM_CACRR, 6, 3, 0, pll4_main_div_table, &imx_ccm_lock);
-+	clk[MVF600_CLK_PLL6_MAIN_DIV] = imx_clk_divider("pll6_main_div", "pll6_main", CCM_CACRR, 21, 1);
-+
-+	clk[MVF600_CLK_USBC0] = imx_clk_gate2("usbc0", "pll3_main", CCM_CCGR1, CCM_CCGRx_CGn(4));
-+	clk[MVF600_CLK_USBC1] = imx_clk_gate2("usbc1", "pll3_main", CCM_CCGR7, CCM_CCGRx_CGn(4));
-+
-+	clk[MVF600_CLK_QSPI0_SEL] = imx_clk_mux("qspi0_sel", CCM_CSCMR1, 22, 2, qspi_sels, 4);
-+	clk[MVF600_CLK_QSPI0_EN] = imx_clk_gate("qspi0_en", "qspi0_sel", CCM_CSCDR3, 4);
-+	clk[MVF600_CLK_QSPI0_X4_DIV] = imx_clk_divider("qspi0_x4", "qspi0_en", CCM_CSCDR3, 0, 2);
-+	clk[MVF600_CLK_QSPI0_X2_DIV] = imx_clk_divider("qspi0_x2", "qspi0_x4", CCM_CSCDR3, 2, 1);
-+	clk[MVF600_CLK_QSPI0_X1_DIV] = imx_clk_divider("qspi0_x1", "qspi0_x2", CCM_CSCDR3, 3, 1);
-+	clk[MVF600_CLK_QSPI0] = imx_clk_gate2("qspi0", "qspi0_x1", CCM_CCGR2, CCM_CCGRx_CGn(4));
-+
-+	clk[MVF600_CLK_QSPI1_SEL] = imx_clk_mux("qspi1_sel", CCM_CSCMR1, 24, 2, qspi_sels, 4);
-+	clk[MVF600_CLK_QSPI1_EN] = imx_clk_gate("qspi1_en", "qspi1_sel", CCM_CSCDR3, 12);
-+	clk[MVF600_CLK_QSPI1_X4_DIV] = imx_clk_divider("qspi1_x4", "qspi1_en", CCM_CSCDR3, 8, 2);
-+	clk[MVF600_CLK_QSPI1_X2_DIV] = imx_clk_divider("qspi1_x2", "qspi1_x4", CCM_CSCDR3, 10, 1);
-+	clk[MVF600_CLK_QSPI1_X1_DIV] = imx_clk_divider("qspi1_x1", "qspi1_x2", CCM_CSCDR3, 11, 1);
-+	clk[MVF600_CLK_QSPI1] = imx_clk_gate2("qspi1", "qspi1_x1", CCM_CCGR8, CCM_CCGRx_CGn(4));
-+
-+	clk[MVF600_CLK_ENET_50M] = imx_clk_fixed_factor("enet_50m", "pll5_main", 1, 10);
-+	clk[MVF600_CLK_ENET_25M] = imx_clk_fixed_factor("enet_25m", "pll5_main", 1, 20);
-+	clk[MVF600_CLK_ENET_SEL] = imx_clk_mux("enet_sel", CCM_CSCMR2, 4, 2, rmii_sels, 4);
-+	clk[MVF600_CLK_ENET_TS_SEL] = imx_clk_mux("enet_ts_sel", CCM_CSCMR2, 0, 3, enet_ts_sels, 7);
-+	clk[MVF600_CLK_ENET] = imx_clk_gate("enet", "enet_sel", CCM_CSCDR1, 24);
-+	clk[MVF600_CLK_ENET_TS] = imx_clk_gate("enet_ts", "enet_ts_sel", CCM_CSCDR1, 23);
-+
-+	clk[MVF600_CLK_PIT] = imx_clk_gate2("pit", "ipg_bus", CCM_CCGR1, CCM_CCGRx_CGn(7));
-+
-+	clk[MVF600_CLK_UART0] = imx_clk_gate2("uart0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(7));
-+	clk[MVF600_CLK_UART1] = imx_clk_gate2("uart1", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(8));
-+	clk[MVF600_CLK_UART2] = imx_clk_gate2("uart2", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(9));
-+	clk[MVF600_CLK_UART3] = imx_clk_gate2("uart3", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(10));
-+
-+	clk[MVF600_CLK_I2C0] = imx_clk_gate2("i2c0", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(6));
-+	clk[MVF600_CLK_I2C1] = imx_clk_gate2("i2c1", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(7));
-+
-+	clk[MVF600_CLK_DSPI0] = imx_clk_gate2("dspi0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(12));
-+	clk[MVF600_CLK_DSPI1] = imx_clk_gate2("dspi1", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(13));
-+	clk[MVF600_CLK_DSPI2] = imx_clk_gate2("dspi2", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(12));
-+	clk[MVF600_CLK_DSPI3] = imx_clk_gate2("dspi3", "ipg_bus", CCM_CCGR6, CCM_CCGRx_CGn(13));
-+
-+	clk[MVF600_CLK_WDT] = imx_clk_gate2("wdt", "ipg_bus", CCM_CCGR1, CCM_CCGRx_CGn(14));
-+
-+	clk[MVF600_CLK_ESDHC0_SEL] = imx_clk_mux("esdhc0_sel", CCM_CSCMR1, 16, 2, esdhc_sels, 4);
-+	clk[MVF600_CLK_ESDHC0_EN] = imx_clk_gate("esdhc0_en", "esdhc0_sel", CCM_CSCDR2, 28);
-+	clk[MVF600_CLK_ESDHC0_DIV] = imx_clk_divider("esdhc0_div", "esdhc0_en", CCM_CSCDR2, 16, 4);
-+	clk[MVF600_CLK_ESDHC0] = imx_clk_gate2("eshc0", "esdhc0_div", CCM_CCGR7, CCM_CCGRx_CGn(1));
-+
-+	clk[MVF600_CLK_ESDHC1_SEL] = imx_clk_mux("esdhc1_sel", CCM_CSCMR1, 18, 2, esdhc_sels, 4);
-+	clk[MVF600_CLK_ESDHC1_EN] = imx_clk_gate("esdhc1_en", "esdhc1_sel", CCM_CSCDR2, 29);
-+	clk[MVF600_CLK_ESDHC1_DIV] = imx_clk_divider("esdhc1_div", "esdhc1_en", CCM_CSCDR2, 20, 4);
-+	clk[MVF600_CLK_ESDHC1] = imx_clk_gate2("eshc1", "esdhc1_div", CCM_CCGR7, CCM_CCGRx_CGn(2));
-+
-+	/*
-+	 * ftm_ext_clk and ftm_fix_clk are FTM timer counter's
-+	 * selectable clock sources, both use a common enable bit
-+	 * in CCM_CSCDR1, selecting "dummy" clock as parent of
-+	 * "ftm0_ext_fix" make it serve only for enable/disable.
-+	 */
-+	clk[MVF600_CLK_FTM0_EXT_SEL] = imx_clk_mux("ftm0_ext_sel", CCM_CSCMR2, 6, 2, ftm_ext_sels, 4);
-+	clk[MVF600_CLK_FTM0_FIX_SEL] = imx_clk_mux("ftm0_fix_sel", CCM_CSCMR2, 14, 1, ftm_fix_sels, 2);
-+	clk[MVF600_CLK_FTM0_EXT_FIX_EN] = imx_clk_gate("ftm0_ext_fix_en", "dummy", CCM_CSCDR1, 25);
-+	clk[MVF600_CLK_FTM1_EXT_SEL] = imx_clk_mux("ftm1_ext_sel", CCM_CSCMR2, 8, 2, ftm_ext_sels, 4);
-+	clk[MVF600_CLK_FTM1_FIX_SEL] = imx_clk_mux("ftm1_fix_sel", CCM_CSCMR2, 15, 1, ftm_fix_sels, 2);
-+	clk[MVF600_CLK_FTM1_EXT_FIX_EN] = imx_clk_gate("ftm1_ext_fix_en", "dummy", CCM_CSCDR1, 26);
-+	clk[MVF600_CLK_FTM2_EXT_SEL] = imx_clk_mux("ftm2_ext_sel", CCM_CSCMR2, 10, 2, ftm_ext_sels, 4);
-+	clk[MVF600_CLK_FTM2_FIX_SEL] = imx_clk_mux("ftm2_fix_sel", CCM_CSCMR2, 16, 1, ftm_fix_sels, 2);
-+	clk[MVF600_CLK_FTM2_EXT_FIX_EN] = imx_clk_gate("ftm2_ext_fix_en", "dummy", CCM_CSCDR1, 27);
-+	clk[MVF600_CLK_FTM3_EXT_SEL] = imx_clk_mux("ftm3_ext_sel", CCM_CSCMR2, 12, 2, ftm_ext_sels, 4);
-+	clk[MVF600_CLK_FTM3_FIX_SEL] = imx_clk_mux("ftm3_fix_sel", CCM_CSCMR2, 17, 1, ftm_fix_sels, 2);
-+	clk[MVF600_CLK_FTM3_EXT_FIX_EN] = imx_clk_gate("ftm3_ext_fix_en", "dummy", CCM_CSCDR1, 28);
-+
-+	/* ftm(n)_clk are FTM module operation clock */
-+	clk[MVF600_CLK_FTM0] = imx_clk_gate2("ftm0", "ipg_bus", CCM_CCGR1, CCM_CCGRx_CGn(8));
-+	clk[MVF600_CLK_FTM1] = imx_clk_gate2("ftm1", "ipg_bus", CCM_CCGR1, CCM_CCGRx_CGn(9));
-+	clk[MVF600_CLK_FTM2] = imx_clk_gate2("ftm2", "ipg_bus", CCM_CCGR7, CCM_CCGRx_CGn(8));
-+	clk[MVF600_CLK_FTM3] = imx_clk_gate2("ftm3", "ipg_bus", CCM_CCGR7, CCM_CCGRx_CGn(9));
-+
-+	clk[MVF600_CLK_DCU0_SEL] = imx_clk_mux("dcu0_sel", CCM_CSCMR1, 28, 1, dcu_sels, 2);
-+	clk[MVF600_CLK_DCU0_EN] = imx_clk_gate("dcu0_en", "dcu0_sel", CCM_CSCDR3, 19);
-+	clk[MVF600_CLK_DCU0_DIV] = imx_clk_divider("dcu0_div", "dcu0_en", CCM_CSCDR3, 16, 3);
-+	clk[MVF600_CLK_DCU0] = imx_clk_gate2("dcu0", "dcu0_div", CCM_CCGR3, CCM_CCGRx_CGn(8));
-+	clk[MVF600_CLK_DCU1_SEL] = imx_clk_mux("dcu1_sel", CCM_CSCMR1, 29, 1, dcu_sels, 2);
-+	clk[MVF600_CLK_DCU1_EN] = imx_clk_gate("dcu1_en", "dcu1_sel", CCM_CSCDR3, 23);
-+	clk[MVF600_CLK_DCU1_DIV] = imx_clk_divider("dcu1_div", "dcu1_en", CCM_CSCDR3, 20, 3);
-+	clk[MVF600_CLK_DCU1] = imx_clk_gate2("dcu1", "dcu1_div", CCM_CCGR9, CCM_CCGRx_CGn(8));
-+
-+	clk[MVF600_CLK_ESAI_SEL] = imx_clk_mux("esai_sel", CCM_CSCMR1, 20, 2, esai_sels, 4);
-+	clk[MVF600_CLK_ESAI_EN] = imx_clk_gate("esai_en", "esai_sel", CCM_CSCDR2, 30);
-+	clk[MVF600_CLK_ESAI_DIV] = imx_clk_divider("esai_div", "esai_en", CCM_CSCDR2, 24, 4);
-+	clk[MVF600_CLK_ESAI] = imx_clk_gate2("esai", "esai_div", CCM_CCGR4, CCM_CCGRx_CGn(2));
-+
-+	clk[MVF600_CLK_SAI0_SEL] = imx_clk_mux("sai0_sel", CCM_CSCMR1, 0, 2, sai_sels, 4);
-+	clk[MVF600_CLK_SAI0_EN] = imx_clk_gate("sai0_en", "sai0_sel", CCM_CSCDR1, 16);
-+	clk[MVF600_CLK_SAI0_DIV] = imx_clk_divider("sai0_div", "sai0_en", CCM_CSCDR1, 0, 4);
-+	clk[MVF600_CLK_SAI0] = imx_clk_gate2("sai0", "sai0_div", CCM_CCGR0, CCM_CCGRx_CGn(15));
-+
-+	clk[MVF600_CLK_SAI1_SEL] = imx_clk_mux("sai1_sel", CCM_CSCMR1, 2, 2, sai_sels, 4);
-+	clk[MVF600_CLK_SAI1_EN] = imx_clk_gate("sai1_en", "sai1_sel", CCM_CSCDR1, 17);
-+	clk[MVF600_CLK_SAI1_DIV] = imx_clk_divider("sai1_div", "sai1_en", CCM_CSCDR1, 4, 4);
-+	clk[MVF600_CLK_SAI1] = imx_clk_gate2("sai1", "sai1_div", CCM_CCGR1, CCM_CCGRx_CGn(0));
-+
-+	clk[MVF600_CLK_SAI2_SEL] = imx_clk_mux("sai2_sel", CCM_CSCMR1, 4, 2, sai_sels, 4);
-+	clk[MVF600_CLK_SAI2_EN] = imx_clk_gate("sai2_en", "sai2_sel", CCM_CSCDR1, 18);
-+	clk[MVF600_CLK_SAI2_DIV] = imx_clk_divider("sai2_div", "sai2_en", CCM_CSCDR1, 8, 4);
-+	clk[MVF600_CLK_SAI2] = imx_clk_gate2("sai2", "sai2_div", CCM_CCGR1, CCM_CCGRx_CGn(1));
-+
-+	clk[MVF600_CLK_SAI3_SEL] = imx_clk_mux("sai3_sel", CCM_CSCMR1, 6, 2, sai_sels, 4);
-+	clk[MVF600_CLK_SAI3_EN] = imx_clk_gate("sai3_en", "sai3_sel", CCM_CSCDR1, 19);
-+	clk[MVF600_CLK_SAI3_DIV] = imx_clk_divider("sai3_div", "sai3_en", CCM_CSCDR1, 12, 4);
-+	clk[MVF600_CLK_SAI3] = imx_clk_gate2("sai3", "sai3_div", CCM_CCGR1, CCM_CCGRx_CGn(2));
-+
-+	clk[MVF600_CLK_NFC_SEL] = imx_clk_mux("nfc_sel", CCM_CSCMR1, 12, 2, nfc_sels, 4);
-+	clk[MVF600_CLK_NFC_EN] = imx_clk_gate("nfc_en", "nfc_sel", CCM_CSCDR2, 9);
-+	clk[MVF600_CLK_NFC_PRE_DIV] = imx_clk_divider("nfc_pre_div", "nfc_en", CCM_CSCDR3, 13, 3);
-+	clk[MVF600_CLK_NFC_FRAC_DIV] = imx_clk_divider("nfc_frac_div", "nfc_pre_div", CCM_CSCDR2, 4, 4);
-+	clk[MVF600_CLK_NFC] = imx_clk_gate2("nfc", "nfc_frac_div", CCM_CCGR10, CCM_CCGRx_CGn(0));
-+
-+	clk[MVF600_CLK_GPU_SEL] = imx_clk_mux("gpu_sel", CCM_CSCMR1, 14, 1, gpu_sels, 2);
-+	clk[MVF600_CLK_GPU_EN] = imx_clk_gate("gpu_en", "gpu_sel", CCM_CSCDR2, 10);
-+	clk[MVF600_CLK_GPU2D] = imx_clk_gate2("gpu", "gpu_en", CCM_CCGR8, CCM_CCGRx_CGn(15));
-+
-+	clk[MVF600_CLK_VADC_SEL] = imx_clk_mux("vadc_sel", CCM_CSCMR1, 8, 2, vadc_sels, 3);
-+	clk[MVF600_CLK_VADC_EN] = imx_clk_gate("vadc_en", "vadc_sel", CCM_CSCDR1, 22);
-+	clk[MVF600_CLK_VADC_DIV] = imx_clk_divider("vadc_div", "vadc_en", CCM_CSCDR1, 20, 2);
-+	clk[MVF600_CLK_VADC_DIV_HALF] = imx_clk_fixed_factor("vadc_div_half", "vadc_div", 1, 2);
-+	clk[MVF600_CLK_VADC] = imx_clk_gate2("vadc", "vadc_div", CCM_CCGR8, CCM_CCGRx_CGn(7));
-+
-+	clk[MVF600_CLK_ADC0] = imx_clk_gate2("adc0", "ipg_bus", CCM_CCGR1, CCM_CCGRx_CGn(11));
-+	clk[MVF600_CLK_ADC1] = imx_clk_gate2("adc1", "ipg_bus", CCM_CCGR7, CCM_CCGRx_CGn(11));
-+	clk[MVF600_CLK_DAC0] = imx_clk_gate2("dac0", "ipg_bus", CCM_CCGR8, CCM_CCGRx_CGn(12));
-+	clk[MVF600_CLK_DAC1] = imx_clk_gate2("dac1", "ipg_bus", CCM_CCGR8, CCM_CCGRx_CGn(13));
-+
-+	clk[MVF600_CLK_ASRC] = imx_clk_gate2("asrc", "ipg_bus", CCM_CCGR4, CCM_CCGRx_CGn(1));
-+
-+	clk[MVF600_CLK_FLEXCAN0] = imx_clk_gate2("flexcan0", "ipg_bus", CCM_CCGR0, CCM_CCGRx_CGn(0));
-+	clk[MVF600_CLK_FLEXCAN1] = imx_clk_gate2("flexcan1", "ipg_bus", CCM_CCGR9, CCM_CCGRx_CGn(4));
-+
-+	clk_set_parent(clk[MVF600_CLK_QSPI0_SEL], clk[MVF600_CLK_PLL1_PFD4]);
-+	clk_set_rate(clk[MVF600_CLK_QSPI0_X4_DIV], clk_get_rate(clk[MVF600_CLK_QSPI0_SEL]) / 2);
-+	clk_set_rate(clk[MVF600_CLK_QSPI0_X2_DIV], clk_get_rate(clk[MVF600_CLK_QSPI0_X4_DIV]) / 2);
-+	clk_set_rate(clk[MVF600_CLK_QSPI0_X1_DIV], clk_get_rate(clk[MVF600_CLK_QSPI0_X2_DIV]) / 2);
-+
-+	clk_set_parent(clk[MVF600_CLK_QSPI1_SEL], clk[MVF600_CLK_PLL1_PFD4]);
-+	clk_set_rate(clk[MVF600_CLK_QSPI1_X4_DIV], clk_get_rate(clk[MVF600_CLK_QSPI1_SEL]) / 2);
-+	clk_set_rate(clk[MVF600_CLK_QSPI1_X2_DIV], clk_get_rate(clk[MVF600_CLK_QSPI1_X4_DIV]) / 2);
-+	clk_set_rate(clk[MVF600_CLK_QSPI1_X1_DIV], clk_get_rate(clk[MVF600_CLK_QSPI1_X2_DIV]) / 2);
-+
-+	clk_set_parent(clk[MVF600_CLK_SAI0_EN], clk[MVF600_CLK_AUDIO_EXT]);
-+	clk_set_parent(clk[MVF600_CLK_SAI1_EN], clk[MVF600_CLK_AUDIO_EXT]);
-+	clk_set_parent(clk[MVF600_CLK_SAI2_EN], clk[MVF600_CLK_AUDIO_EXT]);
-+	clk_set_parent(clk[MVF600_CLK_SAI3_EN], clk[MVF600_CLK_AUDIO_EXT]);
-+
-+	/* Add the clocks to provider list */
-+	clk_data.clks = clk;
-+	clk_data.clk_num = ARRAY_SIZE(clk);
-+	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
-+
-+	return 0;
-+}
-diff --git a/include/dt-bindings/clock/mvf600-clock.h b/include/dt-bindings/clock/mvf600-clock.h
-new file mode 100644
-index 0000000..7c43c8a
---- /dev/null
-+++ b/include/dt-bindings/clock/mvf600-clock.h
-@@ -0,0 +1,163 @@
++++ b/arch/arm/boot/dts/mvf600-twr.dts
+@@ -0,0 +1,108 @@
 +/*
 + * Copyright 2013 Freescale Semiconductor, Inc.
 + *
@@ -401,159 +51,104 @@ index 0000000..7c43c8a
 + * (at your option) any later version.
 + */
 +
-+#ifndef __DT_BINDINGS_CLOCK_MVF600_H
-+#define __DT_BINDINGS_CLOCK_MVF600_H
++/dts-v1/;
++#include "mvf600.dtsi"
 +
-+#define MVF600_CLK_DUMMY		0
-+#define MVF600_CLK_SIRC_128K		1
-+#define MVF600_CLK_SIRC_32K		2
-+#define MVF600_CLK_FIRC			3
-+#define MVF600_CLK_SXOSC		4
-+#define MVF600_CLK_FXOSC		5
-+#define MVF600_CLK_FXOSC_HALF		6
-+#define MVF600_CLK_SLOW_CLK_SEL		7
-+#define MVF600_CLK_FASK_CLK_SEL		8
-+#define MVF600_CLK_AUDIO_EXT		9
-+#define MVF600_CLK_ENET_EXT		10
-+#define MVF600_CLK_PLL1_MAIN		11
-+#define MVF600_CLK_PLL1_PFD1		12
-+#define MVF600_CLK_PLL1_PFD2		13
-+#define MVF600_CLK_PLL1_PFD3		14
-+#define MVF600_CLK_PLL1_PFD4		15
-+#define MVF600_CLK_PLL2_MAIN		16
-+#define MVF600_CLK_PLL2_PFD1		17
-+#define MVF600_CLK_PLL2_PFD2		18
-+#define MVF600_CLK_PLL2_PFD3		19
-+#define MVF600_CLK_PLL2_PFD4		20
-+#define MVF600_CLK_PLL3_MAIN		21
-+#define MVF600_CLK_PLL3_PFD1		22
-+#define MVF600_CLK_PLL3_PFD2		23
-+#define MVF600_CLK_PLL3_PFD3		24
-+#define MVF600_CLK_PLL3_PFD4		25
-+#define MVF600_CLK_PLL4_MAIN		26
-+#define MVF600_CLK_PLL5_MAIN		27
-+#define MVF600_CLK_PLL6_MAIN		28
-+#define MVF600_CLK_PLL3_MAIN_DIV	29
-+#define MVF600_CLK_PLL4_MAIN_DIV	30
-+#define MVF600_CLK_PLL6_MAIN_DIV	31
-+#define MVF600_CLK_PLL1_PFD_SEL		32
-+#define MVF600_CLK_PLL2_PFD_SEL		33
-+#define MVF600_CLK_SYS_SEL		34
-+#define MVF600_CLK_DDR_SEL		35
-+#define MVF600_CLK_SYS_BUS		36
-+#define MVF600_CLK_PLATFORM_BUS		37
-+#define MVF600_CLK_IPG_BUS		38
-+#define MVF600_CLK_UART0		39
-+#define MVF600_CLK_UART1		40
-+#define MVF600_CLK_UART2		41
-+#define MVF600_CLK_UART3		42
-+#define MVF600_CLK_UART4		43
-+#define MVF600_CLK_UART5		44
-+#define MVF600_CLK_PIT			45
-+#define MVF600_CLK_I2C0			46
-+#define MVF600_CLK_I2C1			47
-+#define MVF600_CLK_I2C2			48
-+#define MVF600_CLK_I2C3			49
-+#define MVF600_CLK_FTM0_EXT_SEL		50
-+#define MVF600_CLK_FTM0_FIX_SEL		51
-+#define MVF600_CLK_FTM0_EXT_FIX_EN	52
-+#define MVF600_CLK_FTM1_EXT_SEL		53
-+#define MVF600_CLK_FTM1_FIX_SEL		54
-+#define MVF600_CLK_FTM1_EXT_FIX_EN	55
-+#define MVF600_CLK_FTM2_EXT_SEL		56
-+#define MVF600_CLK_FTM2_FIX_SEL		57
-+#define MVF600_CLK_FTM2_EXT_FIX_EN	58
-+#define MVF600_CLK_FTM3_EXT_SEL		59
-+#define MVF600_CLK_FTM3_FIX_SEL		60
-+#define MVF600_CLK_FTM3_EXT_FIX_EN	61
-+#define MVF600_CLK_FTM0			62
-+#define MVF600_CLK_FTM1			63
-+#define MVF600_CLK_FTM2			64
-+#define MVF600_CLK_FTM3			65
-+#define MVF600_CLK_ENET_50M		66
-+#define MVF600_CLK_ENET_25M		67
-+#define MVF600_CLK_ENET_SEL		68
-+#define MVF600_CLK_ENET			69
-+#define MVF600_CLK_ENET_TS_SEL		70
-+#define MVF600_CLK_ENET_TS		71
-+#define MVF600_CLK_DSPI0		72
-+#define MVF600_CLK_DSPI1		73
-+#define MVF600_CLK_DSPI2		74
-+#define MVF600_CLK_DSPI3		75
-+#define MVF600_CLK_WDT			76
-+#define MVF600_CLK_ESDHC0_SEL		77
-+#define MVF600_CLK_ESDHC0_EN		78
-+#define MVF600_CLK_ESDHC0_DIV		79
-+#define MVF600_CLK_ESDHC0		80
-+#define MVF600_CLK_ESDHC1_SEL		81
-+#define MVF600_CLK_ESDHC1_EN		82
-+#define MVF600_CLK_ESDHC1_DIV		83
-+#define MVF600_CLK_ESDHC1		84
-+#define MVF600_CLK_DCU0_SEL		85
-+#define MVF600_CLK_DCU0_EN		86
-+#define MVF600_CLK_DCU0_DIV		87
-+#define MVF600_CLK_DCU0			88
-+#define MVF600_CLK_DCU1_SEL		89
-+#define MVF600_CLK_DCU1_EN		90
-+#define MVF600_CLK_DCU1_DIV		91
-+#define MVF600_CLK_DCU1			92
-+#define MVF600_CLK_ESAI_SEL		93
-+#define MVF600_CLK_ESAI_EN		94
-+#define MVF600_CLK_ESAI_DIV		95
-+#define MVF600_CLK_ESAI			96
-+#define MVF600_CLK_SAI0_SEL		97
-+#define MVF600_CLK_SAI0_EN		98
-+#define MVF600_CLK_SAI0_DIV		99
-+#define MVF600_CLK_SAI0			100
-+#define MVF600_CLK_SAI1_SEL		101
-+#define MVF600_CLK_SAI1_EN		102
-+#define MVF600_CLK_SAI1_DIV		103
-+#define MVF600_CLK_SAI1			104
-+#define MVF600_CLK_SAI2_SEL		105
-+#define MVF600_CLK_SAI2_EN		106
-+#define MVF600_CLK_SAI2_DIV		107
-+#define MVF600_CLK_SAI2			108
-+#define MVF600_CLK_SAI3_SEL		109
-+#define MVF600_CLK_SAI3_EN		110
-+#define MVF600_CLK_SAI3_DIV		111
-+#define MVF600_CLK_SAI3			112
-+#define MVF600_CLK_USBC0		113
-+#define MVF600_CLK_USBC1		114
-+#define MVF600_CLK_QSPI0_SEL		115
-+#define MVF600_CLK_QSPI0_EN		116
-+#define MVF600_CLK_QSPI0_X4_DIV		117
-+#define MVF600_CLK_QSPI0_X2_DIV		118
-+#define MVF600_CLK_QSPI0_X1_DIV		119
-+#define MVF600_CLK_QSPI1_SEL		120
-+#define MVF600_CLK_QSPI1_EN		121
-+#define MVF600_CLK_QSPI1_X4_DIV		122
-+#define MVF600_CLK_QSPI1_X2_DIV		123
-+#define MVF600_CLK_QSPI1_X1_DIV		124
-+#define MVF600_CLK_QSPI0		125
-+#define MVF600_CLK_QSPI1		126
-+#define MVF600_CLK_NFC_SEL		127
-+#define MVF600_CLK_NFC_EN		128
-+#define MVF600_CLK_NFC_PRE_DIV		129
-+#define MVF600_CLK_NFC_FRAC_DIV		130
-+#define MVF600_CLK_NFC_INV		131
-+#define MVF600_CLK_NFC			132
-+#define MVF600_CLK_VADC_SEL		133
-+#define MVF600_CLK_VADC_EN		134
-+#define MVF600_CLK_VADC_DIV		135
-+#define MVF600_CLK_VADC_DIV_HALF	136
-+#define MVF600_CLK_VADC			137
-+#define MVF600_CLK_ADC0			138
-+#define MVF600_CLK_ADC1			139
-+#define MVF600_CLK_DAC0			140
-+#define MVF600_CLK_DAC1			141
-+#define MVF600_CLK_FLEXCAN0		142
-+#define MVF600_CLK_FLEXCAN1		143
-+#define MVF600_CLK_ASRC			144
-+#define MVF600_CLK_GPU_SEL		145
-+#define MVF600_CLK_GPU_EN		146
-+#define MVF600_CLK_GPU2D		147
-+#define MVF600_CLK_END			148
++/ {
++	model = "MVF600 Tower Board";
++	compatible = "fsl,mvf600-twr", "fsl,mvf600";
 +
-+#endif /* __DT_BINDINGS_CLOCK_MVF600_H */
++	chosen {
++		bootargs = "console=ttyLP1,115200";
++	};
++
++	memory {
++		reg = <0x80000000 0x8000000>;
++	};
++
++	clocks {
++		audio_ext {
++			compatible = "fixed-clock";
++			clock-frequency = <24576000>;
++		};
++
++		enet_ext {
++			compatible = "fixed-clock";
++			clock-frequency = <50000000>;
++		};
++	};
++
++	sound {
++		compatible = "fsl,mvf600-audio-sgtl5000";
++		model = "mvf600-sgtl5000";
++		sai-controller = <&sai2>;
++		audio-codec = <&codec>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++	};
++
++};
++
++&fec0 {
++	phy-mode = "rmii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec0_1>;
++};
++
++&fec1 {
++	phy-mode = "rmii";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_fec1_1>;
++};
++
++&i2c0 {
++	status = "okay";
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c0_1>;
++
++	codec: sgtl5000 at 0a {
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		clocks = <&clks MVF600_CLK_SAI2>;
++	};
++};
++
++&qspi0 { /* QuadSPI0 */
++	fsl,spi-num-chipselects = <1>;
++	fsl,spi-flash-chipselects = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_qspi0_1>;
++	status = "okay";
++
++	flash: s25fl128s at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "spansion,s25fl128s";
++		spi-max-frequency = <20000000>;
++		reg = <0>;
++		linux,modalias = "m25p80";
++		modal = "s25fl128s";
++		partition at 0 {
++			label = "s25fl128s";
++			reg = <0x0 0x1000000>;
++		};
++	};
++};
++
++&sai2 {
++	fsl,mode = "i2s-slave";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai2_1>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart1_1>;
++	status = "okay";
++};
 -- 
 1.8.0
