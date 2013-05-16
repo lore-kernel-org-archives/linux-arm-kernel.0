@@ -1,42 +1,59 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 16 May 2013 11:16:48 -0500
-Subject: [PATCH 1/4] ARM: mmu: Call debug_ll_io_init if no map_io function
- is specified
-In-Reply-To: <1368440169-29088-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1368440169-29088-1-git-send-email-maxime.ripard@free-electrons.com>
- <1368440169-29088-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAL_Jsq+LuNBUyzc++i6RKJ67La1LKyC5d6hPvXuj1Kr_R0EmMQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 May 2013 09:20:35 -0700
+Subject: [PATCH] ARM: OMAP4: change the device names in usb_bind_phy
+In-Reply-To: <519503DA.5070303@iki.fi>
+References: <1366697656-14315-1-git-send-email-kishon@ti.com>
+ <51936946.3030507@iki.fi> <20130516155857.GV5600@atomide.com>
+ <519503DA.5070303@iki.fi>
+Message-ID: <20130516162034.GX5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 5:16 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> More and more sub-architectures are using only the debug_ll_io_init
-> function as the map_io function. Make the core code call this function
-> if no function is specified in the machine description to remove some
-> boilerplate code.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+* Tomi Valkeinen <tomi.valkeinen@iki.fi> [130516 09:11]:
+> On 16/05/13 18:58, Tony Lindgren wrote:
+> > * Tomi Valkeinen <tomi.valkeinen@iki.fi> [130515 03:59]:
+> > 
+> > Just checking.. Do you have CONFIG_OMAP_OCP2SCP=y in your .config? Sounds
+> > like the some transceivers should depend on that for omap4.
+> 
+> Yes, I have OCP2SCP=y.
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Hmm well no idea beyond that then. Sounds like Kishon should check it.
+ 
+> >> The musb-hdrc id is wrong on overo also.
+> > 
+> > Hmm has there been a fix posted for that?
+> 
+> I couldn't find with a quick look. We debugged and discussed this on an irc
+> channel with Kishon, who said he'll send a patch. Changing the musb-hdrc ID
+> on overo fixed the issue, and it looks very similar to the error on 4430sdp.
+> The overo fix was just:
+> 
+> diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+> index 4ca6b68..a496774 100644
+> --- a/arch/arm/mach-omap2/board-overo.c
+> +++ b/arch/arm/mach-omap2/board-overo.c
+> @@ -472,7 +472,7 @@ static void __init overo_init(void)
+>                                   mt46h32m32lf6_sdrc_params);
+>         board_nand_init(overo_nand_partitions,
+>                         ARRAY_SIZE(overo_nand_partitions), NAND_CS, 0, NULL);
+> -       usb_bind_phy("musb-hdrc.0.auto", 0, "twl4030_usb");
+> +       usb_bind_phy("musb-hdrc.1.auto", 0, "twl4030_usb");
+>         usb_musb_init(NULL);
+>  
+>         usbhs_init_phys(phy_data, ARRAY_SIZE(phy_data));
+> 
+> 
+> Is that ID "randomly" chosen? Doesn't that mean that it'll just get broken
+> every now and then?
 
-> ---
->  arch/arm/mm/mmu.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index e0d8565..faa36d7 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1232,6 +1232,8 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
->          */
->         if (mdesc->map_io)
->                 mdesc->map_io();
-> +       else
-> +               debug_ll_io_init();
->         fill_pmd_gaps();
->
->         /* Reserve fixed i/o space in VMALLOC region */
-> --
-> 1.8.1.2
->
+Yes if so it's not a good solution. For omap4 we'll be flipping over to
+be device tree only for v3.11, but that still leaves earlier omaps to
+worry about.
+
+I'll wait for a proper patch for the above for the -rc series after we
+hear from Kishon.
+
+Regards,
+
+Tony
