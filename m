@@ -1,150 +1,96 @@
 From: holt@sgi.com (Robin Holt)
-Date: Thu, 16 May 2013 11:14:44 -0500
-Subject: [PATCH -v11 resend 05/11] checkpatch.pl the new kernel/reboot.c file.
-In-Reply-To: <1368720890-57711-1-git-send-email-holt@sgi.com>
-References: <1368720890-57711-1-git-send-email-holt@sgi.com>
-Message-ID: <1368720890-57711-6-git-send-email-holt@sgi.com>
+Date: Thu, 16 May 2013 11:14:39 -0500
+Subject: [PATCH -v11 resend 00/11] Shutdown from reboot_cpuid without stopping
+ other cpus.
+Message-ID: <1368720890-57711-1-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get the new file to pass scripts/checkpatch.pl
+We recently noticed that reboot of a 1024 cpu machine takes approx 16
+minutes of just stopping the cpus.  The slowdown was tracked to commit
+f96972f.
 
-Signed-off-by: Robin Holt <holt@sgi.com>
+The current implementation does all the work of hot removing the cpus
+before halting the system.  We are switching to just migrating to the
+reboot_cpu and then continuing with shutdown/reboot.
+
+The patch set is broken into eleven parts.  The first two are planned for
+the stable release.  The others move the halt/shutdown/reboot related
+functions to their own kernel/reboot.c file and then move the handling
+of the kernel reboot= kernel parameter to generic kernel code.
+
+Changes since -v10
+ - Added Russell's Acked-by for arm.
+
+ - Fixed an accidentally commented out line in an arm header file.
+
+Changes since -v9
+ - Added Ingo's Acked-by for x86.
+
+ - Added Guan's Acked-by for unicore32.
+
+ - Replaced first patch with updated patch from Srivatsa S. Bhat.
+   This compiles for alpha allmodconfig, all arm defconfigs, and a few
+   test x86_64 defconfigs.  I have not tried more.
+
+Changes since -v8
+ - Changes reboot_cpu on stack to cpu to fix bug noticed by Russell King.
+
+ - Switched unicore32 and arm from using REBOOT_WARM/COLD to HARD/SOFT.
+
+ - Fixed case statement bug.
+
+ - Went to using simple_strtoul for parsing reboot_cpu=smp###.
+
+ - Made parsing of reboot= not use any #ifdef'd code.
+
+Changes since -v7.
+ - Fixed authorship for first patch.
+
+ - Rebased to Linus' current tree (51a26ae7a).
+
+Changes since -v6.
+ - Cross compiled all arm architectures (using v3.9 kernel.  Fails with
+   current).
+
+ - Added a #define for non-hotplug case.
+
+ - Add #define for PF_THREAD_BOUND as compatibility to make stable easier.
+
+ - Fixup s/reboot_cpu_id/reboot_cpu/
+
+ - Add include of linux/uaccess.h to allow building on arm.
+
+ - Removed last remaining checkpatch.pl line length warning on
+   kernel/reboot.c.
+
+ - Fixed the duplicate handling or the reboot= kernel parameter.
+
+Changes since -v5.
+ - Moved the arch/x86 reboot= up to the generic kernel code.
+
+Changes since -v4.
+ - Integrated Srivatsa S. Bhat creating cpu_hotplug_disable()
+   function
+
+ - Integrated comments by Srivatsa S. Bhat.
+
+ - Made one more comment consistent with others in function.
+
+Changes since -v3.
+ - Added a tested-by for the original reporter.
+
+ - Fix compile failure found by Joe Perches.
+
+ - Integrated comments by Joe Perches.
+
+
 To: Andrew Morton <akpm@linux-foundation.org>
 Cc: H. Peter Anvin <hpa@zytor.com>
 Cc: Russ Anderson <rja@sgi.com>
 Cc: Robin Holt <holt@sgi.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
 Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
 Cc: the arch/x86 maintainers <x86@kernel.org>
 Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
-
----
-
-Changes since v6:
- - Removed last remaining line length warning.
----
- include/linux/reboot.h |  2 +-
- kernel/reboot.c        | 28 +++++++++++++---------------
- 2 files changed, 14 insertions(+), 16 deletions(-)
-
-diff --git a/include/linux/reboot.h b/include/linux/reboot.h
-index 23b3630..c6eba21 100644
---- a/include/linux/reboot.h
-+++ b/include/linux/reboot.h
-@@ -26,7 +26,7 @@ extern void machine_shutdown(void);
- struct pt_regs;
- extern void machine_crash_shutdown(struct pt_regs *);
- 
--/* 
-+/*
-  * Architecture independent implemenations of sys_reboot commands.
-  */
- 
-diff --git a/kernel/reboot.c b/kernel/reboot.c
-index 0616483..abb6a04 100644
---- a/kernel/reboot.c
-+++ b/kernel/reboot.c
-@@ -4,6 +4,8 @@
-  *  Copyright (C) 2013  Linus Torvalds
-  */
- 
-+#define pr_fmt(fmt)	"reboot: " fmt
-+
- #include <linux/export.h>
- #include <linux/kexec.h>
- #include <linux/kmod.h>
-@@ -114,9 +116,9 @@ void kernel_restart(char *cmd)
- 	migrate_to_reboot_cpu();
- 	syscore_shutdown();
- 	if (!cmd)
--		printk(KERN_EMERG "Restarting system.\n");
-+		pr_emerg("Restarting system\n");
- 	else
--		printk(KERN_EMERG "Restarting system with command '%s'.\n", cmd);
-+		pr_emerg("Restarting system with command '%s'\n", cmd);
- 	kmsg_dump(KMSG_DUMP_RESTART);
- 	machine_restart(cmd);
- }
-@@ -125,7 +127,7 @@ EXPORT_SYMBOL_GPL(kernel_restart);
- static void kernel_shutdown_prepare(enum system_states state)
- {
- 	blocking_notifier_call_chain(&reboot_notifier_list,
--		(state == SYSTEM_HALT)?SYS_HALT:SYS_POWER_OFF, NULL);
-+		(state == SYSTEM_HALT) ? SYS_HALT : SYS_POWER_OFF, NULL);
- 	system_state = state;
- 	usermodehelper_disable();
- 	device_shutdown();
-@@ -140,11 +142,10 @@ void kernel_halt(void)
- 	kernel_shutdown_prepare(SYSTEM_HALT);
- 	migrate_to_reboot_cpu();
- 	syscore_shutdown();
--	printk(KERN_EMERG "System halted.\n");
-+	pr_emerg("System halted\n");
- 	kmsg_dump(KMSG_DUMP_HALT);
- 	machine_halt();
- }
--
- EXPORT_SYMBOL_GPL(kernel_halt);
- 
- /**
-@@ -159,7 +160,7 @@ void kernel_power_off(void)
- 		pm_power_off_prepare();
- 	migrate_to_reboot_cpu();
- 	syscore_shutdown();
--	printk(KERN_EMERG "Power down.\n");
-+	pr_emerg("Power down\n");
- 	kmsg_dump(KMSG_DUMP_POWEROFF);
- 	machine_power_off();
- }
-@@ -188,10 +189,10 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
- 
- 	/* For safety, we require "magic" arguments. */
- 	if (magic1 != LINUX_REBOOT_MAGIC1 ||
--	    (magic2 != LINUX_REBOOT_MAGIC2 &&
--	                magic2 != LINUX_REBOOT_MAGIC2A &&
-+			(magic2 != LINUX_REBOOT_MAGIC2 &&
-+			magic2 != LINUX_REBOOT_MAGIC2A &&
- 			magic2 != LINUX_REBOOT_MAGIC2B &&
--	                magic2 != LINUX_REBOOT_MAGIC2C))
-+			magic2 != LINUX_REBOOT_MAGIC2C))
- 		return -EINVAL;
- 
- 	/*
-@@ -234,7 +235,8 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
- 		break;
- 
- 	case LINUX_REBOOT_CMD_RESTART2:
--		if (strncpy_from_user(&buffer[0], arg, sizeof(buffer) - 1) < 0) {
-+		ret = strncpy_from_user(&buffer[0], arg, sizeof(buffer) - 1);
-+		if (ret < 0) {
- 			ret = -EFAULT;
- 			break;
- 		}
-@@ -282,7 +284,6 @@ void ctrl_alt_del(void)
- 	else
- 		kill_cad_pid(SIGINT, 1);
- }
--	
- 
- char poweroff_cmd[POWEROFF_CMD_PATH_LEN] = "/sbin/poweroff";
- 
-@@ -301,14 +302,11 @@ static int __orderly_poweroff(bool force)
- 		ret = call_usermodehelper(argv[0], argv, envp, UMH_WAIT_EXEC);
- 		argv_free(argv);
- 	} else {
--		printk(KERN_WARNING "%s failed to allocate memory for \"%s\"\n",
--					 __func__, poweroff_cmd);
- 		ret = -ENOMEM;
- 	}
- 
- 	if (ret && force) {
--		printk(KERN_WARNING "Failed to start orderly shutdown: "
--					"forcing the issue\n");
-+		pr_warn("Failed to start orderly shutdown: forcing the issue\n");
- 		/*
- 		 * I guess this should try to kick off some daemon to sync and
- 		 * poweroff asap.  Or not even bother syncing if we're doing an
--- 
-1.8.2.1
