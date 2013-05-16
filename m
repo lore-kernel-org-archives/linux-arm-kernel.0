@@ -1,36 +1,28 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 May 2013 10:18:14 +0200
-Subject: [PATCHv2 00/20] Cleanup irqchip_init calls
-In-Reply-To: <201305151455.12603.arnd@arndb.de>
+Date: Thu, 16 May 2013 10:18:57 +0200
+Subject: [PATCH 20/20] ARM: vt8500: Remove init_irq declaration in machine
+ description
+In-Reply-To: <5193D953.5040202@prisktech.co.nz>
 References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
- <201305151455.12603.arnd@arndb.de>
-Message-ID: <51949646.4000107@free-electrons.com>
+ <1368545933-7430-21-git-send-email-maxime.ripard@free-electrons.com>
+ <5193D953.5040202@prisktech.co.nz>
+Message-ID: <51949671.1070907@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Tony,
 
-Le 15/05/2013 14:55, Arnd Bergmann a ?crit :
-> On Tuesday 14 May 2013, Maxime Ripard wrote:
->> This is a splitted up version of the patch I previously sent to
->> remove the explicit declaration of irqchip_init as the init_irq callback in
->> the machine descriptions.
->>
->> Since it was a pretty tricky patch to merge, since it was touching a lot of
->> different platforms, I splitted it for each platforms, and rebased it on top
->> of 3.10-rc1.
->>
->> The best way to merge it is probably that each one of us take into their tree
->> the patches that are relevant for our architecture and send them to arm-soc
->> later on.
+Le 15/05/2013 20:52, Tony Prisk a ?crit :
+> I don't have any plans to touch this driver, so please send direct to
+> arm-soc as Arnd
+> requested.
 > 
-> Sounds good to me. I'm sure that some platform maintainers will fail to
-> apply this though. Could you send whatever remains as a separate branch
-> in a couple of weeks so we can directly apply it to next/cleanup?
+> Acked-by: Tony Prisk <linux@prisktech.co.nz>
 
-Ok, I will.
+Thanks!
 
-Thanks,
+I will send it then.
+
 Maxime
 
 -- 
