@@ -1,81 +1,40 @@
-From: yegor_sub1@visionsystems.de (Yegor Yefremov)
-Date: Thu, 16 May 2013 12:19:20 +0200
-Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
-In-Reply-To: <20130515215028.GA11883@animalcreek.com>
-References: <20130515002537.GG5600@atomide.com>
- <20130515015212.GB3268@animalcreek.com> <20130515170734.GI5600@atomide.com>
- <20130515215028.GA11883@animalcreek.com>
-Message-ID: <5194B2A8.8020608@visionsystems.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 May 2013 14:17:27 +0200
+Subject: [RFC PATCHv3 3/6] clk: Add TI-Nspire clock drivers
+In-Reply-To: <15FD6543-D04A-4953-A56A-40B27F0026E4@gmail.com>
+References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
+ <201305151607.54442.arnd@arndb.de>
+ <15FD6543-D04A-4953-A56A-40B27F0026E4@gmail.com>
+Message-ID: <201305161417.28133.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.05.2013 23:50, Mark A. Greer wrote:
-> On Wed, May 15, 2013 at 10:07:35AM -0700, Tony Lindgren wrote:
->> * Mark A. Greer <mgreer@animalcreek.com> [130514 18:57]:
->>> On Tue, May 14, 2013 at 05:25:37PM -0700, Tony Lindgren wrote:
->>>> Commit a819c4f1 (ARM: OMAP3: PM: Only access IVA if one exists)
->>>> changed PM to not access IVA registers on omaps that don't have
->>>> them. Turns out we still need to idle iva2 as otherwise iva2_pwrdm
->>>> will stay on and block deeper idle states.
->>>>
->>>> Signed-off-by: Tony Lindgren <tony@atomide.com>
->>>>
->>>> ---
->>>>
->>>> Paul & Kevin, do you have better ideas for fixing this?
->>>>
->>>> --- a/arch/arm/mach-omap2/pm34xx.c
->>>> +++ b/arch/arm/mach-omap2/pm34xx.c
->>>> @@ -546,8 +546,10 @@ static void __init prcm_setup_regs(void)
->>>>  	/* Clear any pending PRCM interrupts */
->>>>  	omap2_prm_write_mod_reg(0, OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
->>>>  
->>>> -	if (omap3_has_iva())
->>>> -		omap3_iva_idle();
->>>> +	/*
->>>> +	 * We need to idle iva2_pwrdm even on am3703 with no iva2.
->>>> +	 */
->>>> +	omap3_iva_idle();
->>>>  
->>>>  	omap3_d2d_idle();
->>>>  }
->>>
->>> [Kevin, Paul, some background: Tony discovered that the am3703 needs
->>> to have omap3_iva_idle() called even though its not supposed to have
->>> an IVA.]
->>>
->>> This is potentially bad for other SoC's that don't have an IVA so I don't
->>> think its the way to go.  My preference would be to set the OMAP3_HAS_IVA
->>> flag for the am3703 only since its the one with the bug.  Maybe something
->>> in id.c:omap3xxx_check_features() but I don't see any existing way to check
->>> for an am3703 vs. other am37xx SoCs.  Any ideas?
->>>
->>> Another option, I suppose, is a dts entry but I don't like that at all.
->>
->> It seems that iva2_pwrdm is there for all omap3 even if OMAP3_HAS_IVA
->> flag is unset. And if that's the case, iva2 clocks still need to be idled
->> in all cases.
+On Thursday 16 May 2013, Daniel Tang wrote:
 > 
-> Ahh, this takes us to the "Great TI Docs Mystery" :) -- its basically
-> impossible to tell because despite what their docs may say, the hardware
-> can be quite different.  I'm not sure how to proceed other than trial &
-> error with as many different SoCs as we can find.
+> On 16/05/2013, at 12:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
->> It's possible that not all steps in omap3_iva_idle() are needed though.
->> I can debug further to see which part of the omap3_iva_idle() are needed.
->>
->> Mark, do you have some omap3 with no iva (other than am3703) to test the
->> idle states with?
+> > You are missing a binding in Documentation/devicetree, same as for some of
+> > the other drivers in this series.
 > 
-> I have an am35xx which isn't supposed to have an IVA so I can test with it
-> (although, I'm not sure how well the kernel works on the am35xx these days).
-> 
-> I'm a bit busy today but I'll try booting the am35xx tomorrow and if it
-> comes up, see what I can figure out.
+> Should we be adding a vendor prefix to it too? If so, we're not sure whether
+> to use "ti," or not since this isn't an official port by TI.
 
-I think this issue is relevant to am3517 as you can see from this thread: http://thread.gmane.org/gmane.linux.ports.arm.omap/97903
-I could boot only with your patch http://www.spinics.net/lists/arm-kernel/msg168865.html
+The binding describes the hardware, it should not matter who does the port.
+However, any part of the tree that is not actually from TI should have a
+vendor prefix indicating who made that part. IIRC, the SoC used in there
+is from TI, so you should use something else for the on-soc components.
+ 
+> > It seems strange to assign the clk_name variable to node->name
+> > first and then overriding it with the clock-output-names property.
+> > Is that intentional? If so, please explain it in a comment.
+> > 
+> 
+> I copied that bit of boilerplate from drivers/clk/clk-fixed-rate.c but
+> I'm guessing it's to use the node name as the clock name unless there
+> is a property called "clock-output-names"
 
-I have such a system running, so if you have any other patches/ideas to test, I would do it.
+Ah, I see. It seems you forgot to add the clock maintainer to Cc in the
+mail. Mike is the one who will have to take you patch anyway, so I assume
+he will comment on this if you did it wrong.
 
-Yegor
+	Arnd
