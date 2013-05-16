@@ -1,29 +1,180 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 16 May 2013 15:02:17 +0800
-Subject: [PATCH 18/39] crypto: ux500/[cryp|hash] - Show successful
- start-up in the bootlog
-In-Reply-To: <1368611522-9984-19-git-send-email-lee.jones@linaro.org>
-References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-19-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130516070217.GD6721@gondor.apana.org.au>
+From: b35083@freescale.com (Jingchang Lu)
+Date: Thu, 16 May 2013 14:20:24 +0800
+Subject: [PATCH v3 2/2] pinctrl: imx: add MVF600 support to imx pinctrl
+ framework
+In-Reply-To: <1368685224-17915-1-git-send-email-b35083@freescale.com>
+References: <1368685224-17915-1-git-send-email-b35083@freescale.com>
+Message-ID: <1368685224-17915-2-git-send-email-b35083@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 10:51:41AM +0100, Lee Jones wrote:
-> The Cryp driver is currently silent and the Hash driver prints the
-> name of its probe function unnecessarily. Let's just put a nice
-> descriptive one-liner there instead.
-> 
-> Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: Andreas Westin <andreas.westin@stericsson.com>
-> Cc: linux-crypto at vger.kernel.org
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On some platforms such as MVF600, offset of mux and pad ctrl register
+may be zero, and the mux_mode and config_val are in one 32-bit register.
+This patch adds support to imx core pinctrl framework to handle these
+cases.
 
-Acked-by: Herbert Xu <herbert@gondor.apana.org.au>
+Signed-off-by: Jingchang Lu <b35083@freescale.com>
+---
+v3:
+  add ZERO_OFFSET_VALID flag to handle register offset from zero on mvf600.
+  add SHARE_MUX_CONF_REG flag to handle mux mode and config value in one 32-bit
+register in mvf600.
+
+ drivers/pinctrl/pinctrl-imx.c | 53 ++++++++++++++++++++++++++++++++++---------
+ drivers/pinctrl/pinctrl-imx.h |  4 ++++
+ 2 files changed, 46 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-imx.c b/drivers/pinctrl/pinctrl-imx.c
+index 4fcfff92..57a4eb0 100644
+--- a/drivers/pinctrl/pinctrl-imx.c
++++ b/drivers/pinctrl/pinctrl-imx.c
+@@ -221,13 +221,21 @@ static int imx_pmx_enable(struct pinctrl_dev *pctldev, unsigned selector,
+ 		pin_id = pins[i];
+ 		pin_reg = &info->pin_regs[pin_id];
+ 
+-		if (!pin_reg->mux_reg) {
++		if (!(info->flags & ZERO_OFFSET_VALID) && !pin_reg->mux_reg) {
+ 			dev_err(ipctl->dev, "Pin(%s) does not support mux function\n",
+ 				info->pins[pin_id].name);
+ 			return -EINVAL;
+ 		}
+ 
+-		writel(mux[i], ipctl->base + pin_reg->mux_reg);
++		if (info->flags & SHARE_MUX_CONF_REG) {
++			u32 reg;
++			reg = readl(ipctl->base + pin_reg->mux_reg);
++			reg &= ~(0x7 << 20);
++			reg |= (mux[i] << 20);
++			writel(reg, ipctl->base + pin_reg->mux_reg);
++		} else {
++			writel(mux[i], ipctl->base + pin_reg->mux_reg);
++		}
+ 		dev_dbg(ipctl->dev, "write: offset 0x%x val 0x%x\n",
+ 			pin_reg->mux_reg, mux[i]);
+ 
+@@ -287,7 +295,7 @@ static int imx_pinconf_get(struct pinctrl_dev *pctldev,
+ 	const struct imx_pinctrl_soc_info *info = ipctl->info;
+ 	const struct imx_pin_reg *pin_reg = &info->pin_regs[pin_id];
+ 
+-	if (!pin_reg->conf_reg) {
++	if (!(info->flags & ZERO_OFFSET_VALID) && !pin_reg->conf_reg) {
+ 		dev_err(info->dev, "Pin(%s) does not support config function\n",
+ 			info->pins[pin_id].name);
+ 		return -EINVAL;
+@@ -295,6 +303,9 @@ static int imx_pinconf_get(struct pinctrl_dev *pctldev,
+ 
+ 	*config = readl(ipctl->base + pin_reg->conf_reg);
+ 
++	if (info->flags & SHARE_MUX_CONF_REG)
++		*config &= 0xffff;
++
+ 	return 0;
+ }
+ 
+@@ -305,7 +316,7 @@ static int imx_pinconf_set(struct pinctrl_dev *pctldev,
+ 	const struct imx_pinctrl_soc_info *info = ipctl->info;
+ 	const struct imx_pin_reg *pin_reg = &info->pin_regs[pin_id];
+ 
+-	if (!pin_reg->conf_reg) {
++	if (!(info->flags & ZERO_OFFSET_VALID) && !pin_reg->conf_reg) {
+ 		dev_err(info->dev, "Pin(%s) does not support config function\n",
+ 			info->pins[pin_id].name);
+ 		return -EINVAL;
+@@ -314,7 +325,15 @@ static int imx_pinconf_set(struct pinctrl_dev *pctldev,
+ 	dev_dbg(ipctl->dev, "pinconf set pin %s\n",
+ 		info->pins[pin_id].name);
+ 
+-	writel(config, ipctl->base + pin_reg->conf_reg);
++	if (info->flags & SHARE_MUX_CONF_REG) {
++		u32 reg;
++		reg = readl(ipctl->base + pin_reg->conf_reg);
++		reg &= ~0xffff;
++		reg |= config;
++		writel(reg, ipctl->base + pin_reg->conf_reg);
++	} else {
++		writel(config, ipctl->base + pin_reg->conf_reg);
++	}
+ 	dev_dbg(ipctl->dev, "write: offset 0x%x val 0x%lx\n",
+ 		pin_reg->conf_reg, config);
+ 
+@@ -381,19 +400,24 @@ static struct pinctrl_desc imx_pinctrl_desc = {
+  * 1 u32 CONFIG, so 24 types in total for each pin.
+  */
+ #define FSL_PIN_SIZE 24
++#define SHARE_FSL_PIN_SIZE 20
+ 
+ static int imx_pinctrl_parse_groups(struct device_node *np,
+ 				    struct imx_pin_group *grp,
+ 				    struct imx_pinctrl_soc_info *info,
+ 				    u32 index)
+ {
+-	int size;
++	int size, pin_size;
+ 	const __be32 *list;
+ 	int i;
+ 	u32 config;
+ 
+ 	dev_dbg(info->dev, "group(%d): %s\n", index, np->name);
+ 
++	if (info->flags & SHARE_MUX_CONF_REG)
++		pin_size = SHARE_FSL_PIN_SIZE;
++	else
++		pin_size = FSL_PIN_SIZE;
+ 	/* Initialise group */
+ 	grp->name = np->name;
+ 
+@@ -403,12 +427,12 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
+ 	 */
+ 	list = of_get_property(np, "fsl,pins", &size);
+ 	/* we do not check return since it's safe node passed down */
+-	if (!size || size % FSL_PIN_SIZE) {
++	if (!size || size % pin_size) {
+ 		dev_err(info->dev, "Invalid fsl,pins property\n");
+ 		return -EINVAL;
+ 	}
+ 
+-	grp->npins = size / FSL_PIN_SIZE;
++	grp->npins = size / pin_size;
+ 	grp->pins = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
+ 				GFP_KERNEL);
+ 	grp->mux_mode = devm_kzalloc(info->dev, grp->npins * sizeof(unsigned int),
+@@ -421,10 +445,17 @@ static int imx_pinctrl_parse_groups(struct device_node *np,
+ 				GFP_KERNEL);
+ 	for (i = 0; i < grp->npins; i++) {
+ 		u32 mux_reg = be32_to_cpu(*list++);
+-		u32 conf_reg = be32_to_cpu(*list++);
+-		unsigned int pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
+-		struct imx_pin_reg *pin_reg = &info->pin_regs[pin_id];
++		u32 conf_reg;
++		unsigned int pin_id;
++		struct imx_pin_reg *pin_reg;
+ 
++		if (info->flags & SHARE_MUX_CONF_REG)
++			conf_reg = mux_reg;
++		else
++			conf_reg = be32_to_cpu(*list++);
++
++		pin_id = mux_reg ? mux_reg / 4 : conf_reg / 4;
++		pin_reg = &info->pin_regs[pin_id];
+ 		grp->pins[i] = pin_id;
+ 		pin_reg->mux_reg = mux_reg;
+ 		pin_reg->conf_reg = conf_reg;
+diff --git a/drivers/pinctrl/pinctrl-imx.h b/drivers/pinctrl/pinctrl-imx.h
+index 607ef54..bcedd99 100644
+--- a/drivers/pinctrl/pinctrl-imx.h
++++ b/drivers/pinctrl/pinctrl-imx.h
+@@ -74,8 +74,12 @@ struct imx_pinctrl_soc_info {
+ 	unsigned int ngroups;
+ 	struct imx_pmx_func *functions;
+ 	unsigned int nfunctions;
++	unsigned int flags;
+ };
+ 
++#define ZERO_OFFSET_VALID	0x1
++#define SHARE_MUX_CONF_REG	0x2
++
+ #define NO_MUX		0x0
+ #define NO_PAD		0x0
+ 
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.8.0
