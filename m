@@ -1,56 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 May 2013 16:52:55 +0200
-Subject: [PATCH] ARM: mach-moxart: platform port for MOXA ART SoC
-In-Reply-To: <CACmBeS3JZ8bm6jJbmrKTfmZqshezN6QKdmyPCKdQ2HUwzY7ggA@mail.gmail.com>
-References: <CACmBeS1NLFUYHBOVL28aCCzRrgXYGPZF9t3qj6AdcgaMkrPGoQ@mail.gmail.com>
- <201305151516.52389.arnd@arndb.de>
- <CACmBeS3JZ8bm6jJbmrKTfmZqshezN6QKdmyPCKdQ2HUwzY7ggA@mail.gmail.com>
-Message-ID: <4406410.DRdDEViWVK@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 16 May 2013 14:52:34 +0100
+Subject: [RFC PATCH v2 06/11] ARM64: mm: Restore memblock limit when
+ map_mem finished.
+In-Reply-To: <1368006763-30774-7-git-send-email-steve.capper@linaro.org>
+References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
+ <1368006763-30774-7-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130516135233.GB18308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 May 2013 15:37:16 Jonas Jensen wrote:
-> On 15 May 2013 15:16, Arnd Bergmann <arnd@arndb.de> wrote:
-> > The part that I don't understand at all is the "timer0" part. Is that a string
-> > from the data sheet?
+On Wed, May 08, 2013 at 10:52:38AM +0100, Steve Capper wrote:
+> In paging_init the memblock limit is set to restrict any addresses
+> returned by early_alloc to fit within the initial direct kernel
+> mapping in swapper_pg_dir. This allows map_mem to allocate puds,
+> pmds and ptes from the initial direct kernel mapping.
 > 
-> I have next to no data sheets or documentation on the SoC itself. What
-> I know is from looking at old sources, which suggest there are more
-> than one timer (the rest were never implemented).
+> The limit stays low after paging_init() though, meaning any
+> bootmem allocations will be from a restricted subset of memory.
+> Gigabyte huge pages, for instance, are normally allocated from
+> bootmem as their order (18) is too large for the default buddy
+> allocator (MAX_ORDER = 11).
 > 
-> It only needs one for timer_tick? Does it make sense to just call it "timer"?
-
-Yes, I think just "moxa,moxart-timer" is fine. Chances are that if you have
-more of them, they are actually compatible with one another. If they are not
-and you need more than one, you can always pick a different name
-if you need another one.
-
-> > Can you provide some more detail why what PMU registers are used here? Is that
-> > a "Performance Measurement Unit", "Power Management Unit" or something else?
-> > Are you sure that those registers are only ever needed for GPIO?
+> This patch restores the memblock limit when map_mem has finished,
+> allowing gigabyte huge pages (and other objects) to be allocated
+> from all of bootmem.
 > 
-> It's "Power Management Unit". The MMC driver uses it to read system
-> clock and write it to clock control, but I suspect it can be removed.
-> It's code under #ifdef MSD_SUPPORT_GET_CLOCK but I think the else is
-> perfectly acceptable.
-> GPIO uses it only to enable or disable pins.
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
 
-It sounds like this is used for what should be separate drivers/clk and
-drivers/pinctrl drivers:
-
-A pinctrl driver is often the superset of a gpio driver and can control
-more aspects of a pin than the gpio interface can.
-
-The clk driver is supposed to give an abstraction of the clock tree
-to be used with interfaces like clk_get() and clk_set_rate(). It
-can probably be really simple in case of moxart. Is the mmc driver
-the only one that needs access to clocks?
-
-Are the pinctrl and clk registers in different parts of the PMU, or are
-they intermixed? In the former case, you can just turn it into separate
-devices that have their own distinct "reg" properties, in the second
-case, the best solution is likely to mark the pmu 'compatible="syscon"'
-and use the drivers/mfd/syscon.c driver to get a regmap that is used
-by the clock and pinctrl drivers, respectively.
-
-	Arnd
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
