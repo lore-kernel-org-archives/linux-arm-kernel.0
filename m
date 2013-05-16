@@ -1,30 +1,36 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 16 May 2013 16:34:04 +0100
-Subject: [PATCH 0/3] ARM: kernel: cpu_logical_map misc fixes
-Message-ID: <1368718447-19209-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Thu, 16 May 2013 14:05:15 -0500
+Subject: [PATCHv2 4/6] ARM: socfpga: Add syscon to be part of socfpga
+In-Reply-To: <1368731117-4749-1-git-send-email-dinguyen@altera.com>
+References: <1368731117-4749-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1368731117-4749-4-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, Rob,
+From: Dinh Nguyen <dinguyen@altera.com>
 
-this series contains simple fixes/improvements related to the DT
-cpu_logical_map initialization code. I would like to get these patches
-in in order to have a stable base on top of which I can send the DT topology
-bindings and cpu_logical_map bindings/parsing code updates for arm and arm64.
+SOCFPGA has a system manager register block can be accessed by using
+the syscon driver.
 
-Thank you very much,
-Lorenzo
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Cc: Pavel Machek <pavel@denx.de>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: <linux@arm.linux.org.uk>
+---
+ arch/arm/mach-socfpga/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-Lorenzo Pieralisi (3):
-  ARM: DT: kernel: move temporary cpu map stack array to static data
-  ARM: kernel: fix arm_dt_init_cpu_maps() to skip non-cpu nodes
-  ARM: kernel: fix __cpu_logical_map default initialization
-
- arch/arm/include/asm/cputype.h  |  2 ++
- arch/arm/include/asm/smp_plat.h |  2 +-
- arch/arm/kernel/devtree.c       | 14 ++++++++++----
- arch/arm/kernel/setup.c         |  2 +-
- 4 files changed, 14 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+index 566e804..07dff6f 100644
+--- a/arch/arm/mach-socfpga/Kconfig
++++ b/arch/arm/mach-socfpga/Kconfig
+@@ -13,5 +13,6 @@ config ARCH_SOCFPGA
+ 	select GPIO_PL061 if GPIOLIB
+ 	select HAVE_ARM_SCU
+ 	select HAVE_SMP
++	select MFD_SYSCON
+ 	select SPARSE_IRQ
+ 	select USE_OF
 -- 
-1.8.2.2
+1.7.9.5
