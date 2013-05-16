@@ -1,43 +1,52 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 16 May 2013 17:51:17 +0200
-Subject: parallel-display driver for i.MX53
-In-Reply-To: <CAOkaPuUdugB8+qTakh8-N0bsxfobQymbYtCQ67FfX8CuttPb0A@mail.gmail.com>
-References: <CAOkaPuX7RjwrMiZUCGwXTovgsFf=onRkrGa2U+qUv-tU3t4WWg@mail.gmail.com>
- <CAOkaPuUdugB8+qTakh8-N0bsxfobQymbYtCQ67FfX8CuttPb0A@mail.gmail.com>
-Message-ID: <201305161751.17405.marex@denx.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 16 May 2013 11:56:17 -0400
+Subject: [PATCHv9 7/9] pci: PCIe driver for Marvell Armada 370/XP systems
+In-Reply-To: <20130516174903.3a7a07ef@skate>
+References: <1368624323-24311-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1368624323-24311-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130516093312.GB2459@localhost>
+ <20130516154031.GF6563@titan.lakedaemon.net>
+ <20130516174903.3a7a07ef@skate>
+Message-ID: <20130516155617.GH6563@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Rogerio Pimentel,
-
-> Hi Philipp,
+On Thu, May 16, 2013 at 05:49:03PM +0200, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
 > 
-> I see that reverting patch
+> On Thu, 16 May 2013 11:40:31 -0400, Jason Cooper wrote:
 > 
-> 2ea42608ba977bd05ce7b2d8a1f65efacfc84352
-> staging: drm/imx: Add support for VGA via TVE on i.MX53
-> 
-> The display on LCD/i.MX53QSB shows for about 1 second and turn off.
-> Have you noticed any kind of problem on parallel displays after your
-> recent patches?
-> Could you please confirm that imx-parallel display is functional after
-> your tve patches are applied?
-
-You should not do this top-posting ;-)
-
-> On Thu, May 16, 2013 at 11:02 AM, Rogerio Pimentel
-> 
-> <rpimentel.silva@gmail.com> wrote:
-> > Hi,
+> > > > +static int mvebu_pcie_init(void)
+> > > 
+> > > Building this showed a warning here. It seems you forgot
+> > > to mark this one as __init.
 > > 
-> > I'm trying to add the parallel display on i.MX53QSB but it's not
-> > working on current linux next. It was working prior to 3.10-rc1.
-> > 
-> > Does anybody know about any significant change that made this driver
-> > break? Or maybe something else I need to do on imx53-qsb.dtb?
-> > 
-> > Thanks,
-> > Rogerio
+> > Thomas, I'll fix this up when I pull this in, no need to resend. :)
+> 
+> I'll resend, because beyond this function pointed by Ezequiel, there
+> are two other functions that can be marked __init. The one pointed by
+> Ezequiel is important because it causes a section mismatch
+> when !CONFIG_MODULES, because in this case platform_driver_probe() is
+> __init (and this explains what I wasn't seeing the warning, since I'm
+> building CONFIG_MODULES=y). The two other functions are more cosmetic,
+> but good to have as well.
+> 
+> It would already been sent if git hadn't decided to do a 'git gc' right
+> after my rebase. It's been gc-ing for quite some time now...
 
-Best regards,
-Marek Vasut
+Dear boss,
+
+I am in desperate need of a 500GB SSD on which to do my kernel work.
+
+Thanks,
+
+Kranky Kernel Developer
+
+hehehe...
+
+
+I'll pull in once you send.
+
+thx,
+
+Jason.
