@@ -1,26 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 May 2013 09:21:45 -0700
-Subject: [PATCH] ARM: dts: OMAP2+: Simplify NAND support
-In-Reply-To: <1367331082-27944-1-git-send-email-jon-hunter@ti.com>
-References: <1367331082-27944-1-git-send-email-jon-hunter@ti.com>
-Message-ID: <20130516162144.GY5600@atomide.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 16 May 2013 17:22:58 +0100
+Subject: [PATCH] ARM: remove the .vm_mm value from gate_vma.
+In-Reply-To: <20130516143638.GR18614@n2100.arm.linux.org.uk>
+References: <1368702394-1737-1-git-send-email-steve.capper@linaro.org>
+ <20130516143638.GR18614@n2100.arm.linux.org.uk>
+Message-ID: <20130516162257.GA7521@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jon Hunter <jon-hunter@ti.com> [130430 07:16]:
-> Commit 8c8a777 (ARM: OMAP2+: Add function to read GPMC settings from
-> device-tree) added a device-tree property "gpmc,device-nand" to indicate
-> is the GPMC child device is NAND. This commit should have updated the
-> GPMC NAND documentation (Documentation/devicetree/bindings/mtd/gpmc-nand.txt)
-> to list the property "gpmc,device-nand" as a required property and also
-> updated the example. However, this property is redundant and not needed
-> because the GPMC child device node for NAND is called "nand". Therefore,
-> remove this property.
+On Thu, May 16, 2013 at 03:36:38PM +0100, Russell King - ARM Linux wrote:
+> On Thu, May 16, 2013 at 12:06:34PM +0100, Steve Capper wrote:
+
+[ ... ]
+
 > 
-> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
+> This looks fine - x86 also sets .vm_mm to NULL here.  So please put
+> it in my patch system.  Does this need to be applied to stable
+> kernels as well?  If so, please mark it with Cc: <stable@vger.kernel.org>
+> (but do not send it to that address).  Also, it'd be worth checking
+> which stable kernels it needs to be applied to.
+> 
+> Thanks.
 
-Thanks applying into omap-for-v3.11/gpmc.
+Thank you Russell,
+I couldn't see any branches in linux-stable that need this patch.
+The patch is now in your system with id 7727/1.
 
-Regards,
-
-Tony
+Cheers,
+-- 
+Steve
