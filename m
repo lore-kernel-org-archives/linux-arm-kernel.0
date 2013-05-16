@@ -1,37 +1,23 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 16 May 2013 16:34:06 +0100
-Subject: [PATCH 2/3] ARM: kernel: fix arm_dt_init_cpu_maps() to skip non-cpu
- nodes
-In-Reply-To: <1368718447-19209-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1368718447-19209-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1368718447-19209-3-git-send-email-lorenzo.pieralisi@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 May 2013 11:06:50 -0700
+Subject: [PATCH] ARM: defconfigs: OMAP: omap2plus_defconfig missing
+ CONFIG_ARCH_MULTI_V6=y
+In-Reply-To: <alpine.DEB.2.00.1305131703271.7156@utopia.booyaka.com>
+References: <alpine.DEB.2.00.1305131701270.7156@utopia.booyaka.com>
+ <alpine.DEB.2.00.1305131703271.7156@utopia.booyaka.com>
+Message-ID: <20130516180650.GF5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The introduction of the cpu-map topology node in the cpus node implies
-that cpus node might have children that are not cpu nodes. The DT
-parsing code needs updating otherwise it would check for cpu nodes
-properties in nodes that are not required to contain them, resulting
-in warnings that have no bearing on bindings defined in the dts source file.
+* Paul Walmsley <paul@pwsan.com> [130513 10:09]:
+> On Mon, 13 May 2013, Paul Walmsley wrote:
+> 
+> > Fix by setting CONFIG_ARCH_MULTI_V7.
+> 
+> Well, obvious typo here.  Here's the updated version.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm/kernel/devtree.c | 3 +++
- 1 file changed, 3 insertions(+)
+Thanks applying into omap-for-v3.10/fixes.
 
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 3d652e4f..d2293c0 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -93,6 +93,9 @@ void __init arm_dt_init_cpu_maps(void)
- 	for_each_child_of_node(cpus, cpu) {
- 		u32 hwid;
- 
-+		if (of_node_cmp(cpu->type, "cpu"))
-+			continue;
-+
- 		pr_debug(" * %s...\n", cpu->full_name);
- 		/*
- 		 * A device tree containing CPU nodes with missing "reg"
--- 
-1.8.2.2
+Regards,
+
+Tony
