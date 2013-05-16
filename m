@@ -1,22 +1,35 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 16 May 2013 11:38:49 +0200
-Subject: [PATCH] i2c: sirf: move driver init from module_init to
- subsys_initcall
-In-Reply-To: <1368672607-5536-1-git-send-email-Baohua.Song@csr.com>
-References: <1368672607-5536-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <20130516093846.GA2927@katana>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 16 May 2013 11:51:56 +0200
+Subject: [PATCH] ASoC: dfbmcs320: make the driver common for other BT
+ modules
+In-Reply-To: <1368687184-12169-1-git-send-email-Baohua.Song@csr.com>
+References: <1368687184-12169-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <5194AC3C.4080206@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 10:50:07AM +0800, Barry Song wrote:
-> From: Xiaomeng Hou <Xiaomeng.Hou@csr.com>
-> 
-> if we initilize i2c bus by module_init, there are some devices which want
-> initialization earlier than i2c and could not do that in time, so move i2c
-> driver initilization to subsys_initcall and make i2c ready before devices
-> init.
-> 
-> Signed-off-by: Xiaomeng Hou <Xiaomeng.Hou@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+On 05/16/2013 08:53 AM, Barry Song wrote:
+> DFBM-CS320 is only one of bluetooth modules using CSR bluetooth chips,
+> we don't want everyone to have a seperate codec driver. anyway, the
+> feature of Bluetooth handsfree is same on all platforms, so this patch
+> makes the DFBM-CS320 driver become a common BT handsfree driver.
+[...]
+> -static struct platform_driver dfmcs320_driver = {
+> +static struct platform_driver bt_handsfree_driver = {
+>  	.driver = {
+> -		.name = "dfbmcs320",
+> +		.name = "bt-handsfree",
+>  		.owner = THIS_MODULE,
 
-What about deferred probing?
+In my opinion it's a good idea to keep a platform_id list of all the
+supported devices.
+
+>  	},
+> -	.probe = dfbmcs320_probe,
+> -	.remove = dfbmcs320_remove,
+> +	.probe = bt_handsfree_probe,
+> +	.remove = bt_handsfree_remove,
+>  };
+>  
+> -module_platform_driver(dfmcs320_driver);
+> +module_platform_driver(bt_handsfree_driver);
