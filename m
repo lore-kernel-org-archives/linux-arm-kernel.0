@@ -1,90 +1,57 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Thu, 16 May 2013 11:57:11 +0200
-Subject: [PATCH v2 6/6] usb: phy: samsung: Add support for USB 2.0 PHY on
- Exynos 4x12
-In-Reply-To: <1368698231-24268-1-git-send-email-t.figa@samsung.com>
-References: <1368698231-24268-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1368698231-24268-7-git-send-email-t.figa@samsung.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Thu, 16 May 2013 10:56:51 +0100
+Subject: [PATCH RFC 0/2] clk: add metag specific gate/mux clocks
+In-Reply-To: <51940CAF.6010808@codeaurora.org>
+References: <1368198127-1295-1-git-send-email-james.hogan@imgtec.com>
+ <51940CAF.6010808@codeaurora.org>
+Message-ID: <5194AD63.9020804@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds driver data for Exynos 4x12 USB 2.0 PHY.
+On 15/05/13 23:31, Stephen Boyd wrote:
+> On 05/10/13 08:02, James Hogan wrote:
+>> This adds a metag architecture specific clk-gate and clk-mux which
+>> extends the generic ones to use global lock2 to protect the register
+>> fields. It is common with metag to have an RTOS running on a different
+>> thread or core with access to different bits in the same register (which
+>> contain clock gate/switch bits for other clocks). Access to such
+>> registers must be serialised with a global lock such as the one provided
+>> by the metag architecture port in <asm/global_lock.h>
+>>
+>> RFC because despite extending the generic clocks there's still a bit of
+>> duplicated code necessary. One alternative is to add special cases to
+>> the generic clock components for when a global or callback function
+>> based lock is desired instead of a spinlock, but I wasn't sure if that
+>> sort of hack would really be appreciated in the generic drivers.
+>>
+>> Comments?
+> 
+> Can you please Cc the devicetree mailing list when proposing new bindings?
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/usb/phy/phy-samsung-usb.h  |  1 +
- drivers/usb/phy/phy-samsung-usb2.c | 18 ++++++++++++++++++
- 2 files changed, 19 insertions(+)
+Erm, I think it was on Cc (devicetree-discuss at lists.ozlabs.org yeh?)
 
-diff --git a/drivers/usb/phy/phy-samsung-usb.h b/drivers/usb/phy/phy-samsung-usb.h
-index 31e2ec3..585d12f 100644
---- a/drivers/usb/phy/phy-samsung-usb.h
-+++ b/drivers/usb/phy/phy-samsung-usb.h
-@@ -241,6 +241,7 @@
- enum samsung_cpu_type {
- 	TYPE_S3C64XX,
- 	TYPE_EXYNOS4210,
-+	TYPE_EXYNOS4X12,
- 	TYPE_EXYNOS5250,
- };
- 
-diff --git a/drivers/usb/phy/phy-samsung-usb2.c b/drivers/usb/phy/phy-samsung-usb2.c
-index b81347b..381f8d4 100644
---- a/drivers/usb/phy/phy-samsung-usb2.c
-+++ b/drivers/usb/phy/phy-samsung-usb2.c
-@@ -177,6 +177,7 @@ static void samsung_usb2phy_enable(struct samsung_usbphy *sphy)
- 		rstcon |= RSTCON_SWRST;
- 		break;
- 	case TYPE_EXYNOS4210:
-+	case TYPE_EXYNOS4X12:
- 		phypwr &= ~PHYPWR_NORMAL_MASK_PHY0;
- 		rstcon |= RSTCON_SWRST;
- 	default:
-@@ -240,6 +241,7 @@ static void samsung_usb2phy_disable(struct samsung_usbphy *sphy)
- 		phypwr |= PHYPWR_NORMAL_MASK;
- 		break;
- 	case TYPE_EXYNOS4210:
-+	case TYPE_EXYNOS4X12:
- 		phypwr |= PHYPWR_NORMAL_MASK_PHY0;
- 	default:
- 		break;
-@@ -456,6 +458,16 @@ static const struct samsung_usbphy_drvdata usb2phy_exynos4 = {
- 	.phy_disable		= samsung_usb2phy_disable,
- };
- 
-+static const struct samsung_usbphy_drvdata usb2phy_exynos4x12 = {
-+	.cpu_type		= TYPE_EXYNOS4X12,
-+	.devphy_en_mask		= EXYNOS_USBPHY_ENABLE,
-+	.hostphy_en_mask	= EXYNOS_USBPHY_ENABLE,
-+	.rate_to_clksel		= samsung_usbphy_rate_to_clksel_4x12,
-+	.set_isolation		= samsung_usbphy_set_isolation_4210,
-+	.phy_enable		= samsung_usb2phy_enable,
-+	.phy_disable		= samsung_usb2phy_disable,
-+};
-+
- static struct samsung_usbphy_drvdata usb2phy_exynos5 = {
- 	.cpu_type		= TYPE_EXYNOS5250,
- 	.hostphy_en_mask	= EXYNOS_USBPHY_ENABLE,
-@@ -475,6 +487,9 @@ static const struct of_device_id samsung_usbphy_dt_match[] = {
- 		.compatible = "samsung,exynos4210-usb2phy",
- 		.data = &usb2phy_exynos4,
- 	}, {
-+		.compatible = "samsung,exynos4x12-usb2phy",
-+		.data = &usb2phy_exynos4x12,
-+	}, {
- 		.compatible = "samsung,exynos5250-usb2phy",
- 		.data = &usb2phy_exynos5
- 	},
-@@ -491,6 +506,9 @@ static struct platform_device_id samsung_usbphy_driver_ids[] = {
- 		.name		= "exynos4210-usb2phy",
- 		.driver_data	= (unsigned long)&usb2phy_exynos4,
- 	}, {
-+		.name		= "exynos4x12-usb2phy",
-+		.driver_data	= (unsigned long)&usb2phy_exynos4x12,
-+	}, {
- 		.name		= "exynos5250-usb2phy",
- 		.driver_data	= (unsigned long)&usb2phy_exynos5,
- 	},
--- 
-1.8.2.1
+> Your patchset brings up a question I've had which is if we should be
+> putting the bits and register width information in devicetree at all. On
+> the one hand it's nice to not have anything in C code, just iterate over
+> nodes and register clocks. On the other hand, it's the first time I've
+> seen anyone put the register interface into devicetree. From what I can
+> tell, the regulator bindings have put at most the register base and
+> physical properties like enable-time, max voltage, etc., but not what
+> bits are needed to enable/disable a regulator. Also I thought I read
+> somewhere that reg properties shouldn't overlap each other, so if you
+> ever have two clocks living in the same register we're going to violate
+> that.
+
+Oh, I wasn't aware of that limitation.
+
+The SoC I'm working with has some registers full of clock enable bits (I
+guess one could have a gate array component with up to 32 clock inputs
+and outputs) and some registers full of clock mux switch bits (that
+would get really messy to define as a block since each bit switches
+between 2 parents, and some of the parents are other clock muxes in the
+same block). Some registers contain a bunch of low power related bits
+together, including clock enable bits in the same register as various
+pinconf settings which is used by a separate pinctrl driver.
+
+Cheers
+James
