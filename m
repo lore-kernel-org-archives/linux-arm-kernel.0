@@ -1,10 +1,10 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 16 May 2013 13:15:36 +0200
-Subject: [PATCH 08/33] drivers/i2c/busses: don't check resource with
+Date: Thu, 16 May 2013 13:15:43 +0200
+Subject: [PATCH 15/33] drivers/pwm: don't check resource with
  devm_ioremap_resource
 In-Reply-To: <1368702961-4325-1-git-send-email-wsa@the-dreams.de>
 References: <1368702961-4325-1-git-send-email-wsa@the-dreams.de>
-Message-ID: <1368702961-4325-9-git-send-email-wsa@the-dreams.de>
+Message-ID: <1368702961-4325-16-git-send-email-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,59 +13,143 @@ duplicate this in the driver.
 
 Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
 ---
- drivers/i2c/busses/i2c-s3c2410.c |    5 -----
- drivers/i2c/busses/i2c-sirf.c    |    6 ------
- drivers/i2c/busses/i2c-tegra.c   |    5 -----
- 3 files changed, 16 deletions(-)
+ drivers/pwm/pwm-imx.c      |    5 -----
+ drivers/pwm/pwm-puv3.c     |    5 -----
+ drivers/pwm/pwm-pxa.c      |    5 -----
+ drivers/pwm/pwm-tegra.c    |    5 -----
+ drivers/pwm/pwm-tiecap.c   |    5 -----
+ drivers/pwm/pwm-tiehrpwm.c |    5 -----
+ drivers/pwm/pwm-tipwmss.c  |    5 -----
+ drivers/pwm/pwm-vt8500.c   |    5 -----
+ 8 files changed, 40 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 6e8ee92..cab1c91 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -1082,11 +1082,6 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
- 	/* map the registers */
+diff --git a/drivers/pwm/pwm-imx.c b/drivers/pwm/pwm-imx.c
+index ec28798..c938bae 100644
+--- a/drivers/pwm/pwm-imx.c
++++ b/drivers/pwm/pwm-imx.c
+@@ -265,11 +265,6 @@ static int imx_pwm_probe(struct platform_device *pdev)
+ 	imx->chip.npwm = 1;
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (res == NULL) {
--		dev_err(&pdev->dev, "cannot find IO resource\n");
--		return -ENOENT;
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no memory resource defined\n");
+-		return -ENODEV;
 -	}
 -
- 	i2c->regs = devm_ioremap_resource(&pdev->dev, res);
+ 	imx->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+ 	if (IS_ERR(imx->mmio_base))
+ 		return PTR_ERR(imx->mmio_base);
+diff --git a/drivers/pwm/pwm-puv3.c b/drivers/pwm/pwm-puv3.c
+index d1eb499..ed6007b 100644
+--- a/drivers/pwm/pwm-puv3.c
++++ b/drivers/pwm/pwm-puv3.c
+@@ -117,11 +117,6 @@ static int pwm_probe(struct platform_device *pdev)
+ 		return PTR_ERR(puv3->clk);
  
- 	if (IS_ERR(i2c->regs))
-diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
-index 5a7ad24..a63c7d5 100644
---- a/drivers/i2c/busses/i2c-sirf.c
-+++ b/drivers/i2c/busses/i2c-sirf.c
-@@ -303,12 +303,6 @@ static int i2c_sirfsoc_probe(struct platform_device *pdev)
- 	adap->class = I2C_CLASS_HWMON;
- 
- 	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (mem_res == NULL) {
--		dev_err(&pdev->dev, "Unable to get MEM resource\n");
--		err = -EINVAL;
--		goto out;
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no memory resource defined\n");
+-		return -ENODEV;
 -	}
 -
- 	siic->base = devm_ioremap_resource(&pdev->dev, mem_res);
- 	if (IS_ERR(siic->base)) {
- 		err = PTR_ERR(siic->base);
-diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
-index b60ff90..9aa1b60 100644
---- a/drivers/i2c/busses/i2c-tegra.c
-+++ b/drivers/i2c/busses/i2c-tegra.c
-@@ -714,11 +714,6 @@ static int tegra_i2c_probe(struct platform_device *pdev)
- 	int ret = 0;
+ 	puv3->base = devm_ioremap_resource(&pdev->dev, r);
+ 	if (IS_ERR(puv3->base))
+ 		return PTR_ERR(puv3->base);
+diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
+index dee6ab55..dc97175 100644
+--- a/drivers/pwm/pwm-pxa.c
++++ b/drivers/pwm/pwm-pxa.c
+@@ -147,11 +147,6 @@ static int pwm_probe(struct platform_device *pdev)
+ 	pwm->chip.npwm = (id->driver_data & HAS_SECONDARY_PWM) ? 2 : 1;
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		dev_err(&pdev->dev, "no mem resource\n");
--		return -EINVAL;
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no memory resource defined\n");
+-		return -ENODEV;
 -	}
 -
- 	base = devm_ioremap_resource(&pdev->dev, res);
- 	if (IS_ERR(base))
- 		return PTR_ERR(base);
+ 	pwm->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+ 	if (IS_ERR(pwm->mmio_base))
+ 		return PTR_ERR(pwm->mmio_base);
+diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
+index 3d75f4a..a540293 100644
+--- a/drivers/pwm/pwm-tegra.c
++++ b/drivers/pwm/pwm-tegra.c
+@@ -181,11 +181,6 @@ static int tegra_pwm_probe(struct platform_device *pdev)
+ 	pwm->dev = &pdev->dev;
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!r) {
+-		dev_err(&pdev->dev, "no memory resources defined\n");
+-		return -ENODEV;
+-	}
+-
+ 	pwm->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+ 	if (IS_ERR(pwm->mmio_base))
+ 		return PTR_ERR(pwm->mmio_base);
+diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
+index 0d65fb2..72ca42d 100644
+--- a/drivers/pwm/pwm-tiecap.c
++++ b/drivers/pwm/pwm-tiecap.c
+@@ -240,11 +240,6 @@ static int ecap_pwm_probe(struct platform_device *pdev)
+ 	pc->chip.npwm = 1;
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!r) {
+-		dev_err(&pdev->dev, "no memory resource defined\n");
+-		return -ENODEV;
+-	}
+-
+ 	pc->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+ 	if (IS_ERR(pc->mmio_base))
+ 		return PTR_ERR(pc->mmio_base);
+diff --git a/drivers/pwm/pwm-tiehrpwm.c b/drivers/pwm/pwm-tiehrpwm.c
+index 6a21759..48a485c 100644
+--- a/drivers/pwm/pwm-tiehrpwm.c
++++ b/drivers/pwm/pwm-tiehrpwm.c
+@@ -471,11 +471,6 @@ static int ehrpwm_pwm_probe(struct platform_device *pdev)
+ 	pc->chip.npwm = NUM_PWM_CHANNEL;
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!r) {
+-		dev_err(&pdev->dev, "no memory resource defined\n");
+-		return -ENODEV;
+-	}
+-
+ 	pc->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+ 	if (IS_ERR(pc->mmio_base))
+ 		return PTR_ERR(pc->mmio_base);
+diff --git a/drivers/pwm/pwm-tipwmss.c b/drivers/pwm/pwm-tipwmss.c
+index c9c3d3a..3b119bc 100644
+--- a/drivers/pwm/pwm-tipwmss.c
++++ b/drivers/pwm/pwm-tipwmss.c
+@@ -70,11 +70,6 @@ static int pwmss_probe(struct platform_device *pdev)
+ 	mutex_init(&info->pwmss_lock);
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (!r) {
+-		dev_err(&pdev->dev, "no memory resource defined\n");
+-		return -ENODEV;
+-	}
+-
+ 	info->mmio_base = devm_ioremap_resource(&pdev->dev, r);
+ 	if (IS_ERR(info->mmio_base))
+ 		return PTR_ERR(info->mmio_base);
+diff --git a/drivers/pwm/pwm-vt8500.c b/drivers/pwm/pwm-vt8500.c
+index 69effd1..323125a 100644
+--- a/drivers/pwm/pwm-vt8500.c
++++ b/drivers/pwm/pwm-vt8500.c
+@@ -230,11 +230,6 @@ static int vt8500_pwm_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no memory resource defined\n");
+-		return -ENODEV;
+-	}
+-
+ 	chip->base = devm_ioremap_resource(&pdev->dev, r);
+ 	if (IS_ERR(chip->base))
+ 		return PTR_ERR(chip->base);
 -- 
 1.7.10.4
