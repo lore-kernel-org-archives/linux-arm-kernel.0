@@ -1,53 +1,124 @@
-From: david.lanzendoerfer@o2s.ch (David =?iso-8859-1?Q?Lanzend=F6rfer?=)
-Date: Thu, 16 May 2013 09:15:37 +0200
-Subject: Naming convention DSI + device tree
-In-Reply-To: <51940C22.4050802@wwwdotorg.org>
-References: <20130514181745.GA2762@mail.o2s.ch>
- <51940C22.4050802@wwwdotorg.org>
-Message-ID: <20130516071537.GA13573@mail.o2s.ch>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 16 May 2013 12:10:37 +0530
+Subject: [PATCH 07/39] dmaengine: ste_dma40: Only use addresses passed
+ as configuration information
+In-Reply-To: <1368611522-9984-8-git-send-email-lee.jones@linaro.org>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130516064036.GF14863@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 04:28:50PM -0600, Stephen Warren wrote:
-> On 05/14/2013 12:17 PM, David Lanzend?rfer wrote:
-> > Hello
-> > I have the following issue:
-> > In order to make the DSI controller react at all,
-> Hmm. In the upstream kernel, we don't even have a DSI driver at all for
-> Tegra, so control over the panel itself is likely the least of your
-> worries for now.
-Is there a patch set pending for merge into upstream which will provide
-this support? And if yes, where can I find these pending patches?
-I'd like to build up my code based on already existing work which is
-expected to be in upstream at some later point of time.
+On Wed, May 15, 2013 at 10:51:30AM +0100, Lee Jones wrote:
+> Addresses are passed in from the client's driver via the invocation of
+> dmaengine_slave_config(), so there's no need to fetch them from platform
+> data too, hardwired or otherwise. This is a great step forward, as it
+> elevates a large burden from platform data in the way of a look-up
+> table.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+Good code size reduction, always a good template for code improvements
 
-> > I need to pass him a certain combination of pin states.
-> > Until now within the code of the original android kernel which was using board files this has just been
-> > done by doing bit banging.
-> > 
-> > namely:
-> > 	gpio_set_value(tf201_lvds_shutdown, 1);
-> > ...
-> > Now with a device tree comes the question: Where should I put this?
-> Likely, you will need to create a DT binding that represents the
-> particular panel model that you have, and make the Tegra display
-> controller node refer to that panel node. The panel node would need
-> properties to describe the various GPIOs used to control the panel.
-> Then, you'd want to write a panel-specific driver that handles that
-> device tree node.
-That was my thought too.
-Where should I put this panel-specific driver?
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
-> All of this will likely need to be integrated with the upcoming Common
-> Display Framework.
-Is this upcoming CDF included within your "linux-next_common" branch?
-
-best regards
-David
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130516/aa8223d1/attachment.sig>
+--
+~Vinod
+>  drivers/dma/ste_dma40.c |   51 ++++++++++-------------------------------------
+>  1 file changed, 11 insertions(+), 40 deletions(-)
+> 
+> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+> index ba84df8..57a127e 100644
+> --- a/drivers/dma/ste_dma40.c
+> +++ b/drivers/dma/ste_dma40.c
+> @@ -1774,22 +1774,6 @@ static int d40_validate_conf(struct d40_chan *d40c,
+>  		res = -EINVAL;
+>  	}
+>  
+> -	if (conf->dir == STEDMA40_MEM_TO_PERIPH &&
+> -	    d40c->base->plat_data->dev_tx[conf->dev_type] == 0 &&
+> -	    d40c->runtime_addr == 0) {
+> -		chan_err(d40c, "Invalid TX channel address (%d)\n",
+> -			 conf->dev_type);
+> -		res = -EINVAL;
+> -	}
+> -
+> -	if (conf->dir == STEDMA40_PERIPH_TO_MEM &&
+> -	    d40c->base->plat_data->dev_rx[conf->dev_type] == 0 &&
+> -	    d40c->runtime_addr == 0) {
+> -		chan_err(d40c, "Invalid RX channel address (%d)\n",
+> -			 conf->dev_type);
+> -		res = -EINVAL;
+> -	}
+> -
+>  	if (conf->dir == STEDMA40_PERIPH_TO_PERIPH) {
+>  		/*
+>  		 * DMAC HW supports it. Will be added to this driver,
+> @@ -2327,14 +2311,10 @@ d40_prep_sg(struct dma_chan *dchan, struct scatterlist *sg_src,
+>  	if (sg_next(&sg_src[sg_len - 1]) == sg_src)
+>  		desc->cyclic = true;
+>  
+> -	if (direction != DMA_TRANS_NONE) {
+> -		dma_addr_t dev_addr = d40_get_dev_addr(chan, direction);
+> -
+> -		if (direction == DMA_DEV_TO_MEM)
+> -			src_dev_addr = dev_addr;
+> -		else if (direction == DMA_MEM_TO_DEV)
+> -			dst_dev_addr = dev_addr;
+> -	}
+> +	if (direction == DMA_DEV_TO_MEM)
+> +		src_dev_addr = chan->runtime_addr;
+> +	else if (direction == DMA_MEM_TO_DEV)
+> +		dst_dev_addr = chan->runtime_addr;
+>  
+>  	if (chan_is_logical(chan))
+>  		ret = d40_prep_sg_log(chan, desc, sg_src, sg_dst,
+> @@ -2782,15 +2762,8 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+>  	dst_maxburst = config->dst_maxburst;
+>  
+>  	if (config->direction == DMA_DEV_TO_MEM) {
+> -		dma_addr_t dev_addr_rx =
+> -			d40c->base->plat_data->dev_rx[cfg->dev_type];
+> -
+>  		config_addr = config->src_addr;
+> -		if (dev_addr_rx)
+> -			dev_dbg(d40c->base->dev,
+> -				"channel has a pre-wired RX address %08x "
+> -				"overriding with %08x\n",
+> -				dev_addr_rx, config_addr);
+> +
+>  		if (cfg->dir != STEDMA40_PERIPH_TO_MEM)
+>  			dev_dbg(d40c->base->dev,
+>  				"channel was not configured for peripheral "
+> @@ -2805,15 +2778,8 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+>  			dst_maxburst = src_maxburst;
+>  
+>  	} else if (config->direction == DMA_MEM_TO_DEV) {
+> -		dma_addr_t dev_addr_tx =
+> -			d40c->base->plat_data->dev_tx[cfg->dev_type];
+> -
+>  		config_addr = config->dst_addr;
+> -		if (dev_addr_tx)
+> -			dev_dbg(d40c->base->dev,
+> -				"channel has a pre-wired TX address %08x "
+> -				"overriding with %08x\n",
+> -				dev_addr_tx, config_addr);
+> +
+>  		if (cfg->dir != STEDMA40_MEM_TO_PERIPH)
+>  			dev_dbg(d40c->base->dev,
+>  				"channel was not configured for memory "
+> @@ -2833,6 +2799,11 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+>  		return -EINVAL;
+>  	}
+>  
+> +	if (config_addr <= 0) {
+> +		dev_err(d40c->base->dev, "no address supplied\n");
+> +		return -EINVAL;
+> +	}
+> +
+>  	if (src_maxburst * src_addr_width != dst_maxburst * dst_addr_width) {
+>  		dev_err(d40c->base->dev,
+>  			"src/dst width/maxburst mismatch: %d*%d != %d*%d\n",
+> -- 
+> 1.7.10.4
+> 
