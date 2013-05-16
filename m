@@ -1,23 +1,21 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 May 2013 11:06:50 -0700
-Subject: [PATCH] ARM: defconfigs: OMAP: omap2plus_defconfig missing
- CONFIG_ARCH_MULTI_V6=y
-In-Reply-To: <alpine.DEB.2.00.1305131703271.7156@utopia.booyaka.com>
-References: <alpine.DEB.2.00.1305131701270.7156@utopia.booyaka.com>
- <alpine.DEB.2.00.1305131703271.7156@utopia.booyaka.com>
-Message-ID: <20130516180650.GF5600@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 16 May 2013 16:01:56 +0100
+Subject: [RFC PATCH v2 11/11] ARM64: mm: THP support.
+In-Reply-To: <1368006763-30774-12-git-send-email-steve.capper@linaro.org>
+References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
+ <1368006763-30774-12-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130516150155.GG18308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [130513 10:09]:
-> On Mon, 13 May 2013, Paul Walmsley wrote:
+On Wed, May 08, 2013 at 10:52:43AM +0100, Steve Capper wrote:
+> Bring Transparent HugePage support to ARM. The size of a
+> transparent huge page depends on the normal page size. A
+> transparent huge page is always represented as a pmd.
 > 
-> > Fix by setting CONFIG_ARCH_MULTI_V7.
+> If PAGE_SIZE is 4KB, THPs are 2MB.
+> If PAGE_SIZE is 64KB, THPs are 512MB.
 > 
-> Well, obvious typo here.  Here's the updated version.
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
 
-Thanks applying into omap-for-v3.10/fixes.
-
-Regards,
-
-Tony
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
