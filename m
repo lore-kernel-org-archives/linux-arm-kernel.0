@@ -1,53 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 16 May 2013 12:21:19 -0600
-Subject: [PATCH 1/6] ARM: tegra: add an assembly marco to check Tegra
- SoC ID
-In-Reply-To: <1368698988.7403.25.camel@jlo-ubuntu-64.nvidia.com>
-References: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
- <1368613644-11863-2-git-send-email-josephl@nvidia.com>
- <51940FA4.6050609@wwwdotorg.org>
- <1368698988.7403.25.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <5195239F.5030602@wwwdotorg.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 16 May 2013 19:21:22 +0100
+Subject: [PATCH RFC] clk: Introduce userspace clock driver
+In-Reply-To: <51945F27.7010003@codeaurora.org>
+References: <1368207091-32538-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1368207091-32538-2-git-send-email-soren.brinkmann@xilinx.com>
+ <518D320C.4010707@elopez.com.ar>
+ <fe9e603e-a432-4a29-a195-fd393b875a7e@TX2EHSMHS006.ehs.local>
+ <518D411D.9070209@elopez.com.ar>
+ <CAPtuhTgsP4gvMAFoQb3icXAZw3ucSg4dfrAdJMho-VxNmNTvwg@mail.gmail.com>
+ <518D7C45.2090602@codeaurora.org>
+ <20130511142132.GA3200@sirena.org.uk>
+ <51945F27.7010003@codeaurora.org>
+Message-ID: <20130516182122.GG1627@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2013 04:09 AM, Joseph Lo wrote:
-> On Thu, 2013-05-16 at 06:43 +0800, Stephen Warren wrote:
->> On 05/15/2013 04:27 AM, Joseph Lo wrote:
->>> There are some Tegra SoC ID checking code around the low level assembly
->>> code. Adding a marco to replace them. For the single image to support all
->>> the Tegra series, we may also need the marco in other common code. So we
->>> make it become a marco for the usage.
->>
->> I'm not sure this patch doesn't obfuscate the code too much. The big
->> issue I see is:
->>
->>> @@ -115,13 +112,9 @@ ENTRY(__tegra_cpu_reset_handler)
->>>  
->>>  	cpsid	aif, 0x13			@ SVC mode, interrupts disabled
->>>  
->>> -	mov32	r6, TEGRA_APB_MISC_BASE
->>> -	ldr	r6, [r6, #APB_MISC_GP_HIDREV]
->>> -	and	r6, r6, #0xff00
->>> -#ifdef CONFIG_ARCH_TEGRA_2x_SOC
->>> -t20_check:
->>> -	cmp	r6, #(0x20 << 8)
->>> +	tegra_check_soc_id TEGRA20, TEGRA_APB_MISC_BASE, r6, r5
->>
->> Here, we replace all the code with the new macro, ...
->>
->>>  #ifdef CONFIG_ARCH_TEGRA_2x_SOC
->>>  	/* Are we on Tegra20? */
->>> -	cmp	r6, #(0x20 << 8)
->>> +	cmp	r6, #(TEGRA20 << 8)
->>
->> But here we still have to write out the cmp instructions.
->>
-> The marco did "cmp" once and move the soc_id into r6. But the flags may
-> be changed after running some other codes, we need to "cmp" again to get
-> the correct flag.
+On Wed, May 15, 2013 at 09:23:03PM -0700, Saravana Kannan wrote:
+> On 05/11/2013 07:21 AM, Mark Brown wrote:
 
-Yes, I understand that. The issue is that writing the macro didn't
-remove all the code, so it seems like it'd be best if the macro only
-included the common code, and anything that needs to be repeated at each
-test site not be part of the macro.
+> >It's much harder when it's in the standard kernel and there's no contact
+> >with some of the users.  I've pushed back pretty strongly on some of
+> >your equivalent stuff for regulators for this reason.
+
+> Agreed. I don't really keep up with what's going on with the MSM regulators.
+
+> But at some point, I'll start requesting for this for debugfs. It's
+> terribly handy to debug power issues, run unit tests and for debug
+> sessions (debugfs. So, clearly!).
+
+Sure, it's handy for debugging - but it's also far too handy for writing
+silly things in userspace which isn't something we want to encourage.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130516/efb1430b/attachment.sig>
