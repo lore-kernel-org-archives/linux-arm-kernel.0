@@ -1,29 +1,50 @@
-From: neidhard.kim@lge.com (Jongsung Kim)
-Date: Thu, 16 May 2013 22:26:41 +0900
-Subject: [PATCH] ARM: PL011: add support for extended FIFO-size of
- PL011-r1p5
-In-Reply-To: <5193164E.6050400@wwwdotorg.org>
-References: <007301ce375e$bcf6d6b0$36e48410$@lge.com>
- <5191D200.3040604@wwwdotorg.org> <01fd01ce5072$d6b9fcd0$842df670$@lge.com>
- <5192A692.4010700@wwwdotorg.org> <022d01ce5107$8bc668e0$a3533aa0$@lge.com>
- <5193164E.6050400@wwwdotorg.org>
-Message-ID: <02e901ce5239$013b2570$03b17050$@lge.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 16 May 2013 08:29:10 -0500
+Subject: [PATCH] ARM: omap2: remove CONFIG_ARCH_OMAP2PLUS_TYPICAL
+Message-ID: <1368710950-2306-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> :
->> All r1p5 have 32-byte FIFO depth and it's not configurable. From the
-PL011
->> TRM:
->> 
->> r1p4-r1p5	Contains the following differences in functionality:
->> 		* The receive and transmit FIFOs are increased to a depth of
-32.
->> 		* The Revision field in the UARTPeriphID2 Register on page
-3-24
->> 		  bits [7:4] now reads back as 0x3.
->
-> Well, that certainly isn't true in practice. I think we should revert
-> this commit until we can determine what the problem is.
+From: Rob Herring <rob.herring@calxeda.com>
 
-I asked to the ARM support about this. Waiting for reply..
+CONFIG_ARCH_OMAP2PLUS_TYPICAL is selecting user defined features, not h/w
+required options. This does not play well with multi-platform kernels and
+belongs in a defconfig.
+
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
+---
+ arch/arm/mach-omap2/Kconfig | 17 -----------------
+ 1 file changed, 17 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index f49cd51..9d4b5f7 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -26,23 +26,6 @@ if ARCH_OMAP2PLUS
+ 
+ menu "TI OMAP2/3/4 Specific Features"
+ 
+-config ARCH_OMAP2PLUS_TYPICAL
+-	bool "Typical OMAP configuration"
+-	default y
+-	select AEABI
+-	select HIGHMEM
+-	select I2C
+-	select I2C_OMAP
+-	select MENELAUS if ARCH_OMAP2
+-	select NEON if ARCH_OMAP3 || ARCH_OMAP4 || SOC_OMAP5
+-	select PM_RUNTIME
+-	select REGULATOR
+-	select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
+-	select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
+-	select VFP
+-	help
+-	  Compile a kernel suitable for booting most boards
+-
+ config SOC_HAS_OMAP2_SDRC
+ 	bool "OMAP2 SDRAM Controller support"
+ 
+-- 
+1.8.1.2
