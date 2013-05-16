@@ -1,70 +1,103 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 16 May 2013 08:56:43 +0900
-Subject: [PATCH v2 3/4] ARM: shmobile: marzen-reference: Initialise irqpin
-In-Reply-To: <1482970.xQCySsLs8z@avalon>
-References: <1368586650-26263-1-git-send-email-horms+renesas@verge.net.au>
- <1368586650-26263-4-git-send-email-horms+renesas@verge.net.au>
- <1482970.xQCySsLs8z@avalon>
-Message-ID: <20130515235640.GA27876@verge.net.au>
+Date: Thu, 16 May 2013 09:07:04 +0900
+Subject: [PATCHv2 4/5] arm: fix up ARM_ARCH_TIMER selects
+In-Reply-To: <1368631441-28434-5-git-send-email-mark.rutland@arm.com>
+References: <1368631441-28434-1-git-send-email-mark.rutland@arm.com>
+ <1368631441-28434-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <20130516000704.GF27876@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 11:28:15AM +0200, Laurent Pinchart wrote:
-> Hi Simon,
+On Wed, May 15, 2013 at 04:24:00PM +0100, Mark Rutland wrote:
+> In 8a4da6e: "arm: arch_timer: move core to drivers/clocksource", the
+> selection of ARM_ARCH_TIMER was indirected via HAVE_ARM_ARCH_TIMER,
+> though mach-exynos's selection of ARM_ARCH_TIMER was missed, and since
+> then mach-shmobile, mach-tegra, and mach-virt have begun selecting
+> ARM_ARCH_TIMER. This can lead to architected timer support erroneously
+> appearing to not be selected in menuconfig.
 > 
-> Thanks for the patch.
+> This patch fixes up the Kconfigs for those platforms to select
+> HAVE_ARM_ARCH_TIMER.
 > 
-> On Wednesday 15 May 2013 11:57:29 Simon Horman wrote:
-> > Empirically it appears to be necessary to call r8a7779_init_irq_extpin(1)
-> > in order to initialise irqpin for use with IRQ1. This is already done in
-> > the marzen board code. This adds the call to the marzen-reference board
-> > code.
-> > 
-> > The motivation for this is to allow use of SMSC LAN, which uses IRQ1, with
-> > marzen-reference.
-> 
-> This is an acceptable workaround for now, but in the not-so-long term we want 
-> to move that code to the irqpin driver.
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Stephen Warren <swarren@nvidia.com>
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Simon Horman <horms@verge.net.au>
+> ---
+>  arch/arm/mach-exynos/Kconfig   | 2 +-
+>  arch/arm/mach-shmobile/Kconfig | 4 ++--
+>  arch/arm/mach-tegra/Kconfig    | 2 +-
+>  arch/arm/mach-virt/Kconfig     | 2 +-
+>  4 files changed, 5 insertions(+), 5 deletions(-)
 
-Yes, I agree that this not a long term solution.
+arch/arm/mach-shmobile/Kconfig portion:
 
-> I've had a brief look at the irq-renesas-intc-irqpin driver, and it definitely 
-> looks like some love is needed there. I don't have any free time for that at 
-> the moment, but I could provide pointers if anyone wants to work on moving 
-> irqpin-related arch code to the driver.
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
 > 
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >  arch/arm/mach-shmobile/board-marzen-reference.c | 8 +++++++-
-> >  1 file changed, 7 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c
-> > b/arch/arm/mach-shmobile/board-marzen-reference.c index 5332e89..f83b6d1
-> > 100644
-> > --- a/arch/arm/mach-shmobile/board-marzen-reference.c
-> > +++ b/arch/arm/mach-shmobile/board-marzen-reference.c
-> > @@ -63,12 +63,18 @@ static const char *marzen_boards_compat_dt[] __initdata
-> > = { NULL,
-> >  };
-> > 
-> > +void __init marzen_init_irq(void)
-> > +{
-> > +	r8a7779_init_irq_extpin(1); /* IRQ1 as individual interrupt */
-> > +	r8a7779_init_irq_dt();
-> > +}
-> > +
-> >  DT_MACHINE_START(MARZEN, "marzen")
-> >  	.smp		= smp_ops(r8a7779_smp_ops),
-> >  	.map_io		= r8a7779_map_io,
-> >  	.init_early	= r8a7779_init_delay,
-> >  	.nr_irqs	= NR_IRQS_LEGACY,
-> > -	.init_irq	= r8a7779_init_irq_dt,
-> > +	.init_irq	= marzen_init_irq,
-> >  	.init_machine	= marzen_init,
-> >  	.init_time	= shmobile_timer_init,
-> >  	.dt_compat	= marzen_boards_compat_dt,
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index d19edff..3c3f36a 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -76,7 +76,7 @@ config SOC_EXYNOS5440
+>  	default y
+>  	depends on ARCH_EXYNOS5
+>  	select ARCH_HAS_OPP
+> -	select ARM_ARCH_TIMER
+> +	select HAVE_ARM_ARCH_TIMER
+>  	select AUTO_ZRELADDR
+>  	select PINCTRL
+>  	select PINCTRL_EXYNOS5440
+> diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+> index 1a517e2..767a6c3 100644
+> --- a/arch/arm/mach-shmobile/Kconfig
+> +++ b/arch/arm/mach-shmobile/Kconfig
+> @@ -23,7 +23,7 @@ config ARCH_R8A73A4
+>  	select ARCH_WANT_OPTIONAL_GPIOLIB
+>  	select ARM_GIC
+>  	select CPU_V7
+> -	select ARM_ARCH_TIMER
+> +	select HAVE_ARM_ARCH_TIMER
+>  	select SH_CLK_CPG
+>  	select RENESAS_IRQC
+>  
+> @@ -56,7 +56,7 @@ config ARCH_R8A7790
+>  	select ARCH_WANT_OPTIONAL_GPIOLIB
+>  	select ARM_GIC
+>  	select CPU_V7
+> -	select ARM_ARCH_TIMER
+> +	select HAVE_ARM_ARCH_TIMER
+>  	select SH_CLK_CPG
+>  	select RENESAS_IRQC
+>  
+> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+> index 84d72fc..65c5ae6 100644
+> --- a/arch/arm/mach-tegra/Kconfig
+> +++ b/arch/arm/mach-tegra/Kconfig
+> @@ -60,7 +60,7 @@ config ARCH_TEGRA_3x_SOC
+>  
+>  config ARCH_TEGRA_114_SOC
+>  	bool "Enable support for Tegra114 family"
+> -	select ARM_ARCH_TIMER
+> +	select HAVE_ARM_ARCH_TIMER
+>  	select ARM_GIC
+>  	select ARM_L1_CACHE_SHIFT_6
+>  	select CPU_FREQ_TABLE if CPU_FREQ
+> diff --git a/arch/arm/mach-virt/Kconfig b/arch/arm/mach-virt/Kconfig
+> index 8958f0d..081d469 100644
+> --- a/arch/arm/mach-virt/Kconfig
+> +++ b/arch/arm/mach-virt/Kconfig
+> @@ -2,7 +2,7 @@ config ARCH_VIRT
+>  	bool "Dummy Virtual Machine" if ARCH_MULTI_V7
+>  	select ARCH_WANT_OPTIONAL_GPIOLIB
+>  	select ARM_GIC
+> -	select ARM_ARCH_TIMER
+> +	select HAVE_ARM_ARCH_TIMER
+>  	select ARM_PSCI
+>  	select HAVE_SMP
+>  	select CPU_V7
 > -- 
-> Regards,
-> 
-> Laurent Pinchart
+> 1.8.1.1
 > 
