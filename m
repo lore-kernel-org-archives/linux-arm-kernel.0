@@ -1,38 +1,40 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 16 May 2013 13:12:33 +0200
-Subject: [PATCH] ARM: dove: declare all device IDs for module loading
-Message-ID: <20130516131233.30145f82@armhf>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Thu, 16 May 2013 14:10:48 +0300
+Subject: [PATCH v2 03/10] frv: uaccess s/might_sleep/might_fault/
+In-Reply-To: <cover.1368702323.git.mst@redhat.com>
+References: <cover.1368702323.git.mst@redhat.com>
+Message-ID: <89d860b7fb23b35e6a15beda9df6ebccf820a2f6.1368702323.git.mst@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the si5351 driver is a kernel module, it is loaded into memory
-from its i2c device IDs, but not from its DT compatible properties.
+The only reason uaccess routines might sleep
+is if they fault. Make this explicit.
 
-This patch declares the i2c device IDs of all chip variants.
+Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+---
+ arch/frv/include/asm/uaccess.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
---- 
- drivers/clk/clk-si5351.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
-index 8927284..9ebdddd 100644
---- a/drivers/clk/clk-si5351.c
-+++ b/drivers/clk/clk-si5351.c
-@@ -1490,7 +1490,10 @@ static int si5351_i2c_probe(struct i2c_client *client,
+diff --git a/arch/frv/include/asm/uaccess.h b/arch/frv/include/asm/uaccess.h
+index 0b67ec5..3ac9a59 100644
+--- a/arch/frv/include/asm/uaccess.h
++++ b/arch/frv/include/asm/uaccess.h
+@@ -280,14 +280,14 @@ extern long __memcpy_user(void *dst, const void *src, unsigned long count);
+ static inline unsigned long __must_check
+ __copy_to_user(void __user *to, const void *from, unsigned long n)
+ {
+-       might_sleep();
++       might_fault();
+        return __copy_to_user_inatomic(to, from, n);
  }
  
- static const struct i2c_device_id si5351_i2c_ids[] = {
--	{ "silabs,si5351", 0 },
-+	{ "si5351a", 0 },
-+	{ "si5351a-msop", 0 },
-+	{ "si5351b", 0 },
-+	{ "si5351c", 0 },
- 	{ }
- };
- MODULE_DEVICE_TABLE(i2c, si5351_i2c_ids);
-
-
+ static inline unsigned long
+ __copy_from_user(void *to, const void __user *from, unsigned long n)
+ {
+-       might_sleep();
++       might_fault();
+        return __copy_from_user_inatomic(to, from, n);
+ }
+ 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+MST
