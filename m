@@ -1,94 +1,209 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 16 May 2013 09:20:51 +0200
-Subject: [PATCHv2 3/3] arm: dts: add bandgap entry for OMAP4460 devices
-In-Reply-To: <5193B9AA.7020507@ti.com>
-References: <1368629928-6723-1-git-send-email-eduardo.valentin@ti.com>
- <1368629928-6723-4-git-send-email-eduardo.valentin@ti.com>
- <5193A875.1020000@ti.com> <5193B9AA.7020507@ti.com>
-Message-ID: <519488D3.5070003@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 16 May 2013 08:25:57 +0100
+Subject: [PATCH 02/39] dmaengine: ste_dma40: Remove unnecessary call to
+ d40_phy_cfg()
+In-Reply-To: <20130516063546.GD14863@intel.com>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-3-git-send-email-lee.jones@linaro.org>
+ <20130516063546.GD14863@intel.com>
+Message-ID: <20130516072557.GD3269@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+On Thu, 16 May 2013, Vinod Koul wrote:
 
-On 05/15/2013 06:36 PM, Eduardo Valentin wrote:
-> On 15-05-2013 11:23, Benoit Cousson wrote:
->> Hi Eduardo,
->>
->> On 05/15/2013 04:58 PM, Eduardo Valentin wrote:
->>> Include bandgap devices for OMAP4460 devices.
->>>
->>> Cc: "Beno?t Cousson" <b-cousson@ti.com>
->>> Cc: Tony Lindgren <tony@atomide.com>
->>> Cc: Russell King <linux@arm.linux.org.uk>
->>> Cc: linux-omap at vger.kernel.org
->>> Cc: devicetree-discuss at lists.ozlabs.org
->>> Cc: linux-arm-kernel at lists.infradead.org
->>> Cc: linux-kernel at vger.kernel.org
->>> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
->>> ---
->>>  arch/arm/boot/dts/omap4460.dtsi | 9 +++++++++
->>>  1 file changed, 9 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
->>> index 2cf227c..e5bfbfe 100644
->>> --- a/arch/arm/boot/dts/omap4460.dtsi
->>> +++ b/arch/arm/boot/dts/omap4460.dtsi
->>> @@ -29,4 +29,13 @@
->>>  			     <0 55 0x4>;
->>>  		ti,hwmods = "debugss";
->>>  	};
->>> +
->>> +	bandgap {
->>> +		reg = <0x4a002260 0x4
->>> +			0x4a00232C 0x4
->>> +			0x4a002378 0x18>;
->>> +		compatible = "ti,omap4460-bandgap";
->>> +		interrupts = <0 126 4>; /* talert */
->>> +		ti,tshut-gpio = <86>;
-> 
-> 
-> 
->>
->> Why do you need a custom attribute for GPIO? Cannot you use the standard
->> one?
-> 
-> I believe it was by your suggestion :-), during the first attempts to
-> send this driver. But could not find the thread link :-( sorry.
+> On Wed, May 15, 2013 at 10:51:25AM +0100, Lee Jones wrote:
+> > All configuration left in d40_phy_cfg() is runtime configurable and
+> > there is already a call into it from d40_runtime_config(), so let's
+> > rely on that.
+> > 
+> > Acked-by: Vinod Koul <vnod.koul@intel.com>
+> That needs up update!
 
-Ooops :-) I do not remember that... maybe it was long time ago, before
-we had any decent binding available for GPIO and IRQ...
+Ah, where did I get that from that?
 
-> I guess the reasoning to mark it as a ti specific is because it will be
-> used as IRQ line to treat thermal shutdown (in SW).
+Was that my mistake, or was this in the MAINTAINERS file?
 
-Mmm, ok, so in that case, it is not even a gpio, but an interrupt entry
-that is needed like that:
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/dma/ste_dma40.c    |   14 +++---
+> >  drivers/dma/ste_dma40_ll.c |  101 +++++++++++++++++++++-----------------------
+> >  drivers/dma/ste_dma40_ll.h |    3 +-
+> >  3 files changed, 58 insertions(+), 60 deletions(-)
+> > 
+> > diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+> > index 759293e..b7fe46b 100644
+> > --- a/drivers/dma/ste_dma40.c
+> > +++ b/drivers/dma/ste_dma40.c
+> > @@ -2043,6 +2043,14 @@ static int d40_config_memcpy(struct d40_chan *d40c)
+> >  	} else if (dma_has_cap(DMA_MEMCPY, cap) &&
+> >  		   dma_has_cap(DMA_SLAVE, cap)) {
+> >  		d40c->dma_cfg = dma40_memcpy_conf_phy;
+> > +
+> > +		/* Generate interrrupt at end of transfer or relink. */
+> > +		d40c->dst_def_cfg |= BIT(D40_SREG_CFG_TIM_POS);
+> > +
+> > +		/* Generate interrupt on error. */
+> > +		d40c->src_def_cfg |= BIT(D40_SREG_CFG_EIM_POS);
+> > +		d40c->dst_def_cfg |= BIT(D40_SREG_CFG_EIM_POS);
+> > +
+> >  	} else {
+> >  		chan_err(d40c, "No memcpy\n");
+> >  		return -EINVAL;
+> > @@ -2496,9 +2504,6 @@ static int d40_alloc_chan_resources(struct dma_chan *chan)
+> >  	}
+> >  
+> >  	pm_runtime_get_sync(d40c->base->dev);
+> > -	/* Fill in basic CFG register values */
+> > -	d40_phy_cfg(&d40c->dma_cfg, &d40c->src_def_cfg,
+> > -		    &d40c->dst_def_cfg, chan_is_logical(d40c));
+> >  
+> >  	d40_set_prio_realtime(d40c);
+> >  
+> > @@ -2862,8 +2867,7 @@ static int d40_set_runtime_config(struct dma_chan *chan,
+> >  	if (chan_is_logical(d40c))
+> >  		d40_log_cfg(cfg, &d40c->log_def.lcsp1, &d40c->log_def.lcsp3);
+> >  	else
+> > -		d40_phy_cfg(cfg, &d40c->src_def_cfg,
+> > -			    &d40c->dst_def_cfg, false);
+> > +		d40_phy_cfg(cfg, &d40c->src_def_cfg, &d40c->dst_def_cfg);
+> >  
+> >  	/* These settings will take precedence later */
+> >  	d40c->runtime_addr = config_addr;
+> > diff --git a/drivers/dma/ste_dma40_ll.c b/drivers/dma/ste_dma40_ll.c
+> > index 435a223..ab5a2a7 100644
+> > --- a/drivers/dma/ste_dma40_ll.c
+> > +++ b/drivers/dma/ste_dma40_ll.c
+> > @@ -50,63 +50,58 @@ void d40_log_cfg(struct stedma40_chan_cfg *cfg,
+> >  
+> >  }
+> >  
+> > -/* Sets up SRC and DST CFG register for both logical and physical channels */
+> > -void d40_phy_cfg(struct stedma40_chan_cfg *cfg,
+> > -		 u32 *src_cfg, u32 *dst_cfg, bool is_log)
+> > +void d40_phy_cfg(struct stedma40_chan_cfg *cfg, u32 *src_cfg, u32 *dst_cfg)
+> >  {
+> >  	u32 src = 0;
+> >  	u32 dst = 0;
+> >  
+> > -	if (!is_log) {
+> > -		/* Physical channel */
+> > -		if ((cfg->dir ==  STEDMA40_PERIPH_TO_MEM) ||
+> > -		    (cfg->dir == STEDMA40_PERIPH_TO_PERIPH)) {
+> > -			/* Set master port to 1 */
+> > -			src |= 1 << D40_SREG_CFG_MST_POS;
+> > -			src |= D40_TYPE_TO_EVENT(cfg->dev_type);
+> > -
+> > -			if (cfg->src_info.flow_ctrl == STEDMA40_NO_FLOW_CTRL)
+> > -				src |= 1 << D40_SREG_CFG_PHY_TM_POS;
+> > -			else
+> > -				src |= 3 << D40_SREG_CFG_PHY_TM_POS;
+> > -		}
+> > -		if ((cfg->dir ==  STEDMA40_MEM_TO_PERIPH) ||
+> > -		    (cfg->dir == STEDMA40_PERIPH_TO_PERIPH)) {
+> > -			/* Set master port to 1 */
+> > -			dst |= 1 << D40_SREG_CFG_MST_POS;
+> > -			dst |= D40_TYPE_TO_EVENT(cfg->dev_type);
+> > -
+> > -			if (cfg->dst_info.flow_ctrl == STEDMA40_NO_FLOW_CTRL)
+> > -				dst |= 1 << D40_SREG_CFG_PHY_TM_POS;
+> > -			else
+> > -				dst |= 3 << D40_SREG_CFG_PHY_TM_POS;
+> > -		}
+> > -		/* Interrupt on end of transfer for destination */
+> > -		dst |= 1 << D40_SREG_CFG_TIM_POS;
+> > -
+> > -		/* Generate interrupt on error */
+> > -		src |= 1 << D40_SREG_CFG_EIM_POS;
+> > -		dst |= 1 << D40_SREG_CFG_EIM_POS;
+> > -
+> > -		/* PSIZE */
+> > -		if (cfg->src_info.psize != STEDMA40_PSIZE_PHY_1) {
+> > -			src |= 1 << D40_SREG_CFG_PHY_PEN_POS;
+> > -			src |= cfg->src_info.psize << D40_SREG_CFG_PSIZE_POS;
+> > -		}
+> > -		if (cfg->dst_info.psize != STEDMA40_PSIZE_PHY_1) {
+> > -			dst |= 1 << D40_SREG_CFG_PHY_PEN_POS;
+> > -			dst |= cfg->dst_info.psize << D40_SREG_CFG_PSIZE_POS;
+> > -		}
+> > -
+> > -		/* Element size */
+> > -		src |= cfg->src_info.data_width << D40_SREG_CFG_ESIZE_POS;
+> > -		dst |= cfg->dst_info.data_width << D40_SREG_CFG_ESIZE_POS;
+> > -
+> > -		/* Set the priority bit to high for the physical channel */
+> > -		if (cfg->high_priority) {
+> > -			src |= 1 << D40_SREG_CFG_PRI_POS;
+> > -			dst |= 1 << D40_SREG_CFG_PRI_POS;
+> > -		}
+> > +	if ((cfg->dir ==  STEDMA40_PERIPH_TO_MEM) ||
+> > +	    (cfg->dir == STEDMA40_PERIPH_TO_PERIPH)) {
+> > +		/* Set master port to 1 */
+> > +		src |= 1 << D40_SREG_CFG_MST_POS;
+> > +		src |= D40_TYPE_TO_EVENT(cfg->dev_type);
+> > +
+> > +		if (cfg->src_info.flow_ctrl == STEDMA40_NO_FLOW_CTRL)
+> > +			src |= 1 << D40_SREG_CFG_PHY_TM_POS;
+> > +		else
+> > +			src |= 3 << D40_SREG_CFG_PHY_TM_POS;
+> > +	}
+> > +	if ((cfg->dir ==  STEDMA40_MEM_TO_PERIPH) ||
+> > +	    (cfg->dir == STEDMA40_PERIPH_TO_PERIPH)) {
+> > +		/* Set master port to 1 */
+> > +		dst |= 1 << D40_SREG_CFG_MST_POS;
+> > +		dst |= D40_TYPE_TO_EVENT(cfg->dev_type);
+> > +
+> > +		if (cfg->dst_info.flow_ctrl == STEDMA40_NO_FLOW_CTRL)
+> > +			dst |= 1 << D40_SREG_CFG_PHY_TM_POS;
+> > +		else
+> > +			dst |= 3 << D40_SREG_CFG_PHY_TM_POS;
+> > +	}
+> > +	/* Interrupt on end of transfer for destination */
+> > +	dst |= 1 << D40_SREG_CFG_TIM_POS;
+> > +
+> > +	/* Generate interrupt on error */
+> > +	src |= 1 << D40_SREG_CFG_EIM_POS;
+> > +	dst |= 1 << D40_SREG_CFG_EIM_POS;
+> > +
+> > +	/* PSIZE */
+> > +	if (cfg->src_info.psize != STEDMA40_PSIZE_PHY_1) {
+> > +		src |= 1 << D40_SREG_CFG_PHY_PEN_POS;
+> > +		src |= cfg->src_info.psize << D40_SREG_CFG_PSIZE_POS;
+> > +	}
+> > +	if (cfg->dst_info.psize != STEDMA40_PSIZE_PHY_1) {
+> > +		dst |= 1 << D40_SREG_CFG_PHY_PEN_POS;
+> > +		dst |= cfg->dst_info.psize << D40_SREG_CFG_PSIZE_POS;
+> > +	}
+> > +
+> > +	/* Element size */
+> > +	src |= cfg->src_info.data_width << D40_SREG_CFG_ESIZE_POS;
+> > +	dst |= cfg->dst_info.data_width << D40_SREG_CFG_ESIZE_POS;
+> > +
+> > +	/* Set the priority bit to high for the physical channel */
+> > +	if (cfg->high_priority) {
+> > +		src |= 1 << D40_SREG_CFG_PRI_POS;
+> > +		dst |= 1 << D40_SREG_CFG_PRI_POS;
+> >  	}
+> >  
+> >  	if (cfg->src_info.big_endian)
+> > diff --git a/drivers/dma/ste_dma40_ll.h b/drivers/dma/ste_dma40_ll.h
+> > index fdde8ef..1b47312 100644
+> > --- a/drivers/dma/ste_dma40_ll.h
+> > +++ b/drivers/dma/ste_dma40_ll.h
+> > @@ -432,8 +432,7 @@ enum d40_lli_flags {
+> >  
+> >  void d40_phy_cfg(struct stedma40_chan_cfg *cfg,
+> >  		 u32 *src_cfg,
+> > -		 u32 *dst_cfg,
+> > -		 bool is_log);
+> > +		 u32 *dst_cfg);
+> >  
+> >  void d40_log_cfg(struct stedma40_chan_cfg *cfg,
+> >  		 u32 *lcsp1,
 
-	interrupt-parent = <&gpio3>;
-	interrupts = <22>; /* gpio line 86 */
-
-Except that we already have an IRQ line connected to GIC for the
-Talert... I'm not sure we can have 2 different IRQ controllers for one
-device :-(
-
-We need to check.
-
-Regards,
-Benoit
-
-
->> Where is the gpio controller phandle?
->>
->> Usually it looks like this:
->>
->> 	gpios = <&gpio1 8 0>;
->>
->>
->> Regards,
->> Benoit
->>
->>
->>
-> 
-> 
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
