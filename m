@@ -1,199 +1,57 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 16 May 2013 13:44:55 -0700
-Subject: [PATCH v2] clk: Fix race condition between clk_set_parent and
- clk_enable()
-In-Reply-To: <1368677244-7279-1-git-send-email-skannan@codeaurora.org>
-References: <1367383328-25700-1-git-send-email-skannan@codeaurora.org>
- <1368677244-7279-1-git-send-email-skannan@codeaurora.org>
-Message-ID: <20130516204455.12127.75296@quantum>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Thu, 16 May 2013 20:26:58 +0100
+Subject: [RFC 5/8] drm/i2c: nxp-tda998x: prepare for video input configuration
+In-Reply-To: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+Message-ID: <E1Ud3pK-0001qv-D7@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Saravana Kannan (2013-05-15 21:07:24)
-> Without this patch, the following race condition is possible.
-> * clk-A has two parents - clk-X and clk-Y.
-> * All three are disabled and clk-X is current parent.
-> * Thread A: clk_set_parent(clk-A, clk-Y).
-> * Thread A: <snip execution flow>
-> * Thread A: Grabs enable lock.
-> * Thread A: Sees enable count of clk-A is 0, so doesn't enable clk-Y.
-> * Thread A: Updates clk-A SW parent to clk-Y
-> * Thread A: Releases enable lock.
-> * Thread B: clk_enable(clk-A).
-> * Thread B: clk_enable() enables clk-Y, then enabled clk-A and returns.
-> 
-> clk-A is now enabled in software, but not clocking in hardware since the
-> hardware parent is still clk-X.
-> 
-> The only way to avoid race conditions between clk_set_parent() and
-> clk_enable/disable() is to ensure that clk_enable/disable() calls don't
-> require changes to hardware enable state between changes to software clock
-> topology and hardware clock topology.
-> 
-> The options to achieve the above are:
-> 1. Grab the enable lock before changing software/hardware topology and
->    release it afterwards.
-> 2. Keep the clock enabled for the duration of software/hardware topology
->    change so that any additional enable/disable calls don't try to change
->    the hardware state. Once the topology change is complete, the clock can
->    be put back in its original enable state.
-> 
-> Option (1) is not an acceptable solution since the set_parent() ops might
-> need to sleep.
-> 
-> Therefore, this patch implements option (2).
-> 
-> This patch doesn't violate any API semantics. clk_disable() doesn't
-> guarantee that the clock is actually disabled. So, no clients of a clock
-> can assume that a clock is disabled after their last call to clk_disable().
-> So, enabling the clock during a parent change is not a violation of any API
-> semantics.
-> 
-> This also has the nice side effect of simplifying the error handling code.
-> 
-> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/gpu/drm/i2c/tda998x_drv.c |   16 ++++++++++------
+ 1 files changed, 10 insertions(+), 6 deletions(-)
 
-Updated to this version in clk-next.
-
-Thanks,
-Mike
-
-> ---
->  drivers/clk/clk.c |   91 ++++++++++++++++++++++++++---------------------------
->  1 files changed, 45 insertions(+), 46 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 934cfd1..b4dbb8c 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -1377,67 +1377,61 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
->         unsigned long flags;
->         int ret = 0;
->         struct clk *old_parent = clk->parent;
-> -       bool migrated_enable = false;
->  
-> -       /* migrate prepare */
-> -       if (clk->prepare_count)
-> +       /*
-> +        * Migrate prepare state between parents and prevent race with
-> +        * clk_enable().
-> +        *
-> +        * If the clock is not prepared, then a race with
-> +        * clk_enable/disable() is impossible since we already have the
-> +        * prepare lock (future calls to clk_enable() need to be preceded by
-> +        * a clk_prepare()).
-> +        *
-> +        * If the clock is prepared, migrate the prepared state to the new
-> +        * parent and also protect against a race with clk_enable() by
-> +        * forcing the clock and the new parent on.  This ensures that all
-> +        * future calls to clk_enable() are practically NOPs with respect to
-> +        * hardware and software states.
-> +        *
-> +        * See also: Comment for clk_set_parent() below.
-> +        */
-> +       if (clk->prepare_count) {
->                 __clk_prepare(parent);
-> -
-> -       flags = clk_enable_lock();
-> -
-> -       /* migrate enable */
-> -       if (clk->enable_count) {
-> -               __clk_enable(parent);
-> -               migrated_enable = true;
-> +               clk_enable(parent);
-> +               clk_enable(clk);
->         }
->  
->         /* update the clk tree topology */
-> +       flags = clk_enable_lock();
->         clk_reparent(clk, parent);
-> -
->         clk_enable_unlock(flags);
->  
->         /* change clock input source */
->         if (parent && clk->ops->set_parent)
->                 ret = clk->ops->set_parent(clk->hw, p_index);
-> -
->         if (ret) {
-> -               /*
-> -                * The error handling is tricky due to that we need to release
-> -                * the spinlock while issuing the .set_parent callback. This
-> -                * means the new parent might have been enabled/disabled in
-> -                * between, which must be considered when doing rollback.
-> -                */
-> -               flags = clk_enable_lock();
->  
-> +               flags = clk_enable_lock();
->                 clk_reparent(clk, old_parent);
-> -
-> -               if (migrated_enable && clk->enable_count) {
-> -                       __clk_disable(parent);
-> -               } else if (migrated_enable && (clk->enable_count == 0)) {
-> -                       __clk_disable(old_parent);
-> -               } else if (!migrated_enable && clk->enable_count) {
-> -                       __clk_disable(parent);
-> -                       __clk_enable(old_parent);
-> -               }
-> -
->                 clk_enable_unlock(flags);
->  
-> -               if (clk->prepare_count)
-> +               if (clk->prepare_count) {
-> +                       clk_disable(clk);
-> +                       clk_disable(parent);
->                         __clk_unprepare(parent);
-> -
-> +               }
->                 return ret;
->         }
->  
-> -       /* clean up enable for old parent if migration was done */
-> -       if (migrated_enable) {
-> -               flags = clk_enable_lock();
-> -               __clk_disable(old_parent);
-> -               clk_enable_unlock(flags);
-> -       }
-> -
-> -       /* clean up prepare for old parent if migration was done */
-> -       if (clk->prepare_count)
-> +       /*
-> +        * Finish the migration of prepare state and undo the changes done
-> +        * for preventing a race with clk_enable().
-> +        */
-> +       if (clk->prepare_count) {
-> +               clk_disable(clk);
-> +               clk_disable(old_parent);
->                 __clk_unprepare(old_parent);
-> +       }
->  
->         /* update debugfs with new clk tree topology */
->         clk_debug_reparent(clk, parent);
-> @@ -1449,12 +1443,17 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
->   * @clk: the mux clk whose input we are switching
->   * @parent: the new input to clk
->   *
-> - * Re-parent clk to use parent as it's new input source.  If clk has the
-> - * CLK_SET_PARENT_GATE flag set then clk must be gated for this
-> - * operation to succeed.  After successfully changing clk's parent
-> - * clk_set_parent will update the clk topology, sysfs topology and
-> - * propagate rate recalculation via __clk_recalc_rates.  Returns 0 on
-> - * success, -EERROR otherwise.
-> + * Re-parent clk to use parent as its new input source.  If clk is in
-> + * prepared state, the clk will get enabled for the duration of this call. If
-> + * that's not acceptable for a specific clk (Eg: the consumer can't handle
-> + * that, the reparenting is glitchy in hardware, etc), use the
-> + * CLK_SET_PARENT_GATE flag to allow reparenting only when clk is unprepared.
-> + *
-> + * After successfully changing clk's parent clk_set_parent will update the
-> + * clk topology, sysfs topology and propagate rate recalculation via
-> + * __clk_recalc_rates.
-> + *
-> + * Returns 0 on success, -EERROR otherwise.
->   */
->  int clk_set_parent(struct clk *clk, struct clk *parent)
->  {
-> -- 
-> 1.7.8.3
-> 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index da2917b..d6afd02 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -32,6 +32,9 @@ struct tda998x_priv {
+ 	uint16_t rev;
+ 	uint8_t current_page;
+ 	int dpms;
++	u8 vip_cntrl_0;
++	u8 vip_cntrl_1;
++	u8 vip_cntrl_2;
+ };
+ 
+ #define to_tda998x_priv(x)  ((struct tda998x_priv *)to_encoder_slave(x)->slave_priv)
+@@ -447,12 +450,9 @@ tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
+ 		reg_write(encoder, REG_ENA_VP_1, 0xff);
+ 		reg_write(encoder, REG_ENA_VP_2, 0xff);
+ 		/* set muxing after enabling ports: */
+-		reg_write(encoder, REG_VIP_CNTRL_0,
+-				VIP_CNTRL_0_SWAP_A(2) | VIP_CNTRL_0_SWAP_B(3));
+-		reg_write(encoder, REG_VIP_CNTRL_1,
+-				VIP_CNTRL_1_SWAP_C(0) | VIP_CNTRL_1_SWAP_D(1));
+-		reg_write(encoder, REG_VIP_CNTRL_2,
+-				VIP_CNTRL_2_SWAP_E(4) | VIP_CNTRL_2_SWAP_F(5));
++		reg_write(encoder, REG_VIP_CNTRL_0, priv->vip_cntrl_0);
++		reg_write(encoder, REG_VIP_CNTRL_1, priv->vip_cntrl_1);
++		reg_write(encoder, REG_VIP_CNTRL_2, priv->vip_cntrl_2);
+ 		break;
+ 	case DRM_MODE_DPMS_OFF:
+ 		/* disable audio and video ports */
+@@ -822,6 +822,10 @@ tda998x_encoder_init(struct i2c_client *client,
+ 	if (!priv)
+ 		return -ENOMEM;
+ 
++	priv->vip_cntrl_0 = VIP_CNTRL_0_SWAP_A(2) | VIP_CNTRL_0_SWAP_B(3);
++	priv->vip_cntrl_1 = VIP_CNTRL_1_SWAP_C(0) | VIP_CNTRL_1_SWAP_D(1);
++	priv->vip_cntrl_2 = VIP_CNTRL_2_SWAP_E(4) | VIP_CNTRL_2_SWAP_F(5);
++
+ 	priv->current_page = 0;
+ 	priv->cec = i2c_new_dummy(client->adapter, 0x34);
+ 	priv->dpms = DRM_MODE_DPMS_OFF;
+-- 
+1.7.4.4
