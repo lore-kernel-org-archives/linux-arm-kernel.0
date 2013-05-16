@@ -1,60 +1,161 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 16 May 2013 18:35:33 +0800
-Subject: [PATCH 3/6] ARM: tegra: make tegra_resume can work for Tegra114
-In-Reply-To: <519412E9.2080905@wwwdotorg.org>
-References: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
- <1368613644-11863-4-git-send-email-josephl@nvidia.com>
- <519412E9.2080905@wwwdotorg.org>
-Message-ID: <1368700533.7403.47.camel@jlo-ubuntu-64.nvidia.com>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Thu, 16 May 2013 13:42:45 +0300
+Subject: [PATCH v3 2/2] KVM: get rid of $(addprefix ../../../virt/kvm/,
+ ...) in Makefiles
+In-Reply-To: <1368538262-25546-3-git-send-email-marc.zyngier@arm.com>
+References: <1368538262-25546-1-git-send-email-marc.zyngier@arm.com>
+ <1368538262-25546-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130516104245.GR26453@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-05-16 at 06:57 +0800, Stephen Warren wrote:
-> On 05/15/2013 04:27 AM, Joseph Lo wrote:
-> > Tegra114 is an ARM Cortex-A15 based SoC and some of the flow controller
+On Tue, May 14, 2013 at 02:31:02PM +0100, Marc Zyngier wrote:
+> As requested by the KVM maintainers, remove the addprefix used to
+> refer to the main KVM code from the arch code, and replace it with
+> a KVM variable that does the same thing.
 > 
-> I don't think the CPU type is the issue here. The issue is simply that
-> Tegra114's flow controller is different. Mentioning the CPU type seems
-> misleading.
-> 
-> > hardware behavior and configurations are different with other Tegra series.
-> > We fix the common resume function of tegra_resume to make it can work on
-> > Tegra114 by checking SoC ID. And also checking CPU primary part number to
-> > isolate the support code for Cortex A9 and A15.
-> 
-> > diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-> 
-> > -#ifdef CONFIG_ARCH_TEGRA_3x_SOC
-> > +#ifndef CONFIG_ARCH_TEGRA_2x_SOC
-> >  	/* Are we on Tegra20? */
-> >  	tegra_check_soc_id TEGRA20, TEGRA_APB_MISC_BASE, r6, r7
-> >  	beq	1f				@ Yes
-> >  	/* Clear the flow controller flags for this CPU. */
-> > -	mov32	r2, TEGRA_FLOW_CTRL_BASE + FLOW_CTRL_CPU0_CSR	@ CPU0 CSR
-> > -	ldr	r1, [r2]
-> > +	cpu_to_csr_req r1, r0
-> 
-> Where is cpu_to_csr_req defined? grep can't find it in next-20130513,
-> and I don't see it added in this series.
-> 
-The cpu_to_csr_reg macro was defined in "sleep.h". I was used to
-translate the bit offset of CPU number in CSR register. The code here
-was used for CPU0 on Tegra30 only before. Because the Tegra114 had more
-advance CPU power control. Each Core need run through here when power
-gate resume.
+Thanks, I will wait till next week for arch maintainers to comment and apply.
 
-> This presumably changes behaviour on Tegra30; will this cause problems?
+> Cc: Paolo Bonzini <pbonzini@redhat.com>
+> Cc: Gleb Natapov <gleb@redhat.com>
+> Cc: Christoffer Dall <cdall@cs.columbia.edu>
+> Acked-by: Xiantao Zhang <xiantao.zhang@intel.com>
+> Cc: Tony Luck <tony.luck@intel.com>
+> Cc: Fenghua Yu <fenghua.yu@intel.com>
+> Cc: Alexander Graf <agraf@suse.de>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+> Cc: Cornelia Huck <cornelia.huck@de.ibm.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kvm/Makefile     |  2 +-
+>  arch/ia64/kvm/Makefile    |  7 ++++---
+>  arch/powerpc/kvm/Makefile | 13 +++++++------
+>  arch/s390/kvm/Makefile    |  3 ++-
+>  arch/x86/kvm/Makefile     | 13 +++++++------
+>  5 files changed, 21 insertions(+), 17 deletions(-)
 > 
-No, I had verified on Tegra20, Tegra30 and Tegra114 of this series.
+> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+> index 9184a49..d99bee4 100644
+> --- a/arch/arm/kvm/Makefile
+> +++ b/arch/arm/kvm/Makefile
+> @@ -15,7 +15,7 @@ AFLAGS_init.o := -Wa,-march=armv7-a$(plus_virt)
+>  AFLAGS_interrupts.o := -Wa,-march=armv7-a$(plus_virt)
+>  
+>  KVM := ../../../virt/kvm
+> -kvm-arm-y = $(addprefix $(KVM)/, kvm_main.o coalesced_mmio.o)
+> +kvm-arm-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o
+>  
+>  obj-y += kvm-arm.o init.o interrupts.o
+>  obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
+> diff --git a/arch/ia64/kvm/Makefile b/arch/ia64/kvm/Makefile
+> index 1a40537..18e45ec 100644
+> --- a/arch/ia64/kvm/Makefile
+> +++ b/arch/ia64/kvm/Makefile
+> @@ -47,12 +47,13 @@ FORCE : $(obj)/$(offsets-file)
+>  
+>  ccflags-y := -Ivirt/kvm -Iarch/ia64/kvm/
+>  asflags-y := -Ivirt/kvm -Iarch/ia64/kvm/
+> +KVM := ../../../virt/kvm
+>  
+> -common-objs = $(addprefix ../../../virt/kvm/, kvm_main.o ioapic.o \
+> -		coalesced_mmio.o irq_comm.o)
+> +common-objs = $(KVM)/kvm_main.o $(KVM)/ioapic.o \
+> +		$(KVM)/coalesced_mmio.o $(KVM)/irq_comm.o
+>  
+>  ifeq ($(CONFIG_KVM_DEVICE_ASSIGNMENT),y)
+> -common-objs += $(addprefix ../../../virt/kvm/, assigned-dev.o iommu.o)
+> +common-objs += $(KVM)/assigned-dev.o $(KVM)/iommu.o
+>  endif
+>  
+>  kvm-objs := $(common-objs) kvm-ia64.o kvm_fw.o
+> diff --git a/arch/powerpc/kvm/Makefile b/arch/powerpc/kvm/Makefile
+> index 422de3f..008cd85 100644
+> --- a/arch/powerpc/kvm/Makefile
+> +++ b/arch/powerpc/kvm/Makefile
+> @@ -5,9 +5,10 @@
+>  subdir-ccflags-$(CONFIG_PPC_WERROR) := -Werror
+>  
+>  ccflags-y := -Ivirt/kvm -Iarch/powerpc/kvm
+> +KVM := ../../../virt/kvm
+>  
+> -common-objs-y = $(addprefix ../../../virt/kvm/, kvm_main.o coalesced_mmio.o \
+> -						eventfd.o)
+> +common-objs-y = $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o \
+> +		$(KVM)/eventfd.o
+>  
+>  CFLAGS_44x_tlb.o  := -I.
+>  CFLAGS_e500_mmu.o := -I.
+> @@ -53,7 +54,7 @@ kvm-e500mc-objs := \
+>  kvm-objs-$(CONFIG_KVM_E500MC) := $(kvm-e500mc-objs)
+>  
+>  kvm-book3s_64-objs-$(CONFIG_KVM_BOOK3S_64_PR) := \
+> -	../../../virt/kvm/coalesced_mmio.o \
+> +	$(KVM)/coalesced_mmio.o \
+>  	fpu.o \
+>  	book3s_paired_singles.o \
+>  	book3s_pr.o \
+> @@ -86,8 +87,8 @@ kvm-book3s_64-objs-$(CONFIG_KVM_XICS) += \
+>  	book3s_xics.o
+>  
+>  kvm-book3s_64-module-objs := \
+> -	../../../virt/kvm/kvm_main.o \
+> -	../../../virt/kvm/eventfd.o \
+> +	$(KVM)/kvm_main.o \
+> +	$(KVM)/eventfd.o \
+>  	powerpc.o \
+>  	emulate.o \
+>  	book3s.o \
+> @@ -111,7 +112,7 @@ kvm-book3s_32-objs := \
+>  kvm-objs-$(CONFIG_KVM_BOOK3S_32) := $(kvm-book3s_32-objs)
+>  
+>  kvm-objs-$(CONFIG_KVM_MPIC) += mpic.o
+> -kvm-objs-$(CONFIG_HAVE_KVM_IRQ_ROUTING) += $(addprefix ../../../virt/kvm/, irqchip.o)
+> +kvm-objs-$(CONFIG_HAVE_KVM_IRQ_ROUTING) += $(KVM)/irqchip.o
+>  
+>  kvm-objs := $(kvm-objs-m) $(kvm-objs-y)
+>  
+> diff --git a/arch/s390/kvm/Makefile b/arch/s390/kvm/Makefile
+> index 8fe9d65..40b4c64 100644
+> --- a/arch/s390/kvm/Makefile
+> +++ b/arch/s390/kvm/Makefile
+> @@ -6,7 +6,8 @@
+>  # it under the terms of the GNU General Public License (version 2 only)
+>  # as published by the Free Software Foundation.
+>  
+> -common-objs = $(addprefix ../../../virt/kvm/, kvm_main.o eventfd.o)
+> +KVM := ../../../virt/kvm
+> +common-objs = $(KVM)/kvm_main.o $(KVM)/eventfd.o
+>  
+>  ccflags-y := -Ivirt/kvm -Iarch/s390/kvm
+>  
+> diff --git a/arch/x86/kvm/Makefile b/arch/x86/kvm/Makefile
+> index d609e1d..bf4fb04 100644
+> --- a/arch/x86/kvm/Makefile
+> +++ b/arch/x86/kvm/Makefile
+> @@ -5,12 +5,13 @@ CFLAGS_x86.o := -I.
+>  CFLAGS_svm.o := -I.
+>  CFLAGS_vmx.o := -I.
+>  
+> -kvm-y			+= $(addprefix ../../../virt/kvm/, kvm_main.o ioapic.o \
+> -				coalesced_mmio.o irq_comm.o eventfd.o \
+> -				irqchip.o)
+> -kvm-$(CONFIG_KVM_DEVICE_ASSIGNMENT)	+= $(addprefix ../../../virt/kvm/, \
+> -				assigned-dev.o iommu.o)
+> -kvm-$(CONFIG_KVM_ASYNC_PF)	+= $(addprefix ../../../virt/kvm/, async_pf.o)
+> +KVM := ../../../virt/kvm
+> +
+> +kvm-y			+= $(KVM)/kvm_main.o $(KVM)/ioapic.o \
+> +				$(KVM)/coalesced_mmio.o $(KVM)/irq_comm.o \
+> +				$(KVM)/eventfd.o $(KVM)/irqchip.o
+> +kvm-$(CONFIG_KVM_DEVICE_ASSIGNMENT)	+= $(KVM)/assigned-dev.o $(KVM)/iommu.o
+> +kvm-$(CONFIG_KVM_ASYNC_PF)	+= $(KVM)/async_pf.o
+>  
+>  kvm-y			+= x86.o mmu.o emulate.o i8259.o irq.o lapic.o \
+>  			   i8254.o cpuid.o pmu.o
+> -- 
+> 1.8.2.3
+> 
 
-> > +	mov32	r2, TEGRA_FLOW_CTRL_BASE
-> > +	ldr	r1, [r2, r1]
-> >  	/* Clear event & intr flag */
-> >  	orr	r1, r1, \
-> >  		#FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG
-> > -	movw	r0, #0x0FFD	@ enable, cluster_switch, immed, & bitmaps
-> > +	movw	r0, #0x3FFD	@ enable, cluster_switch, immed, & bitmaps
-> 
-> What does this change do; does the commend need updating to describe the
-> new bits that are set?
-It clear the some extensions for CPU power control on Tegra114.
+--
+			Gleb.
