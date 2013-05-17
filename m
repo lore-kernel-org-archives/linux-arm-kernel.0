@@ -1,31 +1,20 @@
-From: rusty@rustcorp.com.au (Rusty Russell)
-Date: Fri, 17 May 2013 09:22:58 +0930
-Subject: [PATCH V2 1/3] virtio: console: Add emergency writeonly register
- to config space
-In-Reply-To: <20130516123746.GA4744@amit.redhat.com>
-References: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
- <1367842791-30285-2-git-send-email-pranavkumar@linaro.org>
- <20130516123746.GA4744@amit.redhat.com>
-Message-ID: <871u96a3dx.fsf@rustcorp.com.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 17 May 2013 09:53:57 +0800
+Subject: [PATCH 16/20] ARM: mxs: Remove init_irq declaration in machine
+ description
+In-Reply-To: <1368545933-7430-17-git-send-email-maxime.ripard@free-electrons.com>
+References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1368545933-7430-17-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130517015355.GB3893@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amit Shah <amit.shah@redhat.com> writes:
-> On (Mon) 06 May 2013 [17:49:49], Pranavkumar Sawargaonkar wrote:
->> This patch adds an emerg_wr register (writeonly) in config space
->> of virtio console device which can be used for debugging.
->> 
->> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->> Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
->
-> OK, this change by itself looks harmless.
->
-> Acked-by: Amit Shah <amit.shah@redhat.com>
->
-> 		Amit
+On Tue, May 14, 2013 at 05:38:49PM +0200, Maxime Ripard wrote:
+> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
+> specified") removed the need to explictly setup the init_irq field in
+> the machine description when using only irqchip_init. Remove that
+> declaration for mxs as well.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Thanks.  This is queued for *next* merge window.
-
-Cheers,
-Rusty.
+Applied, thanks.
