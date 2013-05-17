@@ -1,72 +1,35 @@
-From: jp.francois@cynove.com (Jean-Philippe Francois)
-Date: Fri, 17 May 2013 17:51:26 +0200
-Subject: [PATCH] ARM : omap3 : fix wrong container_of in clock36xx.c
-In-Reply-To: <CAGGh5h3BNV7fE3jC0KSmA+2K6zKwVyHdeo8AW0gvmhgQsy8ZEg@mail.gmail.com>
-References: <CAGGh5h3BNV7fE3jC0KSmA+2K6zKwVyHdeo8AW0gvmhgQsy8ZEg@mail.gmail.com>
-Message-ID: <1368805886-26085-1-git-send-email-jp.francois@cynove.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 May 2013 16:59:36 +0100
+Subject: [Bug] ARM 'perf' regression by commit a43cb95d5
+In-Reply-To: <CACVXFVPJyKrOBk+JjsfCi+aQ8snQ7PsEJVuOnuTkrWBYEnvDtA@mail.gmail.com>
+References: <CACVXFVPjo2dQpYPpqZS8GC8UPNzB5HLURpYm6-g1FOBbSUjDyA@mail.gmail.com>
+ <20130517085530.GB22992@mudshark.cambridge.arm.com>
+ <CACVXFVPEBXat3bPPuHzV535=xLoRMFd03Kjzp=NUF5E3KCq2=g@mail.gmail.com>
+ <20130517093616.GC23112@mudshark.cambridge.arm.com>
+ <CACVXFVP56EJb0BZ+w6hVAukQ-mN0e0Jn_GLw3XqXQqMwVGfNdA@mail.gmail.com>
+ <20130517095423.GD23112@mudshark.cambridge.arm.com>
+ <CACVXFVPJyKrOBk+JjsfCi+aQ8snQ7PsEJVuOnuTkrWBYEnvDtA@mail.gmail.com>
+Message-ID: <20130517155936.GQ23112@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap36xx_pwrdn_clk_enable_with_hsdiv_restore expects the parent hw of the clock
-to be a clk_hw_omap. However, looking at cclock3xxx_data.c, all concerned clock
-have parent defined as clk_divider.
-Fix the function to use clk_divider. 
-Tested with  3.9 on dm3730.
+On Fri, May 17, 2013 at 11:07:37AM +0100, Ming Lei wrote:
+> On Fri, May 17, 2013 at 5:54 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Fri, May 17, 2013 at 10:48:23AM +0100, Ming Lei wrote:
+> >> On Fri, May 17, 2013 at 5:36 PM, Will Deacon <will.deacon@arm.com> wrote:
+> >> >
+> >> > It's probably easier if you choose a workload, otherwise it's difficult to
+> >> > see what is `correct' and what is broken. For example, your broken output
+> >> > seems to be in the smsc95xx driver, so assumedly there's a bunch of
+> >> > networking going on whereas your other output is in cpuidle_enter_state.
+> >>
+> >> If all modules are removed, the result will become OK. And if I only insert one
+> >> module, the top sample will fall inside the only module, but I am sure
+> >> nothing is working on the symbols of the module.
 
-Signed-off-by: Jean-Philippe Fran??ois <jp.francois@cynove.com>
+Ok, I tried to reproduce this on my TC2 with 3.10-rc1 and perf top looks
+fine. I also tried loading your spi-altera module and it made no difference.
 
-Index: b/arch/arm/mach-omap2/clock36xx.c
-===================================================================
---- a/arch/arm/mach-omap2/clock36xx.c
-+++ b/arch/arm/mach-omap2/clock36xx.c
-@@ -20,11 +20,12 @@
- 
- #include <linux/kernel.h>
- #include <linux/clk.h>
-+#include <linux/clk-provider.h>
- #include <linux/io.h>
- 
- #include "clock.h"
- #include "clock36xx.h"
--
-+#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
- 
- /**
-  * omap36xx_pwrdn_clk_enable_with_hsdiv_restore - enable clocks suffering
-@@ -39,29 +40,28 @@
-  */
- int omap36xx_pwrdn_clk_enable_with_hsdiv_restore(struct clk_hw *clk)
- {
--	struct clk_hw_omap *parent;
-+	struct clk_divider *parent;
- 	struct clk_hw *parent_hw;
--	u32 dummy_v, orig_v, clksel_shift;
-+	u32 dummy_v, orig_v;
- 	int ret;
- 
- 	/* Clear PWRDN bit of HSDIVIDER */
- 	ret = omap2_dflt_clk_enable(clk);
- 
- 	parent_hw = __clk_get_hw(__clk_get_parent(clk->clk));
--	parent = to_clk_hw_omap(parent_hw);
-+	parent = to_clk_divider(parent_hw);
- 
- 	/* Restore the dividers */
- 	if (!ret) {
--		clksel_shift = __ffs(parent->clksel_mask);
--		orig_v = __raw_readl(parent->clksel_reg);
-+		orig_v = __raw_readl(parent->reg);
- 		dummy_v = orig_v;
- 
- 		/* Write any other value different from the Read value */
--		dummy_v ^= (1 << clksel_shift);
--		__raw_writel(dummy_v, parent->clksel_reg);
-+		dummy_v ^= (1 << parent->shift);
-+		__raw_writel(dummy_v, parent->reg);
- 
- 		/* Write the original divider */
--		__raw_writel(orig_v, parent->clksel_reg);
-+		__raw_writel(orig_v, parent->reg);
- 	}
- 
- 	return ret;
+I'm using a fairly old perf tool (reports its version as 3.5.5).
+
+Will
