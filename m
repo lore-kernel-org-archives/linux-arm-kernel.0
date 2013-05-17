@@ -1,36 +1,31 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Fri, 17 May 2013 00:43:37 +0200
-Subject: [GIT PULL v2] MFD: Fixes due for the v3.10 -rc:s
-In-Reply-To: <20130515090449.GA3494@gmail.com>
-References: <20130514091956.GG3297@gmail.com> <20130515090449.GA3494@gmail.com>
-Message-ID: <20130516224337.GZ22822@zurbaran>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 16 May 2013 21:10:52 -0300
+Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
+In-Reply-To: <519534A5.2070209@free-electrons.com>
+References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
+ <1368713639-21485-2-git-send-email-fabio.estevam@freescale.com>
+ <CAOMZO5AWBi4gDJCOJf5muFuRXygQAysYCHEL+gb_LwsXiy-knA@mail.gmail.com>
+ <CAOMZO5AKKVeTMsXpG9wa-eeLocBStUwPjQEe3n6fRVY2aSc7Nw@mail.gmail.com>
+ <519534A5.2070209@free-electrons.com>
+Message-ID: <CAOMZO5B_8TPJK9MLWyF5SiE=afKdfmg-ff6qEJOcq_R5VqhAjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Alexandre,
 
-On Wed, May 15, 2013 at 10:04:49AM +0100, Lee Jones wrote:
-> Hi Sam,
-> 
-> Since v1 of my MFD -fixes pull-request, I have applied a few more
-> patches which really should be entered into the -rc:s. As it appears
-> that you have not yet pulled v1, I figured sending a v2 in its place
-> would be appropriate, so here it is.
-This almost looks good, I just have one comment:
+On Thu, May 16, 2013 at 4:33 PM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
 
-> Fabio Baltieri (5):
->       mfd: abx500-core: Fix sparse warning
->       mfd: ab8500-sysctrl: Fix sparse warning
->       mfd: ab8500-sysctrl: Set sysctrl_dev during probe
->       mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
-Unless I'm missing something here, this one is not really rcN material, so
-I'd appreciate if you could queue it to your for-mfd branch instead.
+> Would that be related to the timeouts I'm observing ?
+>
+> http://www.spinics.net/lists/linux-i2c/msg11985.html
+>
+> I didn't have the time to have a look at it yet. I was planning to hook
+> up a logic analyzer someday in june to debug it. It seems that there is
+> a 1 second timeout with each i2c message that are sent.
 
-The rest is pulled and applied, thanks again.
+Yes, I see the same one second timeout for each i2c transaction here.
 
-Cheers,
-Samuel.
+Regards,
 
--- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Fabio Estevam
