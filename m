@@ -1,51 +1,61 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 17 May 2013 18:52:31 +0530
-Subject: [RFC PATCH 1/4] arm: omap: Add phy binding info for musb in plat data
-Message-ID: <1368796954-3499-1-git-send-email-kishon@ti.com>
+Date: Fri, 17 May 2013 18:52:33 +0530
+Subject: [RFC PATCH 3/4] usb: musb: omap: use the new API to get PHY reference
+ by label
+In-Reply-To: <1368796954-3499-1-git-send-email-kishon@ti.com>
+References: <1368796954-3499-1-git-send-email-kishon@ti.com>
+Message-ID: <1368796954-3499-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for controllers to get PHY in case of non dt boot, the phy
-binding information (phy label) should be added in the platform
-data of the controller.
+After the devices are created using PLATFORM_DEVID_AUTO,
+devm_usb_get_phy_dev and usb_get_phy_dev can't be used reliably
+as it relies on the device_names passed in usb_bind_phy. So used the
+new API devm_usb_get_phy_by_name to get the PHY reference.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/mach-omap2/usb-musb.c |    6 +++++-
- include/linux/usb/musb.h       |    3 +++
- 2 files changed, 8 insertions(+), 1 deletion(-)
+ drivers/usb/musb/musb_core.c |    1 +
+ drivers/usb/musb/musb_core.h |    1 +
+ drivers/usb/musb/omap2430.c  |    2 +-
+ 3 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-index 3242a55..5ddbe39 100644
---- a/arch/arm/mach-omap2/usb-musb.c
-+++ b/arch/arm/mach-omap2/usb-musb.c
-@@ -85,8 +85,12 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
- 	musb_plat.mode = board_data->mode;
- 	musb_plat.extvbus = board_data->extvbus;
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+index 37a261a..00fbaf4 100644
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -1864,6 +1864,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
+ 	musb->board_set_power = plat->set_power;
+ 	musb->min_power = plat->min_power;
+ 	musb->ops = plat->platform_ops;
++	musb->phy_name = plat->phy_name;
  
--	if (cpu_is_omap44xx())
-+	if (cpu_is_omap44xx()) {
- 		musb_plat.has_mailbox = true;
-+		musb_plat.phy_name = "omap-usb2";
-+	} else if (cpu_is_omap34xx()) {
-+		musb_plat.phy_name = "twl4030";
-+	}
+ 	/* The musb_platform_init() call:
+ 	 *   - adjusts musb->mregs
+diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+index 7fb4819..e9a9339 100644
+--- a/drivers/usb/musb/musb_core.h
++++ b/drivers/usb/musb/musb_core.h
+@@ -434,6 +434,7 @@ struct musb {
+ 	unsigned                double_buffer_not_ok:1;
  
- 	if (soc_is_am35xx()) {
- 		oh_name = "am35x_otg_hs";
-diff --git a/include/linux/usb/musb.h b/include/linux/usb/musb.h
-index 053c268..c05d46d 100644
---- a/include/linux/usb/musb.h
-+++ b/include/linux/usb/musb.h
-@@ -104,6 +104,9 @@ struct musb_hdrc_platform_data {
- 	/* for clk_get() */
- 	const char	*clock;
+ 	struct musb_hdrc_config	*config;
++	const char		*phy_name;
  
-+	/* phy device label */
-+	const char	*phy_name;
-+
- 	/* (HOST or OTG) switch VBUS on/off */
- 	int		(*set_vbus)(struct device *dev, int is_on);
+ #ifdef MUSB_CONFIG_PROC_FS
+ 	struct proc_dir_entry *proc_entry;
+diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+index 3551f1a..be29aa7 100644
+--- a/drivers/usb/musb/omap2430.c
++++ b/drivers/usb/musb/omap2430.c
+@@ -352,7 +352,7 @@ static int omap2430_musb_init(struct musb *musb)
+ 		musb->xceiv = devm_usb_get_phy_by_phandle(dev->parent,
+ 		    "usb-phy", 0);
+ 	else
+-		musb->xceiv = devm_usb_get_phy_dev(dev, 0);
++		musb->xceiv = devm_usb_get_phy_by_name(dev, musb->phy_name);
  
+ 	if (IS_ERR(musb->xceiv)) {
+ 		status = PTR_ERR(musb->xceiv);
 -- 
 1.7.10.4
