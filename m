@@ -1,49 +1,116 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 17 May 2013 20:28:36 +1200
-Subject: [PATCH] ARM: vt8500: Add missing NULL terminator in dt_compat
-In-Reply-To: <1368776657-23035-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1368776657-23035-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <5195EA34.7000409@prisktech.co.nz>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 17 May 2013 10:28:35 +0200
+Subject: [PATCH 0/5 v2] ARM: at91: dt: switch to pre-processor
+In-Reply-To: <20130515141906.GI22508@game.jcrosoft.org>
+References: <20130515141906.GI22508@game.jcrosoft.org>
+Message-ID: <5195EA33.4010400@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/05/13 19:44, Srinivas KANDAGATLA wrote:
-> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+On 15/05/2013 16:19, Jean-Christophe PLAGNIOL-VILLARD :
+> HI,
 >
-> When I tried booting a stih415 Dual core A9 with multi_v7_defconfig, it
-> failed to boot. The issues seems to be changing by enabling or disabling
-> VT8550 platform. Having a quick look at dt_compat list, it seems to miss
-> a NULL terminator, which means of_flat_dt_match will compat check will
-> cross the boundary of dt_compat and fault at some point , which is what
-> was happening in my case.
+> 	v2:
+> 	 use common IRQ define
+> 	 split patch
+> 	 rebase on 3.10-rc1
 >
-> Without this patch if we try to boot multi_v7_defconfig you might notice
-> that some of the platforms might fault if they fall after vt8500 in
-> machine-desc list. Other platforms which fall before vt8500 in mdesc list
-> will not fault.
+>          The follow patch series switch the at91 to DT pre-processor
 >
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> ---
->   arch/arm/mach-vt8500/vt8500.c |    1 +
->   1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
-> index 1dd281e..f5c33df 100644
-> --- a/arch/arm/mach-vt8500/vt8500.c
-> +++ b/arch/arm/mach-vt8500/vt8500.c
-> @@ -173,6 +173,7 @@ static const char * const vt8500_dt_compat[] = {
->   	"wm,wm8505",
->   	"wm,wm8750",
->   	"wm,wm8850",
-> +	NULL
->   };
->   
->   DT_MACHINE_START(WMT_DT, "VIA/Wondermedia SoC (Device Tree Support)")
-My bad. Thanks for the fix.
+>          So we can use macro for AIC and Pinctrl instead of magic
 
-Acked-by: Tony Prisk <linux@prisktech.co.nz>
+Hi, this is very good for me: nice to use the common GPIO and IRQ 
+defines. It increases readability a lot!
 
-Arnd, Olof: Can you apply this directly please.
+So, it seems natural to push this series through arm-soc. It would be 
+integrated early in a "cleanup" branch for 3.11.
+We also would like to make it a prerequisite for all AT91 material that 
+are touching the changed files, targeted for 3.11.
 
-Regards
-Tony Prisk
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks, best regards.
+
+> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+>
+>    Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+>
+> are available in the git repository at:
+>
+>    git://github.com/at91linux/linux-at91.git j/for-3.11-dt
+>
+> for you to fetch changes up to 3668ac6a70bc5af71a947ad7b531c57b8a787ea0:
+>
+>    ARM: at91: dt: switch to standard IRQ flag defines (2013-05-15 21:56:18 +0800)
+>
+> ----------------------------------------------------------------
+> Jean-Christophe PLAGNIOL-VILLARD (5):
+>        ARM: at91: dt: use #include for all device trees
+>        ARM: at91: dt: switch to standard GPIO flag defines.
+>        ARM: at91: dt: add pinctrl pre-processor define
+>        ARM: at91: dt: switch to pinctrl to pre-processor
+>        ARM: at91: dt: switch to standard IRQ flag defines
+>
+>   arch/arm/boot/dts/aks-cdu.dts               |   12 +--
+>   arch/arm/boot/dts/animeo_ip.dts             |   18 ++---
+>   arch/arm/boot/dts/at91-ariag25.dts          |    6 +-
+>   arch/arm/boot/dts/at91rm9200.dtsi           |  207 +++++++++++++++++++++++++------------------------
+>   arch/arm/boot/dts/at91rm9200ek.dts          |   10 +--
+>   arch/arm/boot/dts/at91sam9260.dtsi          |  215 ++++++++++++++++++++++++++-------------------------
+>   arch/arm/boot/dts/at91sam9263.dtsi          |  203 ++++++++++++++++++++++++------------------------
+>   arch/arm/boot/dts/at91sam9263ek.dts         |   24 +++---
+>   arch/arm/boot/dts/at91sam9g15.dtsi          |    2 +-
+>   arch/arm/boot/dts/at91sam9g15ek.dts         |    4 +-
+>   arch/arm/boot/dts/at91sam9g20.dtsi          |    2 +-
+>   arch/arm/boot/dts/at91sam9g20ek.dts         |    6 +-
+>   arch/arm/boot/dts/at91sam9g20ek_2mmc.dts    |   10 +--
+>   arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   28 ++++---
+>   arch/arm/boot/dts/at91sam9g25.dtsi          |    2 +-
+>   arch/arm/boot/dts/at91sam9g25ek.dts         |    4 +-
+>   arch/arm/boot/dts/at91sam9g35.dtsi          |    2 +-
+>   arch/arm/boot/dts/at91sam9g35ek.dts         |    4 +-
+>   arch/arm/boot/dts/at91sam9g45.dtsi          |  213 +++++++++++++++++++++++++-------------------------
+>   arch/arm/boot/dts/at91sam9m10g45ek.dts      |   38 ++++-----
+>   arch/arm/boot/dts/at91sam9n12.dtsi          |  141 +++++++++++++++++-----------------
+>   arch/arm/boot/dts/at91sam9n12ek.dts         |   14 ++--
+>   arch/arm/boot/dts/at91sam9x25.dtsi          |   22 +++---
+>   arch/arm/boot/dts/at91sam9x25ek.dts         |    4 +-
+>   arch/arm/boot/dts/at91sam9x35.dtsi          |    2 +-
+>   arch/arm/boot/dts/at91sam9x35ek.dts         |    4 +-
+>   arch/arm/boot/dts/at91sam9x5.dtsi           |  279 +++++++++++++++++++++++++++++++++---------------------------------
+>   arch/arm/boot/dts/at91sam9x5cm.dtsi         |    8 +-
+>   arch/arm/boot/dts/at91sam9x5ek.dtsi         |   14 ++--
+>   arch/arm/boot/dts/ethernut5.dts             |    6 +-
+>   arch/arm/boot/dts/evk-pro3.dts              |    6 +-
+>   arch/arm/boot/dts/ge863-pro3.dtsi           |    2 +-
+>   arch/arm/boot/dts/kizbox.dts                |   16 ++--
+>   arch/arm/boot/dts/mpa1600.dts               |    4 +-
+>   arch/arm/boot/dts/pm9g45.dts                |   22 +++---
+>   arch/arm/boot/dts/sama5d3.dtsi              |  520 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-------------------------------------------------------------
+>   arch/arm/boot/dts/sama5d31ek.dts            |    6 +-
+>   arch/arm/boot/dts/sama5d33ek.dts            |    4 +-
+>   arch/arm/boot/dts/sama5d34ek.dts            |    6 +-
+>   arch/arm/boot/dts/sama5d35ek.dts            |    4 +-
+>   arch/arm/boot/dts/sama5d3xcm.dtsi           |    4 +-
+>   arch/arm/boot/dts/sama5d3xdm.dtsi           |    2 +-
+>   arch/arm/boot/dts/sama5d3xmb.dtsi           |   26 +++----
+>   arch/arm/boot/dts/tny_a9260.dts             |    4 +-
+>   arch/arm/boot/dts/tny_a9263.dts             |    4 +-
+>   arch/arm/boot/dts/tny_a9g20.dts             |    4 +-
+>   arch/arm/boot/dts/usb_a9260.dts             |    4 +-
+>   arch/arm/boot/dts/usb_a9260_common.dtsi     |    6 +-
+>   arch/arm/boot/dts/usb_a9263.dts             |    8 +-
+>   arch/arm/boot/dts/usb_a9g20-dab-mmx.dtsi    |   22 +++---
+>   arch/arm/boot/dts/usb_a9g20.dts             |    4 +-
+>   include/dt-bindings/pinctrl/at91.h          |   35 +++++++++
+>   52 files changed, 1139 insertions(+), 1078 deletions(-)
+>   create mode 100644 include/dt-bindings/pinctrl/at91.h
+>
+> Best Regards,
+> J.
+>
+>
+
+
+-- 
+Nicolas Ferre
