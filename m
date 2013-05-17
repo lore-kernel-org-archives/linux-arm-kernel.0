@@ -1,85 +1,42 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 17 May 2013 17:51:45 +0800
-Subject: [PATCH v2 1/4] mtd: atmel_nand: replace pmecc enable code with one
- function.
-In-Reply-To: <1368784308-7600-1-git-send-email-josh.wu@atmel.com>
-References: <1368784308-7600-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1368784308-7600-2-git-send-email-josh.wu@atmel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 May 2013 10:54:23 +0100
+Subject: [Bug] ARM 'perf' regression by commit a43cb95d5
+In-Reply-To: <CACVXFVP56EJb0BZ+w6hVAukQ-mN0e0Jn_GLw3XqXQqMwVGfNdA@mail.gmail.com>
+References: <CACVXFVPjo2dQpYPpqZS8GC8UPNzB5HLURpYm6-g1FOBbSUjDyA@mail.gmail.com>
+ <20130517085530.GB22992@mudshark.cambridge.arm.com>
+ <CACVXFVPEBXat3bPPuHzV535=xLoRMFd03Kjzp=NUF5E3KCq2=g@mail.gmail.com>
+ <20130517093616.GC23112@mudshark.cambridge.arm.com>
+ <CACVXFVP56EJb0BZ+w6hVAukQ-mN0e0Jn_GLw3XqXQqMwVGfNdA@mail.gmail.com>
+Message-ID: <20130517095423.GD23112@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
-v1 --> v2:
- use the exist constants (NAND_ECC_READ/WRITE) instead of define new enums.
+On Fri, May 17, 2013 at 10:48:23AM +0100, Ming Lei wrote:
+> On Fri, May 17, 2013 at 5:36 PM, Will Deacon <will.deacon@arm.com> wrote:
+> >
+> > It's probably easier if you choose a workload, otherwise it's difficult to
+> > see what is `correct' and what is broken. For example, your broken output
+> > seems to be in the smsc95xx driver, so assumedly there's a bunch of
+> > networking going on whereas your other output is in cpuidle_enter_state.
+> 
+> If all modules are removed, the result will become OK. And if I only insert one
+> module, the top sample will fall inside the only module, but I am sure
+> nothing is working on the symbols of the module.
 
- drivers/mtd/nand/atmel_nand.c |   40 +++++++++++++++++++++++++---------------
- 1 file changed, 25 insertions(+), 15 deletions(-)
+Can you check your dmesg please? I suppose the smsc95xx driver might be
+screaming about something and somehow the changes to the reg printing have
+made it get stuck.
 
-diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-index 2d23d29..f747791 100644
---- a/drivers/mtd/nand/atmel_nand.c
-+++ b/drivers/mtd/nand/atmel_nand.c
-@@ -763,6 +763,29 @@ normal_check:
- 	return total_err;
- }
- 
-+static void pmecc_enable(struct atmel_nand_host *host, int ecc_op)
-+{
-+	u32 val;
-+	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_RST);
-+	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
-+	val = pmecc_readl_relaxed(host->ecc, CFG);
-+
-+	if (ecc_op != NAND_ECC_READ && ecc_op != NAND_ECC_WRITE) {
-+		dev_err(host->dev, "atmel_nand: wrong pmecc operation type!");
-+		return;
-+	}
-+
-+	if (ecc_op == NAND_ECC_READ)
-+		pmecc_writel(host->ecc, CFG, (val & ~PMECC_CFG_WRITE_OP)
-+			| PMECC_CFG_AUTO_ENABLE);
-+	else
-+		pmecc_writel(host->ecc, CFG, (val | PMECC_CFG_WRITE_OP)
-+			& ~PMECC_CFG_AUTO_ENABLE);
-+
-+	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_ENABLE);
-+	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DATA);
-+}
-+
- static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
- 	struct nand_chip *chip, uint8_t *buf, int oob_required, int page)
- {
-@@ -774,13 +797,7 @@ static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
- 	unsigned long end_time;
- 	int bitflips = 0;
- 
--	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_RST);
--	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
--	pmecc_writel(host->ecc, CFG, (pmecc_readl_relaxed(host->ecc, CFG)
--		& ~PMECC_CFG_WRITE_OP) | PMECC_CFG_AUTO_ENABLE);
--
--	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_ENABLE);
--	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DATA);
-+	pmecc_enable(host, NAND_ECC_READ);
- 
- 	chip->read_buf(mtd, buf, eccsize);
- 	chip->read_buf(mtd, oob, mtd->oobsize);
-@@ -813,14 +830,7 @@ static int atmel_nand_pmecc_write_page(struct mtd_info *mtd,
- 	int i, j;
- 	unsigned long end_time;
- 
--	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_RST);
--	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
--
--	pmecc_writel(host->ecc, CFG, (pmecc_readl_relaxed(host->ecc, CFG) |
--		PMECC_CFG_WRITE_OP) & ~PMECC_CFG_AUTO_ENABLE);
--
--	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_ENABLE);
--	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DATA);
-+	pmecc_enable(host, NAND_ECC_WRITE);
- 
- 	chip->write_buf(mtd, (u8 *)buf, mtd->writesize);
- 
--- 
-1.7.9.5
+> >
+> > We need an apples-for-apples comparison if you think there's a bug in the
+> > kernel. Can you try profiling hackbench or something?
+> >
+> >> Or could anyone else try to verify the problem on their own environment?
+> >
+> > How are you running perf top?
+> 
+> sudo perf top
+
+... and did hackbench make any difference (i.e. is the profile more stable)?
+
+Will
