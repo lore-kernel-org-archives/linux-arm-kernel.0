@@ -1,23 +1,40 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Fri, 17 May 2013 09:18:50 +0100
-Subject: [PATCH RFC 0/2] clk: add metag specific gate/mux clocks
-In-Reply-To: <51955C2C.5060705@codeaurora.org>
-References: <1368198127-1295-1-git-send-email-james.hogan@imgtec.com>
- <51940CAF.6010808@codeaurora.org> <5194AD63.9020804@imgtec.com>
- <51955C2C.5060705@codeaurora.org>
-Message-ID: <5195E7EA.3020703@imgtec.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 17 May 2013 10:25:10 +0200
+Subject: [GIT PULL v2] MFD: Fixes due for the v3.10 -rc:s
+In-Reply-To: <20130517075140.GA25077@balto.lan>
+References: <20130514091956.GG3297@gmail.com> <20130515090449.GA3494@gmail.com>
+ <20130516224337.GZ22822@zurbaran>
+ <20130517075140.GA25077@balto.lan>
+Message-ID: <CACRpkdYpEreHKdUyfcANA9kTRAjVbLbpJkBJCq1Q_pAeOKcdxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/05/13 23:22, Stephen Boyd wrote:
-> On 05/16/13 02:56, James Hogan wrote:
->> On 15/05/13 23:31, Stephen Boyd wrote:
->>> Can you please Cc the devicetree mailing list when proposing new bindings?
->> Erm, I think it was on Cc (devicetree-discuss at lists.ozlabs.org yeh?)
-> 
-> I added them in my reply.
+On Fri, May 17, 2013 at 9:51 AM, Fabio Baltieri
+<fabio.baltieri@linaro.org> wrote:
+> Hello Samuel,
+(...)
+> The last two:
+>
+>   mfd: ab8500-sysctrl: Set sysctrl_dev during probe
+>   mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
+>
+> are actually fixes for bugs introduced in this merge window that
+> inhibited the ab8500-sysctl driver as a consequence.  Would you
+> reconsider pulling just those?
 
-Ah yes, sorry, my mistake.
+A good way to make sure that patches fixing regressions are applied
+to the -rc series is to indicate in the commit message or even the
+heading that it fixes a regression.
 
-Cheers
-James
+I usually try to begin such commits with the text:
+
+  this patch fixes a regression caused by change 018745435
+  "foo: fix bar"...
+
+Then copying in some crash dump text never hurts :-)
+
+It makes it very easy for us as subsystem maintainers to pick
+regression fixes.
+
+Yours,
+Linus Walleij
