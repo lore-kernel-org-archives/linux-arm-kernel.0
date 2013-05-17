@@ -1,14 +1,17 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 17 May 2013 17:52:29 -0600
-Subject: [PATCH 1/1] ARM: DT: tegra: Add gpio-leds to Tegra30 Beaver
-In-Reply-To: <1368232829-25716-1-git-send-email-ebrower@nvidia.com>
-References: <1368232829-25716-1-git-send-email-ebrower@nvidia.com>
-Message-ID: <5196C2BD.4040709@wwwdotorg.org>
+Date: Fri, 17 May 2013 17:53:45 -0600
+Subject: [PATCH] ARM: tegra: add various LED triggers to defconfig
+In-Reply-To: <1368834690-1174-1-git-send-email-swarren@wwwdotorg.org>
+References: <1368834690-1174-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <5196C309.5000903@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2013 06:40 PM, Eric Brower wrote:
-> Add support for general-purpose LEDs present on Beaver
+On 05/17/2013 05:51 PM, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+> 
+> A couple of Tegra boards have gpio-leds present. Enable various trigger
+> options to make those useful. This sets all the trigger options to their
+> "if you don't know, say X" value.
 
-I've applied this to Tegra's for-3.11/dt branch. When applying, I moved
-the newly added node to maintain the node sort order.
+I have applied this to (squashed it into) Tegra's for-3.11/defconfig branch.
