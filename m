@@ -1,65 +1,42 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 May 2013 18:07:43 +0100
-Subject: [PATCH 04/14] ARM: LPAE: use phys_addr_t for initrd location
+Date: Fri, 17 May 2013 18:07:49 +0100
+Subject: [PATCH 10/14] ARM: fix type of PHYS_PFN_OFFSET to unsigned long
 In-Reply-To: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
 References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1368810473-26070-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1368810473-26070-11-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vitaly Andrianov <vitalya@ti.com>
+From: Cyril Chemparathy <cyril@ti.com>
 
-This patch fixes the initrd setup code to use phys_addr_t instead of assuming
-32-bit addressing.  Without this we cannot boot on systems where initrd is
-located above the 4G physical address limit.
+On LPAE machines, PHYS_OFFSET evaluates to a phys_addr_t and this type is
+inherited by the PHYS_PFN_OFFSET definition as well.  Consequently, the kernel
+build emits warnings of the form:
 
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+init/main.c: In function 'start_kernel':
+init/main.c:588:7: warning: format '%lx' expects argument of type 'long unsigned int', but argument 2 has type 'phys_addr_t' [-Wformat]
+
+This patch fixes this warning by pinning down the PFN type to unsigned long.
+
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Acked-by: Nicolas Pitre <nico@linaro.org>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/init.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/memory.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 68c914e..2ffee02 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -36,12 +36,13 @@
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index e506088..584786f 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -223,7 +223,7 @@ static inline unsigned long __phys_to_virt(unsigned long x)
+  * direct-mapped view.  We assume this is the first page
+  * of RAM in the mem_map as well.
+  */
+-#define PHYS_PFN_OFFSET	(PHYS_OFFSET >> PAGE_SHIFT)
++#define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
  
- #include "mm.h"
- 
--static unsigned long phys_initrd_start __initdata = 0;
-+static phys_addr_t phys_initrd_start __initdata = 0;
- static unsigned long phys_initrd_size __initdata = 0;
- 
- static int __init early_initrd(char *p)
- {
--	unsigned long start, size;
-+	phys_addr_t start;
-+	unsigned long size;
- 	char *endp;
- 
- 	start = memparse(p, &endp);
-@@ -350,14 +351,14 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
- #ifdef CONFIG_BLK_DEV_INITRD
- 	if (phys_initrd_size &&
- 	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
--		pr_err("INITRD: 0x%08lx+0x%08lx is not a memory region - disabling initrd\n",
--		       phys_initrd_start, phys_initrd_size);
-+		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
-+		       (u64)phys_initrd_start, phys_initrd_size);
- 		phys_initrd_start = phys_initrd_size = 0;
- 	}
- 	if (phys_initrd_size &&
- 	    memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) {
--		pr_err("INITRD: 0x%08lx+0x%08lx overlaps in-use memory region - disabling initrd\n",
--		       phys_initrd_start, phys_initrd_size);
-+		pr_err("INITRD: 0x%08llx+0x%08lx overlaps in-use memory region - disabling initrd\n",
-+		       (u64)phys_initrd_start, phys_initrd_size);
- 		phys_initrd_start = phys_initrd_size = 0;
- 	}
- 	if (phys_initrd_size) {
+ /*
+  * These are *only* valid on the kernel direct mapped RAM memory.
 -- 
 1.8.2.2
