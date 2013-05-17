@@ -1,45 +1,33 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 17 May 2013 16:03:14 +0800
-Subject: [PATCH] ARM: imx: apf51: add nfc support
-In-Reply-To: <1368767622-12968-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1368767622-12968-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1368767622-12968-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20130517080312.GE8607@S2101-09.ap.freescale.net>
+Date: Fri, 17 May 2013 16:10:43 +0800
+Subject: [PATCH] ARM: imx23-olinuxino: Add i2c support
+In-Reply-To: <1368766213-16487-1-git-send-email-f.koliqi@gmail.com>
+References: <1368766213-16487-1-git-send-email-f.koliqi@gmail.com>
+Message-ID: <20130517081042.GF8607@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 07:13:42AM +0200, Gwenhael Goavec-Merou wrote:
-> 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+On Fri, May 17, 2013 at 12:50:13AM -0400, Fadil Berisha wrote:
+> -			i2c at 80058000 {
+> +			i2c: i2c at 80058000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "fsl,imx28-i2c";
+>  				reg = <0x80058000 0x2000>;
+>  				dmas = <&dma_apbx 3>;
+>  				dma-names = "rx-tx";
+> +				interrupts = <27 26>;
+> +				clock-frequency = <100000>;
+> +				fsl,i2c-dma-channel = <3>;
 
-I already applied the patch [1], so this one can be ignored? 
+As we have adopted generic DMA bindings, this custom property shouldn't
+be needed now.
 
 Shawn
 
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/236989/
-
-> ---
->  arch/arm/boot/dts/imx51-apf51.dts | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx51-apf51.dts b/arch/arm/boot/dts/imx51-apf51.dts
-> index 2bcf698..8f7f9ac 100644
-> --- a/arch/arm/boot/dts/imx51-apf51.dts
-> +++ b/arch/arm/boot/dts/imx51-apf51.dts
-> @@ -45,6 +45,13 @@
->  	status = "okay";
->  };
+>  				status = "disabled";
+>  			};
 >  
-> +&nfc {
-> +	nand-bus-width = <8>;
-> +	nand-ecc-mode = "hw";
-> +	nand-on-flash-bbt;
-> +	status = "okay";
-> +};
-> +
->  &uart3 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_uart3_2>;
 > -- 
-> 1.8.1.5
+> 1.7.10
 > 
