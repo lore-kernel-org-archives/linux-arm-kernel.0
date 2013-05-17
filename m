@@ -1,9 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 17 May 2013 16:20:54 +0100
-Subject: [RFC PATCH v4 11/18] ARM: dts: picoxcell: cpus/cpu nodes dts updates
+Date: Fri, 17 May 2013 16:20:59 +0100
+Subject: [RFC PATCH v4 16/18] ARM: dts: spear: cpus/cpu nodes dts updates
 In-Reply-To: <1368804061-4421-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1368804061-4421-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1368804061-4421-12-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1368804061-4421-17-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,54 +11,69 @@ This patch updates the in-kernel dts files according to the latest cpus
 and cpu bindings updates for ARM.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/boot/dts/picoxcell-pc3x2.dtsi | 8 ++++----
- arch/arm/boot/dts/picoxcell-pc3x3.dtsi | 8 ++++----
- 2 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/spear13xx.dtsi | 2 ++
+ arch/arm/boot/dts/spear3xx.dtsi  | 8 ++++++--
+ arch/arm/boot/dts/spear600.dtsi  | 8 ++++++--
+ 3 files changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/picoxcell-pc3x2.dtsi b/arch/arm/boot/dts/picoxcell-pc3x2.dtsi
-index f0a8c20..533919e 100644
---- a/arch/arm/boot/dts/picoxcell-pc3x2.dtsi
-+++ b/arch/arm/boot/dts/picoxcell-pc3x2.dtsi
-@@ -18,13 +18,13 @@
- 	#size-cells = <1>;
+diff --git a/arch/arm/boot/dts/spear13xx.dtsi b/arch/arm/boot/dts/spear13xx.dtsi
+index 45597fd..4382547 100644
+--- a/arch/arm/boot/dts/spear13xx.dtsi
++++ b/arch/arm/boot/dts/spear13xx.dtsi
+@@ -22,12 +22,14 @@
+ 
+ 		cpu at 0 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <0>;
+ 			next-level-cache = <&L2>;
+ 		};
+ 
+ 		cpu at 1 {
+ 			compatible = "arm,cortex-a9";
++			device_type = "cpu";
+ 			reg = <1>;
+ 			next-level-cache = <&L2>;
+ 		};
+diff --git a/arch/arm/boot/dts/spear3xx.dtsi b/arch/arm/boot/dts/spear3xx.dtsi
+index c2a852d..f0e3fcf 100644
+--- a/arch/arm/boot/dts/spear3xx.dtsi
++++ b/arch/arm/boot/dts/spear3xx.dtsi
+@@ -17,8 +17,12 @@
+ 	interrupt-parent = <&vic>;
  
  	cpus {
--		#address-cells = <1>;
-+		#address-cells = <0>;
- 		#size-cells = <0>;
- 
 -		cpu at 0 {
--			compatible = "arm,1176jz-s";
+-			compatible = "arm,arm926ejs";
++		#address-cells = <0>;
++		#size-cells = <0>;
++
 +		cpu {
-+			compatible = "arm,arm1176jz-s";
++			compatible = "arm,arm926ej-s";
 +			device_type = "cpu";
- 			clock-frequency = <400000000>;
--			reg = <0>;
- 			d-cache-line-size = <32>;
- 			d-cache-size = <32768>;
- 			i-cache-line-size = <32>;
-diff --git a/arch/arm/boot/dts/picoxcell-pc3x3.dtsi b/arch/arm/boot/dts/picoxcell-pc3x3.dtsi
-index daa962d..ab3e800 100644
---- a/arch/arm/boot/dts/picoxcell-pc3x3.dtsi
-+++ b/arch/arm/boot/dts/picoxcell-pc3x3.dtsi
-@@ -18,13 +18,13 @@
- 	#size-cells = <1>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/spear600.dtsi b/arch/arm/boot/dts/spear600.dtsi
+index 19f99dc..9f60a7b 100644
+--- a/arch/arm/boot/dts/spear600.dtsi
++++ b/arch/arm/boot/dts/spear600.dtsi
+@@ -15,8 +15,12 @@
+ 	compatible = "st,spear600";
  
  	cpus {
--		#address-cells = <1>;
-+		#address-cells = <0>;
- 		#size-cells = <0>;
- 
 -		cpu at 0 {
--			compatible = "arm,1176jz-s";
+-			compatible = "arm,arm926ejs";
++		#address-cells = <0>;
++		#size-cells = <0>;
++
 +		cpu {
-+			compatible = "arm,arm1176jz-s";
++			compatible = "arm,arm926ej-s";
 +			device_type = "cpu";
- 			cpu-clock = <&arm_clk>, "cpu";
--			reg = <0>;
- 			d-cache-line-size = <32>;
- 			d-cache-size = <32768>;
- 			i-cache-line-size = <32>;
+ 		};
+ 	};
+ 
 -- 
 1.8.2.2
