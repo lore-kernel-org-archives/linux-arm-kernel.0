@@ -1,10 +1,9 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 17 May 2013 16:20:48 +0100
-Subject: [RFC PATCH v4 05/18] ARM: dts: armada-370-xp: cpus/cpu node dts
- updates
+Date: Fri, 17 May 2013 16:20:47 +0100
+Subject: [RFC PATCH v4 04/18] ARM: dts: am33xx: cpus/cpu nodes dts updates
 In-Reply-To: <1368804061-4421-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1368804061-4421-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1368804061-4421-6-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1368804061-4421-5-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,25 +12,25 @@ and cpu bindings updates for ARM.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- arch/arm/boot/dts/armada-370-xp.dtsi | 4 ++++
+ arch/arm/boot/dts/am33xx.dtsi | 4 ++++
  1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 272bbc6..2407903 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -23,8 +23,12 @@
- 	compatible = "marvell,armada-370-xp";
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 1460d9b..6827853 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -26,8 +26,12 @@
+ 	};
  
  	cpus {
 +		#address-cells = <1>;
 +		#size-cells = <0>;
  		cpu at 0 {
- 			compatible = "marvell,sheeva-v7";
+ 			compatible = "arm,cortex-a8";
 +			device_type = "cpu";
 +			reg = <0>;
- 		};
- 	};
  
+ 			/*
+ 			 * To consider voltage drop between PMIC and SoC,
 -- 
 1.8.2.2
