@@ -1,70 +1,52 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Fri, 17 May 2013 10:15:09 +0000
-Subject: [PATCH] ARM: OMAP3+: am33xx id: Add new am33xx specific
- function to check dev_feature
-In-Reply-To: <87bo8e1r8o.fsf@linaro.org>
-References: <1367996313-6676-1-git-send-email-hvaibhav@ti.com>
- <87bo8e1r8o.fsf@linaro.org>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EC8BF4F@DBDE04.ent.ti.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 17 May 2013 18:15:59 +0800
+Subject: [PATCH 0/6] ARM: tegra114: add CPU hotplug support
+In-Reply-To: <51952344.1090003@wwwdotorg.org>
+References: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
+ <51941C58.9060002@wwwdotorg.org>
+ <1368698019.7403.10.camel@jlo-ubuntu-64.nvidia.com>
+ <51952344.1090003@wwwdotorg.org>
+Message-ID: <1368785759.3174.8.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 2013-05-17 at 02:19 +0800, Stephen Warren wrote:
+> On 05/16/2013 03:53 AM, Joseph Lo wrote:
+> > On Thu, 2013-05-16 at 07:38 +0800, Stephen Warren wrote:
+> >> On 05/15/2013 04:27 AM, Joseph Lo wrote:
+> >>> Tegra 114 is different with other Tegra SoC chips. It using ARM Cortex-A15
+> >>> as CPU core and a enhanced flow controller for CPU power control. So
+> >>> we need to skip some code that was for Contex-A9 and some other support
+> >>> code that was for other Tegra SoC chips. Then adding the proper power up
+> >>> and hot plug control for Tegra114.
+> >>
+> >> This series mostly works OK, but I see one problem: I can't hotunplug
+> >> CPU0, which the commit descriptions and code changes imply I should be
+> >> able to do:
+> >>
+> >> root at localhost:~# echo 0 > /sys/devices/system/cpu/cpu0/online
+> >> -bash: echo: write error: Operation not permitted
+> > 
+> > I want to provide this function originally. But I found the
+> > tegra_cpu_disable() was removed recently. It was replaced by the common
+> > cpu_disable() function that didn't allow CPU0 to be un-plugged.
+> 
+> Is there a specific reason for that; is there some problem in the core
+> ARM code that implies CPU0 should never be disabled?
+> 
+I think the CPU0 is the boot CPU for most of the case. We always need at
+least one CPU online. That assumes to be the boot CPU.
 
-> -----Original Message-----
-> From: Kevin Hilman [mailto:khilman at linaro.org]
-> Sent: Tuesday, May 14, 2013 3:23 AM
-> To: Hiremath, Vaibhav
-> Cc: linux-omap at vger.kernel.org; tony at atomide.com; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH] ARM: OMAP3+: am33xx id: Add new am33xx specific
-> function to check dev_feature
+> > But I had verified the CPU0 is OK to be un-plugged on the older
+> > linux-next branch that tegra_cpu_disable() watn't removed yet.
+> > 
+> > Do you want me to add them back to support this function for Tegra114?
 > 
-> Vaibhav Hiremath <hvaibhav@ti.com> writes:
+> If there is a problem removing CPU0 in the core code, the functionality
+> of this series is OK, although it's probably worth removing the parts
+> that attempt to make CPU0 hot-unpluggable to reduce the diff size.
 > 
-> > Layout of DEV_FEATURE register (offset = 0x604) is different
-> > between TI81xx and AM33xx device, so create separate function
-> > which will check for features available on specific AM33xx SoC
-> > and set the flags accordingly.
-> >
-> > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> 
-> Minor nit below, otherwise...
-> 
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
-> 
-> > ---
-> >  arch/arm/mach-omap2/control.h |    5 +++++
-> >  arch/arm/mach-omap2/id.c      |   13 +++++++++++++
-> >  arch/arm/mach-omap2/io.c      |    2 +-
-> >  arch/arm/mach-omap2/soc.h     |    1 +
-> >  4 files changed, 20 insertions(+), 1 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-
-> omap2/control.h
-> > index e6c3281..4acdfc5 100644
-> > --- a/arch/arm/mach-omap2/control.h
-> > +++ b/arch/arm/mach-omap2/control.h
-> > @@ -358,6 +358,11 @@
-> >  #define AM33XX_CONTROL_STATUS_SYSBOOT1_WIDTH		0x2
-> >  #define AM33XX_CONTROL_STATUS_SYSBOOT1_MASK		(0x3 << 22)
-> >
-> > +/* DEV Feature register to identify AM33XX features */
-> > +#define AM33XX_DEV_FEATURE		0x604
-> > +#define AM33XX_SGX_SHIFT		29
-> 
-> You don't need the shift value anywhere in the code, so...
-> 
-> > +#define AM33XX_SGX_MASK			(1 << AM33XX_SGX_SHIFT)
-> 
-> #define AM33XX_SGX_MASK		BIT(29)
-> 
-> instead?
-> 
-> Otherwise, rest of patch looks fine.
-> 
-Thanks for the review Kevin.
-I just sent out V2 version of the patch with your reviewed-by
-With changes you mentioned.
+> If there's no problem removing CPU0, it'd be good to make it work,
+> although that could be done in followon patches.
 
-Thanks,
-Vaibhav
+OK. Thanks.
