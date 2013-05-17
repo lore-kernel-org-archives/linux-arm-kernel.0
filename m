@@ -1,20 +1,22 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 17 May 2013 09:53:57 +0800
-Subject: [PATCH 16/20] ARM: mxs: Remove init_irq declaration in machine
- description
-In-Reply-To: <1368545933-7430-17-git-send-email-maxime.ripard@free-electrons.com>
-References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
- <1368545933-7430-17-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130517015355.GB3893@S2101-09.ap.freescale.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 17 May 2013 09:58:24 +0800
+Subject: [PATCH] spi: sirf: fix the issue while transferring more than 256
+ words
+In-Reply-To: <20130516172358.GA1627@sirena.org.uk>
+References: <1363592828-6347-1-git-send-email-Barry.Song@csr.com>
+ <CAGsJ_4wamqzwLZkUz4h6ex=oVQZhzhw7S6r41wt9tTUoMR=aXw@mail.gmail.com>
+ <20130516172358.GA1627@sirena.org.uk>
+Message-ID: <CAGsJ_4z9=2RYkwntnCD4X-JVsZoYEgzwdWO_uryp3RpbEHu7fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 05:38:49PM +0200, Maxime Ripard wrote:
-> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
-> specified") removed the need to explictly setup the init_irq field in
-> the machine description when using only irqchip_init. Remove that
-> declaration for mxs as well.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+2013/5/17 Mark Brown <broonie@kernel.org>:
+> On Wed, May 15, 2013 at 08:59:47PM +0800, Barry Song wrote:
+>> ping Mark, Ping Grant.
+>
+> Don't top post, don't send contentless pings.  At a guess you didn't CC
+> me...
 
-Applied, thanks.
+yes. i missed you in CC. sorry for that, Mark. so do you want me to resend it?
+
+-barry
