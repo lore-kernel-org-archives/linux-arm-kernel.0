@@ -1,26 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 17 May 2013 21:54:46 +0800
-Subject: [PATCH v3 2/4] ARM: imx: add initial support for MVF600
-In-Reply-To: <4003326.AbobOukrYT@wuerfel>
-References: <1368684648-20826-1-git-send-email-b35083@freescale.com>
- <201305171429.52646.arnd@arndb.de>
- <20130517130603.GJ8607@S2101-09.ap.freescale.net>
- <4003326.AbobOukrYT@wuerfel>
-Message-ID: <20130517135444.GK8607@S2101-09.ap.freescale.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 17 May 2013 07:01:26 -0700
+Subject: u8500_defconfig: build failure in linux-next
+In-Reply-To: <CACRpkdYLskC67vXQsVq470yo5J+E6eLtPz5-em4Qd_Pe0pwJiA@mail.gmail.com>
+ (Linus Walleij's message of "Fri, 17 May 2013 08:31:31 +0200")
+References: <CAGa+x85Q8i9DCdTprbVX1opB9UdeD4uxAQpZ-CsqPYt86dLVFA@mail.gmail.com>
+ <CACRpkdYLskC67vXQsVq470yo5J+E6eLtPz5-em4Qd_Pe0pwJiA@mail.gmail.com>
+Message-ID: <87bo89u2mh.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 03:17:31PM +0200, Arnd Bergmann wrote:
-> Can't we move the driver to drivers/clk and have it initialized through
-> of_clk_init() without representing all clocks in the DT?
-> 
-> For all I can tell, CLK_OF_DECLARE() requires only the clock provider
-> to be described in DT, but not the actual clocks.
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Clock provider is actually a "clk".  For fixed rate clock example,
-of_fixed_factor_clk_setup() firstly parses DT to get all the
-necessary data and then calls clk_register_fixed_factor() to register
-the clk to framework, lastly calls of_clk_add_provider() to register the
-clk as a provider.
+> On Thu, May 16, 2013 at 1:29 AM, Kevin Hilman <khilman@linaro.org> wrote:
+>
+>> Lee, Linus,
+>>
+>> In building all the ARM defconfigs in linux-next, I noticed
+>> u8500_defconfig not building:
+>>
+>>   [...]
+>>   CC      drivers/mfd/ab8500-debugfs.o
+>> /work/kernel/next/drivers/mfd/ab8500-debugfs.c:95:23: fatal error:
+>> mach/irqs.h: No such file or directory
+>>
+>> Same build error on v3.10-rc1 and Linus' master branch (but is fine on v3.9)
+>
+> Yes, I sent this patch:
+> http://marc.info/?l=linux-kernel&m=136601206705342&w=2
 
-Shawn
+Great.
+
+> Sam's been a bit overloaded that is why it's taking time to reach
+> Torvalds tree. Recently Lee started to help out queueing patches
+> for MFD so hopefully the bottleneck will be solved this way.
+
+Looks like this hit linux-next today, so u8500_defconfig is back to
+building cleanly in linux-next.
+
+Thanks,
+
+Kevin
