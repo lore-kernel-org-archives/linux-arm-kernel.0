@@ -1,20 +1,63 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 17 May 2013 13:39:00 -0600
-Subject: Naming convention DSI + device tree
-In-Reply-To: <5195C1E2.4020009@nvidia.com>
-References: <20130514181745.GA2762@mail.o2s.ch>
- <51940C22.4050802@wwwdotorg.org> <20130516071537.GA13573@mail.o2s.ch>
- <519522C1.5010107@wwwdotorg.org> <5195C1E2.4020009@nvidia.com>
-Message-ID: <51968754.6050509@wwwdotorg.org>
+Date: Fri, 17 May 2013 13:48:36 -0600
+Subject: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
+In-Reply-To: <C79B248886DD134989C8FF6B096A91AB91B4886B6C@BGMAIL01.nvidia.com>
+References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
+ <1368010660-31465-4-git-send-email-jagarwal@nvidia.com>
+ <518A8596.7070702@wwwdotorg.org>
+ <C79B248886DD134989C8FF6B096A91AB91B4886B5D@BGMAIL01.nvidia.com>
+ <C79B248886DD134989C8FF6B096A91AB91B4886B6C@BGMAIL01.nvidia.com>
+Message-ID: <51968994.5030408@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2013 11:36 PM, Alex Courbot wrote:
+On 05/17/2013 10:51 AM, Jay Agarwal wrote:
+>>> On 05/08/2013 04:57 AM, Jay Agarwal wrote:
+>>>> - Enable PCIe controller on Cardhu
+>>>> - Only port 2 is connected on this board
+>>>> - Add regulators required for Tegra30
+>>>> - Patch is based on remotes/gitorious_thierryreding_linux/tegra/next
+>>>> - and should be applied on top of this.
 ...
-> I checked whether the rebase worked and it does - you just need to
-> enable host1x/tegradrm support on top of the default settings (Stephen,
-> why aren't these enabled by default?)
+>>> So, if I apply this series, I do see the PCIe bridge and Ethernet
+>>> device get enumerated, but I don't see the USB3 controller get
+>>> enumerated. I believe that is a PCIe device behind the same bridge on the
+>>> same Tegra PCIe port.
+>>> Shouldn't this device show up?
+>>
+>> I have also reproduced this problem. I see somehow no non-
+>> prefetchable memory is assigned to any of pcie devices.
+>> Probably that is the reason for USB3 (pci 0000:04:00.0) not getting
+>> enumerated since it uses only non-prefetchable memory.
+> 
+> 1. Bus4(on which usb3 device resides) always return 0xffffffff from it's config space. which means device is not present?
+> 2. That's why it is not assigned any resources and hence no usb3 probe happens.
+> 3. But same bus does return valid info like vendor/device id etc from it's config space in downstream kernel and hence usb3 probe does happen.
+> 
+> Thierry, Stephen,
+> 4. Any idea why bus4 should return 0xffffffff values in upstream kernel? Anything missing?
 
-I guess it just got overlooked. I see CONFIG_DRM is on though; perhaps
-the default for the Tegra DRM driver changed in Kconfig. Feel free to
-send a patch to tegra_defconfig.
+Is there some reset/enable GPIO or regulator that needs to be programmed
+to enable the PCIe USB3 controller? Take a look at the schematic. If you
+can make it work by tweaking those GPIOs/... manually, then we can
+ignore this issue and fix it up later, since it's not directly related
+to the PCIe controller driver patches. It's more important to get this
+Ethernet working than USB, I think.
+
+> 5. Also, how config space of all pcie devices are mapped? I mean if I change the config space offset in dts file, then also I find correct vendor/device id etc for bus0/device0/fun0.
+>     So how this mapping happens that even after changing the config space offset in PCIe address space, it always finds correct vendor/device id.
+
+Can you please word-wrap your email less than 80 columns? It's quite
+hard to read.
+
+I don't quite understand your question. The PCIe driver implements the
+functions that access config space. I don't recall that being influenced
+by anything much in the device tree, except for the 3rd entry in the
+top-level PCIe controller's reg property:
+
+        pcie-controller {
+                compatible = "nvidia,tegra30-pcie";
+                device_type = "pci";
+                reg = <0x00003000 0x00000800   /* PADS registers */
+                       0x00003800 0x00000200   /* AFI registers */
+                       0x10000000 0x10000000>; /* configuration space */
