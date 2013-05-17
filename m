@@ -1,35 +1,103 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 May 2013 16:59:36 +0100
-Subject: [Bug] ARM 'perf' regression by commit a43cb95d5
-In-Reply-To: <CACVXFVPJyKrOBk+JjsfCi+aQ8snQ7PsEJVuOnuTkrWBYEnvDtA@mail.gmail.com>
-References: <CACVXFVPjo2dQpYPpqZS8GC8UPNzB5HLURpYm6-g1FOBbSUjDyA@mail.gmail.com>
- <20130517085530.GB22992@mudshark.cambridge.arm.com>
- <CACVXFVPEBXat3bPPuHzV535=xLoRMFd03Kjzp=NUF5E3KCq2=g@mail.gmail.com>
- <20130517093616.GC23112@mudshark.cambridge.arm.com>
- <CACVXFVP56EJb0BZ+w6hVAukQ-mN0e0Jn_GLw3XqXQqMwVGfNdA@mail.gmail.com>
- <20130517095423.GD23112@mudshark.cambridge.arm.com>
- <CACVXFVPJyKrOBk+JjsfCi+aQ8snQ7PsEJVuOnuTkrWBYEnvDtA@mail.gmail.com>
-Message-ID: <20130517155936.GQ23112@mudshark.cambridge.arm.com>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Fri, 17 May 2013 11:02:32 -0500
+Subject: [PATCH v6] ARM:dts:omap4-panda: Update the LED support for the panda
+ DTS
+Message-ID: <1368806552-8851-1-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 11:07:37AM +0100, Ming Lei wrote:
-> On Fri, May 17, 2013 at 5:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, May 17, 2013 at 10:48:23AM +0100, Ming Lei wrote:
-> >> On Fri, May 17, 2013 at 5:36 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >> >
-> >> > It's probably easier if you choose a workload, otherwise it's difficult to
-> >> > see what is `correct' and what is broken. For example, your broken output
-> >> > seems to be in the smsc95xx driver, so assumedly there's a bunch of
-> >> > networking going on whereas your other output is in cpuidle_enter_state.
-> >>
-> >> If all modules are removed, the result will become OK. And if I only insert one
-> >> module, the top sample will fall inside the only module, but I am sure
-> >> nothing is working on the symbols of the module.
+The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+are different.
 
-Ok, I tried to reproduce this on my TC2 with 3.10-rc1 and perf top looks
-fine. I also tried loading your spi-altera module and it made no difference.
+A1-A3 = gpio_wk7
+ES = gpio_110
 
-I'm using a fairly old perf tool (reports its version as 3.5.5).
+There is no change to LED D2
 
-Will
+Abstract away the pinmux and the LED definitions for the two boards into
+the respective DTS files.
+
+Signed-off-by: Dan Murphy <dmurphy@ti.com>
+---
+Changes in this version:
+	- review comments incorporated.
+Previous version of this patch was discussed in:
+	https://patchwork.kernel.org/patch/2582771/
+
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++++++-
+ arch/arm/boot/dts/omap4-panda-es.dts      |   28 ++++++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index 03bd60d..5fd59b3 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -16,8 +16,13 @@
+ 		reg = <0x80000000 0x40000000>; /* 1 GB */
+ 	};
+ 
+-	leds {
++	leds: leds {
+ 		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <
++			&led_wkgpio_pins
++		>;
++
+ 		heartbeat {
+ 			label = "pandaboard::status1";
+ 			gpios = <&gpio1 7 0>;
+@@ -137,6 +142,15 @@
+ 	};
+ };
+ 
++&omap4_pmx_wkup {
++	led_wkgpio_pins: pinmux_leds_wkpins {
++		pinctrl-single,pins = <
++			0x1a 0x3	/* gpio_wk7 OUTPUT | MODE 3 */
++			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
++		>;
++	};
++};
++
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins>;
+diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+index f1d8c21..c968a3b 100644
+--- a/arch/arm/boot/dts/omap4-panda-es.dts
++++ b/arch/arm/boot/dts/omap4-panda-es.dts
+@@ -34,3 +34,31 @@
+ 		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
+ 		>;
+ };
++
++&omap4_pmx_core {
++	led_gpio_pins: gpio_led_pmx {
++		pinctrl-single,pins = <
++			0xb6 0x3	/* gpio_110 OUTPUT | MODE 3 */
++		>;
++	};
++};
++
++&led_wkgpio_pins {
++	pinctrl-single,pins = <
++		0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
++	>;
++};
++
++&leds {
++	pinctrl-0 = <
++		&led_gpio_pins
++		&led_wkgpio_pins
++	>;
++
++	heartbeat {
++		gpios = <&gpio4 14 0>;
++	};
++	mmc {
++		gpios = <&gpio1 8 0>;
++	};
++};
+-- 
+1.7.5.4
