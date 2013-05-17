@@ -1,43 +1,22 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 17 May 2013 13:01:49 -0400
-Subject: [PATCH] ARM: mvebu: select ARCH_REQUIRE_GPIOLIB for mvebu platform
-In-Reply-To: <1368793503-8883-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1368793503-8883-1-git-send-email-gregory.clement@free-electrons.com>
- <1368793503-8883-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130517170149.GF11137@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 May 2013 18:04:11 +0100
+Subject: [PATCH 1/2] ARM: tlb: don't perform inner-shareable
+ invalidation for local TLB ops
+In-Reply-To: <1368809678-25818-1-git-send-email-will.deacon@arm.com>
+References: <1368809678-25818-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20130517170411.GJ18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 02:25:03PM +0200, Gregory CLEMENT wrote:
-> Initially ARCH_REQUIRE_GPIOLIB was part of Thomas Petazzoni series
-> when he introduced the gpiolib support for mvebu:
-> 93a59cf arm: mvebu: use GPIO support now that a driver is available
-> 
-> This commit was written to be applied for the ARCH_MVEBU which was
-> located in arch/arm/KConfig and was merged in 3.7.
-> 
-> In the same time Rob Herring moved the ARCH_MVEBU block to
-> arch/arm/mach-mvebu/Kconfig with this commit and also merged in 3.7:
-> 387798b ARM: initial multiplatform support
-> 
-> Unfortunately the ARCH_REQUIRE_GPIOLIB have been lost during this
-> migration. This was not noticed until the v3.10-rc1, because mvebu as
-> part of ARCH_MULTIPLATFORM was always selected with ARCH_VEXPRESS, and
-> this architect selected ARCH_REQUIRE_GPIOLIB.
-> 
-> Since the following commit from Arnd: "883a106 ARM: default machine
-> descriptor for multiplatform", ARCH_VEXPRESS was then no more selected
-> by default with ARCH_MVEBU and it made appeared the lack of
-> ARCH_REQUIRE_GPIOLIB for mvebu. This commit added back the selection
-> of ARCH_REQUIRE_GPIOLIB for ARCH_MVEBU.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
+On Fri, May 17, 2013 at 05:54:37PM +0100, Will Deacon wrote:
+>  	if (possible_tlb_flags & (TLB_V4_U_FULL|TLB_V4_D_FULL|TLB_V4_I_FULL)) {
+> -		if (cpumask_test_cpu(get_cpu(), mm_cpumask(mm))) {
+> +		if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(mm))) {
+>  			tlb_op(TLB_V4_U_FULL, "c8, c7, 0", zero);
+>  			tlb_op(TLB_V4_D_FULL, "c8, c6, 0", zero);
+>  			tlb_op(TLB_V4_I_FULL, "c8, c5, 0", zero);
+>  		}
+> -		put_cpu();
 
-Applied to mvebu/fixes
-
-thx,
-
-Jason.
+NAK.  You may wish to read daaeb6c93829806221b2ac533330c64f338ebb89
+which changed this from smp_processor_id() _to_ using get_cpu()/put_cpu().
