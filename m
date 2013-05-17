@@ -1,22 +1,52 @@
-From: jiada_wang@mentor.com (Jiada Wang)
-Date: Fri, 17 May 2013 17:40:43 +0900
-Subject: [PATCH 0/2] remove MLB PLL clock device
-Message-ID: <1368780045-6481-1-git-send-email-jiada_wang@mentor.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Fri, 17 May 2013 09:41:25 +0100
+Subject: [RFC PATCH v2 09/11] ARM64: mm: HugeTLB support.
+In-Reply-To: <20130516143236.GD18308@arm.com>
+References: <1368006763-30774-1-git-send-email-steve.capper@linaro.org>
+ <1368006763-30774-10-git-send-email-steve.capper@linaro.org>
+ <20130516143236.GD18308@arm.com>
+Message-ID: <20130517084124.GA22241@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As MLB PLL is not suitable to be handled outside MLB driver.
-This patch series removes MLB PLL (pll8_mlb) from clk-imx6q
-and pllv3.
+On Thu, May 16, 2013 at 03:32:36PM +0100, Catalin Marinas wrote:
+> On Wed, May 08, 2013 at 10:52:41AM +0100, Steve Capper wrote:
+> > --- /dev/null
+> > +++ b/arch/arm64/include/asm/hugetlb.h
+> ...
+> > +static inline int pud_large(pud_t pud)
+> > +{
+> > +	return !(pud_val(pud) & PUD_TABLE_BIT);
+> > +}
+> 
+> I already commented on this - do we really need pud_large() which is
+> the same as pud_huge()? It's only defined on x86 and can be safely
+> replaced with pud_huge().
+> 
 
-Jiada Wang (2):
-  ARM: imx: disable pll8_mlb in mx6q_clks
-  ARM: imx: remove MLB PLL from pllv3
+Thanks, yes, sorry this one slipped through the cracks.
+I'll update this to use pud_huge.
 
- arch/arm/mach-imx/clk-imx6q.c |  1 -
- arch/arm/mach-imx/clk-pllv3.c | 10 ----------
- arch/arm/mach-imx/clk.h       |  1 -
- 3 files changed, 12 deletions(-)
+> > --- /dev/null
+> > +++ b/arch/arm64/mm/hugetlbpage.c
+> > @@ -0,0 +1,70 @@
+> ...
+> > +int pmd_huge(pmd_t pmd)
+> > +{
+> > +	return !(pmd_val(pmd) & PMD_TABLE_BIT);
+> > +}
+> > +
+> > +int pud_huge(pud_t pud)
+> > +{
+> > +	return !(pud_val(pud) & PUD_TABLE_BIT);
+> > +}
+> 
+> You could even go further and make pud/pmd_huge static inline functions
+> for slightly better efficiency (needs changing in the linux/hugetlb.h
+> header).
 
+I'll have to have a think about this and a tinker :-). 
+
+Cheers,
 -- 
-1.8.1.1
+Steve
