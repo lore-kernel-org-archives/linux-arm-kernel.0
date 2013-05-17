@@ -1,17 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 May 2013 09:28:16 +0100
-Subject: [PATCH] drm/i2c: nxp-tda998x: fix abort of some i2c exchanges
-In-Reply-To: <20130517083803.5f34816e@armhf>
-References: <20130517083803.5f34816e@armhf>
-Message-ID: <20130517082816.GY18614@n2100.arm.linux.org.uk>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Fri, 17 May 2013 20:28:36 +1200
+Subject: [PATCH] ARM: vt8500: Add missing NULL terminator in dt_compat
+In-Reply-To: <1368776657-23035-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1368776657-23035-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <5195EA34.7000409@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 08:38:03AM +0200, Jean-Francois Moine wrote:
-> The signals SIGALRM (most often) and SIGPOLL (sometimes) may be raised
-> after irq or some parameter change and this aborts the i2c exchanges.
-> 
-> The problem is solved by masking these signals.
+On 17/05/13 19:44, Srinivas KANDAGATLA wrote:
+> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>
+> When I tried booting a stih415 Dual core A9 with multi_v7_defconfig, it
+> failed to boot. The issues seems to be changing by enabling or disabling
+> VT8550 platform. Having a quick look at dt_compat list, it seems to miss
+> a NULL terminator, which means of_flat_dt_match will compat check will
+> cross the boundary of dt_compat and fault at some point , which is what
+> was happening in my case.
+>
+> Without this patch if we try to boot multi_v7_defconfig you might notice
+> that some of the platforms might fault if they fall after vt8500 in
+> machine-desc list. Other platforms which fall before vt8500 in mdesc list
+> will not fault.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+> ---
+>   arch/arm/mach-vt8500/vt8500.c |    1 +
+>   1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
+> index 1dd281e..f5c33df 100644
+> --- a/arch/arm/mach-vt8500/vt8500.c
+> +++ b/arch/arm/mach-vt8500/vt8500.c
+> @@ -173,6 +173,7 @@ static const char * const vt8500_dt_compat[] = {
+>   	"wm,wm8505",
+>   	"wm,wm8750",
+>   	"wm,wm8850",
+> +	NULL
+>   };
+>   
+>   DT_MACHINE_START(WMT_DT, "VIA/Wondermedia SoC (Device Tree Support)")
+My bad. Thanks for the fix.
 
-NAK.  The real problem is in the I2C driver, which actually suffers from
-multiple problems.  See the set of I2C patches I posted yesterday.
+Acked-by: Tony Prisk <linux@prisktech.co.nz>
+
+Arnd, Olof: Can you apply this directly please.
+
+Regards
+Tony Prisk
