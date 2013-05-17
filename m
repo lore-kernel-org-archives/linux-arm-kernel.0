@@ -1,33 +1,23 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 17 May 2013 16:10:43 +0800
-Subject: [PATCH] ARM: imx23-olinuxino: Add i2c support
-In-Reply-To: <1368766213-16487-1-git-send-email-f.koliqi@gmail.com>
-References: <1368766213-16487-1-git-send-email-f.koliqi@gmail.com>
-Message-ID: <20130517081042.GF8607@S2101-09.ap.freescale.net>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Fri, 17 May 2013 09:18:50 +0100
+Subject: [PATCH RFC 0/2] clk: add metag specific gate/mux clocks
+In-Reply-To: <51955C2C.5060705@codeaurora.org>
+References: <1368198127-1295-1-git-send-email-james.hogan@imgtec.com>
+ <51940CAF.6010808@codeaurora.org> <5194AD63.9020804@imgtec.com>
+ <51955C2C.5060705@codeaurora.org>
+Message-ID: <5195E7EA.3020703@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 12:50:13AM -0400, Fadil Berisha wrote:
-> -			i2c at 80058000 {
-> +			i2c: i2c at 80058000 {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				compatible = "fsl,imx28-i2c";
->  				reg = <0x80058000 0x2000>;
->  				dmas = <&dma_apbx 3>;
->  				dma-names = "rx-tx";
-> +				interrupts = <27 26>;
-> +				clock-frequency = <100000>;
-> +				fsl,i2c-dma-channel = <3>;
-
-As we have adopted generic DMA bindings, this custom property shouldn't
-be needed now.
-
-Shawn
-
->  				status = "disabled";
->  			};
->  
-> -- 
-> 1.7.10
+On 16/05/13 23:22, Stephen Boyd wrote:
+> On 05/16/13 02:56, James Hogan wrote:
+>> On 15/05/13 23:31, Stephen Boyd wrote:
+>>> Can you please Cc the devicetree mailing list when proposing new bindings?
+>> Erm, I think it was on Cc (devicetree-discuss at lists.ozlabs.org yeh?)
 > 
+> I added them in my reply.
+
+Ah yes, sorry, my mistake.
+
+Cheers
+James
