@@ -1,86 +1,74 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 17 May 2013 10:28:52 +0530
-Subject: [PATCH] ARM: davinci: dma: Convert to devm_* api
-In-Reply-To: <5194DC6A.8080609@cogentembedded.com>
-References: <1368687502-15551-1-git-send-email-prabhakar.csengg@gmail.com>
- <5194DC6A.8080609@cogentembedded.com>
-Message-ID: <CA+V-a8v89gGuGuZB75-LnYNP7G765RnaY9uwviNwPmY-vQzPVA@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Fri, 17 May 2013 17:21:15 +1200
+Subject: [PATCHv6 0/3] Add support for velocity network driver on platform
+ devices
+Message-ID: <1368768078-16121-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+v6 changes:
+Remove more bus specific code from velocity_probe()
+Make velocity_(suspend/resume) accept a struct device *
+Simplify PM code to use velocity_(suspend/resume) - remove the individual
+pci and platform functions.
+Add a struct pci_dev variable to velocity_get_pci_info() to reduce churn
 
-Thanks for the review.
+v5 changes:
+Remove velocity_info union. Change velocity_info->pdev back to struct pci_dev.
+Remove more 'if (pci)' sections.
+Remove 'void *pdev' function parameters.
+Pass correct variable to velocity_choose_state()
 
-On Thu, May 16, 2013 at 6:47 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Hello.
->
->
-> On 16-05-2013 10:58, Lad Prabhakar wrote:
->
->> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->
->
->> Use devm_ioremap_resource instead of reques_mem_region()/ioremap() and
->> devm_request_irq() instead of request_irq().
->
->
->> This ensures more consistent error values and simplifies error paths.
->
->
->> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->> ---
->>   NOte:- Boot tested on Logic-PD OMAP-L138 EVM
->
->
->>   arch/arm/mach-davinci/dma.c |   63
->> ++++++++++++++++--------------------------
->>   1 files changed, 24 insertions(+), 39 deletions(-)
->
->
->> diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
->> index 45b7c71..aeda496 100644
->> --- a/arch/arm/mach-davinci/dma.c
->> +++ b/arch/arm/mach-davinci/dma.c
->
-> [...]
->
->> @@ -1422,25 +1421,16 @@ static int __init edma_probe(struct
->> platform_device *pdev)
->>                         found = 1;
->>                 }
->>
->> -               len[j] = resource_size(r[j]);
->> -
->> -               r[j] = request_mem_region(r[j]->start, len[j],
->> -                       dev_name(&pdev->dev));
->> -               if (!r[j]) {
->> -                       status = -EBUSY;
->> -                       goto fail1;
->> -               }
->> -
->> -               edmacc_regs_base[j] = ioremap(r[j]->start, len[j]);
->> -               if (!edmacc_regs_base[j]) {
->> +               edmacc_regs_base[j] = devm_ioremap_resource(&pdev->dev,
->> r[j]);
->> +               if (IS_ERR(edmacc_regs_base[j])) {
->>                         status = -EBUSY;
->
->
->    And you call that "more consistent error values"? Why not:
->
->                         status = PTR_ERR(edmacc_regs_base[j]);
->
-Yes missed it will fix it in v2.
+v4 changes:
+Code tidyup as requested by Francois Romieu
+Removed '#ifdef PCI' around PCI code. Compile tested on (!)PCI and (!)PM.
 
->
->>                 edma_cc[j] = kzalloc(sizeof(struct edma), GFP_KERNEL);
->
->
->    Maybe it's worth using devm_kzalloc() too?
->
-OK
+v3 changes:
+Rebased against net-next.
+Fix errors in pm code.
 
-Regards,
---Prabhakar Lad
+v2 changes:
+Drop patch #1 as requested by David Miller.
+Correct the PHYID_ICPLUS_IP101A MII bits - should be ON, rather than OFF.
+Read the platform rev_id from the correct register [regs->rev_id]. It's possible
+this would work for the PCI version as well and would remove the need for the
+'if (pci)' test to set vptr->rev_id.
+
+v1:
+The first three patches are general tidyup.
+
+[DROPPED] Patch ## just alphabetizes the #includes to make it easier to read.
+
+Patch #1 replaces vptr->dev with vptr->netdev, in preparation of adding a
+struct device *dev in Patch #2
+
+Patch #2 replaces the pci dma functions with the generic versions.
+
+I have build tested these patches but don't have a PCI velocity to run-test it.
+I can't see that they should introduce any problems as it is all renames and
+function swapping.
+
+Patch #3 adds support for the velocity driver on devicetree platform devices.
+Binding document included. This patch is compile-tested for PCI, and boot
+tested on a VIA APC8750.
+
+I think it would be pertinent to get some tested-by's for PCI users.
+
+Regards
+Tony Prisk
+
+
+Tony Prisk (3):
+  net: velocity: Rename vptr->dev to vptr->netdev
+  net: velocity: Convert to generic dma functions
+  net: velocity: Add platform device support to VIA velocity driver
+
+ .../devicetree/bindings/net/via-velocity.txt       |   20 +
+ drivers/net/ethernet/via/Kconfig                   |    3 +-
+ drivers/net/ethernet/via/via-velocity.c            |  497 +++++++++++++-------
+ drivers/net/ethernet/via/via-velocity.h            |   35 +-
+ 4 files changed, 377 insertions(+), 178 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/via-velocity.txt
+
+-- 
+1.7.9.5
