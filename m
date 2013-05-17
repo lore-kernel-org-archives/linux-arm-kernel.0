@@ -1,23 +1,34 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 17 May 2013 14:17:56 +0200
-Subject: [PATCH 1/9] I2C: mv64xxx: work around signals causing I2C
- transactions to be aborted
-In-Reply-To: <E1Ud4pH-0004JQ-Jq@rmk-PC.arm.linux.org.uk>
-References: <20130516202921.GW18614@n2100.arm.linux.org.uk>
- <E1Ud4pH-0004JQ-Jq@rmk-PC.arm.linux.org.uk>
-Message-ID: <20130517121752.GC2939@katana>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 17 May 2013 14:20:49 +0200
+Subject: [RFC 2/4] dma: add dmaengine driver for Samsung s3c24xx SoCs
+In-Reply-To: <201305152231.52423.heiko@sntech.de>
+References: <201305111330.05046.heiko@sntech.de>
+ <201305111331.25405.heiko@sntech.de>
+ <CACRpkdaT195McX9NeccJYpmWbuYK-AZUTHr9AXKHnJdkf+Qzuw@mail.gmail.com>
+ <201305152231.52423.heiko@sntech.de>
+Message-ID: <CACRpkdaGBjUfhfT2zCEeNmMh3KhouOMjKSB7H6_cu_uDM6cm=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 09:30:59PM +0100, Russell King wrote:
-> Do not use interruptible waits in an I2C driver; if a process uses
-> signals (eg, Xorg uses SIGALRM and SIGPIPE) then these signals can
-> cause the I2C driver to abort a transaction in progress by another
-> driver, which can cause that driver to fail.  I2C drivers are not
-> expected to abort transactions on signals.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Wed, May 15, 2013 at 10:31 PM, Heiko St?bner <heiko@sntech.de> wrote:
 
-Applied to for-current, thanks!
+> If I understand the writel semantics and the thread from you from 2011 [0]
+> correctly, only the writel to DMASKTRIG mustn't be relaxed to make sure the
+> settings registers are written to before, so like:
+>
+>        writel_relaxed(txd->src_addr, phy->base + DISRC);
+>        writel_relaxed(txd->disrcc, phy->base + DISRCC);
+>        writel_relaxed(txd->dst_addr, phy->base + DIDST);
+>        writel_relaxed(txd->didstc, phy->base + DIDSTC);
+>        writel_relaxed(dcon, phy->base + DCON);
+>
+>        val = readl_relaxed(phy->base + DMASKTRIG);
+>        val &= ~DMASKTRIG_STOP;
+>        val |= DMASKTRIG_ON;
+>        writel(val, phy->base + DMASKTRIG);
 
-Rest will be reviewed later...
+Yep. That will drain write buffers etc and make sure all outstanding writes hit
+the hardware.
+
+Yours,
+Linus Walleij
