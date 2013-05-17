@@ -1,125 +1,49 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 17 May 2013 16:02:16 +0200
-Subject: [GIT PULL] at91: cleanup (pinctrl macros, defconfigs) for 3.11 #1
-Message-ID: <1368799336-25226-1-git-send-email-nicolas.ferre@atmel.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 17 May 2013 16:14:43 +0200
+Subject: [PATCH 0/5 v3] ARM: at91: dt: add USBA support
+Message-ID: <20130517141443.GB16804@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+HI,
 
-Here is the first AT91 cleanup pull-request for 3.11. I is dominated by a big
-update of DT files because of the move to macros in pinctrl. As we plan to 
-make this "cleanup" series the base of all our work on AT91 for 3.11, we would
-like to see it appearing early in arm-soc and linux-next: this is why we send
-it to you right now.
+	v3:
+	rebase againt 3.10-rc1 + dt macro cleanup
 
-We have colected the Acked-by from Linus Walleij and we all think that it makes
-sense to merge this material through arm-soc tree:
-- is touches nearly nothing of pinctrl actual code (a header file)
-- all dtsi/dts modifications for 3.11 will need this as a codebase for avoiding
-  merging nightmare
+	This patch serie finish to add the usb device support to dt for at91
+	with the usba support present on the last at91 generation since sam9g45
 
-I hope that it is okay with you.
-
-Thanks, best regards,
-
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
-
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-cleanup
-
-for you to fetch changes up to b3f442b0eedbc20b5ce3f4a96530588d14901199:
+The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
 
   ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
 
-----------------------------------------------------------------
-Big update with pinctrl by use of macros and
-header files. Increases readability and avoid
-typos.
-Update of AT91 defconfigs and merge of defconfigs for
-SoC look-alike:
-sam9260/9g20 and sam9261/9g10.
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git j/for-3.11-usba
+
+for you to fetch changes up to f24c9792c29803420a7bf7204223ef028191d449:
+
+  ARM: at91: sam9m10g45ek add udc DT support (2013-05-17 22:05:46 +0800)
 
 ----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (6):
-      ARM: at91: dt: use #include for all device trees
-      ARM: at91: dt: switch to standard GPIO flag defines.
-      ARM: at91: dt: add pinctrl pre-processor define
-      ARM: at91: dt: switch to pinctrl to pre-processor
-      ARM: at91: dt: switch to standard IRQ flag defines
-      ARM: at91: udpate defconfigs
+Jean-Christophe PLAGNIOL-VILLARD (5):
+      usb: add Atmel USBA UDC DT support
+      ARM: at91: sam9x5 add udc DT support
+      ARM: at91: sam9x5ek add udc DT support
+      ARM: at91: sam9g45 add udc DT support
+      ARM: at91: sam9m10g45ek add udc DT support
 
- arch/arm/boot/dts/aks-cdu.dts                      |  12 +-
- arch/arm/boot/dts/animeo_ip.dts                    |  18 +-
- arch/arm/boot/dts/at91-ariag25.dts                 |   6 +-
- arch/arm/boot/dts/at91rm9200.dtsi                  | 207 ++++----
- arch/arm/boot/dts/at91rm9200ek.dts                 |  10 +-
- arch/arm/boot/dts/at91sam9260.dtsi                 | 215 ++++-----
- arch/arm/boot/dts/at91sam9263.dtsi                 | 203 ++++----
- arch/arm/boot/dts/at91sam9263ek.dts                |  24 +-
- arch/arm/boot/dts/at91sam9g15.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9g15ek.dts                |   4 +-
- arch/arm/boot/dts/at91sam9g20.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9g20ek.dts                |   6 +-
- arch/arm/boot/dts/at91sam9g20ek_2mmc.dts           |  10 +-
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi        |  28 +-
- arch/arm/boot/dts/at91sam9g25.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9g25ek.dts                |   4 +-
- arch/arm/boot/dts/at91sam9g35.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9g35ek.dts                |   4 +-
- arch/arm/boot/dts/at91sam9g45.dtsi                 | 213 ++++-----
- arch/arm/boot/dts/at91sam9m10g45ek.dts             |  38 +-
- arch/arm/boot/dts/at91sam9n12.dtsi                 | 141 +++---
- arch/arm/boot/dts/at91sam9n12ek.dts                |  14 +-
- arch/arm/boot/dts/at91sam9x25.dtsi                 |  22 +-
- arch/arm/boot/dts/at91sam9x25ek.dts                |   4 +-
- arch/arm/boot/dts/at91sam9x35.dtsi                 |   2 +-
- arch/arm/boot/dts/at91sam9x35ek.dts                |   4 +-
- arch/arm/boot/dts/at91sam9x5.dtsi                  | 279 +++++------
- arch/arm/boot/dts/at91sam9x5cm.dtsi                |   8 +-
- arch/arm/boot/dts/at91sam9x5ek.dtsi                |  14 +-
- arch/arm/boot/dts/ethernut5.dts                    |   6 +-
- arch/arm/boot/dts/evk-pro3.dts                     |   6 +-
- arch/arm/boot/dts/ge863-pro3.dtsi                  |   2 +-
- arch/arm/boot/dts/kizbox.dts                       |  16 +-
- arch/arm/boot/dts/mpa1600.dts                      |   4 +-
- arch/arm/boot/dts/pm9g45.dts                       |  22 +-
- arch/arm/boot/dts/sama5d3.dtsi                     | 520 +++++++++++----------
- arch/arm/boot/dts/sama5d31ek.dts                   |   6 +-
- arch/arm/boot/dts/sama5d33ek.dts                   |   4 +-
- arch/arm/boot/dts/sama5d34ek.dts                   |   6 +-
- arch/arm/boot/dts/sama5d35ek.dts                   |   4 +-
- arch/arm/boot/dts/sama5d3xcm.dtsi                  |   4 +-
- arch/arm/boot/dts/sama5d3xdm.dtsi                  |   2 +-
- arch/arm/boot/dts/sama5d3xmb.dtsi                  |  26 +-
- arch/arm/boot/dts/tny_a9260.dts                    |   4 +-
- arch/arm/boot/dts/tny_a9263.dts                    |   4 +-
- arch/arm/boot/dts/tny_a9g20.dts                    |   4 +-
- arch/arm/boot/dts/usb_a9260.dts                    |   4 +-
- arch/arm/boot/dts/usb_a9260_common.dtsi            |   6 +-
- arch/arm/boot/dts/usb_a9263.dts                    |   8 +-
- arch/arm/boot/dts/usb_a9g20-dab-mmx.dtsi           |  22 +-
- arch/arm/boot/dts/usb_a9g20.dts                    |   4 +-
- arch/arm/configs/at91_dt_defconfig                 |  55 ++-
- arch/arm/configs/at91rm9200_defconfig              | 218 ++-------
- ...am9g20_defconfig => at91sam9260_9g20_defconfig} |  67 ++-
- arch/arm/configs/at91sam9260_defconfig             |  91 ----
- ...am9261_defconfig => at91sam9261_9g10_defconfig} |  19 +-
- arch/arm/configs/at91sam9263_defconfig             |  39 +-
- arch/arm/configs/at91sam9g45_defconfig             |  94 ++--
- arch/arm/configs/sama5_defconfig                   |  35 +-
- arch/arm/mach-at91/Kconfig.non_dt                  | 159 +++----
- arch/arm/mach-at91/Makefile                        |   2 -
- arch/arm/mach-at91/board-sam9261ek.c               |  28 +-
- include/dt-bindings/pinctrl/at91.h                 |  35 ++
- 63 files changed, 1407 insertions(+), 1617 deletions(-)
- rename arch/arm/configs/{at91sam9g20_defconfig => at91sam9260_9g20_defconfig} (67%)
- delete mode 100644 arch/arm/configs/at91sam9260_defconfig
- rename arch/arm/configs/{at91sam9261_defconfig => at91sam9261_9g10_defconfig} (91%)
- create mode 100644 include/dt-bindings/pinctrl/at91.h
+ Documentation/devicetree/bindings/usb/atmel-usb.txt |   82 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi                  |   62 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts              |    5 +++++
+ arch/arm/boot/dts/at91sam9x5.dtsi                   |   62 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi                 |    5 +++++
+ arch/arm/mach-at91/at91sam9g45.c                    |    2 ++
+ arch/arm/mach-at91/at91sam9x5.c                     |    2 ++
+ drivers/usb/gadget/Kconfig                          |    2 +-
+ drivers/usb/gadget/atmel_usba_udc.c                 |  214 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----------------------------------------------------
+ drivers/usb/gadget/atmel_usba_udc.h                 |    1 +
+ 10 files changed, 382 insertions(+), 55 deletions(-)
 
--- 
-Nicolas Ferre
+Best Regards,
+J.
