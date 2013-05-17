@@ -1,58 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 May 2013 09:45:42 +0100
-Subject: [PATCH] ARM: remove the .vm_mm value from gate_vma.
-In-Reply-To: <1368702394-1737-1-git-send-email-steve.capper@linaro.org>
-References: <1368702394-1737-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20130517084542.GA22992@mudshark.cambridge.arm.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 17 May 2013 10:51:00 +0200
+Subject: [PATCH] can: flexcan: allow compilation on arm and powerpc
+In-Reply-To: <20130517020351.GE3893@S2101-09.ap.freescale.net>
+References: <1368711756-22324-1-git-send-email-mkl@pengutronix.de>
+ <20130517020351.GE3893@S2101-09.ap.freescale.net>
+Message-ID: <5195EF74.8070005@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 12:06:34PM +0100, Steve Capper wrote:
-> If one reads /proc/$PID/smaps, the mmap_sem belonging to the
-> address space of the task being examined is locked for reading.
-> All the pages of the vmas belonging to the task's address space
-> are then walked with this lock held.
+On 05/17/2013 04:03 AM, Shawn Guo wrote:
+> Hi Marc,
 > 
-> If a gate_vma is present in the architecture, it too is examined
-> by the fs/proc/task_mmu.c code. As gate_vma doesn't belong to the
-> address space of the task though, its pages are not walked.
+> On Thu, May 16, 2013 at 03:42:36PM +0200, Marc Kleine-Budde wrote:
+>> This patch removes the Kconfig symbols HAVE_CAN_FLEXCAN and
+>> IMX_HAVE_PLATFORM_FLEXCAN from arch/{arm,powerpc} and allowing compilation on
+>> all arm and powerpc platforms.
 > 
-> A recent cleanup (commit f6604efe) of the gate_vma initialisation
-> code set the vm_mm value to &init_mm. Unfortunately a non-NULL
-> vm_mm value in the gate_vma will cause the task_mmu code to attempt
-> to walk the pages of the gate_vma (with no mmap-sem lock held). If
-> one enables Transparent Huge Page support and vm debugging, this
-> will then cause OOPses as pmd_trans_huge_lock is called without
-> mmap_sem being locked.
+> I'm generally fine with the approach.  But with Kconfig symbol
+> IMX_HAVE_PLATFORM_FLEXCAN removed, how does the build of
+> platform-flexcan.o work?
 > 
-> This patch removes the .vm_mm value from gate_vma, restoring the
-> original behaviour of the task_mmu code.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> ---
->  arch/arm/kernel/process.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index f219703..282de48 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -411,7 +411,6 @@ static struct vm_area_struct gate_vma = {
->  	.vm_start	= 0xffff0000,
->  	.vm_end		= 0xffff0000 + PAGE_SIZE,
->  	.vm_flags	= VM_READ | VM_EXEC | VM_MAYREAD | VM_MAYEXEC,
-> -	.vm_mm		= &init_mm,
->  };
->  
->  static int __init gate_vma_init(void)
+> arch/arm/mach-imx/devices/Makefile:obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
 
-Thanks to the wonders of Mimecrap, which decided to sit on most of my email
-yesterday, I only just received this patch.
+Doh! - I've removed too much, will change.
 
-I see it's in the patch system, but for the record:
+Tnx,
+Marc
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
 
-Cheers,
-
-Will
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130517/5c5bfc2f/attachment-0001.sig>
