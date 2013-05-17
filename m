@@ -1,22 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 17 May 2013 12:47:45 +0200
-Subject: ARM Cortex-A7 support in Linux
-In-Reply-To: <A1A6EA40F8503D48BB002B42BD65974E295341@039-SN2MPN1-012.039d.mgd.msft.net>
-References: <A1A6EA40F8503D48BB002B42BD65974E295341@039-SN2MPN1-012.039d.mgd.msft.net>
-Message-ID: <f6c9d2b0d52d63efa95f780b172690ef@localhost>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 17 May 2013 12:50:39 +0200
+Subject: [PATCH 0/3] staging: fix parallel display regressions
+In-Reply-To: <1368782393-9660-1-git-send-email-list-09_linuc_arm@tqsc.de>
+References: <1368782393-9660-1-git-send-email-list-09_linuc_arm@tqsc.de>
+Message-ID: <1368787839.4011.4.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 May 2013 09:56:22 +0000, Sharma Bhupesh-B45370
-<B45370@freescale.com> wrote:
+Hi Markus,
 
-> But I am not sure about the following:
-> - Does the current GIC driver support GIC-400 features as well?
+Am Freitag, den 17.05.2013, 11:19 +0200 schrieb Markus Niebel:
+> From: Markus Niebel <Markus.Niebel@tqs.de>
+> 
+> Support for VGA via TVE on iMX53 causes  regression, which prevents
+> parallel display from working. This series brings the parallel display
+> functionality back.
+> 
+> Tested on a modified v3.9 with TQMa53 module and compile tested with
+> v3.10-rc1.
+> 
+> Markus Niebel (3):
+>   staging: drm/imx: set correct sync pins for parallel display
+>   staging: drm/imx: fix spelling error for vsync flag config
+>   staging: drm/imx: revert vsync_cnt for di->id 1
+> 
+>  drivers/staging/imx-drm/ipu-v3/ipu-di.c    |   13 +++++++++----
+>  drivers/staging/imx-drm/parallel-display.c |    4 ++--
+>  2 files changed, 11 insertions(+), 6 deletions(-)
 
-It depends which feature you're after. Linux supports the GIC
-virtualization extensions with KVM, for example. But we don't make any use
-of other things like priorities, split deactivation/priority drop...
+thank you for posting the patches! I can confirm that they fix the
+issues of incorrect signal generation on IPU display interface 1,
+caused by my TVE patch series.
 
-         M.
--- 
-Fast, cheap, reliable. Pick two.
+Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+regards
+Philipp
