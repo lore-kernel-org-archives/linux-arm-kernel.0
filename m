@@ -1,35 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 17 May 2013 09:00:08 +0100
-Subject: ux500 breaking multi-platform kernels
-In-Reply-To: <CACRpkdbJosO7Ea8=BUdgVSf5fZwddWZb79ONaz3r+DqseAaF7Q@mail.gmail.com>
-References: <CAL_JsqJzf8Aj6+K_qEYo3JbAoeJn36EerBfaGYT9EQj-zPaHUw@mail.gmail.com>
- <CACRpkdbJosO7Ea8=BUdgVSf5fZwddWZb79ONaz3r+DqseAaF7Q@mail.gmail.com>
-Message-ID: <20130517080008.GJ3269@gmail.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Fri, 17 May 2013 10:02:39 +0200
+Subject: [PATCH] ARM: ux500: update MSP1 pinctrl defintions
+In-Reply-To: <CACRpkdZj6r3=fo=72PDshHbL7oHxb6H6uGeGvRyb2+uMjoAvUg@mail.gmail.com>
+References: <1368004193-21213-1-git-send-email-fabio.baltieri@linaro.org>
+ <CACRpkdZj6r3=fo=72PDshHbL7oHxb6H6uGeGvRyb2+uMjoAvUg@mail.gmail.com>
+Message-ID: <20130517080239.GA26583@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 May 2013, Linus Walleij wrote:
+On Wed, May 15, 2013 at 09:35:17PM +0200, Linus Walleij wrote:
+> On Wed, May 8, 2013 at 11:09 AM, Fabio Baltieri
+> <fabio.baltieri@linaro.org> wrote:
+> 
+> > Update MSP1 pinctrl definitions in mop500_family_pinmap by removing
+> > sleep state and setting default ones as pin hogs, as those are used by
+> > both ux500-msp-i2s.1 and ux500-msp-i2s.3.
+> >
+> > Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> 
+> Applied to my ux500-pinctrl branch.
 
-> On Wed, May 15, 2013 at 10:30 PM, Rob Herring <robherring2@gmail.com> wrote:
-> 
-> > There are some initcalls on ux500 that are not properly
-> > conditionalized.
-> 
-> Oh wow you actually compiled it in and tried to boot it on something
-> else :-D
-> 
-> Highbank I suppose?
-> 
-> > The first is in ux500_l2x0_init and here is a fix:
-> 
-> I guess this is all -rc material. Can you send a proper patch (set)?
+Thanks Linus,
 
-Feel free to add my fix for cpuidle to this set if it works for you.
+This one was actually sort-of related to the ASoC patch to drop sleep
+pin state control from the ux500 ASoC driver.  Would you be able to
+check that one too?
 
-If it doesn't I'll re-work.
+The subject is:
+  [PATCH 3/6] ASoC: ux500: Drop pinctrl sleep support
+
+There are no dependency issues by applying this and the other in
+different trees, but I'd like to close the discussion on the other one.
+
+Thanks,
+Fabio
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Fabio Baltieri
