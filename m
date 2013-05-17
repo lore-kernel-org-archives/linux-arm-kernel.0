@@ -1,57 +1,45 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 17 May 2013 18:24:28 +0200
-Subject: [PATCH 2/6] ARM: EXYNOS: Fix EINT wake-up mask configuration when
- pinctrl is used
-In-Reply-To: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
-References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1368807872-2601-3-git-send-email-t.figa@samsung.com>
+Date: Fri, 17 May 2013 18:24:26 +0200
+Subject: [PATCH 0/6] Fix suspend/resume issues created by pinmux on exynos,
+ part 2
+Message-ID: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On DT-enabled systems pinctrl-exynos driver is responsible for handling
-of wake-up EINT interrupts. This patch adjusts wake-up mask
-configuration code to take wake-up mask value from pinctrl-exynos driver
-on DT-enabled systems.
+This series aims at fixing problems with suspend/resume on Exynos SoCs
+introduced by migration of GPIO and EINT support to pin control driver
+on DT-enabled platforms.
 
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/include/mach/pm-core.h | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+The patches fix following issues:
+ - missing support for IRQ wake of pinctrl-exynos driver
+ - legacy GPIO and EINT save/restore handling in platform PM code
+   inappropriate on pinctrl-enabled platforms
+ - several EINT-related registers must be saved as well
+ 
+The series is based on a patch by Doug Anderson that adds suspend/restore
+of pinctrl registers to pinctrl-samsung driver:
+[PATCH v3] pinctrl: samsung: fix suspend/resume functionality
+http://www.spinics.net/lists/kernel/msg1534119.html
 
-diff --git a/arch/arm/mach-exynos/include/mach/pm-core.h b/arch/arm/mach-exynos/include/mach/pm-core.h
-index 7dbbfec..296090e 100644
---- a/arch/arm/mach-exynos/include/mach/pm-core.h
-+++ b/arch/arm/mach-exynos/include/mach/pm-core.h
-@@ -18,8 +18,15 @@
- #ifndef __ASM_ARCH_PM_CORE_H
- #define __ASM_ARCH_PM_CORE_H __FILE__
- 
-+#include <linux/of.h>
- #include <mach/regs-pmu.h>
- 
-+#ifdef CONFIG_PINCTRL_EXYNOS
-+extern u32 exynos_get_eint_wake_mask(void);
-+#else
-+static inline u32 exynos_get_eint_wake_mask(void) { return 0xffffffff; }
-+#endif
-+
- static inline void s3c_pm_debug_init_uart(void)
- {
- 	/* nothing here yet */
-@@ -27,7 +34,12 @@ static inline void s3c_pm_debug_init_uart(void)
- 
- static inline void s3c_pm_arch_prepare_irqs(void)
- {
--	__raw_writel(s3c_irqwake_eintmask, S5P_EINT_WAKEUP_MASK);
-+	u32 eintmask = s3c_irqwake_eintmask;
-+
-+	if (of_have_populated_dt())
-+		eintmask = exynos_get_eint_wake_mask();
-+
-+	__raw_writel(eintmask, S5P_EINT_WAKEUP_MASK);
- 	__raw_writel(s3c_irqwake_intmask & ~(1 << 31), S5P_WAKEUP_MASK);
- }
- 
+On Exynos4210-based Trats board:
+Tested-by: Tomasz Figa <t.figa@samsung.com>
+
+Tomasz Figa (6):
+  pinctrl: exynos: Add support for set_irq_wake of wake-up EINTs
+  ARM: EXYNOS: Fix EINT wake-up mask configuration when pinctrl is used
+  ARM: SAMSUNG: pm: Adjust for pinctrl- and DT-enabled platforms
+  pinctrl: samsung: Add support for SoC-specific suspend/resume
+    callbacks
+  pinctrl: samsung: Allow per-bank SoC-specific private data
+  pinctrl: exynos: Handle suspend/resume of GPIO EINT registers
+
+ arch/arm/mach-exynos/include/mach/pm-core.h |  14 +++-
+ arch/arm/plat-samsung/pm.c                  |  17 +++--
+ drivers/pinctrl/pinctrl-exynos.c            | 106 ++++++++++++++++++++++++++++
+ drivers/pinctrl/pinctrl-exynos.h            |   1 +
+ drivers/pinctrl/pinctrl-samsung.c           |   6 ++
+ drivers/pinctrl/pinctrl-samsung.h           |   4 ++
+ 6 files changed, 142 insertions(+), 6 deletions(-)
+
 -- 
 1.8.2.1
