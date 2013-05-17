@@ -1,50 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 17 May 2013 12:25:16 -0700
-Subject: [GIT PULL] omap fixes for v3.10-rc1
-Message-ID: <20130517192515.GC5600@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 17 May 2013 14:36:28 -0500
+Subject: spurious bL cpufreq driver messages
+Message-ID: <519686BC.3090101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+The bL cpufreq driver appears to collide with the cpufreq-cpu0 driver.
+There doesn't appear to be a functional problem, but just spurious
+prints which indicate it is trying to do something. I think it needs
+better checking whether the chip is actually multi-cluster. This is what
+I get when I hotplug cpus:
 
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+[  909.372319] CPU1: Booted secondary processor
+[  909.372616] cpu cpu1: get_cluster_clk_and_freq_table: init_opp_table
+failed, cpu: 1, err: -61
+[  909.385411] cpu cpu1: get_cluster_clk_and_freq_table: Failed to get
+data for cluster: 9
+[  909.394161] CPU2: shutdown
+[  909.400957] CPU2: Booted secondary processor
+[  909.401253] cpu cpu2: get_cluster_clk_and_freq_table: init_opp_table
+failed, cpu: 2, err: -61
+[  909.414044] cpu cpu2: get_cluster_clk_and_freq_table: Failed to get
+data for cluster: 9
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10-rc1/fixes
-
-for you to fetch changes up to a6d25f4c951b8b28f2eaec6f891ff834622532f2:
-
-  ARM: AM33XX: Add missing .clkdm_name to clkdiv32k_ick clock (2013-05-17 10:07:45 -0700)
-
-----------------------------------------------------------------
-Fixes for omaps:
-
-- a section mismatch fix for hwmod
-- boot fix for omap2plus_defconfig for omap2
-- musb interrupt fix when using device tree
-- am33xx clock fix that I missed earlier somehow
-- omap1 dma return code error fix
-
-----------------------------------------------------------------
-Paul Walmsley (1):
-      ARM: OMAP2+: Add missing CONFIG_ARCH_MULTI_V6=y to omap2plus_defconfig
-
-Tony Lindgren (1):
-      ARM: dts: Fix musb interrupt for device tree booting
-
-Vaibhav Hiremath (1):
-      ARM: AM33XX: Add missing .clkdm_name to clkdiv32k_ick clock
-
-Wei Yongjun (1):
-      ARM: OMAP: fix error return code in omap1_system_dma_init()
-
-jean-philippe francois (1):
-      ARM: OMAP: fix __init section mismatch for _enable_preprogram
-
- arch/arm/boot/dts/omap3.dtsi          |  2 +-
- arch/arm/configs/omap2plus_defconfig  |  1 +
- arch/arm/mach-omap1/dma.c             |  1 +
- arch/arm/mach-omap2/cclock33xx_data.c | 26 +++++++++++++++++++++++---
- arch/arm/mach-omap2/omap_hwmod.c      |  2 +-
- 5 files changed, 27 insertions(+), 5 deletions(-)
+Rob
