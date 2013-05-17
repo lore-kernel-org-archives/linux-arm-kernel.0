@@ -1,104 +1,100 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 May 2013 18:07:46 +0100
-Subject: [PATCH 07/14] ARM: LPAE: factor out T1SZ and TTBR1 computations
+Date: Fri, 17 May 2013 18:07:48 +0100
+Subject: [PATCH 09/14] ARM: mm: use physical addresses in highmem sanity checks
 In-Reply-To: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
 References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1368810473-26070-8-git-send-email-will.deacon@arm.com>
+Message-ID: <1368810473-26070-10-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Cyril Chemparathy <cyril@ti.com>
 
-This patch moves the TTBR1 offset calculation and the T1SZ calculation out
-of the TTB setup assembly code.  This should not affect functionality in
-any way, but improves code readability as well as readability of subsequent
-patches in this series.
+This patch modifies the highmem sanity checking code to use physical addresses
+instead.  This change eliminates the wrap-around problems associated with the
+original virtual address based checks, and this simplifies the code a bit.
+
+The one constraint imposed here is that low physical memory must be mapped in
+a monotonically increasing fashion if there are multiple banks of memory,
+i.e., x < y must => pa(x) < pa(y).
 
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Acked-by: Nicolas Pitre <nico@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/pgtable-3level-hwdef.h | 20 ++++++++++++++++++++
- arch/arm/mm/proc-v7-3level.S                | 29 ++++++++---------------------
- 2 files changed, 28 insertions(+), 21 deletions(-)
+ arch/arm/mm/mmu.c | 22 ++++++++++------------
+ 1 file changed, 10 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
-index 18f5cef..c6c6e6d 100644
---- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-@@ -79,4 +79,24 @@
- #define PHYS_MASK_SHIFT		(40)
- #define PHYS_MASK		((1ULL << PHYS_MASK_SHIFT) - 1)
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index b7ce65a8..fc6ff1a 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -988,6 +988,7 @@ phys_addr_t arm_lowmem_limit __initdata = 0;
+ void __init sanity_check_meminfo(void)
+ {
+ 	int i, j, highmem = 0;
++	phys_addr_t vmalloc_limit = __pa(vmalloc_min - 1) + 1;
  
-+/*
-+ * TTBR0/TTBR1 split (PAGE_OFFSET):
-+ *   0x40000000: T0SZ = 2, T1SZ = 0 (not used)
-+ *   0x80000000: T0SZ = 0, T1SZ = 1
-+ *   0xc0000000: T0SZ = 0, T1SZ = 2
-+ *
-+ * Only use this feature if PHYS_OFFSET <= PAGE_OFFSET, otherwise
-+ * booting secondary CPUs would end up using TTBR1 for the identity
-+ * mapping set up in TTBR0.
-+ */
-+#if defined CONFIG_VMSPLIT_2G
-+#define TTBR1_OFFSET	16			/* skip two L1 entries */
-+#elif defined CONFIG_VMSPLIT_3G
-+#define TTBR1_OFFSET	(4096 * (1 + 3))	/* only L2, skip pgd + 3*pmd */
-+#else
-+#define TTBR1_OFFSET	0
-+#endif
-+
-+#define TTBR1_SIZE	(((PAGE_OFFSET >> 30) - 1) << 16)
-+
- #endif
-diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
-index 995857d..58ab747 100644
---- a/arch/arm/mm/proc-v7-3level.S
-+++ b/arch/arm/mm/proc-v7-3level.S
-@@ -114,7 +114,7 @@ ENDPROC(cpu_v7_set_pte_ext)
- 	 */
- 	.macro	v7_ttb_setup, zero, ttbr0, ttbr1, tmp
- 	ldr	\tmp, =swapper_pg_dir		@ swapper_pg_dir virtual address
--	cmp	\ttbr1, \tmp			@ PHYS_OFFSET > PAGE_OFFSET? (branch below)
-+	cmp	\ttbr1, \tmp			@ PHYS_OFFSET > PAGE_OFFSET?
- 	mrc	p15, 0, \tmp, c2, c0, 2		@ TTB control register
- 	orr	\tmp, \tmp, #TTB_EAE
- 	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP)
-@@ -122,27 +122,14 @@ ENDPROC(cpu_v7_set_pte_ext)
- 	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP << 16)
- 	ALT_UP(orr	\tmp, \tmp, #TTB_FLAGS_UP << 16)
- 	/*
--	 * TTBR0/TTBR1 split (PAGE_OFFSET):
--	 *   0x40000000: T0SZ = 2, T1SZ = 0 (not used)
--	 *   0x80000000: T0SZ = 0, T1SZ = 1
--	 *   0xc0000000: T0SZ = 0, T1SZ = 2
--	 *
--	 * Only use this feature if PHYS_OFFSET <= PAGE_OFFSET, otherwise
--	 * booting secondary CPUs would end up using TTBR1 for the identity
--	 * mapping set up in TTBR0.
-+	 * Only use split TTBRs if PHYS_OFFSET <= PAGE_OFFSET (cmp above),
-+	 * otherwise booting secondary CPUs would end up using TTBR1 for the
-+	 * identity mapping set up in TTBR0.
- 	 */
--	bhi	9001f				@ PHYS_OFFSET > PAGE_OFFSET?
--	orr	\tmp, \tmp, #(((PAGE_OFFSET >> 30) - 1) << 16) @ TTBCR.T1SZ
--#if defined CONFIG_VMSPLIT_2G
--	/* PAGE_OFFSET == 0x80000000, T1SZ == 1 */
--	add	\ttbr1, \ttbr1, #1 << 4		@ skip two L1 entries
--#elif defined CONFIG_VMSPLIT_3G
--	/* PAGE_OFFSET == 0xc0000000, T1SZ == 2 */
--	add	\ttbr1, \ttbr1, #4096 * (1 + 3)	@ only L2 used, skip pgd+3*pmd
--#endif
--	/* CONFIG_VMSPLIT_1G does not need TTBR1 adjustment */
--9001:	mcr	p15, 0, \tmp, c2, c0, 2		@ TTB control register
--	mcrr	p15, 1, \ttbr1, \zero, c2	@ load TTBR1
-+	orrls	\tmp, \tmp, #TTBR1_SIZE				@ TTBCR.T1SZ
-+	mcr	p15, 0, \tmp, c2, c0, 2				@ TTBCR
-+	addls	\ttbr1, \ttbr1, #TTBR1_OFFSET
-+	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
- 	.endm
+ 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
+ 		struct membank *bank = &meminfo.bank[j];
+@@ -997,8 +998,7 @@ void __init sanity_check_meminfo(void)
+ 			highmem = 1;
  
- 	__CPUINIT
+ #ifdef CONFIG_HIGHMEM
+-		if (__va(bank->start) >= vmalloc_min ||
+-		    __va(bank->start) < (void *)PAGE_OFFSET)
++		if (bank->start >= vmalloc_limit)
+ 			highmem = 1;
+ 
+ 		bank->highmem = highmem;
+@@ -1007,8 +1007,8 @@ void __init sanity_check_meminfo(void)
+ 		 * Split those memory banks which are partially overlapping
+ 		 * the vmalloc area greatly simplifying things later.
+ 		 */
+-		if (!highmem && __va(bank->start) < vmalloc_min &&
+-		    bank->size > vmalloc_min - __va(bank->start)) {
++		if (!highmem && bank->start < vmalloc_limit &&
++		    bank->size > vmalloc_limit - bank->start) {
+ 			if (meminfo.nr_banks >= NR_BANKS) {
+ 				printk(KERN_CRIT "NR_BANKS too low, "
+ 						 "ignoring high memory\n");
+@@ -1017,12 +1017,12 @@ void __init sanity_check_meminfo(void)
+ 					(meminfo.nr_banks - i) * sizeof(*bank));
+ 				meminfo.nr_banks++;
+ 				i++;
+-				bank[1].size -= vmalloc_min - __va(bank->start);
+-				bank[1].start = __pa(vmalloc_min - 1) + 1;
++				bank[1].size -= vmalloc_limit - bank->start;
++				bank[1].start = vmalloc_limit;
+ 				bank[1].highmem = highmem = 1;
+ 				j++;
+ 			}
+-			bank->size = vmalloc_min - __va(bank->start);
++			bank->size = vmalloc_limit - bank->start;
+ 		}
+ #else
+ 		bank->highmem = highmem;
+@@ -1042,8 +1042,7 @@ void __init sanity_check_meminfo(void)
+ 		 * Check whether this memory bank would entirely overlap
+ 		 * the vmalloc area.
+ 		 */
+-		if (__va(bank->start) >= vmalloc_min ||
+-		    __va(bank->start) < (void *)PAGE_OFFSET) {
++		if (bank->start >= vmalloc_limit) {
+ 			printk(KERN_NOTICE "Ignoring RAM at %.8llx-%.8llx "
+ 			       "(vmalloc region overlap).\n",
+ 			       (unsigned long long)bank->start,
+@@ -1055,9 +1054,8 @@ void __init sanity_check_meminfo(void)
+ 		 * Check whether this memory bank would partially overlap
+ 		 * the vmalloc area.
+ 		 */
+-		if (__va(bank->start + bank->size - 1) >= vmalloc_min ||
+-		    __va(bank->start + bank->size - 1) <= __va(bank->start)) {
+-			unsigned long newsize = vmalloc_min - __va(bank->start);
++		if (bank->start + bank->size > vmalloc_limit)
++			unsigned long newsize = vmalloc_limit - bank->start;
+ 			printk(KERN_NOTICE "Truncating RAM at %.8llx-%.8llx "
+ 			       "to -%.8llx (vmalloc region overlap).\n",
+ 			       (unsigned long long)bank->start,
 -- 
 1.8.2.2
