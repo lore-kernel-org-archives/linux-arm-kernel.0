@@ -1,21 +1,23 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 17 May 2013 09:58:27 +0800
-Subject: [PATCH] i.MX6: Documentation: update from fsl,card-wired to
- non-removable
-In-Reply-To: <1368687094-11385-1-git-send-email-dirk.behme@de.bosch.com>
-References: <1368687094-11385-1-git-send-email-dirk.behme@de.bosch.com>
-Message-ID: <20130517015825.GC3893@S2101-09.ap.freescale.net>
+Date: Fri, 17 May 2013 10:03:52 +0800
+Subject: [PATCH] can: flexcan: allow compilation on arm and powerpc
+In-Reply-To: <1368711756-22324-1-git-send-email-mkl@pengutronix.de>
+References: <1368711756-22324-1-git-send-email-mkl@pengutronix.de>
+Message-ID: <20130517020351.GE3893@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 08:51:34AM +0200, Dirk Behme wrote:
-> With the commit 7f217794f (mmc: dt: Consolidate DT bindings),
-> the device tree properties used by various device drivers
-> for SD/MMC host controllers were standardized.  One of the changes
-> was that the property "fsl,card-wired", previously used by the
-> Freescale driver, was replaced with "non-removable". Fix the example
-> documentation regarding this.
-> 
-> Signed-off-by: Dirk Behme <dirk.behme@de.bosch.com>
+Hi Marc,
 
-Applied, thanks.
+On Thu, May 16, 2013 at 03:42:36PM +0200, Marc Kleine-Budde wrote:
+> This patch removes the Kconfig symbols HAVE_CAN_FLEXCAN and
+> IMX_HAVE_PLATFORM_FLEXCAN from arch/{arm,powerpc} and allowing compilation on
+> all arm and powerpc platforms.
+
+I'm generally fine with the approach.  But with Kconfig symbol
+IMX_HAVE_PLATFORM_FLEXCAN removed, how does the build of
+platform-flexcan.o work?
+
+arch/arm/mach-imx/devices/Makefile:obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
+
+Shawn
