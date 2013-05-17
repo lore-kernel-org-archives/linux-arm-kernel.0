@@ -1,26 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 May 2013 15:45:09 +0200
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
-In-Reply-To: <1368797744-13737-2-git-send-email-oliver+list@schinagl.nl>
-References: <1368797744-13737-1-git-send-email-oliver+list@schinagl.nl>
- <1368797744-13737-2-git-send-email-oliver+list@schinagl.nl>
-Message-ID: <4144514.S8gIuIKLrJ@wuerfel>
+From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
+Date: Fri, 17 May 2013 10:43:20 -0300
+Subject: [PATCH] clk: sunxi: "cpu_data" is defined in header files of some
+ architectures
+In-Reply-To: <5195D615.70608@cateee.net>
+References: <5195D615.70608@cateee.net>
+Message-ID: <1368798200-7063-1-git-send-email-emilio@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 May 2013 15:35:43 Oliver Schinagl wrote:
-> +static struct bin_attribute sid_bin_attr = {
-> +       .attr = {
-> +               .name = "key",
-> +               .mode = S_IRUGO,
-> +       },
-> +       .size = SUNXI_SID_SIZE,
-> +       .read = sid_read,
-> +};
+From: "Giacomo A. Catenazzi" <cate@cateee.net>
 
-I believe all the other drivers in drivers/misc/eeprom use "eeprom"
-as the name for the attribute, so using "key" here is a bit inconsistent.
+In some architectures, the #define cpu_data is not a "macro-function",
+so the compiler will substitute the identifier with probably something
+wrong.
 
-Can you change that?
+Signed-off-by: Giacomo A. Catenazzi <cate@cateee.net>
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
+[emilio at elopez.com.ar: use cpu_mux_data instead of this_cpu_data]
+---
 
-	Arnd
+Hi Giacomo,
+
+I have taken your patch and resent it to linux-arm-kernel and Mike 
+Turquette this time, but please try to use git send-email on your next 
+patch.
+
+Here is a video from Greg that explains how to use it as well as other 
+things (checkpatch.pl, get_maintainer.pl, etc)
+
+http://www.youtube.com/watch?v=LLBrBBImJt4
+
+Thanks! :)
+
+Emilio
+
+ drivers/clk/sunxi/clk-sunxi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 930d36f..412912b 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -239,7 +239,7 @@ struct mux_data {
+ 	u8 shift;
+ };
+ 
+-static const __initconst struct mux_data cpu_data = {
++static const __initconst struct mux_data cpu_mux_data = {
+ 	.shift = 16,
+ };
+ 
+@@ -433,7 +433,7 @@ static const __initconst struct of_device_id clk_div_match[] = {
+ 
+ /* Matches for mux clocks */
+ static const __initconst struct of_device_id clk_mux_match[] = {
+-	{.compatible = "allwinner,sun4i-cpu-clk", .data = &cpu_data,},
++	{.compatible = "allwinner,sun4i-cpu-clk", .data = &cpu_mux_data,},
+ 	{.compatible = "allwinner,sun4i-apb1-mux-clk", .data = &apb1_mux_data,},
+ 	{}
+ };
+-- 
+1.8.2.3
