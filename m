@@ -1,44 +1,113 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 17 May 2013 17:11:43 +0100
-Subject: [GIT PULL] ARM DT topology bindings
-Message-ID: <20130517161143.GA4855@e102568-lin.cambridge.arm.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 17 May 2013 11:15:25 -0500
+Subject: [PATCH v6] ARM:dts:omap4-panda: Update the LED support for the
+ panda DTS
+In-Reply-To: <1368806552-8851-1-git-send-email-dmurphy@ti.com>
+References: <1368806552-8851-1-git-send-email-dmurphy@ti.com>
+Message-ID: <20130517161525.GA30014@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Grant, Rob,
+On 11:02-20130517, Dan Murphy wrote:
+> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+> are different.
+> 
+> A1-A3 = gpio_wk7
+> ES = gpio_110
+> 
+> There is no change to LED D2
+> 
+> Abstract away the pinmux and the LED definitions for the two boards into
+> the respective DTS files.
+> 
+> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+> ---
+> Changes in this version:
+> 	- review comments incorporated.
+> Previous version of this patch was discussed in:
+> 	https://patchwork.kernel.org/patch/2582771/
+one minor nit,
+$subject could do with space after the ':'
+otherwise, it looks fine to me. Will suggest waiting for further
+reviewers if they have an opinion prior to a new rev.
 
-since it looks like we reached agreement on DT topology bindings for ARM
-please pull the bindings documentation so that code relying on the
-topology to be published and set in stone can be released and can stabilize.
+> 
+>  arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++++++-
+>  arch/arm/boot/dts/omap4-panda-es.dts      |   28 ++++++++++++++++++++++++++++
+>  2 files changed, 43 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> index 03bd60d..5fd59b3 100644
+> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> @@ -16,8 +16,13 @@
+>  		reg = <0x80000000 0x40000000>; /* 1 GB */
+>  	};
+>  
+> -	leds {
+> +	leds: leds {
+>  		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <
+> +			&led_wkgpio_pins
+> +		>;
+> +
+>  		heartbeat {
+>  			label = "pandaboard::status1";
+>  			gpios = <&gpio1 7 0>;
+> @@ -137,6 +142,15 @@
+>  	};
+>  };
+>  
+> +&omap4_pmx_wkup {
+> +	led_wkgpio_pins: pinmux_leds_wkpins {
+> +		pinctrl-single,pins = <
+> +			0x1a 0x3	/* gpio_wk7 OUTPUT | MODE 3 */
+> +			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
+> +		>;
+> +	};
+> +};
+> +
+>  &i2c1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&i2c1_pins>;
+> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+> index f1d8c21..c968a3b 100644
+> --- a/arch/arm/boot/dts/omap4-panda-es.dts
+> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
+> @@ -34,3 +34,31 @@
+>  		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
+>  		>;
+>  };
+> +
+> +&omap4_pmx_core {
+> +	led_gpio_pins: gpio_led_pmx {
+> +		pinctrl-single,pins = <
+> +			0xb6 0x3	/* gpio_110 OUTPUT | MODE 3 */
+> +		>;
+> +	};
+> +};
+> +
+> +&led_wkgpio_pins {
+> +	pinctrl-single,pins = <
+> +		0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
+> +	>;
+> +};
+> +
+> +&leds {
+> +	pinctrl-0 = <
+> +		&led_gpio_pins
+> +		&led_wkgpio_pins
+> +	>;
+> +
+> +	heartbeat {
+> +		gpios = <&gpio4 14 0>;
+> +	};
+> +	mmc {
+> +		gpios = <&gpio1 8 0>;
+> +	};
+> +};
 
-The topology documentation relies on updates to the cpus/cpu nodes bindings
-that I have just posted:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/169083.html
-
-I do not know if you prefer to merge both documents at once or we can merge
-this document first waiting for the other patchset to get merged, please
-let me know.
-
-Thank you very much indeed,
-Lorenzo
-
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
-
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-2.6-lp.git dt-topology
-
-for you to fetch changes up to 9cb1b6c8d59f09e51c87ac812b83d0350151ed3b:
-
-  Documentation: DT: arm: define CPU topology bindings (2013-05-17 16:40:12 +0100)
-
-----------------------------------------------------------------
-Lorenzo Pieralisi (1):
-      Documentation: DT: arm: define CPU topology bindings
-
- Documentation/devicetree/bindings/arm/topology.txt | 492 +++++++++++++++++++++
- 1 file changed, 492 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/topology.txt
+-- 
+Regards,
+Nishanth Menon
