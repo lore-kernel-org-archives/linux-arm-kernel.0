@@ -1,65 +1,96 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 17 May 2013 08:55:13 -0400
-Subject: [PATCHv9 5/9] clk: mvebu: create parent-child relation for
- PCIe clocks on Armada 370
-In-Reply-To: <20130517070826.12127.41382@quantum>
-References: <1368624323-24311-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1368624323-24311-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130515214154.12127.73539@quantum>
- <20130516094417.24b1ca0d@skate> <51949830.70306@gmail.com>
- <20130516150616.GD6563@titan.lakedaemon.net>
- <20130517070826.12127.41382@quantum>
-Message-ID: <20130517125513.GC11137@titan.lakedaemon.net>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 17 May 2013 15:00:23 +0200 (CEST)
+Subject: [PATCH 05/11] ARM: shmobile: APE6EVM LAN9220 support
+In-Reply-To: <1364954906-16014-6-git-send-email-horms+renesas@verge.net.au>
+References: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
+ <1364954906-16014-6-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <Pine.LNX.4.64.1305171458550.31481@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 12:08:26AM -0700, Mike Turquette wrote:
-> Quoting Jason Cooper (2013-05-16 08:06:16)
-> > Mike, Sebastian,
-> > 
-> > On Thu, May 16, 2013 at 10:26:24AM +0200, Sebastian Hesselbarth wrote:
-> > > On 05/16/2013 09:44 AM, Thomas Petazzoni wrote:
-> > > >Dear Mike Turquette,
-> > > >
-> > > >On Wed, 15 May 2013 14:41:54 -0700, Mike Turquette wrote:
-> > > >>Quoting Thomas Petazzoni (2013-05-15 06:25:19)
-> > > >>>The Armada 370 has two gatable clocks for each PCIe interface, and we
-> > > >>>want both of them to be enabled. We therefore make one of the two
-> > > >>>clocks a child of the other, as we did for the sataX and sataXlnk
-> > > >>>clocks on Armada XP.
-> > > >>
-> > > >>Ack for patches #5 and #6.  Do you want me to take them?
-> > 
-> > Thanks for the Ack!
-> > 
-> > > >I don't know, I guess with your Ack, it would be easier to carry them
-> > > >through the Marvell maintainers and then the arm-soc tree, so that we
-> > > >can test arm-soc and have all the pieces needed in here.
-> > > >
-> > > >That said, Sebastian Hesselbarth has submitted a big rework of the
-> > > >mvebu clock drivers, which would conflict with this patch, and
-> > > >Sebastian's rework would most likely go through your tree. If that's
-> > > >the case, I guess it would be better to let you take #5 and #6 in this
-> > > >patch series.
-> > > 
-> > > I also requested to take the restructure patches through ARM tree. They
-> > > are only touching files in drivers/clk/mvebu and by taking them through
-> > > ARM, we can update PCIe clock patches easily. The dependency between
-> > > Thomas' and my patches basically is that I renamed files that Thomas
-> > > now commits to. (I switched clk/mvebu from per-function files to per-soc
-> > > files).
-> > 
-> > I agree.  My heart jumped into my throat a little there :)  Mike, if
-> > it's ok with you, I'd prefer to take these through arm-soc.  Any merge
-> > conflicts should be minimal.  And at any rate, resolving the conflicts
-> > are *much* easier to handle than having arm-soc depend on an outside
-> > tree (then Linus has to take care in the order he merges them, no
-> > rebasing for clk tree, dogs and cats living together, etc ;-) )
-> > 
+Hi Simon, Magnus
+
+On Wed, 3 Apr 2013, Simon Horman wrote:
+
+> From: Magnus Damm <damm@opensource.se>
 > 
-> Yeah that all sounds good to me.  I'll review the restructure patches
-> shortly.
+> Add LAN9220 support to the APE6EVM board using C and DT.
+> At this point the PFC driver lacks DT bindings so to
+> configure the PFC we use PINCTRL in C board code.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   23 ++++++++++++++++++-
+>  arch/arm/mach-shmobile/board-ape6evm.c |   38 ++++++++++++++++++++++++++++++++
+>  2 files changed, 60 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> index 833f703..f603c69 100644
+> --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> @@ -16,7 +16,7 @@
+>  	compatible = "renesas,ape6evm", "renesas,r8a73a4";
+>  
+>  	chosen {
+> -		bootargs = "console=ttySC0,115200 ignore_loglevel";
+> +		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp";
+>  	};
+>  
+>  	memory at 40000000 {
+> @@ -24,8 +24,29 @@
+>  		reg = <0 0x40000000 0 0x40000000>;
+>  	};
+>  
+> +	ape6evm_fixed_3v3: fixedregulator at 0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "3V3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-always-on;
+> +	};
+> +
+>  	lbsc {
+>  		#address-cells = <1>;
+>  		#size-cells = <1>;
+> +
+> +		ethernet at 8000000 {
+> +			compatible = "smsc,lan9118", "smsc,lan9115";
+> +			reg = <0x08000000 0x1000>;
+> +			interrupt-parent = <&irqc1>;
+> +			interrupts = <8 0x4>;
+> +			phy-mode = "mii";
+> +			reg-io-width = <4>;
+> +			smsc,irq-active-high;
+> +			smsc,irq-push-pull;
+> +			vdd33a-supply = <&ape6evm_fixed_3v3>;
+> +			vddvario-supply = <&ape6evm_fixed_3v3>;
+> +		};
+>  	};
+>  };
 
-Awesome, thanks.
+The above didn't work in my tests without this:
 
-Jason.
+diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts 
+b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+index f603c69..4fb0102 100644
+--- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
++++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+@@ -33,8 +33,10 @@
+ 	};
+ 
+ 	lbsc {
++		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
++		ranges = <0 0 0 0x80000000>;
+ 
+ 		ethernet at 8000000 {
+ 			compatible = "smsc,lan9118", "smsc,lan9115";
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
