@@ -1,93 +1,81 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 17 May 2013 14:26:48 +0200 (CEST)
-Subject: [PATCH v3 09/20] ARM: shmobile: r8a7790: Add GPIO controller
- devices to device tree
-In-Reply-To: <1368577100-3530-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1368577100-3530-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1368577100-3530-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <Pine.LNX.4.64.1305171423270.31481@axis700.grange>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 May 2013 14:29:52 +0200
+Subject: [PATCH v3 2/4] ARM: imx: add initial support for MVF600
+In-Reply-To: <20130517085714.GG8607@S2101-09.ap.freescale.net>
+References: <1368684648-20826-1-git-send-email-b35083@freescale.com>
+ <5396520.ZTuSn9S4Vd@wuerfel>
+ <20130517085714.GG8607@S2101-09.ap.freescale.net>
+Message-ID: <201305171429.52646.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent
+On Friday 17 May 2013, Shawn Guo wrote:
+> On Thu, May 16, 2013 at 12:29:28PM +0200, Arnd Bergmann wrote:
+> > On Thursday 16 May 2013 14:10:46 Jingchang Lu wrote:
+> > > +config SOC_MVF600
+> > 
+> > Shouldn't that 'depends on ARCH_MULTI_V7'?
+> > 
+> SOC_MVF600 is added as a sub-item of ARCH_MXC which already handles the
+> ARCH_MULTI_* dependency.
 
-On Wed, 15 May 2013, Laurent Pinchart wrote:
+Ah, makes sense.
 
-> Add GPIO controller nodes to the r8a7790 core device tree.
-> 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> ---
->  arch/arm/boot/dts/r8a7790.dtsi | 54 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 54 insertions(+)
+> > Can you describe how much Vybrid is actually like MXC? Do you actually
+> > use most of the mach-imx code?
+> > 
+> Jingchang mentioned some IP blocks shared between IMX and Vybrid.  Right
+> now, mvf600 reuses mxc_restart() and some amount of clk code
+> clk-pllv3.c, clk-gate2.c clk.c etc. in arch/arm/mach-imx.
 
-Also here a couple of things are missing (presumably, for other SoCs you 
-need the same):
+Ok.
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi 
-b/arch/arm/boot/dts/r8a7790.dtsi
-index 674ee39..cd1a04f 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -51,6 +51,7 @@
- 		interrupts = <0 4 0x4>;
- 		#gpio-cells = <2>;
- 		gpio-controller;
-+		gpio-ranges = <&pfc 0 0 32>;
- 	};
- 
- 	gpio1: gpio at ffc41000 {
-@@ -60,6 +61,7 @@
- 		interrupts = <0 5 0x4>;
- 		#gpio-cells = <2>;
- 		gpio-controller;
-+		gpio-ranges = <&pfc 0 32 32>;
- 	};
- 
- 	gpio2: gpio at ffc42000 {
-@@ -69,6 +71,7 @@
- 		interrupts = <0 6 0x4>;
- 		#gpio-cells = <2>;
- 		gpio-controller;
-+		gpio-ranges = <&pfc 0 64 32>;
- 	};
- 
- 	gpio3: gpio at ffc43000 {
-@@ -78,6 +81,7 @@
- 		interrupts = <0 7 0x4>;
- 		#gpio-cells = <2>;
- 		gpio-controller;
-+		gpio-ranges = <&pfc 0 96 32>;
- 	};
- 
- 	gpio4: gpio at ffc44000 {
-@@ -87,6 +91,7 @@
- 		interrupts = <0 8 0x4>;
- 		#gpio-cells = <2>;
- 		gpio-controller;
-+		gpio-ranges = <&pfc 0 128 32>;
- 	};
- 
- 	gpio5: gpio at ffc45000 {
-@@ -96,6 +101,7 @@
- 		interrupts = <0 9 0x4>;
- 		#gpio-cells = <2>;
- 		gpio-controller;
-+		gpio-ranges = <&pfc 0 160 32>;
- 	};
- 
- 	timer {
-@@ -118,6 +124,7 @@
- 	pfc: pfc at e6060000 {
- 		compatible = "renesas,pfc-r8a7790";
- 		reg = <0 0xe6060000 0 0x250>;
-+		#gpio-range-cells = <3>;
- 	};
- 
- 	/* No MMC_CAP_UHS_DDR50 (dual data rate) capability on r8a7790! */
+> > Actually I think you should move that driver to drivers/clk and use
+> > of_clk_init(NULL) to initialize it.
+> > 
+> The mvf600 clock driver uses a lot of base clk support from mach-imx,
+> and can not be moved into drivers/clk as a single driver.  Right now, in
+> IMX clock drivers, we call of_clk_init() to only register fixed rate
+> clocks, since all the other clocks are not represented in device tree.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+What are your plans for this in the long run?
+
+> > It would be nice if we could integrate that into the watchdog driver,
+> > so that driver just registers a pm_restart function when it gets loaded.
+> > It is a rather small driver, so it would not hurt to always load it.
+> > 
+> Sound like a good idea.  We will consider it as another cleanup task for
+> mach-imx.
+
+Ok
+ 
+> > What is the mscm? Shouldn't the boot loader have set this up correctly?
+> > If you can remove that code from the kernel, you can use the default
+> > irqchip_init call.
+> > 
+> Yeah, and if we find another way for l2x0_of_init() call.
+
+Good point. That is something we need to do anyway.
+
+> > > +static const char *mvf600_dt_compat[] __initdata = {
+> > > +	"fsl,mvf600",
+> > > +	NULL,
+> > > +};
+> > > +
+> > > +DT_MACHINE_START(VYBRID_VF6XX, "Freescale Vybrid MVF600 (Device Tree)")
+> > > +	.init_irq	= mvf600_init_irq,
+> > > +	.init_time	= mvf600_init_time,
+> > > +	.init_machine   = mvf600_init_machine,
+> > > +	.dt_compat	= mvf600_dt_compat,
+> > > +	.restart	= mxc_restart,
+> > > +MACHINE_END
+> > 
+> > If we can do all of the above, we can actually remove the entire machine
+> > descriptor here, since all its members are NULL.
+> > 
+> Yeah, we understand the goal, and this will be the goal of mach-imx
+> cleanup.
+
+Ok. I guess we just won't be there for 3.11 then.
+
+	Arnd
