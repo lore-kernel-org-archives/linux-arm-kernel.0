@@ -1,42 +1,51 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 May 2013 18:07:49 +0100
-Subject: [PATCH 10/14] ARM: fix type of PHYS_PFN_OFFSET to unsigned long
+Date: Fri, 17 May 2013 18:07:42 +0100
+Subject: [PATCH 03/14] ARM: LPAE: use phys_addr_t in free_memmap()
 In-Reply-To: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
 References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1368810473-26070-11-git-send-email-will.deacon@arm.com>
+Message-ID: <1368810473-26070-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cyril Chemparathy <cyril@ti.com>
+From: Vitaly Andrianov <vitalya@ti.com>
 
-On LPAE machines, PHYS_OFFSET evaluates to a phys_addr_t and this type is
-inherited by the PHYS_PFN_OFFSET definition as well.  Consequently, the kernel
-build emits warnings of the form:
+The free_memmap() was mistakenly using unsigned long type to represent
+physical addresses.  This breaks on PAE systems where memory could be placed
+above the 32-bit addressible limit.
 
-init/main.c: In function 'start_kernel':
-init/main.c:588:7: warning: format '%lx' expects argument of type 'long unsigned int', but argument 2 has type 'phys_addr_t' [-Wformat]
+This patch fixes this function to properly use phys_addr_t instead.
 
-This patch fixes this warning by pinning down the PFN type to unsigned long.
-
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
 Acked-by: Nicolas Pitre <nico@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/memory.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mm/init.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index e506088..584786f 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -223,7 +223,7 @@ static inline unsigned long __phys_to_virt(unsigned long x)
-  * direct-mapped view.  We assume this is the first page
-  * of RAM in the mem_map as well.
-  */
--#define PHYS_PFN_OFFSET	(PHYS_OFFSET >> PAGE_SHIFT)
-+#define PHYS_PFN_OFFSET	((unsigned long)(PHYS_OFFSET >> PAGE_SHIFT))
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 9a5cdc0..68c914e 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -442,7 +442,7 @@ static inline void
+ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
+ {
+ 	struct page *start_pg, *end_pg;
+-	unsigned long pg, pgend;
++	phys_addr_t pg, pgend;
  
- /*
-  * These are *only* valid on the kernel direct mapped RAM memory.
+ 	/*
+ 	 * Convert start_pfn/end_pfn to a struct page pointer.
+@@ -454,8 +454,8 @@ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
+ 	 * Convert to physical addresses, and
+ 	 * round start upwards and end downwards.
+ 	 */
+-	pg = (unsigned long)PAGE_ALIGN(__pa(start_pg));
+-	pgend = (unsigned long)__pa(end_pg) & PAGE_MASK;
++	pg = PAGE_ALIGN(__pa(start_pg));
++	pgend = __pa(end_pg) & PAGE_MASK;
+ 
+ 	/*
+ 	 * If there are free pages between these,
 -- 
 1.8.2.2
