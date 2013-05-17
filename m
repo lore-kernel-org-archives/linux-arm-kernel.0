@@ -1,52 +1,92 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 17 May 2013 11:31:18 -0500
-Subject: [RFC PATCH v4 01/18] ARM: kernel: fix arm_dt_init_cpu_maps() to
- skip non-cpu nodes
-In-Reply-To: <1368804061-4421-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1368804061-4421-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1368804061-4421-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <CAL_JsqLdbbsBeEaUT5BcxjZnbjEiu=qsPsynxCXdgi1J=ejzTg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 May 2013 17:43:41 +0100
+Subject: [PATCH] arm64: extable: sort the exception table at build time
+Message-ID: <1368809021-25130-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 10:20 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> The introduction of the cpu-map topology node in the cpus node implies
-> that cpus node might have children that are not cpu nodes. The DT
-> parsing code needs updating otherwise it would check for cpu nodes
-> properties in nodes that are not required to contain them, resulting
-> in warnings that have no bearing on bindings defined in the dts source file.
+As is done for other architectures, sort the exception table at
+build-time rather than during boot.
 
-Great, so a new DT with cpu-map entries may not work with old kernels.
-Please check the behavior. This should go to stable kernels.
+Since sortextable appears to be a standalone C program relying on the
+host elf.h to provide EM_AARCH64, I've had to add a conditional check in
+order to allow cross-compilation on machines that aren't running a
+bleeding-edge libc-dev.
 
-Rob
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/Kconfig              |  1 +
+ arch/arm64/kernel/vmlinux.lds.S | 15 +++++++--------
+ scripts/sortextable.c           |  5 +++++
+ 3 files changed, 13 insertions(+), 8 deletions(-)
 
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm/kernel/devtree.c | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> index 5af04f6..904cad5 100644
-> --- a/arch/arm/kernel/devtree.c
-> +++ b/arch/arm/kernel/devtree.c
-> @@ -92,6 +92,9 @@ void __init arm_dt_init_cpu_maps(void)
->         for_each_child_of_node(cpus, cpu) {
->                 u32 hwid;
->
-> +               if (of_node_cmp(cpu->type, "cpu"))
-> +                       continue;
-> +
->                 pr_debug(" * %s...\n", cpu->full_name);
->                 /*
->                  * A device tree containing CPU nodes with missing "reg"
-> --
-> 1.8.2.2
->
->
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 48347dc..fb8fd90 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -7,6 +7,7 @@ config ARM64
+ 	select ARM_AMBA
+ 	select ARM_ARCH_TIMER
+ 	select ARM_GIC
++	select BUILDTIME_EXTABLE_SORT
+ 	select CLONE_BACKWARDS
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 3fae2be..3d527726 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -57,6 +57,13 @@ SECTIONS
+ 
+ 	RO_DATA(PAGE_SIZE)
+ 
++	. = ALIGN(8);
++	__ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) {
++		__start___ex_table = .;
++		*(__ex_table)
++		__stop___ex_table = .;
++	}
++
+ 	_etext = .;			/* End of text and rodata section */
+ 
+ 	. = ALIGN(PAGE_SIZE);
+@@ -99,14 +106,6 @@ SECTIONS
+ 		READ_MOSTLY_DATA(64)
+ 
+ 		/*
+-		 * The exception fixup table (might need resorting at runtime)
+-		 */
+-		. = ALIGN(32);
+-		__start___ex_table = .;
+-		*(__ex_table)
+-		__stop___ex_table = .;
+-
+-		/*
+ 		 * and the usual data section
+ 		 */
+ 		DATA_DATA
+diff --git a/scripts/sortextable.c b/scripts/sortextable.c
+index 1f10e89..f9ce116 100644
+--- a/scripts/sortextable.c
++++ b/scripts/sortextable.c
+@@ -31,6 +31,10 @@
+ #include <tools/be_byteshift.h>
+ #include <tools/le_byteshift.h>
+ 
++#ifndef EM_AARCH64
++#define EM_AARCH64	183
++#endif
++
+ static int fd_map;	/* File descriptor for file being modified. */
+ static int mmap_failed; /* Boolean flag. */
+ static void *ehdr_curr; /* current ElfXX_Ehdr *  for resource cleanup */
+@@ -249,6 +253,7 @@ do_file(char const *const fname)
+ 		custom_sort = sort_relative_table;
+ 		break;
+ 	case EM_ARM:
++	case EM_AARCH64:
+ 	case EM_MIPS:
+ 		break;
+ 	}  /* end switch */
+-- 
+1.8.2.2
