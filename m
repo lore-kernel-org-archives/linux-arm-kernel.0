@@ -1,63 +1,50 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 17 May 2013 17:27:05 +0800
-Subject: [Bug] ARM 'perf' regression by commit a43cb95d5
-In-Reply-To: <20130517085530.GB22992@mudshark.cambridge.arm.com>
-References: <CACVXFVPjo2dQpYPpqZS8GC8UPNzB5HLURpYm6-g1FOBbSUjDyA@mail.gmail.com>
- <20130517085530.GB22992@mudshark.cambridge.arm.com>
-Message-ID: <CACVXFVPEBXat3bPPuHzV535=xLoRMFd03Kjzp=NUF5E3KCq2=g@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 17 May 2013 17:15:23 +0800
+Subject: [PATCH] ARM: imx6q: clk: add the eim_slow clock
+Message-ID: <1368782123-15523-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 4:55 PM, Will Deacon <will.deacon@arm.com> wrote:
->
-> So it's still the morning and I haven't had my coffee yet, but I'm really
-> struggling to see what you're getting at. Why does this have anything to do
-> with perf?
+Add the eim_slow clock, since the weim needs it.
 
-I don't know, and I just report it out, :-)
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ .../devicetree/bindings/clock/imx6q-clock.txt      |    1 +
+ arch/arm/mach-imx/clk-imx6q.c                      |    3 ++-
+ 2 files changed, 3 insertions(+), 1 deletions(-)
 
-I found the problem days ago, and until yesterday I had one more hours to
-git-bisect it, but the result is very frustrated.
-
->
->> [1], 'perf top' mistaken output
->> Samples: 17K of event 'cpu-clock', Event count (approx.): 3516532661
->>  97.51%  [smsc95xx]            [k] 0x013645b8
->>   0.21%  libc-2.15.so          [.] strstr
->>   0.14%  libc-2.15.so          [.] strchr
->>   0.12%  libc-2.15.so          [.] strcmp
->
-> [...]
->
->> [2], 'perf top' correct output
->> Samples: 46K of event 'cpu-clock', Event count (approx.): 937128704
->>  96.44%  [kernel]            [k] cpuidle_enter_state
->>   0.19%  libc-2.15.so        [.] strstr
->>   0.16%  [kernel]            [k] kallsyms_expand_symbol.clone.0
->>   0.13%  [kernel]            [k] _raw_spin_unlock_irq
->
-> [...]
->
-> Are you saying that the profile you're seeing is radically different,
-> rather than there being some formatting error that I can't spot? If so, that
-
-Yes.
-
-> sounds really strange and I can't see how the patch you mention is to
-> blame...
->
-> If we want to persue this, I guess other obvious questions are: which kernel
-> are you running? Does this affect multiple architectures (your diff only
-
-Either 3.10-rc1 or today's -next tree(3.10.0-rc1-next-20130516).
-
-> changes ARM)? What's the workload which you are profiling?
-
-I only tested it on Pandaboard, and no real workload, so you can see
-cpuidle_enter_state is the top frequent symbol.
-
-Or could anyone else try to verify the problem on their own environment?
-
-Thanks,
---
-Ming Lei
+diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+index 6deb6fd..a0e104f 100644
+--- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
++++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
+@@ -208,6 +208,7 @@ clocks and IDs.
+ 	pll4_post_div		193
+ 	pll5_post_div		194
+ 	pll5_video_div		195
++	eim_slow      		196
+ 
+ Examples:
+ 
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 50095dd..441a22d 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -238,7 +238,7 @@ enum mx6q_clks {
+ 	pll4_audio, pll5_video, pll8_mlb, pll7_usb_host, pll6_enet, ssi1_ipg,
+ 	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
+ 	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
+-	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, clk_max
++	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow, clk_max
+ };
+ 
+ static struct clk *clk[clk_max];
+@@ -535,6 +535,7 @@ int __init mx6q_clocks_init(void)
+ 	clk[usdhc2]       = imx_clk_gate2("usdhc2",        "usdhc2_podf",       base + 0x80, 4);
+ 	clk[usdhc3]       = imx_clk_gate2("usdhc3",        "usdhc3_podf",       base + 0x80, 6);
+ 	clk[usdhc4]       = imx_clk_gate2("usdhc4",        "usdhc4_podf",       base + 0x80, 8);
++	clk[eim_slow]     = imx_clk_gate2("eim_slow",      "emi_slow_podf",     base + 0x80, 10);
+ 	clk[vdo_axi]      = imx_clk_gate2("vdo_axi",       "vdo_axi_sel",       base + 0x80, 12);
+ 	clk[vpu_axi]      = imx_clk_gate2("vpu_axi",       "vpu_axi_podf",      base + 0x80, 14);
+ 	clk[cko1]         = imx_clk_gate("cko1",           "cko1_podf",         base + 0x60, 7);
+-- 
+1.7.1
