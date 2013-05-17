@@ -1,71 +1,104 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 May 2013 18:07:53 +0100
-Subject: [PATCH 14/14] ARM: elf: add new hwcap for identifying atomic
- ldrd/strd instructions
+Date: Fri, 17 May 2013 18:07:46 +0100
+Subject: [PATCH 07/14] ARM: LPAE: factor out T1SZ and TTBR1 computations
 In-Reply-To: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
 References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1368810473-26070-15-git-send-email-will.deacon@arm.com>
+Message-ID: <1368810473-26070-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPUs implementing LPAE have atomic ldrd/strd instructions, meaning that
-userspace software can avoid having to use the exclusive variants of
-these instructions if they wish.
+From: Cyril Chemparathy <cyril@ti.com>
 
-This patch advertises the atomicity of these instructions via the
-hwcaps, so userspace can detect this CPU feature.
+This patch moves the TTBR1 offset calculation and the T1SZ calculation out
+of the TTB setup assembly code.  This should not affect functionality in
+any way, but improves code readability as well as readability of subsequent
+patches in this series.
 
-Reported-by: Vladimir Danushevsky <vladimir.danushevsky@oracle.com>
+Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+Acked-by: Nicolas Pitre <nico@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/uapi/asm/hwcap.h | 2 +-
- arch/arm/kernel/setup.c           | 8 +++++++-
- 2 files changed, 8 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/pgtable-3level-hwdef.h | 20 ++++++++++++++++++++
+ arch/arm/mm/proc-v7-3level.S                | 29 ++++++++---------------------
+ 2 files changed, 28 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/include/uapi/asm/hwcap.h b/arch/arm/include/uapi/asm/hwcap.h
-index 3688fd1..6d34d08 100644
---- a/arch/arm/include/uapi/asm/hwcap.h
-+++ b/arch/arm/include/uapi/asm/hwcap.h
-@@ -25,6 +25,6 @@
- #define HWCAP_IDIVT	(1 << 18)
- #define HWCAP_VFPD32	(1 << 19)	/* set if VFP has 32 regs (not 16) */
- #define HWCAP_IDIV	(HWCAP_IDIVA | HWCAP_IDIVT)
--
-+#define HWCAP_LPAE	(1 << 20)
+diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
+index 18f5cef..c6c6e6d 100644
+--- a/arch/arm/include/asm/pgtable-3level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
+@@ -79,4 +79,24 @@
+ #define PHYS_MASK_SHIFT		(40)
+ #define PHYS_MASK		((1ULL << PHYS_MASK_SHIFT) - 1)
  
- #endif /* _UAPI__ASMARM_HWCAP_H */
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 1522c7a..bdcd4dd 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -355,7 +355,7 @@ void __init early_print(const char *str, ...)
- 
- static void __init cpuid_init_hwcaps(void)
- {
--	unsigned int divide_instrs;
-+	unsigned int divide_instrs, vmsa;
- 
- 	if (cpu_architecture() < CPU_ARCH_ARMv7)
- 		return;
-@@ -368,6 +368,11 @@ static void __init cpuid_init_hwcaps(void)
- 	case 1:
- 		elf_hwcap |= HWCAP_IDIVT;
- 	}
++/*
++ * TTBR0/TTBR1 split (PAGE_OFFSET):
++ *   0x40000000: T0SZ = 2, T1SZ = 0 (not used)
++ *   0x80000000: T0SZ = 0, T1SZ = 1
++ *   0xc0000000: T0SZ = 0, T1SZ = 2
++ *
++ * Only use this feature if PHYS_OFFSET <= PAGE_OFFSET, otherwise
++ * booting secondary CPUs would end up using TTBR1 for the identity
++ * mapping set up in TTBR0.
++ */
++#if defined CONFIG_VMSPLIT_2G
++#define TTBR1_OFFSET	16			/* skip two L1 entries */
++#elif defined CONFIG_VMSPLIT_3G
++#define TTBR1_OFFSET	(4096 * (1 + 3))	/* only L2, skip pgd + 3*pmd */
++#else
++#define TTBR1_OFFSET	0
++#endif
 +
-+	/* LPAE implies atomic ldrd/strd instructions */
-+	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-+	if (vmsa >= 5)
-+		elf_hwcap |= HWCAP_LPAE;
- }
++#define TTBR1_SIZE	(((PAGE_OFFSET >> 30) - 1) << 16)
++
+ #endif
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index 995857d..58ab747 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -114,7 +114,7 @@ ENDPROC(cpu_v7_set_pte_ext)
+ 	 */
+ 	.macro	v7_ttb_setup, zero, ttbr0, ttbr1, tmp
+ 	ldr	\tmp, =swapper_pg_dir		@ swapper_pg_dir virtual address
+-	cmp	\ttbr1, \tmp			@ PHYS_OFFSET > PAGE_OFFSET? (branch below)
++	cmp	\ttbr1, \tmp			@ PHYS_OFFSET > PAGE_OFFSET?
+ 	mrc	p15, 0, \tmp, c2, c0, 2		@ TTB control register
+ 	orr	\tmp, \tmp, #TTB_EAE
+ 	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP)
+@@ -122,27 +122,14 @@ ENDPROC(cpu_v7_set_pte_ext)
+ 	ALT_SMP(orr	\tmp, \tmp, #TTB_FLAGS_SMP << 16)
+ 	ALT_UP(orr	\tmp, \tmp, #TTB_FLAGS_UP << 16)
+ 	/*
+-	 * TTBR0/TTBR1 split (PAGE_OFFSET):
+-	 *   0x40000000: T0SZ = 2, T1SZ = 0 (not used)
+-	 *   0x80000000: T0SZ = 0, T1SZ = 1
+-	 *   0xc0000000: T0SZ = 0, T1SZ = 2
+-	 *
+-	 * Only use this feature if PHYS_OFFSET <= PAGE_OFFSET, otherwise
+-	 * booting secondary CPUs would end up using TTBR1 for the identity
+-	 * mapping set up in TTBR0.
++	 * Only use split TTBRs if PHYS_OFFSET <= PAGE_OFFSET (cmp above),
++	 * otherwise booting secondary CPUs would end up using TTBR1 for the
++	 * identity mapping set up in TTBR0.
+ 	 */
+-	bhi	9001f				@ PHYS_OFFSET > PAGE_OFFSET?
+-	orr	\tmp, \tmp, #(((PAGE_OFFSET >> 30) - 1) << 16) @ TTBCR.T1SZ
+-#if defined CONFIG_VMSPLIT_2G
+-	/* PAGE_OFFSET == 0x80000000, T1SZ == 1 */
+-	add	\ttbr1, \ttbr1, #1 << 4		@ skip two L1 entries
+-#elif defined CONFIG_VMSPLIT_3G
+-	/* PAGE_OFFSET == 0xc0000000, T1SZ == 2 */
+-	add	\ttbr1, \ttbr1, #4096 * (1 + 3)	@ only L2 used, skip pgd+3*pmd
+-#endif
+-	/* CONFIG_VMSPLIT_1G does not need TTBR1 adjustment */
+-9001:	mcr	p15, 0, \tmp, c2, c0, 2		@ TTB control register
+-	mcrr	p15, 1, \ttbr1, \zero, c2	@ load TTBR1
++	orrls	\tmp, \tmp, #TTBR1_SIZE				@ TTBCR.T1SZ
++	mcr	p15, 0, \tmp, c2, c0, 2				@ TTBCR
++	addls	\ttbr1, \ttbr1, #TTBR1_OFFSET
++	mcrr	p15, 1, \ttbr1, \zero, c2			@ load TTBR1
+ 	.endm
  
- static void __init feat_v6_fixup(void)
-@@ -872,6 +877,7 @@ static const char *hwcap_str[] = {
- 	"vfpv4",
- 	"idiva",
- 	"idivt",
-+	"lpae",
- 	NULL
- };
- 
+ 	__CPUINIT
 -- 
 1.8.2.2
