@@ -1,44 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 May 2013 15:18:57 +0100
-Subject: dmatest regression in 3.10-rc1
-In-Reply-To: <20130517123423.GR14863@intel.com>
-References: <20130515152803.GL23869@mudshark.cambridge.arm.com>
- <20130516153553.GI11706@mudshark.cambridge.arm.com>
- <20130517123423.GR14863@intel.com>
-Message-ID: <20130517141857.GM23112@mudshark.cambridge.arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 17 May 2013 07:29:04 -0700
+Subject: [PATCH v3 0/6] ARM: OMAP2+: hwmod and SERIAL: Remove sysc
+ handling from driver
+In-Reply-To: <alpine.DEB.2.00.1305161831390.21357@utopia.booyaka.com> (Paul
+ Walmsley's message of "Thu, 16 May 2013 18:32:43 +0000 (UTC)")
+References: <1368629322-3170-1-git-send-email-rnayak@ti.com>
+ <alpine.DEB.2.00.1305161831390.21357@utopia.booyaka.com>
+Message-ID: <87txm1smrz.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Hi Paul,
 
-Thanks for the reply.
+Paul Walmsley <paul@pwsan.com> writes:
 
-On Fri, May 17, 2013 at 01:34:23PM +0100, Vinod Koul wrote:
-> On Thu, May 16, 2013 at 04:35:53PM +0100, Will Deacon wrote:
-> > Right, so I think I understand what's causing this, but I'll leave it to
-> > Andriy to suggest a fix. The problem comes about because the dmatest
-> > module is now driven from debugfs, making it possible to unload the module
-> > whilst a test run is in progress. In this case:
-> > 
-> > 	- The DMA threads will return from wait_event_freezable_timeout(...)
-> > 	  due to kthread_should_stop() returning true, and subsequently
-> > 	  report failure because done.done is false.
-> > 
-> > 	- The DMA engines may not be idle, so the asynchronous callback can
-> > 	  be invoked after we've started cleaning up, explaining the NULL
-> > 	  dereference I'm seeing.
-> > 
-> > The solutions are either fixing the module exit code to cope with concurrent
-> > DMA transfers or to revert 77101ce578bb and not allow the channel threads to
-> > return mid-transfer.
-> We need to properly abort the channels on removal. This is already handled in
-> the code but the kthread_stop is called after the transactions are aborted. It
-> should be the other way round. Can you try with below patch
+> On Wed, 15 May 2013, Rajendra Nayak wrote:
+>
+>> OMAP UART IP needs manual idle modes based on functional state of the
+>> IP. Currently this is handled by the driver with function pointers
+>> implemented in platform code.
+>> 
+>> This however breaks in case of device tree because of missing
+>> idle handling. 
+>> 
+>> The series tries to address the issue and tries to remove complete
+>> sysc handling from serial driver.
+>
+> These look good to me.  Will queue them for v3.10-rc once they pass local 
+> testing here.
 
-Unfortunately, I can trigger the exact same panic with this patch applied.
+I reviewed and tested v2 of this (Rajendra forgot to add the tags in
+v3) and also just sanity tested v3 of this on 4430/panda DT boot to
+verify the console issue is resolved.  Feel free to add:
 
-Isn't there a race between terminating the dmaengine transfers
-(dmaengine_terminate_all) and killing the test threads (kthread_stop) where
-a new transfer could be kicked off by dmatest_func?
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+Tested-by: Kevin Hilman <khilman@linaro.org>  # OMAP4/Panda
 
-Will
+Kevin
