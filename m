@@ -1,47 +1,72 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 17 May 2013 11:49:19 -0400 (EDT)
-Subject: [RFC PATCH v4 01/18] ARM: kernel: fix arm_dt_init_cpu_maps() to
- skip non-cpu nodes
-In-Reply-To: <1368804061-4421-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1368804061-4421-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1368804061-4421-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <alpine.LFD.2.03.1305171148460.31158@syhkavp.arg>
+From: jp.francois@cynove.com (Jean-Philippe Francois)
+Date: Fri, 17 May 2013 17:51:26 +0200
+Subject: [PATCH] ARM : omap3 : fix wrong container_of in clock36xx.c
+In-Reply-To: <CAGGh5h3BNV7fE3jC0KSmA+2K6zKwVyHdeo8AW0gvmhgQsy8ZEg@mail.gmail.com>
+References: <CAGGh5h3BNV7fE3jC0KSmA+2K6zKwVyHdeo8AW0gvmhgQsy8ZEg@mail.gmail.com>
+Message-ID: <1368805886-26085-1-git-send-email-jp.francois@cynove.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 May 2013, Lorenzo Pieralisi wrote:
+omap36xx_pwrdn_clk_enable_with_hsdiv_restore expects the parent hw of the clock
+to be a clk_hw_omap. However, looking at cclock3xxx_data.c, all concerned clock
+have parent defined as clk_divider.
+Fix the function to use clk_divider. 
+Tested with  3.9 on dm3730.
 
-> The introduction of the cpu-map topology node in the cpus node implies
-> that cpus node might have children that are not cpu nodes. The DT
-> parsing code needs updating otherwise it would check for cpu nodes
-> properties in nodes that are not required to contain them, resulting
-> in warnings that have no bearing on bindings defined in the dts source file.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Jean-Philippe Fran??ois <jp.francois@cynove.com>
 
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
-
-
-> ---
->  arch/arm/kernel/devtree.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> index 5af04f6..904cad5 100644
-> --- a/arch/arm/kernel/devtree.c
-> +++ b/arch/arm/kernel/devtree.c
-> @@ -92,6 +92,9 @@ void __init arm_dt_init_cpu_maps(void)
->  	for_each_child_of_node(cpus, cpu) {
->  		u32 hwid;
->  
-> +		if (of_node_cmp(cpu->type, "cpu"))
-> +			continue;
-> +
->  		pr_debug(" * %s...\n", cpu->full_name);
->  		/*
->  		 * A device tree containing CPU nodes with missing "reg"
-> -- 
-> 1.8.2.2
-> 
-> 
+Index: b/arch/arm/mach-omap2/clock36xx.c
+===================================================================
+--- a/arch/arm/mach-omap2/clock36xx.c
++++ b/arch/arm/mach-omap2/clock36xx.c
+@@ -20,11 +20,12 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/clk.h>
++#include <linux/clk-provider.h>
+ #include <linux/io.h>
+ 
+ #include "clock.h"
+ #include "clock36xx.h"
+-
++#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
+ 
+ /**
+  * omap36xx_pwrdn_clk_enable_with_hsdiv_restore - enable clocks suffering
+@@ -39,29 +40,28 @@
+  */
+ int omap36xx_pwrdn_clk_enable_with_hsdiv_restore(struct clk_hw *clk)
+ {
+-	struct clk_hw_omap *parent;
++	struct clk_divider *parent;
+ 	struct clk_hw *parent_hw;
+-	u32 dummy_v, orig_v, clksel_shift;
++	u32 dummy_v, orig_v;
+ 	int ret;
+ 
+ 	/* Clear PWRDN bit of HSDIVIDER */
+ 	ret = omap2_dflt_clk_enable(clk);
+ 
+ 	parent_hw = __clk_get_hw(__clk_get_parent(clk->clk));
+-	parent = to_clk_hw_omap(parent_hw);
++	parent = to_clk_divider(parent_hw);
+ 
+ 	/* Restore the dividers */
+ 	if (!ret) {
+-		clksel_shift = __ffs(parent->clksel_mask);
+-		orig_v = __raw_readl(parent->clksel_reg);
++		orig_v = __raw_readl(parent->reg);
+ 		dummy_v = orig_v;
+ 
+ 		/* Write any other value different from the Read value */
+-		dummy_v ^= (1 << clksel_shift);
+-		__raw_writel(dummy_v, parent->clksel_reg);
++		dummy_v ^= (1 << parent->shift);
++		__raw_writel(dummy_v, parent->reg);
+ 
+ 		/* Write the original divider */
+-		__raw_writel(orig_v, parent->clksel_reg);
++		__raw_writel(orig_v, parent->reg);
+ 	}
+ 
+ 	return ret;
