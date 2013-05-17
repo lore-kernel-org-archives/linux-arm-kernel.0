@@ -1,49 +1,44 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 17 May 2013 16:14:43 +0200
-Subject: [PATCH 0/5 v3] ARM: at91: dt: add USBA support
-Message-ID: <20130517141443.GB16804@game.jcrosoft.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 May 2013 15:18:57 +0100
+Subject: dmatest regression in 3.10-rc1
+In-Reply-To: <20130517123423.GR14863@intel.com>
+References: <20130515152803.GL23869@mudshark.cambridge.arm.com>
+ <20130516153553.GI11706@mudshark.cambridge.arm.com>
+ <20130517123423.GR14863@intel.com>
+Message-ID: <20130517141857.GM23112@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
+Hi Vinod,
 
-	v3:
-	rebase againt 3.10-rc1 + dt macro cleanup
+Thanks for the reply.
 
-	This patch serie finish to add the usb device support to dt for at91
-	with the usba support present on the last at91 generation since sam9g45
+On Fri, May 17, 2013 at 01:34:23PM +0100, Vinod Koul wrote:
+> On Thu, May 16, 2013 at 04:35:53PM +0100, Will Deacon wrote:
+> > Right, so I think I understand what's causing this, but I'll leave it to
+> > Andriy to suggest a fix. The problem comes about because the dmatest
+> > module is now driven from debugfs, making it possible to unload the module
+> > whilst a test run is in progress. In this case:
+> > 
+> > 	- The DMA threads will return from wait_event_freezable_timeout(...)
+> > 	  due to kthread_should_stop() returning true, and subsequently
+> > 	  report failure because done.done is false.
+> > 
+> > 	- The DMA engines may not be idle, so the asynchronous callback can
+> > 	  be invoked after we've started cleaning up, explaining the NULL
+> > 	  dereference I'm seeing.
+> > 
+> > The solutions are either fixing the module exit code to cope with concurrent
+> > DMA transfers or to revert 77101ce578bb and not allow the channel threads to
+> > return mid-transfer.
+> We need to properly abort the channels on removal. This is already handled in
+> the code but the kthread_stop is called after the transactions are aborted. It
+> should be the other way round. Can you try with below patch
 
-The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
+Unfortunately, I can trigger the exact same panic with this patch applied.
 
-  ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
+Isn't there a race between terminating the dmaengine transfers
+(dmaengine_terminate_all) and killing the test threads (kthread_stop) where
+a new transfer could be kicked off by dmatest_func?
 
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git j/for-3.11-usba
-
-for you to fetch changes up to f24c9792c29803420a7bf7204223ef028191d449:
-
-  ARM: at91: sam9m10g45ek add udc DT support (2013-05-17 22:05:46 +0800)
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (5):
-      usb: add Atmel USBA UDC DT support
-      ARM: at91: sam9x5 add udc DT support
-      ARM: at91: sam9x5ek add udc DT support
-      ARM: at91: sam9g45 add udc DT support
-      ARM: at91: sam9m10g45ek add udc DT support
-
- Documentation/devicetree/bindings/usb/atmel-usb.txt |   82 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi                  |   62 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts              |    5 +++++
- arch/arm/boot/dts/at91sam9x5.dtsi                   |   62 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9x5ek.dtsi                 |    5 +++++
- arch/arm/mach-at91/at91sam9g45.c                    |    2 ++
- arch/arm/mach-at91/at91sam9x5.c                     |    2 ++
- drivers/usb/gadget/Kconfig                          |    2 +-
- drivers/usb/gadget/atmel_usba_udc.c                 |  214 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----------------------------------------------------
- drivers/usb/gadget/atmel_usba_udc.h                 |    1 +
- 10 files changed, 382 insertions(+), 55 deletions(-)
-
-Best Regards,
-J.
+Will
