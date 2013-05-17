@@ -1,100 +1,358 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 17 May 2013 23:07:11 +0200
-Subject: [PATCH 3/6] ARM: SAMSUNG: pm: Adjust for pinctrl- and DT-enabled
- platforms
-In-Reply-To: <CAD=FV=XcmzogZc9mWQ+FSr9dg9jML-ACUJY2M2-s+_rBw9gMzQ@mail.gmail.com>
-References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
- <4241187.TFCdy2kUT6@flatron>
- <CAD=FV=XcmzogZc9mWQ+FSr9dg9jML-ACUJY2M2-s+_rBw9gMzQ@mail.gmail.com>
-Message-ID: <1666561.1GujhmlVbA@flatron>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 17 May 2013 23:18:33 +0200
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <1368797744-13737-2-git-send-email-oliver+list@schinagl.nl>
+References: <1368797744-13737-1-git-send-email-oliver+list@schinagl.nl>
+ <1368797744-13737-2-git-send-email-oliver+list@schinagl.nl>
+Message-ID: <51969EA9.1060602@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 of May 2013 13:56:39 Doug Anderson wrote:
-> Tomasz,
-> 
-> On Fri, May 17, 2013 at 1:23 PM, Tomasz Figa <tomasz.figa@gmail.com> 
-wrote:
-> >> I'd rather see you modify patch set #2 to provide some function to
-> >> retrieve just the eint mask and then use it here.  Your patch removes
-> >> this test and doesn't replace it with anything.  If you moved this
-> >> test to pinctrl directly you'd lose the test against intallow.
-> > 
-> > Well, looking from the perspective of status before my patch, it just
-> > bypasses a test that is incorrect on DT-enabled platforms.
-> 
-> True.  What was there before was broken and this avoids the broken code.
-> > I agree that this test is rather reasonable to have, but it would
-> > require defining a new interface and moving all platforms to it,
-> > which for now would be a bit of overkill.
-> 
-> It seems like you could use the same type of solution as patch set #2?
-> 
-> ...oh, but that's only for exynos!  I guess we would need something
-> similar for other platforms.  ...and until we do those other platforms
-> (including S3C64xx, I think) are still using the old
-> s3c_irqwake_eintmask, right?
+Hi Oliver,
 
-Correct.
-
-Also as an extra side note, intallow is used here as a mask of valid 
-eintmask bits on given platform. On Exynos SoCs there are 32 EINTs, so 
-this extra mask is not needed.
-
-> ...so overall your patch series only fully fixes exynos, though it
-> does make other platforms less broken which is a plus.  :)
+Le 17/05/2013 15:35, Oliver Schinagl a ?crit :
+> From: Oliver Schinagl <oliver@schinagl.nl>
 > 
-> > IMHO a separate series that sanitizes the whole PM handling in plat-
-> > samsung, including a rework of this check to make it cover all
-> > platforms in a generic and multiplatform-friendly way. What do you
-> > think?
-> Sure, I think that would be OK.
+> Allwinner has electric fuses (efuse) on their line of chips. This driver
+> reads those fuses and exports them as a sysfs node. Also a symbol is exported
+> for in-kernel useage.
 > 
-> >> Ah, the important part here is the "saved", not the "save"!  The
-> >> "save" should get a NULL chip for all GPIOs and effectively be a
-> >> no-op.
-> >> 
-> >> Skipping the "saved" is important of s3c64xx and s5p64x0 where the
-> >> "saved" seems to transition things over to powerdown mode.  Hopefully
-> >> a future patch of yours adds that back for those platforms in the
-> >> pinmux world.  ...same for restore.
-> > 
-> > S3C64xx can be switched to power down pin configuration manually, but
-> > if you don't do it, it will activate it automatically after entering
-> > sleep mode.
+> While initially these fuses are used to somewhat determin the chipID, these
+> appear to be writeable by the user and thus can be used for other purpouses.
+> For example storing a 128 bit root key, a unique serial number, which could
+> then even be used as a MAC address.
 > 
-> How would restore work in that case?  I'd imagine that it would
-> automatically switch out of the powerdown config at wakeup before
-> running software?  That doesn't seem like a great idea.
-
-This is configurable. There is a bit that determines whether it should 
-switch back to normal config automatically or not. What's interesting is 
-that AFAIR current code uses automatic switch, which even with the glitch 
-prevention in resume can glitch things, due to the period of time between 
-wake-up and resume when pins are misconfigured.
-
-I think we should just configure this bit for manual switch back and 
-trigger the switch from .resumed() callback of the pin controller in 
-pinctrl-s3c64xx driver. I will post a patch for this some day.
-
-> I think that to make S3C64xx work properly we'd need to solve.
+> Because writing to e-fuses can be potentially dangerous, and are certainly
+> not as often writable (if at all) as flash memory, these shouldn't be easily
+> changeable, hence only a read-only mode. An offline tool to write the fuses
+> is in the works.
 > 
+> Currently supported are the following known chips:
+> Allwinner sun4i (A10)
+> Allwinner sun5i (A10s A13)
+> Allwinner sun6i (A31, A31s)
+> Allwinner sun7i (A20)
+
+Since I don't think those patches have been tested on sun6i/sun7i, and
+that there's not even kernel support for those, maybe it's not worth
+mentionning them?
+
 > 
-> I wouldn't be opposed to a re-spin to address some of the above, but I
-> also won't object to this landing and remaining issues being addressed
-> in future patches.  This patch definitely does make things better and
-> no worse.  :)
-
-Let's see. If nobody takes this until Monday, which is very likely, I will 
-send new version.
-
-> On exynos5250-snow (pinmux backported to 3.8):
+> Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
+> ---
+>  drivers/misc/eeprom/Kconfig     |  19 ++++
+>  drivers/misc/eeprom/Makefile    |   1 +
+>  drivers/misc/eeprom/sunxi_sid.c | 218 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 238 insertions(+)
+>  create mode 100644 drivers/misc/eeprom/sunxi_sid.c
 > 
-> Tested-by: Doug Anderson <dianders@chromium.org>
+> diff --git a/drivers/misc/eeprom/Kconfig b/drivers/misc/eeprom/Kconfig
+> index 04f2e1f..c9ddda5 100644
+> --- a/drivers/misc/eeprom/Kconfig
+> +++ b/drivers/misc/eeprom/Kconfig
+> @@ -96,4 +96,23 @@ config EEPROM_DIGSY_MTC_CFG
+>  
+>  	  If unsure, say N.
+>  
+> +config EEPROM_SUNXI_SID
+> +	tristate "Allwinner sunxi security ID support"
+> +	depends on ARCH_SUNXI && SYSFS
+> +	help
+> +	  This is a driver for the 'security ID' available on various Allwinner
+> +	  devices. Currently supported are:
+> +		sun4i (A10)
+> +		sun5i (A10s, A12, A13)
+> +		sun6i (A31)
+> +		sun7i (A20)
+
+Same things here.
+
+> +
+> +	  Due to the potential risks involved with changing e-fuses,
+> +	  this driver is read-only
+> +
+> +	  For more information visit http://linux-sunxi.org/SID
+> +
+> +	  This driver can also be built as a module. If so, the module
+> +	  will be called sunxi_sid.
+> +
+>  endmenu
+> diff --git a/drivers/misc/eeprom/Makefile b/drivers/misc/eeprom/Makefile
+> index fc1e81d..9507aec 100644
+> --- a/drivers/misc/eeprom/Makefile
+> +++ b/drivers/misc/eeprom/Makefile
+> @@ -4,4 +4,5 @@ obj-$(CONFIG_EEPROM_LEGACY)	+= eeprom.o
+>  obj-$(CONFIG_EEPROM_MAX6875)	+= max6875.o
+>  obj-$(CONFIG_EEPROM_93CX6)	+= eeprom_93cx6.o
+>  obj-$(CONFIG_EEPROM_93XX46)	+= eeprom_93xx46.o
+> +obj-$(CONFIG_EEPROM_SUNXI_SID)	+= sunxi_sid.o
+>  obj-$(CONFIG_EEPROM_DIGSY_MTC_CFG) += digsy_mtc_eeprom.o
+> diff --git a/drivers/misc/eeprom/sunxi_sid.c b/drivers/misc/eeprom/sunxi_sid.c
+> new file mode 100644
+> index 0000000..953f137
+> --- /dev/null
+> +++ b/drivers/misc/eeprom/sunxi_sid.c
+> @@ -0,0 +1,218 @@
+> +/*
+> + * Copyright (c) 2013 Oliver Schinagl
+> + * http://www.linux-sunxi.org
+> + *
+> + * Oliver Schinagl <oliver@schinagl.nl>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + *
+> + * This driver exposes the Allwinner security ID, a 128 bit eeprom, in chunks
+> + * of 8 bytes.
+
+16 bytes or 8 bits? because 8 bytes != 128 bits.
+
+> + */
+> +
+> +#include <linux/compiler.h>
+> +#include <linux/device.h>
+> +#include <linux/errno.h>
+> +#include <linux/export.h>
+> +#include <linux/fs.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/kobject.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/stat.h>
+> +#include <linux/sysfs.h>
+> +#include <linux/types.h>
+> +
+> +
+> +#define DRV_NAME "sunxi-sid"
+> +#define DRV_VERSION "1.0"
+> +
+> +/* Register offsets */
+> +#define SUNXI_SID_KEY0 0x00
+> +#define SUNXI_SID_KEY1 0x04
+> +#define SUNXI_SID_KEY2 0x08
+> +#define SUNXI_SID_KEY3 0x0c
+> +
+> +/* There are 4 32-bit keys */
+> +#define SUNXI_SID_KEYS 4
+> +/* and 4 32-bit keys per 32-bit key */
+
+The comment is wrong here.
+
+> +#define SUNXI_SID_SIZE (SUNXI_SID_KEYS * 4)
+> +
+> +#if (SUNXI_SID_SIZE > PAGE_SIZE)
+> +#error "SUNXI_SID_SIZE is larger then the target's PAGE_SIZE, ENOMEM."
+> +#endif
+
+Hmmmm, I don't follow you here, what's the relation between your driver
+and PAGE_SIZE?
+
+> +
+> +static u8 keys_lut[] = {
+> +	SUNXI_SID_KEY0,
+> +	SUNXI_SID_KEY1,
+> +	SUNXI_SID_KEY2,
+> +	SUNXI_SID_KEY3,
+> +};
+> +
+> +struct sid_priv {
+> +	void __iomem *sid_base;
+> +};
+> +
+> +struct sid_priv *p;
+
+What's the point of having a structure here? And why putting a global
+value, !static, with a generic name, while you could have an
+instance-specific one?
+
+struct file has a private_data field, use it.
+
+> +
+> +
+> +/* We read the entire key, using a look up table. Returned is only the
+> + * requested byte. This is of course slower then it could be and uses 4 times
+> + * more reads as needed but keeps code a little simpler.
+> + */
+> +u8 sunxi_sid_read_byte(const int key)
+> +{
+> +	u32 sid_key;
+> +	u8 ret;
+> +
+> +	ret = 0;
+> +	if (likely((key <= SUNXI_SID_SIZE))) {
+> +		sid_key = ioread32(p->sid_base + keys_lut[key >> 2]);
+> +		switch (key % 4) {
+> +		case 0:
+> +			ret = (sid_key >> 24) & 0xff;
+> +			break;
+> +		case 1:
+> +			ret = (sid_key >> 16) & 0xff;
+> +			break;
+> +		case 2:
+> +			ret = (sid_key >> 8) & 0xff;
+> +			break;
+> +		case 3:
+> +			ret = sid_key & 0xff;
+> +			break;
+> +		}
+> +	}
+
+Come on, you can do better. This lookup table is useless.
+
+Also, why the first key is the one with the MSBs?
+I'd expect that the key 0 is the one holding the LSBs.
+
+> +
+> +	return ret;
+> +}
+> +
+> +static ssize_t sid_read(struct file *fd, struct kobject *kobj,
+> +			struct bin_attribute *attr, char *buf,
+> +			loff_t pos, size_t size)
+> +{
+> +	ssize_t ret;
+> +	struct device *dev;
+> +	struct sid_priv *priv;
+> +	int i;
+> +
+> +	ret = -EPERM;
+> +	dev = kobj_to_dev(kobj);
+> +	priv = dev_get_drvdata(dev);
+> +
+> +	if ((likely(size > 0)) && ((size + pos) <= SUNXI_SID_SIZE)) {
+> +		for (i = 0; i < size; i++) {
+> +			buf[i] = sunxi_sid_read_byte(pos + i);
+> +		}
+> +		if (i < PAGE_SIZE) {
+> +			buf[i] = '\0';
+> +			ret = (ssize_t)size;
+> +		} else {
+> +			ret = -ENOMEM;
+> +		}
+
+Hmmmm, what? Why returning \0 here? It's not a string, it's binary data.
+What's the relation with PAGE_SIZE again?
+
+Just return the number of bytes read, that's it.
+
+> +	} else {
+> +		buf[0] = '\0';
+> +		ret = 0;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static struct of_device_id sid_of_match[] = {
+> +	{
+> +		.compatible = "allwinner,sun4i-sid",
+> +	},
+> +	{/* sentinel */}
+> +};
+> +MODULE_DEVICE_TABLE(of, sid_of_match);
+> +
+> +static struct bin_attribute sid_bin_attr = {
+> +	.attr = {
+> +		.name = "key",
+> +		.mode = S_IRUGO,
+> +	},
+> +	.size = SUNXI_SID_SIZE,
+> +	.read = sid_read,
+> +};
+> +
+> +static int sid_remove(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct sid_priv *priv;
+> +
+> +	priv = dev_get_drvdata(dev);
+> +	device_remove_bin_file(dev, &sid_bin_attr);
+> +	iounmap(priv->sid_base);
+> +	devm_kfree(dev, priv);
+> +	return 0;
+> +}
+> +
+> +static int __init sid_probe(struct platform_device *pdev)
+> +{
+> +	int ret;
+> +	struct device *dev = &pdev->dev;
+> +	struct sid_priv *priv;
+> +
+> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+> +	p = priv;
+> +
+> +	dev_set_drvdata(dev, priv);
+> +
+> +	if (!priv) {
+> +		dev_err(dev, "Unable to allocate device private data\n");
+> +		ret = -ENOMEM;
+> +		goto exit;
+> +	}
+
+Isn't it a bit weird to check for the memory allocation after using the
+variable. Also, you don't really need the dev_err, since if the kernel
+fails to allocate some memory, it will tell you anyway.
+
+> +	priv->sid_base = of_iomap(dev->of_node, 0);
+> +	if (!priv->sid_base) {
+> +		dev_err(dev, "Unable to map memory region\n");
+> +		ret = -ENOMEM;
+> +		goto exit_free;
+> +	}
+> +
+> +	ret = device_create_bin_file(dev, &sid_bin_attr);
+> +	if (ret) {
+> +		dev_err(dev, "Unable to create sysfs bin entry\n");
+> +		goto exit_unmap;
+> +	}
+
+Hmmm, maybe it's not worth all these gotos just for an iounmap, I'd
+probably return right away, but that's your call.
+
+> +	dev_info(dev, "Sunxi security ID driver loaded successfully.\n");
+> +
+> +	return 0;
+> +
+> +
+> +exit_unmap:
+> +	iounmap(priv->sid_base);
+> +exit_free:
+> +	devm_kfree(dev, priv);
+> +exit:
+> +	return ret;
+> +}
+> +
+> +static struct platform_driver sid_driver = {
+> +	.probe = sid_probe,
+> +	.remove = sid_remove,
+> +	.driver = {
+> +		.name = DRV_NAME,
+> +		.owner = THIS_MODULE,
+> +		.of_match_table = sid_of_match,
+> +	},
+> +};
+> +module_platform_driver(sid_driver);
+> +
+> +
+> +MODULE_AUTHOR("Oliver Schinagl <oliver@schinagl.nl>");
+> +MODULE_DESCRIPTION("Allwinner sunxi security id driver");
+> +MODULE_VERSION(DRV_VERSION);
+> +MODULE_LICENSE("GPL");
 > 
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
 
-Thanks.
+Thanks for this driver!
+Maxime
 
-Best regards,
-Tomasz
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
