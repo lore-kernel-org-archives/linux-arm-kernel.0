@@ -1,43 +1,35 @@
-From: yegorslists@googlemail.com (Yegor Yefremov)
-Date: Fri, 17 May 2013 23:28:53 +0200
-Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
-In-Reply-To: <20130517185620.GF28484@animalcreek.com>
-References: <20130515002537.GG5600@atomide.com>
- <20130515015212.GB3268@animalcreek.com>
- <20130515170734.GI5600@atomide.com> <20130515215028.GA11883@animalcreek.com>
- <5194B2A8.8020608@visionsystems.de> <20130517185620.GF28484@animalcreek.com>
-Message-ID: <CAGm1_ks10f=6aBxWHzd6KxAaFGfnZUNWrQrSZeFwsT3He9r0Ow@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 18 May 2013 02:23:37 +0400
+Subject: [PATCH v2 2/3] ARM: shmobile: lager: enable Ether
+In-Reply-To: <519235D7.1050706@cogentembedded.com>
+References: <1368499171-22427-1-git-send-email-horms+renesas@verge.net.au>
+ <1368499171-22427-3-git-send-email-horms+renesas@verge.net.au>
+ <9708378.xkqng7A9dx@avalon> <519235D7.1050706@cogentembedded.com>
+Message-ID: <5196ADE9.2080308@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 8:56 PM, Mark A. Greer <mgreer@animalcreek.com> wrote:
-> On Thu, May 16, 2013 at 12:19:20PM +0200, Yegor Yefremov wrote:
->> On 15.05.2013 23:50, Mark A. Greer wrote:
->> > On Wed, May 15, 2013 at 10:07:35AM -0700, Tony Lindgren wrote:
->
->> >> Mark, do you have some omap3 with no iva (other than am3703) to test the
->> >> idle states with?
->> >
->> > I have an am35xx which isn't supposed to have an IVA so I can test with it
->> > (although, I'm not sure how well the kernel works on the am35xx these days).
->> >
->> > I'm a bit busy today but I'll try booting the am35xx tomorrow and if it
->> > comes up, see what I can figure out.
->>
->> I think this issue is relevant to am3517 as you can see from this thread: http://thread.gmane.org/gmane.linux.ports.arm.omap/97903
->> I could boot only with your patch http://www.spinics.net/lists/arm-kernel/msg168865.html
->>
->> I have such a system running, so if you have any other patches/ideas to test, I would do it.
->
-> Yegor, since I've so far been unable to get my am3517evm to fire up, can
-> you play around with the 3517 to see if there appears to be iva registers
-> that can be read/written to safely?  In particular, can the code that idles
-> the iva be run safely on an am3517?
+Hello.
 
-I'll look into this next week. am3517 and IVA seems to be a really big
-mystery. In the TI forum will be stated, there is no IVA:
-http://e2e.ti.com/support/arm/sitara_arm/f/791/t/150961.aspx, but TRM
-has various appearances of IVA2 registers, but no real
-description/explanation of what is IVA and how to eat it.
+On 05/14/2013 05:02 PM, Sergei Shtylyov wrote:
 
-Yegor
+>
+>>> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>>> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>
+>> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>
+>> Is there any ongoing work on DT bindings for sh-eth ?
+>
+>    At least there was -- by Nobuhiro Iwamatsu. I don't think 
+> converting platform data to DT properties makes sense since sh_eth 
+> have some procedural platform data. I also don't think working on DT 
+> makes sense until the driver is cleaned up of all its #ifdef'ery (that 
+> work is partly being done by Nobuhiro and I'm planning to start the 
+> big #ifdef cleanup this week).
+
+     Alas, not this week apparently as my management has shifted 
+priorities thrice this week. So maybe late next week now...
+
+WBR, Sergei
