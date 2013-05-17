@@ -1,46 +1,44 @@
-From: acourbot@nvidia.com (Alex Courbot)
-Date: Fri, 17 May 2013 14:36:34 +0900
-Subject: Naming convention DSI + device tree
-In-Reply-To: <519522C1.5010107@wwwdotorg.org>
-References: <20130514181745.GA2762@mail.o2s.ch>
- <51940C22.4050802@wwwdotorg.org> <20130516071537.GA13573@mail.o2s.ch>
- <519522C1.5010107@wwwdotorg.org>
-Message-ID: <5195C1E2.4020009@nvidia.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 17 May 2013 11:09:24 +0530
+Subject: [PATCH] ARM: OMAP4: change the device names in usb_bind_phy
+In-Reply-To: <20130516162034.GX5600@atomide.com>
+References: <1366697656-14315-1-git-send-email-kishon@ti.com>
+ <51936946.3030507@iki.fi> <20130516155857.GV5600@atomide.com>
+ <519503DA.5070303@iki.fi> <20130516162034.GX5600@atomide.com>
+Message-ID: <5195C28C.40300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2013 03:17 AM, Stephen Warren wrote:
->> Is this upcoming CDF included within your "linux-next_common"
->> branch?
+Hi,
+
+On Thursday 16 May 2013 09:50 PM, Tony Lindgren wrote:
+> * Tomi Valkeinen <tomi.valkeinen@iki.fi> [130516 09:11]:
+>> On 16/05/13 18:58, Tony Lindgren wrote:
+>>> * Tomi Valkeinen <tomi.valkeinen@iki.fi> [130515 03:59]:
+>>>
+>>> Just checking.. Do you have CONFIG_OMAP_OCP2SCP=y in your .config? Sounds
+>>> like the some transceivers should depend on that for omap4.
+>>
+>> Yes, I have OCP2SCP=y.
 >
-> No. That branch of mine is basd on linux-next, so whatever is in
-> linux-next is in my branch, and I certainly haven't applied the CDF
-> locally.
+> Hmm well no idea beyond that then. Sounds like Kishon should check it.
 >
-> I believe the CDF has been posted to various mailing lists a few
-> times, but it isn't checked in yet since there isn't a final version.
-> I CC'd Alex; he might know the status better than me.
+>>>> The musb-hdrc id is wrong on overo also.
+>>>
+>>> Hmm has there been a fix posted for that?
+>>
+>> I couldn't find with a quick look. We debugged and discussed this on an irc
+>> channel with Kishon, who said he'll send a patch. Changing the musb-hdrc ID
+>> on overo fixed the issue, and it looks very similar to the error on 4430sdp.
+>> The overo fix was just:
 
-Current version is RFC v2 - I know Laurent is working on a v3, but it is 
-taking some time. It will probably differ considerably from v2, so be 
-warned if you use it.
+hmm.. I think using device name to bind the controller and the phy can 
+no longer be used reliably. I think it's better to have something like 
+what Grant suggested in my other patch series.. to have the phy 
+reference into the host controllers platform_data structure. And for the 
+phy reference I'll have label and id.
 
-Still, if you want to play around with the CDF, you can have a look at 
-the tegra-cdf branch of my github repo: 
-https://github.com/Gnurou/linux/commits/tegra-cdf
+Does this makes sense to you?
 
-It was kind of old so I rebased it on top of 3.10rc1. It includes the 
-CDF v2 patch, adds CDF support to the tegra-drm driver, and also 
-implements a driver for the Tegra 2-based Ventana panel. It's pretty 
-straightforward to read so I guess you can use that as a guide.
-
-I checked whether the rebase worked and it does - you just need to 
-enable host1x/tegradrm support on top of the default settings (Stephen, 
-why aren't these enabled by default?)
-
-So long story short, CDF works well and is small enough to be easy to 
-maintain out-of-tree. A proper panel framework is desperately needed in 
-the kernel, so I hope it will move forward soon.
-
-Hope this helps,
-Alex.
+Thanks
+Kishon
