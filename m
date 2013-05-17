@@ -1,11 +1,11 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 17 May 2013 08:30:15 +0800
+Date: Fri, 17 May 2013 08:31:24 +0800
 Subject: [PATCH] ARM: prima2: return rather than panic on missing DT nodes
 In-Reply-To: <CAL_JsqL_z99EfT=3E32c0AS6fbwqOyTb7n+AzySmzJNyMCab3w@mail.gmail.com>
 References: <1368719437-28287-1-git-send-email-robherring2@gmail.com>
  <519510A4.8090904@st.com>
  <CAL_JsqL_z99EfT=3E32c0AS6fbwqOyTb7n+AzySmzJNyMCab3w@mail.gmail.com>
-Message-ID: <CAGsJ_4w_a=vXMeh-vbRKwD+KGqRNthx-zne=DR3iR7B-WqiUPw@mail.gmail.com>
+Message-ID: <CAGsJ_4xyLqVRoOa7btKuvPn01KjJF=rXvMEu5XYzPX+UH1S2Wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,6 +19,9 @@ List-Id: linux-arm-kernel.lists.infradead.org
 >> multiplatforms.
 >>
 >> I was just about to send my patch and just noticed your patch.
+
+will you send? i can test.
+
 >>
 >>
 >> On 16/05/13 16:50, Rob Herring wrote:
@@ -50,16 +53,20 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Agreed, but that may cause some init ordering issues. So I'll leave
 > that to someone that knows this platform and can test it.
 
-what if i really want the system to panic early when these is no pwrc
-node?  then we can check the machine , if it is sirf, we panic the
-kernel. that results in ugly source codes.
+what if we want the system to keep the behavior of panic when these is
+no pwrc node?  then we can check the machine , if it is sirf, we panic
+the kernel. that results in ugly source codes.
 
         np = of_find_matching_node(NULL, pwrc_ids);
-        if (!np)
--               panic("unable to find compatible pwrc node in dtb\n");
-+               return -ENODEV;
+        if (!np)  {
+               if (sirf platform)
+                              panic("unable to find compatible pwrc
+node in dtb\n");
+               else
+                              return -ENODEV;
+      }
 
-then it turns out that moving the codes to callbacks of machine is the
+it turns out that moving the codes to callbacks of machine is the
 right way. i will take care the init ordering issues.
 
 >
