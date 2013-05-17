@@ -1,46 +1,24 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 17 May 2013 12:52:12 +0200
-Subject: [PATCH 3/3] staging: drm/imx: revert vsync_cnt for di->id 1
-In-Reply-To: <1368782393-9660-4-git-send-email-list-09_linuc_arm@tqsc.de>
-References: <1368782393-9660-1-git-send-email-list-09_linuc_arm@tqsc.de>
- <1368782393-9660-4-git-send-email-list-09_linuc_arm@tqsc.de>
-Message-ID: <1368787932.4011.8.camel@pizza.hi.pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 May 2013 11:55:00 +0100
+Subject: ARM Cortex-A7 support in Linux
+In-Reply-To: <f6c9d2b0d52d63efa95f780b172690ef@localhost>
+References: <A1A6EA40F8503D48BB002B42BD65974E295341@039-SN2MPN1-012.039d.mgd.msft.net>
+ <f6c9d2b0d52d63efa95f780b172690ef@localhost>
+Message-ID: <20130517105500.GE18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 17.05.2013, 11:19 +0200 schrieb Markus Niebel:
-> From: Markus Niebel <Markus.Niebel@tqs.de>
-> 
-> partial fix of changes from
-> "staging: drm/imx: Add support for VGA via TVE on i.MX53"
-> 
-> parallel display support / DVI needs the original setting to work
-> 
-> Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
-> ---
->  drivers/staging/imx-drm/ipu-v3/ipu-di.c |    7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-> index e7b9c98..0b6806e 100644
-> --- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-> @@ -603,7 +603,12 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
->  
->  		vsync_cnt = 3;
->  		if (di->id == 1)
-> -			vsync_cnt = 6;
-> +			/*
-> +			 * TODO: change only for TVEv2, parallel display
-> +			 * uses pin 2 / 3
-> +			 */
-> +			if (!(sig->hsync_pin == 2 && sig->vsync_pin == 3))
-> +				vsync_cnt = 6;
->  
->  		if (sig->Hsync_pol) {
->  			if (sig->hsync_pin == 2)
+On Fri, May 17, 2013 at 12:47:45PM +0200, Marc Zyngier wrote:
+> It depends which feature you're after. Linux supports the GIC
+> virtualization extensions with KVM, for example. But we don't make any use
+> of other things like priorities, split deactivation/priority drop...
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Not that we could make use of priorities anymore as all interrupt handlers
+are now run with IRQs disabled; an IRQ handler can't be interrupted by a
+higher priority IRQ coming in.
 
-regards
-Philipp
+Part of the solution to that is to go back to the original philosophy of
+IRQ handling in Linux - do the least possible amount of work in the IRQ
+and move the heavier stuff off into soft-IRQ context.  Unfortunately,
+many drivers are no longer written like that, and just do a great amount
+of time consuming work in their IRQ handler.
