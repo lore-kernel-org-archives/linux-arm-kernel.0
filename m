@@ -1,36 +1,112 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 17 May 2013 23:05:31 +0300
-Subject: [PATCH 6/6] ARM: OMAP2+: Remove omap4 ocp2scp pdata
-In-Reply-To: <20130517191803.468.32800.stgit@localhost>
-References: <20130517191304.468.73487.stgit@localhost>
- <20130517191803.468.32800.stgit@localhost>
-Message-ID: <20130517200531.GA17851@arwen.pp.htv.fi>
+From: andreas.herrmann@calxeda.com (Andreas Herrmann)
+Date: Fri, 17 May 2013 22:16:39 +0200
+Subject: [PATCH v2] documentation: iommu: add description of ARM System
+ MMU binding
+In-Reply-To: <20130513104147.GF10369@alberich>
+References: <1365789727-5371-1-git-send-email-will.deacon@arm.com>
+ <20130513095020.GB10369@alberich>
+ <20130513095846.GC29814@mudshark.cambridge.arm.com>
+ <20130513104147.GF10369@alberich>
+Message-ID: <20130517201639.GL10369@alberich>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 12:18:03PM -0700, Tony Lindgren wrote:
-> This is omap4+ only and no longer needed as omap4+ can be booted
-> using device tree.
+On Mon, May 13, 2013 at 12:41:47PM +0200, Andreas Herrmann wrote:
+> On Mon, May 13, 2013 at 05:58:46AM -0400, Will Deacon wrote:
+> > On Mon, May 13, 2013 at 10:50:20AM +0100, Andreas Herrmann wrote:
+
+[snip]
+
+> > > I also think that it is more useful to move the stream-id property to
+> > > the device node of a master device. (It's a characteristic of the
+> > > master device not of the SMMU.) Currently with multiple stream IDs per
+> > > master device you have repeated entries in the mmu-master property.
+> > 
+> > The problem with that approach is how to handle StreamID remastering. This
+> > can and will happen, so the StreamID for a device is actually a property of
+> > both the device *and* a particular point in the bus topology. Putting this
+> > information in the device nodes will drag topology information all over the
+> > place and I don't think it will make things clearer to read or easier to parse.
 > 
-> Also remove the related pdata handling from the driver and the
-> now unneeded platform_data/omap_ocp2scp.h.
+> Ok, good point, didn't think about that.
+> And agreed, adding remastered StreamIDs as a property to a device node is odd.
 > 
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > > But all that is needed is to point (once) to each mmu-master in the
+> > > SMMU device node. Then you should be able to look up the corresponding
+> > > stream IDs in the device node for each mmu-master.
+> > 
+> > Again, you also need to tie in topology information if you go down this
+> > route.
 
-fine by me :-)
+I still don't like the approach of having two independend lists that
+must be in sync to associate a master with its stream-ids.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Why? Say you have 8 masters for an SMMU with 1 or 2 stream-ids each:
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130517/b9180ad0/attachment.sig>
+     	 smmu {
+		...
+                mmu-masters = <&dma0>, <&dma0>, <&dma1>, <&dma1>,
+			      <&dma2>, <&dma2>, <&dma4>, <&dma4>,
+			      <&dma5>, <&dma6>, <&dma7>, <&dma8>;
+                stream-ids =	<0>, <1>, <2>, <3>,
+				<4>, <5>, <6>, <7>,
+		                <8>, <9>, <0xa>, <0xb>;
+	}
+
+Couldn't we use of_phandle_args for this purpose? So your example
+
++        smmu {
+		 ...
++                mmu-masters = <&dma0>,
++                              <&dma0>,
++                              <&dma1>;
++                stream-ids  = <0xd01d>,
++                              <0xd01e>,
++                              <0xd11c>;
++        };
+
+would look like
+
+	dma0 {
+		...
+		#stream-id-cells = <2>
+		...
+	}
+
+	dma1 {
+		...
+		#stream-id-cells = <1>
+		...
+	}
+
+        smmu {
+		...
+		mmu-masters = <&dma0 0xd01d 0xd01e
+			       &dma1 0xd11c>,
+       };
+
+and my example would be converted to
+
+	smmu {
+		...
+                mmu-masters = <&dma0 0 1 &dma1 2 3 &dma2 4 5
+			       &dma4 6 7 &dma5 8 &dma6 9
+			       &dma7 0xa &dma8 0xb>
+		...
+	}
+
+where each master has #stream-id-cells property with value 1 or 2.
+And if dma4 has #stream-id-cells = <1>, the parsing code quickly
+notifies us about an error whereas such an error can't be noticed
+right from the beginning with the two-list-approach. In this example
+stream-id 6 belongs to dma3 which was completely ommitted in both
+descriptions.
+
+Of course usage of of_phandle_args would restrict the number of
+stream-ids per master to 8 (which is currently used as
+MAX_PHANDLE_ARGS). But I don't think that this is a restriction in
+practice or do you expect to have more than 8 stream-ids per master
+(ie. per struct device in Linux)?
+
+
+Andreas
