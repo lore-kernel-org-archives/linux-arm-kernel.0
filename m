@@ -1,78 +1,119 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 17 May 2013 17:17:01 +0200
-Subject: [PULL] add support for ARM-v7M
-Message-ID: <20130517151701.GA8215@pengutronix.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 17 May 2013 16:20:43 +0100
+Subject: [RFC PATCH v4 00/18] ARM: DT cpu bindings updates
+Message-ID: <1368804061-4421-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+This patchset is an update of a previous posting:
 
-The following changes since commit 73a09d212ec65b7068a283e6034fa05649d3d075:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/165219.html
 
-  Merge branch 'for-next' of git://git.pengutronix.de/git/ukl/linux into devel-stable (2013-03-09 15:49:32 +0000)
+v4 changes:
 
-are available in the git repository at:
+- Replaced WARN* with pr_warn
+- Removed tmp_map in arm_dt_init_cpu_maps()
+- Rebased against 3.10-rc1
+- Patched additional atmel and sunxi dts files
+- Removed BUG_ON on !bootcpu_valid, now flagged up as an error
+- Added code to reset invalid entries in cpu_logical_map after DT parsing
 
-  git://git.pengutronix.de/git/ukl/linux.git for-next
+v3 changes:
 
-for you to fetch changes up to 6fae9cdafc92ae9958a3a45dd68205f72e3ad900:
+- More dts fixes of in-kernel dts
+- Defined ARM v8 behaviour with different cpus node #address-cells
+- Added pre ARM11 processors suffixes in the cpu node compatible list
+- Reordered series
+- Reworded #address-cells definition
+- Added ARM v8 - cores running on AArch32 bindings example
+- Moved WARN* calls on one line to prevent grepping issues
 
-  ARM: ARMv7-M: implement read_cpuid_ext (2013-05-17 11:44:40 +0200)
+v2 changes:
 
-All but the last patch were in next since next-20130418 without issues.
-The last patch fixes a problem in combination with 
+- Reworded DT cpu bindings
+- Split the set, with per-mach specific dts updates
+- Updated cpu node compatible string list
+- Defined behaviour of OS running on v8 in AArch32
 
-	8164f7a (ARM: 7680/1: Detect support for SDIV/UDIV from ISAR0 register)
+The introduction of DT cpus/cpu bindings for ARM requires well established
+rules to enforce the reg property definition for 32-bit and 64-bit ARM
+processors, inclusive of legacy and current uniprocessor/SMP systems.
 
-which triggers a WARN_ON without an implemented read_cpuid_ext.
+ARM 64 bit architecture also requires dtb compiled for 64-bit configurations
+to be reused for kernels running in 32 bit mode, so the cpus/cpu bindings
+specification must be made compliant to cope with this configuration.
 
-The branch merges fine into v3.10-rc1 and I'd be happy if you pulled it
-for 3.11-rc1. The only missing piece to be able to run a Cortex-M3 is
-the irqchip driver that will go in via Thomas Gleixner and platform
-specific stuff.
+Patch #1-#2 of this series are fixes and are included to have a clean patch
+series and should get reviewed and merged separately.
 
-Best regards
-Uwe
-----------------------------------------------------------------
-Catalin Marinas (1):
-      ARM: Add base support for ARMv7-M
+Patch #3-18, along with some kernel fixes related to DT parsing function,
+update the cpu node bindings and in kernel dts files to cope with legacy,
+current and upcoming ARM systems.
 
-Uwe Kleine-K?nig (3):
-      ARM: ARMv7-M: Add support for exception handling
-      ARM: ARMv7-M: Allow the building of new kernel port
-      ARM: ARMv7-M: implement read_cpuid_ext
+In-kernel device tree source files are updated to comply with the latest
+specification, so thorough testing is required in order to validate all
+changes on all affected ARM systems, in particular systems with exotic
+MPIDR configurations that are likely to break with the changes provided.
 
- arch/arm/Kconfig                   |   4 +-
- arch/arm/Kconfig-nommu             |   2 +-
- arch/arm/Makefile                  |   1 +
- arch/arm/include/asm/assembler.h   |  17 +++-
- arch/arm/include/asm/cputype.h     |  44 ++++++++++-
- arch/arm/include/asm/glue-cache.h  |  27 +++++++
- arch/arm/include/asm/glue-df.h     |   8 ++
- arch/arm/include/asm/glue-proc.h   |   9 +++
- arch/arm/include/asm/irqflags.h    |  22 ++++--
- arch/arm/include/asm/ptrace.h      |   4 +
- arch/arm/include/asm/system_info.h |   1 +
- arch/arm/include/asm/v7m.h         |  44 +++++++++++
- arch/arm/include/uapi/asm/ptrace.h |  35 +++++++--
- arch/arm/kernel/Makefile           |   8 +-
- arch/arm/kernel/entry-common.S     |   4 +
- arch/arm/kernel/entry-header.S     | 124 +++++++++++++++++++++++++++++
- arch/arm/kernel/entry-v7m.S        | 143 +++++++++++++++++++++++++++++++++
- arch/arm/kernel/head-nommu.S       |  10 ++-
- arch/arm/kernel/setup.c            |  17 +++-
- arch/arm/kernel/traps.c            |   8 ++
- arch/arm/mm/Kconfig                |  21 ++++-
- arch/arm/mm/Makefile               |   2 +
- arch/arm/mm/cache-nop.S            |  50 ++++++++++++
- arch/arm/mm/nommu.c                |   7 ++
- arch/arm/mm/proc-v7m.S             | 157 +++++++++++++++++++++++++++++++++++++
- 25 files changed, 742 insertions(+), 27 deletions(-)
- create mode 100644 arch/arm/include/asm/v7m.h
- create mode 100644 arch/arm/kernel/entry-v7m.S
- create mode 100644 arch/arm/mm/cache-nop.S
- create mode 100644 arch/arm/mm/proc-v7m.S
+Code relying on the reg property size to be 4-bytes must be updated so that
+dtbs compiled for 64-bit kernels can also be used to boot a 32-bit system.
+
+Lorenzo Pieralisi (18):
+  ARM: kernel: fix arm_dt_init_cpu_maps() to skip non-cpu nodes
+  ARM: kernel: fix __cpu_logical_map default initialization
+  Documentation: devicetree: arm: cpus/cpu nodes bindings updates
+  ARM: dts: am33xx: cpus/cpu nodes dts updates
+  ARM: dts: armada-370-xp: cpus/cpu node dts updates
+  ARM: dts: at91: cpus/cpu node dts updates
+  ARM: dts: exynos5440: cpus/cpu nodes dts updates
+  ARM: dts: imx: cpus/cpu nodes dts updates
+  ARM: dts: lpc32xx: cpus/cpu nodes dts updates
+  ARM: dts: omap: cpus/cpu nodes dts updates
+  ARM: dts: picoxcell: cpus/cpu nodes dts updates
+  ARM: dts: prima2: cpus/cpu node dts updates
+  ARM: dts: pxa2xx: cpus/cpu nodes dts updates
+  ARM: dts: r8a7740: cpus/cpu nodes dts updates
+  ARM: dts: sh7372: cpus/cpu nodes dts updates
+  ARM: dts: spear: cpus/cpu nodes dts updates
+  ARM: dts: sunxi: cpus/cpu nodes dts updates
+  ARM: DT: kernel: DT cpus/cpu node bindings update
+
+ Documentation/devicetree/bindings/arm/cpus.txt | 459 ++++++++++++++++++++++---
+ arch/arm/boot/dts/am33xx.dtsi                  |   4 +
+ arch/arm/boot/dts/armada-370-xp.dtsi           |   4 +
+ arch/arm/boot/dts/at91rm9200.dtsi              |   6 +-
+ arch/arm/boot/dts/at91sam9260.dtsi             |   8 +-
+ arch/arm/boot/dts/at91sam9263.dtsi             |   8 +-
+ arch/arm/boot/dts/at91sam9g45.dtsi             |   8 +-
+ arch/arm/boot/dts/at91sam9n12.dtsi             |   8 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi              |   8 +-
+ arch/arm/boot/dts/exynos5440.dtsi              |   4 +
+ arch/arm/boot/dts/imx23.dtsi                   |   8 +-
+ arch/arm/boot/dts/imx28.dtsi                   |   8 +-
+ arch/arm/boot/dts/imx6dl.dtsi                  |   2 +
+ arch/arm/boot/dts/imx6q.dtsi                   |   4 +
+ arch/arm/boot/dts/lpc32xx.dtsi                 |   8 +-
+ arch/arm/boot/dts/omap2.dtsi                   |   6 +-
+ arch/arm/boot/dts/omap3.dtsi                   |   5 +
+ arch/arm/boot/dts/omap4.dtsi                   |   7 +
+ arch/arm/boot/dts/omap5.dtsi                   |   7 +
+ arch/arm/boot/dts/picoxcell-pc3x2.dtsi         |   8 +-
+ arch/arm/boot/dts/picoxcell-pc3x3.dtsi         |   8 +-
+ arch/arm/boot/dts/prima2.dtsi                  |   2 +
+ arch/arm/boot/dts/pxa2xx.dtsi                  |   7 +-
+ arch/arm/boot/dts/r8a7740.dtsi                 |   4 +
+ arch/arm/boot/dts/sama5d3.dtsi                 |   2 +
+ arch/arm/boot/dts/sh7372.dtsi                  |   5 +
+ arch/arm/boot/dts/spear13xx.dtsi               |   2 +
+ arch/arm/boot/dts/spear3xx.dtsi                |   8 +-
+ arch/arm/boot/dts/spear600.dtsi                |   8 +-
+ arch/arm/boot/dts/sun4i-a10.dtsi               |   2 +
+ arch/arm/boot/dts/sun5i-a13.dtsi               |   2 +
+ arch/arm/include/asm/cputype.h                 |   2 +
+ arch/arm/include/asm/smp_plat.h                |   2 +-
+ arch/arm/kernel/devtree.c                      | 149 ++++----
+ arch/arm/kernel/setup.c                        |   2 +-
+ 35 files changed, 646 insertions(+), 139 deletions(-)
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.8.2.2
