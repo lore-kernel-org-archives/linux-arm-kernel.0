@@ -1,126 +1,36 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 17 May 2013 21:49:13 +0200
-Subject: [PATCH 2/6] ARM: EXYNOS: Fix EINT wake-up mask configuration when
- pinctrl is used
-In-Reply-To: <CAD=FV=UUzB=FwHfzTwRMDDGn3+FkuZPbXG9QL_h07qZgRMkZrw@mail.gmail.com>
-References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
- <1368807872-2601-3-git-send-email-t.figa@samsung.com>
- <CAD=FV=UUzB=FwHfzTwRMDDGn3+FkuZPbXG9QL_h07qZgRMkZrw@mail.gmail.com>
-Message-ID: <13970900.6bfa7bMWJL@flatron>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 17 May 2013 23:05:31 +0300
+Subject: [PATCH 6/6] ARM: OMAP2+: Remove omap4 ocp2scp pdata
+In-Reply-To: <20130517191803.468.32800.stgit@localhost>
+References: <20130517191304.468.73487.stgit@localhost>
+ <20130517191803.468.32800.stgit@localhost>
+Message-ID: <20130517200531.GA17851@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-
-On Friday 17 of May 2013 12:22:36 Doug Anderson wrote:
-> Tomasz,
+On Fri, May 17, 2013 at 12:18:03PM -0700, Tony Lindgren wrote:
+> This is omap4+ only and no longer needed as omap4+ can be booted
+> using device tree.
 > 
-> On Fri, May 17, 2013 at 9:24 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> > On DT-enabled systems pinctrl-exynos driver is responsible for
-> > handling
-> > of wake-up EINT interrupts. This patch adjusts wake-up mask
-> > configuration code to take wake-up mask value from pinctrl-exynos
-> > driver on DT-enabled systems.
-> > 
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> > 
-> >  arch/arm/mach-exynos/include/mach/pm-core.h | 14 +++++++++++++-
-> >  1 file changed, 13 insertions(+), 1 deletion(-)
+> Also remove the related pdata handling from the driver and the
+> now unneeded platform_data/omap_ocp2scp.h.
 > 
-> A little ugly
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
 
-Hehe. I thought exactly the same, but I don't see any better solution at 
-the moment, except persuading the whole suspend/resume support in plat-
-samsung to be a friend of multiplatform, which will have to be done 
-eventually, but at the moment I don't have time to work on it.
+fine by me :-)
 
-> because of the need to support old non-device tree
-> boards, but seems reasonable.  Means that if you have a device tree
-> you'd better be using pincontrol.  Assuming that's true now someone
-> needs to go through and remove all of the device tree support (and
-> bindings Documentation) for gpio-samsung.  Maybe someone has already
-> started?
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-If I remember correctly Sylwester Nawrocki had some patches to remove 
-that. He's on a leave right now, so he won't send them for a while, but I 
-guess it's nothing urgent.
-
-> On exynos5250-snow (pinmux backported to 3.8):
-> 
-> Tested-by: Doug Anderson <dianders@chromium.org>
-> 
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-
-Thanks.
-
-Best regards,
-Tomasz
-
-> On Fri, May 17, 2013 at 9:24 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> > On DT-enabled systems pinctrl-exynos driver is responsible for
-> > handling
-> > of wake-up EINT interrupts. This patch adjusts wake-up mask
-> > configuration code to take wake-up mask value from pinctrl-exynos
-> > driver on DT-enabled systems.
-> > 
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> > 
-> >  arch/arm/mach-exynos/include/mach/pm-core.h | 14 +++++++++++++-
-> >  1 file changed, 13 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mach-exynos/include/mach/pm-core.h
-> > b/arch/arm/mach-exynos/include/mach/pm-core.h index 7dbbfec..296090e
-> > 100644
-> > --- a/arch/arm/mach-exynos/include/mach/pm-core.h
-> > +++ b/arch/arm/mach-exynos/include/mach/pm-core.h
-> > @@ -18,8 +18,15 @@
-> > 
-> >  #ifndef __ASM_ARCH_PM_CORE_H
-> >  #define __ASM_ARCH_PM_CORE_H __FILE__
-> > 
-> > +#include <linux/of.h>
-> > 
-> >  #include <mach/regs-pmu.h>
-> > 
-> > +#ifdef CONFIG_PINCTRL_EXYNOS
-> > +extern u32 exynos_get_eint_wake_mask(void);
-> > +#else
-> > +static inline u32 exynos_get_eint_wake_mask(void) { return
-> > 0xffffffff; } +#endif
-> > +
-> > 
-> >  static inline void s3c_pm_debug_init_uart(void)
-> >  {
-> >  
-> >         /* nothing here yet */
-> > 
-> > @@ -27,7 +34,12 @@ static inline void s3c_pm_debug_init_uart(void)
-> > 
-> >  static inline void s3c_pm_arch_prepare_irqs(void)
-> >  {
-> > 
-> > -       __raw_writel(s3c_irqwake_eintmask, S5P_EINT_WAKEUP_MASK);
-> > +       u32 eintmask = s3c_irqwake_eintmask;
-> > +
-> > +       if (of_have_populated_dt())
-> > +               eintmask = exynos_get_eint_wake_mask();
-> > +
-> > +       __raw_writel(eintmask, S5P_EINT_WAKEUP_MASK);
-> > 
-> >         __raw_writel(s3c_irqwake_intmask & ~(1 << 31),
-> >         S5P_WAKEUP_MASK);
-> >  
-> >  }
-> > 
-> > --
-> > 1.8.2.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe
-> linux-samsung-soc" in the body of a message to
-> majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130517/b9180ad0/attachment.sig>
