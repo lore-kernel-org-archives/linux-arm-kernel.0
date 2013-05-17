@@ -1,109 +1,50 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 17 May 2013 12:25:02 -0700
-Subject: [PATCH 6/6] pinctrl: exynos: Handle suspend/resume of GPIO EINT
- registers
-In-Reply-To: <1368807872-2601-7-git-send-email-t.figa@samsung.com>
-References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
- <1368807872-2601-7-git-send-email-t.figa@samsung.com>
-Message-ID: <CAD=FV=WKCeW=3BFnmnyXB70VCjXHGrzarXbj8cBfq4-ENA-Y2w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 17 May 2013 12:25:16 -0700
+Subject: [GIT PULL] omap fixes for v3.10-rc1
+Message-ID: <20130517192515.GC5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
-On Fri, May 17, 2013 at 9:24 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> Some GPIO EINT control registers needs to be preserved across
-> suspend/resume cycle. This patch extends the driver to take care of
-> this.
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
 
-I was confused why we didn't seem to need this on exynos5250-snow but
-figured it out.  We only use interrupts on GPX lines which don't need
-this code.  ...but on any exynos5250 boards that use one of the other
-banks for interrupts you'd need it.  I tested by setting one of the
-registers related to GPA0 and found that this code is indeed needed on
-exynos5250.  :)
+are available in the git repository at:
 
-Just nits / optional comments below, so on exynos5250-snow (pinmux
-backported to 3.8):
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10-rc1/fixes
 
-Tested-by: Doug Anderson <dianders@chromium.org>
+for you to fetch changes up to a6d25f4c951b8b28f2eaec6f891ff834622532f2:
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+  ARM: AM33XX: Add missing .clkdm_name to clkdiv32k_ick clock (2013-05-17 10:07:45 -0700)
 
+----------------------------------------------------------------
+Fixes for omaps:
 
-> @@ -229,6 +235,11 @@ static int exynos_eint_gpio_init(struct samsung_pinctrl_drv_data *d)
->                         dev_err(dev, "gpio irq domain add failed\n");
->                         return -ENXIO;
->                 }
-> +
-> +               bank->soc_priv = devm_kzalloc(d->dev,
-> +                       sizeof(struct exynos_eint_gpio_save), GFP_KERNEL);
-> +               if (!bank->soc_priv)
-> +                       return -ENOMEM;
+- a section mismatch fix for hwmod
+- boot fix for omap2plus_defconfig for omap2
+- musb interrupt fix when using device tree
+- am33xx clock fix that I missed earlier somehow
+- omap1 dma return code error fix
 
-Slight nit to add this before the call to irq_domain_add_linear().
-demv() will handle freeing your memory but nothing will handle undoing
-the irq_domain_add_linear() if you return an error.
+----------------------------------------------------------------
+Paul Walmsley (1):
+      ARM: OMAP2+: Add missing CONFIG_ARCH_MULTI_V6=y to omap2plus_defconfig
 
->         }
->
->         return 0;
-> @@ -528,6 +539,58 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
->         return 0;
->  }
->
-> +static void exynos_pinctrl_suspend_bank(
-> +                               struct samsung_pinctrl_drv_data *drvdata,
-> +                               struct samsung_pin_bank *bank)
-> +{
-> +       struct exynos_eint_gpio_save *save = bank->soc_priv;
-> +       void __iomem *regs = drvdata->virt_base;
-> +
-> +       save->eint_con = readl(regs + EXYNOS_GPIO_ECON_OFFSET
-> +                                               + bank->eint_offset);
-> +       save->eint_fltcon0 = readl(regs + EXYNOS_GPIO_EFLTCON_OFFSET
-> +                                               + 2 * bank->eint_offset);
-> +       save->eint_fltcon1 = readl(regs + EXYNOS_GPIO_EFLTCON_OFFSET
-> +                                               + 2 * bank->eint_offset + 4);
+Tony Lindgren (1):
+      ARM: dts: Fix musb interrupt for device tree booting
 
-Optional: I wish there were debug statements to help debug, like:
+Vaibhav Hiremath (1):
+      ARM: AM33XX: Add missing .clkdm_name to clkdiv32k_ick clock
 
-pr_debug("%s: save     con %#010x\n", bank->name, save->eint_con);
-pr_debug("%s: save fltcon0 %#010x\n", bank->name, save->eint_fltcon0);
-pr_debug("%s: save fltcon1 %#010x\n", bank->name, save->eint_fltcon1);
+Wei Yongjun (1):
+      ARM: OMAP: fix error return code in omap1_system_dma_init()
 
+jean-philippe francois (1):
+      ARM: OMAP: fix __init section mismatch for _enable_preprogram
 
-> +}
-> +
-> +static void exynos_pinctrl_suspend(struct samsung_pinctrl_drv_data *drvdata)
-> +{
-> +       struct samsung_pin_ctrl *ctrl = drvdata->ctrl;
-> +       struct samsung_pin_bank *bank = ctrl->pin_banks;
-> +       int i;
-> +
-> +       for (i = 0; i < ctrl->nr_banks; ++i, ++bank)
-> +               if (bank->eint_type == EINT_TYPE_GPIO)
-> +                       exynos_pinctrl_suspend_bank(drvdata, bank);
-> +}
-> +
-> +static void exynos_pinctrl_resume_bank(
-> +                               struct samsung_pinctrl_drv_data *drvdata,
-> +                               struct samsung_pin_bank *bank)
-> +{
-> +       struct exynos_eint_gpio_save *save = bank->soc_priv;
-> +       void __iomem *regs = drvdata->virt_base;
-> +
-
-Optional: debug statements:
-
-pr_debug("%s:     con %#010x => %#010x\n", bank->name,
-  readl(regs + EXYNOS_GPIO_ECON_OFFSET + bank->eint_offset),
-  save->eint_con);
-pr_debug("%s: fltcon0 %#010x => %#010x\n", bank->name,
-  readl(regs + EXYNOS_GPIO_EFLTCON_OFFSET + 2 * bank->eint_offset),
-  save->eint_fltcon0);
-pr_debug("%s: fltcon1 %#010x => %#010x\n", bank->name,
-  readl(regs + EXYNOS_GPIO_EFLTCON_OFFSET + 2 * bank->eint_offset + 4),
-  save->eint_fltcon1);
-
--Doug
+ arch/arm/boot/dts/omap3.dtsi          |  2 +-
+ arch/arm/configs/omap2plus_defconfig  |  1 +
+ arch/arm/mach-omap1/dma.c             |  1 +
+ arch/arm/mach-omap2/cclock33xx_data.c | 26 +++++++++++++++++++++++---
+ arch/arm/mach-omap2/omap_hwmod.c      |  2 +-
+ 5 files changed, 27 insertions(+), 5 deletions(-)
