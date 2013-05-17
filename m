@@ -1,53 +1,100 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 17 May 2013 14:05:50 -0700
-Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
-In-Reply-To: <20130515015212.GB3268@animalcreek.com>
-References: <20130515002537.GG5600@atomide.com>
- <20130515015212.GB3268@animalcreek.com>
-Message-ID: <20130517210550.GH28484@animalcreek.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 17 May 2013 23:07:11 +0200
+Subject: [PATCH 3/6] ARM: SAMSUNG: pm: Adjust for pinctrl- and DT-enabled
+ platforms
+In-Reply-To: <CAD=FV=XcmzogZc9mWQ+FSr9dg9jML-ACUJY2M2-s+_rBw9gMzQ@mail.gmail.com>
+References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
+ <4241187.TFCdy2kUT6@flatron>
+ <CAD=FV=XcmzogZc9mWQ+FSr9dg9jML-ACUJY2M2-s+_rBw9gMzQ@mail.gmail.com>
+Message-ID: <1666561.1GujhmlVbA@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 06:52:12PM -0700, Mark A. Greer wrote:
-> On Tue, May 14, 2013 at 05:25:37PM -0700, Tony Lindgren wrote:
-> > Commit a819c4f1 (ARM: OMAP3: PM: Only access IVA if one exists)
-> > changed PM to not access IVA registers on omaps that don't have
-> > them. Turns out we still need to idle iva2 as otherwise iva2_pwrdm
-> > will stay on and block deeper idle states.
+On Friday 17 of May 2013 13:56:39 Doug Anderson wrote:
+> Tomasz,
+> 
+> On Fri, May 17, 2013 at 1:23 PM, Tomasz Figa <tomasz.figa@gmail.com> 
+wrote:
+> >> I'd rather see you modify patch set #2 to provide some function to
+> >> retrieve just the eint mask and then use it here.  Your patch removes
+> >> this test and doesn't replace it with anything.  If you moved this
+> >> test to pinctrl directly you'd lose the test against intallow.
 > > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > Well, looking from the perspective of status before my patch, it just
+> > bypasses a test that is incorrect on DT-enabled platforms.
+> 
+> True.  What was there before was broken and this avoids the broken code.
+> > I agree that this test is rather reasonable to have, but it would
+> > require defining a new interface and moving all platforms to it,
+> > which for now would be a bit of overkill.
+> 
+> It seems like you could use the same type of solution as patch set #2?
+> 
+> ...oh, but that's only for exynos!  I guess we would need something
+> similar for other platforms.  ...and until we do those other platforms
+> (including S3C64xx, I think) are still using the old
+> s3c_irqwake_eintmask, right?
+
+Correct.
+
+Also as an extra side note, intallow is used here as a mask of valid 
+eintmask bits on given platform. On Exynos SoCs there are 32 EINTs, so 
+this extra mask is not needed.
+
+> ...so overall your patch series only fully fixes exynos, though it
+> does make other platforms less broken which is a plus.  :)
+> 
+> > IMHO a separate series that sanitizes the whole PM handling in plat-
+> > samsung, including a rework of this check to make it cover all
+> > platforms in a generic and multiplatform-friendly way. What do you
+> > think?
+> Sure, I think that would be OK.
+> 
+> >> Ah, the important part here is the "saved", not the "save"!  The
+> >> "save" should get a NULL chip for all GPIOs and effectively be a
+> >> no-op.
+> >> 
+> >> Skipping the "saved" is important of s3c64xx and s5p64x0 where the
+> >> "saved" seems to transition things over to powerdown mode.  Hopefully
+> >> a future patch of yours adds that back for those platforms in the
+> >> pinmux world.  ...same for restore.
 > > 
-> > ---
-> > 
-> > Paul & Kevin, do you have better ideas for fixing this?
-> > 
-> > --- a/arch/arm/mach-omap2/pm34xx.c
-> > +++ b/arch/arm/mach-omap2/pm34xx.c
-> > @@ -546,8 +546,10 @@ static void __init prcm_setup_regs(void)
-> >  	/* Clear any pending PRCM interrupts */
-> >  	omap2_prm_write_mod_reg(0, OCP_MOD, OMAP3_PRM_IRQSTATUS_MPU_OFFSET);
-> >  
-> > -	if (omap3_has_iva())
-> > -		omap3_iva_idle();
-> > +	/*
-> > +	 * We need to idle iva2_pwrdm even on am3703 with no iva2.
-> > +	 */
-> > +	omap3_iva_idle();
-> >  
-> >  	omap3_d2d_idle();
-> >  }
+> > S3C64xx can be switched to power down pin configuration manually, but
+> > if you don't do it, it will activate it automatically after entering
+> > sleep mode.
+> 
+> How would restore work in that case?  I'd imagine that it would
+> automatically switch out of the powerdown config at wakeup before
+> running software?  That doesn't seem like a great idea.
 
-> This is potentially bad for other SoC's that don't have an IVA so I don't
-> think its the way to go.  My preference would be to set the OMAP3_HAS_IVA
-> flag for the am3703 only since its the one with the bug.  Maybe something
-> in id.c:omap3xxx_check_features() but I don't see any existing way to check
-> for an am3703 vs. other am37xx SoCs.  Any ideas?
+This is configurable. There is a bit that determines whether it should 
+switch back to normal config automatically or not. What's interesting is 
+that AFAIR current code uses automatic switch, which even with the glitch 
+prevention in resume can glitch things, due to the period of time between 
+wake-up and resume when pins are misconfigured.
 
-As I think about it more, I may have been overly dramatic here.
+I think we should just configure this bit for manual switch back and 
+trigger the switch from .resumed() callback of the pin controller in 
+pinctrl-s3c64xx driver. I will post a patch for this some day.
 
-Before the check that's being removed existed, omap3_iva_idle() was always
-called and nobody complained (including am3517).  So, I'd still like to hear
-what Yegor can figure out but I have to believe that this patch is safe.
+> I think that to make S3C64xx work properly we'd need to solve.
+> 
+> 
+> I wouldn't be opposed to a re-spin to address some of the above, but I
+> also won't object to this landing and remaining issues being addressed
+> in future patches.  This patch definitely does make things better and
+> no worse.  :)
 
-Mark
---
+Let's see. If nobody takes this until Monday, which is very likely, I will 
+send new version.
+
+> On exynos5250-snow (pinmux backported to 3.8):
+> 
+> Tested-by: Doug Anderson <dianders@chromium.org>
+> 
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+
+Thanks.
+
+Best regards,
+Tomasz
