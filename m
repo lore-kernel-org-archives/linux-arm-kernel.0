@@ -1,75 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 17 May 2013 23:21:42 +0200
-Subject: [PATCH 2/2] Add sunxi-sid to dts for sun4i and sun5i
-In-Reply-To: <1368797744-13737-3-git-send-email-oliver+list@schinagl.nl>
-References: <1368797744-13737-1-git-send-email-oliver+list@schinagl.nl>
- <1368797744-13737-3-git-send-email-oliver+list@schinagl.nl>
-Message-ID: <51969F66.7080205@free-electrons.com>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Fri, 17 May 2013 23:28:53 +0200
+Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
+In-Reply-To: <20130517185620.GF28484@animalcreek.com>
+References: <20130515002537.GG5600@atomide.com>
+ <20130515015212.GB3268@animalcreek.com>
+ <20130515170734.GI5600@atomide.com> <20130515215028.GA11883@animalcreek.com>
+ <5194B2A8.8020608@visionsystems.de> <20130517185620.GF28484@animalcreek.com>
+Message-ID: <CAGm1_ks10f=6aBxWHzd6KxAaFGfnZUNWrQrSZeFwsT3He9r0Ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oliver,
+On Fri, May 17, 2013 at 8:56 PM, Mark A. Greer <mgreer@animalcreek.com> wrote:
+> On Thu, May 16, 2013 at 12:19:20PM +0200, Yegor Yefremov wrote:
+>> On 15.05.2013 23:50, Mark A. Greer wrote:
+>> > On Wed, May 15, 2013 at 10:07:35AM -0700, Tony Lindgren wrote:
+>
+>> >> Mark, do you have some omap3 with no iva (other than am3703) to test the
+>> >> idle states with?
+>> >
+>> > I have an am35xx which isn't supposed to have an IVA so I can test with it
+>> > (although, I'm not sure how well the kernel works on the am35xx these days).
+>> >
+>> > I'm a bit busy today but I'll try booting the am35xx tomorrow and if it
+>> > comes up, see what I can figure out.
+>>
+>> I think this issue is relevant to am3517 as you can see from this thread: http://thread.gmane.org/gmane.linux.ports.arm.omap/97903
+>> I could boot only with your patch http://www.spinics.net/lists/arm-kernel/msg168865.html
+>>
+>> I have such a system running, so if you have any other patches/ideas to test, I would do it.
+>
+> Yegor, since I've so far been unable to get my am3517evm to fire up, can
+> you play around with the 3517 to see if there appears to be iva registers
+> that can be read/written to safely?  In particular, can the code that idles
+> the iva be run safely on an am3517?
 
-Le 17/05/2013 15:35, Oliver Schinagl a ?crit :
-> From: Oliver Schinagl <oliver@schinagl.nl>
-> 
-> This should add support for the sunxi-sid driver to the device table for sun4i and sun5i
+I'll look into this next week. am3517 and IVA seems to be a really big
+mystery. In the TI forum will be stated, there is no IVA:
+http://e2e.ti.com/support/arm/sitara_arm/f/791/t/150961.aspx, but TRM
+has various appearances of IVA2 registers, but no real
+description/explanation of what is IVA and how to eat it.
 
-And it actually does :)
-
-> 
-> Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
-> ---
->  arch/arm/boot/dts/sun4i-a10.dtsi | 5 +++++
->  arch/arm/boot/dts/sun5i-a13.dtsi | 5 +++++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-> index e7ef619..1043db2 100644
-> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
-> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-> @@ -163,6 +163,11 @@
->  		reg = <0x01c20000 0x300000>;
->  		ranges;
->  
-> +		sid: eeprom at 01c23800 {
-> +			compatible = "allwinner,sun4i-sid";
-> +			reg = <0x01c23800 0x10>;
-> +		};
-> +
-
-I'd prefer to have the nodes sorted by base addresses.
-Also, the reserved address space for this IP is 1kB, please make it as
-such in the dt.
-
->  		intc: interrupt-controller at 01c20400 {
->  			compatible = "allwinner,sun4i-ic";
->  			reg = <0x01c20400 0x400>;
-> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-> index 8ba65c1..f715132 100644
-> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
-> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-> @@ -153,6 +153,11 @@
->  		reg = <0x01c20000 0x300000>;
->  		ranges;
->  
-> +		sid: eeprom at 01c23800 {
-> +			compatible = "allwinner,sun4i-sid";
-> +			reg = <0x01c23800 0x10>;
-> +		};
-
-Ditto,
-
-> +
->  		intc: interrupt-controller at 01c20400 {
->  			compatible = "allwinner,sun4i-ic";
->  			reg = <0x01c20400 0x400>;
-> 
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Yegor
