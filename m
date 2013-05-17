@@ -1,37 +1,55 @@
-From: B45370@freescale.com (Sharma Bhupesh-B45370)
-Date: Fri, 17 May 2013 09:56:22 +0000
-Subject: ARM Cortex-A7 support in Linux
-Message-ID: <A1A6EA40F8503D48BB002B42BD65974E295341@039-SN2MPN1-012.039d.mgd.msft.net>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 17 May 2013 17:58:48 +0800
+Subject: [PATCH 0/4] mtd: atmel_nand: enable Nand Flash Controller (NFC)
+ support
+In-Reply-To: <1368696748.15764.184.camel@sauron.fi.intel.com>
+References: <1366712997-17639-1-git-send-email-josh.wu@atmel.com>
+ <1368696748.15764.184.camel@sauron.fi.intel.com>
+Message-ID: <5195FF58.4070909@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin, list
+Hi, Artem
 
-I am trying to locate support for Cortex-A7 soc (in Linux) and it's primary features like:
-- SMMU 400 (Virtualization)
-- CCI 400 
-- LPAE
-- GIC 400
+On 5/16/2013 5:32 PM, Artem Bityutskiy wrote:
+> On Tue, 2013-04-23 at 18:29 +0800, Josh Wu wrote:
+>> This patch series enable NFC support for SAMA5 soc. It can send command,
+>> address cycles automaticly. Also when enable NFC sram, NFC will transfer
+>> data to sram. Which can save lots of cpu time.
+>>
+>> Josh Wu (4):
+>>    mtd: atmel_nand: replace pmecc enable code with one function.
+>>    mtd: atmel_nand: add Nand Flash Controller (NFC) support
+>>    mtd: atmel_nand: enable Nand Flash Controller (NFC) read data
+>>      via sram
+>>    mtd: atmel_nand: enable Nand Flash Controller (NFC) write via
+>>      sram
+> Please, re-base against the latest l2-mtd.git tree. The patches do not
+> compile:
 
-We wish to use this core in one of our SoCs and will like to reuse most of the code.
-I can see some support added for:
-- Cortex-A7 dts by Pawel for Versatile board
-	http://linux-arm.org/git?p=arm-dts.git;a=commitdiff;h=81195261a984e8c734f319eda80f86ba82b37d27
+I've sent out the v2 version which is rebased on the latest l2-mtd.git 
+tree. It fixed the compiler error and imcompatible parameters of the 
+write_page().
+Thanks for point out.
 
-- LPAE support by Catalin
-	http://lxr.linux.no/linux+v3.9.2/arch/arm/mm/Kconfig#L589
+Best Regards,
+Josh Wu
 
-- CCI 400 RFC patches from Lorenzo
-	https://patchwork.kernel.org/patch/2508121/
-
-- Basic dts support for GIC virtualization support is already present here:
-	http://lxr.linux.no/linux+v3.9.2/Documentation/devicetree/bindings/arm/gic.txt#L64
-
-But I am not sure about the following:
-- Does the current GIC driver support GIC-400 features as well?
-
-- I don't see many of these features supported in u-boot. Any idea if any work is going on for the same? 
-
-Thanks for your help.
-Regards,
-Bhupesh
+> --------------------------------------------------------------------------------
+> Failed to build the following commit for configuration "arm-at91cap9_defconfig" (architecture arm)":
+>
+> 2bd4bff mtd: atmel_nand: enable Nand Flash Controller (NFC) write via sram
+>
+> drivers/mtd/nand/atmel_nand.c: In function 'nfc_nand_command':
+> drivers/mtd/nand/atmel_nand.c:1848: error: 'NAND_CMD_DEPLETE1' undeclared (first use in this function)
+> drivers/mtd/nand/atmel_nand.c:1848: error: (Each undeclared identifier is reported only once
+> drivers/mtd/nand/atmel_nand.c:1848: error: for each function it appears in.)
+> drivers/mtd/nand/atmel_nand.c:1854: error: 'NAND_CMD_STATUS_ERROR' undeclared (first use in this function)
+> drivers/mtd/nand/atmel_nand.c:1855: error: 'NAND_CMD_STATUS_ERROR0' undeclared (first use in this function)
+> drivers/mtd/nand/atmel_nand.c:1856: error: 'NAND_CMD_STATUS_ERROR1' undeclared (first use in this function)
+> drivers/mtd/nand/atmel_nand.c:1857: error: 'NAND_CMD_STATUS_ERROR2' undeclared (first use in this function)
+> drivers/mtd/nand/atmel_nand.c:1858: error: 'NAND_CMD_STATUS_ERROR3' undeclared (first use in this function)
+> drivers/mtd/nand/atmel_nand.c: In function 'nfc_sram_init':
+> drivers/mtd/nand/atmel_nand.c:1979: warning: assignment from incompatible pointer type
+> make[4]: *** [drivers/mtd/nand/atmel_nand.o] Error 1
+>
