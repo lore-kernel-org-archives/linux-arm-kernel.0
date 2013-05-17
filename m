@@ -1,168 +1,24 @@
-From: Baohua.Song@csr.com (Barry Song)
-Date: Fri, 17 May 2013 10:19:37 +0800
-Subject: [PATCH v2] ASoC: dfbmcs320: make the driver common for other BT
- modules
-Message-ID: <1368757177-15372-1-git-send-email-Baohua.Song@csr.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 17 May 2013 10:25:31 +0800
+Subject: [PATCH 1/2] ARM: dts: imx: Remove custom dma-channel bindings
+In-Reply-To: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
+References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130517022529.GA8607@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DFBM-CS320 is only one of bluetooth modules using CSR bluetooth chips,
-we don't want everyone to have a seperate codec driver. anyway, the
-feature of Bluetooth handsfree is same on all platforms, so this patch
-makes the DFBM-CS320 driver become a common BT handsfree driver.
+On Thu, May 16, 2013 at 11:13:58AM -0300, Fabio Estevam wrote:
+> Commit f30fb03 (ARM: dts: add generic DMA device tree binding for mxs-dma) added
+> the generic DMA dt bindings, but missed to remove the old ones.
+> 
+> Remove the the old dma bindings.
 
-Cc: Graeme Gregory <graeme@openmoko.org>
-Cc: Lars-Peter Clausen <lars@metafoo.de>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- -v2: keep the device id list
+I already had a patch [1] to remove those old DMA binding data (both
+channel and interrupt number) from client device nodes.  And I'm waiting
+for mxs-saif/pcm to be converted to generic DMA binding helper to apply
+the patch.  Mark has queued mxs-saif conversion for 3.11, and I have to
+wait for 3.11-rc1 to apply the dts cleanup.
 
- sound/soc/codecs/Kconfig                         |  4 +--
- sound/soc/codecs/Makefile                        |  4 +--
- sound/soc/codecs/{dfbmcs320.c => bt-handsfree.c} | 37 +++++++++++++++---------
- sound/soc/samsung/neo1973_wm8753.c               |  2 +-
- 4 files changed, 28 insertions(+), 19 deletions(-)
- rename sound/soc/codecs/{dfbmcs320.c => bt-handsfree.c} (51%)
+Shawn
 
-diff --git a/sound/soc/codecs/Kconfig b/sound/soc/codecs/Kconfig
-index d8c4f3d..618928a 100644
---- a/sound/soc/codecs/Kconfig
-+++ b/sound/soc/codecs/Kconfig
-@@ -40,7 +40,7 @@ config SND_SOC_ALL_CODECS
- 	select SND_SOC_DA7213 if I2C
- 	select SND_SOC_DA732X if I2C
- 	select SND_SOC_DA9055 if I2C
--	select SND_SOC_DFBMCS320
-+	select SND_SOC_BT_HANDSFREE
- 	select SND_SOC_ISABELLE if I2C
- 	select SND_SOC_JZ4740_CODEC
- 	select SND_SOC_LM4857 if I2C
-@@ -263,7 +263,7 @@ config SND_SOC_DA732X
- config SND_SOC_DA9055
- 	tristate
- 
--config SND_SOC_DFBMCS320
-+config SND_SOC_BT_HANDSFREE
- 	tristate
- 
- config SND_SOC_DMIC
-diff --git a/sound/soc/codecs/Makefile b/sound/soc/codecs/Makefile
-index 49ff127..23a8c06 100644
---- a/sound/soc/codecs/Makefile
-+++ b/sound/soc/codecs/Makefile
-@@ -27,7 +27,7 @@ snd-soc-da7210-objs := da7210.o
- snd-soc-da7213-objs := da7213.o
- snd-soc-da732x-objs := da732x.o
- snd-soc-da9055-objs := da9055.o
--snd-soc-dfbmcs320-objs := dfbmcs320.o
-+snd-soc-bt-handsfree-objs := bt-handsfree.o
- snd-soc-dmic-objs := dmic.o
- snd-soc-isabelle-objs := isabelle.o
- snd-soc-jz4740-codec-objs := jz4740.o
-@@ -154,7 +154,7 @@ obj-$(CONFIG_SND_SOC_DA7210)	+= snd-soc-da7210.o
- obj-$(CONFIG_SND_SOC_DA7213)	+= snd-soc-da7213.o
- obj-$(CONFIG_SND_SOC_DA732X)	+= snd-soc-da732x.o
- obj-$(CONFIG_SND_SOC_DA9055)	+= snd-soc-da9055.o
--obj-$(CONFIG_SND_SOC_DFBMCS320)	+= snd-soc-dfbmcs320.o
-+obj-$(CONFIG_SND_SOC_BT_HANDSFREE)	+= snd-soc-bt-handsfree.o
- obj-$(CONFIG_SND_SOC_DMIC)	+= snd-soc-dmic.o
- obj-$(CONFIG_SND_SOC_ISABELLE)	+= snd-soc-isabelle.o
- obj-$(CONFIG_SND_SOC_JZ4740_CODEC)	+= snd-soc-jz4740-codec.o
-diff --git a/sound/soc/codecs/dfbmcs320.c b/sound/soc/codecs/bt-handsfree.c
-similarity index 51%
-rename from sound/soc/codecs/dfbmcs320.c
-rename to sound/soc/codecs/bt-handsfree.c
-index 4f4f7f4..7ec784a 100644
---- a/sound/soc/codecs/dfbmcs320.c
-+++ b/sound/soc/codecs/bt-handsfree.c
-@@ -1,5 +1,5 @@
- /*
-- * Driver for the DFBM-CS320 bluetooth module
-+ * Driver for generic Bluetooth Handsfree
-  * Copyright 2011 Lars-Peter Clausen <lars@metafoo.de>
-  *
-  *  This program is free software; you can redistribute  it and/or modify it
-@@ -15,8 +15,8 @@
- 
- #include <sound/soc.h>
- 
--static struct snd_soc_dai_driver dfbmcs320_dai = {
--	.name = "dfbmcs320-pcm",
-+static struct snd_soc_dai_driver bt_handsfree_dai = {
-+	.name = "bt-handsfree-pcm",
- 	.playback = {
- 		.channels_min = 1,
- 		.channels_max = 1,
-@@ -31,32 +31,41 @@ static struct snd_soc_dai_driver dfbmcs320_dai = {
- 	},
- };
- 
--static struct snd_soc_codec_driver soc_codec_dev_dfbmcs320;
-+static struct snd_soc_codec_driver soc_codec_dev_bt_handsfree;
- 
--static int dfbmcs320_probe(struct platform_device *pdev)
-+static int bt_handsfree_probe(struct platform_device *pdev)
- {
--	return snd_soc_register_codec(&pdev->dev, &soc_codec_dev_dfbmcs320,
--			&dfbmcs320_dai, 1);
-+	return snd_soc_register_codec(&pdev->dev, &soc_codec_dev_bt_handsfree,
-+			&bt_handsfree_dai, 1);
- }
- 
--static int dfbmcs320_remove(struct platform_device *pdev)
-+static int bt_handsfree_remove(struct platform_device *pdev)
- {
- 	snd_soc_unregister_codec(&pdev->dev);
- 
- 	return 0;
- }
- 
--static struct platform_driver dfmcs320_driver = {
-+static struct platform_device_id bt_handsfree_driver_ids[] = {
-+	{
-+		.name		= "dfbmcs320",
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(platform, bt_handsfree_driver_ids);
-+
-+static struct platform_driver bt_handsfree_driver = {
- 	.driver = {
--		.name = "dfbmcs320",
-+		.name = "bt-handsfree",
- 		.owner = THIS_MODULE,
- 	},
--	.probe = dfbmcs320_probe,
--	.remove = dfbmcs320_remove,
-+	.probe = bt_handsfree_probe,
-+	.remove = bt_handsfree_remove,
-+	.id_table = bt_handsfree_driver_ids,
- };
- 
--module_platform_driver(dfmcs320_driver);
-+module_platform_driver(bt_handsfree_driver);
- 
- MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>");
--MODULE_DESCRIPTION("ASoC DFBM-CS320 bluethooth module driver");
-+MODULE_DESCRIPTION("ASoC generic bluethooth handsfree driver");
- MODULE_LICENSE("GPL");
-diff --git a/sound/soc/samsung/neo1973_wm8753.c b/sound/soc/samsung/neo1973_wm8753.c
-index e591c38..3aefea4 100644
---- a/sound/soc/samsung/neo1973_wm8753.c
-+++ b/sound/soc/samsung/neo1973_wm8753.c
-@@ -373,7 +373,7 @@ static struct snd_soc_dai_link neo1973_dai[] = {
- { /* Voice via BT */
- 	.name = "Bluetooth",
- 	.stream_name = "Voice",
--	.cpu_dai_name = "dfbmcs320-pcm",
-+	.cpu_dai_name = "bt-handsfree-pcm",
- 	.codec_dai_name = "wm8753-voice",
- 	.codec_name = "wm8753.0-001a",
- 	.ops = &neo1973_voice_ops,
--- 
-1.8.2.3
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+[1] http://thread.gmane.org/gmane.linux.alsa.devel/106027/focus=220815
