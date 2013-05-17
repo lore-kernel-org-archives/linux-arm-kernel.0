@@ -1,51 +1,83 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 May 2013 18:07:42 +0100
-Subject: [PATCH 03/14] ARM: LPAE: use phys_addr_t in free_memmap()
+Date: Fri, 17 May 2013 18:07:44 +0100
+Subject: [PATCH 05/14] ARM: LPAE: use phys_addr_t in switch_mm()
 In-Reply-To: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
 References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1368810473-26070-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1368810473-26070-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vitaly Andrianov <vitalya@ti.com>
+From: Cyril Chemparathy <cyril@ti.com>
 
-The free_memmap() was mistakenly using unsigned long type to represent
-physical addresses.  This breaks on PAE systems where memory could be placed
-above the 32-bit addressible limit.
+This patch modifies the switch_mm() processor functions to use phys_addr_t.
+On LPAE systems, we now honor the upper 32-bits of the physical address that
+is being passed in, and program these into TTBR as expected.
 
-This patch fixes this function to properly use phys_addr_t instead.
-
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
-Acked-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+[will: fixed up conflict in 3-level switch_mm with big-endian changes]
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/init.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/proc-fns.h |  4 ++--
+ arch/arm/mm/proc-v7-3level.S    | 16 ++++++++++++----
+ 2 files changed, 14 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 9a5cdc0..68c914e 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -442,7 +442,7 @@ static inline void
- free_memmap(unsigned long start_pfn, unsigned long end_pfn)
- {
- 	struct page *start_pg, *end_pg;
--	unsigned long pg, pgend;
-+	phys_addr_t pg, pgend;
- 
+diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+index f3628fb..75b5f14 100644
+--- a/arch/arm/include/asm/proc-fns.h
++++ b/arch/arm/include/asm/proc-fns.h
+@@ -60,7 +60,7 @@ extern struct processor {
  	/*
- 	 * Convert start_pfn/end_pfn to a struct page pointer.
-@@ -454,8 +454,8 @@ free_memmap(unsigned long start_pfn, unsigned long end_pfn)
- 	 * Convert to physical addresses, and
- 	 * round start upwards and end downwards.
+ 	 * Set the page table
  	 */
--	pg = (unsigned long)PAGE_ALIGN(__pa(start_pg));
--	pgend = (unsigned long)__pa(end_pg) & PAGE_MASK;
-+	pg = PAGE_ALIGN(__pa(start_pg));
-+	pgend = __pa(end_pg) & PAGE_MASK;
- 
+-	void (*switch_mm)(unsigned long pgd_phys, struct mm_struct *mm);
++	void (*switch_mm)(phys_addr_t pgd_phys, struct mm_struct *mm);
  	/*
- 	 * If there are free pages between these,
+ 	 * Set a possibly extended PTE.  Non-extended PTEs should
+ 	 * ignore 'ext'.
+@@ -82,7 +82,7 @@ extern void cpu_proc_init(void);
+ extern void cpu_proc_fin(void);
+ extern int cpu_do_idle(void);
+ extern void cpu_dcache_clean_area(void *, int);
+-extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
++extern void cpu_do_switch_mm(phys_addr_t pgd_phys, struct mm_struct *mm);
+ #ifdef CONFIG_ARM_LPAE
+ extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte);
+ #else
+diff --git a/arch/arm/mm/proc-v7-3level.S b/arch/arm/mm/proc-v7-3level.S
+index 363027e..995857d 100644
+--- a/arch/arm/mm/proc-v7-3level.S
++++ b/arch/arm/mm/proc-v7-3level.S
+@@ -39,6 +39,14 @@
+ #define TTB_FLAGS_SMP	(TTB_IRGN_WBWA|TTB_S|TTB_RGN_OC_WBWA)
+ #define PMD_FLAGS_SMP	(PMD_SECT_WBWA|PMD_SECT_S)
+ 
++#ifndef __ARMEB__
++#  define rpgdl	r0
++#  define rpgdh	r1
++#else
++#  define rpgdl	r1
++#  define rpgdh	r0
++#endif
++
+ /*
+  * cpu_v7_switch_mm(pgd_phys, tsk)
+  *
+@@ -47,10 +55,10 @@
+  */
+ ENTRY(cpu_v7_switch_mm)
+ #ifdef CONFIG_MMU
+-	mmid	r1, r1				@ get mm->context.id
+-	asid	r3, r1
+-	mov	r3, r3, lsl #(48 - 32)		@ ASID
+-	mcrr	p15, 0, r0, r3, c2		@ set TTB 0
++	mmid	r2, r2
++	asid	r2, r2
++	orr	rpgdh, rpgdh, r2, lsl #(48 - 32)	@ upper 32-bits of pgd
++	mcrr	p15, 0, rpgdl, rpgdh, c2		@ set TTB 0
+ 	isb
+ #endif
+ 	mov	pc, lr
 -- 
 1.8.2.2
