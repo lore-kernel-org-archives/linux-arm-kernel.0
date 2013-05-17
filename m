@@ -1,46 +1,79 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 17 May 2013 19:16:36 +0200
-Subject: [RFC PATCH v4 05/18] ARM: dts: armada-370-xp: cpus/cpu node dts
- updates
-In-Reply-To: <1368804061-4421-6-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1368804061-4421-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1368804061-4421-6-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <519665F4.8090707@free-electrons.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 17 May 2013 10:22:31 -0700
+Subject: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and updates
+ for 3.10
+In-Reply-To: <5195E380.4040103@ti.com>
+References: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130401170539.GK10155@atomide.com> <515BA76D.3000302@ti.com>
+ <alpine.DEB.2.00.1304031146230.2616@utopia.booyaka.com>
+ <515D6020.2030103@ti.com> <20130404165208.GI10155@atomide.com>
+ <515DB110.9000503@ti.com> <515F00B8.3000501@ti.com>
+ <5195E380.4040103@ti.com>
+Message-ID: <20130517172231.GW5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2013 05:20 PM, Lorenzo Pieralisi wrote:
-> This patch updates the in-kernel dts files according to the latest cpus
-> and cpu bindings updates for ARM.
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [130517 01:02]:
+> Paul, Tony,
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm/boot/dts/armada-370-xp.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 272bbc6..2407903 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -23,8 +23,12 @@
->  	compatible = "marvell,armada-370-xp";
->  
->  	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
->  		cpu at 0 {
->  			compatible = "marvell,sheeva-v7";
-> +			device_type = "cpu";
-> +			reg = <0>;
->  		};
->  	};
->  
-> 
+> On Friday 05 April 2013 10:20 PM, Santosh Shilimkar wrote:
+> > On Thursday 04 April 2013 10:27 PM, Santosh Shilimkar wrote:
+> >> On Thursday 04 April 2013 10:22 PM, Tony Lindgren wrote:
+> >>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130404 04:15]:
+> > [..]
+> > 
+> >>> Can't we already trim the am33xx hwmod data after your patches for
+> >>> v3.10 as am33xx is already DT only? Unfortunately we cannot create
+> >>> negative diffstat in other ways for v3.10 merge window as we cannot
+> >>> make omap4 DT only just quite yet.
+> >>>
+> >> Yes we can and I can take a stab it tomorrow. The only thing is I
+> >> might need some support for testing but thats manageable. Will
+> >> take a stab at it tomorrow and if everything goes well, post a
+> >> patch for smae.
+> >>
+> > Patch for the AM33XX to trim is end of the email. Thanks to
+> > Sricharan and Pekon for patch and testing. Looping both
+> > Vaibhav's if they have any objection on the patch.
+> > 
+> > Regards,
+> > Santosh
+> > 
+> > From b95dd33fe59b8e77727eb3b1717d763bbf9a2893 Mon Sep 17 00:00:00 2001
+> > From: Sricharan R <r.sricharan@ti.com>
+> > Date: Fri, 5 Apr 2013 20:39:12 +0530
+> > Subject: [PATCH] ARM: AM33XX: hwmod data: Clean up the data file
+> > 
+> For whatever reason, we again missed the merge window for the subject
+> series, I would like to know your plan on the subject series for
+> at least 3.11. Asking *well in advance* to avoid late merge related
+> discussions.
 
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Yes, I think we should have now a omap5 hwmod data sized hole coming
+up with conversion of omap4 to be DT only. I'll post those patches
+today for the board file and legacy mux removal for omap4:
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+12 files changed, 52 insertions(+), 3260 deletions(-)
+
+Those coupled with your am33xx hwmod cleanup patch and your omap4
+hwmod cleanup patch should allow us having the omap5 hwmod data
+without making the diffstats look too bad.
+ 
+> Thanks to Vaibhav, AM33XX patch is tested and validated with some
+> updates considering upcoming PM support for AM33XX. So that
+> patch will be included in the series.
+> 
+> Rajendra will follow up the patchset if there is some re-basing is
+> needed since I will away for few weeks because of travel. 
+
+OK, well the omap4 hwmod clean-up patch depends on first dropping
+the above mentioned omap4 legacy files.
+ 
+> OMAP5 data is the *only* thing which is gating the device to boot
+> from mainline.
+
+That's great!
+
+Regards,
+
+Tony
