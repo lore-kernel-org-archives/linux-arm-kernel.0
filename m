@@ -1,43 +1,86 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 17 May 2013 06:19:53 +0200
-Subject: Introduce a new helper framework for buffer synchronization
-In-Reply-To: <CAF6AEGuBexKUpTwm9cjGjkxCTKgEaDhAakeP0RN=rtLS6Qy=Mg@mail.gmail.com>
-References: <CAAQKjZNNw4qddo6bE5OY_CahrqDtqkxdO7Pm9RCguXyj9F4cMQ@mail.gmail.com>
- <51909DB4.2060208@canonical.com>
- <025201ce4fbb$363d0390$a2b70ab0$%dae@samsung.com>
- <5190B7D8.3010803@canonical.com>
- <027a01ce4fcc$5e7c7320$1b755960$%dae@samsung.com>
- <5190D14A.7050904@canonical.com>
- <028a01ce4fd4$5ec6f000$1c54d000$%dae@samsung.com>
- <CAF6AEGvWazezZdLDn5=H8wNQdQSWV=EmqE1a4wh7QwrT_h6vKQ@mail.gmail.com>
- <CAAQKjZP=iOmHRpHZCbZD3v_RKUFSn0eM_WVZZvhe7F9g3eTmPA@mail.gmail.com>
- <CAF6AEGuDih-NR-VZCmQfqbvCOxjxreZRPGfhCyL12FQ1Qd616Q@mail.gmail.com>
- <006a01ce504e$0de3b0e0$29ab12a0$%dae@samsung.com>
- <CAF6AEGv2FiKMUpb5s4zHPdj4uVxnQWdVJWL-i1mOOZRxBvMZ4Q@mail.gmail.com>
- <00cf01ce512b$bacc5540$3064ffc0$%dae@samsung.com>
- <CAF6AEGuBexKUpTwm9cjGjkxCTKgEaDhAakeP0RN=rtLS6Qy=Mg@mail.gmail.com>
-Message-ID: <CAKMK7uHRER_wmBcEN1JRqtkLxA_0SHBp16Z1Z_GqVbYw-YAZSA@mail.gmail.com>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 17 May 2013 10:28:52 +0530
+Subject: [PATCH] ARM: davinci: dma: Convert to devm_* api
+In-Reply-To: <5194DC6A.8080609@cogentembedded.com>
+References: <1368687502-15551-1-git-send-email-prabhakar.csengg@gmail.com>
+ <5194DC6A.8080609@cogentembedded.com>
+Message-ID: <CA+V-a8v89gGuGuZB75-LnYNP7G765RnaY9uwviNwPmY-vQzPVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 4:06 PM, Rob Clark <robdclark@gmail.com> wrote:
-> So while it seems nice and orthogonal/clean to couple cache and
-> synchronization and handle dma->cpu and cpu->cpu and cpu->dma in the
-> same generic way, but I think in practice we have to make things more
-> complex than they otherwise need to be to do this.  Otherwise I think
-> we'll be having problems with badly behaved or crashing userspace.
+Hi Sergei,
 
-I haven't read through the entire thread careful but imo this is very
-important. If we add a fence interface which allows userspace to block
-dma this is a no-go. The only thing we need is to sync up with all
-outstanding dma operations and flush caches for cpu access. If broken
-userspace starts to issue new dma (or multiple thread stomp onto each
-another) that's not a problem dma fences/syncpoints should try to
-solve. This way we can concentrate on solving the (already
-challenging) device-to-device sync issues without additional
-complexities which cpu->cpu sync would impose.
--Daniel
---
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Thanks for the review.
+
+On Thu, May 16, 2013 at 6:47 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Hello.
+>
+>
+> On 16-05-2013 10:58, Lad Prabhakar wrote:
+>
+>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>
+>
+>> Use devm_ioremap_resource instead of reques_mem_region()/ioremap() and
+>> devm_request_irq() instead of request_irq().
+>
+>
+>> This ensures more consistent error values and simplifies error paths.
+>
+>
+>> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>> ---
+>>   NOte:- Boot tested on Logic-PD OMAP-L138 EVM
+>
+>
+>>   arch/arm/mach-davinci/dma.c |   63
+>> ++++++++++++++++--------------------------
+>>   1 files changed, 24 insertions(+), 39 deletions(-)
+>
+>
+>> diff --git a/arch/arm/mach-davinci/dma.c b/arch/arm/mach-davinci/dma.c
+>> index 45b7c71..aeda496 100644
+>> --- a/arch/arm/mach-davinci/dma.c
+>> +++ b/arch/arm/mach-davinci/dma.c
+>
+> [...]
+>
+>> @@ -1422,25 +1421,16 @@ static int __init edma_probe(struct
+>> platform_device *pdev)
+>>                         found = 1;
+>>                 }
+>>
+>> -               len[j] = resource_size(r[j]);
+>> -
+>> -               r[j] = request_mem_region(r[j]->start, len[j],
+>> -                       dev_name(&pdev->dev));
+>> -               if (!r[j]) {
+>> -                       status = -EBUSY;
+>> -                       goto fail1;
+>> -               }
+>> -
+>> -               edmacc_regs_base[j] = ioremap(r[j]->start, len[j]);
+>> -               if (!edmacc_regs_base[j]) {
+>> +               edmacc_regs_base[j] = devm_ioremap_resource(&pdev->dev,
+>> r[j]);
+>> +               if (IS_ERR(edmacc_regs_base[j])) {
+>>                         status = -EBUSY;
+>
+>
+>    And you call that "more consistent error values"? Why not:
+>
+>                         status = PTR_ERR(edmacc_regs_base[j]);
+>
+Yes missed it will fix it in v2.
+
+>
+>>                 edma_cc[j] = kzalloc(sizeof(struct edma), GFP_KERNEL);
+>
+>
+>    Maybe it's worth using devm_kzalloc() too?
+>
+OK
+
+Regards,
+--Prabhakar Lad
