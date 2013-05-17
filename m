@@ -1,85 +1,168 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 17 May 2013 10:16:40 +0800
-Subject: [Bug] ARM 'perf' regression by commit a43cb95d5
-Message-ID: <CACVXFVPjo2dQpYPpqZS8GC8UPNzB5HLURpYm6-g1FOBbSUjDyA@mail.gmail.com>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Fri, 17 May 2013 10:19:37 +0800
+Subject: [PATCH v2] ASoC: dfbmcs320: make the driver common for other BT
+ modules
+Message-ID: <1368757177-15372-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+DFBM-CS320 is only one of bluetooth modules using CSR bluetooth chips,
+we don't want everyone to have a seperate codec driver. anyway, the
+feature of Bluetooth handsfree is same on all platforms, so this patch
+makes the DFBM-CS320 driver become a common BT handsfree driver.
 
-The commit a43cb95d5(dump_stack: unify debug information printed by show_regs())
-caused ARM perf regression, then 'perf top' outputs mistakenly, see
-[1].  The correct
-output should be [2], which can be got after reverting the commit or
-doing it partly
-by the one line change below:
+Cc: Graeme Gregory <graeme@openmoko.org>
+Cc: Lars-Peter Clausen <lars@metafoo.de>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ -v2: keep the device id list
 
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index f219703..89bc3a4 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -225,7 +225,7 @@ void __show_regs(struct pt_regs *regs)
-        unsigned long flags;
-        char buf[64];
+ sound/soc/codecs/Kconfig                         |  4 +--
+ sound/soc/codecs/Makefile                        |  4 +--
+ sound/soc/codecs/{dfbmcs320.c => bt-handsfree.c} | 37 +++++++++++++++---------
+ sound/soc/samsung/neo1973_wm8753.c               |  2 +-
+ 4 files changed, 28 insertions(+), 19 deletions(-)
+ rename sound/soc/codecs/{dfbmcs320.c => bt-handsfree.c} (51%)
 
--       show_regs_print_info(KERN_DEFAULT);
-+       //show_regs_print_info(KERN_DEFAULT);
+diff --git a/sound/soc/codecs/Kconfig b/sound/soc/codecs/Kconfig
+index d8c4f3d..618928a 100644
+--- a/sound/soc/codecs/Kconfig
++++ b/sound/soc/codecs/Kconfig
+@@ -40,7 +40,7 @@ config SND_SOC_ALL_CODECS
+ 	select SND_SOC_DA7213 if I2C
+ 	select SND_SOC_DA732X if I2C
+ 	select SND_SOC_DA9055 if I2C
+-	select SND_SOC_DFBMCS320
++	select SND_SOC_BT_HANDSFREE
+ 	select SND_SOC_ISABELLE if I2C
+ 	select SND_SOC_JZ4740_CODEC
+ 	select SND_SOC_LM4857 if I2C
+@@ -263,7 +263,7 @@ config SND_SOC_DA732X
+ config SND_SOC_DA9055
+ 	tristate
+ 
+-config SND_SOC_DFBMCS320
++config SND_SOC_BT_HANDSFREE
+ 	tristate
+ 
+ config SND_SOC_DMIC
+diff --git a/sound/soc/codecs/Makefile b/sound/soc/codecs/Makefile
+index 49ff127..23a8c06 100644
+--- a/sound/soc/codecs/Makefile
++++ b/sound/soc/codecs/Makefile
+@@ -27,7 +27,7 @@ snd-soc-da7210-objs := da7210.o
+ snd-soc-da7213-objs := da7213.o
+ snd-soc-da732x-objs := da732x.o
+ snd-soc-da9055-objs := da9055.o
+-snd-soc-dfbmcs320-objs := dfbmcs320.o
++snd-soc-bt-handsfree-objs := bt-handsfree.o
+ snd-soc-dmic-objs := dmic.o
+ snd-soc-isabelle-objs := isabelle.o
+ snd-soc-jz4740-codec-objs := jz4740.o
+@@ -154,7 +154,7 @@ obj-$(CONFIG_SND_SOC_DA7210)	+= snd-soc-da7210.o
+ obj-$(CONFIG_SND_SOC_DA7213)	+= snd-soc-da7213.o
+ obj-$(CONFIG_SND_SOC_DA732X)	+= snd-soc-da732x.o
+ obj-$(CONFIG_SND_SOC_DA9055)	+= snd-soc-da9055.o
+-obj-$(CONFIG_SND_SOC_DFBMCS320)	+= snd-soc-dfbmcs320.o
++obj-$(CONFIG_SND_SOC_BT_HANDSFREE)	+= snd-soc-bt-handsfree.o
+ obj-$(CONFIG_SND_SOC_DMIC)	+= snd-soc-dmic.o
+ obj-$(CONFIG_SND_SOC_ISABELLE)	+= snd-soc-isabelle.o
+ obj-$(CONFIG_SND_SOC_JZ4740_CODEC)	+= snd-soc-jz4740-codec.o
+diff --git a/sound/soc/codecs/dfbmcs320.c b/sound/soc/codecs/bt-handsfree.c
+similarity index 51%
+rename from sound/soc/codecs/dfbmcs320.c
+rename to sound/soc/codecs/bt-handsfree.c
+index 4f4f7f4..7ec784a 100644
+--- a/sound/soc/codecs/dfbmcs320.c
++++ b/sound/soc/codecs/bt-handsfree.c
+@@ -1,5 +1,5 @@
+ /*
+- * Driver for the DFBM-CS320 bluetooth module
++ * Driver for generic Bluetooth Handsfree
+  * Copyright 2011 Lars-Peter Clausen <lars@metafoo.de>
+  *
+  *  This program is free software; you can redistribute  it and/or modify it
+@@ -15,8 +15,8 @@
+ 
+ #include <sound/soc.h>
+ 
+-static struct snd_soc_dai_driver dfbmcs320_dai = {
+-	.name = "dfbmcs320-pcm",
++static struct snd_soc_dai_driver bt_handsfree_dai = {
++	.name = "bt-handsfree-pcm",
+ 	.playback = {
+ 		.channels_min = 1,
+ 		.channels_max = 1,
+@@ -31,32 +31,41 @@ static struct snd_soc_dai_driver dfbmcs320_dai = {
+ 	},
+ };
+ 
+-static struct snd_soc_codec_driver soc_codec_dev_dfbmcs320;
++static struct snd_soc_codec_driver soc_codec_dev_bt_handsfree;
+ 
+-static int dfbmcs320_probe(struct platform_device *pdev)
++static int bt_handsfree_probe(struct platform_device *pdev)
+ {
+-	return snd_soc_register_codec(&pdev->dev, &soc_codec_dev_dfbmcs320,
+-			&dfbmcs320_dai, 1);
++	return snd_soc_register_codec(&pdev->dev, &soc_codec_dev_bt_handsfree,
++			&bt_handsfree_dai, 1);
+ }
+ 
+-static int dfbmcs320_remove(struct platform_device *pdev)
++static int bt_handsfree_remove(struct platform_device *pdev)
+ {
+ 	snd_soc_unregister_codec(&pdev->dev);
+ 
+ 	return 0;
+ }
+ 
+-static struct platform_driver dfmcs320_driver = {
++static struct platform_device_id bt_handsfree_driver_ids[] = {
++	{
++		.name		= "dfbmcs320",
++	},
++	{},
++};
++MODULE_DEVICE_TABLE(platform, bt_handsfree_driver_ids);
++
++static struct platform_driver bt_handsfree_driver = {
+ 	.driver = {
+-		.name = "dfbmcs320",
++		.name = "bt-handsfree",
+ 		.owner = THIS_MODULE,
+ 	},
+-	.probe = dfbmcs320_probe,
+-	.remove = dfbmcs320_remove,
++	.probe = bt_handsfree_probe,
++	.remove = bt_handsfree_remove,
++	.id_table = bt_handsfree_driver_ids,
+ };
+ 
+-module_platform_driver(dfmcs320_driver);
++module_platform_driver(bt_handsfree_driver);
+ 
+ MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>");
+-MODULE_DESCRIPTION("ASoC DFBM-CS320 bluethooth module driver");
++MODULE_DESCRIPTION("ASoC generic bluethooth handsfree driver");
+ MODULE_LICENSE("GPL");
+diff --git a/sound/soc/samsung/neo1973_wm8753.c b/sound/soc/samsung/neo1973_wm8753.c
+index e591c38..3aefea4 100644
+--- a/sound/soc/samsung/neo1973_wm8753.c
++++ b/sound/soc/samsung/neo1973_wm8753.c
+@@ -373,7 +373,7 @@ static struct snd_soc_dai_link neo1973_dai[] = {
+ { /* Voice via BT */
+ 	.name = "Bluetooth",
+ 	.stream_name = "Voice",
+-	.cpu_dai_name = "dfbmcs320-pcm",
++	.cpu_dai_name = "bt-handsfree-pcm",
+ 	.codec_dai_name = "wm8753-voice",
+ 	.codec_name = "wm8753.0-001a",
+ 	.ops = &neo1973_voice_ops,
+-- 
+1.8.2.3
 
 
-Looks a bit weird, anyone can give a hint?
 
-
-Thanks,
---
-Ming Lei
-
-[1], 'perf top' mistaken output
-Samples: 17K of event 'cpu-clock', Event count (approx.): 3516532661
- 97.51%  [smsc95xx]            [k] 0x013645b8
-  0.21%  libc-2.15.so          [.] strstr
-  0.14%  libc-2.15.so          [.] strchr
-  0.12%  libc-2.15.so          [.] strcmp
-  0.12%  perf                  [.] perf_evsel__parse_sample
-  0.09%  perf                  [.] symbols__insert
-  0.09%  perf                  [.] dso__load_sym
-  0.08%  perf                  [.] perf_top__mmap_read_idx
-  0.08%  perf                  [.] symbol_filter
-  0.07%  libc-2.15.so          [.] memchr
-  0.07%  libc-2.15.so          [.] memset
-  0.07%  perf                  [.] internal_cplus_demangle
-  0.06%  perf                  [.] sort__dso_cmp
-  0.06%  libc-2.15.so          [.] strncmp
-  0.06%  perf                  [.] add_hist_entry.isra.2
-  0.06%  perf                  [.] dso__find_symbol
-  0.06%  libc-2.15.so          [.] _int_malloc
-  0.05%  perf                  [.] 0x00010d60
-  0.04%  libc-2.15.so          [.] memcpy
-  0.04%  perf                  [.] map__find_symbol
-  0.04%  perf                  [.] rb_next
-  0.04%  libelf-0.154.so       [.] gelf_getsym
-
-
-[2], 'perf top' correct output
-Samples: 46K of event 'cpu-clock', Event count (approx.): 937128704
- 96.44%  [kernel]            [k] cpuidle_enter_state
-  0.19%  libc-2.15.so        [.] strstr
-  0.16%  [kernel]            [k] kallsyms_expand_symbol.clone.0
-  0.13%  [kernel]            [k] _raw_spin_unlock_irq
-  0.13%  [kernel]            [k] _raw_spin_unlock_irqrestore
-  0.10%  [kernel]            [k] format_decode
-  0.10%  perf                [.] perf_top__mmap_read_idx
-  0.10%  perf                [.] rb_next
-  0.09%  perf                [.] dso__find_symbol
-  0.08%  [kernel]            [k] vsnprintf
-  0.08%  perf                [.] add_hist_entry.isra.2
-  0.08%  libc-2.15.so        [.] strcmp
-  0.08%  libc-2.15.so        [.] memchr
-  0.07%  perf                [.] sort__dso_cmp
-  0.07%  libc-2.15.so        [.] strchr
-  0.07%  [kernel]            [k] number.clone.1
-  0.07%  perf                [.] map__process_kallsym_symbol
-  0.06%  [kernel]            [k] memcpy
-  0.05%  perf                [.] perf_evsel__parse_sample
-  0.05%  libc-2.15.so        [.] _int_malloc
-  0.05%  libc-2.15.so        [.] memcpy
-  0.05%  perf                [.] perf_event__preprocess_sample
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
