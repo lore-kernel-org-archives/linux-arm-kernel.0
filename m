@@ -1,78 +1,109 @@
-From: jp.francois@cynove.com (jean-philippe francois)
-Date: Fri, 17 May 2013 13:20:20 +0200
-Subject: 3.9 regression : CAM_XCLKA wrong frequency setting.
-In-Reply-To: <CAGGh5h2RB7OEOpGOe52eE8+LgdSmvDK5rPLueMzQMfVfOCuYHg@mail.gmail.com>
-References: <CAGGh5h2RB7OEOpGOe52eE8+LgdSmvDK5rPLueMzQMfVfOCuYHg@mail.gmail.com>
-Message-ID: <CAGGh5h3BNV7fE3jC0KSmA+2K6zKwVyHdeo8AW0gvmhgQsy8ZEg@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 17 May 2013 13:33:45 +0200
+Subject: [RFC 0/8] rmk's Dove DRM/TDA19988 Cubox driver
+In-Reply-To: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+Message-ID: <20130517133345.7c1368f5@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/5/17 jean-philippe francois <jp.francois@cynove.com>:
-> Hi,
->
-> Laurent, you are on the recipient list because the symptom is visible
-> throug your driver. I found the other name looking in the clock
-> related files. Please apologize if you are not concerned by this mail.
->
-> Symptom :
-> External clock CAM_XCLKA frequency is wrong with 3.9, it was ok until
-> 3.6. Everything else is working fine, except the fps are higher, and
-> the image quality sucks because the input clock is out of spec.
-> Oscilloscope measured freq is around 30 MHz instead of the 24 MHz the
-> sensor is asking for.
->
-> Hardware :
-> dm3730, with 19.2 MHz crystal, running at OPP100
->
-> The register frequency settings seems to be ok, and they are the same
-> as in 3.6.11 :
-> CM_CLKSEL2_PLL : 0x04816807
->         19, 2 * 360 / 8 = 864 MHz
->          this value is already set when I look at it in u-boot
->
-> CM_CLKSEL_CAM : 0x5
->         864 / 5 = 172,8 MHz
->         this value is set through the clock framework by the omap3isp
-> driver code
->
-> ISP.TCTRL_CTRL : 0x7
->         172,8 / 7 = 24,685... MHz
->          this value is set by the omap3isp driver code
->
-> However, as stated before, the actual output frequency is NOT 24 MHz
-> but around 30.
->
-> If dpll4 frequency is wrong, what other clock would be affected ?
+On Thu, 16 May 2013 20:25:10 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-As usual, writing a mail brings up new idea. Sorry to use the lists
-as rubber duck debug partner, but I still need your help.
+> What follows is my DRM driver for Dove, which I've been working on with
+> the Solid-run Cubox, which only offers HDMI output via the TDA19988
+> chip.
+> 
+> Not everything is finished off perfectly in this driver; there's quite
+> a number of ragged edges (particularly with page flipping, which is
+> completely untested.)
+> 
+> I have most of the Xorg driver complete - none of the DRI interfaces
+> checked yet (partly because that involves quite an amount of work with
+> Mesa).
+> 
+> However, graphics, video overlay, interlacing, accelerated GPU via the
+> original vivante support all works through this driver, with this driver
+> providing the X pixmaps.
 
-Obviously, dpll4 frequency is correct, because it sources the 96 and
-48 MHz clock.
-I can check it measuring bit time on uart3tx : 8.6usec for 115200 => Ok
+Hi Russell,
 
-30 MHz is 1.25 * 24 MHz
-CM_CLKSEL_CAM reset value is 4, programmed value is 5,
-So I did the following, while looking at CAM_XCLKA on scope :
+I quickly compared your dove drm driver and ours (Sebastian and me):
 
-# devmem 0x48004f40
-0x00000005
-# devmem 0x48004f40 32 5  -> freq = 30 MHz
-# devmem 0x48004f40 32 4  -> freq = 30 MHz
-# devmem 0x48004f40 32 5  -> freq = 24 MHz
+- CMA helper
 
-So there is something nasty in the setup sequence of cam_mclk and dpll4_m5ckx2
-that prevents the new divisor value to be used by the hardware.
-I will dive into the code to see where things went wrong, but I am a
-bit lost here.
+  You don't use DRM_KMS_CMA_HELPER and DRM_GEM_CMA_HELPER which would
+  simplify some code.
 
-> What can I do to debug this ?
-> Laurent, I believe you have a camera add-on board for the beagle xm,
-> could you test and report wether you can reproduce this bug ?
->
-> Attached is the boot log with 3.9, with some debugging messages activated.
->
-> Thank you for your help,
-> Regards,
->
-> Jean-Philippe Fran?ois
+- device tree
+
+  Our driver depends on the DT and, by this way, it may be used for
+  various boards (Cubox, DB-MV88AP510 Development Board, CompuLab
+  CM-A510 Board..). Especially, in the Cubox, only a HDMI screen may be
+  connected, while the display controller permits connection of a smart
+  panel (port A) and a VGA screen (port B). 
+  Also, the driver could be used for different chips as the Armada 160
+  which has quite the same LCD controller (but one LCD only and no
+  display controller - Sebastian's idea).
+
+- module loading (si5351, tda998x)
+
+  As our driver is loaded by the Cubox DT, and as the auxilliary drivers
+  (external clock, HDMI transmitter) may also be modules, a
+  synchronization mechanism (inspired by the tegra drm driver) permits
+  the driver to start when all the other drivers are also started.
+
+- display controller
+
+  I implemented output port cloning (LCD 0 to port B) but it is not
+  tested (I just have a Cubox and I think that Sebastian did not have
+  time enough yet to do it).     
+
+- LCD handling
+
+  With our driver, the description of a smart panel (port A) may be
+  done by the DT.
+
+- hardware cursor
+
+  Our driver always proposes the HWC 32 (RGBA 64x64).
+
+- LCD clocks
+
+  Each LCD may use one clock amongst 4 (AXI, LCD PLL and 2 external
+  clocks). In our driver, the choice of the clock is done on each video
+  mode change (Sebastian's idea).
+
+- interlaced modes
+
+  While the code is there, I did not test the interlaced modes.
+  Your code may be better.
+
+- video overlay
+
+  Same as above: the code is in our driver (overlay plane), but it is
+  not tested.
+
+- private ioctls
+
+  It should be easy to add them in our driver and have an API
+  compatible with your X server module. 
+
+- screen rotation (IRE)
+
+  This feature is needed when the Dove SoC is used in a tablet and does
+  not exist in both drivers.
+
+- VGA DAC
+
+  This feature is needed to get the VGA screen parameters (mode,
+  dimensions) and does not exist in both drivers too.
+
+Otherwise, there are some small differences in, for example,
+programming the LCD modes, or treating the vblank events.
+
+What do you think about merging?
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
