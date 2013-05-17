@@ -1,112 +1,99 @@
-From: andreas.herrmann@calxeda.com (Andreas Herrmann)
-Date: Fri, 17 May 2013 22:16:39 +0200
-Subject: [PATCH v2] documentation: iommu: add description of ARM System
- MMU binding
-In-Reply-To: <20130513104147.GF10369@alberich>
-References: <1365789727-5371-1-git-send-email-will.deacon@arm.com>
- <20130513095020.GB10369@alberich>
- <20130513095846.GC29814@mudshark.cambridge.arm.com>
- <20130513104147.GF10369@alberich>
-Message-ID: <20130517201639.GL10369@alberich>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Fri, 17 May 2013 22:23:07 +0200
+Subject: [PATCH 3/6] ARM: SAMSUNG: pm: Adjust for pinctrl- and DT-enabled
+ platforms
+In-Reply-To: <CAD=FV=XJ=_o+hVbD=pPqXxXo=1PZdeRWyn-xyfS+Jf5LYfe2dg@mail.gmail.com>
+References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
+ <1368807872-2601-4-git-send-email-t.figa@samsung.com>
+ <CAD=FV=XJ=_o+hVbD=pPqXxXo=1PZdeRWyn-xyfS+Jf5LYfe2dg@mail.gmail.com>
+Message-ID: <4241187.TFCdy2kUT6@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 12:41:47PM +0200, Andreas Herrmann wrote:
-> On Mon, May 13, 2013 at 05:58:46AM -0400, Will Deacon wrote:
-> > On Mon, May 13, 2013 at 10:50:20AM +0100, Andreas Herrmann wrote:
-
-[snip]
-
-> > > I also think that it is more useful to move the stream-id property to
-> > > the device node of a master device. (It's a characteristic of the
-> > > master device not of the SMMU.) Currently with multiple stream IDs per
-> > > master device you have repeated entries in the mmu-master property.
-> > 
-> > The problem with that approach is how to handle StreamID remastering. This
-> > can and will happen, so the StreamID for a device is actually a property of
-> > both the device *and* a particular point in the bus topology. Putting this
-> > information in the device nodes will drag topology information all over the
-> > place and I don't think it will make things clearer to read or easier to parse.
+On Friday 17 of May 2013 12:24:04 Doug Anderson wrote:
+> Tomasz,
 > 
-> Ok, good point, didn't think about that.
-> And agreed, adding remastered StreamIDs as a property to a device node is odd.
-> 
-> > > But all that is needed is to point (once) to each mmu-master in the
-> > > SMMU device node. Then you should be able to look up the corresponding
-> > > stream IDs in the device node for each mmu-master.
+> On Fri, May 17, 2013 at 9:24 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+> > This patch makes legacy code on suspend/resume path being executed
+> > conditionally, on non-DT platforms only, to fix suspend/resume of
+> > DT-enabled systems, for which the code is inappropriate.
 > > 
-> > Again, you also need to tie in topology information if you go down this
-> > route.
+> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> > 
+> >  arch/arm/plat-samsung/pm.c | 17 ++++++++++++-----
+> >  1 file changed, 12 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+> > index 53210ec..8ac2b2d 100644
+> > --- a/arch/arm/plat-samsung/pm.c
+> > +++ b/arch/arm/plat-samsung/pm.c
+> > @@ -261,7 +261,8 @@ static int s3c_pm_enter(suspend_state_t state)
+> > 
+> >          * require a full power-cycle)
+> >         
+> >         */
+> > 
+> > -       if (!any_allowed(s3c_irqwake_intmask, s3c_irqwake_intallow) &&
+> > +       if (!of_have_populated_dt() &&
+> > +           !any_allowed(s3c_irqwake_intmask, s3c_irqwake_intallow) &&
+> 
+> I'd rather see you modify patch set #2 to provide some function to
+> retrieve just the eint mask and then use it here.  Your patch removes
+> this test and doesn't replace it with anything.  If you moved this
+> test to pinctrl directly you'd lose the test against intallow.
 
-I still don't like the approach of having two independend lists that
-must be in sync to associate a master with its stream-ids.
+Well, looking from the perspective of status before my patch, it just 
+bypasses a test that is incorrect on DT-enabled platforms.
 
-Why? Say you have 8 masters for an SMMU with 1 or 2 stream-ids each:
+I agree that this test is rather reasonable to have, but it would require 
+defining a new interface and moving all platforms to it, which for now 
+would be a bit of overkill.
 
-     	 smmu {
-		...
-                mmu-masters = <&dma0>, <&dma0>, <&dma1>, <&dma1>,
-			      <&dma2>, <&dma2>, <&dma4>, <&dma4>,
-			      <&dma5>, <&dma6>, <&dma7>, <&dma8>;
-                stream-ids =	<0>, <1>, <2>, <3>,
-				<4>, <5>, <6>, <7>,
-		                <8>, <9>, <0xa>, <0xb>;
-	}
+IMHO a separate series that sanitizes the whole PM handling in plat-
+samsung, including a rework of this check to make it cover all platforms 
+in a generic and multiplatform-friendly way. What do you think?
 
-Couldn't we use of_phandle_args for this purpose? So your example
+> ...or do you think this test is no longer useful for some reason?
+> 
+> >             !any_allowed(s3c_irqwake_eintmask, s3c_irqwake_eintallow))
+> >             {
+> >             
+> >                 printk(KERN_ERR "%s: No wake-up sources!\n",
+> >                 __func__);
+> >                 printk(KERN_ERR "%s: Aborting sleep\n", __func__);
+> > 
+> > @@ -270,8 +271,11 @@ static int s3c_pm_enter(suspend_state_t state)
+> > 
+> >         /* save all necessary core registers not covered by the
+> >         drivers */
+> > 
+> > -       samsung_pm_save_gpios();
+> > -       samsung_pm_saved_gpios();
+> > +       if (!of_have_populated_dt()) {
+> > +               samsung_pm_save_gpios();
+> > +               samsung_pm_saved_gpios();
+> > +       }
+> > +
+> 
+> Ah, the important part here is the "saved", not the "save"!  The
+> "save" should get a NULL chip for all GPIOs and effectively be a
+> no-op.
+> 
+> Skipping the "saved" is important of s3c64xx and s5p64x0 where the
+> "saved" seems to transition things over to powerdown mode.  Hopefully
+> a future patch of yours adds that back for those platforms in the
+> pinmux world.  ...same for restore.
 
-+        smmu {
-		 ...
-+                mmu-masters = <&dma0>,
-+                              <&dma0>,
-+                              <&dma1>;
-+                stream-ids  = <0xd01d>,
-+                              <0xd01e>,
-+                              <0xd11c>;
-+        };
+S3C64xx can be switched to power down pin configuration manually, but if 
+you don't do it, it will activate it automatically after entering sleep 
+mode.
 
-would look like
+> Summary: I've tested this on exynos5250-snow and it's reasonable but
+> I'd love a response about the missing test before adding Reviewed-by.
 
-	dma0 {
-		...
-		#stream-id-cells = <2>
-		...
-	}
+Thanks.
 
-	dma1 {
-		...
-		#stream-id-cells = <1>
-		...
-	}
-
-        smmu {
-		...
-		mmu-masters = <&dma0 0xd01d 0xd01e
-			       &dma1 0xd11c>,
-       };
-
-and my example would be converted to
-
-	smmu {
-		...
-                mmu-masters = <&dma0 0 1 &dma1 2 3 &dma2 4 5
-			       &dma4 6 7 &dma5 8 &dma6 9
-			       &dma7 0xa &dma8 0xb>
-		...
-	}
-
-where each master has #stream-id-cells property with value 1 or 2.
-And if dma4 has #stream-id-cells = <1>, the parsing code quickly
-notifies us about an error whereas such an error can't be noticed
-right from the beginning with the two-list-approach. In this example
-stream-id 6 belongs to dma3 which was completely ommitted in both
-descriptions.
-
-Of course usage of of_phandle_args would restrict the number of
-stream-ids per master to 8 (which is currently used as
-MAX_PHANDLE_ARGS). But I don't think that this is a restriction in
-practice or do you expect to have more than 8 stream-ids per master
-(ie. per struct device in Linux)?
-
-
-Andreas
+Best regards,
+Tomasz
