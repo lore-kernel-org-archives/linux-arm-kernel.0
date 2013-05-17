@@ -1,50 +1,59 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 17 May 2013 17:15:23 +0800
-Subject: [PATCH] ARM: imx6q: clk: add the eim_slow clock
-Message-ID: <1368782123-15523-1-git-send-email-b32955@freescale.com>
+From: jp.francois@cynove.com (jean-philippe francois)
+Date: Fri, 17 May 2013 11:32:05 +0200
+Subject: 3.9 regression : CAM_XCLKA wrong frequency setting.
+Message-ID: <CAGGh5h2RB7OEOpGOe52eE8+LgdSmvDK5rPLueMzQMfVfOCuYHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the eim_slow clock, since the weim needs it.
+Hi,
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- .../devicetree/bindings/clock/imx6q-clock.txt      |    1 +
- arch/arm/mach-imx/clk-imx6q.c                      |    3 ++-
- 2 files changed, 3 insertions(+), 1 deletions(-)
+Laurent, you are on the recipient list because the symptom is visible
+throug your driver. I found the other name looking in the clock
+related files. Please apologize if you are not concerned by this mail.
 
-diff --git a/Documentation/devicetree/bindings/clock/imx6q-clock.txt b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-index 6deb6fd..a0e104f 100644
---- a/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/imx6q-clock.txt
-@@ -208,6 +208,7 @@ clocks and IDs.
- 	pll4_post_div		193
- 	pll5_post_div		194
- 	pll5_video_div		195
-+	eim_slow      		196
- 
- Examples:
- 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 50095dd..441a22d 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -238,7 +238,7 @@ enum mx6q_clks {
- 	pll4_audio, pll5_video, pll8_mlb, pll7_usb_host, pll6_enet, ssi1_ipg,
- 	ssi2_ipg, ssi3_ipg, rom, usbphy1, usbphy2, ldb_di0_div_3_5, ldb_di1_div_3_5,
- 	sata_ref, sata_ref_100m, pcie_ref, pcie_ref_125m, enet_ref, usbphy1_gate,
--	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, clk_max
-+	usbphy2_gate, pll4_post_div, pll5_post_div, pll5_video_div, eim_slow, clk_max
- };
- 
- static struct clk *clk[clk_max];
-@@ -535,6 +535,7 @@ int __init mx6q_clocks_init(void)
- 	clk[usdhc2]       = imx_clk_gate2("usdhc2",        "usdhc2_podf",       base + 0x80, 4);
- 	clk[usdhc3]       = imx_clk_gate2("usdhc3",        "usdhc3_podf",       base + 0x80, 6);
- 	clk[usdhc4]       = imx_clk_gate2("usdhc4",        "usdhc4_podf",       base + 0x80, 8);
-+	clk[eim_slow]     = imx_clk_gate2("eim_slow",      "emi_slow_podf",     base + 0x80, 10);
- 	clk[vdo_axi]      = imx_clk_gate2("vdo_axi",       "vdo_axi_sel",       base + 0x80, 12);
- 	clk[vpu_axi]      = imx_clk_gate2("vpu_axi",       "vpu_axi_podf",      base + 0x80, 14);
- 	clk[cko1]         = imx_clk_gate("cko1",           "cko1_podf",         base + 0x60, 7);
--- 
-1.7.1
+Symptom :
+External clock CAM_XCLKA frequency is wrong with 3.9, it was ok until
+3.6. Everything else is working fine, except the fps are higher, and
+the image quality sucks because the input clock is out of spec.
+Oscilloscope measured freq is around 30 MHz instead of the 24 MHz the
+sensor is asking for.
+
+Hardware :
+dm3730, with 19.2 MHz crystal, running at OPP100
+
+The register frequency settings seems to be ok, and they are the same
+as in 3.6.11 :
+CM_CLKSEL2_PLL : 0x04816807
+        19, 2 * 360 / 8 = 864 MHz
+         this value is already set when I look at it in u-boot
+
+CM_CLKSEL_CAM : 0x5
+        864 / 5 = 172,8 MHz
+        this value is set through the clock framework by the omap3isp
+driver code
+
+ISP.TCTRL_CTRL : 0x7
+        172,8 / 7 = 24,685... MHz
+         this value is set by the omap3isp driver code
+
+However, as stated before, the actual output frequency is NOT 24 MHz
+but around 30.
+
+If dpll4 frequency is wrong, what other clock would be affected ?
+What can I do to debug this ?
+Laurent, I believe you have a camera add-on board for the beagle xm,
+could you test and report wether you can reproduce this bug ?
+
+Attached is the boot log with 3.9, with some debugging messages activated.
+
+Thank you for your help,
+Regards,
+
+Jean-Philippe Fran?ois
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 3.9dmesg
+Type: application/octet-stream
+Size: 28444 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130517/4fd9064f/attachment-0001.obj>
