@@ -1,24 +1,26 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 17 May 2013 10:25:31 +0800
-Subject: [PATCH 1/2] ARM: dts: imx: Remove custom dma-channel bindings
-In-Reply-To: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
-References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20130517022529.GA8607@S2101-09.ap.freescale.net>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Fri, 17 May 2013 10:28:23 +0800
+Subject: [Bug] ARM 'perf' regression by commit a43cb95d5
+In-Reply-To: <CACVXFVPjo2dQpYPpqZS8GC8UPNzB5HLURpYm6-g1FOBbSUjDyA@mail.gmail.com>
+References: <CACVXFVPjo2dQpYPpqZS8GC8UPNzB5HLURpYm6-g1FOBbSUjDyA@mail.gmail.com>
+Message-ID: <CACVXFVPYsF3z6GajSeTSq6r0jbLrPWeGf9=0ckqC+uprF7wOiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 11:13:58AM -0300, Fabio Estevam wrote:
-> Commit f30fb03 (ARM: dts: add generic DMA device tree binding for mxs-dma) added
-> the generic DMA dt bindings, but missed to remove the old ones.
-> 
-> Remove the the old dma bindings.
+On Fri, May 17, 2013 at 10:16 AM, Ming Lei <ming.lei@canonical.com> wrote:
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index f219703..89bc3a4 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -225,7 +225,7 @@ void __show_regs(struct pt_regs *regs)
+>         unsigned long flags;
+>         char buf[64];
+>
+> -       show_regs_print_info(KERN_DEFAULT);
+> +       //show_regs_print_info(KERN_DEFAULT);
 
-I already had a patch [1] to remove those old DMA binding data (both
-channel and interrupt number) from client device nodes.  And I'm waiting
-for mxs-saif/pcm to be converted to generic DMA binding helper to apply
-the patch.  Mark has queued mxs-saif conversion for 3.11, and I have to
-wait for 3.11-rc1 to apply the dts cleanup.
+Forget to mention, __show_regs() isn't run under both cases.
 
-Shawn
-
-[1] http://thread.gmane.org/gmane.linux.alsa.devel/106027/focus=220815
+Thanks,
+--
+Ming Lei
