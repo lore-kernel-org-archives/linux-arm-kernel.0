@@ -1,55 +1,92 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 17 May 2013 18:07:37 +0800
-Subject: [Bug] ARM 'perf' regression by commit a43cb95d5
-In-Reply-To: <20130517095423.GD23112@mudshark.cambridge.arm.com>
-References: <CACVXFVPjo2dQpYPpqZS8GC8UPNzB5HLURpYm6-g1FOBbSUjDyA@mail.gmail.com>
- <20130517085530.GB22992@mudshark.cambridge.arm.com>
- <CACVXFVPEBXat3bPPuHzV535=xLoRMFd03Kjzp=NUF5E3KCq2=g@mail.gmail.com>
- <20130517093616.GC23112@mudshark.cambridge.arm.com>
- <CACVXFVP56EJb0BZ+w6hVAukQ-mN0e0Jn_GLw3XqXQqMwVGfNdA@mail.gmail.com>
- <20130517095423.GD23112@mudshark.cambridge.arm.com>
-Message-ID: <CACVXFVPJyKrOBk+JjsfCi+aQ8snQ7PsEJVuOnuTkrWBYEnvDtA@mail.gmail.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Fri, 17 May 2013 15:43:41 +0530
+Subject: [PATCH-V2] ARM: OMAP3+: am33xx id: Add new am33xx specific function
+ to check dev_feature
+Message-ID: <1368785621-31591-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 5:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, May 17, 2013 at 10:48:23AM +0100, Ming Lei wrote:
->> On Fri, May 17, 2013 at 5:36 PM, Will Deacon <will.deacon@arm.com> wrote:
->> >
->> > It's probably easier if you choose a workload, otherwise it's difficult to
->> > see what is `correct' and what is broken. For example, your broken output
->> > seems to be in the smsc95xx driver, so assumedly there's a bunch of
->> > networking going on whereas your other output is in cpuidle_enter_state.
->>
->> If all modules are removed, the result will become OK. And if I only insert one
->> module, the top sample will fall inside the only module, but I am sure
->> nothing is working on the symbols of the module.
->
-> Can you check your dmesg please? I suppose the smsc95xx driver might be
-> screaming about something and somehow the changes to the reg printing have
-> made it get stuck.
+Layout of DEV_FEATURE register (offset = 0x604) is different
+between TI81xx and AM33xx device, so create separate function
+which will check for features available on specific AM33xx SoC
+and set the flags accordingly.
 
-If I insert only one useless module(such as, spi-altera.ko) on Pandaboard,
-the top sample will fall inside the module of spi-altera, so it is nothing to
-do with smsc95xx, also you can see the sampled top IP is an invalid address.
+Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
+---
+Changes from V1:
+	- Removed SHIFT value, as it never gets used in code
+	- Used BIT() macro for MASK definition
 
->
->> >
->> > We need an apples-for-apples comparison if you think there's a bug in the
->> > kernel. Can you try profiling hackbench or something?
->> >
->> >> Or could anyone else try to verify the problem on their own environment?
->> >
->> > How are you running perf top?
->>
->> sudo perf top
->
-> ... and did hackbench make any difference (i.e. is the profile more stable)?
+ arch/arm/mach-omap2/control.h |    4 ++++
+ arch/arm/mach-omap2/id.c      |   13 +++++++++++++
+ arch/arm/mach-omap2/io.c      |    2 +-
+ arch/arm/mach-omap2/soc.h     |    1 +
+ 4 files changed, 19 insertions(+), 1 deletions(-)
 
-When hackbench is started, there is no much change compared with idle,
-only another sample( 2.49%  [unknown]            [.] 0xb6f618a0) comes and
-becomes top 2.
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index e6c3281..174eb41 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -358,6 +358,10 @@
+ #define AM33XX_CONTROL_STATUS_SYSBOOT1_WIDTH		0x2
+ #define AM33XX_CONTROL_STATUS_SYSBOOT1_MASK		(0x3 << 22)
 
-Thanks,
++/* DEV Feature register to identify AM33XX features */
++#define AM33XX_DEV_FEATURE		0x604
++#define AM33XX_SGX_MASK			BIT(29)
++
+ /* CONTROL OMAP STATUS register to identify OMAP3 features */
+ #define OMAP3_CONTROL_OMAP_STATUS	0x044c
+
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 1272c41..44be835 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -302,6 +302,19 @@ void __init ti81xx_check_features(void)
+ 	omap3_cpuinfo();
+ }
+
++void __init am33xx_check_features(void)
++{
++	u32 status;
++
++	omap_features = OMAP3_HAS_NEON;
++
++	status = omap_ctrl_readl(AM33XX_DEV_FEATURE);
++	if (status & AM33XX_SGX_MASK)
++		omap_features |= OMAP3_HAS_SGX;
++
++	omap3_cpuinfo();
++}
++
+ void __init omap3xxx_check_revision(void)
+ {
+ 	const char *cpu_rev;
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+index 09abf99..06a8946 100644
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -576,7 +576,7 @@ void __init am33xx_init_early(void)
+ 	omap2_set_globals_prm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE));
+ 	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE), NULL);
+ 	omap3xxx_check_revision();
+-	ti81xx_check_features();
++	am33xx_check_features();
+ 	am33xx_voltagedomains_init();
+ 	am33xx_powerdomains_init();
+ 	am33xx_clockdomains_init();
+diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+index 197cc16..fd4507b 100644
+--- a/arch/arm/mach-omap2/soc.h
++++ b/arch/arm/mach-omap2/soc.h
+@@ -424,6 +424,7 @@ void omap4xxx_check_revision(void);
+ void omap5xxx_check_revision(void);
+ void omap3xxx_check_features(void);
+ void ti81xx_check_features(void);
++void am33xx_check_features(void);
+ void omap4xxx_check_features(void);
+
+ /*
 --
-Ming Lei
+1.7.0.4
