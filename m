@@ -1,440 +1,78 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 17 May 2013 16:42:06 +0200
-Subject: [PATCH 1/5] usb: add Atmel USBA UDC DT support
-In-Reply-To: <20130517141443.GB16804@game.jcrosoft.org>
-References: <20130517141443.GB16804@game.jcrosoft.org>
-Message-ID: <1368801730-31383-1-git-send-email-plagnioj@jcrosoft.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 17 May 2013 17:17:01 +0200
+Subject: [PULL] add support for ARM-v7M
+Message-ID: <20130517151701.GA8215@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow to compile the driver all the time if AT91 enabled.
+Hello Russell,
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: linux-usb at vger.kernel.org
----
- .../devicetree/bindings/usb/atmel-usb.txt          |   82 ++++++++
- drivers/usb/gadget/Kconfig                         |    2 +-
- drivers/usb/gadget/atmel_usba_udc.c                |  214 +++++++++++++++-----
- drivers/usb/gadget/atmel_usba_udc.h                |    1 +
- 4 files changed, 244 insertions(+), 55 deletions(-)
+The following changes since commit 73a09d212ec65b7068a283e6034fa05649d3d075:
 
-diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-index 60bd215..878556b2 100644
---- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
-+++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
-@@ -47,3 +47,85 @@ usb1: gadget at fffa4000 {
- 	interrupts = <10 4>;
- 	atmel,vbus-gpio = <&pioC 5 0>;
- };
-+
-+Atmel High-Speed USB device controller
-+
-+Required properties:
-+ - compatible: Should be "atmel,at91sam9rl-udc"
-+ - reg: Address and length of the register set for the device
-+ - interrupts: Should contain macb interrupt
-+ - ep childnode: To specifiy the number of endpoints and their properties.
-+
-+Optional properties:
-+ - atmel,vbus-gpio: If present, specifies a gpio that needs to be
-+   activated for the bus to be powered.
-+
-+Required child node properties:
-+ - name: Name of the endpoint.
-+ - reg: Num of the endpoint.
-+ - atmel,fifo-size: Size of the fifo.
-+ - atmel,nb-banks: Number of banks.
-+ - atmel,can-dma: Boolean to specify if the endpoint support DMA.
-+ - atmel,can-isoc: Boolean to specify if the endpoint support ISOC.
-+
-+usb2: gadget at fff78000 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	compatible = "atmel,at91sam9rl-udc";
-+	reg = <0x00600000 0x80000
-+	       0xfff78000 0x400>;
-+	interrupts = <27 4>;
-+	atmel,vbus-gpio = <&pioB 19 0>;
-+
-+	ep0 {
-+		reg = <0>;
-+		atmel,fifo-size = <64>;
-+		atmel,nb-banks = <1>;
-+	};
-+
-+	ep1 {
-+		reg = <1>;
-+		atmel,fifo-size = <1024>;
-+		atmel,nb-banks = <2>;
-+		atmel,can-dma;
-+		atmel,can-isoc;
-+	};
-+
-+	ep2 {
-+		reg = <2>;
-+		atmel,fifo-size = <1024>;
-+		atmel,nb-banks = <2>;
-+		atmel,can-dma;
-+		atmel,can-isoc;
-+	};
-+
-+	ep3 {
-+		reg = <3>;
-+		atmel,fifo-size = <1024>;
-+		atmel,nb-banks = <3>;
-+		atmel,can-dma;
-+	};
-+
-+	ep4 {
-+		reg = <4>;
-+		atmel,fifo-size = <1024>;
-+		atmel,nb-banks = <3>;
-+		atmel,can-dma;
-+	};
-+
-+	ep5 {
-+		reg = <5>;
-+		atmel,fifo-size = <1024>;
-+		atmel,nb-banks = <3>;
-+		atmel,can-dma;
-+		atmel,can-isoc;
-+	};
-+
-+	ep6 {
-+		reg = <6>;
-+		atmel,fifo-size = <1024>;
-+		atmel,nb-banks = <3>;
-+		atmel,can-dma;
-+		atmel,can-isoc;
-+	};
-+};
-diff --git a/drivers/usb/gadget/Kconfig b/drivers/usb/gadget/Kconfig
-index 83300d9..5e47d50 100644
---- a/drivers/usb/gadget/Kconfig
-+++ b/drivers/usb/gadget/Kconfig
-@@ -156,7 +156,7 @@ config USB_LPC32XX
- 
- config USB_ATMEL_USBA
- 	tristate "Atmel USBA"
--	depends on AVR32 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
-+	depends on AVR32 || ARCH_AT91
- 	help
- 	  USBA is the integrated high-speed USB Device controller on
- 	  the AT32AP700x, some AT91SAM9 and AT91CAP9 processors from Atmel.
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index f2a970f..b3084b9 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -22,6 +22,8 @@
- #include <linux/usb/atmel_usba_udc.h>
- #include <linux/delay.h>
- #include <linux/platform_data/atmel.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
- 
- #include <asm/gpio.h>
- 
-@@ -1835,9 +1837,143 @@ static int atmel_usba_stop(struct usb_gadget *gadget,
- 	return 0;
- }
- 
--static int __init usba_udc_probe(struct platform_device *pdev)
-+#ifdef CONFIG_OF
-+static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
-+						    struct usba_udc *udc)
-+{
-+	u32 val;
-+	const char *name;
-+	enum of_gpio_flags flags;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct device_node *pp;
-+	int i, ret;
-+	struct usba_ep *eps, *ep;
-+
-+	udc->num_ep = 0;
-+
-+	udc->vbus_pin = of_get_named_gpio_flags(np, "atmel,vbus-gpio", 0,
-+						&flags);
-+	udc->vbus_pin_inverted = (flags & OF_GPIO_ACTIVE_LOW) ? 1 : 0;
-+
-+	pp = NULL;
-+	while ((pp = of_get_next_child(np, pp)))
-+		udc->num_ep++;
-+
-+	eps = devm_kzalloc(&pdev->dev, sizeof(struct usba_ep) * udc->num_ep,
-+			   GFP_KERNEL);
-+	if (!eps)
-+		return ERR_PTR(-ENOMEM);
-+
-+	udc->gadget.ep0 = &eps[0].ep;
-+
-+	INIT_LIST_HEAD(&eps[0].ep.ep_list);
-+
-+	pp = NULL;
-+	i = 0;
-+	while ((pp = of_get_next_child(np, pp))) {
-+		ep = &eps[i];
-+
-+		ret = of_property_read_u32(pp, "reg", &val);
-+		if (ret) {
-+			dev_err(&pdev->dev, "of_probe: reg error(%d)\n", ret);
-+			goto err;
-+		}
-+		ep->index = val;
-+
-+		ret = of_property_read_u32(pp, "atmel,fifo-size", &val);
-+		if (ret) {
-+			dev_err(&pdev->dev, "of_probe: fifo-size error(%d)\n", ret);
-+			goto err;
-+		}
-+		ep->fifo_size = val;
-+
-+		ret = of_property_read_u32(pp, "atmel,nb-banks", &val);
-+		if (ret) {
-+			dev_err(&pdev->dev, "of_probe: nb-banks error(%d)\n", ret);
-+			goto err;
-+		}
-+		ep->nr_banks = val;
-+
-+		ep->can_dma = of_property_read_bool(pp, "atmel,can-dma");
-+		ep->can_isoc = of_property_read_bool(pp, "atmel,can-isoc");
-+
-+		ret = of_property_read_string(pp, "name", &name);
-+		ep->ep.name = name;
-+
-+		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
-+		ep->dma_regs = udc->regs + USBA_DMA_BASE(i);
-+		ep->fifo = udc->fifo + USBA_FIFO_BASE(i);
-+		ep->ep.ops = &usba_ep_ops;
-+		ep->ep.maxpacket = ep->fifo_size;
-+		ep->udc = udc;
-+		INIT_LIST_HEAD(&ep->queue);
-+
-+		if (i)
-+			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
-+
-+		i++;
-+	}
-+
-+	return eps;
-+err:
-+	return ERR_PTR(ret);
-+}
-+#else
-+static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
-+						    struct usba_udc *udc)
-+{
-+	return ERR_PTR(-ENOSYS);
-+}
-+#endif
-+
-+static struct usba_ep * usba_udc_pdata(struct platform_device *pdev,
-+						 struct usba_udc *udc)
- {
- 	struct usba_platform_data *pdata = pdev->dev.platform_data;
-+	struct usba_ep *eps;
-+	int i;
-+
-+	if (!pdata)
-+		return ERR_PTR(-ENXIO);
-+
-+	eps = devm_kzalloc(&pdev->dev, sizeof(struct usba_ep) * pdata->num_ep,
-+			   GFP_KERNEL);
-+	if (!eps)
-+		return ERR_PTR(-ENOMEM);
-+
-+	udc->gadget.ep0 = &eps[0].ep;
-+
-+	udc->vbus_pin = pdata->vbus_pin;
-+	udc->vbus_pin_inverted = pdata->vbus_pin_inverted;
-+	udc->num_ep = pdata->num_ep;
-+
-+	INIT_LIST_HEAD(&eps[0].ep.ep_list);
-+
-+	for (i = 0; i < pdata->num_ep; i++) {
-+		struct usba_ep *ep = &eps[i];
-+
-+		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
-+		ep->dma_regs = udc->regs + USBA_DMA_BASE(i);
-+		ep->fifo = udc->fifo + USBA_FIFO_BASE(i);
-+		ep->ep.ops = &usba_ep_ops;
-+		ep->ep.name = pdata->ep[i].name;
-+		ep->fifo_size = ep->ep.maxpacket = pdata->ep[i].fifo_size;
-+		ep->udc = udc;
-+		INIT_LIST_HEAD(&ep->queue);
-+		ep->nr_banks = pdata->ep[i].nr_banks;
-+		ep->index = pdata->ep[i].index;
-+		ep->can_dma = pdata->ep[i].can_dma;
-+		ep->can_isoc = pdata->ep[i].can_isoc;
-+
-+		if (i)
-+			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
-+	}
-+
-+	return eps;
-+}
-+
-+static int __init usba_udc_probe(struct platform_device *pdev)
-+{
- 	struct resource *regs, *fifo;
- 	struct clk *pclk, *hclk;
- 	struct usba_udc *udc = &the_udc;
-@@ -1845,7 +1981,7 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 
- 	regs = platform_get_resource(pdev, IORESOURCE_MEM, CTRL_IOMEM_ID);
- 	fifo = platform_get_resource(pdev, IORESOURCE_MEM, FIFO_IOMEM_ID);
--	if (!regs || !fifo || !pdata)
-+	if (!regs || !fifo)
- 		return -ENXIO;
- 
- 	irq = platform_get_irq(pdev, 0);
-@@ -1891,46 +2027,14 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 	usba_writel(udc, CTRL, USBA_DISABLE_MASK);
- 	clk_disable(pclk);
- 
--	usba_ep = kzalloc(sizeof(struct usba_ep) * pdata->num_ep,
--			  GFP_KERNEL);
--	if (!usba_ep)
--		goto err_alloc_ep;
--
--	the_udc.gadget.ep0 = &usba_ep[0].ep;
--
--	INIT_LIST_HEAD(&usba_ep[0].ep.ep_list);
--	usba_ep[0].ep_regs = udc->regs + USBA_EPT_BASE(0);
--	usba_ep[0].dma_regs = udc->regs + USBA_DMA_BASE(0);
--	usba_ep[0].fifo = udc->fifo + USBA_FIFO_BASE(0);
--	usba_ep[0].ep.ops = &usba_ep_ops;
--	usba_ep[0].ep.name = pdata->ep[0].name;
--	usba_ep[0].ep.maxpacket = pdata->ep[0].fifo_size;
--	usba_ep[0].udc = &the_udc;
--	INIT_LIST_HEAD(&usba_ep[0].queue);
--	usba_ep[0].fifo_size = pdata->ep[0].fifo_size;
--	usba_ep[0].nr_banks = pdata->ep[0].nr_banks;
--	usba_ep[0].index = pdata->ep[0].index;
--	usba_ep[0].can_dma = pdata->ep[0].can_dma;
--	usba_ep[0].can_isoc = pdata->ep[0].can_isoc;
--
--	for (i = 1; i < pdata->num_ep; i++) {
--		struct usba_ep *ep = &usba_ep[i];
--
--		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
--		ep->dma_regs = udc->regs + USBA_DMA_BASE(i);
--		ep->fifo = udc->fifo + USBA_FIFO_BASE(i);
--		ep->ep.ops = &usba_ep_ops;
--		ep->ep.name = pdata->ep[i].name;
--		ep->ep.maxpacket = pdata->ep[i].fifo_size;
--		ep->udc = &the_udc;
--		INIT_LIST_HEAD(&ep->queue);
--		ep->fifo_size = pdata->ep[i].fifo_size;
--		ep->nr_banks = pdata->ep[i].nr_banks;
--		ep->index = pdata->ep[i].index;
--		ep->can_dma = pdata->ep[i].can_dma;
--		ep->can_isoc = pdata->ep[i].can_isoc;
-+	if (pdev->dev.of_node)
-+		usba_ep = atmel_udc_of_init(pdev, udc);
-+	else
-+		usba_ep = usba_udc_pdata(pdev, udc);
- 
--		list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
-+	if (IS_ERR(usba_ep)) {
-+		ret = PTR_ERR(usba_ep);
-+		goto err_alloc_ep;
- 	}
- 
- 	ret = request_irq(irq, usba_udc_irq, 0, "atmel_usba_udc", udc);
-@@ -1941,16 +2045,12 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 	}
- 	udc->irq = irq;
- 
--	if (gpio_is_valid(pdata->vbus_pin)) {
--		if (!gpio_request(pdata->vbus_pin, "atmel_usba_udc")) {
--			udc->vbus_pin = pdata->vbus_pin;
--			udc->vbus_pin_inverted = pdata->vbus_pin_inverted;
--
-+	if (gpio_is_valid(udc->vbus_pin)) {
-+		if (!devm_gpio_request(&pdev->dev, udc->vbus_pin, "atmel_usba_udc")) {
- 			ret = request_irq(gpio_to_irq(udc->vbus_pin),
- 					usba_vbus_irq, 0,
- 					"atmel_usba_udc", udc);
- 			if (ret) {
--				gpio_free(udc->vbus_pin);
- 				udc->vbus_pin = -ENODEV;
- 				dev_warn(&udc->pdev->dev,
- 					 "failed to request vbus irq; "
-@@ -1969,16 +2069,14 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 		goto err_add_udc;
- 
- 	usba_init_debugfs(udc);
--	for (i = 1; i < pdata->num_ep; i++)
-+	for (i = 1; i < udc->num_ep; i++)
- 		usba_ep_init_debugfs(udc, &usba_ep[i]);
- 
- 	return 0;
- 
- err_add_udc:
--	if (gpio_is_valid(pdata->vbus_pin)) {
-+	if (gpio_is_valid(udc->vbus_pin))
- 		free_irq(gpio_to_irq(udc->vbus_pin), udc);
--		gpio_free(udc->vbus_pin);
--	}
- 
- 	free_irq(irq, udc);
- err_request_irq:
-@@ -2001,19 +2099,17 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
- {
- 	struct usba_udc *udc;
- 	int i;
--	struct usba_platform_data *pdata = pdev->dev.platform_data;
- 
- 	udc = platform_get_drvdata(pdev);
- 
- 	usb_del_gadget_udc(&udc->gadget);
- 
--	for (i = 1; i < pdata->num_ep; i++)
-+	for (i = 1; i < udc->num_ep; i++)
- 		usba_ep_cleanup_debugfs(&usba_ep[i]);
- 	usba_cleanup_debugfs(udc);
- 
- 	if (gpio_is_valid(udc->vbus_pin)) {
- 		free_irq(gpio_to_irq(udc->vbus_pin), udc);
--		gpio_free(udc->vbus_pin);
- 	}
- 
- 	free_irq(udc->irq, udc);
-@@ -2026,11 +2122,21 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#if defined(CONFIG_OF)
-+static const struct of_device_id atmel_udc_dt_ids[] = {
-+	{ .compatible = "atmel,at91sam9rl-udc" },
-+	{ /* sentinel */ }
-+};
-+
-+MODULE_DEVICE_TABLE(of, atmel_udc_dt_ids);
-+#endif
-+
- static struct platform_driver udc_driver = {
- 	.remove		= __exit_p(usba_udc_remove),
- 	.driver		= {
- 		.name		= "atmel_usba_udc",
- 		.owner		= THIS_MODULE,
-+		.of_match_table	= of_match_ptr(atmel_udc_dt_ids),
- 	},
- };
- 
-diff --git a/drivers/usb/gadget/atmel_usba_udc.h b/drivers/usb/gadget/atmel_usba_udc.h
-index d65a618..6999a26 100644
---- a/drivers/usb/gadget/atmel_usba_udc.h
-+++ b/drivers/usb/gadget/atmel_usba_udc.h
-@@ -317,6 +317,7 @@ struct usba_udc {
- 	int irq;
- 	int vbus_pin;
- 	int vbus_pin_inverted;
-+	int num_ep;
- 	struct clk *pclk;
- 	struct clk *hclk;
- 
+  Merge branch 'for-next' of git://git.pengutronix.de/git/ukl/linux into devel-stable (2013-03-09 15:49:32 +0000)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/ukl/linux.git for-next
+
+for you to fetch changes up to 6fae9cdafc92ae9958a3a45dd68205f72e3ad900:
+
+  ARM: ARMv7-M: implement read_cpuid_ext (2013-05-17 11:44:40 +0200)
+
+All but the last patch were in next since next-20130418 without issues.
+The last patch fixes a problem in combination with 
+
+	8164f7a (ARM: 7680/1: Detect support for SDIV/UDIV from ISAR0 register)
+
+which triggers a WARN_ON without an implemented read_cpuid_ext.
+
+The branch merges fine into v3.10-rc1 and I'd be happy if you pulled it
+for 3.11-rc1. The only missing piece to be able to run a Cortex-M3 is
+the irqchip driver that will go in via Thomas Gleixner and platform
+specific stuff.
+
+Best regards
+Uwe
+----------------------------------------------------------------
+Catalin Marinas (1):
+      ARM: Add base support for ARMv7-M
+
+Uwe Kleine-K?nig (3):
+      ARM: ARMv7-M: Add support for exception handling
+      ARM: ARMv7-M: Allow the building of new kernel port
+      ARM: ARMv7-M: implement read_cpuid_ext
+
+ arch/arm/Kconfig                   |   4 +-
+ arch/arm/Kconfig-nommu             |   2 +-
+ arch/arm/Makefile                  |   1 +
+ arch/arm/include/asm/assembler.h   |  17 +++-
+ arch/arm/include/asm/cputype.h     |  44 ++++++++++-
+ arch/arm/include/asm/glue-cache.h  |  27 +++++++
+ arch/arm/include/asm/glue-df.h     |   8 ++
+ arch/arm/include/asm/glue-proc.h   |   9 +++
+ arch/arm/include/asm/irqflags.h    |  22 ++++--
+ arch/arm/include/asm/ptrace.h      |   4 +
+ arch/arm/include/asm/system_info.h |   1 +
+ arch/arm/include/asm/v7m.h         |  44 +++++++++++
+ arch/arm/include/uapi/asm/ptrace.h |  35 +++++++--
+ arch/arm/kernel/Makefile           |   8 +-
+ arch/arm/kernel/entry-common.S     |   4 +
+ arch/arm/kernel/entry-header.S     | 124 +++++++++++++++++++++++++++++
+ arch/arm/kernel/entry-v7m.S        | 143 +++++++++++++++++++++++++++++++++
+ arch/arm/kernel/head-nommu.S       |  10 ++-
+ arch/arm/kernel/setup.c            |  17 +++-
+ arch/arm/kernel/traps.c            |   8 ++
+ arch/arm/mm/Kconfig                |  21 ++++-
+ arch/arm/mm/Makefile               |   2 +
+ arch/arm/mm/cache-nop.S            |  50 ++++++++++++
+ arch/arm/mm/nommu.c                |   7 ++
+ arch/arm/mm/proc-v7m.S             | 157 +++++++++++++++++++++++++++++++++++++
+ 25 files changed, 742 insertions(+), 27 deletions(-)
+ create mode 100644 arch/arm/include/asm/v7m.h
+ create mode 100644 arch/arm/kernel/entry-v7m.S
+ create mode 100644 arch/arm/mm/cache-nop.S
+ create mode 100644 arch/arm/mm/proc-v7m.S
+
 -- 
-1.7.10.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
