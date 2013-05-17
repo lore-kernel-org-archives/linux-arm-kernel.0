@@ -1,92 +1,75 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 May 2013 17:43:41 +0100
-Subject: [PATCH] arm64: extable: sort the exception table at build time
-Message-ID: <1368809021-25130-1-git-send-email-will.deacon@arm.com>
+Date: Fri, 17 May 2013 17:54:38 +0100
+Subject: [PATCH 2/2] ARM: tlb: don't perform inner-shareable invalidation for
+ local BP ops
+In-Reply-To: <1368809678-25818-1-git-send-email-will.deacon@arm.com>
+References: <1368809678-25818-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1368809678-25818-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As is done for other architectures, sort the exception table at
-build-time rather than during boot.
+Now that the ASID allocator doesn't require inner-shareable maintenance,
+we can convert the local_bp_flush_all function to perform only
+non-shareable flushing, in a similar manner to the TLB invalidation
+routines.
 
-Since sortextable appears to be a standalone C program relying on the
-host elf.h to provide EM_AARCH64, I've had to add a conditional check in
-order to allow cross-compilation on machines that aren't running a
-bleeding-edge libc-dev.
-
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/Kconfig              |  1 +
- arch/arm64/kernel/vmlinux.lds.S | 15 +++++++--------
- scripts/sortextable.c           |  5 +++++
- 3 files changed, 13 insertions(+), 8 deletions(-)
+ arch/arm/include/asm/tlbflush.h | 16 +++++++++++++---
+ arch/arm/kernel/smp_tlb.c       |  2 +-
+ 2 files changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 48347dc..fb8fd90 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -7,6 +7,7 @@ config ARM64
- 	select ARM_AMBA
- 	select ARM_ARCH_TIMER
- 	select ARM_GIC
-+	select BUILDTIME_EXTABLE_SORT
- 	select CLONE_BACKWARDS
- 	select COMMON_CLK
- 	select GENERIC_CLOCKEVENTS
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 3fae2be..3d527726 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -57,6 +57,13 @@ SECTIONS
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index 55b5e18..8630db6 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -168,7 +168,7 @@
  
- 	RO_DATA(PAGE_SIZE)
+ #define v7wbi_tlb_flags_smp	(TLB_WB | TLB_BARRIER | \
+ 				 TLB_V6_U_FULL | TLB_V6_U_PAGE | \
+-				 TLB_V6_U_ASID | \
++				 TLB_V6_U_ASID | TLB_V6_BP | \
+ 				 TLB_V7_UIS_FULL | TLB_V7_UIS_PAGE | \
+ 				 TLB_V7_UIS_ASID | TLB_V7_UIS_BP)
+ #define v7wbi_tlb_flags_up	(TLB_WB | TLB_DCLEAN | TLB_BARRIER | \
+@@ -488,14 +488,24 @@ static inline void __flush_tlb_kernel_page(unsigned long kaddr)
+ 	}
+ }
  
-+	. = ALIGN(8);
-+	__ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) {
-+		__start___ex_table = .;
-+		*(__ex_table)
-+		__stop___ex_table = .;
-+	}
+-static inline void local_flush_bp_all(void)
++static inline void __flush_bp_all(void)
+ {
+ 	const int zero = 0;
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
+ 	if (tlb_flag(TLB_V7_UIS_BP))
+ 		asm("mcr p15, 0, %0, c7, c1, 6" : : "r" (zero));
+-	else if (tlb_flag(TLB_V6_BP))
 +
- 	_etext = .;			/* End of text and rodata section */
- 
- 	. = ALIGN(PAGE_SIZE);
-@@ -99,14 +106,6 @@ SECTIONS
- 		READ_MOSTLY_DATA(64)
- 
- 		/*
--		 * The exception fixup table (might need resorting at runtime)
--		 */
--		. = ALIGN(32);
--		__start___ex_table = .;
--		*(__ex_table)
--		__stop___ex_table = .;
--
--		/*
- 		 * and the usual data section
- 		 */
- 		DATA_DATA
-diff --git a/scripts/sortextable.c b/scripts/sortextable.c
-index 1f10e89..f9ce116 100644
---- a/scripts/sortextable.c
-+++ b/scripts/sortextable.c
-@@ -31,6 +31,10 @@
- #include <tools/be_byteshift.h>
- #include <tools/le_byteshift.h>
- 
-+#ifndef EM_AARCH64
-+#define EM_AARCH64	183
-+#endif
++	if (tlb_flag(TLB_BARRIER))
++		isb();
++}
 +
- static int fd_map;	/* File descriptor for file being modified. */
- static int mmap_failed; /* Boolean flag. */
- static void *ehdr_curr; /* current ElfXX_Ehdr *  for resource cleanup */
-@@ -249,6 +253,7 @@ do_file(char const *const fname)
- 		custom_sort = sort_relative_table;
- 		break;
- 	case EM_ARM:
-+	case EM_AARCH64:
- 	case EM_MIPS:
- 		break;
- 	}  /* end switch */
++static inline void local_flush_bp_all(void)
++{
++	const int zero = 0;
++	const unsigned int __tlb_flag = __cpu_tlb_flags;
++
++	if (tlb_flag(TLB_V6_BP))
+ 		asm("mcr p15, 0, %0, c7, c5, 6" : : "r" (zero));
+ 
+ 	if (tlb_flag(TLB_BARRIER))
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index cc299b5..5cb5500 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -204,5 +204,5 @@ void flush_bp_all(void)
+ 	if (tlb_ops_need_broadcast())
+ 		on_each_cpu(ipi_flush_bp_all, NULL, 1);
+ 	else
+-		local_flush_bp_all();
++		__flush_bp_all();
+ }
 -- 
 1.8.2.2
