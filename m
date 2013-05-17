@@ -1,87 +1,40 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 17 May 2013 20:57:17 +0200
-Subject: [RFC 0/8] rmk's Dove DRM/TDA19988 Cubox driver
-In-Reply-To: <20130517180028.GK18614@n2100.arm.linux.org.uk>
-References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
- <20130517133345.7c1368f5@armhf>
- <20130517120115.GF18614@n2100.arm.linux.org.uk>
- <20130517194023.0c385ea0@armhf>
- <20130517180028.GK18614@n2100.arm.linux.org.uk>
-Message-ID: <20130517205717.4d7e5ef9@armhf>
+From: mgreer@animalcreek.com (Mark A. Greer)
+Date: Fri, 17 May 2013 11:56:20 -0700
+Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
+In-Reply-To: <5194B2A8.8020608@visionsystems.de>
+References: <20130515002537.GG5600@atomide.com>
+ <20130515015212.GB3268@animalcreek.com>
+ <20130515170734.GI5600@atomide.com>
+ <20130515215028.GA11883@animalcreek.com>
+ <5194B2A8.8020608@visionsystems.de>
+Message-ID: <20130517185620.GF28484@animalcreek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 May 2013 19:00:29 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Thu, May 16, 2013 at 12:19:20PM +0200, Yegor Yefremov wrote:
+> On 15.05.2013 23:50, Mark A. Greer wrote:
+> > On Wed, May 15, 2013 at 10:07:35AM -0700, Tony Lindgren wrote:
 
-> > Maybe I did not explain correctly: the colored cursor maybe RGB888 +
-> > transparency (64x64) or full ARGB (64x32 or 32x64). I coded the first
-> > case. And, yes, I better like a hardware cursor: it asks for less
-> > computation, and I get it immediately at graphic starting time!  
+> >> Mark, do you have some omap3 with no iva (other than am3703) to test the
+> >> idle states with?
+> > 
+> > I have an am35xx which isn't supposed to have an IVA so I can test with it
+> > (although, I'm not sure how well the kernel works on the am35xx these days).
+> > 
+> > I'm a bit busy today but I'll try booting the am35xx tomorrow and if it
+> > comes up, see what I can figure out.
 > 
-> Interesting.  Where did you find the documentation for the transparency?
-> The FS lists HWC32_TRANS_CNTL but omits to specify where that gets used.
-
-Simply in the ? 11.3.2.1. The HWC32_TRANS_CNTL SRAM is loaded like the
-HWC 2bpp, but with 00 transparent / 01 RGB.
-
-> > The first step is "DT or not DT"? For me, the DT is more flexible
-> > (one or two LCDs, smart panel definition, display controller or not..)
-> > and permits easy inclusion of out of tree drivers as the private VPU
-> > and GPU ones.  
+> I think this issue is relevant to am3517 as you can see from this thread: http://thread.gmane.org/gmane.linux.ports.arm.omap/97903
+> I could boot only with your patch http://www.spinics.net/lists/arm-kernel/msg168865.html
 > 
-> I'd argue supporting both. :)
+> I have such a system running, so if you have any other patches/ideas to test, I would do it.
 
-Not easy!
+Yegor, since I've so far been unable to get my am3517evm to fire up, can
+you play around with the 3517 to see if there appears to be iva registers
+that can be read/written to safely?  In particular, can the code that idles
+the iva be run safely on an am3517?
 
-If you have not yet looked at our driver, here is how it starts:
+Thanks,
 
-- in '/', the DT contains
-
-	video {
-		compatible = "marvell,dove-video";
-	};
-
-  which loads the dove-drm module.
-
-- its module init function registers the lcd driver, the dcon driver
-  and the drm driver.
-
-- the lcd probe function tries to get all the resources for the
-  specific LCD from the DT, including the clocks and the HDMI
-  transmitter.
-  If some resource is lacking, it deferes.
-  When all resources are there, it says "present" to the drm driver (see
-  below).
-
-  The resources of a LCD are declared in the DT by something like:
-
-  &lcd0 {					/* the iomem and irq are declared
-						 * in the Dove global DT */
-	status = "okay";			/* this LCD is present and usable */
-	clocks = <&core_clk 3>, <0>, <&lcdclk>, <&si5351 0>;
-							/* 3 usable clocks */
-	marvell,port-type = <11>;			/* HDMIA */
-	marvell,external-encoder = <&tda998x>;		/* HDMI slave encoder */
-  };
-
-- the dcon probe function gets its resources and says "present" to the
-  drm driver.
-  Its DT declaration is just:
-
-  &dcon { status = "okay"; };			/* iomem and irq in the Dove DT */
-
-- the drm probe function scans all the DT, counting its usuable devices,
-  (i.e. the LCDs and the dcon), and decrement the "present" variable
-  accordingly.
-
-- when the "present" variable is null, the active devices have all
-  their resources, and, then, the drm driver is activated by a call to
-  drm_platform_init().
-
-I don't see clearly how to do that with a static initialization, and I
-don't want to write a "cubox-setup.c". A kernel CONFIG_CUBOX ?
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Mark
+--
