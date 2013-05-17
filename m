@@ -1,39 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 May 2013 15:17:31 +0200
-Subject: [PATCH v3 2/4] ARM: imx: add initial support for MVF600
-In-Reply-To: <20130517130603.GJ8607@S2101-09.ap.freescale.net>
-References: <1368684648-20826-1-git-send-email-b35083@freescale.com>
- <201305171429.52646.arnd@arndb.de>
- <20130517130603.GJ8607@S2101-09.ap.freescale.net>
-Message-ID: <4003326.AbobOukrYT@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 17 May 2013 15:17:39 +0200
+Subject: [RFC PATCHv3 4/6] clocksource: Add TI-Nspire timer drivers
+In-Reply-To: <26FBB324-AAA9-4C10-8978-C2EC1C26672E@gmail.com>
+References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
+ <1368332581-94691-5-git-send-email-dt.tangr@gmail.com>
+ <CACRpkdZBFbOnQ9rCehO0yKDN7fH9VR3VYCa_NkOGJz7KN+02FQ@mail.gmail.com>
+ <26FBB324-AAA9-4C10-8978-C2EC1C26672E@gmail.com>
+Message-ID: <CACRpkdaO7ieSdo5+Yq0+CLDfP==+DBOWn8+v0ap5iMOJy0Vf=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 May 2013 21:06:05 Shawn Guo wrote:
-> On Fri, May 17, 2013 at 02:29:52PM +0200, Arnd Bergmann wrote:
-> > > > Actually I think you should move that driver to drivers/clk and use
-> > > > of_clk_init(NULL) to initialize it.
-> > > > 
-> > > The mvf600 clock driver uses a lot of base clk support from mach-imx,
-> > > and can not be moved into drivers/clk as a single driver.  Right now, in
-> > > IMX clock drivers, we call of_clk_init() to only register fixed rate
-> > > clocks, since all the other clocks are not represented in device tree.
-> > 
-> > What are your plans for this in the long run?
-> > 
-> We can move all the IMX clock drivers into drivers/clk at some point
-> when necessary.  But I do not have a plan to register all the clocks
-> by merely calling of_clk_init(), because doing that would mean we have
-> to represent all these clocks in device tree.  For imx6q example, it's
-> about 200 ~ 300 nodes addition to DTB.  Device tree maintainers are
-> against to the idea.  They are perfectly fine with having clock driver
-> in kernel to represent/register these SoC internal clocks to clk
-> framework.
+On Tue, May 14, 2013 at 1:51 PM, Daniel Tang <dt.tangr@gmail.com> wrote:
+> On 14/05/2013, at 6:03 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+>>> +
+>>> +       timer->interrupt_regs = of_iomap(node, 1);
+>>
+>> Check for errors.
+>>
+>>> +       timer->irqnr = irq_of_parse_and_map(node, 0);
+>>
+>> Check for errors.
+>>> +       if (timer->interrupt_regs && timer->irqnr) {
+>>>
+>
+> The idea with this is to make these properties optional. Each timer has two sub-timers
+> but only one can generate interrupts.
 
-Can't we move the driver to drivers/clk and have it initialized through
-of_clk_init() without representing all clocks in the DT?
+I see now. Sorry, I was just being dumb, don't worry!
 
-For all I can tell, CLK_OF_DECLARE() requires only the clock provider
-to be described in DT, but not the actual clocks.
+> Should I comment it in the code to make it apparent what's happening or is there a
+> better way to express this?
 
-	Arnd
+Maybe. Maybe it's obvious to everyone else but me :-/
+
+>>> +               writel(0x3F, timer->interrupt_regs + IO_INTR_ACK);
+>>
+>> Hm magic number, I guess it's clearing all IRQ lines?
+>
+> It's a bitmask of bits 0-5.
+
+Yeah I figured so much... So 6 IRQ lines that get cleared.
+
+>> If this timer is really just 16 bits, it's a *pretty* good idea to use
+>> the prescaler (I guess this is what IO_DIVIDER is) beacuse else you
+>> will get short sleep times with CONFIG_NO_HZ_IDLE on this system,
+>> and wake up unnecessarily often.
+>>
+>> The same goes for the clock event.
+>
+> The clock frequency is 32768Hz. Should I be scaling it down at that frequency?
+
+No. But that was *pretty* slow.
+
+The thing is that the driver is getting "some clockfrequency" from
+the clk subsystem and does not know what it is.
+
+Usually (and I've seen this hardware design pattern a lot) when you
+have a clock like this, and go talk to the clk implementation specialist
+s/he will say "oh, yeah, I can mux in this 34 MHz clock to the timer
+as well", and if that is possible then that is often what you want,
+because it's good for things like HRtimers, and then it's useful to have
+a prescaler och the clocksource/clockevent.
+
+You can use that 32768 Hz for clock events and clocksource (but I
+suspect that HRtimers will never be useful on this platform due to this).
+
+Yours,
+Linus Walleij
