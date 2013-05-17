@@ -1,99 +1,129 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 17 May 2013 22:23:07 +0200
-Subject: [PATCH 3/6] ARM: SAMSUNG: pm: Adjust for pinctrl- and DT-enabled
- platforms
-In-Reply-To: <CAD=FV=XJ=_o+hVbD=pPqXxXo=1PZdeRWyn-xyfS+Jf5LYfe2dg@mail.gmail.com>
+Date: Fri, 17 May 2013 22:34:21 +0200
+Subject: [PATCH 6/6] pinctrl: exynos: Handle suspend/resume of GPIO EINT
+ registers
+In-Reply-To: <CAD=FV=WKCeW=3BFnmnyXB70VCjXHGrzarXbj8cBfq4-ENA-Y2w@mail.gmail.com>
 References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
- <1368807872-2601-4-git-send-email-t.figa@samsung.com>
- <CAD=FV=XJ=_o+hVbD=pPqXxXo=1PZdeRWyn-xyfS+Jf5LYfe2dg@mail.gmail.com>
-Message-ID: <4241187.TFCdy2kUT6@flatron>
+ <1368807872-2601-7-git-send-email-t.figa@samsung.com>
+ <CAD=FV=WKCeW=3BFnmnyXB70VCjXHGrzarXbj8cBfq4-ENA-Y2w@mail.gmail.com>
+Message-ID: <18754346.1REWN52J0K@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 of May 2013 12:24:04 Doug Anderson wrote:
+On Friday 17 of May 2013 12:25:02 Doug Anderson wrote:
 > Tomasz,
 > 
 > On Fri, May 17, 2013 at 9:24 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> > This patch makes legacy code on suspend/resume path being executed
-> > conditionally, on non-DT platforms only, to fix suspend/resume of
-> > DT-enabled systems, for which the code is inappropriate.
+> > Some GPIO EINT control registers needs to be preserved across
+> > suspend/resume cycle. This patch extends the driver to take care of
+> > this.
+> 
+> I was confused why we didn't seem to need this on exynos5250-snow but
+> figured it out.  We only use interrupts on GPX lines which don't need
+> this code.  ...but on any exynos5250 boards that use one of the other
+> banks for interrupts you'd need it.  I tested by setting one of the
+> registers related to GPA0 and found that this code is indeed needed on
+> exynos5250.  :)
+> 
+> Just nits / optional comments below, so on exynos5250-snow (pinmux
+> backported to 3.8):
+> 
+> Tested-by: Doug Anderson <dianders@chromium.org>
+> 
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> 
+> > @@ -229,6 +235,11 @@ static int exynos_eint_gpio_init(struct
+> > samsung_pinctrl_drv_data *d)> 
+> >                         dev_err(dev, "gpio irq domain add failed\n");
+> >                         return -ENXIO;
+> >                 
+> >                 }
 > > 
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> > 
-> >  arch/arm/plat-samsung/pm.c | 17 ++++++++++++-----
-> >  1 file changed, 12 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
-> > index 53210ec..8ac2b2d 100644
-> > --- a/arch/arm/plat-samsung/pm.c
-> > +++ b/arch/arm/plat-samsung/pm.c
-> > @@ -261,7 +261,8 @@ static int s3c_pm_enter(suspend_state_t state)
-> > 
-> >          * require a full power-cycle)
+> > +
+> > +               bank->soc_priv = devm_kzalloc(d->dev,
+> > +                       sizeof(struct exynos_eint_gpio_save),
+> > GFP_KERNEL); +               if (!bank->soc_priv)
+> > +                       return -ENOMEM;
+> 
+> Slight nit to add this before the call to irq_domain_add_linear().
+> demv() will handle freeing your memory but nothing will handle undoing
+> the irq_domain_add_linear() if you return an error.
+
+I'm a bit sceptical when it is about error handling in such cases. 
+Basically if interrupt initialization fails, something is seriously wrong, 
+either with your kernel config or with some code.
+
+Since such case has been already unhandled in the driver (with nr_banks > 
+1 = always), so I didn't bother to add any undoing here.
+
+> >         }
 > >         
-> >         */
+> >         return 0;
 > > 
-> > -       if (!any_allowed(s3c_irqwake_intmask, s3c_irqwake_intallow) &&
-> > +       if (!of_have_populated_dt() &&
-> > +           !any_allowed(s3c_irqwake_intmask, s3c_irqwake_intallow) &&
+> > @@ -528,6 +539,58 @@ static int exynos_eint_wkup_init(struct
+> > samsung_pinctrl_drv_data *d)> 
+> >         return 0;
+> >  
+> >  }
+> > 
+> > +static void exynos_pinctrl_suspend_bank(
+> > +                               struct samsung_pinctrl_drv_data
+> > *drvdata, +                               struct samsung_pin_bank
+> > *bank) +{
+> > +       struct exynos_eint_gpio_save *save = bank->soc_priv;
+> > +       void __iomem *regs = drvdata->virt_base;
+> > +
+> > +       save->eint_con = readl(regs + EXYNOS_GPIO_ECON_OFFSET
+> > +                                               + bank->eint_offset);
+> > +       save->eint_fltcon0 = readl(regs + EXYNOS_GPIO_EFLTCON_OFFSET
+> > +                                               + 2 *
+> > bank->eint_offset); +       save->eint_fltcon1 = readl(regs +
+> > EXYNOS_GPIO_EFLTCON_OFFSET +                                         
+> >      + 2 * bank->eint_offset + 4);
+> Optional: I wish there were debug statements to help debug, like:
 > 
-> I'd rather see you modify patch set #2 to provide some function to
-> retrieve just the eint mask and then use it here.  Your patch removes
-> this test and doesn't replace it with anything.  If you moved this
-> test to pinctrl directly you'd lose the test against intallow.
-
-Well, looking from the perspective of status before my patch, it just 
-bypasses a test that is incorrect on DT-enabled platforms.
-
-I agree that this test is rather reasonable to have, but it would require 
-defining a new interface and moving all platforms to it, which for now 
-would be a bit of overkill.
-
-IMHO a separate series that sanitizes the whole PM handling in plat-
-samsung, including a rework of this check to make it cover all platforms 
-in a generic and multiplatform-friendly way. What do you think?
-
-> ...or do you think this test is no longer useful for some reason?
+> pr_debug("%s: save     con %#010x\n", bank->name, save->eint_con);
+> pr_debug("%s: save fltcon0 %#010x\n", bank->name, save->eint_fltcon0);
+> pr_debug("%s: save fltcon1 %#010x\n", bank->name, save->eint_fltcon1);
 > 
-> >             !any_allowed(s3c_irqwake_eintmask, s3c_irqwake_eintallow))
-> >             {
-> >             
-> >                 printk(KERN_ERR "%s: No wake-up sources!\n",
-> >                 __func__);
-> >                 printk(KERN_ERR "%s: Aborting sleep\n", __func__);
-> > 
-> > @@ -270,8 +271,11 @@ static int s3c_pm_enter(suspend_state_t state)
-> > 
-> >         /* save all necessary core registers not covered by the
-> >         drivers */
-> > 
-> > -       samsung_pm_save_gpios();
-> > -       samsung_pm_saved_gpios();
-> > +       if (!of_have_populated_dt()) {
-> > +               samsung_pm_save_gpios();
-> > +               samsung_pm_saved_gpios();
-> > +       }
+
+Right, seems reasonable.
+
+> > +}
+> > +
+> > +static void exynos_pinctrl_suspend(struct samsung_pinctrl_drv_data
+> > *drvdata) +{
+> > +       struct samsung_pin_ctrl *ctrl = drvdata->ctrl;
+> > +       struct samsung_pin_bank *bank = ctrl->pin_banks;
+> > +       int i;
+> > +
+> > +       for (i = 0; i < ctrl->nr_banks; ++i, ++bank)
+> > +               if (bank->eint_type == EINT_TYPE_GPIO)
+> > +                       exynos_pinctrl_suspend_bank(drvdata, bank);
+> > +}
+> > +
+> > +static void exynos_pinctrl_resume_bank(
+> > +                               struct samsung_pinctrl_drv_data
+> > *drvdata, +                               struct samsung_pin_bank
+> > *bank) +{
+> > +       struct exynos_eint_gpio_save *save = bank->soc_priv;
+> > +       void __iomem *regs = drvdata->virt_base;
 > > +
 > 
-> Ah, the important part here is the "saved", not the "save"!  The
-> "save" should get a NULL chip for all GPIOs and effectively be a
-> no-op.
+> Optional: debug statements:
 > 
-> Skipping the "saved" is important of s3c64xx and s5p64x0 where the
-> "saved" seems to transition things over to powerdown mode.  Hopefully
-> a future patch of yours adds that back for those platforms in the
-> pinmux world.  ...same for restore.
+> pr_debug("%s:     con %#010x => %#010x\n", bank->name,
+>   readl(regs + EXYNOS_GPIO_ECON_OFFSET + bank->eint_offset),
+>   save->eint_con);
+> pr_debug("%s: fltcon0 %#010x => %#010x\n", bank->name,
+>   readl(regs + EXYNOS_GPIO_EFLTCON_OFFSET + 2 * bank->eint_offset),
+>   save->eint_fltcon0);
+> pr_debug("%s: fltcon1 %#010x => %#010x\n", bank->name,
+>   readl(regs + EXYNOS_GPIO_EFLTCON_OFFSET + 2 * bank->eint_offset + 4),
+>   save->eint_fltcon1);
 
-S3C64xx can be switched to power down pin configuration manually, but if 
-you don't do it, it will activate it automatically after entering sleep 
-mode.
-
-> Summary: I've tested this on exynos5250-snow and it's reasonable but
-> I'd love a response about the missing test before adding Reviewed-by.
-
-Thanks.
+OK. I wonder if this could be added in a separate patch or I should rather 
+send v2 on Monday?
 
 Best regards,
 Tomasz
