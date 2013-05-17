@@ -1,63 +1,61 @@
-From: emilio@elopez.com.ar (=?UTF-8?q?Emilio=20L=C3=B3pez?=)
-Date: Fri, 17 May 2013 10:43:20 -0300
-Subject: [PATCH] clk: sunxi: "cpu_data" is defined in header files of some
- architectures
-In-Reply-To: <5195D615.70608@cateee.net>
-References: <5195D615.70608@cateee.net>
-Message-ID: <1368798200-7063-1-git-send-email-emilio@elopez.com.ar>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 17 May 2013 15:47:37 +0200
+Subject: [PATCH] arm: mvebu: enable the third USB interface on OpenBlocks
+ AX3
+In-Reply-To: <20130517.111810.02327269.yamagata@plathome.co.jp>
+References: <1368720444-29357-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130517.111810.02327269.yamagata@plathome.co.jp>
+Message-ID: <519634F9.7060700@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Giacomo A. Catenazzi" <cate@cateee.net>
+Hi Thomas,
+On 05/17/2013 04:18 AM, yamagata at plathome.co.jp wrote:
+> Dear Mr. Petazzoni
+> 
+>> Besides the two "classic" USB interfaces with normal USB ports on the
+>> front side, the PlatHome OpenBlocks AX3 uses the third USB interface
+>> of the Marvell SoC in the mini-PCIe connector. This allows certain
+>> mini-PCIe cards to expose parts of their functionality as a USB
+>> peripheral.
+>>
+>> This commit enables this third USB interface in the OpenBlocks AX3
+>> Device Tree, and also adds comments on top of the two other USB
+>> interfaces so that the Device Tree makes it clear which USB interface
+>> at the SoC level matches which USB interface visible on the board.
+> 
+> I see the following messages by dmesg with your patch for
+> linux-3.10-rc1 and 3.9.2.
+> 
+> ...
+> usb 3-1: New USB device found, idVendor=0a5c, idProduct=219c
+> usb 3-1: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+> usb 3-1: Product: Broadcom BCM2070 Bluetooth Device
+> usb 3-1: Manufacturer: Broadcom Corp
+> usb 3-1: SerialNumber: B4749F63C1B6
+> ...
+> Bluetooth: Core ver 2.16
+> NET: Registered protocol family 31
+> Bluetooth: HCI device and connection manager initialized
+> Bluetooth: HCI socket layer initialized
+> Bluetooth: L2CAP socket layer initialized
+> Bluetooth: SCO socket layer initialized
+> usbcore: registered new interface driver btusb
 
-In some architectures, the #define cpu_data is not a "macro-function",
-so the compiler will substitute the identifier with probably something
-wrong.
+This patch is nice and adds useful information.
 
-Signed-off-by: Giacomo A. Catenazzi <cate@cateee.net>
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-[emilio at elopez.com.ar: use cpu_mux_data instead of this_cpu_data]
----
+I applied and tested on my OpenBlocks AX3 and get the 3rd USB
+interface detected. As I don't have any mini-PCIe card which use USB,
+I didn't tested it furthermore, but as Atsushi Yamagata managed to
+detect an USB device on this interface, we can be pretty confident
+with this patch:
 
-Hi Giacomo,
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-I have taken your patch and resent it to linux-arm-kernel and Mike 
-Turquette this time, but please try to use git send-email on your next 
-patch.
+Thanks,
 
-Here is a video from Greg that explains how to use it as well as other 
-things (checkpatch.pl, get_maintainer.pl, etc)
-
-http://www.youtube.com/watch?v=LLBrBBImJt4
-
-Thanks! :)
-
-Emilio
-
- drivers/clk/sunxi/clk-sunxi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 930d36f..412912b 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -239,7 +239,7 @@ struct mux_data {
- 	u8 shift;
- };
- 
--static const __initconst struct mux_data cpu_data = {
-+static const __initconst struct mux_data cpu_mux_data = {
- 	.shift = 16,
- };
- 
-@@ -433,7 +433,7 @@ static const __initconst struct of_device_id clk_div_match[] = {
- 
- /* Matches for mux clocks */
- static const __initconst struct of_device_id clk_mux_match[] = {
--	{.compatible = "allwinner,sun4i-cpu-clk", .data = &cpu_data,},
-+	{.compatible = "allwinner,sun4i-cpu-clk", .data = &cpu_mux_data,},
- 	{.compatible = "allwinner,sun4i-apb1-mux-clk", .data = &apb1_mux_data,},
- 	{}
- };
 -- 
-1.8.2.3
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
