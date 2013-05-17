@@ -1,31 +1,69 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 16 May 2013 21:10:52 -0300
-Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
-In-Reply-To: <519534A5.2070209@free-electrons.com>
-References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
- <1368713639-21485-2-git-send-email-fabio.estevam@freescale.com>
- <CAOMZO5AWBi4gDJCOJf5muFuRXygQAysYCHEL+gb_LwsXiy-knA@mail.gmail.com>
- <CAOMZO5AKKVeTMsXpG9wa-eeLocBStUwPjQEe3n6fRVY2aSc7Nw@mail.gmail.com>
- <519534A5.2070209@free-electrons.com>
-Message-ID: <CAOMZO5B_8TPJK9MLWyF5SiE=afKdfmg-ff6qEJOcq_R5VqhAjg@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 17 May 2013 08:30:15 +0800
+Subject: [PATCH] ARM: prima2: return rather than panic on missing DT nodes
+In-Reply-To: <CAL_JsqL_z99EfT=3E32c0AS6fbwqOyTb7n+AzySmzJNyMCab3w@mail.gmail.com>
+References: <1368719437-28287-1-git-send-email-robherring2@gmail.com>
+ <519510A4.8090904@st.com>
+ <CAL_JsqL_z99EfT=3E32c0AS6fbwqOyTb7n+AzySmzJNyMCab3w@mail.gmail.com>
+Message-ID: <CAGsJ_4w_a=vXMeh-vbRKwD+KGqRNthx-zne=DR3iR7B-WqiUPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
-
-On Thu, May 16, 2013 at 4:33 PM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-
-> Would that be related to the timeouts I'm observing ?
+2013/5/17 Rob Herring <robherring2@gmail.com>:
+> On Thu, May 16, 2013 at 12:00 PM, Srinivas KANDAGATLA
+> <srinivas.kandagatla@st.com> wrote:
+>> Hi Rob,
+>>
+>> I was just testing multi_v7_defconfig and noticed that the code is still
+>> doing early_initcall and postcore_initcalls. Which IMO is NOK for
+>> multiplatforms.
+>>
+>> I was just about to send my patch and just noticed your patch.
+>>
+>>
+>> On 16/05/13 16:50, Rob Herring wrote:
+>>> From: Rob Herring <rob.herring@calxeda.com>
+>>>
+>>> Missing nodes is a normal condition in multi-platform kernels when we boot
+>>> on other platforms. So remove the panic and just return if we don't find
+>>> a DT node.
+>>>
+>>> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+>>> Cc: Barry Song <baohua.song@csr.com>
+>>> ---
+>>>  arch/arm/mach-prima2/pm.c   | 2 +-
+>>>  arch/arm/mach-prima2/rstc.c | 2 +-
+>>>  2 files changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
+>>> index 9936c18..a8003e2 100644
+>>> --- a/arch/arm/mach-prima2/pm.c
+>>> +++ b/arch/arm/mach-prima2/pm.c
+>>> @@ -102,7 +102,7 @@ static int __init sirfsoc_of_pwrc_init(void)
+>>>
+>> First thing is the mach code should not even attempt to run this
+>> function in first place.
+>>
+>> I think the correct fix for this is to move all the postcore_initcalls
+>> and early_initcalls to callbacks in MACHINE.
 >
-> http://www.spinics.net/lists/linux-i2c/msg11985.html
+> Agreed, but that may cause some init ordering issues. So I'll leave
+> that to someone that knows this platform and can test it.
+
+what if i really want the system to panic early when these is no pwrc
+node?  then we can check the machine , if it is sirf, we panic the
+kernel. that results in ugly source codes.
+
+        np = of_find_matching_node(NULL, pwrc_ids);
+        if (!np)
+-               panic("unable to find compatible pwrc node in dtb\n");
++               return -ENODEV;
+
+then it turns out that moving the codes to callbacks of machine is the
+right way. i will take care the init ordering issues.
+
 >
-> I didn't have the time to have a look at it yet. I was planning to hook
-> up a logic analyzer someday in june to debug it. It seems that there is
-> a 1 second timeout with each i2c message that are sent.
+> Rob
+>
 
-Yes, I see the same one second timeout for each i2c transaction here.
-
-Regards,
-
-Fabio Estevam
+-barry
