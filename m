@@ -1,35 +1,63 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Fri, 17 May 2013 09:51:40 +0200
-Subject: [GIT PULL v2] MFD: Fixes due for the v3.10 -rc:s
-In-Reply-To: <20130516224337.GZ22822@zurbaran>
-References: <20130514091956.GG3297@gmail.com> <20130515090449.GA3494@gmail.com>
- <20130516224337.GZ22822@zurbaran>
-Message-ID: <20130517075140.GA25077@balto.lan>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 17 May 2013 13:30:00 +0530
+Subject: [GIT PULL] ARM: OMAP5: hwmod, prm/cm data files and updates for
+ 3.10
+In-Reply-To: <515F00B8.3000501@ti.com>
+References: <1363768852-18125-1-git-send-email-santosh.shilimkar@ti.com>
+ <20130401170539.GK10155@atomide.com> <515BA76D.3000302@ti.com>
+ <alpine.DEB.2.00.1304031146230.2616@utopia.booyaka.com>
+ <515D6020.2030103@ti.com> <20130404165208.GI10155@atomide.com>
+ <515DB110.9000503@ti.com> <515F00B8.3000501@ti.com>
+Message-ID: <5195E380.4040103@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Samuel,
+Paul, Tony,
 
-On Fri, May 17, 2013 at 12:43:37AM +0200, Samuel Ortiz wrote:
-> > Fabio Baltieri (5):
-> >       mfd: abx500-core: Fix sparse warning
-> >       mfd: ab8500-sysctrl: Fix sparse warning
-> >       mfd: ab8500-sysctrl: Set sysctrl_dev during probe
-> >       mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
-> Unless I'm missing something here, this one is not really rcN material, so
-> I'd appreciate if you could queue it to your for-mfd branch instead.
+On Friday 05 April 2013 10:20 PM, Santosh Shilimkar wrote:
+> On Thursday 04 April 2013 10:27 PM, Santosh Shilimkar wrote:
+>> On Thursday 04 April 2013 10:22 PM, Tony Lindgren wrote:
+>>> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130404 04:15]:
+> [..]
+> 
+>>> Can't we already trim the am33xx hwmod data after your patches for
+>>> v3.10 as am33xx is already DT only? Unfortunately we cannot create
+>>> negative diffstat in other ways for v3.10 merge window as we cannot
+>>> make omap4 DT only just quite yet.
+>>>
+>> Yes we can and I can take a stab it tomorrow. The only thing is I
+>> might need some support for testing but thats manageable. Will
+>> take a stab at it tomorrow and if everything goes well, post a
+>> patch for smae.
+>>
+> Patch for the AM33XX to trim is end of the email. Thanks to
+> Sricharan and Pekon for patch and testing. Looping both
+> Vaibhav's if they have any objection on the patch.
+> 
+> Regards,
+> Santosh
+> 
+> From b95dd33fe59b8e77727eb3b1717d763bbf9a2893 Mon Sep 17 00:00:00 2001
+> From: Sricharan R <r.sricharan@ti.com>
+> Date: Fri, 5 Apr 2013 20:39:12 +0530
+> Subject: [PATCH] ARM: AM33XX: hwmod data: Clean up the data file
+> 
+For whatever reason, we again missed the merge window for the subject
+series, I would like to know your plan on the subject series for
+at least 3.11. Asking *well in advance* to avoid late merge related
+discussions.
 
-The last two:
+Thanks to Vaibhav, AM33XX patch is tested and validated with some
+updates considering upcoming PM support for AM33XX. So that
+patch will be included in the series.
 
-  mfd: ab8500-sysctrl: Set sysctrl_dev during probe
-  mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
+Rajendra will follow up the patchset if there is some re-basing is
+needed since I will away for few weeks because of travel. 
 
-are actually fixes for bugs introduced in this merge window that
-inhibited the ab8500-sysctl driver as a consequence.  Would you
-reconsider pulling just those?
+OMAP5 data is the *only* thing which is gating the device to boot
+from mainline.
 
-Thanks,
-Fabio
+Thanks in advance.
 
--- 
-Fabio Baltieri
+Regards,
+Santosh
