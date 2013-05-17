@@ -1,165 +1,129 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 17 May 2013 16:57:15 +0800
-Subject: [PATCH v3 2/4] ARM: imx: add initial support for MVF600
-In-Reply-To: <5396520.ZTuSn9S4Vd@wuerfel>
-References: <1368684648-20826-1-git-send-email-b35083@freescale.com>
- <1368684648-20826-3-git-send-email-b35083@freescale.com>
- <5396520.ZTuSn9S4Vd@wuerfel>
-Message-ID: <20130517085714.GG8607@S2101-09.ap.freescale.net>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Fri, 17 May 2013 10:59:17 +0200
+Subject: [PATCH v2] can: flexcan: remove HAVE_CAN_FLEXCAN Kconfig symbol
+Message-ID: <1368781157-4646-1-git-send-email-mkl@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+This patch removes the Kconfig symbol HAVE_CAN_FLEXCAN from arch/{arm,powerpc}
+and allowing compilation unconditionally on all arm and powerpc platforms.
 
-Allow me help respond a little bit.
+This brings a bigger compile time coverage and removes the following dependency
+warning found by Arnd Bergmann:
 
-On Thu, May 16, 2013 at 12:29:28PM +0200, Arnd Bergmann wrote:
-> On Thursday 16 May 2013 14:10:46 Jingchang Lu wrote:
-> 
-> > index a402248..b9c01a1 100644
-> > --- a/arch/arm/mach-imx/Kconfig
-> > +++ b/arch/arm/mach-imx/Kconfig
-> > @@ -835,6 +835,21 @@ config SOC_IMX6SL
-> >  	help
-> >  	  This enables support for Freescale i.MX6 SoloLite processor.
-> >  
-> > +config SOC_MVF600
-> > +	bool "Vybrid Family MVF600 support"
-> > +	select CPU_V7
-> > +	select ARM_GIC
-> > +	select CLKSRC_OF
-> > +	select PINCTRL
-> > +	select PINCTRL_MVF600
-> > +	select MVF600_PIT_TIMER
-> > +	select PL310_ERRATA_588369 if CACHE_PL310
-> > +	select PL310_ERRATA_727915 if CACHE_PL310
-> > +	select PL310_ERRATA_769419 if CACHE_PL310
-> > +
-> > +	help
-> > +	  This enable support for Freescale Vybrid MVF600 processor.
-> > +
-> >  endif
-> 
-> Shouldn't that 'depends on ARCH_MULTI_V7'?
-> 
-SOC_MVF600 is added as a sub-item of ARCH_MXC which already handles the
-ARCH_MULTI_* dependency.
+    warning: (SOC_IMX28 && SOC_IMX25 && SOC_IMX35 && IMX_HAVE_PLATFORM_FLEXCAN &&
+        SOC_IMX53 && SOC_IMX6Q) selects HAVE_CAN_FLEXCAN
+    which has unmet direct dependencies (NET && CAN && CAN_DEV)
 
-> Can you describe how much Vybrid is actually like MXC? Do you actually
-> use most of the mach-imx code?
-> 
-Jingchang mentioned some IP blocks shared between IMX and Vybrid.  Right
-now, mvf600 reuses mxc_restart() and some amount of clk code
-clk-pllv3.c, clk-gate2.c clk.c etc. in arch/arm/mach-imx.
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Shawn Guo <shawn.guo@linaro.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
+Cc: Kumar Gala <galak@kernel.crashing.org>
+Cc: U Bhaskar-B22300 <B22300@freescale.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+---
+Changes since v1:
+- don't remove IMX_HAVE_PLATFORM_FLEXCAN, which breaks non DT imx platforms
+  tnx Shawn
 
-> > diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-> > index 208e76f..55cdba0 100644
-> > --- a/arch/arm/mach-imx/common.h
-> > +++ b/arch/arm/mach-imx/common.h
-> > @@ -70,6 +70,7 @@ extern int mx51_clocks_init_dt(void);
-> >  extern int mx53_clocks_init_dt(void);
-> >  extern int mx6q_clocks_init(void);
-> >  extern int imx6sl_clocks_init(void);
-> > +extern int mvf600_clocks_init(void);
-> >  extern struct platform_device *mxc_register_gpio(char *name, int id,
-> >  	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high);
-> >  extern void mxc_set_cpu_type(unsigned int type);
-> 
-> This hunk belongs into the first patch, right?
-> 
-The declaration is only used in this patch by mach-mvf600.c.
+ arch/arm/mach-imx/Kconfig         | 4 ----
+ arch/arm/mach-imx/devices/Kconfig | 1 -
+ arch/arm/mach-mxs/Kconfig         | 1 -
+ arch/powerpc/Kconfig              | 1 -
+ drivers/net/can/Kconfig           | 5 +----
+ 5 files changed, 1 insertion(+), 11 deletions(-)
 
-> Actually I think you should move that driver to drivers/clk and use
-> of_clk_init(NULL) to initialize it.
-> 
-The mvf600 clock driver uses a lot of base clk support from mach-imx,
-and can not be moved into drivers/clk as a single driver.  Right now, in
-IMX clock drivers, we call of_clk_init() to only register fixed rate
-clocks, since all the other clocks are not represented in device tree.
-
-> > +static void __init mvf600_init_machine(void)
-> > +{
-> > +	mxc_arch_reset_init_dt();
-> 
-> I don't see the mxc_arch_reset_init_dt function in 3.10-rc1. Where does it
-> get introduced?
-> 
-It gets introduced by my series below.  And I guess Jiangchang is basing
-his series on my imx/soc branch.
-
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/235986/focus=236091
-
-> It would be nice if we could integrate that into the watchdog driver,
-> so that driver just registers a pm_restart function when it gets loaded.
-> It is a rather small driver, so it would not hurt to always load it.
-> 
-Sound like a good idea.  We will consider it as another cleanup task for
-mach-imx.
-
-> > +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> > +}
-> 
-> It would be nicer if you could just use the default init_machine.
-> 
-> > +static void __init mvf600_init_irq(void)
-> > +{
-> > +	struct device_node *np;
-> > +	void __iomem *mscm_base;
-> > +	int i;
-> > +
-> > +	l2x0_of_init(0, ~0UL);
-> > +
-> > +	np = of_find_compatible_node(NULL, NULL, "fsl,mvf600-mscm");
-> > +	mscm_base = of_iomap(np, 0);
-> > +	if (!mscm_base)
-> > +		return;
-> > +
-> > +	/* route all shared peripheral interrupts to CP0 */
-> > +	for (i = 0; i < 111; i++)
-> > +		__raw_writew(1, mscm_base + 0x880 + 2 * i);
-> > +
-> > +	iounmap(mscm_base);
-> > +
-> > +	irqchip_init();
-> > +}
-> 
-> What is the mscm? Shouldn't the boot loader have set this up correctly?
-> If you can remove that code from the kernel, you can use the default
-> irqchip_init call.
-> 
-Yeah, and if we find another way for l2x0_of_init() call.
-
-> > +static void __init mvf600_init_time(void)
-> > +{
-> > +	mvf600_clocks_init();
-> > +	clocksource_of_init();
-> > +}
-> 
-> I would like to call of_clk_init(NULL) unconditionally on all machines
-> in 3.11, so this function could also go away.
-> 
-of_clk_init() has been called in mvf600_clocks_init(), but as explained
-as above, it only registers fixed rate clocks and can not save
-mvf600_clocks_init() call right now where most of mvf600 clocks gets
-registered.
-
-> > +static const char *mvf600_dt_compat[] __initdata = {
-> > +	"fsl,mvf600",
-> > +	NULL,
-> > +};
-> > +
-> > +DT_MACHINE_START(VYBRID_VF6XX, "Freescale Vybrid MVF600 (Device Tree)")
-> > +	.init_irq	= mvf600_init_irq,
-> > +	.init_time	= mvf600_init_time,
-> > +	.init_machine   = mvf600_init_machine,
-> > +	.dt_compat	= mvf600_dt_compat,
-> > +	.restart	= mxc_restart,
-> > +MACHINE_END
-> 
-> If we can do all of the above, we can actually remove the entire machine
-> descriptor here, since all its members are NULL.
-> 
-Yeah, we understand the goal, and this will be the goal of mach-imx
-cleanup.
-
-Shawn
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index ba44328..af8e109 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -111,7 +111,6 @@ config SOC_IMX25
+ 	select ARCH_MXC_IOMUX_V3
+ 	select COMMON_CLK
+ 	select CPU_ARM926T
+-	select HAVE_CAN_FLEXCAN if CAN
+ 	select MXC_AVIC
+ 
+ config SOC_IMX27
+@@ -137,7 +136,6 @@ config SOC_IMX35
+ 	select ARCH_MXC_IOMUX_V3
+ 	select COMMON_CLK
+ 	select CPU_V6K
+-	select HAVE_CAN_FLEXCAN if CAN
+ 	select HAVE_EPIT
+ 	select MXC_AVIC
+ 	select SMP_ON_UP if SMP
+@@ -776,7 +774,6 @@ comment "Device tree only"
+ 
+ config	SOC_IMX53
+ 	bool "i.MX53 support"
+-	select HAVE_CAN_FLEXCAN if CAN
+ 	select HAVE_IMX_SRC
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
+ 	select PINCTRL
+@@ -799,7 +796,6 @@ config SOC_IMX6Q
+ 	select CPU_V7
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if LOCAL_TIMERS
+-	select HAVE_CAN_FLEXCAN if CAN
+ 	select HAVE_IMX_ANATOP
+ 	select HAVE_IMX_GPC
+ 	select HAVE_IMX_MMDC
+diff --git a/arch/arm/mach-imx/devices/Kconfig b/arch/arm/mach-imx/devices/Kconfig
+index 3dd2b1b..68c74fb 100644
+--- a/arch/arm/mach-imx/devices/Kconfig
++++ b/arch/arm/mach-imx/devices/Kconfig
+@@ -4,7 +4,6 @@ config IMX_HAVE_PLATFORM_FEC
+ 
+ config IMX_HAVE_PLATFORM_FLEXCAN
+ 	bool
+-	select HAVE_CAN_FLEXCAN if CAN
+ 
+ config IMX_HAVE_PLATFORM_FSL_USB2_UDC
+ 	bool
+diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+index 4dc2fbb..ce6e7d6 100644
+--- a/arch/arm/mach-mxs/Kconfig
++++ b/arch/arm/mach-mxs/Kconfig
+@@ -11,7 +11,6 @@ config SOC_IMX28
+ 	select ARM_AMBA
+ 	select ARM_CPU_SUSPEND if PM
+ 	select CPU_ARM926T
+-	select HAVE_CAN_FLEXCAN if CAN
+ 	select HAVE_PWM
+ 	select PINCTRL_IMX28
+ 
+diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
+index c33e3ad..7754c6b 100644
+--- a/arch/powerpc/Kconfig
++++ b/arch/powerpc/Kconfig
+@@ -674,7 +674,6 @@ config SBUS
+ 
+ config FSL_SOC
+ 	bool
+-	select HAVE_CAN_FLEXCAN if NET && CAN
+ 
+ config FSL_PCI
+  	bool
+diff --git a/drivers/net/can/Kconfig b/drivers/net/can/Kconfig
+index e456b70..3c06947 100644
+--- a/drivers/net/can/Kconfig
++++ b/drivers/net/can/Kconfig
+@@ -102,12 +102,9 @@ config CAN_JANZ_ICAN3
+ 	  This driver can also be built as a module. If so, the module will be
+ 	  called janz-ican3.ko.
+ 
+-config HAVE_CAN_FLEXCAN
+-	bool
+-
+ config CAN_FLEXCAN
+ 	tristate "Support for Freescale FLEXCAN based chips"
+-	depends on HAVE_CAN_FLEXCAN
++	depends on ARM || PPC
+ 	---help---
+ 	  Say Y here if you want to support for Freescale FlexCAN.
+ 
+-- 
+1.8.2.rc2
