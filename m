@@ -1,40 +1,47 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 May 2013 11:23:45 +0100
+Date: Fri, 17 May 2013 11:27:00 +0100
 Subject: [PATCH 0/6] ARM: tegra114: add CPU hotplug support
-In-Reply-To: <1368698019.7403.10.camel@jlo-ubuntu-64.nvidia.com>
+In-Reply-To: <51952344.1090003@wwwdotorg.org>
 References: <1368613644-11863-1-git-send-email-josephl@nvidia.com>
  <51941C58.9060002@wwwdotorg.org>
  <1368698019.7403.10.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <20130517102345.GC18614@n2100.arm.linux.org.uk>
+ <51952344.1090003@wwwdotorg.org>
+Message-ID: <20130517102700.GD18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 05:53:39PM +0800, Joseph Lo wrote:
-> On Thu, 2013-05-16 at 07:38 +0800, Stephen Warren wrote:
-> > This series mostly works OK, but I see one problem: I can't hotunplug
-> > CPU0, which the commit descriptions and code changes imply I should be
-> > able to do:
-> > 
-> > root at localhost:~# echo 0 > /sys/devices/system/cpu/cpu0/online
-> > -bash: echo: write error: Operation not permitted
-> 
-> I want to provide this function originally. But I found the
-> tegra_cpu_disable() was removed recently. It was replaced by the common
-> cpu_disable() function that didn't allow CPU0 to be un-plugged.
+On Thu, May 16, 2013 at 12:19:48PM -0600, Stephen Warren wrote:
+> Is there a specific reason for that; is there some problem in the core
+> ARM code that implies CPU0 should never be disabled?
 
-It got removed for the simple reason that the implementation of that
-function was exactly the same as the default path in cpu_disable().
-If you have a need to do something else other than the default, then
-provide the function (and *only* provide it if you need to do something
-different.)
+No.  This is the code I removed:
 
-However, if the default suffices, do not provide extra code even if you
-later intend to change the function.  Only add the function when you
-need to do something else.
+-int tegra_cpu_disable(unsigned int cpu)
+-{
+-       /*
+-        * we don't allow CPU 0 to be shutdown (it is still too special
+-        * e.g. clock tick interrupts)
+-        */
+-       return cpu == 0 ? -EPERM : 0;
+-}
 
-I see too much of this "I'll add this function just becase, and maybe
-I'll change it later" crap getting into the kernel; this needs to stop.
-Things like providing an empty function for every single method in a
-struct even through the behaviour would be to do nothing had that
-function not been provided.  So whenever I see this, I remove the
-offending functions if I'm touching that code.
+This gets called from here:
+
+static int platform_cpu_disable(unsigned int cpu)
+{
+        if (smp_ops.cpu_disable)
+                return smp_ops.cpu_disable(cpu);
+
+        /*
+         * By default, allow disabling all CPUs except the first one,
+         * since this is special on a lot of platforms, e.g. because
+         * of clock tick interrupts.
+         */
+        return cpu == 0 ? -EPERM : 0;
+}
+
+Notice the useless utterly nature of tegra_cpu_disable() given that it's
+doing _precisely_ the same thing as the common code.  It might as well
+not even exist - and it doesn't for that very reason.  Never provide
+implementations for methods which are copies of the default action if
+no method is provided.
