@@ -1,44 +1,79 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 17 May 2013 12:42:11 +0100
-Subject: ARM Cortex-A7 support in Linux
-In-Reply-To: <20130517113622.GH23112@mudshark.cambridge.arm.com>
-References: <A1A6EA40F8503D48BB002B42BD65974E295341@039-SN2MPN1-012.039d.mgd.msft.net>
- <f6c9d2b0d52d63efa95f780b172690ef@localhost>
- <20130517105500.GE18614@n2100.arm.linux.org.uk>
- <20130517113622.GH23112@mudshark.cambridge.arm.com>
-Message-ID: <51961793.1000107@arm.com>
+From: pavel@denx.de (Pavel Machek)
+Date: Fri, 17 May 2013 13:46:07 +0200
+Subject: [PATCHv2 6/6] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
+In-Reply-To: <1368731117-4749-6-git-send-email-dinguyen@altera.com>
+References: <1368731117-4749-1-git-send-email-dinguyen@altera.com>
+ <1368731117-4749-6-git-send-email-dinguyen@altera.com>
+Message-ID: <20130517114607.GB3466@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/05/13 12:36, Will Deacon wrote:
-> On Fri, May 17, 2013 at 11:55:00AM +0100, Russell King - ARM Linux wrote:
->> On Fri, May 17, 2013 at 12:47:45PM +0200, Marc Zyngier wrote:
->>> It depends which feature you're after. Linux supports the GIC
->>> virtualization extensions with KVM, for example. But we don't make any use
->>> of other things like priorities, split deactivation/priority drop...
->>
->> Not that we could make use of priorities anymore as all interrupt handlers
->> are now run with IRQs disabled; an IRQ handler can't be interrupted by a
->> higher priority IRQ coming in.
->>
->> Part of the solution to that is to go back to the original philosophy of
->> IRQ handling in Linux - do the least possible amount of work in the IRQ
->> and move the heavier stuff off into soft-IRQ context.  Unfortunately,
->> many drivers are no longer written like that, and just do a great amount
->> of time consuming work in their IRQ handler.
-> 
-> We could also consider using interrupt priorities to have a fake NMI (I
-> think PPC does this for some cores), which is useful for profiling and
-> watchdogs, especially now that FIQ is often stolen by the secure world.
-> 
-> I remember dismissing this in the past because I thought it would increase
-> our GIC distributor accesses, but I don't remember why.
+Hi!
 
-I think it would rather require to write to the interrupt priority mask
-register (GIC_PMR) in the CPU interface. The cost is probably the same,
-actually (probably quite high, given how often we enable/disable
-interrupts).
+> Add platform specific functionality for the DW SD/MMC driver for
+> SoCFPGA. Move SDMMC_CMD_USE_HOLD_REG to dw_mmc.h so other platforms
+> can use this define.
 
-	M.
+> --- /dev/null
+> +++ b/drivers/mmc/host/dw_mmc-socfpga.c
+> @@ -0,0 +1,139 @@
+> +/*
+> + * Altera SoCFPGA Specific Extensions for Synopsys DW Multimedia Card Interface driver
+> + *
+> + *  Copyright (C) 2012, Samsung Electronics Co., Ltd.
+> + *  Copyright (C) 2013 Altera Corporation
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * Taken from dw_mmc_exynos.c
+
+Actually it is   dw_mmc-exynos.c
+
+> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET		0x108
+> +#define DRV_CLK_PHASE_SHIFT_SEL_MASK	0x7
+> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)		\
+> +	((((drvsel) << 0) & 0x7) | (((smplsel) << 3) & 0x38))
+
+Should SYSMGR stuff go to shared header file somewhere?
+
+> +extern void __iomem *sys_manager_base_addr;
+
+This is unused.
+
+> +/* SOCFPGA implementation specific driver private data */
+> +struct dw_mci_socfpga_priv_data {
+> +	u8	ciu_div;
+
+comment would be nice, something like
+/* card interface unit divisor */ ?
+
+> +	u32	hs_timing;
+
+/* card interface unit phase shift for RX/TX mode */
+?
+
+> +static int dw_mci_socfpga_setup_clock(struct dw_mci *host)
+> +{
+> +	struct dw_mci_socfpga_priv_data *priv = host->priv;
+> +
+> +	clk_disable(host->ciu_clk);
+> +	regmap_write(priv->sysreg, SYSMGR_SDMMCGRP_CTRL_OFFSET, priv->hs_timing);
+> +	clk_enable(host->ciu_clk);
+> +
+> +	host->bus_hz /= (priv->ciu_div + 1);
+
+Previous version said:
+
++       host->bus_hz /= priv->ciu_div;
+
+I see you want to avoid division by zero, but this will introduce
+significant error for low divisors, right? Is divisor of 0 valid?
+
+Otherwise it looks good. Thanks,
+									Pavel
 -- 
-Jazz is not dead. It just smells funny...
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
