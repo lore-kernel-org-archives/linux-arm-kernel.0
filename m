@@ -1,62 +1,44 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 17 May 2013 14:18:39 -0700
-Subject: [PATCH 6/6] pinctrl: exynos: Handle suspend/resume of GPIO EINT
- registers
-In-Reply-To: <18754346.1REWN52J0K@flatron>
-References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
- <1368807872-2601-7-git-send-email-t.figa@samsung.com>
- <CAD=FV=WKCeW=3BFnmnyXB70VCjXHGrzarXbj8cBfq4-ENA-Y2w@mail.gmail.com>
- <18754346.1REWN52J0K@flatron>
-Message-ID: <CAD=FV=XiWET3Xptfk2CVWMw=xVCE4zUJhJtgXHbhiND12rJGnQ@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sat, 18 May 2013 09:18:51 +1200
+Subject: [PATCH 3/4] clk: vt8500: Remove unnecessary divisor adjustment in
+ vtwm_dclk_set_rate()
+In-Reply-To: <1368825532-30917-1-git-send-email-linux@prisktech.co.nz>
+References: <1368825532-30917-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1368825532-30917-4-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+The divisor adjustment code to ensure that a divisor is not rounded down,
+thereby giving a rate higher than requested, is unnecessary and in some
+instances results in the actual rate being much lower than requested due to
+rounding errors.
 
-On Fri, May 17, 2013 at 1:34 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
->> Slight nit to add this before the call to irq_domain_add_linear().
->> demv() will handle freeing your memory but nothing will handle undoing
->> the irq_domain_add_linear() if you return an error.
->
-> I'm a bit sceptical when it is about error handling in such cases.
-> Basically if interrupt initialization fails, something is seriously wrong,
-> either with your kernel config or with some code.
->
-> Since such case has been already unhandled in the driver (with nr_banks >
-> 1 = always), so I didn't bother to add any undoing here.
+The test is already performed in vtwm_dclk_round_rate(), which is always
+called when clk_set_rate is called. Due to rounding errors in the line:
+divisor = parent_rate / rate (clk-vt8500.c:160) we will sometimes end up
+adjusting the divisor twice - first in round_rate and then again in set_rate.
 
-Yeah, not all drivers handle it well.  I'm always surprised by the
-number of drivers that seem have it right, though.  Certainly it seems
-awfully unlikely that allocating a small number of bytes in a probe
-function would fail.
+This patch removes the test/adjustment in vtwm_dclk_set_rate.
 
-...but changing the order doesn't hurt anything and would make it more
-correct, even if it's not fully correct.
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ drivers/clk/clk-vt8500.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
-
->> Optional: debug statements:
->>
->> pr_debug("%s:     con %#010x => %#010x\n", bank->name,
->>   readl(regs + EXYNOS_GPIO_ECON_OFFSET + bank->eint_offset),
->>   save->eint_con);
->> pr_debug("%s: fltcon0 %#010x => %#010x\n", bank->name,
->>   readl(regs + EXYNOS_GPIO_EFLTCON_OFFSET + 2 * bank->eint_offset),
->>   save->eint_fltcon0);
->> pr_debug("%s: fltcon1 %#010x => %#010x\n", bank->name,
->>   readl(regs + EXYNOS_GPIO_EFLTCON_OFFSET + 2 * bank->eint_offset + 4),
->>   save->eint_fltcon1);
->
-> OK. I wonder if this could be added in a separate patch or I should rather
-> send v2 on Monday?
-
-Definitely optional to add these, so up to you whether to spin the
-patch, ignore my suggestion, or do a separate patch.  :)
-
-
-Thanks for sending all of these up, by the way!  If things look good
-next week I'll probably revert my local version of this (the V2 of my
-original series) and pull in your series to keep us on the same page.
-:)
-
-
--Doug
+diff --git a/drivers/clk/clk-vt8500.c b/drivers/clk/clk-vt8500.c
+index ce401cf..82306f5 100644
+--- a/drivers/clk/clk-vt8500.c
++++ b/drivers/clk/clk-vt8500.c
+@@ -157,10 +157,6 @@ static int vt8500_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	divisor =  parent_rate / rate;
+ 
+-	/* If prate / rate would be decimal, incr the divisor */
+-	if (rate * divisor < parent_rate)
+-		divisor++;
+-
+ 	if (divisor == cdev->div_mask + 1)
+ 		divisor = 0;
+ 
+-- 
+1.7.9.5
