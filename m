@@ -1,27 +1,71 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 17 May 2013 10:06:48 -0700
-Subject: [PATCH 1/9] I2C: mv64xxx: work around signals causing I2C
- transactions to be aborted
-In-Reply-To: <E1Ud4pH-0004JQ-Jq@rmk-PC.arm.linux.org.uk>
-References: <20130516202921.GW18614@n2100.arm.linux.org.uk>
- <E1Ud4pH-0004JQ-Jq@rmk-PC.arm.linux.org.uk>
-Message-ID: <20130517170648.GD28484@animalcreek.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 17 May 2013 10:10:17 -0700
+Subject: [PATCH-V2] ARM: AM33XX: Add missing .clkdm_name to
+ clkdiv32k_ick clock
+In-Reply-To: <79CD15C6BA57404B839C016229A409A83EC8BFA7@DBDE04.ent.ti.com>
+References: <1364378666-23641-1-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.00.1303271744510.17356@utopia.booyaka.com>
+ <79CD15C6BA57404B839C016229A409A83EC8BFA7@DBDE04.ent.ti.com>
+Message-ID: <20130517171016.GV5600@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 09:30:59PM +0100, Russell King wrote:
-> Do not use interruptible waits in an I2C driver; if a process uses
-> signals (eg, Xorg uses SIGALRM and SIGPIPE) then these signals can
-> cause the I2C driver to abort a transaction in progress by another
-> driver, which can cause that driver to fail.  I2C drivers are not
-> expected to abort transactions on signals.
+* Hiremath, Vaibhav <hvaibhav@ti.com> [130517 03:36]:
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
+> > -----Original Message-----
+> > From: Paul Walmsley [mailto:paul at pwsan.com]
+> > Sent: Wednesday, March 27, 2013 11:15 PM
+> > To: Tony Lindgren; Hiremath, Vaibhav
+> > Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > Nayak, Rajendra
+> > Subject: Re: [PATCH-V2] ARM: AM33XX: Add missing .clkdm_name to
+> > clkdiv32k_ick clock
+> > 
+> > On Wed, 27 Mar 2013, Vaibhav Hiremath wrote:
+> > 
+> > > It is required to enable respective clock-domain before
+> > > enabling any clock/module inside that clock-domain.
+> > >
+> > > During common-clock migration, .clkdm_name field got missed
+> > > for "clkdiv32k_ick" clock, which leaves "clk_24mhz_clkdm"
+> > > unused; so it will be disabled even if childs of this clock-domain
+> > > is enabled, which keeps child modules in idle mode.
+> > >
+> > > This fixes the kernel crash observed on AM335xEVM-SK platform,
+> > > where clkdiv32_ick clock is being used as a gpio debounce clock
+> > > and since clkdiv32k_ick is in idle mode it leads to below crash -
+> > >
+> > > Crash Log:
+> > > ==========
+> > > [    2.598347] Unhandled fault: external abort on non-linefetch
+> > (0x1028) at
+> > > 0xfa1ac150
+> > > [    2.606434] Internal error: : 1028 [#1] SMP ARM
+> > > [    2.611207] Modules linked in:
+> > > [    2.614449] CPU: 0    Not tainted  (3.8.4-01382-g1f449cd-dirty #4)
+> > > [    2.620973] PC is at _set_gpio_debounce+0x60/0x104
+> > > [    2.626025] LR is at clk_enable+0x30/0x3c
+> > >
+> > > Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> > > Cc: Tony Lindgren <tony@atomide.com>
+> > > Cc: Paul Walmsley <paul@pwsan.com>
+> > > Cc: Rajendra Nayak <rnayak@ti.com>
+> > 
+> > Acked-by: Paul Walmsley <paul@pwsan.com>
+> > 
+> > Tony, if it isn't too late, could this one be added to your 3.9-rc
+> > fixes
+> > series?
+> > 
+> > 
+> 
+> Looks like we missed this so far.
+> 
+> Tony, can you merge this patch for v3.10-rc ?
 
-I don't have hardware to test but I have no issues with these patches so,
-FWIW:
+Oops, sorry somehow this did not make it. I'll apply it to omap-for-v3.10/fixes
+with cc: stable flag.
 
-Acked-by: Mark A. Greer <mgreer@animalcreek.com>
+Regards,
 
-for the entire series.
+Tony
