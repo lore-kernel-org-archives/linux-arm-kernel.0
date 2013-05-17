@@ -1,78 +1,29 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Fri, 17 May 2013 08:09:58 -0300
-Subject: [PATCH 2/2] ARM: mvebu: Add support for NOR flash device on Armada
- XP-DB board
-In-Reply-To: <1368788998-4672-1-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1368788998-4672-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1368788998-4672-2-git-send-email-ezequiel.garcia@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 17 May 2013 12:15:23 +0100
+Subject: [PATCH v2] ASoC: dfbmcs320: make the driver common for other BT
+ modules
+In-Reply-To: <1368757177-15372-1-git-send-email-Baohua.Song@csr.com>
+References: <1368757177-15372-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <20130517111523.GM1627@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada XP Development Board (DB-78460-BP) has a NOR flash device
-connected to the Device Bus. This commit adds the device tree node
-to support this device.
+On Fri, May 17, 2013 at 10:19:37AM +0800, Barry Song wrote:
+> DFBM-CS320 is only one of bluetooth modules using CSR bluetooth chips,
+> we don't want everyone to have a seperate codec driver. anyway, the
+> feature of Bluetooth handsfree is same on all platforms, so this patch
+> makes the DFBM-CS320 driver become a common BT handsfree driver.
 
-This SoC supports a flexible and dynamic decoding window allocation
-scheme; but since this feature is still not implemented we need
-to specify the window base address in the device tree node itself.
+Sorry, should have thought of this before but why are we calling this
+"handsfree"?  It's just a generic bluetooth link as far as the host
+system is concerned, "bt-sco" might be more appropriate?
 
-This base address has been selected in a completely arbitrary fashion.
-
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-xp-db.dts | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
-
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index d6cc8bf..864831a 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -30,6 +30,9 @@
- 	};
- 
- 	soc {
-+		ranges = <0          0 0xd0000000 0x100000	/* Internal registers 1MiB */
-+			  0xf0000000 0 0xf0000000 0x1000000>;	/* Device Bus, NOR 16MiB   */
-+
- 		internal-regs {
- 			serial at 12000 {
- 				clock-frequency = <250000000>;
-@@ -155,6 +158,35 @@
- 					status = "okay";
- 				};
- 			};
-+
-+			devbus-bootcs at 10400 {
-+				status = "okay";
-+				ranges = <0 0xf0000000 0x1000000>;
-+
-+				/* Device Bus parameters are required */
-+
-+				/* Read parameters */
-+				devbus,bus-width    = <8>;
-+				devbus,turn-off-ps  = <60000>;
-+				devbus,badr-skew-ps = <0>;
-+				devbus,acc-first-ps = <124000>;
-+				devbus,acc-next-ps  = <248000>;
-+				devbus,rd-setup-ps  = <0>;
-+				devbus,rd-hold-ps   = <0>;
-+
-+				/* Write parameters */
-+				devbus,sync-enable = <0>;
-+				devbus,wr-high-ps  = <60000>;
-+				devbus,wr-low-ps   = <60000>;
-+				devbus,ale-wr-ps   = <60000>;
-+
-+				/* NOR 16 MiB */
-+				nor at 0 {
-+					compatible = "cfi-flash";
-+					reg = <0 0x1000000>;
-+					bank-width = <2>;
-+				};
-+			};
- 		};
- 	};
- };
--- 
-1.8.1.5
+Otherwise this looks OK for ASoC though I'd expect to see a change to
+registration of the OpenMoko BT device (perhaps I missed it though).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130517/09653d70/attachment.sig>
