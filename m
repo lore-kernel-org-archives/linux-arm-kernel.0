@@ -1,73 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 May 2013 10:36:16 +0100
-Subject: [Bug] ARM 'perf' regression by commit a43cb95d5
-In-Reply-To: <CACVXFVPEBXat3bPPuHzV535=xLoRMFd03Kjzp=NUF5E3KCq2=g@mail.gmail.com>
-References: <CACVXFVPjo2dQpYPpqZS8GC8UPNzB5HLURpYm6-g1FOBbSUjDyA@mail.gmail.com>
- <20130517085530.GB22992@mudshark.cambridge.arm.com>
- <CACVXFVPEBXat3bPPuHzV535=xLoRMFd03Kjzp=NUF5E3KCq2=g@mail.gmail.com>
-Message-ID: <20130517093616.GC23112@mudshark.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 May 2013 10:34:49 +0100
+Subject: [PATCH 3/9] I2C: mv64xxx: use devm_ioremap_resource()
+In-Reply-To: <20130517112316.12a3ddc3@armhf>
+References: <20130516202921.GW18614@n2100.arm.linux.org.uk>
+ <E1Ud4rN-0004Jc-CL@rmk-PC.arm.linux.org.uk> <20130517112316.12a3ddc3@armhf>
+Message-ID: <20130517093449.GA18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 10:27:05AM +0100, Ming Lei wrote:
-> On Fri, May 17, 2013 at 4:55 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >
-> > So it's still the morning and I haven't had my coffee yet, but I'm really
-> > struggling to see what you're getting at. Why does this have anything to do
-> > with perf?
+On Fri, May 17, 2013 at 11:23:16AM +0200, Jean-Francois Moine wrote:
+> On Thu, 16 May 2013 21:33:09 +0100
+> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
 > 
-> I don't know, and I just report it out, :-)
+> > Eliminate reg_base_p and reg_size, mv64xxx_i2c_unmap_regs() and an
+> > unchecked ioremap() return from this driver by using the devm_*
+> > API for requesting and ioremapping resources.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  drivers/i2c/busses/i2c-mv64xxx.c |   46 +++++---------------------------------
+> >  1 files changed, 6 insertions(+), 40 deletions(-)
+> > 
+> > diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+> > index 0339cd8..19cc9bf 100644
+> > --- a/drivers/i2c/busses/i2c-mv64xxx.c
+> > +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+> 	[snip]
+> > @@ -704,7 +671,6 @@ mv64xxx_i2c_remove(struct platform_device *dev)
+> >  
+> >  	rc = i2c_del_adapter(&drv_data->adapter);
+> >  	free_irq(drv_data->irq, drv_data);
+> > -	mv64xxx_i2c_unmap_regs(drv_data);
+> >  #if defined(CONFIG_HAVE_CLK)
+> >  	/* Not all platforms have a clk */
+> >  	if (!IS_ERR(drv_data->clk)) {
 > 
-> I found the problem days ago, and until yesterday I had one more hours to
-> git-bisect it, but the result is very frustrated.
-> 
-> >
-> >> [1], 'perf top' mistaken output
-> >> Samples: 17K of event 'cpu-clock', Event count (approx.): 3516532661
-> >>  97.51%  [smsc95xx]            [k] 0x013645b8
-> >>   0.21%  libc-2.15.so          [.] strstr
-> >>   0.14%  libc-2.15.so          [.] strchr
-> >>   0.12%  libc-2.15.so          [.] strcmp
-> >
-> > [...]
-> >
-> >> [2], 'perf top' correct output
-> >> Samples: 46K of event 'cpu-clock', Event count (approx.): 937128704
-> >>  96.44%  [kernel]            [k] cpuidle_enter_state
-> >>   0.19%  libc-2.15.so        [.] strstr
-> >>   0.16%  [kernel]            [k] kallsyms_expand_symbol.clone.0
-> >>   0.13%  [kernel]            [k] _raw_spin_unlock_irq
-> >
-> > [...]
-> >
-> > Are you saying that the profile you're seeing is radically different,
-> > rather than there being some formatting error that I can't spot? If so, that
-> 
-> Yes.
-> 
-> > sounds really strange and I can't see how the patch you mention is to
-> > blame...
-> >
-> > If we want to persue this, I guess other obvious questions are: which kernel
-> > are you running? Does this affect multiple architectures (your diff only
-> 
-> Either 3.10-rc1 or today's -next tree(3.10.0-rc1-next-20130516).
-> 
-> > changes ARM)? What's the workload which you are profiling?
-> 
-> I only tested it on Pandaboard, and no real workload, so you can see
-> cpuidle_enter_state is the top frequent symbol.
+> The patch does not apply: it seems it lacks:
 
-It's probably easier if you choose a workload, otherwise it's difficult to
-see what is `correct' and what is broken. For example, your broken output
-seems to be in the smsc95xx driver, so assumedly there's a bunch of
-networking going on whereas your other output is in cpuidle_enter_state.
+I should've mentioned that the patches are against v3.9, not v3.10-rc1.
 
-We need an apples-for-apples comparison if you think there's a bug in the
-kernel. Can you try profiling hackbench or something?
+> +	int rc;
+> 
+> -	i2c_del_adapter(&drv_data->adapter);
+> +	rc = i2c_del_adapter(&drv_data->adapter);
+> 
+> -	return 0;
+> +	return rc;
+> 
+> BTW, is this return code useful?
 
-> Or could anyone else try to verify the problem on their own environment?
+No it isn't.  Removals *can't* fail.  Once the remove function is called,
+the device _will_ be unbound no matter what the return value of that
+function is.  The module will also be unloaded (if that's why it's being
+unbound) whether or not you return an error.
 
-How are you running perf top?
-
-Will
+So, removals must always succeed.  Why their return type hasn't been void
+from the start I've no idea - but that's a question for Patrick Mochel
+who implemented the original driver model design.
