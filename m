@@ -1,50 +1,62 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Fri, 17 May 2013 10:33:54 +0200
-Subject: [GIT PULL v2] MFD: Fixes due for the v3.10 -rc:s
-In-Reply-To: <CACRpkdYpEreHKdUyfcANA9kTRAjVbLbpJkBJCq1Q_pAeOKcdxw@mail.gmail.com>
-References: <20130514091956.GG3297@gmail.com> <20130515090449.GA3494@gmail.com>
- <20130516224337.GZ22822@zurbaran>
- <20130517075140.GA25077@balto.lan>
- <CACRpkdYpEreHKdUyfcANA9kTRAjVbLbpJkBJCq1Q_pAeOKcdxw@mail.gmail.com>
-Message-ID: <20130517083354.GA32133@balto.lan>
+From: jiada_wang@mentor.com (Jiada Wang)
+Date: Fri, 17 May 2013 17:40:45 +0900
+Subject: [PATCH 2/2] ARM: imx: remove MLB PLL from pllv3
+In-Reply-To: <1368780045-6481-1-git-send-email-jiada_wang@mentor.com>
+References: <1368780045-6481-1-git-send-email-jiada_wang@mentor.com>
+Message-ID: <1368780045-6481-3-git-send-email-jiada_wang@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 10:25:10AM +0200, Linus Walleij wrote:
-> On Fri, May 17, 2013 at 9:51 AM, Fabio Baltieri
-> <fabio.baltieri@linaro.org> wrote:
-> > Hello Samuel,
-> (...)
-> > The last two:
-> >
-> >   mfd: ab8500-sysctrl: Set sysctrl_dev during probe
-> >   mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
-> >
-> > are actually fixes for bugs introduced in this merge window that
-> > inhibited the ab8500-sysctl driver as a consequence.  Would you
-> > reconsider pulling just those?
-> 
-> A good way to make sure that patches fixing regressions are applied
-> to the -rc series is to indicate in the commit message or even the
-> heading that it fixes a regression.
-> 
-> I usually try to begin such commits with the text:
-> 
->   this patch fixes a regression caused by change 018745435
->   "foo: fix bar"...
-> 
-> Then copying in some crash dump text never hurts :-)
-> 
-> It makes it very easy for us as subsystem maintainers to pick
-> regression fixes.
+MLB PLL should be handled internally in MLB driver,
+so remove it from pllv3.
 
-Right, I actually pointed to the culprit commit (applied during the
-merge window) in the message, but I'll try to be more direct next time.
-I also agree on the crash dump, but unfortunately this one was failing
-silently. :-)
+Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+CC: Shawn Guo <shawn.guo@linaro.org>
+CC: Dirk Behme <dirk.behme@de.bosch.com>
+---
+ arch/arm/mach-imx/clk-pllv3.c | 10 ----------
+ arch/arm/mach-imx/clk.h       |  1 -
+ 2 files changed, 11 deletions(-)
 
-Thanks for the tip!
-Fabio
-
+diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
+index d09bc3d..a9fad5f 100644
+--- a/arch/arm/mach-imx/clk-pllv3.c
++++ b/arch/arm/mach-imx/clk-pllv3.c
+@@ -296,13 +296,6 @@ static const struct clk_ops clk_pllv3_enet_ops = {
+ 	.recalc_rate	= clk_pllv3_enet_recalc_rate,
+ };
+ 
+-static const struct clk_ops clk_pllv3_mlb_ops = {
+-	.prepare	= clk_pllv3_prepare,
+-	.unprepare	= clk_pllv3_unprepare,
+-	.enable		= clk_pllv3_enable,
+-	.disable	= clk_pllv3_disable,
+-};
+-
+ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
+ 			  const char *parent_name, void __iomem *base,
+ 			  u32 div_mask)
+@@ -330,9 +323,6 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
+ 	case IMX_PLLV3_ENET:
+ 		ops = &clk_pllv3_enet_ops;
+ 		break;
+-	case IMX_PLLV3_MLB:
+-		ops = &clk_pllv3_mlb_ops;
+-		break;
+ 	default:
+ 		ops = &clk_pllv3_ops;
+ 	}
+diff --git a/arch/arm/mach-imx/clk.h b/arch/arm/mach-imx/clk.h
+index d9d9d9c..bcaafe9 100644
+--- a/arch/arm/mach-imx/clk.h
++++ b/arch/arm/mach-imx/clk.h
+@@ -18,7 +18,6 @@ enum imx_pllv3_type {
+ 	IMX_PLLV3_USB,
+ 	IMX_PLLV3_AV,
+ 	IMX_PLLV3_ENET,
+-	IMX_PLLV3_MLB,
+ };
+ 
+ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
 -- 
-Fabio Baltieri
+1.8.1.1
