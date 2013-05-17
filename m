@@ -1,17 +1,15 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 17 May 2013 17:53:45 -0600
-Subject: [PATCH] ARM: tegra: add various LED triggers to defconfig
-In-Reply-To: <1368834690-1174-1-git-send-email-swarren@wwwdotorg.org>
-References: <1368834690-1174-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <5196C309.5000903@wwwdotorg.org>
+Date: Fri, 17 May 2013 17:54:40 -0600
+Subject: [PATCH 2/2] ARM: tegra: dts: dalmore: enable spi4
+In-Reply-To: <1365594483-20651-2-git-send-email-ldewangan@nvidia.com>
+References: <1365594483-20651-1-git-send-email-ldewangan@nvidia.com>
+ <1365594483-20651-2-git-send-email-ldewangan@nvidia.com>
+Message-ID: <5196C340.2080706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2013 05:51 PM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> A couple of Tegra boards have gpio-leds present. Enable various trigger
-> options to make those useful. This sets all the trigger options to their
-> "if you don't know, say X" value.
+On 04/10/2013 05:48 AM, Laxman Dewangan wrote:
+> Enable SPI4 and add Winbond SPI flash W25Q32DW device
+> on CS0 line.
 
-I have applied this to (squashed it into) Tegra's for-3.11/defconfig branch.
+I have applied this to Tegra's for-3.11/dt branch.
