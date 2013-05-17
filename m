@@ -1,40 +1,28 @@
-From: mgreer@animalcreek.com (Mark A. Greer)
-Date: Fri, 17 May 2013 11:56:20 -0700
-Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
-In-Reply-To: <5194B2A8.8020608@visionsystems.de>
-References: <20130515002537.GG5600@atomide.com>
- <20130515015212.GB3268@animalcreek.com>
- <20130515170734.GI5600@atomide.com>
- <20130515215028.GA11883@animalcreek.com>
- <5194B2A8.8020608@visionsystems.de>
-Message-ID: <20130517185620.GF28484@animalcreek.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 17 May 2013 12:17:02 -0700
+Subject: [PATCH 1/6] pinctrl: exynos: Add support for set_irq_wake of
+ wake-up EINTs
+In-Reply-To: <1368807872-2601-2-git-send-email-t.figa@samsung.com>
+References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
+ <1368807872-2601-2-git-send-email-t.figa@samsung.com>
+Message-ID: <CAD=FV=V-GfvVi++6Mrz2d=idRkj3q5O0NQQmCGE=0vi1=sD5cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 12:19:20PM +0200, Yegor Yefremov wrote:
-> On 15.05.2013 23:50, Mark A. Greer wrote:
-> > On Wed, May 15, 2013 at 10:07:35AM -0700, Tony Lindgren wrote:
+Tomasz,
 
-> >> Mark, do you have some omap3 with no iva (other than am3703) to test the
-> >> idle states with?
-> > 
-> > I have an am35xx which isn't supposed to have an IVA so I can test with it
-> > (although, I'm not sure how well the kernel works on the am35xx these days).
-> > 
-> > I'm a bit busy today but I'll try booting the am35xx tomorrow and if it
-> > comes up, see what I can figure out.
-> 
-> I think this issue is relevant to am3517 as you can see from this thread: http://thread.gmane.org/gmane.linux.ports.arm.omap/97903
-> I could boot only with your patch http://www.spinics.net/lists/arm-kernel/msg168865.html
-> 
-> I have such a system running, so if you have any other patches/ideas to test, I would do it.
+On Fri, May 17, 2013 at 9:24 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+> This patch adds support of IRQ wake-up ability configuration for
+> wake-up EINTs on Exynos SoCs.
+>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/pinctrl/pinctrl-exynos.c | 23 +++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
 
-Yegor, since I've so far been unable to get my am3517evm to fire up, can
-you play around with the 3517 to see if there appears to be iva registers
-that can be read/written to safely?  In particular, can the code that idles
-the iva be run safely on an am3517?
+On exynos5250-snow (pinmux backported to 3.8):
 
-Thanks,
+Tested-by: Doug Anderson <dianders@chromium.org>
 
-Mark
---
+Reviewed-by: Doug Anderson <dianders@chromium.org>
