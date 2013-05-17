@@ -1,40 +1,67 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 May 2013 18:07:52 +0100
-Subject: [PATCH 13/14] ARM: lpae: fix definition of PTE_HWTABLE_PTRS
+Date: Fri, 17 May 2013 18:07:40 +0100
+Subject: [PATCH 01/14] ARM: LPAE: use signed arithmetic for mask definitions
 In-Reply-To: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
 References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1368810473-26070-14-git-send-email-will.deacon@arm.com>
+Message-ID: <1368810473-26070-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For 2-level page tables, PTE_HWTABLE_PTRS describes the offset between
-Linux PTEs and hardware PTEs. On LPAE, there is no distinction (since
-we have 64-bit descriptors with plenty of space) so PTE_HWTABLE_PTRS
-should be 0. Unfortunately, it is wrongly defined as PTRS_PER_PTE,
-meaning that current pte table flushing is off by a page. Luckily,
-all current LPAE implementations are SMP, so the hardware walker can
-snoop L1.
+From: Cyril Chemparathy <cyril@ti.com>
 
-This patch fixes the broken definition.
+This patch applies to PAGE_MASK, PMD_MASK, and PGDIR_MASK, where forcing
+unsigned long math truncates the mask at the 32-bits.  This clearly does bad
+things on PAE systems.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+This patch fixes this problem by defining these masks as signed quantities.
+We then rely on sign extension to do the right thing.
+
+Signed-off-by: Cyril Chemparathy <cyril@ti.com>
+Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/pgtable-3level.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/include/asm/page.h           | 2 +-
+ arch/arm/include/asm/pgtable-3level.h | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+index 812a494..6363f3d 100644
+--- a/arch/arm/include/asm/page.h
++++ b/arch/arm/include/asm/page.h
+@@ -13,7 +13,7 @@
+ /* PAGE_SHIFT determines the page size */
+ #define PAGE_SHIFT		12
+ #define PAGE_SIZE		(_AC(1,UL) << PAGE_SHIFT)
+-#define PAGE_MASK		(~(PAGE_SIZE-1))
++#define PAGE_MASK		(~((1 << PAGE_SHIFT) - 1))
+ 
+ #ifndef __ASSEMBLY__
+ 
 diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index 5b85b21..d03c589 100644
+index 86b8fe3..5b85b21 100644
 --- a/arch/arm/include/asm/pgtable-3level.h
 +++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -33,7 +33,7 @@
- #define PTRS_PER_PMD		512
- #define PTRS_PER_PGD		4
+@@ -48,16 +48,16 @@
+ #define PMD_SHIFT		21
  
--#define PTE_HWTABLE_PTRS	(PTRS_PER_PTE)
-+#define PTE_HWTABLE_PTRS	(0)
- #define PTE_HWTABLE_OFF		(0)
- #define PTE_HWTABLE_SIZE	(PTRS_PER_PTE * sizeof(u64))
+ #define PMD_SIZE		(1UL << PMD_SHIFT)
+-#define PMD_MASK		(~(PMD_SIZE-1))
++#define PMD_MASK		(~((1 << PMD_SHIFT) - 1))
+ #define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
+-#define PGDIR_MASK		(~(PGDIR_SIZE-1))
++#define PGDIR_MASK		(~((1 << PGDIR_SHIFT) - 1))
+ 
+ /*
+  * section address mask and size definitions.
+  */
+ #define SECTION_SHIFT		21
+ #define SECTION_SIZE		(1UL << SECTION_SHIFT)
+-#define SECTION_MASK		(~(SECTION_SIZE-1))
++#define SECTION_MASK		(~((1 << SECTION_SHIFT) - 1))
+ 
+ #define USER_PTRS_PER_PGD	(PAGE_OFFSET / PGDIR_SIZE)
  
 -- 
 1.8.2.2
