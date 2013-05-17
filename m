@@ -1,39 +1,95 @@
-From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
-Date: Fri, 17 May 2013 11:30:38 +0530
-Subject: [PATCH V2 1/3] virtio: console: Add emergency writeonly register
- to config space
-In-Reply-To: <871u96a3dx.fsf@rustcorp.com.au>
-References: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
- <1367842791-30285-2-git-send-email-pranavkumar@linaro.org>
- <20130516123746.GA4744@amit.redhat.com>
- <871u96a3dx.fsf@rustcorp.com.au>
-Message-ID: <CAAHg+HhrvF6XxogiAA-8fzuT6byiwFUkpvr__qwTgKTxXDNdJw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 17 May 2013 08:24:35 +0200
+Subject: GPIO sysfs : set a wake source
+In-Reply-To: <87ip2ig1ez.fsf@free.fr>
+References: <87fvxwia0s.fsf@free.fr>
+ <CACRpkdYjQD9phVtWNh2QGkZWOdEJyZENnYatXt7bd23bgqXitw@mail.gmail.com>
+ <51926177.1050600@wwwdotorg.org> <87ip2ig1ez.fsf@free.fr>
+Message-ID: <CACRpkdbiZFutP_+u=ciuC6r-8N5FpkEnGVLH9LGDQ7pvdo3_-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 May 2013 05:22, Rusty Russell <rusty@rustcorp.com.au> wrote:
-> Amit Shah <amit.shah@redhat.com> writes:
->> On (Mon) 06 May 2013 [17:49:49], Pranavkumar Sawargaonkar wrote:
->>> This patch adds an emerg_wr register (writeonly) in config space
->>> of virtio console device which can be used for debugging.
->>>
->>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
->>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
->>> Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
->>
->> OK, this change by itself looks harmless.
->>
->> Acked-by: Amit Shah <amit.shah@redhat.com>
->>
->>               Amit
+On Thu, May 16, 2013 at 9:39 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+
+>>> Don't go down this path, let the kernel handle this kind of stuff.
+
+> Oh really, where ?
 >
-> Thanks.  This is queued for *next* merge window.
+> Let me show you why it can't be a module.
+
+I'm not following. I haven't been talking about modules ...
+(I think?)
+
+Do you mean you want to show why it can't be in the kernel?
+
+> In my case, I have a 2G modem connected to the soc :
+>  - the modem and 1 SoC UART are connected (TX, RX, CTS, ...)
+>  - the modem and SoC are connected through several gpios
+>    - one or two control to power up and reset the modem
+>    - one connected to the modem "ring" signal (the one I want a wakeup for).
 >
+> So I have no module to handle my modem :
+>  - UART is handled by pxa-uart
+>  - control/reset by gpiolib
 
-Thanks amit and rusty.
+Do you mean control/reset is handled by the userspace sysfs
+interface to GPIOlib? This is not necessarily a good idea
+in that case.
 
-> Cheers,
-> Rusty.
+>  - ring ... by nobody
+>
+> So my point is that this ring *should* be handled by gpiolib, just as any casual
+> input gpio. Moreover, the "wake-up" ability should be activable/deactivable on
+> wish by userspace.
 
-Regards,
-Pranav
+(...)
+
+>>> Instead figure out how to make the subsystems we have and the
+>>> device trees express what you want to do.
+> As I said above, I don't think it's the way to go. I have *no* subsystem to
+> address.
+
+We have several cases of out-of-tree code due to missing subsystems.
+
+One such subsystem is the in-kernel modem subsystem which Arun
+has been trying to get going:
+http://marc.info/?l=linux-kernel&m=134881988212794&w=2
+
+> Devicetree can't help in the toggle to "activate" or "deactivate" the wakeup
+> upon this GPIO, can it ?
+
+No, I'm just saying the connection between the device and the
+GPIO tree shall be modeled in the device tree, especially since
+this is obviously deeply embedded, soldered-on stuff and the
+hardware set-up should be encoded in the device tree.
+
+I am starting so suspect that the real issue here, which has
+not been expressed so far, is that you think of this embedded
+modem as a US Robotics 28K8 modem connected to a serial
+port, and as something that should be handled by userspace.
+
+Is there a silent assumption that "modem drivers must be in
+userspace"?
+
+This assumption is not necessarily true when the modem start
+to connect wires like GPIO to work. There are modems using
+other things than UART, such as HSI, for datapath. And modems
+using in-kernel protocols like CAIF or Phonet for control.
+
+I think you need to think about how we join this modem closer
+with the kernel instead of trying to paper it over using userspace
+GPIO.
+
+>>> What do you think about this idea? [GPIO hogs]
+> I don't yet know. Let me think this more over. I'd like some literature if you
+> can provide (especially on LAKML).
+
+It doesn't toggle any pins so it's not what you want anyway.
+
+I think you want part of your driver in the kernel.
+
+I think the dilemma faced by embedded modems need to
+be considered thoroughly here.
+
+Yours,
+Linus Walleij
