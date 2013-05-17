@@ -1,31 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 17 May 2013 17:09:51 +0800
-Subject: [PATCH v2] can: flexcan: remove HAVE_CAN_FLEXCAN Kconfig symbol
-In-Reply-To: <1368781157-4646-1-git-send-email-mkl@pengutronix.de>
-References: <1368781157-4646-1-git-send-email-mkl@pengutronix.de>
-Message-ID: <20130517090949.GI8607@S2101-09.ap.freescale.net>
+From: list-09_linuc_arm@tqsc.de (Markus Niebel)
+Date: Fri, 17 May 2013 11:19:51 +0200
+Subject: [PATCH 1/3] staging: drm/imx: set correct sync pins for parallel
+ display
+In-Reply-To: <1368782393-9660-1-git-send-email-list-09_linuc_arm@tqsc.de>
+References: <1368782393-9660-1-git-send-email-list-09_linuc_arm@tqsc.de>
+Message-ID: <1368782393-9660-2-git-send-email-list-09_linuc_arm@tqsc.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 10:59:17AM +0200, Marc Kleine-Budde wrote:
-> This patch removes the Kconfig symbol HAVE_CAN_FLEXCAN from arch/{arm,powerpc}
-> and allowing compilation unconditionally on all arm and powerpc platforms.
-> 
-> This brings a bigger compile time coverage and removes the following dependency
-> warning found by Arnd Bergmann:
-> 
->     warning: (SOC_IMX28 && SOC_IMX25 && SOC_IMX35 && IMX_HAVE_PLATFORM_FLEXCAN &&
->         SOC_IMX53 && SOC_IMX6Q) selects HAVE_CAN_FLEXCAN
->     which has unmet direct dependencies (NET && CAN && CAN_DEV)
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
+From: Markus Niebel <Markus.Niebel@tqs.de>
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+partial fix of changes from
+"staging: drm/imx: Add support for VGA via TVE on i.MX53"
 
-> Cc: Sascha Hauer <s.hauer@pengutronix.de>
-> Cc: Kumar Gala <galak@kernel.crashing.org>
-> Cc: U Bhaskar-B22300 <B22300@freescale.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
+Have to call imx_drm_crtc_panel_format_pins with the correct pins instead of (0, 0)
+This enables configuration of correct waveforms for vsync / hsync
+
+TODO: configure pins via device tree
+
+Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
+---
+ drivers/staging/imx-drm/parallel-display.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/staging/imx-drm/parallel-display.c b/drivers/staging/imx-drm/parallel-display.c
+index e7fba62..e49a906 100644
+--- a/drivers/staging/imx-drm/parallel-display.c
++++ b/drivers/staging/imx-drm/parallel-display.c
+@@ -114,8 +114,8 @@ static void imx_pd_encoder_prepare(struct drm_encoder *encoder)
+ {
+ 	struct imx_parallel_display *imxpd = enc_to_imxpd(encoder);
+ 
+-	imx_drm_crtc_panel_format(encoder->crtc, DRM_MODE_ENCODER_NONE,
+-			imxpd->interface_pix_fmt);
++	imx_drm_crtc_panel_format_pins(encoder->crtc, DRM_MODE_ENCODER_NONE,
++			imxpd->interface_pix_fmt, 2, 3);
+ }
+ 
+ static void imx_pd_encoder_commit(struct drm_encoder *encoder)
+-- 
+1.7.9.5
