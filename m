@@ -1,44 +1,39 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 17 May 2013 11:09:24 +0530
-Subject: [PATCH] ARM: OMAP4: change the device names in usb_bind_phy
-In-Reply-To: <20130516162034.GX5600@atomide.com>
-References: <1366697656-14315-1-git-send-email-kishon@ti.com>
- <51936946.3030507@iki.fi> <20130516155857.GV5600@atomide.com>
- <519503DA.5070303@iki.fi> <20130516162034.GX5600@atomide.com>
-Message-ID: <5195C28C.40300@ti.com>
+From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
+Date: Fri, 17 May 2013 11:30:38 +0530
+Subject: [PATCH V2 1/3] virtio: console: Add emergency writeonly register
+ to config space
+In-Reply-To: <871u96a3dx.fsf@rustcorp.com.au>
+References: <1367842791-30285-1-git-send-email-pranavkumar@linaro.org>
+ <1367842791-30285-2-git-send-email-pranavkumar@linaro.org>
+ <20130516123746.GA4744@amit.redhat.com>
+ <871u96a3dx.fsf@rustcorp.com.au>
+Message-ID: <CAAHg+HhrvF6XxogiAA-8fzuT6byiwFUkpvr__qwTgKTxXDNdJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thursday 16 May 2013 09:50 PM, Tony Lindgren wrote:
-> * Tomi Valkeinen <tomi.valkeinen@iki.fi> [130516 09:11]:
->> On 16/05/13 18:58, Tony Lindgren wrote:
->>> * Tomi Valkeinen <tomi.valkeinen@iki.fi> [130515 03:59]:
+On 17 May 2013 05:22, Rusty Russell <rusty@rustcorp.com.au> wrote:
+> Amit Shah <amit.shah@redhat.com> writes:
+>> On (Mon) 06 May 2013 [17:49:49], Pranavkumar Sawargaonkar wrote:
+>>> This patch adds an emerg_wr register (writeonly) in config space
+>>> of virtio console device which can be used for debugging.
 >>>
->>> Just checking.. Do you have CONFIG_OMAP_OCP2SCP=y in your .config? Sounds
->>> like the some transceivers should depend on that for omap4.
+>>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>>> Signed-off-by: Rusty Russell <rusty@rustcorp.com.au>
 >>
->> Yes, I have OCP2SCP=y.
->
-> Hmm well no idea beyond that then. Sounds like Kishon should check it.
->
->>>> The musb-hdrc id is wrong on overo also.
->>>
->>> Hmm has there been a fix posted for that?
+>> OK, this change by itself looks harmless.
 >>
->> I couldn't find with a quick look. We debugged and discussed this on an irc
->> channel with Kishon, who said he'll send a patch. Changing the musb-hdrc ID
->> on overo fixed the issue, and it looks very similar to the error on 4430sdp.
->> The overo fix was just:
+>> Acked-by: Amit Shah <amit.shah@redhat.com>
+>>
+>>               Amit
+>
+> Thanks.  This is queued for *next* merge window.
+>
 
-hmm.. I think using device name to bind the controller and the phy can 
-no longer be used reliably. I think it's better to have something like 
-what Grant suggested in my other patch series.. to have the phy 
-reference into the host controllers platform_data structure. And for the 
-phy reference I'll have label and id.
+Thanks amit and rusty.
 
-Does this makes sense to you?
+> Cheers,
+> Rusty.
 
-Thanks
-Kishon
+Regards,
+Pranav
