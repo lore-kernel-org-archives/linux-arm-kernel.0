@@ -1,26 +1,41 @@
-From: gwenhael.goavec-merou@armadeus.com (gwenhael.goavec)
-Date: Fri, 17 May 2013 11:06:14 +0200
-Subject: [PATCH] ARM: imx: apf51: add nfc support
-In-Reply-To: <20130517080312.GE8607@S2101-09.ap.freescale.net>
-References: <1368767622-12968-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <1368767622-12968-2-git-send-email-gwenhael.goavec-merou@armadeus.com>
- <20130517080312.GE8607@S2101-09.ap.freescale.net>
-Message-ID: <20130517110614.553b1c6d@x230>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 17 May 2013 17:08:17 +0800
+Subject: [PATCH v3 2/4] ARM: imx: add initial support for MVF600
+In-Reply-To: <1368684648-20826-3-git-send-email-b35083@freescale.com>
+References: <1368684648-20826-1-git-send-email-b35083@freescale.com>
+ <1368684648-20826-3-git-send-email-b35083@freescale.com>
+Message-ID: <20130517090815.GH8607@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 May 2013 16:03:14 +0800
-Shawn Guo <shawn.guo@linaro.org> wrote:
-
-> On Fri, May 17, 2013 at 07:13:42AM +0200, Gwenhael Goavec-Merou wrote:
-> > 
-> > Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
+On Thu, May 16, 2013 at 02:10:46PM +0800, Jingchang Lu wrote:
+> Add initial support for Vybrid MVF600 SoC.
 > 
-> I already applied the patch [1], so this one can be ignored? 
-> 
-Yes,
-It's a wrong manip.
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> ---
+> v3:
+>   remove unused #include header lines.
 
-Sorry.
+There are more ...
 
-Gwen
+> +#include <linux/io.h>
+> +#include <linux/delay.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/clk.h>
+> +#include <linux/clocksource.h>
+> +#include <linux/irqchip.h>
+> +#include <linux/irqchip/arm-gic.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/hardware/cache-l2x0.h>
+> +#include <asm/system_misc.h>
+
+#include <linux/delay.h>
+#include <linux/clk.h>
+#include <linux/irqchip/arm-gic.h>
+#include <asm/system_misc.h>
+
+I do not see how these 4 headers are needed.
+
+Shawn
