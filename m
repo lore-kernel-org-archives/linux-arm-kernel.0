@@ -1,20 +1,17 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 May 2013 18:07:41 +0100
-Subject: [PATCH 02/14] ARM: LPAE: use phys_addr_t in alloc_init_pud()
+Date: Fri, 17 May 2013 18:07:43 +0100
+Subject: [PATCH 04/14] ARM: LPAE: use phys_addr_t for initrd location
 In-Reply-To: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
 References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1368810473-26070-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1368810473-26070-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Vitaly Andrianov <vitalya@ti.com>
 
-This patch fixes the alloc_init_pud() function to use phys_addr_t instead of
-unsigned long when passing in the phys argument.
-
-This is an extension to commit 97092e0c56830457af0639f6bd904537a150ea4a (ARM:
-pgtable: use phys_addr_t for physical addresses), which applied similar changes
-elsewhere in the ARM memory management code.
+This patch fixes the initrd setup code to use phys_addr_t instead of assuming
+32-bit addressing.  Without this we cannot boot on systems where initrd is
+located above the 4G physical address limit.
 
 Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
 Signed-off-by: Cyril Chemparathy <cyril@ti.com>
@@ -22,22 +19,47 @@ Acked-by: Nicolas Pitre <nico@linaro.org>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/mmu.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mm/init.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e0d8565..b7ce65a8 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -673,7 +673,8 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- }
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 68c914e..2ffee02 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -36,12 +36,13 @@
  
- static void __init alloc_init_pud(pgd_t *pgd, unsigned long addr,
--	unsigned long end, unsigned long phys, const struct mem_type *type)
-+				  unsigned long end, phys_addr_t phys,
-+				  const struct mem_type *type)
+ #include "mm.h"
+ 
+-static unsigned long phys_initrd_start __initdata = 0;
++static phys_addr_t phys_initrd_start __initdata = 0;
+ static unsigned long phys_initrd_size __initdata = 0;
+ 
+ static int __init early_initrd(char *p)
  {
- 	pud_t *pud = pud_offset(pgd, addr);
- 	unsigned long next;
+-	unsigned long start, size;
++	phys_addr_t start;
++	unsigned long size;
+ 	char *endp;
+ 
+ 	start = memparse(p, &endp);
+@@ -350,14 +351,14 @@ void __init arm_memblock_init(struct meminfo *mi, struct machine_desc *mdesc)
+ #ifdef CONFIG_BLK_DEV_INITRD
+ 	if (phys_initrd_size &&
+ 	    !memblock_is_region_memory(phys_initrd_start, phys_initrd_size)) {
+-		pr_err("INITRD: 0x%08lx+0x%08lx is not a memory region - disabling initrd\n",
+-		       phys_initrd_start, phys_initrd_size);
++		pr_err("INITRD: 0x%08llx+0x%08lx is not a memory region - disabling initrd\n",
++		       (u64)phys_initrd_start, phys_initrd_size);
+ 		phys_initrd_start = phys_initrd_size = 0;
+ 	}
+ 	if (phys_initrd_size &&
+ 	    memblock_is_region_reserved(phys_initrd_start, phys_initrd_size)) {
+-		pr_err("INITRD: 0x%08lx+0x%08lx overlaps in-use memory region - disabling initrd\n",
+-		       phys_initrd_start, phys_initrd_size);
++		pr_err("INITRD: 0x%08llx+0x%08lx overlaps in-use memory region - disabling initrd\n",
++		       (u64)phys_initrd_start, phys_initrd_size);
+ 		phys_initrd_start = phys_initrd_size = 0;
+ 	}
+ 	if (phys_initrd_size) {
 -- 
 1.8.2.2
