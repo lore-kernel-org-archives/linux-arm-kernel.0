@@ -1,48 +1,17 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 17 May 2013 16:26:00 +0800
-Subject: [PATCH] ARM: etm: add missing misc_deregister() on probe error and
- remove
-Message-ID: <CAPgLHd_ScFPt5iYoFv++Bn-0cbwBXRX4YXJWqyyNzhQQkTsHXQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 May 2013 09:28:16 +0100
+Subject: [PATCH] drm/i2c: nxp-tda998x: fix abort of some i2c exchanges
+In-Reply-To: <20130517083803.5f34816e@armhf>
+References: <20130517083803.5f34816e@armhf>
+Message-ID: <20130517082816.GY18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Fri, May 17, 2013 at 08:38:03AM +0200, Jean-Francois Moine wrote:
+> The signals SIGALRM (most often) and SIGPOLL (sometimes) may be raised
+> after irq or some parameter change and this aborts the i2c exchanges.
+> 
+> The problem is solved by masking these signals.
 
-Add the missing misc_deregister() on probe error and remove.
-
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- arch/arm/kernel/etm.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/etm.c b/arch/arm/kernel/etm.c
-index 8ff0ecd..d0b7426 100644
---- a/arch/arm/kernel/etm.c
-+++ b/arch/arm/kernel/etm.c
-@@ -365,7 +365,8 @@ static int etb_probe(struct amba_device *dev, const struct amba_id *id)
- 	t->emu_clk = clk_get(&dev->dev, "emu_src_ck");
- 	if (IS_ERR(t->emu_clk)) {
- 		dev_dbg(&dev->dev, "Failed to obtain emu_src_ck.\n");
--		return -EFAULT;
-+		ret = PTR_ERR(t->emu_clk);
-+		goto out_dereg;
- 	}
- 
- 	clk_enable(t->emu_clk);
-@@ -384,6 +385,8 @@ static int etb_probe(struct amba_device *dev, const struct amba_id *id)
- out:
- 	return ret;
- 
-+out_dereg:
-+	misc_deregister(&etb_miscdev);
- out_unmap:
- 	amba_set_drvdata(dev, NULL);
- 	iounmap(t->etb_regs);
-@@ -398,6 +401,7 @@ static int etb_remove(struct amba_device *dev)
- {
- 	struct tracectx *t = amba_get_drvdata(dev);
- 
-+	misc_deregister(&etb_miscdev);
- 	amba_set_drvdata(dev, NULL);
- 
- 	iounmap(t->etb_regs);
+NAK.  The real problem is in the I2C driver, which actually suffers from
+multiple problems.  See the set of I2C patches I posted yesterday.
