@@ -1,29 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 17 May 2013 12:03:30 +0100
-Subject: [PATCH] spi: sirf: fix the issue while transferring more than
- 256 words
-In-Reply-To: <CAGsJ_4z9=2RYkwntnCD4X-JVsZoYEgzwdWO_uryp3RpbEHu7fA@mail.gmail.com>
-References: <1363592828-6347-1-git-send-email-Barry.Song@csr.com>
- <CAGsJ_4wamqzwLZkUz4h6ex=oVQZhzhw7S6r41wt9tTUoMR=aXw@mail.gmail.com>
- <20130516172358.GA1627@sirena.org.uk>
- <CAGsJ_4z9=2RYkwntnCD4X-JVsZoYEgzwdWO_uryp3RpbEHu7fA@mail.gmail.com>
-Message-ID: <20130517110330.GJ1627@sirena.org.uk>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Fri, 17 May 2013 11:07:38 +0000
+Subject: [PATCH 0/2] ARM: OMAP AM33XX: clock data: Enable clkout2 output
+ on SoC pad
+In-Reply-To: <1367919574-21353-1-git-send-email-hvaibhav@ti.com>
+References: <1367919574-21353-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EC8C081@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 09:58:24AM +0800, Barry Song wrote:
-> 2013/5/17 Mark Brown <broonie@kernel.org>:
 
-> > Don't top post, don't send contentless pings.  At a guess you didn't CC
-> > me...
+> -----Original Message-----
+> From: Hiremath, Vaibhav
+> Sent: Tuesday, May 07, 2013 3:10 PM
+> To: linux-omap at vger.kernel.org
+> Cc: tony at atomide.com; Cousson, Benoit; paul at pwsan.com; linux-arm-
+> kernel at lists.infradead.org; Hiremath, Vaibhav
+> Subject: [PATCH 0/2] ARM: OMAP AM33XX: clock data: Enable clkout2
+> output on SoC pad
+> 
+> 'clkout2' comes out on the device pad and is being used by various
+> external on-board peripherals like, Audio codecs, Wilink and stuff.
+> So enable the clkout2 by default during init sequence itself
+> along with right pinmux configuration clkout2 output.
+> 
+> Also, add the missing entry of "clkout2_ck" to the AM33xx clock table.
+> 
+> As far as enabling of clkout2 during init is concerned,
+> we can argue that it can be handled using DT property and enable
+> the clock only when specified; but not until OMAP clock-tree
+> migration to DT.
+> 
+> Vaibhav Hiremath (2):
+>   ARM: OMAP AM33XX: clock data: Enable clkout2 as part of init
+>   ARM: dts: AM33XX: Set pinmux for clkout2 pad used for clock output
+> 
+>  arch/arm/boot/dts/am335x-bone.dts     |    8 +++++++-
+>  arch/arm/boot/dts/am335x-evm.dts      |    8 +++++++-
+>  arch/arm/boot/dts/am335x-evmsk.dts    |    8 +++++++-
+>  arch/arm/mach-omap2/cclock33xx_data.c |    2 ++
+>  4 files changed, 23 insertions(+), 3 deletions(-)
 
-> yes. i missed you in CC. sorry for that, Mark. so do you want me to resend it?
+Tony, Paul and Benoit,
 
-Yes, please.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130517/84799da4/attachment-0001.sig>
+Any update on this series?
+
+Thanks,
+Vaibhav
