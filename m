@@ -1,35 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 17 May 2013 09:31:13 +0100
-Subject: [PATCH 1/9] I2C: mv64xxx: work around signals causing I2C
- transactions to be aborted
-In-Reply-To: <20130517083743.31af4eb0@armhf>
-References: <20130516202921.GW18614@n2100.arm.linux.org.uk>
- <E1Ud4pH-0004JQ-Jq@rmk-PC.arm.linux.org.uk> <20130517083743.31af4eb0@armhf>
-Message-ID: <20130517083113.GZ18614@n2100.arm.linux.org.uk>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Fri, 17 May 2013 10:33:54 +0200
+Subject: [GIT PULL v2] MFD: Fixes due for the v3.10 -rc:s
+In-Reply-To: <CACRpkdYpEreHKdUyfcANA9kTRAjVbLbpJkBJCq1Q_pAeOKcdxw@mail.gmail.com>
+References: <20130514091956.GG3297@gmail.com> <20130515090449.GA3494@gmail.com>
+ <20130516224337.GZ22822@zurbaran>
+ <20130517075140.GA25077@balto.lan>
+ <CACRpkdYpEreHKdUyfcANA9kTRAjVbLbpJkBJCq1Q_pAeOKcdxw@mail.gmail.com>
+Message-ID: <20130517083354.GA32133@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 08:37:43AM +0200, Jean-Francois Moine wrote:
-> On Thu, 16 May 2013 21:30:59 +0100
-> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+On Fri, May 17, 2013 at 10:25:10AM +0200, Linus Walleij wrote:
+> On Fri, May 17, 2013 at 9:51 AM, Fabio Baltieri
+> <fabio.baltieri@linaro.org> wrote:
+> > Hello Samuel,
+> (...)
+> > The last two:
+> >
+> >   mfd: ab8500-sysctrl: Set sysctrl_dev during probe
+> >   mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
+> >
+> > are actually fixes for bugs introduced in this merge window that
+> > inhibited the ab8500-sysctl driver as a consequence.  Would you
+> > reconsider pulling just those?
 > 
-> > Do not use interruptible waits in an I2C driver; if a process uses
-> > signals (eg, Xorg uses SIGALRM and SIGPIPE) then these signals can
-> > cause the I2C driver to abort a transaction in progress by another
-> > driver, which can cause that driver to fail.  I2C drivers are not
-> > expected to abort transactions on signals.
+> A good way to make sure that patches fixing regressions are applied
+> to the -rc series is to indicate in the commit message or even the
+> heading that it fixes a regression.
 > 
-> Hi Russell,
+> I usually try to begin such commits with the text:
 > 
-> I had the same problem with my dove drm driver, but I don't fully agree
-> with your solution.
+>   this patch fixes a regression caused by change 018745435
+>   "foo: fix bar"...
 > 
-> Using wait_event_timeout() stops the system, and reading the EDID from
-> an external screen may take some time.
+> Then copying in some crash dump text never hurts :-)
+> 
+> It makes it very easy for us as subsystem maintainers to pick
+> regression fixes.
 
-It doesn't stop the system.  It stops the process until that has completed.
-Using the DRM TDA19988 driver, things are nice and quick while reading
-the EDID, because it does reads an entire EDID block using one message.
+Right, I actually pointed to the culprit commit (applied during the
+merge window) in the message, but I'll try to be more direct next time.
+I also agree on the crash dump, but unfortunately this one was failing
+silently. :-)
 
-Blocking the signals like you do has exactly the same effect - you
-prevent the I2C driver being interrupted by signals.
+Thanks for the tip!
+Fabio
+
+-- 
+Fabio Baltieri
