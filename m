@@ -1,42 +1,67 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Fri, 17 May 2013 10:51:00 +0200
-Subject: [PATCH] can: flexcan: allow compilation on arm and powerpc
-In-Reply-To: <20130517020351.GE3893@S2101-09.ap.freescale.net>
-References: <1368711756-22324-1-git-send-email-mkl@pengutronix.de>
- <20130517020351.GE3893@S2101-09.ap.freescale.net>
-Message-ID: <5195EF74.8070005@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 May 2013 09:55:31 +0100
+Subject: [Bug] ARM 'perf' regression by commit a43cb95d5
+In-Reply-To: <CACVXFVPjo2dQpYPpqZS8GC8UPNzB5HLURpYm6-g1FOBbSUjDyA@mail.gmail.com>
+References: <CACVXFVPjo2dQpYPpqZS8GC8UPNzB5HLURpYm6-g1FOBbSUjDyA@mail.gmail.com>
+Message-ID: <20130517085530.GB22992@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2013 04:03 AM, Shawn Guo wrote:
-> Hi Marc,
+On Fri, May 17, 2013 at 03:16:40AM +0100, Ming Lei wrote:
+> Hi,
+
+Hello,
+
+> The commit a43cb95d5(dump_stack: unify debug information printed by show_regs())
+> caused ARM perf regression, then 'perf top' outputs mistakenly, see
+> [1].  The correct
+> output should be [2], which can be got after reverting the commit or
+> doing it partly
+> by the one line change below:
 > 
-> On Thu, May 16, 2013 at 03:42:36PM +0200, Marc Kleine-Budde wrote:
->> This patch removes the Kconfig symbols HAVE_CAN_FLEXCAN and
->> IMX_HAVE_PLATFORM_FLEXCAN from arch/{arm,powerpc} and allowing compilation on
->> all arm and powerpc platforms.
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index f219703..89bc3a4 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -225,7 +225,7 @@ void __show_regs(struct pt_regs *regs)
+>         unsigned long flags;
+>         char buf[64];
 > 
-> I'm generally fine with the approach.  But with Kconfig symbol
-> IMX_HAVE_PLATFORM_FLEXCAN removed, how does the build of
-> platform-flexcan.o work?
+> -       show_regs_print_info(KERN_DEFAULT);
+> +       //show_regs_print_info(KERN_DEFAULT);
 > 
-> arch/arm/mach-imx/devices/Makefile:obj-$(CONFIG_IMX_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
+> 
+> Looks a bit weird, anyone can give a hint?
 
-Doh! - I've removed too much, will change.
+So it's still the morning and I haven't had my coffee yet, but I'm really
+struggling to see what you're getting at. Why does this have anything to do
+with perf?
 
-Tnx,
-Marc
+> [1], 'perf top' mistaken output
+> Samples: 17K of event 'cpu-clock', Event count (approx.): 3516532661
+>  97.51%  [smsc95xx]            [k] 0x013645b8
+>   0.21%  libc-2.15.so          [.] strstr
+>   0.14%  libc-2.15.so          [.] strchr
+>   0.12%  libc-2.15.so          [.] strcmp
 
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+[...]
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130517/5c5bfc2f/attachment-0001.sig>
+> [2], 'perf top' correct output
+> Samples: 46K of event 'cpu-clock', Event count (approx.): 937128704
+>  96.44%  [kernel]            [k] cpuidle_enter_state
+>   0.19%  libc-2.15.so        [.] strstr
+>   0.16%  [kernel]            [k] kallsyms_expand_symbol.clone.0
+>   0.13%  [kernel]            [k] _raw_spin_unlock_irq
+
+[...]
+
+Are you saying that the profile you're seeing is radically different,
+rather than there being some formatting error that I can't spot? If so, that
+sounds really strange and I can't see how the patch you mention is to
+blame...
+
+If we want to persue this, I guess other obvious questions are: which kernel
+are you running? Does this affect multiple architectures (your diff only
+changes ARM)? What's the workload which you are profiling?
+
+Will
