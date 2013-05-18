@@ -1,41 +1,34 @@
-From: andy.chernyak@gmail.com (Andy Chernyak)
-Date: Sat, 18 May 2013 15:41:45 +0200
-Subject: [PATCH 4/4] fb: vt8500: Add VGA output support to wm8505fb driver.
-In-Reply-To: <CABjd4Yxrk3hXnB5f6u+1HcJjymDZbtQ1F1HXkZ2dzF3dwCrWhg@mail.gmail.com>
-References: <1368868514-18975-1-git-send-email-linux@prisktech.co.nz>
- <1368868514-18975-5-git-send-email-linux@prisktech.co.nz>
- <CABjd4Yxrk3hXnB5f6u+1HcJjymDZbtQ1F1HXkZ2dzF3dwCrWhg@mail.gmail.com>
-Message-ID: <51978519.7090907@gmail.com>
+From: nerv@dawncrow.de (=?ISO-8859-15?Q?Andr=E9_Hentschel?=)
+Date: Sat, 18 May 2013 17:02:25 +0200
+Subject: [PATCHv4] arm: Preserve the user r/w register TPIDRURW on context
+ switch and fork
+In-Reply-To: <518AA19B.2020209@dawncrow.de>
+References: <518AA19B.2020209@dawncrow.de>
+Message-ID: <51979801.7010903@dawncrow.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2013 03:28 PM, Alexey Charkov wrote:
-> 2013/5/18 Tony Prisk <linux@prisktech.co.nz>:
->
->>         /* Virtual buffer size */
->> @@ -167,7 +176,12 @@ static int wm8505fb_init_hw(struct fb_info *info)
->>
->>         /* black magic ;) */
->>         writel(0xf,                    fbi->regbase + REG_GOVRH_FHI);
->> -       writel(4,                      fbi->regbase + REG_GOVRH_DVO_SET);
->> +
->> +       if (fbi->interface == INTERFACE_VGA)
->> +               writel(0xe, fbi->regbase + REG_GOVRH_DVO_SET);
->> +       else
->> +               writel(4, fbi->regbase + REG_GOVRH_DVO_SET);
-> I don't remember if HDMI is yet another option for this register or
-> not... If it is, it would probably warrant defining fbi->interface as
-> an enum and changing this if-else into a switch statement to let the
-> compiler add its checks/warnings.
-HDMI output can work simultaneously with LCD (on 8850 at least), which
-fbi->interface in its current form would not allow to express.
+Am 08.05.2013 21:03, schrieb Andr? Hentschel:
+> From: =?UTF-8?q?Andr=C3=A9=20Hentschel?= <nerv@dawncrow.de>
+> 
+> Since commit 6a1c53124aa1 the user writeable TLS register was zeroed to
+> prevent it from being used as a covert channel between two tasks.
+> 
+> There are more and more applications coming to WinRT, Wine could support them,
+> but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
+> 
+> This patch preserves that register per thread instead of clearing it.
+> Unlike the TPIDRURO, which is already switched, the TPIDRURW
+> can be updated from userspace so needs careful treatment in the case that we
+> modify TPIDRURW and call fork(). To avoid this we must always read
+> TPIDRURW in copy_thread.
+> 
+> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com> 
+> 
 
-> +       if (fbi->interface == INTERFACE_VGA)
-> +               writel(h_sync,  fbi->regbase + REG_GOVRH_VGA_HSYNW);
-> Will it misbehave on LCD if you write to the VGA register unconditionally?
->
-Can we have 3 flags, something like LCD_ON, VGA_ON, HDMI_ON instead of
-enum for video interface selection?
-
-Regards,
-Andy.
+Hi,
+I'm not yet very familiar with the development process here,
+am i getting no feedback on v4 because of the mergewindow being closed?
+Or is there another reason? Sry for being impatient.
