@@ -1,65 +1,402 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Sat, 18 May 2013 19:01:58 +0200
-Subject: ARM: 3.10-rc1 does not boot anymore on OpenBlocks AX3
-Message-ID: <20130518170158.GB1936@1wt.eu>
+From: oliver+list@schinagl.nl (Oliver Schinagl)
+Date: Sat, 18 May 2013 19:19:43 +0200
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <51969EA9.1060602@free-electrons.com>
+References: <1368797744-13737-1-git-send-email-oliver+list@schinagl.nl>
+ <1368797744-13737-2-git-send-email-oliver+list@schinagl.nl>
+ <51969EA9.1060602@free-electrons.com>
+Message-ID: <5197B82F.8010809@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On 05/17/13 23:18, Maxime Ripard wrote:
+> Hi Oliver,
+>
+> Le 17/05/2013 15:35, Oliver Schinagl a ?crit :
+>> From: Oliver Schinagl <oliver@schinagl.nl>
+>>
+>> Allwinner has electric fuses (efuse) on their line of chips. This driver
+>> reads those fuses and exports them as a sysfs node. Also a symbol is exported
+>> for in-kernel useage.
+>>
+>> While initially these fuses are used to somewhat determin the chipID, these
+>> appear to be writeable by the user and thus can be used for other purpouses.
+>> For example storing a 128 bit root key, a unique serial number, which could
+>> then even be used as a MAC address.
+>>
+>> Because writing to e-fuses can be potentially dangerous, and are certainly
+>> not as often writable (if at all) as flash memory, these shouldn't be easily
+>> changeable, hence only a read-only mode. An offline tool to write the fuses
+>> is in the works.
+>>
+>> Currently supported are the following known chips:
+>> Allwinner sun4i (A10)
+>> Allwinner sun5i (A10s A13)
+>> Allwinner sun6i (A31, A31s)
+>> Allwinner sun7i (A20)
+>
+> Since I don't think those patches have been tested on sun6i/sun7i, and
+> that there's not even kernel support for those, maybe it's not worth
+> mentionning them?
+A31 is out in the wild, but haven't seen that functionality in, I have 
+seen the register named and defined, just not used, so that could go 
+until confirmed.
 
-I wanted to give a try to your marvell-pcie-v10-and-seb-clks branch on
-my AX3 and got the following error, which I also got after switching
-back to plain 3.10-rc1 :
+A20 has the same feature as we can see in the dumped sources. [0]
 
-Uncompressing Linux... done, booting the kernel.
-Booting Linux on physical CPU 0x0
-Linux version 3.10.0-rc-mvebu (willy at pcw) (gcc version 4.7.3 20130205 (prerelease) (crosstool-NG 1.18.0) ) #6 SMP Sat May 18 17:40:55 CEST 2013
-CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7), cr=10c53c7d
-CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-Machine: Marvell Armada 370/XP (Device Tree), model: PlatHome OpenBlocks AX3-4 board
-bootconsole [earlycon0] enabled
-INITRD: 0x07000040+0x00a5c000 is not a memory region - disabling initrd
-Memory policy: ECC disabled, Data cache writealloc
-Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
 
-Finally I bisected this to the following patch :
+>
+>>
+>> Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
+>> ---
+>>   drivers/misc/eeprom/Kconfig     |  19 ++++
+>>   drivers/misc/eeprom/Makefile    |   1 +
+>>   drivers/misc/eeprom/sunxi_sid.c | 218 ++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 238 insertions(+)
+>>   create mode 100644 drivers/misc/eeprom/sunxi_sid.c
+>>
+>> diff --git a/drivers/misc/eeprom/Kconfig b/drivers/misc/eeprom/Kconfig
+>> index 04f2e1f..c9ddda5 100644
+>> --- a/drivers/misc/eeprom/Kconfig
+>> +++ b/drivers/misc/eeprom/Kconfig
+>> @@ -96,4 +96,23 @@ config EEPROM_DIGSY_MTC_CFG
+>>
+>>   	  If unsure, say N.
+>>
+>> +config EEPROM_SUNXI_SID
+>> +	tristate "Allwinner sunxi security ID support"
+>> +	depends on ARCH_SUNXI && SYSFS
+>> +	help
+>> +	  This is a driver for the 'security ID' available on various Allwinner
+>> +	  devices. Currently supported are:
+>> +		sun4i (A10)
+>> +		sun5i (A10s, A12, A13)
+>> +		sun6i (A31)
+>> +		sun7i (A20)
+>
+> Same things here.
+>
+>> +
+>> +	  Due to the potential risks involved with changing e-fuses,
+>> +	  this driver is read-only
+>> +
+>> +	  For more information visit http://linux-sunxi.org/SID
+>> +
+>> +	  This driver can also be built as a module. If so, the module
+>> +	  will be called sunxi_sid.
+>> +
+>>   endmenu
+>> diff --git a/drivers/misc/eeprom/Makefile b/drivers/misc/eeprom/Makefile
+>> index fc1e81d..9507aec 100644
+>> --- a/drivers/misc/eeprom/Makefile
+>> +++ b/drivers/misc/eeprom/Makefile
+>> @@ -4,4 +4,5 @@ obj-$(CONFIG_EEPROM_LEGACY)	+= eeprom.o
+>>   obj-$(CONFIG_EEPROM_MAX6875)	+= max6875.o
+>>   obj-$(CONFIG_EEPROM_93CX6)	+= eeprom_93cx6.o
+>>   obj-$(CONFIG_EEPROM_93XX46)	+= eeprom_93xx46.o
+>> +obj-$(CONFIG_EEPROM_SUNXI_SID)	+= sunxi_sid.o
+>>   obj-$(CONFIG_EEPROM_DIGSY_MTC_CFG) += digsy_mtc_eeprom.o
+>> diff --git a/drivers/misc/eeprom/sunxi_sid.c b/drivers/misc/eeprom/sunxi_sid.c
+>> new file mode 100644
+>> index 0000000..953f137
+>> --- /dev/null
+>> +++ b/drivers/misc/eeprom/sunxi_sid.c
+>> @@ -0,0 +1,218 @@
+>> +/*
+>> + * Copyright (c) 2013 Oliver Schinagl
+>> + * http://www.linux-sunxi.org
+>> + *
+>> + * Oliver Schinagl <oliver@schinagl.nl>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * This driver exposes the Allwinner security ID, a 128 bit eeprom, in chunks
+>> + * of 8 bytes.
+>
+> 16 bytes or 8 bits? because 8 bytes != 128 bits.
+fixed, it was late when I wrote that :( It is indeed 8 bits, e.g. byte 
+sized chunks.
 
-  commit 74898364e717c6bd939bb88d95049fc91d2b4950
-  Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
-  Date:   Fri Apr 12 16:29:10 2013 +0200
+>
+>> + */
+>> +
+>> +#include <linux/compiler.h>
+>> +#include <linux/device.h>
+>> +#include <linux/errno.h>
+>> +#include <linux/export.h>
+>> +#include <linux/fs.h>
+>> +#include <linux/init.h>
+>> +#include <linux/io.h>
+>> +#include <linux/kobject.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/stat.h>
+>> +#include <linux/sysfs.h>
+>> +#include <linux/types.h>
+>> +
+>> +
+>> +#define DRV_NAME "sunxi-sid"
+>> +#define DRV_VERSION "1.0"
+>> +
+>> +/* Register offsets */
+>> +#define SUNXI_SID_KEY0 0x00
+>> +#define SUNXI_SID_KEY1 0x04
+>> +#define SUNXI_SID_KEY2 0x08
+>> +#define SUNXI_SID_KEY3 0x0c
+>> +
+>> +/* There are 4 32-bit keys */
+>> +#define SUNXI_SID_KEYS 4
+>> +/* and 4 32-bit keys per 32-bit key */
+>
+> The comment is wrong here.
+Same as above, corrected.
 
-    ARM: dts: mvebu: Convert mvebu device tree files to 64 bits
-    
-    In order to be able to use more than 4GB of RAM when the LPAE is
-    activated, the dts must be converted in 64 bits.
-    
-    Only Armada XP is LPAE capable, but as it shares a common dtsi file
-    with Armada 370, then the common file include the skeleton64. Thanks
-    to the use of the overload capability of the device tree format,
-    armada-370 include the 32 bit skeleton and all the armada 370 based
-    dts can remain the same.
-    
-    This was heavily based on the work of Lior Amsalem.
-    
-    Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+>
+>> +#define SUNXI_SID_SIZE (SUNXI_SID_KEYS * 4)
+>> +
+>> +#if (SUNXI_SID_SIZE > PAGE_SIZE)
+>> +#error "SUNXI_SID_SIZE is larger then the target's PAGE_SIZE, ENOMEM."
+>> +#endif
+>
+> Hmmmm, I don't follow you here, what's the relation between your driver
+> and PAGE_SIZE?
+Nothing, I thought there was, but isn't. removed.
+>
+>> +
+>> +static u8 keys_lut[] = {
+>> +	SUNXI_SID_KEY0,
+>> +	SUNXI_SID_KEY1,
+>> +	SUNXI_SID_KEY2,
+>> +	SUNXI_SID_KEY3,
+>> +};
+>> +
+>> +struct sid_priv {
+>> +	void __iomem *sid_base;
+>> +};
+>> +
+>> +struct sid_priv *p;
+>
+> What's the point of having a structure here? And why putting a global
+> value, !static, with a generic name, while you could have an
+> instance-specific one?
+Forgot the static keyword, and the struct kept on shrinking until only 
+the base address was left. I guess memory wise it shouldn't make a 
+difference, but the compiler also doesn't agree, so gone it is :)
+>
+> struct file has a private_data field, use it.
+But since we don't 'open' it, we can't use that, as we talked on IRC.
 
-I'm used to boot my kernel and initrd from the network this way :
+>
+>> +
+>> +
+>> +/* We read the entire key, using a look up table. Returned is only the
+>> + * requested byte. This is of course slower then it could be and uses 4 times
+>> + * more reads as needed but keeps code a little simpler.
+>> + */
+>> +u8 sunxi_sid_read_byte(const int key)
+>> +{
+>> +	u32 sid_key;
+>> +	u8 ret;
+>> +
+>> +	ret = 0;
+>> +	if (likely((key <= SUNXI_SID_SIZE))) {
+>> +		sid_key = ioread32(p->sid_base + keys_lut[key >> 2]);
+>> +		switch (key % 4) {
+>> +		case 0:
+>> +			ret = (sid_key >> 24) & 0xff;
+>> +			break;
+>> +		case 1:
+>> +			ret = (sid_key >> 16) & 0xff;
+>> +			break;
+>> +		case 2:
+>> +			ret = (sid_key >> 8) & 0xff;
+>> +			break;
+>> +		case 3:
+>> +			ret = sid_key & 0xff;
+>> +			break;
+>> +		}
+>> +	}
+>
+> Come on, you can do better. This lookup table is useless.
+I didn't want to depend on the fixed layout of memory, but consider it 
+removed.
+>
+> Also, why the first key is the one with the MSBs?
+> I'd expect that the key 0 is the one holding the LSBs.
+Strangely enough, they have swapped the MSB and LSB bytes. I double 
+checked it with u-boot and yep, swapped. Though in the end, if we write 
+stuff there and we read stuff from there, order doesn't matter? So what 
+do we prefer. Have it so that it makes sense and ignore how u-boot reads 
+it, or correct it and be consistent?
 
-  tftpboot 0x7000000 uInitrd4
-  tftpboot 0x6400000 uImage-ax3.dtb
-  bootm 0x6400000 0x7000000
+>
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static ssize_t sid_read(struct file *fd, struct kobject *kobj,
+>> +			struct bin_attribute *attr, char *buf,
+>> +			loff_t pos, size_t size)
+>> +{
+>> +	ssize_t ret;
+>> +	struct device *dev;
+>> +	struct sid_priv *priv;
+>> +	int i;
+>> +
+>> +	ret = -EPERM;
+>> +	dev = kobj_to_dev(kobj);
+>> +	priv = dev_get_drvdata(dev);
+>> +
+>> +	if ((likely(size > 0)) && ((size + pos) <= SUNXI_SID_SIZE)) {
+>> +		for (i = 0; i < size; i++) {
+>> +			buf[i] = sunxi_sid_read_byte(pos + i);
+>> +		}
+>> +		if (i < PAGE_SIZE) {
+>> +			buf[i] = '\0';
+>> +			ret = (ssize_t)size;
+>> +		} else {
+>> +			ret = -ENOMEM;
+>> +		}
+>
+> Hmmmm, what? Why returning \0 here? It's not a string, it's binary data.
+> What's the relation with PAGE_SIZE again?
+I thought that buf is at most PAGE_SIZE large [1] "sysfs allocates a 
+buffer of size (PAGE_SIZE) and passes it to the method."
+>
+> Just return the number of bytes read, that's it.
+Yes, had forgotten that this was of course the binary read function and 
+not the text version. So yeah, in the binary case, gone.
+>
+>> +	} else {
+>> +		buf[0] = '\0';
+>> +		ret = 0;
+>> +	}
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static struct of_device_id sid_of_match[] = {
+>> +	{
+>> +		.compatible = "allwinner,sun4i-sid",
+>> +	},
+>> +	{/* sentinel */}
+>> +};
+>> +MODULE_DEVICE_TABLE(of, sid_of_match);
+>> +
+>> +static struct bin_attribute sid_bin_attr = {
+>> +	.attr = {
+>> +		.name = "key",
+>> +		.mode = S_IRUGO,
+>> +	},
+>> +	.size = SUNXI_SID_SIZE,
+>> +	.read = sid_read,
+>> +};
+>> +
+>> +static int sid_remove(struct platform_device *pdev)
+>> +{
+>> +	struct device *dev = &pdev->dev;
+>> +	struct sid_priv *priv;
+>> +
+>> +	priv = dev_get_drvdata(dev);
+>> +	device_remove_bin_file(dev, &sid_bin_attr);
+>> +	iounmap(priv->sid_base);
+>> +	devm_kfree(dev, priv);
+>> +	return 0;
+>> +}
+>> +
+>> +static int __init sid_probe(struct platform_device *pdev)
+>> +{
+>> +	int ret;
+>> +	struct device *dev = &pdev->dev;
+>> +	struct sid_priv *priv;
+>> +
+>> +	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+>> +	p = priv;
+>> +
+>> +	dev_set_drvdata(dev, priv);
+>> +
+>> +	if (!priv) {
+>> +		dev_err(dev, "Unable to allocate device private data\n");
+>> +		ret = -ENOMEM;
+>> +		goto exit;
+>> +	}
+>
+> Isn't it a bit weird to check for the memory allocation after using the
+Yes, more 'oops'. Re-arranged.
+> variable. Also, you don't really need the dev_err, since if the kernel
+> fails to allocate some memory, it will tell you anyway.
+I had it there mostly for consistency, the other 2 did the same check. 
+Initially I had 5 functions here, but you corrected me on that :)
 
-So the address reported above clearly is the one of the initrd, and
-the reported size seems to match my initrd's size (10 MB). I tried
-to load at a lower address but it did not change anything. I bisected
-using mvebu_defconfig.
+>
+>> +	priv->sid_base = of_iomap(dev->of_node, 0);
+>> +	if (!priv->sid_base) {
+>> +		dev_err(dev, "Unable to map memory region\n");
+>> +		ret = -ENOMEM;
+>> +		goto exit_free;
+>> +	}
+>> +
+>> +	ret = device_create_bin_file(dev, &sid_bin_attr);
+>> +	if (ret) {
+>> +		dev_err(dev, "Unable to create sysfs bin entry\n");
+>> +		goto exit_unmap;
+>> +	}
+>
+> Hmmm, maybe it's not worth all these gotos just for an iounmap, I'd
+> probably return right away, but that's your call.
+I saw a lot of drivers do the goto: dance in init/probe/exit/remove 
+functions, I don't think the overhead here would be so bad?
+>
+>> +	dev_info(dev, "Sunxi security ID driver loaded successfully.\n");
+>> +
+>> +	return 0;
+>> +
+>> +
+>> +exit_unmap:
+>> +	iounmap(priv->sid_base);
+>> +exit_free:
+>> +	devm_kfree(dev, priv);
+>> +exit:
+>> +	return ret;
+>> +}
+>> +
+>> +static struct platform_driver sid_driver = {
+>> +	.probe = sid_probe,
+>> +	.remove = sid_remove,
+>> +	.driver = {
+>> +		.name = DRV_NAME,
+>> +		.owner = THIS_MODULE,
+>> +		.of_match_table = sid_of_match,
+>> +	},
+>> +};
+>> +module_platform_driver(sid_driver);
+>> +
+>> +
+>> +MODULE_AUTHOR("Oliver Schinagl <oliver@schinagl.nl>");
+>> +MODULE_DESCRIPTION("Allwinner sunxi security id driver");
+>> +MODULE_VERSION(DRV_VERSION);
+>> +MODULE_LICENSE("GPL");
+>>
+>
+> Thanks for this driver!
+> Maxime
+>
+You are welcome! :D While awaiting more feedback, i've pushed the 
+current version to my github [2].
 
-My AX3 has 3 GB of RAM if that can make a difference (I still have
-not found a 4GB DDR3 module to experiment with). Do you have any idea
-of what causes the issue, or do you want me to run more tests ? I can
-even open it and remove the 2GB DDR3 module if that can help diagnose
-the issue.
+Oliver
 
-Thanks,
-Willy
+[0] 
+https://github.com/amery/linux-allwinner/blob/lichee-3.3/sun7i-dev/arch/arm/mach-sun7i/security_id.c#L91
+[1] https://www.kernel.org/doc/Documentation/filesystems/sysfs.txt
+[2] 
+https://github.com/oliv3r/linux/blob/wip/sunxi-security-id/drivers/misc/eeprom/sunxi_sid.c
