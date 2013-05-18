@@ -1,47 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 18 May 2013 21:46:56 +0100
-Subject: [RFC 3/4] DRM: add OF support for Dove DRM driver
-In-Reply-To: <20130518194502.102caa9e@armhf>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 18 May 2013 22:50:40 +0200
+Subject: [RFC 4/4] DRM: tda998x: add missing include
+In-Reply-To: <20130518202604.GM18614@n2100.arm.linux.org.uk>
 References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
  <1368897139-25485-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1368897139-25485-4-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130518194502.102caa9e@armhf>
-Message-ID: <20130518204655.GN18614@n2100.arm.linux.org.uk>
+ <1368897139-25485-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130518194644.2a02a4fc@armhf>
+ <CAF6AEGtx7RbvKEEc5uSFvz-2uveB1cnJNf_ESn6JYhfte5UmZQ@mail.gmail.com>
+ <20130518205845.2dfe9fe5@armhf> <5197D6C1.3060702@gmail.com>
+ <20130518202604.GM18614@n2100.arm.linux.org.uk>
+Message-ID: <5197E9A0.1020607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 18, 2013 at 07:45:02PM +0200, Jean-Francois Moine wrote:
-> It seems we are moving backwards:
-> - what about the display controller?
-> - how do you clone the lcd 0 output to the port B?
-> - what occurs when the si5351 and the tda998x are modules?
+On 05/18/2013 10:26 PM, Russell King - ARM Linux wrote:
+> On Sat, May 18, 2013 at 09:30:09PM +0200, Sebastian Hesselbarth wrote:
+>> The device for tda998x yes, but not the driver. Anyway, Russel decided
+>> to have tda998x probed by his drm_driver.
+>
+> For the simple reason that _that_ is how DRM slave encoders work.
+> Sometimes, reading the code of the subsystem you're using is well
+> worth the effort.
 
-I've no idea why you keep bringing that last point up.  I've already
-told you what happens when the SI5351 is a module.  It is already not
-a problem as I have already evidenced by my boot log.  So please get
-that and stop repeating this same point which I've already answered,
-or I will start ranting at you and we will have a massive falling out.
+I agree and add that the probing itself doesn't prevent you from using
+DT for tda driver at all. You can still have an marvell,external-slave
+property pointing to the phandle of tda node. With that you get the
+adapter and i2c slave address for what is currently called
+dove_tda19989.c and may become e.g. dove_ext_i2c.c. In tda998x_drv you
+find the node and get all properties for input config or interrupt
+gpio.
 
-As for cloning output to the VGA port, that's just a matter of dealing
-with the display controller.  That's _not_ difficult.
+I have done that in the drivers before, but DT node parsing here is
+_added_ to the driver as it can be used on other non-DT platforms as
+well.
 
-> My driver had the same layout as Russell's when I proposed it to you
-> and when you insisted to handle the 2 LCDs and the 2 ports as one card.
+>> The connection of Dove LCD and tda998x is _not_ Cubox specific, it is
+>> also on the D2Plug. To be precise, even "Dove LCD" is not Dove specific
+>> as you can find the very same controller on other Marvell SoCs with
+>> little differences.
+>
+> Well, to spoil the argument a little, actually, the interconnection
+> between the two is in no way "standardized".  There's many different
+> ways to wire the two chips together and have it work - because the
+> TDA998x chips have a set of input muxes and swaps which allow you to
+> connect the red, green, blue high/low nibbles in various ways and
+> still have a correctly working system.  The TDA998x connectivity is
+> _highly_ configuable.
+>
+> So, just because one board connects LCD_D0 (red bit 0) to a particular
+> pin on the TDA998x does not mean that another board does it that way
+> too.
+>
+> So Jean-Francois is quite correct that this data needs to be provided
+> by the board in some manner.  The question is - how to do that sensibly.
+>
+> One possible stop-gap solution is to provide a default set which just
+> happens to match the cubox, and allow OF to override it. :)
 
-This seems to be a misrepresentation.  So what you're saying is that
-your driver originally handled the two LCDs as two separate cards.
+While I agree, Rob may have a different view on that for tda998x ;)
 
-That is _not_ the same as my driver.  My driver handles the two LCDs
-as two separate CRTs of the same DRM device.  This allows X to drive
-the two CRTs together in any manner it desires depending on the
-capabilities of the "connectors" associated with each CRTC and the
-user preferences.
+>> There is so much to take care of like pixel format on lcd pins driving
+>> an external encoder (_not_ only tda998x), what gpio pin is connected to
+>> TDA interrupt line, one or two lcds, ...
+>
+> Luckily, drivers/gpu/drm/i2c/tda998x.c does not make use of the IRQ
+> signal at present - it's fairly basic and it currently operates by
+> polling.  Eventually, this could change of course. :)
 
-> I spent 2 months to have a nice design and you put it to garbage!
-> I am not happy...
+Again, that is in the driver Jean-Francois has available. Make sure irq
+handler runs in a separate thread from get_edid and hpd and you will
+be interrupted on hpd. Having said, that should finally lead to the
+slave encoder setting .connector_type and .polled as this is where you
+know it.
 
-Stop that right now.  If you want to start whinging about the amount of
-time you've spent on this, then I can tell you now that if you have only
-spent two months on this, you are a total newbie to this and your effort
-is utterly insignificant compared to mine.  And you *have* touched a
-nerve here by making that statement.
+Sebastian
