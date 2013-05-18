@@ -1,30 +1,38 @@
 From: gnurou@gmail.com (Alexandre Courbot)
-Date: Sat, 18 May 2013 18:17:46 +0900
-Subject: [PATCH] ARM: tegra: enable host1x support by default
-Message-ID: <1368868666-24754-1-git-send-email-acourbot@nvidia.com>
+Date: Sat, 18 May 2013 19:29:53 +0900
+Subject: [PATCH V2] video: implement a simple framebuffer driver
+In-Reply-To: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CAAVeFuJ5q4Y0QtvJX2iVmq_O2ofs1B9=MB_aA8VdcEBdM4zf2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tegra DRM support used to be enabled in the default Tegra configuration,
-but it now depends on CONFIG_TEGRA_HOST1X which is disabled by default.
-Enable CONFIG_TEGRA_HOST1X so that DRM support is compiled in again.
+On Thu, Apr 4, 2013 at 11:39 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> +struct simplefb_format {
+> +       const char *name;
+> +       u32 bits_per_pixel;
+> +       struct fb_bitfield red;
+> +       struct fb_bitfield green;
+> +       struct fb_bitfield blue;
+> +       struct fb_bitfield transp;
+> +};
+> +
+> +struct simplefb_format simplefb_formats[] = {
+> +       { "r5g6b5", 16, {11, 5}, {5, 6}, {0, 5}, {0, 0} },
+> +};
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
----
- arch/arm/configs/tegra_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+I have been adding a few extra formats to this list, and I wonder if
+this could not simply be turned into a function that would directly
+convert the name string into the corresponding right format. The
+mapping between name and format seems to be a 1:1 and this would
+probably avoid errors in the future. I'm especially thinking about
+color order here - I started adding a mode that reads
 
-diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-index a5f0485..dbf83db 100644
---- a/arch/arm/configs/tegra_defconfig
-+++ b/arch/arm/configs/tegra_defconfig
-@@ -153,6 +153,7 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_MEDIA_USB_SUPPORT=y
- CONFIG_USB_VIDEO_CLASS=m
- CONFIG_DRM=y
-+CONFIG_TEGRA_HOST1X=y
- CONFIG_DRM_TEGRA=y
- CONFIG_BACKLIGHT_LCD_SUPPORT=y
- # CONFIG_LCD_CLASS_DEVICE is not set
--- 
-1.8.2.3
+    { "r8g8b8a8", 32, {0, 8}, {8, 8}, {16, 8}, {24, 8} },
+
+while it should probably be called "a8b8g8r8" as the order of colors
+is not the same as your r5g6b5.
+
+I can submit a patch if there is no issue with that idea.
+
+Alex.
