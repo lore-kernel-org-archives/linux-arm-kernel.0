@@ -1,179 +1,126 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat, 18 May 2013 20:25:00 +0800
-Subject: [PATCH v4] ASoC: dfbmcs320: make the driver common for other BT
- modules
-Message-ID: <1368879900-28395-1-git-send-email-Baohua.Song@csr.com>
+From: alchark@gmail.com (Alexey Charkov)
+Date: Sat, 18 May 2013 17:28:54 +0400
+Subject: [PATCH 4/4] fb: vt8500: Add VGA output support to wm8505fb driver.
+In-Reply-To: <1368868514-18975-5-git-send-email-linux@prisktech.co.nz>
+References: <1368868514-18975-1-git-send-email-linux@prisktech.co.nz>
+ <1368868514-18975-5-git-send-email-linux@prisktech.co.nz>
+Message-ID: <CABjd4Yxrk3hXnB5f6u+1HcJjymDZbtQ1F1HXkZ2dzF3dwCrWhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DFBM-CS320 is only one of bluetooth modules using CSR bluetooth chips,
-we don't want everyone to have a seperate codec driver. anyway, the
-feature of Bluetooth SCO is same on all platforms, so this patch
-makes the DFBM-CS320 driver become a common BT SCO link driver.
+2013/5/18 Tony Prisk <linux@prisktech.co.nz>:
+> The APC8750 does not support an LCD panel, but provides a VGA connector.
+> This patch adds support for the VGA interface, and defines an optional
+> devicetree property to specify the output interface. The default if not
+> specified is LCD for backward compatibility.
+>
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
+>  .../devicetree/bindings/video/wm,wm8505-fb.txt     |    5 ++++
+>  drivers/video/wm8505fb.c                           |   31 ++++++++++++++++++--
+>  2 files changed, 34 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+> index 601416c..9f1d648 100644
+> --- a/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+> +++ b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+> @@ -7,6 +7,10 @@ Required properties:
+>  - bits-per-pixel : bit depth of framebuffer (16 or 32)
+>  - clocks : phandle to DVO clock
+>
+> +Optional properties:
+> +- output-interface : the interface the fb should output on. Valid values are
+> +       "lcd" or "vga". If not specified, the default is "lcd".
+> +
+>  Required subnodes:
+>  - display-timings: see display-timing.txt for information
+>
+> @@ -17,6 +21,7 @@ Example:
+>                 reg = <0xd8051700 0x200>;
+>                 bits-per-pixel = <16>;
+>                 clocks = <&clkdvo>;
+> +               output-interface = "vga";
+>
+>                 display-timings {
+>                         native-mode = <&timing0>;
+> diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
+> index f8bffc2..d1f7f33 100644
+> --- a/drivers/video/wm8505fb.c
+> +++ b/drivers/video/wm8505fb.c
+> @@ -130,12 +130,17 @@
+>
+>  #define to_wm8505fb_info(__info) container_of(__info, \
+>                                                 struct wm8505fb_info, fb)
+> +
+> +#define INTERFACE_LCD  1
+> +#define INTERFACE_VGA  2
+> +
+>  struct wm8505fb_info {
+>         struct fb_info fb;
+>         void __iomem *regbase;
+>         unsigned int contrast;
+>         struct device *dev;
+>         struct clk *clk_dvo;
+> +       int interface;
+>  };
+>
+>
+> @@ -158,7 +163,11 @@ static int wm8505fb_init_hw(struct fb_info *info)
+>          * 0x31C sets the correct color mode (RGB565) for WM8650
+>          * Bit 8+9 (0x300) are ignored on WM8505 as reserved
+>          */
+> -       writel(0x31c,                  fbi->regbase + REG_GOVRH_YUVRGB);
+> +       if (fbi->interface == INTERFACE_VGA)
+> +               writel(0x338, fbi->regbase + REG_GOVRH_YUVRGB);
+> +       else
+> +               writel(0x31c, fbi->regbase + REG_GOVRH_YUVRGB);
+> +
+>         writel(1,                      fbi->regbase + REG_GOVRH_DVO_PIX);
 
-Cc: Graeme Gregory <graeme@openmoko.org>
-Cc: Lars-Peter Clausen <lars@metafoo.de>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- v4:
- change "select SND_SOC_DFBMCS320" to "select SND_SOC_BT_SCO" for OpenMOKO user
- as v3 missed this
+Tony,
 
- sound/soc/codecs/Kconfig                   |  4 ++--
- sound/soc/codecs/Makefile                  |  4 ++--
- sound/soc/codecs/{dfbmcs320.c => bt-sco.c} | 37 +++++++++++++++++++-----------
- sound/soc/samsung/Kconfig                  |  2 +-
- sound/soc/samsung/neo1973_wm8753.c         |  2 +-
- 5 files changed, 29 insertions(+), 20 deletions(-)
- rename sound/soc/codecs/{dfbmcs320.c => bt-sco.c} (53%)
+Would it be possible to also define known bit offsets for those
+registers, while you are at this? It would probably reduce the black
+magic quite a bit :)
 
-diff --git a/sound/soc/codecs/Kconfig b/sound/soc/codecs/Kconfig
-index d8c4f3d..386292d 100644
---- a/sound/soc/codecs/Kconfig
-+++ b/sound/soc/codecs/Kconfig
-@@ -40,7 +40,7 @@ config SND_SOC_ALL_CODECS
- 	select SND_SOC_DA7213 if I2C
- 	select SND_SOC_DA732X if I2C
- 	select SND_SOC_DA9055 if I2C
--	select SND_SOC_DFBMCS320
-+	select SND_SOC_BT_SCO
- 	select SND_SOC_ISABELLE if I2C
- 	select SND_SOC_JZ4740_CODEC
- 	select SND_SOC_LM4857 if I2C
-@@ -263,7 +263,7 @@ config SND_SOC_DA732X
- config SND_SOC_DA9055
- 	tristate
- 
--config SND_SOC_DFBMCS320
-+config SND_SOC_BT_SCO
- 	tristate
- 
- config SND_SOC_DMIC
-diff --git a/sound/soc/codecs/Makefile b/sound/soc/codecs/Makefile
-index 49ff127..82aa34e 100644
---- a/sound/soc/codecs/Makefile
-+++ b/sound/soc/codecs/Makefile
-@@ -27,7 +27,7 @@ snd-soc-da7210-objs := da7210.o
- snd-soc-da7213-objs := da7213.o
- snd-soc-da732x-objs := da732x.o
- snd-soc-da9055-objs := da9055.o
--snd-soc-dfbmcs320-objs := dfbmcs320.o
-+snd-soc-bt-sco-objs := bt-sco.o
- snd-soc-dmic-objs := dmic.o
- snd-soc-isabelle-objs := isabelle.o
- snd-soc-jz4740-codec-objs := jz4740.o
-@@ -154,7 +154,7 @@ obj-$(CONFIG_SND_SOC_DA7210)	+= snd-soc-da7210.o
- obj-$(CONFIG_SND_SOC_DA7213)	+= snd-soc-da7213.o
- obj-$(CONFIG_SND_SOC_DA732X)	+= snd-soc-da732x.o
- obj-$(CONFIG_SND_SOC_DA9055)	+= snd-soc-da9055.o
--obj-$(CONFIG_SND_SOC_DFBMCS320)	+= snd-soc-dfbmcs320.o
-+obj-$(CONFIG_SND_SOC_BT_SCO)	+= snd-soc-bt-sco.o
- obj-$(CONFIG_SND_SOC_DMIC)	+= snd-soc-dmic.o
- obj-$(CONFIG_SND_SOC_ISABELLE)	+= snd-soc-isabelle.o
- obj-$(CONFIG_SND_SOC_JZ4740_CODEC)	+= snd-soc-jz4740-codec.o
-diff --git a/sound/soc/codecs/dfbmcs320.c b/sound/soc/codecs/bt-sco.c
-similarity index 53%
-rename from sound/soc/codecs/dfbmcs320.c
-rename to sound/soc/codecs/bt-sco.c
-index 4f4f7f4..a081d9f 100644
---- a/sound/soc/codecs/dfbmcs320.c
-+++ b/sound/soc/codecs/bt-sco.c
-@@ -1,5 +1,5 @@
- /*
-- * Driver for the DFBM-CS320 bluetooth module
-+ * Driver for generic Bluetooth SCO link
-  * Copyright 2011 Lars-Peter Clausen <lars@metafoo.de>
-  *
-  *  This program is free software; you can redistribute  it and/or modify it
-@@ -15,8 +15,8 @@
- 
- #include <sound/soc.h>
- 
--static struct snd_soc_dai_driver dfbmcs320_dai = {
--	.name = "dfbmcs320-pcm",
-+static struct snd_soc_dai_driver bt_sco_dai = {
-+	.name = "bt-sco-pcm",
- 	.playback = {
- 		.channels_min = 1,
- 		.channels_max = 1,
-@@ -31,32 +31,41 @@ static struct snd_soc_dai_driver dfbmcs320_dai = {
- 	},
- };
- 
--static struct snd_soc_codec_driver soc_codec_dev_dfbmcs320;
-+static struct snd_soc_codec_driver soc_codec_dev_bt_sco;
- 
--static int dfbmcs320_probe(struct platform_device *pdev)
-+static int bt_sco_probe(struct platform_device *pdev)
- {
--	return snd_soc_register_codec(&pdev->dev, &soc_codec_dev_dfbmcs320,
--			&dfbmcs320_dai, 1);
-+	return snd_soc_register_codec(&pdev->dev, &soc_codec_dev_bt_sco,
-+			&bt_sco_dai, 1);
- }
- 
--static int dfbmcs320_remove(struct platform_device *pdev)
-+static int bt_sco_remove(struct platform_device *pdev)
- {
- 	snd_soc_unregister_codec(&pdev->dev);
- 
- 	return 0;
- }
- 
--static struct platform_driver dfmcs320_driver = {
-+static struct platform_device_id bt_sco_driver_ids[] = {
-+	{
-+		.name		= "dfbmcs320",
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(platform, bt_sco_driver_ids);
-+
-+static struct platform_driver bt_sco_driver = {
- 	.driver = {
--		.name = "dfbmcs320",
-+		.name = "bt-sco",
- 		.owner = THIS_MODULE,
- 	},
--	.probe = dfbmcs320_probe,
--	.remove = dfbmcs320_remove,
-+	.probe = bt_sco_probe,
-+	.remove = bt_sco_remove,
-+	.id_table = bt_sco_driver_ids,
- };
- 
--module_platform_driver(dfmcs320_driver);
-+module_platform_driver(bt_sco_driver);
- 
- MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>");
--MODULE_DESCRIPTION("ASoC DFBM-CS320 bluethooth module driver");
-+MODULE_DESCRIPTION("ASoC generic bluethooth sco link driver");
- MODULE_LICENSE("GPL");
-diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
-index 475fb0d..ae0ea87 100644
---- a/sound/soc/samsung/Kconfig
-+++ b/sound/soc/samsung/Kconfig
-@@ -39,7 +39,7 @@ config SND_SOC_SAMSUNG_NEO1973_WM8753
- 	depends on SND_SOC_SAMSUNG && MACH_NEO1973_GTA02
- 	select SND_S3C24XX_I2S
- 	select SND_SOC_WM8753
--	select SND_SOC_DFBMCS320
-+	select SND_SOC_SCO
- 	help
- 	  Say Y here to enable audio support for the Openmoko Neo1973
- 	  Smartphones.
-diff --git a/sound/soc/samsung/neo1973_wm8753.c b/sound/soc/samsung/neo1973_wm8753.c
-index e591c38..807db41 100644
---- a/sound/soc/samsung/neo1973_wm8753.c
-+++ b/sound/soc/samsung/neo1973_wm8753.c
-@@ -373,7 +373,7 @@ static struct snd_soc_dai_link neo1973_dai[] = {
- { /* Voice via BT */
- 	.name = "Bluetooth",
- 	.stream_name = "Voice",
--	.cpu_dai_name = "dfbmcs320-pcm",
-+	.cpu_dai_name = "bt-sco-pcm",
- 	.codec_dai_name = "wm8753-voice",
- 	.codec_name = "wm8753.0-001a",
- 	.ops = &neo1973_voice_ops,
--- 
-1.8.2.3
+>         /* Virtual buffer size */
+> @@ -167,7 +176,12 @@ static int wm8505fb_init_hw(struct fb_info *info)
+>
+>         /* black magic ;) */
+>         writel(0xf,                    fbi->regbase + REG_GOVRH_FHI);
+> -       writel(4,                      fbi->regbase + REG_GOVRH_DVO_SET);
+> +
+> +       if (fbi->interface == INTERFACE_VGA)
+> +               writel(0xe, fbi->regbase + REG_GOVRH_DVO_SET);
+> +       else
+> +               writel(4, fbi->regbase + REG_GOVRH_DVO_SET);
+
+I don't remember if HDMI is yet another option for this register or
+not... If it is, it would probably warrant defining fbi->interface as
+an enum and changing this if-else into a switch statement to let the
+compiler add its checks/warnings.
+
+>         writel(1,                      fbi->regbase + REG_GOVRH_MIF);
+>         writel(1,                      fbi->regbase + REG_GOVRH_REG_STS);
+>
+> @@ -194,11 +208,15 @@ static int wm8505fb_set_timing(struct fb_info *info)
+>         writel(h_end,   fbi->regbase + REG_GOVRH_ACTPX_END);
+>         writel(h_all,   fbi->regbase + REG_GOVRH_H_ALLPXL);
+>         writel(h_sync,  fbi->regbase + REG_GOVRH_HDMI_HSYNW);
+> +       if (fbi->interface == INTERFACE_VGA)
+> +               writel(h_sync,  fbi->regbase + REG_GOVRH_VGA_HSYNW);
+
+Will it misbehave on LCD if you write to the VGA register unconditionally?
+
+>         writel(v_start, fbi->regbase + REG_GOVRH_ACTLN_BG);
+>         writel(v_end,   fbi->regbase + REG_GOVRH_ACTLN_END);
+>         writel(v_all,   fbi->regbase + REG_GOVRH_V_ALLLN);
+>         writel(v_sync,  fbi->regbase + REG_GOVRH_HDMI_VBISW);
+> +       if (fbi->interface == INTERFACE_VGA)
+> +               writel(info->var.pixclock,  fbi->regbase + REG_GOVRH_VGA_VSYNW);
+
+Same here. I would assume that setting the pixclock should not hurt
+LCD, which would then simplify the code a little.
+
+Thanks,
+Alexey
