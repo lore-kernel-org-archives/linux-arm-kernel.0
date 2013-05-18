@@ -1,46 +1,161 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 19 May 2013 00:56:30 +0200
-Subject: [PATCH] of: irq: Pass trigger type in IRQ resource flags
-Message-ID: <1368917790-23770-1-git-send-email-tomasz.figa@gmail.com>
+Date: Sun, 19 May 2013 01:03:14 +0200
+Subject: [PATCH] net: dm9000: Allow instantiation using device tree
+Message-ID: <1368918194-24030-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some drivers might rely on availability of trigger flags in IRQ
-resource, for example to configure the hardware for particular interrupt
-type. However current code creating IRQ resources from data in device
-tree does not configure trigger flags in resulting resources.
-
-This patch solves the problem, based on the fact that
-irq_of_parse_and_map() configures the trigger based on DT interrupt
-specifier, IRQD_TRIGGER_* flags are consistent with IORESOURCE_IRQ_*,
-and we can get trigger type by calling irqd_get_trigger_type() after
-mapping the interrupt.
+This patch adds Device Tree support to dm9000 driver.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- drivers/of/irq.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ .../devicetree/bindings/net/davicom-dm9000.txt     | 27 ++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ drivers/net/ethernet/davicom/dm9000.c              | 60 ++++++++++++++++++++++
+ 3 files changed, 88 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/davicom-dm9000.txt
 
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index a3c1c5a..79a7a26 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -355,6 +355,16 @@ int of_irq_to_resource(struct device_node *dev, int index, struct resource *r)
- 		r->start = r->end = irq;
- 		r->flags = IORESOURCE_IRQ;
- 		r->name = name ? name : dev->full_name;
+diff --git a/Documentation/devicetree/bindings/net/davicom-dm9000.txt b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
+new file mode 100644
+index 0000000..d2902db
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
+@@ -0,0 +1,27 @@
++Davicom DM9000 Fast Ethernet controller
 +
-+		/*
-+		 * Some drivers might rely on availability of trigger flags
-+		 * in IRQ resource. Since irq_of_parse_and_map() configures the
-+		 * trigger based on interrupt specifier and IRQD_TRIGGER_*
-+		 * flags are consistent with IORESOURCE_IRQ_*, we can get
-+		 * trigger type that was just set and pass it through resource
-+		 * flags as well.
-+		 */
-+		r->flags |= irqd_get_trigger_type(irq_get_irq_data(irq));
- 	}
++Required properties:
++- compatible = "davicom,dm9000";
++- reg : physical addresses and sizes of registers, must contain 2 entries:
++    first entry : address register,
++    second entry : address register.
++- interrupt-parent : interrupt controller to which the device is connected
++- interrupts : interrupt specifier specific to interrupt controller
++
++Optional properties:
++- local-mac-address : A bytestring of 6 bytes specifying Ethernet MAC address
++    to use (from firmware or bootloader)
++- davicom,no-eeprom : Configuration EEPROM is not available
++- davicom,ext-phy : Use external PHY
++- davicom,simple-phy : Use NSR to find LinkStatus
++
++Example:
++
++	ethernet at 18000000 {
++		compatible = "davicom,dm9000";
++		reg = <0x18000000 0x2 0x18000004 0x2>;
++		interrupt-parent = <&gpn>;
++		interrupts = <7 4>;
++		local-mac-address = [00 00 de ad be ef];
++		davicom,no-eeprom;
++	};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 6931c43..2fe74e6 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -18,6 +18,7 @@ chrp	Common Hardware Reference Platform
+ cirrus	Cirrus Logic, Inc.
+ cortina	Cortina Systems, Inc.
+ dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
++davicom	DAVICOM Semiconductor, Inc.
+ denx	Denx Software Engineering
+ emmicro	EM Microelectronic
+ epson	Seiko Epson Corp.
+diff --git a/drivers/net/ethernet/davicom/dm9000.c b/drivers/net/ethernet/davicom/dm9000.c
+index 9105465..6c91708 100644
+--- a/drivers/net/ethernet/davicom/dm9000.c
++++ b/drivers/net/ethernet/davicom/dm9000.c
+@@ -29,6 +29,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/crc32.h>
+ #include <linux/mii.h>
++#include <linux/of.h>
+ #include <linux/ethtool.h>
+ #include <linux/dm9000.h>
+ #include <linux/delay.h>
+@@ -1358,6 +1359,50 @@ static const struct net_device_ops dm9000_netdev_ops = {
+ #endif
+ };
  
- 	return irq;
++#ifdef CONFIG_OF
++static struct dm9000_plat_data *dm9000_parse_dt(struct device *dev)
++{
++	struct dm9000_plat_data *pdata;
++	struct device_node *np = dev->of_node;
++	const void *prop;
++	int len;
++
++	if (!np)
++		return NULL;
++
++	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata) {
++		dev_err(dev, "failed to allocate platform data struct\n");
++		return ERR_PTR(-ENOMEM);
++	}
++
++	if (of_find_property(np, "davicom,ext-phy", NULL))
++		pdata->flags |= DM9000_PLATF_EXT_PHY;
++	if (of_find_property(np, "davicom,no-eeprom", NULL))
++		pdata->flags |= DM9000_PLATF_NO_EEPROM;
++	if (of_find_property(np, "davicom,simple-phy", NULL))
++		pdata->flags |= DM9000_PLATF_SIMPLE_PHY;
++
++	prop = of_get_property(np, "local-mac-address", &len);
++	if (!prop)
++		return pdata;
++
++	if (len < sizeof(pdata->dev_addr)) {
++		dev_err(dev, "invalid length of local-mac-address property\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	memcpy(pdata->dev_addr, prop, sizeof(pdata->dev_addr));
++
++	return pdata;
++}
++#else
++static struct dm9000_plat_data *dm9000_parse_dt(struct device *unused)
++{
++	return NULL;
++}
++#endif
++
+ /*
+  * Search DM9000 board, allocate space and register it
+  */
+@@ -1373,6 +1418,12 @@ dm9000_probe(struct platform_device *pdev)
+ 	int i;
+ 	u32 id_val;
+ 
++	if (!pdata) {
++		pdata = dm9000_parse_dt(&pdev->dev);
++		if (IS_ERR(pdata))
++			return PTR_ERR(pdata);
++	}
++
+ 	/* Init network device */
+ 	ndev = alloc_etherdev(sizeof(struct board_info));
+ 	if (!ndev)
+@@ -1683,11 +1734,20 @@ dm9000_drv_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id dm9000_of_matches[] = {
++	{ .compatible = "davicom,dm9000", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, dm9000_of_matches);
++#endif
++
+ static struct platform_driver dm9000_driver = {
+ 	.driver	= {
+ 		.name    = "dm9000",
+ 		.owner	 = THIS_MODULE,
+ 		.pm	 = &dm9000_drv_pm_ops,
++		.of_match_table = of_match_ptr(dm9000_of_matches),
+ 	},
+ 	.probe   = dm9000_probe,
+ 	.remove  = dm9000_drv_remove,
 -- 
 1.8.2.1
