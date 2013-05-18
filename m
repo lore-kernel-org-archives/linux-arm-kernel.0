@@ -1,42 +1,73 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Sat, 18 May 2013 14:28:57 -0300
-Subject: ARM: 3.10-rc1 does not boot anymore on OpenBlocks AX3
-In-Reply-To: <20130518172633.GD1936@1wt.eu>
-References: <20130518170158.GB1936@1wt.eu> <20130518172212.GA21837@localhost>
- <20130518172633.GD1936@1wt.eu>
-Message-ID: <CALF0-+UfQeh-vKMmm7Eehbw6MNtouL0i+BceC2zVmBk5s7QfGg@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sat, 18 May 2013 19:33:54 +0200
+Subject: [RFC 2/4] ARM: dove: add video card node for SolidRun CuBox
+In-Reply-To: <1368897139-25485-3-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+ <1368897139-25485-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1368897139-25485-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130518193354.1be73084@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 18, 2013 at 2:26 PM, Willy Tarreau <w@1wt.eu> wrote:
-> Hi Gregory & Ezequeil,
->
-> On Sat, May 18, 2013 at 02:22:13PM -0300, Ezequiel Garcia wrote:
->> Hi Willy,
->>
->> On Sat, May 18, 2013 at 07:01:58PM +0200, Willy Tarreau wrote:
->> >
->> > Uncompressing Linux... done, booting the kernel.
->> > Booting Linux on physical CPU 0x0
->> > Linux version 3.10.0-rc-mvebu (willy at pcw) (gcc version 4.7.3 20130205 (prerelease) (crosstool-NG 1.18.0) ) #6 SMP Sat May 18 17:40:55 CEST 2013
->> > CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7), cr=10c53c7d
->> > CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
->> > Machine: Marvell Armada 370/XP (Device Tree), model: PlatHome OpenBlocks AX3-4 board
->> > bootconsole [earlycon0] enabled
->> > INITRD: 0x07000040+0x00a5c000 is not a memory region - disabling initrd
->> > Memory policy: ECC disabled, Data cache writealloc
->> > Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
->>
->> This is a known issue.
->> Please try again with this patch:
->>
->> [PATCH] ARM: zImage: Convert 32bits memory size and address from ATAG to
->> 64bits DTB
->>
->> which has been posted on LAKML on May 14th.
->
-> Thanks to you both for your simultaneous response :-)
+On Sat, 18 May 2013 19:12:17 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-That's because our mvebu stuff has enabled parallel user support :-)
+> This adds a video card node required for rmk's dove_drm driver. Reg
+> property matches reserved memory region (currently 16M at top of memory),
+> clocks property should carry extclk0 for now.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: dri-devel at lists.freedesktop.org
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Jean-Francois Moine <moinejf@free.fr>
+> ---
+>  arch/arm/boot/dts/dove-cubox.dts |   16 +++++++++++++++-
+>  1 file changed, 15 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+> index ed2b7b2..f26d0d2 100644
+> --- a/arch/arm/boot/dts/dove-cubox.dts
+> +++ b/arch/arm/boot/dts/dove-cubox.dts
+> @@ -8,7 +8,7 @@
+>  
+>  	memory {
+>  		device_type = "memory";
+> -		reg = <0x00000000 0x40000000>;
+> +		reg = <0x00000000 0x3f000000>;
+>  	};
+>  
+>  	chosen {
+> @@ -52,10 +52,24 @@
+>  			#clock-cells = <0>;
+>  		};
+>  	};
+> +
+> +	video {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		vcard: video-card {
+> +			compatible = "marvell,dove-video-card";
+> +			reg = <0x3f000000 0x1000000>;
+> +			clocks = <&si5351 0>, <&si5351 0>;
+> +		};
+> +	};
+>  };
+>  
+>  &uart0 { status = "okay"; };
+>  &sata0 { status = "okay"; };
+> +&lcd0 { status = "okay"; };
+>  
+>  &i2c0 {
+>  	status = "okay";
+
+May you explain a bit more this strange hack?
+
 -- 
-    Ezequiel
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
