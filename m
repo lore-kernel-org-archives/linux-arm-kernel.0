@@ -1,47 +1,103 @@
-From: dt.tangr@gmail.com (Daniel Tang)
-Date: Sat, 18 May 2013 16:40:31 +1000
-Subject: [RFC PATCHv3 4/6] clocksource: Add TI-Nspire timer drivers
-In-Reply-To: <CACRpkdaO7ieSdo5+Yq0+CLDfP==+DBOWn8+v0ap5iMOJy0Vf=Q@mail.gmail.com>
-References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
- <1368332581-94691-5-git-send-email-dt.tangr@gmail.com>
- <CACRpkdZBFbOnQ9rCehO0yKDN7fH9VR3VYCa_NkOGJz7KN+02FQ@mail.gmail.com>
- <26FBB324-AAA9-4C10-8978-C2EC1C26672E@gmail.com>
- <CACRpkdaO7ieSdo5+Yq0+CLDfP==+DBOWn8+v0ap5iMOJy0Vf=Q@mail.gmail.com>
-Message-ID: <6807056B-84F9-468D-87C6-4C4AD7D8BA99@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 18 May 2013 08:44:30 +0200
+Subject: [PATCH v3 09/20] ARM: shmobile: r8a7790: Add GPIO controller
+ devices to device tree
+In-Reply-To: <Pine.LNX.4.64.1305171423270.31481@axis700.grange>
+References: <1368577100-3530-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1368577100-3530-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <Pine.LNX.4.64.1305171423270.31481@axis700.grange>
+Message-ID: <14114689.gQXHdCTQYZ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Guennadi,
 
-On 17/05/2013, at 11:17 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+On Friday 17 May 2013 14:26:48 Guennadi Liakhovetski wrote:
+> Hi Laurent
+> 
+> On Wed, 15 May 2013, Laurent Pinchart wrote:
+> > Add GPIO controller nodes to the r8a7790 core device tree.
+> > 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  arch/arm/boot/dts/r8a7790.dtsi | 54 +++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 54 insertions(+)
+> 
+> Also here a couple of things are missing (presumably, for other SoCs you
+> need the same):
 
->>> If this timer is really just 16 bits, it's a *pretty* good idea to use
->>> the prescaler (I guess this is what IO_DIVIDER is) beacuse else you
->>> will get short sleep times with CONFIG_NO_HZ_IDLE on this system,
->>> and wake up unnecessarily often.
->>> 
->>> The same goes for the clock event.
->> 
->> The clock frequency is 32768Hz. Should I be scaling it down at that frequency?
-> 
-> No. But that was *pretty* slow.
-> 
-> The thing is that the driver is getting "some clockfrequency" from
-> the clk subsystem and does not know what it is.
-> 
-> Usually (and I've seen this hardware design pattern a lot) when you
-> have a clock like this, and go talk to the clk implementation specialist
-> s/he will say "oh, yeah, I can mux in this 34 MHz clock to the timer
-> as well", and if that is possible then that is often what you want,
-> because it's good for things like HRtimers, and then it's useful to have
-> a prescaler och the clocksource/clockevent.
-> 
-> You can use that 32768 Hz for clock events and clocksource (but I
-> suspect that HRtimers will never be useful on this platform due to this).
-> 
+Thank you for testing the patch set. I'll integrate the modification in the 
+next version for r8a7778, r8a7779 and r8a7790.
 
-I forgot to mention before that there is also another timer that runs at the same freq as the APB (which is usually around 30MHz). Is this what you were alluding to? I haven't tested the driver on that timer yet.
+As the gpio-ranges property specifies the number of GPIOs handled by the 
+controller, what's your opinion on dropping the #gpio-lines property from the 
+bindings ?
 
-As I understand it, you're saying to use a prescaler on faster clock rates so the kernel can have a longer maximum delay time (since a 16 bit register can only hold only so much). In that case, what kind of range should I be scaling to? I suspect it needs to be large enough to keep the kernel from constantly waking but small enough for HR timers to be useful.
+> diff --git a/arch/arm/boot/dts/r8a7790.dtsi
+> b/arch/arm/boot/dts/r8a7790.dtsi
+> index 674ee39..cd1a04f 100644
+> --- a/arch/arm/boot/dts/r8a7790.dtsi
+> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> @@ -51,6 +51,7 @@
+>  		interrupts = <0 4 0x4>;
+>  		#gpio-cells = <2>;
+>  		gpio-controller;
+> +		gpio-ranges = <&pfc 0 0 32>;
+>  	};
+> 
+>  	gpio1: gpio at ffc41000 {
+> @@ -60,6 +61,7 @@
+>  		interrupts = <0 5 0x4>;
+>  		#gpio-cells = <2>;
+>  		gpio-controller;
+> +		gpio-ranges = <&pfc 0 32 32>;
+>  	};
+> 
+>  	gpio2: gpio at ffc42000 {
+> @@ -69,6 +71,7 @@
+>  		interrupts = <0 6 0x4>;
+>  		#gpio-cells = <2>;
+>  		gpio-controller;
+> +		gpio-ranges = <&pfc 0 64 32>;
+>  	};
+> 
+>  	gpio3: gpio at ffc43000 {
+> @@ -78,6 +81,7 @@
+>  		interrupts = <0 7 0x4>;
+>  		#gpio-cells = <2>;
+>  		gpio-controller;
+> +		gpio-ranges = <&pfc 0 96 32>;
+>  	};
+> 
+>  	gpio4: gpio at ffc44000 {
+> @@ -87,6 +91,7 @@
+>  		interrupts = <0 8 0x4>;
+>  		#gpio-cells = <2>;
+>  		gpio-controller;
+> +		gpio-ranges = <&pfc 0 128 32>;
+>  	};
+> 
+>  	gpio5: gpio at ffc45000 {
+> @@ -96,6 +101,7 @@
+>  		interrupts = <0 9 0x4>;
+>  		#gpio-cells = <2>;
+>  		gpio-controller;
+> +		gpio-ranges = <&pfc 0 160 32>;
+>  	};
+> 
+>  	timer {
+> @@ -118,6 +124,7 @@
+>  	pfc: pfc at e6060000 {
+>  		compatible = "renesas,pfc-r8a7790";
+>  		reg = <0 0xe6060000 0 0x250>;
+> +		#gpio-range-cells = <3>;
+>  	};
+> 
+>  	/* No MMC_CAP_UHS_DDR50 (dual data rate) capability on r8a7790! */
 
-> Yours,
-> Linus Walleij
+-- 
+Regards,
+
+Laurent Pinchart
