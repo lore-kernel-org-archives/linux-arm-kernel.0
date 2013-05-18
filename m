@@ -1,56 +1,70 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 18 May 2013 08:56:59 +0200
-Subject: [RFC 3/8] drm/i2c: nxp-tda998x: ensure VIP output mux is
- properly set
-In-Reply-To: <E1Ud3og-0001qm-52@rmk-PC.arm.linux.org.uk>
-References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
- <E1Ud3og-0001qm-52@rmk-PC.arm.linux.org.uk>
-Message-ID: <20130518085659.40932cd8@armhf>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Sat, 18 May 2013 08:57:41 +0200 (CEST)
+Subject: [PATCH v3 09/20] ARM: shmobile: r8a7790: Add GPIO controller
+ devices to device tree
+In-Reply-To: <14114689.gQXHdCTQYZ@avalon>
+References: <1368577100-3530-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1368577100-3530-10-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <Pine.LNX.4.64.1305171423270.31481@axis700.grange>
+ <14114689.gQXHdCTQYZ@avalon>
+Message-ID: <Pine.LNX.4.64.1305180851320.9241@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 May 2013 20:26:18 +0100
-Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+Hi Laurent
 
-> When switching between various drivers for this device, it's possible
-> that some critical registers are left containing values which affect
-> the device operation.  One such case encountered is the VIP output
-> mux register.  This defaults to 0x24 on powerup, but other drivers may
-> set this to 0x12.  This results in incorrect colours.
-> 
-> Fix this by ensuring that the register is always set to the power on
-> default setting.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/gpu/drm/i2c/tda998x_drv.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-> index d71c408..4b4db95 100644
-> --- a/drivers/gpu/drm/i2c/tda998x_drv.c
-> +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-> @@ -110,6 +110,7 @@ struct tda998x_priv {
->  #define REG_VIP_CNTRL_5           REG(0x00, 0x25)     /* write */
->  # define VIP_CNTRL_5_CKCASE       (1 << 0)
->  # define VIP_CNTRL_5_SP_CNT(x)    (((x) & 3) << 1)
-> +#define REG_MUX_VP_VIP_OUT        REG(0x00, 0x27)     /* read/write */
->  #define REG_MAT_CONTRL            REG(0x00, 0x80)     /* write */
->  # define MAT_CONTRL_MAT_SC(x)     (((x) & 3) << 0)
->  # define MAT_CONTRL_MAT_BP        (1 << 2)
-> @@ -438,6 +439,8 @@ tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
->  
->  	switch (mode) {
->  	case DRM_MODE_DPMS_ON:
-> +		/* Write the default value MUX register */
-> +		reg_write(encoder, REG_MUX_VP_VIP_OUT, 0x24);
->  		/* enable audio and video ports */
->  		reg_write(encoder, REG_ENA_AP, 0xff);
->  		reg_write(encoder, REG_ENA_VP_0, 0xff);
+On Sat, 18 May 2013, Laurent Pinchart wrote:
 
-This register is never touched. Should not this setting better go at
-reset time (in tda998x_reset)?
+> Hi Guennadi,
+> 
+> On Friday 17 May 2013 14:26:48 Guennadi Liakhovetski wrote:
+> > Hi Laurent
+> > 
+> > On Wed, 15 May 2013, Laurent Pinchart wrote:
+> > > Add GPIO controller nodes to the r8a7790 core device tree.
+> > > 
+> > > Signed-off-by: Laurent Pinchart
+> > > <laurent.pinchart+renesas@ideasonboard.com>
+> > > ---
+> > > 
+> > >  arch/arm/boot/dts/r8a7790.dtsi | 54 +++++++++++++++++++++++++++++++++++++
+> > >  1 file changed, 54 insertions(+)
+> > 
+> > Also here a couple of things are missing (presumably, for other SoCs you
+> > need the same):
+> 
+> Thank you for testing the patch set. I'll integrate the modification in the 
+> next version for r8a7778, r8a7779 and r8a7790.
+> 
+> As the gpio-ranges property specifies the number of GPIOs handled by the 
+> controller, what's your opinion on dropping the #gpio-lines property from the 
+> bindings ?
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Well, gpio-ranges can contain several ranges, so, in a generic case you 
+would have to sum them up to get a total count. But if you're ok with that 
+or if your platforms only have 1 gpio gange per controller, of course, 
+that property seems redundant. OTOH it is already used in r8a7779.dtsi, 
+and thus already belongs to the ABI... Not sure whether removing it would 
+be accepted.
+
+Thanks
+Guennadi
+
+> > diff --git a/arch/arm/boot/dts/r8a7790.dtsi
+> > b/arch/arm/boot/dts/r8a7790.dtsi
+> > index 674ee39..cd1a04f 100644
+> > --- a/arch/arm/boot/dts/r8a7790.dtsi
+> > +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> > @@ -51,6 +51,7 @@
+> >  		interrupts = <0 4 0x4>;
+> >  		#gpio-cells = <2>;
+> >  		gpio-controller;
+> > +		gpio-ranges = <&pfc 0 0 32>;
+> >  	};
+> > 
+> >  	gpio1: gpio at ffc41000 {
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
