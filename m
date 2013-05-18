@@ -1,34 +1,65 @@
-From: nerv@dawncrow.de (=?ISO-8859-15?Q?Andr=E9_Hentschel?=)
-Date: Sat, 18 May 2013 17:02:25 +0200
-Subject: [PATCHv4] arm: Preserve the user r/w register TPIDRURW on context
- switch and fork
-In-Reply-To: <518AA19B.2020209@dawncrow.de>
-References: <518AA19B.2020209@dawncrow.de>
-Message-ID: <51979801.7010903@dawncrow.de>
+From: w@1wt.eu (Willy Tarreau)
+Date: Sat, 18 May 2013 19:01:58 +0200
+Subject: ARM: 3.10-rc1 does not boot anymore on OpenBlocks AX3
+Message-ID: <20130518170158.GB1936@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 08.05.2013 21:03, schrieb Andr? Hentschel:
-> From: =?UTF-8?q?Andr=C3=A9=20Hentschel?= <nerv@dawncrow.de>
-> 
-> Since commit 6a1c53124aa1 the user writeable TLS register was zeroed to
-> prevent it from being used as a covert channel between two tasks.
-> 
-> There are more and more applications coming to WinRT, Wine could support them,
-> but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
-> 
-> This patch preserves that register per thread instead of clearing it.
-> Unlike the TPIDRURO, which is already switched, the TPIDRURW
-> can be updated from userspace so needs careful treatment in the case that we
-> modify TPIDRURW and call fork(). To avoid this we must always read
-> TPIDRURW in copy_thread.
-> 
-> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com> 
-> 
+Hi Gregory,
 
-Hi,
-I'm not yet very familiar with the development process here,
-am i getting no feedback on v4 because of the mergewindow being closed?
-Or is there another reason? Sry for being impatient.
+I wanted to give a try to your marvell-pcie-v10-and-seb-clks branch on
+my AX3 and got the following error, which I also got after switching
+back to plain 3.10-rc1 :
+
+Uncompressing Linux... done, booting the kernel.
+Booting Linux on physical CPU 0x0
+Linux version 3.10.0-rc-mvebu (willy at pcw) (gcc version 4.7.3 20130205 (prerelease) (crosstool-NG 1.18.0) ) #6 SMP Sat May 18 17:40:55 CEST 2013
+CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7), cr=10c53c7d
+CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+Machine: Marvell Armada 370/XP (Device Tree), model: PlatHome OpenBlocks AX3-4 board
+bootconsole [earlycon0] enabled
+INITRD: 0x07000040+0x00a5c000 is not a memory region - disabling initrd
+Memory policy: ECC disabled, Data cache writealloc
+Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
+
+Finally I bisected this to the following patch :
+
+  commit 74898364e717c6bd939bb88d95049fc91d2b4950
+  Author: Gregory CLEMENT <gregory.clement@free-electrons.com>
+  Date:   Fri Apr 12 16:29:10 2013 +0200
+
+    ARM: dts: mvebu: Convert mvebu device tree files to 64 bits
+    
+    In order to be able to use more than 4GB of RAM when the LPAE is
+    activated, the dts must be converted in 64 bits.
+    
+    Only Armada XP is LPAE capable, but as it shares a common dtsi file
+    with Armada 370, then the common file include the skeleton64. Thanks
+    to the use of the overload capability of the device tree format,
+    armada-370 include the 32 bit skeleton and all the armada 370 based
+    dts can remain the same.
+    
+    This was heavily based on the work of Lior Amsalem.
+    
+    Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
+
+I'm used to boot my kernel and initrd from the network this way :
+
+  tftpboot 0x7000000 uInitrd4
+  tftpboot 0x6400000 uImage-ax3.dtb
+  bootm 0x6400000 0x7000000
+
+So the address reported above clearly is the one of the initrd, and
+the reported size seems to match my initrd's size (10 MB). I tried
+to load at a lower address but it did not change anything. I bisected
+using mvebu_defconfig.
+
+My AX3 has 3 GB of RAM if that can make a difference (I still have
+not found a 4GB DDR3 module to experiment with). Do you have any idea
+of what causes the issue, or do you want me to run more tests ? I can
+even open it and remove the 2GB DDR3 module if that can help diagnose
+the issue.
+
+Thanks,
+Willy
