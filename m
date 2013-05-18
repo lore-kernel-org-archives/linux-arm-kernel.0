@@ -1,63 +1,38 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Sat, 18 May 2013 09:50:20 +0200 (CEST)
-Subject: [PATCH v3 09/20] ARM: shmobile: r8a7790: Add GPIO controller
- devices to device tree
-In-Reply-To: <7692964.4oKpK3W9nB@avalon>
-References: <1368577100-3530-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <14114689.gQXHdCTQYZ@avalon> <Pine.LNX.4.64.1305180851320.9241@axis700.grange>
- <7692964.4oKpK3W9nB@avalon>
-Message-ID: <Pine.LNX.4.64.1305180949480.9241@axis700.grange>
+From: erappleman@gmail.com (Eric Appleman)
+Date: Sat, 18 May 2013 04:26:45 -0400
+Subject: Would like to form a pool of Linux copyright holders for faster GPL
+ enforcement against Anthrax Kernels
+Message-ID: <51973B45.7040209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 18 May 2013, Laurent Pinchart wrote:
+Background on Anthrax Kernels and their GPL violation:
+http://pastebin.com/X5Cciy03
 
-> Hi Guennadi,
-> 
-> On Saturday 18 May 2013 08:57:41 Guennadi Liakhovetski wrote:
-> > On Sat, 18 May 2013, Laurent Pinchart wrote:
-> > > On Friday 17 May 2013 14:26:48 Guennadi Liakhovetski wrote:
-> > > > On Wed, 15 May 2013, Laurent Pinchart wrote:
-> > > > > Add GPIO controller nodes to the r8a7790 core device tree.
-> > > > > 
-> > > > > Signed-off-by: Laurent Pinchart 
-> > > > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > > > ---
-> > > > > 
-> > > > >  arch/arm/boot/dts/r8a7790.dtsi | 54 +++++++++++++++++++++++++++++++++
-> > > > >  1 file changed, 54 insertions(+)
-> > > > 
-> > > > Also here a couple of things are missing (presumably, for other SoCs you
-> > > > need the same):
-> > >
-> > > Thank you for testing the patch set. I'll integrate the modification in
-> > > the next version for r8a7778, r8a7779 and r8a7790.
-> > > 
-> > > As the gpio-ranges property specifies the number of GPIOs handled by the
-> > > controller, what's your opinion on dropping the #gpio-lines property from
-> > > the bindings ?
-> > 
-> > Well, gpio-ranges can contain several ranges, so, in a generic case you
-> > would have to sum them up to get a total count. But if you're ok with that
-> > or if your platforms only have 1 gpio gange per controller, of course,
-> > that property seems redundant.
-> 
-> The gpio-rcar driver exposes a single range on all the current platforms. I 
-> don't really foresee any change there in the future, but I might be 
-> overlooking something. Magnus, any opinion ?
-> 
-> > OTOH it is already used in r8a7779.dtsi, and thus already belongs to the
-> > ABI... Not sure whether removing it would be accepted.
-> 
-> It's only used in my DT bindings proposal that haven't been merged yet, so 
-> that shouldn't be an issue :-)
+Would anyone be interested in forming such a pool? I am willing to wait 
+years for this to be resolved through certain organizations, but I 
+believe we can do better.
 
-Then yes, sure, you can add it any time in the future if needed, removing 
-is more difficult ;-)
+Last I checked, I have 1 long-time poster of the gpl-violations list on 
+board. Would anyone else like to join? Ideally I'd like to get the LKML 
+(which I have CC'd among others) involved so that authors of critical 
+Linux components be a part of this. I'm not sure if my defconfig commits 
+to Android kernel branches count as contributions, so I'm not going to 
+consider myself a Linux contributor unless told otherwise.
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+This pool would be used in the following manner:
+
+* Formally requesting source for binaries (means to request source is 
+actively hidden)
+* Formally requesting removal of critical copyrighted code that Linux 
+cannot function without
+* Informing interested parties with respect to refusals of the above
+
+The CTO of Anthrax's hosting server is very interested in terminating 
+Chad Goodman's account. Bullet point #3 might come into effect here.
+
+If this is a bad idea, breaks list etiquette, uses incorrect logic, or 
+does not follow the conventions of GPL enforcement, feel free to shoot 
+this idea down with utmost prejudice.
+
+- Eric
