@@ -1,76 +1,91 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 18 May 2013 22:50:40 +0200
-Subject: [RFC 4/4] DRM: tda998x: add missing include
-In-Reply-To: <20130518202604.GM18614@n2100.arm.linux.org.uk>
-References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
- <1368897139-25485-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1368897139-25485-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130518194644.2a02a4fc@armhf>
- <CAF6AEGtx7RbvKEEc5uSFvz-2uveB1cnJNf_ESn6JYhfte5UmZQ@mail.gmail.com>
- <20130518205845.2dfe9fe5@armhf> <5197D6C1.3060702@gmail.com>
- <20130518202604.GM18614@n2100.arm.linux.org.uk>
-Message-ID: <5197E9A0.1020607@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 19 May 2013 00:13:04 +0200
+Subject: [PATCH] ARM: nomadik: add led and key for S8815
+Message-ID: <1368915184-29657-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2013 10:26 PM, Russell King - ARM Linux wrote:
-> On Sat, May 18, 2013 at 09:30:09PM +0200, Sebastian Hesselbarth wrote:
->> The device for tda998x yes, but not the driver. Anyway, Russel decided
->> to have tda998x probed by his drm_driver.
->
-> For the simple reason that _that_ is how DRM slave encoders work.
-> Sometimes, reading the code of the subsystem you're using is well
-> worth the effort.
+This adds device tree hunks for the LED and userbutton on the
+USB S8815 board, and set up a heartbeat trigger on the LED and
+an escape key on the user button. Alter the defconfig to enable
+these standard DT-enabled GPIO drivers.
 
-I agree and add that the probing itself doesn't prevent you from using
-DT for tda driver at all. You can still have an marvell,external-slave
-property pointing to the phandle of tda node. With that you get the
-adapter and i2c slave address for what is currently called
-dove_tda19989.c and may become e.g. dove_ext_i2c.c. In tda998x_drv you
-find the node and get all properties for input config or interrupt
-gpio.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-nomadik-s8815.dts | 22 ++++++++++++++++++++++
+ arch/arm/configs/nhk8815_defconfig      |  6 ++++++
+ arch/arm/mach-nomadik/cpu-8815.c        |  4 ++++
+ 3 files changed, 32 insertions(+)
 
-I have done that in the drivers before, but DT node parsing here is
-_added_ to the driver as it can be used on other non-DT platforms as
-well.
-
->> The connection of Dove LCD and tda998x is _not_ Cubox specific, it is
->> also on the D2Plug. To be precise, even "Dove LCD" is not Dove specific
->> as you can find the very same controller on other Marvell SoCs with
->> little differences.
->
-> Well, to spoil the argument a little, actually, the interconnection
-> between the two is in no way "standardized".  There's many different
-> ways to wire the two chips together and have it work - because the
-> TDA998x chips have a set of input muxes and swaps which allow you to
-> connect the red, green, blue high/low nibbles in various ways and
-> still have a correctly working system.  The TDA998x connectivity is
-> _highly_ configuable.
->
-> So, just because one board connects LCD_D0 (red bit 0) to a particular
-> pin on the TDA998x does not mean that another board does it that way
-> too.
->
-> So Jean-Francois is quite correct that this data needs to be provided
-> by the board in some manner.  The question is - how to do that sensibly.
->
-> One possible stop-gap solution is to provide a default set which just
-> happens to match the cubox, and allow OF to override it. :)
-
-While I agree, Rob may have a different view on that for tda998x ;)
-
->> There is so much to take care of like pixel format on lcd pins driving
->> an external encoder (_not_ only tda998x), what gpio pin is connected to
->> TDA interrupt line, one or two lcds, ...
->
-> Luckily, drivers/gpu/drm/i2c/tda998x.c does not make use of the IRQ
-> signal at present - it's fairly basic and it currently operates by
-> polling.  Eventually, this could change of course. :)
-
-Again, that is in the driver Jean-Francois has available. Make sure irq
-handler runs in a separate thread from get_edid and hpd and you will
-be interrupted on hpd. Having said, that should finally lead to the
-slave encoder setting .connector_type and .polled as this is where you
-know it.
-
-Sebastian
+diff --git a/arch/arm/boot/dts/ste-nomadik-s8815.dts b/arch/arm/boot/dts/ste-nomadik-s8815.dts
+index b28fbf3..666945a 100644
+--- a/arch/arm/boot/dts/ste-nomadik-s8815.dts
++++ b/arch/arm/boot/dts/ste-nomadik-s8815.dts
+@@ -27,4 +27,26 @@
+ 			gpios = <&gpio3 16 0x1>;
+ 		};
+ 	};
++
++	/* The user LED on the board is set up to be used for heartbeat */
++	leds {
++		compatible = "gpio-leds";
++		user-led {
++			label = "user_led";
++			gpios = <&gpio0 2 0x1>;
++			default-state = "off";
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
++	/* User key mapped in as "escape" */
++	gpio-keys {
++		compatible = "gpio-keys";
++		user-button {
++			label = "user_button";
++			gpios = <&gpio0 3 0x1>;
++			linux,code = <1>; /* KEY_ESC */
++			gpio-key,wakeup;
++		};
++	};
+ };
+diff --git a/arch/arm/configs/nhk8815_defconfig b/arch/arm/configs/nhk8815_defconfig
+index b01e763..35f8cf2 100644
+--- a/arch/arm/configs/nhk8815_defconfig
++++ b/arch/arm/configs/nhk8815_defconfig
+@@ -81,6 +81,7 @@ CONFIG_PPP_SYNC_TTY=m
+ # CONFIG_INPUT_MOUSEDEV is not set
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_KEYBOARD_ATKBD is not set
++CONFIG_KEYBOARD_GPIO=y
+ # CONFIG_MOUSE_PS2 is not set
+ # CONFIG_SERIO is not set
+ # CONFIG_LEGACY_PTYS is not set
+@@ -96,6 +97,11 @@ CONFIG_DEBUG_GPIO=y
+ CONFIG_MMC=y
+ CONFIG_MMC_CLKGATE=y
+ CONFIG_MMC_ARMMMCI=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_GPIO=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_PL031=y
+ CONFIG_DMADEVICES=y
+diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
+index 59f6ff5..1e0ec38 100644
+--- a/arch/arm/mach-nomadik/cpu-8815.c
++++ b/arch/arm/mach-nomadik/cpu-8815.c
+@@ -99,6 +99,10 @@ static unsigned long in_pullup[] = { PIN_INPUT_PULLUP };
+ static struct pinctrl_map __initdata nhk8815_pinmap[] = {
+ 	PIN_MAP_MUX_GROUP_DEFAULT("uart0", "pinctrl-stn8815", "u0_a_1", "u0"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("uart1", "pinctrl-stn8815", "u1_a_1", "u1"),
++	/* User LED on S8815 */
++	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO2_C5", out_high),
++	/* User button on S8815 */
++	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO3_A4", in_nopull),
+ 	/* Hog in MMC/SD card mux */
+ 	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-stn8815", "mmcsd_a_1", "mmcsd"),
+ 	/* MCCLK */
+-- 
+1.8.1.4
