@@ -1,46 +1,28 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat, 18 May 2013 20:30:21 +1200
-Subject: [PATCH 4/4] MAINTAINERS: vt8500: Add clk-vt8500.c to MAINTAINERS
- file
-In-Reply-To: <CABjd4Yw2LbnaUbQFW_bd_6WRGTA34-Vp_tUC2b4Jczj-MM8x1w@mail.gmail.com>
-References: <1368825532-30917-1-git-send-email-linux@prisktech.co.nz>
- <1368825532-30917-5-git-send-email-linux@prisktech.co.nz>
- <CABjd4Yw2LbnaUbQFW_bd_6WRGTA34-Vp_tUC2b4Jczj-MM8x1w@mail.gmail.com>
-Message-ID: <51973C1D.2080404@prisktech.co.nz>
+Date: Sat, 18 May 2013 21:15:10 +1200
+Subject: [PATCH 0/4] FB updates for 3.11
+Message-ID: <1368868514-18975-1-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/05/13 18:40, Alexey Charkov wrote:
-> On 18 May 2013 01:18, "Tony Prisk" <linux@prisktech.co.nz> wrote:
->> This file has missed being added under ARM/VT8500 ARM ARCHITECTURE,
->> and is maintained along with the rest of the vt8500 arch code.
->>
->> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
->> ---
->>   MAINTAINERS |    1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index 3d7782b..5ab8ccb 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -1283,6 +1283,7 @@ M:        Tony Prisk <linux@prisktech.co.nz>
->>   L:     linux-arm-kernel at lists.infradead.org (moderated for
-> non-subscribers)
->>   S:     Maintained
->>   F:     arch/arm/mach-vt8500/
->> +F:     drivers/clk/vt8500-vt8500.c
-> This looks like a typo (clk vs. vt8500).
->
-> Best,
-> Alexey
->
-eeek - oops.
+Patch #1 - Move register defines inside the driver and drop the header.
+Patch #2 - Convert the register defines to use the vendor preferred names.
+Patch #3 - Add a device clock to wm8505fb. Without it, only the uboot
+initialized resolution is supported.
+Patch #4 - Add support for the VGA output found on the APC8750 board.
 
-Mike,
+Tony Prisk (4):
+  fb: vt8500: Move register defines inside driver
+  fb: vt8500: Convert to use vendor register names
+  fb: vt8500: Require a device clock for wm8505fb driver
+  fb: vt8500: Add VGA output support to wm8505fb driver.
 
-Disregard this patch - I will send a more complete one through arm-soc 
-as there are other files missing as well.
+ .../devicetree/bindings/video/wm,wm8505-fb.txt     |    9 +-
+ drivers/video/wm8505fb.c                           |  195 ++++++++++++--
+ drivers/video/wm8505fb_regs.h                      |   76 ------
+ drivers/video/wmt_ge_rops.c                        |  280 +++++++++++++++-----
+ 4 files changed, 394 insertions(+), 166 deletions(-)
+ delete mode 100644 drivers/video/wm8505fb_regs.h
 
-Regards
-Tony P
+-- 
+1.7.9.5
