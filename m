@@ -1,38 +1,40 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 18 May 2013 09:27:28 +0800
-Subject: [PATCH v3 2/4] ARM: imx: add initial support for MVF600
-In-Reply-To: <1368684648-20826-3-git-send-email-b35083@freescale.com>
-References: <1368684648-20826-1-git-send-email-b35083@freescale.com>
- <1368684648-20826-3-git-send-email-b35083@freescale.com>
-Message-ID: <20130518012726.GA18553@S2101-09.ap.freescale.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Sat, 18 May 2013 07:33:48 +0530
+Subject: spurious bL cpufreq driver messages
+In-Reply-To: <519686BC.3090101@gmail.com>
+References: <519686BC.3090101@gmail.com>
+Message-ID: <CAKohpom0cGfWvsCf-jaMyu0cQJi2hVk9_0wskEDH2X7MaeHDLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 02:10:46PM +0800, Jingchang Lu wrote:
-> +static void __init mvf600_init_irq(void)
-> +{
-> +	struct device_node *np;
-> +	void __iomem *mscm_base;
-> +	int i;
-> +
-> +	l2x0_of_init(0, ~0UL);
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,mvf600-mscm");
-> +	mscm_base = of_iomap(np, 0);
-> +	if (!mscm_base)
-> +		return;
-> +
-> +	/* route all shared peripheral interrupts to CP0 */
-> +	for (i = 0; i < 111; i++)
-> +		__raw_writew(1, mscm_base + 0x880 + 2 * i);
+On 18 May 2013 01:06, Rob Herring <robherring2@gmail.com> wrote:
+> The bL cpufreq driver appears to collide with the cpufreq-cpu0 driver.
+> There doesn't appear to be a functional problem, but just spurious
+> prints which indicate it is trying to do something. I think it needs
+> better checking whether the chip is actually multi-cluster. This is what
+> I get when I hotplug cpus:
+>
+> [  909.372319] CPU1: Booted secondary processor
+> [  909.372616] cpu cpu1: get_cluster_clk_and_freq_table: init_opp_table
+> failed, cpu: 1, err: -61
+> [  909.385411] cpu cpu1: get_cluster_clk_and_freq_table: Failed to get
+> data for cluster: 9
+> [  909.394161] CPU2: shutdown
+> [  909.400957] CPU2: Booted secondary processor
+> [  909.401253] cpu cpu2: get_cluster_clk_and_freq_table: init_opp_table
+> failed, cpu: 2, err: -61
+> [  909.414044] cpu cpu2: get_cluster_clk_and_freq_table: Failed to get
+> data for cluster: 9
 
-I second Arnd's comment on this.  Can we have this setup done in
-bootloader?
+See if this fixes your issue.
 
-Shawn
+https://groups.google.com/forum/?fromgroups#!topic/linux.kernel/XJF-82rad4o
 
-> +
-> +	iounmap(mscm_base);
-> +
-> +	irqchip_init();
-> +}
+Attached too.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-cpufreq-arm_big_little_dt-Register-driver-only-if-DT.patch
+Type: application/octet-stream
+Size: 3967 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130518/88214fa6/attachment.obj>
