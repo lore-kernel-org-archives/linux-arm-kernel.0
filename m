@@ -1,59 +1,46 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 19 May 2013 00:50:05 +0200
-Subject: [PATCH v2 2/6] ARM: SAMSUNG: uncompress: Use local definitions of
- watchdog registers
-In-Reply-To: <1368916627-23139-3-git-send-email-tomasz.figa@gmail.com>
-References: <1368916627-23139-1-git-send-email-tomasz.figa@gmail.com>
- <1368916627-23139-3-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <3859367.63djUfrUBu@flatron>
+Date: Sun, 19 May 2013 00:56:30 +0200
+Subject: [PATCH] of: irq: Pass trigger type in IRQ resource flags
+Message-ID: <1368917790-23770-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds local definitions of required watchdog registers and
-bitfields to the uncompress header, allowing to remove the dependency on
-plat/regs-watchdog.h header and the ugly hack to replace virtual with
-physical addresses.
+Some drivers might rely on availability of trigger flags in IRQ
+resource, for example to configure the hardware for particular interrupt
+type. However current code creating IRQ resources from data in device
+tree does not configure trigger flags in resulting resources.
 
-In addition, it fixes reboot on decompression failure feature, due to
-the mentioned ugly hack not working anymore (the macro being redefined
-got renamed, without fixing this code).
+This patch solves the problem, based on the fact that
+irq_of_parse_and_map() configures the trigger based on DT interrupt
+specifier, IRQD_TRIGGER_* flags are consistent with IORESOURCE_IRQ_*,
+and we can get trigger type by calling irqd_get_trigger_type() after
+mapping the interrupt.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
-Changes since v1:
- - Proper commit message. I have sent wrong version previously, sorry
-  for the noise.
+ drivers/of/irq.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
- arch/arm/plat-samsung/include/plat/uncompress.h | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h b/arch/arm/plat-samsung/include/plat/uncompress.h
-index 438b248..e8954b8 100644
---- a/arch/arm/plat-samsung/include/plat/uncompress.h
-+++ b/arch/arm/plat-samsung/include/plat/uncompress.h
-@@ -28,11 +28,20 @@ static void arch_detect_cpu(void);
- /* defines for UART registers */
+diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+index a3c1c5a..79a7a26 100644
+--- a/drivers/of/irq.c
++++ b/drivers/of/irq.c
+@@ -355,6 +355,16 @@ int of_irq_to_resource(struct device_node *dev, int index, struct resource *r)
+ 		r->start = r->end = irq;
+ 		r->flags = IORESOURCE_IRQ;
+ 		r->name = name ? name : dev->full_name;
++
++		/*
++		 * Some drivers might rely on availability of trigger flags
++		 * in IRQ resource. Since irq_of_parse_and_map() configures the
++		 * trigger based on interrupt specifier and IRQD_TRIGGER_*
++		 * flags are consistent with IORESOURCE_IRQ_*, we can get
++		 * trigger type that was just set and pass it through resource
++		 * flags as well.
++		 */
++		r->flags |= irqd_get_trigger_type(irq_get_irq_data(irq));
+ 	}
  
- #include <plat/regs-serial.h>
--#include <plat/regs-watchdog.h>
- 
- /* working in physical space... */
--#undef S3C2410_WDOGREG
--#define S3C2410_WDOGREG(x) ((S3C24XX_PA_WATCHDOG + (x)))
-+#define S3C_WDOGREG(x)	((S3C_PA_WDT + (x)))
-+
-+#define S3C2410_WTCON	S3C_WDOGREG(0x00)
-+#define S3C2410_WTDAT	S3C_WDOGREG(0x04)
-+#define S3C2410_WTCNT	S3C_WDOGREG(0x08)
-+
-+#define S3C2410_WTCON_RSTEN	(1 << 0)
-+#define S3C2410_WTCON_ENABLE	(1 << 5)
-+
-+#define S3C2410_WTCON_DIV128	(3 << 3)
-+
-+#define S3C2410_WTCON_PRESCALE(x)	((x) << 8)
- 
- /* how many bytes we allow into the FIFO@a time in FIFO mode */
- #define FIFO_MAX	 (14)
+ 	return irq;
 -- 
 1.8.2.1
