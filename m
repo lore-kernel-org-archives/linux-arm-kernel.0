@@ -1,60 +1,39 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Sat, 18 May 2013 15:11:03 -0400
-Subject: [RFC 4/4] DRM: tda998x: add missing include
-In-Reply-To: <20130518205845.2dfe9fe5@armhf>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sat, 18 May 2013 21:18:46 +0200
+Subject: [RFC 3/4] DRM: add OF support for Dove DRM driver
+In-Reply-To: <5197C650.9020802@gmail.com>
 References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
  <1368897139-25485-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1368897139-25485-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130518194644.2a02a4fc@armhf>
- <CAF6AEGtx7RbvKEEc5uSFvz-2uveB1cnJNf_ESn6JYhfte5UmZQ@mail.gmail.com>
- <20130518205845.2dfe9fe5@armhf>
-Message-ID: <CAF6AEGuvte+tfWwC-zDG=TeAo0Qh9-sN-K+0oMTGGa9kBUntOw@mail.gmail.com>
+ <1368897139-25485-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130518194502.102caa9e@armhf> <5197C650.9020802@gmail.com>
+Message-ID: <20130518211846.0ef5a14b@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 18, 2013 at 2:58 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> On Sat, 18 May 2013 14:23:19 -0400
-> Rob Clark <robdclark@gmail.com> wrote:
->
->> > These parameters should not be there. It seems to me that the DT is the
->> > right place.
->>
->> You might not want to directly have a hard DT dependency in tda998x,
->> as the encoder could be used on non-DT platforms.  Although a DT to
->> encoder-params helper might be a nice idea for platforms which do have
->> DT.
->
-> If I correctly understand:
->
-> - Russell does not use any DT, so his drm driver should be declared in
->   some cubox-setup code in mach-dove/
->
-> - this code should also declare the tda998x
->
-> - the drm driver contains/passes parameters to the tda998x
->
-> As the connection Dove LCD <-> tda998x is Cubox specific, the question
-> is: why are'nt the tda998x parameters in the cubox-setup code?
+On Sat, 18 May 2013 20:20:00 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-ok, maybe I am misunderstanding you.  I think the parameters should be
-filled in by the board file on a non-DT setup.  But the part in
-drivers/gpu/drm/i2c should not pull them directly out of DT, or should
-have an arrangement like
+> I put nothing to garbage. _You_ also agreed to merge with rmk's driver!
+> We can now put in all features we implemented differently
+> _step-by-step_.
+> 
+> Merging the drivers starts with adding support for DT - that is what
+> I provided. You know the HW better than me, why don't you start picking
+> features from your driver and add them in rmk's driver?
 
- #ifdef CONFIG_OF
- .. pull params out of DT ..
-#else
- .. use params passed in from via params struct, which is populated in
-board file ..
-#endif
+The general hardware code of both drivers is close enough for merging
+may be done starting from anyone. But the general layout is not:
 
-to accommodate non-DT builds.  (Although I think just having a helper
-to populate 'struct tda998x_encoder_params' from DT seems cleaner.)
+- my driver is DT driven and has one card with 2 CTRC's and 2 connectors.
 
+- Russell's is non-DT, so, with some extra code I am not aware of, with
+  any number of cards each one with one CRTC and one connector (no, I
+  tried it, you cannot clone a connector of one card to the connector
+  of another card).
 
-BR,
--R
+So, for me, merging means enhance my code from Russell's, but I will
+not go to a non-DT kernel.
 
-> --
-> Ken ar c'henta? |             ** Breizh ha Linux atav! **
-> Jef             |               http://moinejf.free.fr/
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
