@@ -1,174 +1,39 @@
-From: romieu@fr.zoreil.com (Francois Romieu)
-Date: Sat, 18 May 2013 20:55:26 +0200
-Subject: [PATCHv8 3/3] net: velocity: Add platform device support to VIA
- velocity driver
-In-Reply-To: <1368853187-17823-4-git-send-email-linux@prisktech.co.nz>
-References: <1368853187-17823-1-git-send-email-linux@prisktech.co.nz>
- <1368853187-17823-4-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130518185526.GA25486@electric-eye.fr.zoreil.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sat, 18 May 2013 20:58:45 +0200
+Subject: [RFC 4/4] DRM: tda998x: add missing include
+In-Reply-To: <CAF6AEGtx7RbvKEEc5uSFvz-2uveB1cnJNf_ESn6JYhfte5UmZQ@mail.gmail.com>
+References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+ <1368897139-25485-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1368897139-25485-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130518194644.2a02a4fc@armhf>
+ <CAF6AEGtx7RbvKEEc5uSFvz-2uveB1cnJNf_ESn6JYhfte5UmZQ@mail.gmail.com>
+Message-ID: <20130518205845.2dfe9fe5@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Prisk <linux@prisktech.co.nz> :
-[...]
-> diff --git a/drivers/net/ethernet/via/via-velocity.c b/drivers/net/ethernet/via/via-velocity.c
-> index 5996cee..d8d5bc5 100644
-> --- a/drivers/net/ethernet/via/via-velocity.c
-> +++ b/drivers/net/ethernet/via/via-velocity.c
-[...]
-> @@ -84,6 +88,16 @@
->  static int velocity_nics;
->  static int msglevel = MSG_LEVEL_INFO;
->  
-> +static void velocity_set_power_state(struct velocity_info *vptr, char state)
-> +{
-> +	void *addr = vptr->mac_regs;
+On Sat, 18 May 2013 14:23:19 -0400
+Rob Clark <robdclark@gmail.com> wrote:
 
-Your choice but it's only used once.
+> > These parameters should not be there. It seems to me that the DT is the
+> > right place.  
+> 
+> You might not want to directly have a hard DT dependency in tda998x,
+> as the encoder could be used on non-DT platforms.  Although a DT to
+> encoder-params helper might be a nice idea for platforms which do have
+> DT.
 
-[...]
-> @@ -1353,9 +1366,12 @@ static void velocity_init_registers(struct velocity_info *vptr,
->  		velocity_soft_reset(vptr);
->  		mdelay(5);
->  
-> -		mac_eeprom_reload(regs);
-> -		for (i = 0; i < 6; i++)
-> -			writeb(vptr->netdev->dev_addr[i], &(regs->PAR[i]));
-> +		if (!vptr->no_eeprom) {
-> +			mac_eeprom_reload(regs);
-> +			for (i = 0; i < 6; i++)
-> +				writeb(vptr->netdev->dev_addr[i],
-> +							&(regs->PAR[i]));
-> +		}
+If I correctly understand:
 
-velocity_init_registers would not suffer from a local vptr->netdev variable.
+- Russell does not use any DT, so his drm driver should be declared in
+  some cubox-setup code in mach-dove/
 
-If you change this code, you may replace &(regs->PAR[i]) with regs->PAR + i.
+- this code should also declare the tda998x
 
-[...]
-> @@ -2730,19 +2773,19 @@ static int velocity_found1(struct pci_dev *pdev,
->  	 * can support more than MAX_UNITS.
->  	 */
->  	if (velocity_nics >= MAX_UNITS) {
-> -		dev_notice(&pdev->dev, "already found %d NICs.\n",
-> -			   velocity_nics);
-> +		dev_notice(dev, "already found %d NICs.\n", velocity_nics);
->  		return -ENODEV;
->  	}
->  
-> -	dev = alloc_etherdev(sizeof(struct velocity_info));
-> -	if (!dev)
-> +	netdev = alloc_etherdev(sizeof(struct velocity_info));
-> +	if (!netdev)
->  		goto out;
->  
->  	/* Chain it all together */
->  
-> -	SET_NETDEV_DEV(dev, &pdev->dev);
-> -	vptr = netdev_priv(dev);
-> +	SET_NETDEV_DEV(netdev, dev);
-> +	vptr = netdev_priv(netdev);
-> +	memset(vptr, 0, sizeof(struct velocity_info));
+- the drm driver contains/passes parameters to the tda998x
 
-memset is not needed (alloc_etherdev indirectly uses kzalloc).
-
-[...]
-> +static int velocity_pci_probe(struct pci_dev *pdev,
-> +			   const struct pci_device_id *ent)
-
-It does not seem to line up as it should.
-
-> +{
-> +	int ret;
-> +	const struct velocity_info_tbl *info =
-> +					&chip_info_table[ent->driver_data];
-
-Long lines ought to come first.
-
-> +
-> +	ret = pci_enable_device(pdev);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	ret = pci_request_regions(pdev, VELOCITY_NAME);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "No PCI resources.\n");
-> +		pci_disable_device(pdev);
-> +		return ret;
-> +	}
-> +
-> +	ret = velocity_probe(&pdev->dev, pdev->irq, info, BUS_PCI);
-> +	if (ret < 0) {
-> +		pci_release_regions(pdev);
-> +		pci_disable_device(pdev);
-> +	}
-
-Please use gotos for the error paths.
-
-[...]
-> @@ -3270,7 +3409,11 @@ static void velocity_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo
->  	struct velocity_info *vptr = netdev_priv(dev);
->  	strlcpy(info->driver, VELOCITY_NAME, sizeof(info->driver));
-
-You may sneak an empty line after the declaration.
-
->  	strlcpy(info->version, VELOCITY_VERSION, sizeof(info->version));
-> -	strlcpy(info->bus_info, pci_name(vptr->pdev), sizeof(info->bus_info));
-> +	if (vptr->bustype == BUS_PCI)
-> +		strlcpy(info->bus_info, pci_name(vptr->pdev),
-> +						sizeof(info->bus_info));
-> +	else
-> +		strlcpy(info->bus_info, "platform", sizeof(info->bus_info));
-
-	strlcpy(info->bus_info, vptr->pdev ? pci_name(vptr->pdev) : "platform",
-		sizeof(info->bus_info));
-
->  static void velocity_ethtool_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
-> @@ -3563,9 +3706,15 @@ static int __init velocity_init_module(void)
->  	int ret;
->  
->  	velocity_register_notifier();
-> -	ret = pci_register_driver(&velocity_driver);
-> +
-> +	ret = pci_register_driver(&velocity_pci_driver);
-> +	if (ret < 0)
-> +		velocity_unregister_notifier();
-> +
-> +	ret = platform_driver_register(&velocity_platform_driver);
->  	if (ret < 0)
->  		velocity_unregister_notifier();
-> +
-
-I'd rather velocity_unregister_notifier iif both driver registrations
-failed.
-
-[...]
-> diff --git a/drivers/net/ethernet/via/via-velocity.h b/drivers/net/ethernet/via/via-velocity.h
-> index c38bbae..1d94612 100644
-> --- a/drivers/net/ethernet/via/via-velocity.h
-> +++ b/drivers/net/ethernet/via/via-velocity.h
-[...]
-> @@ -1433,10 +1433,17 @@ struct velocity_opt {
->  
->  #define GET_RD_BY_IDX(vptr, idx)   (vptr->rd_ring[idx])
->  
-> +enum velocity_bus_type {
-> +	BUS_PCI,
-> +	BUS_PLATFORM,
-> +};
-> +
->  struct velocity_info {
-> -	struct device *dev;
->  	struct pci_dev *pdev;
-> +	struct device *dev;
-
-Please don't move the fields you added.
-
->  	struct net_device *netdev;
-> +	enum velocity_bus_type bustype;
-
-velocity_bus_type is not really needed since you always have pdev to
-check against.
+As the connection Dove LCD <-> tda998x is Cubox specific, the question
+is: why are'nt the tda998x parameters in the cubox-setup code?
 
 -- 
-Ueimor
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
