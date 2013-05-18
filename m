@@ -1,69 +1,128 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 18 May 2013 14:51:04 -0500
-Subject: spurious bL cpufreq driver messages
-In-Reply-To: <CAKohpom0cGfWvsCf-jaMyu0cQJi2hVk9_0wskEDH2X7MaeHDLw@mail.gmail.com>
-References: <519686BC.3090101@gmail.com>
- <CAKohpom0cGfWvsCf-jaMyu0cQJi2hVk9_0wskEDH2X7MaeHDLw@mail.gmail.com>
-Message-ID: <CAL_JsqLEv38DwnL4=ToXtEKNrDbgYv_0qiOc+cXZSjnfKVbeNg@mail.gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sun, 19 May 2013 07:51:38 +1200
+Subject: [PATCH 4/4] fb: vt8500: Add VGA output support to wm8505fb driver.
+In-Reply-To: <CABjd4Yxrk3hXnB5f6u+1HcJjymDZbtQ1F1HXkZ2dzF3dwCrWhg@mail.gmail.com>
+References: <1368868514-18975-1-git-send-email-linux@prisktech.co.nz>
+ <1368868514-18975-5-git-send-email-linux@prisktech.co.nz>
+ <CABjd4Yxrk3hXnB5f6u+1HcJjymDZbtQ1F1HXkZ2dzF3dwCrWhg@mail.gmail.com>
+Message-ID: <5197DBCA.8050708@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 9:03 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> On 18 May 2013 01:06, Rob Herring <robherring2@gmail.com> wrote:
->> The bL cpufreq driver appears to collide with the cpufreq-cpu0 driver.
->> There doesn't appear to be a functional problem, but just spurious
->> prints which indicate it is trying to do something. I think it needs
->> better checking whether the chip is actually multi-cluster. This is what
->> I get when I hotplug cpus:
+On 19/05/13 01:28, Alexey Charkov wrote:
+> 2013/5/18 Tony Prisk <linux@prisktech.co.nz>:
+>> The APC8750 does not support an LCD panel, but provides a VGA connector.
+>> This patch adds support for the VGA interface, and defines an optional
+>> devicetree property to specify the output interface. The default if not
+>> specified is LCD for backward compatibility.
 >>
->> [  909.372319] CPU1: Booted secondary processor
->> [  909.372616] cpu cpu1: get_cluster_clk_and_freq_table: init_opp_table
->> failed, cpu: 1, err: -61
->> [  909.385411] cpu cpu1: get_cluster_clk_and_freq_table: Failed to get
->> data for cluster: 9
->> [  909.394161] CPU2: shutdown
->> [  909.400957] CPU2: Booted secondary processor
->> [  909.401253] cpu cpu2: get_cluster_clk_and_freq_table: init_opp_table
->> failed, cpu: 2, err: -61
->> [  909.414044] cpu cpu2: get_cluster_clk_and_freq_table: Failed to get
->> data for cluster: 9
+>> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+>> ---
+>>   .../devicetree/bindings/video/wm,wm8505-fb.txt     |    5 ++++
+>>   drivers/video/wm8505fb.c                           |   31 ++++++++++++++++++--
+>>   2 files changed, 34 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+>> index 601416c..9f1d648 100644
+>> --- a/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+>> +++ b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+>> @@ -7,6 +7,10 @@ Required properties:
+>>   - bits-per-pixel : bit depth of framebuffer (16 or 32)
+>>   - clocks : phandle to DVO clock
+>>
+>> +Optional properties:
+>> +- output-interface : the interface the fb should output on. Valid values are
+>> +       "lcd" or "vga". If not specified, the default is "lcd".
+>> +
+>>   Required subnodes:
+>>   - display-timings: see display-timing.txt for information
+>>
+>> @@ -17,6 +21,7 @@ Example:
+>>                  reg = <0xd8051700 0x200>;
+>>                  bits-per-pixel = <16>;
+>>                  clocks = <&clkdvo>;
+>> +               output-interface = "vga";
+>>
+>>                  display-timings {
+>>                          native-mode = <&timing0>;
+>> diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
+>> index f8bffc2..d1f7f33 100644
+>> --- a/drivers/video/wm8505fb.c
+>> +++ b/drivers/video/wm8505fb.c
+>> @@ -130,12 +130,17 @@
+>>
+>>   #define to_wm8505fb_info(__info) container_of(__info, \
+>>                                                  struct wm8505fb_info, fb)
+>> +
+>> +#define INTERFACE_LCD  1
+>> +#define INTERFACE_VGA  2
+>> +
+>>   struct wm8505fb_info {
+>>          struct fb_info fb;
+>>          void __iomem *regbase;
+>>          unsigned int contrast;
+>>          struct device *dev;
+>>          struct clk *clk_dvo;
+>> +       int interface;
+>>   };
+>>
+>>
+>> @@ -158,7 +163,11 @@ static int wm8505fb_init_hw(struct fb_info *info)
+>>           * 0x31C sets the correct color mode (RGB565) for WM8650
+>>           * Bit 8+9 (0x300) are ignored on WM8505 as reserved
+>>           */
+>> -       writel(0x31c,                  fbi->regbase + REG_GOVRH_YUVRGB);
+>> +       if (fbi->interface == INTERFACE_VGA)
+>> +               writel(0x338, fbi->regbase + REG_GOVRH_YUVRGB);
+>> +       else
+>> +               writel(0x31c, fbi->regbase + REG_GOVRH_YUVRGB);
+>> +
+>>          writel(1,                      fbi->regbase + REG_GOVRH_DVO_PIX);
+> Tony,
 >
-> See if this fixes your issue.
+> Would it be possible to also define known bit offsets for those
+> registers, while you are at this? It would probably reduce the black
+> magic quite a bit :)
+On my list of things to do :)
+>>          /* Virtual buffer size */
+>> @@ -167,7 +176,12 @@ static int wm8505fb_init_hw(struct fb_info *info)
+>>
+>>          /* black magic ;) */
+>>          writel(0xf,                    fbi->regbase + REG_GOVRH_FHI);
+>> -       writel(4,                      fbi->regbase + REG_GOVRH_DVO_SET);
+>> +
+>> +       if (fbi->interface == INTERFACE_VGA)
+>> +               writel(0xe, fbi->regbase + REG_GOVRH_DVO_SET);
+>> +       else
+>> +               writel(4, fbi->regbase + REG_GOVRH_DVO_SET);
+> I don't remember if HDMI is yet another option for this register or
+> not... If it is, it would probably warrant defining fbi->interface as
+> an enum and changing this if-else into a switch statement to let the
+> compiler add its checks/warnings.
+This register defines the h/v syncpolarity and enable/disable for DVO.
 >
-> https://groups.google.com/forum/?fromgroups#!topic/linux.kernel/XJF-82rad4o
+>>          writel(1,                      fbi->regbase + REG_GOVRH_MIF);
+>>          writel(1,                      fbi->regbase + REG_GOVRH_REG_STS);
+>>
+>> @@ -194,11 +208,15 @@ static int wm8505fb_set_timing(struct fb_info *info)
+>>          writel(h_end,   fbi->regbase + REG_GOVRH_ACTPX_END);
+>>          writel(h_all,   fbi->regbase + REG_GOVRH_H_ALLPXL);
+>>          writel(h_sync,  fbi->regbase + REG_GOVRH_HDMI_HSYNW);
+>> +       if (fbi->interface == INTERFACE_VGA)
+>> +               writel(h_sync,  fbi->regbase + REG_GOVRH_VGA_HSYNW);
+> Will it misbehave on LCD if you write to the VGA register unconditionally?
+Don't know - wouldn't imagine so. I will test it and see.
 >
-> Attached too.
-
-No, it still registers the bL driver. The problem is not that DT data
-is missing, but it is present on a single cluster system. This is what
-my 1st cpu node looks like:
-
-$ ls /proc/device-tree/cpus/cpu at 900/
-clock-latency  clocks      device_type  next-level-cache  reg
-clock-names    compatible  name         operating-points  transition-latency
-
-This is the boot log:
-
-[    1.192186] cpu cpu0: get_cluster_clk_and_freq_table: Failed to get
-clk for cpu: 0, cluster: 9
-[    1.200804] cpu cpu0: get_cluster_clk_and_freq_table: Failed to get
-data for cluster: 9
-[    1.208815] cpu cpu1: get_cluster_clk_and_freq_table:
-init_opp_table failed, cpu: 1, err: -61
-[    1.217345] cpu cpu1: get_cluster_clk_and_freq_table: Failed to get
-data for cluster: 9
-[    1.225354] cpu cpu2: get_cluster_clk_and_freq_table:
-init_opp_table failed, cpu: 2, err: -61
-[    1.233879] cpu cpu2: get_cluster_clk_and_freq_table: Failed to get
-data for cluster: 9
-[    1.241880] cpu cpu3: get_cluster_clk_and_freq_table:
-init_opp_table failed, cpu: 3, err: -61
-[    1.250403] cpu cpu3: get_cluster_clk_and_freq_table: Failed to get
-data for cluster: 9
-[    1.258406] arm_big_little: bL_cpufreq_register: Registered
-platform driver: dt-bl
-[    1.266123] cpufreq_cpu0: failed to get cpu0 regulator: -19
-[    1.271704] cpufreq_cpu0: failed register driver: -16
-[    1.276764] cpufreq-cpu0: probe of cpufreq-cpu0.0 failed with error -16
-
-Rob
+>>          writel(v_start, fbi->regbase + REG_GOVRH_ACTLN_BG);
+>>          writel(v_end,   fbi->regbase + REG_GOVRH_ACTLN_END);
+>>          writel(v_all,   fbi->regbase + REG_GOVRH_V_ALLLN);
+>>          writel(v_sync,  fbi->regbase + REG_GOVRH_HDMI_VBISW);
+>> +       if (fbi->interface == INTERFACE_VGA)
+>> +               writel(info->var.pixclock,  fbi->regbase + REG_GOVRH_VGA_VSYNW);
+> Same here. I would assume that setting the pixclock should not hurt
+> LCD, which would then simplify the code a little.
+>
+> Thanks,
+> Alexey
+Regards
+Tony Prisk
