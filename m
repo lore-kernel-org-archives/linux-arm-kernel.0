@@ -1,128 +1,35 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sun, 19 May 2013 07:51:38 +1200
-Subject: [PATCH 4/4] fb: vt8500: Add VGA output support to wm8505fb driver.
-In-Reply-To: <CABjd4Yxrk3hXnB5f6u+1HcJjymDZbtQ1F1HXkZ2dzF3dwCrWhg@mail.gmail.com>
-References: <1368868514-18975-1-git-send-email-linux@prisktech.co.nz>
- <1368868514-18975-5-git-send-email-linux@prisktech.co.nz>
- <CABjd4Yxrk3hXnB5f6u+1HcJjymDZbtQ1F1HXkZ2dzF3dwCrWhg@mail.gmail.com>
-Message-ID: <5197DBCA.8050708@prisktech.co.nz>
+From: w@1wt.eu (Willy Tarreau)
+Date: Sat, 18 May 2013 21:52:23 +0200
+Subject: [PATCH] arm: mvebu: enable the third USB interface on OpenBlocks
+ AX3
+In-Reply-To: <519634F9.7060700@free-electrons.com>
+References: <1368720444-29357-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130517.111810.02327269.yamagata@plathome.co.jp>
+ <519634F9.7060700@free-electrons.com>
+Message-ID: <20130518195223.GG1936@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/05/13 01:28, Alexey Charkov wrote:
-> 2013/5/18 Tony Prisk <linux@prisktech.co.nz>:
->> The APC8750 does not support an LCD panel, but provides a VGA connector.
->> This patch adds support for the VGA interface, and defines an optional
->> devicetree property to specify the output interface. The default if not
->> specified is LCD for backward compatibility.
->>
->> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
->> ---
->>   .../devicetree/bindings/video/wm,wm8505-fb.txt     |    5 ++++
->>   drivers/video/wm8505fb.c                           |   31 ++++++++++++++++++--
->>   2 files changed, 34 insertions(+), 2 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
->> index 601416c..9f1d648 100644
->> --- a/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
->> +++ b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
->> @@ -7,6 +7,10 @@ Required properties:
->>   - bits-per-pixel : bit depth of framebuffer (16 or 32)
->>   - clocks : phandle to DVO clock
->>
->> +Optional properties:
->> +- output-interface : the interface the fb should output on. Valid values are
->> +       "lcd" or "vga". If not specified, the default is "lcd".
->> +
->>   Required subnodes:
->>   - display-timings: see display-timing.txt for information
->>
->> @@ -17,6 +21,7 @@ Example:
->>                  reg = <0xd8051700 0x200>;
->>                  bits-per-pixel = <16>;
->>                  clocks = <&clkdvo>;
->> +               output-interface = "vga";
->>
->>                  display-timings {
->>                          native-mode = <&timing0>;
->> diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
->> index f8bffc2..d1f7f33 100644
->> --- a/drivers/video/wm8505fb.c
->> +++ b/drivers/video/wm8505fb.c
->> @@ -130,12 +130,17 @@
->>
->>   #define to_wm8505fb_info(__info) container_of(__info, \
->>                                                  struct wm8505fb_info, fb)
->> +
->> +#define INTERFACE_LCD  1
->> +#define INTERFACE_VGA  2
->> +
->>   struct wm8505fb_info {
->>          struct fb_info fb;
->>          void __iomem *regbase;
->>          unsigned int contrast;
->>          struct device *dev;
->>          struct clk *clk_dvo;
->> +       int interface;
->>   };
->>
->>
->> @@ -158,7 +163,11 @@ static int wm8505fb_init_hw(struct fb_info *info)
->>           * 0x31C sets the correct color mode (RGB565) for WM8650
->>           * Bit 8+9 (0x300) are ignored on WM8505 as reserved
->>           */
->> -       writel(0x31c,                  fbi->regbase + REG_GOVRH_YUVRGB);
->> +       if (fbi->interface == INTERFACE_VGA)
->> +               writel(0x338, fbi->regbase + REG_GOVRH_YUVRGB);
->> +       else
->> +               writel(0x31c, fbi->regbase + REG_GOVRH_YUVRGB);
->> +
->>          writel(1,                      fbi->regbase + REG_GOVRH_DVO_PIX);
-> Tony,
->
-> Would it be possible to also define known bit offsets for those
-> registers, while you are at this? It would probably reduce the black
-> magic quite a bit :)
-On my list of things to do :)
->>          /* Virtual buffer size */
->> @@ -167,7 +176,12 @@ static int wm8505fb_init_hw(struct fb_info *info)
->>
->>          /* black magic ;) */
->>          writel(0xf,                    fbi->regbase + REG_GOVRH_FHI);
->> -       writel(4,                      fbi->regbase + REG_GOVRH_DVO_SET);
->> +
->> +       if (fbi->interface == INTERFACE_VGA)
->> +               writel(0xe, fbi->regbase + REG_GOVRH_DVO_SET);
->> +       else
->> +               writel(4, fbi->regbase + REG_GOVRH_DVO_SET);
-> I don't remember if HDMI is yet another option for this register or
-> not... If it is, it would probably warrant defining fbi->interface as
-> an enum and changing this if-else into a switch statement to let the
-> compiler add its checks/warnings.
-This register defines the h/v syncpolarity and enable/disable for DVO.
->
->>          writel(1,                      fbi->regbase + REG_GOVRH_MIF);
->>          writel(1,                      fbi->regbase + REG_GOVRH_REG_STS);
->>
->> @@ -194,11 +208,15 @@ static int wm8505fb_set_timing(struct fb_info *info)
->>          writel(h_end,   fbi->regbase + REG_GOVRH_ACTPX_END);
->>          writel(h_all,   fbi->regbase + REG_GOVRH_H_ALLPXL);
->>          writel(h_sync,  fbi->regbase + REG_GOVRH_HDMI_HSYNW);
->> +       if (fbi->interface == INTERFACE_VGA)
->> +               writel(h_sync,  fbi->regbase + REG_GOVRH_VGA_HSYNW);
-> Will it misbehave on LCD if you write to the VGA register unconditionally?
-Don't know - wouldn't imagine so. I will test it and see.
->
->>          writel(v_start, fbi->regbase + REG_GOVRH_ACTLN_BG);
->>          writel(v_end,   fbi->regbase + REG_GOVRH_ACTLN_END);
->>          writel(v_all,   fbi->regbase + REG_GOVRH_V_ALLLN);
->>          writel(v_sync,  fbi->regbase + REG_GOVRH_HDMI_VBISW);
->> +       if (fbi->interface == INTERFACE_VGA)
->> +               writel(info->var.pixclock,  fbi->regbase + REG_GOVRH_VGA_VSYNW);
-> Same here. I would assume that setting the pixclock should not hurt
-> LCD, which would then simplify the code a little.
->
-> Thanks,
-> Alexey
-Regards
-Tony Prisk
+Hi Gregory,
+
+On Fri, May 17, 2013 at 03:47:37PM +0200, Gregory CLEMENT wrote:
+> I applied and tested on my OpenBlocks AX3 and get the 3rd USB
+> interface detected. As I don't have any mini-PCIe card which use USB,
+> I didn't tested it furthermore, but as Atsushi Yamagata managed to
+> detect an USB device on this interface, we can be pretty confident
+> with this patch:
+
+I do have a mini-PCIe to PCIe+USB adapter [1]. I have plugged it
+with a USB flash and it was correctly detected as well after I
+applied the patch :
+
+usb 3-1: new high-speed USB device number 2 using orion-ehci
+usb 3-1: New USB device found, idVendor=0781, idProduct=5567
+usb 3-1: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+usb 3-1: Product: Cruzer Blade
+usb 3-1: Manufacturer: SanDisk
+
+Best regards,
+Willy
+
+[1] : http://www.hwtools.net/Adapter/PM2.html
