@@ -1,56 +1,59 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 19 May 2013 00:47:39 +0200
-Subject: [PATCH] ARM: nomadik: fix IRQ assignment for SMC ethernet
-Message-ID: <1368917259-7883-1-git-send-email-linus.walleij@linaro.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 19 May 2013 00:50:05 +0200
+Subject: [PATCH v2 2/6] ARM: SAMSUNG: uncompress: Use local definitions of
+ watchdog registers
+In-Reply-To: <1368916627-23139-3-git-send-email-tomasz.figa@gmail.com>
+References: <1368916627-23139-1-git-send-email-tomasz.figa@gmail.com>
+ <1368916627-23139-3-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <3859367.63djUfrUBu@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The assignment of IRQ for the SMC91x ethernet adapter had two
-problems making it non-working:
+This patch adds local definitions of required watchdog registers and
+bitfields to the uncompress header, allowing to remove the dependency on
+plat/regs-watchdog.h header and the ugly hack to replace virtual with
+physical addresses.
 
-- It was not put into the ethernet device node. Let's do this
-  by using the board-specific overlay, so we can make other
-  overlays on other Nomadik boards.
+In addition, it fixes reboot on decompression failure feature, due to
+the mentioned ugly hack not working anymore (the macro being redefined
+got renamed, without fixing this code).
 
-- The IRQ number was actually completely wrong, this was the
-  number for NHK8815, not S8815.
-
-After this ethernet starts working on the USB S8815.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
-ARM SoC folks: I would appreciate if you apply this patch
-directly for v3.10 fixes.
----
- arch/arm/boot/dts/ste-nomadik-s8815.dts | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+Changes since v1:
+ - Proper commit message. I have sent wrong version previously, sorry
+  for the noise.
 
-diff --git a/arch/arm/boot/dts/ste-nomadik-s8815.dts b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-index b28fbf3..6f82d93 100644
---- a/arch/arm/boot/dts/ste-nomadik-s8815.dts
-+++ b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-@@ -14,13 +14,19 @@
- 		bootargs = "root=/dev/ram0 console=ttyAMA1,115200n8 earlyprintk";
- 	};
+ arch/arm/plat-samsung/include/plat/uncompress.h | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h b/arch/arm/plat-samsung/include/plat/uncompress.h
+index 438b248..e8954b8 100644
+--- a/arch/arm/plat-samsung/include/plat/uncompress.h
++++ b/arch/arm/plat-samsung/include/plat/uncompress.h
+@@ -28,11 +28,20 @@ static void arch_detect_cpu(void);
+ /* defines for UART registers */
  
-+	/* This is where the interrupt is routed on the S8815 board */
-+	external-bus at 34000000 {
-+		ethernet at 300 {
-+			interrupt-parent = <&gpio3>;
-+			interrupts = <8 0x1>;
-+		};
-+	};
+ #include <plat/regs-serial.h>
+-#include <plat/regs-watchdog.h>
+ 
+ /* working in physical space... */
+-#undef S3C2410_WDOGREG
+-#define S3C2410_WDOGREG(x) ((S3C24XX_PA_WATCHDOG + (x)))
++#define S3C_WDOGREG(x)	((S3C_PA_WDT + (x)))
 +
- 	/* Custom board node with GPIO pins to active etc */
- 	usb-s8815 {
- 		/* The S8815 is using this very GPIO pin for the SMSC91x IRQs */
- 		ethernet-gpio {
--			gpios = <&gpio3 19 0x1>;
--			interrupts = <19 0x1>;
--			interrupt-parent = <&gpio3>;
-+			gpios = <&gpio3 8 0x1>;
- 		};
- 		/* This will bias the MMC/SD card detect line */
- 		mmcsd-gpio {
++#define S3C2410_WTCON	S3C_WDOGREG(0x00)
++#define S3C2410_WTDAT	S3C_WDOGREG(0x04)
++#define S3C2410_WTCNT	S3C_WDOGREG(0x08)
++
++#define S3C2410_WTCON_RSTEN	(1 << 0)
++#define S3C2410_WTCON_ENABLE	(1 << 5)
++
++#define S3C2410_WTCON_DIV128	(3 << 3)
++
++#define S3C2410_WTCON_PRESCALE(x)	((x) << 8)
+ 
+ /* how many bytes we allow into the FIFO@a time in FIFO mode */
+ #define FIFO_MAX	 (14)
 -- 
-1.8.1.4
+1.8.2.1
