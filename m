@@ -1,67 +1,56 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 19 May 2013 00:37:07 +0200
-Subject: [PATCH 6/6] ARM: SAMSUNG: Remove unused plat/regs-watchdog.h header
-In-Reply-To: <1368916627-23139-1-git-send-email-tomasz.figa@gmail.com>
-References: <1368916627-23139-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1368916627-23139-7-git-send-email-tomasz.figa@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 19 May 2013 00:47:39 +0200
+Subject: [PATCH] ARM: nomadik: fix IRQ assignment for SMC ethernet
+Message-ID: <1368917259-7883-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since there are no remaining users of this header, it can be safely
-dropped.
+The assignment of IRQ for the SMC91x ethernet adapter had two
+problems making it non-working:
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+- It was not put into the ethernet device node. Let's do this
+  by using the board-specific overlay, so we can make other
+  overlays on other Nomadik boards.
+
+- The IRQ number was actually completely wrong, this was the
+  number for NHK8815, not S8815.
+
+After this ethernet starts working on the USB S8815.
+
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/plat-samsung/include/plat/regs-watchdog.h | 41 ----------------------
- 1 file changed, 41 deletions(-)
- delete mode 100644 arch/arm/plat-samsung/include/plat/regs-watchdog.h
+ARM SoC folks: I would appreciate if you apply this patch
+directly for v3.10 fixes.
+---
+ arch/arm/boot/dts/ste-nomadik-s8815.dts | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/regs-watchdog.h b/arch/arm/plat-samsung/include/plat/regs-watchdog.h
-deleted file mode 100644
-index 4938492..0000000
---- a/arch/arm/plat-samsung/include/plat/regs-watchdog.h
-+++ /dev/null
-@@ -1,41 +0,0 @@
--/* arch/arm/mach-s3c2410/include/mach/regs-watchdog.h
-- *
-- * Copyright (c) 2003 Simtec Electronics <linux@simtec.co.uk>
-- *		      http://www.simtec.co.uk/products/SWLINUX/
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * S3C2410 Watchdog timer control
--*/
--
--
--#ifndef __ASM_ARCH_REGS_WATCHDOG_H
--#define __ASM_ARCH_REGS_WATCHDOG_H
--
--#define S3C_WDOGREG(x) ((x) + S3C_VA_WATCHDOG)
--
--#define S3C2410_WTCON	   S3C_WDOGREG(0x00)
--#define S3C2410_WTDAT	   S3C_WDOGREG(0x04)
--#define S3C2410_WTCNT	   S3C_WDOGREG(0x08)
--
--/* the watchdog can either generate a reset pulse, or an
-- * interrupt.
-- */
--
--#define S3C2410_WTCON_RSTEN   (0x01)
--#define S3C2410_WTCON_INTEN   (1<<2)
--#define S3C2410_WTCON_ENABLE  (1<<5)
--
--#define S3C2410_WTCON_DIV16   (0<<3)
--#define S3C2410_WTCON_DIV32   (1<<3)
--#define S3C2410_WTCON_DIV64   (2<<3)
--#define S3C2410_WTCON_DIV128  (3<<3)
--
--#define S3C2410_WTCON_PRESCALE(x) ((x) << 8)
--#define S3C2410_WTCON_PRESCALE_MASK (0xff00)
--
--#endif /* __ASM_ARCH_REGS_WATCHDOG_H */
--
--
+diff --git a/arch/arm/boot/dts/ste-nomadik-s8815.dts b/arch/arm/boot/dts/ste-nomadik-s8815.dts
+index b28fbf3..6f82d93 100644
+--- a/arch/arm/boot/dts/ste-nomadik-s8815.dts
++++ b/arch/arm/boot/dts/ste-nomadik-s8815.dts
+@@ -14,13 +14,19 @@
+ 		bootargs = "root=/dev/ram0 console=ttyAMA1,115200n8 earlyprintk";
+ 	};
+ 
++	/* This is where the interrupt is routed on the S8815 board */
++	external-bus at 34000000 {
++		ethernet at 300 {
++			interrupt-parent = <&gpio3>;
++			interrupts = <8 0x1>;
++		};
++	};
++
+ 	/* Custom board node with GPIO pins to active etc */
+ 	usb-s8815 {
+ 		/* The S8815 is using this very GPIO pin for the SMSC91x IRQs */
+ 		ethernet-gpio {
+-			gpios = <&gpio3 19 0x1>;
+-			interrupts = <19 0x1>;
+-			interrupt-parent = <&gpio3>;
++			gpios = <&gpio3 8 0x1>;
+ 		};
+ 		/* This will bias the MMC/SD card detect line */
+ 		mmcsd-gpio {
 -- 
-1.8.2.1
+1.8.1.4
