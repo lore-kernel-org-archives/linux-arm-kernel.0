@@ -1,51 +1,73 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Sat, 18 May 2013 19:48:17 +0200
-Subject: ARM: 3.10-rc1 does not boot anymore on OpenBlocks AX3
-In-Reply-To: <CALF0-+UfQeh-vKMmm7Eehbw6MNtouL0i+BceC2zVmBk5s7QfGg@mail.gmail.com>
-References: <20130518170158.GB1936@1wt.eu> <20130518172212.GA21837@localhost>
- <20130518172633.GD1936@1wt.eu>
- <CALF0-+UfQeh-vKMmm7Eehbw6MNtouL0i+BceC2zVmBk5s7QfGg@mail.gmail.com>
-Message-ID: <20130518174817.GE1936@1wt.eu>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 18 May 2013 20:20:00 +0200
+Subject: [RFC 3/4] DRM: add OF support for Dove DRM driver
+In-Reply-To: <20130518194502.102caa9e@armhf>
+References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+ <1368897139-25485-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1368897139-25485-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130518194502.102caa9e@armhf>
+Message-ID: <5197C650.9020802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 18, 2013 at 02:28:57PM -0300, Ezequiel Garcia wrote:
-> On Sat, May 18, 2013 at 2:26 PM, Willy Tarreau <w@1wt.eu> wrote:
-> > Hi Gregory & Ezequeil,
-> >
-> > On Sat, May 18, 2013 at 02:22:13PM -0300, Ezequiel Garcia wrote:
-> >> Hi Willy,
-> >>
-> >> On Sat, May 18, 2013 at 07:01:58PM +0200, Willy Tarreau wrote:
-> >> >
-> >> > Uncompressing Linux... done, booting the kernel.
-> >> > Booting Linux on physical CPU 0x0
-> >> > Linux version 3.10.0-rc-mvebu (willy at pcw) (gcc version 4.7.3 20130205 (prerelease) (crosstool-NG 1.18.0) ) #6 SMP Sat May 18 17:40:55 CEST 2013
-> >> > CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7), cr=10c53c7d
-> >> > CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-> >> > Machine: Marvell Armada 370/XP (Device Tree), model: PlatHome OpenBlocks AX3-4 board
-> >> > bootconsole [earlycon0] enabled
-> >> > INITRD: 0x07000040+0x00a5c000 is not a memory region - disabling initrd
-> >> > Memory policy: ECC disabled, Data cache writealloc
-> >> > Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
-> >>
-> >> This is a known issue.
-> >> Please try again with this patch:
-> >>
-> >> [PATCH] ARM: zImage: Convert 32bits memory size and address from ATAG to
-> >> 64bits DTB
-> >>
-> >> which has been posted on LAKML on May 14th.
-> >
-> > Thanks to you both for your simultaneous response :-)
-> 
-> That's because our mvebu stuff has enabled parallel user support :-)
+On 05/18/2013 07:45 PM, Jean-Francois Moine wrote:
+> On Sat, 18 May 2013 19:12:18 +0200
+> Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>  wrote:
+>> This adds OF support for the Dove DRM driver recently posted as RFC by
+>> Russell King.
+>>
+...
 
-:-)
+Jean-Francois,
 
-I confirm the fix is OK for me. I'll play a bit with the new
-kernel on the box now.
+one thing first: It is an RFC! It is to allow you to _test_ rmk's driver
+on DT. Nothing more, nothing less.
 
-Have a nice week-end,
+I will comment on your questions but that all can change for a full
+patch set of rmk, you, or me.
 
-Willy
+The "video-card" node combines all devices that will be available and
+active on a specific Dove board. As you may have noticed about rmk's
+driver, it is registering crtcs from IORESOURCE_MEM passed with the
+platform_device.
+
+To match with this approach we _have to_ recreate that platform_device
+from what we see on DT. On DT each bus node gets registered as its own
+platform_device. So in the video-card driver we look for node we know
+of and put together a platform_device for rmk's driver. We cannot hook
+DT upon either an lcd node nor dcon node as they might be disabled and
+the driver will get called multiple times.
+
+> It seems we are moving backwards:
+> - what about the display controller?
+
+That would be part of probing DT nodes above. I did not take care of
+that because rmk doesn't support dcon for now.
+
+> - how do you clone the lcd 0 output to the port B?
+
+Pass properties on video-card node or even better let dcon driver
+take care of it when it sees a video-card with more than one crtc.
+
+> - what occurs when the si5351 and the tda998x are modules?
+
+Touche, forgot that part. Feel free to add module support to the
+RFC.
+
+> My driver had the same layout as Russell's when I proposed it to you
+> and when you insisted to handle the 2 LCDs and the 2 ports as one card.
+
+I still insist to handle 2 LCDs and DCON.
+
+> I spent 2 months to have a nice design and you put it to garbage!
+> I am not happy...
+
+I put nothing to garbage. _You_ also agreed to merge with rmk's driver!
+We can now put in all features we implemented differently
+_step-by-step_.
+
+Merging the drivers starts with adding support for DT - that is what
+I provided. You know the HW better than me, why don't you start picking
+features from your driver and add them in rmk's driver?
+
+Sebastian
