@@ -1,91 +1,198 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 19 May 2013 00:13:04 +0200
-Subject: [PATCH] ARM: nomadik: add led and key for S8815
-Message-ID: <1368915184-29657-1-git-send-email-linus.walleij@linaro.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 19 May 2013 00:31:21 +0200
+Subject: [PATCH] ARM: s5p64x0: Use common uncompress.h part for plat-samsung
+Message-ID: <1368916282-22896-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds device tree hunks for the LED and userbutton on the
-USB S8815 board, and set up a heartbeat trigger on the LED and
-an escape key on the user button. Alter the defconfig to enable
-these standard DT-enabled GPIO drivers.
+Since uart_base can be set dynamically in arch_detect_cpu(), there is no
+need to have a copy of all code locally, just to override UART base
+address.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+This patch removes any duplicate code in uncompress.h variant of s5p64x0
+and implements proper arch_detect_cpu() function to initialize UART with
+SoC-specific parameters.
+
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/boot/dts/ste-nomadik-s8815.dts | 22 ++++++++++++++++++++++
- arch/arm/configs/nhk8815_defconfig      |  6 ++++++
- arch/arm/mach-nomadik/cpu-8815.c        |  4 ++++
- 3 files changed, 32 insertions(+)
+ arch/arm/mach-s5p64x0/include/mach/uncompress.h | 155 +-----------------------
+ 1 file changed, 5 insertions(+), 150 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-nomadik-s8815.dts b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-index b28fbf3..666945a 100644
---- a/arch/arm/boot/dts/ste-nomadik-s8815.dts
-+++ b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-@@ -27,4 +27,26 @@
- 			gpios = <&gpio3 16 0x1>;
- 		};
- 	};
+diff --git a/arch/arm/mach-s5p64x0/include/mach/uncompress.h b/arch/arm/mach-s5p64x0/include/mach/uncompress.h
+index 19e0d64..b383b81 100644
+--- a/arch/arm/mach-s5p64x0/include/mach/uncompress.h
++++ b/arch/arm/mach-s5p64x0/include/mach/uncompress.h
+@@ -15,37 +15,11 @@
+ 
+ #include <mach/map.h>
+ 
+-/*
+- * cannot use commonly <plat/uncompress.h>
+- * because uart base of S5P6440 and S5P6450 is different
+- */
+-
+-typedef unsigned int upf_t;	/* cannot include linux/serial_core.h */
+-
+-/* uart setup */
+-
+-unsigned int fifo_mask;
+-unsigned int fifo_max;
+-
+-/* forward declerations */
+-
+-static void arch_detect_cpu(void);
+-
+-/* defines for UART registers */
+-
+-#include <plat/regs-serial.h>
+-#include <plat/regs-watchdog.h>
+-
+-/* working in physical space... */
+-#undef S3C2410_WDOGREG
+-#define S3C2410_WDOGREG(x) ((S3C24XX_PA_WATCHDOG + (x)))
+-
+-/* how many bytes we allow into the FIFO at a time in FIFO mode */
+-#define FIFO_MAX	 (14)
+-
+ unsigned long uart_base;
+ 
+-static __inline__ void get_uart_base(void)
++#include <plat/uncompress.h>
 +
-+	/* The user LED on the board is set up to be used for heartbeat */
-+	leds {
-+		compatible = "gpio-leds";
-+		user-led {
-+			label = "user_led";
-+			gpios = <&gpio0 2 0x1>;
-+			default-state = "off";
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	/* User key mapped in as "escape" */
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		user-button {
-+			label = "user_button";
-+			gpios = <&gpio0 3 0x1>;
-+			linux,code = <1>; /* KEY_ESC */
-+			gpio-key,wakeup;
-+		};
-+	};
- };
-diff --git a/arch/arm/configs/nhk8815_defconfig b/arch/arm/configs/nhk8815_defconfig
-index b01e763..35f8cf2 100644
---- a/arch/arm/configs/nhk8815_defconfig
-+++ b/arch/arm/configs/nhk8815_defconfig
-@@ -81,6 +81,7 @@ CONFIG_PPP_SYNC_TTY=m
- # CONFIG_INPUT_MOUSEDEV is not set
- CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_GPIO=y
- # CONFIG_MOUSE_PS2 is not set
- # CONFIG_SERIO is not set
- # CONFIG_LEGACY_PTYS is not set
-@@ -96,6 +97,11 @@ CONFIG_DEBUG_GPIO=y
- CONFIG_MMC=y
- CONFIG_MMC_CLKGATE=y
- CONFIG_MMC_ARMMMCI=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_DMADEVICES=y
-diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
-index 59f6ff5..1e0ec38 100644
---- a/arch/arm/mach-nomadik/cpu-8815.c
-+++ b/arch/arm/mach-nomadik/cpu-8815.c
-@@ -99,6 +99,10 @@ static unsigned long in_pullup[] = { PIN_INPUT_PULLUP };
- static struct pinctrl_map __initdata nhk8815_pinmap[] = {
- 	PIN_MAP_MUX_GROUP_DEFAULT("uart0", "pinctrl-stn8815", "u0_a_1", "u0"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("uart1", "pinctrl-stn8815", "u1_a_1", "u1"),
-+	/* User LED on S8815 */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO2_C5", out_high),
-+	/* User button on S8815 */
-+	PIN_MAP_CONFIGS_PIN_HOG_DEFAULT("pinctrl-stn8815", "GPIO3_A4", in_nopull),
- 	/* Hog in MMC/SD card mux */
- 	PIN_MAP_MUX_GROUP_HOG_DEFAULT("pinctrl-stn8815", "mmcsd_a_1", "mmcsd"),
- 	/* MCCLK */
++static void arch_detect_cpu(void)
+ {
+ 	unsigned int chipid;
+ 
+@@ -57,128 +31,9 @@ static __inline__ void get_uart_base(void)
+ 		uart_base += 0xEC800000;
+ 	else
+ 		uart_base += 0xEC000000;
+-}
+-
+-static __inline__ void uart_wr(unsigned int reg, unsigned int val)
+-{
+-	volatile unsigned int *ptr;
+ 
+-	get_uart_base();
+-	ptr = (volatile unsigned int *)(reg + uart_base);
+-	*ptr = val;
+-}
+-
+-static __inline__ unsigned int uart_rd(unsigned int reg)
+-{
+-	volatile unsigned int *ptr;
+-
+-	get_uart_base();
+-	ptr = (volatile unsigned int *)(reg + uart_base);
+-	return *ptr;
+-}
+-
+-/*
+- * we can deal with the case the UARTs are being run
+- * in FIFO mode, so that we don't hold up our execution
+- * waiting for tx to happen...
+- */
+-
+-static void putc(int ch)
+-{
+-	if (uart_rd(S3C2410_UFCON) & S3C2410_UFCON_FIFOMODE) {
+-		int level;
+-
+-		while (1) {
+-			level = uart_rd(S3C2410_UFSTAT);
+-			level &= fifo_mask;
+-
+-			if (level < fifo_max)
+-				break;
+-		}
+-
+-	} else {
+-		/* not using fifos */
+-
+-		while ((uart_rd(S3C2410_UTRSTAT) & S3C2410_UTRSTAT_TXE) != S3C2410_UTRSTAT_TXE)
+-			barrier();
+-	}
+-
+-	/* write byte to transmission register */
+-	uart_wr(S3C2410_UTXH, ch);
+-}
+-
+-static inline void flush(void)
+-{
+-}
+-
+-#define __raw_writel(d, ad)			\
+-	do {							\
+-		*((volatile unsigned int __force *)(ad)) = (d); \
+-	} while (0)
+-
+-
+-#ifdef CONFIG_S3C_BOOT_ERROR_RESET
+-
+-static void arch_decomp_error(const char *x)
+-{
+-	putstr("\n\n");
+-	putstr(x);
+-	putstr("\n\n -- System resetting\n");
+-
+-	__raw_writel(0x4000, S3C2410_WTDAT);
+-	__raw_writel(0x4000, S3C2410_WTCNT);
+-	__raw_writel(S3C2410_WTCON_ENABLE | S3C2410_WTCON_DIV128 | S3C2410_WTCON_RSTEN | S3C2410_WTCON_PRESCALE(0x40), S3C2410_WTCON);
+-
+-	while(1);
+-}
+-
+-#define arch_error arch_decomp_error
+-#endif
+-
+-#ifdef CONFIG_S3C_BOOT_UART_FORCE_FIFO
+-static inline void arch_enable_uart_fifo(void)
+-{
+-	u32 fifocon = uart_rd(S3C2410_UFCON);
+-
+-	if (!(fifocon & S3C2410_UFCON_FIFOMODE)) {
+-		fifocon |= S3C2410_UFCON_RESETBOTH;
+-		uart_wr(S3C2410_UFCON, fifocon);
+-
+-		/* wait for fifo reset to complete */
+-		while (1) {
+-			fifocon = uart_rd(S3C2410_UFCON);
+-			if (!(fifocon & S3C2410_UFCON_RESETBOTH))
+-				break;
+-		}
+-	}
+-}
+-#else
+-#define arch_enable_uart_fifo() do { } while(0)
+-#endif
+-
+-static void arch_decomp_setup(void)
+-{
+-	/*
+-	 * we may need to setup the uart(s) here if we are not running
+-	 * on an BAST... the BAST will have left the uarts configured
+-	 * after calling linux.
+-	 */
+-
+-	arch_detect_cpu();
+-
+-	/*
+-	 * Enable the UART FIFOs if they where not enabled and our
+-	 * configuration says we should turn them on.
+-	 */
+-
+-	arch_enable_uart_fifo();
+-}
+-
+-
+-
+-static void arch_detect_cpu(void)
+-{
+-	/* we do not need to do any cpu detection here@the moment. */
++	fifo_mask = S3C2440_UFSTAT_TXMASK;
++	fifo_max = 63 << S3C2440_UFSTAT_TXSHIFT;
+ }
+ 
+ #endif /* __ASM_ARCH_UNCOMPRESS_H */
 -- 
-1.8.1.4
+1.8.2.1
