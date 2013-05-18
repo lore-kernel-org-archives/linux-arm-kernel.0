@@ -1,38 +1,46 @@
-From: erappleman@gmail.com (Eric Appleman)
-Date: Sat, 18 May 2013 04:26:45 -0400
-Subject: Would like to form a pool of Linux copyright holders for faster GPL
- enforcement against Anthrax Kernels
-Message-ID: <51973B45.7040209@gmail.com>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sat, 18 May 2013 20:30:21 +1200
+Subject: [PATCH 4/4] MAINTAINERS: vt8500: Add clk-vt8500.c to MAINTAINERS
+ file
+In-Reply-To: <CABjd4Yw2LbnaUbQFW_bd_6WRGTA34-Vp_tUC2b4Jczj-MM8x1w@mail.gmail.com>
+References: <1368825532-30917-1-git-send-email-linux@prisktech.co.nz>
+ <1368825532-30917-5-git-send-email-linux@prisktech.co.nz>
+ <CABjd4Yw2LbnaUbQFW_bd_6WRGTA34-Vp_tUC2b4Jczj-MM8x1w@mail.gmail.com>
+Message-ID: <51973C1D.2080404@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Background on Anthrax Kernels and their GPL violation:
-http://pastebin.com/X5Cciy03
+On 18/05/13 18:40, Alexey Charkov wrote:
+> On 18 May 2013 01:18, "Tony Prisk" <linux@prisktech.co.nz> wrote:
+>> This file has missed being added under ARM/VT8500 ARM ARCHITECTURE,
+>> and is maintained along with the rest of the vt8500 arch code.
+>>
+>> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+>> ---
+>>   MAINTAINERS |    1 +
+>>   1 file changed, 1 insertion(+)
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 3d7782b..5ab8ccb 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -1283,6 +1283,7 @@ M:        Tony Prisk <linux@prisktech.co.nz>
+>>   L:     linux-arm-kernel at lists.infradead.org (moderated for
+> non-subscribers)
+>>   S:     Maintained
+>>   F:     arch/arm/mach-vt8500/
+>> +F:     drivers/clk/vt8500-vt8500.c
+> This looks like a typo (clk vs. vt8500).
+>
+> Best,
+> Alexey
+>
+eeek - oops.
 
-Would anyone be interested in forming such a pool? I am willing to wait 
-years for this to be resolved through certain organizations, but I 
-believe we can do better.
+Mike,
 
-Last I checked, I have 1 long-time poster of the gpl-violations list on 
-board. Would anyone else like to join? Ideally I'd like to get the LKML 
-(which I have CC'd among others) involved so that authors of critical 
-Linux components be a part of this. I'm not sure if my defconfig commits 
-to Android kernel branches count as contributions, so I'm not going to 
-consider myself a Linux contributor unless told otherwise.
+Disregard this patch - I will send a more complete one through arm-soc 
+as there are other files missing as well.
 
-This pool would be used in the following manner:
-
-* Formally requesting source for binaries (means to request source is 
-actively hidden)
-* Formally requesting removal of critical copyrighted code that Linux 
-cannot function without
-* Informing interested parties with respect to refusals of the above
-
-The CTO of Anthrax's hosting server is very interested in terminating 
-Chad Goodman's account. Bullet point #3 might come into effect here.
-
-If this is a bad idea, breaks list etiquette, uses incorrect logic, or 
-does not follow the conventions of GPL enforcement, feel free to shoot 
-this idea down with utmost prejudice.
-
-- Eric
+Regards
+Tony P
