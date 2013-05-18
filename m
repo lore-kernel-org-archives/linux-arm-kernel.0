@@ -1,115 +1,99 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Sat, 18 May 2013 19:46:06 +0800
-Subject: [PATCH RESEND] spi: sirf: fix the issue while transferring more than
- 256 words
-Message-ID: <1368877566-27812-1-git-send-email-Baohua.Song@csr.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 18 May 2013 11:18:40 +0200
+Subject: GPIO sysfs : set a wake source
+References: <87fvxwia0s.fsf@free.fr>
+ <CACRpkdYjQD9phVtWNh2QGkZWOdEJyZENnYatXt7bd23bgqXitw@mail.gmail.com>
+ <51926177.1050600@wwwdotorg.org> <87ip2ig1ez.fsf@free.fr>
+ <CACRpkdbiZFutP_+u=ciuC6r-8N5FpkEnGVLH9LGDQ7pvdo3_-Q@mail.gmail.com>
+Message-ID: <87k3mwv6ru.fsf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Qipan Li <Qipan.Li@csr.com>
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-currently, spi irq handler only does rx processing and fetching data from rx
-fifo when "FRM_END" irq happens. FRM_END indicates one transfer completes. if
-rx size is less than 256, it works well.
-but the problem is that spi rx fifo size is only 256 bytes, then if data size
-of one frame is more than 256, before FRM_END comes, rx fifo will be filled with
-RXFIFO_OFLOW overflow interrupt, it will make us lose some data due to fifo
-overflow.
-Explicitly we need do fetch work from device rx fifo in irq handler not only in
-"FRM_END" irq but also in "THD_REACH" irq. THD_REACH means rx fifo has come to
-its threshold and will come to overflow if we don't take data from it in time.
+> On Thu, May 16, 2013 at 9:39 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>
+>>>> Don't go down this path, let the kernel handle this kind of stuff.
+>
+>> Oh really, where ?
+>>
+>> Let me show you why it can't be a module.
+>
+> I'm not following. I haven't been talking about modules ...
+> (I think?)
+> Do you mean you want to show why it can't be in the kernel?
+My bad. Bad wording, I should have said "why it shouldn't be in kernel".
 
-In this patch, we fix this issue. we take data from rx fifo when either FRM_END
-or RX_THD_REACH irq comes, we put data into tx fifo when either TX_FIFO_EMPTY
-or TX_THD_REACH irq comes.
+>
+>> In my case, I have a 2G modem connected to the soc :
+>>  - the modem and 1 SoC UART are connected (TX, RX, CTS, ...)
+>>  - the modem and SoC are connected through several gpios
+>>    - one or two control to power up and reset the modem
+>>    - one connected to the modem "ring" signal (the one I want a wakeup for).
+>>
+>> So I have no module to handle my modem :
+>>  - UART is handled by pxa-uart
+>>  - control/reset by gpiolib
+>
+> Do you mean control/reset is handled by the userspace sysfs
+> interface to GPIOlib? This is not necessarily a good idea
+> in that case.
+Exactly, all controlled through userspace sysfs.
 
-Signed-off-by: Qipan Li <Qipan.Li@csr.com>
-Signed-off-by: Zhiwu Song <Zhiwu.Song@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/spi/spi-sirf.c | 43 +++++++++++++------------------------------
- 1 file changed, 13 insertions(+), 30 deletions(-)
+Well, it's the agreed method for far, see [1].
+Search [1] for the string "These are really lengthy and time consuming sequences".
 
-diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
-index 0808cd5..ac98cec 100644
---- a/drivers/spi/spi-sirf.c
-+++ b/drivers/spi/spi-sirf.c
-@@ -142,9 +142,6 @@ struct sirfsoc_spi {
- 	unsigned int left_tx_cnt;
- 	unsigned int left_rx_cnt;
- 
--	/* tasklet to push tx msg into FIFO */
--	struct tasklet_struct tasklet_tx;
--
- 	int chipselect[0];
- };
- 
-@@ -236,17 +233,6 @@ static void spi_sirfsoc_tx_word_u32(struct sirfsoc_spi *sspi)
- 	sspi->left_tx_cnt--;
- }
- 
--static void spi_sirfsoc_tasklet_tx(unsigned long arg)
--{
--	struct sirfsoc_spi *sspi = (struct sirfsoc_spi *)arg;
--
--	/* Fill Tx FIFO while there are left words to be transmitted */
--	while (!((readl(sspi->base + SIRFSOC_SPI_TXFIFO_STATUS) &
--			SIRFSOC_SPI_FIFO_FULL)) &&
--			sspi->left_tx_cnt)
--		sspi->tx_word(sspi);
--}
--
- static irqreturn_t spi_sirfsoc_irq(int irq, void *dev_id)
- {
- 	struct sirfsoc_spi *sspi = dev_id;
-@@ -261,25 +247,25 @@ static irqreturn_t spi_sirfsoc_irq(int irq, void *dev_id)
- 		writel(0x0, sspi->base + SIRFSOC_SPI_INT_EN);
- 	}
- 
--	if (spi_stat & SIRFSOC_SPI_FRM_END) {
-+	if (spi_stat & (SIRFSOC_SPI_FRM_END
-+			| SIRFSOC_SPI_RXFIFO_THD_REACH))
- 		while (!((readl(sspi->base + SIRFSOC_SPI_RXFIFO_STATUS)
- 				& SIRFSOC_SPI_FIFO_EMPTY)) &&
- 				sspi->left_rx_cnt)
- 			sspi->rx_word(sspi);
- 
--		/* Received all words */
--		if ((sspi->left_rx_cnt == 0) && (sspi->left_tx_cnt == 0)) {
--			complete(&sspi->done);
--			writel(0x0, sspi->base + SIRFSOC_SPI_INT_EN);
--		}
--	}
--
--	if (spi_stat & SIRFSOC_SPI_RXFIFO_THD_REACH ||
--		spi_stat & SIRFSOC_SPI_TXFIFO_THD_REACH ||
--		spi_stat & SIRFSOC_SPI_RX_FIFO_FULL ||
--		spi_stat & SIRFSOC_SPI_TXFIFO_EMPTY)
--		tasklet_schedule(&sspi->tasklet_tx);
-+	if (spi_stat & (SIRFSOC_SPI_FIFO_EMPTY
-+			| SIRFSOC_SPI_TXFIFO_THD_REACH))
-+		while (!((readl(sspi->base + SIRFSOC_SPI_TXFIFO_STATUS)
-+				& SIRFSOC_SPI_FIFO_FULL)) &&
-+				sspi->left_tx_cnt)
-+			sspi->tx_word(sspi);
- 
-+	/* Received all words */
-+	if ((sspi->left_rx_cnt == 0) && (sspi->left_tx_cnt == 0)) {
-+		complete(&sspi->done);
-+		writel(0x0, sspi->base + SIRFSOC_SPI_INT_EN);
-+	}
- 	return IRQ_HANDLED;
- }
- 
-@@ -573,9 +559,6 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
- 
- 	init_completion(&sspi->done);
- 
--	tasklet_init(&sspi->tasklet_tx, spi_sirfsoc_tasklet_tx,
--		     (unsigned long)sspi);
--
- 	writel(SIRFSOC_SPI_FIFO_RESET, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
- 	writel(SIRFSOC_SPI_FIFO_RESET, sspi->base + SIRFSOC_SPI_TXFIFO_OP);
- 	writel(SIRFSOC_SPI_FIFO_START, sspi->base + SIRFSOC_SPI_RXFIFO_OP);
+>> Devicetree can't help in the toggle to "activate" or "deactivate" the wakeup
+>> upon this GPIO, can it ?
+>
+> No, I'm just saying the connection between the device and the
+> GPIO tree shall be modeled in the device tree, especially since
+> this is obviously deeply embedded, soldered-on stuff and the
+> hardware set-up should be encoded in the device tree.
+OK, expressed in DT, why not.
+
+> I am starting so suspect that the real issue here, which has
+> not been expressed so far, is that you think of this embedded
+> modem as a US Robotics 28K8 modem connected to a serial
+> port, and as something that should be handled by userspace.
+Yes, that's what I and others think for modem startup control ([1]) but not for
+modem data path.
+
+> Is there a silent assumption that "modem drivers must be in
+> userspace"?
+No, certainly not. The assumption is one though that this particular modem,
+which is that old and simple, doesn't require a driver other than the uart SoC
+driver.
+
+> This assumption is not necessarily true when the modem start
+> to connect wires like GPIO to work. There are modems using
+> other things than UART, such as HSI, for datapath. And modems
+> using in-kernel protocols like CAIF or Phonet for control.
+These are far more modern modems than the one I'm talking of.
+Mine is a Sagem X200 (I think, from board disassembly).
+
+> I think you need to think about how we join this modem closer
+> with the kernel instead of trying to paper it over using userspace
+> GPIO.
+Why ? I has only one UART and several GPIOs. What good would it be to add it in
+kernel ?
+
+>> I don't yet know. Let me think this more over. I'd like some literature if you
+>> can provide (especially on LAKML).
+> It doesn't toggle any pins so it's not what you want anyway.
+> I think you want part of your driver in the kernel.
+Which driver ? The Sagem X200 ?
+
+> I think the dilemma faced by embedded modems need to
+> be considered thoroughly here.
+As I said, it's an "old" modem. And if by embedded you mean "embedded in the
+SoC", it's not, it's a separate chip. The interconnect are the UART lines and
+the GPIO lines (solder lines as you pointed out).
+
+
+Cheers.
+
 -- 
-1.8.2.3
+Robert
+
+[1] http://archive.arm.linux.org.uk/lurker/message/20080612.101303.80e8bb8b.fr.html
