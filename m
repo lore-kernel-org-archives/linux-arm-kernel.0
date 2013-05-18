@@ -1,38 +1,31 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Sat, 18 May 2013 19:29:53 +0900
-Subject: [PATCH V2] video: implement a simple framebuffer driver
-In-Reply-To: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
-References: <1365043183-28905-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CAAVeFuJ5q4Y0QtvJX2iVmq_O2ofs1B9=MB_aA8VdcEBdM4zf2Q@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sat, 18 May 2013 19:03:24 +0800
+Subject: [alsa-devel] [PATCH v2] ASoC: dfbmcs320: make the driver common
+ for other BT modules
+In-Reply-To: <20130517111523.GM1627@sirena.org.uk>
+References: <1368757177-15372-1-git-send-email-Baohua.Song@csr.com>
+ <20130517111523.GM1627@sirena.org.uk>
+Message-ID: <CAGsJ_4zjgLhNOiwGcTjvC6dP2XPqnmjzWF12pVPomU-ERH6YYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 4, 2013 at 11:39 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> +struct simplefb_format {
-> +       const char *name;
-> +       u32 bits_per_pixel;
-> +       struct fb_bitfield red;
-> +       struct fb_bitfield green;
-> +       struct fb_bitfield blue;
-> +       struct fb_bitfield transp;
-> +};
-> +
-> +struct simplefb_format simplefb_formats[] = {
-> +       { "r5g6b5", 16, {11, 5}, {5, 6}, {0, 5}, {0, 0} },
-> +};
+2013/5/17 Mark Brown <broonie@kernel.org>:
+> On Fri, May 17, 2013 at 10:19:37AM +0800, Barry Song wrote:
+>> DFBM-CS320 is only one of bluetooth modules using CSR bluetooth chips,
+>> we don't want everyone to have a seperate codec driver. anyway, the
+>> feature of Bluetooth handsfree is same on all platforms, so this patch
+>> makes the DFBM-CS320 driver become a common BT handsfree driver.
+>
+> Sorry, should have thought of this before but why are we calling this
+> "handsfree"?  It's just a generic bluetooth link as far as the host
+> system is concerned, "bt-sco" might be more appropriate?
 
-I have been adding a few extra formats to this list, and I wonder if
-this could not simply be turned into a function that would directly
-convert the name string into the corresponding right format. The
-mapping between name and format seems to be a 1:1 and this would
-probably avoid errors in the future. I'm especially thinking about
-color order here - I started adding a mode that reads
+agree. BT SCO should be more suitable.
 
-    { "r8g8b8a8", 32, {0, 8}, {8, 8}, {16, 8}, {24, 8} },
+>
+> Otherwise this looks OK for ASoC though I'd expect to see a change to
+> registration of the OpenMoko BT device (perhaps I missed it though).
 
-while it should probably be called "a8b8g8r8" as the order of colors
-is not the same as your r5g6b5.
+sorry. i don't understand. i would think OpenMOKO can also use this driver?
 
-I can submit a patch if there is no issue with that idea.
-
-Alex.
+-barry
