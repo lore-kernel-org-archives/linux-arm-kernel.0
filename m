@@ -1,28 +1,132 @@
 From: linux@prisktech.co.nz (Tony Prisk)
-Date: Sat, 18 May 2013 21:15:10 +1200
-Subject: [PATCH 0/4] FB updates for 3.11
-Message-ID: <1368868514-18975-1-git-send-email-linux@prisktech.co.nz>
+Date: Sat, 18 May 2013 21:15:13 +1200
+Subject: [PATCH 3/4] fb: vt8500: Require a device clock for wm8505fb driver
+In-Reply-To: <1368868514-18975-1-git-send-email-linux@prisktech.co.nz>
+References: <1368868514-18975-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <1368868514-18975-4-git-send-email-linux@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch #1 - Move register defines inside the driver and drop the header.
-Patch #2 - Convert the register defines to use the vendor preferred names.
-Patch #3 - Add a device clock to wm8505fb. Without it, only the uboot
-initialized resolution is supported.
-Patch #4 - Add support for the VGA output found on the APC8750 board.
+The wm8505fb driver requires a clock to work properly. Without a clock,
+the driver can only initialize the display resolution that was set in
+uboot.
+This patch updates the driver to get and use a clock, and updates
+the devicetree documentation to indicate the requirement for a clock.
 
-Tony Prisk (4):
-  fb: vt8500: Move register defines inside driver
-  fb: vt8500: Convert to use vendor register names
-  fb: vt8500: Require a device clock for wm8505fb driver
-  fb: vt8500: Add VGA output support to wm8505fb driver.
+Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+---
+ .../devicetree/bindings/video/wm,wm8505-fb.txt     |    4 ++-
+ drivers/video/wm8505fb.c                           |   30 +++++++++++++++++---
+ 2 files changed, 29 insertions(+), 5 deletions(-)
 
- .../devicetree/bindings/video/wm,wm8505-fb.txt     |    9 +-
- drivers/video/wm8505fb.c                           |  195 ++++++++++++--
- drivers/video/wm8505fb_regs.h                      |   76 ------
- drivers/video/wmt_ge_rops.c                        |  280 +++++++++++++++-----
- 4 files changed, 394 insertions(+), 166 deletions(-)
- delete mode 100644 drivers/video/wm8505fb_regs.h
-
+diff --git a/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+index 0bcadb2..601416c 100644
+--- a/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
++++ b/Documentation/devicetree/bindings/video/wm,wm8505-fb.txt
+@@ -5,6 +5,7 @@ Required properties:
+ - compatible : "wm,wm8505-fb"
+ - reg : Should contain 1 register ranges(address and length)
+ - bits-per-pixel : bit depth of framebuffer (16 or 32)
++- clocks : phandle to DVO clock
+ 
+ Required subnodes:
+ - display-timings: see display-timing.txt for information
+@@ -15,11 +16,12 @@ Example:
+ 		compatible = "wm,wm8505-fb";
+ 		reg = <0xd8051700 0x200>;
+ 		bits-per-pixel = <16>;
++		clocks = <&clkdvo>;
+ 
+ 		display-timings {
+ 			native-mode = <&timing0>;
+ 			timing0: 800x480 {
+-				clock-frequency = <0>; /* unused but required */
++				clock-frequency = <30000000>;
+ 				hactive = <800>;
+ 				vactive = <480>;
+ 				hfront-porch = <40>;
+diff --git a/drivers/video/wm8505fb.c b/drivers/video/wm8505fb.c
+index 167a9e2..f8bffc2 100644
+--- a/drivers/video/wm8505fb.c
++++ b/drivers/video/wm8505fb.c
+@@ -14,6 +14,7 @@
+  * GNU General Public License for more details.
+  */
+ 
++#include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/fb.h>
+@@ -130,9 +131,11 @@
+ #define to_wm8505fb_info(__info) container_of(__info, \
+ 						struct wm8505fb_info, fb)
+ struct wm8505fb_info {
+-	struct fb_info		fb;
+-	void __iomem		*regbase;
+-	unsigned int		contrast;
++	struct fb_info fb;
++	void __iomem *regbase;
++	unsigned int contrast;
++	struct device *dev;
++	struct clk *clk_dvo;
+ };
+ 
+ 
+@@ -210,6 +213,13 @@ static int wm8505fb_set_par(struct fb_info *info)
+ 	if (!fbi)
+ 		return -EINVAL;
+ 
++	if (info->var.pixclock == 0) {
++		dev_err(fbi->dev, "requested pixclock = 0\n");
++		return -EINVAL;
++	}
++
++	clk_set_rate(fbi->clk_dvo, PICOS2KHZ(info->var.pixclock)*1000);
++
+ 	if (info->var.bits_per_pixel == 32) {
+ 		info->var.red.offset = 16;
+ 		info->var.red.length = 8;
+@@ -369,6 +379,8 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
++	fbi->dev = &pdev->dev;
++
+ 	strcpy(fbi->fb.fix.id, DRIVER_NAME);
+ 
+ 	fbi->fb.fix.type	= FB_TYPE_PACKED_PIXELS;
+@@ -408,6 +420,14 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		return ret;
+ 
++	fbi->clk_dvo = of_clk_get(pdev->dev.of_node, 0);
++	if (IS_ERR(fbi->clk_dvo)) {
++		dev_err(&pdev->dev, "Error retrieving clock\n");
++		return PTR_ERR(fbi->clk_dvo);
++	}
++
++	clk_prepare_enable(fbi->clk_dvo);
++
+ 	fb_videomode_to_var(&fbi->fb.var, &mode);
+ 
+ 	fbi->fb.var.nonstd		= 0;
+@@ -421,7 +441,7 @@ static int wm8505fb_probe(struct platform_device *pdev)
+ 	fb_mem_virt = dmam_alloc_coherent(&pdev->dev, fb_mem_len, &fb_mem_phys,
+ 				GFP_KERNEL);
+ 	if (!fb_mem_virt) {
+-		pr_err("%s: Failed to allocate framebuffer\n", __func__);
++		dev_err(&pdev->dev, "Failed to allocate framebuffer\n");
+ 		return -ENOMEM;
+ 	}
+ 
+@@ -480,6 +500,8 @@ static int wm8505fb_remove(struct platform_device *pdev)
+ 
+ 	unregister_framebuffer(&fbi->fb);
+ 
++	clk_disable_unprepare(fbi->clk_dvo);
++
+ 	writel(0, fbi->regbase);
+ 
+ 	if (fbi->fb.cmap.len)
 -- 
 1.7.9.5
