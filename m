@@ -1,57 +1,174 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sat, 18 May 2013 20:33:50 +0200
-Subject: [RFC 2/4] ARM: dove: add video card node for SolidRun CuBox
-In-Reply-To: <20130518193354.1be73084@armhf>
-References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
- <1368897139-25485-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1368897139-25485-3-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130518193354.1be73084@armhf>
-Message-ID: <5197C98E.1060104@gmail.com>
+From: romieu@fr.zoreil.com (Francois Romieu)
+Date: Sat, 18 May 2013 20:55:26 +0200
+Subject: [PATCHv8 3/3] net: velocity: Add platform device support to VIA
+ velocity driver
+In-Reply-To: <1368853187-17823-4-git-send-email-linux@prisktech.co.nz>
+References: <1368853187-17823-1-git-send-email-linux@prisktech.co.nz>
+ <1368853187-17823-4-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20130518185526.GA25486@electric-eye.fr.zoreil.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2013 07:33 PM, Jean-Francois Moine wrote:
-> On Sat, 18 May 2013 19:12:17 +0200
-> Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>  wrote:
->> This adds a video card node required for rmk's dove_drm driver. Reg
->> property matches reserved memory region (currently 16M at top of memory),
->> clocks property should carry extclk0 for now.
->>
->> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
->> ---
-...
->> +		vcard: video-card {
->> +			compatible = "marvell,dove-video-card";
->> +			reg =<0x3f000000 0x1000000>;
->> +			clocks =<&si5351 0>,<&si5351 0>;
->> +		};
->> +	};
-...
->> +&lcd0 { status = "okay"; };
->
-> May you explain a bit more this strange hack?
+Tony Prisk <linux@prisktech.co.nz> :
+[...]
+> diff --git a/drivers/net/ethernet/via/via-velocity.c b/drivers/net/ethernet/via/via-velocity.c
+> index 5996cee..d8d5bc5 100644
+> --- a/drivers/net/ethernet/via/via-velocity.c
+> +++ b/drivers/net/ethernet/via/via-velocity.c
+[...]
+> @@ -84,6 +88,16 @@
+>  static int velocity_nics;
+>  static int msglevel = MSG_LEVEL_INFO;
+>  
+> +static void velocity_set_power_state(struct velocity_info *vptr, char state)
+> +{
+> +	void *addr = vptr->mac_regs;
 
-This "hack" adds the video-card device node that describes the board
-dependent part of Dove SoC video. Remember, it is a device tree node
-to match Russel's driver!
+Your choice but it's only used once.
 
-You have the video memory passed, the clocks property will vanish
-later. And you enable lcd0 as you may have noticed that there is
-nothing connected on lcd1 on the _CuBox_.
+[...]
+> @@ -1353,9 +1366,12 @@ static void velocity_init_registers(struct velocity_info *vptr,
+>  		velocity_soft_reset(vptr);
+>  		mdelay(5);
+>  
+> -		mac_eeprom_reload(regs);
+> -		for (i = 0; i < 6; i++)
+> -			writeb(vptr->netdev->dev_addr[i], &(regs->PAR[i]));
+> +		if (!vptr->no_eeprom) {
+> +			mac_eeprom_reload(regs);
+> +			for (i = 0; i < 6; i++)
+> +				writeb(vptr->netdev->dev_addr[i],
+> +							&(regs->PAR[i]));
+> +		}
 
-But there is on the D2Plug, and that DT description _will_ enable
-lcd0, lcd1 and dcon.
+velocity_init_registers would not suffer from a local vptr->netdev variable.
 
-Maybe, there is a misunderstanding in in the concept of DT here.
-DT does _not_ describe the driver layout but the HW. And for Linux
-this basically means, you replace board/SoC dependent init code
-that register some platform_device with a description in DT.
+If you change this code, you may replace &(regs->PAR[i]) with regs->PAR + i.
 
-The actual driver does _not_ need to know about non-DT or DT except
-that somebody has to parse it and create a platform_device for it.
-If you only have standard properties like reg and irq, it all gets
-parsed automagically by DT bus probing. But as you already pointed
-out, a video card on Dove is a little bit more complex as reg and
-irq - so I provided a DT parser for rmk's *RFC* driver as *RFC*!
+[...]
+> @@ -2730,19 +2773,19 @@ static int velocity_found1(struct pci_dev *pdev,
+>  	 * can support more than MAX_UNITS.
+>  	 */
+>  	if (velocity_nics >= MAX_UNITS) {
+> -		dev_notice(&pdev->dev, "already found %d NICs.\n",
+> -			   velocity_nics);
+> +		dev_notice(dev, "already found %d NICs.\n", velocity_nics);
+>  		return -ENODEV;
+>  	}
+>  
+> -	dev = alloc_etherdev(sizeof(struct velocity_info));
+> -	if (!dev)
+> +	netdev = alloc_etherdev(sizeof(struct velocity_info));
+> +	if (!netdev)
+>  		goto out;
+>  
+>  	/* Chain it all together */
+>  
+> -	SET_NETDEV_DEV(dev, &pdev->dev);
+> -	vptr = netdev_priv(dev);
+> +	SET_NETDEV_DEV(netdev, dev);
+> +	vptr = netdev_priv(netdev);
+> +	memset(vptr, 0, sizeof(struct velocity_info));
 
-Sebastian
+memset is not needed (alloc_etherdev indirectly uses kzalloc).
+
+[...]
+> +static int velocity_pci_probe(struct pci_dev *pdev,
+> +			   const struct pci_device_id *ent)
+
+It does not seem to line up as it should.
+
+> +{
+> +	int ret;
+> +	const struct velocity_info_tbl *info =
+> +					&chip_info_table[ent->driver_data];
+
+Long lines ought to come first.
+
+> +
+> +	ret = pci_enable_device(pdev);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = pci_request_regions(pdev, VELOCITY_NAME);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "No PCI resources.\n");
+> +		pci_disable_device(pdev);
+> +		return ret;
+> +	}
+> +
+> +	ret = velocity_probe(&pdev->dev, pdev->irq, info, BUS_PCI);
+> +	if (ret < 0) {
+> +		pci_release_regions(pdev);
+> +		pci_disable_device(pdev);
+> +	}
+
+Please use gotos for the error paths.
+
+[...]
+> @@ -3270,7 +3409,11 @@ static void velocity_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo
+>  	struct velocity_info *vptr = netdev_priv(dev);
+>  	strlcpy(info->driver, VELOCITY_NAME, sizeof(info->driver));
+
+You may sneak an empty line after the declaration.
+
+>  	strlcpy(info->version, VELOCITY_VERSION, sizeof(info->version));
+> -	strlcpy(info->bus_info, pci_name(vptr->pdev), sizeof(info->bus_info));
+> +	if (vptr->bustype == BUS_PCI)
+> +		strlcpy(info->bus_info, pci_name(vptr->pdev),
+> +						sizeof(info->bus_info));
+> +	else
+> +		strlcpy(info->bus_info, "platform", sizeof(info->bus_info));
+
+	strlcpy(info->bus_info, vptr->pdev ? pci_name(vptr->pdev) : "platform",
+		sizeof(info->bus_info));
+
+>  static void velocity_ethtool_get_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+> @@ -3563,9 +3706,15 @@ static int __init velocity_init_module(void)
+>  	int ret;
+>  
+>  	velocity_register_notifier();
+> -	ret = pci_register_driver(&velocity_driver);
+> +
+> +	ret = pci_register_driver(&velocity_pci_driver);
+> +	if (ret < 0)
+> +		velocity_unregister_notifier();
+> +
+> +	ret = platform_driver_register(&velocity_platform_driver);
+>  	if (ret < 0)
+>  		velocity_unregister_notifier();
+> +
+
+I'd rather velocity_unregister_notifier iif both driver registrations
+failed.
+
+[...]
+> diff --git a/drivers/net/ethernet/via/via-velocity.h b/drivers/net/ethernet/via/via-velocity.h
+> index c38bbae..1d94612 100644
+> --- a/drivers/net/ethernet/via/via-velocity.h
+> +++ b/drivers/net/ethernet/via/via-velocity.h
+[...]
+> @@ -1433,10 +1433,17 @@ struct velocity_opt {
+>  
+>  #define GET_RD_BY_IDX(vptr, idx)   (vptr->rd_ring[idx])
+>  
+> +enum velocity_bus_type {
+> +	BUS_PCI,
+> +	BUS_PLATFORM,
+> +};
+> +
+>  struct velocity_info {
+> -	struct device *dev;
+>  	struct pci_dev *pdev;
+> +	struct device *dev;
+
+Please don't move the fields you added.
+
+>  	struct net_device *netdev;
+> +	enum velocity_bus_type bustype;
+
+velocity_bus_type is not really needed since you always have pdev to
+check against.
+
+-- 
+Ueimor
