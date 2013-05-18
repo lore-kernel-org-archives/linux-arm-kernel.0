@@ -1,20 +1,15 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 18 May 2013 19:21:18 +0200
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Sat, 18 May 2013 14:22:13 -0300
 Subject: ARM: 3.10-rc1 does not boot anymore on OpenBlocks AX3
 In-Reply-To: <20130518170158.GB1936@1wt.eu>
 References: <20130518170158.GB1936@1wt.eu>
-Message-ID: <5197B88E.1050305@free-electrons.com>
+Message-ID: <20130518172212.GA21837@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Willy,
 
-On 05/18/2013 07:01 PM, Willy Tarreau wrote:
-> Hi Gregory,
-> 
-> I wanted to give a try to your marvell-pcie-v10-and-seb-clks branch on
-> my AX3 and got the following error, which I also got after switching
-> back to plain 3.10-rc1 :
+On Sat, May 18, 2013 at 07:01:58PM +0200, Willy Tarreau wrote:
 > 
 > Uncompressing Linux... done, booting the kernel.
 > Booting Linux on physical CPU 0x0
@@ -27,24 +22,14 @@ On 05/18/2013 07:01 PM, Willy Tarreau wrote:
 > Memory policy: ECC disabled, Data cache writealloc
 > Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
 
-This is a known issue (at least by me! ;) ).
-You have 2 choices:
-- either you disable CONFIG_ARM_APPENDED_DTB
-- or you appliy the patch "ARM: zImage: Convert 32bits memory size
- and address from ATAG to 64bits DTB"
-see https://patchwork.kernel.org/patch/2566771/
+This is a known issue.
+Please try again with this patch:
 
-This patch have been applied by Russell King in his git tree, and I hope
-he will push it soon to Linus for the 3.10-rc2.
+[PATCH] ARM: zImage: Convert 32bits memory size and address from ATAG to
+64bits DTB
 
-By the way I also sent an other fix for led and gpio button:
-https://patchwork.kernel.org/patch/2582531/
-
-Regards,
-
-
+which has been posted on LAKML on May 14th.
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
 http://free-electrons.com
