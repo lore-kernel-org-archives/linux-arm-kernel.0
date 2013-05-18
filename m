@@ -1,65 +1,51 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 18 May 2013 19:46:44 +0200
-Subject: [RFC 4/4] DRM: tda998x: add missing include
-In-Reply-To: <1368897139-25485-5-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
- <1368897139-25485-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1368897139-25485-5-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130518194644.2a02a4fc@armhf>
+From: w@1wt.eu (Willy Tarreau)
+Date: Sat, 18 May 2013 19:48:17 +0200
+Subject: ARM: 3.10-rc1 does not boot anymore on OpenBlocks AX3
+In-Reply-To: <CALF0-+UfQeh-vKMmm7Eehbw6MNtouL0i+BceC2zVmBk5s7QfGg@mail.gmail.com>
+References: <20130518170158.GB1936@1wt.eu> <20130518172212.GA21837@localhost>
+ <20130518172633.GD1936@1wt.eu>
+ <CALF0-+UfQeh-vKMmm7Eehbw6MNtouL0i+BceC2zVmBk5s7QfGg@mail.gmail.com>
+Message-ID: <20130518174817.GE1936@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 18 May 2013 19:12:19 +0200
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
-
-> The RFC sent by Russell King was missing an include for tda998x. This
-> is just a compatible clone to remember Russell to add that later.
+On Sat, May 18, 2013 at 02:28:57PM -0300, Ezequiel Garcia wrote:
+> On Sat, May 18, 2013 at 2:26 PM, Willy Tarreau <w@1wt.eu> wrote:
+> > Hi Gregory & Ezequeil,
+> >
+> > On Sat, May 18, 2013 at 02:22:13PM -0300, Ezequiel Garcia wrote:
+> >> Hi Willy,
+> >>
+> >> On Sat, May 18, 2013 at 07:01:58PM +0200, Willy Tarreau wrote:
+> >> >
+> >> > Uncompressing Linux... done, booting the kernel.
+> >> > Booting Linux on physical CPU 0x0
+> >> > Linux version 3.10.0-rc-mvebu (willy at pcw) (gcc version 4.7.3 20130205 (prerelease) (crosstool-NG 1.18.0) ) #6 SMP Sat May 18 17:40:55 CEST 2013
+> >> > CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7), cr=10c53c7d
+> >> > CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+> >> > Machine: Marvell Armada 370/XP (Device Tree), model: PlatHome OpenBlocks AX3-4 board
+> >> > bootconsole [earlycon0] enabled
+> >> > INITRD: 0x07000040+0x00a5c000 is not a memory region - disabling initrd
+> >> > Memory policy: ECC disabled, Data cache writealloc
+> >> > Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
+> >>
+> >> This is a known issue.
+> >> Please try again with this patch:
+> >>
+> >> [PATCH] ARM: zImage: Convert 32bits memory size and address from ATAG to
+> >> 64bits DTB
+> >>
+> >> which has been posted on LAKML on May 14th.
+> >
+> > Thanks to you both for your simultaneous response :-)
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Jean-Francois Moine <moinejf@free.fr>
-> ---
->  include/drm/i2c/tda998x.h |   23 +++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->  create mode 100644 include/drm/i2c/tda998x.h
-> 
-> diff --git a/include/drm/i2c/tda998x.h b/include/drm/i2c/tda998x.h
-> new file mode 100644
-> index 0000000..41f799f
-> --- /dev/null
-> +++ b/include/drm/i2c/tda998x.h
-> @@ -0,0 +1,23 @@
-> +#ifndef __TDA998X_H__
-> +#define __TDA998X_H__
-> +
-> +enum tda998x_audio_format {
-> +	AFMT_I2S,
-> +	AFMT_SPDIF,
-> +};
-> +
-> +struct tda998x_encoder_params {
-> +	int audio_cfg;
-> +	int audio_clk_cfg;
-> +	enum tda998x_audio_format audio_format;
-> +	int audio_sample_rate;
-> +	char audio_frame[6];
-> +	int swap_a, mirr_a;
-> +	int swap_b, mirr_b;
-> +	int swap_c, mirr_c;
-> +	int swap_d, mirr_d;
-> +	int swap_e, mirr_e;
-> +	int swap_f, mirr_f;
-> +};
-> +
-> +#endif
+> That's because our mvebu stuff has enabled parallel user support :-)
 
-These parameters should not be there. It seems to me that the DT is the
-right place.
+:-)
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+I confirm the fix is OK for me. I'll play a bit with the new
+kernel on the box now.
+
+Have a nice week-end,
+
+Willy
