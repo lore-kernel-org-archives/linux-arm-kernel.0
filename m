@@ -1,80 +1,57 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Sat, 18 May 2013 14:23:19 -0400
-Subject: [RFC 4/4] DRM: tda998x: add missing include
-In-Reply-To: <20130518194644.2a02a4fc@armhf>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Sat, 18 May 2013 20:33:50 +0200
+Subject: [RFC 2/4] ARM: dove: add video card node for SolidRun CuBox
+In-Reply-To: <20130518193354.1be73084@armhf>
 References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
  <1368897139-25485-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1368897139-25485-5-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130518194644.2a02a4fc@armhf>
-Message-ID: <CAF6AEGtx7RbvKEEc5uSFvz-2uveB1cnJNf_ESn6JYhfte5UmZQ@mail.gmail.com>
+ <1368897139-25485-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130518193354.1be73084@armhf>
+Message-ID: <5197C98E.1060104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 18, 2013 at 1:46 PM, Jean-Francois Moine <moinejf@free.fr> wrote:
-> On Sat, 18 May 2013 19:12:19 +0200
-> Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
->
->> The RFC sent by Russell King was missing an include for tda998x. This
->> is just a compatible clone to remember Russell to add that later.
+On 05/18/2013 07:33 PM, Jean-Francois Moine wrote:
+> On Sat, 18 May 2013 19:12:17 +0200
+> Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>  wrote:
+>> This adds a video card node required for rmk's dove_drm driver. Reg
+>> property matches reserved memory region (currently 16M at top of memory),
+>> clocks property should carry extclk0 for now.
 >>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
 >> ---
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: dri-devel at lists.freedesktop.org
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Jean-Francois Moine <moinejf@free.fr>
->> ---
->>  include/drm/i2c/tda998x.h |   23 +++++++++++++++++++++++
->>  1 file changed, 23 insertions(+)
->>  create mode 100644 include/drm/i2c/tda998x.h
->>
->> diff --git a/include/drm/i2c/tda998x.h b/include/drm/i2c/tda998x.h
->> new file mode 100644
->> index 0000000..41f799f
->> --- /dev/null
->> +++ b/include/drm/i2c/tda998x.h
->> @@ -0,0 +1,23 @@
->> +#ifndef __TDA998X_H__
->> +#define __TDA998X_H__
->> +
->> +enum tda998x_audio_format {
->> +     AFMT_I2S,
->> +     AFMT_SPDIF,
->> +};
->> +
->> +struct tda998x_encoder_params {
->> +     int audio_cfg;
->> +     int audio_clk_cfg;
->> +     enum tda998x_audio_format audio_format;
->> +     int audio_sample_rate;
->> +     char audio_frame[6];
->> +     int swap_a, mirr_a;
->> +     int swap_b, mirr_b;
->> +     int swap_c, mirr_c;
->> +     int swap_d, mirr_d;
->> +     int swap_e, mirr_e;
->> +     int swap_f, mirr_f;
->> +};
->> +
->> +#endif
+...
+>> +		vcard: video-card {
+>> +			compatible = "marvell,dove-video-card";
+>> +			reg =<0x3f000000 0x1000000>;
+>> +			clocks =<&si5351 0>,<&si5351 0>;
+>> +		};
+>> +	};
+...
+>> +&lcd0 { status = "okay"; };
 >
-> These parameters should not be there. It seems to me that the DT is the
-> right place.
+> May you explain a bit more this strange hack?
 
-You might not want to directly have a hard DT dependency in tda998x,
-as the encoder could be used on non-DT platforms.  Although a DT to
-encoder-params helper might be a nice idea for platforms which do have
-DT.
+This "hack" adds the video-card device node that describes the board
+dependent part of Dove SoC video. Remember, it is a device tree node
+to match Russel's driver!
 
-BR,
--R
+You have the video memory passed, the clocks property will vanish
+later. And you enable lcd0 as you may have noticed that there is
+nothing connected on lcd1 on the _CuBox_.
 
-> --
-> Ken ar c'henta? |             ** Breizh ha Linux atav! **
-> Jef             |               http://moinejf.free.fr/
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+But there is on the D2Plug, and that DT description _will_ enable
+lcd0, lcd1 and dcon.
+
+Maybe, there is a misunderstanding in in the concept of DT here.
+DT does _not_ describe the driver layout but the HW. And for Linux
+this basically means, you replace board/SoC dependent init code
+that register some platform_device with a description in DT.
+
+The actual driver does _not_ need to know about non-DT or DT except
+that somebody has to parse it and create a platform_device for it.
+If you only have standard properties like reg and irq, it all gets
+parsed automagically by DT bus probing. But as you already pointed
+out, a video card on Dove is a little bit more complex as reg and
+irq - so I provided a DT parser for rmk's *RFC* driver as *RFC*!
+
+Sebastian
