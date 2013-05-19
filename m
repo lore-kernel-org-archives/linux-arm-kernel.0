@@ -1,46 +1,83 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sun, 19 May 2013 19:40:09 +0300
-Subject: [PATCH v2 10/10] kernel: might_fault does not imply might_sleep
-In-Reply-To: <1368979579.6828.114.camel@gandalf.local.home>
-References: <cover.1368702323.git.mst@redhat.com>
- <1f85dc8e6a0149677563a2dfb4cef9a9c7eaa391.1368702323.git.mst@redhat.com>
- <20130516184041.GP19669@dyad.programming.kicks-ass.net>
- <20130519093526.GD19883@redhat.com>
- <1368966844.6828.111.camel@gandalf.local.home>
- <20130519133418.GA24381@redhat.com>
- <1368979579.6828.114.camel@gandalf.local.home>
-Message-ID: <20130519164009.GA2434@redhat.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 19 May 2013 18:49:05 +0200
+Subject: [RFC 4/4] DRM: tda998x: add missing include
+In-Reply-To: <51988D88.10306@gmail.com>
+References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+ <1368897139-25485-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1368897139-25485-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130518194644.2a02a4fc@armhf>
+ <CAF6AEGtx7RbvKEEc5uSFvz-2uveB1cnJNf_ESn6JYhfte5UmZQ@mail.gmail.com>
+ <20130518205845.2dfe9fe5@armhf> <5197D6C1.3060702@gmail.com>
+ <20130519080152.0b486b75@armhf> <51988D88.10306@gmail.com>
+Message-ID: <20130519184905.1f238710@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 19, 2013 at 12:06:19PM -0400, Steven Rostedt wrote:
-> On Sun, 2013-05-19 at 16:34 +0300, Michael S. Tsirkin wrote:
+On Sun, 19 May 2013 10:30:00 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
+> > /* --- test (not cubox) ---- *
+> > &dcon { status = "okay"; };
+> > 
+> > &lcd1 {
+> > 	status = "okay";
+> > 	clocks =<&core_clk 3>,<0>,<&lcdclk>,<0>;
+> > 	marvell,port-type =<1>;
+> > 	display-timings {
+> > 		mode {
+> > 			hactive =<1920>;
+> > 			vactive =<1080>;
+> > 			hfront-porch =<88>;
+> > 			hsync-len =<44>;
+> > 			hback-porch =<148>;
+> > 			vfront-porch =<4>;
+> > 			vsync-len =<5>;
+> > 			vback-porch =<36>;
+> > 			clock =<148500>;
+> > 		};
+> > 	};  
 > 
-> > Right but we need to keep it working on upstream as well.
-> > If I do preempt_enable under a spinlock upstream won't it
-> > try to sleep under spinlock?
-> 
-> No it wont. A spinlock calls preempt_disable implicitly, and a
-> preempt_enable() will not schedule unless preempt_count is zero, which
-> it wont be under a spinlock.
-> 
-> If it did, there would be lots of bugs all over the place because this
-> is done throughout the kernel (a preempt_enable() under a spinlock).
-> 
-> In other words, don't ever use preempt_enable_no_resched().
-> 
-> -- Steve
-> 
+> I would be surprised if, lcd1 will ever be capable of driving
+> 1080p60 on a *VGA port*!
 
+As you may see, this sequence is preceded by an open comment: "test".
 
-OK I get it. So let me correct myself. The simple code
-that does something like this under a spinlock:
->       preempt_disable
->       pagefault_disable
->       error = copy_to_user
->       pagefault_enable
->       preempt_enable
->
-is not doing anything wrong and should not get a warning,
-as long as error is handled correctly later.
-Right?
+Now, as the port B of the display controller is only VGA (this is
+checked in my driver), as there is no VGA connector on the Cubox, as
+there is no VGA DAC code in my driver, and as I had to test the display
+controller, I:
+
+- defined the port B as VGA,
+
+- set the timings of the mode I use for my HDMI display.
+
+This does not mean the example must be used in the real word. It is
+just a working example for test purpose.
+
+> Seriously, start _reading_ what we say. I want all those
+> features I already told you for your driver, in mainline driver
+> too. All I told you was to prevent you from doing dirty little
+> Cubox specific hacks that I would have to remove for e.g. D2Plug.
+
+There is _NO_ Cubox specific stuff in my driver (I don't even use any
+cubox-setup as Russell) and it should work without any change (except
+the DT) in your D2plug. Remember, all my drm driver work is in
+http://moinejf.free.fr/cubox/ as a big kernel patch (I will add the
+I2C: mv64xxx which work fine - thanks Russell).
+
+> *But* if you ask me if we should take Russell's or your driver
+> as a basis, the answer is Russell's. Colon.
+
+OK. Do what you want. My driver works fine enough for my usage:
+software development. For video, my ISP gives us for free a Atom based
+multimedia player with a Blue-Ray reader, and I have a AMD64 double
+core on my family TV set for internet video (it will be a long time
+till there will be VP8 decoding with vMeta). The only interest I see
+in the Cubox is its low power consumption.
+
+Now, I will switch back to my favorite long-distance development...
+
+See you.
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
