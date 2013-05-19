@@ -1,122 +1,56 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Sun, 19 May 2013 12:35:26 +0300
-Subject: [PATCH v2 10/10] kernel: might_fault does not imply might_sleep
-In-Reply-To: <20130516184041.GP19669@dyad.programming.kicks-ass.net>
-References: <cover.1368702323.git.mst@redhat.com>
- <1f85dc8e6a0149677563a2dfb4cef9a9c7eaa391.1368702323.git.mst@redhat.com>
- <20130516184041.GP19669@dyad.programming.kicks-ass.net>
-Message-ID: <20130519093526.GD19883@redhat.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 19 May 2013 11:30:49 +0100
+Subject: [RFC 3/8] drm/i2c: nxp-tda998x: ensure VIP output mux is
+ properly set
+In-Reply-To: <20130518085659.40932cd8@armhf>
+References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+ <E1Ud3og-0001qm-52@rmk-PC.arm.linux.org.uk> <20130518085659.40932cd8@armhf>
+Message-ID: <20130519103049.GQ18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 08:40:41PM +0200, Peter Zijlstra wrote:
-> On Thu, May 16, 2013 at 02:16:10PM +0300, Michael S. Tsirkin wrote:
-> > There are several ways to make sure might_fault
-> > calling function does not sleep.
-> > One is to use it on kernel or otherwise locked memory - apparently
-> > nfs/sunrpc does this. As noted by Ingo, this is handled by the
-> > migh_fault() implementation in mm/memory.c but not the one in
-> > linux/kernel.h so in the current code might_fault() schedules
-> > differently depending on CONFIG_PROVE_LOCKING, which is an undesired
-> > semantical side effect.
-> > 
-> > Another is to call pagefault_disable: in this case the page fault
-> > handler will go to fixups processing and we get an error instead of
-> > sleeping, so the might_sleep annotation is a false positive.
-> > vhost driver wants to do this now in order to reuse socket ops
-> > under a spinlock (and fall back on slower thread handler
-> > on error).
+On Sat, May 18, 2013 at 08:56:59AM +0200, Jean-Francois Moine wrote:
+> On Thu, 16 May 2013 20:26:18 +0100
+> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
 > 
-> Are you using the assumption that spin_lock() implies preempt_disable() implies
-> pagefault_disable()? Note that this assumption isn't valid for -rt where the
-> spinlock becomes preemptible but we'll not disable pagefaults.
-
-No, I was not assuming that. What I'm trying to say is that a caller
-that does something like this under a spinlock:
-	preempt_disable
-	pagefault_disable
-	error = copy_to_user
-	pagefault_enable
-	preempt_enable_no_resched
-
-is not doing anything wrong and should not get a warning,
-as long as error is handled correctly later.
-Right?
-
-> > Address both issues by:
-> > 	- dropping the unconditional call to might_sleep
-> > 	  from the fast might_fault code in linux/kernel.h
-> > 	- checking for pagefault_disable() in the
-> > 	  CONFIG_PROVE_LOCKING implementation
+> > When switching between various drivers for this device, it's possible
+> > that some critical registers are left containing values which affect
+> > the device operation.  One such case encountered is the VIP output
+> > mux register.  This defaults to 0x24 on powerup, but other drivers may
+> > set this to 0x12.  This results in incorrect colours.
 > > 
-> > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> > Fix this by ensuring that the register is always set to the power on
+> > default setting.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > > ---
-> >  include/linux/kernel.h |  1 -
-> >  mm/memory.c            | 14 +++++++++-----
-> >  2 files changed, 9 insertions(+), 6 deletions(-)
+> >  drivers/gpu/drm/i2c/tda998x_drv.c |    3 +++
+> >  1 files changed, 3 insertions(+), 0 deletions(-)
 > > 
-> > diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-> > index e96329c..322b065 100644
-> > --- a/include/linux/kernel.h
-> > +++ b/include/linux/kernel.h
-> > @@ -198,7 +198,6 @@ void might_fault(void);
-> >  #else
-> >  static inline void might_fault(void)
-> >  {
-> > -	might_sleep();
-> 
-> This removes potential resched points for PREEMPT_VOLUNTARY -- was that
-> intentional?
-
-No it's a bug. Thanks for pointing this out.
-OK so I guess it should be might_sleep_if(!in_atomic())
-and this means might_fault would have to move from linux/kernel.h to
-linux/uaccess.h, since in_atomic() is in linux/hardirq.h
-
-Makes sense?
-
-> >  }
-> >  #endif
+> > diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+> > index d71c408..4b4db95 100644
+> > --- a/drivers/gpu/drm/i2c/tda998x_drv.c
+> > +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+> > @@ -110,6 +110,7 @@ struct tda998x_priv {
+> >  #define REG_VIP_CNTRL_5           REG(0x00, 0x25)     /* write */
+> >  # define VIP_CNTRL_5_CKCASE       (1 << 0)
+> >  # define VIP_CNTRL_5_SP_CNT(x)    (((x) & 3) << 1)
+> > +#define REG_MUX_VP_VIP_OUT        REG(0x00, 0x27)     /* read/write */
+> >  #define REG_MAT_CONTRL            REG(0x00, 0x80)     /* write */
+> >  # define MAT_CONTRL_MAT_SC(x)     (((x) & 3) << 0)
+> >  # define MAT_CONTRL_MAT_BP        (1 << 2)
+> > @@ -438,6 +439,8 @@ tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
 > >  
-> > diff --git a/mm/memory.c b/mm/memory.c
-> > index 6dc1882..1b8327b 100644
-> > --- a/mm/memory.c
-> > +++ b/mm/memory.c
-> > @@ -4222,13 +4222,17 @@ void might_fault(void)
-> >  	if (segment_eq(get_fs(), KERNEL_DS))
-> >  		return;
-> >  
-> > -	might_sleep();
-> >  	/*
-> > -	 * it would be nicer only to annotate paths which are not under
-> > -	 * pagefault_disable, however that requires a larger audit and
-> > -	 * providing helpers like get_user_atomic.
-> > +	 * It would be nicer to annotate paths which are under preempt_disable
-> > +	 * but not under pagefault_disable, however that requires a new flag
-> > +	 * for differentiating between the two.
+> >  	switch (mode) {
+> >  	case DRM_MODE_DPMS_ON:
+> > +		/* Write the default value MUX register */
+> > +		reg_write(encoder, REG_MUX_VP_VIP_OUT, 0x24);
+> >  		/* enable audio and video ports */
+> >  		reg_write(encoder, REG_ENA_AP, 0xff);
+> >  		reg_write(encoder, REG_ENA_VP_0, 0xff);
 > 
-> -rt has this, pagefault_disable() doesn't change the preempt count but pokes
-> at task_struct::pagefault_disable.
+> This register is never touched. Should not this setting better go at
+> reset time (in tda998x_reset)?
 
-Good to know.
-
-So maybe we can import this at least for CONFIG_PROVE_LOCKING?
-To make the patch smaller I'd prefer doing both for now,
-this way this patchset does not have to poke in too many
-mm internals.
-I can try doing that - unless
-someone else has plans to merge this part soon anyway?
-
-> >  	 */
-> > -	if (!in_atomic() && current->mm)
-> > +	if (in_atomic())
-> > +		return;
-> > +
-> > +	might_sleep();
-> > +
-> > +	if (current->mm)
-> >  		might_lock_read(&current->mm->mmap_sem);
-> >  }
-> >  EXPORT_SYMBOL(might_fault);
-> > -- 
-> > MST
+Yes, you're right, it could be done there without any additional side
+effects.  I've just moved it there.
