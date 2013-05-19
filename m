@@ -1,28 +1,62 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 19 May 2013 16:17:23 -0400
-Subject: [PATCH 15/20] ARM: mvebu: Remove init_irq declaration in
- machine description
-In-Reply-To: <1368545933-7430-16-git-send-email-maxime.ripard@free-electrons.com>
-References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
- <1368545933-7430-16-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130519201723.GK11137@titan.lakedaemon.net>
+Date: Sun, 19 May 2013 16:19:39 -0400
+Subject: [PATCH] arm: mvebu: enable the third USB interface on
+ OpenBlocks AX3
+In-Reply-To: <20130517.111810.02327269.yamagata@plathome.co.jp>
+References: <1368720444-29357-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130517.111810.02327269.yamagata@plathome.co.jp>
+Message-ID: <20130519201939.GL11137@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 05:38:48PM +0200, Maxime Ripard wrote:
-> Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
-> specified") removed the need to explictly setup the init_irq field in
-> the machine description when using only irqchip_init. Remove that
-> declaration for mvebu as well.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Jason Cooper <jason@lakedaemon.net>
-> ---
->  arch/arm/mach-mvebu/armada-370-xp.c | 2 --
->  1 file changed, 2 deletions(-)
+Mr Yamagata, Willy,
 
-Applied to mvebu/cleanup
+I don't like to assume for people, so if you could please provided a
+"Tested-by:" I'd appreciate it.
 
 thx,
 
 Jason.
+
+On Fri, May 17, 2013 at 11:18:10AM +0900, yamagata at plathome.co.jp wrote:
+> Dear Mr. Petazzoni
+> 
+> > Besides the two "classic" USB interfaces with normal USB ports on the
+> > front side, the PlatHome OpenBlocks AX3 uses the third USB interface
+> > of the Marvell SoC in the mini-PCIe connector. This allows certain
+> > mini-PCIe cards to expose parts of their functionality as a USB
+> > peripheral.
+> > 
+> > This commit enables this third USB interface in the OpenBlocks AX3
+> > Device Tree, and also adds comments on top of the two other USB
+> > interfaces so that the Device Tree makes it clear which USB interface
+> > at the SoC level matches which USB interface visible on the board.
+> 
+> I see the following messages by dmesg with your patch for
+> linux-3.10-rc1 and 3.9.2.
+> 
+> ...
+> usb 3-1: New USB device found, idVendor=0a5c, idProduct=219c
+> usb 3-1: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+> usb 3-1: Product: Broadcom BCM2070 Bluetooth Device
+> usb 3-1: Manufacturer: Broadcom Corp
+> usb 3-1: SerialNumber: B4749F63C1B6
+> ...
+> Bluetooth: Core ver 2.16
+> NET: Registered protocol family 31
+> Bluetooth: HCI device and connection manager initialized
+> Bluetooth: HCI socket layer initialized
+> Bluetooth: L2CAP socket layer initialized
+> Bluetooth: SCO socket layer initialized
+> usbcore: registered new interface driver btusb
+> ...
+> 
+> Best regards
+> 
+> Atsushi Yamagata
+> --- Atsushi Yamagata
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
