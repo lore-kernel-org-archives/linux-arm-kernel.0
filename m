@@ -1,65 +1,45 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sun, 19 May 2013 15:27:53 +0200
-Subject: [PATCH v2] net: dm9000: Allow instantiation using device tree
-In-Reply-To: <1368962191-32594-1-git-send-email-tomasz.figa@gmail.com>
-References: <1368962191-32594-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <5198D359.5060608@gmail.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Sun, 19 May 2013 16:34:18 +0300
+Subject: [PATCH v2 10/10] kernel: might_fault does not imply might_sleep
+In-Reply-To: <1368966844.6828.111.camel@gandalf.local.home>
+References: <cover.1368702323.git.mst@redhat.com>
+ <1f85dc8e6a0149677563a2dfb4cef9a9c7eaa391.1368702323.git.mst@redhat.com>
+ <20130516184041.GP19669@dyad.programming.kicks-ass.net>
+ <20130519093526.GD19883@redhat.com>
+ <1368966844.6828.111.camel@gandalf.local.home>
+Message-ID: <20130519133418.GA24381@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, May 19, 2013 at 08:34:04AM -0400, Steven Rostedt wrote:
+> On Sun, 2013-05-19 at 12:35 +0300, Michael S. Tsirkin wrote:
+> 
+> > No, I was not assuming that. What I'm trying to say is that a caller
+> > that does something like this under a spinlock:
+> > 	preempt_disable
+> > 	pagefault_disable
+> > 	error = copy_to_user
+> > 	pagefault_enable
+> > 	preempt_enable_no_resched
+> > 
+> > is not doing anything wrong and should not get a warning,
+> > as long as error is handled correctly later.
+> > Right?
+> > 
+> 
+> What I see wrong with the above is the preempt_enable_no_resched(). The
+> only place that should be ever used is right before a schedule(), as you
+> don't want to schedule twice (once for the preempt_enable() and then
+> again for the schedule itself).
+> 
+> Remember, in -rt, a spin lock does not disable preemption.
+> 
+> -- Steve
 
-On 05/19/2013 01:16 PM, Tomasz Figa wrote:
-> +++ b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
-> @@ -0,0 +1,26 @@
-> +Davicom DM9000 Fast Ethernet controller
-> +
-> +Required properties:
-> +- compatible = "davicom,dm9000";
-> +- reg : physical addresses and sizes of registers, must contain 2 entries:
-> +    first entry : address register,
-> +    second entry : address register.
+Right but we need to keep it working on upstream as well.
+If I do preempt_enable under a spinlock upstream won't it
+try to sleep under spinlock?
 
-Two address registers ? Shouldn't one of these be "data register" ?
 
-> +Example:
-> +
-> +	ethernet at 18000000 {
-> +		compatible = "davicom,dm9000";
-> +		reg =<0x18000000 0x2 0x18000004 0x2>;
-> +		interrupt-parent =<&gpn>;
-> +		interrupts =<7 4>;
-> +		local-mac-address = [00 00 de ad be ef];
-> +		davicom,no-eeprom;
-> +	};
-
-> +static struct dm9000_plat_data *dm9000_parse_dt(struct device *dev)
-> +{
-> +	struct dm9000_plat_data *pdata;
-> +	struct device_node *np = dev->of_node;
-> +	const void *mac_addr;
-> +
-> +	if (!IS_ENABLED(CONFIG_OF) || !np)
-> +		return NULL;
-
-Shouldn't ERR_PTR() value be returned here ?
-
-> +	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-> +	if (!pdata) {
-> +		dev_err(dev, "failed to allocate platform data struct\n");
-
-There is no need for this error log, k*alloc already logs any failures.
-
-> @@ -1373,6 +1402,12 @@ dm9000_probe(struct platform_device *pdev)
->   	int i;
->   	u32 id_val;
->
-> +	if (!pdata) {
-> +		pdata = dm9000_parse_dt(&pdev->dev);
-> +		if (IS_ERR(pdata))
-> +			return PTR_ERR(pdata);
-> +	}
-
-Thanks,
-
-Sylwester
+-- 
+MST
