@@ -1,68 +1,35 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Sun, 19 May 2013 15:14:38 +0300
-Subject: [PATCH v3 0/2] ARM: KVM: Moving GIC/timer out of arch/arm
-In-Reply-To: <1368538262-25546-1-git-send-email-marc.zyngier@arm.com>
-References: <1368538262-25546-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130519121438.GG4725@redhat.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Sun, 19 May 2013 08:34:04 -0400
+Subject: [PATCH v2 10/10] kernel: might_fault does not imply might_sleep
+In-Reply-To: <20130519093526.GD19883@redhat.com>
+References: <cover.1368702323.git.mst@redhat.com>
+ <1f85dc8e6a0149677563a2dfb4cef9a9c7eaa391.1368702323.git.mst@redhat.com>
+ <20130516184041.GP19669@dyad.programming.kicks-ass.net>
+ <20130519093526.GD19883@redhat.com>
+Message-ID: <1368966844.6828.111.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 02:31:00PM +0100, Marc Zyngier wrote:
-> As KVM/arm64 is looming on the horizon, it makes sense to move some
-> of the common code to a single location in order to reduce duplication.
-> 
-> The code could live anywhere. Actually, most of KVM is already built
-> with a bunch of ugly ../../.. hacks in the various Makefiles, so we're
-> not exactly talking about style here. But maybe it is time to start
-> moving into a less ugly direction.
-> 
-> The include files must be in a "public" location, as they are accessed
-> from non-KVM files (arch/arm/kernel/asm-offsets.c).
-> 
-> For this purpose, introduce two new locations:
-> - virt/kvm/arm/ : x86 and ia64 already share the ioapic code in
->   virt/kvm, so this could be seen as a (very ugly) precedent.
-> - include/kvm/  : there is already an include/xen, and while the
->   intent is slightly different, this seems as good a location as
->   any
-> 
-> A second, tree-wide patch also removes the use of the addprefix used
-> to refer to the main KVM code from the arch code, and replace it with
-> a KVM variable that does the same thing.
-> 
-> * From v2:
->   - Fix silly bug breaking compilation on x86...
-> 
-Applied, thanks.
+On Sun, 2013-05-19 at 12:35 +0300, Michael S. Tsirkin wrote:
 
-> Marc Zyngier (2):
->   ARM: KVM: move GIC/timer code to a common location
->   KVM: get rid of $(addprefix ../../../virt/kvm/, ...) in Makefiles
+> No, I was not assuming that. What I'm trying to say is that a caller
+> that does something like this under a spinlock:
+> 	preempt_disable
+> 	pagefault_disable
+> 	error = copy_to_user
+> 	pagefault_enable
+> 	preempt_enable_no_resched
 > 
->  arch/arm/include/asm/kvm_host.h                             |  4 ++--
->  arch/arm/kvm/Makefile                                       |  7 ++++---
->  arch/ia64/kvm/Makefile                                      |  7 ++++---
->  arch/powerpc/kvm/Makefile                                   | 13 +++++++------
->  arch/s390/kvm/Makefile                                      |  3 ++-
->  arch/x86/kvm/Makefile                                       | 13 +++++++------
->  .../asm/kvm_arch_timer.h => include/kvm/arm_arch_timer.h    |  0
->  arch/arm/include/asm/kvm_vgic.h => include/kvm/arm_vgic.h   |  0
->  {arch/arm/kvm => virt/kvm/arm}/arch_timer.c                 |  4 ++--
->  {arch/arm/kvm => virt/kvm/arm}/vgic.c                       |  0
->  10 files changed, 28 insertions(+), 23 deletions(-)
->  rename arch/arm/include/asm/kvm_arch_timer.h => include/kvm/arm_arch_timer.h (100%)
->  rename arch/arm/include/asm/kvm_vgic.h => include/kvm/arm_vgic.h (100%)
->  rename {arch/arm/kvm => virt/kvm/arm}/arch_timer.c (99%)
->  rename {arch/arm/kvm => virt/kvm/arm}/vgic.c (100%)
+> is not doing anything wrong and should not get a warning,
+> as long as error is handled correctly later.
+> Right?
 > 
-> -- 
-> 1.8.2.3
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
---
-			Gleb.
+What I see wrong with the above is the preempt_enable_no_resched(). The
+only place that should be ever used is right before a schedule(), as you
+don't want to schedule twice (once for the preempt_enable() and then
+again for the schedule itself).
+
+Remember, in -rt, a spin lock does not disable preemption.
+
+-- Steve
