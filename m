@@ -1,47 +1,150 @@
-From: dt.tangr@gmail.com (Daniel Tang)
-Date: Sun, 19 May 2013 21:09:17 +1000
-Subject: [RFC PATCHv3 3/6] clk: Add TI-Nspire clock drivers
-In-Reply-To: <201305161417.28133.arnd@arndb.de>
-References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
- <201305151607.54442.arnd@arndb.de>
- <15FD6543-D04A-4953-A56A-40B27F0026E4@gmail.com>
- <201305161417.28133.arnd@arndb.de>
-Message-ID: <F8915E01-0FCA-4C9F-8440-63B5A73B349B@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sun, 19 May 2013 13:16:31 +0200
+Subject: [PATCH v2] net: dm9000: Allow instantiation using device tree
+Message-ID: <1368962191-32594-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds Device Tree support to dm9000 driver.
 
-On 16/05/2013, at 10:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
 
-> On Thursday 16 May 2013, Daniel Tang wrote:
->> 
->> On 16/05/2013, at 12:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> 
->>> You are missing a binding in Documentation/devicetree, same as for some of
->>> the other drivers in this series.
->> 
->> Should we be adding a vendor prefix to it too? If so, we're not sure whether
->> to use "ti," or not since this isn't an official port by TI.
-> 
-> The binding describes the hardware, it should not matter who does the port.
-> However, any part of the tree that is not actually from TI should have a
-> vendor prefix indicating who made that part. IIRC, the SoC used in there
-> is from TI, so you should use something else for the on-soc components.
-> 
+Changes since v1:
+ - dropped davicom,simple-phy property as it seems to be of no use
+ - used of_get_mac_address() to get MAC address from device tree
+ - replaced #ifdef CONFIG_OF around dm9000_parse_dt() with IS_ENABLED
 
-If the vendors for the on-SOC components are unknown, should we just leave the compatible strings as is (i.e. "nspire-XXX")?
+ .../devicetree/bindings/net/davicom-dm9000.txt     | 26 +++++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ drivers/net/ethernet/davicom/dm9000.c              | 44 ++++++++++++++++++++++
+ 3 files changed, 71 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/davicom-dm9000.txt
 
->>> It seems strange to assign the clk_name variable to node->name
->>> first and then overriding it with the clock-output-names property.
->>> Is that intentional? If so, please explain it in a comment.
->>> 
->> 
->> I copied that bit of boilerplate from drivers/clk/clk-fixed-rate.c but
->> I'm guessing it's to use the node name as the clock name unless there
->> is a property called "clock-output-names"
-> 
-> Ah, I see. It seems you forgot to add the clock maintainer to Cc in the
-> mail. Mike is the one who will have to take you patch anyway, so I assume
-> he will comment on this if you did it wrong.
-> 
-> 	Arnd
+diff --git a/Documentation/devicetree/bindings/net/davicom-dm9000.txt b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
+new file mode 100644
+index 0000000..653df17
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
+@@ -0,0 +1,26 @@
++Davicom DM9000 Fast Ethernet controller
++
++Required properties:
++- compatible = "davicom,dm9000";
++- reg : physical addresses and sizes of registers, must contain 2 entries:
++    first entry : address register,
++    second entry : address register.
++- interrupt-parent : interrupt controller to which the device is connected
++- interrupts : interrupt specifier specific to interrupt controller
++
++Optional properties:
++- local-mac-address : A bytestring of 6 bytes specifying Ethernet MAC address
++    to use (from firmware or bootloader)
++- davicom,no-eeprom : Configuration EEPROM is not available
++- davicom,ext-phy : Use external PHY
++
++Example:
++
++	ethernet at 18000000 {
++		compatible = "davicom,dm9000";
++		reg = <0x18000000 0x2 0x18000004 0x2>;
++		interrupt-parent = <&gpn>;
++		interrupts = <7 4>;
++		local-mac-address = [00 00 de ad be ef];
++		davicom,no-eeprom;
++	};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 6931c43..2fe74e6 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -18,6 +18,7 @@ chrp	Common Hardware Reference Platform
+ cirrus	Cirrus Logic, Inc.
+ cortina	Cortina Systems, Inc.
+ dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
++davicom	DAVICOM Semiconductor, Inc.
+ denx	Denx Software Engineering
+ emmicro	EM Microelectronic
+ epson	Seiko Epson Corp.
+diff --git a/drivers/net/ethernet/davicom/dm9000.c b/drivers/net/ethernet/davicom/dm9000.c
+index 9105465..8b69586 100644
+--- a/drivers/net/ethernet/davicom/dm9000.c
++++ b/drivers/net/ethernet/davicom/dm9000.c
+@@ -29,6 +29,8 @@
+ #include <linux/spinlock.h>
+ #include <linux/crc32.h>
+ #include <linux/mii.h>
++#include <linux/of.h>
++#include <linux/of_net.h>
+ #include <linux/ethtool.h>
+ #include <linux/dm9000.h>
+ #include <linux/delay.h>
+@@ -1358,6 +1360,33 @@ static const struct net_device_ops dm9000_netdev_ops = {
+ #endif
+ };
+ 
++static struct dm9000_plat_data *dm9000_parse_dt(struct device *dev)
++{
++	struct dm9000_plat_data *pdata;
++	struct device_node *np = dev->of_node;
++	const void *mac_addr;
++
++	if (!IS_ENABLED(CONFIG_OF) || !np)
++		return NULL;
++
++	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata) {
++		dev_err(dev, "failed to allocate platform data struct\n");
++		return ERR_PTR(-ENOMEM);
++	}
++
++	if (of_find_property(np, "davicom,ext-phy", NULL))
++		pdata->flags |= DM9000_PLATF_EXT_PHY;
++	if (of_find_property(np, "davicom,no-eeprom", NULL))
++		pdata->flags |= DM9000_PLATF_NO_EEPROM;
++
++	mac_addr = of_get_mac_address(np);
++	if (mac_addr)
++		memcpy(pdata->dev_addr, mac_addr, sizeof(pdata->dev_addr));
++
++	return pdata;
++}
++
+ /*
+  * Search DM9000 board, allocate space and register it
+  */
+@@ -1373,6 +1402,12 @@ dm9000_probe(struct platform_device *pdev)
+ 	int i;
+ 	u32 id_val;
+ 
++	if (!pdata) {
++		pdata = dm9000_parse_dt(&pdev->dev);
++		if (IS_ERR(pdata))
++			return PTR_ERR(pdata);
++	}
++
+ 	/* Init network device */
+ 	ndev = alloc_etherdev(sizeof(struct board_info));
+ 	if (!ndev)
+@@ -1683,11 +1718,20 @@ dm9000_drv_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id dm9000_of_matches[] = {
++	{ .compatible = "davicom,dm9000", },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, dm9000_of_matches);
++#endif
++
+ static struct platform_driver dm9000_driver = {
+ 	.driver	= {
+ 		.name    = "dm9000",
+ 		.owner	 = THIS_MODULE,
+ 		.pm	 = &dm9000_drv_pm_ops,
++		.of_match_table = of_match_ptr(dm9000_of_matches),
+ 	},
+ 	.probe   = dm9000_probe,
+ 	.remove  = dm9000_drv_remove,
+-- 
+1.8.2.1
