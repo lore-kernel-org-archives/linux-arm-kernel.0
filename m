@@ -1,64 +1,91 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sun, 19 May 2013 22:12:43 +0200
-Subject: [PATCH] ARM: plat-orion: Fix num_resources and id for ge10 and ge11
-Message-ID: <1368994363-14762-1-git-send-email-gregory.clement@free-electrons.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 19 May 2013 16:13:12 -0400
+Subject: [PATCH 00/10] clk: mvebu: restructure SoC clock drivers
+In-Reply-To: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130519201312.GJ11137@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When platform data were moved from arch/arm/mach-mv78xx0/common.c to
-arch/arm/plat-orion/common.c with the commit "7e3819d ARM: orion:
-Consolidate ethernet platform data", there were few typo made on
-gigabit Ethernet interface ge10 and ge11. This commit writes back
-their initial value, which allows to use this interfaces again.
+Sebastian,
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/plat-orion/common.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+On Sat, May 11, 2013 at 03:08:00AM +0200, Sebastian Hesselbarth wrote:
+> Marvell EBU SoCs share some common clock functions that register core
+> clocks or clock gates from SoC specific data. These clock drivers are
+> organized by function and over time the drivers filled up with #ifdefs
+> to separate different SoC specific code.
+> 
+> This patch set first adds a new element to clock gate descriptors to
+> allow to pass clk flags per clock gate. (Patch 1)
+> 
+> Then it restructures MVEBU clock drivers into common clock setup and
+> SoC specific files and Kconfig options. The driver's init functions
+> are also registered to get called with of_clk_init. (Patches 2, 3-6)
+> 
+> It then switches Dove, Kirkwood, and Armada 370/XP to make use of
+> of_clk_init instead of mvebu_clocks_init. (Patches 7-9)
+> 
+> Finally, all obsolete files and Kconfig options are removed. (Patch 10)
+> 
+> It has been tested on CuBox (Dove) and Dockstar (Kirkwood) by me.
+> Armada 370 and XP are compile tested only and should get their Tested-by
+> from Thomas and Gregory, respectively.
+> 
+> @Mike: As this only touches MVEBU related code, I suggest to take it
+> all through the corresponding ARM branch.
+> 
+> Sebastian Hesselbarth (10):
+>   clk: mvebu: introduce per-clock-gate flags
+>   clk: mvebu: add common clock functions for core clk and clk gating
+>   clk: mvebu: add Dove SoC-centric clock init
+>   clk: mvebu: add Kirkwood SoC-centric clock init
+>   clk: mvebu: add Armada 370 SoC-centric clock init
+>   clk: mvebu: add Armada XP SoC-centric clock init
+>   ARM: dove: move DT boards to SoC-centric clock init
+>   ARM: kirkwood: move DT boards to SoC-centric clock init
+>   ARM: mvebu: move DT boards to SoC-centric clock init
+>   clk: mvebu: desintegrate obsolete file
+> 
+>  arch/arm/mach-dove/Kconfig          |    3 +-
+>  arch/arm/mach-dove/board-dt.c       |    3 +-
+>  arch/arm/mach-dove/common.c         |    1 -
+>  arch/arm/mach-kirkwood/Kconfig      |    3 +-
+>  arch/arm/mach-kirkwood/board-dt.c   |    3 +-
+>  arch/arm/mach-mvebu/Kconfig         |    5 +-
+>  arch/arm/mach-mvebu/armada-370-xp.c |    4 +-
+>  drivers/clk/mvebu/Kconfig           |   25 +-
+>  drivers/clk/mvebu/Makefile          |    8 +-
+>  drivers/clk/mvebu/armada-370.c      |  176 +++++++++
+>  drivers/clk/mvebu/armada-xp.c       |  204 +++++++++++
+>  drivers/clk/mvebu/clk-core.c        |  675 -----------------------------------
+>  drivers/clk/mvebu/clk-core.h        |   18 -
+>  drivers/clk/mvebu/clk-gating-ctrl.c |  250 -------------
+>  drivers/clk/mvebu/clk-gating-ctrl.h |   22 --
+>  drivers/clk/mvebu/clk.c             |   23 --
+>  drivers/clk/mvebu/common.c          |  163 +++++++++
+>  drivers/clk/mvebu/common.h          |   48 +++
+>  drivers/clk/mvebu/dove.c            |  194 ++++++++++
+>  drivers/clk/mvebu/kirkwood.c        |  247 +++++++++++++
+>  include/linux/clk/mvebu.h           |   22 --
+>  21 files changed, 1066 insertions(+), 1031 deletions(-)
+>  create mode 100644 drivers/clk/mvebu/armada-370.c
+>  create mode 100644 drivers/clk/mvebu/armada-xp.c
+>  delete mode 100644 drivers/clk/mvebu/clk-core.c
+>  delete mode 100644 drivers/clk/mvebu/clk-core.h
+>  delete mode 100644 drivers/clk/mvebu/clk-gating-ctrl.c
+>  delete mode 100644 drivers/clk/mvebu/clk-gating-ctrl.h
+>  delete mode 100644 drivers/clk/mvebu/clk.c
+>  create mode 100644 drivers/clk/mvebu/common.c
+>  create mode 100644 drivers/clk/mvebu/common.h
+>  create mode 100644 drivers/clk/mvebu/dove.c
+>  create mode 100644 drivers/clk/mvebu/kirkwood.c
+>  delete mode 100644 include/linux/clk/mvebu.h
+> ---
 
-diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-index 251f827..c019b7a 100644
---- a/arch/arm/plat-orion/common.c
-+++ b/arch/arm/plat-orion/common.c
-@@ -383,7 +383,7 @@ static struct resource orion_ge10_shared_resources[] = {
- 
- static struct platform_device orion_ge10_shared = {
- 	.name		= MV643XX_ETH_SHARED_NAME,
--	.id		= 1,
-+	.id		= 2,
- 	.dev		= {
- 		.platform_data	= &orion_ge10_shared_data,
- 	},
-@@ -398,8 +398,8 @@ static struct resource orion_ge10_resources[] = {
- 
- static struct platform_device orion_ge10 = {
- 	.name		= MV643XX_ETH_NAME,
--	.id		= 1,
--	.num_resources	= 2,
-+	.id		= 2,
-+	.num_resources	= 1,
- 	.resource	= orion_ge10_resources,
- 	.dev		= {
- 		.coherent_dma_mask	= DMA_BIT_MASK(32),
-@@ -432,7 +432,7 @@ static struct resource orion_ge11_shared_resources[] = {
- 
- static struct platform_device orion_ge11_shared = {
- 	.name		= MV643XX_ETH_SHARED_NAME,
--	.id		= 1,
-+	.id		= 3,
- 	.dev		= {
- 		.platform_data	= &orion_ge11_shared_data,
- 	},
-@@ -447,8 +447,8 @@ static struct resource orion_ge11_resources[] = {
- 
- static struct platform_device orion_ge11 = {
- 	.name		= MV643XX_ETH_NAME,
--	.id		= 1,
--	.num_resources	= 2,
-+	.id		= 3,
-+	.num_resources	= 1,
- 	.resource	= orion_ge11_resources,
- 	.dev		= {
- 		.coherent_dma_mask	= DMA_BIT_MASK(32),
--- 
-1.8.1.2
+I've tentatively applied the whole series to mvebu/seb_clk and merged it
+into for-next.  This will get it a few rounds of testing in linux-next
+until Mike has a chance to review it.
+
+thx,
+
+Jason.
