@@ -1,77 +1,157 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sun, 19 May 2013 23:39:35 +0200
-Subject: [RFC PATCH 2/5] ARM: mv78x00: Convert RD-78X00-mASA board to device
- tree
+Date: Sun, 19 May 2013 23:39:37 +0200
+Subject: [RFC PATCH 4/5] ARM: mv78x00: Add the Device Tree support for MV78X00
+ family
 In-Reply-To: <1368999578-19938-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1368999578-19938-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1368999578-19938-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1368999578-19938-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit converts the 'RD-78X00-mASA' board to the Device
-Tree. Most of the devices are converted to the Device Tree, the only
-devices which have not their Device Tree bindings are the Gigabit
-Ethernet ones and remain instantiated in the old way.
+This commit adds the Device Tree support for the mv78x00 SoC
+family. It adds an mv78x00.dtsi description of the mv78x00 SoC
+
+So far, the Device Tree contains the interrupt controller, the GPIO
+bank, the UART controllers, the USB host controllers, the SATA
+controllers and the I2C controllers.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mv78xx0/board-dt.c           |  3 +++
- arch/arm/mach-mv78xx0/common.h             |  7 +++++++
- arch/arm/mach-mv78xx0/rd78x00-masa-setup.c | 10 ++++++++++
- 3 files changed, 20 insertions(+)
+ arch/arm/boot/dts/mv78x00.dtsi | 126 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 126 insertions(+)
+ create mode 100644 arch/arm/boot/dts/mv78x00.dtsi
 
-diff --git a/arch/arm/mach-mv78xx0/board-dt.c b/arch/arm/mach-mv78xx0/board-dt.c
-index 4995fee..5111cbd 100644
---- a/arch/arm/mach-mv78xx0/board-dt.c
-+++ b/arch/arm/mach-mv78xx0/board-dt.c
-@@ -26,6 +26,9 @@ static void __init mv78x00_dt_init(void)
- 	 */
- 	mv78xx0_init();
- 
-+	if (of_machine_is_compatible("marvell,rd-78x00-masa"))
-+		rd78x00_masa_init_dt();
+diff --git a/arch/arm/boot/dts/mv78x00.dtsi b/arch/arm/boot/dts/mv78x00.dtsi
+new file mode 100644
+index 0000000..df496f5
+--- /dev/null
++++ b/arch/arm/boot/dts/mv78x00.dtsi
+@@ -0,0 +1,126 @@
++/*
++ * Copyright (C) 2013 Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2. This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
- }
- 
-diff --git a/arch/arm/mach-mv78xx0/common.h b/arch/arm/mach-mv78xx0/common.h
-index 5e9485b..6e9140d 100644
---- a/arch/arm/mach-mv78xx0/common.h
-+++ b/arch/arm/mach-mv78xx0/common.h
-@@ -17,6 +17,13 @@ struct mv_sata_platform_data;
- /*
-  * Basic MV78xx0 init functions used early by machine-setup.
-  */
-+#ifdef CONFIG_MACH_RD78X00_MASA
-+void rd78x00_masa_init_dt(void);
-+#else
-+static inline void rd78x00_masa_init_dt(void) {};
-+#endif
++/include/ "skeleton.dtsi"
++
++/ {
++	model = "Marvell MV78X00 SoC";
++	compatible = "marvell,mv78x00";
++	interrupt-parent = <&intc>;
++
++	intc: interrupt-controller {
++		compatible = "marvell,orion-intc", "marvell,intc";
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		reg = <0xf1020210 0x04>,
++		      <0xf1020214 0x04>,
++		      <0xf102020c 0x04>;
++	};
++
++	ocp at f1000000 {
++		compatible = "simple-bus";
++		ranges = <0x00000000 0xf1000000 0x4000000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		gpio0: gpio at 10100 {
++			compatible = "marvell,orion-gpio";
++			#gpio-cells = <2>;
++			gpio-controller;
++			reg = <0x10100 0x40>;
++			ngpios = <32>;
++			interrupts = <56>, <57>, <58>, <59>;
++		};
++
++		serial at 12000 {
++			compatible = "ns16550a";
++			reg = <0x12000 0x100>;
++			reg-shift = <2>;
++			interrupts = <12>;
++			/* set clock-frequency in board dts */
++			status = "disabled";
++		};
++
++		serial at 12100 {
++			compatible = "ns16550a";
++			reg = <0x12100 0x100>;
++			reg-shift = <2>;
++			interrupts = <13>;
++			/* set clock-frequency in board dts */
++			status = "disabled";
++		};
++
++		serial at 12200 {
++			compatible = "ns16550a";
++			reg = <0x12200 0x100>;
++			reg-shift = <2>;
++			interrupts = <14>;
++			/* set clock-frequency in board dts */
++			status = "disabled";
++		};
++
++		serial at 12300 {
++			compatible = "ns16550a";
++			reg = <0x12300 0x100>;
++			reg-shift = <2>;
++			interrupts = <15>;
++			/* set clock-frequency in board dts */
++			status = "disabled";
++		};
 +
 +
- int mv78xx0_core_index(void);
- void mv78xx0_map_io(void);
- void mv78xx0_init(void);
-diff --git a/arch/arm/mach-mv78xx0/rd78x00-masa-setup.c b/arch/arm/mach-mv78xx0/rd78x00-masa-setup.c
-index d2d06f3..8d88657 100644
---- a/arch/arm/mach-mv78xx0/rd78x00-masa-setup.c
-+++ b/arch/arm/mach-mv78xx0/rd78x00-masa-setup.c
-@@ -64,6 +64,16 @@ static void __init rd78x00_masa_init(void)
- 	}
- }
- 
-+void __init rd78x00_masa_init_dt(void)
-+{
-+	/* Internal devices not ported to DT yet */
-+	mv78xx0_ge00_init(&rd78x00_masa_ge00_data);
-+	mv78xx0_ge10_init(&rd78x00_masa_ge10_data);
-+		mv78xx0_ge01_init(&rd78x00_masa_ge01_data);
-+		mv78xx0_ge11_init(&rd78x00_masa_ge11_data);
++		sata at a0000 {
++			compatible = "marvell,orion-sata";
++			reg = <0xa0000 0x5000>;
++			interrupts = <26>;
++			status = "disabled";
++		};
 +
-+}
++		i2c at 10000 {
++			compatible = "marvell,mv64xxx-i2c";
++			reg = <0x10000 0x20>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			interrupts = <2>;
++			clock-frequency = <100000>;
++			status = "disabled";
++		};
 +
- static int __init rd78x00_pci_init(void)
- {
- 	/*
++		i2c at 11000 {
++			compatible = "marvell,mv64xxx-i2c";
++			reg = <0x11000 0x20>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			interrupts = <3>;
++			clock-frequency = <100000>;
++			status = "disabled";
++		};
++
++		ehci at 50000 {
++			compatible = "marvell,orion-ehci";
++			reg = <0x50000 0x1000>;
++			interrupts = <16>;
++			status = "disabled";
++		};
++
++		ehci at 51000 {
++			compatible = "marvell,orion-ehci";
++			reg = <0x51000 0x1000>;
++			interrupts = <17>;
++			status = "disabled";
++		};
++
++		ehci at 52000 {
++			compatible = "marvell,orion-ehci";
++			reg = <0x52000 0x1000>;
++			interrupts = <18>;
++			status = "disabled";
++		};
++
++	};
++};
 -- 
 1.8.1.2
