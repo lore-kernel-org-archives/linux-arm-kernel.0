@@ -1,119 +1,47 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 19 May 2013 13:04:59 +0200
-Subject: [PATCH] net: dm9000: Allow instantiation using device tree
-In-Reply-To: <20130519103544.GZ32299@pengutronix.de>
-References: <1368918194-24030-1-git-send-email-tomasz.figa@gmail.com>
- <2763249.7aFBh8NOHl@flatron> <20130519103544.GZ32299@pengutronix.de>
-Message-ID: <1433733.7VTOAEOlx2@flatron>
+From: dt.tangr@gmail.com (Daniel Tang)
+Date: Sun, 19 May 2013 21:09:17 +1000
+Subject: [RFC PATCHv3 3/6] clk: Add TI-Nspire clock drivers
+In-Reply-To: <201305161417.28133.arnd@arndb.de>
+References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
+ <201305151607.54442.arnd@arndb.de>
+ <15FD6543-D04A-4953-A56A-40B27F0026E4@gmail.com>
+ <201305161417.28133.arnd@arndb.de>
+Message-ID: <F8915E01-0FCA-4C9F-8440-63B5A73B349B@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 19 of May 2013 12:35:44 Sascha Hauer wrote:
-> On Sun, May 19, 2013 at 10:54:53AM +0200, Tomasz Figa wrote:
-> > Hi Sascha,
-> > 
-> > On Sunday 19 of May 2013 09:05:38 Sascha Hauer wrote:
-> > > Hi Tomasz,
-> > > 
-> > > On Sun, May 19, 2013 at 01:03:14AM +0200, Tomasz Figa wrote:
-> > > > This patch adds Device Tree support to dm9000 driver.
-> > > > 
-> > > > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > > > ---
-> > > > 
-> > > >  .../devicetree/bindings/net/davicom-dm9000.txt     | 27
-> > > >  ++++++++++
-> > > >  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
-> > > >  drivers/net/ethernet/davicom/dm9000.c              | 60
-> > > >  ++++++++++++++++++++++ 3 files changed, 88 insertions(+)
-> > > >  create mode 100644
-> > > >  Documentation/devicetree/bindings/net/davicom-dm9000.txt>
-> > > > 
-> > > > diff --git
-> > > > a/Documentation/devicetree/bindings/net/davicom-dm9000.txt
-> > > > b/Documentation/devicetree/bindings/net/davicom-dm9000.txt new
-> > > > file
-> > > > mode 100644
-> > > > index 0000000..d2902db
-> > > > --- /dev/null
-> > > > +++ b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
-> > > > @@ -0,0 +1,27 @@
-> > > > +Davicom DM9000 Fast Ethernet controller
-> > > > +
-> > > > +Required properties:
-> > > > +- compatible = "davicom,dm9000";
-> > > > +- reg : physical addresses and sizes of registers, must contain 2
-> > > > entries: +    first entry : address register,
-> > > > +    second entry : address register.
-> > > > +- interrupt-parent : interrupt controller to which the device is
-> > > > connected +- interrupts : interrupt specifier specific to
-> > > > interrupt
-> > > > controller +
-> > > > +Optional properties:
-> > > > +- local-mac-address : A bytestring of 6 bytes specifying Ethernet
-> > > > MAC
-> > > > address +    to use (from firmware or bootloader)
-> > > > +- davicom,no-eeprom : Configuration EEPROM is not available
-> > > > +- davicom,ext-phy : Use external PHY
-> > > > +- davicom,simple-phy : Use NSR to find LinkStatus
-> > > 
-> > > Do we really need to expose this simple-phy property? Looking at the
-> > > drvier code this more looks like a work around shortcomings of the
-> > > driver code rather than something really necessary.
-> > 
-> > Well, depending on this property it can use two different methods of
-> > checking carrier status and it seems to depend on hardware, which one
-> > should be used. I don't see any driver shortcomings here, but maybe
-> > I'm
-> > missing something.
-> 
-> It's not hardware dependent, at least not from the original commit log.
-> 
-> The driver doesn't use mdiobus_register which you normally would do
-> today. If someone ports the driver over to mdiobus we would still have
-> to support this legacy flag as a special case.
-> 
-> Since no mainline user makes use of this flag I suggest to skip it from
-> the devicetree, at least until someone really asks for this specific
-> flag (and has good reasons to use it)
 
-Well, I don't need this flag on my platform, so I'm not strongly against 
-removing it. If you really don't like it, I will remove it in v2.
+On 16/05/2013, at 10:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-> > > > +#ifdef CONFIG_OF
-> > > > +static struct dm9000_plat_data *dm9000_parse_dt(struct device
-> > > > *dev)
-> > > > +{
-> > > > +	struct dm9000_plat_data *pdata;
-> > > > +	struct device_node *np = dev->of_node;
-> > > > +	const void *prop;
-> > > > +	int len;
-> > > > +
-> > > > +	if (!np)
-> > > > +		return NULL;
-> > > 
-> > > You should be able to kill the ifdef around this function by doing
-> > 
-> > Basically this would be a kill with a double-edged sword.
-> > 
-> > I could completely drop the #ifdef without any additional check, as it
-> > is not possible that np is not NULL with !CONFIG_OF,
+> On Thursday 16 May 2013, Daniel Tang wrote:
+>> 
+>> On 16/05/2013, at 12:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> 
+>>> You are missing a binding in Documentation/devicetree, same as for some of
+>>> the other drivers in this series.
+>> 
+>> Should we be adding a vendor prefix to it too? If so, we're not sure whether
+>> to use "ti," or not since this isn't an official port by TI.
 > 
-> Yes, but the compiler doesn't know this.
+> The binding describes the hardware, it should not matter who does the port.
+> However, any part of the tree that is not actually from TI should have a
+> vendor prefix indicating who made that part. IIRC, the SoC used in there
+> is from TI, so you should use something else for the on-soc components.
 > 
-> > but I decided to keep
-> > the code conditional to reduce driver code a bit on platforms that
-> > don't need OF.
+
+If the vendors for the on-SOC components are unknown, should we just leave the compatible strings as is (i.e. "nspire-XXX")?
+
+>>> It seems strange to assign the clk_name variable to node->name
+>>> first and then overriding it with the clock-output-names property.
+>>> Is that intentional? If so, please explain it in a comment.
+>>> 
+>> 
+>> I copied that bit of boilerplate from drivers/clk/clk-fixed-rate.c but
+>> I'm guessing it's to use the node name as the clock name unless there
+>> is a property called "clock-output-names"
 > 
-> IS_ENABLED(CONFIG_OF) will expand to 0 without OF and the compiler will
-> through the unused code away. You won't find differences in the binary
-> size.
-
-Hmm, so IS_ENABLED returns a constant, OK. I have never bothered to look 
-that up and ended with a strange belief that it is a runtime check (which 
-doesn't make sense...). Always good to learn something, thanks.
-
-OK, I'm fine with this, will change it in v2.
-
-Best regards,
-Tomasz
+> Ah, I see. It seems you forgot to add the clock maintainer to Cc in the
+> mail. Mike is the one who will have to take you patch anyway, so I assume
+> he will comment on this if you did it wrong.
+> 
+> 	Arnd
