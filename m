@@ -1,61 +1,122 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 May 2013 09:59:20 +0100
-Subject: [RFC 0/8] rmk's Dove DRM/TDA19988 Cubox driver
-In-Reply-To: <20130517194023.0c385ea0@armhf>
-References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
- <20130517133345.7c1368f5@armhf>
- <20130517120115.GF18614@n2100.arm.linux.org.uk>
- <20130517194023.0c385ea0@armhf>
-Message-ID: <20130519085920.GO18614@n2100.arm.linux.org.uk>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Sun, 19 May 2013 12:35:26 +0300
+Subject: [PATCH v2 10/10] kernel: might_fault does not imply might_sleep
+In-Reply-To: <20130516184041.GP19669@dyad.programming.kicks-ass.net>
+References: <cover.1368702323.git.mst@redhat.com>
+ <1f85dc8e6a0149677563a2dfb4cef9a9c7eaa391.1368702323.git.mst@redhat.com>
+ <20130516184041.GP19669@dyad.programming.kicks-ass.net>
+Message-ID: <20130519093526.GD19883@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 07:40:23PM +0200, Jean-Francois Moine wrote:
-> Maybe I did not explain correctly: the colored cursor maybe RGB888 +
-> transparency (64x64) or full ARGB (64x32 or 32x64). I coded the first
-> case. And, yes, I better like a hardware cursor: it asks for less
-> computation, and I get it immediately at graphic starting time!
+On Thu, May 16, 2013 at 08:40:41PM +0200, Peter Zijlstra wrote:
+> On Thu, May 16, 2013 at 02:16:10PM +0300, Michael S. Tsirkin wrote:
+> > There are several ways to make sure might_fault
+> > calling function does not sleep.
+> > One is to use it on kernel or otherwise locked memory - apparently
+> > nfs/sunrpc does this. As noted by Ingo, this is handled by the
+> > migh_fault() implementation in mm/memory.c but not the one in
+> > linux/kernel.h so in the current code might_fault() schedules
+> > differently depending on CONFIG_PROVE_LOCKING, which is an undesired
+> > semantical side effect.
+> > 
+> > Another is to call pagefault_disable: in this case the page fault
+> > handler will go to fixups processing and we get an error instead of
+> > sleeping, so the might_sleep annotation is a false positive.
+> > vhost driver wants to do this now in order to reuse socket ops
+> > under a spinlock (and fall back on slower thread handler
+> > on error).
+> 
+> Are you using the assumption that spin_lock() implies preempt_disable() implies
+> pagefault_disable()? Note that this assumption isn't valid for -rt where the
+> spinlock becomes preemptible but we'll not disable pagefaults.
 
-Having looked at this now, using the RGB+transparency is less than ideal
-because we're having to reduce an alpha channel down to a simple on/off
-transparency.  X cursors really are alphablended components!
+No, I was not assuming that. What I'm trying to say is that a caller
+that does something like this under a spinlock:
+	preempt_disable
+	pagefault_disable
+	error = copy_to_user
+	pagefault_enable
+	preempt_enable_no_resched
 
-So, the options here are:
-(a) use "software" rendered cursor
-    + correct and expected cursor size
-    + correct rendering
-    + possible to use the GPU (I believe mine does)
-    - maybe time consuming as it has to be removed/replaced on the screen
-(b) use RGB+transparency for 64x64 hardware cursor
-    + correct and expected cursor size
-    + does not have to be removed/replaced when screen contents change
-    - incorrect rendering due to reducing the alpha channel to a simple
-      on/off transparency mask
-    - has to be reloaded when the pointer is close to the edges of the
-      screen which is CPU intensive
-    - cursor image data passed into DRM is required to be ARGB (I've
-      discussed this with David Airlie last night.)  This means we have
-      to do translation to RGB+T in the kernel which is *not* nice.
-(c) use ARGB 32x64 or 64x32 hardware cursor
-    + does not have to be removed/replaced when screen contents change
-    + correct rendering of cursor
-    - unexpected cursor size; user clients do not expect to be restricted
-      to 32 rows or 32 lines of cursor
-    - can only select maximum cursor size on initialization of hardware
-      cursor; can't dynamically switch between 32x64 and 64x32 sizes
-    - has to be reloaded when the pointer is close to the edges of the
-      screen which is CPU intensive
+is not doing anything wrong and should not get a warning,
+as long as error is handled correctly later.
+Right?
 
-While I would like to have hardware cursor support, I don't think it's
-worth the effort.  The one which tips it for me is the need to reload
-the cursor near the edges - note the restriction in the documentation
-that the cursor position + cursor size can't be outside the active
-size.  Also, cursors generally have 7 or so transparent pixels to the
-left of them (which of course changes depending on the cursor shape.)
+> > Address both issues by:
+> > 	- dropping the unconditional call to might_sleep
+> > 	  from the fast might_fault code in linux/kernel.h
+> > 	- checking for pagefault_disable() in the
+> > 	  CONFIG_PROVE_LOCKING implementation
+> > 
+> > Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
+> > ---
+> >  include/linux/kernel.h |  1 -
+> >  mm/memory.c            | 14 +++++++++-----
+> >  2 files changed, 9 insertions(+), 6 deletions(-)
+> > 
+> > diff --git a/include/linux/kernel.h b/include/linux/kernel.h
+> > index e96329c..322b065 100644
+> > --- a/include/linux/kernel.h
+> > +++ b/include/linux/kernel.h
+> > @@ -198,7 +198,6 @@ void might_fault(void);
+> >  #else
+> >  static inline void might_fault(void)
+> >  {
+> > -	might_sleep();
+> 
+> This removes potential resched points for PREEMPT_VOLUNTARY -- was that
+> intentional?
 
-It's also less CPU intensive to (probably) allow the GPU to render it
-than it is for the CPU to deal with these hardware restrictions.
+No it's a bug. Thanks for pointing this out.
+OK so I guess it should be might_sleep_if(!in_atomic())
+and this means might_fault would have to move from linux/kernel.h to
+linux/uaccess.h, since in_atomic() is in linux/hardirq.h
 
-I would've liked to see hardware cursor support, but I think what I'm
-going to be doing is stripping the cursor code out of the main driver
-into a separate optional patch which will ultimately be dropped.
+Makes sense?
+
+> >  }
+> >  #endif
+> >  
+> > diff --git a/mm/memory.c b/mm/memory.c
+> > index 6dc1882..1b8327b 100644
+> > --- a/mm/memory.c
+> > +++ b/mm/memory.c
+> > @@ -4222,13 +4222,17 @@ void might_fault(void)
+> >  	if (segment_eq(get_fs(), KERNEL_DS))
+> >  		return;
+> >  
+> > -	might_sleep();
+> >  	/*
+> > -	 * it would be nicer only to annotate paths which are not under
+> > -	 * pagefault_disable, however that requires a larger audit and
+> > -	 * providing helpers like get_user_atomic.
+> > +	 * It would be nicer to annotate paths which are under preempt_disable
+> > +	 * but not under pagefault_disable, however that requires a new flag
+> > +	 * for differentiating between the two.
+> 
+> -rt has this, pagefault_disable() doesn't change the preempt count but pokes
+> at task_struct::pagefault_disable.
+
+Good to know.
+
+So maybe we can import this at least for CONFIG_PROVE_LOCKING?
+To make the patch smaller I'd prefer doing both for now,
+this way this patchset does not have to poke in too many
+mm internals.
+I can try doing that - unless
+someone else has plans to merge this part soon anyway?
+
+> >  	 */
+> > -	if (!in_atomic() && current->mm)
+> > +	if (in_atomic())
+> > +		return;
+> > +
+> > +	might_sleep();
+> > +
+> > +	if (current->mm)
+> >  		might_lock_read(&current->mm->mmap_sem);
+> >  }
+> >  EXPORT_SYMBOL(might_fault);
+> > -- 
+> > MST
