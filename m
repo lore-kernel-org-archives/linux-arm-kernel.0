@@ -1,161 +1,231 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 19 May 2013 01:03:14 +0200
-Subject: [PATCH] net: dm9000: Allow instantiation using device tree
-Message-ID: <1368918194-24030-1-git-send-email-tomasz.figa@gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sun, 19 May 2013 08:01:52 +0200
+Subject: [RFC 4/4] DRM: tda998x: add missing include
+In-Reply-To: <5197D6C1.3060702@gmail.com>
+References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+ <1368897139-25485-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1368897139-25485-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130518194644.2a02a4fc@armhf>
+ <CAF6AEGtx7RbvKEEc5uSFvz-2uveB1cnJNf_ESn6JYhfte5UmZQ@mail.gmail.com>
+ <20130518205845.2dfe9fe5@armhf> <5197D6C1.3060702@gmail.com>
+Message-ID: <20130519080152.0b486b75@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Device Tree support to dm9000 driver.
+On Sat, 18 May 2013 21:30:09 +0200
+Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- .../devicetree/bindings/net/davicom-dm9000.txt     | 27 ++++++++++
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- drivers/net/ethernet/davicom/dm9000.c              | 60 ++++++++++++++++++++++
- 3 files changed, 88 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/davicom-dm9000.txt
+> So in the end, we will have a DT node for the HW controllers found
+> in Dove SoCs, a node for TDA998x, and a node for the video card, i.e.
+> _how_ lcd controllers, external encoders, clocks, maybe audio, ...
+> are hooked up on that specific board.
 
-diff --git a/Documentation/devicetree/bindings/net/davicom-dm9000.txt b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
-new file mode 100644
-index 0000000..d2902db
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
-@@ -0,0 +1,27 @@
-+Davicom DM9000 Fast Ethernet controller
-+
-+Required properties:
-+- compatible = "davicom,dm9000";
-+- reg : physical addresses and sizes of registers, must contain 2 entries:
-+    first entry : address register,
-+    second entry : address register.
-+- interrupt-parent : interrupt controller to which the device is connected
-+- interrupts : interrupt specifier specific to interrupt controller
-+
-+Optional properties:
-+- local-mac-address : A bytestring of 6 bytes specifying Ethernet MAC address
-+    to use (from firmware or bootloader)
-+- davicom,no-eeprom : Configuration EEPROM is not available
-+- davicom,ext-phy : Use external PHY
-+- davicom,simple-phy : Use NSR to find LinkStatus
-+
-+Example:
-+
-+	ethernet at 18000000 {
-+		compatible = "davicom,dm9000";
-+		reg = <0x18000000 0x2 0x18000004 0x2>;
-+		interrupt-parent = <&gpn>;
-+		interrupts = <7 4>;
-+		local-mac-address = [00 00 de ad be ef];
-+		davicom,no-eeprom;
-+	};
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 6931c43..2fe74e6 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -18,6 +18,7 @@ chrp	Common Hardware Reference Platform
- cirrus	Cirrus Logic, Inc.
- cortina	Cortina Systems, Inc.
- dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
-+davicom	DAVICOM Semiconductor, Inc.
- denx	Denx Software Engineering
- emmicro	EM Microelectronic
- epson	Seiko Epson Corp.
-diff --git a/drivers/net/ethernet/davicom/dm9000.c b/drivers/net/ethernet/davicom/dm9000.c
-index 9105465..6c91708 100644
---- a/drivers/net/ethernet/davicom/dm9000.c
-+++ b/drivers/net/ethernet/davicom/dm9000.c
-@@ -29,6 +29,7 @@
- #include <linux/spinlock.h>
- #include <linux/crc32.h>
- #include <linux/mii.h>
-+#include <linux/of.h>
- #include <linux/ethtool.h>
- #include <linux/dm9000.h>
- #include <linux/delay.h>
-@@ -1358,6 +1359,50 @@ static const struct net_device_ops dm9000_netdev_ops = {
- #endif
- };
- 
-+#ifdef CONFIG_OF
-+static struct dm9000_plat_data *dm9000_parse_dt(struct device *dev)
-+{
-+	struct dm9000_plat_data *pdata;
-+	struct device_node *np = dev->of_node;
-+	const void *prop;
-+	int len;
-+
-+	if (!np)
-+		return NULL;
-+
-+	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata) {
-+		dev_err(dev, "failed to allocate platform data struct\n");
-+		return ERR_PTR(-ENOMEM);
-+	}
-+
-+	if (of_find_property(np, "davicom,ext-phy", NULL))
-+		pdata->flags |= DM9000_PLATF_EXT_PHY;
-+	if (of_find_property(np, "davicom,no-eeprom", NULL))
-+		pdata->flags |= DM9000_PLATF_NO_EEPROM;
-+	if (of_find_property(np, "davicom,simple-phy", NULL))
-+		pdata->flags |= DM9000_PLATF_SIMPLE_PHY;
-+
-+	prop = of_get_property(np, "local-mac-address", &len);
-+	if (!prop)
-+		return pdata;
-+
-+	if (len < sizeof(pdata->dev_addr)) {
-+		dev_err(dev, "invalid length of local-mac-address property\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	memcpy(pdata->dev_addr, prop, sizeof(pdata->dev_addr));
-+
-+	return pdata;
-+}
-+#else
-+static struct dm9000_plat_data *dm9000_parse_dt(struct device *unused)
-+{
-+	return NULL;
-+}
-+#endif
-+
- /*
-  * Search DM9000 board, allocate space and register it
-  */
-@@ -1373,6 +1418,12 @@ dm9000_probe(struct platform_device *pdev)
- 	int i;
- 	u32 id_val;
- 
-+	if (!pdata) {
-+		pdata = dm9000_parse_dt(&pdev->dev);
-+		if (IS_ERR(pdata))
-+			return PTR_ERR(pdata);
-+	}
-+
- 	/* Init network device */
- 	ndev = alloc_etherdev(sizeof(struct board_info));
- 	if (!ndev)
-@@ -1683,11 +1734,20 @@ dm9000_drv_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id dm9000_of_matches[] = {
-+	{ .compatible = "davicom,dm9000", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, dm9000_of_matches);
-+#endif
-+
- static struct platform_driver dm9000_driver = {
- 	.driver	= {
- 		.name    = "dm9000",
- 		.owner	 = THIS_MODULE,
- 		.pm	 = &dm9000_drv_pm_ops,
-+		.of_match_table = of_match_ptr(dm9000_of_matches),
- 	},
- 	.probe   = dm9000_probe,
- 	.remove  = dm9000_drv_remove,
+Here is my dove-cubox.dts. What is wrong with it?
+
+/dts-v1/;
+
+/include/ "dove.dtsi"
+
+/ {
+	model = "SolidRun CuBox";
+	compatible = "solidrun,cubox", "marvell,dove";
+
+	memory {
+		device_type = "memory";
+		reg = <0x00000000 0x40000000>;
+	};
+
+	chosen {
+		bootargs = "console=ttyS0,115200n8 earlyprintk";
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		pinctrl-0 = <&pmx_gpio_18>;
+		pinctrl-names = "default";
+
+		power {
+			label = "Power";
+			gpios = <&gpio0 18 1>;
+			linux,default-trigger = "default-on";
+		};
+	};
+
+	regulators {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		usb_power: regulator at 1 {
+			compatible = "regulator-fixed";
+			reg = <1>;
+			regulator-name = "USB Power";
+			regulator-min-microvolt = <5000000>;
+			regulator-max-microvolt = <5000000>;
+			enable-active-high;
+			regulator-always-on;
+			regulator-boot-on;
+			gpio = <&gpio0 1 0>;
+		};
+	};
+
+	clocks {
+		/* 25MHz reference crystal */
+		ref25: oscillator {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <25000000>;
+		};
+
+		lcdclk: fixed-clock {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <400000000>;
+		};
+	};
+
+	audio {
+		compatible = "marvell,kirkwood-spdif-audio";
+		id = <1>;
+	};
+
+	video {
+		compatible = "marvell,dove-video";
+	};
+};
+
+&uart0 { status = "okay"; };
+&sata0 { status = "okay"; };
+&i2c0 {
+	status = "okay";
+	clock-frequency = <100000>;
+
+	si5351: clock-generator {
+		compatible = "silabs,si5351a-msop";
+		reg = <0x60>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		#clock-cells = <1>;
+
+		/* connect xtal input to 25MHz reference */
+		clocks = <&ref25>;
+
+		/* connect xtal input as source of pll0 and pll1 */
+		silabs,pll-source = <0 0>, <1 0>;
+
+		clkout0 {
+			reg = <0>;
+			silabs,drive-strength = <8>;
+			silabs,multisynth-source = <0>;
+			silabs,clock-source = <0>;
+			silabs,pll-master;
+		};
+
+		clkout1 {
+			reg = <1>;
+			silabs,drive-strength = <8>;
+			silabs,multisynth-source = <1>;
+			silabs,clock-source = <0>;
+			silabs,pll-master;
+		};
+
+		clkout2 {
+			reg = <2>;
+			silabs,multisynth-source = <1>;
+			silabs,clock-source = <0>;
+		};
+	};
+
+	tda998x: hdmi-encoder {
+		compatible = "nxp,tda998x";
+		reg = <0x70>;
+		interrupt-parent = <&gpio0>;
+		interrupts = <27 2>;		/* falling edge */
+	};
+};
+
+&sdio0 {
+	status = "okay";
+	/* sdio0 card detect is connected to wrong pin on CuBox */
+	cd-gpios = <&gpio0 12 1>;
+};
+
+&spi0 {
+	status = "okay";
+
+	/* spi0.0: 4M Flash Winbond W25Q32BV */
+	spi-flash at 0 {
+		compatible = "st,w25q32";
+		spi-max-frequency = <20000000>;
+		reg = <0>;
+	};
+};
+
+&pinctrl {
+	pinctrl-0 = <&pmx_gpio_1 &pmx_gpio_12 &pmx_gpio_13 &pmx_gpio_camera>;
+	pinctrl-names = "default";
+
+	pmx_gpio_1: pmx-gpio-1 {
+		marvell,pins = "mpp1";
+		marvell,function = "gpio";
+	};
+
+	pmx_gpio_12: pmx-gpio-12 {
+		marvell,pins = "mpp12";
+		marvell,function = "gpio";
+	};
+
+/* kirkwood i2s */
+	pmx_gpio_13: pmx-gpio-13 {
+		marvell,pins = "mpp13";
+		marvell,function = "gpio";
+	};
+
+	pmx_gpio_18: pmx-gpio-18 {
+		marvell,pins = "mpp18";
+		marvell,function = "gpio";
+	};
+/* nxp HDMI irq on pin 27 */
+	pmx_gpio_camera: pmx-gpio-camera {
+		marvell,pins = "mpp_camera";
+		marvell,function = "gpio";
+	};
+};
+
+&mdio { status = "okay"; };
+&ethernet { status = "okay"; };
+&lcd0 {
+	status = "okay";
+	clocks = <&core_clk 3>, <0>, <&lcdclk>, <&si5351 0>;
+	marvell,port-type = <11>;		/* HDMIA */
+	marvell,external-encoder = <&tda998x>;
+};
+
+&i2s1 { status = "okay"; };
+
+/* --- test (not cubox) ---- *
+&dcon { status = "okay"; };
+
+&lcd1 {
+	status = "okay";
+	clocks = <&core_clk 3>, <0>, <&lcdclk>, <0>;
+	marvell,port-type = <1>;
+	display-timings {
+		mode {
+			hactive = <1920>;
+			vactive = <1080>;
+			hfront-porch = <88>;
+			hsync-len = <44>;
+			hback-porch = <148>;
+			vfront-porch = <4>;
+			vsync-len = <5>;
+			vback-porch = <36>;
+			clock = <148500>;
+		};
+	};
+};
+ * ---- */
+
 -- 
-1.8.2.1
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
