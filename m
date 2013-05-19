@@ -1,63 +1,63 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 19 May 2013 16:31:56 -0400
-Subject: [PATCHv10 2/9] of/pci: Provide support for parsing PCI DT
- ranges property
-In-Reply-To: <1368719725-21265-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1368719725-21265-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1368719725-21265-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130519203156.GO11137@titan.lakedaemon.net>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Sun, 19 May 2013 23:35:51 +0300
+Subject: [PATCH v2 10/10] kernel: might_fault does not imply might_sleep
+In-Reply-To: <1368995002.6828.117.camel@gandalf.local.home>
+References: <cover.1368702323.git.mst@redhat.com>
+ <1f85dc8e6a0149677563a2dfb4cef9a9c7eaa391.1368702323.git.mst@redhat.com>
+ <20130516184041.GP19669@dyad.programming.kicks-ass.net>
+ <20130519093526.GD19883@redhat.com>
+ <1368966844.6828.111.camel@gandalf.local.home>
+ <20130519133418.GA24381@redhat.com>
+ <1368979579.6828.114.camel@gandalf.local.home>
+ <20130519164009.GA2434@redhat.com>
+ <1368995002.6828.117.camel@gandalf.local.home>
+Message-ID: <20130519203551.GA27708@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 05:55:17PM +0200, Thomas Petazzoni wrote:
-> From: Andrew Murray <Andrew.Murray@arm.com>
+On Sun, May 19, 2013 at 04:23:22PM -0400, Steven Rostedt wrote:
+> On Sun, 2013-05-19 at 19:40 +0300, Michael S. Tsirkin wrote:
 > 
-> This patch factors out common implementation patterns to reduce overall kernel
-> code and provide a means for host bridge drivers to directly obtain struct
-> resources from the DT's ranges property without relying on architecture specific
-> DT handling. This will make it easier to write archiecture independent host bridge
-> drivers and mitigate against further duplication of DT parsing code.
+> > OK I get it. So let me correct myself. The simple code
+> > that does something like this under a spinlock:
+> > >       preempt_disable
+> > >       pagefault_disable
+> > >       error = copy_to_user
+> > >       pagefault_enable
+> > >       preempt_enable
+> > >
+> > is not doing anything wrong and should not get a warning,
+> > as long as error is handled correctly later.
+> > Right?
 > 
-> This patch can be used in the following way:
-> 
-> 	struct of_pci_range_parser parser;
-> 	struct of_pci_range range;
-> 
-> 	if (of_pci_range_parser_init(&parser, np))
-> 		; //no ranges property
-> 
-> 	for_each_of_pci_range(&parser, &range) {
-> 
-> 		/*
-> 			directly access properties of the address range, e.g.:
-> 			range.pci_space, range.pci_addr, range.cpu_addr,
-> 			range.size, range.flags
-> 
-> 			alternatively obtain a struct resource, e.g.:
-> 			struct resource res;
-> 			of_pci_range_to_resource(&range, np, &res);
-> 		*/
-> 	}
-> 
-> Additionally the implementation takes care of adjacent ranges and merges them
-> into a single range (as was the case with powerpc and microblaze).
-> 
-> Signed-off-by: Andrew Murray <Andrew.Murray@arm.com>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Reviewed-by: Rob Herring <rob.herring@calxeda.com>
-> Tested-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Tested-by: Linus Walleij <linus.walleij@linaro.org>
-> Tested-by: Jingoo Han <jg1.han@samsung.com>
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> ---
->  drivers/of/address.c       |   67 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/of_address.h |   48 +++++++++++++++++++++++++++++++
->  2 files changed, 115 insertions(+)
+> I came in mid thread and I don't know the context.
 
-patches 2, 3, and 4 applied to mvebu/of_pci to facilitate others
-(LinusW) basing their work off of it.
+The context is that I want to change might_fault
+from might_sleep to
+might_sleep_if(!in_atomic())
+so that above does not trigger warnings even with
+CONFIG_DEBUG_ATOMIC_SLEEP enabled.
 
-thx,
 
-Jason.
+> Anyway, the above
+> looks to me as you just don't want to sleep.
+
+Exactly. upstream we can just do pagefault_disable but to make
+this code -rt ready it's best to do preempt_disable as well.
+
+> If you try to copy data to
+> user space that happens not to be currently mapped for any reason, you
+> will get an error. Even if the address space is completely valid. Is
+> that what you want?
+> 
+> -- Steve
+> 
+
+Yes, this is by design.
+We detect that and bounce the work to a thread outside
+any locks.
+
+Thanks,
+
+-- 
+MST
