@@ -1,50 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Sun, 19 May 2013 09:13:26 +0200
-Subject: [PATCH 2/2] ARM: mvebu: Add support for NOR flash device on
- Armada XP-DB board
-In-Reply-To: <20130517165656.GE11137@titan.lakedaemon.net>
-References: <1368788998-4672-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1368788998-4672-2-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130517165656.GE11137@titan.lakedaemon.net>
-Message-ID: <20130519091326.74a77b91@skate>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Sun, 19 May 2013 20:06:45 +1200
+Subject: [PATCH 0/4] FB updates for 3.11
+In-Reply-To: <1368868514-18975-1-git-send-email-linux@prisktech.co.nz>
+References: <1368868514-18975-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <51988815.40006@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+On 18/05/13 21:15, Tony Prisk wrote:
+> Patch #1 - Move register defines inside the driver and drop the header.
+> Patch #2 - Convert the register defines to use the vendor preferred names.
+> Patch #3 - Add a device clock to wm8505fb. Without it, only the uboot
+> initialized resolution is supported.
+> Patch #4 - Add support for the VGA output found on the APC8750 board.
+>
+> Tony Prisk (4):
+>    fb: vt8500: Move register defines inside driver
+>    fb: vt8500: Convert to use vendor register names
+>    fb: vt8500: Require a device clock for wm8505fb driver
+>    fb: vt8500: Add VGA output support to wm8505fb driver.
+>
+>   .../devicetree/bindings/video/wm,wm8505-fb.txt     |    9 +-
+>   drivers/video/wm8505fb.c                           |  195 ++++++++++++--
+>   drivers/video/wm8505fb_regs.h                      |   76 ------
+>   drivers/video/wmt_ge_rops.c                        |  280 +++++++++++++++-----
+>   4 files changed, 394 insertions(+), 166 deletions(-)
+>   delete mode 100644 drivers/video/wm8505fb_regs.h
+>
+Florian/Tomi,
 
-On Fri, 17 May 2013 12:56:56 -0400, Jason Cooper wrote:
-> On Fri, May 17, 2013 at 08:09:58AM -0300, Ezequiel Garcia wrote:
-> > The Armada XP Development Board (DB-78460-BP) has a NOR flash device
-> > connected to the Device Bus. This commit adds the device tree node
-> > to support this device.
-> > 
-> > This SoC supports a flexible and dynamic decoding window allocation
-> > scheme; but since this feature is still not implemented we need
-> > to specify the window base address in the device tree node itself.
-> > 
-> > This base address has been selected in a completely arbitrary fashion.
-> > 
-> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/armada-xp-db.dts | 32 ++++++++++++++++++++++++++++++++
-> >  1 file changed, 32 insertions(+)
-> 
-> Applied to mvebu/fixes
+Please ignore these patches. This driver needs a bit more work, so I 
+will do a
+more thorough series and resubmit.
 
-Is mvebu/fixes the branch intended to be pushed to 3.10-rcX, or to
-3.11 ?
-
-I'm asking because you've applied both 1/2 and 2/2 on the same
-mvebu/fixes branch, while 1/2 is intended for 3.10-rcX (fixing
-existing DT data), and 2/2 is intended for 3.11 (adding support for a
-new device in the DT).
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards
+Tony Prisk
