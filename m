@@ -1,112 +1,61 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 19 May 2013 10:54:53 +0200
-Subject: [PATCH] net: dm9000: Allow instantiation using device tree
-In-Reply-To: <20130519070538.GX32299@pengutronix.de>
-References: <1368918194-24030-1-git-send-email-tomasz.figa@gmail.com>
- <20130519070538.GX32299@pengutronix.de>
-Message-ID: <2763249.7aFBh8NOHl@flatron>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 19 May 2013 09:59:20 +0100
+Subject: [RFC 0/8] rmk's Dove DRM/TDA19988 Cubox driver
+In-Reply-To: <20130517194023.0c385ea0@armhf>
+References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+ <20130517133345.7c1368f5@armhf>
+ <20130517120115.GF18614@n2100.arm.linux.org.uk>
+ <20130517194023.0c385ea0@armhf>
+Message-ID: <20130519085920.GO18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+On Fri, May 17, 2013 at 07:40:23PM +0200, Jean-Francois Moine wrote:
+> Maybe I did not explain correctly: the colored cursor maybe RGB888 +
+> transparency (64x64) or full ARGB (64x32 or 32x64). I coded the first
+> case. And, yes, I better like a hardware cursor: it asks for less
+> computation, and I get it immediately at graphic starting time!
 
-On Sunday 19 of May 2013 09:05:38 Sascha Hauer wrote:
-> Hi Tomasz,
-> 
-> On Sun, May 19, 2013 at 01:03:14AM +0200, Tomasz Figa wrote:
-> > This patch adds Device Tree support to dm9000 driver.
-> > 
-> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > ---
-> > 
-> >  .../devicetree/bindings/net/davicom-dm9000.txt     | 27 ++++++++++
-> >  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
-> >  drivers/net/ethernet/davicom/dm9000.c              | 60
-> >  ++++++++++++++++++++++ 3 files changed, 88 insertions(+)
-> >  create mode 100644
-> >  Documentation/devicetree/bindings/net/davicom-dm9000.txt> 
-> > diff --git a/Documentation/devicetree/bindings/net/davicom-dm9000.txt
-> > b/Documentation/devicetree/bindings/net/davicom-dm9000.txt new file
-> > mode 100644
-> > index 0000000..d2902db
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
-> > @@ -0,0 +1,27 @@
-> > +Davicom DM9000 Fast Ethernet controller
-> > +
-> > +Required properties:
-> > +- compatible = "davicom,dm9000";
-> > +- reg : physical addresses and sizes of registers, must contain 2
-> > entries: +    first entry : address register,
-> > +    second entry : address register.
-> > +- interrupt-parent : interrupt controller to which the device is
-> > connected +- interrupts : interrupt specifier specific to interrupt
-> > controller +
-> > +Optional properties:
-> > +- local-mac-address : A bytestring of 6 bytes specifying Ethernet MAC
-> > address +    to use (from firmware or bootloader)
-> > +- davicom,no-eeprom : Configuration EEPROM is not available
-> > +- davicom,ext-phy : Use external PHY
-> > +- davicom,simple-phy : Use NSR to find LinkStatus
-> 
-> Do we really need to expose this simple-phy property? Looking at the
-> drvier code this more looks like a work around shortcomings of the
-> driver code rather than something really necessary.
+Having looked at this now, using the RGB+transparency is less than ideal
+because we're having to reduce an alpha channel down to a simple on/off
+transparency.  X cursors really are alphablended components!
 
-Well, depending on this property it can use two different methods of 
-checking carrier status and it seems to depend on hardware, which one 
-should be used. I don't see any driver shortcomings here, but maybe I'm 
-missing something.
+So, the options here are:
+(a) use "software" rendered cursor
+    + correct and expected cursor size
+    + correct rendering
+    + possible to use the GPU (I believe mine does)
+    - maybe time consuming as it has to be removed/replaced on the screen
+(b) use RGB+transparency for 64x64 hardware cursor
+    + correct and expected cursor size
+    + does not have to be removed/replaced when screen contents change
+    - incorrect rendering due to reducing the alpha channel to a simple
+      on/off transparency mask
+    - has to be reloaded when the pointer is close to the edges of the
+      screen which is CPU intensive
+    - cursor image data passed into DRM is required to be ARGB (I've
+      discussed this with David Airlie last night.)  This means we have
+      to do translation to RGB+T in the kernel which is *not* nice.
+(c) use ARGB 32x64 or 64x32 hardware cursor
+    + does not have to be removed/replaced when screen contents change
+    + correct rendering of cursor
+    - unexpected cursor size; user clients do not expect to be restricted
+      to 32 rows or 32 lines of cursor
+    - can only select maximum cursor size on initialization of hardware
+      cursor; can't dynamically switch between 32x64 and 64x32 sizes
+    - has to be reloaded when the pointer is close to the edges of the
+      screen which is CPU intensive
 
-> > +#ifdef CONFIG_OF
-> > +static struct dm9000_plat_data *dm9000_parse_dt(struct device *dev)
-> > +{
-> > +	struct dm9000_plat_data *pdata;
-> > +	struct device_node *np = dev->of_node;
-> > +	const void *prop;
-> > +	int len;
-> > +
-> > +	if (!np)
-> > +		return NULL;
-> 
-> You should be able to kill the ifdef around this function by doing
+While I would like to have hardware cursor support, I don't think it's
+worth the effort.  The one which tips it for me is the need to reload
+the cursor near the edges - note the restriction in the documentation
+that the cursor position + cursor size can't be outside the active
+size.  Also, cursors generally have 7 or so transparent pixels to the
+left of them (which of course changes depending on the cursor shape.)
 
-Basically this would be a kill with a double-edged sword.
+It's also less CPU intensive to (probably) allow the GPU to render it
+than it is for the CPU to deal with these hardware restrictions.
 
-I could completely drop the #ifdef without any additional check, as it is 
-not possible that np is not NULL with !CONFIG_OF, but I decided to keep 
-the code conditional to reduce driver code a bit on platforms that don't 
-need OF.
-
-Maybe this single driver wouldn't give any significant difference, but if 
-you make all the drivers used on the platform this way, you will save some 
-kilobytes.
-
-> 	if (!IS_ENABLED(CONFIG_OF) || !np)
-> 		return NULL;
-> 
-> > +
-> > +	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-> > +	if (!pdata) {
-> > +		dev_err(dev, "failed to allocate platform data struct\n");
-> > +		return ERR_PTR(-ENOMEM);
-> > +	}
-> > +
-> > +	if (of_find_property(np, "davicom,ext-phy", NULL))
-> > +		pdata->flags |= DM9000_PLATF_EXT_PHY;
-> > +	if (of_find_property(np, "davicom,no-eeprom", NULL))
-> > +		pdata->flags |= DM9000_PLATF_NO_EEPROM;
-> > +	if (of_find_property(np, "davicom,simple-phy", NULL))
-> > +		pdata->flags |= DM9000_PLATF_SIMPLE_PHY;
-> > +
-> > +	prop = of_get_property(np, "local-mac-address", &len);
-> > +	if (!prop)
-> > +		return pdata;
-> 
-> I think you should use of_get_mac_address() here.
-
-Oops. Right, this is what I was looking for, but somehow I failed. Will 
-change this in next version. Thanks.
-
-Best regards,
-Tomasz
+I would've liked to see hardware cursor support, but I think what I'm
+going to be doing is stripping the cursor code out of the main driver
+into a separate optional patch which will ultimately be dropped.
