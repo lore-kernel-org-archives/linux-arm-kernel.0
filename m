@@ -1,56 +1,108 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 May 2013 11:30:49 +0100
-Subject: [RFC 3/8] drm/i2c: nxp-tda998x: ensure VIP output mux is
- properly set
-In-Reply-To: <20130518085659.40932cd8@armhf>
-References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
- <E1Ud3og-0001qm-52@rmk-PC.arm.linux.org.uk> <20130518085659.40932cd8@armhf>
-Message-ID: <20130519103049.GQ18614@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sun, 19 May 2013 12:35:44 +0200
+Subject: [PATCH] net: dm9000: Allow instantiation using device tree
+In-Reply-To: <2763249.7aFBh8NOHl@flatron>
+References: <1368918194-24030-1-git-send-email-tomasz.figa@gmail.com>
+ <20130519070538.GX32299@pengutronix.de>
+ <2763249.7aFBh8NOHl@flatron>
+Message-ID: <20130519103544.GZ32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 18, 2013 at 08:56:59AM +0200, Jean-Francois Moine wrote:
-> On Thu, 16 May 2013 20:26:18 +0100
-> Russell King <rmk+kernel@arm.linux.org.uk> wrote:
+On Sun, May 19, 2013 at 10:54:53AM +0200, Tomasz Figa wrote:
+> Hi Sascha,
 > 
-> > When switching between various drivers for this device, it's possible
-> > that some critical registers are left containing values which affect
-> > the device operation.  One such case encountered is the VIP output
-> > mux register.  This defaults to 0x24 on powerup, but other drivers may
-> > set this to 0x12.  This results in incorrect colours.
+> On Sunday 19 of May 2013 09:05:38 Sascha Hauer wrote:
+> > Hi Tomasz,
 > > 
-> > Fix this by ensuring that the register is always set to the power on
-> > default setting.
+> > On Sun, May 19, 2013 at 01:03:14AM +0200, Tomasz Figa wrote:
+> > > This patch adds Device Tree support to dm9000 driver.
+> > > 
+> > > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> > > ---
+> > > 
+> > >  .../devicetree/bindings/net/davicom-dm9000.txt     | 27 ++++++++++
+> > >  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+> > >  drivers/net/ethernet/davicom/dm9000.c              | 60
+> > >  ++++++++++++++++++++++ 3 files changed, 88 insertions(+)
+> > >  create mode 100644
+> > >  Documentation/devicetree/bindings/net/davicom-dm9000.txt> 
+> > > diff --git a/Documentation/devicetree/bindings/net/davicom-dm9000.txt
+> > > b/Documentation/devicetree/bindings/net/davicom-dm9000.txt new file
+> > > mode 100644
+> > > index 0000000..d2902db
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
+> > > @@ -0,0 +1,27 @@
+> > > +Davicom DM9000 Fast Ethernet controller
+> > > +
+> > > +Required properties:
+> > > +- compatible = "davicom,dm9000";
+> > > +- reg : physical addresses and sizes of registers, must contain 2
+> > > entries: +    first entry : address register,
+> > > +    second entry : address register.
+> > > +- interrupt-parent : interrupt controller to which the device is
+> > > connected +- interrupts : interrupt specifier specific to interrupt
+> > > controller +
+> > > +Optional properties:
+> > > +- local-mac-address : A bytestring of 6 bytes specifying Ethernet MAC
+> > > address +    to use (from firmware or bootloader)
+> > > +- davicom,no-eeprom : Configuration EEPROM is not available
+> > > +- davicom,ext-phy : Use external PHY
+> > > +- davicom,simple-phy : Use NSR to find LinkStatus
 > > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  drivers/gpu/drm/i2c/tda998x_drv.c |    3 +++
-> >  1 files changed, 3 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-> > index d71c408..4b4db95 100644
-> > --- a/drivers/gpu/drm/i2c/tda998x_drv.c
-> > +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-> > @@ -110,6 +110,7 @@ struct tda998x_priv {
-> >  #define REG_VIP_CNTRL_5           REG(0x00, 0x25)     /* write */
-> >  # define VIP_CNTRL_5_CKCASE       (1 << 0)
-> >  # define VIP_CNTRL_5_SP_CNT(x)    (((x) & 3) << 1)
-> > +#define REG_MUX_VP_VIP_OUT        REG(0x00, 0x27)     /* read/write */
-> >  #define REG_MAT_CONTRL            REG(0x00, 0x80)     /* write */
-> >  # define MAT_CONTRL_MAT_SC(x)     (((x) & 3) << 0)
-> >  # define MAT_CONTRL_MAT_BP        (1 << 2)
-> > @@ -438,6 +439,8 @@ tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
-> >  
-> >  	switch (mode) {
-> >  	case DRM_MODE_DPMS_ON:
-> > +		/* Write the default value MUX register */
-> > +		reg_write(encoder, REG_MUX_VP_VIP_OUT, 0x24);
-> >  		/* enable audio and video ports */
-> >  		reg_write(encoder, REG_ENA_AP, 0xff);
-> >  		reg_write(encoder, REG_ENA_VP_0, 0xff);
+> > Do we really need to expose this simple-phy property? Looking at the
+> > drvier code this more looks like a work around shortcomings of the
+> > driver code rather than something really necessary.
 > 
-> This register is never touched. Should not this setting better go at
-> reset time (in tda998x_reset)?
+> Well, depending on this property it can use two different methods of 
+> checking carrier status and it seems to depend on hardware, which one 
+> should be used. I don't see any driver shortcomings here, but maybe I'm 
+> missing something.
 
-Yes, you're right, it could be done there without any additional side
-effects.  I've just moved it there.
+It's not hardware dependent, at least not from the original commit log.
+
+The driver doesn't use mdiobus_register which you normally would do
+today. If someone ports the driver over to mdiobus we would still have
+to support this legacy flag as a special case.
+
+Since no mainline user makes use of this flag I suggest to skip it from
+the devicetree, at least until someone really asks for this specific
+flag (and has good reasons to use it)
+
+> 
+> > > +#ifdef CONFIG_OF
+> > > +static struct dm9000_plat_data *dm9000_parse_dt(struct device *dev)
+> > > +{
+> > > +	struct dm9000_plat_data *pdata;
+> > > +	struct device_node *np = dev->of_node;
+> > > +	const void *prop;
+> > > +	int len;
+> > > +
+> > > +	if (!np)
+> > > +		return NULL;
+> > 
+> > You should be able to kill the ifdef around this function by doing
+> 
+> Basically this would be a kill with a double-edged sword.
+> 
+> I could completely drop the #ifdef without any additional check, as it is 
+> not possible that np is not NULL with !CONFIG_OF,
+
+Yes, but the compiler doesn't know this.
+
+> but I decided to keep 
+> the code conditional to reduce driver code a bit on platforms that don't 
+> need OF.
+
+IS_ENABLED(CONFIG_OF) will expand to 0 without OF and the compiler will
+through the unused code away. You won't find differences in the binary
+size.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
