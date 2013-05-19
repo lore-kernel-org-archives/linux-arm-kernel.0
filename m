@@ -1,48 +1,52 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sun, 19 May 2013 19:18:41 +0200
-Subject: [PATCH v2] net: dm9000: Allow instantiation using device tree
-In-Reply-To: <15046898.dr5fzcR9ZS@flatron>
-References: <1368962191-32594-1-git-send-email-tomasz.figa@gmail.com>
- <5198D359.5060608@gmail.com> <15046898.dr5fzcR9ZS@flatron>
-Message-ID: <51990971.2050306@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sun, 19 May 2013 14:16:32 -0400
+Subject: [PATCH 2/2] ARM: mvebu: Add support for NOR flash device on
+ Armada XP-DB board
+In-Reply-To: <20130519091326.74a77b91@skate>
+References: <1368788998-4672-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1368788998-4672-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130517165656.GE11137@titan.lakedaemon.net>
+ <20130519091326.74a77b91@skate>
+Message-ID: <20130519181632.GG11137@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2013 03:41 PM, Tomasz Figa wrote:
->>> +static struct dm9000_plat_data *dm9000_parse_dt(struct device *dev)
->>> >  >  +{
->>> >  >  +	struct dm9000_plat_data *pdata;
->>> >  >  +	struct device_node *np = dev->of_node;
->>> >  >  +	const void *mac_addr;
->>> >  >  +
->>> >  >  +	if (!IS_ENABLED(CONFIG_OF) || !np)
->>> >  >  +		return NULL;
->> >
->> >  Shouldn't ERR_PTR() value be returned here ?
->
-> Nope. No platform data is a valid case, so no error here.
+On Sun, May 19, 2013 at 09:13:26AM +0200, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
+> 
+> On Fri, 17 May 2013 12:56:56 -0400, Jason Cooper wrote:
+> > On Fri, May 17, 2013 at 08:09:58AM -0300, Ezequiel Garcia wrote:
+> > > The Armada XP Development Board (DB-78460-BP) has a NOR flash device
+> > > connected to the Device Bus. This commit adds the device tree node
+> > > to support this device.
+> > > 
+> > > This SoC supports a flexible and dynamic decoding window allocation
+> > > scheme; but since this feature is still not implemented we need
+> > > to specify the window base address in the device tree node itself.
+> > > 
+> > > This base address has been selected in a completely arbitrary fashion.
+> > > 
+> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > ---
+> > >  arch/arm/boot/dts/armada-xp-db.dts | 32 ++++++++++++++++++++++++++++++++
+> > >  1 file changed, 32 insertions(+)
+> > 
+> > Applied to mvebu/fixes
+> 
+> Is mvebu/fixes the branch intended to be pushed to 3.10-rcX, or to
+> 3.11 ?
+> 
+> I'm asking because you've applied both 1/2 and 2/2 on the same
+> mvebu/fixes branch, while 1/2 is intended for 3.10-rcX (fixing
+> existing DT data), and 2/2 is intended for 3.11 (adding support for a
+> new device in the DT).
 
-OK, sorry, I should have checked that.
+I've added it to /fixes because it implements the same fix the other
+patch did for the change in DT parsing.  I debated asking Ezequiel to
+split it into two patches, one for the ranges fix, the other for the new
+nodes.  In the end, since it isn't C code, I elected for simplicity.
 
->>> >  >  +	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
->>> >  >  +	if (!pdata) {
->>> >  >  +		dev_err(dev, "failed to allocate platform data struct\n");
->> >
->> >  There is no need for this error log, k*alloc already logs any failures.
->
-> Hmm. Does it print what allocation exactly failed? (e.g. a backtrace)
+thx,
 
-It seems the caller tracking is supported in subset of the kernel 
-configurations.
-
-> Not that it would give anything that could help you in an out of memory
-> condition like this, but in general it's good to know in what point the
-> failure happened.
-
-As long as it is ENOMEM and the driver core reports failed probe I wouldn't
-really care. Nevertheless I saw patch series removing such already existing
-"Not enough memory" kind of error logs from the kernel, pointing out that mm
-already provides relevant error logging.
-
-Thanks,
-Sylwester
+Jason.
