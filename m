@@ -1,92 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sun, 19 May 2013 09:05:38 +0200
-Subject: [PATCH] net: dm9000: Allow instantiation using device tree
-In-Reply-To: <1368918194-24030-1-git-send-email-tomasz.figa@gmail.com>
-References: <1368918194-24030-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <20130519070538.GX32299@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 19 May 2013 09:13:26 +0200
+Subject: [PATCH 2/2] ARM: mvebu: Add support for NOR flash device on
+ Armada XP-DB board
+In-Reply-To: <20130517165656.GE11137@titan.lakedaemon.net>
+References: <1368788998-4672-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1368788998-4672-2-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130517165656.GE11137@titan.lakedaemon.net>
+Message-ID: <20130519091326.74a77b91@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Dear Jason Cooper,
 
-On Sun, May 19, 2013 at 01:03:14AM +0200, Tomasz Figa wrote:
-> This patch adds Device Tree support to dm9000 driver.
+On Fri, 17 May 2013 12:56:56 -0400, Jason Cooper wrote:
+> On Fri, May 17, 2013 at 08:09:58AM -0300, Ezequiel Garcia wrote:
+> > The Armada XP Development Board (DB-78460-BP) has a NOR flash device
+> > connected to the Device Bus. This commit adds the device tree node
+> > to support this device.
+> > 
+> > This SoC supports a flexible and dynamic decoding window allocation
+> > scheme; but since this feature is still not implemented we need
+> > to specify the window base address in the device tree node itself.
+> > 
+> > This base address has been selected in a completely arbitrary fashion.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/armada-xp-db.dts | 32 ++++++++++++++++++++++++++++++++
+> >  1 file changed, 32 insertions(+)
 > 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  .../devicetree/bindings/net/davicom-dm9000.txt     | 27 ++++++++++
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  drivers/net/ethernet/davicom/dm9000.c              | 60 ++++++++++++++++++++++
->  3 files changed, 88 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/davicom-dm9000.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/net/davicom-dm9000.txt b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
-> new file mode 100644
-> index 0000000..d2902db
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
-> @@ -0,0 +1,27 @@
-> +Davicom DM9000 Fast Ethernet controller
-> +
-> +Required properties:
-> +- compatible = "davicom,dm9000";
-> +- reg : physical addresses and sizes of registers, must contain 2 entries:
-> +    first entry : address register,
-> +    second entry : address register.
-> +- interrupt-parent : interrupt controller to which the device is connected
-> +- interrupts : interrupt specifier specific to interrupt controller
-> +
-> +Optional properties:
-> +- local-mac-address : A bytestring of 6 bytes specifying Ethernet MAC address
-> +    to use (from firmware or bootloader)
-> +- davicom,no-eeprom : Configuration EEPROM is not available
-> +- davicom,ext-phy : Use external PHY
-> +- davicom,simple-phy : Use NSR to find LinkStatus
+> Applied to mvebu/fixes
 
-Do we really need to expose this simple-phy property? Looking at the
-drvier code this more looks like a work around shortcomings of the
-driver code rather than something really necessary.
+Is mvebu/fixes the branch intended to be pushed to 3.10-rcX, or to
+3.11 ?
 
-> +#ifdef CONFIG_OF
-> +static struct dm9000_plat_data *dm9000_parse_dt(struct device *dev)
-> +{
-> +	struct dm9000_plat_data *pdata;
-> +	struct device_node *np = dev->of_node;
-> +	const void *prop;
-> +	int len;
-> +
-> +	if (!np)
-> +		return NULL;
+I'm asking because you've applied both 1/2 and 2/2 on the same
+mvebu/fixes branch, while 1/2 is intended for 3.10-rcX (fixing
+existing DT data), and 2/2 is intended for 3.11 (adding support for a
+new device in the DT).
 
-You should be able to kill the ifdef around this function by doing
+Thanks,
 
-	if (!IS_ENABLED(CONFIG_OF) || !np)
-		return NULL;
-
-> +
-> +	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-> +	if (!pdata) {
-> +		dev_err(dev, "failed to allocate platform data struct\n");
-> +		return ERR_PTR(-ENOMEM);
-> +	}
-> +
-> +	if (of_find_property(np, "davicom,ext-phy", NULL))
-> +		pdata->flags |= DM9000_PLATF_EXT_PHY;
-> +	if (of_find_property(np, "davicom,no-eeprom", NULL))
-> +		pdata->flags |= DM9000_PLATF_NO_EEPROM;
-> +	if (of_find_property(np, "davicom,simple-phy", NULL))
-> +		pdata->flags |= DM9000_PLATF_SIMPLE_PHY;
-> +
-> +	prop = of_get_property(np, "local-mac-address", &len);
-> +	if (!prop)
-> +		return pdata;
-
-I think you should use of_get_mac_address() here.
-
-Sascha
-
+Thomas
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
