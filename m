@@ -1,29 +1,28 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 19 May 2013 16:47:03 -0400
-Subject: [PATCHv10 5/9] clk: mvebu: create parent-child relation for
- PCIe clocks on Armada 370
-In-Reply-To: <1368719725-21265-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Sun, 19 May 2013 16:49:57 -0400
+Subject: [PATCHv10 9/9] arm: mvebu: update defconfig with PCI and USB
+ support
+In-Reply-To: <1368719725-21265-10-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1368719725-21265-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1368719725-21265-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130519204703.GP11137@titan.lakedaemon.net>
+ <1368719725-21265-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130519204957.GQ11137@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 05:55:20PM +0200, Thomas Petazzoni wrote:
-> The Armada 370 has two gatable clocks for each PCIe interface, and we
-> want both of them to be enabled. We therefore make one of the two
-> clocks a child of the other, as we did for the sataX and sataXlnk
-> clocks on Armada XP.
+On Thu, May 16, 2013 at 05:55:24PM +0200, Thomas Petazzoni wrote:
+> Now that we have the necessary drivers and Device Tree informations to
+> support PCIe on Armada 370 and Armada XP, enable the CONFIG_PCI
+> option.
+> 
+> Also, since the Armada 370 Mirabox has a built-in USB XHCI controller
+> connected on the PCIe bus, enable the corresponding options as well.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
 > ---
->  drivers/clk/mvebu/clk-gating-ctrl.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/configs/mvebu_defconfig |    3 +++
+>  1 file changed, 3 insertions(+)
 
-Patches 5 - 8 applied to mvebu/pcie, with a dep on Sebastian's clock
-rework and mvebu/of_pci.  Thanks for the head's up on the clk conflict.
-My resolution should match yours.  Please let me know if it doesn't.
+Applied to mvebu/defconfig
 
 thx,
 
