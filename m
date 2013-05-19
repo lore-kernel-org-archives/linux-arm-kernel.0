@@ -1,42 +1,68 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 19 May 2013 12:25:52 +0100
-Subject: [RFC 0/8] rmk's Dove DRM/TDA19988 Cubox driver
-In-Reply-To: <20130517133345.7c1368f5@armhf>
-References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
- <20130517133345.7c1368f5@armhf>
-Message-ID: <20130519112552.GR18614@n2100.arm.linux.org.uk>
+From: gleb@redhat.com (Gleb Natapov)
+Date: Sun, 19 May 2013 15:14:38 +0300
+Subject: [PATCH v3 0/2] ARM: KVM: Moving GIC/timer out of arch/arm
+In-Reply-To: <1368538262-25546-1-git-send-email-marc.zyngier@arm.com>
+References: <1368538262-25546-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130519121438.GG4725@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 01:33:45PM +0200, Jean-Francois Moine wrote:
-> I quickly compared your dove drm driver and ours (Sebastian and me):
+On Tue, May 14, 2013 at 02:31:00PM +0100, Marc Zyngier wrote:
+> As KVM/arm64 is looming on the horizon, it makes sense to move some
+> of the common code to a single location in order to reduce duplication.
 > 
-> - CMA helper
+> The code could live anywhere. Actually, most of KVM is already built
+> with a bunch of ugly ../../.. hacks in the various Makefiles, so we're
+> not exactly talking about style here. But maybe it is time to start
+> moving into a less ugly direction.
 > 
->   You don't use DRM_KMS_CMA_HELPER and DRM_GEM_CMA_HELPER which would
->   simplify some code.
+> The include files must be in a "public" location, as they are accessed
+> from non-KVM files (arch/arm/kernel/asm-offsets.c).
+> 
+> For this purpose, introduce two new locations:
+> - virt/kvm/arm/ : x86 and ia64 already share the ioapic code in
+>   virt/kvm, so this could be seen as a (very ugly) precedent.
+> - include/kvm/  : there is already an include/xen, and while the
+>   intent is slightly different, this seems as good a location as
+>   any
+> 
+> A second, tree-wide patch also removes the use of the addprefix used
+> to refer to the main KVM code from the arch code, and replace it with
+> a KVM variable that does the same thing.
+> 
+> * From v2:
+>   - Fix silly bug breaking compilation on x86...
+> 
+Applied, thanks.
 
-Looking at the CMA helper code in DRM, it makes some fundamental errors:
+> Marc Zyngier (2):
+>   ARM: KVM: move GIC/timer code to a common location
+>   KVM: get rid of $(addprefix ../../../virt/kvm/, ...) in Makefiles
+> 
+>  arch/arm/include/asm/kvm_host.h                             |  4 ++--
+>  arch/arm/kvm/Makefile                                       |  7 ++++---
+>  arch/ia64/kvm/Makefile                                      |  7 ++++---
+>  arch/powerpc/kvm/Makefile                                   | 13 +++++++------
+>  arch/s390/kvm/Makefile                                      |  3 ++-
+>  arch/x86/kvm/Makefile                                       | 13 +++++++------
+>  .../asm/kvm_arch_timer.h => include/kvm/arm_arch_timer.h    |  0
+>  arch/arm/include/asm/kvm_vgic.h => include/kvm/arm_vgic.h   |  0
+>  {arch/arm/kvm => virt/kvm/arm}/arch_timer.c                 |  4 ++--
+>  {arch/arm/kvm => virt/kvm/arm}/vgic.c                       |  0
+>  10 files changed, 28 insertions(+), 23 deletions(-)
+>  rename arch/arm/include/asm/kvm_arch_timer.h => include/kvm/arm_arch_timer.h (100%)
+>  rename arch/arm/include/asm/kvm_vgic.h => include/kvm/arm_vgic.h (100%)
+>  rename {arch/arm/kvm => virt/kvm/arm}/arch_timer.c (99%)
+>  rename {arch/arm/kvm => virt/kvm/arm}/vgic.c (100%)
+> 
+> -- 
+> 1.8.2.3
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-1. It assumes the returned DMA address is a physical address.  This
-   is not necessarily the case (there are a number of ARM platforms
-   where this is most definitely not true.)  So:
-
-        cma_obj->vaddr = dma_alloc_writecombine(drm->dev, size,
-                        &cma_obj->paddr, GFP_KERNEL | __GFP_NOWARN);
-...
-        ret = remap_pfn_range(vma, vma->vm_start, cma_obj->paddr >> PAGE_SHIFT,
-                        vma->vm_end - vma->vm_start, vma->vm_page_prot);
-
-   is extremely broken.
-
-2. If you use the CMA helper, then all your GEM objects must be CMA
-   objects.  You can't combine different types of objects (eg, SHM-backed
-   objects) with CMA objects.  This will be a massive performance
-   regression with GPUs which can handle scatter-gathered SHM objects
-   such as the Vivante GPU on the Armada 510.
-
-So, for me, the last point especially is a very strong argument not to
-use the DRM CMA helper.  Yes, I could switch to using the DMA coherent/
-writecombine allocation API and thus make use of CMA, and that's
-something I will be looking at.
+--
+			Gleb.
