@@ -1,19 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 19 May 2013 21:48:46 +0200
-Subject: [RFC PATCHv3 3/6] clk: Add TI-Nspire clock drivers
-In-Reply-To: <F8915E01-0FCA-4C9F-8440-63B5A73B349B@gmail.com>
-References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
- <201305161417.28133.arnd@arndb.de>
- <F8915E01-0FCA-4C9F-8440-63B5A73B349B@gmail.com>
-Message-ID: <201305192148.46398.arnd@arndb.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sun, 19 May 2013 22:12:43 +0200
+Subject: [PATCH] ARM: plat-orion: Fix num_resources and id for ge10 and ge11
+Message-ID: <1368994363-14762-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 19 May 2013, Daniel Tang wrote:
-> If the vendors for the on-SOC components are unknown, should we just
-> leave the compatible strings as is (i.e. "nspire-XXX")?
+When platform data were moved from arch/arm/mach-mv78xx0/common.c to
+arch/arm/plat-orion/common.c with the commit "7e3819d ARM: orion:
+Consolidate ethernet platform data", there were few typo made on
+gigabit Ethernet interface ge10 and ge11. This commit writes back
+their initial value, which allows to use this interfaces again.
 
-In that case, I would use the name of the company that made the SoC.
-I believe someone mentioned it was made by LSI logic.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/plat-orion/common.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index 251f827..c019b7a 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -383,7 +383,7 @@ static struct resource orion_ge10_shared_resources[] = {
+ 
+ static struct platform_device orion_ge10_shared = {
+ 	.name		= MV643XX_ETH_SHARED_NAME,
+-	.id		= 1,
++	.id		= 2,
+ 	.dev		= {
+ 		.platform_data	= &orion_ge10_shared_data,
+ 	},
+@@ -398,8 +398,8 @@ static struct resource orion_ge10_resources[] = {
+ 
+ static struct platform_device orion_ge10 = {
+ 	.name		= MV643XX_ETH_NAME,
+-	.id		= 1,
+-	.num_resources	= 2,
++	.id		= 2,
++	.num_resources	= 1,
+ 	.resource	= orion_ge10_resources,
+ 	.dev		= {
+ 		.coherent_dma_mask	= DMA_BIT_MASK(32),
+@@ -432,7 +432,7 @@ static struct resource orion_ge11_shared_resources[] = {
+ 
+ static struct platform_device orion_ge11_shared = {
+ 	.name		= MV643XX_ETH_SHARED_NAME,
+-	.id		= 1,
++	.id		= 3,
+ 	.dev		= {
+ 		.platform_data	= &orion_ge11_shared_data,
+ 	},
+@@ -447,8 +447,8 @@ static struct resource orion_ge11_resources[] = {
+ 
+ static struct platform_device orion_ge11 = {
+ 	.name		= MV643XX_ETH_NAME,
+-	.id		= 1,
+-	.num_resources	= 2,
++	.id		= 3,
++	.num_resources	= 1,
+ 	.resource	= orion_ge11_resources,
+ 	.dev		= {
+ 		.coherent_dma_mask	= DMA_BIT_MASK(32),
+-- 
+1.8.1.2
