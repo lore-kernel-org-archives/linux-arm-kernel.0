@@ -1,113 +1,46 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sun, 19 May 2013 23:39:38 +0200
-Subject: [RFC PATCH 5/5] ARM: mv78x00: Add Device Tree support for the
- RD-78X00-mASA board
-In-Reply-To: <1368999578-19938-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1368999578-19938-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1368999578-19938-6-git-send-email-gregory.clement@free-electrons.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 19 May 2013 23:40:33 +0200
+Subject: [PATCH v2] ARM: sunxi: New watchdog driver for Allwinner A10/A13
+In-Reply-To: <F595BD7D-09B6-452A-B8FF-C7B667CE1DF8@gmail.com>
+References: <1368903956-32388-1-git-send-email-carlo.caione@gmail.com>
+ <20130519153235.GC7717@lukather>
+ <F595BD7D-09B6-452A-B8FF-C7B667CE1DF8@gmail.com>
+Message-ID: <20130519214033.GA8509@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the device tree support for the RD-78X00-mASA board.
-It mainly converts the platform resource from the former board file
-to the dts. It also add this device tree to the list of the dtbs
-make rule.
+On Sun, May 19, 2013 at 07:01:54PM +0200, Carlo Caione wrote:
+> 
+> On May 19, 2013, at 5:32 PM, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > Hi Carlo,
+> 
+> Hi Maxime,
+> 
+> >> +
+> >> +#define WDT_CTRL                0x00
+> >> +#define WDT_CTRL_RESTART        (1 << 0)
+> >> +#define WDT_CTRL_RESERVED       (0x0a57 << 1)
+> > 
+> > You didn't replied to me on that part in the previous mail. It doesn't
+> > seem to be needed, so why keeping it?
+> 
+> Actually I wrote you about this on irc (probably you were afk)
+> Anyway I tested the driver without using the 0x0a57 and without these bits the watchdog is never successfully kicked.
+> I'm going to submit a v3 soon, addressing also the suggestions given by Henrik on linux-sunxi ml.
 
-Currently support includes:
-- UARTs
-- USBs
-- I2Cs
-- RTC
-- SATAs
+Ok, please discuss this both using mails and by keeping all the
+recipients... I wasn't in copy of these mails anymore, neither were the
+kernel mailing lists which makes it a pain for the archives and for
+other people being part of the discussions.
 
-The mains lacks are PCI and Ethernet which will be added when
-converted to device tree.
+Please always reply-to-all, and with mails, to these questions.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/boot/dts/Makefile            |  1 +
- arch/arm/boot/dts/mv78x00-masa-db.dts | 61 +++++++++++++++++++++++++++++++++++
- 2 files changed, 62 insertions(+)
- create mode 100644 arch/arm/boot/dts/mv78x00-masa-db.dts
+Anyway, ok. Put a comment explaining why you need it then.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b9f7121..f152b89 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -91,6 +91,7 @@ dtb-$(CONFIG_ARCH_KIRKWOOD) += kirkwood-cloudbox.dtb \
- dtb-$(CONFIG_ARCH_MARCO) += marco-evb.dtb
- dtb-$(CONFIG_ARCH_MSM) += msm8660-surf.dtb \
- 	msm8960-cdp.dtb
-+dtb-$(CONFIG_ARCH_MV78X00) += mv78x00-masa-db.dtb
- dtb-$(CONFIG_ARCH_MVEBU) += armada-370-db.dtb \
- 	armada-370-mirabox.dtb \
- 	armada-370-rd.dtb \
-diff --git a/arch/arm/boot/dts/mv78x00-masa-db.dts b/arch/arm/boot/dts/mv78x00-masa-db.dts
-new file mode 100644
-index 0000000..f87f84d
---- /dev/null
-+++ b/arch/arm/boot/dts/mv78x00-masa-db.dts
-@@ -0,0 +1,61 @@
-+/*
-+ * Copyright (C) 2013  Gregory CLEMENT <gregory.clement@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2. This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+/include/ "mv78x00.dtsi"
-+
-+/ {
-+	model = "Marvell RD-78x00-MASA Development Board";
-+	compatible = "marvell,rd-78x00-masa", "marvell,mv78x00";
-+
-+	memory {
-+		reg = <0x00000000 0x20000000>; /* 512 MB */
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk";
-+	};
-+
-+	ocp at f1000000 {
-+
-+		serial at 12000 {
-+			clock-frequency = <200000000>;
-+			status = "okay";
-+		};
-+
-+		serial at 12200 {
-+			clock-frequency = <200000000>;
-+			status = "okay";
-+		};
-+
-+		sata at a0000 {
-+			nr-ports = <2>;
-+			status = "okay";
-+		};
-+
-+		i2c0: i2c at 10000 {
-+			status = "okay";
-+			rtc: rtc at 68 {
-+				compatible = "dallas,ds1338";
-+				reg = <0x68>;
-+			};
-+		};
-+
-+		ehci at 50000 {
-+			status = "okay";
-+		};
-+
-+		ehci at 51000 {
-+			status = "okay";
-+		};
-+
-+		ehci at 52000 {
-+			status = "okay";
-+		};
-+	};
-+};
+Maxime
+
 -- 
-1.8.1.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
