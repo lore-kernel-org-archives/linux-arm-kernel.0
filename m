@@ -1,35 +1,35 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 20 May 2013 16:54:07 +0800
-Subject: [PATCH] ARM: S5PV210: dependency issue,
- S5P_SLEEP is depend on ARM_CPU_SUSPEND
-Message-ID: <5199E4AF.7040607@asianux.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Mon, 20 May 2013 16:48:56 +0800
+Subject: [PATCH 0/6] ARM: imx6q{dl}: add the WEIM driver
+Message-ID: <1369039742-10893-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch set adds a new driver for WEIM in the imx6q{dl}-sabreauto boards.
 
-When randconfig with MMU for arm s5pv210 (and select all cpu type),
-need let S5P_SLEEP depend on ARM_CPU_SUSPEND, or will cause issue below:
+The WEIM(Wireless External Interface Module) works like a bus.
+You can attach many different devices on it, such as NOR, onenand.
 
-  arch/arm/plat-samsung/built-in.o: In function `s3c_cpu_resume':
-  arch/arm/plat-samsung/s5p-sleep.S:83: undefined reference to `cpu_resume'
+In the case of i.MX6q-sabreauto, only the NOR is connected to WEIM.
 
+Huang Shijie (6):
+  drivers: bus: add a new driver for WEIM
+  ARM: dts: imx6q{dl}: fix the pin conflict between SPI and WEIM
+  ARM: dts: imx6qdl: add more information for WEIM
+  ARM: dts: imx6q: add pinctrl for WEIM NOR
+  ARM: dts: imx6ql: add a pinctrl for WEIM NOR
+  ARM: dts: imx6qdl: enable the WEIM NOR
 
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm/plat-samsung/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index f8ed2de..1d38541 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -483,6 +483,7 @@ config S5P_PM
- 
- config S5P_SLEEP
- 	bool
-+	select ARM_CPU_SUSPEND
- 	help
- 	  Internal config node to apply common S5P sleep management code.
- 	  Can be selected by S5P and newer SoCs with similar sleep procedure.
--- 
-1.7.7.6
+ Documentation/devicetree/bindings/bus/imx-weim.txt |   69 +++++++++
+ arch/arm/boot/dts/imx6dl-sabreauto.dts             |    9 +-
+ arch/arm/boot/dts/imx6dl.dtsi                      |   57 ++++++++
+ arch/arm/boot/dts/imx6q-sabreauto.dts              |    9 +-
+ arch/arm/boot/dts/imx6q.dtsi                       |   58 ++++++++
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |   23 +++-
+ arch/arm/boot/dts/imx6qdl.dtsi                     |    4 +-
+ drivers/bus/Kconfig                                |    9 ++
+ drivers/bus/Makefile                               |    1 +
+ drivers/bus/imx-weim.c                             |  145 ++++++++++++++++++++
+ 10 files changed, 380 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/bus/imx-weim.txt
+ create mode 100644 drivers/bus/imx-weim.c
