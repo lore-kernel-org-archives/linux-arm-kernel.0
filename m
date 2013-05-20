@@ -1,28 +1,34 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 20 May 2013 10:59:57 -0300
-Subject: [PATCH] ARM: imx: imx_v6_v7_defconfig: Select CONFIG_DRM_IMX_TVE
-Message-ID: <1369058397-25071-1-git-send-email-fabio.estevam@freescale.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 20 May 2013 16:13:27 +0200
+Subject: [PATCH] ARM: dts: mvebu: Fix wrong the address reg value for the
+ L2-cache node
+Message-ID: <1369059207-32210-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let the mx53 TVE driver be built by default.
+During the conversion to the internal-regs' subnode, the L2-cache node
+haven not been converted (due to a wrong choice made by myself during
+the resolution of the merge conflict when I rebased the commit). This
+leads to wrong address for L2 cache which prevent it to be used on
+Armada 370. This commit fix the address reg of the e L2-cache node.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/armada-370.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 6ec010f..a50d9af 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -208,6 +208,7 @@ CONFIG_IMX_SDMA=y
- CONFIG_MXS_DMA=y
- CONFIG_STAGING=y
- CONFIG_DRM_IMX=y
-+CONFIG_DRM_IMX_TVE=y
- CONFIG_DRM_IMX_IPUV3_CORE=y
- CONFIG_DRM_IMX_IPUV3=y
- CONFIG_COMMON_CLK_DEBUG=y
+diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+index b2c1b5a..a38a262 100644
+--- a/arch/arm/boot/dts/armada-370.dtsi
++++ b/arch/arm/boot/dts/armada-370.dtsi
+@@ -38,7 +38,7 @@
+ 
+ 			L2: l2-cache {
+ 				compatible = "marvell,aurora-outer-cache";
+-				reg = <0xd0008000 0x1000>;
++				reg = <0x08000 0x1000>;
+ 				cache-id-part = <0x100>;
+ 				wt-override;
+ 			};
 -- 
 1.8.1.2
