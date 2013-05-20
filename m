@@ -1,72 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 May 2013 10:16:35 +0200
-Subject: [PATCH] pinctrl: sirf: save the status in suspend and restore
- after resuming
-In-Reply-To: <1368674229-11813-1-git-send-email-Baohua.Song@csr.com>
-References: <1368674229-11813-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <CACRpkdaSTC8cLi-C_gwZEk8iF=bnAce920DbKvxN6S-=75xbnA@mail.gmail.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 20 May 2013 16:16:34 +0800
+Subject: [PATCH] include/linux/posix_acl.h: need 'return NULL' when BUG(),
+ if neither CONFIG_BUG nor HAVE_ARCH_BUG is defined.
+Message-ID: <5199DBE2.5080707@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 5:17 AM, Barry Song <Baohua.Song@csr.com> wrote:
 
-> this patch saves the status of pinctrl registers and restore them while
-> resuming. this makes all drivers have coherent status for pinmux after
-> suspending and resuming.
->
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+If neither CONFIG_BUG nor HAVE_ARCH_BUG is defined, the BUG() will
+defined as empty (e.g. randconfig with MMU for arm s5pv210)
 
-Applied, but a quick remark that you may want to fix up:
+In this case, need 'return NULL' to let upper caller knows the failure.
 
-(...)
 
-> +#ifdef CONFIG_PM_SLEEP
-> +static int sirfsoc_pinmux_suspend_noirq(struct device *dev)
-> +{
-> +       int i, j;
-> +       struct sirfsoc_pmx *spmx = dev_get_drvdata(dev);
-> +
-> +       for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
-> +               for (j = 0; j < SIRFSOC_GPIO_BANK_SIZE; j++) {
-> +                       spmx->gpio_regs[i][j] = readl(spmx->gpio_virtbase +
-> +                               SIRFSOC_GPIO_CTRL(i, j));
-> +               }
-> +               spmx->ints_regs[i] = readl(spmx->gpio_virtbase +
-> +                       SIRFSOC_GPIO_INT_STATUS(i));
-> +               spmx->paden_regs[i] = readl(spmx->gpio_virtbase +
-> +                       SIRFSOC_GPIO_PAD_EN(i));
-> +       }
-> +       spmx->dspen_regs = readl(spmx->gpio_virtbase + SIRFSOC_GPIO_DSP_EN0);
-> +
-> +       for (i = 0; i < 3; i++)
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ include/linux/posix_acl.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Why are you hard-coding 3 here? It looks fragile.
-
-> +               spmx->rsc_regs[i] = readl(spmx->rsc_virtbase + 4 * i);
-> +
-> +       return 0;
-> +}
-> +
-> +static int sirfsoc_pinmux_resume_noirq(struct device *dev)
-> +{
-> +       int i, j;
-> +       struct sirfsoc_pmx *spmx = dev_get_drvdata(dev);
-> +
-> +       for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
-> +               for (j = 0; j < SIRFSOC_GPIO_BANK_SIZE; j++) {
-> +                       writel(spmx->gpio_regs[i][j], spmx->gpio_virtbase +
-> +                               SIRFSOC_GPIO_CTRL(i, j));
-> +               }
-> +               writel(spmx->ints_regs[i], spmx->gpio_virtbase +
-> +                       SIRFSOC_GPIO_INT_STATUS(i));
-> +               writel(spmx->paden_regs[i], spmx->gpio_virtbase +
-> +                       SIRFSOC_GPIO_PAD_EN(i));
-> +       }
-> +       writel(spmx->dspen_regs, spmx->gpio_virtbase + SIRFSOC_GPIO_DSP_EN0);
-> +
-> +       for (i = 0; i < 3; i++)
-
-Dito.
-
-Yours,
-Linus Walleij
+diff --git a/include/linux/posix_acl.h b/include/linux/posix_acl.h
+index 7931efe..2c48d06 100644
+--- a/include/linux/posix_acl.h
++++ b/include/linux/posix_acl.h
+@@ -104,6 +104,7 @@ static inline struct posix_acl **acl_by_type(struct inode *inode, int type)
+ 		return &inode->i_default_acl;
+ 	default:
+ 		BUG();
++		return NULL;
+ 	}
+ }
+ 
+-- 
+1.7.7.6
