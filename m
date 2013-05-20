@@ -1,35 +1,30 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 20 May 2013 14:02:54 -0400
-Subject: [PATCHv10 5/9] clk: mvebu: create parent-child relation for
- PCIe clocks on Armada 370
-In-Reply-To: <20130519204703.GP11137@titan.lakedaemon.net>
-References: <1368719725-21265-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1368719725-21265-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130519204703.GP11137@titan.lakedaemon.net>
-Message-ID: <20130520180254.GD31290@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 20 May 2013 20:15:43 +0200
+Subject: [PATCH] gpio: mxs: Use set and clear capabilities of the gpio
+ controller
+In-Reply-To: <1367244438-5322-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1367244438-5322-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CACRpkdbXHvhnmk=QfmmZiYwdVedP2P5zY12cqRtb6QfYCu3o=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 19, 2013 at 04:47:03PM -0400, Jason Cooper wrote:
-> On Thu, May 16, 2013 at 05:55:20PM +0200, Thomas Petazzoni wrote:
-> > The Armada 370 has two gatable clocks for each PCIe interface, and we
-> > want both of them to be enabled. We therefore make one of the two
-> > clocks a child of the other, as we did for the sataX and sataXlnk
-> > clocks on Armada XP.
-> > 
-> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > ---
-> >  drivers/clk/mvebu/clk-gating-ctrl.c |    4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> Patches 5 - 8 applied to mvebu/pcie, with a dep on Sebastian's clock
-> rework and mvebu/of_pci.  Thanks for the head's up on the clk conflict.
-> My resolution should match yours.  Please let me know if it doesn't.
+On Mon, Apr 29, 2013 at 4:07 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-As stated in the clk thread, I'm going to re-order this so pcie doesn't
-depend on the clk series.
+> The current driver doesn't use the set and clear registers found on the
+> mxs gpio controller.
+>
+> This leads the generic gpio controller to be using some internal value
+> to avoid looking up the value stored in the registers, making it behave
+> pretty much like a cache.
+>
+> This raises some coherency problem when a gpio is not modified by the
+> gpio controller, while it can easily be fixed by using the set and clear
+> registers.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-thx,
+Patch applied for rc-fixes with Shawns ACK.
 
-Jason.
+Yours,
+Linus Walleij
