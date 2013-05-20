@@ -1,64 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 20 May 2013 12:07:14 +0200
-Subject: [RFC PATCH 0/5] ARM: mv78x00: First step to convert mv78x00 to
- Device Tree
-In-Reply-To: <5199F3E8.8060008@free-electrons.com>
-References: <1368999578-19938-1-git-send-email-gregory.clement@free-electrons.com>
- <20130520094318.GD26249@lunn.ch>
- <5199F3E8.8060008@free-electrons.com>
-Message-ID: <20130520100714.GF26249@lunn.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 May 2013 11:16:24 +0100
+Subject: [RFC 3/4] DRM: add OF support for Dove DRM driver
+In-Reply-To: <20130518211846.0ef5a14b@armhf>
+References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+ <1368897139-25485-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1368897139-25485-4-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130518194502.102caa9e@armhf> <5197C650.9020802@gmail.com>
+ <20130518211846.0ef5a14b@armhf>
+Message-ID: <20130520101624.GV18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 11:59:04AM +0200, Gregory CLEMENT wrote:
-> On 05/20/2013 11:43 AM, Andrew Lunn wrote:
-> > On Sun, May 19, 2013 at 11:39:33PM +0200, Gregory CLEMENT wrote:
-> >> Hello,
-> >>
-> >> This patch set is a first step in order to convert mach-mv78x00 to
-> >> device tree before it joins mach-mvebu.
-> >>
-> >> I managed to test it on the RD-78X00-mASA board. All the peripherals I
-> >> have tested work as they work before the migration to the device tree:
-> >> - UART
-> >> - Ethernet
-> >> - USB
-> >> - SATA
-> >>
-> >> My main concern is that the mv78x00 are MP but not SMP
-> >> capable. Currently the same kernel run on the 2 cores and it is in the
-> >> board file that the peripherals are assigned for each CPU. (Actually I
-> >> didn't test this behavior, but the code is written in this way.)
-> >>
-> >> I don't know how to assign a peripheral to a given CPU with the device
-> >> tree. The only way I have in mind is to have a dts per CPU, but I am
-> >> not sure it is very convenient.
-> >>
-> >> So for now the code assigns all the peripherals to the CPU.
-> > 
-> > Hi Gregory
+On Sat, May 18, 2013 at 09:18:46PM +0200, Jean-Francois Moine wrote:
+> The general hardware code of both drivers is close enough for merging
+> may be done starting from anyone. But the general layout is not:
 > 
-> Hi Andrew,
+> - my driver is DT driven and has one card with 2 CTRC's and 2 connectors.
 > 
-> > 
-> > Could you explain what you have in a bit more detail. Are you just
-> > bringing up one CPU and assigning all peripherals to that? Or do all
-> > peripherals get assigned to the first CPU but both are running?
+> - Russell's is non-DT, so, with some extra code I am not aware of, with
+>   any number of cards each one with one CRTC and one connector (no, I
+
+Utter shit, and I've told you before.  I'm not going to repeat it again,
+and I warned you that we would have a falling out.  As you seem to be
+immune to my comments provided in a sane manner, I'm now just going to
+ignore you in the future because you're clearly not bothering to read
+anything I'm telling you.  That makes further discussion with you utterly
+pointless.
+
+>   tried it, you cannot clone a connector of one card to the connector
+>   of another card).
 > 
-> Currently I didn't find (but I didn't looked for so much) how to
-> boot the kernel on both CPU even with the legacy code. So I am just
-> bringing up one CPU and assigning all peripherals to that.
+> So, for me, merging means enhance my code from Russell's, but I will
+> not go to a non-DT kernel.
 
-Hi Gregory
+You seem to see DT setups vs non-DT setups as two entirely separate things.
+They are not.  We have plenty of drivers which work in both setups just
+fine.
 
-Did you try looking at UART 1. It could be there is a second uboot
-instance running on it which is for CPU1.
+So really all of your points above are utter trash to me - really.
 
-> > It might be interesting to ask on the buffalo forums if anybody is
-> > actually using mainline on TS-WLX.
-> 
-> Do you know where is this forum?
+As to illustrate the point, my TDA19988 backend is now _just_ a slave
+encoder backend, it has nothing TDA19988 specific, nor does it have
+anything cubox specific there; the cubox specific part has been moved
+up into dove_drv.c as pure data, and that data can be constructed
+either from platform data or from OF properties parsed by dove_drv.c.
 
-http://forum.buffalo.nas-central.org
-
-	Andrew
+But why did I just bother to type that.  You're just going to ignore it
+and keep repeating your same old claptrap.
