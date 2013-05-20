@@ -1,36 +1,79 @@
-From: bkuhn@sfconservancy.org (Bradley M. Kuhn)
-Date: Mon, 20 May 2013 11:13:00 -0400
-Subject: Would like to form a pool of Linux copyright holders for faster
- GPL enforcement against Anthrax Kernels
-In-Reply-To: <51973B45.7040209@gmail.com> (Eric Appleman's message of "Sat, 18
- May 2013 04:26:45 -0400")
-References: <51973B45.7040209@gmail.com>
-Message-ID: <87a9npvg5f.fsf@ebb.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 21 May 2013 01:40:46 +0900
+Subject: [PATCH 08/33] drivers/i2c/busses: don't check resource with
+ devm_ioremap_resource
+In-Reply-To: <1368702961-4325-9-git-send-email-wsa@the-dreams.de>
+References: <1368702961-4325-1-git-send-email-wsa@the-dreams.de>
+ <1368702961-4325-9-git-send-email-wsa@the-dreams.de>
+Message-ID: <519A520E.3060801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Appleman wrote at 04:26 (EDT) on Saturday:
-> Would anyone be interested in forming such a pool? I am willing to
-> wait years for this to be resolved through certain organizations, but
-> I believe we can do better.
+On 05/16/13 20:15, Wolfram Sang wrote:
+> devm_ioremap_resource does sanity checks on the given resource. No need to
+> duplicate this in the driver.
+>
+> Signed-off-by: Wolfram Sang<wsa@the-dreams.de>
 
-As some on these lists likely already know, Conservancy's GPL Compliance
-Project for Linux Developers [0] is aware of this matter and is
-considering what actions to take, and how such actions should be ranked
-in priority given the queue of the hundreds of known GPL violations on
-Linux occurring every day.
+For i2c-s3c2410:
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-We very much appreciate that Eric has brought the matter to our
-attention and I'm continuing to correspond with Eric privately in the
-hopes that we can resolve the matter.
+Thanks.
 
-If anyone wants to join Conservancy's GPL Compliance Project for Linux
-Developers, please do contact me!
+- Kukjin
 
-[0] More details on Conservancy's GPL Compliance Project for Linux
-    Developers can be found at
-    https://sfconservancy.org/news/2012/may/29/compliance/
-
-Sincerely,
--- 
-Bradley M. Kuhn, Executive Director, Software Freedom Conservancy
+> ---
+>   drivers/i2c/busses/i2c-s3c2410.c |    5 -----
+>   drivers/i2c/busses/i2c-sirf.c    |    6 ------
+>   drivers/i2c/busses/i2c-tegra.c   |    5 -----
+>   3 files changed, 16 deletions(-)
+>
+> diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+> index 6e8ee92..cab1c91 100644
+> --- a/drivers/i2c/busses/i2c-s3c2410.c
+> +++ b/drivers/i2c/busses/i2c-s3c2410.c
+> @@ -1082,11 +1082,6 @@ static int s3c24xx_i2c_probe(struct platform_device *pdev)
+>   	/* map the registers */
+>
+>   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (res == NULL) {
+> -		dev_err(&pdev->dev, "cannot find IO resource\n");
+> -		return -ENOENT;
+> -	}
+> -
+>   	i2c->regs = devm_ioremap_resource(&pdev->dev, res);
+>
+>   	if (IS_ERR(i2c->regs))
+> diff --git a/drivers/i2c/busses/i2c-sirf.c b/drivers/i2c/busses/i2c-sirf.c
+> index 5a7ad24..a63c7d5 100644
+> --- a/drivers/i2c/busses/i2c-sirf.c
+> +++ b/drivers/i2c/busses/i2c-sirf.c
+> @@ -303,12 +303,6 @@ static int i2c_sirfsoc_probe(struct platform_device *pdev)
+>   	adap->class = I2C_CLASS_HWMON;
+>
+>   	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (mem_res == NULL) {
+> -		dev_err(&pdev->dev, "Unable to get MEM resource\n");
+> -		err = -EINVAL;
+> -		goto out;
+> -	}
+> -
+>   	siic->base = devm_ioremap_resource(&pdev->dev, mem_res);
+>   	if (IS_ERR(siic->base)) {
+>   		err = PTR_ERR(siic->base);
+> diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+> index b60ff90..9aa1b60 100644
+> --- a/drivers/i2c/busses/i2c-tegra.c
+> +++ b/drivers/i2c/busses/i2c-tegra.c
+> @@ -714,11 +714,6 @@ static int tegra_i2c_probe(struct platform_device *pdev)
+>   	int ret = 0;
+>
+>   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (!res) {
+> -		dev_err(&pdev->dev, "no mem resource\n");
+> -		return -EINVAL;
+> -	}
+> -
+>   	base = devm_ioremap_resource(&pdev->dev, res);
+>   	if (IS_ERR(base))
+>   		return PTR_ERR(base);
