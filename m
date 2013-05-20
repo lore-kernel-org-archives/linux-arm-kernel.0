@@ -1,27 +1,33 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 20 May 2013 23:42:14 +0100
-Subject: [PATCH 04/20] ARM: picoxcell: Remove init_irq declaration in
- machine description
-In-Reply-To: <519496AC.1070809@free-electrons.com>
-References: <1368545933-7430-1-git-send-email-maxime.ripard@free-electrons.com>
- <1368545933-7430-5-git-send-email-maxime.ripard@free-electrons.com>
- <20130514162046.GA16346@page> <519496AC.1070809@free-electrons.com>
-Message-ID: <20130520224214.GA4659@page>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Tue, 21 May 2013 01:01:44 +0200
+Subject: [PATCH V3 03/10] mmc: tmio-mmc: handle mmc_of_parse() errors during
+ probe
+In-Reply-To: <1369090911-1479-1-git-send-email-gmbnomis@gmail.com>
+References: <1369090911-1479-1-git-send-email-gmbnomis@gmail.com>
+Message-ID: <1369090911-1479-4-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 10:19:56AM +0200, Maxime Ripard wrote:
-> Hi Jamie,
-> 
-> Le 14/05/2013 18:20, Jamie Iles a ?crit :
-> > Hi Maxime,
-> > 
-> > Thanks for this, I'll add it to my tree.  I've modified it slightly to 
-> > kill off the other irq includes, hopefully that's okay with you.
-> 
-> Yes, I was pretty conservative since I was not familiar with most of the
-> code, but yes, I'm fine with the changes.
+Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+Acked-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+---
+ drivers/mmc/host/tmio_mmc_pio.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Thanks Maxime, applied to picoxcell-next.
-
-Jamie
+diff --git a/drivers/mmc/host/tmio_mmc_pio.c b/drivers/mmc/host/tmio_mmc_pio.c
+index f508ecb..f1a9d4a 100644
+--- a/drivers/mmc/host/tmio_mmc_pio.c
++++ b/drivers/mmc/host/tmio_mmc_pio.c
+@@ -988,7 +988,9 @@ int tmio_mmc_host_probe(struct tmio_mmc_host **host,
+ 	if (!mmc)
+ 		return -ENOMEM;
+ 
+-	mmc_of_parse(mmc);
++	ret = mmc_of_parse(mmc);
++	if (ret < 0)
++		goto host_free;
+ 
+ 	pdata->dev = &pdev->dev;
+ 	_host = mmc_priv(mmc);
+-- 
+1.7.9.5
