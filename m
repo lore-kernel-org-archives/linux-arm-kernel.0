@@ -1,49 +1,51 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Mon, 20 May 2013 16:49:02 +0800
-Subject: [PATCH 6/6] ARM: dts: imx6qdl: enable the WEIM NOR
-In-Reply-To: <1369039742-10893-1-git-send-email-b32955@freescale.com>
-References: <1369039742-10893-1-git-send-email-b32955@freescale.com>
-Message-ID: <1369039742-10893-7-git-send-email-b32955@freescale.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 May 2013 10:10:08 +0100
+Subject: [PATCH] arm64: kernel: need extern variable 'screen_info' for
+ related driver using.
+In-Reply-To: <5199B7D6.40907@asianux.com>
+References: <5199B7D6.40907@asianux.com>
+Message-ID: <20130520091008.GB31359@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the WEIM NOR for imx6q{dl} boards.
+Hi Chen,
 
-For the pin conflict with SPI NOR, its status is set to "disabled".
+On Mon, May 20, 2013 at 06:42:46AM +0100, Chen Gang wrote:
+> 
+> Add the extern variable 'screen_info' according to arm32 has done.
+> 
+> The related error:
+>   drivers/video/console/vgacon.c:1305: undefined reference to `screen_info'
+> 
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm64/kernel/setup.c |   11 +++++++++++
+>  1 files changed, 11 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index add6ea6..1055992 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -374,3 +374,14 @@ const struct seq_operations cpuinfo_op = {
+>  	.stop	= c_stop,
+>  	.show	= c_show
+>  };
+> +
+> +#if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
+> +struct screen_info screen_info = {
+> +	.orig_video_lines	= 30,
+> +	.orig_video_cols	= 80,
+> +	.orig_video_mode	= 0,
+> +	.orig_video_ega_bx	= 0,
+> +	.orig_video_isVGA	= 1,
+> +	.orig_video_points	= 8
+> +};
+> +#endif
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+I think it would be better if we added a something like
+CONFIG_HAVE_VGA_CONSOLE, which VGA_CONSOLE can then depend on. Architectures
+like x86 can then select the former, and we can remove the long list of
+architectures from the current option.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index eb293f5..9ce7c1d 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -58,3 +58,24 @@
- 	wp-gpios = <&gpio1 13 0>;
- 	status = "okay";
- };
-+
-+&weim {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_weim_nor_1>;
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	ranges = <0 0 0x08000000 0x08000000>;
-+	status = "disabled"; /* pin conflict with SPI NOR */
-+
-+	nor at 0,0 {
-+		compatible = "cfi-flash";
-+		reg = <0 0 0x02000000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		bank-width = <2>;
-+
-+		weim-cs-index = <0>;
-+		weim-cs-timing = <0x00620081 0x00000001 0x1C022000
-+				0x0000C000 0x1404a38e 0x00000000>;
-+	};
-+};
--- 
-1.7.1
+Will
