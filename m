@@ -1,36 +1,36 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 May 2013 16:43:06 +0100
-Subject: [PATCH v4 02/32] arm64: KVM: HYP mode idmap support
-In-Reply-To: <20130520153142.GA3639@MacBook-Pro.local>
+Date: Mon, 20 May 2013 16:45:15 +0100
+Subject: [PATCH v4 05/32] arm64: KVM: Basic ESR_EL2 helpers and vcpu
+ register access
+In-Reply-To: <20130520154142.GD3639@MacBook-Pro.local>
 References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
- <1368540840-26750-3-git-send-email-marc.zyngier@arm.com>
- <20130520153142.GA3639@MacBook-Pro.local>
-Message-ID: <519A448A.4000506@arm.com>
+ <1368540840-26750-6-git-send-email-marc.zyngier@arm.com>
+ <20130520154142.GD3639@MacBook-Pro.local>
+Message-ID: <519A450B.5030309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/13 16:31, Catalin Marinas wrote:
-> On Tue, May 14, 2013 at 03:13:30PM +0100, Marc Zyngier wrote:
->> Add the necessary infrastructure for identity-mapped HYP page
->> tables. Idmap-ed code must be in the ".hyp.idmap.text" linker
->> section.
+On 20/05/13 16:41, Catalin Marinas wrote:
+> On Tue, May 14, 2013 at 03:13:33PM +0100, Marc Zyngier wrote:
+>> Implements helpers for dealing with the EL2 syndrome register as
+>> well as accessing the vcpu registers.
 >>
->> The rest of the HYP ends up in ".hyp.text".
->>
+>> Reviewed-by: Christopher Covington <cov@codeaurora.org>
 >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ...
->> +/*
->> + * The HYP init code can't be more than a page long.
->> + */
->> +ASSERT(((__hyp_idmap_text_start + PAGE_SIZE) >= __hyp_idmap_text_end),
->> +       "HYP init code too big")
+>> +static inline bool kvm_vcpu_dabt_isvalid(const struct kvm_vcpu *vcpu)
+>> +{
+>> +	return !!(kvm_vcpu_get_hsr(vcpu) & ESR_EL2_ISV);
+>> +}
 > 
-> Is __hyp_idmap_text_end inclusive or exclusive? I think the latter and
-> you can use greater than (without equal).
+> You kept these '!!' ;). BTW, would the compiler handle the conversion
+> between the integer and bool here?
 
-Indeed. I'll update the check.
+I like them very much. The compiler handles the conversion perfectly
+fine, but the '!!' makes the intent explicit, and someone reviewing the
+code won't be tempted to change the return type to u64 or something similar.
 
-> Otherwise:
+> Either way is fine by me:
 > 
 > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
