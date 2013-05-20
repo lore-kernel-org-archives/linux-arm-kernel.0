@@ -1,69 +1,168 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 20 May 2013 18:13:52 +0100
-Subject: [PATCH 14/14] ARM: elf: add new hwcap for identifying atomic
- ldrd/strd instructions
-In-Reply-To: <20130520160407.GS31359@mudshark.cambridge.arm.com>
-References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
- <1368810473-26070-15-git-send-email-will.deacon@arm.com>
- <20130520141809.GA27473@arm.com>
- <20130520142459.GN31359@mudshark.cambridge.arm.com>
- <20130520151158.GA3520@MacBook-Pro.local>
- <20130520160407.GS31359@mudshark.cambridge.arm.com>
-Message-ID: <20130520171349.GM3639@MacBook-Pro.local>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 20 May 2013 13:21:51 -0400
+Subject: [RFC PATCH 4/5] ARM: mv78x00: Add the Device Tree support for
+ MV78X00 family
+In-Reply-To: <1368999578-19938-5-git-send-email-gregory.clement@free-electrons.com>
+References: <1368999578-19938-1-git-send-email-gregory.clement@free-electrons.com>
+ <1368999578-19938-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130520172151.GW31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 05:04:07PM +0100, Will Deacon wrote:
-> On Mon, May 20, 2013 at 04:11:58PM +0100, Catalin Marinas wrote:
-> > On Mon, May 20, 2013 at 03:24:59PM +0100, Will Deacon wrote:
-> > > On Mon, May 20, 2013 at 03:18:09PM +0100, Catalin Marinas wrote:
-> > > > As I mentioned in the past, I don't agree with exposing the "LPAE"
-> > > > feature to user-space, it's not a feature that user space should care
-> > > > about. An atomic double hwcap is better and you can even make this per
-> > > > CPU via __v7_proc.
-> > > 
-> > > I don't buy the argument that this could be per-CPU: doubleword atomicity
-> > > requires support in the whole system -- not just in the CPU. The only way we
-> > > can rely on it, is by guarantees made in the architecture, which are made
-> > > as part of LPAE.
-> > 
-> > Well, you know that for A7/A15 you have this feature as they support
-> > LPAE. You can have it as a generic LPAE test (only that the ARM ARM
-> > isn't entirely clear here, so for people asking in the future we could
-> > say it's a feature of the A7/A15/etc.)
+On Sun, May 19, 2013 at 11:39:37PM +0200, Gregory CLEMENT wrote:
+> This commit adds the Device Tree support for the mv78x00 SoC
+> family. It adds an mv78x00.dtsi description of the mv78x00 SoC
 > 
-> No, as far as Linux is concerned, it's a feature of any system claiming to
-> have support for LPAE. Given that we allocate page tables using our usual
-> allocators, all memory that we map as normal must be capable of doubleword
-> atomics. We make use of this in our atomic64_{read,set} implementations.
-
-I guess we don't have non-LPAE processors that do atomic doubles (if we
-would, they can use __v7_proc explicitly, though with a different name).
-
-> > > If this just boils down to a naming issue, thn I'm happy to change it, but
-> > > we *are* reporting whether LPAE is supported and I can't think of a better
-> > > name than that.
-> > 
-> > Given that the ARM ARM isn't clear (though this is the case on the
-> > actual implementations), user space may not necessarily assume that
-> > LPAE==atomic doubles. That's why I think reporting the actual atomic
-> > feature is better.
+> So far, the Device Tree contains the interrupt controller, the GPIO
+> bank, the UART controllers, the USB host controllers, the SATA
+> controllers and the I2C controllers.
 > 
-> The ARM ARM isn't too bad: it's just avoiding mandating 64-bit-wide paths
-> around the entire SoC (and I've checked this with the architects). The only
-> way we can probe this feature is using the MMFR0 and checking if LPAE is
-> supported, and that's exactly what userspace will need to rely on.
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/mv78x00.dtsi | 126 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 126 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/mv78x00.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/mv78x00.dtsi b/arch/arm/boot/dts/mv78x00.dtsi
+> new file mode 100644
+> index 0000000..df496f5
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mv78x00.dtsi
+> @@ -0,0 +1,126 @@
+> +/*
+> + * Copyright (C) 2013 Gregory CLEMENT <gregory.clement@free-electrons.com>
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +/include/ "skeleton.dtsi"
+> +
+> +/ {
+> +	model = "Marvell MV78X00 SoC";
+> +	compatible = "marvell,mv78x00";
+> +	interrupt-parent = <&intc>;
+> +
+> +	intc: interrupt-controller {
+> +		compatible = "marvell,orion-intc", "marvell,intc";
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		reg = <0xf1020210 0x04>,
+> +		      <0xf1020214 0x04>,
+> +		      <0xf102020c 0x04>;
+> +	};
+> +
+> +	ocp at f1000000 {
+> +		compatible = "simple-bus";
+> +		ranges = <0x00000000 0xf1000000 0x4000000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		gpio0: gpio at 10100 {
+> +			compatible = "marvell,orion-gpio";
+> +			#gpio-cells = <2>;
+> +			gpio-controller;
+> +			reg = <0x10100 0x40>;
+> +			ngpios = <32>;
+> +			interrupts = <56>, <57>, <58>, <59>;
+> +		};
+> +
+> +		serial at 12000 {
+> +			compatible = "ns16550a";
+> +			reg = <0x12000 0x100>;
+> +			reg-shift = <2>;
+> +			interrupts = <12>;
+> +			/* set clock-frequency in board dts */
+> +			status = "disabled";
+> +		};
+> +
+> +		serial at 12100 {
+> +			compatible = "ns16550a";
+> +			reg = <0x12100 0x100>;
+> +			reg-shift = <2>;
+> +			interrupts = <13>;
+> +			/* set clock-frequency in board dts */
+> +			status = "disabled";
+> +		};
+> +
+> +		serial at 12200 {
+> +			compatible = "ns16550a";
+> +			reg = <0x12200 0x100>;
+> +			reg-shift = <2>;
+> +			interrupts = <14>;
+> +			/* set clock-frequency in board dts */
+> +			status = "disabled";
+> +		};
+> +
+> +		serial at 12300 {
+> +			compatible = "ns16550a";
+> +			reg = <0x12300 0x100>;
+> +			reg-shift = <2>;
+> +			interrupts = <15>;
+> +			/* set clock-frequency in board dts */
 
-Well, LPAE implies atomic doubles but I wouldn't say that's the "only"
-way, it can always be a feature of the CPU. Now, would the user
-developers fully understand the implications of LPAE?
+We should probably add a note to these comments that this is only until
+mv78x00 is converted to the clock infrastructure.
 
-> We can
-> change the name, but the probe code will remain the same so I'm not sure it
-> makes anything clearer. We had "atomicd" originally, but that sounds like a
-> techno band.
+thx,
 
-We can make it longer, 'atomicdbl', if that's the issue ;).
+Jason.
 
--- 
-Catalin
+> +			status = "disabled";
+> +		};
+> +
+> +
+> +		sata at a0000 {
+> +			compatible = "marvell,orion-sata";
+> +			reg = <0xa0000 0x5000>;
+> +			interrupts = <26>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c at 10000 {
+> +			compatible = "marvell,mv64xxx-i2c";
+> +			reg = <0x10000 0x20>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			interrupts = <2>;
+> +			clock-frequency = <100000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c at 11000 {
+> +			compatible = "marvell,mv64xxx-i2c";
+> +			reg = <0x11000 0x20>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			interrupts = <3>;
+> +			clock-frequency = <100000>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ehci at 50000 {
+> +			compatible = "marvell,orion-ehci";
+> +			reg = <0x50000 0x1000>;
+> +			interrupts = <16>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ehci at 51000 {
+> +			compatible = "marvell,orion-ehci";
+> +			reg = <0x51000 0x1000>;
+> +			interrupts = <17>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ehci at 52000 {
+> +			compatible = "marvell,orion-ehci";
+> +			reg = <0x52000 0x1000>;
+> +			interrupts = <18>;
+> +			status = "disabled";
+> +		};
+> +
+> +	};
+> +};
+> -- 
+> 1.8.1.2
+> 
