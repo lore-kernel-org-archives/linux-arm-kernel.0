@@ -1,37 +1,22 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 20 May 2013 14:48:05 +0800
-Subject: [PATCH] arm64: kernel: compiling issue,
- need 'EXPORT_SYMBOL_GPL(read_current_timer)'
-Message-ID: <5199C725.8050102@asianux.com>
+From: girishks2000@gmail.com (Girish K S)
+Date: Mon, 20 May 2013 12:21:31 +0530
+Subject: [PATCH v1 0/3] Polling support for s3c64xx spi controller
+Message-ID: <1369032694-13183-1-git-send-email-ks.giri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series adds support for the polling mode only. Also 2nd patch
+in the series adds support for dedicated cs pin. After Thomas's patch for
+using default gpio is merged(commit id: 00ab539), one of the patch in this
+series is dropped and new series is generated.
 
-Need 'EXPORT_SYMBOL_GPL(read_current_timer)' if build with allmodconfig.
+Girish K S (3):
+  spi: s3c64xx: added support for polling mode
+  spi: s3c64xx: Added provision for dedicated cs pin
+  spi: s3c64xx: Added support for exynos5440 spi
 
-The related error:
-  ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
-  ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
-  ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
-  ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
+ drivers/spi/spi-s3c64xx.c |  197 ++++++++++++++++++++++++++++++++-------------
+ 1 files changed, 140 insertions(+), 57 deletions(-)
 
-
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm64/kernel/time.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-index a551f88..7fcba80 100644
---- a/arch/arm64/kernel/time.c
-+++ b/arch/arm64/kernel/time.c
-@@ -73,6 +73,7 @@ int read_current_timer(unsigned long *timer_value)
- 	*timer_value = arch_timer_read_counter();
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(read_current_timer);
- 
- void __init time_init(void)
- {
 -- 
-1.7.7.6
+1.7.5.4
