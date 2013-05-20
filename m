@@ -1,31 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 May 2013 14:19:40 +0200
-Subject: [PATCH 20/39] usb: musb: ux500: move channel number knowledge
- into the driver
-In-Reply-To: <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
-References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbhzdPGRPFvcSupCJ_vYCdFOnbM-vhp60f9A5Q+jxrP=w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 20 May 2013 14:26:30 +0200
+Subject: [RFC PATCHv3 3/6] clk: Add TI-Nspire clock drivers
+In-Reply-To: <C574C0B3-194E-451A-8584-A351D85C5792@gmail.com>
+References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
+ <201305192148.46398.arnd@arndb.de>
+ <C574C0B3-194E-451A-8584-A351D85C5792@gmail.com>
+Message-ID: <4603632.xLpXUpmrfP@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
+On Monday 20 May 2013 21:19:33 Daniel Tang wrote:
+> On 20/05/2013, at 5:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> 
+> > On Sunday 19 May 2013, Daniel Tang wrote:
+> >> If the vendors for the on-SOC components are unknown, should we just
+> >> leave the compatible strings as is (i.e. "nspire-XXX")?
+> > 
+> > In that case, I would use the name of the company that made the SoC.
+> > I believe someone mentioned it was made by LSI logic.
+> 
+> Yep, that's right. So "lsi,nspire-XXX" should be fine?
 
-> For all ux500 based platforms the maximum number of end-points are used.
-> Move this knowledge into the driver so we can relinquish the burden from
-> platform data. This also removes quite a bit of complexity from the driver
-> and will aid us when we come to enable the driver for Device Tree.
->
-> Cc: Felipe Balbi <balbi@ti.com>
-> Cc: linux-usb at vger.kernel.org
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+I wouldn't use that combination, since lsi did not make the nspire.
+For anything on the LSI chip, "lsi,zevio-XXX" would be correct,
+or maybe "lsi,zevio1020-XXX" for something specific to a particular
+SoC variant. For off-SoC parts, "ti,nspire-XXX" would be right,
+or "ti,nspire-cx-XXX" if you care about the model.
 
-I have now gone over and collected ACKs etc for the patches up until here.
-
-Now you need Felipe's consent to proceed with the MUSB changes
-through my tree.
-
-Yours,
-Linus Walleij
+	Arnd
