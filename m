@@ -1,54 +1,20 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 20 May 2013 14:40:55 -0600
-Subject: [PATCH] pinctrl: sink pinctrldev_list_mutex
-In-Reply-To: <1368690525-32252-1-git-send-email-linus.walleij@stericsson.com>
-References: <1368690525-32252-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <519A8A57.9060007@wwwdotorg.org>
+Date: Mon, 20 May 2013 14:44:05 -0600
+Subject: [PATCH v4 4/5] clk: add CLK_SET_RATE_NO_REPARENT flag
+In-Reply-To: <1369056507-32521-5-git-send-email-james.hogan@imgtec.com>
+References: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
+ <1369056507-32521-5-git-send-email-james.hogan@imgtec.com>
+Message-ID: <519A8B15.4040702@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2013 01:48 AM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On 05/20/2013 07:28 AM, James Hogan wrote:
+> Add a CLK_SET_RATE_NO_REPARENT clock flag, which will prevent muxes
+> being reparented during clk_set_rate.
 > 
-> The pinctrldev_list_mutex is sinked into the functions that
-> actually traverse the list and lock it there. The code makes
-> much more sense in this way. All the callers are in
-> non-performance critical paths and the code is way more
-> readable this way.
-> 
-> Also refactor the function get_pinctrl_dev_from_devname() to
-> follow the design pattern of get_pinctrl_dev_from_of_node()
-> which is slightly simpler.
+> To avoid breaking existing platforms, all callers of clk_register_mux()
+> are adjusted to pass the new flag. Platform maintainers are encouraged
+> to remove the flag if they wish to allow mux reparenting on set_rate.
 
-This seems fine on the surface, but I do have one question:
-
-I think the pinctrl lock serves a couple of purposes:
-
-1) Basic protection for accesses to the pinctrldev_list itself.
-
-This patch seems just fine w.r.t. this point.
-
-2) Preventing pinctrl drivers from being unregistered (and their modules
-unloaded) when some operation is being performed on/to them.
-
-So, that means some code is written as follows:
-
-lock
-find pinctrl device
-perform operation on pinctrl device
-unlock
-// only now could the found pinctrl device be unregistered
-
-However, I think this patch changes that to the following for some
-operations:
-
-lock
-find pinctrl device
-unlock
-// now the found pinctrl device can be unregistered
-perform operation on pinctrl device
-
-Is this true here, or am I off-base?
-
-If this isn't an issue, then the patch is fine by me. But, how is the
-unregistration prevented while the device is being operated on then?
+The Tegra parts,
+Acked-by: Stephen Warren <swarren@nvidia.com>
