@@ -1,79 +1,67 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 20 May 2013 09:44:21 -0300
-Subject: mvebu: mbus device tree binding
-In-Reply-To: <20130520123153.GA2904@localhost>
-References: <20130520123153.GA2904@localhost>
-Message-ID: <20130520124420.GA3030@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 20 May 2013 14:49:01 +0200
+Subject: [RFC PATCHv3 4/6] clocksource: Add TI-Nspire timer drivers
+In-Reply-To: <6807056B-84F9-468D-87C6-4C4AD7D8BA99@gmail.com>
+References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
+ <1368332581-94691-5-git-send-email-dt.tangr@gmail.com>
+ <CACRpkdZBFbOnQ9rCehO0yKDN7fH9VR3VYCa_NkOGJz7KN+02FQ@mail.gmail.com>
+ <26FBB324-AAA9-4C10-8978-C2EC1C26672E@gmail.com>
+ <CACRpkdaO7ieSdo5+Yq0+CLDfP==+DBOWn8+v0ap5iMOJy0Vf=Q@mail.gmail.com>
+ <6807056B-84F9-468D-87C6-4C4AD7D8BA99@gmail.com>
+Message-ID: <CACRpkdZ+nkRVwh9RguJkctCk4U7wnYBxuyg5j2nAUg7o3SvWPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, May 18, 2013 at 8:40 AM, Daniel Tang <dt.tangr@gmail.com> wrote:
+> On 17/05/2013, at 11:17 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>
+>>>> If this timer is really just 16 bits, it's a *pretty* good idea to use
+>>>> the prescaler (I guess this is what IO_DIVIDER is) beacuse else you
+>>>> will get short sleep times with CONFIG_NO_HZ_IDLE on this system,
+>>>> and wake up unnecessarily often.
+>>>>
+>>>> The same goes for the clock event.
+>>>
+>>> The clock frequency is 32768Hz. Should I be scaling it down at that frequency?
+>>
+>> No. But that was *pretty* slow.
+>>
+>> The thing is that the driver is getting "some clockfrequency" from
+>> the clk subsystem and does not know what it is.
+>>
+>> Usually (and I've seen this hardware design pattern a lot) when you
+>> have a clock like this, and go talk to the clk implementation specialist
+>> s/he will say "oh, yeah, I can mux in this 34 MHz clock to the timer
+>> as well", and if that is possible then that is often what you want,
+>> because it's good for things like HRtimers, and then it's useful to have
+>> a prescaler och the clocksource/clockevent.
+>>
+>> You can use that 32768 Hz for clock events and clocksource (but I
+>> suspect that HRtimers will never be useful on this platform due to this).
+>>
+>
+> I forgot to mention before that there is also another timer that runs
+> at the same freq as the APB (which is usually around 30MHz).
+> Is this what you were alluding to? I haven't tested the driver on that timer yet.
 
-Adding Jason to the discussion.
+OK then that is probably the timer you will use for clock event and
+also sched_clock() in the end. (You'll be setting a better rating on it.)
 
-On Mon, May 20, 2013 at 09:31:53AM -0300, Ezequiel Garcia wrote:
-> Hello Arnd and Jason,
-> 
-> Let's advance with the DT binding for mvebu-mbus,
-> and perhaps have it ready for v3.11.
-> 
-> Our current approach to the mbus-windows allocation is as follows:
-> 
-> 1. Every device is located as a child of the soc/internal-regs node.
->    The DT contains information for the assigned address space,
->    encoded in the 'ranges' property, like this:
-> 
->    soc {
->    
->    	ranges =  < internal-regs
->         	    PCIe
-> 		    NOR
-> 		    ... >;
->    	internal-regs {
-> 		...
->    	};
->    }
-> 
-> 
-> 2. Each driver is in charge of allocating the mbus windows, using
->    the mbus API and the address region obtained through the information
->    on the device tree.
-> 
-> Now, this approach is particularly error-prone because of (1). The
-> 'ranges' entry in a given .dtsi file is overrided by the 'ranges'
-> in the per-board .dts file. So, when if we need to declare a node for a
-> NOR device, we need to duplicate all ranges entries from the parent
-> .dtsi files.
-> 
-> This does not seem to be hugely problematic, for one could put the
-> 'ranges' property only in the per-board files, and remove it from the
-> common dtsi.
-> 
-> Therefore, first of all I'd like to know:
-> 
-> **1** What's so broken with the current approach that makes us seek for
->       solution, in the form of an mbus DT binding?
-> 
-> In addition, reading the previous discussion you've had about this, I
-> noticed Arnd suggested (and even required) that the mbus binding should
-> update the ranges property in the DT blob each time an address window
-> is dynamically allocated.
-> 
-> **2** Why is this required? Who will read the updated ranges
->       information?
->       Why can't the kernel access the mbus API to obtain information
->       about currently allocated windows?
-> 
-> Those are my questions for now and I'm quite sure many more will come
-> in the future, so please bare with me!
-> 
-> Thanks a lot,
-> -- 
-> Ezequiel Garc?a, Free Electrons
-> Embedded Linux, Kernel and Android Engineering
-> http://free-electrons.com
+I'm not alluding to it as I didn't know of it, but it makes HW-sense
+that it exists :-)
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+> As I understand it, you're saying to use a prescaler on faster clock rates
+> so the kernel can have a longer maximum delay time (since a 16 bit register
+> can only hold only so much). In that case, what kind of range should I be
+> scaling to? I suspect it needs to be large enough to keep the kernel from
+> constantly waking but small enough for HR timers to be useful.
+
+Yeah :-/
+
+This is one of the cases where one thing excludes the other.
+
+But if it's hard-wired to 32kHz you probably want to leave it as it
+is.
+
+Yours,
+Linus Walleij
