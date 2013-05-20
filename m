@@ -1,26 +1,44 @@
-From: dt.tangr@gmail.com (Daniel Tang)
-Date: Mon, 20 May 2013 21:19:33 +1000
-Subject: [RFC PATCHv3 3/6] clk: Add TI-Nspire clock drivers
-In-Reply-To: <201305192148.46398.arnd@arndb.de>
-References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
- <201305161417.28133.arnd@arndb.de>
- <F8915E01-0FCA-4C9F-8440-63B5A73B349B@gmail.com>
- <201305192148.46398.arnd@arndb.de>
-Message-ID: <C574C0B3-194E-451A-8584-A351D85C5792@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 20 May 2013 14:01:06 +0200
+Subject: [PATCH 02/39] dmaengine: ste_dma40: Remove unnecessary call to
+ d40_phy_cfg()
+In-Reply-To: <20130516105959.GI3269@gmail.com>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-3-git-send-email-lee.jones@linaro.org>
+ <20130516063546.GD14863@intel.com>
+ <20130516072557.GD3269@gmail.com>
+ <20130516094014.GJ14863@intel.com>
+ <20130516105959.GI3269@gmail.com>
+Message-ID: <CACRpkdabfNb_KeRqNgQQ2fVpS-_8q26k697cFOwamDLugExrhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 16, 2013 at 12:59 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Thu, 16 May 2013, Vinod Koul wrote:
+>
+>> On Thu, May 16, 2013 at 08:25:57AM +0100, Lee Jones wrote:
+>> > On Thu, 16 May 2013, Vinod Koul wrote:
+>> >
+>> > > On Wed, May 15, 2013 at 10:51:25AM +0100, Lee Jones wrote:
+>> > > > All configuration left in d40_phy_cfg() is runtime configurable and
+>> > > > there is already a call into it from d40_runtime_config(), so let's
+>> > > > rely on that.
+>> > > >
+>> > > > Acked-by: Vinod Koul <vnod.koul@intel.com>
+>> > > That needs up update!
+>> >
+>> > Ah, where did I get that from that?
+>> >
+>> > Was that my mistake, or was this in the MAINTAINERS file?
+>> Certainly not in MAINTAINERS file :)
+>
+> My bad then, sorry.
+>
+> Linus,
+>
+> Would you be kind enough to fix it please, as it's in your tree now.
 
-On 20/05/2013, at 5:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+I've fixed it up!
 
-> On Sunday 19 May 2013, Daniel Tang wrote:
->> If the vendors for the on-SOC components are unknown, should we just
->> leave the compatible strings as is (i.e. "nspire-XXX")?
-> 
-> In that case, I would use the name of the company that made the SoC.
-> I believe someone mentioned it was made by LSI logic.
-
-Yep, that's right. So "lsi,nspire-XXX" should be fine?
-
-> 
-> 	Arnd
+Yours,
+Linus Walleij
