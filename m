@@ -1,36 +1,43 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 20 May 2013 16:03:58 -0400
-Subject: [GIT PULL] ARM: mvebu: boards for v3.11 (round 1)
-Message-ID: <20130520200358.GK31290@titan.lakedaemon.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 20 May 2013 22:05:33 +0200
+Subject: [PATCH] rtc: max8998: Check for pdata presence before
+ dereferencing
+In-Reply-To: <1368630968-30460-1-git-send-email-t.figa@samsung.com>
+References: <1368630968-30460-1-git-send-email-t.figa@samsung.com>
+Message-ID: <5315595.u903qx3Wqg@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Alessandro,
 
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+On Wednesday 15 of May 2013 17:16:08 Tomasz Figa wrote:
+> Currently the driver can crash with a NULL pointer dereference if no
+> pdata is provided, despite of successful registration of MFD part. This
+> patch fixes the problem by adding a NULL check before dereferencing the
+> pdata pointer.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  drivers/rtc/rtc-max8998.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/rtc/rtc-max8998.c b/drivers/rtc/rtc-max8998.c
+> index 48b6612..d5af7ba 100644
+> --- a/drivers/rtc/rtc-max8998.c
+> +++ b/drivers/rtc/rtc-max8998.c
+> @@ -285,7 +285,7 @@ static int max8998_rtc_probe(struct platform_device
+> *pdev) info->irq, ret);
+> 
+>  	dev_info(&pdev->dev, "RTC CHIP NAME: %s\n", pdev->id_entry->name);
+> -	if (pdata->rtc_delay) {
+> +	if (pdata && pdata->rtc_delay) {
+>  		info->lp3974_bug_workaround = true;
+>  		dev_warn(&pdev->dev, "LP3974 with RTC REGERR option."
+>  				" RTC updates will be extremely slow.\n");
 
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+Since this is a fix, could you apply this patch to your fixes branch for 
+3.10-rc2, please?
 
-are available in the git repository at:
-
-  git://git.infradead.org/users/jcooper/linux.git tags/boards-3.11-1
-
-for you to fetch changes up to 193da78bec1b510ab0a743348a7e9a2c24766268:
-
-  ARM: Kirkwood: add DT support for Sheevaplug and Sheevaplug eSATA (2013-05-15 00:33:18 +0000)
-
-----------------------------------------------------------------
-mvebu boards for v3.11 (round 1)
-
- - kirkwood: add sheevaplug and sheevaplug eSATA
-
-----------------------------------------------------------------
-Simon Baatz (1):
-      ARM: Kirkwood: add DT support for Sheevaplug and Sheevaplug eSATA
-
- arch/arm/mach-kirkwood/Kconfig            |  7 +++++++
- arch/arm/mach-kirkwood/Makefile           |  1 +
- arch/arm/mach-kirkwood/board-dt.c         |  4 ++++
- arch/arm/mach-kirkwood/board-sheevaplug.c | 27 +++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/common.h           |  5 +++++
- 5 files changed, 44 insertions(+)
- create mode 100644 arch/arm/mach-kirkwood/board-sheevaplug.c
+Best regards,
+Tomasz
