@@ -1,53 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 20 May 2013 20:15:49 +0200
-Subject: [PATCH 00/10] clk: mvebu: restructure SoC clock drivers
-In-Reply-To: <20130520175827.GC31290@titan.lakedaemon.net>
-References: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130516184658.0650f838@skate>
- <20130520175827.GC31290@titan.lakedaemon.net>
-Message-ID: <20130520201549.475e50d0@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 20 May 2013 20:25:35 +0200
+Subject: GPIO sysfs : set a wake source
+In-Reply-To: <87k3mwv6ru.fsf@free.fr>
+References: <87fvxwia0s.fsf@free.fr>
+ <CACRpkdYjQD9phVtWNh2QGkZWOdEJyZENnYatXt7bd23bgqXitw@mail.gmail.com>
+ <51926177.1050600@wwwdotorg.org> <87ip2ig1ez.fsf@free.fr>
+ <CACRpkdbiZFutP_+u=ciuC6r-8N5FpkEnGVLH9LGDQ7pvdo3_-Q@mail.gmail.com>
+ <87k3mwv6ru.fsf@free.fr>
+Message-ID: <CACRpkdYX4w-efLMZKbEg4MS2odGi9jhj5FssNyi=LEhf32-P6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+On Sat, May 18, 2013 at 11:18 AM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> Linus Walleij <linus.walleij@linaro.org> writes:
 
-On Mon, 20 May 2013 13:58:27 -0400, Jason Cooper wrote:
+>> I think you need to think about how we join this modem closer
+>> with the kernel instead of trying to paper it over using userspace
+>> GPIO.
 
-> > I've tested on Armada 370 DB (after reverting the ARM core patch
-> > that prevents this platform from booting) and the Armada XP DB.
-> > Both boards boot fine, and detect PCIe devices as they should.
-> > 
-> > There is some conflict between this set of commits and the two
-> > commits that modify the PCIe clocks in my PCIe series. I've pushed
-> > a branch at
-> > https://github.com/MISL-EBU-System-SW/mainline-public/tree/marvell-pcie-v10-and-seb-clks
-> > which has the mvebu PCIe stuff + Sebastian patches on top of it,
-> > with the conflicts resolved. The tricky thing is that since
-> > Sebastian is adding new clock files, and then removing the old
-> > ones, it's pretty easy to "loose" the changes the two PCIe clock
-> > patches are doing. The branch above works on Armada 370/XP, so you
-> > can compare the clock files if needed.
-> 
-> hmm, in my haste yesterday, I did this in the opposite order (clk,
-> then pcie on top).  I'm going to reshuffle them because I don't want
-> pcie depending on and waiting for this clock series to be ready :)
+> Why ? I has only one UART and several GPIOs. What good would it be to add it in
+> kernel ?
 
-Ok. Either way is fine with me, but it's true that chronologically, the
-PCIe stuff has been around for way more time than the clk
-restructure patches.
+Because of the Subject: of this email.
 
-> The good news is everything (except kirkwood-pcie, ran out of time)
-> made it through linux-next!  Also, kisskb is now building
-> mvebu_defconfig in addition to all the other ones.
+You are starting to set up interrupts and wakeup sources and
+other kernel proprietary stuff from userspace and basically (IMO)
+trespassing on kernel territory.
 
-Ok. Gregory can give more details, but I believe we are also building
-daily linux-next and Linus master for the mvebu_defconfig.
+>> I think the dilemma faced by embedded modems need to
+>> be considered thoroughly here.
+>
+> As I said, it's an "old" modem. And if by embedded you mean "embedded in the
+> SoC", it's not, it's a separate chip. The interconnect are the UART lines and
+> the GPIO lines (solder lines as you pointed out).
 
-Best regards,
+I do not worry about the age of the modem. I would have thought
+the same if you took the PCB out of a Robotics 28K8 and soldered
+it onto some chipset and soldered a wakeup line on a GPIO pin.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+I worry about userspace getting to know everthing about interrupts
+and wake up sources and it just IMO *shouldn't*. I don't think
+userspace should know anything about IRQs beside /proc/interrupts
+but I'm CC:ing tglx so he can say something here.
+
+Yours,
+Linus Walleij
