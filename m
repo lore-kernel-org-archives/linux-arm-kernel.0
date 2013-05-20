@@ -1,67 +1,54 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Mon, 20 May 2013 10:13:11 +0100
-Subject: [PATCH v3 2/4] clk: add support for clock reparent on set_rate
-In-Reply-To: <20130520041508.GA27676@codeaurora.org>
-References: <1368625263-23136-1-git-send-email-james.hogan@imgtec.com>
- <1368625263-23136-3-git-send-email-james.hogan@imgtec.com>
- <20130520041508.GA27676@codeaurora.org>
-Message-ID: <5199E927.3080500@imgtec.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Mon, 20 May 2013 15:05:37 +0530
+Subject: [PATCH 0/6] Fix suspend/resume issues created by pinmux on exynos,
+ part 2
+In-Reply-To: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
+References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
+Message-ID: <5199EE69.7090605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/13 05:15, Stephen Boyd wrote:
-> Noticed another minor thing. I'm working on the set rate and
-> parent at the same time op on top of this patch series. Hopefully
-> have something soon.
+On 05/17/2013 09:54 PM, Tomasz Figa wrote:
+> This series aims at fixing problems with suspend/resume on Exynos SoCs
+> introduced by migration of GPIO and EINT support to pin control driver
+> on DT-enabled platforms.
 > 
-> On 05/15, James Hogan wrote:
->> @@ -1181,6 +1242,11 @@ static void clk_change_rate(struct clk *clk)
->>  
->>  	old_rate = clk->rate;
->>  
->> +	/* set parent */
->> +	if (clk->new_parent && clk->new_parent != clk->parent)
->> +		__clk_set_parent_no_recalc(clk, clk->new_parent,
->> +					   clk->new_parent_index);
->> +
+> The patches fix following issues:
+>  - missing support for IRQ wake of pinctrl-exynos driver
+>  - legacy GPIO and EINT save/restore handling in platform PM code
+>    inappropriate on pinctrl-enabled platforms
+>  - several EINT-related registers must be saved as well
+>  
+> The series is based on a patch by Doug Anderson that adds suspend/restore
+> of pinctrl registers to pinctrl-samsung driver:
+> [PATCH v3] pinctrl: samsung: fix suspend/resume functionality
+> http://www.spinics.net/lists/kernel/msg1534119.html
 > 
-> This check here for new_parent != clk->parent ...
-> 
->> @@ -1451,6 +1501,27 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
->>  	return 0;
->>  }
->>  
->> +static int __clk_set_parent_no_recalc(struct clk *clk, struct clk *parent,
->> +				      u8 p_index)
->> +{
->> +	int ret = 0;
->> +
->> +	if (clk->parent == parent)
->> +		goto out;
-> 
-> causes this to never be true, so we can probably drop it.
-> 
->> +
->> +	/* only re-parent if the clock is not in use */
->> +	ret = __clk_set_parent(clk, parent, p_index);
->> +	if (ret)
->> +		goto out;
->> +
->> +	/* reparent, but don't propagate rate recalculation downstream */
->> +	clk_reparent(clk, parent);
->> +	clk_debug_reparent(clk, parent);
->> +
->> +out:
->> +	return ret;
->> +}
-> 
-> Also, we never check the return code so it's sort of useless.
+> On Exynos4210-based Trats board:
+> Tested-by: Tomasz Figa <t.figa@samsung.com>
 > 
 
-Hi Stephen,
+On Exynos5250-based Arndale board:
+Tested-by: Tushar Behera <tushar.behera@linaro.org>
 
-Well spotted, and as you pointed it privately it can use
-__clk_set_parent() instead of __clk_set_parent_no_recalc() now :)
+> Tomasz Figa (6):
+>   pinctrl: exynos: Add support for set_irq_wake of wake-up EINTs
+>   ARM: EXYNOS: Fix EINT wake-up mask configuration when pinctrl is used
+>   ARM: SAMSUNG: pm: Adjust for pinctrl- and DT-enabled platforms
+>   pinctrl: samsung: Add support for SoC-specific suspend/resume
+>     callbacks
+>   pinctrl: samsung: Allow per-bank SoC-specific private data
+>   pinctrl: exynos: Handle suspend/resume of GPIO EINT registers
+> 
+>  arch/arm/mach-exynos/include/mach/pm-core.h |  14 +++-
+>  arch/arm/plat-samsung/pm.c                  |  17 +++--
+>  drivers/pinctrl/pinctrl-exynos.c            | 106 ++++++++++++++++++++++++++++
+>  drivers/pinctrl/pinctrl-exynos.h            |   1 +
+>  drivers/pinctrl/pinctrl-samsung.c           |   6 ++
+>  drivers/pinctrl/pinctrl-samsung.h           |   4 ++
+>  6 files changed, 142 insertions(+), 6 deletions(-)
+> 
 
-Thanks
-James
+
+-- 
+Tushar Behera
