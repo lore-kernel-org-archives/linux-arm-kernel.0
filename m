@@ -1,58 +1,33 @@
-From: nerv@dawncrow.de (=?UTF-8?B?QW5kcsOpIEhlbnRzY2hlbA==?=)
-Date: Mon, 20 May 2013 14:51:48 +0200
-Subject: [PATCHv4] arm: Preserve the user r/w register TPIDRURW on context
- switch and fork
-In-Reply-To: <519A030D.1030809@arm.com>
-References: <518AA19B.2020209@dawncrow.de> <51979801.7010903@dawncrow.de>
- <519A030D.1030809@arm.com>
-Message-ID: <519A1C64.3020807@dawncrow.de>
+From: jiada_wang@mentor.com (Jiada Wang)
+Date: Mon, 20 May 2013 21:51:51 +0900
+Subject: [PATCH] ARM i.MX6q: fix for ldb_di_sels
+Message-ID: <1369054311-2519-1-git-send-email-jiada_wang@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 20.05.2013 13:03, schrieb Jonathan Austin:
-> Hi Andr?
-> 
-> On 18/05/13 16:02, Andr? Hentschel wrote:
->> Am 08.05.2013 21:03, schrieb Andr? Hentschel:
->>> From: =?UTF-8?q?Andr=C3=A9=20Hentschel?= <nerv@dawncrow.de>
->>>
-> 
-> This is strangely formatted for me too, and I use a different client from Will so I'm not sure that the problem is just at our end...
-> 
-> (Also see that the list archive has weird formatting:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/167325.html )
-> 
-> Your first couple of patches didn't come out strangely formatted, so I'm not really sure what's going on.
+As pll5_video_div has been introduced to represent the clock
+generated from post-divider for video.
+Instead of pll5_video, pll5_video_div should be proper root clock
+for ldb_di_sel.
 
-I'll retry it with plain Text or something. AFAIK git should understand this =UTF= style, though.
+Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+CC: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-imx/clk-imx6q.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
->>> Since commit 6a1c53124aa1 the user writeable TLS register was zeroed to
->>> prevent it from being used as a covert channel between two tasks.
->>>
->>> There are more and more applications coming to WinRT, Wine could support them,
->>> but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
->>>
->>> This patch preserves that register per thread instead of clearing it.
->>> Unlike the TPIDRURO, which is already switched, the TPIDRURW
->>> can be updated from userspace so needs careful treatment in the case that we
->>> modify TPIDRURW and call fork(). To avoid this we must always read
->>> TPIDRURW in copy_thread.
->>>
->>> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
->>> Signed-off-by: Will Deacon <will.deacon@arm.com>
->>> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
->>>
->>
->> Hi,
->> I'm not yet very familiar with the development process here,
->> am i getting no feedback on v4 because of the mergewindow being closed?
->> Or is there another reason? Sry for being impatient.
->>
-> 
-> This is a feature, not a fix, so most likely it'll be included at the next merge window. For that to happen it should be in Russell's tree around the middle of this cycle.
-> 
-> Can you please rebase on 3.10-rc2 (when it happens) and post one more version? After that, assuming nobody else has any final comments, you could put it in to Russell's patch system...
-> 
-> Just as a hint - one thing you might have done to increase the chances of getting comments to clarify what's different between v3 and v4 - as a way to make life easier for reviewers you can highlight the differences between versions after the "---" (where you currently have the description of why there are so many S-o-Bs).
-
-I'll do, thank you very much for the reply and the clarification.
+diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+index 1512590..19ea58d 100644
+--- a/arch/arm/mach-imx/clk-imx6q.c
++++ b/arch/arm/mach-imx/clk-imx6q.c
+@@ -187,7 +187,7 @@ static const char *gpu2d_core_sels[]	= { "axi", "pll3_usb_otg", "pll2_pfd0_352m"
+ static const char *gpu3d_core_sels[]	= { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll2_pfd2_396m", };
+ static const char *gpu3d_shader_sels[] = { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll2_pfd9_720m", };
+ static const char *ipu_sels[]		= { "mmdc_ch0_axi", "pll2_pfd2_396m", "pll3_120m", "pll3_pfd1_540m", };
+-static const char *ldb_di_sels[]	= { "pll5_video", "pll2_pfd0_352m", "pll2_pfd2_396m", "mmdc_ch1_axi", "pll3_usb_otg", };
++static const char *ldb_di_sels[]	= { "pll5_video_div", "pll2_pfd0_352m", "pll2_pfd2_396m", "mmdc_ch1_axi", "pll3_usb_otg", };
+ static const char *ipu_di_pre_sels[]	= { "mmdc_ch0_axi", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0_352m", "pll2_pfd2_396m", "pll3_pfd1_540m", };
+ static const char *ipu1_di0_sels[]	= { "ipu1_di0_pre", "dummy", "dummy", "ldb_di0", "ldb_di1", };
+ static const char *ipu1_di1_sels[]	= { "ipu1_di1_pre", "dummy", "dummy", "ldb_di0", "ldb_di1", };
+-- 
+1.8.1.1
