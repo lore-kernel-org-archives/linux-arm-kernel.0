@@ -1,53 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 20 May 2013 10:08:28 -0700
-Subject: [PATCH] ARM: OMAP2+: Fix multiple randconfig errors if no SoC
- is selected, take3
-In-Reply-To: <20130517210317.GB10378@atomide.com>
-References: <20130517210317.GB10378@atomide.com>
-Message-ID: <20130520170827.GF10378@atomide.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 20 May 2013 19:11:22 +0200
+Subject: [PATCH 30/33] arch/arm/plat-samsung: don't check resource with
+ devm_ioremap_resource
+In-Reply-To: <519A517F.5020003@samsung.com>
+References: <1368702961-4325-1-git-send-email-wsa@the-dreams.de>
+ <1368702961-4325-31-git-send-email-wsa@the-dreams.de>
+ <519A517F.5020003@samsung.com>
+Message-ID: <20130520171118.GA5717@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130517 14:08]:
-> --- a/arch/arm/mach-omap2/Makefile
-> +++ b/arch/arm/mach-omap2/Makefile
-> @@ -6,7 +6,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
->  	-I$(srctree)/arch/arm/plat-omap/include
->  
->  # Common support
-> -obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o gpmc.o timer.o pm.o \
-> +soc-y := id.o io.o control.o mux.o devices.o fb.o serial.o gpmc.o timer.o pm.o \
->  	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o omap_hwmod.o \
->  	 omap_device.o sram.o
->  
-> @@ -85,7 +85,8 @@ obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
->  obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
->  obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o
->  obj-$(CONFIG_SOC_OMAP5)			+= omap-mpuss-lowpower.o
-> -obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
-> +pm-$(CONFIG_ARCH_OMAP)			+= pm-debug.o
-> +obj-$(CONFIG_PM_DEBUG)			+= $(pm-y)
->  
->  obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
->  obj-$(CONFIG_POWER_AVS_OMAP_CLASS3)    += smartreflex-class3.o
-> @@ -201,7 +202,8 @@ obj-$(CONFIG_ARCH_OMAP4)		+= omap_hwmod_44xx_data.o
->  
->  # EMU peripherals
->  obj-$(CONFIG_OMAP3_EMU)			+= emu.o
-> -obj-$(CONFIG_HW_PERF_EVENTS)		+= pmu.o
-> +pmu-$(CONFIG_ARCH_OMAP)			+= pmu.o
-> +obj-$(CONFIG_HW_PERF_EVENTS)		+= $(pmu-y)
->  
->  obj-$(CONFIG_OMAP_MBOX_FWK)		+= mailbox_mach.o
->  mailbox_mach-objs			:= mailbox.o
+On Tue, May 21, 2013 at 01:38:23AM +0900, Kukjin Kim wrote:
+> On 05/16/13 20:15, Wolfram Sang wrote:
+> >devm_ioremap_resource does sanity checks on the given resource. No need to
+> >duplicate this in the driver.
+> >
+> >Signed-off-by: Wolfram Sang<wsa@the-dreams.de>
+> 
+> Looks good to me, applied into Samsung tree.
+> 
+> Wolfram, if you want to take this into your tree, let me know.
 
-Oops, both pm-debug.o and pmu.o should now be just:
-
-soc-$(CONFIG_PM_DEBUG)			+= pm-debug.o
-soc-$(CONFIG_ARCH_OMAP)			+= pmu.o
-
-Will repost after running make randconfig for few hours today.
-
-Regards,
-
-Tony
+It is already upstream :)
