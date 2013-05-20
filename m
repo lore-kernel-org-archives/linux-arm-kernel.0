@@ -1,54 +1,58 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 20 May 2013 15:48:16 -0400
-Subject: [PATCHv2 3/5] clocksource: arch_timer: use virtual counters
-In-Reply-To: <1368631441-28434-4-git-send-email-mark.rutland@arm.com>
-References: <1368631441-28434-1-git-send-email-mark.rutland@arm.com>
- <1368631441-28434-4-git-send-email-mark.rutland@arm.com>
-Message-ID: <519A7E00.7090600@codeaurora.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 20 May 2013 15:51:35 -0400
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.10 (round 2)
+Message-ID: <20130520195135.GH31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
 
-On 05/15/2013 11:23 AM, Mark Rutland wrote:
+The following changes since commit 00ed4a0bd964555fe9276f2299564c384d50ae7d:
 
-[...]
+  ARM: mvebu: Add a ranges entry to translate devbus childs (2013-05-13 16:23:47 +0000)
 
-> Instead, this patch makes us always use the virtual counters. If we're a
-> guest, or don't have hyp mode, we'll use the virtual timers, and as such
-> don't care about CNTVOFF as long as it doesn't change in such a way as
-> to make time travel backwards. If we do have hyp mode, and might be a
-> KVM host, we have to use the physical timers, and require CNTVOFF to be
-> zero so as to have a consistent view of time between the physical timers
-> and virtual counters.
+are available in the git repository at:
 
-[...]
+  git://git.infradead.org/users/jcooper/linux.git tags/fixes-3.10-2
 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index a2b2541..053d846 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -287,7 +279,7 @@ static int __init arch_timer_register(void)
->  	cyclecounter.mult = clocksource_counter.mult;
->  	cyclecounter.shift = clocksource_counter.shift;
->  	timecounter_init(&timecounter, &cyclecounter,
-> -			 arch_counter_get_cntpct());
-> +			 arch_counter_get_cntvct());
->  
->  	if (arch_timer_use_virtual) {
->  		ppi = arch_timer_ppi[VIRT_PPI];
+for you to fetch changes up to 489e138eec96f529c5e8d4cd3ea45882ecdbf5ca:
 
-[...]
+  ARM: dts: mvebu: Fix wrong the address reg value for the L2-cache node (2013-05-20 17:44:54 +0000)
 
+----------------------------------------------------------------
+mvebu fixes for v3.10 (round 2)
 
-You say "we have to use the physical timers", but then change the code to read
-exclusively from the virtual counter. I think it'd make more sense to just say
-that CNTVOFF has to be zero (and why exactly?).
+ - mvebu (and orion SoCs)
+    - remove init_dma_coherent_pool_size()
 
-Thanks,
-Christopher
+ - mvebu
+    - fix ranges DT property
+    - fix DT reg value for L2 cache
+    - select ARCH_REQUIRE_GPIOLIB
 
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+ - orion legacy
+    - fix num_resources and id for ge10 and ge11
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Orion: Remove redundant init_dma_coherent_pool_size()
+
+Ezequiel Garcia (1):
+      ARM: mvebu: Fix ranges entry on XP GP board
+
+Gregory CLEMENT (3):
+      ARM: mvebu: select ARCH_REQUIRE_GPIOLIB for mvebu platform
+      ARM: plat-orion: Fix num_resources and id for ge10 and ge11
+      ARM: dts: mvebu: Fix wrong the address reg value for the L2-cache node
+
+Thomas Petazzoni (1):
+      arm: mvebu: fix the 'ranges' property to handle PCIe
+
+ arch/arm/boot/dts/armada-370-xp.dtsi |  3 ++-
+ arch/arm/boot/dts/armada-370.dtsi    |  5 +++--
+ arch/arm/boot/dts/armada-xp-gp.dts   |  3 +++
+ arch/arm/mach-kirkwood/common.c      |  6 ------
+ arch/arm/mach-mvebu/Kconfig          |  1 +
+ arch/arm/mach-mvebu/armada-370-xp.c  |  7 -------
+ arch/arm/mach-orion5x/common.c       |  7 -------
+ arch/arm/plat-orion/common.c         | 12 ++++++------
+ 8 files changed, 15 insertions(+), 29 deletions(-)
