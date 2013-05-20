@@ -1,31 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 May 2013 17:17:31 +0100
-Subject: [PATCH v4 07/32] arm64: KVM: architecture specific MMU backend
-In-Reply-To: <20130520155739.GF3639@MacBook-Pro.local>
-References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
- <1368540840-26750-8-git-send-email-marc.zyngier@arm.com>
- <20130520155739.GF3639@MacBook-Pro.local>
-Message-ID: <519A4C9B.8070307@arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 21 May 2013 01:19:49 +0900
+Subject: [PATCH] ARM: dts: add max8997 device node for exynos4210-origen
+ board
+In-Reply-To: <518C9807.80906@linaro.org>
+References: <1353664412-17678-1-git-send-email-thomas.abraham@linaro.org>
+ <50EA598D.6090604@linaro.org> <518C9807.80906@linaro.org>
+Message-ID: <519A4D25.9090001@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/13 16:57, Catalin Marinas wrote:
-> On Tue, May 14, 2013 at 03:13:35PM +0100, Marc Zyngier wrote:
->> +static inline bool kvm_is_write_fault(unsigned long esr)
->> +{
->> +	unsigned long esr_ec = esr >> ESR_EL2_EC_SHIFT;
-> 
-> Not that it would make much difference but for consistency - we use esr
-> as an 'unsigned int' in the arm64 code (only 32-bit needed).
+On 05/10/13 15:47, Tushar Behera wrote:
+> On 01/07/2013 10:43 AM, Tushar Behera wrote:
+>> On 11/23/2012 03:23 PM, Thomas Abraham wrote:
+>>> Add max8997 regulator device node for exynos4210-origen board and list
+>>> all the supported regulators.
+>>>
+>>> Signed-off-by: Thomas Abraham<thomas.abraham@linaro.org>
+>>
+>> Tested-by: Tushar Behera<tushar.behera@linaro.org>
+>>
+> Kukjin,
+>
+> This patch got missed for 3.10 merge window. This patch still applies on
+> the latest mainline kernel and is essential for Origen board. Would you
+> please take this patch?
+>
+Applied, thanks.
 
-Indeed. Changing it would require a 32bit patch though, as I'd like to
-keep the two code bases in line.
-
-If you don't mind, I'll queue a patch changing this to "unsigned int" on
-both architectures once this is merged.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+- Kukjin
