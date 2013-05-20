@@ -1,49 +1,36 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Mon, 20 May 2013 05:01:47 +0000
-Subject: [PATCH v3 4/4] ARM: dts: add initial MVF600 Tower board dts
- support
-In-Reply-To: <20130519152932.GA24301@S2101-09.ap.freescale.net>
-References: <1368684648-20826-1-git-send-email-b35083@freescale.com>
- <1368684648-20826-5-git-send-email-b35083@freescale.com>
- <20130519152932.GA24301@S2101-09.ap.freescale.net>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E851CB26E@039-SN1MPN1-003.039d.mgd.msft.net>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 20 May 2013 10:59:42 +0530
+Subject: [PATCH 07/18] cpufreq: s3c24xx: move cpufreq driver to
+ drivers/cpufreq
+In-Reply-To: <2001452.Fn2HjLbNED@vostro.rjw.lan>
+References: <cover.1365079581.git.viresh.kumar@linaro.org>
+ <CAKohponkFB7ND38jv5oGnQLx8cq0b=uHTCmL3EERe6P54ijYhw@mail.gmail.com>
+ <093901ce509f$afe92f40$0fbb8dc0$%kim@samsung.com>
+ <2001452.Fn2HjLbNED@vostro.rjw.lan>
+Message-ID: <CAKohpon97dbLDF0xU7vhf5V+UVeJv7WdeMuZ1jXLUTey2+gD2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +
->> +	sound {
->> +		compatible = "fsl,mvf600-audio-sgtl5000";
->> +		model = "mvf600-sgtl5000";
->> +		sai-controller = <&sai2>;
->> +		audio-codec = <&codec>;
->> +		audio-routing =
->> +			"MIC_IN", "Mic Jack",
->> +			"Mic Jack", "Mic Bias",
->> +			"Headphone Jack", "HP_OUT";
->> +	};
+On 14 May 2013 18:30, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> On Tuesday, May 14, 2013 09:36:42 PM Kukjin Kim wrote:
+>> Viresh Kumar wrote:
+>> >
+>> > On 13 May 2013 16:21, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+>> > > That doesn't matter I suppose.  I can take it, but please rebase it on
+>> > top
+>> > > of current linux-next.
+>> >
+>> > I have already done that (attached). But i wasn't sure what Kukjin wants
+>> > as
+>> > he may report conflicts again and i will ask the same question for 3.12 :)
+>> >
+>> Since this missed last time, this would be sent to upstream via samsung tree
+>> again. It means the conflicts should be handled by myself.
+>>
+>> Rafael, if you don't mind, let me take this into Samsung tree for v3.11.
 >
->Has this been tested against mainline kernel?  If not, please remove it.
->
->> +	clock-frequency = <100000>;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_i2c0_1>;
->> +
->> +	codec: sgtl5000 at 0a {
->> +		compatible = "fsl,sgtl5000";
->> +		reg = <0x0a>;
->> +		clocks = <&clks MVF600_CLK_SAI2>;
->
->The sgtl5000 uses SAI2 clock?
-[Lu Jingchang-B35083] 
-  Yes, the sgtl5000 uses the SAI2 clock on MVF600 Tower board. Thanks!
->
->> +	};
->> +};
->
->Is i2c-imx driver working for mvf600 right now?
->
->
->Do we have a QuadSPI driver on mainline kernel?  Please only add it when
->it's been tested against mainline kernel.
-[Lu Jingchang-B35083] 
- Sound, I2C, QuadSPI and SAI added in the initial dts have been test locally on the mainline kernel, and the patches will be sent to maillist later. Thanks!
+> Sure, please go ahead.
+
+Kukjin,
+
+I hope you have already applied this for linux-next?
