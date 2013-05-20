@@ -1,153 +1,28 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Mon, 20 May 2013 09:59:59 -0500
-Subject: [PATCHv2 3/6] ARM: socfpga: Add support to gate peripheral clocks
-In-Reply-To: <20130517110940.GA3466@amd.pavel.ucw.cz>
-References: <1368731117-4749-1-git-send-email-dinguyen@altera.com>
- <1368731117-4749-3-git-send-email-dinguyen@altera.com>
- <20130517110940.GA3466@amd.pavel.ucw.cz>
-Message-ID: <519A3A6F.7020700@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 20 May 2013 11:10:33 -0400
+Subject: [PATCH] arm: mvebu: enable the third USB interface on
+ OpenBlocks AX3
+In-Reply-To: <20130519213040.GD8651@1wt.eu>
+References: <1368720444-29357-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130517.111810.02327269.yamagata@plathome.co.jp>
+ <20130519201939.GL11137@titan.lakedaemon.net>
+ <20130519213040.GD8651@1wt.eu>
+Message-ID: <20130520151033.GS31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Sun, May 19, 2013 at 11:30:40PM +0200, Willy Tarreau wrote:
+> On Sun, May 19, 2013 at 04:19:39PM -0400, Jason Cooper wrote:
+> > Mr Yamagata, Willy,
+> > 
+> > I don't like to assume for people, so if you could please provided a
+> > "Tested-by:" I'd appreciate it.
+> 
+> Yes of course, I didn't propose it in order to save you the work of
+> collecting these tags :-)
+> 
+>   Tested-by: Willy Tarreau <w@1wt.eu>
 
-On 05/17/2013 06:09 AM, Pavel Machek wrote:
-> Hi!
-> 
->> From: Dinh Nguyen <dinguyen@altera.com>
->>
->> Add support to gate the clocks that directly feed peripherals. For clocks
->> with multiple parents, add the ability to determine the correct parent,
->> and also set parents. Also add support to calculate and set the clocks'
->> rate.
->>
->> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
->> Reviewed-by: Pavel Machek <pavel@denx.de>
->> CC: Mike Turquette <mturquette@linaro.org>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> CC: Olof Johansson <olof@lixom.net>
->> Cc: Pavel Machek <pavel@denx.de>
->> CC: <linux@arm.linux.org.uk>
->>
->> v2:
->> - Fix space/indent errors
->> - Add streq for strcmp == 0
->> ---
-> 
->> +static u8 socfpga_clk_get_parent(struct clk_hw *hwclk)
->> +{
->> +	u32 l4_src;
->> +	u32 perpll_src;
->> +	u8 parent;
->> +
->> +	if (streq(hwclk->init->name, SOCFPGA_L4_MP_CLK)) {
->> +		l4_src = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
->> +		l4_src &= 0x1;
->> +		parent = l4_src;
->> +	} else if (streq(hwclk->init->name, SOCFPGA_L4_SP_CLK)) {
->> +		l4_src = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
->> +		l4_src = ((l4_src & 0x2) >> 1);
->> +		parent = l4_src;
->> +	} else {
->> +		perpll_src = readl(clk_mgr_base_addr + CLKMGR_PERPLL_SRC);
->> +		if (streq(hwclk->init->name, SOCFPGA_MMC_CLK))
->> +			perpll_src &= 0x3;
->> +		else if (streq(hwclk->init->name, SOCFPGA_NAND_CLK) ||
->> +			streq(hwclk->init->name, SOCFPGA_NAND_X_CLK))
->> +			perpll_src = ((perpll_src & 0xC) >> 2);
->> +		else /*QSPI clock */
->> +			perpll_src = ((perpll_src & 0x30) >> 4);
->> +		parent = perpll_src;
-> 
-> I really don't like the "else" here. If some new clock name appears in
-> hwclk->init->name or if there's problem somewhere, it will just
-> silently operate wrong clock. WARN_ON(!streq(...))?
-> 
-> (I tried to append patch to previous email, with suggested
-> cleanups....)
-> 
+Thanks!
 
-Ok, will fix in rev3.
-
->> +		} else {/*QSPI clock */
->> +			src_reg &= ~0x30;
->> +			src_reg |= (parent << 4);
->> +		}
-> 
-> Same here. (And there should be space after /* ).
->
-
-OK...
-
->> +	socfpga_clk = kzalloc(sizeof(*socfpga_clk), GFP_KERNEL);
->> +	if (WARN_ON(!socfpga_clk))
->> +		return;
->> +
->> +	rc = of_property_read_u32_array(node, "clk-gate", clk_gate, 2);
->> +	if (rc)
->> +		clk_gate[0] = 0;
->> +
->> +	rc = of_property_read_u32(node, "fixed-divider", &fixed_div);
->> +	if (rc)
->> +		socfpga_clk->fixed_div = 0;
->> +	else
->> +		socfpga_clk->fixed_div = fixed_div;
->> +
->> +	if (clk_gate[0]) {
->> +		socfpga_clk->hw.reg = clk_mgr_base_addr + clk_gate[0];
->> +		socfpga_clk->hw.bit_idx = clk_gate[1];
->> +
->> +		gateclk_ops.enable = clk_gate_ops.enable;
->> +		gateclk_ops.disable = clk_gate_ops.disable;
->> +	}
->> +
-> 
-> Could if (clk_gate[]) be moved one block above? It uses
-> partially-initialized array, so it would be nice to have code as clear
-> as possible.
-> 
-
-OK..
-
-> 
->> +	of_property_read_string(node, "clock-output-names", &clk_name);
->> +
->> +	init.name = clk_name;
->> +	init.ops = ops;
->> +	init.flags = 0;
->> +	while (i < SOCFGPA_MAX_PARENTS && (parent_name[i] =
->> +			of_clk_get_parent_name(node, i)) != NULL)
->> +		i++;
-> 
-> I'd suggest explicit loop, like
-> 
-> +       while (i < SOCFGPA_MAX_PARENTS) {
-> +               char *name = of_clk_get_parent_name(node, i);
-> +               parent_name[i] = name;
-> +               if (name == NULL)
-> +                       break;
->                 i++;
-> +       }
-> 
-> This is a bit too subtle.
-
-I don't know, it seems like the previous simple loop is pretty explicit.
-
-> 
->> +	init.parent_names = parent_name;
->> +	init.num_parents = i;
->> +	socfpga_clk->hw.hw.init = &init;
->> +
->> +	clk = clk_register(NULL, &socfpga_clk->hw.hw);
-> 
-> init is local variable, yet pointer passed to it is in globally
-> alocated structure. What is going on there? Are there some comments
-> needed?
-
-Same code is used everywhere in drivers/clk.
-
-Dinh
-> 
-> Thanks,
-> 									Pavel
-> 
+Jason.
