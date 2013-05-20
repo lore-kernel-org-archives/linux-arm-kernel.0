@@ -1,79 +1,35 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 20 May 2013 10:22:05 +0200
-Subject: [PATCH] ARM: plat-orion: Fix num_resources and id for ge10 and
- ge11
-In-Reply-To: <1368994363-14762-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1368994363-14762-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130520082205.GC26249@lunn.ch>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 20 May 2013 16:54:07 +0800
+Subject: [PATCH] ARM: S5PV210: dependency issue,
+ S5P_SLEEP is depend on ARM_CPU_SUSPEND
+Message-ID: <5199E4AF.7040607@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 19, 2013 at 10:12:43PM +0200, Gregory CLEMENT wrote:
-> When platform data were moved from arch/arm/mach-mv78xx0/common.c to
-> arch/arm/plat-orion/common.c with the commit "7e3819d ARM: orion:
-> Consolidate ethernet platform data", there were few typo made on
-> gigabit Ethernet interface ge10 and ge11. This commit writes back
-> their initial value, which allows to use this interfaces again.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  arch/arm/plat-orion/common.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-> index 251f827..c019b7a 100644
-> --- a/arch/arm/plat-orion/common.c
-> +++ b/arch/arm/plat-orion/common.c
-> @@ -383,7 +383,7 @@ static struct resource orion_ge10_shared_resources[] = {
->  
->  static struct platform_device orion_ge10_shared = {
->  	.name		= MV643XX_ETH_SHARED_NAME,
-> -	.id		= 1,
-> +	.id		= 2,
->  	.dev		= {
->  		.platform_data	= &orion_ge10_shared_data,
->  	},
-> @@ -398,8 +398,8 @@ static struct resource orion_ge10_resources[] = {
->  
->  static struct platform_device orion_ge10 = {
->  	.name		= MV643XX_ETH_NAME,
-> -	.id		= 1,
-> -	.num_resources	= 2,
-> +	.id		= 2,
-> +	.num_resources	= 1,
->  	.resource	= orion_ge10_resources,
->  	.dev		= {
->  		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> @@ -432,7 +432,7 @@ static struct resource orion_ge11_shared_resources[] = {
->  
->  static struct platform_device orion_ge11_shared = {
->  	.name		= MV643XX_ETH_SHARED_NAME,
-> -	.id		= 1,
-> +	.id		= 3,
->  	.dev		= {
->  		.platform_data	= &orion_ge11_shared_data,
->  	},
-> @@ -447,8 +447,8 @@ static struct resource orion_ge11_resources[] = {
->  
->  static struct platform_device orion_ge11 = {
->  	.name		= MV643XX_ETH_NAME,
-> -	.id		= 1,
-> -	.num_resources	= 2,
-> +	.id		= 3,
-> +	.num_resources	= 1,
->  	.resource	= orion_ge11_resources,
->  	.dev		= {
->  		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> -- 
-> 1.8.1.2
-> 
 
-Hi Gregory
+When randconfig with MMU for arm s5pv210 (and select all cpu type),
+need let S5P_SLEEP depend on ARM_CPU_SUSPEND, or will cause issue below:
 
-My Bad. Thanks for fixing this.
+  arch/arm/plat-samsung/built-in.o: In function `s3c_cpu_resume':
+  arch/arm/plat-samsung/s5p-sleep.S:83: undefined reference to `cpu_resume'
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Jason, this can go into stable, as far back as 3.0.
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm/plat-samsung/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-       Andrew
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index f8ed2de..1d38541 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -483,6 +483,7 @@ config S5P_PM
+ 
+ config S5P_SLEEP
+ 	bool
++	select ARM_CPU_SUSPEND
+ 	help
+ 	  Internal config node to apply common S5P sleep management code.
+ 	  Can be selected by S5P and newer SoCs with similar sleep procedure.
+-- 
+1.7.7.6
