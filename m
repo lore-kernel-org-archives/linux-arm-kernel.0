@@ -1,95 +1,57 @@
 From: gmbnomis@gmail.com (Simon Baatz)
-Date: Tue, 21 May 2013 01:01:41 +0200
-Subject: [PATCH V3 00/10] mmc_of_parse() adaptations,
- DT support for Sheevaplugs
-Message-ID: <1369090911-1479-1-git-send-email-gmbnomis@gmail.com>
+Date: Tue, 21 May 2013 01:01:47 +0200
+Subject: [PATCH V3 06/10] mmc: tegra: handle mmc_of_parse() errors during probe
+In-Reply-To: <1369090911-1479-1-git-send-email-gmbnomis@gmail.com>
+References: <1369090911-1479-1-git-send-email-gmbnomis@gmail.com>
+Message-ID: <1369090911-1479-7-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+---
+ drivers/mmc/host/sdhci-tegra.c |    9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-	V3 changes:
-	- Patch 01/10: Added EPROBE_DEFER case to mmc_of_parse() 
-	- Added Acked-By to (unmodified) patches 02 and 03.
-
-	V2 changes:
-	- Converted mvsdio to use mmc_of_parse()
-	- Adapted DTS files using mvsdio accordingly
-	- Changed mmc_of_parse() to return errors to the caller
-
-While adding DT support for the Sheevaplugs by Globalscale Technologies
-(Kirkwood), it turned out that the DT binding of mvsdio lacked features to
-properly support the hardware (active high/low of CD and WP pins could not
-be described in DT).
-
-This is standard functionality provided by the mmc_of_parse() helper
-function.  However, mmc_of_parse() may allocate GPIO lines.  If the
-allocation fails, it outputs an error, but does not return an error to its
-caller.  Therefore, a proposal to handle errors in mmc_of_parse() is made.
-
-The patch set is structured as follows:
-
-1   Adapt mmc_of_parse() to return errors
-2-6 Handle errors in current drivers using mmc_of_parse() (compile tested
-    only)
-7-8 Convert mvsdio and respective dts files to mmc_of_parse() (tested on
-    kirkwood)
-9   Add dts files for (eSATA) Sheevaplug
-10  Add DT support for (eSATA) Sheevaplug
-
-
-I could only test on an eSATA Sheevaplug. I found patches with
-different LEDs for the Sheevaplug.  Thus, I would highly appreciate if
-someone with the hardware could give this a spin on a non-eSATA
-version.  Some additional testing of the change detect and write
-protect behaviour for mvsdio can't hurt either.  I hope that there aren't
-board revisions with different CD/WP pins out there.
-
-Simon Baatz (10):
-  mmc: return mmc_of_parse() errors to caller
-  mmc: sh_mmcif: handle mmc_of_parse() errors during probe
-  mmc: tmio-mmc: handle mmc_of_parse() errors during probe
-  mmc: mxcmmc: handle mmc_of_parse() errors during probe
-  mmc: sdhci-pxav3: handle mmc_of_parse() errors during probe
-  mmc: tegra: handle mmc_of_parse() errors during probe
-  ARM: mvebu: Use standard MMC binding for all users of mvsdio
-  mmc: mvsdio: use standard MMC device-tree binding parser
-    mmc_of_parse()
-  ARM: Kirkwood: Add dts files for Sheevaplug and eSATA Sheevaplug
-  ARM: Kirkwood: add DT support for Sheevaplug and Sheevaplug eSATA
-
- arch/arm/boot/dts/Makefile                         |    2 +
- arch/arm/boot/dts/armada-370-db.dts                |    1 +
- arch/arm/boot/dts/armada-370-mirabox.dts           |    1 +
- arch/arm/boot/dts/armada-370-rd.dts                |    1 +
- arch/arm/boot/dts/armada-370-xp.dtsi               |    4 +
- arch/arm/boot/dts/armada-xp-db.dts                 |    1 +
- arch/arm/boot/dts/kirkwood-dreamplug.dts           |    1 +
- .../arm/boot/dts/kirkwood-guruplug-server-plus.dts |    2 +
- arch/arm/boot/dts/kirkwood-mplcec4.dts             |    2 +-
- arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi  |   97 ++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts    |   40 ++++++++
- arch/arm/boot/dts/kirkwood-sheevaplug.dts          |   45 +++++++++
- arch/arm/boot/dts/kirkwood-topkick.dts             |    1 +
- arch/arm/boot/dts/kirkwood.dtsi                    |    4 +
- arch/arm/mach-kirkwood/Kconfig                     |    7 ++
- arch/arm/mach-kirkwood/Makefile                    |    1 +
- arch/arm/mach-kirkwood/board-dt.c                  |    4 +
- arch/arm/mach-kirkwood/board-sheevaplug.c          |   27 ++++++
- arch/arm/mach-kirkwood/common.h                    |    5 +
- drivers/mmc/core/host.c                            |   30 +++++-
- drivers/mmc/host/mvsdio.c                          |   73 ++++++++-------
- drivers/mmc/host/mxcmmc.c                          |    4 +-
- drivers/mmc/host/sdhci-pxav3.c                     |    7 +-
- drivers/mmc/host/sdhci-tegra.c                     |    9 +-
- drivers/mmc/host/sh_mmcif.c                        |    7 +-
- drivers/mmc/host/tmio_mmc_pio.c                    |    4 +-
- include/linux/mmc/host.h                           |    2 +-
- 27 files changed, 334 insertions(+), 48 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
- create mode 100644 arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-sheevaplug.dts
- create mode 100644 arch/arm/mach-kirkwood/board-sheevaplug.c
-
+diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+index e0dba74..7eb62f8 100644
+--- a/drivers/mmc/host/sdhci-tegra.c
++++ b/drivers/mmc/host/sdhci-tegra.c
+@@ -205,7 +205,7 @@ static const struct of_device_id sdhci_tegra_dt_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, sdhci_tegra_dt_match);
+ 
+-static void sdhci_tegra_parse_dt(struct device *dev)
++static int sdhci_tegra_parse_dt(struct device *dev)
+ {
+ 	struct device_node *np = dev->of_node;
+ 	struct sdhci_host *host = dev_get_drvdata(dev);
+@@ -213,7 +213,7 @@ static void sdhci_tegra_parse_dt(struct device *dev)
+ 	struct sdhci_tegra *tegra_host = pltfm_host->priv;
+ 
+ 	tegra_host->power_gpio = of_get_named_gpio(np, "power-gpios", 0);
+-	mmc_of_parse(host->mmc);
++	return mmc_of_parse(host->mmc);
+ }
+ 
+ static int sdhci_tegra_probe(struct platform_device *pdev)
+@@ -245,7 +245,9 @@ static int sdhci_tegra_probe(struct platform_device *pdev)
+ 	tegra_host->soc_data = soc_data;
+ 	pltfm_host->priv = tegra_host;
+ 
+-	sdhci_tegra_parse_dt(&pdev->dev);
++	rc = sdhci_tegra_parse_dt(&pdev->dev);
++	if (rc)
++		goto err_parse_dt;
+ 
+ 	if (gpio_is_valid(tegra_host->power_gpio)) {
+ 		rc = gpio_request(tegra_host->power_gpio, "sdhci_power");
+@@ -278,6 +280,7 @@ err_add_host:
+ err_clk_get:
+ 	if (gpio_is_valid(tegra_host->power_gpio))
+ 		gpio_free(tegra_host->power_gpio);
++err_parse_dt:
+ err_power_req:
+ err_alloc_tegra_host:
+ 	sdhci_pltfm_free(pdev);
 -- 
 1.7.9.5
