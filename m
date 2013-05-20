@@ -1,55 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 May 2013 10:56:06 +0100
-Subject: [PATCH] arm64: kernel: compiling issue, need
- 'EXPORT_SYMBOL_GPL(read_current_timer)'
-In-Reply-To: <168084c28e8ba5124c05553e97463172@localhost>
-References: <5199C725.8050102@asianux.com>
- <168084c28e8ba5124c05553e97463172@localhost>
-Message-ID: <20130520095606.GH31359@mudshark.cambridge.arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 20 May 2013 11:59:04 +0200
+Subject: [RFC PATCH 1/2] ARM: delay: print dummy values for bogomips
+In-Reply-To: <alpine.LFD.2.03.1305150830540.31158@syhkavp.arg>
+References: <1367602547-19322-1-git-send-email-will.deacon@arm.com>
+ <1367602547-19322-2-git-send-email-will.deacon@arm.com>
+ <20130506231554.GB16801@amd.pavel.ucw.cz>
+ <5188B8B2.5030601@arm.com>
+ <alpine.LFD.2.03.1305141547180.31158@syhkavp.arg>
+ <CAL_Jsq+Q5UMGo3J+vKKCRU+w4Kj0YN0exs7UCWTEOxmFjWfo3g@mail.gmail.com>
+ <alpine.LFD.2.03.1305141945160.31158@syhkavp.arg>
+ <20130515090103.GA12907@mudshark.cambridge.arm.com>
+ <20130515114737.GA7900@amd.pavel.ucw.cz>
+ <alpine.LFD.2.03.1305150830540.31158@syhkavp.arg>
+Message-ID: <20130520095904.GA7279@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 08:15:04AM +0100, Marc Zyngier wrote:
-> On Mon, 20 May 2013 14:48:05 +0800, Chen Gang <gang.chen@asianux.com>
-> wrote:
-> > Need 'EXPORT_SYMBOL_GPL(read_current_timer)' if build with allmodconfig.
-> > 
-> > The related error:
-> >   ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
-> >   ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
-> >   ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
-> >   ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
-> > 
-> > 
-> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> > ---
-> >  arch/arm64/kernel/time.c |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-> > index a551f88..7fcba80 100644
-> > --- a/arch/arm64/kernel/time.c
-> > +++ b/arch/arm64/kernel/time.c
-> > @@ -73,6 +73,7 @@ int read_current_timer(unsigned long *timer_value)
-> >  	*timer_value = arch_timer_read_counter();
-> >  	return 0;
-> >  }
-> > +EXPORT_SYMBOL_GPL(read_current_timer);
-> >  
-> >  void __init time_init(void)
-> >  {
-> 
-> While this solves the problem, I'm not sure this is the best fix. The real
-> issue is with get_cycles, which is a macro around read_current_timer.
-> 
-> AArch32 exports it because of the number of timer implementations. On
-> arm64, we should be able to just return CNTVCT_EL0.
-> 
-> Catalin, Will, what do you think?
+Hi!
 
-Should be ok once the arch timer driver has moved exclusively to virtual
-time. I'm also not sure we even need to implement read_current_timer() --
-it's only used for delay-loop calibration, which we don't need for the
-arch timer.
+> > > In fact, I just tried it and at least my linaro filesystem seems happy
+> > > enough.
+> > 
+> > Would it be too much work to simply put the field back with the right
+> > value? We don't have to get it as precise as we used to, that should
+> > make slowdown minimum.
+> 
+> There is simply no right value.  And whenever there is a value, people 
+> read too much into it.
 
-Will
+You are right that there is no right value. But there are many _wrong_
+values.
+
+Take a look at CPU temperature. There's no right value there, either,
+as CPU has different temperatures at different places. Displaying
+heatsink temp +5C is probably ok. Displaying case temperature or
+compile time constant is not.
+
+Now, bogoMIPS is supposed to be instructions per second. Measure
+instructions per second, and you have acceptable value to display. Put
+back code from previous version, and you have acceptable value to
+display.
+
+"0", "1" or value from Kconfig is _not_ acceptable value.
+
+Maybe bogomips should not have been exposed in /proc in the first
+place, but it is too late now. "No regressions".
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
