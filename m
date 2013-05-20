@@ -1,42 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 May 2013 10:54:47 +0100
-Subject: [PATCH 1/6] ARM: OMAP2+: Remove board-4430sdp.c
-In-Reply-To: <20130517191751.468.89202.stgit@localhost>
-References: <20130517191304.468.73487.stgit@localhost>
- <20130517191751.468.89202.stgit@localhost>
-Message-ID: <20130520095447.GR21614@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 May 2013 10:56:06 +0100
+Subject: [PATCH] arm64: kernel: compiling issue, need
+ 'EXPORT_SYMBOL_GPL(read_current_timer)'
+In-Reply-To: <168084c28e8ba5124c05553e97463172@localhost>
+References: <5199C725.8050102@asianux.com>
+ <168084c28e8ba5124c05553e97463172@localhost>
+Message-ID: <20130520095606.GH31359@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 12:17:51PM -0700, Tony Lindgren wrote:
-> We can now boot with device tree. If you don't want to update u-boot,
-> you can boot with appended DTB with the following instructions:
+On Mon, May 20, 2013 at 08:15:04AM +0100, Marc Zyngier wrote:
+> On Mon, 20 May 2013 14:48:05 +0800, Chen Gang <gang.chen@asianux.com>
+> wrote:
+> > Need 'EXPORT_SYMBOL_GPL(read_current_timer)' if build with allmodconfig.
+> > 
+> > The related error:
+> >   ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
+> >   ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
+> >   ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
+> >   ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
+> > 
+> > 
+> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> > ---
+> >  arch/arm64/kernel/time.c |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+> > index a551f88..7fcba80 100644
+> > --- a/arch/arm64/kernel/time.c
+> > +++ b/arch/arm64/kernel/time.c
+> > @@ -73,6 +73,7 @@ int read_current_timer(unsigned long *timer_value)
+> >  	*timer_value = arch_timer_read_counter();
+> >  	return 0;
+> >  }
+> > +EXPORT_SYMBOL_GPL(read_current_timer);
+> >  
+> >  void __init time_init(void)
+> >  {
 > 
-> 1. Make sure you have the appended DTB support in .config
+> While this solves the problem, I'm not sure this is the best fix. The real
+> issue is with get_cycles, which is a macro around read_current_timer.
 > 
->    CONFIG_ARM_APPENDED_DTB=y
->    CONFIG_ARM_ATAG_DTB_COMPAT=y
->    CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
+> AArch32 exports it because of the number of timer implementations. On
+> arm64, we should be able to just return CNTVCT_EL0.
 > 
-> 2. Build the zImage
-> 
->    $ ARCH=arm CROSS_COMPILE=... make zImage
-> 
-> 3. Build the device tree blobs
-> 
->    $ ARCH=arm CROSS_COMPILE=... make dtbs
-> 
-> 4. Append the dtb to zImage
-> 
->    $ cat arch/arm/boot/zImage arch/arm/boot/dts/omap4-sdp.dtb > /tmp/appended
-> 
-> 5. Use mkimage to produce the appended device tree uImage
-> 
->    $ mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 \
->      -n "Linux" -d /tmp/appended /tmp/uImage
-> 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Catalin, Will, what do you think?
 
-Okay, I'm removing the 4430SDP from the boot test system once this goes
-in, because this will mean rewriting the build system to cope with this
-stuff.
+Should be ok once the arch timer driver has moved exclusively to virtual
+time. I'm also not sure we even need to implement read_current_timer() --
+it's only used for delay-loop calibration, which we don't need for the
+arch timer.
+
+Will
