@@ -1,20 +1,16 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 20 May 2013 11:57:25 -0700
-Subject: [PATCH v2 1/5] tty: xuartps: Remove suspend/resume functions
-In-Reply-To: <51961E02.9020501@monstr.eu>
-References: <1368467199-8702-1-git-send-email-soren.brinkmann@xilinx.com>
- <1368467199-8702-2-git-send-email-soren.brinkmann@xilinx.com>
- <51961E02.9020501@monstr.eu>
-Message-ID: <20130520185725.GA21134@kroah.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 20 May 2013 13:08:04 -0600
+Subject: [PATCH] ARM: tegra: enable host1x support by default
+In-Reply-To: <1368868666-24754-1-git-send-email-acourbot@nvidia.com>
+References: <1368868666-24754-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <519A7494.1050206@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 02:09:38PM +0200, Michal Simek wrote:
-> Hi Greg,
-> 
-> can you please add this patch to your tree?
-> It is unrelated to clk changes which Soren sent.
+On 05/18/2013 03:17 AM, Alexandre Courbot wrote:
+> Tegra DRM support used to be enabled in the default Tegra configuration,
+> but it now depends on CONFIG_TEGRA_HOST1X which is disabled by default.
+> Enable CONFIG_TEGRA_HOST1X so that DRM support is compiled in again.
 
-Ok, will do.
-
-greg k-h
+I've forwarded this to arm at kernel.org in the hope it can be pulled into
+3.10. If not, I'll apply it to the Tegra tree once I hear back.
