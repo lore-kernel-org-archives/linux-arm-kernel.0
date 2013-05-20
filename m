@@ -1,85 +1,68 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 20 May 2013 18:39:25 +0800
-Subject: [PATCH V2 2/6] ARM: tegra: skip SCU and PL310 code when CPU is not
- Cortex-A9
+Date: Mon, 20 May 2013 18:39:28 +0800
+Subject: [PATCH V2 5/6] clk: tegra114: implement wait_for_reset and
+ disable_clock for tegra_cpu_car_ops
 In-Reply-To: <1369046369-12489-1-git-send-email-josephl@nvidia.com>
 References: <1369046369-12489-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1369046369-12489-3-git-send-email-josephl@nvidia.com>
+Message-ID: <1369046369-12489-6-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For supporting single image on all Tegra series, we need to skip some HW
-support code for Cortex-A9 only.
+The conventional CPU hotplug sequence on the other Tegra chips, we will also
+clock gate the CPU in tegra_cpu_kill() after the CPU was power gated. For
+Tegra114, the flow controller will clock gate the CPU after the power down
+sequence. But we still need to implement a empty function for disable_clock
+to avoid kernel warning message.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
+Acked-by: Mike Turquette <mturquette@linaro.org>
 ---
 V2:
-* no change; but double confirmed the patch is OK with THUMB2_KERNEL
+* no change
 ---
- arch/arm/mach-tegra/sleep.S |  8 +++++---
- arch/arm/mach-tegra/sleep.h | 24 ++++++++++++++++++------
- 2 files changed, 23 insertions(+), 9 deletions(-)
+ drivers/clk/tegra/clk-tegra114.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-tegra/sleep.S b/arch/arm/mach-tegra/sleep.S
-index 364d845..9daaef2 100644
---- a/arch/arm/mach-tegra/sleep.S
-+++ b/arch/arm/mach-tegra/sleep.S
-@@ -106,9 +106,11 @@ ENTRY(tegra_shut_off_mmu)
- 	isb
- #ifdef CONFIG_CACHE_L2X0
- 	/* Disable L2 cache */
--	mov32	r4, TEGRA_ARM_PERIF_BASE + 0x3000
--	mov	r5, #0
--	str	r5, [r4, #L2X0_CTRL]
-+	check_cpu_part_num 0xc09, r9, r10
-+	movweq	r4, #:lower16:(TEGRA_ARM_PERIF_BASE + 0x3000)
-+	movteq	r4, #:upper16:(TEGRA_ARM_PERIF_BASE + 0x3000)
-+	moveq	r5, #0
-+	streq	r5, [r4, #L2X0_CTRL]
- #endif
- 	mov	pc, r0
- ENDPROC(tegra_shut_off_mmu)
-diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
-index f9f2164..2269c0d 100644
---- a/arch/arm/mach-tegra/sleep.h
-+++ b/arch/arm/mach-tegra/sleep.h
-@@ -70,19 +70,31 @@
- 	movt	\reg, #:upper16:\val
- .endm
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index d78e16e..40d939d 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -250,6 +250,9 @@
+ #define CLK_SOURCE_XUSB_DEV_SRC 0x60c
+ #define CLK_SOURCE_EMC 0x19c
  
-+/* Marco to check CPU part num */
-+.macro check_cpu_part_num part_num, tmp1, tmp2
-+	mrc	p15, 0, \tmp1, c0, c0, 0
-+	ubfx	\tmp1, \tmp1, #4, #12
-+	mov32	\tmp2, \part_num
-+	cmp	\tmp1, \tmp2
-+.endm
++/* Tegra CPU clock and reset control regs */
++#define CLK_RST_CONTROLLER_CPU_CMPLX_STATUS	0x470
 +
- /* Macro to exit SMP coherency. */
- .macro exit_smp, tmp1, tmp2
- 	mrc	p15, 0, \tmp1, c1, c0, 1	@ ACTLR
- 	bic	\tmp1, \tmp1, #(1<<6) | (1<<0)	@ clear ACTLR.SMP | ACTLR.FW
- 	mcr	p15, 0, \tmp1, c1, c0, 1	@ ACTLR
- 	isb
--	cpu_id	\tmp1
--	mov	\tmp1, \tmp1, lsl #2
--	mov	\tmp2, #0xf
--	mov	\tmp2, \tmp2, lsl \tmp1
--	mov32	\tmp1, TEGRA_ARM_PERIF_VIRT + 0xC
--	str	\tmp2, [\tmp1]			@ invalidate SCU tags for CPU
-+#ifdef CONFIG_HAVE_ARM_SCU
-+	check_cpu_part_num 0xc09, \tmp1, \tmp2
-+	mrceq	p15, 0, \tmp1, c0, c0, 5
-+	andeq	\tmp1, \tmp1, #0xF
-+	moveq	\tmp1, \tmp1, lsl #2
-+	moveq	\tmp2, #0xf
-+	moveq	\tmp2, \tmp2, lsl \tmp1
-+	ldreq	\tmp1, =(TEGRA_ARM_PERIF_VIRT + 0xC)
-+	streq	\tmp2, [\tmp1]			@ invalidate SCU tags for CPU
- 	dsb
-+#endif
- .endm
+ static int periph_clk_enb_refcnt[CLK_OUT_ENB_NUM * 32];
  
- /* Macro to check Tegra revision */
+ static void __iomem *clk_base;
+@@ -2000,7 +2003,25 @@ static __init void tegra114_periph_clk_init(void __iomem *clk_base)
+ 	}
+ }
+ 
+-static struct tegra_cpu_car_ops tegra114_cpu_car_ops;
++/* Tegra114 CPU clock and reset control functions */
++static void tegra114_wait_cpu_in_reset(u32 cpu)
++{
++	unsigned int reg;
++
++	do {
++		reg = readl(clk_base + CLK_RST_CONTROLLER_CPU_CMPLX_STATUS);
++		cpu_relax();
++	} while (!(reg & (1 << cpu)));  /* check CPU been reset or not */
++}
++static void tegra114_disable_cpu_clock(u32 cpu)
++{
++	/* flow controller would take care in the power sequence. */
++}
++
++static struct tegra_cpu_car_ops tegra114_cpu_car_ops = {
++	.wait_for_reset	= tegra114_wait_cpu_in_reset,
++	.disable_clock	= tegra114_disable_cpu_clock,
++};
+ 
+ static const struct of_device_id pmc_match[] __initconst = {
+ 	{ .compatible = "nvidia,tegra114-pmc" },
 -- 
 1.8.2.2
