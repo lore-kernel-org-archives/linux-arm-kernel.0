@@ -1,79 +1,73 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 20 May 2013 11:43:18 +0200
-Subject: [RFC PATCH 0/5] ARM: mv78x00: First step to convert mv78x00 to
- Device Tree
-In-Reply-To: <1368999578-19938-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1368999578-19938-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130520094318.GD26249@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 May 2013 10:46:04 +0100
+Subject: [PATCH] arm64: extable: sort the exception table at build time
+In-Reply-To: <51967811.7090709@gmail.com>
+References: <1368809021-25130-1-git-send-email-will.deacon@arm.com>
+ <51967811.7090709@gmail.com>
+Message-ID: <20130520094604.GF31359@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 19, 2013 at 11:39:33PM +0200, Gregory CLEMENT wrote:
-> Hello,
+Hi David,
+
+On Fri, May 17, 2013 at 07:33:53PM +0100, David Daney wrote:
+> On 05/17/2013 09:43 AM, Will Deacon wrote:
+> > As is done for other architectures, sort the exception table at
+> > build-time rather than during boot.
+> >
+> > Since sortextable appears to be a standalone C program relying on the
+> > host elf.h to provide EM_AARCH64, I've had to add a conditional check in
+> > order to allow cross-compilation on machines that aren't running a
+> > bleeding-edge libc-dev.
+> >
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >   arch/arm64/Kconfig              |  1 +
+> >   arch/arm64/kernel/vmlinux.lds.S | 15 +++++++--------
+> >   scripts/sortextable.c           |  5 +++++
+> >   3 files changed, 13 insertions(+), 8 deletions(-)
+> >
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index 48347dc..fb8fd90 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -7,6 +7,7 @@ config ARM64
+> >   	select ARM_AMBA
+> >   	select ARM_ARCH_TIMER
+> >   	select ARM_GIC
+> > +	select BUILDTIME_EXTABLE_SORT
+> >   	select CLONE_BACKWARDS
+> >   	select COMMON_CLK
+> >   	select GENERIC_CLOCKEVENTS
+> > diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> > index 3fae2be..3d527726 100644
+> > --- a/arch/arm64/kernel/vmlinux.lds.S
+> > +++ b/arch/arm64/kernel/vmlinux.lds.S
+> > @@ -57,6 +57,13 @@ SECTIONS
+> >
+> >   	RO_DATA(PAGE_SIZE)
+> >
+> > +	. = ALIGN(8);
+> > +	__ex_table : AT(ADDR(__ex_table) - LOAD_OFFSET) {
+> > +		__start___ex_table = .;
+> > +		*(__ex_table)
+> > +		__stop___ex_table = .;
+> > +	}
+> > +
+> >   	_etext = .;			/* End of text and rodata section */
 > 
-> This patch set is a first step in order to convert mach-mv78x00 to
-> device tree before it joins mach-mvebu.
 > 
-> I managed to test it on the RD-78X00-mASA board. All the peripherals I
-> have tested work as they work before the migration to the device tree:
-> - UART
-> - Ethernet
-> - USB
-> - SATA
+> You have moved this to rodata.
+
+I don't think I have moved this to rodata. The RO_DATA macro expands to a
+bunch of sections, but it doesn't leave any of them open at the end.
+
+> o Will the runtime sort still work like this?
 > 
-> My main concern is that the mv78x00 are MP but not SMP
-> capable. Currently the same kernel run on the 2 cores and it is in the
-> board file that the peripherals are assigned for each CPU. (Actually I
-> didn't test this behavior, but the code is written in this way.)
-> 
-> I don't know how to assign a peripheral to a given CPU with the device
-> tree. The only way I have in mind is to have a dts per CPU, but I am
-> not sure it is very convenient.
-> 
-> So for now the code assigns all the peripherals to the CPU.
+> o Do we care?  Maybe not.
 
-Hi Gregory
+For arm64 we'd be moving exclusively to build-time sorting, so I guess we
+*could* stick the thing in rodata if we wanted to. Not sure it's worth the
+linker script munging though.
 
-Could you explain what you have in a bit more detail. Are you just
-bringing up one CPU and assigning all peripherals to that? Or do all
-peripherals get assigned to the first CPU but both are running?
-
-As you say, it looks like you need a DTS subtree per CPU for placing
-peripherals. No idea if it will work, but i guess i would try:
-
-       ocp at f1000000@cpu0 {
-/include/ "mv78x00-peripherals.dtsi"
-       }
-       ocp at f1000000@cpu1 {
-/include/ "mv78x00-peripherals.dtsi"
-       }
- 
-so you get all the peripherals twice, disabled by default. In the
-board-dt.c you can then do something like:
-
-
-	if (mv78xx0_core_index() == 0) {
-	   np = of_find_node_by_name(NULL, "ocp at f1000000@cpu0");
-	else
-	   np = of_find_node_by_name(NULL, "ocp at f1000000@cpu1");
-	
-        of_platform_populate(np, kirkwood_dt_match_table, NULL, NULL);
-
-There are a few more details, like the GPIO controller has a different
-mask register for CPU1, but that is not supported in the current mvebu
-gpio code. However none of the current 3 boards make use of GPIO, let
-alone GPIO interrupts.
-
-> I am also concerned by the 2 other boards: the Marvell DB-78x00-BP
-> Development Board and the Buffalo WLX (Terastation Duo) NAS. I don't
-> have them and so I can't test them if I want to convert them to device
-> tree too.
-
-The Buffalo WLX is interesting. The wxl_init() does not differentiate
-between CPU0 and CPU1, where as the Marvell reference boards do. So i
-suspect only one CPU is running, or its broken.
-
-It might be interesting to ask on the buffalo forums if anybody is
-actually using mainline on TS-WLX.
-
-      Andrew
+Will
