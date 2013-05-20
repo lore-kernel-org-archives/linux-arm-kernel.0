@@ -1,50 +1,41 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 20 May 2013 12:12:37 +0200
-Subject: [PATCH 1/5] usb: add Atmel USBA UDC DT support
-In-Reply-To: <519997CA.8010503@atmel.com>
-References: <20130517141443.GB16804@game.jcrosoft.org>
- <1368801730-31383-1-git-send-email-plagnioj@jcrosoft.com>
- <519997CA.8010503@atmel.com>
-Message-ID: <20130520101237.GA9937@game.jcrosoft.org>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 20 May 2013 18:39:23 +0800
+Subject: [PATCH V2 0/6] ARM: tegra114: add CPU hotplug support
+Message-ID: <1369046369-12489-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >
-> >-static int __init usba_udc_probe(struct platform_device *pdev)
-> >+#ifdef CONFIG_OF
-> >+static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
-> >+						    struct usba_udc *udc)
-> >+{
-> >+	u32 val;
-> >+	const char *name;
-> >+	enum of_gpio_flags flags;
-> >+	struct device_node *np = pdev->dev.of_node;
-> >+	struct device_node *pp;
-> >+	int i, ret;
-> >+	struct usba_ep *eps, *ep;
-> >+
-> >+	udc->num_ep = 0;
-> >+
-> >+	udc->vbus_pin = of_get_named_gpio_flags(np, "atmel,vbus-gpio", 0,
-> >+						&flags);
-> >+	udc->vbus_pin_inverted = (flags & OF_GPIO_ACTIVE_LOW) ? 1 : 0;
-> >+
-> >+	pp = NULL;
-> >+	while ((pp = of_get_next_child(np, pp)))
-> >+		udc->num_ep++;
-> >+
-> >+	eps = devm_kzalloc(&pdev->dev, sizeof(struct usba_ep) * udc->num_ep,
-> >+			   GFP_KERNEL);
-> 
-> Using devm_kzalloc will cause issue when build as modules, and load
-> and unload this driver, the second time unload, it will come out
-> following segment fault, log as following. Using kzalloc will fix
-> it.
+Tegra 114 is different with other Tegra SoC chips. It using ARM Cortex-A15
+as CPU core and a enhanced flow controller for CPU power control. So
+we need to skip some code that was for Contex-A9 and some other support
+code that was for other Tegra SoC chips. Then adding the proper power up
+and hot plug control for Tegra114.
 
-no devm_kzalloc is the right one to use
+Verified on Seaboard, Cardhu and Dalmore.
 
-if there is a this not in the drivers and kzalloc is not the solution
-we need to find the real reason as devm_xxx are used everywhere by now
+V2:
+* Double confirmed the patch set is OK with THUMB2_KERNEL enabled.
 
-Best Regards,
-J.
+Joseph Lo (6):
+  ARM: tegra: add an assembly marco to check Tegra SoC ID
+  ARM: tegra: skip SCU and PL310 code when CPU is not Cortex-A9
+  ARM: tegra: make tegra_resume can work for Tegra114
+  ARM: tegra114: add power up sequence for warm boot CPU
+  clk: tegra114: implement wait_for_reset and disable_clock for
+    tegra_cpu_car_ops
+  ARM: tegra114: add CPU hotplug support
+
+ arch/arm/mach-tegra/Makefile        |  1 +
+ arch/arm/mach-tegra/flowctrl.h      |  1 +
+ arch/arm/mach-tegra/fuse.h          | 22 ++++++++--------
+ arch/arm/mach-tegra/hotplug.c       |  2 ++
+ arch/arm/mach-tegra/platsmp.c       | 25 +++++++++++++++++-
+ arch/arm/mach-tegra/reset-handler.S | 51 +++++++++++++++++++++----------------
+ arch/arm/mach-tegra/sleep-tegra30.S | 30 ++++++++++++++++++----
+ arch/arm/mach-tegra/sleep.S         |  8 +++---
+ arch/arm/mach-tegra/sleep.h         | 35 ++++++++++++++++++++-----
+ drivers/clk/tegra/clk-tegra114.c    | 23 ++++++++++++++++-
+ 10 files changed, 150 insertions(+), 48 deletions(-)
+
+-- 
+1.8.2.2
