@@ -1,48 +1,40 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Mon, 20 May 2013 18:06:24 +0200
-Subject: [PATCH v2] can: flexcan: remove HAVE_CAN_FLEXCAN Kconfig symbol
-In-Reply-To: <20130517090949.GI8607@S2101-09.ap.freescale.net>
-References: <1368781157-4646-1-git-send-email-mkl@pengutronix.de>
- <20130517090949.GI8607@S2101-09.ap.freescale.net>
-Message-ID: <519A4A00.8000109@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 21 May 2013 01:07:35 +0900
+Subject: [PATCH v2] ARM: S3C24XX: add devicetree support for smdk2416
+In-Reply-To: <201304131606.48278.heiko@sntech.de>
+References: <201304131606.48278.heiko@sntech.de>
+Message-ID: <519A4A47.1010300@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2013 11:09 AM, Shawn Guo wrote:
-> On Fri, May 17, 2013 at 10:59:17AM +0200, Marc Kleine-Budde wrote:
->> This patch removes the Kconfig symbol HAVE_CAN_FLEXCAN from arch/{arm,powerpc}
->> and allowing compilation unconditionally on all arm and powerpc platforms.
->>
->> This brings a bigger compile time coverage and removes the following dependency
->> warning found by Arnd Bergmann:
->>
->>     warning: (SOC_IMX28 && SOC_IMX25 && SOC_IMX35 && IMX_HAVE_PLATFORM_FLEXCAN &&
->>         SOC_IMX53 && SOC_IMX6Q) selects HAVE_CAN_FLEXCAN
->>     which has unmet direct dependencies (NET && CAN && CAN_DEV)
->>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+On 04/13/13 23:06, Heiko St?bner wrote:
+> Definitions in s3c24xx.dtsi are usable for all s3c24xx SoCs, but some
+> need to be extended with proper compatible properties, as can be seen
+> in s3c2416.dtsi .
+>
+> Signed-off-by: Heiko Stuebner<heiko@sntech.de>
+> Reviewed-by: Sylwester Nawrocki<s.nawrocki@samsung.com>
 
-Thanks.
+Looks good to me, applied, thanks.
 
-An Acked-by by the powerpc people would be fine. However, if nobody
-doesn't object, I'm sending this patch via linux-can and net-next upstream.
+- Kukjin
 
-regards,
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130520/3d31d1dd/attachment.sig>
+> ---
+> changes since v1:
+>    fix compatible property of default irq controller
+>    (the correct one is samsung,s3c2410-irq)
+>
+>   arch/arm/boot/dts/Makefile              |    1 +
+>   arch/arm/boot/dts/s3c2416-pinctrl.dtsi  |  173 +++++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/s3c2416-smdk2416.dts  |   72 +++++++++++++
+>   arch/arm/boot/dts/s3c2416.dtsi          |   79 ++++++++++++++
+>   arch/arm/boot/dts/s3c24xx.dtsi          |   92 ++++++++++++++++
+>   arch/arm/mach-s3c24xx/Kconfig           |   12 ++
+>   arch/arm/mach-s3c24xx/Makefile          |    1 +
+>   arch/arm/mach-s3c24xx/mach-s3c2416-dt.c |   91 ++++++++++++++++
+>   8 files changed, 521 insertions(+), 0 deletions(-)
+>   create mode 100644 arch/arm/boot/dts/s3c2416-pinctrl.dtsi
+>   create mode 100644 arch/arm/boot/dts/s3c2416-smdk2416.dts
+>   create mode 100644 arch/arm/boot/dts/s3c2416.dtsi
+>   create mode 100644 arch/arm/boot/dts/s3c24xx.dtsi
+>   create mode 100644 arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
