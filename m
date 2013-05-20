@@ -1,105 +1,104 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 20 May 2013 18:25:46 +0200
-Subject: [PATCH 2/7] USB: gadget: atmel_usba: allow multi instance
+Date: Mon, 20 May 2013 18:25:48 +0200
+Subject: [PATCH 4/7] ARM: at91: sam9x5 add udc DT support
 In-Reply-To: <1369067151-3178-1-git-send-email-plagnioj@jcrosoft.com>
 References: <1369067151-3178-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1369067151-3178-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1369067151-3178-4-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drop static struct usba_udc the_udc
-
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/gadget/atmel_usba_udc.c |   36 +++++++++++++++++------------------
- 1 file changed, 18 insertions(+), 18 deletions(-)
+ arch/arm/boot/dts/at91sam9x5.dtsi |   62 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/at91sam9x5.c   |    2 ++
+ 2 files changed, 64 insertions(+)
 
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index d2ffd04..eea57a3 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -27,9 +27,6 @@
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index af91599..01a815d 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -645,6 +645,68 @@
+ 				status = "disabled";
+ 			};
  
- #include "atmel_usba_udc.h"
- 
--
--static struct usba_udc the_udc;
--
- #ifdef CONFIG_USB_GADGET_DEBUG_FS
- #include <linux/debugfs.h>
- #include <linux/uaccess.h>
-@@ -1013,16 +1010,13 @@ static void nop_release(struct device *dev)
- 
- }
- 
--static struct usba_udc the_udc = {
--	.gadget	= {
--		.ops		= &usba_udc_ops,
--		.ep_list	= LIST_HEAD_INIT(the_udc.gadget.ep_list),
--		.max_speed	= USB_SPEED_HIGH,
--		.name		= "atmel_usba_udc",
--		.dev	= {
--			.init_name	= "gadget",
--			.release	= nop_release,
--		},
-+struct usb_gadget usba_gadget_template = {
-+	.ops		= &usba_udc_ops,
-+	.max_speed	= USB_SPEED_HIGH,
-+	.name		= "atmel_usba_udc",
-+	.dev	= {
-+		.init_name	= "gadget",
-+		.release	= nop_release,
- 	},
++			usb2: gadget at f803c000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91sam9rl-udc";
++				reg = <0x00500000 0x80000
++				       0xf803c000 0x400>;
++				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 0>;
++				status = "disabled";
++
++				ep0 {
++					reg = <0>;
++					atmel,fifo-size = <64>;
++					atmel,nb-banks = <1>;
++				};
++
++				ep1 {
++					reg = <1>;
++					atmel,fifo-size = <1024>;
++					atmel,nb-banks = <2>;
++					atmel,can-dma;
++					atmel,can-isoc;
++				};
++
++				ep2 {
++					reg = <2>;
++					atmel,fifo-size = <1024>;
++					atmel,nb-banks = <2>;
++					atmel,can-dma;
++					atmel,can-isoc;
++				};
++
++				ep3 {
++					reg = <3>;
++					atmel,fifo-size = <1024>;
++					atmel,nb-banks = <3>;
++					atmel,can-dma;
++				};
++
++				ep4 {
++					reg = <4>;
++					atmel,fifo-size = <1024>;
++					atmel,nb-banks = <3>;
++					atmel,can-dma;
++				};
++
++				ep5 {
++					reg = <5>;
++					atmel,fifo-size = <1024>;
++					atmel,nb-banks = <3>;
++					atmel,can-dma;
++					atmel,can-isoc;
++				};
++
++				ep6 {
++					reg = <6>;
++					atmel,fifo-size = <1024>;
++					atmel,nb-banks = <3>;
++					atmel,can-dma;
++					atmel,can-isoc;
++				};
++			};
++
+ 			rtc at fffffeb0 {
+ 				compatible = "atmel,at91rm9200-rtc";
+ 				reg = <0xfffffeb0 0x40>;
+diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+index e631fec..2abee66 100644
+--- a/arch/arm/mach-at91/at91sam9x5.c
++++ b/arch/arm/mach-at91/at91sam9x5.c
+@@ -249,6 +249,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("hclk", "600000.ohci", &uhphs_clk),
+ 	CLKDEV_CON_DEV_ID("ohci_clk", "600000.ohci", &uhphs_clk),
+ 	CLKDEV_CON_DEV_ID("ehci_clk", "700000.ehci", &uhphs_clk),
++	CLKDEV_CON_DEV_ID("hclk", "500000.gadget", &utmi_clk),
++	CLKDEV_CON_DEV_ID("pclk", "500000.gadget", &udphs_clk),
  };
  
-@@ -1839,10 +1833,17 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 	struct usba_platform_data *pdata = pdev->dev.platform_data;
- 	struct resource *regs, *fifo;
- 	struct clk *pclk, *hclk;
--	struct usba_udc *udc = &the_udc;
-+	struct usba_udc *udc;
- 	static struct usba_ep *usba_ep;
- 	int irq, ret, i;
- 
-+	udc = devm_kzalloc(&pdev->dev, sizeof(*udc), GFP_KERNEL);
-+	if (!udc)
-+		return -ENOMEM;
-+
-+	udc->gadget = usba_gadget_template;
-+	INIT_LIST_HEAD(&udc->gadget.ep_list);
-+
- 	regs = platform_get_resource(pdev, IORESOURCE_MEM, CTRL_IOMEM_ID);
- 	fifo = platform_get_resource(pdev, IORESOURCE_MEM, FIFO_IOMEM_ID);
- 	if (!regs || !fifo || !pdata)
-@@ -1897,8 +1898,7 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 		goto err_alloc_ep;
- 
- 	udc->usba_ep = usba_ep;
--
--	the_udc.gadget.ep0 = &usba_ep[0].ep;
-+	udc->gadget.ep0 = &usba_ep[0].ep;
- 
- 	INIT_LIST_HEAD(&usba_ep[0].ep.ep_list);
- 	usba_ep[0].ep_regs = udc->regs + USBA_EPT_BASE(0);
-@@ -1907,7 +1907,7 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 	usba_ep[0].ep.ops = &usba_ep_ops;
- 	usba_ep[0].ep.name = pdata->ep[0].name;
- 	usba_ep[0].ep.maxpacket = pdata->ep[0].fifo_size;
--	usba_ep[0].udc = &the_udc;
-+	usba_ep[0].udc = udc;
- 	INIT_LIST_HEAD(&usba_ep[0].queue);
- 	usba_ep[0].fifo_size = pdata->ep[0].fifo_size;
- 	usba_ep[0].nr_banks = pdata->ep[0].nr_banks;
-@@ -1924,7 +1924,7 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 		ep->ep.ops = &usba_ep_ops;
- 		ep->ep.name = pdata->ep[i].name;
- 		ep->ep.maxpacket = pdata->ep[i].fifo_size;
--		ep->udc = &the_udc;
-+		ep->udc = udc;
- 		INIT_LIST_HEAD(&ep->queue);
- 		ep->fifo_size = pdata->ep[i].fifo_size;
- 		ep->nr_banks = pdata->ep[i].nr_banks;
+ /*
 -- 
 1.7.10.4
