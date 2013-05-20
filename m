@@ -1,16 +1,30 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 20 May 2013 13:08:04 -0600
-Subject: [PATCH] ARM: tegra: enable host1x support by default
-In-Reply-To: <1368868666-24754-1-git-send-email-acourbot@nvidia.com>
-References: <1368868666-24754-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <519A7494.1050206@wwwdotorg.org>
+Date: Mon, 20 May 2013 13:12:35 -0600
+Subject: [PATCH] ARM: tegra: config: enable TPS65090 charger
+Message-ID: <1369077155-1483-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2013 03:17 AM, Alexandre Courbot wrote:
-> Tegra DRM support used to be enabled in the default Tegra configuration,
-> but it now depends on CONFIG_TEGRA_HOST1X which is disabled by default.
-> Enable CONFIG_TEGRA_HOST1X so that DRM support is compiled in again.
+From: Stephen Warren <swarren@nvidia.com>
 
-I've forwarded this to arm at kernel.org in the hope it can be pulled into
-3.10. If not, I'll apply it to the Tegra tree once I hear back.
+This is part of the TPS65090 MFD chip on the Dalmore board.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/configs/tegra_defconfig |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index 9de7693..4dbcd9f 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -130,6 +130,7 @@ CONFIG_GPIO_TPS6586X=y
+ CONFIG_GPIO_TPS65910=y
+ CONFIG_POWER_SUPPLY=y
+ CONFIG_BATTERY_SBS=y
++CONFIG_CHARGER_TPS65090=y
+ CONFIG_POWER_RESET=y
+ CONFIG_POWER_RESET_GPIO=y
+ CONFIG_SENSORS_LM90=y
+-- 
+1.7.10.4
