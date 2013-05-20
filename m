@@ -1,30 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 May 2013 14:26:30 +0200
-Subject: [RFC PATCHv3 3/6] clk: Add TI-Nspire clock drivers
-In-Reply-To: <C574C0B3-194E-451A-8584-A351D85C5792@gmail.com>
-References: <1368332581-94691-1-git-send-email-dt.tangr@gmail.com>
- <201305192148.46398.arnd@arndb.de>
- <C574C0B3-194E-451A-8584-A351D85C5792@gmail.com>
-Message-ID: <4603632.xLpXUpmrfP@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 20 May 2013 14:29:26 +0200
+Subject: [PATCH 23/63] dmaengine: ste_dma40: Also report the number of
+ logical channels
+In-Reply-To: <1367591569-32197-24-git-send-email-lee.jones@linaro.org>
+References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
+ <1367591569-32197-24-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZQityADLQTcyLBzDsTNA18ij3c94qiFYFXKBQDQNFasQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 May 2013 21:19:33 Daniel Tang wrote:
-> On 20/05/2013, at 5:48 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> 
-> > On Sunday 19 May 2013, Daniel Tang wrote:
-> >> If the vendors for the on-SOC components are unknown, should we just
-> >> leave the compatible strings as is (i.e. "nspire-XXX")?
-> > 
-> > In that case, I would use the name of the company that made the SoC.
-> > I believe someone mentioned it was made by LSI logic.
-> 
-> Yep, that's right. So "lsi,nspire-XXX" should be fine?
+On Fri, May 3, 2013 at 4:32 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-I wouldn't use that combination, since lsi did not make the nspire.
-For anything on the LSI chip, "lsi,zevio-XXX" would be correct,
-or maybe "lsi,zevio1020-XXX" for something specific to a particular
-SoC variant. For off-SoC parts, "ti,nspire-XXX" would be right,
-or "ti,nspire-cx-XXX" if you care about the model.
+> Now we know the total of physical and logical channels, we may as
+> well report them within the information log.
+>
+> Before:
+> dma40 dma40.0: hardware revision: 3 @ 0x801c0000 with 8 physical channels
+>
+> After:
+> <as above ...> and 256 logical channels
+>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Per Forlin <per.forlin@stericsson.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-	Arnd
+I'm missing Vinod's ACK on this before I can proceed with my
+branch to ARM SoC.
+
+Vinod?
+
+Yours,
+Linus Walleij
