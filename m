@@ -1,33 +1,100 @@
-From: jiada_wang@mentor.com (Jiada Wang)
-Date: Mon, 20 May 2013 21:51:51 +0900
-Subject: [PATCH] ARM i.MX6q: fix for ldb_di_sels
-Message-ID: <1369054311-2519-1-git-send-email-jiada_wang@mentor.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Mon, 20 May 2013 13:48:59 +0100
+Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
+In-Reply-To: <201305171636.49627.arnd@arndb.de>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305082148.10933.arnd@arndb.de> <518B77C1.70107@st.com>
+ <201305171636.49627.arnd@arndb.de>
+Message-ID: <519A1BBB.2070903@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As pll5_video_div has been introduced to represent the clock
-generated from post-divider for video.
-Instead of pll5_video, pll5_video_div should be proper root clock
-for ldb_di_sel.
+Hi Arnd,
+Thankyou for the comments.
 
-Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
-CC: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-imx/clk-imx6q.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 17/05/13 15:36, Arnd Bergmann wrote:
+> On Thursday 09 May 2013, Srinivas KANDAGATLA wrote:
+>> On 08/05/13 20:48, Arnd Bergmann wrote:
+>> I agree, my initial approach was having a dedicated driver specific to
+>> ST syscon, however syscon seems to do things very much similar to what
+>> we want, so I have integrated those 3 functions in syscon.
+>> Am happy to go back with my first approach of adding ST specific syscon
+>> driver if no one is actually going to benefit with such a change to
+>> syscon driver.
+> 
+> That would at least be less controversial.
 
-diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-index 1512590..19ea58d 100644
---- a/arch/arm/mach-imx/clk-imx6q.c
-+++ b/arch/arm/mach-imx/clk-imx6q.c
-@@ -187,7 +187,7 @@ static const char *gpu2d_core_sels[]	= { "axi", "pll3_usb_otg", "pll2_pfd0_352m"
- static const char *gpu3d_core_sels[]	= { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll2_pfd2_396m", };
- static const char *gpu3d_shader_sels[] = { "mmdc_ch0_axi", "pll3_usb_otg", "pll2_pfd1_594m", "pll2_pfd9_720m", };
- static const char *ipu_sels[]		= { "mmdc_ch0_axi", "pll2_pfd2_396m", "pll3_120m", "pll3_pfd1_540m", };
--static const char *ldb_di_sels[]	= { "pll5_video", "pll2_pfd0_352m", "pll2_pfd2_396m", "mmdc_ch1_axi", "pll3_usb_otg", };
-+static const char *ldb_di_sels[]	= { "pll5_video_div", "pll2_pfd0_352m", "pll2_pfd2_396m", "mmdc_ch1_axi", "pll3_usb_otg", };
- static const char *ipu_di_pre_sels[]	= { "mmdc_ch0_axi", "pll3_usb_otg", "pll5_video_div", "pll2_pfd0_352m", "pll2_pfd2_396m", "pll3_pfd1_540m", };
- static const char *ipu1_di0_sels[]	= { "ipu1_di0_pre", "dummy", "dummy", "ldb_di0", "ldb_di1", };
- static const char *ipu1_di1_sels[]	= { "ipu1_di1_pre", "dummy", "dummy", "ldb_di0", "ldb_di1", };
--- 
-1.8.1.1
+yes I agree.
+> 
+>> Total layout of the sysconf changes per SOC, and the bit arrangements
+>> aswell, however the core IP(pinctrl, etherenet ...) and logic to drive
+>> those bits remains exactly same.
+> 
+> It sounds like you really need a driver with high-level interfaces
+> for the bits that change by each core and are needed by otherwise
+> identical drivers, like the Ethernet driver you mention.
+> 
+> I would not go as far as you did describing the individual bits in
+> the device node using these however. That driver can be layered on
+> top of the existing syscon driver, but hardcode the bits for each
+> SoC it knows of.
+Some of the drivers like Ethernet already provide higher level
+interfaces via callbacks. We did implement such a callbacks per each SOC
+in non-DT case, and ended up having code duplicated for each SOC.
+
+On the other hand using device trees to describe the HW
+configuration(sysconfs) made more sense and got rid of SOC specific
+callbacks.
+
+> 
+> For drivers that are essentially just wrappers around sysconf,
+> I would make them one driver per SoC and use a low-level interface
+> but still hardcode the offsets in the driver instead of using DT
+> to find the registers.
+> 
+> The pinctrl and reset drivers are examples of this.
+
+In pinctrl bindings case, I think we could do better job by replacing
+the existing bindings of sysconfs for a group of banks with just two
+integer offsets. This would mean that, we can still use the a common
+driver across the SOCs.
+
+And w.r.t to reset, we are planning on using sysconf based
+reset-controller API sitting underneath the reset-controller subsystem.
+Passing the information from device trees would be much clear and
+flexible than adding new driver per/SOC.
+
+>> 2> The infrastructure should protect the claimed registers from
+>> over-writing by other drivers. We do this by claim-read/write-release
+>> style API.
+> 
+> I don't understand this part. Is it about atomicity of accesses to
+> 32-bit registers when you only want to change a bit? That is something
+> the regmap interface handles already.
+
+I forget to mention a important point here, the protection is at bit
+level for the sysconfs. Some of sysconfs have bits shared across IPs, so
+protecting them while the IP is still using it is what we are trying to
+achieve with sysconf-claim/release apis.
+While it may be overkill, but In past it has found bugs and been helpful
+with a meaning full debug output.
+
+>> 3> The driver should be able to set a group of sysconf registers bits to
+>> a particular values before initialises the IP. I was thinking of doing
+>> this in a same way as pinctrl state.
+> 
+> That does not fit well with the model we use for other subsystems. If possible,
+> try to use the existing abstractions for clock, regulator, pinctrl, reset,
+> etc. and call generic interfaces from the driver. When that does not work,
+> create a high-level function call from your sysconf driver to do a particular
+> thing (e.g. stih_sysconf_ethernet_set_phy_mode()) rather than set up random
+> bits from the driver.
+I agree going for a higher level api in this case makes sense.
+
+Thanks,
+srini
+
+> 
+> 	Arnd
+> 
+> 
