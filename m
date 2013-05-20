@@ -1,97 +1,50 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 May 2013 11:18:41 +0100
-Subject: [PATCH v2] documentation: iommu: add description of ARM System
- MMU binding
-In-Reply-To: <20130517201639.GL10369@alberich>
-References: <1365789727-5371-1-git-send-email-will.deacon@arm.com>
- <20130513095020.GB10369@alberich>
- <20130513095846.GC29814@mudshark.cambridge.arm.com>
- <20130513104147.GF10369@alberich> <20130517201639.GL10369@alberich>
-Message-ID: <20130520101841.GK31359@mudshark.cambridge.arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 20 May 2013 12:12:37 +0200
+Subject: [PATCH 1/5] usb: add Atmel USBA UDC DT support
+In-Reply-To: <519997CA.8010503@atmel.com>
+References: <20130517141443.GB16804@game.jcrosoft.org>
+ <1368801730-31383-1-git-send-email-plagnioj@jcrosoft.com>
+ <519997CA.8010503@atmel.com>
+Message-ID: <20130520101237.GA9937@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
+> >
+> >-static int __init usba_udc_probe(struct platform_device *pdev)
+> >+#ifdef CONFIG_OF
+> >+static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+> >+						    struct usba_udc *udc)
+> >+{
+> >+	u32 val;
+> >+	const char *name;
+> >+	enum of_gpio_flags flags;
+> >+	struct device_node *np = pdev->dev.of_node;
+> >+	struct device_node *pp;
+> >+	int i, ret;
+> >+	struct usba_ep *eps, *ep;
+> >+
+> >+	udc->num_ep = 0;
+> >+
+> >+	udc->vbus_pin = of_get_named_gpio_flags(np, "atmel,vbus-gpio", 0,
+> >+						&flags);
+> >+	udc->vbus_pin_inverted = (flags & OF_GPIO_ACTIVE_LOW) ? 1 : 0;
+> >+
+> >+	pp = NULL;
+> >+	while ((pp = of_get_next_child(np, pp)))
+> >+		udc->num_ep++;
+> >+
+> >+	eps = devm_kzalloc(&pdev->dev, sizeof(struct usba_ep) * udc->num_ep,
+> >+			   GFP_KERNEL);
+> 
+> Using devm_kzalloc will cause issue when build as modules, and load
+> and unload this driver, the second time unload, it will come out
+> following segment fault, log as following. Using kzalloc will fix
+> it.
 
-On Fri, May 17, 2013 at 09:16:39PM +0100, Andreas Herrmann wrote:
-> On Mon, May 13, 2013 at 12:41:47PM +0200, Andreas Herrmann wrote:
-> > On Mon, May 13, 2013 at 05:58:46AM -0400, Will Deacon wrote:
-> > > Again, you also need to tie in topology information if you go down this
-> > > route.
-> 
-> I still don't like the approach of having two independend lists that
-> must be in sync to associate a master with its stream-ids.
-> 
-> Why? Say you have 8 masters for an SMMU with 1 or 2 stream-ids each:
-> 
->      	 smmu {
-> 		...
->                 mmu-masters = <&dma0>, <&dma0>, <&dma1>, <&dma1>,
-> 			      <&dma2>, <&dma2>, <&dma4>, <&dma4>,
-> 			      <&dma5>, <&dma6>, <&dma7>, <&dma8>;
->                 stream-ids =	<0>, <1>, <2>, <3>,
-> 				<4>, <5>, <6>, <7>,
-> 		                <8>, <9>, <0xa>, <0xb>;
-> 	}
-> 
-> Couldn't we use of_phandle_args for this purpose? So your example
-> 
-> +        smmu {
-> 		 ...
-> +                mmu-masters = <&dma0>,
-> +                              <&dma0>,
-> +                              <&dma1>;
-> +                stream-ids  = <0xd01d>,
-> +                              <0xd01e>,
-> +                              <0xd11c>;
-> +        };
-> 
-> would look like
-> 
-> 	dma0 {
-> 		...
-> 		#stream-id-cells = <2>
-> 		...
-> 	}
-> 
-> 	dma1 {
-> 		...
-> 		#stream-id-cells = <1>
-> 		...
-> 	}
-> 
->         smmu {
-> 		...
-> 		mmu-masters = <&dma0 0xd01d 0xd01e
-> 			       &dma1 0xd11c>,
->        };
-> 
-> and my example would be converted to
-> 
-> 	smmu {
-> 		...
->                 mmu-masters = <&dma0 0 1 &dma1 2 3 &dma2 4 5
-> 			       &dma4 6 7 &dma5 8 &dma6 9
-> 			       &dma7 0xa &dma8 0xb>
-> 		...
-> 	}
+no devm_kzalloc is the right one to use
 
-That also looks fine to me, although I'd like to write the parsing code in
-my driver before I commit to anything!
+if there is a this not in the drivers and kzalloc is not the solution
+we need to find the real reason as devm_xxx are used everywhere by now
 
-> Of course usage of of_phandle_args would restrict the number of
-> stream-ids per master to 8 (which is currently used as
-> MAX_PHANDLE_ARGS). But I don't think that this is a restriction in
-> practice or do you expect to have more than 8 stream-ids per master
-> (ie. per struct device in Linux)?
-
-Actually, I think that could be a problem. It doesn't sound unlikely that
-multi-channel DMA controllers could have:
-
-	- Separate instruction fetch streamid per channel
-	- Separate read/write streamids per channel
-
-so 8 does sound a bit small to me. How difficult would it be to bump that
-number in the future if we needed to?
-
-Will
+Best Regards,
+J.
