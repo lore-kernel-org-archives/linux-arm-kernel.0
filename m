@@ -1,48 +1,41 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 20 May 2013 11:12:22 +0530
-Subject: [PATCH v3 0/6] ARM: OMAP2+: hwmod and SERIAL: Remove sysc handling
- from driver
-In-Reply-To: <87txm1smrz.fsf@linaro.org>
-References: <1368629322-3170-1-git-send-email-rnayak@ti.com>
- <alpine.DEB.2.00.1305161831390.21357@utopia.booyaka.com>
- <87txm1smrz.fsf@linaro.org>
-Message-ID: <5199B7BE.8060808@ti.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 20 May 2013 13:42:46 +0800
+Subject: [PATCH] arm64: kernel: need extern variable 'screen_info' for related
+ driver using.
+Message-ID: <5199B7D6.40907@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 May 2013 07:59 PM, Kevin Hilman wrote:
-> Hi Paul,
-> 
-> Paul Walmsley <paul@pwsan.com> writes:
-> 
->> On Wed, 15 May 2013, Rajendra Nayak wrote:
->>
->>> OMAP UART IP needs manual idle modes based on functional state of the
->>> IP. Currently this is handled by the driver with function pointers
->>> implemented in platform code.
->>>
->>> This however breaks in case of device tree because of missing
->>> idle handling. 
->>>
->>> The series tries to address the issue and tries to remove complete
->>> sysc handling from serial driver.
->>
->> These look good to me.  Will queue them for v3.10-rc once they pass local 
->> testing here.
-> 
-> I reviewed and tested v2 of this (Rajendra forgot to add the tags in
 
-Oops, sorry about that Kevin, and thanks for the repeated reviews and
-tests on this series.
+Add the extern variable 'screen_info' according to arm32 has done.
 
-regards,
-Rajendra
+The related error:
+  drivers/video/console/vgacon.c:1305: undefined reference to `screen_info'
 
-> v3) and also just sanity tested v3 of this on 4430/panda DT boot to
-> verify the console issue is resolved.  Feel free to add:
-> 
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
-> Tested-by: Kevin Hilman <khilman@linaro.org>  # OMAP4/Panda
-> 
-> Kevin
-> 
+
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm64/kernel/setup.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index add6ea6..1055992 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -374,3 +374,14 @@ const struct seq_operations cpuinfo_op = {
+ 	.stop	= c_stop,
+ 	.show	= c_show
+ };
++
++#if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
++struct screen_info screen_info = {
++	.orig_video_lines	= 30,
++	.orig_video_cols	= 80,
++	.orig_video_mode	= 0,
++	.orig_video_ega_bx	= 0,
++	.orig_video_isVGA	= 1,
++	.orig_video_points	= 8
++};
++#endif
+-- 
+1.7.7.6
