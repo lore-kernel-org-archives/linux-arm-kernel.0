@@ -1,45 +1,49 @@
-From: pekon@ti.com (Gupta, Pekon)
-Date: Mon, 20 May 2013 04:44:31 +0000
-Subject: [v2, 3/3] ARM: dts: AM33XX: Add NAND flash device tree data to
- am335x-evm
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73E9C320D@DBDE04.ent.ti.com>
-References: <ebfab3e9123b3e50b9a9678c1480191addd86d59.1359007746.git.avinashphilip@ti.com>
- <517F5126.5000509@ti.com> <20130508235404.GX32546@atomide.com>
- <20980858CB6D3A4BAE95CA194937D5E73E9C320D@DBDE04.ent.ti.com>
-Message-ID: <20980858CB6D3A4BAE95CA194937D5E73E9C5629@DBDE04.ent.ti.com>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Mon, 20 May 2013 05:01:47 +0000
+Subject: [PATCH v3 4/4] ARM: dts: add initial MVF600 Tower board dts
+ support
+In-Reply-To: <20130519152932.GA24301@S2101-09.ap.freescale.net>
+References: <1368684648-20826-1-git-send-email-b35083@freescale.com>
+ <1368684648-20826-5-git-send-email-b35083@freescale.com>
+ <20130519152932.GA24301@S2101-09.ap.freescale.net>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E851CB26E@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-> > > >
-> > > >  	am33xx_pinmux: pinmux at 44e10800 {
-> > > >  		pinctrl-names = "default";
-> > > > -		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0>;
-> > > > +		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0
-> > > > +			&nandflash_pins_s0>;
-> > >
-> > > Why add this to the board level fallback (called pinctrl hogs, I think)?
-> > > This can be part of nand node you added below so that the pinctrl will
-> > > take effect when nand gets probed instead of all the time.
-> >
-> > Yes we should have all the pinctrl entries under the related drivers.
-> > This makes it easy remux pins during runtime if needed, and also
-> > allows unloading pinctrl-single.ko for development.
-> >
-> Yes, accepted. This has been already fixed in v3 of this patch set.
-> If all fine, then please pull this for next merge..
-> 
-> http://lists.infradead.org/pipermail/linux-mtd/2013-May/046712.html
-> 
-> http://lists.infradead.org/pipermail/linux-mtd/2013-May/046814.html
-> 
-> http://lists.infradead.org/pipermail/linux-mtd/2013-May/046710.html
-> 
-> 
-> with regards, pekon
-
-Request you to please accept | provide feedbacks on this patch series.
-These are waiting acceptance since Jan-2013, and are necessary for 
-DT based configs for board having NAND support.
-
-with regards, pekon
+>> +
+>> +	sound {
+>> +		compatible = "fsl,mvf600-audio-sgtl5000";
+>> +		model = "mvf600-sgtl5000";
+>> +		sai-controller = <&sai2>;
+>> +		audio-codec = <&codec>;
+>> +		audio-routing =
+>> +			"MIC_IN", "Mic Jack",
+>> +			"Mic Jack", "Mic Bias",
+>> +			"Headphone Jack", "HP_OUT";
+>> +	};
+>
+>Has this been tested against mainline kernel?  If not, please remove it.
+>
+>> +	clock-frequency = <100000>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_i2c0_1>;
+>> +
+>> +	codec: sgtl5000 at 0a {
+>> +		compatible = "fsl,sgtl5000";
+>> +		reg = <0x0a>;
+>> +		clocks = <&clks MVF600_CLK_SAI2>;
+>
+>The sgtl5000 uses SAI2 clock?
+[Lu Jingchang-B35083] 
+  Yes, the sgtl5000 uses the SAI2 clock on MVF600 Tower board. Thanks!
+>
+>> +	};
+>> +};
+>
+>Is i2c-imx driver working for mvf600 right now?
+>
+>
+>Do we have a QuadSPI driver on mainline kernel?  Please only add it when
+>it's been tested against mainline kernel.
+[Lu Jingchang-B35083] 
+ Sound, I2C, QuadSPI and SAI added in the initial dts have been test locally on the mainline kernel, and the patches will be sent to maillist later. Thanks!
