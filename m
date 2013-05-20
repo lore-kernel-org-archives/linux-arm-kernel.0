@@ -1,23 +1,21 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 20 May 2013 13:53:52 +0800
-Subject: [PATCH v3 4/4] ARM: dts: add initial MVF600 Tower board dts
- support
-In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E851CB26E@039-SN1MPN1-003.039d.mgd.msft.net>
-References: <1368684648-20826-1-git-send-email-b35083@freescale.com>
- <1368684648-20826-5-git-send-email-b35083@freescale.com>
- <20130519152932.GA24301@S2101-09.ap.freescale.net>
- <B56CDBE15CE27145A4B77D2D24263E851CB26E@039-SN1MPN1-003.039d.mgd.msft.net>
-Message-ID: <20130520055350.GF25113@S2101-09.ap.freescale.net>
+Date: Mon, 20 May 2013 14:06:51 +0800
+Subject: [PATCH 1/2] ARM: imx: disable pll8_mlb in mx6q_clks
+In-Reply-To: <1368780045-6481-2-git-send-email-jiada_wang@mentor.com>
+References: <1368780045-6481-1-git-send-email-jiada_wang@mentor.com>
+ <1368780045-6481-2-git-send-email-jiada_wang@mentor.com>
+Message-ID: <20130520060649.GG25113@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 05:01:47AM +0000, Lu Jingchang-B35083 wrote:
-> [Lu Jingchang-B35083] 
->  Sound, I2C, QuadSPI and SAI added in the initial dts have been test locally on the mainline kernel, and the patches will be sent to maillist later. Thanks!
+On Fri, May 17, 2013 at 05:40:44PM +0900, Jiada Wang wrote:
+> The MLB PLL clock's operation doesn't fit for clock framework and
+> it should be handled internally in MLB driver.
+> Remove initialization of pll8_mlb clock device but leave its
+> declaration in mx6q_clks to avoid affecting imx6q clock numbering.
 > 
+> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+> CC: Shawn Guo <shawn.guo@linaro.org>
+> CC: Dirk Behme <dirk.behme@de.bosch.com>
 
-Please add them after driver patches get accepted by subsystem
-maintainers.  If the DT bindings can not be accepted as it is, we will
-end up changing the dts files back and forth.
-
-Shawn
+Applied both, thanks.
