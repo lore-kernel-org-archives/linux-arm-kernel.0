@@ -1,34 +1,79 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 20 May 2013 16:16:34 +0800
-Subject: [PATCH] include/linux/posix_acl.h: need 'return NULL' when BUG(),
- if neither CONFIG_BUG nor HAVE_ARCH_BUG is defined.
-Message-ID: <5199DBE2.5080707@asianux.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 20 May 2013 10:22:05 +0200
+Subject: [PATCH] ARM: plat-orion: Fix num_resources and id for ge10 and
+ ge11
+In-Reply-To: <1368994363-14762-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1368994363-14762-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130520082205.GC26249@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, May 19, 2013 at 10:12:43PM +0200, Gregory CLEMENT wrote:
+> When platform data were moved from arch/arm/mach-mv78xx0/common.c to
+> arch/arm/plat-orion/common.c with the commit "7e3819d ARM: orion:
+> Consolidate ethernet platform data", there were few typo made on
+> gigabit Ethernet interface ge10 and ge11. This commit writes back
+> their initial value, which allows to use this interfaces again.
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/plat-orion/common.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+> index 251f827..c019b7a 100644
+> --- a/arch/arm/plat-orion/common.c
+> +++ b/arch/arm/plat-orion/common.c
+> @@ -383,7 +383,7 @@ static struct resource orion_ge10_shared_resources[] = {
+>  
+>  static struct platform_device orion_ge10_shared = {
+>  	.name		= MV643XX_ETH_SHARED_NAME,
+> -	.id		= 1,
+> +	.id		= 2,
+>  	.dev		= {
+>  		.platform_data	= &orion_ge10_shared_data,
+>  	},
+> @@ -398,8 +398,8 @@ static struct resource orion_ge10_resources[] = {
+>  
+>  static struct platform_device orion_ge10 = {
+>  	.name		= MV643XX_ETH_NAME,
+> -	.id		= 1,
+> -	.num_resources	= 2,
+> +	.id		= 2,
+> +	.num_resources	= 1,
+>  	.resource	= orion_ge10_resources,
+>  	.dev		= {
+>  		.coherent_dma_mask	= DMA_BIT_MASK(32),
+> @@ -432,7 +432,7 @@ static struct resource orion_ge11_shared_resources[] = {
+>  
+>  static struct platform_device orion_ge11_shared = {
+>  	.name		= MV643XX_ETH_SHARED_NAME,
+> -	.id		= 1,
+> +	.id		= 3,
+>  	.dev		= {
+>  		.platform_data	= &orion_ge11_shared_data,
+>  	},
+> @@ -447,8 +447,8 @@ static struct resource orion_ge11_resources[] = {
+>  
+>  static struct platform_device orion_ge11 = {
+>  	.name		= MV643XX_ETH_NAME,
+> -	.id		= 1,
+> -	.num_resources	= 2,
+> +	.id		= 3,
+> +	.num_resources	= 1,
+>  	.resource	= orion_ge11_resources,
+>  	.dev		= {
+>  		.coherent_dma_mask	= DMA_BIT_MASK(32),
+> -- 
+> 1.8.1.2
+> 
 
-If neither CONFIG_BUG nor HAVE_ARCH_BUG is defined, the BUG() will
-defined as empty (e.g. randconfig with MMU for arm s5pv210)
+Hi Gregory
 
-In this case, need 'return NULL' to let upper caller knows the failure.
+My Bad. Thanks for fixing this.
 
+Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- include/linux/posix_acl.h |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Jason, this can go into stable, as far back as 3.0.
 
-diff --git a/include/linux/posix_acl.h b/include/linux/posix_acl.h
-index 7931efe..2c48d06 100644
---- a/include/linux/posix_acl.h
-+++ b/include/linux/posix_acl.h
-@@ -104,6 +104,7 @@ static inline struct posix_acl **acl_by_type(struct inode *inode, int type)
- 		return &inode->i_default_acl;
- 	default:
- 		BUG();
-+		return NULL;
- 	}
- }
- 
--- 
-1.7.7.6
+       Andrew
