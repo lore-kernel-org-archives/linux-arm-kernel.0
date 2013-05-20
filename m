@@ -1,43 +1,43 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 20 May 2013 22:05:33 +0200
-Subject: [PATCH] rtc: max8998: Check for pdata presence before
- dereferencing
-In-Reply-To: <1368630968-30460-1-git-send-email-t.figa@samsung.com>
-References: <1368630968-30460-1-git-send-email-t.figa@samsung.com>
-Message-ID: <5315595.u903qx3Wqg@flatron>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 20 May 2013 16:09:12 -0400
+Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.11 (round 2)
+Message-ID: <20130520200912.GL31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alessandro,
 
-On Wednesday 15 of May 2013 17:16:08 Tomasz Figa wrote:
-> Currently the driver can crash with a NULL pointer dereference if no
-> pdata is provided, despite of successful registration of MFD part. This
-> patch fixes the problem by adding a NULL check before dereferencing the
-> pdata pointer.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  drivers/rtc/rtc-max8998.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/rtc-max8998.c b/drivers/rtc/rtc-max8998.c
-> index 48b6612..d5af7ba 100644
-> --- a/drivers/rtc/rtc-max8998.c
-> +++ b/drivers/rtc/rtc-max8998.c
-> @@ -285,7 +285,7 @@ static int max8998_rtc_probe(struct platform_device
-> *pdev) info->irq, ret);
-> 
->  	dev_info(&pdev->dev, "RTC CHIP NAME: %s\n", pdev->id_entry->name);
-> -	if (pdata->rtc_delay) {
-> +	if (pdata && pdata->rtc_delay) {
->  		info->lp3974_bug_workaround = true;
->  		dev_warn(&pdev->dev, "LP3974 with RTC REGERR option."
->  				" RTC updates will be extremely slow.\n");
+The following changes since commit 366c0b76416ed15feb90ba4ef0bd8f03d62d1091:
 
-Since this is a fix, could you apply this patch to your fixes branch for 
-3.10-rc2, please?
+  ARM: mvebu: Add support for USB storage class in mvebu_defconfig (2013-05-13 20:06:06 +0000)
 
-Best regards,
-Tomasz
+are available in the git repository at:
+
+  git://git.infradead.org/users/jcooper/linux.git tags/defconfig-3.11-2
+
+for you to fetch changes up to 921b1ab0af2c5e0718e0e0ef334a91aa9c4507d4:
+
+  arm: kirkwood: update defconfig with PCIe driver and board updates (2013-05-20 19:29:31 +0000)
+
+----------------------------------------------------------------
+mvebu defconfig changes for v3.11 (round 2)
+
+ - mvebu
+    - add PCI and USB
+
+ - kirkwood
+    - add DT sheevaplug, usb3 and pcie
+
+----------------------------------------------------------------
+Andrew Lunn (1):
+      ARM: Kirkwood: Enable USB 3.0 in kirkwood_defconfig
+
+Jason Cooper (1):
+      ARM: kirkwood: enable Sheevaplug DT in defconfig
+
+Thomas Petazzoni (2):
+      arm: mvebu: update defconfig with PCI and USB support
+      arm: kirkwood: update defconfig with PCIe driver and board updates
+
+ arch/arm/configs/kirkwood_defconfig | 7 ++++---
+ arch/arm/configs/mvebu_defconfig    | 3 +++
+ 2 files changed, 7 insertions(+), 3 deletions(-)
