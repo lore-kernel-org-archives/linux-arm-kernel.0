@@ -1,46 +1,36 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 20 May 2013 22:01:27 +0200
-Subject: [PATCH] ARM: SAMSUNG: devs: Add names to fimd0 IRQ resources
-In-Reply-To: <1368630584-30147-1-git-send-email-t.figa@samsung.com>
-References: <1368630584-30147-1-git-send-email-t.figa@samsung.com>
-Message-ID: <2346119.JROXYaUvrv@flatron>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 20 May 2013 16:03:58 -0400
+Subject: [GIT PULL] ARM: mvebu: boards for v3.11 (round 1)
+Message-ID: <20130520200358.GK31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kukjin,
 
-On Wednesday 15 of May 2013 17:09:44 Tomasz Figa wrote:
-> Since commit 1977e6d8 (drm/exynos: change the method for getting the
-> interrupt) the Exynos DRM FIMD driver requires IRQ resources to be
-> named. This patch fixes probe failure in non-DT cases by adding
-> appropriate resource names to fimd0 platform device.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/plat-samsung/devs.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-> index 30c2fe2..0f9c3f4 100644
-> --- a/arch/arm/plat-samsung/devs.c
-> +++ b/arch/arm/plat-samsung/devs.c
-> @@ -311,9 +311,9 @@ struct platform_device s5p_device_jpeg = {
->  #ifdef CONFIG_S5P_DEV_FIMD0
->  static struct resource s5p_fimd0_resource[] = {
->  	[0] = DEFINE_RES_MEM(S5P_PA_FIMD0, SZ_32K),
-> -	[1] = DEFINE_RES_IRQ(IRQ_FIMD0_VSYNC),
-> -	[2] = DEFINE_RES_IRQ(IRQ_FIMD0_FIFO),
-> -	[3] = DEFINE_RES_IRQ(IRQ_FIMD0_SYSTEM),
-> +	[1] = DEFINE_RES_IRQ_NAMED(IRQ_FIMD0_VSYNC, "vsync"),
-> +	[2] = DEFINE_RES_IRQ_NAMED(IRQ_FIMD0_FIFO, "fifo"),
-> +	[3] = DEFINE_RES_IRQ_NAMED(IRQ_FIMD0_SYSTEM, "lcd_sys"),
->  };
-> 
->  struct platform_device s5p_device_fimd0 = {
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
-This is a fix of a regression introduced to 3.10-rc1. Could you apply this 
-patch to your fixes branch, please?
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
 
-Best regards,
-Tomasz
+are available in the git repository at:
+
+  git://git.infradead.org/users/jcooper/linux.git tags/boards-3.11-1
+
+for you to fetch changes up to 193da78bec1b510ab0a743348a7e9a2c24766268:
+
+  ARM: Kirkwood: add DT support for Sheevaplug and Sheevaplug eSATA (2013-05-15 00:33:18 +0000)
+
+----------------------------------------------------------------
+mvebu boards for v3.11 (round 1)
+
+ - kirkwood: add sheevaplug and sheevaplug eSATA
+
+----------------------------------------------------------------
+Simon Baatz (1):
+      ARM: Kirkwood: add DT support for Sheevaplug and Sheevaplug eSATA
+
+ arch/arm/mach-kirkwood/Kconfig            |  7 +++++++
+ arch/arm/mach-kirkwood/Makefile           |  1 +
+ arch/arm/mach-kirkwood/board-dt.c         |  4 ++++
+ arch/arm/mach-kirkwood/board-sheevaplug.c | 27 +++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/common.h           |  5 +++++
+ 5 files changed, 44 insertions(+)
+ create mode 100644 arch/arm/mach-kirkwood/board-sheevaplug.c
