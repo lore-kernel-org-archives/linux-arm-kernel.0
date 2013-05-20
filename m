@@ -1,51 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 May 2013 10:10:08 +0100
-Subject: [PATCH] arm64: kernel: need extern variable 'screen_info' for
- related driver using.
-In-Reply-To: <5199B7D6.40907@asianux.com>
-References: <5199B7D6.40907@asianux.com>
-Message-ID: <20130520091008.GB31359@mudshark.cambridge.arm.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Mon, 20 May 2013 10:13:11 +0100
+Subject: [PATCH v3 2/4] clk: add support for clock reparent on set_rate
+In-Reply-To: <20130520041508.GA27676@codeaurora.org>
+References: <1368625263-23136-1-git-send-email-james.hogan@imgtec.com>
+ <1368625263-23136-3-git-send-email-james.hogan@imgtec.com>
+ <20130520041508.GA27676@codeaurora.org>
+Message-ID: <5199E927.3080500@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen,
+On 20/05/13 05:15, Stephen Boyd wrote:
+> Noticed another minor thing. I'm working on the set rate and
+> parent at the same time op on top of this patch series. Hopefully
+> have something soon.
+> 
+> On 05/15, James Hogan wrote:
+>> @@ -1181,6 +1242,11 @@ static void clk_change_rate(struct clk *clk)
+>>  
+>>  	old_rate = clk->rate;
+>>  
+>> +	/* set parent */
+>> +	if (clk->new_parent && clk->new_parent != clk->parent)
+>> +		__clk_set_parent_no_recalc(clk, clk->new_parent,
+>> +					   clk->new_parent_index);
+>> +
+> 
+> This check here for new_parent != clk->parent ...
+> 
+>> @@ -1451,6 +1501,27 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
+>>  	return 0;
+>>  }
+>>  
+>> +static int __clk_set_parent_no_recalc(struct clk *clk, struct clk *parent,
+>> +				      u8 p_index)
+>> +{
+>> +	int ret = 0;
+>> +
+>> +	if (clk->parent == parent)
+>> +		goto out;
+> 
+> causes this to never be true, so we can probably drop it.
+> 
+>> +
+>> +	/* only re-parent if the clock is not in use */
+>> +	ret = __clk_set_parent(clk, parent, p_index);
+>> +	if (ret)
+>> +		goto out;
+>> +
+>> +	/* reparent, but don't propagate rate recalculation downstream */
+>> +	clk_reparent(clk, parent);
+>> +	clk_debug_reparent(clk, parent);
+>> +
+>> +out:
+>> +	return ret;
+>> +}
+> 
+> Also, we never check the return code so it's sort of useless.
+> 
 
-On Mon, May 20, 2013 at 06:42:46AM +0100, Chen Gang wrote:
-> 
-> Add the extern variable 'screen_info' according to arm32 has done.
-> 
-> The related error:
->   drivers/video/console/vgacon.c:1305: undefined reference to `screen_info'
-> 
-> 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm64/kernel/setup.c |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index add6ea6..1055992 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -374,3 +374,14 @@ const struct seq_operations cpuinfo_op = {
->  	.stop	= c_stop,
->  	.show	= c_show
->  };
-> +
-> +#if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
-> +struct screen_info screen_info = {
-> +	.orig_video_lines	= 30,
-> +	.orig_video_cols	= 80,
-> +	.orig_video_mode	= 0,
-> +	.orig_video_ega_bx	= 0,
-> +	.orig_video_isVGA	= 1,
-> +	.orig_video_points	= 8
-> +};
-> +#endif
+Hi Stephen,
 
-I think it would be better if we added a something like
-CONFIG_HAVE_VGA_CONSOLE, which VGA_CONSOLE can then depend on. Architectures
-like x86 can then select the former, and we can remove the long list of
-architectures from the current option.
+Well spotted, and as you pointed it privately it can use
+__clk_set_parent() instead of __clk_set_parent_no_recalc() now :)
 
-Will
+Thanks
+James
