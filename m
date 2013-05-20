@@ -1,67 +1,30 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Mon, 20 May 2013 09:31:54 -0300
-Subject: mvebu: mbus device tree binding
-Message-ID: <20130520123153.GA2904@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 20 May 2013 14:32:38 +0200
+Subject: [PATCH 12/63] dmaengine: ste_dma40: Remove home-brew MAX() macro
+In-Reply-To: <1367591569-32197-13-git-send-email-lee.jones@linaro.org>
+References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
+ <1367591569-32197-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdY3TvuYjT-YEMcG1gfMTHs7Zz_rNvo+00z4Gqg4uPc63Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd and Jason,
+On Fri, May 3, 2013 at 4:31 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Let's advance with the DT binding for mvebu-mbus,
-and perhaps have it ready for v3.11.
+> The current implementation of the DMA40's local MAX() macro evaluates
+> its arguments more times than is necessary and it not type checked.
+> This patch strips replaces it with a new, more efficient constant.
+>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> Cc: Dan Williams <djbw@fb.com>
+> Cc: Per Forlin <per.forlin@stericsson.com>
+> Cc: Rabin Vincent <rabin@rab.in>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Reported-by: Harvey Harrison <harvey.harrison@gmail.com>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Our current approach to the mbus-windows allocation is as follows:
+Still waiting for Vinod's ACK on this as well.
 
-1. Every device is located as a child of the soc/internal-regs node.
-   The DT contains information for the assigned address space,
-   encoded in the 'ranges' property, like this:
+Vinod?
 
-   soc {
-   
-   	ranges =  < internal-regs
-        	    PCIe
-		    NOR
-		    ... >;
-   	internal-regs {
-		...
-   	};
-   }
-
-
-2. Each driver is in charge of allocating the mbus windows, using
-   the mbus API and the address region obtained through the information
-   on the device tree.
-
-Now, this approach is particularly error-prone because of (1). The
-'ranges' entry in a given .dtsi file is overrided by the 'ranges'
-in the per-board .dts file. So, when if we need to declare a node for a
-NOR device, we need to duplicate all ranges entries from the parent
-.dtsi files.
-
-This does not seem to be hugely problematic, for one could put the
-'ranges' property only in the per-board files, and remove it from the
-common dtsi.
-
-Therefore, first of all I'd like to know:
-
-**1** What's so broken with the current approach that makes us seek for
-      solution, in the form of an mbus DT binding?
-
-In addition, reading the previous discussion you've had about this, I
-noticed Arnd suggested (and even required) that the mbus binding should
-update the ranges property in the DT blob each time an address window
-is dynamically allocated.
-
-**2** Why is this required? Who will read the updated ranges
-      information?
-      Why can't the kernel access the mbus API to obtain information
-      about currently allocated windows?
-
-Those are my questions for now and I'm quite sure many more will come
-in the future, so please bare with me!
-
-Thanks a lot,
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Yours,
+Linus Walleij
