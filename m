@@ -1,55 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 May 2013 17:04:07 +0100
-Subject: [PATCH 14/14] ARM: elf: add new hwcap for identifying atomic
- ldrd/strd instructions
-In-Reply-To: <20130520151158.GA3520@MacBook-Pro.local>
-References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
- <1368810473-26070-15-git-send-email-will.deacon@arm.com>
- <20130520141809.GA27473@arm.com>
- <20130520142459.GN31359@mudshark.cambridge.arm.com>
- <20130520151158.GA3520@MacBook-Pro.local>
-Message-ID: <20130520160407.GS31359@mudshark.cambridge.arm.com>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Mon, 20 May 2013 18:06:24 +0200
+Subject: [PATCH v2] can: flexcan: remove HAVE_CAN_FLEXCAN Kconfig symbol
+In-Reply-To: <20130517090949.GI8607@S2101-09.ap.freescale.net>
+References: <1368781157-4646-1-git-send-email-mkl@pengutronix.de>
+ <20130517090949.GI8607@S2101-09.ap.freescale.net>
+Message-ID: <519A4A00.8000109@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 04:11:58PM +0100, Catalin Marinas wrote:
-> On Mon, May 20, 2013 at 03:24:59PM +0100, Will Deacon wrote:
-> > On Mon, May 20, 2013 at 03:18:09PM +0100, Catalin Marinas wrote:
-> > > As I mentioned in the past, I don't agree with exposing the "LPAE"
-> > > feature to user-space, it's not a feature that user space should care
-> > > about. An atomic double hwcap is better and you can even make this per
-> > > CPU via __v7_proc.
-> > 
-> > I don't buy the argument that this could be per-CPU: doubleword atomicity
-> > requires support in the whole system -- not just in the CPU. The only way we
-> > can rely on it, is by guarantees made in the architecture, which are made
-> > as part of LPAE.
+On 05/17/2013 11:09 AM, Shawn Guo wrote:
+> On Fri, May 17, 2013 at 10:59:17AM +0200, Marc Kleine-Budde wrote:
+>> This patch removes the Kconfig symbol HAVE_CAN_FLEXCAN from arch/{arm,powerpc}
+>> and allowing compilation unconditionally on all arm and powerpc platforms.
+>>
+>> This brings a bigger compile time coverage and removes the following dependency
+>> warning found by Arnd Bergmann:
+>>
+>>     warning: (SOC_IMX28 && SOC_IMX25 && SOC_IMX35 && IMX_HAVE_PLATFORM_FLEXCAN &&
+>>         SOC_IMX53 && SOC_IMX6Q) selects HAVE_CAN_FLEXCAN
+>>     which has unmet direct dependencies (NET && CAN && CAN_DEV)
+>>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
 > 
-> Well, you know that for A7/A15 you have this feature as they support
-> LPAE. You can have it as a generic LPAE test (only that the ARM ARM
-> isn't entirely clear here, so for people asking in the future we could
-> say it's a feature of the A7/A15/etc.)
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-No, as far as Linux is concerned, it's a feature of any system claiming to
-have support for LPAE. Given that we allocate page tables using our usual
-allocators, all memory that we map as normal must be capable of doubleword
-atomics. We make use of this in our atomic64_{read,set} implementations.
+Thanks.
 
-> > If this just boils down to a naming issue, thn I'm happy to change it, but
-> > we *are* reporting whether LPAE is supported and I can't think of a better
-> > name than that.
-> 
-> Given that the ARM ARM isn't clear (though this is the case on the
-> actual implementations), user space may not necessarily assume that
-> LPAE==atomic doubles. That's why I think reporting the actual atomic
-> feature is better.
+An Acked-by by the powerpc people would be fine. However, if nobody
+doesn't object, I'm sending this patch via linux-can and net-next upstream.
 
-The ARM ARM isn't too bad: it's just avoiding mandating 64-bit-wide paths
-around the entire SoC (and I've checked this with the architects). The only
-way we can probe this feature is using the MMFR0 and checking if LPAE is
-supported, and that's exactly what userspace will need to rely on. We can
-change the name, but the probe code will remain the same so I'm not sure it
-makes anything clearer. We had "atomicd" originally, but that sounds like a
-techno band.
+regards,
+Marc
 
-Will
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130520/3d31d1dd/attachment.sig>
