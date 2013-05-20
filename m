@@ -1,104 +1,103 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Mon, 20 May 2013 18:58:10 +0530
-Subject: [PATCH-V2 2/2] ARM: dts: AM33XX: Set pinmux for clkout2 pad used for
- clock output
-In-Reply-To: <1369056490-12632-1-git-send-email-hvaibhav@ti.com>
-References: <1369056490-12632-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1369056490-12632-3-git-send-email-hvaibhav@ti.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Mon, 20 May 2013 14:28:22 +0100
+Subject: [PATCH v4 0/5] clk: implement remuxing during set_rate
+Message-ID: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-xdma_event_intr1.clkout2 pad can be used to source clock
-from either 32K OSC or any of the PLL (except MPU) outputs.
-On the existing AM335x based boards (EVM, EVM-SK and Bone),
-this pad is used to feed the clock to audio codes.
+This patchset adds support for automatic selection of the best parent
+for a clock mux, i.e. the one which can provide the closest clock rate
+to that requested. It can be disabled by a new CLK_SET_RATE_NO_REPARENT
+flag (which is set for all uses of clk_register_mux().
 
-So, this patch configures the pinmux to get clkout2 on the pad.
+This works by way of adding a new op, determine_rate, similar to
+round_rate but with an extra parameter to allow the clock driver to
+optionally select a different parent clock. This is used in
+clk_calc_new_rates to decide whether to initiate a set_parent operation.
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
----
- arch/arm/boot/dts/am335x-bone.dts  |    8 +++++++-
- arch/arm/boot/dts/am335x-evm.dts   |    8 +++++++-
- arch/arm/boot/dts/am335x-evmsk.dts |    8 +++++++-
- 3 files changed, 21 insertions(+), 3 deletions(-)
+Changes in v4:
 
-diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
-index bfba6fc..74bfcc6 100644
---- a/arch/arm/boot/dts/am335x-bone.dts
-+++ b/arch/arm/boot/dts/am335x-bone.dts
-@@ -26,7 +26,7 @@
+* rebased on clk-next ("clk: sun5i: Add compatibles for Allwinner A13").
+* replace __clk_set_parent_no_recalc with __clk_set_parent.
+* never pass NULL to determine_rate's best_parent_clk parameter, and
+  slight refactor of __clk_round_rate to use local copy of clk->parent.
+* a few new comments around use of clk::new_child.
+* new patch (patch 2) split out of patch 3 to avoid having to declare
+  static __clk_set_parent() at the top of clk.c, and to ease readability
+  of patch 3.
 
- 	am33xx_pinmux: pinmux at 44e10800 {
- 		pinctrl-names = "default";
--		pinctrl-0 = <>;
-+		pinctrl-0 = <&clkout2_pin>;
+Changes in v3:
 
- 		user_leds_s0: user_leds_s0 {
- 			pinctrl-single,pins = <
-@@ -50,6 +50,12 @@
- 				0x174 0x00	/* uart0_txd.uart0_txd PULLDOWN | MODE0 */
- 			>;
- 		};
-+
-+		clkout2_pin: pinmux_clkout2_pin {
-+			pinctrl-single,pins = <
-+				0x1b4 0x03	/* xdma_event_intr1.clkout2 OMAP_MUX_MODE3 | AM33XX_PIN_OUTPUT */
-+			>;
-+		};
- 	};
+* rebased on v3.10-rc1.
+* remove double underscore prefix from clk_get_parent_by_index()
+* store new_parent_index in struct clk too (calculated from
+  clk_fetch_parent_index, and passed through __clk_set_parent_no_recalc
+  to __clk_set_parent).
+* allow determine_rate to satisfy recalc_rate check in __clk_init.
+* rename/invert CLK_SET_RATE_REMUX to CLK_SET_RATE_NO_REPARENT and move
+  to patch 3.
+* patch 3: add CLK_SET_RATE_NO_REPARENT flag to all callers of
+  clk_register_mux. If you don't mind your clocks being reparented in
+  response to set_rate please let me know and I'll drop the relevant
+  portion of the patch.
 
- 	ocp {
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 7647c9d..896d392 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -26,7 +26,7 @@
+Changes in v2:
 
- 	am33xx_pinmux: pinmux at 44e10800 {
- 		pinctrl-names = "default";
--		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0>;
-+		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0 &clkout2_pin>;
+I've moved the mux determine_rate implementation into a core helper, but
+I haven't pushed it fully into the core, as I think it just wouldn't
+work correctly for more complex clocks, e.g. if you (theoretically) had
+a combined mux and divide, you'd want to intercept the determine_rate
+and ask for a larger rate from the parent clocks, then return the
+divided rate. This should be possible by wrapping the mux determine_rate
+helper.
 
- 		matrix_keypad_s0: matrix_keypad_s0 {
- 			pinctrl-single,pins = <
-@@ -65,6 +65,12 @@
- 				0x174 0x00	/* uart0_txd.uart0_txd PULLDOWN | MODE0 */
- 			>;
- 		};
-+
-+		clkout2_pin: pinmux_clkout2_pin {
-+			pinctrl-single,pins = <
-+				0x1b4 0x03	/* xdma_event_intr1.clkout2 OMAP_MUX_MODE3 | AM33XX_PIN_OUTPUT */
-+			>;
-+		};
- 	};
+Patch 1 still exports the __clk_get_parent_by_index as it seems like it
+might be a useful thing for clock implementations to have access to if
+they ever wanted to do something more fancy with changing clock parents.
 
- 	ocp {
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 0eec644..4d81dbc 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -32,7 +32,7 @@
+I haven't made any attempt to implement the atomic set_parent+set_rate
+as I don't have hardware that could take proper advantage of it, but it
+shouldn't be too difficult for others to implement if they wanted since
+they're fairly close to one another (in clk_change_rate()).
 
- 	am33xx_pinmux: pinmux at 44e10800 {
- 		pinctrl-names = "default";
--		pinctrl-0 = <&gpio_keys_s0>;
-+		pinctrl-0 = <&gpio_keys_s0 &clkout2_pin>;
+* switched to using new determine_rate op rather than adding an argument
+  to round_rate.
+* moved mux implementation into a single helper which should be usable
+  from more complex clocks which can mux.
+* rewrite main implementation so that no changes are made until after
+  the PRE notifications have been sent, and in a way that should ensure
+  correct notifications without duplicates, and I think should be safe
+  in the event of a notification failing.
+* various tidy ups and fixes.
 
- 		user_leds_s0: user_leds_s0 {
- 			pinctrl-single,pins = <
-@@ -65,6 +65,12 @@
- 				0x174 0x00	/* uart0_txd.uart0_txd PULLDOWN | MODE0 */
- 			>;
- 		};
-+
-+		clkout2_pin: pinmux_clkout2_pin {
-+			pinctrl-single,pins = <
-+				0x1b4 0x03	/* xdma_event_intr1.clkout2 OMAP_MUX_MODE3 | AM33XX_PIN_OUTPUT */
-+			>;
-+		};
- 	};
+James Hogan (5):
+  clk: abstract parent cache
+  clk: move some parent related functions upwards
+  clk: add support for clock reparent on set_rate
+  clk: add CLK_SET_RATE_NO_REPARENT flag
+  clk: clk-mux: implement remuxing on set_rate
 
- 	ocp {
---
-1.7.0.4
+ Documentation/clk.txt                |   4 +
+ arch/arm/mach-imx/clk.h              |   5 +-
+ drivers/clk/clk-mux.c                |   1 +
+ drivers/clk/clk.c                    | 416 ++++++++++++++++++++++-------------
+ drivers/clk/mmp/clk-mmp2.c           |  39 ++--
+ drivers/clk/mmp/clk-pxa168.c         |  40 ++--
+ drivers/clk/mmp/clk-pxa910.c         |  31 ++-
+ drivers/clk/mxs/clk.h                |   4 +-
+ drivers/clk/samsung/clk.h            |   2 +-
+ drivers/clk/spear/spear1310_clock.c  | 179 +++++++--------
+ drivers/clk/spear/spear1340_clock.c  |  97 ++++----
+ drivers/clk/spear/spear3xx_clock.c   |  57 +++--
+ drivers/clk/spear/spear6xx_clock.c   |  35 +--
+ drivers/clk/sunxi/clk-sunxi.c        |   3 +-
+ drivers/clk/tegra/clk-tegra114.c     |  36 ++-
+ drivers/clk/tegra/clk-tegra20.c      |   6 +-
+ drivers/clk/tegra/clk-tegra30.c      |  33 ++-
+ drivers/clk/versatile/clk-vexpress.c |   4 +-
+ include/linux/clk-private.h          |   3 +
+ include/linux/clk-provider.h         |  12 +
+ 20 files changed, 614 insertions(+), 393 deletions(-)
+
+-- 
+1.8.1.2
