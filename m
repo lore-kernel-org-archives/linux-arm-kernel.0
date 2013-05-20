@@ -1,43 +1,17 @@
-From: rklein@nvidia.com (Rhyland Klein)
-Date: Mon, 20 May 2013 11:35:03 -0400
-Subject: [PATCH] ARM: tegra: Add charger subnode to tps65090 node
-In-Reply-To: <519A4108.2040606@wwwdotorg.org>
-References: <1365623505-6309-1-git-send-email-rklein@nvidia.com>
- <5196C3F2.8070204@wwwdotorg.org> <519A4027.2020801@nvidia.com>
- <519A4108.2040606@wwwdotorg.org>
-Message-ID: <519A42A7.5080208@nvidia.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 20 May 2013 16:35:58 +0100
+Subject: [PATCH v4 03/32] arm64: KVM: EL2 register definitions
+In-Reply-To: <1368540840-26750-4-git-send-email-marc.zyngier@arm.com>
+References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
+ <1368540840-26750-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130520153558.GB3639@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/20/2013 11:28 AM, Stephen Warren wrote:
-> On 05/20/2013 09:24 AM, Rhyland Klein wrote:
->> On 5/17/2013 7:57 PM, Stephen Warren wrote:
->>> On 04/10/2013 01:51 PM, Rhyland Klein wrote:
->>>> The charger is now represented by a distinct subnode of the tps65090
->>>> device. Add this node and enable low current charging with it.
->>>
->>> What's the status of the TPS60590 bindings; are they agreed upon by
->>> NVIDIA, TI, and SlimLogic yet? In other words, is this patch still
->>> something I should apply for 3.11, or does it need to be reworked?
->>
->> I haven't seen any discussion with slimlogic or TI about the tps65090.
->> As far as I know the bindings for this driver haven't changed.
->>
->> Laxman, do you think the work on the palmas driver will impact the
->> design of the bindings for the tps65090?
+On Tue, May 14, 2013 at 03:13:31PM +0100, Marc Zyngier wrote:
+> Define all the useful bitfields for EL2 registers.
 > 
-> Sorry, perhaps I'm confusing two different chips. If TPS65090 isn't
-> Palmas, then ignore my question. In which case, I suppose I should just
-> apply your patch then?
-> 
+> Reviewed-by: Christopher Covington <cov@codeaurora.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-I would say yes. The design of having the child node this way was how we
-had agreed worked best. The only reason I would see a significant reason
-to change this, is if something was decided that all mfd devices should
-start to follow some pattern which differed, which would mean changing
-existing bindings and therefore is unlikely.
-
--rhyland
-
--- 
-nvpublic
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
