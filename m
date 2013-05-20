@@ -1,79 +1,123 @@
 From: james.hogan@imgtec.com (James Hogan)
-Date: Mon, 20 May 2013 14:28:23 +0100
-Subject: [PATCH v4 1/5] clk: abstract parent cache
+Date: Mon, 20 May 2013 14:28:27 +0100
+Subject: [PATCH v4 5/5] clk: clk-mux: implement remuxing on set_rate
 In-Reply-To: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
 References: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
-Message-ID: <1369056507-32521-2-git-send-email-james.hogan@imgtec.com>
+Message-ID: <1369056507-32521-6-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Abstract access to the clock parent cache by defining
-clk_get_parent_by_index(clk, index). This allows access to parent
-clocks from clock drivers.
+Implement clk-mux remuxing if the CLK_SET_RATE_NO_REPARENT flag isn't
+set. This implements determine_rate for clk-mux to propagate to each
+parent and to choose the best one (like clk-divider this chooses the
+parent which provides the fastest rate <= the requested rate).
+
+The determine_rate op is implemented as a core helper function so that
+it can be easily used by more complex clocks which incorporate muxes.
 
 Signed-off-by: James Hogan <james.hogan@imgtec.com>
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Mike Turquette <mturquette@linaro.org>
 Cc: linux-arm-kernel at lists.infradead.org
 ---
+Changes in v4:
+
+* never pass NULL to determine_rate's best_parent_clk parameter.
+
 Changes in v3:
 
-* remove double underscore prefix from clk_get_parent_by_index()
+* rename/invert CLK_SET_RATE_REMUX to CLK_SET_RATE_NO_REPARENT and move
+  to patch 3.
 
- drivers/clk/clk.c            | 21 ++++++++++++++-------
- include/linux/clk-provider.h |  1 +
- 2 files changed, 15 insertions(+), 7 deletions(-)
+ drivers/clk/clk-mux.c        |  1 +
+ drivers/clk/clk.c            | 49 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk-provider.h |  3 +++
+ 3 files changed, 53 insertions(+)
 
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 25b1734..cecfa01 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -100,6 +100,7 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+ const struct clk_ops clk_mux_ops = {
+ 	.get_parent = clk_mux_get_parent,
+ 	.set_parent = clk_mux_set_parent,
++	.determine_rate = __clk_mux_determine_rate,
+ };
+ EXPORT_SYMBOL_GPL(clk_mux_ops);
+ 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 74e5ab2..f0ebada 100644
+index 3ce4810..85b661d 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -559,6 +559,19 @@ struct clk *__clk_get_parent(struct clk *clk)
- 	return !clk ? NULL : clk->parent;
+@@ -692,6 +692,55 @@ struct clk *__clk_lookup(const char *name)
+ 	return NULL;
  }
  
-+struct clk *clk_get_parent_by_index(struct clk *clk, u8 index)
++/*
++ * Helper for finding best parent to provide a given frequency. This can be used
++ * directly as a determine_rate callback (e.g. for a mux), or from a more
++ * complex clock that may combine a mux with other operations.
++ */
++long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
++			      unsigned long *best_parent_rate,
++			      struct clk **best_parent_p)
 +{
-+	if (!clk || index >= clk->num_parents)
-+		return NULL;
-+	else if (!clk->parents)
-+		return __clk_lookup(clk->parent_names[index]);
-+	else if (!clk->parents[index])
-+		return clk->parents[index] =
-+			__clk_lookup(clk->parent_names[index]);
-+	else
-+		return clk->parents[index];
++	struct clk *clk = hw->clk, *parent, *best_parent = NULL;
++	int i, num_parents;
++	unsigned long parent_rate, best = 0;
++
++	/* if NO_REPARENT flag set, pass through to current parent */
++	if (clk->flags & CLK_SET_RATE_NO_REPARENT) {
++		parent = clk->parent;
++		if (clk->flags & CLK_SET_RATE_PARENT)
++			best = __clk_round_rate(parent, rate);
++		else if (parent)
++			best = __clk_get_rate(parent);
++		else
++			best = __clk_get_rate(clk);
++		goto out;
++	}
++
++	/* find the parent that can provide the fastest rate <= rate */
++	num_parents = clk->num_parents;
++	for (i = 0; i < num_parents; i++) {
++		parent = clk_get_parent_by_index(clk, i);
++		if (!parent)
++			continue;
++		if (clk->flags & CLK_SET_RATE_PARENT)
++			parent_rate = __clk_round_rate(parent, rate);
++		else
++			parent_rate = __clk_get_rate(parent);
++		if (parent_rate <= rate && parent_rate > best) {
++			best_parent = parent;
++			best = parent_rate;
++		}
++	}
++
++out:
++	if (best_parent)
++		*best_parent_p = best_parent;
++	*best_parent_rate = best;
++
++	return best;
 +}
 +
- unsigned int __clk_get_enable_count(struct clk *clk)
- {
- 	return !clk ? 0 : clk->enable_count;
-@@ -1315,13 +1328,7 @@ static struct clk *__clk_init_parent(struct clk *clk)
- 			kzalloc((sizeof(struct clk*) * clk->num_parents),
- 					GFP_KERNEL);
+ /***        clk api        ***/
  
--	if (!clk->parents)
--		ret = __clk_lookup(clk->parent_names[index]);
--	else if (!clk->parents[index])
--		ret = clk->parents[index] =
--			__clk_lookup(clk->parent_names[index]);
--	else
--		ret = clk->parents[index];
-+	ret = clk_get_parent_by_index(clk, index);
- 
- out:
- 	return ret;
+ void __clk_unprepare(struct clk *clk)
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 1186098..76b1667 100644
+index bb2d812..d6057eb 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -403,6 +403,7 @@ const char *__clk_get_name(struct clk *clk);
- struct clk_hw *__clk_get_hw(struct clk *clk);
- u8 __clk_get_num_parents(struct clk *clk);
- struct clk *__clk_get_parent(struct clk *clk);
-+struct clk *clk_get_parent_by_index(struct clk *clk, u8 index);
- unsigned int __clk_get_enable_count(struct clk *clk);
- unsigned int __clk_get_prepare_count(struct clk *clk);
- unsigned long __clk_get_rate(struct clk *clk);
+@@ -419,6 +419,9 @@ unsigned long __clk_get_flags(struct clk *clk);
+ bool __clk_is_prepared(struct clk *clk);
+ bool __clk_is_enabled(struct clk *clk);
+ struct clk *__clk_lookup(const char *name);
++long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
++			      unsigned long *best_parent_rate,
++			      struct clk **best_parent_p);
+ 
+ /*
+  * FIXME clock api without lock protection
 -- 
 1.8.1.2
