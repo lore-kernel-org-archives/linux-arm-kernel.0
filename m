@@ -1,26 +1,30 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Mon, 20 May 2013 09:05:10 +0800
-Subject: [PATCH] Change internal SRAM memory type to "MT_MEMORY_SO"
-Message-ID: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
+Date: Mon, 20 May 2013 09:06:19 +0800
+Subject: [PATCH] ARM: at91: Fix: Change internal SRAM memory type to
+ "MT_MEMORY_SO"
+In-Reply-To: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
+References: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1369011979-21354-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-This patch is to change the internal SRAM memory type to "MT_MEMORY_SO", the right type.
-
-It tested on sama5d3xek boards.
-
-It based on v3.10-rc1.
-
-Best Regards,
-Wenyou Yang
-
-Wenyou Yang (1):
-  ARM: at91: Fix: Change internal SRAM memory type to "MT_MEMORY_SO"
-
+Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+---
  arch/arm/mach-at91/setup.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index e2f4bdd..d68be6c 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -80,7 +80,7 @@ void __init at91_init_sram(int bank, unsigned long base, unsigned int length)
+ 
+ 	desc->pfn = __phys_to_pfn(base);
+ 	desc->length = length;
+-	desc->type = MT_DEVICE;
++	desc->type = MT_MEMORY_SO;
+ 
+ 	pr_info("AT91: sram at 0x%lx of 0x%x mapped at 0x%lx\n",
+ 		base, length, desc->virtual);
 -- 
 1.7.9.5
