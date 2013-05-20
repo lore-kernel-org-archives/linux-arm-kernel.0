@@ -1,99 +1,45 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 20 May 2013 10:06:49 +0530
-Subject: spurious bL cpufreq driver messages
-In-Reply-To: <CAL_JsqLEv38DwnL4=ToXtEKNrDbgYv_0qiOc+cXZSjnfKVbeNg@mail.gmail.com>
-References: <519686BC.3090101@gmail.com>
- <CAKohpom0cGfWvsCf-jaMyu0cQJi2hVk9_0wskEDH2X7MaeHDLw@mail.gmail.com>
- <CAL_JsqLEv38DwnL4=ToXtEKNrDbgYv_0qiOc+cXZSjnfKVbeNg@mail.gmail.com>
-Message-ID: <CAKohpomG5E2FAeZGnX3eBw8fOiX3K8sWEeHgb5NT_FT3y+Cg1w@mail.gmail.com>
+From: pekon@ti.com (Gupta, Pekon)
+Date: Mon, 20 May 2013 04:44:31 +0000
+Subject: [v2, 3/3] ARM: dts: AM33XX: Add NAND flash device tree data to
+ am335x-evm
+In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73E9C320D@DBDE04.ent.ti.com>
+References: <ebfab3e9123b3e50b9a9678c1480191addd86d59.1359007746.git.avinashphilip@ti.com>
+ <517F5126.5000509@ti.com> <20130508235404.GX32546@atomide.com>
+ <20980858CB6D3A4BAE95CA194937D5E73E9C320D@DBDE04.ent.ti.com>
+Message-ID: <20980858CB6D3A4BAE95CA194937D5E73E9C5629@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2013 01:21, Rob Herring <robherring2@gmail.com> wrote:
-> No, it still registers the bL driver. The problem is not that DT data
-> is missing, but it is present on a single cluster system.
+ 
+> > > >
+> > > >  	am33xx_pinmux: pinmux at 44e10800 {
+> > > >  		pinctrl-names = "default";
+> > > > -		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0>;
+> > > > +		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0
+> > > > +			&nandflash_pins_s0>;
+> > >
+> > > Why add this to the board level fallback (called pinctrl hogs, I think)?
+> > > This can be part of nand node you added below so that the pinctrl will
+> > > take effect when nand gets probed instead of all the time.
+> >
+> > Yes we should have all the pinctrl entries under the related drivers.
+> > This makes it easy remux pins during runtime if needed, and also
+> > allows unloading pinctrl-single.ko for development.
+> >
+> Yes, accepted. This has been already fixed in v3 of this patch set.
+> If all fine, then please pull this for next merge..
+> 
+> http://lists.infradead.org/pipermail/linux-mtd/2013-May/046712.html
+> 
+> http://lists.infradead.org/pipermail/linux-mtd/2013-May/046814.html
+> 
+> http://lists.infradead.org/pipermail/linux-mtd/2013-May/046710.html
+> 
+> 
+> with regards, pekon
 
-I misread your mail.. I got the problem now.. Below should fix your
-issue (It is rebased on the patch I pointed to you earlier):
+Request you to please accept | provide feedbacks on this patch series.
+These are waiting acceptance since Jan-2013, and are necessary for 
+DT based configs for board having NAND support.
 
-Attached too for testing as gmail copy-paste will break it.
-
-@Rafael: Once Rob gives his Tested-by, please queue it for 3.10-rcs
-
-------------x-----------------x-----------------
-
-From: Viresh Kumar <viresh.kumar@linaro.org>
-Date: Mon, 20 May 2013 09:57:17 +0530
-Subject: [PATCH] cpufreq: arm_big_little_dt: Instantiate as platform_driver
-
-As multiplatform build is being adopted by more and more ARM platforms, initcall
-function should be used very carefully. For example, when both arm_big_little_dt
-and cpufreq-cpu0 drivers are compiled in, arm_big_little_dt driver may try to
-register even if we had platform device for cpufreq-cpu0 registered.
-
-To eliminate this undesired the effect, the patch changes arm_big_little_dt
-driver to have it instantiated as a platform_driver. Then it will only run on
-platforms that create the platform_device "arm-bL-cpufreq-dt".
-
-Reported-by: Rob Herring <robherring2@gmail.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/arm_big_little_dt.c | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/cpufreq/arm_big_little_dt.c
-b/drivers/cpufreq/arm_big_little_dt.c
-index 27e2f45..fd9e3ea 100644
---- a/drivers/cpufreq/arm_big_little_dt.c
-+++ b/drivers/cpufreq/arm_big_little_dt.c
-@@ -26,6 +26,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/opp.h>
-+#include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <linux/types.h>
- #include "arm_big_little.h"
-@@ -95,7 +96,7 @@ static struct cpufreq_arm_bL_ops dt_bL_ops = {
- 	.init_opp_table = dt_init_opp_table,
- };
-
--static int generic_bL_init(void)
-+static int generic_bL_probe(struct platform_device *pdev)
- {
- 	struct device_node *np;
-
-@@ -106,13 +107,22 @@ static int generic_bL_init(void)
- 	of_node_put(np);
- 	return bL_cpufreq_register(&dt_bL_ops);
- }
--module_init(generic_bL_init);
-
--static void generic_bL_exit(void)
-+static int generic_bL_remove(struct platform_device *pdev)
- {
--	return bL_cpufreq_unregister(&dt_bL_ops);
-+	bL_cpufreq_unregister(&dt_bL_ops);
-+	return 0;
- }
--module_exit(generic_bL_exit);
-+
-+static struct platform_driver generic_bL_platdrv = {
-+	.driver = {
-+		.name	= "arm-bL-cpufreq-dt",
-+		.owner	= THIS_MODULE,
-+	},
-+	.probe		= generic_bL_probe,
-+	.remove		= generic_bL_remove,
-+};
-+module_platform_driver(generic_bL_platdrv);
-
- MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
- MODULE_DESCRIPTION("Generic ARM big LITTLE cpufreq driver via DT");
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-cpufreq-arm_big_little_dt-Instantiate-as-platform_dr.patch
-Type: application/octet-stream
-Size: 2494 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130520/e3af1072/attachment.obj>
+with regards, pekon
