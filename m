@@ -1,41 +1,69 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 20 May 2013 23:38:00 +0200
-Subject: [PATCH v3 6/7] ARM: kirkwood: add gigabit ethernet and mvmdio
- device tree nodes
-In-Reply-To: <20130520212708.GA26519@schnuecks.de>
-References: <1365071235-11611-1-git-send-email-florian@openwrt.org>
- <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1367854420-8006-7-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130520212708.GA26519@schnuecks.de>
-Message-ID: <519A97B8.1090503@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 20 May 2013 14:55:54 -0700
+Subject: [PATCHv6 03/11] ARM: smp: Remove duplicate dummy timer
+ implementation
+In-Reply-To: <1368473175-4841-4-git-send-email-sboyd@codeaurora.org>
+References: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
+ <1368473175-4841-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <519A9BEA.1010404@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2013 11:27 PM, Simon Baatz wrote:
-> Hi Sebastian,
+On 05/13/13 12:26, Stephen Boyd wrote:
+> Drop ARM's version of the dummy timer now that we have a generic
+> implementation in drivers/clocksource.
 >
-> On Mon, May 06, 2013 at 05:33:39PM +0200, Sebastian Hesselbarth wrote:
->> This patch adds mv643xx_eth and mvmdio device tree nodes for DT enabled
->> Kirkwood boards. Phy nodes are also added with reg property set on a
->> per-board basis.
-> ...
->> diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
->> index fada7e6..c01a273 100644
->> --- a/arch/arm/boot/dts/kirkwood.dtsi
->> +++ b/arch/arm/boot/dts/kirkwood.dtsi
->> @@ -202,5 +202,57 @@
->>   			clocks =<&gate_clk 4>;
->>   			status = "disabled";
->>   		};
->> +
->> +		mdio: mdio-bus at 72004 {
->> +			compatible = "marvell,orion-mdio";
->> +			reg =<0x72004 0x84>;
->> +			interrupts =<11>;
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Russell, can you please ack this patch and patch #11?
+
+> ---
+>  arch/arm/kernel/smp.c | 22 ++--------------------
+>  1 file changed, 2 insertions(+), 20 deletions(-)
 >
-> Shouldn't this be 46?
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 47ab905..4dc883a 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -503,24 +503,6 @@ void tick_broadcast(const struct cpumask *mask)
+>  }
+>  #endif
+>  
+> -static void broadcast_timer_set_mode(enum clock_event_mode mode,
+> -	struct clock_event_device *evt)
+> -{
+> -}
+> -
+> -static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
+> -{
+> -	evt->name	= "dummy_timer";
+> -	evt->features	= CLOCK_EVT_FEAT_ONESHOT |
+> -			  CLOCK_EVT_FEAT_PERIODIC |
+> -			  CLOCK_EVT_FEAT_DUMMY;
+> -	evt->rating	= 100;
+> -	evt->mult	= 1;
+> -	evt->set_mode	= broadcast_timer_set_mode;
+> -
+> -	clockevents_register_device(evt);
+> -}
+> -
+>  static struct local_timer_ops *lt_ops;
+>  
+>  #ifdef CONFIG_LOCAL_TIMERS
+> @@ -544,8 +526,8 @@ static void __cpuinit percpu_timer_setup(void)
+>  
+>  	evt->cpumask = cpumask_of(cpu);
+>  
+> -	if (!lt_ops || lt_ops->setup(evt))
+> -		broadcast_timer_setup(evt);
+> +	if (lt_ops)
+> +		lt_ops->setup(evt);
+>  }
+>  
+>  #ifdef CONFIG_HOTPLUG_CPU
 
-Yes, mdio is using GbE0Err interrupt and that is 14 on IRQ HIGH CAUSE.
-I was misled by 11 on IRQ LOW CAUSE.
 
-Sebastian
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
