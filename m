@@ -1,32 +1,41 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 20 May 2013 13:51:54 -0400
-Subject: [PATCH] arm: mvebu: enable the third USB interface on
- OpenBlocks AX3
-In-Reply-To: <1368720444-29357-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1368720444-29357-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130520175154.GB31290@titan.lakedaemon.net>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Mon, 20 May 2013 17:55:58 +0000
+Subject: [PATCH-V2] ARM: OMAP2+: AM33xx: Fix missing reset status data
+ to GFX hwmod
+In-Reply-To: <alpine.DEB.2.02.1305201439020.6174@utopia.booyaka.com>
+References: <1369057116-31423-1-git-send-email-hvaibhav@ti.com>
+ <alpine.DEB.2.02.1305201439020.6174@utopia.booyaka.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EC8EF8A@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 06:07:24PM +0200, Thomas Petazzoni wrote:
-> Besides the two "classic" USB interfaces with normal USB ports on the
-> front side, the PlatHome OpenBlocks AX3 uses the third USB interface
-> of the Marvell SoC in the mini-PCIe connector. This allows certain
-> mini-PCIe cards to expose parts of their functionality as a USB
-> peripheral.
+> -----Original Message-----
+> From: Paul Walmsley [mailto:paul at pwsan.com]
+> Sent: Monday, May 20, 2013 8:09 PM
+> To: Hiremath, Vaibhav
+> Cc: linux-omap at vger.kernel.org; tony at atomide.com; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH-V2] ARM: OMAP2+: AM33xx: Fix missing reset status
+> data to GFX hwmod
 > 
-> This commit enables this third USB interface in the OpenBlocks AX3
-> Device Tree, and also adds comments on top of the two other USB
-> interfaces so that the Device Tree makes it clear which USB interface
-> at the SoC level matches which USB interface visible on the board.
+> On Mon, 20 May 2013, Vaibhav Hiremath wrote:
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts |    9 +++++++++
->  1 file changed, 9 insertions(+)
+> > GFX has a reset status register (PRM_GFX.RM_GFX_RSTST),
+> > so update the GFX hwmod data with .rstst_off and .st_shift
+> > information.
+> >
+> > Although it doesn't have impact on kernel boot, but this is
+> > regression fix from original hwmod commit.
+> >
+> 
+> Did it ever work?  If not, then it's not a regression, right?
+> 
 
-Applied to mvebu/dt with Willy's and Mr. Yamagata's Tested-by's
+As we know none of the GFX sw is available in the mainline, so never got
+exercised so far; but kernel boots up fine without any issues.
+I was also confused a bit on this, but then thought, this could be regression
+As it is fixing wrong/missing data without which GFX will not work.
+May be I was wrong.
 
-thx,
-
-Jason.
+Thanks,
+Vaibhav
