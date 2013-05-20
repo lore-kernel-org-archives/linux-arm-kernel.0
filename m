@@ -1,28 +1,72 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 20 May 2013 10:52:34 +0300
-Subject: dmatest regression in 3.10-rc1
-In-Reply-To: <20130517141857.GM23112@mudshark.cambridge.arm.com>
-References: <20130515152803.GL23869@mudshark.cambridge.arm.com>
- <20130516153553.GI11706@mudshark.cambridge.arm.com>
- <20130517123423.GR14863@intel.com>
- <20130517141857.GM23112@mudshark.cambridge.arm.com>
-Message-ID: <1369036354.29283.115.camel@smile>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 20 May 2013 10:16:35 +0200
+Subject: [PATCH] pinctrl: sirf: save the status in suspend and restore
+ after resuming
+In-Reply-To: <1368674229-11813-1-git-send-email-Baohua.Song@csr.com>
+References: <1368674229-11813-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <CACRpkdaSTC8cLi-C_gwZEk8iF=bnAce920DbKvxN6S-=75xbnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-05-17 at 15:18 +0100, Will Deacon wrote: 
-> On Fri, May 17, 2013 at 01:34:23PM +0100, Vinod Koul wrote:
-> > On Thu, May 16, 2013 at 04:35:53PM +0100, Will Deacon wrote:
-> > > Right, so I think I understand what's causing this, but I'll leave it to
-> > > Andriy to suggest a fix.
+On Thu, May 16, 2013 at 5:17 AM, Barry Song <Baohua.Song@csr.com> wrote:
 
-Thanks for the report.
+> this patch saves the status of pinctrl registers and restore them while
+> resuming. this makes all drivers have coherent status for pinmux after
+> suspending and resuming.
+>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-Unfortunately neither me nor other guys in the team could not reproduce
-mentioned issue on our hardware.
-Nevertheless I will try to allocate time and suggest possible fix if any
-comes to my mind. So, your testing and analysis is appreciated.
+Applied, but a quick remark that you may want to fix up:
 
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+(...)
+
+> +#ifdef CONFIG_PM_SLEEP
+> +static int sirfsoc_pinmux_suspend_noirq(struct device *dev)
+> +{
+> +       int i, j;
+> +       struct sirfsoc_pmx *spmx = dev_get_drvdata(dev);
+> +
+> +       for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
+> +               for (j = 0; j < SIRFSOC_GPIO_BANK_SIZE; j++) {
+> +                       spmx->gpio_regs[i][j] = readl(spmx->gpio_virtbase +
+> +                               SIRFSOC_GPIO_CTRL(i, j));
+> +               }
+> +               spmx->ints_regs[i] = readl(spmx->gpio_virtbase +
+> +                       SIRFSOC_GPIO_INT_STATUS(i));
+> +               spmx->paden_regs[i] = readl(spmx->gpio_virtbase +
+> +                       SIRFSOC_GPIO_PAD_EN(i));
+> +       }
+> +       spmx->dspen_regs = readl(spmx->gpio_virtbase + SIRFSOC_GPIO_DSP_EN0);
+> +
+> +       for (i = 0; i < 3; i++)
+
+Why are you hard-coding 3 here? It looks fragile.
+
+> +               spmx->rsc_regs[i] = readl(spmx->rsc_virtbase + 4 * i);
+> +
+> +       return 0;
+> +}
+> +
+> +static int sirfsoc_pinmux_resume_noirq(struct device *dev)
+> +{
+> +       int i, j;
+> +       struct sirfsoc_pmx *spmx = dev_get_drvdata(dev);
+> +
+> +       for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
+> +               for (j = 0; j < SIRFSOC_GPIO_BANK_SIZE; j++) {
+> +                       writel(spmx->gpio_regs[i][j], spmx->gpio_virtbase +
+> +                               SIRFSOC_GPIO_CTRL(i, j));
+> +               }
+> +               writel(spmx->ints_regs[i], spmx->gpio_virtbase +
+> +                       SIRFSOC_GPIO_INT_STATUS(i));
+> +               writel(spmx->paden_regs[i], spmx->gpio_virtbase +
+> +                       SIRFSOC_GPIO_PAD_EN(i));
+> +       }
+> +       writel(spmx->dspen_regs, spmx->gpio_virtbase + SIRFSOC_GPIO_DSP_EN0);
+> +
+> +       for (i = 0; i < 3; i++)
+
+Dito.
+
+Yours,
+Linus Walleij
