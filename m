@@ -1,32 +1,20 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Mon, 20 May 2013 09:23:19 +0530
-Subject: [PATCH] ARM: dts: add max8997 device node for exynos4210-origen
- board
-In-Reply-To: <518C9807.80906@linaro.org>
-References: <1353664412-17678-1-git-send-email-thomas.abraham@linaro.org>
- <50EA598D.6090604@linaro.org> <518C9807.80906@linaro.org>
-Message-ID: <51999E2F.9030703@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 20 May 2013 12:01:05 +0800
+Subject: [PATCH v3 2/2] pinctrl: imx: add MVF600 support to imx pinctrl
+ framework
+In-Reply-To: <1368685224-17915-2-git-send-email-b35083@freescale.com>
+References: <1368685224-17915-1-git-send-email-b35083@freescale.com>
+ <1368685224-17915-2-git-send-email-b35083@freescale.com>
+Message-ID: <20130520040103.GE25113@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/10/2013 12:17 PM, Tushar Behera wrote:
-> On 01/07/2013 10:43 AM, Tushar Behera wrote:
->> On 11/23/2012 03:23 PM, Thomas Abraham wrote:
->>> Add max8997 regulator device node for exynos4210-origen board and list
->>> all the supported regulators.
->>>
->>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
->>
->> Tested-by: Tushar Behera <tushar.behera@linaro.org>
->>
-> Kukjin,
+On Thu, May 16, 2013 at 02:20:24PM +0800, Jingchang Lu wrote:
+> On some platforms such as MVF600, offset of mux and pad ctrl register
+> may be zero, and the mux_mode and config_val are in one 32-bit register.
+> This patch adds support to imx core pinctrl framework to handle these
+> cases.
 > 
-> This patch got missed for 3.10 merge window. This patch still applies on
-> the latest mainline kernel and is essential for Origen board. Would you
-> please take this patch?
-> 
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
 
-Ping !!!
-
--- 
-Tushar Behera
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
