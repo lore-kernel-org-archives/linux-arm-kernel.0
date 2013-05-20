@@ -1,86 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 20 May 2013 13:13:01 -0400
-Subject: [PATCH] ARM: plat-orion: Fix num_resources and id for ge10 and
- ge11
-In-Reply-To: <20130520082205.GC26249@lunn.ch>
-References: <1368994363-14762-1-git-send-email-gregory.clement@free-electrons.com>
- <20130520082205.GC26249@lunn.ch>
-Message-ID: <20130520171301.GV31290@titan.lakedaemon.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 21 May 2013 02:13:00 +0900
+Subject: [PATCH 30/33] arch/arm/plat-samsung: don't check resource with
+ devm_ioremap_resource
+In-Reply-To: <20130520171118.GA5717@katana>
+References: <1368702961-4325-1-git-send-email-wsa@the-dreams.de>
+ <1368702961-4325-31-git-send-email-wsa@the-dreams.de>
+ <519A517F.5020003@samsung.com> <20130520171118.GA5717@katana>
+Message-ID: <519A599C.2020702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 10:22:05AM +0200, Andrew Lunn wrote:
-> On Sun, May 19, 2013 at 10:12:43PM +0200, Gregory CLEMENT wrote:
-> > When platform data were moved from arch/arm/mach-mv78xx0/common.c to
-> > arch/arm/plat-orion/common.c with the commit "7e3819d ARM: orion:
-> > Consolidate ethernet platform data", there were few typo made on
-> > gigabit Ethernet interface ge10 and ge11. This commit writes back
-> > their initial value, which allows to use this interfaces again.
-> > 
-> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > ---
-> >  arch/arm/plat-orion/common.c | 12 ++++++------
-> >  1 file changed, 6 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-> > index 251f827..c019b7a 100644
-> > --- a/arch/arm/plat-orion/common.c
-> > +++ b/arch/arm/plat-orion/common.c
-> > @@ -383,7 +383,7 @@ static struct resource orion_ge10_shared_resources[] = {
-> >  
-> >  static struct platform_device orion_ge10_shared = {
-> >  	.name		= MV643XX_ETH_SHARED_NAME,
-> > -	.id		= 1,
-> > +	.id		= 2,
-> >  	.dev		= {
-> >  		.platform_data	= &orion_ge10_shared_data,
-> >  	},
-> > @@ -398,8 +398,8 @@ static struct resource orion_ge10_resources[] = {
-> >  
-> >  static struct platform_device orion_ge10 = {
-> >  	.name		= MV643XX_ETH_NAME,
-> > -	.id		= 1,
-> > -	.num_resources	= 2,
-> > +	.id		= 2,
-> > +	.num_resources	= 1,
-> >  	.resource	= orion_ge10_resources,
-> >  	.dev		= {
-> >  		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> > @@ -432,7 +432,7 @@ static struct resource orion_ge11_shared_resources[] = {
-> >  
-> >  static struct platform_device orion_ge11_shared = {
-> >  	.name		= MV643XX_ETH_SHARED_NAME,
-> > -	.id		= 1,
-> > +	.id		= 3,
-> >  	.dev		= {
-> >  		.platform_data	= &orion_ge11_shared_data,
-> >  	},
-> > @@ -447,8 +447,8 @@ static struct resource orion_ge11_resources[] = {
-> >  
-> >  static struct platform_device orion_ge11 = {
-> >  	.name		= MV643XX_ETH_NAME,
-> > -	.id		= 1,
-> > -	.num_resources	= 2,
-> > +	.id		= 3,
-> > +	.num_resources	= 1,
-> >  	.resource	= orion_ge11_resources,
-> >  	.dev		= {
-> >  		.coherent_dma_mask	= DMA_BIT_MASK(32),
-> > -- 
-> > 1.8.1.2
-> > 
-> 
-> Hi Gregory
-> 
-> My Bad. Thanks for fixing this.
-> 
-> Acked-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> Jason, this can go into stable, as far back as 3.0.
+On 05/21/13 02:11, Wolfram Sang wrote:
+> On Tue, May 21, 2013 at 01:38:23AM +0900, Kukjin Kim wrote:
+>> On 05/16/13 20:15, Wolfram Sang wrote:
+>>> devm_ioremap_resource does sanity checks on the given resource. No need to
+>>> duplicate this in the driver.
+>>>
+>>> Signed-off-by: Wolfram Sang<wsa@the-dreams.de>
+>>
+>> Looks good to me, applied into Samsung tree.
+>>
+>> Wolfram, if you want to take this into your tree, let me know.
+>
+> It is already upstream :)
+>
+Oh, OK. Let me drop it in my tree ;-)
 
-Ok, thanks for the heads up.  I'll wait for v2 (with rmk's suggestion)
-and tag it for stable.
+Thanks.
 
-thx,
-
-Jason.
+- Kukjin
