@@ -1,189 +1,65 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 20 May 2013 18:39:29 +0800
-Subject: [PATCH V2 6/6] ARM: tegra114: add CPU hotplug support
-In-Reply-To: <1369046369-12489-1-git-send-email-josephl@nvidia.com>
-References: <1369046369-12489-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1369046369-12489-7-git-send-email-josephl@nvidia.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Mon, 20 May 2013 12:03:41 +0100
+Subject: [PATCHv4] arm: Preserve the user r/w register TPIDRURW on context
+ switch and fork
+In-Reply-To: <51979801.7010903@dawncrow.de>
+References: <518AA19B.2020209@dawncrow.de> <51979801.7010903@dawncrow.de>
+Message-ID: <519A030D.1030809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra114 is a quad cores SoC. Each core can be hotplugged including
-CPU0. The hotplug sequence can be controlled by setting event trigger in
-flow controller. Then the flow controller will take care all the power
-sequence that include CPU up and down.
+Hi Andr?
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
-V2:
-* add init value (r3) in tegra30_cpu_shutdown
-* update some comment message
----
- arch/arm/mach-tegra/Makefile        |  1 +
- arch/arm/mach-tegra/hotplug.c       |  2 ++
- arch/arm/mach-tegra/reset-handler.S | 15 ++++++++++++---
- arch/arm/mach-tegra/sleep-tegra30.S | 30 +++++++++++++++++++++++++-----
- arch/arm/mach-tegra/sleep.h         |  2 ++
- 5 files changed, 42 insertions(+), 8 deletions(-)
+On 18/05/13 16:02, Andr? Hentschel wrote:
+> Am 08.05.2013 21:03, schrieb Andr? Hentschel:
+>> From: =?UTF-8?q?Andr=C3=A9=20Hentschel?= <nerv@dawncrow.de>
+>>
 
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index d011f0a..98b184e 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -30,6 +30,7 @@ obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
- obj-$(CONFIG_TEGRA_PCI)			+= pcie.o
- 
- obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= tegra114_speedo.o
-+obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= sleep-tegra30.o
- ifeq ($(CONFIG_CPU_IDLE),y)
- obj-$(CONFIG_ARCH_TEGRA_114_SOC)	+= cpuidle-tegra114.o
- endif
-diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-index 184914a..d07f152 100644
---- a/arch/arm/mach-tegra/hotplug.c
-+++ b/arch/arm/mach-tegra/hotplug.c
-@@ -55,4 +55,6 @@ void __init tegra_hotplug_init(void)
- 		tegra_hotplug_shutdown = tegra20_hotplug_shutdown;
- 	if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) && tegra_chip_id == TEGRA30)
- 		tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
-+	if (IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC) && tegra_chip_id == TEGRA114)
-+		tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
- }
-diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
-index 424e01f..d2042ac 100644
---- a/arch/arm/mach-tegra/reset-handler.S
-+++ b/arch/arm/mach-tegra/reset-handler.S
-@@ -38,18 +38,24 @@
-  *	  CPU boot vector when restarting the a CPU following
-  *	  an LP2 transition. Also branched to by LP0 and LP1 resume after
-  *	  re-enabling sdram.
-+ *
-+ *	r6: SoC ID
-  */
- ENTRY(tegra_resume)
- 	bl	v7_invalidate_l1
- 
- 	cpu_id	r0
-+	tegra_get_soc_id TEGRA_APB_MISC_BASE, r6
-+	cmp	r6, #TEGRA114
-+	beq	no_cpu0_chk
-+
- 	cmp	r0, #0				@ CPU0?
-  THUMB(	it	ne )
- 	bne	cpu_resume			@ no
-+no_cpu0_chk:
- 
- #ifndef CONFIG_ARCH_TEGRA_2x_SOC
- 	/* Are we on Tegra20? */
--	tegra_get_soc_id TEGRA_APB_MISC_BASE, r6
- 	cmp	r6, #TEGRA20
- 	beq	1f				@ Yes
- 	/* Clear the flow controller flags for this CPU. */
-@@ -187,11 +193,14 @@ __is_not_lp2:
- 
- #ifdef CONFIG_SMP
- 	/*
--	 * Can only be secondary boot (initial or hotplug) but CPU 0
--	 * cannot be here.
-+	 * Can only be secondary boot (initial or hotplug)
-+	 * CPU0 can't be here for Tegra20/30
- 	 */
-+	cmp	r6, #TEGRA114
-+	beq	__no_cpu0_chk
- 	cmp	r10, #0
- 	bleq	__die				@ CPU0 cannot be here
-+__no_cpu0_chk:
- 	ldr	lr, [r12, #RESET_DATA(STARTUP_SECONDARY)]
- 	cmp	lr, #0
- 	bleq	__die				@ no secondary startup handler
-diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
-index d29dfcc..ada8821 100644
---- a/arch/arm/mach-tegra/sleep-tegra30.S
-+++ b/arch/arm/mach-tegra/sleep-tegra30.S
-@@ -19,6 +19,7 @@
- #include <asm/assembler.h>
- #include <asm/asm-offsets.h>
- 
-+#include "fuse.h"
- #include "sleep.h"
- #include "flowctrl.h"
- 
-@@ -43,14 +44,19 @@ ENDPROC(tegra30_hotplug_shutdown)
-  *
-  * Puts the current CPU in wait-for-event mode on the flow controller
-  * and powergates it -- flags (in R0) indicate the request type.
-- * Must never be called for CPU 0.
-  *
-- * corrupts r0-r4, r12
-+ * r10 = SoC ID
-+ * corrupts r0-r4, r10-r12
-  */
- ENTRY(tegra30_cpu_shutdown)
- 	cpu_id	r3
-+	tegra_get_soc_id TEGRA_APB_MISC_VIRT, r10
-+	cmp	r10, #TEGRA30
-+	bne	_no_cpu0_chk	@ It's not Tegra30
-+
- 	cmp	r3, #0
- 	moveq	pc, lr		@ Must never be called for CPU 0
-+_no_cpu0_chk:
- 
- 	ldr	r12, =TEGRA_FLOW_CTRL_VIRT
- 	cpu_to_csr_reg r1, r3
-@@ -65,7 +71,9 @@ ENTRY(tegra30_cpu_shutdown)
- 	movw	r12, \
- 		FLOW_CTRL_CSR_INTR_FLAG | FLOW_CTRL_CSR_EVENT_FLAG | \
- 		FLOW_CTRL_CSR_ENABLE
--	mov	r4, #(1 << 4)
-+	cmp	r10, #TEGRA30
-+	moveq	r4, #(1 << 4)			@ wfe bitmap
-+	movne	r4, #(1 << 8)			@ wfi bitmap
-  ARM(	orr	r12, r12, r4, lsl r3	)
-  THUMB(	lsl	r4, r4, r3		)
-  THUMB(	orr	r12, r12, r4		)
-@@ -79,9 +87,20 @@ delay_1:
- 	cpsid	a				@ disable imprecise aborts.
- 	ldr	r3, [r1]			@ read CSR
- 	str	r3, [r1]			@ clear CSR
-+
- 	tst	r0, #TEGRA30_POWER_HOTPLUG_SHUTDOWN
-+	beq	flow_ctrl_setting_for_lp2
-+
-+	/* flow controller set up for hotplug */
-+	mov	r3, #FLOW_CTRL_WAITEVENT		@ For hotplug
-+	b	flow_ctrl_done
-+flow_ctrl_setting_for_lp2:
-+	/* flow controller set up for LP2 */
-+	cmp	r10, #TEGRA30
- 	moveq   r3, #FLOW_CTRL_WAIT_FOR_INTERRUPT	@ For LP2
--	movne	r3, #FLOW_CTRL_WAITEVENT		@ For hotplug
-+	movne	r3, #FLOW_CTRL_WAITEVENT
-+flow_ctrl_done:
-+	cmp	r10, #TEGRA30
- 	str	r3, [r2]
- 	ldr	r0, [r2]
- 	b	wfe_war
-@@ -89,7 +108,8 @@ delay_1:
- __cpu_reset_again:
- 	dsb
- 	.align 5
--	wfe					@ CPU should be power gated here
-+	wfeeq					@ CPU should be power gated here
-+	wfine
- wfe_war:
- 	b	__cpu_reset_again
- 
-diff --git a/arch/arm/mach-tegra/sleep.h b/arch/arm/mach-tegra/sleep.h
-index 2269c0d..98b7da6 100644
---- a/arch/arm/mach-tegra/sleep.h
-+++ b/arch/arm/mach-tegra/sleep.h
-@@ -25,6 +25,8 @@
- 					+ IO_PPSB_VIRT)
- #define TEGRA_CLK_RESET_VIRT (TEGRA_CLK_RESET_BASE - IO_PPSB_PHYS \
- 					+ IO_PPSB_VIRT)
-+#define TEGRA_APB_MISC_VIRT (TEGRA_APB_MISC_BASE - IO_APB_PHYS \
-+					+ IO_APB_VIRT)
- #define TEGRA_PMC_VIRT	(TEGRA_PMC_BASE - IO_APB_PHYS + IO_APB_VIRT)
- 
- /* PMC_SCRATCH37-39 and 41 are used for tegra_pen_lock and idle */
--- 
-1.8.2.2
+This is strangely formatted for me too, and I use a different client 
+from Will so I'm not sure that the problem is just at our end...
+
+(Also see that the list archive has weird formatting:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/167325.html )
+
+Your first couple of patches didn't come out strangely formatted, so I'm 
+not really sure what's going on.
+
+>> Since commit 6a1c53124aa1 the user writeable TLS register was zeroed to
+>> prevent it from being used as a covert channel between two tasks.
+>>
+>> There are more and more applications coming to WinRT, Wine could support them,
+>> but mostly they expect to have the thread environment block (TEB) in TPIDRURW.
+>>
+>> This patch preserves that register per thread instead of clearing it.
+>> Unlike the TPIDRURO, which is already switched, the TPIDRURW
+>> can be updated from userspace so needs careful treatment in the case that we
+>> modify TPIDRURW and call fork(). To avoid this we must always read
+>> TPIDRURW in copy_thread.
+>>
+>> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+>> Signed-off-by: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+>>
+>
+> Hi,
+> I'm not yet very familiar with the development process here,
+> am i getting no feedback on v4 because of the mergewindow being closed?
+> Or is there another reason? Sry for being impatient.
+>
+
+This is a feature, not a fix, so most likely it'll be included at the 
+next merge window. For that to happen it should be in Russell's tree 
+around the middle of this cycle.
+
+Can you please rebase on 3.10-rc2 (when it happens) and post one more 
+version? After that, assuming nobody else has any final comments, you 
+could put it in to Russell's patch system...
+
+Just as a hint - one thing you might have done to increase the chances 
+of getting comments to clarify what's different between v3 and v4 - as a 
+way to make life easier for reviewers you can highlight the differences 
+between versions after the "---" (where you currently have the 
+description of why there are so many S-o-Bs).
+
+Hope that helps,
+Jonny
