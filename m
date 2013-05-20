@@ -1,100 +1,220 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Mon, 20 May 2013 13:48:59 +0100
-Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
-In-Reply-To: <201305171636.49627.arnd@arndb.de>
-References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
- <201305082148.10933.arnd@arndb.de> <518B77C1.70107@st.com>
- <201305171636.49627.arnd@arndb.de>
-Message-ID: <519A1BBB.2070903@st.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 20 May 2013 15:18:27 +0200
+Subject: [PATCH 1/6] drivers: bus: add a new driver for WEIM
+In-Reply-To: <1369039742-10893-2-git-send-email-b32955@freescale.com>
+References: <1369039742-10893-1-git-send-email-b32955@freescale.com>
+ <1369039742-10893-2-git-send-email-b32955@freescale.com>
+Message-ID: <20130520131827.GB32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-Thankyou for the comments.
-
-On 17/05/13 15:36, Arnd Bergmann wrote:
-> On Thursday 09 May 2013, Srinivas KANDAGATLA wrote:
->> On 08/05/13 20:48, Arnd Bergmann wrote:
->> I agree, my initial approach was having a dedicated driver specific to
->> ST syscon, however syscon seems to do things very much similar to what
->> we want, so I have integrated those 3 functions in syscon.
->> Am happy to go back with my first approach of adding ST specific syscon
->> driver if no one is actually going to benefit with such a change to
->> syscon driver.
+On Mon, May 20, 2013 at 04:48:57PM +0800, Huang Shijie wrote:
+> The WEIM(Wireless External Interface Module) works like a bus.
+> You can attach many different devices on it, such as NOR, onenand.
 > 
-> That would at least be less controversial.
-
-yes I agree.
+> In the case of i.MX6q-sabreauto, the NOR is connected to WEIM.
 > 
->> Total layout of the sysconf changes per SOC, and the bit arrangements
->> aswell, however the core IP(pinctrl, etherenet ...) and logic to drive
->> those bits remains exactly same.
+> This patch also adds the devicetree binding document.
+> The driver only works when the devicetree is enabled.
 > 
-> It sounds like you really need a driver with high-level interfaces
-> for the bits that change by each core and are needed by otherwise
-> identical drivers, like the Ethernet driver you mention.
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  Documentation/devicetree/bindings/bus/imx-weim.txt |   69 +++++++++
+>  drivers/bus/Kconfig                                |    9 ++
+>  drivers/bus/Makefile                               |    1 +
+>  drivers/bus/imx-weim.c                             |  145 ++++++++++++++++++++
+>  4 files changed, 224 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/bus/imx-weim.txt
+>  create mode 100644 drivers/bus/imx-weim.c
 > 
-> I would not go as far as you did describing the individual bits in
-> the device node using these however. That driver can be layered on
-> top of the existing syscon driver, but hardcode the bits for each
-> SoC it knows of.
-Some of the drivers like Ethernet already provide higher level
-interfaces via callbacks. We did implement such a callbacks per each SOC
-in non-DT case, and ended up having code duplicated for each SOC.
+> diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
+> new file mode 100644
+> index 0000000..9913454
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
+> @@ -0,0 +1,69 @@
+> +Device tree bindings for i.MX Wireless External Interface Module (WEIM)
+> +
+> +The term ???wireless??? does not imply that the WEIM is literally an interface
+> +without wires. It simply means that this module was originally designed for
+> +wireless and mobile applications that use low-power technology.
+> +
+> +The actual devices are instantiated from the child nodes of a WEIM node.
+> +But now we only have the NOR device.
+> +
+> +NOR flash connected to the WEIM (found on i.MX boards) are represented as
+> +child nodes with a name of "nor".
+> +
+> +Required properties:
+> +
+> + - compatible:		Should be set to "fsl, imx6q-weim"
+> + - reg:			A resource specifier for the register space
+> +			(see the example below)
+> + - interrupts:		the interrupt number, see the example below.
+> + - clocks:		the clock, see the example below.
+> + - #address-cells:	Must be set to 2 to allow memory address translation
+> + - #size-cells:		Must be set to 1 to allow CS address passing
+> + - ranges:		Must be set up to reflect the memory layout with four
+> +			integer values for each chip-select line in use:
+> +
+> +			   <cs-number> 0 <physical address of mapping> <size>
+> +
+> +Timing properties for child nodes. All are mandatory, not optional.
+> +
+> + -weim-cs-index:	The CS index which the device is attaching on.
+> + -weim-cs-timing:	The timing array, contains 6 timing values for the
+> +			weim-cs-index.
+> +
+> +Example for an i.MX6q-sabreauto board:
+> +	weim: weim at 021b8000 {
+> +		compatible = "fsl,imx6q-weim";
+> +		reg = <0x021b8000 0x4000>;
+> +		interrupts = <0 14 0x04>;
+> +		clocks = <&clks 196>;
+> +		#address-cells = <2>;
 
-On the other hand using device trees to describe the HW
-configuration(sysconfs) made more sense and got rid of SOC specific
-callbacks.
+Why is address cells 2 in this example?
 
-> 
-> For drivers that are essentially just wrappers around sysconf,
-> I would make them one driver per SoC and use a low-level interface
-> but still hardcode the offsets in the driver instead of using DT
-> to find the registers.
-> 
-> The pinctrl and reset drivers are examples of this.
+> +		#size-cells = <1>;
+> +		ranges = <0 0 0x08000000 0x08000000>;
+> +
+> +		nor at 0,0 {
+> +			compatible = "cfi-flash";
+> +			reg = <0 0 0x02000000>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			bank-width = <2>;
+> +
+> +			weim-cs-index = <0>;
+> +			weim-cs-timing = <0x00620081 0x00000001 0x1C022000
+> +					0x0000C000 0x1404a38e 0x00000000>;
+> +			partition at 0 {
+> +				label = "U-Boot";
+> +				reg = <0x0 0x40000>;
+> +			};
+> +
+> +			partition at 40000 {
+> +				label = "U-Boot-ENV";
+> +				reg = <0x40000 0x10000>;
+> +				read-only;
+> +			};
+> +
+> +			partition at 50000 {
+> +				label = "Kernel";
+> +				reg = <0x50000 0x3b0000>;
+> +			};
 
-In pinctrl bindings case, I think we could do better job by replacing
-the existing bindings of sysconfs for a group of banks with just two
-integer offsets. This would mean that, we can still use the a common
-driver across the SOCs.
+The partitions are unnecessary to understand the example. Please drop them.
 
-And w.r.t to reset, we are planning on using sysconf based
-reset-controller API sitting underneath the reset-controller subsystem.
-Passing the information from device trees would be much clear and
-flexible than adding new driver per/SOC.
+> +#define CS_TIMING_LEN 6
+> +#define CS_REG_RANGE  0x18
+> +/* Parse and set the timing for this device. */
+> +static int weim_timing(struct platform_device *pdev, struct device_node *np)
+> +{
+> +	struct imx_weim *weim = platform_get_drvdata(pdev);
+> +	u32 value[CS_TIMING_LEN];
+> +	u32 cs_idx;
+> +	int ret;
+> +	int i;
+> +
+> +	ret = of_property_read_u32(np, "weim-cs-index", &cs_idx);
+> +	if (ret)
+> +		goto weim_parse_err;
 
->> 2> The infrastructure should protect the claimed registers from
->> over-writing by other drivers. We do this by claim-read/write-release
->> style API.
-> 
-> I don't understand this part. Is it about atomicity of accesses to
-> 32-bit registers when you only want to change a bit? That is something
-> the regmap interface handles already.
+It would be nice to check for cs_idx being valid.
 
-I forget to mention a important point here, the protection is at bit
-level for the sysconfs. Some of sysconfs have bits shared across IPs, so
-protecting them while the IP is still using it is what we are trying to
-achieve with sysconf-claim/release apis.
-While it may be overkill, but In past it has found bugs and been helpful
-with a meaning full debug output.
+> +
+> +	ret = of_property_read_u32_array(np, "weim-cs-timing",
+> +					value, CS_TIMING_LEN);
+> +	if (ret)
+> +		goto weim_parse_err;
+> +
+> +	/* set the timing for WEIM */
+> +	for (i = 0; i < CS_TIMING_LEN; i++)
+> +		writel(value[i], weim->base + cs_idx * CS_REG_RANGE + i * 4);
+> +	return 0;
+> +
+> +weim_parse_err:
+> +	return ret;
+> +}
+> +
+> +static int weim_parse_dt(struct platform_device *pdev)
+> +{
+> +	struct device_node *child;
+> +	int ret;
+> +
+> +	/* We only support the Parallel NOR now. We may add more in future. */
+> +	child = of_find_node_by_name(NULL, "nor");
+> +	if (child) {
+> +		ret = weim_timing(pdev, child);
+> +		if (ret)
+> +			goto parse_fail;
+> +
+> +		if (!of_platform_device_create(child, NULL, &pdev->dev)) {
+> +			ret = -EINVAL;
+> +			goto parse_fail;
+> +		}
+> +	}
 
->> 3> The driver should be able to set a group of sysconf registers bits to
->> a particular values before initialises the IP. I was thinking of doing
->> this in a same way as pinctrl state.
-> 
-> That does not fit well with the model we use for other subsystems. If possible,
-> try to use the existing abstractions for clock, regulator, pinctrl, reset,
-> etc. and call generic interfaces from the driver. When that does not work,
-> create a high-level function call from your sysconf driver to do a particular
-> thing (e.g. stih_sysconf_ethernet_set_phy_mode()) rather than set up random
-> bits from the driver.
-I agree going for a higher level api in this case makes sense.
+What you want to do here is:
 
-Thanks,
-srini
+- iterate over your child nodes
+- call weim_timing() for each of them
+- call of_platform_device_create for each child (or even
+  of_platform_populate() with the parent node)
 
-> 
-> 	Arnd
-> 
-> 
+
+> +	return 0;
+> +
+> +parse_fail:
+> +	return ret;
+> +}
+> +
+> +static int weim_probe(struct platform_device *pdev)
+> +{
+> +	struct imx_weim *weim;
+> +	struct resource *res;
+> +	int ret = -EINVAL;
+> +
+> +	weim = devm_kzalloc(&pdev->dev, sizeof(*weim), GFP_KERNEL);
+> +	if (!weim) {
+> +		ret = -ENOMEM;
+> +		goto weim_err;
+> +	}
+> +	platform_set_drvdata(pdev, weim);
+> +
+> +	/* get the resource */
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		ret = -ENOENT;
+> +		goto weim_err;
+> +	}
+
+No need to do error checking here. devm_ioremap_resource() will do this
+for you and also print an error message.
+
+> +
+> +	weim->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(weim->base)) {
+> +		ret = PTR_ERR(weim->base);
+> +		goto weim_err;
+> +	}
+> +
+> +	/* get the clock */
+> +	weim->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(weim->clk))
+> +		goto weim_err;
+> +
+> +	clk_prepare_enable(weim->clk);
+
+what is this clock used for? Is it necessary for the register access or
+is it necessary for the chipselects on the WEIM to work?
+
+Sascha
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
