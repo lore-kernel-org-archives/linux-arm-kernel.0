@@ -1,18 +1,24 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 20 May 2013 15:29:58 +0100
-Subject: [PATCH v4 01/32] arm64: KVM: define HYP and Stage-2
- translation page flags
-In-Reply-To: <1368540840-26750-2-git-send-email-marc.zyngier@arm.com>
-References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
- <1368540840-26750-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130520142958.GB27473@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 20 May 2013 14:39:21 +0000 (UTC)
+Subject: [PATCH-V2] ARM: OMAP2+: AM33xx: Fix missing reset status data
+ to GFX hwmod
+In-Reply-To: <1369057116-31423-1-git-send-email-hvaibhav@ti.com>
+References: <1369057116-31423-1-git-send-email-hvaibhav@ti.com>
+Message-ID: <alpine.DEB.2.02.1305201439020.6174@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 03:13:29PM +0100, Marc Zyngier wrote:
-> Add HYP and S2 page flags, for both normal and device memory.
-> 
-> Reviewed-by: Christopher Covington <cov@codeaurora.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Mon, 20 May 2013, Vaibhav Hiremath wrote:
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> GFX has a reset status register (PRM_GFX.RM_GFX_RSTST),
+> so update the GFX hwmod data with .rstst_off and .st_shift
+> information.
+> 
+> Although it doesn't have impact on kernel boot, but this is
+> regression fix from original hwmod commit.
+> 
+
+Did it ever work?  If not, then it's not a regression, right?
+
+
+- Paul
