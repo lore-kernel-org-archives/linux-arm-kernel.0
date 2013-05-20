@@ -1,45 +1,99 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 20 May 2013 12:19:31 +0800
-Subject: [PATCH] arm64: compiling issue for allmodconfig, need "asm/parport.h"
- by "drivers/parport/parport_pc.c"
-In-Reply-To: <20130424110511.GK23397@arm.com>
-References: <5177551D.8090007@asianux.com> <20130424082237.GA23397@arm.com>
- <5177B1F0.10106@asianux.com>
- <20130424102327.GF21850@mudshark.cambridge.arm.com>
- <5177BAD0.9000500@asianux.com> <20130424110511.GK23397@arm.com>
-Message-ID: <5199A453.4080402@asianux.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 20 May 2013 10:06:49 +0530
+Subject: spurious bL cpufreq driver messages
+In-Reply-To: <CAL_JsqLEv38DwnL4=ToXtEKNrDbgYv_0qiOc+cXZSjnfKVbeNg@mail.gmail.com>
+References: <519686BC.3090101@gmail.com>
+ <CAKohpom0cGfWvsCf-jaMyu0cQJi2hVk9_0wskEDH2X7MaeHDLw@mail.gmail.com>
+ <CAL_JsqLEv38DwnL4=ToXtEKNrDbgYv_0qiOc+cXZSjnfKVbeNg@mail.gmail.com>
+Message-ID: <CAKohpomG5E2FAeZGnX3eBw8fOiX3K8sWEeHgb5NT_FT3y+Cg1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 19 May 2013 01:21, Rob Herring <robherring2@gmail.com> wrote:
+> No, it still registers the bL driver. The problem is not that DT data
+> is missing, but it is present on a single cluster system.
 
-Need add the default file in 'asm/Kbuild' just like arm has done.
+I misread your mail.. I got the problem now.. Below should fix your
+issue (It is rebased on the patch I pointed to you earlier):
 
-The build command is:
-  make EXTRA_CFLAGS=-W ARCH=arm64 allmodconfig
-  make EXTRA_CFLAGS=-W ARCH=arm64 menuconfig
-    set "aarch64-linux-gnu-" as cross compiling prefix.
-  make EXTRA_CFLAGS=-W ARCH=arm64
+Attached too for testing as gmail copy-paste will break it.
 
-The related error:
-  drivers/parport/parport_pc.c:67:25: fatal error: asm/parport.h: No such file or directory
+@Rafael: Once Rob gives his Tested-by, please queue it for 3.10-rcs
 
+------------x-----------------x-----------------
 
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
+From: Viresh Kumar <viresh.kumar@linaro.org>
+Date: Mon, 20 May 2013 09:57:17 +0530
+Subject: [PATCH] cpufreq: arm_big_little_dt: Instantiate as platform_driver
+
+As multiplatform build is being adopted by more and more ARM platforms, initcall
+function should be used very carefully. For example, when both arm_big_little_dt
+and cpufreq-cpu0 drivers are compiled in, arm_big_little_dt driver may try to
+register even if we had platform device for cpufreq-cpu0 registered.
+
+To eliminate this undesired the effect, the patch changes arm_big_little_dt
+driver to have it instantiated as a platform_driver. Then it will only run on
+platforms that create the platform_device "arm-bL-cpufreq-dt".
+
+Reported-by: Rob Herring <robherring2@gmail.com>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm64/include/asm/Kbuild |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+ drivers/cpufreq/arm_big_little_dt.c | 20 +++++++++++++++-----
+ 1 file changed, 15 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 79a642d..9005e81 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -25,6 +25,7 @@ generic-y += local64.h
- generic-y += mman.h
- generic-y += msgbuf.h
- generic-y += mutex.h
-+generic-y += parport.h
- generic-y += pci.h
- generic-y += percpu.h
- generic-y += poll.h
--- 
-1.7.7.6
+diff --git a/drivers/cpufreq/arm_big_little_dt.c
+b/drivers/cpufreq/arm_big_little_dt.c
+index 27e2f45..fd9e3ea 100644
+--- a/drivers/cpufreq/arm_big_little_dt.c
++++ b/drivers/cpufreq/arm_big_little_dt.c
+@@ -26,6 +26,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/opp.h>
++#include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/types.h>
+ #include "arm_big_little.h"
+@@ -95,7 +96,7 @@ static struct cpufreq_arm_bL_ops dt_bL_ops = {
+ 	.init_opp_table = dt_init_opp_table,
+ };
+
+-static int generic_bL_init(void)
++static int generic_bL_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np;
+
+@@ -106,13 +107,22 @@ static int generic_bL_init(void)
+ 	of_node_put(np);
+ 	return bL_cpufreq_register(&dt_bL_ops);
+ }
+-module_init(generic_bL_init);
+
+-static void generic_bL_exit(void)
++static int generic_bL_remove(struct platform_device *pdev)
+ {
+-	return bL_cpufreq_unregister(&dt_bL_ops);
++	bL_cpufreq_unregister(&dt_bL_ops);
++	return 0;
+ }
+-module_exit(generic_bL_exit);
++
++static struct platform_driver generic_bL_platdrv = {
++	.driver = {
++		.name	= "arm-bL-cpufreq-dt",
++		.owner	= THIS_MODULE,
++	},
++	.probe		= generic_bL_probe,
++	.remove		= generic_bL_remove,
++};
++module_platform_driver(generic_bL_platdrv);
+
+ MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
+ MODULE_DESCRIPTION("Generic ARM big LITTLE cpufreq driver via DT");
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-cpufreq-arm_big_little_dt-Instantiate-as-platform_dr.patch
+Type: application/octet-stream
+Size: 2494 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130520/e3af1072/attachment.obj>
