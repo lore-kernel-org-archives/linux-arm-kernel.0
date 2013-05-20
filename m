@@ -1,87 +1,37 @@
-From: sanjay.rawat@linaro.org (Sanjay Singh Rawat)
-Date: Mon, 20 May 2013 12:03:28 +0530
-Subject: [RFC PATCH 6/6] ARM: EXYNOS: use the core cpu hotplug functions
-In-Reply-To: <1369031608-27347-1-git-send-email-sanjay.rawat@linaro.org>
-References: <1369031608-27347-1-git-send-email-sanjay.rawat@linaro.org>
-Message-ID: <1369031608-27347-7-git-send-email-sanjay.rawat@linaro.org>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 20 May 2013 14:48:05 +0800
+Subject: [PATCH] arm64: kernel: compiling issue,
+ need 'EXPORT_SYMBOL_GPL(read_current_timer)'
+Message-ID: <5199C725.8050102@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generic arm cpu hotplug related functions are moved to core hotplug code,
-Exynos-4 is having Cortex-A9, remove the functions from the platform code.
 
-Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
+Need 'EXPORT_SYMBOL_GPL(read_current_timer)' if build with allmodconfig.
+
+The related error:
+  ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
+  ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
+  ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
+  ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
+
+
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
 ---
- arch/arm/mach-exynos/hotplug.c |   40 ++--------------------------------------
- 1 file changed, 2 insertions(+), 38 deletions(-)
+ arch/arm64/kernel/time.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-index af90cfa..3489760 100644
---- a/arch/arm/mach-exynos/hotplug.c
-+++ b/arch/arm/mach-exynos/hotplug.c
-@@ -21,30 +21,10 @@
- 
- #include <mach/regs-pmu.h>
- #include <plat/cpu.h>
-+#include <asm/hotplug.h>
- 
- #include "common.h"
- 
--static inline void cpu_enter_lowpower_a9(void)
--{
--	unsigned int v;
--
--	asm volatile(
--	"	mcr	p15, 0, %1, c7, c5, 0\n"
--	"	mcr	p15, 0, %1, c7, c10, 4\n"
--	/*
--	 * Turn off coherency
--	 */
--	"	mrc	p15, 0, %0, c1, c0, 1\n"
--	"	bic	%0, %0, %3\n"
--	"	mcr	p15, 0, %0, c1, c0, 1\n"
--	"	mrc	p15, 0, %0, c1, c0, 0\n"
--	"	bic	%0, %0, %2\n"
--	"	mcr	p15, 0, %0, c1, c0, 0\n"
--	  : "=&r" (v)
--	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
--	  : "cc");
--}
--
- static inline void cpu_enter_lowpower_a15(void)
- {
- 	unsigned int v;
-@@ -74,22 +54,6 @@ static inline void cpu_enter_lowpower_a15(void)
- 	dsb();
+diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+index a551f88..7fcba80 100644
+--- a/arch/arm64/kernel/time.c
++++ b/arch/arm64/kernel/time.c
+@@ -73,6 +73,7 @@ int read_current_timer(unsigned long *timer_value)
+ 	*timer_value = arch_timer_read_counter();
+ 	return 0;
  }
++EXPORT_SYMBOL_GPL(read_current_timer);
  
--static inline void cpu_leave_lowpower(void)
--{
--	unsigned int v;
--
--	asm volatile(
--	"mrc	p15, 0, %0, c1, c0, 0\n"
--	"	orr	%0, %0, %1\n"
--	"	mcr	p15, 0, %0, c1, c0, 0\n"
--	"	mrc	p15, 0, %0, c1, c0, 1\n"
--	"	orr	%0, %0, %2\n"
--	"	mcr	p15, 0, %0, c1, c0, 1\n"
--	  : "=&r" (v)
--	  : "Ir" (CR_C), "Ir" (0x40)
--	  : "cc");
--}
--
- static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ void __init time_init(void)
  {
- 	for (;;) {
-@@ -144,7 +108,7 @@ void __ref exynos_cpu_die(unsigned int cpu)
- 	if ((primary_part & 0xfff0) == 0xc0f0)
- 		cpu_enter_lowpower_a15();
- 	else
--		cpu_enter_lowpower_a9();
-+		cpu_enter_lowpower();
- 
- 	platform_do_lowpower(cpu, &spurious);
- 
 -- 
-1.7.9.5
+1.7.7.6
