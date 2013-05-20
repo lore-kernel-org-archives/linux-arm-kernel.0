@@ -1,30 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 20 May 2013 13:08:16 -0400
-Subject: [PATCHv10 2/9] of/pci: Provide support for parsing PCI DT
- ranges property
-In-Reply-To: <CACRpkdamm9vh_bXenJigwTYmN=n_SsEp+GQqAe9rdm8PRxPsqw@mail.gmail.com>
-References: <1368719725-21265-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1368719725-21265-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130519203156.GO11137@titan.lakedaemon.net>
- <CACRpkdamm9vh_bXenJigwTYmN=n_SsEp+GQqAe9rdm8PRxPsqw@mail.gmail.com>
-Message-ID: <20130520170816.GU31290@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 20 May 2013 10:08:28 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix multiple randconfig errors if no SoC
+ is selected, take3
+In-Reply-To: <20130517210317.GB10378@atomide.com>
+References: <20130517210317.GB10378@atomide.com>
+Message-ID: <20130520170827.GF10378@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 09:03:00AM +0200, Linus Walleij wrote:
-> On Sun, May 19, 2013 at 10:31 PM, Jason Cooper <jason@lakedaemon.net> wrote:
-> 
-> > patches 2, 3, and 4 applied to mvebu/of_pci to facilitate others
-> > (LinusW) basing their work off of it.
-> 
-> Thanks, is this going to be pulled into ARM SoC soon-ish?
-> 
-> I think Arnd may need this for some PCI work too.
+* Tony Lindgren <tony@atomide.com> [130517 14:08]:
+> --- a/arch/arm/mach-omap2/Makefile
+> +++ b/arch/arm/mach-omap2/Makefile
+> @@ -6,7 +6,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+>  	-I$(srctree)/arch/arm/plat-omap/include
+>  
+>  # Common support
+> -obj-y := id.o io.o control.o mux.o devices.o fb.o serial.o gpmc.o timer.o pm.o \
+> +soc-y := id.o io.o control.o mux.o devices.o fb.o serial.o gpmc.o timer.o pm.o \
+>  	 common.o gpio.o dma.o wd_timer.o display.o i2c.o hdq1w.o omap_hwmod.o \
+>  	 omap_device.o sram.o
+>  
+> @@ -85,7 +85,8 @@ obj-$(CONFIG_ARCH_OMAP2)		+= sleep24xx.o
+>  obj-$(CONFIG_ARCH_OMAP3)		+= pm34xx.o sleep34xx.o
+>  obj-$(CONFIG_ARCH_OMAP4)		+= pm44xx.o omap-mpuss-lowpower.o
+>  obj-$(CONFIG_SOC_OMAP5)			+= omap-mpuss-lowpower.o
+> -obj-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+> +pm-$(CONFIG_ARCH_OMAP)			+= pm-debug.o
+> +obj-$(CONFIG_PM_DEBUG)			+= $(pm-y)
+>  
+>  obj-$(CONFIG_POWER_AVS_OMAP)		+= sr_device.o
+>  obj-$(CONFIG_POWER_AVS_OMAP_CLASS3)    += smartreflex-class3.o
+> @@ -201,7 +202,8 @@ obj-$(CONFIG_ARCH_OMAP4)		+= omap_hwmod_44xx_data.o
+>  
+>  # EMU peripherals
+>  obj-$(CONFIG_OMAP3_EMU)			+= emu.o
+> -obj-$(CONFIG_HW_PERF_EVENTS)		+= pmu.o
+> +pmu-$(CONFIG_ARCH_OMAP)			+= pmu.o
+> +obj-$(CONFIG_HW_PERF_EVENTS)		+= $(pmu-y)
+>  
+>  obj-$(CONFIG_OMAP_MBOX_FWK)		+= mailbox_mach.o
+>  mailbox_mach-objs			:= mailbox.o
 
-I was half expecting -rc2 to drop yesterday.  Since it didn't, I'll go
-ahead and send another round of PRs, including this one.  Probably today
-or tomorrow.
+Oops, both pm-debug.o and pmu.o should now be just:
 
-thx,
+soc-$(CONFIG_PM_DEBUG)			+= pm-debug.o
+soc-$(CONFIG_ARCH_OMAP)			+= pmu.o
 
-Jason.
+Will repost after running make randconfig for few hours today.
+
+Regards,
+
+Tony
