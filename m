@@ -1,23 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 May 2013 09:03:00 +0200
-Subject: [PATCHv10 2/9] of/pci: Provide support for parsing PCI DT ranges
- property
-In-Reply-To: <20130519203156.GO11137@titan.lakedaemon.net>
-References: <1368719725-21265-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1368719725-21265-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130519203156.GO11137@titan.lakedaemon.net>
-Message-ID: <CACRpkdamm9vh_bXenJigwTYmN=n_SsEp+GQqAe9rdm8PRxPsqw@mail.gmail.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 20 May 2013 15:12:57 +0800
+Subject: [PATCH] arm64: kernel: compiling issue,
+ need 'EXPORT_SYMBOL(clear_page)'
+Message-ID: <5199CCF9.4030305@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 19, 2013 at 10:31 PM, Jason Cooper <jason@lakedaemon.net> wrote:
 
-> patches 2, 3, and 4 applied to mvebu/of_pci to facilitate others
-> (LinusW) basing their work off of it.
+Need 'EXPORT_SYMBOL(clear_page)' if building with allmodconfig.
 
-Thanks, is this going to be pulled into ARM SoC soon-ish?
+The related errors:
+  ERROR: "clear_page" [fs/ocfs2/dlm/ocfs2_dlm.ko] undefined!
+  ERROR: "clear_page" [fs/ntfs/ntfs.ko] undefined!
+  ERROR: "clear_page" [fs/gfs2/gfs2.ko] undefined!
+  ERROR: "clear_page" [fs/fuse/fuse.ko] undefined!
+  ERROR: "clear_page" [fs/ext3/ext3.ko] undefined!
+  ERROR: "clear_page" [fs/ext2/ext2.ko] undefined!
+  ERROR: "clear_page" [fs/exofs/libore.ko] undefined!
+  ERROR: "clear_page" [fs/exofs/exofs.ko] undefined!
+  ERROR: "clear_page" [drivers/block/brd.ko] undefined!
 
-I think Arnd may need this for some PCI work too.
 
-Yours,
-Linus Walleij
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm64/kernel/arm64ksyms.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
+index 7df1aad..41b4f62 100644
+--- a/arch/arm64/kernel/arm64ksyms.c
++++ b/arch/arm64/kernel/arm64ksyms.c
+@@ -34,6 +34,7 @@ EXPORT_SYMBOL(__strnlen_user);
+ EXPORT_SYMBOL(__strncpy_from_user);
+ 
+ EXPORT_SYMBOL(copy_page);
++EXPORT_SYMBOL(clear_page);
+ 
+ EXPORT_SYMBOL(__copy_from_user);
+ EXPORT_SYMBOL(__copy_to_user);
+-- 
+1.7.7.6
