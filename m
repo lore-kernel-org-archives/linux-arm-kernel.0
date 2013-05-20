@@ -1,45 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 21 May 2013 01:38:23 +0900
-Subject: [PATCH 30/33] arch/arm/plat-samsung: don't check resource with
- devm_ioremap_resource
-In-Reply-To: <1368702961-4325-31-git-send-email-wsa@the-dreams.de>
-References: <1368702961-4325-1-git-send-email-wsa@the-dreams.de>
- <1368702961-4325-31-git-send-email-wsa@the-dreams.de>
-Message-ID: <519A517F.5020003@samsung.com>
+From: bkuhn@sfconservancy.org (Bradley M. Kuhn)
+Date: Mon, 20 May 2013 11:13:00 -0400
+Subject: Would like to form a pool of Linux copyright holders for faster
+ GPL enforcement against Anthrax Kernels
+In-Reply-To: <51973B45.7040209@gmail.com> (Eric Appleman's message of "Sat, 18
+ May 2013 04:26:45 -0400")
+References: <51973B45.7040209@gmail.com>
+Message-ID: <87a9npvg5f.fsf@ebb.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/13 20:15, Wolfram Sang wrote:
-> devm_ioremap_resource does sanity checks on the given resource. No need to
-> duplicate this in the driver.
->
-> Signed-off-by: Wolfram Sang<wsa@the-dreams.de>
+Eric Appleman wrote at 04:26 (EDT) on Saturday:
+> Would anyone be interested in forming such a pool? I am willing to
+> wait years for this to be resolved through certain organizations, but
+> I believe we can do better.
 
-Looks good to me, applied into Samsung tree.
+As some on these lists likely already know, Conservancy's GPL Compliance
+Project for Linux Developers [0] is aware of this matter and is
+considering what actions to take, and how such actions should be ranked
+in priority given the queue of the hundreds of known GPL violations on
+Linux occurring every day.
 
-Wolfram, if you want to take this into your tree, let me know.
+We very much appreciate that Eric has brought the matter to our
+attention and I'm continuing to correspond with Eric privately in the
+hopes that we can resolve the matter.
 
-Thanks.
+If anyone wants to join Conservancy's GPL Compliance Project for Linux
+Developers, please do contact me!
 
-- Kukjin
+[0] More details on Conservancy's GPL Compliance Project for Linux
+    Developers can be found at
+    https://sfconservancy.org/news/2012/may/29/compliance/
 
-> ---
->   arch/arm/plat-samsung/adc.c |    5 -----
->   1 file changed, 5 deletions(-)
->
-> diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-> index ca07cb1..79690f2 100644
-> --- a/arch/arm/plat-samsung/adc.c
-> +++ b/arch/arm/plat-samsung/adc.c
-> @@ -381,11 +381,6 @@ static int s3c_adc_probe(struct platform_device *pdev)
->   	}
->
->   	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	if (!regs) {
-> -		dev_err(dev, "failed to find registers\n");
-> -		return -ENXIO;
-> -	}
-> -
->   	adc->regs = devm_ioremap_resource(dev, regs);
->   	if (IS_ERR(adc->regs))
->   		return PTR_ERR(adc->regs);
+Sincerely,
+-- 
+Bradley M. Kuhn, Executive Director, Software Freedom Conservancy
