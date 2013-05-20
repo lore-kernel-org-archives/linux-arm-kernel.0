@@ -1,44 +1,40 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 20 May 2013 16:19:59 -0400
-Subject: [GIT PULL 1/2] of/pci dependency for mvebu/arm-soc
-Message-ID: <20130520201959.GN31290@titan.lakedaemon.net>
+From: alexdeucher@gmail.com (Alex Deucher)
+Date: Mon, 20 May 2013 16:23:33 -0400
+Subject: [RFC 0/8] rmk's Dove DRM/TDA19988 Cubox driver
+In-Reply-To: <20130520201536.GY18614@n2100.arm.linux.org.uk>
+References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+ <20130517133345.7c1368f5@armhf>
+ <20130517120115.GF18614@n2100.arm.linux.org.uk>
+ <20130517194023.0c385ea0@armhf>
+ <20130519085920.GO18614@n2100.arm.linux.org.uk>
+ <CADnq5_Pajy4jxLdd9QGBrUooWYFjfQRQgdbvbu9UDE8-7Tmm8g@mail.gmail.com>
+ <20130520201536.GY18614@n2100.arm.linux.org.uk>
+Message-ID: <CADnq5_O8nLi1=HOrXO0AeQuX17tGj05fhao4mmauzZ5h8Ciyaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, May 20, 2013 at 4:15 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, May 20, 2013 at 09:36:02AM -0400, Alex Deucher wrote:
+>> You can tell the xserver what size cursor you support when you call
+>> xf86_cursors_init() in the ddx.  Just expose a 32x64 or 64x32 ARGB
+>> cursor.  Most apps don't use a 64x64 cursor anyway.  I've used
+>> hardware with non-64x64 cursors and haven't run into any problems yet.
+>
+> I guess the xf86 backend will fall back to software cursors if it gets
+> a cursor larger than the hardware supports, so maybe 64x32 will be
+> fine.
+>
+> However, my comments concerning the less-than-64x64 size come from
+> David Airlie who said "X and userside programs expect 64x64 to work.
+> so its possibly pointless supporting anything less, as in you'd write
+> code but nobody would end up using it".
+>
+> Note also that the generic DRM KMS code assumes cursor support at
+> 64x64, and there's no generic way for a driver at present (that I know
+> of) to inform it of anything different.
 
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+It shouldn't be too hard to add a new cap for querying the cursor size
+to the drm cap interface.
 
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/jcooper/linux.git tags/of_pci-3.11
-
-for you to fetch changes up to 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
-
-  of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
-
-----------------------------------------------------------------
-of/pci changes for v3.11
-
- - parse DT ranges property
- - add of_pci_get_devfn()
- - add of_pci_parse_bus_range()
-
-Note:
- - mvebu/pcie will depend on this branch
- - work by LinusW and possibly Arnd will depend on this branch
-
-----------------------------------------------------------------
-Andrew Murray (1):
-      of/pci: Provide support for parsing PCI DT ranges property
-
-Thierry Reding (2):
-      of/pci: Add of_pci_get_devfn() function
-      of/pci: Add of_pci_parse_bus_range() function
-
- drivers/of/address.c       | 67 ++++++++++++++++++++++++++++++++++++++++++++++
- drivers/of/of_pci.c        | 59 ++++++++++++++++++++++++++++++++++++----
- include/linux/of_address.h | 48 +++++++++++++++++++++++++++++++++
- include/linux/of_pci.h     |  2 ++
- 4 files changed, 171 insertions(+), 5 deletions(-)
+Alex
