@@ -1,122 +1,105 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 20 May 2013 18:25:54 +0200
-Subject: [PATCH 1/7] USB: gadget: atmel_usba: move global struct usba_ep
- usba_ep to struct usba_udc
-In-Reply-To: <20130520162149.GC9937@game.jcrosoft.org>
+Date: Mon, 20 May 2013 18:25:57 +0200
+Subject: [PATCH 4/7] ARM: at91: sam9x5 add udc DT support
+In-Reply-To: <1369067160-3230-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20130520162149.GC9937@game.jcrosoft.org>
-Message-ID: <1369067160-3230-1-git-send-email-plagnioj@jcrosoft.com>
+ <1369067160-3230-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1369067160-3230-4-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-so we can have multiple usb gadget instance
-
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/gadget/atmel_usba_udc.c |   20 +++++++++++---------
- drivers/usb/gadget/atmel_usba_udc.h |    1 +
- 2 files changed, 12 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/at91sam9x5.dtsi |   62 +++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-at91/at91sam9x5.c   |    2 ++
+ 2 files changed, 64 insertions(+)
 
-diff --git a/drivers/usb/gadget/atmel_usba_udc.c b/drivers/usb/gadget/atmel_usba_udc.c
-index f2a970f..d2ffd04 100644
---- a/drivers/usb/gadget/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/atmel_usba_udc.c
-@@ -29,7 +29,6 @@
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index af91599..01a815d 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -645,6 +645,68 @@
+ 				status = "disabled";
+ 			};
  
- 
- static struct usba_udc the_udc;
--static struct usba_ep *usba_ep;
- 
- #ifdef CONFIG_USB_GADGET_DEBUG_FS
- #include <linux/debugfs.h>
-@@ -1147,7 +1146,7 @@ static int do_test_mode(struct usba_udc *udc)
- 		 * Test_SE0_NAK: Force high-speed mode and set up ep0
- 		 * for Bulk IN transfers
- 		 */
--		ep = &usba_ep[0];
-+		ep = &udc->usba_ep[0];
- 		usba_writel(udc, TST,
- 				USBA_BF(SPEED_CFG, USBA_SPEED_CFG_FORCE_HIGH));
- 		usba_ep_writel(ep, CFG,
-@@ -1165,7 +1164,7 @@ static int do_test_mode(struct usba_udc *udc)
- 		break;
- 	case 0x0400:
- 		/* Test_Packet */
--		ep = &usba_ep[0];
-+		ep = &udc->usba_ep[0];
- 		usba_ep_writel(ep, CFG,
- 				USBA_BF(EPT_SIZE, USBA_EPT_SIZE_64)
- 				| USBA_EPT_DIR_IN
-@@ -1668,7 +1667,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 
- 		for (i = 1; i < USBA_NR_ENDPOINTS; i++)
- 			if (dma_status & (1 << i))
--				usba_dma_irq(udc, &usba_ep[i]);
-+				usba_dma_irq(udc, &udc->usba_ep[i]);
- 	}
- 
- 	ep_status = USBA_BFEXT(EPT_INT, status);
-@@ -1677,10 +1676,10 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 
- 		for (i = 0; i < USBA_NR_ENDPOINTS; i++)
- 			if (ep_status & (1 << i)) {
--				if (ep_is_control(&usba_ep[i]))
--					usba_control_irq(udc, &usba_ep[i]);
-+				if (ep_is_control(&udc->usba_ep[i]))
-+					usba_control_irq(udc, &udc->usba_ep[i]);
- 				else
--					usba_ep_irq(udc, &usba_ep[i]);
-+					usba_ep_irq(udc, &udc->usba_ep[i]);
- 			}
- 	}
- 
-@@ -1705,7 +1704,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 		DBG(DBG_BUS, "%s bus reset detected\n",
- 		    usb_speed_string(udc->gadget.speed));
- 
--		ep0 = &usba_ep[0];
-+		ep0 = &udc->usba_ep[0];
- 		ep0->ep.desc = &usba_ep0_desc;
- 		ep0->state = WAIT_FOR_SETUP;
- 		usba_ep_writel(ep0, CFG,
-@@ -1841,6 +1840,7 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 	struct resource *regs, *fifo;
- 	struct clk *pclk, *hclk;
- 	struct usba_udc *udc = &the_udc;
-+	static struct usba_ep *usba_ep;
- 	int irq, ret, i;
- 
- 	regs = platform_get_resource(pdev, IORESOURCE_MEM, CTRL_IOMEM_ID);
-@@ -1896,6 +1896,8 @@ static int __init usba_udc_probe(struct platform_device *pdev)
- 	if (!usba_ep)
- 		goto err_alloc_ep;
- 
-+	udc->usba_ep = usba_ep;
++			usb2: gadget at f803c000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91sam9rl-udc";
++				reg = <0x00500000 0x80000
++				       0xf803c000 0x400>;
++				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 0>;
++				status = "disabled";
 +
- 	the_udc.gadget.ep0 = &usba_ep[0].ep;
++				ep0 {
++					reg = <0>;
++					atmel,fifo-size = <64>;
++					atmel,nb-banks = <1>;
++				};
++
++				ep1 {
++					reg = <1>;
++					atmel,fifo-size = <1024>;
++					atmel,nb-banks = <2>;
++					atmel,can-dma;
++					atmel,can-isoc;
++				};
++
++				ep2 {
++					reg = <2>;
++					atmel,fifo-size = <1024>;
++					atmel,nb-banks = <2>;
++					atmel,can-dma;
++					atmel,can-isoc;
++				};
++
++				ep3 {
++					reg = <3>;
++					atmel,fifo-size = <1024>;
++					atmel,nb-banks = <3>;
++					atmel,can-dma;
++				};
++
++				ep4 {
++					reg = <4>;
++					atmel,fifo-size = <1024>;
++					atmel,nb-banks = <3>;
++					atmel,can-dma;
++				};
++
++				ep5 {
++					reg = <5>;
++					atmel,fifo-size = <1024>;
++					atmel,nb-banks = <3>;
++					atmel,can-dma;
++					atmel,can-isoc;
++				};
++
++				ep6 {
++					reg = <6>;
++					atmel,fifo-size = <1024>;
++					atmel,nb-banks = <3>;
++					atmel,can-dma;
++					atmel,can-isoc;
++				};
++			};
++
+ 			rtc at fffffeb0 {
+ 				compatible = "atmel,at91rm9200-rtc";
+ 				reg = <0xfffffeb0 0x40>;
+diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
+index e631fec..2abee66 100644
+--- a/arch/arm/mach-at91/at91sam9x5.c
++++ b/arch/arm/mach-at91/at91sam9x5.c
+@@ -249,6 +249,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("hclk", "600000.ohci", &uhphs_clk),
+ 	CLKDEV_CON_DEV_ID("ohci_clk", "600000.ohci", &uhphs_clk),
+ 	CLKDEV_CON_DEV_ID("ehci_clk", "700000.ehci", &uhphs_clk),
++	CLKDEV_CON_DEV_ID("hclk", "500000.gadget", &utmi_clk),
++	CLKDEV_CON_DEV_ID("pclk", "500000.gadget", &udphs_clk),
+ };
  
- 	INIT_LIST_HEAD(&usba_ep[0].ep.ep_list);
-@@ -2008,7 +2010,7 @@ static int __exit usba_udc_remove(struct platform_device *pdev)
- 	usb_del_gadget_udc(&udc->gadget);
- 
- 	for (i = 1; i < pdata->num_ep; i++)
--		usba_ep_cleanup_debugfs(&usba_ep[i]);
-+		usba_ep_cleanup_debugfs(&udc->usba_ep[i]);
- 	usba_cleanup_debugfs(udc);
- 
- 	if (gpio_is_valid(udc->vbus_pin)) {
-diff --git a/drivers/usb/gadget/atmel_usba_udc.h b/drivers/usb/gadget/atmel_usba_udc.h
-index d65a618..0841986 100644
---- a/drivers/usb/gadget/atmel_usba_udc.h
-+++ b/drivers/usb/gadget/atmel_usba_udc.h
-@@ -319,6 +319,7 @@ struct usba_udc {
- 	int vbus_pin_inverted;
- 	struct clk *pclk;
- 	struct clk *hclk;
-+	struct usba_ep *usba_ep;
- 
- 	u16 devstatus;
- 
+ /*
 -- 
 1.7.10.4
