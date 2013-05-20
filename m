@@ -1,151 +1,112 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 20 May 2013 21:16:58 +0200
-Subject: [PATCH v3] net: dm9000: Allow instantiation using device tree
-Message-ID: <1369077418-5966-1-git-send-email-tomasz.figa@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 20 May 2013 21:18:42 +0200
+Subject: [RFC PATCH 2/5] ARM: mv78x00: Convert RD-78X00-mASA board to
+ device tree
+In-Reply-To: <5199F428.7000305@free-electrons.com>
+References: <1368999578-19938-1-git-send-email-gregory.clement@free-electrons.com>
+ <1368999578-19938-3-git-send-email-gregory.clement@free-electrons.com>
+ <20130520095231.GE26249@lunn.ch> <5199F428.7000305@free-electrons.com>
+Message-ID: <519A7712.3060903@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds Device Tree support to dm9000 driver.
+On 05/20/2013 12:00 PM, Gregory CLEMENT wrote:
+> On 05/20/2013 11:52 AM, Andrew Lunn wrote:
+>> On Sun, May 19, 2013 at 11:39:35PM +0200, Gregory CLEMENT wrote:
+>>> This commit converts the 'RD-78X00-mASA' board to the Device
+>>> Tree. Most of the devices are converted to the Device Tree, the only
+>>> devices which have not their Device Tree bindings are the Gigabit
+>>> Ethernet ones and remain instantiated in the old way.
+>>>
+>>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>>> ---
+>>>  arch/arm/mach-mv78xx0/board-dt.c           |  3 +++
+>>>  arch/arm/mach-mv78xx0/common.h             |  7 +++++++
+>>>  arch/arm/mach-mv78xx0/rd78x00-masa-setup.c | 10 ++++++++++
+>>>  3 files changed, 20 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mach-mv78xx0/board-dt.c b/arch/arm/mach-mv78xx0/board-dt.c
+>>> index 4995fee..5111cbd 100644
+>>> --- a/arch/arm/mach-mv78xx0/board-dt.c
+>>> +++ b/arch/arm/mach-mv78xx0/board-dt.c
+>>> @@ -26,6 +26,9 @@ static void __init mv78x00_dt_init(void)
+>>>  	 */
+>>>  	mv78xx0_init();
+>>>  
+>>> +	if (of_machine_is_compatible("marvell,rd-78x00-masa"))
+>>> +		rd78x00_masa_init_dt();
+>>> +
+>>>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>>>  }
+>>>  
+>>> diff --git a/arch/arm/mach-mv78xx0/common.h b/arch/arm/mach-mv78xx0/common.h
+>>> index 5e9485b..6e9140d 100644
+>>> --- a/arch/arm/mach-mv78xx0/common.h
+>>> +++ b/arch/arm/mach-mv78xx0/common.h
+>>> @@ -17,6 +17,13 @@ struct mv_sata_platform_data;
+>>>  /*
+>>>   * Basic MV78xx0 init functions used early by machine-setup.
+>>>   */
+>>> +#ifdef CONFIG_MACH_RD78X00_MASA
+>>> +void rd78x00_masa_init_dt(void);
+>>> +#else
+>>> +static inline void rd78x00_masa_init_dt(void) {};
+>>> +#endif
+>>> +
+>>> +
+>>>  int mv78xx0_core_index(void);
+>>>  void mv78xx0_map_io(void);
+>>>  void mv78xx0_init(void);
+>>> diff --git a/arch/arm/mach-mv78xx0/rd78x00-masa-setup.c b/arch/arm/mach-mv78xx0/rd78x00-masa-setup.c
+>>> index d2d06f3..8d88657 100644
+>>> --- a/arch/arm/mach-mv78xx0/rd78x00-masa-setup.c
+>>> +++ b/arch/arm/mach-mv78xx0/rd78x00-masa-setup.c
+>>> @@ -64,6 +64,16 @@ static void __init rd78x00_masa_init(void)
+>>>  	}
+>>>  }
+>>>  
+>>> +void __init rd78x00_masa_init_dt(void)
+>>> +{
+>>> +	/* Internal devices not ported to DT yet */
+>>> +	mv78xx0_ge00_init(&rd78x00_masa_ge00_data);
+>>> +	mv78xx0_ge10_init(&rd78x00_masa_ge10_data);
+>>> +		mv78xx0_ge01_init(&rd78x00_masa_ge01_data);
+>>> +		mv78xx0_ge11_init(&rd78x00_masa_ge11_data);
+>>> +
+>>> +}
+>>
+>> Hi Gregory
+>>
+>> First off, the indentation looks wrong. Might be a space/tab issue.
+> 
+> Thanks I will fix it
+> 
+>>
+>> I would also be tempted to place this code into board-dt.c and not
+>> touch or even compile rd78x00-masa-setup.c when using DT. If i
+>> remember correctly, Jason had a patch for Kirkwood which centralized
+>> all the ethernet setup code. You can maybe copy/paste that.
+> 
+> OK I will have a look on it.
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
+Initially I wanted to avoid duplicating the platform data, which are
+the PHY address for the ethernet. But for coherency I will do the same
+that it have been done in mach-kirkwood.
 
-Changes since v2:
- - corrected a typo in bindings documentation
- - removed redundant error message about failed memory allocation
-Changes since v1:
- - dropped davicom,simple-phy property as it seems to be of no use
- - used of_get_mac_address() to get MAC address from device tree
- - replaced #ifdef CONFIG_OF around dm9000_parse_dt() with IS_ENABLED
+>>
+>>> +
+>>>  static int __init rd78x00_pci_init(void)
+>>>  {
+>>>  	/*
+>>> -- 
+>>> 1.8.1.2
+>>>
+> 
+> 
 
- .../devicetree/bindings/net/davicom-dm9000.txt     | 26 ++++++++++++++
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- drivers/net/ethernet/davicom/dm9000.c              | 42 ++++++++++++++++++++++
- 3 files changed, 69 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/davicom-dm9000.txt
 
-diff --git a/Documentation/devicetree/bindings/net/davicom-dm9000.txt b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
-new file mode 100644
-index 0000000..2d39c99
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/davicom-dm9000.txt
-@@ -0,0 +1,26 @@
-+Davicom DM9000 Fast Ethernet controller
-+
-+Required properties:
-+- compatible = "davicom,dm9000";
-+- reg : physical addresses and sizes of registers, must contain 2 entries:
-+    first entry : address register,
-+    second entry : data register.
-+- interrupt-parent : interrupt controller to which the device is connected
-+- interrupts : interrupt specifier specific to interrupt controller
-+
-+Optional properties:
-+- local-mac-address : A bytestring of 6 bytes specifying Ethernet MAC address
-+    to use (from firmware or bootloader)
-+- davicom,no-eeprom : Configuration EEPROM is not available
-+- davicom,ext-phy : Use external PHY
-+
-+Example:
-+
-+	ethernet at 18000000 {
-+		compatible = "davicom,dm9000";
-+		reg = <0x18000000 0x2 0x18000004 0x2>;
-+		interrupt-parent = <&gpn>;
-+		interrupts = <7 4>;
-+		local-mac-address = [00 00 de ad be ef];
-+		davicom,no-eeprom;
-+	};
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 6931c43..2fe74e6 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -18,6 +18,7 @@ chrp	Common Hardware Reference Platform
- cirrus	Cirrus Logic, Inc.
- cortina	Cortina Systems, Inc.
- dallas	Maxim Integrated Products (formerly Dallas Semiconductor)
-+davicom	DAVICOM Semiconductor, Inc.
- denx	Denx Software Engineering
- emmicro	EM Microelectronic
- epson	Seiko Epson Corp.
-diff --git a/drivers/net/ethernet/davicom/dm9000.c b/drivers/net/ethernet/davicom/dm9000.c
-index 9105465..7af6126 100644
---- a/drivers/net/ethernet/davicom/dm9000.c
-+++ b/drivers/net/ethernet/davicom/dm9000.c
-@@ -29,6 +29,8 @@
- #include <linux/spinlock.h>
- #include <linux/crc32.h>
- #include <linux/mii.h>
-+#include <linux/of.h>
-+#include <linux/of_net.h>
- #include <linux/ethtool.h>
- #include <linux/dm9000.h>
- #include <linux/delay.h>
-@@ -1358,6 +1360,31 @@ static const struct net_device_ops dm9000_netdev_ops = {
- #endif
- };
- 
-+static struct dm9000_plat_data *dm9000_parse_dt(struct device *dev)
-+{
-+	struct dm9000_plat_data *pdata;
-+	struct device_node *np = dev->of_node;
-+	const void *mac_addr;
-+
-+	if (!IS_ENABLED(CONFIG_OF) || !np)
-+		return NULL;
-+
-+	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata)
-+		return ERR_PTR(-ENOMEM);
-+
-+	if (of_find_property(np, "davicom,ext-phy", NULL))
-+		pdata->flags |= DM9000_PLATF_EXT_PHY;
-+	if (of_find_property(np, "davicom,no-eeprom", NULL))
-+		pdata->flags |= DM9000_PLATF_NO_EEPROM;
-+
-+	mac_addr = of_get_mac_address(np);
-+	if (mac_addr)
-+		memcpy(pdata->dev_addr, mac_addr, sizeof(pdata->dev_addr));
-+
-+	return pdata;
-+}
-+
- /*
-  * Search DM9000 board, allocate space and register it
-  */
-@@ -1373,6 +1400,12 @@ dm9000_probe(struct platform_device *pdev)
- 	int i;
- 	u32 id_val;
- 
-+	if (!pdata) {
-+		pdata = dm9000_parse_dt(&pdev->dev);
-+		if (IS_ERR(pdata))
-+			return PTR_ERR(pdata);
-+	}
-+
- 	/* Init network device */
- 	ndev = alloc_etherdev(sizeof(struct board_info));
- 	if (!ndev)
-@@ -1683,11 +1716,20 @@ dm9000_drv_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id dm9000_of_matches[] = {
-+	{ .compatible = "davicom,dm9000", },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, dm9000_of_matches);
-+#endif
-+
- static struct platform_driver dm9000_driver = {
- 	.driver	= {
- 		.name    = "dm9000",
- 		.owner	 = THIS_MODULE,
- 		.pm	 = &dm9000_drv_pm_ops,
-+		.of_match_table = of_match_ptr(dm9000_of_matches),
- 	},
- 	.probe   = dm9000_probe,
- 	.remove  = dm9000_drv_remove,
 -- 
-1.8.2.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
