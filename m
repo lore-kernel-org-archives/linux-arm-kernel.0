@@ -1,22 +1,15 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 20 May 2013 11:46:54 -0600
-Subject: [PATCH 1/4] ARM: tegra: use #include for all device trees
-In-Reply-To: <1368473072-10145-1-git-send-email-swarren@wwwdotorg.org>
-References: <1368473072-10145-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <519A618E.4040400@wwwdotorg.org>
+Date: Mon, 20 May 2013 11:47:21 -0600
+Subject: [PATCH V2 3/4] ARM: tegra: convert device tree files to use GPIO
+ defines
+In-Reply-To: <1369069845-7601-1-git-send-email-swarren@wwwdotorg.org>
+References: <1369069845-7601-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <519A61A9.2040407@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2013 01:24 PM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> Replace /include/ (dtc) with #include (C pre-processor) for all Tegra DT
-> files, so that gcc -E handles the entire include tree, and hence any of
-> those files can #include some other file e.g. for constant definitions.
-> 
-> This allows future use of #defines and header files in order to define
-> names for various constants, such as the IDs and flags in GPIO
-> specifiers. Use of those features will increase the readability of the
-> device tree files.
+On 05/20/2013 11:10 AM, Stephen Warren wrote:
+> Use TEGRA_GPIO() macro to name all GPIOs referenced by GPIO properties,
+> and some interrupts properties. Use standard GPIO flag defines too.
 
-I have applied this series, with patch 3/4 replaced with V3 of that patch.
+Applied (along with the reset of the series) to Tegra's for-3.11/dt branch.
