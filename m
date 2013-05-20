@@ -1,103 +1,359 @@
 From: james.hogan@imgtec.com (James Hogan)
-Date: Mon, 20 May 2013 14:28:22 +0100
-Subject: [PATCH v4 0/5] clk: implement remuxing during set_rate
-Message-ID: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
+Date: Mon, 20 May 2013 14:28:25 +0100
+Subject: [PATCH v4 3/5] clk: add support for clock reparent on set_rate
+In-Reply-To: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
+References: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
+Message-ID: <1369056507-32521-4-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for automatic selection of the best parent
-for a clock mux, i.e. the one which can provide the closest clock rate
-to that requested. It can be disabled by a new CLK_SET_RATE_NO_REPARENT
-flag (which is set for all uses of clk_register_mux().
+Add core support to allow clock implementations to select the best
+parent clock when rounding a rate, e.g. the one which can provide the
+closest clock rate to that requested. This is by way of adding a new
+clock op, determine_rate(), which is like round_rate() but has an extra
+parameter to allow the clock implementation to optionally select a
+different parent clock. The core then takes care of reparenting the
+clock when setting the rate.
 
-This works by way of adding a new op, determine_rate, similar to
-round_rate but with an extra parameter to allow the clock driver to
-optionally select a different parent clock. This is used in
-clk_calc_new_rates to decide whether to initiate a set_parent operation.
+The parent change takes place with the help of some new private data
+members. struct clk::new_parent specifies a clock's new parent (NULL
+indicates no change), and struct clk::new_child specifies a clock's new
+child (whose new_parent member points back to it). The purpose of these
+are to allow correct walking of the future tree for notifications prior
+to actually reparenting any clocks, specifically to skip child clocks
+who are being reparented to another clock (they will be notified via the
+new parent), and to include any new child clock. These pointers are set
+by clk_calc_subtree(), and the new_child pointer gets cleared when a
+child is actually reparented to avoid duplicate POST_RATE_CHANGE
+notifications.
 
+Each place where round_rate() is called, determine_rate() is checked
+first and called in preference. This restructures a few of the call
+sites to simplify the logic into if/else blocks.
+
+Signed-off-by: James Hogan <james.hogan@imgtec.com>
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+---
 Changes in v4:
 
-* rebased on clk-next ("clk: sun5i: Add compatibles for Allwinner A13").
+* (not included Stephen Boyd's Reviewed-by due to changes)
 * replace __clk_set_parent_no_recalc with __clk_set_parent.
 * never pass NULL to determine_rate's best_parent_clk parameter, and
   slight refactor of __clk_round_rate to use local copy of clk->parent.
 * a few new comments around use of clk::new_child.
-* new patch (patch 2) split out of patch 3 to avoid having to declare
-  static __clk_set_parent() at the top of clk.c, and to ease readability
-  of patch 3.
 
 Changes in v3:
 
 * rebased on v3.10-rc1.
-* remove double underscore prefix from clk_get_parent_by_index()
 * store new_parent_index in struct clk too (calculated from
   clk_fetch_parent_index, and passed through __clk_set_parent_no_recalc
   to __clk_set_parent).
 * allow determine_rate to satisfy recalc_rate check in __clk_init.
-* rename/invert CLK_SET_RATE_REMUX to CLK_SET_RATE_NO_REPARENT and move
-  to patch 3.
-* patch 3: add CLK_SET_RATE_NO_REPARENT flag to all callers of
-  clk_register_mux. If you don't mind your clocks being reparented in
-  response to set_rate please let me know and I'll drop the relevant
-  portion of the patch.
 
-Changes in v2:
+ Documentation/clk.txt        |   4 ++
+ drivers/clk/clk.c            | 142 +++++++++++++++++++++++++++++--------------
+ include/linux/clk-private.h  |   3 +
+ include/linux/clk-provider.h |   7 +++
+ 4 files changed, 110 insertions(+), 46 deletions(-)
 
-I've moved the mux determine_rate implementation into a core helper, but
-I haven't pushed it fully into the core, as I think it just wouldn't
-work correctly for more complex clocks, e.g. if you (theoretically) had
-a combined mux and divide, you'd want to intercept the determine_rate
-and ask for a larger rate from the parent clocks, then return the
-divided rate. This should be possible by wrapping the mux determine_rate
-helper.
-
-Patch 1 still exports the __clk_get_parent_by_index as it seems like it
-might be a useful thing for clock implementations to have access to if
-they ever wanted to do something more fancy with changing clock parents.
-
-I haven't made any attempt to implement the atomic set_parent+set_rate
-as I don't have hardware that could take proper advantage of it, but it
-shouldn't be too difficult for others to implement if they wanted since
-they're fairly close to one another (in clk_change_rate()).
-
-* switched to using new determine_rate op rather than adding an argument
-  to round_rate.
-* moved mux implementation into a single helper which should be usable
-  from more complex clocks which can mux.
-* rewrite main implementation so that no changes are made until after
-  the PRE notifications have been sent, and in a way that should ensure
-  correct notifications without duplicates, and I think should be safe
-  in the event of a notification failing.
-* various tidy ups and fixes.
-
-James Hogan (5):
-  clk: abstract parent cache
-  clk: move some parent related functions upwards
-  clk: add support for clock reparent on set_rate
-  clk: add CLK_SET_RATE_NO_REPARENT flag
-  clk: clk-mux: implement remuxing on set_rate
-
- Documentation/clk.txt                |   4 +
- arch/arm/mach-imx/clk.h              |   5 +-
- drivers/clk/clk-mux.c                |   1 +
- drivers/clk/clk.c                    | 416 ++++++++++++++++++++++-------------
- drivers/clk/mmp/clk-mmp2.c           |  39 ++--
- drivers/clk/mmp/clk-pxa168.c         |  40 ++--
- drivers/clk/mmp/clk-pxa910.c         |  31 ++-
- drivers/clk/mxs/clk.h                |   4 +-
- drivers/clk/samsung/clk.h            |   2 +-
- drivers/clk/spear/spear1310_clock.c  | 179 +++++++--------
- drivers/clk/spear/spear1340_clock.c  |  97 ++++----
- drivers/clk/spear/spear3xx_clock.c   |  57 +++--
- drivers/clk/spear/spear6xx_clock.c   |  35 +--
- drivers/clk/sunxi/clk-sunxi.c        |   3 +-
- drivers/clk/tegra/clk-tegra114.c     |  36 ++-
- drivers/clk/tegra/clk-tegra20.c      |   6 +-
- drivers/clk/tegra/clk-tegra30.c      |  33 ++-
- drivers/clk/versatile/clk-vexpress.c |   4 +-
- include/linux/clk-private.h          |   3 +
- include/linux/clk-provider.h         |  12 +
- 20 files changed, 614 insertions(+), 393 deletions(-)
-
+diff --git a/Documentation/clk.txt b/Documentation/clk.txt
+index b9911c2..3110ba4 100644
+--- a/Documentation/clk.txt
++++ b/Documentation/clk.txt
+@@ -70,6 +70,10 @@ the operations defined in clk.h:
+ 						unsigned long parent_rate);
+ 		long		(*round_rate)(struct clk_hw *hw, unsigned long,
+ 						unsigned long *);
++		long		(*determine_rate)(struct clk_hw *hw,
++						unsigned long rate,
++						unsigned long *best_parent_rate,
++						struct clk **best_parent_clk);
+ 		int		(*set_parent)(struct clk_hw *hw, u8 index);
+ 		u8		(*get_parent)(struct clk_hw *hw);
+ 		int		(*set_rate)(struct clk_hw *hw, unsigned long);
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index a4cd6bc..3ce4810 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -888,21 +888,24 @@ EXPORT_SYMBOL_GPL(clk_enable);
+ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+ {
+ 	unsigned long parent_rate = 0;
++	struct clk *parent;
+ 
+ 	if (!clk)
+ 		return 0;
+ 
+-	if (!clk->ops->round_rate) {
+-		if (clk->flags & CLK_SET_RATE_PARENT)
+-			return __clk_round_rate(clk->parent, rate);
+-		else
+-			return clk->rate;
+-	}
+-
+-	if (clk->parent)
+-		parent_rate = clk->parent->rate;
+-
+-	return clk->ops->round_rate(clk->hw, rate, &parent_rate);
++	parent = clk->parent;
++	if (parent)
++		parent_rate = parent->rate;
++
++	if (clk->ops->determine_rate)
++		return clk->ops->determine_rate(clk->hw, rate, &parent_rate,
++						&parent);
++	else if (clk->ops->round_rate)
++		return clk->ops->round_rate(clk->hw, rate, &parent_rate);
++	else if (clk->flags & CLK_SET_RATE_PARENT)
++		return __clk_round_rate(clk->parent, rate);
++	else
++		return clk->rate;
+ }
+ 
+ /**
+@@ -1055,6 +1058,10 @@ static u8 clk_fetch_parent_index(struct clk *clk, struct clk *parent)
+ 
+ static void clk_reparent(struct clk *clk, struct clk *new_parent)
+ {
++	/* avoid duplicate POST_RATE_CHANGE notifications */
++	if (new_parent->new_child == clk)
++		new_parent->new_child = NULL;
++
+ 	hlist_del(&clk->child_node);
+ 
+ 	if (new_parent)
+@@ -1173,18 +1180,25 @@ out:
+ 	return ret;
+ }
+ 
+-static void clk_calc_subtree(struct clk *clk, unsigned long new_rate)
++static void clk_calc_subtree(struct clk *clk, unsigned long new_rate,
++			     struct clk *new_parent, u8 p_index)
+ {
+ 	struct clk *child;
+ 
+ 	clk->new_rate = new_rate;
++	clk->new_parent = new_parent;
++	clk->new_parent_index = p_index;
++	/* include clk in new parent's PRE_RATE_CHANGE notifications */
++	clk->new_child = NULL;
++	if (new_parent && new_parent != clk->parent)
++		new_parent->new_child = clk;
+ 
+ 	hlist_for_each_entry(child, &clk->children, child_node) {
+ 		if (child->ops->recalc_rate)
+ 			child->new_rate = child->ops->recalc_rate(child->hw, new_rate);
+ 		else
+ 			child->new_rate = new_rate;
+-		clk_calc_subtree(child, child->new_rate);
++		clk_calc_subtree(child, child->new_rate, NULL, 0);
+ 	}
+ }
+ 
+@@ -1195,50 +1209,63 @@ static void clk_calc_subtree(struct clk *clk, unsigned long new_rate)
+ static struct clk *clk_calc_new_rates(struct clk *clk, unsigned long rate)
+ {
+ 	struct clk *top = clk;
++	struct clk *old_parent, *parent;
+ 	unsigned long best_parent_rate = 0;
+ 	unsigned long new_rate;
++	u8 p_index = 0;
+ 
+ 	/* sanity */
+ 	if (IS_ERR_OR_NULL(clk))
+ 		return NULL;
+ 
+ 	/* save parent rate, if it exists */
+-	if (clk->parent)
+-		best_parent_rate = clk->parent->rate;
+-
+-	/* never propagate up to the parent */
+-	if (!(clk->flags & CLK_SET_RATE_PARENT)) {
+-		if (!clk->ops->round_rate) {
+-			clk->new_rate = clk->rate;
+-			return NULL;
+-		}
+-		new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
++	parent = old_parent = clk->parent;
++	if (parent)
++		best_parent_rate = parent->rate;
++
++	/* find the closest rate and parent clk/rate */
++	if (clk->ops->determine_rate) {
++		new_rate = clk->ops->determine_rate(clk->hw, rate,
++						    &best_parent_rate,
++						    &parent);
++	} else if (clk->ops->round_rate) {
++		new_rate = clk->ops->round_rate(clk->hw, rate,
++						&best_parent_rate);
++	} else if (!parent || !(clk->flags & CLK_SET_RATE_PARENT)) {
++		/* pass-through clock without adjustable parent */
++		clk->new_rate = clk->rate;
++		return NULL;
++	} else {
++		/* pass-through clock with adjustable parent */
++		top = clk_calc_new_rates(parent, rate);
++		new_rate = parent->new_rate;
+ 		goto out;
+ 	}
+ 
+-	/* need clk->parent from here on out */
+-	if (!clk->parent) {
+-		pr_debug("%s: %s has NULL parent\n", __func__, clk->name);
++	/* some clocks must be gated to change parent */
++	if (parent != old_parent &&
++	    (clk->flags & CLK_SET_PARENT_GATE) && clk->prepare_count) {
++		pr_debug("%s: %s not gated but wants to reparent\n",
++			 __func__, clk->name);
+ 		return NULL;
+ 	}
+ 
+-	if (!clk->ops->round_rate) {
+-		top = clk_calc_new_rates(clk->parent, rate);
+-		new_rate = clk->parent->new_rate;
+-
+-		goto out;
++	/* try finding the new parent index */
++	if (parent) {
++		p_index = clk_fetch_parent_index(clk, parent);
++		if (p_index == clk->num_parents) {
++			pr_debug("%s: clk %s can not be parent of clk %s\n",
++				 __func__, parent->name, clk->name);
++			return NULL;
++		}
+ 	}
+ 
+-	new_rate = clk->ops->round_rate(clk->hw, rate, &best_parent_rate);
+-
+-	if (best_parent_rate != clk->parent->rate) {
+-		top = clk_calc_new_rates(clk->parent, best_parent_rate);
+-
+-		goto out;
+-	}
++	if ((clk->flags & CLK_SET_RATE_PARENT) && parent &&
++	    best_parent_rate != parent->rate)
++		top = clk_calc_new_rates(parent, best_parent_rate);
+ 
+ out:
+-	clk_calc_subtree(clk, new_rate);
++	clk_calc_subtree(clk, new_rate, parent, p_index);
+ 
+ 	return top;
+ }
+@@ -1250,7 +1277,7 @@ out:
+  */
+ static struct clk *clk_propagate_rate_change(struct clk *clk, unsigned long event)
+ {
+-	struct clk *child, *fail_clk = NULL;
++	struct clk *child, *tmp_clk, *fail_clk = NULL;
+ 	int ret = NOTIFY_DONE;
+ 
+ 	if (clk->rate == clk->new_rate)
+@@ -1263,9 +1290,19 @@ static struct clk *clk_propagate_rate_change(struct clk *clk, unsigned long even
+ 	}
+ 
+ 	hlist_for_each_entry(child, &clk->children, child_node) {
+-		clk = clk_propagate_rate_change(child, event);
+-		if (clk)
+-			fail_clk = clk;
++		/* Skip children who will be reparented to another clock */
++		if (child->new_parent && child->new_parent != clk)
++			continue;
++		tmp_clk = clk_propagate_rate_change(child, event);
++		if (tmp_clk)
++			fail_clk = tmp_clk;
++	}
++
++	/* handle the new child who might not be in clk->children yet */
++	if (clk->new_child) {
++		tmp_clk = clk_propagate_rate_change(clk->new_child, event);
++		if (tmp_clk)
++			fail_clk = tmp_clk;
+ 	}
+ 
+ 	return fail_clk;
+@@ -1283,6 +1320,10 @@ static void clk_change_rate(struct clk *clk)
+ 
+ 	old_rate = clk->rate;
+ 
++	/* set parent */
++	if (clk->new_parent && clk->new_parent != clk->parent)
++		__clk_set_parent(clk, clk->new_parent, clk->new_parent_index);
++
+ 	if (clk->parent)
+ 		best_parent_rate = clk->parent->rate;
+ 
+@@ -1297,8 +1338,16 @@ static void clk_change_rate(struct clk *clk)
+ 	if (clk->notifier_count && old_rate != clk->rate)
+ 		__clk_notify(clk, POST_RATE_CHANGE, old_rate, clk->rate);
+ 
+-	hlist_for_each_entry(child, &clk->children, child_node)
++	hlist_for_each_entry(child, &clk->children, child_node) {
++		/* Skip children who will be reparented to another clock */
++		if (child->new_parent && child->new_parent != clk)
++			continue;
+ 		clk_change_rate(child);
++	}
++
++	/* handle the new child who might not be in clk->children yet */
++	if (clk->new_child)
++		clk_change_rate(clk->new_child);
+ }
+ 
+ /**
+@@ -1545,8 +1594,9 @@ int __clk_init(struct device *dev, struct clk *clk)
+ 
+ 	/* check that clk_ops are sane.  See Documentation/clk.txt */
+ 	if (clk->ops->set_rate &&
+-			!(clk->ops->round_rate && clk->ops->recalc_rate)) {
+-		pr_warning("%s: %s must implement .round_rate & .recalc_rate\n",
++	    !((clk->ops->round_rate || clk->ops->determine_rate) &&
++	      clk->ops->recalc_rate)) {
++		pr_warning("%s: %s must implement .round_rate or .determine_rate in addition to .recalc_rate\n",
+ 				__func__, clk->name);
+ 		ret = -EINVAL;
+ 		goto out;
+diff --git a/include/linux/clk-private.h b/include/linux/clk-private.h
+index dd7adff..8138c94 100644
+--- a/include/linux/clk-private.h
++++ b/include/linux/clk-private.h
+@@ -33,8 +33,11 @@ struct clk {
+ 	const char		**parent_names;
+ 	struct clk		**parents;
+ 	u8			num_parents;
++	u8			new_parent_index;
+ 	unsigned long		rate;
+ 	unsigned long		new_rate;
++	struct clk		*new_parent;
++	struct clk		*new_child;
+ 	unsigned long		flags;
+ 	unsigned int		enable_count;
+ 	unsigned int		prepare_count;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 76b1667..24cb2ee 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -79,6 +79,10 @@ struct clk_hw;
+  * @round_rate:	Given a target rate as input, returns the closest rate actually
+  * 		supported by the clock.
+  *
++ * @determine_rate: Given a target rate as input, returns the closest rate
++ *		actually supported by the clock, and optionally the parent clock
++ *		that should be used to provide the clock rate.
++ *
+  * @get_parent:	Queries the hardware to determine the parent of a clock.  The
+  * 		return value is a u8 which specifies the index corresponding to
+  * 		the parent clock.  This index can be applied to either the
+@@ -126,6 +130,9 @@ struct clk_ops {
+ 					unsigned long parent_rate);
+ 	long		(*round_rate)(struct clk_hw *hw, unsigned long,
+ 					unsigned long *);
++	long		(*determine_rate)(struct clk_hw *hw, unsigned long rate,
++					unsigned long *best_parent_rate,
++					struct clk **best_parent_clk);
+ 	int		(*set_parent)(struct clk_hw *hw, u8 index);
+ 	u8		(*get_parent)(struct clk_hw *hw);
+ 	int		(*set_rate)(struct clk_hw *hw, unsigned long,
 -- 
 1.8.1.2
