@@ -1,133 +1,95 @@
 From: gmbnomis@gmail.com (Simon Baatz)
-Date: Tue, 21 May 2013 01:01:42 +0200
-Subject: [PATCH V3 01/10] mmc: return mmc_of_parse() errors to caller
-In-Reply-To: <1369090911-1479-1-git-send-email-gmbnomis@gmail.com>
-References: <1369090911-1479-1-git-send-email-gmbnomis@gmail.com>
-Message-ID: <1369090911-1479-2-git-send-email-gmbnomis@gmail.com>
+Date: Tue, 21 May 2013 01:01:41 +0200
+Subject: [PATCH V3 00/10] mmc_of_parse() adaptations,
+ DT support for Sheevaplugs
+Message-ID: <1369090911-1479-1-git-send-email-gmbnomis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In addition to just logging errors encountered during DT parsing or
-allocating GPIO slots for CD/WP, mmc_of_parse() now returns with an error.
+Hi,
 
-In particular, this is needed if the GPIO allocation may return
-EPROBE_DEFER.
+	V3 changes:
+	- Patch 01/10: Added EPROBE_DEFER case to mmc_of_parse() 
+	- Added Acked-By to (unmodified) patches 02 and 03.
 
-Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
----
+	V2 changes:
+	- Converted mvsdio to use mmc_of_parse()
+	- Adapted DTS files using mvsdio accordingly
+	- Changed mmc_of_parse() to return errors to the caller
 
-changes in V3:
-- Handle EPROBE_DEFER case
+While adding DT support for the Sheevaplugs by Globalscale Technologies
+(Kirkwood), it turned out that the DT binding of mvsdio lacked features to
+properly support the hardware (active high/low of CD and WP pins could not
+be described in DT).
 
- drivers/mmc/core/host.c  |   30 +++++++++++++++++++++++++-----
- include/linux/mmc/host.h |    2 +-
- 2 files changed, 26 insertions(+), 6 deletions(-)
+This is standard functionality provided by the mmc_of_parse() helper
+function.  However, mmc_of_parse() may allocate GPIO lines.  If the
+allocation fails, it outputs an error, but does not return an error to its
+caller.  Therefore, a proposal to handle errors in mmc_of_parse() is made.
 
-diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-index 2a3593d..89f5849 100644
---- a/drivers/mmc/core/host.c
-+++ b/drivers/mmc/core/host.c
-@@ -306,7 +306,7 @@ static inline void mmc_host_clk_sysfs_init(struct mmc_host *host)
-  * parse the properties and set respective generic mmc-host flags and
-  * parameters.
-  */
--void mmc_of_parse(struct mmc_host *host)
-+int mmc_of_parse(struct mmc_host *host)
- {
- 	struct device_node *np;
- 	u32 bus_width;
-@@ -315,7 +315,7 @@ void mmc_of_parse(struct mmc_host *host)
- 	int len, ret, gpio;
- 
- 	if (!host->parent || !host->parent->of_node)
--		return;
-+		return 0;
- 
- 	np = host->parent->of_node;
- 
-@@ -338,6 +338,7 @@ void mmc_of_parse(struct mmc_host *host)
- 	default:
- 		dev_err(host->parent,
- 			"Invalid \"bus-width\" value %ud!\n", bus_width);
-+		return -EINVAL;
- 	}
- 
- 	/* f_max is obtained from the optional "max-frequency" property */
-@@ -367,18 +368,22 @@ void mmc_of_parse(struct mmc_host *host)
- 			host->caps |= MMC_CAP_NEEDS_POLL;
- 
- 		gpio = of_get_named_gpio_flags(np, "cd-gpios", 0, &flags);
-+		if (gpio == -EPROBE_DEFER)
-+			return gpio;
- 		if (gpio_is_valid(gpio)) {
- 			if (!(flags & OF_GPIO_ACTIVE_LOW))
- 				gpio_inv_cd = true;
- 
- 			ret = mmc_gpio_request_cd(host, gpio);
--			if (ret < 0)
-+			if (ret < 0) {
- 				dev_err(host->parent,
- 					"Failed to request CD GPIO #%d: %d!\n",
- 					gpio, ret);
--			else
-+				return ret;
-+			} else {
- 				dev_info(host->parent, "Got CD GPIO #%d.\n",
- 					 gpio);
-+			}
- 		}
- 
- 		if (explicit_inv_cd ^ gpio_inv_cd)
-@@ -389,14 +394,23 @@ void mmc_of_parse(struct mmc_host *host)
- 	explicit_inv_wp = of_property_read_bool(np, "wp-inverted");
- 
- 	gpio = of_get_named_gpio_flags(np, "wp-gpios", 0, &flags);
-+	if (gpio == -EPROBE_DEFER) {
-+		ret = -EPROBE_DEFER;
-+		goto out;
-+	}
- 	if (gpio_is_valid(gpio)) {
- 		if (!(flags & OF_GPIO_ACTIVE_LOW))
- 			gpio_inv_wp = true;
- 
- 		ret = mmc_gpio_request_ro(host, gpio);
--		if (ret < 0)
-+		if (ret < 0) {
- 			dev_err(host->parent,
- 				"Failed to request WP GPIO: %d!\n", ret);
-+			goto out;
-+		} else {
-+				dev_info(host->parent, "Got WP GPIO #%d.\n",
-+					 gpio);
-+		}
- 	}
- 	if (explicit_inv_wp ^ gpio_inv_wp)
- 		host->caps2 |= MMC_CAP2_RO_ACTIVE_HIGH;
-@@ -413,6 +427,12 @@ void mmc_of_parse(struct mmc_host *host)
- 		host->pm_caps |= MMC_PM_KEEP_POWER;
- 	if (of_find_property(np, "enable-sdio-wakeup", &len))
- 		host->pm_caps |= MMC_PM_WAKE_SDIO_IRQ;
-+
-+	return 0;
-+
-+out:
-+	mmc_gpio_free_cd(host);
-+	return ret;
- }
- 
- EXPORT_SYMBOL(mmc_of_parse);
-diff --git a/include/linux/mmc/host.h b/include/linux/mmc/host.h
-index e326ae2..c8c4fbc 100644
---- a/include/linux/mmc/host.h
-+++ b/include/linux/mmc/host.h
-@@ -369,7 +369,7 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *);
- int mmc_add_host(struct mmc_host *);
- void mmc_remove_host(struct mmc_host *);
- void mmc_free_host(struct mmc_host *);
--void mmc_of_parse(struct mmc_host *host);
-+int mmc_of_parse(struct mmc_host *host);
- 
- static inline void *mmc_priv(struct mmc_host *host)
- {
+The patch set is structured as follows:
+
+1   Adapt mmc_of_parse() to return errors
+2-6 Handle errors in current drivers using mmc_of_parse() (compile tested
+    only)
+7-8 Convert mvsdio and respective dts files to mmc_of_parse() (tested on
+    kirkwood)
+9   Add dts files for (eSATA) Sheevaplug
+10  Add DT support for (eSATA) Sheevaplug
+
+
+I could only test on an eSATA Sheevaplug. I found patches with
+different LEDs for the Sheevaplug.  Thus, I would highly appreciate if
+someone with the hardware could give this a spin on a non-eSATA
+version.  Some additional testing of the change detect and write
+protect behaviour for mvsdio can't hurt either.  I hope that there aren't
+board revisions with different CD/WP pins out there.
+
+Simon Baatz (10):
+  mmc: return mmc_of_parse() errors to caller
+  mmc: sh_mmcif: handle mmc_of_parse() errors during probe
+  mmc: tmio-mmc: handle mmc_of_parse() errors during probe
+  mmc: mxcmmc: handle mmc_of_parse() errors during probe
+  mmc: sdhci-pxav3: handle mmc_of_parse() errors during probe
+  mmc: tegra: handle mmc_of_parse() errors during probe
+  ARM: mvebu: Use standard MMC binding for all users of mvsdio
+  mmc: mvsdio: use standard MMC device-tree binding parser
+    mmc_of_parse()
+  ARM: Kirkwood: Add dts files for Sheevaplug and eSATA Sheevaplug
+  ARM: Kirkwood: add DT support for Sheevaplug and Sheevaplug eSATA
+
+ arch/arm/boot/dts/Makefile                         |    2 +
+ arch/arm/boot/dts/armada-370-db.dts                |    1 +
+ arch/arm/boot/dts/armada-370-mirabox.dts           |    1 +
+ arch/arm/boot/dts/armada-370-rd.dts                |    1 +
+ arch/arm/boot/dts/armada-370-xp.dtsi               |    4 +
+ arch/arm/boot/dts/armada-xp-db.dts                 |    1 +
+ arch/arm/boot/dts/kirkwood-dreamplug.dts           |    1 +
+ .../arm/boot/dts/kirkwood-guruplug-server-plus.dts |    2 +
+ arch/arm/boot/dts/kirkwood-mplcec4.dts             |    2 +-
+ arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi  |   97 ++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts    |   40 ++++++++
+ arch/arm/boot/dts/kirkwood-sheevaplug.dts          |   45 +++++++++
+ arch/arm/boot/dts/kirkwood-topkick.dts             |    1 +
+ arch/arm/boot/dts/kirkwood.dtsi                    |    4 +
+ arch/arm/mach-kirkwood/Kconfig                     |    7 ++
+ arch/arm/mach-kirkwood/Makefile                    |    1 +
+ arch/arm/mach-kirkwood/board-dt.c                  |    4 +
+ arch/arm/mach-kirkwood/board-sheevaplug.c          |   27 ++++++
+ arch/arm/mach-kirkwood/common.h                    |    5 +
+ drivers/mmc/core/host.c                            |   30 +++++-
+ drivers/mmc/host/mvsdio.c                          |   73 ++++++++-------
+ drivers/mmc/host/mxcmmc.c                          |    4 +-
+ drivers/mmc/host/sdhci-pxav3.c                     |    7 +-
+ drivers/mmc/host/sdhci-tegra.c                     |    9 +-
+ drivers/mmc/host/sh_mmcif.c                        |    7 +-
+ drivers/mmc/host/tmio_mmc_pio.c                    |    4 +-
+ include/linux/mmc/host.h                           |    2 +-
+ 27 files changed, 334 insertions(+), 48 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
+ create mode 100644 arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-sheevaplug.dts
+ create mode 100644 arch/arm/mach-kirkwood/board-sheevaplug.c
+
 -- 
 1.7.9.5
