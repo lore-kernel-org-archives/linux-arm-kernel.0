@@ -1,95 +1,48 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Mon, 20 May 2013 09:40:18 -0500
-Subject: [PATCHv2 6/6] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
-In-Reply-To: <20130517114607.GB3466@amd.pavel.ucw.cz>
-References: <1368731117-4749-1-git-send-email-dinguyen@altera.com>
- <1368731117-4749-6-git-send-email-dinguyen@altera.com>
- <20130517114607.GB3466@amd.pavel.ucw.cz>
-Message-ID: <519A35D2.4010601@gmail.com>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Mon, 20 May 2013 07:40:24 -0700
+Subject: [PATCH] include/linux/posix_acl.h: need 'return NULL' when BUG(),
+ if neither CONFIG_BUG nor HAVE_ARCH_BUG is defined.
+In-Reply-To: <5199DBE2.5080707@asianux.com>
+References: <5199DBE2.5080707@asianux.com>
+Message-ID: <97dada79-cd78-4799-8f18-ed2bf8eee508@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
 
-On 05/17/2013 06:46 AM, Pavel Machek wrote:
-> Hi!
-> 
->> Add platform specific functionality for the DW SD/MMC driver for
->> SoCFPGA. Move SDMMC_CMD_USE_HOLD_REG to dw_mmc.h so other platforms
->> can use this define.
-> 
->> --- /dev/null
->> +++ b/drivers/mmc/host/dw_mmc-socfpga.c
->> @@ -0,0 +1,139 @@
->> +/*
->> + * Altera SoCFPGA Specific Extensions for Synopsys DW Multimedia Card Interface driver
->> + *
->> + *  Copyright (C) 2012, Samsung Electronics Co., Ltd.
->> + *  Copyright (C) 2013 Altera Corporation
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * Taken from dw_mmc_exynos.c
-> 
-> Actually it is   dw_mmc-exynos.c
 
-Will fix in rev3.
+Chen Gang <gang.chen@asianux.com> wrote:
 
-> 
->> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET		0x108
->> +#define DRV_CLK_PHASE_SHIFT_SEL_MASK	0x7
->> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)		\
->> +	((((drvsel) << 0) & 0x7) | (((smplsel) << 3) & 0x38))
-> 
-> Should SYSMGR stuff go to shared header file somewhere?
-> 
->> +extern void __iomem *sys_manager_base_addr;
-> 
-> This is unused.
+>
+>If neither CONFIG_BUG nor HAVE_ARCH_BUG is defined, the BUG() will
+>defined as empty (e.g. randconfig with MMU for arm s5pv210)
+>
+>In this case, need 'return NULL' to let upper caller knows the failure.
 
-Will remove.
+Seriously?  The correct fix it would seem is to give a useful default BUG definition.  Say *NULL.
 
-> 
->> +/* SOCFPGA implementation specific driver private data */
->> +struct dw_mci_socfpga_priv_data {
->> +	u8	ciu_div;
-> 
-> comment would be nice, something like
-> /* card interface unit divisor */ ?
-> 
->> +	u32	hs_timing;
-> 
-> /* card interface unit phase shift for RX/TX mode */
-> ?
+Further we should never hit that code in the first place if it calls BUG.  So upper callers should never get there.
 
-Will add comments.
+If it is ever possible to get there the callers need to be fixed.
 
-> 
->> +static int dw_mci_socfpga_setup_clock(struct dw_mci *host)
->> +{
->> +	struct dw_mci_socfpga_priv_data *priv = host->priv;
->> +
->> +	clk_disable(host->ciu_clk);
->> +	regmap_write(priv->sysreg, SYSMGR_SDMMCGRP_CTRL_OFFSET, priv->hs_timing);
->> +	clk_enable(host->ciu_clk);
->> +
->> +	host->bus_hz /= (priv->ciu_div + 1);
-> 
-> Previous version said:
-> 
-> +       host->bus_hz /= priv->ciu_div;
-> 
-> I see you want to avoid division by zero, but this will introduce
-> significant error for low divisors, right? Is divisor of 0 valid?
+Eric
 
-Divisor of 0 is not valid. Not sure what you mean my low divisos?
-
-Thanks,
-Dinh
+>Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>---
+> include/linux/posix_acl.h |    1 +
+> 1 files changed, 1 insertions(+), 0 deletions(-)
+>
+>diff --git a/include/linux/posix_acl.h b/include/linux/posix_acl.h
+>index 7931efe..2c48d06 100644
+>--- a/include/linux/posix_acl.h
+>+++ b/include/linux/posix_acl.h
+>@@ -104,6 +104,7 @@ static inline struct posix_acl **acl_by_type(struct
+>inode *inode, int type)
+> 		return &inode->i_default_acl;
+> 	default:
+> 		BUG();
+>+		return NULL;
+> 	}
+> }
 > 
-> Otherwise it looks good. Thanks,
-> 									Pavel
-> 
+>-- 
+>1.7.7.6
