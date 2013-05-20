@@ -1,23 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 20 May 2013 11:51:59 +0800
-Subject: [PATCH v3 1/2] pinctrl: add MVF600 pinctrl driver
-In-Reply-To: <20130520033207.GD25113@S2101-09.ap.freescale.net>
-References: <1368685224-17915-1-git-send-email-b35083@freescale.com>
- <20130520033207.GD25113@S2101-09.ap.freescale.net>
-Message-ID: <CAAQ0ZWSZeqOEceN-KmDS4_BT27_4xCYjfFMj8sHkEonOXaoF_g@mail.gmail.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Mon, 20 May 2013 09:23:19 +0530
+Subject: [PATCH] ARM: dts: add max8997 device node for exynos4210-origen
+ board
+In-Reply-To: <518C9807.80906@linaro.org>
+References: <1353664412-17678-1-git-send-email-thomas.abraham@linaro.org>
+ <50EA598D.6090604@linaro.org> <518C9807.80906@linaro.org>
+Message-ID: <51999E2F.9030703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 May 2013 11:32, Shawn Guo <shawn.guo@linaro.org> wrote:
->> +static struct imx_pinctrl_soc_info mvf600_pinctrl_info = {
->> +     .pins = mvf600_pinctrl_pads,
->> +     .npins = ARRAY_SIZE(mvf600_pinctrl_pads),
->> +     .flags = ZERO_OFFSET_VALID | SHARE_MUX_CONF_REG,
->
-> The flags should be introduced in the same patch where they are used
-> in the first place.
->
-I just found what you need to do is just to reverse the patch order,
-having this patch be the second one.
+On 05/10/2013 12:17 PM, Tushar Behera wrote:
+> On 01/07/2013 10:43 AM, Tushar Behera wrote:
+>> On 11/23/2012 03:23 PM, Thomas Abraham wrote:
+>>> Add max8997 regulator device node for exynos4210-origen board and list
+>>> all the supported regulators.
+>>>
+>>> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+>>
+>> Tested-by: Tushar Behera <tushar.behera@linaro.org>
+>>
+> Kukjin,
+> 
+> This patch got missed for 3.10 merge window. This patch still applies on
+> the latest mainline kernel and is essential for Origen board. Would you
+> please take this patch?
+> 
 
-Shawn
+Ping !!!
+
+-- 
+Tushar Behera
