@@ -1,24 +1,58 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 20 May 2013 11:10:53 -0400
-Subject: [PATCH] arm: mvebu: enable the third USB interface on
- OpenBlocks AX3
-In-Reply-To: <20130520.145044.280780615.yamagata@plathome.co.jp>
-References: <1368720444-29357-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130517.111810.02327269.yamagata@plathome.co.jp>
- <20130519201939.GL11137@titan.lakedaemon.net>
- <20130520.145044.280780615.yamagata@plathome.co.jp>
-Message-ID: <20130520151053.GT31290@titan.lakedaemon.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 20 May 2013 16:11:58 +0100
+Subject: [PATCH 14/14] ARM: elf: add new hwcap for identifying atomic
+ ldrd/strd instructions
+In-Reply-To: <20130520142459.GN31359@mudshark.cambridge.arm.com>
+References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
+ <1368810473-26070-15-git-send-email-will.deacon@arm.com>
+ <20130520141809.GA27473@arm.com>
+ <20130520142459.GN31359@mudshark.cambridge.arm.com>
+Message-ID: <20130520151158.GA3520@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 02:50:44PM +0900, yamagata at plathome.co.jp wrote:
-> Dear Mr. Jason Cooper
+On Mon, May 20, 2013 at 03:24:59PM +0100, Will Deacon wrote:
+> On Mon, May 20, 2013 at 03:18:09PM +0100, Catalin Marinas wrote:
+> > On Fri, May 17, 2013 at 06:07:53PM +0100, Will Deacon wrote:
+> > > CPUs implementing LPAE have atomic ldrd/strd instructions, meaning that
+> > > userspace software can avoid having to use the exclusive variants of
+> > > these instructions if they wish.
+> > > 
+> > > This patch advertises the atomicity of these instructions via the
+> > > hwcaps, so userspace can detect this CPU feature.
+> > > 
+> > > Reported-by: Vladimir Danushevsky <vladimir.danushevsky@oracle.com>
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ...
+> > > +
+> > > +	/* LPAE implies atomic ldrd/strd instructions */
+> > > +	vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
+> > > +	if (vmsa >= 5)
+> > > +		elf_hwcap |= HWCAP_LPAE;
+> > 
+> > As I mentioned in the past, I don't agree with exposing the "LPAE"
+> > feature to user-space, it's not a feature that user space should care
+> > about. An atomic double hwcap is better and you can even make this per
+> > CPU via __v7_proc.
 > 
-> > I don't like to assume for people, so if you could please provided a
-> > "Tested-by:" I'd appreciate it.
-> 
-> Tested-by: Atsushi Yamagata <yamagata@plathome.co.jp>
+> I don't buy the argument that this could be per-CPU: doubleword atomicity
+> requires support in the whole system -- not just in the CPU. The only way we
+> can rely on it, is by guarantees made in the architecture, which are made
+> as part of LPAE.
 
-Thanks!
+Well, you know that for A7/A15 you have this feature as they support
+LPAE. You can have it as a generic LPAE test (only that the ARM ARM
+isn't entirely clear here, so for people asking in the future we could
+say it's a feature of the A7/A15/etc.)
 
-Jason.
+> If this just boils down to a naming issue, thn I'm happy to change it, but
+> we *are* reporting whether LPAE is supported and I can't think of a better
+> name than that.
+
+Given that the ARM ARM isn't clear (though this is the case on the
+actual implementations), user space may not necessarily assume that
+LPAE==atomic doubles. That's why I think reporting the actual atomic
+feature is better.
+
+-- 
+Catalin
