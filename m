@@ -1,30 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 May 2013 20:15:43 +0200
-Subject: [PATCH] gpio: mxs: Use set and clear capabilities of the gpio
- controller
-In-Reply-To: <1367244438-5322-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1367244438-5322-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkdbXHvhnmk=QfmmZiYwdVedP2P5zY12cqRtb6QfYCu3o=A@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 20 May 2013 20:15:49 +0200
+Subject: [PATCH 00/10] clk: mvebu: restructure SoC clock drivers
+In-Reply-To: <20130520175827.GC31290@titan.lakedaemon.net>
+References: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130516184658.0650f838@skate>
+ <20130520175827.GC31290@titan.lakedaemon.net>
+Message-ID: <20130520201549.475e50d0@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 29, 2013 at 4:07 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+Dear Jason Cooper,
 
-> The current driver doesn't use the set and clear registers found on the
-> mxs gpio controller.
->
-> This leads the generic gpio controller to be using some internal value
-> to avoid looking up the value stored in the registers, making it behave
-> pretty much like a cache.
->
-> This raises some coherency problem when a gpio is not modified by the
-> gpio controller, while it can easily be fixed by using the set and clear
-> registers.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Mon, 20 May 2013 13:58:27 -0400, Jason Cooper wrote:
 
-Patch applied for rc-fixes with Shawns ACK.
+> > I've tested on Armada 370 DB (after reverting the ARM core patch
+> > that prevents this platform from booting) and the Armada XP DB.
+> > Both boards boot fine, and detect PCIe devices as they should.
+> > 
+> > There is some conflict between this set of commits and the two
+> > commits that modify the PCIe clocks in my PCIe series. I've pushed
+> > a branch at
+> > https://github.com/MISL-EBU-System-SW/mainline-public/tree/marvell-pcie-v10-and-seb-clks
+> > which has the mvebu PCIe stuff + Sebastian patches on top of it,
+> > with the conflicts resolved. The tricky thing is that since
+> > Sebastian is adding new clock files, and then removing the old
+> > ones, it's pretty easy to "loose" the changes the two PCIe clock
+> > patches are doing. The branch above works on Armada 370/XP, so you
+> > can compare the clock files if needed.
+> 
+> hmm, in my haste yesterday, I did this in the opposite order (clk,
+> then pcie on top).  I'm going to reshuffle them because I don't want
+> pcie depending on and waiting for this clock series to be ready :)
 
-Yours,
-Linus Walleij
+Ok. Either way is fine with me, but it's true that chronologically, the
+PCIe stuff has been around for way more time than the clk
+restructure patches.
+
+> The good news is everything (except kirkwood-pcie, ran out of time)
+> made it through linux-next!  Also, kisskb is now building
+> mvebu_defconfig in addition to all the other ones.
+
+Ok. Gregory can give more details, but I believe we are also building
+daily linux-next and Linus master for the mvebu_defconfig.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
