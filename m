@@ -1,60 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Sun, 19 May 2013 21:15:08 -0700
-Subject: [PATCH v3 2/4] clk: add support for clock reparent on set_rate
-In-Reply-To: <1368625263-23136-3-git-send-email-james.hogan@imgtec.com>
-References: <1368625263-23136-1-git-send-email-james.hogan@imgtec.com>
- <1368625263-23136-3-git-send-email-james.hogan@imgtec.com>
-Message-ID: <20130520041508.GA27676@codeaurora.org>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 20 May 2013 12:19:31 +0800
+Subject: [PATCH] arm64: compiling issue for allmodconfig, need "asm/parport.h"
+ by "drivers/parport/parport_pc.c"
+In-Reply-To: <20130424110511.GK23397@arm.com>
+References: <5177551D.8090007@asianux.com> <20130424082237.GA23397@arm.com>
+ <5177B1F0.10106@asianux.com>
+ <20130424102327.GF21850@mudshark.cambridge.arm.com>
+ <5177BAD0.9000500@asianux.com> <20130424110511.GK23397@arm.com>
+Message-ID: <5199A453.4080402@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Noticed another minor thing. I'm working on the set rate and
-parent at the same time op on top of this patch series. Hopefully
-have something soon.
 
-On 05/15, James Hogan wrote:
-> @@ -1181,6 +1242,11 @@ static void clk_change_rate(struct clk *clk)
->  
->  	old_rate = clk->rate;
->  
-> +	/* set parent */
-> +	if (clk->new_parent && clk->new_parent != clk->parent)
-> +		__clk_set_parent_no_recalc(clk, clk->new_parent,
-> +					   clk->new_parent_index);
-> +
+Need add the default file in 'asm/Kbuild' just like arm has done.
 
-This check here for new_parent != clk->parent ...
+The build command is:
+  make EXTRA_CFLAGS=-W ARCH=arm64 allmodconfig
+  make EXTRA_CFLAGS=-W ARCH=arm64 menuconfig
+    set "aarch64-linux-gnu-" as cross compiling prefix.
+  make EXTRA_CFLAGS=-W ARCH=arm64
 
-> @@ -1451,6 +1501,27 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
->  	return 0;
->  }
->  
-> +static int __clk_set_parent_no_recalc(struct clk *clk, struct clk *parent,
-> +				      u8 p_index)
-> +{
-> +	int ret = 0;
-> +
-> +	if (clk->parent == parent)
-> +		goto out;
+The related error:
+  drivers/parport/parport_pc.c:67:25: fatal error: asm/parport.h: No such file or directory
 
-causes this to never be true, so we can probably drop it.
 
-> +
-> +	/* only re-parent if the clock is not in use */
-> +	ret = __clk_set_parent(clk, parent, p_index);
-> +	if (ret)
-> +		goto out;
-> +
-> +	/* reparent, but don't propagate rate recalculation downstream */
-> +	clk_reparent(clk, parent);
-> +	clk_debug_reparent(clk, parent);
-> +
-> +out:
-> +	return ret;
-> +}
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm64/include/asm/Kbuild |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Also, we never check the return code so it's sort of useless.
-
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index 79a642d..9005e81 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -25,6 +25,7 @@ generic-y += local64.h
+ generic-y += mman.h
+ generic-y += msgbuf.h
+ generic-y += mutex.h
++generic-y += parport.h
+ generic-y += pci.h
+ generic-y += percpu.h
+ generic-y += poll.h
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.7.6
