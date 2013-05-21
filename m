@@ -1,40 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 21 May 2013 14:15:40 +0100
-Subject: [PATCH] arm64: kernel: need extern variable 'screen_info' for
- related driver using.
-In-Reply-To: <519B48B4.6050607@asianux.com>
-References: <5199B7D6.40907@asianux.com>
- <20130520091008.GB31359@mudshark.cambridge.arm.com>
- <519AE6D7.1090401@asianux.com>
- <CAMuHMdWNHPDkf35MYMKnxt5pn3a+dsT4jgYxuuHrp+mpZMckfw@mail.gmail.com>
- <519B278B.6030708@asianux.com>
- <20130521090336.GC10453@mudshark.cambridge.arm.com>
- <519B48B4.6050607@asianux.com>
-Message-ID: <20130521131539.GC27002@arm.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 21 May 2013 15:15:45 +0200
+Subject: [PATCH 3/6] ARM: SAMSUNG: pm: Adjust for pinctrl- and DT-enabled
+ platforms
+In-Reply-To: <CACRpkdbVnPhTMKDBtPNAka_V8H-2w2gK7prw9LVPRk_P7NMt7w@mail.gmail.com>
+References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
+ <1666561.1GujhmlVbA@flatron>
+ <CACRpkdbVnPhTMKDBtPNAka_V8H-2w2gK7prw9LVPRk_P7NMt7w@mail.gmail.com>
+Message-ID: <1738596.V1D84NEkmc@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 11:13:08AM +0100, Chen Gang wrote:
-> On 05/21/2013 05:03 PM, Will Deacon wrote:
-> > On Tue, May 21, 2013 at 08:51:39AM +0100, Chen Gang wrote:
-> >> For me, I still recommend add 'ARM64' in the long list of architectures
-> >> for 'VGA_CONSOLE', I have 3 reasons, please check:
-> >>
-> >> a. current implementation only changes one area which only related with
-> >> arm64 and 'VGA_CONSOLE', but if use 'CONFIG_HAVE_VGA_CONSOLE', that will
-> >> touch many multiple platforms dependency, at least we need discuss about
-> >> it with multiple platforms guys for it, firstly.
+Hi Linus,
+
+On Tuesday 21 of May 2013 13:29:23 Linus Walleij wrote:
+> On Fri, May 17, 2013 at 11:07 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> > On Friday 17 of May 2013 13:56:39 Doug Anderson wrote:
+> >> I wouldn't be opposed to a re-spin to address some of the above, but I
+> >> also won't object to this landing and remaining issues being addressed
+> >> in future patches.  This patch definitely does make things better and
+> >> no worse.  :)
 > > 
-> > That's a weak argument. You might as well propose the cleanup and see what
-> > people say.
+> > Let's see. If nobody takes this until Monday, which is very likely, I will
+> > send new version.
 > 
-> Hmm.. I think at least, we need discuss it with the 'final applier'
-> firstly (and now, I even do not know who is the 'final applier').
+> I applied 1 & 2 so pls repost your updated patches 3,4,5,6 on
+> monday and let's continue fixing.
 
-Well, you can post the patch to linux-arch, cc'ing the arch maintainers
-whose Kconfig files you touch. If there are no comments, it will most
-likely be picked by Andrew Morton and sent to Linus (make sure you cc
-Andrew as well).
+Thanks.
 
+Feel free to apply current version of patches 3, 4 and 5 as well. I will post 
+updated patch 6 in a while.
+
+Best regards,
 -- 
-Catalin
+Tomasz Figa
+Linux Kernel Developer
+Samsung R&D Institute Poland
+Samsung Electronics
+ 
+> Yours,
+> Linus Walleij
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
