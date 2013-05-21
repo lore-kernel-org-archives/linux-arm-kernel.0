@@ -1,18 +1,18 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 21 May 2013 13:53:51 +0800
-Subject: [PATCH 2/6] ARM: dts: imx6q{dl}: fix the pin conflict between
- SPI and WEIM
-In-Reply-To: <20130521054931.GF3080@S2101-09.ap.freescale.net>
-References: <1369039742-10893-1-git-send-email-b32955@freescale.com>
- <1369039742-10893-3-git-send-email-b32955@freescale.com>
- <20130521054931.GF3080@S2101-09.ap.freescale.net>
-Message-ID: <519B0BEF.60505@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 21 May 2013 14:01:47 +0800
+Subject: [PATCH] ARM i.MX6q: fix for ldb_di_sels
+In-Reply-To: <1369054311-2519-1-git-send-email-jiada_wang@mentor.com>
+References: <1369054311-2519-1-git-send-email-jiada_wang@mentor.com>
+Message-ID: <20130521060145.GG3080@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?05?21? 13:49, Shawn Guo ??:
-> specific pin setup for ecspi1, something like pinctrl_ecspi1_sabreauto.
-ok.
+On Mon, May 20, 2013 at 09:51:51PM +0900, Jiada Wang wrote:
+> As pll5_video_div has been introduced to represent the clock
+> generated from post-divider for video.
+> Instead of pll5_video, pll5_video_div should be proper root clock
+> for ldb_di_sel.
+> 
+> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
 
-thanks
-Huang Shijie
+Applied, thanks.
