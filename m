@@ -1,46 +1,111 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 21 May 2013 12:33:28 +0200
-Subject: [PATCH 3/9] arm: mvebu: mark functions of armada-370-xp.c as static
+Date: Tue, 21 May 2013 12:33:29 +0200
+Subject: [PATCH 4/9] arm: mvebu: remove dependency of SMP init on static I/O
+ mapping
 In-Reply-To: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369132414-18959-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369132414-18959-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the functions in armada-370-xp.c are called from the
-DT_MACHINE_START function pointers, so there is no need for them to be
-visible outside of this file, and we therefore mark them as static.
+The ->smp_init_cpus() function is called very early during boot, at a
+point where dynamic I/O mappings are not yet possible. However, in the
+Armada 370/XP implementation of this function, we have to get the
+number of CPUs. We used to do that by accessing a hardware register,
+which requires relying on a static I/O mapping set up by
+->map_io(). Not only this requires hardcoding a virtual address, but
+it also prevents us from removing the static I/O mapping.
+
+So this commit changes the way used to get the number of CPUs: we now
+use the Device Tree, which is a representation of the hardware, and
+provides us the number of available CPUs. This is also more accurate,
+because it potentially allows to boot the Linux kernel on only a
+number of CPUs given by the Device Tree, instead of unconditionally on
+all CPUs.
+
+As a consequence, the coherency_get_cpu_count() function becomes no
+longer used, so we remove it.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/armada-370-xp.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-mvebu/coherency.c |   12 ------------
+ arch/arm/mach-mvebu/coherency.h |    4 ----
+ arch/arm/mach-mvebu/common.h    |    2 ++
+ arch/arm/mach-mvebu/platsmp.c   |   10 +++++++++-
+ 4 files changed, 11 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 42a4cb3..bfe337d 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -38,18 +38,18 @@ static struct map_desc armada_370_xp_io_desc[] __initdata = {
- 	},
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 8278960..46d66c0 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -47,18 +47,6 @@ static struct of_device_id of_coherency_table[] = {
+ 	{ /* end of list */ },
  };
  
--void __init armada_370_xp_map_io(void)
-+static void __init armada_370_xp_map_io(void)
- {
- 	iotable_init(armada_370_xp_io_desc, ARRAY_SIZE(armada_370_xp_io_desc));
- }
+-#ifdef CONFIG_SMP
+-int coherency_get_cpu_count(void)
+-{
+-	int reg, cnt;
+-
+-	reg = readl(coherency_base + COHERENCY_FABRIC_CFG_OFFSET);
+-	cnt = (reg & 0xF) + 1;
+-
+-	return cnt;
+-}
+-#endif
+-
+ /* Function defined in coherency_ll.S */
+ int ll_set_cpu_coherent(void __iomem *base_addr, unsigned int hw_cpu_id);
  
--void __init armada_370_xp_timer_and_clk_init(void)
-+static void __init armada_370_xp_timer_and_clk_init(void)
- {
- 	mvebu_clocks_init();
- 	armada_370_xp_timer_init();
- }
+diff --git a/arch/arm/mach-mvebu/coherency.h b/arch/arm/mach-mvebu/coherency.h
+index 2f42813..df33ad8 100644
+--- a/arch/arm/mach-mvebu/coherency.h
++++ b/arch/arm/mach-mvebu/coherency.h
+@@ -14,10 +14,6 @@
+ #ifndef __MACH_370_XP_COHERENCY_H
+ #define __MACH_370_XP_COHERENCY_H
  
--void __init armada_370_xp_init_early(void)
-+static void __init armada_370_xp_init_early(void)
- {
- 	char *mbus_soc_name;
+-#ifdef CONFIG_SMP
+-int coherency_get_cpu_count(void);
+-#endif
+-
+ int set_cpu_coherent(int cpu_id, int smp_group_id);
+ int coherency_init(void);
  
+diff --git a/arch/arm/mach-mvebu/common.h b/arch/arm/mach-mvebu/common.h
+index aa27bc2..98defd5 100644
+--- a/arch/arm/mach-mvebu/common.h
++++ b/arch/arm/mach-mvebu/common.h
+@@ -15,6 +15,8 @@
+ #ifndef __ARCH_MVEBU_COMMON_H
+ #define __ARCH_MVEBU_COMMON_H
+ 
++#define ARMADA_XP_MAX_CPUS 4
++
+ void mvebu_restart(char mode, const char *cmd);
+ 
+ void armada_370_xp_init_irq(void);
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index 875ea74..93f2f3a 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -88,8 +88,16 @@ static int __cpuinit armada_xp_boot_secondary(unsigned int cpu,
+ 
+ static void __init armada_xp_smp_init_cpus(void)
+ {
++	struct device_node *np;
+ 	unsigned int i, ncores;
+-	ncores = coherency_get_cpu_count();
++
++	np = of_find_node_by_name(NULL, "cpus");
++	if (!np)
++		panic("No 'cpus' node found\n");
++
++	ncores = of_get_child_count(np);
++	if (ncores == 0 || ncores > ARMADA_XP_MAX_CPUS)
++		panic("Invalid number of CPUs in DT\n");
+ 
+ 	/* Limit possible CPUs to defconfig */
+ 	if (ncores > nr_cpu_ids) {
 -- 
 1.7.9.5
