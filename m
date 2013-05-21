@@ -1,38 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 20 May 2013 23:51:13 -0700
-Subject: [PATCH] ARM: tegra: defconfig fixes
-In-Reply-To: <1369076839-31787-1-git-send-email-swarren@wwwdotorg.org>
-References: <1369076839-31787-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130521065113.GJ20453@quad.lixom.net>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 21 May 2013 08:57:36 +0200
+Subject: [PATCH] arm64: kernel: need extern variable 'screen_info' for
+ related driver using.
+In-Reply-To: <519AE6D7.1090401@asianux.com>
+References: <5199B7D6.40907@asianux.com>
+ <20130520091008.GB31359@mudshark.cambridge.arm.com>
+ <519AE6D7.1090401@asianux.com>
+Message-ID: <CAMuHMdWNHPDkf35MYMKnxt5pn3a+dsT4jgYxuuHrp+mpZMckfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 01:07:19PM -0600, Stephen Warren wrote:
-> From: Alexandre Courbot <gnurou@gmail.com>
-> 
-> The AK8975 Kconfig option was renamed during the 3.10 merge window.
-> Adjust tegra_defconfig to enable the new name, so it's not missing
-> useful features.
-> 
-> Tegra DRM support used to be enabled in the default Tegra configuration,
-> but it now depends on CONFIG_TEGRA_HOST1X which is disabled by default.
-> Enable CONFIG_TEGRA_HOST1X so that DRM support is compiled in again.
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> [swarren, squashed Alex's and my changes together]
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Olof, Arnd,
-> 
-> Can this be taken into 3.10? Hopefully Linus won't mind defconfig changes
-> sneaking in now. If not, let me know, and I'll for it into Tegra's
-> for-3.11/dt branch instead. Thanks.
+On Tue, May 21, 2013 at 5:15 AM, Chen Gang <gang.chen@asianux.com> wrote:
+>> I think it would be better if we added a something like
+>> CONFIG_HAVE_VGA_CONSOLE, which VGA_CONSOLE can then depend on. Architectures
+>> like x86 can then select the former, and we can remove the long list of
+>> architectures from the current option.
+>
+> I guess your meaning is:
+>
+>   under arm64, actually, need not support 'VGA_CONSOLE', and 'screen_info' is useless.
+>   So better to define 'CONFIG_HAVE_VGA_CONSOLE' which 'VGA_CONSOLE' can depend on it, and in arm64, we do not define CONFIG_HAVE_VGA_CONSOLE.
+>
+> Is it correct ?
 
-Since people actually use the defconfigs it does make sense to keep them
-working and regression-free.
+No, you missed "and we can remove the long list of architectures from the
+current option".
 
-I think we'll be fine with a rare occurrance of it. We'll find out. :)
+> If so, I recommend to add depend item for VGA_CONSOLE directly:
 
+I strongly support CONFIG_HAVE_VGA_CONSOLE.
 
+Gr{oetje,eeting}s,
 
--Olof
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
