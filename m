@@ -1,33 +1,28 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 21 May 2013 11:06:00 +0200
-Subject: [PATCH] Change internal SRAM memory type to "MT_MEMORY_SO"
-In-Reply-To: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
-References: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <519B38F8.1040601@atmel.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 21 May 2013 11:06:16 +0200
+Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
+In-Reply-To: <519B2993.4090409@cn.fujitsu.com>
+References: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
+ <20130520.232619.964940909999914694.davem@davemloft.net>
+ <20130521084108.1a585f32@skate> <519B2993.4090409@cn.fujitsu.com>
+Message-ID: <20130521110616.21eee053@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/2013 03:05, Wenyou Yang :
-> Hi Russell,
+Dear Gu Zheng,
 
-Wenyou, In fact this patch is targeted for myself and not Russell. It 
-will join mainline using arm-soc git tree which is managed by Arnd and Olof.
+On Tue, 21 May 2013 16:00:19 +0800, Gu Zheng wrote:
 
-> This patch is to change the internal SRAM memory type to "MT_MEMORY_SO", the right type.
->
-> It tested on sama5d3xek boards.
->
-> It based on v3.10-rc1.
->
-> Best Regards,
-> Wenyou Yang
->
-> Wenyou Yang (1):
->    ARM: at91: Fix: Change internal SRAM memory type to "MT_MEMORY_SO"
->
->   arch/arm/mach-at91/setup.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+> > Or, maybe make the existing module_platform_driver() macro do this?
+> 
+> But not all the modules use module_platform_driver() macro to replace the module init/exit.
 
-Bye,
+Then maybe it's a good opportunity to convert those ones to use
+module_platform_driver() ?
+
+Thomas
 -- 
-Nicolas Ferre
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
