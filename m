@@ -1,32 +1,20 @@
-From: clbchenlibo.chen@huawei.com (Libo Chen)
-Date: Tue, 21 May 2013 17:42:34 +0800
-Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
-In-Reply-To: <20130521110616.21eee053@skate>
-References: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
- <20130520.232619.964940909999914694.davem@davemloft.net>
- <20130521084108.1a585f32@skate> <519B2993.4090409@cn.fujitsu.com>
- <20130521110616.21eee053@skate>
-Message-ID: <519B418A.7060805@huawei.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 21 May 2013 11:46:13 +0200
+Subject: [PATCH 0/3] ARM: ux500: Update defconfigs for MMC
+Message-ID: <1369129576-28617-1-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013/5/21 17:06, Thomas Petazzoni wrote:
-> Dear Gu Zheng,
-> 
-> On Tue, 21 May 2013 16:00:19 +0800, Gu Zheng wrote:
-> 
->>> Or, maybe make the existing module_platform_driver() macro do this?
->>
->> But not all the modules use module_platform_driver() macro to replace the module init/exit.
-> 
-> Then maybe it's a good opportunity to convert those ones to use
-> module_platform_driver() ?
-> 
-> Thomas
-> 
+This patchset updates the MMC defconfigs in the u8500|u300_defconfig.
 
- In my opinion, not all modules can use module_platform_driver() macro to replace the module init/exit easily, like us3mc_init.
+Ulf Hansson (3):
+  ARM: ux500: Enable MMC_UNSAFE_RESUME
+  ARM: ux500: Don't use MMC_CLKGATE
+  ARM: ux500: Disable MMC_BLOCK_BOUNCE
 
- Furthermore this work will touch various platforms and architectures, I am worried it is hard to *test* (compile and boot).
+ arch/arm/configs/u300_defconfig  |    3 ++-
+ arch/arm/configs/u8500_defconfig |    3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
 
- What do you think?
+-- 
+1.7.10
