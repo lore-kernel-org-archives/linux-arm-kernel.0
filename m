@@ -1,61 +1,56 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 21 May 2013 15:33:17 +0300
-Subject: [PATCH] dmatest: abort transfers immediately when asked for
-In-Reply-To: <20130516153553.GI11706@mudshark.cambridge.arm.com>
-References: <20130516153553.GI11706@mudshark.cambridge.arm.com>
-Message-ID: <1369139597-24446-1-git-send-email-andriy.shevchenko@linux.intel.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Tue, 21 May 2013 14:08:51 +0200
+Subject: [PATCH] ARM: OMAP4: change the device names in usb_bind_phy
+In-Reply-To: <20130517172335.GX5600@atomide.com>
+References: <1366697656-14315-1-git-send-email-kishon@ti.com>
+ <51936946.3030507@iki.fi> <20130516155857.GV5600@atomide.com>
+ <519503DA.5070303@iki.fi> <20130516162034.GX5600@atomide.com>
+ <5195C28C.40300@ti.com> <20130517172335.GX5600@atomide.com>
+Message-ID: <519B63D3.7040600@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When thread is going to be stopped we have to unconditionally terminate all
-ongoing transfers. Otherwise it would be possible that callback function will
-be called on the next interrupt and will try to access to already freed
-structures.
 
-The patch introduces specific error message for this, though it doesn't
-increase the counter of the failed tests.
+On 05/17/2013 07:23 PM, Tony Lindgren wrote:
+> * Kishon Vijay Abraham I <kishon@ti.com> [130516 22:45]:
+>> Hi,
+>>
+>> On Thursday 16 May 2013 09:50 PM, Tony Lindgren wrote:
+>>> * Tomi Valkeinen <tomi.valkeinen@iki.fi> [130516 09:11]:
+>>>> On 16/05/13 18:58, Tony Lindgren wrote:
+>>>>> * Tomi Valkeinen <tomi.valkeinen@iki.fi> [130515 03:59]:
+>>>>>
+>>>>> Just checking.. Do you have CONFIG_OMAP_OCP2SCP=y in your .config? Sounds
+>>>>> like the some transceivers should depend on that for omap4.
+>>>>
+>>>> Yes, I have OCP2SCP=y.
+>>>
+>>> Hmm well no idea beyond that then. Sounds like Kishon should check it.
+>>>
+>>>>>> The musb-hdrc id is wrong on overo also.
+>>>>>
+>>>>> Hmm has there been a fix posted for that?
+>>>>
+>>>> I couldn't find with a quick look. We debugged and discussed this on an irc
+>>>> channel with Kishon, who said he'll send a patch. Changing the musb-hdrc ID
+>>>> on overo fixed the issue, and it looks very similar to the error on 4430sdp.
+>>>> The overo fix was just:
+>>
+>> hmm.. I think using device name to bind the controller and the phy
+>> can no longer be used reliably. I think it's better to have
+>> something like what Grant suggested in my other patch series.. to
+>> have the phy reference into the host controllers platform_data
+>> structure. And for the phy reference I'll have label and id.
+>>
+>> Does this makes sense to you?
+>
+> Sounds OK to me, but I guess that would be for v3.11. I think we
+> still need a fix for at least overo for v3.10?
+>
 
-Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Reported-by: Will Deacon <will.deacon@arm.com>
----
- drivers/dma/dmatest.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Indead, musb-hdrc is broken on overo with 3.10-rc2. The patch posted in this
+thread fixes the issue.
 
-diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
-index d8ce4ec..f61bd55 100644
---- a/drivers/dma/dmatest.c
-+++ b/drivers/dma/dmatest.c
-@@ -92,6 +92,7 @@ enum dmatest_error_type {
- 	DMATEST_ET_MAP_DST,
- 	DMATEST_ET_PREP,
- 	DMATEST_ET_SUBMIT,
-+	DMATEST_ET_ABORT,
- 	DMATEST_ET_TIMEOUT,
- 	DMATEST_ET_DMA_ERROR,
- 	DMATEST_ET_DMA_IN_PROGRESS,
-@@ -366,6 +367,7 @@ static char *thread_result_get(const char *name,
- 		[DMATEST_ET_MAP_DST]		= "dst mapping error",
- 		[DMATEST_ET_PREP]		= "prep error",
- 		[DMATEST_ET_SUBMIT]		= "submit error",
-+		[DMATEST_ET_ABORT]		= "transfer aborted",
- 		[DMATEST_ET_TIMEOUT]		= "test timed out",
- 		[DMATEST_ET_DMA_ERROR]		=
- 			"got completion callback (DMA_ERROR)",
-@@ -720,6 +722,15 @@ static int dmatest_func(void *data)
- 					     done.done || kthread_should_stop(),
- 					     msecs_to_jiffies(params->timeout));
- 
-+		/* terminate all transfers on specified channel if needed */
-+		if (kthread_should_stop()) {
-+			dmaengine_terminate_all(chan);
-+			thread_result_add(info, result, DMATEST_ET_ABORT,
-+					  total_tests, src_off, dst_off,
-+					  len, 0);
-+			break;
-+		}
-+
- 		status = dma_async_is_tx_complete(chan, cookie, NULL, NULL);
- 
- 		if (!done.done) {
--- 
-1.8.2.rc0.22.gb3600c3
+Regards,
+
+Florian
