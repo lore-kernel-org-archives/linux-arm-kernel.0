@@ -1,65 +1,45 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 21 May 2013 12:37:25 -0400
-Subject: [PATCH 6/9] arm: mvebu: move cache and mvebu-mbus
- initialization later
-In-Reply-To: <20130521181018.401ddabf@skate>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1369132414-18959-7-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130521141621.GU31290@titan.lakedaemon.net>
- <20130521173707.5a49eaec@skate>
- <20130521154313.GV31290@titan.lakedaemon.net>
- <20130521181018.401ddabf@skate>
-Message-ID: <20130521163725.GW31290@titan.lakedaemon.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 21 May 2013 11:42:12 -0500
+Subject: spurious bL cpufreq driver messages
+In-Reply-To: <CAKohpomG5E2FAeZGnX3eBw8fOiX3K8sWEeHgb5NT_FT3y+Cg1w@mail.gmail.com>
+References: <519686BC.3090101@gmail.com>
+ <CAKohpom0cGfWvsCf-jaMyu0cQJi2hVk9_0wskEDH2X7MaeHDLw@mail.gmail.com>
+ <CAL_JsqLEv38DwnL4=ToXtEKNrDbgYv_0qiOc+cXZSjnfKVbeNg@mail.gmail.com>
+ <CAKohpomG5E2FAeZGnX3eBw8fOiX3K8sWEeHgb5NT_FT3y+Cg1w@mail.gmail.com>
+Message-ID: <CAL_JsqKrZzV+kpQ9rUUkhEAV=kiouAWEuuZnKqX63X6ZPsu3cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On Sun, May 19, 2013 at 11:36 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 19 May 2013 01:21, Rob Herring <robherring2@gmail.com> wrote:
+>> No, it still registers the bL driver. The problem is not that DT data
+>> is missing, but it is present on a single cluster system.
+>
+> I misread your mail.. I got the problem now.. Below should fix your
+> issue (It is rebased on the patch I pointed to you earlier):
+>
+> Attached too for testing as gmail copy-paste will break it.
+>
+> @Rafael: Once Rob gives his Tested-by, please queue it for 3.10-rcs
+>
+> ------------x-----------------x-----------------
+>
+> From: Viresh Kumar <viresh.kumar@linaro.org>
+> Date: Mon, 20 May 2013 09:57:17 +0530
+> Subject: [PATCH] cpufreq: arm_big_little_dt: Instantiate as platform_driver
+>
+> As multiplatform build is being adopted by more and more ARM platforms, initcall
+> function should be used very carefully. For example, when both arm_big_little_dt
+> and cpufreq-cpu0 drivers are compiled in, arm_big_little_dt driver may try to
+> register even if we had platform device for cpufreq-cpu0 registered.
+>
+> To eliminate this undesired the effect, the patch changes arm_big_little_dt
+> driver to have it instantiated as a platform_driver. Then it will only run on
+> platforms that create the platform_device "arm-bL-cpufreq-dt".
+>
+> Reported-by: Rob Herring <robherring2@gmail.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-On Tue, May 21, 2013 at 06:10:18PM +0200, Thomas Petazzoni wrote:
-> On Tue, 21 May 2013 11:43:13 -0400, Jason Cooper wrote:
-> > > > I tried hacking it up to put it in mvebu/soc-internal_regs for a few
-> > > > rounds of testing in linux-next during review, however, I'd prefer you
-> > > > rebase this on top of mvebu/cleanup.
-> > > 
-> > > So you mean my next version of the "Internal registers switch" should
-> > > be based on mvebu/cleanup, right?
-> > 
-> > Yes, sorry I wasn't clear, I meant the series.  You can drop 1-3 as
-> > well for the next version, since I've pulled those.
-> 
-> Ok. 1-2 have been merged in mvebu/fixes, and 3 in mvebu/cleanup. So I
-> suppose mvebu/cleanup is based on mvebu/fixes ? Or should I base on
-> mvebu/cleanup and assume when it will lend in mainline, the mvebu/fixes
-> patches will be there (which doesn't make the thing easy for testing
-> here, because to test, I actually need all the patches in the same
-> branch). Just trying to figure the workflow :)
+That works. Thanks.
 
-For your development, I would checkout v3.10-rc2, merge /fixes, then
-merge /cleanup, the put 4-9 on top.  Then, when sending, just do 4-9
-with a note about the merge dependency on /cleanup, and the boot
-dependency on /fixes.
-
-If you'd like, I can hold off on merging it until I can base the series
-on an -rc including patches 1 and 2.  As is, I might move #3 into the
-same branch as 4-9, but we'll still have the conflict I highlighted
-earlier.  And anyone resolving it will probably miss the .init_early
-removal.
-
-> > > There will be some next version in any case, because I just found a
-> > > bug in the latest patch when booting from a bootloader that has
-> > > already done the switch to 0xF1.
-> > 
-> > Ok, I'll hold off putting it up for testing until v2.
-> 
-> Well, the current version should be ok build-wise, and works with all
-> currently available Marvell bootloaders. The bug can only be seen with
-> a bootloader version that has not yet been really released by Marvell.
-> 
-> But anyway, v2 will follow shortly. With this v1, I was mainly hoping
-> for some feedback, to see if the solution was acceptable or not.
-
-That was a great explanation of a Schr?dinger's Register ;-)
-
-thx,
-
-Jason.
+Tested-by: Rob Herring <rob.herring@calxeda.com>
