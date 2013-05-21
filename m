@@ -1,28 +1,18 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 20 May 2013 23:25:27 -0700
-Subject: [GIT PULL] at91: fixes for 3.10 #1
-In-Reply-To: <1368614747-1737-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1368614747-1737-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20130521062527.GD19627@quad.lixom.net>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 20 May 2013 23:26:19 -0700 (PDT)
+Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
+In-Reply-To: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
+References: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
+Message-ID: <20130520.232619.964940909999914694.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 12:45:47PM +0200, Nicolas Ferre wrote:
-> Arnd, Olof,
-> 
-> This is the first AT91 fixes pull-request for 3.10-rc.
-> 
-> Thanks, best regards,
-> 
-> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
-> 
->   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-fixes
+From: Libo Chen <libo.chen@huawei.com>
+Date: Tue, 21 May 2013 10:42:00 +0800
 
-Pulled, thanks.
+> I find a lot of mistakes using struct platform_driver without owner.
+> So I pick up some of them including usb and net modules
 
-
--Olof
+Instead of doing it this way, which is obviously error prone and
+easy to forget, make platform_driver_register() be a macro which
+sets the module owner field then calls the real __platform_driver_register().
