@@ -1,61 +1,39 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Tue, 21 May 2013 15:51:39 +0800
-Subject: [PATCH] arm64: kernel: need extern variable 'screen_info' for
- related driver using.
-In-Reply-To: <CAMuHMdWNHPDkf35MYMKnxt5pn3a+dsT4jgYxuuHrp+mpZMckfw@mail.gmail.com>
-References: <5199B7D6.40907@asianux.com>
- <20130520091008.GB31359@mudshark.cambridge.arm.com>
- <519AE6D7.1090401@asianux.com>
- <CAMuHMdWNHPDkf35MYMKnxt5pn3a+dsT4jgYxuuHrp+mpZMckfw@mail.gmail.com>
-Message-ID: <519B278B.6030708@asianux.com>
+From: guz.fnst@cn.fujitsu.com (Gu Zheng)
+Date: Tue, 21 May 2013 16:00:19 +0800
+Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
+In-Reply-To: <20130521084108.1a585f32@skate>
+References: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
+ <20130520.232619.964940909999914694.davem@davemloft.net>
+ <20130521084108.1a585f32@skate>
+Message-ID: <519B2993.4090409@cn.fujitsu.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2013 02:57 PM, Geert Uytterhoeven wrote:
-> On Tue, May 21, 2013 at 5:15 AM, Chen Gang <gang.chen@asianux.com> wrote:
->>> >> I think it would be better if we added a something like
->>> >> CONFIG_HAVE_VGA_CONSOLE, which VGA_CONSOLE can then depend on. Architectures
->>> >> like x86 can then select the former, and we can remove the long list of
->>> >> architectures from the current option.
->> >
->> > I guess your meaning is:
->> >
->> >   under arm64, actually, need not support 'VGA_CONSOLE', and 'screen_info' is useless.
->> >   So better to define 'CONFIG_HAVE_VGA_CONSOLE' which 'VGA_CONSOLE' can depend on it, and in arm64, we do not define CONFIG_HAVE_VGA_CONSOLE.
->> >
->> > Is it correct ?
-> No, you missed "and we can remove the long list of architectures from the
-> current option".
+On 05/21/2013 02:41 PM, Thomas Petazzoni wrote:
+
+> Dear David Miller,
 > 
-
-OK, thanks.
-
-Is it correct: "it is unnecessary to add 'screen_info' to the code, for
-arm64 will never support 'VGA_CONSOLE'" ?
-
-
->> > If so, I recommend to add depend item for VGA_CONSOLE directly:
-> I strongly support CONFIG_HAVE_VGA_CONSOLE.
-
-For me, I still recommend add 'ARM64' in the long list of architectures
-for 'VGA_CONSOLE', I have 3 reasons, please check:
-
-a. current implementation only changes one area which only related with
-arm64 and 'VGA_CONSOLE', but if use 'CONFIG_HAVE_VGA_CONSOLE', that will
-touch many multiple platforms dependency, at least we need discuss about
-it with multiple platforms guys for it, firstly.
-
-b. We can find some cases to use CONFIG_HAVE_* as dpend on, but I can
-not find any cases which let CONFIG_'samename' depend on
-CONFIG_HAVE_'samename'.
-
-c. The original way still has effect, although it seems not quit
-beautiful, but it is correct and still clear for readers, it is still
-sustainable.
+> On Mon, 20 May 2013 23:26:19 -0700 (PDT), David Miller wrote:
+>> From: Libo Chen <libo.chen@huawei.com>
+>> Date: Tue, 21 May 2013 10:42:00 +0800
+>>
+>>> I find a lot of mistakes using struct platform_driver without owner.
+>>> So I pick up some of them including usb and net modules
+>>
+>> Instead of doing it this way, which is obviously error prone and
+>> easy to forget, make platform_driver_register() be a macro which
+>> sets the module owner field then calls the real
+>> __platform_driver_register().
+> 
+> Or, maybe make the existing module_platform_driver() macro do this?
 
 
-Thanks.
--- 
-Chen Gang
+But not all the modules use module_platform_driver() macro to replace the module init/exit.
 
-Asianux Corporation
+Thanks,
+Gu
+
+> 
+> Best regards,
+> 
+> Thomas
