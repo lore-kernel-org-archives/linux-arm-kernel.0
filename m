@@ -1,39 +1,47 @@
-From: mchehab@redhat.com (Mauro Carvalho Chehab)
-Date: Tue, 21 May 2013 07:21:49 -0300
-Subject: [PATCH] Finally eradicate CONFIG_HOTPLUG
-In-Reply-To: <20130521134935.d18c3f5c23485fb5ddabc365@canb.auug.org.au>
-References: <20130521134935.d18c3f5c23485fb5ddabc365@canb.auug.org.au>
-Message-ID: <20130521072149.0dac0d9e@redhat.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 21 May 2013 09:25:27 -0400
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.10 (round 2)
+In-Reply-To: <20130521064413.GF20453@quad.lixom.net>
+References: <20130520195135.GH31290@titan.lakedaemon.net>
+ <20130521064413.GF20453@quad.lixom.net>
+Message-ID: <20130521132527.GQ31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, 21 May 2013 13:49:35 +1000
-Stephen Rothwell <sfr@canb.auug.org.au> escreveu:
+Ezequiel,
 
-> Ever since commit 45f035ab9b8f ("CONFIG_HOTPLUG should be always on"),
-> it has been basically impossible to build a kernel with CONFIG_HOTPLUG
-> turned off.  Remove all the remaining references to it.
+On Mon, May 20, 2013 at 11:44:13PM -0700, Olof Johansson wrote:
+> On Mon, May 20, 2013 at 03:51:35PM -0400, Jason Cooper wrote:
+> > 
+> > The following changes since commit 00ed4a0bd964555fe9276f2299564c384d50ae7d:
+> > 
+> >   ARM: mvebu: Add a ranges entry to translate devbus childs (2013-05-13 16:23:47 +0000)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.infradead.org/users/jcooper/linux.git tags/fixes-3.10-2
+> > 
+> > for you to fetch changes up to 489e138eec96f529c5e8d4cd3ea45882ecdbf5ca:
+> > 
+> >   ARM: dts: mvebu: Fix wrong the address reg value for the L2-cache node (2013-05-20 17:44:54 +0000)
 > 
-> Cc: linux-arch at vger.kernel.org
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Doug Thompson <dougthompson@xmission.com>
-> Cc: linux-edac at vger.kernel.org
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: linux-pci at vger.kernel.org
-> Cc: linux-pcmcia at lists.infradead.org
-> Cc: Hans Verkuil <hans.verkuil@cisco.com>
-> Cc: Steven Whitehouse <swhiteho@redhat.com>
-> Cc: cluster-devel at redhat.com
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Pavel Machek <pavel@ucw.cz>
-> Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
-> Cc: linux-pm at vger.kernel.org
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: linux-mm at kvack.org
-> Signed-off-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> Pulled, thanks.
+> 
+> > 
+> > ----------------------------------------------------------------
+> > mvebu fixes for v3.10 (round 2)
+> > 
+> >  - mvebu (and orion SoCs)
+> >     - remove init_dma_coherent_pool_size()
+> > 
+> >  - mvebu
+> >     - fix ranges DT property
+> 
+> We've seen two of these now. Can someone please make a sweep and make sure
+> there are no more of these pending?
 
-Acked-by: Mauro Carvalho Chehab <mchehab@redhat.com>
+Mind doing a sweep?  You've first hand knowledge of the devbus stuff.
 
-Cheers,
-Mauro
+thx,
+
+Jason.
