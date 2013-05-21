@@ -1,34 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 21 May 2013 08:41:08 +0200
-Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
-In-Reply-To: <20130520.232619.964940909999914694.davem@davemloft.net>
-References: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
- <20130520.232619.964940909999914694.davem@davemloft.net>
-Message-ID: <20130521084108.1a585f32@skate>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 20 May 2013 23:44:13 -0700
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.10 (round 2)
+In-Reply-To: <20130520195135.GH31290@titan.lakedaemon.net>
+References: <20130520195135.GH31290@titan.lakedaemon.net>
+Message-ID: <20130521064413.GF20453@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear David Miller,
-
-On Mon, 20 May 2013 23:26:19 -0700 (PDT), David Miller wrote:
-> From: Libo Chen <libo.chen@huawei.com>
-> Date: Tue, 21 May 2013 10:42:00 +0800
+On Mon, May 20, 2013 at 03:51:35PM -0400, Jason Cooper wrote:
 > 
-> > I find a lot of mistakes using struct platform_driver without owner.
-> > So I pick up some of them including usb and net modules
+> The following changes since commit 00ed4a0bd964555fe9276f2299564c384d50ae7d:
 > 
-> Instead of doing it this way, which is obviously error prone and
-> easy to forget, make platform_driver_register() be a macro which
-> sets the module owner field then calls the real
-> __platform_driver_register().
+>   ARM: mvebu: Add a ranges entry to translate devbus childs (2013-05-13 16:23:47 +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/jcooper/linux.git tags/fixes-3.10-2
+> 
+> for you to fetch changes up to 489e138eec96f529c5e8d4cd3ea45882ecdbf5ca:
+> 
+>   ARM: dts: mvebu: Fix wrong the address reg value for the L2-cache node (2013-05-20 17:44:54 +0000)
 
-Or, maybe make the existing module_platform_driver() macro do this?
+Pulled, thanks.
 
-Best regards,
+> 
+> ----------------------------------------------------------------
+> mvebu fixes for v3.10 (round 2)
+> 
+>  - mvebu (and orion SoCs)
+>     - remove init_dma_coherent_pool_size()
+> 
+>  - mvebu
+>     - fix ranges DT property
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+We've seen two of these now. Can someone please make a sweep and make sure
+there are no more of these pending?
+
+
+Thanks,
+
+-Olof
