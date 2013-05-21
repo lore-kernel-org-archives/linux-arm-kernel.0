@@ -1,179 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 May 2013 09:58:32 +0100
-Subject: [PATCH] arm64: kernel: compiling issue,
- need 'EXPORT_SYMBOL_GPL(read_current_timer)'
-In-Reply-To: <519B332F.1000404@asianux.com>
-References: <5199C725.8050102@asianux.com>
- <168084c28e8ba5124c05553e97463172@localhost>
- <20130520095606.GH31359@mudshark.cambridge.arm.com>
- <519AF2DC.2040200@asianux.com> <5bf8a8dd20ecd01c14f0ed9aa054f2df@localhost>
- <519B332F.1000404@asianux.com>
-Message-ID: <519B3738.1010004@arm.com>
+From: gordon@holliweb.co.uk (Gordon Hollingworth)
+Date: Tue, 21 May 2013 10:00:37 +0100
+Subject: [PATCH] ARM: bcm2835: override the HW UART periphid
+In-Reply-To: <008d01ce55e9$7c479510$74d6bf30$@lge.com>
+References: <519AD82A.6090809@wwwdotorg.org>
+ <1369116149-2361-1-git-send-email-neidhard.kim@lge.com>
+ <008d01ce55e9$7c479510$74d6bf30$@lge.com>
+Message-ID: <CAE8Q9tD8UiV=3sYbPPFGgiPCGzMS6xUWSGCRnR8tpGwQegyEQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/13 09:41, Chen Gang wrote:
-> On 05/21/2013 02:13 PM, Marc Zyngier wrote:
->> On Tue, 21 May 2013 12:06:52 +0800, Chen Gang <gang.chen@asianux.com>
->> wrote:
->>> On 05/20/2013 05:56 PM, Will Deacon wrote:
->>>> On Mon, May 20, 2013 at 08:15:04AM +0100, Marc Zyngier wrote:
->>>>> On Mon, 20 May 2013 14:48:05 +0800, Chen Gang <gang.chen@asianux.com>
->>>>> wrote:
->>>>>> Need 'EXPORT_SYMBOL_GPL(read_current_timer)' if build with
->>>>>> allmodconfig.
->>>>>>
->>>>>> The related error:
->>>>>>   ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
->>>>>>   ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
->>>>>>   ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
->>>>>>   ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
->>>>>>
->>>>>>
->>>>>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->>>>>> ---
->>>>>>  arch/arm64/kernel/time.c |    1 +
->>>>>>  1 files changed, 1 insertions(+), 0 deletions(-)
->>>>>>
->>>>>> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
->>>>>> index a551f88..7fcba80 100644
->>>>>> --- a/arch/arm64/kernel/time.c
->>>>>> +++ b/arch/arm64/kernel/time.c
->>>>>> @@ -73,6 +73,7 @@ int read_current_timer(unsigned long *timer_value)
->>>>>>  	*timer_value = arch_timer_read_counter();
->>>>>>  	return 0;
->>>>>>  }
->>>>>> +EXPORT_SYMBOL_GPL(read_current_timer);
->>>>>>  
->>>>>>  void __init time_init(void)
->>>>>>  {
->>>>>
->>>>> While this solves the problem, I'm not sure this is the best fix. The
->>>>> real
->>>>> issue is with get_cycles, which is a macro around read_current_timer.
->>>>>
->>>>> AArch32 exports it because of the number of timer implementations. On
->>>>> arm64, we should be able to just return CNTVCT_EL0.
->>>>>
->>>>> Catalin, Will, what do you think?
->>>>
->>>> Should be ok once the arch timer driver has moved exclusively to
->> virtual
->>>> time. I'm also not sure we even need to implement read_current_timer()
->> --
->>>> it's only used for delay-loop calibration, which we don't need for the
->>>> arch timer.
->>>>
->>>
->>> For whether we need implement read_current_timer():
->>>
->>>   many platforms have implemented it (openrisc, arm, sparc, hexagon,
->>>   avr32, x86).
->>>   it is called by init/calibrate.c when 'ARCH_HAS_READ_CURRENT_TIMER' is
->>>   defined.
->>>   since arm64 can implement it, better to provide it as an architect
->>>   features to let outside use.
+Have checked with the designer of the UART block and he confirmed that
+the 2835 PL011 contains a 16 deep fifo not 32 deep...
+
+Hardware guys, they can never just leave it alone!!!
+
+Gordon
+
+On 21 May 2013 07:07, Jongsung Kim <neidhard.kim@lge.com> wrote:
+> Jongsung Kim <neidhard.kim@lge.com> :
+>> diff --git a/arch/arm/boot/dts/bcm2835.dtsi
+> b/arch/arm/boot/dts/bcm2835.dtsi
+>> index f0052dc..1e12aef 100644
+>> --- a/arch/arm/boot/dts/bcm2835.dtsi
+>> +++ b/arch/arm/boot/dts/bcm2835.dtsi
+>> @@ -44,6 +44,7 @@
+>>                       reg = <0x7e201000 0x1000>;
+>>                       interrupts = <2 25>;
+>>                       clock-frequency = <3000000>;
+>> +                     arm,primecell-periphid = <0x00241011>;
+>>               };
 >>
->> Nobody disputes the interest of read_current_timer.
->>
-> 
-> It is for Will said "I'm also not sure we even need to implement
-> read_current_timer()".
-> 
-> I think we still need it.
-
-Not really. The only use of read_current_timer is for calibrating the
-delay loop, and we just do not need this, because we can actually rely
-on the timer to give us an accurate timing information.
-
->>> For the implementation of read_current_timer():
->>>
->>>   it has to face various configurations
->>>     (e.g. CONFIG_ARM_ARCH_TIMER, arch_timer_read_zero,
->>>     arch_counter_get_cntvct, arch_counter_get_cntpct)
->>>   so better still use variable instead of.
->>>     (excuse me, I do not know what is 'CNTVCT_EL0', is it like a
->> constant
->>>     number ?)
->>
->> Architected timer is mandatory on arm64, so we can always rely on it it be
->> present. CNTVCT_EL0 is the system register accessing the Virtual Counter,
->> which is basically what read_current_timer() returns.
->>
-> 
-> OK, thanks. for CNTVCT_EL0, can we use arch_counter_get_cntvct() which
-> is defined in "arch/arm64/include/asm/arch_timer.h" ?
-
-Yes.
-
->>> For the implementation of get_cycles()
->>>
->>>   if read_current_timer() is provided,
->>>   better to let get_cycles() to call it, instead of implement once
->> again.
->>
->> There is certainly some value in reusing existing code, but in this
->> particular case we can simply inline two instructions (isb + mrs
->> cntvct_el0), and I'm not even completely sure about the isb.
->>
-> 
-> OK, thanks.
-> 
-> 
-> So, how about the fix below :)
-> 
-> ------------------------diff begin-------------------------------
-> 
-> diff --git a/arch/arm64/include/asm/timex.h b/arch/arm64/include/asm/timex.h
-> index b24a31a..768ba44 100644
-> --- a/arch/arm64/include/asm/timex.h
-> +++ b/arch/arm64/include/asm/timex.h
-> @@ -16,11 +16,13 @@
->  #ifndef __ASM_TIMEX_H
->  #define __ASM_TIMEX_H
->  
-> +#include <asm/arch_timer.h>
-> +
->  /*
->   * Use the current timer as a cycle counter since this is what we use for
->   * the delay loop.
->   */
-> -#define get_cycles()	({ cycles_t c; read_current_timer(&c); c; })
-> +#define get_cycles()	arch_counter_get_cntvct()
->  
->  #include <asm-generic/timex.h>
->  
-> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-> index a551f88..6d7ce08 100644
-> --- a/arch/arm64/kernel/time.c
-> +++ b/arch/arm64/kernel/time.c
-> @@ -38,6 +38,7 @@
->  
->  #include <asm/thread_info.h>
->  #include <asm/stacktrace.h>
-> +#include <asm/arch_timer.h>
->  
->  #ifdef CONFIG_SMP
->  unsigned long profile_pc(struct pt_regs *regs)
-> @@ -70,7 +71,7 @@ unsigned long long notrace sched_clock(void)
->  
->  int read_current_timer(unsigned long *timer_value)
->  {
-> -	*timer_value = arch_timer_read_counter();
-> +	*timer_value = arch_counter_get_cntvct();
->  	return 0;
->  }
-> 
-> 
-> ------------------------diff end---------------------------------
-
-I think you should try to implement Will's suggestion and drop
-read_current_timer (and the ARCH_HAS_READ_CURRENT_TIMER macro) altogether.
-
-It would be a much better fix.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>>               gpio: gpio {
+>
+> Stephen, how do you think about this kind of approach instead?
+>
+>
+> _______________________________________________
+> linux-rpi-kernel mailing list
+> linux-rpi-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
