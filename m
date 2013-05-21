@@ -1,29 +1,29 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue, 21 May 2013 18:16:21 +1200
-Subject: [PATCH] i2c: vt8500: Add support for I2C bus on Wondermedia SoCs
-In-Reply-To: <1368350634-12654-1-git-send-email-linux@prisktech.co.nz>
-References: <1368350634-12654-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <519B1135.4060509@prisktech.co.nz>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 20 May 2013 23:19:06 -0700
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.10 (round 1)
+In-Reply-To: <20130513170325.GT31290@titan.lakedaemon.net>
+References: <20130513170325.GT31290@titan.lakedaemon.net>
+Message-ID: <20130521061906.GB19627@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/13 21:23, Tony Prisk wrote:
-> This patch adds support for the I2C bus controllers found on Wondermedia
-> 8xxx-series SoCs. Only master-mode is supported.
->
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
->   .../devicetree/bindings/i2c/i2c-vt8500.txt         |   24 +
->   MAINTAINERS                                        |    1 +
->   drivers/i2c/busses/Kconfig                         |   10 +
->   drivers/i2c/busses/Makefile                        |    1 +
->   drivers/i2c/busses/i2c-wmt.c                       |  488 ++++++++++++++++++++
->   5 files changed, 524 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/i2c/i2c-vt8500.txt
->   create mode 100644 drivers/i2c/busses/i2c-wmt.c
->
->
-This patch seems to have stalled. Any news?
+On Mon, May 13, 2013 at 01:03:25PM -0400, Jason Cooper wrote:
+> 
+> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+> 
+>   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/jcooper/linux.git tags/fixes-3.10-1
+> 
+> for you to fetch changes up to 00ed4a0bd964555fe9276f2299564c384d50ae7d:
+> 
+>   ARM: mvebu: Add a ranges entry to translate devbus childs (2013-05-13 16:23:47 +0000)
 
-Regards
-Tony Prisk
+Children? :)
+
+Pulled, thanks.
+
+
+-Olof
