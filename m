@@ -1,73 +1,32 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Tue, 21 May 2013 17:46:05 +0800
-Subject: [PATCH v2] arm64: kernel: compiling issue,
- need delete read_current_timer().
-In-Reply-To: <20130521085325.GB10453@mudshark.cambridge.arm.com>
-References: <5199C725.8050102@asianux.com>
- <168084c28e8ba5124c05553e97463172@localhost>
- <20130520095606.GH31359@mudshark.cambridge.arm.com>
- <519AF2DC.2040200@asianux.com>
- <20130521085325.GB10453@mudshark.cambridge.arm.com>
-Message-ID: <519B425D.4030806@asianux.com>
+From: clbchenlibo.chen@huawei.com (Libo Chen)
+Date: Tue, 21 May 2013 17:42:34 +0800
+Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
+In-Reply-To: <20130521110616.21eee053@skate>
+References: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
+ <20130520.232619.964940909999914694.davem@davemloft.net>
+ <20130521084108.1a585f32@skate> <519B2993.4090409@cn.fujitsu.com>
+ <20130521110616.21eee053@skate>
+Message-ID: <519B418A.7060805@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 2013/5/21 17:06, Thomas Petazzoni wrote:
+> Dear Gu Zheng,
+> 
+> On Tue, 21 May 2013 16:00:19 +0800, Gu Zheng wrote:
+> 
+>>> Or, maybe make the existing module_platform_driver() macro do this?
+>>
+>> But not all the modules use module_platform_driver() macro to replace the module init/exit.
+> 
+> Then maybe it's a good opportunity to convert those ones to use
+> module_platform_driver() ?
+> 
+> Thomas
+> 
 
-Under arm64, we will calibrate the delay loop statically using a known
-timer frequency, so delete read_current_timer(), or it will cause
-compiling issue with allmodconfig.
+ In my opinion, not all modules can use module_platform_driver() macro to replace the module init/exit easily, like us3mc_init.
 
-The related error:
-  ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
-  ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
-  ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
-  ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
+ Furthermore this work will touch various platforms and architectures, I am worried it is hard to *test* (compile and boot).
 
-
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm64/include/asm/timex.h |    6 +++---
- arch/arm64/kernel/time.c       |    6 ------
- 2 files changed, 3 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm64/include/asm/timex.h b/arch/arm64/include/asm/timex.h
-index b24a31a..81a076e 100644
---- a/arch/arm64/include/asm/timex.h
-+++ b/arch/arm64/include/asm/timex.h
-@@ -16,14 +16,14 @@
- #ifndef __ASM_TIMEX_H
- #define __ASM_TIMEX_H
- 
-+#include <asm/arch_timer.h>
-+
- /*
-  * Use the current timer as a cycle counter since this is what we use for
-  * the delay loop.
-  */
--#define get_cycles()	({ cycles_t c; read_current_timer(&c); c; })
-+#define get_cycles()	arch_counter_get_cntvct()
- 
- #include <asm-generic/timex.h>
- 
--#define ARCH_HAS_READ_CURRENT_TIMER
--
- #endif
-diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-index a551f88..03dc371 100644
---- a/arch/arm64/kernel/time.c
-+++ b/arch/arm64/kernel/time.c
-@@ -68,12 +68,6 @@ unsigned long long notrace sched_clock(void)
- 	return arch_timer_read_counter() * sched_clock_mult;
- }
- 
--int read_current_timer(unsigned long *timer_value)
--{
--	*timer_value = arch_timer_read_counter();
--	return 0;
--}
--
- void __init time_init(void)
- {
- 	u32 arch_timer_rate;
--- 
-1.7.7.6
+ What do you think?
