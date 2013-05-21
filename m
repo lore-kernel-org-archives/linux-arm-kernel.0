@@ -1,119 +1,104 @@
-From: elyas.r@gmail.com (Elyas Razzaghi)
-Date: Wed, 22 May 2013 01:36:52 +0300
-Subject: AT91SAM9260 I2C Driver
-References: c88e466f0708070426i44ee92l3ed67fdefd9fa707@mail.gmail.com
-Message-ID: <519BF704.40706@gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 22 May 2013 01:45:46 +0200
+Subject: spurious bL cpufreq driver messages
+In-Reply-To: <CAKohpomG5E2FAeZGnX3eBw8fOiX3K8sWEeHgb5NT_FT3y+Cg1w@mail.gmail.com>
+References: <519686BC.3090101@gmail.com>
+ <CAL_JsqLEv38DwnL4=ToXtEKNrDbgYv_0qiOc+cXZSjnfKVbeNg@mail.gmail.com>
+ <CAKohpomG5E2FAeZGnX3eBw8fOiX3K8sWEeHgb5NT_FT3y+Cg1w@mail.gmail.com>
+Message-ID: <11917612.jOVuLqOMKF@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Monday, May 20, 2013 10:06:49 AM Viresh Kumar wrote:
+> On 19 May 2013 01:21, Rob Herring <robherring2@gmail.com> wrote:
+> > No, it still registers the bL driver. The problem is not that DT data
+> > is missing, but it is present on a single cluster system.
+> 
+> I misread your mail.. I got the problem now.. Below should fix your
+> issue (It is rebased on the patch I pointed to you earlier):
+> 
+> Attached too for testing as gmail copy-paste will break it.
+> 
+> @Rafael: Once Rob gives his Tested-by, please queue it for 3.10-rcs
+> 
+> ------------x-----------------x-----------------
+> 
+> From: Viresh Kumar <viresh.kumar@linaro.org>
+> Date: Mon, 20 May 2013 09:57:17 +0530
+> Subject: [PATCH] cpufreq: arm_big_little_dt: Instantiate as platform_driver
+> 
+> As multiplatform build is being adopted by more and more ARM platforms, initcall
+> function should be used very carefully. For example, when both arm_big_little_dt
+> and cpufreq-cpu0 drivers are compiled in, arm_big_little_dt driver may try to
+> register even if we had platform device for cpufreq-cpu0 registered.
+> 
+> To eliminate this undesired the effect, the patch changes arm_big_little_dt
+> driver to have it instantiated as a platform_driver. Then it will only run on
+> platforms that create the platform_device "arm-bL-cpufreq-dt".
+> 
+> Reported-by: Rob Herring <robherring2@gmail.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-I have decided to use the PCA9665 I2C controller on my AT91RM9200 custom 
-board. Could you help me with my board specific code to initialize the 
-driver? How should I modify the code for PCA(I2C) part of my 
-arch/arm/mach-at91/board-xxx.c file?
+The patch (from the attachment) didn't apply for me.  Please check the
+bleeding-edge branch.
 
-Best regards,
-Elyas
+Thanks,
+Rafael
 
-On 2007-08-07 11:26, Michel Benoit wrote:
- > Hello Alex,
- >
- > I've cc'ed this email to the linux-arm-kernel list.
- >
- > > I too have decided to use the PCA9564 I2C controller, as the on-chip
- > > TWI controller was too buggy. I'm now trying to utilize the PCA9564
- > > driver included in 2.6.21, but am having some trouble figuring out how
- > > to use it. Would you mind answering a few questions for me?
- > >
- > > First off, I've included the PCA driver (not the ISA version) in my
- > > kernel using the menu configuration (not as a loadable module, but
- > > included it directly in the kernel), but I can't find anything in the
- > > running kernel that lets me know it has been included, except that the
- > > directory "/sys/bus/platform/drivers/pca9564" exists. I see nothing
- > > in the startup text stating that the driver is loaded and there is no
- > > entry in "/dev". Do you know what steps I need to take to load the
- > > driver?
- >
- > Have you included any board specific code to initialise the driver?
- >
- > Here is some code from my arch/arm/mach-at91rm9200/board-xxx.c file.
- >
- >
- > #if defined(CONFIG_I2C_PCA) || defined(CONFIG_I2C_PCA_MODULE)
- >
- > static struct at91_pca_data pca_data;
- >
- >
- >
- >
- > void __init at91_add_device_i2c_pca(struct at91_pca_data *data)
- > {
- >
- >
- >
- >
- >
- >
- >
- >
- >
- >
- >
- >
- > >
- > > Second, how do you physically connect the PCA9564 to your processor?
- > > Do you use GPIO, or is it placed on the data bus?
- >
- > The PCA9564 is on the system data bus with the irq and the reset pins
- > connected to gpio.
- >
- > I had to tweak the driver a little in order to use the GPIO reset pin
- > when the PCA detects an error condition on the bus.
- >
- >
- > > Thanks in advance for any help you can provide,
- > > Alex Parkinson
- > >
- > > On 5/30/07, Michel Benoit <murpme@gmail.com> wrote:
- > > > Hi Alex,
- > > >
- > > > Here is a copy of the driver that I wrote to test the 9260 i2c
- > > > interface. Its raw but it supports both master and slave mode. I did
- > > > not manage to get the twi hw to work in slave mode on the EK
- > > > development board so we chose to use an external PCA i2c controller
- > > > instead on our hw. I was told that the i2c (twi) controller is buggy
- > > > and cannot be trusted 100% of the time even in master mode.
- > > >
- > > > There are some folks that have been discussing an implementation of
- > > > interrupt based at91 i2c driver on the lm-sensors mailing list. I'm
- > > > not sure what the status of that drive ris but I know that 
-someone was
- > > > trying to get the driver into mainline.
- > > >
- > > > Good luck!
- > > >
- > > >
- > > >
- > > >
- > > > On 5/29/07, Alex Parkinson <okalex@gmail.com> wrote:
- > > > > Michel,
- > > > >
- > > > > I've seen on a number of mailing lists that you've worked with 
-the I2C
- > > > > driver for the SAM9260 quite a bit. I'm about to dive into the code
- > > > > now, and I just wanted to ask you if you ever managed to get it
- > > > > working. I saw on the lm-sensors mailing list that you modified the
- > > > > driver to be interrupt-based. Has your code made it into the 
-mainline
- > > > > kernel? If not, would you mind sharing it with me?
- > > > >
- > > > > Sincerely,
- > > > > Alex Parkinson
- > > > >
- > > >
- > > >
- > >
- >
- >
- >
+
+> ---
+>  drivers/cpufreq/arm_big_little_dt.c | 20 +++++++++++++++-----
+>  1 file changed, 15 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/arm_big_little_dt.c
+> b/drivers/cpufreq/arm_big_little_dt.c
+> index 27e2f45..fd9e3ea 100644
+> --- a/drivers/cpufreq/arm_big_little_dt.c
+> +++ b/drivers/cpufreq/arm_big_little_dt.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/opp.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/slab.h>
+>  #include <linux/types.h>
+>  #include "arm_big_little.h"
+> @@ -95,7 +96,7 @@ static struct cpufreq_arm_bL_ops dt_bL_ops = {
+>  	.init_opp_table = dt_init_opp_table,
+>  };
+> 
+> -static int generic_bL_init(void)
+> +static int generic_bL_probe(struct platform_device *pdev)
+>  {
+>  	struct device_node *np;
+> 
+> @@ -106,13 +107,22 @@ static int generic_bL_init(void)
+>  	of_node_put(np);
+>  	return bL_cpufreq_register(&dt_bL_ops);
+>  }
+> -module_init(generic_bL_init);
+> 
+> -static void generic_bL_exit(void)
+> +static int generic_bL_remove(struct platform_device *pdev)
+>  {
+> -	return bL_cpufreq_unregister(&dt_bL_ops);
+> +	bL_cpufreq_unregister(&dt_bL_ops);
+> +	return 0;
+>  }
+> -module_exit(generic_bL_exit);
+> +
+> +static struct platform_driver generic_bL_platdrv = {
+> +	.driver = {
+> +		.name	= "arm-bL-cpufreq-dt",
+> +		.owner	= THIS_MODULE,
+> +	},
+> +	.probe		= generic_bL_probe,
+> +	.remove		= generic_bL_remove,
+> +};
+> +module_platform_driver(generic_bL_platdrv);
+> 
+>  MODULE_AUTHOR("Viresh Kumar <viresh.kumar@linaro.org>");
+>  MODULE_DESCRIPTION("Generic ARM big LITTLE cpufreq driver via DT");
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
