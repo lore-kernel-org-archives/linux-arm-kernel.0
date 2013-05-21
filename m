@@ -1,103 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 May 2013 08:13:54 +0200
-Subject: [PATCH] arm64: kernel: compiling issue,
- need =?UTF-8?Q?=27EXPORT=5FSY?=
- =?UTF-8?Q?MBOL=5FGPL=28read=5Fcurrent=5Ftimer=29=27?=
-In-Reply-To: <519AF2DC.2040200@asianux.com>
-References: <5199C725.8050102@asianux.com>
- <168084c28e8ba5124c05553e97463172@localhost>
- <20130520095606.GH31359@mudshark.cambridge.arm.com>
- <519AF2DC.2040200@asianux.com>
-Message-ID: <5bf8a8dd20ecd01c14f0ed9aa054f2df@localhost>
+From: linux@prisktech.co.nz (Tony Prisk)
+Date: Tue, 21 May 2013 18:16:21 +1200
+Subject: [PATCH] i2c: vt8500: Add support for I2C bus on Wondermedia SoCs
+In-Reply-To: <1368350634-12654-1-git-send-email-linux@prisktech.co.nz>
+References: <1368350634-12654-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <519B1135.4060509@prisktech.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 May 2013 12:06:52 +0800, Chen Gang <gang.chen@asianux.com>
-wrote:
-> On 05/20/2013 05:56 PM, Will Deacon wrote:
->> On Mon, May 20, 2013 at 08:15:04AM +0100, Marc Zyngier wrote:
->>> On Mon, 20 May 2013 14:48:05 +0800, Chen Gang <gang.chen@asianux.com>
->>> wrote:
->>>> Need 'EXPORT_SYMBOL_GPL(read_current_timer)' if build with
->>>> allmodconfig.
->>>>
->>>> The related error:
->>>>   ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
->>>>   ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
->>>>   ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
->>>>   ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
->>>>
->>>>
->>>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->>>> ---
->>>>  arch/arm64/kernel/time.c |    1 +
->>>>  1 files changed, 1 insertions(+), 0 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
->>>> index a551f88..7fcba80 100644
->>>> --- a/arch/arm64/kernel/time.c
->>>> +++ b/arch/arm64/kernel/time.c
->>>> @@ -73,6 +73,7 @@ int read_current_timer(unsigned long *timer_value)
->>>>  	*timer_value = arch_timer_read_counter();
->>>>  	return 0;
->>>>  }
->>>> +EXPORT_SYMBOL_GPL(read_current_timer);
->>>>  
->>>>  void __init time_init(void)
->>>>  {
->>>
->>> While this solves the problem, I'm not sure this is the best fix. The
->>> real
->>> issue is with get_cycles, which is a macro around read_current_timer.
->>>
->>> AArch32 exports it because of the number of timer implementations. On
->>> arm64, we should be able to just return CNTVCT_EL0.
->>>
->>> Catalin, Will, what do you think?
->> 
->> Should be ok once the arch timer driver has moved exclusively to
-virtual
->> time. I'm also not sure we even need to implement read_current_timer()
---
->> it's only used for delay-loop calibration, which we don't need for the
->> arch timer.
->> 
-> 
-> For whether we need implement read_current_timer():
-> 
->   many platforms have implemented it (openrisc, arm, sparc, hexagon,
->   avr32, x86).
->   it is called by init/calibrate.c when 'ARCH_HAS_READ_CURRENT_TIMER' is
->   defined.
->   since arm64 can implement it, better to provide it as an architect
->   features to let outside use.
+On 12/05/13 21:23, Tony Prisk wrote:
+> This patch adds support for the I2C bus controllers found on Wondermedia
+> 8xxx-series SoCs. Only master-mode is supported.
+>
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
+>   .../devicetree/bindings/i2c/i2c-vt8500.txt         |   24 +
+>   MAINTAINERS                                        |    1 +
+>   drivers/i2c/busses/Kconfig                         |   10 +
+>   drivers/i2c/busses/Makefile                        |    1 +
+>   drivers/i2c/busses/i2c-wmt.c                       |  488 ++++++++++++++++++++
+>   5 files changed, 524 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/i2c/i2c-vt8500.txt
+>   create mode 100644 drivers/i2c/busses/i2c-wmt.c
+>
+>
+This patch seems to have stalled. Any news?
 
-Nobody disputes the interest of read_current_timer.
-
-> For the implementation of read_current_timer():
-> 
->   it has to face various configurations
->     (e.g. CONFIG_ARM_ARCH_TIMER, arch_timer_read_zero,
->     arch_counter_get_cntvct, arch_counter_get_cntpct)
->   so better still use variable instead of.
->     (excuse me, I do not know what is 'CNTVCT_EL0', is it like a
-constant
->     number ?)
-
-Architected timer is mandatory on arm64, so we can always rely on it it be
-present. CNTVCT_EL0 is the system register accessing the Virtual Counter,
-which is basically what read_current_timer() returns.
-
-> For the implementation of get_cycles()
-> 
->   if read_current_timer() is provided,
->   better to let get_cycles() to call it, instead of implement once
-again.
-
-There is certainly some value in reusing existing code, but in this
-particular case we can simply inline two instructions (isb + mrs
-cntvct_el0), and I'm not even completely sure about the isb.
-
-        M.
--- 
-Fast, cheap, reliable. Pick two.
+Regards
+Tony Prisk
