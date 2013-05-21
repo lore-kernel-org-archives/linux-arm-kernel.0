@@ -1,18 +1,40 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 21 May 2013 14:01:47 +0800
-Subject: [PATCH] ARM i.MX6q: fix for ldb_di_sels
-In-Reply-To: <1369054311-2519-1-git-send-email-jiada_wang@mentor.com>
-References: <1369054311-2519-1-git-send-email-jiada_wang@mentor.com>
-Message-ID: <20130521060145.GG3080@S2101-09.ap.freescale.net>
+From: neidhard.kim@lge.com (Jongsung Kim)
+Date: Tue, 21 May 2013 15:02:29 +0900
+Subject: [PATCH] ARM: bcm2835: override the HW UART periphid
+In-Reply-To: <519AD82A.6090809@wwwdotorg.org>
+References: <519AD82A.6090809@wwwdotorg.org>
+Message-ID: <1369116149-2361-1-git-send-email-neidhard.kim@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 09:51:51PM +0900, Jiada Wang wrote:
-> As pll5_video_div has been introduced to represent the clock
-> generated from post-divider for video.
-> Instead of pll5_video, pll5_video_div should be proper root clock
-> for ldb_di_sel.
-> 
-> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+Stephen Warren reported the recent commit 78506f2 (add support for
+extended FIFO-size of PL011-r1p5) breaks the serial port on the
+BCM2835 ARM SoC.
 
-Applied, thanks.
+A UART compatible with the ARM PL011-r1p5 should have 32-deep FIFOs.
+The BCM2835 UART just looks like an ARM PL011-r1p5, but has 16-deep
+FIFOs just like PL011-r1p4 or earlier revisions. As a workaround for
+this compatibility issue, this patch overrides the HW UART periphid
+register values with the actually compatible UART periphid 0x00241011
+(r1p3 or r1p4).
+
+Reported-by: Stephen Warren <swarren@wwwdotorg.org>
+Signed-off-by: Jongsung Kim <neidhard.kim@lge.com>
+---
+ arch/arm/boot/dts/bcm2835.dtsi |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index f0052dc..1e12aef 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -44,6 +44,7 @@
+ 			reg = <0x7e201000 0x1000>;
+ 			interrupts = <2 25>;
+ 			clock-frequency = <3000000>;
++			arm,primecell-periphid = <0x00241011>;
+ 		};
+ 
+ 		gpio: gpio {
+-- 
+1.7.1
