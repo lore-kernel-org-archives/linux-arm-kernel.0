@@ -1,53 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 20 May 2013 23:31:39 -0700
-Subject: [PATCH] ARM: vt8500: Add missing NULL terminator in dt_compat
-In-Reply-To: <5195EA34.7000409@prisktech.co.nz>
-References: <1368776657-23035-1-git-send-email-srinivas.kandagatla@st.com>
- <5195EA34.7000409@prisktech.co.nz>
-Message-ID: <20130521063139.GA20453@quad.lixom.net>
+Date: Mon, 20 May 2013 23:37:32 -0700
+Subject: [GIT PULL] omap fixes for v3.10-rc1
+In-Reply-To: <20130517192515.GC5600@atomide.com>
+References: <20130517192515.GC5600@atomide.com>
+Message-ID: <20130521063732.GD20453@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 08:28:36PM +1200, Tony Prisk wrote:
-> On 17/05/13 19:44, Srinivas KANDAGATLA wrote:
-> >From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> >
-> >When I tried booting a stih415 Dual core A9 with multi_v7_defconfig, it
-> >failed to boot. The issues seems to be changing by enabling or disabling
-> >VT8550 platform. Having a quick look at dt_compat list, it seems to miss
-> >a NULL terminator, which means of_flat_dt_match will compat check will
-> >cross the boundary of dt_compat and fault at some point , which is what
-> >was happening in my case.
-> >
-> >Without this patch if we try to boot multi_v7_defconfig you might notice
-> >that some of the platforms might fault if they fall after vt8500 in
-> >machine-desc list. Other platforms which fall before vt8500 in mdesc list
-> >will not fault.
-> >
-> >Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> >---
-> >  arch/arm/mach-vt8500/vt8500.c |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> >
-> >diff --git a/arch/arm/mach-vt8500/vt8500.c b/arch/arm/mach-vt8500/vt8500.c
-> >index 1dd281e..f5c33df 100644
-> >--- a/arch/arm/mach-vt8500/vt8500.c
-> >+++ b/arch/arm/mach-vt8500/vt8500.c
-> >@@ -173,6 +173,7 @@ static const char * const vt8500_dt_compat[] = {
-> >  	"wm,wm8505",
-> >  	"wm,wm8750",
-> >  	"wm,wm8850",
-> >+	NULL
-> >  };
-> >  DT_MACHINE_START(WMT_DT, "VIA/Wondermedia SoC (Device Tree Support)")
-> My bad. Thanks for the fix.
+On Fri, May 17, 2013 at 12:25:16PM -0700, Tony Lindgren wrote:
+> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 > 
-> Acked-by: Tony Prisk <linux@prisktech.co.nz>
+>   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
 > 
-> Arnd, Olof: Can you apply this directly please.
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10-rc1/fixes
 
-Done.
+Well, it's for -rc3 now but it can never have been for -rc1 since that's
+what the branch is base on. :-)
 
-Thanks,
+
+IOW: Pulled, thanks!
+
 
 -Olof
