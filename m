@@ -1,47 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 20 May 2013 20:12:58 -0600
-Subject: [PATCH] ARM: PL011: add support for extended FIFO-size of
- PL011-r1p5
-In-Reply-To: <007001ce55c4$139f96e0$3adec4a0$@lge.com>
-References: <007301ce375e$bcf6d6b0$36e48410$@lge.com>
- <5191D200.3040604@wwwdotorg.org> <01fd01ce5072$d6b9fcd0$842df670$@lge.com>
- <5192A692.4010700@wwwdotorg.org> <022d01ce5107$8bc668e0$a3533aa0$@lge.com>
- <5193164E.6050400@wwwdotorg.org> <007001ce55c4$139f96e0$3adec4a0$@lge.com>
-Message-ID: <519AD82A.6090809@wwwdotorg.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 21 May 2013 10:17:20 +0800
+Subject: [PATCH v3 2/4] ARM: imx: add initial support for MVF600
+In-Reply-To: <4003326.AbobOukrYT@wuerfel>
+References: <1368684648-20826-1-git-send-email-b35083@freescale.com>
+ <201305171429.52646.arnd@arndb.de>
+ <20130517130603.GJ8607@S2101-09.ap.freescale.net>
+ <4003326.AbobOukrYT@wuerfel>
+Message-ID: <20130521021718.GA3080@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2013 07:39 PM, Jongsung Kim wrote:
-> Jongsung Kim <neidhard.kim@lge.com> :
->> Stephen Warren <swarren@wwwdotorg.org> :
->>>> All r1p5 have 32-byte FIFO depth and it's not configurable. From the 
->>>> PL011
->>>> TRM:
->>>>
->>>> r1p4-r1p5	Contains the following differences in functionality:
->>>> 		* The receive and transmit FIFOs are increased to a depth of
-> 32.
->>>> 		* The Revision field in the UARTPeriphID2 Register on page
-> 3-24
->>>> 		  bits [7:4] now reads back as 0x3.
->>>
->>> Well, that certainly isn't true in practice. I think we should revert 
->>> this commit until we can determine what the problem is.
->>
->> I asked to the ARM support about this. Waiting for reply..
+On Fri, May 17, 2013 at 03:17:31PM +0200, Arnd Bergmann wrote:
+> On Friday 17 May 2013 21:06:05 Shawn Guo wrote:
+> > On Fri, May 17, 2013 at 02:29:52PM +0200, Arnd Bergmann wrote:
+> > > > > Actually I think you should move that driver to drivers/clk and use
+> > > > > of_clk_init(NULL) to initialize it.
+> > > > > 
+> > > > The mvf600 clock driver uses a lot of base clk support from mach-imx,
+> > > > and can not be moved into drivers/clk as a single driver.  Right now, in
+> > > > IMX clock drivers, we call of_clk_init() to only register fixed rate
+> > > > clocks, since all the other clocks are not represented in device tree.
+> > > 
+> > > What are your plans for this in the long run?
+> > > 
+> > We can move all the IMX clock drivers into drivers/clk at some point
+> > when necessary.  But I do not have a plan to register all the clocks
+> > by merely calling of_clk_init(), because doing that would mean we have
+> > to represent all these clocks in device tree.  For imx6q example, it's
+> > about 200 ~ 300 nodes addition to DTB.  Device tree maintainers are
+> > against to the idea.  They are perfectly fine with having clock driver
+> > in kernel to represent/register these SoC internal clocks to clk
+> > framework.
 > 
-> ARM support said they doesn't have information about BCM2835 UART. Does
-> anyone have a communication channel to Broadcom? It takes time for me to
-> get contact point to Broadcom.. (I'm trying)
-> 
-> However, ARM support also said:
-> 
-> "If the Broadcom part definitely has 16-deep FIFOs, it cannot be based
-> on a PL011 r1p5, so I might guess that Broadcom have just referenced
-> the latest version of the documentation on our website, but have actually
-> implemented an earlier version."
+> Can't we move the driver to drivers/clk and have it initialized through
+> of_clk_init() without representing all clocks in the DT?
 
-This all seems rather academic. Irrespective of what the cause of the
-problem is, the commit actively breaks a previously working
-configuration. I still believe we should revert it first, then find out
-exactly what's going on later. Should I sent the revert commit?
+Sorry.  I just get aware of that I misunderstood your comment.  Yes,
+declaring the clock initialization function with CLK_OF_DECLARE(),
+we can use of_clk_init() to have them invoked properly.  I just sent a
+patch to change imx6 clock driver to do that.
+
+Shawn
