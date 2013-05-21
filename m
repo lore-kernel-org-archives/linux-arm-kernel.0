@@ -1,28 +1,32 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 21 May 2013 13:09:57 +0100
-Subject: [PATCH] ARM: ux500: fix typo in STUIB device tree
-In-Reply-To: <1369137402-17580-1-git-send-email-linus.walleij@stericsson.com>
-References: <1369137402-17580-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130521120957.GA9471@gmail.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 21 May 2013 14:14:22 +0200
+Subject: [PATCH v4 01/21] sh-pfc: Remove support for platform data
+In-Reply-To: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1369138482-5871-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 May 2013, Linus Walleij wrote:
+Platform data isn't used, support can thus be removed.
 
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> The Rohm vendor name was twisted in the STUIB device tree
-> include file. Fix it up.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/boot/dts/stuib.dtsi | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
+ drivers/pinctrl/sh-pfc/core.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
+diff --git a/drivers/pinctrl/sh-pfc/core.c b/drivers/pinctrl/sh-pfc/core.c
+index 3b2fd43..ac45084 100644
+--- a/drivers/pinctrl/sh-pfc/core.c
++++ b/drivers/pinctrl/sh-pfc/core.c
+@@ -354,8 +354,7 @@ static int sh_pfc_probe(struct platform_device *pdev)
+ 	struct sh_pfc *pfc;
+ 	int ret;
+ 
+-	info = pdev->id_entry->driver_data
+-	      ? (void *)pdev->id_entry->driver_data : pdev->dev.platform_data;
++	info = (void *)pdev->id_entry->driver_data;
+ 	if (info == NULL)
+ 		return -ENODEV;
+ 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.1.5
