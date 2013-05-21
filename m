@@ -1,56 +1,26 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 21 May 2013 18:10:18 +0200
-Subject: [PATCH 6/9] arm: mvebu: move cache and mvebu-mbus
- initialization later
-In-Reply-To: <20130521154313.GV31290@titan.lakedaemon.net>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1369132414-18959-7-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130521141621.GU31290@titan.lakedaemon.net>
- <20130521173707.5a49eaec@skate>
- <20130521154313.GV31290@titan.lakedaemon.net>
-Message-ID: <20130521181018.401ddabf@skate>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 21 May 2013 10:13:31 -0600
+Subject: [v2 2/6] ARM: tegra20: convert device tree files to use CLK
+ defines
+In-Reply-To: <1369127450-15203-3-git-send-email-hdoyu@nvidia.com>
+References: <1369127450-15203-1-git-send-email-hdoyu@nvidia.com>
+ <1369127450-15203-3-git-send-email-hdoyu@nvidia.com>
+Message-ID: <519B9D2B.5010101@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
-
-On Tue, 21 May 2013 11:43:13 -0400, Jason Cooper wrote:
-
-> > > I tried hacking it up to put it in mvebu/soc-internal_regs for a few
-> > > rounds of testing in linux-next during review, however, I'd prefer you
-> > > rebase this on top of mvebu/cleanup.
-> > 
-> > So you mean my next version of the "Internal registers switch" should
-> > be based on mvebu/cleanup, right?
+On 05/21/2013 03:10 AM, Hiroshi Doyu wrote:
+> Use the Tegra20 CAR binding header (tegra20-car.h) to replace magic
+> numbers in the device tree. For example,
 > 
-> Yes, sorry I wasn't clear, I meant the series.  You can drop 1-3 as
-> well for the next version, since I've pulled those.
+> -               clocks = <&tegra_car 28>;
+> +               clocks = <&tegra_car CLK_HOST1X>;
 
-Ok. 1-2 have been merged in mvebu/fixes, and 3 in mvebu/cleanup. So I
-suppose mvebu/cleanup is based on mvebu/fixes ? Or should I base on
-mvebu/cleanup and assume when it will lend in mainline, the mvebu/fixes
-patches will be there (which doesn't make the thing easy for testing
-here, because to test, I actually need all the patches in the same
-branch). Just trying to figure the workflow :)
+> diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
 
-> > There will be some next version in any case, because I just found a
-> > bug in the latest patch when booting from a bootloader that has
-> > already done the switch to 0xF1.
-> 
-> Ok, I'll hold off putting it up for testing until v2.
+> -		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 94>;
+> +		clocks = <&tegra_car TEGRA20_CLK_PLL_A>, <&tegra_car TEGRA20_CLK_PLL_A_OUT0>, <&tegra_car TEGRA20_CLK_CDEV1>;
 
-Well, the current version should be ok build-wise, and works with all
-currently available Marvell bootloaders. The bug can only be seen with
-a bootloader version that has not yet been really released by Marvell.
-
-But anyway, v2 will follow shortly. With this v1, I was mainly hoping
-for some feedback, to see if the solution was acceptable or not.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+That's well over 80 columns. Can you wrap it and make sure there aren't
+any other instances of this? I guess checkpatch doesn't actually impose
+this rule on *.dts files, since it didn't complain about this.
