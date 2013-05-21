@@ -1,48 +1,48 @@
-From: list-09_linux_arm@tqsc.de (Markus Niebel)
-Date: Tue, 21 May 2013 20:04:06 +0200
-Subject: [PATCH v2 2/3] staging: drm/imx: fix spelling error for vsync flag
- config
-In-Reply-To: <1369159448-14584-1-git-send-email-list-09_linux_arm@tqsc.de>
-References: <1369159448-14584-1-git-send-email-list-09_linux_arm@tqsc.de>
-Message-ID: <1369159448-14584-3-git-send-email-list-09_linux_arm@tqsc.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 May 2013 19:02:01 +0100
+Subject: [PATCH 14/14] ARM: elf: add new hwcap for identifying atomic
+ ldrd/strd instructions
+In-Reply-To: <20130520171349.GM3639@MacBook-Pro.local>
+References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
+ <1368810473-26070-15-git-send-email-will.deacon@arm.com>
+ <20130520141809.GA27473@arm.com>
+ <20130520142459.GN31359@mudshark.cambridge.arm.com>
+ <20130520151158.GA3520@MacBook-Pro.local>
+ <20130520160407.GS31359@mudshark.cambridge.arm.com>
+ <20130520171349.GM3639@MacBook-Pro.local>
+Message-ID: <20130521180201.GB26251@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Niebel <Markus.Niebel@tqs.de>
+On Mon, May 20, 2013 at 06:13:52PM +0100, Catalin Marinas wrote:
+> On Mon, May 20, 2013 at 05:04:07PM +0100, Will Deacon wrote:
+> > On Mon, May 20, 2013 at 04:11:58PM +0100, Catalin Marinas wrote:
+> > > Given that the ARM ARM isn't clear (though this is the case on the
+> > > actual implementations), user space may not necessarily assume that
+> > > LPAE==atomic doubles. That's why I think reporting the actual atomic
+> > > feature is better.
+> > 
+> > The ARM ARM isn't too bad: it's just avoiding mandating 64-bit-wide paths
+> > around the entire SoC (and I've checked this with the architects). The only
+> > way we can probe this feature is using the MMFR0 and checking if LPAE is
+> > supported, and that's exactly what userspace will need to rely on.
+> 
+> Well, LPAE implies atomic doubles but I wouldn't say that's the "only"
+> way, it can always be a feature of the CPU. Now, would the user
+> developers fully understand the implications of LPAE?
 
-partial fix of changes from
-"staging: drm/imx: Add support for VGA via TVE on i.MX53"
+I don't think it *can* be a feature of the CPU, because it depends on
+system-wide support. It could be a feature of an SoC, but per-SoC hwcaps
+isn't something we currently support. As I said, the only reason we can even
+probe this is because the architecture helps us out.
 
-Have to check for vsync_pin instead of hsync_pin to set Vsync_pol.
+> > We can
+> > change the name, but the probe code will remain the same so I'm not sure it
+> > makes anything clearer. We had "atomicd" originally, but that sounds like a
+> > techno band.
+> 
+> We can make it longer, 'atomicdbl', if that's the issue ;).
 
-Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
----
-V2:
-  - no changes in patch
-  - add Acked-by from v1 of patch
+Argh! :)
 
- drivers/staging/imx-drm/ipu-v3/ipu-di.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-index 19d777e..e7b9c98 100644
---- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-+++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-@@ -614,11 +614,11 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
- 				di_gen |= DI_GEN_POLARITY_7;
- 		}
- 		if (sig->Vsync_pol) {
--			if (sig->hsync_pin == 3)
-+			if (sig->vsync_pin == 3)
- 				di_gen |= DI_GEN_POLARITY_3;
--			else if (sig->hsync_pin == 6)
-+			else if (sig->vsync_pin == 6)
- 				di_gen |= DI_GEN_POLARITY_6;
--			else if (sig->hsync_pin == 8)
-+			else if (sig->vsync_pin == 8)
- 				di_gen |= DI_GEN_POLARITY_8;
- 		}
- 	}
--- 
-1.7.9.5
+Will
