@@ -1,53 +1,56 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 21 May 2013 12:09:47 -0400 (EDT)
-Subject: [PATCH v4 21/32] arm64: KVM: Build system integration
-In-Reply-To: <20130521154227.GM27002@arm.com>
-References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
- <1368540840-26750-22-git-send-email-marc.zyngier@arm.com>
- <20130521154227.GM27002@arm.com>
-Message-ID: <850310439.5245685.1369152587054.JavaMail.root@redhat.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 21 May 2013 18:10:18 +0200
+Subject: [PATCH 6/9] arm: mvebu: move cache and mvebu-mbus
+ initialization later
+In-Reply-To: <20130521154313.GV31290@titan.lakedaemon.net>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1369132414-18959-7-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130521141621.GU31290@titan.lakedaemon.net>
+ <20130521173707.5a49eaec@skate>
+ <20130521154313.GV31290@titan.lakedaemon.net>
+Message-ID: <20130521181018.401ddabf@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Jason Cooper,
 
+On Tue, 21 May 2013 11:43:13 -0400, Jason Cooper wrote:
 
------ Messaggio originale -----
-> Da: "Catalin Marinas" <catalin.marinas@arm.com>
-> A: "Marc Zyngier" <Marc.Zyngier@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org, kvmarm at lists.cs.columbia.edu, kvm at vger.kernel.org, "Will Deacon"
-> <Will.Deacon@arm.com>, pbonzini at redhat.com, gleb at redhat.com, "Christopher Covington" <cov@codeaurora.org>
-> Inviato: Marted?, 21 maggio 2013 17:42:27
-> Oggetto: Re: [PATCH v4 21/32] arm64: KVM: Build system integration
+> > > I tried hacking it up to put it in mvebu/soc-internal_regs for a few
+> > > rounds of testing in linux-next during review, however, I'd prefer you
+> > > rebase this on top of mvebu/cleanup.
+> > 
+> > So you mean my next version of the "Internal registers switch" should
+> > be based on mvebu/cleanup, right?
 > 
-> On Tue, May 14, 2013 at 03:13:49PM +0100, Marc Zyngier wrote:
-> > --- /dev/null
-> > +++ b/arch/arm64/kvm/Kconfig
-> ...
-> > +config KVM_ARM_VGIC
-> > +        bool
-> > +	depends on KVM_ARM_HOST && OF
-> > +	select HAVE_KVM_IRQCHIP
-> > +	---help---
-> > +	  Adds support for a hardware assisted, in-kernel GIC emulation.
-> > +
-> > +config KVM_ARM_TIMER
-> > +        bool
-> > +	depends on KVM_ARM_VGIC
-> > +	select HAVE_KVM_IRQCHIP
-> > +	---help---
-> > +	  Adds support for the Architected Timers in virtual machines
-> > +
-> > +source drivers/virtio/Kconfig
+> Yes, sorry I wasn't clear, I meant the series.  You can drop 1-3 as
+> well for the next version, since I've pulled those.
+
+Ok. 1-2 have been merged in mvebu/fixes, and 3 in mvebu/cleanup. So I
+suppose mvebu/cleanup is based on mvebu/fixes ? Or should I base on
+mvebu/cleanup and assume when it will lend in mainline, the mvebu/fixes
+patches will be there (which doesn't make the thing easy for testing
+here, because to test, I actually need all the patches in the same
+branch). Just trying to figure the workflow :)
+
+> > There will be some next version in any case, because I just found a
+> > bug in the latest patch when booting from a bootloader that has
+> > already done the switch to 0xF1.
 > 
-> Shouldn't the above configs go to drivers/virtio/Kconfig as well (or
-> drivers/virtio/arm/Kconfig)?
+> Ok, I'll hold off putting it up for testing until v2.
 
-virtio doesn't mean "virtual versions of devices that also exist in
-hardware"; those are indeed in arch/ARCH/kvm.  virtio is a specific bus
-for paravirtualized devices.  It is not KVM-specific and the code runs
-in the guest (whereas arch/arm64/kvm/Kconfig is host code).
+Well, the current version should be ok build-wise, and works with all
+currently available Marvell bootloaders. The bug can only be seen with
+a bootloader version that has not yet been really released by Marvell.
 
-That said, drivers/virtio/Kconfig is already sourced by drivers/Kconfig.
-Why do you need to source it again here?
+But anyway, v2 will follow shortly. With this v1, I was mainly hoping
+for some feedback, to see if the solution was acceptable or not.
 
-Paolo
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
