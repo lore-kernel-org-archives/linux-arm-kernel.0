@@ -1,40 +1,47 @@
-From: neidhard.kim@lge.com (Jongsung Kim)
-Date: Tue, 21 May 2013 10:39:46 +0900
-Subject: [PATCH] ARM: PL011: add support for extended FIFO-size of
- PL011-r1p5
-References: <007301ce375e$bcf6d6b0$36e48410$@lge.com>
- <5191D200.3040604@wwwdotorg.org> <01fd01ce5072$d6b9fcd0$842df670$@lge.com>
- <5192A692.4010700@wwwdotorg.org> <022d01ce5107$8bc668e0$a3533aa0$@lge.com>
- <5193164E.6050400@wwwdotorg.org>
-Message-ID: <007001ce55c4$139f96e0$3adec4a0$@lge.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 21 May 2013 09:51:57 +0800
+Subject: [PATCH] include/linux/posix_acl.h: need 'return NULL' when BUG(),
+ if neither CONFIG_BUG nor HAVE_ARCH_BUG is defined.
+In-Reply-To: <20130520163118.GX18614@n2100.arm.linux.org.uk>
+References: <5199DBE2.5080707@asianux.com>
+ <97dada79-cd78-4799-8f18-ed2bf8eee508@email.android.com>
+ <20130520163118.GX18614@n2100.arm.linux.org.uk>
+Message-ID: <519AD33D.1030106@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jongsung Kim <neidhard.kim@lge.com> :
-> Stephen Warren <swarren@wwwdotorg.org> :
->>> All r1p5 have 32-byte FIFO depth and it's not configurable. From the 
->>> PL011
->>> TRM:
->>> 
->>> r1p4-r1p5	Contains the following differences in functionality:
->>> 		* The receive and transmit FIFOs are increased to a depth of
-32.
->>> 		* The Revision field in the UARTPeriphID2 Register on page
-3-24
->>> 		  bits [7:4] now reads back as 0x3.
->>
->> Well, that certainly isn't true in practice. I think we should revert 
->> this commit until we can determine what the problem is.
->
-> I asked to the ARM support about this. Waiting for reply..
+On 05/21/2013 12:31 AM, Russell King - ARM Linux wrote:
+> On Mon, May 20, 2013 at 07:40:24AM -0700, Eric W. Biederman wrote:
+>> Seriously?  The correct fix it would seem is to give a useful default BUG
+>> definition.  Say *NULL.
+> 
+> Absolutely.
+> 
+> The real question is... how is this happening.  I've seen it occasionally
+> in the randconfig builds - though I don't have any logs to hand which
+> show that in the build system at the moment.  So, looking at the files:
+> 
 
-ARM support said they doesn't have information about BCM2835 UART. Does
-anyone have a communication channel to Broadcom? It takes time for me to
-get contact point to Broadcom.. (I'm trying)
+Maybe it is my fault for the incorrect configuration.
 
-However, ARM support also said:
+My operation:
+  make EXTRA_CFLAGS=-W ARCH=arm randconfig
+  make EXTRA_CFLAGS=-W ARCH=arm menuconfig
+    set 'arm-linux-gnu-' as cross compiler prefix.
+    select "MMU-based Paged Memory" in "System Type".
+    select "Samsung S5PV210/S5PC110" in "ARM System type"
+  make EXTRA_CFLAGS=-W ARCH=arm
+  ...
 
-"If the Broadcom part definitely has 16-deep FIFOs, it cannot be based
-on a PL011 r1p5, so I might guess that Broadcom have just referenced
-the latest version of the documentation on our website, but have actually
-implemented an earlier version."
+In menuconfig, I do not touch the "S5PV210 Machines" or "S5PC110
+Machines" in "System Type", and no machines will be chosen as default.
+
+I think, it may be my fault, or need provide a default machine for S5P*
+with randconfig (also better to select MMU automatically).
+
+
+Thanks.
+-- 
+Chen Gang
+
+Asianux Corporation
