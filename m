@@ -1,62 +1,221 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 21 May 2013 18:13:35 +0800
-Subject: [PATCH] ARM: tegra: add cpu_disable for hotplug
-Message-ID: <1369131215-2920-1-git-send-email-josephl@nvidia.com>
+From: tobetter@gmail.com (Dongjin Kim)
+Date: Tue, 21 May 2013 22:56:04 +0900
+Subject: [PATCH] ARM: dts: add max77686 node entry for ODROID-X
+Message-ID: <1369144571-16901-1-git-send-email-tobetter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Tegra114 could hotplug the CPU0, but the common cpu_disable didn't
-support that. Adding a Tegra specific cpu_disable function for it.
+ODROID-X board have a max77686 PMIC on i2c channel 0. The properties of used
+LDO and BUCK are defined according the schematic.
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
+Signed-off-by: Dongjin Kim <tobetter@gmail.com>
 ---
-This patch depends on the series of "ARM: tegra114: add CPU hotplug support".
----
- arch/arm/mach-tegra/common.h  |  1 +
- arch/arm/mach-tegra/hotplug.c | 10 ++++++++++
- arch/arm/mach-tegra/platsmp.c |  1 +
- 3 files changed, 12 insertions(+)
+ arch/arm/boot/dts/exynos4412-odroidx.dts |  195 ++++++++++++++++++++++++++++++
+ 1 file changed, 195 insertions(+)
 
-diff --git a/arch/arm/mach-tegra/common.h b/arch/arm/mach-tegra/common.h
-index 5900cc4..32f8eb3 100644
---- a/arch/arm/mach-tegra/common.h
-+++ b/arch/arm/mach-tegra/common.h
-@@ -2,3 +2,4 @@ extern struct smp_operations tegra_smp_ops;
- 
- extern int tegra_cpu_kill(unsigned int cpu);
- extern void tegra_cpu_die(unsigned int cpu);
-+extern int tegra_cpu_disable(unsigned int cpu);
-diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-index d07f152..9695b63 100644
---- a/arch/arm/mach-tegra/hotplug.c
-+++ b/arch/arm/mach-tegra/hotplug.c
-@@ -46,6 +46,16 @@ void __ref tegra_cpu_die(unsigned int cpu)
- 	BUG();
- }
- 
-+int tegra_cpu_disable(unsigned int cpu)
-+{
-+	switch (tegra_chip_id) {
-+	case TEGRA114:
-+		return 0;
-+	default:
-+		return cpu == 0 ? -EPERM : 0;
-+	}
-+}
+diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+index 53bc8bf..1786225 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidx.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+@@ -108,4 +108,199 @@
+ 			clock-frequency = <24000000>;
+ 		};
+ 	};
 +
- void __init tegra_hotplug_init(void)
- {
- 	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU))
-diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
-index 554aedc..24db4ac 100644
---- a/arch/arm/mach-tegra/platsmp.c
-+++ b/arch/arm/mach-tegra/platsmp.c
-@@ -196,5 +196,6 @@ struct smp_operations tegra_smp_ops __initdata = {
- #ifdef CONFIG_HOTPLUG_CPU
- 	.cpu_kill		= tegra_cpu_kill,
- 	.cpu_die		= tegra_cpu_die,
-+	.cpu_disable		= tegra_cpu_disable,
- #endif
++	i2c at 13860000 {
++		pinctrl-0 = <&i2c0_bus>;
++		pinctrl-names = "default";
++		status = "okay";
++
++		max77686: pmic at 09 {
++			compatible = "maxim,max77686";
++			reg = <0x09>;
++
++			voltage-regulators {
++				ldo1_reg: LDO1 {
++					regulator-name = "VDD_ALIVE_1.0V";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo2_reg: LDO2 {
++					regulator-name = "VDDQ_M1_2_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo3_reg: LDO3 {
++					regulator-name = "VDDQ_EXT_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo4_reg: LDO4 {
++					regulator-name = "VDDQ_MMC2_2.8V";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo5_reg: LDO5 {
++					regulator-name = "VDDQ_MMC1_3_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo6_reg: LDO6 {
++					regulator-name = "VDD10_MPLL_1.0V";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo7_reg: LDO7 {
++					regulator-name = "VDD10_XPLL_1.0V";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++				};
++
++				ldo11_reg: LDO11 {
++					regulator-name = "VDD18_ABB1_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++				};
++
++				ldo12_reg: LDO12 {
++					regulator-name = "VDD33_USB_3.3V";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo13_reg: LDO13 {
++					regulator-name = "VDDQ_C2C_W_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo14_reg: LDO14 {
++					regulator-name = "VDD18_ABB0_2_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo15_reg: LDO15 {
++					regulator-name = "VDD10_HSIC_1.0V";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo16_reg: LDO16 {
++					regulator-name = "VDD18_HSIC_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo20_reg: LDO20 {
++					regulator-name = "LDO20_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-boot-on;
++				};
++
++				ldo21_reg: LDO21 {
++					regulator-name = "LDO21_3.3V";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				ldo25_reg: LDO25 {
++					regulator-name = "VDDQ_LCD_1.8V";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck1_reg: BUCK1 {
++					regulator-name = "vdd_mif";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck2_reg: BUCK2 {
++					regulator-name = "vdd_arm";
++					regulator-min-microvolt = <900000>;
++					regulator-max-microvolt = <1300000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck3_reg: BUCK3 {
++					regulator-name = "vdd_int";
++					regulator-min-microvolt = <1000000>;
++					regulator-max-microvolt = <1000000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck4_reg: BUCK4 {
++					regulator-name = "vdd_g3d";
++					regulator-min-microvolt = <900000>;
++					regulator-max-microvolt = <1100000>;
++					regulator-microvolt-offset = <50000>;
++				};
++
++				buck5_reg: BUCK5 {
++					regulator-name = "VDDQ_CKEM1_2_1.2V";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck6_reg: BUCK6 {
++					regulator-name = "BUCK6_1.35V";
++					regulator-min-microvolt = <1350000>;
++					regulator-max-microvolt = <1350000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++
++				buck7_reg: BUCK7 {
++					regulator-name = "BUCK7_2.0V";
++					regulator-min-microvolt = <2000000>;
++					regulator-max-microvolt = <2000000>;
++					regulator-always-on;
++				};
++
++				buck8_reg: BUCK8 {
++					regulator-name = "BUCK8_2.8V";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++					regulator-always-on;
++				};
++			};
++		};
++	};
  };
 -- 
-1.8.2.2
+1.7.9.5
