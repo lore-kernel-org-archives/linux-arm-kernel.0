@@ -1,19 +1,24 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 21 May 2013 18:41:42 +0200
-Subject: [PATCH v4 04/12] net: mv643xx_eth: use of_phy_connect if phy_node
- present
+Date: Tue, 21 May 2013 18:41:46 +0200
+Subject: [PATCH v4 08/12] ARM: orion5x: add gigabit ethernet and mvmdio device
+ tree nodes
 In-Reply-To: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1369154510-4927-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1369154510-4927-9-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This connects to a phy node passed to the port device instead of probing
-the phy by phy_addr.
+This patch adds mv643xx_eth and mvmdio device tree nodes for DT enabled
+Orion5x boards. Phy nodes are also added with reg property set on a
+per-board basis.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
+Changelog:
+v3->v4:
+- convert to new device tree binding
+
 Cc: David Miller <davem@davemloft.net>
 Cc: Lennert Buytenhek <buytenh@wantstofly.org>
 Cc: Jason Cooper <jason@lakedaemon.net>
@@ -22,57 +27,75 @@ Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
 Cc: netdev at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linuxppc-dev at lists.ozlabs.org
-Cc: linux-kernel at vger.kernel.org       
+Cc: linux-kernel at vger.kernel.org
 ---
- drivers/net/ethernet/marvell/mv643xx_eth.c |   25 ++++++++++++++++++-------
- 1 file changed, 18 insertions(+), 7 deletions(-)
+ .../dts/orion5x-lacie-ethernet-disk-mini-v2.dts    |   17 ++++++++++++
+ arch/arm/boot/dts/orion5x.dtsi                     |   29 ++++++++++++++++++++
+ 2 files changed, 46 insertions(+)
 
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index e658ebd..0f5c3c2 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -60,6 +60,7 @@
- #include <linux/types.h>
- #include <linux/slab.h>
- #include <linux/clk.h>
-+#include <linux/of_mdio.h>
- 
- static char mv643xx_eth_driver_name[] = "mv643xx_eth";
- static char mv643xx_eth_driver_version[] = "1.4";
-@@ -2715,17 +2716,27 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
- 	netif_set_real_num_tx_queues(dev, mp->txq_count);
- 	netif_set_real_num_rx_queues(dev, mp->rxq_count);
- 
--	if (pd->phy_addr != MV643XX_ETH_PHY_NONE) {
-+	err = 0;
-+	if (pd->phy_node) {
-+		mp->phy = of_phy_connect(mp->dev, pd->phy_node,
-+					 mv643xx_eth_adjust_link, 0,
-+					 PHY_INTERFACE_MODE_GMII);
-+		if (!mp->phy)
-+			err = -ENODEV;
-+	} else if (pd->phy_addr != MV643XX_ETH_PHY_NONE) {
- 		mp->phy = phy_scan(mp, pd->phy_addr);
- 
--		if (IS_ERR(mp->phy)) {
-+		if (IS_ERR(mp->phy))
- 			err = PTR_ERR(mp->phy);
--			if (err == -ENODEV)
--				err = -EPROBE_DEFER;
--			goto out;
--		}
--		phy_init(mp, pd->speed, pd->duplex);
-+		else
-+			phy_init(mp, pd->speed, pd->duplex);
- 	}
-+	if (err == -ENODEV) {
-+		err = -EPROBE_DEFER;
-+		goto out;
-+	}
-+	if (err)
-+		goto out;
- 
- 	SET_ETHTOOL_OPS(dev, &mv643xx_eth_ethtool_ops);
- 
+diff --git a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+index 0077fc8..c7e2efd 100644
+--- a/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
++++ b/arch/arm/boot/dts/orion5x-lacie-ethernet-disk-mini-v2.dts
+@@ -53,3 +53,20 @@
+ 		};
+ 	};
+ };
++
++&mdio {
++	status = "okay";
++
++	&ethphy: ethernet-phy {
++		device-type = "ethernet-phy";
++		reg = <8>;
++	};
++};
++
++&eth {
++	status = "okay";
++
++	ethernet-port at 0 {
++		phy-handle = <&ethphy>;
++	};
++};
+diff --git a/arch/arm/boot/dts/orion5x.dtsi b/arch/arm/boot/dts/orion5x.dtsi
+index 892c64e..6fe45d5 100644
+--- a/arch/arm/boot/dts/orion5x.dtsi
++++ b/arch/arm/boot/dts/orion5x.dtsi
+@@ -132,5 +132,34 @@
+ 			interrupts = <28>;
+ 			status = "okay";
+ 		};
++
++		mdio: mdio-bus at 72004 {
++			compatible = "marvell,orion-mdio";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x72004 0x84>;
++			interrupts = <22>;
++			status = "disabled";
++
++			/* add phy nodes in board file */
++		};
++
++		eth: ethernet-controller at 72000 {
++			compatible = "marvell,orion-eth";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x72000 0x4000>;
++			marvell,tx-checksum-limit = <1600>;
++			status = "disabled";
++
++			ethernet-port at 0 {
++				device_type = "network";
++				compatible = "marvell,orion-eth-port";
++				reg = <0>;
++				/* overwrite MAC address in bootloader */
++				local-mac-address = [00 00 00 00 00 00];
++				/* set phy-handle property in board file */
++			};
++		};
+ 	};
+ };
 -- 
 1.7.10.4
