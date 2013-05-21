@@ -1,97 +1,48 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Tue, 21 May 2013 20:39:36 +0300
-Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
-In-Reply-To: <20130520174621.GI10378@atomide.com>
-References: <20130513205302.GA3157@blackmetal.musicnaut.iki.fi>
- <20130516180933.GG5600@atomide.com>
- <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
- <20130516214430.GN5600@atomide.com>
- <20130520174621.GI10378@atomide.com>
-Message-ID: <20130521173936.GE31836@blackmetal.musicnaut.iki.fi>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 21 May 2013 19:41:48 +0200
+Subject: [PATCH] ARM: Kirkwood: TS219: Fix crash by double PCIe instantiation
+Message-ID: <1369158108-5603-1-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 10:46:21AM -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [130516 14:50]:
-> > * Aaro Koskinen <aaro.koskinen@iki.fi> [130516 14:05]:
-> > > On Thu, May 16, 2013 at 11:09:34AM -0700, Tony Lindgren wrote:
-> > > > * Aaro Koskinen <aaro.koskinen@iki.fi> [130513 13:58]:
-> > > > > I tested 3.10-rc1 on OMAP1 / Nokia 770, and Retu MFD probe is broken:
-> > > > > 
-> > > > > [    2.264221] retu-mfd 2-0001: Retu v3.2 found
-> > > > > [    2.281951] retu-mfd 2-0001: Failed to allocate IRQs: -12
-> > > > > [    2.300140] retu-mfd: probe of 2-0001 failed with error -12
-> > > > > 
-> > > > > The error is coming from regmap code. According to git bisect, it is
-> > > > > caused by:
-> > > > > 
-> > > > > 	commit ede4d7a5b9835510fd1f724367f68d2fa4128453
-> > > > > 	Author: Jon Hunter <jon-hunter@ti.com>
-> > > > > 	Date:   Fri Mar 1 11:22:47 2013 -0600
-> > > > > 
-> > > > > 	    gpio/omap: convert gpio irq domain to linear mapping
-> > > > > 
-> > > > > The commit does not anymore revert cleanly, and I haven't yet tried
-> > > > > crafting a manual revert, so any fix proposals/ideas are welcome...
-> > > > 
-> > > > Hmm this might be a bit trickier to fix. Obviously the real solution
-> > > > is to convert omap1 to SPARSE_IRQ like we did for omap2+.
-> > > > 
-> > > > For the -rc cycle, it might be possible to fix this by adding a
-> > > > different irq_to_gpio() and gpio_to_irq() functions for omap1.
-> > > 
-> > > The commit reverts cleanly if we also revert
-> > > 3513cdeccc647d41c4a9ff923af17deaaac04a66 (gpio/omap: optimise interrupt
-> > > service routine), which seems to be just some minor optimization. The
-> > > result is below, and with it 770 works again.
-> > 
-> > Hmm in this case it seems that we should just fix it rather than go back
-> > to the old code, so let's take a look at that first.
-> 
-> Does the following fix it for you or do we need to fix something else
-> there too?
+When creating the DT based boards-ts219.c the none DT ts219-setup.c
+was used as a template. This includes a lateinit() call to initialize
+the PCIe bus. The code makes use of machine_is_ts219() which is never
+true on DT, so a FIXME was added and the code left as is. This was
+unproblematic until b73690c8f8b5d: "ARM: Kirkwood: Support basic
+hotplug for PCI-E" which changes the way the PCIe bus is
+initialized. The non-DT ts219-setup.c now crashes during boot.  The
+lateinit() call in the DT boards-ts219.c is being called,
+machine_is_ts219() is true and so the PCIe is initialized a second
+time.
 
-Thanks, that fixes Retu probe on 770.
+This patch removes the useless, and now clearly dangerous, code from
+boards-ts219.c, making ts219-setup.c work again.
 
-Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+This can also be tagged for stable 3.9
 
-A.
+ arch/arm/mach-kirkwood/board-ts219.c |   10 ----------
+ 1 file changed, 10 deletions(-)
 
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1094,6 +1094,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
->  	const struct omap_gpio_platform_data *pdata;
->  	struct resource *res;
->  	struct gpio_bank *bank;
-> +	int irq_base;
->  
->  	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
->  
-> @@ -1135,11 +1136,23 @@ static int omap_gpio_probe(struct platform_device *pdev)
->  				pdata->get_context_loss_count;
->  	}
->  
-> -
-> -	bank->domain = irq_domain_add_linear(node, bank->width,
-> -					     &irq_domain_simple_ops, NULL);
-> -	if (!bank->domain)
-> +	/*
-> +	 * REVISIT: Once we have omap1 supporting  SPARSE_IRQ, we can drop
-> +	 * irq_alloc_descs() and irq_domain_add_legacy() and just do:
-> +	 *
-> +	 * bank->domain = irq_domain_add_linear(node, bank->width,
-> +	 *				     &irq_domain_simple_ops, NULL);
-> +	 * if (!bank->domain)
-> +	 *	return -ENODEV;
-> +	 */
-> +	irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
-> +	if (irq_base < 0) {
-> +		dev_err(dev, "Couldn't allocate IRQ numbers\n");
->  		return -ENODEV;
-> +	}
-> +
-> +	bank->domain = irq_domain_add_legacy(node, bank->width, irq_base,
-> +					     0, &irq_domain_simple_ops, NULL);
->  
->  	if (bank->regs->set_dataout && bank->regs->clr_dataout)
->  		bank->set_dataout = _set_gpio_dataout_reg;
+diff --git a/arch/arm/mach-kirkwood/board-ts219.c b/arch/arm/mach-kirkwood/board-ts219.c
+index acb0187..4695d5f 100644
+--- a/arch/arm/mach-kirkwood/board-ts219.c
++++ b/arch/arm/mach-kirkwood/board-ts219.c
+@@ -41,13 +41,3 @@ void __init qnap_dt_ts219_init(void)
+ 
+ 	pm_power_off = qnap_tsx1x_power_off;
+ }
+-
+-/* FIXME: Will not work with DT. Maybe use MPP40_GPIO? */
+-static int __init ts219_pci_init(void)
+-{
+-	if (machine_is_ts219())
+-		kirkwood_pcie_init(KW_PCIE0);
+-
+-	return 0;
+-}
+-subsys_initcall(ts219_pci_init);
+-- 
+1.7.10.4
