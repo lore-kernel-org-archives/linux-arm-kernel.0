@@ -1,40 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 May 2013 15:36:27 +0100
-Subject: [PATCH v4 14/32] arm64: KVM: guest one-reg interface
-In-Reply-To: <20130521143015.GF27002@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 21 May 2013 15:40:05 +0100
+Subject: [PATCH v4 15/32] arm64: KVM: hypervisor initialization code
+In-Reply-To: <1368540840-26750-16-git-send-email-marc.zyngier@arm.com>
 References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
- <1368540840-26750-15-git-send-email-marc.zyngier@arm.com>
- <20130521143015.GF27002@arm.com>
-Message-ID: <519B866B.5080101@arm.com>
+ <1368540840-26750-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130521144005.GG27002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/13 15:30, Catalin Marinas wrote:
-> On Tue, May 14, 2013 at 03:13:42PM +0100, Marc Zyngier wrote:
->> Let userspace play with the guest registers.
->>
->> Reviewed-by: Christopher Covington <cov@codeaurora.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> --- /dev/null
->> +++ b/arch/arm64/kvm/guest.c
-> ...
->> +static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->> +{
->> +	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
->> +	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
->> +	int nr_regs = sizeof(*regs) / sizeof(__u32);
-> 
-> Was there any conclusion on using __u32 rather than __u64 here? At least
-> you should add a comment since it's slightly confusing.
+On Tue, May 14, 2013 at 03:13:43PM +0100, Marc Zyngier wrote:
+> --- /dev/null
+> +++ b/arch/arm64/kvm/hyp-init.S
+...
+> +	.text
+> +	.pushsection	.hyp.idmap.text, "ax"
+> +
+> +	.align	11
+> +
+> +__kvm_hyp_init:
+> +	.global	__kvm_hyp_init
+> +
+> +ENTRY(__kvm_hyp_init_vector)
 
-To use __u64, we'd have to move the FP/SIMD stuff out of struct kvm_regs
-and use a separate one_reg bank. Actually, probably two, as the FP stuff
-is already a mix of 32b and 128b registers.
+Why do you need both __kvm_hyp_init and __kvm_hyp_init_vector? You could
+drop the former.
 
-I'll add a comment about the __u32 addressing of the structure.
+> +__do_hyp_init:
+> +
+> +	msr	ttbr0_el2, x0
+> +
+> +	mrs	x4, tcr_el1
+> +	ldr	x5, =TCR_EL2_MASK
+> +	and	x4, x4, x5
+> +	ldr	x5, =TCR_EL2_FLAGS
+> +	orr	x4, x4, x5
+> +	msr	tcr_el2, x4
+> +
+> +	ldr	x4, =VTCR_EL2_FLAGS
+> +	msr	vtcr_el2, x4
+> +
+> +	mrs	x4, mair_el1
+> +	msr	mair_el2, x4
+> +	isb
+> +
+> +	mov	x4, #SCTLR_EL2_FLAGS
+> +	msr	sctlr_el2, x4
+> +	isb
+> +
+> +	/* MMU is now enabled. Get ready for the trampoline dance */
+> +	ldr	x4, =TRAMPOLINE_VA
+> +	adr	x5, target
+> +	bfi	x4, x5, #0, #PAGE_SHIFT
+> +	br	x4
+> +
+> +	nop
 
-Thanks,
+What is this nop for?
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
