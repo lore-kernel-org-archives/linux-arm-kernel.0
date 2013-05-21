@@ -1,103 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 21 May 2013 19:48:49 +0200
-Subject: [PATCH v4 06/12] ARM: dove: add gigabit ethernet and mvmdio
- device tree nodes
-In-Reply-To: <1369154510-4927-7-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369154510-4927-7-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130521174849.GL26249@lunn.ch>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 21 May 2013 19:53:09 +0200
+Subject: [PATCH] arm: mvebu: enable two USB interfaces on the Armada XP GP
+ board
+Message-ID: <1369158789-3218-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 06:41:44PM +0200, Sebastian Hesselbarth wrote:
-> This patch adds orion-eth and mvmdio device tree nodes for DT enabled
-> Dove boards. As there is only one ethernet controller on Dove, a default
-> phy node is also added with a note to set its reg property on a per-board
-> basis.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Changelog:
-> v3->v4:
-> - convert to new device tree binding
-> 
-> Cc: David Miller <davem@davemloft.net>
-> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: netdev at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/boot/dts/dove-cubox.dts |    7 +++++++
->  arch/arm/boot/dts/dove.dtsi      |   35 +++++++++++++++++++++++++++++++++++
->  2 files changed, 42 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
-> index 7e3065a..02618fa 100644
-> --- a/arch/arm/boot/dts/dove-cubox.dts
-> +++ b/arch/arm/boot/dts/dove-cubox.dts
-> @@ -49,6 +49,13 @@
->  &uart0 { status = "okay"; };
->  &sata0 { status = "okay"; };
->  &i2c0 { status = "okay"; };
-> +&mdio { status = "okay"; };
-> +&eth { status = "okay"; };
-> +
-> +&ethphy {
-> +	compatible = "marvell,88e1310";
-> +	reg = <1>;
-> +};
->  
->  &sdio0 {
->  	status = "okay";
-> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-> index 6cab468..8612658 100644
-> --- a/arch/arm/boot/dts/dove.dtsi
-> +++ b/arch/arm/boot/dts/dove.dtsi
-> @@ -258,5 +258,40 @@
->  				dmacap,xor;
->  			};
->  		};
-> +
-> +		mdio: mdio-bus at 72004 {
-> +			compatible = "marvell,orion-mdio";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0x72004 0x84>;
-> +			interrupts = <30>;
-> +			clocks = <&gate_clk 2>;
-> +			status = "disabled";
-> +
-> +			ethphy: ethernet-phy {
-> +				device-type = "ethernet-phy";
-> +				/* set phy address in board file */
-> +			};
-> +		};
-> +
-> +		eth: ethernet-controller at 72000 {
-> +			compatible = "marvell,orion-eth";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <0x72000 0x4000>;
-> +			clocks = <&gate_clk 2>;
-> +			marvell,tx-checksum-limit = <1600>;
-> +			status = "disabled";
-> +
-> +			ethernet-port at 0 {
-> +				device_type = "network";
-> +				compatible = "marvell,orion-eth-port";
-> +				reg = <0>;
-> +				interrupts = <29>;
-> +				/* overwrite MAC address in bootloader */
-> +				local-mac-address = [00 00 00 00 00 00];
+The Armada XP GP board has two USB slots: one on the front side and
+one on the back side. This commit enables the two USB host controllers
+that correspond to those wo USB slots.
 
-Hi Sebastian
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-xp-gp.dts |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Its probably a good idea to set the local administration bit in this
-MAC address. i.e. first byte is 02.
-
-    Andrew
+diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+index 26ad06f..f63426e 100644
+--- a/arch/arm/boot/dts/armada-xp-gp.dts
++++ b/arch/arm/boot/dts/armada-xp-gp.dts
+@@ -101,6 +101,16 @@
+ 				phy-mode = "rgmii-id";
+ 			};
+ 
++			/* Front-side USB slot */
++			usb at 50000 {
++				status = "okay";
++			};
++
++			/* Back-side USB slot */
++			usb at 51000 {
++				status = "okay";
++			};
++
+ 			spi0: spi at 10600 {
+ 				status = "okay";
+ 
+-- 
+1.7.9.5
