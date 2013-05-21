@@ -1,40 +1,45 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 21 May 2013 19:53:09 +0200
-Subject: [PATCH] arm: mvebu: enable two USB interfaces on the Armada XP GP
- board
-Message-ID: <1369158789-3218-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: list-09_linux_arm@tqsc.de (Markus Niebel)
+Date: Tue, 21 May 2013 20:04:05 +0200
+Subject: [PATCH v2 1/3] staging: drm/imx: set correct sync pins for display
+In-Reply-To: <1369159448-14584-1-git-send-email-list-09_linux_arm@tqsc.de>
+References: <1369159448-14584-1-git-send-email-list-09_linux_arm@tqsc.de>
+Message-ID: <1369159448-14584-2-git-send-email-list-09_linux_arm@tqsc.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada XP GP board has two USB slots: one on the front side and
-one on the back side. This commit enables the two USB host controllers
-that correspond to those wo USB slots.
+From: Markus Niebel <Markus.Niebel@tqs.de>
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+partial fix of changes from
+"staging: drm/imx: Add support for VGA via TVE on i.MX53"
+
+Have to call imx_drm_crtc_panel_format_pins in imx_drm_crtc_panel_format
+with the correct pins instead of (0, 0) This enables configuration of
+correct waveforms for vsync / hsync for parallel display, LDB (i.MX53 and
+i.MX6) as well as HDMI and MIPI (i.MX6)
+
+TODO: configure pins via device tree
+
+Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
 ---
- arch/arm/boot/dts/armada-xp-gp.dts |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+V2:
+  changed patch as suggested by Philipp Zabel. This will
+  fix regressions for other interfaces, too
 
-diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index 26ad06f..f63426e 100644
---- a/arch/arm/boot/dts/armada-xp-gp.dts
-+++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -101,6 +101,16 @@
- 				phy-mode = "rgmii-id";
- 			};
- 
-+			/* Front-side USB slot */
-+			usb at 50000 {
-+				status = "okay";
-+			};
-+
-+			/* Back-side USB slot */
-+			usb at 51000 {
-+				status = "okay";
-+			};
-+
- 			spi0: spi at 10600 {
- 				status = "okay";
+ drivers/staging/imx-drm/imx-drm-core.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/staging/imx-drm/imx-drm-core.c b/drivers/staging/imx-drm/imx-drm-core.c
+index 6455305..8c433fc 100644
+--- a/drivers/staging/imx-drm/imx-drm-core.c
++++ b/drivers/staging/imx-drm/imx-drm-core.c
+@@ -144,7 +144,7 @@ int imx_drm_crtc_panel_format(struct drm_crtc *crtc, u32 encoder_type,
+ 		u32 interface_pix_fmt)
+ {
+ 	return imx_drm_crtc_panel_format_pins(crtc, encoder_type,
+-					      interface_pix_fmt, 0, 0);
++					      interface_pix_fmt, 2, 3);
+ }
+ EXPORT_SYMBOL_GPL(imx_drm_crtc_panel_format);
  
 -- 
 1.7.9.5
