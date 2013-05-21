@@ -1,76 +1,86 @@
-From: libo.chen@huawei.com (Libo Chen)
-Date: Tue, 21 May 2013 10:42:00 +0800
-Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
-Message-ID: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 21 May 2013 11:15:35 +0800
+Subject: [PATCH] arm64: kernel: need extern variable 'screen_info' for
+ related driver using.
+In-Reply-To: <20130520091008.GB31359@mudshark.cambridge.arm.com>
+References: <5199B7D6.40907@asianux.com>
+ <20130520091008.GB31359@mudshark.cambridge.arm.com>
+Message-ID: <519AE6D7.1090401@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I find a lot of mistakes using struct platform_driver without owner.
-So I pick up some of them including usb and net modules
+On 05/20/2013 05:10 PM, Will Deacon wrote:
+> Hi Chen,
+> 
+> On Mon, May 20, 2013 at 06:42:46AM +0100, Chen Gang wrote:
+>>
+>> Add the extern variable 'screen_info' according to arm32 has done.
+>>
+>> The related error:
+>>   drivers/video/console/vgacon.c:1305: undefined reference to `screen_info'
+>>
+>>
+>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>> ---
+>>  arch/arm64/kernel/setup.c |   11 +++++++++++
+>>  1 files changed, 11 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>> index add6ea6..1055992 100644
+>> --- a/arch/arm64/kernel/setup.c
+>> +++ b/arch/arm64/kernel/setup.c
+>> @@ -374,3 +374,14 @@ const struct seq_operations cpuinfo_op = {
+>>  	.stop	= c_stop,
+>>  	.show	= c_show
+>>  };
+>> +
+>> +#if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
+>> +struct screen_info screen_info = {
+>> +	.orig_video_lines	= 30,
+>> +	.orig_video_cols	= 80,
+>> +	.orig_video_mode	= 0,
+>> +	.orig_video_ega_bx	= 0,
+>> +	.orig_video_isVGA	= 1,
+>> +	.orig_video_points	= 8
+>> +};
+>> +#endif
+> 
+> I think it would be better if we added a something like
+> CONFIG_HAVE_VGA_CONSOLE, which VGA_CONSOLE can then depend on. Architectures
+> like x86 can then select the former, and we can remove the long list of
+> architectures from the current option.
+> 
 
-Libo Chen (19):
-  drivers/usb/musb: add missing platform_driver owner
-  drivers/usb/host: add missing platform_driver owner
-  drivers/usb/chipidea: add missing platform_driver owner
-  drivers/usb/dwc3: add missing platform_driver owner
-  drivers/ust/renesas_usbhs: add missing platform_driver owner
-  drivers/usb/phy: add missing platform_driver owner
-  drivers/usb/gadget: add missing platform_driver owner
-  drivers/net/ethernet/amd: add missing platform_driver owner
-  drivers/net/ethernet: add missing platform_driver owner
-  drivers/net/ethernet/freescale: add missing platform_driver owner
-  drivers/net/ethernet/natsemi: add missing platform_driver owner
-  drivers/net/ethernet/xscale: add missing platform_driver owner
-  drivers/net/ethernet/calxeda: add missing platform_driver owner
-  drivers/net/wireless/brcm80211/brcmfmac: add missing platform_driver
-    owner
-  drivers/net/irda: add missing platform_driver owner
-  drivers/net/wan: add missing platform_driver owner
-  drivers/net/ethernet/nxp: add missing platform_driver owner
-  drivers/net/ethernet/marvell: add missing platform_driver owne
-  drivers/net/ethernet/renesas: add missing platform_driver owner
+I guess your meaning is:
 
- drivers/net/ethernet/amd/am79c961a.c                   | 1 +
- drivers/net/ethernet/calxeda/xgmac.c                   | 1 +
- drivers/net/ethernet/dnet.c                            | 3 ++-
- drivers/net/ethernet/freescale/xgmac_mdio.c            | 1 +
- drivers/net/ethernet/korina.c                          | 1 +
- drivers/net/ethernet/marvell/mvneta.c                  | 1 +
- drivers/net/ethernet/natsemi/xtsonic.c                 | 1 +
- drivers/net/ethernet/nxp/lpc_eth.c                     | 1 +
- drivers/net/ethernet/renesas/sh_eth.c                  | 1 +
- drivers/net/ethernet/xscale/ixp4xx_eth.c               | 1 +
- drivers/net/irda/bfin_sir.c                            | 1 +
- drivers/net/irda/sh_irda.c                             | 1 +
- drivers/net/irda/sh_sir.c                              | 1 +
- drivers/net/irda/smsc-ircc2.c                          | 1 +
- drivers/net/wan/ixp4xx_hss.c                           | 1 +
- drivers/net/wireless/brcm80211/brcmfmac/bcmsdh_sdmmc.c | 3 ++-
- drivers/usb/chipidea/ci13xxx_msm.c                     | 2 +-
- drivers/usb/chipidea/core.c                            | 1 +
- drivers/usb/dwc3/core.c                                | 1 +
- drivers/usb/dwc3/dwc3-exynos.c                         | 1 +
- drivers/usb/dwc3/dwc3-omap.c                           | 1 +
- drivers/usb/gadget/r8a66597-udc.c                      | 1 +
- drivers/usb/host/ehci-atmel.c                          | 1 +
- drivers/usb/host/ehci-msm.c                            | 1 +
- drivers/usb/host/ehci-mv.c                             | 1 +
- drivers/usb/host/ehci-mxc.c                            | 1 +
- drivers/usb/host/ehci-omap.c                           | 1 +
- drivers/usb/host/ehci-spear.c                          | 1 +
- drivers/usb/host/isp1760-if.c                          | 1 +
- drivers/usb/host/oxu210hp-hcd.c                        | 1 +
- drivers/usb/host/xhci-plat.c                           | 1 +
- drivers/usb/musb/am35x.c                               | 1 +
- drivers/usb/musb/blackfin.c                            | 1 +
- drivers/usb/musb/da8xx.c                               | 1 +
- drivers/usb/musb/davinci.c                             | 1 +
- drivers/usb/musb/omap2430.c                            | 1 +
- drivers/usb/musb/tusb6010.c                            | 1 +
- drivers/usb/musb/ux500.c                               | 1 +
- drivers/usb/phy/phy-rcar-usb.c                         | 1 +
- drivers/usb/renesas_usbhs/common.c                     | 1 +
- 40 files changed, 42 insertions(+), 3 deletions(-)
+  under arm64, actually, need not support 'VGA_CONSOLE', and 'screen_info' is useless.
+  So better to define 'CONFIG_HAVE_VGA_CONSOLE' which 'VGA_CONSOLE' can depend on it, and in arm64, we do not define CONFIG_HAVE_VGA_CONSOLE.
 
+Is it correct ?
+
+If so, I recommend to add depend item for VGA_CONSOLE directly:
+
+-------------------diff begin----------------------------------
+
+diff --git a/drivers/video/console/Kconfig b/drivers/video/console/Kconfig
+index bc922c4..b759157 100644
+--- a/drivers/video/console/Kconfig
++++ b/drivers/video/console/Kconfig
+@@ -6,7 +6,7 @@ menu "Console display driver support"
+ 
+ config VGA_CONSOLE
+ 	bool "VGA text console" if EXPERT || !X86
+-	depends on !4xx && !8xx && !SPARC && !M68K && !PARISC && !FRV && !SUPERH && !BLACKFIN && !AVR32 && !MN10300 && (!ARM || ARCH_FOOTBRIDGE || ARCH_INTEGRATOR || ARCH_NETWINDER)
++	depends on !4xx && !8xx && !SPARC && !M68K && !PARISC && !FRV && !SUPERH && !BLACKFIN && !AVR32 && !MN10300 && !ARM64 && (!ARM || ARCH_FOOTBRIDGE || ARCH_INTEGRATOR || ARCH_NETWINDER)
+ 	default y
+ 	help
+ 	  Saying Y here will allow you to use Linux in text mode through a
+
+-------------------diff end------------------------------------
+
+
+Thanks.
 -- 
-1.8.1.2
+Chen Gang
+
+Asianux Corporation
