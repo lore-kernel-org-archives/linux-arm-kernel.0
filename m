@@ -1,48 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 21 May 2013 09:53:25 +0100
-Subject: [PATCH] arm64: kernel: compiling issue, need
- 'EXPORT_SYMBOL_GPL(read_current_timer)'
-In-Reply-To: <519AF2DC.2040200@asianux.com>
-References: <5199C725.8050102@asianux.com>
- <168084c28e8ba5124c05553e97463172@localhost>
- <20130520095606.GH31359@mudshark.cambridge.arm.com>
- <519AF2DC.2040200@asianux.com>
-Message-ID: <20130521085325.GB10453@mudshark.cambridge.arm.com>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 21 May 2013 10:56:50 +0200
+Subject: [GIT PULL v2] MFD: Fixes due for the v3.10 -rc:s
+In-Reply-To: <20130517075140.GA25077@balto.lan>
+References: <20130514091956.GG3297@gmail.com> <20130515090449.GA3494@gmail.com>
+ <20130516224337.GZ22822@zurbaran>
+ <20130517075140.GA25077@balto.lan>
+Message-ID: <20130521085650.GB4589@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 05:06:52AM +0100, Chen Gang wrote:
-> On 05/20/2013 05:56 PM, Will Deacon wrote:
-> > Should be ok once the arch timer driver has moved exclusively to virtual
-> > time. I'm also not sure we even need to implement read_current_timer() --
-> > it's only used for delay-loop calibration, which we don't need for the
-> > arch timer.
-> > 
+Hi Fabio,
+
+On Fri, May 17, 2013 at 09:51:40AM +0200, Fabio Baltieri wrote:
+> Hello Samuel,
 > 
-> For whether we need implement read_current_timer():
+> On Fri, May 17, 2013 at 12:43:37AM +0200, Samuel Ortiz wrote:
+> > > Fabio Baltieri (5):
+> > >       mfd: abx500-core: Fix sparse warning
+> > >       mfd: ab8500-sysctrl: Fix sparse warning
+> > >       mfd: ab8500-sysctrl: Set sysctrl_dev during probe
+> > >       mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
+> > Unless I'm missing something here, this one is not really rcN material, so
+> > I'd appreciate if you could queue it to your for-mfd branch instead.
 > 
->   many platforms have implemented it (openrisc, arm, sparc, hexagon, avr32, x86).
->   it is called by init/calibrate.c when 'ARCH_HAS_READ_CURRENT_TIMER' is defined.
->   since arm64 can implement it, better to provide it as an architect features to let outside use.
-
-No, that code is not needed on arm64 because we calibrate the delay loop
-statically using a known timer frequency.
-
-> For the implementation of read_current_timer():
+> The last two:
 > 
->   it has to face various configurations
->     (e.g. CONFIG_ARM_ARCH_TIMER, arch_timer_read_zero, arch_counter_get_cntvct, arch_counter_get_cntpct)
->   so better still use variable instead of.
->     (excuse me, I do not know what is 'CNTVCT_EL0', is it like a constant number ?)
+>   mfd: ab8500-sysctrl: Set sysctrl_dev during probe
+This one is already in mfd-fixes, the commit log was clear enough.
 
-cntvct_el0 is a system register, which provides the virtual counter value.
 
-> For the implementation of get_cycles()
-> 
->   if read_current_timer() is provided,
->   better to let get_cycles() to call it, instead of implement once again.
+>   mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
+This one is not, as the commit log is not showing it actually fixes something
+but only makes the code cleaner. If it really fixes something, could you
+please provide me with a commit log that describes what exactly it fixes ?
 
-You can implement it as a macro if you like, I'm just suggesting that we
-might not need read_current_timer after all.
+Cheers,
+Samuel.
 
-Will
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
