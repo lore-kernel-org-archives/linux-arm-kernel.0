@@ -1,26 +1,61 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 21 May 2013 10:13:31 -0600
-Subject: [v2 2/6] ARM: tegra20: convert device tree files to use CLK
- defines
-In-Reply-To: <1369127450-15203-3-git-send-email-hdoyu@nvidia.com>
-References: <1369127450-15203-1-git-send-email-hdoyu@nvidia.com>
- <1369127450-15203-3-git-send-email-hdoyu@nvidia.com>
-Message-ID: <519B9D2B.5010101@wwwdotorg.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 21 May 2013 17:14:07 +0100
+Subject: [PATCH v4 21/32] arm64: KVM: Build system integration
+In-Reply-To: <850310439.5245685.1369152587054.JavaMail.root@redhat.com>
+References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
+ <1368540840-26750-22-git-send-email-marc.zyngier@arm.com>
+ <20130521154227.GM27002@arm.com>
+ <850310439.5245685.1369152587054.JavaMail.root@redhat.com>
+Message-ID: <519B9D4F.9030308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2013 03:10 AM, Hiroshi Doyu wrote:
-> Use the Tegra20 CAR binding header (tegra20-car.h) to replace magic
-> numbers in the device tree. For example,
+On 21/05/13 17:09, Paolo Bonzini wrote:
 > 
-> -               clocks = <&tegra_car 28>;
-> +               clocks = <&tegra_car CLK_HOST1X>;
+> 
+> ----- Messaggio originale -----
+>> Da: "Catalin Marinas" <catalin.marinas@arm.com>
+>> A: "Marc Zyngier" <Marc.Zyngier@arm.com>
+>> Cc: linux-arm-kernel at lists.infradead.org, kvmarm at lists.cs.columbia.edu, kvm at vger.kernel.org, "Will Deacon"
+>> <Will.Deacon@arm.com>, pbonzini at redhat.com, gleb at redhat.com, "Christopher Covington" <cov@codeaurora.org>
+>> Inviato: Marted?, 21 maggio 2013 17:42:27
+>> Oggetto: Re: [PATCH v4 21/32] arm64: KVM: Build system integration
+>>
+>> On Tue, May 14, 2013 at 03:13:49PM +0100, Marc Zyngier wrote:
+>>> --- /dev/null
+>>> +++ b/arch/arm64/kvm/Kconfig
+>> ...
+>>> +config KVM_ARM_VGIC
+>>> +        bool
+>>> +	depends on KVM_ARM_HOST && OF
+>>> +	select HAVE_KVM_IRQCHIP
+>>> +	---help---
+>>> +	  Adds support for a hardware assisted, in-kernel GIC emulation.
+>>> +
+>>> +config KVM_ARM_TIMER
+>>> +        bool
+>>> +	depends on KVM_ARM_VGIC
+>>> +	select HAVE_KVM_IRQCHIP
+>>> +	---help---
+>>> +	  Adds support for the Architected Timers in virtual machines
+>>> +
+>>> +source drivers/virtio/Kconfig
+>>
+>> Shouldn't the above configs go to drivers/virtio/Kconfig as well (or
+>> drivers/virtio/arm/Kconfig)?
+> 
+> virtio doesn't mean "virtual versions of devices that also exist in
+> hardware"; those are indeed in arch/ARCH/kvm.  virtio is a specific bus
+> for paravirtualized devices.  It is not KVM-specific and the code runs
+> in the guest (whereas arch/arm64/kvm/Kconfig is host code).
+> 
+> That said, drivers/virtio/Kconfig is already sourced by drivers/Kconfig.
+> Why do you need to source it again here?
 
-> diff --git a/arch/arm/boot/dts/tegra20-paz00.dts b/arch/arm/boot/dts/tegra20-paz00.dts
+Probably some brain fart on my side. I'll get rid of it.
 
-> -		clocks = <&tegra_car 112>, <&tegra_car 113>, <&tegra_car 94>;
-> +		clocks = <&tegra_car TEGRA20_CLK_PLL_A>, <&tegra_car TEGRA20_CLK_PLL_A_OUT0>, <&tegra_car TEGRA20_CLK_CDEV1>;
+Thanks,
 
-That's well over 80 columns. Can you wrap it and make sure there aren't
-any other instances of this? I guess checkpatch doesn't actually impose
-this rule on *.dts files, since it didn't complain about this.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
