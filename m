@@ -1,59 +1,58 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Tue, 21 May 2013 17:27:20 +0800
-Subject: [PATCH] arm64: kernel: compiling issue,
- need 'EXPORT_SYMBOL_GPL(read_current_timer)'
-In-Reply-To: <20130521085325.GB10453@mudshark.cambridge.arm.com>
-References: <5199C725.8050102@asianux.com>
- <168084c28e8ba5124c05553e97463172@localhost>
- <20130520095606.GH31359@mudshark.cambridge.arm.com>
- <519AF2DC.2040200@asianux.com>
- <20130521085325.GB10453@mudshark.cambridge.arm.com>
-Message-ID: <519B3DF8.9060902@asianux.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 21 May 2013 11:35:02 +0200
+Subject: mvebu: mbus device tree binding
+In-Reply-To: <20130520123153.GA2904@localhost>
+References: <20130520123153.GA2904@localhost>
+Message-ID: <20130521113502.231a5f38@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2013 04:53 PM, Will Deacon wrote:
-> On Tue, May 21, 2013 at 05:06:52AM +0100, Chen Gang wrote:
->> On 05/20/2013 05:56 PM, Will Deacon wrote:
->>> Should be ok once the arch timer driver has moved exclusively to virtual
->>> time. I'm also not sure we even need to implement read_current_timer() --
->>> it's only used for delay-loop calibration, which we don't need for the
->>> arch timer.
->>>
->>
->> For whether we need implement read_current_timer():
->>
->>   many platforms have implemented it (openrisc, arm, sparc, hexagon, avr32, x86).
->>   it is called by init/calibrate.c when 'ARCH_HAS_READ_CURRENT_TIMER' is defined.
->>   since arm64 can implement it, better to provide it as an architect features to let outside use.
-> 
-> No, that code is not needed on arm64 because we calibrate the delay loop
-> statically using a known timer frequency.
-> 
->> For the implementation of read_current_timer():
->>
->>   it has to face various configurations
->>     (e.g. CONFIG_ARM_ARCH_TIMER, arch_timer_read_zero, arch_counter_get_cntvct, arch_counter_get_cntpct)
->>   so better still use variable instead of.
->>     (excuse me, I do not know what is 'CNTVCT_EL0', is it like a constant number ?)
-> 
-> cntvct_el0 is a system register, which provides the virtual counter value.
-> 
->> For the implementation of get_cycles()
->>
->>   if read_current_timer() is provided,
->>   better to let get_cycles() to call it, instead of implement once again.
-> 
-> You can implement it as a macro if you like, I'm just suggesting that we
-> might not need read_current_timer after all.
-> 
-> Will
-> 
-> 
+Dear Ezequiel Garcia,
 
-Thanks, I should try patch v2.  :-)
+On Mon, 20 May 2013 09:31:54 -0300, Ezequiel Garcia wrote:
 
+> This does not seem to be hugely problematic, for one could put the
+> 'ranges' property only in the per-board files, and remove it from the
+> common dtsi.
+> 
+> Therefore, first of all I'd like to know:
+> 
+> **1** What's so broken with the current approach that makes us seek for
+>       solution, in the form of an mbus DT binding?
+
+Currently, the addresses of the registers to configure the MBUS windows
+and get the current values of the DRAM windows (to provide those
+values to the device drivers so that they can configure their own DRAM
+windows for DMA) are completely hardcoded. See
+mach-mvebu/armada-370-xp.h.
+
+For sure, we want those values to move into the Device Tree, just like
+for all other peripherals. This is what my original DT binding of the
+mvebu-mbus driver was doing, but since the DT binding was not complete,
+Arnd suggested to completely remove it, merge the driver without a DT
+binding, and think about it later.
+
+So, for sure, we want a DT binding for the mvebu-mbus driver.
+
+> In addition, reading the previous discussion you've had about this, I
+> noticed Arnd suggested (and even required) that the mbus binding should
+> update the ranges property in the DT blob each time an address window
+> is dynamically allocated.
+> 
+> **2** Why is this required? Who will read the updated ranges
+>       information?
+>       Why can't the kernel access the mbus API to obtain information
+>       about currently allocated windows?
+
+This has already been asked by me in the past, and answered by Arnd at
+the end of
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-April/160923.html.
+
+Best regards,
+
+Thomas
 -- 
-Chen Gang
-
-Asianux Corporation
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
