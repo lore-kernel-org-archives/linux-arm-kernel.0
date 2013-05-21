@@ -1,93 +1,227 @@
-From: prakash.pm@ti.com (Manjunathappa, Prakash)
-Date: Tue, 21 May 2013 14:16:58 +0000
-Subject: Query on pinctrl usage for DT nodes
-In-Reply-To: <20130423181753.GK10155@atomide.com>
-References: <CA+V-a8uiPwsAD--OHFAE=i2ed+-wbXm4p2deZXr92+Zv6GDS1w@mail.gmail.com>
- <515C5C76.3080009@wwwdotorg.org>
- <CA+V-a8t3wtP77DdeUoQHKMjAuWmV+ude+1J3UjJmMTqobgStjA@mail.gmail.com>
- <5162FD4A.1030909@wwwdotorg.org>
- <CA+V-a8vwdCkyMqiynj5BodXbjwJ=e4qNb-29FhLweqbjc7DBQA@mail.gmail.com>
- <5165A22B.4070200@wwwdotorg.org> <20130410203408.GP10155@atomide.com>
- <516BB99F.2080502@ti.com> <20130416213232.GU10155@atomide.com>
- <51763B7B.707@ti.com> <20130423181753.GK10155@atomide.com>
-Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA661EB@DBDE04.ent.ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Tue, 21 May 2013 12:09:53 +0200 (CEST)
+Subject: [PATCH 1/2] ARM: shmobile: r8a7790: implement CPU clock scaling for
+ CPUFreq
+Message-ID: <Pine.LNX.4.64.1305211202380.2863@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds support for the Z-clock on r8a7790 SoCs, which is driving
+the Cortex A15 core. Adding an "operating-points" property to the CPU0 DT
+node and a regulator, this patch allows platforms to use the generic
+cpufreq-cpu0 driver to use SoC's DVFS capabilities.
 
-On Tue, Apr 23, 2013 at 23:47:54, Tony Lindgren wrote:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [130423 00:47]:
-> > On 04/16/2013 11:32 PM, Tony Lindgren wrote:
-> > > * Peter Ujfalusi <peter.ujfalusi@ti.com> [130415 01:30]:
-> > >> On 04/10/2013 10:34 PM, Tony Lindgren wrote:
-> > >>> Yeah how about just change the pintctrl-single,bits register
-> > >>> naming to be register + bit?  Something like 0xdeadbeef.0 and
-> > >>> 0xdeadbeef.1 and so on.
-> > >>
-> > >> Something like this might work I think. It is going to be a bit tricky IMHO
-> > >> since we might need span out new 'register' every time a device requests for a
-> > >> new pinctrl-single,bits for already used register in the
-> > >> pinctrl-single,bit-per-mux area. In this way we still can make sure that
-> > >> certain bit are only used by a single driver.
-> > > 
-> > > OK. If it's one bit per mux type register we should be able to create
-> > > the right amount of entries based on the submask in pinctrs-single,bit?
-> > 
-> > Right now it seams to be true that we have one bit per mux (in DEVCONF0 on
-> > OMAP3 for example). So that would work fine, but There could be different
-> > registers around with more than one bit per mux.
-> 
-> Yes you are right, we should cover that case too. But maybe we
-> can wait until we have such an example :)
->  
-> > Another way to deal with this is to:
-> > in case of pinctrl-single,bit-per-mux we assume one bit per mux and create
-> > entries based on the pinctrl-single,function-mask's bits.
-> > 
-> > In case we have more than one bit for the mux in the register we could have
-> > optional property stating the number of different muxes handled by the register.
-> 
-> Yes that's doable.
->  
-> > One bit per mux type:
-> > 
-> > control_devconf0: pinmux at 48002274 {
-> >         compatible = "pinctrl-single";
-> >         reg = <0x48002274 4>;   /* Single register */
-> >         #address-cells = <1>;
-> >         #size-cells = <0>;
-> >         pinctrl-single,bit-per-mux;
-> >         pinctrl-single,register-width = <32>;
-> >         pinctrl-single,function-mask = <0x5F>;
-> > };
-> > 
-> > Results six entries.
-> 
-> Yup, I think this is the way to go for now, see below..
->  
-> > control_devconf0: pinmux at 48002274 {
-> >         compatible = "pinctrl-single";
-> >         reg = <0x48002274 4>;   /* Single register */
-> >         #address-cells = <1>;
-> >         #size-cells = <0>;
-> >         pinctrl-single,bit-per-mux;
-> >         pinctrl-single,functions-in-register = <3>;
-> >         pinctrl-single,register-width = <32>;
-> >         pinctrl-single,function-mask = <0x5F>;
-> > };
-> > 
-> > Will results three entries.
-> 
-> ..but let's not add this. The reason why I'd like to postpone adding
-> pinctrl-single,functions-in-register is because we may be able to
-> do it automatically.
-> 
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+---
 
-I have posted patch to take care of this:
-http://davinci-linux-open-source.1494791.n2.nabble.com/PATCH-0-3-pinctrl-pinctrl-single-Add-full-fledge-support-to-configure-multiple-pins-of-different-mods-tt7583066.html
+Since I cannot use the regulator, supplying the DVFS voltage to the CPU on 
+Lager, I only tested this patch without voltage adjustments, but that 
+shouldn't matter for this specific change. I did verify, using the 
+ondemand CPUFreq governor, that the frequency and the CPU performance 
+change, depending on CPU load.
 
-Please review this solution.
+ arch/arm/mach-shmobile/Kconfig         |    2 +
+ arch/arm/mach-shmobile/clock-r8a7790.c |  134 ++++++++++++++++++++++++++++++++
+ 2 files changed, 136 insertions(+), 0 deletions(-)
 
-Thanks,
-Prakash
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 0319cf9..97bc6cf 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -60,6 +60,8 @@ config ARCH_R8A7790
+ 	select ARM_ARCH_TIMER
+ 	select SH_CLK_CPG
+ 	select RENESAS_IRQC
++	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_OPP
+ 
+ config ARCH_EMEV2
+ 	bool "Emma Mobile EV2"
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index 53a13b4..d78d6ff 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -47,6 +47,9 @@
+ #define CPG_BASE 0xe6150000
+ #define CPG_LEN 0x1000
+ 
++#define FRQCRB   0xe6150004
++#define FRQCRC   0xe61500e0
++
+ #define SMSTPCR2 0xe6150138
+ #define SMSTPCR3 0xe615013c
+ #define SMSTPCR7 0xe615014c
+@@ -83,11 +86,137 @@ static struct clk main_clk = {
+  * clock ratio of these clock will be updated
+  * on r8a7790_clock_init()
+  */
++SH_FIXED_RATIO_CLK_SET(pll0_clk,		main_clk,	1, 1);
+ SH_FIXED_RATIO_CLK_SET(pll1_clk,		main_clk,	1, 1);
+ SH_FIXED_RATIO_CLK_SET(pll3_clk,		main_clk,	1, 1);
+ SH_FIXED_RATIO_CLK_SET(lb_clk,			pll1_clk,	1, 1);
+ SH_FIXED_RATIO_CLK_SET(qspi_clk,		pll1_clk,	1, 1);
+ 
++/* If more clocks need to access FRQCRB, we'll have to lock eventually */
++static int frqcr_kick_check(struct clk *clk)
++{
++	return ioread32(clk->mapped_reg) & BIT(31) ? -EBUSY : 0;
++}
++
++static int frqcr_kick_do(struct clk *clk)
++{
++	int i;
++
++	/* set KICK bit in FRQCRB to update hardware setting, check success */
++	iowrite32(ioread32(clk->mapped_reg) | BIT(31), clk->mapped_reg);
++	for (i = 1000; i; i--)
++		if (!(ioread32(clk->mapped_reg) & BIT(31)))
++			cpu_relax();
++		else
++			break;
++
++	if (!i)
++		return -ETIMEDOUT;
++
++	iowrite32(ioread32(clk->mapped_reg) & ~BIT(31), clk->mapped_reg);
++
++	return 0;
++}
++
++static int zclk_set_rate(struct clk *clk, unsigned long rate)
++{
++	void __iomem *frqcrc;
++	int ret;
++	unsigned long step, p_rate;
++	u32 val;
++
++	if (!clk->parent || !__clk_get(clk->parent))
++		return -ENODEV;
++
++	ret = frqcr_kick_check(clk);
++	if (ret < 0)
++		goto done;
++
++	frqcrc = clk->mapped_reg + (FRQCRC - (u32)clk->enable_reg);
++
++	p_rate = clk_get_rate(clk->parent);
++	if (rate == p_rate) {
++		val = 0;
++	} else {
++		step = DIV_ROUND_CLOSEST(p_rate, 32);
++		val = 32 - rate / step;
++	}
++
++	iowrite32((ioread32(frqcrc) & ~(clk->div_mask << clk->enable_bit)) |
++		  (val << clk->enable_bit), frqcrc);
++
++	ret = frqcr_kick_do(clk);
++
++done:
++	__clk_put(clk->parent);
++	return ret;
++}
++
++static long zclk_round_rate(struct clk *clk, unsigned long rate)
++{
++	/*
++	 * theoretical rate = parent rate * multiplier / 32,
++	 * where 1 <= multiplier <= 32. Therefore we should do
++	 * multiplier = rate * 32 / parent rate
++	 * rounded rate = parent rate * multiplier / 32.
++	 * However, multiplication before division won't fit in 32 bits, so
++	 * we sacrifice some precision by first dividing and then multiplying.
++	 * To find the nearest divisor we calculate both and pick up the best
++	 * one. This avoids 64-bit arithmetics.
++	 */
++	unsigned long step, mul_min, mul_max, rate_min, rate_max;
++
++	rate_max = clk_get_rate(clk->parent);
++
++	/* output freq <= parent */
++	if (rate >= rate_max)
++		return rate_max;
++
++	step = DIV_ROUND_CLOSEST(rate_max, 32);
++	/* output freq >= parent / 32 */
++	if (step >= rate)
++		return step;
++
++	mul_min = rate / step;
++	mul_max = DIV_ROUND_UP(rate, step);
++	rate_min = step * mul_min;
++	if (mul_max == mul_min)
++		return rate_min;
++
++	rate_max = step * mul_max;
++
++	if (rate_max - rate <  rate - rate_min)
++		return rate_max;
++
++	return rate_min;
++}
++
++static unsigned long zclk_recalc(struct clk *clk)
++{
++	void __iomem *frqcrc = FRQCRC - (u32)clk->enable_reg + clk->mapped_reg;
++	unsigned int max = clk->div_mask + 1;
++	unsigned long val = ((ioread32(frqcrc) >> clk->enable_bit) &
++			     clk->div_mask);
++
++	return DIV_ROUND_CLOSEST(clk_get_rate(clk->parent), max) *
++		(max - val);
++}
++
++static struct sh_clk_ops zclk_ops = {
++	.recalc = zclk_recalc,
++	.set_rate = zclk_set_rate,
++	.round_rate = zclk_round_rate,
++};
++
++static struct clk z_clk = {
++	.parent = &pll0_clk,
++	.div_mask = 0x1f,
++	.enable_bit = 8,
++	/* We'll need to access FRQCRB and FRQCRC */
++	.enable_reg = (void __iomem *)FRQCRB,
++	.ops = &zclk_ops,
++};
++
+ /* fixed ratio clock */
+ SH_FIXED_RATIO_CLK_SET(extal_div2_clk,		extal_clk,	1, 2);
+ SH_FIXED_RATIO_CLK_SET(cp_clk,			extal_clk,	1, 2);
+@@ -115,11 +244,13 @@ static struct clk *main_clks[] = {
+ 	&extal_clk,
+ 	&extal_div2_clk,
+ 	&main_clk,
++	&pll0_clk,
+ 	&pll1_clk,
+ 	&pll1_div2_clk,
+ 	&pll3_clk,
+ 	&lb_clk,
+ 	&qspi_clk,
++	&z_clk,
+ 	&zg_clk,
+ 	&zx_clk,
+ 	&zs_clk,
+@@ -213,6 +344,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("pll1",		&pll1_clk),
+ 	CLKDEV_CON_ID("pll1_div2",	&pll1_div2_clk),
+ 	CLKDEV_CON_ID("pll3",		&pll3_clk),
++	CLKDEV_DEV_ID("cpufreq-cpu0",	&z_clk),
+ 	CLKDEV_CON_ID("zg",		&zg_clk),
+ 	CLKDEV_CON_ID("zx",		&zx_clk),
+ 	CLKDEV_CON_ID("zs",		&zs_clk),
+@@ -263,9 +395,11 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_mmcif.1", &mstp_clks[MSTP305]),
+ };
+ 
++/* "/ 2" is a "fixed divider" - see the "PLL Multiplication Ratio" table */
+ #define R8A7790_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
+ 	extal_clk.rate	= e * 1000 * 1000;			\
+ 	main_clk.parent	= m;					\
++	SH_CLK_SET_RATIO(&pll0_clk_ratio, p0 / 2, 1);		\
+ 	SH_CLK_SET_RATIO(&pll1_clk_ratio, p1 / 2, 1);		\
+ 	if (mode & MD(19))					\
+ 		SH_CLK_SET_RATIO(&pll3_clk_ratio, p31, 1);	\
+-- 
+1.7.2.5
