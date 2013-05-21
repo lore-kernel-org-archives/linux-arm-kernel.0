@@ -1,43 +1,76 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 21 May 2013 10:17:20 +0800
-Subject: [PATCH v3 2/4] ARM: imx: add initial support for MVF600
-In-Reply-To: <4003326.AbobOukrYT@wuerfel>
-References: <1368684648-20826-1-git-send-email-b35083@freescale.com>
- <201305171429.52646.arnd@arndb.de>
- <20130517130603.GJ8607@S2101-09.ap.freescale.net>
- <4003326.AbobOukrYT@wuerfel>
-Message-ID: <20130521021718.GA3080@S2101-09.ap.freescale.net>
+From: libo.chen@huawei.com (Libo Chen)
+Date: Tue, 21 May 2013 10:42:00 +0800
+Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
+Message-ID: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 03:17:31PM +0200, Arnd Bergmann wrote:
-> On Friday 17 May 2013 21:06:05 Shawn Guo wrote:
-> > On Fri, May 17, 2013 at 02:29:52PM +0200, Arnd Bergmann wrote:
-> > > > > Actually I think you should move that driver to drivers/clk and use
-> > > > > of_clk_init(NULL) to initialize it.
-> > > > > 
-> > > > The mvf600 clock driver uses a lot of base clk support from mach-imx,
-> > > > and can not be moved into drivers/clk as a single driver.  Right now, in
-> > > > IMX clock drivers, we call of_clk_init() to only register fixed rate
-> > > > clocks, since all the other clocks are not represented in device tree.
-> > > 
-> > > What are your plans for this in the long run?
-> > > 
-> > We can move all the IMX clock drivers into drivers/clk at some point
-> > when necessary.  But I do not have a plan to register all the clocks
-> > by merely calling of_clk_init(), because doing that would mean we have
-> > to represent all these clocks in device tree.  For imx6q example, it's
-> > about 200 ~ 300 nodes addition to DTB.  Device tree maintainers are
-> > against to the idea.  They are perfectly fine with having clock driver
-> > in kernel to represent/register these SoC internal clocks to clk
-> > framework.
-> 
-> Can't we move the driver to drivers/clk and have it initialized through
-> of_clk_init() without representing all clocks in the DT?
+I find a lot of mistakes using struct platform_driver without owner.
+So I pick up some of them including usb and net modules
 
-Sorry.  I just get aware of that I misunderstood your comment.  Yes,
-declaring the clock initialization function with CLK_OF_DECLARE(),
-we can use of_clk_init() to have them invoked properly.  I just sent a
-patch to change imx6 clock driver to do that.
+Libo Chen (19):
+  drivers/usb/musb: add missing platform_driver owner
+  drivers/usb/host: add missing platform_driver owner
+  drivers/usb/chipidea: add missing platform_driver owner
+  drivers/usb/dwc3: add missing platform_driver owner
+  drivers/ust/renesas_usbhs: add missing platform_driver owner
+  drivers/usb/phy: add missing platform_driver owner
+  drivers/usb/gadget: add missing platform_driver owner
+  drivers/net/ethernet/amd: add missing platform_driver owner
+  drivers/net/ethernet: add missing platform_driver owner
+  drivers/net/ethernet/freescale: add missing platform_driver owner
+  drivers/net/ethernet/natsemi: add missing platform_driver owner
+  drivers/net/ethernet/xscale: add missing platform_driver owner
+  drivers/net/ethernet/calxeda: add missing platform_driver owner
+  drivers/net/wireless/brcm80211/brcmfmac: add missing platform_driver
+    owner
+  drivers/net/irda: add missing platform_driver owner
+  drivers/net/wan: add missing platform_driver owner
+  drivers/net/ethernet/nxp: add missing platform_driver owner
+  drivers/net/ethernet/marvell: add missing platform_driver owne
+  drivers/net/ethernet/renesas: add missing platform_driver owner
 
-Shawn
+ drivers/net/ethernet/amd/am79c961a.c                   | 1 +
+ drivers/net/ethernet/calxeda/xgmac.c                   | 1 +
+ drivers/net/ethernet/dnet.c                            | 3 ++-
+ drivers/net/ethernet/freescale/xgmac_mdio.c            | 1 +
+ drivers/net/ethernet/korina.c                          | 1 +
+ drivers/net/ethernet/marvell/mvneta.c                  | 1 +
+ drivers/net/ethernet/natsemi/xtsonic.c                 | 1 +
+ drivers/net/ethernet/nxp/lpc_eth.c                     | 1 +
+ drivers/net/ethernet/renesas/sh_eth.c                  | 1 +
+ drivers/net/ethernet/xscale/ixp4xx_eth.c               | 1 +
+ drivers/net/irda/bfin_sir.c                            | 1 +
+ drivers/net/irda/sh_irda.c                             | 1 +
+ drivers/net/irda/sh_sir.c                              | 1 +
+ drivers/net/irda/smsc-ircc2.c                          | 1 +
+ drivers/net/wan/ixp4xx_hss.c                           | 1 +
+ drivers/net/wireless/brcm80211/brcmfmac/bcmsdh_sdmmc.c | 3 ++-
+ drivers/usb/chipidea/ci13xxx_msm.c                     | 2 +-
+ drivers/usb/chipidea/core.c                            | 1 +
+ drivers/usb/dwc3/core.c                                | 1 +
+ drivers/usb/dwc3/dwc3-exynos.c                         | 1 +
+ drivers/usb/dwc3/dwc3-omap.c                           | 1 +
+ drivers/usb/gadget/r8a66597-udc.c                      | 1 +
+ drivers/usb/host/ehci-atmel.c                          | 1 +
+ drivers/usb/host/ehci-msm.c                            | 1 +
+ drivers/usb/host/ehci-mv.c                             | 1 +
+ drivers/usb/host/ehci-mxc.c                            | 1 +
+ drivers/usb/host/ehci-omap.c                           | 1 +
+ drivers/usb/host/ehci-spear.c                          | 1 +
+ drivers/usb/host/isp1760-if.c                          | 1 +
+ drivers/usb/host/oxu210hp-hcd.c                        | 1 +
+ drivers/usb/host/xhci-plat.c                           | 1 +
+ drivers/usb/musb/am35x.c                               | 1 +
+ drivers/usb/musb/blackfin.c                            | 1 +
+ drivers/usb/musb/da8xx.c                               | 1 +
+ drivers/usb/musb/davinci.c                             | 1 +
+ drivers/usb/musb/omap2430.c                            | 1 +
+ drivers/usb/musb/tusb6010.c                            | 1 +
+ drivers/usb/musb/ux500.c                               | 1 +
+ drivers/usb/phy/phy-rcar-usb.c                         | 1 +
+ drivers/usb/renesas_usbhs/common.c                     | 1 +
+ 40 files changed, 42 insertions(+), 3 deletions(-)
+
+-- 
+1.8.1.2
