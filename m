@@ -1,66 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 May 2013 17:43:20 +0100
-Subject: [PATCH v4 16/32] arm64: KVM: HYP mode world switch implementation
-In-Reply-To: <20130521151604.GH27002@arm.com>
-References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
- <1368540840-26750-17-git-send-email-marc.zyngier@arm.com>
- <20130521151604.GH27002@arm.com>
-Message-ID: <519BA428.2030506@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 21 May 2013 18:44:13 +0200
+Subject: [PATCH 6/9] arm: mvebu: move cache and mvebu-mbus
+ initialization later
+In-Reply-To: <20130521163725.GW31290@titan.lakedaemon.net>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1369132414-18959-7-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130521141621.GU31290@titan.lakedaemon.net>
+ <20130521173707.5a49eaec@skate>
+ <20130521154313.GV31290@titan.lakedaemon.net>
+ <20130521181018.401ddabf@skate>
+ <20130521163725.GW31290@titan.lakedaemon.net>
+Message-ID: <20130521184413.68cca154@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/13 16:16, Catalin Marinas wrote:
-> On Tue, May 14, 2013 at 03:13:44PM +0100, Marc Zyngier wrote:
->> +// void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
->> +ENTRY(__kvm_tlb_flush_vmid_ipa)
->> +       kern_hyp_va     x0
->> +       ldr     x2, [x0, #KVM_VTTBR]
->> +       msr     vttbr_el2, x2
->> +       isb
->> +
->> +       /*
->> +        * We could do so much better if we had the VA as well.
->> +        * Instead, we invalidate Stage-2 for this IPA, and the
->> +        * whole of Stage-1. Weep...
->> +        */
->> +       tlbi    ipas2e1is, x1
->> +       dsb     sy
->> +       tlbi    vmalle1is
->> +       dsb     sy
->> +       isb
->> +
->> +       msr     vttbr_el2, xzr
->> +       isb
->> +       ret
->> +ENDPROC(__kvm_tlb_flush_vmid_ipa)
+Dear Jason Cooper,
+
+On Tue, 21 May 2013 12:37:25 -0400, Jason Cooper wrote:
+
+> On Tue, May 21, 2013 at 06:10:18PM +0200, Thomas Petazzoni wrote:
+> > On Tue, 21 May 2013 11:43:13 -0400, Jason Cooper wrote:
+> > > > > I tried hacking it up to put it in mvebu/soc-internal_regs for a few
+> > > > > rounds of testing in linux-next during review, however, I'd prefer you
+> > > > > rebase this on top of mvebu/cleanup.
+> > > > 
+> > > > So you mean my next version of the "Internal registers switch" should
+> > > > be based on mvebu/cleanup, right?
+> > > 
+> > > Yes, sorry I wasn't clear, I meant the series.  You can drop 1-3 as
+> > > well for the next version, since I've pulled those.
+> > 
+> > Ok. 1-2 have been merged in mvebu/fixes, and 3 in mvebu/cleanup. So I
+> > suppose mvebu/cleanup is based on mvebu/fixes ? Or should I base on
+> > mvebu/cleanup and assume when it will lend in mainline, the mvebu/fixes
+> > patches will be there (which doesn't make the thing easy for testing
+> > here, because to test, I actually need all the patches in the same
+> > branch). Just trying to figure the workflow :)
 > 
-> There are some isbs here which could be removed if you need an eret
-> anyway.
+> For your development, I would checkout v3.10-rc2, merge /fixes, then
+> merge /cleanup, the put 4-9 on top.  Then, when sending, just do 4-9
+> with a note about the merge dependency on /cleanup, and the boot
+> dependency on /fixes.
 
-There was some discussions a long while ago on kvmarm about keeping
-these isbs in we decided to call them from EL2. I could remove them
-altogether and only reintroduce them if/when we decide to do that.
+Ok, sounds good.
 
->> +ENTRY(__kvm_flush_vm_context)
->> +       tlbi    alle1is
->> +       ic      ialluis
->> +       dsb     sy
->> +       isb
->> +       ret
->> +ENDPROC(__kvm_flush_vm_context)
+> If you'd like, I can hold off on merging it until I can base the series
+> on an -rc including patches 1 and 2.  As is, I might move #3 into the
+> same branch as 4-9, but we'll still have the conflict I highlighted
+> earlier.  And anyone resolving it will probably miss the .init_early
+> removal.
+
+Don't worry, the solution you've proposed earlier sounds fine to me.
+
+> > Well, the current version should be ok build-wise, and works with all
+> > currently available Marvell bootloaders. The bug can only be seen with
+> > a bootloader version that has not yet been really released by Marvell.
+> > 
+> > But anyway, v2 will follow shortly. With this v1, I was mainly hoping
+> > for some feedback, to see if the solution was acceptable or not.
 > 
-> I didn't fully understand - why do we need I-cache maintenance here? Is
-> it for ASID-tagged VIVT I-cache?
+> That was a great explanation of a Schr?dinger's Register ;-)
 
-We do that on VMID rollover, as that's basically the only thing we can
-do (nuke everything). There's a comment about that in the call site
-(arch/arm/arm.c:update_vttbr).
+That's a nice name for such a complicated register, indeed :)
 
-> BTW, the arch/arm equivalent has some better comments on this code ;).
-
-Sure. I'll try to add some more... But this code has much better arm64
-support! ;-)
-
-	M.
+Thomas
 -- 
-Jazz is not dead. It just smells funny...
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
