@@ -1,28 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 21 May 2013 13:29:23 +0200
-Subject: [PATCH 3/6] ARM: SAMSUNG: pm: Adjust for pinctrl- and DT-enabled
- platforms
-In-Reply-To: <1666561.1GujhmlVbA@flatron>
-References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
- <4241187.TFCdy2kUT6@flatron>
- <CAD=FV=XcmzogZc9mWQ+FSr9dg9jML-ACUJY2M2-s+_rBw9gMzQ@mail.gmail.com>
- <1666561.1GujhmlVbA@flatron>
-Message-ID: <CACRpkdbVnPhTMKDBtPNAka_V8H-2w2gK7prw9LVPRk_P7NMt7w@mail.gmail.com>
+From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 21 May 2013 13:40:04 +0200
+Subject: [RFC/PATCH v2 0/2] R-Car GPIO DT bindings
+Message-ID: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 11:07 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On Friday 17 of May 2013 13:56:39 Doug Anderson wrote:
->> I wouldn't be opposed to a re-spin to address some of the above, but I
->> also won't object to this landing and remaining issues being addressed
->> in future patches.  This patch definitely does make things better and
->> no worse.  :)
->
-> Let's see. If nobody takes this until Monday, which is very likely, I will
-> send new version.
+Hello,
 
-I applied 1 & 2 so pls repost your updated patches 3,4,5,6 on
-monday and let's continue fixing.
+Here's the second version of the gpio-rcar driver DT bindings. I've tested the
+patches on the Marzen board (r8a7779).
 
-Yours,
-Linus Walleij
+Once again I'd appreciate feedback on the DT bindings. I'm particularly
+wondering whether getting the number of lines through the gpio-ranges property
+instead of using a dedicated #gpio-lines property as in v1 is a good idea.
+
+Changes since v1:
+
+- Initialize the gpiochip dev field at probe time.
+- Add the gpio-ranges property.
+- Remove the #gpio-lines property. The number of lines is now passed through
+  the gpio-ranges property.
+
+Laurent Pinchart (2):
+  gpio-rcar: Make the platform data gpio_base field signed
+  gpio-rcar: Add DT support
+
+ .../devicetree/bindings/gpio/renesas,gpio-rcar.txt | 52 +++++++++++++++++
+ drivers/gpio/gpio-rcar.c                           | 66 ++++++++++++++++++----
+ include/linux/platform_data/gpio-rcar.h            |  2 +-
+ 3 files changed, 109 insertions(+), 11 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+
+-- 
+Regards,
+
+Laurent Pinchart
