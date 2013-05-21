@@ -1,66 +1,265 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 21 May 2013 18:41:50 +0200
-Subject: [PATCH v4 12/12] ARM: orion5x: remove legacy mv643xx_eth board setup
-In-Reply-To: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1369154510-4927-13-git-send-email-sebastian.hesselbarth@gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 21 May 2013 19:05:45 +0200
+Subject: [PATCH v2 6/6] pinctrl: exynos: Handle suspend/resume of GPIO EINT
+ registers
+In-Reply-To: <CAD=FV=XiWET3Xptfk2CVWMw=xVCE4zUJhJtgXHbhiND12rJGnQ@mail.gmail.com>
+References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
+ <18754346.1REWN52J0K@flatron>
+ <CAD=FV=XiWET3Xptfk2CVWMw=xVCE4zUJhJtgXHbhiND12rJGnQ@mail.gmail.com>
+Message-ID: <4536937.hnhaYZLnaG@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With DT support for mv643xx_eth we do not need legacy platform_data
-based setup for DT enabled boards. This patch removes eth setup
-for all orion5x DT board files.
+Some GPIO EINT control registers needs to be preserved across
+suspend/resume cycle. This patch extends the driver to take care of
+this.
 
-Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
-Cc: David Miller <davem@davemloft.net>
-Cc: Lennert Buytenhek <buytenh@wantstofly.org>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: netdev at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mach-orion5x/edmini_v2-setup.c |   10 ----------
- 1 file changed, 10 deletions(-)
 
-diff --git a/arch/arm/mach-orion5x/edmini_v2-setup.c b/arch/arm/mach-orion5x/edmini_v2-setup.c
-index 1476155..d9de926 100644
---- a/arch/arm/mach-orion5x/edmini_v2-setup.c
-+++ b/arch/arm/mach-orion5x/edmini_v2-setup.c
-@@ -24,7 +24,6 @@
- #include <linux/pci.h>
- #include <linux/irq.h>
- #include <linux/mtd/physmap.h>
--#include <linux/mv643xx_eth.h>
- #include <linux/leds.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
-@@ -96,14 +95,6 @@ static struct platform_device edmini_v2_nor_flash = {
+Changes since v1:
+ - Added optional debugging messages
+ - Added proper error path in initialization
+
+ drivers/pinctrl/pinctrl-exynos.c | 116 ++++++++++++++++++++++++++++++++++++++-
+ drivers/pinctrl/pinctrl-exynos.h |   1 +
+ 2 files changed, 115 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
+index 4f868e5..864e2c0 100644
+--- a/drivers/pinctrl/pinctrl-exynos.c
++++ b/drivers/pinctrl/pinctrl-exynos.c
+@@ -196,6 +196,12 @@ static irqreturn_t exynos_eint_gpio_irq(int irq, void *data)
+ 	return IRQ_HANDLED;
+ }
+ 
++struct exynos_eint_gpio_save {
++	u32 eint_con;
++	u32 eint_fltcon0;
++	u32 eint_fltcon1;
++};
++
+ /*
+  * exynos_eint_gpio_init() - setup handling of external gpio interrupts.
+  * @d: driver data of samsung pinctrl driver.
+@@ -204,8 +210,9 @@ static int exynos_eint_gpio_init(struct samsung_pinctrl_drv_data *d)
+ {
+ 	struct samsung_pin_bank *bank;
+ 	struct device *dev = d->dev;
+-	unsigned int ret;
++	int ret;
+ 	unsigned int i;
++	unsigned int undo;
+ 
+ 	if (!d->irq) {
+ 		dev_err(dev, "irq number not available\n");
+@@ -227,11 +234,30 @@ static int exynos_eint_gpio_init(struct samsung_pinctrl_drv_data *d)
+ 				bank->nr_pins, &exynos_gpio_irqd_ops, bank);
+ 		if (!bank->irq_domain) {
+ 			dev_err(dev, "gpio irq domain add failed\n");
+-			return -ENXIO;
++			ret = -ENXIO;
++			goto err_domains;
++		}
++
++		bank->soc_priv = devm_kzalloc(d->dev,
++			sizeof(struct exynos_eint_gpio_save), GFP_KERNEL);
++		if (!bank->soc_priv) {
++			++i;
++			ret = -ENOMEM;
++			goto err_domains;
+ 		}
+ 	}
+ 
+ 	return 0;
++
++err_domains:
++	bank = d->ctrl->pin_banks;
++	for (undo = 0; undo < i; ++undo) {
++		if (bank->eint_type != EINT_TYPE_GPIO)
++			continue;
++		irq_domain_remove(bank->irq_domain);
++	}
++
++	return ret;
+ }
+ 
+ static void exynos_wkup_irq_unmask(struct irq_data *irqd)
+@@ -528,6 +554,72 @@ static int exynos_eint_wkup_init(struct samsung_pinctrl_drv_data *d)
+ 	return 0;
+ }
+ 
++static void exynos_pinctrl_suspend_bank(
++				struct samsung_pinctrl_drv_data *drvdata,
++				struct samsung_pin_bank *bank)
++{
++	struct exynos_eint_gpio_save *save = bank->soc_priv;
++	void __iomem *regs = drvdata->virt_base;
++
++	save->eint_con = readl(regs + EXYNOS_GPIO_ECON_OFFSET
++						+ bank->eint_offset);
++	save->eint_fltcon0 = readl(regs + EXYNOS_GPIO_EFLTCON_OFFSET
++						+ 2 * bank->eint_offset);
++	save->eint_fltcon1 = readl(regs + EXYNOS_GPIO_EFLTCON_OFFSET
++						+ 2 * bank->eint_offset + 4);
++
++	pr_debug("%s: save     con %#010x\n", bank->name, save->eint_con);
++	pr_debug("%s: save fltcon0 %#010x\n", bank->name, save->eint_fltcon0);
++	pr_debug("%s: save fltcon1 %#010x\n", bank->name, save->eint_fltcon1);
++}
++
++static void exynos_pinctrl_suspend(struct samsung_pinctrl_drv_data *drvdata)
++{
++	struct samsung_pin_ctrl *ctrl = drvdata->ctrl;
++	struct samsung_pin_bank *bank = ctrl->pin_banks;
++	int i;
++
++	for (i = 0; i < ctrl->nr_banks; ++i, ++bank)
++		if (bank->eint_type == EINT_TYPE_GPIO)
++			exynos_pinctrl_suspend_bank(drvdata, bank);
++}
++
++static void exynos_pinctrl_resume_bank(
++				struct samsung_pinctrl_drv_data *drvdata,
++				struct samsung_pin_bank *bank)
++{
++	struct exynos_eint_gpio_save *save = bank->soc_priv;
++	void __iomem *regs = drvdata->virt_base;
++
++	pr_debug("%s:     con %#010x => %#010x\n", bank->name,
++			readl(regs + EXYNOS_GPIO_ECON_OFFSET
++			+ bank->eint_offset), save->eint_con);
++	pr_debug("%s: fltcon0 %#010x => %#010x\n", bank->name,
++			readl(regs + EXYNOS_GPIO_EFLTCON_OFFSET
++			+ 2 * bank->eint_offset), save->eint_fltcon0);
++	pr_debug("%s: fltcon1 %#010x => %#010x\n", bank->name,
++			readl(regs + EXYNOS_GPIO_EFLTCON_OFFSET
++			+ 2 * bank->eint_offset + 4), save->eint_fltcon1);
++
++	writel(save->eint_con, regs + EXYNOS_GPIO_ECON_OFFSET
++						+ bank->eint_offset);
++	writel(save->eint_fltcon0, regs + EXYNOS_GPIO_EFLTCON_OFFSET
++						+ 2 * bank->eint_offset);
++	writel(save->eint_fltcon1, regs + EXYNOS_GPIO_EFLTCON_OFFSET
++						+ 2 * bank->eint_offset + 4);
++}
++
++static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
++{
++	struct samsung_pin_ctrl *ctrl = drvdata->ctrl;
++	struct samsung_pin_bank *bank = ctrl->pin_banks;
++	int i;
++
++	for (i = 0; i < ctrl->nr_banks; ++i, ++bank)
++		if (bank->eint_type == EINT_TYPE_GPIO)
++			exynos_pinctrl_resume_bank(drvdata, bank);
++}
++
+ /* pin banks of exynos4210 pin-controller 0 */
+ static struct samsung_pin_bank exynos4210_pin_banks0[] = {
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
+@@ -591,6 +683,8 @@ struct samsung_pin_ctrl exynos4210_pin_ctrl[] = {
+ 		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
+ 		.svc		= EXYNOS_SVC_OFFSET,
+ 		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
+ 		.label		= "exynos4210-gpio-ctrl0",
+ 	}, {
+ 		/* pin-controller instance 1 data */
+@@ -605,6 +699,8 @@ struct samsung_pin_ctrl exynos4210_pin_ctrl[] = {
+ 		.svc		= EXYNOS_SVC_OFFSET,
+ 		.eint_gpio_init = exynos_eint_gpio_init,
+ 		.eint_wkup_init = exynos_eint_wkup_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
+ 		.label		= "exynos4210-gpio-ctrl1",
+ 	}, {
+ 		/* pin-controller instance 2 data */
+@@ -686,6 +782,8 @@ struct samsung_pin_ctrl exynos4x12_pin_ctrl[] = {
+ 		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
+ 		.svc		= EXYNOS_SVC_OFFSET,
+ 		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
+ 		.label		= "exynos4x12-gpio-ctrl0",
+ 	}, {
+ 		/* pin-controller instance 1 data */
+@@ -700,6 +798,8 @@ struct samsung_pin_ctrl exynos4x12_pin_ctrl[] = {
+ 		.svc		= EXYNOS_SVC_OFFSET,
+ 		.eint_gpio_init = exynos_eint_gpio_init,
+ 		.eint_wkup_init = exynos_eint_wkup_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
+ 		.label		= "exynos4x12-gpio-ctrl1",
+ 	}, {
+ 		/* pin-controller instance 2 data */
+@@ -710,6 +810,8 @@ struct samsung_pin_ctrl exynos4x12_pin_ctrl[] = {
+ 		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
+ 		.svc		= EXYNOS_SVC_OFFSET,
+ 		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
+ 		.label		= "exynos4x12-gpio-ctrl2",
+ 	}, {
+ 		/* pin-controller instance 3 data */
+@@ -720,6 +822,8 @@ struct samsung_pin_ctrl exynos4x12_pin_ctrl[] = {
+ 		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
+ 		.svc		= EXYNOS_SVC_OFFSET,
+ 		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
+ 		.label		= "exynos4x12-gpio-ctrl3",
+ 	},
  };
+@@ -798,6 +902,8 @@ struct samsung_pin_ctrl exynos5250_pin_ctrl[] = {
+ 		.svc		= EXYNOS_SVC_OFFSET,
+ 		.eint_gpio_init = exynos_eint_gpio_init,
+ 		.eint_wkup_init = exynos_eint_wkup_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
+ 		.label		= "exynos5250-gpio-ctrl0",
+ 	}, {
+ 		/* pin-controller instance 1 data */
+@@ -808,6 +914,8 @@ struct samsung_pin_ctrl exynos5250_pin_ctrl[] = {
+ 		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
+ 		.svc		= EXYNOS_SVC_OFFSET,
+ 		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
+ 		.label		= "exynos5250-gpio-ctrl1",
+ 	}, {
+ 		/* pin-controller instance 2 data */
+@@ -818,6 +926,8 @@ struct samsung_pin_ctrl exynos5250_pin_ctrl[] = {
+ 		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
+ 		.svc		= EXYNOS_SVC_OFFSET,
+ 		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
+ 		.label		= "exynos5250-gpio-ctrl2",
+ 	}, {
+ 		/* pin-controller instance 3 data */
+@@ -828,6 +938,8 @@ struct samsung_pin_ctrl exynos5250_pin_ctrl[] = {
+ 		.geint_pend	= EXYNOS_GPIO_EPEND_OFFSET,
+ 		.svc		= EXYNOS_SVC_OFFSET,
+ 		.eint_gpio_init = exynos_eint_gpio_init,
++		.suspend	= exynos_pinctrl_suspend,
++		.resume		= exynos_pinctrl_resume,
+ 		.label		= "exynos5250-gpio-ctrl3",
+ 	},
+ };
+diff --git a/drivers/pinctrl/pinctrl-exynos.h b/drivers/pinctrl/pinctrl-exynos.h
+index 9b1f77a..3c91c35 100644
+--- a/drivers/pinctrl/pinctrl-exynos.h
++++ b/drivers/pinctrl/pinctrl-exynos.h
+@@ -19,6 +19,7 @@
  
- /*****************************************************************************
-- * Ethernet
-- ****************************************************************************/
--
--static struct mv643xx_eth_platform_data edmini_v2_eth_data = {
--	.phy_addr	= 8,
--};
--
--/*****************************************************************************
-  * RTC 5C372a on I2C bus
-  ****************************************************************************/
- 
-@@ -152,7 +143,6 @@ void __init edmini_v2_init(void)
- 	 * Configure peripherals.
- 	 */
- 	orion5x_ehci0_init();
--	orion5x_eth_init(&edmini_v2_eth_data);
- 
- 	mvebu_mbus_add_window("devbus-boot", EDMINI_V2_NOR_BOOT_BASE,
- 			      EDMINI_V2_NOR_BOOT_SIZE);
+ /* External GPIO and wakeup interrupt related definitions */
+ #define EXYNOS_GPIO_ECON_OFFSET		0x700
++#define EXYNOS_GPIO_EFLTCON_OFFSET	0x800
+ #define EXYNOS_GPIO_EMASK_OFFSET	0x900
+ #define EXYNOS_GPIO_EPEND_OFFSET	0xA00
+ #define EXYNOS_WKUP_ECON_OFFSET		0xE00
 -- 
-1.7.10.4
+1.8.2.1
