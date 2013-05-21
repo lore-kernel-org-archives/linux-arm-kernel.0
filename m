@@ -1,27 +1,130 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 21 May 2013 15:31:00 +0300
-Subject: dmatest regression in 3.10-rc1
-In-Reply-To: <20130520095857.GI31359@mudshark.cambridge.arm.com>
-References: <20130515152803.GL23869@mudshark.cambridge.arm.com>
- <20130516153553.GI11706@mudshark.cambridge.arm.com>
- <20130517123423.GR14863@intel.com>
- <20130517141857.GM23112@mudshark.cambridge.arm.com>
- <1369036354.29283.115.camel@smile>
- <20130520095857.GI31359@mudshark.cambridge.arm.com>
-Message-ID: <1369139460.29283.147.camel@smile>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 21 May 2013 13:57:34 +0200
+Subject: [PATCH v2 10/10] kernel: might_fault does not imply might_sleep
+In-Reply-To: <20130519093526.GD19883@redhat.com>
+References: <cover.1368702323.git.mst@redhat.com>
+ <1f85dc8e6a0149677563a2dfb4cef9a9c7eaa391.1368702323.git.mst@redhat.com>
+ <20130516184041.GP19669@dyad.programming.kicks-ass.net>
+ <20130519093526.GD19883@redhat.com>
+Message-ID: <20130521115734.GA9554@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-05-20 at 10:58 +0100, Will Deacon wrote: 
-> Sure. They way I trigger it is to unload the module whilst the DMA is
-> ongoing (I'm using a software model, so I can make the DMA nice and slow --
-> I guess you could try using some large buffers).
+On Sun, May 19, 2013 at 12:35:26PM +0300, Michael S. Tsirkin wrote:
+> > > --- a/include/linux/kernel.h
+> > > +++ b/include/linux/kernel.h
+> > > @@ -198,7 +198,6 @@ void might_fault(void);
+> > >  #else
+> > >  static inline void might_fault(void)
+> > >  {
+> > > -	might_sleep();
+> > 
+> > This removes potential resched points for PREEMPT_VOLUNTARY -- was that
+> > intentional?
+> 
+> No it's a bug. Thanks for pointing this out.
+> OK so I guess it should be might_sleep_if(!in_atomic())
+> and this means might_fault would have to move from linux/kernel.h to
+> linux/uaccess.h, since in_atomic() is in linux/hardirq.h
+> 
+> Makes sense?
 
-Thank you for the script. It looks like I managed to reproduce it with
-help of your script. I'm about to send the patch. I will appreciate to
-collect a Tested-by tags in case it solves the issue.
+So the only difference between PROVE_LOCKING and not should be the
+might_lock_read() thing; so how about something like this?
 
+---
+ include/linux/kernel.h  |  7 ++-----
+ include/linux/uaccess.h | 26 ++++++++++++++++++++++++++
+ mm/memory.c             | 14 ++------------
+ 3 files changed, 30 insertions(+), 17 deletions(-)
 
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+diff --git a/include/linux/kernel.h b/include/linux/kernel.h
+index e96329c..70812f4 100644
+--- a/include/linux/kernel.h
++++ b/include/linux/kernel.h
+@@ -194,12 +194,9 @@ extern int _cond_resched(void);
+ 	})
+ 
+ #ifdef CONFIG_PROVE_LOCKING
+-void might_fault(void);
++void might_fault_lockdep(void);
+ #else
+-static inline void might_fault(void)
+-{
+-	might_sleep();
+-}
++static inline void might_fault_lockdep(void) { }
+ #endif
+ 
+ extern struct atomic_notifier_head panic_notifier_list;
+diff --git a/include/linux/uaccess.h b/include/linux/uaccess.h
+index 5ca0951..50a2cc9 100644
+--- a/include/linux/uaccess.h
++++ b/include/linux/uaccess.h
+@@ -38,6 +38,32 @@ static inline void pagefault_enable(void)
+ 	preempt_check_resched();
+ }
+ 
++static inline bool __can_fault(void)
++{
++	/*
++	 * Some code (nfs/sunrpc) uses socket ops on kernel memory while
++	 * holding the mmap_sem, this is safe because kernel memory doesn't
++	 * get paged out, therefore we'll never actually fault, and the
++	 * below annotations will generate false positives.
++	 */
++	if (segment_eq(get_fs(), KERNEL_DS))
++		return false;
++
++	if (in_atomic() /* || pagefault_disabled() */)
++		return false;
++
++	return true;
++}
++
++static inline void might_fault(void)
++{
++	if (!__can_fault())
++		return;
++
++	might_sleep();
++	might_fault_lockdep();
++}
++
+ #ifndef ARCH_HAS_NOCACHE_UACCESS
+ 
+ static inline unsigned long __copy_from_user_inatomic_nocache(void *to,
+diff --git a/mm/memory.c b/mm/memory.c
+index 6dc1882..266610c 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -4211,19 +4211,9 @@ void print_vma_addr(char *prefix, unsigned long ip)
+ }
+ 
+ #ifdef CONFIG_PROVE_LOCKING
+-void might_fault(void)
++void might_fault_lockdep(void)
+ {
+ 	/*
+-	 * Some code (nfs/sunrpc) uses socket ops on kernel memory while
+-	 * holding the mmap_sem, this is safe because kernel memory doesn't
+-	 * get paged out, therefore we'll never actually fault, and the
+-	 * below annotations will generate false positives.
+-	 */
+-	if (segment_eq(get_fs(), KERNEL_DS))
+-		return;
+-
+-	might_sleep();
+-	/*
+ 	 * it would be nicer only to annotate paths which are not under
+ 	 * pagefault_disable, however that requires a larger audit and
+ 	 * providing helpers like get_user_atomic.
+@@ -4231,7 +4221,7 @@ void might_fault(void)
+ 	if (!in_atomic() && current->mm)
+ 		might_lock_read(&current->mm->mmap_sem);
+ }
+-EXPORT_SYMBOL(might_fault);
++EXPORT_SYMBOL(might_fault_lockdep);
+ #endif
+ 
+ #if defined(CONFIG_TRANSPARENT_HUGEPAGE) || defined(CONFIG_HUGETLBFS)
