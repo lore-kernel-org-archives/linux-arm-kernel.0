@@ -1,30 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 20 May 2013 23:50:03 -0700
-Subject: [PATCH] ARM: nomadik: fix IRQ assignment for SMC ethernet
-In-Reply-To: <1368917259-7883-1-git-send-email-linus.walleij@linaro.org>
-References: <1368917259-7883-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20130521065003.GI20453@quad.lixom.net>
+Date: Mon, 20 May 2013 23:51:13 -0700
+Subject: [PATCH] ARM: tegra: defconfig fixes
+In-Reply-To: <1369076839-31787-1-git-send-email-swarren@wwwdotorg.org>
+References: <1369076839-31787-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130521065113.GJ20453@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 19, 2013 at 12:47:39AM +0200, Linus Walleij wrote:
-> The assignment of IRQ for the SMC91x ethernet adapter had two
-> problems making it non-working:
+On Mon, May 20, 2013 at 01:07:19PM -0600, Stephen Warren wrote:
+> From: Alexandre Courbot <gnurou@gmail.com>
 > 
-> - It was not put into the ethernet device node. Let's do this
->   by using the board-specific overlay, so we can make other
->   overlays on other Nomadik boards.
+> The AK8975 Kconfig option was renamed during the 3.10 merge window.
+> Adjust tegra_defconfig to enable the new name, so it's not missing
+> useful features.
 > 
-> - The IRQ number was actually completely wrong, this was the
->   number for NHK8815, not S8815.
+> Tegra DRM support used to be enabled in the default Tegra configuration,
+> but it now depends on CONFIG_TEGRA_HOST1X which is disabled by default.
+> Enable CONFIG_TEGRA_HOST1X so that DRM support is compiled in again.
 > 
-> After this ethernet starts working on the USB S8815.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> [swarren, squashed Alex's and my changes together]
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > ---
-> ARM SoC folks: I would appreciate if you apply this patch
-> directly for v3.10 fixes.
+> Olof, Arnd,
+> 
+> Can this be taken into 3.10? Hopefully Linus won't mind defconfig changes
+> sneaking in now. If not, let me know, and I'll for it into Tegra's
+> for-3.11/dt branch instead. Thanks.
 
-Done.
+Since people actually use the defconfigs it does make sense to keep them
+working and regression-free.
+
+I think we'll be fine with a rare occurrance of it. We'll find out. :)
+
+
 
 -Olof
