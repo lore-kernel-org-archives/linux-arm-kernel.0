@@ -1,77 +1,33 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 21 May 2013 17:25:11 +0100
-Subject: [PATCH v2 1/3] ARM: allow platforms to use generic headers without
- ARCH_MULTIPLATFORM
-In-Reply-To: <20130515233335.GO5600@atomide.com>
-References: <1368530845-7415-1-git-send-email-jonathan.austin@arm.com>
- <1368530845-7415-2-git-send-email-jonathan.austin@arm.com>
- <5192532B.1070705@gmail.com> <20130515233335.GO5600@atomide.com>
-Message-ID: <519B9FE7.3030907@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 21 May 2013 10:34:17 -0600
+Subject: [PATCH] ARM: bcm2835: override the HW UART periphid
+In-Reply-To: <1369116149-2361-1-git-send-email-neidhard.kim@lge.com>
+References: <519AD82A.6090809@wwwdotorg.org>
+ <1369116149-2361-1-git-send-email-neidhard.kim@lge.com>
+Message-ID: <519BA209.6050407@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On 05/21/2013 12:02 AM, Jongsung Kim wrote:
+> Stephen Warren reported the recent commit 78506f2 (add support for
+> extended FIFO-size of PL011-r1p5) breaks the serial port on the
+> BCM2835 ARM SoC.
+> 
+> A UART compatible with the ARM PL011-r1p5 should have 32-deep FIFOs.
+> The BCM2835 UART just looks like an ARM PL011-r1p5, but has 16-deep
+> FIFOs just like PL011-r1p4 or earlier revisions. As a workaround for
+> this compatibility issue, this patch overrides the HW UART periphid
+> register values with the actually compatible UART periphid 0x00241011
+> (r1p3 or r1p4).
+> 
+> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
+> Signed-off-by: Jongsung Kim <neidhard.kim@lge.com>
 
-On 16/05/13 00:33, Tony Lindgren wrote:
-> * Rob Herring <robherring2@gmail.com> [130514 08:12]:
->> On 05/14/2013 06:27 AM, Jonathan Austin wrote:
->>> Currently the use of generic mach headers is only is controlled by the same
->>> config option as selection of a multiplatform kernel (i.e.
->>> ARCH_MULTIPLATFORM). However, there are cases where it is valid to use the
->>> generic headers but still build a single platform kernel.
->>>
->>> One such example is when using the vexpress platform with a core that does
->>> not have an MMU; a multiplatform kernel does not make sense, but use of the
->>> generic headers is required by the vexpress platform since 617276307cd4c
->>> ("ARM: vexpress: convert to multi-platform").
->>>
->>> This patch untangles these two options by introducing a new
->>> ARM_GENERIC_HEADERS config option that ARCH_MULTIPLATFORM selects. Other
->>> platforms can now select ARM_GENERIC_HEADERS independently.
->>
->> I find this name confusing. It is no headers you are selecting and
->> generic is a bit overused IMHO. So how about something like
->> NEED_NO_MACH_HEADERS to somewhat align to the other header related
->> config options (e.g. NEED_MACH_GPIO_H).
->
-> Hmm it _looks_ like this won't allow the drivers again to
-> #include <plat/*.h> and <mach/*.h>. Have you checked that?
->
-> It might be worth checking as we really don't want to go back there
-> again.. Currently arch/arm/Makefile has:
->
-> ifneq ($(CONFIG_ARCH_MULTIPLATFORM),y)
-> ifeq ($(KBUILD_SRC),)
-> KBUILD_CPPFLAGS += $(patsubst %,-I%include,$(machdirs) $(platdirs))
-> else
-> KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%include,$(machdirs) $(platdirs))
-> endif
-> endif
->
-> So you may need to do something there to prevent drivers from again
-> including machdirs and platdirs.
->
-If I've understood you correctly, then this patch already deals with 
-this case (though it isn't hugely obvious from the diff...) by replacing 
-CONFIG_ARCH_MULTIPLATFORM in your example above with 
-CONFIG_ARM_GENERIC_HEADERS (soon to be renamed, as per Rob's suggestion).
+I know this will work, because I tried out the same thing last week.
 
-Because ARCH_MULTIPLATFORM selects 
-CONFIG_(FORMERLY_KNOWN_AS_)ARM_GENERIC_HEADERS it shouldn't be possible 
-for anything multi-platform to start including <plat/*.h> and <mach/*.h> 
-again.
-
-This seems to be the right thing to do because it also makes it 
-impossible to include <plat/*.h> and <mach/*.h> in !MULTIPLATFORM 
-situations that don't need mach/plat headers, like the VEXPRESS_NOMMU case.
-
-Is that what you were getting at? Please let me know if not...
-
-Thanks,
-
-Jonny
-
-> Regards,
->
-> Tony
->
+However, I'm not convinced that it's the correct approach. What other
+changes exist between r1p4 and r1p5; can you check in the TRM? Faking
+the periphid would prevent the driver from taking account of any other
+changes. Should we instead add a DT property solely to override the FIFO
+size, and then set that for bcm2835? I guess if there really aren't any
+other SW-visible changes in r1p5, this approach is fine.
