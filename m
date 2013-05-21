@@ -1,40 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 21 May 2013 13:48:35 -0500
-Subject: [PATCH 14/14] ARM: elf: add new hwcap for identifying atomic
- ldrd/strd instructions
-In-Reply-To: <20130520141809.GA27473@arm.com>
-References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
- <1368810473-26070-15-git-send-email-will.deacon@arm.com>
- <20130520141809.GA27473@arm.com>
-Message-ID: <CAL_JsqLSC2QgMdTGtH5G_F5SYjA3Hs--jMmxBES=fqGLwapptQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 21 May 2013 21:24:30 +0200
+Subject: [PATCH] ARM: iomux-mx51: Always define PUE for pins used as GPIO
+In-Reply-To: <1369124845-19244-1-git-send-email-shc_work@mail.ru>
+References: <1369124845-19244-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20130521192430.GU32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 9:18 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Fri, May 17, 2013 at 06:07:53PM +0100, Will Deacon wrote:
->> CPUs implementing LPAE have atomic ldrd/strd instructions, meaning that
->> userspace software can avoid having to use the exclusive variants of
->> these instructions if they wish.
->>
->> This patch advertises the atomicity of these instructions via the
->> hwcaps, so userspace can detect this CPU feature.
->>
->> Reported-by: Vladimir Danushevsky <vladimir.danushevsky@oracle.com>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ...
->> +
->> +     /* LPAE implies atomic ldrd/strd instructions */
->> +     vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
->> +     if (vmsa >= 5)
->> +             elf_hwcap |= HWCAP_LPAE;
->
-> As I mentioned in the past, I don't agree with exposing the "LPAE"
-> feature to user-space, it's not a feature that user space should care
-> about. An atomic double hwcap is better and you can even make this per
-> CPU via __v7_proc.
+On Tue, May 21, 2013 at 12:27:25PM +0400, Alexander Shiyan wrote:
+> This patch adds a PUE bit for pins which used as GPIO. This allow
+> to use the GPIOs correctly as inputs when source is open-drain with
+> external pullup resistor (IRQ open-drain outputs for example).
 
-How does userspace know whether to install a non-LPAE or LPAE kernel
-in a generic way?
+I don't understand. If there's an external pullup why do you want to
+turn on the internal one?
 
-Rob
+Sascha
+
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/mach-imx/iomux-mx51.h | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-imx/iomux-mx51.h b/arch/arm/mach-imx/iomux-mx51.h
+> index 75bbcc4..7dc187c 100644
+> --- a/arch/arm/mach-imx/iomux-mx51.h
+> +++ b/arch/arm/mach-imx/iomux-mx51.h
+> @@ -34,7 +34,8 @@
+>  #define MX51_SDHCI_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_DSE_HIGH | \
+>  				PAD_CTL_PUS_47K_UP | PAD_CTL_PUE | \
+>  				PAD_CTL_SRE_FAST | PAD_CTL_DVS)
+> -#define MX51_GPIO_PAD_CTRL	(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | PAD_CTL_SRE_FAST)
+> +#define MX51_GPIO_PAD_CTRL	(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | \
+> +				PAD_CTL_PUE | PAD_CTL_SRE_FAST)
+>  
+>  #define MX51_PAD_CTRL_2		(PAD_CTL_PKE | PAD_CTL_HYS)
+>  #define MX51_PAD_CTRL_3		(PAD_CTL_PKE | PAD_CTL_PUS_100K_UP)
+> -- 
+> 1.8.1.5
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
