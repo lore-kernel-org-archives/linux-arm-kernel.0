@@ -1,20 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 21 May 2013 16:27:06 +0100
-Subject: [PATCH v4 19/32] arm64: KVM: Plug the arch timer
-In-Reply-To: <1368540840-26750-20-git-send-email-marc.zyngier@arm.com>
-References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
- <1368540840-26750-20-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130521152706.GK27002@arm.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 21 May 2013 17:37:07 +0200
+Subject: [PATCH 6/9] arm: mvebu: move cache and mvebu-mbus
+ initialization later
+In-Reply-To: <20130521141621.GU31290@titan.lakedaemon.net>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1369132414-18959-7-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130521141621.GU31290@titan.lakedaemon.net>
+Message-ID: <20130521173707.5a49eaec@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 03:13:47PM +0100, Marc Zyngier wrote:
-> Add support for the in-kernel timer emulation.
+Dear Jason Cooper,
+
+On Tue, 21 May 2013 10:16:21 -0400, Jason Cooper wrote:
+
+> This doesn't apply when based on mvebu/cleanup because of:
 > 
-> Reviewed-by: Christopher Covington <cov@codeaurora.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>   49ed97f ARM: Orion: Remove redundant init_dma_coherent_pool_size()
 
-I think same comment as one of the previous patches, you could get rid
-of some ISBs if you get an ERET anyway. Otherwise:
+Right.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> I tried hacking it up to put it in mvebu/soc-internal_regs for a few
+> rounds of testing in linux-next during review, however, I'd prefer you
+> rebase this on top of mvebu/cleanup.
+
+So you mean my next version of the "Internal registers switch" should
+be based on mvebu/cleanup, right? There will be some next version in
+any case, because I just found a bug in the latest patch when booting
+from a bootloader that has already done the switch to 0xF1.
+
+> My version ended up looking like:
+> 
+> ---8<----
+> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+> index b9319c4..75ebf56 100644
+> --- a/arch/arm/mach-mvebu/armada-370-xp.c
+> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
+> @@ -44,14 +44,11 @@ static void __init armada_370_xp_map_io(void)
+>  
+>  static void __init armada_370_xp_timer_and_clk_init(void)
+>  {
+> +	char *mbus_soc_name;
+> +
+>  	mvebu_clocks_init();
+>  	armada_370_xp_timer_init();
+>  	coherency_init();
+> -}
+> -
+> -static void __init armada_370_xp_init_early(void)
+> -{
+> -	char *mbus_soc_name;
+>  
+>  	/*
+>  	 * This initialization will be replaced by a DT-based
+> @@ -87,7 +84,6 @@ DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 370/XP (Device Tree)")
+>  	.smp		= smp_ops(armada_xp_smp_ops),
+>  	.init_machine	= armada_370_xp_dt_init,
+>  	.map_io		= armada_370_xp_map_io,
+> -	.init_early	= armada_370_xp_init_early,
+>  	.init_time	= armada_370_xp_timer_and_clk_init,
+>  	.restart	= mvebu_restart,
+>  	.dt_compat	= armada_370_xp_dt_compat,
+
+>From a quick look your version looks correct. Everything ends up into
+the ->init_time() hook, which is correct. The only thing I had left in
+->init_early() in my version was the DMA coherent thing, which is no
+longer needed.
+
+Thanks!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
