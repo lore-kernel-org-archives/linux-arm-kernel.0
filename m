@@ -1,29 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 21 May 2013 15:30:16 +0100
-Subject: [PATCH v4 14/32] arm64: KVM: guest one-reg interface
-In-Reply-To: <1368540840-26750-15-git-send-email-marc.zyngier@arm.com>
-References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
- <1368540840-26750-15-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130521143015.GF27002@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 21 May 2013 07:34:40 -0700
+Subject: [GIT PULL] omap fixes for v3.10-rc1
+In-Reply-To: <20130521063732.GD20453@quad.lixom.net>
+References: <20130517192515.GC5600@atomide.com>
+ <20130521063732.GD20453@quad.lixom.net>
+Message-ID: <20130521143439.GO10378@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 03:13:42PM +0100, Marc Zyngier wrote:
-> Let userspace play with the guest registers.
+* Olof Johansson <olof@lixom.net> [130520 23:43]:
+> On Fri, May 17, 2013 at 12:25:16PM -0700, Tony Lindgren wrote:
+> > The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+> > 
+> >   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10-rc1/fixes
 > 
-> Reviewed-by: Christopher Covington <cov@codeaurora.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> --- /dev/null
-> +++ b/arch/arm64/kvm/guest.c
-...
-> +static int get_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> +{
-> +	__u32 __user *uaddr = (__u32 __user *)(unsigned long)reg->addr;
-> +	struct kvm_regs *regs = vcpu_gp_regs(vcpu);
-> +	int nr_regs = sizeof(*regs) / sizeof(__u32);
+> Well, it's for -rc3 now but it can never have been for -rc1 since that's
+> what the branch is base on. :-)
 
-Was there any conclusion on using __u32 rather than __u64 here? At least
-you should add a comment since it's slightly confusing.
+Heh OK I'll change the naming in the future to be "patches against v3.10-rc1"
+then.
 
--- 
-Catalin
+Using some future tag name that does not yet exist may never happen either :)
+ 
+> IOW: Pulled, thanks!
+
+Regards,
+
+Tony
