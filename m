@@ -1,25 +1,24 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 20 May 2013 11:09:30 -0500
-Subject: [PATCH RESEND] spi: sirf: fix the issue while transferring more
- than 256 words
-In-Reply-To: <1368877566-27812-1-git-send-email-Baohua.Song@csr.com>
-References: <1368877566-27812-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <20130520160930.GX1627@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 May 2013 18:33:58 +0100
+Subject: [PATCH v2] documentation: iommu: add description of ARM System
+ MMU binding
+In-Reply-To: <20130521102501.GB14432@alberich>
+References: <1365789727-5371-1-git-send-email-will.deacon@arm.com>
+ <20130513095020.GB10369@alberich>
+ <20130513095846.GC29814@mudshark.cambridge.arm.com>
+ <20130513104147.GF10369@alberich> <20130517201639.GL10369@alberich>
+ <20130520101841.GK31359@mudshark.cambridge.arm.com>
+ <20130521102501.GB14432@alberich>
+Message-ID: <20130521173357.GA26251@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 18, 2013 at 07:46:06PM +0800, Barry Song wrote:
-> From: Qipan Li <Qipan.Li@csr.com>
-> 
-> currently, spi irq handler only does rx processing and fetching data from rx
-> fifo when "FRM_END" irq happens. FRM_END indicates one transfer completes. if
-> rx size is less than 256, it works well.
+On Tue, May 21, 2013 at 11:25:01AM +0100, Andreas Herrmann wrote:
+> On Mon, May 20, 2013 at 06:18:41AM -0400, Will Deacon wrote:
+> > That also looks fine to me, although I'd like to write the parsing code in
+> > my driver before I commit to anything!
 
-Applied, thanks.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130520/b9afa1bc/attachment.sig>
+Right, I hacked that up this afternoon and it seems to be working ok. I'll
+post a revised binding soon (hopefully I'll include my driver this time too!).
+
+Will
