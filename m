@@ -1,18 +1,35 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 20 May 2013 23:26:19 -0700 (PDT)
-Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
-In-Reply-To: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
-References: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
-Message-ID: <20130520.232619.964940909999914694.davem@davemloft.net>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 21 May 2013 08:30:31 +0200
+Subject: [RFC 0/8] rmk's Dove DRM/TDA19988 Cubox driver
+In-Reply-To: <CADnq5_O8nLi1=HOrXO0AeQuX17tGj05fhao4mmauzZ5h8Ciyaw@mail.gmail.com>
+References: <20130516192510.GV18614@n2100.arm.linux.org.uk>
+ <20130517133345.7c1368f5@armhf>
+ <20130517120115.GF18614@n2100.arm.linux.org.uk>
+ <20130517194023.0c385ea0@armhf>
+ <20130519085920.GO18614@n2100.arm.linux.org.uk>
+ <CADnq5_Pajy4jxLdd9QGBrUooWYFjfQRQgdbvbu9UDE8-7Tmm8g@mail.gmail.com>
+ <20130520201536.GY18614@n2100.arm.linux.org.uk>
+ <CADnq5_O8nLi1=HOrXO0AeQuX17tGj05fhao4mmauzZ5h8Ciyaw@mail.gmail.com>
+Message-ID: <20130521083031.48f1e43e@armhf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Libo Chen <libo.chen@huawei.com>
-Date: Tue, 21 May 2013 10:42:00 +0800
+On Mon, 20 May 2013 16:23:33 -0400
+Alex Deucher <alexdeucher@gmail.com> wrote:
 
-> I find a lot of mistakes using struct platform_driver without owner.
-> So I pick up some of them including usb and net modules
+> > Note also that the generic DRM KMS code assumes cursor support at
+> > 64x64, and there's no generic way for a driver at present (that I know
+> > of) to inform it of anything different.  
+> 
+> It shouldn't be too hard to add a new cap for querying the cursor size
+> to the drm cap interface.
 
-Instead of doing it this way, which is obviously error prone and
-easy to forget, make platform_driver_register() be a macro which
-sets the module owner field then calls the real __platform_driver_register().
+There was already a patch request for that, but the functions were
+surely useless.
+
+Otherwise, you may do a search on "largest cursor:" (xdpyinfo output).
+The results are surprising..
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
