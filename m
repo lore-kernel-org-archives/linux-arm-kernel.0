@@ -1,28 +1,42 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 21 May 2013 11:06:16 +0200
-Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
-In-Reply-To: <519B2993.4090409@cn.fujitsu.com>
-References: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
- <20130520.232619.964940909999914694.davem@davemloft.net>
- <20130521084108.1a585f32@skate> <519B2993.4090409@cn.fujitsu.com>
-Message-ID: <20130521110616.21eee053@skate>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 21 May 2013 11:06:58 +0200
+Subject: [PATCH] ARM: at91: Fix: Change internal SRAM memory type to
+ "MT_MEMORY_SO"
+In-Reply-To: <1369011979-21354-1-git-send-email-wenyou.yang@atmel.com>
+References: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
+ <1369011979-21354-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <519B3932.7030508@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Gu Zheng,
+On 20/05/2013 03:06, Wenyou Yang :
+> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 
-On Tue, 21 May 2013 16:00:19 +0800, Gu Zheng wrote:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> > Or, maybe make the existing module_platform_driver() macro do this?
-> 
-> But not all the modules use module_platform_driver() macro to replace the module init/exit.
+And stacked on at91-3.10-fixes.
 
-Then maybe it's a good opportunity to convert those ones to use
-module_platform_driver() ?
+Best regards,
 
-Thomas
+> ---
+>   arch/arm/mach-at91/setup.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+> index e2f4bdd..d68be6c 100644
+> --- a/arch/arm/mach-at91/setup.c
+> +++ b/arch/arm/mach-at91/setup.c
+> @@ -80,7 +80,7 @@ void __init at91_init_sram(int bank, unsigned long base, unsigned int length)
+>
+>   	desc->pfn = __phys_to_pfn(base);
+>   	desc->length = length;
+> -	desc->type = MT_DEVICE;
+> +	desc->type = MT_MEMORY_SO;
+>
+>   	pr_info("AT91: sram at 0x%lx of 0x%x mapped at 0x%lx\n",
+>   		base, length, desc->virtual);
+>
+
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Nicolas Ferre
