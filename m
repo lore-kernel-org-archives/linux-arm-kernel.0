@@ -1,29 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 20 May 2013 23:40:34 -0700
-Subject: [GIT PULL] Samsung fixes-2 for v3.10
-In-Reply-To: <519A5933.3040005@samsung.com>
-References: <519A5933.3040005@samsung.com>
-Message-ID: <20130521064034.GE20453@quad.lixom.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 21 May 2013 08:41:08 +0200
+Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
+In-Reply-To: <20130520.232619.964940909999914694.davem@davemloft.net>
+References: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
+ <20130520.232619.964940909999914694.davem@davemloft.net>
+Message-ID: <20130521084108.1a585f32@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 02:11:15AM +0900, Kukjin Kim wrote:
-> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+Dear David Miller,
+
+On Mon, 20 May 2013 23:26:19 -0700 (PDT), David Miller wrote:
+> From: Libo Chen <libo.chen@huawei.com>
+> Date: Tue, 21 May 2013 10:42:00 +0800
 > 
->   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+> > I find a lot of mistakes using struct platform_driver without owner.
+> > So I pick up some of them including usb and net modules
 > 
-> are available in the git repository at:
-> 
+> Instead of doing it this way, which is obviously error prone and
+> easy to forget, make platform_driver_register() be a macro which
+> sets the module owner field then calls the real
+> __platform_driver_register().
 
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-fixes-2
+Or, maybe make the existing module_platform_driver() macro do this?
 
-What happened to the 4210 rev0 regression fixes from Tomasz? I would
-have expected them in this batch?
+Best regards,
 
-Might as well hold off this one until that is reviewed and ready, since
-it's silly to keep pulling one-patch branches. At least if that's happening
-this week.
-
-
--Olof
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
