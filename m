@@ -1,55 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 20 May 2013 17:50:37 -0700
-Subject: [PATCH] ARM: dts: msm: Fix bad register addresses
-Message-ID: <1369097437-19217-1-git-send-email-sboyd@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 21 May 2013 10:27:27 +0900
+Subject: [PATCH] ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
+In-Reply-To: <1623377.nVo7nUcid2@flatron>
+References: <1368630484-29939-1-git-send-email-t.figa@samsung.com>
+ <1623377.nVo7nUcid2@flatron>
+Message-ID: <0f8101ce55c2$5b084c90$1118e5b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some bad copy/paste got in as well as too many zeroes. Fix
-everything up so that the registers after the @ sign are
-consistent with the first reg property.
+Tomasz Figa wrote:
+> 
+> Hi Kukjin,
+> 
+Hi,
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/boot/dts/msm8660-surf.dts | 4 ++--
- arch/arm/boot/dts/msm8960-cdp.dts  | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+> On Wednesday 15 of May 2013 17:08:04 Tomasz Figa wrote:
+> > This patch extends exynos_init_time() function to handle Exynos4210 rev0
+> > SoC, which differs in availability of system timers and needs different
+> > clocksource initialization.
+> >
+> > This makes it possible to use exynos_init_time() function as init_time
+> > callback for all Exynos-based boards, including Universal_C210, which
+> > originally had to use samsung_timer_init().
+> >
+> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> >  arch/arm/mach-exynos/Kconfig               |  3 ++-
+> >  arch/arm/mach-exynos/common.c              | 30
+> > +++++++++++++++++++++++++++++- arch/arm/mach-exynos/common.h
+> >   |  2 ++
+> >  arch/arm/mach-exynos/mach-universal_c210.c |  5 ++---
+> >  4 files changed, 35 insertions(+), 5 deletions(-)
+> 
+> Could you pick this patch to your fixes branch?
+> 
+Yeah, I will after looking at.
 
-diff --git a/arch/arm/boot/dts/msm8660-surf.dts b/arch/arm/boot/dts/msm8660-surf.dts
-index 9bf49b3..d347082 100644
---- a/arch/arm/boot/dts/msm8660-surf.dts
-+++ b/arch/arm/boot/dts/msm8660-surf.dts
-@@ -15,7 +15,7 @@
- 		      < 0x02081000 0x1000 >;
- 	};
- 
--	timer at 2000004 {
-+	timer at 2000000 {
- 		compatible = "qcom,scss-timer", "qcom,msm-timer";
- 		interrupts = <1 0 0x301>,
- 			     <1 1 0x301>,
-@@ -26,7 +26,7 @@
- 		cpu-offset = <0x40000>;
- 	};
- 
--	serial at 19c400000 {
-+	serial at 19c40000 {
- 		compatible = "qcom,msm-hsuart", "qcom,msm-uart";
- 		reg = <0x19c40000 0x1000>,
- 		      <0x19c00000 0x1000>;
-diff --git a/arch/arm/boot/dts/msm8960-cdp.dts b/arch/arm/boot/dts/msm8960-cdp.dts
-index 2e4d87a..7c9ef9b 100644
---- a/arch/arm/boot/dts/msm8960-cdp.dts
-+++ b/arch/arm/boot/dts/msm8960-cdp.dts
-@@ -26,7 +26,7 @@
- 		cpu-offset = <0x80000>;
- 	};
- 
--	serial at 19c400000 {
-+	serial at 16440000 {
- 		compatible = "qcom,msm-hsuart", "qcom,msm-uart";
- 		reg = <0x16440000 0x1000>,
- 		      <0x16400000 0x1000>;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+> This is a fix of a regression in handling Exynos4210 rev0 SoC (e.g.
+> Universal C210 board) introduced by patches merged to 3.10.
+> 
+OK, I see but I didn't review yet and I  will within a couple of days ;-)
+
+- Kukjin
