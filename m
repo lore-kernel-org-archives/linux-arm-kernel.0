@@ -1,37 +1,77 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 21 May 2013 10:15:48 -0600
-Subject: [PATCH] ARM: tegra: add cpu_disable for hotplug
-In-Reply-To: <1369131215-2920-1-git-send-email-josephl@nvidia.com>
-References: <1369131215-2920-1-git-send-email-josephl@nvidia.com>
-Message-ID: <519B9DB4.7070106@wwwdotorg.org>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Tue, 21 May 2013 17:25:11 +0100
+Subject: [PATCH v2 1/3] ARM: allow platforms to use generic headers without
+ ARCH_MULTIPLATFORM
+In-Reply-To: <20130515233335.GO5600@atomide.com>
+References: <1368530845-7415-1-git-send-email-jonathan.austin@arm.com>
+ <1368530845-7415-2-git-send-email-jonathan.austin@arm.com>
+ <5192532B.1070705@gmail.com> <20130515233335.GO5600@atomide.com>
+Message-ID: <519B9FE7.3030907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2013 04:13 AM, Joseph Lo wrote:
-> The Tegra114 could hotplug the CPU0, but the common cpu_disable didn't
-> support that. Adding a Tegra specific cpu_disable function for it.
-> 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+Hi Tony,
 
-> diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+On 16/05/13 00:33, Tony Lindgren wrote:
+> * Rob Herring <robherring2@gmail.com> [130514 08:12]:
+>> On 05/14/2013 06:27 AM, Jonathan Austin wrote:
+>>> Currently the use of generic mach headers is only is controlled by the same
+>>> config option as selection of a multiplatform kernel (i.e.
+>>> ARCH_MULTIPLATFORM). However, there are cases where it is valid to use the
+>>> generic headers but still build a single platform kernel.
+>>>
+>>> One such example is when using the vexpress platform with a core that does
+>>> not have an MMU; a multiplatform kernel does not make sense, but use of the
+>>> generic headers is required by the vexpress platform since 617276307cd4c
+>>> ("ARM: vexpress: convert to multi-platform").
+>>>
+>>> This patch untangles these two options by introducing a new
+>>> ARM_GENERIC_HEADERS config option that ARCH_MULTIPLATFORM selects. Other
+>>> platforms can now select ARM_GENERIC_HEADERS independently.
+>>
+>> I find this name confusing. It is no headers you are selecting and
+>> generic is a bit overused IMHO. So how about something like
+>> NEED_NO_MACH_HEADERS to somewhat align to the other header related
+>> config options (e.g. NEED_MACH_GPIO_H).
+>
+> Hmm it _looks_ like this won't allow the drivers again to
+> #include <plat/*.h> and <mach/*.h>. Have you checked that?
+>
+> It might be worth checking as we really don't want to go back there
+> again.. Currently arch/arm/Makefile has:
+>
+> ifneq ($(CONFIG_ARCH_MULTIPLATFORM),y)
+> ifeq ($(KBUILD_SRC),)
+> KBUILD_CPPFLAGS += $(patsubst %,-I%include,$(machdirs) $(platdirs))
+> else
+> KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%include,$(machdirs) $(platdirs))
+> endif
+> endif
+>
+> So you may need to do something there to prevent drivers from again
+> including machdirs and platdirs.
+>
+If I've understood you correctly, then this patch already deals with 
+this case (though it isn't hugely obvious from the diff...) by replacing 
+CONFIG_ARCH_MULTIPLATFORM in your example above with 
+CONFIG_ARM_GENERIC_HEADERS (soon to be renamed, as per Rob's suggestion).
 
-> +int tegra_cpu_disable(unsigned int cpu)
-> +{
-> +	switch (tegra_chip_id) {
-> +	case TEGRA114:
-> +		return 0;
-> +	default:
-> +		return cpu == 0 ? -EPERM : 0;
-> +	}
-> +}
+Because ARCH_MULTIPLATFORM selects 
+CONFIG_(FORMERLY_KNOWN_AS_)ARM_GENERIC_HEADERS it shouldn't be possible 
+for anything multi-platform to start including <plat/*.h> and <mach/*.h> 
+again.
 
-Do we expect all/most future chips to support hotplug of CPU0? Or at
-least, fewer chips to have the restriction than not? If so, it might be
-more forward-looking to write that as:
+This seems to be the right thing to do because it also makes it 
+impossible to include <plat/*.h> and <mach/*.h> in !MULTIPLATFORM 
+situations that don't need mach/plat headers, like the VEXPRESS_NOMMU case.
 
-if (tegra_chip_id == TEGRA30)
-    return cpu == 0 ? -EPERM : 0;
+Is that what you were getting at? Please let me know if not...
 
-return 0;
+Thanks,
 
-?
+Jonny
+
+> Regards,
+>
+> Tony
+>
