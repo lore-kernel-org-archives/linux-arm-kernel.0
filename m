@@ -1,42 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 20 May 2013 23:44:13 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes for v3.10 (round 2)
-In-Reply-To: <20130520195135.GH31290@titan.lakedaemon.net>
-References: <20130520195135.GH31290@titan.lakedaemon.net>
-Message-ID: <20130521064413.GF20453@quad.lixom.net>
+Date: Mon, 20 May 2013 23:47:02 -0700
+Subject: [GIT PULL] ARM: imx: fixes for 3.10
+In-Reply-To: <20130514084430.GC16250@S2101-09.ap.freescale.net>
+References: <20130514084430.GC16250@S2101-09.ap.freescale.net>
+Message-ID: <20130521064702.GG20453@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 03:51:35PM -0400, Jason Cooper wrote:
+On Tue, May 14, 2013 at 04:44:32PM +0800, Shawn Guo wrote:
+> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 > 
-> The following changes since commit 00ed4a0bd964555fe9276f2299564c384d50ae7d:
-> 
->   ARM: mvebu: Add a ranges entry to translate devbus childs (2013-05-13 16:23:47 +0000)
+>   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/users/jcooper/linux.git tags/fixes-3.10-2
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.10
 > 
-> for you to fetch changes up to 489e138eec96f529c5e8d4cd3ea45882ecdbf5ca:
+> for you to fetch changes up to de78a23d73ba7f1d08f3e1aeaa0a03cb912c62a0:
 > 
->   ARM: dts: mvebu: Fix wrong the address reg value for the L2-cache node (2013-05-20 17:44:54 +0000)
+>   ARM: imx: fix typo in gpu3d_shader_sels (2013-05-12 21:39:51 +0800)
 
-Pulled, thanks.
+Pulled, thanks!
 
-> 
-> ----------------------------------------------------------------
-> mvebu fixes for v3.10 (round 2)
-> 
->  - mvebu (and orion SoCs)
->     - remove init_dma_coherent_pool_size()
-> 
->  - mvebu
->     - fix ranges DT property
-
-We've seen two of these now. Can someone please make a sweep and make sure
-there are no more of these pending?
-
-
-Thanks,
 
 -Olof
