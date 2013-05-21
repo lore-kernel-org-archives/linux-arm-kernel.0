@@ -1,27 +1,103 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 21 May 2013 10:46:51 -0700
-Subject: OMAP baseline test results for v3.10-rc1
-In-Reply-To: <alpine.DEB.2.00.1305192219240.2656@utopia.booyaka.com> (Paul
- Walmsley's message of "Sun, 19 May 2013 22:29:40 +0000 (UTC)")
-References: <alpine.DEB.2.00.1305192159080.2656@utopia.booyaka.com>
- <alpine.DEB.2.00.1305192219240.2656@utopia.booyaka.com>
-Message-ID: <874ndwmdis.fsf@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 21 May 2013 19:48:49 +0200
+Subject: [PATCH v4 06/12] ARM: dove: add gigabit ethernet and mvmdio
+ device tree nodes
+In-Reply-To: <1369154510-4927-7-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369154510-4927-7-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130521174849.GL26249@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Paul Walmsley <paul@pwsan.com> writes:
+On Tue, May 21, 2013 at 06:41:44PM +0200, Sebastian Hesselbarth wrote:
+> This patch adds orion-eth and mvmdio device tree nodes for DT enabled
+> Dove boards. As there is only one ethernet controller on Dove, a default
+> phy node is also added with a note to set its reg property on a per-board
+> basis.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Changelog:
+> v3->v4:
+> - convert to new device tree binding
+> 
+> Cc: David Miller <davem@davemloft.net>
+> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/boot/dts/dove-cubox.dts |    7 +++++++
+>  arch/arm/boot/dts/dove.dtsi      |   35 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 42 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+> index 7e3065a..02618fa 100644
+> --- a/arch/arm/boot/dts/dove-cubox.dts
+> +++ b/arch/arm/boot/dts/dove-cubox.dts
+> @@ -49,6 +49,13 @@
+>  &uart0 { status = "okay"; };
+>  &sata0 { status = "okay"; };
+>  &i2c0 { status = "okay"; };
+> +&mdio { status = "okay"; };
+> +&eth { status = "okay"; };
+> +
+> +&ethphy {
+> +	compatible = "marvell,88e1310";
+> +	reg = <1>;
+> +};
+>  
+>  &sdio0 {
+>  	status = "okay";
+> diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+> index 6cab468..8612658 100644
+> --- a/arch/arm/boot/dts/dove.dtsi
+> +++ b/arch/arm/boot/dts/dove.dtsi
+> @@ -258,5 +258,40 @@
+>  				dmacap,xor;
+>  			};
+>  		};
+> +
+> +		mdio: mdio-bus at 72004 {
+> +			compatible = "marvell,orion-mdio";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0x72004 0x84>;
+> +			interrupts = <30>;
+> +			clocks = <&gate_clk 2>;
+> +			status = "disabled";
+> +
+> +			ethphy: ethernet-phy {
+> +				device-type = "ethernet-phy";
+> +				/* set phy address in board file */
+> +			};
+> +		};
+> +
+> +		eth: ethernet-controller at 72000 {
+> +			compatible = "marvell,orion-eth";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			reg = <0x72000 0x4000>;
+> +			clocks = <&gate_clk 2>;
+> +			marvell,tx-checksum-limit = <1600>;
+> +			status = "disabled";
+> +
+> +			ethernet-port at 0 {
+> +				device_type = "network";
+> +				compatible = "marvell,orion-eth-port";
+> +				reg = <0>;
+> +				interrupts = <29>;
+> +				/* overwrite MAC address in bootloader */
+> +				local-mac-address = [00 00 00 00 00 00];
 
-[...]
+Hi Sebastian
 
-> PM: chip retention via suspend:
->     FAIL ( 4/ 6): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes
->     Pass ( 2/ 6): 3530es3beagle, 3730beaglexm
+Its probably a good idea to set the local administration bit in this
+MAC address. i.e. first byte is 02.
 
-FYI...
-
-I also just noticed that 3730beaglexm has stopped waking from suspend
-via RTC (non-DT boot.)  Waking from UART console still works.
-
-Worked fine on v3.9, so there's a regressions somewhere.
-
-Kevin
+    Andrew
