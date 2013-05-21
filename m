@@ -1,93 +1,46 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 21 May 2013 14:14:39 +0200
-Subject: [PATCH v4 18/21] ARM: shmobile: kzm9g-reference: Move SDHI regulators
- to DT
+Date: Tue, 21 May 2013 14:14:40 +0200
+Subject: [PATCH v4 19/21] ARM: shmobile: kzm9g-reference: Add LED1-LED4 to the
+ device tree
 In-Reply-To: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1369138482-5871-19-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1369138482-5871-20-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create two GPIO-controlled fixed-voltage regulators in the
-kzm9g-reference DT and remove manual configuration of the corresponding
-GPIOs from board code.
+LED1 to LED4 are GPIO LEDs. Add corresponding DT nodes.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts   | 22 ++++++++++++++++++++--
- arch/arm/mach-shmobile/board-kzm9g-reference.c |  6 ------
- 2 files changed, 20 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index 475535f..cdfd71a 100644
+index cdfd71a..21b0fe3 100644
 --- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
 +++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -58,6 +58,24 @@
- 		regulator-boot-on;
+@@ -88,6 +88,22 @@
+ 		vddvario-supply = <&reg_1p8v>;
+ 		vdd33a-supply = <&reg_3p3v>;
  	};
- 
-+	vmmc_sdhi0: regulator at 2 {
-+	        compatible = "regulator-fixed";
-+		regulator-name = "SDHI0 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&pfc 15 0>;
-+		enable-active-high;
-+	};
 +
-+	vmmc_sdhi2: regulator at 3 {
-+	        compatible = "regulator-fixed";
-+		regulator-name = "SDHI2 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&pfc 14 0>;
-+		enable-active-high;
++	leds {
++		compatible = "gpio-leds";
++		led1 {
++			gpios = <&pfc 20 1>; /* Active low */
++		};
++		led2 {
++			gpios = <&pfc 21 1>; /* Active low */
++		};
++		led3 {
++			gpios = <&pfc 22 1>; /* Active low */
++		};
++		led4 {
++			gpios = <&pfc 23 1>; /* Active low */
++		};
 +	};
-+
- 	lan9220 at 10000000 {
- 		compatible = "smsc,lan9220", "smsc,lan9115";
- 		reg = <0x10000000 0x100>;
-@@ -200,7 +218,7 @@
- 	pinctrl-0 = <&sdhi0_pins>;
- 	pinctrl-names = "default";
- 
--	vmmc-supply = <&reg_3p3v>;
-+	vmmc-supply = <&vmmc_sdhi0>;
- 	bus-width = <4>;
- 	status = "okay";
  };
-@@ -209,7 +227,7 @@
- 	pinctrl-0 = <&sdhi2_pins>;
- 	pinctrl-names = "default";
  
--	vmmc-supply = <&reg_3p3v>;
-+	vmmc-supply = <&vmmc_sdhi2>;
- 	bus-width = <4>;
- 	broken-cd;
- 	status = "okay";
-diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-index fc2bb37..1847b4d 100644
---- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-@@ -21,7 +21,6 @@
-  */
- 
- #include <linux/delay.h>
--#include <linux/gpio.h>
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/irqchip.h>
-@@ -37,11 +36,6 @@ static void __init kzm_init(void)
- {
- 	sh73a0_add_standard_devices_dt();
- 
--	/* enable SD */
--	gpio_request_one(15, GPIOF_OUT_INIT_HIGH, NULL); /* power */
--
--	gpio_request_one(14, GPIOF_OUT_INIT_HIGH, NULL); /* power */
--
- #ifdef CONFIG_CACHE_L2X0
- 	/* Early BRESP enable, Shared attribute override enable, 64K*8way */
- 	l2x0_init(IOMEM(0xf0100000), 0x40460000, 0x82000fff);
+ &i2c0 {
 -- 
 1.8.1.5
