@@ -1,97 +1,99 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 21 May 2013 14:14:31 +0200
-Subject: [PATCH v4 10/21] ARM: shmobile: r8a7790: Add GPIO controller devices
- to device tree
+Date: Tue, 21 May 2013 14:14:33 +0200
+Subject: [PATCH v4 12/21] ARM: shmobile: sh73a0: Add pin control device to
+ device tree
 In-Reply-To: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1369138482-5871-11-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1369138482-5871-13-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add GPIO controller nodes to the r8a7790 core device tree.
+Add a pfc node to the sh73a0 device tree and remove manual pinmux
+initialization from the corresponding board files.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 61 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
+ arch/arm/boot/dts/sh73a0.dtsi                  |  8 ++++++++
+ arch/arm/mach-shmobile/board-kzm9g-reference.c | 27 +++++++++++++-------------
+ 2 files changed, 21 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index c14fbd1..89afccd 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -44,6 +44,66 @@
- 		};
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index 17fd9c6..9b1e8f8 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -233,4 +233,12 @@
+ 		cap-sd-highspeed;
+ 		status = "disabled";
  	};
- 
-+	gpio0: gpio at ffc40000 {
-+		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
-+		reg = <0 0xffc40000 0 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 4 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 0 32>;
-+	};
 +
-+	gpio1: gpio at ffc41000 {
-+		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
-+		reg = <0 0xffc41000 0 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 5 0x4>;
-+		#gpio-cells = <2>;
++	pfc: pfc at e6050000 {
++		compatible = "renesas,pfc-sh73a0";
++		reg = <0xe6050000 0x8000>,
++		      <0xe605801c 0x1c>;
 +		gpio-controller;
-+		gpio-ranges = <&pfc 0 32 32>;
-+	};
-+
-+	gpio2: gpio at ffc42000 {
-+		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
-+		reg = <0 0xffc42000 0 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 6 0x4>;
 +		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 64 32>;
 +	};
-+
-+	gpio3: gpio at ffc43000 {
-+		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
-+		reg = <0 0xffc43000 0 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 7 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 96 32>;
-+	};
-+
-+	gpio4: gpio at ffc44000 {
-+		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
-+		reg = <0 0xffc44000 0 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 8 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 128 32>;
-+	};
-+
-+	gpio5: gpio at ffc45000 {
-+		compatible = "renesas,gpio-r8a7790", "renesas,gpio-rcar";
-+		reg = <0 0xffc45000 0 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 9 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 160 32>;
-+	};
-+
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupts = <1 13 0xf08>,
-@@ -64,5 +124,6 @@
- 	pfc: pfc at e6060000 {
- 		compatible = "renesas,pfc-r8a7790";
- 		reg = <0 0xe6060000 0 0x250>;
-+		#gpio-range-cells = <3>;
- 	};
  };
+diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+index 44055fe..6ff6ca2 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
++++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+@@ -40,35 +40,35 @@ static unsigned long pin_pullup_conf[] = {
+ };
+ 
+ static const struct pinctrl_map kzm_pinctrl_map[] = {
+-	PIN_MAP_MUX_GROUP_DEFAULT("e6826000.i2c", "pfc-sh73a0",
++	PIN_MAP_MUX_GROUP_DEFAULT("e6826000.i2c", "e6050000.pfc",
+ 				  "i2c3_1", "i2c3"),
+ 	/* MMCIF */
+-	PIN_MAP_MUX_GROUP_DEFAULT("e6bd0000.mmcif", "pfc-sh73a0",
++	PIN_MAP_MUX_GROUP_DEFAULT("e6bd0000.mmcif", "e6050000.pfc",
+ 				  "mmc0_data8_0", "mmc0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("e6bd0000.mmcif", "pfc-sh73a0",
++	PIN_MAP_MUX_GROUP_DEFAULT("e6bd0000.mmcif", "e6050000.pfc",
+ 				  "mmc0_ctrl_0", "mmc0"),
+-	PIN_MAP_CONFIGS_PIN_DEFAULT("e6bd0000.mmcif", "pfc-sh73a0",
++	PIN_MAP_CONFIGS_PIN_DEFAULT("e6bd0000.mmcif", "e6050000.pfc",
+ 				    "PORT279", pin_pullup_conf),
+-	PIN_MAP_CONFIGS_GROUP_DEFAULT("e6bd0000.mmcif", "pfc-sh73a0",
++	PIN_MAP_CONFIGS_GROUP_DEFAULT("e6bd0000.mmcif", "e6050000.pfc",
+ 				      "mmc0_data8_0", pin_pullup_conf),
+ 	/* SCIFA4 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "e6050000.pfc",
+ 				  "scifa4_data", "scifa4"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "pfc-sh73a0",
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "e6050000.pfc",
+ 				  "scifa4_ctrl", "scifa4"),
+ 	/* SDHI0 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "pfc-sh73a0",
++	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "e6050000.pfc",
+ 				  "sdhi0_data4", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "pfc-sh73a0",
++	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "e6050000.pfc",
+ 				  "sdhi0_ctrl", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "pfc-sh73a0",
++	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "e6050000.pfc",
+ 				  "sdhi0_cd", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "pfc-sh73a0",
++	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "e6050000.pfc",
+ 				  "sdhi0_wp", "sdhi0"),
+ 	/* SDHI2 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("ee140000.sdhi", "pfc-sh73a0",
++	PIN_MAP_MUX_GROUP_DEFAULT("ee140000.sdhi", "e6050000.pfc",
+ 				  "sdhi2_data4", "sdhi2"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("ee140000.sdhi", "pfc-sh73a0",
++	PIN_MAP_MUX_GROUP_DEFAULT("ee140000.sdhi", "e6050000.pfc",
+ 				  "sdhi2_ctrl", "sdhi2"),
+ };
+ 
+@@ -76,7 +76,6 @@ static void __init kzm_init(void)
+ {
+ 	sh73a0_add_standard_devices_dt();
+ 	pinctrl_register_mappings(kzm_pinctrl_map, ARRAY_SIZE(kzm_pinctrl_map));
+-	sh73a0_pinmux_init();
+ 
+ 	/* enable SD */
+ 	gpio_request_one(15, GPIOF_OUT_INIT_HIGH, NULL); /* power */
 -- 
 1.8.1.5
