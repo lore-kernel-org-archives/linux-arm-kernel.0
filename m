@@ -1,25 +1,44 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Tue, 21 May 2013 19:38:38 +1000
-Subject: [RFC PATCH v3] drivers: bus: add ARM CCI support
-In-Reply-To: <20130521092119.GA1885@e102568-lin.cambridge.arm.com>
-References: <1368095640-3675-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1368095640-3675-2-git-send-email-lorenzo.pieralisi@arm.com>
- <1369051881.3511.4.camel@linaro1.home>
- <20130521092119.GA1885@e102568-lin.cambridge.arm.com>
-Message-ID: <1369129118.6387.61.camel@pasglop>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 21 May 2013 11:46:14 +0200
+Subject: [PATCH 1/3] ARM: ux500: Enable MMC_UNSAFE_RESUME
+In-Reply-To: <1369129576-28617-1-git-send-email-ulf.hansson@linaro.org>
+References: <1369129576-28617-1-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <1369129576-28617-2-git-send-email-ulf.hansson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-05-21 at 10:21 +0100, Lorenzo Pieralisi wrote:
-> The node name, not type, but point is taken. I prefer to add a
-> compatible property to slave-if nodes (eg "arm,cci-400-control-if"),
-> I do not think that checking the node name is the standard way of
-> doing
-> things in DT world.
-> 
-> Thoughts ?
+Enable CONFIG_MMC_UNSAFE_RESUME to be accomplish a proper
+suspend/resume cycle for SD/SDIO/(e)MMC.
 
-Agreed.
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ arch/arm/configs/u300_defconfig  |    1 +
+ arch/arm/configs/u8500_defconfig |    1 +
+ 2 files changed, 2 insertions(+)
 
-Cheers,
-Ben.
+diff --git a/arch/arm/configs/u300_defconfig b/arch/arm/configs/u300_defconfig
+index 374000e..c839375 100644
+--- a/arch/arm/configs/u300_defconfig
++++ b/arch/arm/configs/u300_defconfig
+@@ -51,6 +51,7 @@ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ # CONFIG_HID_SUPPORT is not set
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_MMC=y
++CONFIG_MMC_UNSAFE_RESUME=y
+ CONFIG_MMC_CLKGATE=y
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_RTC_CLASS=y
+diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+index c037aa1..f9e3f38 100644
+--- a/arch/arm/configs/u8500_defconfig
++++ b/arch/arm/configs/u8500_defconfig
+@@ -82,6 +82,7 @@ CONFIG_REGULATOR_GPIO=y
+ CONFIG_USB_GADGET=y
+ CONFIG_AB8500_USB=y
+ CONFIG_MMC=y
++CONFIG_MMC_UNSAFE_RESUME=y
+ CONFIG_MMC_CLKGATE=y
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_NEW_LEDS=y
+-- 
+1.7.10
