@@ -1,26 +1,40 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 21 May 2013 09:45:36 -0400
-Subject: [PATCH 3/9] arm: mvebu: mark functions of armada-370-xp.c as
- static
-In-Reply-To: <1369132414-18959-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1369132414-18959-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130521134536.GT31290@titan.lakedaemon.net>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Tue, 21 May 2013 15:47:51 +0200
+Subject: [PATCH] arm: omap: board-overo: reset GPIO for SMSC911x
+Message-ID: <1369144071-10673-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 12:33:28PM +0200, Thomas Petazzoni wrote:
-> All the functions in armada-370-xp.c are called from the
-> DT_MACHINE_START function pointers, so there is no need for them to be
-> visible outside of this file, and we therefore mark them as static.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/armada-370-xp.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+The reset GPIO should be set for the SMSC911x, otherwise the controller
+will not work and probing will fail. In the case of the tobi-duo
+expansion board, the second controller shares the same GPIO, thus no
+more changes are required (not tested).
 
-Applied to mvebu/cleanup
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+---
+ arch/arm/mach-omap2/board-overo.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-thx,
-
-Jason.
+diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+index 4ca6b68..5748b5d 100644
+--- a/arch/arm/mach-omap2/board-overo.c
++++ b/arch/arm/mach-omap2/board-overo.c
+@@ -68,6 +68,7 @@
+ 
+ #define OVERO_SMSC911X_CS      5
+ #define OVERO_SMSC911X_GPIO    176
++#define OVERO_SMSC911X_NRESET  64
+ #define OVERO_SMSC911X2_CS     4
+ #define OVERO_SMSC911X2_GPIO   65
+ 
+@@ -122,7 +123,7 @@ static struct omap_smsc911x_platform_data smsc911x_cfg = {
+ 	.id		= 0,
+ 	.cs             = OVERO_SMSC911X_CS,
+ 	.gpio_irq       = OVERO_SMSC911X_GPIO,
+-	.gpio_reset     = -EINVAL,
++	.gpio_reset     = OVERO_SMSC911X_NRESET,
+ 	.flags		= SMSC911X_USE_32BIT,
+ };
+ 
+-- 
+1.7.5.4
