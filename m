@@ -1,157 +1,93 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 21 May 2013 14:14:38 +0200
-Subject: [PATCH v4 17/21] ARM: shmobile: kzm9g-reference: Move pinctrl
- mappings to device tree
+Date: Tue, 21 May 2013 14:14:39 +0200
+Subject: [PATCH v4 18/21] ARM: shmobile: kzm9g-reference: Move SDHI regulators
+ to DT
 In-Reply-To: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1369138482-5871-18-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1369138482-5871-19-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the pinctrl mappings in board code by device tree mappings.
-For devices that are still instantiated from board code reference the
-mappings as the default pin controller state to apply them at boot time.
+Create two GPIO-controlled fixed-voltage regulators in the
+kzm9g-reference DT and remove manual configuration of the corresponding
+GPIOs from board code.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/boot/dts/sh73a0-kzm9g-reference.dts   | 51 ++++++++++++++++++++++++++
- arch/arm/mach-shmobile/board-kzm9g-reference.c | 40 --------------------
- 2 files changed, 51 insertions(+), 40 deletions(-)
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts   | 22 ++++++++++++++++++++--
+ arch/arm/mach-shmobile/board-kzm9g-reference.c |  6 ------
+ 2 files changed, 20 insertions(+), 8 deletions(-)
 
 diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-index b6f759e..475535f 100644
+index 475535f..cdfd71a 100644
 --- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
 +++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
-@@ -145,19 +145,70 @@
+@@ -58,6 +58,24 @@
+ 		regulator-boot-on;
  	};
- };
  
-+&i2c3 {
-+	pinctrl-0 = <&i2c3_pins>;
-+	pinctrl-names = "default";
-+};
++	vmmc_sdhi0: regulator at 2 {
++	        compatible = "regulator-fixed";
++		regulator-name = "SDHI0 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&pfc 15 0>;
++		enable-active-high;
++	};
 +
- &mmcif {
-+	pinctrl-0 = <&mmcif_pins>;
-+	pinctrl-names = "default";
++	vmmc_sdhi2: regulator at 3 {
++	        compatible = "regulator-fixed";
++		regulator-name = "SDHI2 Vcc";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&pfc 14 0>;
++		enable-active-high;
++	};
 +
- 	bus-width = <8>;
- 	vmmc-supply = <&reg_1p8v>;
- 	status = "okay";
- };
+ 	lan9220 at 10000000 {
+ 		compatible = "smsc,lan9220", "smsc,lan9115";
+ 		reg = <0x10000000 0x100>;
+@@ -200,7 +218,7 @@
+ 	pinctrl-0 = <&sdhi0_pins>;
+ 	pinctrl-names = "default";
  
-+&pfc {
-+	pinctrl-0 = <&scifa4_pins>;
-+	pinctrl-names = "default";
-+
-+	i2c3_pins: i2c3 {
-+		renesas,groups = "i2c3_1";
-+		renesas,function = "i2c3";
-+	};
-+
-+	mmcif_pins: mmcif {
-+		mux {
-+			renesas,groups = "mmc0_data8_0", "mmc0_ctrl_0";
-+			renesas,function = "mmc0";
-+		};
-+		cfg {
-+			renesas,groups = "mmc0_data8_0";
-+			renesas,pins = "PORT279";
-+			renesas,pull-up = <1>;
-+		};
-+	};
-+
-+	scifa4_pins: scifa4 {
-+		renesas,groups = "scifa4_data", "scifa4_ctrl";
-+		renesas,function = "scifa4";
-+	};
-+
-+	sdhi0_pins: sdhi0 {
-+		renesas,groups = "sdhi0_data4", "sdhi0_ctrl", "sdhi0_cd", "sdhi0_wp";
-+		renesas,function = "sdhi0";
-+	};
-+
-+	sdhi2_pins: sdhi2 {
-+		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
-+		renesas,function = "sdhi2";
-+	};
-+};
-+
- &sdhi0 {
-+	pinctrl-0 = <&sdhi0_pins>;
-+	pinctrl-names = "default";
-+
- 	vmmc-supply = <&reg_3p3v>;
+-	vmmc-supply = <&reg_3p3v>;
++	vmmc-supply = <&vmmc_sdhi0>;
  	bus-width = <4>;
  	status = "okay";
  };
+@@ -209,7 +227,7 @@
+ 	pinctrl-0 = <&sdhi2_pins>;
+ 	pinctrl-names = "default";
  
- &sdhi2 {
-+	pinctrl-0 = <&sdhi2_pins>;
-+	pinctrl-names = "default";
-+
- 	vmmc-supply = <&reg_3p3v>;
+-	vmmc-supply = <&reg_3p3v>;
++	vmmc-supply = <&vmmc_sdhi2>;
  	bus-width = <4>;
  	broken-cd;
+ 	status = "okay";
 diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-index 6ff6ca2..fc2bb37 100644
+index fc2bb37..1847b4d 100644
 --- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
 +++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
-@@ -27,55 +27,15 @@
- #include <linux/irqchip.h>
- #include <linux/input.h>
- #include <linux/of_platform.h>
--#include <linux/pinctrl/machine.h>
--#include <linux/pinctrl/pinconf-generic.h>
- #include <mach/sh73a0.h>
- #include <mach/common.h>
- #include <asm/hardware/cache-l2x0.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
+@@ -21,7 +21,6 @@
+  */
  
--static unsigned long pin_pullup_conf[] = {
--	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
--};
--
--static const struct pinctrl_map kzm_pinctrl_map[] = {
--	PIN_MAP_MUX_GROUP_DEFAULT("e6826000.i2c", "e6050000.pfc",
--				  "i2c3_1", "i2c3"),
--	/* MMCIF */
--	PIN_MAP_MUX_GROUP_DEFAULT("e6bd0000.mmcif", "e6050000.pfc",
--				  "mmc0_data8_0", "mmc0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("e6bd0000.mmcif", "e6050000.pfc",
--				  "mmc0_ctrl_0", "mmc0"),
--	PIN_MAP_CONFIGS_PIN_DEFAULT("e6bd0000.mmcif", "e6050000.pfc",
--				    "PORT279", pin_pullup_conf),
--	PIN_MAP_CONFIGS_GROUP_DEFAULT("e6bd0000.mmcif", "e6050000.pfc",
--				      "mmc0_data8_0", pin_pullup_conf),
--	/* SCIFA4 */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "e6050000.pfc",
--				  "scifa4_data", "scifa4"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.4", "e6050000.pfc",
--				  "scifa4_ctrl", "scifa4"),
--	/* SDHI0 */
--	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "e6050000.pfc",
--				  "sdhi0_data4", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "e6050000.pfc",
--				  "sdhi0_ctrl", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "e6050000.pfc",
--				  "sdhi0_cd", "sdhi0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("ee100000.sdhi", "e6050000.pfc",
--				  "sdhi0_wp", "sdhi0"),
--	/* SDHI2 */
--	PIN_MAP_MUX_GROUP_DEFAULT("ee140000.sdhi", "e6050000.pfc",
--				  "sdhi2_data4", "sdhi2"),
--	PIN_MAP_MUX_GROUP_DEFAULT("ee140000.sdhi", "e6050000.pfc",
--				  "sdhi2_ctrl", "sdhi2"),
--};
--
- static void __init kzm_init(void)
+ #include <linux/delay.h>
+-#include <linux/gpio.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/irqchip.h>
+@@ -37,11 +36,6 @@ static void __init kzm_init(void)
  {
  	sh73a0_add_standard_devices_dt();
--	pinctrl_register_mappings(kzm_pinctrl_map, ARRAY_SIZE(kzm_pinctrl_map));
  
- 	/* enable SD */
- 	gpio_request_one(15, GPIOF_OUT_INIT_HIGH, NULL); /* power */
+-	/* enable SD */
+-	gpio_request_one(15, GPIOF_OUT_INIT_HIGH, NULL); /* power */
+-
+-	gpio_request_one(14, GPIOF_OUT_INIT_HIGH, NULL); /* power */
+-
+ #ifdef CONFIG_CACHE_L2X0
+ 	/* Early BRESP enable, Shared attribute override enable, 64K*8way */
+ 	l2x0_init(IOMEM(0xf0100000), 0x40460000, 0x82000fff);
 -- 
 1.8.1.5
