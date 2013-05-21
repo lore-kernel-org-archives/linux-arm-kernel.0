@@ -1,42 +1,65 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 21 May 2013 11:06:58 +0200
-Subject: [PATCH] ARM: at91: Fix: Change internal SRAM memory type to
- "MT_MEMORY_SO"
-In-Reply-To: <1369011979-21354-1-git-send-email-wenyou.yang@atmel.com>
-References: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
- <1369011979-21354-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <519B3932.7030508@atmel.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Tue, 21 May 2013 11:12:30 +0200
+Subject: [GIT PULL v2] MFD: Fixes due for the v3.10 -rc:s
+In-Reply-To: <20130521085650.GB4589@zurbaran>
+References: <20130514091956.GG3297@gmail.com> <20130515090449.GA3494@gmail.com>
+ <20130516224337.GZ22822@zurbaran>
+ <20130517075140.GA25077@balto.lan> <20130521085650.GB4589@zurbaran>
+Message-ID: <20130521091230.GA28756@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/2013 03:06, Wenyou Yang :
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+Hi Samuel,
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Tue, May 21, 2013 at 10:56:50AM +0200, Samuel Ortiz wrote:
+> Hi Fabio,
+> 
+> On Fri, May 17, 2013 at 09:51:40AM +0200, Fabio Baltieri wrote:
+> > Hello Samuel,
+> > 
+> > On Fri, May 17, 2013 at 12:43:37AM +0200, Samuel Ortiz wrote:
+> > > > Fabio Baltieri (5):
+> > > >       mfd: abx500-core: Fix sparse warning
+> > > >       mfd: ab8500-sysctrl: Fix sparse warning
+> > > >       mfd: ab8500-sysctrl: Set sysctrl_dev during probe
+> > > >       mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
+> > > Unless I'm missing something here, this one is not really rcN material, so
+> > > I'd appreciate if you could queue it to your for-mfd branch instead.
+> > 
+> > The last two:
+> > 
+> >   mfd: ab8500-sysctrl: Set sysctrl_dev during probe
+> This one is already in mfd-fixes, the commit log was clear enough.
 
-And stacked on at91-3.10-fixes.
+Great!
 
-Best regards,
+> >   mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
+> This one is not, as the commit log is not showing it actually fixes something
+> but only makes the code cleaner. If it really fixes something, could you
+> please provide me with a commit log that describes what exactly it fixes ?
 
-> ---
->   arch/arm/mach-at91/setup.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-> index e2f4bdd..d68be6c 100644
-> --- a/arch/arm/mach-at91/setup.c
-> +++ b/arch/arm/mach-at91/setup.c
-> @@ -80,7 +80,7 @@ void __init at91_init_sram(int bank, unsigned long base, unsigned int length)
->
->   	desc->pfn = __phys_to_pfn(base);
->   	desc->length = length;
-> -	desc->type = MT_DEVICE;
-> +	desc->type = MT_MEMORY_SO;
->
->   	pr_info("AT91: sram at 0x%lx of 0x%x mapped at 0x%lx\n",
->   		base, length, desc->virtual);
->
+Ok, the fix here is that right now that driver is initialized without a
+specific pdata (that is plat->sysctrl), so enforcing it breaks existing
+platforms for no reason.  To make the commit more clear I would just
+point that out as in (just last two sentences):
 
+--- >8 ---
+mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
+
+A check for a valid plat->sysctrl was introduced in:
+
+2377e52 mfd: ab8500-sysctrl: Error check clean up
+
+but the driver works just fine even without that initialization data,
+and enforcing it breaks existing platforms for no reason.
+
+This patch removes the check and let the driver go ahead with probe.
+--- >8 ---
+
+Is it better?
+
+Thanks,
+Fabio
 
 -- 
-Nicolas Ferre
+Fabio Baltieri
