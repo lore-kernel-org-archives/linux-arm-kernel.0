@@ -1,73 +1,48 @@
-From: guz.fnst@cn.fujitsu.com (Gu Zheng)
-Date: Tue, 21 May 2013 16:50:38 +0800
-Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
-In-Reply-To: <519B2FC7.6000801@huawei.com>
-References: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
- <20130520.232619.964940909999914694.davem@davemloft.net>
- <20130521084108.1a585f32@skate> <519B2993.4090409@cn.fujitsu.com>
- <519B2FC7.6000801@huawei.com>
-Message-ID: <519B355E.8020505@cn.fujitsu.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 May 2013 09:53:25 +0100
+Subject: [PATCH] arm64: kernel: compiling issue, need
+ 'EXPORT_SYMBOL_GPL(read_current_timer)'
+In-Reply-To: <519AF2DC.2040200@asianux.com>
+References: <5199C725.8050102@asianux.com>
+ <168084c28e8ba5124c05553e97463172@localhost>
+ <20130520095606.GH31359@mudshark.cambridge.arm.com>
+ <519AF2DC.2040200@asianux.com>
+Message-ID: <20130521085325.GB10453@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2013 04:26 PM, Libo Chen wrote:
+On Tue, May 21, 2013 at 05:06:52AM +0100, Chen Gang wrote:
+> On 05/20/2013 05:56 PM, Will Deacon wrote:
+> > Should be ok once the arch timer driver has moved exclusively to virtual
+> > time. I'm also not sure we even need to implement read_current_timer() --
+> > it's only used for delay-loop calibration, which we don't need for the
+> > arch timer.
+> > 
+> 
+> For whether we need implement read_current_timer():
+> 
+>   many platforms have implemented it (openrisc, arm, sparc, hexagon, avr32, x86).
+>   it is called by init/calibrate.c when 'ARCH_HAS_READ_CURRENT_TIMER' is defined.
+>   since arm64 can implement it, better to provide it as an architect features to let outside use.
 
-> On 2013/5/21 16:00, Gu Zheng wrote:
->> On 05/21/2013 02:41 PM, Thomas Petazzoni wrote:
->>
->>> Dear David Miller,
->>>
->>> On Mon, 20 May 2013 23:26:19 -0700 (PDT), David Miller wrote:
->>>> From: Libo Chen <libo.chen@huawei.com>
->>>> Date: Tue, 21 May 2013 10:42:00 +0800
->>>>
->>>>> I find a lot of mistakes using struct platform_driver without owner.
->>>>> So I pick up some of them including usb and net modules
->>>>
->>>> Instead of doing it this way, which is obviously error prone and
->>>> easy to forget, make platform_driver_register() be a macro which
->>>> sets the module owner field then calls the real
->>>> __platform_driver_register().
->>>
->>> Or, maybe make the existing module_platform_driver() macro do this?
->>
->>
->> But not all the modules use module_platform_driver() macro to replace the module init/exit.
->>
->> Thanks,
->> Gu
->>
-> 
-> yes, there are many drivers register platform_driver by platform_driver_register manually.
-> 
-> make both platform_driver_register() and module_platform_driver()  to check and set the module owner field?
+No, that code is not needed on arm64 because we calibrate the delay loop
+statically using a known timer frequency.
 
+> For the implementation of read_current_timer():
+> 
+>   it has to face various configurations
+>     (e.g. CONFIG_ARM_ARCH_TIMER, arch_timer_read_zero, arch_counter_get_cntvct, arch_counter_get_cntpct)
+>   so better still use variable instead of.
+>     (excuse me, I do not know what is 'CNTVCT_EL0', is it like a constant number ?)
 
-No, module_platform_driver() will call platform_driver_register() to register platform_driver, just do it in
-platform_driver_register() is enough.
-As David mentioned, making platform_driver_register() be a macro and sets the module owner field in it, seems
-a good way.
+cntvct_el0 is a system register, which provides the virtual counter value.
 
-Thanks,
-Gu
+> For the implementation of get_cycles()
+> 
+>   if read_current_timer() is provided,
+>   better to let get_cycles() to call it, instead of implement once again.
 
-> 
-> 
-> 
->>>
->>> Best regards,
->>>
->>> Thomas
->>
->>
->>
->> .
->>
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+You can implement it as a macro if you like, I'm just suggesting that we
+might not need read_current_timer after all.
+
+Will
