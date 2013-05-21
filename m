@@ -1,47 +1,44 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 21 May 2013 19:52:36 +0900
-Subject: [GIT PULL] Samsung fixes-2 for v3.10
-In-Reply-To: <20130521064034.GE20453@quad.lixom.net>
-References: <519A5933.3040005@samsung.com>
- <20130521064034.GE20453@quad.lixom.net>
-Message-ID: <102901ce5611$4df09bd0$e9d1d370$%kim@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 May 2013 11:59:59 +0100
+Subject: [PATCH] include/linux/posix_acl.h: need 'return NULL' when
+ BUG(), if neither CONFIG_BUG nor HAVE_ARCH_BUG is defined.
+In-Reply-To: <519AD33D.1030106@asianux.com>
+References: <5199DBE2.5080707@asianux.com>
+ <97dada79-cd78-4799-8f18-ed2bf8eee508@email.android.com>
+ <20130520163118.GX18614@n2100.arm.linux.org.uk>
+ <519AD33D.1030106@asianux.com>
+Message-ID: <20130521105959.GZ18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+On Tue, May 21, 2013 at 09:51:57AM +0800, Chen Gang wrote:
+> On 05/21/2013 12:31 AM, Russell King - ARM Linux wrote:
+> > On Mon, May 20, 2013 at 07:40:24AM -0700, Eric W. Biederman wrote:
+> >> Seriously?  The correct fix it would seem is to give a useful default BUG
+> >> definition.  Say *NULL.
+> > 
+> > Absolutely.
+> > 
+> > The real question is... how is this happening.  I've seen it occasionally
+> > in the randconfig builds - though I don't have any logs to hand which
+> > show that in the build system at the moment.  So, looking at the files:
+> > 
 > 
-> On Tue, May 21, 2013 at 02:11:15AM +0900, Kukjin Kim wrote:
-> > The following changes since commit
-> f722406faae2d073cc1d01063d1123c35425939e:
-> >
-> >   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-> >
-> > are available in the git repository at:
-> >
+> Maybe it is my fault for the incorrect configuration.
 > 
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > tags/samsung-fixes-2
+> My operation:
+>   make EXTRA_CFLAGS=-W ARCH=arm randconfig
+>   make EXTRA_CFLAGS=-W ARCH=arm menuconfig
+>     set 'arm-linux-gnu-' as cross compiler prefix.
+>     select "MMU-based Paged Memory" in "System Type".
+>     select "Samsung S5PV210/S5PC110" in "ARM System type"
+>   make EXTRA_CFLAGS=-W ARCH=arm
+>   ...
 > 
-> What happened to the 4210 rev0 regression fixes from Tomasz? I would
-> have expected them in this batch?
-> 
-Hmm... please see below:
-https://patchwork.kernel.org/patch/2478431/
+> In menuconfig, I do not touch the "S5PV210 Machines" or "S5PC110
+> Machines" in "System Type", and no machines will be chosen as default.
 
-Since many conflicts at that time, the 11/13 patch missed in the last merge
-window. Then, seems as Tomasz replied, he re-submitted after -rc1.
-
-OK, I will pick that up into upcoming fixes for Samsung stuff.
-
-> Might as well hold off this one until that is reviewed and ready, since
-> it's silly to keep pulling one-patch branches. At least if that's
-> happening
-> this week.
-> 
-Yeah, agreed. Let me sort out other fixes within a couple of days.
-
-Please kindly ignore this pull request :-)
-
-Thanks.
-
-- Kukjin
+You know, telling us that you're using a random configuration to produce
+a problem and not providing the actual configuration file is utterly
+insane.  How many iterations do you think it might take to generate a
+random configuration which shows the same problem you're seeing?
