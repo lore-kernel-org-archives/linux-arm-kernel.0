@@ -1,46 +1,69 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Tue, 21 May 2013 22:26:01 +0200
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
- 370/XP
-In-Reply-To: <20130521221235.61491ecb@skate>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130521193803.GA20882@1wt.eu> <20130521221235.61491ecb@skate>
-Message-ID: <20130521202601.GB20882@1wt.eu>
+From: sameo@linux.intel.com (Samuel Ortiz)
+Date: Tue, 21 May 2013 23:58:06 +0200
+Subject: [GIT PULL v2] MFD: Fixes due for the v3.10 -rc:s
+In-Reply-To: <20130521091230.GA28756@balto.lan>
+References: <20130514091956.GG3297@gmail.com> <20130515090449.GA3494@gmail.com>
+ <20130516224337.GZ22822@zurbaran>
+ <20130517075140.GA25077@balto.lan> <20130521085650.GB4589@zurbaran>
+ <20130521091230.GA28756@balto.lan>
+Message-ID: <20130521215806.GC4566@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 10:12:35PM +0200, Thomas Petazzoni wrote:
-> Dear Willy Tarreau,
-> 
-> On Tue, 21 May 2013 21:38:03 +0200, Willy Tarreau wrote:
-> 
-> > Just out of curiosity, what happens if you touch the register at the
-> > wrong address ?
-> 
-> On Armada 370/XP, it hangs the CPU.
-> 
-> > I mean, if you blindly write to the 0xD0xxxxxx address
-> > that you want the registers to be mapped at 0xF1xxxxxx. Will the chip
-> > hang, will it silently ignore the sequence ?
-> 
-> Answered above: it hangs.
-> 
-> > Because maybe you don't need to detect using CP15 whether the remapping was done,
-> > you could simply perform it unconditionally. Another point would be that if the
-> > boot loader is the only one to know whether the registeres were remapped,
-> > then maybe it could put something into the atags or DT about this. And
-> > maybe we'll simply find that DT-enabled boot loaders are remapped and
-> > that non-DT ones are not.
-> > 
-> > Just a few ideas since you feel a bit worried about the fragility of
-> > the CP15 bit :-)
-> 
-> No, as explained above, we have considered a way of "detecting" whether
-> the remapping occurred, or to unconditionally do the remapping. But
-> none of those solutions work: we need to know, through some external
-> mechanism, whether the remapping has already taken place or not.
+Hi Fabio,
 
-OK, thank you for these precisions.
+On Tue, May 21, 2013 at 11:12:30AM +0200, Fabio Baltieri wrote:
+> On Tue, May 21, 2013 at 10:56:50AM +0200, Samuel Ortiz wrote:
+> > On Fri, May 17, 2013 at 09:51:40AM +0200, Fabio Baltieri wrote:
+> > > Hello Samuel,
+> > > 
+> > > On Fri, May 17, 2013 at 12:43:37AM +0200, Samuel Ortiz wrote:
+> > > > > Fabio Baltieri (5):
+> > > > >       mfd: abx500-core: Fix sparse warning
+> > > > >       mfd: ab8500-sysctrl: Fix sparse warning
+> > > > >       mfd: ab8500-sysctrl: Set sysctrl_dev during probe
+> > > > >       mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
+> > > > Unless I'm missing something here, this one is not really rcN material, so
+> > > > I'd appreciate if you could queue it to your for-mfd branch instead.
+> > > 
+> > > The last two:
+> > > 
+> > >   mfd: ab8500-sysctrl: Set sysctrl_dev during probe
+> > This one is already in mfd-fixes, the commit log was clear enough.
+> 
+> Great!
+> 
+> > >   mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
+> > This one is not, as the commit log is not showing it actually fixes something
+> > but only makes the code cleaner. If it really fixes something, could you
+> > please provide me with a commit log that describes what exactly it fixes ?
+> 
+> Ok, the fix here is that right now that driver is initialized without a
+> specific pdata (that is plat->sysctrl), so enforcing it breaks existing
+> platforms for no reason.  To make the commit more clear I would just
+> point that out as in (just last two sentences):
+> 
+> --- >8 ---
+> mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
+> 
+> A check for a valid plat->sysctrl was introduced in:
+> 
+> 2377e52 mfd: ab8500-sysctrl: Error check clean up
+> 
+> but the driver works just fine even without that initialization data,
+> and enforcing it breaks existing platforms for no reason.
+> 
+> This patch removes the check and let the driver go ahead with probe.
+> --- >8 ---
+> 
+> Is it better?
+Slightly. Next time please describe how it breaks.
+I applied and pushed this patch now, I'll send a pull request to Linus
+tomorrow morning.
 
-Best regards,
-Willy
+Cheers,
+Samuel.
+
+-- 
+Intel Open Source Technology Centre
+http://oss.intel.com/
