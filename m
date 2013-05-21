@@ -1,33 +1,36 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 21 May 2013 07:34:40 -0700
-Subject: [GIT PULL] omap fixes for v3.10-rc1
-In-Reply-To: <20130521063732.GD20453@quad.lixom.net>
-References: <20130517192515.GC5600@atomide.com>
- <20130521063732.GD20453@quad.lixom.net>
-Message-ID: <20130521143439.GO10378@atomide.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 21 May 2013 16:34:49 +0200
+Subject: [PATCH v2 0/5] Zynq: revised CCF code
+In-Reply-To: <1368467199-8702-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1368467199-8702-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <6d3d9b84-3438-4d74-9565-5c969e72b1df@CO9EHSMHS025.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [130520 23:43]:
-> On Fri, May 17, 2013 at 12:25:16PM -0700, Tony Lindgren wrote:
-> > The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
-> > 
-> >   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10-rc1/fixes
+On 05/13/2013 07:46 PM, Soren Brinkmann wrote:
+> I rebased this series on v3.10-rc1 eliminating all dependencies and incorporated
+> Greg's feedback.
+> I'll push this also to my github repository.
+> https://github.com/sorenb-xlnx/linux-xlnx/tree/zynq/clkc
 > 
-> Well, it's for -rc3 now but it can never have been for -rc1 since that's
-> what the branch is base on. :-)
+> v2:
+>  - dropped the 'sort #includes' patches
+> 
+> 	S?ren
+> 
+> 
+> Soren Brinkmann (5):
+>   tty: xuartps: Remove suspend/resume functions
 
-Heh OK I'll change the naming in the future to be "patches against v3.10-rc1"
-then.
+This patch will go through Greg trees.
 
-Using some future tag name that does not yet exist may never happen either :)
- 
-> IOW: Pulled, thanks!
+>   clk: zynq: Factor out PLL driver
+>   clk: zynq: Add clock controller driver
+>   arm: zynq: Migrate platform to clock controller
+>   clk: zynq: Remove deprecated clock code
 
-Regards,
+I have added these patches to my arm-next branch
+and also to zynq/clk branch.
 
-Tony
+Thanks,
+Michal
