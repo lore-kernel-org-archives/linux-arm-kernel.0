@@ -1,243 +1,36 @@
-From: b35083@freescale.com (Jingchang Lu)
-Date: Tue, 21 May 2013 15:27:54 +0800
-Subject: [PATCH v4] clocksource: add Vybrid Family pit timer support
-Message-ID: <1369121274-9371-1-git-send-email-b35083@freescale.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 21 May 2013 12:33:26 +0200
+Subject: [PATCH 1/9] arm: mvebu: fix length of SATA registers area in .dtsi
+In-Reply-To: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369132414-18959-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Freescale Vybrid Family period interrupt timer support.
+The length of the registers area for the Marvell 370/XP SATA
+controller was incorrect in the .dtsi: 0x2400 while it should have
+been 0x5000. Until now, this problem wasn't noticed because there was
+a large static mapping for all I/Os set up by ->map_io(). But since
+we're going to get rid of this static mapping, we need to ensure that
+the register areas are properly sized.
 
-Signed-off-by: Jingchang Lu <b35083@freescale.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
-v4:
-  use family name names driver and symbol instead of SoC name.
-  remove redundant code.
-  use BUG_ON instead of WARN_ON.
-  add necessory comment information.
+ arch/arm/boot/dts/armada-370-xp.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/clocksource/Kconfig         |   5 +
- drivers/clocksource/Makefile        |   1 +
- drivers/clocksource/mvf_pit_timer.c | 187 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 193 insertions(+)
- create mode 100644 drivers/clocksource/mvf_pit_timer.c
-
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index f151c6c..4f3ca11 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -85,3 +85,8 @@ config CLKSRC_SAMSUNG_PWM
- 	  Samsung S3C, S5P and Exynos SoCs, replacing an earlier driver
- 	  for all devicetree enabled platforms. This driver will be
- 	  needed only on systems that do not have the Exynos MCT available.
-+
-+config MVF_PIT_TIMER
-+	bool
-+	help
-+	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 8d979c7..e28783c 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -26,6 +26,7 @@ obj-$(CONFIG_ARCH_BCM)		+= bcm_kona_timer.o
- obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence_ttc_timer.o
- obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
- obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
-+obj-$(CONFIG_MVF_PIT_TIMER)	+= mvf_pit_timer.o
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 272bbc6..75de3fe 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -79,7 +79,7 @@
  
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
- obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
-diff --git a/drivers/clocksource/mvf_pit_timer.c b/drivers/clocksource/mvf_pit_timer.c
-new file mode 100644
-index 0000000..34f4871
---- /dev/null
-+++ b/drivers/clocksource/mvf_pit_timer.c
-@@ -0,0 +1,187 @@
-+/*
-+ * Copyright 2012-2013 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version 2
-+ * of the License, or (at your option) any later version.
-+ */
-+
-+#include <linux/interrupt.h>
-+#include <linux/clockchips.h>
-+#include <linux/clk.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <asm/sched_clock.h>
-+
-+/*
-+ * Each pit takes 0x10 Bytes register space
-+ */
-+#define PITMCR		0x00
-+#define PIT0_OFFSET	0x100
-+#define PITn_OFFSET(n)	(PIT0_OFFSET + 0x10 * (n))
-+#define PITLDVAL	0x00
-+#define PITCVAL		0x04
-+#define PITTCTRL	0x08
-+#define PITTFLG		0x0c
-+
-+#define PITMCR_MDIS	(0x1 << 1)
-+
-+#define PITTCTRL_TEN	(0x1 << 0)
-+#define PITTCTRL_TIE	(0x1 << 1)
-+#define PITCTRL_CHN	(0x1 << 2)
-+
-+#define PITTFLG_TIF	0x1
-+
-+static void __iomem *clksrc_base;
-+static void __iomem *clkevt_base;
-+static unsigned long cycle_per_jiffy;
-+
-+static inline void pit_timer_enable(void)
-+{
-+	__raw_writel(PITTCTRL_TEN | PITTCTRL_TIE, clkevt_base + PITTCTRL);
-+}
-+
-+static inline void pit_timer_disable(void)
-+{
-+	__raw_writel(0, clkevt_base + PITTCTRL);
-+}
-+
-+static inline void pit_irq_acknowledge(void)
-+{
-+	__raw_writel(PITTFLG_TIF, clkevt_base + PITTFLG);
-+}
-+
-+static unsigned int pit_read_sched_clock(void)
-+{
-+	return __raw_readl(clksrc_base + PITCVAL);
-+}
-+
-+static int __init pit_clocksource_init(struct clk *pit_clk)
-+{
-+	unsigned int c = clk_get_rate(pit_clk);
-+
-+	/* set the max load value and start the clock source counter */
-+	__raw_writel(0, clksrc_base + PITTCTRL);
-+	__raw_writel(~0UL, clksrc_base + PITLDVAL);
-+	__raw_writel(PITTCTRL_TEN, clksrc_base + PITTCTRL);
-+
-+	setup_sched_clock(pit_read_sched_clock, 32, c);
-+	return clocksource_mmio_init(clksrc_base + PITCVAL, "mvf-pit", c,
-+			300, 32, clocksource_mmio_readl_down);
-+}
-+
-+static int pit_set_next_event(unsigned long delta,
-+				struct clock_event_device *unused)
-+{
-+	/*
-+	 * set a new value to PITLDVAL register will not restart the timer,
-+	 * to abort the current cycle and start a timer period with the new
-+	 * value, the timer must be disabled and enabled again.
-+	 * and the PITLAVAL should be set to delta minus one.
-+	 */
-+	pit_timer_disable();
-+	__raw_writel(delta - 1, clkevt_base + PITLDVAL);
-+	pit_timer_enable();
-+
-+	return 0;
-+}
-+
-+static void pit_set_mode(enum clock_event_mode mode,
-+				struct clock_event_device *evt)
-+{
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		pit_timer_disable();
-+		__raw_writel(cycle_per_jiffy - 1, clkevt_base + PITLDVAL);
-+		pit_timer_enable();
-+		break;
-+	default:
-+		break;
-+	}
-+}
-+
-+static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = dev_id;
-+
-+	pit_irq_acknowledge();
-+
-+	/*
-+	 * pit hardware doesn't support oneshot, it will generate an interrupt
-+	 * and reload the counter value from PITLDVAL when PITCVAL reach zero,
-+	 * and start the counter again. So software need to disable the timer
-+	 * to stop the counter loop in ONESHOT mode.
-+	 */
-+	if (likely(evt->mode == CLOCK_EVT_MODE_ONESHOT))
-+		pit_timer_disable();
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct clock_event_device clockevent_pit = {
-+	.name		= "MVF pit timer",
-+	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_mode	= pit_set_mode,
-+	.set_next_event	= pit_set_next_event,
-+	.rating		= 300,
-+};
-+
-+static struct irqaction pit_timer_irq = {
-+	.name		= "MVF pit timer",
-+	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler	= pit_timer_interrupt,
-+	.dev_id		= &clockevent_pit,
-+};
-+
-+static int __init pit_clockevent_init(struct clk *pit_clk, int irq)
-+{
-+	unsigned int c = clk_get_rate(pit_clk);
-+
-+	__raw_writel(0, clkevt_base + PITTCTRL);
-+	__raw_writel(PITTFLG_TIF, clkevt_base + PITTFLG);
-+
-+	clockevent_pit.cpumask = cpumask_of(0);
-+	clockevents_config_and_register(&clockevent_pit, c, 2, 0xffffffff);
-+
-+	BUG_ON(setup_irq(irq, &pit_timer_irq));
-+
-+	return 0;
-+}
-+
-+static void __init pit_timer_init(struct device_node *np)
-+{
-+	struct clk *pit_clk;
-+	void __iomem *timer_base;
-+	int irq;
-+
-+	timer_base = of_iomap(np, 0);
-+	BUG_ON(!timer_base);
-+
-+	/*
-+	 * PIT0 and PIT1 can be chained to build a 64-bit timer,
-+	 * so choose PIT2 as clocksource, PIT3 as clockevent device,
-+	 * and leave PIT0 and PIT1 unused for anyone else who needs them.
-+	 */
-+	clksrc_base = timer_base + PITn_OFFSET(2);
-+	clkevt_base = timer_base + PITn_OFFSET(3);
-+
-+	irq = irq_of_parse_and_map(np, 0);
-+
-+	pit_clk = of_clk_get(np, 0);
-+	BUG_ON(IS_ERR(pit_clk));
-+
-+	BUG_ON(clk_prepare_enable(pit_clk));
-+
-+	cycle_per_jiffy = clk_get_rate(pit_clk)/(HZ);
-+
-+	/* enable the pit module */
-+	__raw_writel(~PITMCR_MDIS, timer_base + PITMCR);
-+
-+	BUG_ON(pit_clocksource_init(pit_clk));
-+
-+	pit_clockevent_init(pit_clk, irq);
-+}
-+CLOCKSOURCE_OF_DECLARE(mvf600, "fsl,mvf600-pit", pit_timer_init);
+ 			sata at a0000 {
+ 				compatible = "marvell,orion-sata";
+-				reg = <0xa0000 0x2400>;
++				reg = <0xa0000 0x5000>;
+ 				interrupts = <55>;
+ 				clocks = <&gateclk 15>, <&gateclk 30>;
+ 				clock-names = "0", "1";
 -- 
-1.8.0
+1.7.9.5
