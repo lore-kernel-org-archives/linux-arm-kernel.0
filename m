@@ -1,45 +1,73 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 21 May 2013 11:46:16 +0200
-Subject: [PATCH 3/3] ARM: ux500: Disable MMC_BLOCK_BOUNCE
-In-Reply-To: <1369129576-28617-1-git-send-email-ulf.hansson@linaro.org>
-References: <1369129576-28617-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <1369129576-28617-4-git-send-email-ulf.hansson@linaro.org>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 21 May 2013 17:46:05 +0800
+Subject: [PATCH v2] arm64: kernel: compiling issue,
+ need delete read_current_timer().
+In-Reply-To: <20130521085325.GB10453@mudshark.cambridge.arm.com>
+References: <5199C725.8050102@asianux.com>
+ <168084c28e8ba5124c05553e97463172@localhost>
+ <20130520095606.GH31359@mudshark.cambridge.arm.com>
+ <519AF2DC.2040200@asianux.com>
+ <20130521085325.GB10453@mudshark.cambridge.arm.com>
+Message-ID: <519B425D.4030806@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since ARMMMCI can do scatter-gather we don't need CONFIG_MMC_BLOCK_BOUNCE.
-Explicity disable it since it's default enabled, to skip unnecessarry
-bounce buffer copying.
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Under arm64, we will calibrate the delay loop statically using a known
+timer frequency, so delete read_current_timer(), or it will cause
+compiling issue with allmodconfig.
+
+The related error:
+  ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
+  ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
+  ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
+  ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
+
+
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
 ---
- arch/arm/configs/u300_defconfig  |    1 +
- arch/arm/configs/u8500_defconfig |    1 +
- 2 files changed, 2 insertions(+)
+ arch/arm64/include/asm/timex.h |    6 +++---
+ arch/arm64/kernel/time.c       |    6 ------
+ 2 files changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/configs/u300_defconfig b/arch/arm/configs/u300_defconfig
-index ffe2db8..9c7941d 100644
---- a/arch/arm/configs/u300_defconfig
-+++ b/arch/arm/configs/u300_defconfig
-@@ -52,6 +52,7 @@ CONFIG_BACKLIGHT_CLASS_DEVICE=y
- # CONFIG_USB_SUPPORT is not set
- CONFIG_MMC=y
- CONFIG_MMC_UNSAFE_RESUME=y
-+# CONFIG_MMC_BLOCK_BOUNCE is not set
- CONFIG_MMC_ARMMMCI=y
- CONFIG_RTC_CLASS=y
- # CONFIG_RTC_HCTOSYS is not set
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index 45d9087..8fe6293 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -83,6 +83,7 @@ CONFIG_USB_GADGET=y
- CONFIG_AB8500_USB=y
- CONFIG_MMC=y
- CONFIG_MMC_UNSAFE_RESUME=y
-+# CONFIG_MMC_BLOCK_BOUNCE is not set
- CONFIG_MMC_ARMMMCI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
+diff --git a/arch/arm64/include/asm/timex.h b/arch/arm64/include/asm/timex.h
+index b24a31a..81a076e 100644
+--- a/arch/arm64/include/asm/timex.h
++++ b/arch/arm64/include/asm/timex.h
+@@ -16,14 +16,14 @@
+ #ifndef __ASM_TIMEX_H
+ #define __ASM_TIMEX_H
+ 
++#include <asm/arch_timer.h>
++
+ /*
+  * Use the current timer as a cycle counter since this is what we use for
+  * the delay loop.
+  */
+-#define get_cycles()	({ cycles_t c; read_current_timer(&c); c; })
++#define get_cycles()	arch_counter_get_cntvct()
+ 
+ #include <asm-generic/timex.h>
+ 
+-#define ARCH_HAS_READ_CURRENT_TIMER
+-
+ #endif
+diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+index a551f88..03dc371 100644
+--- a/arch/arm64/kernel/time.c
++++ b/arch/arm64/kernel/time.c
+@@ -68,12 +68,6 @@ unsigned long long notrace sched_clock(void)
+ 	return arch_timer_read_counter() * sched_clock_mult;
+ }
+ 
+-int read_current_timer(unsigned long *timer_value)
+-{
+-	*timer_value = arch_timer_read_counter();
+-	return 0;
+-}
+-
+ void __init time_init(void)
+ {
+ 	u32 arch_timer_rate;
 -- 
-1.7.10
+1.7.7.6
