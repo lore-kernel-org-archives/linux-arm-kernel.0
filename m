@@ -1,65 +1,61 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Tue, 21 May 2013 11:12:30 +0200
-Subject: [GIT PULL v2] MFD: Fixes due for the v3.10 -rc:s
-In-Reply-To: <20130521085650.GB4589@zurbaran>
-References: <20130514091956.GG3297@gmail.com> <20130515090449.GA3494@gmail.com>
- <20130516224337.GZ22822@zurbaran>
- <20130517075140.GA25077@balto.lan> <20130521085650.GB4589@zurbaran>
-Message-ID: <20130521091230.GA28756@balto.lan>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Tue, 21 May 2013 11:17:16 +0200
+Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
+In-Reply-To: <20130520220540.GL10378@atomide.com>
+References: <20130515002537.GG5600@atomide.com>
+ <20130515015212.GB3268@animalcreek.com>
+ <20130515170734.GI5600@atomide.com> <20130515215028.GA11883@animalcreek.com>
+ <5194B2A8.8020608@visionsystems.de> <20130517185620.GF28484@animalcreek.com>
+ <CAGm1_ks10f=6aBxWHzd6KxAaFGfnZUNWrQrSZeFwsT3He9r0Ow@mail.gmail.com>
+ <20130520220540.GL10378@atomide.com>
+Message-ID: <CAGm1_ku3Fgib8+ZkF0XOq6K9QxY80dAMZAP65uz4jpMEXQtWLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
+On Tue, May 21, 2013 at 12:05 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Yegor Yefremov <yegorslists@googlemail.com> [130517 14:34]:
+>> On Fri, May 17, 2013 at 8:56 PM, Mark A. Greer <mgreer@animalcreek.com> wrote:
+>> > On Thu, May 16, 2013 at 12:19:20PM +0200, Yegor Yefremov wrote:
+>> >> On 15.05.2013 23:50, Mark A. Greer wrote:
+>> >> > On Wed, May 15, 2013 at 10:07:35AM -0700, Tony Lindgren wrote:
+>> >
+>> >> >> Mark, do you have some omap3 with no iva (other than am3703) to test the
+>> >> >> idle states with?
+>> >> >
+>> >> > I have an am35xx which isn't supposed to have an IVA so I can test with it
+>> >> > (although, I'm not sure how well the kernel works on the am35xx these days).
+>> >> >
+>> >> > I'm a bit busy today but I'll try booting the am35xx tomorrow and if it
+>> >> > comes up, see what I can figure out.
+>> >>
+>> >> I think this issue is relevant to am3517 as you can see from this thread: http://thread.gmane.org/gmane.linux.ports.arm.omap/97903
+>> >> I could boot only with your patch http://www.spinics.net/lists/arm-kernel/msg168865.html
+>> >>
+>> >> I have such a system running, so if you have any other patches/ideas to test, I would do it.
+>> >
+>> > Yegor, since I've so far been unable to get my am3517evm to fire up, can
+>> > you play around with the 3517 to see if there appears to be iva registers
+>> > that can be read/written to safely?  In particular, can the code that idles
+>> > the iva be run safely on an am3517?
+>>
+>> I'll look into this next week. am3517 and IVA seems to be a really big
+>> mystery. In the TI forum will be stated, there is no IVA:
+>> http://e2e.ti.com/support/arm/sitara_arm/f/791/t/150961.aspx, but TRM
+>> has various appearances of IVA2 registers, but no real
+>> description/explanation of what is IVA and how to eat it.
+>
+> On 3703 it looks like the whole omap3_iva_idle() reset is needed, except
+> for setting the iva2 bootmode to idle. So I'm planning to merge the following
+> patch with just comments update this week unless somebody has a better fix
+> in mind.
 
-On Tue, May 21, 2013 at 10:56:50AM +0200, Samuel Ortiz wrote:
-> Hi Fabio,
-> 
-> On Fri, May 17, 2013 at 09:51:40AM +0200, Fabio Baltieri wrote:
-> > Hello Samuel,
-> > 
-> > On Fri, May 17, 2013 at 12:43:37AM +0200, Samuel Ortiz wrote:
-> > > > Fabio Baltieri (5):
-> > > >       mfd: abx500-core: Fix sparse warning
-> > > >       mfd: ab8500-sysctrl: Fix sparse warning
-> > > >       mfd: ab8500-sysctrl: Set sysctrl_dev during probe
-> > > >       mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
-> > > Unless I'm missing something here, this one is not really rcN material, so
-> > > I'd appreciate if you could queue it to your for-mfd branch instead.
-> > 
-> > The last two:
-> > 
-> >   mfd: ab8500-sysctrl: Set sysctrl_dev during probe
-> This one is already in mfd-fixes, the commit log was clear enough.
+calling omap3_iva_idle() made no difference so far. I still can boot
+3.10-rc2 with 'nohlt' and omap3_iva_idle() and vice versa, without
+'nohlt' I cannot boot whether with or without calling
+omap3_iva_idle().
 
-Great!
+BTW Tony I've sent a patch to fix MUSB clock naming. Should I also
+make a recent including linux-usb mailing list or can we handle this
+internally on omap/arm list?
 
-> >   mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
-> This one is not, as the commit log is not showing it actually fixes something
-> but only makes the code cleaner. If it really fixes something, could you
-> please provide me with a commit log that describes what exactly it fixes ?
-
-Ok, the fix here is that right now that driver is initialized without a
-specific pdata (that is plat->sysctrl), so enforcing it breaks existing
-platforms for no reason.  To make the commit more clear I would just
-point that out as in (just last two sentences):
-
---- >8 ---
-mfd: ab8500-sysctrl: Let sysctrl driver work without pdata
-
-A check for a valid plat->sysctrl was introduced in:
-
-2377e52 mfd: ab8500-sysctrl: Error check clean up
-
-but the driver works just fine even without that initialization data,
-and enforcing it breaks existing platforms for no reason.
-
-This patch removes the check and let the driver go ahead with probe.
---- >8 ---
-
-Is it better?
-
-Thanks,
-Fabio
-
--- 
-Fabio Baltieri
+Yegor
