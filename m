@@ -1,305 +1,65 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 21 May 2013 15:38:52 +0100
-Subject: [PATCH v11 1/2] arm: introduce psci_smp_ops
-In-Reply-To: <alpine.DEB.2.02.1305211522120.4799@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1305211522120.4799@kaball.uk.xensource.com>
-Message-ID: <1369147133-29729-1-git-send-email-stefano.stabellini@eu.citrix.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 May 2013 16:11:43 +0100
+Subject: [PATCH] dmatest: abort transfers immediately when asked for
+In-Reply-To: <1369139597-24446-1-git-send-email-andriy.shevchenko@linux.intel.com>
+References: <20130516153553.GI11706@mudshark.cambridge.arm.com>
+ <1369139597-24446-1-git-send-email-andriy.shevchenko@linux.intel.com>
+Message-ID: <20130521151143.GH10453@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rename virt_smp_ops to psci_smp_ops and move them to arch/arm/kernel/psci_smp.c.
-Remove mach-virt/platsmp.c, now unused.
-Compile psci_smp if CONFIG_ARM_PSCI and CONFIG_SMP.
+Hi Andy,
 
-Add a cpu_die smp_op based on psci_ops.cpu_off.
+On Tue, May 21, 2013 at 01:33:17PM +0100, Andy Shevchenko wrote:
+> When thread is going to be stopped we have to unconditionally terminate all
+> ongoing transfers. Otherwise it would be possible that callback function will
+> be called on the next interrupt and will try to access to already freed
+> structures.
+> 
+> The patch introduces specific error message for this, though it doesn't
+> increase the counter of the failed tests.
+> 
+> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Reported-by: Will Deacon <will.deacon@arm.com>
 
-Initialize PSCI before setting smp_ops in setup_arch.
+Thanks for persevering with this! Although this patch definitely fixes the
+panic I was seeing, I now observe buffer verification failures in subsequent
+test runs after an aborted run:
 
-If PSCI is available on the platform, prefer psci_smp_ops over the
-platform smp_ops.
+[   43.888424] dma0chan0-copy0: #1: transfer aborted with src_off=0x81f0 dst_off=0x9f4 len=0xdf29 (0)
+[   43.888526] dma0chan0-copy0: terminating after 1 tests, 0 failures (status 0)
+[   43.888635] dmatest: thread dma0chan0-copy0 exited with status 0
 
+<reload module and start new tests>
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-CC: arnd at arndb.de
-CC: marc.zyngier at arm.com
-CC: linux at arm.linux.org.uk
-CC: nico at linaro.org
-CC: rob.herring at calxeda.com
----
- arch/arm/include/asm/psci.h  |    9 ++++
- arch/arm/kernel/Makefile     |    5 ++-
- arch/arm/kernel/psci.c       |    7 +--
- arch/arm/kernel/psci_smp.c   |   84 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm/kernel/setup.c      |    7 +++-
- arch/arm/mach-virt/Makefile  |    1 -
- arch/arm/mach-virt/platsmp.c |   50 -------------------------
- arch/arm/mach-virt/virt.c    |    3 -
- 8 files changed, 106 insertions(+), 60 deletions(-)
- create mode 100644 arch/arm/kernel/psci_smp.c
- delete mode 100644 arch/arm/mach-virt/platsmp.c
+[   77.341405] dma0chan0-copy0: #1: errors with src_off=0x8e29 dst_off=0x11dc8 len=0x2b93 (370)
+[   77.341505] dma0chan0-copy0: terminating after 1 tests, 1 failures (status 0)
 
-diff --git a/arch/arm/include/asm/psci.h b/arch/arm/include/asm/psci.h
-index ce0dbe7..c4ae171 100644
---- a/arch/arm/include/asm/psci.h
-+++ b/arch/arm/include/asm/psci.h
-@@ -32,5 +32,14 @@ struct psci_operations {
- };
- 
- extern struct psci_operations psci_ops;
-+extern struct smp_operations psci_smp_ops;
-+
-+#ifdef CONFIG_ARM_PSCI
-+void psci_init(void);
-+bool psci_smp_available(void);
-+#else
-+static inline void psci_init(void) { }
-+static inline bool psci_smp_available(void) { return false; }
-+#endif
- 
- #endif /* __ASM_ARM_PSCI_H */
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 5f3338e..dd9d90a 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -82,6 +82,9 @@ obj-$(CONFIG_DEBUG_LL)	+= debug.o
- obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- 
- obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
--obj-$(CONFIG_ARM_PSCI)		+= psci.o
-+ifeq ($(CONFIG_ARM_PSCI),y)
-+obj-y				+= psci.o
-+obj-$(CONFIG_SMP)		+= psci_smp.o
-+endif
- 
- extra-y := $(head-y) vmlinux.lds
-diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
-index 3653164..4693188 100644
---- a/arch/arm/kernel/psci.c
-+++ b/arch/arm/kernel/psci.c
-@@ -158,7 +158,7 @@ static const struct of_device_id psci_of_match[] __initconst = {
- 	{},
- };
- 
--static int __init psci_init(void)
-+void __init psci_init(void)
- {
- 	struct device_node *np;
- 	const char *method;
-@@ -166,7 +166,7 @@ static int __init psci_init(void)
- 
- 	np = of_find_matching_node(NULL, psci_of_match);
- 	if (!np)
--		return 0;
-+		return;
- 
- 	pr_info("probing function IDs from device-tree\n");
- 
-@@ -206,6 +206,5 @@ static int __init psci_init(void)
- 
- out_put_node:
- 	of_node_put(np);
--	return 0;
-+	return;
- }
--early_initcall(psci_init);
-diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-new file mode 100644
-index 0000000..23a1142
---- /dev/null
-+++ b/arch/arm/kernel/psci_smp.c
-@@ -0,0 +1,84 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copyright (C) 2012 ARM Limited
-+ *
-+ * Author: Will Deacon <will.deacon@arm.com>
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/irqchip/arm-gic.h>
-+#include <linux/smp.h>
-+#include <linux/of.h>
-+
-+#include <asm/psci.h>
-+#include <asm/smp_plat.h>
-+
-+/*
-+ * psci_smp assumes that the following is true about PSCI:
-+ *
-+ * cpu_suspend   Suspend the execution on a CPU
-+ * @state        we don't currently describe affinity levels, so just pass 0.
-+ * @entry_point  the first instruction to be executed on return
-+ * returns 0  success, < 0 on failure
-+ *
-+ * cpu_off       Power down a CPU
-+ * @state        we don't currently describe affinity levels, so just pass 0.
-+ * no return on successful call
-+ *
-+ * cpu_on        Power up a CPU
-+ * @cpuid        cpuid of target CPU, as from MPIDR
-+ * @entry_point  the first instruction to be executed on return
-+ * returns 0  success, < 0 on failure
-+ *
-+ * migrate       Migrate the context to a different CPU
-+ * @cpuid        cpuid of target CPU, as from MPIDR
-+ * returns 0  success, < 0 on failure
-+ *
-+ */
-+
-+extern void secondary_startup(void);
-+
-+static int __cpuinit psci_boot_secondary(unsigned int cpu,
-+					 struct task_struct *idle)
-+{
-+	if (psci_ops.cpu_on)
-+		return psci_ops.cpu_on(cpu_logical_map(cpu),
-+				       __pa(secondary_startup));
-+	return -ENODEV;
-+}
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+void __ref psci_cpu_die(unsigned int cpu)
-+{
-+       const struct psci_power_state ps = {
-+               .type = PSCI_POWER_STATE_TYPE_POWER_DOWN,
-+       };
-+
-+       if (psci_ops.cpu_off)
-+               psci_ops.cpu_off(ps);
-+
-+       /* We should never return */
-+       panic("psci: cpu %d failed to shutdown\n", cpu);
-+}
-+#else
-+#define psci_cpu_die NULL
-+#endif
-+
-+bool __init psci_smp_available(void)
-+{
-+	/* is cpu_on available@least? */
-+	return (psci_ops.cpu_on != NULL);
-+}
-+
-+struct smp_operations __initdata psci_smp_ops = {
-+	.smp_boot_secondary	= psci_boot_secondary,
-+	.cpu_die		= psci_cpu_die,
-+};
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 1522c7a..8f7a6e9 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -37,6 +37,7 @@
- #include <asm/cputype.h>
- #include <asm/elf.h>
- #include <asm/procinfo.h>
-+#include <asm/psci.h>
- #include <asm/sections.h>
- #include <asm/setup.h>
- #include <asm/smp_plat.h>
-@@ -796,9 +797,13 @@ void __init setup_arch(char **cmdline_p)
- 	unflatten_device_tree();
- 
- 	arm_dt_init_cpu_maps();
-+	psci_init();
- #ifdef CONFIG_SMP
- 	if (is_smp()) {
--		smp_set_ops(mdesc->smp);
-+		if (psci_smp_available())
-+			smp_set_ops(&psci_smp_ops);
-+		else if (mdesc->smp)
-+			smp_set_ops(mdesc->smp);
- 		smp_init_cpus();
- 	}
- #endif
-diff --git a/arch/arm/mach-virt/Makefile b/arch/arm/mach-virt/Makefile
-index 042afc1..7ddbfa6 100644
---- a/arch/arm/mach-virt/Makefile
-+++ b/arch/arm/mach-virt/Makefile
-@@ -3,4 +3,3 @@
- #
- 
- obj-y					:= virt.o
--obj-$(CONFIG_SMP)			+= platsmp.o
-diff --git a/arch/arm/mach-virt/platsmp.c b/arch/arm/mach-virt/platsmp.c
-deleted file mode 100644
-index f4143f5..0000000
---- a/arch/arm/mach-virt/platsmp.c
-+++ /dev/null
-@@ -1,50 +0,0 @@
--/*
-- * Dummy Virtual Machine - does what it says on the tin.
-- *
-- * Copyright (C) 2012 ARM Ltd
-- * Author: Will Deacon <will.deacon@arm.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-- */
--
--#include <linux/init.h>
--#include <linux/smp.h>
--#include <linux/of.h>
--
--#include <asm/psci.h>
--#include <asm/smp_plat.h>
--
--extern void secondary_startup(void);
--
--static void __init virt_smp_init_cpus(void)
--{
--}
--
--static void __init virt_smp_prepare_cpus(unsigned int max_cpus)
--{
--}
--
--static int __cpuinit virt_boot_secondary(unsigned int cpu,
--					 struct task_struct *idle)
--{
--	if (psci_ops.cpu_on)
--		return psci_ops.cpu_on(cpu_logical_map(cpu),
--				       __pa(secondary_startup));
--	return -ENODEV;
--}
--
--struct smp_operations __initdata virt_smp_ops = {
--	.smp_init_cpus		= virt_smp_init_cpus,
--	.smp_prepare_cpus	= virt_smp_prepare_cpus,
--	.smp_boot_secondary	= virt_boot_secondary,
--};
-diff --git a/arch/arm/mach-virt/virt.c b/arch/arm/mach-virt/virt.c
-index 061f283..a67d2dd 100644
---- a/arch/arm/mach-virt/virt.c
-+++ b/arch/arm/mach-virt/virt.c
-@@ -36,11 +36,8 @@ static const char *virt_dt_match[] = {
- 	NULL
- };
- 
--extern struct smp_operations virt_smp_ops;
--
- DT_MACHINE_START(VIRT, "Dummy Virtual Machine")
- 	.init_irq	= irqchip_init,
- 	.init_machine	= virt_init,
--	.smp		= smp_ops(virt_smp_ops),
- 	.dt_compat	= virt_dt_match,
- MACHINE_END
--- 
-1.7.2.5
+Note that the non-aborted transfers (I have 4 dma controllers) seem fine.
+
+Looking at the results file doesn't show anything obvious, although I do
+see some strange entries:
+
+	[...]
+	dstbuf not copied! [0xffffffff] Expected ff, got ff
+	dstbuf not copied! [0xffffffff] Expected ff, got ff
+	dstbuf not copied! [0xffffffff] Expected 00, got 00
+	dstbuf not copied! [0xffffffff] Expected 00, got 00
+	dstbuf not copied! [0xffffffff] Expected ff, got ff
+	[...]
+
+The more alarming ones look like:
+
+	[...]
+	dstbuf not copied! [0x147e9] Expected d5, got 36
+	dstbuf not copied! [0x147ea] Expected d4, got 35
+	dstbuf not copied! [0x147eb] Expected d3, got 34
+	dstbuf not copied! [0x147ec] Expected d2, got 33
+	dstbuf not copied! [0x147ed] Expected d1, got 32
+	dstbuf not copied! [0x147ee] Expected d0, got 31
+	[...]
+
+Of course, this could be a driver bug with the PL330 that is being exposed
+by this aborting code.
+
+Will
