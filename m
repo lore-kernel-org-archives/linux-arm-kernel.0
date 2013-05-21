@@ -1,56 +1,61 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 21 May 2013 14:08:51 +0200
-Subject: [PATCH] ARM: OMAP4: change the device names in usb_bind_phy
-In-Reply-To: <20130517172335.GX5600@atomide.com>
-References: <1366697656-14315-1-git-send-email-kishon@ti.com>
- <51936946.3030507@iki.fi> <20130516155857.GV5600@atomide.com>
- <519503DA.5070303@iki.fi> <20130516162034.GX5600@atomide.com>
- <5195C28C.40300@ti.com> <20130517172335.GX5600@atomide.com>
-Message-ID: <519B63D3.7040600@epfl.ch>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 21 May 2013 13:21:26 +0200
+Subject: [PATCH v2 10/10] kernel: might_fault does not imply might_sleep
+In-Reply-To: <20130519093526.GD19883@redhat.com>
+References: <cover.1368702323.git.mst@redhat.com>
+ <1f85dc8e6a0149677563a2dfb4cef9a9c7eaa391.1368702323.git.mst@redhat.com>
+ <20130516184041.GP19669@dyad.programming.kicks-ass.net>
+ <20130519093526.GD19883@redhat.com>
+Message-ID: <20130521112126.GJ26912@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, May 19, 2013 at 12:35:26PM +0300, Michael S. Tsirkin wrote:
+> On Thu, May 16, 2013 at 08:40:41PM +0200, Peter Zijlstra wrote:
+> > On Thu, May 16, 2013 at 02:16:10PM +0300, Michael S. Tsirkin wrote:
+> > > There are several ways to make sure might_fault
+> > > calling function does not sleep.
+> > > One is to use it on kernel or otherwise locked memory - apparently
+> > > nfs/sunrpc does this. As noted by Ingo, this is handled by the
+> > > migh_fault() implementation in mm/memory.c but not the one in
+> > > linux/kernel.h so in the current code might_fault() schedules
+> > > differently depending on CONFIG_PROVE_LOCKING, which is an undesired
+> > > semantical side effect.
+> > > 
+> > > Another is to call pagefault_disable: in this case the page fault
+> > > handler will go to fixups processing and we get an error instead of
+> > > sleeping, so the might_sleep annotation is a false positive.
+> > > vhost driver wants to do this now in order to reuse socket ops
+> > > under a spinlock (and fall back on slower thread handler
+> > > on error).
+> > 
+> > Are you using the assumption that spin_lock() implies preempt_disable() implies
+> > pagefault_disable()? Note that this assumption isn't valid for -rt where the
+> > spinlock becomes preemptible but we'll not disable pagefaults.
+> 
+> No, I was not assuming that. What I'm trying to say is that a caller
+> that does something like this under a spinlock:
+> 	preempt_disable
+> 	pagefault_disable
+> 	error = copy_to_user
+> 	pagefault_enable
+> 	preempt_enable_no_resched
+> 
+> is not doing anything wrong and should not get a warning,
+> as long as error is handled correctly later.
+> Right?
 
-On 05/17/2013 07:23 PM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [130516 22:45]:
->> Hi,
->>
->> On Thursday 16 May 2013 09:50 PM, Tony Lindgren wrote:
->>> * Tomi Valkeinen <tomi.valkeinen@iki.fi> [130516 09:11]:
->>>> On 16/05/13 18:58, Tony Lindgren wrote:
->>>>> * Tomi Valkeinen <tomi.valkeinen@iki.fi> [130515 03:59]:
->>>>>
->>>>> Just checking.. Do you have CONFIG_OMAP_OCP2SCP=y in your .config? Sounds
->>>>> like the some transceivers should depend on that for omap4.
->>>>
->>>> Yes, I have OCP2SCP=y.
->>>
->>> Hmm well no idea beyond that then. Sounds like Kishon should check it.
->>>
->>>>>> The musb-hdrc id is wrong on overo also.
->>>>>
->>>>> Hmm has there been a fix posted for that?
->>>>
->>>> I couldn't find with a quick look. We debugged and discussed this on an irc
->>>> channel with Kishon, who said he'll send a patch. Changing the musb-hdrc ID
->>>> on overo fixed the issue, and it looks very similar to the error on 4430sdp.
->>>> The overo fix was just:
->>
->> hmm.. I think using device name to bind the controller and the phy
->> can no longer be used reliably. I think it's better to have
->> something like what Grant suggested in my other patch series.. to
->> have the phy reference into the host controllers platform_data
->> structure. And for the phy reference I'll have label and id.
->>
->> Does this makes sense to you?
->
-> Sounds OK to me, but I guess that would be for v3.11. I think we
-> still need a fix for at least overo for v3.10?
->
+Aside from the no_resched() thing which Steven already explained and my
+previous email asking why you need the preempt_disable() at all, that
+should indeed work.
 
-Indead, musb-hdrc is broken on overo with 3.10-rc2. The patch posted in this
-thread fixes the issue.
+The reason I was asking was that I wasn't sure you weren't doing:
 
-Regards,
+  spin_lock(&my_lock);
+  error = copy_to_user();
+  spin_unlock(&my_lock);
 
-Florian
+and expecting the copy_to_user() to always take the exception table
+route. This works on mainline (since spin_lock implies a preempt disable
+and preempt_disable is the same as pagefault_disable). However as should
+be clear by now, it doesn't quite work that way for -rt.
