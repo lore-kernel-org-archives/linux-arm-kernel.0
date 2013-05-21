@@ -1,45 +1,35 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 21 May 2013 10:27:27 +0900
-Subject: [PATCH] ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
-In-Reply-To: <1623377.nVo7nUcid2@flatron>
-References: <1368630484-29939-1-git-send-email-t.figa@samsung.com>
- <1623377.nVo7nUcid2@flatron>
-Message-ID: <0f8101ce55c2$5b084c90$1118e5b0$%kim@samsung.com>
+From: bill4carson@gmail.com (bill4carson)
+Date: Tue, 21 May 2013 09:35:07 +0800
+Subject: hugetlbfs support plan for ARM
+In-Reply-To: <3E54258959B69E4282D79E01AB1F32B7044F299D@DFLE11.ent.ti.com>
+References: <3E54258959B69E4282D79E01AB1F32B7044F299D@DFLE11.ent.ti.com>
+Message-ID: <519ACF4B.9070502@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> Hi Kukjin,
-> 
-Hi,
+Hi, Karichri
 
-> On Wednesday 15 of May 2013 17:08:04 Tomasz Figa wrote:
-> > This patch extends exynos_init_time() function to handle Exynos4210 rev0
-> > SoC, which differs in availability of system timers and needs different
-> > clocksource initialization.
-> >
-> > This makes it possible to use exynos_init_time() function as init_time
-> > callback for all Exynos-based boards, including Universal_C210, which
-> > originally had to use samsung_timer_init().
-> >
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> >  arch/arm/mach-exynos/Kconfig               |  3 ++-
-> >  arch/arm/mach-exynos/common.c              | 30
-> > +++++++++++++++++++++++++++++- arch/arm/mach-exynos/common.h
-> >   |  2 ++
-> >  arch/arm/mach-exynos/mach-universal_c210.c |  5 ++---
-> >  4 files changed, 35 insertions(+), 5 deletions(-)
-> 
-> Could you pick this patch to your fixes branch?
-> 
-Yeah, I will after looking at.
+On 2013?05?21? 02:26, Karicheri, Muralidharan wrote:
+> Hi Bill,
+>
+> I see the patch at http://lists.infradead.org/pipermail/linux-arm-kernel/2012-February/084360.html
+>
+> Is there a plan to merge this to upstream Linux kernel? I would appreciate your response on this.
 
-> This is a fix of a regression in handling Exynos4210 rev0 SoC (e.g.
-> Universal C210 board) introduced by patches merged to 3.10.
-> 
-OK, I see but I didn't review yet and I  will within a couple of days ;-)
+I tried to post several round of this patch set, but haven't got more time to merge it.
+Steve Capper from ARM proposed both HUGEPAGE and THP in below link,
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-February/148451.html
 
-- Kukjin
+Look https://wiki.linaro.org/LEG/Engineering/Kernel/HugePages here to find what you needs.
+
+> Thanks.
+>
+> Murali Karicheri
+>
+> /Software Design Engineer/
+>
+
+-- 
+?????????,??????????
+
+--bill
