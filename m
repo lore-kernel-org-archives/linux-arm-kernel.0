@@ -1,25 +1,30 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Tue, 21 May 2013 20:23:16 +0200
-Subject: [PATCH v4] ASoC: dfbmcs320: make the driver common for other
- BT modules
-In-Reply-To: <1368879900-28395-1-git-send-email-Baohua.Song@csr.com>
-References: <1368879900-28395-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <519BBB94.5010408@metafoo.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 21 May 2013 20:23:03 +0200
+Subject: [PATCH V2 1/2] ARM: mmc: bcm281xx SDHCI driver
+In-Reply-To: <519B2EAD.4000208@broadcom.com>
+References: <1368200883-15668-1-git-send-email-csd@broadcom.com>
+ <201305170009.46244.arnd@arndb.de> <519B2EAD.4000208@broadcom.com>
+Message-ID: <201305212023.03272.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2013 02:25 PM, Barry Song wrote:
-> DFBM-CS320 is only one of bluetooth modules using CSR bluetooth chips, we
-> don't want everyone to have a seperate codec driver. anyway, the feature
-> of Bluetooth SCO is same on all platforms, so this patch makes the
-> DFBM-CS320 driver become a common BT SCO link driver.
-> 
-> Cc: Graeme Gregory <graeme@openmoko.org> Cc: Lars-Peter Clausen
-> <lars@metafoo.de> Signed-off-by: Barry Song <Baohua.Song@csr.com> --- v4: 
-> change "select SND_SOC_DFBMCS320" to "select SND_SOC_BT_SCO" for OpenMOKO
-> user as v3 missed this
-> 
+On Tuesday 21 May 2013, Christian Daudt wrote:
+> >> +    cfg = devm_kzalloc(&pdev->dev, sizeof(*cfg), GFP_KERNEL);
+> >> +    if (!cfg) {
+> >> +            dev_err(&pdev->dev, "Can't allocate platform cfg\n");
+> >> +            return NULL;
+> >> +    }
+> > Not needed
+> what is not needed ?
 
-Looks good to me.
+The allocation, it can be part of the sdhci_pltfm_host data.
 
-Acked-by: Lars-Peter Clausen <lars@metafoo.de>
+> >> +    const struct sdhci_pltfm_data *plat_data;
+> > make it global.
+> why make this global ?
+
+Sorry for being unclear. I mean you can just use &sdhci_pltfm_data_kona
+in the probe function, since the data is constant anyway, no need to have
+a local variable for pulling this out of the device id.
+
+	Arnd
