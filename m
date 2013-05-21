@@ -1,52 +1,167 @@
-From: clbchenlibo.chen@huawei.com (Libo Chen)
-Date: Tue, 21 May 2013 16:26:47 +0800
-Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
-In-Reply-To: <519B2993.4090409@cn.fujitsu.com>
-References: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
- <20130520.232619.964940909999914694.davem@davemloft.net>
- <20130521084108.1a585f32@skate> <519B2993.4090409@cn.fujitsu.com>
-Message-ID: <519B2FC7.6000801@huawei.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 21 May 2013 16:41:19 +0800
+Subject: [PATCH] arm64: kernel: compiling issue,
+ need 'EXPORT_SYMBOL_GPL(read_current_timer)'
+In-Reply-To: <5bf8a8dd20ecd01c14f0ed9aa054f2df@localhost>
+References: <5199C725.8050102@asianux.com>
+ <168084c28e8ba5124c05553e97463172@localhost>
+ <20130520095606.GH31359@mudshark.cambridge.arm.com>
+ <519AF2DC.2040200@asianux.com> <5bf8a8dd20ecd01c14f0ed9aa054f2df@localhost>
+Message-ID: <519B332F.1000404@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013/5/21 16:00, Gu Zheng wrote:
-> On 05/21/2013 02:41 PM, Thomas Petazzoni wrote:
-> 
->> Dear David Miller,
->>
->> On Mon, 20 May 2013 23:26:19 -0700 (PDT), David Miller wrote:
->>> From: Libo Chen <libo.chen@huawei.com>
->>> Date: Tue, 21 May 2013 10:42:00 +0800
+On 05/21/2013 02:13 PM, Marc Zyngier wrote:
+> On Tue, 21 May 2013 12:06:52 +0800, Chen Gang <gang.chen@asianux.com>
+> wrote:
+>> On 05/20/2013 05:56 PM, Will Deacon wrote:
+>>> On Mon, May 20, 2013 at 08:15:04AM +0100, Marc Zyngier wrote:
+>>>> On Mon, 20 May 2013 14:48:05 +0800, Chen Gang <gang.chen@asianux.com>
+>>>> wrote:
+>>>>> Need 'EXPORT_SYMBOL_GPL(read_current_timer)' if build with
+>>>>> allmodconfig.
+>>>>>
+>>>>> The related error:
+>>>>>   ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
+>>>>>   ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
+>>>>>   ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
+>>>>>   ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
+>>>>>
+>>>>>
+>>>>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>>>>> ---
+>>>>>  arch/arm64/kernel/time.c |    1 +
+>>>>>  1 files changed, 1 insertions(+), 0 deletions(-)
+>>>>>
+>>>>> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+>>>>> index a551f88..7fcba80 100644
+>>>>> --- a/arch/arm64/kernel/time.c
+>>>>> +++ b/arch/arm64/kernel/time.c
+>>>>> @@ -73,6 +73,7 @@ int read_current_timer(unsigned long *timer_value)
+>>>>>  	*timer_value = arch_timer_read_counter();
+>>>>>  	return 0;
+>>>>>  }
+>>>>> +EXPORT_SYMBOL_GPL(read_current_timer);
+>>>>>  
+>>>>>  void __init time_init(void)
+>>>>>  {
+>>>>
+>>>> While this solves the problem, I'm not sure this is the best fix. The
+>>>> real
+>>>> issue is with get_cycles, which is a macro around read_current_timer.
+>>>>
+>>>> AArch32 exports it because of the number of timer implementations. On
+>>>> arm64, we should be able to just return CNTVCT_EL0.
+>>>>
+>>>> Catalin, Will, what do you think?
 >>>
->>>> I find a lot of mistakes using struct platform_driver without owner.
->>>> So I pick up some of them including usb and net modules
+>>> Should be ok once the arch timer driver has moved exclusively to
+> virtual
+>>> time. I'm also not sure we even need to implement read_current_timer()
+> --
+>>> it's only used for delay-loop calibration, which we don't need for the
+>>> arch timer.
 >>>
->>> Instead of doing it this way, which is obviously error prone and
->>> easy to forget, make platform_driver_register() be a macro which
->>> sets the module owner field then calls the real
->>> __platform_driver_register().
 >>
->> Or, maybe make the existing module_platform_driver() macro do this?
-> 
-> 
-> But not all the modules use module_platform_driver() macro to replace the module init/exit.
-> 
-> Thanks,
-> Gu
-> 
-
-yes, there are many drivers register platform_driver by platform_driver_register manually.
-
-make both platform_driver_register() and module_platform_driver()  to check and set the module owner field?
-
-
-
+>> For whether we need implement read_current_timer():
 >>
->> Best regards,
+>>   many platforms have implemented it (openrisc, arm, sparc, hexagon,
+>>   avr32, x86).
+>>   it is called by init/calibrate.c when 'ARCH_HAS_READ_CURRENT_TIMER' is
+>>   defined.
+>>   since arm64 can implement it, better to provide it as an architect
+>>   features to let outside use.
+> 
+> Nobody disputes the interest of read_current_timer.
+> 
+
+It is for Will said "I'm also not sure we even need to implement
+read_current_timer()".
+
+I think we still need it.
+
+
+>> For the implementation of read_current_timer():
 >>
->> Thomas
+>>   it has to face various configurations
+>>     (e.g. CONFIG_ARM_ARCH_TIMER, arch_timer_read_zero,
+>>     arch_counter_get_cntvct, arch_counter_get_cntpct)
+>>   so better still use variable instead of.
+>>     (excuse me, I do not know what is 'CNTVCT_EL0', is it like a
+> constant
+>>     number ?)
 > 
+> Architected timer is mandatory on arm64, so we can always rely on it it be
+> present. CNTVCT_EL0 is the system register accessing the Virtual Counter,
+> which is basically what read_current_timer() returns.
 > 
+
+OK, thanks. for CNTVCT_EL0, can we use arch_counter_get_cntvct() which
+is defined in "arch/arm64/include/asm/arch_timer.h" ?
+
+
+>> For the implementation of get_cycles()
+>>
+>>   if read_current_timer() is provided,
+>>   better to let get_cycles() to call it, instead of implement once
+> again.
 > 
-> .
+> There is certainly some value in reusing existing code, but in this
+> particular case we can simply inline two instructions (isb + mrs
+> cntvct_el0), and I'm not even completely sure about the isb.
 > 
+
+OK, thanks.
+
+
+So, how about the fix below :)
+
+------------------------diff begin-------------------------------
+
+diff --git a/arch/arm64/include/asm/timex.h b/arch/arm64/include/asm/timex.h
+index b24a31a..768ba44 100644
+--- a/arch/arm64/include/asm/timex.h
++++ b/arch/arm64/include/asm/timex.h
+@@ -16,11 +16,13 @@
+ #ifndef __ASM_TIMEX_H
+ #define __ASM_TIMEX_H
+ 
++#include <asm/arch_timer.h>
++
+ /*
+  * Use the current timer as a cycle counter since this is what we use for
+  * the delay loop.
+  */
+-#define get_cycles()	({ cycles_t c; read_current_timer(&c); c; })
++#define get_cycles()	arch_counter_get_cntvct()
+ 
+ #include <asm-generic/timex.h>
+ 
+diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+index a551f88..6d7ce08 100644
+--- a/arch/arm64/kernel/time.c
++++ b/arch/arm64/kernel/time.c
+@@ -38,6 +38,7 @@
+ 
+ #include <asm/thread_info.h>
+ #include <asm/stacktrace.h>
++#include <asm/arch_timer.h>
+ 
+ #ifdef CONFIG_SMP
+ unsigned long profile_pc(struct pt_regs *regs)
+@@ -70,7 +71,7 @@ unsigned long long notrace sched_clock(void)
+ 
+ int read_current_timer(unsigned long *timer_value)
+ {
+-	*timer_value = arch_timer_read_counter();
++	*timer_value = arch_counter_get_cntvct();
+ 	return 0;
+ }
+
+
+------------------------diff end---------------------------------
+
+-- 
+Chen Gang
+
+Asianux Corporation
