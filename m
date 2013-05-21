@@ -1,46 +1,37 @@
-From: dgilbert@interlog.com (Douglas Gilbert)
-Date: Tue, 21 May 2013 18:21:07 -0400
-Subject: [PATCH] v2 rtc-at91rm9200: add support for at91sam9x5
-Message-ID: <519BF353.2060800@interlog.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 21 May 2013 18:27:44 -0400
+Subject: [PATCH] ARM: Kirkwood: TS219: Fix crash by double PCIe
+ instantiation
+In-Reply-To: <1369158108-5603-1-git-send-email-andrew@lunn.ch>
+References: <1369158108-5603-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20130521222744.GX31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An unspecified number of SoCs from the Atmel's
-at91sam9x5 family including the at91sam9g25 have a
-broken AT91_RTC_IMR (interrupt mask) register which
-always returns zero.
+On Tue, May 21, 2013 at 07:41:48PM +0200, Andrew Lunn wrote:
+> When creating the DT based boards-ts219.c the none DT ts219-setup.c
+> was used as a template. This includes a lateinit() call to initialize
+> the PCIe bus. The code makes use of machine_is_ts219() which is never
+> true on DT, so a FIXME was added and the code left as is. This was
+> unproblematic until b73690c8f8b5d: "ARM: Kirkwood: Support basic
+> hotplug for PCI-E" which changes the way the PCIe bus is
+> initialized. The non-DT ts219-setup.c now crashes during boot.  The
+> lateinit() call in the DT boards-ts219.c is being called,
+> machine_is_ts219() is true and so the PCIe is initialized a second
+> time.
+> 
+> This patch removes the useless, and now clearly dangerous, code from
+> boards-ts219.c, making ts219-setup.c work again.
+> 
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> ---
+> This can also be tagged for stable 3.9
+> 
+>  arch/arm/mach-kirkwood/board-ts219.c |   10 ----------
+>  1 file changed, 10 deletions(-)
 
-If this bug can be neutralized, then the existing
-rtc-at91rm9200 driver will work. On the other hand,
-leaving this bug in place, and starting the RTC
-causes unhandled interrupts which result in the
-"SYS" interrupt being disabled. And that takes down
-several other interrupts wired or-ed through the
-SYS interrupt including the DBG port.
+Applied to mvebu/fixes
 
-This is the second version of this patch, and is
-against lk 3.10.0-rc2 .
+thx,
 
-ChangeLog:
-    - checks in probe() function if AT91_RTC_IMR is broken.
-      If so, uses a shadow imr
-    - apart from that check, SoCs with a good IMR register
-      take the same paths through rtc-at91rm9200.c as before
-    - SoCs with a broken IMR take a spinlock while changing
-      the state of IER or IDR (and the shadow), mainly to
-      disable interrupts **.
-
-** similar technique used in arch/arm/mach-at91/clock.c
-
-Tested on an Aria G25 (at91sam9g25 based).
-
-Signed-off-by: Douglas Gilbert <dgilbert@interlog.com>
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: rtc-sam9x5_3100rc1.patch
-Type: text/x-patch
-Size: 5787 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130521/44c67885/attachment.bin>
+Jason.
