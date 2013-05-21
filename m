@@ -1,71 +1,66 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 21 May 2013 18:44:13 +0200
-Subject: [PATCH 6/9] arm: mvebu: move cache and mvebu-mbus
- initialization later
-In-Reply-To: <20130521163725.GW31290@titan.lakedaemon.net>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1369132414-18959-7-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130521141621.GU31290@titan.lakedaemon.net>
- <20130521173707.5a49eaec@skate>
- <20130521154313.GV31290@titan.lakedaemon.net>
- <20130521181018.401ddabf@skate>
- <20130521163725.GW31290@titan.lakedaemon.net>
-Message-ID: <20130521184413.68cca154@skate>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 21 May 2013 18:41:50 +0200
+Subject: [PATCH v4 12/12] ARM: orion5x: remove legacy mv643xx_eth board setup
+In-Reply-To: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1369154510-4927-13-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+With DT support for mv643xx_eth we do not need legacy platform_data
+based setup for DT enabled boards. This patch removes eth setup
+for all orion5x DT board files.
 
-On Tue, 21 May 2013 12:37:25 -0400, Jason Cooper wrote:
+Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+---
+Cc: David Miller <davem@davemloft.net>
+Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: netdev at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/mach-orion5x/edmini_v2-setup.c |   10 ----------
+ 1 file changed, 10 deletions(-)
 
-> On Tue, May 21, 2013 at 06:10:18PM +0200, Thomas Petazzoni wrote:
-> > On Tue, 21 May 2013 11:43:13 -0400, Jason Cooper wrote:
-> > > > > I tried hacking it up to put it in mvebu/soc-internal_regs for a few
-> > > > > rounds of testing in linux-next during review, however, I'd prefer you
-> > > > > rebase this on top of mvebu/cleanup.
-> > > > 
-> > > > So you mean my next version of the "Internal registers switch" should
-> > > > be based on mvebu/cleanup, right?
-> > > 
-> > > Yes, sorry I wasn't clear, I meant the series.  You can drop 1-3 as
-> > > well for the next version, since I've pulled those.
-> > 
-> > Ok. 1-2 have been merged in mvebu/fixes, and 3 in mvebu/cleanup. So I
-> > suppose mvebu/cleanup is based on mvebu/fixes ? Or should I base on
-> > mvebu/cleanup and assume when it will lend in mainline, the mvebu/fixes
-> > patches will be there (which doesn't make the thing easy for testing
-> > here, because to test, I actually need all the patches in the same
-> > branch). Just trying to figure the workflow :)
-> 
-> For your development, I would checkout v3.10-rc2, merge /fixes, then
-> merge /cleanup, the put 4-9 on top.  Then, when sending, just do 4-9
-> with a note about the merge dependency on /cleanup, and the boot
-> dependency on /fixes.
-
-Ok, sounds good.
-
-> If you'd like, I can hold off on merging it until I can base the series
-> on an -rc including patches 1 and 2.  As is, I might move #3 into the
-> same branch as 4-9, but we'll still have the conflict I highlighted
-> earlier.  And anyone resolving it will probably miss the .init_early
-> removal.
-
-Don't worry, the solution you've proposed earlier sounds fine to me.
-
-> > Well, the current version should be ok build-wise, and works with all
-> > currently available Marvell bootloaders. The bug can only be seen with
-> > a bootloader version that has not yet been really released by Marvell.
-> > 
-> > But anyway, v2 will follow shortly. With this v1, I was mainly hoping
-> > for some feedback, to see if the solution was acceptable or not.
-> 
-> That was a great explanation of a Schr?dinger's Register ;-)
-
-That's a nice name for such a complicated register, indeed :)
-
-Thomas
+diff --git a/arch/arm/mach-orion5x/edmini_v2-setup.c b/arch/arm/mach-orion5x/edmini_v2-setup.c
+index 1476155..d9de926 100644
+--- a/arch/arm/mach-orion5x/edmini_v2-setup.c
++++ b/arch/arm/mach-orion5x/edmini_v2-setup.c
+@@ -24,7 +24,6 @@
+ #include <linux/pci.h>
+ #include <linux/irq.h>
+ #include <linux/mtd/physmap.h>
+-#include <linux/mv643xx_eth.h>
+ #include <linux/leds.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+@@ -96,14 +95,6 @@ static struct platform_device edmini_v2_nor_flash = {
+ };
+ 
+ /*****************************************************************************
+- * Ethernet
+- ****************************************************************************/
+-
+-static struct mv643xx_eth_platform_data edmini_v2_eth_data = {
+-	.phy_addr	= 8,
+-};
+-
+-/*****************************************************************************
+  * RTC 5C372a on I2C bus
+  ****************************************************************************/
+ 
+@@ -152,7 +143,6 @@ void __init edmini_v2_init(void)
+ 	 * Configure peripherals.
+ 	 */
+ 	orion5x_ehci0_init();
+-	orion5x_eth_init(&edmini_v2_eth_data);
+ 
+ 	mvebu_mbus_add_window("devbus-boot", EDMINI_V2_NOR_BOOT_BASE,
+ 			      EDMINI_V2_NOR_BOOT_SIZE);
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.10.4
