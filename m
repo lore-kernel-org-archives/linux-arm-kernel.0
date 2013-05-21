@@ -1,42 +1,16 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 21 May 2013 11:43:13 -0400
-Subject: [PATCH 6/9] arm: mvebu: move cache and mvebu-mbus
- initialization later
-In-Reply-To: <20130521173707.5a49eaec@skate>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1369132414-18959-7-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130521141621.GU31290@titan.lakedaemon.net>
- <20130521173707.5a49eaec@skate>
-Message-ID: <20130521154313.GV31290@titan.lakedaemon.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 21 May 2013 16:44:41 +0100
+Subject: [PATCH v4 31/32] arm64: KVM: MAINTAINERS update
+In-Reply-To: <1368540840-26750-32-git-send-email-marc.zyngier@arm.com>
+References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
+ <1368540840-26750-32-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130521154441.GN27002@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
-
-On Tue, May 21, 2013 at 05:37:07PM +0200, Thomas Petazzoni wrote:
-> On Tue, 21 May 2013 10:16:21 -0400, Jason Cooper wrote:
-> > This doesn't apply when based on mvebu/cleanup because of:
-> > 
-> >   49ed97f ARM: Orion: Remove redundant init_dma_coherent_pool_size()
+On Tue, May 14, 2013 at 03:13:59PM +0100, Marc Zyngier wrote:
+> Elect myself as the KVM/arm64 maintainer.
 > 
-> Right.
-> 
-> > I tried hacking it up to put it in mvebu/soc-internal_regs for a few
-> > rounds of testing in linux-next during review, however, I'd prefer you
-> > rebase this on top of mvebu/cleanup.
-> 
-> So you mean my next version of the "Internal registers switch" should
-> be based on mvebu/cleanup, right?
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Yes, sorry I wasn't clear, I meant the series.  You can drop 1-3 as
-well for the next version, since I've pulled those.
-
-> There will be some next version in any case, because I just found a
-> bug in the latest patch when booting from a bootloader that has
-> already done the switch to 0xF1.
-
-Ok, I'll hold off putting it up for testing until v2.
-
-thx,
-
-Jason.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
