@@ -1,61 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 May 2013 17:14:07 +0100
-Subject: [PATCH v4 21/32] arm64: KVM: Build system integration
-In-Reply-To: <850310439.5245685.1369152587054.JavaMail.root@redhat.com>
-References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
- <1368540840-26750-22-git-send-email-marc.zyngier@arm.com>
- <20130521154227.GM27002@arm.com>
- <850310439.5245685.1369152587054.JavaMail.root@redhat.com>
-Message-ID: <519B9D4F.9030308@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 21 May 2013 10:15:48 -0600
+Subject: [PATCH] ARM: tegra: add cpu_disable for hotplug
+In-Reply-To: <1369131215-2920-1-git-send-email-josephl@nvidia.com>
+References: <1369131215-2920-1-git-send-email-josephl@nvidia.com>
+Message-ID: <519B9DB4.7070106@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/13 17:09, Paolo Bonzini wrote:
+On 05/21/2013 04:13 AM, Joseph Lo wrote:
+> The Tegra114 could hotplug the CPU0, but the common cpu_disable didn't
+> support that. Adding a Tegra specific cpu_disable function for it.
 > 
-> 
-> ----- Messaggio originale -----
->> Da: "Catalin Marinas" <catalin.marinas@arm.com>
->> A: "Marc Zyngier" <Marc.Zyngier@arm.com>
->> Cc: linux-arm-kernel at lists.infradead.org, kvmarm at lists.cs.columbia.edu, kvm at vger.kernel.org, "Will Deacon"
->> <Will.Deacon@arm.com>, pbonzini at redhat.com, gleb at redhat.com, "Christopher Covington" <cov@codeaurora.org>
->> Inviato: Marted?, 21 maggio 2013 17:42:27
->> Oggetto: Re: [PATCH v4 21/32] arm64: KVM: Build system integration
->>
->> On Tue, May 14, 2013 at 03:13:49PM +0100, Marc Zyngier wrote:
->>> --- /dev/null
->>> +++ b/arch/arm64/kvm/Kconfig
->> ...
->>> +config KVM_ARM_VGIC
->>> +        bool
->>> +	depends on KVM_ARM_HOST && OF
->>> +	select HAVE_KVM_IRQCHIP
->>> +	---help---
->>> +	  Adds support for a hardware assisted, in-kernel GIC emulation.
->>> +
->>> +config KVM_ARM_TIMER
->>> +        bool
->>> +	depends on KVM_ARM_VGIC
->>> +	select HAVE_KVM_IRQCHIP
->>> +	---help---
->>> +	  Adds support for the Architected Timers in virtual machines
->>> +
->>> +source drivers/virtio/Kconfig
->>
->> Shouldn't the above configs go to drivers/virtio/Kconfig as well (or
->> drivers/virtio/arm/Kconfig)?
-> 
-> virtio doesn't mean "virtual versions of devices that also exist in
-> hardware"; those are indeed in arch/ARCH/kvm.  virtio is a specific bus
-> for paravirtualized devices.  It is not KVM-specific and the code runs
-> in the guest (whereas arch/arm64/kvm/Kconfig is host code).
-> 
-> That said, drivers/virtio/Kconfig is already sourced by drivers/Kconfig.
-> Why do you need to source it again here?
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
 
-Probably some brain fart on my side. I'll get rid of it.
+> diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
 
-Thanks,
+> +int tegra_cpu_disable(unsigned int cpu)
+> +{
+> +	switch (tegra_chip_id) {
+> +	case TEGRA114:
+> +		return 0;
+> +	default:
+> +		return cpu == 0 ? -EPERM : 0;
+> +	}
+> +}
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Do we expect all/most future chips to support hotplug of CPU0? Or at
+least, fewer chips to have the restriction than not? If so, it might be
+more forward-looking to write that as:
+
+if (tegra_chip_id == TEGRA30)
+    return cpu == 0 ? -EPERM : 0;
+
+return 0;
+
+?
