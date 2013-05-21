@@ -1,202 +1,108 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 21 May 2013 13:40:06 +0200
-Subject: [RFC/PATCH v2 2/2] gpio-rcar: Add DT support
-In-Reply-To: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1369136406-23800-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Tue, 21 May 2013 19:40:52 +0800
+Subject: [PATCH] arm64: kernel: need extern variable 'screen_info' for
+ related driver using.
+In-Reply-To: <CAMuHMdWqDDe4gtjO8A2ds_46NQ_XGkVFj9TqJPGWtAtr7_ef8A@mail.gmail.com>
+References: <5199B7D6.40907@asianux.com>
+ <20130520091008.GB31359@mudshark.cambridge.arm.com>
+ <519AE6D7.1090401@asianux.com>
+ <CAMuHMdWNHPDkf35MYMKnxt5pn3a+dsT4jgYxuuHrp+mpZMckfw@mail.gmail.com>
+ <519B278B.6030708@asianux.com>
+ <CAMuHMdWqDDe4gtjO8A2ds_46NQ_XGkVFj9TqJPGWtAtr7_ef8A@mail.gmail.com>
+Message-ID: <519B5D44.70506@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings for the gpio-rcar driver and read the device
-configuration from the DT node at probe time if available.
+On 05/21/2013 07:07 PM, Geert Uytterhoeven wrote:
+> On Tue, May 21, 2013 at 9:51 AM, Chen Gang <gang.chen@asianux.com> wrote:
+>> > On 05/21/2013 02:57 PM, Geert Uytterhoeven wrote:
+>>> >> On Tue, May 21, 2013 at 5:15 AM, Chen Gang <gang.chen@asianux.com> wrote:
+>>>>>>> >>>> >> I think it would be better if we added a something like
+>>>>>>> >>>> >> CONFIG_HAVE_VGA_CONSOLE, which VGA_CONSOLE can then depend on. Architectures
+>>>>>>> >>>> >> like x86 can then select the former, and we can remove the long list of
+>>>>>>> >>>> >> architectures from the current option.
+>>>>> >>> >
+>>>>> >>> > I guess your meaning is:
+>>>>> >>> >
+>>>>> >>> >   under arm64, actually, need not support 'VGA_CONSOLE', and 'screen_info' is useless.
+>>>>> >>> >   So better to define 'CONFIG_HAVE_VGA_CONSOLE' which 'VGA_CONSOLE' can depend on it, and in arm64, we do not define CONFIG_HAVE_VGA_CONSOLE.
+>>>>> >>> >
+>>>>> >>> > Is it correct ?
+>>> >> No, you missed "and we can remove the long list of architectures from the
+>>> >> current option".
+>>> >>
+>> >
+>> > OK, thanks.
+>> >
+>> > Is it correct: "it is unnecessary to add 'screen_info' to the code, for
+>> > arm64 will never support 'VGA_CONSOLE'" ?
+> On arm (not (yet?) arm64), drivers/video/console/dummycon.c also uses
+> screen_info. The default text mode resolution may come from atags.
+> 
 
-Cc: devicetree-discuss at lists.ozlabs.org
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- .../devicetree/bindings/gpio/renesas,gpio-rcar.txt | 52 +++++++++++++++++
- drivers/gpio/gpio-rcar.c                           | 66 ++++++++++++++++++----
- 2 files changed, 108 insertions(+), 10 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+Oh, really it is, we need consider them both.
 
-diff --git a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-new file mode 100644
-index 0000000..46d76a0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-@@ -0,0 +1,52 @@
-+* Renesas R-Car GPIO Controller
-+
-+Required Properties:
-+
-+  - compatible: should be one of the following.
-+    - "renesas,gpio-r8a7778": for R8A7778 (R-Mobile M1) compatible GPIO controller.
-+    - "renesas,gpio-r8a7779": for R8A7779 (R-Car H1) compatible GPIO controller.
-+    - "renesas,gpio-r8a7790": for R8A7790 (R-Car H2) compatible GPIO controller.
-+    - "renesas,gpio-rcar": for generic R-Car GPIO controller.
-+
-+  - reg: Base address and length of each memory resource used by the GPIO
-+    controller hardware module.
-+
-+  - interrupt-parent: phandle of the parent interrupt controller.
-+  - interrupts: Interrupt specifier for the controllers interrupt.
-+
-+  - gpio-controller: Marks the device node as a gpio controller.
-+  - #gpio-cells: Should be 2. The first cell is the GPIO number and the second
-+    cell is used to specify optional parameters as bit flags. Only the GPIO
-+    active low flag (bit 0) is currently supported.
-+  - gpio-ranges: Range of pins managed by the GPIO controller as a 4-cells
-+    tuple using the following syntax.
-+
-+    <[phandle of the pin controller node]
-+     0
-+     [index of the first pin]
-+     [number of pins]>
-+
-+Please refer to gpio.txt in this directory for details of the common GPIO
-+bindings used by client devices.
-+
-+Example: R8A7779 (R-Car H1) GPIO controller nodes
-+
-+	gpio0: gpio at ffc40000 {
-+		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
-+		reg = <0xffc40000 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 141 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 0 32>;
-+	};
-+	...
-+	gpio6: gpio at ffc46000 {
-+		compatible = "renesas,gpio-r8a7779", "renesas,gpio-rcar";
-+		reg = <0xffc46000 0x2c>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <0 147 0x4>;
-+		#gpio-cells = <2>;
-+		gpio-controller;
-+		gpio-ranges = <&pfc 0 192 9>;
-+	};
-diff --git a/drivers/gpio/gpio-rcar.c b/drivers/gpio/gpio-rcar.c
-index 0f3d647..c153837 100644
---- a/drivers/gpio/gpio-rcar.c
-+++ b/drivers/gpio/gpio-rcar.c
-@@ -50,6 +50,8 @@ struct gpio_rcar_priv {
- #define EDGLEVEL 0x24
- #define FILONOFF 0x28
- 
-+#define RCAR_MAX_GPIO_PER_BANK		32
-+
- static inline u32 gpio_rcar_read(struct gpio_rcar_priv *p, int offs)
- {
- 	return ioread32(p->base + offs);
-@@ -258,9 +260,39 @@ static struct irq_domain_ops gpio_rcar_irq_domain_ops = {
- 	.map	= gpio_rcar_irq_domain_map,
- };
- 
-+static void gpio_rcar_parse_pdata(struct gpio_rcar_priv *p)
-+{
-+	struct gpio_rcar_config *pdata = p->pdev->dev.platform_data;
-+#ifdef CONFIG_OF
-+	struct device_node *np = p->pdev->dev.of_node;
-+	struct of_phandle_args args;
-+	int ret;
-+#endif
-+
-+	if (pdata)
-+		p->config = *pdata;
-+#ifdef CONFIG_OF
-+	else if (np) {
-+		ret = of_parse_phandle_with_args(np, "gpio-ranges",
-+				"#gpio-range-cells", 0, &args);
-+		p->config.number_of_pins = ret == 0 && args.args_count == 3
-+					 ? args.args[2]
-+					 : RCAR_MAX_GPIO_PER_BANK;
-+		p->config.gpio_base = -1;
-+	}
-+#endif
-+
-+	if (p->config.number_of_pins == 0 ||
-+	    p->config.number_of_pins > RCAR_MAX_GPIO_PER_BANK) {
-+		dev_warn(&p->pdev->dev,
-+			 "Invalid number of gpio lines %u, using %u\n",
-+			 p->config.number_of_pins, RCAR_MAX_GPIO_PER_BANK);
-+		p->config.number_of_pins = RCAR_MAX_GPIO_PER_BANK;
-+	}
-+}
-+
- static int gpio_rcar_probe(struct platform_device *pdev)
- {
--	struct gpio_rcar_config *pdata = pdev->dev.platform_data;
- 	struct gpio_rcar_priv *p;
- 	struct resource *io, *irq;
- 	struct gpio_chip *gpio_chip;
-@@ -275,14 +307,14 @@ static int gpio_rcar_probe(struct platform_device *pdev)
- 		goto err0;
- 	}
- 
--	/* deal with driver instance configuration */
--	if (pdata)
--		p->config = *pdata;
--
- 	p->pdev = pdev;
--	platform_set_drvdata(pdev, p);
- 	spin_lock_init(&p->lock);
- 
-+	/* Get device configuration from DT node or platform data. */
-+	gpio_rcar_parse_pdata(p);
-+
-+	platform_set_drvdata(pdev, p);
-+
- 	io = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
- 
-@@ -309,6 +341,7 @@ static int gpio_rcar_probe(struct platform_device *pdev)
- 	gpio_chip->set = gpio_rcar_set;
- 	gpio_chip->to_irq = gpio_rcar_to_irq;
- 	gpio_chip->label = name;
-+	gpio_chip->dev = &pdev->dev;
- 	gpio_chip->owner = THIS_MODULE;
- 	gpio_chip->base = p->config.gpio_base;
- 	gpio_chip->ngpio = p->config.number_of_pins;
-@@ -355,10 +388,12 @@ static int gpio_rcar_probe(struct platform_device *pdev)
- 				 p->config.irq_base, ret);
- 	}
- 
--	ret = gpiochip_add_pin_range(gpio_chip, p->config.pctl_name, 0,
--				     gpio_chip->base, gpio_chip->ngpio);
--	if (ret < 0)
--		dev_warn(&pdev->dev, "failed to add pin range\n");
-+	if (p->config.pctl_name) {
-+		ret = gpiochip_add_pin_range(gpio_chip, p->config.pctl_name, 0,
-+					     gpio_chip->base, gpio_chip->ngpio);
-+		if (ret < 0)
-+			dev_warn(&pdev->dev, "failed to add pin range\n");
-+	}
- 
- 	return 0;
- 
-@@ -381,11 +416,22 @@ static int gpio_rcar_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_OF
-+static const struct of_device_id gpio_rcar_of_table[] = {
-+	{
-+		.compatible = "renesas,gpio-rcar",
-+	},
-+};
-+
-+MODULE_DEVICE_TABLE(of, gpio_rcar_of_table);
-+#endif
-+
- static struct platform_driver gpio_rcar_device_driver = {
- 	.probe		= gpio_rcar_probe,
- 	.remove		= gpio_rcar_remove,
- 	.driver		= {
- 		.name	= "gpio_rcar",
-+		.of_match_table = of_match_ptr(gpio_rcar_of_table),
- 	}
- };
- 
+
+>>>>> >>> > If so, I recommend to add depend item for VGA_CONSOLE directly:
+>>> >> I strongly support CONFIG_HAVE_VGA_CONSOLE.
+>> >
+>> > For me, I still recommend add 'ARM64' in the long list of architectures
+>> > for 'VGA_CONSOLE', I have 3 reasons, please check:
+>> >
+>> > a. current implementation only changes one area which only related with
+>> > arm64 and 'VGA_CONSOLE', but if use 'CONFIG_HAVE_VGA_CONSOLE', that will
+>> > touch many multiple platforms dependency, at least we need discuss about
+>> > it with multiple platforms guys for it, firstly.
+> Sure. But this can be one cleanup patch.
+> 
+
+Hmm..., it seems so, but I think we'd better to discuss it with the
+'final applier' firstly.
+
+
+>> > b. We can find some cases to use CONFIG_HAVE_* as dpend on, but I can
+>> > not find any cases which let CONFIG_'samename' depend on
+>> > CONFIG_HAVE_'samename'.
+> A similar mechanism is used for PC-style floppy support, but the naming
+> is different, cfr. drivers/block/Kconfig:
+> 
+> config BLK_DEV_FD
+>         tristate "Normal floppy disk support"
+>         depends on ARCH_MAY_HAVE_PC_FDC
+> 
+> so perhaps ARCH_MAY_HAVE_VGA?
+> 
+> PARPORT_PC could use the same mechanism.
+> 
+
+Oh, really, it is !!
+
+Hmm.., most of current machines do not have floppy, now, and will be
+less and less in the future, it has to use the variables in this way to
+avoid a very very very long list (not only include architectures, but
+also include the each features companition) !!
+
+But for VIDEO_CONSOL, most of machines need it, and will be more and
+more in the future (maybe arm64 will also support it, too, in the future).
+
+So...
+
+
+>> > c. The original way still has effect, although it seems not quit
+>> > beautiful, but it is correct and still clear for readers, it is still
+>> > sustainable.
+> Most/every new architecture needs to add a depend to it.
+> 
+> BTW, I should have done this when sending out the patch to add CRIS to the
+> list of dependencies...
+
+I suggest better to discuss it with the 'final applier' firstly.
+
+Good Luck !!
+
+
+Thanks.
 -- 
-1.8.1.5
+Chen Gang
+
+Asianux Corporation
