@@ -1,45 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 22 May 2013 10:41:47 -0300
-Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
-In-Reply-To: <201305221219.43558.jbe@pengutronix.de>
-References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
- <CAOMZO5AWBi4gDJCOJf5muFuRXygQAysYCHEL+gb_LwsXiy-knA@mail.gmail.com>
- <CAOMZO5AKKVeTMsXpG9wa-eeLocBStUwPjQEe3n6fRVY2aSc7Nw@mail.gmail.com>
- <201305221219.43558.jbe@pengutronix.de>
-Message-ID: <CAOMZO5Cd19Jx0sXdD55hat579E9CsPqWEKS-FQfVz5LMmuvXjw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 22 May 2013 09:43:19 -0400
+Subject: [PATCH 0/4] Marvell PCIe driver improvements
+In-Reply-To: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130522134319.GC31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Juergen,
+Thomas,
 
-On Wed, May 22, 2013 at 7:19 AM, Juergen Beisert <jbe@pengutronix.de> wrote:
-> Hi Fabio,
->
->> i2c slowness is a different issue.
->
-> Same happens here for my i.M23 based platform. It seems the PIO mode does not
-> work, or at least not like it works on a i.MX28. Each short transfer needs
-> about one second (without an error message) but does not send anything on the
-> I2C lines.
->
-> I need the following patches to make I2C master work within a 3.10-rc2 kernel:
+On Wed, May 22, 2013 at 03:12:34PM +0200, Thomas Petazzoni wrote:
+> Bjorn, Jason, Andrew, Gregory,
+> 
+> You'll find in this patch series 4 small patches that make various
+> improvements to the Marvell PCIe driver.
+> 
+> I'd like those improvements to be kept separated from the original
+> PCIe driver itself: while the PCIe driver has been around and reviewed
+> for a long time, those improvements are newer. And I clearly do not
+> want the PCIe driver to miss 3.11 because of any problem that could be
+> found in those additional improvements.
 
-Thanks, I tried forcing dma mode and I got the following probe issue
-on a mx28evk running today's linux-next:
+Agreed.
 
-[    6.403193] mxs-sgtl5000 sound.12: ASoC: CODEC (null) not registered
-[    6.412175] mxs-sgtl5000 sound.12: snd_soc_register_card failed (-517)
-[    6.425582] platform sound.12: Driver mxs-sgtl5000 requests probe deferral
-[    6.434043]  mmcblk0: p1 p2 p3
-[    6.439586] stmp3xxx-rtc 80056000.rtc: setting system clock to
-2013-04-23 21:00:42 UTC (1366750842)
-[    6.458141] mxs-sgtl5000 sound.12: ASoC: CODEC (null) not registered
-[    6.464773] mxs-sgtl5000 sound.12: snd_soc_register_card failed (-517)
+For Bjorn and others:
 
-If I run linux-next with 2f769432d8554 reverted then I get a 23
-seconds delay in the probe (1 second for each sgtl5000 register
-write).
+The original patch series Thomas is referring to missed the merge window
+for v3.10 due to a build failure.  It is currently sitting in our mvebu
+repo.  The first three patches, "of/pci ..." are in mvebu/of_pci.  The
+rest of the series is on top of that in the branch mvebu/pcie.
 
-Regards,
+I've sent pull requests for both branches to arm-soc.  There are two
+other arm SoC pcie efforts which are depending on mvebu/of_pci.  Hence
+why I did a separate branch.
 
-Fabio Estevam
+Both branches are also merged into mvebu/for-next, and have survived
+linux-next for three days or so.  But, it's early, so we'll see how it
+goes. :-)
+
+> Bjorn, with your Acked-by, could the Marvell maintainers include those
+> patches in their branch, merged through arm-soc? They already have the
+> Marvell PCIe driver itself, so I believe it makes sense to merge those
+> improvements through the same path.
+
+I agree, please see above regarding arm-soc dependencies.
+
+> Jason, those patches have been prepared on top of my marvell-pcie-v10
+> branch, I hope that's ok for you. If you want me to rebase them on
+> some other branch in which you have integrated the PCIe driver, don't
+> hesitate to tell me to do so. That said, since those patches are only
+> touching the driver itself and no other file, they should not cause
+> any conflict with other changes.
+
+Should be fine, I'll let you know.
+
+thx,
+
+Jason.
