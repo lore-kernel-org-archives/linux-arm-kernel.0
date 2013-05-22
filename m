@@ -1,133 +1,237 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 22 May 2013 18:08:42 +0200
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
- 370/XP
-In-Reply-To: <201305221735.11815.arnd@arndb.de>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201305221633.46705.arnd@arndb.de> <20130522170643.54a2b9d2@skate>
- <201305221735.11815.arnd@arndb.de>
-Message-ID: <20130522180842.7edcc3ee@skate>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 23 May 2013 00:13:18 +0800
+Subject: [PATCH] input: sirfsoc_pwrc: add onkey input driver for CSR
+ SiRFprimaII PWRC
+Message-ID: <1369239198-11059-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+From: Binghua Duan <Binghua.Duan@csr.com>
 
-On Wed, 22 May 2013 17:35:11 +0200, Arnd Bergmann wrote:
+there is an embedded PWRC(power controller) in SiRFprimaII and SiRFatlasVI,
+we have an ONKEY button which can generate interrupt to IRQ controller.
+in a typical user scenarios, at the runtime, if users touch the key, we put
+system to s2ram status.
 
-> Ok, but going back to the discussion about remapping physical memory
-> addresses, would you actually be able to map more of the available
-> RAM when the registers are moved out of the way?
+Signed-off-by: Binghua Duan <Binghua.Duan@csr.com>
+Signed-off-by: Xianglong Du <Xianglong.Du@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/input/misc/Kconfig         |  10 +++
+ drivers/input/misc/Makefile        |   1 +
+ drivers/input/misc/sirfsoc_onkey.c | 176 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 187 insertions(+)
+ create mode 100644 drivers/input/misc/sirfsoc_onkey.c
 
-Yes, we can.
-
-> IIRC the translation is rather coarse-grained, and the new location
-> is still in the same 1GB window from 0xc0000000-0xffffffff.
-
-We have four different CS for RAM, and therefore when we have 8 GB of
-RAM installed, if the internal registers are at 0xD0000000, we loose
-768 MB of RAM. When they are mapped at 0xF1000000, we loose only 256 MB
-of RAM. A win of 512 MB of RAM, which is not negligible.
-
-And the new bootloaders that are remapping to 0xf1000000 on Armada
-370/XP are already being shipped by Marvell, so it's not like we have
-much choice here.
-
-> > > > So, the new generation of bootloaders that are shipped on new Marvell
-> > > > Armada 370/XP platforms are doing the remapping at 0xF1000000 prior to
-> > > > starting Linux. The current kernel cannot boot on such platforms.
-> > > 
-> > > Does it boot if you disable the DEBUG_LL code and apply your
-> > > patches 1-8?
-> > 
-> > Patches 1-8 do not change anything in terms of the internal register
-> > window base address. So just like the kernel was working with and
-> > without DEBUG_LL before patches 1-8, it continues to work after those
-> > cleanups/improvements.
-> 
-> I mean with the new boot loader which breaks unmodified kernels.
-
-If you boot the kernel with, or without 1-8, it will not boot with a
-new bootloader. Only if you apply the 9th patch will it work. And the
-kernel will continue to work with both an old and a new bootloader.
-
-> > I'm sorry, but I don't follow you here. When you have patches 1-8 (or
-> > no patch applied at all), the UART for mach-mvebu is *always* at
-> > 0xd0012000.
-> 
-> No. UART0 is always at 0xd0012000 but there are also UARTs at 0xd0012100,
-> 0xd0012200 and 0xd0012300. You don't currently support using them for
-> early output, but you might need to add that, similar to how other
-> SoC platforms handle this.
-
-Right.
-
-> More importantly, you can build a kernel with any number of other SoCs
-> already, and if you have a combined ArmadaXP+OMAP+Highbank kernel,
-> there is no way to get a working early debug output.
-
-So you're proposing to add two Kconfig options, one to have the UART at
-0xd0012000 and the other one to have the UART at 0xf1012000. The user
-would have to know whether he is going to boot with an old bootloader
-or new bootloader, and select the appropriate option. This means that
-the mvebu_defconfig would no longer be able to have earlyprintk enabled
-by default, otherwise the resulting kernel may not boot for some
-people, but maybe it's a reasonable tradeoff.
-
-> > > As you already admit, using the CP15 register is a hack. It sounds
-> > > to me that a cleaner approach would be to put the correct address
-> > > into the device tree and use that value everywhere, rather than
-> > > hardcoding one or more addresses.
-> > 
-> > I don't see how this can fix the problem. Which internal register base
-> > address do we put in our Device Tree source in arch/arm/boot/dts? The
-> > old one? The new one?
-> 
-> The one matching the boot loader for that board, i.e. the new address
-> for all boards but Mirabox and OpenBlocks.
-
-And what happens when Globalscale (Mirabox manufacturer) or Plathome
-(manufacturer of OpenBlocks) release a new bootloader version, based on
-the new bootloader from Marvell, which remaps things at 0xf1000000 ? Or
-when those people boot from Barebox, which remaps at 0xf1000000 ?
-
-Conclusion: you can't classify on one side boards that are at 0xd0 and
-boards that are at 0xf1. It depends on *which* bootloader each
-particular instance of those boards will be using. Will it be a
-bootloader that complies with the "old" protocol (CP15 bit cleared and
-registers at 0xd0) or the "new" protocol (CP15 bit set and registers at
-0xf1).
-
-So we can't encode into the boards Device Tree whether the registers
-are at 0xd0 or 0xf1, because it's not a board-related information, but
-a bootloader-related information.
-
-> > > > Unfortunately, tweaking ->map_io() is not sufficient: we also want
-> > > > earlyprintk to work. And earlyprintk is used *before* ->map_io() is
-> > > > called, and *after* ->map_io() is called.
-> > > 
-> > > Note that by the time map_io is called, we no longer care about
-> > > the physical address, since the uart is only accessed through the
-> > > virtual mapping after __enable_mmu.
-> > 
-> > That's not correct. ->map_io() calls debug_ll_io_init(), which calls
-> > the addruart code of earlyprintk, from which it gets the virtual
-> > address *AND* physical address of the UART, and sets up a mapping with
-> > create_mapping(). See the implementation of debug_ll_io_init().
-> 
-> Ah right, but that is also something that could easily be changed.
-
-I must admit I'm not sure why we have this debug_ll_io_init() function.
-When DEBUG_LL is enabled, there is already a call to addruart from
-arch/arm/kernel/head.S, which does create a virtual -> physical mapping
-that covers the UART area. Since debug_ll_io_init() is also only
-enabled under DEBUG_LL, I am not sure to understand what it does that
-the assembly code in arch/arm/kernel/head.S hasn't done already. Adding
-Rob in Cc, as he's the one who added debug_ll_io_init() in the first
-place.
-
-Thomas
+diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+index bb698e1..1d91d1b 100644
+--- a/drivers/input/misc/Kconfig
++++ b/drivers/input/misc/Kconfig
+@@ -637,4 +637,14 @@ config INPUT_XEN_KBDDEV_FRONTEND
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called xen-kbdfront.
+ 
++config INPUT_SIRFSOC_ONKEY
++	bool "CSR SiRFSoC power on/off/suspend key support"
++	depends on ARCH_SIRF
++	default y
++	help
++	  Say Y here if you want to support for the SiRFSoC power on/off/suspend key
++	  in Linux, after you press the onkey, system will suspend.
++
++	  If unsure, say N.
++
+ endif
+diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
+index d7fc17f..1d66f03 100644
+--- a/drivers/input/misc/Makefile
++++ b/drivers/input/misc/Makefile
+@@ -60,3 +60,4 @@ obj-$(CONFIG_INPUT_WISTRON_BTNS)	+= wistron_btns.o
+ obj-$(CONFIG_INPUT_WM831X_ON)		+= wm831x-on.o
+ obj-$(CONFIG_INPUT_XEN_KBDDEV_FRONTEND)	+= xen-kbdfront.o
+ obj-$(CONFIG_INPUT_YEALINK)		+= yealink.o
++obj-$(CONFIG_INPUT_SIRFSOC_ONKEY)	+= sirfsoc_onkey.o
+diff --git a/drivers/input/misc/sirfsoc_onkey.c b/drivers/input/misc/sirfsoc_onkey.c
+new file mode 100644
+index 0000000..3e48db9
+--- /dev/null
++++ b/drivers/input/misc/sirfsoc_onkey.c
+@@ -0,0 +1,176 @@
++/*
++ * Power key driver for SiRF PrimaII
++ *
++ * Copyright (c) 2013 Cambridge Silicon Radio Limited, a CSR plc group company.
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/delay.h>
++#include <linux/platform_device.h>
++#include <linux/input.h>
++#include <linux/rtc/sirfsoc_rtciobrg.h>
++#include <linux/of.h>
++
++struct sirfsoc_pwrc_drvdata {
++	u32			pwrc_base;
++	int			irq;
++	struct input_dev	*input;
++};
++
++#define PWRC_ON_KEY_BIT			(1 << 0)
++
++#define PWRC_INT_STATUS			0xc
++#define PWRC_INT_MASK			0x10
++
++static irqreturn_t sirfsoc_pwrc_isr(int irq, void *dev_id)
++{
++	struct sirfsoc_pwrc_drvdata *pwrcdrv =
++			(struct sirfsoc_pwrc_drvdata *)dev_id;
++	u32 int_status;
++	int_status = sirfsoc_rtc_iobrg_readl(
++			pwrcdrv->pwrc_base + PWRC_INT_STATUS);
++	sirfsoc_rtc_iobrg_writel(int_status & (~PWRC_ON_KEY_BIT),
++			pwrcdrv->pwrc_base + PWRC_INT_STATUS);
++
++	/*
++	 * For a typical Linux system, we report KEY_SUSPEND to trigger apm-power.c
++	 * to queue a SUSPEND APM event
++	 */
++	input_event(pwrcdrv->input, EV_PWR, KEY_SUSPEND, 1);
++	input_sync(pwrcdrv->input);
++
++	/*
++	 * Todo: report KEY_POWER event for Android platforms, Android PowerManager
++	 * will handle the suspend and powerdown/hibernation
++	 */
++
++	return IRQ_HANDLED;
++}
++
++static const struct of_device_id sirfsoc_pwrc_of_match[] = {
++	{ .compatible = "sirf,prima2-pwrc" },
++	{},
++}
++MODULE_DEVICE_TABLE(of, sirfsoc_pwrc_of_match);
++
++static int sirfsoc_pwrc_probe(struct platform_device *pdev)
++{
++	int ret;
++	struct sirfsoc_pwrc_drvdata *pwrcdrv = NULL;
++	struct device_node *np = pdev->dev.of_node;
++
++	pwrcdrv = devm_kzalloc(&pdev->dev,
++		sizeof(struct sirfsoc_pwrc_drvdata), GFP_KERNEL);
++	if (!pwrcdrv) {
++		dev_info(&pdev->dev, "kzalloc fail!\n");
++		return -ENOMEM;
++	}
++
++	/*
++	 * we can't use of_iomap because pwrc is not mapped in memory, the so-called base
++	 * address is only offset in rtciobrg
++	 */
++	ret = of_property_read_u32(np, "reg", &pwrcdrv->pwrc_base);
++	if (ret) {
++		dev_err(&pdev->dev, "unable to find base address of pwrc node in dtb\n");
++		return ret;
++	}
++
++	pwrcdrv->input = devm_input_allocate_device(&pdev->dev);
++	if (!pwrcdrv->input)
++		return -ENOMEM;
++
++	pwrcdrv->input->name = "sirfsoc pwrckey";
++	pwrcdrv->input->phys = "pwrc/input0";
++
++	platform_set_drvdata(pdev, pwrcdrv);
++
++	pwrcdrv->irq = platform_get_irq(pdev, 0);
++	ret = devm_request_irq(&pdev->dev, pwrcdrv->irq,
++			sirfsoc_pwrc_isr, IRQF_SHARED,
++			"sirfsoc_pwrc_int", pwrcdrv);
++
++	sirfsoc_rtc_iobrg_writel(
++		sirfsoc_rtc_iobrg_readl(pwrcdrv->pwrc_base + PWRC_INT_MASK)
++		| PWRC_ON_KEY_BIT, pwrcdrv->pwrc_base + PWRC_INT_MASK);
++	if (ret) {
++		dev_err(&pdev->dev, "pwrc: Unable to claim irq %d; error %d\n",
++			pwrcdrv->irq, ret);
++		return ret;
++	}
++
++	pwrcdrv->input->evbit[0] = BIT_MASK(EV_PWR) | BIT_MASK(EV_KEY);
++	set_bit(KEY_POWER, pwrcdrv->input->keybit);
++
++	ret = input_register_device(pwrcdrv->input);
++	if (ret) {
++		dev_err(&pdev->dev,
++			"pwrc: Unable to register input device,error: %d\n",
++			ret);
++		return ret;
++	}
++
++	device_init_wakeup(&pdev->dev, 1);
++
++	return 0;
++}
++
++static int sirfsoc_pwrc_remove(struct platform_device *pdev)
++{
++	device_init_wakeup(&pdev->dev, 0);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int pwrc_suspend(struct device *dev)
++{
++	return 0;
++}
++
++static int pwrc_resume(struct device *dev)
++{
++	struct sirfsoc_pwrc_drvdata *pwrcdrv = dev_get_drvdata(dev);
++
++	/* 
++	 * Do not mask pwrc interrupt as we want pwrc work as a wakeup source
++	 * if users touch X_ONKEY_B, see arch/arm/mach-prima2/pm.c
++	 */
++	sirfsoc_rtc_iobrg_writel(
++		sirfsoc_rtc_iobrg_readl(
++		pwrcdrv->pwrc_base + PWRC_INT_MASK) | PWRC_ON_KEY_BIT,
++		pwrcdrv->pwrc_base + PWRC_INT_MASK);
++
++	return 0;
++}
++
++static const struct dev_pm_ops sirfsoc_pwrc_pm_ops = {
++	.suspend = pwrc_suspend,
++	.resume	= pwrc_resume,
++};
++#endif
++
++static struct platform_driver sirfsoc_pwrc_driver = {
++	.probe		= sirfsoc_pwrc_probe,
++	.remove		= sirfsoc_pwrc_remove,
++	.driver		= {
++		.name	= "sirfsoc-pwrc",
++		.owner	= THIS_MODULE,
++#ifdef CONFIG_PM
++		.pm	= &sirfsoc_pwrc_pm_ops,
++#endif
++		.of_match_table = of_match_ptr(sirfsoc_pwrc_of_match),
++	}
++};
++
++module_platform_driver(sirfsoc_pwrc_driver);
++
++MODULE_LICENSE("GPLv2");
++MODULE_AUTHOR("Binghua Duan <Binghua.Duan@csr.com>, "
++		"Xianglong Du <Xianglong.Du@csr.com>");
++MODULE_DESCRIPTION("CSR Prima2 PWRC Driver");
++MODULE_ALIAS("platform:sirfsoc-pwrc");
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.8.2.3
