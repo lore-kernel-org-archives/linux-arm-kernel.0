@@ -1,63 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 22 May 2013 14:09:35 -0400
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on
- Armada 370/XP
-In-Reply-To: <20130522200513.5e266edc@skate>
-References: <201305221633.46705.arnd@arndb.de> <20130522170643.54a2b9d2@skate>
- <201305221735.11815.arnd@arndb.de> <20130522180842.7edcc3ee@skate>
- <20130522163557.GC27348@1wt.eu> <20130522184250.1d5f2f10@skate>
- <20130522164936.GE31290@titan.lakedaemon.net>
- <20130522185757.60091a66@skate>
- <20130522171359.GG31290@titan.lakedaemon.net>
- <20130522200513.5e266edc@skate>
-Message-ID: <20130522180935.GJ31290@titan.lakedaemon.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 22 May 2013 19:09:42 +0100
+Subject: [PATCH 14/14] ARM: elf: add new hwcap for identifying atomic
+ ldrd/strd instructions
+In-Reply-To: <20130522084744.GD14322@arm.com>
+References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
+ <1368810473-26070-15-git-send-email-will.deacon@arm.com>
+ <20130520141809.GA27473@arm.com>
+ <CAL_JsqLSC2QgMdTGtH5G_F5SYjA3Hs--jMmxBES=fqGLwapptQ@mail.gmail.com>
+ <20130522084744.GD14322@arm.com>
+Message-ID: <20130522180942.GK16361@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 08:05:13PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
-> 
-> On Wed, 22 May 2013 13:13:59 -0400, Jason Cooper wrote:
-> 
-> > > On Wed, 22 May 2013 12:49:36 -0400, Jason Cooper wrote:
-> > > 
-> > > > > As far as I know, a DT-capable bootloader doesn't pass any ATAG. The
-> > > > > ARM register that was used to pass the pointer to the ATAGS is now used
-> > > > > to pass the pointer to the DTB in memory.
-> > > > 
-> > > > So we could look for the ATAG magic or the dtb magic at that address,
-> > > > then we know if we have an old or new bootloader...
-> > > 
-> > > No, because you can use an old bootloader, and still do some old-style
+On Wed, May 22, 2013 at 09:47:44AM +0100, Catalin Marinas wrote:
+> On Tue, May 21, 2013 at 07:48:35PM +0100, Rob Herring wrote:
+> > On Mon, May 20, 2013 at 9:18 AM, Catalin Marinas
+> > <catalin.marinas@arm.com> wrote:
+> > > On Fri, May 17, 2013 at 06:07:53PM +0100, Will Deacon wrote:
+> > >> CPUs implementing LPAE have atomic ldrd/strd instructions, meaning that
+> > >> userspace software can avoid having to use the exclusive variants of
+> > >> these instructions if they wish.
+> > >>
+> > >> This patch advertises the atomicity of these instructions via the
+> > >> hwcaps, so userspace can detect this CPU feature.
+> > >>
+> > >> Reported-by: Vladimir Danushevsky <vladimir.danushevsky@oracle.com>
+> > >> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > ...
+> > >> +
+> > >> +     /* LPAE implies atomic ldrd/strd instructions */
+> > >> +     vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
+> > >> +     if (vmsa >= 5)
+> > >> +             elf_hwcap |= HWCAP_LPAE;
+> > >
+> > > As I mentioned in the past, I don't agree with exposing the "LPAE"
+> > > feature to user-space, it's not a feature that user space should care
+> > > about. An atomic double hwcap is better and you can even make this per
+> > > CPU via __v7_proc.
 > > 
-> > Did you mean 'new bootloader'?
+> > How does userspace know whether to install a non-LPAE or LPAE kernel
+> > in a generic way?
 > 
-> Gaah, yes, of course. Getting myself confused with all this old/new
-> discussion :)
-> 
-> "No, because you can use a new bootloader, and still do some
-> old-style..."
-> 
-> > > appended-DTB booting, in which case you have a new bootloader
-> > > (registers mapped at 0xf1), but you see the ATAG magic, which will make
-> > > you think you booted from an old bootloader (registers mapped at 0xd0).
-> > > 
-> > > For example, I'm currently booting alternatively with an old and a new
-> > > bootloader (to test that things work properly), and in both cases I'm
-> > > booting old style, DTB-appended, with ATAGs.
-> > 
-> > Is this something users would experience?  I think it is fairly safe to
-> > say that once dt-able bootloaders are shipped, they will provide a dtb.
-> > So, OF_DT_MAGIC == new bootloader might hold true for users.
-> 
-> We could be tempted to say that, but since what users trying to do this
-> would experience is a completely silent kernel, no message, nothing,
-> I'm not sure I like this too much.
+> This is a valid reason to expose LPAE to user, though elf_hwcap sounds a
+> bit strange.
 
-Ok, I buy that.  Having stared at blank terminals many times, that's
-not cool. :(  It really hurts to hear the HD spin down too.  It just
-sounds like something died a horrible agonizing death.
+In lieu of anything else, do you mind if I continue with the patch as it
+stands?
 
-thx,
-
-Jason.
+Will
