@@ -1,19 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 22 May 2013 13:10:56 -0700
-Subject: [GIT PULL] ARM: OMAP2+: hwmod/serial: fix DT case
-In-Reply-To: <20130521181109.GR10378@atomide.com>
-References: <alpine.DEB.2.00.1305192331390.2656@utopia.booyaka.com>
- <20130521181109.GR10378@atomide.com>
-Message-ID: <20130522201056.GA21266@quad.lixom.net>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 22 May 2013 14:16:07 -0600
+Subject: [PATCH 2/2] net: mv643xx_eth: proper initialization for Kirkwood
+ SoCs
+In-Reply-To: <1369253042-15082-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369253042-15082-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369253042-15082-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130522201607.GA18823@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 11:11:10AM -0700, Tony Lindgren wrote:
-> Olof,
-> 
-> Care to pull this into your fixes directly?
+On Wed, May 22, 2013 at 10:04:02PM +0200, Sebastian Hesselbarth wrote:
 
+> Ethernet controllers found on Kirkwood SoCs not only suffer from loosing
+> MAC address register contents on clock gating but also some important
+> registers are reset to values that would break ethernet. This patch
 
-Pulled, thanks.
+FWIW, we found that the bootloader has to write to PSC1, the driver
+doesn't work with the power on/reset value of the register. So I think
+it is safe to assume that all kirkwood bootloaders alter the value.
 
--Olof
+Our systems write the value 0x00638488 to PSC1.
+
+I looked at patching mv643xx_eth, but ran into the same complexity you
+did, it isn't clear what variants of this IP block have the
+register/etc.
+
+> +	/* Kirkwood resets some registers on gated clocks. Especially
+> +	 * CLK125_BYPASS_EN must be cleared but is not available on
+> +	 * all other SoCs/System Controllers using this driver.
+> +	 */
+> +	if (of_machine_is_compatible("marvell,kirkwood"))
+> +		wrlp(mp, PORT_SERIAL_CONTROL1,
+> +		     rdlp(mp, PORT_SERIAL_CONTROL1) & ~CLK125_BYPASS_EN);
+
+of_machine_is_compatible seems heavy handed, I would expect this to be
+based on the compatible string of the ethernet node itself, not the
+machine??
+
+Jason
