@@ -1,41 +1,49 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 22 May 2013 23:39:40 +0900
-Subject: [PATCH FOR v3.10 v2] ARM: shmobile: kzm9g-reference: Update CMT
- clocksource rating to 80
-In-Reply-To: <519CD3F0.7050002@cogentembedded.com>
-References: <1369232020-22681-1-git-send-email-horms+renesas@verge.net.au>
- <519CD3F0.7050002@cogentembedded.com>
-Message-ID: <20130522143940.GF32012@verge.net.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 May 2013 15:40:42 +0100
+Subject: [PATCH 02/11] gpio: davinci: coding style correction
+In-Reply-To: <1369206634-6778-3-git-send-email-avinashphilip@ti.com>
+References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
+ <1369206634-6778-3-git-send-email-avinashphilip@ti.com>
+Message-ID: <20130522144042.GG18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 06:19:28PM +0400, Sergei Shtylyov wrote:
-> On 22-05-2013 18:13, Simon Horman wrote:
-> 
-> >Update the CMT clocksource rating from 125 to 80.
-> 
-> >This resolves a boot-failure regression for kzm9g-reference in v3.10-rc1
-> >introduced by f7db706b132f11c79ae1d74b2382e0926cf31644 ("ARM: 7674/1: smp:
-> >Avoid dummy clockevent being preferred over real").
-> 
-> >The patch noted above reduces the rating of dummy clockevent from 400 to 100.
-> >This patch reduces the rating of CMT so that it is once again less than that
-> >of the dummy clockevent.
-> 
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> >---
-> 
-> >I also plan to reduce the rating of the STI clocksource to less than 100.
-> >However, as I am not aware of any problems relating to STI in v3.10-rc
-> >my plan is to update STI in the v3.11 timeframe.
-> >---
-> >  arch/arm/mach-shmobile/setup-sh73a0.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
->    BTW, shouldn't the subject be "ARM: shmobile: sh73a0: Update CMT
-> clocksource rating to 80"?
+On Wed, May 22, 2013 at 12:40:25PM +0530, Philip Avinash wrote:
+>  /*
+>   * Assuming the pin is muxed as a gpio output, set its output value.
+>   */
+> -static void
+> -davinci_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+> +static void davinci_gpio_set(struct gpio_chip *chip, unsigned offset,
+> +		int value)
 
-Yes, silly me.
+This kind of stuff is just churn.  If you read Documentation/CodingStyle:
 
-I'll fix that.
+Statements longer than 80 columns will be broken into sensible chunks, unless
+exceeding 80 columns significantly increases readability and does not hide
+information. Descendants are always substantially shorter than the parent and
+are placed substantially to the right. The same applies to function headers
+with a long argument list. However, never break user-visible strings such as
+printk messages, because that breaks the ability to grep for them.
+
+"broken into sensible chunks".  Here's the question: is the former a
+sensible format?  Arguably it is because it results in all the arguments
+fitting on one line at the expense of missing the return value.
+
+The latter is also a sensible format - but breaks the arguments instead
+of the return value.
+
+Both formats can be found in their entirety by grep by function name alone:
+
+	grep -1 davinci_gpio_set
+
+or if you prefer to type some more then you end up with more specific
+
+	grep -A1 davinci_gpio_set
+or
+	grep -B1 davinci_gpio_set
+
+depending on the version.
+
+Where there's no clear advantage one way or the other, let the authors
+preference stand.
