@@ -1,47 +1,66 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 22 May 2013 12:35:25 +0200
-Subject: [PATCH v2 1/2] clk: Disable unused clocks after deferred
- probing is done
-In-Reply-To: <518D7CC3.6050000@codeaurora.org>
-References: <1368076726-11492-1-git-send-email-skannan@codeaurora.org>
- <1368124502-18830-1-git-send-email-skannan@codeaurora.org>
- <20130510064520.GI3041@game.jcrosoft.org>
- <518D7CC3.6050000@codeaurora.org>
-Message-ID: <20130522103525.GD9937@game.jcrosoft.org>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Wed, 22 May 2013 12:54:18 +0200
+Subject: spurious bL cpufreq driver messages
+In-Reply-To: <CAKohpokkMvEhotcow8qfCGP0SxNfRsxw7swo-ZFbTSKE-F8Xtw@mail.gmail.com>
+References: <519686BC.3090101@gmail.com> <11917612.jOVuLqOMKF@vostro.rjw.lan>
+ <CAKohpokkMvEhotcow8qfCGP0SxNfRsxw7swo-ZFbTSKE-F8Xtw@mail.gmail.com>
+Message-ID: <2544320.us1o8zUn7V@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:03 Fri 10 May     , Saravana Kannan wrote:
-> On 05/09/2013 11:45 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >On 11:35 Thu 09 May     , Saravana Kannan wrote:
-> >>With deferred probing, late_initcall() is too soon to declare a clock as
-> >>unused. Wait for deferred probing to finish before declaring a clock as
-> >>unused. Since deferred probing is done in late_initcall(), do the unused
-> >>check to late_initcall_sync.
+On Wednesday, May 22, 2013 06:44:20 AM Viresh Kumar wrote:
+> On 22 May 2013 05:15, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> > On Monday, May 20, 2013 10:06:49 AM Viresh Kumar wrote:
+> >> On 19 May 2013 01:21, Rob Herring <robherring2@gmail.com> wrote:
+> >> > No, it still registers the bL driver. The problem is not that DT data
+> >> > is missing, but it is present on a single cluster system.
+> >>
+> >> I misread your mail.. I got the problem now.. Below should fix your
+> >> issue (It is rebased on the patch I pointed to you earlier):
+> >>
+> >> Attached too for testing as gmail copy-paste will break it.
+> >>
+> >> @Rafael: Once Rob gives his Tested-by, please queue it for 3.10-rcs
+> >>
+> >> ------------x-----------------x-----------------
+> >>
+> >> From: Viresh Kumar <viresh.kumar@linaro.org>
+> >> Date: Mon, 20 May 2013 09:57:17 +0530
+> >> Subject: [PATCH] cpufreq: arm_big_little_dt: Instantiate as platform_driver
+> >>
+> >> As multiplatform build is being adopted by more and more ARM platforms, initcall
+> >> function should be used very carefully. For example, when both arm_big_little_dt
+> >> and cpufreq-cpu0 drivers are compiled in, arm_big_little_dt driver may try to
+> >> register even if we had platform device for cpufreq-cpu0 registered.
+> >>
+> >> To eliminate this undesired the effect, the patch changes arm_big_little_dt
+> >> driver to have it instantiated as a platform_driver. Then it will only run on
+> >> platforms that create the platform_device "arm-bL-cpufreq-dt".
+> >>
+> >> Reported-by: Rob Herring <robherring2@gmail.com>
+> >> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > >
-> >Nack for both regulator & clk
-> >
-> >you can not known when the clock need to be shutdown
-> >
-> >example display splash screen set by the bootloader and display as module
-> >
-> >Best Regards,
-> >J.
+> > The patch (from the attachment) didn't apply for me.  Please check the
+> > bleeding-edge branch.
 > 
-> You are joking right? This is already done in the kernel. If you
-> don't want that, please rip out the code and try to get that picked
-> up. I'm sending out this patch for fix what's currently in the
-> kernel for those who care for the current feature.
+> Have you tried applying this before it (As written in my last mail)?
 
-so this feature is nightmare we need to KILL it
+No and I'm not sure which mail you're referring to.  There's been quite
+a number of them recently. :-)
 
-Best Regards,
-J.
-> 
-> Regards,
-> Saravana
-> 
-> 
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
+> https://groups.google.com/forum/?fromgroups#!topic/linux.kernel/XJF-82rad4o
+>
+> Above is also required fix for 3.10-rc3
+
+OK, that worked.
+
+Please check the bleeding-edge branch now and see if anything for-3.10-rc is
+still missing.
+
+Thanks,
+Rafael
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
