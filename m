@@ -1,59 +1,46 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Wed, 22 May 2013 10:45:08 +0200
-Subject: [PATCH v4 21/32] arm64: KVM: Build system integration
-In-Reply-To: <20130522084214.GB14322@arm.com>
-References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
- <1368540840-26750-22-git-send-email-marc.zyngier@arm.com>
- <20130521154227.GM27002@arm.com>
- <850310439.5245685.1369152587054.JavaMail.root@redhat.com>
- <20130522084214.GB14322@arm.com>
-Message-ID: <519C8594.3050305@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 22 May 2013 09:47:44 +0100
+Subject: [PATCH 14/14] ARM: elf: add new hwcap for identifying atomic
+ ldrd/strd instructions
+In-Reply-To: <CAL_JsqLSC2QgMdTGtH5G_F5SYjA3Hs--jMmxBES=fqGLwapptQ@mail.gmail.com>
+References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
+ <1368810473-26070-15-git-send-email-will.deacon@arm.com>
+ <20130520141809.GA27473@arm.com>
+ <CAL_JsqLSC2QgMdTGtH5G_F5SYjA3Hs--jMmxBES=fqGLwapptQ@mail.gmail.com>
+Message-ID: <20130522084744.GD14322@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 22/05/2013 10:42, Catalin Marinas ha scritto:
-> On Tue, May 21, 2013 at 05:09:47PM +0100, Paolo Bonzini wrote:
->>
->>
->> ----- Messaggio originale -----
->>> Da: "Catalin Marinas" <catalin.marinas@arm.com>
->>> A: "Marc Zyngier" <Marc.Zyngier@arm.com>
->>> Cc: linux-arm-kernel at lists.infradead.org, kvmarm at lists.cs.columbia.edu, kvm at vger.kernel.org, "Will Deacon"
->>> <Will.Deacon@arm.com>, pbonzini at redhat.com, gleb at redhat.com, "Christopher Covington" <cov@codeaurora.org>
->>> Inviato: Marted?, 21 maggio 2013 17:42:27
->>> Oggetto: Re: [PATCH v4 21/32] arm64: KVM: Build system integration
->>>
->>> On Tue, May 14, 2013 at 03:13:49PM +0100, Marc Zyngier wrote:
->>>> --- /dev/null
->>>> +++ b/arch/arm64/kvm/Kconfig
->>> ...
->>>> +config KVM_ARM_VGIC
->>>> +        bool
->>>> +	depends on KVM_ARM_HOST && OF
->>>> +	select HAVE_KVM_IRQCHIP
->>>> +	---help---
->>>> +	  Adds support for a hardware assisted, in-kernel GIC emulation.
->>>> +
->>>> +config KVM_ARM_TIMER
->>>> +        bool
->>>> +	depends on KVM_ARM_VGIC
->>>> +	select HAVE_KVM_IRQCHIP
->>>> +	---help---
->>>> +	  Adds support for the Architected Timers in virtual machines
->>>> +
->>>> +source drivers/virtio/Kconfig
->>>
->>> Shouldn't the above configs go to drivers/virtio/Kconfig as well (or
->>> drivers/virtio/arm/Kconfig)?
->>
->> virtio doesn't mean "virtual versions of devices that also exist in
->> hardware"; those are indeed in arch/ARCH/kvm.  virtio is a specific bus
->> for paravirtualized devices.  It is not KVM-specific and the code runs
->> in the guest (whereas arch/arm64/kvm/Kconfig is host code).
+On Tue, May 21, 2013 at 07:48:35PM +0100, Rob Herring wrote:
+> On Mon, May 20, 2013 at 9:18 AM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Fri, May 17, 2013 at 06:07:53PM +0100, Will Deacon wrote:
+> >> CPUs implementing LPAE have atomic ldrd/strd instructions, meaning that
+> >> userspace software can avoid having to use the exclusive variants of
+> >> these instructions if they wish.
+> >>
+> >> This patch advertises the atomicity of these instructions via the
+> >> hwcaps, so userspace can detect this CPU feature.
+> >>
+> >> Reported-by: Vladimir Danushevsky <vladimir.danushevsky@oracle.com>
+> >> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ...
+> >> +
+> >> +     /* LPAE implies atomic ldrd/strd instructions */
+> >> +     vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
+> >> +     if (vmsa >= 5)
+> >> +             elf_hwcap |= HWCAP_LPAE;
+> >
+> > As I mentioned in the past, I don't agree with exposing the "LPAE"
+> > feature to user-space, it's not a feature that user space should care
+> > about. An atomic double hwcap is better and you can even make this per
+> > CPU via __v7_proc.
 > 
-> You are right. What I meant was kvm/virt/arm/Kconfig (the place where
-> the vgic and timer driver goes).
+> How does userspace know whether to install a non-LPAE or LPAE kernel
+> in a generic way?
 
-Ah yeah, that could make sense.
+This is a valid reason to expose LPAE to user, though elf_hwcap sounds a
+bit strange.
 
-Paolo
+-- 
+Catalin
