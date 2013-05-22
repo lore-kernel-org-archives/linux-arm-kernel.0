@@ -1,48 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 22 May 2013 15:18:01 +0200
-Subject: [PATCH] regulator: ab8500-ext: Don't register without
- initialisation data
-In-Reply-To: <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
-References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
- <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYHiwbGonH80aJfHxP6F+hLb+_KdCr_g5ae1Yr-v=WcxA@mail.gmail.com>
+Date: Wed, 22 May 2013 15:20:19 +0200
+Subject: [PATCH] regulator: ab8500: Remove external regulator init()
+ clauses
+In-Reply-To: <1369228025-17192-1-git-send-email-lee.jones@linaro.org>
+References: <1369228025-17192-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkda0Oupr56a+Tj7jKCh2vCaD_R0_KVFBe8ZuYQYgVtG2CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 2:47 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wed, May 22, 2013 at 3:07 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> This patch fixes a bug introduced in the v3.10 merge window.
->
-> Some platforms will not want external registers. Rather than setting up
-> lots of different clauses in the core ab8500 regulator driver not to
-> call ab8500-ext init() we just won't pass the initialisation data from
-> platform code. This patch checks for it and if it's missing, we won't
-> register the external regulators.
+> The driver no longer needs to worry about which platform can and can't
+> use external regulators successfully. Instead platform code will hold
+> back external regulator initialisation data in the use-cases where the
+> driver isn't applicable.
 >
 > Cc: Mark Brown <broonie@kernel.org>
 > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/regulator/ab8500-ext.c |    6 ++++++
->  1 file changed, 6 insertions(+)
->
-> diff --git a/drivers/regulator/ab8500-ext.c b/drivers/regulator/ab8500-ext.c
-> index b4d4547..8421537 100644
-> --- a/drivers/regulator/ab8500-ext.c
-> +++ b/drivers/regulator/ab8500-ext.c
-> @@ -334,6 +334,12 @@ int ab8500_ext_regulator_init(struct platform_device *pdev)
->                 return -EINVAL;
->         }
->
-> +       /* have any external regulators been specified? */
-> +       if (pdata->num_ext_regulator == 0) {
-> +               dev_warn(&pdev->dev, "Not using external regulators\n");
-> +               return 0;
-> +       }
 
-dev_warn() is really when we warn about something really nasty, worse
-than dev_err(). It seems dev_info() is more apropriate.
-
-Anyway since it's an urgent regression:
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Linus
+Yours,
+Linus Walleij
