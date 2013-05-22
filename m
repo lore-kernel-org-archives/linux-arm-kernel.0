@@ -1,20 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 22 May 2013 11:24:05 +0800
-Subject: [PATCH v3 1/2] pinctrl: add MVF600 pinctrl driver
-In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E851CBBA4@039-SN1MPN1-003.039d.mgd.msft.net>
-References: <1368685224-17915-1-git-send-email-b35083@freescale.com>
- <20130520033207.GD25113@S2101-09.ap.freescale.net>
- <CAAQ0ZWSZeqOEceN-KmDS4_BT27_4xCYjfFMj8sHkEonOXaoF_g@mail.gmail.com>
- <B56CDBE15CE27145A4B77D2D24263E851CBBA4@039-SN1MPN1-003.039d.mgd.msft.net>
-Message-ID: <CAAQ0ZWTBZ=10B+0Zc4iZmvrr0hzdBKf1mn1CzhJokWE44dxsoA@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 21 May 2013 21:46:35 -0700
+Subject: [PATCH v2 6/6] pinctrl: exynos: Handle suspend/resume of GPIO
+ EINT registers
+In-Reply-To: <4536937.hnhaYZLnaG@amdc1227>
+References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
+ <18754346.1REWN52J0K@flatron>
+ <CAD=FV=XiWET3Xptfk2CVWMw=xVCE4zUJhJtgXHbhiND12rJGnQ@mail.gmail.com>
+ <4536937.hnhaYZLnaG@amdc1227>
+Message-ID: <CAD=FV=VYhBP+V6SQt5SkFZszdVxSJ6AZk-C-zx1Di-RZBYhGvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 May 2013 15:56, Lu Jingchang-B35083 <B35083@freescale.com> wrote:
-> [Lu Jingchang-B35083]
-> I see you have Acked [PATCH v3 2/2] pinctrl: imx: add MVF600 support to imx pinctrl framework, do I need resend it as the first one. Thanks!
->
+Tomasz,
 
-Since LinusW hasn't applied it, you should just resend.
+On Tue, May 21, 2013 at 10:05 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+>         return 0;
+> +
+> +err_domains:
+> +       bank = d->ctrl->pin_banks;
+> +       for (undo = 0; undo < i; ++undo) {
 
-Shawn
+++bank is missing, I think.  This will free the same bank many times.
+
+optional: could also avoid extra 'undo' variable and remove in reverse
+order by changing i to signed and counting down to 0.
+
+-Doug
