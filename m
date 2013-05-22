@@ -1,52 +1,17 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 22 May 2013 13:41:12 +0100
-Subject: [PATCH] dmatest: abort transfers immediately when asked for
-In-Reply-To: <CAHp75VdRn8baf0ak57HpoJKNues6vEsjBp1uOQ2Zpvwa+B5rjA@mail.gmail.com>
-References: <20130516153553.GI11706@mudshark.cambridge.arm.com>
- <1369139597-24446-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <20130521151143.GH10453@mudshark.cambridge.arm.com>
- <CAHp75VdRn8baf0ak57HpoJKNues6vEsjBp1uOQ2Zpvwa+B5rjA@mail.gmail.com>
-Message-ID: <20130522124112.GA16361@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 22 May 2013 13:47:31 +0100
+Subject: [RC FIXES] Fix broken MMC devices on Snowball
+Message-ID: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 06:24:15PM +0100, Andy Shevchenko wrote:
-> On Tue, May 21, 2013 at 6:11 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > Hi Andy,
-> >
-> > On Tue, May 21, 2013 at 01:33:17PM +0100, Andy Shevchenko wrote:
-> >> When thread is going to be stopped we have to unconditionally terminate all
-> >> ongoing transfers. Otherwise it would be possible that callback function will
-> >> be called on the next interrupt and will try to access to already freed
-> >> structures.
-> >>
-> >> The patch introduces specific error message for this, though it doesn't
-> >> increase the counter of the failed tests.
-> >>
-> >> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> >> Reported-by: Will Deacon <will.deacon@arm.com>
-> >
-> > Thanks for persevering with this! Although this patch definitely fixes the
-> > panic I was seeing, I now observe buffer verification failures in subsequent
-> > test runs after an aborted run:
-> 
-> I think the description to the commit adfa543e "dmatest: don't use
-> set_freezable_with_signal()" may shed light on this.
-> 
-> The background (if  I got it correctly) is in race with done flag. So,
-> we got a callback call from the DMA engine, but we don't know which
-> transfer triggers it.
-> I might be wrong. This is just an assumption.
+The newly introduced ab8500 external regulator driver causes an
+unexpected quirk when used with the Snowball low-cost development
+board. When the 3 ab8500 external regulators are registered, the
+ones which can be freed, are. Unfortunately, on Snowball one of
+them is connected to the MMC power line. Once freed, this turns
+off the MMC device. External regulators are not used on Snowball,
+so it's pointless registering them in the first place.
 
-I've not managed to work out exactly what's going on, but it's certainly
-something like that. In fact, I just managed to trigger a case where all but
-one of the transfers is aborted, whilst the remaining one fails. Looking at
-the code, I can't see how that situation comes about, since the threads are
-protected with the info mutex and kthread_stop is synchronous.
-
-> Have you ever see such behaviour on pre v3.10-rc1 kernels? (I mean
-> with old dmatest module)
-
-No, dmatest from 3.9 is completely reliable in my experience.
-
-Will
+These two patches ensure external regulators aren't registered 
+on Snowball or any other platforms which do not require them.
