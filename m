@@ -1,35 +1,122 @@
-From: florian.meier@koalo.de (Florian Meier)
-Date: Wed, 22 May 2013 19:16:41 +0200
-Subject: [PATCH] ASoC: Add support for BCM2708
-In-Reply-To: <20130522163942.GQ1627@sirena.org.uk>
-References: <519CD1CC.8070507@koalo.de> <20130522163942.GQ1627@sirena.org.uk>
-Message-ID: <519CFD79.3050002@koalo.de>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 22 May 2013 19:22:59 +0200 (CEST)
+Subject: [PATCH 05/11] ARM: shmobile: APE6EVM LAN9220 support
+In-Reply-To: <20130522143204.GE32012@verge.net.au>
+References: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
+ <1364954906-16014-6-git-send-email-horms+renesas@verge.net.au>
+ <Pine.LNX.4.64.1305171458550.31481@axis700.grange>
+ <20130522143204.GE32012@verge.net.au>
+Message-ID: <Pine.LNX.4.64.1305221911380.12715@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.05.2013 18:39, Mark Brown wrote:
-> On Wed, May 22, 2013 at 04:10:20PM +0200, Florian Meier wrote:
-> 
->> This driver adds support for digital audio (I2S)
->> for the BCM2708 SoC that is used by the
->> Raspberry Pi. External audio codecs can be
->> connected to the Raspberry Pi via P5 header.
-> 
-> Split this up into a patch series, for example one per CPU side driver
-> and one per machine driver.  I've given the code a relatively quick run
-> through here, it looks mostly sensible though DT would be nice but
-> there's a few comments.
-> 
->> +static inline void bcm2708_i2s_write_reg(struct bcm2708_i2s_dev *dev,
->> +					   int reg, u32 val)
->> +{
->> +	dev_dbg(dev->dev, "I2S write to register %p = %x\n",
->> +			dev->clk_base + reg, val);
->> +	__raw_writel(val, dev->i2s_base + reg);
->> +}
-> 
-> This all looks like you want to use regmap-mmio.........
+Hi Simon
 
-Thank you for your comments! I will have a look at them and send a new
-patch series taking them into account.
-Before that I will create a patch for the DMA engine driver.
+On Wed, 22 May 2013, Simon Horman wrote:
+
+> On Fri, May 17, 2013 at 03:00:23PM +0200, Guennadi Liakhovetski wrote:
+> > Hi Simon, Magnus
+> > 
+> > On Wed, 3 Apr 2013, Simon Horman wrote:
+> > 
+> > > From: Magnus Damm <damm@opensource.se>
+> > > 
+> > > Add LAN9220 support to the APE6EVM board using C and DT.
+> > > At this point the PFC driver lacks DT bindings so to
+> > > configure the PFC we use PINCTRL in C board code.
+> > > 
+> > > Signed-off-by: Magnus Damm <damm@opensource.se>
+> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > ---
+> > >  arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   23 ++++++++++++++++++-
+> > >  arch/arm/mach-shmobile/board-ape6evm.c |   38 ++++++++++++++++++++++++++++++++
+> > >  2 files changed, 60 insertions(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > > index 833f703..f603c69 100644
+> > > --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > > +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > > @@ -16,7 +16,7 @@
+> > >  	compatible = "renesas,ape6evm", "renesas,r8a73a4";
+> > >  
+> > >  	chosen {
+> > > -		bootargs = "console=ttySC0,115200 ignore_loglevel";
+> > > +		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp";
+> > >  	};
+> > >  
+> > >  	memory at 40000000 {
+> > > @@ -24,8 +24,29 @@
+> > >  		reg = <0 0x40000000 0 0x40000000>;
+> > >  	};
+> > >  
+> > > +	ape6evm_fixed_3v3: fixedregulator at 0 {
+> > > +		compatible = "regulator-fixed";
+> > > +		regulator-name = "3V3";
+> > > +		regulator-min-microvolt = <3300000>;
+> > > +		regulator-max-microvolt = <3300000>;
+> > > +		regulator-always-on;
+> > > +	};
+> > > +
+> > >  	lbsc {
+> > >  		#address-cells = <1>;
+> > >  		#size-cells = <1>;
+> > > +
+> > > +		ethernet at 8000000 {
+> > > +			compatible = "smsc,lan9118", "smsc,lan9115";
+> > > +			reg = <0x08000000 0x1000>;
+> > > +			interrupt-parent = <&irqc1>;
+> > > +			interrupts = <8 0x4>;
+> > > +			phy-mode = "mii";
+> > > +			reg-io-width = <4>;
+> > > +			smsc,irq-active-high;
+> > > +			smsc,irq-push-pull;
+> > > +			vdd33a-supply = <&ape6evm_fixed_3v3>;
+> > > +			vddvario-supply = <&ape6evm_fixed_3v3>;
+> > > +		};
+> > >  	};
+> > >  };
+> > 
+> > The above didn't work in my tests without this:
+> > 
+> > diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts 
+> > b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > index f603c69..4fb0102 100644
+> > --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > @@ -33,8 +33,10 @@
+> >  	};
+> >  
+> >  	lbsc {
+> > +		compatible = "simple-bus";
+> >  		#address-cells = <1>;
+> >  		#size-cells = <1>;
+> > +		ranges = <0 0 0 0x80000000>;
+> >  
+> >  		ethernet at 8000000 {
+> >  			compatible = "smsc,lan9118", "smsc,lan9115";
+> > 
+> 
+> Could you please post this as a formal patch and indicate
+> if you would like it included as a fix in v3.10 or not?
+
+Can do that, sure, just thought maybe it would be better to fix the 
+original patch. Besides, I wasn't sure what the correct values for 
+"ranges" are, I just picked up something, that would be sufficient for 
+ethernet. But if more devices are added to it in the future, maybe 
+different ranges values would be needed. I think actually, lbsc should map 
+the 3 BSC areas, so, the correct property would be
+
++		ranges = <0 0 0 0x14000000>;
+
+> Also, I am curious to know what your tests are.
+
+Just booting with NFS root. I think, anything involving ethernet. Without 
+the "simple-bus" property the lbsc node doesn't get scanned, so, no device 
+is added. Without "ranges" addresses cannot be mapped correctly.
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
