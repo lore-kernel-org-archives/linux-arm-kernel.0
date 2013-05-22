@@ -1,54 +1,56 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 22 May 2013 10:36:33 +0200
-Subject: [PATCH] ARM: iomux-mx51: Always define
- PU E for pins used as GPIO
-In-Reply-To: <1369207056.596630214@f96.mail.ru>
-References: <1369124845-19244-1-git-send-email-shc_work@mail.ru>
- <1369203552.559574351@f389.i.mail.ru>
- <20892.28064.82907.942799@ipc1.ka-ro>
- <1369207056.596630214@f96.mail.ru>
-Message-ID: <20892.33681.753710.620640@ipc1.ka-ro>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 22 May 2013 09:42:14 +0100
+Subject: [PATCH v4 21/32] arm64: KVM: Build system integration
+In-Reply-To: <850310439.5245685.1369152587054.JavaMail.root@redhat.com>
+References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
+ <1368540840-26750-22-git-send-email-marc.zyngier@arm.com>
+ <20130521154227.GM27002@arm.com>
+ <850310439.5245685.1369152587054.JavaMail.root@redhat.com>
+Message-ID: <20130522084214.GB14322@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Alexander Shiyan writes:
-> > Alexander Shiyan writes:
-> > > > On Tue, May 21, 2013 at 12:27:25PM +0400, Alexander Shiyan wrote:
-> > > > > This patch adds a PUE bit for pins which used as GPIO. This allow
-> > > > > to use the GPIOs correctly as inputs when source is open-drain with
-> > > > > external pullup resistor (IRQ open-drain outputs for example).
-> > > > 
-> > > > I don't understand. If there's an external pullup why do you want to
-> > > > turn on the internal one?
-> > > 
-> > > It is just switch off keeper circuit.
-> > > 
-> > If you want to switch the keeper circuit off why don't you do that by
-> > removing PAD_CTL_PKE rather than adding PAD_CTL_PUE?
+On Tue, May 21, 2013 at 05:09:47PM +0100, Paolo Bonzini wrote:
 > 
-> Again, I do not know which the solution here is better. If we remove
-> the PKE bit, for some pins it will be removed the default pullup/pulldown (PUS = 0),
-> so it may affect the some running configuration.
 > 
-IMO the current approach of defining the pad config with the pad
-definition is broken anyway. It would be much better to specify the
-pad configuration at the point where a specific pad is used, rather
-than where it is defined.
-The pin mux setting for a specific function of a pin is always the
-same for any platform but the pad config may be different for
-different platforms.
+> ----- Messaggio originale -----
+> > Da: "Catalin Marinas" <catalin.marinas@arm.com>
+> > A: "Marc Zyngier" <Marc.Zyngier@arm.com>
+> > Cc: linux-arm-kernel at lists.infradead.org, kvmarm at lists.cs.columbia.edu, kvm at vger.kernel.org, "Will Deacon"
+> > <Will.Deacon@arm.com>, pbonzini at redhat.com, gleb at redhat.com, "Christopher Covington" <cov@codeaurora.org>
+> > Inviato: Marted?, 21 maggio 2013 17:42:27
+> > Oggetto: Re: [PATCH v4 21/32] arm64: KVM: Build system integration
+> > 
+> > On Tue, May 14, 2013 at 03:13:49PM +0100, Marc Zyngier wrote:
+> > > --- /dev/null
+> > > +++ b/arch/arm64/kvm/Kconfig
+> > ...
+> > > +config KVM_ARM_VGIC
+> > > +        bool
+> > > +	depends on KVM_ARM_HOST && OF
+> > > +	select HAVE_KVM_IRQCHIP
+> > > +	---help---
+> > > +	  Adds support for a hardware assisted, in-kernel GIC emulation.
+> > > +
+> > > +config KVM_ARM_TIMER
+> > > +        bool
+> > > +	depends on KVM_ARM_VGIC
+> > > +	select HAVE_KVM_IRQCHIP
+> > > +	---help---
+> > > +	  Adds support for the Architected Timers in virtual machines
+> > > +
+> > > +source drivers/virtio/Kconfig
+> > 
+> > Shouldn't the above configs go to drivers/virtio/Kconfig as well (or
+> > drivers/virtio/arm/Kconfig)?
+> 
+> virtio doesn't mean "virtual versions of devices that also exist in
+> hardware"; those are indeed in arch/ARCH/kvm.  virtio is a specific bus
+> for paravirtualized devices.  It is not KVM-specific and the code runs
+> in the guest (whereas arch/arm64/kvm/Kconfig is host code).
 
+You are right. What I meant was kvm/virt/arm/Kconfig (the place where
+the vgic and timer driver goes).
 
-Lothar Wa?mann
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Catalin
