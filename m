@@ -1,92 +1,48 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Wed, 22 May 2013 16:56:58 +0100
-Subject: [PATCH 11/14] sched: filter task pull request
-In-Reply-To: <CAKfTPtCUvKmTHzyVRCkGyM-nWOSWP8OUzMgyCyzPEXf1NoxsQQ@mail.gmail.com>
-References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
- <1366910611-20048-12-git-send-email-vincent.guittot@linaro.org>
- <CAKfTPtCUvKmTHzyVRCkGyM-nWOSWP8OUzMgyCyzPEXf1NoxsQQ@mail.gmail.com>
-Message-ID: <20130522155658.GB4935@e103034-lin>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 22 May 2013 08:57:39 -0700
+Subject: [PATCH v3 6/6] pinctrl: exynos: Handle suspend/resume of GPIO
+ EINT registers
+In-Reply-To: <3059629.yu4Ei1BXhd@amdc1227>
+References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
+ <4536937.hnhaYZLnaG@amdc1227>
+ <CAD=FV=VYhBP+V6SQt5SkFZszdVxSJ6AZk-C-zx1Di-RZBYhGvw@mail.gmail.com>
+ <3059629.yu4Ei1BXhd@amdc1227>
+Message-ID: <CAD=FV=X3B9feSMmRQd5PYj01U+GEXMFG3tvj7hCY=89Uh9ccEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 26, 2013 at 11:00:58AM +0100, Vincent Guittot wrote:
-> Part of this patch is missing, the fix below is needed
-> 
-> @@ -3497,7 +3497,9 @@ static bool is_buddy_full(int cpu)
->  static bool is_my_buddy(int cpu, int buddy)
->  {
->   int my_buddy = per_cpu(sd_pack_buddy, cpu);
-> - return (my_buddy == -1) || (buddy == my_buddy);
-> +
-> + return ((sysctl_sched_packing_mode == SCHED_PACKING_FULL) &&
-> +               ((my_buddy == -1) || (buddy == my_buddy)));
->  }
-> 
->  static bool is_light_task(struct task_struct *p)
-> 
-> 
-> On 25 April 2013 19:23, Vincent Guittot <vincent.guittot@linaro.org> wrote:
-> > Only CPUs that participates to the packing effort can pull tasks on a busiest
-> > group.
-> >
-> > Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-> > ---
-> >  kernel/sched/fair.c |   14 ++++++++++++--
-> >  1 file changed, 12 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
-> > index 28f8ea7..6f63fb9 100644
-> > --- a/kernel/sched/fair.c
-> > +++ b/kernel/sched/fair.c
-> > @@ -3494,6 +3494,12 @@ static bool is_buddy_full(int cpu)
-> >         return (sum * 1024 >= period * 1000);
-> >  }
-> >
-> > +static bool is_my_buddy(int cpu, int buddy)
-> > +{
-> > +       int my_buddy = per_cpu(sd_pack_buddy, cpu);
-> > +       return (my_buddy == -1) || (buddy == my_buddy);
-> > +}
+Tomasz,
 
-Would it make sense to change the function name to something like
-is_packing_target() and only have one argument?
+On Wed, May 22, 2013 at 7:03 AM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Some GPIO EINT control registers needs to be preserved across
+> suspend/resume cycle. This patch extends the driver to take care of
+> this.
+>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>
+> Changes since v2:
+>  - Fixed error path
+> Changes since v1:
+>  - Added optional debugging messages
+>  - Added proper error path in initialization
+>
+>  drivers/pinctrl/pinctrl-exynos.c | 116 ++++++++++++++++++++++++++++++++++++++-
+>  drivers/pinctrl/pinctrl-exynos.h |   1 +
+>  2 files changed, 114 insertions(+), 3 deletions(-)
 
-is_my_buddy() is only used with the same variable for both arguments
-like below.
+Looks good to me.  Thanks!
 
-> > +
-> >  static bool is_light_task(struct task_struct *p)
-> >  {
-> >         /* A light task runs less than 20% in average */
-> > @@ -4688,8 +4694,8 @@ static inline void update_sg_lb_stats(struct lb_env *env,
-> >
-> >                 /* Bias balancing toward cpus of our domain */
-> >                 if (local_group) {
-> > -                       if (idle_cpu(i) && !first_idle_cpu &&
-> > -                                       cpumask_test_cpu(i, sched_group_mask(group))) {
-> > +                       if (is_my_buddy(i, i) && idle_cpu(i) && !first_idle_cpu
-> > +                        && cpumask_test_cpu(i, sched_group_mask(group))) {
-> >                                 first_idle_cpu = 1;
-> >                                 balance_cpu = i;
-> >                         }
-> > @@ -4817,6 +4823,10 @@ static void update_plb_buddy(int cpu, int *balance, struct sd_lb_stats *sds,
-> >
-> >         /* Get my new buddy */
-> >         buddy = per_cpu(sd_pack_buddy, cpu);
-> > +
-> > +       /* This CPU doesn't act for agressive packing */
-> > +       if (buddy != cpu)
-> > +               sds->busiest = 0;
+Good thing I tried the printouts too--they pointed to the fact that
+"git am" had somehow applied part 4 ("Add support for SoC-specific
+suspend/resume callbacks") incorrectly and with no warning!  It had
+put the resume() call at the beginning of the suspend function.
+Weird.  I had to fall back to using "patch -p1 to apply".  :-/
 
-sds->busiest is a pointer, so I think it should be assigned to NULL
-instead of 0.
 
-Morten
+On exynos5250-snow (pinmux backported to 3.8):
 
-> >  }
-> >
-> >  /**
-> > --
-> > 1.7.9.5
-> >
-> 
+Tested-by: Doug Anderson <dianders@chromium.org>
+
+Reviewed-by: Doug Anderson <dianders@chromium.org>
