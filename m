@@ -1,47 +1,34 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 22 May 2013 23:48:09 +0900
-Subject: [PATCH v3] ARM: shmobile: sh73a0: Update CMT clockevent rating to 80
-Message-ID: <1369234089-736-1-git-send-email-horms+renesas@verge.net.au>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 22 May 2013 15:49:57 +0100
+Subject: [PATCH v2] ARM: ux500: Apply other compatible name to the u8540 DTS
+ file
+In-Reply-To: <1369233402-19225-1-git-send-email-lee.jones@linaro.org>
+References: <1369233402-19225-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130522144957.GA18714@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the CMT clockevent rating from 125 to 80.
+ARM: ux500: Apply other compatible name to the u8540 DTS file
+    
+Devices in board DTS files are usually searchable by multiple
+compatible strings. In this case the 8540 based SoC should be
+obtainable via the chipset [DB8540 & AB8540] name 'u8540' or
+the board name 'ccu8540'. It's already possible to obtain the
+Device Tree via its chipset name, this patch makes it possible
+to get it by its board name too.
+    
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-This resolves a boot-failure regression for kzm9g-reference in v3.10-rc1
-introduced by f7db706b132f11c79ae1d74b2382e0926cf31644 ("ARM: 7674/1: smp:
-Avoid dummy clockevent being preferred over real").
-
-The patch noted above reduces the rating of dummy clockevent from 400 to 100.
-This patch reduces the rating of CMT so that it is once again less than that
-of the dummy clockevent.
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-sh73a0.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-I also plan to reduce the rating of the STI clockevent to less than 100.
-However, as I am not aware of any problems relating to STI in v3.10-rc
-my plan is to update STI in the v3.11 timeframe.
-
-v3
-* s/kzm9g-reference/sh73a0/ in subject, as suggested by Sergei Shtylyov
-
-v2
-* Fix typos pointed out by Sergei Shtylyov
-
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index fdf3894..9696f36 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -252,7 +252,7 @@ static struct sh_timer_config cmt10_platform_data = {
- 	.name = "CMT10",
- 	.channel_offset = 0x10,
- 	.timer_bit = 0,
--	.clockevent_rating = 125,
-+	.clockevent_rating = 80,
- 	.clocksource_rating = 125,
- };
+diff --git a/arch/arm/boot/dts/ccu8540.dts b/arch/arm/boot/dts/ccu8540.dts
+index 18daa01..af4487f 100644
+--- a/arch/arm/boot/dts/ccu8540.dts
++++ b/arch/arm/boot/dts/ccu8540.dts
+@@ -14,7 +14,7 @@
  
--- 
-1.8.2.1
+ / {
+ 	model = "ST-Ericsson U8540 platform with Device Tree";
+-	compatible = "st-ericsson,u8540";
++	compatible = "st-ericsson,ccu8540", "st-ericsson,u8540";
+ 
+ 	memory {
+ 		reg = <0x00000000 0x20000000>;
