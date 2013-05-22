@@ -1,76 +1,35 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Wed, 22 May 2013 12:58:18 +0300
-Subject: [PATCH v2 00/10] uaccess: better might_sleep/might_fault behavior
-In-Reply-To: <201305221125.36284.arnd@arndb.de>
-References: <cover.1368702323.git.mst@redhat.com>
- <201305221125.36284.arnd@arndb.de>
-Message-ID: <20130522095818.GB24931@redhat.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 22 May 2013 12:01:29 +0200
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
+ 370/XP
+In-Reply-To: <20130521193803.GA20882@1wt.eu>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130521193803.GA20882@1wt.eu>
+Message-ID: <519C9779.1040104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 11:25:36AM +0200, Arnd Bergmann wrote:
-> On Thursday 16 May 2013, Michael S. Tsirkin wrote:
-> > This improves the might_fault annotations used
-> > by uaccess routines:
-> > 
-> > 1. The only reason uaccess routines might sleep
-> >    is if they fault. Make this explicit for
-> >    all architectures.
-> > 2. Accesses (e.g through socket ops) to kernel memory
-> >    with KERNEL_DS like net/sunrpc does will never sleep.
-> >    Remove an unconditinal might_sleep in the inline
-> >    might_fault in kernel.h
-> >    (used when PROVE_LOCKING is not set).
-> > 3. Accesses with pagefault_disable return EFAULT
-> >    but won't cause caller to sleep.
-> >    Check for that and avoid might_sleep when
-> >    PROVE_LOCKING is set.
-> > 
-> > I'd like these changes to go in for the benefit of
-> > the vhost driver where we want to call socket ops
-> > under a spinlock, and fall back on slower thread handler
-> > on error.
-> 
-> Hi Michael,
-> 
-> I have recently stumbled over a related topic, which is the highly
-> inconsistent placement of might_fault() or might_sleep() in certain
-> classes of uaccess functions. Your patches seem completely reasonable,
-> but it would be good to also fix the other problem, at least on
-> the architectures we most care about.
-> 
-> Given the most commonly used functions and a couple of architectures
-> I'm familiar with, these are the ones that currently call might_fault()
-> 
-> 			x86-32	x86-64	arm	arm64	powerpc	s390	generic
-> copy_to_user		-	x	-	-	-	x	x
-> copy_from_user		-	x	-	-	-	x	x
-> put_user		x	x	x	x	x	x	x
-> get_user		x	x	x	x	x	x	x
-> __copy_to_user		x	x	-	-	x	-	-
-> __copy_from_user	x	x	-	-	x	-	-
-> __put_user		-	-	x	-	x	-	-
-> __get_user		-	-	x	-	x	-	-
-> 
-> WTF?
+On 05/21/2013 09:38 PM, Willy Tarreau wrote:
+> On Tue, May 21, 2013 at 12:33:25PM +0200, Thomas Petazzoni wrote:
+> (...)
+>> As it was explained above, we unfortunately can't read the
+>> current base address of the internal register window, so we need a
+>> different mechanism to know if the bootloader has done the remapping
+>> at 0xF1000000 (new generation bootloader) or has left the internal
+>> registers at 0xD0000000 (old generation bootloader).
+>
+> Just out of curiosity, what happens if you touch the register at the
+> wrong address ? I mean, if you blindly write to the 0xD0xxxxxx address
+> that you want the registers to be mapped at 0xF1xxxxxx. Will the chip
+> hang, will it silently ignore the sequence ? Because maybe you don't
+> need to detect using CP15 whether the remapping was done, you could
+> simply perform it unconditionally.
 
-Yea.
+Willy,
 
-> Calling might_fault() for every __get_user/__put_user is rather expensive
-> because it turns what should be a single instruction (plus fixup) into an
-> external function call.
+I tried the above on Dove which is possibly affected by the workaround
+as it is also ARMv7. In Dove you can access unmapped addresses without
+any problems, but as Thomas already stated Armada 370/XP just hang.
+Must be some default AHB slave in Dove, which Armada 370/XP is missing.
 
-You mean _cond_resched with CONFIG_PREEMPT_VOLUNTARY? Or do you
-mean when we build with PROVE_LOCKING?
-
-> My feeling is that we should do might_fault() only in access_ok() to get
-> the right balance.
-> 
-> 	Arnd
-
-Well access_ok is currently non-blocking I think - we'd have to audit
-all callers. There are some 200 of these in drivers and some
-1000 total so ... a bit risky.
-
--- 
-MST
+Sebastian
