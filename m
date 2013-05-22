@@ -1,54 +1,21 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 22 May 2013 10:15:56 -0600
-Subject: [PATCH] ASoC: Add support for BCM2708
-In-Reply-To: <519CED72.40406@koalo.de>
-References: <519CD1CC.8070507@koalo.de> <519CE2B7.8080704@wwwdotorg.org>
- <519CED72.40406@koalo.de>
-Message-ID: <519CEF3C.4000502@wwwdotorg.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 22 May 2013 18:16:21 +0200
+Subject: [PATCH v4 00/12] net: mv643xx_eth DT support and fixes
+In-Reply-To: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130522161621.GM2824@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2013 10:08 AM, Florian Meier wrote:
-> On 22.05.2013 17:22, Stephen Warren wrote:
->> On 05/22/2013 08:10 AM, Florian Meier wrote:
->>> This driver adds support for digital audio (I2S)
->>> for the BCM2708 SoC that is used by the
->>> Raspberry Pi. External audio codecs can be
->>> connected to the Raspberry Pi via P5 header.
->>>
->>> It relies on cyclic DMA engine support for BCM2708
->>> that is not included in this patch.
->>
->> This SoC is actually the BCM2835, so the files should be named for that.
-> 
-> Actually, I changed the name several times and in the end I sticked to
-> https://github.com/raspberrypi/linux/issues/22
-> but if you think it is better to use BCM2835 I am happy to agree with
-> you and change it.
-> 
->> Upstream only uses device tree for BCM2835. Does this driver support DT?
->> Where is the DT binding definition file?
-> 
-> I have not accomplished to use the mainline kernel and DT with the
-> Raspberry Pi. Do you have any introductive information about how to do this?
+On Tue, May 21, 2013 at 06:41:38PM +0200, Sebastian Hesselbarth wrote:
+> This patch set picks up work by Florian Fainelli bringing full DT
+> support to mv643xx_eth and Marvell SoCs using it.
 
-Oh, so is this patch intended for the downstream Raspberry Pi Foundation
-kernel, or the upstream kernel?
+Hi Sebastian
 
-The fact you haven't run it on the upstream kernel implies that you
-intend the patch to be applied to the downstream kernel.
+I tested on my QNAP and topkick. Works great.
 
-The fact you sent the driver to all the upstream mailing lists implies
-that you intend the patch to be applied to the upstream kernel.
+Tested-by: Andrew Lunn <andrew@lunn.ch>
 
-BTW, I wrote a Google+ post on using the upstream kernel on the Pi:
-https://plus.google.com/101715070573995136397/posts/gWkwrfNfYVm
-
->> I assume you're planning on sending the DMA driver upstream too? I guess
->> this driver isn't useful without it.
-> 
-> I would like to, but it only supports cyclic DMA. Should I send it
-> upstream anyway? In case you are interested:
-
-I don't think that limitation would stop it being useful upstream;
-somebody else might always enhance it.
+   Andrew
