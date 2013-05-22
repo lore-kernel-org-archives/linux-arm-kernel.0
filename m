@@ -1,65 +1,84 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 22 May 2013 18:22:19 +0200
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
- 370/XP
-In-Reply-To: <20130522155134.GL2824@lunn.ch>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201305221633.46705.arnd@arndb.de> <20130522170643.54a2b9d2@skate>
- <201305221735.11815.arnd@arndb.de> <20130522155134.GL2824@lunn.ch>
-Message-ID: <20130522182219.062079ac@skate>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 23 May 2013 00:28:21 +0800
+Subject: [PATCH] pinctrl: sirf: save the status in suspend and restore
+ after resuming
+In-Reply-To: <CACRpkdaSTC8cLi-C_gwZEk8iF=bnAce920DbKvxN6S-=75xbnA@mail.gmail.com>
+References: <1368674229-11813-1-git-send-email-Baohua.Song@csr.com>
+ <CACRpkdaSTC8cLi-C_gwZEk8iF=bnAce920DbKvxN6S-=75xbnA@mail.gmail.com>
+Message-ID: <CAGsJ_4wPd1_T--ezGQQVbeL3sJQwSTACJvE787JUoDQVvZ_muw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+2013/5/20 Linus Walleij <linus.walleij@linaro.org>:
+> On Thu, May 16, 2013 at 5:17 AM, Barry Song <Baohua.Song@csr.com> wrote:
+>
+>> this patch saves the status of pinctrl registers and restore them while
+>> resuming. this makes all drivers have coherent status for pinmux after
+>> suspending and resuming.
+>>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>
+> Applied, but a quick remark that you may want to fix up:
 
-On Wed, 22 May 2013 17:51:34 +0200, Andrew Lunn wrote:
+thanks, linus. i will have an incremental patch to fix it.
 
-> Maybe i'm missunderstand Arnd, but i think he is suggesting a property
-> somewhere in DT which says where the bootloader left the register
-> space before jumping to the kernel. You can then look at this property
-> and then decide if you need to remap or not. Only this one property
-> needs to differ between old and new bootloader. You could even say, if
-> the property is not in DT, a remap is needed.
+>
+> (...)
+>
+>> +#ifdef CONFIG_PM_SLEEP
+>> +static int sirfsoc_pinmux_suspend_noirq(struct device *dev)
+>> +{
+>> +       int i, j;
+>> +       struct sirfsoc_pmx *spmx = dev_get_drvdata(dev);
+>> +
+>> +       for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
+>> +               for (j = 0; j < SIRFSOC_GPIO_BANK_SIZE; j++) {
+>> +                       spmx->gpio_regs[i][j] = readl(spmx->gpio_virtbase +
+>> +                               SIRFSOC_GPIO_CTRL(i, j));
+>> +               }
+>> +               spmx->ints_regs[i] = readl(spmx->gpio_virtbase +
+>> +                       SIRFSOC_GPIO_INT_STATUS(i));
+>> +               spmx->paden_regs[i] = readl(spmx->gpio_virtbase +
+>> +                       SIRFSOC_GPIO_PAD_EN(i));
+>> +       }
+>> +       spmx->dspen_regs = readl(spmx->gpio_virtbase + SIRFSOC_GPIO_DSP_EN0);
+>> +
+>> +       for (i = 0; i < 3; i++)
+>
+> Why are you hard-coding 3 here? It looks fragile.
 
-The problem is that neither the old nor the new bootloaders are setting
-such property in the DT. Old bootloaders shipped by Marvell don't have
-DT support at all. New bootloaders shipped by Marvell do have DT
-support, but they are not adding any specific DT property that allows
-us to tell whether the registers are mapped here or there.
+that means i have 3 registers beginning from spmx->rsc_virtbase to
+save and restore. i missed to check the name of everyone.
 
-We could maybe find a way of detecting whether if the bootloader is DT
-capable, and assume that if it's DT capable, the registers are already
-mapped at 0xf1. But that's very fragile: nothing prevents an user to
-use a DT-capable bootloader to boot a kernel in the old style way
-(appended DTB). In this case, we would assume that the registers are at
-0xd0, because we're being booted old-style, and therefore it must be an
-old bootloader. Very fragile, clearly not better than the CP15 trick.
+>
+>> +               spmx->rsc_regs[i] = readl(spmx->rsc_virtbase + 4 * i);
+>> +ery
+>> +       return 0;
+>> +}
+>> +
+>> +static int sirfsoc_pinmux_resume_noirq(struct device *dev)
+>> +{
+>> +       int i, j;
+>> +       struct sirfsoc_pmx *spmx = dev_get_drvdata(dev);
+>> +
+>> +       for (i = 0; i < SIRFSOC_GPIO_NO_OF_BANKS; i++) {
+>> +               for (j = 0; j < SIRFSOC_GPIO_BANK_SIZE; j++) {
+>> +                       writel(spmx->gpio_regs[i][j], spmx->gpio_virtbase +
+>> +                               SIRFSOC_GPIO_CTRL(i, j));
+>> +               }
+>> +               writel(spmx->ints_regs[i], spmx->gpio_virtbase +
+>> +                       SIRFSOC_GPIO_INT_STATUS(i));
+>> +               writel(spmx->paden_regs[i], spmx->gpio_virtbase +
+>> +                       SIRFSOC_GPIO_PAD_EN(i));
+>> +       }
+>> +       writel(spmx->dspen_regs, spmx->gpio_virtbase + SIRFSOC_GPIO_DSP_EN0);
+>> +
+>> +       for (i = 0; i < 3; i++)
+>
+> Dito.
+>
+> Yours,
+> Linus Walleij
+>
 
-> However, i don't know if this can actually work. How early can you
-> parse the DT in order to know where the serial port is for
-> earlyprintk()? It also gets messy keeping track of the two different
-> DT binary blobs and somehow having the probe the uboot version in
-> order to install the right one. I don't know how i would include this
-> into the debian flash-kernel for example.
-
-For earlyprintk, we can "solve" it as Arnd suggested: just have two
-Kconfig options, one for 0xd0, one for 0xf1, and it's up to the user to
-choose the right one. It's not entirely nice because it's no longer
-automatic, and I'm sure our users will have a hard time figuring out
-whether they have an "old" or a "new" bootloader. But let's assume we
-do this. earlyprintk knows the physical address of the UART.
-
-Then, we enter ->map_io(). We have access to the Device Tree. But the
-Device Tree doesn't tell us whether the bootloader has mapped the
-registers. As I explained to Arnd, it's not a per-board criteria: when
-I'm booting my OpenBlocks with the manufacturer U-Boot, registers are
-mapped at 0xd0. When I boot the same OpenBlocks with the (admittedly
-work-in-progress) Barebox bootloader, registers are mapped at 0xf1.
-Same board, different register location.
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-barry
