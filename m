@@ -1,60 +1,58 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 22 May 2013 10:19:12 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBpb211eC1teDUxOiBBbHdheXMgZGVmaW5lIFBV?=
- =?UTF-8?B?RSBmb3IgcGlucyB1c2VkIGFzIEdQSU8=?=
-In-Reply-To: <20130521192430.GU32299@pengutronix.de>
-References: <1369124845-19244-1-git-send-email-shc_work@mail.ru>
- <20130521192430.GU32299@pengutronix.de>
-Message-ID: <1369203552.559574351@f389.i.mail.ru>
+From: nvmarkzhang@gmail.com (Mark Zhang)
+Date: Wed, 22 May 2013 14:24:43 +0800
+Subject: Naming convention DSI + device tree
+In-Reply-To: <5195C1E2.4020009@nvidia.com>
+References: <20130514181745.GA2762@mail.o2s.ch>
+ <51940C22.4050802@wwwdotorg.org> <20130516071537.GA13573@mail.o2s.ch>
+ <519522C1.5010107@wwwdotorg.org> <5195C1E2.4020009@nvidia.com>
+Message-ID: <519C64AB.2090708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tue, May 21, 2013 at 12:27:25PM +0400, Alexander Shiyan wrote:
-> > This patch adds a PUE bit for pins which used as GPIO. This allow
-> > to use the GPIOs correctly as inputs when source is open-drain with
-> > external pullup resistor (IRQ open-drain outputs for example).
+Cool. Alex, do you know any updates on DSI part of CDF? I recall few
+months ago, Laurent wrote mail to share some infos about the CDF
+discussions, and it mentioned that the DSI will be considered in next
+version of CDF... you know, for t114, the DSI support is a must.
+
+Mark
+On 05/17/2013 01:36 PM, Alex Courbot wrote:
+> On 05/17/2013 03:17 AM, Stephen Warren wrote:
+>>> Is this upcoming CDF included within your "linux-next_common"
+>>> branch?
+>>
+>> No. That branch of mine is basd on linux-next, so whatever is in
+>> linux-next is in my branch, and I certainly haven't applied the CDF
+>> locally.
+>>
+>> I believe the CDF has been posted to various mailing lists a few
+>> times, but it isn't checked in yet since there isn't a final version.
+>> I CC'd Alex; he might know the status better than me.
 > 
-> I don't understand. If there's an external pullup why do you want to
-> turn on the internal one?
-
-It is just switch off keeper circuit.
-
-Some pads not have internal pullup, probably this is affected only for such pins.
-This is example of this issue:
-Used pad MX51_PAD_DISPB2_SER_CLK__GPIO3_7, (GPIO3.7 = 71).
-External pullup resistor is used.
-
-gpio_direction output 71 1
-gpio_direction_input 71
-gpio_get_value 71; echo $?
-1
-gpio_direction output 71 0
-gpio_direction_input 71
-gpio_get_value 71; echo $?
-0
-
-So, we cannot get "1" here anymore if only pullup is used for this pad. The pad is keep last logic state...
-The second solution for this is disable PKE, i am not sure which solution is the best...
-
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > ---
-> >  arch/arm/mach-imx/iomux-mx51.h | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/iomux-mx51.h b/arch/arm/mach-imx/iomux-mx51.h
-> > index 75bbcc4..7dc187c 100644
-> > --- a/arch/arm/mach-imx/iomux-mx51.h
-> > +++ b/arch/arm/mach-imx/iomux-mx51.h
-> > @@ -34,7 +34,8 @@
-> >  #define MX51_SDHCI_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_DSE_HIGH | \
-> >  				PAD_CTL_PUS_47K_UP | PAD_CTL_PUE | \
-> >  				PAD_CTL_SRE_FAST | PAD_CTL_DVS)
-> > -#define MX51_GPIO_PAD_CTRL	(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | PAD_CTL_SRE_FAST)
-> > +#define MX51_GPIO_PAD_CTRL	(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | \
-> > +				PAD_CTL_PUE | PAD_CTL_SRE_FAST)
-> >  
-> >  #define MX51_PAD_CTRL_2		(PAD_CTL_PKE | PAD_CTL_HYS)
-> >  #define MX51_PAD_CTRL_3		(PAD_CTL_PKE | PAD_CTL_PUS_100K_UP)
-> > -- 
-
----
+> Current version is RFC v2 - I know Laurent is working on a v3, but it is
+> taking some time. It will probably differ considerably from v2, so be
+> warned if you use it.
+> 
+> Still, if you want to play around with the CDF, you can have a look at
+> the tegra-cdf branch of my github repo:
+> https://github.com/Gnurou/linux/commits/tegra-cdf
+> 
+> It was kind of old so I rebased it on top of 3.10rc1. It includes the
+> CDF v2 patch, adds CDF support to the tegra-drm driver, and also
+> implements a driver for the Tegra 2-based Ventana panel. It's pretty
+> straightforward to read so I guess you can use that as a guide.
+> 
+> I checked whether the rebase worked and it does - you just need to
+> enable host1x/tegradrm support on top of the default settings (Stephen,
+> why aren't these enabled by default?)
+> 
+> So long story short, CDF works well and is small enough to be easy to
+> maintain out-of-tree. A proper panel framework is desperately needed in
+> the kernel, so I hope it will move forward soon.
+> 
+> Hope this helps,
+> Alex.
+> 
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
