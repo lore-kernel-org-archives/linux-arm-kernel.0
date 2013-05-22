@@ -1,35 +1,52 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 22 May 2013 12:01:29 +0200
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
- 370/XP
-In-Reply-To: <20130521193803.GA20882@1wt.eu>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130521193803.GA20882@1wt.eu>
-Message-ID: <519C9779.1040104@gmail.com>
+From: tiejun.chen@windriver.com (tiejun.chen)
+Date: Wed, 22 May 2013 18:04:18 +0800
+Subject: [PATCH v4 06/12] ARM: dove: add gigabit ethernet and mvmdio device
+ tree nodes
+In-Reply-To: <519C9333.20609@gmail.com>
+References: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369154510-4927-7-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130521174849.GL26249@lunn.ch> <519C9333.20609@gmail.com>
+Message-ID: <519C9822.9040909@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2013 09:38 PM, Willy Tarreau wrote:
-> On Tue, May 21, 2013 at 12:33:25PM +0200, Thomas Petazzoni wrote:
-> (...)
->> As it was explained above, we unfortunately can't read the
->> current base address of the internal register window, so we need a
->> different mechanism to know if the bootloader has done the remapping
->> at 0xF1000000 (new generation bootloader) or has left the internal
->> registers at 0xD0000000 (old generation bootloader).
+On 05/22/2013 05:43 PM, Sebastian Hesselbarth wrote:
+> On 05/21/2013 07:48 PM, Andrew Lunn wrote:
+>> On Tue, May 21, 2013 at 06:41:44PM +0200, Sebastian Hesselbarth wrote:
+>>> This patch adds orion-eth and mvmdio device tree nodes for DT enabled
+>>> Dove boards. As there is only one ethernet controller on Dove, a default
+>>> phy node is also added with a note to set its reg property on a per-board
+>>> basis.
+>>>
+>>> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
+>>> ---
+> ...
+>>> +            ethernet-port at 0 {
+>>> +                device_type = "network";
+>>> +                compatible = "marvell,orion-eth-port";
+>>> +                reg =<0>;
+>>> +                interrupts =<29>;
+>>> +                /* overwrite MAC address in bootloader */
+>>> +                local-mac-address = [00 00 00 00 00 00];
+>>
+>> Hi Sebastian
+>>
+>> Its probably a good idea to set the local administration bit in this
+>> MAC address. i.e. first byte is 02.
 >
-> Just out of curiosity, what happens if you touch the register at the
-> wrong address ? I mean, if you blindly write to the 0xD0xxxxxx address
-> that you want the registers to be mapped at 0xF1xxxxxx. Will the chip
-> hang, will it silently ignore the sequence ? Because maybe you don't
-> need to detect using CP15 whether the remapping was done, you could
-> simply perform it unconditionally.
+> Andrew,
+>
+> we just need an invalid address here to trigger the default behavior of
+> the driver and load the MAC address from its register. As PPC binding
+> documentation also has all zero, I just took it.
 
-Willy,
+The truth is in PPC case, often we set the real mac address with some variables 
+like 'eth[x]addr' in u-boot prompt, then u-boot will parse that value to fill 
+the dtb. At last the associated driver can get the actual mac address from the 
+dtb. And especially for those older u-boot version, even you have to reset the 
+'local-mac-address' property in dts directly with the real mac address before 
+generate the dtb since the older u-boot have no this ability to fill dtb again 
+before pass the kernel.
 
-I tried the above on Dove which is possibly affected by the workaround
-as it is also ARMv7. In Dove you can access unmapped addresses without
-any problems, but as Thomas already stated Armada 370/XP just hang.
-Must be some default AHB slave in Dove, which Armada 370/XP is missing.
-
-Sebastian
+Tiejun
