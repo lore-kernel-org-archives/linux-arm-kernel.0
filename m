@@ -1,40 +1,55 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Wed, 22 May 2013 09:02:56 +0200
-Subject: [PATCH] ARM: iomux-mx51: Always define PU
- E for pins used as GPIO
-In-Reply-To: <1369203552.559574351@f389.i.mail.ru>
-References: <1369124845-19244-1-git-send-email-shc_work@mail.ru>
- <20130521192430.GU32299@pengutronix.de>
- <1369203552.559574351@f389.i.mail.ru>
-Message-ID: <20892.28064.82907.942799@ipc1.ka-ro>
+From: avinashphilip@ti.com (Philip Avinash)
+Date: Wed, 22 May 2013 12:40:24 +0530
+Subject: [PATCH 01/11] ARM: davinci: GPIO: Add platform data structure
+In-Reply-To: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
+References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <1369206634-6778-2-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: KV Sujith <sujithkv@ti.com>
 
-Alexander Shiyan writes:
-> > On Tue, May 21, 2013 at 12:27:25PM +0400, Alexander Shiyan wrote:
-> > > This patch adds a PUE bit for pins which used as GPIO. This allow
-> > > to use the GPIOs correctly as inputs when source is open-drain with
-> > > external pullup resistor (IRQ open-drain outputs for example).
-> > 
-> > I don't understand. If there's an external pullup why do you want to
-> > turn on the internal one?
-> 
-> It is just switch off keeper circuit.
-> 
-If you want to switch the keeper circuit off why don't you do that by
-removing PAD_CTL_PKE rather than adding PAD_CTL_PUE?
+Add struct davinci_gpio_platform_data davinci gpio module.
 
+Signed-off-by: KV Sujith <sujithkv@ti.com>
+Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+---
+ include/linux/platform_data/gpio-davinci.h |   27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 include/linux/platform_data/gpio-davinci.h
 
-Lothar Wa?mann
+diff --git a/include/linux/platform_data/gpio-davinci.h b/include/linux/platform_data/gpio-davinci.h
+new file mode 100644
+index 0000000..f1c8277
+--- /dev/null
++++ b/include/linux/platform_data/gpio-davinci.h
+@@ -0,0 +1,27 @@
++/*
++ * gpio-davinci.h
++ *
++ * DaVinci GPIO Platform Related Defines
++ *
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __ASM_ARCH_DAVINCI_GPIO_H
++#define __ASM_ARCH_DAVINCI_GPIO_H
++
++struct davinci_gpio_platform_data {
++	u32	ngpio;
++	u32	gpio_unbanked;
++	u32	intc_irq_num;
++};
++
++#endif
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+1.7.9.5
