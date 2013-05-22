@@ -1,70 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 22 May 2013 09:10:10 -0400
-Subject: [PATCH v4 06/12] ARM: dove: add gigabit ethernet and mvmdio
- device tree nodes
-In-Reply-To: <519C9A66.3050807@gmail.com>
-References: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369154510-4927-7-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130521174849.GL26249@lunn.ch> <519C9333.20609@gmail.com>
- <519C9822.9040909@windriver.com> <519C9A66.3050807@gmail.com>
-Message-ID: <20130522131010.GB31290@titan.lakedaemon.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 22 May 2013 15:12:38 +0200
+Subject: [PATCH 4/4] pci: mvebu: fix the emulation of the status register
+In-Reply-To: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369228358-32580-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 12:13:58PM +0200, Sebastian Hesselbarth wrote:
-> On 05/22/2013 12:04 PM, tiejun.chen wrote:
-> >On 05/22/2013 05:43 PM, Sebastian Hesselbarth wrote:
-> >>On 05/21/2013 07:48 PM, Andrew Lunn wrote:
-> >>>On Tue, May 21, 2013 at 06:41:44PM +0200, Sebastian Hesselbarth wrote:
-> >>>>This patch adds orion-eth and mvmdio device tree nodes for DT enabled
-> >>>>Dove boards. As there is only one ethernet controller on Dove, a
-> >>>>default
-> >>>>phy node is also added with a note to set its reg property on a
-> >>>>per-board
-> >>>>basis.
-> >>>>
-> >>>>Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
-> >>>>---
-> >>...
-> >>>>+ ethernet-port at 0 {
-> >>>>+ device_type = "network";
-> >>>>+ compatible = "marvell,orion-eth-port";
-> >>>>+ reg =<0>;
-> >>>>+ interrupts =<29>;
-> >>>>+ /* overwrite MAC address in bootloader */
-> >>>>+ local-mac-address = [00 00 00 00 00 00];
-> >>>
-> >>>Hi Sebastian
-> >>>
-> >>>Its probably a good idea to set the local administration bit in this
-> >>>MAC address. i.e. first byte is 02.
-> >>
-> >>Andrew,
-> >>
-> >>we just need an invalid address here to trigger the default behavior of
-> >>the driver and load the MAC address from its register. As PPC binding
-> >>documentation also has all zero, I just took it.
-> >
-> >The truth is in PPC case, often we set the real mac address with some
-> >variables like 'eth[x]addr' in u-boot prompt, then u-boot will parse
-> >that value to fill the dtb. At last the associated driver can get the
-> >actual mac address from the dtb. And especially for those older u-boot
-> >version, even you have to reset the 'local-mac-address' property in dts
-> >directly with the real mac address before generate the dtb since the
-> >older u-boot have no this ability to fill dtb again before pass the kernel.
-> 
-> Tiejun,
-> 
-> with Marvell SoCs it is no different, except that there is almost no dtb
-> support in their u-boot.
+In a PCI configuration header, the 'devsel' bits of the status
+register are read-only, and indicate the timing of the secondary
+interface. Currently, we implement them as read/write, so when the
+Linux PCI core writes all 1's to this register, it gets 11b as the
+'devsel' value, which is reserved.
 
-iirc, our solution to this was to parse the ATAGs for the mac addr and
-update the appended dtb.  This way, module load and unload would work
-without loosing the mac address.  I believe Jason Gunthorpe has a patch
-to atags_to_fdt() for this...  This should allow us to get rid of the
-clocks hack.
+This commit fixes the PCI-to-PCI bridge emulation of the Marvell PCIe
+driver to ensure those bits remain set to 00b, which indicate a fast
+devsel decoding.
 
-thx,
+This allows to fix the lspci -v output from:
 
-Jason.
+  Flags: bus master, 66MHz, user-definable features, ?? devsel, latency 0
+
+to:
+
+  Flags: bus master, 66MHz, user-definable features, fast devsel, latency 0
+
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/pci/host/pci-mvebu.c |    5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index c887598..d730bf4 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -490,6 +490,11 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+ 	case PCI_COMMAND:
+ 		bridge->command = value & 0xffff;
+ 		bridge->status = value >> 16;
++		/*
++		 * The devsel bits are read-only, and we want to keep
++		 * them set to 0
++		 */
++		bridge->status &= ~PCI_STATUS_DEVSEL_MASK;
+ 		break;
+ 
+ 	case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
+-- 
+1.7.9.5
