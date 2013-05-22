@@ -1,34 +1,60 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Wed, 22 May 2013 09:12:48 +0300
-Subject: [v2 0/6] CLK: tegra: convert device tree files to use CLK defines
-In-Reply-To: <519B9B5D.4050402@wwwdotorg.org>
-References: <1369127450-15203-1-git-send-email-hdoyu@nvidia.com>
- <519B9B5D.4050402@wwwdotorg.org>
-Message-ID: <20130522091248.b3acd9c56ab66535d75b8fd1@nvidia.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 22 May 2013 10:19:12 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gQVJNOiBpb211eC1teDUxOiBBbHdheXMgZGVmaW5lIFBV?=
+ =?UTF-8?B?RSBmb3IgcGlucyB1c2VkIGFzIEdQSU8=?=
+In-Reply-To: <20130521192430.GU32299@pengutronix.de>
+References: <1369124845-19244-1-git-send-email-shc_work@mail.ru>
+ <20130521192430.GU32299@pengutronix.de>
+Message-ID: <1369203552.559574351@f389.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 May 2013 18:05:49 +0200
-Stephen Warren <swarren@wwwdotorg.org> wrote:
-
-> On 05/21/2013 03:10 AM, Hiroshi Doyu wrote:
-> > This patchset converts device tree files to use CLK defines. This
-> > version was updated along with the latest DT changes.
-> > 
-> > The following changes since commit 7479d8bb5650f43053d0e82fa44db668cf968f11:
-> > 
-> >   TESTING: Build Tegra USB as a module (2013-05-20 13:11:19 -0600)
+> On Tue, May 21, 2013 at 12:27:25PM +0400, Alexander Shiyan wrote:
+> > This patch adds a PUE bit for pins which used as GPIO. This allow
+> > to use the GPIOs correctly as inputs when source is open-drain with
+> > external pullup resistor (IRQ open-drain outputs for example).
 > 
-> That commit is in my personal work-in-progress branch. This series
-> should be based on Tegra's for-3.11/dt branch. This will make a
-> difference (at least) in patch 6/6, where you've edited some DT nodes
-> that don't yet exist upstream (i.e. Tegra's for-3.11/dt branch) and
-> hence this series won't apply there.
+> I don't understand. If there's an external pullup why do you want to
+> turn on the internal one?
 
-I'll rebase.
+It is just switch off keeper circuit.
 
-> I assume you're planning to send a series for 3.11 that converts
-> drivers/clk/tegra/ to use these new header files?
+Some pads not have internal pullup, probably this is affected only for such pins.
+This is example of this issue:
+Used pad MX51_PAD_DISPB2_SER_CLK__GPIO3_7, (GPIO3.7 = 71).
+External pullup resistor is used.
 
-I think that I'll work on SMMU first, which diverted from the
-downstream now. So the above may come a bit later.
+gpio_direction output 71 1
+gpio_direction_input 71
+gpio_get_value 71; echo $?
+1
+gpio_direction output 71 0
+gpio_direction_input 71
+gpio_get_value 71; echo $?
+0
+
+So, we cannot get "1" here anymore if only pullup is used for this pad. The pad is keep last logic state...
+The second solution for this is disable PKE, i am not sure which solution is the best...
+
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > ---
+> >  arch/arm/mach-imx/iomux-mx51.h | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/iomux-mx51.h b/arch/arm/mach-imx/iomux-mx51.h
+> > index 75bbcc4..7dc187c 100644
+> > --- a/arch/arm/mach-imx/iomux-mx51.h
+> > +++ b/arch/arm/mach-imx/iomux-mx51.h
+> > @@ -34,7 +34,8 @@
+> >  #define MX51_SDHCI_PAD_CTRL	(PAD_CTL_PKE | PAD_CTL_DSE_HIGH | \
+> >  				PAD_CTL_PUS_47K_UP | PAD_CTL_PUE | \
+> >  				PAD_CTL_SRE_FAST | PAD_CTL_DVS)
+> > -#define MX51_GPIO_PAD_CTRL	(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | PAD_CTL_SRE_FAST)
+> > +#define MX51_GPIO_PAD_CTRL	(PAD_CTL_DSE_HIGH | PAD_CTL_PKE | \
+> > +				PAD_CTL_PUE | PAD_CTL_SRE_FAST)
+> >  
+> >  #define MX51_PAD_CTRL_2		(PAD_CTL_PKE | PAD_CTL_HYS)
+> >  #define MX51_PAD_CTRL_3		(PAD_CTL_PKE | PAD_CTL_PUS_100K_UP)
+> > -- 
+
+---
