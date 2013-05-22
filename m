@@ -1,32 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 May 2013 16:11:08 +0200
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
- 370/XP
-In-Reply-To: <20130522155218.1c2af492@skate>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130522134336.GE18614@n2100.arm.linux.org.uk>
- <20130522155218.1c2af492@skate>
-Message-ID: <201305221611.08823.arnd@arndb.de>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 22 May 2013 23:13:40 +0900
+Subject: [PATCH FOR v3.10 v2] ARM: shmobile: kzm9g-reference: Update CMT
+ clocksource rating to 80
+Message-ID: <1369232020-22681-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 May 2013, Thomas Petazzoni wrote:
-> Dear Russell King - ARM Linux,
-> 
-> On Wed, 22 May 2013 14:43:36 +0100, Russell King - ARM Linux wrote:
-> > On Wed, May 22, 2013 at 12:01:29PM +0200, Sebastian Hesselbarth wrote:
-> > > I tried the above on Dove which is possibly affected by the workaround
-> > > as it is also ARMv7. In Dove you can access unmapped addresses without
-> > > any problems, but as Thomas already stated Armada 370/XP just hang.
-> > > Must be some default AHB slave in Dove, which Armada 370/XP is missing.
-> > 
-> > It may be some clock setting somewhere on the 370/XP.  The Dove will hang
-> > as well if you prod at peripherals which you've turned their clocks off.
-> 
-> The register in question (offset 0x20080 from the base address of the
-> internal register) is part of the "core" registers, so I clearly don't
-> see how the system could even be booting if this clock was gated. No?
+Update the CMT clocksource rating from 125 to 80.
 
-It would hang if you add that offset to the wrong base address though.
+This resolves a boot-failure regression for kzm9g-reference in v3.10-rc1
+introduced by f7db706b132f11c79ae1d74b2382e0926cf31644 ("ARM: 7674/1: smp:
+Avoid dummy clockevent being preferred over real").
 
-	Arnd
+The patch noted above reduces the rating of dummy clockevent from 400 to 100.
+This patch reduces the rating of CMT so that it is once again less than that
+of the dummy clockevent.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+---
+
+I also plan to reduce the rating of the STI clocksource to less than 100.
+However, as I am not aware of any problems relating to STI in v3.10-rc
+my plan is to update STI in the v3.11 timeframe.
+---
+ arch/arm/mach-shmobile/setup-sh73a0.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index fdf3894..9696f36 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -252,7 +252,7 @@ static struct sh_timer_config cmt10_platform_data = {
+ 	.name = "CMT10",
+ 	.channel_offset = 0x10,
+ 	.timer_bit = 0,
+-	.clockevent_rating = 125,
++	.clockevent_rating = 80,
+ 	.clocksource_rating = 125,
+ };
+ 
+-- 
+1.8.2.1
