@@ -1,122 +1,167 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 22 May 2013 19:22:59 +0200 (CEST)
-Subject: [PATCH 05/11] ARM: shmobile: APE6EVM LAN9220 support
-In-Reply-To: <20130522143204.GE32012@verge.net.au>
-References: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
- <1364954906-16014-6-git-send-email-horms+renesas@verge.net.au>
- <Pine.LNX.4.64.1305171458550.31481@axis700.grange>
- <20130522143204.GE32012@verge.net.au>
-Message-ID: <Pine.LNX.4.64.1305221911380.12715@axis700.grange>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 22 May 2013 19:26:53 +0200
+Subject: [PATCH] ASoC: Add support for BCM2708
+In-Reply-To: <519CD1CC.8070507@koalo.de>
+References: <519CD1CC.8070507@koalo.de>
+Message-ID: <519CFFDD.4080203@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon
+On 05/22/2013 04:10 PM, Florian Meier wrote:
+[...]
+> diff --git a/sound/soc/bcm2708/bcm2708-i2s.c b/sound/soc/bcm2708/bcm2708-i2s.c
+> new file mode 100644
+> index 0000000..a8e995f
+> --- /dev/null
+> +++ b/sound/soc/bcm2708/bcm2708-i2s.c
+> @@ -0,0 +1,964 @@
+[...]
+> +static int bcm2708_i2s_startup(struct snd_pcm_substream *substream,
+> +			       struct snd_soc_dai *dai)
+> +{
+> +	struct bcm2708_i2s_dev *dev = snd_soc_dai_get_drvdata(dai);
+> +
+> +	if (!dev->first_stream) {
+> +		dev->first_stream = substream;
+> +
+> +		/* should this still be running stop it */
+> +		bcm2708_i2s_stop_clock(dev);
+> +
+> +		/* enable PCM block */
+> +		bcm2708_i2s_set_bits(dev, BCM2708_I2S_CS_A_REG, BCM2708_I2S_EN);
+> +
+> +		/*
+> +		 * Disable STBY
+> +		 * Requires at least 4 PCM clock cycles to take effect
+> +		 */
+> +		bcm2708_i2s_set_bits(dev, BCM2708_I2S_CS_A_REG,
+> +				BCM2708_I2S_STBY);
+> +	} else {
+> +		struct snd_pcm_runtime *first_runtime =
+> +			dev->first_stream->runtime;
+> +
+> +		/*
+> +		 * This is the second stream open, so we need to impose
+> +		 * sample size and sampling rate constraints.
+> +		 * This is because frame length and clock cannot be specified
+> +		 * seperately.
+> +		 *
+> +		 * Note that this can cause a race condition if the
+> +		 * second stream is opened before the first stream is
+> +		 * fully initialized.  We provide some protection by
+> +		 * checking to make sure the first stream is
+> +		 * initialized, but it's not perfect.  ALSA sometimes
+> +		 * re-initializes the driver with a different sample
+> +		 * rate or size.  If the second stream is opened
+> +		 * before the first stream has received its final
+> +		 * parameters, then the second stream may be
+> +		 * constrained to the wrong sample rate or size.
+> +		 *
+> +		 * We will continue in case of failure and recheck the
+> +		 * constraint in hw_params.
+> +		 */
+> +		if (!first_runtime->format) {
+> +			dev_err(substream->pcm->card->dev,
+> +					"Set format in %s stream first! "
+> +					"Initialization may fail.\n",
+> +					substream->stream ==
+> +					SNDRV_PCM_STREAM_PLAYBACK
+> +					? "capture" : "playback");
+> +		} else {
+> +			snd_pcm_hw_constraint_minmax(substream->runtime,
+> +					SNDRV_PCM_HW_PARAM_FORMAT,
+> +					first_runtime->format,
+> +					first_runtime->format);
+> +		}
+> +
+> +		if (!first_runtime->rate) {
+> +			dev_err(substream->pcm->card->dev,
+> +					"Set sampling rate in %s stream first! "
+> +					"Initialization may fail!\n",
+> +					substream->stream ==
+> +					SNDRV_PCM_STREAM_PLAYBACK
+> +					? "capture" : "playback");
+> +		} else {
+> +			snd_pcm_hw_constraint_minmax(substream->runtime,
+> +					SNDRV_PCM_HW_PARAM_RATE,
+> +					first_runtime->rate,
+> +					first_runtime->rate);
+> +		}
 
-On Wed, 22 May 2013, Simon Horman wrote:
+Setting the symmetric_rates lets the core take care of setting the proper
+constraints on the rate. It probably makes sense to also add a
+symmetric_formats since this isn't the only driver that has the requirement
+that the formats for playback and capture match.
 
-> On Fri, May 17, 2013 at 03:00:23PM +0200, Guennadi Liakhovetski wrote:
-> > Hi Simon, Magnus
-> > 
-> > On Wed, 3 Apr 2013, Simon Horman wrote:
-> > 
-> > > From: Magnus Damm <damm@opensource.se>
-> > > 
-> > > Add LAN9220 support to the APE6EVM board using C and DT.
-> > > At this point the PFC driver lacks DT bindings so to
-> > > configure the PFC we use PINCTRL in C board code.
-> > > 
-> > > Signed-off-by: Magnus Damm <damm@opensource.se>
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > ---
-> > >  arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   23 ++++++++++++++++++-
-> > >  arch/arm/mach-shmobile/board-ape6evm.c |   38 ++++++++++++++++++++++++++++++++
-> > >  2 files changed, 60 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > > index 833f703..f603c69 100644
-> > > --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > > +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > > @@ -16,7 +16,7 @@
-> > >  	compatible = "renesas,ape6evm", "renesas,r8a73a4";
-> > >  
-> > >  	chosen {
-> > > -		bootargs = "console=ttySC0,115200 ignore_loglevel";
-> > > +		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp";
-> > >  	};
-> > >  
-> > >  	memory at 40000000 {
-> > > @@ -24,8 +24,29 @@
-> > >  		reg = <0 0x40000000 0 0x40000000>;
-> > >  	};
-> > >  
-> > > +	ape6evm_fixed_3v3: fixedregulator at 0 {
-> > > +		compatible = "regulator-fixed";
-> > > +		regulator-name = "3V3";
-> > > +		regulator-min-microvolt = <3300000>;
-> > > +		regulator-max-microvolt = <3300000>;
-> > > +		regulator-always-on;
-> > > +	};
-> > > +
-> > >  	lbsc {
-> > >  		#address-cells = <1>;
-> > >  		#size-cells = <1>;
-> > > +
-> > > +		ethernet at 8000000 {
-> > > +			compatible = "smsc,lan9118", "smsc,lan9115";
-> > > +			reg = <0x08000000 0x1000>;
-> > > +			interrupt-parent = <&irqc1>;
-> > > +			interrupts = <8 0x4>;
-> > > +			phy-mode = "mii";
-> > > +			reg-io-width = <4>;
-> > > +			smsc,irq-active-high;
-> > > +			smsc,irq-push-pull;
-> > > +			vdd33a-supply = <&ape6evm_fixed_3v3>;
-> > > +			vddvario-supply = <&ape6evm_fixed_3v3>;
-> > > +		};
-> > >  	};
-> > >  };
-> > 
-> > The above didn't work in my tests without this:
-> > 
-> > diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts 
-> > b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > index f603c69..4fb0102 100644
-> > --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > @@ -33,8 +33,10 @@
-> >  	};
-> >  
-> >  	lbsc {
-> > +		compatible = "simple-bus";
-> >  		#address-cells = <1>;
-> >  		#size-cells = <1>;
-> > +		ranges = <0 0 0 0x80000000>;
-> >  
-> >  		ethernet at 8000000 {
-> >  			compatible = "smsc,lan9118", "smsc,lan9115";
-> > 
-> 
-> Could you please post this as a formal patch and indicate
-> if you would like it included as a fix in v3.10 or not?
+> +
+> +		dev->second_stream = substream;
+> +	}
+> +
+> +	snd_soc_dai_set_dma_data(dai, substream,
+> +			&dev->dma_params[substream->stream]);
+> +
+> +	return 0;
+> +}
+> +
+> +static void bcm2708_i2s_shutdown(struct snd_pcm_substream *substream,
+> +		struct snd_soc_dai *dai)
+> +{
+> +	struct bcm2708_i2s_dev *dev = snd_soc_dai_get_drvdata(dai);
+> +
+> +	bcm2708_i2s_stop(dev, substream);
+> +
+> +	if (dev->first_stream == substream)
+> +		dev->first_stream = dev->second_stream;
+> +
+> +	dev->second_stream = NULL;
+> +
+> +	/* If both streams are stopped, disable module and clock */
+> +	if (!dev->first_stream) {
+> +		/* Disable the module */
+> +		bcm2708_i2s_clear_bits(dev, BCM2708_I2S_CS_A_REG,
+> +				BCM2708_I2S_EN);
+> +
+> +		/*
+> +		 * Stopping clock is necessary, because stop does
+> +		 * not stop the clock when SND_SOC_DAIFMT_CONT
+> +		 */
+> +		bcm2708_i2s_stop_clock(dev);
+> +	}
+> +}
+[...]
+> diff --git a/sound/soc/bcm2708/bcm2708-pcm.c b/sound/soc/bcm2708/bcm2708-pcm.c
+> new file mode 100644
+> index 0000000..4b3e688
+> --- /dev/null
+> +++ b/sound/soc/bcm2708/bcm2708-pcm.c
+> @@ -0,0 +1,303 @@
 
-Can do that, sure, just thought maybe it would be better to fix the 
-original patch. Besides, I wasn't sure what the correct values for 
-"ranges" are, I just picked up something, that would be sufficient for 
-ethernet. But if more devices are added to it in the future, maybe 
-different ranges values would be needed. I think actually, lbsc should map 
-the 3 BSC areas, so, the correct property would be
+I think you should be able to remove the bulk of this driver by using the
+generic PCM dmaengine driver.
 
-+		ranges = <0 0 0 0x14000000>;
+[...]
+> +
+> +#include "bcm2708-pcm.h"
+> +
+> +static const struct snd_pcm_hardware bcm2708_pcm_hardware = {
+> +	.info			= SNDRV_PCM_INFO_MMAP |
+> +				  SNDRV_PCM_INFO_MMAP_VALID |
+> +				  SNDRV_PCM_INFO_INTERLEAVED |
+> +				  SNDRV_PCM_INFO_PAUSE |
+> +				  SNDRV_PCM_INFO_RESUME |
+> +				  SNDRV_PCM_INFO_JOINT_DUPLEX |
+> +				  SNDRV_PCM_INFO_NO_PERIOD_WAKEUP,
 
-> Also, I am curious to know what your tests are.
+I don't think you actually support the last one, and neither pause and
+resume are supported.
 
-Just booting with NFS root. I think, anything involving ethernet. Without 
-the "simple-bus" property the lbsc node doesn't get scanned, so, no device 
-is added. Without "ranges" addresses cannot be mapped correctly.
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+> +	.formats		= SNDRV_PCM_FMTBIT_S16_LE |
+> +				  SNDRV_PCM_FMTBIT_S32_LE,
+> +	.period_bytes_min	= 32,
+> +	.period_bytes_max	= 64 * 1024,
+> +	.periods_min		= 2,
+> +	.periods_max		= 255,
+> +	.buffer_bytes_max	= 128 * 1024,
+> +};
+> +
+[...]
