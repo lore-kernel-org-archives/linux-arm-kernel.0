@@ -1,139 +1,190 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Wed, 22 May 2013 12:47:09 +0300
-Subject: [PATCH v2 10/10] kernel: might_fault does not imply might_sleep
-In-Reply-To: <20130521115734.GA9554@twins.programming.kicks-ass.net>
-References: <cover.1368702323.git.mst@redhat.com>
- <1f85dc8e6a0149677563a2dfb4cef9a9c7eaa391.1368702323.git.mst@redhat.com>
- <20130516184041.GP19669@dyad.programming.kicks-ass.net>
- <20130519093526.GD19883@redhat.com>
- <20130521115734.GA9554@twins.programming.kicks-ass.net>
-Message-ID: <20130522094709.GA26451@redhat.com>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Wed, 22 May 2013 09:47:37 +0000
+Subject: [PATCH v4] clocksource: add Vybrid Family pit timer support
+In-Reply-To: <519B48F4.8050005@linaro.org>
+References: <1369121274-9371-1-git-send-email-b35083@freescale.com>
+ <519B48F4.8050005@linaro.org>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E851CBE88@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 01:57:34PM +0200, Peter Zijlstra wrote:
-> On Sun, May 19, 2013 at 12:35:26PM +0300, Michael S. Tsirkin wrote:
-> > > > --- a/include/linux/kernel.h
-> > > > +++ b/include/linux/kernel.h
-> > > > @@ -198,7 +198,6 @@ void might_fault(void);
-> > > >  #else
-> > > >  static inline void might_fault(void)
-> > > >  {
-> > > > -	might_sleep();
-> > > 
-> > > This removes potential resched points for PREEMPT_VOLUNTARY -- was that
-> > > intentional?
-> > 
-> > No it's a bug. Thanks for pointing this out.
-> > OK so I guess it should be might_sleep_if(!in_atomic())
-> > and this means might_fault would have to move from linux/kernel.h to
-> > linux/uaccess.h, since in_atomic() is in linux/hardirq.h
-> > 
-> > Makes sense?
-> 
-> So the only difference between PROVE_LOCKING and not should be the
-> might_lock_read() thing; so how about something like this?
-> 
-> ---
->  include/linux/kernel.h  |  7 ++-----
->  include/linux/uaccess.h | 26 ++++++++++++++++++++++++++
->  mm/memory.c             | 14 ++------------
->  3 files changed, 30 insertions(+), 17 deletions(-)
-> 
-> diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-> index e96329c..70812f4 100644
-> --- a/include/linux/kernel.h
-> +++ b/include/linux/kernel.h
-> @@ -194,12 +194,9 @@ extern int _cond_resched(void);
->  	})
->  
->  #ifdef CONFIG_PROVE_LOCKING
-> -void might_fault(void);
-> +void might_fault_lockdep(void);
->  #else
-> -static inline void might_fault(void)
-> -{
-> -	might_sleep();
-> -}
-> +static inline void might_fault_lockdep(void) { }
->  #endif
->  
->  extern struct atomic_notifier_head panic_notifier_list;
-> diff --git a/include/linux/uaccess.h b/include/linux/uaccess.h
-> index 5ca0951..50a2cc9 100644
-> --- a/include/linux/uaccess.h
-> +++ b/include/linux/uaccess.h
-> @@ -38,6 +38,32 @@ static inline void pagefault_enable(void)
->  	preempt_check_resched();
->  }
->  
-> +static inline bool __can_fault(void)
-> +{
-> +	/*
-> +	 * Some code (nfs/sunrpc) uses socket ops on kernel memory while
-> +	 * holding the mmap_sem, this is safe because kernel memory doesn't
-> +	 * get paged out, therefore we'll never actually fault, and the
-> +	 * below annotations will generate false positives.
-> +	 */
-> +	if (segment_eq(get_fs(), KERNEL_DS))
-> +		return false;
-> +
-> +	if (in_atomic() /* || pagefault_disabled() */)
-
-One question here: I'm guessing you put this comment here
-for illustrative purposes, implying code that will
-be enabled in -rt?
-We don't want it upstream I think, right?
 
 
-> +		return false;
-> +
-> +	return true;
-> +}
-> +
-> +static inline void might_fault(void)
-> +{
-> +	if (!__can_fault())
-> +		return;
-> +
-> +	might_sleep();
-> +	might_fault_lockdep();
-> +}
-> +
->  #ifndef ARCH_HAS_NOCACHE_UACCESS
->  
->  static inline unsigned long __copy_from_user_inatomic_nocache(void *to,
-> diff --git a/mm/memory.c b/mm/memory.c
-> index 6dc1882..266610c 100644
-> --- a/mm/memory.c
-> +++ b/mm/memory.c
-> @@ -4211,19 +4211,9 @@ void print_vma_addr(char *prefix, unsigned long ip)
->  }
->  
->  #ifdef CONFIG_PROVE_LOCKING
-> -void might_fault(void)
-> +void might_fault_lockdep(void)
->  {
->  	/*
-> -	 * Some code (nfs/sunrpc) uses socket ops on kernel memory while
-> -	 * holding the mmap_sem, this is safe because kernel memory doesn't
-> -	 * get paged out, therefore we'll never actually fault, and the
-> -	 * below annotations will generate false positives.
-> -	 */
-> -	if (segment_eq(get_fs(), KERNEL_DS))
-> -		return;
-> -
-> -	might_sleep();
-> -	/*
->  	 * it would be nicer only to annotate paths which are not under
->  	 * pagefault_disable, however that requires a larger audit and
->  	 * providing helpers like get_user_atomic.
-> @@ -4231,7 +4221,7 @@ void might_fault(void)
->  	if (!in_atomic() && current->mm)
->  		might_lock_read(&current->mm->mmap_sem);
->  }
-> -EXPORT_SYMBOL(might_fault);
-> +EXPORT_SYMBOL(might_fault_lockdep);
->  #endif
->  
->  #if defined(CONFIG_TRANSPARENT_HUGEPAGE) || defined(CONFIG_HUGETLBFS)
+>-----Original Message-----
+>From: Daniel Lezcano [mailto:daniel.lezcano at linaro.org]
+>Sent: Tuesday, May 21, 2013 6:14 PM
+>To: Lu Jingchang-B35083
+>Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>john.stultz at linaro.org; tglx at linutronix.de; shawn.guo at linaro.org;
+>s.hauer at pengutronix.de
+>Subject: Re: [PATCH v4] clocksource: add Vybrid Family pit timer support
+>
+>On 05/21/2013 09:27 AM, Jingchang Lu wrote:
+>> Add Freescale Vybrid Family period interrupt timer support.
+>>
+>> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+>> ---
+>> v4:
+>>   use family name names driver and symbol instead of SoC name.
+>>   remove redundant code.
+>>   use BUG_ON instead of WARN_ON.
+>>   add necessory comment information.
+>>
+>>  drivers/clocksource/Kconfig         |   5 +
+>>  drivers/clocksource/Makefile        |   1 +
+>>  drivers/clocksource/mvf_pit_timer.c | 187
+>> ++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 193 insertions(+)
+>>  create mode 100644 drivers/clocksource/mvf_pit_timer.c
+>
+>[ ... ]
+>
+>> +
+>> +static int pit_set_next_event(unsigned long delta,
+>> +				struct clock_event_device *unused) {
+>> +	/*
+>> +	 * set a new value to PITLDVAL register will not restart the timer,
+>> +	 * to abort the current cycle and start a timer period with the new
+>> +	 * value, the timer must be disabled and enabled again.
+>> +	 * and the PITLAVAL should be set to delta minus one.
+>
+>Why delta "minus one" ?
+[Lu Jingchang-B35083] 
+This is required by the PIT hardware, it is a down counter, the PITLAVAL register should be set to (delta-1), it will raise an interrupt when it counts down to 0. Thanks!
+>
+>> +	 */
+>> +	pit_timer_disable();
+>> +	__raw_writel(delta - 1, clkevt_base + PITLDVAL);
+>> +	pit_timer_enable();
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static void pit_set_mode(enum clock_event_mode mode,
+>> +				struct clock_event_device *evt)
+>> +{
+>> +	switch (mode) {
+>> +	case CLOCK_EVT_MODE_PERIODIC:
+>> +		pit_timer_disable();
+>> +		__raw_writel(cycle_per_jiffy - 1, clkevt_base + PITLDVAL);
+>> +		pit_timer_enable();
+>
+>You can call pit_set_next_event(cycle_per_jiffy, evt) instead of adding
+>redundant code, no ?
+[Lu Jingchang-B35083] 
+ Yes, I will do that. Thanks!
+>
+>> +		break;
+>> +	default:
+>> +		break;
+>> +	}
+>> +}
+>
+>[ ... ]
+>
+>> +
+>> +static struct clock_event_device clockevent_pit = {
+>> +	.name		= "MVF pit timer",
+>> +	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+>> +	.set_mode	= pit_set_mode,
+>> +	.set_next_event	= pit_set_next_event,
+>> +	.rating		= 300,
+>> +};
+>> +
+>> +static struct irqaction pit_timer_irq = {
+>> +	.name		= "MVF pit timer",
+>> +	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+>
+>Did you take into account Thomas's comment ?
+[Lu Jingchang-B35083] 
+Sorry, I misunderstand Thomas's meaning, I will remove IRQF_DISABLED flag. Thanks! 
+>
+>> +	.handler	= pit_timer_interrupt,
+>> +	.dev_id		= &clockevent_pit,
+>> +};
+>> +
+>> +static int __init pit_clockevent_init(struct clk *pit_clk, int irq) {
+>> +	unsigned int c = clk_get_rate(pit_clk);
+>> +
+>> +	__raw_writel(0, clkevt_base + PITTCTRL);
+>> +	__raw_writel(PITTFLG_TIF, clkevt_base + PITTFLG);
+>> +
+>> +	clockevent_pit.cpumask = cpumask_of(0);
+>
+>The irq initialization is missing.
+>
+>	clockevent_pit.irq = irq;
+>
+[Lu Jingchang-B35083] 
+Yes, I will add this. Thanks!
+
+>> +	clockevents_config_and_register(&clockevent_pit, c, 2, 0xffffffff);
+>
+>Is it possible to have a comment with the justification for these values ?
+[Lu Jingchang-B35083] 
+Yes, I will add a comment for these values. Thanks!
+>
+>> +
+>> +	BUG_ON(setup_irq(irq, &pit_timer_irq));
+>> +	return 0;
+>
+>Everything is ok if you can't setup your timer ?
+>
+>> +}
+>> +
+>> +static void __init pit_timer_init(struct device_node *np) {
+>> +	struct clk *pit_clk;
+>> +	void __iomem *timer_base;
+>> +	int irq;
+>> +
+>> +	timer_base = of_iomap(np, 0);
+>> +	BUG_ON(!timer_base);
+>
+>You raise a bug and then you go ahead setting up the address with an
+>invalid value, leading to a random crash.
+[Lu Jingchang-B35083] 
+The BUG_ON() will call BUG() if condition is true. It will print the stack trace and the current process will die, it won't go ahead, won't it? Thanks! 
+>
+>> +	/*
+>> +	 * PIT0 and PIT1 can be chained to build a 64-bit timer,
+>> +	 * so choose PIT2 as clocksource, PIT3 as clockevent device,
+>> +	 * and leave PIT0 and PIT1 unused for anyone else who needs them.
+>> +	 */
+>> +	clksrc_base = timer_base + PITn_OFFSET(2);
+>> +	clkevt_base = timer_base + PITn_OFFSET(3);
+>> +
+>> +	irq = irq_of_parse_and_map(np, 0);
+>> +
+>> +	pit_clk = of_clk_get(np, 0);
+>> +	BUG_ON(IS_ERR(pit_clk));
+>> +
+>> +	BUG_ON(clk_prepare_enable(pit_clk));
+>
+>Same here.
+>
+>> +	cycle_per_jiffy = clk_get_rate(pit_clk)/(HZ);
+>> +
+>> +	/* enable the pit module */
+>> +	__raw_writel(~PITMCR_MDIS, timer_base + PITMCR);
+>> +
+>> +	BUG_ON(pit_clocksource_init(pit_clk));
+>> +
+>> +	pit_clockevent_init(pit_clk, irq);
+>
+>Please, remove these BUG_ON, this is inconsistent especially with a one
+>call init function. If pit_timer_init can't be initialized, just pr_err
+>+ BUG.
+[Lu Jingchang-B35083] 
+Do you mean that I should not use the BUG_ON or I need print an error information by pr_err before BUG. Thanks!
+>
+>Thanks
+>  -- Daniel
+>
+>
+>--
+> <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>
+>Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+><http://twitter.com/#!/linaroorg> Twitter | <http://www.linaro.org/linaro-
+>blog/> Blog
+>
