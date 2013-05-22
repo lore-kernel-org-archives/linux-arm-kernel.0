@@ -1,57 +1,51 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 22 May 2013 15:12:34 +0200
-Subject: [PATCH 0/4] Marvell PCIe driver improvements
-Message-ID: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 22 May 2013 15:12:37 +0200
+Subject: [PATCH 3/4] pci: mvebu: emulate an empty capability list
+In-Reply-To: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369228358-32580-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn, Jason, Andrew, Gregory,
+Currently, our PCI-to-PCI bridge emulation doesn't emulate a proper
+capability list, which leads 'lspci -v' to show:
 
-You'll find in this patch series 4 small patches that make various
-improvements to the Marvell PCIe driver.
+  Capabilities: [fc] <chain broken>
 
-I'd like those improvements to be kept separated from the original
-PCIe driver itself: while the PCIe driver has been around and reviewed
-for a long time, those improvements are newer. And I clearly do not
-want the PCIe driver to miss 3.11 because of any problem that could be
-found in those additional improvements.
+In order to fix this, this commit improve the PCI-to-PCI bridge
+emulation to emulate an empty capability list. It might be later
+extended to expose things like the PCI Express Capability header, but
+an empty capability list is sufficient for now.
 
-The main improvement being brought here is that the PCI-to-PCI bridge
-logic is fixed/extended to properly support physical PCIe bridges that
-are connected on a PCIe interface of a Marvell board. Without this
-improvement, only the devices connected directly to the PCIe
-interfaces of the board are properly enumerated. Any device that would
-sit beyond a physical bridge is not visible.
+lspci -v now shows the much nicer:
 
-The other improvements are more minor, and the patch description
-should be sufficient to understand what's going on.
+  Capabilities: [40] #00 [0000]
 
-Those patches have been tested on both Armada 370/XP and Kirkwood.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/pci/host/pci-mvebu.c |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Bjorn, with your Acked-by, could the Marvell maintainers include those
-patches in their branch, merged through arm-soc? They already have the
-Marvell PCIe driver itself, so I believe it makes sense to merge those
-improvements through the same path.
-
-Jason, those patches have been prepared on top of my marvell-pcie-v10
-branch, I hope that's ok for you. If you want me to rebase them on
-some other branch in which you have integrated the PCIe driver, don't
-hesitate to tell me to do so. That said, since those patches are only
-touching the driver itself and no other file, they should not cause
-any conflict with other changes.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (4):
-  pci: mvebu: no longer fake the slot location of downstream devices
-  pci: mvebu: allow the enumeration of devices beyond physical bridges
-  pci: mvebu: emulate an empty capability list
-  pci: mvebu: fix the emulation of the status register
-
- drivers/pci/host/pci-mvebu.c |   65 +++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 58 insertions(+), 7 deletions(-)
-
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index c21ca84..c887598 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -440,6 +440,16 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
+ 		*value = 0;
+ 		break;
+ 
++	case PCI_CAPABILITY_LIST:
++		/* Offset of the capability list */
++		*value = 0x40;
++		break;
++
++	case 0x40:
++		/* We have no element in our capability list */
++		*value = 0;
++		break;
++
+ 	default:
+ 		*value = 0xffffffff;
+ 		return PCIBIOS_BAD_REGISTER_NUMBER;
 -- 
 1.7.9.5
