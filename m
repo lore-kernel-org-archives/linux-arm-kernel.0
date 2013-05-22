@@ -1,97 +1,61 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 22 May 2013 13:40:16 -0700
-Subject: [RFC/PATCH 1/2] of: Assign of_device_id to matching device_node
-In-Reply-To: <1369255217-29764-1-git-send-email-sboyd@codeaurora.org>
-References: <1369255217-29764-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1369255217-29764-2-git-send-email-sboyd@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 May 2013 22:40:04 +0200
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
+ 370/XP
+In-Reply-To: <20130522180842.7edcc3ee@skate>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201305221735.11815.arnd@arndb.de> <20130522180842.7edcc3ee@skate>
+Message-ID: <201305222240.05124.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Platform drivers have to match the compatible field twice if they
-want to use the .data field of the of_device_id struct when their
-driver matches multiple devicetree compatible fields. The first
-match happens when the driver core probes for a matching
-device and the second match typically happens during their probe
-routine when the driver calls of_match_device() to get the
-of_device_id that this device matches.
+On Wednesday 22 May 2013, Thomas Petazzoni wrote:
+> > More importantly, you can build a kernel with any number of other SoCs
+> > already, and if you have a combined ArmadaXP+OMAP+Highbank kernel,
+> > there is no way to get a working early debug output.
+> 
+> So you're proposing to add two Kconfig options, one to have the UART at
+> 0xd0012000 and the other one to have the UART at 0xf1012000. The user
+> would have to know whether he is going to boot with an old bootloader
+> or new bootloader, and select the appropriate option. This means that
+> the mvebu_defconfig would no longer be able to have earlyprintk enabled
+> by default, otherwise the resulting kernel may not boot for some
+> people, but maybe it's a reasonable tradeoff.
 
-Skip this duplicate search by assigning the of_device_id to a new
-id_entry pointer in the device_node struct when the driver core
-matches up an of_device_id with a device_node. Drivers can then
-get the entry pointer via dev->of_node->id_entry and access the
-.data field to differentiate which device they matched.
+Yes. It may also be reasonable to use the CP15 hack for DEBUG_LL, but
+I would not like to see that information getting used anywhere in the
+kernel outside of DEBUG_LL. That should really come from the DT.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/of/device.c       | 18 ++++++++++++++++++
- include/linux/of.h        |  1 +
- include/linux/of_device.h | 12 ++----------
- 3 files changed, 21 insertions(+), 10 deletions(-)
+> > > > As you already admit, using the CP15 register is a hack. It sounds
+> > > > to me that a cleaner approach would be to put the correct address
+> > > > into the device tree and use that value everywhere, rather than
+> > > > hardcoding one or more addresses.
+> > > 
+> > > I don't see how this can fix the problem. Which internal register base
+> > > address do we put in our Device Tree source in arch/arm/boot/dts? The
+> > > old one? The new one?
+> > 
+> > The one matching the boot loader for that board, i.e. the new address
+> > for all boards but Mirabox and OpenBlocks.
+> 
+> And what happens when Globalscale (Mirabox manufacturer) or Plathome
+> (manufacturer of OpenBlocks) release a new bootloader version, based on
+> the new bootloader from Marvell, which remaps things at 0xf1000000 ? Or
+> when those people boot from Barebox, which remaps at 0xf1000000 ?
+> 
+> Conclusion: you can't classify on one side boards that are at 0xd0 and
+> boards that are at 0xf1. It depends on which bootloader each
+> particular instance of those boards will be using. Will it be a
+> bootloader that complies with the "old" protocol (CP15 bit cleared and
+> registers at 0xd0) or the "new" protocol (CP15 bit set and registers at
+> 0xf1).
+> 
+> So we can't encode into the boards Device Tree whether the registers
+> are at 0xd0 or 0xf1, because it's not a board-related information, but
+> a bootloader-related information.
 
-diff --git a/drivers/of/device.c b/drivers/of/device.c
-index f685e55..f3eab88 100644
---- a/drivers/of/device.c
-+++ b/drivers/of/device.c
-@@ -27,6 +27,24 @@ const struct of_device_id *of_match_device(const struct of_device_id *matches,
- }
- EXPORT_SYMBOL(of_match_device);
- 
-+/**
-+ * of_driver_match_device - Tell if a driver's of_match_table matches a device.
-+ * @drv: the device_driver structure to test
-+ * @dev: the device structure to match against
-+ */
-+int of_driver_match_device(struct device *dev,
-+			   const struct device_driver *drv)
-+{
-+	const struct of_device_id *id;
-+
-+	id = of_match_device(drv->of_match_table, dev);
-+	if (id)
-+		dev->of_node->id_entry = id;
-+
-+	return id != NULL;
-+}
-+EXPORT_SYMBOL(of_driver_match_device);
-+
- struct platform_device *of_dev_get(struct platform_device *dev)
- {
- 	struct device *tmp;
-diff --git a/include/linux/of.h b/include/linux/of.h
-index 1fd08ca..6c847af 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -59,6 +59,7 @@ struct device_node {
- 	struct	proc_dir_entry *pde;	/* this node's proc directory */
- 	struct	kref kref;
- 	unsigned long _flags;
-+	const struct  of_device_id *id_entry;
- 	void	*data;
- #if defined(CONFIG_SPARC)
- 	const char *path_component_name;
-diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-index 901b743..5b2a69a 100644
---- a/include/linux/of_device.h
-+++ b/include/linux/of_device.h
-@@ -14,16 +14,8 @@ extern const struct of_device_id *of_match_device(
- 	const struct of_device_id *matches, const struct device *dev);
- extern void of_device_make_bus_id(struct device *dev);
- 
--/**
-- * of_driver_match_device - Tell if a driver's of_match_table matches a device.
-- * @drv: the device_driver structure to test
-- * @dev: the device structure to match against
-- */
--static inline int of_driver_match_device(struct device *dev,
--					 const struct device_driver *drv)
--{
--	return of_match_device(drv->of_match_table, dev) != NULL;
--}
-+extern int of_driver_match_device(struct device *dev,
-+				  const struct device_driver *drv);
- 
- extern struct platform_device *of_dev_get(struct platform_device *dev);
- extern void of_dev_put(struct platform_device *dev);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+The new boot loaders will of course know that they are remapping the
+registers, so they are also able to put the correct information into the
+DT.
+
+	Arnd
