@@ -1,50 +1,57 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 22 May 2013 15:12:38 +0200
-Subject: [PATCH 4/4] pci: mvebu: fix the emulation of the status register
-In-Reply-To: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369228358-32580-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 22 May 2013 15:12:34 +0200
+Subject: [PATCH 0/4] Marvell PCIe driver improvements
+Message-ID: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a PCI configuration header, the 'devsel' bits of the status
-register are read-only, and indicate the timing of the secondary
-interface. Currently, we implement them as read/write, so when the
-Linux PCI core writes all 1's to this register, it gets 11b as the
-'devsel' value, which is reserved.
+Bjorn, Jason, Andrew, Gregory,
 
-This commit fixes the PCI-to-PCI bridge emulation of the Marvell PCIe
-driver to ensure those bits remain set to 00b, which indicate a fast
-devsel decoding.
+You'll find in this patch series 4 small patches that make various
+improvements to the Marvell PCIe driver.
 
-This allows to fix the lspci -v output from:
+I'd like those improvements to be kept separated from the original
+PCIe driver itself: while the PCIe driver has been around and reviewed
+for a long time, those improvements are newer. And I clearly do not
+want the PCIe driver to miss 3.11 because of any problem that could be
+found in those additional improvements.
 
-  Flags: bus master, 66MHz, user-definable features, ?? devsel, latency 0
+The main improvement being brought here is that the PCI-to-PCI bridge
+logic is fixed/extended to properly support physical PCIe bridges that
+are connected on a PCIe interface of a Marvell board. Without this
+improvement, only the devices connected directly to the PCIe
+interfaces of the board are properly enumerated. Any device that would
+sit beyond a physical bridge is not visible.
 
-to:
+The other improvements are more minor, and the patch description
+should be sufficient to understand what's going on.
 
-  Flags: bus master, 66MHz, user-definable features, fast devsel, latency 0
+Those patches have been tested on both Armada 370/XP and Kirkwood.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/pci/host/pci-mvebu.c |    5 +++++
- 1 file changed, 5 insertions(+)
+Bjorn, with your Acked-by, could the Marvell maintainers include those
+patches in their branch, merged through arm-soc? They already have the
+Marvell PCIe driver itself, so I believe it makes sense to merge those
+improvements through the same path.
 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index c887598..d730bf4 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -490,6 +490,11 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
- 	case PCI_COMMAND:
- 		bridge->command = value & 0xffff;
- 		bridge->status = value >> 16;
-+		/*
-+		 * The devsel bits are read-only, and we want to keep
-+		 * them set to 0
-+		 */
-+		bridge->status &= ~PCI_STATUS_DEVSEL_MASK;
- 		break;
- 
- 	case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
+Jason, those patches have been prepared on top of my marvell-pcie-v10
+branch, I hope that's ok for you. If you want me to rebase them on
+some other branch in which you have integrated the PCIe driver, don't
+hesitate to tell me to do so. That said, since those patches are only
+touching the driver itself and no other file, they should not cause
+any conflict with other changes.
+
+Thanks,
+
+Thomas
+
+Thomas Petazzoni (4):
+  pci: mvebu: no longer fake the slot location of downstream devices
+  pci: mvebu: allow the enumeration of devices beyond physical bridges
+  pci: mvebu: emulate an empty capability list
+  pci: mvebu: fix the emulation of the status register
+
+ drivers/pci/host/pci-mvebu.c |   65 +++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 58 insertions(+), 7 deletions(-)
+
 -- 
 1.7.9.5
