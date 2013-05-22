@@ -1,97 +1,78 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 22 May 2013 23:32:04 +0900
-Subject: [PATCH 05/11] ARM: shmobile: APE6EVM LAN9220 support
-In-Reply-To: <Pine.LNX.4.64.1305171458550.31481@axis700.grange>
-References: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
- <1364954906-16014-6-git-send-email-horms+renesas@verge.net.au>
- <Pine.LNX.4.64.1305171458550.31481@axis700.grange>
-Message-ID: <20130522143204.GE32012@verge.net.au>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 May 2013 16:33:46 +0200
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
+ 370/XP
+In-Reply-To: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <201305221633.46705.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 03:00:23PM +0200, Guennadi Liakhovetski wrote:
-> Hi Simon, Magnus
+On Tuesday 21 May 2013, Thomas Petazzoni wrote:
+> Unfortunately, for Armada 370 and Armada XP, the current generation of
+> bootloaders that are being shipped on Marvell evaluation boards, but
+> also on products like the Plathome OpenBlocks AX3 or the Globalscale
+> Mirabox do not do the remapping, and are leaving the internal
+> registers at 0xD0000000.
 > 
-> On Wed, 3 Apr 2013, Simon Horman wrote:
+> However, this is causing some problems:
 > 
-> > From: Magnus Damm <damm@opensource.se>
-> > 
-> > Add LAN9220 support to the APE6EVM board using C and DT.
-> > At this point the PFC driver lacks DT bindings so to
-> > configure the PFC we use PINCTRL in C board code.
-> > 
-> > Signed-off-by: Magnus Damm <damm@opensource.se>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >  arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   23 ++++++++++++++++++-
-> >  arch/arm/mach-shmobile/board-ape6evm.c |   38 ++++++++++++++++++++++++++++++++
-> >  2 files changed, 60 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > index 833f703..f603c69 100644
-> > --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > @@ -16,7 +16,7 @@
-> >  	compatible = "renesas,ape6evm", "renesas,r8a73a4";
-> >  
-> >  	chosen {
-> > -		bootargs = "console=ttySC0,115200 ignore_loglevel";
-> > +		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp";
-> >  	};
-> >  
-> >  	memory at 40000000 {
-> > @@ -24,8 +24,29 @@
-> >  		reg = <0 0x40000000 0 0x40000000>;
-> >  	};
-> >  
-> > +	ape6evm_fixed_3v3: fixedregulator at 0 {
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "3V3";
-> > +		regulator-min-microvolt = <3300000>;
-> > +		regulator-max-microvolt = <3300000>;
-> > +		regulator-always-on;
-> > +	};
-> > +
-> >  	lbsc {
-> >  		#address-cells = <1>;
-> >  		#size-cells = <1>;
-> > +
-> > +		ethernet at 8000000 {
-> > +			compatible = "smsc,lan9118", "smsc,lan9115";
-> > +			reg = <0x08000000 0x1000>;
-> > +			interrupt-parent = <&irqc1>;
-> > +			interrupts = <8 0x4>;
-> > +			phy-mode = "mii";
-> > +			reg-io-width = <4>;
-> > +			smsc,irq-active-high;
-> > +			smsc,irq-push-pull;
-> > +			vdd33a-supply = <&ape6evm_fixed_3v3>;
-> > +			vddvario-supply = <&ape6evm_fixed_3v3>;
-> > +		};
-> >  	};
-> >  };
-> 
-> The above didn't work in my tests without this:
-> 
-> diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts 
-> b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> index f603c69..4fb0102 100644
-> --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> @@ -33,8 +33,10 @@
->  	};
->  
->  	lbsc {
-> +		compatible = "simple-bus";
->  		#address-cells = <1>;
->  		#size-cells = <1>;
-> +		ranges = <0 0 0 0x80000000>;
->  
->  		ethernet at 8000000 {
->  			compatible = "smsc,lan9118", "smsc,lan9115";
-> 
+>  1 The internal registers window sits at 3 GB, in the middle of the
+>    0-4 GB area of physical memory, which is quite annoying when you
+>    have more than 3 GB of memory. Having them at 0xF1000000 means that
+>    you lose less RAM when you have more than 3 GB of physical memory
+>    installed. And since Armada XP is LPAE capable, you can even have
+>    more than 4 GB memory: we already have boards with 8 GB of memory
+>    installed.
 
-Could you please post this as a formal patch and indicate
-if you would like it included as a fix in v3.10 or not?
+Just for completeness:
 
-Also, I am curious to know what your tests are.
+Do any of the machines that use the old boot loader have more
+than 3 GB of memory?
+
+>  2 This is different from Kirkwood and Dove, which makes sharing some
+>    early code like earlyprintk complicated, while our goal is
+>    ultimately to merge all Marvell EBU platforms into mach-mvebu.
+> 
+> (1) is really the primary motivation here, (2) is only a nice
+> side-effect.
+> 
+> So, the new generation of bootloaders that are shipped on new Marvell
+> Armada 370/XP platforms are doing the remapping at 0xF1000000 prior to
+> starting Linux. The current kernel cannot boot on such platforms.
+
+Does it boot if you disable the DEBUG_LL code and apply your
+patches 1-8? The reason I'm asking is that you already cannot have
+DEBUG_LL on a multiplatform kernel targeted at systems which don't
+use the same UART. Adding a further restriction that they must map
+the internal registers to the same physical address does not change
+this a lot.
+
+> Therefore, the last patch of this series adds some early code in the
+> kernel, at the ->map_io() stage, to switch the internal registers from
+> 0xD0000000 to 0xF1000000 if this has not been done already by the
+> bootloader. As it was explained above, we unfortunately can't read the
+> current base address of the internal register window, so we need a
+> different mechanism to know if the bootloader has done the remapping
+> at 0xF1000000 (new generation bootloader) or has left the internal
+> registers at 0xD0000000 (old generation bootloader). In order to
+> distinguish between those two cases, a CP15 bit is being used. Old
+> bootloaders do not touch this CP15, so it is set to 0. New bootloaders
+> set this CP15 bit to 1, so that the kernel knows that the remapping
+> has already been done. The ->map_io() code looks at this bit to know
+> if the remapping should be done or not.
+
+As you already admit, using the CP15 register is a hack. It sounds
+to me that a cleaner approach would be to put the correct address
+into the device tree and use that value everywhere, rather than
+hardcoding one or more addresses.
+
+> Unfortunately, tweaking ->map_io() is not sufficient: we also want
+> earlyprintk to work. And earlyprintk is used *before* ->map_io() is
+> called, and *after* ->map_io() is called.
+
+Note that by the time map_io is called, we no longer care about
+the physical address, since the uart is only accessed through the
+virtual mapping after __enable_mmu.
+
+	Arnd
