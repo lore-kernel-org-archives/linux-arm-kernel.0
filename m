@@ -1,42 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 22 May 2013 12:45:16 -0500
-Subject: [PATCH] regulator: ab8500-ext: Don't register without
- initialisation data
-In-Reply-To: <20130522165353.GB18714@gmail.com>
-References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
- <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
- <20130522155347.GJ1627@sirena.org.uk>
- <20130522165353.GB18714@gmail.com>
-Message-ID: <20130522174516.GT1627@sirena.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 22 May 2013 13:48:15 -0400
+Subject: [PATCH v4 06/12] ARM: dove: add gigabit ethernet and mvmdio
+ device tree nodes
+In-Reply-To: <519D038C.9000605@gmail.com>
+References: <1369154510-4927-7-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130521174849.GL26249@lunn.ch> <519C9333.20609@gmail.com>
+ <519C9822.9040909@windriver.com> <519C9A66.3050807@gmail.com>
+ <20130522131010.GB31290@titan.lakedaemon.net>
+ <20130522165908.GB12320@obsidianresearch.com>
+ <519D0143.1000203@gmail.com>
+ <20130522173505.GH31290@titan.lakedaemon.net>
+ <519D038C.9000605@gmail.com>
+Message-ID: <20130522174815.GI31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 05:53:53PM +0100, Lee Jones wrote:
-> On Wed, 22 May 2013, Mark Brown wrote:
+On Wed, May 22, 2013 at 07:42:36PM +0200, Sebastian Hesselbarth wrote:
+> On 05/22/2013 07:35 PM, Jason Cooper wrote:
+> >On Wed, May 22, 2013 at 07:32:51PM +0200, Sebastian Hesselbarth wrote:
+> >>On 05/22/2013 06:59 PM, Jason Gunthorpe wrote:
+> >>>On Wed, May 22, 2013 at 09:10:10AM -0400, Jason Cooper wrote:
+> >>>>iirc, our solution to this was to parse the ATAGs for the mac addr and
+> >>>>update the appended dtb.  This way, module load and unload would work
+> >>>>without loosing the mac address.  I believe Jason Gunthorpe has a patch
+> >>>>to atags_to_fdt() for this...  This should allow us to get rid of the
+> >>>>clocks hack.
+> >>>
+> >>>Sorry, no, we don't use ATAGs here, our platforms start the kernel
+> >>>with a correct DTB that has the correct mac address to use. My patch
+> >>>was to have the driver accept it, and I think Sebastian has already
+> >>>got that functionality...
+> >>
+> >>Not neccessary anyway, after talking Jason C in a Kirkwood-only
+> >>workaround I prepared a patch that reads mac address registers early
+> >>and stores it in the local-mac-address property.
+> >
+> >Sweet!
+> >
+> >>Just tested on Dockstar with gated clocks and modular DT mv643xx_eth.
+> >>
+> >>Will append to the DT mv643xx_eth patch set if a v5 will be required
+> >>or as single patch prior Jason C taking in the ARM part of it
+> >>otherwise.
+> >
+> >Please post, in-reply-to v4 is fine.
+> 
+> Hmm, maybe a little bit too early. While restoring the MAC address now
+> works, another bug arises which I guess is related with phy setup
+> and aneg.
+> 
+> Will investigate and update patch set accordingly.
 
-> > running or not, the worst that should happen is that the state can be
-> > read back.  I'd therefore expect the fix here to be in the board side
-> > code that enables the regulators.
+Cool, chances are, we should be able to take that patch in by itself for
+this merge window...
 
-> It's both.
+thx,
 
-> From the platform side we have stopped passing the external regulator
-> driver's constraints for Snowball:
-
-> https://lkml.org/lkml/2013/5/22/280
-
-> All I've done here is stop the ext driver from crapping out with the
-> misleading error "Configuration error: size mismatch", because a)
-> it's not an error, it's expected and b) It's not a size mismatch,
-> instead we have chosen to keep the constraints back in the Snowball
-> (and u8505) case.
-
-OK, so the regulator driver is buggy and insisting on having constraints
-passed in for every regulator then?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130522/7ecf3ecc/attachment.sig>
+Jason.
