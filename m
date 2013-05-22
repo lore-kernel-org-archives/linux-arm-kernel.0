@@ -1,321 +1,521 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 22 May 2013 16:27:41 +0200
-Subject: [PATCH 2/5] ARM: dts: OMAP2+: create a DT header for GPIO
+Date: Wed, 22 May 2013 16:27:40 +0200
+Subject: [PATCH 1/5] ARM: dts: OMAP2+: use #include for all device trees
 In-Reply-To: <1369232864-14460-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1369232864-14460-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1369232864-14460-3-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1369232864-14460-2-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the OMAP_GPIO macro to conveniently use GPIO inside OMAP DT.
-For example:
-
-	gpios = <&gpio6 3 0>;  /* GPIO 163 */
-
-can be replaced by
-
-	gpios = OMAP_GPIO(163, 0);
+Replace /include/ by #include for OMAP2+ DT, in order to use the
+C pre-processor, making use of #define features possible.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- include/dt-bindings/gpio/omap-gpio.h |  289 ++++++++++++++++++++++++++++++++++
- 1 files changed, 289 insertions(+), 0 deletions(-)
- create mode 100644 include/dt-bindings/gpio/omap-gpio.h
+ arch/arm/boot/dts/omap2.dtsi              |    2 +-
+ arch/arm/boot/dts/omap2420-h4.dts         |    2 +-
+ arch/arm/boot/dts/omap2420.dtsi           |    2 +-
+ arch/arm/boot/dts/omap2430.dtsi           |    2 +-
+ arch/arm/boot/dts/omap3-beagle-xm.dts     |    4 ++--
+ arch/arm/boot/dts/omap3-beagle.dts        |    4 ++--
+ arch/arm/boot/dts/omap3-devkit8000.dts    |    4 ++--
+ arch/arm/boot/dts/omap3-evm.dts           |    4 ++--
+ arch/arm/boot/dts/omap3-igep.dtsi         |    4 ++--
+ arch/arm/boot/dts/omap3-igep0020.dts      |    2 +-
+ arch/arm/boot/dts/omap3-igep0030.dts      |    2 +-
+ arch/arm/boot/dts/omap3-overo.dtsi        |    4 ++--
+ arch/arm/boot/dts/omap3-tobi.dts          |    2 +-
+ arch/arm/boot/dts/omap3.dtsi              |    2 +-
+ arch/arm/boot/dts/omap3430-sdp.dts        |    4 ++--
+ arch/arm/boot/dts/omap34xx.dtsi           |    2 +-
+ arch/arm/boot/dts/omap36xx.dtsi           |    2 +-
+ arch/arm/boot/dts/omap4-panda-a4.dts      |    4 ++--
+ arch/arm/boot/dts/omap4-panda-common.dtsi |    4 ++--
+ arch/arm/boot/dts/omap4-panda-es.dts      |    4 ++--
+ arch/arm/boot/dts/omap4-panda.dts         |    4 ++--
+ arch/arm/boot/dts/omap4-sdp-es23plus.dts  |    2 +-
+ arch/arm/boot/dts/omap4-sdp.dts           |    6 +++---
+ arch/arm/boot/dts/omap4-var-som.dts       |    4 ++--
+ arch/arm/boot/dts/omap4.dtsi              |    2 +-
+ arch/arm/boot/dts/omap443x.dtsi           |    2 +-
+ arch/arm/boot/dts/omap4460.dtsi           |    2 +-
+ arch/arm/boot/dts/omap5-evm.dts           |    4 ++--
+ arch/arm/boot/dts/omap5.dtsi              |    2 +-
+ 29 files changed, 44 insertions(+), 44 deletions(-)
 
-diff --git a/include/dt-bindings/gpio/omap-gpio.h b/include/dt-bindings/gpio/omap-gpio.h
-new file mode 100644
-index 0000000..64f2686
---- /dev/null
-+++ b/include/dt-bindings/gpio/omap-gpio.h
-@@ -0,0 +1,289 @@
-+/*
-+ * This header provides macros and constants for binding ti,omap*-gpio
-+ *
-+ * Compatible with OMAP2, OMAP3, OMAP4 and OMAP5.
-+ */
-+
-+#ifndef _DT_BINDINGS_GPIO_OMAP_GPIO_H
-+#define _DT_BINDINGS_GPIO_OMAP_GPIO_H
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+#define OMAP_GPIO_0_BANK        gpio1
-+#define OMAP_GPIO_1_BANK        gpio1
-+#define OMAP_GPIO_2_BANK        gpio1
-+#define OMAP_GPIO_3_BANK        gpio1
-+#define OMAP_GPIO_4_BANK        gpio1
-+#define OMAP_GPIO_5_BANK        gpio1
-+#define OMAP_GPIO_6_BANK        gpio1
-+#define OMAP_GPIO_7_BANK        gpio1
-+#define OMAP_GPIO_8_BANK        gpio1
-+#define OMAP_GPIO_9_BANK        gpio1
-+#define OMAP_GPIO_10_BANK       gpio1
-+#define OMAP_GPIO_11_BANK       gpio1
-+#define OMAP_GPIO_12_BANK       gpio1
-+#define OMAP_GPIO_13_BANK       gpio1
-+#define OMAP_GPIO_14_BANK       gpio1
-+#define OMAP_GPIO_15_BANK       gpio1
-+#define OMAP_GPIO_16_BANK       gpio1
-+#define OMAP_GPIO_17_BANK       gpio1
-+#define OMAP_GPIO_18_BANK       gpio1
-+#define OMAP_GPIO_19_BANK       gpio1
-+#define OMAP_GPIO_20_BANK       gpio1
-+#define OMAP_GPIO_21_BANK       gpio1
-+#define OMAP_GPIO_22_BANK       gpio1
-+#define OMAP_GPIO_23_BANK       gpio1
-+#define OMAP_GPIO_24_BANK       gpio1
-+#define OMAP_GPIO_25_BANK       gpio1
-+#define OMAP_GPIO_26_BANK       gpio1
-+#define OMAP_GPIO_27_BANK       gpio1
-+#define OMAP_GPIO_28_BANK       gpio1
-+#define OMAP_GPIO_29_BANK       gpio1
-+#define OMAP_GPIO_30_BANK       gpio1
-+#define OMAP_GPIO_31_BANK       gpio1
-+
-+#define OMAP_GPIO_32_BANK       gpio2
-+#define OMAP_GPIO_33_BANK       gpio2
-+#define OMAP_GPIO_34_BANK       gpio2
-+#define OMAP_GPIO_35_BANK       gpio2
-+#define OMAP_GPIO_36_BANK       gpio2
-+#define OMAP_GPIO_37_BANK       gpio2
-+#define OMAP_GPIO_38_BANK       gpio2
-+#define OMAP_GPIO_39_BANK       gpio2
-+#define OMAP_GPIO_40_BANK       gpio2
-+#define OMAP_GPIO_41_BANK       gpio2
-+#define OMAP_GPIO_42_BANK       gpio2
-+#define OMAP_GPIO_43_BANK       gpio2
-+#define OMAP_GPIO_44_BANK       gpio2
-+#define OMAP_GPIO_45_BANK       gpio2
-+#define OMAP_GPIO_46_BANK       gpio2
-+#define OMAP_GPIO_47_BANK       gpio2
-+#define OMAP_GPIO_48_BANK       gpio2
-+#define OMAP_GPIO_49_BANK       gpio2
-+#define OMAP_GPIO_50_BANK       gpio2
-+#define OMAP_GPIO_51_BANK       gpio2
-+#define OMAP_GPIO_52_BANK       gpio2
-+#define OMAP_GPIO_53_BANK       gpio2
-+#define OMAP_GPIO_54_BANK       gpio2
-+#define OMAP_GPIO_55_BANK       gpio2
-+#define OMAP_GPIO_56_BANK       gpio2
-+#define OMAP_GPIO_57_BANK       gpio2
-+#define OMAP_GPIO_58_BANK       gpio2
-+#define OMAP_GPIO_59_BANK       gpio2
-+#define OMAP_GPIO_60_BANK       gpio2
-+#define OMAP_GPIO_61_BANK       gpio2
-+#define OMAP_GPIO_62_BANK       gpio2
-+#define OMAP_GPIO_63_BANK       gpio2
-+
-+#define OMAP_GPIO_64_BANK       gpio3
-+#define OMAP_GPIO_65_BANK       gpio3
-+#define OMAP_GPIO_66_BANK       gpio3
-+#define OMAP_GPIO_67_BANK       gpio3
-+#define OMAP_GPIO_68_BANK       gpio3
-+#define OMAP_GPIO_69_BANK       gpio3
-+#define OMAP_GPIO_70_BANK       gpio3
-+#define OMAP_GPIO_71_BANK       gpio3
-+#define OMAP_GPIO_72_BANK       gpio3
-+#define OMAP_GPIO_73_BANK       gpio3
-+#define OMAP_GPIO_74_BANK       gpio3
-+#define OMAP_GPIO_75_BANK       gpio3
-+#define OMAP_GPIO_76_BANK       gpio3
-+#define OMAP_GPIO_77_BANK       gpio3
-+#define OMAP_GPIO_78_BANK       gpio3
-+#define OMAP_GPIO_79_BANK       gpio3
-+#define OMAP_GPIO_80_BANK       gpio3
-+#define OMAP_GPIO_81_BANK       gpio3
-+#define OMAP_GPIO_82_BANK       gpio3
-+#define OMAP_GPIO_83_BANK       gpio3
-+#define OMAP_GPIO_84_BANK       gpio3
-+#define OMAP_GPIO_85_BANK       gpio3
-+#define OMAP_GPIO_86_BANK       gpio3
-+#define OMAP_GPIO_87_BANK       gpio3
-+#define OMAP_GPIO_88_BANK       gpio3
-+#define OMAP_GPIO_89_BANK       gpio3
-+#define OMAP_GPIO_90_BANK       gpio3
-+#define OMAP_GPIO_91_BANK       gpio3
-+#define OMAP_GPIO_92_BANK       gpio3
-+#define OMAP_GPIO_93_BANK       gpio3
-+#define OMAP_GPIO_94_BANK       gpio3
-+#define OMAP_GPIO_95_BANK       gpio3
-+
-+#define OMAP_GPIO_96_BANK       gpio4
-+#define OMAP_GPIO_97_BANK       gpio4
-+#define OMAP_GPIO_98_BANK       gpio4
-+#define OMAP_GPIO_99_BANK       gpio4
-+#define OMAP_GPIO_100_BANK      gpio4
-+#define OMAP_GPIO_101_BANK      gpio4
-+#define OMAP_GPIO_102_BANK      gpio4
-+#define OMAP_GPIO_103_BANK      gpio4
-+#define OMAP_GPIO_104_BANK      gpio4
-+#define OMAP_GPIO_105_BANK      gpio4
-+#define OMAP_GPIO_106_BANK      gpio4
-+#define OMAP_GPIO_107_BANK      gpio4
-+#define OMAP_GPIO_108_BANK      gpio4
-+#define OMAP_GPIO_109_BANK      gpio4
-+#define OMAP_GPIO_110_BANK      gpio4
-+#define OMAP_GPIO_111_BANK      gpio4
-+#define OMAP_GPIO_112_BANK      gpio4
-+#define OMAP_GPIO_113_BANK      gpio4
-+#define OMAP_GPIO_114_BANK      gpio4
-+#define OMAP_GPIO_115_BANK      gpio4
-+#define OMAP_GPIO_116_BANK      gpio4
-+#define OMAP_GPIO_117_BANK      gpio4
-+#define OMAP_GPIO_118_BANK      gpio4
-+#define OMAP_GPIO_119_BANK      gpio4
-+#define OMAP_GPIO_120_BANK      gpio4
-+#define OMAP_GPIO_121_BANK      gpio4
-+#define OMAP_GPIO_122_BANK      gpio4
-+#define OMAP_GPIO_123_BANK      gpio4
-+#define OMAP_GPIO_124_BANK      gpio4
-+#define OMAP_GPIO_125_BANK      gpio4
-+#define OMAP_GPIO_126_BANK      gpio4
-+#define OMAP_GPIO_127_BANK      gpio4
-+
-+/* Not available on OMAP2420 */
-+#define OMAP_GPIO_128_BANK      gpio5
-+#define OMAP_GPIO_129_BANK      gpio5
-+#define OMAP_GPIO_130_BANK      gpio5
-+#define OMAP_GPIO_131_BANK      gpio5
-+#define OMAP_GPIO_132_BANK      gpio5
-+#define OMAP_GPIO_133_BANK      gpio5
-+#define OMAP_GPIO_134_BANK      gpio5
-+#define OMAP_GPIO_135_BANK      gpio5
-+#define OMAP_GPIO_136_BANK      gpio5
-+#define OMAP_GPIO_137_BANK      gpio5
-+#define OMAP_GPIO_138_BANK      gpio5
-+#define OMAP_GPIO_139_BANK      gpio5
-+#define OMAP_GPIO_140_BANK      gpio5
-+#define OMAP_GPIO_141_BANK      gpio5
-+#define OMAP_GPIO_142_BANK      gpio5
-+#define OMAP_GPIO_143_BANK      gpio5
-+#define OMAP_GPIO_144_BANK      gpio5
-+#define OMAP_GPIO_145_BANK      gpio5
-+#define OMAP_GPIO_146_BANK      gpio5
-+#define OMAP_GPIO_147_BANK      gpio5
-+#define OMAP_GPIO_148_BANK      gpio5
-+#define OMAP_GPIO_149_BANK      gpio5
-+#define OMAP_GPIO_150_BANK      gpio5
-+#define OMAP_GPIO_151_BANK      gpio5
-+#define OMAP_GPIO_152_BANK      gpio5
-+#define OMAP_GPIO_153_BANK      gpio5
-+#define OMAP_GPIO_154_BANK      gpio5
-+#define OMAP_GPIO_155_BANK      gpio5
-+#define OMAP_GPIO_156_BANK      gpio5
-+#define OMAP_GPIO_157_BANK      gpio5
-+#define OMAP_GPIO_158_BANK      gpio5
-+#define OMAP_GPIO_159_BANK      gpio5
-+
-+/* Not available on OMAP2 */
-+#define OMAP_GPIO_160_BANK      gpio6
-+#define OMAP_GPIO_161_BANK      gpio6
-+#define OMAP_GPIO_162_BANK      gpio6
-+#define OMAP_GPIO_163_BANK      gpio6
-+#define OMAP_GPIO_164_BANK      gpio6
-+#define OMAP_GPIO_165_BANK      gpio6
-+#define OMAP_GPIO_166_BANK      gpio6
-+#define OMAP_GPIO_167_BANK      gpio6
-+#define OMAP_GPIO_168_BANK      gpio6
-+#define OMAP_GPIO_169_BANK      gpio6
-+#define OMAP_GPIO_170_BANK      gpio6
-+#define OMAP_GPIO_171_BANK      gpio6
-+#define OMAP_GPIO_172_BANK      gpio6
-+#define OMAP_GPIO_173_BANK      gpio6
-+#define OMAP_GPIO_174_BANK      gpio6
-+#define OMAP_GPIO_175_BANK      gpio6
-+#define OMAP_GPIO_176_BANK      gpio6
-+#define OMAP_GPIO_177_BANK      gpio6
-+#define OMAP_GPIO_178_BANK      gpio6
-+#define OMAP_GPIO_179_BANK      gpio6
-+#define OMAP_GPIO_180_BANK      gpio6
-+#define OMAP_GPIO_181_BANK      gpio6
-+#define OMAP_GPIO_182_BANK      gpio6
-+#define OMAP_GPIO_183_BANK      gpio6
-+#define OMAP_GPIO_184_BANK      gpio6
-+#define OMAP_GPIO_185_BANK      gpio6
-+#define OMAP_GPIO_186_BANK      gpio6
-+#define OMAP_GPIO_187_BANK      gpio6
-+#define OMAP_GPIO_188_BANK      gpio6
-+#define OMAP_GPIO_189_BANK      gpio6
-+#define OMAP_GPIO_190_BANK      gpio6
-+#define OMAP_GPIO_191_BANK      gpio6
-+
-+/* Only available on OMAP5 */
-+#define OMAP_GPIO_192_BANK      gpio7
-+#define OMAP_GPIO_193_BANK      gpio7
-+#define OMAP_GPIO_194_BANK      gpio7
-+#define OMAP_GPIO_195_BANK      gpio7
-+#define OMAP_GPIO_196_BANK      gpio7
-+#define OMAP_GPIO_197_BANK      gpio7
-+#define OMAP_GPIO_198_BANK      gpio7
-+#define OMAP_GPIO_199_BANK      gpio7
-+#define OMAP_GPIO_200_BANK      gpio7
-+#define OMAP_GPIO_201_BANK      gpio7
-+#define OMAP_GPIO_202_BANK      gpio7
-+#define OMAP_GPIO_203_BANK      gpio7
-+#define OMAP_GPIO_204_BANK      gpio7
-+#define OMAP_GPIO_205_BANK      gpio7
-+#define OMAP_GPIO_206_BANK      gpio7
-+#define OMAP_GPIO_207_BANK      gpio7
-+#define OMAP_GPIO_208_BANK      gpio7
-+#define OMAP_GPIO_209_BANK      gpio7
-+#define OMAP_GPIO_210_BANK      gpio7
-+#define OMAP_GPIO_211_BANK      gpio7
-+#define OMAP_GPIO_212_BANK      gpio7
-+#define OMAP_GPIO_213_BANK      gpio7
-+#define OMAP_GPIO_214_BANK      gpio7
-+#define OMAP_GPIO_215_BANK      gpio7
-+#define OMAP_GPIO_216_BANK      gpio7
-+#define OMAP_GPIO_217_BANK      gpio7
-+#define OMAP_GPIO_218_BANK      gpio7
-+#define OMAP_GPIO_219_BANK      gpio7
-+#define OMAP_GPIO_220_BANK      gpio7
-+#define OMAP_GPIO_221_BANK      gpio7
-+#define OMAP_GPIO_222_BANK      gpio7
-+#define OMAP_GPIO_223_BANK      gpio7
-+
-+/* Only available on OMAP5 */
-+#define OMAP_GPIO_224_BANK      gpio8
-+#define OMAP_GPIO_225_BANK      gpio8
-+#define OMAP_GPIO_226_BANK      gpio8
-+#define OMAP_GPIO_227_BANK      gpio8
-+#define OMAP_GPIO_228_BANK      gpio8
-+#define OMAP_GPIO_229_BANK      gpio8
-+#define OMAP_GPIO_230_BANK      gpio8
-+#define OMAP_GPIO_231_BANK      gpio8
-+#define OMAP_GPIO_232_BANK      gpio8
-+#define OMAP_GPIO_233_BANK      gpio8
-+#define OMAP_GPIO_234_BANK      gpio8
-+#define OMAP_GPIO_235_BANK      gpio8
-+#define OMAP_GPIO_236_BANK      gpio8
-+#define OMAP_GPIO_237_BANK      gpio8
-+#define OMAP_GPIO_238_BANK      gpio8
-+#define OMAP_GPIO_239_BANK      gpio8
-+#define OMAP_GPIO_240_BANK      gpio8
-+#define OMAP_GPIO_241_BANK      gpio8
-+#define OMAP_GPIO_242_BANK      gpio8
-+#define OMAP_GPIO_243_BANK      gpio8
-+#define OMAP_GPIO_244_BANK      gpio8
-+#define OMAP_GPIO_245_BANK      gpio8
-+#define OMAP_GPIO_246_BANK      gpio8
-+#define OMAP_GPIO_247_BANK      gpio8
-+#define OMAP_GPIO_248_BANK      gpio8
-+#define OMAP_GPIO_249_BANK      gpio8
-+#define OMAP_GPIO_250_BANK      gpio8
-+#define OMAP_GPIO_251_BANK      gpio8
-+#define OMAP_GPIO_252_BANK      gpio8
-+#define OMAP_GPIO_253_BANK      gpio8
-+#define OMAP_GPIO_254_BANK      gpio8
-+#define OMAP_GPIO_255_BANK      gpio8
-+
-+
-+#define _OMAP_GPIO_OFFSET(gpio) \
-+	(gpio & 0x1F)
-+
-+
-+/* Declare a reference to an OMAP GPIO */
-+#define OMAP_GPIO(gpio, level) \
-+	<&OMAP_GPIO_##gpio##_BANK _OMAP_GPIO_OFFSET(gpio) level>
-+
-+#endif
+diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
+index 37aa748..e6e4587 100644
+--- a/arch/arm/boot/dts/omap2.dtsi
++++ b/arch/arm/boot/dts/omap2.dtsi
+@@ -8,7 +8,7 @@
+  * kind, whether express or implied.
+  */
+ 
+-/include/ "skeleton.dtsi"
++#include "skeleton.dtsi"
+ 
+ / {
+ 	compatible = "ti,omap2430", "ti,omap2420", "ti,omap2";
+diff --git a/arch/arm/boot/dts/omap2420-h4.dts b/arch/arm/boot/dts/omap2420-h4.dts
+index 68282ee..224c08f 100644
+--- a/arch/arm/boot/dts/omap2420-h4.dts
++++ b/arch/arm/boot/dts/omap2420-h4.dts
+@@ -7,7 +7,7 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap2420.dtsi"
++#include "omap2420.dtsi"
+ 
+ / {
+ 	model = "TI OMAP2420 H4 board";
+diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
+index da5b285..c8f9c55 100644
+--- a/arch/arm/boot/dts/omap2420.dtsi
++++ b/arch/arm/boot/dts/omap2420.dtsi
+@@ -8,7 +8,7 @@
+  * kind, whether express or implied.
+  */
+ 
+-/include/ "omap2.dtsi"
++#include "omap2.dtsi"
+ 
+ / {
+ 	compatible = "ti,omap2420", "ti,omap2";
+diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
+index 054bc44..c535a5a 100644
+--- a/arch/arm/boot/dts/omap2430.dtsi
++++ b/arch/arm/boot/dts/omap2430.dtsi
+@@ -8,7 +8,7 @@
+  * kind, whether express or implied.
+  */
+ 
+-/include/ "omap2.dtsi"
++#include "omap2.dtsi"
+ 
+ / {
+ 	compatible = "ti,omap2430", "ti,omap2";
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index 3046d1f..e0ce823 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -7,7 +7,7 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap36xx.dtsi"
++#include "omap36xx.dtsi"
+ 
+ / {
+ 	model = "TI OMAP3 BeagleBoard xM";
+@@ -75,7 +75,7 @@
+ 	};
+ };
+ 
+-/include/ "twl4030.dtsi"
++#include "twl4030.dtsi"
+ 
+ &i2c2 {
+ 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index 6eec699..fcac96a 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -7,7 +7,7 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap34xx.dtsi"
++#include "omap34xx.dtsi"
+ 
+ / {
+ 	model = "TI OMAP3 BeagleBoard";
+@@ -107,7 +107,7 @@
+ 	};
+ };
+ 
+-/include/ "twl4030.dtsi"
++#include "twl4030.dtsi"
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
+index 8a5cdcc..8d0f5e4 100644
+--- a/arch/arm/boot/dts/omap3-devkit8000.dts
++++ b/arch/arm/boot/dts/omap3-devkit8000.dts
+@@ -7,7 +7,7 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap34xx.dtsi"
++#include "omap34xx.dtsi"
+ / {
+ 	model = "TimLL OMAP3 Devkit8000";
+ 	compatible = "timll,omap3-devkit8000", "ti,omap3";
+@@ -80,7 +80,7 @@
+ 	status = "disabled";
+ };
+ 
+-/include/ "twl4030.dtsi"
++#include "twl4030.dtsi"
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
+index 96d1c20..d75759b 100644
+--- a/arch/arm/boot/dts/omap3-evm.dts
++++ b/arch/arm/boot/dts/omap3-evm.dts
+@@ -7,7 +7,7 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap34xx.dtsi"
++#include "omap34xx.dtsi"
+ 
+ / {
+ 	model = "TI OMAP3 EVM (OMAP3530, AM/DM37x)";
+@@ -44,7 +44,7 @@
+ 	};
+ };
+ 
+-/include/ "twl4030.dtsi"
++#include "twl4030.dtsi"
+ 
+ &i2c2 {
+ 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+index f8fe3b7..54588b0 100644
+--- a/arch/arm/boot/dts/omap3-igep.dtsi
++++ b/arch/arm/boot/dts/omap3-igep.dtsi
+@@ -10,7 +10,7 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap34xx.dtsi"
++#include "omap34xx.dtsi"
+ 
+ / {
+ 	memory {
+@@ -80,7 +80,7 @@
+ 	};
+ };
+ 
+-/include/ "twl4030.dtsi"
++#include "twl4030.dtsi"
+ 
+ &i2c2 {
+ 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
+index e2b9849..2f96a5c 100644
+--- a/arch/arm/boot/dts/omap3-igep0020.dts
++++ b/arch/arm/boot/dts/omap3-igep0020.dts
+@@ -9,7 +9,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
+-/include/ "omap3-igep.dtsi"
++#include "omap3-igep.dtsi"
+ 
+ / {
+ 	model = "IGEPv2";
+diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
+index 9dc48d2..f3a1bf0 100644
+--- a/arch/arm/boot/dts/omap3-igep0030.dts
++++ b/arch/arm/boot/dts/omap3-igep0030.dts
+@@ -9,7 +9,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
+-/include/ "omap3-igep.dtsi"
++#include "omap3-igep.dtsi"
+ 
+ / {
+ 	model = "IGEP COM Module";
+diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+index a626c50..e112a42 100644
+--- a/arch/arm/boot/dts/omap3-overo.dtsi
++++ b/arch/arm/boot/dts/omap3-overo.dtsi
+@@ -11,7 +11,7 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap34xx.dtsi"
++#include "omap34xx.dtsi"
+ 
+ / {
+ 	pwmleds {
+@@ -49,7 +49,7 @@
+ 	};
+ };
+ 
+-/include/ "twl4030.dtsi"
++#include "twl4030.dtsi"
+ 
+ /* i2c2 pins are used for gpio */
+ &i2c2 {
+diff --git a/arch/arm/boot/dts/omap3-tobi.dts b/arch/arm/boot/dts/omap3-tobi.dts
+index a13d12d..5df894f 100644
+--- a/arch/arm/boot/dts/omap3-tobi.dts
++++ b/arch/arm/boot/dts/omap3-tobi.dts
+@@ -10,7 +10,7 @@
+  * Tobi expansion board is manufactured by Gumstix Inc.
+  */
+ 
+-/include/ "omap3-overo.dtsi"
++#include "omap3-overo.dtsi"
+ 
+ / {
+ 	model = "TI OMAP3 Gumstix Overo on Tobi";
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 82a404d..7c7d494 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -8,7 +8,7 @@
+  * kind, whether express or implied.
+  */
+ 
+-/include/ "skeleton.dtsi"
++#include "skeleton.dtsi"
+ 
+ / {
+ 	compatible = "ti,omap3430", "ti,omap3";
+diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
+index 144ae43..2a725a0 100644
+--- a/arch/arm/boot/dts/omap3430-sdp.dts
++++ b/arch/arm/boot/dts/omap3430-sdp.dts
+@@ -7,7 +7,7 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap34xx.dtsi"
++#include "omap34xx.dtsi"
+ 
+ / {
+ 	model = "TI OMAP3430 SDP";
+@@ -28,7 +28,7 @@
+ 	};
+ };
+ 
+-/include/ "twl4030.dtsi"
++#include "twl4030.dtsi"
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+diff --git a/arch/arm/boot/dts/omap34xx.dtsi b/arch/arm/boot/dts/omap34xx.dtsi
+index 75ed4ae..5355d61 100644
+--- a/arch/arm/boot/dts/omap34xx.dtsi
++++ b/arch/arm/boot/dts/omap34xx.dtsi
+@@ -8,7 +8,7 @@
+  * kind, whether express or implied.
+  */
+ 
+-/include/ "omap3.dtsi"
++#include "omap3.dtsi"
+ 
+ / {
+ 	cpus {
+diff --git a/arch/arm/boot/dts/omap36xx.dtsi b/arch/arm/boot/dts/omap36xx.dtsi
+index f3447bc..f8b3765 100644
+--- a/arch/arm/boot/dts/omap36xx.dtsi
++++ b/arch/arm/boot/dts/omap36xx.dtsi
+@@ -8,7 +8,7 @@
+  * kind, whether express or implied.
+  */
+ 
+-/include/ "omap3.dtsi"
++#include "omap3.dtsi"
+ 
+ / {
+ 	aliases {
+diff --git a/arch/arm/boot/dts/omap4-panda-a4.dts b/arch/arm/boot/dts/omap4-panda-a4.dts
+index e30cdf0..f18fb5c 100644
+--- a/arch/arm/boot/dts/omap4-panda-a4.dts
++++ b/arch/arm/boot/dts/omap4-panda-a4.dts
+@@ -7,8 +7,8 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap443x.dtsi"
+-/include/ "omap4-panda-common.dtsi"
++#include "omap443x.dtsi"
++#include "omap4-panda-common.dtsi"
+ 
+ /* Pandaboard Rev A4+ have external pullups on SCL & SDA */
+ &dss_hdmi_pins {
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index 03bd60d..63148d1 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -5,7 +5,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-/include/ "elpida_ecb240abacn.dtsi"
++#include "elpida_ecb240abacn.dtsi"
+ 
+ / {
+ 	model = "TI OMAP4 PandaBoard";
+@@ -164,7 +164,7 @@
+ 	};
+ };
+ 
+-/include/ "twl6030.dtsi"
++#include "twl6030.dtsi"
+ 
+ &i2c2 {
+ 	pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+index f1d8c21..c6f012e 100644
+--- a/arch/arm/boot/dts/omap4-panda-es.dts
++++ b/arch/arm/boot/dts/omap4-panda-es.dts
+@@ -7,8 +7,8 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap4460.dtsi"
+-/include/ "omap4-panda-common.dtsi"
++#include "omap4460.dtsi"
++#include "omap4-panda-common.dtsi"
+ 
+ /* Audio routing is differnet between PandaBoard4430 and PandaBoardES */
+ &sound {
+diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
+index f8b221f..6189a8b 100644
+--- a/arch/arm/boot/dts/omap4-panda.dts
++++ b/arch/arm/boot/dts/omap4-panda.dts
+@@ -7,5 +7,5 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap443x.dtsi"
+-/include/ "omap4-panda-common.dtsi"
++#include "omap443x.dtsi"
++#include "omap4-panda-common.dtsi"
+diff --git a/arch/arm/boot/dts/omap4-sdp-es23plus.dts b/arch/arm/boot/dts/omap4-sdp-es23plus.dts
+index b4a40ff..4f26355 100644
+--- a/arch/arm/boot/dts/omap4-sdp-es23plus.dts
++++ b/arch/arm/boot/dts/omap4-sdp-es23plus.dts
+@@ -5,7 +5,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-/include/ "omap4-sdp.dts"
++#include "omap4-sdp.dts"
+ 
+ /* SDP boards with 4430 ES2.3+ or 4460 have external pullups on SCL & SDA */
+ &dss_hdmi_pins {
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index a35d9cd..5edd08e 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -7,8 +7,8 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap443x.dtsi"
+-/include/ "elpida_ecb240abacn.dtsi"
++#include "omap443x.dtsi"
++#include "elpida_ecb240abacn.dtsi"
+ 
+ / {
+ 	model = "TI OMAP4 SDP board";
+@@ -316,7 +316,7 @@
+ 	};
+ };
+ 
+-/include/ "twl6030.dtsi"
++#include "twl6030.dtsi"
+ 
+ &i2c2 {
+ 	pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/omap4-var-som.dts b/arch/arm/boot/dts/omap4-var-som.dts
+index 7e04103..6593607 100644
+--- a/arch/arm/boot/dts/omap4-var-som.dts
++++ b/arch/arm/boot/dts/omap4-var-som.dts
+@@ -7,7 +7,7 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap443x.dtsi"
++#include "omap443x.dtsi"
+ 
+ / {
+ 	model = "Variscite OMAP4 SOM";
+@@ -39,7 +39,7 @@
+ 	};
+ };
+ 
+-/include/ "twl6030.dtsi"
++#include "twl6030.dtsi"
+ 
+ &i2c2 {
+ 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 2a56428..53d80aa 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -14,7 +14,7 @@
+  */
+ /memreserve/ 0x9d000000 0x03000000;
+ 
+-/include/ "skeleton.dtsi"
++#include "skeleton.dtsi"
+ 
+ / {
+ 	compatible = "ti,omap4430", "ti,omap4";
+diff --git a/arch/arm/boot/dts/omap443x.dtsi b/arch/arm/boot/dts/omap443x.dtsi
+index cccf39a..a81f8df 100644
+--- a/arch/arm/boot/dts/omap443x.dtsi
++++ b/arch/arm/boot/dts/omap443x.dtsi
+@@ -8,7 +8,7 @@
+  * kind, whether express or implied.
+  */
+ 
+-/include/ "omap4.dtsi"
++#include "omap4.dtsi"
+ 
+ / {
+ 	cpus {
+diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+index 2cf227c..41762c2 100644
+--- a/arch/arm/boot/dts/omap4460.dtsi
++++ b/arch/arm/boot/dts/omap4460.dtsi
+@@ -7,7 +7,7 @@
+  * version 2.  This program is licensed "as is" without any warranty of any
+  * kind, whether express or implied.
+  */
+-/include/ "omap4.dtsi"
++#include "omap4.dtsi"
+ 
+ / {
+ 	cpus {
+diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-evm.dts
+index 982acd1..f5f55d1 100644
+--- a/arch/arm/boot/dts/omap5-evm.dts
++++ b/arch/arm/boot/dts/omap5-evm.dts
+@@ -7,8 +7,8 @@
+  */
+ /dts-v1/;
+ 
+-/include/ "omap5.dtsi"
+-/include/ "samsung_k3pe0e000b.dtsi"
++#include "omap5.dtsi"
++#include "samsung_k3pe0e000b.dtsi"
+ 
+ / {
+ 	model = "TI OMAP5 EVM board";
+diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+index 3dd7ff8..e8e6653 100644
+--- a/arch/arm/boot/dts/omap5.dtsi
++++ b/arch/arm/boot/dts/omap5.dtsi
+@@ -15,7 +15,7 @@
+  */
+ /memreserve/ 0x9d000000 0x03000000;
+ 
+-/include/ "skeleton.dtsi"
++#include "skeleton.dtsi"
+ 
+ / {
+ 	#address-cells = <1>;
 -- 
 1.7.5.4
