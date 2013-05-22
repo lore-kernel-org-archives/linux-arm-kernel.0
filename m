@@ -1,24 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 May 2013 14:59:34 +0200
-Subject: [PATCH 1/6] drivers: bus: add a new driver for WEIM
-In-Reply-To: <519C7ED3.3030004@freescale.com>
-References: <1369039742-10893-1-git-send-email-b32955@freescale.com>
- <20130521054323.GE3080@S2101-09.ap.freescale.net>
- <519C7ED3.3030004@freescale.com>
-Message-ID: <201305221459.34859.arnd@arndb.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 22 May 2013 14:06:35 +0100
+Subject: [PATCH] ARM: ux500: regulators: Remove misleading comment
+Message-ID: <1369227995-17142-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 May 2013, Huang Shijie wrote:
-> ? 2013?05?21? 13:43, Shawn Guo ??:
-> > It seems we can find it out from "reg" property, so that we can save
-> > this property?
-> >
-> we may have several devices attaching to the weim, each device has its 
-> own CS index.
-> it's better to keep this property, make it more clear.
+This patch removes a comment which explains that the ab8505 platform
+uses the same initialisation settings as the ab8500. Well when this
+changed and the ab8505 started using its own set of initialisation
+values, someone forgot to remove it.
 
-I agree with Shawn, we should not have this property when it is the
-same as the upper half of the "reg" property.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500-regulators.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-	Arnd
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+index 33c353b..b34441b 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.c
++++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+@@ -996,7 +996,6 @@ struct ab8500_regulator_platform_data ab8500_regulator_plat_data = {
+ 	.num_ext_regulator      = ARRAY_SIZE(ab8500_ext_regulators),
+ };
+ 
+-/* Use the AB8500 init settings for AB8505 as they are the same right now */
+ struct ab8500_regulator_platform_data ab8505_regulator_plat_data = {
+ 	.reg_init               = ab8505_reg_init,
+ 	.num_reg_init           = ARRAY_SIZE(ab8505_reg_init),
+-- 
+1.7.10.4
