@@ -1,69 +1,46 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 22 May 2013 08:49:41 -0600
-Subject: [PATCH 4/4] pci: mvebu: fix the emulation of the status register
-In-Reply-To: <1369228358-32580-5-git-send-email-thomas.petazzoni@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 22 May 2013 16:55:29 +0200
+Subject: [PATCH 3/4] pci: mvebu: emulate an empty capability list
+In-Reply-To: <CAErSpo6gFf9ou-VtZ=F0+1GqcSoPS_dDMGphhgv=8mD602=BRA@mail.gmail.com>
 References: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1369228358-32580-5-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CAErSpo5LAOFtWUQpDk4OdfrCPr4gAnp_+nkmZcOib0531Who-A@mail.gmail.com>
+ <1369228358-32580-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo6gFf9ou-VtZ=F0+1GqcSoPS_dDMGphhgv=8mD602=BRA@mail.gmail.com>
+Message-ID: <20130522165529.64174e06@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 7:12 AM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-> In a PCI configuration header, the 'devsel' bits of the status
-> register are read-only, and indicate the timing of the secondary
-> interface. Currently, we implement them as read/write, so when the
-> Linux PCI core writes all 1's to this register, it gets 11b as the
-> 'devsel' value, which is reserved.
+Dear Bjorn Helgaas,
 
-I suppose the problem is that pci_scan_bridge() writes 0xffff to the
-PCI_STATUS register?
+On Wed, 22 May 2013 08:39:03 -0600, Bjorn Helgaas wrote:
 
-PCI_STATUS is documented as containing either RO or RW1C
-(write-1-to-clear status) bits, so it makes sense to write all ones to
-clear all status bits.  But there are other RO bits that I think you
-should mask out, too: Interrupt Status, Capabilities List, etc.
+> > emulation to emulate an empty capability list. It might be later
+> > extended to expose things like the PCI Express Capability header, but
+> > an empty capability list is sufficient for now.
+> >
+> > lspci -v now shows the much nicer:
+> >
+> >   Capabilities: [40] #00 [0000]
+> 
+> It'd be even better if you could make the Capabilities List bit in the
+> Device Status register be zero.  Then lspci wouldn't even try to read
+> the Capabilities Pointer at 0x34, and you wouldn't have to deal with
+> reads of 0x40.
 
-Maybe if you fix this, it will also fix the Capability List issue you
-saw in patch 3/4.
+The Device Status register is emulated with an initial value of zero.
+Then, whenever the Linux PCI core writes into it, those writes are
+preserved. So to me, it looks like the Linux PCI core might be setting
+this Capabilities List bit, and later re-reads it and finds it to be
+set to 1.
 
-> This commit fixes the PCI-to-PCI bridge emulation of the Marvell PCIe
-> driver to ensure those bits remain set to 00b, which indicate a fast
-> devsel decoding.
->
-> This allows to fix the lspci -v output from:
->
->   Flags: bus master, 66MHz, user-definable features, ?? devsel, latency 0
->
-> to:
->
->   Flags: bus master, 66MHz, user-definable features, fast devsel, latency 0
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/pci/host/pci-mvebu.c |    5 +++++
->  1 file changed, 5 insertions(+)
->
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index c887598..d730bf4 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -490,6 +490,11 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
->         case PCI_COMMAND:
->                 bridge->command = value & 0xffff;
->                 bridge->status = value >> 16;
-> +               /*
-> +                * The devsel bits are read-only, and we want to keep
-> +                * them set to 0
-> +                */
-> +               bridge->status &= ~PCI_STATUS_DEVSEL_MASK;
->                 break;
->
->         case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Should this bit be emulated as a read-only bit (it's not made explicit
+for this particular bit in the PCI-to-PCI bridge specification that I
+have in front of me) ? Or even the entire Device Status register ?
+
+Thanks for your comments!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
