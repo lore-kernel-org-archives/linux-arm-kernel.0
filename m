@@ -1,81 +1,48 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 22 May 2013 13:36:29 -0600
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
- 370/XP
-In-Reply-To: <20130522185521.GR26249@lunn.ch>
-References: <201305221633.46705.arnd@arndb.de> <20130522170643.54a2b9d2@skate>
- <201305221735.11815.arnd@arndb.de> <20130522180842.7edcc3ee@skate>
- <20130522163557.GC27348@1wt.eu> <20130522184250.1d5f2f10@skate>
- <20130522164936.GE31290@titan.lakedaemon.net>
- <20130522185757.60091a66@skate>
- <20130522181953.GD12320@obsidianresearch.com>
- <20130522185521.GR26249@lunn.ch>
-Message-ID: <20130522193629.GA18344@obsidianresearch.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 22 May 2013 23:50:21 +0400
+Subject: [PATCH] ARM: shmobile: marzen: Use error values in usb_power_*
+In-Reply-To: <1369205290-6272-2-git-send-email-horms+renesas@verge.net.au>
+References: <1369205290-6272-1-git-send-email-horms+renesas@verge.net.au>
+ <1369205290-6272-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <519D217D.2060405@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 08:55:21PM +0200, Andrew Lunn wrote:
-> > Just to chime in a bit here.. We also hit this problem on Kirkwood,
-> > and fixed it in the bootloader. The power on default for Kirkwood
-> > chips is 0xd0000000 and Linux has long required the bootloader to move
-> > it.. Not sure why 370/XP dropped this.
-> > 
-> > Also, can you talk abit more about how this works to give more low DDR
-> > memory? The docs say you can't overlap windows, and DDR CS's have a
-> > power of two size/alignment requirement.
-> > 
-> > Does this mean the desire is to place a DDR CS from 3G -> 3.5G?
-> > 
-> > > For example, I'm currently booting alternatively with an old and a new
-> > > bootloader (to test that things work properly), and in both cases I'm
-> > > booting old style, DTB-appended, with ATAGs.
-> > 
-> > IMHO the DTB must match both the hardware *and* the bootloader. The
-> > bootloader is setting the address map, the DTB contains that address
-> > map, they must all match together.
-> > 
-> > Using a DTB property really is the right way to go.
-> 
-> Interesting you said that, yet for your kirkwood, you hacked your
-> bootloader rather than Linux.
+Hello.
 
-Not sure what you mean?
+On 05/22/2013 10:48 AM, Simon Horman wrote:
 
-I don't care where internal-regs is on my box, so least-work is to
-have the bootloader produce a DTB and memory map that matches the
-hardwired expectations in Linux.
+> This patch updates the marzen board code as if USB PHY isn't enabled
+> they phy will have a value set by ERR_PTR() rather than be NULL.
+>
+> Without this patch a NULL pointer dereference  and kernel panic
+> occurs on initialisation of USB on marzen.
+>
+> This resolves a regression introduced in 3.10-rc1 by
+> b7fa5c2aec5be083eb2719b405089703608e9bc6
+> ("usb: phy: return -ENXIO when PHY layer isn't enabled").
+>
+> Tested-by: Nguyen Hong Ky <nh-ky@jinso.co.jp>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>   arch/arm/mach-shmobile/board-marzen.c | 6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+> index 9105285..b9594e9 100644
+> --- a/arch/arm/mach-shmobile/board-marzen.c
+> +++ b/arch/arm/mach-shmobile/board-marzen.c
+> @@ -212,8 +212,8 @@ static struct platform_device *marzen_devices[] __initdata = {
+>   static struct usb_phy *phy;
+>   static int usb_power_on(struct platform_device *pdev)
+>   {
+> -	if (!phy)
+> -		return -EIO;
+> +	if (IS_ERR(phy))
 
-Keep in mind, the internal regs base is already encoded in the DTB,
-but it must be 0xf1.. otherwise Linux blows up. That is a Linux 'bug',
-IMHO.
+    And even before the mentioned commit the right check should have 
+been IS_ERR_OR_NULL().
+Thanks for finding/fixing this. Too bad I'll have to respin my USB 
+patches now... :-)
 
-> I think in practice, it is not going to be easy to match the DTB to
-> the hardware and the bootloader. Look at debians flash-kernel, used to
-> prepare the kernel for an embedded system. For each target it has a
-> database entry:
-
-Right, that is why I suggested using the CP15 indication to fix the
-DTB on-the-fly. Similar to how ATAGs fixes the DTB. This makes the
-meaning of the CP15 bit much cleaner: 'If set, override the internal
-regs base in the DTB to be XYZ, if clear do not mangle the DTB'
-
-Obviously this mangling should migrate into the DTB aware bootloader.
-
-> So it appends the kirkwood-dreamplug.dtb blob to the kernel.  What
-> you are saying is that it also needs to somehow query the version of
-> uboot running on the hardware so it can pick the correct dtb blob
-> from a collection of kirkwood-dreamplug.dtb blobs and append it to
-> the kernel.
-
-IMHO, if you are already booted and running in Linux you can just look
-at the DTB Linux is already using to find a match in the available
-DTBs. A DTB database is only needed for the OS install.
-
-> To keep the problems tractable, we should not really be dependent on
-> the bootloader version.
-
-So, as bootloaders get updated to support native DTB, how do you
-envision supporting that through flash-kernel? The way to set the DTB
-is bootloader version dependent..
-
-Jason
+WBR, Sergei
