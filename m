@@ -1,39 +1,35 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 22 May 2013 16:20:24 +0900
-Subject: [PATCH] ARM: EXYNOS: add __cpuinit annotation to write_pen_release()
-Message-ID: <000201ce56bc$d399b770$7acd2650$@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 22 May 2013 15:23:05 +0800
+Subject: [PATCH v3] tty: serial: add Freescale lpuart driver support
+In-Reply-To: <13F8657A829DAB49A2A937FD6FC10F790B3CDB85@039-SN2MPN1-012.039d.mgd.msft.net>
+References: <1368685096-13177-1-git-send-email-b35083@freescale.com>
+ <20130520030523.GB25113@S2101-09.ap.freescale.net>
+ <13F8657A829DAB49A2A937FD6FC10F790B3CDB85@039-SN2MPN1-012.039d.mgd.msft.net>
+Message-ID: <CAAQ0ZWRz+byPKxMjDH3zKsc0u4bmkPO_1u6w2H4Z7nD0z8+9ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The variable __cpuinitdata pen_release is referenced by write_pen_release().
-Also, write_pen_release() is called by exynos_secondary_init() which is
-annotated with __cpuinit. Thus, __cpuinit should be added write_pen_release()
-to fix section mismatch warning.
+On 22 May 2013 14:40, Jin Zhengxiong-R64188 <R64188@freescale.com> wrote:
+> [Jason Jin-R64188] Reuse the same LPUART on LS-1 with the compatible strings 'fsl,mvf600-lpuart' is technically OK, But it will fuss the route map of the product Line. The general name can show that the IP is shared between several product lines, and the history for which SOC firstly used the IP is not very important. With general compatible name, We can setup the general dts for the shared IPs.
+>
+> That's also the case for the IPs used on Power platform, Take the IFC for example, this IP implemented on Power platform will also be reused LS-1, The compatible string is set as  "fsl,ifc", "simple-bus" but not the soc name on which the IP first used.
+>
+>  Another example, though a little different, the nor flash driver, which is used for many platform, the compatible "cfi-flash" will be more reasonable than the soc/board name.
+>
+> With the general name for the compatible string in the driver, if there is minor difference for the different implementation of the same IP, we can add the soc related compatible string to the driver to pass different .data structure for that soc.
+>
 
-Fixed section mismatch warning as below:
+As I already said, a generic compatible string does not specify
+anything about compatibility/version, and hence it's not a good
+compatible for IP block which is possibly to be integrated on multiple
+SoCs with slight differences.
 
-  WARNING: vmlinux.o(.text.unlikely+0x1f4): Section mismatch in reference from the function write_pen_release() to the variable
-.cpuinit.data:pen_release
-  The function write_pen_release() references the variable __cpuinitdata pen_release.
-  This is often because write_pen_release lacks a __cpuinitdata annotation or the annotation of pen_release is wrong.
+For example, if there is a new SoC mvf900 integrating the IP with
+everything compatible to the version used on mvf600,
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
----
- arch/arm/mach-exynos/platsmp.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  compatible = <fsl,mvf900-uart>, <fsl,mvf600-uart>;
+  compatible = <fsl,mvf900-uart>, <fsl,lpuart>;
 
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index a0e8ff7..9676af2 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -58,7 +58,7 @@ static inline void __iomem *cpu_boot_reg(int cpu)
-  * observers, irrespective of whether they're taking part in coherency
-  * or not.  This is necessary for the hotplug code to work reliably.
-  */
--static void write_pen_release(int val)
-+static void __cpuinit write_pen_release(int val)
- {
- 	pen_release = val;
- 	smp_wmb();
--- 
-1.7.10.4
+which one do you think is better to tell the compatibility/version?
+
+Shawn
