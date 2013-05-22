@@ -1,33 +1,41 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 22 May 2013 13:05:09 +0200
-Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
-In-Reply-To: <201305221219.43558.jbe@pengutronix.de>
-References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
- <CAOMZO5AKKVeTMsXpG9wa-eeLocBStUwPjQEe3n6fRVY2aSc7Nw@mail.gmail.com>
- <201305221219.43558.jbe@pengutronix.de>
-Message-ID: <201305221305.09579.marex@denx.de>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Wed, 22 May 2013 14:07:29 +0300
+Subject: [PATCH v2 00/10] uaccess: better might_sleep/might_fault behavior
+In-Reply-To: <20130522101916.GM18810@twins.programming.kicks-ass.net>
+References: <cover.1368702323.git.mst@redhat.com>
+ <201305221125.36284.arnd@arndb.de>
+ <20130522101916.GM18810@twins.programming.kicks-ass.net>
+Message-ID: <20130522110729.GB5643@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Juergen Beisert,
+On Wed, May 22, 2013 at 12:19:16PM +0200, Peter Zijlstra wrote:
+> On Wed, May 22, 2013 at 11:25:36AM +0200, Arnd Bergmann wrote:
+> > Calling might_fault() for every __get_user/__put_user is rather expensive
+> > because it turns what should be a single instruction (plus fixup) into an
+> > external function call.
+> 
+> We could hide it all behind CONFIG_DEBUG_ATOMIC_SLEEP just like
+> might_sleep() is. I'm not sure there's a point to might_fault() when
+> might_sleep() is a NOP.
 
-> Hi Fabio,
-> 
-> > i2c slowness is a different issue.
-> 
-> Same happens here for my i.M23 based platform. It seems the PIO mode does
-> not work, or at least not like it works on a i.MX28. Each short transfer
-> needs about one second (without an error message) but does not send
-> anything on the I2C lines.
-> 
-> I need the following patches to make I2C master work within a 3.10-rc2
-> kernel:
-> 
-> Subject: [PATCH] I2C/MXS: distinguish i.MX23 and i.MX28 based I2C
+The patch that you posted gets pretty close.
+E.g. I'm testing this now:
++#define might_fault() do { \
++       if (_might_fault()) \
++               __might_sleep(__FILE__, __LINE__, 0); \
++       might_resched(); \
++} while(0)
 
-I'm all for it, but then ... won't it be better if you actually fixed the PIO 
-and mixed-mode on MX23 instead of implementing such hack? It might actually turn 
-out to be beneficial for MX28 too.
+So if might_sleep is a NOP, __might_sleep and might_resched are NOPs
+so compiler will optimize this all out.
 
-Best regards,
-Marek Vasut
+However, in a related thread, you pointed out that might_sleep is not a NOP if
+CONFIG_PREEMPT_VOLUNTARY is set, even without CONFIG_DEBUG_ATOMIC_SLEEP.
+
+Do you think we should drop the preemption point in might_fault?
+Only copy_XX_user?
+Only __copy_XXX_user ?
+
+-- 
+MST
