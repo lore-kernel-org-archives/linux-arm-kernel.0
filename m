@@ -1,40 +1,70 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 22 May 2013 16:23:17 +0200
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
- 370/XP
-In-Reply-To: <20130522141751.GF18614@n2100.arm.linux.org.uk>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130521193803.GA20882@1wt.eu> <519C9779.1040104@gmail.com>
- <20130522134336.GE18614@n2100.arm.linux.org.uk>
- <20130522155218.1c2af492@skate>
- <20130522141751.GF18614@n2100.arm.linux.org.uk>
-Message-ID: <519CD4D5.9060401@gmail.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Wed, 22 May 2013 16:27:39 +0200
+Subject: [PATCH 0/5] ARM: dts: OMAP2+: use preprocessor for device trees
+Message-ID: <1369232864-14460-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2013 04:17 PM, Russell King - ARM Linux wrote:
-> The question which was asked was:
->
-> 	What happens if you access a register at 0xd0xxxxxx when the
-> 	registers are remapped to 0xf1xxxxxx?
->
-> The answer which was given was:
->
-> 	It hangs on XP / 370, but doesn't on Dove.
->
-...
-> What we need to know is: after the boot loader passes control to the
-> kernel, and before _we_ start fiddling around with any clocks, is the
-> region at 0xd0xxxxxx accessible without hanging the CPU?
->
-> That's the point at which we'd want to probe for the remapped registers,
-> so that's the point where the test access must be made - and with the
-> system clocks in whatever state was left by the reset+boot loader.
+Hello,
 
-Russell,
+Following a similar proposal by Stephen Warren for tegra [1], this series
+makes use of the C preprocessor when compiling OMAP DT files, and
+accomplishes some improvements to improve overall readability.
 
-I tried both Armada 370 and Dove on a very minimal console-only barebox.
-Poking the wrong addresses always hangs 370 while Dove happily returns
-zero.
+Patch 2 creates a header file to define the OMAP_GPIO() macro, used by
+patch 3 to make GPIOs more readable.
+Likewise patch 5 uses the existing constants to make IRQs more readable.
+Patch 4 is a small random fix.
 
-Sebastian
+This series was boot-tested on omap3-tobi. For other targets, the
+decompiled .dtb were diff'ed before and after applying the series
+to guarantee identity.
+
+Best regards,
+
+Florian
+
+[1] https://patchwork.kernel.org/patch/2560091/
+
+Florian Vaussard (5):
+  ARM: dts: OMAP2+: use #include for all device trees
+  ARM: dts: OMAP2+: create a DT header for GPIO
+  ARM: dts: OMAP2+: convert DT files to use the new OMAP_GPIO macro
+  ARM: dts: OMAP3: fix incorrect notation for musb-hdrc interrupt
+  ARM: dts: OMAP4/5: use existing constants for IRQs
+
+ arch/arm/boot/dts/omap2.dtsi              |    4 +-
+ arch/arm/boot/dts/omap2420-h4.dts         |    2 +-
+ arch/arm/boot/dts/omap2420.dtsi           |    2 +-
+ arch/arm/boot/dts/omap2430.dtsi           |    2 +-
+ arch/arm/boot/dts/omap3-beagle-xm.dts     |    8 +-
+ arch/arm/boot/dts/omap3-beagle.dts        |   10 +-
+ arch/arm/boot/dts/omap3-devkit8000.dts    |   10 +-
+ arch/arm/boot/dts/omap3-evm.dts           |    4 +-
+ arch/arm/boot/dts/omap3-igep.dtsi         |    4 +-
+ arch/arm/boot/dts/omap3-igep0020.dts      |    8 +-
+ arch/arm/boot/dts/omap3-igep0030.dts      |    4 +-
+ arch/arm/boot/dts/omap3-overo.dtsi        |    4 +-
+ arch/arm/boot/dts/omap3-tobi.dts          |    4 +-
+ arch/arm/boot/dts/omap3.dtsi              |    6 +-
+ arch/arm/boot/dts/omap3430-sdp.dts        |    4 +-
+ arch/arm/boot/dts/omap34xx.dtsi           |    2 +-
+ arch/arm/boot/dts/omap36xx.dtsi           |    2 +-
+ arch/arm/boot/dts/omap4-panda-a4.dts      |    4 +-
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   18 +-
+ arch/arm/boot/dts/omap4-panda-es.dts      |    4 +-
+ arch/arm/boot/dts/omap4-panda.dts         |    4 +-
+ arch/arm/boot/dts/omap4-sdp-es23plus.dts  |    2 +-
+ arch/arm/boot/dts/omap4-sdp.dts           |   32 ++--
+ arch/arm/boot/dts/omap4-var-som.dts       |    8 +-
+ arch/arm/boot/dts/omap4.dtsi              |  117 ++++++------
+ arch/arm/boot/dts/omap443x.dtsi           |    2 +-
+ arch/arm/boot/dts/omap4460.dtsi           |    6 +-
+ arch/arm/boot/dts/omap5-evm.dts           |    4 +-
+ arch/arm/boot/dts/omap5.dtsi              |  125 +++++++------
+ include/dt-bindings/gpio/omap-gpio.h      |  289 +++++++++++++++++++++++++++++
+ 30 files changed, 497 insertions(+), 198 deletions(-)
+ create mode 100644 include/dt-bindings/gpio/omap-gpio.h
+
+-- 
+1.7.5.4
