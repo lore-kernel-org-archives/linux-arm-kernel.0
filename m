@@ -1,99 +1,78 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 22 May 2013 15:32:20 +0800
-Subject: [PATCH] arm64: compiling issue for allmodconfig,
- need "asm/parport.h" by "drivers/parport/parport_pc.c"
-In-Reply-To: <519C1539.10908@asianux.com>
-References: <5177551D.8090007@asianux.com> <20130424082237.GA23397@arm.com>
- <5177B1F0.10106@asianux.com>
- <20130424102327.GF21850@mudshark.cambridge.arm.com>
- <5177BAD0.9000500@asianux.com> <20130424110511.GK23397@arm.com>
- <5199A453.4080402@asianux.com> <20130521131734.GD27002@arm.com>
- <519C1539.10908@asianux.com>
-Message-ID: <519C7484.9020709@asianux.com>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Wed, 22 May 2013 10:09:30 +0200
+Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
+In-Reply-To: <87zjvokxf0.fsf@linaro.org>
+References: <20130515002537.GG5600@atomide.com>
+ <20130515015212.GB3268@animalcreek.com>
+ <20130515170734.GI5600@atomide.com> <20130515215028.GA11883@animalcreek.com>
+ <5194B2A8.8020608@visionsystems.de> <20130517185620.GF28484@animalcreek.com>
+ <CAGm1_ks10f=6aBxWHzd6KxAaFGfnZUNWrQrSZeFwsT3He9r0Ow@mail.gmail.com>
+ <20130520220540.GL10378@atomide.com> <87zjvokxf0.fsf@linaro.org>
+Message-ID: <CAGm1_kvoJ=y5t4SY_3p2Bk1PgU1DOJ39yOBFO83yBo__oLUGuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2013 08:45 AM, Chen Gang wrote:
-> On 05/21/2013 09:17 PM, Catalin Marinas wrote:
->> On Mon, May 20, 2013 at 05:19:31AM +0100, Chen Gang wrote:
+On Tue, May 21, 2013 at 8:20 PM, Kevin Hilman <khilman@linaro.org> wrote:
+> Tony Lindgren <tony@atomide.com> writes:
+>
+>> * Yegor Yefremov <yegorslists@googlemail.com> [130517 14:34]:
+>>> On Fri, May 17, 2013 at 8:56 PM, Mark A. Greer <mgreer@animalcreek.com> wrote:
+>>> > On Thu, May 16, 2013 at 12:19:20PM +0200, Yegor Yefremov wrote:
+>>> >> On 15.05.2013 23:50, Mark A. Greer wrote:
+>>> >> > On Wed, May 15, 2013 at 10:07:35AM -0700, Tony Lindgren wrote:
+>>> >
+>>> >> >> Mark, do you have some omap3 with no iva (other than am3703) to test the
+>>> >> >> idle states with?
+>>> >> >
+>>> >> > I have an am35xx which isn't supposed to have an IVA so I can test with it
+>>> >> > (although, I'm not sure how well the kernel works on the am35xx these days).
+>>> >> >
+>>> >> > I'm a bit busy today but I'll try booting the am35xx tomorrow and if it
+>>> >> > comes up, see what I can figure out.
+>>> >>
+>>> >> I think this issue is relevant to am3517 as you can see from this
+>>> >> thread: http://thread.gmane.org/gmane.linux.ports.arm.omap/97903
+>>> >> I could boot only with your patch http://www.spinics.net/lists/arm-kernel/msg168865.html
+>>> >>
+>>> >> I have such a system running, so if you have any other patches/ideas to test, I would do it.
+>>> >
+>>> > Yegor, since I've so far been unable to get my am3517evm to fire up, can
+>>> > you play around with the 3517 to see if there appears to be iva registers
+>>> > that can be read/written to safely?  In particular, can the code that idles
+>>> > the iva be run safely on an am3517?
 >>>
->>> Need add the default file in 'asm/Kbuild' just like arm has done.
->>>
->>> The build command is:
->>>   make EXTRA_CFLAGS=-W ARCH=arm64 allmodconfig
->>>   make EXTRA_CFLAGS=-W ARCH=arm64 menuconfig
->>>     set "aarch64-linux-gnu-" as cross compiling prefix.
->>>   make EXTRA_CFLAGS=-W ARCH=arm64
->>>
->>> The related error:
->>>   drivers/parport/parport_pc.c:67:25: fatal error: asm/parport.h: No such file or directory
+>>> I'll look into this next week. am3517 and IVA seems to be a really big
+>>> mystery. In the TI forum will be stated, there is no IVA:
+>>> http://e2e.ti.com/support/arm/sitara_arm/f/791/t/150961.aspx, but TRM
+>>> has various appearances of IVA2 registers, but no real
+>>> description/explanation of what is IVA and how to eat it.
 >>
->> As I don't see when we'd need this driver, you can probably change the
->> Kconfig entry (similar to the VGA_CONSOLE one).
+>> On 3703 it looks like the whole omap3_iva_idle() reset is needed, except
+>> for setting the iva2 bootmode to idle. So I'm planning to merge the following
+>> patch with just comments update this week unless somebody has a better fix
+>> in mind.
 >>
+>> Regards,
+>>
+>> Tony
+>>
+>>
+>> From: Tony Lindgren <tony@atomide.com>
+>> Date: Tue, 14 May 2013 20:28:15 -0700
+>> Subject: [PATCH] ARM: OMAP3: Fix iva2_pwrdm settings for 3703
+>>
+>> Commit a819c4f1 (ARM: OMAP3: PM: Only access IVA if one exists)
+>> changed PM to not access IVA registers on omaps that don't have
+>> them. Turns out we still need to idle iva2 as otherwise
+>> iva2_pwrdm will stay on and block deeper idle states.
+>>
+>> It seems that the only part of the reset that may not be needed
+>> is the setting of the iva2 boot mode to idle. But as that register
+>> seems to be there and is harmless if no iva2 is on the SoC, it's
+>> probably safest to do the complete reset.
+>>
+>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>
+> Acked-by: Kevin Hilman <khilman@linaro.org>
 
-After check the Kconfig in drivers, we can find quite a few using long
-list args which related with ARCH.
-
-And they are not only depend on ARCHs, but also depend on another
-things (e.g. VGA_CONSOL also depend on !4xx && !8xx, and another
-combinations).
-
-We also can find another long list for depend on, but not related with
-ARCH.
-
-They seems not quit difficult for reading (in fact, if we separate them
-into pieces and let them spread into another areas, the reader will not
-see the whole dependency clearly)
-
-For fixing bug, better as local as possible, as independent as possible,
-it will be OK if only add !ARM64 for PARPORT_PC depend on, and it has
-no any negative effect. But if we define CONFIG_HAVE_*, we have to let
-it related with multiple platforms.
-
-For design: if can bear current design, better not to touch it, I think
-current design is still sustainable, and not complex for understanding,
-so not need redesign.
-
-
-The depends on samples which related with ARCH:
-
-  ./ide/Kconfig:  depends on ALPHA || X86 || IA64 || M32R || MIPS || ARCH_RPC || ARCH_SHARK
-  ./dma/Kconfig:  depends on ARCH_IOP32X || ARCH_IOP33X || ARCH_IOP13XX
-  ./misc/Kconfig: depends on (IA64_GENERIC || IA64_SGI_SN2 || IA64_SGI_UV || X86_UV) && SMP
-  ./gpio/Kconfig: depends on PPC_MPC512x || PPC_MPC831x || PPC_MPC834x || PPC_MPC837x || ...
-  ./gpio/Kconfig: depends on GPIOLIB && ARCH_MSM && (ARCH_MSM7X00A || ARCH_MSM7X30 || ARCH_QSD8X50)
-  ./mtd/onenand/Kconfig:        depends on ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS4
-  ./net/ethernet/ti/Kconfig:      depends on PCI || EISA || AR7 || (ARM && (ARCH_DAVINCI || ARCH_OMAP3 || SOC_AM33XX))
-  ./net/ethernet/ibm/Kconfig:     depends on MCA || PPC_PSERIES || PPC_PSERIES || PPC_DCR || ...
-  ./net/ethernet/smsc/Kconfig:    depends on (ARM || M32R || SUPERH || MIPS || BLACKFIN || ...
-  ./net/ethernet/smsc/Kconfig:    depends on (ARM || SUPERH || BLACKFIN || MIPS || MN10300)
-  ./rtc/Kconfig:  depends on X86 || ALPHA || ARM || M32R || ATARI || PPC || MIPS || SPARC64
-  ./rtc/Kconfig:  depends on ARCH_OMAP15XX || ARCH_OMAP16XX || ARCH_OMAP730 || ARCH_DAVINCI_DA8XX || SOC_AM33XX
-  ./isdn/hisax/Kconfig:   depends on PCI && (BROKEN || !(SPARC || PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
-  ./isdn/hisax/Kconfig:   depends on PCI && (BROKEN || !(PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
-  ./isdn/hisax/Kconfig:   depends on PCI && (BROKEN || !(SPARC || PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
-  ./isdn/hisax/Kconfig:   depends on HISAX_NETJET && PCI && (BROKEN || !(SPARC || PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
-  ./input/serio/Kconfig:  depends on !PARISC && (!ARM || ARCH_SHARK || FOOTBRIDGE_HOST) && ...
-  ./char/Kconfig: depends on RTC!=y && !IA64 && !ARM && !M32R && !MIPS && !SPARC && !FRV && !S390 && !SUPERH && !AVR32 && !BLACKFIN && !UML
-  ./video/console/Kconfig:        depends on !4xx && !8xx && !SPARC && !M68K && !PARISC && !FRV && !SUPERH && !BLACKFIN && !AVR32 && !MN10300 && (!ARM || ARCH_FOOTBRIDGE || ARCH_INTEGRATOR || ARCH_NETWINDER)
-  ./video/Kconfig:        depends on FB && (CPU_S3C2416 || ARCH_S3C64XX || ARCH_S5P64X0 || ...
-  ...
-
-
-
-> 
-> Oh, really it is, it is for PC, it seems except x86, no one else will
-> use it. And for x86, it will be less and less used, in the future.
-> 
-> It seems it is a better candidate than VGA_CONSOLE. I will define
-> CONFIG_HAVE_PARPORT_PC for it.  :-)
-> 
-> Thanks.
-> 
-
-
--- 
-Chen Gang
-
-Asianux Corporation
+Tested-by: Yegor Yefremov <yegorslists@googlemail.com>
