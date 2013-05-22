@@ -1,39 +1,38 @@
-From: morten.rasmussen@arm.com (Morten Rasmussen)
-Date: Wed, 22 May 2013 16:46:39 +0100
-Subject: [PATCH 13/14] sched: update the cpu_power
-In-Reply-To: <1366910611-20048-14-git-send-email-vincent.guittot@linaro.org>
-References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
- <1366910611-20048-14-git-send-email-vincent.guittot@linaro.org>
-Message-ID: <20130522154639.GA4935@e103034-lin>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 22 May 2013 17:51:34 +0200
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
+ 370/XP
+In-Reply-To: <201305221735.11815.arnd@arndb.de>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201305221633.46705.arnd@arndb.de> <20130522170643.54a2b9d2@skate>
+ <201305221735.11815.arnd@arndb.de>
+Message-ID: <20130522155134.GL2824@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 25, 2013 at 06:23:29PM +0100, Vincent Guittot wrote:
-> @@ -4596,8 +4597,12 @@ static void update_cpu_power(struct sched_domain *sd, int cpu)
->  	cpu_rq(cpu)->cpu_available = power;
->  	sdg->sgp->power_available = power;
->  
-> +	if (!is_my_buddy(cpu, cpu))
-> +		power = 1;
-> +
-
-Using your fix for is_my_buddy() for patch 11 the above will always be
-true when sched_packing_mode is to anything else than
-SCHED_PACKING_FULL. So cpu_power for all cpus in
-SCHED_PACKING_{DEFAULT,NONE} is 1.
-
-As far is I understand, this is not the intention?
-
-Cheers,
-Morten
-
->  	cpu_rq(cpu)->cpu_power = power;
->  	sdg->sgp->power = power;
-> +
->  }
->  
->  void update_group_power(struct sched_domain *sd, int cpu)
-> -- 
-> 1.7.9.5
+> > I don't see how this can fix the problem. Which internal register base
+> > address do we put in our Device Tree source in arch/arm/boot/dts? The
+> > old one? The new one?
 > 
-> 
+> The one matching the boot loader for that board, i.e. the new address
+> for all boards but Mirabox and OpenBlocks.
+
+Hi Thomas
+
+Maybe i'm missunderstand Arnd, but i think he is suggesting a property
+somewhere in DT which says where the bootloader left the register
+space before jumping to the kernel. You can then look at this property
+and then decide if you need to remap or not. Only this one property
+needs to differ between old and new bootloader. You could even say, if
+the property is not in DT, a remap is needed.
+
+However, i don't know if this can actually work. How early can you
+parse the DT in order to know where the serial port is for
+earlyprintk()? It also gets messy keeping track of the two different
+DT binary blobs and somehow having the probe the uboot version in
+order to install the right one. I don't know how i would include this
+into the debian flash-kernel for example.
+
+I prefer the CP15 bit.
+
+	Andrew
