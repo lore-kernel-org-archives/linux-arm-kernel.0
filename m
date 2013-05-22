@@ -1,50 +1,76 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Wed, 22 May 2013 11:55:45 +0200
-Subject: [PATCH] v2 rtc-at91rm9200: add support for at91sam9x5
-In-Reply-To: <519BF353.2060800@interlog.com>
-References: <519BF353.2060800@interlog.com>
-Message-ID: <20130522095545.GA11420@localhost>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Wed, 22 May 2013 12:58:18 +0300
+Subject: [PATCH v2 00/10] uaccess: better might_sleep/might_fault behavior
+In-Reply-To: <201305221125.36284.arnd@arndb.de>
+References: <cover.1368702323.git.mst@redhat.com>
+ <201305221125.36284.arnd@arndb.de>
+Message-ID: <20130522095818.GB24931@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 06:21:07PM -0400, Douglas Gilbert wrote:
-> An unspecified number of SoCs from the Atmel's
-> at91sam9x5 family including the at91sam9g25 have a
-> broken AT91_RTC_IMR (interrupt mask) register which
-> always returns zero.
+On Wed, May 22, 2013 at 11:25:36AM +0200, Arnd Bergmann wrote:
+> On Thursday 16 May 2013, Michael S. Tsirkin wrote:
+> > This improves the might_fault annotations used
+> > by uaccess routines:
+> > 
+> > 1. The only reason uaccess routines might sleep
+> >    is if they fault. Make this explicit for
+> >    all architectures.
+> > 2. Accesses (e.g through socket ops) to kernel memory
+> >    with KERNEL_DS like net/sunrpc does will never sleep.
+> >    Remove an unconditinal might_sleep in the inline
+> >    might_fault in kernel.h
+> >    (used when PROVE_LOCKING is not set).
+> > 3. Accesses with pagefault_disable return EFAULT
+> >    but won't cause caller to sleep.
+> >    Check for that and avoid might_sleep when
+> >    PROVE_LOCKING is set.
+> > 
+> > I'd like these changes to go in for the benefit of
+> > the vhost driver where we want to call socket ops
+> > under a spinlock, and fall back on slower thread handler
+> > on error.
 > 
-> If this bug can be neutralized, then the existing
-> rtc-at91rm9200 driver will work. On the other hand,
-> leaving this bug in place, and starting the RTC
-> causes unhandled interrupts which result in the
-> "SYS" interrupt being disabled. And that takes down
-> several other interrupts wired or-ed through the
-> SYS interrupt including the DBG port.
+> Hi Michael,
 > 
-> This is the second version of this patch, and is
-> against lk 3.10.0-rc2 .
+> I have recently stumbled over a related topic, which is the highly
+> inconsistent placement of might_fault() or might_sleep() in certain
+> classes of uaccess functions. Your patches seem completely reasonable,
+> but it would be good to also fix the other problem, at least on
+> the architectures we most care about.
+> 
+> Given the most commonly used functions and a couple of architectures
+> I'm familiar with, these are the ones that currently call might_fault()
+> 
+> 			x86-32	x86-64	arm	arm64	powerpc	s390	generic
+> copy_to_user		-	x	-	-	-	x	x
+> copy_from_user		-	x	-	-	-	x	x
+> put_user		x	x	x	x	x	x	x
+> get_user		x	x	x	x	x	x	x
+> __copy_to_user		x	x	-	-	x	-	-
+> __copy_from_user	x	x	-	-	x	-	-
+> __put_user		-	-	x	-	x	-	-
+> __get_user		-	-	x	-	x	-	-
+> 
+> WTF?
 
-Your patch is almost identical to the one I submitted about two months
-ago in this thread:
+Yea.
 
-	https://lkml.org/lkml/2013/4/3/166
+> Calling might_fault() for every __get_user/__put_user is rather expensive
+> because it turns what should be a single instruction (plus fixup) into an
+> external function call.
 
-except that you do not use DT to the detect SoCs with broken IMR. (Your
-patch is also lacking the register-read-back heuristic to make sure the
-interrupts have been disabled before you update the mask.)
+You mean _cond_resched with CONFIG_PREEMPT_VOLUNTARY? Or do you
+mean when we build with PROVE_LOCKING?
 
-Are there sam9x5 SoCs with non-broken RTC_IMR which would prevent us
-from using DT for detection? If so, I'd rather see your test for
-broken-IMR implemented on top of my implementation.
+> My feeling is that we should do might_fault() only in access_ok() to get
+> the right balance.
+> 
+> 	Arnd
 
-Thanks,
-Johan
+Well access_ok is currently non-blocking I think - we'd have to audit
+all callers. There are some 200 of these in drivers and some
+1000 total so ... a bit risky.
 
-> ChangeLog:
->     - checks in probe() function if AT91_RTC_IMR is broken.
->       If so, uses a shadow imr
->     - apart from that check, SoCs with a good IMR register
->       take the same paths through rtc-at91rm9200.c as before
->     - SoCs with a broken IMR take a spinlock while changing
->       the state of IER or IDR (and the shadow), mainly to
->       disable interrupts **.
+-- 
+MST
