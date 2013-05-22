@@ -1,48 +1,42 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 22 May 2013 23:50:21 +0400
-Subject: [PATCH] ARM: shmobile: marzen: Use error values in usb_power_*
-In-Reply-To: <1369205290-6272-2-git-send-email-horms+renesas@verge.net.au>
-References: <1369205290-6272-1-git-send-email-horms+renesas@verge.net.au>
- <1369205290-6272-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <519D217D.2060405@cogentembedded.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 22 May 2013 21:52:40 +0200
+Subject: [PATCH v4 06/12] ARM: dove: add gigabit ethernet and mvmdio device
+ tree nodes
+In-Reply-To: <20130522174815.GI31290@titan.lakedaemon.net>
+References: <1369154510-4927-7-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130521174849.GL26249@lunn.ch> <519C9333.20609@gmail.com>
+ <519C9822.9040909@windriver.com> <519C9A66.3050807@gmail.com>
+ <20130522131010.GB31290@titan.lakedaemon.net>
+ <20130522165908.GB12320@obsidianresearch.com> <519D0143.1000203@gmail.com>
+ <20130522173505.GH31290@titan.lakedaemon.net> <519D038C.9000605@gmail.com>
+ <20130522174815.GI31290@titan.lakedaemon.net>
+Message-ID: <519D2208.8040902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 05/22/2013 07:48 PM, Jason Cooper wrote:
+> On Wed, May 22, 2013 at 07:42:36PM +0200, Sebastian Hesselbarth wrote:
+>> On 05/22/2013 07:35 PM, Jason Cooper wrote:
+>>> On Wed, May 22, 2013 at 07:32:51PM +0200, Sebastian Hesselbarth wrote:
+>>>> Just tested on Dockstar with gated clocks and modular DT mv643xx_eth.
+>>>>
+>>>> Will append to the DT mv643xx_eth patch set if a v5 will be required
+>>>> or as single patch prior Jason C taking in the ARM part of it
+>>>> otherwise.
+>>>
+>>> Please post, in-reply-to v4 is fine.
+>>
+>> Hmm, maybe a little bit too early. While restoring the MAC address now
+>> works, another bug arises which I guess is related with phy setup
+>> and aneg.
+>>
+>> Will investigate and update patch set accordingly.
 
-On 05/22/2013 10:48 AM, Simon Horman wrote:
+Ok, have it working now by properly clearing CLK125_BYPASS_EN bit in
+PORT_SERIAL_CTRL1 register for Kirkwood only. I have two more patches
+ready that I will post as single patches in reply to v4.
 
-> This patch updates the marzen board code as if USB PHY isn't enabled
-> they phy will have a value set by ERR_PTR() rather than be NULL.
->
-> Without this patch a NULL pointer dereference  and kernel panic
-> occurs on initialisation of USB on marzen.
->
-> This resolves a regression introduced in 3.10-rc1 by
-> b7fa5c2aec5be083eb2719b405089703608e9bc6
-> ("usb: phy: return -ENXIO when PHY layer isn't enabled").
->
-> Tested-by: Nguyen Hong Ky <nh-ky@jinso.co.jp>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->   arch/arm/mach-shmobile/board-marzen.c | 6 +++---
->   1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-> index 9105285..b9594e9 100644
-> --- a/arch/arm/mach-shmobile/board-marzen.c
-> +++ b/arch/arm/mach-shmobile/board-marzen.c
-> @@ -212,8 +212,8 @@ static struct platform_device *marzen_devices[] __initdata = {
->   static struct usb_phy *phy;
->   static int usb_power_on(struct platform_device *pdev)
->   {
-> -	if (!phy)
-> -		return -EIO;
-> +	if (IS_ERR(phy))
+If David gives his ACK for the patch set and names a branch to base it
+on, I will send a v5 including all patches.
 
-    And even before the mentioned commit the right check should have 
-been IS_ERR_OR_NULL().
-Thanks for finding/fixing this. Too bad I'll have to respin my USB 
-patches now... :-)
-
-WBR, Sergei
+Sebastian
