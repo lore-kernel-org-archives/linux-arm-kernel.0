@@ -1,50 +1,51 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 22 May 2013 08:50:32 +0800
-Subject: [PATCH] arm64: kernel: need extern variable 'screen_info' for
- related driver using.
-In-Reply-To: <20130521131539.GC27002@arm.com>
-References: <5199B7D6.40907@asianux.com>
- <20130520091008.GB31359@mudshark.cambridge.arm.com>
- <519AE6D7.1090401@asianux.com>
- <CAMuHMdWNHPDkf35MYMKnxt5pn3a+dsT4jgYxuuHrp+mpZMckfw@mail.gmail.com>
- <519B278B.6030708@asianux.com>
- <20130521090336.GC10453@mudshark.cambridge.arm.com>
- <519B48B4.6050607@asianux.com> <20130521131539.GC27002@arm.com>
-Message-ID: <519C1658.3040209@asianux.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 22 May 2013 06:44:20 +0530
+Subject: spurious bL cpufreq driver messages
+In-Reply-To: <11917612.jOVuLqOMKF@vostro.rjw.lan>
+References: <519686BC.3090101@gmail.com>
+ <CAL_JsqLEv38DwnL4=ToXtEKNrDbgYv_0qiOc+cXZSjnfKVbeNg@mail.gmail.com>
+ <CAKohpomG5E2FAeZGnX3eBw8fOiX3K8sWEeHgb5NT_FT3y+Cg1w@mail.gmail.com>
+ <11917612.jOVuLqOMKF@vostro.rjw.lan>
+Message-ID: <CAKohpokkMvEhotcow8qfCGP0SxNfRsxw7swo-ZFbTSKE-F8Xtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2013 09:15 PM, Catalin Marinas wrote:
-> On Tue, May 21, 2013 at 11:13:08AM +0100, Chen Gang wrote:
->> > On 05/21/2013 05:03 PM, Will Deacon wrote:
->>> > > On Tue, May 21, 2013 at 08:51:39AM +0100, Chen Gang wrote:
->>>> > >> For me, I still recommend add 'ARM64' in the long list of architectures
->>>> > >> for 'VGA_CONSOLE', I have 3 reasons, please check:
->>>> > >>
->>>> > >> a. current implementation only changes one area which only related with
->>>> > >> arm64 and 'VGA_CONSOLE', but if use 'CONFIG_HAVE_VGA_CONSOLE', that will
->>>> > >> touch many multiple platforms dependency, at least we need discuss about
->>>> > >> it with multiple platforms guys for it, firstly.
->>> > > 
->>> > > That's a weak argument. You might as well propose the cleanup and see what
->>> > > people say.
->> > 
->> > Hmm.. I think at least, we need discuss it with the 'final applier'
->> > firstly (and now, I even do not know who is the 'final applier').
-> Well, you can post the patch to linux-arch, cc'ing the arch maintainers
-> whose Kconfig files you touch. If there are no comments, it will most
-> likely be picked by Andrew Morton and sent to Linus (make sure you cc
-> Andrew as well).
+On 22 May 2013 05:15, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> On Monday, May 20, 2013 10:06:49 AM Viresh Kumar wrote:
+>> On 19 May 2013 01:21, Rob Herring <robherring2@gmail.com> wrote:
+>> > No, it still registers the bL driver. The problem is not that DT data
+>> > is missing, but it is present on a single cluster system.
+>>
+>> I misread your mail.. I got the problem now.. Below should fix your
+>> issue (It is rebased on the patch I pointed to you earlier):
+>>
+>> Attached too for testing as gmail copy-paste will break it.
+>>
+>> @Rafael: Once Rob gives his Tested-by, please queue it for 3.10-rcs
+>>
+>> ------------x-----------------x-----------------
+>>
+>> From: Viresh Kumar <viresh.kumar@linaro.org>
+>> Date: Mon, 20 May 2013 09:57:17 +0530
+>> Subject: [PATCH] cpufreq: arm_big_little_dt: Instantiate as platform_driver
+>>
+>> As multiplatform build is being adopted by more and more ARM platforms, initcall
+>> function should be used very carefully. For example, when both arm_big_little_dt
+>> and cpufreq-cpu0 drivers are compiled in, arm_big_little_dt driver may try to
+>> register even if we had platform device for cpufreq-cpu0 registered.
+>>
+>> To eliminate this undesired the effect, the patch changes arm_big_little_dt
+>> driver to have it instantiated as a platform_driver. Then it will only run on
+>> platforms that create the platform_device "arm-bL-cpufreq-dt".
+>>
+>> Reported-by: Rob Herring <robherring2@gmail.com>
+>> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>
+> The patch (from the attachment) didn't apply for me.  Please check the
+> bleeding-edge branch.
 
-OK, thanks. I will do with PARPORT_PC firstly, I think, it is a better
-candidate than VGA_CONSOLE.
+Have you tried applying this before it (As written in my last mail)?
 
-And excuse me, I have to do another things now, and I think I should
-finish the PARPORT_PC within this week.
+https://groups.google.com/forum/?fromgroups#!topic/linux.kernel/XJF-82rad4o
 
-
-Thanks.
--- 
-Chen Gang
-
-Asianux Corporation
+Above is also required fix for 3.10-rc3
