@@ -1,78 +1,80 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 22 May 2013 14:54:13 +0200
-Subject: [PATCH v4] clocksource: add Vybrid Family pit timer support
-In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E851CBE88@039-SN1MPN1-003.039d.mgd.msft.net>
-References: <1369121274-9371-1-git-send-email-b35083@freescale.com>
- <519B48F4.8050005@linaro.org>
- <B56CDBE15CE27145A4B77D2D24263E851CBE88@039-SN1MPN1-003.039d.mgd.msft.net>
-Message-ID: <519CBFF5.3060900@linaro.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 22 May 2013 16:59:46 +0400
+Subject: [PATCH 02/11] gpio: davinci: coding style correction
+In-Reply-To: <1369206634-6778-3-git-send-email-avinashphilip@ti.com>
+References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
+ <1369206634-6778-3-git-send-email-avinashphilip@ti.com>
+Message-ID: <519CC142.7050301@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2013 11:47 AM, Lu Jingchang-B35083 wrote:
-> 
+Hello.
 
-[ ... ]
+On 22-05-2013 11:10, Philip Avinash wrote:
 
->>
->>> +}
->>> +
->>> +static void __init pit_timer_init(struct device_node *np) {
->>> +	struct clk *pit_clk;
->>> +	void __iomem *timer_base;
->>> +	int irq;
->>> +
->>> +	timer_base = of_iomap(np, 0);
->>> +	BUG_ON(!timer_base);
->>
->> You raise a bug and then you go ahead setting up the address with an
->> invalid value, leading to a random crash.
-> [Lu Jingchang-B35083] 
-> The BUG_ON() will call BUG() if condition is true. It will print the stack trace and the current process will die, it won't go ahead, won't it? Thanks! 
+> 1. Corrects coding and commenting styles
+> 2. Variables name change to meaningful name
+> 3. Remove unnecessary variable usage
+> 4. Add BINTEN macro definition
+>
+> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> ---
+>   drivers/gpio/gpio-davinci.c |  182 +++++++++++++++++++++----------------------
+>   1 file changed, 89 insertions(+), 93 deletions(-)
 
-Pff, right. I just puzzled myself. Never mind.
+> diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+> index 17df6db..d308955 100644
+> --- a/drivers/gpio/gpio-davinci.c
+> +++ b/drivers/gpio/gpio-davinci.c
+[...]
+> @@ -31,10 +31,11 @@ struct davinci_gpio_regs {
+>   	u32	intstat;
+>   };
+>
+> +#define BINTEN	0x08 /* GPIO Interrupt Per-Bank Enable Register */
 
+    Empty line needed here.
 
->>> +	/*
->>> +	 * PIT0 and PIT1 can be chained to build a 64-bit timer,
->>> +	 * so choose PIT2 as clocksource, PIT3 as clockevent device,
->>> +	 * and leave PIT0 and PIT1 unused for anyone else who needs them.
->>> +	 */
->>> +	clksrc_base = timer_base + PITn_OFFSET(2);
->>> +	clkevt_base = timer_base + PITn_OFFSET(3);
->>> +
->>> +	irq = irq_of_parse_and_map(np, 0);
->>> +
->>> +	pit_clk = of_clk_get(np, 0);
->>> +	BUG_ON(IS_ERR(pit_clk));
->>> +
->>> +	BUG_ON(clk_prepare_enable(pit_clk));
->>
->> Same here.
->>
->>> +	cycle_per_jiffy = clk_get_rate(pit_clk)/(HZ);
->>> +
->>> +	/* enable the pit module */
->>> +	__raw_writel(~PITMCR_MDIS, timer_base + PITMCR);
->>> +
->>> +	BUG_ON(pit_clocksource_init(pit_clk));
->>> +
->>> +	pit_clockevent_init(pit_clk, irq);
->>
->> Please, remove these BUG_ON, this is inconsistent especially with a one
->> call init function. If pit_timer_init can't be initialized, just pr_err
->> + BUG.
-> [Lu Jingchang-B35083] 
-> Do you mean that I should not use the BUG_ON or I need print an error information by pr_err before BUG. Thanks!
+>   #define chip2controller(chip)	\
+>   	container_of(chip, struct davinci_gpio_controller, chip)
+>
+[...]
+> @@ -98,8 +94,8 @@ static int davinci_direction_in(struct gpio_chip *chip, unsigned offset)
+>   	return __davinci_direction(chip, offset, false, 0);
+>   }
+>
+> -static int
+> -davinci_direction_out(struct gpio_chip *chip, unsigned offset, int value)
+> +static int davinci_direction_out(struct gpio_chip *chip, unsigned offset,
+> +		int value)
 
-Actually, my initial comment was wrong, so you can ignore it.
+     This line should be aligned under the next character after (.
 
-Thank
-  -- Daniel
+[...]
+> @@ -113,22 +109,22 @@ davinci_direction_out(struct gpio_chip *chip, unsigned offset, int value)
+[...]
+>   /*
+>    * Assuming the pin is muxed as a gpio output, set its output value.
+>    */
+> -static void
+> -davinci_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+> +static void davinci_gpio_set(struct gpio_chip *chip, unsigned offset,
+> +		int value)
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+     Same here.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+[...]
+> @@ -368,16 +363,16 @@ static int __init davinci_gpio_irq_setup(void)
+[...]
+>   	for (gpio = 0, bank = 0; gpio < ngpio; bank++, gpio += 32) {
+> -		chips[bank].chip.to_irq = gpio_to_irq_banked;
+> -		chips[bank].irq_base = soc_info->gpio_unbanked
+> -			? -EINVAL
+> -			: (soc_info->intc_irq_num + gpio);
+> +		ctlrs[bank].chip.to_irq = gpio_to_irq_banked;
+> +		ctlrs[bank].irq_base = soc_info->gpio_unbanked ?
+> +			-EINVAL : (soc_info->intc_irq_num + gpio);
+
+    () not needed here.
+
+WBR, Sergei
