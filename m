@@ -1,28 +1,26 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Wed, 22 May 2013 12:24:48 -0600
-Subject: [PATCH v4 06/12] ARM: dove: add gigabit ethernet and mvmdio
- device tree nodes
-In-Reply-To: <519D0143.1000203@gmail.com>
-References: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369154510-4927-7-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130521174849.GL26249@lunn.ch> <519C9333.20609@gmail.com>
- <519C9822.9040909@windriver.com> <519C9A66.3050807@gmail.com>
- <20130522131010.GB31290@titan.lakedaemon.net>
- <20130522165908.GB12320@obsidianresearch.com>
- <519D0143.1000203@gmail.com>
-Message-ID: <20130522182448.GA17206@obsidianresearch.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 22 May 2013 20:31:05 +0200
+Subject: [PATCH 9/9] arm: mvebu: switch internal register address at
+ runtime if needed
+In-Reply-To: <20130522195942.33ff1131@skate>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1369132414-18959-10-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130522174258.GO2824@lunn.ch> <20130522195942.33ff1131@skate>
+Message-ID: <20130522183105.GQ26249@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 07:32:51PM +0200, Sebastian Hesselbarth wrote:
- 
-> Not neccessary anyway, after talking Jason C in a Kirkwood-only
-> workaround I prepared a patch that reads mac address registers early
-> and stores it in the local-mac-address property.
+> > > +		/*
+> > > +		 * Change the physical base address of the
+> > > +		 * registers. From now on, and until
+> > > +		 * debug_ll_io_init() is called below, it is not
+> > > +		 * possible to do any print, because earlyprintk will
+> > > +		 * not work.
+> > 
+> > Is its "not work" or "locks up the CPU as dead as a Dodo?".
+> 
+> locks up the CPU as a Dodo
 
-That sounds great, but, FWIW, our bootloaders don't set the MAC
-address registers. Does the work around only trigger if the
-local-mac-address property is 0?
+Then i would suggest something a bit strong than "will not work".
 
-Jason
+     Andrew
