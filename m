@@ -1,66 +1,45 @@
-From: R64188@freescale.com (Jin Zhengxiong-R64188)
-Date: Wed, 22 May 2013 08:59:20 +0000
-Subject: [PATCH v3] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <CAAQ0ZWRz+byPKxMjDH3zKsc0u4bmkPO_1u6w2H4Z7nD0z8+9ig@mail.gmail.com>
-References: <1368685096-13177-1-git-send-email-b35083@freescale.com>
- <20130520030523.GB25113@S2101-09.ap.freescale.net>
- <13F8657A829DAB49A2A937FD6FC10F790B3CDB85@039-SN2MPN1-012.039d.mgd.msft.net>
- <CAAQ0ZWRz+byPKxMjDH3zKsc0u4bmkPO_1u6w2H4Z7nD0z8+9ig@mail.gmail.com>
-Message-ID: <13F8657A829DAB49A2A937FD6FC10F790B3CECEB@039-SN2MPN1-012.039d.mgd.msft.net>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 22 May 2013 12:03:04 +0300
+Subject: [PATCH] ARM: tegra: add cpu_disable for hotplug
+In-Reply-To: <519B9DB4.7070106@wwwdotorg.org>
+References: <1369131215-2920-1-git-send-email-josephl@nvidia.com>
+ <519B9DB4.7070106@wwwdotorg.org>
+Message-ID: <20130522090304.GT21944@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH v3] tty: serial: add Freescale lpuart driver support
+On Tue, May 21, 2013 at 06:15:48PM +0200, Stephen Warren wrote:
+> On 05/21/2013 04:13 AM, Joseph Lo wrote:
+> > The Tegra114 could hotplug the CPU0, but the common cpu_disable didn't
+> > support that. Adding a Tegra specific cpu_disable function for it.
+> > 
+> > Signed-off-by: Joseph Lo <josephl@nvidia.com>
 > 
-> On 22 May 2013 14:40, Jin Zhengxiong-R64188 <R64188@freescale.com> wrote:
-> > [Jason Jin-R64188] Reuse the same LPUART on LS-1 with the compatible
-> strings 'fsl,mvf600-lpuart' is technically OK, But it will fuss the route
-> map of the product Line. The general name can show that the IP is shared
-> between several product lines, and the history for which SOC firstly used
-> the IP is not very important. With general compatible name, We can setup
-> the general dts for the shared IPs.
-> >
-> > That's also the case for the IPs used on Power platform, Take the IFC
-> for example, this IP implemented on Power platform will also be reused
-> LS-1, The compatible string is set as  "fsl,ifc", "simple-bus" but not
-> the soc name on which the IP first used.
-> >
-> >  Another example, though a little different, the nor flash driver,
-> which is used for many platform, the compatible "cfi-flash" will be more
-> reasonable than the soc/board name.
-> >
-> > With the general name for the compatible string in the driver, if there
-> is minor difference for the different implementation of the same IP, we
-> can add the soc related compatible string to the driver to pass
-> different .data structure for that soc.
-> >
+> > diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
 > 
-> As I already said, a generic compatible string does not specify anything
-> about compatibility/version, and hence it's not a good compatible for IP
-> block which is possibly to be integrated on multiple SoCs with slight
-> differences.
+> > +int tegra_cpu_disable(unsigned int cpu)
+> > +{
+> > +	switch (tegra_chip_id) {
+> > +	case TEGRA114:
+> > +		return 0;
+> > +	default:
+> > +		return cpu == 0 ? -EPERM : 0;
+> > +	}
+> > +}
 > 
-> For example, if there is a new SoC mvf900 integrating the IP with
-> everything compatible to the version used on mvf600,
-> 
->   compatible = <fsl,mvf900-uart>, <fsl,mvf600-uart>;
->   compatible = <fsl,mvf900-uart>, <fsl,lpuart>;
-> 
-> which one do you think is better to tell the compatibility/version?
-> 
-> Shawn
-[Jason Jin-R64188] For the lpuart itself, I do not think it will have different version IP. The general name is sufficient and soc related name can introduce the minor difference. If the there are update version, we can name it lpuart2.0 or something like that.
+> Do we expect all/most future chips to support hotplug of CPU0? Or at
+> least, fewer chips to have the restriction than not? If so, it might be
 
-For the compatible property itself, the ePAPR described it as:
----- 
-The compatible property value consists of one or more strings that define the specific programming model for the device. This list of strings should be used by a client program for device driver selection. The property value consists of a concatenated list of null terminated strings, from most specific to most general. 
-----
-So for the IPs especially for the peripheral IPs, the compatible just used to select the driver for the device. It should not used to describe the version information. If the version changed and the driver cannot be used for the device then another compatible strings should be used.
+Yes. I think we can safely assume future chips will support hotplugging CPU0.
 
-As I said, Another reason for the general strings used is the across platform issue, It's maybe reasonably to name the compatible strings as you recommended for the IPs share in the same SoC family. But for the IPs shared across platform, general name sound more reasonably to avoid the product line confusing. 
+> more forward-looking to write that as:
+> 
+> if (tegra_chip_id == TEGRA30)
+>     return cpu == 0 ? -EPERM : 0;
+> 
 
-The compatible strings once named as you said for Power platform, but more general strings were used later as IPs shared for more SoCs.
+Also Tegra20 doesn't support hotplugging CPU0?
 
-I was wondering what's kind of strings should be used for this kind of IPs across different platforms. I added Grant Likely for comments, Thanks.
+Cheers,
 
-Jason 
+Peter.
