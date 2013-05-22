@@ -1,56 +1,44 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 22 May 2013 09:42:14 +0100
-Subject: [PATCH v4 21/32] arm64: KVM: Build system integration
-In-Reply-To: <850310439.5245685.1369152587054.JavaMail.root@redhat.com>
-References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
- <1368540840-26750-22-git-send-email-marc.zyngier@arm.com>
- <20130521154227.GM27002@arm.com>
- <850310439.5245685.1369152587054.JavaMail.root@redhat.com>
-Message-ID: <20130522084214.GB14322@arm.com>
+Date: Wed, 22 May 2013 09:43:28 +0100
+Subject: [PATCH 14/14] ARM: elf: add new hwcap for identifying atomic
+ ldrd/strd instructions
+In-Reply-To: <20130521180201.GB26251@mudshark.cambridge.arm.com>
+References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
+ <1368810473-26070-15-git-send-email-will.deacon@arm.com>
+ <20130520141809.GA27473@arm.com>
+ <20130520142459.GN31359@mudshark.cambridge.arm.com>
+ <20130520151158.GA3520@MacBook-Pro.local>
+ <20130520160407.GS31359@mudshark.cambridge.arm.com>
+ <20130520171349.GM3639@MacBook-Pro.local>
+ <20130521180201.GB26251@mudshark.cambridge.arm.com>
+Message-ID: <20130522084328.GC14322@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 05:09:47PM +0100, Paolo Bonzini wrote:
-> 
-> 
-> ----- Messaggio originale -----
-> > Da: "Catalin Marinas" <catalin.marinas@arm.com>
-> > A: "Marc Zyngier" <Marc.Zyngier@arm.com>
-> > Cc: linux-arm-kernel at lists.infradead.org, kvmarm at lists.cs.columbia.edu, kvm at vger.kernel.org, "Will Deacon"
-> > <Will.Deacon@arm.com>, pbonzini at redhat.com, gleb at redhat.com, "Christopher Covington" <cov@codeaurora.org>
-> > Inviato: Marted?, 21 maggio 2013 17:42:27
-> > Oggetto: Re: [PATCH v4 21/32] arm64: KVM: Build system integration
+On Tue, May 21, 2013 at 07:02:01PM +0100, Will Deacon wrote:
+> On Mon, May 20, 2013 at 06:13:52PM +0100, Catalin Marinas wrote:
+> > On Mon, May 20, 2013 at 05:04:07PM +0100, Will Deacon wrote:
+> > > On Mon, May 20, 2013 at 04:11:58PM +0100, Catalin Marinas wrote:
+> > > > Given that the ARM ARM isn't clear (though this is the case on the
+> > > > actual implementations), user space may not necessarily assume that
+> > > > LPAE==atomic doubles. That's why I think reporting the actual atomic
+> > > > feature is better.
+> > > 
+> > > The ARM ARM isn't too bad: it's just avoiding mandating 64-bit-wide paths
+> > > around the entire SoC (and I've checked this with the architects). The only
+> > > way we can probe this feature is using the MMFR0 and checking if LPAE is
+> > > supported, and that's exactly what userspace will need to rely on.
 > > 
-> > On Tue, May 14, 2013 at 03:13:49PM +0100, Marc Zyngier wrote:
-> > > --- /dev/null
-> > > +++ b/arch/arm64/kvm/Kconfig
-> > ...
-> > > +config KVM_ARM_VGIC
-> > > +        bool
-> > > +	depends on KVM_ARM_HOST && OF
-> > > +	select HAVE_KVM_IRQCHIP
-> > > +	---help---
-> > > +	  Adds support for a hardware assisted, in-kernel GIC emulation.
-> > > +
-> > > +config KVM_ARM_TIMER
-> > > +        bool
-> > > +	depends on KVM_ARM_VGIC
-> > > +	select HAVE_KVM_IRQCHIP
-> > > +	---help---
-> > > +	  Adds support for the Architected Timers in virtual machines
-> > > +
-> > > +source drivers/virtio/Kconfig
-> > 
-> > Shouldn't the above configs go to drivers/virtio/Kconfig as well (or
-> > drivers/virtio/arm/Kconfig)?
+> > Well, LPAE implies atomic doubles but I wouldn't say that's the "only"
+> > way, it can always be a feature of the CPU. Now, would the user
+> > developers fully understand the implications of LPAE?
 > 
-> virtio doesn't mean "virtual versions of devices that also exist in
-> hardware"; those are indeed in arch/ARCH/kvm.  virtio is a specific bus
-> for paravirtualized devices.  It is not KVM-specific and the code runs
-> in the guest (whereas arch/arm64/kvm/Kconfig is host code).
+> I don't think it *can* be a feature of the CPU, because it depends on
+> system-wide support. It could be a feature of an SoC, but per-SoC hwcaps
+> isn't something we currently support. As I said, the only reason we can even
+> probe this is because the architecture helps us out.
 
-You are right. What I meant was kvm/virt/arm/Kconfig (the place where
-the vgic and timer driver goes).
+LPAE is also a feature of the CPU, not the SoC.
 
 -- 
 Catalin
