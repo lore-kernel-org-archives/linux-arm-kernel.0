@@ -1,43 +1,44 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 22 May 2013 13:47:33 +0100
-Subject: [PATCH] regulator: ab8500-ext: Don't register without initialisation
- data
-In-Reply-To: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
-References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 22 May 2013 21:49:40 +0900
+Subject: [PATCH] ARM: shmobile: kzm9g-reference: Update CMT clocksource rating
+ to 80
+Message-ID: <1369226980-16203-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a bug introduced in the v3.10 merge window.
+Update the CMT clocksource rating from 100 to 10.
 
-Some platforms will not want external registers. Rather than setting up
-lots of different clauses in the core ab8500 regulator driver not to
-call ab8500-ext init() we just won't pass the initialisation data from
-platform code. This patch checks for it and if it's missing, we won't
-register the external regulators.
+This resolves a boot-failure regression for kzm9g-reference in v3.10-rc1
+introduced by f7db706b132f11c79ae1d74b2382e0926cf31644 ("ARM: 7674/1: smp:
+Avoid dummy clockevent being preferred over real").
 
-Cc: Mark Brown <broonie@kernel.org>
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+The patch noted above reduces the rating of dummy clockevent from 400 to 100.
+This patch reduces the rating of CMT so that it is once again less than that
+of the dummy clockevent.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
 ---
- drivers/regulator/ab8500-ext.c |    6 ++++++
- 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/regulator/ab8500-ext.c b/drivers/regulator/ab8500-ext.c
-index b4d4547..8421537 100644
---- a/drivers/regulator/ab8500-ext.c
-+++ b/drivers/regulator/ab8500-ext.c
-@@ -334,6 +334,12 @@ int ab8500_ext_regulator_init(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+I also plan to reduce the rating of the STI clocksource to less than 100.
+However, as I am not aware of any problems relating to STI in v3.10-rc
+my plan is to update STI in the v3.11 timeframe.
+---
+ arch/arm/mach-shmobile/setup-sh73a0.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index fdf3894..9696f36 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -252,7 +252,7 @@ static struct sh_timer_config cmt10_platform_data = {
+ 	.name = "CMT10",
+ 	.channel_offset = 0x10,
+ 	.timer_bit = 0,
+-	.clockevent_rating = 125,
++	.clockevent_rating = 80,
+ 	.clocksource_rating = 125,
+ };
  
-+	/* have any external regulators been specified? */
-+	if (pdata->num_ext_regulator == 0) {
-+		dev_warn(&pdev->dev, "Not using external regulators\n");
-+		return 0;
-+	}
-+
- 	/* make sure the platform data has the correct size */
- 	if (pdata->num_ext_regulator != ARRAY_SIZE(ab8500_ext_regulator_info)) {
- 		dev_err(&pdev->dev, "Configuration error: size mismatch.\n");
 -- 
-1.7.10.4
+1.8.2.1
