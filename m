@@ -1,28 +1,26 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 21 May 2013 21:46:35 -0700
-Subject: [PATCH v2 6/6] pinctrl: exynos: Handle suspend/resume of GPIO
- EINT registers
-In-Reply-To: <4536937.hnhaYZLnaG@amdc1227>
-References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
- <18754346.1REWN52J0K@flatron>
- <CAD=FV=XiWET3Xptfk2CVWMw=xVCE4zUJhJtgXHbhiND12rJGnQ@mail.gmail.com>
- <4536937.hnhaYZLnaG@amdc1227>
-Message-ID: <CAD=FV=VYhBP+V6SQt5SkFZszdVxSJ6AZk-C-zx1Di-RZBYhGvw@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Wed, 22 May 2013 13:15:26 +0800
+Subject: [PATCH v4] ASoC: dfbmcs320: make the driver common for other BT
+ modules
+In-Reply-To: <20130521181849.GG1627@sirena.org.uk>
+References: <1368879900-28395-1-git-send-email-Baohua.Song@csr.com>
+ <20130521181849.GG1627@sirena.org.uk>
+Message-ID: <CAGsJ_4x3QrvReOnFQFqRMWfUf-v-Js4+L_Vr8jht_wR-ApQJrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+2013/5/22 Mark Brown <broonie@kernel.org>:
+> On Sat, May 18, 2013 at 08:25:00PM +0800, Barry Song wrote:
+>> DFBM-CS320 is only one of bluetooth modules using CSR bluetooth chips,
+>> we don't want everyone to have a seperate codec driver. anyway, the
+>> feature of Bluetooth SCO is same on all platforms, so this patch
+>> makes the DFBM-CS320 driver become a common BT SCO link driver.
+>
+> Applied, thanks.
 
-On Tue, May 21, 2013 at 10:05 AM, Tomasz Figa <t.figa@samsung.com> wrote:
->         return 0;
-> +
-> +err_domains:
-> +       bank = d->ctrl->pin_banks;
-> +       for (undo = 0; undo < i; ++undo) {
+thanks, Mark. can we also do something in omap-hdmi to make the HDMI
+codec common as well?
+i think it is in the same situation with BT SCO:
+http://comments.gmane.org/gmane.linux.alsa.devel/108234
 
-++bank is missing, I think.  This will free the same bank many times.
-
-optional: could also avoid extra 'undo' variable and remove in reverse
-order by changing i to signed and counting down to 0.
-
--Doug
+-barry
