@@ -1,47 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 22 May 2013 11:18:29 -0400
-Subject: [PATCH 0/4] Marvell PCIe driver improvements
-In-Reply-To: <519CDFBA.8010607@free-electrons.com>
-References: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130522134319.GC31290@titan.lakedaemon.net>
- <519CDFBA.8010607@free-electrons.com>
-Message-ID: <20130522151829.GD31290@titan.lakedaemon.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 May 2013 17:18:53 +0200
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
+ 370/XP
+In-Reply-To: <519CD920.5030301@free-electrons.com>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201305221633.46705.arnd@arndb.de> <519CD920.5030301@free-electrons.com>
+Message-ID: <201305221718.53759.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 05:09:46PM +0200, Gregory CLEMENT wrote:
-> On 05/22/2013 03:43 PM, Jason Cooper wrote:
-> > Thomas,
+On Wednesday 22 May 2013, Gregory CLEMENT wrote:
+> >> Therefore, the last patch of this series adds some early code in the
+> >> kernel, at the ->map_io() stage, to switch the internal registers from
+> >> 0xD0000000 to 0xF1000000 if this has not been done already by the
+> >> bootloader. As it was explained above, we unfortunately can't read the
+> >> current base address of the internal register window, so we need a
+> >> different mechanism to know if the bootloader has done the remapping
+> >> at 0xF1000000 (new generation bootloader) or has left the internal
+> >> registers at 0xD0000000 (old generation bootloader). In order to
+> >> distinguish between those two cases, a CP15 bit is being used. Old
+> >> bootloaders do not touch this CP15, so it is set to 0. New bootloaders
+> >> set this CP15 bit to 1, so that the kernel knows that the remapping
+> >> has already been done. The ->map_io() code looks at this bit to know
+> >> if the remapping should be done or not.
 > > 
-> > On Wed, May 22, 2013 at 03:12:34PM +0200, Thomas Petazzoni wrote:
-> >> Bjorn, Jason, Andrew, Gregory,
-> >>
-> >> You'll find in this patch series 4 small patches that make various
-> >> improvements to the Marvell PCIe driver.
-> >>
-> >> I'd like those improvements to be kept separated from the original
-> >> PCIe driver itself: while the PCIe driver has been around and reviewed
-> >> for a long time, those improvements are newer. And I clearly do not
-> >> want the PCIe driver to miss 3.11 because of any problem that could be
-> >> found in those additional improvements.
-> > 
-> > Agreed.
+> > As you already admit, using the CP15 register is a hack. It sounds
+> > to me that a cleaner approach would be to put the correct address
+> > into the device tree and use that value everywhere, rather than
+> > hardcoding one or more addresses.
 > 
-> All the changes are located in one single file drivers/pci/host/pci-mvebu.c.
-> So as soon as they will be acked by Bjron, I think we can make a PR for them.
-> As nothing else depend of it, even if for a reason or another it is dropped,
-> there will be no reason to drop anything else.
+> That means reading and decoding the device tree very early in the
+> auto-uncompress part of the kernel.
 
-Right, which is why we'll put it in a separate branch.  Say,
-mvebu/pcie_bridge.  This way if /pcie_bridge has to be dropped (say an
-API that it used is changed), /pcie would remain.  Which is the main
-concern.
+Why that? I was only implying that we would have no console output in
+the uncompressor, which is already the case on multiplatform these
+days when DEBUG_LL is disabled.
 
-Had I known enough last time around, I would have done the /of_pci |
-/pcie split.  /pcie would have been dropped, and /of_pci would have made
-it in.  As well as LinusW's work which depends upon it (and now Arnd
-might have something using it as well).
-
-thx,
-
-Jason.
+	Arnd
