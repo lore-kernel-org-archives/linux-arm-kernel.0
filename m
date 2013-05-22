@@ -1,67 +1,48 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 22 May 2013 19:59:42 +0200
-Subject: [PATCH 9/9] arm: mvebu: switch internal register address at
- runtime if needed
-In-Reply-To: <20130522174258.GO2824@lunn.ch>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1369132414-18959-10-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130522174258.GO2824@lunn.ch>
-Message-ID: <20130522195942.33ff1131@skate>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Wed, 22 May 2013 14:01:14 -0400
+Subject: [PATCH V2 2/2] ARM: mmc: bcm281xx SDHCI driver (dt mods)
+In-Reply-To: <1368200883-15668-2-git-send-email-csd@broadcom.com>
+References: <1368200883-15668-1-git-send-email-csd@broadcom.com>
+ <1368200883-15668-2-git-send-email-csd@broadcom.com>
+Message-ID: <20130522180114.GA8235@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+Hi Christian,
 
-On Wed, 22 May 2013 19:42:58 +0200, Andrew Lunn wrote:
+On Fri, May 10, 2013 at 08:48:03AM -0700, Christian Daudt wrote:
+> Add SDHCI driver for the Broadcom 281xx SoCs. Also
+> add bindings for it into bcm281xx dts files.
 
-> > + * However, when the bit is not set, we do a static mapping of the
-> > + * register area that allows to change the internal register address,
-> > + * we change this address, and set this bit.
+Since this is independent of the driver, the description should probably
+be updated to reflect that this is just the DT support for the bcm281xx
+(or kona) SDHCI hw.
+
+> Changes from V1:
+>  - split original patch into 2, one for driver and this one for dt
 > 
-> Hi Thomas
+> Signed-off-by: Christian Daudt <csd@broadcom.com>
 > 
-> Please could you explain this "and set this bit".
-> 
-> If i understand the comment correctly, you are talking about the bit
-> in CP15. Why is it necessary to set it, since at the next WFI its
-> going to get cleared. I also don't actually see any code doing the
-> setting of this bit.
+> diff --git a/Documentation/devicetree/bindings/mmc/bcm,kona-sdhci.txt b/Documentation/devicetree/bindings/mmc/bcm,kona-sdhci.txt
+> new file mode 100644
+> index 0000000..ad1c4bd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/bcm,kona-sdhci.txt
+> @@ -0,0 +1,16 @@
+> +Broadcom BCM281xx SDHCI driver
 
-Nice catch. This is a left-over from a previous implementation. For
-experimentation purposes, I have been using a different CP15 bit that
-was not getting cleared on WFIs, so once the register address switch was
-done, I was setting this bit to indicate to further invocations of
-earlyprintk that the switch has occurred.
+s/driver//
 
-In the mean time, the code has been changed to use the final bit used
-by Marvell bootloaders, and this one gets cleared at the next WFI. So
-I'm now using a global variable instead to indicate that the switch has
-occurred making this comment inaccurate.
+> +
+> +This file documents differences between the core properties in mmc.txt
+> +and the properties in the bcm281xx driver.
 
-I'll fix that in the next revision of this patch set.
+The hardware binding should not mention the supporting driver. Borrowing
+from other examples, you'd want something more like:
 
+"
+This file documents differences between the core properties described
+by mmc.txt and the properties that represent the bcm281xx [kona?] SDHCI.
+"
 
-> > +		/*
-> > +		 * Change the physical base address of the
-> > +		 * registers. From now on, and until
-> > +		 * debug_ll_io_init() is called below, it is not
-> > +		 * possible to do any print, because earlyprintk will
-> > +		 * not work.
-> 
-> Is its "not work" or "locks up the CPU as dead as a Dodo?".
-
-locks up the CPU as a Dodo: you have switched the registers from 0xd0
-to 0xf1, but the earlyprintk virtual mapping still points to 0xd0. So
-if you try to do a printk, it will call earlyprintk, which will use the
-old virtual mapping (since mvebu_switched_regs isn't set yet, it will
-be at the next line), and that will make it use the old physical
-address of the UART. So you'll write to 0xd0012000, and you're dead.
-
-Thanks for the review!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-Matt
