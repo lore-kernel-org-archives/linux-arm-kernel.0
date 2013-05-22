@@ -1,56 +1,91 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 22 May 2013 23:02:05 +0200
-Subject: [PATCH 2/2] net: mv643xx_eth: proper initialization for Kirkwood
- SoCs
-In-Reply-To: <20130522201607.GA18823@obsidianresearch.com>
-References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369253042-15082-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369253042-15082-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130522201607.GA18823@obsidianresearch.com>
-Message-ID: <519D324D.6070903@gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 22 May 2013 17:02:57 -0400
+Subject: [PATCH v4 11/12] ARM: kirkwood: remove redundant DT board files
+In-Reply-To: <519D30CF.9040904@gmail.com>
+References: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369154510-4927-12-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130522203633.GA28394@schnuecks.de> <519D30CF.9040904@gmail.com>
+Message-ID: <20130522210257.GM31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2013 10:16 PM, Jason Gunthorpe wrote:
-> On Wed, May 22, 2013 at 10:04:02PM +0200, Sebastian Hesselbarth wrote:
->> Ethernet controllers found on Kirkwood SoCs not only suffer from loosing
->> MAC address register contents on clock gating but also some important
->> registers are reset to values that would break ethernet. This patch
->
-> FWIW, we found that the bootloader has to write to PSC1, the driver
-> doesn't work with the power on/reset value of the register. So I think
-> it is safe to assume that all kirkwood bootloaders alter the value.
+On Wed, May 22, 2013 at 10:55:43PM +0200, Sebastian Hesselbarth wrote:
+> On 05/22/2013 10:36 PM, Simon Baatz wrote:
+> >Hi Sebastian,
+> >
+> >On Tue, May 21, 2013 at 06:41:49PM +0200, Sebastian Hesselbarth wrote:
+> >>With DT support for mv643xx_eth, board specific init for some boards now
+> >>is unneccessary. Remove those board files, Kconfig entries, and
+> >>corresponding entries in kirkwood_defconfig.
+> >>
+> >>Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
+> >>---
+> >>Note: board-km_kirkwood.c is also removed, as Valentin Longchamp confirmed
+> >>the lock-up is not caused by accessing clock gating registers but rather
+> >>non-existent device registers. This will be addressed by dtsi separation
+> >>for kirkwood and bobcat SoC variants.
+> >>
+> >>Changelog:
+> >>v3->v4:
+> >>- remove more boards that don't require board specific setup
+> >>
+> ...
+> >We still have:
+> >
+> >static const char * const kirkwood_dt_board_compat[] = {
+> >	"globalscale,dreamplug",
+> >	"globalscale,guruplug",
+> >	"dlink,dns-320",
+> >	"dlink,dns-325",
+> >	"iom,iconnect",
+> >	"raidsonic,ib-nas62x0",
+> >	"qnap,ts219",
+> >	"seagate,dockstar",
+> >	"seagate,goflexnet",
+> >	"buffalo,lsxl",
+> >	"iom,ix2-200",
+> >	"keymile,km_kirkwood",
+> >	"lacie,cloudbox",
+> >	"lacie,inetspace_v2",
+> >	"lacie,netspace_lite_v2",
+> >	"lacie,netspace_max_v2",
+> >	"lacie,netspace_mini_v2",
+> >	"lacie,netspace_v2",
+> >	"mpl,cec4",
+> >	"netgear,readynas-duo-v2",
+> >	"plathome,openblocks-a6",
+> >	"usi,topkick",
+> >	"zyxel,nsa310",
+> >	NULL
+> >};
+> >
+> >in that file. I think it does not make sense that we need to list
+> >boards here that can be described fully by DT. When adding such a
+> >board in the future, you will still need to adapt board-dt.c.
+> 
+> True, will remove the redundant compatible strings for v5.
+> Actually, if I am not missing something, all compatible strings except
+> "marvell,kirkwood" are redundant as long as board.dts append it
+> correctly.
+> 
+> >Should we remove the boards that you removed above here as well and
+> >add
+> >
+> >	"marvell,kirkwood-88f6192",
+> >	"marvell,kirkwood-88f6281",
+> >	"marvell,kirkwood-88f6282",
+> >	"marvell,kirkwood-88f6283",
+> >	"marvell,kirkwood-88f6702",
+> >	"marvell,kirkwood-98DX4122",
+> >
+> >or even just state "marvell,kirkwood"?
+> 
+> I would stick with "marvell,kirkwood" only. This is SoC init code and
+> we do not distinguish variants here at all.
 
-It is safe to assume the bootloader alters it, but that modification is
-lost when clocks get gated. I assume on clock ungate, the controller is
-reset. Saying this, I will double check Dove's reset value but looks 
-like reset mess has been fixed in that later SoC.
+Agreed, nice catch Simon.
 
-> Our systems write the value 0x00638488 to PSC1.
->
-> I looked at patching mv643xx_eth, but ran into the same complexity you
-> did, it isn't clear what variants of this IP block have the
-> register/etc.
+thx,
 
-For Orion SoCs it is quite clear to me, with Gregory Clement and Thomas
-Petazzoni we could also confirm if it does any harm there if we
-unconditionally clear it. But for PPC system controllers I have no
-idea...
-
->> +	/* Kirkwood resets some registers on gated clocks. Especially
->> +	 * CLK125_BYPASS_EN must be cleared but is not available on
->> +	 * all other SoCs/System Controllers using this driver.
->> +	 */
->> +	if (of_machine_is_compatible("marvell,kirkwood"))
->> +		wrlp(mp, PORT_SERIAL_CONTROL1,
->> +		     rdlp(mp, PORT_SERIAL_CONTROL1)&  ~CLK125_BYPASS_EN);
->
-> of_machine_is_compatible seems heavy handed, I would expect this to be
-> based on the compatible string of the ethernet node itself, not the
-> machine??
-
-I have no strong opinion about checking the machine compatible or have
-an extra compatible string for Kirkwood ethernet. Both would work fine
-and are checked once upon probe anyway.
-
-Sebastian
+Jason.
