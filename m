@@ -1,51 +1,103 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 22 May 2013 15:12:37 +0200
-Subject: [PATCH 3/4] pci: mvebu: emulate an empty capability list
+Date: Wed, 22 May 2013 15:12:36 +0200
+Subject: [PATCH 2/4] pci: mvebu: allow the enumeration of devices beyond
+ physical bridges
 In-Reply-To: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369228358-32580-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369228358-32580-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, our PCI-to-PCI bridge emulation doesn't emulate a proper
-capability list, which leads 'lspci -v' to show:
+Until now, the Marvell PCIe driver was only allowing the enumeration
+of the devices in the secondary bus of the emulated PCI-to-PCI
+bridge. This works fine when a PCIe device is directly connected into
+a PCIe slot of the Marvell board.
 
-  Capabilities: [fc] <chain broken>
+However, when the device connected in the PCIe slot is a physical PCIe
+bridge, beyond which a real PCIe device is connected, it no longer
+worked, as the driver was preventing the Linux PCI core from seeing
+such devices.
 
-In order to fix this, this commit improve the PCI-to-PCI bridge
-emulation to emulate an empty capability list. It might be later
-extended to expose things like the PCI Express Capability header, but
-an empty capability list is sufficient for now.
+This commit fixes that by ensuring that configuration transactions on
+subordinate busses are properly forwarded on the right PCIe interface.
 
-lspci -v now shows the much nicer:
+Thanks to this patch, a PCIe card beyond a PCIe bridge, itself beyond
+the emulated PCI-to-PCI bridge is properly detected, with the
+following layout:
 
-  Capabilities: [40] #00 [0000]
+-[0000:00]-+-01.0-[01]----00.0
+           +-09.0-[02-07]----00.0-[03-07]--+-01.0-[04]--
+           |                               +-05.0-[05]--
+           |                               +-07.0-[06]--
+           |                               \-09.0-[07]----00.0
+           \-0a.0-[08]----00.0
+
+Where the PCIe interface that sits beyond the emulated PCI-to-PCI
+bridge at 09.0 allows to access the secondary bus 02, on which there
+is a PCIe bridge that allows to access the 3 to 7 busses, that are
+subordinates to this bridge. And on one of this bus (bus 7), there is
+one real PCIe device connected.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/pci/host/pci-mvebu.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/pci/host/pci-mvebu.c |   31 ++++++++++++++++++++++++++++---
+ 1 file changed, 28 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index c21ca84..c887598 100644
+index 0bc21b0..c21ca84 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -440,6 +440,16 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
- 		*value = 0;
- 		break;
+@@ -554,7 +554,8 @@ mvebu_pcie_find_port(struct mvebu_pcie *pcie, struct pci_bus *bus,
+ 		if (bus->number == 0 && port->devfn == devfn)
+ 			return port;
+ 		if (bus->number != 0 &&
+-		    port->bridge.secondary_bus == bus->number)
++		    bus->number >= port->bridge.secondary_bus &&
++		    bus->number <= port->bridge.subordinate_bus)
+ 			return port;
+ 	}
  
-+	case PCI_CAPABILITY_LIST:
-+		/* Offset of the capability list */
-+		*value = 0x40;
-+		break;
+@@ -578,7 +579,18 @@ static int mvebu_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 	if (bus->number == 0)
+ 		return mvebu_sw_pci_bridge_write(port, where, size, val);
+ 
+-	if (!port->haslink || PCI_SLOT(devfn) != 0)
++	if (!port->haslink)
++		return PCIBIOS_DEVICE_NOT_FOUND;
 +
-+	case 0x40:
-+		/* We have no element in our capability list */
-+		*value = 0;
-+		break;
++	/*
++	 * On the secondary bus, we don't want to expose any other
++	 * device that the device physically connected in the PCIe
++	 * slot, visible in slot 0. In slot 1, there's a special
++	 * Marvell device that only makes sense when the Armada is
++	 * used as a PCIe endpoint.
++	 */
++	if (bus->number == port->bridge.secondary_bus &&
++	    PCI_SLOT(devfn) != 0)
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 
+ 	/* Access the real PCIe interface */
+@@ -609,7 +621,20 @@ static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+ 	if (bus->number == 0)
+ 		return mvebu_sw_pci_bridge_read(port, where, size, val);
+ 
+-	if (!port->haslink || PCI_SLOT(devfn) != 0) {
++	if (!port->haslink) {
++		*val = 0xffffffff;
++		return PCIBIOS_DEVICE_NOT_FOUND;
++	}
 +
- 	default:
- 		*value = 0xffffffff;
- 		return PCIBIOS_BAD_REGISTER_NUMBER;
++	/*
++	 * On the secondary bus, we don't want to expose any other
++	 * device that the device physically connected in the PCIe
++	 * slot, visible in slot 0. In slot 1, there's a special
++	 * Marvell device that only makes sense when the Armada is
++	 * used as a PCIe endpoint.
++	 */
++	if (bus->number == port->bridge.secondary_bus &&
++	    PCI_SLOT(devfn) != 0) {
+ 		*val = 0xffffffff;
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 	}
 -- 
 1.7.9.5
