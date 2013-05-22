@@ -1,59 +1,67 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 22 May 2013 13:48:15 -0400
-Subject: [PATCH v4 06/12] ARM: dove: add gigabit ethernet and mvmdio
- device tree nodes
-In-Reply-To: <519D038C.9000605@gmail.com>
-References: <1369154510-4927-7-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130521174849.GL26249@lunn.ch> <519C9333.20609@gmail.com>
- <519C9822.9040909@windriver.com> <519C9A66.3050807@gmail.com>
- <20130522131010.GB31290@titan.lakedaemon.net>
- <20130522165908.GB12320@obsidianresearch.com>
- <519D0143.1000203@gmail.com>
- <20130522173505.GH31290@titan.lakedaemon.net>
- <519D038C.9000605@gmail.com>
-Message-ID: <20130522174815.GI31290@titan.lakedaemon.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 22 May 2013 19:59:42 +0200
+Subject: [PATCH 9/9] arm: mvebu: switch internal register address at
+ runtime if needed
+In-Reply-To: <20130522174258.GO2824@lunn.ch>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1369132414-18959-10-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130522174258.GO2824@lunn.ch>
+Message-ID: <20130522195942.33ff1131@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 07:42:36PM +0200, Sebastian Hesselbarth wrote:
-> On 05/22/2013 07:35 PM, Jason Cooper wrote:
-> >On Wed, May 22, 2013 at 07:32:51PM +0200, Sebastian Hesselbarth wrote:
-> >>On 05/22/2013 06:59 PM, Jason Gunthorpe wrote:
-> >>>On Wed, May 22, 2013 at 09:10:10AM -0400, Jason Cooper wrote:
-> >>>>iirc, our solution to this was to parse the ATAGs for the mac addr and
-> >>>>update the appended dtb.  This way, module load and unload would work
-> >>>>without loosing the mac address.  I believe Jason Gunthorpe has a patch
-> >>>>to atags_to_fdt() for this...  This should allow us to get rid of the
-> >>>>clocks hack.
-> >>>
-> >>>Sorry, no, we don't use ATAGs here, our platforms start the kernel
-> >>>with a correct DTB that has the correct mac address to use. My patch
-> >>>was to have the driver accept it, and I think Sebastian has already
-> >>>got that functionality...
-> >>
-> >>Not neccessary anyway, after talking Jason C in a Kirkwood-only
-> >>workaround I prepared a patch that reads mac address registers early
-> >>and stores it in the local-mac-address property.
-> >
-> >Sweet!
-> >
-> >>Just tested on Dockstar with gated clocks and modular DT mv643xx_eth.
-> >>
-> >>Will append to the DT mv643xx_eth patch set if a v5 will be required
-> >>or as single patch prior Jason C taking in the ARM part of it
-> >>otherwise.
-> >
-> >Please post, in-reply-to v4 is fine.
+Dear Andrew Lunn,
+
+On Wed, 22 May 2013 19:42:58 +0200, Andrew Lunn wrote:
+
+> > + * However, when the bit is not set, we do a static mapping of the
+> > + * register area that allows to change the internal register address,
+> > + * we change this address, and set this bit.
 > 
-> Hmm, maybe a little bit too early. While restoring the MAC address now
-> works, another bug arises which I guess is related with phy setup
-> and aneg.
+> Hi Thomas
 > 
-> Will investigate and update patch set accordingly.
+> Please could you explain this "and set this bit".
+> 
+> If i understand the comment correctly, you are talking about the bit
+> in CP15. Why is it necessary to set it, since at the next WFI its
+> going to get cleared. I also don't actually see any code doing the
+> setting of this bit.
 
-Cool, chances are, we should be able to take that patch in by itself for
-this merge window...
+Nice catch. This is a left-over from a previous implementation. For
+experimentation purposes, I have been using a different CP15 bit that
+was not getting cleared on WFIs, so once the register address switch was
+done, I was setting this bit to indicate to further invocations of
+earlyprintk that the switch has occurred.
 
-thx,
+In the mean time, the code has been changed to use the final bit used
+by Marvell bootloaders, and this one gets cleared at the next WFI. So
+I'm now using a global variable instead to indicate that the switch has
+occurred making this comment inaccurate.
 
-Jason.
+I'll fix that in the next revision of this patch set.
+
+
+> > +		/*
+> > +		 * Change the physical base address of the
+> > +		 * registers. From now on, and until
+> > +		 * debug_ll_io_init() is called below, it is not
+> > +		 * possible to do any print, because earlyprintk will
+> > +		 * not work.
+> 
+> Is its "not work" or "locks up the CPU as dead as a Dodo?".
+
+locks up the CPU as a Dodo: you have switched the registers from 0xd0
+to 0xf1, but the earlyprintk virtual mapping still points to 0xd0. So
+if you try to do a printk, it will call earlyprintk, which will use the
+old virtual mapping (since mvebu_switched_regs isn't set yet, it will
+be at the next line), and that will make it use the old physical
+address of the UART. So you'll write to 0xd0012000, and you're dead.
+
+Thanks for the review!
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
