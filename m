@@ -1,46 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 22 May 2013 09:47:44 +0100
-Subject: [PATCH 14/14] ARM: elf: add new hwcap for identifying atomic
- ldrd/strd instructions
-In-Reply-To: <CAL_JsqLSC2QgMdTGtH5G_F5SYjA3Hs--jMmxBES=fqGLwapptQ@mail.gmail.com>
-References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
- <1368810473-26070-15-git-send-email-will.deacon@arm.com>
- <20130520141809.GA27473@arm.com>
- <CAL_JsqLSC2QgMdTGtH5G_F5SYjA3Hs--jMmxBES=fqGLwapptQ@mail.gmail.com>
-Message-ID: <20130522084744.GD14322@arm.com>
+From: R64188@freescale.com (Jin Zhengxiong-R64188)
+Date: Wed, 22 May 2013 08:59:20 +0000
+Subject: [PATCH v3] tty: serial: add Freescale lpuart driver support
+In-Reply-To: <CAAQ0ZWRz+byPKxMjDH3zKsc0u4bmkPO_1u6w2H4Z7nD0z8+9ig@mail.gmail.com>
+References: <1368685096-13177-1-git-send-email-b35083@freescale.com>
+ <20130520030523.GB25113@S2101-09.ap.freescale.net>
+ <13F8657A829DAB49A2A937FD6FC10F790B3CDB85@039-SN2MPN1-012.039d.mgd.msft.net>
+ <CAAQ0ZWRz+byPKxMjDH3zKsc0u4bmkPO_1u6w2H4Z7nD0z8+9ig@mail.gmail.com>
+Message-ID: <13F8657A829DAB49A2A937FD6FC10F790B3CECEB@039-SN2MPN1-012.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 07:48:35PM +0100, Rob Herring wrote:
-> On Mon, May 20, 2013 at 9:18 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Fri, May 17, 2013 at 06:07:53PM +0100, Will Deacon wrote:
-> >> CPUs implementing LPAE have atomic ldrd/strd instructions, meaning that
-> >> userspace software can avoid having to use the exclusive variants of
-> >> these instructions if they wish.
-> >>
-> >> This patch advertises the atomicity of these instructions via the
-> >> hwcaps, so userspace can detect this CPU feature.
-> >>
-> >> Reported-by: Vladimir Danushevsky <vladimir.danushevsky@oracle.com>
-> >> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ...
-> >> +
-> >> +     /* LPAE implies atomic ldrd/strd instructions */
-> >> +     vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-> >> +     if (vmsa >= 5)
-> >> +             elf_hwcap |= HWCAP_LPAE;
-> >
-> > As I mentioned in the past, I don't agree with exposing the "LPAE"
-> > feature to user-space, it's not a feature that user space should care
-> > about. An atomic double hwcap is better and you can even make this per
-> > CPU via __v7_proc.
+> Subject: Re: [PATCH v3] tty: serial: add Freescale lpuart driver support
 > 
-> How does userspace know whether to install a non-LPAE or LPAE kernel
-> in a generic way?
+> On 22 May 2013 14:40, Jin Zhengxiong-R64188 <R64188@freescale.com> wrote:
+> > [Jason Jin-R64188] Reuse the same LPUART on LS-1 with the compatible
+> strings 'fsl,mvf600-lpuart' is technically OK, But it will fuss the route
+> map of the product Line. The general name can show that the IP is shared
+> between several product lines, and the history for which SOC firstly used
+> the IP is not very important. With general compatible name, We can setup
+> the general dts for the shared IPs.
+> >
+> > That's also the case for the IPs used on Power platform, Take the IFC
+> for example, this IP implemented on Power platform will also be reused
+> LS-1, The compatible string is set as  "fsl,ifc", "simple-bus" but not
+> the soc name on which the IP first used.
+> >
+> >  Another example, though a little different, the nor flash driver,
+> which is used for many platform, the compatible "cfi-flash" will be more
+> reasonable than the soc/board name.
+> >
+> > With the general name for the compatible string in the driver, if there
+> is minor difference for the different implementation of the same IP, we
+> can add the soc related compatible string to the driver to pass
+> different .data structure for that soc.
+> >
+> 
+> As I already said, a generic compatible string does not specify anything
+> about compatibility/version, and hence it's not a good compatible for IP
+> block which is possibly to be integrated on multiple SoCs with slight
+> differences.
+> 
+> For example, if there is a new SoC mvf900 integrating the IP with
+> everything compatible to the version used on mvf600,
+> 
+>   compatible = <fsl,mvf900-uart>, <fsl,mvf600-uart>;
+>   compatible = <fsl,mvf900-uart>, <fsl,lpuart>;
+> 
+> which one do you think is better to tell the compatibility/version?
+> 
+> Shawn
+[Jason Jin-R64188] For the lpuart itself, I do not think it will have different version IP. The general name is sufficient and soc related name can introduce the minor difference. If the there are update version, we can name it lpuart2.0 or something like that.
 
-This is a valid reason to expose LPAE to user, though elf_hwcap sounds a
-bit strange.
+For the compatible property itself, the ePAPR described it as:
+---- 
+The compatible property value consists of one or more strings that define the specific programming model for the device. This list of strings should be used by a client program for device driver selection. The property value consists of a concatenated list of null terminated strings, from most specific to most general. 
+----
+So for the IPs especially for the peripheral IPs, the compatible just used to select the driver for the device. It should not used to describe the version information. If the version changed and the driver cannot be used for the device then another compatible strings should be used.
 
--- 
-Catalin
+As I said, Another reason for the general strings used is the across platform issue, It's maybe reasonably to name the compatible strings as you recommended for the IPs share in the same SoC family. But for the IPs shared across platform, general name sound more reasonably to avoid the product line confusing. 
+
+The compatible strings once named as you said for Power platform, but more general strings were used later as IPs shared for more SoCs.
+
+I was wondering what's kind of strings should be used for this kind of IPs across different platforms. I added Grant Likely for comments, Thanks.
+
+Jason 
