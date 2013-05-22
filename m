@@ -1,46 +1,54 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 22 May 2013 23:17:46 +0200
-Subject: [PATCH v4 11/12] ARM: kirkwood: remove redundant DT board files
-In-Reply-To: <20130522210257.GM31290@titan.lakedaemon.net>
-References: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369154510-4927-12-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130522203633.GA28394@schnuecks.de> <519D30CF.9040904@gmail.com>
- <20130522210257.GM31290@titan.lakedaemon.net>
-Message-ID: <519D35FA.2060002@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 22 May 2013 15:18:54 -0600
+Subject: [PATCH] ARM: tegra: add cpu_disable for hotplug
+In-Reply-To: <20130522090304.GT21944@tbergstrom-lnx.Nvidia.com>
+References: <1369131215-2920-1-git-send-email-josephl@nvidia.com>
+ <519B9DB4.7070106@wwwdotorg.org>
+ <20130522090304.GT21944@tbergstrom-lnx.Nvidia.com>
+Message-ID: <519D363E.4000409@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/22/2013 11:02 PM, Jason Cooper wrote:
-> On Wed, May 22, 2013 at 10:55:43PM +0200, Sebastian Hesselbarth wrote:
->> On 05/22/2013 10:36 PM, Simon Baatz wrote:
->>> Hi Sebastian,
+On 05/22/2013 03:03 AM, Peter De Schrijver wrote:
+> On Tue, May 21, 2013 at 06:15:48PM +0200, Stephen Warren wrote:
+>> On 05/21/2013 04:13 AM, Joseph Lo wrote:
+>>> The Tegra114 could hotplug the CPU0, but the common cpu_disable didn't
+>>> support that. Adding a Tegra specific cpu_disable function for it.
 >>>
->>> On Tue, May 21, 2013 at 06:41:49PM +0200, Sebastian Hesselbarth wrote:
->>>> With DT support for mv643xx_eth, board specific init for some boards now
->>>> is unneccessary. Remove those board files, Kconfig entries, and
->>>> corresponding entries in kirkwood_defconfig.
->>>>
->>>> Signed-off-by: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
->>>> ---
->>>> Note: board-km_kirkwood.c is also removed, as Valentin Longchamp confirmed
->>>> the lock-up is not caused by accessing clock gating registers but rather
->>>> non-existent device registers. This will be addressed by dtsi separation
->>>> for kirkwood and bobcat SoC variants.
->>>>
->>>> Changelog:
->>>> v3->v4:
->>>> - remove more boards that don't require board specific setup
->>>>
->> ...
+>>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
 >>
->> I would stick with "marvell,kirkwood" only. This is SoC init code and
->> we do not distinguish variants here at all.
->
-> Agreed, nice catch Simon.
+>>> diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+>>
+>>> +int tegra_cpu_disable(unsigned int cpu)
+>>> +{
+>>> +	switch (tegra_chip_id) {
+>>> +	case TEGRA114:
+>>> +		return 0;
+>>> +	default:
+>>> +		return cpu == 0 ? -EPERM : 0;
+>>> +	}
+>>> +}
+>>
+>> Do we expect all/most future chips to support hotplug of CPU0? Or at
+>> least, fewer chips to have the restriction than not? If so, it might be
+> 
+> Yes. I think we can safely assume future chips will support hotplugging CPU0.
+> 
+>> more forward-looking to write that as:
+>>
+>> if (tegra_chip_id == TEGRA30)
+>>     return cpu == 0 ? -EPERM : 0;
+>>
+> 
+> Also Tegra20 doesn't support hotplugging CPU0?
 
-I just confirmed all kirkwood dts/dtsi properly set "marvell,kirkwood"
-in their compatible strings. Will remove all other comapatible strings
-from mach-kirkwood/board-dt.c as Simon suggested for v5.
+Oh right, this isn't a Tegra30+ file. How about just inverting the
+switch so it doesn't need to change later:
 
-Sebastian
+	switch (tegra_chip_id) {
+	case TEGRA20:
+	case TEGRA30:
+		return cpu == 0 ? -EPERM : 0;
+	default:
+		return 0;
+	}
