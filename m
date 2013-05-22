@@ -1,41 +1,39 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Wed, 22 May 2013 15:32:36 +0200
-Subject: [PATCH v2 6/6] pinctrl: exynos: Handle suspend/resume of GPIO EINT
- registers
-In-Reply-To: <CAD=FV=VYhBP+V6SQt5SkFZszdVxSJ6AZk-C-zx1Di-RZBYhGvw@mail.gmail.com>
-References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
- <4536937.hnhaYZLnaG@amdc1227>
- <CAD=FV=VYhBP+V6SQt5SkFZszdVxSJ6AZk-C-zx1Di-RZBYhGvw@mail.gmail.com>
-Message-ID: <4391865.a7p9jbyZ7B@amdc1227>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 May 2013 14:33:17 +0100
+Subject: [PATCH] kernel/sched/core.c: need return NULL when BUG() is
+ defined as empty.
+In-Reply-To: <20130522091156.GC18810@twins.programming.kicks-ass.net>
+References: <5199D565.4070307@asianux.com>
+ <20130522091156.GC18810@twins.programming.kicks-ass.net>
+Message-ID: <20130522133317.GC18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 21 of May 2013 21:46:35 Doug Anderson wrote:
-> Tomasz,
-> 
-> On Tue, May 21, 2013 at 10:05 AM, Tomasz Figa <t.figa@samsung.com> wrote:
-> >         return 0;
+On Wed, May 22, 2013 at 11:11:56AM +0200, Peter Zijlstra wrote:
+> On Mon, May 20, 2013 at 03:48:53PM +0800, Chen Gang wrote:
 > > 
-> > +
-> > +err_domains:
-> > +       bank = d->ctrl->pin_banks;
-> > +       for (undo = 0; undo < i; ++undo) {
+> > When neither CONFIG_BUG nor HAVE_ARCH_BUG is defined, need let function
+> > return failure value ('NULL') instead of random value.
 > 
-> ++bank is missing, I think.  This will free the same bank many times.
+> What will such a kernel do? Happily continue running whenever we hit a
+> BUG? that seems like a particularly bad idea. Should we not have a stub
+> BUG() function like:
+> 
+> void BUG(void) __attribute__((noreturn))
+> {
+> 	local_irq_disable();
+> 	while (1) ;
+> }
 
-Shit, this is what happens when you post patches so late and in a hurry. Will 
-send something sane in a while.
+Eww.  So you've a platform where you have things like panic_on_oops
+enabled, and you hit this bug... do we really want to just stop?
+Wouldn't replacing BUG() with panic("BUG"); be better ?
 
-> optional: could also avoid extra 'undo' variable and remove in reverse
-> order by changing i to signed and counting down to 0.
+But, this begs the question - what is the point of being able to turn
+off BUG() ?  As BUG() on any sensible architecture is implemented by
+placing the minimum of code at the callsite (eg, one instruction if
+not using verbose) anything like the above is likely to be bigger.
 
-Sure.
-
-Best regards,
-Tomasz
-
-> -Doug
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+So, I'd actually argue that rather than trying to "fix" this, get rid
+of CONFIG_BUG and make it always enabled everywhere - just like what
+has recently been done with hotplug.
