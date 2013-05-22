@@ -1,40 +1,97 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 22 May 2013 12:49:36 -0400
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on
- Armada 370/XP
-In-Reply-To: <20130522184250.1d5f2f10@skate>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201305221633.46705.arnd@arndb.de> <20130522170643.54a2b9d2@skate>
- <201305221735.11815.arnd@arndb.de> <20130522180842.7edcc3ee@skate>
- <20130522163557.GC27348@1wt.eu> <20130522184250.1d5f2f10@skate>
-Message-ID: <20130522164936.GE31290@titan.lakedaemon.net>
+From: morten.rasmussen@arm.com (Morten Rasmussen)
+Date: Wed, 22 May 2013 17:50:35 +0100
+Subject: [PATCH 09/14] sched: evaluate the activity level of the system
+In-Reply-To: <1366910611-20048-10-git-send-email-vincent.guittot@linaro.org>
+References: <1366910611-20048-1-git-send-email-vincent.guittot@linaro.org>
+ <1366910611-20048-10-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20130522165035.GC4935@e103034-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Thomas,
-
-On Wed, May 22, 2013 at 06:42:50PM +0200, Thomas Petazzoni wrote:
-> On Wed, 22 May 2013 18:35:57 +0200, Willy Tarreau wrote:
-> > On Wed, May 22, 2013 at 06:08:42PM +0200, Thomas Petazzoni wrote:
-> > > Conclusion: you can't classify on one side boards that are at 0xd0 and
-> > > boards that are at 0xf1. It depends on *which* bootloader each
-> > > particular instance of those boards will be using. Will it be a
-> > > bootloader that complies with the "old" protocol (CP15 bit cleared and
-> > > registers at 0xd0) or the "new" protocol (CP15 bit set and registers at
-> > > 0xf1).
-> > 
-> > Just a point I'm thinking about, is it possible to detect the boot loader's
-> > mode via ATAGs ? ATAGs are present very early as well (but maybe too late
-> > already).
+On Thu, Apr 25, 2013 at 06:23:25PM +0100, Vincent Guittot wrote:
+> We evaluate the activity level of CPUs, groups and domains in order to define
+> how many CPUs are required to handle the current activity.
 > 
-> As far as I know, a DT-capable bootloader doesn't pass any ATAG. The
-> ARM register that was used to pass the pointer to the ATAGS is now used
-> to pass the pointer to the DTB in memory.
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> ---
+>  kernel/sched/fair.c |   19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+> index 954adfd..234ecdd 100644
+> --- a/kernel/sched/fair.c
+> +++ b/kernel/sched/fair.c
+> @@ -3465,7 +3465,22 @@ static int check_pack_buddy(int cpu, struct task_struct *p)
+>  		return true;
+>  
+>  	return false;
+> +}
+> +
+> +static int get_cpu_activity(int cpu)
+> +{
+> +	struct rq *rq = cpu_rq(cpu);
+> +	u32 sum = rq->avg.runnable_avg_sum;
+> +	u32 period = rq->avg.runnable_avg_period;
+> +
+> +	sum = min(sum, period);
+> +
+> +	if (sum == period) {
+> +		u32 overload = rq->nr_running > 1 ? 1 : 0;
+> +		return power_of(cpu) + overload;
+> +	}
 
-So we could look for the ATAG magic or the dtb magic at that address,
-then we know if we have an old or new bootloader...
+Adding one to indicate cpu overload seems to work well in the cases that
+I can think of. It may take some time to have effect if the overloaded
+cpu is in a group with nearly overloaded cpus. Adding one won't enable
+more cpus in another group until they have all reached overload.
 
-thx,
+Reaching sum == period takes quite a long time. Would it be an idea to
+use sum*1024 >= period*1000 like you do in is_buddy_full()?
 
-Jason.
+I think that would be more consistent since overloaded is essential the
+same as full.
+
+Cheers,
+Morten
+
+>  
+> +	return (sum * power_of(cpu)) / period;
+>  }
+>  
+>  /*
+> @@ -4355,6 +4370,7 @@ struct sd_lb_stats {
+>  	struct sched_group *busiest; /* Busiest group in this sd */
+>  	struct sched_group *this;  /* Local group in this sd */
+>  	unsigned long total_load;  /* Total load of all groups in sd */
+> +	unsigned long total_activity;  /* Total activity of all groups in sd */
+>  	unsigned long total_pwr;   /*	Total power of all groups in sd */
+>  	unsigned long avg_load;	   /* Average load across all groups in sd */
+>  
+> @@ -4383,6 +4399,7 @@ struct sd_lb_stats {
+>  struct sg_lb_stats {
+>  	unsigned long avg_load; /*Avg load across the CPUs of the group */
+>  	unsigned long group_load; /* Total load over the CPUs of the group */
+> +	unsigned long group_activity; /* Total activity of the group */
+>  	unsigned long sum_nr_running; /* Nr tasks running in the group */
+>  	unsigned long sum_weighted_load; /* Weighted load of group's tasks */
+>  	unsigned long group_capacity;
+> @@ -4629,6 +4646,7 @@ static inline void update_sg_lb_stats(struct lb_env *env,
+>  		}
+>  
+>  		sgs->group_load += load;
+> +		sgs->group_activity += get_cpu_activity(i);
+>  		sgs->sum_nr_running += nr_running;
+>  		sgs->sum_weighted_load += weighted_cpuload(i);
+>  		if (idle_cpu(i))
+> @@ -4752,6 +4770,7 @@ static inline void update_sd_lb_stats(struct lb_env *env,
+>  			return;
+>  
+>  		sds->total_load += sgs.group_load;
+> +		sds->total_activity += sgs.group_activity;
+>  		sds->total_pwr += sg->sgp->power;
+>  
+>  		/*
+> -- 
+> 1.7.9.5
+> 
+> 
