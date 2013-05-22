@@ -1,36 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 May 2013 14:41:24 +0100
-Subject: [PATCH v2 00/10] uaccess: better might_sleep/might_fault behavior
-In-Reply-To: <201305221125.36284.arnd@arndb.de>
-References: <cover.1368702323.git.mst@redhat.com>
- <201305221125.36284.arnd@arndb.de>
-Message-ID: <20130522134124.GD18614@n2100.arm.linux.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 22 May 2013 17:43:51 +0400
+Subject: [PATCH] ARM: shmobile: kzm9g-reference: Update CMT clocksource
+ rating to 80
+In-Reply-To: <1369226980-16203-1-git-send-email-horms+renesas@verge.net.au>
+References: <1369226980-16203-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <519CCB97.20207@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 11:25:36AM +0200, Arnd Bergmann wrote:
-> Given the most commonly used functions and a couple of architectures
-> I'm familiar with, these are the ones that currently call might_fault()
-> 
-> 			x86-32	x86-64	arm	arm64	powerpc	s390	generic
-> copy_to_user		-	x	-	-	-	x	x
-> copy_from_user		-	x	-	-	-	x	x
-> put_user		x	x	x	x	x	x	x
-> get_user		x	x	x	x	x	x	x
-> __copy_to_user		x	x	-	-	x	-	-
-> __copy_from_user	x	x	-	-	x	-	-
-> __put_user		-	-	x	-	x	-	-
-> __get_user		-	-	x	-	x	-	-
-> 
-> WTF?
+Hello.
 
-I think your table is rather screwed - especially on ARM.  Tell me -
-how can __copy_to_user() use might_fault() but copy_to_user() not when
-copy_to_user() is implemented using __copy_to_user() ?  Same for
-copy_from_user() but the reverse argument - there's nothing special
-in our copy_from_user() which would make it do might_fault() when
-__copy_from_user() wouldn't.
+On 22-05-2013 16:49, Simon Horman wrote:
 
-The correct position for ARM is: our (__)?(pu|ge)t_user all use
-might_fault(), but (__)?copy_(to|from)_user do not.  Neither does
-(__)?clear_user.  We might want to fix those to use might_fault().
+> Update the CMT clocksource rating from 100 to 10.
+
+    s/100/125/ and s/10/80/, apparently.
+
+> This resolves a boot-failure regression for kzm9g-reference in v3.10-rc1
+> introduced by f7db706b132f11c79ae1d74b2382e0926cf31644 ("ARM: 7674/1: smp:
+> Avoid dummy clockevent being preferred over real").
+
+> The patch noted above reduces the rating of dummy clockevent from 400 to 100.
+
+    400 seems very high rating for a dummy clockevent...
+
+> This patch reduces the rating of CMT so that it is once again less than that
+> of the dummy clockevent.
+
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+> ---
+
+> I also plan to reduce the rating of the STI clocksource to less than 100.
+> However, as I am not aware of any problems relating to STI in v3.10-rc
+> my plan is to update STI in the v3.11 timeframe.
+> ---
+>   arch/arm/mach-shmobile/setup-sh73a0.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+
+> diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+> index fdf3894..9696f36 100644
+> --- a/arch/arm/mach-shmobile/setup-sh73a0.c
+> +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+> @@ -252,7 +252,7 @@ static struct sh_timer_config cmt10_platform_data = {
+>   	.name = "CMT10",
+>   	.channel_offset = 0x10,
+>   	.timer_bit = 0,
+> -	.clockevent_rating = 125,
+> +	.clockevent_rating = 80,
+>   	.clocksource_rating = 125,
+>   };
+
+WBR, Sergei
