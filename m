@@ -1,42 +1,40 @@
-From: guz.fnst@cn.fujitsu.com (Gu Zheng)
-Date: Wed, 22 May 2013 09:30:11 +0800
-Subject: [PATCH 00/19] driver:usb&net: add missing platform_driver owner
-In-Reply-To: <519B418A.7060805@huawei.com>
-References: <1369104120-35552-1-git-send-email-libo.chen@huawei.com>
- <20130520.232619.964940909999914694.davem@davemloft.net>
- <20130521084108.1a585f32@skate> <519B2993.4090409@cn.fujitsu.com>
- <20130521110616.21eee053@skate> <519B418A.7060805@huawei.com>
-Message-ID: <519C1FA3.2020500@cn.fujitsu.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 21 May 2013 19:43:39 -0600
+Subject: [PATCH] ARM: bcm2835: override the HW UART periphid
+In-Reply-To: <519BA209.6050407@wwwdotorg.org>
+References: <519AD82A.6090809@wwwdotorg.org>
+ <1369116149-2361-1-git-send-email-neidhard.kim@lge.com>
+ <519BA209.6050407@wwwdotorg.org>
+Message-ID: <519C22CB.5040009@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2013 05:42 PM, Libo Chen wrote:
+On 05/21/2013 10:34 AM, Stephen Warren wrote:
+> On 05/21/2013 12:02 AM, Jongsung Kim wrote:
+>> Stephen Warren reported the recent commit 78506f2 (add support for
+>> extended FIFO-size of PL011-r1p5) breaks the serial port on the
+>> BCM2835 ARM SoC.
+>>
+>> A UART compatible with the ARM PL011-r1p5 should have 32-deep FIFOs.
+>> The BCM2835 UART just looks like an ARM PL011-r1p5, but has 16-deep
+>> FIFOs just like PL011-r1p4 or earlier revisions. As a workaround for
+>> this compatibility issue, this patch overrides the HW UART periphid
+>> register values with the actually compatible UART periphid 0x00241011
+>> (r1p3 or r1p4).
+>>
+>> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
+>> Signed-off-by: Jongsung Kim <neidhard.kim@lge.com>
+> 
+> I know this will work, because I tried out the same thing last week.
+> 
+> However, I'm not convinced that it's the correct approach. What other
+> changes exist between r1p4 and r1p5; can you check in the TRM?
 
-> On 2013/5/21 17:06, Thomas Petazzoni wrote:
->> Dear Gu Zheng,
->>
->> On Tue, 21 May 2013 16:00:19 +0800, Gu Zheng wrote:
->>
->>>> Or, maybe make the existing module_platform_driver() macro do this?
->>>
->>> But not all the modules use module_platform_driver() macro to replace the module init/exit.
->>
->> Then maybe it's a good opportunity to convert those ones to use
->> module_platform_driver() ?
->>
->> Thomas
->>
-> 
->  In my opinion, not all modules can use module_platform_driver() macro to replace the module init/exit easily, like us3mc_init.
-> 
->  Furthermore this work will touch various platforms and architectures, I am worried it is hard to *test* (compile and boot).
+Looking at the TRM, it seems this is really the only change, according
+to the changelog in the documentation (although it's a little difficult
+to tell since the document seems to have a bunch of changes that
+presumably don't affect behaviour). So, faking the periphid seems OK.
 
-Agree. I stick to the way that David mentioned.
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 
-Thanks,
-Gu
-
-> 
->  What do you think?
-> 
-> 
+Let's apply for 3.10.
