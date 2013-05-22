@@ -1,62 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 22 May 2013 17:53:53 +0100
-Subject: [PATCH] regulator: ab8500-ext: Don't register without
- initialisation data
-In-Reply-To: <20130522155347.GJ1627@sirena.org.uk>
-References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
- <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
- <20130522155347.GJ1627@sirena.org.uk>
-Message-ID: <20130522165353.GB18714@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 22 May 2013 18:57:57 +0200
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
+ 370/XP
+In-Reply-To: <20130522164936.GE31290@titan.lakedaemon.net>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201305221633.46705.arnd@arndb.de> <20130522170643.54a2b9d2@skate>
+ <201305221735.11815.arnd@arndb.de> <20130522180842.7edcc3ee@skate>
+ <20130522163557.GC27348@1wt.eu> <20130522184250.1d5f2f10@skate>
+ <20130522164936.GE31290@titan.lakedaemon.net>
+Message-ID: <20130522185757.60091a66@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 May 2013, Mark Brown wrote:
+Dear Jason Cooper,
 
-> On Wed, May 22, 2013 at 01:47:33PM +0100, Lee Jones wrote:
-> > This patch fixes a bug introduced in the v3.10 merge window.
-> > 
-> > Some platforms will not want external registers. Rather than setting up
-> > lots of different clauses in the core ab8500 regulator driver not to
-> > call ab8500-ext init() we just won't pass the initialisation data from
-> > platform code. This patch checks for it and if it's missing, we won't
-> > register the external regulators.
+On Wed, 22 May 2013 12:49:36 -0400, Jason Cooper wrote:
+
+> > As far as I know, a DT-capable bootloader doesn't pass any ATAG. The
+> > ARM register that was used to pass the pointer to the ATAGS is now used
+> > to pass the pointer to the DTB in memory.
 > 
-> This seems problematic - if the regulators are unused then they
-> shouldn't have anything enabled in the constraints
+> So we could look for the ATAG magic or the dtb magic at that address,
+> then we know if we have an old or new bootloader...
 
-Right, that's what this does.
+No, because you can use an old bootloader, and still do some old-style
+appended-DTB booting, in which case you have a new bootloader
+(registers mapped at 0xf1), but you see the ATAG magic, which will make
+you think you booted from an old bootloader (registers mapped at 0xd0).
 
-"we just won't pass the initialisation data from platform code."
+For example, I'm currently booting alternatively with an old and a new
+bootloader (to test that things work properly), and in both cases I'm
+booting old style, DTB-appended, with ATAGs.
 
-'initialisation data' == 'constraints'.
+Best regards,
 
-> and the regulator
-> driver ought to be read only in which case it doesn't matter if it's
-> running or not, the worst that should happen is that the state can be
-> read back.  I'd therefore expect the fix here to be in the board side
-> code that enables the regulators.
-
-It's both.
-
->From the platform side we have stopped passing the external regulator
-driver's constraints for Snowball:
-
-https://lkml.org/lkml/2013/5/22/280
-
-All I've done here is stop the ext driver from crapping out with the
-misleading error "Configuration error: size mismatch", because a)
-it's not an error, it's expected and b) It's not a size mismatch,
-instead we have chosen to keep the constraints back in the Snowball
-(and u8505) case.
-
-Strictly speaking 'this' part of the fix is not an -rc candidate, but
-without it someone could waste a great deal of time finding out why
-this 'error' has appeared when it's not actually an error at all. Thus,
-it would be more than helpful if it made it into the -rcs along with
-the real platform fix.
-
+Thomas
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
