@@ -1,58 +1,57 @@
 From: axel.lin@ingics.com (Axel Lin)
-Date: Wed, 22 May 2013 10:23:16 +0800
-Subject: [RESEND][PATCH 1/2] clk: wm831x: Fix update wrong register for
- enable/disable FLL
-Message-ID: <1369189396.19416.0.camel@phoenix>
+Date: Wed, 22 May 2013 10:24:16 +0800
+Subject: [RESEND][PATCH 2/2] clk: wm831x: Fix wm831x_clkout_get_parent
+In-Reply-To: <1369189396.19416.0.camel@phoenix>
+References: <1369189396.19416.0.camel@phoenix>
+Message-ID: <1369189456.19416.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the datasheet, FLL Enable is controlled by
-R16530 (4092h) FLL Control1
-        BIT 0: FLL Enable
-                0 = Disable
-                1 = Enable
+Current code looks strange because calling wm831x_clkout_set_parent() with 0 as
+parent parameter, wm831x_clkout_get_parent() will return 1.
 
-Thus the code should update WM831X_FLL_CONTROL_1 register rather than
-WM831X_FLL_CONTROL_2 register.
+According to the datasheet:
+R16528 (4090h) Clock Control1
+        BIT 0: CLKOUT output source select
+                0 = FLL output
+                1 = 32.768kHz oscillator
 
-Also fixes a trivial typo in dev_crit message.
+Thus fix the entry order in wm831x_clkout_parents[] to make it has
+the same meaning as the datasheet and make the return value
+of wm831x_clkout_get_parent() consistent with the parent pass to
+wm831x_clkout_set_parent().
 
 Signed-off-by: Axel Lin <axel.lin@ingics.com>
 Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
-Hi Mike,
-This patch serial was sent on http://lkml.org/lkml/2013/5/1/152
-With Mark's Ack.
-
-Regards,
-Axel
  drivers/clk/clk-wm831x.c | 6 +++---
  1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
-index 16ed068..4bdf0b0 100644
+index 4bdf0b0..58d08a6 100644
 --- a/drivers/clk/clk-wm831x.c
 +++ b/drivers/clk/clk-wm831x.c
-@@ -97,7 +97,7 @@ static int wm831x_fll_prepare(struct clk_hw *hw)
- 	struct wm831x *wm831x = clkdata->wm831x;
- 	int ret;
- 
--	ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_2,
-+	ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_1,
- 			      WM831X_FLL_ENA, WM831X_FLL_ENA);
- 	if (ret != 0)
- 		dev_crit(wm831x->dev, "Failed to enable FLL: %d\n", ret);
-@@ -114,9 +114,9 @@ static void wm831x_fll_unprepare(struct clk_hw *hw)
- 	struct wm831x *wm831x = clkdata->wm831x;
- 	int ret;
- 
--	ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_2, WM831X_FLL_ENA, 0);
-+	ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_1, WM831X_FLL_ENA, 0);
- 	if (ret != 0)
--		dev_crit(wm831x->dev, "Failed to disaable FLL: %d\n", ret);
-+		dev_crit(wm831x->dev, "Failed to disable FLL: %d\n", ret);
+@@ -299,8 +299,8 @@ static void wm831x_clkout_unprepare(struct clk_hw *hw)
  }
  
- static unsigned long wm831x_fll_recalc_rate(struct clk_hw *hw,
+ static const char *wm831x_clkout_parents[] = {
+-	"xtal",
+ 	"fll",
++	"xtal",
+ };
+ 
+ static u8 wm831x_clkout_get_parent(struct clk_hw *hw)
+@@ -318,9 +318,9 @@ static u8 wm831x_clkout_get_parent(struct clk_hw *hw)
+ 	}
+ 
+ 	if (ret & WM831X_CLKOUT_SRC)
+-		return 0;
+-	else
+ 		return 1;
++	else
++		return 0;
+ }
+ 
+ static int wm831x_clkout_set_parent(struct clk_hw *hw, u8 parent)
 -- 
 1.8.1.2
