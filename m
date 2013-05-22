@@ -1,60 +1,266 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Wed, 22 May 2013 18:35:57 +0200
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
- 370/XP
-In-Reply-To: <20130522180842.7edcc3ee@skate>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201305221633.46705.arnd@arndb.de> <20130522170643.54a2b9d2@skate>
- <201305221735.11815.arnd@arndb.de> <20130522180842.7edcc3ee@skate>
-Message-ID: <20130522163557.GC27348@1wt.eu>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 22 May 2013 11:39:42 -0500
+Subject: [PATCH] ASoC: Add support for BCM2708
+In-Reply-To: <519CD1CC.8070507@koalo.de>
+References: <519CD1CC.8070507@koalo.de>
+Message-ID: <20130522163942.GQ1627@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Wed, May 22, 2013 at 04:10:20PM +0200, Florian Meier wrote:
 
-On Wed, May 22, 2013 at 06:08:42PM +0200, Thomas Petazzoni wrote:
-> And the new bootloaders that are remapping to 0xf1000000 on Armada
-> 370/XP are already being shipped by Marvell, so it's not like we have
-> much choice here.
+> This driver adds support for digital audio (I2S)
+> for the BCM2708 SoC that is used by the
+> Raspberry Pi. External audio codecs can be
+> connected to the Raspberry Pi via P5 header.
 
-Which also means we can't request to modify new boot loaders to pass
-any specific information.
+Split this up into a patch series, for example one per CPU side driver
+and one per machine driver.  I've given the code a relatively quick run
+through here, it looks mostly sensible though DT would be nice but
+there's a few comments.
 
-(...)
-> And what happens when Globalscale (Mirabox manufacturer) or Plathome
-> (manufacturer of OpenBlocks) release a new bootloader version, based on
-> the new bootloader from Marvell, which remaps things at 0xf1000000 ? Or
-> when those people boot from Barebox, which remaps at 0xf1000000 ?
+> +static inline void bcm2708_i2s_write_reg(struct bcm2708_i2s_dev *dev,
+> +					   int reg, u32 val)
+> +{
+> +	dev_dbg(dev->dev, "I2S write to register %p = %x\n",
+> +			dev->clk_base + reg, val);
+> +	__raw_writel(val, dev->i2s_base + reg);
+> +}
 
-We experienced a similar issue some time ago when something changed
-in the boot loader spec. Kernels >= 3.2 would randomly hang at boot
-when using old boot loaders, and many boot loaders had to be upgraded.
-It was quite painful because there was no information reported with
-this hang but I guess most people managed to upgrade the boot loaders.
-I don't know for how long devices have been shipped with boot loaders
-mapping at 0xd0, nor if all these platforms do have a new boot loader,
-but maybe the same forced upgrade could be reasonable, I have no idea.
-On the other hand, if we consider the forced upgrade as mostly acceptable,
-then the CP15 trick already is an acceptable workaround in that it is
-used as an indicator to detect the old boot loader. So even if for any
-reason it fails on some users, they'll have to upgrade anyway.
+This all looks like you want to use regmap-mmio - that'll get you all
+the logging and so on for free too.
 
-> Conclusion: you can't classify on one side boards that are at 0xd0 and
-> boards that are at 0xf1. It depends on *which* bootloader each
-> particular instance of those boards will be using. Will it be a
-> bootloader that complies with the "old" protocol (CP15 bit cleared and
-> registers at 0xd0) or the "new" protocol (CP15 bit set and registers at
-> 0xf1).
+> +static void bcm2708_i2s_start_clock(struct bcm2708_i2s_dev *dev)
+> +{
+> +	/*
+> +	 * Start the clock if in master mode.
+> +	 */
+> +	unsigned int master = dev->fmt & SND_SOC_DAIFMT_MASTER_MASK;
+> +	if (master == SND_SOC_DAIFMT_CBS_CFS
+> +			|| master == SND_SOC_DAIFMT_CBS_CFM) {
 
-Just a point I'm thinking about, is it possible to detect the boot loader's
-mode via ATAGs ? ATAGs are present very early as well (but maybe too late
-already).
+This looks like it should be a switch statement.
 
-> So we can't encode into the boards Device Tree whether the registers
-> are at 0xd0 or 0xf1, because it's not a board-related information, but
-> a bootloader-related information.
+> +		unsigned int clkreg = bcm2708_clk_read_reg(dev,
+> +				BCM2708_CLK_PCMCTL_REG);
+> +		bcm2708_clk_write_reg(dev, BCM2708_CLK_PCMCTL_REG,
+> +				BCM2708_CLK_PASSWD | clkreg | BCM2708_CLK_ENAB);
+> +	}
 
-I totally agree with you. The issue is only the boot loader.
+Shouldn't this be using your set bits operation?
 
-Best regards,
-Willy
+> +static bool bcm2708_i2s_check_other_stream(struct bcm2708_i2s_dev *dev,
+> +					struct snd_pcm_substream *substream,
+> +					struct snd_pcm_substream *other_stream,
+> +					struct snd_pcm_hw_params *params)
+> +{
+> +	if (other_stream->runtime->format &&
+> +		(other_stream->runtime->format != params_format(params))) {
+> +		dev_err(dev->dev,
+> +			"Sample formats of streams are different. %i (%s) != %i (%s) Initialization failed!\n",
+> +			other_stream->runtime->format,
+> +			(other_stream->stream ==
+> +			 SNDRV_PCM_STREAM_PLAYBACK ?
+> +			 "playback" : "capture"),
+> +			params_format(params),
+> +			(substream->stream ==
+> +			 SNDRV_PCM_STREAM_PLAYBACK ?
+> +			 "playback" : "capture"));
+
+This is illegible.
+
+> +	/* Ensure, that both streams have the same settings */
+> +	struct snd_pcm_substream *other_stream = dev->first_stream;
+> +	if (other_stream == substream)
+> +		other_stream = dev->second_stream;
+
+Set constraints for this so that the upper layers will stop mismatched
+settings being configured.
+
+> +	/*
+> +	 * Clear both FIFOs if the one that should be started
+> +	 * is not empty at the moment. This should only happen
+> +	 * after overrun. Otherwise, hw_params would have cleared
+> +	 * the FIFO.
+> +	 */
+
+Why both?
+
+> +	case SNDRV_PCM_TRIGGER_START:
+> +	case SNDRV_PCM_TRIGGER_RESUME:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+> +		bcm2708_i2s_start(dev, substream);
+
+These functions are pretty small, I'd just inline them.
+
+> +		/*
+> +		 * This is the second stream open, so we need to impose
+> +		 * sample size and sampling rate constraints.
+> +		 * This is because frame length and clock cannot be specified
+> +		 * seperately.
+> +		 *
+> +		 * Note that this can cause a race condition if the
+> +		 * second stream is opened before the first stream is
+> +		 * fully initialized.  We provide some protection by
+> +		 * checking to make sure the first stream is
+> +		 * initialized, but it's not perfect.  ALSA sometimes
+> +		 * re-initializes the driver with a different sample
+> +		 * rate or size.  If the second stream is opened
+> +		 * before the first stream has received its final
+> +		 * parameters, then the second stream may be
+> +		 * constrained to the wrong sample rate or size.
+> +		 *
+> +		 * We will continue in case of failure and recheck the
+> +		 * constraint in hw_params.
+> +		 */
+> +		if (!first_runtime->format) {
+> +			dev_err(substream->pcm->card->dev,
+> +					"Set format in %s stream first! "
+> +					"Initialization may fail.\n",
+
+Don't split strings, but in any case you should just let people set up -
+hopefully they'll try to set something that might work anyway.  Any code
+for fixing this up should be in the core, like symmetric_rates.
+
+> +static void bcm2708_i2s_setup_gpio(void)
+> +{
+> +	/*
+> +	 * This is the common way to handle the GPIO pins for
+> +	 * the Raspberry Pi.
+> +	 * TODO Better way would be to handle
+> +	 * this in the device tree!
+> +	 */
+
+Yup.
+
+> +	/* request both ioareas */
+> +	for (i = 0; i <= 1; i++) {
+> +		struct resource *mem, *ioarea;
+> +		mem = platform_get_resource(pdev, IORESOURCE_MEM, i);
+> +		if (!mem) {
+
+devm_ioremap_resource().
+
+> +	/* get DMA data (e.g. FIFO address and DREQ) */
+> +	dma_data = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+> +
+> +	/*
+> +	 * There seems to be no use for bufferless
+> +	 * transfer with this SoC.
+> +	 */
+> +	if (!dma_data)
+> +		return 0;
+
+This is now supported properly by the framework, no need for this.
+
+> +	dma_data = snd_soc_dai_get_dma_data(rtd->cpu_dai, substream);
+> +
+> +	switch (cmd) {
+> +	case SNDRV_PCM_TRIGGER_START:
+> +	case SNDRV_PCM_TRIGGER_RESUME:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+> +		break;
+> +
+> +	case SNDRV_PCM_TRIGGER_STOP:
+> +	case SNDRV_PCM_TRIGGER_SUSPEND:
+> +	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+> +		break;
+> +	default:
+> +		ret = -EINVAL;
+> +	}
+> +
+> +	if (ret == 0)
+> +		ret = snd_dmaengine_pcm_trigger(substream, cmd);
+
+Juse don't have switch statement.
+
+> +static snd_pcm_uframes_t bcm2708_pcm_pointer(
+> +		struct snd_pcm_substream *substream)
+> +{
+> +	return snd_dmaengine_pcm_pointer(substream);
+> +}
+
+Should just be able to use snd_dmaengine_pcm_pointer() as the ops.
+
+> +static int bcm2708_pcm_mmap(struct snd_pcm_substream *substream,
+> +	struct vm_area_struct *vma)
+
+This should be a generic op...
+
+> +{
+> +	struct snd_pcm_runtime *runtime = substream->runtime;
+> +
+> +	return dma_mmap_writecombine(substream->pcm->card->dev, vma,
+
+Should be using the DMA controller device not the card.
+
+> +				     runtime->dma_area,
+> +				     runtime->dma_addr,
+> +				     runtime->dma_bytes);
+> +}
+
+> +static int bcm2708_pcm_preallocate_dma_buffer(struct snd_pcm *pcm,
+> +	int stream)
+> +{
+> +	struct snd_pcm_substream *substream = pcm->streams[stream].substream;
+> +	struct snd_dma_buffer *buf = &substream->dma_buffer;
+> +	size_t size = bcm2708_pcm_hardware.buffer_bytes_max;
+> +
+> +	buf->dev.type = SNDRV_DMA_TYPE_DEV;
+> +	buf->dev.dev = pcm->card->dev;
+
+DMA controller device.
+
+> +static int snd_rpi_mbed_init(struct snd_soc_pcm_runtime *rtd)
+> +{
+> +	return 0;
+> +}
+
+Empty functions can just be removed.
+
+> +static const unsigned int wm8731_rates_12288000[] = {
+> +	8000, 32000, 48000, 96000,
+> +};
+> +
+> +static struct snd_pcm_hw_constraint_list wm8731_constraints_12288000 = {
+> +	.list = wm8731_rates_12288000,
+> +	.count = ARRAY_SIZE(wm8731_rates_12288000),
+> +};
+> +
+> +static int snd_rpi_proto_startup(struct snd_pcm_substream *substream)
+> +{
+> +	/* Setup constraints, because there is a 12.288 MHz XTAL on the board */
+> +	snd_pcm_hw_constraint_list(substream->runtime, 0,
+> +				SNDRV_PCM_HW_PARAM_RATE,
+> +				&wm8731_constraints_12288000);
+> +	return 0;
+> +}
+
+Push this into the CODEC driver, this will be true for the device on any
+platform with a fixed clock.
+
+> +static int snd_rpi_proto_hw_params(struct snd_pcm_substream *substream,
+> +				       struct snd_pcm_hw_params *params)
+> +{
+> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> +	struct snd_soc_dai *codec_dai = rtd->codec_dai;
+> +	int sysclk = 12288000; /* This is fixed on this board */
+> +
+> +	/* Set proto sysclk */
+> +	int ret = snd_soc_dai_set_sysclk(codec_dai, WM8731_SYSCLK_XTAL,
+> +		sysclk, SND_SOC_CLOCK_IN);
+> +	if (ret < 0) {
+> +		dev_err(substream->pcm->dev,
+> +				"Failed to set WM8731 SYSCLK: %d\n", ret);
+> +		return ret;
+> +	}
+
+Since this is fixed just do it once on init (eg, in late_probe()) rather
+than every single time.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130522/feeabfa5/attachment.sig>
