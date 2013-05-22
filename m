@@ -1,71 +1,182 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 May 2013 22:36:12 +0200
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
- 370/XP
-In-Reply-To: <20130522182219.062079ac@skate>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130522155134.GL2824@lunn.ch> <20130522182219.062079ac@skate>
-Message-ID: <201305222236.12652.arnd@arndb.de>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Wed, 22 May 2013 22:36:33 +0200
+Subject: [PATCH v4 11/12] ARM: kirkwood: remove redundant DT board files
+In-Reply-To: <1369154510-4927-12-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1367854420-8006-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369154510-4927-12-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130522203633.GA28394@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 May 2013, Thomas Petazzoni wrote:
-> On Wed, 22 May 2013 17:51:34 +0200, Andrew Lunn wrote:
+Hi Sebastian,
+
+On Tue, May 21, 2013 at 06:41:49PM +0200, Sebastian Hesselbarth wrote:
+> With DT support for mv643xx_eth, board specific init for some boards now
+> is unneccessary. Remove those board files, Kconfig entries, and
+> corresponding entries in kirkwood_defconfig.
 > 
-> > Maybe i'm missunderstand Arnd, but i think he is suggesting a property
-> > somewhere in DT which says where the bootloader left the register
-> > space before jumping to the kernel. You can then look at this property
-> > and then decide if you need to remap or not. Only this one property
-> > needs to differ between old and new bootloader. You could even say, if
-> > the property is not in DT, a remap is needed.
-
-No, the idea was that we don't need to remap if we know where the registers
-are. The mbus driver might remap them if it is really careful about not
-breaking any existing mappings, but it's probably easier to just leave
-them alone.
-
-> The problem is that neither the old nor the new bootloaders are setting
-> such property in the DT. Old bootloaders shipped by Marvell don't have
-> DT support at all. New bootloaders shipped by Marvell do have DT
-> support, but they are not adding any specific DT property that allows
-> us to tell whether the registers are mapped here or there.
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Note: board-km_kirkwood.c is also removed, as Valentin Longchamp confirmed
+> the lock-up is not caused by accessing clock gating registers but rather
+> non-existent device registers. This will be addressed by dtsi separation
+> for kirkwood and bobcat SoC variants.
 > 
-> We could maybe find a way of detecting whether if the bootloader is DT
-> capable, and assume that if it's DT capable, the registers are already
-> mapped at 0xf1. But that's very fragile: nothing prevents an user to
-> use a DT-capable bootloader to boot a kernel in the old style way
-> (appended DTB). In this case, we would assume that the registers are at
-> 0xd0, because we're being booted old-style, and therefore it must be an
-> old bootloader. Very fragile, clearly not better than the CP15 trick.
-
-Yes, that would not be an improvement. However, since we know what boot
-loader we have when we pass the devicetree, that devicetree can just
-contain the correct 'reg' property for the internal registers.
-
-> > However, i don't know if this can actually work. How early can you
-> > parse the DT in order to know where the serial port is for
-> > earlyprintk()? It also gets messy keeping track of the two different
-> > DT binary blobs and somehow having the probe the uboot version in
-> > order to install the right one. I don't know how i would include this
-> > into the debian flash-kernel for example.
+> Changelog:
+> v3->v4:
+> - remove more boards that don't require board specific setup
 > 
-> For earlyprintk, we can "solve" it as Arnd suggested: just have two
-> Kconfig options, one for 0xd0, one for 0xf1, and it's up to the user to
-> choose the right one. It's not entirely nice because it's no longer
-> automatic, and I'm sure our users will have a hard time figuring out
-> whether they have an "old" or a "new" bootloader. But let's assume we
-> do this. earlyprintk knows the physical address of the UART.
+> Cc: David Miller <davem@davemloft.net>
+> Cc: Lennert Buytenhek <buytenh@wantstofly.org>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: netdev at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/configs/kirkwood_defconfig           |   16 ----
+>  arch/arm/mach-kirkwood/Kconfig                |  117 -------------------------
+>  arch/arm/mach-kirkwood/Makefile               |   16 ----
+>  arch/arm/mach-kirkwood/board-dnskw.c          |    7 --
+>  arch/arm/mach-kirkwood/board-dockstar.c       |   32 -------
+>  arch/arm/mach-kirkwood/board-dreamplug.c      |   35 --------
+>  arch/arm/mach-kirkwood/board-dt.c             |   38 --------
+>  arch/arm/mach-kirkwood/board-goflexnet.c      |   34 -------
+>  arch/arm/mach-kirkwood/board-guruplug.c       |   33 -------
+>  arch/arm/mach-kirkwood/board-ib62x0.c         |   29 ------
+>  arch/arm/mach-kirkwood/board-iconnect.c       |   10 ---
+>  arch/arm/mach-kirkwood/board-iomega_ix2_200.c |   34 -------
+>  arch/arm/mach-kirkwood/board-km_kirkwood.c    |   44 ----------
+>  arch/arm/mach-kirkwood/board-lsxl.c           |   16 ----
+>  arch/arm/mach-kirkwood/board-mplcec4.c        |   14 ---
+>  arch/arm/mach-kirkwood/board-ns2.c            |   35 --------
+>  arch/arm/mach-kirkwood/board-openblocks_a6.c  |   26 ------
+>  arch/arm/mach-kirkwood/board-readynas.c       |    6 --
+>  arch/arm/mach-kirkwood/board-ts219.c          |   13 ---
+>  arch/arm/mach-kirkwood/board-usi_topkick.c    |   29 ------
+>  20 files changed, 584 deletions(-)
+>  delete mode 100644 arch/arm/mach-kirkwood/board-dockstar.c
+>  delete mode 100644 arch/arm/mach-kirkwood/board-dreamplug.c
+>  delete mode 100644 arch/arm/mach-kirkwood/board-goflexnet.c
+>  delete mode 100644 arch/arm/mach-kirkwood/board-guruplug.c
+>  delete mode 100644 arch/arm/mach-kirkwood/board-ib62x0.c
+>  delete mode 100644 arch/arm/mach-kirkwood/board-iomega_ix2_200.c
+>  delete mode 100644 arch/arm/mach-kirkwood/board-km_kirkwood.c
+>  delete mode 100644 arch/arm/mach-kirkwood/board-ns2.c
+>  delete mode 100644 arch/arm/mach-kirkwood/board-openblocks_a6.c
+>  delete mode 100644 arch/arm/mach-kirkwood/board-usi_topkick.c
 > 
-> Then, we enter ->map_io(). We have access to the Device Tree. But the
-> Device Tree doesn't tell us whether the bootloader has mapped the
-> registers. As I explained to Arnd, it's not a per-board criteria: when
-> I'm booting my OpenBlocks with the manufacturer U-Boot, registers are
-> mapped at 0xd0. When I boot the same OpenBlocks with the (admittedly
-> work-in-progress) Barebox bootloader, registers are mapped at 0xf1.
-> Same board, different register location.
+...
+> diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+> index 8db388a..a86b41c 100644
+> --- a/arch/arm/mach-kirkwood/board-dt.c
+> +++ b/arch/arm/mach-kirkwood/board-dt.c
+> @@ -104,59 +104,21 @@ static void __init kirkwood_dt_init(void)
+>  	kexec_reinit = kirkwood_enable_pcie;
+>  #endif
+>  
+> -	if (of_machine_is_compatible("globalscale,dreamplug"))
+> -		dreamplug_init();
+> -
+> -	if (of_machine_is_compatible("globalscale,guruplug"))
+> -		guruplug_dt_init();
+> -
+>  	if (of_machine_is_compatible("dlink,dns-kirkwood"))
+>  		dnskw_init();
+>  
+> -	if (of_machine_is_compatible("iom,iconnect"))
+> -		iconnect_init();
+> -
+> -	if (of_machine_is_compatible("raidsonic,ib-nas62x0"))
+> -		ib62x0_init();
+> -
+>  	if (of_machine_is_compatible("qnap,ts219"))
+>  		qnap_dt_ts219_init();
+>  
+> -	if (of_machine_is_compatible("seagate,dockstar"))
+> -		dockstar_dt_init();
+> -
+> -	if (of_machine_is_compatible("seagate,goflexnet"))
+> -		goflexnet_init();
+> -
+>  	if (of_machine_is_compatible("buffalo,lsxl"))
+>  		lsxl_init();
+>  
+> -	if (of_machine_is_compatible("iom,ix2-200"))
+> -		iomega_ix2_200_init();
+> -
+> -	if (of_machine_is_compatible("keymile,km_kirkwood"))
+> -		km_kirkwood_init();
+> -
+> -	if (of_machine_is_compatible("lacie,cloudbox") ||
+> -	    of_machine_is_compatible("lacie,inetspace_v2") ||
+> -	    of_machine_is_compatible("lacie,netspace_lite_v2") ||
+> -	    of_machine_is_compatible("lacie,netspace_max_v2") ||
+> -	    of_machine_is_compatible("lacie,netspace_mini_v2") ||
+> -	    of_machine_is_compatible("lacie,netspace_v2"))
+> -		ns2_init();
+> -
+>  	if (of_machine_is_compatible("mpl,cec4"))
+>  		mplcec4_init();
+>  
+>  	if (of_machine_is_compatible("netgear,readynas-duo-v2"))
+>  		netgear_readynas_init();
+>  
+> -	if (of_machine_is_compatible("plathome,openblocks-a6"))
+> -		openblocks_a6_init();
+> -
+> -	if (of_machine_is_compatible("usi,topkick"))
+> -		usi_topkick_init();
+> -
+>  	of_platform_populate(NULL, kirkwood_dt_match_table, NULL, NULL);
+>  }
 
-But since you control barebox, you can find the "regs" property of the
-mbus node in it and set it up to the same address you use when you
-map the internal registers.
+We still have:
 
-	Arnd
+static const char * const kirkwood_dt_board_compat[] = {
+	"globalscale,dreamplug",
+	"globalscale,guruplug",
+	"dlink,dns-320",
+	"dlink,dns-325",
+	"iom,iconnect",
+	"raidsonic,ib-nas62x0",
+	"qnap,ts219",
+	"seagate,dockstar",
+	"seagate,goflexnet",
+	"buffalo,lsxl",
+	"iom,ix2-200",
+	"keymile,km_kirkwood",
+	"lacie,cloudbox",
+	"lacie,inetspace_v2",
+	"lacie,netspace_lite_v2",
+	"lacie,netspace_max_v2",
+	"lacie,netspace_mini_v2",
+	"lacie,netspace_v2",
+	"mpl,cec4",
+	"netgear,readynas-duo-v2",
+	"plathome,openblocks-a6",
+	"usi,topkick",
+	"zyxel,nsa310",
+	NULL
+};
+
+in that file. I think it does not make sense that we need to list
+boards here that can be described fully by DT. When adding such a
+board in the future, you will still need to adapt board-dt.c.
+
+Should we remove the boards that you removed above here as well and
+add
+
+	"marvell,kirkwood-88f6192",
+	"marvell,kirkwood-88f6281",
+	"marvell,kirkwood-88f6282",
+	"marvell,kirkwood-88f6283",
+	"marvell,kirkwood-88f6702",
+	"marvell,kirkwood-98DX4122",
+
+or even just state "marvell,kirkwood"?
+
+- Simon
