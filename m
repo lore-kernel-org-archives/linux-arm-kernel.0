@@ -1,31 +1,39 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 22 May 2013 11:17:36 +0400
-Subject: =?UTF-8?B?UmVbM106IFtQQVRDSF0gQVJNOiBpb211eC1teDUxOiBBbHdheXMgZGVmaW5l?=
- =?UTF-8?B?IFBVIEUgZm9yIHBpbnMgdXNlZCBhcyBHUElP?=
-In-Reply-To: <20892.28064.82907.942799@ipc1.ka-ro>
-References: <1369124845-19244-1-git-send-email-shc_work@mail.ru>
- <1369203552.559574351@f389.i.mail.ru>
- <20892.28064.82907.942799@ipc1.ka-ro>
-Message-ID: <1369207056.596630214@f96.mail.ru>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 22 May 2013 16:20:24 +0900
+Subject: [PATCH] ARM: EXYNOS: add __cpuinit annotation to write_pen_release()
+Message-ID: <000201ce56bc$d399b770$7acd2650$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Alexander Shiyan writes:
-> > > On Tue, May 21, 2013 at 12:27:25PM +0400, Alexander Shiyan wrote:
-> > > > This patch adds a PUE bit for pins which used as GPIO. This allow
-> > > > to use the GPIOs correctly as inputs when source is open-drain with
-> > > > external pullup resistor (IRQ open-drain outputs for example).
-> > > 
-> > > I don't understand. If there's an external pullup why do you want to
-> > > turn on the internal one?
-> > 
-> > It is just switch off keeper circuit.
-> > 
-> If you want to switch the keeper circuit off why don't you do that by
-> removing PAD_CTL_PKE rather than adding PAD_CTL_PUE?
+The variable __cpuinitdata pen_release is referenced by write_pen_release().
+Also, write_pen_release() is called by exynos_secondary_init() which is
+annotated with __cpuinit. Thus, __cpuinit should be added write_pen_release()
+to fix section mismatch warning.
 
-Again, I do not know which the solution here is better. If we remove
-the PKE bit, for some pins it will be removed the default pullup/pulldown (PUS = 0),
-so it may affect the some running configuration.
+Fixed section mismatch warning as below:
 
+  WARNING: vmlinux.o(.text.unlikely+0x1f4): Section mismatch in reference from the function write_pen_release() to the variable
+.cpuinit.data:pen_release
+  The function write_pen_release() references the variable __cpuinitdata pen_release.
+  This is often because write_pen_release lacks a __cpuinitdata annotation or the annotation of pen_release is wrong.
+
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
 ---
+ arch/arm/mach-exynos/platsmp.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index a0e8ff7..9676af2 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -58,7 +58,7 @@ static inline void __iomem *cpu_boot_reg(int cpu)
+  * observers, irrespective of whether they're taking part in coherency
+  * or not.  This is necessary for the hotplug code to work reliably.
+  */
+-static void write_pen_release(int val)
++static void __cpuinit write_pen_release(int val)
+ {
+ 	pen_release = val;
+ 	smp_wmb();
+-- 
+1.7.10.4
