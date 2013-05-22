@@ -1,57 +1,44 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 May 2013 16:04:48 +0200
-Subject: [PATCH v2 00/10] uaccess: better might_sleep/might_fault behavior
-In-Reply-To: <20130522134124.GD18614@n2100.arm.linux.org.uk>
-References: <cover.1368702323.git.mst@redhat.com>
- <201305221125.36284.arnd@arndb.de>
- <20130522134124.GD18614@n2100.arm.linux.org.uk>
-Message-ID: <201305221604.49185.arnd@arndb.de>
+Date: Wed, 22 May 2013 16:08:10 +0200
+Subject: [PATCH] regulator: ab8500-ext: Don't register without
+ initialisation data
+In-Reply-To: <CACRpkdYHiwbGonH80aJfHxP6F+hLb+_KdCr_g5ae1Yr-v=WcxA@mail.gmail.com>
+References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
+ <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYHiwbGonH80aJfHxP6F+hLb+_KdCr_g5ae1Yr-v=WcxA@mail.gmail.com>
+Message-ID: <201305221608.10759.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 May 2013, Russell King - ARM Linux wrote:
-> On Wed, May 22, 2013 at 11:25:36AM +0200, Arnd Bergmann wrote:
-> > Given the most commonly used functions and a couple of architectures
-> > I'm familiar with, these are the ones that currently call might_fault()
-> > 
-> >                       x86-32  x86-64  arm     arm64   powerpc s390    generic
-> > copy_to_user          -       x       -       -       -       x       x
-> > copy_from_user        -       x       -       -       -       x       x
-> > put_user              x       x       x       x       x       x       x
-> > get_user              x       x       x       x       x       x       x
-> > __copy_to_user        x       x       -       -       x       -       -
-> > __copy_from_user      x       x       -       -       x       -       -
-> > __put_user            -       -       x       -       x       -       -
-> > __get_user            -       -       x       -       x       -       -
-> > 
-> > WTF?
+On Wednesday 22 May 2013, Linus Walleij wrote:
+> > diff --git a/drivers/regulator/ab8500-ext.c b/drivers/regulator/ab8500-ext.c
+> > index b4d4547..8421537 100644
+> > --- a/drivers/regulator/ab8500-ext.c
+> > +++ b/drivers/regulator/ab8500-ext.c
+> > @@ -334,6 +334,12 @@ int ab8500_ext_regulator_init(struct platform_device *pdev)
+> >                 return -EINVAL;
+> >         }
+> >
+> > +       /* have any external regulators been specified? */
+> > +       if (pdata->num_ext_regulator == 0) {
+> > +               dev_warn(&pdev->dev, "Not using external regulators\n");
+> > +               return 0;
+> > +       }
 > 
-> I think your table is rather screwed - especially on ARM.  Tell me -
-> how can __copy_to_user() use might_fault() but copy_to_user() not when
-> copy_to_user() is implemented using __copy_to_user() ?  Same for
-> copy_from_user() but the reverse argument - there's nothing special
-> in our copy_from_user() which would make it do might_fault() when
-> __copy_from_user() wouldn't.
+> dev_warn() is really when we warn about something really nasty, worse
+> than dev_err(). It seems dev_info() is more apropriate.
 
-I think something went wrong with formatting of the tabstobs in
-the table. I've tried to correct it above to the same version I
-see on the mailing list.
+Are you confusing it with dev_crit()?
 
-> The correct position for ARM is: our (__)?(pu|ge)t_user all use
-> might_fault(), but (__)?copy_(to|from)_user do not.  Neither does
-> (__)?clear_user.  We might want to fix those to use might_fault().
+This is how the levels are defined, and "warning" is less urgent than "error":
 
-Yes, that sounds like a good idea, especially since they are all
-implemented out-of-line.
-
-For __get_user()/__put_user(), I would probably do the reverse and make
-them not call might_fault() though, like we do on most other architectures:
-
-Look at the object code produced for setup_sigframe for instance, it calls
-might_fault() around 25 times where one should really be enough. Using
-__put_user() instead of put_user() is normally an indication that the
-author of that function has made performance considerations and move the
-(trivial) access_ok() call out, but now we add a more expensive
-call instead.
+#define KERN_EMERG      KERN_SOH "0"    /* system is unusable */
+#define KERN_ALERT      KERN_SOH "1"    /* action must be taken immediately */
+#define KERN_CRIT       KERN_SOH "2"    /* critical conditions */
+#define KERN_ERR        KERN_SOH "3"    /* error conditions */
+#define KERN_WARNING    KERN_SOH "4"    /* warning conditions */
+#define KERN_NOTICE     KERN_SOH "5"    /* normal but significant condition */
+#define KERN_INFO       KERN_SOH "6"    /* informational */
+#define KERN_DEBUG      KERN_SOH "7"    /* debug-level messages */
 
 	Arnd
