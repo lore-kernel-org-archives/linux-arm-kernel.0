@@ -1,35 +1,99 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 22 May 2013 15:23:05 +0800
-Subject: [PATCH v3] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <13F8657A829DAB49A2A937FD6FC10F790B3CDB85@039-SN2MPN1-012.039d.mgd.msft.net>
-References: <1368685096-13177-1-git-send-email-b35083@freescale.com>
- <20130520030523.GB25113@S2101-09.ap.freescale.net>
- <13F8657A829DAB49A2A937FD6FC10F790B3CDB85@039-SN2MPN1-012.039d.mgd.msft.net>
-Message-ID: <CAAQ0ZWRz+byPKxMjDH3zKsc0u4bmkPO_1u6w2H4Z7nD0z8+9ig@mail.gmail.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 22 May 2013 15:32:20 +0800
+Subject: [PATCH] arm64: compiling issue for allmodconfig,
+ need "asm/parport.h" by "drivers/parport/parport_pc.c"
+In-Reply-To: <519C1539.10908@asianux.com>
+References: <5177551D.8090007@asianux.com> <20130424082237.GA23397@arm.com>
+ <5177B1F0.10106@asianux.com>
+ <20130424102327.GF21850@mudshark.cambridge.arm.com>
+ <5177BAD0.9000500@asianux.com> <20130424110511.GK23397@arm.com>
+ <5199A453.4080402@asianux.com> <20130521131734.GD27002@arm.com>
+ <519C1539.10908@asianux.com>
+Message-ID: <519C7484.9020709@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 May 2013 14:40, Jin Zhengxiong-R64188 <R64188@freescale.com> wrote:
-> [Jason Jin-R64188] Reuse the same LPUART on LS-1 with the compatible strings 'fsl,mvf600-lpuart' is technically OK, But it will fuss the route map of the product Line. The general name can show that the IP is shared between several product lines, and the history for which SOC firstly used the IP is not very important. With general compatible name, We can setup the general dts for the shared IPs.
->
-> That's also the case for the IPs used on Power platform, Take the IFC for example, this IP implemented on Power platform will also be reused LS-1, The compatible string is set as  "fsl,ifc", "simple-bus" but not the soc name on which the IP first used.
->
->  Another example, though a little different, the nor flash driver, which is used for many platform, the compatible "cfi-flash" will be more reasonable than the soc/board name.
->
-> With the general name for the compatible string in the driver, if there is minor difference for the different implementation of the same IP, we can add the soc related compatible string to the driver to pass different .data structure for that soc.
->
+On 05/22/2013 08:45 AM, Chen Gang wrote:
+> On 05/21/2013 09:17 PM, Catalin Marinas wrote:
+>> On Mon, May 20, 2013 at 05:19:31AM +0100, Chen Gang wrote:
+>>>
+>>> Need add the default file in 'asm/Kbuild' just like arm has done.
+>>>
+>>> The build command is:
+>>>   make EXTRA_CFLAGS=-W ARCH=arm64 allmodconfig
+>>>   make EXTRA_CFLAGS=-W ARCH=arm64 menuconfig
+>>>     set "aarch64-linux-gnu-" as cross compiling prefix.
+>>>   make EXTRA_CFLAGS=-W ARCH=arm64
+>>>
+>>> The related error:
+>>>   drivers/parport/parport_pc.c:67:25: fatal error: asm/parport.h: No such file or directory
+>>
+>> As I don't see when we'd need this driver, you can probably change the
+>> Kconfig entry (similar to the VGA_CONSOLE one).
+>>
 
-As I already said, a generic compatible string does not specify
-anything about compatibility/version, and hence it's not a good
-compatible for IP block which is possibly to be integrated on multiple
-SoCs with slight differences.
+After check the Kconfig in drivers, we can find quite a few using long
+list args which related with ARCH.
 
-For example, if there is a new SoC mvf900 integrating the IP with
-everything compatible to the version used on mvf600,
+And they are not only depend on ARCHs, but also depend on another
+things (e.g. VGA_CONSOL also depend on !4xx && !8xx, and another
+combinations).
 
-  compatible = <fsl,mvf900-uart>, <fsl,mvf600-uart>;
-  compatible = <fsl,mvf900-uart>, <fsl,lpuart>;
+We also can find another long list for depend on, but not related with
+ARCH.
 
-which one do you think is better to tell the compatibility/version?
+They seems not quit difficult for reading (in fact, if we separate them
+into pieces and let them spread into another areas, the reader will not
+see the whole dependency clearly)
 
-Shawn
+For fixing bug, better as local as possible, as independent as possible,
+it will be OK if only add !ARM64 for PARPORT_PC depend on, and it has
+no any negative effect. But if we define CONFIG_HAVE_*, we have to let
+it related with multiple platforms.
+
+For design: if can bear current design, better not to touch it, I think
+current design is still sustainable, and not complex for understanding,
+so not need redesign.
+
+
+The depends on samples which related with ARCH:
+
+  ./ide/Kconfig:  depends on ALPHA || X86 || IA64 || M32R || MIPS || ARCH_RPC || ARCH_SHARK
+  ./dma/Kconfig:  depends on ARCH_IOP32X || ARCH_IOP33X || ARCH_IOP13XX
+  ./misc/Kconfig: depends on (IA64_GENERIC || IA64_SGI_SN2 || IA64_SGI_UV || X86_UV) && SMP
+  ./gpio/Kconfig: depends on PPC_MPC512x || PPC_MPC831x || PPC_MPC834x || PPC_MPC837x || ...
+  ./gpio/Kconfig: depends on GPIOLIB && ARCH_MSM && (ARCH_MSM7X00A || ARCH_MSM7X30 || ARCH_QSD8X50)
+  ./mtd/onenand/Kconfig:        depends on ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS4
+  ./net/ethernet/ti/Kconfig:      depends on PCI || EISA || AR7 || (ARM && (ARCH_DAVINCI || ARCH_OMAP3 || SOC_AM33XX))
+  ./net/ethernet/ibm/Kconfig:     depends on MCA || PPC_PSERIES || PPC_PSERIES || PPC_DCR || ...
+  ./net/ethernet/smsc/Kconfig:    depends on (ARM || M32R || SUPERH || MIPS || BLACKFIN || ...
+  ./net/ethernet/smsc/Kconfig:    depends on (ARM || SUPERH || BLACKFIN || MIPS || MN10300)
+  ./rtc/Kconfig:  depends on X86 || ALPHA || ARM || M32R || ATARI || PPC || MIPS || SPARC64
+  ./rtc/Kconfig:  depends on ARCH_OMAP15XX || ARCH_OMAP16XX || ARCH_OMAP730 || ARCH_DAVINCI_DA8XX || SOC_AM33XX
+  ./isdn/hisax/Kconfig:   depends on PCI && (BROKEN || !(SPARC || PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
+  ./isdn/hisax/Kconfig:   depends on PCI && (BROKEN || !(PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
+  ./isdn/hisax/Kconfig:   depends on PCI && (BROKEN || !(SPARC || PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
+  ./isdn/hisax/Kconfig:   depends on HISAX_NETJET && PCI && (BROKEN || !(SPARC || PPC || PARISC || M68K || (MIPS && !CPU_LITTLE_ENDIAN) || FRV || (XTENSA && !CPU_LITTLE_ENDIAN)))
+  ./input/serio/Kconfig:  depends on !PARISC && (!ARM || ARCH_SHARK || FOOTBRIDGE_HOST) && ...
+  ./char/Kconfig: depends on RTC!=y && !IA64 && !ARM && !M32R && !MIPS && !SPARC && !FRV && !S390 && !SUPERH && !AVR32 && !BLACKFIN && !UML
+  ./video/console/Kconfig:        depends on !4xx && !8xx && !SPARC && !M68K && !PARISC && !FRV && !SUPERH && !BLACKFIN && !AVR32 && !MN10300 && (!ARM || ARCH_FOOTBRIDGE || ARCH_INTEGRATOR || ARCH_NETWINDER)
+  ./video/Kconfig:        depends on FB && (CPU_S3C2416 || ARCH_S3C64XX || ARCH_S5P64X0 || ...
+  ...
+
+
+
+> 
+> Oh, really it is, it is for PC, it seems except x86, no one else will
+> use it. And for x86, it will be less and less used, in the future.
+> 
+> It seems it is a better candidate than VGA_CONSOLE. I will define
+> CONFIG_HAVE_PARPORT_PC for it.  :-)
+> 
+> Thanks.
+> 
+
+
+-- 
+Chen Gang
+
+Asianux Corporation
