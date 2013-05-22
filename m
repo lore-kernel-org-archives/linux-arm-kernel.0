@@ -1,43 +1,65 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 22 May 2013 18:19:35 +0200
-Subject: [PATCH] kernel/sched/core.c: need return NULL when BUG() is
- defined as empty.
-In-Reply-To: <20130522133317.GC18614@n2100.arm.linux.org.uk>
-References: <5199D565.4070307@asianux.com>
- <20130522091156.GC18810@twins.programming.kicks-ass.net>
- <20130522133317.GC18614@n2100.arm.linux.org.uk>
-Message-ID: <20130522161935.GR18810@twins.programming.kicks-ass.net>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 22 May 2013 18:22:19 +0200
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
+ 370/XP
+In-Reply-To: <20130522155134.GL2824@lunn.ch>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201305221633.46705.arnd@arndb.de> <20130522170643.54a2b9d2@skate>
+ <201305221735.11815.arnd@arndb.de> <20130522155134.GL2824@lunn.ch>
+Message-ID: <20130522182219.062079ac@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 02:33:17PM +0100, Russell King - ARM Linux wrote:
-> On Wed, May 22, 2013 at 11:11:56AM +0200, Peter Zijlstra wrote:
-> > On Mon, May 20, 2013 at 03:48:53PM +0800, Chen Gang wrote:
-> > > 
-> > > When neither CONFIG_BUG nor HAVE_ARCH_BUG is defined, need let function
-> > > return failure value ('NULL') instead of random value.
-> > 
-> > What will such a kernel do? Happily continue running whenever we hit a
-> > BUG? that seems like a particularly bad idea. Should we not have a stub
-> > BUG() function like:
-> > 
-> > void BUG(void) __attribute__((noreturn))
-> > {
-> > 	local_irq_disable();
-> > 	while (1) ;
-> > }
-> 
-> Eww.  So you've a platform where you have things like panic_on_oops
-> enabled, and you hit this bug... do we really want to just stop?
-> Wouldn't replacing BUG() with panic("BUG"); be better ?
-> 
-> But, this begs the question - what is the point of being able to turn
-> off BUG() ?  As BUG() on any sensible architecture is implemented by
-> placing the minimum of code at the callsite (eg, one instruction if
-> not using verbose) anything like the above is likely to be bigger.
-> 
-> So, I'd actually argue that rather than trying to "fix" this, get rid
-> of CONFIG_BUG and make it always enabled everywhere - just like what
-> has recently been done with hotplug.
+Dear Andrew Lunn,
 
-Works for me. 
+On Wed, 22 May 2013 17:51:34 +0200, Andrew Lunn wrote:
+
+> Maybe i'm missunderstand Arnd, but i think he is suggesting a property
+> somewhere in DT which says where the bootloader left the register
+> space before jumping to the kernel. You can then look at this property
+> and then decide if you need to remap or not. Only this one property
+> needs to differ between old and new bootloader. You could even say, if
+> the property is not in DT, a remap is needed.
+
+The problem is that neither the old nor the new bootloaders are setting
+such property in the DT. Old bootloaders shipped by Marvell don't have
+DT support at all. New bootloaders shipped by Marvell do have DT
+support, but they are not adding any specific DT property that allows
+us to tell whether the registers are mapped here or there.
+
+We could maybe find a way of detecting whether if the bootloader is DT
+capable, and assume that if it's DT capable, the registers are already
+mapped at 0xf1. But that's very fragile: nothing prevents an user to
+use a DT-capable bootloader to boot a kernel in the old style way
+(appended DTB). In this case, we would assume that the registers are at
+0xd0, because we're being booted old-style, and therefore it must be an
+old bootloader. Very fragile, clearly not better than the CP15 trick.
+
+> However, i don't know if this can actually work. How early can you
+> parse the DT in order to know where the serial port is for
+> earlyprintk()? It also gets messy keeping track of the two different
+> DT binary blobs and somehow having the probe the uboot version in
+> order to install the right one. I don't know how i would include this
+> into the debian flash-kernel for example.
+
+For earlyprintk, we can "solve" it as Arnd suggested: just have two
+Kconfig options, one for 0xd0, one for 0xf1, and it's up to the user to
+choose the right one. It's not entirely nice because it's no longer
+automatic, and I'm sure our users will have a hard time figuring out
+whether they have an "old" or a "new" bootloader. But let's assume we
+do this. earlyprintk knows the physical address of the UART.
+
+Then, we enter ->map_io(). We have access to the Device Tree. But the
+Device Tree doesn't tell us whether the bootloader has mapped the
+registers. As I explained to Arnd, it's not a per-board criteria: when
+I'm booting my OpenBlocks with the manufacturer U-Boot, registers are
+mapped at 0xd0. When I boot the same OpenBlocks with the (admittedly
+work-in-progress) Barebox bootloader, registers are mapped at 0xf1.
+Same board, different register location.
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
