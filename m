@@ -1,37 +1,40 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 22 May 2013 18:19:28 +0400
-Subject: [PATCH FOR v3.10 v2] ARM: shmobile: kzm9g-reference: Update CMT
- clocksource rating to 80
-In-Reply-To: <1369232020-22681-1-git-send-email-horms+renesas@verge.net.au>
-References: <1369232020-22681-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <519CD3F0.7050002@cogentembedded.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 22 May 2013 16:23:17 +0200
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
+ 370/XP
+In-Reply-To: <20130522141751.GF18614@n2100.arm.linux.org.uk>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130521193803.GA20882@1wt.eu> <519C9779.1040104@gmail.com>
+ <20130522134336.GE18614@n2100.arm.linux.org.uk>
+ <20130522155218.1c2af492@skate>
+ <20130522141751.GF18614@n2100.arm.linux.org.uk>
+Message-ID: <519CD4D5.9060401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22-05-2013 18:13, Simon Horman wrote:
+On 05/22/2013 04:17 PM, Russell King - ARM Linux wrote:
+> The question which was asked was:
+>
+> 	What happens if you access a register at 0xd0xxxxxx when the
+> 	registers are remapped to 0xf1xxxxxx?
+>
+> The answer which was given was:
+>
+> 	It hangs on XP / 370, but doesn't on Dove.
+>
+...
+> What we need to know is: after the boot loader passes control to the
+> kernel, and before _we_ start fiddling around with any clocks, is the
+> region at 0xd0xxxxxx accessible without hanging the CPU?
+>
+> That's the point at which we'd want to probe for the remapped registers,
+> so that's the point where the test access must be made - and with the
+> system clocks in whatever state was left by the reset+boot loader.
 
-> Update the CMT clocksource rating from 125 to 80.
+Russell,
 
-> This resolves a boot-failure regression for kzm9g-reference in v3.10-rc1
-> introduced by f7db706b132f11c79ae1d74b2382e0926cf31644 ("ARM: 7674/1: smp:
-> Avoid dummy clockevent being preferred over real").
+I tried both Armada 370 and Dove on a very minimal console-only barebox.
+Poking the wrong addresses always hangs 370 while Dove happily returns
+zero.
 
-> The patch noted above reduces the rating of dummy clockevent from 400 to 100.
-> This patch reduces the rating of CMT so that it is once again less than that
-> of the dummy clockevent.
-
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-> ---
-
-> I also plan to reduce the rating of the STI clocksource to less than 100.
-> However, as I am not aware of any problems relating to STI in v3.10-rc
-> my plan is to update STI in the v3.11 timeframe.
-> ---
->   arch/arm/mach-shmobile/setup-sh73a0.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-
-    BTW, shouldn't the subject be "ARM: shmobile: sh73a0: Update CMT 
-clocksource rating to 80"?
-
-WBR, Sergei
+Sebastian
