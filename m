@@ -1,62 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 May 2013 11:25:36 +0200
-Subject: [PATCH v2 00/10] uaccess: better might_sleep/might_fault behavior
-In-Reply-To: <cover.1368702323.git.mst@redhat.com>
-References: <cover.1368702323.git.mst@redhat.com>
-Message-ID: <201305221125.36284.arnd@arndb.de>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 22 May 2013 17:29:51 +0800
+Subject: [PATCH] kernel/sched/core.c: need return NULL when BUG() is
+ defined as empty.
+In-Reply-To: <20130522091156.GC18810@twins.programming.kicks-ass.net>
+References: <5199D565.4070307@asianux.com>
+ <20130522091156.GC18810@twins.programming.kicks-ass.net>
+Message-ID: <519C900F.1040008@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 May 2013, Michael S. Tsirkin wrote:
-> This improves the might_fault annotations used
-> by uaccess routines:
+On 05/22/2013 05:11 PM, Peter Zijlstra wrote:
+> On Mon, May 20, 2013 at 03:48:53PM +0800, Chen Gang wrote:
+>> > 
+>> > When neither CONFIG_BUG nor HAVE_ARCH_BUG is defined, need let function
+>> > return failure value ('NULL') instead of random value.
+> What will such a kernel do? Happily continue running whenever we hit a
+> BUG? that seems like a particularly bad idea. Should we not have a stub
+> BUG() function like:
 > 
-> 1. The only reason uaccess routines might sleep
->    is if they fault. Make this explicit for
->    all architectures.
-> 2. Accesses (e.g through socket ops) to kernel memory
->    with KERNEL_DS like net/sunrpc does will never sleep.
->    Remove an unconditinal might_sleep in the inline
->    might_fault in kernel.h
->    (used when PROVE_LOCKING is not set).
-> 3. Accesses with pagefault_disable return EFAULT
->    but won't cause caller to sleep.
->    Check for that and avoid might_sleep when
->    PROVE_LOCKING is set.
+> void BUG(void) __attribute__((noreturn))
+> {
+> 	local_irq_disable();
+> 	while (1) ;
+> }
 > 
-> I'd like these changes to go in for the benefit of
-> the vhost driver where we want to call socket ops
-> under a spinlock, and fall back on slower thread handler
-> on error.
+> Which would at least halt things?
+> 
+> 
 
-Hi Michael,
+At least for me, it is a good idea. :-)
 
-I have recently stumbled over a related topic, which is the highly
-inconsistent placement of might_fault() or might_sleep() in certain
-classes of uaccess functions. Your patches seem completely reasonable,
-but it would be good to also fix the other problem, at least on
-the architectures we most care about.
+In menuconfig we can set !CONFIG_BUG and !HAVE_ARCH_BUG manually under
+any architectures:
 
-Given the most commonly used functions and a couple of architectures
-I'm familiar with, these are the ones that currently call might_fault()
+  "> General setup > Configure standard kernel features (expert users) > BUG() Support"
 
-			x86-32	x86-64	arm	arm64	powerpc	s390	generic
-copy_to_user		-	x	-	-	-	x	x
-copy_from_user		-	x	-	-	-	x	x
-put_user		x	x	x	x	x	x	x
-get_user		x	x	x	x	x	x	x
-__copy_to_user		x	x	-	-	x	-	-
-__copy_from_user	x	x	-	-	x	-	-
-__put_user		-	-	x	-	x	-	-
-__get_user		-	-	x	-	x	-	-
+So I think, we really need your patch.
 
-WTF?
 
-Calling might_fault() for every __get_user/__put_user is rather expensive
-because it turns what should be a single instruction (plus fixup) into an
-external function call.
+Thanks.
+-- 
+Chen Gang
 
-My feeling is that we should do might_fault() only in access_ok() to get
-the right balance.
-
-	Arnd
+Asianux Corporation
