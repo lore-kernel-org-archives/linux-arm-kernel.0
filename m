@@ -1,316 +1,321 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 22 May 2013 16:27:42 +0200
-Subject: [PATCH 3/5] ARM: dts: OMAP2+: convert DT files to use the new
- OMAP_GPIO macro
+Date: Wed, 22 May 2013 16:27:41 +0200
+Subject: [PATCH 2/5] ARM: dts: OMAP2+: create a DT header for GPIO
 In-Reply-To: <1369232864-14460-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1369232864-14460-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1369232864-14460-4-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1369232864-14460-3-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use OMAP_GPIO(), in conjunction with standard GPIO flags, to enhance the
-readability of DT GPIOs.
+Define the OMAP_GPIO macro to conveniently use GPIO inside OMAP DT.
+For example:
+
+	gpios = <&gpio6 3 0>;  /* GPIO 163 */
+
+can be replaced by
+
+	gpios = OMAP_GPIO(163, 0);
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/boot/dts/omap2.dtsi              |    2 ++
- arch/arm/boot/dts/omap3-beagle-xm.dts     |    4 ++--
- arch/arm/boot/dts/omap3-beagle.dts        |    6 +++---
- arch/arm/boot/dts/omap3-devkit8000.dts    |    6 +++---
- arch/arm/boot/dts/omap3-igep0020.dts      |    6 +++---
- arch/arm/boot/dts/omap3-igep0030.dts      |    2 +-
- arch/arm/boot/dts/omap3-tobi.dts          |    2 +-
- arch/arm/boot/dts/omap3.dtsi              |    2 ++
- arch/arm/boot/dts/omap4-panda-common.dtsi |    6 +++---
- arch/arm/boot/dts/omap4-sdp.dts           |   20 ++++++++++----------
- arch/arm/boot/dts/omap4.dtsi              |    2 ++
- arch/arm/boot/dts/omap5.dtsi              |    2 ++
- 12 files changed, 34 insertions(+), 26 deletions(-)
+ include/dt-bindings/gpio/omap-gpio.h |  289 ++++++++++++++++++++++++++++++++++
+ 1 files changed, 289 insertions(+), 0 deletions(-)
+ create mode 100644 include/dt-bindings/gpio/omap-gpio.h
 
-diff --git a/arch/arm/boot/dts/omap2.dtsi b/arch/arm/boot/dts/omap2.dtsi
-index e6e4587..7ea5df4 100644
---- a/arch/arm/boot/dts/omap2.dtsi
-+++ b/arch/arm/boot/dts/omap2.dtsi
-@@ -8,6 +8,8 @@
-  * kind, whether express or implied.
-  */
- 
-+#include <dt-bindings/gpio/omap-gpio.h>
+diff --git a/include/dt-bindings/gpio/omap-gpio.h b/include/dt-bindings/gpio/omap-gpio.h
+new file mode 100644
+index 0000000..64f2686
+--- /dev/null
++++ b/include/dt-bindings/gpio/omap-gpio.h
+@@ -0,0 +1,289 @@
++/*
++ * This header provides macros and constants for binding ti,omap*-gpio
++ *
++ * Compatible with OMAP2, OMAP3, OMAP4 and OMAP5.
++ */
 +
- #include "skeleton.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index e0ce823..e773a5e 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -29,13 +29,13 @@
- 
- 		heartbeat {
- 			label = "beagleboard::usr0";
--			gpios = <&gpio5 22 0>; /* 150 -> D6 LED */
-+			gpios = OMAP_GPIO(150, GPIO_ACTIVE_HIGH); /* 150 -> D6 LED */
- 			linux,default-trigger = "heartbeat";
- 		};
- 
- 		mmc {
- 			label = "beagleboard::usr1";
--			gpios = <&gpio5 21 0>; /* 149 -> D7 LED */
-+			gpios = OMAP_GPIO(149, GPIO_ACTIVE_HIGH); /* 149 -> D7 LED */
- 			linux,default-trigger = "mmc0";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index fcac96a..f1fd002 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -33,13 +33,13 @@
- 
- 		heartbeat {
- 			label = "beagleboard::usr0";
--			gpios = <&gpio5 22 0>; /* 150 -> D6 LED */
-+			gpios = OMAP_GPIO(150, GPIO_ACTIVE_HIGH); /* 150 -> D6 LED */
- 			linux,default-trigger = "heartbeat";
- 		};
- 
- 		mmc {
- 			label = "beagleboard::usr1";
--			gpios = <&gpio5 21 0>; /* 149 -> D7 LED */
-+			gpios = OMAP_GPIO(149, GPIO_ACTIVE_HIGH); /* 149 -> D7 LED */
- 			linux,default-trigger = "mmc0";
- 		};
- 	};
-@@ -50,7 +50,7 @@
- 		regulator-name = "hsusb2_reset";
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
--		gpio = <&gpio5 19 0>;	/* gpio_147 */
-+		gpio = OMAP_GPIO(147, GPIO_ACTIVE_HIGH);
- 		startup-delay-us = <70000>;
- 		enable-active-high;
- 	};
-diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
-index 8d0f5e4..fecb5ac 100644
---- a/arch/arm/boot/dts/omap3-devkit8000.dts
-+++ b/arch/arm/boot/dts/omap3-devkit8000.dts
-@@ -22,21 +22,21 @@
- 
- 		heartbeat {
- 			label = "devkit8000::led1";
--			gpios = <&gpio6 26 0>;	/* 186 -> LED1 */
-+			gpios = OMAP_GPIO(186, GPIO_ACTIVE_HIGH);	/* 186 -> LED1 */
- 			default-state = "on";
- 			linux,default-trigger = "heartbeat";
- 		};
- 
- 		mmc {
- 			label = "devkit8000::led2";
--			gpios = <&gpio6 3 0>;	/* 163 -> LED2 */
-+			gpios = OMAP_GPIO(163, GPIO_ACTIVE_HIGH);	/* 163 -> LED2 */
- 			default-state = "on";
- 			linux,default-trigger = "none";
- 		};
- 
- 		usr {
- 			label = "devkit8000::led3";
--			gpios = <&gpio6 4 0>;	/* 164 -> LED3 */
-+			gpios = OMAP_GPIO(164, GPIO_ACTIVE_HIGH);	/* 164 -> LED3 */
- 			default-state = "on";
- 			linux,default-trigger = "usr";
-                 };
-diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
-index 2f96a5c..4be8ba1 100644
---- a/arch/arm/boot/dts/omap3-igep0020.dts
-+++ b/arch/arm/boot/dts/omap3-igep0020.dts
-@@ -19,19 +19,19 @@
- 		compatible = "gpio-leds";
- 		boot {
- 			 label = "omap3:green:boot";
--			 gpios = <&gpio1 26 0>;
-+			 gpios = OMAP_GPIO(26, GPIO_ACTIVE_HIGH);
- 			 default-state = "on";
- 		};
- 
- 		user0 {
- 			 label = "omap3:red:user0";
--			 gpios = <&gpio1 27 0>;
-+			 gpios = OMAP_GPIO(27, GPIO_ACTIVE_HIGH);
- 			 default-state = "off";
- 		};
- 
- 		user1 {
- 			 label = "omap3:red:user1";
--			 gpios = <&gpio1 28 0>;
-+			 gpios = OMAP_GPIO(28, GPIO_ACTIVE_HIGH);
- 			 default-state = "off";
- 		};
- 
-diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
-index f3a1bf0..5a2c7a6 100644
---- a/arch/arm/boot/dts/omap3-igep0030.dts
-+++ b/arch/arm/boot/dts/omap3-igep0030.dts
-@@ -37,7 +37,7 @@
- 
- 		user2 {
- 			 label = "omap3:red:user1";
--			 gpios = <&gpio1 16 1>;
-+			 gpios = OMAP_GPIO(16, GPIO_ACTIVE_LOW);
- 			 default-state = "off";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/omap3-tobi.dts b/arch/arm/boot/dts/omap3-tobi.dts
-index 5df894f..8390c8b 100644
---- a/arch/arm/boot/dts/omap3-tobi.dts
-+++ b/arch/arm/boot/dts/omap3-tobi.dts
-@@ -20,7 +20,7 @@
- 		compatible = "gpio-leds";
- 		heartbeat {
- 			label = "overo:red:gpio21";
--			gpios = <&gpio1 21 0>;
-+			gpios = OMAP_GPIO(21, GPIO_ACTIVE_HIGH);
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 7c7d494..15049b8 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -8,6 +8,8 @@
-  * kind, whether express or implied.
-  */
- 
-+#include <dt-bindings/gpio/omap-gpio.h>
++#ifndef _DT_BINDINGS_GPIO_OMAP_GPIO_H
++#define _DT_BINDINGS_GPIO_OMAP_GPIO_H
 +
- #include "skeleton.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index 63148d1..b71f5cd 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -20,13 +20,13 @@
- 		compatible = "gpio-leds";
- 		heartbeat {
- 			label = "pandaboard::status1";
--			gpios = <&gpio1 7 0>;
-+			gpios = OMAP_GPIO(7, GPIO_ACTIVE_HIGH);
- 			linux,default-trigger = "heartbeat";
- 		};
- 
- 		mmc {
- 			label = "pandaboard::status2";
--			gpios = <&gpio1 8 0>;
-+			gpios = OMAP_GPIO(8, GPIO_ACTIVE_HIGH);
- 			linux,default-trigger = "mmc0";
- 		};
- 	};
-@@ -156,7 +156,7 @@
- 		/* SPI = 0, IRQ# = 119, 4 = active high level-sensitive */
- 		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
- 		interrupt-parent = <&gic>;
--		ti,audpwron-gpio = <&gpio4 31 0>;  /* gpio line 127 */
-+		ti,audpwron-gpio = OMAP_GPIO(127, GPIO_ACTIVE_HIGH);
- 
- 		vio-supply = <&v1v8>;
- 		v2v1-supply = <&v2v1>;
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 5edd08e..f55bb68 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -24,7 +24,7 @@
- 		regulator-name = "VDD_ETH";
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
--		gpio = <&gpio2 16 0>;  /* gpio line 48 */
-+		gpio = OMAP_GPIO(48, GPIO_ACTIVE_HIGH);
- 		enable-active-high;
- 		regulator-boot-on;
- 	};
-@@ -41,42 +41,42 @@
- 		compatible = "gpio-leds";
- 		debug0 {
- 			label = "omap4:green:debug0";
--			gpios = <&gpio2 29 0>; /* 61 */
-+			gpios = OMAP_GPIO(61, GPIO_ACTIVE_HIGH);
- 		};
- 
- 		debug1 {
- 			label = "omap4:green:debug1";
--			gpios = <&gpio1 30 0>; /* 30 */
-+			gpios = OMAP_GPIO(30, GPIO_ACTIVE_HIGH);
- 		};
- 
- 		debug2 {
- 			label = "omap4:green:debug2";
--			gpios = <&gpio1 7 0>; /* 7 */
-+			gpios = OMAP_GPIO(7, GPIO_ACTIVE_HIGH);
- 		};
- 
- 		debug3 {
- 			label = "omap4:green:debug3";
--			gpios = <&gpio1 8 0>; /* 8 */
-+			gpios = OMAP_GPIO(8, GPIO_ACTIVE_HIGH);
- 		};
- 
- 		debug4 {
- 			label = "omap4:green:debug4";
--			gpios = <&gpio2 18 0>; /* 50 */
-+			gpios = OMAP_GPIO(50, GPIO_ACTIVE_HIGH);
- 		};
- 
- 		user1 {
- 			label = "omap4:blue:user";
--			gpios = <&gpio6 9 0>; /* 169 */
-+			gpios = OMAP_GPIO(169, GPIO_ACTIVE_HIGH);
- 		};
- 
- 		user2 {
- 			label = "omap4:red:user";
--			gpios = <&gpio6 10 0>; /* 170 */
-+			gpios = OMAP_GPIO(170, GPIO_ACTIVE_HIGH);
- 		};
- 
- 		user3 {
- 			label = "omap4:green:user";
--			gpios = <&gpio5 11 0>; /* 139 */
-+			gpios = OMAP_GPIO(139, GPIO_ACTIVE_HIGH);
- 		};
- 	};
- 
-@@ -296,7 +296,7 @@
- 		/* SPI = 0, IRQ# = 119, 4 = active high level-sensitive */
- 		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
- 		interrupt-parent = <&gic>;
--		ti,audpwron-gpio = <&gpio4 31 0>;  /* gpio line 127 */
-+		ti,audpwron-gpio = OMAP_GPIO(127, GPIO_ACTIVE_HIGH);
- 
- 		vio-supply = <&v1v8>;
- 		v2v1-supply = <&v2v1>;
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 53d80aa..3c00b72 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -14,6 +14,8 @@
-  */
- /memreserve/ 0x9d000000 0x03000000;
- 
-+#include <dt-bindings/gpio/omap-gpio.h>
++#include <dt-bindings/gpio/gpio.h>
 +
- #include "skeleton.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index e8e6653..af849e6 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -15,6 +15,8 @@
-  */
- /memreserve/ 0x9d000000 0x03000000;
- 
-+#include <dt-bindings/gpio/omap-gpio.h>
++#define OMAP_GPIO_0_BANK        gpio1
++#define OMAP_GPIO_1_BANK        gpio1
++#define OMAP_GPIO_2_BANK        gpio1
++#define OMAP_GPIO_3_BANK        gpio1
++#define OMAP_GPIO_4_BANK        gpio1
++#define OMAP_GPIO_5_BANK        gpio1
++#define OMAP_GPIO_6_BANK        gpio1
++#define OMAP_GPIO_7_BANK        gpio1
++#define OMAP_GPIO_8_BANK        gpio1
++#define OMAP_GPIO_9_BANK        gpio1
++#define OMAP_GPIO_10_BANK       gpio1
++#define OMAP_GPIO_11_BANK       gpio1
++#define OMAP_GPIO_12_BANK       gpio1
++#define OMAP_GPIO_13_BANK       gpio1
++#define OMAP_GPIO_14_BANK       gpio1
++#define OMAP_GPIO_15_BANK       gpio1
++#define OMAP_GPIO_16_BANK       gpio1
++#define OMAP_GPIO_17_BANK       gpio1
++#define OMAP_GPIO_18_BANK       gpio1
++#define OMAP_GPIO_19_BANK       gpio1
++#define OMAP_GPIO_20_BANK       gpio1
++#define OMAP_GPIO_21_BANK       gpio1
++#define OMAP_GPIO_22_BANK       gpio1
++#define OMAP_GPIO_23_BANK       gpio1
++#define OMAP_GPIO_24_BANK       gpio1
++#define OMAP_GPIO_25_BANK       gpio1
++#define OMAP_GPIO_26_BANK       gpio1
++#define OMAP_GPIO_27_BANK       gpio1
++#define OMAP_GPIO_28_BANK       gpio1
++#define OMAP_GPIO_29_BANK       gpio1
++#define OMAP_GPIO_30_BANK       gpio1
++#define OMAP_GPIO_31_BANK       gpio1
 +
- #include "skeleton.dtsi"
- 
- / {
++#define OMAP_GPIO_32_BANK       gpio2
++#define OMAP_GPIO_33_BANK       gpio2
++#define OMAP_GPIO_34_BANK       gpio2
++#define OMAP_GPIO_35_BANK       gpio2
++#define OMAP_GPIO_36_BANK       gpio2
++#define OMAP_GPIO_37_BANK       gpio2
++#define OMAP_GPIO_38_BANK       gpio2
++#define OMAP_GPIO_39_BANK       gpio2
++#define OMAP_GPIO_40_BANK       gpio2
++#define OMAP_GPIO_41_BANK       gpio2
++#define OMAP_GPIO_42_BANK       gpio2
++#define OMAP_GPIO_43_BANK       gpio2
++#define OMAP_GPIO_44_BANK       gpio2
++#define OMAP_GPIO_45_BANK       gpio2
++#define OMAP_GPIO_46_BANK       gpio2
++#define OMAP_GPIO_47_BANK       gpio2
++#define OMAP_GPIO_48_BANK       gpio2
++#define OMAP_GPIO_49_BANK       gpio2
++#define OMAP_GPIO_50_BANK       gpio2
++#define OMAP_GPIO_51_BANK       gpio2
++#define OMAP_GPIO_52_BANK       gpio2
++#define OMAP_GPIO_53_BANK       gpio2
++#define OMAP_GPIO_54_BANK       gpio2
++#define OMAP_GPIO_55_BANK       gpio2
++#define OMAP_GPIO_56_BANK       gpio2
++#define OMAP_GPIO_57_BANK       gpio2
++#define OMAP_GPIO_58_BANK       gpio2
++#define OMAP_GPIO_59_BANK       gpio2
++#define OMAP_GPIO_60_BANK       gpio2
++#define OMAP_GPIO_61_BANK       gpio2
++#define OMAP_GPIO_62_BANK       gpio2
++#define OMAP_GPIO_63_BANK       gpio2
++
++#define OMAP_GPIO_64_BANK       gpio3
++#define OMAP_GPIO_65_BANK       gpio3
++#define OMAP_GPIO_66_BANK       gpio3
++#define OMAP_GPIO_67_BANK       gpio3
++#define OMAP_GPIO_68_BANK       gpio3
++#define OMAP_GPIO_69_BANK       gpio3
++#define OMAP_GPIO_70_BANK       gpio3
++#define OMAP_GPIO_71_BANK       gpio3
++#define OMAP_GPIO_72_BANK       gpio3
++#define OMAP_GPIO_73_BANK       gpio3
++#define OMAP_GPIO_74_BANK       gpio3
++#define OMAP_GPIO_75_BANK       gpio3
++#define OMAP_GPIO_76_BANK       gpio3
++#define OMAP_GPIO_77_BANK       gpio3
++#define OMAP_GPIO_78_BANK       gpio3
++#define OMAP_GPIO_79_BANK       gpio3
++#define OMAP_GPIO_80_BANK       gpio3
++#define OMAP_GPIO_81_BANK       gpio3
++#define OMAP_GPIO_82_BANK       gpio3
++#define OMAP_GPIO_83_BANK       gpio3
++#define OMAP_GPIO_84_BANK       gpio3
++#define OMAP_GPIO_85_BANK       gpio3
++#define OMAP_GPIO_86_BANK       gpio3
++#define OMAP_GPIO_87_BANK       gpio3
++#define OMAP_GPIO_88_BANK       gpio3
++#define OMAP_GPIO_89_BANK       gpio3
++#define OMAP_GPIO_90_BANK       gpio3
++#define OMAP_GPIO_91_BANK       gpio3
++#define OMAP_GPIO_92_BANK       gpio3
++#define OMAP_GPIO_93_BANK       gpio3
++#define OMAP_GPIO_94_BANK       gpio3
++#define OMAP_GPIO_95_BANK       gpio3
++
++#define OMAP_GPIO_96_BANK       gpio4
++#define OMAP_GPIO_97_BANK       gpio4
++#define OMAP_GPIO_98_BANK       gpio4
++#define OMAP_GPIO_99_BANK       gpio4
++#define OMAP_GPIO_100_BANK      gpio4
++#define OMAP_GPIO_101_BANK      gpio4
++#define OMAP_GPIO_102_BANK      gpio4
++#define OMAP_GPIO_103_BANK      gpio4
++#define OMAP_GPIO_104_BANK      gpio4
++#define OMAP_GPIO_105_BANK      gpio4
++#define OMAP_GPIO_106_BANK      gpio4
++#define OMAP_GPIO_107_BANK      gpio4
++#define OMAP_GPIO_108_BANK      gpio4
++#define OMAP_GPIO_109_BANK      gpio4
++#define OMAP_GPIO_110_BANK      gpio4
++#define OMAP_GPIO_111_BANK      gpio4
++#define OMAP_GPIO_112_BANK      gpio4
++#define OMAP_GPIO_113_BANK      gpio4
++#define OMAP_GPIO_114_BANK      gpio4
++#define OMAP_GPIO_115_BANK      gpio4
++#define OMAP_GPIO_116_BANK      gpio4
++#define OMAP_GPIO_117_BANK      gpio4
++#define OMAP_GPIO_118_BANK      gpio4
++#define OMAP_GPIO_119_BANK      gpio4
++#define OMAP_GPIO_120_BANK      gpio4
++#define OMAP_GPIO_121_BANK      gpio4
++#define OMAP_GPIO_122_BANK      gpio4
++#define OMAP_GPIO_123_BANK      gpio4
++#define OMAP_GPIO_124_BANK      gpio4
++#define OMAP_GPIO_125_BANK      gpio4
++#define OMAP_GPIO_126_BANK      gpio4
++#define OMAP_GPIO_127_BANK      gpio4
++
++/* Not available on OMAP2420 */
++#define OMAP_GPIO_128_BANK      gpio5
++#define OMAP_GPIO_129_BANK      gpio5
++#define OMAP_GPIO_130_BANK      gpio5
++#define OMAP_GPIO_131_BANK      gpio5
++#define OMAP_GPIO_132_BANK      gpio5
++#define OMAP_GPIO_133_BANK      gpio5
++#define OMAP_GPIO_134_BANK      gpio5
++#define OMAP_GPIO_135_BANK      gpio5
++#define OMAP_GPIO_136_BANK      gpio5
++#define OMAP_GPIO_137_BANK      gpio5
++#define OMAP_GPIO_138_BANK      gpio5
++#define OMAP_GPIO_139_BANK      gpio5
++#define OMAP_GPIO_140_BANK      gpio5
++#define OMAP_GPIO_141_BANK      gpio5
++#define OMAP_GPIO_142_BANK      gpio5
++#define OMAP_GPIO_143_BANK      gpio5
++#define OMAP_GPIO_144_BANK      gpio5
++#define OMAP_GPIO_145_BANK      gpio5
++#define OMAP_GPIO_146_BANK      gpio5
++#define OMAP_GPIO_147_BANK      gpio5
++#define OMAP_GPIO_148_BANK      gpio5
++#define OMAP_GPIO_149_BANK      gpio5
++#define OMAP_GPIO_150_BANK      gpio5
++#define OMAP_GPIO_151_BANK      gpio5
++#define OMAP_GPIO_152_BANK      gpio5
++#define OMAP_GPIO_153_BANK      gpio5
++#define OMAP_GPIO_154_BANK      gpio5
++#define OMAP_GPIO_155_BANK      gpio5
++#define OMAP_GPIO_156_BANK      gpio5
++#define OMAP_GPIO_157_BANK      gpio5
++#define OMAP_GPIO_158_BANK      gpio5
++#define OMAP_GPIO_159_BANK      gpio5
++
++/* Not available on OMAP2 */
++#define OMAP_GPIO_160_BANK      gpio6
++#define OMAP_GPIO_161_BANK      gpio6
++#define OMAP_GPIO_162_BANK      gpio6
++#define OMAP_GPIO_163_BANK      gpio6
++#define OMAP_GPIO_164_BANK      gpio6
++#define OMAP_GPIO_165_BANK      gpio6
++#define OMAP_GPIO_166_BANK      gpio6
++#define OMAP_GPIO_167_BANK      gpio6
++#define OMAP_GPIO_168_BANK      gpio6
++#define OMAP_GPIO_169_BANK      gpio6
++#define OMAP_GPIO_170_BANK      gpio6
++#define OMAP_GPIO_171_BANK      gpio6
++#define OMAP_GPIO_172_BANK      gpio6
++#define OMAP_GPIO_173_BANK      gpio6
++#define OMAP_GPIO_174_BANK      gpio6
++#define OMAP_GPIO_175_BANK      gpio6
++#define OMAP_GPIO_176_BANK      gpio6
++#define OMAP_GPIO_177_BANK      gpio6
++#define OMAP_GPIO_178_BANK      gpio6
++#define OMAP_GPIO_179_BANK      gpio6
++#define OMAP_GPIO_180_BANK      gpio6
++#define OMAP_GPIO_181_BANK      gpio6
++#define OMAP_GPIO_182_BANK      gpio6
++#define OMAP_GPIO_183_BANK      gpio6
++#define OMAP_GPIO_184_BANK      gpio6
++#define OMAP_GPIO_185_BANK      gpio6
++#define OMAP_GPIO_186_BANK      gpio6
++#define OMAP_GPIO_187_BANK      gpio6
++#define OMAP_GPIO_188_BANK      gpio6
++#define OMAP_GPIO_189_BANK      gpio6
++#define OMAP_GPIO_190_BANK      gpio6
++#define OMAP_GPIO_191_BANK      gpio6
++
++/* Only available on OMAP5 */
++#define OMAP_GPIO_192_BANK      gpio7
++#define OMAP_GPIO_193_BANK      gpio7
++#define OMAP_GPIO_194_BANK      gpio7
++#define OMAP_GPIO_195_BANK      gpio7
++#define OMAP_GPIO_196_BANK      gpio7
++#define OMAP_GPIO_197_BANK      gpio7
++#define OMAP_GPIO_198_BANK      gpio7
++#define OMAP_GPIO_199_BANK      gpio7
++#define OMAP_GPIO_200_BANK      gpio7
++#define OMAP_GPIO_201_BANK      gpio7
++#define OMAP_GPIO_202_BANK      gpio7
++#define OMAP_GPIO_203_BANK      gpio7
++#define OMAP_GPIO_204_BANK      gpio7
++#define OMAP_GPIO_205_BANK      gpio7
++#define OMAP_GPIO_206_BANK      gpio7
++#define OMAP_GPIO_207_BANK      gpio7
++#define OMAP_GPIO_208_BANK      gpio7
++#define OMAP_GPIO_209_BANK      gpio7
++#define OMAP_GPIO_210_BANK      gpio7
++#define OMAP_GPIO_211_BANK      gpio7
++#define OMAP_GPIO_212_BANK      gpio7
++#define OMAP_GPIO_213_BANK      gpio7
++#define OMAP_GPIO_214_BANK      gpio7
++#define OMAP_GPIO_215_BANK      gpio7
++#define OMAP_GPIO_216_BANK      gpio7
++#define OMAP_GPIO_217_BANK      gpio7
++#define OMAP_GPIO_218_BANK      gpio7
++#define OMAP_GPIO_219_BANK      gpio7
++#define OMAP_GPIO_220_BANK      gpio7
++#define OMAP_GPIO_221_BANK      gpio7
++#define OMAP_GPIO_222_BANK      gpio7
++#define OMAP_GPIO_223_BANK      gpio7
++
++/* Only available on OMAP5 */
++#define OMAP_GPIO_224_BANK      gpio8
++#define OMAP_GPIO_225_BANK      gpio8
++#define OMAP_GPIO_226_BANK      gpio8
++#define OMAP_GPIO_227_BANK      gpio8
++#define OMAP_GPIO_228_BANK      gpio8
++#define OMAP_GPIO_229_BANK      gpio8
++#define OMAP_GPIO_230_BANK      gpio8
++#define OMAP_GPIO_231_BANK      gpio8
++#define OMAP_GPIO_232_BANK      gpio8
++#define OMAP_GPIO_233_BANK      gpio8
++#define OMAP_GPIO_234_BANK      gpio8
++#define OMAP_GPIO_235_BANK      gpio8
++#define OMAP_GPIO_236_BANK      gpio8
++#define OMAP_GPIO_237_BANK      gpio8
++#define OMAP_GPIO_238_BANK      gpio8
++#define OMAP_GPIO_239_BANK      gpio8
++#define OMAP_GPIO_240_BANK      gpio8
++#define OMAP_GPIO_241_BANK      gpio8
++#define OMAP_GPIO_242_BANK      gpio8
++#define OMAP_GPIO_243_BANK      gpio8
++#define OMAP_GPIO_244_BANK      gpio8
++#define OMAP_GPIO_245_BANK      gpio8
++#define OMAP_GPIO_246_BANK      gpio8
++#define OMAP_GPIO_247_BANK      gpio8
++#define OMAP_GPIO_248_BANK      gpio8
++#define OMAP_GPIO_249_BANK      gpio8
++#define OMAP_GPIO_250_BANK      gpio8
++#define OMAP_GPIO_251_BANK      gpio8
++#define OMAP_GPIO_252_BANK      gpio8
++#define OMAP_GPIO_253_BANK      gpio8
++#define OMAP_GPIO_254_BANK      gpio8
++#define OMAP_GPIO_255_BANK      gpio8
++
++
++#define _OMAP_GPIO_OFFSET(gpio) \
++	(gpio & 0x1F)
++
++
++/* Declare a reference to an OMAP GPIO */
++#define OMAP_GPIO(gpio, level) \
++	<&OMAP_GPIO_##gpio##_BANK _OMAP_GPIO_OFFSET(gpio) level>
++
++#endif
 -- 
 1.7.5.4
