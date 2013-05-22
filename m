@@ -1,37 +1,40 @@
-From: jonas@microbit.se (Jonas Andersson)
-Date: Wed, 22 May 2013 08:52:45 +0200
-Subject: imx53 cspi clock problem
-Message-ID: <519C6B3D.3030106@microbit.se>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Wed, 22 May 2013 09:02:56 +0200
+Subject: [PATCH] ARM: iomux-mx51: Always define PU
+ E for pins used as GPIO
+In-Reply-To: <1369203552.559574351@f389.i.mail.ru>
+References: <1369124845-19244-1-git-send-email-shc_work@mail.ru>
+ <20130521192430.GU32299@pengutronix.de>
+ <1369203552.559574351@f389.i.mail.ru>
+Message-ID: <20892.28064.82907.942799@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-i have found a problem when using the cspi port in a imx53 soc. I am 
-using kernel 3.10-rc2. This is the dts defenition:
+Alexander Shiyan writes:
+> > On Tue, May 21, 2013 at 12:27:25PM +0400, Alexander Shiyan wrote:
+> > > This patch adds a PUE bit for pins which used as GPIO. This allow
+> > > to use the GPIOs correctly as inputs when source is open-drain with
+> > > external pullup resistor (IRQ open-drain outputs for example).
+> > 
+> > I don't understand. If there's an external pullup why do you want to
+> > turn on the internal one?
+> 
+> It is just switch off keeper circuit.
+> 
+If you want to switch the keeper circuit off why don't you do that by
+removing PAD_CTL_PKE rather than adding PAD_CTL_PUE?
 
-cspi: cspi at 63fc0000 {
-	#address-cells = <1>;
-	#size-cells = <0>;
-	compatible = "fsl,imx53-cspi", "fsl,imx35-cspi";
-	reg = <0x63fc0000 0x4000>;
-	interrupts = <38>;
-	clocks = <&clks 55>, <&clks 0>;
-	clock-names = "ipg", "per";
-	status = "disabled";
-};
 
-then in the driver spi-imx.c:
+Lothar Wa?mann
+-- 
+___________________________________________________________
 
-spi_imx->spi_clk = clk_get_rate(spi_imx->clk_per);
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
 
-clk_get_rate() will return the rate 0. In function mx31_config, this line:
-
-reg |= spi_imx_clkdiv_2(spi_imx->spi_clk, config->speed_hz) <<
-	MX31_CSPICTRL_DR_SHIFT;
-
-will always configure the port for full speed (16.7 MHz in my system).
-
-This "per" clock rate should be around 67MHz.
-
-Jonas
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
