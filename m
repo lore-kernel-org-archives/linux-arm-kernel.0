@@ -1,268 +1,353 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Thu, 23 May 2013 22:37:19 +0900
-Subject: Introduce a new helper framework for buffer synchronization
-In-Reply-To: <CAKMK7uHtk+A7CDZH3qHt+F3H_fdSsWwt-bEPn-N0919oOE+Jkg@mail.gmail.com>
-References: <CAAQKjZP=iOmHRpHZCbZD3v_RKUFSn0eM_WVZZvhe7F9g3eTmPA@mail.gmail.com>
- <CAF6AEGuDih-NR-VZCmQfqbvCOxjxreZRPGfhCyL12FQ1Qd616Q@mail.gmail.com>
- <006a01ce504e$0de3b0e0$29ab12a0$%dae@samsung.com>
- <CAF6AEGv2FiKMUpb5s4zHPdj4uVxnQWdVJWL-i1mOOZRxBvMZ4Q@mail.gmail.com>
- <00cf01ce512b$bacc5540$3064ffc0$%dae@samsung.com>
- <CAF6AEGuBexKUpTwm9cjGjkxCTKgEaDhAakeP0RN=rtLS6Qy=Mg@mail.gmail.com>
- <CAAQKjZP37koEPob6yqpn-WxxTh3+O=twyvRzDiEhVJTD8BxQzw@mail.gmail.com>
- <20130520211304.GV12292@phenom.ffwll.local>
- <20130520213033.GW12292@phenom.ffwll.local>
- <032701ce55f1$3e9ba4b0$bbd2ee10$%dae@samsung.com>
- <20130521074441.GZ12292@phenom.ffwll.local>
- <033a01ce5604$c32bd250$498376f0$%dae@samsung.com>
- <CAKMK7uHtk+A7CDZH3qHt+F3H_fdSsWwt-bEPn-N0919oOE+Jkg@mail.gmail.com>
-Message-ID: <012801ce57ba$a5a87fa0$f0f97ee0$%dae@samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 23 May 2013 15:42:00 +0200
+Subject: [PATCH v2 6/6] arm: mvebu: support new bootloaders shipped by
+ Marvell
+In-Reply-To: <1369315854-32724-7-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1369315854-32724-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1369315854-32724-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130523134200.GD8681@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: daniel.vetter at ffwll.ch [mailto:daniel.vetter at ffwll.ch] On Behalf Of
-> Daniel Vetter
-> Sent: Thursday, May 23, 2013 8:56 PM
-> To: Inki Dae
-> Cc: Rob Clark; linux-fbdev; DRI mailing list; Kyungmin Park; myungjoo.ham;
-> YoungJun Cho; linux-arm-kernel at lists.infradead.org; linux-
-> media at vger.kernel.org
-> Subject: Re: Introduce a new helper framework for buffer synchronization
+On Thu, May 23, 2013 at 03:30:54PM +0200, Thomas Petazzoni wrote:
+> On Marvell platforms, the "internal registers" is a window of 1 MB of
+> the physical address space that contains all the registers for the
+> various peripherals of the SoC (timers, interrupt controllers, GPIO
+> controllers, Ethernet, etc.). The base address of this 1 MB window is
+> configurable, and this base address is configured using a register
+> that is itself part of this window.
 > 
-> On Tue, May 21, 2013 at 11:22 AM, Inki Dae <inki.dae@samsung.com> wrote:
-> >> -----Original Message-----
-> >> From: Daniel Vetter [mailto:daniel.vetter at ffwll.ch] On Behalf Of Daniel
-> >> Vetter
-> >> Sent: Tuesday, May 21, 2013 4:45 PM
-> >> To: Inki Dae
-> >> Cc: 'Daniel Vetter'; 'Rob Clark'; 'linux-fbdev'; 'DRI mailing list';
-> >> 'Kyungmin Park'; 'myungjoo.ham'; 'YoungJun Cho'; linux-arm-
-> >> kernel at lists.infradead.org; linux-media at vger.kernel.org
-> >> Subject: Re: Introduce a new helper framework for buffer
-> synchronization
-> >>
-> >> On Tue, May 21, 2013 at 04:03:06PM +0900, Inki Dae wrote:
-> >> > > - Integration of fence syncing into dma_buf. Imo we should have a
-> >> > >   per-attachment mode which decides whether map/unmap (and the new
-> >> sync)
-> >> > >   should wait for fences or whether the driver takes care of
-> syncing
-> >> > >   through the new fence framework itself (for direct hw sync).
-> >> >
-> >> > I think it's a good idea to have per-attachment mode for buffer sync.
-> >> But
-> >> > I'd like to say we make sure what is the purpose of map
-> >> > (dma_buf_map_attachment)first. This interface is used to get a sgt;
-> >> > containing pages to physical memory region, and map that region with
-> >> > device's iommu table. The important thing is that this interface is
-> >> called
-> >> > just one time when user wants to share an allocated buffer with dma.
-> But
-> >> cpu
-> >> > will try to access the buffer every time as long as it wants.
-> Therefore,
-> >> we
-> >> > need cache control every time cpu and dma access the shared buffer:
-> >> cache
-> >> > clean when cpu goes to dma and cache invalidate when dma goes to cpu.
-> >> That
-> >> > is why I added new interfaces, DMA_BUF_GET_FENCE and
-> DMA_BUF_PUT_FENCE,
-> >> to
-> >> > dma buf framework. Of course, Those are ugly so we need a better way:
-> I
-> >> just
-> >> > wanted to show you that in such way, we can synchronize the shared
-> >> buffer
-> >> > between cpu and dma. By any chance, is there any way that kernel can
-> be
-> >> > aware of when cpu accesses the shared buffer or is there any point I
-> >> didn't
-> >> > catch up?
-> >>
-> >> Well dma_buf_map/unmap_attachment should also flush/invalidate any
-> caches,
-> >> and with the current dma_buf spec those two functions are the _only_
-> means
-> >
-> > I know that dma buf exporter should make sure that cache
-> clean/invalidate
-> > are done when dma_buf_map/unmap_attachement is called. For this, already
-> we
-> > do so. However, this function is called when dma buf import is requested
-> by
-> > user to map a dmabuf fd with dma. This means that
-> dma_buf_map_attachement()
-> > is called ONCE when user wants to share the dmabuf fd with dma.
-Actually,
-> in
-> > case of exynos drm, dma_map_sg_attrs(), performing cache operation
-> > internally, is called when dmabuf import is requested by user.
-> >
-> >> you have to do so. Which strictly means that if you interleave device
-> dma
-> >> and cpu acccess you need to unmap/map every time.
-> >>
-> >> Which is obviously horribly inefficient, but a known gap in the dma_buf
-> >
-> > Right, and also this has big overhead.
-> >
-> >> interface. Hence why I proposed to add dma_buf_sync_attachment similar
-> to
-> >> dma_sync_single_for_device:
-> >>
-> >> /**
-> >>  * dma_buf_sync_sg_attachment - sync caches for dma access
-> >>  * @attach: dma-buf attachment to sync
-> >>  * @sgt: the sg table to sync (returned by dma_buf_map_attachement)
-> >>  * @direction: dma direction to sync for
-> >>  *
-> >>  * This function synchronizes caches for device dma through the given
-> >>  * dma-buf attachment when interleaving dma from different devices and
-> the
-> >>  * cpu. Other device dma needs to be synced also by calls to this
-> >>  * function (or a pair of dma_buf_map/unmap_attachment calls), cpu
-> access
-> >>  * needs to be synced with dma_buf_begin/end_cpu_access.
-> >>  */
-> >> void dma_buf_sync_sg_attachment(struct dma_buf_attachment *attach,
-> >>                               struct sg_table *sgt,
-> >>                               enum dma_data_direction direction)
-> >>
-> >> Note that "sync" here only means to synchronize caches, not wait for
-> any
-> >> outstanding fences. This is simply to be consistent with the
-> established
-> >> lingo of the dma api. How the dma-buf fences fit into this is imo a
-> >> different topic, but my idea is that all the cache coherency barriers
-> >> (i.e. dma_buf_map/unmap_attachment, dma_buf_sync_sg_attachment and
-> >> dma_buf_begin/end_cpu_access) would automatically block for any
-> attached
-> >> fences (i.e. block for write fences when doing read-only access, block
-> for
-> >> all fences otherwise).
-> >
-> > As I mentioned already, kernel can't aware of when cpu accesses a shared
-> > buffer: user can access a shared buffer after mmap anytime and the
-> shared
-> > buffer should be synchronized between cpu and dma. Therefore, the above
-> > cache coherency barriers should be called every time cpu and dma tries
-> to
-> > access a shared buffer, checking before and after of cpu and dma access.
-> And
-> > exactly, the proposed way do such thing. For this, you can refer to the
-> > below link,
-> >
-> > http://www.mail-archive.com/linux-media at vger.kernel.org/msg62124.html
-> >
-> > My point is that how kernel can aware of when those cache coherency
-> barriers
-> > should be called to synchronize caches and buffer access between cpu and
-> > dma.
-> >
-> >>
-> >> Then we could do a new dma_buf_attach_flags interface for special cases
-> >> (might also be useful for other things, similar to the recently added
-> >> flags in the dma api for wc/no-kernel-mapping/...). A new flag like
-> >> DMA_BUF_ATTACH_NO_AUTOFENCE would then mean that the driver takes care
-> of
-> >> all
-> >> fencing for this attachment and the dma-buf functions should not do the
-> >> automagic fence blocking.
-> >>
-> >> > In Linux kernel, especially embedded system, we had tried to
-> implement
-> >> > generic interfaces for buffer management; how to allocate a buffer
-> and
-> >> how
-> >> > to share a buffer. As a result, now we have CMA (Contiguous Memory
-> >> > Allocator) for buffer allocation, and we have DMA-BUF for buffer
-> sharing
-> >> > between cpu and dma. And then how to synchronize a buffer between cpu
-> >> and
-> >> > dma? I think now it's best time to discuss buffer synchronization
-> >> mechanism,
-> >> > and that is very natural.
-> >>
-> >> I think it's important to differentiate between the two meanings of
-> sync:
-> >> - synchronize caches (i.e. cpu cache flushing in most cases)
-> >> - and synchronize in-flight dma with fences.
-> >>
-> >
-> > Agree, and I meant that the buffer synchronization mechanism includes
-> the
-> > above two things. And I think the two things should be addressed
-> together.
+> All earlier families of Marvell EBU SoCs supported by Linux used
+> 0xf1000000 as the base address of the internal registers window. For
+> some reason, early versions of the Marvell 370/XP platforms used
+> 0xd0000000 as the base address. This base address is set up by the
+> bootloader. However, in order to keep as much physical address space
+> to address RAM below the 4 GB limit, Marvell had to switch the base
+> address of the internal registers window back to 0xf1000000.
 > 
-> I'm still confused about what you're trying to achive in the big
-> picture here exactly. I think the key point is your statement above
-> that the kernel can't know when the cpu access a dma-buf. That's not
-> true though:
+> All the new bootloaders shipped by Marvell remap those registers to
+> 0xf1000000. This commit adapts the kernel Device Tree and other
+> definitions so that it can boot with such bootloaders.
 > 
-> For userspace mmaps the kernel can shoot down ptes and so prevent
-> userspace from accessing a buffer.
-
-In this case, cpu access to user space will incur page fault. However, cpu
-accesses user space region after mmap in user mode and every time user
-wants. And user needs something before passing a buffer accessed into device
-driver and also vice versa.
-
-> Since that's pretty inefficient
-> gem/ttm have additional ioctls for cache coherency transitions.
-
-Yes, that's the something, and that's a way now we are using if I understood
-surely. User side calls those ioctls for cache coherency between cpu and
-dma: cache clean after cpu access and before dma access, and cache
-invalidate after dma access and before cpu access. I thought it's better to
-control cache in kernel side than user because I had found some Linux based
-platforms overuse cache operations. So I thought the best place for it is
-the proposed fence helper or similar thing: we would need interfaces to
-notify the moment, 'before and after of cpu access', into kernel side. My
-proposal is to couple those two things, synchronizing caches and in-flight
-dma with fences, in kernel side. With this approach, user doesn't need to
-care when dma and cpu access will be started, and when dma and cpu access
-will be completed anymore when user wants to access a buffer and share it
-with dma. All things, cache coherency and buffer fencing between dma and
-cpu, will be done in kernel side.
-
-> dma_buf currently has no support for explicit coherency transitions
-> from userpsace, so if pte shootdown is an issue we need to improve
-> that.
+> However, since those changing are breaking the compatibility with old
+> bootloader (resulting in a kernel that crashes without displaying any
+> message), we have implement a temporary solution for users of an old
+> bootloader.
 > 
-> If I read your proposal correctly you instead suggest to _alway_ flush
-> cache before/after each dma. That will _completely_ kill performance
-> (been there with i915, trust me).
+> One particular bit of a CP15 register has been chosen to indicate
+> whether we use an old bootloader (setting the address at 0xd0000000)
+> or a new bootloader (setting the address at 0xf1000000). In the
+> ->map_io() function, when the bit is already set, there is nothing to
+> do, we are already using a new bootloader and internal registers are
+> at 0xf1000000.
 > 
-
-In case of using a cachable mapped buffer and sharing the buffer with dma,
-we need to clean cache after cpu access and before dma access, and we need
-to invalidate cache after dma access and before cpu access every time. Isn't
-that we are doing so now? I have a little knowledge about Desktop world so
-there might be my misunderstanding.
-
-Could you please give me advices and more comments if there is my missing
-point or misunderstanding?
-
-> For cpu access from kernel space we already have explicit mappings all
-> over the place (kmap&friends), so I don't see any issues with
-> inserting the relevant begin/end_cpu_access calls just around the cpu
-> access. The big exception is the framebuffer layer, but even that has
-> the deferred io support. KMS otoh has a nice frontbuffer dirty
-> interface to correctly support dumb clients, unfortunately fbcon does
-> not (yet) use that.
+> However, when the bit is not set, we do a static mapping of the
+> register area that allows to change the internal register address, we
+> change this address, and set this bit.
 > 
-> For these reasons I don't see a need to smash cache coherency and
-> fencing into one problem, and hence why I've proposed to tackle each
-> of them individually.
+> Note that this mechanism also needs cooperation from the earlyprintk
+> addruart handler (in arch/arm/include/debug/mvebu.S). This is where
+> things get complex: the CP15 bit that has been chosen gets reset to
+> zero at the first call to the 'wfi' instruction. So it cannot be used
+> during the entire life of the system. Instead, whenever the ->map_io()
+> function has switched to the internal register space to the new
+> address, it sets a global variable 'mvebu_switched_regs', which the
+> earlyprintk reads. If it's true, then the move has already been done
+> and there is no need to read the CP15 register. If
+> 'mvebu_switched_regs' is false, we are before the register move, so we
+> need to read the CP15 bit to find out whether we're being booted from
+> an old bootloader (which mapped the register space at 0xd0000000) or a
+> new bootloader (which mapped the register space at 0xf1000000).
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
-I might be really missing some points :)
+Hi Thomas
 
-Thanks,
-Inki Dae
+Thanks for making the small changes i requested.
 
-> -Daniel
-> --
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> +41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+	  Andrew
+
+
+
+> ---
+>  arch/arm/boot/dts/armada-370-xp.dtsi |    2 +-
+>  arch/arm/boot/dts/armada-370.dtsi    |    3 +-
+>  arch/arm/boot/dts/armada-xp-gp.dts   |    2 +-
+>  arch/arm/include/debug/mvebu.S       |   77 +++++++++++++++++++++++--
+>  arch/arm/mach-mvebu/armada-370-xp.c  |  105 ++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-mvebu/armada-370-xp.h  |    2 +-
+>  6 files changed, 181 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+> index 52a1f5e..95ec049 100644
+> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
+> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+> @@ -33,7 +33,7 @@
+>  		#size-cells = <1>;
+>  		compatible = "simple-bus";
+>  		interrupt-parent = <&mpic>;
+> -		ranges = <0          0 0xd0000000 0x0100000 /* internal registers */
+> +		ranges = <0          0 0xf1000000 0x0100000 /* internal registers */
+>  			  0xe0000000 0 0xe0000000 0x8100000 /* PCIe */>;
+>  
+>  		internal-regs {
+> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
+> index aee2b18..030e425 100644
+> --- a/arch/arm/boot/dts/armada-370.dtsi
+> +++ b/arch/arm/boot/dts/armada-370.dtsi
+> @@ -29,8 +29,9 @@
+>  	};
+>  
+>  	soc {
+> -		ranges = <0          0xd0000000 0x0100000 /* internal registers */
+> +		ranges = <0          0xf1000000 0x0100000 /* internal registers */
+>  			  0xe0000000 0xe0000000 0x8100000 /* PCIe */>;
+> +
+>  		internal-regs {
+>  			system-controller at 18200 {
+>  				compatible = "marvell,armada-370-xp-system-controller";
+> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
+> index 3ee63d1..8fb1679 100644
+> --- a/arch/arm/boot/dts/armada-xp-gp.dts
+> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
+> @@ -39,7 +39,7 @@
+>  	};
+>  
+>  	soc {
+> -		ranges = <0          0 0xd0000000 0x100000
+> +		ranges = <0          0 0xf1000000 0x100000
+>  			  0xf0000000 0 0xf0000000 0x1000000>;
+>  
+>  		internal-regs {
+> diff --git a/arch/arm/include/debug/mvebu.S b/arch/arm/include/debug/mvebu.S
+> index df191af..ec875c4 100644
+> --- a/arch/arm/include/debug/mvebu.S
+> +++ b/arch/arm/include/debug/mvebu.S
+> @@ -5,20 +5,85 @@
+>   *
+>   * Lior Amsalem <alior@marvell.com>
+>   * Gregory Clement <gregory.clement@free-electrons.com>
+> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+>   * published by the Free Software Foundation.
+>  */
+>  
+> -#define ARMADA_370_XP_REGS_PHYS_BASE	0xd0000000
+> -#define ARMADA_370_XP_REGS_VIRT_BASE	0xfec00000
+> +#define ARMADA_370_XP_UART_PHYS_BASE_OLD	0xd0012000
+> +#define ARMADA_370_XP_UART_PHYS_BASE_NEW	0xf1012000
+> +#define ARMADA_370_XP_UART_VIRT_BASE_OLD	0xfec12000
+> +#define ARMADA_370_XP_UART_VIRT_BASE_NEW	0xfea12000
+>  
+>  	.macro	addruart, rp, rv, tmp
+> -	ldr	\rp, =ARMADA_370_XP_REGS_PHYS_BASE
+> -	ldr	\rv, =ARMADA_370_XP_REGS_VIRT_BASE
+> -	orr	\rp, \rp, #0x00012000
+> -	orr	\rv, \rv, #0x00012000
+> +
+> +#ifndef ZIMAGE
+> +	/*
+> +	 * This loads the value of mvebu_switched_regs. We need a
+> +	 * little bit of gymnastic here to handle the fact that the
+> +	 * addruart code is duplicated in different places, and called
+> +	 * sometimes with the MMU disabled, sometimes the MMU enabled.
+> +	 *
+> +	 * Notice that when this earlyprintk code is linked into the
+> +	 * kernel decompressor (i.e ZIMAGE is defined), this code isn't
+> +	 * compiled. The reason is because the global mvebu_switched_regs
+> +	 * variable is not available in the decompressor code. At this
+> +	 * early stage, we simply test the CP15 bit (below) to know where
+> +	 * the internal registers are.
+> +	 */
+> +	adr	\rp, addruart_switched_regs_\@
+> +	ldr	\rv, [\rp]
+> +	sub	\rv, \rv, \rp
+> +	ldr	\rp, [\rp, #4]
+> +	sub	\tmp, \rp, \rv
+> +	ldr	\rp, [\tmp, #0]
+> +	cmp	\rp, #0
+> +
+> +	/* If we have already switched, then use the new register
+> +	   address */
+> +	bne	addruart_new_\@
+> +#endif
+> +
+> +	/*
+> +	 * We haven't switched the register location, so test the CP15
+> +	 * register bit to find whether we are:
+> +	 * - with an old bootloader setting the base address to
+> +	 *   0xd0000000
+> +	 * - with a new bootloader that has already set the
+> +	 *   base address to 0xf1000000
+> +	 * We adapt the physical address returned depending on the
+> +	 * value of this bit, but also the virtual address, because we
+> +	 * can't remap the old physical address and the new physical
+> +	 * address at the same location.
+> +	 */
+> +	mrc	p15, 0, \tmp, c5, c0, 0
+> +	and	\tmp, \tmp, #(1 << 11)
+> +	cmp	\tmp, #0
+> +	bne	addruart_new_\@
+> +
+> +addruart_old_\@:
+> +	ldr	\rp, =ARMADA_370_XP_UART_PHYS_BASE_OLD
+> +	ldr	\rv, =ARMADA_370_XP_UART_VIRT_BASE_OLD
+> +	b	addruart_out_\@
+> +addruart_new_\@:
+> +	ldr	\rp, =ARMADA_370_XP_UART_PHYS_BASE_NEW
+> +	ldr	\rv, =ARMADA_370_XP_UART_VIRT_BASE_NEW
+> +	b	addruart_out_\@
+> +
+> +#ifndef ZIMAGE
+> +	/*
+> +	 * Global variable mvebu_switched_regs not visible in the
+> +	 * decompressor code
+> +	 */
+> +	.align
+> +addruart_switched_regs_\@:
+> +	.long	.
+> +	.long	mvebu_switched_regs
+> +#endif
+> +
+> +addruart_out_\@:
+>  	.endm
+>  
+>  #define UART_SHIFT	2
+> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+> index c1c0556..752eedd 100644
+> --- a/arch/arm/mach-mvebu/armada-370-xp.c
+> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
+> @@ -28,8 +28,113 @@
+>  #include "common.h"
+>  #include "coherency.h"
+>  
+> +/*
+> + * Note on the internal register address.
+> + *
+> + * On Marvell platforms, the "internal registers" is a window of 1 MB
+> + * of the physical address space that contains all the registers for
+> + * the various peripherals of the SoC (timers, interrupt controllers,
+> + * GPIO controllers, Ethernet, etc.). The base address of this 1 MB
+> + * window is configurable, and this base address is configured using a
+> + * register that is itself part of this window.
+> + *
+> + * All earlier families of Marvell EBU SoCs supported by Linux used
+> + * 0xf1000000 as the base address of the internal registers
+> + * window. For some reason, early versions of the Marvell 370/XP
+> + * platforms used 0xd0000000 as the base address. This base address is
+> + * set up by the bootloader. However, in order to keep as much
+> + * physical address space to address RAM below the 4 GB limit, we had
+> + * to switch the base address of the internal registers window back to
+> + * 0xf1000000, and we wanted to achieve that without breaking existing
+> + * platforms, where the bootloader was initially setting the base
+> + * address to 0xd0000000. So the kernel is responsible for switching
+> + * to 0xf1000000 when needed.
+> + *
+> + * One particular bit of a CP15 register has been chosen to indicate
+> + * whether we use an old bootloader (setting the address at
+> + * 0xd0000000) or a new bootloader (setting the address at
+> + * 0xf1000000). In the ->map_io() function, when the bit is already
+> + * set, there is nothing to do, we are already using a new bootloader
+> + * and internal registers are at 0xf1000000.
+> + *
+> + * However, when the bit is not set, we do a static mapping of the
+> + * register area that allows to change the internal register address
+> + * and we change this address.
+> + *
+> + * Once those steps are done, we set a global variable,
+> + * mvebu_switched_regs, that tells the earlyprintk code how to
+> + * behave. Note that this mechanism also needs cooperation from the
+> + * earlyprintk addruart handler (in arch/arm/include/debug/mvebu.S).
+> + */
+> +
+> +#define NEW_INTERNAL_REGS_ADDR  0xf1000000
+> +#define OLD_INTERNAL_REGS_ADDR  0xd0000000
+> +#define MBUS_OLD_PHYS_ADDR      (OLD_INTERNAL_REGS_ADDR + 0x20000)
+> +#define MBUS_OLD_VIRT_ADDR      0xfe9ff000
+> +#define  MBUS_INTERNAL_REGS_ADDR      0x80
+> +
+> +/*
+> + * We really want this variable to be part of the .data section,
+> + * because it gets accessed by the earlyprintk code before BSS gets
+> + * initialized to zero. This variable indicates whether the switch to
+> + * the new register has taken place or not. It is needed because the
+> + * CP15 bit used by the bootloader to tell the kernel where the
+> + * registers are mapped is cleared to 0 at the first 'wfi'
+> + * instruction. So we can't use it for the entire life of the system,
+> + * and we instead use this boolean to indicate to the earlyprintk code
+> + * that the switch has occured and it doesn't need to look at the CP15
+> + * bit anymore.
+> + */
+> +unsigned int __section(.data) mvebu_switched_regs = 0;
+> +
+> +/*
+> + * Detect if we're running an old bootloader that has set the physical
+> + * base address of internal registers to 0xd0000000
+> + */
+> +static int armada_370_xp_has_old_bootloader(void)
+> +{
+> +	u32 val;
+> +	asm volatile("mrc p15, 0, %0, c5, c0, 0" : "=r"(val));
+> +	return !(val & BIT(11));
+> +}
+> +
+>  static void __init armada_370_xp_map_io(void)
+>  {
+> +	if (armada_370_xp_has_old_bootloader()) {
+> +		struct map_desc desc;
+> +		void __iomem *mbus = IOMEM(MBUS_OLD_VIRT_ADDR);
+> +
+> +		desc.virtual = MBUS_OLD_VIRT_ADDR;
+> +		desc.pfn     = __phys_to_pfn(MBUS_OLD_PHYS_ADDR);
+> +		desc.length  = PAGE_SIZE;
+> +		desc.type    = MT_DEVICE;
+> +
+> +		/*
+> +		 * Map the area that contains the registers that
+> +		 * allows to change the base address of internal
+> +		 * registers.
+> +		 */
+> +		iotable_init(&desc, 1);
+> +
+> +		/*
+> +		 * Change the physical base address of the
+> +		 * registers. From now on, and until
+> +		 * debug_ll_io_init() is called below, it is not
+> +		 * possible to do any print, because using earlyprintk
+> +		 * would lead to memory writes to the old internal
+> +		 * registers, which would hang the CPU.
+> +		 */
+> +		writel(NEW_INTERNAL_REGS_ADDR, mbus + MBUS_INTERNAL_REGS_ADDR);
+> +	}
+> +
+> +	/*
+> +	 * Either the registers have been switched by the above code,
+> +	 * or the bootloader had already set the register space at the
+> +	 * right location. In both cases, tell the earlyprintk code it
+> +	 * can now use the new location.
+> +	 */
+> +	mvebu_switched_regs = 1;
+> +
+>  	debug_ll_io_init();
+>  }
+>  
+> diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
+> index 585e147..ff9adc4 100644
+> --- a/arch/arm/mach-mvebu/armada-370-xp.h
+> +++ b/arch/arm/mach-mvebu/armada-370-xp.h
+> @@ -15,7 +15,7 @@
+>  #ifndef __MACH_ARMADA_370_XP_H
+>  #define __MACH_ARMADA_370_XP_H
+>  
+> -#define ARMADA_370_XP_REGS_PHYS_BASE	0xd0000000
+> +#define ARMADA_370_XP_REGS_PHYS_BASE	0xf1000000
+>  
+>  /* These defines can go away once mvebu-mbus has a DT binding */
+>  #define ARMADA_370_XP_MBUS_WINS_BASE    (ARMADA_370_XP_REGS_PHYS_BASE + 0x20000)
+> -- 
+> 1.7.9.5
+> 
