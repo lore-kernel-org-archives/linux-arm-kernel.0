@@ -1,79 +1,49 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 23 May 2013 19:51:46 +0200
-Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
-In-Reply-To: <1369322904.4142.36.camel@weser.hi.pengutronix.de>
-References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
- <201305221305.09579.marex@denx.de> <201305230920.18200.jbe@pengutronix.de>
- <201305231648.17356.marex@denx.de>
- <1369322904.4142.36.camel@weser.hi.pengutronix.de>
-Message-ID: <519E5732.1040800@free-electrons.com>
+From: rpimentel.silva@gmail.com (Rogerio Pimentel)
+Date: Thu, 23 May 2013 14:53:57 -0300
+Subject: [PATCH 0/3] staging: fix parallel display regressions
+In-Reply-To: <1368787839.4011.4.camel@pizza.hi.pengutronix.de>
+References: <1368782393-9660-1-git-send-email-list-09_linuc_arm@tqsc.de>
+ <1368787839.4011.4.camel@pizza.hi.pengutronix.de>
+Message-ID: <CAOkaPuVhTPNgWXWw_vPu28ZdPjRVYsrodaumptUQpp5NMz+rOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 23/05/2013 17:28, Lucas Stach wrote:
-> Am Donnerstag, den 23.05.2013, 16:48 +0200 schrieb Marek Vasut:
->> Dear Juergen Beisert,
+On Fri, May 17, 2013 at 7:50 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> Hi Markus,
+>
+> Am Freitag, den 17.05.2013, 11:19 +0200 schrieb Markus Niebel:
+>> From: Markus Niebel <Markus.Niebel@tqs.de>
 >>
->>> Hi Marek,
->>>
->>> Marek Vasut wrote:
->>>>>> i2c slowness is a different issue.
->>>>> Same happens here for my i.M23 based platform. It seems the PIO mode
->>>>> does not work, or at least not like it works on a i.MX28. Each short
->>>>> transfer needs about one second (without an error message) but does
->>>>> not send anything on the I2C lines.
->>>>>
->>>>> I need the following patches to make I2C master work within a 3.10-rc2
->>>>> kernel:
->>>>>
->>>>> Subject: [PATCH] I2C/MXS: distinguish i.MX23 and i.MX28 based I2C
->>>> I'm all for it, but then ... won't it be better if you actually fixed the
->>>> PIO and mixed-mode on MX23 instead of implementing such hack?
->>> If the PIO mode or my patch is a hack depends on the point of view: Lucas
->>> told me the PIO mode is *mentioned* but *not specified* in the
->>> i.MX23/i.MX28 datasheets.
->> The PIO works the same way DMA does -- set up bits and then pump data into the 
->> DATA register. 
->>> So, the PIO mode seems to depend on some undocumented status bits in the
->>> i.MX28 I2C controller implementation.
->> How would DMA work then if it used undocumented registers ? It's in the 
->> documentation, just read it or ask FSL ;-)
+>> Support for VGA via TVE on iMX53 causes  regression, which prevents
+>> parallel display from working. This series brings the parallel display
+>> functionality back.
 >>
-> While the PIO mode might use the same controller mechanisms as the DMA
-> mode, PIO mode is _not_ a documented mode of operation for the i.MX23.
+>> Tested on a modified v3.9 with TQMa53 module and compile tested with
+>> v3.10-rc1.
+>>
+>> Markus Niebel (3):
+>>   staging: drm/imx: set correct sync pins for parallel display
+>>   staging: drm/imx: fix spelling error for vsync flag config
+>>   staging: drm/imx: revert vsync_cnt for di->id 1
+>>
+>>  drivers/staging/imx-drm/ipu-v3/ipu-di.c    |   13 +++++++++----
+>>  drivers/staging/imx-drm/parallel-display.c |    4 ++--
+>>  2 files changed, 11 insertions(+), 6 deletions(-)
 >
-> To quote the i.MX28 RM: "The I2C block on the i.MX28 supports a new PIO
-> mode or soft-DMA mode.", which implies the PIO mode to be a new mode of
-> operation not found on earlier i.MX SoCs.
-> The doc is slightly fuzzy here as the i.MX23 RM in contrary states:
-> "Short transmission (up to three bytes plus address) can be easily
-> triggered using only PIO operations, i.e., no DMA setup required." But
-> again it's not a documented mode of operation, i.MX23 doc only describes
-> the DMA mode.
+> thank you for posting the patches! I can confirm that they fix the
+> issues of incorrect signal generation on IPU display interface 1,
+> caused by my TVE patch series.
 >
-> So while we _might_ be able to get the PIO mode to work on the i.MX23
-> there is nothing in the doc stating that it's even meant to work. Even
-> while PIO and DMA mode use the same internal mechanisms, there's still
-> plenty of opportunities of fail in there. After all PIO mode relies on
-> reading a debug register in the course of normal operation.
+> Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
 >
-> Only more extensive experimentation could show if we are in fact able to
-> make it work, a first shot of using PIO mode on MX23 failed, so it might
-> as well be that Juergens quick fix is correct and we have to disable PIO
-> mode on MX23 altogether. That said please stop slapping the word "hack"
-> over this patch until proven otherwise.
+> regards
+> Philipp
+>
 
-Still, Fabio and I have been experiencing the one second delay on
-i.mx28. From my experience, it appeared between 3.7 and 3.9, see:
-http://www.spinics.net/lists/linux-i2c/msg11985.html. I still didn't
-take the time to investigate more yet but it confirms that PIO mode is
-working on i.mx28 though with an annoying delay.
+With these patches I was able to enable the parallel display on i.MX53 QSB.
+It works.
 
-Regards,
+Tested-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Rgds
+Rogerio Pimentel
