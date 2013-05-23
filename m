@@ -1,56 +1,40 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 23 May 2013 16:41:25 +0200
-Subject: [PATCH v2 0/6] Support new Marvell bootloaders for Armada 370/XP
-In-Reply-To: <1369315854-32724-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1369315854-32724-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <519E2A95.1040600@free-electrons.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 May 2013 15:44:53 +0100
+Subject: [PATCH] regulator: ab8500-ext: Don't register without
+ initialisation data
+In-Reply-To: <20130523142419.GG2412@sirena.org.uk>
+References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
+ <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
+ <20130522155347.GJ1627@sirena.org.uk>
+ <20130522165353.GB18714@gmail.com>
+ <20130522174516.GT1627@sirena.org.uk>
+ <20130523070905.GD18714@gmail.com>
+ <20130523142419.GG2412@sirena.org.uk>
+Message-ID: <20130523144453.GL22683@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-On 05/23/2013 03:30 PM, Thomas Petazzoni wrote:
+On Thu, 23 May 2013, Mark Brown wrote:
 
-[...]
-
-> Best regards,
+> On Thu, May 23, 2013 at 08:09:05AM +0100, Lee Jones wrote:
+> > On Wed, 22 May 2013, Mark Brown wrote:
 > 
-> Thomas
+> > > OK, so the regulator driver is buggy and insisting on having constraints
+> > > passed in for every regulator then?
 > 
-> Thomas Petazzoni (6):
->   arm: mvebu: remove dependency of SMP init on static I/O mapping
->   arm: mvebu: avoid hardcoded virtual address in coherency code
->   arm: mvebu: move cache and mvebu-mbus initialization later
->   arm: mvebu: remove hardcoded static I/O mapping
->   arm: mvebu: don't hardcode a physical address in headsmp.S
->   arm: mvebu: support new bootloaders shipped by Marvell
-
-I have already reviewed it internally. All the changes are really
-limited to mvebu and do not impact any other subsystem. So you
-have my acked-by, and once Jason Cooper will have given his Acked-by,
-then I think we will be able to apply the series on mvebu/ branches.
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
+> > If that's not how it's meant to work then, yes.
 > 
->  arch/arm/boot/dts/armada-370-xp.dtsi |    2 +-
->  arch/arm/boot/dts/armada-370.dtsi    |    3 +-
->  arch/arm/boot/dts/armada-xp-gp.dts   |    2 +-
->  arch/arm/include/debug/mvebu.S       |   77 +++++++++++++++++++--
->  arch/arm/mach-mvebu/armada-370-xp.c  |  124 +++++++++++++++++++++++++++++-----
->  arch/arm/mach-mvebu/armada-370-xp.h  |    4 +-
->  arch/arm/mach-mvebu/coherency.c      |   36 ++++------
->  arch/arm/mach-mvebu/coherency.h      |    4 --
->  arch/arm/mach-mvebu/common.h         |    2 +
->  arch/arm/mach-mvebu/headsmp.S        |   20 +++---
->  arch/arm/mach-mvebu/platsmp.c        |   10 ++-
->  11 files changed, 220 insertions(+), 64 deletions(-)
-> 
+> Yes, that's the intention - it should be possible to just not pass in
+> anything in and have the driver start up in read only mode (partly to
+> save having to do things like what you're doing).
 
+Okay, noted.
+
+Well, whatever happens I'm going to be able to refactor the driver in
+the -rc:s, so we still need this fix, or the world will end.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
