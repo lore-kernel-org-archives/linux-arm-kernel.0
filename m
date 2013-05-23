@@ -1,23 +1,45 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 24 May 2013 01:09:46 +0200
-Subject: [PATCH 4/6] i2c: stu300: do not request a specific clock name
-In-Reply-To: <1369330288-14856-5-git-send-email-linus.walleij@stericsson.com>
-References: <1369330288-14856-1-git-send-email-linus.walleij@stericsson.com>
- <1369330288-14856-5-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130523230943.GA3645@katana>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 May 2013 00:09:11 +0100
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on
+ Armada 370/XP
+In-Reply-To: <201305232240.03959.arnd@arndb.de>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130523142301.10dbeff9@skate>
+ <20130523202643.GQ18614@n2100.arm.linux.org.uk>
+ <201305232240.03959.arnd@arndb.de>
+Message-ID: <20130523230911.GR18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 07:31:26PM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, May 23, 2013 at 10:40:03PM +0200, Arnd Bergmann wrote:
+> On Thursday 23 May 2013, Russell King - ARM Linux wrote:
+> > On Thu, May 23, 2013 at 02:23:01PM +0200, Thomas Petazzoni wrote:
+> > > But that's not the case. Neither the old nor the new bootloaders are
+> > > changing the Device Tree in any way that allows us to know whether
+> > > registers are mapped at 0xd0 and 0xf1.
+> > 
+> > Who provides this DT blob?  Is it already provided with the board, or
+> > is it something which is provided by others?
 > 
-> We have used the default clock associated with the block
-> for a long time, only heuristics in the clock system has
-> made this work anyway. This needs to be done away with as
-> we start probing this driver and its clocks exclusively
-> from the device tree.
+> In theory, the board could provide the DT, but we would always be able
+> to provide an updated DT blob if necessary. In practice, the DT blob at
+> the moment is always shipped alongside the kernel, as some interfaces
+> (e.g. the mbus or pci in case of mvebu) are not final yet.
 > 
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> The boot loader has ways to modify that blob in memory, in order to
+> pass the information that traditionally is in the ATAGS and other things
+> like a board specific MAC address. It is straightforward for the bootloader
+> to update properties like the location of the internal registers, once
+> we have specified the binding for the mbus, but not until then.
+> 
+> For older boot loaders that only support ATAGS, the update of the DT
+> blob happens inside of the kernel in arch/arm/boot/compressed/atags_to_fdt.c
+> on the blob that is appended to the zImage.
 
-Acked-by: Wolfram Sang <wsa@the-dreams.de>
+*Sigh*
+
+No, I'm not asking about the principle.  I'm asking _in this particular
+problem case_ who provides the DT blob?
+
+So the person to answer that question is Thomas or someone who is using
+the boards concerned.
