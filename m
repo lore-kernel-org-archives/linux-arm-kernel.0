@@ -1,75 +1,55 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 23 May 2013 12:26:01 +0200
-Subject: [PATCH 1/3] ARM: at91: move at91 aic driver to drivers/irqchip
-In-Reply-To: <20130523122000.22a9a4d0@skate>
-References: <1369299909-10078-1-git-send-email-b.brezillon@overkiz.com>
- <1369299909-10078-2-git-send-email-b.brezillon@overkiz.com>
- <20130523090611.GG9937@game.jcrosoft.org>
- <519DE6A8.6040502@overkiz.com> <20130523120920.1df8e23a@skate>
- <20130523100951.GH9937@game.jcrosoft.org>
- <20130523122000.22a9a4d0@skate>
-Message-ID: <20130523102601.GI9937@game.jcrosoft.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 May 2013 11:29:34 +0100
+Subject: [PATCH] arch: configuration, deleting 'CONFIG_BUG' since
+ always need it.
+In-Reply-To: <878v369fdd.fsf@xmission.com>
+References: <519DCBEF.3090208@asianux.com>
+ <20130523090534.GJ18614@n2100.arm.linux.org.uk>
+ <CAMuHMdWez-j1Maa3BD7ucmzv0_zFJnChERQiHFmkCaZUzG0_AA@mail.gmail.com>
+ <201305231139.38233.arnd@arndb.de> <878v369fdd.fsf@xmission.com>
+Message-ID: <20130523102934.GN18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:20 Thu 23 May     , Thomas Petazzoni wrote:
-> Dear Jean-Christophe PLAGNIOL-VILLARD,
+On Thu, May 23, 2013 at 03:09:50AM -0700, Eric W. Biederman wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
 > 
-> On Thu, 23 May 2013 12:09:51 +0200, Jean-Christophe PLAGNIOL-VILLARD
-> wrote:
+> > On Thursday 23 May 2013, Geert Uytterhoeven wrote:
+> >> > The problem is: trying to fix that will mean the result is a larger
+> >> > kernel than if you just do the usual arch-implemented thing of placing
+> >> > an defined faulting instruction at the BUG() site - which defeats the
+> >> > purpose of turning off CONFIG_BUG.
+> >> 
+> >> Is __builtin_unreachable() working well these days?
+> >> 
+> >
+> > Hmm, I just tried the trivial patch below, which seemed to do the right thing.
+> > Needs a little more investigation, but that might actually be the correct
+> > solution. I thought that at some point __builtin_unreachable() was the same
+> > as "do {} while (1)", but this is not the case with the gcc I was using --
+> > it just tells gcc that we don't expect to ever get here.
 > 
-> > > You can put it in <linux/irqchip/at91-aic.h>, there are already a few
-> > > headers there. But I think it's not the right solution.
-> > > 
-> > > *However*, ideally, this header should disappear completely. All the
-> > > register defines should go directly into the driver C file. The only
-> > > usage of the AIC defines outside of the IRQ driver are for debug prints
-> > > in the pm.c code, which I think you could get rid of.
-> > > 
-> > > Ditto for the at91_aic_{read,write} macros.
-> > > 
-> > > The NR_AIC5_IRQS can also move to the driver itself.
-> > > 
-> > > The only remaining one would be NR_AIC_IRQS, you can't get rid of it,
-> > > because it's used for the IRQ priority arrays. But I believe keeping
-> > > this one in <linux/irqchip/at91-aic.h> is reasonable.
-> > 
-> > do want either as we expose the register acces for pm & co
+> Yes.
 > 
-> Did you read what I write? In arch/arm/mach-at91/pm.c, the only
-> accesses made to the AIC registers are for pr_debug() calls, i.e only
-> to print some debugging messages. I believe those ones can simply be
-> removed to decouple the pm.c code from the irq.c code.
+> We already have this abstracted in compiler.h as the macro unreachable,
+> so the slight modification of your patch below should handle this case.
+> 
+> For compilers without __builtin_unreachable() unreachable() expands to
+> do {} while(1) but an infinite loop seems reasonable and preserves the
+> semantics of the code, unlike the current noop that is do {} while(0).
 
-yes I read and yes I do not want to move code before we do cleanup MANDATORY
+Semantics of the code really don't come in to it if you use unreachable().
+unreachable() is an effective do { } while (0) to the compiler.  It just
+doesn't warn about it anymore.  It's actually worse than that - it's
+permission to the compiler to just stop considering flow control at that
+point and do anything it likes with the following instruction slot.
 
-unclean code in mach-at91 is fine this is legacy, move them arround NACK
+What __builtin_unreachable() means to the compiler is "we will *never*
+get here".  That isn't the case for BUG() - BUG() means "we hope that
+we will never get here, but we might, and if we do your data is in
+grave danger."
 
-we cleanup first
-> 
-> > until this is cleanup NACK
-> 
-> Is this really the way we want to welcome contributions in the kernel
-> community?
-> 
-> Boris, what you'd have to do is just do a few preparations patches
-> in your patch set. Something like:
-> 
->  * PATCH 1: remove usage of AIC registers for debug messages in pm.c
-NACK I do want this debug, very usefull to debug pm
-
-Best Regards,
-J.
->  * PATCH 2: move all of at91_aic.h in irq.c, except NR_AIC_IRQS
->  * PATCH 3: move irq.c to drivers/irqchip/, and at91_aic.h to
->    include/linux/irqchip/, and adjust what's necessary
->  * and then your other patches.
-> 
-> Best regards,
-> 
-> Thomas
-> -- 
-> Thomas Petazzoni, Free Electrons
-> Kernel, drivers, real-time and embedded Linux
-> development, consulting, training and support.
-> http://free-electrons.com
+We should either have something at that point (like a call to a function
+which panics) or remove the ability to turn off CONFIG_BUG and anyone who
+cares about kernel size needs to come up with a single trapping
+instruction BUG() implementation.
