@@ -1,41 +1,51 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 23 May 2013 18:07:52 +0100
-Subject: [PATCH 05/11] mm: thp: Correct the HPAGE_PMD_ORDER check.
+Date: Thu, 23 May 2013 18:07:54 +0100
+Subject: [PATCH 07/11] ARM64: mm: Make PAGE_NONE pages read only and
+ no-execute.
 In-Reply-To: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
 References: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1369328878-11706-6-git-send-email-steve.capper@linaro.org>
+Message-ID: <1369328878-11706-8-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All Transparent Huge Pages are allocated by the buddy allocator.
+If we consider the following code sequence:
 
-A compile time check is in place that fails when the order of a
-transparent huge page is too large to be allocated by the buddy
-allocator. Unfortunately that compile time check passes when:
-HPAGE_PMD_ORDER == MAX_ORDER
-( which is incorrect as the buddy allocator can only allocate
-memory of order strictly less than MAX_ORDER. )
+	my_pte = pte_modify(entry, myprot);
+	x = pte_write(my_pte);
+	y = pte_exec(my_pte);
 
-This patch updates the compile time check to fail in the above
-case.
+If myprot comes from a PROT_NONE page, then x and y will both be
+true which is undesireable behaviour.
+
+This patch sets the no-execute and read-only bits for PAGE_NONE
+such that the code above will return false for both x and y.
 
 Signed-off-by: Steve Capper <steve.capper@linaro.org>
 ---
- include/linux/huge_mm.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/include/asm/pgtable.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/huge_mm.h b/include/linux/huge_mm.h
-index 528454c..26ee56c 100644
---- a/include/linux/huge_mm.h
-+++ b/include/linux/huge_mm.h
-@@ -123,7 +123,7 @@ extern void __split_huge_page_pmd(struct vm_area_struct *vma,
- 	} while (0)
- extern void split_huge_page_pmd_mm(struct mm_struct *mm, unsigned long address,
- 		pmd_t *pmd);
--#if HPAGE_PMD_ORDER > MAX_ORDER
-+#if HPAGE_PMD_ORDER >= MAX_ORDER
- #error "hugepages can't be allocated by the buddy allocator"
- #endif
- extern int hugepage_madvise(struct vm_area_struct *vma,
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index e333a24..77b09d6 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -66,7 +66,7 @@ extern pgprot_t pgprot_default;
+ 
+ #define _MOD_PROT(p, b)		__pgprot_modify(p, 0, b)
+ 
+-#define PAGE_NONE		__pgprot_modify(pgprot_default, PTE_TYPE_MASK, PTE_PROT_NONE)
++#define PAGE_NONE		__pgprot_modify(pgprot_default, PTE_TYPE_MASK, PTE_PROT_NONE | PTE_RDONLY | PTE_PXN | PTE_UXN)
+ #define PAGE_SHARED		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+ #define PAGE_SHARED_EXEC	_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN)
+ #define PAGE_COPY		_MOD_PROT(pgprot_default, PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_RDONLY)
+@@ -76,7 +76,7 @@ extern pgprot_t pgprot_default;
+ #define PAGE_KERNEL		_MOD_PROT(pgprot_default, PTE_PXN | PTE_UXN | PTE_DIRTY)
+ #define PAGE_KERNEL_EXEC	_MOD_PROT(pgprot_default, PTE_UXN | PTE_DIRTY)
+ 
+-#define __PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE)
++#define __PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_TYPE_MASK) | PTE_PROT_NONE | PTE_RDONLY | PTE_PXN | PTE_UXN)
+ #define __PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN)
+ #define __PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN)
+ #define __PAGE_COPY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_RDONLY)
 -- 
 1.8.1.4
