@@ -1,56 +1,117 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 23 May 2013 16:09:40 -0400 (EDT)
-Subject: [PATCH v7] arm: use built-in byte swap function
-In-Reply-To: <20130523114654.1f273241725205c6703b2226@freescale.com>
-References: <20130129181046.GC25415@pd.tnic>
- <alpine.LFD.2.02.1302082102380.6300@xanadu.home>
- <20130219203115.114eab79e8d2099c6306d921@freescale.com>
- <alpine.LFD.2.03.1302192151280.6419@syhkavp.arg>
- <1361356696.13482.269.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302200835380.6419@syhkavp.arg>
- <1361367842.13482.279.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302200905300.6419@syhkavp.arg>
- <1361372008.13482.280.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
- <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
- <alpine.LFD.2.03.1302202327370.6419@syhkavp.arg>
- <20130221005221.15279b1372501af12c1e4f32@freescale.com>
- <alpine.LFD.2.03.1302211134160.6419@syhkavp.arg>
- <20130221203327.6558f89277468f7ffffa6506@freescale.com>
- <alpine.LFD.2.03.1302212219100.6419@syhkavp.arg>
- <20130222194032.f7b44aefa5e2723d16767a1b@freescale.com>
- <1361661654.18110.102.camel@shinybook.infradead.org>
- <20130523114654.1f273241725205c6703b2226@freescale.com>
-Message-ID: <alpine.LFD.2.03.1305231607060.1918@syhkavp.arg>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Thu, 23 May 2013 23:13:58 +0300
+Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
+In-Reply-To: <519E67AD.6070702@gmail.com>
+References: <20130513205302.GA3157@blackmetal.musicnaut.iki.fi>
+ <20130516180933.GG5600@atomide.com>
+ <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
+ <20130516214430.GN5600@atomide.com>
+ <20130520174621.GI10378@atomide.com>
+ <20130521173936.GE31836@blackmetal.musicnaut.iki.fi>
+ <519BCCEC.8010303@gmail.com>
+ <20130522212054.GG31836@blackmetal.musicnaut.iki.fi>
+ <519E67AD.6070702@gmail.com>
+Message-ID: <20130523201358.GI31836@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 May 2013, Kim Phillips wrote:
-
-> Enable the compiler intrinsic for byte swapping on arch ARM.  This
-> allows the compiler to detect and be able to optimize out byte
-> swappings, and has a very modest benefit on vmlinux size (Linaro gcc
-> 4.8):
+On Thu, May 23, 2013 at 08:02:05PM +0100, Jon Hunter wrote:
+> On 22/05/13 22:20, Aaro Koskinen wrote:
+> > On Tue, May 21, 2013 at 08:37:16PM +0100, Jon Hunter wrote:
+> >> On 21/05/13 18:39, Aaro Koskinen wrote:
+> >>> On Mon, May 20, 2013 at 10:46:21AM -0700, Tony Lindgren wrote:
+> >>>> * Tony Lindgren <tony@atomide.com> [130516 14:50]:
+> >>>>> * Aaro Koskinen <aaro.koskinen@iki.fi> [130516 14:05]:
+> >>>>>> On Thu, May 16, 2013 at 11:09:34AM -0700, Tony Lindgren wrote:
+> >>>>>>> * Aaro Koskinen <aaro.koskinen@iki.fi> [130513 13:58]:
+> >>>>>>>> I tested 3.10-rc1 on OMAP1 / Nokia 770, and Retu MFD probe is broken:
+> >>>>>>>>
+> >>>>>>>> [    2.264221] retu-mfd 2-0001: Retu v3.2 found
+> >>>>>>>> [    2.281951] retu-mfd 2-0001: Failed to allocate IRQs: -12
+> >>>>>>>> [    2.300140] retu-mfd: probe of 2-0001 failed with error -12
+> >>>>>>>>
+> >>>>>>>> The error is coming from regmap code. According to git bisect, it is
+> >>>>>>>> caused by:
+> >>>>>>>>
+> >>>>>>>> 	commit ede4d7a5b9835510fd1f724367f68d2fa4128453
+> >>>>>>>> 	Author: Jon Hunter <jon-hunter@ti.com>
+> >>>>>>>> 	Date:   Fri Mar 1 11:22:47 2013 -0600
+> >>>>>>>>
+> >>>>>>>> 	    gpio/omap: convert gpio irq domain to linear mapping
+> >>>>>>>>
+> >>>>>>>> The commit does not anymore revert cleanly, and I haven't yet tried
+> >>>>>>>> crafting a manual revert, so any fix proposals/ideas are welcome...
+> >>>>>>>
+> >>>>>>> Hmm this might be a bit trickier to fix. Obviously the real solution
+> >>>>>>> is to convert omap1 to SPARSE_IRQ like we did for omap2+.
+> >>>>>>>
+> >>>>>>> For the -rc cycle, it might be possible to fix this by adding a
+> >>>>>>> different irq_to_gpio() and gpio_to_irq() functions for omap1.
+> >>>>>>
+> >>>>>> The commit reverts cleanly if we also revert
+> >>>>>> 3513cdeccc647d41c4a9ff923af17deaaac04a66 (gpio/omap: optimise interrupt
+> >>>>>> service routine), which seems to be just some minor optimization. The
+> >>>>>> result is below, and with it 770 works again.
+> >>>>>
+> >>>>> Hmm in this case it seems that we should just fix it rather than go back
+> >>>>> to the old code, so let's take a look at that first.
+> >>>>
+> >>>> Does the following fix it for you or do we need to fix something else
+> >>>> there too?
+> >>>
+> >>> Thanks, that fixes Retu probe on 770.
+> >>
+> >> Sorry for not responding sooner, but I have been moving. 
+> >>
+> >> From looking at the code it appears that the regmap_add_irq_chip()
+> >> is failing in the retu driver. I am not sure if this will work, 
+> >> but have you tried making the following change to the retu driver 
+> >> so that it also uses irq_domain_add_linear() as well? Just a thought ...
+> > 
+> > This will trigger WARNING: at drivers/base/regmap/regmap-irq.c:514.
 > 
->    text	   data	    bss	    dec	    hex	filename
-> 2840310	 123932	  61960	3026202	 2e2d1a	vmlinux-lart #orig
-> 2840152	 123932	  61960	3026044	 2e2c7c	vmlinux-lart #builtin-bswap
+> Sorry, there is another change needed. Can you try ...
+
+I will try this. However, I would also like to point out that Retu works
+fine on N800/N810 (OMAP2). If the problem is in Retu, why only OMAP1
+is affected?
+
+A.
+
+> diff --git a/drivers/mfd/retu-mfd.c b/drivers/mfd/retu-mfd.c
+> index a183098..9080cd6 100644
+> --- a/drivers/mfd/retu-mfd.c
+> +++ b/drivers/mfd/retu-mfd.c
+> @@ -267,14 +267,13 @@ static int retu_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
+>         if (ret < 0)
+>                 return ret;
+>  
+> -       ret = regmap_add_irq_chip(rdev->regmap, i2c->irq, IRQF_ONESHOT, -1,
+> +       ret = regmap_add_irq_chip(rdev->regmap, i2c->irq, IRQF_ONESHOT, 0,
+>                                   rdat->irq_chip, &rdev->irq_data);
+>         if (ret < 0)
+>                 return ret;
+>  
+>         ret = mfd_add_devices(rdev->dev, -1, rdat->children, rdat->nchildren,
+> -                             NULL, regmap_irq_chip_get_base(rdev->irq_data),
+> -                             NULL);
+> +                             NULL, 0, regmap_irq_get_domain(rdev->irq_data));
+>         if (ret < 0) {
+>                 regmap_del_irq_chip(i2c->irq, rdev->irq_data);
+>                 return ret;
+>  
+> > Also other drivers report GPIO IRQ issues later in the boot, e.g.
+> > 
+> > [    3.907928] genirq: Flags mismatch irq 0. 00000001 (serial wakeup) vs. 00002000 (RETU)
+> > [    3.923706] No interrupt for UART wake GPIO: 37
 > 
-> 6473120	 314840	5616016	12403976 bd4508	vmlinux-mxs #orig
-> 6472586	 314848	5616016	12403450 bd42fa	vmlinux-mxs #builtin-bswap
+> Looks like the gpio is just conflicting with the RETU driver.
+>  
+> > With Tony's patch (without any Retu modifications), the boot is clean. So
+> > I guess gpio-omap fix is needed.
 > 
-> 7419872	 318372	 379556	8117800	 7bde28	vmlinux-imx_v6_v7 #orig
-> 7419170	 318364	 379556	8117090	 7bdb62	vmlinux-imx_v6_v7 #builtin-bswap
+> Ideally it would be good if the RETU can use linear domains and then may be this
+> can be avoided.
 > 
-> Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
-> Reviewed-by: Nicolas Pitre <nico@linaro.org>
-> Acked-by: David Woodhouse <David.Woodhouse@intel.com>
-> ---
-> resending as v6 appears to have fallen though the cracks.  Russell?
-
-Please send your patch to Russell's patch system:
-
-http://www.arm.linux.org.uk/developer/patches/
-
-
-Nicolas
+> Cheers
+> Jon
