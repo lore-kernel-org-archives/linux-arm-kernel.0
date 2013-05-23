@@ -1,29 +1,35 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 23 May 2013 09:29:16 -0700
-Subject: [PATCH] input: sirfsoc_pwrc: add onkey input driver for CSR
- SiRFprimaII PWRC
-In-Reply-To: <AAD401B65941D44692B7183E6577180803A11B7C@banasiexm01.ASIA.ROOT.PRI>
-References: <1369239198-11059-1-git-send-email-Baohua.Song@csr.com>
- <AAD401B65941D44692B7183E6577180803A11B7C@banasiexm01.ASIA.ROOT.PRI>
-Message-ID: <20130523162916.GB15494@core.coreip.homeip.net>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 23 May 2013 10:46:54 -0600
+Subject: [PATCH 0/4] Marvell PCIe driver improvements
+In-Reply-To: <20130523001353.GH31625@1wt.eu>
+References: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130523001353.GH31625@1wt.eu>
+Message-ID: <20130523164654.GA31281@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Madhvapathi,
+On Thu, May 23, 2013 at 02:13:53AM +0200, Willy Tarreau wrote:
+> Hi Thomas,
+> 
+> On Wed, May 22, 2013 at 03:12:34PM +0200, Thomas Petazzoni wrote:
+> > Bjorn, Jason, Andrew, Gregory,
+> > 
+> > You'll find in this patch series 4 small patches that make various
+> > improvements to the Marvell PCIe driver.
+> (...)
+> 
+> FWIW, these patches applied on top of your pcie-v10 tree have made
+> my mini-pcie dual-nic appear for the first time on the mirabox. Till
+> now I never knew if it was a hardware or software issue since the NIC
+> does not appear in u-boot nor lspci, whatever the kernel versions,
+> including the original Marvell one's. The NIC has two functions (one
+> per controller) and no bridge, so it may be a side effect of your
+> improvements (or maybe you fixed a bug).
 
-On Thu, May 23, 2013 at 01:49:10PM +0000, Madhvapathi Sriram wrote:
-> Possible mem leak here not freeing any allocated devices/memory/irq.
-> I suggest all the error handling be collated at the end of this
-> function for various stages and error handling be done there.
-> Please have a look at
-> https://www.kernel.org/doc/Documentation/input/input-programming.txt
+There was some talk earlier that some buggy chips required their
+device number to be 0. I'm guessing Thomas's change to ensure that
+always happens by moving the device number of the internal device is
+the root fix here?
 
-Please note that the driver uses managed resources which get cleaned
-automatically.
-
-Also, could you please use a sane mailer that wraps long lines properly.
-
-Thanks.
-
--- 
-Dmitry
+Regards,
+Jason
