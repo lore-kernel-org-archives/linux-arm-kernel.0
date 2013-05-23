@@ -1,109 +1,113 @@
-From: jgchunter@gmail.com (Jon Hunter)
-Date: Thu, 23 May 2013 20:02:05 +0100
-Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
-In-Reply-To: <20130522212054.GG31836@blackmetal.musicnaut.iki.fi>
-References: <20130513205302.GA3157@blackmetal.musicnaut.iki.fi>
- <20130516180933.GG5600@atomide.com>
- <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
- <20130516214430.GN5600@atomide.com> <20130520174621.GI10378@atomide.com>
- <20130521173936.GE31836@blackmetal.musicnaut.iki.fi>
- <519BCCEC.8010303@gmail.com>
- <20130522212054.GG31836@blackmetal.musicnaut.iki.fi>
-Message-ID: <519E67AD.6070702@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 May 2013 21:34:22 +0200
+Subject: [GIT PULL] ux500 DMA40 device tree migration base
+Message-ID: <CACRpkdZjr=48_GJxsoYgK7DFUqLs10x4o9yky3MzNR7vh24ogA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi ARM SoC folks,
 
-On 22/05/13 22:20, Aaro Koskinen wrote:
-> On Tue, May 21, 2013 at 08:37:16PM +0100, Jon Hunter wrote:
->> On 21/05/13 18:39, Aaro Koskinen wrote:
->>> On Mon, May 20, 2013 at 10:46:21AM -0700, Tony Lindgren wrote:
->>>> * Tony Lindgren <tony@atomide.com> [130516 14:50]:
->>>>> * Aaro Koskinen <aaro.koskinen@iki.fi> [130516 14:05]:
->>>>>> On Thu, May 16, 2013 at 11:09:34AM -0700, Tony Lindgren wrote:
->>>>>>> * Aaro Koskinen <aaro.koskinen@iki.fi> [130513 13:58]:
->>>>>>>> I tested 3.10-rc1 on OMAP1 / Nokia 770, and Retu MFD probe is broken:
->>>>>>>>
->>>>>>>> [    2.264221] retu-mfd 2-0001: Retu v3.2 found
->>>>>>>> [    2.281951] retu-mfd 2-0001: Failed to allocate IRQs: -12
->>>>>>>> [    2.300140] retu-mfd: probe of 2-0001 failed with error -12
->>>>>>>>
->>>>>>>> The error is coming from regmap code. According to git bisect, it is
->>>>>>>> caused by:
->>>>>>>>
->>>>>>>> 	commit ede4d7a5b9835510fd1f724367f68d2fa4128453
->>>>>>>> 	Author: Jon Hunter <jon-hunter@ti.com>
->>>>>>>> 	Date:   Fri Mar 1 11:22:47 2013 -0600
->>>>>>>>
->>>>>>>> 	    gpio/omap: convert gpio irq domain to linear mapping
->>>>>>>>
->>>>>>>> The commit does not anymore revert cleanly, and I haven't yet tried
->>>>>>>> crafting a manual revert, so any fix proposals/ideas are welcome...
->>>>>>>
->>>>>>> Hmm this might be a bit trickier to fix. Obviously the real solution
->>>>>>> is to convert omap1 to SPARSE_IRQ like we did for omap2+.
->>>>>>>
->>>>>>> For the -rc cycle, it might be possible to fix this by adding a
->>>>>>> different irq_to_gpio() and gpio_to_irq() functions for omap1.
->>>>>>
->>>>>> The commit reverts cleanly if we also revert
->>>>>> 3513cdeccc647d41c4a9ff923af17deaaac04a66 (gpio/omap: optimise interrupt
->>>>>> service routine), which seems to be just some minor optimization. The
->>>>>> result is below, and with it 770 works again.
->>>>>
->>>>> Hmm in this case it seems that we should just fix it rather than go back
->>>>> to the old code, so let's take a look at that first.
->>>>
->>>> Does the following fix it for you or do we need to fix something else
->>>> there too?
->>>
->>> Thanks, that fixes Retu probe on 770.
->>
->> Sorry for not responding sooner, but I have been moving. 
->>
->> From looking at the code it appears that the regmap_add_irq_chip()
->> is failing in the retu driver. I am not sure if this will work, 
->> but have you tried making the following change to the retu driver 
->> so that it also uses irq_domain_add_linear() as well? Just a thought ...
-> 
-> This will trigger WARNING: at drivers/base/regmap/regmap-irq.c:514.
+here is a patch set that Lee has been chiseling out recently. I've
+accumulated it in my ux500 tree and piled ACKs on the first 36
+patches of the patch set. Basically that includes ACKs from
+subsystem maintainers Vinod Koul and Herbert Xu for affected
+parts.
 
-Sorry, there is another change needed. Can you try ...
+We need to get this into Linux-next to proceed with further
+migration on top of it. All have been circulated on the lists for
+a while.
 
-diff --git a/drivers/mfd/retu-mfd.c b/drivers/mfd/retu-mfd.c
-index a183098..9080cd6 100644
---- a/drivers/mfd/retu-mfd.c
-+++ b/drivers/mfd/retu-mfd.c
-@@ -267,14 +267,13 @@ static int retu_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
-        if (ret < 0)
-                return ret;
- 
--       ret = regmap_add_irq_chip(rdev->regmap, i2c->irq, IRQF_ONESHOT, -1,
-+       ret = regmap_add_irq_chip(rdev->regmap, i2c->irq, IRQF_ONESHOT, 0,
-                                  rdat->irq_chip, &rdev->irq_data);
-        if (ret < 0)
-                return ret;
- 
-        ret = mfd_add_devices(rdev->dev, -1, rdat->children, rdat->nchildren,
--                             NULL, regmap_irq_chip_get_base(rdev->irq_data),
--                             NULL);
-+                             NULL, 0, regmap_irq_get_domain(rdev->irq_data));
-        if (ret < 0) {
-                regmap_del_irq_chip(i2c->irq, rdev->irq_data);
-                return ret;
- 
-> Also other drivers report GPIO IRQ issues later in the boot, e.g.
-> 
-> [    3.907928] genirq: Flags mismatch irq 0. 00000001 (serial wakeup) vs. 00002000 (RETU)
-> [    3.923706] No interrupt for UART wake GPIO: 37
+Please pull this into an apropriate ARM SoC branch for v3.11!
 
-Looks like the gpio is just conflicting with the RETU driver.
- 
-> With Tony's patch (without any Retu modifications), the boot is clean. So
-> I guess gpio-omap fix is needed.
+If we can get ACKs for the rest of the patches in Lee's set these
+will arrive on top of this base as soon as they are ready.
 
-Ideally it would be good if the RETU can use linear domains and then may be this
-can be avoided.
+Yours,
+Linus Walleij
 
-Cheers
-Jon
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-dma40-for-arm-soc
+
+for you to fetch changes up to 95e4bf98520c9a92cd1b87d12c89e8c60c5fe2ca:
+
+  ARM: ux500: Register Cryp and Hash platform drivers on Snowball
+(2013-05-23 21:14:25 +0200)
+
+----------------------------------------------------------------
+This is a set of patches from Lee Jones to start converting
+the ux500 to fetch DMA channels from the device tree:
+- Full DT support and channel mapping in the DMA40 driver
+- Dropping of platform data for migrated devices on the DT
+  boot path.
+
+----------------------------------------------------------------
+Lee Jones (35):
+      dmaengine: ste_dma40: Assign memcpy channels in the driver
+      dmaengine: ste_dma40: Move default memcpy configs into the driver
+      dmaengine: ste_dma40: Rectify incorrect configuration validation checking
+      dmaengine: ste_dma40: Amalgamate DMA source and destination
+channel numbers
+      ARM: ux500: Strip out duplicate USB DMA configuration
+      dmaengine: ste_dma40: Remove home-brew MAX() macro
+      ARM: ux500: Remove unused 'data_width' attributes from SDI DMA configs
+      ARM: ux500: Remove unused 'data_width' attributes from SSP DMA configs
+      ARM: ux500: Remove unused 'data_width' attributes from UART DMA configs
+      ARM: ux500: Remove superfluous 'psize' attribute from Audio platform data
+      dmaengine: ste_dma40: Calculate number of logical channels from
+physical ones
+      dmaengine: ste_dma40: Remove 'always true' checking
+      dmaengine: ste_dma40: Move rev error-check up to revision acquisition
+      dmaengine: ste_dma40: Also report the number of logical channels
+      dmaengine: ste_dma40: Allocate plat_data on declaration
+      dmaengine: ste_dma40: Allow driver to be probe()able when DT is enabled
+      dmaengine: ste_dma40: Supply full Device Tree parsing support
+      ARM: ux500: Pass remnant platform data though to DMA40 driver
+      dmaengine: ste_dma40: Separate Logical Global Interrupt Mask
+(GIM) unmasking
+      dmaengine: ste_dma40: Remove unnecessary call to d40_phy_cfg()
+      dmaengine: ste_dma40: Don't configure runtime configurable setup
+during allocate
+      ARM: ux500: Stop passing UART's platform data for Device Tree boots
+      dmaengine: ste_dma40: Only use addresses passed as configuration
+information
+      dmaengine: ste_dma40: Remove redundant address fetching function
+      ARM: ux500: Remove DMA address look-up table
+      dmaengine: ste_dma40: Correct copy/paste error
+      ARM: ux500: Remove unnecessary attributes from DMA channel request pdata
+      crypto: ux500/hash - Prepare clock before enabling it
+      crypto: ux500/hash - Set DMA configuration though dma_slave_config()
+      ARM: ux500: Stop passing Hash DMA channel config information though pdata
+      crypto: ux500/cryp - Prepare clock before enabling it
+      crypto: ux500/cryp - Set DMA configuration though dma_slave_config()
+      ARM: ux500: Stop passing Cryp DMA channel config information though pdata
+      crypto: ux500/[cryp|hash] - Show successful start-up in the bootlog
+      ARM: ux500: Register Cryp and Hash platform drivers on Snowball
+
+Linus Walleij (1):
+      dmaengine: ste_dma40: Fix up static memcpy event lines
+
+ .../devicetree/bindings/dma/ste-dma40.txt          |  62 ++++
+ arch/arm/mach-ux500/board-mop500-audio.c           |  56 +---
+ arch/arm/mach-ux500/board-mop500-sdi.c             |  40 +--
+ arch/arm/mach-ux500/board-mop500.c                 |  63 +---
+ arch/arm/mach-ux500/board-mop500.h                 |   1 +
+ arch/arm/mach-ux500/cpu-db8500.c                   |  52 +--
+ arch/arm/mach-ux500/devices-db8500.c               | 123 +------
+ arch/arm/mach-ux500/ste-dma40-db8500.h             | 193 ++++-------
+ arch/arm/mach-ux500/usb.c                          |  18 +-
+ drivers/crypto/ux500/cryp/cryp.h                   |   7 +-
+ drivers/crypto/ux500/cryp/cryp_core.c              |  31 +-
+ drivers/crypto/ux500/hash/hash_alg.h               |   5 +-
+ drivers/crypto/ux500/hash/hash_core.c              |  24 +-
+ drivers/dma/ste_dma40.c                            | 366 ++++++++++++---------
+ drivers/dma/ste_dma40_ll.c                         | 106 +++---
+ drivers/dma/ste_dma40_ll.h                         |   3 +-
+ include/linux/platform_data/dma-ste-dma40.h        |  20 +-
+ 17 files changed, 504 insertions(+), 666 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/ste-dma40.txt
