@@ -1,29 +1,52 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 23 May 2013 21:47:47 +0300
-Subject: [PATCH 3/7] USB: gadget: atmel_usba: add DT support
-In-Reply-To: <1369067160-3230-3-git-send-email-plagnioj@jcrosoft.com>
-References: <20130520162149.GC9937@game.jcrosoft.org>
- <1369067160-3230-1-git-send-email-plagnioj@jcrosoft.com>
- <1369067160-3230-3-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20130523184747.GF19834@arwen.pp.htv.fi>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 23 May 2013 20:53:48 +0200
+Subject: [PATCH v2 0/3] Marvell PCIe driver improvements
+In-Reply-To: <20130523182622.GT31290@titan.lakedaemon.net>
+References: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130523182622.GT31290@titan.lakedaemon.net>
+Message-ID: <20130523205348.54751fca@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 06:25:56PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> Allow to compile the driver all the time if AT91 enabled.
+Dear Jason Cooper,
+
+On Thu, 23 May 2013 14:26:22 -0400, Jason Cooper wrote:
+
+> >  drivers/pci/host/pci-mvebu.c |   55 +++++++++++++++++++++++++++++++++---------
+> >  1 file changed, 44 insertions(+), 11 deletions(-)
 > 
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: linux-usb at vger.kernel.org
+> Whole series applied to mvebu/pcie_bridge with Bjorn's Ack.  The whole
+> pcie tree now looks like:
+> 
+>         /-mvebu/of_pci  /-mvebu/pcie
+>         |               |
+> +---+---+---+---+---+---+---+---+---+---+ mvebu/pcie_bridge
+>                         |
+>                         \---+---+---+---+ mvebu/pcie_kirkwood
+> (not to scale :) )
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+Nice diagram, I like it :-)
 
+> This is getting pretty hairy, do you intend on anything else for mvebu
+> pcie for this merge window?
+
+No, nothing significant. There might be some minor additional fixes
+that you can just stack into the mvebu/pcie_bridge branch, but I don't
+have any such fixes sitting anywhere in my repo at this point.
+
+I now intend to work on the MSI support, but since it requires a quite
+significant work to properly expose the msi_chip from the IRQ
+controller driver, I don't really think it will be ready in time for
+3.11.
+
+Thanks a lot for the quick merges. I'm really eager to see this PCIe
+code that has been around for a long time finally merged.
+
+Best regards,
+
+Thomas
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130523/570679ff/attachment.sig>
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
