@@ -1,183 +1,113 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 23 May 2013 16:24:40 +0530
-Subject: [PATCH 26/63] dmaengine: ste_dma40: Supply full Device Tree
- parsing support
-In-Reply-To: <1367591569-32197-27-git-send-email-lee.jones@linaro.org>
-References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
- <1367591569-32197-27-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130523105440.GH30200@intel.com>
+From: jonas@microbit.se (Jonas Andersson)
+Date: Thu, 23 May 2013 13:38:05 +0200
+Subject: [PATCH] ARM: dts: imx: fix clocks for cspi
+Message-ID: <1369309085-31146-1-git-send-email-jonas@microbit.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 03, 2013 at 03:32:12PM +0100, Lee Jones wrote:
-> Using the new DMA DT bindings and API, we can register the DMA40 driver
-> as Device Tree capable. Now, when a client attempts to allocate a
-> channel using the DMA DT bindings via its own node, we are able to parse
-> the request and allocate a channel in the correct manner.
-> 
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+The CSPI controller has only one clock, but the driver spi-imx.c needs clock "per" to calculate bitrate divisor.
 
---
-~Vinod
-> ---
->  .../devicetree/bindings/dma/ste-dma40.txt          |   62 ++++++++++++++++++++
->  drivers/dma/ste_dma40.c                            |   52 ++++++++++++++++
->  2 files changed, 114 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/ste-dma40.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/ste-dma40.txt b/Documentation/devicetree/bindings/dma/ste-dma40.txt
-> new file mode 100644
-> index 0000000..2679a87
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/ste-dma40.txt
-> @@ -0,0 +1,62 @@
-> +* DMA40 DMA Controller
-> +
-> +Required properties:
-> +- compatible: "stericsson,dma40"
-> +- reg: Address range of the DMAC registers
-> +- reg-names: Names of the above areas to use during resource look-up
-> +- interrupt: Should contain the DMAC interrupt number
-> +- #dma-cells: must be <3>
-> +
-> +Optional properties:
-> +- dma-channels: Number of channels supported by hardware - if not present
-> +		the driver will attempt to obtain the information from H/W
-> +
-> +Example:
-> +
-> +	dma: dma-controller at 801C0000 {
-> +		compatible = "stericsson,db8500-dma40", "stericsson,dma40";
-> +		reg = <0x801C0000 0x1000  0x40010000 0x800>;
-> +		reg-names = "base", "lcpa";
-> +		interrupt-parent = <&intc>;
-> +		interrupts = <0 25 0x4>;
-> +
-> +		#dma-cells = <2>;
-> +		dma-channels = <8>;
-> +	};
-> +
-> +Clients
-> +Required properties:
-> +- dmas: Comma separated list of dma channel requests
-> +- dma-names: Names of the aforementioned requested channels
-> +
-> +Each dmas request consists of 4 cells:
-> +  1. A phandle pointing to the DMA controller
-> +  2. Device Type
-> +  3. The DMA request line number (only when 'use fixed channel' is set)
-> +  4. A 32bit mask specifying; mode, direction and endianess [NB: This list will grow]
-> +        0x00000001: Mode:
-> +                Logical channel when unset
-> +                Physical channel when set
-> +        0x00000002: Direction:
-> +                Memory to Device when unset
-> +                Device to Memory when set
-> +        0x00000004: Endianess:
-> +                Little endian when unset
-> +                Big endian when set
-> +        0x00000008: Use fixed channel:
-> +                Use automatic channel selection when unset
-> +                Use DMA request line number when set
-> +
-> +Example:
-> +
-> +	uart at 80120000 {
-> +		compatible = "arm,pl011", "arm,primecell";
-> +		reg = <0x80120000 0x1000>;
-> +		interrupts = <0 11 0x4>;
-> +
-> +		dmas = <&dma 13 0 0x2>, /* Logical - DevToMem */
-> +		       <&dma 13 0 0x0>; /* Logical - MemToDev */
-> +		dma-names = "rx", "rx";
-> +
-> +		status = "disabled";
-> +	};
-> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-> index d7c2397..b77d508 100644
-> --- a/drivers/dma/ste_dma40.c
-> +++ b/drivers/dma/ste_dma40.c
-> @@ -18,6 +18,7 @@
->  #include <linux/pm_runtime.h>
->  #include <linux/err.h>
->  #include <linux/of.h>
-> +#include <linux/of_dma.h>
->  #include <linux/amba/bus.h>
->  #include <linux/regulator/consumer.h>
->  #include <linux/platform_data/dma-ste-dma40.h>
-> @@ -2419,6 +2420,50 @@ static void d40_set_prio_realtime(struct d40_chan *d40c)
->  		__d40_set_prio_rt(d40c, d40c->dma_cfg.dev_type, false);
->  }
->  
-> +#define D40_DT_FLAGS_MODE(flags)       ((flags >> 0) & 0x1)
-> +#define D40_DT_FLAGS_DIR(flags)        ((flags >> 1) & 0x1)
-> +#define D40_DT_FLAGS_BIG_ENDIAN(flags) ((flags >> 2) & 0x1)
-> +#define D40_DT_FLAGS_FIXED_CHAN(flags) ((flags >> 3) & 0x1)
-> +
-> +static struct dma_chan *d40_xlate(struct of_phandle_args *dma_spec,
-> +				  struct of_dma *ofdma)
-> +{
-> +	struct stedma40_chan_cfg cfg;
-> +	dma_cap_mask_t cap;
-> +	u32 flags;
-> +
-> +	memset(&cfg, 0, sizeof(struct stedma40_chan_cfg));
-> +
-> +	dma_cap_zero(cap);
-> +	dma_cap_set(DMA_SLAVE, cap);
-> +
-> +	cfg.dev_type = dma_spec->args[0];
-> +	flags = dma_spec->args[2];
-> +
-> +	switch (D40_DT_FLAGS_MODE(flags)) {
-> +	case 0: cfg.mode = STEDMA40_MODE_LOGICAL; break;
-> +	case 1: cfg.mode = STEDMA40_MODE_PHYSICAL; break;
-> +	}
-> +
-> +	switch (D40_DT_FLAGS_DIR(flags)) {
-> +	case 0:
-> +		cfg.dir = STEDMA40_MEM_TO_PERIPH;
-> +		cfg.dst_info.big_endian = D40_DT_FLAGS_BIG_ENDIAN(flags);
-> +		break;
-> +	case 1:
-> +		cfg.dir = STEDMA40_PERIPH_TO_MEM;
-> +		cfg.src_info.big_endian = D40_DT_FLAGS_BIG_ENDIAN(flags);
-> +		break;
-> +	}
-> +
-> +	if (D40_DT_FLAGS_FIXED_CHAN(flags)) {
-> +		cfg.phy_channel = dma_spec->args[1];
-> +		cfg.use_fixed_channel = true;
-> +	}
-> +
-> +	return dma_request_channel(cap, stedma40_filter, &cfg);
-> +}
-> +
->  /* DMA ENGINE functions */
->  static int d40_alloc_chan_resources(struct dma_chan *chan)
->  {
-> @@ -3632,6 +3677,13 @@ static int __init d40_probe(struct platform_device *pdev)
->  
->  	d40_hw_init(base);
->  
-> +	if (np) {
-> +		err = of_dma_controller_register(np, d40_xlate, NULL);
-> +		if (err && err != -ENODEV)
-> +			dev_err(&pdev->dev,
-> +				"could not register of_dma_controller\n");
-> +	}
-> +
->  	dev_info(base->dev, "initialized\n");
->  	return 0;
->  
-> -- 
-> 1.7.10.4
-> 
+Signed-off-by: Jonas Andersson <jonas@microbit.se>
+---
+ arch/arm/boot/dts/imx25.dtsi | 12 ++++++------
+ arch/arm/boot/dts/imx27.dtsi |  6 +++---
+ arch/arm/boot/dts/imx51.dtsi |  2 +-
+ arch/arm/boot/dts/imx53.dtsi |  2 +-
+ 4 files changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index d2550e0..7011539 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -141,8 +141,8 @@
+ 				#size-cells = <0>;
+ 				compatible = "fsl,imx25-cspi", "fsl,imx35-cspi";
+ 				reg = <0x43fa4000 0x4000>;
+-				clocks = <&clks 62>;
+-				clock-names = "ipg";
++				clocks = <&clks 62>, <&clks 62>;
++				clock-names = "ipg", "per";
+ 				interrupts = <14>;
+ 				status = "disabled";
+ 			};
+@@ -182,8 +182,8 @@
+ 				compatible = "fsl,imx25-cspi", "fsl,imx35-cspi";
+ 				reg = <0x50004000 0x4000>;
+ 				interrupts = <0>;
+-				clocks = <&clks 80>;
+-				clock-names = "ipg";
++				clocks = <&clks 80>, <&clks 80>;
++				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+ 
+@@ -210,8 +210,8 @@
+ 				#size-cells = <0>;
+ 				compatible = "fsl,imx25-cspi", "fsl,imx35-cspi";
+ 				reg = <0x50010000 0x4000>;
+-				clocks = <&clks 79>;
+-				clock-names = "ipg";
++				clocks = <&clks 79>, <&clks 79>;
++				clock-names = "ipg", "per";
+ 				interrupts = <13>;
+ 				status = "disabled";
+ 			};
+diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+index ff4bd48..75bd113 100644
+--- a/arch/arm/boot/dts/imx27.dtsi
++++ b/arch/arm/boot/dts/imx27.dtsi
+@@ -131,7 +131,7 @@
+ 				compatible = "fsl,imx27-cspi";
+ 				reg = <0x1000e000 0x1000>;
+ 				interrupts = <16>;
+-				clocks = <&clks 53>, <&clks 0>;
++				clocks = <&clks 53>, <&clks 53>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -142,7 +142,7 @@
+ 				compatible = "fsl,imx27-cspi";
+ 				reg = <0x1000f000 0x1000>;
+ 				interrupts = <15>;
+-				clocks = <&clks 52>, <&clks 0>;
++				clocks = <&clks 52>, <&clks 52>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+@@ -223,7 +223,7 @@
+ 				compatible = "fsl,imx27-cspi";
+ 				reg = <0x10017000 0x1000>;
+ 				interrupts = <6>;
+-				clocks = <&clks 51>, <&clks 0>;
++				clocks = <&clks 51>, <&clks 51>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+index 21bb786..53fdde6 100644
+--- a/arch/arm/boot/dts/imx51.dtsi
++++ b/arch/arm/boot/dts/imx51.dtsi
+@@ -631,7 +631,7 @@
+ 				compatible = "fsl,imx51-cspi", "fsl,imx35-cspi";
+ 				reg = <0x83fc0000 0x4000>;
+ 				interrupts = <38>;
+-				clocks = <&clks 55>, <&clks 0>;
++				clocks = <&clks 55>, <&clks 55>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 845982e..eb83aa0 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -714,7 +714,7 @@
+ 				compatible = "fsl,imx53-cspi", "fsl,imx35-cspi";
+ 				reg = <0x63fc0000 0x4000>;
+ 				interrupts = <38>;
+-				clocks = <&clks 55>, <&clks 0>;
++				clocks = <&clks 55>, <&clks 55>;
+ 				clock-names = "ipg", "per";
+ 				status = "disabled";
+ 			};
+-- 
+1.8.1.4
