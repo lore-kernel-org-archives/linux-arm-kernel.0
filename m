@@ -1,47 +1,23 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 24 May 2013 00:59:16 +0200
-Subject: [PATCH 1/1] ARM: at91: at91sam9n12: move external irq declatation to
- DT
-Message-ID: <1369349956-22985-1-git-send-email-plagnioj@jcrosoft.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 24 May 2013 01:09:46 +0200
+Subject: [PATCH 4/6] i2c: stu300: do not request a specific clock name
+In-Reply-To: <1369330288-14856-5-git-send-email-linus.walleij@stericsson.com>
+References: <1369330288-14856-1-git-send-email-linus.walleij@stericsson.com>
+ <1369330288-14856-5-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130523230943.GA3645@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/arm/boot/dts/at91sam9n12.dtsi |    1 +
- arch/arm/mach-at91/at91sam9n12.c   |    6 ------
- 2 files changed, 1 insertion(+), 6 deletions(-)
+On Thu, May 23, 2013 at 07:31:26PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> We have used the default clock associated with the block
+> for a long time, only heuristics in the clock system has
+> made this work anyway. This needs to be done away with as
+> we start probing this driver and its clocks exclusively
+> from the device tree.
+> 
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 566af32..d864f7a9 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -60,6 +60,7 @@
- 				compatible = "atmel,at91rm9200-aic";
- 				interrupt-controller;
- 				reg = <0xfffff000 0x200>;
-+				atmel,external-irqs = <31>;
- 			};
- 
- 			ramc0: ramc at ffffe800 {
-diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-index 13cdbcd..c7d670d1 100644
---- a/arch/arm/mach-at91/at91sam9n12.c
-+++ b/arch/arm/mach-at91/at91sam9n12.c
-@@ -223,13 +223,7 @@ static void __init at91sam9n12_map_io(void)
- 	at91_init_sram(0, AT91SAM9N12_SRAM_BASE, AT91SAM9N12_SRAM_SIZE);
- }
- 
--void __init at91sam9n12_initialize(void)
--{
--	at91_extern_irq = (1 << AT91SAM9N12_ID_IRQ0);
--}
--
- AT91_SOC_START(at91sam9n12)
- 	.map_io = at91sam9n12_map_io,
- 	.register_clocks = at91sam9n12_register_clocks,
--	.init = at91sam9n12_initialize,
- AT91_SOC_END
--- 
-1.7.10.4
+Acked-by: Wolfram Sang <wsa@the-dreams.de>
