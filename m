@@ -1,60 +1,89 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 23 May 2013 15:30:52 +0200
-Subject: [PATCH v2 4/6] arm: mvebu: remove hardcoded static I/O mapping
+Date: Thu, 23 May 2013 15:30:50 +0200
+Subject: [PATCH v2 2/6] arm: mvebu: avoid hardcoded virtual address in
+ coherency code
 In-Reply-To: <1369315854-32724-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1369315854-32724-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369315854-32724-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369315854-32724-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have removed the need of the static I/O mapping for early
-initialization reasons, and fixed the registers area length that were
-broken, we can get rid of the static I/O mapping. Only the earlyprintk
-mapping needs to be set up, using the debug_ll_io_init() helper
-function.
+Now that the coherency_get_cpu_count() function no longer requires a
+very early mapping of the coherency unit registers, we can avoid the
+hardcoded virtual address in coherency.c. However, the coherency
+features are still used quite early, so we need to do the of_iomap()
+early enough, at the ->init_timer() level, so we have the call of
+coherency_init() at this point.
+
+Unfortunately, at ->init_timer() time, it is not possible to register
+a bus notifier, so we add a separate coherency_late_init() function
+that gets called as as postcore_initcall(), when bus notifiers are
+available.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mvebu/armada-370-xp.c |   11 +----------
- arch/arm/mach-mvebu/armada-370-xp.h |    2 --
- 2 files changed, 1 insertion(+), 12 deletions(-)
+ arch/arm/mach-mvebu/armada-370-xp.c |    2 +-
+ arch/arm/mach-mvebu/coherency.c     |   20 ++++++++++----------
+ 2 files changed, 11 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index 75ebf56..c1c0556 100644
+index cf8e357..b9319c4 100644
 --- a/arch/arm/mach-mvebu/armada-370-xp.c
 +++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -28,18 +28,9 @@
- #include "common.h"
- #include "coherency.h"
- 
--static struct map_desc armada_370_xp_io_desc[] __initdata = {
--	{
--		.virtual	= (unsigned long) ARMADA_370_XP_REGS_VIRT_BASE,
--		.pfn		= __phys_to_pfn(ARMADA_370_XP_REGS_PHYS_BASE),
--		.length		= ARMADA_370_XP_REGS_SIZE,
--		.type		= MT_DEVICE,
--	},
--};
--
- static void __init armada_370_xp_map_io(void)
+@@ -46,6 +46,7 @@ static void __init armada_370_xp_timer_and_clk_init(void)
  {
--	iotable_init(armada_370_xp_io_desc, ARRAY_SIZE(armada_370_xp_io_desc));
-+	debug_ll_io_init();
+ 	mvebu_clocks_init();
+ 	armada_370_xp_timer_init();
++	coherency_init();
  }
  
- static void __init armada_370_xp_timer_and_clk_init(void)
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-index 2070e1b..585e147 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.h
-+++ b/arch/arm/mach-mvebu/armada-370-xp.h
-@@ -16,8 +16,6 @@
- #define __MACH_ARMADA_370_XP_H
+ static void __init armada_370_xp_init_early(void)
+@@ -75,7 +76,6 @@ static void __init armada_370_xp_init_early(void)
+ static void __init armada_370_xp_dt_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-	coherency_init();
+ }
  
- #define ARMADA_370_XP_REGS_PHYS_BASE	0xd0000000
--#define ARMADA_370_XP_REGS_VIRT_BASE	IOMEM(0xfec00000)
--#define ARMADA_370_XP_REGS_SIZE		SZ_1M
+ static const char * const armada_370_xp_dt_compat[] = {
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 46d66c0..d74794a 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -27,14 +27,7 @@
+ #include <asm/smp_plat.h>
+ #include "armada-370-xp.h"
  
- /* These defines can go away once mvebu-mbus has a DT binding */
- #define ARMADA_370_XP_MBUS_WINS_BASE    (ARMADA_370_XP_REGS_PHYS_BASE + 0x20000)
+-/*
+- * Some functions in this file are called very early during SMP
+- * initialization. At that time the device tree framework is not yet
+- * ready, and it is not possible to get the register address to
+- * ioremap it. That's why the pointer below is given with an initial
+- * value matching its virtual mapping
+- */
+-static void __iomem *coherency_base = ARMADA_370_XP_REGS_VIRT_BASE + 0x20200;
++static void __iomem *coherency_base;
+ static void __iomem *coherency_cpu_base;
+ 
+ /* Coherency fabric registers */
+@@ -135,9 +128,16 @@ int __init coherency_init(void)
+ 		coherency_base = of_iomap(np, 0);
+ 		coherency_cpu_base = of_iomap(np, 1);
+ 		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+-		bus_register_notifier(&platform_bus_type,
+-					&mvebu_hwcc_platform_nb);
+ 	}
+ 
+ 	return 0;
+ }
++
++static int __init coherency_late_init(void)
++{
++	bus_register_notifier(&platform_bus_type,
++			      &mvebu_hwcc_platform_nb);
++	return 0;
++}
++
++postcore_initcall(coherency_late_init);
 -- 
 1.7.9.5
