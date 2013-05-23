@@ -1,91 +1,109 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 23 May 2013 13:01:40 -0600
-Subject: [PATCH 2/2] net: mv643xx_eth: proper initialization for Kirkwood
- SoCs
-In-Reply-To: <20130523184028.GU31290@titan.lakedaemon.net>
-References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369253042-15082-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369253042-15082-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130522201607.GA18823@obsidianresearch.com>
- <20130523160111.GP31290@titan.lakedaemon.net>
- <20130523171112.GB31281@obsidianresearch.com>
- <20130523172339.GQ31290@titan.lakedaemon.net>
- <20130523175357.GB2821@obsidianresearch.com>
- <20130523184028.GU31290@titan.lakedaemon.net>
-Message-ID: <20130523190140.GA4010@obsidianresearch.com>
+From: jgchunter@gmail.com (Jon Hunter)
+Date: Thu, 23 May 2013 20:02:05 +0100
+Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
+In-Reply-To: <20130522212054.GG31836@blackmetal.musicnaut.iki.fi>
+References: <20130513205302.GA3157@blackmetal.musicnaut.iki.fi>
+ <20130516180933.GG5600@atomide.com>
+ <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
+ <20130516214430.GN5600@atomide.com> <20130520174621.GI10378@atomide.com>
+ <20130521173936.GE31836@blackmetal.musicnaut.iki.fi>
+ <519BCCEC.8010303@gmail.com>
+ <20130522212054.GG31836@blackmetal.musicnaut.iki.fi>
+Message-ID: <519E67AD.6070702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 02:40:28PM -0400, Jason Cooper wrote:
 
-> > But there is a larger problem here then just this one bit.
-> > 
-> > The PSC1 register must be set properly for the board layout, and today
-> > we rely on the bootloader to set it. In fact, even with Sebastian's
-> > change the ethernet port won't work without bootloader
-> > intervention. The PortReset bit should also be cleared by the driver
-> > (and it is only present on some variants of this IP block,
-> > apparently).
-> > 
-> > We know that some Marvell SOC's wack the ethernet registers when they
-> > clock gate, and the flip of Clk125Bypass is another symptom of this
-> > general problem.
-> > 
-> > So, long term, the PSC1 must be fully set by the driver, based on DT
-> > information describing the board (eg RGMII/MII/1000Base-X [SFP] Phy
-> > type), and the layout of this register seems to vary on a SOC by SOC
-> > basis.
-> > 
-> > Thus, I think it is appropriate to call this variant of the eth IP
-> > 'marvell,kirkwood-eth' which indicates that the register block follows
-> > the kirkwood manual and the PSC1 register specifically has the
-> > kirkwood layout.
+On 22/05/13 22:20, Aaro Koskinen wrote:
+> On Tue, May 21, 2013 at 08:37:16PM +0100, Jon Hunter wrote:
+>> On 21/05/13 18:39, Aaro Koskinen wrote:
+>>> On Mon, May 20, 2013 at 10:46:21AM -0700, Tony Lindgren wrote:
+>>>> * Tony Lindgren <tony@atomide.com> [130516 14:50]:
+>>>>> * Aaro Koskinen <aaro.koskinen@iki.fi> [130516 14:05]:
+>>>>>> On Thu, May 16, 2013 at 11:09:34AM -0700, Tony Lindgren wrote:
+>>>>>>> * Aaro Koskinen <aaro.koskinen@iki.fi> [130513 13:58]:
+>>>>>>>> I tested 3.10-rc1 on OMAP1 / Nokia 770, and Retu MFD probe is broken:
+>>>>>>>>
+>>>>>>>> [    2.264221] retu-mfd 2-0001: Retu v3.2 found
+>>>>>>>> [    2.281951] retu-mfd 2-0001: Failed to allocate IRQs: -12
+>>>>>>>> [    2.300140] retu-mfd: probe of 2-0001 failed with error -12
+>>>>>>>>
+>>>>>>>> The error is coming from regmap code. According to git bisect, it is
+>>>>>>>> caused by:
+>>>>>>>>
+>>>>>>>> 	commit ede4d7a5b9835510fd1f724367f68d2fa4128453
+>>>>>>>> 	Author: Jon Hunter <jon-hunter@ti.com>
+>>>>>>>> 	Date:   Fri Mar 1 11:22:47 2013 -0600
+>>>>>>>>
+>>>>>>>> 	    gpio/omap: convert gpio irq domain to linear mapping
+>>>>>>>>
+>>>>>>>> The commit does not anymore revert cleanly, and I haven't yet tried
+>>>>>>>> crafting a manual revert, so any fix proposals/ideas are welcome...
+>>>>>>>
+>>>>>>> Hmm this might be a bit trickier to fix. Obviously the real solution
+>>>>>>> is to convert omap1 to SPARSE_IRQ like we did for omap2+.
+>>>>>>>
+>>>>>>> For the -rc cycle, it might be possible to fix this by adding a
+>>>>>>> different irq_to_gpio() and gpio_to_irq() functions for omap1.
+>>>>>>
+>>>>>> The commit reverts cleanly if we also revert
+>>>>>> 3513cdeccc647d41c4a9ff923af17deaaac04a66 (gpio/omap: optimise interrupt
+>>>>>> service routine), which seems to be just some minor optimization. The
+>>>>>> result is below, and with it 770 works again.
+>>>>>
+>>>>> Hmm in this case it seems that we should just fix it rather than go back
+>>>>> to the old code, so let's take a look at that first.
+>>>>
+>>>> Does the following fix it for you or do we need to fix something else
+>>>> there too?
+>>>
+>>> Thanks, that fixes Retu probe on 770.
+>>
+>> Sorry for not responding sooner, but I have been moving. 
+>>
+>> From looking at the code it appears that the regmap_add_irq_chip()
+>> is failing in the retu driver. I am not sure if this will work, 
+>> but have you tried making the following change to the retu driver 
+>> so that it also uses irq_domain_add_linear() as well? Just a thought ...
 > 
-> Ok, so mv643xx_eth would match both "marvell,orion-eth" and
-> "marvell,kirkwood-eth", then write to PSC1 iff it sees a node matching
-> "marvell,kirkwood-eth".  I'm not too keen on that, however, the matching
-> of the machine doesn't look to good, either.
+> This will trigger WARNING: at drivers/base/regmap/regmap-irq.c:514.
 
-Why are you not keen on this? It seems like normal device driver
-practice, that is what the data field of of_device_id is typically
-used for..
+Sorry, there is another change needed. Can you try ...
 
-There are more compatible strings than just kirkwood and orion in this
-driver, the whole TX_BW_CONTROL_OLD_LAYOUT/TX_BW_CONTROL_NEW_LAYOUT
-buisness (affecting PPC/MIPS) should also someday be captured with
-compatible strings rather than auto-detection too..
-
-> > The question is what other Marvell SOCs have the same PSC1 layout as
-> > kirkwood?
+diff --git a/drivers/mfd/retu-mfd.c b/drivers/mfd/retu-mfd.c
+index a183098..9080cd6 100644
+--- a/drivers/mfd/retu-mfd.c
++++ b/drivers/mfd/retu-mfd.c
+@@ -267,14 +267,13 @@ static int retu_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
+        if (ret < 0)
+                return ret;
+ 
+-       ret = regmap_add_irq_chip(rdev->regmap, i2c->irq, IRQF_ONESHOT, -1,
++       ret = regmap_add_irq_chip(rdev->regmap, i2c->irq, IRQF_ONESHOT, 0,
+                                  rdat->irq_chip, &rdev->irq_data);
+        if (ret < 0)
+                return ret;
+ 
+        ret = mfd_add_devices(rdev->dev, -1, rdat->children, rdat->nchildren,
+-                             NULL, regmap_irq_chip_get_base(rdev->irq_data),
+-                             NULL);
++                             NULL, 0, regmap_irq_get_domain(rdev->irq_data));
+        if (ret < 0) {
+                regmap_del_irq_chip(i2c->irq, rdev->irq_data);
+                return ret;
+ 
+> Also other drivers report GPIO IRQ issues later in the boot, e.g.
 > 
-> I think marvell,psc1_reset = <>; gives us the most flexibility in
-> accurately describing the hardware.
+> [    3.907928] genirq: Flags mismatch irq 0. 00000001 (serial wakeup) vs. 00002000 (RETU)
+> [    3.923706] No interrupt for UART wake GPIO: 37
 
-Agree, providing psc1_reset value is a good idea to setup the phy
-modes. If all 'orion' SOCs have the PSC1 value then we don't need the
-kirkwood differentiators, especially if things like the reset bit are
-in the same place.
+Looks like the gpio is just conflicting with the RETU driver.
+ 
+> With Tony's patch (without any Retu modifications), the boot is clean. So
+> I guess gpio-omap fix is needed.
 
-The same trick Sebastian used to capture the mac address could be used
-to capture the PSC1 value from the bootloader.
+Ideally it would be good if the RETU can use linear domains and then may be this
+can be avoided.
 
-Basically, I think any IP variants that have idential register layouts
-can share a compatible string, otherwise different layouts need
-different compatible strings, so the general format:
-
- compatible = "marvell,SOCNAME-eth", "marvell,<something>-eth";
-
-Seems very sane to me. At least this way if we discover more changes
-then the driver can match on the SOCNAME compatible string to find
-them.
-
-<someting> = orion for TX_BW_CONTROL_NEW_LAYOUT variants also seems
-reasonable..
-
-No idea what to call TX_BW_CONTROL_OLD_LAYOUT variants, or the PPC
-variants, not important right now it seems.
-
-(BTW, I wonder if the driver should ideally toggle PSC1 reset at some
-point????)
-
-Jason
+Cheers
+Jon
