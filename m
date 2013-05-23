@@ -1,41 +1,100 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 23 May 2013 16:16:58 +0530
-Subject: [PATCH 10/63] dmaengine: ste_dma40: Amalgamate DMA source and
- destination channel numbers
-In-Reply-To: <CACRpkdai7y+LBiFyK+b-CvW6p7n+TbC1iX0+XiLyg2V_8rFL+A@mail.gmail.com>
-References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
- <1367591569-32197-11-git-send-email-lee.jones@linaro.org>
- <CACRpkdai7y+LBiFyK+b-CvW6p7n+TbC1iX0+XiLyg2V_8rFL+A@mail.gmail.com>
-Message-ID: <20130523104658.GF30200@intel.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 23 May 2013 07:23:35 -0400
+Subject: [PATCH V3 00/10] mmc_of_parse() adaptations, DT support for
+ Sheevaplugs
+In-Reply-To: <20130522192501.GC25367@schnuecks.de>
+References: <1369090911-1479-1-git-send-email-gmbnomis@gmail.com>
+ <20130521131455.GP31290@titan.lakedaemon.net>
+ <20130522192501.GC25367@schnuecks.de>
+Message-ID: <20130523112335.GN31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 02:35:01PM +0200, Linus Walleij wrote:
-> On Fri, May 3, 2013 at 4:31 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Wed, May 22, 2013 at 09:25:02PM +0200, Simon Baatz wrote:
+> Hi Jason,
 > 
-> > Devices which utilise DMA use the same device numbers for transmitting
-> > and receiving. In this patch we encode the source and destination
-> > information into one single attribute. We can subsequently exploit the
-> > direction attribute to see which of the transfer directions are being
-> > described. This also lessens the burden on platform data.
-> >
-> > Cc: Vinod Koul <vinod.koul@intel.com>
-> > Cc: Dan Williams <djbw@fb.com>
-> > Cc: Per Forlin <per.forlin@stericsson.com>
-> > Cc: Rabin Vincent <rabin@rab.in>
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> On Tue, May 21, 2013 at 09:14:55AM -0400, Jason Cooper wrote:
+> > On Tue, May 21, 2013 at 01:01:41AM +0200, Simon Baatz wrote:
+> > > Hi,
+> > > 
+> > > 	V3 changes:
+> > > 	- Patch 01/10: Added EPROBE_DEFER case to mmc_of_parse() 
+> > > 	- Added Acked-By to (unmodified) patches 02 and 03.
+> > > 
+> > > 	V2 changes:
+> > > 	- Converted mvsdio to use mmc_of_parse()
+> > > 	- Adapted DTS files using mvsdio accordingly
+> > > 	- Changed mmc_of_parse() to return errors to the caller
+> > > 
+> > > While adding DT support for the Sheevaplugs by Globalscale Technologies
+> > > (Kirkwood), it turned out that the DT binding of mvsdio lacked features to
+> > > properly support the hardware (active high/low of CD and WP pins could not
+> > > be described in DT).
+> > > 
+> > > This is standard functionality provided by the mmc_of_parse() helper
+> > > function.  However, mmc_of_parse() may allocate GPIO lines.  If the
+> > > allocation fails, it outputs an error, but does not return an error to its
+> > > caller.  Therefore, a proposal to handle errors in mmc_of_parse() is made.
+> > > 
+> > > The patch set is structured as follows:
+> > > 
+> > > 1   Adapt mmc_of_parse() to return errors
+> > > 2-6 Handle errors in current drivers using mmc_of_parse() (compile tested
+> > >     only)
+> > > 7-8 Convert mvsdio and respective dts files to mmc_of_parse() (tested on
+> > >     kirkwood)
+> > > 9   Add dts files for (eSATA) Sheevaplug
+> > > 10  Add DT support for (eSATA) Sheevaplug
+> > 
+> > Patches 7, 9, and 10 already pulled into mvebu/dt.  You can drop those
+> > from this series if you need to do another revision.
 > 
-> Still waiting for an ACK from Vinod on this as well.
-Here you go...
+> If you don't mind too much, as this crosses two trees, I would prefer
+> to keep the series "self-contained" if people want to test.
 
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+That's fine, you can host the series in a single branch for folks to
+pull and test.  From our side, 7, 9 and 10 need to go through arm-soc,
+and the rest need to go through -mmc.  There is _no_ build or merge
+dependency between the two.
 
---
-~Vinod
-> 
-> Vinod?
-> 
-> Yours,
-> Linus Walleij
+> Additionally, I have two Acked-bys for 9 and 10 from Andrew that are
+> not part of the patches yet.
+
+Yes, I saw those after I sent the PR.  I sent that a little too fast.
+I'm developing a new system and still working out the kinks.  Sorry
+about that.
+
+> > > I could only test on an eSATA Sheevaplug. I found patches with
+> > > different LEDs for the Sheevaplug.  Thus, I would highly appreciate if
+> > > someone with the hardware could give this a spin on a non-eSATA
+> > > version.  
+> > 
+> > I happen to have one.  Unfortunately, it is currently my primary email
+> > server, dhcp, dns, file server, and a few other irreplaceable things. :(
+> > I *really* need to upgrade/reconfigure ...
+
+FYI:
+
+$ uname -r
+2.6.30.2
+
+Yikes.  I'm so embarrassed.  :(  However,
+
+$ uptime
+ 07:16:42 up 251 days, 0 min,...
+
+before that was over 400 days, then I had an ups failure.
+
+> Even without reinstalling, can you please have a look if your
+> "plug:green:health" LED is really green (mine is blue)?  And if your
+> kernel already has a "plug:red:misc" LED could you verify whether it
+> is really there?  Do you happen to know which board revision you
+> have?
+
+I have one directory under /sys/class/leds, plug:green:health.  It
+controls a *blue* led.  There is also a green led, not enumerated.  I'm
+sure the results would be better with a more recent kernel...
+
+thx,
+
+Jason.
