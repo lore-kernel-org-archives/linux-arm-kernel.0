@@ -1,104 +1,33 @@
-From: jhovold@gmail.com (Johan Hovold)
-Date: Thu, 23 May 2013 10:38:54 +0200
-Subject: [PATCH v3 4/5] rtc-at91rm9200: add shadow interrupt mask
-In-Reply-To: <1369298335-24597-1-git-send-email-jhovold@gmail.com>
-References: <1364983415-20298-1-git-send-email-jhovold@gmail.com>
- <1369298335-24597-1-git-send-email-jhovold@gmail.com>
-Message-ID: <1369298335-24597-5-git-send-email-jhovold@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 May 2013 09:41:26 +0100
+Subject: [PATCH 2/2] ARM: move VFP init to an earlier boot stage
+In-Reply-To: <1369294104-3849-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1369294104-3849-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1369294104-3849-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20130523084126.GI18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add shadow interrupt-mask register which can be used on SoCs where the
-actual hardware register is broken.
+On Thu, May 23, 2013 at 09:28:24AM +0200, Ard Biesheuvel wrote:
+> In order to use the NEON/VFP unit in the kernel, we should
+> initialize it a bit earlier in the boot process so NEON users
+> that like to do a quick benchmark at load time (like the
+> xor_blocks or RAID-6 code) find the NEON/VFP unit already
+> enabled.
 
-Note that some care needs to be taken to make sure the shadow mask
-corresponds to the actual hardware state. The added overhead is not an
-issue for the non-broken SoCs due to the relatively infrequent
-interrupt-mask updates. We do, however, only use the shadow mask value
-as a fall-back when it actually needed as there is still a theoretical
-possibility that the mask is incorrect (see the code for details).
+So what are the results of those benchmarks that the RAID-6 code does?
 
-Signed-off-by: Johan Hovold <jhovold@gmail.com>
----
- drivers/rtc/rtc-at91rm9200.c | 39 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 38 insertions(+), 1 deletion(-)
+This isn't something which will get accepted without there being a very
+strong case for it; firstly, we've always said "no FP in the kernel".
+Secondly, it makes it too easy for people to start thinking that FP is
+safe in the kernel.  It isn't - this will go horribly wrong if the VFP
+hardware bounces an instruction to the support code.
 
-diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-index 9592d08..205701e 100644
---- a/drivers/rtc/rtc-at91rm9200.c
-+++ b/drivers/rtc/rtc-at91rm9200.c
-@@ -30,6 +30,7 @@
- #include <linux/io.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/spinlock.h>
- 
- #include <asm/uaccess.h>
- 
-@@ -43,6 +44,7 @@
- #define AT91_RTC_EPOCH		1900UL	/* just like arch/arm/common/rtctime.c */
- 
- struct at91_rtc_config {
-+	bool use_shadow_imr;
- };
- 
- static const struct at91_rtc_config *at91_rtc_config;
-@@ -50,20 +52,55 @@ static DECLARE_COMPLETION(at91_rtc_updated);
- static unsigned int at91_alarm_year = AT91_RTC_EPOCH;
- static void __iomem *at91_rtc_regs;
- static int irq;
-+static DEFINE_SPINLOCK(at91_rtc_lock);
-+static u32 at91_rtc_shadow_imr;
- 
- static void at91_rtc_write_ier(u32 mask)
- {
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&at91_rtc_lock, flags);
-+	at91_rtc_shadow_imr |= mask;
- 	at91_rtc_write(AT91_RTC_IER, mask);
-+	spin_unlock_irqrestore(&at91_rtc_lock, flags);
- }
- 
- static void at91_rtc_write_idr(u32 mask)
- {
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&at91_rtc_lock, flags);
- 	at91_rtc_write(AT91_RTC_IDR, mask);
-+	/*
-+	 * Register read back (of any RTC-register) needed to make sure
-+	 * IDR-register write has reached the peripheral before updating
-+	 * shadow mask.
-+	 *
-+	 * Note that there is still a possibility that the mask is updated
-+	 * before interrupts have actually been disabled in hardware. The only
-+	 * way to be certain would be to poll the IMR-register, which is is
-+	 * the very register we are trying to emulate. The register read back
-+	 * is a reasonable heuristic.
-+	 */
-+	at91_rtc_read(AT91_RTC_SR);
-+	at91_rtc_shadow_imr &= ~mask;
-+	spin_unlock_irqrestore(&at91_rtc_lock, flags);
- }
- 
- static u32 at91_rtc_read_imr(void)
- {
--	return at91_rtc_read(AT91_RTC_IMR);
-+	unsigned long flags;
-+	u32 mask;
-+
-+	if (at91_rtc_config->use_shadow_imr) {
-+		spin_lock_irqsave(&at91_rtc_lock, flags);
-+		mask = at91_rtc_shadow_imr;
-+		spin_unlock_irqrestore(&at91_rtc_lock, flags);
-+	} else {
-+		mask = at91_rtc_read(AT91_RTC_IMR);
-+	}
-+
-+	return mask;
- }
- 
- /*
--- 
-1.8.2.1
+Lastly, what happens if you sleep between kernel_vfp_start() and
+kernel_vfp_end() ?  That's a context switch which will mess up your
+VFP state.  I think you need to take a spinlock (not _bh nor _irqsave
+versions) in here to ensure that people don't get the idea that they
+_can_ sleep between these two.
+
+So, good attempt, but I think you need to think about this more, and
+also justify the need for it.
