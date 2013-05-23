@@ -1,39 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 May 2013 08:53:04 +0100
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on
- Armada 370/XP
-In-Reply-To: <20130522233108.01cb51f0@skate>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201305221735.11815.arnd@arndb.de> <20130522180842.7edcc3ee@skate>
- <201305222240.05124.arnd@arndb.de> <20130522233108.01cb51f0@skate>
-Message-ID: <20130523075304.GH18614@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 May 2013 09:56:46 +0200
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <1368797744-13737-2-git-send-email-oliver+list@schinagl.nl>
+References: <1368797744-13737-1-git-send-email-oliver+list@schinagl.nl>
+ <1368797744-13737-2-git-send-email-oliver+list@schinagl.nl>
+Message-ID: <CACRpkdaWADjy1YZXTcRaXU+ZsS6_pG0hojQdnz=qeTgyVY7_Ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 11:31:08PM +0200, Thomas Petazzoni wrote:
-> Dear Arnd Bergmann,
-> 
-> The thing that I believe you don't realize is that those new bootloaders
-> are already shipping *today*. And they are not putting whatever
-> "correct" information into the DT you believe they should be putting.
+On Fri, May 17, 2013 at 3:35 PM, Oliver Schinagl
+<oliver+list@schinagl.nl> wrote:
 
-Well, if they're not putting addresses of registers into the DT, then
-that DT information is surely pretty much useless to the kernel - or
-anything.
+(...)
+> While initially these fuses are used to somewhat determin the chipID, these
+> appear to be writeable by the user and thus can be used for other purpouses.
+> For example storing a 128 bit root key, a unique serial number, which could
+> then even be used as a MAC address.
+(...)
+Then follows some code to read out the keys from sysfs I guess..
+> +static int __init sid_probe(struct platform_device *pdev)
 
-If it's putting _wrong_ addresses in the DT, then the same thing applies.
+It's really simple to actually make the kernel use this to seed the
+entropy pool.
 
-Either way, it says "you need to change the DT blob passed to the kernel."
+#include <linux/random.h>
+add_device_randomness(u8 *, num);
 
-Luckily, as has already been agreed, DT blobs will not be hard-coded into
-boot loaders, so that's easily sorted - you just tell people in the
-installation instructions "if you have X versions of the boot loader, you
-need to use DT blob X, otherwise you need to use blob Y."
+If you know after probe that you can read out a number of bytes
+of device-unique data, I think you should add those bytes to the
+entropy pool like this.
 
->From what you're saying, that's the best that can be done - the kernel
-can't do much else.
-
-I'd also hasten to point out that even if we could detect the base of the
-registers, with DT, what matters is what's in the DT blob itself, which
-should override any detection.  So the DT blob would need to be updated
-in any case.
+Yours,
+Linus Walleij
