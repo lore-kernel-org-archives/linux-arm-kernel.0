@@ -1,22 +1,41 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Thu, 23 May 2013 16:41:45 +0530
-Subject: [RFC PATCH 2/3] USB: OHCI: Generic changes to make ohci-pci a
- separate driver
+Date: Thu, 23 May 2013 16:41:46 +0530
+Subject: [RFC V6 PATCH 3/3] USB: OHCI: make ohci-pci a separate driver
 In-Reply-To: <1369307506-4458-1-git-send-email-manjunath.goudar@linaro.org>
 References: <1365746856-7772-2-git-send-email-manjunath.goudar@linaro.org>
  <1369307506-4458-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1369307506-4458-3-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1369307506-4458-4-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Note that this changes is part of separating the ohci pci host controller
-driver from ohci-hcd host code.
-This contains :
- -Moved sb800_prefetch() function from ohci-pci.c to pci-quirks.c file
-  and EXPORTed, this is part of the effort to move the ohci pci related
-  code to generic pci code.
- -Passed "pci_dev" argument instead  of "ohci_hcd" in sb800_prefetch()
-  function to avoid extra include file in pci-quirks.c.
+This patch splits the PCI portion of ohci-hcd out into its
+own separate driver module, called ohci-pci.
+
+The major point of difficulty lies in ohci-pci's many vendor- and
+device-specific workarounds.  Some of them have to be applied before
+calling ohci_start() some after, which necessitates a fair amount of
+code motion.  The other platform drivers require much smaller changes.
+
+The complete sb800_prefetch() function moved to ohci-q.c,because its
+only related to ohci-pci driver.
+
+V2:
+  - few specific content of pci related code in ohci_pci_start function has been moved to ohci_pci_reset
+    and rest of the generic code is written in ohci_start of ohci-hcd.c file.
+V3:
+ - ohci_restart() has been called in ohci_pci_reset() function for to reset the ohci pci.
+
+V4:
+ -sb800_prefetch() moved to ohci-q.c,because its only related to ohci-pci.
+ -no longer _creating_ CONFIG_USB_OHCI_PCI,creating CONFIG_USB_OHCI_HCD_PCI.
+ -overrides renamed with pci_override,its giving proper meaning.
+
+V5:
+ -sb800_prefetch() moved to pci-quirks.c,because its only related to pci.
+
+V6:
+ -sb800_prefetch() function has been moved to pci-quirks.c made as separate patch in 2/3.
+ -Most of the generic ohci pci changes moved in 2/3 patch,now this is complete  ohci-pci separation patch.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
 Cc: Arnd Bergmann <arnd@arndb.de>
@@ -24,144 +43,321 @@ Cc: Greg KH <greg@kroah.com>
 Cc: Alan Stern <stern@rowland.harvard.edu>
 Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/host/ohci-hcd.c   |   11 +----------
- drivers/usb/host/ohci-pci.c   |   13 -------------
- drivers/usb/host/ohci-q.c     |    6 ++++--
- drivers/usb/host/pci-quirks.c |   12 ++++++++++++
- drivers/usb/host/pci-quirks.h |    2 ++
- 5 files changed, 19 insertions(+), 25 deletions(-)
+ drivers/usb/host/Kconfig      |    4 +-
+ drivers/usb/host/Makefile     |    3 +
+ drivers/usb/host/ohci-hcd.c   |   15 -----
+ drivers/usb/host/ohci-pci.c   |  132 ++++++++++++++---------------------------
+ drivers/usb/host/ohci-q.c     |    2 +
+ drivers/usb/host/ohci.h       |    4 ++
+ drivers/usb/host/pci-quirks.c |    2 +
+ drivers/usb/host/pci-quirks.h |    1 +
+ 8 files changed, 59 insertions(+), 104 deletions(-)
 
+diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+index 64d7209..7e75387 100644
+--- a/drivers/usb/host/Kconfig
++++ b/drivers/usb/host/Kconfig
+@@ -377,7 +377,7 @@ config USB_FUSBH200_HCD
+ 	module will be called fusbh200-hcd.
+ 
+ config USB_OHCI_HCD
+-	tristate "OHCI HCD support"
++	tristate "OHCI HCD (USB 1.1) support"
+ 	depends on USB_ARCH_HAS_OHCI
+ 	select ISP1301_OMAP if MACH_OMAP_H2 || MACH_OMAP_H3
+ 	depends on USB_ISP1301 || !ARCH_LPC32XX
+@@ -446,7 +446,7 @@ config USB_OHCI_HCD_PPC_OF
+ 	default USB_OHCI_HCD_PPC_OF_BE || USB_OHCI_HCD_PPC_OF_LE
+ 
+ config USB_OHCI_HCD_PCI
+-	bool "OHCI support for PCI-bus USB controllers"
++	tristate "OHCI support for PCI-bus USB controllers"
+ 	depends on PCI && (STB03xxx || PPC_MPC52xx || USB_OHCI_HCD_PPC_OF)
+ 	default y
+ 	select USB_OHCI_LITTLE_ENDIAN
+diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
+index 661c558..2214ded 100644
+--- a/drivers/usb/host/Makefile
++++ b/drivers/usb/host/Makefile
+@@ -42,7 +42,10 @@ obj-$(CONFIG_USB_EHCI_TEGRA)    +=ehci-tegra.o
+ obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
+ obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
+ obj-$(CONFIG_USB_ISP1362_HCD)	+= isp1362-hcd.o
++
+ obj-$(CONFIG_USB_OHCI_HCD)	+= ohci-hcd.o
++obj-$(CONFIG_USB_OHCI_HCD_PCI)	+= ohci-pci.o
++
+ obj-$(CONFIG_USB_UHCI_HCD)	+= uhci-hcd.o
+ obj-$(CONFIG_USB_FHCI_HCD)	+= fhci.o
+ obj-$(CONFIG_USB_XHCI_HCD)	+= xhci-hcd.o
 diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index 13ebbb7..2490b81 100644
+index 2490b81..36fc3f7 100644
 --- a/drivers/usb/host/ohci-hcd.c
 +++ b/drivers/usb/host/ohci-hcd.c
-@@ -80,15 +80,6 @@ static const char	hcd_name [] = "ohci_hcd";
+@@ -1166,11 +1166,6 @@ MODULE_AUTHOR (DRIVER_AUTHOR);
+ MODULE_DESCRIPTION(DRIVER_DESC);
+ MODULE_LICENSE ("GPL");
  
- static void ohci_dump (struct ohci_hcd *ohci, int verbose);
- static void ohci_stop (struct usb_hcd *hcd);
 -#ifdef CONFIG_PCI
--static void sb800_prefetch(struct ohci_hcd *ohci, int on);
--#else
--static inline void sb800_prefetch(struct ohci_hcd *ohci, int on)
--{
--	return;
--}
+-#include "ohci-pci.c"
+-#define PCI_DRIVER		ohci_pci_driver
 -#endif
 -
- 
- #include "ohci-hub.c"
- #include "ohci-dbg.c"
-@@ -1275,7 +1266,7 @@ MODULE_LICENSE ("GPL");
- #define PLATFORM_DRIVER		ohci_platform_driver
+ #if defined(CONFIG_ARCH_SA1100) && defined(CONFIG_SA1111)
+ #include "ohci-sa1111.c"
+ #define SA1111_DRIVER		ohci_hcd_sa1111_driver
+@@ -1341,12 +1336,6 @@ static int __init ohci_hcd_mod_init(void)
+ 		goto error_sa1111;
  #endif
  
--#if	!defined(PCI_DRIVER) &&		\
-+#if	!defined(PCI_DRIVER) && \
- 	!defined(PLATFORM_DRIVER) &&	\
- 	!defined(OMAP1_PLATFORM_DRIVER) &&	\
- 	!defined(OMAP3_PLATFORM_DRIVER) &&	\
+-#ifdef PCI_DRIVER
+-	retval = pci_register_driver(&PCI_DRIVER);
+-	if (retval < 0)
+-		goto error_pci;
+-#endif
+-
+ #ifdef SM501_OHCI_DRIVER
+ 	retval = platform_driver_register(&SM501_OHCI_DRIVER);
+ 	if (retval < 0)
+@@ -1440,10 +1429,6 @@ static int __init ohci_hcd_mod_init(void)
+ 	platform_driver_unregister(&SM501_OHCI_DRIVER);
+  error_sm501:
+ #endif
+-#ifdef PCI_DRIVER
+-	pci_unregister_driver(&PCI_DRIVER);
+- error_pci:
+-#endif
+ #ifdef SA1111_DRIVER
+ 	sa1111_driver_unregister(&SA1111_DRIVER);
+  error_sa1111:
 diff --git a/drivers/usb/host/ohci-pci.c b/drivers/usb/host/ohci-pci.c
-index 2c27a5f..c3fa936 100644
+index c3fa936..ea088c1 100644
 --- a/drivers/usb/host/ohci-pci.c
 +++ b/drivers/usb/host/ohci-pci.c
-@@ -168,19 +168,6 @@ static int ohci_quirk_amd700(struct usb_hcd *hcd)
- 	return 0;
- }
+@@ -14,12 +14,19 @@
+  * This file is licenced under the GPL.
+  */
  
--static void sb800_prefetch(struct ohci_hcd *ohci, int on)
--{
--	struct pci_dev *pdev;
--	u16 misc;
+-#ifndef CONFIG_PCI
+-#error "This file is PCI bus glue.  CONFIG_PCI must be defined."
+-#endif
 -
--	pdev = to_pci_dev(ohci_to_hcd(ohci)->self.controller);
--	pci_read_config_word(pdev, 0x50, &misc);
--	if (on == 0)
--		pci_write_config_word(pdev, 0x50, misc & 0xfcff);
--	else
--		pci_write_config_word(pdev, 0x50, misc | 0x0300);
+-#include <linux/pci.h>
+ #include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/pci.h>
++#include <linux/usb.h>
++#include <linux/usb/hcd.h>
++
++#include "ohci.h"
++#include "pci-quirks.h"
++
++#define DRIVER_DESC "OHCI PCI platform driver"
++
++static const char hcd_name[] = "ohci-pci";
+ 
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -229,10 +236,10 @@ static const struct pci_device_id ohci_pci_quirks[] = {
+ static int ohci_pci_reset (struct usb_hcd *hcd)
+ {
+ 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
++	struct pci_dev *pdev = to_pci_dev(hcd->self.controller);
+ 	int ret = 0;
+ 
+ 	if (hcd->self.controller) {
+-		struct pci_dev *pdev = to_pci_dev(hcd->self.controller);
+ 		const struct pci_device_id *quirk_id;
+ 
+ 		quirk_id = pci_match_id(ohci_pci_quirks, pdev);
+@@ -242,94 +249,24 @@ static int ohci_pci_reset (struct usb_hcd *hcd)
+ 			ret = quirk(hcd);
+ 		}
+ 	}
+-	if (ret == 0) {
+-		ohci_hcd_init (ohci);
+-		return ohci_init (ohci);
+-	}
+-	return ret;
 -}
 -
- /* List of quirks for OHCI */
- static const struct pci_device_id ohci_pci_quirks[] = {
- 	{
+-
+-static int ohci_pci_start (struct usb_hcd *hcd)
+-{
+-	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
+-	int		ret;
+-
+-#ifdef CONFIG_PM /* avoid warnings about unused pdev */
+-	if (hcd->self.controller) {
+-		struct pci_dev *pdev = to_pci_dev(hcd->self.controller);
+-
+-		/* RWC may not be set for add-in PCI cards, since boot
+-		 * firmware probably ignored them.  This transfers PCI
+-		 * PM wakeup capabilities.
+-		 */
+-		if (device_can_wakeup(&pdev->dev))
+-			ohci->hc_control |= OHCI_CTRL_RWC;
+-	}
+-#endif /* CONFIG_PM */
+-
+-	ret = ohci_run (ohci);
+-	if (ret < 0) {
+-		ohci_err (ohci, "can't start\n");
+-		ohci_stop (hcd);
+-	}
++	if (ret == 0)
++		ohci_setup(hcd);
++	/*
++	* After ohci setup RWC may not be set for add-in PCI cards.
++	* This transfers PCI PM wakeup capabilities.
++	*/
++	if (device_can_wakeup(&pdev->dev))
++		ohci->hc_control |= OHCI_CTRL_RWC;
+ 	return ret;
+ }
+ 
++static struct hc_driver __read_mostly ohci_pci_hc_driver;
+ 
+-/*-------------------------------------------------------------------------*/
+-
+-static const struct hc_driver ohci_pci_hc_driver = {
+-	.description =		hcd_name,
+-	.product_desc =		"OHCI Host Controller",
+-	.hcd_priv_size =	sizeof(struct ohci_hcd),
+-
+-	/*
+-	 * generic hardware linkage
+-	 */
+-	.irq =			ohci_irq,
+-	.flags =		HCD_MEMORY | HCD_USB11,
+-
+-	/*
+-	 * basic lifecycle operations
+-	 */
++static const struct ohci_driver_overrides pci_overrides __initconst = {
++	.product_desc =		"OHCI PCI host controller",
+ 	.reset =		ohci_pci_reset,
+-	.start =		ohci_pci_start,
+-	.stop =			ohci_stop,
+-	.shutdown =		ohci_shutdown,
+-
+-#ifdef	CONFIG_PM
+-	.pci_suspend =		ohci_suspend,
+-	.pci_resume =		ohci_resume,
+-#endif
+-
+-	/*
+-	 * managing i/o requests and associated device resources
+-	 */
+-	.urb_enqueue =		ohci_urb_enqueue,
+-	.urb_dequeue =		ohci_urb_dequeue,
+-	.endpoint_disable =	ohci_endpoint_disable,
+-
+-	/*
+-	 * scheduling support
+-	 */
+-	.get_frame_number =	ohci_get_frame,
+-
+-	/*
+-	 * root hub support
+-	 */
+-	.hub_status_data =	ohci_hub_status_data,
+-	.hub_control =		ohci_hub_control,
+-#ifdef	CONFIG_PM
+-	.bus_suspend =		ohci_bus_suspend,
+-	.bus_resume =		ohci_bus_resume,
+-#endif
+-	.start_port_reset =	ohci_start_port_reset,
+ };
+ 
+-/*-------------------------------------------------------------------------*/
+-
+-
+ static const struct pci_device_id pci_ids [] = { {
+ 	/* handle any USB OHCI controller */
+ 	PCI_DEVICE_CLASS(PCI_CLASS_SERIAL_USB_OHCI, ~0),
+@@ -357,3 +294,24 @@ static struct pci_driver ohci_pci_driver = {
+ 	},
+ #endif
+ };
++
++static int __init ohci_pci_init(void)
++{
++	if (usb_disabled())
++		return -ENODEV;
++
++	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
++
++	ohci_init_driver(&ohci_pci_hc_driver, &pci_overrides);
++	return pci_register_driver(&ohci_pci_driver);
++}
++module_init(ohci_pci_init);
++
++static void __exit ohci_pci_cleanup(void)
++{
++	pci_unregister_driver(&ohci_pci_driver);
++}
++module_exit(ohci_pci_cleanup);
++
++MODULE_DESCRIPTION(DRIVER_DESC);
++MODULE_LICENSE("GPL");
 diff --git a/drivers/usb/host/ohci-q.c b/drivers/usb/host/ohci-q.c
-index 88731b7..78e0095 100644
+index 78e0095..0ed8187 100644
 --- a/drivers/usb/host/ohci-q.c
 +++ b/drivers/usb/host/ohci-q.c
-@@ -41,6 +41,7 @@ finish_urb(struct ohci_hcd *ohci, struct urb *urb, int status)
- __releases(ohci->lock)
- __acquires(ohci->lock)
- {
-+	struct pci_dev *pdev = to_pci_dev(ohci_to_hcd(ohci)->self.controller);
- 	// ASSERT (urb->hcpriv != 0);
+@@ -9,6 +9,8 @@
  
- 	urb_free_priv (ohci, urb->hcpriv);
-@@ -55,7 +56,7 @@ __acquires(ohci->lock)
- 			if (quirk_amdiso(ohci))
- 				usb_amd_quirk_pll_enable();
- 			if (quirk_amdprefetch(ohci))
--				sb800_prefetch(ohci, 0);
-+				sb800_prefetch(pdev, 0);
- 		}
- 		break;
- 	case PIPE_INTERRUPT:
-@@ -580,6 +581,7 @@ static void td_submit_urb (
- 	struct urb	*urb
- ) {
- 	struct urb_priv	*urb_priv = urb->hcpriv;
-+	struct pci_dev *pdev = to_pci_dev(ohci_to_hcd(ohci)->self.controller);
- 	dma_addr_t	data;
- 	int		data_len = urb->transfer_buffer_length;
- 	int		cnt = 0;
-@@ -689,7 +691,7 @@ static void td_submit_urb (
- 			if (quirk_amdiso(ohci))
- 				usb_amd_quirk_pll_disable();
- 			if (quirk_amdprefetch(ohci))
--				sb800_prefetch(ohci, 1);
-+				sb800_prefetch(pdev, 1);
- 		}
- 		periodic = ohci_to_hcd(ohci)->self.bandwidth_isoc_reqs++ == 0
- 			&& ohci_to_hcd(ohci)->self.bandwidth_int_reqs == 0;
+ #include <linux/irq.h>
+ #include <linux/slab.h>
++#include "ohci.h"
++#include "pci-quirks.h"
+ 
+ static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
+ {
+diff --git a/drivers/usb/host/ohci.h b/drivers/usb/host/ohci.h
+index 3b58482..ecc471a 100644
+--- a/drivers/usb/host/ohci.h
++++ b/drivers/usb/host/ohci.h
+@@ -12,6 +12,9 @@
+  * __leXX (normally) or __beXX (given OHCI_BIG_ENDIAN), depending on the
+  * host controller implementation.
+  */
++#ifndef __USB_HOST_OHCI_H
++#define __USB_HOST_OHCI_H
++
+ typedef __u32 __bitwise __hc32;
+ typedef __u16 __bitwise __hc16;
+ 
+@@ -735,3 +738,4 @@ extern int	ohci_setup(struct usb_hcd *hcd);
+ extern int	ohci_suspend(struct usb_hcd *hcd, bool do_wakeup);
+ extern int	ohci_resume(struct usb_hcd *hcd, bool hibernated);
+ #endif
++#endif
 diff --git a/drivers/usb/host/pci-quirks.c b/drivers/usb/host/pci-quirks.c
-index 4c338ec..5f01540 100644
+index 5f01540..112c85f 100644
 --- a/drivers/usb/host/pci-quirks.c
 +++ b/drivers/usb/host/pci-quirks.c
-@@ -91,6 +91,18 @@ static struct amd_chipset_info {
+@@ -17,6 +17,8 @@
+ #include <linux/export.h>
+ #include <linux/acpi.h>
+ #include <linux/dmi.h>
++#include <linux/usb.h>
++#include <linux/usb/hcd.h>
+ #include "pci-quirks.h"
+ #include "xhci-ext-caps.h"
  
- static DEFINE_SPINLOCK(amd_lock);
- 
-+void sb800_prefetch(struct pci_dev *pdev, int on)
-+{
-+	u16 misc;
-+
-+	pci_read_config_word(pdev, 0x50, &misc);
-+	if (on == 0)
-+		pci_write_config_word(pdev, 0x50, misc & 0xfcff);
-+	else
-+		pci_write_config_word(pdev, 0x50, misc | 0x0300);
-+}
-+EXPORT_SYMBOL_GPL(sb800_prefetch);
-+
- int usb_amd_find_chipset_info(void)
- {
- 	u8 rev = 0;
 diff --git a/drivers/usb/host/pci-quirks.h b/drivers/usb/host/pci-quirks.h
-index 7f69a39..7c5fbc1 100644
+index 7c5fbc1..ba4d76b 100644
 --- a/drivers/usb/host/pci-quirks.h
 +++ b/drivers/usb/host/pci-quirks.h
-@@ -11,11 +11,13 @@ void usb_amd_quirk_pll_enable(void);
- bool usb_is_intel_switchable_xhci(struct pci_dev *pdev);
- void usb_enable_xhci_ports(struct pci_dev *xhci_pdev);
- void usb_disable_xhci_ports(struct pci_dev *xhci_pdev);
-+void sb800_prefetch(struct pci_dev *pdev, int on);
- #else
- static inline void usb_amd_quirk_pll_disable(void) {}
- static inline void usb_amd_quirk_pll_enable(void) {}
- static inline void usb_amd_dev_put(void) {}
- static inline void usb_disable_xhci_ports(struct pci_dev *xhci_pdev) {}
-+static inline void sb800_prefetch(struct pci_dev *pdev, int on) {}
- #endif  /* CONFIG_PCI */
+@@ -1,6 +1,7 @@
+ #ifndef __LINUX_USB_PCI_QUIRKS_H
+ #define __LINUX_USB_PCI_QUIRKS_H
  
- #endif  /*  __LINUX_USB_PCI_QUIRKS_H  */
++struct ohci_hcd;
+ #ifdef CONFIG_PCI
+ void uhci_reset_hc(struct pci_dev *pdev, unsigned long base);
+ int uhci_check_and_reset_hc(struct pci_dev *pdev, unsigned long base);
 -- 
 1.7.9.5
