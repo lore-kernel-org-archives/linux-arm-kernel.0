@@ -1,73 +1,123 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 23 May 2013 18:07:47 +0100
-Subject: [PATCH 00/11] HugeTLB and THP support for ARM64.
-Message-ID: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
+Date: Thu, 23 May 2013 18:07:51 +0100
+Subject: [PATCH 04/11] x86: mm: Remove general hugetlb code from x86.
+In-Reply-To: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
+References: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1369328878-11706-5-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series brings huge pages and transparent huge pages to ARM64.
-The functionality is very similar to x86, and a lot of code that can
-be used by both ARM64 and x86 is brought into mm to avoid the need
-for code duplication.
+huge_pte_alloc, huge_pte_offset and follow_huge_p[mu]d have
+already been copied over to mm.
 
-One notable difference from x86 is that ARM64 supports normal pages
-that are 64KB. When 64KB pages are enabled, huge page and
-transparent huge pages are 512MB only, otherwise the sizes match
-x86.
+This patch removes the x86 copies of these functions and activates
+the general ones by enabling:
+CONFIG_ARCH_WANT_GENERAL_HUGETLB
 
-This series applies to 3.10-rc2.
-
-I've tested this under the ARMv8 Fast model and the x86 code has
-been tested in a KVM guest. libhugetlbfs was used for testing under
-both architectures.
-
-Changelog:
-Patch:
-   * pud_large usage replaced with pud_huge for general hugetlb
-     code imported into mm.
-   * comments tidied up for bit swap of PTE_FILE, PTE_PROT_NONE.
-
-RFC v2:
-   * PROT_NONE support added for HugeTLB and THP.
-   * pmd_modify implementation fixed.
-   * Superfluous huge dcache flushing code removed.
-   * Simplified (and corrected) MAX_ORDER raise for THP && 64KB
-     pages.
-   * The MAX_ORDER check in huge_mm.h has been corrected.
-
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
 ---
+ arch/x86/Kconfig          |  3 +++
+ arch/x86/mm/hugetlbpage.c | 67 -----------------------------------------------
+ 2 files changed, 3 insertions(+), 67 deletions(-)
 
-Steve Capper (11):
-  mm: hugetlb: Copy huge_pmd_share from x86 to mm.
-  x86: mm: Remove x86 version of huge_pmd_share.
-  mm: hugetlb: Copy general hugetlb code from x86 to mm.
-  x86: mm: Remove general hugetlb code from x86.
-  mm: thp: Correct the HPAGE_PMD_ORDER check.
-  ARM64: mm: Restore memblock limit when map_mem finished.
-  ARM64: mm: Make PAGE_NONE pages read only and no-execute.
-  ARM64: mm: Swap PTE_FILE and PTE_PROT_NONE bits.
-  ARM64: mm: HugeTLB support.
-  ARM64: mm: Raise MAX_ORDER for 64KB pages and THP.
-  ARM64: mm: THP support.
-
- arch/arm64/Kconfig                     |  17 +++
- arch/arm64/include/asm/hugetlb.h       | 117 ++++++++++++++++++
- arch/arm64/include/asm/pgtable-hwdef.h |  12 ++
- arch/arm64/include/asm/pgtable.h       |  84 +++++++++++--
- arch/arm64/include/asm/tlb.h           |   6 +
- arch/arm64/include/asm/tlbflush.h      |   2 +
- arch/arm64/mm/Makefile                 |   1 +
- arch/arm64/mm/fault.c                  |  19 +--
- arch/arm64/mm/hugetlbpage.c            |  70 +++++++++++
- arch/arm64/mm/mmu.c                    |  19 ++-
- arch/x86/Kconfig                       |   6 +
- arch/x86/mm/hugetlbpage.c              | 187 ----------------------------
- include/linux/huge_mm.h                |   2 +-
- include/linux/hugetlb.h                |   4 +
- mm/hugetlb.c                           | 219 +++++++++++++++++++++++++++++++--
- 15 files changed, 537 insertions(+), 228 deletions(-)
- create mode 100644 arch/arm64/include/asm/hugetlb.h
- create mode 100644 arch/arm64/mm/hugetlbpage.c
-
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index 476f786..191c4e3 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -210,6 +210,9 @@ config ARCH_SUSPEND_POSSIBLE
+ config ARCH_WANT_HUGE_PMD_SHARE
+ 	def_bool y
+ 
++config ARCH_WANT_GENERAL_HUGETLB
++	def_bool y
++
+ config ZONE_DMA32
+ 	bool
+ 	default X86_64
+diff --git a/arch/x86/mm/hugetlbpage.c b/arch/x86/mm/hugetlbpage.c
+index 7e522a3..7e73e8c 100644
+--- a/arch/x86/mm/hugetlbpage.c
++++ b/arch/x86/mm/hugetlbpage.c
+@@ -16,49 +16,6 @@
+ #include <asm/tlbflush.h>
+ #include <asm/pgalloc.h>
+ 
+-pte_t *huge_pte_alloc(struct mm_struct *mm,
+-			unsigned long addr, unsigned long sz)
+-{
+-	pgd_t *pgd;
+-	pud_t *pud;
+-	pte_t *pte = NULL;
+-
+-	pgd = pgd_offset(mm, addr);
+-	pud = pud_alloc(mm, pgd, addr);
+-	if (pud) {
+-		if (sz == PUD_SIZE) {
+-			pte = (pte_t *)pud;
+-		} else {
+-			BUG_ON(sz != PMD_SIZE);
+-			if (pud_none(*pud))
+-				pte = huge_pmd_share(mm, addr, pud);
+-			else
+-				pte = (pte_t *)pmd_alloc(mm, pud, addr);
+-		}
+-	}
+-	BUG_ON(pte && !pte_none(*pte) && !pte_huge(*pte));
+-
+-	return pte;
+-}
+-
+-pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
+-{
+-	pgd_t *pgd;
+-	pud_t *pud;
+-	pmd_t *pmd = NULL;
+-
+-	pgd = pgd_offset(mm, addr);
+-	if (pgd_present(*pgd)) {
+-		pud = pud_offset(pgd, addr);
+-		if (pud_present(*pud)) {
+-			if (pud_large(*pud))
+-				return (pte_t *)pud;
+-			pmd = pmd_offset(pud, addr);
+-		}
+-	}
+-	return (pte_t *) pmd;
+-}
+-
+ #if 0	/* This is just for testing */
+ struct page *
+ follow_huge_addr(struct mm_struct *mm, unsigned long address, int write)
+@@ -120,30 +77,6 @@ int pud_huge(pud_t pud)
+ 	return !!(pud_val(pud) & _PAGE_PSE);
+ }
+ 
+-struct page *
+-follow_huge_pmd(struct mm_struct *mm, unsigned long address,
+-		pmd_t *pmd, int write)
+-{
+-	struct page *page;
+-
+-	page = pte_page(*(pte_t *)pmd);
+-	if (page)
+-		page += ((address & ~PMD_MASK) >> PAGE_SHIFT);
+-	return page;
+-}
+-
+-struct page *
+-follow_huge_pud(struct mm_struct *mm, unsigned long address,
+-		pud_t *pud, int write)
+-{
+-	struct page *page;
+-
+-	page = pte_page(*(pte_t *)pud);
+-	if (page)
+-		page += ((address & ~PUD_MASK) >> PAGE_SHIFT);
+-	return page;
+-}
+-
+ #endif
+ 
+ /* x86_64 also uses this file */
 -- 
 1.8.1.4
