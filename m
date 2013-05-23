@@ -1,38 +1,62 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 May 2013 16:30:15 +0100
-Subject: [PATCH] regulator: ab8500-ext: Don't register without
- initialisation data
-In-Reply-To: <20130523151816.GB6406@sirena.org.uk>
-References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
- <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
- <20130522155347.GJ1627@sirena.org.uk>
- <20130522165353.GB18714@gmail.com>
- <20130522174516.GT1627@sirena.org.uk>
- <20130523070905.GD18714@gmail.com>
- <20130523142419.GG2412@sirena.org.uk>
- <20130523144453.GL22683@gmail.com>
- <20130523151816.GB6406@sirena.org.uk>
-Message-ID: <20130523153015.GN22683@gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 23 May 2013 16:31:16 +0100
+Subject: [PATCH v2 0/4] ARM: mm: HugeTLB + THP support.
+Message-ID: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 May 2013, Mark Brown wrote:
+The following patches bring both HugeTLB support and Transparent
+HugePage (THP) support to ARM.
 
-> On Thu, May 23, 2013 at 03:44:53PM +0100, Lee Jones wrote:
-> 
-> > Well, whatever happens I'm going to be able to refactor the driver in
-> > the -rc:s, so we still need this fix, or the world will end.
-> 
-> Why is it so invasive to have the driver cope with absent constraints?
+Only long descriptors (LPAE) are supported in this series.
 
-It probably isn't. Are you asking me to code that up for the -rc:s?
+The code has been tested on an Arndale board (Exynos 5250).
 
-I would be happier if I could stick it onto my TODO and address it
-at another time for inclusion into -next, as I have a list of priority
-items to attend to in the immediate future.
+This patch set is based on 3.10-rc2.
+
+Major changes since the Patch:
+ * LPAE code has been separated from non-LPAE code (this series
+   is the LPAE code).
+ * PROT_NONE support for HugeTLB and THP has been implemented.
+
+Major changes since the RFC:
+ * huge pmd sharing removed from the 3-level code as this was
+   found to be very rarely, if ever?, used. This allowed for some
+   code simplification.
+
+ * hardware pmd bits for 2-levels of paging are now taken from
+   mmu.c. Also the mapping code now uses pte/pmd bit helper
+   functions rather than the custom pre-processor logic.
+
+Cheers,
+-- 
+Steve
+
+Catalin Marinas (2):
+  ARM: mm: HugeTLB support for LPAE systems.
+  ARM: mm: Transparent huge page support for LPAE systems.
+
+Steve Capper (2):
+  ARM: mm: correct pte_same behaviour for LPAE.
+  ARM: mm: Add support for flushing HugeTLB pages.
+
+ arch/arm/Kconfig                            |   8 +++
+ arch/arm/include/asm/hugetlb-3level.h       |  71 +++++++++++++++++++
+ arch/arm/include/asm/hugetlb.h              |  84 +++++++++++++++++++++++
+ arch/arm/include/asm/pgtable-3level-hwdef.h |   4 ++
+ arch/arm/include/asm/pgtable-3level.h       |  88 ++++++++++++++++++++++++
+ arch/arm/include/asm/pgtable.h              |   3 +
+ arch/arm/include/asm/tlb.h                  |   6 ++
+ arch/arm/include/asm/tlbflush.h             |   2 +
+ arch/arm/mm/Makefile                        |   1 +
+ arch/arm/mm/dma-mapping.c                   |   2 +-
+ arch/arm/mm/flush.c                         |  25 ++++---
+ arch/arm/mm/fsr-3level.c                    |   4 +-
+ arch/arm/mm/hugetlbpage.c                   | 101 ++++++++++++++++++++++++++++
+ 13 files changed, 386 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/include/asm/hugetlb-3level.h
+ create mode 100644 arch/arm/include/asm/hugetlb.h
+ create mode 100644 arch/arm/mm/hugetlbpage.c
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.1.4
