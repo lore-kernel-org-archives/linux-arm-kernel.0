@@ -1,62 +1,55 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 23 May 2013 16:31:16 +0100
-Subject: [PATCH v2 0/4] ARM: mm: HugeTLB + THP support.
-Message-ID: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
+Date: Thu, 23 May 2013 16:31:17 +0100
+Subject: [PATCH v2 1/4] ARM: mm: correct pte_same behaviour for LPAE.
+In-Reply-To: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
+References: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <1369323080-9673-2-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patches bring both HugeTLB support and Transparent
-HugePage (THP) support to ARM.
+For 3 levels of paging the PTE_EXT_NG bit will be set for user
+address ptes that are written to a page table but not for ptes
+created with mk_pte.
 
-Only long descriptors (LPAE) are supported in this series.
+This can cause some comparison tests made by pte_same to fail
+spuriously and lead to other problems.
 
-The code has been tested on an Arndale board (Exynos 5250).
+To correct this behaviour, we mask off PTE_EXT_NG for any pte that
+is present before running the comparison.
 
-This patch set is based on 3.10-rc2.
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/pgtable-3level.h | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Major changes since the Patch:
- * LPAE code has been separated from non-LPAE code (this series
-   is the LPAE code).
- * PROT_NONE support for HugeTLB and THP has been implemented.
-
-Major changes since the RFC:
- * huge pmd sharing removed from the 3-level code as this was
-   found to be very rarely, if ever?, used. This allowed for some
-   code simplification.
-
- * hardware pmd bits for 2-levels of paging are now taken from
-   mmu.c. Also the mapping code now uses pte/pmd bit helper
-   functions rather than the custom pre-processor logic.
-
-Cheers,
--- 
-Steve
-
-Catalin Marinas (2):
-  ARM: mm: HugeTLB support for LPAE systems.
-  ARM: mm: Transparent huge page support for LPAE systems.
-
-Steve Capper (2):
-  ARM: mm: correct pte_same behaviour for LPAE.
-  ARM: mm: Add support for flushing HugeTLB pages.
-
- arch/arm/Kconfig                            |   8 +++
- arch/arm/include/asm/hugetlb-3level.h       |  71 +++++++++++++++++++
- arch/arm/include/asm/hugetlb.h              |  84 +++++++++++++++++++++++
- arch/arm/include/asm/pgtable-3level-hwdef.h |   4 ++
- arch/arm/include/asm/pgtable-3level.h       |  88 ++++++++++++++++++++++++
- arch/arm/include/asm/pgtable.h              |   3 +
- arch/arm/include/asm/tlb.h                  |   6 ++
- arch/arm/include/asm/tlbflush.h             |   2 +
- arch/arm/mm/Makefile                        |   1 +
- arch/arm/mm/dma-mapping.c                   |   2 +-
- arch/arm/mm/flush.c                         |  25 ++++---
- arch/arm/mm/fsr-3level.c                    |   4 +-
- arch/arm/mm/hugetlbpage.c                   | 101 ++++++++++++++++++++++++++++
- 13 files changed, 386 insertions(+), 13 deletions(-)
- create mode 100644 arch/arm/include/asm/hugetlb-3level.h
- create mode 100644 arch/arm/include/asm/hugetlb.h
- create mode 100644 arch/arm/mm/hugetlbpage.c
-
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index 86b8fe3..70f041c 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -166,6 +166,23 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
+ 		clean_pmd_entry(pmdp);	\
+ 	} while (0)
+ 
++/*
++ * For 3 levels of paging the PTE_EXT_NG bit will be set for user address ptes
++ * that are written to a page table but not for ptes created with mk_pte.
++ *
++ * In hugetlb_no_page, a new huge pte (new_pte) is generated and passed to
++ * hugetlb_cow, where it is compared with an entry in a page table.
++ * This comparison test fails erroneously leading ultimately to a memory leak.
++ *
++ * To correct this behaviour, we mask off PTE_EXT_NG for any pte that is
++ * present before running the comparison.
++ */
++#define __HAVE_ARCH_PTE_SAME
++#define pte_same(pte_a,pte_b)	((pte_present(pte_a) ? pte_val(pte_a) & ~PTE_EXT_NG	\
++					: pte_val(pte_a))				\
++				== (pte_present(pte_b) ? pte_val(pte_b) & ~PTE_EXT_NG	\
++					: pte_val(pte_b)))
++
+ #define set_pte_ext(ptep,pte,ext) cpu_set_pte_ext(ptep,__pte(pte_val(pte)|(ext)))
+ 
+ #endif /* __ASSEMBLY__ */
 -- 
 1.8.1.4
