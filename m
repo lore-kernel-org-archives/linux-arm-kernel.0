@@ -1,53 +1,116 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 23 May 2013 14:33:01 -0700
-Subject: [PATCHv6 01/11] clockevents: Prefer CPU local devices over
- global devices
-In-Reply-To: <1368473175-4841-2-git-send-email-sboyd@codeaurora.org>
-References: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
- <1368473175-4841-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <3a735301-0634-4c83-b0f6-3ecfa04675bf@DB8EHSMHS021.ehs.local>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Thu, 23 May 2013 16:36:37 -0500
+Subject: [PATCHv3 1/6] ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
+Message-ID: <1369345002-20002-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 13, 2013 at 12:26:05PM -0700, Stephen Boyd wrote:
-> On an SMP system with only one global clockevent and a dummy
-> clockevent per CPU we run into problems. We want the dummy
-> clockevents to be registered as the per CPU tick devices, but
-> we can only achieve that if we register the dummy clockevents
-> before the global clockevent or if we artificially inflate the
-> rating of the dummy clockevents to be higher than the rating
-> of the global clockevent. Failure to do so leads to boot
-> hangs when the dummy timers are registered on all other CPUs
-> besides the CPU that accepted the global clockevent as its tick
-> device and there is no broadcast timer to poke the dummy
-> devices.
-> 
-> If we're registering multiple clockevents and one clockevent is
-> global and the other is local to a particular CPU we should
-> choose to use the local clockevent regardless of the rating of
-> the device. This way, if the clockevent is a dummy it will take
-> the tick device duty as long as there isn't a higher rated tick
-> device and any global clockevent will be bumped out into
-> broadcast mode, fixing the problem described above.
-> 
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Tested-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Tested-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+From: Dinh Nguyen <dinguyen@altera.com>
 
-I tested this on Zynq. Zynq uses the ARM twd timer as clockevent devices when
-available. When I remove the twd nodes from DT the clockevent device is
-a timer common to both CPUs. Without this patch this seems to stall the
-second CPU resulting in the system to hang sooner or later.
+Add entry for 2nd GMAC controller. Add the correct clocks for the GMAC.
 
-[   65.360000] INFO: rcu_preempt detected stalls on CPUs/tasks:
-[   65.360000]  1: (1 GPs behind) idle=56e/0/0 softirq=0/0 
-[   65.360000]  (detected by 0, t=6502 jiffies, g=4294966997, c=4294966996, q=6844)
-[   65.360000] Task dump for CPU 1:
-[   65.360000] swapper/1       R running      0     0      1 0x00000000
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Reviewed-by: Pavel Machek <pavel@denx.de>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Olof Johansson <olof@lixom.net>
+Cc: Pavel Machek <pavel@denx.de>
+CC: <linux@arm.linux.org.uk>
 
-With this patch everything looks fine.
+v2:
+- Moved "disabled" status to dtsi file
+---
+ arch/arm/boot/dts/socfpga.dtsi         |   18 ++++++++++++++++--
+ arch/arm/boot/dts/socfpga_cyclone5.dts |   13 +++++++++++++
+ arch/arm/boot/dts/socfpga_vt.dts       |    5 +++++
+ 3 files changed, 34 insertions(+), 2 deletions(-)
 
-	S?ren
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 16a6e13..02bb425 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -23,6 +23,7 @@
+ 
+ 	aliases {
+ 		ethernet0 = &gmac0;
++		ethernet1 = &gmac1;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 		timer0 = &timer0;
+@@ -238,13 +239,26 @@
+ 				};
+ 			};
+ 
+-		gmac0: stmmac at ff700000 {
++		gmac0: ethernet at ff700000 {
+ 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
+ 			reg = <0xff700000 0x2000>;
+ 			interrupts = <0 115 4>;
+ 			interrupt-names = "macirq";
+ 			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+-			phy-mode = "gmii";
++			clocks = <&emac0_clk>;
++			clock-names = "stmmaceth";
++			status = "disabled";
++		};
++
++		gmac1: ethernet at ff702000 {
++			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
++			reg = <0xff702000 0x2000>;
++			interrupts = <0 120 4>;
++			interrupt-names = "macirq";
++			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
++			clocks = <&emac1_clk>;
++			clock-names = "stmmaceth";
++			status = "disabled";
+ 		};
+ 
+ 		L2: l2-cache at fffef000 {
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
+index 2495958..973999d 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
+@@ -32,6 +32,13 @@
+ 		reg = <0x0 0x40000000>; /* 1GB */
+ 	};
+ 
++	aliases {
++		/* this allow the ethaddr uboot environmnet variable contents
++		 * to be added to the gmac1 device tree blob.
++		 */
++		ethernet0 = &gmac1;
++	};
++
+ 	soc {
+ 		clkmgr at ffd04000 {
+ 			clocks {
+@@ -41,6 +48,12 @@
+ 			};
+ 		};
+ 
++		ethernet at ff702000 {
++			phy-mode = "rgmii";
++			phy-addr = <0xffffffff>; /* probe for phy addr */
++			status = "okay";
++		};
++
+ 		timer0 at ffc08000 {
+ 			clock-frequency = <100000000>;
+ 		};
+diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+index 0bf035d..d1ec0ca 100644
+--- a/arch/arm/boot/dts/socfpga_vt.dts
++++ b/arch/arm/boot/dts/socfpga_vt.dts
+@@ -41,6 +41,11 @@
+ 			};
+ 		};
+ 
++		ethernet at ff700000 {
++			phy-mode = "gmii";
++			status = "okay";
++		};
++
+ 		timer0 at ffc08000 {
+ 			clock-frequency = <7000000>;
+ 		};
+-- 
+1.7.9.5
