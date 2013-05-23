@@ -1,52 +1,49 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 23 May 2013 13:51:29 +0300
-Subject: [PATCH] dmatest: abort transfers immediately when asked for
-In-Reply-To: <20130523100932.GA30200@intel.com>
-References: <20130516153553.GI11706@mudshark.cambridge.arm.com>
- <1369139597-24446-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <20130521151143.GH10453@mudshark.cambridge.arm.com>
- <CAHp75VdRn8baf0ak57HpoJKNues6vEsjBp1uOQ2Zpvwa+B5rjA@mail.gmail.com>
- <20130523100932.GA30200@intel.com>
-Message-ID: <CAHp75Vf58kq0t7+et9i54fxjEdQfBrTWxji4xk_MS-fZgWGOdQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 23 May 2013 11:52:54 +0100
+Subject: [PATCH 3/3] ARM: cacheflush: add new iovec-based cache flushing
+ system call
+In-Reply-To: <20130327111210.GH801@MacBook-Pro.local>
+References: <1364235486-17738-1-git-send-email-will.deacon@arm.com>
+ <1364235486-17738-4-git-send-email-will.deacon@arm.com>
+ <20130327111210.GH801@MacBook-Pro.local>
+Message-ID: <20130523105254.GE31543@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 1:09 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Tue, May 21, 2013 at 08:24:15PM +0300, Andy Shevchenko wrote:
->> On Tue, May 21, 2013 at 6:11 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > On Tue, May 21, 2013 at 01:33:17PM +0100, Andy Shevchenko wrote:
->> >> When thread is going to be stopped we have to unconditionally terminate all
->> >> ongoing transfers. Otherwise it would be possible that callback function will
->> >> be called on the next interrupt and will try to access to already freed
->> >> structures.
->> >>
->> >> The patch introduces specific error message for this, though it doesn't
->> >> increase the counter of the failed tests.
->> >>
->> > Thanks for persevering with this! Although this patch definitely fixes the
->> > panic I was seeing, I now observe buffer verification failures in subsequent
->> > test runs after an aborted run:
->>
->> I think the description to the commit adfa543e "dmatest: don't use
->> set_freezable_with_signal()" may shed light on this.
->>
->> The background (if  I got it correctly) is in race with done flag. So,
->> we got a callback call from the DMA engine, but we don't know which
->> transfer triggers it.
->> I might be wrong. This is just an assumption.
->>
->> Have you ever see such behaviour on pre v3.10-rc1 kernels? (I mean
->> with old dmatest module)
-> Terminate shouldnt cause the issue with buffer verfication, can you try this on
-> dw_dmac, do you see similar failures on verfication?
+On Wed, Mar 27, 2013 at 11:12:11AM +0000, Catalin Marinas wrote:
+> On Mon, Mar 25, 2013 at 06:18:06PM +0000, Will Deacon wrote:
+> > +static inline int
+> > +do_cache_op_iov(const struct iovec __user *uiov, unsigned long cnt, int flags)
+> > +{
+> > +	int i, ret = 0;
+> > +	unsigned long len = cnt * sizeof(struct iovec);
+> > +	struct iovec *iov = kmalloc(len, GFP_KERNEL);
+> > +
+> > +	if (iov == NULL) {
+> > +		ret = -ENOMEM;
+> > +		goto out;
+> > +	}
+> > +
+> > +	if (copy_from_user(iov, uiov, len)) {
+> > +		ret = -EFAULT;
+> > +		goto out_free;
+> > +	}
+> > +
+> > +	for (i = 0; i < cnt; ++i) {
+> > +		unsigned long start = (unsigned long __force)iov[i].iov_base;
+> > +		unsigned long end = start + iov[i].iov_len;
+> > +		ret = do_cache_op(start, end, flags);
+> > +		if (ret)
+> > +			break;
+> > +	}
+> 
+> Could you use get_user() on struct iovec fields directly to avoid
+> kmalloc? It would be slightly faster.
 
-I saw the similar errors on dw_dmac on Intel Medfield device.
-Anyway, I checked another approach with Will.
-For now I will send a quick fix that prevents tester to abort an
-ongoing transfer.
-In future we could implement a robust logic when transfers can be
-interrupted at any time.
+I just had a look at this, but the problem is that we want to know the
+entire (combined) region size so that we may just decide to flush the entire
+cache, rather than iterate over each region line-by-line. This requires
+copying the whole iovec into kernel space up front, so that we can iterate
+over the regions with iov_length.
 
--- 
-With Best Regards,
-Andy Shevchenko
+Will
