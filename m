@@ -1,58 +1,56 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 23 May 2013 10:37:51 -0400 (EDT)
-Subject: [RFC V6 PATCH 3/3] USB: OHCI: make ohci-pci a separate driver
-In-Reply-To: <1369307506-4458-4-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1305231034110.925-100000@iolanthe.rowland.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 23 May 2013 16:41:25 +0200
+Subject: [PATCH v2 0/6] Support new Marvell bootloaders for Armada 370/XP
+In-Reply-To: <1369315854-32724-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1369315854-32724-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <519E2A95.1040600@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 May 2013, Manjunath Goudar wrote:
+Hi Thomas,
+On 05/23/2013 03:30 PM, Thomas Petazzoni wrote:
 
-> This patch splits the PCI portion of ohci-hcd out into its
-> own separate driver module, called ohci-pci.
+[...]
+
+> Best regards,
 > 
-> The major point of difficulty lies in ohci-pci's many vendor- and
-> device-specific workarounds.  Some of them have to be applied before
-> calling ohci_start() some after, which necessitates a fair amount of
-> code motion.  The other platform drivers require much smaller changes.
+> Thomas
 > 
-> The complete sb800_prefetch() function moved to ohci-q.c,because its
-> only related to ohci-pci driver.
+> Thomas Petazzoni (6):
+>   arm: mvebu: remove dependency of SMP init on static I/O mapping
+>   arm: mvebu: avoid hardcoded virtual address in coherency code
+>   arm: mvebu: move cache and mvebu-mbus initialization later
+>   arm: mvebu: remove hardcoded static I/O mapping
+>   arm: mvebu: don't hardcode a physical address in headsmp.S
+>   arm: mvebu: support new bootloaders shipped by Marvell
+
+I have already reviewed it internally. All the changes are really
+limited to mvebu and do not impact any other subsystem. So you
+have my acked-by, and once Jason Cooper will have given his Acked-by,
+then I think we will be able to apply the series on mvebu/ branches.
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Thanks,
+
 > 
-> V2:
->   - few specific content of pci related code in ohci_pci_start function has been moved to ohci_pci_reset
->     and rest of the generic code is written in ohci_start of ohci-hcd.c file.
-> V3:
->  - ohci_restart() has been called in ohci_pci_reset() function for to reset the ohci pci.
+>  arch/arm/boot/dts/armada-370-xp.dtsi |    2 +-
+>  arch/arm/boot/dts/armada-370.dtsi    |    3 +-
+>  arch/arm/boot/dts/armada-xp-gp.dts   |    2 +-
+>  arch/arm/include/debug/mvebu.S       |   77 +++++++++++++++++++--
+>  arch/arm/mach-mvebu/armada-370-xp.c  |  124 +++++++++++++++++++++++++++++-----
+>  arch/arm/mach-mvebu/armada-370-xp.h  |    4 +-
+>  arch/arm/mach-mvebu/coherency.c      |   36 ++++------
+>  arch/arm/mach-mvebu/coherency.h      |    4 --
+>  arch/arm/mach-mvebu/common.h         |    2 +
+>  arch/arm/mach-mvebu/headsmp.S        |   20 +++---
+>  arch/arm/mach-mvebu/platsmp.c        |   10 ++-
+>  11 files changed, 220 insertions(+), 64 deletions(-)
 > 
-> V4:
->  -sb800_prefetch() moved to ohci-q.c,because its only related to ohci-pci.
->  -no longer _creating_ CONFIG_USB_OHCI_PCI,creating CONFIG_USB_OHCI_HCD_PCI.
->  -overrides renamed with pci_override,its giving proper meaning.
-> 
-> V5:
->  -sb800_prefetch() moved to pci-quirks.c,because its only related to pci.
-> 
-> V6:
->  -sb800_prefetch() function has been moved to pci-quirks.c made as separate patch in 2/3.
->  -Most of the generic ohci pci changes moved in 2/3 patch,now this is complete  ohci-pci separation patch.
 
-This patch has a lot of extra stuff in it.  It looks like you forgot to
-undo a bunch of things from the previous version, things that are no
-longer needed.
 
-As I said before, you really need to proofread your patches before
-emailing them.  Don't rely on other people to find your mistakes.
-
-Also, you left out one thing that should still be here.  What happened 
-to the part about changing
-
-#if	!defined(PCI_DRIVER) &&		\
-
-to
-
-#if	!ENABLED(CONFIG_USB_OHCI_HCD_PCI) &&	\
-
-?
-
-Alan Stern
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
