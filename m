@@ -1,44 +1,28 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 23 May 2013 20:57:26 +0200
-Subject: [PATCH 0/4] Marvell PCIe driver improvements
-In-Reply-To: <20130523164654.GA31281@obsidianresearch.com>
-References: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130523001353.GH31625@1wt.eu>
- <20130523164654.GA31281@obsidianresearch.com>
-Message-ID: <20130523205726.05ba45bf@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 23 May 2013 21:00:51 +0200
+Subject: [PATCH v2] mmc: mmci: Allow MMCI to request channels with
+ information acquired from DT
+In-Reply-To: <20130424155547.GA4623@gmail.com>
+References: <1366801122-13302-1-git-send-email-lee.jones@linaro.org>
+ <20130424155547.GA4623@gmail.com>
+Message-ID: <CACRpkdbr4Lm4NGHzX4TTq4fYwFahwC82fQSBg_V=SGVKkqFdUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Gunthorpe,
+On Wed, Apr 24, 2013 at 5:55 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-On Thu, 23 May 2013 10:46:54 -0600, Jason Gunthorpe wrote:
+> Currently, if DMA information isn't passed from platform data, then DMA
+> will not be used. This patch allows DMA information obtained though Device
+> Tree to be used as well.
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: linux-mmc at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-> > FWIW, these patches applied on top of your pcie-v10 tree have made
-> > my mini-pcie dual-nic appear for the first time on the mirabox. Till
-> > now I never knew if it was a hardware or software issue since the NIC
-> > does not appear in u-boot nor lspci, whatever the kernel versions,
-> > including the original Marvell one's. The NIC has two functions (one
-> > per controller) and no bridge, so it may be a side effect of your
-> > improvements (or maybe you fixed a bug).
-> 
-> There was some talk earlier that some buggy chips required their
-> device number to be 0. I'm guessing Thomas's change to ensure that
-> always happens by moving the device number of the internal device is
-> the root fix here?
+I've now tested this v2 version with device tree on Nomadik and
+U300 and it works like a charm.
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
 
-You're correct. Off-list, I've sent to Willy a patch that applies on
-top of those additional "bridge-related" fixes, but that reverts back
-the slot number of the real PCIe device to be 1 instead of 0. And in
-this case, the PCIe device that Willy is using is not detected.
-
-So indeed, there are some PCIe devices who really want to receive
-"configuration transactions" as slot 0.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yours,
+Linus Walleij
