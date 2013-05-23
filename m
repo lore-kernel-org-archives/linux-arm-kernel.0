@@ -1,61 +1,75 @@
-From: dhobsong@igel.co.jp (Damian Hobson-Garcia)
-Date: Thu, 23 May 2013 11:47:13 +0900
-Subject: [PATCH v2 0/4] dma-mapping: Define dma_{alloc,free}_attrs() for
- all archs
-In-Reply-To: <20130522094741.GE14322@arm.com>
-References: <1367290899-10410-1-git-send-email-dhobsong@igel.co.jp>
- <519C2F5D.8000809@igel.co.jp> <20130522094741.GE14322@arm.com>
-Message-ID: <519D8331.3060203@igel.co.jp>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 23 May 2013 10:51:01 +0800
+Subject: [PATCH v3] tty: serial: add Freescale lpuart driver support
+In-Reply-To: <13F8657A829DAB49A2A937FD6FC10F790B3CECEB@039-SN2MPN1-012.039d.mgd.msft.net>
+References: <1368685096-13177-1-git-send-email-b35083@freescale.com>
+ <20130520030523.GB25113@S2101-09.ap.freescale.net>
+ <13F8657A829DAB49A2A937FD6FC10F790B3CDB85@039-SN2MPN1-012.039d.mgd.msft.net>
+ <CAAQ0ZWRz+byPKxMjDH3zKsc0u4bmkPO_1u6w2H4Z7nD0z8+9ig@mail.gmail.com>
+ <13F8657A829DAB49A2A937FD6FC10F790B3CECEB@039-SN2MPN1-012.039d.mgd.msft.net>
+Message-ID: <20130523025059.GB2704@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-On 2013/05/22 18:47, Catalin Marinas wrote:
-> On Wed, May 22, 2013 at 03:37:17AM +0100, Damian Hobson-Garcia wrote:
->> Hello,
->> On 2013/04/30 12:01, Damian Hobson-Garcia wrote:
->>> Most architectures that define CONFIG_HAVE_DMA=y, have implementations for
->>> both dma_alloc_attrs() and dma_free_attrs().  All achitectures that do
->>> not define CONFIG_HAVE_DMA also have both of these definitions provided by
->>> dma-mapping-broken.h.
-> 
-> BTW, shouldn't this be called CONFIG_HAVE_DMA_ATTRS?
+On Wed, May 22, 2013 at 08:59:20AM +0000, Jin Zhengxiong-R64188 wrote:
+> [Jason Jin-R64188] For the lpuart itself, I do not think it will have different version IP.
 
-CONFIG_HAVE_DMA_ATTRS is currently used to enable the functions to
-set/get the DMA attribute values. Poking through the headers, it looks
-like the struct dma_attrs is defined regardless of the
-CONFIG_HAVE_DMA_ATTRS setting, so in that respect
-we always seem to "have" DMA attributes (if we have DMA), but they may
-not always be meaningful (ie. set to some value).
+You can never tell in 5 or 10 years.  Also no major version doesn't
+necessarily mean no minor updates or revise.
 
+> The general name is sufficient and soc related name can introduce the minor difference. If the there are update version, we can name it lpuart2.0 or something like that.
 > 
->>> Provide a default definition for the archs that define CONFIG_HAVE_DMA=y,
->>> but have no implementation for dma_{alloc,free}_attrs(). 
->>>
->>> As I don't have hardware for any of these systems, the patches are only
->>> compile-tested where I could (arm64, s390) and untested for the archs
->>> where I couldn't find a readily available prebuilt cross-compiler (c6x, parisc).
->>
->>>  arch/arm64/include/asm/dma-mapping.h  |   17 +++++++++++------
->>>  arch/c6x/include/asm/dma-mapping.h    |    3 +++
->>>  arch/parisc/include/asm/dma-mapping.h |    3 +++
->>>  arch/s390/include/asm/dma-mapping.h   |   17 +++++++++++------
->>>  4 files changed, 28 insertions(+), 12 deletions(-)
->>>
->>
->> Since this series spans several architectures, what would be the best
->> way to have this patch series merged?
->> Should I resubmit each patch to the mailing list for each architecture
->> separately?
-> 
-> I'm happy to take the arm64 patch.
-Very much appreciated.
 
+Yeah, if IP designers name it lpuart2.0, it surely works.  But from my
+experience on IMX, hardware guys are not always properly updating IP
+name.  Then the version 2.0 becomes a versioning given by software
+people which is improper to be used in compatible string.
+
+> For the compatible property itself, the ePAPR described it as:
+> ---- 
+> The compatible property value consists of one or more strings that define the specific programming model for the device. This list of strings should be used by a client program for device driver selection. The property value consists of a concatenated list of null terminated strings, from most specific to most general. 
+> ----
+> So for the IPs especially for the peripheral IPs, the compatible just used to select the driver for the device.
+
+Not only select the driver but also the programing model implemented in
+the driver.  Take a look at drivers/mmc/host/sdhci-esdhc-imx.c or
+drivers/net/ethernet/freescale/fec_main.c, multiple compatible strings
+select the same driver but the different programing model implemented in
+the driver.
+
+> It should not used to describe the version information.
+
+Seriously?  The "version" equally means the compatibility here.  How can
+a compatible string be not used to describe "version" - compatibility?
+
+> If the version changed and the driver cannot be used for the device then another compatible strings should be used.
 > 
-> Thanks.
+
+If the IP gets a revise, the driver should be updated to support a new
+programing model with a new compatible string.
+
+> As I said, Another reason for the general strings used is the across platform issue, It's maybe reasonably to name the compatible strings as you recommended for the IPs share in the same SoC family. But for the IPs shared across platform, general name sound more reasonably to avoid the product line confusing. 
 > 
-Damian
--- 
-Damian Hobson-Garcia
-IGEL Co.,Ltd
-http://www.igel.co.jp
+
+Think about it from "compatibility" point of view.  It does not cause
+confusion but just help understand the compatible history.  Saying the
+same IP is reused on LS-1 SoC, I do not see a problem with putting the
+following compatible into LS-1 <soc>.dtsi under UART node, to tell that
+the UART block on LS-1 is completely compatible with the one used on
+MVF600.
+
+  compatible = "fsl,ls1-uart", "fsl,mvf600-uart";
+
+> The compatible strings once named as you said for Power platform, but more general strings were used later as IPs shared for more SoCs.
+> 
+
+I think IMX device tree support is added more recently than Power.
+Encoding SoC name in IP compatible string is a general practise for IMX
+device tree bindings.
+
+Shawn
+
+> I was wondering what's kind of strings should be used for this kind of IPs across different platforms. I added Grant Likely for comments, Thanks.
+> 
+> Jason 
+> 
