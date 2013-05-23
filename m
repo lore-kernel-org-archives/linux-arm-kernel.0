@@ -1,47 +1,202 @@
-From: valentin.longchamp@keymile.com (Valentin Longchamp)
-Date: Thu, 23 May 2013 15:17:52 +0200
-Subject: [PATCH] ARM: kirkwood: refactor dtsi to largest common nodes
-In-Reply-To: <20130523114025.GO31290@titan.lakedaemon.net>
-References: <1369301130-29900-1-git-send-email-valentin.longchamp@keymile.com>
- <20130523114025.GO31290@titan.lakedaemon.net>
-Message-ID: <519E1700.5040906@keymile.com>
+From: prakash.pm@ti.com (Manjunathappa, Prakash)
+Date: Thu, 23 May 2013 13:25:57 +0000
+Subject: [PATCH 1/4] ARM: davinci: uart: move to dev_id based clk_get
+In-Reply-To: <517A2661.3000605@ti.com>
+References: <1365510481-32129-1-git-send-email-prakash.pm@ti.com>
+ <1365510664-1394-2-git-send-email-prakash.pm@ti.com>
+ <517A2661.3000605@ti.com>
+Message-ID: <A73F36158E33644199EB82C5EC81C7BC3EA6726A@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+Hi Sekhar,
 
-On 05/23/2013 01:40 PM, Jason Cooper wrote:
-> Valentin,
+Thanks for reviewing.
+
+On Fri, Apr 26, 2013 at 12:31:53, Nori, Sekhar wrote:
+> Hi Prakash,
 > 
-> On Thu, May 23, 2013 at 11:25:30AM +0200, Valentin Longchamp wrote:
->> Some kirkwood variants (for instance present in the prestera SoCs) do
->> not have all the peripherals whose nodes are initialized in the
->> kirkwood.dtsi. These missing peripherals are SATA, SDIO, and RTC.
+> On 4/9/2013 6:01 PM, Manjunathappa, Prakash wrote:
+> > For modules having single clock, clk_get should be done with dev_id.
+> > But current davinci implementation handles multiple instances
+> > of the UART devices with single platform_device_register. Hence clk_get
+> > is based on con_id rather than dev_id, this is not correct. Do
+> > platform_device_register for each instance and clk_get on dev_id.
+> > 
+> > Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+> > ---
+> >  arch/arm/mach-davinci/da830.c                  |    8 ++--
+> >  arch/arm/mach-davinci/da850.c                  |    8 ++--
+> >  arch/arm/mach-davinci/devices-da8xx.c          |   40 ++++++++++++++++---
+> >  arch/arm/mach-davinci/devices-tnetv107x.c      |   35 ++++++++++++++---
+> >  arch/arm/mach-davinci/dm355.c                  |   48 ++++++++++++++++++-----
+> >  arch/arm/mach-davinci/dm365.c                  |   35 ++++++++++++----
+> >  arch/arm/mach-davinci/dm644x.c                 |   48 ++++++++++++++++++-----
+> >  arch/arm/mach-davinci/dm646x.c                 |   49 +++++++++++++++++++-----
+> >  arch/arm/mach-davinci/include/mach/da8xx.h     |    2 +-
+> >  arch/arm/mach-davinci/include/mach/tnetv107x.h |    2 +-
+> >  arch/arm/mach-davinci/serial.c                 |   19 ++++++---
+> >  arch/arm/mach-davinci/tnetv107x.c              |    8 ++--
+> >  12 files changed, 230 insertions(+), 72 deletions(-)
 > 
-> Could you provide a little more detail here about the exact problem this
-> is solving?
-
-Sure, I will add more detail.
-
+> [...]
 > 
->> Their corresponding nodes are moved from kirkwood.dtsi to the
->> kirkwood-628x.dtsi files so that they still are initialized for these
->> variants.
->>
->> Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
->> ---
->>  arch/arm/boot/dts/kirkwood-6281.dtsi | 24 ++++++++++++++++++++++++
->>  arch/arm/boot/dts/kirkwood-6282.dtsi | 24 ++++++++++++++++++++++++
->>  arch/arm/boot/dts/kirkwood.dtsi      | 24 ------------------------
->>  3 files changed, 48 insertions(+), 24 deletions(-)
+> > diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> > index fc50243..eec7132 100644
+> > --- a/arch/arm/mach-davinci/devices-da8xx.c
+> > +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> > @@ -67,7 +67,7 @@
+> >  void __iomem *da8xx_syscfg0_base;
+> >  void __iomem *da8xx_syscfg1_base;
+> >  
+> > -static struct plat_serial8250_port da8xx_serial_pdata[] = {
+> > +static struct plat_serial8250_port da8xx_serial_pdata0[] = {
 > 
-> What about kirkwood-nsa310.dts?
+> da8xx_serial0_pdata is more appropriate. Likewise for other entries below.
 > 
 
-Argh, this one slipped through my net when I checked that all .dts except
-km_kirkwood somehow include 628[x].dtsi.
+True, will change them.
 
-I guess it would be OK to just include kirkwood-6281.dtsi in kirkwood-nsa310.dts
-as well. Does someone have access to the HW to actually test it ?
+> >  	{
+> >  		.mapbase	= DA8XX_UART0_BASE,
+> >  		.irq		= IRQ_DA8XX_UARTINT0,
+> > @@ -77,6 +77,11 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
+> >  		.regshift	= 2,
+> >  	},
+> >  	{
+> > +		.flags	= 0,
+> > +	},
+> 
+> No need of trailing ',' on sentinel. No need of the zero initialization.
+> Here and other places below.
+> 
 
-Valentin
+Ok. I will remove them.
+
+> > +};
+> > +static struct plat_serial8250_port da8xx_serial_pdata1[] = {
+> > +	{
+> >  		.mapbase	= DA8XX_UART1_BASE,
+> >  		.irq		= IRQ_DA8XX_UARTINT1,
+> >  		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+> > @@ -85,6 +90,11 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
+> >  		.regshift	= 2,
+> >  	},
+> >  	{
+> > +		.flags	= 0,
+> > +	},
+> > +};
+> > +static struct plat_serial8250_port da8xx_serial_pdata2[] = {
+> > +	{
+> >  		.mapbase	= DA8XX_UART2_BASE,
+> >  		.irq		= IRQ_DA8XX_UARTINT2,
+> >  		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST |
+> > @@ -97,11 +107,29 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
+> >  	},
+> >  };
+> >  
+> > -struct platform_device da8xx_serial_device = {
+> > -	.name	= "serial8250",
+> > -	.id	= PLAT8250_DEV_PLATFORM,
+> > -	.dev	= {
+> > -		.platform_data	= da8xx_serial_pdata,
+> > +struct platform_device da8xx_serial_device[] = {
+> > +	{
+> > +		.name	= "serial8250",
+> > +		.id	= PLAT8250_DEV_PLATFORM,
+> > +		.dev	= {
+> > +			.platform_data	= da8xx_serial_pdata0,
+> > +		},
+> > +	},
+> > +	{
+> > +		.name	= "serial8250",
+> > +		.id	= PLAT8250_DEV_PLATFORM1,
+> > +		.dev	= {
+> > +			.platform_data	= da8xx_serial_pdata1,
+> > +		},
+> > +	},
+> > +	{
+> > +		.name	= "serial8250",
+> > +		.id	= PLAT8250_DEV_PLATFORM2,
+> > +		.dev	= {
+> > +			.platform_data	= da8xx_serial_pdata2,
+> > +		},
+> > +	},
+> > +	{
+> >  	},
+> >  };
+> 
+> [...]
+> 
+> > diff --git a/arch/arm/mach-davinci/serial.c b/arch/arm/mach-davinci/serial.c
+> > index f262581..57e6150 100644
+> > --- a/arch/arm/mach-davinci/serial.c
+> > +++ b/arch/arm/mach-davinci/serial.c
+> > @@ -76,7 +76,7 @@ int __init davinci_serial_setup_clk(unsigned instance, unsigned int *rate)
+> >  	char name[16];
+> >  	struct clk *clk;
+> >  	struct davinci_soc_info *soc_info = &davinci_soc_info;
+> > -	struct device *dev = &soc_info->serial_dev->dev;
+> > +	struct device *dev = &soc_info->serial_dev[instance].dev;
+> >  
+> >  	sprintf(name, "uart%d", instance);
+> >  	clk = clk_get(dev, name);
+> 
+> Why not pass con_id = NULL now?
+> 
+
+Correct, I will change it.
+
+> > @@ -96,19 +96,25 @@ int __init davinci_serial_setup_clk(unsigned instance, unsigned int *rate)
+> >  
+> >  int __init davinci_serial_init(struct davinci_uart_config *info)
+> >  {
+> > -	int i, ret;
+> > +	int i, ret = 0;
+> >  	struct davinci_soc_info *soc_info = &davinci_soc_info;
+> > -	struct device *dev = &soc_info->serial_dev->dev;
+> > -	struct plat_serial8250_port *p = dev->platform_data;
+> > +	struct device *dev;
+> > +	struct plat_serial8250_port *p;
+> >  
+> >  	/*
+> >  	 * Make sure the serial ports are muxed on at this point.
+> >  	 * You have to mux them off in device drivers later on if not needed.
+> >  	 */
+> > -	for (i = 0; p->flags; i++, p++) {
+> > +	for (i = 0; soc_info->serial_dev[i].dev.platform_data != NULL; i++) {
+> > +		dev = &soc_info->serial_dev[i].dev;
+> > +		p = dev->platform_data;
+> >  		if (!(info->enabled_uarts & (1 << i)))
+> >  			continue;
+> >  
+> > +		ret = platform_device_register(&soc_info->serial_dev[i]);
+> > +		if (ret)
+> > +			continue;
+> > +
+> >  		ret = davinci_serial_setup_clk(i, &p->uartclk);
+> >  		if (ret)
+> >  			continue;
+> > @@ -125,6 +131,5 @@ int __init davinci_serial_init(struct davinci_uart_config *info)
+> >  		if (p->membase && p->type != PORT_AR7)
+> >  			davinci_serial_reset(p);
+> >  	}
+> > -
+> > -	return platform_device_register(soc_info->serial_dev);
+> > +	return ret;
+> >  }
+> 
+> Now that we are overhauling this part of code, some improvements can be
+> done. First, get rid of struct davinci_uart_config. None of the board
+> files use it meaningfully and we know we are not going to have more
+> board files. Second, make davinci_serial_init() take pointer to serial
+> platform device directly. This eliminates need for serial_dev in the
+> soc_info structure (yay!). You might also find that
+> davinci_serial_setup_clk() can be eliminated as well since there is not
+> much to do there now.
+> 
+
+Ok I will cleanup this and submit v2.
+
+Thanks,
+Prakash
