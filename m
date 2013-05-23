@@ -1,55 +1,64 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Thu, 23 May 2013 11:53:57 -0600
-Subject: [PATCH 2/2] net: mv643xx_eth: proper initialization for Kirkwood
- SoCs
-In-Reply-To: <20130523172339.GQ31290@titan.lakedaemon.net>
-References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369253042-15082-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369253042-15082-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130522201607.GA18823@obsidianresearch.com>
- <20130523160111.GP31290@titan.lakedaemon.net>
- <20130523171112.GB31281@obsidianresearch.com>
- <20130523172339.GQ31290@titan.lakedaemon.net>
-Message-ID: <20130523175357.GB2821@obsidianresearch.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 23 May 2013 10:54:26 -0700
+Subject: [PATCH] ARM: avoid mis-detecting some V7 cores in the decompressor
+In-Reply-To: <5193E424.9090605@codeaurora.org>
+References: <1368049671-22879-1-git-send-email-sboyd@codeaurora.org>
+ <5193E424.9090605@codeaurora.org>
+Message-ID: <519E57D2.3050000@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 01:23:39PM -0400, Jason Cooper wrote:
+On 05/15/13 12:38, Stephen Boyd wrote:
+> On 05/08/13 14:47, Stephen Boyd wrote:
+>> From: Brian Swetland <swetland@google.com>
+>>
+>> Currently v7 CPUs with an MIDR that has no bits set in the range
+>> [16:12] will be detected as old ARM CPUs with no caches and so
+>> the cache will never be turned on during decompression. ARM's
+>> Cortex chips have an 0xC in the range [16:12] so they never match
+>> this entry, but Qualcomm's Scorpion and Krait processors never
+>> set these bits to anything besides 0 so they always match.
+>>
+>> Skip this entry if we've compiled in support for v7 CPUs. This
+>> allows kernel decompression to happen nearly instantly instead of
+>> taking over 20 seconds.
+>>
+>> Signed-off-by: Brian Swetland <swetland@google.com>
+>> [sboyd: Clarified and extended commit text]
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+> Ping?
 
-> Shouldn't it rather be
-> 
-> 	compatible = "marvell,kirkwood-eth", "marvell,orion-eth";
+Russell, shall I add this to the patch tracker?
 
-Not sure about orion-eth?
- 
-> I'm inclined to go with of_machine_is_compatible() since the only
-> concrete difference we know is that the tweak is needed on kirkwood and
-> nowhere else.
+>
+>>  arch/arm/boot/compressed/head.S | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+>> index fe4d9c3..a236190 100644
+>> --- a/arch/arm/boot/compressed/head.S
+>> +++ b/arch/arm/boot/compressed/head.S
+>> @@ -805,6 +805,8 @@ call_cache_fn:	adr	r12, proc_types
+>>  		.align	2
+>>  		.type	proc_types,#object
+>>  proc_types:
+>> +#if !defined(CONFIG_CPU_V7)
+>> +		/* This collides with some V7 IDs, preventing correct detection */
+>>  		.word	0x00000000		@ old ARM ID
+>>  		.word	0x0000f000
+>>  		mov	pc, lr
+>> @@ -813,6 +815,7 @@ proc_types:
+>>   THUMB(		nop				)
+>>  		mov	pc, lr
+>>   THUMB(		nop				)
+>> +#endif
+>>  
+>>  		.word	0x41007000		@ ARM7/710
+>>  		.word	0xfff8fe00
+>
 
-But there is a larger problem here then just this one bit.
 
-The PSC1 register must be set properly for the board layout, and today
-we rely on the bootloader to set it. In fact, even with Sebastian's
-change the ethernet port won't work without bootloader
-intervention. The PortReset bit should also be cleared by the driver
-(and it is only present on some variants of this IP block,
-apparently).
-
-We know that some Marvell SOC's wack the ethernet registers when they
-clock gate, and the flip of Clk125Bypass is another symptom of this
-general problem.
-
-So, long term, the PSC1 must be fully set by the driver, based on DT
-information describing the board (eg RGMII/MII/1000Base-X [SFP] Phy
-type), and the layout of this register seems to vary on a SOC by SOC
-basis.
-
-Thus, I think it is appropriate to call this variant of the eth IP
-'marvell,kirkwood-eth' which indicates that the register block follows
-the kirkwood manual and the PSC1 register specifically has the
-kirkwood layout.
-
-The question is what other Marvell SOCs have the same PSC1 layout as
-kirkwood?
-
-Jason
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
