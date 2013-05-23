@@ -1,84 +1,71 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 23 May 2013 14:26:22 -0400
-Subject: [PATCH v2 0/3] Marvell PCIe driver improvements
-In-Reply-To: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130523182622.GT31290@titan.lakedaemon.net>
+Date: Thu, 23 May 2013 14:40:28 -0400
+Subject: [PATCH 2/2] net: mv643xx_eth: proper initialization for
+ Kirkwood SoCs
+In-Reply-To: <20130523175357.GB2821@obsidianresearch.com>
+References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369253042-15082-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369253042-15082-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130522201607.GA18823@obsidianresearch.com>
+ <20130523160111.GP31290@titan.lakedaemon.net>
+ <20130523171112.GB31281@obsidianresearch.com>
+ <20130523172339.GQ31290@titan.lakedaemon.net>
+ <20130523175357.GB2821@obsidianresearch.com>
+Message-ID: <20130523184028.GU31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 04:32:50PM +0200, Thomas Petazzoni wrote:
-> Bjorn, Jason, Andrew, Gregory,
+On Thu, May 23, 2013 at 11:53:57AM -0600, Jason Gunthorpe wrote:
+> On Thu, May 23, 2013 at 01:23:39PM -0400, Jason Cooper wrote:
 > 
-> Here is an updated version of the PCIe improvements.
+> > Shouldn't it rather be
+> > 
+> > 	compatible = "marvell,kirkwood-eth", "marvell,orion-eth";
 > 
-> Changes since v1:
+> Not sure about orion-eth?
+>  
+> > I'm inclined to go with of_machine_is_compatible() since the only
+> > concrete difference we know is that the tweak is needed on kirkwood and
+> > nowhere else.
 > 
->  * Fix some typos in the comments of PATCH 2, noticed by Bjorn
->    Helgaas.
+> But there is a larger problem here then just this one bit.
 > 
->  * Rework the two last patches (first one was fixing the capability
->    list, the other one the emulation of the devsel bits in the status
->    register), after the comments of Bjorn. In fact, it turns out that
->    the status register is composed of read-only bits for which we want
->    to emulate a value of zero, and the other bits are write-1-to-clear
->    bits that expose error conditions that we do not handle in the
->    emulated bridge. So, in summary, emulating a 0 status register on
->    reads, and ignoring writes to the status register is the simplest
->    solution. If we later on implement a capability list, we can use a
->    more clever emulation of the status register, but for the moment,
->    this simple solution is enough. Therefore, the two last patches are
->    now one single, simpler patch.
+> The PSC1 register must be set properly for the board layout, and today
+> we rely on the bootloader to set it. In fact, even with Sebastian's
+> change the ethernet port won't work without bootloader
+> intervention. The PortReset bit should also be cleared by the driver
+> (and it is only present on some variants of this IP block,
+> apparently).
 > 
-> I'd like those improvements to be kept separated from the original
-> PCIe driver itself: while the PCIe driver has been around and reviewed
-> for a long time, those improvements are newer. And I clearly do not
-> want the PCIe driver to miss 3.11 because of any problem that could be
-> found in those additional improvements.
+> We know that some Marvell SOC's wack the ethernet registers when they
+> clock gate, and the flip of Clk125Bypass is another symptom of this
+> general problem.
 > 
-> The main improvement being brought here is that the PCI-to-PCI bridge
-> logic is fixed/extended to properly support physical PCIe bridges that
-> are connected on a PCIe interface of a Marvell board. Without this
-> improvement, only the devices connected directly to the PCIe
-> interfaces of the board are properly enumerated. Any device that would
-> sit beyond a physical bridge is not visible.
+> So, long term, the PSC1 must be fully set by the driver, based on DT
+> information describing the board (eg RGMII/MII/1000Base-X [SFP] Phy
+> type), and the layout of this register seems to vary on a SOC by SOC
+> basis.
 > 
-> Bjorn, with your Acked-by, could the Marvell maintainers include those
-> patches in their branch, merged through arm-soc? They already have the
-> Marvell PCIe driver itself, so I believe it makes sense to merge those
-> improvements through the same path.
-> 
-> Jason, those patches have been prepared on top of my marvell-pcie-v10
-> branch, I hope that's ok for you. If you want me to rebase them on
-> some other branch in which you have integrated the PCIe driver, don't
-> hesitate to tell me to do so. That said, since those patches are only
-> touching the driver itself and no other file, they should not cause
-> any conflict with other changes.
-> 
-> Thanks,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (3):
->   pci: mvebu: no longer fake the slot location of downstream devices
->   pci: mvebu: allow the enumeration of devices beyond physical bridges
->   pci: mvebu: fix the emulation of the status register
-> 
->  drivers/pci/host/pci-mvebu.c |   55 +++++++++++++++++++++++++++++++++---------
->  1 file changed, 44 insertions(+), 11 deletions(-)
+> Thus, I think it is appropriate to call this variant of the eth IP
+> 'marvell,kirkwood-eth' which indicates that the register block follows
+> the kirkwood manual and the PSC1 register specifically has the
+> kirkwood layout.
 
-Whole series applied to mvebu/pcie_bridge with Bjorn's Ack.  The whole
-pcie tree now looks like:
+Ok, so mv643xx_eth would match both "marvell,orion-eth" and
+"marvell,kirkwood-eth", then write to PSC1 iff it sees a node matching
+"marvell,kirkwood-eth".  I'm not too keen on that, however, the matching
+of the machine doesn't look to good, either.
 
-        /-mvebu/of_pci  /-mvebu/pcie
-        |               |
-+---+---+---+---+---+---+---+---+---+---+ mvebu/pcie_bridge
-                        |
-                        \---+---+---+---+ mvebu/pcie_kirkwood
-(not to scale :) )
+Perhaps a better answer is to add a boolean, "marvell,kirkwood_psc1" and
+check for that?
 
-This is getting pretty hairy, do you intend on anything else for mvebu
-pcie for this merge window?
+Or, marvell,psc1_reset = <0xWWXXYYZZ>;
+
+> The question is what other Marvell SOCs have the same PSC1 layout as
+> kirkwood?
+
+I think marvell,psc1_reset = <>; gives us the most flexibility in
+accurately describing the hardware.
 
 thx,
 
