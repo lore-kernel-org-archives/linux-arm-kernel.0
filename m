@@ -1,65 +1,136 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 May 2013 12:24:01 +0100
-Subject: [PATCH] arch: configuration, deleting 'CONFIG_BUG' since
- always need it.
-In-Reply-To: <201305231259.43750.arnd@arndb.de>
-References: <519DCBEF.3090208@asianux.com> <201305231139.38233.arnd@arndb.de>
- <20130523100409.GK18614@n2100.arm.linux.org.uk>
- <201305231259.43750.arnd@arndb.de>
-Message-ID: <20130523112401.GO18614@n2100.arm.linux.org.uk>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Thu, 23 May 2013 14:29:53 +0300
+Subject: [PATCH] dmatest: do not allow to interrupt ongoing tests
+Message-ID: <1369308593-3723-1-git-send-email-andriy.shevchenko@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 12:59:43PM +0200, Arnd Bergmann wrote:
-> On Thursday 23 May 2013, Russell King - ARM Linux wrote:
-> > So, if you want to use this, then you should update the CONFIG_BUG text
-> > to include a warning to this effect:
-> > 
-> >      Warning: if CONFIG_BUG is turned off, and control flow reaches
-> >      a BUG(), the system behaviour will be undefined.
-> > 
-> > so that people can make an informed choice about this, because at the
-> > moment:
-> > 
-> >           Disabling this option eliminates support for BUG and WARN, reducing
-> >           the size of your kernel image and potentially quietly ignoring
-> >           numerous fatal conditions. You should only consider disabling this
-> >           option for embedded systems with no facilities for reporting errors.
-> >           Just say Y.
-> > 
-> > will become completely misleading.  Turning this option off will not
-> > result in "quietly ignoring numerous fatal conditions".
-> 
-> I must be missing something, to me the two descriptions mean the same thing.
+When user interrupts ongoing transfers the dmatest may end up with console
+lockup, oops, or data mismatch. This patch prevents user to abort any ongoing
+test.
 
-To me, the current text suggests that we still detect the fatal condition
-but the code continues to execute in a manner controlled by the program.
+Documentation is updated accordingly.
 
-The latter is uncontrolled code (or data) execution in ways unspecified
-by the program.
+Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Reported-by: Will Deacon <will.deacon@arm.com>
+Tested-by: Will Deacon <will.deacon@arm.com>
+---
+ Documentation/dmatest.txt |  6 +++---
+ drivers/dma/dmatest.c     | 45 +++++++++++++++++++++++----------------------
+ 2 files changed, 26 insertions(+), 25 deletions(-)
 
-> You don't just want to avoid the code for printing the bug message and
-> the invalid instruction, we also want the compiler to not emit the 
-> function call or check the enum for unexpected values. The meaning of
-> BUG() is really that person writing that statement was sure it cannot
-> happen unless there is a bug in the kernel, which has likely already
-> corrupted data. Printing a diagnostic at this point is nice if someone
-> is there to look at it, but letting the kernel do further actions that
-> may be undefined is not going to make things worse.
-
-I'm not talking about printing a diagnostic.  I'm talking about the CPU
-remaining under the control of the program it is running - that being
-the Linux kernel.
-
-With CONFIG_BUG unset, turning on things like reboot-on-panic and such
-like is worthless.  Arguably even is having a hardware watchdog - because
-even if you hit one of these BUG() conditions where the CPU goes off and
-does its own thing, it might be sufficient that the system is still able
-to take care of the watchdog.
-
-This is the problem you guys are missing - unreachable() means "we lose
-control of the CPU at this point".
-
-If you have an embedded system and you've taken out all the printk()
-stuff, you most certainly want the system to do _something_ if you hit
-an unexpected condition.
+diff --git a/Documentation/dmatest.txt b/Documentation/dmatest.txt
+index 279ac0a..132a094 100644
+--- a/Documentation/dmatest.txt
++++ b/Documentation/dmatest.txt
+@@ -34,7 +34,7 @@ command:
+ After a while you will start to get messages about current status or error like
+ in the original code.
+ 
+-Note that running a new test will stop any in progress test.
++Note that running a new test will not stop any in progress test.
+ 
+ The following command should return actual state of the test.
+ 	% cat /sys/kernel/debug/dmatest/run
+@@ -52,8 +52,8 @@ To wait for test done the user may perform a busy loop that checks the state.
+ 
+ The module parameters that is supplied to the kernel command line will be used
+ for the first performed test. After user gets a control, the test could be
+-interrupted or re-run with same or different parameters. For the details see
+-the above section "Part 2 - When dmatest is built as a module..."
++re-run with the same or different parameters. For the details see the above
++section "Part 2 - When dmatest is built as a module..."
+ 
+ In both cases the module parameters are used as initial values for the test case.
+ You always could check them at run-time by running
+diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
+index d8ce4ec..e88ded2 100644
+--- a/drivers/dma/dmatest.c
++++ b/drivers/dma/dmatest.c
+@@ -716,8 +716,7 @@ static int dmatest_func(void *data)
+ 		}
+ 		dma_async_issue_pending(chan);
+ 
+-		wait_event_freezable_timeout(done_wait,
+-					     done.done || kthread_should_stop(),
++		wait_event_freezable_timeout(done_wait, done.done,
+ 					     msecs_to_jiffies(params->timeout));
+ 
+ 		status = dma_async_is_tx_complete(chan, cookie, NULL, NULL);
+@@ -997,7 +996,6 @@ static void stop_threaded_test(struct dmatest_info *info)
+ static int __restart_threaded_test(struct dmatest_info *info, bool run)
+ {
+ 	struct dmatest_params *params = &info->params;
+-	int ret;
+ 
+ 	/* Stop any running test first */
+ 	__stop_threaded_test(info);
+@@ -1012,13 +1010,23 @@ static int __restart_threaded_test(struct dmatest_info *info, bool run)
+ 	memcpy(params, &info->dbgfs_params, sizeof(*params));
+ 
+ 	/* Run test with new parameters */
+-	ret = __run_threaded_test(info);
+-	if (ret) {
+-		__stop_threaded_test(info);
+-		pr_err("dmatest: Can't run test\n");
++	return __run_threaded_test(info);
++}
++
++static bool __is_threaded_test_run(struct dmatest_info *info)
++{
++	struct dmatest_chan *dtc;
++
++	list_for_each_entry(dtc, &info->channels, node) {
++		struct dmatest_thread *thread;
++
++		list_for_each_entry(thread, &dtc->threads, node) {
++			if (!thread->done)
++				return true;
++		}
+ 	}
+ 
+-	return ret;
++	return false;
+ }
+ 
+ static ssize_t dtf_write_string(void *to, size_t available, loff_t *ppos,
+@@ -1091,22 +1099,10 @@ static ssize_t dtf_read_run(struct file *file, char __user *user_buf,
+ {
+ 	struct dmatest_info *info = file->private_data;
+ 	char buf[3];
+-	struct dmatest_chan *dtc;
+-	bool alive = false;
+ 
+ 	mutex_lock(&info->lock);
+-	list_for_each_entry(dtc, &info->channels, node) {
+-		struct dmatest_thread *thread;
+-
+-		list_for_each_entry(thread, &dtc->threads, node) {
+-			if (!thread->done) {
+-				alive = true;
+-				break;
+-			}
+-		}
+-	}
+ 
+-	if (alive) {
++	if (__is_threaded_test_run(info)) {
+ 		buf[0] = 'Y';
+ 	} else {
+ 		__stop_threaded_test(info);
+@@ -1132,7 +1128,12 @@ static ssize_t dtf_write_run(struct file *file, const char __user *user_buf,
+ 
+ 	if (strtobool(buf, &bv) == 0) {
+ 		mutex_lock(&info->lock);
+-		ret = __restart_threaded_test(info, bv);
++
++		if (__is_threaded_test_run(info))
++			ret = -EBUSY;
++		else
++			ret = __restart_threaded_test(info, bv);
++
+ 		mutex_unlock(&info->lock);
+ 	}
+ 
+-- 
+1.8.2.rc0.22.gb3600c3
