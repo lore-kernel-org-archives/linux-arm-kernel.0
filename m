@@ -1,301 +1,79 @@
-From: Madhvapathi.Sriram@csr.com (Madhvapathi Sriram)
-Date: Thu, 23 May 2013 16:53:38 +0000
-Subject: [PATCH] input: sirfsoc_pwrc: add onkey input driver for CSR
- SiRFprimaII PWRC
-In-Reply-To: <CAGsJ_4y6BwTpZpwYv0njvqYtp9Y0UU5qhVJhqG5X+8+Hy_LW8Q@mail.gmail.com>
-References: <1369239198-11059-1-git-send-email-Baohua.Song@csr.com>
- <AAD401B65941D44692B7183E6577180803A11B7C@banasiexm01.ASIA.ROOT.PRI>,
- <CAGsJ_4y6BwTpZpwYv0njvqYtp9Y0UU5qhVJhqG5X+8+Hy_LW8Q@mail.gmail.com>
-Message-ID: <AAD401B65941D44692B7183E6577180803A11BF4@banasiexm01.ASIA.ROOT.PRI>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 23 May 2013 11:01:10 -0600
+Subject: [PATCH v2 0/3] Marvell PCIe driver improvements
+In-Reply-To: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAErSpo6ytq9Tzq_=KucZA+1=90t57QP5-Fw_dus2dXiXL5YKtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Agreed Barry. Please ignore my comments on resources management below.
-
-Best Regards,
-Madhvapathi Sriram
-
-________________________________________
-From: Barry Song [21cnbao at gmail.com]
-Sent: Thursday, May 23, 2013 9:47 PM
-To: Madhvapathi Sriram
-Cc: dtor at mail.ru; dmitry.torokhov at gmail.com; linux-input at vger.kernel.org; DL-SHA-WorkGroupLinux; linux-arm-kernel at lists.infradead.org; Binghua Duan; Xianglong Du; Barry Song
-Subject: Re: [PATCH] input: sirfsoc_pwrc: add onkey input driver for CSR SiRFprimaII PWRC
-
-hi madhvapathi,
-thanks for comments.
-
-2013/5/23 Madhvapathi Sriram <Madhvapathi.Sriram@csr.com>:
-> Comments inline.
-> ________________________________________
-> From: Barry Song [21cnbao at gmail.com]
-> Sent: Wednesday, May 22, 2013 9:43 PM
-> To: dtor at mail.ru; dmitry.torokhov at gmail.com
-> Cc: linux-input at vger.kernel.org; DL-SHA-WorkGroupLinux; linux-arm-kernel at lists.infradead.org; Binghua Duan; Xianglong Du; Barry Song
-> Subject: [PATCH] input: sirfsoc_pwrc: add onkey input driver for CSR SiRFprimaII PWRC
+On Thu, May 23, 2013 at 8:32 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Bjorn, Jason, Andrew, Gregory,
 >
-> From: Binghua Duan <Binghua.Duan@csr.com>
+> Here is an updated version of the PCIe improvements.
 >
-> there is an embedded PWRC(power controller) in SiRFprimaII and SiRFatlasVI,
-> we have an ONKEY button which can generate interrupt to IRQ controller.
-> in a typical user scenarios, at the runtime, if users touch the key, we put
-> system to s2ram status.
+> Changes since v1:
 >
-> Signed-off-by: Binghua Duan <Binghua.Duan@csr.com>
-> Signed-off-by: Xianglong Du <Xianglong.Du@csr.com>
-> Signed-off-by: Barry Song <Baohua.Song@csr.com>
-> ---
->  drivers/input/misc/Kconfig         |  10 +++
->  drivers/input/misc/Makefile        |   1 +
->  drivers/input/misc/sirfsoc_onkey.c | 176 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 187 insertions(+)
->  create mode 100644 drivers/input/misc/sirfsoc_onkey.c
+>  * Fix some typos in the comments of PATCH 2, noticed by Bjorn
+>    Helgaas.
 >
-> diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-> index bb698e1..1d91d1b 100644
-> --- a/drivers/input/misc/Kconfig
-> +++ b/drivers/input/misc/Kconfig
-> @@ -637,4 +637,14 @@ config INPUT_XEN_KBDDEV_FRONTEND
->           To compile this driver as a module, choose M here: the
->           module will be called xen-kbdfront.
+>  * Rework the two last patches (first one was fixing the capability
+>    list, the other one the emulation of the devsel bits in the status
+>    register), after the comments of Bjorn. In fact, it turns out that
+>    the status register is composed of read-only bits for which we want
+>    to emulate a value of zero, and the other bits are write-1-to-clear
+>    bits that expose error conditions that we do not handle in the
+>    emulated bridge. So, in summary, emulating a 0 status register on
+>    reads, and ignoring writes to the status register is the simplest
+>    solution. If we later on implement a capability list, we can use a
+>    more clever emulation of the status register, but for the moment,
+>    this simple solution is enough. Therefore, the two last patches are
+>    now one single, simpler patch.
 >
-> +config INPUT_SIRFSOC_ONKEY
-> +       bool "CSR SiRFSoC power on/off/suspend key support"
-> +       depends on ARCH_SIRF
-> +       default y
-> +       help
-> +         Say Y here if you want to support for the SiRFSoC power on/off/suspend key
-> +         in Linux, after you press the onkey, system will suspend.
-> +
-> +         If unsure, say N.
-> +
->  endif
-> diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
-> index d7fc17f..1d66f03 100644
-> --- a/drivers/input/misc/Makefile
-> +++ b/drivers/input/misc/Makefile
-> @@ -60,3 +60,4 @@ obj-$(CONFIG_INPUT_WISTRON_BTNS)      += wistron_btns.o
->  obj-$(CONFIG_INPUT_WM831X_ON)          += wm831x-on.o
->  obj-$(CONFIG_INPUT_XEN_KBDDEV_FRONTEND)        += xen-kbdfront.o
->  obj-$(CONFIG_INPUT_YEALINK)            += yealink.o
-> +obj-$(CONFIG_INPUT_SIRFSOC_ONKEY)      += sirfsoc_onkey.o
-> diff --git a/drivers/input/misc/sirfsoc_onkey.c b/drivers/input/misc/sirfsoc_onkey.c
-> new file mode 100644
-> index 0000000..3e48db9
-> --- /dev/null
-> +++ b/drivers/input/misc/sirfsoc_onkey.c
-> @@ -0,0 +1,176 @@
-> +/*
-> + * Power key driver for SiRF PrimaII
-> + *
-> + * Copyright (c) 2013 Cambridge Silicon Radio Limited, a CSR plc group company.
-> + *
-> + * Licensed under GPLv2 or later.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/init.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/delay.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/input.h>
-> +#include <linux/rtc/sirfsoc_rtciobrg.h>
-> +#include <linux/of.h>
-> +
-> +struct sirfsoc_pwrc_drvdata {
-> +       u32                     pwrc_base;
-> +       int                     irq;
-> +       struct input_dev        *input;
-> +};
-> +
-> +#define PWRC_ON_KEY_BIT                        (1 << 0)
-> +
-> +#define PWRC_INT_STATUS                        0xc
-> +#define PWRC_INT_MASK                  0x10
-> +
-> +static irqreturn_t sirfsoc_pwrc_isr(int irq, void *dev_id)
-> +{
-> +       struct sirfsoc_pwrc_drvdata *pwrcdrv =
-> +                       (struct sirfsoc_pwrc_drvdata *)dev_id;
-> +       u32 int_status;
-> +       int_status = sirfsoc_rtc_iobrg_readl(
-> +                       pwrcdrv->pwrc_base + PWRC_INT_STATUS);
-> +       sirfsoc_rtc_iobrg_writel(int_status & (~PWRC_ON_KEY_BIT),
-> +                       pwrcdrv->pwrc_base + PWRC_INT_STATUS);
-> +
-> +       /*
-> +        * For a typical Linux system, we report KEY_SUSPEND to trigger apm-power.c
-> +        * to queue a SUSPEND APM event
-> +        */
-> +       input_event(pwrcdrv->input, EV_PWR, KEY_SUSPEND, 1);
-> +       input_sync(pwrcdrv->input);
-> +
-> +       /*
-> +        * Todo: report KEY_POWER event for Android platforms, Android PowerManager
-> +        * will handle the suspend and powerdown/hibernation
-> +        */
-> +
-> +       return IRQ_HANDLED;
-> +}
-> +
-> +static const struct of_device_id sirfsoc_pwrc_of_match[] = {
-> +       { .compatible = "sirf,prima2-pwrc" },
-> +       {},
-> +}
-> +MODULE_DEVICE_TABLE(of, sirfsoc_pwrc_of_match);
-> +
-> +static int sirfsoc_pwrc_probe(struct platform_device *pdev)
-> +{
-> +       int ret;
-> +       struct sirfsoc_pwrc_drvdata *pwrcdrv = NULL;
-> +       struct device_node *np = pdev->dev.of_node;
-> +
-> +       pwrcdrv = devm_kzalloc(&pdev->dev,
-> +               sizeof(struct sirfsoc_pwrc_drvdata), GFP_KERNEL);
-> +       if (!pwrcdrv) {
-> +               dev_info(&pdev->dev, "kzalloc fail!\n");
-> +               return -ENOMEM;
-> +       }
-> +
-> +       /*
-> +        * we can't use of_iomap because pwrc is not mapped in memory, the so-called base
-> +        * address is only offset in rtciobrg
-> +        */
-> +       ret = of_property_read_u32(np, "reg", &pwrcdrv->pwrc_base);
+> I'd like those improvements to be kept separated from the original
+> PCIe driver itself: while the PCIe driver has been around and reviewed
+> for a long time, those improvements are newer. And I clearly do not
+> want the PCIe driver to miss 3.11 because of any problem that could be
+> found in those additional improvements.
 >
-> Possible mem leak here  - not freeing pwrcdrv
-
-no. there is no mem leak here. devm_ means device management resources.
-
+> The main improvement being brought here is that the PCI-to-PCI bridge
+> logic is fixed/extended to properly support physical PCIe bridges that
+> are connected on a PCIe interface of a Marvell board. Without this
+> improvement, only the devices connected directly to the PCIe
+> interfaces of the board are properly enumerated. Any device that would
+> sit beyond a physical bridge is not visible.
 >
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "unable to find base address of pwrc node in dtb\n");
-> +               return ret;
-> +       }
-> +
-> +       pwrcdrv->input = devm_input_allocate_device(&pdev->dev);
-> +       if (!pwrcdrv->input)
-> +               return -ENOMEM;
-> +
-> +       pwrcdrv->input->name = "sirfsoc pwrckey";
-> +       pwrcdrv->input->phys = "pwrc/input0";
-> +
-> +       platform_set_drvdata(pdev, pwrcdrv);
-> +
-> +       pwrcdrv->irq = platform_get_irq(pdev, 0);
-> +       ret = devm_request_irq(&pdev->dev, pwrcdrv->irq,
-> +                       sirfsoc_pwrc_isr, IRQF_SHARED,
-> +                       "sirfsoc_pwrc_int", pwrcdrv);
-> +
-> +       sirfsoc_rtc_iobrg_writel(
-> +               sirfsoc_rtc_iobrg_readl(pwrcdrv->pwrc_base + PWRC_INT_MASK)
-> +               | PWRC_ON_KEY_BIT, pwrcdrv->pwrc_base + PWRC_INT_MASK);
+> Bjorn, with your Acked-by, could the Marvell maintainers include those
+> patches in their branch, merged through arm-soc? They already have the
+> Marvell PCIe driver itself, so I believe it makes sense to merge those
+> improvements through the same path.
 >
-> Enabling the MASK for an interrupt should only come after it has been successfully claimed? Else we might be leaving and interrupt enabled without being able to handle it?
-
-here moving ahead of request_irq and placing here both work. as there
-is another gate in irq controller.
-
+> Jason, those patches have been prepared on top of my marvell-pcie-v10
+> branch, I hope that's ok for you. If you want me to rebase them on
+> some other branch in which you have integrated the PCIe driver, don't
+> hesitate to tell me to do so. That said, since those patches are only
+> touching the driver itself and no other file, they should not cause
+> any conflict with other changes.
 >
-> Possible mem leak here not freeing any allocated devices/memory/irq.
-> I suggest all the error handling be collated at the end of this function for various stages and error handling be done there.
-
-and we don't need to free devm_irq and devm_mem as well.
-
-> Please have a look at https://www.kernel.org/doc/Documentation/input/input-programming.txt
+> Thanks,
 >
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "pwrc: Unable to claim irq %d; error %d\n",
-> +                       pwrcdrv->irq, ret);
-> +               return ret;
-> +       }
-> +
-> +       pwrcdrv->input->evbit[0] = BIT_MASK(EV_PWR) | BIT_MASK(EV_KEY);
-> +       set_bit(KEY_POWER, pwrcdrv->input->keybit);
-> +
-> +       ret = input_register_device(pwrcdrv->input);
-> +       if (ret) {
-> +               dev_err(&pdev->dev,
-> +                       "pwrc: Unable to register input device,error: %d\n",
-> +                       ret);
-> +               return ret;
-> +       }
-> +
-> +       device_init_wakeup(&pdev->dev, 1);
-> +
-> +       return 0;
-> +}
-> +
-> +static int sirfsoc_pwrc_remove(struct platform_device *pdev)
-> +{
-> +       device_init_wakeup(&pdev->dev, 0);
-> +
-> +       return 0;
-> +}
-> +
-> +#ifdef CONFIG_PM
-> +static int pwrc_suspend(struct device *dev)
-> +{
-> +       return 0;
-> +}
-> +
-> +static int pwrc_resume(struct device *dev)
-> +{
-> +       struct sirfsoc_pwrc_drvdata *pwrcdrv = dev_get_drvdata(dev);
-> +
+> Thomas
 >
-> Typically, the wake up interrupts would be ensured to be active while going to sleep/suspend.
-> However, here at resume the interrupt mask is being set. Is it because, there are some caveats here?
-
-xianglong, pls explain.
-
+> Thomas Petazzoni (3):
+>   pci: mvebu: no longer fake the slot location of downstream devices
+>   pci: mvebu: allow the enumeration of devices beyond physical bridges
+>   pci: mvebu: fix the emulation of the status register
 >
-> +       /*
-> +        * Do not mask pwrc interrupt as we want pwrc work as a wakeup source
-> +        * if users touch X_ONKEY_B, see arch/arm/mach-prima2/pm.c
-> +        */
-> +       sirfsoc_rtc_iobrg_writel(
-> +               sirfsoc_rtc_iobrg_readl(
-> +               pwrcdrv->pwrc_base + PWRC_INT_MASK) | PWRC_ON_KEY_BIT,
-> +               pwrcdrv->pwrc_base + PWRC_INT_MASK);
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct dev_pm_ops sirfsoc_pwrc_pm_ops = {
-> +       .suspend = pwrc_suspend,
-> +       .resume = pwrc_resume,
-> +};
-> +#endif
-> +
-> +static struct platform_driver sirfsoc_pwrc_driver = {
-> +       .probe          = sirfsoc_pwrc_probe,
-> +       .remove         = sirfsoc_pwrc_remove,
-> +       .driver         = {
-> +               .name   = "sirfsoc-pwrc",
-> +               .owner  = THIS_MODULE,
-> +#ifdef CONFIG_PM
-> +               .pm     = &sirfsoc_pwrc_pm_ops,
-> +#endif
-> +               .of_match_table = of_match_ptr(sirfsoc_pwrc_of_match),
-> +       }
-> +};
-> +
-> +module_platform_driver(sirfsoc_pwrc_driver);
-> +
-> +MODULE_LICENSE("GPLv2");
-> +MODULE_AUTHOR("Binghua Duan <Binghua.Duan@csr.com>, "
-> +               "Xianglong Du <Xianglong.Du@csr.com>");
-> +MODULE_DESCRIPTION("CSR Prima2 PWRC Driver");
-> +MODULE_ALIAS("platform:sirfsoc-pwrc");
-> --
-> 1.8.2.3
+>  drivers/pci/host/pci-mvebu.c |   55 +++++++++++++++++++++++++++++++++---------
+>  1 file changed, 44 insertions(+), 11 deletions(-)
 
--barry
+For all three:
 
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
- To report this email as spam click https://www.mailcontrol.com/sr/MZbqvYs5QwJvpeaetUwhCQ== .
+Feel free to merge these through the arm-soc tree or whatever makes
+sense for you.  Nobody else is working on this file, so there
+shouldn't be any conflicts.
 
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Bjorn
