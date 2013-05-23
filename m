@@ -1,30 +1,141 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 23 May 2013 17:27:37 +0800
-Subject: [PATCH V2 4/6] ARM: dts: imx6q: add pinctrl for WEIM NOR
-In-Reply-To: <1369300440.725629549@f101.mail.ru>
-References: <1369296978-7669-1-git-send-email-b32955@freescale.com>
- <1369296978-7669-5-git-send-email-b32955@freescale.com>
- <1369300440.725629549@f101.mail.ru>
-Message-ID: <519DE109.1030903@freescale.com>
+From: valentin.longchamp@keymile.com (Valentin Longchamp)
+Date: Thu, 23 May 2013 11:25:30 +0200
+Subject: [PATCH] ARM: kirkwood: refactor dtsi to largest common nodes
+Message-ID: <1369301130-29900-1-git-send-email-valentin.longchamp@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?05?23? 17:14, Alexander Shiyan ??:
-> I suggest remove "nor" label here since it can be used for other devices later.
-this pinctrl is just for NOR.
+Some kirkwood variants (for instance present in the prestera SoCs) do
+not have all the peripherals whose nodes are initialized in the
+kirkwood.dtsi. These missing peripherals are SATA, SDIO, and RTC.
 
-If we attach other device to WEIM, it maybe needs other PAD, such as
+Their corresponding nodes are moved from kirkwood.dtsi to the
+kirkwood-628x.dtsi files so that they still are initialized for these
+variants.
 
-MX6Q_PAD_EIM_LBA__EIM_LBA_B.  We need to add another pinctrl then.
+Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
+---
+ arch/arm/boot/dts/kirkwood-6281.dtsi | 24 ++++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood-6282.dtsi | 24 ++++++++++++++++++++++++
+ arch/arm/boot/dts/kirkwood.dtsi      | 24 ------------------------
+ 3 files changed, 48 insertions(+), 24 deletions(-)
 
-
-
->> >  +						fsl,pins =<
->> >  +							MX6Q_PAD_EIM_CS0__EIM_CS0_B   0xb0b1
-> Since driver can support multiple chipselects it would be nice to
-> define EIM_CSX in other place for possible using other chipselects.
->
-Ditto.
-
-thanks
-Huang Shijie
+diff --git a/arch/arm/boot/dts/kirkwood-6281.dtsi b/arch/arm/boot/dts/kirkwood-6281.dtsi
+index d6c9d65..29f831e 100644
+--- a/arch/arm/boot/dts/kirkwood-6281.dtsi
++++ b/arch/arm/boot/dts/kirkwood-6281.dtsi
+@@ -40,5 +40,29 @@
+ 				marvell,function = "sdio";
+ 			};
+ 		};
++
++		rtc at 10300 {
++			compatible = "marvell,kirkwood-rtc", "marvell,orion-rtc";
++			reg = <0x10300 0x20>;
++			interrupts = <53>;
++			clocks = <&gate_clk 7>;
++		};
++
++		sata at 80000 {
++			compatible = "marvell,orion-sata";
++			reg = <0x80000 0x5000>;
++			interrupts = <21>;
++			clocks = <&gate_clk 14>, <&gate_clk 15>;
++			clock-names = "0", "1";
++			status = "disabled";
++		};
++
++		mvsdio at 90000 {
++			compatible = "marvell,orion-sdio";
++			reg = <0x90000 0x200>;
++			interrupts = <28>;
++			clocks = <&gate_clk 4>;
++			status = "disabled";
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/kirkwood-6282.dtsi b/arch/arm/boot/dts/kirkwood-6282.dtsi
+index 23991e4..a1c2c05 100644
+--- a/arch/arm/boot/dts/kirkwood-6282.dtsi
++++ b/arch/arm/boot/dts/kirkwood-6282.dtsi
+@@ -49,6 +49,30 @@
+ 			};
+ 		};
+ 
++		rtc at 10300 {
++			compatible = "marvell,kirkwood-rtc", "marvell,orion-rtc";
++			reg = <0x10300 0x20>;
++			interrupts = <53>;
++			clocks = <&gate_clk 7>;
++		};
++
++		sata at 80000 {
++			compatible = "marvell,orion-sata";
++			reg = <0x80000 0x5000>;
++			interrupts = <21>;
++			clocks = <&gate_clk 14>, <&gate_clk 15>;
++			clock-names = "0", "1";
++			status = "disabled";
++		};
++
++		mvsdio at 90000 {
++			compatible = "marvell,orion-sdio";
++			reg = <0x90000 0x200>;
++			interrupts = <28>;
++			clocks = <&gate_clk 4>;
++			status = "disabled";
++		};
++
+ 		thermal at 10078 {
+ 			compatible = "marvell,kirkwood-thermal";
+ 			reg = <0x10078 0x4>;
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index fada7e6..39f497e 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -71,13 +71,6 @@
+ 			status = "disabled";
+ 		};
+ 
+-		rtc at 10300 {
+-			compatible = "marvell,kirkwood-rtc", "marvell,orion-rtc";
+-			reg = <0x10300 0x20>;
+-			interrupts = <53>;
+-			clocks = <&gate_clk 7>;
+-		};
+-
+ 		spi at 10600 {
+ 			compatible = "marvell,orion-spi";
+ 			#address-cells = <1>;
+@@ -151,15 +144,6 @@
+ 			status = "okay";
+ 		};
+ 
+-		sata at 80000 {
+-			compatible = "marvell,orion-sata";
+-			reg = <0x80000 0x5000>;
+-			interrupts = <21>;
+-			clocks = <&gate_clk 14>, <&gate_clk 15>;
+-			clock-names = "0", "1";
+-			status = "disabled";
+-		};
+-
+ 		nand at 3000000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+@@ -194,13 +178,5 @@
+ 			clocks = <&gate_clk 17>;
+ 			status = "okay";
+ 		};
+-
+-		mvsdio at 90000 {
+-			compatible = "marvell,orion-sdio";
+-			reg = <0x90000 0x200>;
+-			interrupts = <28>;
+-			clocks = <&gate_clk 4>;
+-			status = "disabled";
+-		};
+ 	};
+ };
+-- 
+1.8.0.1
