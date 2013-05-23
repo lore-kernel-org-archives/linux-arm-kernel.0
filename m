@@ -1,46 +1,30 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 23 May 2013 16:10:59 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSF0gQVJNOiBkdHM6IGlteDogZml4IGNsb2NrcyBmb3Ig?=
- =?UTF-8?B?Y3NwaQ==?=
-In-Reply-To: <1369310474.965158503@f320.mail.ru>
-References: <1369309085-31146-1-git-send-email-jonas@microbit.se>
- <1369310474.965158503@f320.mail.ru>
-Message-ID: <1369311059.366490908@f190.mail.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 23 May 2013 14:09:02 +0200
+Subject: [PATCH] arch: configuration,
+ deleting 'CONFIG_BUG' since always need it.
+In-Reply-To: <20130523112401.GO18614@n2100.arm.linux.org.uk>
+References: <519DCBEF.3090208@asianux.com> <201305231259.43750.arnd@arndb.de>
+ <20130523112401.GO18614@n2100.arm.linux.org.uk>
+Message-ID: <201305231409.02359.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > The CSPI controller has only one clock, but the driver spi-imx.c needs clock "per" to calculate bitrate divisor.
-> > 
-> > Signed-off-by: Jonas Andersson <jonas@microbit.se>
-> > ---
-> >  arch/arm/boot/dts/imx25.dtsi | 12 ++++++------
-> >  arch/arm/boot/dts/imx27.dtsi |  6 +++---
-> >  arch/arm/boot/dts/imx51.dtsi |  2 +-
-> >  arch/arm/boot/dts/imx53.dtsi |  2 +-
-> >  4 files changed, 11 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> > index d2550e0..7011539 100644
-> > --- a/arch/arm/boot/dts/imx25.dtsi
-> > +++ b/arch/arm/boot/dts/imx25.dtsi
-> > @@ -141,8 +141,8 @@
-> >  				#size-cells = <0>;
-> >  				compatible = "fsl,imx25-cspi", "fsl,imx35-cspi";
-> >  				reg = <0x43fa4000 0x4000>;
-> > -				clocks = <&clks 62>;
-> > -				clock-names = "ipg";
-> > +				clocks = <&clks 62>, <&clks 62>;
-> > +				clock-names = "ipg", "per";
-> >  				interrupts = <14>;
-> >  				status = "disabled";
-> >  			};
+On Thursday 23 May 2013, Russell King - ARM Linux wrote:
+> This is the problem you guys are missing - unreachable() means "we lose
+> control of the CPU at this point".
 
-Sorry, typo.
+I'm absolutely aware of this. Again, the current behaviour of doing nothing
+at all isn't very different from undefined behavior when you get when you
+get to the end of a function returning a pointer without a "return" statement,
+or when you return from a function that has determined that it is not safe
+to continue.
 
-> Why you do not use "dummy" clock for "per" here?
+> If you have an embedded system and you've taken out all the printk()
+> stuff, you most certainly want the system to do something if you hit
+> an unexpected condition.
 
-*for "ipg"
+I did not claim that it was a good idea to disable BUG(), all I said is
+that "random stuff may happen" is probably what Matt Mackall had in mind when
+he introduced the option.
 
-> This variant will request/enable one clock two times.
- 
----
+	Arnd
