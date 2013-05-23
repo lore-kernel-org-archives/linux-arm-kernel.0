@@ -1,267 +1,49 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 23 May 2013 15:57:35 +0800
-Subject: [PATCH] arch: configuration, deleting 'CONFIG_BUG' since always need
- it.
-Message-ID: <519DCBEF.3090208@asianux.com>
+From: oliver+list@schinagl.nl (Oliver Schinagl)
+Date: Thu, 23 May 2013 10:10:17 +0200
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <CACRpkdaWADjy1YZXTcRaXU+ZsS6_pG0hojQdnz=qeTgyVY7_Ww@mail.gmail.com>
+References: <1368797744-13737-1-git-send-email-oliver+list@schinagl.nl>
+ <1368797744-13737-2-git-send-email-oliver+list@schinagl.nl>
+ <CACRpkdaWADjy1YZXTcRaXU+ZsS6_pG0hojQdnz=qeTgyVY7_Ww@mail.gmail.com>
+Message-ID: <519DCEE9.6070208@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/23/13 09:56, Linus Walleij wrote:
+> On Fri, May 17, 2013 at 3:35 PM, Oliver Schinagl
+> <oliver+list@schinagl.nl> wrote:
+>
+> (...)
+>> While initially these fuses are used to somewhat determin the chipID, these
+>> appear to be writeable by the user and thus can be used for other purpouses.
+>> For example storing a 128 bit root key, a unique serial number, which could
+>> then even be used as a MAC address.
+> (...)
+> Then follows some code to read out the keys from sysfs I guess..
+>> +static int __init sid_probe(struct platform_device *pdev)
+>
+> It's really simple to actually make the kernel use this to seed the
+> entropy pool.
+>
+> #include <linux/random.h>
+> add_device_randomness(u8 *, num);
+>
+> If you know after probe that you can read out a number of bytes
+> of device-unique data, I think you should add those bytes to the
+> entropy pool like this.
+While that is a great idea, we can't guarantee device uniqueness. We've 
+already seen some chips that where 'forgotten' to program and default 
+set to all 0. I guess that doesn't have to be a bad thing.
 
-The crazy user can unset 'CONFIG_BUG' in menuconfig: "> General setup >
-Configure standard kernel features (expert users) > BUG() Support".
+Then, i'm not sure if the driver is the best for this to be loaded? 
+Maxime, what do you think? Personally I would feel more in having this 
+in the mach-sunxi/core.c bit, but then again, this is currently a module 
+and wouldn't be useful to have there. Maxime is far more knowledgeable 
+to answer that.
 
-But in fact, we always need it, and quite a few of architectures have
-already implemented it (e.g. alpha, arc, arm, avr32, blackfin, cris,
-frv, ia64, m68k, mips, mn10300, parisc, powerpc, s390, sh, sparc, x86).
-
-And kernel also already has prepared a default effective implementation
-for the architectures which is unwilling to implement it by themselves
-(e.g. arm64, c6x, h8300, hexagon, m32r, metag, microblaze, openrisc,
-score, tile, um, unicore32, xtensa).
-
-So need get rid of 'CONFIG_BUG', and let it always enabled everywhere.
-
-
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm/Kconfig          |    1 -
- arch/avr32/Kconfig        |    1 -
- arch/blackfin/Kconfig     |    1 -
- arch/h8300/Kconfig        |    1 -
- arch/hexagon/Kconfig      |    1 -
- arch/parisc/Kconfig       |    2 --
- arch/powerpc/Kconfig      |    1 -
- arch/s390/Kconfig         |    2 +-
- arch/sh/Kconfig           |    2 +-
- arch/um/Kconfig.common    |    1 -
- arch/x86/Kconfig          |    1 -
- include/asm-generic/bug.h |   29 -----------------------------
- init/Kconfig              |   10 ----------
- lib/Kconfig.debug         |    2 +-
- 14 files changed, 3 insertions(+), 52 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a7fc5ea..ea4a146 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -265,7 +265,6 @@ config PHYS_OFFSET
- 
- config GENERIC_BUG
- 	def_bool y
--	depends on BUG
- 
- source "init/Kconfig"
- 
-diff --git a/arch/avr32/Kconfig b/arch/avr32/Kconfig
-index bdc3558..7c9005a 100644
---- a/arch/avr32/Kconfig
-+++ b/arch/avr32/Kconfig
-@@ -55,7 +55,6 @@ config GENERIC_CALIBRATE_DELAY
- 
- config GENERIC_BUG
- 	def_bool y
--	depends on BUG
- 
- source "init/Kconfig"
- 
-diff --git a/arch/blackfin/Kconfig b/arch/blackfin/Kconfig
-index a117652..637dc42 100644
---- a/arch/blackfin/Kconfig
-+++ b/arch/blackfin/Kconfig
-@@ -47,7 +47,6 @@ config GENERIC_CSUM
- 
- config GENERIC_BUG
- 	def_bool y
--	depends on BUG
- 
- config ZONE_DMA
- 	def_bool y
-diff --git a/arch/h8300/Kconfig b/arch/h8300/Kconfig
-index 303e4f9..88848da 100644
---- a/arch/h8300/Kconfig
-+++ b/arch/h8300/Kconfig
-@@ -56,7 +56,6 @@ config GENERIC_CALIBRATE_DELAY
- 
- config GENERIC_BUG
-         bool
--        depends on BUG
- 
- config TIME_LOW_RES
- 	bool
-diff --git a/arch/hexagon/Kconfig b/arch/hexagon/Kconfig
-index 33a9792..f50cc8f 100644
---- a/arch/hexagon/Kconfig
-+++ b/arch/hexagon/Kconfig
-@@ -84,7 +84,6 @@ config STACKTRACE_SUPPORT
- 
- config GENERIC_BUG
- 	def_bool y
--	depends on BUG
- 
- menu "Machine selection"
- 
-diff --git a/arch/parisc/Kconfig b/arch/parisc/Kconfig
-index 6507dab..5de1f8c 100644
---- a/arch/parisc/Kconfig
-+++ b/arch/parisc/Kconfig
-@@ -10,7 +10,6 @@ config PARISC
- 	select RTC_CLASS
- 	select RTC_DRV_GENERIC
- 	select INIT_ALL_POSSIBLE
--	select BUG
- 	select HAVE_PERF_EVENTS
- 	select GENERIC_ATOMIC64 if !64BIT
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
-@@ -62,7 +61,6 @@ config ARCH_HAS_ILOG2_U64
- config GENERIC_BUG
- 	bool
- 	default y
--	depends on BUG
- 
- config GENERIC_HWEIGHT
- 	bool
-diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index c33e3ad..34f4ca9 100644
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -187,7 +187,6 @@ config AUDIT_ARCH
- config GENERIC_BUG
- 	bool
- 	default y
--	depends on BUG
- 
- config SYS_SUPPORTS_APM_EMULATION
- 	default y if PMAC_APM_EMU
-diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-index da183c5..5d7b3db 100644
---- a/arch/s390/Kconfig
-+++ b/arch/s390/Kconfig
-@@ -29,7 +29,7 @@ config GENERIC_HWEIGHT
- 	def_bool y
- 
- config GENERIC_BUG
--	def_bool y if BUG
-+	def_bool y
- 
- config GENERIC_BUG_RELATIVE_POINTERS
- 	def_bool y
-diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
-index 8c868cf..d555e7f 100644
---- a/arch/sh/Kconfig
-+++ b/arch/sh/Kconfig
-@@ -84,7 +84,7 @@ config RWSEM_XCHGADD_ALGORITHM
- 
- config GENERIC_BUG
- 	def_bool y
--	depends on BUG && SUPERH32
-+	depends on SUPERH32
- 
- config GENERIC_CSUM
- 	def_bool y
-diff --git a/arch/um/Kconfig.common b/arch/um/Kconfig.common
-index bceee66..7aae42a 100644
---- a/arch/um/Kconfig.common
-+++ b/arch/um/Kconfig.common
-@@ -53,7 +53,6 @@ config GENERIC_CALIBRATE_DELAY
- config GENERIC_BUG
- 	bool
- 	default y
--	depends on BUG
- 
- config HZ
- 	int
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 723e42e..a36e1b4 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -166,7 +166,6 @@ config GENERIC_ISA_DMA
- 
- config GENERIC_BUG
- 	def_bool y
--	depends on BUG
- 	select GENERIC_BUG_RELATIVE_POINTERS if X86_64
- 
- config GENERIC_BUG_RELATIVE_POINTERS
-diff --git a/include/asm-generic/bug.h b/include/asm-generic/bug.h
-index 7d10f96..5d50903 100644
---- a/include/asm-generic/bug.h
-+++ b/include/asm-generic/bug.h
-@@ -12,8 +12,6 @@
- #ifndef __ASSEMBLY__
- #include <linux/kernel.h>
- 
--#ifdef CONFIG_BUG
--
- #ifdef CONFIG_GENERIC_BUG
- struct bug_entry {
- #ifndef CONFIG_GENERIC_BUG_RELATIVE_POINTERS
-@@ -106,33 +104,6 @@ extern void warn_slowpath_null(const char *file, const int line);
- 	unlikely(__ret_warn_on);					\
- })
- 
--#else /* !CONFIG_BUG */
--#ifndef HAVE_ARCH_BUG
--#define BUG() do {} while(0)
--#endif
--
--#ifndef HAVE_ARCH_BUG_ON
--#define BUG_ON(condition) do { if (condition) ; } while(0)
--#endif
--
--#ifndef HAVE_ARCH_WARN_ON
--#define WARN_ON(condition) ({						\
--	int __ret_warn_on = !!(condition);				\
--	unlikely(__ret_warn_on);					\
--})
--#endif
--
--#ifndef WARN
--#define WARN(condition, format...) ({					\
--	int __ret_warn_on = !!(condition);				\
--	unlikely(__ret_warn_on);					\
--})
--#endif
--
--#define WARN_TAINT(condition, taint, format...) WARN_ON(condition)
--
--#endif
--
- #define WARN_ON_ONCE(condition)	({				\
- 	static bool __section(.data.unlikely) __warned;		\
- 	int __ret_warn_once = !!(condition);			\
-diff --git a/init/Kconfig b/init/Kconfig
-index 7fb26a6..bc1dd49 100644
---- a/init/Kconfig
-+++ b/init/Kconfig
-@@ -1360,16 +1360,6 @@ config PRINTK
- 	  very difficult to diagnose system problems, saying N here is
- 	  strongly discouraged.
- 
--config BUG
--	bool "BUG() support" if EXPERT
--	default y
--	help
--          Disabling this option eliminates support for BUG and WARN, reducing
--          the size of your kernel image and potentially quietly ignoring
--          numerous fatal conditions. You should only consider disabling this
--          option for embedded systems with no facilities for reporting errors.
--          Just say Y.
--
- config ELF_CORE
- 	depends on COREDUMP
- 	default y
-diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-index 566cf2b..54b3251 100644
---- a/lib/Kconfig.debug
-+++ b/lib/Kconfig.debug
-@@ -700,7 +700,7 @@ config HAVE_DEBUG_BUGVERBOSE
- 
- config DEBUG_BUGVERBOSE
- 	bool "Verbose BUG() reporting (adds 70K)" if DEBUG_KERNEL && EXPERT
--	depends on BUG && (GENERIC_BUG || HAVE_DEBUG_BUGVERBOSE)
-+	depends on GENERIC_BUG || HAVE_DEBUG_BUGVERBOSE
- 	default y
- 	help
- 	  Say Y here to make BUG() panics output the file name and line number
--- 
-1.7.7.6
+It should probably be noted, that the sunxi series have a hardware 
+crypto engine, with hardware random seed generator, one for a later project.
+>
+> Yours,
+> Linus Walleij
+>
