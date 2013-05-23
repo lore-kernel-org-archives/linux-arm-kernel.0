@@ -1,60 +1,58 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 23 May 2013 14:36:42 +0200
-Subject: [PATCH] ARM: dts: imx: fix clocks for cspi
-In-Reply-To: <1369311059.366490908@f190.mail.ru>
-References: <1369309085-31146-1-git-send-email-jonas@microbit.se>
- <1369310474.965158503@f320.mail.ru>
- <1369311059.366490908@f190.mail.ru>
-Message-ID: <20130523123642.GK32299@pengutronix.de>
+From: linux-arm@overkiz.com (Boris BREZILLON)
+Date: Thu, 23 May 2013 14:42:24 +0200
+Subject: [PATCH 1/3] ARM: at91: move at91 aic driver to drivers/irqchip
+In-Reply-To: <20130523141344.7a01ce88@skate>
+References: <1369299909-10078-1-git-send-email-b.brezillon@overkiz.com>
+ <1369299909-10078-2-git-send-email-b.brezillon@overkiz.com>
+ <20130523101825.GL18614@n2100.arm.linux.org.uk>
+ <20130523141344.7a01ce88@skate>
+Message-ID: <519E0EB0.7000502@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 04:10:59PM +0400, Alexander Shiyan wrote:
-> > > The CSPI controller has only one clock, but the driver spi-imx.c needs clock "per" to calculate bitrate divisor.
-> > > 
-> > > Signed-off-by: Jonas Andersson <jonas@microbit.se>
-> > > ---
-> > >  arch/arm/boot/dts/imx25.dtsi | 12 ++++++------
-> > >  arch/arm/boot/dts/imx27.dtsi |  6 +++---
-> > >  arch/arm/boot/dts/imx51.dtsi |  2 +-
-> > >  arch/arm/boot/dts/imx53.dtsi |  2 +-
-> > >  4 files changed, 11 insertions(+), 11 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> > > index d2550e0..7011539 100644
-> > > --- a/arch/arm/boot/dts/imx25.dtsi
-> > > +++ b/arch/arm/boot/dts/imx25.dtsi
-> > > @@ -141,8 +141,8 @@
-> > >  				#size-cells = <0>;
-> > >  				compatible = "fsl,imx25-cspi", "fsl,imx35-cspi";
-> > >  				reg = <0x43fa4000 0x4000>;
-> > > -				clocks = <&clks 62>;
-> > > -				clock-names = "ipg";
-> > > +				clocks = <&clks 62>, <&clks 62>;
-> > > +				clock-names = "ipg", "per";
-> > >  				interrupts = <14>;
-> > >  				status = "disabled";
-> > >  			};
-> 
-> Sorry, typo.
-> 
-> > Why you do not use "dummy" clock for "per" here?
-> 
-> *for "ipg"
+On 23/05/2013 14:13, Thomas Petazzoni wrote:
+> Dear Russell King - ARM Linux,
+>
+> On Thu, 23 May 2013 11:18:25 +0100, Russell King - ARM Linux wrote:
+>
+>> I notice arch/arm/mach-at91/pm.c makes use of some of the register
+>> definitions:
+>>
+>>          at91_irq_suspend();
+>>
+>>          pr_debug("AT91: PM - wake mask %08x, pm state %d\n",
+>>                          /* remember all the always-wake irqs */
+>>                          (at91_pmc_read(AT91_PMC_PCSR)
+>>                                          | (1 << AT91_ID_FIQ)
+>>                                          | (1 << AT91_ID_SYS)
+>>                                          | (at91_extern_irq))
+>>                                  & at91_aic_read(AT91_AIC_IMR),
+>>                          state);
+>>
+>> at91_irq_suspend() is in arch/arm/mach-at91/irq.c already, so there's no
+>> reason that fragment can't be moved there.
+>
+> The problem is that the goal of the patch set is to move
+> arch/arm/mach-at91/irq.c into drivers/irqchip/.
+>
+> However, if you move that chunk of code to drivers/irqchip/irq-at91.c,
+> you are using at91_pmc_read() which is defined in
+> arch/arm/mach-at91/include/mach/at91_pmc.h. So,
+> drivers/irqchip/irq-at91.c would have to include such an header file,
+> which is something we want to avoid since drivers/ code should not
+> include something in <mach/...>, as it breaks multiplatform kernels.
+>
+> So, I'm afraid, simply moving this chunk of code in at91_irq_suspend()
+> doesn't make the thing any better.
+>
+What about keeping the former at91_aic.h in arch/arm/match-at91 and copy 
+the definitions we need in drivers/irqchip/irq-at91.c ?
 
-Because the same clock is used for the register clock and the baudrate
-clock. You have to enable the ipg clock to access registers.
+This way we get an aic irqchip driver independant of any specific 
+machine headers and keep the non dt boards and pm drivers without any 
+change.
 
-> 
-> > This variant will request/enable one clock two times.
-
-Indeed, but what's the problem with this?
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> Best regards,
+>
+> Thomas
+>
