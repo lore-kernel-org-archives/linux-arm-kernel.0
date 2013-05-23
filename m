@@ -1,73 +1,104 @@
 From: jhovold@gmail.com (Johan Hovold)
-Date: Thu, 23 May 2013 10:38:55 +0200
-Subject: [PATCH v3 5/5] rtc-at91rm9200: use shadow IMR on at91sam9x5
+Date: Thu, 23 May 2013 10:38:54 +0200
+Subject: [PATCH v3 4/5] rtc-at91rm9200: add shadow interrupt mask
 In-Reply-To: <1369298335-24597-1-git-send-email-jhovold@gmail.com>
 References: <1364983415-20298-1-git-send-email-jhovold@gmail.com>
  <1369298335-24597-1-git-send-email-jhovold@gmail.com>
-Message-ID: <1369298335-24597-6-git-send-email-jhovold@gmail.com>
+Message-ID: <1369298335-24597-5-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the at91sam9x5-family which must use the shadow
-interrupt mask due to a hardware issue (causing RTC_IMR to always be
-zero).
+Add shadow interrupt-mask register which can be used on SoCs where the
+actual hardware register is broken.
+
+Note that some care needs to be taken to make sure the shadow mask
+corresponds to the actual hardware state. The added overhead is not an
+issue for the non-broken SoCs due to the relatively infrequent
+interrupt-mask updates. We do, however, only use the shadow mask value
+as a fall-back when it actually needed as there is still a theoretical
+possibility that the mask is incorrect (see the code for details).
 
 Signed-off-by: Johan Hovold <jhovold@gmail.com>
 ---
- Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt | 2 +-
- arch/arm/boot/dts/at91sam9x5.dtsi                              | 2 +-
- drivers/rtc/rtc-at91rm9200.c                                   | 7 +++++++
- 3 files changed, 9 insertions(+), 2 deletions(-)
+ drivers/rtc/rtc-at91rm9200.c | 39 ++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 38 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
-index 2a3feab..34c1505 100644
---- a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
-+++ b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
-@@ -1,7 +1,7 @@
- Atmel AT91RM9200 Real Time Clock
- 
- Required properties:
--- compatible: should be: "atmel,at91rm9200-rtc"
-+- compatible: should be: "atmel,at91rm9200-rtc" or "atmel,at91sam9x5-rtc"
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: rtc alarm/event interrupt
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index 1145ac3..b5833d1f 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -643,7 +643,7 @@
- 			};
- 
- 			rtc at fffffeb0 {
--				compatible = "atmel,at91rm9200-rtc";
-+				compatible = "atmel,at91sam9x5-rtc";
- 				reg = <0xfffffeb0 0x40>;
- 				interrupts = <1 4 7>;
- 				status = "disabled";
 diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-index 205701e..47416e9 100644
+index 9592d08..205701e 100644
 --- a/drivers/rtc/rtc-at91rm9200.c
 +++ b/drivers/rtc/rtc-at91rm9200.c
-@@ -309,12 +309,19 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *dev_id)
- static const struct at91_rtc_config at91rm9200_config = {
+@@ -30,6 +30,7 @@
+ #include <linux/io.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/spinlock.h>
+ 
+ #include <asm/uaccess.h>
+ 
+@@ -43,6 +44,7 @@
+ #define AT91_RTC_EPOCH		1900UL	/* just like arch/arm/common/rtctime.c */
+ 
+ struct at91_rtc_config {
++	bool use_shadow_imr;
  };
  
-+static const struct at91_rtc_config at91sam9x5_config = {
-+	.use_shadow_imr	= true,
-+};
+ static const struct at91_rtc_config *at91_rtc_config;
+@@ -50,20 +52,55 @@ static DECLARE_COMPLETION(at91_rtc_updated);
+ static unsigned int at91_alarm_year = AT91_RTC_EPOCH;
+ static void __iomem *at91_rtc_regs;
+ static int irq;
++static DEFINE_SPINLOCK(at91_rtc_lock);
++static u32 at91_rtc_shadow_imr;
+ 
+ static void at91_rtc_write_ier(u32 mask)
+ {
++	unsigned long flags;
 +
- #ifdef CONFIG_OF
- static const struct of_device_id at91_rtc_dt_ids[] = {
- 	{
- 		.compatible = "atmel,at91rm9200-rtc",
- 		.data = &at91rm9200_config,
- 	}, {
-+		.compatible = "atmel,at91sam9x5-rtc",
-+		.data = &at91sam9x5_config,
-+	}, {
- 		/* sentinel */
- 	}
- };
++	spin_lock_irqsave(&at91_rtc_lock, flags);
++	at91_rtc_shadow_imr |= mask;
+ 	at91_rtc_write(AT91_RTC_IER, mask);
++	spin_unlock_irqrestore(&at91_rtc_lock, flags);
+ }
+ 
+ static void at91_rtc_write_idr(u32 mask)
+ {
++	unsigned long flags;
++
++	spin_lock_irqsave(&at91_rtc_lock, flags);
+ 	at91_rtc_write(AT91_RTC_IDR, mask);
++	/*
++	 * Register read back (of any RTC-register) needed to make sure
++	 * IDR-register write has reached the peripheral before updating
++	 * shadow mask.
++	 *
++	 * Note that there is still a possibility that the mask is updated
++	 * before interrupts have actually been disabled in hardware. The only
++	 * way to be certain would be to poll the IMR-register, which is is
++	 * the very register we are trying to emulate. The register read back
++	 * is a reasonable heuristic.
++	 */
++	at91_rtc_read(AT91_RTC_SR);
++	at91_rtc_shadow_imr &= ~mask;
++	spin_unlock_irqrestore(&at91_rtc_lock, flags);
+ }
+ 
+ static u32 at91_rtc_read_imr(void)
+ {
+-	return at91_rtc_read(AT91_RTC_IMR);
++	unsigned long flags;
++	u32 mask;
++
++	if (at91_rtc_config->use_shadow_imr) {
++		spin_lock_irqsave(&at91_rtc_lock, flags);
++		mask = at91_rtc_shadow_imr;
++		spin_unlock_irqrestore(&at91_rtc_lock, flags);
++	} else {
++		mask = at91_rtc_read(AT91_RTC_IMR);
++	}
++
++	return mask;
+ }
+ 
+ /*
 -- 
 1.8.2.1
