@@ -1,59 +1,55 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 23 May 2013 09:00:45 +0800
-Subject: [PATCH] kernel/sched/core.c: need return NULL when BUG() is
- defined as empty.
-In-Reply-To: <20130522161935.GR18810@twins.programming.kicks-ass.net>
-References: <5199D565.4070307@asianux.com>
- <20130522091156.GC18810@twins.programming.kicks-ass.net>
- <20130522133317.GC18614@n2100.arm.linux.org.uk>
- <20130522161935.GR18810@twins.programming.kicks-ass.net>
-Message-ID: <519D6A3D.5050003@asianux.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 23 May 2013 10:11:17 +0900
+Subject: [PATCH] ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
+References: <1368630484-29939-1-git-send-email-t.figa@samsung.com>
+ <1623377.nVo7nUcid2@flatron>
+Message-ID: <120501ce5752$6daef380$490cda80$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2013 12:19 AM, Peter Zijlstra wrote:
-> On Wed, May 22, 2013 at 02:33:17PM +0100, Russell King - ARM Linux wrote:
->> > On Wed, May 22, 2013 at 11:11:56AM +0200, Peter Zijlstra wrote:
->>> > > On Mon, May 20, 2013 at 03:48:53PM +0800, Chen Gang wrote:
->>>> > > > 
->>>> > > > When neither CONFIG_BUG nor HAVE_ARCH_BUG is defined, need let function
->>>> > > > return failure value ('NULL') instead of random value.
->>> > > 
->>> > > What will such a kernel do? Happily continue running whenever we hit a
->>> > > BUG? that seems like a particularly bad idea. Should we not have a stub
->>> > > BUG() function like:
->>> > > 
->>> > > void BUG(void) __attribute__((noreturn))
->>> > > {
->>> > > 	local_irq_disable();
->>> > > 	while (1) ;
->>> > > }
->> > 
->> > Eww.  So you've a platform where you have things like panic_on_oops
->> > enabled, and you hit this bug... do we really want to just stop?
->> > Wouldn't replacing BUG() with panic("BUG"); be better ?
->> > 
->> > But, this begs the question - what is the point of being able to turn
->> > off BUG() ?  As BUG() on any sensible architecture is implemented by
->> > placing the minimum of code at the callsite (eg, one instruction if
->> > not using verbose) anything like the above is likely to be bigger.
->> > 
->> > So, I'd actually argue that rather than trying to "fix" this, get rid
->> > of CONFIG_BUG and make it always enabled everywhere - just like what
->> > has recently been done with hotplug.
-> Works for me. 
+Kukjin Kim wrote:
 > 
+> Tomasz Figa wrote:
+> >
+> > Hi Kukjin,
+> >
+> Hi,
+> 
+> > On Wednesday 15 of May 2013 17:08:04 Tomasz Figa wrote:
+> > > This patch extends exynos_init_time() function to handle Exynos4210
+> rev0
+> > > SoC, which differs in availability of system timers and needs
+> different
+> > > clocksource initialization.
+> > >
+> > > This makes it possible to use exynos_init_time() function as init_time
+> > > callback for all Exynos-based boards, including Universal_C210, which
+> > > originally had to use samsung_timer_init().
+> > >
+> > > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > > ---
+> > >  arch/arm/mach-exynos/Kconfig               |  3 ++-
+> > >  arch/arm/mach-exynos/common.c              | 30
+> > > +++++++++++++++++++++++++++++- arch/arm/mach-exynos/common.h
+> > >   |  2 ++
+> > >  arch/arm/mach-exynos/mach-universal_c210.c |  5 ++---
+> > >  4 files changed, 35 insertions(+), 5 deletions(-)
+> >
+> > Could you pick this patch to your fixes branch?
+> >
+> Yeah, I will after looking at.
+> 
+> > This is a fix of a regression in handling Exynos4210 rev0 SoC (e.g.
+> > Universal C210 board) introduced by patches merged to 3.10.
+> >
+> OK, I see but I didn't review yet and I  will within a couple of days ;-)
+> 
+OK, looks fine, this will be sent to upstream during -rc for v3.10.
 
-Thanks all, I should send the related patch for it.
-
-Excuse me, I have to do another things, so I will finish it within this
-week (2013-05-26)
-
-Welcome any additional suggestions and completions.
-
+But, Tomasz, as you know, non-DT supporting files will be gone away in
+v3.11, just note.
 
 Thanks.
--- 
-Chen Gang
 
-Asianux Corporation
+- Kukjin
