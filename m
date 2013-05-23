@@ -1,87 +1,144 @@
 From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Thu, 23 May 2013 11:45:05 +0200
-Subject: [PATCH V2 1/3] mmc: mmci: Use optional sleep pinctrl state
+Date: Thu, 23 May 2013 11:45:07 +0200
+Subject: [PATCH V2 3/3] mmc: mmci: Save and restore register context
 In-Reply-To: <1369302307-28540-1-git-send-email-ulf.hansson@stericsson.com>
 References: <1369302307-28540-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1369302307-28540-2-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <1369302307-28540-4-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ulf Hansson <ulf.hansson@linaro.org>
 
-By optionally putting the pins into sleep state in the .runtime_suspend
-callback we can accomplish two things. One is to minimize current leakage
-from pins and thus save power, second we can prevent the IP from driving
-pins output in an uncontrolled manner, which may happen if the power domain
-drops the domain regulator.
+If a corresponding power domain exists for the device and it manages
+to cut the domain regulator while the device is runtime suspended,
+the IP loses it's registers context. We restore the context in the
+.runtime_resume callback from the existing register caches to adapt
+to this siutuation.
 
-When returning from idle, entering .runtime_resume callback, the pins
-are restored to default state.
+We also want to make sure the registers are in a known state while
+restoring context in the case when the power domain did not drop the
+power, since there are restrictions for the order of writing to these
+registers. To handle this, we clear the registers in the
+.runtime_suspend callback.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 
 Changes in v2:
-	Just adding Linus reviewed by.
+	Rebased on top of recently merged patchset for UHS card support.
 ---
- drivers/mmc/host/mmci.c |   16 ++++++++++++++++
- drivers/mmc/host/mmci.h |    1 +
- 2 files changed, 17 insertions(+)
+ drivers/mmc/host/mmci.c |   43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
 diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-index c3785ed..9fa8855 100644
+index 8f70e5b..ec9f17c 100644
 --- a/drivers/mmc/host/mmci.c
 +++ b/drivers/mmc/host/mmci.c
-@@ -1527,6 +1527,12 @@ static int mmci_probe(struct amba_device *dev,
- 	} else
- 		dev_warn(&dev->dev, "could not get default pinstate\n");
+@@ -62,6 +62,7 @@ static unsigned int fmax = 515633;
+  * @signal_direction: input/out direction of bus signals can be indicated
+  * @pwrreg_clkgate: MMCIPOWER register must be used to gate the clock
+  * @busy_detect: true if busy detection on dat0 is supported
++ * @pwrreg_nopower: bits in MMCIPOWER don't controls ext. power supply
+  */
+ struct variant_data {
+ 	unsigned int		clkreg;
+@@ -76,6 +77,7 @@ struct variant_data {
+ 	bool			signal_direction;
+ 	bool			pwrreg_clkgate;
+ 	bool			busy_detect;
++	bool			pwrreg_nopower;
+ };
  
-+	/* fetch optional sleep state of pins */
-+	host->pins_sleep = pinctrl_lookup_state(host->pinctrl,
-+			PINCTRL_STATE_SLEEP);
-+	if (IS_ERR(host->pins_sleep))
-+		dev_dbg(&dev->dev, "could not get sleep pinstate\n");
-+
- 	/* Get regulators and the supported OCR mask */
- 	mmc_regulator_get_supply(mmc);
- 	if (!mmc->ocr_avail)
-@@ -1767,6 +1773,11 @@ static int mmci_runtime_suspend(struct device *dev)
+ static struct variant_data variant_arm = {
+@@ -109,6 +111,7 @@ static struct variant_data variant_u300 = {
+ 	.pwrreg_powerup		= MCI_PWR_ON,
+ 	.signal_direction	= true,
+ 	.pwrreg_clkgate		= true,
++	.pwrreg_nopower		= true,
+ };
  
- 	if (mmc) {
- 		struct mmci_host *host = mmc_priv(mmc);
+ static struct variant_data variant_nomadik = {
+@@ -121,6 +124,7 @@ static struct variant_data variant_nomadik = {
+ 	.pwrreg_powerup		= MCI_PWR_ON,
+ 	.signal_direction	= true,
+ 	.pwrreg_clkgate		= true,
++	.pwrreg_nopower		= true,
+ };
+ 
+ static struct variant_data variant_ux500 = {
+@@ -135,6 +139,7 @@ static struct variant_data variant_ux500 = {
+ 	.signal_direction	= true,
+ 	.pwrreg_clkgate		= true,
+ 	.busy_detect		= true,
++	.pwrreg_nopower		= true,
+ };
+ 
+ static struct variant_data variant_ux500v2 = {
+@@ -150,6 +155,7 @@ static struct variant_data variant_ux500v2 = {
+ 	.signal_direction	= true,
+ 	.pwrreg_clkgate		= true,
+ 	.busy_detect		= true,
++	.pwrreg_nopower		= true,
+ };
+ 
+ static int mmci_card_busy(struct mmc_host *mmc)
+@@ -1782,6 +1788,41 @@ static int mmci_resume(struct device *dev)
+ #endif
+ 
+ #ifdef CONFIG_PM_RUNTIME
++static void mmci_save(struct mmci_host *host)
++{
++	unsigned long flags;
 +
-+		/* Optionally let pins go into sleep state */
-+		if (!IS_ERR(host->pins_sleep))
-+			pinctrl_select_state(host->pinctrl, host->pins_sleep);
++	if (host->variant->pwrreg_nopower) {
++		spin_lock_irqsave(&host->lock, flags);
 +
++		writel(0, host->base + MMCIMASK0);
++		writel(0, host->base + MMCIDATACTRL);
++		writel(0, host->base + MMCIPOWER);
++		writel(0, host->base + MMCICLOCK);
++		mmci_reg_delay(host);
++
++		spin_unlock_irqrestore(&host->lock, flags);
++	}
++
++}
++
++static void mmci_restore(struct mmci_host *host)
++{
++	unsigned long flags;
++
++	if (host->variant->pwrreg_nopower) {
++		spin_lock_irqsave(&host->lock, flags);
++
++		writel(host->clk_reg, host->base + MMCICLOCK);
++		writel(host->datactrl_reg, host->base + MMCIDATACTRL);
++		writel(host->pwr_reg, host->base + MMCIPOWER);
++		writel(MCI_IRQENABLE, host->base + MMCIMASK0);
++		mmci_reg_delay(host);
++
++		spin_unlock_irqrestore(&host->lock, flags);
++	}
++}
++
+ static int mmci_runtime_suspend(struct device *dev)
+ {
+ 	struct amba_device *adev = to_amba_device(dev);
+@@ -1794,6 +1835,7 @@ static int mmci_runtime_suspend(struct device *dev)
+ 		if (!IS_ERR(host->pins_sleep))
+ 			pinctrl_select_state(host->pinctrl, host->pins_sleep);
+ 
++		mmci_save(host);
  		clk_disable_unprepare(host->clk);
  	}
  
-@@ -1780,7 +1791,12 @@ static int mmci_runtime_resume(struct device *dev)
- 
- 	if (mmc) {
+@@ -1809,6 +1851,7 @@ static int mmci_runtime_resume(struct device *dev)
  		struct mmci_host *host = mmc_priv(mmc);
-+
+ 
  		clk_prepare_enable(host->clk);
-+
-+		/* Optionally enable pins to be muxed in and configured */
-+		if (!IS_ERR(host->pins_default))
-+			pinctrl_select_state(host->pinctrl, host->pins_default);
- 	}
++		mmci_restore(host);
  
- 	return 0;
-diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
-index 69080fa..060f919 100644
---- a/drivers/mmc/host/mmci.h
-+++ b/drivers/mmc/host/mmci.h
-@@ -203,6 +203,7 @@ struct mmci_host {
- 	/* pinctrl handles */
- 	struct pinctrl		*pinctrl;
- 	struct pinctrl_state	*pins_default;
-+	struct pinctrl_state	*pins_sleep;
- 
- #ifdef CONFIG_DMA_ENGINE
- 	/* DMA stuff */
+ 		/* Optionally enable pins to be muxed in and configured */
+ 		if (!IS_ERR(host->pins_default))
 -- 
 1.7.10
