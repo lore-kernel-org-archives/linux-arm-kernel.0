@@ -1,99 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 23 May 2013 09:28:23 +0200
-Subject: [PATCH 1/2] ARM: add support for kernel mode NEON/VFP
-Message-ID: <1369294104-3849-1-git-send-email-ard.biesheuvel@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 May 2013 08:53:04 +0100
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on
+ Armada 370/XP
+In-Reply-To: <20130522233108.01cb51f0@skate>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201305221735.11815.arnd@arndb.de> <20130522180842.7edcc3ee@skate>
+ <201305222240.05124.arnd@arndb.de> <20130522233108.01cb51f0@skate>
+Message-ID: <20130523075304.GH18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to safely support the use of NEON or VFP instructions in
-kernel mode, some precautions need to be taken:
-- the userland context that may be present in the registers (even
-  if the NEON/VFP is currently disabled) must be stored under the
-  correct task (which may not be 'current' in the UP case),
-- to avoid having to keep track of additional vfpstates for the
-  kernel side, disallow the use of NEON/VFP in interrupt context
-  and run with preemption disabled,
-- after use, re-enable preemption and re-enable the lazy restore
-  machinery by disabling the NEON/VFP unit.
+On Wed, May 22, 2013 at 11:31:08PM +0200, Thomas Petazzoni wrote:
+> Dear Arnd Bergmann,
+> 
+> The thing that I believe you don't realize is that those new bootloaders
+> are already shipping *today*. And they are not putting whatever
+> "correct" information into the DT you believe they should be putting.
 
-This patch adds the functions kernel_vfp_begin() and kernel_vfp_end()
-which take care of the above.
+Well, if they're not putting addresses of registers into the DT, then
+that DT information is surely pretty much useless to the kernel - or
+anything.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/include/asm/vfp.h |  5 +++++
- arch/arm/vfp/vfpmodule.c   | 39 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 44 insertions(+)
+If it's putting _wrong_ addresses in the DT, then the same thing applies.
 
-diff --git a/arch/arm/include/asm/vfp.h b/arch/arm/include/asm/vfp.h
-index f4ab34f..a488876 100644
---- a/arch/arm/include/asm/vfp.h
-+++ b/arch/arm/include/asm/vfp.h
-@@ -82,3 +82,8 @@
- #define VFPOPDESC_UNUSED_BIT	(24)
- #define VFPOPDESC_UNUSED_MASK	(0xFF << VFPOPDESC_UNUSED_BIT)
- #define VFPOPDESC_OPDESC_MASK	(~(VFPOPDESC_LENGTH_MASK | VFPOPDESC_UNUSED_MASK))
-+
-+#ifndef __ASSEMBLY__
-+void kernel_vfp_begin(void);
-+void kernel_vfp_end(void);
-+#endif
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index 5dfbb0b..ab1eeae 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -20,6 +20,7 @@
- #include <linux/init.h>
- #include <linux/uaccess.h>
- #include <linux/user.h>
-+#include <linux/export.h>
- 
- #include <asm/cp15.h>
- #include <asm/cputype.h>
-@@ -649,6 +650,44 @@ static int vfp_hotplug(struct notifier_block *b, unsigned long action,
- }
- 
- /*
-+ * Kernel-side NEON/VFP support functions
-+ */
-+void kernel_vfp_begin(void)
-+{
-+	struct thread_info *thread = current_thread_info();
-+	unsigned int cpu;
-+	u32 fpexc;
-+
-+	/* Avoid using the NEON/VFP in interrupt context */
-+	might_sleep();
-+	cpu = get_cpu();
-+
-+	fpexc = fmrx(FPEXC) | FPEXC_EN;
-+	fmxr(FPEXC, fpexc);
-+
-+	/*
-+	 * Save the userland NEON/VFP state. Under UP, the owner could be a task
-+	 * other than 'current'
-+	 */
-+	if (vfp_state_in_hw(cpu, thread))
-+		vfp_save_state(&thread->vfpstate, fpexc);
-+#ifndef CONFIG_SMP
-+	else if (vfp_current_hw_state[cpu] != NULL)
-+		vfp_save_state(vfp_current_hw_state[cpu], fpexc);
-+#endif
-+	vfp_current_hw_state[cpu] = NULL;
-+}
-+EXPORT_SYMBOL(kernel_vfp_begin);
-+
-+void kernel_vfp_end(void)
-+{
-+	/* Disable the NEON/VFP unit. */
-+	fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-+	put_cpu();
-+}
-+EXPORT_SYMBOL(kernel_vfp_end);
-+
-+/*
-  * VFP support code initialisation.
-  */
- static int __init vfp_init(void)
--- 
-1.8.1.2
+Either way, it says "you need to change the DT blob passed to the kernel."
+
+Luckily, as has already been agreed, DT blobs will not be hard-coded into
+boot loaders, so that's easily sorted - you just tell people in the
+installation instructions "if you have X versions of the boot loader, you
+need to use DT blob X, otherwise you need to use blob Y."
+
+>From what you're saying, that's the best that can be done - the kernel
+can't do much else.
+
+I'd also hasten to point out that even if we could detect the base of the
+registers, with DT, what matters is what's in the DT blob itself, which
+should override any detection.  So the DT blob would need to be updated
+in any case.
