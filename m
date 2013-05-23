@@ -1,353 +1,269 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 23 May 2013 15:42:00 +0200
-Subject: [PATCH v2 6/6] arm: mvebu: support new bootloaders shipped by
- Marvell
-In-Reply-To: <1369315854-32724-7-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1369315854-32724-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1369315854-32724-7-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130523134200.GD8681@lunn.ch>
+From: Madhvapathi.Sriram@csr.com (Madhvapathi Sriram)
+Date: Thu, 23 May 2013 13:49:10 +0000
+Subject: [PATCH] input: sirfsoc_pwrc: add onkey input driver for CSR
+ SiRFprimaII PWRC
+In-Reply-To: <1369239198-11059-1-git-send-email-Baohua.Song@csr.com>
+References: <1369239198-11059-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <AAD401B65941D44692B7183E6577180803A11B7C@banasiexm01.ASIA.ROOT.PRI>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 03:30:54PM +0200, Thomas Petazzoni wrote:
-> On Marvell platforms, the "internal registers" is a window of 1 MB of
-> the physical address space that contains all the registers for the
-> various peripherals of the SoC (timers, interrupt controllers, GPIO
-> controllers, Ethernet, etc.). The base address of this 1 MB window is
-> configurable, and this base address is configured using a register
-> that is itself part of this window.
-> 
-> All earlier families of Marvell EBU SoCs supported by Linux used
-> 0xf1000000 as the base address of the internal registers window. For
-> some reason, early versions of the Marvell 370/XP platforms used
-> 0xd0000000 as the base address. This base address is set up by the
-> bootloader. However, in order to keep as much physical address space
-> to address RAM below the 4 GB limit, Marvell had to switch the base
-> address of the internal registers window back to 0xf1000000.
-> 
-> All the new bootloaders shipped by Marvell remap those registers to
-> 0xf1000000. This commit adapts the kernel Device Tree and other
-> definitions so that it can boot with such bootloaders.
-> 
-> However, since those changing are breaking the compatibility with old
-> bootloader (resulting in a kernel that crashes without displaying any
-> message), we have implement a temporary solution for users of an old
-> bootloader.
-> 
-> One particular bit of a CP15 register has been chosen to indicate
-> whether we use an old bootloader (setting the address at 0xd0000000)
-> or a new bootloader (setting the address at 0xf1000000). In the
-> ->map_io() function, when the bit is already set, there is nothing to
-> do, we are already using a new bootloader and internal registers are
-> at 0xf1000000.
-> 
-> However, when the bit is not set, we do a static mapping of the
-> register area that allows to change the internal register address, we
-> change this address, and set this bit.
-> 
-> Note that this mechanism also needs cooperation from the earlyprintk
-> addruart handler (in arch/arm/include/debug/mvebu.S). This is where
-> things get complex: the CP15 bit that has been chosen gets reset to
-> zero at the first call to the 'wfi' instruction. So it cannot be used
-> during the entire life of the system. Instead, whenever the ->map_io()
-> function has switched to the internal register space to the new
-> address, it sets a global variable 'mvebu_switched_regs', which the
-> earlyprintk reads. If it's true, then the move has already been done
-> and there is no need to read the CP15 register. If
-> 'mvebu_switched_regs' is false, we are before the register move, so we
-> need to read the CP15 bit to find out whether we're being booted from
-> an old bootloader (which mapped the register space at 0xd0000000) or a
-> new bootloader (which mapped the register space at 0xf1000000).
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Comments inline.
+________________________________________
+From: Barry Song [21cnbao at gmail.com]
+Sent: Wednesday, May 22, 2013 9:43 PM
+To: dtor at mail.ru; dmitry.torokhov at gmail.com
+Cc: linux-input at vger.kernel.org; DL-SHA-WorkGroupLinux; linux-arm-kernel at lists.infradead.org; Binghua Duan; Xianglong Du; Barry Song
+Subject: [PATCH] input: sirfsoc_pwrc: add onkey input driver for CSR SiRFprimaII PWRC
 
-Hi Thomas
+From: Binghua Duan <Binghua.Duan@csr.com>
 
-Thanks for making the small changes i requested.
+there is an embedded PWRC(power controller) in SiRFprimaII and SiRFatlasVI,
+we have an ONKEY button which can generate interrupt to IRQ controller.
+in a typical user scenarios, at the runtime, if users touch the key, we put
+system to s2ram status.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Binghua Duan <Binghua.Duan@csr.com>
+Signed-off-by: Xianglong Du <Xianglong.Du@csr.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ drivers/input/misc/Kconfig         |  10 +++
+ drivers/input/misc/Makefile        |   1 +
+ drivers/input/misc/sirfsoc_onkey.c | 176 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 187 insertions(+)
+ create mode 100644 drivers/input/misc/sirfsoc_onkey.c
 
-	  Andrew
+diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+index bb698e1..1d91d1b 100644
+--- a/drivers/input/misc/Kconfig
++++ b/drivers/input/misc/Kconfig
+@@ -637,4 +637,14 @@ config INPUT_XEN_KBDDEV_FRONTEND
+          To compile this driver as a module, choose M here: the
+          module will be called xen-kbdfront.
+
++config INPUT_SIRFSOC_ONKEY
++       bool "CSR SiRFSoC power on/off/suspend key support"
++       depends on ARCH_SIRF
++       default y
++       help
++         Say Y here if you want to support for the SiRFSoC power on/off/suspend key
++         in Linux, after you press the onkey, system will suspend.
++
++         If unsure, say N.
++
+ endif
+diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
+index d7fc17f..1d66f03 100644
+--- a/drivers/input/misc/Makefile
++++ b/drivers/input/misc/Makefile
+@@ -60,3 +60,4 @@ obj-$(CONFIG_INPUT_WISTRON_BTNS)      += wistron_btns.o
+ obj-$(CONFIG_INPUT_WM831X_ON)          += wm831x-on.o
+ obj-$(CONFIG_INPUT_XEN_KBDDEV_FRONTEND)        += xen-kbdfront.o
+ obj-$(CONFIG_INPUT_YEALINK)            += yealink.o
++obj-$(CONFIG_INPUT_SIRFSOC_ONKEY)      += sirfsoc_onkey.o
+diff --git a/drivers/input/misc/sirfsoc_onkey.c b/drivers/input/misc/sirfsoc_onkey.c
+new file mode 100644
+index 0000000..3e48db9
+--- /dev/null
++++ b/drivers/input/misc/sirfsoc_onkey.c
+@@ -0,0 +1,176 @@
++/*
++ * Power key driver for SiRF PrimaII
++ *
++ * Copyright (c) 2013 Cambridge Silicon Radio Limited, a CSR plc group company.
++ *
++ * Licensed under GPLv2 or later.
++ */
++
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/delay.h>
++#include <linux/platform_device.h>
++#include <linux/input.h>
++#include <linux/rtc/sirfsoc_rtciobrg.h>
++#include <linux/of.h>
++
++struct sirfsoc_pwrc_drvdata {
++       u32                     pwrc_base;
++       int                     irq;
++       struct input_dev        *input;
++};
++
++#define PWRC_ON_KEY_BIT                        (1 << 0)
++
++#define PWRC_INT_STATUS                        0xc
++#define PWRC_INT_MASK                  0x10
++
++static irqreturn_t sirfsoc_pwrc_isr(int irq, void *dev_id)
++{
++       struct sirfsoc_pwrc_drvdata *pwrcdrv =
++                       (struct sirfsoc_pwrc_drvdata *)dev_id;
++       u32 int_status;
++       int_status = sirfsoc_rtc_iobrg_readl(
++                       pwrcdrv->pwrc_base + PWRC_INT_STATUS);
++       sirfsoc_rtc_iobrg_writel(int_status & (~PWRC_ON_KEY_BIT),
++                       pwrcdrv->pwrc_base + PWRC_INT_STATUS);
++
++       /*
++        * For a typical Linux system, we report KEY_SUSPEND to trigger apm-power.c
++        * to queue a SUSPEND APM event
++        */
++       input_event(pwrcdrv->input, EV_PWR, KEY_SUSPEND, 1);
++       input_sync(pwrcdrv->input);
++
++       /*
++        * Todo: report KEY_POWER event for Android platforms, Android PowerManager
++        * will handle the suspend and powerdown/hibernation
++        */
++
++       return IRQ_HANDLED;
++}
++
++static const struct of_device_id sirfsoc_pwrc_of_match[] = {
++       { .compatible = "sirf,prima2-pwrc" },
++       {},
++}
++MODULE_DEVICE_TABLE(of, sirfsoc_pwrc_of_match);
++
++static int sirfsoc_pwrc_probe(struct platform_device *pdev)
++{
++       int ret;
++       struct sirfsoc_pwrc_drvdata *pwrcdrv = NULL;
++       struct device_node *np = pdev->dev.of_node;
++
++       pwrcdrv = devm_kzalloc(&pdev->dev,
++               sizeof(struct sirfsoc_pwrc_drvdata), GFP_KERNEL);
++       if (!pwrcdrv) {
++               dev_info(&pdev->dev, "kzalloc fail!\n");
++               return -ENOMEM;
++       }
++
++       /*
++        * we can't use of_iomap because pwrc is not mapped in memory, the so-called base
++        * address is only offset in rtciobrg
++        */
++       ret = of_property_read_u32(np, "reg", &pwrcdrv->pwrc_base);
+
+Possible mem leak here  - not freeing pwrcdrv
+
++       if (ret) {
++               dev_err(&pdev->dev, "unable to find base address of pwrc node in dtb\n");
++               return ret;
++       }
++
++       pwrcdrv->input = devm_input_allocate_device(&pdev->dev);
++       if (!pwrcdrv->input)
++               return -ENOMEM;
++
++       pwrcdrv->input->name = "sirfsoc pwrckey";
++       pwrcdrv->input->phys = "pwrc/input0";
++
++       platform_set_drvdata(pdev, pwrcdrv);
++
++       pwrcdrv->irq = platform_get_irq(pdev, 0);
++       ret = devm_request_irq(&pdev->dev, pwrcdrv->irq,
++                       sirfsoc_pwrc_isr, IRQF_SHARED,
++                       "sirfsoc_pwrc_int", pwrcdrv);
++
++       sirfsoc_rtc_iobrg_writel(
++               sirfsoc_rtc_iobrg_readl(pwrcdrv->pwrc_base + PWRC_INT_MASK)
++               | PWRC_ON_KEY_BIT, pwrcdrv->pwrc_base + PWRC_INT_MASK);
+
+Enabling the MASK for an interrupt should only come after it has been successfully claimed? Else we might be leaving and interrupt enabled without being able to handle it?
+
+Possible mem leak here not freeing any allocated devices/memory/irq.
+I suggest all the error handling be collated at the end of this function for various stages and error handling be done there.
+Please have a look at https://www.kernel.org/doc/Documentation/input/input-programming.txt
+
++       if (ret) {
++               dev_err(&pdev->dev, "pwrc: Unable to claim irq %d; error %d\n",
++                       pwrcdrv->irq, ret);
++               return ret;
++       }
++
++       pwrcdrv->input->evbit[0] = BIT_MASK(EV_PWR) | BIT_MASK(EV_KEY);
++       set_bit(KEY_POWER, pwrcdrv->input->keybit);
++
++       ret = input_register_device(pwrcdrv->input);
++       if (ret) {
++               dev_err(&pdev->dev,
++                       "pwrc: Unable to register input device,error: %d\n",
++                       ret);
++               return ret;
++       }
++
++       device_init_wakeup(&pdev->dev, 1);
++
++       return 0;
++}
++
++static int sirfsoc_pwrc_remove(struct platform_device *pdev)
++{
++       device_init_wakeup(&pdev->dev, 0);
++
++       return 0;
++}
++
++#ifdef CONFIG_PM
++static int pwrc_suspend(struct device *dev)
++{
++       return 0;
++}
++
++static int pwrc_resume(struct device *dev)
++{
++       struct sirfsoc_pwrc_drvdata *pwrcdrv = dev_get_drvdata(dev);
++
+
+Typically, the wake up interrupts would be ensured to be active while going to sleep/suspend.
+However, here at resume the interrupt mask is being set. Is it because, there are some caveats here?
+
++       /*
++        * Do not mask pwrc interrupt as we want pwrc work as a wakeup source
++        * if users touch X_ONKEY_B, see arch/arm/mach-prima2/pm.c
++        */
++       sirfsoc_rtc_iobrg_writel(
++               sirfsoc_rtc_iobrg_readl(
++               pwrcdrv->pwrc_base + PWRC_INT_MASK) | PWRC_ON_KEY_BIT,
++               pwrcdrv->pwrc_base + PWRC_INT_MASK);
++
++       return 0;
++}
++
++static const struct dev_pm_ops sirfsoc_pwrc_pm_ops = {
++       .suspend = pwrc_suspend,
++       .resume = pwrc_resume,
++};
++#endif
++
++static struct platform_driver sirfsoc_pwrc_driver = {
++       .probe          = sirfsoc_pwrc_probe,
++       .remove         = sirfsoc_pwrc_remove,
++       .driver         = {
++               .name   = "sirfsoc-pwrc",
++               .owner  = THIS_MODULE,
++#ifdef CONFIG_PM
++               .pm     = &sirfsoc_pwrc_pm_ops,
++#endif
++               .of_match_table = of_match_ptr(sirfsoc_pwrc_of_match),
++       }
++};
++
++module_platform_driver(sirfsoc_pwrc_driver);
++
++MODULE_LICENSE("GPLv2");
++MODULE_AUTHOR("Binghua Duan <Binghua.Duan@csr.com>, "
++               "Xianglong Du <Xianglong.Du@csr.com>");
++MODULE_DESCRIPTION("CSR Prima2 PWRC Driver");
++MODULE_ALIAS("platform:sirfsoc-pwrc");
+--
+1.8.2.3
 
 
 
-> ---
->  arch/arm/boot/dts/armada-370-xp.dtsi |    2 +-
->  arch/arm/boot/dts/armada-370.dtsi    |    3 +-
->  arch/arm/boot/dts/armada-xp-gp.dts   |    2 +-
->  arch/arm/include/debug/mvebu.S       |   77 +++++++++++++++++++++++--
->  arch/arm/mach-mvebu/armada-370-xp.c  |  105 ++++++++++++++++++++++++++++++++++
->  arch/arm/mach-mvebu/armada-370-xp.h  |    2 +-
->  6 files changed, 181 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-> index 52a1f5e..95ec049 100644
-> --- a/arch/arm/boot/dts/armada-370-xp.dtsi
-> +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-> @@ -33,7 +33,7 @@
->  		#size-cells = <1>;
->  		compatible = "simple-bus";
->  		interrupt-parent = <&mpic>;
-> -		ranges = <0          0 0xd0000000 0x0100000 /* internal registers */
-> +		ranges = <0          0 0xf1000000 0x0100000 /* internal registers */
->  			  0xe0000000 0 0xe0000000 0x8100000 /* PCIe */>;
->  
->  		internal-regs {
-> diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-> index aee2b18..030e425 100644
-> --- a/arch/arm/boot/dts/armada-370.dtsi
-> +++ b/arch/arm/boot/dts/armada-370.dtsi
-> @@ -29,8 +29,9 @@
->  	};
->  
->  	soc {
-> -		ranges = <0          0xd0000000 0x0100000 /* internal registers */
-> +		ranges = <0          0xf1000000 0x0100000 /* internal registers */
->  			  0xe0000000 0xe0000000 0x8100000 /* PCIe */>;
-> +
->  		internal-regs {
->  			system-controller at 18200 {
->  				compatible = "marvell,armada-370-xp-system-controller";
-> diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-> index 3ee63d1..8fb1679 100644
-> --- a/arch/arm/boot/dts/armada-xp-gp.dts
-> +++ b/arch/arm/boot/dts/armada-xp-gp.dts
-> @@ -39,7 +39,7 @@
->  	};
->  
->  	soc {
-> -		ranges = <0          0 0xd0000000 0x100000
-> +		ranges = <0          0 0xf1000000 0x100000
->  			  0xf0000000 0 0xf0000000 0x1000000>;
->  
->  		internal-regs {
-> diff --git a/arch/arm/include/debug/mvebu.S b/arch/arm/include/debug/mvebu.S
-> index df191af..ec875c4 100644
-> --- a/arch/arm/include/debug/mvebu.S
-> +++ b/arch/arm/include/debug/mvebu.S
-> @@ -5,20 +5,85 @@
->   *
->   * Lior Amsalem <alior@marvell.com>
->   * Gregory Clement <gregory.clement@free-electrons.com>
-> + * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->   *
->   * This program is free software; you can redistribute it and/or modify
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
->  */
->  
-> -#define ARMADA_370_XP_REGS_PHYS_BASE	0xd0000000
-> -#define ARMADA_370_XP_REGS_VIRT_BASE	0xfec00000
-> +#define ARMADA_370_XP_UART_PHYS_BASE_OLD	0xd0012000
-> +#define ARMADA_370_XP_UART_PHYS_BASE_NEW	0xf1012000
-> +#define ARMADA_370_XP_UART_VIRT_BASE_OLD	0xfec12000
-> +#define ARMADA_370_XP_UART_VIRT_BASE_NEW	0xfea12000
->  
->  	.macro	addruart, rp, rv, tmp
-> -	ldr	\rp, =ARMADA_370_XP_REGS_PHYS_BASE
-> -	ldr	\rv, =ARMADA_370_XP_REGS_VIRT_BASE
-> -	orr	\rp, \rp, #0x00012000
-> -	orr	\rv, \rv, #0x00012000
-> +
-> +#ifndef ZIMAGE
-> +	/*
-> +	 * This loads the value of mvebu_switched_regs. We need a
-> +	 * little bit of gymnastic here to handle the fact that the
-> +	 * addruart code is duplicated in different places, and called
-> +	 * sometimes with the MMU disabled, sometimes the MMU enabled.
-> +	 *
-> +	 * Notice that when this earlyprintk code is linked into the
-> +	 * kernel decompressor (i.e ZIMAGE is defined), this code isn't
-> +	 * compiled. The reason is because the global mvebu_switched_regs
-> +	 * variable is not available in the decompressor code. At this
-> +	 * early stage, we simply test the CP15 bit (below) to know where
-> +	 * the internal registers are.
-> +	 */
-> +	adr	\rp, addruart_switched_regs_\@
-> +	ldr	\rv, [\rp]
-> +	sub	\rv, \rv, \rp
-> +	ldr	\rp, [\rp, #4]
-> +	sub	\tmp, \rp, \rv
-> +	ldr	\rp, [\tmp, #0]
-> +	cmp	\rp, #0
-> +
-> +	/* If we have already switched, then use the new register
-> +	   address */
-> +	bne	addruart_new_\@
-> +#endif
-> +
-> +	/*
-> +	 * We haven't switched the register location, so test the CP15
-> +	 * register bit to find whether we are:
-> +	 * - with an old bootloader setting the base address to
-> +	 *   0xd0000000
-> +	 * - with a new bootloader that has already set the
-> +	 *   base address to 0xf1000000
-> +	 * We adapt the physical address returned depending on the
-> +	 * value of this bit, but also the virtual address, because we
-> +	 * can't remap the old physical address and the new physical
-> +	 * address at the same location.
-> +	 */
-> +	mrc	p15, 0, \tmp, c5, c0, 0
-> +	and	\tmp, \tmp, #(1 << 11)
-> +	cmp	\tmp, #0
-> +	bne	addruart_new_\@
-> +
-> +addruart_old_\@:
-> +	ldr	\rp, =ARMADA_370_XP_UART_PHYS_BASE_OLD
-> +	ldr	\rv, =ARMADA_370_XP_UART_VIRT_BASE_OLD
-> +	b	addruart_out_\@
-> +addruart_new_\@:
-> +	ldr	\rp, =ARMADA_370_XP_UART_PHYS_BASE_NEW
-> +	ldr	\rv, =ARMADA_370_XP_UART_VIRT_BASE_NEW
-> +	b	addruart_out_\@
-> +
-> +#ifndef ZIMAGE
-> +	/*
-> +	 * Global variable mvebu_switched_regs not visible in the
-> +	 * decompressor code
-> +	 */
-> +	.align
-> +addruart_switched_regs_\@:
-> +	.long	.
-> +	.long	mvebu_switched_regs
-> +#endif
-> +
-> +addruart_out_\@:
->  	.endm
->  
->  #define UART_SHIFT	2
-> diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-> index c1c0556..752eedd 100644
-> --- a/arch/arm/mach-mvebu/armada-370-xp.c
-> +++ b/arch/arm/mach-mvebu/armada-370-xp.c
-> @@ -28,8 +28,113 @@
->  #include "common.h"
->  #include "coherency.h"
->  
-> +/*
-> + * Note on the internal register address.
-> + *
-> + * On Marvell platforms, the "internal registers" is a window of 1 MB
-> + * of the physical address space that contains all the registers for
-> + * the various peripherals of the SoC (timers, interrupt controllers,
-> + * GPIO controllers, Ethernet, etc.). The base address of this 1 MB
-> + * window is configurable, and this base address is configured using a
-> + * register that is itself part of this window.
-> + *
-> + * All earlier families of Marvell EBU SoCs supported by Linux used
-> + * 0xf1000000 as the base address of the internal registers
-> + * window. For some reason, early versions of the Marvell 370/XP
-> + * platforms used 0xd0000000 as the base address. This base address is
-> + * set up by the bootloader. However, in order to keep as much
-> + * physical address space to address RAM below the 4 GB limit, we had
-> + * to switch the base address of the internal registers window back to
-> + * 0xf1000000, and we wanted to achieve that without breaking existing
-> + * platforms, where the bootloader was initially setting the base
-> + * address to 0xd0000000. So the kernel is responsible for switching
-> + * to 0xf1000000 when needed.
-> + *
-> + * One particular bit of a CP15 register has been chosen to indicate
-> + * whether we use an old bootloader (setting the address at
-> + * 0xd0000000) or a new bootloader (setting the address at
-> + * 0xf1000000). In the ->map_io() function, when the bit is already
-> + * set, there is nothing to do, we are already using a new bootloader
-> + * and internal registers are at 0xf1000000.
-> + *
-> + * However, when the bit is not set, we do a static mapping of the
-> + * register area that allows to change the internal register address
-> + * and we change this address.
-> + *
-> + * Once those steps are done, we set a global variable,
-> + * mvebu_switched_regs, that tells the earlyprintk code how to
-> + * behave. Note that this mechanism also needs cooperation from the
-> + * earlyprintk addruart handler (in arch/arm/include/debug/mvebu.S).
-> + */
-> +
-> +#define NEW_INTERNAL_REGS_ADDR  0xf1000000
-> +#define OLD_INTERNAL_REGS_ADDR  0xd0000000
-> +#define MBUS_OLD_PHYS_ADDR      (OLD_INTERNAL_REGS_ADDR + 0x20000)
-> +#define MBUS_OLD_VIRT_ADDR      0xfe9ff000
-> +#define  MBUS_INTERNAL_REGS_ADDR      0x80
-> +
-> +/*
-> + * We really want this variable to be part of the .data section,
-> + * because it gets accessed by the earlyprintk code before BSS gets
-> + * initialized to zero. This variable indicates whether the switch to
-> + * the new register has taken place or not. It is needed because the
-> + * CP15 bit used by the bootloader to tell the kernel where the
-> + * registers are mapped is cleared to 0 at the first 'wfi'
-> + * instruction. So we can't use it for the entire life of the system,
-> + * and we instead use this boolean to indicate to the earlyprintk code
-> + * that the switch has occured and it doesn't need to look at the CP15
-> + * bit anymore.
-> + */
-> +unsigned int __section(.data) mvebu_switched_regs = 0;
-> +
-> +/*
-> + * Detect if we're running an old bootloader that has set the physical
-> + * base address of internal registers to 0xd0000000
-> + */
-> +static int armada_370_xp_has_old_bootloader(void)
-> +{
-> +	u32 val;
-> +	asm volatile("mrc p15, 0, %0, c5, c0, 0" : "=r"(val));
-> +	return !(val & BIT(11));
-> +}
-> +
->  static void __init armada_370_xp_map_io(void)
->  {
-> +	if (armada_370_xp_has_old_bootloader()) {
-> +		struct map_desc desc;
-> +		void __iomem *mbus = IOMEM(MBUS_OLD_VIRT_ADDR);
-> +
-> +		desc.virtual = MBUS_OLD_VIRT_ADDR;
-> +		desc.pfn     = __phys_to_pfn(MBUS_OLD_PHYS_ADDR);
-> +		desc.length  = PAGE_SIZE;
-> +		desc.type    = MT_DEVICE;
-> +
-> +		/*
-> +		 * Map the area that contains the registers that
-> +		 * allows to change the base address of internal
-> +		 * registers.
-> +		 */
-> +		iotable_init(&desc, 1);
-> +
-> +		/*
-> +		 * Change the physical base address of the
-> +		 * registers. From now on, and until
-> +		 * debug_ll_io_init() is called below, it is not
-> +		 * possible to do any print, because using earlyprintk
-> +		 * would lead to memory writes to the old internal
-> +		 * registers, which would hang the CPU.
-> +		 */
-> +		writel(NEW_INTERNAL_REGS_ADDR, mbus + MBUS_INTERNAL_REGS_ADDR);
-> +	}
-> +
-> +	/*
-> +	 * Either the registers have been switched by the above code,
-> +	 * or the bootloader had already set the register space at the
-> +	 * right location. In both cases, tell the earlyprintk code it
-> +	 * can now use the new location.
-> +	 */
-> +	mvebu_switched_regs = 1;
-> +
->  	debug_ll_io_init();
->  }
->  
-> diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-> index 585e147..ff9adc4 100644
-> --- a/arch/arm/mach-mvebu/armada-370-xp.h
-> +++ b/arch/arm/mach-mvebu/armada-370-xp.h
-> @@ -15,7 +15,7 @@
->  #ifndef __MACH_ARMADA_370_XP_H
->  #define __MACH_ARMADA_370_XP_H
->  
-> -#define ARMADA_370_XP_REGS_PHYS_BASE	0xd0000000
-> +#define ARMADA_370_XP_REGS_PHYS_BASE	0xf1000000
->  
->  /* These defines can go away once mvebu-mbus has a DT binding */
->  #define ARMADA_370_XP_MBUS_WINS_BASE    (ARMADA_370_XP_REGS_PHYS_BASE + 0x20000)
-> -- 
-> 1.7.9.5
-> 
+ To report this email as spam click https://www.mailcontrol.com/sr/MZbqvYs5QwJvpeaetUwhCQ== .
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
