@@ -1,35 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 May 2013 00:15:31 +0100
-Subject: [PATCH] ARM: avoid mis-detecting some V7 cores in the decompressor
-In-Reply-To: <519E57D2.3050000@codeaurora.org>
-References: <1368049671-22879-1-git-send-email-sboyd@codeaurora.org>
- <5193E424.9090605@codeaurora.org> <519E57D2.3050000@codeaurora.org>
-Message-ID: <20130523231531.GT18614@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 24 May 2013 01:17:24 +0200
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
+ 370/XP
+In-Reply-To: <20130523230911.GR18614@n2100.arm.linux.org.uk>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130523142301.10dbeff9@skate>
+ <20130523202643.GQ18614@n2100.arm.linux.org.uk>
+ <201305232240.03959.arnd@arndb.de>
+ <20130523230911.GR18614@n2100.arm.linux.org.uk>
+Message-ID: <20130524011724.515eac91@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 10:54:26AM -0700, Stephen Boyd wrote:
-> On 05/15/13 12:38, Stephen Boyd wrote:
-> > On 05/08/13 14:47, Stephen Boyd wrote:
-> >> From: Brian Swetland <swetland@google.com>
-> >>
-> >> Currently v7 CPUs with an MIDR that has no bits set in the range
-> >> [16:12] will be detected as old ARM CPUs with no caches and so
-> >> the cache will never be turned on during decompression. ARM's
-> >> Cortex chips have an 0xC in the range [16:12] so they never match
-> >> this entry, but Qualcomm's Scorpion and Krait processors never
-> >> set these bits to anything besides 0 so they always match.
-> >>
-> >> Skip this entry if we've compiled in support for v7 CPUs. This
-> >> allows kernel decompression to happen nearly instantly instead of
-> >> taking over 20 seconds.
-> >>
-> >> Signed-off-by: Brian Swetland <swetland@google.com>
-> >> [sboyd: Clarified and extended commit text]
-> >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> >> ---
-> > Ping?
-> 
-> Russell, shall I add this to the patch tracker?
+Russell,
 
-Yes please.
+On Fri, 24 May 2013 00:09:11 +0100, Russell King - ARM Linux wrote:
+
+> No, I'm not asking about the principle.  I'm asking _in this particular
+> problem case_ who provides the DT blob?
+> 
+> So the person to answer that question is Thomas or someone who is using
+> the boards concerned.
+
+The DTB is built from arch/arm/boot/dts/, together with the kernel
+image itself. As far as I'm aware of, there is for the moment no plan
+to "burn" the DTB on the board and therefore make the Device Tree
+really separated from the kernel.
+
+Does that answer your question? If not, do not hesitate to ask for
+further details.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
