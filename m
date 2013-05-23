@@ -1,47 +1,23 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 23 May 2013 15:39:32 +0530
-Subject: [PATCH] dmatest: abort transfers immediately when asked for
-In-Reply-To: <CAHp75VdRn8baf0ak57HpoJKNues6vEsjBp1uOQ2Zpvwa+B5rjA@mail.gmail.com>
-References: <20130516153553.GI11706@mudshark.cambridge.arm.com>
- <1369139597-24446-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <20130521151143.GH10453@mudshark.cambridge.arm.com>
- <CAHp75VdRn8baf0ak57HpoJKNues6vEsjBp1uOQ2Zpvwa+B5rjA@mail.gmail.com>
-Message-ID: <20130523100932.GA30200@intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 23 May 2013 11:46:07 +0100
+Subject: [PATCH v4 22/32] arm64: KVM: define 32bit specific registers
+In-Reply-To: <1368540840-26750-23-git-send-email-marc.zyngier@arm.com>
+References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
+ <1368540840-26750-23-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130523104607.GD16722@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 08:24:15PM +0300, Andy Shevchenko wrote:
-> On Tue, May 21, 2013 at 6:11 PM, Will Deacon <will.deacon@arm.com> wrote:
-> > Hi Andy,
-> >
-> > On Tue, May 21, 2013 at 01:33:17PM +0100, Andy Shevchenko wrote:
-> >> When thread is going to be stopped we have to unconditionally terminate all
-> >> ongoing transfers. Otherwise it would be possible that callback function will
-> >> be called on the next interrupt and will try to access to already freed
-> >> structures.
-> >>
-> >> The patch introduces specific error message for this, though it doesn't
-> >> increase the counter of the failed tests.
-> >>
-> >> Signed-off-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-> >> Reported-by: Will Deacon <will.deacon@arm.com>
-> >
-> > Thanks for persevering with this! Although this patch definitely fixes the
-> > panic I was seeing, I now observe buffer verification failures in subsequent
-> > test runs after an aborted run:
+On Tue, May 14, 2013 at 03:13:50PM +0100, Marc Zyngier wrote:
+> Define the 32bit specific registers (SPSRs, cp15...).
 > 
-> I think the description to the commit adfa543e "dmatest: don't use
-> set_freezable_with_signal()" may shed light on this.
+> Most CPU registers are directly mapped to a 64bit register
+> (r0->x0...). Only the SPSRs have separate registers.
 > 
-> The background (if  I got it correctly) is in race with done flag. So,
-> we got a callback call from the DMA engine, but we don't know which
-> transfer triggers it.
-> I might be wrong. This is just an assumption.
+> cp15 registers are also mapped into their 64bit counterpart in most
+> cases.
 > 
-> Have you ever see such behaviour on pre v3.10-rc1 kernels? (I mean
-> with old dmatest module)
-Terminate shouldnt cause the issue with buffer verfication, can you try this on
-dw_dmac, do you see similar failures on verfication?
+> Reviewed-by: Christopher Covington <cov@codeaurora.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
---
-~Vinod
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
