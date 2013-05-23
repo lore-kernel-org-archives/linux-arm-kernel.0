@@ -1,18 +1,60 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 23 May 2013 12:10:37 +0100
-Subject: [PATCH v4 30/32] arm64: KVM: userspace API documentation
-In-Reply-To: <1368540840-26750-31-git-send-email-marc.zyngier@arm.com>
-References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
- <1368540840-26750-31-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130523111037.GL16722@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 23 May 2013 13:55:05 +0200
+Subject: [PATCH V2 1/6] drivers: bus: add a new driver for WEIM
+In-Reply-To: <201305231153.38111.arnd@arndb.de>
+References: <1369296978-7669-1-git-send-email-b32955@freescale.com>
+ <20130523092344.GF32299@pengutronix.de>
+ <519DE2EE.1050006@freescale.com> <201305231153.38111.arnd@arndb.de>
+Message-ID: <20130523115505.GG32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 03:13:58PM +0100, Marc Zyngier wrote:
-> Unsurprisingly, the arm64 userspace API is extremely similar to
-> the 32bit one, the only significant difference being the ONE_REG
-> register mapping.
+On Thu, May 23, 2013 at 11:53:37AM +0200, Arnd Bergmann wrote:
+> On Thursday 23 May 2013, Huang Shijie wrote:
+> > ? 2013?05?23? 17:23, Sascha Hauer ??:
+> > > On Thu, May 23, 2013 at 04:16:13PM +0800, Huang Shijie wrote:
+> > >> +			<cs-number>  0<physical address of mapping>  <size>
+> > >> +
+> > >> +Timing property for child nodes. It is mandatory, not optional.
+> > >> +
+> > >> + - fsl,weim-cs-timing:	The timing array, contains 6 timing values for the
+> > >> +			child node. We can get the CS index from the child
+> > >> +			node's "reg" property.
+> > > This should be more detailed, something like:
+> > >
+> > > This contains the values for the registers EIM_CSnGCR1, EIM_CSnGCR2,
+> > > EIM_CSnRCR1, EIM_CSnRCR2, EIM_CSnWCR1, EIM_CSnWCR2 in this order.
+> > >
+> > 
+> > 
+> > do you mean i should add some new properties, such as
+> > "fsl,eim_csnrcr1", "fsl,eim_csnrcr2" ...
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> No, the property is fine, just update the documentation the way that
+> Sascha suggested.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Yes, that's what I meant.
+
+> 
+> > >> +static int weim_remove(struct platform_device *pdev)
+> > >> +{
+> > >> +	struct imx_weim *weim = platform_get_drvdata(pdev);
+> > >> +
+> > >> +	clk_disable_unprepare(weim->clk);
+> > > Once again: Is this clock needed for the child devices? If yes, you
+> > > can't disable it here and leave the child devices registered.
+> > >
+> 
+> But weim_remove will not be called as long as there are children
+> registered, right?
+
+But then weim_remove would never be called since nobody unregisters the
+children, right?
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
