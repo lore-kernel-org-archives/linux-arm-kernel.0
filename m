@@ -1,47 +1,79 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 23 May 2013 10:39:30 +0900
-Subject: [RFC/PATCH v2 1/2] gpio-rcar: Make the platform data gpio_base
- field signed
-In-Reply-To: <1369136406-23800-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1369136406-23800-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20130523013930.GH22608@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 22 May 2013 19:06:43 -0700
+Subject: [PATCH v2 1/3] ARM: allow platforms to use generic headers
+ without ARCH_MULTIPLATFORM
+In-Reply-To: <519B9FE7.3030907@arm.com>
+References: <1368530845-7415-1-git-send-email-jonathan.austin@arm.com>
+ <1368530845-7415-2-git-send-email-jonathan.austin@arm.com>
+ <5192532B.1070705@gmail.com> <20130515233335.GO5600@atomide.com>
+ <519B9FE7.3030907@arm.com>
+Message-ID: <20130523020643.GB13507@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 01:40:05PM +0200, Laurent Pinchart wrote:
-> The gpio_base field is used to specify the desired GPIO base for the
-> GPIO controller. The GPIO core can automatically allocate a GPIO number
-> range when the base is set to -1. To make this possible, make the field
-> signed.
+* Jonathan Austin <jonathan.austin@arm.com> [130521 09:30]:
+> Hi Tony,
 > 
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> On 16/05/13 00:33, Tony Lindgren wrote:
+> >* Rob Herring <robherring2@gmail.com> [130514 08:12]:
+> >>On 05/14/2013 06:27 AM, Jonathan Austin wrote:
+> >>>Currently the use of generic mach headers is only is controlled by the same
+> >>>config option as selection of a multiplatform kernel (i.e.
+> >>>ARCH_MULTIPLATFORM). However, there are cases where it is valid to use the
+> >>>generic headers but still build a single platform kernel.
+> >>>
+> >>>One such example is when using the vexpress platform with a core that does
+> >>>not have an MMU; a multiplatform kernel does not make sense, but use of the
+> >>>generic headers is required by the vexpress platform since 617276307cd4c
+> >>>("ARM: vexpress: convert to multi-platform").
+> >>>
+> >>>This patch untangles these two options by introducing a new
+> >>>ARM_GENERIC_HEADERS config option that ARCH_MULTIPLATFORM selects. Other
+> >>>platforms can now select ARM_GENERIC_HEADERS independently.
+> >>
+> >>I find this name confusing. It is no headers you are selecting and
+> >>generic is a bit overused IMHO. So how about something like
+> >>NEED_NO_MACH_HEADERS to somewhat align to the other header related
+> >>config options (e.g. NEED_MACH_GPIO_H).
+> >
+> >Hmm it _looks_ like this won't allow the drivers again to
+> >#include <plat/*.h> and <mach/*.h>. Have you checked that?
+> >
+> >It might be worth checking as we really don't want to go back there
+> >again.. Currently arch/arm/Makefile has:
+> >
+> >ifneq ($(CONFIG_ARCH_MULTIPLATFORM),y)
+> >ifeq ($(KBUILD_SRC),)
+> >KBUILD_CPPFLAGS += $(patsubst %,-I%include,$(machdirs) $(platdirs))
+> >else
+> >KBUILD_CPPFLAGS += $(patsubst %,-I$(srctree)/%include,$(machdirs) $(platdirs))
+> >endif
+> >endif
+> >
+> >So you may need to do something there to prevent drivers from again
+> >including machdirs and platdirs.
+> >
+> If I've understood you correctly, then this patch already deals with
+> this case (though it isn't hugely obvious from the diff...) by
+> replacing CONFIG_ARCH_MULTIPLATFORM in your example above with
+> CONFIG_ARM_GENERIC_HEADERS (soon to be renamed, as per Rob's
+> suggestion).
+> 
+> Because ARCH_MULTIPLATFORM selects
+> CONFIG_(FORMERLY_KNOWN_AS_)ARM_GENERIC_HEADERS it shouldn't be
+> possible for anything multi-platform to start including <plat/*.h>
+> and <mach/*.h> again.
+> 
+> This seems to be the right thing to do because it also makes it
+> impossible to include <plat/*.h> and <mach/*.h> in !MULTIPLATFORM
+> situations that don't need mach/plat headers, like the
+> VEXPRESS_NOMMU case.
+> 
+> Is that what you were getting at? Please let me know if not...
 
-Thanks, this is queued-up for v3.11 in the gpio-rcar branch.
+Yes that's exactly what I was worried about as it was a bit hard to
+see from the patch. Thanks for checking it.
 
-> ---
->  include/linux/platform_data/gpio-rcar.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/include/linux/platform_data/gpio-rcar.h b/include/linux/platform_data/gpio-rcar.h
-> index cc472f6..fb2c718 100644
-> --- a/include/linux/platform_data/gpio-rcar.h
-> +++ b/include/linux/platform_data/gpio-rcar.h
-> @@ -17,7 +17,7 @@
->  #define __GPIO_RCAR_H__
->  
->  struct gpio_rcar_config {
-> -	unsigned int gpio_base;
-> +	int gpio_base;
->  	unsigned int irq_base;
->  	unsigned int number_of_pins;
->  	const char *pctl_name;
-> -- 
-> 1.8.1.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Regards,
+
+Tony 
