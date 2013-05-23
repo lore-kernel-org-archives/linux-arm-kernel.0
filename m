@@ -1,197 +1,72 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 23 May 2013 16:31:20 +0100
-Subject: [PATCH v2 4/4] ARM: mm: Transparent huge page support for LPAE
- systems.
-In-Reply-To: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
-References: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1369323080-9673-5-git-send-email-steve.capper@linaro.org>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Thu, 23 May 2013 17:36:56 +0200
+Subject: [PATCH v2 0/5] ARM: dts: OMAP2+: use preprocessor for device trees
+Message-ID: <1369323421-4180-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Catalin Marinas <catalin.marinas@arm.com>
+Hello,
 
-The patch adds support for THP (transparent huge pages) to LPAE
-systems. When this feature is enabled, the kernel tries to map
-anonymous pages as 2MB sections where possible.
+Following a similar proposal by Stephen Warren for tegra [1], this series
+makes use of the C preprocessor when compiling OMAP DT files, and
+accomplishes some improvements to improve overall readability.
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-[steve.capper at linaro.org: symbolic constants used, value of
-PMD_SECT_SPLITTING adjusted, tlbflush.h included in pgtable.h,
-added PROT_NONE support.]
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/Kconfig                            |  4 ++
- arch/arm/include/asm/pgtable-3level-hwdef.h |  2 +
- arch/arm/include/asm/pgtable-3level.h       | 60 +++++++++++++++++++++++++++++
- arch/arm/include/asm/pgtable.h              |  3 ++
- arch/arm/include/asm/tlb.h                  |  6 +++
- arch/arm/include/asm/tlbflush.h             |  2 +
- arch/arm/mm/fsr-3level.c                    |  2 +-
- 7 files changed, 78 insertions(+), 1 deletion(-)
+Patch 1 is a preparation for the rest of the series.
+Patch 2 uses existing constants for GPIOs. Patch 3 does the same for
+IRQs. Patch 4 creates a new header for OMAP's padmux, and patch 5 uses
+it to simplify pinctrl DT.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 860f034..f07a462 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1711,6 +1711,10 @@ config SYS_SUPPORTS_HUGETLBFS
-        def_bool y
-        depends on ARM_LPAE
- 
-+config HAVE_ARCH_TRANSPARENT_HUGEPAGE
-+       def_bool y
-+       depends on ARM_LPAE
-+
- source "mm/Kconfig"
- 
- config FORCE_MAX_ZONEORDER
-diff --git a/arch/arm/include/asm/pgtable-3level-hwdef.h b/arch/arm/include/asm/pgtable-3level-hwdef.h
-index 42df407..f088c86 100644
---- a/arch/arm/include/asm/pgtable-3level-hwdef.h
-+++ b/arch/arm/include/asm/pgtable-3level-hwdef.h
-@@ -42,6 +42,8 @@
-  */
- #define PMD_SECT_BUFFERABLE	(_AT(pmdval_t, 1) << 2)
- #define PMD_SECT_CACHEABLE	(_AT(pmdval_t, 1) << 3)
-+#define PMD_SECT_USER		(_AT(pmdval_t, 1) << 6)		/* AP[1] */
-+#define PMD_SECT_RDONLY		(_AT(pmdval_t, 1) << 7)		/* AP[2] */
- #define PMD_SECT_S		(_AT(pmdval_t, 3) << 8)
- #define PMD_SECT_AF		(_AT(pmdval_t, 1) << 10)
- #define PMD_SECT_nG		(_AT(pmdval_t, 1) << 11)
-diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
-index d1bcd82..54733e5 100644
---- a/arch/arm/include/asm/pgtable-3level.h
-+++ b/arch/arm/include/asm/pgtable-3level.h
-@@ -87,6 +87,11 @@
- #define L_PTE_SPECIAL		(_AT(pteval_t, 1) << 56)	/* unused */
- #define L_PTE_NONE		(_AT(pteval_t, 1) << 57)	/* PROT_NONE */
- 
-+#define PMD_SECT_VALID		(_AT(pmdval_t, 1) << 0)
-+#define PMD_SECT_DIRTY		(_AT(pmdval_t, 1) << 55)
-+#define PMD_SECT_SPLITTING	(_AT(pmdval_t, 1) << 56)
-+#define PMD_SECT_NONE		(_AT(pmdval_t, 1) << 57)
-+
- /*
-  * To be used in assembly code with the upper page attributes.
-  */
-@@ -196,6 +201,61 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
- #define pte_huge(pte)		(pte_val(pte) && !(pte_val(pte) & PTE_TABLE_BIT))
- #define pte_mkhuge(pte)		(__pte(pte_val(pte) & ~PTE_TABLE_BIT))
- 
-+#define pmd_young(pmd)		(pmd_val(pmd) & PMD_SECT_AF)
-+
-+#define __HAVE_ARCH_PMD_WRITE
-+#define pmd_write(pmd)		(!(pmd_val(pmd) & PMD_SECT_RDONLY))
-+
-+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-+#define pmd_trans_huge(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
-+#define pmd_trans_splitting(pmd) (pmd_val(pmd) & PMD_SECT_SPLITTING)
-+#endif
-+
-+#define PMD_BIT_FUNC(fn,op) \
-+static inline pmd_t pmd_##fn(pmd_t pmd) { pmd_val(pmd) op; return pmd; }
-+
-+PMD_BIT_FUNC(wrprotect,	|= PMD_SECT_RDONLY);
-+PMD_BIT_FUNC(mkold,	&= ~PMD_SECT_AF);
-+PMD_BIT_FUNC(mksplitting, |= PMD_SECT_SPLITTING);
-+PMD_BIT_FUNC(mkwrite,   &= ~PMD_SECT_RDONLY);
-+PMD_BIT_FUNC(mkdirty,   |= PMD_SECT_DIRTY);
-+PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
-+
-+#define pmd_mkhuge(pmd)		(__pmd(pmd_val(pmd) & ~PMD_TABLE_BIT))
-+
-+#define pmd_pfn(pmd)		(((pmd_val(pmd) & PMD_MASK) & PHYS_MASK) >> PAGE_SHIFT)
-+#define pfn_pmd(pfn,prot)	(__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
-+#define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
-+
-+/* represent a notpresent pmd by zero, this is used by pmdp_invalidate */
-+#define pmd_mknotpresent(pmd)	(__pmd(0))
-+
-+static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
-+{
-+	const pmdval_t mask = PMD_SECT_USER | PMD_SECT_XN | PMD_SECT_RDONLY |
-+				PMD_SECT_VALID | PMD_SECT_NONE;
-+	pmd_val(pmd) = (pmd_val(pmd) & ~mask) | (pgprot_val(newprot) & mask);
-+	return pmd;
-+}
-+
-+static inline void set_pmd_at(struct mm_struct *mm, unsigned long addr,
-+			      pmd_t *pmdp, pmd_t pmd)
-+{
-+	BUG_ON(addr >= TASK_SIZE);
-+
-+	/* create a faulting entry if PROT_NONE protected */
-+	if (pmd_val(pmd) & PMD_SECT_NONE)
-+		pmd_val(pmd) &= ~PMD_SECT_VALID;
-+
-+	*pmdp = __pmd(pmd_val(pmd) | PMD_SECT_nG);
-+	flush_pmd_entry(pmdp);
-+}
-+
-+static inline int has_transparent_hugepage(void)
-+{
-+	return 1;
-+}
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif /* _ASM_PGTABLE_3LEVEL_H */
-diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
-index 9bcd262..eaedce7 100644
---- a/arch/arm/include/asm/pgtable.h
-+++ b/arch/arm/include/asm/pgtable.h
-@@ -24,6 +24,9 @@
- #include <asm/memory.h>
- #include <asm/pgtable-hwdef.h>
- 
-+
-+#include <asm/tlbflush.h>
-+
- #ifdef CONFIG_ARM_LPAE
- #include <asm/pgtable-3level.h>
- #else
-diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
-index 99a1951..bdc62da 100644
---- a/arch/arm/include/asm/tlb.h
-+++ b/arch/arm/include/asm/tlb.h
-@@ -223,6 +223,12 @@ static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
- #endif
- }
- 
-+static inline void
-+tlb_remove_pmd_tlb_entry(struct mmu_gather *tlb, pmd_t *pmdp, unsigned long addr)
-+{
-+	tlb_add_flush(tlb, addr);
-+}
-+
- #define pte_free_tlb(tlb, ptep, addr)	__pte_free_tlb(tlb, ptep, addr)
- #define pmd_free_tlb(tlb, pmdp, addr)	__pmd_free_tlb(tlb, pmdp, addr)
- #define pud_free_tlb(tlb, pudp, addr)	pud_free((tlb)->mm, pudp)
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index a3625d1..c374592 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -535,6 +535,8 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
- }
- #endif
- 
-+#define update_mmu_cache_pmd(vma, address, pmd) do { } while (0)
-+
- #endif
- 
- #endif /* CONFIG_MMU */
-diff --git a/arch/arm/mm/fsr-3level.c b/arch/arm/mm/fsr-3level.c
-index e115fc7..ab4409a 100644
---- a/arch/arm/mm/fsr-3level.c
-+++ b/arch/arm/mm/fsr-3level.c
-@@ -9,7 +9,7 @@ static struct fsr_info fsr_info[] = {
- 	{ do_page_fault,	SIGSEGV, SEGV_MAPERR,	"level 3 translation fault"	},
- 	{ do_bad,		SIGBUS,  0,		"reserved access flag fault"	},
- 	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 access flag fault"	},
--	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 2 access flag fault"	},
-+	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 access flag fault"	},
- 	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 access flag fault"	},
- 	{ do_bad,		SIGBUS,  0,		"reserved permission fault"	},
- 	{ do_bad,		SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
+For all targets, the .dtb files were diff-tested before and after
+applying the series to guarantee identity.
+
+Best regards,
+
+Florian
+
+>From v1:
+- Remove duplicated fix
+- Remove OMAP_GPIO macro
+- Add pinctrl constants
+
+Florian Vaussard (5):
+  ARM: dts: OMAP2+: use #include for all device trees
+  ARM: dts: OMAP2+: use existing constants for GPIOs
+  ARM: dts: OMAP4/5: use existing constants for IRQs
+  ARM: dts: OMAP2+: header file for pinctrl constants
+  ARM: dts: OMAP2+: use pinctrl constants
+
+ arch/arm/boot/dts/omap2.dtsi              |    5 +-
+ arch/arm/boot/dts/omap2420-h4.dts         |    2 +-
+ arch/arm/boot/dts/omap2420.dtsi           |    2 +-
+ arch/arm/boot/dts/omap2430.dtsi           |    2 +-
+ arch/arm/boot/dts/omap3-beagle-xm.dts     |    8 +-
+ arch/arm/boot/dts/omap3-beagle.dts        |   34 ++++----
+ arch/arm/boot/dts/omap3-devkit8000.dts    |   10 +-
+ arch/arm/boot/dts/omap3-evm.dts           |    6 +-
+ arch/arm/boot/dts/omap3-igep.dtsi         |   36 ++++----
+ arch/arm/boot/dts/omap3-igep0020.dts      |   10 +-
+ arch/arm/boot/dts/omap3-igep0030.dts      |   10 +-
+ arch/arm/boot/dts/omap3-overo.dtsi        |    4 +-
+ arch/arm/boot/dts/omap3-tobi.dts          |    4 +-
+ arch/arm/boot/dts/omap3.dtsi              |    5 +-
+ arch/arm/boot/dts/omap3430-sdp.dts        |    4 +-
+ arch/arm/boot/dts/omap34xx.dtsi           |    2 +-
+ arch/arm/boot/dts/omap36xx.dtsi           |    2 +-
+ arch/arm/boot/dts/omap4-panda-a4.dts      |   10 +-
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   66 ++++++++--------
+ arch/arm/boot/dts/omap4-panda-es.dts      |   10 +-
+ arch/arm/boot/dts/omap4-panda.dts         |    4 +-
+ arch/arm/boot/dts/omap4-sdp-es23plus.dts  |    8 +-
+ arch/arm/boot/dts/omap4-sdp.dts           |  122 ++++++++++++++--------------
+ arch/arm/boot/dts/omap4-var-som.dts       |    8 +-
+ arch/arm/boot/dts/omap4.dtsi              |  118 ++++++++++++++-------------
+ arch/arm/boot/dts/omap443x.dtsi           |    2 +-
+ arch/arm/boot/dts/omap4460.dtsi           |    6 +-
+ arch/arm/boot/dts/omap5-evm.dts           |   92 +++++++++++-----------
+ arch/arm/boot/dts/omap5.dtsi              |  126 +++++++++++++++--------------
+ include/dt-bindings/pinctrl/omap.h        |   54 ++++++++++++
+ 30 files changed, 420 insertions(+), 352 deletions(-)
+ create mode 100644 include/dt-bindings/pinctrl/omap.h
+
 -- 
-1.8.1.4
+1.7.5.4
