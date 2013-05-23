@@ -1,169 +1,41 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 23 May 2013 18:07:49 +0100
-Subject: [PATCH 02/11] x86: mm: Remove x86 version of huge_pmd_share.
+Date: Thu, 23 May 2013 18:07:52 +0100
+Subject: [PATCH 05/11] mm: thp: Correct the HPAGE_PMD_ORDER check.
 In-Reply-To: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
 References: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1369328878-11706-3-git-send-email-steve.capper@linaro.org>
+Message-ID: <1369328878-11706-6-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The huge_pmd_share code has been copied over to mm/hugetlb.c to
-make it accessible to other architectures.
+All Transparent Huge Pages are allocated by the buddy allocator.
 
-Remove the x86 copy of the huge_pmd_share code and enable the
-ARCH_WANT_HUGE_PMD_SHARE config flag. That way we reference the
-general one.
+A compile time check is in place that fails when the order of a
+transparent huge page is too large to be allocated by the buddy
+allocator. Unfortunately that compile time check passes when:
+HPAGE_PMD_ORDER == MAX_ORDER
+( which is incorrect as the buddy allocator can only allocate
+memory of order strictly less than MAX_ORDER. )
+
+This patch updates the compile time check to fail in the above
+case.
 
 Signed-off-by: Steve Capper <steve.capper@linaro.org>
 ---
- arch/x86/Kconfig          |   3 ++
- arch/x86/mm/hugetlbpage.c | 120 ----------------------------------------------
- 2 files changed, 3 insertions(+), 120 deletions(-)
+ include/linux/huge_mm.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 685692c..476f786 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -207,6 +207,9 @@ config ARCH_HIBERNATION_POSSIBLE
- config ARCH_SUSPEND_POSSIBLE
- 	def_bool y
- 
-+config ARCH_WANT_HUGE_PMD_SHARE
-+	def_bool y
-+
- config ZONE_DMA32
- 	bool
- 	default X86_64
-diff --git a/arch/x86/mm/hugetlbpage.c b/arch/x86/mm/hugetlbpage.c
-index ae1aa71..7e522a3 100644
---- a/arch/x86/mm/hugetlbpage.c
-+++ b/arch/x86/mm/hugetlbpage.c
-@@ -16,126 +16,6 @@
- #include <asm/tlbflush.h>
- #include <asm/pgalloc.h>
- 
--static unsigned long page_table_shareable(struct vm_area_struct *svma,
--				struct vm_area_struct *vma,
--				unsigned long addr, pgoff_t idx)
--{
--	unsigned long saddr = ((idx - svma->vm_pgoff) << PAGE_SHIFT) +
--				svma->vm_start;
--	unsigned long sbase = saddr & PUD_MASK;
--	unsigned long s_end = sbase + PUD_SIZE;
--
--	/* Allow segments to share if only one is marked locked */
--	unsigned long vm_flags = vma->vm_flags & ~VM_LOCKED;
--	unsigned long svm_flags = svma->vm_flags & ~VM_LOCKED;
--
--	/*
--	 * match the virtual addresses, permission and the alignment of the
--	 * page table page.
--	 */
--	if (pmd_index(addr) != pmd_index(saddr) ||
--	    vm_flags != svm_flags ||
--	    sbase < svma->vm_start || svma->vm_end < s_end)
--		return 0;
--
--	return saddr;
--}
--
--static int vma_shareable(struct vm_area_struct *vma, unsigned long addr)
--{
--	unsigned long base = addr & PUD_MASK;
--	unsigned long end = base + PUD_SIZE;
--
--	/*
--	 * check on proper vm_flags and page table alignment
--	 */
--	if (vma->vm_flags & VM_MAYSHARE &&
--	    vma->vm_start <= base && end <= vma->vm_end)
--		return 1;
--	return 0;
--}
--
--/*
-- * Search for a shareable pmd page for hugetlb. In any case calls pmd_alloc()
-- * and returns the corresponding pte. While this is not necessary for the
-- * !shared pmd case because we can allocate the pmd later as well, it makes the
-- * code much cleaner. pmd allocation is essential for the shared case because
-- * pud has to be populated inside the same i_mmap_mutex section - otherwise
-- * racing tasks could either miss the sharing (see huge_pte_offset) or select a
-- * bad pmd for sharing.
-- */
--static pte_t *
--huge_pmd_share(struct mm_struct *mm, unsigned long addr, pud_t *pud)
--{
--	struct vm_area_struct *vma = find_vma(mm, addr);
--	struct address_space *mapping = vma->vm_file->f_mapping;
--	pgoff_t idx = ((addr - vma->vm_start) >> PAGE_SHIFT) +
--			vma->vm_pgoff;
--	struct vm_area_struct *svma;
--	unsigned long saddr;
--	pte_t *spte = NULL;
--	pte_t *pte;
--
--	if (!vma_shareable(vma, addr))
--		return (pte_t *)pmd_alloc(mm, pud, addr);
--
--	mutex_lock(&mapping->i_mmap_mutex);
--	vma_interval_tree_foreach(svma, &mapping->i_mmap, idx, idx) {
--		if (svma == vma)
--			continue;
--
--		saddr = page_table_shareable(svma, vma, addr, idx);
--		if (saddr) {
--			spte = huge_pte_offset(svma->vm_mm, saddr);
--			if (spte) {
--				get_page(virt_to_page(spte));
--				break;
--			}
--		}
--	}
--
--	if (!spte)
--		goto out;
--
--	spin_lock(&mm->page_table_lock);
--	if (pud_none(*pud))
--		pud_populate(mm, pud, (pmd_t *)((unsigned long)spte & PAGE_MASK));
--	else
--		put_page(virt_to_page(spte));
--	spin_unlock(&mm->page_table_lock);
--out:
--	pte = (pte_t *)pmd_alloc(mm, pud, addr);
--	mutex_unlock(&mapping->i_mmap_mutex);
--	return pte;
--}
--
--/*
-- * unmap huge page backed by shared pte.
-- *
-- * Hugetlb pte page is ref counted at the time of mapping.  If pte is shared
-- * indicated by page_count > 1, unmap is achieved by clearing pud and
-- * decrementing the ref count. If count == 1, the pte page is not shared.
-- *
-- * called with vma->vm_mm->page_table_lock held.
-- *
-- * returns: 1 successfully unmapped a shared pte page
-- *	    0 the underlying pte page is not shared, or it is the last user
-- */
--int huge_pmd_unshare(struct mm_struct *mm, unsigned long *addr, pte_t *ptep)
--{
--	pgd_t *pgd = pgd_offset(mm, *addr);
--	pud_t *pud = pud_offset(pgd, *addr);
--
--	BUG_ON(page_count(virt_to_page(ptep)) == 0);
--	if (page_count(virt_to_page(ptep)) == 1)
--		return 0;
--
--	pud_clear(pud);
--	put_page(virt_to_page(ptep));
--	*addr = ALIGN(*addr, HPAGE_SIZE * PTRS_PER_PTE) - HPAGE_SIZE;
--	return 1;
--}
--
- pte_t *huge_pte_alloc(struct mm_struct *mm,
- 			unsigned long addr, unsigned long sz)
- {
+diff --git a/include/linux/huge_mm.h b/include/linux/huge_mm.h
+index 528454c..26ee56c 100644
+--- a/include/linux/huge_mm.h
++++ b/include/linux/huge_mm.h
+@@ -123,7 +123,7 @@ extern void __split_huge_page_pmd(struct vm_area_struct *vma,
+ 	} while (0)
+ extern void split_huge_page_pmd_mm(struct mm_struct *mm, unsigned long address,
+ 		pmd_t *pmd);
+-#if HPAGE_PMD_ORDER > MAX_ORDER
++#if HPAGE_PMD_ORDER >= MAX_ORDER
+ #error "hugepages can't be allocated by the buddy allocator"
+ #endif
+ extern int hugepage_madvise(struct vm_area_struct *vma,
 -- 
 1.8.1.4
