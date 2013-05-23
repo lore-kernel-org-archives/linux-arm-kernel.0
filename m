@@ -1,93 +1,58 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 23 May 2013 16:32:53 +0200
-Subject: [PATCH v2 3/3] pci: mvebu: fix the emulation of the status register
-In-Reply-To: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369319573-19927-4-git-send-email-thomas.petazzoni@free-electrons.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 23 May 2013 10:37:51 -0400 (EDT)
+Subject: [RFC V6 PATCH 3/3] USB: OHCI: make ohci-pci a separate driver
+In-Reply-To: <1369307506-4458-4-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1305231034110.925-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The status register of the PCI configuration space of PCI-to-PCI
-bridges contain some read-only bits, and so write-1-to-clear bits. So,
-the Linux PCI core sometimes writes 0xffff to this status register,
-and in the current PCI-to-PCI bridge emulation code of the Marvell
-driver, we do take all those 1s being written. Even the read-only bits
-are being overwritten.
+On Thu, 23 May 2013, Manjunath Goudar wrote:
 
-For now, all the read-only bits should be emulated to have the zero
-value.
+> This patch splits the PCI portion of ohci-hcd out into its
+> own separate driver module, called ohci-pci.
+> 
+> The major point of difficulty lies in ohci-pci's many vendor- and
+> device-specific workarounds.  Some of them have to be applied before
+> calling ohci_start() some after, which necessitates a fair amount of
+> code motion.  The other platform drivers require much smaller changes.
+> 
+> The complete sb800_prefetch() function moved to ohci-q.c,because its
+> only related to ohci-pci driver.
+> 
+> V2:
+>   - few specific content of pci related code in ohci_pci_start function has been moved to ohci_pci_reset
+>     and rest of the generic code is written in ohci_start of ohci-hcd.c file.
+> V3:
+>  - ohci_restart() has been called in ohci_pci_reset() function for to reset the ohci pci.
+> 
+> V4:
+>  -sb800_prefetch() moved to ohci-q.c,because its only related to ohci-pci.
+>  -no longer _creating_ CONFIG_USB_OHCI_PCI,creating CONFIG_USB_OHCI_HCD_PCI.
+>  -overrides renamed with pci_override,its giving proper meaning.
+> 
+> V5:
+>  -sb800_prefetch() moved to pci-quirks.c,because its only related to pci.
+> 
+> V6:
+>  -sb800_prefetch() function has been moved to pci-quirks.c made as separate patch in 2/3.
+>  -Most of the generic ohci pci changes moved in 2/3 patch,now this is complete  ohci-pci separation patch.
 
-The other bits, that are write-1-to-clear bits are used to report
-various kind of errors, and are never set by the emulated bridge, so
-there is no need to support this write-1-to-clear bits mechanism.
+This patch has a lot of extra stuff in it.  It looks like you forgot to
+undo a bunch of things from the previous version, things that are no
+longer needed.
 
-As a conclusion, the easiest solution is to simply emulate this status
-register by returning zero when read, and ignore the writes to it.
+As I said before, you really need to proofread your patches before
+emailing them.  Don't rely on other people to find your mistakes.
 
-This has two visible effects:
+Also, you left out one thing that should still be here.  What happened 
+to the part about changing
 
- * The devsel is no longer 'unknown' in, i.e
+#if	!defined(PCI_DRIVER) &&		\
 
-   Flags: bus master, 66MHz, user-definable features, ?? devsel, latency 0
+to
 
-   becomes:
+#if	!ENABLED(CONFIG_USB_OHCI_HCD_PCI) &&	\
 
-   Flags: bus master, 66MHz, user-definable features, fast devsel, latency 0
+?
 
-   in lspci -v.
-
-   This was caused by a value of 11b being read for devsel, which is
-   an invalid value. This 11b value being read was due to a previous
-   write of 0xffff into the status register.
-
- * The capability list is no longer broken, because we indicate to the
-   Linux PCI core that we don't have a Capabilities Pointer in the PCI
-   configuration space of this bridge. The following message is
-   therefore no longer visible in lspci -v:
-
-   Capabilities: [fc] <chain broken>
-
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/pci/host/pci-mvebu.c |    5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
-
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index a3c4638..481e44a 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -69,7 +69,6 @@ struct mvebu_sw_pci_bridge {
- 	u16 vendor;
- 	u16 device;
- 	u16 command;
--	u16 status;
- 	u16 class;
- 	u8 interface;
- 	u8 revision;
-@@ -359,7 +358,6 @@ static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
- 
- 	memset(bridge, 0, sizeof(struct mvebu_sw_pci_bridge));
- 
--	bridge->status = PCI_STATUS_CAP_LIST;
- 	bridge->class = PCI_CLASS_BRIDGE_PCI;
- 	bridge->vendor = PCI_VENDOR_ID_MARVELL;
- 	bridge->device = MARVELL_EMULATED_PCI_PCI_BRIDGE_ID;
-@@ -386,7 +384,7 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
- 		break;
- 
- 	case PCI_COMMAND:
--		*value = bridge->status << 16 | bridge->command;
-+		*value = bridge->command;
- 		break;
- 
- 	case PCI_CLASS_REVISION:
-@@ -479,7 +477,6 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
- 	switch (where & ~3) {
- 	case PCI_COMMAND:
- 		bridge->command = value & 0xffff;
--		bridge->status = value >> 16;
- 		break;
- 
- 	case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
--- 
-1.7.9.5
+Alan Stern
