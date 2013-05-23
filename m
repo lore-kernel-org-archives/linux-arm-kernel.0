@@ -1,66 +1,68 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 23 May 2013 10:30:38 -0400 (EDT)
-Subject: [RFC PATCH 2/3] USB: OHCI: Generic changes to make ohci-pci a
- separate driver
-In-Reply-To: <1369307506-4458-3-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1305231027140.925-100000@iolanthe.rowland.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 23 May 2013 16:32:50 +0200
+Subject: [PATCH v2 0/3] Marvell PCIe driver improvements
+Message-ID: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 May 2013, Manjunath Goudar wrote:
+Bjorn, Jason, Andrew, Gregory,
 
-> Note that this changes is part of separating the ohci pci host controller
-> driver from ohci-hcd host code.
-> This contains :
->  -Moved sb800_prefetch() function from ohci-pci.c to pci-quirks.c file
->   and EXPORTed, this is part of the effort to move the ohci pci related
->   code to generic pci code.
->  -Passed "pci_dev" argument instead  of "ohci_hcd" in sb800_prefetch()
->   function to avoid extra include file in pci-quirks.c.
+Here is an updated version of the PCIe improvements.
 
-> diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-> index 13ebbb7..2490b81 100644
-> --- a/drivers/usb/host/ohci-hcd.c
-> +++ b/drivers/usb/host/ohci-hcd.c
+Changes since v1:
 
-> @@ -1275,7 +1266,7 @@ MODULE_LICENSE ("GPL");
->  #define PLATFORM_DRIVER		ohci_platform_driver
->  #endif
->  
-> -#if	!defined(PCI_DRIVER) &&		\
-> +#if	!defined(PCI_DRIVER) && \
->  	!defined(PLATFORM_DRIVER) &&	\
->  	!defined(OMAP1_PLATFORM_DRIVER) &&	\
->  	!defined(OMAP3_PLATFORM_DRIVER) &&	\
+ * Fix some typos in the comments of PATCH 2, noticed by Bjorn
+   Helgaas.
 
-As Arnd mentioned, this doesn't belong here.
+ * Rework the two last patches (first one was fixing the capability
+   list, the other one the emulation of the devsel bits in the status
+   register), after the comments of Bjorn. In fact, it turns out that
+   the status register is composed of read-only bits for which we want
+   to emulate a value of zero, and the other bits are write-1-to-clear
+   bits that expose error conditions that we do not handle in the
+   emulated bridge. So, in summary, emulating a 0 status register on
+   reads, and ignoring writes to the status register is the simplest
+   solution. If we later on implement a capability list, we can use a
+   more clever emulation of the status register, but for the moment,
+   this simple solution is enough. Therefore, the two last patches are
+   now one single, simpler patch.
 
-> diff --git a/drivers/usb/host/ohci-q.c b/drivers/usb/host/ohci-q.c
-> index 88731b7..78e0095 100644
-> --- a/drivers/usb/host/ohci-q.c
-> +++ b/drivers/usb/host/ohci-q.c
-> @@ -41,6 +41,7 @@ finish_urb(struct ohci_hcd *ohci, struct urb *urb, int status)
->  __releases(ohci->lock)
->  __acquires(ohci->lock)
->  {
-> +	struct pci_dev *pdev = to_pci_dev(ohci_to_hcd(ohci)->self.controller);
+I'd like those improvements to be kept separated from the original
+PCIe driver itself: while the PCIe driver has been around and reviewed
+for a long time, those improvements are newer. And I clearly do not
+want the PCIe driver to miss 3.11 because of any problem that could be
+found in those additional improvements.
 
-You shouldn't call to_pci_dev().  At this point you don't know if the 
-controller is a PCI device or not.  Instead, just do
+The main improvement being brought here is that the PCI-to-PCI bridge
+logic is fixed/extended to properly support physical PCIe bridges that
+are connected on a PCIe interface of a Marvell board. Without this
+improvement, only the devices connected directly to the PCIe
+interfaces of the board are properly enumerated. Any device that would
+sit beyond a physical bridge is not visible.
 
-	struct device *dev = ohci_to_hcd(ohci)->self.controller;
+Bjorn, with your Acked-by, could the Marvell maintainers include those
+patches in their branch, merged through arm-soc? They already have the
+Marvell PCIe driver itself, so I believe it makes sense to merge those
+improvements through the same path.
 
-Then in sb800_prefetch(), where it makes sense, you can call 
-to_pci_dev().
+Jason, those patches have been prepared on top of my marvell-pcie-v10
+branch, I hope that's ok for you. If you want me to rebase them on
+some other branch in which you have integrated the PCIe driver, don't
+hesitate to tell me to do so. That said, since those patches are only
+touching the driver itself and no other file, they should not cause
+any conflict with other changes.
 
-> @@ -580,6 +581,7 @@ static void td_submit_urb (
->  	struct urb	*urb
->  ) {
->  	struct urb_priv	*urb_priv = urb->hcpriv;
-> +	struct pci_dev *pdev = to_pci_dev(ohci_to_hcd(ohci)->self.controller);
+Thanks,
 
-Same thing here.
+Thomas
 
-Otherwise this is okay.
+Thomas Petazzoni (3):
+  pci: mvebu: no longer fake the slot location of downstream devices
+  pci: mvebu: allow the enumeration of devices beyond physical bridges
+  pci: mvebu: fix the emulation of the status register
 
-Alan Stern
+ drivers/pci/host/pci-mvebu.c |   55 +++++++++++++++++++++++++++++++++---------
+ 1 file changed, 44 insertions(+), 11 deletions(-)
+
+-- 
+1.7.9.5
