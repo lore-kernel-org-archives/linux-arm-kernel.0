@@ -1,57 +1,32 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 23 May 2013 12:09:51 +0200
-Subject: [PATCH 1/3] ARM: at91: move at91 aic driver to drivers/irqchip
-In-Reply-To: <20130523120920.1df8e23a@skate>
-References: <1369299909-10078-1-git-send-email-b.brezillon@overkiz.com>
- <1369299909-10078-2-git-send-email-b.brezillon@overkiz.com>
- <20130523090611.GG9937@game.jcrosoft.org>
- <519DE6A8.6040502@overkiz.com> <20130523120920.1df8e23a@skate>
-Message-ID: <20130523100951.GH9937@game.jcrosoft.org>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 23 May 2013 18:18:48 +0800
+Subject: [PATCH] at91: sama5: fix incorrect PMC pcr div definition
+Message-ID: <1369304328-11442-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:09 Thu 23 May     , Thomas Petazzoni wrote:
-> Dear boris brezillon,
-> 
-> On Thu, 23 May 2013 11:51:36 +0200, boris brezillon wrote:
-> > On 23/05/2013 11:06, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 11:05 Thu 23 May     , Boris BREZILLON wrote:
-> > >> Move arch/arm/mach-at91/irq.c to drivers/irqchip/irq-at91.c.
-> > >> Move arch/arm/mach-at91/at91_aic.h to
-> > >> arch/arm/mach-at91/include/mach/at91_aic.h to avoid ugly reference
-> > >> to header file :
-> > >> #include "../../arch/arm/mach-at91/at91_aic.h"
-> > > no we are going to drop arch/arm/mach-at91/include/mach for multi support
-> > >
-> > > arch/arm/mach-at91/include/mach is for removal
-> > What should be done ?
-> > 
-> > include ../../arch/arm/mach-at91/at91_aic.h from irq-at91.c
-> > 
-> > or
-> > 
-> > move at91_aic.h into drivers/irqchips and patch every non dt board to
-> > include ../../../drivers/irqchip/at91_aic.h
-> 
-> You can put it in <linux/irqchip/at91-aic.h>, there are already a few
-> headers there. But I think it's not the right solution.
-> 
-> *However*, ideally, this header should disappear completely. All the
-> register defines should go directly into the driver C file. The only
-> usage of the AIC defines outside of the IRQ driver are for debug prints
-> in the pm.c code, which I think you could get rid of.
-> 
-> Ditto for the at91_aic_{read,write} macros.
-> 
-> The NR_AIC5_IRQS can also move to the driver itself.
-> 
-> The only remaining one would be NR_AIC_IRQS, you can't get rid of it,
-> because it's used for the IRQ priority arrays. But I believe keeping
-> this one in <linux/irqchip/at91-aic.h> is reasonable.
 
-do want either as we expose the register acces for pm & co
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+ arch/arm/mach-at91/include/mach/at91_pmc.h |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-until this is cleanup NACK
-
-Best Regards,
-J.
+diff --git a/arch/arm/mach-at91/include/mach/at91_pmc.h b/arch/arm/mach-at91/include/mach/at91_pmc.h
+index 31df120..2bd7f51 100644
+--- a/arch/arm/mach-at91/include/mach/at91_pmc.h
++++ b/arch/arm/mach-at91/include/mach/at91_pmc.h
+@@ -179,9 +179,9 @@ extern void __iomem *at91_pmc_base;
+ #define		AT91_PMC_PCR_CMD	(0x1  <<  12)		/* Command (read=0, write=1) */
+ #define		AT91_PMC_PCR_DIV(n)	((n)  <<  16)		/* Divisor Value */
+ #define			AT91_PMC_PCR_DIV0	0x0			/* Peripheral clock is MCK */
+-#define			AT91_PMC_PCR_DIV2	0x2			/* Peripheral clock is MCK/2 */
+-#define			AT91_PMC_PCR_DIV4	0x4			/* Peripheral clock is MCK/4 */
+-#define			AT91_PMC_PCR_DIV8	0x8			/* Peripheral clock is MCK/8 */
++#define			AT91_PMC_PCR_DIV2	0x1			/* Peripheral clock is MCK/2 */
++#define			AT91_PMC_PCR_DIV4	0x2			/* Peripheral clock is MCK/4 */
++#define			AT91_PMC_PCR_DIV8	0x3			/* Peripheral clock is MCK/8 */
+ #define		AT91_PMC_PCR_EN		(0x1  <<  28)		/* Enable */
+ 
+ #endif
+-- 
+1.7.10
