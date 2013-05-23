@@ -1,35 +1,45 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 23 May 2013 07:40:25 -0400
-Subject: [PATCH] ARM: kirkwood: refactor dtsi to largest common nodes
-In-Reply-To: <1369301130-29900-1-git-send-email-valentin.longchamp@keymile.com>
-References: <1369301130-29900-1-git-send-email-valentin.longchamp@keymile.com>
-Message-ID: <20130523114025.GO31290@titan.lakedaemon.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 23 May 2013 12:49:56 +0100
+Subject: [GIT PULL] ARM cpu logical map init updates
+Message-ID: <20130523114956.GA3872@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Valentin,
+Hi Russell,
 
-On Thu, May 23, 2013 at 11:25:30AM +0200, Valentin Longchamp wrote:
-> Some kirkwood variants (for instance present in the prestera SoCs) do
-> not have all the peripherals whose nodes are initialized in the
-> kirkwood.dtsi. These missing peripherals are SATA, SDIO, and RTC.
+following the pull request for DT cpus/cpu bindings for arm/arm64
+updates and relative dts files updates:
 
-Could you provide a little more detail here about the exact problem this
-is solving?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/170234.html
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/170242.html
 
-> Their corresponding nodes are moved from kirkwood.dtsi to the
-> kirkwood-628x.dtsi files so that they still are initialized for these
-> variants.
-> 
-> Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
-> ---
->  arch/arm/boot/dts/kirkwood-6281.dtsi | 24 ++++++++++++++++++++++++
->  arch/arm/boot/dts/kirkwood-6282.dtsi | 24 ++++++++++++++++++++++++
->  arch/arm/boot/dts/kirkwood.dtsi      | 24 ------------------------
->  3 files changed, 48 insertions(+), 24 deletions(-)
+please pull the arm core code patches that enable the parsing of the
+new bindings. First two patches are two fixes, the first aimed also at
+the stable kernel, as marked in the commit log.
 
-What about kirkwood-nsa310.dts?
+Thank you very much indeed,
+Lorenzo
 
-thx,
+The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
 
-Jason.
+  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+
+are available in the git repository at:
+
+  git://linux-arm.org/linux-2.6-lp.git dt-init-map-updates
+
+for you to fetch changes up to 1b4a70726dfafb82ebedc017bf02c20edaf5dd29:
+
+  ARM: DT: kernel: DT cpus/cpu node bindings update (2013-05-23 12:35:51 +0100)
+
+----------------------------------------------------------------
+Lorenzo Pieralisi (3):
+      ARM: kernel: fix arm_dt_init_cpu_maps() to skip non-cpu nodes
+      ARM: kernel: fix __cpu_logical_map default initialization
+      ARM: DT: kernel: DT cpus/cpu node bindings update
+
+ arch/arm/include/asm/cputype.h  |   2 +
+ arch/arm/include/asm/smp_plat.h |   2 +-
+ arch/arm/kernel/devtree.c       | 149 ++++++++++++++++++++++++----------------
+ arch/arm/kernel/setup.c         |   2 +-
+ 4 files changed, 95 insertions(+), 60 deletions(-)
