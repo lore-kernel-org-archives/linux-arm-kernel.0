@@ -1,39 +1,50 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 23 May 2013 12:00:22 -0400
-Subject: [PATCH v2 0/5] ARM: dts: OMAP2+: use preprocessor for device trees
-In-Reply-To: <1369323421-4180-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1369323421-4180-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <519E3D16.2090003@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 23 May 2013 12:01:11 -0400
+Subject: [PATCH 2/2] net: mv643xx_eth: proper initialization for
+ Kirkwood SoCs
+In-Reply-To: <20130522201607.GA18823@obsidianresearch.com>
+References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369253042-15082-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369253042-15082-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130522201607.GA18823@obsidianresearch.com>
+Message-ID: <20130523160111.GP31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 May 2013 11:36 AM, Florian Vaussard wrote:
-> Hello,
-> 
-> Following a similar proposal by Stephen Warren for tegra [1], this series
-> makes use of the C preprocessor when compiling OMAP DT files, and
-> accomplishes some improvements to improve overall readability.
-> 
-> Patch 1 is a preparation for the rest of the series.
-> Patch 2 uses existing constants for GPIOs. Patch 3 does the same for
-> IRQs. Patch 4 creates a new header for OMAP's padmux, and patch 5 uses
-> it to simplify pinctrl DT.
-> 
-> For all targets, the .dtb files were diff-tested before and after
-> applying the series to guarantee identity.
-> 
+Sebastian,
 
+On Wed, May 22, 2013 at 02:16:07PM -0600, Jason Gunthorpe wrote:
+> On Wed, May 22, 2013 at 10:04:02PM +0200, Sebastian Hesselbarth wrote:
 > 
-> Florian Vaussard (5):
->   ARM: dts: OMAP2+: use #include for all device trees
->   ARM: dts: OMAP2+: use existing constants for GPIOs
->   ARM: dts: OMAP4/5: use existing constants for IRQs
->   ARM: dts: OMAP2+: header file for pinctrl constants
->   ARM: dts: OMAP2+: use pinctrl constants
+> > Ethernet controllers found on Kirkwood SoCs not only suffer from loosing
+> > MAC address register contents on clock gating but also some important
+> > registers are reset to values that would break ethernet. This patch
 > 
-I just quickly scanned the series and patches looks
-good to my eyes. Its a nice clean-up to align OMAP
-dts files with others.
+> FWIW, we found that the bootloader has to write to PSC1, the driver
+> doesn't work with the power on/reset value of the register. So I think
+> it is safe to assume that all kirkwood bootloaders alter the value.
+> 
+> Our systems write the value 0x00638488 to PSC1.
+> 
+> I looked at patching mv643xx_eth, but ran into the same complexity you
+> did, it isn't clear what variants of this IP block have the
+> register/etc.
+> 
+> > +	/* Kirkwood resets some registers on gated clocks. Especially
+> > +	 * CLK125_BYPASS_EN must be cleared but is not available on
+> > +	 * all other SoCs/System Controllers using this driver.
+> > +	 */
+> > +	if (of_machine_is_compatible("marvell,kirkwood"))
+> > +		wrlp(mp, PORT_SERIAL_CONTROL1,
+> > +		     rdlp(mp, PORT_SERIAL_CONTROL1) & ~CLK125_BYPASS_EN);
+> 
+> of_machine_is_compatible seems heavy handed, I would expect this to be
+> based on the compatible string of the ethernet node itself, not the
+> machine??
 
-FWIW,
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Is there a model number variation between IP that needs this and IP that
+doesn't?  If not, I'm fine with of_machine_is_compatible().
+
+thx,
+
+Jason.
