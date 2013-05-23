@@ -1,146 +1,80 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 23 May 2013 19:31:25 +0200
-Subject: [PATCH 3/6] clk: move the U300 fixed and fixed-factor to DT
-In-Reply-To: <1369330288-14856-1-git-send-email-linus.walleij@stericsson.com>
-References: <1369330288-14856-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1369330288-14856-4-git-send-email-linus.walleij@stericsson.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 23 May 2013 19:33:06 +0200
+Subject: [PATCH] ARM: dts: imx: fix clocks for cspi
+In-Reply-To: <1369319290.379285076@f398.i.mail.ru>
+References: <1369309085-31146-1-git-send-email-jonas@microbit.se>
+ <1369311059.366490908@f190.mail.ru>
+ <20130523123642.GK32299@pengutronix.de>
+ <1369319290.379285076@f398.i.mail.ru>
+Message-ID: <20130523173306.GT32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, May 23, 2013 at 06:28:10PM +0400, Alexander Shiyan wrote:
+> > On Thu, May 23, 2013 at 04:10:59PM +0400, Alexander Shiyan wrote:
+> > > > > The CSPI controller has only one clock, but the driver spi-imx.c needs clock "per" to calculate bitrate divisor.
+> > > > > 
+> > > > > Signed-off-by: Jonas Andersson <jonas@microbit.se>
+> > > > > ---
+> > > > >  arch/arm/boot/dts/imx25.dtsi | 12 ++++++------
+> > > > >  arch/arm/boot/dts/imx27.dtsi |  6 +++---
+> > > > >  arch/arm/boot/dts/imx51.dtsi |  2 +-
+> > > > >  arch/arm/boot/dts/imx53.dtsi |  2 +-
+> > > > >  4 files changed, 11 insertions(+), 11 deletions(-)
+> > > > > 
+> > > > > diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> > > > > index d2550e0..7011539 100644
+> > > > > --- a/arch/arm/boot/dts/imx25.dtsi
+> > > > > +++ b/arch/arm/boot/dts/imx25.dtsi
+> > > > > @@ -141,8 +141,8 @@
+> > > > >  				#size-cells = <0>;
+> > > > >  				compatible = "fsl,imx25-cspi", "fsl,imx35-cspi";
+> > > > >  				reg = <0x43fa4000 0x4000>;
+> > > > > -				clocks = <&clks 62>;
+> > > > > -				clock-names = "ipg";
+> > > > > +				clocks = <&clks 62>, <&clks 62>;
+> > > > > +				clock-names = "ipg", "per";
+> > > > >  				interrupts = <14>;
+> > > > >  				status = "disabled";
+> > > > >  			};
+> > > 
+> > > Sorry, typo.
+> > > 
+> > > > Why you do not use "dummy" clock for "per" here?
+> > > 
+> > > *for "ipg"
+> > 
+> > Because the same clock is used for the register clock and the baudrate
+> > clock. You have to enable the ipg clock to access registers.
+> 
+> I am not see any "ipg" clock usage in the spi driver.
 
-This converts the fixed and fixed-factor clocks in the U300
-platform to register themselves from the device tree.
+It's the register clock. The driver enables it in order to access the
+registers.
 
-Cc: Mike Turquette <mturquette@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Hi Mike, seeking an ACK on this to take the series through
-ARM SoC.
----
- arch/arm/boot/dts/ste-u300.dts | 44 ++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/clk-u300.c         | 33 +++++++++++++------------------
- 2 files changed, 57 insertions(+), 20 deletions(-)
+> If "ipg" clock is
+> a dependency for "per" clock, it should be registered in ccm as parent.
 
-diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
-index 0530095..c51a8c7 100644
---- a/arch/arm/boot/dts/ste-u300.dts
-+++ b/arch/arm/boot/dts/ste-u300.dts
-@@ -33,6 +33,49 @@
- 	syscon: syscon at c0011000 {
- 		compatible = "stericsson,u300-syscon";
- 		reg = <0xc0011000 0x1000>;
-+		clk32: app_32_clk at 32k {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32768>;
-+		};
-+		pll13: pll13 at 13M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <13000000>;
-+		};
-+		pll208: pll208 at 208M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <208000000>;
-+		};
-+		app208: app_208_clk at 208M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clock-div = <1>;
-+			clock-mult = <1>;
-+			clocks = <&pll208>;
-+		};
-+		app104: app_104_clk at 104M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clock-div = <2>;
-+			clock-mult = <1>;
-+			clocks = <&pll208>;
-+		};
-+		app52: app_52_clk at 52M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clock-div = <4>;
-+			clock-mult = <1>;
-+			clocks = <&pll208>;
-+		};
-+		app26: app_26_clk at 26M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clock-div = <2>;
-+			clock-mult = <1>;
-+			clocks = <&app52>;
-+		};
- 	};
- 
- 	timer: timer at c0014000 {
-@@ -65,6 +108,7 @@
- 		reg = <0xc0012000 0x1000>;
- 		interrupt-parent = <&vicb>;
- 		interrupts = <3>;
-+		clocks = <&clk32>;
- 	};
- 
- 	rtc: rtc at c0017000 {
-diff --git a/drivers/clk/clk-u300.c b/drivers/clk/clk-u300.c
-index a41e42e..bebd6c9 100644
---- a/drivers/clk/clk-u300.c
-+++ b/drivers/clk/clk-u300.c
-@@ -11,6 +11,7 @@
- #include <linux/io.h>
- #include <linux/clk-provider.h>
- #include <linux/spinlock.h>
-+#include <linux/of.h>
- 
- /* APP side SYSCON registers */
- /* CLK Control Register 16bit (R/W) */
-@@ -931,6 +932,17 @@ mclk_clk_register(struct device *dev, const char *name,
- 	return clk;
- }
- 
-+static const __initconst struct of_device_id u300_clk_match[] = {
-+	{
-+		.compatible = "fixed-clock",
-+		.data = of_fixed_clk_setup,
-+	},
-+	{
-+		.compatible = "fixed-factor-clock",
-+		.data = of_fixed_factor_clk_setup,
-+	},
-+};
-+
- void __init u300_clk_init(void __iomem *base)
- {
- 	u16 val;
-@@ -951,26 +963,7 @@ void __init u300_clk_init(void __iomem *base)
- 	val |= U300_SYSCON_PMCR_PWR_MGNT_ENABLE;
- 	writew(val, syscon_vbase + U300_SYSCON_PMCR);
- 
--	/* These are always available (RTC and PLL13) */
--	clk = clk_register_fixed_rate(NULL, "app_32_clk", NULL,
--				      CLK_IS_ROOT, 32768);
--	/* The watchdog sits directly on the 32 kHz clock */
--	clk_register_clkdev(clk, NULL, "coh901327_wdog");
--	clk = clk_register_fixed_rate(NULL, "pll13", NULL,
--				      CLK_IS_ROOT, 13000000);
--
--	/* These derive from PLL208 */
--	clk = clk_register_fixed_rate(NULL, "pll208", NULL,
--				      CLK_IS_ROOT, 208000000);
--	clk = clk_register_fixed_factor(NULL, "app_208_clk", "pll208",
--					0, 1, 1);
--	clk = clk_register_fixed_factor(NULL, "app_104_clk", "pll208",
--					0, 1, 2);
--	clk = clk_register_fixed_factor(NULL, "app_52_clk", "pll208",
--					0, 1, 4);
--	/* The 52 MHz is divided down to 26 MHz */
--	clk = clk_register_fixed_factor(NULL, "app_26_clk", "app_52_clk",
--					0, 1, 2);
-+	of_clk_init(u300_clk_match);
- 
- 	/* Directly on the AMBA interconnect */
- 	clk = syscon_clk_register(NULL, "cpu_clk", "app_208_clk", 0, true,
+Look, the eCSPI unit has two clock inputs, one for accessing the
+registers (ipg) and one for generating the SPI bit clock (per). Now the
+CSPI unit only has a single clock input, so the 100% correct way would
+be to specify only a single clock for this unit. However, since we
+handle both units with the same driver the simplest way to cope with
+it is to provide the very same clock twice, once for the register access
+and once for generating the SPI bit clock.
+And yes, we have to specify the real clock twice and can't replace one
+with a dummy clock, because if we specify a dummy clock for the ipg
+clock, then the driver couldn't access the registers even if it enabled
+the clock. If we would replace the SPI bit clock with a dummy clock then
+the device couldn't send data even if the driver enabled the bit clock.
+(That of course only becomes relevant when the driver actually
+en/disables the clocks during runtime and not only once during probe).
+
+Sascha
+
+
 -- 
-1.7.11.3
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
