@@ -1,26 +1,28 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 23 May 2013 10:17:16 +0800
-Subject: [PATCH 1/6] drivers: bus: add a new driver for WEIM
-In-Reply-To: <201305221459.34859.arnd@arndb.de>
-References: <1369039742-10893-1-git-send-email-b32955@freescale.com>
- <20130521054323.GE3080@S2101-09.ap.freescale.net>
- <519C7ED3.3030004@freescale.com> <201305221459.34859.arnd@arndb.de>
-Message-ID: <519D7C2C.9080506@freescale.com>
+From: voice.shen@atmel.com (Bo Shen)
+Date: Thu, 23 May 2013 10:23:27 +0800
+Subject: [PATCH 1/7] USB: gadget: atmel_usba: move global struct usba_ep
+ usba_ep to struct usba_udc
+In-Reply-To: <1369067160-3230-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20130520162149.GC9937@game.jcrosoft.org>
+ <1369067160-3230-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <519D7D9F.1070109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2013?05?22? 20:59, Arnd Bergmann ??:
-> On Wednesday 22 May 2013, Huang Shijie wrote:
->> ? 2013?05?21? 13:43, Shawn Guo ??:
->>> It seems we can find it out from "reg" property, so that we can save
->>> this property?
->>>
->> we may have several devices attaching to the weim, each device has its 
->> own CS index.
->> it's better to keep this property, make it more clear.
-> I agree with Shawn, we should not have this property when it is the
-> same as the upper half of the "reg" property.
-okay. I will remove this property.
+Hi J,
 
-thanks
-Huang Shijie
+On 5/21/2013 00:25, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> so we can have multiple usb gadget instance
+>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: linux-usb at vger.kernel.org
+
+For this series, test OK on at91sam9m10g45ek and at91sam9x5ek board
+Tested-by: Bo Shen <voice.shen@atmel.com>
+
+PS: When do testing, we need build in or choose as module: "Device 
+Drivers ---> Generic Target Core Mod (TCM) and ConfigFS infrastructure"
+
+Best Regards,
+Bo Shen
