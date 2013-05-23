@@ -1,49 +1,55 @@
-From: rpimentel.silva@gmail.com (Rogerio Pimentel)
-Date: Thu, 23 May 2013 14:53:57 -0300
-Subject: [PATCH 0/3] staging: fix parallel display regressions
-In-Reply-To: <1368787839.4011.4.camel@pizza.hi.pengutronix.de>
-References: <1368782393-9660-1-git-send-email-list-09_linuc_arm@tqsc.de>
- <1368787839.4011.4.camel@pizza.hi.pengutronix.de>
-Message-ID: <CAOkaPuVhTPNgWXWw_vPu28ZdPjRVYsrodaumptUQpp5NMz+rOA@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 23 May 2013 11:53:57 -0600
+Subject: [PATCH 2/2] net: mv643xx_eth: proper initialization for Kirkwood
+ SoCs
+In-Reply-To: <20130523172339.GQ31290@titan.lakedaemon.net>
+References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369253042-15082-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369253042-15082-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130522201607.GA18823@obsidianresearch.com>
+ <20130523160111.GP31290@titan.lakedaemon.net>
+ <20130523171112.GB31281@obsidianresearch.com>
+ <20130523172339.GQ31290@titan.lakedaemon.net>
+Message-ID: <20130523175357.GB2821@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 17, 2013 at 7:50 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> Hi Markus,
->
-> Am Freitag, den 17.05.2013, 11:19 +0200 schrieb Markus Niebel:
->> From: Markus Niebel <Markus.Niebel@tqs.de>
->>
->> Support for VGA via TVE on iMX53 causes  regression, which prevents
->> parallel display from working. This series brings the parallel display
->> functionality back.
->>
->> Tested on a modified v3.9 with TQMa53 module and compile tested with
->> v3.10-rc1.
->>
->> Markus Niebel (3):
->>   staging: drm/imx: set correct sync pins for parallel display
->>   staging: drm/imx: fix spelling error for vsync flag config
->>   staging: drm/imx: revert vsync_cnt for di->id 1
->>
->>  drivers/staging/imx-drm/ipu-v3/ipu-di.c    |   13 +++++++++----
->>  drivers/staging/imx-drm/parallel-display.c |    4 ++--
->>  2 files changed, 11 insertions(+), 6 deletions(-)
->
-> thank you for posting the patches! I can confirm that they fix the
-> issues of incorrect signal generation on IPU display interface 1,
-> caused by my TVE patch series.
->
-> Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
->
-> regards
-> Philipp
->
+On Thu, May 23, 2013 at 01:23:39PM -0400, Jason Cooper wrote:
 
-With these patches I was able to enable the parallel display on i.MX53 QSB.
-It works.
+> Shouldn't it rather be
+> 
+> 	compatible = "marvell,kirkwood-eth", "marvell,orion-eth";
 
-Tested-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
+Not sure about orion-eth?
+ 
+> I'm inclined to go with of_machine_is_compatible() since the only
+> concrete difference we know is that the tweak is needed on kirkwood and
+> nowhere else.
 
-Rgds
-Rogerio Pimentel
+But there is a larger problem here then just this one bit.
+
+The PSC1 register must be set properly for the board layout, and today
+we rely on the bootloader to set it. In fact, even with Sebastian's
+change the ethernet port won't work without bootloader
+intervention. The PortReset bit should also be cleared by the driver
+(and it is only present on some variants of this IP block,
+apparently).
+
+We know that some Marvell SOC's wack the ethernet registers when they
+clock gate, and the flip of Clk125Bypass is another symptom of this
+general problem.
+
+So, long term, the PSC1 must be fully set by the driver, based on DT
+information describing the board (eg RGMII/MII/1000Base-X [SFP] Phy
+type), and the layout of this register seems to vary on a SOC by SOC
+basis.
+
+Thus, I think it is appropriate to call this variant of the eth IP
+'marvell,kirkwood-eth' which indicates that the register block follows
+the kirkwood manual and the PSC1 register specifically has the
+kirkwood layout.
+
+The question is what other Marvell SOCs have the same PSC1 layout as
+kirkwood?
+
+Jason
