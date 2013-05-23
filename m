@@ -1,72 +1,71 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 23 May 2013 14:40:28 -0400
-Subject: [PATCH 2/2] net: mv643xx_eth: proper initialization for
- Kirkwood SoCs
-In-Reply-To: <20130523175357.GB2821@obsidianresearch.com>
-References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369253042-15082-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369253042-15082-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130522201607.GA18823@obsidianresearch.com>
- <20130523160111.GP31290@titan.lakedaemon.net>
- <20130523171112.GB31281@obsidianresearch.com>
- <20130523172339.GQ31290@titan.lakedaemon.net>
- <20130523175357.GB2821@obsidianresearch.com>
-Message-ID: <20130523184028.GU31290@titan.lakedaemon.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 23 May 2013 11:46:37 -0700
+Subject: [PATCH v2 5/5] ARM: dts: OMAP2+: use pinctrl constants
+In-Reply-To: <1369323421-4180-6-git-send-email-florian.vaussard@epfl.ch>
+References: <1369323421-4180-1-git-send-email-florian.vaussard@epfl.ch>
+ <1369323421-4180-6-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <20130523184636.GE13507@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 11:53:57AM -0600, Jason Gunthorpe wrote:
-> On Thu, May 23, 2013 at 01:23:39PM -0400, Jason Cooper wrote:
-> 
-> > Shouldn't it rather be
-> > 
-> > 	compatible = "marvell,kirkwood-eth", "marvell,orion-eth";
-> 
-> Not sure about orion-eth?
+* Florian Vaussard <florian.vaussard@epfl.ch> [130523 08:42]:
+> index f39b237..b3cc896 100644
+> --- a/arch/arm/boot/dts/omap2.dtsi
+> +++ b/arch/arm/boot/dts/omap2.dtsi
+> @@ -9,6 +9,7 @@
+>   */
 >  
-> > I'm inclined to go with of_machine_is_compatible() since the only
-> > concrete difference we know is that the tweak is needed on kirkwood and
-> > nowhere else.
-> 
-> But there is a larger problem here then just this one bit.
-> 
-> The PSC1 register must be set properly for the board layout, and today
-> we rely on the bootloader to set it. In fact, even with Sebastian's
-> change the ethernet port won't work without bootloader
-> intervention. The PortReset bit should also be cleared by the driver
-> (and it is only present on some variants of this IP block,
-> apparently).
-> 
-> We know that some Marvell SOC's wack the ethernet registers when they
-> clock gate, and the flip of Clk125Bypass is another symptom of this
-> general problem.
-> 
-> So, long term, the PSC1 must be fully set by the driver, based on DT
-> information describing the board (eg RGMII/MII/1000Base-X [SFP] Phy
-> type), and the layout of this register seems to vary on a SOC by SOC
-> basis.
-> 
-> Thus, I think it is appropriate to call this variant of the eth IP
-> 'marvell,kirkwood-eth' which indicates that the register block follows
-> the kirkwood manual and the PSC1 register specifically has the
-> kirkwood layout.
+>  #include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/pinctrl/omap.h>
+>  
+>  #include "skeleton.dtsi"
+>  
+> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+> index 434288f..2518e6a 100644
+> --- a/arch/arm/boot/dts/omap3-beagle.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+> @@ -81,18 +81,18 @@
+>  
+>  	hsusbb2_pins: pinmux_hsusbb2_pins {
+>  		pinctrl-single,pins = <
+> -			0x5c0 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_clk OUTPUT */
+> -			0x5c2 0x3  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_stp OUTPUT */
+> -			0x5c4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dir INPUT | PULLDOWN */
+> -			0x5c6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_nxt INPUT | PULLDOWN */
+> -			0x5c8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat0 INPUT | PULLDOWN */
+> -			0x5cA 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat1 INPUT | PULLDOWN */
+> -			0x1a4 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat2 INPUT | PULLDOWN */
+> -			0x1a6 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat3 INPUT | PULLDOWN */
+> -			0x1a8 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat4 INPUT | PULLDOWN */
+> -			0x1aa 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat5 INPUT | PULLDOWN */
+> -			0x1ac 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat6 INPUT | PULLDOWN */
+> -			0x1ae 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat7 INPUT | PULLDOWN */
+> +			0x5c0 (OMAP_PIN_OUTPUT | OMAP_MUX_MODE3)		/* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_clk */
+> +			0x5c2 (OMAP_PIN_OUTPUT | OMAP_MUX_MODE3)		/* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_stp */
+> +			0x5c4 (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE3)	/* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dir */
+> +			0x5c6 (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE3)	/* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_nxt */
+> +			0x5c8 (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE3)	/* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat0 */
+> +			0x5cA (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE3)	/* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat1 */
+> +			0x1a4 (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE3)	/* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat2 */
+> +			0x1a6 (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE3)	/* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat3 */
+> +			0x1a8 (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE3)	/* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat4 */
+> +			0x1aa (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE3)	/* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat5 */
+> +			0x1ac (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE3)	/* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat6 */
+> +			0x1ae (OMAP_PIN_INPUT_PULLDOWN | OMAP_MUX_MODE3)	/* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat7 */
+>  		>;
+>  	};
+>  };
 
-Ok, so mv643xx_eth would match both "marvell,orion-eth" and
-"marvell,kirkwood-eth", then write to PSC1 iff it sees a node matching
-"marvell,kirkwood-eth".  I'm not too keen on that, however, the matching
-of the machine doesn't look to good, either.
+Nice!
 
-Perhaps a better answer is to add a boolean, "marvell,kirkwood_psc1" and
-check for that?
+While at it, can you lowercase the USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_clk
+naming to usbb2_ulpittl_clk.usbb1_ulpiphy_clk? You can also leave out _MUXMODE
+from these for consistency.
 
-Or, marvell,psc1_reset = <0xWWXXYYZZ>;
+I wonder if we can leave out the OMAP_ prefix from the mux mode defines
+here and just assume PIN_OUTPUT etc would not conflict with other SoC's
+naming?
 
-> The question is what other Marvell SOCs have the same PSC1 layout as
-> kirkwood?
+Regards,
 
-I think marvell,psc1_reset = <>; gives us the most flexibility in
-accurately describing the hardware.
-
-thx,
-
-Jason.
+Tony
