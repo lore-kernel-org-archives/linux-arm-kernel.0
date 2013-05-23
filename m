@@ -1,45 +1,58 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 23 May 2013 07:53:06 +0200
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
- 370/XP
-In-Reply-To: <20130522233108.01cb51f0@skate>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201305221735.11815.arnd@arndb.de> <20130522180842.7edcc3ee@skate>
- <201305222240.05124.arnd@arndb.de> <20130522233108.01cb51f0@skate>
-Message-ID: <20130523055306.GV26249@lunn.ch>
+From: avinashphilip@ti.com (Philip, Avinash)
+Date: Thu, 23 May 2013 06:27:09 +0000
+Subject: [PATCH 02/11] gpio: davinci: coding style correction
+In-Reply-To: <20130522144042.GG18614@n2100.arm.linux.org.uk>
+References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
+ <1369206634-6778-3-git-send-email-avinashphilip@ti.com>
+ <20130522144042.GG18614@n2100.arm.linux.org.uk>
+Message-ID: <518397C60809E147AF5323E0420B992E3EAC7AE8@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > The new boot loaders will of course know that they are remapping the
-> > registers, so they are also able to put the correct information into the
-> > DT.
+On Wed, May 22, 2013 at 20:10:42, Russell King - ARM Linux wrote:
+> On Wed, May 22, 2013 at 12:40:25PM +0530, Philip Avinash wrote:
+> >  /*
+> >   * Assuming the pin is muxed as a gpio output, set its output value.
+> >   */
+> > -static void
+> > -davinci_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+> > +static void davinci_gpio_set(struct gpio_chip *chip, unsigned offset,
+> > +		int value)
 > 
-> The thing that I believe you don't realize is that those new bootloaders
-> are already shipping *today*. And they are not putting whatever
-> "correct" information into the DT you believe they should be putting.
+> This kind of stuff is just churn.  If you read Documentation/CodingStyle:
 > 
-> So what do we do, today, with those new bootloaders, that are not the
-> future, but the present. Again, they do *not* add any information in
-> the DT that allows us to know that they have remapped the registers to
-> 0xf1.
+> Statements longer than 80 columns will be broken into sensible chunks, unless
+> exceeding 80 columns significantly increases readability and does not hide
+> information. Descendants are always substantially shorter than the parent and
+> are placed substantially to the right. The same applies to function headers
+> with a long argument list. However, never break user-visible strings such as
+> printk messages, because that breaks the ability to grep for them.
+> 
+> "broken into sensible chunks".  Here's the question: is the former a
+> sensible format?  Arguably it is because it results in all the arguments
+> fitting on one line at the expense of missing the return value.
+> 
+> The latter is also a sensible format - but breaks the arguments instead
+> of the return value.
+> 
+> Both formats can be found in their entirety by grep by function name alone:
+> 
+> 	grep -1 davinci_gpio_set
+> 
+> or if you prefer to type some more then you end up with more specific
+> 
+> 	grep -A1 davinci_gpio_set
+> or
+> 	grep -B1 davinci_gpio_set
+> 
+> depending on the version.
+> 
+> Where there's no clear advantage one way or the other, let the authors
+> preference stand.
 
-That is a key point. Compared to the kernel, the bootloaders a very
-slow to evolve new features, even slower to get deployed, and have a
-very long life without ever getting upgraded. The kernel has to deal
-with legacy bootloaders.
+Ok I understood and I will remove these changes in next version.
 
-What we seem to be heading towards is a bootloader which actually uses
-the DT itself, can modify it dynamically to reflect the running system,
-and pass it to the kernel.
+Thanks
+Avinash
 
-What we have today, on Marvell boards, is mostly no support for DT at
-all with blobs appended to the kernel with tools like debians
-flash-kernel. Maybe this new Marvell uboot can load the blob in the
-same way it can load the kernel, or initrd, from flash, a file on a
-disk, tftpboot, etc, but i expect it is just an opaque binary blob to
-uboot.
-
-I guess your bootloader which will put the correct information into
-the DT is a few years away.
-
-    Andrew
+> 
