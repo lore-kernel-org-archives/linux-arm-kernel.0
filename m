@@ -1,19 +1,21 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 23 May 2013 14:11:01 +0200
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 23 May 2013 14:16:52 +0200
 Subject: [PATCH] at91: sama5: fix incorrect PMC pcr div definition
 In-Reply-To: <1369304328-11442-1-git-send-email-josh.wu@atmel.com>
 References: <1369304328-11442-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20130523121101.GC24476@game.jcrosoft.org>
+Message-ID: <20130523121652.GB3013@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:18 Thu 23 May     , Josh Wu wrote:
+On Thu, May 23, 2013 at 06:18:48PM +0800, Josh Wu wrote:
 > 
 > Signed-off-by: Josh Wu <josh.wu@atmel.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Best Regards,
-J.
+Nice catch, thanks Josh.
+
+Ludovic
+
 > ---
 >  arch/arm/mach-at91/include/mach/at91_pmc.h |    6 +++---
 >  1 file changed, 3 insertions(+), 3 deletions(-)
