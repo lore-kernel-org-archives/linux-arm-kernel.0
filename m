@@ -1,75 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 23 May 2013 10:51:01 +0800
-Subject: [PATCH v3] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <13F8657A829DAB49A2A937FD6FC10F790B3CECEB@039-SN2MPN1-012.039d.mgd.msft.net>
-References: <1368685096-13177-1-git-send-email-b35083@freescale.com>
- <20130520030523.GB25113@S2101-09.ap.freescale.net>
- <13F8657A829DAB49A2A937FD6FC10F790B3CDB85@039-SN2MPN1-012.039d.mgd.msft.net>
- <CAAQ0ZWRz+byPKxMjDH3zKsc0u4bmkPO_1u6w2H4Z7nD0z8+9ig@mail.gmail.com>
- <13F8657A829DAB49A2A937FD6FC10F790B3CECEB@039-SN2MPN1-012.039d.mgd.msft.net>
-Message-ID: <20130523025059.GB2704@S2101-09.ap.freescale.net>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Thu, 23 May 2013 10:47:30 +0800
+Subject: [RFC PATCH] ARM: mm: lazy cache flushing on non-mapped pages
+In-Reply-To: <20130522144240.GA4173@localhost.cambridge.arm.com>
+References: <1369223711-2995-1-git-send-email-ming.lei@canonical.com>
+ <20130522144240.GA4173@localhost.cambridge.arm.com>
+Message-ID: <CACVXFVMsWHf6t-P9Q3YbE3WyhAQX1pcmFLni7uGH3PxXt=R+eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 08:59:20AM +0000, Jin Zhengxiong-R64188 wrote:
-> [Jason Jin-R64188] For the lpuart itself, I do not think it will have different version IP.
+On Wed, May 22, 2013 at 10:42 PM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+>
+> That's the meaning of mapping_mapped(), it doesn't tell whether the page
+> has a user virtual address.
 
-You can never tell in 5 or 10 years.  Also no major version doesn't
-necessarily mean no minor updates or revise.
+Yes, I mean pages only need to flush if they has been mapped, so we can
+use page_mapped() to decide that.
 
-> The general name is sufficient and soc related name can introduce the minor difference. If the there are update version, we can name it lpuart2.0 or something like that.
-> 
+>
+>> This patch also uses page_mapcount() to decide if the page has been
+>> mapped.
+>
+> Better use page_mapped() instead.
 
-Yeah, if IP designers name it lpuart2.0, it surely works.  But from my
-experience on IMX, hardware guys are not always properly updating IP
-name.  Then the version 2.0 becomes a versioning given by software
-people which is improper to be used in compatible string.
+Good idea, will do it v1, :-)
 
-> For the compatible property itself, the ePAPR described it as:
-> ---- 
-> The compatible property value consists of one or more strings that define the specific programming model for the device. This list of strings should be used by a client program for device driver selection. The property value consists of a concatenated list of null terminated strings, from most specific to most general. 
-> ----
-> So for the IPs especially for the peripheral IPs, the compatible just used to select the driver for the device.
-
-Not only select the driver but also the programing model implemented in
-the driver.  Take a look at drivers/mmc/host/sdhci-esdhc-imx.c or
-drivers/net/ethernet/freescale/fec_main.c, multiple compatible strings
-select the same driver but the different programing model implemented in
-the driver.
-
-> It should not used to describe the version information.
-
-Seriously?  The "version" equally means the compatibility here.  How can
-a compatible string be not used to describe "version" - compatibility?
-
-> If the version changed and the driver cannot be used for the device then another compatible strings should be used.
-> 
-
-If the IP gets a revise, the driver should be updated to support a new
-programing model with a new compatible string.
-
-> As I said, Another reason for the general strings used is the across platform issue, It's maybe reasonably to name the compatible strings as you recommended for the IPs share in the same SoC family. But for the IPs shared across platform, general name sound more reasonably to avoid the product line confusing. 
-> 
-
-Think about it from "compatibility" point of view.  It does not cause
-confusion but just help understand the compatible history.  Saying the
-same IP is reused on LS-1 SoC, I do not see a problem with putting the
-following compatible into LS-1 <soc>.dtsi under UART node, to tell that
-the UART block on LS-1 is completely compatible with the one used on
-MVF600.
-
-  compatible = "fsl,ls1-uart", "fsl,mvf600-uart";
-
-> The compatible strings once named as you said for Power platform, but more general strings were used later as IPs shared for more SoCs.
-> 
-
-I think IMX device tree support is added more recently than Power.
-Encoding SoC name in IP compatible string is a general practise for IMX
-device tree bindings.
-
-Shawn
-
-> I was wondering what's kind of strings should be used for this kind of IPs across different platforms. I added Grant Likely for comments, Thanks.
-> 
-> Jason 
-> 
+Thanks,
+--
+Ming Lei
