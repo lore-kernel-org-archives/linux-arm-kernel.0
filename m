@@ -1,48 +1,46 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 23 May 2013 16:16:18 +0800
-Subject: [PATCH V2 6/6] ARM: dts: imx6qdl: enable the WEIM NOR
-In-Reply-To: <1369296978-7669-1-git-send-email-b32955@freescale.com>
-References: <1369296978-7669-1-git-send-email-b32955@freescale.com>
-Message-ID: <1369296978-7669-7-git-send-email-b32955@freescale.com>
+From: jhovold@gmail.com (Johan Hovold)
+Date: Thu, 23 May 2013 10:38:50 +0200
+Subject: [PATCH v3 0/5] rtc-at91rm9200: add shadow interrupt mask
+In-Reply-To: <1364983415-20298-1-git-send-email-jhovold@gmail.com>
+References: <1364983415-20298-1-git-send-email-jhovold@gmail.com>
+Message-ID: <1369298335-24597-1-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the WEIM NOR for imx6q{dl} boards.
+This is an update of the shadow-interrupt-mask series against v3.10-rc2.
 
-For the pin conflict with SPI NOR, its status is set to "disabled".
+I guess we need Atmel to confirm that all sam9x5 SoCs are indeed
+affected. If not, then some probing mechanism as the one Doug suggested
+could be implemented on top of (a subset of) these patches. What do you
+say, Nicolas?
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
+Note that the first patch (adding a missing OF compile guard) could be
+applied straight away.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index a4466e6..684b208 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -58,3 +58,23 @@
- 	wp-gpios = <&gpio1 13 0>;
- 	status = "okay";
- };
-+
-+&weim {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_weim_nor_1>;
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	ranges = <0 0 0x08000000 0x08000000>;
-+	status = "disabled"; /* pin conflict with SPI NOR */
-+
-+	nor at 0,0 {
-+		compatible = "cfi-flash";
-+		reg = <0 0 0x02000000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		bank-width = <2>;
-+
-+		fsl,weim-cs-timing = <0x00620081 0x00000001 0x1C022000
-+				0x0000C000 0x1404a38e 0x00000000>;
-+	};
-+};
+Thanks,
+Johan
+
+
+v3:
+ - rebase against v3.10-rc2
+ - remove some comments
+
+v2:
+ - rebase on top of DT-support patch by Joachim Eastwood
+ - add missing brace in DT-id table
+
+
+Johan Hovold (5):
+  rtc-at91rm9200: add match-table compile guard
+  rtc-at91rm9200: add configuration support
+  rtc-at91rm9200: refactor interrupt-register handling
+  rtc-at91rm9200: add shadow interrupt mask
+  rtc-at91rm9200: use shadow IMR on at91sam9x5
+
+ .../bindings/rtc/atmel,at91rm9200-rtc.txt          |   2 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |   2 +-
+ drivers/rtc/rtc-at91rm9200.c                       | 131 +++++++++++++++++----
+ 3 files changed, 113 insertions(+), 22 deletions(-)
+
 -- 
-1.7.1
+1.8.2.1
