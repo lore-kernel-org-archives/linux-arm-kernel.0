@@ -1,53 +1,40 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 23 May 2013 14:13:44 +0200
-Subject: [PATCH 1/3] ARM: at91: move at91 aic driver to drivers/irqchip
-In-Reply-To: <20130523101825.GL18614@n2100.arm.linux.org.uk>
-References: <1369299909-10078-1-git-send-email-b.brezillon@overkiz.com>
- <1369299909-10078-2-git-send-email-b.brezillon@overkiz.com>
- <20130523101825.GL18614@n2100.arm.linux.org.uk>
-Message-ID: <20130523141344.7a01ce88@skate>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 23 May 2013 14:11:01 +0200
+Subject: [PATCH] at91: sama5: fix incorrect PMC pcr div definition
+In-Reply-To: <1369304328-11442-1-git-send-email-josh.wu@atmel.com>
+References: <1369304328-11442-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <20130523121101.GC24476@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell King - ARM Linux,
-
-On Thu, 23 May 2013 11:18:25 +0100, Russell King - ARM Linux wrote:
-
-> I notice arch/arm/mach-at91/pm.c makes use of some of the register
-> definitions:
+On 18:18 Thu 23 May     , Josh Wu wrote:
 > 
->         at91_irq_suspend();
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+
+Best Regards,
+J.
+> ---
+>  arch/arm/mach-at91/include/mach/at91_pmc.h |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
->         pr_debug("AT91: PM - wake mask %08x, pm state %d\n",
->                         /* remember all the always-wake irqs */
->                         (at91_pmc_read(AT91_PMC_PCSR)
->                                         | (1 << AT91_ID_FIQ)
->                                         | (1 << AT91_ID_SYS)
->                                         | (at91_extern_irq))
->                                 & at91_aic_read(AT91_AIC_IMR),
->                         state);
+> diff --git a/arch/arm/mach-at91/include/mach/at91_pmc.h b/arch/arm/mach-at91/include/mach/at91_pmc.h
+> index 31df120..2bd7f51 100644
+> --- a/arch/arm/mach-at91/include/mach/at91_pmc.h
+> +++ b/arch/arm/mach-at91/include/mach/at91_pmc.h
+> @@ -179,9 +179,9 @@ extern void __iomem *at91_pmc_base;
+>  #define		AT91_PMC_PCR_CMD	(0x1  <<  12)		/* Command (read=0, write=1) */
+>  #define		AT91_PMC_PCR_DIV(n)	((n)  <<  16)		/* Divisor Value */
+>  #define			AT91_PMC_PCR_DIV0	0x0			/* Peripheral clock is MCK */
+> -#define			AT91_PMC_PCR_DIV2	0x2			/* Peripheral clock is MCK/2 */
+> -#define			AT91_PMC_PCR_DIV4	0x4			/* Peripheral clock is MCK/4 */
+> -#define			AT91_PMC_PCR_DIV8	0x8			/* Peripheral clock is MCK/8 */
+> +#define			AT91_PMC_PCR_DIV2	0x1			/* Peripheral clock is MCK/2 */
+> +#define			AT91_PMC_PCR_DIV4	0x2			/* Peripheral clock is MCK/4 */
+> +#define			AT91_PMC_PCR_DIV8	0x3			/* Peripheral clock is MCK/8 */
+>  #define		AT91_PMC_PCR_EN		(0x1  <<  28)		/* Enable */
+>  
+>  #endif
+> -- 
+> 1.7.10
 > 
-> at91_irq_suspend() is in arch/arm/mach-at91/irq.c already, so there's no
-> reason that fragment can't be moved there.
-
-The problem is that the goal of the patch set is to move
-arch/arm/mach-at91/irq.c into drivers/irqchip/.
-
-However, if you move that chunk of code to drivers/irqchip/irq-at91.c,
-you are using at91_pmc_read() which is defined in
-arch/arm/mach-at91/include/mach/at91_pmc.h. So,
-drivers/irqchip/irq-at91.c would have to include such an header file,
-which is something we want to avoid since drivers/ code should not
-include something in <mach/...>, as it breaks multiplatform kernels.
-
-So, I'm afraid, simply moving this chunk of code in at91_irq_suspend()
-doesn't make the thing any better.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
