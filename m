@@ -1,37 +1,73 @@
 From: jhovold@gmail.com (Johan Hovold)
-Date: Thu, 23 May 2013 10:38:51 +0200
-Subject: [PATCH v3 1/5] rtc-at91rm9200: add match-table compile guard
+Date: Thu, 23 May 2013 10:38:55 +0200
+Subject: [PATCH v3 5/5] rtc-at91rm9200: use shadow IMR on at91sam9x5
 In-Reply-To: <1369298335-24597-1-git-send-email-jhovold@gmail.com>
 References: <1364983415-20298-1-git-send-email-jhovold@gmail.com>
  <1369298335-24597-1-git-send-email-jhovold@gmail.com>
-Message-ID: <1369298335-24597-2-git-send-email-jhovold@gmail.com>
+Message-ID: <1369298335-24597-6-git-send-email-jhovold@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing match-table compile guard.
+Add support for the at91sam9x5-family which must use the shadow
+interrupt mask due to a hardware issue (causing RTC_IMR to always be
+zero).
 
 Signed-off-by: Johan Hovold <jhovold@gmail.com>
 ---
- drivers/rtc/rtc-at91rm9200.c | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt | 2 +-
+ arch/arm/boot/dts/at91sam9x5.dtsi                              | 2 +-
+ drivers/rtc/rtc-at91rm9200.c                                   | 7 +++++++
+ 3 files changed, 9 insertions(+), 2 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
+index 2a3feab..34c1505 100644
+--- a/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
++++ b/Documentation/devicetree/bindings/rtc/atmel,at91rm9200-rtc.txt
+@@ -1,7 +1,7 @@
+ Atmel AT91RM9200 Real Time Clock
+ 
+ Required properties:
+-- compatible: should be: "atmel,at91rm9200-rtc"
++- compatible: should be: "atmel,at91rm9200-rtc" or "atmel,at91sam9x5-rtc"
+ - reg: physical base address of the controller and length of memory mapped
+   region.
+ - interrupts: rtc alarm/event interrupt
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 1145ac3..b5833d1f 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -643,7 +643,7 @@
+ 			};
+ 
+ 			rtc at fffffeb0 {
+-				compatible = "atmel,at91rm9200-rtc";
++				compatible = "atmel,at91sam9x5-rtc";
+ 				reg = <0xfffffeb0 0x40>;
+ 				interrupts = <1 4 7>;
+ 				status = "disabled";
 diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-index 0eab77b..eeeb73f 100644
+index 205701e..47416e9 100644
 --- a/drivers/rtc/rtc-at91rm9200.c
 +++ b/drivers/rtc/rtc-at91rm9200.c
-@@ -383,11 +383,13 @@ static int at91_rtc_resume(struct device *dev)
- 
- static SIMPLE_DEV_PM_OPS(at91_rtc_pm_ops, at91_rtc_suspend, at91_rtc_resume);
- 
-+#ifdef CONFIG_OF
- static const struct of_device_id at91_rtc_dt_ids[] = {
- 	{ .compatible = "atmel,at91rm9200-rtc" },
- 	{ /* sentinel */ }
+@@ -309,12 +309,19 @@ static irqreturn_t at91_rtc_interrupt(int irq, void *dev_id)
+ static const struct at91_rtc_config at91rm9200_config = {
  };
- MODULE_DEVICE_TABLE(of, at91_rtc_dt_ids);
-+#endif
  
- static struct platform_driver at91_rtc_driver = {
- 	.remove		= __exit_p(at91_rtc_remove),
++static const struct at91_rtc_config at91sam9x5_config = {
++	.use_shadow_imr	= true,
++};
++
+ #ifdef CONFIG_OF
+ static const struct of_device_id at91_rtc_dt_ids[] = {
+ 	{
+ 		.compatible = "atmel,at91rm9200-rtc",
+ 		.data = &at91rm9200_config,
+ 	}, {
++		.compatible = "atmel,at91sam9x5-rtc",
++		.data = &at91sam9x5_config,
++	}, {
+ 		/* sentinel */
+ 	}
+ };
 -- 
 1.8.2.1
