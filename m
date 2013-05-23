@@ -1,46 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 May 2013 08:09:05 +0100
-Subject: [PATCH] regulator: ab8500-ext: Don't register without
- initialisation data
-In-Reply-To: <20130522174516.GT1627@sirena.org.uk>
-References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
- <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
- <20130522155347.GJ1627@sirena.org.uk>
- <20130522165353.GB18714@gmail.com>
- <20130522174516.GT1627@sirena.org.uk>
-Message-ID: <20130523070905.GD18714@gmail.com>
+From: jbe@pengutronix.de (Juergen Beisert)
+Date: Thu, 23 May 2013 09:20:17 +0200
+Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
+In-Reply-To: <201305221305.09579.marex@denx.de>
+References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
+ <201305221219.43558.jbe@pengutronix.de> <201305221305.09579.marex@denx.de>
+Message-ID: <201305230920.18200.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 May 2013, Mark Brown wrote:
+Hi Marek,
 
-> On Wed, May 22, 2013 at 05:53:53PM +0100, Lee Jones wrote:
-> > On Wed, 22 May 2013, Mark Brown wrote:
-> 
-> > > running or not, the worst that should happen is that the state can be
-> > > read back.  I'd therefore expect the fix here to be in the board side
-> > > code that enables the regulators.
-> 
-> > It's both.
-> 
-> > From the platform side we have stopped passing the external regulator
-> > driver's constraints for Snowball:
-> 
-> > https://lkml.org/lkml/2013/5/22/280
-> 
-> > All I've done here is stop the ext driver from crapping out with the
-> > misleading error "Configuration error: size mismatch", because a)
-> > it's not an error, it's expected and b) It's not a size mismatch,
-> > instead we have chosen to keep the constraints back in the Snowball
-> > (and u8505) case.
-> 
-> OK, so the regulator driver is buggy and insisting on having constraints
-> passed in for every regulator then?
+Marek Vasut wrote:
+> > > i2c slowness is a different issue.
+> >
+> > Same happens here for my i.M23 based platform. It seems the PIO mode does
+> > not work, or at least not like it works on a i.MX28. Each short transfer
+> > needs about one second (without an error message) but does not send
+> > anything on the I2C lines.
+> >
+> > I need the following patches to make I2C master work within a 3.10-rc2
+> > kernel:
+> >
+> > Subject: [PATCH] I2C/MXS: distinguish i.MX23 and i.MX28 based I2C
+>
+> I'm all for it, but then ... won't it be better if you actually fixed the
+> PIO and mixed-mode on MX23 instead of implementing such hack?
 
-If that's not how it's meant to work then, yes.
+If the PIO mode or my patch is a hack depends on the point of view: Lucas told 
+me the PIO mode is *mentioned* but *not specified* in the i.MX23/i.MX28 
+datasheets.
+So, the PIO mode seems to depend on some undocumented status bits in the 
+i.MX28 I2C controller implementation.
+
+Regards,
+Juergen
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                              | Juergen Beisert             |
+Linux Solutions for Science and Industry      | Phone: +49-5121-206917-5128 |
+Peiner Str. 6-8, 31137 Hildesheim, Germany    | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686              | http://www.pengutronix.de/  |
