@@ -1,40 +1,70 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 23 May 2013 19:19:30 +0800
-Subject: [PATCH] arch: configuration, deleting 'CONFIG_BUG' since always
- need it.
-In-Reply-To: <201305231259.43750.arnd@arndb.de>
-References: <519DCBEF.3090208@asianux.com> <201305231139.38233.arnd@arndb.de>
- <20130523100409.GK18614@n2100.arm.linux.org.uk>
- <201305231259.43750.arnd@arndb.de>
-Message-ID: <519DFB42.7010509@asianux.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 23 May 2013 13:22:55 +0200
+Subject: [PATCH 1/3] ARM: at91: move at91 aic driver to drivers/irqchip
+In-Reply-To: <20130523102601.GI9937@game.jcrosoft.org>
+References: <1369299909-10078-1-git-send-email-b.brezillon@overkiz.com>
+ <1369299909-10078-2-git-send-email-b.brezillon@overkiz.com>
+ <20130523090611.GG9937@game.jcrosoft.org>
+ <519DE6A8.6040502@overkiz.com> <20130523120920.1df8e23a@skate>
+ <20130523100951.GH9937@game.jcrosoft.org>
+ <20130523122000.22a9a4d0@skate>
+ <20130523102601.GI9937@game.jcrosoft.org>
+Message-ID: <20130523132255.3acf4431@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2013 06:59 PM, Arnd Bergmann wrote:
-> You don't just want to avoid the code for printing the bug message and
-> the invalid instruction, we also want the compiler to not emit the 
-> function call or check the enum for unexpected values. The meaning of
-> BUG() is really that person writing that statement was sure it cannot
-> happen unless there is a bug in the kernel, which has likely already
-> corrupted data. Printing a diagnostic at this point is nice if someone
-> is there to look at it, but letting the kernel do further actions that
-> may be undefined is not going to make things worse.
+Dear Jean-Christophe PLAGNIOL-VILLARD,
 
-So I think neither unreachable() nor panic() are suitable for this
-condition.
+On Thu, 23 May 2013 12:26:01 +0200, Jean-Christophe PLAGNIOL-VILLARD
+wrote:
 
-I guess 'CONFIG_BUG' is not belong to common features, now (and in the
-future), so it is not suitable still exist in "asm-generic/bug.h", need
-remove it firstly.
+> > Did you read what I write? In arch/arm/mach-at91/pm.c, the only
+> > accesses made to the AIC registers are for pr_debug() calls, i.e only
+> > to print some debugging messages. I believe those ones can simply be
+> > removed to decouple the pm.c code from the irq.c code.
+> 
+> yes I read and yes I do not want to move code before we do cleanup MANDATORY
 
-And then let the specific architectures to implement their own BUG(), if
-they want some special features.
+Then please explain to our volunteer contributor what sort of cleanup
+is required. Simply NACKing without offering any insight as to how
+things should be done is completely useless, counter-productive, and a
+complete abuse of a maintainer's power over contributors.
 
-SO most of arches can skip this issue.
+> >  * PATCH 1: remove usage of AIC registers for debug messages in pm.c
+> NACK I do want this debug, very usefull to debug pm
 
+For the cases where you need to debug this stuff, you can always re-add
+some instrumentation in this code to dump whatever you want.
 
-Thanks.
+Or, alternatively, we can make the irqchip driver show using
+pr_debug() the value of IMR in its ->suspend() hook, the value of IMR &
+IPR in its ->resume() hook, and the pm.c code can show the PMC_PCSR on
+suspend. This way, you have all the informations you need for debugging.
+
+Having the PM driver and the irqchip driver step on each other register
+areas is anyway a bad idea, especially when the only reason to do so is
+for two debugging messages that can be implemented differently.
+
+Notice that this solution can always be improved later on if needed,
+with further cleanups from you.
+
+But please stop rejecting valid patches from contributors, just because
+the code is not coming from you. What Boris is proposing is perfectly
+fine, just needs a little bit more work to sort out the header
+problems as we discussed, and is a good step in the right direction. And
+this step in the right direction doesn't prevent anyone else, including
+you, to provide additional patches to move even further in the right
+direction.
+
+It would be good if the other AT91 maintainers could raise their voice
+here, so that Boris knows whether it is worthwhile doing additional
+revisions of this patch set.
+
+Best regards,
+
+Thomas
 -- 
-Chen Gang
-
-Asianux Corporation
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
