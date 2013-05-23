@@ -1,45 +1,41 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 May 2013 00:09:11 +0100
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on
- Armada 370/XP
-In-Reply-To: <201305232240.03959.arnd@arndb.de>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130523142301.10dbeff9@skate>
- <20130523202643.GQ18614@n2100.arm.linux.org.uk>
- <201305232240.03959.arnd@arndb.de>
-Message-ID: <20130523230911.GR18614@n2100.arm.linux.org.uk>
+Date: Fri, 24 May 2013 00:13:36 +0100
+Subject: [PATCH v7] arm: use built-in byte swap function
+In-Reply-To: <20130523114654.1f273241725205c6703b2226@freescale.com>
+References: <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
+ <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
+ <alpine.LFD.2.03.1302202327370.6419@syhkavp.arg>
+ <20130221005221.15279b1372501af12c1e4f32@freescale.com>
+ <alpine.LFD.2.03.1302211134160.6419@syhkavp.arg>
+ <20130221203327.6558f89277468f7ffffa6506@freescale.com>
+ <alpine.LFD.2.03.1302212219100.6419@syhkavp.arg>
+ <20130222194032.f7b44aefa5e2723d16767a1b@freescale.com>
+ <1361661654.18110.102.camel@shinybook.infradead.org>
+ <20130523114654.1f273241725205c6703b2226@freescale.com>
+Message-ID: <20130523231336.GS18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 10:40:03PM +0200, Arnd Bergmann wrote:
-> On Thursday 23 May 2013, Russell King - ARM Linux wrote:
-> > On Thu, May 23, 2013 at 02:23:01PM +0200, Thomas Petazzoni wrote:
-> > > But that's not the case. Neither the old nor the new bootloaders are
-> > > changing the Device Tree in any way that allows us to know whether
-> > > registers are mapped at 0xd0 and 0xf1.
-> > 
-> > Who provides this DT blob?  Is it already provided with the board, or
-> > is it something which is provided by others?
+On Thu, May 23, 2013 at 11:46:54AM -0500, Kim Phillips wrote:
+> Enable the compiler intrinsic for byte swapping on arch ARM.  This
+> allows the compiler to detect and be able to optimize out byte
+> swappings, and has a very modest benefit on vmlinux size (Linaro gcc
+> 4.8):
 > 
-> In theory, the board could provide the DT, but we would always be able
-> to provide an updated DT blob if necessary. In practice, the DT blob at
-> the moment is always shipped alongside the kernel, as some interfaces
-> (e.g. the mbus or pci in case of mvebu) are not final yet.
+>    text	   data	    bss	    dec	    hex	filename
+> 2840310	 123932	  61960	3026202	 2e2d1a	vmlinux-lart #orig
+> 2840152	 123932	  61960	3026044	 2e2c7c	vmlinux-lart #builtin-bswap
 > 
-> The boot loader has ways to modify that blob in memory, in order to
-> pass the information that traditionally is in the ATAGS and other things
-> like a board specific MAC address. It is straightforward for the bootloader
-> to update properties like the location of the internal registers, once
-> we have specified the binding for the mbus, but not until then.
+> 6473120	 314840	5616016	12403976 bd4508	vmlinux-mxs #orig
+> 6472586	 314848	5616016	12403450 bd42fa	vmlinux-mxs #builtin-bswap
 > 
-> For older boot loaders that only support ATAGS, the update of the DT
-> blob happens inside of the kernel in arch/arm/boot/compressed/atags_to_fdt.c
-> on the blob that is appended to the zImage.
+> 7419872	 318372	 379556	8117800	 7bde28	vmlinux-imx_v6_v7 #orig
+> 7419170	 318364	 379556	8117090	 7bdb62	vmlinux-imx_v6_v7 #builtin-bswap
+> 
+> Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
+> Reviewed-by: Nicolas Pitre <nico@linaro.org>
+> Acked-by: David Woodhouse <David.Woodhouse@intel.com>
+> ---
+> resending as v6 appears to have fallen though the cracks.  Russell?
 
-*Sigh*
-
-No, I'm not asking about the principle.  I'm asking _in this particular
-problem case_ who provides the DT blob?
-
-So the person to answer that question is Thomas or someone who is using
-the boards concerned.
+Please put it in the patch system (otherwise I do drop patches.)
