@@ -1,68 +1,55 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 23 May 2013 10:45:38 +0200
-Subject: [PATCH 0/7 v4] ARM: at91: dt: add USBA support
-In-Reply-To: <20130520162149.GC9937@game.jcrosoft.org>
-References: <20130520162149.GC9937@game.jcrosoft.org>
-Message-ID: <20130523084538.GE9937@game.jcrosoft.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 23 May 2013 09:50:07 +0100
+Subject: [PATCH 14/14] ARM: elf: add new hwcap for identifying atomic
+ ldrd/strd instructions
+In-Reply-To: <20130522180942.GK16361@mudshark.cambridge.arm.com>
+References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
+ <1368810473-26070-15-git-send-email-will.deacon@arm.com>
+ <20130520141809.GA27473@arm.com>
+ <CAL_JsqLSC2QgMdTGtH5G_F5SYjA3Hs--jMmxBES=fqGLwapptQ@mail.gmail.com>
+ <20130522084744.GD14322@arm.com>
+ <20130522180942.GK16361@mudshark.cambridge.arm.com>
+Message-ID: <20130523085006.GA16722@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+On Wed, May 22, 2013 at 07:09:42PM +0100, Will Deacon wrote:
+> On Wed, May 22, 2013 at 09:47:44AM +0100, Catalin Marinas wrote:
+> > On Tue, May 21, 2013 at 07:48:35PM +0100, Rob Herring wrote:
+> > > On Mon, May 20, 2013 at 9:18 AM, Catalin Marinas
+> > > <catalin.marinas@arm.com> wrote:
+> > > > On Fri, May 17, 2013 at 06:07:53PM +0100, Will Deacon wrote:
+> > > >> CPUs implementing LPAE have atomic ldrd/strd instructions, meaning that
+> > > >> userspace software can avoid having to use the exclusive variants of
+> > > >> these instructions if they wish.
+> > > >>
+> > > >> This patch advertises the atomicity of these instructions via the
+> > > >> hwcaps, so userspace can detect this CPU feature.
+> > > >>
+> > > >> Reported-by: Vladimir Danushevsky <vladimir.danushevsky@oracle.com>
+> > > >> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > > ...
+> > > >> +
+> > > >> +     /* LPAE implies atomic ldrd/strd instructions */
+> > > >> +     vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
+> > > >> +     if (vmsa >= 5)
+> > > >> +             elf_hwcap |= HWCAP_LPAE;
+> > > >
+> > > > As I mentioned in the past, I don't agree with exposing the "LPAE"
+> > > > feature to user-space, it's not a feature that user space should care
+> > > > about. An atomic double hwcap is better and you can even make this per
+> > > > CPU via __v7_proc.
+> > > 
+> > > How does userspace know whether to install a non-LPAE or LPAE kernel
+> > > in a generic way?
+> > 
+> > This is a valid reason to expose LPAE to user, though elf_hwcap sounds a
+> > bit strange.
+> 
+> In lieu of anything else, do you mind if I continue with the patch as it
+> stands?
 
-	if it's ok with you I send the patch series via at91
-	with the DT
+OK, I give up ;)
 
-Best Regards,
-J.
-On 18:21 Mon 20 May     , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> HI,
-> 
-> 	v4:
-> 	fix multi instance support
-> 
-> 	v3:
-> 	rebase againt 3.10-rc1 + dt macro cleanup
-> 
-> 	This patch serie finish to add the usb device support to dt for at91
-> 	with the usba support present on the last at91 generation since sam9g45
-> 
-> The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
-> 
->   ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git j/for-3.11-usba
-> 
-> for you to fetch changes up to 910026a08e2c2205953f2507cc11f4822998989b:
-> 
->   ARM: at91: sam9m10g45ek add udc DT support (2013-05-20 23:52:17 +0800)
-> 
-> ----------------------------------------------------------------
-> Jean-Christophe PLAGNIOL-VILLARD (7):
->       USB: gadget: atmel_usba: move global struct usba_ep usba_ep to struct usba_udc
->       USB: gadget: atmel_usba: allow multi instance
->       USB: gadget: atmel_usba: add DT support
->       ARM: at91: sam9x5 add udc DT support
->       ARM: at91: sam9x5ek add udc DT support
->       ARM: at91: sam9g45 add udc DT support
->       ARM: at91: sam9m10g45ek add udc DT support
-> 
->  Documentation/devicetree/bindings/usb/atmel-usb.txt |   82 ++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/at91sam9g45.dtsi                  |   62 +++++++++++++++++++++++
->  arch/arm/boot/dts/at91sam9m10g45ek.dts              |    5 ++
->  arch/arm/boot/dts/at91sam9x5.dtsi                   |   62 +++++++++++++++++++++++
->  arch/arm/boot/dts/at91sam9x5ek.dtsi                 |    5 ++
->  arch/arm/mach-at91/at91sam9g45.c                    |    2 +
->  arch/arm/mach-at91/at91sam9x5.c                     |    2 +
->  drivers/usb/gadget/Kconfig                          |    2 +-
->  drivers/usb/gadget/atmel_usba_udc.c                 |  264 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------
->  drivers/usb/gadget/atmel_usba_udc.h                 |    2 +
->  10 files changed, 407 insertions(+), 81 deletions(-)
-> 
-> Best Regards,
-> J.
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+-- 
+Catalin
