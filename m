@@ -1,148 +1,76 @@
 From: steve.capper@linaro.org (Steve Capper)
-Date: Thu, 23 May 2013 18:07:50 +0100
-Subject: [PATCH 03/11] mm: hugetlb: Copy general hugetlb code from x86 to mm.
+Date: Thu, 23 May 2013 18:07:53 +0100
+Subject: [PATCH 06/11] ARM64: mm: Restore memblock limit when map_mem finished.
 In-Reply-To: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
 References: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <1369328878-11706-4-git-send-email-steve.capper@linaro.org>
+Message-ID: <1369328878-11706-7-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The huge_pte_alloc, huge_pte_offset and follow_huge_p[mu]d
-functions in x86/mm/hugetlbpage.c do not rely on any architecture
-specific knowledge other than the fact that pmds and puds can be
-treated as huge ptes.
+In paging_init the memblock limit is set to restrict any addresses
+returned by early_alloc to fit within the initial direct kernel
+mapping in swapper_pg_dir. This allows map_mem to allocate puds,
+pmds and ptes from the initial direct kernel mapping.
 
-To allow other architectures to use this code (and reduce the need
-for code duplication), this patch copies these functions into mm,
-replaces the use of pud_large with pud_huge and provides a config
-flag to activate them:
-CONFIG_ARCH_WANT_GENERAL_HUGETLB
+The limit stays low after paging_init() though, meaning any
+bootmem allocations will be from a restricted subset of memory.
+Gigabyte huge pages, for instance, are normally allocated from
+bootmem as their order (18) is too large for the default buddy
+allocator (MAX_ORDER = 11).
 
-If CONFIG_ARCH_WANT_HUGE_PMD_SHARE is also active then the
-huge_pmd_share code will be called by huge_pte_alloc (othewise we
-call pmd_alloc and skip the sharing code).
+This patch restores the memblock limit when map_mem has finished,
+allowing gigabyte huge pages (and other objects) to be allocated
+from all of bootmem.
 
 Signed-off-by: Steve Capper <steve.capper@linaro.org>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- mm/hugetlb.c | 97 ++++++++++++++++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 88 insertions(+), 9 deletions(-)
+ arch/arm64/mm/mmu.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
 
-diff --git a/mm/hugetlb.c b/mm/hugetlb.c
-index b0bfb29..6321726 100644
---- a/mm/hugetlb.c
-+++ b/mm/hugetlb.c
-@@ -2931,15 +2931,6 @@ out_mutex:
- 	return ret;
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index eeecc9c..9fa027b 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -297,6 +297,16 @@ static void __init map_mem(void)
+ {
+ 	struct memblock_region *reg;
+ 
++	/*
++	 * Temporarily limit the memblock range. We need to do this as
++	 * create_mapping requires puds, pmds and ptes to be allocated from
++	 * memory addressable from the initial direct kernel mapping.
++	 *
++	 * The initial direct kernel mapping, located at swapper_pg_dir,
++	 * gives us PGDIR_SIZE memory starting from PHYS_OFFSET (aligned).
++	 */
++	memblock_set_current_limit((PHYS_OFFSET & PGDIR_MASK) + PGDIR_SIZE);
++
+ 	/* map all the memory banks */
+ 	for_each_memblock(memory, reg) {
+ 		phys_addr_t start = reg->base;
+@@ -307,6 +317,9 @@ static void __init map_mem(void)
+ 
+ 		create_mapping(start, __phys_to_virt(start), end - start);
+ 	}
++
++	/* Limit no longer required. */
++	memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
  }
  
--/* Can be overriden by architectures */
--__attribute__((weak)) struct page *
--follow_huge_pud(struct mm_struct *mm, unsigned long address,
--	       pud_t *pud, int write)
--{
--	BUG();
--	return NULL;
--}
+ /*
+@@ -317,12 +330,6 @@ void __init paging_init(void)
+ {
+ 	void *zero_page;
+ 
+-	/*
+-	 * Maximum PGDIR_SIZE addressable via the initial direct kernel
+-	 * mapping in swapper_pg_dir.
+-	 */
+-	memblock_set_current_limit((PHYS_OFFSET & PGDIR_MASK) + PGDIR_SIZE);
 -
- long follow_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vma,
- 			 struct page **pages, struct vm_area_struct **vmas,
- 			 unsigned long *position, unsigned long *nr_pages,
-@@ -3289,8 +3280,96 @@ int huge_pmd_unshare(struct mm_struct *mm, unsigned long *addr, pte_t *ptep)
- 	*addr = ALIGN(*addr, HPAGE_SIZE * PTRS_PER_PTE) - HPAGE_SIZE;
- 	return 1;
- }
-+#define want_pmd_share()	(1)
-+#else /* !CONFIG_ARCH_WANT_HUGE_PMD_SHARE */
-+pte_t *huge_pmd_share(struct mm_struct *mm, unsigned long addr, pud_t *pud)
-+{
-+	return NULL;
-+}
-+#define want_pmd_share()	(0)
- #endif /* CONFIG_ARCH_WANT_HUGE_PMD_SHARE */
+ 	init_mem_pgprot();
+ 	map_mem();
  
-+#ifdef CONFIG_ARCH_WANT_GENERAL_HUGETLB
-+pte_t *huge_pte_alloc(struct mm_struct *mm,
-+			unsigned long addr, unsigned long sz)
-+{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+	pte_t *pte = NULL;
-+
-+	pgd = pgd_offset(mm, addr);
-+	pud = pud_alloc(mm, pgd, addr);
-+	if (pud) {
-+		if (sz == PUD_SIZE) {
-+			pte = (pte_t *)pud;
-+		} else {
-+			BUG_ON(sz != PMD_SIZE);
-+			if (want_pmd_share() && pud_none(*pud))
-+				pte = huge_pmd_share(mm, addr, pud);
-+			else
-+				pte = (pte_t *)pmd_alloc(mm, pud, addr);
-+		}
-+	}
-+	BUG_ON(pte && !pte_none(*pte) && !pte_huge(*pte));
-+
-+	return pte;
-+}
-+
-+pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
-+{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmd = NULL;
-+
-+	pgd = pgd_offset(mm, addr);
-+	if (pgd_present(*pgd)) {
-+		pud = pud_offset(pgd, addr);
-+		if (pud_present(*pud)) {
-+			if (pud_huge(*pud))
-+				return (pte_t *)pud;
-+			pmd = pmd_offset(pud, addr);
-+		}
-+	}
-+	return (pte_t *) pmd;
-+}
-+
-+struct page *
-+follow_huge_pmd(struct mm_struct *mm, unsigned long address,
-+		pmd_t *pmd, int write)
-+{
-+	struct page *page;
-+
-+	page = pte_page(*(pte_t *)pmd);
-+	if (page)
-+		page += ((address & ~PMD_MASK) >> PAGE_SHIFT);
-+	return page;
-+}
-+
-+struct page *
-+follow_huge_pud(struct mm_struct *mm, unsigned long address,
-+		pud_t *pud, int write)
-+{
-+	struct page *page;
-+
-+	page = pte_page(*(pte_t *)pud);
-+	if (page)
-+		page += ((address & ~PUD_MASK) >> PAGE_SHIFT);
-+	return page;
-+}
-+
-+#else /* !CONFIG_ARCH_WANT_GENERAL_HUGETLB */
-+
-+/* Can be overriden by architectures */
-+__attribute__((weak)) struct page *
-+follow_huge_pud(struct mm_struct *mm, unsigned long address,
-+	       pud_t *pud, int write)
-+{
-+	BUG();
-+	return NULL;
-+}
-+
-+#endif /* CONFIG_ARCH_WANT_GENERAL_HUGETLB */
-+
- #ifdef CONFIG_MEMORY_FAILURE
- 
- /* Should be called in hugetlb_lock */
 -- 
 1.8.1.4
