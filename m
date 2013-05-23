@@ -1,46 +1,38 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 23 May 2013 20:53:48 +0200
-Subject: [PATCH v2 0/3] Marvell PCIe driver improvements
-In-Reply-To: <20130523182622.GT31290@titan.lakedaemon.net>
-References: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130523182622.GT31290@titan.lakedaemon.net>
-Message-ID: <20130523205348.54751fca@skate>
+Date: Thu, 23 May 2013 20:57:26 +0200
+Subject: [PATCH 0/4] Marvell PCIe driver improvements
+In-Reply-To: <20130523164654.GA31281@obsidianresearch.com>
+References: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130523001353.GH31625@1wt.eu>
+ <20130523164654.GA31281@obsidianresearch.com>
+Message-ID: <20130523205726.05ba45bf@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+Dear Jason Gunthorpe,
 
-On Thu, 23 May 2013 14:26:22 -0400, Jason Cooper wrote:
+On Thu, 23 May 2013 10:46:54 -0600, Jason Gunthorpe wrote:
 
-> >  drivers/pci/host/pci-mvebu.c |   55 +++++++++++++++++++++++++++++++++---------
-> >  1 file changed, 44 insertions(+), 11 deletions(-)
+> > FWIW, these patches applied on top of your pcie-v10 tree have made
+> > my mini-pcie dual-nic appear for the first time on the mirabox. Till
+> > now I never knew if it was a hardware or software issue since the NIC
+> > does not appear in u-boot nor lspci, whatever the kernel versions,
+> > including the original Marvell one's. The NIC has two functions (one
+> > per controller) and no bridge, so it may be a side effect of your
+> > improvements (or maybe you fixed a bug).
 > 
-> Whole series applied to mvebu/pcie_bridge with Bjorn's Ack.  The whole
-> pcie tree now looks like:
-> 
->         /-mvebu/of_pci  /-mvebu/pcie
->         |               |
-> +---+---+---+---+---+---+---+---+---+---+ mvebu/pcie_bridge
->                         |
->                         \---+---+---+---+ mvebu/pcie_kirkwood
-> (not to scale :) )
+> There was some talk earlier that some buggy chips required their
+> device number to be 0. I'm guessing Thomas's change to ensure that
+> always happens by moving the device number of the internal device is
+> the root fix here?
 
-Nice diagram, I like it :-)
+You're correct. Off-list, I've sent to Willy a patch that applies on
+top of those additional "bridge-related" fixes, but that reverts back
+the slot number of the real PCIe device to be 1 instead of 0. And in
+this case, the PCIe device that Willy is using is not detected.
 
-> This is getting pretty hairy, do you intend on anything else for mvebu
-> pcie for this merge window?
-
-No, nothing significant. There might be some minor additional fixes
-that you can just stack into the mvebu/pcie_bridge branch, but I don't
-have any such fixes sitting anywhere in my repo at this point.
-
-I now intend to work on the MSI support, but since it requires a quite
-significant work to properly expose the msi_chip from the IRQ
-controller driver, I don't really think it will be ready in time for
-3.11.
-
-Thanks a lot for the quick merges. I'm really eager to see this PCIe
-code that has been around for a long time finally merged.
+So indeed, there are some PCIe devices who really want to receive
+"configuration transactions" as slot 0.
 
 Best regards,
 
