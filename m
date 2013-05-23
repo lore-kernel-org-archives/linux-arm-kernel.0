@@ -1,51 +1,47 @@
-From: ulf.hansson@stericsson.com (Ulf Hansson)
-Date: Thu, 23 May 2013 15:13:48 +0200
-Subject: [PATCH 4/6] ARM: ux500: Enable support for discard for MMC/SD
-In-Reply-To: <1369314830-3727-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1369314830-3727-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <1369314830-3727-5-git-send-email-ulf.hansson@stericsson.com>
+From: valentin.longchamp@keymile.com (Valentin Longchamp)
+Date: Thu, 23 May 2013 15:17:52 +0200
+Subject: [PATCH] ARM: kirkwood: refactor dtsi to largest common nodes
+In-Reply-To: <20130523114025.GO31290@titan.lakedaemon.net>
+References: <1369301130-29900-1-git-send-email-valentin.longchamp@keymile.com>
+ <20130523114025.GO31290@titan.lakedaemon.net>
+Message-ID: <519E1700.5040906@keymile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+Jason,
 
-By enabling MMC_CAP_ERASE for the SD/MMC devices the mmc block
-layer will now act on DISCARD requests.
+On 05/23/2013 01:40 PM, Jason Cooper wrote:
+> Valentin,
+> 
+> On Thu, May 23, 2013 at 11:25:30AM +0200, Valentin Longchamp wrote:
+>> Some kirkwood variants (for instance present in the prestera SoCs) do
+>> not have all the peripherals whose nodes are initialized in the
+>> kirkwood.dtsi. These missing peripherals are SATA, SDIO, and RTC.
+> 
+> Could you provide a little more detail here about the exact problem this
+> is solving?
 
-Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
----
- arch/arm/mach-ux500/board-mop500-sdi.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Sure, I will add more detail.
 
-diff --git a/arch/arm/mach-ux500/board-mop500-sdi.c b/arch/arm/mach-ux500/board-mop500-sdi.c
-index 9bb3ca5..3c07f55 100644
---- a/arch/arm/mach-ux500/board-mop500-sdi.c
-+++ b/arch/arm/mach-ux500/board-mop500-sdi.c
-@@ -55,7 +55,8 @@ struct mmci_platform_data mop500_sdi0_data = {
- 	.f_max		= 100000000,
- 	.capabilities	= MMC_CAP_4_BIT_DATA |
- 				MMC_CAP_SD_HIGHSPEED |
--				MMC_CAP_MMC_HIGHSPEED,
-+				MMC_CAP_MMC_HIGHSPEED |
-+				MMC_CAP_ERASE,
- 	.gpio_wp	= -1,
- 	.sigdir		= MCI_ST_FBCLKEN |
- 				MCI_ST_CMDDIREN |
-@@ -146,6 +147,7 @@ struct mmci_platform_data mop500_sdi2_data = {
- 	.capabilities	= MMC_CAP_4_BIT_DATA |
- 				MMC_CAP_8_BIT_DATA |
- 				MMC_CAP_MMC_HIGHSPEED |
-+				MMC_CAP_ERASE |
- 				MMC_CAP_CMD23,
- 	.gpio_cd	= -1,
- 	.gpio_wp	= -1,
-@@ -185,6 +187,7 @@ struct mmci_platform_data mop500_sdi4_data = {
- 	.capabilities	= MMC_CAP_4_BIT_DATA |
- 				MMC_CAP_8_BIT_DATA |
- 				MMC_CAP_MMC_HIGHSPEED |
-+				MMC_CAP_ERASE |
- 				MMC_CAP_CMD23,
- 	.gpio_cd	= -1,
- 	.gpio_wp	= -1,
--- 
-1.7.10
+> 
+>> Their corresponding nodes are moved from kirkwood.dtsi to the
+>> kirkwood-628x.dtsi files so that they still are initialized for these
+>> variants.
+>>
+>> Signed-off-by: Valentin Longchamp <valentin.longchamp@keymile.com>
+>> ---
+>>  arch/arm/boot/dts/kirkwood-6281.dtsi | 24 ++++++++++++++++++++++++
+>>  arch/arm/boot/dts/kirkwood-6282.dtsi | 24 ++++++++++++++++++++++++
+>>  arch/arm/boot/dts/kirkwood.dtsi      | 24 ------------------------
+>>  3 files changed, 48 insertions(+), 24 deletions(-)
+> 
+> What about kirkwood-nsa310.dts?
+> 
+
+Argh, this one slipped through my net when I checked that all .dts except
+km_kirkwood somehow include 628[x].dtsi.
+
+I guess it would be OK to just include kirkwood-6281.dtsi in kirkwood-nsa310.dts
+as well. Does someone have access to the HW to actually test it ?
+
+Valentin
