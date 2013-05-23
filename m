@@ -1,50 +1,22 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Thu, 23 May 2013 16:41:44 +0530
-Subject: [RFC V6 PATCH 1/3] USB: OHCI: prepare to make ohci-hcd a library
- module
+Date: Thu, 23 May 2013 16:41:45 +0530
+Subject: [RFC PATCH 2/3] USB: OHCI: Generic changes to make ohci-pci a
+ separate driver
 In-Reply-To: <1369307506-4458-1-git-send-email-manjunath.goudar@linaro.org>
 References: <1365746856-7772-2-git-send-email-manjunath.goudar@linaro.org>
  <1369307506-4458-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1369307506-4458-2-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1369307506-4458-3-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch prepares ohci-hcd for being split up into a core
-library and separate platform driver modules.  A generic
-ohci_hc_driver structure is created, containing all the "standard"
-values, and a new mechanism is added whereby a driver module can
-specify a set of overrides to those values.  In addition the
-ohci_restart(),ohci_suspend() and ohci_resume() routines need
-to be EXPORTed for use by the drivers.
-
-Added ohci_setip(() and ohci_start() routine for to start the generic
-controller rather than each having its own idiosyncratic approach.
-This allow to clean duplicated code in most of SOC driver
-
-In V2:
- -ohci_hcd_init() ohci_run() and ohci_stop() are not made non-static.
- -Adds the ohci_setup() and ohci_start() routine.
-
-In V3:
- -purpose of ohci_setup() and ohci_start() function description written in the patch
-  description.
- -ohci_init() are not made non-static but now called beginning of the ohci_restart().
- -ohci_run() signature change reverted back.
- -unrelated changes removed.
- -duplicate comment line removed.
- -inline ohci_suspend() and ohci_resume() is not needed so removed from ohci.h file.
-
-In V4:
- -ohci-init() EXPORTed because it is called by all bus glue modules.
- -ohci-setup() removed from 1/2 added into 2/2 patch.
-
-In V5:
- -Again ohci_setup() is added and EXPORTed because to replace the ohci_init() from
-  all bus glues.
- -ohci_init() is not made non-static function.
-
-In V6:
-  -ohci_init() call is removed from ohci_quirk_nec_worker(), because it is already called in ohci_restart().
+Note that this changes is part of separating the ohci pci host controller
+driver from ohci-hcd host code.
+This contains :
+ -Moved sb800_prefetch() function from ohci-pci.c to pci-quirks.c file
+  and EXPORTed, this is part of the effort to move the ohci pci related
+  code to generic pci code.
+ -Passed "pci_dev" argument instead  of "ohci_hcd" in sb800_prefetch()
+  function to avoid extra include file in pci-quirks.c.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
 Cc: Arnd Bergmann <arnd@arndb.de>
@@ -52,230 +24,144 @@ Cc: Greg KH <greg@kroah.com>
 Cc: Alan Stern <stern@rowland.harvard.edu>
 Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/host/ohci-hcd.c |  103 +++++++++++++++++++++++++++++++++++++++----
- drivers/usb/host/ohci-hub.c |    1 -
- drivers/usb/host/ohci-pci.c |    7 ---
- drivers/usb/host/ohci.h     |   17 +++++++
- 4 files changed, 111 insertions(+), 17 deletions(-)
+ drivers/usb/host/ohci-hcd.c   |   11 +----------
+ drivers/usb/host/ohci-pci.c   |   13 -------------
+ drivers/usb/host/ohci-q.c     |    6 ++++--
+ drivers/usb/host/pci-quirks.c |   12 ++++++++++++
+ drivers/usb/host/pci-quirks.h |    2 ++
+ 5 files changed, 19 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index 9e6de95..13ebbb7 100644
+index 13ebbb7..2490b81 100644
 --- a/drivers/usb/host/ohci-hcd.c
 +++ b/drivers/usb/host/ohci-hcd.c
-@@ -79,13 +79,7 @@ static const char	hcd_name [] = "ohci_hcd";
- #include "pci-quirks.h"
+@@ -80,15 +80,6 @@ static const char	hcd_name [] = "ohci_hcd";
  
  static void ohci_dump (struct ohci_hcd *ohci, int verbose);
--static int ohci_init (struct ohci_hcd *ohci);
  static void ohci_stop (struct usb_hcd *hcd);
--
--#if defined(CONFIG_PM) || defined(CONFIG_PCI)
--static int ohci_restart (struct ohci_hcd *ohci);
+-#ifdef CONFIG_PCI
+-static void sb800_prefetch(struct ohci_hcd *ohci, int on);
+-#else
+-static inline void sb800_prefetch(struct ohci_hcd *ohci, int on)
+-{
+-	return;
+-}
 -#endif
 -
- #ifdef CONFIG_PCI
- static void sb800_prefetch(struct ohci_hcd *ohci, int on);
- #else
-@@ -768,6 +762,30 @@ retry:
- 	return 0;
- }
  
-+/* ohci_setup routine for generic controller initialization */
-+
-+int ohci_setup(struct usb_hcd *hcd)
-+{
-+	struct ohci_hcd		*ohci = hcd_to_ohci(hcd);
-+
-+	return ohci_init(ohci);
-+}
-+EXPORT_SYMBOL_GPL(ohci_setup);
-+
-+/* ohci_start routine for generic controller start of all OHCI bus glue */
-+static int ohci_start(struct usb_hcd *hcd)
-+{
-+	struct ohci_hcd		*ohci = hcd_to_ohci(hcd);
-+	int	ret;
-+
-+	ret = ohci_run(ohci);
-+	if (ret < 0) {
-+		ohci_err(ohci, "can't start\n");
-+		ohci_stop(hcd);
-+	}
-+	return ret;
-+}
-+
- /*-------------------------------------------------------------------------*/
- 
- /* an interrupt happens */
-@@ -949,12 +967,13 @@ static void ohci_stop (struct usb_hcd *hcd)
- #if defined(CONFIG_PM) || defined(CONFIG_PCI)
- 
- /* must not be called from interrupt context */
--static int ohci_restart (struct ohci_hcd *ohci)
-+int ohci_restart(struct ohci_hcd *ohci)
- {
- 	int temp;
- 	int i;
- 	struct urb_priv *priv;
- 
-+	ohci_init(ohci);
- 	spin_lock_irq(&ohci->lock);
- 	ohci->rh_state = OHCI_RH_HALTED;
- 
-@@ -1008,12 +1027,13 @@ static int ohci_restart (struct ohci_hcd *ohci)
- 	ohci_dbg(ohci, "restart complete\n");
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(ohci_restart);
- 
+ #include "ohci-hub.c"
+ #include "ohci-dbg.c"
+@@ -1275,7 +1266,7 @@ MODULE_LICENSE ("GPL");
+ #define PLATFORM_DRIVER		ohci_platform_driver
  #endif
  
- #ifdef CONFIG_PM
- 
--static int __maybe_unused ohci_suspend(struct usb_hcd *hcd, bool do_wakeup)
-+int ohci_suspend(struct usb_hcd *hcd, bool do_wakeup)
- {
- 	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
- 	unsigned long	flags;
-@@ -1031,9 +1051,10 @@ static int __maybe_unused ohci_suspend(struct usb_hcd *hcd, bool do_wakeup)
- 
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(ohci_suspend);
- 
- 
--static int __maybe_unused ohci_resume(struct usb_hcd *hcd, bool hibernated)
-+int ohci_resume(struct usb_hcd *hcd, bool hibernated)
- {
- 	struct ohci_hcd		*ohci = hcd_to_ohci(hcd);
- 	int			port;
-@@ -1081,8 +1102,72 @@ static int __maybe_unused ohci_resume(struct usb_hcd *hcd, bool hibernated)
- 
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(ohci_resume);
-+
-+#endif
-+
-+/*-------------------------------------------------------------------------*/
-+
-+/*
-+ * Generic structure: This gets copied for platform drivers so that
-+ * individual entries can be overridden as needed.
-+ */
- 
-+static const struct hc_driver ohci_hc_driver = {
-+	.description =          hcd_name,
-+	.product_desc =         "OHCI Host Controller",
-+	.hcd_priv_size =        sizeof(struct ohci_hcd),
-+
-+	/*
-+	 * generic hardware linkage
-+	*/
-+	.irq =                  ohci_irq,
-+	.flags =                HCD_MEMORY | HCD_USB11,
-+
-+	/*
-+	* basic lifecycle operations
-+	*/
-+	.reset =                ohci_setup,
-+	.start =                ohci_start,
-+	.stop =                 ohci_stop,
-+	.shutdown =             ohci_shutdown,
-+
-+	/*
-+	 * managing i/o requests and associated device resources
-+	*/
-+	.urb_enqueue =          ohci_urb_enqueue,
-+	.urb_dequeue =          ohci_urb_dequeue,
-+	.endpoint_disable =     ohci_endpoint_disable,
-+
-+	/*
-+	* scheduling support
-+	*/
-+	.get_frame_number =     ohci_get_frame,
-+
-+	/*
-+	* root hub support
-+	*/
-+	.hub_status_data =      ohci_hub_status_data,
-+	.hub_control =          ohci_hub_control,
-+#ifdef CONFIG_PM
-+	.bus_suspend =          ohci_bus_suspend,
-+	.bus_resume =           ohci_bus_resume,
- #endif
-+	.start_port_reset =	ohci_start_port_reset,
-+};
-+
-+void ohci_init_driver(struct hc_driver *drv,
-+		const struct ohci_driver_overrides *over)
-+{
-+	/* Copy the generic table to drv and then apply the overrides */
-+	*drv = ohci_hc_driver;
-+
-+	drv->product_desc = over->product_desc;
-+	drv->hcd_priv_size += over->extra_priv_size;
-+	if (over->reset)
-+		drv->reset = over->reset;
-+}
-+EXPORT_SYMBOL_GPL(ohci_init_driver);
- 
- /*-------------------------------------------------------------------------*/
- 
-diff --git a/drivers/usb/host/ohci-hub.c b/drivers/usb/host/ohci-hub.c
-index 60ff422..2347ab8 100644
---- a/drivers/usb/host/ohci-hub.c
-+++ b/drivers/usb/host/ohci-hub.c
-@@ -176,7 +176,6 @@ __acquires(ohci->lock)
- 	if (status == -EBUSY) {
- 		if (!autostopped) {
- 			spin_unlock_irq (&ohci->lock);
--			(void) ohci_init (ohci);
- 			status = ohci_restart (ohci);
- 
- 			usb_root_hub_lost_power(hcd->self.root_hub);
+-#if	!defined(PCI_DRIVER) &&		\
++#if	!defined(PCI_DRIVER) && \
+ 	!defined(PLATFORM_DRIVER) &&	\
+ 	!defined(OMAP1_PLATFORM_DRIVER) &&	\
+ 	!defined(OMAP3_PLATFORM_DRIVER) &&	\
 diff --git a/drivers/usb/host/ohci-pci.c b/drivers/usb/host/ohci-pci.c
-index 951514e..2c27a5f 100644
+index 2c27a5f..c3fa936 100644
 --- a/drivers/usb/host/ohci-pci.c
 +++ b/drivers/usb/host/ohci-pci.c
-@@ -123,13 +123,6 @@ static void ohci_quirk_nec_worker(struct work_struct *work)
- 	struct ohci_hcd *ohci = container_of(work, struct ohci_hcd, nec_work);
- 	int status;
+@@ -168,19 +168,6 @@ static int ohci_quirk_amd700(struct usb_hcd *hcd)
+ 	return 0;
+ }
  
--	status = ohci_init(ohci);
--	if (status != 0) {
--		ohci_err(ohci, "Restarting NEC controller failed in %s, %d\n",
--			 "ohci_init", status);
--		return;
--	}
+-static void sb800_prefetch(struct ohci_hcd *ohci, int on)
+-{
+-	struct pci_dev *pdev;
+-	u16 misc;
 -
- 	status = ohci_restart(ohci);
- 	if (status != 0)
- 		ohci_err(ohci, "Restarting NEC controller failed in %s, %d\n",
-diff --git a/drivers/usb/host/ohci.h b/drivers/usb/host/ohci.h
-index d329914..3b58482 100644
---- a/drivers/usb/host/ohci.h
-+++ b/drivers/usb/host/ohci.h
-@@ -718,3 +718,20 @@ static inline u32 roothub_status (struct ohci_hcd *hc)
- 	{ return ohci_readl (hc, &hc->regs->roothub.status); }
- static inline u32 roothub_portstatus (struct ohci_hcd *hc, int i)
- 	{ return read_roothub (hc, portstatus [i], 0xffe0fce0); }
+-	pdev = to_pci_dev(ohci_to_hcd(ohci)->self.controller);
+-	pci_read_config_word(pdev, 0x50, &misc);
+-	if (on == 0)
+-		pci_write_config_word(pdev, 0x50, misc & 0xfcff);
+-	else
+-		pci_write_config_word(pdev, 0x50, misc | 0x0300);
+-}
+-
+ /* List of quirks for OHCI */
+ static const struct pci_device_id ohci_pci_quirks[] = {
+ 	{
+diff --git a/drivers/usb/host/ohci-q.c b/drivers/usb/host/ohci-q.c
+index 88731b7..78e0095 100644
+--- a/drivers/usb/host/ohci-q.c
++++ b/drivers/usb/host/ohci-q.c
+@@ -41,6 +41,7 @@ finish_urb(struct ohci_hcd *ohci, struct urb *urb, int status)
+ __releases(ohci->lock)
+ __acquires(ohci->lock)
+ {
++	struct pci_dev *pdev = to_pci_dev(ohci_to_hcd(ohci)->self.controller);
+ 	// ASSERT (urb->hcpriv != 0);
+ 
+ 	urb_free_priv (ohci, urb->hcpriv);
+@@ -55,7 +56,7 @@ __acquires(ohci->lock)
+ 			if (quirk_amdiso(ohci))
+ 				usb_amd_quirk_pll_enable();
+ 			if (quirk_amdprefetch(ohci))
+-				sb800_prefetch(ohci, 0);
++				sb800_prefetch(pdev, 0);
+ 		}
+ 		break;
+ 	case PIPE_INTERRUPT:
+@@ -580,6 +581,7 @@ static void td_submit_urb (
+ 	struct urb	*urb
+ ) {
+ 	struct urb_priv	*urb_priv = urb->hcpriv;
++	struct pci_dev *pdev = to_pci_dev(ohci_to_hcd(ohci)->self.controller);
+ 	dma_addr_t	data;
+ 	int		data_len = urb->transfer_buffer_length;
+ 	int		cnt = 0;
+@@ -689,7 +691,7 @@ static void td_submit_urb (
+ 			if (quirk_amdiso(ohci))
+ 				usb_amd_quirk_pll_disable();
+ 			if (quirk_amdprefetch(ohci))
+-				sb800_prefetch(ohci, 1);
++				sb800_prefetch(pdev, 1);
+ 		}
+ 		periodic = ohci_to_hcd(ohci)->self.bandwidth_isoc_reqs++ == 0
+ 			&& ohci_to_hcd(ohci)->self.bandwidth_int_reqs == 0;
+diff --git a/drivers/usb/host/pci-quirks.c b/drivers/usb/host/pci-quirks.c
+index 4c338ec..5f01540 100644
+--- a/drivers/usb/host/pci-quirks.c
++++ b/drivers/usb/host/pci-quirks.c
+@@ -91,6 +91,18 @@ static struct amd_chipset_info {
+ 
+ static DEFINE_SPINLOCK(amd_lock);
+ 
++void sb800_prefetch(struct pci_dev *pdev, int on)
++{
++	u16 misc;
 +
-+/* Declarations of things exported for use by ohci platform drivers */
++	pci_read_config_word(pdev, 0x50, &misc);
++	if (on == 0)
++		pci_write_config_word(pdev, 0x50, misc & 0xfcff);
++	else
++		pci_write_config_word(pdev, 0x50, misc | 0x0300);
++}
++EXPORT_SYMBOL_GPL(sb800_prefetch);
 +
-+struct ohci_driver_overrides {
-+	const char	*product_desc;
-+	size_t		extra_priv_size;
-+	int		(*reset)(struct usb_hcd *hcd);
-+};
-+
-+extern void	ohci_init_driver(struct hc_driver *drv,
-+				const struct ohci_driver_overrides *over);
-+extern int	ohci_restart(struct ohci_hcd *ohci);
-+extern int	ohci_setup(struct usb_hcd *hcd);
-+#ifdef CONFIG_PM
-+extern int	ohci_suspend(struct usb_hcd *hcd, bool do_wakeup);
-+extern int	ohci_resume(struct usb_hcd *hcd, bool hibernated);
-+#endif
+ int usb_amd_find_chipset_info(void)
+ {
+ 	u8 rev = 0;
+diff --git a/drivers/usb/host/pci-quirks.h b/drivers/usb/host/pci-quirks.h
+index 7f69a39..7c5fbc1 100644
+--- a/drivers/usb/host/pci-quirks.h
++++ b/drivers/usb/host/pci-quirks.h
+@@ -11,11 +11,13 @@ void usb_amd_quirk_pll_enable(void);
+ bool usb_is_intel_switchable_xhci(struct pci_dev *pdev);
+ void usb_enable_xhci_ports(struct pci_dev *xhci_pdev);
+ void usb_disable_xhci_ports(struct pci_dev *xhci_pdev);
++void sb800_prefetch(struct pci_dev *pdev, int on);
+ #else
+ static inline void usb_amd_quirk_pll_disable(void) {}
+ static inline void usb_amd_quirk_pll_enable(void) {}
+ static inline void usb_amd_dev_put(void) {}
+ static inline void usb_disable_xhci_ports(struct pci_dev *xhci_pdev) {}
++static inline void sb800_prefetch(struct pci_dev *pdev, int on) {}
+ #endif  /* CONFIG_PCI */
+ 
+ #endif  /*  __LINUX_USB_PCI_QUIRKS_H  */
 -- 
 1.7.9.5
