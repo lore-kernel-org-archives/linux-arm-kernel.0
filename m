@@ -1,14 +1,14 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 23 May 2013 10:39:14 +0900
-Subject: [PATCH v4 2/7] clocksource: sh_cmt: Add OF support
-In-Reply-To: <1365679443-25456-2-git-send-email-hechtb+renesas@gmail.com>
+Date: Thu, 23 May 2013 10:39:18 +0900
+Subject: [PATCH v4 3/7] clocksource: sh_tmu: Add OF support
+In-Reply-To: <1365679443-25456-3-git-send-email-hechtb+renesas@gmail.com>
 References: <1365679443-25456-1-git-send-email-hechtb+renesas@gmail.com>
- <1365679443-25456-2-git-send-email-hechtb+renesas@gmail.com>
-Message-ID: <20130523013914.GD22608@verge.net.au>
+ <1365679443-25456-3-git-send-email-hechtb+renesas@gmail.com>
+Message-ID: <20130523013918.GE22608@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 11, 2013 at 01:23:58PM +0200, Bastian Hecht wrote:
+On Thu, Apr 11, 2013 at 01:23:59PM +0200, Bastian Hecht wrote:
 > We add the capabilty to probe SH CMT timer devices using Device Tree
 > setup.
 > 
@@ -21,61 +21,67 @@ for v3.11.
 > ---
 > v4:
 > Moved the assignments of p->channel_offset and p->timer_bit so that
-> they are ready as soon as setup_irq() is called
+> they are ready as soon as setup_irq() is called.
 > 
->  drivers/clocksource/sh_cmt.c |  108 +++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 95 insertions(+), 13 deletions(-)
+>  drivers/clocksource/sh_tmu.c |   96 +++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 85 insertions(+), 11 deletions(-)
 > 
-> diff --git a/drivers/clocksource/sh_cmt.c b/drivers/clocksource/sh_cmt.c
-> index 08d0c41..66a12e9 100644
-> --- a/drivers/clocksource/sh_cmt.c
-> +++ b/drivers/clocksource/sh_cmt.c
+> diff --git a/drivers/clocksource/sh_tmu.c b/drivers/clocksource/sh_tmu.c
+> index 78b8dae..17bb607 100644
+> --- a/drivers/clocksource/sh_tmu.c
+> +++ b/drivers/clocksource/sh_tmu.c
 > @@ -34,10 +34,13 @@
 >  #include <linux/module.h>
 >  #include <linux/pm_domain.h>
 >  #include <linux/pm_runtime.h>
 > +#include <linux/of.h>
 >  
->  struct sh_cmt_priv {
+>  struct sh_tmu_priv {
 >  	void __iomem *mapbase;
 >  	struct clk *clk;
 > +	long channel_offset;
 > +	int timer_bit;
->  	unsigned long width; /* 16 or 32 bit version of hardware block */
->  	unsigned long overflow_bit;
->  	unsigned long clear_bits;
-> @@ -109,9 +112,7 @@ static void sh_cmt_write32(void __iomem *base, unsigned long offs,
+>  	struct irqaction irqaction;
+>  	struct platform_device *pdev;
+>  	unsigned long rate;
+> @@ -57,12 +60,11 @@ static DEFINE_RAW_SPINLOCK(sh_tmu_lock);
 >  
->  static inline unsigned long sh_cmt_read_cmstr(struct sh_cmt_priv *p)
+>  static inline unsigned long sh_tmu_read(struct sh_tmu_priv *p, int reg_nr)
 >  {
 > -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
-> -
-> -	return p->read_control(p->mapbase - cfg->channel_offset, 0);
-> +	return p->read_control(p->mapbase - p->channel_offset, 0);
->  }
+>  	void __iomem *base = p->mapbase;
+>  	unsigned long offs;
 >  
->  static inline unsigned long sh_cmt_read_cmcsr(struct sh_cmt_priv *p)
-> @@ -127,9 +128,7 @@ static inline unsigned long sh_cmt_read_cmcnt(struct sh_cmt_priv *p)
->  static inline void sh_cmt_write_cmstr(struct sh_cmt_priv *p,
->  				      unsigned long value)
+>  	if (reg_nr == TSTR)
+> -		return ioread8(base - cfg->channel_offset);
+> +		return ioread8(base - p->channel_offset);
+>  
+>  	offs = reg_nr << 2;
+>  
+> @@ -75,12 +77,11 @@ static inline unsigned long sh_tmu_read(struct sh_tmu_priv *p, int reg_nr)
+>  static inline void sh_tmu_write(struct sh_tmu_priv *p, int reg_nr,
+>  				unsigned long value)
 >  {
 > -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
-> -
-> -	p->write_control(p->mapbase - cfg->channel_offset, 0, value);
-> +	p->write_control(p->mapbase - p->channel_offset, 0, value);
->  }
+>  	void __iomem *base = p->mapbase;
+>  	unsigned long offs;
 >  
->  static inline void sh_cmt_write_cmcsr(struct sh_cmt_priv *p,
-> @@ -176,7 +175,6 @@ static DEFINE_RAW_SPINLOCK(sh_cmt_lock);
+>  	if (reg_nr == TSTR) {
+> -		iowrite8(value, base - cfg->channel_offset);
+> +		iowrite8(value, base - p->channel_offset);
+>  		return;
+>  	}
 >  
->  static void sh_cmt_start_stop_ch(struct sh_cmt_priv *p, int start)
+> @@ -94,7 +95,6 @@ static inline void sh_tmu_write(struct sh_tmu_priv *p, int reg_nr,
+>  
+>  static void sh_tmu_start_stop_ch(struct sh_tmu_priv *p, int start)
 >  {
 > -	struct sh_timer_config *cfg = p->pdev->dev.platform_data;
 >  	unsigned long flags, value;
 >  
 >  	/* start stop register shared by multiple timer channels */
-> @@ -184,9 +182,9 @@ static void sh_cmt_start_stop_ch(struct sh_cmt_priv *p, int start)
->  	value = sh_cmt_read_cmstr(p);
+> @@ -102,9 +102,9 @@ static void sh_tmu_start_stop_ch(struct sh_tmu_priv *p, int start)
+>  	value = sh_tmu_read(p, TSTR);
 >  
 >  	if (start)
 > -		value |= 1 << cfg->timer_bit;
@@ -84,27 +90,27 @@ for v3.11.
 > -		value &= ~(1 << cfg->timer_bit);
 > +		value &= ~(1 << p->timer_bit);
 >  
->  	sh_cmt_write_cmstr(p, value);
->  	raw_spin_unlock_irqrestore(&sh_cmt_lock, flags);
-> @@ -673,15 +671,93 @@ static int sh_cmt_register(struct sh_cmt_priv *p, char *name,
+>  	sh_tmu_write(p, TSTR, value);
+>  	raw_spin_unlock_irqrestore(&sh_tmu_lock, flags);
+> @@ -421,15 +421,83 @@ static int sh_tmu_register(struct sh_tmu_priv *p, char *name,
 >  	return 0;
 >  }
 >  
-> -static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev)
-> +static const struct of_device_id of_sh_cmt_match[] = {
-> +	{ .compatible = "renesas,cmt-timer" },
+> -static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
+> +static const struct of_device_id of_sh_tmu_match[] = {
+> +	{ .compatible = "renesas,tmu-timer" },
 > +	{},
 > +};
-> +MODULE_DEVICE_TABLE(of, of_sh_cmt_match);
+> +MODULE_DEVICE_TABLE(of, of_sh_tmu_match);
 > +
-> +static const int sh_cmt_offset_multiplier[] = { 0x60, 0x10, 0x40, 0x40, 0x40 };
-> +#define CMT_MAX_CHANNELS	6
+> +#define TMU_OFFSET_MULTIPLIER	0xc
+> +#define TMU_MAX_CHANNELS	3
 > +
-> +static struct sh_timer_config *sh_cmt_parse_dt(struct device *dev)
+> +static struct sh_timer_config *sh_tmu_parse_dt(struct device *dev)
 > +{
 > +	struct sh_timer_config *cfg;
 > +	struct device_node *np = dev->of_node;
-> +	u32 timer_id, channel_id, rating;
+> +	u32 channel_id, rating;
 > +
 > +	if (!IS_ENABLED(CONFIG_OF) || !np)
 > +		return NULL;
@@ -115,26 +121,16 @@ for v3.11.
 > +		return NULL;
 > +	}
 > +
-> +	if (of_property_read_u32(np, "renesas,device-id", &timer_id)) {
-> +		dev_err(dev, "device id missing\n");
-> +		return NULL;
-> +	}
-> +	if (timer_id >= ARRAY_SIZE(sh_cmt_offset_multiplier)) {
-> +		dev_err(dev, "invalid device id\n");
-> +		return NULL;
-> +	}
-> +
 > +	if (of_property_read_u32(np, "renesas,channel-id", &channel_id)) {
 > +		dev_err(dev, "channel id missing\n");
 > +		return NULL;
 > +	}
-> +	if (channel_id >= CMT_MAX_CHANNELS) {
+> +	if (channel_id >= TMU_MAX_CHANNELS) {
 > +		dev_err(dev, "invalid channel id\n");
 > +		return NULL;
 > +	}
 > +
-> +	cfg->channel_offset = sh_cmt_offset_multiplier[timer_id] *
-> +							(channel_id + 1);
+> +	cfg->channel_offset = channel_id * TMU_OFFSET_MULTIPLIER + 4;
 > +	cfg->timer_bit = channel_id;
 > +
 > +	/*
@@ -167,7 +163,7 @@ for v3.11.
 > +	return cfg;
 > +}
 > +
-> +static int sh_cmt_setup(struct sh_cmt_priv *p, struct platform_device *pdev,
+> +static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev,
 > +						struct sh_timer_config *cfg)
 >  {
 > -	struct sh_timer_config *cfg = pdev->dev.platform_data;
@@ -182,41 +178,41 @@ for v3.11.
 >  
 >  	if (!cfg) {
 >  		dev_err(&p->pdev->dev, "missing platform data\n");
-> @@ -777,7 +853,7 @@ err0:
->  static int sh_cmt_probe(struct platform_device *pdev)
+> @@ -487,7 +555,7 @@ static int sh_tmu_setup(struct sh_tmu_priv *p, struct platform_device *pdev)
+>  static int sh_tmu_probe(struct platform_device *pdev)
 >  {
->  	struct sh_cmt_priv *p = platform_get_drvdata(pdev);
+>  	struct sh_tmu_priv *p = platform_get_drvdata(pdev);
 > -	struct sh_timer_config *cfg = pdev->dev.platform_data;
 > +	struct sh_timer_config *cfg;
 >  	int ret;
 >  
 >  	if (!is_early_platform_device(pdev)) {
-> @@ -785,6 +861,11 @@ static int sh_cmt_probe(struct platform_device *pdev)
+> @@ -495,6 +563,11 @@ static int sh_tmu_probe(struct platform_device *pdev)
 >  		pm_runtime_enable(&pdev->dev);
 >  	}
 >  
 > +	if (pdev->dev.of_node)
-> +		cfg = sh_cmt_parse_dt(&pdev->dev);
+> +		cfg = sh_tmu_parse_dt(&pdev->dev);
 > +	else
 > +		cfg = pdev->dev.platform_data;
 > +
 >  	if (p) {
 >  		dev_info(&pdev->dev, "kept as earlytimer\n");
 >  		goto out;
-> @@ -796,7 +877,7 @@ static int sh_cmt_probe(struct platform_device *pdev)
+> @@ -506,7 +579,7 @@ static int sh_tmu_probe(struct platform_device *pdev)
 >  		return -ENOMEM;
 >  	}
 >  
-> -	ret = sh_cmt_setup(p, pdev);
-> +	ret = sh_cmt_setup(p, pdev, cfg);
+> -	ret = sh_tmu_setup(p, pdev);
+> +	ret = sh_tmu_setup(p, pdev, cfg);
 >  	if (ret) {
 >  		kfree(p);
->  		pm_runtime_idle(&pdev->dev);
-> @@ -824,6 +905,7 @@ static struct platform_driver sh_cmt_device_driver = {
->  	.remove		= sh_cmt_remove,
+>  		platform_set_drvdata(pdev, NULL);
+> @@ -535,6 +608,7 @@ static struct platform_driver sh_tmu_device_driver = {
+>  	.remove		= sh_tmu_remove,
 >  	.driver		= {
->  		.name	= "sh_cmt",
-> +		.of_match_table = of_match_ptr(of_sh_cmt_match),
+>  		.name	= "sh_tmu",
+> +		.of_match_table = of_sh_tmu_match,
 >  	}
 >  };
 >  
