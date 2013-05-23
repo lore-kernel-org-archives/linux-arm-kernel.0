@@ -1,1051 +1,209 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu, 23 May 2013 17:48:54 +0200
-Subject: [PATCH v2 2/3] ARM: at91: move at91 aic driver to drivers/irqchip
-In-Reply-To: <1369324135-31211-1-git-send-email-b.brezillon@overkiz.com>
-References: <1369324135-31211-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1369324135-31211-3-git-send-email-b.brezillon@overkiz.com>
+From: hector.palacios@digi.com (Hector Palacios)
+Date: Thu, 23 May 2013 17:56:48 +0200
+Subject: mxsfb: DATA_FORMAT_24_BIT flag outputs invalid colours
+In-Reply-To: <201305231531.31376.jbe@pengutronix.de>
+References: <519E03B0.1080006@digi.com> <20130523130039.GF8595@lukather>
+ <201305231531.31376.jbe@pengutronix.de>
+Message-ID: <519E3C40.4020405@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move arch/arm/mach-at91/irq.c to drivers/irqchip/irq-at91.c.
-Move arch/arm/mach-at91/at91_aic.h to include/linux/irqchip/at91.h to
-avoid reference to machine specific hearder files.
-Remove __ASSEMBLY__ section in header file (at91_aic_base is only used
-in .c files).
+Hi Juergen,
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/mach-at91/Makefile                        |    2 +-
- arch/arm/mach-at91/at91rm9200.c                    |    2 +-
- arch/arm/mach-at91/at91sam9260.c                   |    2 +-
- arch/arm/mach-at91/at91sam9261.c                   |    2 +-
- arch/arm/mach-at91/at91sam9263.c                   |    2 +-
- arch/arm/mach-at91/at91sam9g45.c                   |    2 +-
- arch/arm/mach-at91/at91sam9rl.c                    |    2 +-
- arch/arm/mach-at91/at91x40.c                       |    2 +-
- arch/arm/mach-at91/board-1arm.c                    |    2 +-
- arch/arm/mach-at91/board-afeb-9260v1.c             |    2 +-
- arch/arm/mach-at91/board-cam60.c                   |    2 +-
- arch/arm/mach-at91/board-carmeva.c                 |    2 +-
- arch/arm/mach-at91/board-cpu9krea.c                |    2 +-
- arch/arm/mach-at91/board-cpuat91.c                 |    2 +-
- arch/arm/mach-at91/board-csb337.c                  |    2 +-
- arch/arm/mach-at91/board-csb637.c                  |    2 +-
- arch/arm/mach-at91/board-dt-rm9200.c               |    2 +-
- arch/arm/mach-at91/board-dt-sam9.c                 |    2 +-
- arch/arm/mach-at91/board-dt-sama5.c                |    2 +-
- arch/arm/mach-at91/board-eb01.c                    |    2 +-
- arch/arm/mach-at91/board-eb9200.c                  |    2 +-
- arch/arm/mach-at91/board-ecbat91.c                 |    2 +-
- arch/arm/mach-at91/board-eco920.c                  |    2 +-
- arch/arm/mach-at91/board-flexibity.c               |    2 +-
- arch/arm/mach-at91/board-foxg20.c                  |    2 +-
- arch/arm/mach-at91/board-gsia18s.c                 |    2 +-
- arch/arm/mach-at91/board-kafa.c                    |    2 +-
- arch/arm/mach-at91/board-kb9202.c                  |    2 +-
- arch/arm/mach-at91/board-pcontrol-g20.c            |    2 +-
- arch/arm/mach-at91/board-picotux200.c              |    2 +-
- arch/arm/mach-at91/board-qil-a9260.c               |    2 +-
- arch/arm/mach-at91/board-rm9200dk.c                |    2 +-
- arch/arm/mach-at91/board-rm9200ek.c                |    2 +-
- arch/arm/mach-at91/board-rsi-ews.c                 |    2 +-
- arch/arm/mach-at91/board-sam9-l9260.c              |    2 +-
- arch/arm/mach-at91/board-sam9260ek.c               |    2 +-
- arch/arm/mach-at91/board-sam9261ek.c               |    2 +-
- arch/arm/mach-at91/board-sam9263ek.c               |    2 +-
- arch/arm/mach-at91/board-sam9g20ek.c               |    2 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c            |    2 +-
- arch/arm/mach-at91/board-sam9rlek.c                |    2 +-
- arch/arm/mach-at91/board-snapper9260.c             |    2 +-
- arch/arm/mach-at91/board-stamp9g20.c               |    2 +-
- arch/arm/mach-at91/board-usb-a926x.c               |    2 +-
- arch/arm/mach-at91/board-yl-9200.c                 |    2 +-
- arch/arm/mach-at91/pm.c                            |    2 +-
- drivers/irqchip/Makefile                           |    1 +
- .../mach-at91/irq.c => drivers/irqchip/irq-at91.c  |    4 ++--
- .../at91_aic.h => include/linux/irqchip/at91.h     |    6 +-----
- 49 files changed, 50 insertions(+), 53 deletions(-)
+On 05/23/2013 03:31 PM, Juergen Beisert wrote:
+> Hi Maxime,
+>
+> maxime.ripard at free-electrons.com wrote:
+>> On Thu, May 23, 2013 at 01:55:28PM +0200, Hector Palacios wrote:
+>>> I'm using an i.MX28 based board with lcd connected with 18bits data bus.
+>>> My platform uses 32 bits per pixel:
+>>>
+>>> 	mxsfb_pdata.default_bpp = 32;
+>>> 	mxsfb_pdata.ld_intf_width = STMLCDIF_18BIT;
+>>>
+>>> With these settings the mxsfb.c driver sets flag DATA_FORMAT_24_BIT
+>>> at HW_LCDIF_CTRL register in function mxsfb_set_par():
+>>>
+>>> 	case 32:
+>>> 		dev_dbg(&host->pdev->dev, "Setting up RGB888/666 mode\n");
+>>> 		ctrl |= CTRL_SET_WORD_LENGTH(3);
+>>> 		switch (host->ld_intf_width) {
+>>> 		case STMLCDIF_8BIT:
+>>> 			dev_dbg(&host->pdev->dev,
+>>> 					"Unsupported LCD bus width mapping\n");
+>>> 			return -EINVAL;
+>>> 		case STMLCDIF_16BIT:
+>>> 		case STMLCDIF_18BIT:
+>>> 			/* 24 bit to 18 bit mapping */
+>>> 			ctrl |= CTRL_DF24; /* ignore the upper 2 bits in
+>>> 					    *  each colour component
+>>> 					    */
+>>> 			break;
+>>> 		case STMLCDIF_24BIT:
+>>> 			/* real 24 bit */
+>>> 			break;
+>>> 		}
+>>>
+>>> According to the manual, this flag does:
+>>> 	0x0: ALL_24_BITS_VALID: Data input to the block is in 24 bpp
+>>> format, such that all RGB 888 data is contained in 24 bits.
+>>> 	0x1: DROP_UPPER_2_BITS_PER_BYTE ? Data input to the block is
+>>> actually RGB 18 bpp, but there is 1 colour per byte, hence the upper
+>>> 2 bits in each byte do not contain any useful data, and should be
+>>> dropped.
+>>>
+>>> The setting of this flag is producing bad colours with true colour
+>>> images (i.e. the Linux penguin is displayed ok, but QT applications
+>>> or images displayed with fbv are not).
+>>> I believe the setting of this flag is not correct (after all, if my
+>>> bpp is 32, then all 24bit colours are useful and dropping the upper
+>>> 2 bits is a bad idea).
+>>> If I don't set it, then true colour images are displayed correctly.
+>>> The only problem is that the Linux penguin is displayed much darker
+>>> than usual (correct colours, but darker). Perhaps the 224 colour
+>>> format of this image justifies it?
+>>>
+>>> I noticed the cfa10049 platform also uses the same configuration (18
+>>> bits data bus and 32bpp) and was wondering if true colour images are
+>>> correctly displayed in this platform with this flag set (for example
+>>> with fbv application [1]).
+>>
+>> I had the exact same problem, and suggested the exact same solution a
+>> few weeks back.
+>>
+>> https://patchwork.kernel.org/patch/2470441/
+>>
+>> The conclusion of that discussion what that the userspace applications
+>> were not honouring the bitfield correctly set by the mxsfb driver, and
+>> as such, it was not a bug in the driver.
+>>
+>> While this is correct, I wonder, now that since we had that same problem
+>> in a very short amount of time, if we couldn't set this behaviour
+>> dependant of some (dt? kernel argument?) property so that one could
+>> customise it anyway he want.
+>>
+>> Maxime
+>
+> i.MX2[3|8]    LCD1       LCD2       LCD3
+>                24bit      18bit      18bit
+> --------------------------------------------
+> LCD_D0         B0         B0         --
+> LCD_D1         B1         B1         --
+> LCD_D2         B2         B2         B0
+> LCD_D3         B3         B3         B1
+> LCD_D4         B4         B4         B2
+> LCD_D5         B5         B5         B3
+> LCD_D6         B6         G0         B4
+> LCD_D7         B7         G1         B5
+>
+> LCD_D8         G0         G2         --
+> LCD_D9         G1         G3         --
+> LCD_D10        G2         G4         G0
+> LCD_D11        G3         G5         G1
+> LCD_D12        G4         R0         G2
+> LCD_D13        G5         R1         G3
+> LCD_D14        G6         R2         G4
+> LCD_D15        G7         R3         G5
+>
+> LCD_D16        R0         R4         --
+> LCD_D17        R1         R5         --
+> LCD_D18        R2                    R0
+> LCD_D19        R3                    R1
+> LCD_D20        R4                    R2
+> LCD_D21        R5                    R3
+> LCD_D22        R6                    R4
+> LCD_D23        R7                    R5
+>
+> Is your display connected like LCD2 or LCD3? LCD3 must still handled like a 24
+> bit display shown in LCD1, while only the LCD2-case is the "24 bit to 18 bit
+> mapping" case.
+>
+> At least my current tests with an i.MX23 and a connection like LCD2 are
+> working here with a Qt application. Qt honours the pixel bitfield
+> description. And I'm using the "bits-per-pixel = <32>" and "bus-width = <18>"
+> entries in the device tree.
 
-diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
-index 788562d..5333701 100644
---- a/arch/arm/mach-at91/Makefile
-+++ b/arch/arm/mach-at91/Makefile
-@@ -2,7 +2,7 @@
- # Makefile for the linux kernel.
- #
- 
--obj-y		:= irq.o gpio.o setup.o
-+obj-y		:= gpio.o setup.o
- obj-m		:=
- obj-n		:=
- obj-		:=
-diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index d193a40..39e7845 100644
---- a/arch/arm/mach-at91/at91rm9200.c
-+++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/irq.h>
- #include <asm/mach/arch.h>
-@@ -21,7 +22,6 @@
- #include <mach/at91_st.h>
- #include <mach/cpu.h>
- 
--#include "at91_aic.h"
- #include "soc.h"
- #include "generic.h"
- #include "clock.h"
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index a8ce245..5d06727 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/proc-fns.h>
- #include <asm/irq.h>
-@@ -22,7 +23,6 @@
- #include <mach/at91sam9260.h>
- #include <mach/at91_pmc.h>
- 
--#include "at91_aic.h"
- #include "at91_rstc.h"
- #include "soc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 25efb5a..554aa43 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/proc-fns.h>
- #include <asm/irq.h>
-@@ -21,7 +22,6 @@
- #include <mach/at91sam9261.h>
- #include <mach/at91_pmc.h>
- 
--#include "at91_aic.h"
- #include "at91_rstc.h"
- #include "soc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
-index f44ffd2..481e993 100644
---- a/arch/arm/mach-at91/at91sam9263.c
-+++ b/arch/arm/mach-at91/at91sam9263.c
-@@ -11,6 +11,7 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/proc-fns.h>
- #include <asm/irq.h>
-@@ -20,7 +21,6 @@
- #include <mach/at91sam9263.h>
- #include <mach/at91_pmc.h>
- 
--#include "at91_aic.h"
- #include "at91_rstc.h"
- #include "soc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
-index 8b7fce0..bc198a9 100644
---- a/arch/arm/mach-at91/at91sam9g45.c
-+++ b/arch/arm/mach-at91/at91sam9g45.c
-@@ -12,6 +12,7 @@
- 
- #include <linux/module.h>
- #include <linux/dma-mapping.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/irq.h>
- #include <asm/mach/arch.h>
-@@ -21,7 +22,6 @@
- #include <mach/at91_pmc.h>
- #include <mach/cpu.h>
- 
--#include "at91_aic.h"
- #include "soc.h"
- #include "generic.h"
- #include "clock.h"
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index f77fae5..65154f0 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -10,6 +10,7 @@
-  */
- 
- #include <linux/module.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/proc-fns.h>
- #include <asm/irq.h>
-@@ -21,7 +22,6 @@
- #include <mach/at91sam9rl.h>
- #include <mach/at91_pmc.h>
- 
--#include "at91_aic.h"
- #include "at91_rstc.h"
- #include "soc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/at91x40.c b/arch/arm/mach-at91/at91x40.c
-index 19ca793..4ae1400 100644
---- a/arch/arm/mach-at91/at91x40.c
-+++ b/arch/arm/mach-at91/at91x40.c
-@@ -14,6 +14,7 @@
- #include <linux/init.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-+#include <linux/irqchip/at91.h>
- #include <asm/proc-fns.h>
- #include <asm/system_misc.h>
- #include <asm/mach/arch.h>
-@@ -21,7 +22,6 @@
- #include <mach/at91_st.h>
- #include <mach/timex.h>
- 
--#include "at91_aic.h"
- #include "generic.h"
- 
- /*
-diff --git a/arch/arm/mach-at91/board-1arm.c b/arch/arm/mach-at91/board-1arm.c
-index 8389e81..7c18c14 100644
---- a/arch/arm/mach-at91/board-1arm.c
-+++ b/arch/arm/mach-at91/board-1arm.c
-@@ -24,6 +24,7 @@
- #include <linux/mm.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <mach/hardware.h>
- #include <asm/setup.h>
-@@ -36,7 +37,6 @@
- 
- #include <mach/cpu.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-afeb-9260v1.c b/arch/arm/mach-at91/board-afeb-9260v1.c
-index 82832f1..f22552b 100644
---- a/arch/arm/mach-at91/board-afeb-9260v1.c
-+++ b/arch/arm/mach-at91/board-afeb-9260v1.c
-@@ -33,6 +33,7 @@
- #include <linux/spi/spi.h>
- #include <linux/clk.h>
- #include <linux/dma-mapping.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <mach/hardware.h>
- #include <asm/setup.h>
-@@ -43,7 +44,6 @@
- #include <asm/mach/map.h>
- #include <asm/mach/irq.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-cam60.c b/arch/arm/mach-at91/board-cam60.c
-index c1146d9..be01453 100644
---- a/arch/arm/mach-at91/board-cam60.c
-+++ b/arch/arm/mach-at91/board-cam60.c
-@@ -28,6 +28,7 @@
- #include <linux/platform_device.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/flash.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <mach/hardware.h>
- #include <asm/setup.h>
-@@ -40,7 +41,6 @@
- 
- #include <mach/at91sam9_smc.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/board-carmeva.c b/arch/arm/mach-at91/board-carmeva.c
-index c0aac79..96a9bee 100644
---- a/arch/arm/mach-at91/board-carmeva.c
-+++ b/arch/arm/mach-at91/board-carmeva.c
-@@ -25,6 +25,7 @@
- #include <linux/mm.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -36,7 +37,6 @@
- 
- #include <mach/hardware.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-cpu9krea.c b/arch/arm/mach-at91/board-cpu9krea.c
-index c8ddf60..1148009 100644
---- a/arch/arm/mach-at91/board-cpu9krea.c
-+++ b/arch/arm/mach-at91/board-cpu9krea.c
-@@ -30,6 +30,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
- #include <linux/mtd/physmap.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -44,7 +45,6 @@
- #include <mach/at91sam9260_matrix.h>
- #include <mach/at91_matrix.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/board-cpuat91.c b/arch/arm/mach-at91/board-cpuat91.c
-index b7675c8..75c5cd2 100644
---- a/arch/arm/mach-at91/board-cpuat91.c
-+++ b/arch/arm/mach-at91/board-cpuat91.c
-@@ -26,6 +26,7 @@
- #include <linux/platform_device.h>
- #include <linux/mtd/physmap.h>
- #include <linux/mtd/plat-ram.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <mach/hardware.h>
- #include <asm/setup.h>
-@@ -40,7 +41,6 @@
- #include <mach/at91_ramc.h>
- #include <mach/cpu.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-csb337.c b/arch/arm/mach-at91/board-csb337.c
-index 746120d..e651d5f 100644
---- a/arch/arm/mach-at91/board-csb337.c
-+++ b/arch/arm/mach-at91/board-csb337.c
-@@ -28,6 +28,7 @@
- #include <linux/mtd/physmap.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -39,7 +40,6 @@
- 
- #include <mach/hardware.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-csb637.c b/arch/arm/mach-at91/board-csb637.c
-index c61f7d9..bec8c25 100644
---- a/arch/arm/mach-at91/board-csb637.c
-+++ b/arch/arm/mach-at91/board-csb637.c
-@@ -25,6 +25,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/mtd/physmap.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -36,7 +37,6 @@
- 
- #include <mach/hardware.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-dt-rm9200.c b/arch/arm/mach-at91/board-dt-rm9200.c
-index 13d7c62..67fff54 100644
---- a/arch/arm/mach-at91/board-dt-rm9200.c
-+++ b/arch/arm/mach-at91/board-dt-rm9200.c
-@@ -15,6 +15,7 @@
- #include <linux/of.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/irq.h>
-@@ -22,7 +23,6 @@
- #include <asm/mach/map.h>
- #include <asm/mach/irq.h>
- 
--#include "at91_aic.h"
- #include "generic.h"
- 
- 
-diff --git a/arch/arm/mach-at91/board-dt-sam9.c b/arch/arm/mach-at91/board-dt-sam9.c
-index 4d291ae..65edc6e 100644
---- a/arch/arm/mach-at91/board-dt-sam9.c
-+++ b/arch/arm/mach-at91/board-dt-sam9.c
-@@ -14,6 +14,7 @@
- #include <linux/of.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/irq.h>
-@@ -21,7 +22,6 @@
- #include <asm/mach/map.h>
- #include <asm/mach/irq.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
-index d39a459..015178f 100644
---- a/arch/arm/mach-at91/board-dt-sama5.c
-+++ b/arch/arm/mach-at91/board-dt-sama5.c
-@@ -16,6 +16,7 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/phy.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/irq.h>
-@@ -23,7 +24,6 @@
- #include <asm/mach/map.h>
- #include <asm/mach/irq.h>
- 
--#include "at91_aic.h"
- #include "generic.h"
- 
- 
-diff --git a/arch/arm/mach-at91/board-eb01.c b/arch/arm/mach-at91/board-eb01.c
-index 8d84f46..f0804fd 100644
---- a/arch/arm/mach-at91/board-eb01.c
-+++ b/arch/arm/mach-at91/board-eb01.c
-@@ -23,12 +23,12 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/irq.h>
-+#include <linux/irqchip/at91.h>
- #include <asm/mach-types.h>
- #include <mach/hardware.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-eb9200.c b/arch/arm/mach-at91/board-eb9200.c
-index 95a4a65..ce9ddb5 100644
---- a/arch/arm/mach-at91/board-eb9200.c
-+++ b/arch/arm/mach-at91/board-eb9200.c
-@@ -25,6 +25,7 @@
- #include <linux/mm.h>
- #include <linux/module.h>
- #include <linux/device.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <mach/hardware.h>
- #include <asm/setup.h>
-@@ -35,7 +36,6 @@
- #include <asm/mach/map.h>
- #include <asm/mach/irq.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-ecbat91.c b/arch/arm/mach-at91/board-ecbat91.c
-index 4bababc..971a309 100644
---- a/arch/arm/mach-at91/board-ecbat91.c
-+++ b/arch/arm/mach-at91/board-ecbat91.c
-@@ -27,6 +27,7 @@
- #include <linux/platform_device.h>
- #include <linux/spi/spi.h>
- #include <linux/spi/flash.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <mach/hardware.h>
- #include <asm/setup.h>
-@@ -39,7 +40,6 @@
- 
- #include <mach/cpu.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-eco920.c b/arch/arm/mach-at91/board-eco920.c
-index ba6c6f7..f8463e1 100644
---- a/arch/arm/mach-at91/board-eco920.c
-+++ b/arch/arm/mach-at91/board-eco920.c
-@@ -18,6 +18,7 @@
- #include <linux/platform_device.h>
- #include <linux/mtd/physmap.h>
- #include <linux/gpio.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/mach-types.h>
- 
-@@ -28,7 +29,6 @@
- #include <mach/at91_ramc.h>
- #include <mach/cpu.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
-index b9b1f59..8d3ea6d 100644
---- a/arch/arm/mach-at91/board-flexibity.c
-+++ b/arch/arm/mach-at91/board-flexibity.c
-@@ -25,6 +25,7 @@
- #include <linux/spi/spi.h>
- #include <linux/input.h>
- #include <linux/gpio.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/mach-types.h>
- 
-@@ -34,7 +35,6 @@
- 
- #include <mach/hardware.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-foxg20.c b/arch/arm/mach-at91/board-foxg20.c
-index 816db05..14ec339 100644
---- a/arch/arm/mach-at91/board-foxg20.c
-+++ b/arch/arm/mach-at91/board-foxg20.c
-@@ -31,6 +31,7 @@
- #include <linux/input.h>
- #include <linux/clk.h>
- #include <linux/w1-gpio.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <mach/hardware.h>
- #include <asm/setup.h>
-@@ -43,7 +44,6 @@
- 
- #include <mach/at91sam9_smc.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/board-gsia18s.c b/arch/arm/mach-at91/board-gsia18s.c
-index af6a925..0912ba5 100644
---- a/arch/arm/mach-at91/board-gsia18s.c
-+++ b/arch/arm/mach-at91/board-gsia18s.c
-@@ -26,13 +26,13 @@
- #include <linux/i2c/pcf857x.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
- #include <mach/at91sam9_smc.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/board-kafa.c b/arch/arm/mach-at91/board-kafa.c
-index 31bd8c9..10970ba 100644
---- a/arch/arm/mach-at91/board-kafa.c
-+++ b/arch/arm/mach-at91/board-kafa.c
-@@ -24,6 +24,7 @@
- #include <linux/mm.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <mach/hardware.h>
- #include <asm/setup.h>
-@@ -36,7 +37,6 @@
- 
- #include <mach/cpu.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-kb9202.c b/arch/arm/mach-at91/board-kb9202.c
-index df43c2e..6a4a93c 100644
---- a/arch/arm/mach-at91/board-kb9202.c
-+++ b/arch/arm/mach-at91/board-kb9202.c
-@@ -25,6 +25,7 @@
- #include <linux/mm.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <mach/hardware.h>
- #include <asm/setup.h>
-@@ -39,7 +40,6 @@
- #include <mach/at91rm9200_mc.h>
- #include <mach/at91_ramc.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-pcontrol-g20.c b/arch/arm/mach-at91/board-pcontrol-g20.c
-index 724c91b..456a5db 100644
---- a/arch/arm/mach-at91/board-pcontrol-g20.c
-+++ b/arch/arm/mach-at91/board-pcontrol-g20.c
-@@ -25,13 +25,13 @@
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
- #include <linux/w1-gpio.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
- #include <mach/at91sam9_smc.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/board-picotux200.c b/arch/arm/mach-at91/board-picotux200.c
-index 479a034..e511065 100644
---- a/arch/arm/mach-at91/board-picotux200.c
-+++ b/arch/arm/mach-at91/board-picotux200.c
-@@ -27,6 +27,7 @@
- #include <linux/platform_device.h>
- #include <linux/spi/spi.h>
- #include <linux/mtd/physmap.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <mach/hardware.h>
- #include <asm/setup.h>
-@@ -40,7 +41,6 @@
- #include <mach/at91rm9200_mc.h>
- #include <mach/at91_ramc.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-qil-a9260.c b/arch/arm/mach-at91/board-qil-a9260.c
-index 1d7a4e7..2ffe497 100644
---- a/arch/arm/mach-at91/board-qil-a9260.c
-+++ b/arch/arm/mach-at91/board-qil-a9260.c
-@@ -30,6 +30,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
- #include <linux/clk.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -42,7 +43,6 @@
- #include <mach/hardware.h>
- #include <mach/at91sam9_smc.h>
- 
--#include "at91_aic.h"
- #include "at91_shdwc.h"
- #include "board.h"
- #include "sam9_smc.h"
-diff --git a/arch/arm/mach-at91/board-rm9200dk.c b/arch/arm/mach-at91/board-rm9200dk.c
-index cc04718..7a1e71d 100644
---- a/arch/arm/mach-at91/board-rm9200dk.c
-+++ b/arch/arm/mach-at91/board-rm9200dk.c
-@@ -29,6 +29,7 @@
- #include <linux/platform_device.h>
- #include <linux/spi/spi.h>
- #include <linux/mtd/physmap.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -42,7 +43,6 @@
- #include <mach/at91rm9200_mc.h>
- #include <mach/at91_ramc.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
-index 13a121a..46acbf9 100644
---- a/arch/arm/mach-at91/board-rm9200ek.c
-+++ b/arch/arm/mach-at91/board-rm9200ek.c
-@@ -29,6 +29,7 @@
- #include <linux/platform_device.h>
- #include <linux/spi/spi.h>
- #include <linux/mtd/physmap.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -42,7 +43,6 @@
- #include <mach/at91rm9200_mc.h>
- #include <mach/at91_ramc.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-rsi-ews.c b/arch/arm/mach-at91/board-rsi-ews.c
-index d15ef0c..f7f4406 100644
---- a/arch/arm/mach-at91/board-rsi-ews.c
-+++ b/arch/arm/mach-at91/board-rsi-ews.c
-@@ -15,6 +15,7 @@
- #include <linux/platform_device.h>
- #include <linux/spi/spi.h>
- #include <linux/mtd/physmap.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -28,7 +29,6 @@
- 
- #include <linux/gpio.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/board-sam9-l9260.c b/arch/arm/mach-at91/board-sam9-l9260.c
-index 0907df4..72f9163 100644
---- a/arch/arm/mach-at91/board-sam9-l9260.c
-+++ b/arch/arm/mach-at91/board-sam9-l9260.c
-@@ -27,6 +27,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/spi/spi.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <mach/hardware.h>
- #include <asm/setup.h>
-@@ -39,7 +40,6 @@
- 
- #include <mach/at91sam9_smc.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/board-sam9260ek.c b/arch/arm/mach-at91/board-sam9260ek.c
-index 0361c4d..ea5a9cb 100644
---- a/arch/arm/mach-at91/board-sam9260ek.c
-+++ b/arch/arm/mach-at91/board-sam9260ek.c
-@@ -31,6 +31,7 @@
- #include <linux/i2c/at24.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -44,7 +45,6 @@
- #include <mach/at91sam9_smc.h>
- #include <mach/system_rev.h>
- 
--#include "at91_aic.h"
- #include "at91_shdwc.h"
- #include "board.h"
- #include "sam9_smc.h"
-diff --git a/arch/arm/mach-at91/board-sam9261ek.c b/arch/arm/mach-at91/board-sam9261ek.c
-index c28401a..a181855 100644
---- a/arch/arm/mach-at91/board-sam9261ek.c
-+++ b/arch/arm/mach-at91/board-sam9261ek.c
-@@ -33,6 +33,7 @@
- #include <linux/fb.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <video/atmel_lcdc.h>
- 
-@@ -48,7 +49,6 @@
- #include <mach/at91sam9_smc.h>
- #include <mach/system_rev.h>
- 
--#include "at91_aic.h"
- #include "at91_shdwc.h"
- #include "board.h"
- #include "sam9_smc.h"
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index 1287d81..8f8e3f7 100644
---- a/arch/arm/mach-at91/board-sam9263ek.c
-+++ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -32,6 +32,7 @@
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
- #include <linux/leds.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <video/atmel_lcdc.h>
- 
-@@ -47,7 +48,6 @@
- #include <mach/at91sam9_smc.h>
- #include <mach/system_rev.h>
- 
--#include "at91_aic.h"
- #include "at91_shdwc.h"
- #include "board.h"
- #include "sam9_smc.h"
-diff --git a/arch/arm/mach-at91/board-sam9g20ek.c b/arch/arm/mach-at91/board-sam9g20ek.c
-index c6ea31d..13a4c16 100644
---- a/arch/arm/mach-at91/board-sam9g20ek.c
-+++ b/arch/arm/mach-at91/board-sam9g20ek.c
-@@ -31,6 +31,7 @@
- #include <linux/regulator/machine.h>
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/consumer.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <linux/platform_data/at91_adc.h>
- 
-@@ -46,7 +47,6 @@
- #include <mach/at91sam9_smc.h>
- #include <mach/system_rev.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/board-sam9m10g45ek.c b/arch/arm/mach-at91/board-sam9m10g45ek.c
-index 139a67e..98f88f2 100644
---- a/arch/arm/mach-at91/board-sam9m10g45ek.c
-+++ b/arch/arm/mach-at91/board-sam9m10g45ek.c
-@@ -26,6 +26,7 @@
- #include <linux/leds.h>
- #include <linux/atmel-mci.h>
- #include <linux/delay.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <linux/platform_data/at91_adc.h>
- 
-@@ -45,7 +46,6 @@
- #include <mach/at91sam9_smc.h>
- #include <mach/system_rev.h>
- 
--#include "at91_aic.h"
- #include "at91_shdwc.h"
- #include "board.h"
- #include "sam9_smc.h"
-diff --git a/arch/arm/mach-at91/board-sam9rlek.c b/arch/arm/mach-at91/board-sam9rlek.c
-index fdcb1cc..6da0fdb 100644
---- a/arch/arm/mach-at91/board-sam9rlek.c
-+++ b/arch/arm/mach-at91/board-sam9rlek.c
-@@ -18,6 +18,7 @@
- #include <linux/clk.h>
- #include <linux/input.h>
- #include <linux/gpio_keys.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <video/atmel_lcdc.h>
- 
-@@ -33,7 +34,6 @@
- #include <mach/at91sam9_smc.h>
- 
- 
--#include "at91_aic.h"
- #include "at91_shdwc.h"
- #include "board.h"
- #include "sam9_smc.h"
-diff --git a/arch/arm/mach-at91/board-snapper9260.c b/arch/arm/mach-at91/board-snapper9260.c
-index c07e86a..7cfc767 100644
---- a/arch/arm/mach-at91/board-snapper9260.c
-+++ b/arch/arm/mach-at91/board-snapper9260.c
-@@ -27,6 +27,7 @@
- #include <linux/platform_device.h>
- #include <linux/spi/spi.h>
- #include <linux/i2c/pca953x.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -34,7 +35,6 @@
- #include <mach/hardware.h>
- #include <mach/at91sam9_smc.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
-index 4977e6e..01d7245 100644
---- a/arch/arm/mach-at91/board-stamp9g20.c
-+++ b/arch/arm/mach-at91/board-stamp9g20.c
-@@ -21,13 +21,13 @@
- #include <linux/platform_device.h>
- #include <linux/gpio.h>
- #include <linux/w1-gpio.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
- 
- #include <mach/at91sam9_smc.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "sam9_smc.h"
- #include "generic.h"
-diff --git a/arch/arm/mach-at91/board-usb-a926x.c b/arch/arm/mach-at91/board-usb-a926x.c
-index a0f7d74..a89b733 100644
---- a/arch/arm/mach-at91/board-usb-a926x.c
-+++ b/arch/arm/mach-at91/board-usb-a926x.c
-@@ -31,6 +31,7 @@
- #include <linux/gpio.h>
- #include <linux/input.h>
- #include <linux/spi/mmc_spi.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -43,7 +44,6 @@
- #include <mach/hardware.h>
- #include <mach/at91sam9_smc.h>
- 
--#include "at91_aic.h"
- #include "at91_shdwc.h"
- #include "board.h"
- #include "sam9_smc.h"
-diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
-index ac3b263..a858ea1 100644
---- a/arch/arm/mach-at91/board-yl-9200.c
-+++ b/arch/arm/mach-at91/board-yl-9200.c
-@@ -33,6 +33,7 @@
- #include <linux/mtd/physmap.h>
- #include <linux/gpio_keys.h>
- #include <linux/input.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/setup.h>
- #include <asm/mach-types.h>
-@@ -47,7 +48,6 @@
- #include <mach/at91_ramc.h>
- #include <mach/cpu.h>
- 
--#include "at91_aic.h"
- #include "board.h"
- #include "generic.h"
- 
-diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index 530db30..6577307 100644
---- a/arch/arm/mach-at91/pm.c
-+++ b/arch/arm/mach-at91/pm.c
-@@ -19,6 +19,7 @@
- #include <linux/module.h>
- #include <linux/platform_device.h>
- #include <linux/io.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <asm/irq.h>
- #include <linux/atomic.h>
-@@ -28,7 +29,6 @@
- #include <mach/at91_pmc.h>
- #include <mach/cpu.h>
- 
--#include "at91_aic.h"
- #include "generic.h"
- #include "pm.h"
- 
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index cda4cb5..208b708 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -1,5 +1,6 @@
- obj-$(CONFIG_IRQCHIP)			+= irqchip.o
- 
-+obj-$(CONFIG_ARCH_AT91)			+= irq-at91.o
- obj-$(CONFIG_ARCH_BCM2835)		+= irq-bcm2835.o
- obj-$(CONFIG_ARCH_EXYNOS)		+= exynos-combiner.o
- obj-$(CONFIG_ARCH_MVEBU)		+= irq-armada-370-xp.o
-diff --git a/arch/arm/mach-at91/irq.c b/drivers/irqchip/irq-at91.c
-similarity index 99%
-rename from arch/arm/mach-at91/irq.c
-rename to drivers/irqchip/irq-at91.c
-index 18c653f..ca49096 100644
---- a/arch/arm/mach-at91/irq.c
-+++ b/drivers/irqchip/irq-at91.c
-@@ -1,5 +1,5 @@
- /*
-- * linux/arch/arm/mach-at91/irq.c
-+ * drivers/irqchip/irq-at91.c
-  *
-  *  Copyright (C) 2004 SAN People
-  *  Copyright (C) 2004 ATMEL
-@@ -32,6 +32,7 @@
- #include <linux/irqdomain.h>
- #include <linux/err.h>
- #include <linux/slab.h>
-+#include <linux/irqchip/at91.h>
- 
- #include <mach/hardware.h>
- #include <asm/irq.h>
-@@ -42,7 +43,6 @@
- #include <asm/mach/irq.h>
- #include <asm/mach/map.h>
- 
--#include "at91_aic.h"
- 
- void __iomem *at91_aic_base;
- static struct irq_domain *at91_aic_domain;
-diff --git a/arch/arm/mach-at91/at91_aic.h b/include/linux/irqchip/at91.h
-similarity index 97%
-rename from arch/arm/mach-at91/at91_aic.h
-rename to include/linux/irqchip/at91.h
-index be8680d..42f1260 100644
---- a/arch/arm/mach-at91/at91_aic.h
-+++ b/include/linux/irqchip/at91.h
-@@ -1,5 +1,5 @@
- /*
-- * arch/arm/mach-at91/include/mach/at91_aic.h
-+ * include/linux/irqchip/at91.h
-  *
-  * Copyright (C) 2005 Ivan Kokshaysky
-  * Copyright (C) SAN People
-@@ -16,7 +16,6 @@
- #ifndef AT91_AIC_H
- #define AT91_AIC_H
- 
--#ifndef __ASSEMBLY__
- extern void __iomem *at91_aic_base;
- 
- #define at91_aic_read(field) \
-@@ -24,9 +23,6 @@ extern void __iomem *at91_aic_base;
- 
- #define at91_aic_write(field, value) \
- 	__raw_writel(value, at91_aic_base + field)
--#else
--.extern at91_aic_base
--#endif
- 
- /* Number of irq lines managed by AIC */
- #define NR_AIC_IRQS	32
+I have a 24bit LCD display but my connection to it is done at 18bits data width.
+Represented below as LCD4.
+NOTE: In my LCD4 column, notation Rx/Gx/Bx represent the color bit in memory as well 
+as the display data line.
+Since we use 32bpp each channel has 8 bits (R7..R0, etc.).
+I understand that you have an 18bit display and that your notation in LCD2 column 
+represents the display data lines, not the color bit indexes in memory.
+
+i.MX2[3|8]    LCD1       LCD2       LCD3	LCD4
+               24bit      18bit      18bit	24bit connected at 18bit
+-------------------------------------------------------
+LCD_D0         B0         B0         --		B2
+LCD_D1         B1         B1         --		B3
+LCD_D2         B2         B2         B0		B4
+LCD_D3         B3         B3         B1		B5
+LCD_D4         B4         B4         B2		B6
+LCD_D5         B5         B5         B3		B7
+LCD_D6         B6         G0         B4		G2
+LCD_D7         B7         G1         B5		G3
+
+LCD_D8         G0         G2         --		G4
+LCD_D9         G1         G3         --		G5
+LCD_D10        G2         G4         G0		G6
+LCD_D11        G3         G5         G1		G7
+LCD_D12        G4         R0         G2		R2
+LCD_D13        G5         R1         G3		R3
+LCD_D14        G6         R2         G4		R4
+LCD_D15        G7         R3         G5		R5
+
+LCD_D16        R0         R4         --		R6
+LCD_D17        R1         R5         --		R7
+LCD_D18        R2                    R0
+LCD_D19        R3                    R1
+LCD_D20        R4                    R2
+LCD_D21        R5                    R3
+LCD_D22        R6                    R4
+LCD_D23        R7                    R5
+
+For 32bpp (RGB888) and 18bit data bus I would expect the LCD controller to take the 
+six *most significant* bits [7..2] from each color byte out to the LCD data bus 
+(LCD_D17..D0) in the order depicted in my LCD4 column.
+
+I'm not sure what the DATA_FORMAT_24_BIT flag is doing, but dropping the two most 
+significant bits of color in memory doesn't seem to be a good idea unless (maybe) 
+color is in 18bpp. Previous kernels did not even touch this flag.
+
+Does the following patch make sense?
+
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index b1c1a80..bb0a4e1 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -298,9 +298,6 @@ static int mxsfb_check_var(struct fb_var_screeninfo *var,
+                         break;
+                 case STMLCDIF_16BIT:
+                 case STMLCDIF_18BIT:
+-                       /* 24 bit to 18 bit mapping */
+-                       rgb = def_rgb666;
+-                       break;
+                 case STMLCDIF_24BIT:
+                         /* real 24 bit */
+                         rgb = def_rgb888;
+@@ -424,11 +421,6 @@ static int mxsfb_set_par(struct fb_info *fb_info)
+                         return -EINVAL;
+                 case STMLCDIF_16BIT:
+                 case STMLCDIF_18BIT:
+-                       /* 24 bit to 18 bit mapping */
+-                       ctrl |= CTRL_DF24; /* ignore the upper 2 bits in
+-                                           *  each colour component
+-                                           */
+-                       break;
+                 case STMLCDIF_24BIT:
+                         /* real 24 bit */
+                         break;
+
+The setting of def_rgb666 for a 32bpp color depth does not make sense to me because 
+the color in memory is really rgb888.
+
+With this patch, my true color images are displayed ok and so does the penguin logo.
+I don't know however how other displays connections at 18bit will do.
+
+Regards,
 -- 
-1.7.9.5
+H?ctor Palacios
