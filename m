@@ -1,53 +1,83 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 23 May 2013 13:23:39 -0400
-Subject: [PATCH 2/2] net: mv643xx_eth: proper initialization for
- Kirkwood SoCs
-In-Reply-To: <20130523171112.GB31281@obsidianresearch.com>
-References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369253042-15082-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369253042-15082-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130522201607.GA18823@obsidianresearch.com>
- <20130523160111.GP31290@titan.lakedaemon.net>
- <20130523171112.GB31281@obsidianresearch.com>
-Message-ID: <20130523172339.GQ31290@titan.lakedaemon.net>
+Date: Thu, 23 May 2013 13:24:37 -0400
+Subject: [PATCH v2 0/3] Marvell PCIe driver improvements
+In-Reply-To: <CAErSpo6ytq9Tzq_=KucZA+1=90t57QP5-Fw_dus2dXiXL5YKtg@mail.gmail.com>
+References: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo6ytq9Tzq_=KucZA+1=90t57QP5-Fw_dus2dXiXL5YKtg@mail.gmail.com>
+Message-ID: <20130523172437.GR31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 11:11:12AM -0600, Jason Gunthorpe wrote:
-> On Thu, May 23, 2013 at 12:01:11PM -0400, Jason Cooper wrote:
-> > > > +	/* Kirkwood resets some registers on gated clocks. Especially
-> > > > +	 * CLK125_BYPASS_EN must be cleared but is not available on
-> > > > +	 * all other SoCs/System Controllers using this driver.
-> > > > +	 */
-> > > > +	if (of_machine_is_compatible("marvell,kirkwood"))
-> > > > +		wrlp(mp, PORT_SERIAL_CONTROL1,
-> > > > +		     rdlp(mp, PORT_SERIAL_CONTROL1) & ~CLK125_BYPASS_EN);
-> > > 
-> > > of_machine_is_compatible seems heavy handed, I would expect this to be
-> > > based on the compatible string of the ethernet node itself, not the
-> > > machine??
-> > 
-> > Is there a model number variation between IP that needs this and IP that
-> > doesn't?  If not, I'm fine with of_machine_is_compatible().
+On Thu, May 23, 2013 at 11:01:10AM -0600, Bjorn Helgaas wrote:
+> On Thu, May 23, 2013 at 8:32 AM, Thomas Petazzoni
+> <thomas.petazzoni@free-electrons.com> wrote:
+> > Bjorn, Jason, Andrew, Gregory,
+> >
+> > Here is an updated version of the PCIe improvements.
+> >
+> > Changes since v1:
+> >
+> >  * Fix some typos in the comments of PATCH 2, noticed by Bjorn
+> >    Helgaas.
+> >
+> >  * Rework the two last patches (first one was fixing the capability
+> >    list, the other one the emulation of the devsel bits in the status
+> >    register), after the comments of Bjorn. In fact, it turns out that
+> >    the status register is composed of read-only bits for which we want
+> >    to emulate a value of zero, and the other bits are write-1-to-clear
+> >    bits that expose error conditions that we do not handle in the
+> >    emulated bridge. So, in summary, emulating a 0 status register on
+> >    reads, and ignoring writes to the status register is the simplest
+> >    solution. If we later on implement a capability list, we can use a
+> >    more clever emulation of the status register, but for the moment,
+> >    this simple solution is enough. Therefore, the two last patches are
+> >    now one single, simpler patch.
+> >
+> > I'd like those improvements to be kept separated from the original
+> > PCIe driver itself: while the PCIe driver has been around and reviewed
+> > for a long time, those improvements are newer. And I clearly do not
+> > want the PCIe driver to miss 3.11 because of any problem that could be
+> > found in those additional improvements.
+> >
+> > The main improvement being brought here is that the PCI-to-PCI bridge
+> > logic is fixed/extended to properly support physical PCIe bridges that
+> > are connected on a PCIe interface of a Marvell board. Without this
+> > improvement, only the devices connected directly to the PCIe
+> > interfaces of the board are properly enumerated. Any device that would
+> > sit beyond a physical bridge is not visible.
+> >
+> > Bjorn, with your Acked-by, could the Marvell maintainers include those
+> > patches in their branch, merged through arm-soc? They already have the
+> > Marvell PCIe driver itself, so I believe it makes sense to merge those
+> > improvements through the same path.
+> >
+> > Jason, those patches have been prepared on top of my marvell-pcie-v10
+> > branch, I hope that's ok for you. If you want me to rebase them on
+> > some other branch in which you have integrated the PCIe driver, don't
+> > hesitate to tell me to do so. That said, since those patches are only
+> > touching the driver itself and no other file, they should not cause
+> > any conflict with other changes.
+> >
+> > Thanks,
+> >
+> > Thomas
+> >
+> > Thomas Petazzoni (3):
+> >   pci: mvebu: no longer fake the slot location of downstream devices
+> >   pci: mvebu: allow the enumeration of devices beyond physical bridges
+> >   pci: mvebu: fix the emulation of the status register
+> >
+> >  drivers/pci/host/pci-mvebu.c |   55 +++++++++++++++++++++++++++++++++---------
+> >  1 file changed, 44 insertions(+), 11 deletions(-)
 > 
-> Well the name 'mv643xx' is a family of system controller SOC's
-> from ages ago, it seems reasonble to continue the trend and label the
-> IP variations with the SOC name:
+> For all three:
 > 
->  compatible = "marvell,kirwood,ethernet", "marvell,mv643xx_eth"
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> 
+> Feel free to merge these through the arm-soc tree or whatever makes
+> sense for you.  Nobody else is working on this file, so there
+> shouldn't be any conflicts.
 
-Shouldn't it rather be
-
-	compatible = "marvell,kirkwood-eth", "marvell,orion-eth";
-
-I'm inclined to go with of_machine_is_compatible() since the only
-concrete difference we know is that the tweak is needed on kirkwood and
-nowhere else.
-
-If we had an errata, or a datasheet saying specifically flavor X needs
-this and none other does, then we could trigger on the ethernet node
-compatible string or a boolean in the node.  But we don't have that...
-
-thx,
+Thanks, Bjorn!
 
 Jason.
