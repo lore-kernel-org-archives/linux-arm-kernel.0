@@ -1,83 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 23 May 2013 13:24:37 -0400
-Subject: [PATCH v2 0/3] Marvell PCIe driver improvements
-In-Reply-To: <CAErSpo6ytq9Tzq_=KucZA+1=90t57QP5-Fw_dus2dXiXL5YKtg@mail.gmail.com>
-References: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAErSpo6ytq9Tzq_=KucZA+1=90t57QP5-Fw_dus2dXiXL5YKtg@mail.gmail.com>
-Message-ID: <20130523172437.GR31290@titan.lakedaemon.net>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Thu, 23 May 2013 11:27:54 -0600
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
+ 370/XP
+In-Reply-To: <20130523115321.660fa521@skate>
+References: <201305221633.46705.arnd@arndb.de> <20130522170643.54a2b9d2@skate>
+ <201305221735.11815.arnd@arndb.de> <20130522180842.7edcc3ee@skate>
+ <20130522163557.GC27348@1wt.eu> <20130522184250.1d5f2f10@skate>
+ <20130522164936.GE31290@titan.lakedaemon.net>
+ <20130522185757.60091a66@skate>
+ <20130522181953.GD12320@obsidianresearch.com>
+ <20130523115321.660fa521@skate>
+Message-ID: <20130523172754.GA2821@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 11:01:10AM -0600, Bjorn Helgaas wrote:
-> On Thu, May 23, 2013 at 8:32 AM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> > Bjorn, Jason, Andrew, Gregory,
-> >
-> > Here is an updated version of the PCIe improvements.
-> >
-> > Changes since v1:
-> >
-> >  * Fix some typos in the comments of PATCH 2, noticed by Bjorn
-> >    Helgaas.
-> >
-> >  * Rework the two last patches (first one was fixing the capability
-> >    list, the other one the emulation of the devsel bits in the status
-> >    register), after the comments of Bjorn. In fact, it turns out that
-> >    the status register is composed of read-only bits for which we want
-> >    to emulate a value of zero, and the other bits are write-1-to-clear
-> >    bits that expose error conditions that we do not handle in the
-> >    emulated bridge. So, in summary, emulating a 0 status register on
-> >    reads, and ignoring writes to the status register is the simplest
-> >    solution. If we later on implement a capability list, we can use a
-> >    more clever emulation of the status register, but for the moment,
-> >    this simple solution is enough. Therefore, the two last patches are
-> >    now one single, simpler patch.
-> >
-> > I'd like those improvements to be kept separated from the original
-> > PCIe driver itself: while the PCIe driver has been around and reviewed
-> > for a long time, those improvements are newer. And I clearly do not
-> > want the PCIe driver to miss 3.11 because of any problem that could be
-> > found in those additional improvements.
-> >
-> > The main improvement being brought here is that the PCI-to-PCI bridge
-> > logic is fixed/extended to properly support physical PCIe bridges that
-> > are connected on a PCIe interface of a Marvell board. Without this
-> > improvement, only the devices connected directly to the PCIe
-> > interfaces of the board are properly enumerated. Any device that would
-> > sit beyond a physical bridge is not visible.
-> >
-> > Bjorn, with your Acked-by, could the Marvell maintainers include those
-> > patches in their branch, merged through arm-soc? They already have the
-> > Marvell PCIe driver itself, so I believe it makes sense to merge those
-> > improvements through the same path.
-> >
-> > Jason, those patches have been prepared on top of my marvell-pcie-v10
-> > branch, I hope that's ok for you. If you want me to rebase them on
-> > some other branch in which you have integrated the PCIe driver, don't
-> > hesitate to tell me to do so. That said, since those patches are only
-> > touching the driver itself and no other file, they should not cause
-> > any conflict with other changes.
-> >
-> > Thanks,
-> >
-> > Thomas
-> >
-> > Thomas Petazzoni (3):
-> >   pci: mvebu: no longer fake the slot location of downstream devices
-> >   pci: mvebu: allow the enumeration of devices beyond physical bridges
-> >   pci: mvebu: fix the emulation of the status register
-> >
-> >  drivers/pci/host/pci-mvebu.c |   55 +++++++++++++++++++++++++++++++++---------
-> >  1 file changed, 44 insertions(+), 11 deletions(-)
-> 
-> For all three:
-> 
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> Feel free to merge these through the arm-soc tree or whatever makes
-> sense for you.  Nobody else is working on this file, so there
-> shouldn't be any conflicts.
+On Thu, May 23, 2013 at 11:53:21AM +0200, Thomas Petazzoni wrote:
 
-Thanks, Bjorn!
+> This is not a problem, because the MBus Bridge Window {Base,Control}
+> Register tell the CPU that memory accesses between addresses X and Y
+> are for MBus windows, and the other accesses are for the DRAM.
 
-Jason.
+Okay, I see, you are minimizing the size of the memory hole, sounds
+good.
+
+> > You can combine this idea with the CP15 signalling mechanism. Check
+> > CP15 and use it to alter the DTB, similar to how ATAGs are used to
+> > fixup the DTB. Don't relocate the registers.
+> 
+> Where would the code doing this would sit? Remember, this is a
+> temporary solution that we want to get rid of after some time. So I've
+> been very careful in this proposal to only touch mvebu-specific code.
+
+Well, there are three elements here:
+ 1) Remove ARMADA_370_XP_REGS_PHYS_BASE and related (looks nearly done now)
+ 2) Adjust the FDT/DT before it is used based on CP15
+ 3) Support early printk
+
+#1 looks like it is done when the mbus driver is merged, ie
+   we will soon have full dynamic support for the internal regs base
+#2 can be done in the machine's init_early, nothing will touch
+   internal regs prior to init_early
+#3 is for expert use, so the rules can be a bit different:
+   - Patch the XP/370 specific early printk code to look in CP15
+     to compute the base address
+   - .. or rely on a CONFIG_XXX to set the serial base address
+   - .. or parse the FDT to find the serial port, requiring
+     that the developer has made the FDT match the bootloader.
+
+So, I'm not sure what common code would need to be touched, do you see
+something else?
+
+Jason
