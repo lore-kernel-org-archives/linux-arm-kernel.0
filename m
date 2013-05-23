@@ -1,61 +1,68 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 23 May 2013 10:40:29 +0200
-Subject: [PATCH] arch: configuration, deleting 'CONFIG_BUG' since always
- need it.
-In-Reply-To: <519DCBEF.3090208@asianux.com>
-References: <519DCBEF.3090208@asianux.com>
-Message-ID: <CAMuHMdU7QuzgmWCH145p8PVebBzPo8DBAvbY+0AZa2cmGXmRHw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 23 May 2013 10:45:38 +0200
+Subject: [PATCH 0/7 v4] ARM: at91: dt: add USBA support
+In-Reply-To: <20130520162149.GC9937@game.jcrosoft.org>
+References: <20130520162149.GC9937@game.jcrosoft.org>
+Message-ID: <20130523084538.GE9937@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 9:57 AM, Chen Gang <gang.chen@asianux.com> wrote:
-> The crazy user can unset 'CONFIG_BUG' in menuconfig: "> General setup >
-> Configure standard kernel features (expert users) > BUG() Support".
->
-> But in fact, we always need it, and quite a few of architectures have
+Hi Felipe,
 
-Sorry, but we don't. I think you don't get the meaning of the BUG config symbol
-(see below).
+	if it's ok with you I send the patch series via at91
+	with the DT
 
-> already implemented it (e.g. alpha, arc, arm, avr32, blackfin, cris,
-> frv, ia64, m68k, mips, mn10300, parisc, powerpc, s390, sh, sparc, x86).
-
-What do you mean by "already implemented it"? E.g. on m68k, I can disable
-or enable CONFIG_BUG. Both work.
-
-> And kernel also already has prepared a default effective implementation
-> for the architectures which is unwilling to implement it by themselves
-> (e.g. arm64, c6x, h8300, hexagon, m32r, metag, microblaze, openrisc,
-> score, tile, um, unicore32, xtensa).
-
-This is not about providing an implementation or not...
-
-> -config BUG
-> -       bool "BUG() support" if EXPERT
-> -       default y
-> -       help
-> -          Disabling this option eliminates support for BUG and WARN, reducing
-> -          the size of your kernel image and potentially quietly ignoring
-> -          numerous fatal conditions. You should only consider disabling this
-> -          option for embedded systems with no facilities for reporting errors.
-> -          Just say Y.
-
-... It's about reducing memory size on devices where you can't show bug or
-warning messages.
-
-> So need get rid of 'CONFIG_BUG', and let it always enabled everywhere.
-
-So please keep it.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best Regards,
+J.
+On 18:21 Mon 20 May     , Jean-Christophe PLAGNIOL-VILLARD wrote:
+> HI,
+> 
+> 	v4:
+> 	fix multi instance support
+> 
+> 	v3:
+> 	rebase againt 3.10-rc1 + dt macro cleanup
+> 
+> 	This patch serie finish to add the usb device support to dt for at91
+> 	with the usba support present on the last at91 generation since sam9g45
+> 
+> The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
+> 
+>   ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git j/for-3.11-usba
+> 
+> for you to fetch changes up to 910026a08e2c2205953f2507cc11f4822998989b:
+> 
+>   ARM: at91: sam9m10g45ek add udc DT support (2013-05-20 23:52:17 +0800)
+> 
+> ----------------------------------------------------------------
+> Jean-Christophe PLAGNIOL-VILLARD (7):
+>       USB: gadget: atmel_usba: move global struct usba_ep usba_ep to struct usba_udc
+>       USB: gadget: atmel_usba: allow multi instance
+>       USB: gadget: atmel_usba: add DT support
+>       ARM: at91: sam9x5 add udc DT support
+>       ARM: at91: sam9x5ek add udc DT support
+>       ARM: at91: sam9g45 add udc DT support
+>       ARM: at91: sam9m10g45ek add udc DT support
+> 
+>  Documentation/devicetree/bindings/usb/atmel-usb.txt |   82 ++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/at91sam9g45.dtsi                  |   62 +++++++++++++++++++++++
+>  arch/arm/boot/dts/at91sam9m10g45ek.dts              |    5 ++
+>  arch/arm/boot/dts/at91sam9x5.dtsi                   |   62 +++++++++++++++++++++++
+>  arch/arm/boot/dts/at91sam9x5ek.dtsi                 |    5 ++
+>  arch/arm/mach-at91/at91sam9g45.c                    |    2 +
+>  arch/arm/mach-at91/at91sam9x5.c                     |    2 +
+>  drivers/usb/gadget/Kconfig                          |    2 +-
+>  drivers/usb/gadget/atmel_usba_udc.c                 |  264 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------
+>  drivers/usb/gadget/atmel_usba_udc.h                 |    2 +
+>  10 files changed, 407 insertions(+), 81 deletions(-)
+> 
+> Best Regards,
+> J.
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
