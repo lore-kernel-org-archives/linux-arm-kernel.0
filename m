@@ -1,32 +1,41 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 23 May 2013 18:18:48 +0800
-Subject: [PATCH] at91: sama5: fix incorrect PMC pcr div definition
-Message-ID: <1369304328-11442-1-git-send-email-josh.wu@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 May 2013 11:18:25 +0100
+Subject: [PATCH 1/3] ARM: at91: move at91 aic driver to drivers/irqchip
+In-Reply-To: <1369299909-10078-2-git-send-email-b.brezillon@overkiz.com>
+References: <1369299909-10078-1-git-send-email-b.brezillon@overkiz.com>
+ <1369299909-10078-2-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20130523101825.GL18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 23, 2013 at 11:05:07AM +0200, Boris BREZILLON wrote:
+> Move arch/arm/mach-at91/irq.c to drivers/irqchip/irq-at91.c.
+> Move arch/arm/mach-at91/at91_aic.h to
+> arch/arm/mach-at91/include/mach/at91_aic.h to avoid ugly reference
+> to header file :
+> #include "../../arch/arm/mach-at91/at91_aic.h"
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
- arch/arm/mach-at91/include/mach/at91_pmc.h |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+The right way to do this is to move the definitions which should only
+be used by arch/arm/mach-at91/irq.c to that file or a header file along
+side that file, and find a place in include/linux for the remainder.
 
-diff --git a/arch/arm/mach-at91/include/mach/at91_pmc.h b/arch/arm/mach-at91/include/mach/at91_pmc.h
-index 31df120..2bd7f51 100644
---- a/arch/arm/mach-at91/include/mach/at91_pmc.h
-+++ b/arch/arm/mach-at91/include/mach/at91_pmc.h
-@@ -179,9 +179,9 @@ extern void __iomem *at91_pmc_base;
- #define		AT91_PMC_PCR_CMD	(0x1  <<  12)		/* Command (read=0, write=1) */
- #define		AT91_PMC_PCR_DIV(n)	((n)  <<  16)		/* Divisor Value */
- #define			AT91_PMC_PCR_DIV0	0x0			/* Peripheral clock is MCK */
--#define			AT91_PMC_PCR_DIV2	0x2			/* Peripheral clock is MCK/2 */
--#define			AT91_PMC_PCR_DIV4	0x4			/* Peripheral clock is MCK/4 */
--#define			AT91_PMC_PCR_DIV8	0x8			/* Peripheral clock is MCK/8 */
-+#define			AT91_PMC_PCR_DIV2	0x1			/* Peripheral clock is MCK/2 */
-+#define			AT91_PMC_PCR_DIV4	0x2			/* Peripheral clock is MCK/4 */
-+#define			AT91_PMC_PCR_DIV8	0x3			/* Peripheral clock is MCK/8 */
- #define		AT91_PMC_PCR_EN		(0x1  <<  28)		/* Enable */
- 
- #endif
--- 
-1.7.10
+I notice arch/arm/mach-at91/pm.c makes use of some of the register
+definitions:
+
+        at91_irq_suspend();
+
+        pr_debug("AT91: PM - wake mask %08x, pm state %d\n",
+                        /* remember all the always-wake irqs */
+                        (at91_pmc_read(AT91_PMC_PCSR)
+                                        | (1 << AT91_ID_FIQ)
+                                        | (1 << AT91_ID_SYS)
+                                        | (at91_extern_irq))
+                                & at91_aic_read(AT91_AIC_IMR),
+                        state);
+
+at91_irq_suspend() is in arch/arm/mach-at91/irq.c already, so there's no
+reason that fragment can't be moved there.
+
+That leaves: at91_aic_handle_irq, at91_aic5_handle_irq, NR_AIC_IRQS and
+NR_AIC5_IRQS, which if you did patch 3 first, would leave you with just
+the NR_.*_IRQS definitions to find a home for.
