@@ -1,32 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 23 May 2013 16:14:53 +0200
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
- 370/XP
-In-Reply-To: <20130523142301.10dbeff9@skate>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201305222240.05124.arnd@arndb.de> <20130523142301.10dbeff9@skate>
-Message-ID: <201305231614.53664.arnd@arndb.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 23 May 2013 09:24:19 -0500
+Subject: [PATCH] regulator: ab8500-ext: Don't register without
+ initialisation data
+In-Reply-To: <20130523070905.GD18714@gmail.com>
+References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
+ <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
+ <20130522155347.GJ1627@sirena.org.uk>
+ <20130522165353.GB18714@gmail.com>
+ <20130522174516.GT1627@sirena.org.uk>
+ <20130523070905.GD18714@gmail.com>
+Message-ID: <20130523142419.GG2412@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 May 2013, Thomas Petazzoni wrote:
-> But that's not the case. Neither the old nor the new bootloaders are
-> changing the Device Tree in any way that allows us to know whether
-> registers are mapped at 0xd0 and 0xf1. Those bootloaders are already in
-> the field, and we have little control over that. Even if we had
-> control, what we would tell Marvell to implement in their U-Boot,
-> today?
+On Thu, May 23, 2013 at 08:09:05AM +0100, Lee Jones wrote:
+> On Wed, 22 May 2013, Mark Brown wrote:
 
-We would tell Marvell that changing the base address was a horrible
-mistake and that they have to revert to 0xd0 in order to make sure
-the mistake does not spread any further and all users would update.
+> > OK, so the regulator driver is buggy and insisting on having constraints
+> > passed in for every regulator then?
 
-> The DT binding of the mbus driver is not complete, and therefore
-> the mechanism to specify the location of the internal registers is
-> going to change when we introduce the DT binding for the mbus driver.
+> If that's not how it's meant to work then, yes.
 
-Right. It should not be hard to agree on the binding at least, but
-you are correct that we don't have that today and we shouldn't rush
-things here.
-
-	Arnd
+Yes, that's the intention - it should be possible to just not pass in
+anything in and have the driver start up in read only mode (partly to
+save having to do things like what you're doing).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130523/3b48a1f1/attachment.sig>
