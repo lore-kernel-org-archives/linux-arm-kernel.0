@@ -1,31 +1,85 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 23 May 2013 20:15:19 +0200
-Subject: [PATCH] ARM: mvebu: Fix bug in coherency fabric low level init
- function
-In-Reply-To: <1369299242-16506-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1369299242-16506-1-git-send-email-gregory.clement@free-electrons.com>
- <1369299242-16506-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130523181519.GF2680@1wt.eu>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 23 May 2013 14:26:22 -0400
+Subject: [PATCH v2 0/3] Marvell PCIe driver improvements
+In-Reply-To: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130523182622.GT31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
-
-On Thu, May 23, 2013 at 10:54:02AM +0200, Gregory CLEMENT wrote:
-> From: Nadav Haklai <nadavh@marvell.com>
+On Thu, May 23, 2013 at 04:32:50PM +0200, Thomas Petazzoni wrote:
+> Bjorn, Jason, Andrew, Gregory,
 > 
-> When adding CPU to the SMP group and enabling the coherency on this
-> CPU we must protect the register access.
-> The previous implementation claims to be atomic but doesn't provide
-> any protection against parallel access to the coherency fabric control
-> and configuration registers.
+> Here is an updated version of the PCIe improvements.
 > 
-> This patch fixes this by using the ldrex and strex mechanism.
-> This method should be used in all accesses to those registers.
+> Changes since v1:
+> 
+>  * Fix some typos in the comments of PATCH 2, noticed by Bjorn
+>    Helgaas.
+> 
+>  * Rework the two last patches (first one was fixing the capability
+>    list, the other one the emulation of the devsel bits in the status
+>    register), after the comments of Bjorn. In fact, it turns out that
+>    the status register is composed of read-only bits for which we want
+>    to emulate a value of zero, and the other bits are write-1-to-clear
+>    bits that expose error conditions that we do not handle in the
+>    emulated bridge. So, in summary, emulating a 0 status register on
+>    reads, and ignoring writes to the status register is the simplest
+>    solution. If we later on implement a capability list, we can use a
+>    more clever emulation of the status register, but for the moment,
+>    this simple solution is enough. Therefore, the two last patches are
+>    now one single, simpler patch.
+> 
+> I'd like those improvements to be kept separated from the original
+> PCIe driver itself: while the PCIe driver has been around and reviewed
+> for a long time, those improvements are newer. And I clearly do not
+> want the PCIe driver to miss 3.11 because of any problem that could be
+> found in those additional improvements.
+> 
+> The main improvement being brought here is that the PCI-to-PCI bridge
+> logic is fixed/extended to properly support physical PCIe bridges that
+> are connected on a PCIe interface of a Marvell board. Without this
+> improvement, only the devices connected directly to the PCIe
+> interfaces of the board are properly enumerated. Any device that would
+> sit beyond a physical bridge is not visible.
+> 
+> Bjorn, with your Acked-by, could the Marvell maintainers include those
+> patches in their branch, merged through arm-soc? They already have the
+> Marvell PCIe driver itself, so I believe it makes sense to merge those
+> improvements through the same path.
+> 
+> Jason, those patches have been prepared on top of my marvell-pcie-v10
+> branch, I hope that's ok for you. If you want me to rebase them on
+> some other branch in which you have integrated the PCIe driver, don't
+> hesitate to tell me to do so. That said, since those patches are only
+> touching the driver itself and no other file, they should not cause
+> any conflict with other changes.
+> 
+> Thanks,
+> 
+> Thomas
+> 
+> Thomas Petazzoni (3):
+>   pci: mvebu: no longer fake the slot location of downstream devices
+>   pci: mvebu: allow the enumeration of devices beyond physical bridges
+>   pci: mvebu: fix the emulation of the status register
+> 
+>  drivers/pci/host/pci-mvebu.c |   55 +++++++++++++++++++++++++++++++++---------
+>  1 file changed, 44 insertions(+), 11 deletions(-)
 
-I don't know how to tell whether the fix works since it's unclear
-to me what issue it fixes, but at least I can say that it doesn't
-break my armada370 on 3.10-rc2 + latest fixes from your dev branch.
+Whole series applied to mvebu/pcie_bridge with Bjorn's Ack.  The whole
+pcie tree now looks like:
 
-Best regards,
-Willy
+        /-mvebu/of_pci  /-mvebu/pcie
+        |               |
++---+---+---+---+---+---+---+---+---+---+ mvebu/pcie_bridge
+                        |
+                        \---+---+---+---+ mvebu/pcie_kirkwood
+(not to scale :) )
+
+This is getting pretty hairy, do you intend on anything else for mvebu
+pcie for this merge window?
+
+thx,
+
+Jason.
