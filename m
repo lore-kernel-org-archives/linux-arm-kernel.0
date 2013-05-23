@@ -1,33 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 23 May 2013 09:24:19 -0500
-Subject: [PATCH] regulator: ab8500-ext: Don't register without
- initialisation data
-In-Reply-To: <20130523070905.GD18714@gmail.com>
-References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
- <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
- <20130522155347.GJ1627@sirena.org.uk>
- <20130522165353.GB18714@gmail.com>
- <20130522174516.GT1627@sirena.org.uk>
- <20130523070905.GD18714@gmail.com>
-Message-ID: <20130523142419.GG2412@sirena.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 23 May 2013 10:27:10 -0400 (EDT)
+Subject: [RFC V6 PATCH 1/3] USB: OHCI: prepare to make ohci-hcd a library
+ module
+In-Reply-To: <1369307506-4458-2-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1305231026420.925-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 08:09:05AM +0100, Lee Jones wrote:
-> On Wed, 22 May 2013, Mark Brown wrote:
+On Thu, 23 May 2013, Manjunath Goudar wrote:
 
-> > OK, so the regulator driver is buggy and insisting on having constraints
-> > passed in for every regulator then?
+> This patch prepares ohci-hcd for being split up into a core
+> library and separate platform driver modules.  A generic
+> ohci_hc_driver structure is created, containing all the "standard"
+> values, and a new mechanism is added whereby a driver module can
+> specify a set of overrides to those values.  In addition the
+> ohci_restart(),ohci_suspend() and ohci_resume() routines need
+> to be EXPORTed for use by the drivers.
+> 
+> Added ohci_setip(() and ohci_start() routine for to start the generic
+> controller rather than each having its own idiosyncratic approach.
+> This allow to clean duplicated code in most of SOC driver
 
-> If that's not how it's meant to work then, yes.
+This patch looks good.
 
-Yes, that's the intention - it should be possible to just not pass in
-anything in and have the driver start up in read only mode (partly to
-save having to do things like what you're doing).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130523/3b48a1f1/attachment.sig>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
