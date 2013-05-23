@@ -1,68 +1,103 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 23 May 2013 16:32:50 +0200
-Subject: [PATCH v2 0/3] Marvell PCIe driver improvements
-Message-ID: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu, 23 May 2013 16:32:51 +0200
+Subject: [PATCH v2 1/3] pci: mvebu: no longer fake the slot location of
+ downstream devices
+In-Reply-To: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369319573-19927-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn, Jason, Andrew, Gregory,
+By default, the Marvell hardware, for each PCIe interface, exhibits
+the following devices:
 
-Here is an updated version of the PCIe improvements.
+ * On slot 0, a "Marvell Memory controller", identical on all PCIe
+   interfaces, and which isn't useful when the Marvell SoC is the PCIe
+   root complex (i.e, the normal case when we run Linux on the Marvell
+   SoC).
 
-Changes since v1:
+ * On slot 1, the real PCIe card connected into the PCIe slot of the
+   board.
 
- * Fix some typos in the comments of PATCH 2, noticed by Bjorn
-   Helgaas.
+So, what the Marvell PCIe driver was doing in its PCI-to-PCI bridge
+emulation is that when the Linux PCI core was trying to access the
+device in slot 0, we were in fact forwarding the configuration
+transaction to the device in slot 1. For all other slots, we were
+telling the Linux PCI core that there was no device connected.
 
- * Rework the two last patches (first one was fixing the capability
-   list, the other one the emulation of the devsel bits in the status
-   register), after the comments of Bjorn. In fact, it turns out that
-   the status register is composed of read-only bits for which we want
-   to emulate a value of zero, and the other bits are write-1-to-clear
-   bits that expose error conditions that we do not handle in the
-   emulated bridge. So, in summary, emulating a 0 status register on
-   reads, and ignoring writes to the status register is the simplest
-   solution. If we later on implement a capability list, we can use a
-   more clever emulation of the status register, but for the moment,
-   this simple solution is enough. Therefore, the two last patches are
-   now one single, simpler patch.
+However, new versions of bootloaders from Marvell change the default
+PCIe configuration, and make the real device appear in slot 0, and the
+"Marvell Memory controller" in slot 1.
 
-I'd like those improvements to be kept separated from the original
-PCIe driver itself: while the PCIe driver has been around and reviewed
-for a long time, those improvements are newer. And I clearly do not
-want the PCIe driver to miss 3.11 because of any problem that could be
-found in those additional improvements.
+Therefore, this commit modifies the Marvell PCIe driver to adjust the
+PCIe hardware configuration to make sure that this behavior (real
+device in slot 0, "Marvell Memory controller" in slot 1) is the one
+we'll see regardless of what the bootloader has done. It allows to
+remove the little hack that was forwarding configuration transactions
+on slot 0 to slot 1, which is nice.
 
-The main improvement being brought here is that the PCI-to-PCI bridge
-logic is fixed/extended to properly support physical PCIe bridges that
-are connected on a PCIe interface of a Marvell board. Without this
-improvement, only the devices connected directly to the PCIe
-interfaces of the board are properly enumerated. Any device that would
-sit beyond a physical bridge is not visible.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/pci/host/pci-mvebu.c |   19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
 
-Bjorn, with your Acked-by, could the Marvell maintainers include those
-patches in their branch, merged through arm-soc? They already have the
-Marvell PCIe driver itself, so I believe it makes sense to merge those
-improvements through the same path.
-
-Jason, those patches have been prepared on top of my marvell-pcie-v10
-branch, I hope that's ok for you. If you want me to rebase them on
-some other branch in which you have integrated the PCIe driver, don't
-hesitate to tell me to do so. That said, since those patches are only
-touching the driver itself and no other file, they should not cause
-any conflict with other changes.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (3):
-  pci: mvebu: no longer fake the slot location of downstream devices
-  pci: mvebu: allow the enumeration of devices beyond physical bridges
-  pci: mvebu: fix the emulation of the status register
-
- drivers/pci/host/pci-mvebu.c |   55 +++++++++++++++++++++++++++++++++---------
- 1 file changed, 44 insertions(+), 11 deletions(-)
-
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index ad1c46b..0bc21b0 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -51,6 +51,7 @@
+ #define  PCIE_CTRL_X1_MODE		0x0001
+ #define PCIE_STAT_OFF		0x1a04
+ #define  PCIE_STAT_BUS                  0xff00
++#define  PCIE_STAT_DEV                  0x1f0000
+ #define  PCIE_STAT_LINK_DOWN		BIT(0)
+ #define PCIE_DEBUG_CTRL         0x1a60
+ #define  PCIE_DEBUG_SOFT_RESET		BIT(20)
+@@ -148,6 +149,16 @@ static void mvebu_pcie_set_local_bus_nr(struct mvebu_pcie_port *port, int nr)
+ 	writel(stat, port->base + PCIE_STAT_OFF);
+ }
+ 
++static void mvebu_pcie_set_local_dev_nr(struct mvebu_pcie_port *port, int nr)
++{
++	u32 stat;
++
++	stat = readl(port->base + PCIE_STAT_OFF);
++	stat &= ~PCIE_STAT_DEV;
++	stat |= nr << 16;
++	writel(stat, port->base + PCIE_STAT_OFF);
++}
++
+ /*
+  * Setup PCIE BARs and Address Decode Wins:
+  * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
+@@ -572,8 +583,7 @@ static int mvebu_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 
+ 	/* Access the real PCIe interface */
+ 	spin_lock_irqsave(&port->conf_lock, flags);
+-	ret = mvebu_pcie_hw_wr_conf(port, bus,
+-				    PCI_DEVFN(1, PCI_FUNC(devfn)),
++	ret = mvebu_pcie_hw_wr_conf(port, bus, devfn,
+ 				    where, size, val);
+ 	spin_unlock_irqrestore(&port->conf_lock, flags);
+ 
+@@ -606,8 +616,7 @@ static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+ 
+ 	/* Access the real PCIe interface */
+ 	spin_lock_irqsave(&port->conf_lock, flags);
+-	ret = mvebu_pcie_hw_rd_conf(port, bus,
+-				    PCI_DEVFN(1, PCI_FUNC(devfn)),
++	ret = mvebu_pcie_hw_rd_conf(port, bus, devfn,
+ 				    where, size, val);
+ 	spin_unlock_irqrestore(&port->conf_lock, flags);
+ 
+@@ -817,6 +826,8 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 			continue;
+ 		}
+ 
++		mvebu_pcie_set_local_dev_nr(port, 1);
++
+ 		if (mvebu_pcie_link_up(port)) {
+ 			port->haslink = 1;
+ 			dev_info(&pdev->dev, "PCIe%d.%d: link up\n",
 -- 
 1.7.9.5
