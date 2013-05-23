@@ -1,53 +1,65 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 23 May 2013 16:18:29 +0530
-Subject: [PATCH 23/63] dmaengine: ste_dma40: Also report the number of
- logical channels
-In-Reply-To: <1367591569-32197-24-git-send-email-lee.jones@linaro.org>
-References: <1367591569-32197-1-git-send-email-lee.jones@linaro.org>
- <1367591569-32197-24-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130523104829.GG30200@intel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 May 2013 12:24:01 +0100
+Subject: [PATCH] arch: configuration, deleting 'CONFIG_BUG' since
+ always need it.
+In-Reply-To: <201305231259.43750.arnd@arndb.de>
+References: <519DCBEF.3090208@asianux.com> <201305231139.38233.arnd@arndb.de>
+ <20130523100409.GK18614@n2100.arm.linux.org.uk>
+ <201305231259.43750.arnd@arndb.de>
+Message-ID: <20130523112401.GO18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 03, 2013 at 03:32:09PM +0100, Lee Jones wrote:
-> Now we know the total of physical and logical channels, we may as
-> well report them within the information log.
+On Thu, May 23, 2013 at 12:59:43PM +0200, Arnd Bergmann wrote:
+> On Thursday 23 May 2013, Russell King - ARM Linux wrote:
+> > So, if you want to use this, then you should update the CONFIG_BUG text
+> > to include a warning to this effect:
+> > 
+> >      Warning: if CONFIG_BUG is turned off, and control flow reaches
+> >      a BUG(), the system behaviour will be undefined.
+> > 
+> > so that people can make an informed choice about this, because at the
+> > moment:
+> > 
+> >           Disabling this option eliminates support for BUG and WARN, reducing
+> >           the size of your kernel image and potentially quietly ignoring
+> >           numerous fatal conditions. You should only consider disabling this
+> >           option for embedded systems with no facilities for reporting errors.
+> >           Just say Y.
+> > 
+> > will become completely misleading.  Turning this option off will not
+> > result in "quietly ignoring numerous fatal conditions".
 > 
-> Before:
-> dma40 dma40.0: hardware revision: 3 @ 0x801c0000 with 8 physical channels
-> 
-> After:
-> <as above ...> and 256 logical channels
-> 
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <djbw@fb.com>
-> Cc: Per Forlin <per.forlin@stericsson.com>
-> Cc: Rabin Vincent <rabin@rab.in>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
-Acked-by: Vinod Koul <vinod.koul@intel.com>
+> I must be missing something, to me the two descriptions mean the same thing.
 
---
-~Vinod
->  drivers/dma/ste_dma40.c |    5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-> index e5f0e3c..6d81f44 100644
-> --- a/drivers/dma/ste_dma40.c
-> +++ b/drivers/dma/ste_dma40.c
-> @@ -3213,8 +3213,9 @@ static struct d40_base * __init d40_hw_detect_init(struct platform_device *pdev)
->  
->  	num_log_chans = num_phy_chans * D40_MAX_LOG_CHAN_PER_PHY;
->  
-> -	dev_info(&pdev->dev, "hardware revision: %d @ 0x%x with %d physical channels\n",
-> -		 rev, res->start, num_phy_chans);
-> +	dev_info(&pdev->dev,
-> +		 "hardware rev: %d @ 0x%x with %d physical and %d logical channels\n",
-> +		 rev, res->start, num_phy_chans, num_log_chans);
->  
->  	base = kzalloc(ALIGN(sizeof(struct d40_base), 4) +
->  		       (num_phy_chans + num_log_chans + ARRAY_SIZE(dma40_memcpy_channels)) *
-> -- 
-> 1.7.10.4
-> 
+To me, the current text suggests that we still detect the fatal condition
+but the code continues to execute in a manner controlled by the program.
+
+The latter is uncontrolled code (or data) execution in ways unspecified
+by the program.
+
+> You don't just want to avoid the code for printing the bug message and
+> the invalid instruction, we also want the compiler to not emit the 
+> function call or check the enum for unexpected values. The meaning of
+> BUG() is really that person writing that statement was sure it cannot
+> happen unless there is a bug in the kernel, which has likely already
+> corrupted data. Printing a diagnostic at this point is nice if someone
+> is there to look at it, but letting the kernel do further actions that
+> may be undefined is not going to make things worse.
+
+I'm not talking about printing a diagnostic.  I'm talking about the CPU
+remaining under the control of the program it is running - that being
+the Linux kernel.
+
+With CONFIG_BUG unset, turning on things like reboot-on-panic and such
+like is worthless.  Arguably even is having a hardware watchdog - because
+even if you hit one of these BUG() conditions where the CPU goes off and
+does its own thing, it might be sufficient that the system is still able
+to take care of the watchdog.
+
+This is the problem you guys are missing - unreachable() means "we lose
+control of the CPU at this point".
+
+If you have an embedded system and you've taken out all the printk()
+stuff, you most certainly want the system to do _something_ if you hit
+an unexpected condition.
