@@ -1,63 +1,44 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 23 May 2013 10:20:09 +0200
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
-In-Reply-To: <519DCEE9.6070208@schinagl.nl>
-References: <1368797744-13737-1-git-send-email-oliver+list@schinagl.nl>
- <1368797744-13737-2-git-send-email-oliver+list@schinagl.nl>
- <CACRpkdaWADjy1YZXTcRaXU+ZsS6_pG0hojQdnz=qeTgyVY7_Ww@mail.gmail.com>
- <519DCEE9.6070208@schinagl.nl>
-Message-ID: <CACRpkdZveQsVpw7_FnecGNZX4nVwWMtVwme7JEcy1R7uvdEe8A@mail.gmail.com>
+Date: Thu, 23 May 2013 10:23:43 +0200
+Subject: [PATCH] regulator: ab8500-ext: Don't register without
+ initialisation data
+In-Reply-To: <201305221608.10759.arnd@arndb.de>
+References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
+ <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYHiwbGonH80aJfHxP6F+hLb+_KdCr_g5ae1Yr-v=WcxA@mail.gmail.com>
+ <201305221608.10759.arnd@arndb.de>
+Message-ID: <CACRpkdacteTbFkOQ9w3LQCwN+RDviK04j77itz7uyTiY56+nCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 10:10 AM, Oliver Schinagl
-<oliver+list@schinagl.nl> wrote:
-> On 05/23/13 09:56, Linus Walleij wrote:
+On Wed, May 22, 2013 at 4:08 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 22 May 2013, Linus Walleij wrote:
+>> > diff --git a/drivers/regulator/ab8500-ext.c b/drivers/regulator/ab8500-ext.c
+>> > index b4d4547..8421537 100644
+>> > --- a/drivers/regulator/ab8500-ext.c
+>> > +++ b/drivers/regulator/ab8500-ext.c
+>> > @@ -334,6 +334,12 @@ int ab8500_ext_regulator_init(struct platform_device *pdev)
+>> >                 return -EINVAL;
+>> >         }
+>> >
+>> > +       /* have any external regulators been specified? */
+>> > +       if (pdata->num_ext_regulator == 0) {
+>> > +               dev_warn(&pdev->dev, "Not using external regulators\n");
+>> > +               return 0;
+>> > +       }
 >>
->> On Fri, May 17, 2013 at 3:35 PM, Oliver Schinagl
->> <oliver+list@schinagl.nl> wrote:
->>
->> (...)
->>>
->>> While initially these fuses are used to somewhat determin the chipID,
->>> these
->>> appear to be writeable by the user and thus can be used for other
->>> purpouses.
->>> For example storing a 128 bit root key, a unique serial number, which
->>> could
->>> then even be used as a MAC address.
->>
->> (...)
->> Then follows some code to read out the keys from sysfs I guess..
->>>
->>> +static int __init sid_probe(struct platform_device *pdev)
->>
->>
->> It's really simple to actually make the kernel use this to seed the
->> entropy pool.
->>
->> #include <linux/random.h>
->> add_device_randomness(u8 *, num);
->>
->> If you know after probe that you can read out a number of bytes
->> of device-unique data, I think you should add those bytes to the
->> entropy pool like this.
+>> dev_warn() is really when we warn about something really nasty, worse
+>> than dev_err(). It seems dev_info() is more apropriate.
 >
-> While that is a great idea, we can't guarantee device uniqueness. We've
-> already seen some chips that where 'forgotten' to program and default set to
-> all 0. I guess that doesn't have to be a bad thing.
+> Are you confusing it with dev_crit()?
+>
+> This is how the levels are defined, and "warning" is less urgent than "error":
 
-Ted can confirm but AFAIK that is not a problem. This device-unique
-numer is just one of the things mixed into the pool, if it's on some
-devices just an array of zeroes it does not make things worse, but
-in the cases when there is some uniqueness in it make things better.
+Yeah :-/
 
-> It should probably be noted, that the sunxi series have a hardware crypto
-> engine, with hardware random seed generator, one for a later project.
+But I still think this should be just dev_info().
 
-That will anyway be augmented with the contents of the entropy
-pool rather than returned to random clients right off if I know the
-recent changes to random code right.
+No big deal though.
 
 Yours,
 Linus Walleij
