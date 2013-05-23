@@ -1,58 +1,99 @@
 From: avinashphilip@ti.com (Philip, Avinash)
-Date: Thu, 23 May 2013 06:27:09 +0000
+Date: Thu, 23 May 2013 06:27:08 +0000
 Subject: [PATCH 02/11] gpio: davinci: coding style correction
-In-Reply-To: <20130522144042.GG18614@n2100.arm.linux.org.uk>
+In-Reply-To: <519CC142.7050301@cogentembedded.com>
 References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
  <1369206634-6778-3-git-send-email-avinashphilip@ti.com>
- <20130522144042.GG18614@n2100.arm.linux.org.uk>
-Message-ID: <518397C60809E147AF5323E0420B992E3EAC7AE8@DBDE04.ent.ti.com>
+ <519CC142.7050301@cogentembedded.com>
+Message-ID: <518397C60809E147AF5323E0420B992E3EAC7AE3@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 20:10:42, Russell King - ARM Linux wrote:
-> On Wed, May 22, 2013 at 12:40:25PM +0530, Philip Avinash wrote:
-> >  /*
-> >   * Assuming the pin is muxed as a gpio output, set its output value.
-> >   */
+On Wed, May 22, 2013 at 18:29:46, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 22-05-2013 11:10, Philip Avinash wrote:
+> 
+> > 1. Corrects coding and commenting styles
+> > 2. Variables name change to meaningful name
+> > 3. Remove unnecessary variable usage
+> > 4. Add BINTEN macro definition
+> >
+> > Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> > ---
+> >   drivers/gpio/gpio-davinci.c |  182 +++++++++++++++++++++----------------------
+> >   1 file changed, 89 insertions(+), 93 deletions(-)
+> 
+> > diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+> > index 17df6db..d308955 100644
+> > --- a/drivers/gpio/gpio-davinci.c
+> > +++ b/drivers/gpio/gpio-davinci.c
+> [...]
+> > @@ -31,10 +31,11 @@ struct davinci_gpio_regs {
+> >   	u32	intstat;
+> >   };
+> >
+> > +#define BINTEN	0x08 /* GPIO Interrupt Per-Bank Enable Register */
+> 
+>     Empty line needed here.
+
+Ok, I will add.
+
+> 
+> >   #define chip2controller(chip)	\
+> >   	container_of(chip, struct davinci_gpio_controller, chip)
+> >
+> [...]
+> > @@ -98,8 +94,8 @@ static int davinci_direction_in(struct gpio_chip *chip, unsigned offset)
+> >   	return __davinci_direction(chip, offset, false, 0);
+> >   }
+> >
+> > -static int
+> > -davinci_direction_out(struct gpio_chip *chip, unsigned offset, int value)
+> > +static int davinci_direction_out(struct gpio_chip *chip, unsigned offset,
+> > +		int value)
+> 
+>      This line should be aligned under the next character after (.
+
+Will remove this change as Russel pointed out.
+
+> 
+> [...]
+> > @@ -113,22 +109,22 @@ davinci_direction_out(struct gpio_chip *chip, unsigned offset, int value)
+> [...]
+> >   /*
+> >    * Assuming the pin is muxed as a gpio output, set its output value.
+> >    */
 > > -static void
 > > -davinci_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
 > > +static void davinci_gpio_set(struct gpio_chip *chip, unsigned offset,
 > > +		int value)
 > 
-> This kind of stuff is just churn.  If you read Documentation/CodingStyle:
-> 
-> Statements longer than 80 columns will be broken into sensible chunks, unless
-> exceeding 80 columns significantly increases readability and does not hide
-> information. Descendants are always substantially shorter than the parent and
-> are placed substantially to the right. The same applies to function headers
-> with a long argument list. However, never break user-visible strings such as
-> printk messages, because that breaks the ability to grep for them.
-> 
-> "broken into sensible chunks".  Here's the question: is the former a
-> sensible format?  Arguably it is because it results in all the arguments
-> fitting on one line at the expense of missing the return value.
-> 
-> The latter is also a sensible format - but breaks the arguments instead
-> of the return value.
-> 
-> Both formats can be found in their entirety by grep by function name alone:
-> 
-> 	grep -1 davinci_gpio_set
-> 
-> or if you prefer to type some more then you end up with more specific
-> 
-> 	grep -A1 davinci_gpio_set
-> or
-> 	grep -B1 davinci_gpio_set
-> 
-> depending on the version.
-> 
-> Where there's no clear advantage one way or the other, let the authors
-> preference stand.
+>      Same here.
 
-Ok I understood and I will remove these changes in next version.
+I will remove this change as Russel pointed out.
+
+> 
+> [...]
+> > @@ -368,16 +363,16 @@ static int __init davinci_gpio_irq_setup(void)
+> [...]
+> >   	for (gpio = 0, bank = 0; gpio < ngpio; bank++, gpio += 32) {
+> > -		chips[bank].chip.to_irq = gpio_to_irq_banked;
+> > -		chips[bank].irq_base = soc_info->gpio_unbanked
+> > -			? -EINVAL
+> > -			: (soc_info->intc_irq_num + gpio);
+> > +		ctlrs[bank].chip.to_irq = gpio_to_irq_banked;
+> > +		ctlrs[bank].irq_base = soc_info->gpio_unbanked ?
+> > +			-EINVAL : (soc_info->intc_irq_num + gpio);
+> 
+>     () not needed here.
+
+Ok will remove in next version ().
 
 Thanks
 Avinash
 
+> 
+> WBR, Sergei
+> 
 > 
