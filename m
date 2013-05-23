@@ -1,103 +1,93 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 23 May 2013 16:32:52 +0200
-Subject: [PATCH v2 2/3] pci: mvebu: allow the enumeration of devices beyond
- physical bridges
+Date: Thu, 23 May 2013 16:32:53 +0200
+Subject: [PATCH v2 3/3] pci: mvebu: fix the emulation of the status register
 In-Reply-To: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369319573-19927-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369319573-19927-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now, the Marvell PCIe driver was only allowing the enumeration
-of the devices in the secondary bus of the emulated PCI-to-PCI
-bridge. This works fine when a PCIe device is directly connected into
-a PCIe slot of the Marvell board.
+The status register of the PCI configuration space of PCI-to-PCI
+bridges contain some read-only bits, and so write-1-to-clear bits. So,
+the Linux PCI core sometimes writes 0xffff to this status register,
+and in the current PCI-to-PCI bridge emulation code of the Marvell
+driver, we do take all those 1s being written. Even the read-only bits
+are being overwritten.
 
-However, when the device connected in the PCIe slot is a physical PCIe
-bridge, beyond which a real PCIe device is connected, it no longer
-worked, as the driver was preventing the Linux PCI core from seeing
-such devices.
+For now, all the read-only bits should be emulated to have the zero
+value.
 
-This commit fixes that by ensuring that configuration transactions on
-subordinate busses are properly forwarded on the right PCIe interface.
+The other bits, that are write-1-to-clear bits are used to report
+various kind of errors, and are never set by the emulated bridge, so
+there is no need to support this write-1-to-clear bits mechanism.
 
-Thanks to this patch, a PCIe card beyond a PCIe bridge, itself beyond
-the emulated PCI-to-PCI bridge is properly detected, with the
-following layout:
+As a conclusion, the easiest solution is to simply emulate this status
+register by returning zero when read, and ignore the writes to it.
 
--[0000:00]-+-01.0-[01]----00.0
-           +-09.0-[02-07]----00.0-[03-07]--+-01.0-[04]--
-           |                               +-05.0-[05]--
-           |                               +-07.0-[06]--
-           |                               \-09.0-[07]----00.0
-           \-0a.0-[08]----00.0
+This has two visible effects:
 
-Where the PCIe interface that sits beyond the emulated PCI-to-PCI
-bridge at 09.0 allows to access the secondary bus 02, on which there
-is a PCIe bridge that allows to access the 3 to 7 busses, that are
-subordinates to this bridge. And on one of this bus (bus 7), there is
-one real PCIe device connected.
+ * The devsel is no longer 'unknown' in, i.e
+
+   Flags: bus master, 66MHz, user-definable features, ?? devsel, latency 0
+
+   becomes:
+
+   Flags: bus master, 66MHz, user-definable features, fast devsel, latency 0
+
+   in lspci -v.
+
+   This was caused by a value of 11b being read for devsel, which is
+   an invalid value. This 11b value being read was due to a previous
+   write of 0xffff into the status register.
+
+ * The capability list is no longer broken, because we indicate to the
+   Linux PCI core that we don't have a Capabilities Pointer in the PCI
+   configuration space of this bridge. The following message is
+   therefore no longer visible in lspci -v:
+
+   Capabilities: [fc] <chain broken>
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/pci/host/pci-mvebu.c |   31 ++++++++++++++++++++++++++++---
- 1 file changed, 28 insertions(+), 3 deletions(-)
+ drivers/pci/host/pci-mvebu.c |    5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 0bc21b0..a3c4638 100644
+index a3c4638..481e44a 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -554,7 +554,8 @@ mvebu_pcie_find_port(struct mvebu_pcie *pcie, struct pci_bus *bus,
- 		if (bus->number == 0 && port->devfn == devfn)
- 			return port;
- 		if (bus->number != 0 &&
--		    port->bridge.secondary_bus == bus->number)
-+		    bus->number >= port->bridge.secondary_bus &&
-+		    bus->number <= port->bridge.subordinate_bus)
- 			return port;
- 	}
+@@ -69,7 +69,6 @@ struct mvebu_sw_pci_bridge {
+ 	u16 vendor;
+ 	u16 device;
+ 	u16 command;
+-	u16 status;
+ 	u16 class;
+ 	u8 interface;
+ 	u8 revision;
+@@ -359,7 +358,6 @@ static void mvebu_sw_pci_bridge_init(struct mvebu_pcie_port *port)
  
-@@ -578,7 +579,18 @@ static int mvebu_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
- 	if (bus->number == 0)
- 		return mvebu_sw_pci_bridge_write(port, where, size, val);
+ 	memset(bridge, 0, sizeof(struct mvebu_sw_pci_bridge));
  
--	if (!port->haslink || PCI_SLOT(devfn) != 0)
-+	if (!port->haslink)
-+		return PCIBIOS_DEVICE_NOT_FOUND;
-+
-+	/*
-+	 * On the secondary bus, we don't want to expose any other
-+	 * device than the device physically connected in the PCIe
-+	 * slot, visible in slot 0. In slot 1, there's a special
-+	 * Marvell device that only makes sense when the Armada is
-+	 * used as a PCIe endpoint.
-+	 */
-+	if (bus->number == port->bridge.secondary_bus &&
-+	    PCI_SLOT(devfn) != 0)
- 		return PCIBIOS_DEVICE_NOT_FOUND;
+-	bridge->status = PCI_STATUS_CAP_LIST;
+ 	bridge->class = PCI_CLASS_BRIDGE_PCI;
+ 	bridge->vendor = PCI_VENDOR_ID_MARVELL;
+ 	bridge->device = MARVELL_EMULATED_PCI_PCI_BRIDGE_ID;
+@@ -386,7 +384,7 @@ static int mvebu_sw_pci_bridge_read(struct mvebu_pcie_port *port,
+ 		break;
  
- 	/* Access the real PCIe interface */
-@@ -609,7 +621,20 @@ static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
- 	if (bus->number == 0)
- 		return mvebu_sw_pci_bridge_read(port, where, size, val);
+ 	case PCI_COMMAND:
+-		*value = bridge->status << 16 | bridge->command;
++		*value = bridge->command;
+ 		break;
  
--	if (!port->haslink || PCI_SLOT(devfn) != 0) {
-+	if (!port->haslink) {
-+		*val = 0xffffffff;
-+		return PCIBIOS_DEVICE_NOT_FOUND;
-+	}
-+
-+	/*
-+	 * On the secondary bus, we don't want to expose any other
-+	 * device than the device physically connected in the PCIe
-+	 * slot, visible in slot 0. In slot 1, there's a special
-+	 * Marvell device that only makes sense when the Armada is
-+	 * used as a PCIe endpoint.
-+	 */
-+	if (bus->number == port->bridge.secondary_bus &&
-+	    PCI_SLOT(devfn) != 0) {
- 		*val = 0xffffffff;
- 		return PCIBIOS_DEVICE_NOT_FOUND;
- 	}
+ 	case PCI_CLASS_REVISION:
+@@ -479,7 +477,6 @@ static int mvebu_sw_pci_bridge_write(struct mvebu_pcie_port *port,
+ 	switch (where & ~3) {
+ 	case PCI_COMMAND:
+ 		bridge->command = value & 0xffff;
+-		bridge->status = value >> 16;
+ 		break;
+ 
+ 	case PCI_BASE_ADDRESS_0 ... PCI_BASE_ADDRESS_1:
 -- 
 1.7.9.5
