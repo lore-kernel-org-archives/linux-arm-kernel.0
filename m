@@ -1,61 +1,20 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 23 May 2013 15:52:48 +0530
-Subject: [PATCH] dmatest: abort transfers immediately when asked for
-In-Reply-To: <CAHp75Vf58kq0t7+et9i54fxjEdQfBrTWxji4xk_MS-fZgWGOdQ@mail.gmail.com>
-References: <20130516153553.GI11706@mudshark.cambridge.arm.com>
- <1369139597-24446-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <20130521151143.GH10453@mudshark.cambridge.arm.com>
- <CAHp75VdRn8baf0ak57HpoJKNues6vEsjBp1uOQ2Zpvwa+B5rjA@mail.gmail.com>
- <20130523100932.GA30200@intel.com>
- <CAHp75Vf58kq0t7+et9i54fxjEdQfBrTWxji4xk_MS-fZgWGOdQ@mail.gmail.com>
-Message-ID: <20130523102248.GC30200@intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 23 May 2013 12:00:26 +0100
+Subject: [PATCH v4 25/32] arm64: KVM: 32bit handling of coprocessor traps
+In-Reply-To: <1368540840-26750-26-git-send-email-marc.zyngier@arm.com>
+References: <1368540840-26750-1-git-send-email-marc.zyngier@arm.com>
+ <1368540840-26750-26-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130523110025.GG16722@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 01:51:29PM +0300, Andy Shevchenko wrote:
-> On Thu, May 23, 2013 at 1:09 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> > On Tue, May 21, 2013 at 08:24:15PM +0300, Andy Shevchenko wrote:
-> >> On Tue, May 21, 2013 at 6:11 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >> > On Tue, May 21, 2013 at 01:33:17PM +0100, Andy Shevchenko wrote:
-> >> >> When thread is going to be stopped we have to unconditionally terminate all
-> >> >> ongoing transfers. Otherwise it would be possible that callback function will
-> >> >> be called on the next interrupt and will try to access to already freed
-> >> >> structures.
-> >> >>
-> >> >> The patch introduces specific error message for this, though it doesn't
-> >> >> increase the counter of the failed tests.
-> >> >>
-> >> > Thanks for persevering with this! Although this patch definitely fixes the
-> >> > panic I was seeing, I now observe buffer verification failures in subsequent
-> >> > test runs after an aborted run:
-> >>
-> >> I think the description to the commit adfa543e "dmatest: don't use
-> >> set_freezable_with_signal()" may shed light on this.
-> >>
-> >> The background (if  I got it correctly) is in race with done flag. So,
-> >> we got a callback call from the DMA engine, but we don't know which
-> >> transfer triggers it.
-> >> I might be wrong. This is just an assumption.
-> >>
-> >> Have you ever see such behaviour on pre v3.10-rc1 kernels? (I mean
-> >> with old dmatest module)
-> > Terminate shouldnt cause the issue with buffer verfication, can you try this on
-> > dw_dmac, do you see similar failures on verfication?
+On Tue, May 14, 2013 at 03:13:53PM +0100, Marc Zyngier wrote:
+> Provide the necessary infrastructure to trap coprocessor accesses that
+> occur when running 32bit guests.
 > 
-> I saw the similar errors on dw_dmac on Intel Medfield device.
-Ah, so may not be a driver issue.
-
-> Anyway, I checked another approach with Will.
-> For now I will send a quick fix that prevents tester to abort an
-> ongoing transfer.
-okay so taht should prevent regression, let me check on my setup if I find
-anything
-
---
-~Vinod
-> In future we could implement a robust logic when transfers can be
-> interrupted at any time.
+> Also wire SMC and HVC trapped in 32bit mode while were at it.
 > 
-> -- 
-> With Best Regards,
-> Andy Shevchenko
+> Reviewed-by: Christopher Covington <cov@codeaurora.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
