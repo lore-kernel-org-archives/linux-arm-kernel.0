@@ -1,99 +1,48 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Thu, 23 May 2013 06:27:08 +0000
-Subject: [PATCH 02/11] gpio: davinci: coding style correction
-In-Reply-To: <519CC142.7050301@cogentembedded.com>
-References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
- <1369206634-6778-3-git-send-email-avinashphilip@ti.com>
- <519CC142.7050301@cogentembedded.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EAC7AE3@DBDE04.ent.ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 23 May 2013 08:35:09 +0200
+Subject: [PATCH 0/4] Marvell PCIe driver improvements
+In-Reply-To: <20130523001353.GH31625@1wt.eu>
+References: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130523001353.GH31625@1wt.eu>
+Message-ID: <20130523083509.79297513@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 18:29:46, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 22-05-2013 11:10, Philip Avinash wrote:
-> 
-> > 1. Corrects coding and commenting styles
-> > 2. Variables name change to meaningful name
-> > 3. Remove unnecessary variable usage
-> > 4. Add BINTEN macro definition
-> >
-> > Signed-off-by: Philip Avinash <avinashphilip@ti.com>
-> > ---
-> >   drivers/gpio/gpio-davinci.c |  182 +++++++++++++++++++++----------------------
-> >   1 file changed, 89 insertions(+), 93 deletions(-)
-> 
-> > diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-> > index 17df6db..d308955 100644
-> > --- a/drivers/gpio/gpio-davinci.c
-> > +++ b/drivers/gpio/gpio-davinci.c
-> [...]
-> > @@ -31,10 +31,11 @@ struct davinci_gpio_regs {
-> >   	u32	intstat;
-> >   };
-> >
-> > +#define BINTEN	0x08 /* GPIO Interrupt Per-Bank Enable Register */
-> 
->     Empty line needed here.
+Dear Willy Tarreau,
 
-Ok, I will add.
+On Thu, 23 May 2013 02:13:53 +0200, Willy Tarreau wrote:
 
+> > You'll find in this patch series 4 small patches that make various
+> > improvements to the Marvell PCIe driver.
+> (...)
 > 
-> >   #define chip2controller(chip)	\
-> >   	container_of(chip, struct davinci_gpio_controller, chip)
-> >
-> [...]
-> > @@ -98,8 +94,8 @@ static int davinci_direction_in(struct gpio_chip *chip, unsigned offset)
-> >   	return __davinci_direction(chip, offset, false, 0);
-> >   }
-> >
-> > -static int
-> > -davinci_direction_out(struct gpio_chip *chip, unsigned offset, int value)
-> > +static int davinci_direction_out(struct gpio_chip *chip, unsigned offset,
-> > +		int value)
-> 
->      This line should be aligned under the next character after (.
+> FWIW, these patches applied on top of your pcie-v10 tree have made
+> my mini-pcie dual-nic appear for the first time on the mirabox. Till
+> now I never knew if it was a hardware or software issue since the NIC
+> does not appear in u-boot nor lspci, whatever the kernel versions,
+> including the original Marvell one's. The NIC has two functions (one
+> per controller) and no bridge, so it may be a side effect of your
+> improvements (or maybe you fixed a bug).
 
-Will remove this change as Russel pointed out.
+Hum, interesting. Can you show the output of lspci -v and lspci -t
+(which a pciutils version of lspci, not Busybox one) ? I'm interested
+in seeing the layout of the PCIe bus with such a device, to get a
+better understanding.
 
+> Anyway for me it's a great improvement !
 > 
-> [...]
-> > @@ -113,22 +109,22 @@ davinci_direction_out(struct gpio_chip *chip, unsigned offset, int value)
-> [...]
-> >   /*
-> >    * Assuming the pin is muxed as a gpio output, set its output value.
-> >    */
-> > -static void
-> > -davinci_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
-> > +static void davinci_gpio_set(struct gpio_chip *chip, unsigned offset,
-> > +		int value)
+> I've not tried it on the OpenBlocks AX3 yet (it was not detected
+> there previously). But I have good hopes.
 > 
->      Same here.
+> For reference, the NIC is Jetway's ADMPEIDLA (intel i350-AM2).
 
-I will remove this change as Russel pointed out.
+Should I be taking this as a formal Tested-by from you? :-)
 
-> 
-> [...]
-> > @@ -368,16 +363,16 @@ static int __init davinci_gpio_irq_setup(void)
-> [...]
-> >   	for (gpio = 0, bank = 0; gpio < ngpio; bank++, gpio += 32) {
-> > -		chips[bank].chip.to_irq = gpio_to_irq_banked;
-> > -		chips[bank].irq_base = soc_info->gpio_unbanked
-> > -			? -EINVAL
-> > -			: (soc_info->intc_irq_num + gpio);
-> > +		ctlrs[bank].chip.to_irq = gpio_to_irq_banked;
-> > +		ctlrs[bank].irq_base = soc_info->gpio_unbanked ?
-> > +			-EINVAL : (soc_info->intc_irq_num + gpio);
-> 
->     () not needed here.
+Thanks!
 
-Ok will remove in next version ().
-
-Thanks
-Avinash
-
-> 
-> WBR, Sergei
-> 
-> 
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
