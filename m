@@ -1,21 +1,47 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 23 May 2013 13:39:56 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCBWMiA0LzZdIEFSTTogZHRzOiBpbXg2cTogYWRkIHBp?=
- =?UTF-8?B?bmN0cmwgZm9yIFdFSU0gTk9S?=
-In-Reply-To: <519DE109.1030903@freescale.com>
-References: <1369296978-7669-1-git-send-email-b32955@freescale.com>
- <1369300440.725629549@f101.mail.ru>
- <519DE109.1030903@freescale.com>
-Message-ID: <1369301996.738631947@f310.mail.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 23 May 2013 11:39:37 +0200
+Subject: [PATCH] arch: configuration,
+ deleting 'CONFIG_BUG' since always need it.
+In-Reply-To: <CAMuHMdWez-j1Maa3BD7ucmzv0_zFJnChERQiHFmkCaZUzG0_AA@mail.gmail.com>
+References: <519DCBEF.3090208@asianux.com>
+ <20130523090534.GJ18614@n2100.arm.linux.org.uk>
+ <CAMuHMdWez-j1Maa3BD7ucmzv0_zFJnChERQiHFmkCaZUzG0_AA@mail.gmail.com>
+Message-ID: <201305231139.38233.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I suggest remove "nor" label here since it can be used for other devices later.
-> this pinctrl is just for NOR.
+On Thursday 23 May 2013, Geert Uytterhoeven wrote:
+> > The problem is: trying to fix that will mean the result is a larger
+> > kernel than if you just do the usual arch-implemented thing of placing
+> > an defined faulting instruction at the BUG() site - which defeats the
+> > purpose of turning off CONFIG_BUG.
 > 
-> If we attach other device to WEIM, it maybe needs other PAD, such as
-> MX6Q_PAD_EIM_LBA__EIM_LBA_B. We need to add another pinctrl then.
+> Is __builtin_unreachable() working well these days?
+> 
 
-How we should define CS1 pin in your example for second device?
+Hmm, I just tried the trivial patch below, which seemed to do the right thing.
+Needs a little more investigation, but that might actually be the correct
+solution. I thought that at some point __builtin_unreachable() was the same
+as "do {} while (1)", but this is not the case with the gcc I was using --
+it just tells gcc that we don't expect to ever get here.
 
----
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/include/asm-generic/bug.h b/include/asm-generic/bug.h
+index 7d10f96..9afff7d 100644
+--- a/include/asm-generic/bug.h
++++ b/include/asm-generic/bug.h
+@@ -108,11 +108,11 @@ extern void warn_slowpath_null(const char *file, const int line);
+ 
+ #else /* !CONFIG_BUG */
+ #ifndef HAVE_ARCH_BUG
+-#define BUG() do {} while(0)
++#define BUG() __builtin_unreachable ()
+ #endif
+ 
+ #ifndef HAVE_ARCH_BUG_ON
+-#define BUG_ON(condition) do { if (condition) ; } while(0)
++#define BUG_ON(condition) do { if (condition) __builtin_unreachable(); } while(0)
+ #endif
+ 
+ #ifndef HAVE_ARCH_WARN_ON
