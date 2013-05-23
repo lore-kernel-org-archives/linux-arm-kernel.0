@@ -1,195 +1,301 @@
-From: kim.phillips@freescale.com (Kim Phillips)
-Date: Thu, 23 May 2013 11:46:54 -0500
-Subject: [PATCH v7] arm: use built-in byte swap function
-In-Reply-To: <1361661654.18110.102.camel@shinybook.infradead.org>
-References: <20130129181046.GC25415@pd.tnic>
- <20130208191208.2ef3d78bda71aa7b44d00d7b@freescale.com>
- <alpine.LFD.2.02.1302082102380.6300@xanadu.home>
- <20130219203115.114eab79e8d2099c6306d921@freescale.com>
- <alpine.LFD.2.03.1302192151280.6419@syhkavp.arg>
- <1361356696.13482.269.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302200835380.6419@syhkavp.arg>
- <1361367842.13482.279.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302200905300.6419@syhkavp.arg>
- <1361372008.13482.280.camel@i7.infradead.org>
- <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
- <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
- <alpine.LFD.2.03.1302202327370.6419@syhkavp.arg>
- <20130221005221.15279b1372501af12c1e4f32@freescale.com>
- <alpine.LFD.2.03.1302211134160.6419@syhkavp.arg>
- <20130221203327.6558f89277468f7ffffa6506@freescale.com>
- <alpine.LFD.2.03.1302212219100.6419@syhkavp.arg>
- <20130222194032.f7b44aefa5e2723d16767a1b@freescale.com>
- <1361661654.18110.102.camel@shinybook.infradead.org>
-Message-ID: <20130523114654.1f273241725205c6703b2226@freescale.com>
+From: Madhvapathi.Sriram@csr.com (Madhvapathi Sriram)
+Date: Thu, 23 May 2013 16:53:38 +0000
+Subject: [PATCH] input: sirfsoc_pwrc: add onkey input driver for CSR
+ SiRFprimaII PWRC
+In-Reply-To: <CAGsJ_4y6BwTpZpwYv0njvqYtp9Y0UU5qhVJhqG5X+8+Hy_LW8Q@mail.gmail.com>
+References: <1369239198-11059-1-git-send-email-Baohua.Song@csr.com>
+ <AAD401B65941D44692B7183E6577180803A11B7C@banasiexm01.ASIA.ROOT.PRI>,
+ <CAGsJ_4y6BwTpZpwYv0njvqYtp9Y0UU5qhVJhqG5X+8+Hy_LW8Q@mail.gmail.com>
+Message-ID: <AAD401B65941D44692B7183E6577180803A11BF4@banasiexm01.ASIA.ROOT.PRI>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the compiler intrinsic for byte swapping on arch ARM.  This
-allows the compiler to detect and be able to optimize out byte
-swappings, and has a very modest benefit on vmlinux size (Linaro gcc
-4.8):
+Agreed Barry. Please ignore my comments on resources management below.
 
-   text	   data	    bss	    dec	    hex	filename
-2840310	 123932	  61960	3026202	 2e2d1a	vmlinux-lart #orig
-2840152	 123932	  61960	3026044	 2e2c7c	vmlinux-lart #builtin-bswap
+Best Regards,
+Madhvapathi Sriram
 
-6473120	 314840	5616016	12403976 bd4508	vmlinux-mxs #orig
-6472586	 314848	5616016	12403450 bd42fa	vmlinux-mxs #builtin-bswap
+________________________________________
+From: Barry Song [21cnbao at gmail.com]
+Sent: Thursday, May 23, 2013 9:47 PM
+To: Madhvapathi Sriram
+Cc: dtor at mail.ru; dmitry.torokhov at gmail.com; linux-input at vger.kernel.org; DL-SHA-WorkGroupLinux; linux-arm-kernel at lists.infradead.org; Binghua Duan; Xianglong Du; Barry Song
+Subject: Re: [PATCH] input: sirfsoc_pwrc: add onkey input driver for CSR SiRFprimaII PWRC
 
-7419872	 318372	 379556	8117800	 7bde28	vmlinux-imx_v6_v7 #orig
-7419170	 318364	 379556	8117090	 7bdb62	vmlinux-imx_v6_v7 #builtin-bswap
+hi madhvapathi,
+thanks for comments.
 
-Signed-off-by: Kim Phillips <kim.phillips@freescale.com>
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
-Acked-by: David Woodhouse <David.Woodhouse@intel.com>
----
-resending as v6 appears to have fallen though the cracks.  Russell?
+2013/5/23 Madhvapathi Sriram <Madhvapathi.Sriram@csr.com>:
+> Comments inline.
+> ________________________________________
+> From: Barry Song [21cnbao at gmail.com]
+> Sent: Wednesday, May 22, 2013 9:43 PM
+> To: dtor at mail.ru; dmitry.torokhov at gmail.com
+> Cc: linux-input at vger.kernel.org; DL-SHA-WorkGroupLinux; linux-arm-kernel at lists.infradead.org; Binghua Duan; Xianglong Du; Barry Song
+> Subject: [PATCH] input: sirfsoc_pwrc: add onkey input driver for CSR SiRFprimaII PWRC
+>
+> From: Binghua Duan <Binghua.Duan@csr.com>
+>
+> there is an embedded PWRC(power controller) in SiRFprimaII and SiRFatlasVI,
+> we have an ONKEY button which can generate interrupt to IRQ controller.
+> in a typical user scenarios, at the runtime, if users touch the key, we put
+> system to s2ram status.
+>
+> Signed-off-by: Binghua Duan <Binghua.Duan@csr.com>
+> Signed-off-by: Xianglong Du <Xianglong.Du@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+> ---
+>  drivers/input/misc/Kconfig         |  10 +++
+>  drivers/input/misc/Makefile        |   1 +
+>  drivers/input/misc/sirfsoc_onkey.c | 176 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 187 insertions(+)
+>  create mode 100644 drivers/input/misc/sirfsoc_onkey.c
+>
+> diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+> index bb698e1..1d91d1b 100644
+> --- a/drivers/input/misc/Kconfig
+> +++ b/drivers/input/misc/Kconfig
+> @@ -637,4 +637,14 @@ config INPUT_XEN_KBDDEV_FRONTEND
+>           To compile this driver as a module, choose M here: the
+>           module will be called xen-kbdfront.
+>
+> +config INPUT_SIRFSOC_ONKEY
+> +       bool "CSR SiRFSoC power on/off/suspend key support"
+> +       depends on ARCH_SIRF
+> +       default y
+> +       help
+> +         Say Y here if you want to support for the SiRFSoC power on/off/suspend key
+> +         in Linux, after you press the onkey, system will suspend.
+> +
+> +         If unsure, say N.
+> +
+>  endif
+> diff --git a/drivers/input/misc/Makefile b/drivers/input/misc/Makefile
+> index d7fc17f..1d66f03 100644
+> --- a/drivers/input/misc/Makefile
+> +++ b/drivers/input/misc/Makefile
+> @@ -60,3 +60,4 @@ obj-$(CONFIG_INPUT_WISTRON_BTNS)      += wistron_btns.o
+>  obj-$(CONFIG_INPUT_WM831X_ON)          += wm831x-on.o
+>  obj-$(CONFIG_INPUT_XEN_KBDDEV_FRONTEND)        += xen-kbdfront.o
+>  obj-$(CONFIG_INPUT_YEALINK)            += yealink.o
+> +obj-$(CONFIG_INPUT_SIRFSOC_ONKEY)      += sirfsoc_onkey.o
+> diff --git a/drivers/input/misc/sirfsoc_onkey.c b/drivers/input/misc/sirfsoc_onkey.c
+> new file mode 100644
+> index 0000000..3e48db9
+> --- /dev/null
+> +++ b/drivers/input/misc/sirfsoc_onkey.c
+> @@ -0,0 +1,176 @@
+> +/*
+> + * Power key driver for SiRF PrimaII
+> + *
+> + * Copyright (c) 2013 Cambridge Silicon Radio Limited, a CSR plc group company.
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/init.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/delay.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/input.h>
+> +#include <linux/rtc/sirfsoc_rtciobrg.h>
+> +#include <linux/of.h>
+> +
+> +struct sirfsoc_pwrc_drvdata {
+> +       u32                     pwrc_base;
+> +       int                     irq;
+> +       struct input_dev        *input;
+> +};
+> +
+> +#define PWRC_ON_KEY_BIT                        (1 << 0)
+> +
+> +#define PWRC_INT_STATUS                        0xc
+> +#define PWRC_INT_MASK                  0x10
+> +
+> +static irqreturn_t sirfsoc_pwrc_isr(int irq, void *dev_id)
+> +{
+> +       struct sirfsoc_pwrc_drvdata *pwrcdrv =
+> +                       (struct sirfsoc_pwrc_drvdata *)dev_id;
+> +       u32 int_status;
+> +       int_status = sirfsoc_rtc_iobrg_readl(
+> +                       pwrcdrv->pwrc_base + PWRC_INT_STATUS);
+> +       sirfsoc_rtc_iobrg_writel(int_status & (~PWRC_ON_KEY_BIT),
+> +                       pwrcdrv->pwrc_base + PWRC_INT_STATUS);
+> +
+> +       /*
+> +        * For a typical Linux system, we report KEY_SUSPEND to trigger apm-power.c
+> +        * to queue a SUSPEND APM event
+> +        */
+> +       input_event(pwrcdrv->input, EV_PWR, KEY_SUSPEND, 1);
+> +       input_sync(pwrcdrv->input);
+> +
+> +       /*
+> +        * Todo: report KEY_POWER event for Android platforms, Android PowerManager
+> +        * will handle the suspend and powerdown/hibernation
+> +        */
+> +
+> +       return IRQ_HANDLED;
+> +}
+> +
+> +static const struct of_device_id sirfsoc_pwrc_of_match[] = {
+> +       { .compatible = "sirf,prima2-pwrc" },
+> +       {},
+> +}
+> +MODULE_DEVICE_TABLE(of, sirfsoc_pwrc_of_match);
+> +
+> +static int sirfsoc_pwrc_probe(struct platform_device *pdev)
+> +{
+> +       int ret;
+> +       struct sirfsoc_pwrc_drvdata *pwrcdrv = NULL;
+> +       struct device_node *np = pdev->dev.of_node;
+> +
+> +       pwrcdrv = devm_kzalloc(&pdev->dev,
+> +               sizeof(struct sirfsoc_pwrc_drvdata), GFP_KERNEL);
+> +       if (!pwrcdrv) {
+> +               dev_info(&pdev->dev, "kzalloc fail!\n");
+> +               return -ENOMEM;
+> +       }
+> +
+> +       /*
+> +        * we can't use of_iomap because pwrc is not mapped in memory, the so-called base
+> +        * address is only offset in rtciobrg
+> +        */
+> +       ret = of_property_read_u32(np, "reg", &pwrcdrv->pwrc_base);
+>
+> Possible mem leak here  - not freeing pwrcdrv
 
-v7: rebased onto next-20130521, re-ran above vmlinux sizes with
-    Linaro gcc 4.8, added Nicolas' Reviewed-by, and David's Acked-by.
-v6 and prior version information:
-    https://lkml.org/lkml/2013/2/22/475
+no. there is no mem leak here. devm_ means device management resources.
 
- arch/arm/Kconfig                  |  1 +
- arch/arm/boot/compressed/Makefile | 15 +++++++++++----
- arch/arm/kernel/armksyms.c        |  4 ++++
- arch/arm/lib/Makefile             |  2 +-
- arch/arm/lib/bswapsdi2.S          | 36 ++++++++++++++++++++++++++++++++++++
- 5 files changed, 53 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/lib/bswapsdi2.S
+>
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "unable to find base address of pwrc node in dtb\n");
+> +               return ret;
+> +       }
+> +
+> +       pwrcdrv->input = devm_input_allocate_device(&pdev->dev);
+> +       if (!pwrcdrv->input)
+> +               return -ENOMEM;
+> +
+> +       pwrcdrv->input->name = "sirfsoc pwrckey";
+> +       pwrcdrv->input->phys = "pwrc/input0";
+> +
+> +       platform_set_drvdata(pdev, pwrcdrv);
+> +
+> +       pwrcdrv->irq = platform_get_irq(pdev, 0);
+> +       ret = devm_request_irq(&pdev->dev, pwrcdrv->irq,
+> +                       sirfsoc_pwrc_isr, IRQF_SHARED,
+> +                       "sirfsoc_pwrc_int", pwrcdrv);
+> +
+> +       sirfsoc_rtc_iobrg_writel(
+> +               sirfsoc_rtc_iobrg_readl(pwrcdrv->pwrc_base + PWRC_INT_MASK)
+> +               | PWRC_ON_KEY_BIT, pwrcdrv->pwrc_base + PWRC_INT_MASK);
+>
+> Enabling the MASK for an interrupt should only come after it has been successfully claimed? Else we might be leaving and interrupt enabled without being able to handle it?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index a7fc5ea..c2fe04d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -63,6 +63,7 @@ config ARM
- 	select OLD_SIGSUSPEND3
- 	select OLD_SIGACTION
- 	select HAVE_CONTEXT_TRACKING
-+	select ARCH_USE_BUILTIN_BSWAP
- 	help
- 	  The ARM series is a line of low-power-consumption RISC chip designs
- 	  licensed by ARM Ltd and targeted at embedded applications and
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 198a4ad..bd8a176 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -112,12 +112,12 @@ endif
- 
- targets       := vmlinux vmlinux.lds \
- 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
--		 lib1funcs.o lib1funcs.S ashldi3.o ashldi3.S \
--		 font.o font.c head.o misc.o $(OBJS)
-+		 lib1funcs.o lib1funcs.S ashldi3.o ashldi3.S bswapsdi2.o \
-+		 bswapsdi2.S font.o font.c head.o misc.o $(OBJS)
- 
- # Make sure files are removed during clean
- extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern piggy.lz4 \
--		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs)
-+		 lib1funcs.S ashldi3.S bswapsdi2.S $(libfdt) $(libfdt_hdrs)
- 
- ifeq ($(CONFIG_FUNCTION_TRACER),y)
- ORIG_CFLAGS := $(KBUILD_CFLAGS)
-@@ -159,6 +159,12 @@ ashldi3 = $(obj)/ashldi3.o
- $(obj)/ashldi3.S: $(srctree)/arch/$(SRCARCH)/lib/ashldi3.S
- 	$(call cmd,shipped)
- 
-+# For __bswapsi2, __bswapdi2
-+bswapsdi2 = $(obj)/bswapsdi2.o
-+
-+$(obj)/bswapsdi2.S: $(srctree)/arch/$(SRCARCH)/lib/bswapsdi2.S
-+	$(call cmd,shipped)
-+
- # We need to prevent any GOTOFF relocs being used with references
- # to symbols in the .bss section since we cannot relocate them
- # independently from the rest at run time.  This can be achieved by
-@@ -180,7 +186,8 @@ if [ $(words $(ZRELADDR)) -gt 1 -a "$(CONFIG_AUTO_ZRELADDR)" = "" ]; then \
- fi
- 
- $(obj)/vmlinux: $(obj)/vmlinux.lds $(obj)/$(HEAD) $(obj)/piggy.$(suffix_y).o \
--		$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) FORCE
-+		$(addprefix $(obj)/, $(OBJS)) $(lib1funcs) $(ashldi3) \
-+		$(bswapsdi2) FORCE
- 	@$(check_for_multiple_zreladdr)
- 	$(call if_changed,ld)
- 	@$(check_for_bad_syms)
-diff --git a/arch/arm/kernel/armksyms.c b/arch/arm/kernel/armksyms.c
-index 60d3b73..ba578f7 100644
---- a/arch/arm/kernel/armksyms.c
-+++ b/arch/arm/kernel/armksyms.c
-@@ -35,6 +35,8 @@ extern void __ucmpdi2(void);
- extern void __udivsi3(void);
- extern void __umodsi3(void);
- extern void __do_div64(void);
-+extern void __bswapsi2(void);
-+extern void __bswapdi2(void);
- 
- extern void __aeabi_idiv(void);
- extern void __aeabi_idivmod(void);
-@@ -114,6 +116,8 @@ EXPORT_SYMBOL(__ucmpdi2);
- EXPORT_SYMBOL(__udivsi3);
- EXPORT_SYMBOL(__umodsi3);
- EXPORT_SYMBOL(__do_div64);
-+EXPORT_SYMBOL(__bswapsi2);
-+EXPORT_SYMBOL(__bswapdi2);
- 
- #ifdef CONFIG_AEABI
- EXPORT_SYMBOL(__aeabi_idiv);
-diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-index af72969..5383df7 100644
---- a/arch/arm/lib/Makefile
-+++ b/arch/arm/lib/Makefile
-@@ -13,7 +13,7 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
- 		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
- 		   ucmpdi2.o lib1funcs.o div64.o                      \
- 		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
--		   call_with_stack.o
-+		   call_with_stack.o bswapsdi2.o
- 
- mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
- 
-diff --git a/arch/arm/lib/bswapsdi2.S b/arch/arm/lib/bswapsdi2.S
-new file mode 100644
-index 0000000..2ba43a0
---- /dev/null
-+++ b/arch/arm/lib/bswapsdi2.S
-@@ -0,0 +1,36 @@
-+#include <linux/linkage.h>
-+
-+#if __LINUX_ARM_ARCH__ >= 6
-+ENTRY(__bswapsi2)
-+	rev	r0, r0
-+	bx	lr
-+ENDPROC(__bswapsi2)
-+
-+ENTRY(__bswapdi2)
-+	rev	r3, r0
-+	rev	r0, r1
-+	mov	r1, r3
-+	bx	lr
-+ENDPROC(__bswapdi2)
-+#else
-+ENTRY(__bswapsi2)
-+	eor     r3, r0, r0, ror #16
-+	mov     r3, r3, lsr #8
-+	bic     r3, r3, #0xff00
-+	eor     r0, r3, r0, ror #8
-+	mov     pc, lr
-+ENDPROC(__bswapsi2)
-+
-+ENTRY(__bswapdi2)
-+	mov     ip, r1
-+	eor     r3, ip, ip, ror #16
-+	eor     r1, r0, r0, ror #16
-+	mov     r1, r1, lsr #8
-+	mov     r3, r3, lsr #8
-+	bic     r3, r3, #0xff00
-+	bic     r1, r1, #0xff00
-+	eor     r1, r1, r0, ror #8
-+	eor     r0, r3, ip, ror #8
-+	mov     pc, lr
-+ENDPROC(__bswapdi2)
-+#endif
--- 
-1.8.1.5
+here moving ahead of request_irq and placing here both work. as there
+is another gate in irq controller.
+
+>
+> Possible mem leak here not freeing any allocated devices/memory/irq.
+> I suggest all the error handling be collated at the end of this function for various stages and error handling be done there.
+
+and we don't need to free devm_irq and devm_mem as well.
+
+> Please have a look at https://www.kernel.org/doc/Documentation/input/input-programming.txt
+>
+> +       if (ret) {
+> +               dev_err(&pdev->dev, "pwrc: Unable to claim irq %d; error %d\n",
+> +                       pwrcdrv->irq, ret);
+> +               return ret;
+> +       }
+> +
+> +       pwrcdrv->input->evbit[0] = BIT_MASK(EV_PWR) | BIT_MASK(EV_KEY);
+> +       set_bit(KEY_POWER, pwrcdrv->input->keybit);
+> +
+> +       ret = input_register_device(pwrcdrv->input);
+> +       if (ret) {
+> +               dev_err(&pdev->dev,
+> +                       "pwrc: Unable to register input device,error: %d\n",
+> +                       ret);
+> +               return ret;
+> +       }
+> +
+> +       device_init_wakeup(&pdev->dev, 1);
+> +
+> +       return 0;
+> +}
+> +
+> +static int sirfsoc_pwrc_remove(struct platform_device *pdev)
+> +{
+> +       device_init_wakeup(&pdev->dev, 0);
+> +
+> +       return 0;
+> +}
+> +
+> +#ifdef CONFIG_PM
+> +static int pwrc_suspend(struct device *dev)
+> +{
+> +       return 0;
+> +}
+> +
+> +static int pwrc_resume(struct device *dev)
+> +{
+> +       struct sirfsoc_pwrc_drvdata *pwrcdrv = dev_get_drvdata(dev);
+> +
+>
+> Typically, the wake up interrupts would be ensured to be active while going to sleep/suspend.
+> However, here at resume the interrupt mask is being set. Is it because, there are some caveats here?
+
+xianglong, pls explain.
+
+>
+> +       /*
+> +        * Do not mask pwrc interrupt as we want pwrc work as a wakeup source
+> +        * if users touch X_ONKEY_B, see arch/arm/mach-prima2/pm.c
+> +        */
+> +       sirfsoc_rtc_iobrg_writel(
+> +               sirfsoc_rtc_iobrg_readl(
+> +               pwrcdrv->pwrc_base + PWRC_INT_MASK) | PWRC_ON_KEY_BIT,
+> +               pwrcdrv->pwrc_base + PWRC_INT_MASK);
+> +
+> +       return 0;
+> +}
+> +
+> +static const struct dev_pm_ops sirfsoc_pwrc_pm_ops = {
+> +       .suspend = pwrc_suspend,
+> +       .resume = pwrc_resume,
+> +};
+> +#endif
+> +
+> +static struct platform_driver sirfsoc_pwrc_driver = {
+> +       .probe          = sirfsoc_pwrc_probe,
+> +       .remove         = sirfsoc_pwrc_remove,
+> +       .driver         = {
+> +               .name   = "sirfsoc-pwrc",
+> +               .owner  = THIS_MODULE,
+> +#ifdef CONFIG_PM
+> +               .pm     = &sirfsoc_pwrc_pm_ops,
+> +#endif
+> +               .of_match_table = of_match_ptr(sirfsoc_pwrc_of_match),
+> +       }
+> +};
+> +
+> +module_platform_driver(sirfsoc_pwrc_driver);
+> +
+> +MODULE_LICENSE("GPLv2");
+> +MODULE_AUTHOR("Binghua Duan <Binghua.Duan@csr.com>, "
+> +               "Xianglong Du <Xianglong.Du@csr.com>");
+> +MODULE_DESCRIPTION("CSR Prima2 PWRC Driver");
+> +MODULE_ALIAS("platform:sirfsoc-pwrc");
+> --
+> 1.8.2.3
+
+-barry
+
+
+ To report this email as spam click https://www.mailcontrol.com/sr/MZbqvYs5QwJvpeaetUwhCQ== .
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
