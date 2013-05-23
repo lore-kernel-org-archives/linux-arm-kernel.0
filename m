@@ -1,36 +1,101 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 23 May 2013 10:54:10 +0200
-Subject: [PATCH] arch: configuration,
- deleting 'CONFIG_BUG' since always need it.
-In-Reply-To: <CAMuHMdU7QuzgmWCH145p8PVebBzPo8DBAvbY+0AZa2cmGXmRHw@mail.gmail.com>
-References: <519DCBEF.3090208@asianux.com>
- <CAMuHMdU7QuzgmWCH145p8PVebBzPo8DBAvbY+0AZa2cmGXmRHw@mail.gmail.com>
-Message-ID: <201305231054.10735.arnd@arndb.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 23 May 2013 10:51:22 +0200
+Subject: [PATCH 0/3] ARM: at91: move aic driver to drivers/irqchip
+In-Reply-To: <1369298990-9826-1-git-send-email-b.brezillon@overkiz.com>
+References: <1369298990-9826-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20130523085122.GF9937@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 May 2013, Geert Uytterhoeven wrote:
-> > -config BUG
-> > -       bool "BUG() support" if EXPERT
-> > -       default y
-> > -       help
-> > -          Disabling this option eliminates support for BUG and WARN, reducing
-> > -          the size of your kernel image and potentially quietly ignoring
-> > -          numerous fatal conditions. You should only consider disabling this
-> > -          option for embedded systems with no facilities for reporting errors.
-> > -          Just say Y.
-> 
-> ... It's about reducing memory size on devices where you can't show bug or
-> warning messages.
-> 
-> > So need get rid of 'CONFIG_BUG', and let it always enabled everywhere.
-> 
-> So please keep it.
+Hi,
 
-Agreed. The one annoying property of disabling BUG() support is that it causes
-a large number of build warnings since the compiler now has to assume that a lot
-of code is reachable when it is normally annotate as unreachable.
+	please resend with git format-path -M so see the diff not the copy
 
-When I do "randconfig" tests, I always turn on CONFIG_BUG because of this.
-
-	Arnd
+Best Regsards,
+J.
+On 10:49 Thu 23 May     , Boris BREZILLON wrote:
+> Hello,
+> 
+> This patch series move the at91 AIC (Advance Interrupt Controller)
+> driver to the irqchip subsystem directory (drivers/irqchip).
+> 
+> It also make use of IRQCHIP_DECLARE to register irqchip for dt boards
+> instead of using the machine specific "init_irq" function.
+> 
+> Finally it register the arch specific irq handler inside the the init
+> functions using set_handle_irq. This way we can remove all the machine
+> specific "handle_irq".
+> 
+> This patch series was tested on kizbox board (sam9g20 SoC) using
+> device tree. Could someone test it on other boards (both dt and non dt)?
+> 
+> Best Regards,
+> Boris
+> 
+> 
+> Boris BREZILLON (3):
+>   ARM: at91: move at91 aic driver to drivers/irqchip
+>   ARM: at91: use IRQCHIP_DECLARE instead of machine specific init_irq
+>   ARM: at91: use set_handle_irq instead of machine specific handle_irq
+> 
+>  arch/arm/mach-at91/Makefile                |    2 +-
+>  arch/arm/mach-at91/at91_aic.h              |   99 -----
+>  arch/arm/mach-at91/at91rm9200.c            |    2 +-
+>  arch/arm/mach-at91/at91sam9260.c           |    2 +-
+>  arch/arm/mach-at91/at91sam9261.c           |    2 +-
+>  arch/arm/mach-at91/at91sam9263.c           |    2 +-
+>  arch/arm/mach-at91/at91sam9g45.c           |    2 +-
+>  arch/arm/mach-at91/at91sam9rl.c            |    2 +-
+>  arch/arm/mach-at91/at91x40.c               |    2 +-
+>  arch/arm/mach-at91/board-1arm.c            |    3 +-
+>  arch/arm/mach-at91/board-afeb-9260v1.c     |    3 +-
+>  arch/arm/mach-at91/board-cam60.c           |    3 +-
+>  arch/arm/mach-at91/board-carmeva.c         |    3 +-
+>  arch/arm/mach-at91/board-cpu9krea.c        |    3 +-
+>  arch/arm/mach-at91/board-cpuat91.c         |    3 +-
+>  arch/arm/mach-at91/board-csb337.c          |    3 +-
+>  arch/arm/mach-at91/board-csb637.c          |    3 +-
+>  arch/arm/mach-at91/board-dt-rm9200.c       |   15 +-
+>  arch/arm/mach-at91/board-dt-sam9.c         |   16 +-
+>  arch/arm/mach-at91/board-dt-sama5.c        |   16 +-
+>  arch/arm/mach-at91/board-eb01.c            |    4 +-
+>  arch/arm/mach-at91/board-eb9200.c          |    4 +-
+>  arch/arm/mach-at91/board-ecbat91.c         |    3 +-
+>  arch/arm/mach-at91/board-eco920.c          |    3 +-
+>  arch/arm/mach-at91/board-flexibity.c       |    3 +-
+>  arch/arm/mach-at91/board-foxg20.c          |    3 +-
+>  arch/arm/mach-at91/board-gsia18s.c         |    3 +-
+>  arch/arm/mach-at91/board-kafa.c            |    3 +-
+>  arch/arm/mach-at91/board-kb9202.c          |    3 +-
+>  arch/arm/mach-at91/board-pcontrol-g20.c    |    3 +-
+>  arch/arm/mach-at91/board-picotux200.c      |    3 +-
+>  arch/arm/mach-at91/board-qil-a9260.c       |    3 +-
+>  arch/arm/mach-at91/board-rm9200dk.c        |    3 +-
+>  arch/arm/mach-at91/board-rm9200ek.c        |    3 +-
+>  arch/arm/mach-at91/board-rsi-ews.c         |    4 +-
+>  arch/arm/mach-at91/board-sam9-l9260.c      |    3 +-
+>  arch/arm/mach-at91/board-sam9260ek.c       |    3 +-
+>  arch/arm/mach-at91/board-sam9261ek.c       |    3 +-
+>  arch/arm/mach-at91/board-sam9263ek.c       |    3 +-
+>  arch/arm/mach-at91/board-sam9g20ek.c       |    4 +-
+>  arch/arm/mach-at91/board-sam9m10g45ek.c    |    3 +-
+>  arch/arm/mach-at91/board-sam9rlek.c        |    3 +-
+>  arch/arm/mach-at91/board-snapper9260.c     |    3 +-
+>  arch/arm/mach-at91/board-stamp9g20.c       |    4 +-
+>  arch/arm/mach-at91/board-usb-a926x.c       |    5 +-
+>  arch/arm/mach-at91/board-yl-9200.c         |    3 +-
+>  arch/arm/mach-at91/generic.h               |    5 -
+>  arch/arm/mach-at91/include/mach/at91_aic.h |   96 +++++
+>  arch/arm/mach-at91/irq.c                   |  547 ---------------------------
+>  arch/arm/mach-at91/pm.c                    |    2 +-
+>  drivers/irqchip/Makefile                   |    1 +
+>  drivers/irqchip/irq-at91.c                 |  557 ++++++++++++++++++++++++++++
+>  52 files changed, 706 insertions(+), 773 deletions(-)
+>  delete mode 100644 arch/arm/mach-at91/at91_aic.h
+>  create mode 100644 arch/arm/mach-at91/include/mach/at91_aic.h
+>  delete mode 100644 arch/arm/mach-at91/irq.c
+>  create mode 100644 drivers/irqchip/irq-at91.c
+> 
+> -- 
+> 1.7.9.5
+> 
