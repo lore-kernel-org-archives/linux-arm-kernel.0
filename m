@@ -1,47 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 23 May 2013 15:09:57 +0200
-Subject: [PATCH V2 1/6] drivers: bus: add a new driver for WEIM
-In-Reply-To: <20130523115505.GG32299@pengutronix.de>
-References: <1369296978-7669-1-git-send-email-b32955@freescale.com>
- <201305231153.38111.arnd@arndb.de> <20130523115505.GG32299@pengutronix.de>
-Message-ID: <201305231509.57651.arnd@arndb.de>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Thu, 23 May 2013 15:13:44 +0200
+Subject: [PATCH 0/6] ARM: ux500: Update configurations for SD/SDIO/(e)MMC
+Message-ID: <1369314830-3727-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 May 2013, Sascha Hauer wrote:
-> > > >> +static int weim_remove(struct platform_device *pdev)
-> > > >> +{
-> > > >> +        struct imx_weim *weim = platform_get_drvdata(pdev);
-> > > >> +
-> > > >> +        clk_disable_unprepare(weim->clk);
-> > > > Once again: Is this clock needed for the child devices? If yes, you
-> > > > can't disable it here and leave the child devices registered.
-> > > >
-> > 
-> > But weim_remove will not be called as long as there are children
-> > registered, right?
-> 
-> But then weim_remove would never be called since nobody unregisters the
-> children, right?
-> 
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Ah, right. That is actually another problem: if the probe() function
-creates the child devices, the remove() function should tear them down
-again. If we do that, we can ensure that the clock is only turned
-off after the last child is gone.
+This patchset includes especially enablement for UHS-I SD cards, but
+also some cleanups and additional enabling of SD/SDIO/(e)MMC features.
 
-OTOH, I agree that it would be nicer if the clk could remain turned
-off as long as no children are active. Can we do a clk_disable()
-after setting up the timings for the children and then expect those
-to actually start up the clk again when they need it?
+These changes shall also be adapted to the corresponding DT files,
+but that is left as a separate task and outside this patchset.
 
-Or to take things further: would it make sense to represent WEIM
-itself as a clock driver and perform the settings for each child
-only when it sets up its own clk?
+Ulf Hansson (6):
+  ARM: ux500: Enable 100MHz for SD/SDIO/MMC devices
+  ARM: ux500: Don't set plf ocr mask for SD/MMC device
+  ARM: ux500: Enable support for RPMB and Reliable Write for eMMC
+  ARM: ux500: Enable support for discard for MMC/SD
+  ARM: ux500: Set eMMC and WLAN card slot as non-removable
+  ARM: ux500: Enable support for UHS-I SD-cards
 
-I guess it would also make sense to use of_platform_populate() instead
-of of_platform_device_create() when creating the children, so we actually
-create the entire hierarchy in case of the children itself is a
-"simple-bus".
+ arch/arm/mach-ux500/board-mop500-sdi.c |   34 +++++++++++++++++++++-----------
+ 1 file changed, 22 insertions(+), 12 deletions(-)
 
-	Arnd
+-- 
+1.7.10
