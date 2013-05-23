@@ -1,26 +1,53 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 23 May 2013 10:27:10 -0400 (EDT)
-Subject: [RFC V6 PATCH 1/3] USB: OHCI: prepare to make ohci-hcd a library
- module
-In-Reply-To: <1369307506-4458-2-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1305231026420.925-100000@iolanthe.rowland.org>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Thu, 23 May 2013 18:28:10 +0400
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSF0gQVJNOiBkdHM6IGlteDogZml4IGNsb2NrcyBmb3Ig?=
+ =?UTF-8?B?Y3NwaQ==?=
+In-Reply-To: <20130523123642.GK32299@pengutronix.de>
+References: <1369309085-31146-1-git-send-email-jonas@microbit.se>
+ <1369311059.366490908@f190.mail.ru>
+ <20130523123642.GK32299@pengutronix.de>
+Message-ID: <1369319290.379285076@f398.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 May 2013, Manjunath Goudar wrote:
-
-> This patch prepares ohci-hcd for being split up into a core
-> library and separate platform driver modules.  A generic
-> ohci_hc_driver structure is created, containing all the "standard"
-> values, and a new mechanism is added whereby a driver module can
-> specify a set of overrides to those values.  In addition the
-> ohci_restart(),ohci_suspend() and ohci_resume() routines need
-> to be EXPORTed for use by the drivers.
+> On Thu, May 23, 2013 at 04:10:59PM +0400, Alexander Shiyan wrote:
+> > > > The CSPI controller has only one clock, but the driver spi-imx.c needs clock "per" to calculate bitrate divisor.
+> > > > 
+> > > > Signed-off-by: Jonas Andersson <jonas@microbit.se>
+> > > > ---
+> > > >  arch/arm/boot/dts/imx25.dtsi | 12 ++++++------
+> > > >  arch/arm/boot/dts/imx27.dtsi |  6 +++---
+> > > >  arch/arm/boot/dts/imx51.dtsi |  2 +-
+> > > >  arch/arm/boot/dts/imx53.dtsi |  2 +-
+> > > >  4 files changed, 11 insertions(+), 11 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> > > > index d2550e0..7011539 100644
+> > > > --- a/arch/arm/boot/dts/imx25.dtsi
+> > > > +++ b/arch/arm/boot/dts/imx25.dtsi
+> > > > @@ -141,8 +141,8 @@
+> > > >  				#size-cells = <0>;
+> > > >  				compatible = "fsl,imx25-cspi", "fsl,imx35-cspi";
+> > > >  				reg = <0x43fa4000 0x4000>;
+> > > > -				clocks = <&clks 62>;
+> > > > -				clock-names = "ipg";
+> > > > +				clocks = <&clks 62>, <&clks 62>;
+> > > > +				clock-names = "ipg", "per";
+> > > >  				interrupts = <14>;
+> > > >  				status = "disabled";
+> > > >  			};
+> > 
+> > Sorry, typo.
+> > 
+> > > Why you do not use "dummy" clock for "per" here?
+> > 
+> > *for "ipg"
 > 
-> Added ohci_setip(() and ohci_start() routine for to start the generic
-> controller rather than each having its own idiosyncratic approach.
-> This allow to clean duplicated code in most of SOC driver
+> Because the same clock is used for the register clock and the baudrate
+> clock. You have to enable the ipg clock to access registers.
 
-This patch looks good.
+I am not see any "ipg" clock usage in the spi driver. If "ipg" clock is
+a dependency for "per" clock, it should be registered in ccm as parent.
+Is not it?
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+---
