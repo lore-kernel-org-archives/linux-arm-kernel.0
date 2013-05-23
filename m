@@ -1,70 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 May 2013 11:04:09 +0100
-Subject: [PATCH] arch: configuration, deleting 'CONFIG_BUG' since
- always need it.
-In-Reply-To: <201305231139.38233.arnd@arndb.de>
-References: <519DCBEF.3090208@asianux.com>
- <20130523090534.GJ18614@n2100.arm.linux.org.uk>
- <CAMuHMdWez-j1Maa3BD7ucmzv0_zFJnChERQiHFmkCaZUzG0_AA@mail.gmail.com>
- <201305231139.38233.arnd@arndb.de>
-Message-ID: <20130523100409.GK18614@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 23 May 2013 12:09:20 +0200
+Subject: [PATCH 1/3] ARM: at91: move at91 aic driver to drivers/irqchip
+In-Reply-To: <519DE6A8.6040502@overkiz.com>
+References: <1369299909-10078-1-git-send-email-b.brezillon@overkiz.com>
+ <1369299909-10078-2-git-send-email-b.brezillon@overkiz.com>
+ <20130523090611.GG9937@game.jcrosoft.org>
+ <519DE6A8.6040502@overkiz.com>
+Message-ID: <20130523120920.1df8e23a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 11:39:37AM +0200, Arnd Bergmann wrote:
-> On Thursday 23 May 2013, Geert Uytterhoeven wrote:
-> > > The problem is: trying to fix that will mean the result is a larger
-> > > kernel than if you just do the usual arch-implemented thing of placing
-> > > an defined faulting instruction at the BUG() site - which defeats the
-> > > purpose of turning off CONFIG_BUG.
-> > 
-> > Is __builtin_unreachable() working well these days?
-> > 
+Dear boris brezillon,
+
+On Thu, 23 May 2013 11:51:36 +0200, boris brezillon wrote:
+> On 23/05/2013 11:06, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 11:05 Thu 23 May     , Boris BREZILLON wrote:
+> >> Move arch/arm/mach-at91/irq.c to drivers/irqchip/irq-at91.c.
+> >> Move arch/arm/mach-at91/at91_aic.h to
+> >> arch/arm/mach-at91/include/mach/at91_aic.h to avoid ugly reference
+> >> to header file :
+> >> #include "../../arch/arm/mach-at91/at91_aic.h"
+> > no we are going to drop arch/arm/mach-at91/include/mach for multi support
+> >
+> > arch/arm/mach-at91/include/mach is for removal
+> What should be done ?
 > 
-> Hmm, I just tried the trivial patch below, which seemed to do the right thing.
-> Needs a little more investigation, but that might actually be the correct
-> solution. I thought that at some point __builtin_unreachable() was the same
-> as "do {} while (1)", but this is not the case with the gcc I was using --
-> it just tells gcc that we don't expect to ever get here.
+> include ../../arch/arm/mach-at91/at91_aic.h from irq-at91.c
+> 
+> or
+> 
+> move at91_aic.h into drivers/irqchips and patch every non dt board to
+> include ../../../drivers/irqchip/at91_aic.h
 
-All this is doing is hiding the warning, nothing more.
+You can put it in <linux/irqchip/at91-aic.h>, there are already a few
+headers there. But I think it's not the right solution.
 
-What the compiler does is this:
+*However*, ideally, this header should disappear completely. All the
+register defines should go directly into the driver C file. The only
+usage of the AIC defines outside of the IRQ driver are for debug prints
+in the pm.c code, which I think you could get rid of.
 
-	beq	1f
-	... some asm code ...
-	__builtin_reachable() point
-	maybe a literal table
-1:	... some asm code doing some other part of the function ...
+Ditto for the at91_aic_{read,write} macros.
 
-and what will happen is that the first block of asm will fall through the
-(possibly present) literal table into the following asm code.  So, as
-specified in the gcc manual, if you ever hit a __builtin_unreachable()
-point, your program is undefined (as in, the behaviour of it can no longer
-be known.)
+The NR_AIC5_IRQS can also move to the driver itself.
 
-We can't make that guarantee with BUG() - because sometimes they do fire
-and sometimes in the most unlikely scenarios, particularly if you're not
-looking, or at the most inconvenient time.
+The only remaining one would be NR_AIC_IRQS, you can't get rid of it,
+because it's used for the IRQ priority arrays. But I believe keeping
+this one in <linux/irqchip/at91-aic.h> is reasonable.
 
-So, if you want to use this, then you should update the CONFIG_BUG text
-to include a warning to this effect:
+Best regards,
 
-     Warning: if CONFIG_BUG is turned off, and control flow reaches
-     a BUG(), the system behaviour will be undefined.
-
-so that people can make an informed choice about this, because at the
-moment:
-
-          Disabling this option eliminates support for BUG and WARN, reducing
-          the size of your kernel image and potentially quietly ignoring
-          numerous fatal conditions. You should only consider disabling this
-          option for embedded systems with no facilities for reporting errors.
-          Just say Y.
-
-will become completely misleading.  Turning this option off will _not_
-result in "quietly ignoring numerous fatal conditions".
-
-And I come back to one of my previous arguments - is it not better to
-panic() if we hit one of these conditions so that the system can try to
-do a panic-reboot rather than continue blindly into the unknown?
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
