@@ -1,55 +1,91 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 23 May 2013 09:50:07 +0100
-Subject: [PATCH 14/14] ARM: elf: add new hwcap for identifying atomic
- ldrd/strd instructions
-In-Reply-To: <20130522180942.GK16361@mudshark.cambridge.arm.com>
-References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
- <1368810473-26070-15-git-send-email-will.deacon@arm.com>
- <20130520141809.GA27473@arm.com>
- <CAL_JsqLSC2QgMdTGtH5G_F5SYjA3Hs--jMmxBES=fqGLwapptQ@mail.gmail.com>
- <20130522084744.GD14322@arm.com>
- <20130522180942.GK16361@mudshark.cambridge.arm.com>
-Message-ID: <20130523085006.GA16722@arm.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Thu, 23 May 2013 10:49:47 +0200
+Subject: [PATCH 0/3] ARM: at91: move aic driver to drivers/irqchip
+Message-ID: <1369298990-9826-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 07:09:42PM +0100, Will Deacon wrote:
-> On Wed, May 22, 2013 at 09:47:44AM +0100, Catalin Marinas wrote:
-> > On Tue, May 21, 2013 at 07:48:35PM +0100, Rob Herring wrote:
-> > > On Mon, May 20, 2013 at 9:18 AM, Catalin Marinas
-> > > <catalin.marinas@arm.com> wrote:
-> > > > On Fri, May 17, 2013 at 06:07:53PM +0100, Will Deacon wrote:
-> > > >> CPUs implementing LPAE have atomic ldrd/strd instructions, meaning that
-> > > >> userspace software can avoid having to use the exclusive variants of
-> > > >> these instructions if they wish.
-> > > >>
-> > > >> This patch advertises the atomicity of these instructions via the
-> > > >> hwcaps, so userspace can detect this CPU feature.
-> > > >>
-> > > >> Reported-by: Vladimir Danushevsky <vladimir.danushevsky@oracle.com>
-> > > >> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > > > ...
-> > > >> +
-> > > >> +     /* LPAE implies atomic ldrd/strd instructions */
-> > > >> +     vmsa = (read_cpuid_ext(CPUID_EXT_MMFR0) & 0xf) >> 0;
-> > > >> +     if (vmsa >= 5)
-> > > >> +             elf_hwcap |= HWCAP_LPAE;
-> > > >
-> > > > As I mentioned in the past, I don't agree with exposing the "LPAE"
-> > > > feature to user-space, it's not a feature that user space should care
-> > > > about. An atomic double hwcap is better and you can even make this per
-> > > > CPU via __v7_proc.
-> > > 
-> > > How does userspace know whether to install a non-LPAE or LPAE kernel
-> > > in a generic way?
-> > 
-> > This is a valid reason to expose LPAE to user, though elf_hwcap sounds a
-> > bit strange.
-> 
-> In lieu of anything else, do you mind if I continue with the patch as it
-> stands?
+Hello,
 
-OK, I give up ;)
+This patch series move the at91 AIC (Advance Interrupt Controller)
+driver to the irqchip subsystem directory (drivers/irqchip).
+
+It also make use of IRQCHIP_DECLARE to register irqchip for dt boards
+instead of using the machine specific "init_irq" function.
+
+Finally it register the arch specific irq handler inside the the init
+functions using set_handle_irq. This way we can remove all the machine
+specific "handle_irq".
+
+This patch series was tested on kizbox board (sam9g20 SoC) using
+device tree. Could someone test it on other boards (both dt and non dt)?
+
+Best Regards,
+Boris
+
+
+Boris BREZILLON (3):
+  ARM: at91: move at91 aic driver to drivers/irqchip
+  ARM: at91: use IRQCHIP_DECLARE instead of machine specific init_irq
+  ARM: at91: use set_handle_irq instead of machine specific handle_irq
+
+ arch/arm/mach-at91/Makefile                |    2 +-
+ arch/arm/mach-at91/at91_aic.h              |   99 -----
+ arch/arm/mach-at91/at91rm9200.c            |    2 +-
+ arch/arm/mach-at91/at91sam9260.c           |    2 +-
+ arch/arm/mach-at91/at91sam9261.c           |    2 +-
+ arch/arm/mach-at91/at91sam9263.c           |    2 +-
+ arch/arm/mach-at91/at91sam9g45.c           |    2 +-
+ arch/arm/mach-at91/at91sam9rl.c            |    2 +-
+ arch/arm/mach-at91/at91x40.c               |    2 +-
+ arch/arm/mach-at91/board-1arm.c            |    3 +-
+ arch/arm/mach-at91/board-afeb-9260v1.c     |    3 +-
+ arch/arm/mach-at91/board-cam60.c           |    3 +-
+ arch/arm/mach-at91/board-carmeva.c         |    3 +-
+ arch/arm/mach-at91/board-cpu9krea.c        |    3 +-
+ arch/arm/mach-at91/board-cpuat91.c         |    3 +-
+ arch/arm/mach-at91/board-csb337.c          |    3 +-
+ arch/arm/mach-at91/board-csb637.c          |    3 +-
+ arch/arm/mach-at91/board-dt-rm9200.c       |   15 +-
+ arch/arm/mach-at91/board-dt-sam9.c         |   16 +-
+ arch/arm/mach-at91/board-dt-sama5.c        |   16 +-
+ arch/arm/mach-at91/board-eb01.c            |    4 +-
+ arch/arm/mach-at91/board-eb9200.c          |    4 +-
+ arch/arm/mach-at91/board-ecbat91.c         |    3 +-
+ arch/arm/mach-at91/board-eco920.c          |    3 +-
+ arch/arm/mach-at91/board-flexibity.c       |    3 +-
+ arch/arm/mach-at91/board-foxg20.c          |    3 +-
+ arch/arm/mach-at91/board-gsia18s.c         |    3 +-
+ arch/arm/mach-at91/board-kafa.c            |    3 +-
+ arch/arm/mach-at91/board-kb9202.c          |    3 +-
+ arch/arm/mach-at91/board-pcontrol-g20.c    |    3 +-
+ arch/arm/mach-at91/board-picotux200.c      |    3 +-
+ arch/arm/mach-at91/board-qil-a9260.c       |    3 +-
+ arch/arm/mach-at91/board-rm9200dk.c        |    3 +-
+ arch/arm/mach-at91/board-rm9200ek.c        |    3 +-
+ arch/arm/mach-at91/board-rsi-ews.c         |    4 +-
+ arch/arm/mach-at91/board-sam9-l9260.c      |    3 +-
+ arch/arm/mach-at91/board-sam9260ek.c       |    3 +-
+ arch/arm/mach-at91/board-sam9261ek.c       |    3 +-
+ arch/arm/mach-at91/board-sam9263ek.c       |    3 +-
+ arch/arm/mach-at91/board-sam9g20ek.c       |    4 +-
+ arch/arm/mach-at91/board-sam9m10g45ek.c    |    3 +-
+ arch/arm/mach-at91/board-sam9rlek.c        |    3 +-
+ arch/arm/mach-at91/board-snapper9260.c     |    3 +-
+ arch/arm/mach-at91/board-stamp9g20.c       |    4 +-
+ arch/arm/mach-at91/board-usb-a926x.c       |    5 +-
+ arch/arm/mach-at91/board-yl-9200.c         |    3 +-
+ arch/arm/mach-at91/generic.h               |    5 -
+ arch/arm/mach-at91/include/mach/at91_aic.h |   96 +++++
+ arch/arm/mach-at91/irq.c                   |  547 ---------------------------
+ arch/arm/mach-at91/pm.c                    |    2 +-
+ drivers/irqchip/Makefile                   |    1 +
+ drivers/irqchip/irq-at91.c                 |  557 ++++++++++++++++++++++++++++
+ 52 files changed, 706 insertions(+), 773 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/at91_aic.h
+ create mode 100644 arch/arm/mach-at91/include/mach/at91_aic.h
+ delete mode 100644 arch/arm/mach-at91/irq.c
+ create mode 100644 drivers/irqchip/irq-at91.c
 
 -- 
-Catalin
+1.7.9.5
