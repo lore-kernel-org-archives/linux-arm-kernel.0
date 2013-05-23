@@ -1,103 +1,103 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 23 May 2013 16:32:51 +0200
-Subject: [PATCH v2 1/3] pci: mvebu: no longer fake the slot location of
- downstream devices
+Date: Thu, 23 May 2013 16:32:52 +0200
+Subject: [PATCH v2 2/3] pci: mvebu: allow the enumeration of devices beyond
+ physical bridges
 In-Reply-To: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1369319573-19927-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369319573-19927-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369319573-19927-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By default, the Marvell hardware, for each PCIe interface, exhibits
-the following devices:
+Until now, the Marvell PCIe driver was only allowing the enumeration
+of the devices in the secondary bus of the emulated PCI-to-PCI
+bridge. This works fine when a PCIe device is directly connected into
+a PCIe slot of the Marvell board.
 
- * On slot 0, a "Marvell Memory controller", identical on all PCIe
-   interfaces, and which isn't useful when the Marvell SoC is the PCIe
-   root complex (i.e, the normal case when we run Linux on the Marvell
-   SoC).
+However, when the device connected in the PCIe slot is a physical PCIe
+bridge, beyond which a real PCIe device is connected, it no longer
+worked, as the driver was preventing the Linux PCI core from seeing
+such devices.
 
- * On slot 1, the real PCIe card connected into the PCIe slot of the
-   board.
+This commit fixes that by ensuring that configuration transactions on
+subordinate busses are properly forwarded on the right PCIe interface.
 
-So, what the Marvell PCIe driver was doing in its PCI-to-PCI bridge
-emulation is that when the Linux PCI core was trying to access the
-device in slot 0, we were in fact forwarding the configuration
-transaction to the device in slot 1. For all other slots, we were
-telling the Linux PCI core that there was no device connected.
+Thanks to this patch, a PCIe card beyond a PCIe bridge, itself beyond
+the emulated PCI-to-PCI bridge is properly detected, with the
+following layout:
 
-However, new versions of bootloaders from Marvell change the default
-PCIe configuration, and make the real device appear in slot 0, and the
-"Marvell Memory controller" in slot 1.
+-[0000:00]-+-01.0-[01]----00.0
+           +-09.0-[02-07]----00.0-[03-07]--+-01.0-[04]--
+           |                               +-05.0-[05]--
+           |                               +-07.0-[06]--
+           |                               \-09.0-[07]----00.0
+           \-0a.0-[08]----00.0
 
-Therefore, this commit modifies the Marvell PCIe driver to adjust the
-PCIe hardware configuration to make sure that this behavior (real
-device in slot 0, "Marvell Memory controller" in slot 1) is the one
-we'll see regardless of what the bootloader has done. It allows to
-remove the little hack that was forwarding configuration transactions
-on slot 0 to slot 1, which is nice.
+Where the PCIe interface that sits beyond the emulated PCI-to-PCI
+bridge at 09.0 allows to access the secondary bus 02, on which there
+is a PCIe bridge that allows to access the 3 to 7 busses, that are
+subordinates to this bridge. And on one of this bus (bus 7), there is
+one real PCIe device connected.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/pci/host/pci-mvebu.c |   19 +++++++++++++++----
- 1 file changed, 15 insertions(+), 4 deletions(-)
+ drivers/pci/host/pci-mvebu.c |   31 ++++++++++++++++++++++++++++---
+ 1 file changed, 28 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index ad1c46b..0bc21b0 100644
+index 0bc21b0..a3c4638 100644
 --- a/drivers/pci/host/pci-mvebu.c
 +++ b/drivers/pci/host/pci-mvebu.c
-@@ -51,6 +51,7 @@
- #define  PCIE_CTRL_X1_MODE		0x0001
- #define PCIE_STAT_OFF		0x1a04
- #define  PCIE_STAT_BUS                  0xff00
-+#define  PCIE_STAT_DEV                  0x1f0000
- #define  PCIE_STAT_LINK_DOWN		BIT(0)
- #define PCIE_DEBUG_CTRL         0x1a60
- #define  PCIE_DEBUG_SOFT_RESET		BIT(20)
-@@ -148,6 +149,16 @@ static void mvebu_pcie_set_local_bus_nr(struct mvebu_pcie_port *port, int nr)
- 	writel(stat, port->base + PCIE_STAT_OFF);
- }
+@@ -554,7 +554,8 @@ mvebu_pcie_find_port(struct mvebu_pcie *pcie, struct pci_bus *bus,
+ 		if (bus->number == 0 && port->devfn == devfn)
+ 			return port;
+ 		if (bus->number != 0 &&
+-		    port->bridge.secondary_bus == bus->number)
++		    bus->number >= port->bridge.secondary_bus &&
++		    bus->number <= port->bridge.subordinate_bus)
+ 			return port;
+ 	}
  
-+static void mvebu_pcie_set_local_dev_nr(struct mvebu_pcie_port *port, int nr)
-+{
-+	u32 stat;
+@@ -578,7 +579,18 @@ static int mvebu_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 	if (bus->number == 0)
+ 		return mvebu_sw_pci_bridge_write(port, where, size, val);
+ 
+-	if (!port->haslink || PCI_SLOT(devfn) != 0)
++	if (!port->haslink)
++		return PCIBIOS_DEVICE_NOT_FOUND;
 +
-+	stat = readl(port->base + PCIE_STAT_OFF);
-+	stat &= ~PCIE_STAT_DEV;
-+	stat |= nr << 16;
-+	writel(stat, port->base + PCIE_STAT_OFF);
-+}
-+
- /*
-  * Setup PCIE BARs and Address Decode Wins:
-  * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
-@@ -572,8 +583,7 @@ static int mvebu_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
++	/*
++	 * On the secondary bus, we don't want to expose any other
++	 * device than the device physically connected in the PCIe
++	 * slot, visible in slot 0. In slot 1, there's a special
++	 * Marvell device that only makes sense when the Armada is
++	 * used as a PCIe endpoint.
++	 */
++	if (bus->number == port->bridge.secondary_bus &&
++	    PCI_SLOT(devfn) != 0)
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
  
  	/* Access the real PCIe interface */
- 	spin_lock_irqsave(&port->conf_lock, flags);
--	ret = mvebu_pcie_hw_wr_conf(port, bus,
--				    PCI_DEVFN(1, PCI_FUNC(devfn)),
-+	ret = mvebu_pcie_hw_wr_conf(port, bus, devfn,
- 				    where, size, val);
- 	spin_unlock_irqrestore(&port->conf_lock, flags);
+@@ -609,7 +621,20 @@ static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+ 	if (bus->number == 0)
+ 		return mvebu_sw_pci_bridge_read(port, where, size, val);
  
-@@ -606,8 +616,7 @@ static int mvebu_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
- 
- 	/* Access the real PCIe interface */
- 	spin_lock_irqsave(&port->conf_lock, flags);
--	ret = mvebu_pcie_hw_rd_conf(port, bus,
--				    PCI_DEVFN(1, PCI_FUNC(devfn)),
-+	ret = mvebu_pcie_hw_rd_conf(port, bus, devfn,
- 				    where, size, val);
- 	spin_unlock_irqrestore(&port->conf_lock, flags);
- 
-@@ -817,6 +826,8 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
- 			continue;
- 		}
- 
-+		mvebu_pcie_set_local_dev_nr(port, 1);
+-	if (!port->haslink || PCI_SLOT(devfn) != 0) {
++	if (!port->haslink) {
++		*val = 0xffffffff;
++		return PCIBIOS_DEVICE_NOT_FOUND;
++	}
 +
- 		if (mvebu_pcie_link_up(port)) {
- 			port->haslink = 1;
- 			dev_info(&pdev->dev, "PCIe%d.%d: link up\n",
++	/*
++	 * On the secondary bus, we don't want to expose any other
++	 * device than the device physically connected in the PCIe
++	 * slot, visible in slot 0. In slot 1, there's a special
++	 * Marvell device that only makes sense when the Armada is
++	 * used as a PCIe endpoint.
++	 */
++	if (bus->number == port->bridge.secondary_bus &&
++	    PCI_SLOT(devfn) != 0) {
+ 		*val = 0xffffffff;
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 	}
 -- 
 1.7.9.5
