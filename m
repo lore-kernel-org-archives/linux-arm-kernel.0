@@ -1,23 +1,22 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 23 May 2013 13:55:06 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCBWMiA0LzZdIEFSTTogZHRzOiBpbXg2cTogYWRkIHBp?=
- =?UTF-8?B?bmN0cmwgZm9yIFdFSU0gTk9S?=
-In-Reply-To: <519DE6D0.2040909@freescale.com>
-References: <1369296978-7669-1-git-send-email-b32955@freescale.com>
- <1369301996.738631947@f310.mail.ru>
- <519DE6D0.2040909@freescale.com>
-Message-ID: <1369302906.444557883@f310.mail.ru>
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Thu, 23 May 2013 18:55:21 +0900
+Subject: Naming convention DSI + device tree
+In-Reply-To: <519C64AB.2090708@gmail.com>
+References: <20130514181745.GA2762@mail.o2s.ch>
+ <51940C22.4050802@wwwdotorg.org> <20130516071537.GA13573@mail.o2s.ch>
+ <519522C1.5010107@wwwdotorg.org> <5195C1E2.4020009@nvidia.com>
+ <519C64AB.2090708@gmail.com>
+Message-ID: <519DE789.5020308@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > How we should define CS1 pin in your example for second device?
-> 
-> But in the imx6q{dl}-sabreauto boards, we only have the NOR connected to 
-> WEIM.
-> I do not need to worry about the second device.
+On 05/22/2013 03:24 PM, Mark Zhang wrote:
+> Cool. Alex, do you know any updates on DSI part of CDF? I recall few
+> months ago, Laurent wrote mail to share some infos about the CDF
+> discussions, and it mentioned that the DSI will be considered in next
+> version of CDF... you know, for t114, the DSI support is a must.
 
-OK, but you add "weim-NOR" to the arch/arm/boot/dts/imx6q.dtsi, not
-in imx6qdl-sabreauto.dtsi, so you mean that this definition is generic.
-Should it be moved to imx6qdl-sabreauto.dtsi then?
+I will make sure to discuss this detail with Laurent as he comes for 
+LinuxCon next week. ;)
 
----
+Alex.
