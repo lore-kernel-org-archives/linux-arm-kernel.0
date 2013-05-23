@@ -1,40 +1,46 @@
-From: w@1wt.eu (Willy Tarreau)
-Date: Thu, 23 May 2013 08:52:59 +0200
-Subject: [PATCH 0/4] Marvell PCIe driver improvements
-In-Reply-To: <20130523083509.79297513@skate>
-References: <1369228358-32580-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130523001353.GH31625@1wt.eu> <20130523083509.79297513@skate>
-Message-ID: <20130523065259.GK31625@1wt.eu>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 May 2013 08:09:05 +0100
+Subject: [PATCH] regulator: ab8500-ext: Don't register without
+ initialisation data
+In-Reply-To: <20130522174516.GT1627@sirena.org.uk>
+References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
+ <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
+ <20130522155347.GJ1627@sirena.org.uk>
+ <20130522165353.GB18714@gmail.com>
+ <20130522174516.GT1627@sirena.org.uk>
+Message-ID: <20130523070905.GD18714@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 08:35:09AM +0200, Thomas Petazzoni wrote:
-> > FWIW, these patches applied on top of your pcie-v10 tree have made
-> > my mini-pcie dual-nic appear for the first time on the mirabox. Till
-> > now I never knew if it was a hardware or software issue since the NIC
-> > does not appear in u-boot nor lspci, whatever the kernel versions,
-> > including the original Marvell one's. The NIC has two functions (one
-> > per controller) and no bridge, so it may be a side effect of your
-> > improvements (or maybe you fixed a bug).
+On Wed, 22 May 2013, Mark Brown wrote:
+
+> On Wed, May 22, 2013 at 05:53:53PM +0100, Lee Jones wrote:
+> > On Wed, 22 May 2013, Mark Brown wrote:
 > 
-> Hum, interesting. Can you show the output of lspci -v and lspci -t
-> (which a pciutils version of lspci, not Busybox one) ? I'm interested
-> in seeing the layout of the PCIe bus with such a device, to get a
-> better understanding.
-
-(send privately in another thread).
-
-> > Anyway for me it's a great improvement !
-> > 
-> > I've not tried it on the OpenBlocks AX3 yet (it was not detected
-> > there previously). But I have good hopes.
-> > 
-> > For reference, the NIC is Jetway's ADMPEIDLA (intel i350-AM2).
+> > > running or not, the worst that should happen is that the state can be
+> > > read back.  I'd therefore expect the fix here to be in the board side
+> > > code that enables the regulators.
 > 
-> Should I be taking this as a formal Tested-by from you? :-)
+> > It's both.
+> 
+> > From the platform side we have stopped passing the external regulator
+> > driver's constraints for Snowball:
+> 
+> > https://lkml.org/lkml/2013/5/22/280
+> 
+> > All I've done here is stop the ext driver from crapping out with the
+> > misleading error "Configuration error: size mismatch", because a)
+> > it's not an error, it's expected and b) It's not a size mismatch,
+> > instead we have chosen to keep the constraints back in the Snowball
+> > (and u8505) case.
+> 
+> OK, so the regulator driver is buggy and insisting on having constraints
+> passed in for every regulator then?
 
-Yes, obviously, feel free to add this one :
+If that's not how it's meant to work then, yes.
 
-  Tested-by: Willy Tarreau <w@1wt.eu>
-
-Willy
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
