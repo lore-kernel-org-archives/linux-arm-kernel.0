@@ -1,95 +1,135 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Thu, 23 May 2013 13:14:00 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCBWMiA0LzZdIEFSTTogZHRzOiBpbXg2cTogYWRkIHBpbmN0?=
- =?UTF-8?B?cmwgZm9yIFdFSU0gTk9S?=
-In-Reply-To: <1369296978-7669-5-git-send-email-b32955@freescale.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 23 May 2013 11:23:44 +0200
+Subject: [PATCH V2 1/6] drivers: bus: add a new driver for WEIM
+In-Reply-To: <1369296978-7669-2-git-send-email-b32955@freescale.com>
 References: <1369296978-7669-1-git-send-email-b32955@freescale.com>
- <1369296978-7669-5-git-send-email-b32955@freescale.com>
-Message-ID: <1369300440.725629549@f101.mail.ru>
+ <1369296978-7669-2-git-send-email-b32955@freescale.com>
+Message-ID: <20130523092344.GF32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Add a pinctrl for WEIM nor.
+On Thu, May 23, 2013 at 04:16:13PM +0800, Huang Shijie wrote:
+> The WEIM(Wireless External Interface Module) works like a bus.
+> You can attach many different devices on it, such as NOR, onenand.
+> 
+> In the case of i.MX6q-sabreauto, the NOR is connected to WEIM.
+> 
+> This patch also adds the devicetree binding document.
+> The driver only works when the devicetree is enabled.
 > 
 > Signed-off-by: Huang Shijie <b32955@freescale.com>
 > ---
->  arch/arm/boot/dts/imx6q.dtsi |   56 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 56 insertions(+), 0 deletions(-)
+>  Documentation/devicetree/bindings/bus/imx-weim.txt |   50 +++++++
+>  drivers/bus/Kconfig                                |    9 ++
+>  drivers/bus/Makefile                               |    1 +
+>  drivers/bus/imx-weim.c                             |  146 ++++++++++++++++++++
+>  4 files changed, 206 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/bus/imx-weim.txt
+>  create mode 100644 drivers/bus/imx-weim.c
 > 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index ed11bcf..2a6327a 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -323,6 +323,62 @@
->  						>;
->  					};
->  				};
+> diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
+> new file mode 100644
+> index 0000000..3db588e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
+> @@ -0,0 +1,50 @@
+> +Device tree bindings for i.MX Wireless External Interface Module (WEIM)
 > +
-> +				weim {
-> +					pinctrl_weim_nor_1: weim_norgrp-1 {
-
-I suggest remove "nor" label here since it can be used for other devices later.
-
-> +						fsl,pins = <
-> +							MX6Q_PAD_EIM_CS0__EIM_CS0_B   0xb0b1
-
-Since driver can support multiple chipselects it would be nice to
-define EIM_CSX in other place for possible using other chipselects.
-
-> +							MX6Q_PAD_EIM_OE__EIM_OE_B     0xb0b1
-> +							MX6Q_PAD_EIM_RW__EIM_RW       0xb0b1
-> +							MX6Q_PAD_EIM_WAIT__EIM_WAIT_B 0xb060
+> +The term "wireless" does not imply that the WEIM is literally an interface
+> +without wires. It simply means that this module was originally designed for
+> +wireless and mobile applications that use low-power technology.
 > +
-> +							/* data */
-> +							MX6Q_PAD_EIM_D16__EIM_DATA16 0xb0b1
-> +							MX6Q_PAD_EIM_D17__EIM_DATA17 0xb0b1
-> +							MX6Q_PAD_EIM_D18__EIM_DATA18 0xb0b1
-> +							MX6Q_PAD_EIM_D19__EIM_DATA19 0xb0b1
-> +							MX6Q_PAD_EIM_D20__EIM_DATA20 0xb0b1
-> +							MX6Q_PAD_EIM_D21__EIM_DATA21 0xb0b1
-> +							MX6Q_PAD_EIM_D22__EIM_DATA22 0xb0b1
-> +							MX6Q_PAD_EIM_D23__EIM_DATA23 0xb0b1
-> +							MX6Q_PAD_EIM_D24__EIM_DATA24 0xb0b1
-> +							MX6Q_PAD_EIM_D25__EIM_DATA25 0xb0b1
-> +							MX6Q_PAD_EIM_D26__EIM_DATA26 0xb0b1
-> +							MX6Q_PAD_EIM_D27__EIM_DATA27 0xb0b1
-> +							MX6Q_PAD_EIM_D28__EIM_DATA28 0xb0b1
-> +							MX6Q_PAD_EIM_D29__EIM_DATA29 0xb0b1
-> +							MX6Q_PAD_EIM_D30__EIM_DATA30 0xb0b1
-> +							MX6Q_PAD_EIM_D31__EIM_DATA31 0xb0b1
+> +The actual devices are instantiated from the child nodes of a WEIM node.
 > +
-> +							/* address */
-> +							MX6Q_PAD_EIM_A23__EIM_ADDR23 0xb0b1
-> +							MX6Q_PAD_EIM_A22__EIM_ADDR22 0xb0b1
-> +							MX6Q_PAD_EIM_A21__EIM_ADDR21 0xb0b1
-> +							MX6Q_PAD_EIM_A20__EIM_ADDR20 0xb0b1
-> +							MX6Q_PAD_EIM_A19__EIM_ADDR19 0xb0b1
-> +							MX6Q_PAD_EIM_A18__EIM_ADDR18 0xb0b1
-> +							MX6Q_PAD_EIM_A17__EIM_ADDR17 0xb0b1
-> +							MX6Q_PAD_EIM_A16__EIM_ADDR16 0xb0b1
-> +							MX6Q_PAD_EIM_DA15__EIM_AD15  0xb0b1
-> +							MX6Q_PAD_EIM_DA14__EIM_AD14  0xb0b1
-> +							MX6Q_PAD_EIM_DA13__EIM_AD13  0xb0b1
-> +							MX6Q_PAD_EIM_DA12__EIM_AD12  0xb0b1
-> +							MX6Q_PAD_EIM_DA11__EIM_AD11  0xb0b1
-> +							MX6Q_PAD_EIM_DA10__EIM_AD10  0xb0b1
-> +							MX6Q_PAD_EIM_DA9__EIM_AD09   0xb0b1
-> +							MX6Q_PAD_EIM_DA8__EIM_AD08   0xb0b1
-> +							MX6Q_PAD_EIM_DA7__EIM_AD07   0xb0b1
-> +							MX6Q_PAD_EIM_DA6__EIM_AD06   0xb0b1
-> +							MX6Q_PAD_EIM_DA5__EIM_AD05   0xb0b1
-> +							MX6Q_PAD_EIM_DA4__EIM_AD04   0xb0b1
-> +							MX6Q_PAD_EIM_DA3__EIM_AD03   0xb0b1
-> +							MX6Q_PAD_EIM_DA2__EIM_AD02   0xb0b1
-> +							MX6Q_PAD_EIM_DA1__EIM_AD01   0xb0b1
-> +							MX6Q_PAD_EIM_DA0__EIM_AD00   0xb0b1
-> +						>;
-> +					};
 > +
-> +				};
->  			};
->  		};
->  
-> -- 
+> + - compatible:		Should be set to "fsl,imx6q-weim"
+> + - reg:			A resource specifier for the register space
+> +			(see the example below)
+> + - interrupts:		the interrupt number, see the example below.
+> + - clocks:		the clock, see the example below.
+> + - #address-cells:	Must be set to 2 to allow memory address translation
+> + - #size-cells:		Must be set to 1 to allow CS address passing
+> + - ranges:		Must be set up to reflect the memory layout with four
+> +			integer values for each chip-select line in use:
+> +
+> +			   <cs-number> 0 <physical address of mapping> <size>
+> +
+> +Timing property for child nodes. It is mandatory, not optional.
+> +
+> + - fsl,weim-cs-timing:	The timing array, contains 6 timing values for the
+> +			child node. We can get the CS index from the child
+> +			node's "reg" property.
 
----
+This should be more detailed, something like:
+
+This contains the values for the registers EIM_CSnGCR1, EIM_CSnGCR2,
+EIM_CSnRCR1, EIM_CSnRCR2, EIM_CSnWCR1, EIM_CSnWCR2 in this order.
+
+> +static int weim_parse_dt(struct platform_device *pdev)
+> +{
+> +	struct device_node *child;
+> +	int ret;
+> +
+> +	for_each_child_of_node(pdev->dev.of_node, child) {
+> +		if (!child->name)
+> +			continue;
+> +
+> +		ret = weim_timing_setup(pdev, child);
+> +		if (ret)
+> +			goto parse_fail;
+> +
+> +		if (!of_platform_device_create(child, NULL, &pdev->dev)) {
+> +			ret = -EINVAL;
+> +			goto parse_fail;
+> +		}
+
+I would print some warning here for the failures in this loop, but I
+don't think it's necessary to bail out. No need to make all WEIM devices
+fail if one has an erroneous device node.
+
+> +
+> +	/* get the resource */
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	weim->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(weim->base)) {
+> +		ret = PTR_ERR(weim->base);
+> +		goto weim_err;
+> +	}
+> +
+> +	/* get the clock */
+> +	weim->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(weim->clk))
+> +		goto weim_err;
+> +
+> +	clk_prepare_enable(weim->clk);
+> +
+> +	/* parse the device node */
+> +	ret = weim_parse_dt(pdev);
+> +	if (ret) {
+> +		clk_disable_unprepare(weim->clk);
+> +		goto weim_err;
+> +	}
+> +
+> +	dev_info(&pdev->dev, "WEIM driver registered.\n");
+> +	return 0;
+> +
+> +weim_err:
+> +	return ret;
+> +}
+> +
+> +static int weim_remove(struct platform_device *pdev)
+> +{
+> +	struct imx_weim *weim = platform_get_drvdata(pdev);
+> +
+> +	clk_disable_unprepare(weim->clk);
+
+Once again: Is this clock needed for the child devices? If yes, you
+can't disable it here and leave the child devices registered.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
