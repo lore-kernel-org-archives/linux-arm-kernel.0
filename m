@@ -1,178 +1,70 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Thu, 23 May 2013 16:36:41 -0500
-Subject: [PATCHv3 5/6] ARM: socfpga: dts: Add support for SD/MMC
-In-Reply-To: <1369345002-20002-1-git-send-email-dinguyen@altera.com>
-References: <1369345002-20002-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1369345002-20002-5-git-send-email-dinguyen@altera.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 23 May 2013 23:44:11 +0200
+Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
+In-Reply-To: <519A1BBB.2070903@st.com>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305171636.49627.arnd@arndb.de> <519A1BBB.2070903@st.com>
+Message-ID: <201305232344.11974.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On Monday 20 May 2013, Srinivas KANDAGATLA wrote:
+> On 17/05/13 15:36, Arnd Bergmann wrote:
+>
+> Some of the drivers like Ethernet already provide higher level
+> interfaces via callbacks. We did implement such a callbacks per each SOC
+> in non-DT case, and ended up having code duplicated for each SOC.
+> 
+> On the other hand using device trees to describe the HW
+> configuration(sysconfs) made more sense and got rid of SOC specific
+> callbacks.
 
-Add bindings for SD/MMC for SOCFPGA.
-Add "syscon" to the "altr,sys-mgr" binding.
+I'm sure it's possible to reduce the duplication without going all
+the way to describing every bit in DT.
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Reviewed-by: Pavel Machek <pavel@denx.de>
-CC: Arnd Bergmann <arnd@arndb.de>
-CC: Olof Johansson <olof@lixom.net>
-Cc: Pavel Machek <pavel@denx.de>
-CC: <linux@arm.linux.org.uk>
+> > For drivers that are essentially just wrappers around sysconf,
+> > I would make them one driver per SoC and use a low-level interface
+> > but still hardcode the offsets in the driver instead of using DT
+> > to find the registers.
+> > 
+> > The pinctrl and reset drivers are examples of this.
+> 
+> In pinctrl bindings case, I think we could do better job by replacing
+> the existing bindings of sysconfs for a group of banks with just two
+> integer offsets. This would mean that, we can still use the a common
+> driver across the SOCs.
+>
+> And w.r.t to reset, we are planning on using sysconf based
+> reset-controller API sitting underneath the reset-controller subsystem.
+> Passing the information from device trees would be much clear and
+> flexible than adding new driver per/SOC.
 
-v2:
-- Add "syscon" to "altr,sys-mgr"
-- Remove pwr-en field
----
- .../devicetree/bindings/mmc/socfpga-dw-mshc.txt    |   60 ++++++++++++++++++++
- arch/arm/boot/dts/socfpga.dtsi                     |   13 ++++-
- arch/arm/boot/dts/socfpga_cyclone5.dts             |   13 +++++
- arch/arm/boot/dts/socfpga_vt.dts                   |   12 ++++
- 4 files changed, 97 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+Ok
 
-diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
-new file mode 100644
-index 0000000..9d7062c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
-@@ -0,0 +1,60 @@
-+* Altera SOCFPGA specific extensions to the Synopsis Designware Mobile
-+  Storage Host Controller
-+
-+Required Properties:
-+
-+* compatible: should be
-+	- "altr,socfpga-dw-mshc": for controllers with Altera SOCFPGA
-+	  specific extentions.
-+
-+* altr,dw-mshc-ciu-div: Specifies the divider value for the card interface
-+  unit (ciu) clock. The value should be (n-1). For Altera's SOCFPGA, the divider
-+  value is fixed at 3, which mean parent_clock/4.
-+
-+* altr,dw-mshc-sdr-timing: Specifies the value of CIU clock phase shift value
-+  in transmit mode and CIU clock phase shift value in receive mode for single
-+  data rate mode operation. Refer notes below for the order of the cells and the
-+  valid values.
-+
-+  Notes for the sdr-timing values:
-+
-+    The order of the cells should be
-+      - First Cell: CIU clock phase shift value for RX mode, smplsel bits in
-+	the system manager SDMMC control group.
-+      - Second Cell: CIU clock phase shift value for TX mode, drvsel bits in
-+	the system manager SDMMC control group.
-+
-+    Valid values for SDR CIU clock timing for SOCFPGA:
-+      - valid value for tx phase shift and rx phase shift is 0 to 7.
-+
-+Required properties for a slot:
-+
-+* bus-width: Data width for card slot. 4-bit or 8-bit data.
-+
-+Example:
-+
-+  The MSHC controller node can be split into two portions, SoC specific and
-+  board specific portions as listed below.
-+
-+	dwmmc0 at ff704000 {
-+		compatible = "altr,socfpga-dw-mshc";
-+		reg = <0xff704000 0x1000>;
-+		interrupts = <0 139 4>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	dwmmc0 at ff704000 {
-+		num-slots = <1>;
-+		supports-highspeed;
-+		broken-cd;
-+		fifo-depth = <0x400>;
-+		altr,dw-mshc-ciu-div = <3>;
-+      		altr,dw-mshc-sdr-timing = <0 3>;
-+
-+		slot at 0 {
-+			reg = <0>;
-+			bus-width = <4>;
-+		};
-+	};
-+
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index bee62a2..dbf7f22 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -468,6 +468,17 @@
- 			cache-level = <2>;
- 		};
- 
-+		mmc: dwmmc0 at ff704000 {
-+			compatible = "altr,socfpga-dw-mshc";
-+			reg = <0xff704000 0x1000>;
-+			interrupts = <0 139 4>;
-+			fifo-depth = <0x400>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
-+			clock-names = "biu", "ciu";
-+		};
-+
- 		/* Local timer */
- 		timer at fffec600 {
- 			compatible = "arm,cortex-a9-twd-timer";
-@@ -521,7 +532,7 @@
- 			};
- 
- 		sysmgr at ffd08000 {
--				compatible = "altr,sys-mgr";
-+				compatible = "altr,sys-mgr", "syscon";
- 				reg = <0xffd08000 0x4000>;
- 			};
- 	};
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
-index 973999d..1853cb1 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
-@@ -54,6 +54,19 @@
- 			status = "okay";
- 		};
- 
-+		dwmmc0 at ff704000 {
-+			num-slots = <1>;
-+			supports-highspeed;
-+			broken-cd;
-+			altr,dw-mshc-ciu-div = <3>;
-+			altr,dw-mshc-sdr-timing = <0 3>;
-+
-+			slot at 0 {
-+				reg = <0>;
-+				bus-width = <4>;
-+			};
-+		};
-+
- 		timer0 at ffc08000 {
- 			clock-frequency = <100000000>;
- 		};
-diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
-index d1ec0ca..d93deb0 100644
---- a/arch/arm/boot/dts/socfpga_vt.dts
-+++ b/arch/arm/boot/dts/socfpga_vt.dts
-@@ -46,6 +46,18 @@
- 			status = "okay";
- 		};
- 
-+		dwmmc0 at ff704000 {
-+			num-slots = <1>;
-+			supports-highspeed;
-+			broken-cd;
-+			altr,dw-mshc-ciu-div = <3>;
-+
-+			slot at 0 {
-+				reg = <0>;
-+				bus-width = <4>;
-+			};
-+		};
-+
- 		timer0 at ffc08000 {
- 			clock-frequency = <7000000>;
- 		};
--- 
-1.7.9.5
+> >> 2> The infrastructure should protect the claimed registers from
+> >> over-writing by other drivers. We do this by claim-read/write-release
+> >> style API.
+> > 
+> > I don't understand this part. Is it about atomicity of accesses to
+> > 32-bit registers when you only want to change a bit? That is something
+> > the regmap interface handles already.
+> 
+> I forget to mention a important point here, the protection is at bit
+> level for the sysconfs. Some of sysconfs have bits shared across IPs, so
+> protecting them while the IP is still using it is what we are trying to
+> achieve with sysconf-claim/release apis.
+> While it may be overkill, but In past it has found bugs and been helpful
+> with a meaning full debug output.
+
+Can you give an example of something that is shared across multiple IPs?
+
+Are those always done in the way that you have e.g. the ethernet pinctrl
+in the same register as the usb pinctrl, or could you have an ethernet
+pinctrl setting mixed together with the usb clock setting for instance?
+
+If the hardware has been designed in a sensible way rather than just
+grown by randomly adding bits in open spaces, I would assume that it's
+possible to have high-level interfaces built around ranges of registers
+rather than arbitrary subsets of registers.
+
+	Arnd
