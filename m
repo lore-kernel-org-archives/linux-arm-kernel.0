@@ -1,97 +1,157 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Thu, 23 May 2013 17:48:52 +0200
-Subject: [PATCH v2 0/3] ARM: at91: move aic driver to drivers/irqchip
-Message-ID: <1369324135-31211-1-git-send-email-b.brezillon@overkiz.com>
+Date: Thu, 23 May 2013 17:48:55 +0200
+Subject: [PATCH v2 3/3] ARM: at91: use IRQCHIP_DECLARE instead of machine
+ specific init_irq
+In-Reply-To: <1369324135-31211-1-git-send-email-b.brezillon@overkiz.com>
+References: <1369324135-31211-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1369324135-31211-4-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Replace machine specific init_irq functions with IRQCHIP_DECLARE.
 
-This patch series :
- - register the arch specific irq handler inside the the init functions
-   using set_handle_irq. This way we can remove all the machine specific
-   "handle_irq"
- - move the at91 AIC (Advance Interrupt Controller) driver to the 
-   irqchip subsystem directory (drivers/irqchip)
- - make use of IRQCHIP_DECLARE to register irqchip for dt boards
-   instead of using the machine specific "init_irq" function
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/mach-at91/board-dt-rm9200.c |   11 -----------
+ arch/arm/mach-at91/board-dt-sam9.c   |   12 ------------
+ arch/arm/mach-at91/board-dt-sama5.c  |   12 ------------
+ arch/arm/mach-at91/generic.h         |    5 -----
+ drivers/irqchip/irq-at91.c           |    4 ++++
+ 5 files changed, 4 insertions(+), 40 deletions(-)
 
-This patch series was tested on kizbox board (sam9g20 SoC) using
-device tree. Could someone test it on other boards (both dt and non dt)?
-
-Changes since v1:
- - reorder patch (3rd patch is now applied first).
- - remove references to machine specific header (<mach/at91_aic.h>).
-
-Maybe we should cleanup include/linux/irqchip/at91.h
-(as suggested by Russel).
-Currently, the only MACROs needed outside of irq-at91.c are:
- - pm.c : at91_aic_read, AT91_AIC_IMR and AT91_AIC_IPR
- - at91xxx.c : NR_AICX_IRQS
-
-Please let me know what you think is best.
-
-Best Regards,
-Boris
-
-Boris BREZILLON (3):
-  ARM: at91: use set_handle_irq instead of machine specific handle_irq
-  ARM: at91: move at91 aic driver to drivers/irqchip
-  ARM: at91: use IRQCHIP_DECLARE instead of machine specific init_irq
-
- arch/arm/mach-at91/Makefile                        |    2 +-
- arch/arm/mach-at91/at91rm9200.c                    |    2 +-
- arch/arm/mach-at91/at91sam9260.c                   |    2 +-
- arch/arm/mach-at91/at91sam9261.c                   |    2 +-
- arch/arm/mach-at91/at91sam9263.c                   |    2 +-
- arch/arm/mach-at91/at91sam9g45.c                   |    2 +-
- arch/arm/mach-at91/at91sam9rl.c                    |    2 +-
- arch/arm/mach-at91/at91x40.c                       |    2 +-
- arch/arm/mach-at91/board-1arm.c                    |    3 +--
- arch/arm/mach-at91/board-afeb-9260v1.c             |    3 +--
- arch/arm/mach-at91/board-cam60.c                   |    3 +--
- arch/arm/mach-at91/board-carmeva.c                 |    3 +--
- arch/arm/mach-at91/board-cpu9krea.c                |    3 +--
- arch/arm/mach-at91/board-cpuat91.c                 |    3 +--
- arch/arm/mach-at91/board-csb337.c                  |    3 +--
- arch/arm/mach-at91/board-csb637.c                  |    3 +--
- arch/arm/mach-at91/board-dt-rm9200.c               |   14 +-------------
- arch/arm/mach-at91/board-dt-sam9.c                 |   15 +--------------
- arch/arm/mach-at91/board-dt-sama5.c                |   15 +--------------
- arch/arm/mach-at91/board-eb01.c                    |    3 +--
- arch/arm/mach-at91/board-eb9200.c                  |    3 +--
- arch/arm/mach-at91/board-ecbat91.c                 |    3 +--
- arch/arm/mach-at91/board-eco920.c                  |    3 +--
- arch/arm/mach-at91/board-flexibity.c               |    3 +--
- arch/arm/mach-at91/board-foxg20.c                  |    3 +--
- arch/arm/mach-at91/board-gsia18s.c                 |    3 +--
- arch/arm/mach-at91/board-kafa.c                    |    3 +--
- arch/arm/mach-at91/board-kb9202.c                  |    3 +--
- arch/arm/mach-at91/board-pcontrol-g20.c            |    3 +--
- arch/arm/mach-at91/board-picotux200.c              |    3 +--
- arch/arm/mach-at91/board-qil-a9260.c               |    3 +--
- arch/arm/mach-at91/board-rm9200dk.c                |    3 +--
- arch/arm/mach-at91/board-rm9200ek.c                |    3 +--
- arch/arm/mach-at91/board-rsi-ews.c                 |    3 +--
- arch/arm/mach-at91/board-sam9-l9260.c              |    3 +--
- arch/arm/mach-at91/board-sam9260ek.c               |    3 +--
- arch/arm/mach-at91/board-sam9261ek.c               |    3 +--
- arch/arm/mach-at91/board-sam9263ek.c               |    3 +--
- arch/arm/mach-at91/board-sam9g20ek.c               |    4 +---
- arch/arm/mach-at91/board-sam9m10g45ek.c            |    3 +--
- arch/arm/mach-at91/board-sam9rlek.c                |    3 +--
- arch/arm/mach-at91/board-snapper9260.c             |    3 +--
- arch/arm/mach-at91/board-stamp9g20.c               |    4 +---
- arch/arm/mach-at91/board-usb-a926x.c               |    5 +----
- arch/arm/mach-at91/board-yl-9200.c                 |    3 +--
- arch/arm/mach-at91/generic.h                       |    5 -----
- arch/arm/mach-at91/pm.c                            |    2 +-
- drivers/irqchip/Makefile                           |    1 +
- .../mach-at91/irq.c => drivers/irqchip/irq-at91.c  |   14 ++++++++++++--
- .../at91_aic.h => include/linux/irqchip/at91.h     |    9 +--------
- 50 files changed, 60 insertions(+), 137 deletions(-)
- rename arch/arm/mach-at91/irq.c => drivers/irqchip/irq-at91.c (97%)
- rename arch/arm/mach-at91/at91_aic.h => include/linux/irqchip/at91.h (95%)
-
+diff --git a/arch/arm/mach-at91/board-dt-rm9200.c b/arch/arm/mach-at91/board-dt-rm9200.c
+index 67fff54..7ee7e5f 100644
+--- a/arch/arm/mach-at91/board-dt-rm9200.c
++++ b/arch/arm/mach-at91/board-dt-rm9200.c
+@@ -26,16 +26,6 @@
+ #include "generic.h"
+ 
+ 
+-static const struct of_device_id irq_of_match[] __initconst = {
+-	{ .compatible = "atmel,at91rm9200-aic", .data = at91_aic_of_init },
+-	{ /*sentinel*/ }
+-};
+-
+-static void __init at91rm9200_dt_init_irq(void)
+-{
+-	of_irq_init(irq_of_match);
+-}
+-
+ static void __init at91rm9200_dt_device_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+@@ -50,7 +40,6 @@ DT_MACHINE_START(at91rm9200_dt, "Atmel AT91RM9200 (Device Tree)")
+ 	.init_time      = at91rm9200_timer_init,
+ 	.map_io		= at91_map_io,
+ 	.init_early	= at91rm9200_dt_initialize,
+-	.init_irq	= at91rm9200_dt_init_irq,
+ 	.init_machine	= at91rm9200_dt_device_init,
+ 	.dt_compat	= at91rm9200_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/board-dt-sam9.c b/arch/arm/mach-at91/board-dt-sam9.c
+index 65edc6e..e7aa089 100644
+--- a/arch/arm/mach-at91/board-dt-sam9.c
++++ b/arch/arm/mach-at91/board-dt-sam9.c
+@@ -26,17 +26,6 @@
+ #include "generic.h"
+ 
+ 
+-static const struct of_device_id irq_of_match[] __initconst = {
+-
+-	{ .compatible = "atmel,at91rm9200-aic", .data = at91_aic_of_init },
+-	{ /*sentinel*/ }
+-};
+-
+-static void __init at91_dt_init_irq(void)
+-{
+-	of_irq_init(irq_of_match);
+-}
+-
+ static void __init at91_dt_device_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+@@ -52,7 +41,6 @@ DT_MACHINE_START(at91sam_dt, "Atmel AT91SAM (Device Tree)")
+ 	.init_time	= at91sam926x_pit_init,
+ 	.map_io		= at91_map_io,
+ 	.init_early	= at91_dt_initialize,
+-	.init_irq	= at91_dt_init_irq,
+ 	.init_machine	= at91_dt_device_init,
+ 	.dt_compat	= at91_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+index 015178f..b3b6a1b 100644
+--- a/arch/arm/mach-at91/board-dt-sama5.c
++++ b/arch/arm/mach-at91/board-dt-sama5.c
+@@ -27,17 +27,6 @@
+ #include "generic.h"
+ 
+ 
+-static const struct of_device_id irq_of_match[] __initconst = {
+-
+-	{ .compatible = "atmel,sama5d3-aic", .data = at91_aic5_of_init },
+-	{ /*sentinel*/ }
+-};
+-
+-static void __init at91_dt_init_irq(void)
+-{
+-	of_irq_init(irq_of_match);
+-}
+-
+ static int ksz9021rn_phy_fixup(struct phy_device *phy)
+ {
+ 	int value;
+@@ -79,7 +68,6 @@ DT_MACHINE_START(sama5_dt, "Atmel SAMA5 (Device Tree)")
+ 	.init_time	= at91sam926x_pit_init,
+ 	.map_io		= at91_map_io,
+ 	.init_early	= at91_dt_initialize,
+-	.init_irq	= at91_dt_init_irq,
+ 	.init_machine	= sama5_dt_device_init,
+ 	.dt_compat	= sama5_dt_board_compat,
+ MACHINE_END
+diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
+index 78ab065..23077cf 100644
+--- a/arch/arm/mach-at91/generic.h
++++ b/arch/arm/mach-at91/generic.h
+@@ -29,11 +29,6 @@ extern void __init at91_init_interrupts(unsigned int priority[]);
+ extern void __init at91x40_init_interrupts(unsigned int priority[]);
+ extern void __init at91_aic_init(unsigned int priority[],
+ 				 unsigned int ext_irq_mask);
+-extern int  __init at91_aic_of_init(struct device_node *node,
+-				    struct device_node *parent);
+-extern int  __init at91_aic5_of_init(struct device_node *node,
+-				    struct device_node *parent);
+-
+ 
+  /* Timer */
+ extern void at91rm9200_ioremap_st(u32 addr);
+diff --git a/drivers/irqchip/irq-at91.c b/drivers/irqchip/irq-at91.c
+index ca49096..137d428 100644
+--- a/drivers/irqchip/irq-at91.c
++++ b/drivers/irqchip/irq-at91.c
+@@ -43,6 +43,8 @@
+ #include <asm/mach/irq.h>
+ #include <asm/mach/map.h>
+ 
++#include "irqchip.h"
++
+ 
+ void __iomem *at91_aic_base;
+ static struct irq_domain *at91_aic_domain;
+@@ -473,6 +475,7 @@ int __init at91_aic_of_init(struct device_node *node,
+ 
+ 	return 0;
+ }
++IRQCHIP_DECLARE(at91rm9200_aic, "atmel,at91rm9200-aic", at91_aic_of_init);
+ 
+ int __init at91_aic5_of_init(struct device_node *node,
+ 				     struct device_node *parent)
+@@ -497,6 +500,7 @@ int __init at91_aic5_of_init(struct device_node *node,
+ 
+ 	return 0;
+ }
++IRQCHIP_DECLARE(sama5d3_aic, "atmel,sama5d3-aic", at91_aic5_of_init);
+ #endif
+ 
+ /*
 -- 
 1.7.9.5
