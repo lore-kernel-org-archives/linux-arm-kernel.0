@@ -1,26 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 23 May 2013 19:01:21 +0200
-Subject: [RFC V6 PATCH 3/3] USB: OHCI: make ohci-pci a separate driver
-In-Reply-To: <Pine.LNX.4.44L0.1305231034110.925-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1305231034110.925-100000@iolanthe.rowland.org>
-Message-ID: <201305231901.21632.arnd@arndb.de>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Thu, 23 May 2013 18:07:47 +0100
+Subject: [PATCH 00/11] HugeTLB and THP support for ARM64.
+Message-ID: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 23 May 2013, Alan Stern wrote:
-> On Thu, 23 May 2013, Manjunath Goudar wrote:
+This series brings huge pages and transparent huge pages to ARM64.
+The functionality is very similar to x86, and a lot of code that can
+be used by both ARM64 and x86 is brought into mm to avoid the need
+for code duplication.
 
-> Also, you left out one thing that should still be here.  What happened 
-> to the part about changing
-> 
-> #if	!defined(PCI_DRIVER) &&		\
-> 
-> to
-> 
-> #if	!ENABLED(CONFIG_USB_OHCI_HCD_PCI) &&	\
-> 
+One notable difference from x86 is that ARM64 supports normal pages
+that are 64KB. When 64KB pages are enabled, huge page and
+transparent huge pages are 512MB only, otherwise the sizes match
+x86.
 
-This section of the driver is gone now since 86510bb248 "USB: OHCI: 
-clarify Kconfig dependencies", so the change is no longer needed.
+This series applies to 3.10-rc2.
 
-	Arnd
+I've tested this under the ARMv8 Fast model and the x86 code has
+been tested in a KVM guest. libhugetlbfs was used for testing under
+both architectures.
+
+Changelog:
+Patch:
+   * pud_large usage replaced with pud_huge for general hugetlb
+     code imported into mm.
+   * comments tidied up for bit swap of PTE_FILE, PTE_PROT_NONE.
+
+RFC v2:
+   * PROT_NONE support added for HugeTLB and THP.
+   * pmd_modify implementation fixed.
+   * Superfluous huge dcache flushing code removed.
+   * Simplified (and corrected) MAX_ORDER raise for THP && 64KB
+     pages.
+   * The MAX_ORDER check in huge_mm.h has been corrected.
+
+---
+
+Steve Capper (11):
+  mm: hugetlb: Copy huge_pmd_share from x86 to mm.
+  x86: mm: Remove x86 version of huge_pmd_share.
+  mm: hugetlb: Copy general hugetlb code from x86 to mm.
+  x86: mm: Remove general hugetlb code from x86.
+  mm: thp: Correct the HPAGE_PMD_ORDER check.
+  ARM64: mm: Restore memblock limit when map_mem finished.
+  ARM64: mm: Make PAGE_NONE pages read only and no-execute.
+  ARM64: mm: Swap PTE_FILE and PTE_PROT_NONE bits.
+  ARM64: mm: HugeTLB support.
+  ARM64: mm: Raise MAX_ORDER for 64KB pages and THP.
+  ARM64: mm: THP support.
+
+ arch/arm64/Kconfig                     |  17 +++
+ arch/arm64/include/asm/hugetlb.h       | 117 ++++++++++++++++++
+ arch/arm64/include/asm/pgtable-hwdef.h |  12 ++
+ arch/arm64/include/asm/pgtable.h       |  84 +++++++++++--
+ arch/arm64/include/asm/tlb.h           |   6 +
+ arch/arm64/include/asm/tlbflush.h      |   2 +
+ arch/arm64/mm/Makefile                 |   1 +
+ arch/arm64/mm/fault.c                  |  19 +--
+ arch/arm64/mm/hugetlbpage.c            |  70 +++++++++++
+ arch/arm64/mm/mmu.c                    |  19 ++-
+ arch/x86/Kconfig                       |   6 +
+ arch/x86/mm/hugetlbpage.c              | 187 ----------------------------
+ include/linux/huge_mm.h                |   2 +-
+ include/linux/hugetlb.h                |   4 +
+ mm/hugetlb.c                           | 219 +++++++++++++++++++++++++++++++--
+ 15 files changed, 537 insertions(+), 228 deletions(-)
+ create mode 100644 arch/arm64/include/asm/hugetlb.h
+ create mode 100644 arch/arm64/mm/hugetlbpage.c
+
+-- 
+1.8.1.4
