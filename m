@@ -1,91 +1,60 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 24 May 2013 17:59:22 +0800
-Subject: [PATCH v3 4/6] ARM: dts: imx6q: add pinctrls for WEIM NOR
-In-Reply-To: <1369389564-13181-1-git-send-email-b32955@freescale.com>
-References: <1369389564-13181-1-git-send-email-b32955@freescale.com>
-Message-ID: <1369389564-13181-5-git-send-email-b32955@freescale.com>
+From: itooo@itooo.com (Greg)
+Date: Fri, 24 May 2013 12:25:48 +0200
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
+ 370/XP
+In-Reply-To: <20130523234024.GU18614@n2100.arm.linux.org.uk>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130523142301.10dbeff9@skate>
+ <20130523202643.GQ18614@n2100.arm.linux.org.uk>
+ <201305232240.03959.arnd@arndb.de>
+ <20130523230911.GR18614@n2100.arm.linux.org.uk>
+ <20130524011724.515eac91@skate>
+ <20130523234024.GU18614@n2100.arm.linux.org.uk>
+Message-ID: <519F402C.9050801@itooo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two pinctrls for WEIM:
-   one for the weim nor, another for the chipselect.
+Le 24/05/2013 01:40, Russell King - ARM Linux a ?crit :
+> On Fri, May 24, 2013 at 01:17:24AM +0200, Thomas Petazzoni wrote:
+>> Russell,
+>>
+>> On Fri, 24 May 2013 00:09:11 +0100, Russell King - ARM Linux wrote:
+>>
+>>> No, I'm not asking about the principle.  I'm asking _in this particular
+>>> problem case_ who provides the DT blob?
+>>>
+>>> So the person to answer that question is Thomas or someone who is using
+>>> the boards concerned.
+>> The DTB is built from arch/arm/boot/dts/, together with the kernel
+>> image itself. As far as I'm aware of, there is for the moment no plan
+>> to "burn" the DTB on the board and therefore make the Device Tree
+>> really separated from the kernel.
+> Right, so we're still in the position where we aren't dealing with
+> vendor provided DT blobs... this also means of course that the DT blob
+> isn't going to get updated by the boot loader depending on where it
+> decides to set the registers.
+>
+> I suspect as far as the boot loaders on these boards go, the DT blob is
+> "just another file" to be loaded into memory by the boot loader, and it
+> is completely untouched by the boot loader.
+>
+Russell,
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/boot/dts/imx6q.dtsi |   61 ++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 61 insertions(+), 0 deletions(-)
+this is a little more complicated, the bootloader does touch the DT 
+blob, for example it sets the MAC addresses of the network interfaces, I 
+believe it also sets UART0 parameters. It does this silently if it 
+founds entries it knows about in the DT blob.
 
-diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-index ed11bcf..7c5bcf4 100644
---- a/arch/arm/boot/dts/imx6q.dtsi
-+++ b/arch/arm/boot/dts/imx6q.dtsi
-@@ -323,6 +323,67 @@
- 						>;
- 					};
- 				};
-+
-+				weim {
-+					pinctrl_weim_cs_0: weim_norgrp-1 {
-+						fsl,pins = <
-+							MX6Q_PAD_EIM_CS0__EIM_CS0_B   0xb0b1
-+							>;
-+					};
-+
-+					pinctrl_weim_nor_1: weim_norgrp-2 {
-+						fsl,pins = <
-+							MX6Q_PAD_EIM_OE__EIM_OE_B     0xb0b1
-+							MX6Q_PAD_EIM_RW__EIM_RW       0xb0b1
-+							MX6Q_PAD_EIM_WAIT__EIM_WAIT_B 0xb060
-+
-+							/* data */
-+							MX6Q_PAD_EIM_D16__EIM_DATA16 0xb0b1
-+							MX6Q_PAD_EIM_D17__EIM_DATA17 0xb0b1
-+							MX6Q_PAD_EIM_D18__EIM_DATA18 0xb0b1
-+							MX6Q_PAD_EIM_D19__EIM_DATA19 0xb0b1
-+							MX6Q_PAD_EIM_D20__EIM_DATA20 0xb0b1
-+							MX6Q_PAD_EIM_D21__EIM_DATA21 0xb0b1
-+							MX6Q_PAD_EIM_D22__EIM_DATA22 0xb0b1
-+							MX6Q_PAD_EIM_D23__EIM_DATA23 0xb0b1
-+							MX6Q_PAD_EIM_D24__EIM_DATA24 0xb0b1
-+							MX6Q_PAD_EIM_D25__EIM_DATA25 0xb0b1
-+							MX6Q_PAD_EIM_D26__EIM_DATA26 0xb0b1
-+							MX6Q_PAD_EIM_D27__EIM_DATA27 0xb0b1
-+							MX6Q_PAD_EIM_D28__EIM_DATA28 0xb0b1
-+							MX6Q_PAD_EIM_D29__EIM_DATA29 0xb0b1
-+							MX6Q_PAD_EIM_D30__EIM_DATA30 0xb0b1
-+							MX6Q_PAD_EIM_D31__EIM_DATA31 0xb0b1
-+
-+							/* address */
-+							MX6Q_PAD_EIM_A23__EIM_ADDR23 0xb0b1
-+							MX6Q_PAD_EIM_A22__EIM_ADDR22 0xb0b1
-+							MX6Q_PAD_EIM_A21__EIM_ADDR21 0xb0b1
-+							MX6Q_PAD_EIM_A20__EIM_ADDR20 0xb0b1
-+							MX6Q_PAD_EIM_A19__EIM_ADDR19 0xb0b1
-+							MX6Q_PAD_EIM_A18__EIM_ADDR18 0xb0b1
-+							MX6Q_PAD_EIM_A17__EIM_ADDR17 0xb0b1
-+							MX6Q_PAD_EIM_A16__EIM_ADDR16 0xb0b1
-+							MX6Q_PAD_EIM_DA15__EIM_AD15  0xb0b1
-+							MX6Q_PAD_EIM_DA14__EIM_AD14  0xb0b1
-+							MX6Q_PAD_EIM_DA13__EIM_AD13  0xb0b1
-+							MX6Q_PAD_EIM_DA12__EIM_AD12  0xb0b1
-+							MX6Q_PAD_EIM_DA11__EIM_AD11  0xb0b1
-+							MX6Q_PAD_EIM_DA10__EIM_AD10  0xb0b1
-+							MX6Q_PAD_EIM_DA9__EIM_AD09   0xb0b1
-+							MX6Q_PAD_EIM_DA8__EIM_AD08   0xb0b1
-+							MX6Q_PAD_EIM_DA7__EIM_AD07   0xb0b1
-+							MX6Q_PAD_EIM_DA6__EIM_AD06   0xb0b1
-+							MX6Q_PAD_EIM_DA5__EIM_AD05   0xb0b1
-+							MX6Q_PAD_EIM_DA4__EIM_AD04   0xb0b1
-+							MX6Q_PAD_EIM_DA3__EIM_AD03   0xb0b1
-+							MX6Q_PAD_EIM_DA2__EIM_AD02   0xb0b1
-+							MX6Q_PAD_EIM_DA1__EIM_AD01   0xb0b1
-+							MX6Q_PAD_EIM_DA0__EIM_AD00   0xb0b1
-+						>;
-+					};
-+
-+				};
- 			};
- 		};
- 
--- 
-1.7.1
+I guess the good idea would have been to ask Marvell to also update an 
+MBUS entry in the DT blob instead of doing the CP15 trick. This would 
+not have solved the earlyprintk problem however.
+I also guess this is not feasible anymore since it would imply to have 3 
+different bootloader possibilities and 2 already is a pain to deal with.
+
+Does this raise any new idea to someone ?
+
+Cheers,
+
+PS: I also got Marvell's confirmation, there is no way to avoid CPU hang 
+when accessing an unmapped memory address, this triggers an external 
+abort exception which is not recoverable in kernel mode.
