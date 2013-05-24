@@ -1,78 +1,138 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Fri, 24 May 2013 08:16:42 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSF0gQVJNOiBkdHM6IGlteDogZml4IGNsb2NrcyBmb3Ig?=
- =?UTF-8?B?Y3NwaQ==?=
-In-Reply-To: <20130523173306.GT32299@pengutronix.de>
-References: <1369309085-31146-1-git-send-email-jonas@microbit.se>
- <1369319290.379285076@f398.i.mail.ru>
- <20130523173306.GT32299@pengutronix.de>
-Message-ID: <1369369002.837105175@f322.mail.ru>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Fri, 24 May 2013 12:17:26 +0800
+Subject: [PATCH] arch: configuration, deleting 'CONFIG_BUG' since always
+ need it.
+In-Reply-To: <519ECCCF.8090909@asianux.com>
+References: <519DCBEF.3090208@asianux.com> <201305231259.43750.arnd@arndb.de>
+ <20130523112401.GO18614@n2100.arm.linux.org.uk>
+ <201305231409.02359.arnd@arndb.de>
+ <20130523125033.GP18614@n2100.arm.linux.org.uk>
+ <CAMuHMdUzcBuDupe4Fa6XieziGPMpPKC_k8X8gUUmDvLJ+Fe=Hg@mail.gmail.com>
+ <519ECCCF.8090909@asianux.com>
+Message-ID: <519EE9D6.9010707@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > On Thu, May 23, 2013 at 04:10:59PM +0400, Alexander Shiyan wrote:
-> > > > > > The CSPI controller has only one clock, but the driver spi-imx.c needs clock "per" to calculate bitrate divisor.
-> > > > > > 
-> > > > > > Signed-off-by: Jonas Andersson <jonas@microbit.se>
-> > > > > > ---
-> > > > > >  arch/arm/boot/dts/imx25.dtsi | 12 ++++++------
-> > > > > >  arch/arm/boot/dts/imx27.dtsi |  6 +++---
-> > > > > >  arch/arm/boot/dts/imx51.dtsi |  2 +-
-> > > > > >  arch/arm/boot/dts/imx53.dtsi |  2 +-
-> > > > > >  4 files changed, 11 insertions(+), 11 deletions(-)
-> > > > > > 
-> > > > > > diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> > > > > > index d2550e0..7011539 100644
-> > > > > > --- a/arch/arm/boot/dts/imx25.dtsi
-> > > > > > +++ b/arch/arm/boot/dts/imx25.dtsi
-> > > > > > @@ -141,8 +141,8 @@
-> > > > > >  				#size-cells = <0>;
-> > > > > >  				compatible = "fsl,imx25-cspi", "fsl,imx35-cspi";
-> > > > > >  				reg = <0x43fa4000 0x4000>;
-> > > > > > -				clocks = <&clks 62>;
-> > > > > > -				clock-names = "ipg";
-> > > > > > +				clocks = <&clks 62>, <&clks 62>;
-> > > > > > +				clock-names = "ipg", "per";
-> > > > > >  				interrupts = <14>;
-> > > > > >  				status = "disabled";
-> > > > > >  			};
-> > > > 
-> > > > Sorry, typo.
-> > > > 
-> > > > > Why you do not use "dummy" clock for "per" here?
-> > > > 
-> > > > *for "ipg"
-> > > 
-> > > Because the same clock is used for the register clock and the baudrate
-> > > clock. You have to enable the ipg clock to access registers.
-> > 
-> > I am not see any "ipg" clock usage in the spi driver.
+On 05/24/2013 10:13 AM, Chen Gang wrote:
+> On 05/23/2013 10:10 PM, Geert Uytterhoeven wrote:
+>> On Thu, May 23, 2013 at 2:50 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>>>> On Thu, May 23, 2013 at 02:09:02PM +0200, Arnd Bergmann wrote:
+>>>>>> On Thursday 23 May 2013, Russell King - ARM Linux wrote:
+>>>>>>>> This is the problem you guys are missing - unreachable() means "we lose
+>>>>>>>> control of the CPU at this point".
+>>>>>>
+>>>>>> I'm absolutely aware of this. Again, the current behaviour of doing nothing
+>>>>>> at all isn't very different from undefined behavior when you get when you
+>>>>>> get to the end of a function returning a pointer without a "return" statement,
+>>>>>> or when you return from a function that has determined that it is not safe
+>>>>>> to continue.
+>>>>
+>>>> Running off the end of a function like that is a different kettle of fish.
+>>>> The execution path is still as the compiler intends - what isn't is that
+>>>> the data returned is likely to be random trash.
+>>>>
+>>>> That's _quite_ different from the CPU starting to execute the contents
+>>>> of a literal data pool.
+>> I agree it's best to e.g. trap and reboot.
 > 
-> It's the register clock. The driver enables it in order to access the
-> registers.
-> 
-> > If "ipg" clock is
-> > a dependency for "per" clock, it should be registered in ccm as parent.
-> 
-> Look, the eCSPI unit has two clock inputs, one for accessing the
-> registers (ipg) and one for generating the SPI bit clock (per). Now the
-> CSPI unit only has a single clock input, so the 100% correct way would
-> be to specify only a single clock for this unit. However, since we
-> handle both units with the same driver the simplest way to cope with
-> it is to provide the very same clock twice, once for the register access
-> and once for generating the SPI bit clock.
-> And yes, we have to specify the real clock twice and can't replace one
-> with a dummy clock, because if we specify a dummy clock for the ipg
-> clock, then the driver couldn't access the registers even if it enabled
-> the clock. If we would replace the SPI bit clock with a dummy clock then
-> the device couldn't send data even if the driver enabled the bit clock.
-> (That of course only becomes relevant when the driver actually
-> en/disables the clocks during runtime and not only once during probe).
 
-Well, I completely forgot about the clock for registers.
-Everything looks right then.
-However, it would be nice to add a few words about the clocks in the
-Documentation/devicetree/bindings/spi/fsl-imx~spi.txt
-Thanks for the clarification.
+In fact: if enable CONFIG_BUG, but not enable HAVE_ARCH_BUG, the
+default implementation is:
 
----
+ 47 #ifndef HAVE_ARCH_BUG
+ 48 #define BUG() do { \
+ 49         printk("BUG: failure at %s:%d/%s()!\n", __FILE__, __LINE__, __func__); \
+ 50         panic("BUG!"); \
+ 51 } while (0)
+ 52 #endif
+
+So if we delete CONFIG_BUG, the default implementation will be almost
+like panic(),  and in panic() itself, also calls printk() !!
+
+So...
+
+:-)
+
+
+
+> After read the arch/*/include/asm/bug.h,
+> 
+> It seems panic() is not suitable for NOMMU platforms (only m68k use it,
+> also need CONFIG_BUG and CONFIG_SUN3 enabled).
+> 
+> And unreachable() is need followed with an asm inline instruction (arm,
+> x86, powerpc mips...).
+> 
+> And __builtin_trap() is "the mechanism used may vary from release to
+> release so should not rely on any particular implementation" (ref to
+> "http://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html", used by m68k,
+> sparc, ia64).
+> 
+> I can not find any *trap*() and *unreachable*() in "include/asm-generic/"
+> 
+> I can not find any suitable implementation which 'generic' enough to add
+> in "include/asm-generic/" (and in fact, CONFIG_BUG itself is not
+> 'generic' enough to be in "include/asm-generic/").
+> 
+> 
+> At last, I still suggest to delete CONFIG_BUG, so most of architectures
+> can skip this issue firstly.
+> 
+> Then for specific architectures, also can get 3 benefits:
+> 
+> a. the related maintainers can implement it as their own willing (not
+> need discus it with another platform maintainers again);
+> 
+> b. the related maintainers can free use the platform specific features
+> (which can not be used in "include/asm-generic/");
+> 
+> c. the related maintainers are more familiar their own architectures
+> demands and requirements.
+> 
+> 
+> 
+> ----------- arch/m68k/include/asm/bug.h --------------------------------
+> 
+>   1 #ifndef _M68K_BUG_H
+>   2 #define _M68K_BUG_H
+>   3
+>   4 #ifdef CONFIG_MMU
+>   5 #ifdef CONFIG_BUG
+>   6 #ifdef CONFIG_DEBUG_BUGVERBOSE
+>   7 #ifndef CONFIG_SUN3
+>   8 #define BUG() do { \
+>   9         printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
+>  10         __builtin_trap(); \
+>  11 } while (0)
+>  12 #else
+>  13 #define BUG() do { \
+>  14         printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
+>  15         panic("BUG!"); \
+>  16 } while (0)
+>  17 #endif
+>  18 #else
+>  19 #define BUG() do { \
+>  20         __builtin_trap(); \
+>  21 } while (0)
+>  22 #endif
+>  23
+>  24 #define HAVE_ARCH_BUG
+>  25 #endif
+>  26 #endif /* CONFIG_MMU */
+>  27
+>  28 #include <asm-generic/bug.h>
+>  29
+>  30 #endif
+> 
+> 
+> 
+> 
+> Thanks.
+> 
+
+
+-- 
+Chen Gang
+
+Asianux Corporation
