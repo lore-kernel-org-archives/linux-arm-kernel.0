@@ -1,152 +1,157 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 May 2013 11:44:37 +0200
-Subject: [PATCH 00/21] ARM: kirkwood: improve pinmux configs in Device Tree
-Message-ID: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri, 24 May 2013 11:44:39 +0200
+Subject: [PATCH 02/21] arm: kirkwood: dlink dns: affect pinmux configs to the
+ right devices
+In-Reply-To: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369388699-25975-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+When the pinmux mechanism was added in Kirkwood, the device driver
+core was not yet providing the possibility of attaching pinmux
+configurations to all devices, drivers had to do it explicitly, and
+not all drivers were doing this.
 
-This series of patches has the goal of adding support for the Init
-button on OpenBlocks A6, but takes this opportunity to do a little bit
-of cleanup in the pinmux configurations of the various Kirkwood Device
-Trees.
+Now that the driver core does that in a generic way, it makes sense to
+attach the pinmux configuration to their corresponding devices.
 
-Until now, all pinmux configurations were "owned" by the pinctrl
-driver, because back when they were introduced, the driver core was
-not selecting the pinmux configuration, each driver had to do it
-manually (and not all drivers were doing so). Now that the driver core
-selects the default pinmux configuration when available, it makes
-sense to associate the pinmux configuration to the particular device
-it is related to.
+This allows the pinctrl subsystem to show in debugfs to which device
+is related which pins, for example:
 
-It allows pinctrl to show nice informations in debugfs, which
-associates a particular pin with the particular device using it:
-
-# cat pinctrl/f1010000.pinctrl/pinmux-pins 
-Pinmux settings per pin
-Format: pin (name): mux_owner gpio_owner hog?
-pin 0 (PIN0): f4000000.nand (GPIO UNCLAIMED) function nand group mpp0
-pin 1 (PIN1): f4000000.nand (GPIO UNCLAIMED) function nand group mpp1
-pin 2 (PIN2): f4000000.nand (GPIO UNCLAIMED) function nand group mpp2
-pin 3 (PIN3): f4000000.nand (GPIO UNCLAIMED) function nand group mpp3
-pin 4 (PIN4): f4000000.nand (GPIO UNCLAIMED) function nand group mpp4
-pin 5 (PIN5): f4000000.nand (GPIO UNCLAIMED) function nand group mpp5
-pin 6 (PIN6): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 7 (PIN7): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 8 (PIN8): f1012100.serial (GPIO UNCLAIMED) function uart1 group mpp8
-pin 9 (PIN9): f1012100.serial (GPIO UNCLAIMED) function uart1 group mpp9
-pin 10 (PIN10): f1012000.serial (GPIO UNCLAIMED) function uart0 group mpp10
-pin 11 (PIN11): f1012000.serial (GPIO UNCLAIMED) function uart0 group mpp11
-pin 12 (PIN12): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 13 (PIN13): f1012100.serial (GPIO UNCLAIMED) function uart1 group mpp13
-pin 14 (PIN14): f1012100.serial (GPIO UNCLAIMED) function uart1 group mpp14
-pin 15 (PIN15): f1012000.serial (GPIO UNCLAIMED) function uart0 group mpp15
-pin 16 (PIN16): f1012000.serial (GPIO UNCLAIMED) function uart0 group mpp16
-pin 17 (PIN17): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 18 (PIN18): f4000000.nand (GPIO UNCLAIMED) function nand group mpp18
-pin 19 (PIN19): f4000000.nand (GPIO UNCLAIMED) function nand group mpp19
-pin 20 (PIN20): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp20
-pin 21 (PIN21): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp21
-pin 22 (PIN22): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp22
-pin 23 (PIN23): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp23
-pin 24 (PIN24): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp24
-pin 25 (PIN25): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp25
-pin 26 (PIN26): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp26
-pin 27 (PIN27): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp27
-pin 28 (PIN28): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp28
-pin 29 (PIN29): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp29
-pin 30 (PIN30): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp30
-pin 31 (PIN31): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp31
-pin 32 (PIN32): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 33 (PIN33): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 34 (PIN34): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 35 (PIN35): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 36 (PIN36): f1011100.i2c (GPIO UNCLAIMED) function twsi1 group mpp36
-pin 37 (PIN37): f1011100.i2c (GPIO UNCLAIMED) function twsi1 group mpp37
-pin 38 (PIN38): gpio_keys.2 mvebu-gpio:38 function gpio group mpp38
-pin 39 (PIN39): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 40 (PIN40): (MUX UNCLAIMED) (GPIO UNCLAIMED)
 pin 41 (PIN41): gpio-leds.1 mvebu-gpio:41 function gpio group mpp41
 pin 42 (PIN42): gpio-leds.1 mvebu-gpio:42 function gpio group mpp42
 pin 43 (PIN43): gpio-leds.1 mvebu-gpio:43 function gpio group mpp43
-pin 44 (PIN44): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 45 (PIN45): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 46 (PIN46): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 47 (PIN47): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 48 (PIN48): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-pin 49 (PIN49): (MUX UNCLAIMED) (GPIO UNCLAIMED)
 
-Without this patch set, all pins appear to be owned by
-"f1010000.pinctrl".
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/kirkwood-dns320.dts |    7 +++++++
+ arch/arm/boot/dts/kirkwood-dns325.dts |    5 +++++
+ arch/arm/boot/dts/kirkwood-dnskw.dtsi |   32 +++++++++++++++++---------------
+ 3 files changed, 29 insertions(+), 15 deletions(-)
 
-Even though GPIO muxing is automatically done when a device driver
-requests a GPIO, Andrew Lunn and I had agreed to make the pinmuxing
-explicit, in order to have correct informations in debugfs. See our
-discussion at
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-March/158190.html.
-
-The last patch finally adds support for the init button of the
-Plathome OpenBlocks A6 platform.
-
-Best regards,
-
-Thomas
-
-Thomas Petazzoni (21):
-  arm: kirkwood: cloudbox: affect pinmux configs to the right devices
-  arm: kirkwood: dlink dns: affect pinmux configs to the right devices
-  arm: kirkwood: dockstar: affect pinmux configs to the right devices
-  arm: kirkwood: dreamplug: affect pinmux configs to the right devices
-  arm: kirkwood: goflexnet: affect pinmux configs to the right devices
-  arm: kirkwood: guruplug: affect pinmux configs to the right devices
-  arm: kirkwood: ib62x0: affect pinmux configs to the right devices
-  arm: kirkwood: iconnect: give meaningful names to pinmux configs
-  arm: kirkwood: iconnect: affect pinmux configs to the right devices
-  arm: kirkwood: iomega ix2-200: affect pinmux configs to the right
-    devices
-  arm: kirkwood: ns2: affect pinmux configs to the right devices
-  arm: kirkwood: keymile: affect pinmux configs to the right devices
-  arm: kirkwood: buffalo linkstation: affect pinmux configs to the
-    right devices
-  arm: kirkwood: mplcec4: affect pinmux configs to the right devices
-  arm: kirkwood: readynas: affect pinmux configs to the right devices
-  arm: kirkwood: nsa310: affect pinmux configs to the right devices
-  arm: kirkwood: openblocks_a6: affect pinmux configs to the right
-    devices
-  arm: kirkwood: topkick: affect pinmux configs to the right devices
-  arm: kirkwood: ts219: affect pinmux configs to the right devices
-  arm: kirkwood: openblocks-a6: group pinmux configurations
-  arm: kirkwood: openblocks-a6: add support for Init button
-
- arch/arm/boot/dts/kirkwood-cloudbox.dts            |   10 +-
- arch/arm/boot/dts/kirkwood-dns320.dts              |    7 ++
- arch/arm/boot/dts/kirkwood-dns325.dts              |    5 +
- arch/arm/boot/dts/kirkwood-dnskw.dtsi              |   32 +++---
- arch/arm/boot/dts/kirkwood-dockstar.dts            |    9 +-
- arch/arm/boot/dts/kirkwood-dreamplug.dts           |   11 +-
- arch/arm/boot/dts/kirkwood-goflexnet.dts           |   18 ++--
- .../arm/boot/dts/kirkwood-guruplug-server-plus.dts |    8 +-
- arch/arm/boot/dts/kirkwood-ib62x0.dts              |   17 +--
- arch/arm/boot/dts/kirkwood-iconnect.dts            |   36 +++----
- arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts      |   15 +--
- arch/arm/boot/dts/kirkwood-is2.dts                 |    2 +
- arch/arm/boot/dts/kirkwood-km_kirkwood.dts         |    6 +-
- arch/arm/boot/dts/kirkwood-lsxl.dtsi               |   22 ++--
- arch/arm/boot/dts/kirkwood-mplcec4.dts             |   23 +++--
- .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  |   22 ++--
- arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |   10 +-
- arch/arm/boot/dts/kirkwood-ns2.dts                 |    2 +
- arch/arm/boot/dts/kirkwood-ns2lite.dts             |    2 +
- arch/arm/boot/dts/kirkwood-ns2max.dts              |    2 +
- arch/arm/boot/dts/kirkwood-ns2mini.dts             |    2 +
- arch/arm/boot/dts/kirkwood-nsa310.dts              |   29 +++---
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts       |  108 ++++++--------------
- arch/arm/boot/dts/kirkwood-topkick.dts             |   51 ++++-----
- arch/arm/boot/dts/kirkwood-ts219-6281.dts          |    8 +-
- arch/arm/boot/dts/kirkwood-ts219-6282.dts          |    8 +-
- arch/arm/boot/dts/kirkwood-ts219.dtsi              |   10 ++
- 27 files changed, 235 insertions(+), 240 deletions(-)
-
+diff --git a/arch/arm/boot/dts/kirkwood-dns320.dts b/arch/arm/boot/dts/kirkwood-dns320.dts
+index c9c44b2..14d4cee 100644
+--- a/arch/arm/boot/dts/kirkwood-dns320.dts
++++ b/arch/arm/boot/dts/kirkwood-dns320.dts
+@@ -17,6 +17,11 @@
+ 
+ 	gpio-leds {
+ 		compatible = "gpio-leds";
++		pinctrl-0 = <&pmx_led_power &pmx_led_red_usb_320
++			     &pmx_led_red_left_hdd &pmx_led_red_right_hdd
++			     &pmx_led_white_usb>;
++		pinctrl-names = "default";
++
+ 		blue-power {
+ 			label = "dns320:blue:power";
+ 			gpios = <&gpio0 26 1>; /* GPIO 26 Active Low */
+@@ -46,6 +51,8 @@
+ 		};
+ 
+ 		serial at 12100 {
++			pinctrl-0 = <&pmx_uart1>;
++			pinctrl-names = "default";
+ 			status = "okay";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/kirkwood-dns325.dts b/arch/arm/boot/dts/kirkwood-dns325.dts
+index e4e4930..6387257 100644
+--- a/arch/arm/boot/dts/kirkwood-dns325.dts
++++ b/arch/arm/boot/dts/kirkwood-dns325.dts
+@@ -17,6 +17,11 @@
+ 
+ 	gpio-leds {
+ 		compatible = "gpio-leds";
++		pinctrl-0 = <&pmx_led_power &pmx_led_red_usb_325
++			     &pmx_led_red_left_hdd &pmx_led_red_right_hdd
++			     &pmx_led_white_usb>;
++		pinctrl-names = "default";
++
+ 		white-power {
+ 			label = "dns325:white:power";
+ 			gpios = <&gpio0 26 1>; /* GPIO 26 Active Low */
+diff --git a/arch/arm/boot/dts/kirkwood-dnskw.dtsi b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
+index 6875ac0..0afe1d0 100644
+--- a/arch/arm/boot/dts/kirkwood-dnskw.dtsi
++++ b/arch/arm/boot/dts/kirkwood-dnskw.dtsi
+@@ -9,6 +9,10 @@
+ 		compatible = "gpio-keys";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		pinctrl-0 = <&pmx_button_power &pmx_button_unmount
++			     &pmx_button_reset>;
++		pinctrl-names = "default";
++
+ 		button at 1 {
+ 			label = "Power button";
+ 			linux,code = <116>;
+@@ -29,6 +33,8 @@
+ 	gpio_fan {
+ 		/* Fan: ADDA AD045HB-G73 40mm 6000rpm at 5v */
+ 		compatible = "gpio-fan";
++		pinctrl-0 = <&pmx_fan_high_speed &pmx_fan_low_speed>;
++		pinctrl-names = "default";
+ 		gpios = <&gpio1 14 1
+ 			 &gpio1 13 1>;
+ 		gpio-fan,speed-map = <0    0
+@@ -38,27 +44,17 @@
+ 
+ 	gpio_poweroff {
+ 		compatible = "gpio-poweroff";
++		pinctrl-0 = <&pmx_power_off>;
++		pinctrl-names = "default";
+ 		gpios = <&gpio1 4 0>;
+ 	};
+ 
+ 	ocp at f1000000 {
+ 		pinctrl: pinctrl at 10000 {
+ 
+-			pinctrl-0 = < &pmx_nand &pmx_uart1
+-				      &pmx_sata0 &pmx_sata1
+-				      &pmx_led_power
+-				      &pmx_led_red_right_hdd
+-				      &pmx_led_red_left_hdd
+-				      &pmx_led_red_usb_325
+-				      &pmx_button_power
+-				      &pmx_led_red_usb_320
+-				      &pmx_power_off &pmx_power_back_on
+-				      &pmx_power_sata0 &pmx_power_sata1
+-				      &pmx_present_sata0 &pmx_present_sata1
+-				      &pmx_led_white_usb &pmx_fan_tacho
+-				      &pmx_fan_high_speed &pmx_fan_low_speed
+-				      &pmx_button_unmount &pmx_button_reset
+-				      &pmx_temp_alarm >;
++			pinctrl-0 = <&pmx_power_back_on &pmx_present_sata0
++				     &pmx_present_sata1 &pmx_fan_tacho
++				     &pmx_temp_alarm>;
+ 			pinctrl-names = "default";
+ 
+ 			pmx_sata0: pmx-sata0 {
+@@ -147,11 +143,15 @@
+ 			};
+ 		};
+ 		sata at 80000 {
++			pinctrl-0 = <&pmx_sata0 &pmx_sata1>;
++			pinctrl-names = "default";
+ 			status = "okay";
+ 			nr-ports = <2>;
+ 		};
+ 
+ 		nand at 3000000 {
++			pinctrl-0 = <&pmx_nand>;
++			pinctrl-names = "default";
+ 			status = "okay";
+ 			chip-delay = <35>;
+ 
+@@ -192,6 +192,8 @@
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		pinctrl-0 = <&pmx_power_sata0 &pmx_power_sata1>;
++		pinctrl-names = "default";
+ 
+ 		sata0_power: regulator at 1 {
+ 			compatible = "regulator-fixed";
 -- 
 1.7.9.5
