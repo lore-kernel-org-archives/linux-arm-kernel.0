@@ -1,47 +1,159 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 24 May 2013 10:52:31 +0200
-Subject: [PATCH] ARM: at91/dt: fix macb pinctrl_macb_rmii_mii_alt
- definition
-In-Reply-To: <1369324881-31428-1-git-send-email-b.brezillon@overkiz.com>
-References: <1369324881-31428-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <519F2A4F.8080008@atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 24 May 2013 10:52:42 +0200
+Subject: [PATCH v4 02/21] sh-pfc: Add DT support
+In-Reply-To: <1369138482-5871-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1369138482-5871-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CACRpkdZNv5AO48Bmquyr8mBQvgjBMCk3Ob8ngutSq8RV1HFT0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/2013 18:01, Boris BREZILLON :
-> The PA24 pin is wrongly assigned to peripheral B.
-> In the current config there is 2 ETX3 pins (PA11 and PA24) and
-> no ETXER pin (PA22).
+On Tue, May 21, 2013 at 2:14 PM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
+
+> Support device instantiation through the device tree. The compatible
+> property is used to select the SoC pinmux information.
 >
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-
-Nice catch!
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-and stacked on at91-3.10-fixes and add the stable tag #3.8+
-
-Thanks, bye.
-
-> ---
->   arch/arm/boot/dts/at91sam9260.dtsi |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+> Set the gpio_chip device field to the PFC device to enable automatic
+> GPIO OF support.
 >
-> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> index 70b5ccb..84c4bef 100644
-> --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> @@ -264,7 +264,7 @@
->   						atmel,pins =
->   							<0 10 0x2 0x0	/* PA10 periph B */
->   							 0 11 0x2 0x0	/* PA11 periph B */
-> -							 0 24 0x2 0x0	/* PA24 periph B */
-> +							 0 22 0x2 0x0	/* PA22 periph B */
->   							 0 25 0x2 0x0	/* PA25 periph B */
->   							 0 26 0x2 0x0	/* PA26 periph B */
->   							 0 27 0x2 0x0	/* PA27 periph B */
->
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+(...)
+
+(Again I'm rather nervous about all the device tree binding reviewing being
+dropped in the lap of Linux subsystem maintainers and then expecting them
+to be good and OS-neutral... Not your fault though.)
+
+> +Pin Configuration Node Properties:
+> +
+> +- renesas,pins : An array of strings, each string containing the name of a pin.
+> +- renesas,groups : An array of strings, each string containing the name of a pin
+> +  group.
+> +
+> +- renesas,function: A string containing the name of the function to mux to the
+> +  pin group(s) specified by the renesas,groups property
+> +
+> +  Valid values for pin, group and function names can be found in the group and
+> +  function arrays of the PFC data file corresponding to the SoC
+> +  (drivers/pinctrl/sh-pfc/pfc-*.c)
+> +
+> +- renesas,pull-up: An integer representing the pull-up strength to be applied
+> +  to all pins specified by the renesas,pins and renesas-groups properties.
+> +  0 disables the pull-up, 1 enables it. Other values should not be used.
+
+Then just use a boolean.
+
+> +- renesas,pull-down: An integer representing the pull-down strength to be
+> +  applied to all pins specified by the renesas,pins and renesas-groups
+> +  properties. 0 disables the pull-down, 1 enables it. Other values should not
+> +  be used.
+
+Just use a boolean oneliner then.
+
+But I prefer that you define something really generic in
+Documentation/devicetree/bindings/pinconf.txt for anyone using
+generic pin config, then reference that.
+
+This way we can have a more general config binding for any system
+using generic pin config, mapping to the configs we have in
+<linux/pinctrl/pinconf-generic.h>
+
+The upside is that we could move the pinconf generic parsing code
+to drivers/pinctrl/pinconf-generic.c and thus avoid code duplication.
+
+We have so far not tried much to standardize pinctrl bindings, but
+this would be a good opportunity.
+
+> +On SH7372, SH73A0, R8A73A4 and R8A7740 the PFC node is also a GPIO controller
+> +node.
+> +
+> +Required Properties:
+> +
+> +  - gpio-controller: Marks the device node as a gpio controller.
+> +
+> +  - #gpio-cells: Should be 2. The first cell is the pin number and the second
+> +    cell is used to specify optional parameters as bit flags. Only the GPIO
+> +    active low flag (bit 0) is currently supported.
 
 
--- 
-Nicolas Ferre
+I suggest these properties shall be defined in an include file using that new
+include hierarchy, since you're using pinconf generic.
+
+include/dt-bindings/gpio/gpio.h
+Referenced by <dt-bindings/gpio/gpio.h> in the .dts[i] files.
+
+In Linux-next you find how tegra machines and the imx6sl DTs have
+started to use this facility for symbolic names.
+
+And for that you should reference
+<dt-bindings/gpio/gpio.h>
+
+Use the symbolic names GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW
+here.
+
+(...)
+> +Example 2: A GPIO LED node that references a GPIO
+> +
+> +       leds {
+> +               compatible = "gpio-leds";
+> +               led1 {
+> +                       gpios = <&pfc 20 1>; /* Active low */
+
+
+#include <dt-bindings/gpio/gpio.h>
+gpios = <&pfc 20 GPIO_ACTIVE_LOW>;
+
+(...)
+> +Example 3: KZM-A9-GT (SH-Mobile AG5) default pin state hog and pin control maps
+> +           for the MMCIF and SCIFA4 devices
+> +
+> +       &pfc {
+> +               pinctrl-0 = <&scifa4_pins>;
+> +               pinctrl-names = "default";
+> +
+> +               mmcif_pins: mmcif {
+> +                       mux {
+> +                               renesas,groups = "mmc0_data8_0", "mmc0_ctrl_0";
+> +                               renesas,function = "mmc0";
+> +                       };
+> +                       cfg {
+> +                               renesas,groups = "mmc0_data8_0";
+> +                               renesas,pins = "PORT279";
+> +                               renesas,pull-up = <1>;
+
+Just
+renesas,pull-up;
+
+Or go for the generic pinconf binding I'm suggesting.
+Then I guess it'd be something like:
+
+pinconf-bias-pull-up;
+
+(Quite readable.)
+
+(...)
+> +++ b/drivers/pinctrl/sh-pfc/pinctrl.c
+> +static const struct sh_pfc_config_param sh_pfc_config_params[] = {
+> +       { "renesas,pull-up", PIN_CONFIG_BIAS_PULL_UP },
+> +       { "renesas,pull-down", PIN_CONFIG_BIAS_PULL_DOWN },
+> +};
+
+So these should be checked as booleans instead:
+
+> +       for (i = 0; i < ARRAY_SIZE(sh_pfc_config_params); ++i) {
+> +               const struct sh_pfc_config_param *param =
+> +                       &sh_pfc_config_params[i];
+> +               unsigned long config;
+> +               u32 val;
+> +
+> +               ret = of_property_read_u32(np, param->name, &val);
+
+of_property_read_bool()
+
+Though I much rather like this code added as helper lib
+in pinconf-generic.c. Use drivers/pinctrl/pinconf.h for
+API.
+
+Yours,
+Linus Walleij
