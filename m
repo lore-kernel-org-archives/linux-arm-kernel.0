@@ -1,33 +1,26 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 24 May 2013 16:03:22 +0200
-Subject: [PATCH] ARM: at91: Fix: Change internal SRAM memory type to
- "MT_MEMORY_SO"
-In-Reply-To: <20130524112029.GW18614@n2100.arm.linux.org.uk>
-References: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
- <1369011979-21354-1-git-send-email-wenyou.yang@atmel.com>
- <20130522001457.GA18614@n2100.arm.linux.org.uk>
- <B256D81BAE5131468A838E5D7A243641687BB93C@penmbx01>
- <20130524112029.GW18614@n2100.arm.linux.org.uk>
-Message-ID: <20130524140322.GD24476@game.jcrosoft.org>
+Date: Fri, 24 May 2013 16:05:28 +0200
+Subject: [PATCH] ARM: at91/dt: add pinctrl definition for at91 tc blocks
+In-Reply-To: <1369389956-30466-1-git-send-email-b.brezillon@overkiz.com>
+References: <1369389956-30466-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20130524140528.GE24476@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:20 Fri 24 May     , Russell King - ARM Linux wrote:
-> On Fri, May 24, 2013 at 07:11:04AM +0000, Yang, Wenyou wrote:
-> > The story is: for sama5d3x with Cortex-A5 core, if not so, when copying
-> > code snippet to the internal SRAM, then jump to run this code, but fail
-> > to run.
+On 12:05 Fri 24 May     , Boris BREZILLON wrote:
+> Hello,
 > 
-> And that is where your mistake is - you forgot that you're working with
-> a CPU with harvard caches which will require some cache maintanence
-> between copying the code and executing it.
-> 
-> You want to look at flush_icache_range() rather than making this memory
-> strongly ordered.
+> This patch adds pinctrl configs for at91 Timer Conter blocks.
+> These pin configs will be referenced by "atmel,tcb-pwm" devices to
+> setup pins as PWM output.
 
-I understand your point but today we map a SRAM as MT_DEVICE
+you need to rebase on
 
-I do not think it's the best
+a cleanup I did preset on our git tag at91-3.11-cleanup
+
+As we announce Mandaotory for 3.11
+
+as I introduce Macro fro DT
 
 Best Regards,
 J.
