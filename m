@@ -1,25 +1,26 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 May 2013 12:18:42 +0100
-Subject: [PATCH 05/11] mm: thp: Correct the HPAGE_PMD_ORDER check.
-In-Reply-To: <1369328878-11706-6-git-send-email-steve.capper@linaro.org>
+Date: Fri, 24 May 2013 12:21:49 +0100
+Subject: [PATCH 07/11] ARM64: mm: Make PAGE_NONE pages read only and
+ no-execute.
+In-Reply-To: <1369328878-11706-8-git-send-email-steve.capper@linaro.org>
 References: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
- <1369328878-11706-6-git-send-email-steve.capper@linaro.org>
-Message-ID: <20130524111842.GI18272@arm.com>
+ <1369328878-11706-8-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130524112149.GJ18272@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 06:07:52PM +0100, Steve Capper wrote:
-> All Transparent Huge Pages are allocated by the buddy allocator.
+On Thu, May 23, 2013 at 06:07:54PM +0100, Steve Capper wrote:
+> If we consider the following code sequence:
 > 
-> A compile time check is in place that fails when the order of a
-> transparent huge page is too large to be allocated by the buddy
-> allocator. Unfortunately that compile time check passes when:
-> HPAGE_PMD_ORDER == MAX_ORDER
-> ( which is incorrect as the buddy allocator can only allocate
-> memory of order strictly less than MAX_ORDER. )
+> 	my_pte = pte_modify(entry, myprot);
+> 	x = pte_write(my_pte);
+> 	y = pte_exec(my_pte);
 > 
-> This patch updates the compile time check to fail in the above
-> case.
+> If myprot comes from a PROT_NONE page, then x and y will both be
+> true which is undesireable behaviour.
+> 
+> This patch sets the no-execute and read-only bits for PAGE_NONE
+> such that the code above will return false for both x and y.
 > 
 > Signed-off-by: Steve Capper <steve.capper@linaro.org>
 
