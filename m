@@ -1,58 +1,68 @@
-From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Fri, 24 May 2013 09:53:07 -0300
-Subject: [PATCHv3 5/6] ARM: cubieboard: Enable ethernet (EMAC) support
- in dts
-In-Reply-To: <1369387394-9453-6-git-send-email-maxime.ripard@free-electrons.com>
-References: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
- <1369387394-9453-6-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <519F62B3.8090302@elopez.com.ar>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 24 May 2013 13:53:14 +0100
+Subject: [PATCH] ARM: ux500: enable the crypto and hash on all dbx500
+In-Reply-To: <CACRpkdb1CZKoaG6nNF-yBC3Eovoe3_0BHa6uO-OQkePDcrkamg@mail.gmail.com>
+References: <1369378122-25897-1-git-send-email-linus.walleij@stericsson.com>
+ <20130524082758.GP22683@gmail.com>
+ <CACRpkdb1CZKoaG6nNF-yBC3Eovoe3_0BHa6uO-OQkePDcrkamg@mail.gmail.com>
+Message-ID: <20130524125314.GZ22683@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 24 May 2013, Linus Walleij wrote:
 
-El 24/05/13 06:23, Maxime Ripard escribi?:
-> From: Stefan Roese <sr@denx.de>
+> On Fri, May 24, 2013 at 10:27 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Fri, 24 May 2013, Linus Walleij wrote:
+> >> From: Linus Walleij <linus.walleij@linaro.org>
+> >>
+> >> Commits:
+> >> "ARM: ux500: Add Device Tree nodes for the ux500 Crypt device"
+> >> "ARM: ux500: Add Device Tree nodes for the ux500 Hash device"
+> >>
+> >> Added the crypto and hash devices conditionally, i.e. so as to
+> >> be turned on per-board by setting an "status" property on the
+> >> device from "disabled" to "okay" on each device.
+> >>
+> >> This is wrong since this is an SoC feature, it is not board
+> >> dependent. It is the same ASIC under all circumstances and
+> >> functionality does not vary with board family.
+> >>
+> >> This moves the enablement into the SoC file.
+> >>
+> >> Cc: Lee Jones <lee.jones@linaro.org>
+> >> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> >> ---
+> >>  arch/arm/boot/dts/dbx5x0.dtsi  | 4 ----
+> >>  arch/arm/boot/dts/snowball.dts | 8 --------
+> >>  2 files changed, 12 deletions(-)
+> >>
+> >> diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+> >> index f051963..cd5cd09 100644
+> >> --- a/arch/arm/boot/dts/dbx5x0.dtsi
+> >> +++ b/arch/arm/boot/dts/dbx5x0.dtsi
+> >> @@ -760,17 +760,13 @@
+> >>                       compatible = "stericsson,ux500-cryp";
+> >>                       reg = <0xa03cb000 0x1000>;
+> >>                       interrupts = <0 15 0x4>;
+> >> -
+> >
+> > Why do you insist on removing all line spacings from the DTS file?
+> >
+> > I saw you removing them in between nodes too.
 > 
-> Signed-off-by: Stefan Roese <sr@denx.de>
-> ---
->  arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> index b70fe0d..32d9b18 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-> @@ -27,6 +27,21 @@
->  	};
->  
->  	soc at 01c20000 {
-> +		emac: ethernet at 01c0b000 {
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&emac_pins_a>;
-> +			phy = <&phy0>;
-> +			status = "okay";
-> +		};
-> +
-> +		mdio at 01c0b080 {
-> +			status = "okay";
-> +
-> +			phy0: ethernet-phy at 0 {
-> +				reg = <0>;
-> +			};
+> I was hit by a linespace when I was a child, since then I take
+> every opportunity for revenge.
 
-During my testing I found out that I needed to use 1 as reg for the
-driver to work. You can find a fixup patch enclosed that changes this;
-it's possible that some extra changes may also be needed (s/phy0/phy1/
-on the node?)
+:)
 
-Cheers,
+> If I keep the spacing, can I have your ACK?
 
-Emilio
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: fixup-reg.patch
-Type: text/x-diff
-Size: 711 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130524/8a9338c8/attachment-0001.bin>
+You can.
+
+For reference, I like a space separating all nodes too. :)
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
