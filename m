@@ -1,33 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 May 2013 09:32:31 +0100
-Subject: [PATCH 5/6] crypto: ux500/cryp - Enable DT probing of the driver
-In-Reply-To: <CACRpkdZHT0g_Agtug6jC3rU+DYKOpmwqZ9eQAkRGRw5Kj0wW4A@mail.gmail.com>
-References: <1368703646-26418-1-git-send-email-lee.jones@linaro.org>
- <1368703646-26418-6-git-send-email-lee.jones@linaro.org>
- <CACRpkdZHT0g_Agtug6jC3rU+DYKOpmwqZ9eQAkRGRw5Kj0wW4A@mail.gmail.com>
-Message-ID: <20130524083231.GQ22683@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 24 May 2013 10:51:50 +0200
+Subject: [PATCH] at91: sama5: fix incorrect PMC pcr div definition
+In-Reply-To: <1369304328-11442-1-git-send-email-josh.wu@atmel.com>
+References: <1369304328-11442-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <519F2A26.3080907@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 May 2013, Linus Walleij wrote:
+On 23/05/2013 12:18, Josh Wu :
+>
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-> On Thu, May 16, 2013 at 1:27 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > By providing an OF match table with a suitable compatible string, we
-> > can ensure the ux500-crypt driver is probed by supplying an associated
-> > DT node in a given platform's Device Tree.
-> >
-> > Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> > Cc: linux-crypto at vger.kernel.org
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Herbert, can I have your ACK on patch 5 & 6 in this series to take it
-> through the ARM SoC tree?
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Right, there are no bindings, so they don't need a document.
+And stacked on top of at91-3.10-fixes.
+
+Thanks for catching this! Bye.
+
+> ---
+>   arch/arm/mach-at91/include/mach/at91_pmc.h |    6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/include/mach/at91_pmc.h b/arch/arm/mach-at91/include/mach/at91_pmc.h
+> index 31df120..2bd7f51 100644
+> --- a/arch/arm/mach-at91/include/mach/at91_pmc.h
+> +++ b/arch/arm/mach-at91/include/mach/at91_pmc.h
+> @@ -179,9 +179,9 @@ extern void __iomem *at91_pmc_base;
+>   #define		AT91_PMC_PCR_CMD	(0x1  <<  12)		/* Command (read=0, write=1) */
+>   #define		AT91_PMC_PCR_DIV(n)	((n)  <<  16)		/* Divisor Value */
+>   #define			AT91_PMC_PCR_DIV0	0x0			/* Peripheral clock is MCK */
+> -#define			AT91_PMC_PCR_DIV2	0x2			/* Peripheral clock is MCK/2 */
+> -#define			AT91_PMC_PCR_DIV4	0x4			/* Peripheral clock is MCK/4 */
+> -#define			AT91_PMC_PCR_DIV8	0x8			/* Peripheral clock is MCK/8 */
+> +#define			AT91_PMC_PCR_DIV2	0x1			/* Peripheral clock is MCK/2 */
+> +#define			AT91_PMC_PCR_DIV4	0x2			/* Peripheral clock is MCK/4 */
+> +#define			AT91_PMC_PCR_DIV8	0x3			/* Peripheral clock is MCK/8 */
+>   #define		AT91_PMC_PCR_EN		(0x1  <<  28)		/* Enable */
+>
+>   #endif
+>
+
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Nicolas Ferre
