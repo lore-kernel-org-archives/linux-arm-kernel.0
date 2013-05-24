@@ -1,10 +1,10 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 May 2013 11:44:46 +0200
-Subject: [PATCH 09/21] arm: kirkwood: iconnect: affect pinmux configs to the
+Date: Fri, 24 May 2013 11:44:42 +0200
+Subject: [PATCH 05/21] arm: kirkwood: goflexnet: affect pinmux configs to the
  right devices
 In-Reply-To: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369388699-25975-10-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369388699-25975-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,49 +25,51 @@ pin 43 (PIN43): gpio-leds.1 mvebu-gpio:43 function gpio group mpp43
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/kirkwood-iconnect.dts |   16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/kirkwood-goflexnet.dts |   18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
-index 20c3ece..0275018 100644
---- a/arch/arm/boot/dts/kirkwood-iconnect.dts
-+++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
-@@ -20,14 +20,6 @@
+diff --git a/arch/arm/boot/dts/kirkwood-goflexnet.dts b/arch/arm/boot/dts/kirkwood-goflexnet.dts
+index c3573be..31caa64 100644
+--- a/arch/arm/boot/dts/kirkwood-goflexnet.dts
++++ b/arch/arm/boot/dts/kirkwood-goflexnet.dts
+@@ -18,15 +18,6 @@
  
  	ocp at f1000000 {
  		pinctrl: pinctrl at 10000 {
 -
--			pinctrl-0 = < &pmx_button_reset &pmx_button_otb
--				      &pmx_led_level &pmx_led_power_blue
--				      &pmx_led_power_red &pmx_led_usb1
--				      &pmx_led_usb2 &pmx_led_usb3
--				      &pmx_led_usb4 &pmx_led_otb >;
+-			pinctrl-0 = < &pmx_usb_power_enable &pmx_led_orange
+-				      &pmx_led_left_cap_0 &pmx_led_left_cap_1
+-				      &pmx_led_left_cap_2 &pmx_led_left_cap_3
+-				      &pmx_led_right_cap_0 &pmx_led_right_cap_1
+-				      &pmx_led_right_cap_2 &pmx_led_right_cap_3
+-				    >;
 -			pinctrl-names = "default";
 -
- 			pmx_button_reset: pmx-button-reset {
- 				marvell,pins = "mpp12";
+ 			pmx_usb_power_enable: pmx-usb-power-enable {
+ 				marvell,pins = "mpp29";
  				marvell,function = "gpio";
-@@ -113,6 +105,11 @@
- 
+@@ -109,6 +100,13 @@
+ 	};
  	gpio-leds {
  		compatible = "gpio-leds";
-+		pinctrl-0 = < &pmx_led_level &pmx_led_power_blue
-+			      &pmx_led_power_red &pmx_led_usb1
-+			      &pmx_led_usb2 &pmx_led_usb3
-+			      &pmx_led_usb4 &pmx_led_otb >;
++		pinctrl-0 = < &pmx_led_orange
++			      &pmx_led_left_cap_0 &pmx_led_left_cap_1
++			      &pmx_led_left_cap_2 &pmx_led_left_cap_3
++			      &pmx_led_right_cap_0 &pmx_led_right_cap_1
++			      &pmx_led_right_cap_2 &pmx_led_right_cap_3
++			    >;
 +		pinctrl-names = "default";
  
- 		led-level {
- 			label = "led_level";
-@@ -154,6 +151,9 @@
- 		compatible = "gpio-keys";
+ 		health {
+ 			label = "status:green:health";
+@@ -156,6 +154,8 @@
+ 		compatible = "simple-bus";
  		#address-cells = <1>;
  		#size-cells = <0>;
-+		pinctrl-0 = < &pmx_button_reset &pmx_button_otb >;
++		pinctrl-0 = <&pmx_usb_power_enable>;
 +		pinctrl-names = "default";
-+
- 		button at 1 {
- 			label = "OTB Button";
- 			linux,code = <133>;
+ 
+ 		usb_power: regulator at 1 {
+ 			compatible = "regulator-fixed";
 -- 
 1.7.9.5
