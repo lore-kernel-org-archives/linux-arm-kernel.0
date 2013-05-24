@@ -1,49 +1,53 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 24 May 2013 17:42:31 +0200
-Subject: [GIT PULL] at91: fixes for 3.10 #2
-Message-ID: <1369410151-7837-1-git-send-email-nicolas.ferre@atmel.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Fri, 24 May 2013 16:43:56 +0100
+Subject: [PATCH] ARM: document the bigger pagetables needed for LPAE
+Message-ID: <1369410236-22398-1-git-send-email-javi.merino@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+The Booting documentation assumes that the initial pagetables are
+16KiB but since 1b6ba46 (ARM: LPAE: MMU setup for the 3-level page
+table format) they are 20KiB for LPAE kernels.  Thus, the
+recommendation to put atags or the dtb in the first 16KiB is wrong,
+there's only 12KiB of space there in LPAE kernels, so update the
+documentation accordingly.
+---
+ Documentation/arm/Booting |    9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-Second AT91 fixes pull-request for 3.10-rc. The PMC definition fix is the most
-important of this batch.
-
-Thanks, best regards,
-
-The following changes since commit b7a8ca5173ef9aa55fa039d7c216426ff0b25a12:
-
-  ARM: at91: rm9200 fix time support (2013-05-15 12:37:45 +0200)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
-
-for you to fetch changes up to 144ea15e4fefbee14a7dcb05c7cd0822fda3ebf6:
-
-  ARM: at91/sama5: fix incorrect PMC pcr div definition (2013-05-24 10:53:51 +0200)
-
-----------------------------------------------------------------
-One definition fix that can lead to mis-clock some
-AT91 peripherals on SAMA5.
-Two DT related fixes.
-
-----------------------------------------------------------------
-Boris BREZILLON (1):
-      ARM: at91/dt: fix macb pinctrl_macb_rmii_mii_alt definition
-
-Jean-Christophe PLAGNIOL-VILLARD (1):
-      ARM: at91: at91sam9n12: move external irq declatation to DT
-
-Josh Wu (1):
-      ARM: at91/sama5: fix incorrect PMC pcr div definition
-
- arch/arm/boot/dts/at91sam9260.dtsi         | 2 +-
- arch/arm/boot/dts/at91sam9n12.dtsi         | 1 +
- arch/arm/mach-at91/at91sam9n12.c           | 6 ------
- arch/arm/mach-at91/include/mach/at91_pmc.h | 6 +++---
- 4 files changed, 5 insertions(+), 10 deletions(-)
-
+diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
+index 0c1f475..f6f9cd8 100644
+--- a/Documentation/arm/Booting
++++ b/Documentation/arm/Booting
+@@ -105,7 +105,7 @@ The tagged list should be stored in system RAM.
+ 
+ The tagged list must be placed in a region of memory where neither
+ the kernel decompressor nor initrd 'bootp' program will overwrite
+-it.  The recommended placement is in the first 16KiB of RAM.
++it.  The recommended placement is in the first 12KiB of RAM.
+ 
+ 4b. Setup the device tree
+ -------------------------
+@@ -120,7 +120,7 @@ tagged list.
+ The boot loader must pass at a minimum the size and location of the
+ system memory, and the root filesystem location.  The dtb must be
+ placed in a region of memory where the kernel decompressor will not
+-overwrite it.  The recommended placement is in the first 16KiB of RAM
++overwrite it.  The recommended placement is in the first 12KiB of RAM
+ with the caveat that it may not be located at physical address 0 since
+ the kernel interprets a value of 0 in r2 to mean neither a tagged list
+ nor a dtb were passed.
+@@ -137,8 +137,9 @@ then it is legal for the boot loader to call the zImage in flash
+ directly.
+ 
+ The zImage may also be placed in system RAM (at any location) and
+-called there.  Note that the kernel uses 16K of RAM below the image
+-to store page tables.  The recommended placement is 32KiB into RAM.
++called there.  Note that the kernel may use up to 20KiB of RAM below
++the image to store page tables.  The recommended placement is 32KiB
++into RAM.
+ 
+ In either case, the following conditions must be met:
+ 
 -- 
-Nicolas Ferre
+1.7.9.5
