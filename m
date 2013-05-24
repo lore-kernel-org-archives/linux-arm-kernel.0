@@ -1,18 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 May 2013 20:58:34 +0200
-Subject: [PATCHv4 6/6] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
-In-Reply-To: <1369418588.9717.0.camel@linux-builds1>
-References: <1369410080-436-1-git-send-email-dinguyen@altera.com>
- <201305241912.53751.arnd@arndb.de> <1369418588.9717.0.camel@linux-builds1>
-Message-ID: <201305242058.34332.arnd@arndb.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 24 May 2013 12:28:22 -0700
+Subject: [PATCH] ARM: DTS: OMAP4: Panda/SDP: twl6030: fix mux for IRQ pin and
+ msecure line
+Message-ID: <1369423702-31501-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 May 2013, Dinh Nguyen wrote:
-> I apologize for that. Will make sure to include a [PATCH 0/6] message in
-> the future.
+Earlier commits ensured proper muxing of pins related to proper
+TWL6030 behavior: see commit 265a2bc8 (ARM: OMAP3: TWL4030: ensure
+sys_nirq1 is mux'd and wakeup enabled) and commit 1ef43369 (ARM:
+OMAP4: TWL: mux sys_drm_msecure as output for PMIC).
 
-No worries, I actually saw now that my only other comment was also
-wrong, as you have the binding I was looking for in patch 5/6.
+However these only fixed legacy boot and not DT boot.  For DT boot,
+the default mux values need to be set properly in DT.
 
-	Arnd
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+Applies on v3.10-rc2
+
+ arch/arm/boot/dts/omap4-panda-common.dtsi | 8 ++++++++
+ arch/arm/boot/dts/omap4-sdp.dts           | 8 ++++++++
+ 2 files changed, 16 insertions(+)
+
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index 03bd60d..a7a9bc0 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -59,6 +59,7 @@
+ &omap4_pmx_core {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <
++			&twl6030_pins
+ 			&twl6040_pins
+ 			&mcpdm_pins
+ 			&mcbsp1_pins
+@@ -66,6 +67,13 @@
+ 			&tpd12s015_pins
+ 	>;
+ 
++	twl6030_pins: pinmux_twl6030_pins {
++		pinctrl-single,pins = <
++			0x15e 0x4118	/* sys_nirq1.sys_nirq1 OMAP_WAKEUP_EN | INPUT_PULLUP | MODE0 */
++			0x14 0x0	/* fref_clk0_out.sys_drm_msecure OUTPUT */
++		>;
++	};
++
+ 	twl6040_pins: pinmux_twl6040_pins {
+ 		pinctrl-single,pins = <
+ 			0xe0 0x3	/* hdq_sio.gpio_127 OUTPUT | MODE3 */
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index a35d9cd..5ad0c10 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -145,6 +145,7 @@
+ &omap4_pmx_core {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <
++			&twl6030_pins
+ 			&twl6040_pins
+ 			&mcpdm_pins
+ 			&dmic_pins
+@@ -179,6 +180,13 @@
+ 		>;
+ 	};
+ 
++	twl6030_pins: pinmux_twl6030_pins {
++		pinctrl-single,pins = <
++			0x15e 0x4118	/* sys_nirq1.sys_nirq1 OMAP_WAKEUP_EN | INPUT_PULLUP | MODE0 */
++			0x14 0x0	/* fref_clk0_out.sys_drm_msecure OUTPUT */
++		>;
++	};
++
+ 	twl6040_pins: pinmux_twl6040_pins {
+ 		pinctrl-single,pins = <
+ 			0xe0 0x3	/* hdq_sio.gpio_127 OUTPUT | MODE3 */
+-- 
+1.8.2
