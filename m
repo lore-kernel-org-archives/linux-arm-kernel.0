@@ -1,44 +1,38 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Fri, 24 May 2013 14:10:10 +0200
-Subject: [I2C] informations + advice about messages handling
-In-Reply-To: <CAK7N6vqqG68c4vx1uBsNLF8zpSRQWwY5jERqjVYKE7NkEEzFSA@mail.gmail.com>
-References: <CA78C307B8F06747967D122FC656B153986448@SERVEUR0.nvp.local>
- <CAK7N6vpg6QUAKODKO2Msr4+GTASLDpA2cG1teQV3yiwt7D4SSw@mail.gmail.com>
- <20130524094407.61d0ec42@endymion.delvare>
- <CAK7N6vqqG68c4vx1uBsNLF8zpSRQWwY5jERqjVYKE7NkEEzFSA@mail.gmail.com>
-Message-ID: <20130524141010.1b3590b4@endymion.delvare>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 24 May 2013 14:10:32 +0200
+Subject: [GIT PULL] arm-soc: Xilinx zynq core - smp for v3.10
+In-Reply-To: <20130524112610.GX18614@n2100.arm.linux.org.uk>
+References: <890ef3b8-f536-4b00-9bd8-5ea50de3bf51@DB8EHSMHS032.ehs.local>
+ <20130524112610.GX18614@n2100.arm.linux.org.uk>
+Message-ID: <744356bb-78fa-4592-97ef-0709fe65dbee@CH1EHSMHS025.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 May 2013 16:29:36 +0530, anish singh wrote:
-> On Fri, May 24, 2013 at 1:14 PM, Jean Delvare <khali@linux-fr.org> wrote:
-> > On Fri, 24 May 2013 12:52:40 +0530, anish singh wrote:
-> >> http://thread.gmane.org/gmane.linux.kernel/1410276
-> >
-> > This is for a specific case. The general case is handled by the
-> > per-adapter mutex for years now. 2.6.32 should be just fine in this
-> > respect.
->
-> I may be mis-understanding here but when two client wants to
-> communicate with same master and at the same
-> time how does that happen?
+Hi Russell,
 
-In general clients (slaves in I2C terminology) do not initiate
-transactions, it's the master's job.
+On 05/24/2013 01:26 PM, Russell King - ARM Linux wrote:
+> On Thu, Apr 04, 2013 at 09:47:09AM +0200, Michal Simek wrote:
+>> Hi Arnd and Olof,
+>>
+>> please pull the following smp support to your arm-soc tree.
+>>
+>> This branch is based on zynq/clksrc/cleanup parts because
+>> there are some dependencies on moving timer to generic location.
+>>
+>> I could based it on standard Linux tagged version but you will get
+>> several conflicts you will have to resolve.
+>> If you are OK to resolving these problems, please let me know
+>> I will create another branch with core-smp changes which are not based
+>> on zynq/clksrc/cleanup branch.
+> 
+> You might want to resolve this new warning:
+> 
+> arch/arm/mach-zynq/hotplug.c:1:0: warning: switch -mcpu=cortex-a9 conflicts with -march= switch
+> 
+> found by lastnights OMAP4430 randconfig build.
 
-> In the thread I mentioned client pulls the line low indicating that
-> it wants to own the bus and waits for some time and then checks
-> if the line is still low or not.If it is still low then it owns the bus
-> and start transaction and if clients see otherwise it releases the
-> bus and tries again after some time.How is that handled in the
-> previous kernel?
+Do you have that randconfig file?
+And can you please point me to the repo which is is used for this build?
 
-That particular scenario is not handled by earlier kernels, but this is
-a very special case. In most cases (including Myl?ne's as far as I can
-see) it is not needed because there is a single master on the segment.
-And even with multiple masters, I2C bus arbitration normally takes place
-transparently. Only when the standard bus arbitration can't work for
-some reason, the code you mentioned is needed.
-
--- 
-Jean Delvare
+Thanks,
+Michal
