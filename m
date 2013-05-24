@@ -1,42 +1,35 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Fri, 24 May 2013 17:17:47 +0300
-Subject: [PATCH v3 02/11] arm64: uaccess s/might_sleep/might_fault/
-In-Reply-To: <cover.1368702323.git.mst@redhat.com>
-References: <cover.1368702323.git.mst@redhat.com>
-Message-ID: <1369404522-12927-2-git-send-email-mst@redhat.com>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Fri, 24 May 2013 16:29:02 +0200
+Subject: [PATCH] ARM: at91/dt: add pinctrl definition for at91 tc blocks
+In-Reply-To: <519F754F.50908@atmel.com>
+References: <1369389956-30466-1-git-send-email-b.brezillon@overkiz.com>
+ <20130524140528.GE24476@game.jcrosoft.org> <519F754F.50908@atmel.com>
+Message-ID: <519F792E.8090109@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only reason uaccess routines might sleep
-is if they fault. Make this explicit.
-
-Signed-off-by: Michael S. Tsirkin <mst@redhat.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/include/asm/uaccess.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 008f848..edb3d5c 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -166,7 +166,7 @@ do {									\
- 
- #define get_user(x, ptr)						\
- ({									\
--	might_sleep();							\
-+	might_fault();							\
- 	access_ok(VERIFY_READ, (ptr), sizeof(*(ptr))) ?			\
- 		__get_user((x), (ptr)) :				\
- 		((x) = 0, -EFAULT);					\
-@@ -227,7 +227,7 @@ do {									\
- 
- #define put_user(x, ptr)						\
- ({									\
--	might_sleep();							\
-+	might_fault();							\
- 	access_ok(VERIFY_WRITE, (ptr), sizeof(*(ptr))) ?		\
- 		__put_user((x), (ptr)) :				\
- 		-EFAULT;						\
--- 
-MST
+On 24/05/2013 16:12, Nicolas Ferre wrote:
+> On 24/05/2013 16:05, Jean-Christophe PLAGNIOL-VILLARD :
+>> On 12:05 Fri 24 May     , Boris BREZILLON wrote:
+>>> Hello,
+>>>
+>>> This patch adds pinctrl configs for at91 Timer Conter blocks.
+>>> These pin configs will be referenced by "atmel,tcb-pwm" devices to
+>>> setup pins as PWM output.
+>>
+>> you need to rebase on
+>>
+>> a cleanup I did preset on our git tag at91-3.11-cleanup
+>>
+>> As we announce Mandaotory for 3.11
+>>
+>> as I introduce Macro fro DT
+Ok, I'll base my future dt patches (kizbox.dts) on this tag.
+>
+> Boris, Hold on.
+>
+> I may have the solution for you. Give me some time and we may have the 
+> automatic generation for updating your patch.
+Ok, thanks.
+>
+> Bye,
