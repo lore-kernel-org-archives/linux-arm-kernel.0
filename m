@@ -1,24 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 May 2013 17:21:10 +0100
-Subject: [PATCH] ARM: document the bigger pagetables needed for LPAE
-In-Reply-To: <1369410236-22398-1-git-send-email-javi.merino@arm.com>
-References: <1369410236-22398-1-git-send-email-javi.merino@arm.com>
-Message-ID: <20130524162109.GA22600@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 May 2013 17:40:56 +0100
+Subject: [PATCH] ARM: at91: Fix: Change internal SRAM memory type to
+ "MT_MEMORY_SO"
+In-Reply-To: <20130524140322.GD24476@game.jcrosoft.org>
+References: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
+ <1369011979-21354-1-git-send-email-wenyou.yang@atmel.com>
+ <20130522001457.GA18614@n2100.arm.linux.org.uk>
+ <B256D81BAE5131468A838E5D7A243641687BB93C@penmbx01>
+ <20130524112029.GW18614@n2100.arm.linux.org.uk>
+ <20130524140322.GD24476@game.jcrosoft.org>
+Message-ID: <20130524164055.GA18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 04:43:56PM +0100, Javi Merino wrote:
-> The Booting documentation assumes that the initial pagetables are
-> 16KiB but since 1b6ba46 (ARM: LPAE: MMU setup for the 3-level page
-> table format) they are 20KiB for LPAE kernels.  Thus, the
-> recommendation to put atags or the dtb in the first 16KiB is wrong,
-> there's only 12KiB of space there in LPAE kernels, so update the
-> documentation accordingly.
-> ---
->  Documentation/arm/Booting |    9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
+On Fri, May 24, 2013 at 04:03:22PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 12:20 Fri 24 May     , Russell King - ARM Linux wrote:
+> > On Fri, May 24, 2013 at 07:11:04AM +0000, Yang, Wenyou wrote:
+> > > The story is: for sama5d3x with Cortex-A5 core, if not so, when copying
+> > > code snippet to the internal SRAM, then jump to run this code, but fail
+> > > to run.
+> > 
+> > And that is where your mistake is - you forgot that you're working with
+> > a CPU with harvard caches which will require some cache maintanence
+> > between copying the code and executing it.
+> > 
+> > You want to look at flush_icache_range() rather than making this memory
+> > strongly ordered.
+> 
+> I understand your point but today we map a SRAM as MT_DEVICE
 
-Missing Signed-off-by?
-
--- 
-Catalin
+If you map SRAM as MT_DEVICE then you won't be able to execute code from
+it.  It needs to be a normal memory mapping.
