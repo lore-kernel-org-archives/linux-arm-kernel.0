@@ -1,39 +1,46 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 24 May 2013 16:55:42 -0300
-Subject: [PATCH 2/2] ARM: imx: clk: No need to initialize phandle struct
-In-Reply-To: <1369425342-20153-1-git-send-email-festevam@gmail.com>
-References: <1369425342-20153-1-git-send-email-festevam@gmail.com>
-Message-ID: <1369425342-20153-2-git-send-email-festevam@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 24 May 2013 21:55:25 +0200
+Subject: [PATCH v2 0/4] mtd: atmel_nand: enable Nand Flash Controller
+ (NFC) support
+In-Reply-To: <1368784308-7600-1-git-send-email-josh.wu@atmel.com>
+References: <1368784308-7600-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <20130524195525.GL24476@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On 17:51 Fri 17 May     , Josh Wu wrote:
+> This patch series enable NFC support for SAMA5 soc. It can send command,
+> address cycles automaticly. Also when enable NFC sram, NFC will transfer
+> data to sram. Which can save lots of cpu time.
 
-commit 84344b43c (ARM: i.MX5: Allow DT clock providers) introduce the following
-sparse warning:
+can you give some stats please
 
-arch/arm/mach-imx/clk.c:12:43: warning: Using plain integer as NULL pointer
+and performance comparaisan NFS vs DMA
 
-There is no need to initialize phandle, so remove it.
-
-Cc: Martin Fuzzey <mfuzzey@parkeon.com>
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/clk.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-imx/clk.c b/arch/arm/mach-imx/clk.c
-index 53e8788..55bc80a 100644
---- a/arch/arm/mach-imx/clk.c
-+++ b/arch/arm/mach-imx/clk.c
-@@ -9,7 +9,7 @@ DEFINE_SPINLOCK(imx_ccm_lock);
- 
- static struct clk * __init imx_obtain_fixed_clock_from_dt(const char *name)
- {
--	struct of_phandle_args phandle = {0};
-+	struct of_phandle_args phandle;
- 	struct clk *clk = ERR_PTR(-ENODEV);
- 	char *path;
- 
--- 
-1.8.1.2
+Best Regards,
+J.
+> 
+> v1 --> v2:
+>  1) rebase it with latest l2-mtd git tree: 
+>     - remove useless nand commands (NAND_CMD_DEPLETE1, NAND_CMD_STATUS_ERRORx).
+>     - adopt to the new nand write function's parameters. Add error message when
+>       handle subpage write via nfc sram.
+>  2) rewrite pmecc_enable function. Now I use exist NAND_ECC_READ/WRITE const
+>     instead of using a new enum definition.
+> 
+> Josh Wu (4):
+>   mtd: atmel_nand: replace pmecc enable code with one function.
+>   mtd: atmel_nand: add Nand Flash Controller (NFC) support
+>   mtd: atmel_nand: enable Nand Flash Controller (NFC) read data via
+>     sram
+>   mtd: atmel_nand: enable Nand Flash Controller (NFC) write via sram
+> 
+>  .../devicetree/bindings/mtd/atmel-nand.txt         |    4 +
+>  drivers/mtd/nand/atmel_nand.c                      |  657 ++++++++++++++++++--
+>  drivers/mtd/nand/atmel_nand_nfc.h                  |  106 ++++
+>  3 files changed, 718 insertions(+), 49 deletions(-)
+>  create mode 100644 drivers/mtd/nand/atmel_nand_nfc.h
+> 
+> -- 
+> 1.7.9.5
+> 
