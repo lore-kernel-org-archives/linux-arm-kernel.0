@@ -1,37 +1,43 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 May 2013 12:36:06 +0100
-Subject: [PATCHv3 1/5] ARM: hyp: initialize CNTVOFF to zero
+Date: Fri, 24 May 2013 12:36:07 +0100
+Subject: [PATCHv3 2/5] ARM: KVM: arch_timers: zero CNTVOFF upon return to host
 In-Reply-To: <1369395370-21358-1-git-send-email-mark.rutland@arm.com>
 References: <1369395370-21358-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1369395370-21358-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1369395370-21358-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <Marc.Zyngier@arm.com>
+To use the virtual counters from the host, we need to ensure that
+CNTVOFF doesn't change unexpectedly. When we change to a guest, we
+replace the host's CNTVOFF, but we don't restore it when returning to
+the host.
 
-In order to be able to use the virtual counter in a safe way,
-make sure it is initialized to zero before dropping to SVC.
+As the host sets CNTVOFF to zero, and never changes it, we can simply
+zero CNTVOFF when returning to the host. This patch adds said zeroing to
+the return to host path.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Dave Martin <dave.martin@linaro.org>
+Acked-by: Christoffer Dall <cdall@cs.columbia.edu>
 ---
- arch/arm/kernel/hyp-stub.S | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/kvm/interrupts_head.S | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index 1315c4c..dbe2110 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -153,6 +153,8 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
- 	mrc	p15, 4, r7, c14, c1, 0	@ CNTHCTL
- 	orr	r7, r7, #3		@ PL1PCEN | PL1PCTEN
- 	mcr	p15, 4, r7, c14, c1, 0	@ CNTHCTL
-+	mov	r7, #0
-+	mcrr	p15, 4, r7, r7, c14	@ CNTVOFF
+diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
+index 3c8f2f0..d43cfb5 100644
+--- a/arch/arm/kvm/interrupts_head.S
++++ b/arch/arm/kvm/interrupts_head.S
+@@ -497,6 +497,10 @@ vcpu	.req	r0		@ vcpu pointer always in r0
+ 	add	r5, vcpu, r4
+ 	strd	r2, r3, [r5]
+ 
++	@ Ensure host CNTVCT == CNTPCT
++	mov	r2, #0
++	mcrr	p15, 4, r2, r2, c14	@ CNTVOFF
++
  1:
  #endif
- 
+ 	@ Allow physical timer/counter access for the host
 -- 
 1.8.1.1
