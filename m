@@ -1,43 +1,30 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Fri, 24 May 2013 07:11:04 +0000
-Subject: [PATCH] ARM: at91: Fix: Change internal SRAM memory type to
- "MT_MEMORY_SO"
-In-Reply-To: <20130522001457.GA18614@n2100.arm.linux.org.uk>
-References: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
- <1369011979-21354-1-git-send-email-wenyou.yang@atmel.com>
- <20130522001457.GA18614@n2100.arm.linux.org.uk>
-Message-ID: <B256D81BAE5131468A838E5D7A243641687BB93C@penmbx01>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 May 2013 09:15:27 +0200
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
+ 370/XP
+In-Reply-To: <20130523230911.GR18614@n2100.arm.linux.org.uk>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201305232240.03959.arnd@arndb.de>
+ <20130523230911.GR18614@n2100.arm.linux.org.uk>
+Message-ID: <201305240915.27847.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 24 May 2013, Russell King - ARM Linux wrote:
+> No, I'm not asking about the principle.  I'm asking _in this particular
+> problem case_ who provides the DT blob?
+> 
+> So the person to answer that question is Thomas or someone who is using
+> the boards concerned.
 
+But there is no problem on those boards /yet/. So far, the two boards
+always come with the known 0xd0 configuration that match the DTs
+we have, independent of where they come from.
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
-> Sent: 2013?5?22? 8:15
-> To: Yang, Wenyou
-> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> plagnioj at jcrosoft.com; Ferre, Nicolas; linux at maxim.org.za
-> Subject: Re: [PATCH] ARM: at91: Fix: Change internal SRAM memory type to
-> "MT_MEMORY_SO"
-> 
-> On Mon, May 20, 2013 at 09:06:19AM +0800, Wenyou Yang wrote:
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> 
-> This needs more of a description.  Also, for a single patch, it's silly
-> to send two mails, the first being a cover which has a little more
-> information in it about the patch than the patch itself.
-> 
-> You need to explain _why_ you're making this change.  What I want to see
-> is that you've thought about the implications of this - particularly that
-> you know that strongly ordered memory does *not* imply any ordering with
-> any other memory types.
-> 
-> In other words, I want to know that this change is not a bodge but there's
-> a real reason behind it.
-The story is: for sama5d3x with Cortex-A5 core, if not so, when copying code snippet to the internal SRAM, then jump to run this code, but fail to run.
-So, refer to other code(such as omap4), do such change. I also test it on at91sam9 with 926ej-s core.
-As what you said, I am digging it. Thank you very much.
+Thomas wants to be prepared for them to do something stupid, and he
+anticipates that they are going to do it in a particular way, but
+he says that he has no control over them, so it's all speculation
+at this point, unless we do something stupid and change the dts
+files in the kernel to no longer match the current hardware.
 
-Best Regards,
-Wenyou Yang
+	Arnd
