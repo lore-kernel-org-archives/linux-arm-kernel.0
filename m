@@ -1,48 +1,91 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 25 May 2013 01:00:21 +0200
-Subject: clock framework: Don't disable a clock already enabled by boot
- loader?
-In-Reply-To: <519F60CA.6090302@de.bosch.com>
-References: <519F60CA.6090302@de.bosch.com>
-Message-ID: <20130524230021.GF31135@pengutronix.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 25 May 2013 08:25:15 +0900
+Subject: [GIT PULL] Samsung fixes-3 for v3.10
+Message-ID: <519FF6DB.5040002@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
-On Fri, May 24, 2013 at 02:44:58PM +0200, Dirk Behme wrote:
-> Hi,
-> 
-> we register a clock using clk_register_clkdev() etc already enabled
-> by a boot loader. We are doing only the clk_register_clkdev(), but
-> no clock_enable() etc on this clock.
-> 
-> With this, enable_count for this clock is zero, while in fact it's
-> already on. I.e. the kernel doesn't know that it is on.
-> 
-> This results in
-> 
-> late_initcall(clk_disable_unused())
-> 
-> disabling this clock because the kernel thinks it's unused.
-> 
-> Is this the intended behavior?
+   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
 
-Yes, and it's great since after this point the hardware state is in sync
-with the enable counter.
+are available in the git repository at:
 
-> Is there a way to let the kernel know
-> "the clock is enabled already, set enable_count != 0"? Or is the
-> only way to do this correctly calling clock_enable() on an already
-> enabled clock?
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/samsung-fixes-3
 
-You could set the CLK_IGNORE_UNUSED flag in the clock, but I suggest to
-just clk_get/clk_enable the clock in the driver using it.
+for you to fetch changes up to 15f504f0c2038b9a0f1569c9ce34def61f0c65be:
 
-Sascha
+   ARM: SAMSUNG: Add names to fimd0 IRQ resources (2013-05-25 06:49:43 
++0900)
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+----------------------------------------------------------------
+Fixes following for v3.10
+- to get usb2 working on the Chromebook with adding the
+   usb phy node for usb2 on exynos5250
+- supporting exynos4210 rev0 SoC
+- exynos5440 restart applying only to powered-on domains
+- drm-exynos probe failure with adding resource names to
+   fimd0 platform device
+
+----------------------------------------------------------------
+Jungseok Lee (1):
+       ARM: EXYNOS: fix software reset logic for EXYNOS5440 SOC
+
+Tomasz Figa (2):
+       ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
+       ARM: SAMSUNG: Add names to fimd0 IRQ resources
+
+Vivek Gautam (1):
+       ARM: dts: Enabling samsung-usb2phy driver for exynos5250
+
+  arch/arm/boot/dts/exynos5250.dtsi          | 15 ++++++++++++
+  arch/arm/mach-exynos/Kconfig               |  3 ++-
+  arch/arm/mach-exynos/common.c              | 39 
+++++++++++++++++++++++++++++--
+  arch/arm/mach-exynos/common.h              |  2 ++
+  arch/arm/mach-exynos/mach-universal_c210.c |  5 ++--
+  arch/arm/plat-samsung/devs.c               |  6 ++---
+  6 files changed, 61 insertions(+), 9 deletions(-)
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+
+   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
+tags/samsung-fixes-3
+
+for you to fetch changes up to 15f504f0c2038b9a0f1569c9ce34def61f0c65be:
+
+   ARM: SAMSUNG: Add names to fimd0 IRQ resources (2013-05-25 06:49:43 
++0900)
+
+----------------------------------------------------------------
+Fixes following for v3.10
+- to get usb2 working on the Chromebook with adding the
+   usb phy node for usb2 on exynos5250
+- supporting exynos4210 rev0 SoC
+- exynos5440 restart applying only to powered-on domains
+- drm-exynos probe failure with adding resource names to
+   fimd0 platform device
+
+----------------------------------------------------------------
+Jungseok Lee (1):
+       ARM: EXYNOS: fix software reset logic for EXYNOS5440 SOC
+
+Tomasz Figa (2):
+       ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
+       ARM: SAMSUNG: Add names to fimd0 IRQ resources
+
+Vivek Gautam (1):
+       ARM: dts: Enabling samsung-usb2phy driver for exynos5250
+
+  arch/arm/boot/dts/exynos5250.dtsi          | 15 ++++++++++++
+  arch/arm/mach-exynos/Kconfig               |  3 ++-
+  arch/arm/mach-exynos/common.c              | 39 
+++++++++++++++++++++++++++++--
+  arch/arm/mach-exynos/common.h              |  2 ++
+  arch/arm/mach-exynos/mach-universal_c210.c |  5 ++--
+  arch/arm/plat-samsung/devs.c               |  6 ++---
+  6 files changed, 61 insertions(+), 9 deletions(-)
