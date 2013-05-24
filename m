@@ -1,83 +1,116 @@
-From: florian.meier@koalo.de (Florian Meier)
-Date: Fri, 24 May 2013 17:32:35 +0200
-Subject: [PATCH] ASoC: Add support for BCM2708
-In-Reply-To: <519CFFDD.4080203@metafoo.de>
-References: <519CD1CC.8070507@koalo.de>
-	<519CFFDD.4080203@metafoo.de>
-Message-ID: <CABDT8WxS+Aq_feGqhzUMK-=DkZsnOULrH_fd+j0OP0czGnFdAw@mail.gmail.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Fri, 24 May 2013 10:41:15 -0500
+Subject: [PATCHv4 1/6] ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
+Message-ID: <1369410080-436-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/5/22 Lars-Peter Clausen <lars@metafoo.de>
->
-> On 05/22/2013 04:10 PM, Florian Meier wrote:
-> [...]
-> > diff --git a/sound/soc/bcm2708/bcm2708-i2s.c b/sound/soc/bcm2708/bcm2708-i2s.c
-> > new file mode 100644
-> > index 0000000..a8e995f
-> > --- /dev/null
-> > +++ b/sound/soc/bcm2708/bcm2708-i2s.c
-> > @@ -0,0 +1,964 @@
-> [...]
-> > +static int bcm2708_i2s_startup(struct snd_pcm_substream *substream,
-> > +                            struct snd_soc_dai *dai)
-> > +{
-> > +     struct bcm2708_i2s_dev *dev = snd_soc_dai_get_drvdata(dai);
-> > +
-> > [...]
-> > +             } else {
-> > +                     snd_pcm_hw_constraint_minmax(substream->runtime,
-> > +                                     SNDRV_PCM_HW_PARAM_RATE,
-> > +                                     first_runtime->rate,
-> > +                                     first_runtime->rate);
-> > +             }
->
-> Setting the symmetric_rates lets the core take care of setting the proper
-> constraints on the rate. It probably makes sense to also add a
-> symmetric_formats since this isn't the only driver that has the requirement
-> that the formats for playback and capture match.
+From: Dinh Nguyen <dinguyen@altera.com>
 
+Add entry for 2nd GMAC controller. Add the correct clocks for the GMAC.
 
-You are right! I forgot to remove this after I found the symmetric_rates flag.
-For symmetric_formats I will have a closer look into the ALSA sources.
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Reviewed-by: Pavel Machek <pavel@denx.de>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Olof Johansson <olof@lixom.net>
+Cc: Pavel Machek <pavel@denx.de>
+CC: <linux@arm.linux.org.uk>
 
+v2:
+- Moved "disabled" status to dtsi file
+---
+ arch/arm/boot/dts/socfpga.dtsi         |   18 ++++++++++++++++--
+ arch/arm/boot/dts/socfpga_cyclone5.dts |   13 +++++++++++++
+ arch/arm/boot/dts/socfpga_vt.dts       |    5 +++++
+ 3 files changed, 34 insertions(+), 2 deletions(-)
 
-
-> [...]
-> > diff --git a/sound/soc/bcm2708/bcm2708-pcm.c b/sound/soc/bcm2708/bcm2708-pcm.c
-> > new file mode 100644
-> > index 0000000..4b3e688
-> > --- /dev/null
-> > +++ b/sound/soc/bcm2708/bcm2708-pcm.c
-> > @@ -0,0 +1,303 @@
->
-> I think you should be able to remove the bulk of this driver by using the
-> generic PCM dmaengine driver.
-
-
-As implied in the header of this file, I would really like to use the
-generic PCM dmaengine driver,
-but I would also like to maintain compatibility to the Raspberry Pi
-downstream kernel.
-Therefore, I have to wait until the downstream kernel migrates to the
-new version.
-
-
-
-> [...]
-> > +
-> > +#include "bcm2708-pcm.h"
-> > +
-> > +static const struct snd_pcm_hardware bcm2708_pcm_hardware = {
-> > +     .info                   = SNDRV_PCM_INFO_MMAP |
-> > +                               SNDRV_PCM_INFO_MMAP_VALID |
-> > +                               SNDRV_PCM_INFO_INTERLEAVED |
-> > +                               SNDRV_PCM_INFO_PAUSE |
-> > +                               SNDRV_PCM_INFO_RESUME |
-> > +                               SNDRV_PCM_INFO_JOINT_DUPLEX |
-> > +                               SNDRV_PCM_INFO_NO_PERIOD_WAKEUP,
->
-> I don't think you actually support the last one, and neither pause and
-> resume are supported.
-
-I will have a closer look at these flags. Thanks!
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 16a6e13..02bb425 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -23,6 +23,7 @@
+ 
+ 	aliases {
+ 		ethernet0 = &gmac0;
++		ethernet1 = &gmac1;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 		timer0 = &timer0;
+@@ -238,13 +239,26 @@
+ 				};
+ 			};
+ 
+-		gmac0: stmmac at ff700000 {
++		gmac0: ethernet at ff700000 {
+ 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
+ 			reg = <0xff700000 0x2000>;
+ 			interrupts = <0 115 4>;
+ 			interrupt-names = "macirq";
+ 			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+-			phy-mode = "gmii";
++			clocks = <&emac0_clk>;
++			clock-names = "stmmaceth";
++			status = "disabled";
++		};
++
++		gmac1: ethernet at ff702000 {
++			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
++			reg = <0xff702000 0x2000>;
++			interrupts = <0 120 4>;
++			interrupt-names = "macirq";
++			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
++			clocks = <&emac1_clk>;
++			clock-names = "stmmaceth";
++			status = "disabled";
+ 		};
+ 
+ 		L2: l2-cache at fffef000 {
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
+index 2495958..973999d 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
+@@ -32,6 +32,13 @@
+ 		reg = <0x0 0x40000000>; /* 1GB */
+ 	};
+ 
++	aliases {
++		/* this allow the ethaddr uboot environmnet variable contents
++		 * to be added to the gmac1 device tree blob.
++		 */
++		ethernet0 = &gmac1;
++	};
++
+ 	soc {
+ 		clkmgr at ffd04000 {
+ 			clocks {
+@@ -41,6 +48,12 @@
+ 			};
+ 		};
+ 
++		ethernet at ff702000 {
++			phy-mode = "rgmii";
++			phy-addr = <0xffffffff>; /* probe for phy addr */
++			status = "okay";
++		};
++
+ 		timer0 at ffc08000 {
+ 			clock-frequency = <100000000>;
+ 		};
+diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+index 0bf035d..d1ec0ca 100644
+--- a/arch/arm/boot/dts/socfpga_vt.dts
++++ b/arch/arm/boot/dts/socfpga_vt.dts
+@@ -41,6 +41,11 @@
+ 			};
+ 		};
+ 
++		ethernet at ff700000 {
++			phy-mode = "gmii";
++			status = "okay";
++		};
++
+ 		timer0 at ffc08000 {
+ 			clock-frequency = <7000000>;
+ 		};
+-- 
+1.7.9.5
