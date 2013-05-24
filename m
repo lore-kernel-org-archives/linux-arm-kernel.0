@@ -1,10 +1,10 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 May 2013 11:44:52 +0200
-Subject: [PATCH 15/21] arm: kirkwood: readynas: affect pinmux configs to the
+Date: Fri, 24 May 2013 11:44:55 +0200
+Subject: [PATCH 18/21] arm: kirkwood: topkick: affect pinmux configs to the
  right devices
 In-Reply-To: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369388699-25975-16-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369388699-25975-19-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,62 +25,110 @@ pin 43 (PIN43): gpio-leds.1 mvebu-gpio:43 function gpio group mpp43
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  |   22 +++++++++-----------
- 1 file changed, 10 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/kirkwood-topkick.dts |   51 ++++++++++++++++----------------
+ 1 file changed, 26 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-index 1ca66ab..b79ea8c 100644
---- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-+++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
-@@ -18,18 +18,6 @@
- 
+diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
+index 66eb45b..940b54f 100644
+--- a/arch/arm/boot/dts/kirkwood-topkick.dts
++++ b/arch/arm/boot/dts/kirkwood-topkick.dts
+@@ -19,18 +19,6 @@
  	ocp at f1000000 {
  		pinctrl: pinctrl at 10000 {
+ 			/*
+-			 * GPIO LED layout
+-			 *
+-			 *       /-SYS_LED(2)
+-			 *       |
+-			 *       |   /-DISK_LED
+-			 *       |   |
+-			 *       |   |   /-WLAN_LED(2)
+-			 *       |   |   |
+-			 * [SW] [*] [*] [*]
+-			 */
 -
--			pinctrl-0 = < &pmx_uart0
--				      &pmx_button_power
--				      &pmx_button_backup
--				      &pmx_button_reset
--				      &pmx_led_blue_power
--				      &pmx_led_blue_activity
--				      &pmx_led_blue_disk1
--				      &pmx_led_blue_disk2
--				      &pmx_led_blue_backup >;
--			pinctrl-names = "default";
--
- 			pmx_button_power: pmx-button-power {
- 				marvell,pins = "mpp47";
- 				marvell,function = "gpio";
-@@ -74,6 +62,8 @@
- 		};
+-			/*
+ 			 * Switch positions
+ 			 *
+ 			 *     /-SW_LEFT(2)
+@@ -41,19 +29,8 @@
+ 			 *     |   |   |
+ 			 * PS [L] [I] [R] LEDS
+ 			 */
+-			pinctrl-0 = < &pmx_led_disk_yellow
+-				      &pmx_sata0_pwr_enable
+-				      &pmx_led_sys_red
+-				      &pmx_led_sys_blue
+-				      &pmx_led_wifi_green
+-				      &pmx_sw_left
+-				      &pmx_sw_right
+-				      &pmx_sw_idle
+-				      &pmx_sw_left2
+-				      &pmx_led_wifi_yellow
+-				      &pmx_uart0
+-				      &pmx_nand
+-				      &pmx_twsi0 >;
++			pinctrl-0 = <&pmx_sw_left &pmx_sw_right
++				     &pmx_sw_idle &pmx_sw_left2>;
+ 			pinctrl-names = "default";
+ 
+ 			pmx_led_disk_yellow: pmx-led-disk-yellow {
+@@ -109,10 +86,14 @@
  
  		serial at 12000 {
+ 			status = "ok";
 +			pinctrl-0 = <&pmx_uart0>;
 +			pinctrl-names = "default";
- 			status = "okay";
  		};
  
-@@ -115,6 +105,10 @@
+ 		nand at 3000000 {
+ 			status = "okay";
++			pinctrl-0 = <&pmx_nand>;
++			pinctrl-names = "default";
+ 
+ 			partition at 0 {
+ 				label = "u-boot";
+@@ -147,6 +128,8 @@
+ 
+ 		i2c at 11000 {
+ 			status = "ok";
++			pinctrl-0 = <&pmx_twsi0>;
++			pinctrl-names = "default";
+ 		};
+ 
+ 		mvsdio at 90000 {
+@@ -158,7 +141,23 @@
+ 	};
  
  	gpio-leds {
++		/*
++		 * GPIO LED layout
++		 *
++		 *       /-SYS_LED(2)
++		 *       |
++		 *       |   /-DISK_LED
++		 *       |   |
++		 *       |   |   /-WLAN_LED(2)
++		 *       |   |   |
++		 * [SW] [*] [*] [*]
++		 */
++
  		compatible = "gpio-leds";
-+		pinctrl-0 = < &pmx_led_blue_power &pmx_led_blue_activity
-+			      &pmx_led_blue_disk1 &pmx_led_blue_disk2
-+			      &pmx_led_blue_backup >;
++		pinctrl-0 = <&pmx_led_disk_yellow &pmx_led_sys_red
++			     &pmx_led_sys_blue &pmx_led_wifi_green
++			     &pmx_led_wifi_yellow>;
 +		pinctrl-names = "default";
  
- 		power_led {
- 			label = "status:blue:power_led";
-@@ -143,6 +137,10 @@
- 		compatible = "gpio-keys";
+ 		disk {
+ 			label = "topkick:yellow:disk";
+@@ -187,6 +186,8 @@
+ 		compatible = "simple-bus";
  		#address-cells = <1>;
  		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_button_power &pmx_button_backup
-+			     &pmx_button_reset>;
++		pinctrl-0 = <&pmx_sata0_pwr_enable>;
 +		pinctrl-names = "default";
-+
- 		button at 1 {
- 			label = "Power Button";
- 			linux,code = <116>;     /* KEY_POWER */
+ 
+ 		sata0_power: regulator at 1 {
+ 			compatible = "regulator-fixed";
 -- 
 1.7.9.5
