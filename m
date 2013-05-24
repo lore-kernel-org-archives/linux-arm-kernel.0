@@ -1,75 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 24 May 2013 11:23:14 +0200
-Subject: [PATCHv3 6/6] ARM: sunxi: Add EMAC Controller to Hackberry dt
-In-Reply-To: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1369387394-9453-7-git-send-email-maxime.ripard@free-electrons.com>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Fri, 24 May 2013 09:25:22 +0000
+Subject: [PATCH v3 1/2] pinctrl: add MVF600 pinctrl driver
+In-Reply-To: <CACRpkdZ=67CWrPqFMU4FeES5OUyV5=Zz2fwy-GAMVHrNU6y6jA@mail.gmail.com>
+References: <1368685224-17915-1-git-send-email-b35083@freescale.com>
+ <20130520033207.GD25113@S2101-09.ap.freescale.net>
+ <CAAQ0ZWSZeqOEceN-KmDS4_BT27_4xCYjfFMj8sHkEonOXaoF_g@mail.gmail.com>
+ <B56CDBE15CE27145A4B77D2D24263E851CBBA4@039-SN1MPN1-003.039d.mgd.msft.net>
+ <CAAQ0ZWTBZ=10B+0Zc4iZmvrr0hzdBKf1mn1CzhJokWE44dxsoA@mail.gmail.com>
+ <CACRpkdZ=67CWrPqFMU4FeES5OUyV5=Zz2fwy-GAMVHrNU6y6jA@mail.gmail.com>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E851CC580@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Hackberry has a PHY that needs to be powered up through a GPIO, so
-we need to use a fixed regulator here.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun4i-a10-hackberry.dts | 41 +++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-index b9efac1..3514b37 100644
---- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-@@ -23,10 +23,51 @@
- 	};
- 
- 	soc at 01c20000 {
-+		emac: ethernet at 01c0b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&emac_pins_a>;
-+			phy = <&phy0>;
-+			status = "okay";
-+		};
-+
-+		mdio at 01c0b080 {
-+			phy-supply = <&reg_emac_3v3>;
-+			status = "okay";
-+
-+			phy0: ethernet-phy at 0 {
-+				reg = <0>;
-+			};
-+		};
-+
-+		pio: pinctrl at 01c20800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&hackberry_hogs>;
-+
-+			hackberry_hogs: hogs at 0 {
-+				allwinner,pins = "PH19";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_emac_3v3: emac-3v3 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "emac-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			enable-active-high;
-+			gpio = <&pio 7 19 0>;
-+		};
-+	};
- };
--- 
-1.8.1.2
+>-----Original Message-----
+>From: Linus Walleij [mailto:linus.walleij at linaro.org]
+>Sent: Friday, May 24, 2013 4:56 PM
+>To: Shawn Guo
+>Cc: Lu Jingchang-B35083; linux-arm-kernel; Sascha Hauer
+>Subject: Re: [PATCH v3 1/2] pinctrl: add MVF600 pinctrl driver
+>
+>On Wed, May 22, 2013 at 5:24 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+>> On 21 May 2013 15:56, Lu Jingchang-B35083 <B35083@freescale.com> wrote:
+>>> [Lu Jingchang-B35083]
+>>> I see you have Acked [PATCH v3 2/2] pinctrl: imx: add MVF600 support to
+>imx pinctrl framework, do I need resend it as the first one. Thanks!
+>>
+>> Since LinusW hasn't applied it, you should just resend.
+>
+>Now it appears I applied 2/2 but not 1/2 due to comments.
+>
+>Are they orthogonal or do I need to pull the applied patch out again?
+>
+[Lu Jingchang-B35083] 
+Please pull the applied patch out again, I will resend the patch to keep the patch's sequence.
+On the other hand I also have some minor update to the patch's description.
+Thanks!
