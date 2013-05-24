@@ -1,39 +1,53 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 24 May 2013 10:01:43 +0200
-Subject: [PATCH 2/2] ARM: move VFP init to an earlier boot stage
-In-Reply-To: <alpine.LFD.2.03.1305231654440.1918@syhkavp.arg>
-References: <1369294104-3849-1-git-send-email-ard.biesheuvel@linaro.org>
- <1369294104-3849-2-git-send-email-ard.biesheuvel@linaro.org>
- <20130523084126.GI18614@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1305231108500.1918@syhkavp.arg>
- <CAKv+Gu9FDprQtVitu5dojoWqY15s4ytOCxbFUjUnLsX8L92Zag@mail.gmail.com>
- <alpine.LFD.2.03.1305231654440.1918@syhkavp.arg>
-Message-ID: <CAKv+Gu-O-ehYLp+yh5c=+d7NPOjqARRWLuidTgyNZP_DS2zaEw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 24 May 2013 10:04:44 +0200
+Subject: [PATCH] pinctrl: sink pinctrldev_list_mutex
+In-Reply-To: <519A8A57.9060007@wwwdotorg.org>
+References: <1368690525-32252-1-git-send-email-linus.walleij@stericsson.com>
+ <519A8A57.9060007@wwwdotorg.org>
+Message-ID: <CACRpkdZieCmFnHCGUkv8EqcAtb3DA7dSZpimSdB4P81tZPJRoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 May 2013 22:57, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Thu, 23 May 2013, Ard Biesheuvel wrote:
->> Currently, the lazy restore is armed even in kernel mode, so it pulls
->> in the userland context if you issue NEON/VFP instructions in kernel
->> mode with the FP unit off. This is probably a side effect of the VFP
->> detection code relying on this code path as well.
->> As kernel_vfp_begin() disarms the lazy restore and takes care of
->> preserving the userland context itself, entering __und_svc because of
->> NEON/VFP instructions should only be allowed in this particular case,
->> i.e., VFP detection and all other instances should BUG() imho
->> (regardless of if we end up doing NEON in the kernel or not). Doing it
->> that way, I don't think there is a reason for keeping additional
->> flags.
->
-> The concern is more about VFP instructions that could trigger an
-> exception where support code is invoked to emulate that instruction.
->
+On Mon, May 20, 2013 at 10:40 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
-So perhaps that is where we should draw the line: I am not proposing
-supporting arbitrary VFP code in the kernel, just NEON (which does not
-bounce and hence does not require the support code). Maybe I should
-rename to kernel_neon_begin/kernel_neon_end to reflect that?
+> This seems fine on the surface, but I do have one question:
+>
+> I think the pinctrl lock serves a couple of purposes:
+>
+> 1) Basic protection for accesses to the pinctrldev_list itself.
+>
+> This patch seems just fine w.r.t. this point.
+>
+> 2) Preventing pinctrl drivers from being unregistered (and their modules
+> unloaded) when some operation is being performed on/to them.
 
-Regards,
-Ard.
+Prevention of module unloading of pin controllers has never
+been working properly, as there is no way to release the
+pinctrl handles taken by different drivers.
+
+I think that is why most pin controller drivers are bool rather
+than tristate.
+
+Currently only pinctrl-single is tristate. Part of me want to
+change that to bool, I think it only will work when using the
+single with hogs (that will be properly free:ed when unloading
+the driver).
+
+Tony: is this really working with non-hogs?
+
+If we really want to support loading/unloading of pin controllers
+I think the mutex is the least of the problems, and we should
+probably create a separate lock for handling that instead of
+relying on the list lock in that case.
+
+While it's probably possible to *unload* the driver properly
+after some hacking like this, we get to the problem of
+re-probing the driver and re-associating all pinctrl handles
+(at that point floating in space with no driver back-end)
+with the driver again.
+
+I feel this needs to be driven by someone who actually
+need to load/unload pinctrl modules.
+
+Yours,
+Linus Walleij
