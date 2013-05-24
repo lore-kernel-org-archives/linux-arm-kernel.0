@@ -1,48 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 May 2013 12:36:10 +0100
-Subject: [PATCHv3 5/5] ARM: arch_timer: stop virtual timer when booted in HYP
- mode
-In-Reply-To: <1369395370-21358-1-git-send-email-mark.rutland@arm.com>
-References: <1369395370-21358-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1369395370-21358-6-git-send-email-mark.rutland@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 May 2013 12:59:17 +0100
+Subject: [PATCH v2 4/4] ARM: cacheflush: don't bother rounding to
+ nearest vma
+In-Reply-To: <1369395087-30972-5-git-send-email-will.deacon@arm.com>
+References: <1369395087-30972-1-git-send-email-will.deacon@arm.com>
+ <1369395087-30972-5-git-send-email-will.deacon@arm.com>
+Message-ID: <20130524115917.GY18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <Marc.Zyngier@arm.com>
+On Fri, May 24, 2013 at 12:31:27PM +0100, Will Deacon wrote:
+> do_cache_op finds the lowest VMA contained in the specified address
+> range and rounds the range to cover only the mapped addresses.
+> 
+> Since commit 4542b6a0fa6b ("ARM: 7365/1: drop unused parameter from
+> flush_cache_user_range") the VMA is not used for anything else in this
+> code and seeing as the low-level cache flushing routines return -EFAULT
+> if the address is not valid, there is no need for this range truncation.
+> 
+> This patch removes the VMA handling code from the cacheflushing syscall.
 
-When booting the kernel, a bootloader could have left the virtual
-timer ticking away, potentially generating interrupts. This could
-be troublesome if the user of the virtual timer is not careful
-when enabling the interrupt.
+The only thing which access_ok() tells you is that the addresses are
+_potentially_ valid user addresses.  That's not what the VMA check is
+there for.
 
-In order to avoid any surprise, stop the virtual timer from
-interrupting us when booted in HYP mode, as we'll use the physical
-timer in this case.
-
-Reported-by: Giridhar Maruthy <giridhar.m@samsung.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Dave Martin <dave.martin@linaro.org>
----
- arch/arm/kernel/hyp-stub.S | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
-index dbe2110..4910232 100644
---- a/arch/arm/kernel/hyp-stub.S
-+++ b/arch/arm/kernel/hyp-stub.S
-@@ -155,6 +155,11 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
- 	mcr	p15, 4, r7, c14, c1, 0	@ CNTHCTL
- 	mov	r7, #0
- 	mcrr	p15, 4, r7, r7, c14	@ CNTVOFF
-+
-+	@ Disable virtual timer in case it was counting
-+	mrc	p15, 0, r7, c14, c3, 1	@ CNTV_CTL
-+	bic	r7, #1			@ Clear ENABLE
-+	mcr	p15, 0, r7, c14, c3, 1	@ CNTV_CTL
- 1:
- #endif
- 
--- 
-1.8.1.1
+That check is there to make sure userspace doesn't do something idiotic,
+and to keep the use of this API limited to specific actions such as self
+modifying code, and not a general purpose cache flushing API covering
+multiple VMAs.
