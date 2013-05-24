@@ -1,35 +1,30 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Fri, 24 May 2013 16:29:02 +0200
-Subject: [PATCH] ARM: at91/dt: add pinctrl definition for at91 tc blocks
-In-Reply-To: <519F754F.50908@atmel.com>
-References: <1369389956-30466-1-git-send-email-b.brezillon@overkiz.com>
- <20130524140528.GE24476@game.jcrosoft.org> <519F754F.50908@atmel.com>
-Message-ID: <519F792E.8090109@overkiz.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Fri, 24 May 2013 16:22:31 +0100
+Subject: [PATCH v3] pinctrl: move subsystem mutex to pinctrl_dev struct
+In-Reply-To: <1366988907-13485-1-git-send-email-linus.walleij@stericsson.com>
+References: <1366988907-13485-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <CAAG0J990rqDdG5WdOrVGqZ9tFgJmnmP18S=c6o9JNygTLHS6=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/05/2013 16:12, Nicolas Ferre wrote:
-> On 24/05/2013 16:05, Jean-Christophe PLAGNIOL-VILLARD :
->> On 12:05 Fri 24 May     , Boris BREZILLON wrote:
->>> Hello,
->>>
->>> This patch adds pinctrl configs for at91 Timer Conter blocks.
->>> These pin configs will be referenced by "atmel,tcb-pwm" devices to
->>> setup pins as PWM output.
->>
->> you need to rebase on
->>
->> a cleanup I did preset on our git tag at91-3.11-cleanup
->>
->> As we announce Mandaotory for 3.11
->>
->> as I introduce Macro fro DT
-Ok, I'll base my future dt patches (kizbox.dts) on this tag.
+On 26 April 2013 16:08, Linus Walleij <linus.walleij@stericsson.com> wrote:
+> @@ -608,7 +610,7 @@ static int pinconf_dbg_config_print(struct seq_file *s, void *d)
+>         bool found = false;
+>         unsigned long config;
 >
-> Boris, Hold on.
+> -       mutex_lock(&pinctrl_mutex);
+> +       mutex_lock(&pctldev->mutex);
 >
-> I may have the solution for you. Give me some time and we may have the 
-> automatic generation for updating your patch.
-Ok, thanks.
->
-> Bye,
+>         /* Parse the pinctrl map and look for the elected pin/state */
+>         for_each_maps(maps_node, i, map) {
+
+This change causes an oops on v3.10-rc2 when you read pinconf-config
+because pctldev is initialised to NULL and not set until inside the
+loop. I considered initialising pctldev to s->private, but I'm
+concerned that if pctldev is altered in the loop it could end up
+unlocking a different mutex to the one it locked. If this debugfs file
+isn't meant to be specific to a pinctrl device should it be in the
+root pinctrl directory instead of in each pinctrl device's directory?
+
+Cheers
+James
