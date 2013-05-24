@@ -1,104 +1,39 @@
-From: Mylene.Josserand@navocap.com (Mylene Josserand)
-Date: Fri, 24 May 2013 10:54:11 +0200
-Subject: [I2C] informations + advice about messages handling
-In-Reply-To: <20130524094407.61d0ec42@endymion.delvare>
-References: <CA78C307B8F06747967D122FC656B153986448@SERVEUR0.nvp.local>
- <CAK7N6vpg6QUAKODKO2Msr4+GTASLDpA2cG1teQV3yiwt7D4SSw@mail.gmail.com>
- <20130524094407.61d0ec42@endymion.delvare>
-Message-ID: <CA78C307B8F06747967D122FC656B15398644A@SERVEUR0.nvp.local>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 24 May 2013 09:54:51 +0100
+Subject: [PATCH 0/6] ARM: ux500: Update configurations for SD/SDIO/(e)MMC
+In-Reply-To: <1369314830-3727-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1369314830-3727-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <20130524085451.GU22683@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks, both of you, for your answers ! It helps me a lot to understand it !
+On Thu, 23 May 2013, Ulf Hansson wrote:
 
-Le 24/05/2013 09:22, anish singh a ?crit :
- > On Fri, May 24, 2013 at 12:41 PM, Mylene Josserand
- > <Mylene.Josserand@navocap.com>  wrote:
- >> Hi all,
- >>
- >>
- >> I am learning how i2c is working and I read that, to write in an i2c
- >> register, I need to use the function "i2c_smbus_write_byte_data".
- > Only in case your device is smbus compliant.
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+> 
+> This patchset includes especially enablement for UHS-I SD cards, but
+> also some cleanups and additional enabling of SD/SDIO/(e)MMC features.
+> 
+> These changes shall also be adapted to the corresponding DT files,
+> but that is left as a separate task and outside this patchset.
+> 
+> Ulf Hansson (6):
+>   ARM: ux500: Enable 100MHz for SD/SDIO/MMC devices
+>   ARM: ux500: Don't set plf ocr mask for SD/MMC device
+>   ARM: ux500: Enable support for RPMB and Reliable Write for eMMC
+>   ARM: ux500: Enable support for discard for MMC/SD
+>   ARM: ux500: Set eMMC and WLAN card slot as non-removable
+>   ARM: ux500: Enable support for UHS-I SD-cards
+> 
+>  arch/arm/mach-ux500/board-mop500-sdi.c |   34 +++++++++++++++++++++-----------
+>  1 file changed, 22 insertions(+), 12 deletions(-)
+> 
 
-Ah okay ! And if there are not SMBus compliant, what function I will 
-have to use ?
-What is it doing if I use this function and that my device is not SMbus 
-compliant ? I have some difficulties to understand the differences 
-between SMbus and I2C :(
-
-
-Le 24/05/2013 09:44, Jean Delvare a ?crit :
- > Hi Anish, Myl?ne,
- >
- > On Fri, 24 May 2013 12:52:40 +0530, anish singh wrote:
- >> On Fri, May 24, 2013 at 12:41 PM, Mylene Josserand
- >> <Mylene.Josserand@navocap.com>  wrote:
- >>> I have read that this function "i2c_smbus_write_byte_data" uses
- >>> "i2c_smbus_xfer" which uses "i2c_lock_adapter".
- >>> In this function, there is a mutex so I thought that it will handle it
- >>> but it says "Get exclusive access to an I2C bus segment". What is
- >>> exactly an I2C segment ? Is it the device we are talking about ? Or is
- >>> it the use of the i2c bus ?
- >> Don't know what you are referring here.
- >
- > In the most simple case, your I2C bus has a single segment so "segment"
- > or "bus" mean the same thing.
- >
- > It only starts mattering when I2C bus multiplexing comes into play.
- > Then your bus is split into segments, with one segment (trunk) between
- > the master (controller) and the multiplexer, and one or more segments
- > (branches) hanging off the multiplexer.
- >
- > Take look at
- > https://i2c.wiki.kernel.org/index.php/I2C_bus_multiplexing
- > for a sample topology.
- >
- > But anyway the comment in front of i2c_lock_adapter() is somewhat
- > misleading. If you read the code you'll see that it always locks the
- > whole bus tree, because it uses the root segment's mutex.
-
-
-Thanks ! I understand now.
-In my case, I have 2 segments but if I understand, the bus will not be 
-used at the same time.
-
-
- >>> I will certainly have to create an i2c driver and I would like to know
- >>> if this "collision" handling (if it is handled) is done in old kernel
- >>> (2.6.32) or is it handled only in new kernel versions ?
- >> AFAIK collision handling and detection was not supported till now
- >> in linux kernel until recently but I think this patch is doing that.
- >> I may be wrong but I didn't see collision handling in earlier linux
- >> kernels.
- >> http://thread.gmane.org/gmane.linux.kernel/1410276
- >
- > This is for a specific case. The general case is handled by the
- > per-adapter mutex for years now. 2.6.32 should be just fine in this
- > respect.
-
-Okay. So the mutex blocks the I2C bus. And is it locking the bus at the 
-beginning of a message (so when a START is send) and unlocking it after 
-the STOP ?
-So a complete message will be sent to a same device (the one which 
-address is in the data frame) ? A device can not receive a beginning of 
-one message (so with his address) and the end of another message 
-destined to another device [because of "collision"], for example ?
-
-
- >>> If you have any documentation on how the i2c messages are handled in
- >>> case of different devices uses, it will help me a lot ! I will 
-search in
- >>> the kernel documentation but there is many files about i2c.
- >>> And if you know a good i2c driver that I can use as an example to 
-design
- >>> mine, it will be great !
- >
- > Best is to look at a driver for a device which is similar in
- > functionality to yours.
-
-I will search that, thanks for the advice.
-
+All patches look good to me, although you should probably try to use
+the full 72 char limit per line in all of your commit messages.
 
 -- 
-Myl?ne JOSSERAND
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
