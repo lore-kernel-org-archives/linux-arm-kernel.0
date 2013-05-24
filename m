@@ -1,159 +1,120 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 24 May 2013 14:33:10 -0400
-Subject: [PATCH 00/21] ARM: kirkwood: improve pinmux configs in Device Tree
-In-Reply-To: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130524183310.GA31290@titan.lakedaemon.net>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Fri, 24 May 2013 13:56:55 -0500
+Subject: [PATCH v6] ARM:dts:omap4-panda: Update the LED support for the
+ panda DTS
+In-Reply-To: <5196580D.1070209@ti.com>
+References: <1368806552-8851-1-git-send-email-dmurphy@ti.com>
+ <20130517161525.GA30014@kahuna> <5196580D.1070209@ti.com>
+Message-ID: <519FB7F7.7080009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 11:44:37AM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> This series of patches has the goal of adding support for the Init
-> button on OpenBlocks A6, but takes this opportunity to do a little bit
-> of cleanup in the pinmux configurations of the various Kirkwood Device
-> Trees.
-> 
-> Until now, all pinmux configurations were "owned" by the pinctrl
-> driver, because back when they were introduced, the driver core was
-> not selecting the pinmux configuration, each driver had to do it
-> manually (and not all drivers were doing so). Now that the driver core
-> selects the default pinmux configuration when available, it makes
-> sense to associate the pinmux configuration to the particular device
-> it is related to.
-> 
-> It allows pinctrl to show nice informations in debugfs, which
-> associates a particular pin with the particular device using it:
-> 
-> # cat pinctrl/f1010000.pinctrl/pinmux-pins 
-> Pinmux settings per pin
-> Format: pin (name): mux_owner gpio_owner hog?
-> pin 0 (PIN0): f4000000.nand (GPIO UNCLAIMED) function nand group mpp0
-> pin 1 (PIN1): f4000000.nand (GPIO UNCLAIMED) function nand group mpp1
-> pin 2 (PIN2): f4000000.nand (GPIO UNCLAIMED) function nand group mpp2
-> pin 3 (PIN3): f4000000.nand (GPIO UNCLAIMED) function nand group mpp3
-> pin 4 (PIN4): f4000000.nand (GPIO UNCLAIMED) function nand group mpp4
-> pin 5 (PIN5): f4000000.nand (GPIO UNCLAIMED) function nand group mpp5
-> pin 6 (PIN6): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 7 (PIN7): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 8 (PIN8): f1012100.serial (GPIO UNCLAIMED) function uart1 group mpp8
-> pin 9 (PIN9): f1012100.serial (GPIO UNCLAIMED) function uart1 group mpp9
-> pin 10 (PIN10): f1012000.serial (GPIO UNCLAIMED) function uart0 group mpp10
-> pin 11 (PIN11): f1012000.serial (GPIO UNCLAIMED) function uart0 group mpp11
-> pin 12 (PIN12): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 13 (PIN13): f1012100.serial (GPIO UNCLAIMED) function uart1 group mpp13
-> pin 14 (PIN14): f1012100.serial (GPIO UNCLAIMED) function uart1 group mpp14
-> pin 15 (PIN15): f1012000.serial (GPIO UNCLAIMED) function uart0 group mpp15
-> pin 16 (PIN16): f1012000.serial (GPIO UNCLAIMED) function uart0 group mpp16
-> pin 17 (PIN17): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 18 (PIN18): f4000000.nand (GPIO UNCLAIMED) function nand group mpp18
-> pin 19 (PIN19): f4000000.nand (GPIO UNCLAIMED) function nand group mpp19
-> pin 20 (PIN20): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp20
-> pin 21 (PIN21): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp21
-> pin 22 (PIN22): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp22
-> pin 23 (PIN23): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp23
-> pin 24 (PIN24): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp24
-> pin 25 (PIN25): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp25
-> pin 26 (PIN26): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp26
-> pin 27 (PIN27): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp27
-> pin 28 (PIN28): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp28
-> pin 29 (PIN29): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp29
-> pin 30 (PIN30): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp30
-> pin 31 (PIN31): f1010000.pinctrl (GPIO UNCLAIMED) (HOG) function gpio group mpp31
-> pin 32 (PIN32): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 33 (PIN33): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 34 (PIN34): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 35 (PIN35): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 36 (PIN36): f1011100.i2c (GPIO UNCLAIMED) function twsi1 group mpp36
-> pin 37 (PIN37): f1011100.i2c (GPIO UNCLAIMED) function twsi1 group mpp37
-> pin 38 (PIN38): gpio_keys.2 mvebu-gpio:38 function gpio group mpp38
-> pin 39 (PIN39): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 40 (PIN40): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 41 (PIN41): gpio-leds.1 mvebu-gpio:41 function gpio group mpp41
-> pin 42 (PIN42): gpio-leds.1 mvebu-gpio:42 function gpio group mpp42
-> pin 43 (PIN43): gpio-leds.1 mvebu-gpio:43 function gpio group mpp43
-> pin 44 (PIN44): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 45 (PIN45): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 46 (PIN46): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 47 (PIN47): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 48 (PIN48): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> pin 49 (PIN49): (MUX UNCLAIMED) (GPIO UNCLAIMED)
-> 
-> Without this patch set, all pins appear to be owned by
-> "f1010000.pinctrl".
-> 
-> Even though GPIO muxing is automatically done when a device driver
-> requests a GPIO, Andrew Lunn and I had agreed to make the pinmuxing
-> explicit, in order to have correct informations in debugfs. See our
-> discussion at
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-March/158190.html.
-> 
-> The last patch finally adds support for the init button of the
-> Plathome OpenBlocks A6 platform.
-> 
-> Best regards,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (21):
->   arm: kirkwood: cloudbox: affect pinmux configs to the right devices
->   arm: kirkwood: dlink dns: affect pinmux configs to the right devices
->   arm: kirkwood: dockstar: affect pinmux configs to the right devices
->   arm: kirkwood: dreamplug: affect pinmux configs to the right devices
->   arm: kirkwood: goflexnet: affect pinmux configs to the right devices
->   arm: kirkwood: guruplug: affect pinmux configs to the right devices
->   arm: kirkwood: ib62x0: affect pinmux configs to the right devices
->   arm: kirkwood: iconnect: give meaningful names to pinmux configs
->   arm: kirkwood: iconnect: affect pinmux configs to the right devices
->   arm: kirkwood: iomega ix2-200: affect pinmux configs to the right
->     devices
->   arm: kirkwood: ns2: affect pinmux configs to the right devices
->   arm: kirkwood: keymile: affect pinmux configs to the right devices
->   arm: kirkwood: buffalo linkstation: affect pinmux configs to the
->     right devices
->   arm: kirkwood: mplcec4: affect pinmux configs to the right devices
->   arm: kirkwood: readynas: affect pinmux configs to the right devices
->   arm: kirkwood: nsa310: affect pinmux configs to the right devices
->   arm: kirkwood: openblocks_a6: affect pinmux configs to the right
->     devices
->   arm: kirkwood: topkick: affect pinmux configs to the right devices
->   arm: kirkwood: ts219: affect pinmux configs to the right devices
->   arm: kirkwood: openblocks-a6: group pinmux configurations
->   arm: kirkwood: openblocks-a6: add support for Init button
-> 
->  arch/arm/boot/dts/kirkwood-cloudbox.dts            |   10 +-
->  arch/arm/boot/dts/kirkwood-dns320.dts              |    7 ++
->  arch/arm/boot/dts/kirkwood-dns325.dts              |    5 +
->  arch/arm/boot/dts/kirkwood-dnskw.dtsi              |   32 +++---
->  arch/arm/boot/dts/kirkwood-dockstar.dts            |    9 +-
->  arch/arm/boot/dts/kirkwood-dreamplug.dts           |   11 +-
->  arch/arm/boot/dts/kirkwood-goflexnet.dts           |   18 ++--
->  .../arm/boot/dts/kirkwood-guruplug-server-plus.dts |    8 +-
->  arch/arm/boot/dts/kirkwood-ib62x0.dts              |   17 +--
->  arch/arm/boot/dts/kirkwood-iconnect.dts            |   36 +++----
->  arch/arm/boot/dts/kirkwood-iomega_ix2_200.dts      |   15 +--
->  arch/arm/boot/dts/kirkwood-is2.dts                 |    2 +
->  arch/arm/boot/dts/kirkwood-km_kirkwood.dts         |    6 +-
->  arch/arm/boot/dts/kirkwood-lsxl.dtsi               |   22 ++--
->  arch/arm/boot/dts/kirkwood-mplcec4.dts             |   23 +++--
->  .../boot/dts/kirkwood-netgear_readynas_duo_v2.dts  |   22 ++--
->  arch/arm/boot/dts/kirkwood-ns2-common.dtsi         |   10 +-
->  arch/arm/boot/dts/kirkwood-ns2.dts                 |    2 +
->  arch/arm/boot/dts/kirkwood-ns2lite.dts             |    2 +
->  arch/arm/boot/dts/kirkwood-ns2max.dts              |    2 +
->  arch/arm/boot/dts/kirkwood-ns2mini.dts             |    2 +
->  arch/arm/boot/dts/kirkwood-nsa310.dts              |   29 +++---
->  arch/arm/boot/dts/kirkwood-openblocks_a6.dts       |  108 ++++++--------------
->  arch/arm/boot/dts/kirkwood-topkick.dts             |   51 ++++-----
->  arch/arm/boot/dts/kirkwood-ts219-6281.dts          |    8 +-
->  arch/arm/boot/dts/kirkwood-ts219-6282.dts          |    8 +-
->  arch/arm/boot/dts/kirkwood-ts219.dtsi              |   10 ++
->  27 files changed, 235 insertions(+), 240 deletions(-)
+On 05/17/2013 11:17 AM, Dan Murphy wrote:
+> On 05/17/2013 11:15 AM, Nishanth Menon wrote:
+>> On 11:02-20130517, Dan Murphy wrote:
+>>> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+>>> are different.
+>>>
+>>> A1-A3 = gpio_wk7
+>>> ES = gpio_110
+>>>
+>>> There is no change to LED D2
+>>>
+>>> Abstract away the pinmux and the LED definitions for the two boards into
+>>> the respective DTS files.
+>>>
+>>> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+>>> ---
+>>> Changes in this version:
+>>> 	- review comments incorporated.
+>>> Previous version of this patch was discussed in:
+>>> 	https://patchwork.kernel.org/patch/2582771/
+>> one minor nit,
+>> $subject could do with space after the ':'
+>> otherwise, it looks fine to me. Will suggest waiting for further
+>> reviewers if they have an opinion prior to a new rev.
+> Thanks NM I will queue up this change locally and await further review prior to sending v7.
+>
+>>>  arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++++++-
+>>>  arch/arm/boot/dts/omap4-panda-es.dts      |   28 ++++++++++++++++++++++++++++
+>>>  2 files changed, 43 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>> index 03bd60d..5fd59b3 100644
+>>> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+>>> @@ -16,8 +16,13 @@
+>>>  		reg = <0x80000000 0x40000000>; /* 1 GB */
+>>>  	};
+>>>  
+>>> -	leds {
+>>> +	leds: leds {
+>>>  		compatible = "gpio-leds";
+>>> +		pinctrl-names = "default";
+>>> +		pinctrl-0 = <
+>>> +			&led_wkgpio_pins
+>>> +		>;
+>>> +
+>>>  		heartbeat {
+>>>  			label = "pandaboard::status1";
+>>>  			gpios = <&gpio1 7 0>;
+>>> @@ -137,6 +142,15 @@
+>>>  	};
+>>>  };
+>>>  
+>>> +&omap4_pmx_wkup {
+>>> +	led_wkgpio_pins: pinmux_leds_wkpins {
+>>> +		pinctrl-single,pins = <
+>>> +			0x1a 0x3	/* gpio_wk7 OUTPUT | MODE 3 */
+>>> +			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
+>>> +		>;
+>>> +	};
+>>> +};
+>>> +
+>>>  &i2c1 {
+>>>  	pinctrl-names = "default";
+>>>  	pinctrl-0 = <&i2c1_pins>;
+>>> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+>>> index f1d8c21..c968a3b 100644
+>>> --- a/arch/arm/boot/dts/omap4-panda-es.dts
+>>> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
+>>> @@ -34,3 +34,31 @@
+>>>  		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
+>>>  		>;
+>>>  };
+>>> +
+>>> +&omap4_pmx_core {
+>>> +	led_gpio_pins: gpio_led_pmx {
+>>> +		pinctrl-single,pins = <
+>>> +			0xb6 0x3	/* gpio_110 OUTPUT | MODE 3 */
+>>> +		>;
+>>> +	};
+>>> +};
+>>> +
+>>> +&led_wkgpio_pins {
+>>> +	pinctrl-single,pins = <
+>>> +		0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
+>>> +	>;
+>>> +};
+>>> +
+>>> +&leds {
+>>> +	pinctrl-0 = <
+>>> +		&led_gpio_pins
+>>> +		&led_wkgpio_pins
+>>> +	>;
+>>> +
+>>> +	heartbeat {
+>>> +		gpios = <&gpio4 14 0>;
+>>> +	};
+>>> +	mmc {
+>>> +		gpios = <&gpio1 8 0>;
+>>> +	};
+>>> +};
+>
+Any additional comments besides the headline?
 
-Whole series applied to mvebu/dt with one small change, s/affect/move/
-on the Subjects.
+If not I will post v7
 
-thx,
-
-Jason.
+-- 
+------------------
+Dan Murphy
