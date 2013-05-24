@@ -1,71 +1,62 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 24 May 2013 09:19:56 +0200
-Subject: [PATCH V2 1/6] drivers: bus: add a new driver for WEIM
-In-Reply-To: <519F13E5.2040701@freescale.com>
-References: <1369296978-7669-1-git-send-email-b32955@freescale.com>
- <201305231153.38111.arnd@arndb.de>
- <20130523115505.GG32299@pengutronix.de>
- <201305231509.57651.arnd@arndb.de> <519F13E5.2040701@freescale.com>
-Message-ID: <20130524071956.GY32299@pengutronix.de>
+From: anish198519851985@gmail.com (anish singh)
+Date: Fri, 24 May 2013 12:52:40 +0530
+Subject: [I2C] informations + advice about messages handling
+In-Reply-To: <CA78C307B8F06747967D122FC656B153986448@SERVEUR0.nvp.local>
+References: <CA78C307B8F06747967D122FC656B153986448@SERVEUR0.nvp.local>
+Message-ID: <CAK7N6vpg6QUAKODKO2Msr4+GTASLDpA2cG1teQV3yiwt7D4SSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 03:16:53PM +0800, Huang Shijie wrote:
-> ? 2013?05?23? 21:09, Arnd Bergmann ??:
-> >OTOH, I agree that it would be nicer if the clk could remain turned
-> >off as long as no children are active. Can we do a clk_disable()
-> >after setting up the timings for the children and then expect those
-> >to actually start up the clk again when they need it?
-> >
-> >Or to take things further: would it make sense to represent WEIM
-> >itself as a clock driver and perform the settings for each child
-> >only when it sets up its own clk?
-> >
-> If the child's subsystem supports it, we can do it.
-> 
-> The mtd nand does support this feature, it has @select_chip() hook.
-> We can enable/disable the clock in the @select_chip().
-> 
-> But the mtd NOR does _not_ supports it.
-> Please read the /drivers/mtd/maps/physmap_of.c and
-> /drivers/mtd/chips/cfi_cmd_set_xxx.c.
-> Of course, we can add the feature to NOR subsystem. But that's
-> another issue.
-> 
-> So the weim should enable the clock all the time now.
+On Fri, May 24, 2013 at 12:41 PM, Mylene Josserand
+<Mylene.Josserand@navocap.com> wrote:
+> Hi all,
+>
+>
+> I am learning how i2c is working and I read that, to write in an i2c
+> register, I need to use the function "i2c_smbus_write_byte_data".
+Only in case your device is smbus compliant.
 
-Personally I'm fine with this, but you should not disable the clock when
-the children are active, so either make sure
-
-- the WEIM driver can't be unloaded, or
-- the WEIM driver unregisters its children, or
-- just leave the clock enabled.
-
-> ------------------------------------------------------------------------------------------
-> 
-> The system hang at :
-> +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> 
-> ## Booting kernel from Legacy Image at 10800000 ...
->    Image Name:   Linux
->    Image Type:   ARM Linux Kernel Image (uncompressed)
->    Data Size:    4259851 Bytes =  4.1 MB
->    Load Address: 10008000
->    Entry Point:  10008000
->    Verifying Checksum ... OK
->    Loading Kernel Image ... OK
-> OK
-> 
-> Starting kernel ...
-> ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++==
-
-Use EARLY_PRINTK or move your driver init to a late_initcall to make it
-initialize after the console.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> I wanted to know how the message are handled by using this function. If
+> I use this function to talk with 2 different i2d devices, how it will
+> handle "message collision" ? should I have to add a kind of mutex on the
+Message collision and detection is the job of i2c controller and if I am
+not wrong you are writing a chip driver.
+> access of the i2c bus ?
+> Is it possible that the message destined for one device is sent to
+> another one ? Or a "mix" of messages is impossible ?
+It is not possible as the data contains the chip address which is
+unique.7/10 bit mode addressing is used for addresses.
+>
+> I have read that this function "i2c_smbus_write_byte_data" uses
+> "i2c_smbus_xfer" which uses "i2c_lock_adapter".
+> In this function, there is a mutex so I thought that it will handle it
+> but it says "Get exclusive access to an I2C bus segment". What is
+> exactly an I2C segment ? Is it the device we are talking about ? Or is
+> it the use of the i2c bus ?
+Don't know what you are referring here.
+>
+> I will certainly have to create an i2c driver and I would like to know
+> if this "collision" handling (if it is handled) is done in old kernel
+> (2.6.32) or is it handled only in new kernel versions ?
+AFAIK collision handling and detection was not supported till now
+in linux kernel until recently but I think this patch is doing that.
+I may be wrong but I didn't see collision handling in earlier linux
+kernels.
+http://thread.gmane.org/gmane.linux.kernel/1410276
+>
+> If you have any documentation on how the i2c messages are handled in
+> case of different devices uses, it will help me a lot ! I will search in
+> the kernel documentation but there is many files about i2c.
+> And if you know a good i2c driver that I can use as an example to design
+> mine, it will be great !
+>
+>
+> Thank you in advance,
+>
+> --
+> Myl?ne JOSSERAND
+>
+> _______________________________________________
+> Kernelnewbies mailing list
+> Kernelnewbies at kernelnewbies.org
+> http://lists.kernelnewbies.org/mailman/listinfo/kernelnewbies
