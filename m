@@ -1,62 +1,52 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 24 May 2013 14:35:42 +0200 (CEST)
-Subject: LVDS (LDB) driver for i.MX53 IPU
-In-Reply-To: <20130310223241.GQ1906@pengutronix.de>
-References: <5134DF0E.7010402@parkeon.com>
- <20130310223241.GQ1906@pengutronix.de>
-Message-ID: <Pine.LNX.4.64.1305241431460.2226@axis700.grange>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 24 May 2013 14:37:24 +0200
+Subject: [GIT PULL] arm-soc: Xilinx zynq core - smp for v3.10
+In-Reply-To: <20130524123132.GA13111@n2100.arm.linux.org.uk>
+References: <890ef3b8-f536-4b00-9bd8-5ea50de3bf51@DB8EHSMHS032.ehs.local>
+ <20130524112610.GX18614@n2100.arm.linux.org.uk>
+ <744356bb-78fa-4592-97ef-0709fe65dbee@CH1EHSMHS025.ehs.local>
+ <20130524123105.GZ18614@n2100.arm.linux.org.uk>
+ <20130524123132.GA13111@n2100.arm.linux.org.uk>
+Message-ID: <519F5F04.3030400@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha
-
-On Sun, 10 Mar 2013, Sascha Hauer wrote:
-
-> Hi Martin,
+On 05/24/2013 02:31 PM, Russell King - ARM Linux wrote:
+> On Fri, May 24, 2013 at 01:31:05PM +0100, Russell King - ARM Linux wrote:
+>> On Fri, May 24, 2013 at 02:10:32PM +0200, Michal Simek wrote:
+>>> Hi Russell,
+>>>
+>>> On 05/24/2013 01:26 PM, Russell King - ARM Linux wrote:
+>>>> You might want to resolve this new warning:
+>>>>
+>>>> arch/arm/mach-zynq/hotplug.c:1:0: warning: switch -mcpu=cortex-a9 conflicts with -march= switch
+>>>>
+>>>> found by lastnights OMAP4430 randconfig build.
+>>>
+>>> Do you have that randconfig file?
+>>> And can you please point me to the repo which is is used for this build?
+>>
+>> Everything which is public is at:
+>>
+>> http://www.home.arm.linux.org.uk/developer/build/
 > 
-> On Mon, Mar 04, 2013 at 06:51:10PM +0100, Martin Fuzzey wrote:
-> > Hi Sascha,
-> > 
-> > I need to add LVDS support to your staging imx/drm driver.
-> > 
-> > First of all are there any patches floating around to do that? (a
-> > search of the mailing list didn't turn up any).
-> > 
-> > From a hardware point of view it looks quite simple (just one
-> > register to configure) but unfortunately that register is in the
-> > IOMUXC region.
-> > 
-> > That means that if I write a new platform driver similar to
-> > drivers/staging/imx-drm/parallel-display.c (with a new DT node
-> > pointing to the reg) the request_resource() will fail since it will
-> > already be claimed by the iomuxc driver.
-> > 
-> > The only solutions I can think of are:
-> > 1) Add exported function to the iomuxc driver to get the register
-> > or
-> > 2) Directly ioremap() the address
-> > 
-> > Both of these sound horrible.
-> > 
-> > Do you have any suggestions?
-> > 
-> > I guess the generic question I'm asking is how to handle the case
-> > where unrelated drivers require access to the same memory regions?
-> 
-> We have a driver for the ldb. Indeed the driver itself is trivial, but
-> the integration is tricky. For accessing the register the syscon binding
-> can be used. The clock is also a problem, also the mux to the IPU(s)
-> 
-> I'll talk with Philipp tomorrow and I think we can send you the current
-> state then.
+> Err, drop the .home bit out of that.
 
-How's it looking in the meantime? Any plans to mainline it? Or would you 
-be prepared to publish what you've got to try and see whether others can 
-help you with this?
+Thanks that's everything what I need.
+Michal
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130524/60daf3ee/attachment.sig>
