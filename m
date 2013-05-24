@@ -1,63 +1,72 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Fri, 24 May 2013 14:20:17 +0200
-Subject: [I2C] informations + advice about messages handling
-In-Reply-To: <CA78C307B8F06747967D122FC656B15398644B@SERVEUR0.nvp.local>
-References: <CA78C307B8F06747967D122FC656B153986448@SERVEUR0.nvp.local>
- <CAK7N6vpg6QUAKODKO2Msr4+GTASLDpA2cG1teQV3yiwt7D4SSw@mail.gmail.com>
- <20130524094407.61d0ec42@endymion.delvare>
- <CA78C307B8F06747967D122FC656B15398644A@SERVEUR0.nvp.local>
- <20130524110706.6052493e@endymion.delvare>
- <CA78C307B8F06747967D122FC656B15398644B@SERVEUR0.nvp.local>
-Message-ID: <20130524142017.52545a52@endymion.delvare>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 24 May 2013 21:24:26 +0900
+Subject: [PATCH v4 15/21] ARM: shmobile: armadillo-reference: Move st1232
+ reset GPIO to DT
+In-Reply-To: <CACRpkdYUQjtmzFzQBES-bcjjT5iTTXifa2BQSusBzMdTCRtyiA@mail.gmail.com>
+References: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1369138482-5871-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CACRpkdYUQjtmzFzQBES-bcjjT5iTTXifa2BQSusBzMdTCRtyiA@mail.gmail.com>
+Message-ID: <CANqRtoTVjBcsKVP=2jJ7ThC0gXuF-Xd-iByo7db53YhK1x+-wA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 May 2013 11:52:54 +0200, Mylene Josserand wrote:
-> Right now, my company uses the "i2c_smbus_read/write_byte_data" 
-> functions to talk to devices through an application. On the datasheet of 
-> these devices, I search but did not seem to be SMBus compliant.
-> As it was a software which was using these functions, we thought that a 
-> driver (that I would write) should be better. And here I am ! I prefer 
-> to understand well the mechanism before coding anything and it is 
-> interesting !
+Hi Linus,
 
-If the application was using i2c_smbus_read/write_byte_data from
-user-space, then a kernel driver would call the same functions. No
-reason why this wouldn't work.
+On Fri, May 24, 2013 at 5:59 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, May 21, 2013 at 2:14 PM, Laurent Pinchart
+> <laurent.pinchart+renesas@ideasonboard.com> wrote:
+>
+>> Reference the st1232 reset GPIO from the device tree and remove it from
+>> board code.
+>>
+>> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+>
+>> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+>> @@ -43,6 +43,7 @@
+>>                 interrupts = <2 0>; /* IRQ10: hwirq 2 on irqpin1 */
+>>                 pinctrl-0 = <&st1232_pins>;
+>>                 pinctrl-names = "default";
+>> +               gpios = <&pfc 166 1>;
+>
+> Just as a random example this becomes:
+>
+> gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
+>
+> Which is WAAAY more readable.
 
-> (...)
-> Thanks for the explanation.
-> No problem, we have 2 devices used without drivers :
-> - an odometer PIC18F24201 : In the datasheet, there is a SMBus select 
-> bit but I don't know if it is SMBus compliant.
+Yes, agreed, even grumpy me starts thinking this looks good. =)
 
-Couldn't find the datasheet for this one, unfortunately.
+>> +++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+>> @@ -158,7 +158,6 @@ clock_error:
+>>   */
+>>  static void __init eva_init(void)
+>>  {
+>> -
+>>         r8a7740_clock_init(MD_CK0 | MD_CK2);
+>>         eva_clock_init();
+>>
+>> @@ -171,12 +170,6 @@ static void __init eva_init(void)
+>>
+>>         r8a7740_add_standard_devices_dt();
+>>
+>> -       /*
+>> -        * Touchscreen
+>> -        * TODO: Move reset GPIO over to .dts when we can reference it
+>> -        */
+>> -       gpio_request_one(166, GPIOF_OUT_INIT_HIGH, NULL); /* TP_RST_B */
+>> -
+>
+> Not really my business but I guess the driver is already augmented to pick its
+> GPIO from the device tree in this case? And are you willingly breaking
+> non-DT boots or something?
 
-> - an audio codec tlv320aic3204 : There is a driver for this device but 
-> for some reasons, we did not use it. Did not find a "SMBus compliant" in 
-> its datasheet.
+Regarding dependency handing of driver and board code, I believe
+Laurent has us covered.
 
-The tlv320aic32x4 driver uses i2c_master_send, which is a shortcut to
-i2c_transfer. However it seems to only send 2 bytes on the bus at once,
-the same could be achieved with i2c_smbus_write_byte_data if needed.
+As for breaking non-DT boot, under mach-shmobile the code for DT
+"-reference" board support is DT only so judging by the file name this
+kind of change should be fine.
 
-For completeness: a device might use transactions which are compliant
-with SMBus without being formally "SMBus-compliant", because SMBus has
-more constraints than just transaction types (I kept things simple
-originally to not confuse you.) This may explain why it isn't mentioned
-in the datasheet. Or just because the manufacturer did not care because
-they target fully I2C-capable systems anyway.
+Thanks,
 
-What you have to look at is the transaction types. They are usually
-described in the datasheet. Then compare with either the SMBus
-specification or
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/i2c/smbus-protocol
-and if they match then you can use the i2c_smbus_*() calls.
-
-> (...)
-> Thanks a lot for your help !
-
-You're welcome.
-
--- 
-Jean Delvare
+/ magnus
