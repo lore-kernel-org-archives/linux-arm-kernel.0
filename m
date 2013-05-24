@@ -1,28 +1,72 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 May 2013 08:27:52 +0200
-Subject: [PATCH 0/6] crypto: ux500/[cryp|hash] - Enable Device Tree
-In-Reply-To: <1368703646-26418-1-git-send-email-lee.jones@linaro.org>
-References: <1368703646-26418-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdapJ4Y0fxHa_j0WaOtWEom3y+bv2aA3qVBnLBjHsB2tOA@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 24 May 2013 08:48:42 +0200
+Subject: [PATCH] ARM: ux500: enable the crypto and hash on all dbx500
+Message-ID: <1369378122-25897-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 16, 2013 at 1:27 PM, Lee Jones <lee.jones@linaro.org> wrote:
+From: Linus Walleij <linus.walleij@linaro.org>
 
-> This patch-set simply allows ux500-[cryp|hash] drivers to be probed
-> when Snowball is running with Device Tree enabled.
->
-> Linus,
->
-> Feel free to split the DTS changes out into your ux500-devicetree branch.
+Commits:
+"ARM: ux500: Add Device Tree nodes for the ux500 Crypt device"
+"ARM: ux500: Add Device Tree nodes for the ux500 Hash device"
 
-I have tentatively applied 1, 2, 3 & 4 to my device tree branch.
+Added the crypto and hash devices conditionally, i.e. so as to
+be turned on per-board by setting an "status" property on the
+device from "disabled" to "okay" on each device.
 
-5 & 6 need bindings and ACKs.
+This is wrong since this is an SoC feature, it is not board
+dependent. It is the same ASIC under all circumstances and
+functionality does not vary with board family.
 
-I can merge them through the ux500 devicetree branch as well I
-think, they "should" be orthogonal to other (DMA-related) changes
-AFAICT.
+This moves the enablement into the SoC file.
 
-Yours,
-Linus Walleij
+Cc: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/dbx5x0.dtsi  | 4 ----
+ arch/arm/boot/dts/snowball.dts | 8 --------
+ 2 files changed, 12 deletions(-)
+
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index f051963..cd5cd09 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -760,17 +760,13 @@
+ 			compatible = "stericsson,ux500-cryp";
+ 			reg = <0xa03cb000 0x1000>;
+ 			interrupts = <0 15 0x4>;
+-
+ 			v-ape-supply = <&db8500_vape_reg>;
+-			status = "disabled";
+ 		};
+ 
+ 		hash at a03c2000 {
+ 			compatible = "stericsson,ux500-hash";
+ 			reg = <0xa03c2000 0x1000>;
+-
+ 			v-ape-supply = <&db8500_vape_reg>;
+-			status = "disabled";
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index bda002f..e8219cc7 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -356,13 +356,5 @@
+ 				};
+ 			};
+ 		};
+-
+-		cryp at a03cb000 {
+-			status = "okay";
+-		};
+-
+-		hash at a03c2000 {
+-			status = "okay";
+-		};
+ 	};
+ };
+-- 
+1.7.11.3
