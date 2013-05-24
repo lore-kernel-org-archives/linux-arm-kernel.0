@@ -1,43 +1,45 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 24 May 2013 10:51:50 +0200
-Subject: [PATCH] at91: sama5: fix incorrect PMC pcr div definition
-In-Reply-To: <1369304328-11442-1-git-send-email-josh.wu@atmel.com>
-References: <1369304328-11442-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <519F2A26.3080907@atmel.com>
+Date: Fri, 24 May 2013 10:52:31 +0200
+Subject: [PATCH] ARM: at91/dt: fix macb pinctrl_macb_rmii_mii_alt
+ definition
+In-Reply-To: <1369324881-31428-1-git-send-email-b.brezillon@overkiz.com>
+References: <1369324881-31428-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <519F2A4F.8080008@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/2013 12:18, Josh Wu :
+On 23/05/2013 18:01, Boris BREZILLON :
+> The PA24 pin is wrongly assigned to peripheral B.
+> In the current config there is 2 ETX3 pins (PA11 and PA24) and
+> no ETXER pin (PA22).
 >
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+
+Nice catch!
 
 Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-And stacked on top of at91-3.10-fixes.
+and stacked on at91-3.10-fixes and add the stable tag #3.8+
 
-Thanks for catching this! Bye.
+Thanks, bye.
 
 > ---
->   arch/arm/mach-at91/include/mach/at91_pmc.h |    6 +++---
->   1 file changed, 3 insertions(+), 3 deletions(-)
+>   arch/arm/boot/dts/at91sam9260.dtsi |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/arch/arm/mach-at91/include/mach/at91_pmc.h b/arch/arm/mach-at91/include/mach/at91_pmc.h
-> index 31df120..2bd7f51 100644
-> --- a/arch/arm/mach-at91/include/mach/at91_pmc.h
-> +++ b/arch/arm/mach-at91/include/mach/at91_pmc.h
-> @@ -179,9 +179,9 @@ extern void __iomem *at91_pmc_base;
->   #define		AT91_PMC_PCR_CMD	(0x1  <<  12)		/* Command (read=0, write=1) */
->   #define		AT91_PMC_PCR_DIV(n)	((n)  <<  16)		/* Divisor Value */
->   #define			AT91_PMC_PCR_DIV0	0x0			/* Peripheral clock is MCK */
-> -#define			AT91_PMC_PCR_DIV2	0x2			/* Peripheral clock is MCK/2 */
-> -#define			AT91_PMC_PCR_DIV4	0x4			/* Peripheral clock is MCK/4 */
-> -#define			AT91_PMC_PCR_DIV8	0x8			/* Peripheral clock is MCK/8 */
-> +#define			AT91_PMC_PCR_DIV2	0x1			/* Peripheral clock is MCK/2 */
-> +#define			AT91_PMC_PCR_DIV4	0x2			/* Peripheral clock is MCK/4 */
-> +#define			AT91_PMC_PCR_DIV8	0x3			/* Peripheral clock is MCK/8 */
->   #define		AT91_PMC_PCR_EN		(0x1  <<  28)		/* Enable */
->
->   #endif
+> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> index 70b5ccb..84c4bef 100644
+> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> @@ -264,7 +264,7 @@
+>   						atmel,pins =
+>   							<0 10 0x2 0x0	/* PA10 periph B */
+>   							 0 11 0x2 0x0	/* PA11 periph B */
+> -							 0 24 0x2 0x0	/* PA24 periph B */
+> +							 0 22 0x2 0x0	/* PA22 periph B */
+>   							 0 25 0x2 0x0	/* PA25 periph B */
+>   							 0 26 0x2 0x0	/* PA26 periph B */
+>   							 0 27 0x2 0x0	/* PA27 periph B */
 >
 
 
