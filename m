@@ -1,102 +1,93 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 24 May 2013 18:47:24 +0900
-Subject: [PATCH v2] gpio-rcar: Add support for IRQ_TYPE_EDGE_BOTH
-Message-ID: <20130524094724.1510.80331.sendpatchset@w520>
+From: Mylene.Josserand@navocap.com (Mylene Josserand)
+Date: Fri, 24 May 2013 11:52:54 +0200
+Subject: [I2C] informations + advice about messages handling
+In-Reply-To: <20130524110706.6052493e@endymion.delvare>
+References: <CA78C307B8F06747967D122FC656B153986448@SERVEUR0.nvp.local>
+ <CAK7N6vpg6QUAKODKO2Msr4+GTASLDpA2cG1teQV3yiwt7D4SSw@mail.gmail.com>
+ <20130524094407.61d0ec42@endymion.delvare>
+ <CA78C307B8F06747967D122FC656B15398644A@SERVEUR0.nvp.local>
+ <20130524110706.6052493e@endymion.delvare>
+Message-ID: <CA78C307B8F06747967D122FC656B15398644B@SERVEUR0.nvp.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Horman <horms+renesas@verge.net.au>
+Le 24/05/2013 11:07, Jean Delvare a ?crit :
+ > On Fri, 24 May 2013 10:54:11 +0200, Mylene Josserand wrote:
+ >> Ah okay ! And if there are not SMBus compliant, what function I will
+ >> have to use ?
+ >
+ > i2c_transfer()
 
-As hardware support for this feature is not universal for all SoCs a flag,
-has_both_edge_trigger, has been added to the platform data of the driver to
-allow this feature to be enabled.
 
-The motivation for this is to allow use of the gpio-keys driver on the
-lager board which is based on the r8a7790 SoC. The V2 of this patch has been
-fully exercised using that driver on that board.
+Okay, logic name ;)
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
 
- Changes since V1:
- - Modified code to always set BOTHEDGE register if available
- - Set BOTHEDGE before IOINTSEL
- - Successfully tested triggering on both edges with SW2 on Lager
+ >> What is it doing if I use this function and that my device is not SMbus
+ >> compliant ?
+ >
+ > This would make no sense. Your device understands only specific message
+ > formats, which should be documented in its datasheet. You have to use
+ > exactly that in your driver. If the message format matches SMBus, you
+ > can use the SMBus API, otherwise you must use i2c_transfer() instead.
 
- drivers/gpio/gpio-rcar.c                |   26 +++++++++++++++++++++-----
- include/linux/platform_data/gpio-rcar.h |    1 +
- 2 files changed, 22 insertions(+), 5 deletions(-)
+Very interesting !
+Right now, my company uses the "i2c_smbus_read/write_byte_data" 
+functions to talk to devices through an application. On the datasheet of 
+these devices, I search but did not seem to be SMBus compliant.
+As it was a software which was using these functions, we thought that a 
+driver (that I would write) should be better. And here I am ! I prefer 
+to understand well the mechanism before coding anything and it is 
+interesting !
 
---- 0001/drivers/gpio/gpio-rcar.c
-+++ work/drivers/gpio/gpio-rcar.c	2013-05-24 18:39:54.000000000 +0900
-@@ -49,6 +49,7 @@ struct gpio_rcar_priv {
- #define POSNEG 0x20
- #define EDGLEVEL 0x24
- #define FILONOFF 0x28
-+#define BOTHEDGE 0x4c
- 
- static inline u32 gpio_rcar_read(struct gpio_rcar_priv *p, int offs)
- {
-@@ -91,7 +92,8 @@ static void gpio_rcar_irq_enable(struct
- static void gpio_rcar_config_interrupt_input_mode(struct gpio_rcar_priv *p,
- 						  unsigned int hwirq,
- 						  bool active_high_rising_edge,
--						  bool level_trigger)
-+						  bool level_trigger,
-+						  bool both)
- {
- 	unsigned long flags;
- 
-@@ -108,6 +110,10 @@ static void gpio_rcar_config_interrupt_i
- 	/* Configure edge or level trigger in EDGLEVEL */
- 	gpio_rcar_modify_bit(p, EDGLEVEL, hwirq, !level_trigger);
- 
-+	/* Select one edge or both edges in BOTHEDGE */
-+	if (p->config.has_both_edge_trigger)
-+		gpio_rcar_modify_bit(p, BOTHEDGE, hwirq, both);
-+
- 	/* Select "Interrupt Input Mode" in IOINTSEL */
- 	gpio_rcar_modify_bit(p, IOINTSEL, hwirq, true);
- 
-@@ -127,16 +133,26 @@ static int gpio_rcar_irq_set_type(struct
- 
- 	switch (type & IRQ_TYPE_SENSE_MASK) {
- 	case IRQ_TYPE_LEVEL_HIGH:
--		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, true);
-+		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, true,
-+						      false);
- 		break;
- 	case IRQ_TYPE_LEVEL_LOW:
--		gpio_rcar_config_interrupt_input_mode(p, hwirq, false, true);
-+		gpio_rcar_config_interrupt_input_mode(p, hwirq, false, true,
-+						      false);
- 		break;
- 	case IRQ_TYPE_EDGE_RISING:
--		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, false);
-+		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, false,
-+						      false);
- 		break;
- 	case IRQ_TYPE_EDGE_FALLING:
--		gpio_rcar_config_interrupt_input_mode(p, hwirq, false, false);
-+		gpio_rcar_config_interrupt_input_mode(p, hwirq, false, false,
-+						      false);
-+		break;
-+	case IRQ_TYPE_EDGE_BOTH:
-+		if (!p->config.has_both_edge_trigger)
-+			return -EINVAL;
-+		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, false,
-+						      true);
- 		break;
- 	default:
- 		return -EINVAL;
---- 0001/include/linux/platform_data/gpio-rcar.h
-+++ work/include/linux/platform_data/gpio-rcar.h	2013-05-24 18:25:06.000000000 +0900
-@@ -21,6 +21,7 @@ struct gpio_rcar_config {
- 	unsigned int irq_base;
- 	unsigned int number_of_pins;
- 	const char *pctl_name;
-+	unsigned has_both_edge_trigger:1;
- };
- 
- #define RCAR_GP_PIN(bank, pin)		(((bank) * 32) + (pin))
+
+ >> I have some difficulties to understand the differences
+ >> between SMbus and I2C :(
+ >
+ > SMBus is a subset of I2C. With I2C you can have messages of any length
+ > and any format, with no attached semantics. SMBus restricts the
+ > possibilities to a few standardized messages formats with semantics. If
+ > you'd just tell us what your device is, we would be able to tell you if
+ > SMBus will work or if I2C will be needed.
+
+Thanks for the explanation.
+No problem, we have 2 devices used without drivers :
+- an odometer PIC18F24201 : In the datasheet, there is a SMBus select 
+bit but I don't know if it is SMBus compliant.
+- an audio codec tlv320aic3204 : There is a driver for this device but 
+for some reasons, we did not use it. Did not find a "SMBus compliant" in 
+its datasheet.
+
+
+ >> (...)
+ >> In my case, I have 2 segments but if I understand, the bus will not be
+ >> used at the same time.
+ >
+ > I can't comment on that without knowing the exact topology. In
+ > particular, do you have two independent segments each with its own
+ > controller, or are they interconnected in some way? I2C/SMBus is very
+ > simple with basic topologies but can become difficult with complex ones.
+
+Yes of course, I understand.
+For that, I will ask to our "hardware guy".
+
+
+ >> (...)
+ >> Okay. So the mutex blocks the I2C bus. And is it locking the bus at the
+ >> beginning of a message (so when a START is send) and unlocking it after
+ >> the STOP ?
+ >
+ > Yes.
+ >
+ >> So a complete message will be sent to a same device (the one which
+ >> address is in the data frame) ? A device can not receive a beginning of
+ >> one message (so with his address) and the end of another message
+ >> destined to another device [because of "collision"], for example ?
+ >
+ > No, this cannot happen.
+
+
+Thanks a lot for your help !
+
+
+-- 
+Myl?ne JOSSERAND
