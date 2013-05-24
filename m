@@ -1,88 +1,93 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 May 2013 11:44:44 +0200
-Subject: [PATCH 07/21] arm: kirkwood: ib62x0: affect pinmux configs to the
- right devices
+Date: Fri, 24 May 2013 11:44:45 +0200
+Subject: [PATCH 08/21] arm: kirkwood: iconnect: give meaningful names to
+ pinmux configs
 In-Reply-To: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369388699-25975-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369388699-25975-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the pinmux mechanism was added in Kirkwood, the device driver
-core was not yet providing the possibility of attaching pinmux
-configurations to all devices, drivers had to do it explicitly, and
-not all drivers were doing this.
+The Kirkwood iConnect Device Tree is currently using totally
+meaningless names for the pinmux configuration: pmx_gpio_XY.
 
-Now that the driver core does that in a generic way, it makes sense to
-attach the pinmux configuration to their corresponding devices.
-
-This allows the pinctrl subsystem to show in debugfs to which device
-is related which pins, for example:
-
-pin 41 (PIN41): gpio-leds.1 mvebu-gpio:41 function gpio group mpp41
-pin 42 (PIN42): gpio-leds.1 mvebu-gpio:42 function gpio group mpp42
-pin 43 (PIN43): gpio-leds.1 mvebu-gpio:43 function gpio group mpp43
+This patch fixes that by using some more meaningful names such as
+pmx_button_power.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/kirkwood-ib62x0.dts |   17 ++++++++++-------
- 1 file changed, 10 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/kirkwood-iconnect.dts |   30 +++++++++++++++---------------
+ 1 file changed, 15 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-ib62x0.dts b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-index 5335b1a..20c4b08 100644
---- a/arch/arm/boot/dts/kirkwood-ib62x0.dts
-+++ b/arch/arm/boot/dts/kirkwood-ib62x0.dts
-@@ -18,13 +18,6 @@
- 
+diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
+index 12ccf74..20c3ece 100644
+--- a/arch/arm/boot/dts/kirkwood-iconnect.dts
++++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
+@@ -21,50 +21,50 @@
  	ocp at f1000000 {
  		pinctrl: pinctrl at 10000 {
--
--			pinctrl-0 = < &pmx_nand
--				      &pmx_led_os_red &pmx_power_off
--				      &pmx_led_os_green &pmx_led_usb_transfer
--				      &pmx_button_reset &pmx_button_usb_copy >;
--			pinctrl-names = "default";
--
- 			pmx_led_os_red: pmx-led-os-red {
- 				marvell,pins = "mpp22";
+ 
+-			pinctrl-0 = < &pmx_gpio_12 &pmx_gpio_35
+-				      &pmx_gpio_41 &pmx_gpio_42
+-				      &pmx_gpio_43 &pmx_gpio_44
+-				      &pmx_gpio_45 &pmx_gpio_46
+-				      &pmx_gpio_47 &pmx_gpio_48 >;
++			pinctrl-0 = < &pmx_button_reset &pmx_button_otb
++				      &pmx_led_level &pmx_led_power_blue
++				      &pmx_led_power_red &pmx_led_usb1
++				      &pmx_led_usb2 &pmx_led_usb3
++				      &pmx_led_usb4 &pmx_led_otb >;
+ 			pinctrl-names = "default";
+ 
+-			pmx_gpio_12: pmx-gpio-12 {
++			pmx_button_reset: pmx-button-reset {
+ 				marvell,pins = "mpp12";
  				marvell,function = "gpio";
-@@ -61,6 +54,8 @@
- 
- 		nand at 3000000 {
- 			status = "okay";
-+			pinctrl-0 = <&pmx_nand>;
-+			pinctrl-names = "default";
- 
- 			partition at 0 {
- 				label = "u-boot";
-@@ -84,6 +79,9 @@
- 		compatible = "gpio-keys";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_button_reset &pmx_button_usb_copy>;
-+		pinctrl-names = "default";
-+
- 		button at 1 {
- 			label = "USB Copy";
- 			linux,code = <133>;
-@@ -97,6 +95,9 @@
- 	};
- 	gpio-leds {
- 		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_led_os_red &pmx_led_os_green
-+			     &pmx_led_usb_transfer>;
-+		pinctrl-names = "default";
- 
- 		green-os {
- 			label = "ib62x0:green:os";
-@@ -114,6 +115,8 @@
- 	};
- 	gpio_poweroff {
- 		compatible = "gpio-poweroff";
-+		pinctrl-0 = <&pmx_power_off>;
-+		pinctrl-names = "default";
- 		gpios = <&gpio0 24 0>;
- 	};
- 
+ 			};
+-			pmx_gpio_35: pmx-gpio-35 {
++			pmx_button_otb: pmx-button-otb {
+ 				marvell,pins = "mpp35";
+ 				marvell,function = "gpio";
+ 			};
+-			pmx_gpio_41: pmx-gpio-41 {
++			pmx_led_level: pmx-led-level {
+ 				marvell,pins = "mpp41";
+ 				marvell,function = "gpio";
+ 			};
+-			pmx_gpio_42: pmx-gpio-42 {
++			pmx_led_power_blue: pmx-led-power-blue {
+ 				marvell,pins = "mpp42";
+ 				marvell,function = "gpio";
+ 			};
+-			pmx_gpio_43: pmx-gpio-43 {
++			pmx_led_power_red: pmx-power-red {
+ 				marvell,pins = "mpp43";
+ 				marvell,function = "gpio";
+ 			};
+-			pmx_gpio_44: pmx-gpio-44 {
++			pmx_led_usb1: pmx-led-usb1 {
+ 				marvell,pins = "mpp44";
+ 				marvell,function = "gpio";
+ 			};
+-			pmx_gpio_45: pmx-gpio-45 {
++			pmx_led_usb2: pmx-led-usb2 {
+ 				marvell,pins = "mpp45";
+ 				marvell,function = "gpio";
+ 			};
+-			pmx_gpio_46: pmx-gpio-46 {
++			pmx_led_usb3: pmx-led-usb3 {
+ 				marvell,pins = "mpp46";
+ 				marvell,function = "gpio";
+ 			};
+-			pmx_gpio_47: pmx-gpio-47 {
++			pmx_led_usb4: pmx-led-usb4 {
+ 				marvell,pins = "mpp47";
+ 				marvell,function = "gpio";
+ 			};
+-			pmx_gpio_48: pmx-gpio-48 {
++			pmx_led_otb: pmx-led-otb {
+ 				marvell,pins = "mpp48";
+ 				marvell,function = "gpio";
+ 			};
 -- 
 1.7.9.5
