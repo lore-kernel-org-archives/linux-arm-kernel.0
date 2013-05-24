@@ -1,33 +1,34 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 24 May 2013 01:45:11 -0400
-Subject: [PATCH 8/8] ARM: vexpress/dcscb: select multi-cluster SMP operations
-In-Reply-To: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1369374311-21260-9-git-send-email-nicolas.pitre@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 24 May 2013 13:53:41 +0800
+Subject: [PATCH v2 0/2] dma: imx-sdma: add generic DMA device tree
+ bindings support
+In-Reply-To: <20130524050329.GN30200@intel.com>
+References: <1366901008-7593-1-git-send-email-shawn.guo@linaro.org>
+ <20130524052903.GE2704@S2101-09.ap.freescale.net>
+ <20130524050329.GN30200@intel.com>
+Message-ID: <20130524055338.GG2704@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the DCSCB code is successfully probed and initialized, then the
-generic MCPM SPM ops should be used as those operations need to be
-arbitrated through the MCPM layer.
+On Fri, May 24, 2013 at 10:33:29AM +0530, Vinod Koul wrote:
+> On Fri, May 24, 2013 at 01:29:05PM +0800, Shawn Guo wrote:
+> > Vinod,
+> > 
+> > On Thu, Apr 25, 2013 at 10:43:26PM +0800, Shawn Guo wrote:
+> > > Changes since v1:
+> > >  * Fix the example typo in bindings doc.  Thanks to Fabio.
+> > > 
+> > > Shawn Guo (2):
+> > >   dma: imx: change enum definitions to macros
+> > >   dma: imx-sdma: move to generic device tree bindings
+> > 
+> > Can you please apply these for 3.11?
+> Sorry I was thinking that you will update the patchset based on Arnd last
+> comment on (ab)use of macro. Can you fix that & resend
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
----
- arch/arm/mach-vexpress/dcscb.c | 2 ++
- 1 file changed, 2 insertions(+)
+I had a response [1] on that to explain why I think the macro is
+being reasonably used there.
 
-diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-index 1acc975360..ce3118dc05 100644
---- a/arch/arm/mach-vexpress/dcscb.c
-+++ b/arch/arm/mach-vexpress/dcscb.c
-@@ -239,6 +239,8 @@ static int __init dcscb_init(void)
- 		return ret;
- 	}
- 
-+	mcpm_smp_set_ops();
-+
- 	pr_info("VExpress DCSCB support installed\n");
- 
- 	/*
--- 
-1.8.1.2
+Shawn
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/233361/focus=233395
