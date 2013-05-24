@@ -1,81 +1,53 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 24 May 2013 03:00:59 +0200
-Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
-In-Reply-To: <1369322904.4142.36.camel@weser.hi.pengutronix.de>
-References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
- <201305231648.17356.marex@denx.de>
- <1369322904.4142.36.camel@weser.hi.pengutronix.de>
-Message-ID: <201305240301.00137.marex@denx.de>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 24 May 2013 10:11:46 +0900
+Subject: [PATCH] clk: use platform_{get,set}_drvdata()
+Message-ID: <000401ce581b$a9224600$fb66d200$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lucas Stach,
+Use the wrapper functions for getting and setting the driver data using
+platform_device instead of using dev_{get,set}_drvdata() with &pdev->dev,
+so we can directly pass a struct platform_device.
 
-> Am Donnerstag, den 23.05.2013, 16:48 +0200 schrieb Marek Vasut:
-> > Dear Juergen Beisert,
-> > 
-> > > Hi Marek,
-> > > 
-> > > Marek Vasut wrote:
-> > > > > > i2c slowness is a different issue.
-> > > > > 
-> > > > > Same happens here for my i.M23 based platform. It seems the PIO
-> > > > > mode does not work, or at least not like it works on a i.MX28.
-> > > > > Each short transfer needs about one second (without an error
-> > > > > message) but does not send anything on the I2C lines.
-> > > > > 
-> > > > > I need the following patches to make I2C master work within a
-> > > > > 3.10-rc2 kernel:
-> > > > > 
-> > > > > Subject: [PATCH] I2C/MXS: distinguish i.MX23 and i.MX28 based I2C
-> > > > 
-> > > > I'm all for it, but then ... won't it be better if you actually fixed
-> > > > the PIO and mixed-mode on MX23 instead of implementing such hack?
-> > > 
-> > > If the PIO mode or my patch is a hack depends on the point of view:
-> > > Lucas told me the PIO mode is *mentioned* but *not specified* in the
-> > > i.MX23/i.MX28 datasheets.
-> > 
-> > The PIO works the same way DMA does -- set up bits and then pump data
-> > into the DATA register.
-> > 
-> > > So, the PIO mode seems to depend on some undocumented status bits in
-> > > the i.MX28 I2C controller implementation.
-> > 
-> > How would DMA work then if it used undocumented registers ? It's in the
-> > documentation, just read it or ask FSL ;-)
-> 
-> While the PIO mode might use the same controller mechanisms as the DMA
-> mode, PIO mode is _not_ a documented mode of operation for the i.MX23.
-> 
-> To quote the i.MX28 RM: "The I2C block on the i.MX28 supports a new PIO
-> mode or soft-DMA mode.", which implies the PIO mode to be a new mode of
-> operation not found on earlier i.MX SoCs.
-> The doc is slightly fuzzy here as the i.MX23 RM in contrary states:
-> "Short transmission (up to three bytes plus address) can be easily
-> triggered using only PIO operations, i.e., no DMA setup required." But
-> again it's not a documented mode of operation, i.MX23 doc only describes
-> the DMA mode.
+Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+---
+ drivers/clk/clk-twl6040.c |    4 ++--
+ drivers/clk/clk-wm831x.c  |    2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-I'm CCing a Amaury Pouly so he can comment on this stuff. He did some hardware 
-digging.
-
-> So while we _might_ be able to get the PIO mode to work on the i.MX23
-> there is nothing in the doc stating that it's even meant to work. Even
-> while PIO and DMA mode use the same internal mechanisms, there's still
-> plenty of opportunities of fail in there. After all PIO mode relies on
-> reading a debug register in the course of normal operation.
-
-What's the problem with that ? The debug register contains status bits.
-
-> Only more extensive experimentation could show if we are in fact able to
-> make it work, a first shot of using PIO mode on MX23 failed, so it might
-> as well be that Juergens quick fix is correct and we have to disable PIO
-> mode on MX23 altogether. That said please stop slapping the word "hack"
-> over this patch until proven otherwise.
-> 
-> Regards,
-> Lucas
-
-Best regards,
-Marek Vasut
+diff --git a/drivers/clk/clk-twl6040.c b/drivers/clk/clk-twl6040.c
+index 3af729b..1ada79a 100644
+--- a/drivers/clk/clk-twl6040.c
++++ b/drivers/clk/clk-twl6040.c
+@@ -95,14 +95,14 @@ static int twl6040_clk_probe(struct platform_device *pdev)
+ 	if (IS_ERR(clkdata->clk))
+ 		return PTR_ERR(clkdata->clk);
+ 
+-	dev_set_drvdata(&pdev->dev, clkdata);
++	platform_set_drvdata(pdev, clkdata);
+ 
+ 	return 0;
+ }
+ 
+ static int twl6040_clk_remove(struct platform_device *pdev)
+ {
+-	struct twl6040_clk *clkdata = dev_get_drvdata(&pdev->dev);
++	struct twl6040_clk *clkdata = platform_get_drvdata(pdev);
+ 
+ 	clk_unregister(clkdata->clk);
+ 
+diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
+index 16ed068..0d3c04e 100644
+--- a/drivers/clk/clk-wm831x.c
++++ b/drivers/clk/clk-wm831x.c
+@@ -384,7 +384,7 @@ static int wm831x_clk_probe(struct platform_device *pdev)
+ 	if (IS_ERR(clkdata->clkout))
+ 		return PTR_ERR(clkdata->clkout);
+ 
+-	dev_set_drvdata(&pdev->dev, clkdata);
++	platform_set_drvdata(pdev, clkdata);
+ 
+ 	return 0;
+ }
+-- 
+1.7.10.4
