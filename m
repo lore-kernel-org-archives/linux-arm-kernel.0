@@ -1,48 +1,44 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 24 May 2013 11:23:23 +0200
-Subject: [PATCH v3 6/6] pinctrl: exynos: Handle suspend/resume of GPIO EINT
- registers
-In-Reply-To: <CACRpkdbN4Nxg2VSr0bf+h4Y2U=CmX9mijdZz+=tom9V0-i-69g@mail.gmail.com>
-References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
- <3059629.yu4Ei1BXhd@amdc1227>
- <CACRpkdbN4Nxg2VSr0bf+h4Y2U=CmX9mijdZz+=tom9V0-i-69g@mail.gmail.com>
-Message-ID: <2032031.lFyZLmqevW@amdc1227>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 24 May 2013 11:23:13 +0200
+Subject: [PATCHv3 5/6] ARM: cubieboard: Enable ethernet (EMAC) support in dts
+In-Reply-To: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1369387394-9453-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+From: Stefan Roese <sr@denx.de>
 
-On Friday 24 of May 2013 11:12:00 Linus Walleij wrote:
-> On Wed, May 22, 2013 at 4:03 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> > Some GPIO EINT control registers needs to be preserved across
-> > suspend/resume cycle. This patch extends the driver to take care of
-> > this.
-> > 
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
-> > 
-> > Changes since v2:
-> >  - Fixed error path
-> > 
-> > Changes since v1:
-> >  - Added optional debugging messages
-> >  - Added proper error path in initialization
-> 
-> v2 version applied for fixes.
+Signed-off-by: Stefan Roese <sr@denx.de>
+---
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-I posted v3 two days ago. It fixes a stupid mistake in error path I made in a 
-hurry and also addresses some suggestions from Doug.
-
-> Again confirm you must really have all this. It is not looking
-> good with diffstats like this for fixing regressions.
-
-Yes. The whole series is necessary to have correct suspend/resume support of 
-DT-enabled Exynos boards.
-
-Best regards,
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index b70fe0d..32d9b18 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -27,6 +27,21 @@
+ 	};
+ 
+ 	soc at 01c20000 {
++		emac: ethernet at 01c0b000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&emac_pins_a>;
++			phy = <&phy0>;
++			status = "okay";
++		};
++
++		mdio at 01c0b080 {
++			status = "okay";
++
++			phy0: ethernet-phy at 0 {
++				reg = <0>;
++			};
++		};
++
+ 		pinctrl at 01c20800 {
+ 			led_pins_cubieboard: led_pins at 0 {
+ 				allwinner,pins = "PH20", "PH21";
 -- 
-Tomasz Figa
-Linux Kernel Developer
-Samsung R&D Institute Poland
-Samsung Electronics
+1.8.1.2
