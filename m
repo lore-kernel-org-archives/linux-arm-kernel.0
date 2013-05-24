@@ -1,35 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 May 2013 17:55:36 +0100
-Subject: rmk is away
-Message-ID: <20130524165536.GB18614@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 24 May 2013 18:52:54 +0200
+Subject: [PATCH] ARM: at91: Fix: Change internal SRAM memory type to
+ "MT_MEMORY_SO"
+In-Reply-To: <20130524164055.GA18614@n2100.arm.linux.org.uk>
+References: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
+ <1369011979-21354-1-git-send-email-wenyou.yang@atmel.com>
+ <20130522001457.GA18614@n2100.arm.linux.org.uk>
+ <B256D81BAE5131468A838E5D7A243641687BB93C@penmbx01>
+ <20130524112029.GW18614@n2100.arm.linux.org.uk>
+ <20130524140322.GD24476@game.jcrosoft.org>
+ <20130524164055.GA18614@n2100.arm.linux.org.uk>
+Message-ID: <20130524165254.GF24476@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So, this weekend is a holiday weekend in the UK.
+On 17:40 Fri 24 May     , Russell King - ARM Linux wrote:
+> On Fri, May 24, 2013 at 04:03:22PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 12:20 Fri 24 May     , Russell King - ARM Linux wrote:
+> > > On Fri, May 24, 2013 at 07:11:04AM +0000, Yang, Wenyou wrote:
+> > > > The story is: for sama5d3x with Cortex-A5 core, if not so, when copying
+> > > > code snippet to the internal SRAM, then jump to run this code, but fail
+> > > > to run.
+> > > 
+> > > And that is where your mistake is - you forgot that you're working with
+> > > a CPU with harvard caches which will require some cache maintanence
+> > > between copying the code and executing it.
+> > > 
+> > > You want to look at flush_icache_range() rather than making this memory
+> > > strongly ordered.
+> > 
+> > I understand your point but today we map a SRAM as MT_DEVICE
+> 
+> If you map SRAM as MT_DEVICE then you won't be able to execute code from
+> it.  It needs to be a normal memory mapping.
 
-However, I will also be away next week.
+Yeah that a bug on AT91, by luck it work on armv3/v4 with MT_DEVICE, I should
+have spot it earlier when cleanning the at91 but did not
 
-What this will mean is that the nightly build system will be offline for
-the duration I'm away, and it also means a *huge* pile of email on my
-return.
+That's why Yang change the SRAM mapping as MT_MEMORY_SO
 
-I will _not_ be reading that email pile; I did that after I returned in
-April, and it took a week (including weekends) solid of 14 hours a day
-and effectively added that time to my absence, as I wasn't doing
-*anything* at all other than reading email.
+I agree the commit message need to be re-done
 
-I'm *not* doing that again.  (I said that I wouldn't do it last time but
-people whinged that it was a dereliction of my position - well this time,
-tough, I'm doing what Linus et.al. do and drop their mailbox after
-returning from a vacation.)
-
-This is *not* negotiable.  The above is the quickest way for me to
-"recover" from being away.
-
-So, please hold off sending anything which you want a response from me on
-until I return.
-
-Let me repeat: I will _not_ be catching up with email.  Send stuff that
-you want me to look at *after* Sunday 2nd June.  If you send it before,
-I *will* ignore your email.  After all, it's only _four_ UK working days
-away, surely you can wait four UK working days? :)
+Best Regards,
+J.
