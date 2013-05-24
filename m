@@ -1,44 +1,69 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 24 May 2013 11:20:06 +0200
-Subject: [PATCH 4/6] pinctrl: samsung: Add support for SoC-specific
- suspend/resume callbacks
-In-Reply-To: <CACRpkdY-d3YYLJoWydakbT7P4wnBAK2XL7X0Fs0EcNSFakpUDw@mail.gmail.com>
-References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
- <1368807872-2601-5-git-send-email-t.figa@samsung.com>
- <CACRpkdY-d3YYLJoWydakbT7P4wnBAK2XL7X0Fs0EcNSFakpUDw@mail.gmail.com>
-Message-ID: <22452279.DN7eJUzGA7@amdc1227>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 24 May 2013 11:23:08 +0200
+Subject: [PATCHv3 RESEND 0/6] ARM: sunxi: Add support for A10 Ethernet
+ controller
+Message-ID: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi,
 
-On Friday 24 of May 2013 11:07:41 Linus Walleij wrote:
-> On Fri, May 17, 2013 at 6:24 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> > SoC-specific driver might require additional save and restore of
-> > registers. This patch adds pair of SoC-specific callbacks per pinctrl
-> > device to account for this.
-> > 
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Patch applied for fixes.
+The Allwinner A10 SoC has an ethernet controller that seem to be specific to
+Allwinner. This IP has no public documentation, so exact
+details are quite sparse, and this code come from refactored Allwinner
+code.
 
-Thanks.
+The rework to use NAPI is taking more time than expected, I'm still working
+on it, but it could probably be sent as a follow-up patch.
 
-> Hm this is quite a lot of code for "fixes", can you confirm that
-> the system is really unusable without all these patches?
+Thanks,
+Maxime
 
-Well, it is something that should have been already sent as a fix for 3.8, when 
-this pin control driver was added, because since then suspend/resume has been 
-broken on DT-enabled Exynos boards.
+Changes from v2:
+  - Split the MDIO controller to a separate driver and make use of standards
+    device tree bindings
+  - Fixed various minor things as suggested by Florian Fainelli
+  - Added clock support now that we have a clock driver
 
-Without this, suspending the board and then trying to wake it up is rather 
-unpredictable, leading usually to board reset, interrupt storm or at least 
-some devices failing to resume.
+Changes from v1:
+  - Use phylib for the phy-related functions
+  - Use an optional regulator to power up the phy
+  - Rename the driver from Davicom Wemac to Allwinner EMAC, since it's the name
+    mentionned in the datasheet, and we have no strong evidence of a
+    relationship with Davicom
+  - Fix various small things around the driver: add defines for undocumented
+    values, fix documentation name and compatible example, etc.
 
-Best regards,
+Maxime Ripard (4):
+  net: Add MDIO bus driver for the Allwinner EMAC
+  ARM: sun4i: Add muxing options for the ethernet controller
+  ARM: sunxi: Add EMAC controller node to sun4i DTSI
+  ARM: sunxi: Add EMAC Controller to Hackberry dt
+
+Stefan Roese (2):
+  net: Add EMAC ethernet driver found on Allwinner A10 SoC's
+  ARM: cubieboard: Enable ethernet (EMAC) support in dts
+
+ .../bindings/net/allwinner,sun4i-emac.txt          |  22 +
+ .../bindings/net/allwinner,sun4i-mdio.txt          |  26 +
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |  15 +
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts          |  41 +
+ arch/arm/boot/dts/sun4i-a10.dtsi                   |  27 +
+ drivers/net/ethernet/Kconfig                       |   1 +
+ drivers/net/ethernet/Makefile                      |   1 +
+ drivers/net/ethernet/allwinner/Kconfig             |  44 +
+ drivers/net/ethernet/allwinner/Makefile            |   6 +
+ drivers/net/ethernet/allwinner/sun4i-emac.c        | 960 +++++++++++++++++++++
+ drivers/net/ethernet/allwinner/sun4i-emac.h        | 108 +++
+ drivers/net/ethernet/allwinner/sun4i-mdio.c        | 191 ++++
+ 12 files changed, 1442 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun4i-emac.txt
+ create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt
+ create mode 100644 drivers/net/ethernet/allwinner/Kconfig
+ create mode 100644 drivers/net/ethernet/allwinner/Makefile
+ create mode 100644 drivers/net/ethernet/allwinner/sun4i-emac.c
+ create mode 100644 drivers/net/ethernet/allwinner/sun4i-emac.h
+ create mode 100644 drivers/net/ethernet/allwinner/sun4i-mdio.c
+
 -- 
-Tomasz Figa
-Linux Kernel Developer
-Samsung R&D Institute Poland
-Samsung Electronics
+1.8.1.2
