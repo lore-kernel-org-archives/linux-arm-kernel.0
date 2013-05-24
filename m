@@ -1,69 +1,270 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sat, 25 May 2013 07:01:45 +0900
-Subject: [PATCH] ARM: EXYNOS: add PM dependency to PM_GENERIC_DOMAINS
- for Exynos4210
-In-Reply-To: <001a01ce5041$1b9ddd30$52d99790$@samsung.com>
-References: <001a01ce5041$1b9ddd30$52d99790$@samsung.com>
-Message-ID: <519FE349.7050208@samsung.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Sat, 25 May 2013 00:04:45 +0200
+Subject: [RESEND PATCH 2/5] clk: samsung: Add support to register
+ rate_table for PLL3xxx
+In-Reply-To: <1369391478-7665-3-git-send-email-vikas.sajjan@linaro.org>
+References: <1369391478-7665-1-git-send-email-vikas.sajjan@linaro.org>
+ <1369391478-7665-3-git-send-email-vikas.sajjan@linaro.org>
+Message-ID: <2606875.QmniDqB8hY@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/13 10:19, Jingoo Han wrote:
-> PM_GENERIC_DOMAINS needs PM dependency.
->
-> Fixed build warning as below:
->
-> warning: (PLAT_S3C64XX&&  CPU_EXYNOS4210) selects PM_GENERIC_DOMAINS which has unmet direct dependencies (PM)
+Hi,
 
-If so, PLAT_S3C64XX should be fixed together.
+Please see my comments inline.
 
-diff --git a/arch/arm/mach-s3c64xx/Kconfig b/arch/arm/mach-s3c64xx/Kconfig
-index 2057853..c04c4ee 100644
---- a/arch/arm/mach-s3c64xx/Kconfig
-+++ b/arch/arm/mach-s3c64xx/Kconfig
-@@ -8,7 +8,7 @@ config PLAT_S3C64XX
-  	bool
-  	depends on ARCH_S3C64XX
-  	default y
--	select PM_GENERIC_DOMAINS
-+	select PM_GENERIC_DOMAINS if PM
-  	select SAMSUNG_WAKEMASK
-  	help
-  	  Base platform code for any Samsung S3C64XX device
-
-> warning: (PLAT_S3C64XX&&  CPU_EXYNOS4210) selects PM_GENERIC_DOMAINS which has unmet direct dependencies (PM)
-> arch/arm/kernel/return_address.c:63:2: warning: #warning "TODO: return_address should use unwind tables" [-Wcpp]
-> drivers/base/power/domain.c: In function '__pm_genpd_add_device':
-> drivers/base/power/domain.c:1422:2: error: implicit declaration of function 'genpd_acquire_lock'
-> [-Werror=implicit-function-declaration]
-> drivers/base/power/domain.c:1466:2: error: implicit declaration of function 'genpd_release_lock'
-> [-Werror=implicit-function-declaration]
-> drivers/base/power/domain.c: In function 'pm_genpd_add_subdomain':
-> drivers/base/power/domain.c:1649:3: error: implicit declaration of function 'genpd_sd_counter_inc'
-> [-Werror=implicit-function-declaration]
-> drivers/base/power/domain.c: In function 'pm_genpd_remove_subdomain':
-> drivers/base/power/domain.c:1721:4: error: implicit declaration of function 'genpd_sd_counter_dec'
-> [-Werror=implicit-function-declaration]
-> drivers/base/power/domain.c: In function 'pm_genpd_attach_cpuidle':
-> drivers/base/power/domain.c:1887:2: error: implicit declaration of function 'genpd_recalc_cpu_exit_latency'
-> [-Werror=implicit-function-declaration]
-> cc1: some warnings being treated as errors
->
-> Signed-off-by: Jingoo Han<jg1.han@samsung.com>
+On Friday 24 of May 2013 16:01:15 Vikas Sajjan wrote:
+> From: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> 
+> This patch defines a common rate_table which will contain recommended p,
+> m, s and k values for supported rates that needs to be changed for
+> changing corresponding PLL's rate.
+> It also sorts the rate table while registering the PLL rate table.
+> So that this sorted table can be used for making the searching of
+> "required rate" efficient.
+> 
+> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
 > ---
->   arch/arm/mach-exynos/Kconfig |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index d19edff..1f7ddb2 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -34,7 +34,7 @@ config CPU_EXYNOS4210
->   	default y
->   	depends on ARCH_EXYNOS4
->   	select ARM_CPU_SUSPEND if PM
-> -	select PM_GENERIC_DOMAINS
-> +	select PM_GENERIC_DOMAINS if PM
->   	select S5P_PM if PM
->   	select S5P_SLEEP if PM
->   	select SAMSUNG_DMADEV
+>  drivers/clk/samsung/clk-exynos4.c    |    8 ++++----
+>  drivers/clk/samsung/clk-exynos5250.c |   14 +++++++-------
+>  drivers/clk/samsung/clk-pll.c        |   35
+> ++++++++++++++++++++++++++++++++-- drivers/clk/samsung/clk-pll.h       
+> |   27 ++++++++++++++++++++++++-- 4 files changed, 69 insertions(+), 15
+> deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos4.c
+> b/drivers/clk/samsung/clk-exynos4.c index cf7d4e7..beff8a1 100644
+> --- a/drivers/clk/samsung/clk-exynos4.c
+> +++ b/drivers/clk/samsung/clk-exynos4.c
+> @@ -1021,13 +1021,13 @@ void __init exynos4_clk_init(struct device_node
+> *np, enum exynos4_soc exynos4_so reg_base + VPLL_CON0, pll_4650c);
+>  	} else {
+>  		apll = samsung_clk_register_pll35xx("fout_apll", 
+"fin_pll",
+> -					reg_base + APLL_LOCK);
+> +					reg_base + APLL_LOCK, NULL, 0);
+>  		mpll = samsung_clk_register_pll35xx("fout_mpll", 
+"fin_pll",
+> -					reg_base + E4X12_MPLL_LOCK);
+> +					reg_base + E4X12_MPLL_LOCK, NULL, 
+0);
+>  		epll = samsung_clk_register_pll36xx("fout_epll", 
+"fin_pll",
+> -					reg_base + EPLL_LOCK);
+> +					reg_base + EPLL_LOCK, NULL, 0);
+>  		vpll = samsung_clk_register_pll36xx("fout_vpll", 
+"fin_pll",
+> -					reg_base + VPLL_LOCK);
+> +					reg_base + VPLL_LOCK, NULL, 0);
+>  	}
+> 
+>  	samsung_clk_add_lookup(apll, fout_apll);
+> diff --git a/drivers/clk/samsung/clk-exynos5250.c
+> b/drivers/clk/samsung/clk-exynos5250.c index 687b580..ddf10ca 100644
+> --- a/drivers/clk/samsung/clk-exynos5250.c
+> +++ b/drivers/clk/samsung/clk-exynos5250.c
+> @@ -491,19 +491,19 @@ void __init exynos5250_clk_init(struct device_node
+> *np) ext_clk_match);
+> 
+>  	apll = samsung_clk_register_pll35xx("fout_apll", "fin_pll",
+> -			reg_base);
+> +			reg_base, NULL, 0);
+>  	mpll = samsung_clk_register_pll35xx("fout_mpll", "fin_pll",
+> -			reg_base + 0x4000);
+> +			reg_base + 0x4000, NULL, 0);
+>  	bpll = samsung_clk_register_pll35xx("fout_bpll", "fin_pll",
+> -			reg_base + 0x20010);
+> +			reg_base + 0x20010, NULL, 0);
+>  	gpll = samsung_clk_register_pll35xx("fout_gpll", "fin_pll",
+> -			reg_base + 0x10050);
+> +			reg_base + 0x10050, NULL, 0);
+>  	cpll = samsung_clk_register_pll35xx("fout_cpll", "fin_pll",
+> -			reg_base + 0x10020);
+> +			reg_base + 0x10020, NULL, 0);
+>  	epll = samsung_clk_register_pll36xx("fout_epll", "fin_pll",
+> -			reg_base + 0x10030);
+> +			reg_base + 0x10030, NULL, 0);
+>  	vpll = samsung_clk_register_pll36xx("fout_vpll", "mout_vpllsrc",
+> -			reg_base + 0x10040);
+> +			reg_base + 0x10040, NULL, 0);
+> 
+>  	samsung_clk_register_fixed_rate(exynos5250_fixed_rate_clks,
+>  			ARRAY_SIZE(exynos5250_fixed_rate_clks));
+> diff --git a/drivers/clk/samsung/clk-pll.c
+> b/drivers/clk/samsung/clk-pll.c index 01f17cf..b8c0260 100644
+> --- a/drivers/clk/samsung/clk-pll.c
+> +++ b/drivers/clk/samsung/clk-pll.c
+> @@ -10,12 +10,15 @@
+>  */
+> 
+>  #include <linux/errno.h>
+> +#include <linux/sort.h>
+>  #include "clk.h"
+>  #include "clk-pll.h"
+> 
+>  struct samsung_clk_pll {
+>  	struct clk_hw		hw;
+>  	const void __iomem	*base;
+> +	struct samsung_pll_rate_table *rate_table;
+> +	unsigned int rate_count;
+>  };
+> 
+>  #define to_clk_pll(_hw) container_of(_hw, struct samsung_clk_pll, hw)
+> @@ -25,6 +28,14 @@ struct samsung_clk_pll {
+>  #define pll_writel(pll, val, offset)					\
+>  		__raw_writel(val, (void __iomem *)(pll->base + (offset)));
+> 
+> +static int samsung_compare_rate(const void *_a, const void *_b)
+> +{
+> +	const struct samsung_pll_rate_table *a = _a;
+> +	const struct samsung_pll_rate_table *b = _b;
+> +
+> +	return a->rate - b->rate;
+> +}
+> +
+>  /*
+>   * PLL35xx Clock Type
+>   */
+> @@ -62,7 +73,9 @@ static const struct clk_ops samsung_pll35xx_clk_ops =
+> { };
+> 
+>  struct clk * __init samsung_clk_register_pll35xx(const char *name,
+> -			const char *pname, const void __iomem *base)
+> +			const char *pname, const void __iomem *base,
+> +			struct samsung_pll_rate_table *rate_table,
+> +			const unsigned int rate_count)
+>  {
+>  	struct samsung_clk_pll *pll;
+>  	struct clk *clk;
+> @@ -82,6 +95,14 @@ struct clk * __init
+> samsung_clk_register_pll35xx(const char *name,
+> 
+>  	pll->hw.init = &init;
+>  	pll->base = base;
+> +	pll->rate_table = rate_table;
+> +	pll->rate_count = rate_count;
+> +
+> +	if (pll->rate_table && pll->rate_count) {
+
+You seem to assume here that the exact set of rates is known at 
+compilation time. In other words, you assume that all boards have the same 
+PLL input (xtal) frequency.
+
+We have similar patches available in our internal tree that work in a bit 
+different way:
+
+1) they assume that passed array is already sorted, which is a good 
+assumption, because you have full control of this array - it's a part of 
+the clock driver and if it's incorrect it's your fault - you don't deal 
+with data input by user
+
+2) passed array don't have defined rates, but rather only all the relevant 
+PLL coefficients; the frequency for each entry is calculated at 
+registration time, based on rate of parent clock
+
+3) the table is NULL terminated, without the need to pass its size, but 
+it's just a matter of preference
+
+> +		sort(pll->rate_table, pll->rate_count,
+> +			sizeof(struct samsung_pll_rate_table),
+> +			samsung_compare_rate, NULL);
+> +	}
+> 
+>  	clk = clk_register(NULL, &pll->hw);
+>  	if (IS_ERR(clk)) {
+> @@ -137,7 +158,9 @@ static const struct clk_ops samsung_pll36xx_clk_ops
+> = { };
+> 
+>  struct clk * __init samsung_clk_register_pll36xx(const char *name,
+> -			const char *pname, const void __iomem *base)
+> +			const char *pname, const void __iomem *base,
+> +			struct samsung_pll_rate_table *rate_table,
+> +			const unsigned int rate_count)
+>  {
+>  	struct samsung_clk_pll *pll;
+>  	struct clk *clk;
+> @@ -157,6 +180,14 @@ struct clk * __init
+> samsung_clk_register_pll36xx(const char *name,
+> 
+>  	pll->hw.init = &init;
+>  	pll->base = base;
+> +	pll->rate_table = rate_table;
+> +	pll->rate_count = rate_count;
+> +
+> +	if (pll->rate_table && pll->rate_count) {
+> +		sort(pll->rate_table, pll->rate_count,
+> +			sizeof(struct samsung_pll_rate_table),
+> +			samsung_compare_rate, NULL);
+> +	}
+> 
+>  	clk = clk_register(NULL, &pll->hw);
+>  	if (IS_ERR(clk)) {
+> diff --git a/drivers/clk/samsung/clk-pll.h
+> b/drivers/clk/samsung/clk-pll.h index 1329522..b5e12430 100644
+> --- a/drivers/clk/samsung/clk-pll.h
+> +++ b/drivers/clk/samsung/clk-pll.h
+> @@ -12,6 +12,25 @@
+>  #ifndef __SAMSUNG_CLK_PLL_H
+>  #define __SAMSUNG_CLK_PLL_H
+> 
+> +#define PLL_35XX_RATE(_rate, _m, _p, _s)			\
+> +	{							\
+> +		.rate = _rate,					\
+> +		.pll_con0 = ((_m) << 16 | (_p) << 8 | (_s)),	\
+> +	}
+> +
+> +#define PLL_36XX_RATE(_rate, _m, _p, _s, _k)			\
+> +	{							\
+> +		.rate = _rate,					\
+> +		.pll_con0 = ((_m) << 16 | (_p) << 8 | (_s)),	\
+> +		.pll_con1 = _k,					\
+> +	}
+> +
+> +struct samsung_pll_rate_table {
+> +	unsigned  int rate;
+> +	u32 pll_con0;
+> +	u32 pll_con1;
+
+I don't like this struct. What about PLLs that don't have con0 or con1, 
+but rather a completely weird register strukture like PLL_P_REG, 
+PLL_M_REG, PLL_S_REG? The structure has generic name, which suggests that 
+it should be able to handle any future Samsung PLLs as well.
+
+I'd suggest storing all coefficients as separate fields of the struct, 
+e.g.
+
+struct samsung_pll_rate_table {
+	unsigned  int rate;
+	/* ... */
+	unsigned int p;
+	unsigned int m;
+	unsigned int s;
+	/* ... */
+};
+
+Best regards,
+Tomasz
+
+> +};
+> +
+>  enum pll45xx_type {
+>  	pll_4500,
+>  	pll_4502,
+> @@ -25,9 +44,13 @@ enum pll46xx_type {
+>  };
+> 
+>  extern struct clk * __init samsung_clk_register_pll35xx(const char
+> *name, -			const char *pname, const void __iomem 
+*base);
+> +			const char *pname, const void __iomem *base,
+> +			struct samsung_pll_rate_table *rate_table,
+> +			const unsigned int rate_count);
+>  extern struct clk * __init samsung_clk_register_pll36xx(const char
+> *name, -			const char *pname, const void __iomem 
+*base);
+> +			const char *pname, const void __iomem *base,
+> +			struct samsung_pll_rate_table *rate_table,
+> +			const unsigned int rate_count);
+>  extern struct clk * __init samsung_clk_register_pll45xx(const char
+> *name, const char *pname, const void __iomem *con_reg,
+>  			enum pll45xx_type type);
