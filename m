@@ -1,93 +1,141 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 May 2013 11:44:45 +0200
-Subject: [PATCH 08/21] arm: kirkwood: iconnect: give meaningful names to
- pinmux configs
+Date: Fri, 24 May 2013 11:44:48 +0200
+Subject: [PATCH 11/21] arm: kirkwood: ns2: affect pinmux configs to the right
+ devices
 In-Reply-To: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369388699-25975-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369388699-25975-12-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kirkwood iConnect Device Tree is currently using totally
-meaningless names for the pinmux configuration: pmx_gpio_XY.
+When the pinmux mechanism was added in Kirkwood, the device driver
+core was not yet providing the possibility of attaching pinmux
+configurations to all devices, drivers had to do it explicitly, and
+not all drivers were doing this.
 
-This patch fixes that by using some more meaningful names such as
-pmx_button_power.
+Now that the driver core does that in a generic way, it makes sense to
+attach the pinmux configuration to their corresponding devices.
+
+This allows the pinctrl subsystem to show in debugfs to which device
+is related which pins, for example:
+
+pin 41 (PIN41): gpio-leds.1 mvebu-gpio:41 function gpio group mpp41
+pin 42 (PIN42): gpio-leds.1 mvebu-gpio:42 function gpio group mpp42
+pin 43 (PIN43): gpio-leds.1 mvebu-gpio:43 function gpio group mpp43
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/kirkwood-iconnect.dts |   30 +++++++++++++++---------------
- 1 file changed, 15 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/kirkwood-is2.dts         |    2 ++
+ arch/arm/boot/dts/kirkwood-ns2-common.dtsi |   10 ++++++----
+ arch/arm/boot/dts/kirkwood-ns2.dts         |    2 ++
+ arch/arm/boot/dts/kirkwood-ns2lite.dts     |    2 ++
+ arch/arm/boot/dts/kirkwood-ns2max.dts      |    2 ++
+ arch/arm/boot/dts/kirkwood-ns2mini.dts     |    2 ++
+ 6 files changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
-index 12ccf74..20c3ece 100644
---- a/arch/arm/boot/dts/kirkwood-iconnect.dts
-+++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
-@@ -21,50 +21,50 @@
+diff --git a/arch/arm/boot/dts/kirkwood-is2.dts b/arch/arm/boot/dts/kirkwood-is2.dts
+index 0bdce0a..c3f036b 100644
+--- a/arch/arm/boot/dts/kirkwood-is2.dts
++++ b/arch/arm/boot/dts/kirkwood-is2.dts
+@@ -13,6 +13,8 @@
+ 
+ 	ocp at f1000000 {
+ 		sata at 80000 {
++			pinctrl-0 = <&pmx_ns2_sata0>;
++			pinctrl-names = "default";
+ 			status = "okay";
+ 			nr-ports = <1>;
+ 		};
+diff --git a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+index 6affd92..2afac04 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
++++ b/arch/arm/boot/dts/kirkwood-ns2-common.dtsi
+@@ -8,10 +8,6 @@
+ 
  	ocp at f1000000 {
  		pinctrl: pinctrl at 10000 {
+-			pinctrl-0 = < &pmx_spi &pmx_twsi0 &pmx_uart0
+-					&pmx_ns2_sata0 &pmx_ns2_sata1>;
+-			pinctrl-names = "default";
+-
+ 			pmx_ns2_sata0: pmx-ns2-sata0 {
+ 				marvell,pins = "mpp21";
+ 				marvell,function = "sata0";
+@@ -23,10 +19,14 @@
+ 		};
  
--			pinctrl-0 = < &pmx_gpio_12 &pmx_gpio_35
--				      &pmx_gpio_41 &pmx_gpio_42
--				      &pmx_gpio_43 &pmx_gpio_44
--				      &pmx_gpio_45 &pmx_gpio_46
--				      &pmx_gpio_47 &pmx_gpio_48 >;
-+			pinctrl-0 = < &pmx_button_reset &pmx_button_otb
-+				      &pmx_led_level &pmx_led_power_blue
-+				      &pmx_led_power_red &pmx_led_usb1
-+				      &pmx_led_usb2 &pmx_led_usb3
-+				      &pmx_led_usb4 &pmx_led_otb >;
- 			pinctrl-names = "default";
+ 		serial at 12000 {
++			pinctrl-0 = <&pmx_uart0>;
++			pinctrl-names = "default";
+ 			status = "okay";
+ 		};
  
--			pmx_gpio_12: pmx-gpio-12 {
-+			pmx_button_reset: pmx-button-reset {
- 				marvell,pins = "mpp12";
- 				marvell,function = "gpio";
- 			};
--			pmx_gpio_35: pmx-gpio-35 {
-+			pmx_button_otb: pmx-button-otb {
- 				marvell,pins = "mpp35";
- 				marvell,function = "gpio";
- 			};
--			pmx_gpio_41: pmx-gpio-41 {
-+			pmx_led_level: pmx-led-level {
- 				marvell,pins = "mpp41";
- 				marvell,function = "gpio";
- 			};
--			pmx_gpio_42: pmx-gpio-42 {
-+			pmx_led_power_blue: pmx-led-power-blue {
- 				marvell,pins = "mpp42";
- 				marvell,function = "gpio";
- 			};
--			pmx_gpio_43: pmx-gpio-43 {
-+			pmx_led_power_red: pmx-power-red {
- 				marvell,pins = "mpp43";
- 				marvell,function = "gpio";
- 			};
--			pmx_gpio_44: pmx-gpio-44 {
-+			pmx_led_usb1: pmx-led-usb1 {
- 				marvell,pins = "mpp44";
- 				marvell,function = "gpio";
- 			};
--			pmx_gpio_45: pmx-gpio-45 {
-+			pmx_led_usb2: pmx-led-usb2 {
- 				marvell,pins = "mpp45";
- 				marvell,function = "gpio";
- 			};
--			pmx_gpio_46: pmx-gpio-46 {
-+			pmx_led_usb3: pmx-led-usb3 {
- 				marvell,pins = "mpp46";
- 				marvell,function = "gpio";
- 			};
--			pmx_gpio_47: pmx-gpio-47 {
-+			pmx_led_usb4: pmx-led-usb4 {
- 				marvell,pins = "mpp47";
- 				marvell,function = "gpio";
- 			};
--			pmx_gpio_48: pmx-gpio-48 {
-+			pmx_led_otb: pmx-led-otb {
- 				marvell,pins = "mpp48";
- 				marvell,function = "gpio";
- 			};
+ 		spi at 10600 {
++			pinctrl-0 = <&pmx_spi>;
++			pinctrl-names = "default";
+ 			status = "okay";
+ 
+ 			flash at 0 {
+@@ -45,6 +45,8 @@
+ 		};
+ 
+ 		i2c at 11000 {
++			pinctrl-0 = <&pmx_twsi0>;
++			pinctrl-names = "default";
+ 			status = "okay";
+ 
+ 			eeprom at 50 {
+diff --git a/arch/arm/boot/dts/kirkwood-ns2.dts b/arch/arm/boot/dts/kirkwood-ns2.dts
+index f2d36ecf..b50e93d 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2.dts
++++ b/arch/arm/boot/dts/kirkwood-ns2.dts
+@@ -13,6 +13,8 @@
+ 
+ 	ocp at f1000000 {
+ 		sata at 80000 {
++			pinctrl-0 = <&pmx_ns2_sata0>;
++			pinctrl-names = "default";
+ 			status = "okay";
+ 			nr-ports = <1>;
+ 		};
+diff --git a/arch/arm/boot/dts/kirkwood-ns2lite.dts b/arch/arm/boot/dts/kirkwood-ns2lite.dts
+index b02eb4e..af8259f 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2lite.dts
++++ b/arch/arm/boot/dts/kirkwood-ns2lite.dts
+@@ -13,6 +13,8 @@
+ 
+ 	ocp at f1000000 {
+ 		sata at 80000 {
++			pinctrl-0 = <&pmx_ns2_sata0>;
++			pinctrl-names = "default";
+ 			status = "okay";
+ 			nr-ports = <1>;
+ 		};
+diff --git a/arch/arm/boot/dts/kirkwood-ns2max.dts b/arch/arm/boot/dts/kirkwood-ns2max.dts
+index bcec4d6..85f24d2 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2max.dts
++++ b/arch/arm/boot/dts/kirkwood-ns2max.dts
+@@ -13,6 +13,8 @@
+ 
+ 	ocp at f1000000 {
+ 		sata at 80000 {
++			pinctrl-0 = <&pmx_ns2_sata0 &pmx_ns2_sata1>;
++			pinctrl-names = "default";
+ 			status = "okay";
+ 			nr-ports = <2>;
+ 		};
+diff --git a/arch/arm/boot/dts/kirkwood-ns2mini.dts b/arch/arm/boot/dts/kirkwood-ns2mini.dts
+index adab1ab..329e530 100644
+--- a/arch/arm/boot/dts/kirkwood-ns2mini.dts
++++ b/arch/arm/boot/dts/kirkwood-ns2mini.dts
+@@ -14,6 +14,8 @@
+ 
+ 	ocp at f1000000 {
+ 		sata at 80000 {
++			pinctrl-0 = <&pmx_ns2_sata0>;
++			pinctrl-names = "default";
+ 			status = "okay";
+ 			nr-ports = <1>;
+ 		};
 -- 
 1.7.9.5
