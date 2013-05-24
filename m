@@ -1,44 +1,55 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 May 2013 10:07:54 +0200
-Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
- 370/XP
-In-Reply-To: <20130524074616.GV18614@n2100.arm.linux.org.uk>
-References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <201305232240.03959.arnd@arndb.de>
- <20130523230911.GR18614@n2100.arm.linux.org.uk>
- <201305240915.27847.arnd@arndb.de>
- <20130524074616.GV18614@n2100.arm.linux.org.uk>
-Message-ID: <20130524100754.6b2d1bc9@skate>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 24 May 2013 10:08:07 +0200
+Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
+In-Reply-To: <519E5732.1040800@free-electrons.com>
+References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
+ <201305221305.09579.marex@denx.de> <201305230920.18200.jbe@pengutronix.de>
+ <201305231648.17356.marex@denx.de>
+ <1369322904.4142.36.camel@weser.hi.pengutronix.de>
+ <519E5732.1040800@free-electrons.com>
+Message-ID: <1369382887.4117.34.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell King - ARM Linux,
-
-On Fri, 24 May 2013 08:46:16 +0100, Russell King - ARM Linux wrote:
-
-> Wrong, again.  Thomas has already said there are boot loaders shipping
-> on boards which have the registers programmed to be at 0xf1xxxxxx _and_
-> there's boards with boot loaders programmed for 0xd0xxxxxx.
+Am Donnerstag, den 23.05.2013, 19:51 +0200 schrieb Alexandre Belloni:
+> Hi,
 > 
-> The problem is here TODAY.
+[...]
+> >
+> > So while we _might_ be able to get the PIO mode to work on the i.MX23
+> > there is nothing in the doc stating that it's even meant to work. Even
+> > while PIO and DMA mode use the same internal mechanisms, there's still
+> > plenty of opportunities of fail in there. After all PIO mode relies on
+> > reading a debug register in the course of normal operation.
+> >
+> > Only more extensive experimentation could show if we are in fact able to
+> > make it work, a first shot of using PIO mode on MX23 failed, so it might
+> > as well be that Juergens quick fix is correct and we have to disable PIO
+> > mode on MX23 altogether. That said please stop slapping the word "hack"
+> > over this patch until proven otherwise.
+> 
+> Still, Fabio and I have been experiencing the one second delay on
+> i.mx28. From my experience, it appeared between 3.7 and 3.9, see:
+> http://www.spinics.net/lists/linux-i2c/msg11985.html. I still didn't
+> take the time to investigate more yet but it confirms that PIO mode is
+> working on i.mx28 though with an annoying delay.
+> 
 
-Right. And again, don't expect something like:
+Just for the record: I know that PIO mode is functional on i.MX28
+because I have it working on one of our customer boards. I am rather
+much surprised it's still not working well for you, but haven't had a
+chance to investigate yet. The i.MX28 RM explicitly describes how to
+work with the PIO mode, so if it's not working this is bug somewhere.
 
- * Board A = 0xd0xxxxxx
- * Board B = 0xf1xxxxxx
+This thread/patch is about a whole different problem, namely PIO mode
+being non-functional on i.MX23. As the i.MX23 RM doesn't describe the
+PIO mode, there is no indication that it's even meant to work on this
+chip.
 
-Depending on which bootloader, and which version of the bootloader you
-run, on a given board, the kernel may be booted with 0xd0 or 0xf1.
-
-And again, again. This 0xd0 was a mistake. We don't want to support
-moving forward. The only thing we want to support is 0xf1, nothing else.
-
-All the proposal is about a temporary workaround, just to make the
-transition smoother.
-
-Thomas
+Regards,
+Lucas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
