@@ -1,22 +1,23 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 24 May 2013 10:11:33 -0700
-Subject: [GIT PULL] at91: fixes for 3.10 #2
-In-Reply-To: <1369410151-7837-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1369410151-7837-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <CAOesGMjvKhVKZf9A70K7VzXikY902KVyKR==4ivnb-gxhyRCPQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 May 2013 19:12:53 +0200
+Subject: [PATCHv4 6/6] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
+In-Reply-To: <201305241910.37975.arnd@arndb.de>
+References: <1369410080-436-1-git-send-email-dinguyen@altera.com>
+ <1369410080-436-6-git-send-email-dinguyen@altera.com>
+ <201305241910.37975.arnd@arndb.de>
+Message-ID: <201305241912.53751.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday 24 May 2013, Arnd Bergmann wrote:
 
-I'll pull this for now, but...
+> It also seems odd to have this in the series for the ethernet driver.
 
+After I sent it I realized that your patches are actually for different
+parts of the system, they were just all replies to the same first patch.
 
-> Jean-Christophe PLAGNIOL-VILLARD (1):
->       ARM: at91: at91sam9n12: move external irq declatation to DT
+It's usually helpful to add a [PATCH 0/6] message that explains the
+overall intention and who you expect to pick up the patches, to avoid
+the confusion I had.
 
-This one is not a fix. While OK this time, please stick to only
-sending true fixes for 3.10 from here on out.
-
-
--Olof
+	Arnd
