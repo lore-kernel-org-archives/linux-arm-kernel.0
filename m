@@ -1,52 +1,25 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 May 2013 12:23:33 +0100
-Subject: [PATCH] regulator: ab8500-ext: Don't register without
- initialisation data
-In-Reply-To: <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
-References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
- <1369226853-16978-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130524112333.GW22683@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 May 2013 12:23:46 +0100
+Subject: [PATCH 09/11] ARM64: mm: HugeTLB support.
+In-Reply-To: <1369328878-11706-10-git-send-email-steve.capper@linaro.org>
+References: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
+ <1369328878-11706-10-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130524112346.GK18272@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 May 2013, Lee Jones wrote:
-
-> This patch fixes a bug introduced in the v3.10 merge window.
+On Thu, May 23, 2013 at 06:07:56PM +0100, Steve Capper wrote:
+> Add huge page support to ARM64, different huge page sizes are
+> supported depending on the size of normal pages:
 > 
-> Some platforms will not want external registers. Rather than setting up
-> lots of different clauses in the core ab8500 regulator driver not to
-> call ab8500-ext init() we just won't pass the initialisation data from
-> platform code. This patch checks for it and if it's missing, we won't
-> register the external regulators.
+> PAGE_SIZE is 4KB:
+>    2MB - (pmds) these can be allocated at any time.
+> 1024MB - (puds) usually allocated on bootup with the command line
+>          with something like: hugepagesz=1G hugepages=6
 > 
-> Cc: Mark Brown <broonie@kernel.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/regulator/ab8500-ext.c |    6 ++++++
->  1 file changed, 6 insertions(+)
+> PAGE_SIZE is 64KB:
+>  512MB - (pmds) usually allocated on bootup via command line.
 > 
-> diff --git a/drivers/regulator/ab8500-ext.c b/drivers/regulator/ab8500-ext.c
-> index b4d4547..8421537 100644
-> --- a/drivers/regulator/ab8500-ext.c
-> +++ b/drivers/regulator/ab8500-ext.c
-> @@ -334,6 +334,12 @@ int ab8500_ext_regulator_init(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> +	/* have any external regulators been specified? */
-> +	if (pdata->num_ext_regulator == 0) {
-> +		dev_warn(&pdev->dev, "Not using external regulators\n");
-> +		return 0;
-> +	}
-> +
->  	/* make sure the platform data has the correct size */
->  	if (pdata->num_ext_regulator != ARRAY_SIZE(ab8500_ext_regulator_info)) {
->  		dev_err(&pdev->dev, "Configuration error: size mismatch.\n");
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
 
-Okay drop this patch, I have a better solution.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
