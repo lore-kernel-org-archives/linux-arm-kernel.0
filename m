@@ -1,104 +1,33 @@
 From: rogerio.pimentel@freescale.com (Rogerio Pimentel)
-Date: Fri, 24 May 2013 11:09:30 -0300
-Subject: [PATCH v3 1/2] ARM:dts:mx53qsb: Add support for parallel display
-Message-ID: <1369404571-21356-1-git-send-email-rogerio.pimentel@freescale.com>
+Date: Fri, 24 May 2013 11:09:31 -0300
+Subject: [PATCH v3 2/2] ARM:imx_v6_v7_defconfig: enable parallel display
+In-Reply-To: <1369404571-21356-1-git-send-email-rogerio.pimentel@freescale.com>
+References: <1369404571-21356-1-git-send-email-rogerio.pimentel@freescale.com>
+Message-ID: <1369404571-21356-2-git-send-email-rogerio.pimentel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for CLAA WVGA display for i.MX53 QSB.
+Enable paralell display by default
 
 Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
 ---
 Changes since V2:
-Added status = "disabled" by default to avoid conflict with other
-displays like HDMI card.
- arch/arm/boot/dts/imx53-qsb.dts |   27 +++++++++++++++++++++++++++
- arch/arm/boot/dts/imx53.dtsi    |   35 +++++++++++++++++++++++++++++++++++
- 2 files changed, 62 insertions(+)
+CONFIG_OF_VIDEOMODE doesn't need to be added on defconfig
+ arch/arm/configs/imx_v6_v7_defconfig |    2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-index a885d37..8509db3 100644
---- a/arch/arm/boot/dts/imx53-qsb.dts
-+++ b/arch/arm/boot/dts/imx53-qsb.dts
-@@ -21,6 +21,33 @@
- 		reg = <0x70000000 0x40000000>;
- 	};
- 
-+	display at di0 {
-+		compatible = "fsl,imx-parallel-display";
-+		crtcs = <&ipu 0>;
-+		interface-pix-fmt = "rgb565";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ipu_disp0_1>;
-+		status = "disabled";
-+		display-timings {
-+			claawvga {
-+				native-mode;
-+				clock-frequency = <27000000>;
-+				hactive = <800>;
-+				vactive = <480>;
-+				hback-porch = <40>;
-+				hfront-porch = <60>;
-+				vback-porch = <10>;
-+				vfront-porch = <10>;
-+				hsync-len = <20>;
-+				vsync-len = <10>;
-+				hsync-active = <0>;
-+				vsync-active = <0>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
-+			};
-+		};
-+	};
-+
- 	gpio-keys {
- 		compatible = "gpio-keys";
- 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 2dbdc90..3a565ff 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -544,6 +544,41 @@
- 					};
- 				};
- 
-+				ipu_disp0 {
-+					pinctrl_ipu_disp0_1: ipudisp0grp-1 {
-+						fsl,pins = <
-+						MX53_PAD_DI0_DISP_CLK__IPU_DI0_DISP_CLK	0x5
-+						MX53_PAD_DI0_PIN15__IPU_DI0_PIN15		0x5
-+						MX53_PAD_DI0_PIN2__IPU_DI0_PIN2		0x5
-+						MX53_PAD_DI0_PIN3__IPU_DI0_PIN3 		0x5
-+						MX53_PAD_DISP0_DAT0__IPU_DISP0_DAT_0		0x5
-+						MX53_PAD_DISP0_DAT1__IPU_DISP0_DAT_1		0x5
-+						MX53_PAD_DISP0_DAT2__IPU_DISP0_DAT_2		0x5
-+						MX53_PAD_DISP0_DAT3__IPU_DISP0_DAT_3		0x5
-+						MX53_PAD_DISP0_DAT4__IPU_DISP0_DAT_4		0x5
-+						MX53_PAD_DISP0_DAT5__IPU_DISP0_DAT_5		0x5
-+						MX53_PAD_DISP0_DAT6__IPU_DISP0_DAT_6		0x5
-+						MX53_PAD_DISP0_DAT7__IPU_DISP0_DAT_7		0x5
-+						MX53_PAD_DISP0_DAT8__IPU_DISP0_DAT_8		0x5
-+						MX53_PAD_DISP0_DAT9__IPU_DISP0_DAT_9		0x5
-+						MX53_PAD_DISP0_DAT10__IPU_DISP0_DAT_10		0x5
-+						MX53_PAD_DISP0_DAT11__IPU_DISP0_DAT_11		0x5
-+						MX53_PAD_DISP0_DAT12__IPU_DISP0_DAT_12		0x5
-+						MX53_PAD_DISP0_DAT13__IPU_DISP0_DAT_13		0x5
-+						MX53_PAD_DISP0_DAT14__IPU_DISP0_DAT_14		0x5
-+						MX53_PAD_DISP0_DAT15__IPU_DISP0_DAT_15		0x5
-+						MX53_PAD_DISP0_DAT16__IPU_DISP0_DAT_16		0x5
-+						MX53_PAD_DISP0_DAT17__IPU_DISP0_DAT_17		0x5
-+						MX53_PAD_DISP0_DAT18__IPU_DISP0_DAT_18		0x5
-+						MX53_PAD_DISP0_DAT19__IPU_DISP0_DAT_19		0x5
-+						MX53_PAD_DISP0_DAT20__IPU_DISP0_DAT_20		0x5
-+						MX53_PAD_DISP0_DAT21__IPU_DISP0_DAT_21		0x5
-+						MX53_PAD_DISP0_DAT22__IPU_DISP0_DAT_22		0x5
-+						MX53_PAD_DISP0_DAT23__IPU_DISP0_DAT_23		0x5
-+						>;
-+					};
-+				};
-+
- 				ipu_disp1 {
- 					pinctrl_ipu_disp1_1: ipudisp1grp-1 {
- 						fsl,pins = <
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 6ec010f..7085c7a 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -208,6 +208,8 @@ CONFIG_IMX_SDMA=y
+ CONFIG_MXS_DMA=y
+ CONFIG_STAGING=y
+ CONFIG_DRM_IMX=y
++CONFIG_DRM_IMX_FB_HELPER=y
++CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
+ CONFIG_DRM_IMX_IPUV3_CORE=y
+ CONFIG_DRM_IMX_IPUV3=y
+ CONFIG_COMMON_CLK_DEBUG=y
 -- 
 1.7.10.4
