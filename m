@@ -1,53 +1,24 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 May 2013 12:22:19 +0100
-Subject: [PATCH] ARM: ux500: Provide supplies for AUX1, AUX2 and AUX3
-Message-ID: <1369394539-3713-1-git-send-email-lee.jones@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 May 2013 12:20:29 +0100
+Subject: [PATCH] ARM: at91: Fix: Change internal SRAM memory type to
+ "MT_MEMORY_SO"
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641687BB93C@penmbx01>
+References: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
+ <1369011979-21354-1-git-send-email-wenyou.yang@atmel.com>
+ <20130522001457.GA18614@n2100.arm.linux.org.uk>
+ <B256D81BAE5131468A838E5D7A243641687BB93C@penmbx01>
+Message-ID: <20130524112029.GW18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a bug introduced in the v3.10 merge window.
+On Fri, May 24, 2013 at 07:11:04AM +0000, Yang, Wenyou wrote:
+> The story is: for sama5d3x with Cortex-A5 core, if not so, when copying
+> code snippet to the internal SRAM, then jump to run this code, but fail
+> to run.
 
-The AB8500 External Regulator driver has recently landed upstream,
-which registers each of the 3 external regulators located on the
-AB8500. If these regulators are marked as 'always on', there is a
-potential for power-loss. If they're not and are seemingly unused
-the Regulator subsystem will attempt to disable them to save power.
-This causes an issue for AUX1, AUX2 and AUX3 as they obtain their
-power from EXT3. So we're specifying that here to prevent EXT3 from
-being powered down.
+And that is where your mistake is - you forgot that you're working with
+a CPU with harvard caches which will require some cache maintanence
+between copying the code and executing it.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500-regulators.c |    3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-index 33c353b..d6b7c85 100644
---- a/arch/arm/mach-ux500/board-mop500-regulators.c
-+++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-@@ -374,6 +374,7 @@ static struct ab8500_regulator_reg_init ab8500_reg_init[] = {
- static struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
- 	/* supplies to the display/camera */
- 	[AB8500_LDO_AUX1] = {
-+		.supply_regulator = "ab8500-ext-supply3",
- 		.constraints = {
- 			.name = "V-DISPLAY",
- 			.min_uV = 2800000,
-@@ -387,6 +388,7 @@ static struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
- 	},
- 	/* supplies to the on-board eMMC */
- 	[AB8500_LDO_AUX2] = {
-+		.supply_regulator = "ab8500-ext-supply3",
- 		.constraints = {
- 			.name = "V-eMMC1",
- 			.min_uV = 1100000,
-@@ -402,6 +404,7 @@ static struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
- 	},
- 	/* supply for VAUX3, supplies to SDcard slots */
- 	[AB8500_LDO_AUX3] = {
-+		.supply_regulator = "ab8500-ext-supply3",
- 		.constraints = {
- 			.name = "V-MMC-SD",
- 			.min_uV = 1100000,
--- 
-1.7.10.4
+You want to look at flush_icache_range() rather than making this memory
+strongly ordered.
