@@ -1,45 +1,59 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 May 2013 09:24:28 +0100
-Subject: [PATCH] ARM: ux500: Only configure wake-up reasons on ux500
- based platforms
-In-Reply-To: <CACRpkdZjC7nFxsWkED6FvCOxdA1oQVuB+Tz8DZWM+iQDi6zjWA@mail.gmail.com>
-References: <1368702935-25599-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdZjC7nFxsWkED6FvCOxdA1oQVuB+Tz8DZWM+iQDi6zjWA@mail.gmail.com>
-Message-ID: <20130524082428.GO22683@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 24 May 2013 10:26:41 +0200
+Subject: [PATCH 1/1] ARM: at91: at91sam9n12: move external irq declatation
+ to DT
+In-Reply-To: <1369349956-22985-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1369349956-22985-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <519F2441.4010000@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 May 2013, Linus Walleij wrote:
+On 24/05/2013 00:59, Jean-Christophe PLAGNIOL-VILLARD :
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-> On Thu, May 16, 2013 at 1:15 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > Multiplatform calls all enabled platforms' initcalls. In the
-> > ux500_idle_init() initcall we call into the DBx500-PRCMU which in turn
-> > executes some ux500 specific register reads/writes. When running on
-> > some !ux500 platforms this ends up causing a kernel Oops. This patch
-> > ensures the PRCMU call is only invoked when running on ux500 based
-> > platforms.
-> >
-> > Reported-by: Rob Herring <rob.herring@calxeda.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Patch applied for ux500 fixes.
-> 
-> Hm, again and again I get so confused by this, don't you say
-> "wakeup CAUSE" rather than "wakeup REASON"?
-> 
-> Maybe I don't know the anglo saxon well enough...
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-The words 'cause' and 'reason' are fairly synonymous and are
-interchangeable in a great many situations. You have to be an English
-literary Nazi to care enough to work out the semantics, which in case
-you hadn't noticed, I'm not. :)
+Stacked on at91-3.10-fixes. Thanks.
 
-But, credit where credit's due, in this particular instance you are
-correct. Feel free to fixup.
+
+> ---
+>   arch/arm/boot/dts/at91sam9n12.dtsi |    1 +
+>   arch/arm/mach-at91/at91sam9n12.c   |    6 ------
+>   2 files changed, 1 insertion(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+> index 566af32..d864f7a9 100644
+> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+> @@ -60,6 +60,7 @@
+>   				compatible = "atmel,at91rm9200-aic";
+>   				interrupt-controller;
+>   				reg = <0xfffff000 0x200>;
+> +				atmel,external-irqs = <31>;
+>   			};
+>
+>   			ramc0: ramc at ffffe800 {
+> diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
+> index 13cdbcd..c7d670d1 100644
+> --- a/arch/arm/mach-at91/at91sam9n12.c
+> +++ b/arch/arm/mach-at91/at91sam9n12.c
+> @@ -223,13 +223,7 @@ static void __init at91sam9n12_map_io(void)
+>   	at91_init_sram(0, AT91SAM9N12_SRAM_BASE, AT91SAM9N12_SRAM_SIZE);
+>   }
+>
+> -void __init at91sam9n12_initialize(void)
+> -{
+> -	at91_extern_irq = (1 << AT91SAM9N12_ID_IRQ0);
+> -}
+> -
+>   AT91_SOC_START(at91sam9n12)
+>   	.map_io = at91sam9n12_map_io,
+>   	.register_clocks = at91sam9n12_register_clocks,
+> -	.init = at91sam9n12_initialize,
+>   AT91_SOC_END
+>
+
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Nicolas Ferre
