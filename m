@@ -1,85 +1,36 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Fri, 24 May 2013 16:11:04 +0300
-Subject: [PATCH v2 07/10] powerpc: uaccess s/might_sleep/might_fault/
-In-Reply-To: <20130524130032.GA10167@redhat.com>
-References: <cover.1368702323.git.mst@redhat.com>
- <2aa6c3da21a28120126732b5e0b4ecd6cba8ca3b.1368702323.git.mst@redhat.com>
- <201305221559.01806.arnd@arndb.de>
- <20130524130032.GA10167@redhat.com>
-Message-ID: <20130524131104.GA11462@redhat.com>
+From: mfuzzey@parkeon.com (Martin Fuzzey)
+Date: Fri, 24 May 2013 15:12:49 +0200
+Subject: LVDS (LDB) driver for i.MX53 IPU
+In-Reply-To: <Pine.LNX.4.64.1305241431460.2226@axis700.grange>
+References: <5134DF0E.7010402@parkeon.com>
+ <20130310223241.GQ1906@pengutronix.de>
+ <Pine.LNX.4.64.1305241431460.2226@axis700.grange>
+Message-ID: <519F6751.7020706@parkeon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 04:00:32PM +0300, Michael S. Tsirkin wrote:
-> On Wed, May 22, 2013 at 03:59:01PM +0200, Arnd Bergmann wrote:
-> > On Thursday 16 May 2013, Michael S. Tsirkin wrote:
-> > > @@ -178,7 +178,7 @@ do {                                                                \
-> > >         long __pu_err;                                          \
-> > >         __typeof__(*(ptr)) __user *__pu_addr = (ptr);           \
-> > >         if (!is_kernel_addr((unsigned long)__pu_addr))          \
-> > > -               might_sleep();                                  \
-> > > +               might_fault();                                  \
-> > >         __chk_user_ptr(ptr);                                    \
-> > >         __put_user_size((x), __pu_addr, (size), __pu_err);      \
-> > >         __pu_err;                                               \
-> > > 
-> > 
-> > Another observation:
-> > 
-> > 	if (!is_kernel_addr((unsigned long)__pu_addr))
-> > 		might_sleep();
-> > 
-> > is almost the same as
-> > 
-> > 	might_fault();
-> > 
-> > except that it does not call might_lock_read().
-> > 
-> > The version above may have been put there intentionally and correctly, but
-> > if you want to replace it with might_fault(), you should remove the
-> > "if ()" condition.
-> > 
-> > 	Arnd
-> 
-> Well not exactly. The non-inline might_fault checks the
-> current segment, not the address.
-> I'm guessing this is trying to do the same just without
-> pulling in segment_eq, but I'd like a confirmation
-> from more PPC maintainers.
-> 
-> Guys would you ack
-> 
-> - 	if (!is_kernel_addr((unsigned long)__pu_addr))
-> - 		might_fault();
-> + 	might_fault();
-> 
-> on top of this patch?
+Hi Guennadi,
 
-OK I spoke too fast: I found this:
+On 24/05/13 14:35, Guennadi Liakhovetski wrote:
+> Hi Sascha
+>
+> On Sun, 10 Mar 2013, Sascha Hauer wrote:
+>
+>>
+>> We have a driver for the ldb. Indeed the driver itself is trivial, but
+>> the integration is tricky. For accessing the register the syscon binding
+>> can be used. The clock is also a problem, also the mux to the IPU(s)
+>>
+>> I'll talk with Philipp tomorrow and I think we can send you the current
+>> state then.
+> How's it looking in the meantime? Any plans to mainline it? Or would you
+> be prepared to publish what you've got to try and see whether others can
+> help you with this?
+Philipp submitted them on March 28 "[PATCH v3 0/11] LVDS Display Bridge 
+support for i.MX"
+The drivers/staging parts don't seem to have been applied (not in 
+linux/next at any rate)
 
-    powerpc: Fix incorrect might_sleep in __get_user/__put_user on kernel addresses
-    
-    We have a case where __get_user and __put_user can validly be used
-    on kernel addresses in interrupt context - namely, the alignment
-    exception handler, as our get/put_unaligned just do a single access
-    and rely on the alignment exception handler to fix things up in the
-    rare cases where the cpu can't handle it in hardware.  Thus we can
-    get alignment exceptions in the network stack at interrupt level.
-    The alignment exception handler does a __get_user to read the
-    instruction and blows up in might_sleep().
-    
-    Since a __get_user on a kernel address won't actually ever sleep,
-    this makes the might_sleep conditional on the address being less
-    than PAGE_OFFSET.
-    
-    Signed-off-by: Paul Mackerras <paulus@samba.org>
+I've added them to my local tree and they work fine (on i.MX53)
 
-So this won't work, unless we add the is_kernel_addr check
-to might_fault. That will become possible on top of this patchset
-but let's consider this carefully, and make this a separate
-patchset, OK?
-
-> Also, any volunteer to test this (not just test-build)?
-> 
-> -- 
-> MST
+Martin
