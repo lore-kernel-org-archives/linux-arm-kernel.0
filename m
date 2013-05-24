@@ -1,146 +1,106 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 24 May 2013 18:11:02 +0200
-Subject: [GIT PULL] at91: cleanup (pinctrl macros, defconfigs) for 3.11 #1
-In-Reply-To: <1368799336-25226-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1368799336-25226-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <519F9116.8060109@atmel.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Fri, 24 May 2013 17:06:38 +0100
+Subject: [RFC 3/8] mfd:syscon: Introduce claim/read/write/release APIs
+In-Reply-To: <201305232344.11974.arnd@arndb.de>
+References: <1368022187-1633-1-git-send-email-srinivas.kandagatla@st.com>
+ <201305171636.49627.arnd@arndb.de> <519A1BBB.2070903@st.com>
+ <201305232344.11974.arnd@arndb.de>
+Message-ID: <519F900E.308@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/05/2013 16:02, Nicolas Ferre :
-> Arnd, Olof,
->
-> Here is the first AT91 cleanup pull-request for 3.11. I is dominated by a big
-> update of DT files because of the move to macros in pinctrl. As we plan to
-> make this "cleanup" series the base of all our work on AT91 for 3.11, we would
-> like to see it appearing early in arm-soc and linux-next: this is why we send
-> it to you right now.
->
-> We have colected the Acked-by from Linus Walleij and we all think that it makes
-> sense to merge this material through arm-soc tree:
-> - is touches nearly nothing of pinctrl actual code (a header file)
-> - all dtsi/dts modifications for 3.11 will need this as a codebase for avoiding
->    merging nightmare
->
-> I hope that it is okay with you.
->
-> Thanks, best regards,
->
-> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
->
->    Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
->
-> are available in the git repository at:
->
->    git://github.com/at91linux/linux-at91.git tags/at91-cleanup
+On 23/05/13 22:44, Arnd Bergmann wrote:
+Thankyou Arnd for extending this discussion.
+> On Monday 20 May 2013, Srinivas KANDAGATLA wrote:
+>> On 17/05/13 15:36, Arnd Bergmann wrote:
+>>
+>> On the other hand using device trees to describe the HW
+>> configuration(sysconfs) made more sense and got rid of SOC specific
+>> callbacks.
+> 
+> I'm sure it's possible to reduce the duplication without going all
+> the way to describing every bit in DT.
 
-Arnd, Olof,
+Yes, I agree with you. I think just passing the offset information from
+DT would enough in cases like Ethernet or USB where the sysconf
+registers tend to be mostly standard. And the generic higher level
+function should be able to do the rest.
 
-After having sent the second "fixes" pull-request to you, I want to warn 
-you about merging conflicts concerning this "cleanup" pull-request for 3.11.
+>> I forget to mention a important point here, the protection is at bit
+>> level for the sysconfs. Some of sysconfs have bits shared across IPs, so
+>> protecting them while the IP is still using it is what we are trying to
+>> achieve with sysconf-claim/release apis.
+>> While it may be overkill, but In past it has found bugs and been helpful
+>> with a meaning full debug output.
+> 
+> Can you give an example of something that is shared across multiple IPs?
+> 
+> Are those always done in the way that you have e.g. the ethernet pinctrl
+> in the same register as the usb pinctrl, or could you have an ethernet
+> pinctrl setting mixed together with the usb clock setting for instance?
+> 
+> If the hardware has been designed in a sensible way rather than just
+> grown by randomly adding bits in open spaces, I would assume that it's
+> possible to have high-level interfaces built around ranges of registers
+> rather than arbitrary subsets of registers.
 
-2 merging conflicts are appearing when placing the "cleanup" branch on 
-top of the "fixes" material contained today in at91-fixes tag.
-To address this, I have pushed a resolution branch on our usual git tree:
+We have decided to go with using higher level functions as you
+suggested, hopefully based on regmap with some helper functions on top
+of it.
 
-git://github.com/at91linux/linux-at91.git   at91-3.11-cleanup1+resolved
+System configuration registers in the past used to very much shared
+across IPs, However with the new chips they seems be mostly dedicated
+registers for specific IP configurations.
+As we have no plans to support very old chips, So I think I can move
+this out bit level information from device tree and add a higher level
+functions to be accessed by the drivers.
 
-In case of any question, please let me know. If you want me to rebase 
-the original tag that I've sent you, I can do it as well.
+As an example the below sysconf register for a STi7105 chip(Very old
+SOC) looks like:
+SYSTEM_CONFIG7 Comms/Ethernet config control register
 
-Thanks, best regards,
+[31:28] RESERVED
+[27] ENMII:
+	1: MII mode 0: Reverse MII mode
+[26:25] PHY_INTF_SELECT: Selects the type of Ethernet mode
+	00: MII mode (Default)
+	01: Reserved
+	1x: Reserved
+[23] GLOBAL_POWER_DOWN:
+	1: Activate low power
+[24] RESERVED
+	0: Normal mode
+[22] DAA_CONFIG_CTRL: DAA configuration control
+[21] RESERVED
+[20] MAC_SPEED_SEL:
+	1: Indicates that the MAC is running at 100 Mbps speed
+	0: Indicates that the MAC is running at 10 Mbps speed
+[19] RESERVED
+[18] RMII_MODE:
+	1: RMII interface activated
+	0: MII interface activated
+[17] MIIM_DIO_SELECT:
+	1: MIIM_DIO from external input, else from GMAC
+	0: All MII pads in input mode
+[16] ETHERNET_INTERFACE_ON:
+	1: Ethernet on (pads enables controlled by MAC)
+[15:13] RESERVED
+[12] DAA_SERIAL_MODE: DAA serial interface mode select pin
 
-> for you to fetch changes up to b3f442b0eedbc20b5ce3f4a96530588d14901199:
->
->    ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
->
-> ----------------------------------------------------------------
-> Big update with pinctrl by use of macros and
-> header files. Increases readability and avoid
-> typos.
-> Update of AT91 defconfigs and merge of defconfigs for
-> SoC look-alike:
-> sam9260/9g20 and sam9261/9g10.
->
-> ----------------------------------------------------------------
-> Jean-Christophe PLAGNIOL-VILLARD (6):
->        ARM: at91: dt: use #include for all device trees
->        ARM: at91: dt: switch to standard GPIO flag defines.
->        ARM: at91: dt: add pinctrl pre-processor define
->        ARM: at91: dt: switch to pinctrl to pre-processor
->        ARM: at91: dt: switch to standard IRQ flag defines
->        ARM: at91: udpate defconfigs
->
->   arch/arm/boot/dts/aks-cdu.dts                      |  12 +-
->   arch/arm/boot/dts/animeo_ip.dts                    |  18 +-
->   arch/arm/boot/dts/at91-ariag25.dts                 |   6 +-
->   arch/arm/boot/dts/at91rm9200.dtsi                  | 207 ++++----
->   arch/arm/boot/dts/at91rm9200ek.dts                 |  10 +-
->   arch/arm/boot/dts/at91sam9260.dtsi                 | 215 ++++-----
->   arch/arm/boot/dts/at91sam9263.dtsi                 | 203 ++++----
->   arch/arm/boot/dts/at91sam9263ek.dts                |  24 +-
->   arch/arm/boot/dts/at91sam9g15.dtsi                 |   2 +-
->   arch/arm/boot/dts/at91sam9g15ek.dts                |   4 +-
->   arch/arm/boot/dts/at91sam9g20.dtsi                 |   2 +-
->   arch/arm/boot/dts/at91sam9g20ek.dts                |   6 +-
->   arch/arm/boot/dts/at91sam9g20ek_2mmc.dts           |  10 +-
->   arch/arm/boot/dts/at91sam9g20ek_common.dtsi        |  28 +-
->   arch/arm/boot/dts/at91sam9g25.dtsi                 |   2 +-
->   arch/arm/boot/dts/at91sam9g25ek.dts                |   4 +-
->   arch/arm/boot/dts/at91sam9g35.dtsi                 |   2 +-
->   arch/arm/boot/dts/at91sam9g35ek.dts                |   4 +-
->   arch/arm/boot/dts/at91sam9g45.dtsi                 | 213 ++++-----
->   arch/arm/boot/dts/at91sam9m10g45ek.dts             |  38 +-
->   arch/arm/boot/dts/at91sam9n12.dtsi                 | 141 +++---
->   arch/arm/boot/dts/at91sam9n12ek.dts                |  14 +-
->   arch/arm/boot/dts/at91sam9x25.dtsi                 |  22 +-
->   arch/arm/boot/dts/at91sam9x25ek.dts                |   4 +-
->   arch/arm/boot/dts/at91sam9x35.dtsi                 |   2 +-
->   arch/arm/boot/dts/at91sam9x35ek.dts                |   4 +-
->   arch/arm/boot/dts/at91sam9x5.dtsi                  | 279 +++++------
->   arch/arm/boot/dts/at91sam9x5cm.dtsi                |   8 +-
->   arch/arm/boot/dts/at91sam9x5ek.dtsi                |  14 +-
->   arch/arm/boot/dts/ethernut5.dts                    |   6 +-
->   arch/arm/boot/dts/evk-pro3.dts                     |   6 +-
->   arch/arm/boot/dts/ge863-pro3.dtsi                  |   2 +-
->   arch/arm/boot/dts/kizbox.dts                       |  16 +-
->   arch/arm/boot/dts/mpa1600.dts                      |   4 +-
->   arch/arm/boot/dts/pm9g45.dts                       |  22 +-
->   arch/arm/boot/dts/sama5d3.dtsi                     | 520 +++++++++++----------
->   arch/arm/boot/dts/sama5d31ek.dts                   |   6 +-
->   arch/arm/boot/dts/sama5d33ek.dts                   |   4 +-
->   arch/arm/boot/dts/sama5d34ek.dts                   |   6 +-
->   arch/arm/boot/dts/sama5d35ek.dts                   |   4 +-
->   arch/arm/boot/dts/sama5d3xcm.dtsi                  |   4 +-
->   arch/arm/boot/dts/sama5d3xdm.dtsi                  |   2 +-
->   arch/arm/boot/dts/sama5d3xmb.dtsi                  |  26 +-
->   arch/arm/boot/dts/tny_a9260.dts                    |   4 +-
->   arch/arm/boot/dts/tny_a9263.dts                    |   4 +-
->   arch/arm/boot/dts/tny_a9g20.dts                    |   4 +-
->   arch/arm/boot/dts/usb_a9260.dts                    |   4 +-
->   arch/arm/boot/dts/usb_a9260_common.dtsi            |   6 +-
->   arch/arm/boot/dts/usb_a9263.dts                    |   8 +-
->   arch/arm/boot/dts/usb_a9g20-dab-mmx.dtsi           |  22 +-
->   arch/arm/boot/dts/usb_a9g20.dts                    |   4 +-
->   arch/arm/configs/at91_dt_defconfig                 |  55 ++-
->   arch/arm/configs/at91rm9200_defconfig              | 218 ++-------
->   ...am9g20_defconfig => at91sam9260_9g20_defconfig} |  67 ++-
->   arch/arm/configs/at91sam9260_defconfig             |  91 ----
->   ...am9261_defconfig => at91sam9261_9g10_defconfig} |  19 +-
->   arch/arm/configs/at91sam9263_defconfig             |  39 +-
->   arch/arm/configs/at91sam9g45_defconfig             |  94 ++--
->   arch/arm/configs/sama5_defconfig                   |  35 +-
->   arch/arm/mach-at91/Kconfig.non_dt                  | 159 +++----
->   arch/arm/mach-at91/Makefile                        |   2 -
->   arch/arm/mach-at91/board-sam9261ek.c               |  28 +-
->   include/dt-bindings/pinctrl/at91.h                 |  35 ++
->   63 files changed, 1407 insertions(+), 1617 deletions(-)
->   rename arch/arm/configs/{at91sam9g20_defconfig => at91sam9260_9g20_defconfig} (67%)
->   delete mode 100644 arch/arm/configs/at91sam9260_defconfig
->   rename arch/arm/configs/{at91sam9261_defconfig => at91sam9261_9g10_defconfig} (91%)
->   create mode 100644 include/dt-bindings/pinctrl/at91.h
->
+[11] SC1_COND_VCC_ENABLE: Enables control of smart card VCC upon
+bit in the PDES.
+[10] SC_DETECT_VPP_POL:
+	1: Output pin SC_NOT_SETVPP is inverted of PDES_SC_SETVPP
+	0: Output pin SC_NOT_SETVPP is PDES_SC_SETVPP
+[9] IRB_DATA_OUT_POL_OD: Selection of polarity of IRB output signal
+routed as alternate function
 
+...
+...
+Thanks,
+srini
 
--- 
-Nicolas Ferre
+> 
+> 	Arnd
+> 
+> 
