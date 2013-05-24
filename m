@@ -1,51 +1,36 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 24 May 2013 19:11:44 +0200
-Subject: [PATCH] ARM: at91: Fix: Change internal SRAM memory type to
- "MT_MEMORY_SO"
-In-Reply-To: <20130524165934.GC18614@n2100.arm.linux.org.uk>
-References: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
- <1369011979-21354-1-git-send-email-wenyou.yang@atmel.com>
- <20130522001457.GA18614@n2100.arm.linux.org.uk>
- <B256D81BAE5131468A838E5D7A243641687BB93C@penmbx01>
- <20130524112029.GW18614@n2100.arm.linux.org.uk>
- <20130524140322.GD24476@game.jcrosoft.org>
- <20130524164055.GA18614@n2100.arm.linux.org.uk>
- <20130524165254.GF24476@game.jcrosoft.org>
- <20130524165934.GC18614@n2100.arm.linux.org.uk>
-Message-ID: <20130524171144.GG24476@game.jcrosoft.org>
+Date: Fri, 24 May 2013 19:17:09 +0200
+Subject: [GIT PULL] at91: fixes for 3.10 #2
+In-Reply-To: <CAOesGMjvKhVKZf9A70K7VzXikY902KVyKR==4ivnb-gxhyRCPQ@mail.gmail.com>
+References: <1369410151-7837-1-git-send-email-nicolas.ferre@atmel.com>
+ <CAOesGMjvKhVKZf9A70K7VzXikY902KVyKR==4ivnb-gxhyRCPQ@mail.gmail.com>
+Message-ID: <20130524171709.GH24476@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:59 Fri 24 May     , Russell King - ARM Linux wrote:
-> On Fri, May 24, 2013 at 06:52:54PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 17:40 Fri 24 May     , Russell King - ARM Linux wrote:
-> > > On Fri, May 24, 2013 at 04:03:22PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > On 12:20 Fri 24 May     , Russell King - ARM Linux wrote:
-> > > > > On Fri, May 24, 2013 at 07:11:04AM +0000, Yang, Wenyou wrote:
-> > > > > > The story is: for sama5d3x with Cortex-A5 core, if not so, when copying
-> > > > > > code snippet to the internal SRAM, then jump to run this code, but fail
-> > > > > > to run.
-> > > > > 
-> > > > > And that is where your mistake is - you forgot that you're working with
-> > > > > a CPU with harvard caches which will require some cache maintanence
-> > > > > between copying the code and executing it.
-> > > > > 
-> > > > > You want to look at flush_icache_range() rather than making this memory
-> > > > > strongly ordered.
-> > > > 
-> > > > I understand your point but today we map a SRAM as MT_DEVICE
-> > > 
-> > > If you map SRAM as MT_DEVICE then you won't be able to execute code from
-> > > it.  It needs to be a normal memory mapping.
-> > 
-> > Yeah that a bug on AT91, by luck it work on armv3/v4 with MT_DEVICE, I should
-> > have spot it earlier when cleanning the at91 but did not
-> > 
-> > That's why Yang change the SRAM mapping as MT_MEMORY_SO
+On 10:11 Fri 24 May     , Olof Johansson wrote:
+> Hi,
 > 
-> I said "normal memory".  Strongly ordered is not "normal memory".
+> I'll pull this for now, but...
+> 
+> 
+> > Jean-Christophe PLAGNIOL-VILLARD (1):
+> >       ARM: at91: at91sam9n12: move external irq declatation to DT
+> 
+> This one is not a fix. While OK this time, please stick to only
+> sending true fixes for 3.10 from here on out.
 
-yeah btw why omap map their SRAM as strongly orderered?
+it's as you must specify them via DT, the C code is not event use in case of
+DT
+I should have put fix in the commit
 
 Best Regards,
 J.
+> 
+> 
+> -Olof
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
