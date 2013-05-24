@@ -1,49 +1,81 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 24 May 2013 17:59:18 +0800
-Subject: [PATCH v3 0/6] ARM: imx6q{dl}: add the WEIM driver
-Message-ID: <1369389564-13181-1-git-send-email-b32955@freescale.com>
+Date: Fri, 24 May 2013 17:59:20 +0800
+Subject: [PATCH v3 2/6] ARM: dts: imx6q{dl}: fix the pin conflict between SPI
+ and WEIM
+In-Reply-To: <1369389564-13181-1-git-send-email-b32955@freescale.com>
+References: <1369389564-13181-1-git-send-email-b32955@freescale.com>
+Message-ID: <1369389564-13181-3-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds a new driver for WEIM in the imx6q{dl}-sabreauto boards.
+In the imx6q-sabreauto and imx6dl-sabreauto boards,
+the pin MX6Q{DL}_PAD_EIM_D19 is used as a GPIO for SPI NOR, but
+it is used as a data pin for the WEIM NOR.
 
-The WEIM(Wireless External Interface Module) works like a bus.
-You can attach many different devices on it, such as NOR, onenand.
+In order to fix the conflict, this patch removes the pin from the hog,
+and adds a new board-level pinctrl: pinctrl_ecspi1_sabreauto.
 
-In the case of i.MX6q-sabreauto, only the NOR is connected to WEIM.
+The SPI NOR selects this pinctrl_ecspi1_sabreauto when it is enabled.
 
-v2 --> v3:
-	[0] split the NOR pinctrl.
-	[1] make the driver unloaded. change to bool type in Kconfig.
-	[2] use the of_platform_populate().
-	[3] remove the unused "interrupt" property from the Doc.
-v1 --> v2:
-	[0] remove used PADs.
-	[1] fix the wrong pad values, (thanks Alison Chaiken)
-	[2] remove the weim-cs-index.
-	[3] add "fsl" for the weim-cs-timing.
-	[4] remove the partitions info in the document.
-	[5] rewrite the drivers(follow Sascha and Shawn's comments)
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ arch/arm/boot/dts/imx6dl-sabreauto.dts   |    9 ++++++++-
+ arch/arm/boot/dts/imx6q-sabreauto.dts    |    9 ++++++++-
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi |    2 +-
+ 3 files changed, 17 insertions(+), 3 deletions(-)
 
-
-Huang Shijie (6):
-  drivers: bus: add a new driver for WEIM
-  ARM: dts: imx6q{dl}: fix the pin conflict between SPI and WEIM
-  ARM: dts: imx6qdl: add more information for WEIM
-  ARM: dts: imx6q: add pinctrls for WEIM NOR
-  ARM: dts: imx6dl: add pinctrls for WEIM NOR
-  ARM: dts: imx6qdl: enable the WEIM NOR
-
- Documentation/devicetree/bindings/bus/imx-weim.txt |   50 +++++++
- arch/arm/boot/dts/imx6dl-sabreauto.dts             |    9 +-
- arch/arm/boot/dts/imx6dl.dtsi                      |   60 +++++++++
- arch/arm/boot/dts/imx6q-sabreauto.dts              |    9 +-
- arch/arm/boot/dts/imx6q.dtsi                       |   61 +++++++++
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |   22 +++-
- arch/arm/boot/dts/imx6qdl.dtsi                     |    4 +-
- drivers/bus/Kconfig                                |    9 ++
- drivers/bus/Makefile                               |    1 +
- drivers/bus/imx-weim.c                             |  139 ++++++++++++++++++++
- 10 files changed, 360 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/bus/imx-weim.txt
- create mode 100644 drivers/bus/imx-weim.c
+diff --git a/arch/arm/boot/dts/imx6dl-sabreauto.dts b/arch/arm/boot/dts/imx6dl-sabreauto.dts
+index 60f3038..95da711 100644
+--- a/arch/arm/boot/dts/imx6dl-sabreauto.dts
++++ b/arch/arm/boot/dts/imx6dl-sabreauto.dts
+@@ -25,7 +25,14 @@
+ 			fsl,pins = <
+ 				MX6DL_PAD_NANDF_CS2__GPIO6_IO15 0x80000000
+ 				MX6DL_PAD_SD2_DAT2__GPIO1_IO13  0x80000000
+-				MX6DL_PAD_EIM_D19__GPIO3_IO19 	0x80000000
++			>;
++		};
++	};
++
++	ecspi1 {
++		pinctrl_ecspi1_sabreauto: ecspi1-sabreauto {
++			fsl,pins = <
++				MX6DL_PAD_EIM_D19__GPIO3_IO19  0x80000000
+ 			>;
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-sabreauto.dts
+index 9fb3e99..09a7580 100644
+--- a/arch/arm/boot/dts/imx6q-sabreauto.dts
++++ b/arch/arm/boot/dts/imx6q-sabreauto.dts
+@@ -29,7 +29,14 @@
+ 			fsl,pins = <
+ 				MX6Q_PAD_NANDF_CS2__GPIO6_IO15 0x80000000
+ 				MX6Q_PAD_SD2_DAT2__GPIO1_IO13  0x80000000
+-				MX6Q_PAD_EIM_D19__GPIO3_IO19   0x80000000
++			>;
++		};
++	};
++
++	ecspi1 {
++		pinctrl_ecspi1_sabreauto: ecspi1-sabreauto {
++			fsl,pins = <
++				MX6Q_PAD_EIM_D19__GPIO3_IO19  0x80000000
+ 			>;
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index d6baa51..a4466e6 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -20,7 +20,7 @@
+ 	fsl,spi-num-chipselects = <1>;
+ 	cs-gpios = <&gpio3 19 0>;
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_ecspi1_1>;
++	pinctrl-0 = <&pinctrl_ecspi1_1 &pinctrl_ecspi1_sabreauto>;
+ 	status = "disabled"; /* pin conflict with WEIM NOR */
+ 
+ 	flash: m25p80 at 0 {
+-- 
+1.7.1
