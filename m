@@ -1,79 +1,45 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 24 May 2013 12:28:22 -0700
-Subject: [PATCH] ARM: DTS: OMAP4: Panda/SDP: twl6030: fix mux for IRQ pin and
- msecure line
-Message-ID: <1369423702-31501-1-git-send-email-khilman@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 24 May 2013 21:53:52 +0200
+Subject: Allwinner sunXi Fixes for 3.10
+Message-ID: <20130524195352.GA19644@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Earlier commits ensured proper muxing of pins related to proper
-TWL6030 behavior: see commit 265a2bc8 (ARM: OMAP3: TWL4030: ensure
-sys_nirq1 is mux'd and wakeup enabled) and commit 1ef43369 (ARM:
-OMAP4: TWL: mux sys_drm_msecure as output for PMIC).
+Hi Arnd, Olof,
 
-However these only fixed legacy boot and not DT boot.  For DT boot,
-the default mux values need to be set properly in DT.
+Please pull this small pull request with the sunxi fixes for 3.10
 
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
-Applies on v3.10-rc2
+Thanks!
+Maxime
 
- arch/arm/boot/dts/omap4-panda-common.dtsi | 8 ++++++++
- arch/arm/boot/dts/omap4-sdp.dts           | 8 ++++++++
- 2 files changed, 16 insertions(+)
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index 03bd60d..a7a9bc0 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -59,6 +59,7 @@
- &omap4_pmx_core {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <
-+			&twl6030_pins
- 			&twl6040_pins
- 			&mcpdm_pins
- 			&mcbsp1_pins
-@@ -66,6 +67,13 @@
- 			&tpd12s015_pins
- 	>;
- 
-+	twl6030_pins: pinmux_twl6030_pins {
-+		pinctrl-single,pins = <
-+			0x15e 0x4118	/* sys_nirq1.sys_nirq1 OMAP_WAKEUP_EN | INPUT_PULLUP | MODE0 */
-+			0x14 0x0	/* fref_clk0_out.sys_drm_msecure OUTPUT */
-+		>;
-+	};
-+
- 	twl6040_pins: pinmux_twl6040_pins {
- 		pinctrl-single,pins = <
- 			0xe0 0x3	/* hdq_sio.gpio_127 OUTPUT | MODE3 */
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index a35d9cd..5ad0c10 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -145,6 +145,7 @@
- &omap4_pmx_core {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <
-+			&twl6030_pins
- 			&twl6040_pins
- 			&mcpdm_pins
- 			&dmic_pins
-@@ -179,6 +180,13 @@
- 		>;
- 	};
- 
-+	twl6030_pins: pinmux_twl6030_pins {
-+		pinctrl-single,pins = <
-+			0x15e 0x4118	/* sys_nirq1.sys_nirq1 OMAP_WAKEUP_EN | INPUT_PULLUP | MODE0 */
-+			0x14 0x0	/* fref_clk0_out.sys_drm_msecure OUTPUT */
-+		>;
-+	};
-+
- 	twl6040_pins: pinmux_twl6040_pins {
- 		pinctrl-single,pins = <
- 			0xe0 0x3	/* hdq_sio.gpio_127 OUTPUT | MODE3 */
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+
+are available in the git repository at:
+
+  git://github.com/mripard/linux.git sunxi/fixes-for-3.10
+
+for you to fetch changes up to 19a280a61b520febab0f2fde94f4bd50250377b2:
+
+  ARM: sunxi: select ARCH_REQUIRE_GPIOLIB (2013-05-15 09:42:47 +0200)
+
+----------------------------------------------------------------
+Small set of fixes for 3.10:
+  - Fix build breakage in pinctrl driver when no other architecture is selected
+  - Fix Mini X-plus device tree build
+
+----------------------------------------------------------------
+Maxime Ripard (2):
+      ARM: sunxi: Fix Mini X-plus device tree build
+      ARM: sunxi: select ARCH_REQUIRE_GPIOLIB
+
+ arch/arm/boot/dts/Makefile                 | 4 +++-
+ arch/arm/boot/dts/sun4i-a10-mini-xplus.dts | 4 ++--
+ arch/arm/mach-sunxi/Kconfig                | 1 +
+ 3 files changed, 6 insertions(+), 3 deletions(-)
+
 -- 
-1.8.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
