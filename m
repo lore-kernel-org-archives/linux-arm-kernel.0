@@ -1,159 +1,277 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 May 2013 10:52:42 +0200
-Subject: [PATCH v4 02/21] sh-pfc: Add DT support
-In-Reply-To: <1369138482-5871-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1369138482-5871-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CACRpkdZNv5AO48Bmquyr8mBQvgjBMCk3Ob8ngutSq8RV1HFT0w@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 24 May 2013 10:53:33 +0200
+Subject: [PATCH 2/2] ARM: sunxi: irqchip: Update the configuration
+In-Reply-To: <1369385613-8166-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1369385613-8166-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1369385613-8166-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 2:14 PM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
+A10 and A13 have a different set of available interrupt sources, reflect
+this in the documentation.
 
-> Support device instantiation through the device tree. The compatible
-> property is used to select the SoC pinmux information.
->
-> Set the gpio_chip device field to the PFC device to enable automatic
-> GPIO OF support.
->
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-(...)
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ .../interrupt-controller/allwinner,sun4i-ic.txt    | 87 +--------------------
+ .../interrupt-controller/sunxi/sun4i-a10.txt       | 89 ++++++++++++++++++++++
+ .../interrupt-controller/sunxi/sun5i-a13.txt       | 55 +++++++++++++
+ 3 files changed, 146 insertions(+), 85 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/sunxi/sun4i-a10.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/sunxi/sun5i-a13.txt
 
-(Again I'm rather nervous about all the device tree binding reviewing being
-dropped in the lap of Linux subsystem maintainers and then expecting them
-to be good and OS-neutral... Not your fault though.)
-
-> +Pin Configuration Node Properties:
-> +
-> +- renesas,pins : An array of strings, each string containing the name of a pin.
-> +- renesas,groups : An array of strings, each string containing the name of a pin
-> +  group.
-> +
-> +- renesas,function: A string containing the name of the function to mux to the
-> +  pin group(s) specified by the renesas,groups property
-> +
-> +  Valid values for pin, group and function names can be found in the group and
-> +  function arrays of the PFC data file corresponding to the SoC
-> +  (drivers/pinctrl/sh-pfc/pfc-*.c)
-> +
-> +- renesas,pull-up: An integer representing the pull-up strength to be applied
-> +  to all pins specified by the renesas,pins and renesas-groups properties.
-> +  0 disables the pull-up, 1 enables it. Other values should not be used.
-
-Then just use a boolean.
-
-> +- renesas,pull-down: An integer representing the pull-down strength to be
-> +  applied to all pins specified by the renesas,pins and renesas-groups
-> +  properties. 0 disables the pull-down, 1 enables it. Other values should not
-> +  be used.
-
-Just use a boolean oneliner then.
-
-But I prefer that you define something really generic in
-Documentation/devicetree/bindings/pinconf.txt for anyone using
-generic pin config, then reference that.
-
-This way we can have a more general config binding for any system
-using generic pin config, mapping to the configs we have in
-<linux/pinctrl/pinconf-generic.h>
-
-The upside is that we could move the pinconf generic parsing code
-to drivers/pinctrl/pinconf-generic.c and thus avoid code duplication.
-
-We have so far not tried much to standardize pinctrl bindings, but
-this would be a good opportunity.
-
-> +On SH7372, SH73A0, R8A73A4 and R8A7740 the PFC node is also a GPIO controller
-> +node.
-> +
-> +Required Properties:
-> +
-> +  - gpio-controller: Marks the device node as a gpio controller.
-> +
-> +  - #gpio-cells: Should be 2. The first cell is the pin number and the second
-> +    cell is used to specify optional parameters as bit flags. Only the GPIO
-> +    active low flag (bit 0) is currently supported.
-
-
-I suggest these properties shall be defined in an include file using that new
-include hierarchy, since you're using pinconf generic.
-
-include/dt-bindings/gpio/gpio.h
-Referenced by <dt-bindings/gpio/gpio.h> in the .dts[i] files.
-
-In Linux-next you find how tegra machines and the imx6sl DTs have
-started to use this facility for symbolic names.
-
-And for that you should reference
-<dt-bindings/gpio/gpio.h>
-
-Use the symbolic names GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW
-here.
-
-(...)
-> +Example 2: A GPIO LED node that references a GPIO
-> +
-> +       leds {
-> +               compatible = "gpio-leds";
-> +               led1 {
-> +                       gpios = <&pfc 20 1>; /* Active low */
-
-
-#include <dt-bindings/gpio/gpio.h>
-gpios = <&pfc 20 GPIO_ACTIVE_LOW>;
-
-(...)
-> +Example 3: KZM-A9-GT (SH-Mobile AG5) default pin state hog and pin control maps
-> +           for the MMCIF and SCIFA4 devices
-> +
-> +       &pfc {
-> +               pinctrl-0 = <&scifa4_pins>;
-> +               pinctrl-names = "default";
-> +
-> +               mmcif_pins: mmcif {
-> +                       mux {
-> +                               renesas,groups = "mmc0_data8_0", "mmc0_ctrl_0";
-> +                               renesas,function = "mmc0";
-> +                       };
-> +                       cfg {
-> +                               renesas,groups = "mmc0_data8_0";
-> +                               renesas,pins = "PORT279";
-> +                               renesas,pull-up = <1>;
-
-Just
-renesas,pull-up;
-
-Or go for the generic pinconf binding I'm suggesting.
-Then I guess it'd be something like:
-
-pinconf-bias-pull-up;
-
-(Quite readable.)
-
-(...)
-> +++ b/drivers/pinctrl/sh-pfc/pinctrl.c
-> +static const struct sh_pfc_config_param sh_pfc_config_params[] = {
-> +       { "renesas,pull-up", PIN_CONFIG_BIAS_PULL_UP },
-> +       { "renesas,pull-down", PIN_CONFIG_BIAS_PULL_DOWN },
-> +};
-
-So these should be checked as booleans instead:
-
-> +       for (i = 0; i < ARRAY_SIZE(sh_pfc_config_params); ++i) {
-> +               const struct sh_pfc_config_param *param =
-> +                       &sh_pfc_config_params[i];
-> +               unsigned long config;
-> +               u32 val;
-> +
-> +               ret = of_property_read_u32(np, param->name, &val);
-
-of_property_read_bool()
-
-Though I much rather like this code added as helper lib
-in pinconf-generic.c. Use drivers/pinctrl/pinconf.h for
-API.
-
-Yours,
-Linus Walleij
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
+index e7f4dc1..57edb30 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
+@@ -8,91 +8,8 @@ Required properties:
+ - #interrupt-cells : Specifies the number of cells needed to encode an
+   interrupt source. The value shall be 1.
+ 
+-The interrupt sources are as follows:
+-
+-0: ENMI
+-1: UART0
+-2: UART1
+-3: UART2
+-4: UART3
+-5: IR0
+-6: IR1
+-7: I2C0
+-8: I2C1
+-9: I2C2
+-10: SPI0
+-11: SPI1
+-12: SPI2
+-13: SPDIF
+-14: AC97
+-15: TS
+-16: I2S
+-17: UART4
+-18: UART5
+-19: UART6
+-20: UART7
+-21: KEYPAD
+-22: TIMER0
+-23: TIMER1
+-24: TIMER2
+-25: TIMER3
+-26: CAN
+-27: DMA
+-28: PIO
+-29: TOUCH_PANEL
+-30: AUDIO_CODEC
+-31: LRADC
+-32: SDMC0
+-33: SDMC1
+-34: SDMC2
+-35: SDMC3
+-36: MEMSTICK
+-37: NAND
+-38: USB0
+-39: USB1
+-40: USB2
+-41: SCR
+-42: CSI0
+-43: CSI1
+-44: LCDCTRL0
+-45: LCDCTRL1
+-46: MP
+-47: DEFEBE0
+-48: DEFEBE1
+-49: PMU
+-50: SPI3
+-51: TZASC
+-52: PATA
+-53: VE
+-54: SS
+-55: EMAC
+-56: SATA
+-57: GPS
+-58: HDMI
+-59: TVE
+-60: ACE
+-61: TVD
+-62: PS2_0
+-63: PS2_1
+-64: USB3
+-65: USB4
+-66: PLE_PFM
+-67: TIMER4
+-68: TIMER5
+-69: GPU_GP
+-70: GPU_GPMMU
+-71: GPU_PP0
+-72: GPU_PPMMU0
+-73: GPU_PMU
+-74: GPU_RSV0
+-75: GPU_RSV1
+-76: GPU_RSV2
+-77: GPU_RSV3
+-78: GPU_RSV4
+-79: GPU_RSV5
+-80: GPU_RSV6
+-82: SYNC_TIMER0
+-83: SYNC_TIMER1
++For the valid interrupt sources for your SoC, see the documentation in
++sunxi/<soc>.txt
+ 
+ Example:
+ 
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/sunxi/sun4i-a10.txt b/Documentation/devicetree/bindings/interrupt-controller/sunxi/sun4i-a10.txt
+new file mode 100644
+index 0000000..76b98c8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/sunxi/sun4i-a10.txt
+@@ -0,0 +1,89 @@
++Allwinner A10 (sun4i) interrupt sources
++---------------------------------------
++
++The interrupt sources available for the Allwinner A10 SoC are the
++following one:
++
++0: ENMI
++1: UART0
++2: UART1
++3: UART2
++4: UART3
++5: IR0
++6: IR1
++7: I2C0
++8: I2C1
++9: I2C2
++10: SPI0
++11: SPI1
++12: SPI2
++13: SPDIF
++14: AC97
++15: TS
++16: I2S
++17: UART4
++18: UART5
++19: UART6
++20: UART7
++21: KEYPAD
++22: TIMER0
++23: TIMER1
++24: TIMER2
++25: TIMER3
++26: CAN
++27: DMA
++28: PIO
++29: TOUCH_PANEL
++30: AUDIO_CODEC
++31: LRADC
++32: MMC0
++33: MMC1
++34: MMC2
++35: MMC3
++36: MEMSTICK
++37: NAND
++38: USB0
++39: USB1
++40: USB2
++41: SCR
++42: CSI0
++43: CSI1
++44: LCDCTRL0
++45: LCDCTRL1
++46: MP
++47: DEFEBE0
++48: DEFEBE1
++49: PMU
++50: SPI3
++51: TZASC
++52: PATA
++53: VE
++54: SS
++55: EMAC
++56: SATA
++57: GPS
++58: HDMI
++59: TVE
++60: ACE
++61: TVD
++62: PS2_0
++63: PS2_1
++64: USB3
++65: USB4
++66: PLE_PFM
++67: TIMER4
++68: TIMER5
++69: GPU_GP
++70: GPU_GPMMU
++71: GPU_PP0
++72: GPU_PPMMU0
++73: GPU_PMU
++74: GPU_RSV0
++75: GPU_RSV1
++76: GPU_RSV2
++77: GPU_RSV3
++78: GPU_RSV4
++79: GPU_RSV5
++80: GPU_RSV6
++82: SYNC_TIMER0
++83: SYNC_TIMER1
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/sunxi/sun5i-a13.txt b/Documentation/devicetree/bindings/interrupt-controller/sunxi/sun5i-a13.txt
+new file mode 100644
+index 0000000..2ec3b5c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/sunxi/sun5i-a13.txt
+@@ -0,0 +1,55 @@
++Allwinner A13 (sun5i) interrupt sources
++---------------------------------------
++
++The interrupt sources available for the Allwinner A13 SoC are the
++following one:
++
++0: ENMI
++2: UART1
++4: UART3
++5: IR
++7: I2C0
++8: I2C1
++9: I2C2
++10: SPI0
++11: SPI1
++12: SPI2
++22: TIMER0
++23: TIMER1
++24: TIMER2
++25: TIMER3
++27: DMA
++28: PIO
++29: TOUCH_PANEL
++30: AUDIO_CODEC
++31: LRADC
++32: MMC0
++33: MMC1
++34: MMC2
++37: NAND
++38: USB OTG
++39: USB EHCI
++40: USB OHCI
++42: CSI
++44: LCDCTRL
++47: DEFEBE
++49: PMU
++53: VE
++54: SS
++66: PLE_PFM
++67: TIMER4
++68: TIMER5
++69: GPU_GP
++70: GPU_GPMMU
++71: GPU_PP0
++72: GPU_PPMMU0
++73: GPU_PMU
++74: GPU_RSV0
++75: GPU_RSV1
++76: GPU_RSV2
++77: GPU_RSV3
++78: GPU_RSV4
++79: GPU_RSV5
++80: GPU_RSV6
++82: SYNC_TIMER0
++83: SYNC_TIMER1
+-- 
+1.8.1.2
