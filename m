@@ -1,134 +1,140 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 May 2013 11:44:55 +0200
-Subject: [PATCH 18/21] arm: kirkwood: topkick: affect pinmux configs to the
- right devices
+Date: Fri, 24 May 2013 11:44:57 +0200
+Subject: [PATCH 20/21] arm: kirkwood: openblocks-a6: group pinmux
+ configurations
 In-Reply-To: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369388699-25975-19-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369388699-25975-21-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the pinmux mechanism was added in Kirkwood, the device driver
-core was not yet providing the possibility of attaching pinmux
-configurations to all devices, drivers had to do it explicitly, and
-not all drivers were doing this.
-
-Now that the driver core does that in a generic way, it makes sense to
-attach the pinmux configuration to their corresponding devices.
-
-This allows the pinctrl subsystem to show in debugfs to which device
-is related which pins, for example:
-
-pin 41 (PIN41): gpio-leds.1 mvebu-gpio:41 function gpio group mpp41
-pin 42 (PIN42): gpio-leds.1 mvebu-gpio:42 function gpio group mpp42
-pin 43 (PIN43): gpio-leds.1 mvebu-gpio:43 function gpio group mpp43
+Instead of having one separate pinmux configuration for each LED, for
+each GPIO of the GPIO header, for each DIP switch, this patch groups
+them together in configurations that make sense together: LEDs on one
+side, GPIOs of the GPIO header on another side, and DIP switches on
+yet another side.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/kirkwood-topkick.dts |   51 ++++++++++++++++----------------
- 1 file changed, 26 insertions(+), 25 deletions(-)
+ arch/arm/boot/dts/kirkwood-openblocks_a6.dts |   82 +++-----------------------
+ 1 file changed, 9 insertions(+), 73 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-topkick.dts b/arch/arm/boot/dts/kirkwood-topkick.dts
-index 66eb45b..940b54f 100644
---- a/arch/arm/boot/dts/kirkwood-topkick.dts
-+++ b/arch/arm/boot/dts/kirkwood-topkick.dts
-@@ -19,18 +19,6 @@
- 	ocp at f1000000 {
+diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+index a05b382..56e3161 100644
+--- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
++++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
+@@ -83,12 +83,7 @@
+ 		};
+ 
  		pinctrl: pinctrl at 10000 {
- 			/*
--			 * GPIO LED layout
--			 *
--			 *       /-SYS_LED(2)
--			 *       |
--			 *       |   /-DISK_LED
--			 *       |   |
--			 *       |   |   /-WLAN_LED(2)
--			 *       |   |   |
--			 * [SW] [*] [*] [*]
--			 */
--
--			/*
- 			 * Switch positions
- 			 *
- 			 *     /-SW_LEFT(2)
-@@ -41,19 +29,8 @@
- 			 *     |   |   |
- 			 * PS [L] [I] [R] LEDS
- 			 */
--			pinctrl-0 = < &pmx_led_disk_yellow
--				      &pmx_sata0_pwr_enable
--				      &pmx_led_sys_red
--				      &pmx_led_sys_blue
--				      &pmx_led_wifi_green
--				      &pmx_sw_left
--				      &pmx_sw_right
--				      &pmx_sw_idle
--				      &pmx_sw_left2
--				      &pmx_led_wifi_yellow
--				      &pmx_uart0
--				      &pmx_nand
--				      &pmx_twsi0 >;
-+			pinctrl-0 = <&pmx_sw_left &pmx_sw_right
-+				     &pmx_sw_idle &pmx_sw_left2>;
+-			pinctrl-0 = <&pmx_dip_sw0 &pmx_dip_sw1
+-				     &pmx_dip_sw2 &pmx_dip_sw3
+-				     &pmx_gpio_0 &pmx_gpio_1
+-				     &pmx_gpio_2 &pmx_gpio_3
+-				     &pmx_gpio_4 &pmx_gpio_5
+-				     &pmx_gpio_6 &pmx_gpio_7>;
++			pinctrl-0 = <&pmx_dip_switches &pmx_gpio_header>;
  			pinctrl-names = "default";
  
- 			pmx_led_disk_yellow: pmx-led-disk-yellow {
-@@ -109,10 +86,14 @@
+ 			pmx_uart0: pmx-uart0 {
+@@ -108,63 +103,14 @@
+ 				marvell,function = "sysrst";
+ 			};
  
- 		serial at 12000 {
- 			status = "ok";
-+			pinctrl-0 = <&pmx_uart0>;
-+			pinctrl-names = "default";
+-			pmx_dip_sw0: pmx-dip-sw0 {
+-				marvell,pins = "mpp20";
++			pmx_dip_switches: pmx-dip-switches {
++				marvell,pins = "mpp20", "mpp21", "mpp22", "mpp23";
+ 				marvell,function = "gpio";
+ 			};
+ 
+-			pmx_dip_sw1: pmx-dip-sw1 {
+-				marvell,pins = "mpp21";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_dip_sw2: pmx-dip-sw2 {
+-				marvell,pins = "mpp22";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_dip_sw3: pmx-dip-sw3 {
+-				marvell,pins = "mpp23";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_gpio_0: pmx-gpio-0 {
+-				marvell,pins = "mpp24";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_gpio_1: pmx-gpio-1 {
+-				marvell,pins = "mpp25";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_gpio_2: pmx-gpio-2 {
+-				marvell,pins = "mpp26";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_gpio_3: pmx-gpio-3 {
+-				marvell,pins = "mpp27";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_gpio_4: pmx-gpio-4 {
+-				marvell,pins = "mpp28";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_gpio_5: pmx-gpio-5 {
+-				marvell,pins = "mpp29";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_gpio_6: pmx-gpio-6 {
+-				marvell,pins = "mpp30";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_gpio_7: pmx-gpio-7 {
+-				marvell,pins = "mpp31";
++			pmx_gpio_header: pmx-gpio-header {
++				marvell,pins = "mpp24", "mpp25", "mpp26", "mpp27",
++					       "mpp28", "mpp29", "mpp30", "mpp31";
+ 				marvell,function = "gpio";
+ 			};
+ 
+@@ -178,18 +124,8 @@
+ 				marvell,function = "gpio";
+ 			};
+ 
+-			pmx_led_red: pmx-led-red {
+-				marvell,pins = "mpp41";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_led_green: pmx-led-green {
+-				marvell,pins = "mpp42";
+-				marvell,function = "gpio";
+-			};
+-
+-			pmx_led_yellow: pmx-led-yellow {
+-				marvell,pins = "mpp43";
++			pmx_leds: pmx-leds {
++				marvell,pins = "mpp41", "mpp42", "mpp43";
+ 				marvell,function = "gpio";
+ 			};
  		};
- 
- 		nand at 3000000 {
- 			status = "okay";
-+			pinctrl-0 = <&pmx_nand>;
-+			pinctrl-names = "default";
- 
- 			partition at 0 {
- 				label = "u-boot";
-@@ -147,6 +128,8 @@
- 
- 		i2c at 11000 {
- 			status = "ok";
-+			pinctrl-0 = <&pmx_twsi0>;
-+			pinctrl-names = "default";
- 		};
- 
- 		mvsdio at 90000 {
-@@ -158,7 +141,23 @@
- 	};
+@@ -197,7 +133,7 @@
  
  	gpio-leds {
-+		/*
-+		 * GPIO LED layout
-+		 *
-+		 *       /-SYS_LED(2)
-+		 *       |
-+		 *       |   /-DISK_LED
-+		 *       |   |
-+		 *       |   |   /-WLAN_LED(2)
-+		 *       |   |   |
-+		 * [SW] [*] [*] [*]
-+		 */
-+
  		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_led_disk_yellow &pmx_led_sys_red
-+			     &pmx_led_sys_blue &pmx_led_wifi_green
-+			     &pmx_led_wifi_yellow>;
-+		pinctrl-names = "default";
+-		pinctrl-0 = <&pmx_led_red &pmx_led_green &pmx_led_yellow>;
++		pinctrl-0 = <&pmx_leds>;
+ 		pinctrl-names = "default";
  
- 		disk {
- 			label = "topkick:yellow:disk";
-@@ -187,6 +186,8 @@
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_sata0_pwr_enable>;
-+		pinctrl-names = "default";
- 
- 		sata0_power: regulator at 1 {
- 			compatible = "regulator-fixed";
+ 		led-red {
 -- 
 1.7.9.5
