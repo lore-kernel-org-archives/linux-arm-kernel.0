@@ -1,30 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 May 2013 12:59:17 +0100
-Subject: [PATCH v2 4/4] ARM: cacheflush: don't bother rounding to
- nearest vma
-In-Reply-To: <1369395087-30972-5-git-send-email-will.deacon@arm.com>
-References: <1369395087-30972-1-git-send-email-will.deacon@arm.com>
- <1369395087-30972-5-git-send-email-will.deacon@arm.com>
-Message-ID: <20130524115917.GY18614@n2100.arm.linux.org.uk>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Fri, 24 May 2013 14:10:10 +0200
+Subject: [I2C] informations + advice about messages handling
+In-Reply-To: <CAK7N6vqqG68c4vx1uBsNLF8zpSRQWwY5jERqjVYKE7NkEEzFSA@mail.gmail.com>
+References: <CA78C307B8F06747967D122FC656B153986448@SERVEUR0.nvp.local>
+ <CAK7N6vpg6QUAKODKO2Msr4+GTASLDpA2cG1teQV3yiwt7D4SSw@mail.gmail.com>
+ <20130524094407.61d0ec42@endymion.delvare>
+ <CAK7N6vqqG68c4vx1uBsNLF8zpSRQWwY5jERqjVYKE7NkEEzFSA@mail.gmail.com>
+Message-ID: <20130524141010.1b3590b4@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 12:31:27PM +0100, Will Deacon wrote:
-> do_cache_op finds the lowest VMA contained in the specified address
-> range and rounds the range to cover only the mapped addresses.
-> 
-> Since commit 4542b6a0fa6b ("ARM: 7365/1: drop unused parameter from
-> flush_cache_user_range") the VMA is not used for anything else in this
-> code and seeing as the low-level cache flushing routines return -EFAULT
-> if the address is not valid, there is no need for this range truncation.
-> 
-> This patch removes the VMA handling code from the cacheflushing syscall.
+On Fri, 24 May 2013 16:29:36 +0530, anish singh wrote:
+> On Fri, May 24, 2013 at 1:14 PM, Jean Delvare <khali@linux-fr.org> wrote:
+> > On Fri, 24 May 2013 12:52:40 +0530, anish singh wrote:
+> >> http://thread.gmane.org/gmane.linux.kernel/1410276
+> >
+> > This is for a specific case. The general case is handled by the
+> > per-adapter mutex for years now. 2.6.32 should be just fine in this
+> > respect.
+>
+> I may be mis-understanding here but when two client wants to
+> communicate with same master and at the same
+> time how does that happen?
 
-The only thing which access_ok() tells you is that the addresses are
-_potentially_ valid user addresses.  That's not what the VMA check is
-there for.
+In general clients (slaves in I2C terminology) do not initiate
+transactions, it's the master's job.
 
-That check is there to make sure userspace doesn't do something idiotic,
-and to keep the use of this API limited to specific actions such as self
-modifying code, and not a general purpose cache flushing API covering
-multiple VMAs.
+> In the thread I mentioned client pulls the line low indicating that
+> it wants to own the bus and waits for some time and then checks
+> if the line is still low or not.If it is still low then it owns the bus
+> and start transaction and if clients see otherwise it releases the
+> bus and tries again after some time.How is that handled in the
+> previous kernel?
+
+That particular scenario is not handled by earlier kernels, but this is
+a very special case. In most cases (including Myl?ne's as far as I can
+see) it is not needed because there is a single master on the segment.
+And even with multiple masters, I2C bus arbitration normally takes place
+transparently. Only when the standard bus arbitration can't work for
+some reason, the code you mentioned is needed.
+
+-- 
+Jean Delvare
