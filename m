@@ -1,137 +1,84 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 24 May 2013 08:58:13 +0200
-Subject: [PATCH] ARM: ux500: update defconfig base
-Message-ID: <1369378693-27184-1-git-send-email-linus.walleij@stericsson.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 24 May 2013 15:16:53 +0800
+Subject: [PATCH V2 1/6] drivers: bus: add a new driver for WEIM
+In-Reply-To: <201305231509.57651.arnd@arndb.de>
+References: <1369296978-7669-1-git-send-email-b32955@freescale.com>
+ <201305231153.38111.arnd@arndb.de> <20130523115505.GG32299@pengutronix.de>
+ <201305231509.57651.arnd@arndb.de>
+Message-ID: <519F13E5.2040701@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+? 2013?05?23? 21:09, Arnd Bergmann ??:
+> OTOH, I agree that it would be nicer if the clk could remain turned
+> off as long as no children are active. Can we do a clk_disable()
+> after setting up the timings for the children and then expect those
+> to actually start up the clk again when they need it?
+>
+> Or to take things further: would it make sense to represent WEIM
+> itself as a clock driver and perform the settings for each child
+> only when it sets up its own clk?
+>
+If the child's subsystem supports it, we can do it.
 
-Update the defconfig removing/adding selections due to
-Kconfig changes, and select some new hardware drivers that
-have been matured in the tree. For example:
+The mtd nand does support this feature, it has @select_chip() hook.
+We can enable/disable the clock in the @select_chip().
 
-- CONFIG_NO_HZ and CONFIG_HIGH_RES_TIMERS come from the
-  make oldconfig changes after the recent changes to
-  how NOHZ is handled.
-- The U5500 config option is now gone as the machine is
-  deleted. So is the AB5500 driver.
-- CPU_IDLE selected explicitly.
-- LP5521 Kconfig has been moved around.
-- AB8500 core is default-selected, as is the AB8500 USB
-  transciever.
-- The battery and charging management drivers for the
-  AB8500 are not selected again.
-- Select the crypto devices that have been shaped up
-  to work properly.
+But the mtd NOR does _not_ supports it.
+Please read the /drivers/mtd/maps/physmap_of.c and 
+/drivers/mtd/chips/cfi_cmd_set_xxx.c.
+Of course, we can add the feature to NOR subsystem. But that's another 
+issue.
 
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/u8500_defconfig | 28 ++++++++++------------------
- 1 file changed, 10 insertions(+), 18 deletions(-)
+So the weim should enable the clock all the time now.
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index acb62cf..da0614a 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -1,6 +1,7 @@
--CONFIG_EXPERIMENTAL=y
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ=y
-+CONFIG_HIGH_RES_TIMERS=y
- CONFIG_BLK_DEV_INITRD=y
- CONFIG_KALLSYMS_ALL=y
- CONFIG_MODULES=y
-@@ -9,10 +10,7 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_ARCH_U8500=y
- CONFIG_MACH_HREFV60=y
- CONFIG_MACH_SNOWBALL=y
--CONFIG_MACH_U5500=y
- CONFIG_MACH_UX500_DT=y
--CONFIG_NO_HZ=y
--CONFIG_HIGH_RES_TIMERS=y
- CONFIG_SMP=y
- CONFIG_NR_CPUS=2
- CONFIG_PREEMPT=y
-@@ -20,6 +18,7 @@ CONFIG_AEABI=y
- CONFIG_CMDLINE="root=/dev/ram0 console=ttyAMA2,115200n8"
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
-+CONFIG_CPU_IDLE=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- CONFIG_PM_RUNTIME=y
-@@ -36,7 +35,6 @@ CONFIG_CAIF=y
- CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_RAM_SIZE=65536
--CONFIG_AB8500_PWM=y
- CONFIG_SENSORS_BH1780=y
- CONFIG_NETDEVICES=y
- CONFIG_SMSC911X=y
-@@ -60,42 +58,33 @@ CONFIG_VT_HW_CONSOLE_BINDING=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
- CONFIG_HW_RANDOM=y
--CONFIG_HW_RANDOM_NOMADIK=y
- CONFIG_SPI=y
- CONFIG_SPI_PL022=y
- CONFIG_GPIO_STMPE=y
- CONFIG_GPIO_TC3589X=y
--# CONFIG_POWER_SUPPLY is not set
--# CONFIG_AB8500_BM is not set
--# CONFIG_AB8500_BATTERY_THERM_ON_BATCTRL is not set
- CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_MFD_STMPE=y
- CONFIG_MFD_TC3589X=y
--CONFIG_AB5500_CORE=y
--CONFIG_AB8500_CORE=y
--CONFIG_REGULATOR=y
--CONFIG_REGULATOR_AB8500=y
--CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_GPIO=y
--# CONFIG_HID_SUPPORT is not set
-+CONFIG_REGULATOR_AB8500=y
- CONFIG_USB=y
- CONFIG_USB_MUSB_HDRC=y
- CONFIG_USB_MUSB_UX500=y
- CONFIG_USB_PHY=y
-+CONFIG_AB8500_USB=y
- CONFIG_USB_GADGET=y
- CONFIG_USB_GADGET_MUSB_HDRC=y
- CONFIG_USB_ETH=m
--CONFIG_AB8500_USB=y
- CONFIG_MMC=y
- CONFIG_MMC_CLKGATE=y
- CONFIG_MMC_ARMMMCI=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_LM3530=y
--CONFIG_LEDS_LP5521=y
- CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_LP5521=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_RTC_CLASS=y
-@@ -115,7 +104,6 @@ CONFIG_EXT4_FS=y
- CONFIG_VFAT_FS=y
- CONFIG_TMPFS=y
- CONFIG_TMPFS_POSIX_ACL=y
--CONFIG_CONFIGFS_FS=m
- # CONFIG_MISC_FILESYSTEMS is not set
- CONFIG_NFS_FS=y
- CONFIG_ROOT_NFS=y
-@@ -129,3 +117,7 @@ CONFIG_DEBUG_KERNEL=y
- CONFIG_DEBUG_INFO=y
- # CONFIG_FTRACE is not set
- CONFIG_DEBUG_USER=y
-+CONFIG_CRYPTO_DEV_UX500=y
-+CONFIG_CRYPTO_DEV_UX500_CRYP=y
-+CONFIG_CRYPTO_DEV_UX500_HASH=y
-+CONFIG_CRYPTO_DEV_UX500_DEBUG=y
--- 
-1.7.11.3
+
+> I guess it would also make sense to use of_platform_populate() instead
+> of of_platform_device_create() when creating the children, so we actually
+I tried the of_platform_populate(), but failed.
+
+firstly, we should set the timing for the device _before_ we do the 
+of_platform_populate().
+and i rewrite the weim_parse_dt() to:
+------------------------------------------------------------------------------------------
+static void weim_parse_dt(struct platform_device *pdev)
+{
+     struct device_node *child;
+
+     for_each_child_of_node(pdev->dev.of_node, child) {
+         if (!child->name)
+             continue;
+
+         if (weim_timing_setup(pdev, child)) {
+             dev_err(&pdev->dev, "%s set timing failed.\n",
+                 child->full_name);
+             continue;
+         }
+
+     }
+     if (!of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev))
+         dev_err(&pdev->dev, "%s device create failed.\n",
+             child->full_name);
+}
+------------------------------------------------------------------------------------------
+
+The system hang at :
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+## Booting kernel from Legacy Image at 10800000 ...
+    Image Name:   Linux
+    Image Type:   ARM Linux Kernel Image (uncompressed)
+    Data Size:    4259851 Bytes =  4.1 MB
+    Load Address: 10008000
+    Entry Point:  10008000
+    Verifying Checksum ... OK
+    Loading Kernel Image ... OK
+OK
+
+Starting kernel ...
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++==
+
+
+
+thanks
+Huang Shijie
