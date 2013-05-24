@@ -1,28 +1,77 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 24 May 2013 01:45:03 -0400
-Subject: [PATCH 0/8] MCPM support for big.LITTLE Virtual Express RTSM
-Message-ID: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
+Date: Fri, 24 May 2013 01:45:06 -0400
+Subject: [PATCH 3/8] ARM: introduce common set_auxcr/get_auxcr functions
+In-Reply-To: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1369374311-21260-4-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This implements an MCPM backend for the Virtual Express b.L RTSM model.
+From: Rob Herring <rob.herring@calxeda.com>
 
-This series was partially reviewed during previous posting of some
-components in the past, but some new parts were added to improve
-the whole thing.
+Move the private set_auxcr/get_auxcr functions from
+drivers/cpuidle/cpuidle-calxeda.c so they can be used across platforms.
 
-Diffstat:
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Acked-by: Tony Lindgren <tony@atomide.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/cp15.h       | 14 ++++++++++++++
+ drivers/cpuidle/cpuidle-calxeda.c | 14 +-------------
+ 2 files changed, 15 insertions(+), 13 deletions(-)
 
- Documentation/devicetree/bindings/arm/cci.txt   | 169 ++++++
- .../devicetree/bindings/arm/rtsm-dcscb.txt      |  19 +
- arch/arm/include/asm/cp15.h                     |  14 +
- arch/arm/mach-vexpress/Kconfig                  |   9 +
- arch/arm/mach-vexpress/Makefile                 |   1 +
- arch/arm/mach-vexpress/dcscb.c                  | 255 +++++++++
- arch/arm/mach-vexpress/dcscb_setup.S            |  38 ++
- drivers/bus/Kconfig                             |   7 +
- drivers/bus/Makefile                            |   2 +
- drivers/bus/arm-cci.c                           | 529 ++++++++++++++++++
- drivers/cpuidle/cpuidle-calxeda.c               |  14 +-
- include/linux/arm-cci.h                         |  61 ++
- 12 files changed, 1105 insertions(+), 13 deletions(-)
+diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+index 1f3262e99d..cedd372131 100644
+--- a/arch/arm/include/asm/cp15.h
++++ b/arch/arm/include/asm/cp15.h
+@@ -61,6 +61,20 @@ static inline void set_cr(unsigned int val)
+ 	isb();
+ }
+ 
++static inline unsigned int get_auxcr(void)
++{
++	unsigned int val;
++	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val));
++	return val;
++}
++
++static inline void set_auxcr(unsigned int val)
++{
++	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
++	  : : "r" (val));
++	isb();
++}
++
+ #ifndef CONFIG_SMP
+ extern void adjust_cr(unsigned long mask, unsigned long set);
+ #endif
+diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
+index 223379169c..8a08e04c0e 100644
+--- a/drivers/cpuidle/cpuidle-calxeda.c
++++ b/drivers/cpuidle/cpuidle-calxeda.c
+@@ -37,19 +37,7 @@
+ extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
+ extern void *scu_base_addr;
+ 
+-static inline unsigned int get_auxcr(void)
+-{
+-	unsigned int val;
+-	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val) : : "cc");
+-	return val;
+-}
+-
+-static inline void set_auxcr(unsigned int val)
+-{
+-	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
+-	  : : "r" (val) : "cc");
+-	isb();
+-}
++static struct cpuidle_device __percpu *calxeda_idle_cpuidle_devices;
+ 
+ static noinline void calxeda_idle_restore(void)
+ {
+-- 
+1.8.1.2
