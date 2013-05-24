@@ -1,47 +1,57 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 May 2013 12:31:26 +0100
-Subject: [PATCH v2 3/4] ARM: cacheflush: don't round address range up to
- nearest page
+Date: Fri, 24 May 2013 12:31:27 +0100
+Subject: [PATCH v2 4/4] ARM: cacheflush: don't bother rounding to nearest vma
 In-Reply-To: <1369395087-30972-1-git-send-email-will.deacon@arm.com>
 References: <1369395087-30972-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1369395087-30972-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1369395087-30972-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flush_cache_user_range macro takes a pair of addresses describing
-the start and end of the virtual address range to flush. Due to an
-accidental oversight when flush_cache_range_user was introduced, the
-address range was rounded up so that the start and end addresses were
-page-aligned.
+do_cache_op finds the lowest VMA contained in the specified address
+range and rounds the range to cover only the mapped addresses.
 
-For historical reference, the interesting commits in history.git are:
+Since commit 4542b6a0fa6b ("ARM: 7365/1: drop unused parameter from
+flush_cache_user_range") the VMA is not used for anything else in this
+code and seeing as the low-level cache flushing routines return -EFAULT
+if the address is not valid, there is no need for this range truncation.
 
-10eacf1775e1 ("[ARM] Clean up ARM cache handling interfaces (part 1)")
-71432e79b76b ("[ARM] Add flush_cache_user_page() for sys_cacheflush()")
+This patch removes the VMA handling code from the cacheflushing syscall.
 
-This patch removes the alignment code, reducing the amount of flushing
-required for ranges that are not an exact multiple of PAGE_SIZE.
-
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Reported-by: Jonathan Austin <jonathan.austin@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/cacheflush.h | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/kernel/traps.c | 17 ++---------------
+ 1 file changed, 2 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index bff7138..39c3faa 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -268,8 +268,7 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
-  * Harvard caches are synchronised for the user space address range.
-  * This is used for the ARM private sys_cacheflush system call.
-  */
--#define flush_cache_user_range(start,end) \
--	__cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
-+#define flush_cache_user_range(s,e)	__cpuc_coherent_user_range(s,e)
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 47092f2..9af88fd 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -548,24 +548,11 @@ static long do_cache_op_restart(struct restart_block *unused)
+ static inline int
+ do_cache_op(unsigned long start, unsigned long end, int flags)
+ {
+-	struct mm_struct *mm = current->active_mm;
+-	struct vm_area_struct *vma;
+-
+ 	if (end < start || flags)
+ 		return -EINVAL;
  
- /*
-  * Perform necessary cache operations to ensure that data previously
+-	down_read(&mm->mmap_sem);
+-	vma = find_vma(mm, start);
+-	if (!vma || vma->vm_start >= end) {
+-		up_read(&mm->mmap_sem);
+-		return -EINVAL;
+-	}
+-
+-	if (start < vma->vm_start)
+-		start = vma->vm_start;
+-	if (end > vma->vm_end)
+-		end = vma->vm_end;
+-	up_read(&mm->mmap_sem);
++	if (!access_ok(VERIFY_READ, start, end - start))
++		return -EFAULT;
+ 
+ 	return __do_cache_op(start, end);
+ }
 -- 
 1.8.2.2
