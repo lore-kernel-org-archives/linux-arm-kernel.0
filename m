@@ -1,10 +1,10 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 May 2013 11:44:51 +0200
-Subject: [PATCH 14/21] arm: kirkwood: mplcec4: affect pinmux configs to the
+Date: Fri, 24 May 2013 11:44:53 +0200
+Subject: [PATCH 16/21] arm: kirkwood: nsa310: affect pinmux configs to the
  right devices
 In-Reply-To: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369388699-25975-15-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369388699-25975-17-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,68 +25,76 @@ pin 43 (PIN43): gpio-leds.1 mvebu-gpio:43 function gpio group mpp43
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/kirkwood-mplcec4.dts |   23 ++++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/kirkwood-nsa310.dts |   29 +++++++++++++----------------
+ 1 file changed, 13 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-mplcec4.dts b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-index 7588241..1ce1bc6 100644
---- a/arch/arm/boot/dts/kirkwood-mplcec4.dts
-+++ b/arch/arm/boot/dts/kirkwood-mplcec4.dts
-@@ -18,16 +18,6 @@
+diff --git a/arch/arm/boot/dts/kirkwood-nsa310.dts b/arch/arm/boot/dts/kirkwood-nsa310.dts
+index a7412b9..79391ca 100644
+--- a/arch/arm/boot/dts/kirkwood-nsa310.dts
++++ b/arch/arm/boot/dts/kirkwood-nsa310.dts
+@@ -17,22 +17,7 @@
  
  	ocp at f1000000 {
  		pinctrl: pinctrl at 10000 {
--
--			pinctrl-0 = < &pmx_nand &pmx_uart0
--				      &pmx_led_health
--				      &pmx_sata0 &pmx_sata1
--				      &pmx_led_user1o
--				      &pmx_led_user1g &pmx_led_user0o
--				      &pmx_led_user0g &pmx_led_misc
--				    >;
--			pinctrl-names = "default";
--
- 			pmx_led_health: pmx-led-health {
- 				marvell,pins = "mpp7";
- 				marvell,function = "gpo";
-@@ -91,9 +81,13 @@
+-			pinctrl-0 = < &pmx_led_esata_green
+-				      &pmx_led_esata_red
+-				      &pmx_led_usb_green
+-				      &pmx_led_usb_red
+-				      &pmx_usb_power_off
+-				      &pmx_led_sys_green
+-				      &pmx_led_sys_red
+-				      &pmx_btn_reset
+-				      &pmx_btn_copy
+-				      &pmx_led_copy_green
+-				      &pmx_led_copy_red
+-				      &pmx_led_hdd_green
+-				      &pmx_led_hdd_red
+-				      &pmx_unknown
+-				      &pmx_btn_power
+-				      &pmx_pwr_off >;
++			pinctrl-0 = <&pmx_unknown>;
+ 			pinctrl-names = "default";
  
-                 serial at 12000 {
-                         status = "ok";
-+                        pinctrl-0 = <&pmx_uart0>;
-+                        pinctrl-names = "default";
-                 };
+ 			pmx_led_esata_green: pmx-led-esata-green {
+@@ -182,6 +167,8 @@
+ 		compatible = "gpio-keys";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		pinctrl-0 = <&pmx_btn_reset &pmx_btn_copy &pmx_btn_power>;
++		pinctrl-names = "default";
  
-                 nand at 3000000 {
-+                        pinctrl-0 = <&pmx_nand>;
-+                        pinctrl-names = "default";
-                         status = "okay";
- 
-                         partition at 0 {
-@@ -127,9 +121,10 @@
- 		};
- 
- 		sata at 80000 {
-+			pinctrl-0 = <&pmx_sata0 &pmx_sata1>;
-+			pinctrl-names = "default";
- 			nr-ports = <2>;
- 			status = "okay";
--
- 		};
- 
- 		mvsdio at 90000 {
-@@ -143,6 +138,12 @@
+ 		button at 1 {
+ 			label = "Power Button";
+@@ -202,6 +189,12 @@
  
  	gpio-leds {
  		compatible = "gpio-leds";
-+		pinctrl-0 = < &pmx_led_health
-+			      &pmx_led_user1o
-+			      &pmx_led_user1g &pmx_led_user0o
-+			      &pmx_led_user0g &pmx_led_misc
-+			    >;
++		pinctrl-0 = <&pmx_led_esata_green &pmx_led_esata_red
++			     &pmx_led_usb_green &pmx_led_usb_red
++			     &pmx_led_sys_green &pmx_led_sys_red
++			     &pmx_led_copy_green &pmx_led_copy_red
++			     &pmx_led_hdd_green &pmx_led_hdd_red>;
 +		pinctrl-names = "default";
  
- 		health {
- 			label = "status:green:health";
+ 		green-sys {
+ 			label = "nsa310:green:sys";
+@@ -247,6 +240,8 @@
+ 
+ 	gpio_poweroff {
+ 		compatible = "gpio-poweroff";
++		pinctrl-0 = <&pmx_pwr_off>;
++		pinctrl-names = "default";
+ 		gpios = <&gpio1 16 0>;
+ 	};
+ 
+@@ -254,6 +249,8 @@
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		pinctrl-0 = <&pmx_usb_power_off>;
++		pinctrl-names = "default";
+ 
+ 		usb0_power_off: regulator at 1 {
+ 			compatible = "regulator-fixed";
 -- 
 1.7.9.5
