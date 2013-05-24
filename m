@@ -1,24 +1,70 @@
-From: jp.francois@cynove.com (jean-philippe francois)
-Date: Fri, 24 May 2013 09:31:52 +0200
-Subject: [PATCH 0/1] ARM: omap3: Fix regression in dpll4 child clock frequency
- setting.
-Message-ID: <CAGGh5h2qtc4CdAeupzZBz2OPoqy3h3Tw8__fR1w1PBwd7vFeGw@mail.gmail.com>
+From: jp.francois@cynove.com (Jean-Philippe Francois)
+Date: Fri, 24 May 2013 09:33:05 +0200
+Subject: [PATCH 1/1] ARM : omap3 : fix wrong container_of in clock36xx.c
+Message-ID: <1369380785-23374-1-git-send-email-jp.francois@cynove.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+omap36xx_pwrdn_clk_enable_with_hsdiv_restore expects the parent hw of the clock
+to be a clk_hw_omap. However, looking at cclock3xxx_data.c, all concerned clock
+have parent defined as clk_divider.
+Fix the function to use clk_divider. 
+Tested with  3.9 on dm3730.
 
-The following patch fixes a wrong container_of usage for omap3630.
-CAM_MCLK is 216 MHz instead of the asked 172,8 MHz
-Any user of this clock is affected. This is the case for instance if
-CAM_XCLKA is used to provide clock for an external camera.
+Signed-off-by: Jean-Philippe Fran??ois <jp.francois@cynove.com>
 
-All sub clock of dpll4 that do not use a reset value as divider are
-also affected.
-
-Beyond wrong frequency setting, this is also a potential oops waiting
-to bite any omap3isp user, since a wrong pointer is dereferenced, and
-content of this pointer is used to do __raw_writel / __raw_readl.
-
-Regards,
-Jean-Philippe Fran?ois
+Index: b/arch/arm/mach-omap2/clock36xx.c
+===================================================================
+--- a/arch/arm/mach-omap2/clock36xx.c
++++ b/arch/arm/mach-omap2/clock36xx.c
+@@ -20,11 +20,12 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/clk.h>
++#include <linux/clk-provider.h>
+ #include <linux/io.h>
+ 
+ #include "clock.h"
+ #include "clock36xx.h"
+-
++#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
+ 
+ /**
+  * omap36xx_pwrdn_clk_enable_with_hsdiv_restore - enable clocks suffering
+@@ -39,29 +40,28 @@
+  */
+ int omap36xx_pwrdn_clk_enable_with_hsdiv_restore(struct clk_hw *clk)
+ {
+-	struct clk_hw_omap *parent;
++	struct clk_divider *parent;
+ 	struct clk_hw *parent_hw;
+-	u32 dummy_v, orig_v, clksel_shift;
++	u32 dummy_v, orig_v;
+ 	int ret;
+ 
+ 	/* Clear PWRDN bit of HSDIVIDER */
+ 	ret = omap2_dflt_clk_enable(clk);
+ 
+ 	parent_hw = __clk_get_hw(__clk_get_parent(clk->clk));
+-	parent = to_clk_hw_omap(parent_hw);
++	parent = to_clk_divider(parent_hw);
+ 
+ 	/* Restore the dividers */
+ 	if (!ret) {
+-		clksel_shift = __ffs(parent->clksel_mask);
+-		orig_v = __raw_readl(parent->clksel_reg);
++		orig_v = __raw_readl(parent->reg);
+ 		dummy_v = orig_v;
+ 
+ 		/* Write any other value different from the Read value */
+-		dummy_v ^= (1 << clksel_shift);
+-		__raw_writel(dummy_v, parent->clksel_reg);
++		dummy_v ^= (1 << parent->shift);
++		__raw_writel(dummy_v, parent->reg);
+ 
+ 		/* Write the original divider */
+-		__raw_writel(orig_v, parent->clksel_reg);
++		__raw_writel(orig_v, parent->reg);
+ 	}
+ 
+ 	return ret;
