@@ -1,260 +1,103 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Thu, 23 May 2013 20:59:41 -0500
-Subject: [PATCHv3 6/6] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
-In-Reply-To: <519EC6BD.3080202@samsung.com>
-References: <1369345002-20002-1-git-send-email-dinguyen@altera.com>
- <1369345002-20002-6-git-send-email-dinguyen@altera.com>
- <519EC6BD.3080202@samsung.com>
-Message-ID: <519EC98D.5070707@gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 24 May 2013 11:06:24 +0900
+Subject: [PATCH] ARM: mach-shmobile: r8a7790: add SATA support
+Message-ID: <1369361184-20862-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jaehoon,
+Add SATA clock for r8a7790 SoC (for both device tree and usual cases).
+Register SATA controller as a "late" platform device on r8a7790 SoC.
 
-On 05/23/2013 08:47 PM, Jaehoon Chung wrote:
-> On 05/24/2013 06:36 AM, dinguyen at altera.com wrote:
->> From: Dinh Nguyen <dinguyen@altera.com>
->>
->> Add platform specific functionality for the DW SD/MMC driver for
->> SoCFPGA. Move SDMMC_CMD_USE_HOLD_REG to dw_mmc.h so other platforms
->> can use this define.
->>
->> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
->> CC: Seungwon Jeon <tgih.jun@samsung.com>
->> CC: Jaehoon Chung <jh80.chung@samsung.com>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> CC: Olof Johansson <olof@lixom.net>
->> CC: Pavel Machek <pavel@denx.de>
->> CC: linux-mmc at vger.kernel.org
->>
->> v3:
->> - Addressed comments from Seugwon, Jaehoon, and Pavel
->> - Use clk_disable_unprepare/clk_prepare_enable
->>
->> v2:
->> - Use syscon and regmap
->> - Avoid divide by zero
->> - Remove the need to set PWR_EN
->> ---
->>  drivers/mmc/host/Kconfig          |    8 +++
->>  drivers/mmc/host/Makefile         |    1 +
->>  drivers/mmc/host/dw_mmc-exynos.c  |    2 -
->>  drivers/mmc/host/dw_mmc-socfpga.c |  139 +++++++++++++++++++++++++++++++++++++
->>  drivers/mmc/host/dw_mmc.h         |    1 +
->>  5 files changed, 149 insertions(+), 2 deletions(-)
->>  create mode 100644 drivers/mmc/host/dw_mmc-socfpga.c
->>
->> diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
->> index 9ab8f8d..1be2289 100644
->> --- a/drivers/mmc/host/Kconfig
->> +++ b/drivers/mmc/host/Kconfig
->> @@ -556,6 +556,14 @@ config MMC_DW_EXYNOS
->>  	  Synopsys DesignWare Memory Card Interface driver. Select this option
->>  	  for platforms based on Exynos4 and Exynos5 SoC's.
->>  
->> +config MMC_DW_SOCFPGA
->> +	tristate "SOCFPGA specific extensions for Synopsys DW Memory Card Interface"
->> +	depends on MMC_DW
->> +	select MMC_DW_PLTFM
->> +	help
->> +	  This selects support for Altera SoCFPGA specific extensions to the
->> +	  Synopsys DesignWare Memory Card Interface driver.
->> +
->>  config MMC_DW_PCI
->>  	tristate "Synopsys Designware MCI support on PCI bus"
->>  	depends on MMC_DW && PCI
->> diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
->> index cd32280..67718c1 100644
->> --- a/drivers/mmc/host/Makefile
->> +++ b/drivers/mmc/host/Makefile
->> @@ -42,6 +42,7 @@ obj-$(CONFIG_SDH_BFIN)		+= bfin_sdh.o
->>  obj-$(CONFIG_MMC_DW)		+= dw_mmc.o
->>  obj-$(CONFIG_MMC_DW_PLTFM)	+= dw_mmc-pltfm.o
->>  obj-$(CONFIG_MMC_DW_EXYNOS)	+= dw_mmc-exynos.o
->> +obj-$(CONFIG_MMC_DW_SOCFPGA)	+= dw_mmc-socfpga.o
->>  obj-$(CONFIG_MMC_DW_PCI)	+= dw_mmc-pci.o
->>  obj-$(CONFIG_MMC_SH_MMCIF)	+= sh_mmcif.o
->>  obj-$(CONFIG_MMC_JZ4740)	+= jz4740_mmc.o
->> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
->> index f013e7e..866edef 100644
->> --- a/drivers/mmc/host/dw_mmc-exynos.c
->> +++ b/drivers/mmc/host/dw_mmc-exynos.c
->> @@ -31,8 +31,6 @@
->>  					SDMMC_CLKSEL_CCLK_DRIVE(y) |	\
->>  					SDMMC_CLKSEL_CCLK_DIVIDER(z))
->>  
->> -#define SDMMC_CMD_USE_HOLD_REG		BIT(29)
->> -
->>  #define EXYNOS4210_FIXED_CIU_CLK_DIV	2
->>  #define EXYNOS4412_FIXED_CIU_CLK_DIV	4
->>  
->> diff --git a/drivers/mmc/host/dw_mmc-socfpga.c b/drivers/mmc/host/dw_mmc-socfpga.c
->> new file mode 100644
->> index 0000000..3cc1afc
->> --- /dev/null
->> +++ b/drivers/mmc/host/dw_mmc-socfpga.c
->> @@ -0,0 +1,139 @@
->> +/*
->> + * Altera SoCFPGA Specific Extensions for Synopsys DW Multimedia Card Interface driver
->> + *
->> + *  Copyright (C) 2012, Samsung Electronics Co., Ltd.
->> + *  Copyright (C) 2013 Altera Corporation
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License, or
->> + * (at your option) any later version.
->> + *
->> + * Taken from dw_mmc-exynos.c
->> + */
->> +#include <linux/clk.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/mmc/host.h>
->> +#include <linux/mmc/dw_mmc.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/regmap.h>
->> +
->> +#include "dw_mmc.h"
->> +#include "dw_mmc-pltfm.h"
->> +
->> +#define SYSMGR_SDMMCGRP_CTRL_OFFSET		0x108
->> +#define DRV_CLK_PHASE_SHIFT_SEL_MASK	0x7
->> +#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)          \
->> +	((((smplsel) & 0x38) << 3) | (((drvsel) & 0x7) << 0))
-> Is it right? 0x38 is already shifted..
-> (((smplsel & 0x7) << 3) | ((drvsel & 0x7) << 0))
-> isn't?
+Based on "ARM: mach-shmobile: r8a7779: add SATA support" by
+Vladimir Barinov.
 
-Yes, you're right! Will fix..
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
+ arch/arm/mach-shmobile/setup-r8a7790.c | 21 +++++++++++++++++++++
+ 2 files changed, 25 insertions(+)
 
-thanks,
-Dinh
-> 
-> Best Regards,
-> Jaehoon Chung
->> +
->> +/* SOCFPGA implementation specific driver private data */
->> +struct dw_mci_socfpga_priv_data {
->> +	u8	ciu_div; /* card interface unit divisor */
->> +	u32	hs_timing; /* bitmask for CIU clock phase shift */
->> +	struct regmap   *sysreg; /* regmap for system manager register */
->> +};
->> +
->> +static int dw_mci_socfpga_priv_init(struct dw_mci *host)
->> +{
->> +	struct dw_mci_socfpga_priv_data *priv;
->> +
->> +	priv = devm_kzalloc(host->dev, sizeof(*priv), GFP_KERNEL);
->> +	if (!priv) {
->> +		dev_err(host->dev, "mem alloc failed for private data\n");
->> +		return -ENOMEM;
->> +	}
->> +
->> +	host->priv = priv;
->> +
->> +	priv->sysreg = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
->> +	if (IS_ERR(priv->sysreg)) {
->> +		dev_err(host->dev, "regmap for altr,sys-mgr lookup failed.\n");
->> +		return PTR_ERR(priv->sysreg);
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int dw_mci_socfpga_setup_clock(struct dw_mci *host)
->> +{
->> +	struct dw_mci_socfpga_priv_data *priv = host->priv;
->> +
->> +	clk_disable_unprepare(host->ciu_clk);
->> +	regmap_write(priv->sysreg, SYSMGR_SDMMCGRP_CTRL_OFFSET, priv->hs_timing);
->> +	clk_prepare_enable(host->ciu_clk);
->> +
->> +	host->bus_hz /= (priv->ciu_div + 1);
->> +	return 0;
->> +}
->> +
->> +static void dw_mci_socfpga_prepare_command(struct dw_mci *host, u32 *cmdr)
->> +{
->> +	struct dw_mci_socfpga_priv_data *priv = host->priv;
->> +
->> +	if (priv->hs_timing & DRV_CLK_PHASE_SHIFT_SEL_MASK)
->> +		*cmdr |= SDMMC_CMD_USE_HOLD_REG;
->> +}
->> +
->> +static int dw_mci_socfpga_parse_dt(struct dw_mci *host)
->> +{
->> +	struct dw_mci_socfpga_priv_data *priv = host->priv;
->> +	struct device_node *np = host->dev->of_node;
->> +	u32 timing[2];
->> +	u32 div = 0;
->> +	int ret;
->> +
->> +	ret = of_property_read_u32(np, "altr,dw-mshc-ciu-div", &div);
->> +	if (ret)
->> +		dev_info(host->dev, "No dw-mshc-ciu-div specified, assuming 1");
->> +	priv->ciu_div = div;
->> +
->> +	ret = of_property_read_u32_array(np,
->> +			"altr,dw-mshc-sdr-timing", timing, 2);
->> +	if (ret)
->> +		return ret;
->> +
->> +	priv->hs_timing = SYSMGR_SDMMC_CTRL_SET(timing[0], timing[1]);
->> +	return 0;
->> +}
->> +
->> +static const struct dw_mci_drv_data socfpga_drv_data = {
->> +	.init			= dw_mci_socfpga_priv_init,
->> +	.setup_clock		= dw_mci_socfpga_setup_clock,
->> +	.prepare_command	= dw_mci_socfpga_prepare_command,
->> +	.parse_dt		= dw_mci_socfpga_parse_dt,
->> +};
->> +
->> +static const struct of_device_id dw_mci_socfpga_match[] = {
->> +	{ .compatible = "altr,socfpga-dw-mshc",
->> +			.data = &socfpga_drv_data, },
->> +	{},
->> +};
->> +MODULE_DEVICE_TABLE(of, dw_mci_socfpga_match);
->> +
->> +int dw_mci_socfpga_probe(struct platform_device *pdev)
->> +{
->> +	const struct dw_mci_drv_data *drv_data;
->> +	const struct of_device_id *match;
->> +
->> +	match = of_match_node(dw_mci_socfpga_match, pdev->dev.of_node);
->> +	drv_data = match->data;
->> +	return dw_mci_pltfm_register(pdev, drv_data);
->> +}
->> +
->> +static struct platform_driver dw_mci_socfpga_pltfm_driver = {
->> +	.probe		= dw_mci_socfpga_probe,
->> +	.remove		= __exit_p(dw_mci_pltfm_remove),
->> +	.driver		= {
->> +		.name		= "dwmmc_socfpga",
->> +		.of_match_table	= of_match_ptr(dw_mci_socfpga_match),
->> +		.pm		= &dw_mci_pltfm_pmops,
->> +	},
->> +};
->> +
->> +module_platform_driver(dw_mci_socfpga_pltfm_driver);
->> +
->> +MODULE_DESCRIPTION("Altera SOCFPGA Specific DW-MSHC Driver Extension");
->> +MODULE_LICENSE("GPL v2");
->> +MODULE_ALIAS("platform:dwmmc-socfpga");
->> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
->> index 0b74189..3700cb2 100644
->> --- a/drivers/mmc/host/dw_mmc.h
->> +++ b/drivers/mmc/host/dw_mmc.h
->> @@ -111,6 +111,7 @@
->>  #define SDMMC_INT_ERROR			0xbfc2
->>  /* Command register defines */
->>  #define SDMMC_CMD_START			BIT(31)
->> +#define SDMMC_CMD_USE_HOLD_REG	BIT(29)
->>  #define SDMMC_CMD_CCS_EXP		BIT(23)
->>  #define SDMMC_CMD_CEATA_RD		BIT(22)
->>  #define SDMMC_CMD_UPD_CLK		BIT(21)
->>
-> 
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index b393592..3619a52 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -50,6 +50,7 @@
+ #define SMSTPCR2 0xe6150138
+ #define SMSTPCR3 0xe615013c
+ #define SMSTPCR7 0xe615014c
++#define SMSTPCR8 0xe6150990
+ 
+ #define MODEMR		0xE6160060
+ #define SDCKCR		0xE6150074
+@@ -180,6 +181,7 @@ static struct clk div6_clks[DIV6_NR] = {
+ 
+ /* MSTP */
+ enum {
++	MSTP814,
+ 	MSTP721, MSTP720,
+ 	MSTP304,
+ 	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202,
+@@ -187,6 +189,7 @@ enum {
+ };
+ 
+ static struct clk mstp_clks[MSTP_NR] = {
++	[MSTP814] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 15, 0), /* SATA1 */
+ 	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
+ 	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
+ 	[MSTP304] = SH_CLK_MSTP32(&cp_clk, SMSTPCR3, 4, 0), /* TPU0 */
+@@ -249,6 +252,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP202]),
+ 	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP721]),
+ 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
++	CLKDEV_DEV_ID("sata_rcar.1", &mstp_clks[MSTP814]),
+ };
+ 
+ #define R8A7790_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index ed7ee24..5a2a073 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -18,6 +18,7 @@
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
+ 
++#include <linux/dma-mapping.h>
+ #include <linux/irq.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+@@ -118,6 +119,25 @@ static inline void r8a7790_register_scif(int idx)
+ 				      sizeof(struct plat_sci_port));
+ }
+ 
++static __init void r8a7790_register_sata1(void)
++{
++
++	struct resource res[] = {
++		DEFINE_RES_MEM_NAMED(0xee300000, 0x200000, "rcar-sata"),
++		DEFINE_RES_IRQ(gic_iid(106)),
++	};
++
++	struct platform_device_info pdevinfo = {
++		.name = "sata_rcar",
++		.id = 1,
++		.res = res,
++		.num_res = ARRAY_SIZE(res),
++		.dma_mask = DMA_BIT_MASK(32),
++	};
++
++	platform_device_register_full(&pdevinfo);
++}
++
+ static struct renesas_irqc_config irqc0_data = {
+ 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
+ };
+@@ -148,6 +168,7 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_scif(SCIF0);
+ 	r8a7790_register_scif(SCIF1);
+ 	r8a7790_register_irqc(0);
++	r8a7790_register_sata1();
+ }
+ 
+ void __init r8a7790_timer_init(void)
+-- 
+1.8.2.1
