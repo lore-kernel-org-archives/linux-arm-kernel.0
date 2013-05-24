@@ -1,28 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 May 2013 12:26:10 +0100
-Subject: [GIT PULL] arm-soc: Xilinx zynq core - smp for v3.10
-In-Reply-To: <890ef3b8-f536-4b00-9bd8-5ea50de3bf51@DB8EHSMHS032.ehs.local>
-References: <890ef3b8-f536-4b00-9bd8-5ea50de3bf51@DB8EHSMHS032.ehs.local>
-Message-ID: <20130524112610.GX18614@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 24 May 2013 12:26:27 +0100
+Subject: [PATCH] ARM: ux500: regulators: Remove misleading comment
+In-Reply-To: <1369227995-17142-1-git-send-email-lee.jones@linaro.org>
+References: <1369227995-17142-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130524112627.GY22683@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 04, 2013 at 09:47:09AM +0200, Michal Simek wrote:
-> Hi Arnd and Olof,
->
-> please pull the following smp support to your arm-soc tree.
->
-> This branch is based on zynq/clksrc/cleanup parts because
-> there are some dependencies on moving timer to generic location.
->
-> I could based it on standard Linux tagged version but you will get
-> several conflicts you will have to resolve.
-> If you are OK to resolving these problems, please let me know
-> I will create another branch with core-smp changes which are not based
-> on zynq/clksrc/cleanup branch.
+On Wed, 22 May 2013, Lee Jones wrote:
 
-You might want to resolve this new warning:
+> This patch removes a comment which explains that the ab8505 platform
+> uses the same initialisation settings as the ab8500. Well when this
+> changed and the ab8505 started using its own set of initialisation
+> values, someone forgot to remove it.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/mach-ux500/board-mop500-regulators.c |    1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+> index 33c353b..b34441b 100644
+> --- a/arch/arm/mach-ux500/board-mop500-regulators.c
+> +++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+> @@ -996,7 +996,6 @@ struct ab8500_regulator_platform_data ab8500_regulator_plat_data = {
+>  	.num_ext_regulator      = ARRAY_SIZE(ab8500_ext_regulators),
+>  };
+>  
+> -/* Use the AB8500 init settings for AB8505 as they are the same right now */
+>  struct ab8500_regulator_platform_data ab8505_regulator_plat_data = {
+>  	.reg_init               = ab8505_reg_init,
+>  	.num_reg_init           = ARRAY_SIZE(ab8505_reg_init),
 
-arch/arm/mach-zynq/hotplug.c:1:0: warning: switch -mcpu=cortex-a9 conflicts with -march= switch
+This patch still stands though.
 
-found by lastnights OMAP4430 randconfig build.
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
