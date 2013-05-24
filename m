@@ -1,270 +1,105 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 25 May 2013 00:04:45 +0200
-Subject: [RESEND PATCH 2/5] clk: samsung: Add support to register
- rate_table for PLL3xxx
-In-Reply-To: <1369391478-7665-3-git-send-email-vikas.sajjan@linaro.org>
-References: <1369391478-7665-1-git-send-email-vikas.sajjan@linaro.org>
- <1369391478-7665-3-git-send-email-vikas.sajjan@linaro.org>
-Message-ID: <2606875.QmniDqB8hY@flatron>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 24 May 2013 15:05:39 -0700
+Subject: [PATCH] ARM: avoid mis-detecting some V7 cores in the decompressor
+In-Reply-To: <20130523231531.GT18614@n2100.arm.linux.org.uk>
+References: <1368049671-22879-1-git-send-email-sboyd@codeaurora.org>
+ <5193E424.9090605@codeaurora.org> <519E57D2.3050000@codeaurora.org>
+ <20130523231531.GT18614@n2100.arm.linux.org.uk>
+Message-ID: <20130524220539.GB599@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05/24, Russell King - ARM Linux wrote:
+> On Thu, May 23, 2013 at 10:54:26AM -0700, Stephen Boyd wrote:
+> > On 05/15/13 12:38, Stephen Boyd wrote:
+> > > On 05/08/13 14:47, Stephen Boyd wrote:
+> > >> From: Brian Swetland <swetland@google.com>
+> > >>
+> > >> Currently v7 CPUs with an MIDR that has no bits set in the range
+> > >> [16:12] will be detected as old ARM CPUs with no caches and so
+> > >> the cache will never be turned on during decompression. ARM's
+> > >> Cortex chips have an 0xC in the range [16:12] so they never match
+> > >> this entry, but Qualcomm's Scorpion and Krait processors never
+> > >> set these bits to anything besides 0 so they always match.
+> > >>
+> > >> Skip this entry if we've compiled in support for v7 CPUs. This
+> > >> allows kernel decompression to happen nearly instantly instead of
+> > >> taking over 20 seconds.
+> > >>
+> > >> Signed-off-by: Brian Swetland <swetland@google.com>
+> > >> [sboyd: Clarified and extended commit text]
+> > >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> > >> ---
+> > > Ping?
+> > 
+> > Russell, shall I add this to the patch tracker?
+> 
+> Yes please.
+> 
 
-Please see my comments inline.
+Ok, thanks.
 
-On Friday 24 of May 2013 16:01:15 Vikas Sajjan wrote:
-> From: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> 
-> This patch defines a common rate_table which will contain recommended p,
-> m, s and k values for supported rates that needs to be changed for
-> changing corresponding PLL's rate.
-> It also sorts the rate table while registering the PLL rate table.
-> So that this sorted table can be used for making the searching of
-> "required rate" efficient.
-> 
-> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos4.c    |    8 ++++----
->  drivers/clk/samsung/clk-exynos5250.c |   14 +++++++-------
->  drivers/clk/samsung/clk-pll.c        |   35
-> ++++++++++++++++++++++++++++++++-- drivers/clk/samsung/clk-pll.h       
-> |   27 ++++++++++++++++++++++++-- 4 files changed, 69 insertions(+), 15
-> deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos4.c
-> b/drivers/clk/samsung/clk-exynos4.c index cf7d4e7..beff8a1 100644
-> --- a/drivers/clk/samsung/clk-exynos4.c
-> +++ b/drivers/clk/samsung/clk-exynos4.c
-> @@ -1021,13 +1021,13 @@ void __init exynos4_clk_init(struct device_node
-> *np, enum exynos4_soc exynos4_so reg_base + VPLL_CON0, pll_4650c);
->  	} else {
->  		apll = samsung_clk_register_pll35xx("fout_apll", 
-"fin_pll",
-> -					reg_base + APLL_LOCK);
-> +					reg_base + APLL_LOCK, NULL, 0);
->  		mpll = samsung_clk_register_pll35xx("fout_mpll", 
-"fin_pll",
-> -					reg_base + E4X12_MPLL_LOCK);
-> +					reg_base + E4X12_MPLL_LOCK, NULL, 
-0);
->  		epll = samsung_clk_register_pll36xx("fout_epll", 
-"fin_pll",
-> -					reg_base + EPLL_LOCK);
-> +					reg_base + EPLL_LOCK, NULL, 0);
->  		vpll = samsung_clk_register_pll36xx("fout_vpll", 
-"fin_pll",
-> -					reg_base + VPLL_LOCK);
-> +					reg_base + VPLL_LOCK, NULL, 0);
->  	}
-> 
->  	samsung_clk_add_lookup(apll, fout_apll);
-> diff --git a/drivers/clk/samsung/clk-exynos5250.c
-> b/drivers/clk/samsung/clk-exynos5250.c index 687b580..ddf10ca 100644
-> --- a/drivers/clk/samsung/clk-exynos5250.c
-> +++ b/drivers/clk/samsung/clk-exynos5250.c
-> @@ -491,19 +491,19 @@ void __init exynos5250_clk_init(struct device_node
-> *np) ext_clk_match);
-> 
->  	apll = samsung_clk_register_pll35xx("fout_apll", "fin_pll",
-> -			reg_base);
-> +			reg_base, NULL, 0);
->  	mpll = samsung_clk_register_pll35xx("fout_mpll", "fin_pll",
-> -			reg_base + 0x4000);
-> +			reg_base + 0x4000, NULL, 0);
->  	bpll = samsung_clk_register_pll35xx("fout_bpll", "fin_pll",
-> -			reg_base + 0x20010);
-> +			reg_base + 0x20010, NULL, 0);
->  	gpll = samsung_clk_register_pll35xx("fout_gpll", "fin_pll",
-> -			reg_base + 0x10050);
-> +			reg_base + 0x10050, NULL, 0);
->  	cpll = samsung_clk_register_pll35xx("fout_cpll", "fin_pll",
-> -			reg_base + 0x10020);
-> +			reg_base + 0x10020, NULL, 0);
->  	epll = samsung_clk_register_pll36xx("fout_epll", "fin_pll",
-> -			reg_base + 0x10030);
-> +			reg_base + 0x10030, NULL, 0);
->  	vpll = samsung_clk_register_pll36xx("fout_vpll", "mout_vpllsrc",
-> -			reg_base + 0x10040);
-> +			reg_base + 0x10040, NULL, 0);
-> 
->  	samsung_clk_register_fixed_rate(exynos5250_fixed_rate_clks,
->  			ARRAY_SIZE(exynos5250_fixed_rate_clks));
-> diff --git a/drivers/clk/samsung/clk-pll.c
-> b/drivers/clk/samsung/clk-pll.c index 01f17cf..b8c0260 100644
-> --- a/drivers/clk/samsung/clk-pll.c
-> +++ b/drivers/clk/samsung/clk-pll.c
-> @@ -10,12 +10,15 @@
->  */
-> 
->  #include <linux/errno.h>
-> +#include <linux/sort.h>
->  #include "clk.h"
->  #include "clk-pll.h"
-> 
->  struct samsung_clk_pll {
->  	struct clk_hw		hw;
->  	const void __iomem	*base;
-> +	struct samsung_pll_rate_table *rate_table;
-> +	unsigned int rate_count;
->  };
-> 
->  #define to_clk_pll(_hw) container_of(_hw, struct samsung_clk_pll, hw)
-> @@ -25,6 +28,14 @@ struct samsung_clk_pll {
->  #define pll_writel(pll, val, offset)					\
->  		__raw_writel(val, (void __iomem *)(pll->base + (offset)));
-> 
-> +static int samsung_compare_rate(const void *_a, const void *_b)
-> +{
-> +	const struct samsung_pll_rate_table *a = _a;
-> +	const struct samsung_pll_rate_table *b = _b;
-> +
-> +	return a->rate - b->rate;
-> +}
-> +
->  /*
->   * PLL35xx Clock Type
->   */
-> @@ -62,7 +73,9 @@ static const struct clk_ops samsung_pll35xx_clk_ops =
-> { };
-> 
->  struct clk * __init samsung_clk_register_pll35xx(const char *name,
-> -			const char *pname, const void __iomem *base)
-> +			const char *pname, const void __iomem *base,
-> +			struct samsung_pll_rate_table *rate_table,
-> +			const unsigned int rate_count)
->  {
->  	struct samsung_clk_pll *pll;
->  	struct clk *clk;
-> @@ -82,6 +95,14 @@ struct clk * __init
-> samsung_clk_register_pll35xx(const char *name,
-> 
->  	pll->hw.init = &init;
->  	pll->base = base;
-> +	pll->rate_table = rate_table;
-> +	pll->rate_count = rate_count;
-> +
-> +	if (pll->rate_table && pll->rate_count) {
+I've noticed another problem now that our caches are used. On MSM
+we have TEXT_OFFSET set to at least 0x208000 if we've built-in
+support for MSM8x60/8960. If I boot a kernel with the MSM code
+built-in that requires the higher text offset, but I load my
+compressed kernel below that address (such as 0x0) the
+decompression fails.
 
-You seem to assume here that the exact set of rates is known at 
-compilation time. In other words, you assume that all boards have the same 
-PLL input (xtal) frequency.
+This happens because the page tables are written into the
+compressed data region before we relocate ourself to a higher
+location.
 
-We have similar patches available in our internal tree that work in a bit 
-different way:
+Here's some ascii art to show the problem
 
-1) they assume that passed array is already sorted, which is a good 
-assumption, because you have full control of this array - it's a part of 
-the clock driver and if it's incorrect it's your fault - you don't deal 
-with data input by user
+We start off at 0x0
 
-2) passed array don't have defined rates, but rather only all the relevant 
-PLL coefficients; the frequency for each entry is calculated at 
-registration time, based on rate of parent clock
+ 0x000000 +---------+
+          |         |
+          | zImage  |
+ 0x208000 |---------| <- r4 (zreladdr)
+          | zImage  |
+ 0x300000 +---------+ <- _edata
 
-3) the table is NULL terminated, without the need to pass its size, but 
-it's just a matter of preference
+Then we run far enough to call cache_on which goes ahead and
+calls __setup_mmu and sets up our page tables.
 
-> +		sort(pll->rate_table, pll->rate_count,
-> +			sizeof(struct samsung_pll_rate_table),
-> +			samsung_compare_rate, NULL);
-> +	}
-> 
->  	clk = clk_register(NULL, &pll->hw);
->  	if (IS_ERR(clk)) {
-> @@ -137,7 +158,9 @@ static const struct clk_ops samsung_pll36xx_clk_ops
-> = { };
-> 
->  struct clk * __init samsung_clk_register_pll36xx(const char *name,
-> -			const char *pname, const void __iomem *base)
-> +			const char *pname, const void __iomem *base,
-> +			struct samsung_pll_rate_table *rate_table,
-> +			const unsigned int rate_count)
->  {
->  	struct samsung_clk_pll *pll;
->  	struct clk *clk;
-> @@ -157,6 +180,14 @@ struct clk * __init
-> samsung_clk_register_pll36xx(const char *name,
-> 
->  	pll->hw.init = &init;
->  	pll->base = base;
-> +	pll->rate_table = rate_table;
-> +	pll->rate_count = rate_count;
-> +
-> +	if (pll->rate_table && pll->rate_count) {
-> +		sort(pll->rate_table, pll->rate_count,
-> +			sizeof(struct samsung_pll_rate_table),
-> +			samsung_compare_rate, NULL);
-> +	}
-> 
->  	clk = clk_register(NULL, &pll->hw);
->  	if (IS_ERR(clk)) {
-> diff --git a/drivers/clk/samsung/clk-pll.h
-> b/drivers/clk/samsung/clk-pll.h index 1329522..b5e12430 100644
-> --- a/drivers/clk/samsung/clk-pll.h
-> +++ b/drivers/clk/samsung/clk-pll.h
-> @@ -12,6 +12,25 @@
->  #ifndef __SAMSUNG_CLK_PLL_H
->  #define __SAMSUNG_CLK_PLL_H
-> 
-> +#define PLL_35XX_RATE(_rate, _m, _p, _s)			\
-> +	{							\
-> +		.rate = _rate,					\
-> +		.pll_con0 = ((_m) << 16 | (_p) << 8 | (_s)),	\
-> +	}
-> +
-> +#define PLL_36XX_RATE(_rate, _m, _p, _s, _k)			\
-> +	{							\
-> +		.rate = _rate,					\
-> +		.pll_con0 = ((_m) << 16 | (_p) << 8 | (_s)),	\
-> +		.pll_con1 = _k,					\
-> +	}
-> +
-> +struct samsung_pll_rate_table {
-> +	unsigned  int rate;
-> +	u32 pll_con0;
-> +	u32 pll_con1;
+ 0x008000 +---------+
+          |         |
+          | zImage  |
+          |         |
+ 0x204000 |---------|
+          |  pgdir  |
+ 0x208000 |---------| <- r4 (zreladdr)
+          |         |
+          | zImage  |
+          |         |
+ 0x300000 +---------+ <- _edata
 
-I don't like this struct. What about PLLs that don't have con0 or con1, 
-but rather a completely weird register strukture like PLL_P_REG, 
-PLL_M_REG, PLL_S_REG? The structure has generic name, which suggests that 
-it should be able to handle any future Samsung PLLs as well.
+This is bad because we just wrote our page tables into the
+compressed data. Nobody notices though and we finish relocating
+ourselves and then we call decompress_kernel() which fails
+randomly. (BTW, why does error() sit in a while loop forever? We
+can't get any information about why the decompression failed if
+we have debug_ll enabled. I had to patch the error() routine to
+not while loop forever to get that print after do_decompress to
+be useful.)
 
-I'd suggest storing all coefficients as separate fields of the struct, 
-e.g.
+I see a few solutions.
 
-struct samsung_pll_rate_table {
-	unsigned  int rate;
-	/* ... */
-	unsigned int p;
-	unsigned int m;
-	unsigned int s;
-	/* ... */
-};
+ 1) Relocate with caches off and then turn on caches after we're
+    running in a location where we won't overwrite ourselves.
 
-Best regards,
-Tomasz
+ 2) Have temporary page tables for the relocation phase that live
+    just below the location we're going to relocate to.
 
-> +};
-> +
->  enum pll45xx_type {
->  	pll_4500,
->  	pll_4502,
-> @@ -25,9 +44,13 @@ enum pll46xx_type {
->  };
-> 
->  extern struct clk * __init samsung_clk_register_pll35xx(const char
-> *name, -			const char *pname, const void __iomem 
-*base);
-> +			const char *pname, const void __iomem *base,
-> +			struct samsung_pll_rate_table *rate_table,
-> +			const unsigned int rate_count);
->  extern struct clk * __init samsung_clk_register_pll36xx(const char
-> *name, -			const char *pname, const void __iomem 
-*base);
-> +			const char *pname, const void __iomem *base,
-> +			struct samsung_pll_rate_table *rate_table,
-> +			const unsigned int rate_count);
->  extern struct clk * __init samsung_clk_register_pll45xx(const char
-> *name, const char *pname, const void __iomem *con_reg,
->  			enum pll45xx_type type);
+ 3) Force bootloaders loading these types of images to load the
+    zImage@least as high as the TEXT_OFFSET is compiled to.
+
+I don't think we can convince everyone that #3 is ok to do. I'm
+leaning towards #2 since we get all the benefits of the cache
+during the relocation phase but #1 is the obviously simple fix.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
