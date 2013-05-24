@@ -1,55 +1,37 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 May 2013 12:36:05 +0100
-Subject: [PATCHv3 0/5] arm: arch_timer cleanups and niceties
-Message-ID: <1369395370-21358-1-git-send-email-mark.rutland@arm.com>
+Date: Fri, 24 May 2013 12:36:06 +0100
+Subject: [PATCHv3 1/5] ARM: hyp: initialize CNTVOFF to zero
+In-Reply-To: <1369395370-21358-1-git-send-email-mark.rutland@arm.com>
+References: <1369395370-21358-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1369395370-21358-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patches clean up some (harmless) fallout from the changes
-in 3.9, and make the driver always use the virtual counter, eliminating
-problems relating to choosing which counters to use (racy
-initialisation, branches in hot paths).
+From: Marc Zyngier <Marc.Zyngier@arm.com>
 
-The patches can also be found in my public git tree:
-git://linux-arm.org/git/linux-mr.git clocks/arch-timer-cleanups
+In order to be able to use the virtual counter in a safe way,
+make sure it is initialized to zero before dropping to SVC.
 
-Russell, are you happy to take these for 3.11 if I send a pull request or drop
-these in your patch system?
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Dave Martin <dave.martin@linaro.org>
+---
+ arch/arm/kernel/hyp-stub.S | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Since v1 [1]:
-* Rebased to v3.10-rc1
-* Fix up mach-shmobile's selection of ARCH_ARM_TIMER
-Since v2: [2]:
-* Added Simon Horman's ack for shmobile
-* Clarified virtual timer CNTVOFF requirement per Christopher Covington's
-  comments.
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-March/158604.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/168536.html
-
-Marc Zyngier (2):
-  ARM: hyp: initialize CNTVOFF to zero
-  ARM: arch_timer: stop virtual timer when booted in HYP mode
-
-Mark Rutland (3):
-  ARM: KVM: arch_timers: zero CNTVOFF upon return to host
-  clocksource: arch_timer: use virtual counters
-  arm: fix up ARM_ARCH_TIMER selects
-
- arch/arm/include/asm/arch_timer.h    |  9 ---------
- arch/arm/kernel/hyp-stub.S           |  7 +++++++
- arch/arm/kvm/interrupts_head.S       |  4 ++++
- arch/arm/mach-exynos/Kconfig         |  2 +-
- arch/arm/mach-shmobile/Kconfig       |  4 ++--
- arch/arm/mach-tegra/Kconfig          |  2 +-
- arch/arm/mach-virt/Kconfig           |  2 +-
- arch/arm64/include/asm/arch_timer.h  | 10 ----------
- drivers/clocksource/arm_arch_timer.c | 23 +++++------------------
- include/clocksource/arm_arch_timer.h |  2 +-
- 10 files changed, 22 insertions(+), 43 deletions(-)
-
+diff --git a/arch/arm/kernel/hyp-stub.S b/arch/arm/kernel/hyp-stub.S
+index 1315c4c..dbe2110 100644
+--- a/arch/arm/kernel/hyp-stub.S
++++ b/arch/arm/kernel/hyp-stub.S
+@@ -153,6 +153,8 @@ THUMB(	orr	r7, #(1 << 30)	)	@ HSCTLR.TE
+ 	mrc	p15, 4, r7, c14, c1, 0	@ CNTHCTL
+ 	orr	r7, r7, #3		@ PL1PCEN | PL1PCTEN
+ 	mcr	p15, 4, r7, c14, c1, 0	@ CNTHCTL
++	mov	r7, #0
++	mcrr	p15, 4, r7, r7, c14	@ CNTVOFF
+ 1:
+ #endif
+ 
 -- 
 1.8.1.1
