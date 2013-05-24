@@ -1,74 +1,25 @@
-From: anish198519851985@gmail.com (anish singh)
-Date: Fri, 24 May 2013 16:29:36 +0530
-Subject: [I2C] informations + advice about messages handling
-In-Reply-To: <20130524094407.61d0ec42@endymion.delvare>
-References: <CA78C307B8F06747967D122FC656B153986448@SERVEUR0.nvp.local>
- <CAK7N6vpg6QUAKODKO2Msr4+GTASLDpA2cG1teQV3yiwt7D4SSw@mail.gmail.com>
- <20130524094407.61d0ec42@endymion.delvare>
-Message-ID: <CAK7N6vqqG68c4vx1uBsNLF8zpSRQWwY5jERqjVYKE7NkEEzFSA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 May 2013 11:59:58 +0100
+Subject: [PATCH v2 1/4] ARM: mm: correct pte_same behaviour for LPAE.
+In-Reply-To: <1369323080-9673-2-git-send-email-steve.capper@linaro.org>
+References: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
+ <1369323080-9673-2-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130524105958.GA18272@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 1:14 PM, Jean Delvare <khali@linux-fr.org> wrote:
-> Hi Anish, Myl?ne,
->
-> On Fri, 24 May 2013 12:52:40 +0530, anish singh wrote:
->> On Fri, May 24, 2013 at 12:41 PM, Mylene Josserand
->> <Mylene.Josserand@navocap.com> wrote:
->> > I have read that this function "i2c_smbus_write_byte_data" uses
->> > "i2c_smbus_xfer" which uses "i2c_lock_adapter".
->> > In this function, there is a mutex so I thought that it will handle it
->> > but it says "Get exclusive access to an I2C bus segment". What is
->> > exactly an I2C segment ? Is it the device we are talking about ? Or is
->> > it the use of the i2c bus ?
->> Don't know what you are referring here.
->
-> In the most simple case, your I2C bus has a single segment so "segment"
-> or "bus" mean the same thing.
->
-> It only starts mattering when I2C bus multiplexing comes into play.
-> Then your bus is split into segments, with one segment (trunk) between
-> the master (controller) and the multiplexer, and one or more segments
-> (branches) hanging off the multiplexer.
->
-> Take look at
-> https://i2c.wiki.kernel.org/index.php/I2C_bus_multiplexing
-> for a sample topology.
->
-> But anyway the comment in front of i2c_lock_adapter() is somewhat
-> misleading. If you read the code you'll see that it always locks the
-> whole bus tree, because it uses the root segment's mutex.
->
->> > I will certainly have to create an i2c driver and I would like to know
->> > if this "collision" handling (if it is handled) is done in old kernel
->> > (2.6.32) or is it handled only in new kernel versions ?
->> AFAIK collision handling and detection was not supported till now
->> in linux kernel until recently but I think this patch is doing that.
->> I may be wrong but I didn't see collision handling in earlier linux
->> kernels.
->> http://thread.gmane.org/gmane.linux.kernel/1410276
->
-> This is for a specific case. The general case is handled by the
-> per-adapter mutex for years now. 2.6.32 should be just fine in this
-> respect.
-I may be mis-understanding here but when two client wants to
-communicate with same master and at the same
-time how does that happen?
-In the thread I mentioned client pulls the line low indicating that
-it wants to own the bus and waits for some time and then checks
-if the line is still low or not.If it is still low then it owns the bus
-and start transaction and if clients see otherwise it releases the
-bus and tries again after some time.How is that handled in the
-previous kernel?
->
->> > If you have any documentation on how the i2c messages are handled in
->> > case of different devices uses, it will help me a lot ! I will search in
->> > the kernel documentation but there is many files about i2c.
->> > And if you know a good i2c driver that I can use as an example to design
->> > mine, it will be great !
->
-> Best is to look at a driver for a device which is similar in
-> functionality to yours.
->
-> --
-> Jean Delvare
+On Thu, May 23, 2013 at 04:31:17PM +0100, Steve Capper wrote:
+> For 3 levels of paging the PTE_EXT_NG bit will be set for user
+> address ptes that are written to a page table but not for ptes
+> created with mk_pte.
+> 
+> This can cause some comparison tests made by pte_same to fail
+> spuriously and lead to other problems.
+> 
+> To correct this behaviour, we mask off PTE_EXT_NG for any pte that
+> is present before running the comparison.
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
+
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
