@@ -1,55 +1,153 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 24 May 2013 10:08:07 +0200
-Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
-In-Reply-To: <519E5732.1040800@free-electrons.com>
-References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
- <201305221305.09579.marex@denx.de> <201305230920.18200.jbe@pengutronix.de>
- <201305231648.17356.marex@denx.de>
- <1369322904.4142.36.camel@weser.hi.pengutronix.de>
- <519E5732.1040800@free-electrons.com>
-Message-ID: <1369382887.4117.34.camel@weser.hi.pengutronix.de>
+From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
+Date: Fri, 24 May 2013 10:11:56 +0200
+Subject: mxsfb: DATA_FORMAT_24_BIT flag outputs invalid colours
+In-Reply-To: <201305231531.31376.jbe@pengutronix.de>
+References: <519E03B0.1080006@digi.com> <20130523130039.GF8595@lukather>
+ <201305231531.31376.jbe@pengutronix.de>
+Message-ID: <20130524081156.GA3154@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 23.05.2013, 19:51 +0200 schrieb Alexandre Belloni:
-> Hi,
+Hi Juergen,
+
+On Thu, May 23, 2013 at 03:31:31PM +0200, Juergen Beisert wrote:
+> Hi Maxime,
 > 
-[...]
+> maxime.ripard at free-electrons.com wrote:
+> > On Thu, May 23, 2013 at 01:55:28PM +0200, Hector Palacios wrote:
+> > > I'm using an i.MX28 based board with lcd connected with 18bits data bus.
+> > > My platform uses 32 bits per pixel:
+> > >
+> > > 	mxsfb_pdata.default_bpp = 32;
+> > > 	mxsfb_pdata.ld_intf_width = STMLCDIF_18BIT;
+> > >
+> > > With these settings the mxsfb.c driver sets flag DATA_FORMAT_24_BIT
+> > > at HW_LCDIF_CTRL register in function mxsfb_set_par():
+> > >
+> > > 	case 32:
+> > > 		dev_dbg(&host->pdev->dev, "Setting up RGB888/666 mode\n");
+> > > 		ctrl |= CTRL_SET_WORD_LENGTH(3);
+> > > 		switch (host->ld_intf_width) {
+> > > 		case STMLCDIF_8BIT:
+> > > 			dev_dbg(&host->pdev->dev,
+> > > 					"Unsupported LCD bus width mapping\n");
+> > > 			return -EINVAL;
+> > > 		case STMLCDIF_16BIT:
+> > > 		case STMLCDIF_18BIT:
+> > > 			/* 24 bit to 18 bit mapping */
+> > > 			ctrl |= CTRL_DF24; /* ignore the upper 2 bits in
+> > > 					    *  each colour component
+> > > 					    */
+> > > 			break;
+> > > 		case STMLCDIF_24BIT:
+> > > 			/* real 24 bit */
+> > > 			break;
+> > > 		}
+> > >
+> > > According to the manual, this flag does:
+> > > 	0x0: ALL_24_BITS_VALID: Data input to the block is in 24 bpp
+> > > format, such that all RGB 888 data is contained in 24 bits.
+> > > 	0x1: DROP_UPPER_2_BITS_PER_BYTE ? Data input to the block is
+> > > actually RGB 18 bpp, but there is 1 colour per byte, hence the upper
+> > > 2 bits in each byte do not contain any useful data, and should be
+> > > dropped.
+> > >
+> > > The setting of this flag is producing bad colours with true colour
+> > > images (i.e. the Linux penguin is displayed ok, but QT applications
+> > > or images displayed with fbv are not).
+> > > I believe the setting of this flag is not correct (after all, if my
+> > > bpp is 32, then all 24bit colours are useful and dropping the upper
+> > > 2 bits is a bad idea).
+> > > If I don't set it, then true colour images are displayed correctly.
+> > > The only problem is that the Linux penguin is displayed much darker
+> > > than usual (correct colours, but darker). Perhaps the 224 colour
+> > > format of this image justifies it?
+> > >
+> > > I noticed the cfa10049 platform also uses the same configuration (18
+> > > bits data bus and 32bpp) and was wondering if true colour images are
+> > > correctly displayed in this platform with this flag set (for example
+> > > with fbv application [1]).
 > >
-> > So while we _might_ be able to get the PIO mode to work on the i.MX23
-> > there is nothing in the doc stating that it's even meant to work. Even
-> > while PIO and DMA mode use the same internal mechanisms, there's still
-> > plenty of opportunities of fail in there. After all PIO mode relies on
-> > reading a debug register in the course of normal operation.
+> > I had the exact same problem, and suggested the exact same solution a
+> > few weeks back.
 > >
-> > Only more extensive experimentation could show if we are in fact able to
-> > make it work, a first shot of using PIO mode on MX23 failed, so it might
-> > as well be that Juergens quick fix is correct and we have to disable PIO
-> > mode on MX23 altogether. That said please stop slapping the word "hack"
-> > over this patch until proven otherwise.
+> > https://patchwork.kernel.org/patch/2470441/
+> >
+> > The conclusion of that discussion what that the userspace applications
+> > were not honouring the bitfield correctly set by the mxsfb driver, and
+> > as such, it was not a bug in the driver.
+> >
+> > While this is correct, I wonder, now that since we had that same problem
+> > in a very short amount of time, if we couldn't set this behaviour
+> > dependant of some (dt? kernel argument?) property so that one could
+> > customise it anyway he want.
+> >
+> > Maxime
 > 
-> Still, Fabio and I have been experiencing the one second delay on
-> i.mx28. From my experience, it appeared between 3.7 and 3.9, see:
-> http://www.spinics.net/lists/linux-i2c/msg11985.html. I still didn't
-> take the time to investigate more yet but it confirms that PIO mode is
-> working on i.mx28 though with an annoying delay.
+> i.MX2[3|8]    LCD1       LCD2       LCD3
+>               24bit      18bit      18bit
+> --------------------------------------------
+> LCD_D0         B0         B0         --
+> LCD_D1         B1         B1         --
+> LCD_D2         B2         B2         B0
+> LCD_D3         B3         B3         B1
+> LCD_D4         B4         B4         B2
+> LCD_D5         B5         B5         B3
+> LCD_D6         B6         G0         B4
+> LCD_D7         B7         G1         B5
 > 
+> LCD_D8         G0         G2         --
+> LCD_D9         G1         G3         --
+> LCD_D10        G2         G4         G0
+> LCD_D11        G3         G5         G1
+> LCD_D12        G4         R0         G2
+> LCD_D13        G5         R1         G3
+> LCD_D14        G6         R2         G4
+> LCD_D15        G7         R3         G5
+> 
+> LCD_D16        R0         R4         --
+> LCD_D17        R1         R5         --
+> LCD_D18        R2                    R0
+> LCD_D19        R3                    R1
+> LCD_D20        R4                    R2
+> LCD_D21        R5                    R3
+> LCD_D22        R6                    R4
+> LCD_D23        R7                    R5
+> 
+> Is your display connected like LCD2 or LCD3? LCD3 must still handled like a 24 
+> bit display shown in LCD1, while only the LCD2-case is the "24 bit to 18 bit 
+> mapping" case.
+> 
+> At least my current tests with an i.MX23 and a connection like LCD2 are 
+> working here with a Qt application. Qt honours the pixel bitfield 
+> description. And I'm using the "bits-per-pixel = <32>" and "bus-width = <18>" 
+> entries in the device tree.
 
-Just for the record: I know that PIO mode is functional on i.MX28
-because I have it working on one of our customer boards. I am rather
-much surprised it's still not working well for you, but haven't had a
-chance to investigate yet. The i.MX28 RM explicitly describes how to
-work with the PIO mode, so if it's not working this is bug somewhere.
+I'm in the second case, so with the same setup that you have it seems.
 
-This thread/patch is about a whole different problem, namely PIO mode
-being non-functional on i.MX23. As the i.MX23 RM doesn't describe the
-PIO mode, there is no indication that it's even meant to work on this
-chip.
+Don't get me wrong, I was not saying that the driver was flawed or had a
+bug, I understood very well your arguments when I first submitted the
+patch. The problem is more for all the userspace applications that don't
+honour the bitfield and just look at the color depth used to feed data
+to the framebuffer.
 
-Regards,
-Lucas
+I must admit that the ideal case should be that these applications
+should be fixed, but it's not realistic.
+
+About QT, let's not use it as an example, the issues I had were probably
+some miscompilation on my side, and if you say that it works fine, then
+I trust you.
+
+This is also why I suggested a kernel argument to enable a different
+"compatibility" mode when you have to deal with these kind of
+applications on your system. the pixel bitfield should probably be
+changed as well so that applications honouring it are not confused.
+
+Hector's case looks like a different story though.
+
+Maxime
+
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
