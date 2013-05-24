@@ -1,53 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 May 2013 10:04:44 +0200
-Subject: [PATCH] pinctrl: sink pinctrldev_list_mutex
-In-Reply-To: <519A8A57.9060007@wwwdotorg.org>
-References: <1368690525-32252-1-git-send-email-linus.walleij@stericsson.com>
- <519A8A57.9060007@wwwdotorg.org>
-Message-ID: <CACRpkdZieCmFnHCGUkv8EqcAtb3DA7dSZpimSdB4P81tZPJRoQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 24 May 2013 10:07:54 +0200
+Subject: [PATCH 0/9] Switch internal registers address to 0xF1 on Armada
+ 370/XP
+In-Reply-To: <20130524074616.GV18614@n2100.arm.linux.org.uk>
+References: <1369132414-18959-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <201305232240.03959.arnd@arndb.de>
+ <20130523230911.GR18614@n2100.arm.linux.org.uk>
+ <201305240915.27847.arnd@arndb.de>
+ <20130524074616.GV18614@n2100.arm.linux.org.uk>
+Message-ID: <20130524100754.6b2d1bc9@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 20, 2013 at 10:40 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+Dear Russell King - ARM Linux,
 
-> This seems fine on the surface, but I do have one question:
->
-> I think the pinctrl lock serves a couple of purposes:
->
-> 1) Basic protection for accesses to the pinctrldev_list itself.
->
-> This patch seems just fine w.r.t. this point.
->
-> 2) Preventing pinctrl drivers from being unregistered (and their modules
-> unloaded) when some operation is being performed on/to them.
+On Fri, 24 May 2013 08:46:16 +0100, Russell King - ARM Linux wrote:
 
-Prevention of module unloading of pin controllers has never
-been working properly, as there is no way to release the
-pinctrl handles taken by different drivers.
+> Wrong, again.  Thomas has already said there are boot loaders shipping
+> on boards which have the registers programmed to be at 0xf1xxxxxx _and_
+> there's boards with boot loaders programmed for 0xd0xxxxxx.
+> 
+> The problem is here TODAY.
 
-I think that is why most pin controller drivers are bool rather
-than tristate.
+Right. And again, don't expect something like:
 
-Currently only pinctrl-single is tristate. Part of me want to
-change that to bool, I think it only will work when using the
-single with hogs (that will be properly free:ed when unloading
-the driver).
+ * Board A = 0xd0xxxxxx
+ * Board B = 0xf1xxxxxx
 
-Tony: is this really working with non-hogs?
+Depending on which bootloader, and which version of the bootloader you
+run, on a given board, the kernel may be booted with 0xd0 or 0xf1.
 
-If we really want to support loading/unloading of pin controllers
-I think the mutex is the least of the problems, and we should
-probably create a separate lock for handling that instead of
-relying on the list lock in that case.
+And again, again. This 0xd0 was a mistake. We don't want to support
+moving forward. The only thing we want to support is 0xf1, nothing else.
 
-While it's probably possible to *unload* the driver properly
-after some hacking like this, we get to the problem of
-re-probing the driver and re-associating all pinctrl handles
-(at that point floating in space with no driver back-end)
-with the driver again.
+All the proposal is about a temporary workaround, just to make the
+transition smoother.
 
-I feel this needs to be driven by someone who actually
-need to load/unload pinctrl modules.
-
-Yours,
-Linus Walleij
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
