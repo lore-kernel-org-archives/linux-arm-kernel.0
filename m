@@ -1,24 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 May 2013 19:10:37 +0200
-Subject: [PATCHv4 6/6] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
-In-Reply-To: <1369410080-436-6-git-send-email-dinguyen@altera.com>
-References: <1369410080-436-1-git-send-email-dinguyen@altera.com>
- <1369410080-436-6-git-send-email-dinguyen@altera.com>
-Message-ID: <201305241910.37975.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 24 May 2013 10:11:33 -0700
+Subject: [GIT PULL] at91: fixes for 3.10 #2
+In-Reply-To: <1369410151-7837-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1369410151-7837-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <CAOesGMjvKhVKZf9A70K7VzXikY902KVyKR==4ivnb-gxhyRCPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 May 2013, dinguyen at altera.com wrote:
-> 
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> Add platform specific functionality for the DW SD/MMC driver for
-> SoCFPGA. Move SDMMC_CMD_USE_HOLD_REG to dw_mmc.h so other platforms
-> can use this define.
+Hi,
 
-No objections to the patch, but you seem to be missing a  binding document,
-which is mandatory to describe the properties you add.
+I'll pull this for now, but...
 
-It also seems odd to have this in the series for the ethernet driver.
 
-	Arnd
+> Jean-Christophe PLAGNIOL-VILLARD (1):
+>       ARM: at91: at91sam9n12: move external irq declatation to DT
+
+This one is not a fix. While OK this time, please stick to only
+sending true fixes for 3.10 from here on out.
+
+
+-Olof
