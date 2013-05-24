@@ -1,37 +1,81 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 23 May 2013 16:55:04 -0700
-Subject: [rtc-linux] [PATCH] rtc: max8998: Check for pdata presence
- before dereferencing
-In-Reply-To: <1368630968-30460-1-git-send-email-t.figa@samsung.com>
-References: <1368630968-30460-1-git-send-email-t.figa@samsung.com>
-Message-ID: <20130523165504.364bebf5f999e4a12d51e176@linux-foundation.org>
+From: marex@denx.de (Marek Vasut)
+Date: Fri, 24 May 2013 03:00:59 +0200
+Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
+In-Reply-To: <1369322904.4142.36.camel@weser.hi.pengutronix.de>
+References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
+ <201305231648.17356.marex@denx.de>
+ <1369322904.4142.36.camel@weser.hi.pengutronix.de>
+Message-ID: <201305240301.00137.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 May 2013 17:16:08 +0200 Tomasz Figa <t.figa@samsung.com> wrote:
+Dear Lucas Stach,
 
-> Currently the driver can crash with a NULL pointer dereference if no pdata
-> is provided, despite of successful registration of MFD part. This patch
-> fixes the problem by adding a NULL check before dereferencing the pdata
-> pointer.
+> Am Donnerstag, den 23.05.2013, 16:48 +0200 schrieb Marek Vasut:
+> > Dear Juergen Beisert,
+> > 
+> > > Hi Marek,
+> > > 
+> > > Marek Vasut wrote:
+> > > > > > i2c slowness is a different issue.
+> > > > > 
+> > > > > Same happens here for my i.M23 based platform. It seems the PIO
+> > > > > mode does not work, or at least not like it works on a i.MX28.
+> > > > > Each short transfer needs about one second (without an error
+> > > > > message) but does not send anything on the I2C lines.
+> > > > > 
+> > > > > I need the following patches to make I2C master work within a
+> > > > > 3.10-rc2 kernel:
+> > > > > 
+> > > > > Subject: [PATCH] I2C/MXS: distinguish i.MX23 and i.MX28 based I2C
+> > > > 
+> > > > I'm all for it, but then ... won't it be better if you actually fixed
+> > > > the PIO and mixed-mode on MX23 instead of implementing such hack?
+> > > 
+> > > If the PIO mode or my patch is a hack depends on the point of view:
+> > > Lucas told me the PIO mode is *mentioned* but *not specified* in the
+> > > i.MX23/i.MX28 datasheets.
+> > 
+> > The PIO works the same way DMA does -- set up bits and then pump data
+> > into the DATA register.
+> > 
+> > > So, the PIO mode seems to depend on some undocumented status bits in
+> > > the i.MX28 I2C controller implementation.
+> > 
+> > How would DMA work then if it used undocumented registers ? It's in the
+> > documentation, just read it or ask FSL ;-)
 > 
-> ...
->
-> --- a/drivers/rtc/rtc-max8998.c
-> +++ b/drivers/rtc/rtc-max8998.c
-> @@ -285,7 +285,7 @@ static int max8998_rtc_probe(struct platform_device *pdev)
->  			info->irq, ret);
->  
->  	dev_info(&pdev->dev, "RTC CHIP NAME: %s\n", pdev->id_entry->name);
-> -	if (pdata->rtc_delay) {
-> +	if (pdata && pdata->rtc_delay) {
->  		info->lp3974_bug_workaround = true;
->  		dev_warn(&pdev->dev, "LP3974 with RTC REGERR option."
->  				" RTC updates will be extremely slow.\n");
+> While the PIO mode might use the same controller mechanisms as the DMA
+> mode, PIO mode is _not_ a documented mode of operation for the i.MX23.
+> 
+> To quote the i.MX28 RM: "The I2C block on the i.MX28 supports a new PIO
+> mode or soft-DMA mode.", which implies the PIO mode to be a new mode of
+> operation not found on earlier i.MX SoCs.
+> The doc is slightly fuzzy here as the i.MX23 RM in contrary states:
+> "Short transmission (up to three bytes plus address) can be easily
+> triggered using only PIO operations, i.e., no DMA setup required." But
+> again it's not a documented mode of operation, i.MX23 doc only describes
+> the DMA mode.
 
-Looking at your description I'm unable to determine which kernel
-versions we should fix.  This is because the changelog didn't describe
-the circumstances under which the bug triggers.
+I'm CCing a Amaury Pouly so he can comment on this stuff. He did some hardware 
+digging.
 
-It's pretty simple: when fixing a bug, include a full description of
-the bug!  As if you were sending a bug report, not a patch.
+> So while we _might_ be able to get the PIO mode to work on the i.MX23
+> there is nothing in the doc stating that it's even meant to work. Even
+> while PIO and DMA mode use the same internal mechanisms, there's still
+> plenty of opportunities of fail in there. After all PIO mode relies on
+> reading a debug register in the course of normal operation.
+
+What's the problem with that ? The debug register contains status bits.
+
+> Only more extensive experimentation could show if we are in fact able to
+> make it work, a first shot of using PIO mode on MX23 failed, so it might
+> as well be that Juergens quick fix is correct and we have to disable PIO
+> mode on MX23 altogether. That said please stop slapping the word "hack"
+> over this patch until proven otherwise.
+> 
+> Regards,
+> Lucas
+
+Best regards,
+Marek Vasut
