@@ -1,41 +1,47 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 May 2013 12:26:27 +0100
-Subject: [PATCH] ARM: ux500: regulators: Remove misleading comment
-In-Reply-To: <1369227995-17142-1-git-send-email-lee.jones@linaro.org>
-References: <1369227995-17142-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130524112627.GY22683@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 24 May 2013 12:31:26 +0100
+Subject: [PATCH v2 3/4] ARM: cacheflush: don't round address range up to
+ nearest page
+In-Reply-To: <1369395087-30972-1-git-send-email-will.deacon@arm.com>
+References: <1369395087-30972-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1369395087-30972-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 May 2013, Lee Jones wrote:
+The flush_cache_user_range macro takes a pair of addresses describing
+the start and end of the virtual address range to flush. Due to an
+accidental oversight when flush_cache_range_user was introduced, the
+address range was rounded up so that the start and end addresses were
+page-aligned.
 
-> This patch removes a comment which explains that the ab8505 platform
-> uses the same initialisation settings as the ab8500. Well when this
-> changed and the ab8505 started using its own set of initialisation
-> values, someone forgot to remove it.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/mach-ux500/board-mop500-regulators.c |    1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-> index 33c353b..b34441b 100644
-> --- a/arch/arm/mach-ux500/board-mop500-regulators.c
-> +++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-> @@ -996,7 +996,6 @@ struct ab8500_regulator_platform_data ab8500_regulator_plat_data = {
->  	.num_ext_regulator      = ARRAY_SIZE(ab8500_ext_regulators),
->  };
->  
-> -/* Use the AB8500 init settings for AB8505 as they are the same right now */
->  struct ab8500_regulator_platform_data ab8505_regulator_plat_data = {
->  	.reg_init               = ab8505_reg_init,
->  	.num_reg_init           = ARRAY_SIZE(ab8505_reg_init),
+For historical reference, the interesting commits in history.git are:
 
-This patch still stands though.
+10eacf1775e1 ("[ARM] Clean up ARM cache handling interfaces (part 1)")
+71432e79b76b ("[ARM] Add flush_cache_user_page() for sys_cacheflush()")
 
+This patch removes the alignment code, reducing the amount of flushing
+required for ranges that are not an exact multiple of PAGE_SIZE.
+
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Jonathan Austin <jonathan.austin@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/cacheflush.h | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index bff7138..39c3faa 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -268,8 +268,7 @@ extern void flush_cache_page(struct vm_area_struct *vma, unsigned long user_addr
+  * Harvard caches are synchronised for the user space address range.
+  * This is used for the ARM private sys_cacheflush system call.
+  */
+-#define flush_cache_user_range(start,end) \
+-	__cpuc_coherent_user_range((start) & PAGE_MASK, PAGE_ALIGN(end))
++#define flush_cache_user_range(s,e)	__cpuc_coherent_user_range(s,e)
+ 
+ /*
+  * Perform necessary cache operations to ensure that data previously
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.2.2
