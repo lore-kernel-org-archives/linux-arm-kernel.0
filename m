@@ -1,87 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 May 2013 12:25:24 +0100
-Subject: [PATCH] ARM: ux500: Allow Snowball to pass its own regulator
- settings
-In-Reply-To: <1369226853-16978-2-git-send-email-lee.jones@linaro.org>
-References: <1369226853-16978-1-git-send-email-lee.jones@linaro.org>
- <1369226853-16978-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130524112524.GX22683@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 May 2013 12:26:10 +0100
+Subject: [GIT PULL] arm-soc: Xilinx zynq core - smp for v3.10
+In-Reply-To: <890ef3b8-f536-4b00-9bd8-5ea50de3bf51@DB8EHSMHS032.ehs.local>
+References: <890ef3b8-f536-4b00-9bd8-5ea50de3bf51@DB8EHSMHS032.ehs.local>
+Message-ID: <20130524112610.GX18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 May 2013, Lee Jones wrote:
+On Thu, Apr 04, 2013 at 09:47:09AM +0200, Michal Simek wrote:
+> Hi Arnd and Olof,
+>
+> please pull the following smp support to your arm-soc tree.
+>
+> This branch is based on zynq/clksrc/cleanup parts because
+> there are some dependencies on moving timer to generic location.
+>
+> I could based it on standard Linux tagged version but you will get
+> several conflicts you will have to resolve.
+> If you are OK to resolving these problems, please let me know
+> I will create another branch with core-smp changes which are not based
+> on zynq/clksrc/cleanup branch.
 
-> This patch fixes a bug introduced in the v3.10 merge window.
-> 
-> Currently the external regulator settings are passed though to the AB8500
-> regulator driver regards of whether they can or should be used on any
-> ux500 based platform. They are not applicable for the u8505 and when
-> enabled, they turn off AUX2 which adversely affects the eMMC on Snowball.
-> 
-> The driver already knows that the external regulator settings are not
-> appropriate for the u8505, however it's more difficult for driver code to
-> distinguish between two different u8500 based platforms.
-> 
-> Using the new semantics, we can just not pass the external regulator
-> initialisation values from platform code and the external regulator
-> driver will know not to register them.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/mach-ux500/board-mop500-regulators.c |    8 ++++++++
->  arch/arm/mach-ux500/board-mop500-regulators.h |    1 +
->  arch/arm/mach-ux500/board-mop500.c            |    2 ++
->  3 files changed, 11 insertions(+)
-> 
-> diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
-> index b34441b..7399e90 100644
-> --- a/arch/arm/mach-ux500/board-mop500-regulators.c
-> +++ b/arch/arm/mach-ux500/board-mop500-regulators.c
-> @@ -996,6 +996,14 @@ struct ab8500_regulator_platform_data ab8500_regulator_plat_data = {
->  	.num_ext_regulator      = ARRAY_SIZE(ab8500_ext_regulators),
->  };
->  
-> +/* External regulators turn off VAUX2 when in use on Snowball. */
-> +struct ab8500_regulator_platform_data snowball_regulator_plat_data = {
-> +	.reg_init               = ab8500_reg_init,
-> +	.num_reg_init           = ARRAY_SIZE(ab8500_reg_init),
-> +	.regulator              = ab8500_regulators,
-> +	.num_regulator          = ARRAY_SIZE(ab8500_regulators),
-> +};
-> +
->  struct ab8500_regulator_platform_data ab8505_regulator_plat_data = {
->  	.reg_init               = ab8505_reg_init,
->  	.num_reg_init           = ARRAY_SIZE(ab8505_reg_init),
-> diff --git a/arch/arm/mach-ux500/board-mop500-regulators.h b/arch/arm/mach-ux500/board-mop500-regulators.h
-> index 039f513..6300e79 100644
-> --- a/arch/arm/mach-ux500/board-mop500-regulators.h
-> +++ b/arch/arm/mach-ux500/board-mop500-regulators.h
-> @@ -16,6 +16,7 @@
->  
->  extern struct ab8500_regulator_platform_data ab8500_regulator_plat_data;
->  extern struct ab8500_regulator_platform_data ab8505_regulator_plat_data;
-> +extern struct ab8500_regulator_platform_data snowball_regulator_plat_data;
->  extern struct regulator_init_data tps61052_regulator;
->  extern struct regulator_init_data gpio_en_3v3_regulator;
->  extern struct regulator_init_data sdi0_reg_init_data;
-> diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-> index 0b018c4..2d609d4 100644
-> --- a/arch/arm/mach-ux500/board-mop500.c
-> +++ b/arch/arm/mach-ux500/board-mop500.c
-> @@ -615,6 +615,8 @@ static void __init snowball_init_machine(void)
->  	struct device *parent = NULL;
->  	int i;
->  
-> +	ab8500_platdata.regulator = &snowball_regulator_plat_data;
-> +
->  	platform_device_register(&db8500_prcmu_device);
->  
->  	sdi0_reg_info.enable_gpio = SNOWBALL_SDMMC_EN_GPIO;
+You might want to resolve this new warning:
 
-Please drop this patch, I have sent a better solution.
+arch/arm/mach-zynq/hotplug.c:1:0: warning: switch -mcpu=cortex-a9 conflicts with -march= switch
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+found by lastnights OMAP4430 randconfig build.
