@@ -1,27 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 May 2013 12:21:49 +0100
-Subject: [PATCH 07/11] ARM64: mm: Make PAGE_NONE pages read only and
- no-execute.
-In-Reply-To: <1369328878-11706-8-git-send-email-steve.capper@linaro.org>
-References: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
- <1369328878-11706-8-git-send-email-steve.capper@linaro.org>
-Message-ID: <20130524112149.GJ18272@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 24 May 2013 12:22:19 +0100
+Subject: [PATCH] ARM: ux500: Provide supplies for AUX1, AUX2 and AUX3
+Message-ID: <1369394539-3713-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 06:07:54PM +0100, Steve Capper wrote:
-> If we consider the following code sequence:
-> 
-> 	my_pte = pte_modify(entry, myprot);
-> 	x = pte_write(my_pte);
-> 	y = pte_exec(my_pte);
-> 
-> If myprot comes from a PROT_NONE page, then x and y will both be
-> true which is undesireable behaviour.
-> 
-> This patch sets the no-execute and read-only bits for PAGE_NONE
-> such that the code above will return false for both x and y.
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+This patch fixes a bug introduced in the v3.10 merge window.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+The AB8500 External Regulator driver has recently landed upstream,
+which registers each of the 3 external regulators located on the
+AB8500. If these regulators are marked as 'always on', there is a
+potential for power-loss. If they're not and are seemingly unused
+the Regulator subsystem will attempt to disable them to save power.
+This causes an issue for AUX1, AUX2 and AUX3 as they obtain their
+power from EXT3. So we're specifying that here to prevent EXT3 from
+being powered down.
+
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/mach-ux500/board-mop500-regulators.c |    3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/mach-ux500/board-mop500-regulators.c b/arch/arm/mach-ux500/board-mop500-regulators.c
+index 33c353b..d6b7c85 100644
+--- a/arch/arm/mach-ux500/board-mop500-regulators.c
++++ b/arch/arm/mach-ux500/board-mop500-regulators.c
+@@ -374,6 +374,7 @@ static struct ab8500_regulator_reg_init ab8500_reg_init[] = {
+ static struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 	/* supplies to the display/camera */
+ 	[AB8500_LDO_AUX1] = {
++		.supply_regulator = "ab8500-ext-supply3",
+ 		.constraints = {
+ 			.name = "V-DISPLAY",
+ 			.min_uV = 2800000,
+@@ -387,6 +388,7 @@ static struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 	},
+ 	/* supplies to the on-board eMMC */
+ 	[AB8500_LDO_AUX2] = {
++		.supply_regulator = "ab8500-ext-supply3",
+ 		.constraints = {
+ 			.name = "V-eMMC1",
+ 			.min_uV = 1100000,
+@@ -402,6 +404,7 @@ static struct regulator_init_data ab8500_regulators[AB8500_NUM_REGULATORS] = {
+ 	},
+ 	/* supply for VAUX3, supplies to SDcard slots */
+ 	[AB8500_LDO_AUX3] = {
++		.supply_regulator = "ab8500-ext-supply3",
+ 		.constraints = {
+ 			.name = "V-MMC-SD",
+ 			.min_uV = 1100000,
+-- 
+1.7.10.4
