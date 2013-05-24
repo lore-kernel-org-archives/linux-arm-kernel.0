@@ -1,28 +1,21 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 May 2013 10:17:12 +0200
-Subject: [PATCH 0/3] ARM: ux500: Update defconfigs for MMC
-In-Reply-To: <1369129576-28617-1-git-send-email-ulf.hansson@linaro.org>
-References: <1369129576-28617-1-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <CACRpkda6WYLbNHuVW23mEtQeGfbOZobf_9izeSUppTRdrnv1ag@mail.gmail.com>
+Date: Fri, 24 May 2013 10:23:14 +0200
+Subject: [PATCH v4 01/21] sh-pfc: Remove support for platform data
+In-Reply-To: <1369138482-5871-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1369138482-5871-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CACRpkdY+9cKqq+NbNhDpGfuJH2ZeO1QSKuzYWhE4rxqpENF_+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 11:46 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+On Tue, May 21, 2013 at 2:14 PM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
 
-> This patchset updates the MMC defconfigs in the u8500|u300_defconfig.
+> Platform data isn't used, support can thus be removed.
 >
-> Ulf Hansson (3):
->   ARM: ux500: Enable MMC_UNSAFE_RESUME
->   ARM: ux500: Don't use MMC_CLKGATE
->   ARM: ux500: Disable MMC_BLOCK_BOUNCE
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Could you please:
-- Squash all three into one patch doing all three changes
-- Make one patch for ux500 and one for u300
-
-This is because I have different branches for ux500 and u300
-so I don't want them to conflict... Doing 6 patches for this seems
-a bit too much so 2 should do.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
