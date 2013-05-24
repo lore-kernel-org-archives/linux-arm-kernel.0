@@ -1,30 +1,83 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Fri, 24 May 2013 16:22:31 +0100
-Subject: [PATCH v3] pinctrl: move subsystem mutex to pinctrl_dev struct
-In-Reply-To: <1366988907-13485-1-git-send-email-linus.walleij@stericsson.com>
-References: <1366988907-13485-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CAAG0J990rqDdG5WdOrVGqZ9tFgJmnmP18S=c6o9JNygTLHS6=g@mail.gmail.com>
+From: florian.meier@koalo.de (Florian Meier)
+Date: Fri, 24 May 2013 17:32:35 +0200
+Subject: [PATCH] ASoC: Add support for BCM2708
+In-Reply-To: <519CFFDD.4080203@metafoo.de>
+References: <519CD1CC.8070507@koalo.de>
+	<519CFFDD.4080203@metafoo.de>
+Message-ID: <CABDT8WxS+Aq_feGqhzUMK-=DkZsnOULrH_fd+j0OP0czGnFdAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 April 2013 16:08, Linus Walleij <linus.walleij@stericsson.com> wrote:
-> @@ -608,7 +610,7 @@ static int pinconf_dbg_config_print(struct seq_file *s, void *d)
->         bool found = false;
->         unsigned long config;
+2013/5/22 Lars-Peter Clausen <lars@metafoo.de>
 >
-> -       mutex_lock(&pinctrl_mutex);
-> +       mutex_lock(&pctldev->mutex);
+> On 05/22/2013 04:10 PM, Florian Meier wrote:
+> [...]
+> > diff --git a/sound/soc/bcm2708/bcm2708-i2s.c b/sound/soc/bcm2708/bcm2708-i2s.c
+> > new file mode 100644
+> > index 0000000..a8e995f
+> > --- /dev/null
+> > +++ b/sound/soc/bcm2708/bcm2708-i2s.c
+> > @@ -0,0 +1,964 @@
+> [...]
+> > +static int bcm2708_i2s_startup(struct snd_pcm_substream *substream,
+> > +                            struct snd_soc_dai *dai)
+> > +{
+> > +     struct bcm2708_i2s_dev *dev = snd_soc_dai_get_drvdata(dai);
+> > +
+> > [...]
+> > +             } else {
+> > +                     snd_pcm_hw_constraint_minmax(substream->runtime,
+> > +                                     SNDRV_PCM_HW_PARAM_RATE,
+> > +                                     first_runtime->rate,
+> > +                                     first_runtime->rate);
+> > +             }
 >
->         /* Parse the pinctrl map and look for the elected pin/state */
->         for_each_maps(maps_node, i, map) {
+> Setting the symmetric_rates lets the core take care of setting the proper
+> constraints on the rate. It probably makes sense to also add a
+> symmetric_formats since this isn't the only driver that has the requirement
+> that the formats for playback and capture match.
 
-This change causes an oops on v3.10-rc2 when you read pinconf-config
-because pctldev is initialised to NULL and not set until inside the
-loop. I considered initialising pctldev to s->private, but I'm
-concerned that if pctldev is altered in the loop it could end up
-unlocking a different mutex to the one it locked. If this debugfs file
-isn't meant to be specific to a pinctrl device should it be in the
-root pinctrl directory instead of in each pinctrl device's directory?
 
-Cheers
-James
+You are right! I forgot to remove this after I found the symmetric_rates flag.
+For symmetric_formats I will have a closer look into the ALSA sources.
+
+
+
+> [...]
+> > diff --git a/sound/soc/bcm2708/bcm2708-pcm.c b/sound/soc/bcm2708/bcm2708-pcm.c
+> > new file mode 100644
+> > index 0000000..4b3e688
+> > --- /dev/null
+> > +++ b/sound/soc/bcm2708/bcm2708-pcm.c
+> > @@ -0,0 +1,303 @@
+>
+> I think you should be able to remove the bulk of this driver by using the
+> generic PCM dmaengine driver.
+
+
+As implied in the header of this file, I would really like to use the
+generic PCM dmaengine driver,
+but I would also like to maintain compatibility to the Raspberry Pi
+downstream kernel.
+Therefore, I have to wait until the downstream kernel migrates to the
+new version.
+
+
+
+> [...]
+> > +
+> > +#include "bcm2708-pcm.h"
+> > +
+> > +static const struct snd_pcm_hardware bcm2708_pcm_hardware = {
+> > +     .info                   = SNDRV_PCM_INFO_MMAP |
+> > +                               SNDRV_PCM_INFO_MMAP_VALID |
+> > +                               SNDRV_PCM_INFO_INTERLEAVED |
+> > +                               SNDRV_PCM_INFO_PAUSE |
+> > +                               SNDRV_PCM_INFO_RESUME |
+> > +                               SNDRV_PCM_INFO_JOINT_DUPLEX |
+> > +                               SNDRV_PCM_INFO_NO_PERIOD_WAKEUP,
+>
+> I don't think you actually support the last one, and neither pause and
+> resume are supported.
+
+I will have a closer look at these flags. Thanks!
