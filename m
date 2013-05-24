@@ -1,45 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 May 2013 12:31:23 +0100
-Subject: [PATCH v2 0/4] Optimise cache-flushing system call
-Message-ID: <1369395087-30972-1-git-send-email-will.deacon@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 May 2013 12:36:05 +0100
+Subject: [PATCHv3 0/5] arm: arch_timer cleanups and niceties
+Message-ID: <1369395370-21358-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+The following patches clean up some (harmless) fallout from the changes
+in 3.9, and make the driver always use the virtual counter, eliminating
+problems relating to choosing which counters to use (racy
+initialisation, branches in hot paths).
 
-This is a follow-on from the patches I originally posted here:
+The patches can also be found in my public git tree:
+git://linux-arm.org/git/linux-mr.git clocks/arch-timer-cleanups
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-March/157810.html
+Russell, are you happy to take these for 3.11 if I send a pull request or drop
+these in your patch system?
 
-but with some notable differences:
+Since v1 [1]:
+* Rebased to v3.10-rc1
+* Fix up mach-shmobile's selection of ARCH_ARM_TIMER
+Since v2: [2]:
+* Added Simon Horman's ack for shmobile
+* Clarified virtual timer CNTVOFF requirement per Christopher Covington's
+  comments.
 
-  - I've temporarily dropped the iovec system call while I try to work
-    out a sane threshold value between flushing by line and nuking L1.
+Thanks,
+Mark.
 
-  - Added syscall restarting to address DoS issues raised by Catalin.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-March/158604.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/168536.html
 
-  - Added access_ok check now that vma searching code is removed.
+Marc Zyngier (2):
+  ARM: hyp: initialize CNTVOFF to zero
+  ARM: arch_timer: stop virtual timer when booted in HYP mode
 
-  - Based on 3.10-rc2.
+Mark Rutland (3):
+  ARM: KVM: arch_timers: zero CNTVOFF upon return to host
+  clocksource: arch_timer: use virtual counters
+  arm: fix up ARM_ARCH_TIMER selects
 
-As per usual, all comments are welcome.
-
-Cheers,
-
-Will
-
-
-Will Deacon (4):
-  ARM: entry: allow ARM-private syscalls to be restarted
-  ARM: cacheflush: split user cache-flushing into interruptible chunks
-  ARM: cacheflush: don't round address range up to nearest page
-  ARM: cacheflush: don't bother rounding to nearest vma
-
- arch/arm/include/asm/cacheflush.h  |  3 +-
- arch/arm/include/asm/thread_info.h | 11 +++++++
- arch/arm/kernel/entry-common.S     |  4 +--
- arch/arm/kernel/traps.c            | 64 +++++++++++++++++++++++++++++---------
- 4 files changed, 63 insertions(+), 19 deletions(-)
+ arch/arm/include/asm/arch_timer.h    |  9 ---------
+ arch/arm/kernel/hyp-stub.S           |  7 +++++++
+ arch/arm/kvm/interrupts_head.S       |  4 ++++
+ arch/arm/mach-exynos/Kconfig         |  2 +-
+ arch/arm/mach-shmobile/Kconfig       |  4 ++--
+ arch/arm/mach-tegra/Kconfig          |  2 +-
+ arch/arm/mach-virt/Kconfig           |  2 +-
+ arch/arm64/include/asm/arch_timer.h  | 10 ----------
+ drivers/clocksource/arm_arch_timer.c | 23 +++++------------------
+ include/clocksource/arm_arch_timer.h |  2 +-
+ 10 files changed, 22 insertions(+), 43 deletions(-)
 
 -- 
-1.8.2.2
+1.8.1.1
