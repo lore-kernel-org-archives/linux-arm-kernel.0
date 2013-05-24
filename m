@@ -1,54 +1,104 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 24 May 2013 10:53:32 +0200
-Subject: [PATCH 1/2] ARM: sunxi: Update datasheet documentation
-Message-ID: <1369385613-8166-1-git-send-email-maxime.ripard@free-electrons.com>
+From: Mylene.Josserand@navocap.com (Mylene Josserand)
+Date: Fri, 24 May 2013 10:54:11 +0200
+Subject: [I2C] informations + advice about messages handling
+In-Reply-To: <20130524094407.61d0ec42@endymion.delvare>
+References: <CA78C307B8F06747967D122FC656B153986448@SERVEUR0.nvp.local>
+ <CAK7N6vpg6QUAKODKO2Msr4+GTASLDpA2cG1teQV3yiwt7D4SSw@mail.gmail.com>
+ <20130524094407.61d0ec42@endymion.delvare>
+Message-ID: <CA78C307B8F06747967D122FC656B15398644A@SERVEUR0.nvp.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have access to more documentation now, especially the user manuals,
-so add the links to them, and do so minor comestic changes while we're
-at it.
+Thanks, both of you, for your answers ! It helps me a lot to understand it !
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- Documentation/arm/sunxi/README | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
+Le 24/05/2013 09:22, anish singh a ?crit :
+ > On Fri, May 24, 2013 at 12:41 PM, Mylene Josserand
+ > <Mylene.Josserand@navocap.com>  wrote:
+ >> Hi all,
+ >>
+ >>
+ >> I am learning how i2c is working and I read that, to write in an i2c
+ >> register, I need to use the function "i2c_smbus_write_byte_data".
+ > Only in case your device is smbus compliant.
 
-diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
-index 87a1e8f..d9a372d 100644
---- a/Documentation/arm/sunxi/README
-+++ b/Documentation/arm/sunxi/README
-@@ -3,17 +3,22 @@ ARM Allwinner SoCs
- 
- This document lists all the ARM Allwinner SoCs that are currently
- supported in mainline by the Linux kernel. This document will also
--provide links to documentation and or datasheet for these SoCs.
-+provide links to documentation and/or datasheet for these SoCs.
- 
- SunXi family
- ------------
-+  Linux kernel mach directory: arch/arm/mach-sunxi
- 
-   Flavors:
--        Allwinner A10 (sun4i)
--                Datasheet       : http://dl.linux-sunxi.org/A10/A10%20Datasheet%20-%20v1.21%20%282012-04-06%29.pdf
-+    * ARM Cortex-A8 based SoCs
-+      - Allwinner A10 (sun4i)
-+        + Datasheet
-+	  http://dl.linux-sunxi.org/A10/A10%20Datasheet%20-%20v1.21%20%282012-04-06%29.pdf
-+	+ User Manual
-+	  http://dl.linux-sunxi.org/A10/A10%20User%20Manual%20-%20v1.20%20%282012-04-09%2c%20DECRYPTED%29.pdf
- 
--        Allwinner A13 (sun5i)
--                Datasheet       : http://dl.linux-sunxi.org/A13/A13%20Datasheet%20-%20v1.12%20%282012-03-29%29.pdf
--
--  Core: Cortex A8
--  Linux kernel mach directory: arch/arm/mach-sunxi
-\ No newline at end of file
-+      - Allwinner A13 (sun5i)
-+        + Datasheet
-+	  http://dl.linux-sunxi.org/A13/A13%20Datasheet%20-%20v1.12%20%282012-03-29%29.pdf
-+        + User Manual
-+	  http://dl.linux-sunxi.org/A13/A13%20User%20Manual%20-%20v1.2%20%282013-08-08%29.pdf
+Ah okay ! And if there are not SMBus compliant, what function I will 
+have to use ?
+What is it doing if I use this function and that my device is not SMbus 
+compliant ? I have some difficulties to understand the differences 
+between SMbus and I2C :(
+
+
+Le 24/05/2013 09:44, Jean Delvare a ?crit :
+ > Hi Anish, Myl?ne,
+ >
+ > On Fri, 24 May 2013 12:52:40 +0530, anish singh wrote:
+ >> On Fri, May 24, 2013 at 12:41 PM, Mylene Josserand
+ >> <Mylene.Josserand@navocap.com>  wrote:
+ >>> I have read that this function "i2c_smbus_write_byte_data" uses
+ >>> "i2c_smbus_xfer" which uses "i2c_lock_adapter".
+ >>> In this function, there is a mutex so I thought that it will handle it
+ >>> but it says "Get exclusive access to an I2C bus segment". What is
+ >>> exactly an I2C segment ? Is it the device we are talking about ? Or is
+ >>> it the use of the i2c bus ?
+ >> Don't know what you are referring here.
+ >
+ > In the most simple case, your I2C bus has a single segment so "segment"
+ > or "bus" mean the same thing.
+ >
+ > It only starts mattering when I2C bus multiplexing comes into play.
+ > Then your bus is split into segments, with one segment (trunk) between
+ > the master (controller) and the multiplexer, and one or more segments
+ > (branches) hanging off the multiplexer.
+ >
+ > Take look at
+ > https://i2c.wiki.kernel.org/index.php/I2C_bus_multiplexing
+ > for a sample topology.
+ >
+ > But anyway the comment in front of i2c_lock_adapter() is somewhat
+ > misleading. If you read the code you'll see that it always locks the
+ > whole bus tree, because it uses the root segment's mutex.
+
+
+Thanks ! I understand now.
+In my case, I have 2 segments but if I understand, the bus will not be 
+used at the same time.
+
+
+ >>> I will certainly have to create an i2c driver and I would like to know
+ >>> if this "collision" handling (if it is handled) is done in old kernel
+ >>> (2.6.32) or is it handled only in new kernel versions ?
+ >> AFAIK collision handling and detection was not supported till now
+ >> in linux kernel until recently but I think this patch is doing that.
+ >> I may be wrong but I didn't see collision handling in earlier linux
+ >> kernels.
+ >> http://thread.gmane.org/gmane.linux.kernel/1410276
+ >
+ > This is for a specific case. The general case is handled by the
+ > per-adapter mutex for years now. 2.6.32 should be just fine in this
+ > respect.
+
+Okay. So the mutex blocks the I2C bus. And is it locking the bus at the 
+beginning of a message (so when a START is send) and unlocking it after 
+the STOP ?
+So a complete message will be sent to a same device (the one which 
+address is in the data frame) ? A device can not receive a beginning of 
+one message (so with his address) and the end of another message 
+destined to another device [because of "collision"], for example ?
+
+
+ >>> If you have any documentation on how the i2c messages are handled in
+ >>> case of different devices uses, it will help me a lot ! I will 
+search in
+ >>> the kernel documentation but there is many files about i2c.
+ >>> And if you know a good i2c driver that I can use as an example to 
+design
+ >>> mine, it will be great !
+ >
+ > Best is to look at a driver for a device which is similar in
+ > functionality to yours.
+
+I will search that, thanks for the advice.
+
+
 -- 
-1.8.1.2
+Myl?ne JOSSERAND
