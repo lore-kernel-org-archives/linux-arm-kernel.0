@@ -1,47 +1,72 @@
-From: dhobsong@igel.co.jp (Damian Hobson-Garcia)
-Date: Fri, 24 May 2013 11:52:22 +0900
-Subject: [PATCH v2 0/4] dma-mapping: Define dma_{alloc,free}_attrs() for
- all archs
-In-Reply-To: <20130523094709.GB16722@arm.com>
-References: <1367290899-10410-1-git-send-email-dhobsong@igel.co.jp>
- <519C2F5D.8000809@igel.co.jp> <20130522094741.GE14322@arm.com>
- <519D8331.3060203@igel.co.jp> <20130523094709.GB16722@arm.com>
-Message-ID: <519ED5E6.7040506@igel.co.jp>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 24 May 2013 11:59:44 +0900
+Subject: [PATCH] ARM: mach-shmobile: r8a7790: add SATA support
+In-Reply-To: <878v352kb4.wl%kuninori.morimoto.gx@renesas.com>
+References: <1369361184-20862-1-git-send-email-horms+renesas@verge.net.au>
+ <878v352kb4.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <20130524025940.GA10536@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013/05/23 18:47, Catalin Marinas wrote:
-> On Thu, May 23, 2013 at 03:47:13AM +0100, Damian Hobson-Garcia wrote:
->> Hi Catalin,
->> On 2013/05/22 18:47, Catalin Marinas wrote:
->>> On Wed, May 22, 2013 at 03:37:17AM +0100, Damian Hobson-Garcia wrote:
->>>> Hello,
->>>> On 2013/04/30 12:01, Damian Hobson-Garcia wrote:
->>>>> Most architectures that define CONFIG_HAVE_DMA=y, have implementations for
->>>>> both dma_alloc_attrs() and dma_free_attrs().  All achitectures that do
->>>>> not define CONFIG_HAVE_DMA also have both of these definitions provided by
->>>>> dma-mapping-broken.h.
->>>
->>> BTW, shouldn't this be called CONFIG_HAVE_DMA_ATTRS?
->>
->> CONFIG_HAVE_DMA_ATTRS is currently used to enable the functions to
->> set/get the DMA attribute values. Poking through the headers, it looks
->> like the struct dma_attrs is defined regardless of the
->> CONFIG_HAVE_DMA_ATTRS setting, so in that respect
->> we always seem to "have" DMA attributes (if we have DMA), but they may
->> not always be meaningful (ie. set to some value).
+On Thu, May 23, 2013 at 07:17:22PM -0700, Kuninori Morimoto wrote:
 > 
-> My point was about the commit log - grep'ing the kernel for
-> CONFIG_HAVE_DMA did not return anything.
+> Hi Simon
 > 
+> > Add SATA clock for r8a7790 SoC (for both device tree and usual cases).
+> > Register SATA controller as a "late" platform device on r8a7790 SoC.
+> > 
+> > Based on "ARM: mach-shmobile: r8a7779: add SATA support" by
+> > Vladimir Barinov.
+> > 
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> 
+> > +	CLKDEV_DEV_ID("sata_rcar.1", &mstp_clks[MSTP814]),
+> (snip)
+> > +static __init void r8a7790_register_sata1(void)
+> > +{
+> > +
+> > +	struct resource res[] = {
+> > +		DEFINE_RES_MEM_NAMED(0xee300000, 0x200000, "rcar-sata"),
+> > +		DEFINE_RES_IRQ(gic_iid(106)),
+> > +	};
+> > +
+> > +	struct platform_device_info pdevinfo = {
+> > +		.name = "sata_rcar",
+> > +		.id = 1,
+> > +		.res = res,
+> > +		.num_res = ARRAY_SIZE(res),
+> > +		.dma_mask = DMA_BIT_MASK(32),
+> > +	};
+> > +
+> > +	platform_device_register_full(&pdevinfo);
+> > +}
+> 
+> This is a little bit strange for me.
+> Why you don't care SATA0 ?
 
-Oh yes, my mistake.  It should be CONFIG_HAS_DMA instead of
-CONFIG_HAVE_DMA.  I'll update it.
+Because the lager board only seems to expose SATA1 and I was
+interested in something I could test.
 
-Damian
+I am happy to start caring about SATA0 if you think it is
+a good idea.
 
+> Can you use like this ?
+> 
+> static __init void r8a7790_register_sata(int id);
 
--- 
-Damian Hobson-Garcia
-IGEL Co.,Ltd
-http://www.igel.co.jp
+Sure, but I'm unsure how you want r8a7790_register_sata to handle id.
+
+Is it just for the id field of struct platform_device_info pdevinfo?
+Or also to switch between resources somehow?
+
+> BTW, we need to decide "driver registration function naming" ?
+> In r8a7778 case, it is using 
+> 
+> 	r8a7778_add_xxx_device()
+> 	r8a7778_add_xxx_devices()
+> 
+> but r8a7778_register_xxx seems nice naming :)
+
+I chose register as it seemed to be consistent with the
+existing contents of r8a7790_add_standard_devices().
