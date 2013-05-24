@@ -1,26 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 May 2013 12:11:52 +0100
-Subject: [PATCH 01/11] mm: hugetlb: Copy huge_pmd_share from x86 to mm.
-In-Reply-To: <1369328878-11706-2-git-send-email-steve.capper@linaro.org>
-References: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
- <1369328878-11706-2-git-send-email-steve.capper@linaro.org>
-Message-ID: <20130524111152.GD18272@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 24 May 2013 13:13:58 +0200
+Subject: [PATCH] ARM: ux500: enable the crypto and hash on all dbx500
+In-Reply-To: <20130524082758.GP22683@gmail.com>
+References: <1369378122-25897-1-git-send-email-linus.walleij@stericsson.com>
+ <20130524082758.GP22683@gmail.com>
+Message-ID: <CACRpkdb1CZKoaG6nNF-yBC3Eovoe3_0BHa6uO-OQkePDcrkamg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 06:07:48PM +0100, Steve Capper wrote:
-> Under x86, multiple puds can be made to reference the same bank of
-> huge pmds provided that they represent a full PUD_SIZE of shared
-> huge memory that is aligned to a PUD_SIZE boundary.
-> 
-> The code to share pmds does not require any architecture specific
-> knowledge other than the fact that pmds can be indexed, thus can
-> be beneficial to some other architectures.
-> 
-> This patch copies the huge pmd sharing (and unsharing) logic from
-> x86/ to mm/ and introduces a new config option to activate it:
-> CONFIG_ARCH_WANTS_HUGE_PMD_SHARE
-> 
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
+On Fri, May 24, 2013 at 10:27 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Fri, 24 May 2013, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> Commits:
+>> "ARM: ux500: Add Device Tree nodes for the ux500 Crypt device"
+>> "ARM: ux500: Add Device Tree nodes for the ux500 Hash device"
+>>
+>> Added the crypto and hash devices conditionally, i.e. so as to
+>> be turned on per-board by setting an "status" property on the
+>> device from "disabled" to "okay" on each device.
+>>
+>> This is wrong since this is an SoC feature, it is not board
+>> dependent. It is the same ASIC under all circumstances and
+>> functionality does not vary with board family.
+>>
+>> This moves the enablement into the SoC file.
+>>
+>> Cc: Lee Jones <lee.jones@linaro.org>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/dbx5x0.dtsi  | 4 ----
+>>  arch/arm/boot/dts/snowball.dts | 8 --------
+>>  2 files changed, 12 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+>> index f051963..cd5cd09 100644
+>> --- a/arch/arm/boot/dts/dbx5x0.dtsi
+>> +++ b/arch/arm/boot/dts/dbx5x0.dtsi
+>> @@ -760,17 +760,13 @@
+>>                       compatible = "stericsson,ux500-cryp";
+>>                       reg = <0xa03cb000 0x1000>;
+>>                       interrupts = <0 15 0x4>;
+>> -
+>
+> Why do you insist on removing all line spacings from the DTS file?
+>
+> I saw you removing them in between nodes too.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+I was hit by a linespace when I was a child, since then I take
+every opportunity for revenge.
+
+If I keep the spacing, can I have your ACK?
+
+Yours,
+Linus Walleij
