@@ -1,46 +1,26 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 May 2013 09:55:37 +0100
-Subject: [PATCH 0/6] ARM: ux500: Update configurations for SD/SDIO/(e)MMC
-In-Reply-To: <20130524085451.GU22683@gmail.com>
-References: <1369314830-3727-1-git-send-email-ulf.hansson@stericsson.com>
- <20130524085451.GU22683@gmail.com>
-Message-ID: <20130524085537.GV22683@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 24 May 2013 10:55:53 +0200
+Subject: [PATCH v3 1/2] pinctrl: add MVF600 pinctrl driver
+In-Reply-To: <CAAQ0ZWTBZ=10B+0Zc4iZmvrr0hzdBKf1mn1CzhJokWE44dxsoA@mail.gmail.com>
+References: <1368685224-17915-1-git-send-email-b35083@freescale.com>
+ <20130520033207.GD25113@S2101-09.ap.freescale.net>
+ <CAAQ0ZWSZeqOEceN-KmDS4_BT27_4xCYjfFMj8sHkEonOXaoF_g@mail.gmail.com>
+ <B56CDBE15CE27145A4B77D2D24263E851CBBA4@039-SN1MPN1-003.039d.mgd.msft.net>
+ <CAAQ0ZWTBZ=10B+0Zc4iZmvrr0hzdBKf1mn1CzhJokWE44dxsoA@mail.gmail.com>
+Message-ID: <CACRpkdZ=67CWrPqFMU4FeES5OUyV5=Zz2fwy-GAMVHrNU6y6jA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 May 2013, Lee Jones wrote:
+On Wed, May 22, 2013 at 5:24 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> On 21 May 2013 15:56, Lu Jingchang-B35083 <B35083@freescale.com> wrote:
+>> [Lu Jingchang-B35083]
+>> I see you have Acked [PATCH v3 2/2] pinctrl: imx: add MVF600 support to imx pinctrl framework, do I need resend it as the first one. Thanks!
+>
+> Since LinusW hasn't applied it, you should just resend.
 
-> On Thu, 23 May 2013, Ulf Hansson wrote:
-> 
-> > From: Ulf Hansson <ulf.hansson@linaro.org>
-> > 
-> > This patchset includes especially enablement for UHS-I SD cards, but
-> > also some cleanups and additional enabling of SD/SDIO/(e)MMC features.
-> > 
-> > These changes shall also be adapted to the corresponding DT files,
-> > but that is left as a separate task and outside this patchset.
-> > 
-> > Ulf Hansson (6):
-> >   ARM: ux500: Enable 100MHz for SD/SDIO/MMC devices
-> >   ARM: ux500: Don't set plf ocr mask for SD/MMC device
-> >   ARM: ux500: Enable support for RPMB and Reliable Write for eMMC
-> >   ARM: ux500: Enable support for discard for MMC/SD
-> >   ARM: ux500: Set eMMC and WLAN card slot as non-removable
-> >   ARM: ux500: Enable support for UHS-I SD-cards
-> > 
-> >  arch/arm/mach-ux500/board-mop500-sdi.c |   34 +++++++++++++++++++++-----------
-> >  1 file changed, 22 insertions(+), 12 deletions(-)
-> > 
-> 
-> All patches look good to me, although you should probably try to use
-> the full 72 char limit per line in all of your commit messages.
+Now it appears I applied 2/2 but not 1/2 due to comments.
 
-Whoops! In case you couldn't tell that was an:
+Are they orthogonal or do I need to pull the applied patch out again?
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Yours,
+Linus Walleij
