@@ -1,34 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 24 May 2013 13:53:41 +0800
-Subject: [PATCH v2 0/2] dma: imx-sdma: add generic DMA device tree
- bindings support
-In-Reply-To: <20130524050329.GN30200@intel.com>
-References: <1366901008-7593-1-git-send-email-shawn.guo@linaro.org>
- <20130524052903.GE2704@S2101-09.ap.freescale.net>
- <20130524050329.GN30200@intel.com>
-Message-ID: <20130524055338.GG2704@S2101-09.ap.freescale.net>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Thu, 23 May 2013 22:59:55 -0700
+Subject: [PATCH] arch: configuration,
+ deleting 'CONFIG_BUG' since always need it.
+In-Reply-To: <519DCBEF.3090208@asianux.com> (Chen Gang's message of "Thu, 23
+ May 2013 15:57:35 +0800")
+References: <519DCBEF.3090208@asianux.com>
+Message-ID: <877gio3okk.fsf@xmission.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 10:33:29AM +0530, Vinod Koul wrote:
-> On Fri, May 24, 2013 at 01:29:05PM +0800, Shawn Guo wrote:
-> > Vinod,
-> > 
-> > On Thu, Apr 25, 2013 at 10:43:26PM +0800, Shawn Guo wrote:
-> > > Changes since v1:
-> > >  * Fix the example typo in bindings doc.  Thanks to Fabio.
-> > > 
-> > > Shawn Guo (2):
-> > >   dma: imx: change enum definitions to macros
-> > >   dma: imx-sdma: move to generic device tree bindings
-> > 
-> > Can you please apply these for 3.11?
-> Sorry I was thinking that you will update the patchset based on Arnd last
-> comment on (ab)use of macro. Can you fix that & resend
+Chen Gang <gang.chen@asianux.com> writes:
 
-I had a response [1] on that to explain why I think the macro is
-being reasonably used there.
+> The crazy user can unset 'CONFIG_BUG' in menuconfig: "> General setup >
+> Configure standard kernel features (expert users) > BUG() Support".
+>
+> But in fact, we always need it, and quite a few of architectures have
+> already implemented it (e.g. alpha, arc, arm, avr32, blackfin, cris,
+> frv, ia64, m68k, mips, mn10300, parisc, powerpc, s390, sh, sparc, x86).
+>
+> And kernel also already has prepared a default effective implementation
+> for the architectures which is unwilling to implement it by themselves
+> (e.g. arm64, c6x, h8300, hexagon, m32r, metag, microblaze, openrisc,
+> score, tile, um, unicore32, xtensa).
+>
+> So need get rid of 'CONFIG_BUG', and let it always enabled everywhere.
 
-Shawn
 
-[1] http://thread.gmane.org/gmane.linux.ports.arm.kernel/233361/focus=233395
+This looks like the right way to handle this to me.  If the BUG
+annotations are too big and not needed they should simply be deleted
+from the code base.  Disabling CONFIG_BUG which removes the BUG
+annotations from the binaries without modifying the source code seems
+like the wrong approach.
+
+Acked-by: "Eric W. Biederman" <ebiederm@xmission.com>
