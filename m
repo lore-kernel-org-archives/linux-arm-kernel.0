@@ -1,152 +1,240 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 24 May 2013 01:45:08 -0400
-Subject: [PATCH 5/8] ARM: vexpress/dcscb: add CPU use counts to the power
- up/down API implementation
+Date: Fri, 24 May 2013 01:45:10 -0400
+Subject: [PATCH 7/8] ARM: vexpress/dcscb: handle platform coherency exit/setup
+ and CCI
 In-Reply-To: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
 References: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1369374311-21260-6-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1369374311-21260-8-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is possible for a CPU to be told to power up before it managed
-to power itself down.  Solve this race with a usage count to deal
-with this possibility as mandated by the MCPM API definition.
+From: Dave Martin <dave.martin@linaro.org>
 
-Signed-off-by: nicolas Pitre <nico@linaro.org>
+Add the required code to properly handle race free platform coherency exit
+to the DCSCB power down method.
+
+The power_up_setup callback is used to enable the CCI interface for
+the cluster being brought up.  This must be done in assembly before
+the kernel environment is entered.
+
+Thanks to Achin Gupta and Nicolas Pitre for their help and
+contributions.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 Acked-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/mach-vexpress/dcscb.c | 74 +++++++++++++++++++++++++++++++++---------
- 1 file changed, 59 insertions(+), 15 deletions(-)
+ arch/arm/mach-vexpress/Kconfig       |  1 +
+ arch/arm/mach-vexpress/Makefile      |  2 +-
+ arch/arm/mach-vexpress/dcscb.c       | 79 +++++++++++++++++++++++++++---------
+ arch/arm/mach-vexpress/dcscb_setup.S | 38 +++++++++++++++++
+ 4 files changed, 100 insertions(+), 20 deletions(-)
+ create mode 100644 arch/arm/mach-vexpress/dcscb_setup.S
 
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 2f46385c28..b8bbabec63 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -60,6 +60,7 @@ config ARCH_VEXPRESS_CA9X4
+ config ARCH_VEXPRESS_DCSCB
+ 	bool "Dual Cluster System Control Block (DCSCB) support"
+ 	depends on MCPM
++	select ARM_CCI
+ 	help
+ 	  Support for the Dual Cluster System Configuration Block (DCSCB).
+ 	  This is needed to provide CPU and cluster power management
+diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
+index 518519f57a..48ba89a814 100644
+--- a/arch/arm/mach-vexpress/Makefile
++++ b/arch/arm/mach-vexpress/Makefile
+@@ -6,6 +6,6 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+ 
+ obj-y					:= v2m.o
+ obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
+-obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o
++obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o	dcscb_setup.o
+ obj-$(CONFIG_SMP)			+= platsmp.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
 diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-index 38f042a6b2..98873b1c0f 100644
+index b928b1f5eb..1acc975360 100644
 --- a/arch/arm/mach-vexpress/dcscb.c
 +++ b/arch/arm/mach-vexpress/dcscb.c
-@@ -44,6 +44,7 @@
- static arch_spinlock_t dcscb_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+@@ -16,6 +16,7 @@
+ #include <linux/errno.h>
+ #include <linux/of_address.h>
+ #include <linux/vexpress.h>
++#include <linux/arm-cci.h>
  
- static void __iomem *dcscb_base;
-+static int dcscb_use_count[4][2];
- 
- static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
- {
-@@ -60,14 +61,27 @@ static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
- 	local_irq_disable();
- 	arch_spin_lock(&dcscb_lock);
- 
--	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
--	if (rst_hold & (1 << 8)) {
--		/* remove cluster reset and add individual CPU's reset */
--		rst_hold &= ~(1 << 8);
--		rst_hold |= 0xf;
-+	dcscb_use_count[cpu][cluster]++;
-+	if (dcscb_use_count[cpu][cluster] == 1) {
-+		rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-+		if (rst_hold & (1 << 8)) {
-+			/* remove cluster reset and add individual CPU's reset */
-+			rst_hold &= ~(1 << 8);
-+			rst_hold |= 0xf;
-+		}
-+		rst_hold &= ~(cpumask | (cpumask << 4));
-+		writel_relaxed(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-+	} else if (dcscb_use_count[cpu][cluster] != 2) {
-+		/*
-+		 * The only possible values are:
-+		 * 0 = CPU down
-+		 * 1 = CPU (still) up
-+		 * 2 = CPU requested to be up before it had a chance
-+		 *     to actually make itself down.
-+		 * Any other value is a bug.
-+		 */
-+		BUG();
- 	}
--	rst_hold &= ~(cpumask | (cpumask << 4));
--	writel_relaxed(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
- 
- 	arch_spin_unlock(&dcscb_lock);
- 	local_irq_enable();
-@@ -77,7 +91,8 @@ static int dcscb_power_up(unsigned int cpu, unsigned int cluster)
- 
- static void dcscb_power_down(void)
- {
--	unsigned int mpidr, cpu, cluster, rst_hold, cpumask, last_man;
-+	unsigned int mpidr, cpu, cluster, rst_hold, cpumask;
-+	bool last_man = false, skip_wfi = false;
- 
- 	mpidr = read_cpuid_mpidr();
- 	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-@@ -88,13 +103,26 @@ static void dcscb_power_down(void)
+ #include <asm/mcpm.h>
+ #include <asm/proc-fns.h>
+@@ -105,7 +106,10 @@ static void dcscb_power_down(void)
+ 	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
  	BUG_ON(cpu >= 4 || cluster >= 2);
  
++	__mcpm_cpu_going_down(cpu, cluster);
++
  	arch_spin_lock(&dcscb_lock);
--	rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
--	rst_hold |= cpumask;
--	if (((rst_hold | (rst_hold >> 4)) & 0xf) == 0xf)
--		rst_hold |= (1 << 8);
--	writel_relaxed(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-+	dcscb_use_count[cpu][cluster]--;
-+	if (dcscb_use_count[cpu][cluster] == 0) {
-+		rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
-+		rst_hold |= cpumask;
-+		if (((rst_hold | (rst_hold >> 4)) & 0xf) == 0xf) {
-+			rst_hold |= (1 << 8);
-+			last_man = true;
-+		}
-+		writel_relaxed(rst_hold, dcscb_base + RST_HOLD0 + cluster * 4);
-+	} else if (dcscb_use_count[cpu][cluster] == 1) {
-+		/*
-+		 * A power_up request went ahead of us.
-+		 * Even if we do not want to shut this CPU down,
-+		 * the caller expects a certain state as if the WFI
-+		 * was aborted.  So let's continue with cache cleaning.
-+		 */
-+		skip_wfi = true;
-+	} else
-+		BUG();
- 	arch_spin_unlock(&dcscb_lock);
--	last_man = (rst_hold & (1 << 8));
++	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+ 	dcscb_use_count[cpu][cluster]--;
+ 	if (dcscb_use_count[cpu][cluster] == 0) {
+ 		rst_hold = readl_relaxed(dcscb_base + RST_HOLD0 + cluster * 4);
+@@ -125,31 +129,59 @@ static void dcscb_power_down(void)
+ 		skip_wfi = true;
+ 	} else
+ 		BUG();
+-	arch_spin_unlock(&dcscb_lock);
+-
+-	/*
+-	 * Now let's clean our L1 cache and shut ourself down.
+-	 * If we're the last CPU in this cluster then clean L2 too.
+-	 */
  
- 	/*
- 	 * Now let's clean our L1 cache and shut ourself down.
-@@ -122,7 +150,8 @@ static void dcscb_power_down(void)
+-	/*
+-	 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
+-	 * a preliminary flush here for those CPUs.  At least, that's
+-	 * the theory -- without the extra flush, Linux explodes on
+-	 * RTSM (to be investigated)..
+-	 */
+-	flush_cache_louis();
+-	set_cr(get_cr() & ~CR_C);
++	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
++		arch_spin_unlock(&dcscb_lock);
+ 
+-	if (!last_man) {
+-		flush_cache_louis();
+-	} else {
++		/*
++		 * Flush all cache levels for this cluster.
++		 *
++		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
++		 * a preliminary flush here for those CPUs.  At least, that's
++		 * the theory -- without the extra flush, Linux explodes on
++		 * RTSM (to be investigated).
++		 */
++		flush_cache_all();
++		set_cr(get_cr() & ~CR_C);
+ 		flush_cache_all();
++
++		/*
++		 * This is a harmless no-op.  On platforms with a real
++		 * outer cache this might either be needed or not,
++		 * depending on where the outer cache sits.
++		 */
+ 		outer_flush_all();
++
++		/* Disable local coherency by clearing the ACTLR "SMP" bit: */
++		set_auxcr(get_auxcr() & ~(1 << 6));
++
++		/*
++		 * Disable cluster-level coherency by masking
++		 * incoming snoops and DVM messages:
++		 */
++		cci_disable_port_by_cpu(mpidr);
++
++		__mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
++	} else {
++		arch_spin_unlock(&dcscb_lock);
++
++		/*
++		 * Flush the local CPU cache.
++		 *
++		 * A15/A7 can hit in the cache with SCTLR.C=0, so we don't need
++		 * a preliminary flush here for those CPUs.  At least, that's
++		 * the theory -- without the extra flush, Linux explodes on
++		 * RTSM (to be investigated).
++		 */
++		flush_cache_louis();
++		set_cr(get_cr() & ~CR_C);
++		flush_cache_louis();
++
++		/* Disable local coherency by clearing the ACTLR "SMP" bit: */
++		set_auxcr(get_auxcr() & ~(1 << 6));
+ 	}
+ 
+-	/* Disable local coherency by clearing the ACTLR "SMP" bit: */
+-	set_auxcr(get_auxcr() & ~(1 << 6));
++	__mcpm_cpu_down(cpu, cluster);
  
  	/* Now we are prepared for power-down, do it: */
  	dsb();
--	wfi();
-+	if (!skip_wfi)
-+		wfi();
- 
- 	/* Not dead@this point?  Let our caller cope. */
+@@ -177,12 +209,17 @@ static void __init dcscb_usage_count_init(void)
+ 	dcscb_use_count[cpu][cluster] = 1;
  }
-@@ -132,6 +161,19 @@ static const struct mcpm_platform_ops dcscb_power_ops = {
- 	.power_down	= dcscb_power_down,
- };
  
-+static void __init dcscb_usage_count_init(void)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-+	BUG_ON(cpu >= 4 || cluster >= 2);
-+	dcscb_use_count[cpu][cluster] = 1;
-+}
++extern void dcscb_power_up_setup(unsigned int affinity_level);
 +
  static int __init dcscb_init(void)
  {
  	struct device_node *node;
-@@ -144,6 +186,8 @@ static int __init dcscb_init(void)
- 	if (!dcscb_base)
- 		return -EADDRNOTAVAIL;
+ 	unsigned int cfg;
+ 	int ret;
  
-+	dcscb_usage_count_init();
++	if (!cci_probed())
++		return -ENODEV;
 +
+ 	node = of_find_compatible_node(NULL, NULL, "arm,rtsm,dcscb");
+ 	if (!node)
+ 		return -ENODEV;
+@@ -195,11 +232,15 @@ static int __init dcscb_init(void)
+ 	dcscb_usage_count_init();
+ 
  	ret = mcpm_platform_register(&dcscb_power_ops);
++	if (!ret)
++		ret = mcpm_sync_init(dcscb_power_up_setup);
  	if (ret) {
  		iounmap(dcscb_base);
+ 		return ret;
+ 	}
+ 
++	pr_info("VExpress DCSCB support installed\n");
++
+ 	/*
+ 	 * Future entries into the kernel can now go
+ 	 * through the cluster entry vectors.
+diff --git a/arch/arm/mach-vexpress/dcscb_setup.S b/arch/arm/mach-vexpress/dcscb_setup.S
+new file mode 100644
+index 0000000000..4bb7fbe0f6
+--- /dev/null
++++ b/arch/arm/mach-vexpress/dcscb_setup.S
+@@ -0,0 +1,38 @@
++/*
++ * arch/arm/include/asm/dcscb_setup.S
++ *
++ * Created by:  Dave Martin, 2012-06-22
++ * Copyright:   (C) 2012-2013  Linaro Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/linkage.h>
++
++
++ENTRY(dcscb_power_up_setup)
++
++	cmp	r0, #0			@ check affinity level
++	beq	2f
++
++/*
++ * Enable cluster-level coherency, in preparation for turning on the MMU.
++ * The ACTLR SMP bit does not need to be set here, because cpu_resume()
++ * already restores that.
++ *
++ * A15/A7 may not require explicit L2 invalidation on reset, dependent
++ * on hardware integration decisions.
++ * For now, this code assumes that L2 is either already invalidated,
++ * or invalidation is not required.
++ */
++
++	b	cci_enable_port_for_self
++
++2:	@ Implementation-specific local CPU setup operations should go here,
++	@ if any.  In this case, there is nothing to do.
++
++	bx	lr
++
++ENDPROC(dcscb_power_up_setup)
 -- 
 1.8.1.2
