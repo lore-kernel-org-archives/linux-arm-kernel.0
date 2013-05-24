@@ -1,10 +1,10 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 May 2013 11:44:49 +0200
-Subject: [PATCH 12/21] arm: kirkwood: keymile: affect pinmux configs to the
+Date: Fri, 24 May 2013 11:44:46 +0200
+Subject: [PATCH 09/21] arm: kirkwood: iconnect: affect pinmux configs to the
  right devices
 In-Reply-To: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369388699-25975-13-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1369388699-25975-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -25,37 +25,49 @@ pin 43 (PIN43): gpio-leds.1 mvebu-gpio:43 function gpio group mpp43
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
-Note: not sure what the pmx_i2c_gpio_sda and pmx_i2c_gpio_scl pinmux
-configurations are for. Certainly for an I2C bus bit-banged over
-GPIOs, but I don't see where such an I2C bus is declared in the Device
-Tree.
----
- arch/arm/boot/dts/kirkwood-km_kirkwood.dts |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/kirkwood-iconnect.dts |   16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
-index 5bbd054..66b971b 100644
---- a/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
-+++ b/arch/arm/boot/dts/kirkwood-km_kirkwood.dts
-@@ -18,9 +18,7 @@
+diff --git a/arch/arm/boot/dts/kirkwood-iconnect.dts b/arch/arm/boot/dts/kirkwood-iconnect.dts
+index 20c3ece..0275018 100644
+--- a/arch/arm/boot/dts/kirkwood-iconnect.dts
++++ b/arch/arm/boot/dts/kirkwood-iconnect.dts
+@@ -20,14 +20,6 @@
  
  	ocp at f1000000 {
  		pinctrl: pinctrl at 10000 {
 -
--			pinctrl-0 = < &pmx_nand &pmx_i2c_gpio_sda
--				&pmx_i2c_gpio_scl >;
-+			pinctrl-0 = < &pmx_i2c_gpio_sda &pmx_i2c_gpio_scl >;
- 			pinctrl-names = "default";
+-			pinctrl-0 = < &pmx_button_reset &pmx_button_otb
+-				      &pmx_led_level &pmx_led_power_blue
+-				      &pmx_led_power_red &pmx_led_usb1
+-				      &pmx_led_usb2 &pmx_led_usb3
+-				      &pmx_led_usb4 &pmx_led_otb >;
+-			pinctrl-names = "default";
+-
+ 			pmx_button_reset: pmx-button-reset {
+ 				marvell,pins = "mpp12";
+ 				marvell,function = "gpio";
+@@ -113,6 +105,11 @@
  
- 			pmx_i2c_gpio_sda: pmx-gpio-sda {
-@@ -38,6 +36,8 @@
- 		};
+ 	gpio-leds {
+ 		compatible = "gpio-leds";
++		pinctrl-0 = < &pmx_led_level &pmx_led_power_blue
++			      &pmx_led_power_red &pmx_led_usb1
++			      &pmx_led_usb2 &pmx_led_usb3
++			      &pmx_led_usb4 &pmx_led_otb >;
++		pinctrl-names = "default";
  
- 		nand at 3000000 {
-+			pinctrl-0 = <&pmx_nand>;
-+			pinctrl-names = "default";
- 			status = "ok";
- 			chip-delay = <25>;
- 		};
+ 		led-level {
+ 			label = "led_level";
+@@ -154,6 +151,9 @@
+ 		compatible = "gpio-keys";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		pinctrl-0 = < &pmx_button_reset &pmx_button_otb >;
++		pinctrl-names = "default";
++
+ 		button at 1 {
+ 			label = "OTB Button";
+ 			linux,code = <133>;
 -- 
 1.7.9.5
