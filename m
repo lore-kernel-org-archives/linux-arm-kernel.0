@@ -1,58 +1,21 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 May 2013 10:59:50 +0200
-Subject: [PATCH v4 15/21] ARM: shmobile: armadillo-reference: Move st1232
- reset GPIO to DT
-In-Reply-To: <1369138482-5871-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1369138482-5871-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CACRpkdYUQjtmzFzQBES-bcjjT5iTTXifa2BQSusBzMdTCRtyiA@mail.gmail.com>
+Date: Fri, 24 May 2013 11:03:36 +0200
+Subject: [PATCH 0/3] pinctrl: pinctrl-single: Add full fledge support to
+ configure multiple pins of different modules
+In-Reply-To: <1369145282-14419-1-git-send-email-prakash.pm@ti.com>
+References: <1369145282-14419-1-git-send-email-prakash.pm@ti.com>
+Message-ID: <CACRpkdZEsRaaE9dJLDNMzJZSLZ35pqS6XVj5KgCzJGG5nnvPQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 2:14 PM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
+On Tue, May 21, 2013 at 4:07 PM, Manjunathappa, Prakash
+<prakash.pm@ti.com> wrote:
 
-> Reference the st1232 reset GPIO from the device tree and remove it from
-> board code.
->
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Based function-mask and submask preoperties patch allocates and registers pins.
+> Patch is fixes the issue reported and discussed here:
+> http://www.spinics.net/lists/arm-kernel/msg235213.html
 
-> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-> @@ -43,6 +43,7 @@
->                 interrupts = <2 0>; /* IRQ10: hwirq 2 on irqpin1 */
->                 pinctrl-0 = <&st1232_pins>;
->                 pinctrl-names = "default";
-> +               gpios = <&pfc 166 1>;
-
-Just as a random example this becomes:
-
-gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
-
-Which is WAAAY more readable.
-
-> +++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-> @@ -158,7 +158,6 @@ clock_error:
->   */
->  static void __init eva_init(void)
->  {
-> -
->         r8a7740_clock_init(MD_CK0 | MD_CK2);
->         eva_clock_init();
->
-> @@ -171,12 +170,6 @@ static void __init eva_init(void)
->
->         r8a7740_add_standard_devices_dt();
->
-> -       /*
-> -        * Touchscreen
-> -        * TODO: Move reset GPIO over to .dts when we can reference it
-> -        */
-> -       gpio_request_one(166, GPIOF_OUT_INIT_HIGH, NULL); /* TP_RST_B */
-> -
-
-Not really my business but I guess the driver is already augmented to pick its
-GPIO from the device tree in this case? And are you willingly breaking
-non-DT boots or something?
+I'd like Tony to ACK this, and Haojian to have a look at it before applying.
 
 Yours,
 Linus Walleij
