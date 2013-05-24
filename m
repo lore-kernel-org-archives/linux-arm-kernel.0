@@ -1,278 +1,245 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Fri, 24 May 2013 10:41:17 -0500
-Subject: [PATCHv4 3/6] ARM: socfpga: Add support to gate peripheral clocks
+Date: Fri, 24 May 2013 10:41:20 -0500
+Subject: [PATCHv4 6/6] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
 In-Reply-To: <1369410080-436-1-git-send-email-dinguyen@altera.com>
 References: <1369410080-436-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1369410080-436-3-git-send-email-dinguyen@altera.com>
+Message-ID: <1369410080-436-6-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Add support to gate the clocks that directly feed peripherals. For clocks
-with multiple parents, add the ability to determine the correct parent,
-and also set parents. Also add support to calculate and set the clocks'
-rate.
+Add platform specific functionality for the DW SD/MMC driver for
+SoCFPGA. Move SDMMC_CMD_USE_HOLD_REG to dw_mmc.h so other platforms
+can use this define.
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-Reviewed-by: Pavel Machek <pavel@denx.de>
-CC: Mike Turquette <mturquette@linaro.org>
+CC: Seungwon Jeon <tgih.jun@samsung.com>
+CC: Jaehoon Chung <jh80.chung@samsung.com>
 CC: Arnd Bergmann <arnd@arndb.de>
 CC: Olof Johansson <olof@lixom.net>
-Cc: Pavel Machek <pavel@denx.de>
-CC: <linux@arm.linux.org.uk>
+CC: Pavel Machek <pavel@denx.de>
+CC: linux-mmc at vger.kernel.org
+
+v4:
+- Fix up SYSMGR_SDMMC_CTRL_SET macro
 
 v3:
-- Addressed comments from Pavel
+- Addressed comments from Seugwon, Jaehoon, and Pavel
+- Use clk_disable_unprepare/clk_prepare_enable
 
 v2:
-- Fix space/indent errors
-- Add streq for strcmp == 0
+- Use syscon and regmap
+- Avoid divide by zero
+- Remove the need to set PWR_EN
 ---
- drivers/clk/socfpga/clk.c |  194 ++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 185 insertions(+), 9 deletions(-)
+ drivers/mmc/host/Kconfig          |    8 +++
+ drivers/mmc/host/Makefile         |    1 +
+ drivers/mmc/host/dw_mmc-exynos.c  |    2 -
+ drivers/mmc/host/dw_mmc-socfpga.c |  138 +++++++++++++++++++++++++++++++++++++
+ drivers/mmc/host/dw_mmc.h         |    1 +
+ 5 files changed, 148 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/mmc/host/dw_mmc-socfpga.c
 
-diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-index bd11315..5bb848c 100644
---- a/drivers/clk/socfpga/clk.c
-+++ b/drivers/clk/socfpga/clk.c
-@@ -24,15 +24,17 @@
- #include <linux/of.h>
+diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
+index 9ab8f8d..1be2289 100644
+--- a/drivers/mmc/host/Kconfig
++++ b/drivers/mmc/host/Kconfig
+@@ -556,6 +556,14 @@ config MMC_DW_EXYNOS
+ 	  Synopsys DesignWare Memory Card Interface driver. Select this option
+ 	  for platforms based on Exynos4 and Exynos5 SoC's.
  
- /* Clock Manager offsets */
--#define CLKMGR_CTRL    0x0
--#define CLKMGR_BYPASS 0x4
-+#define CLKMGR_CTRL	0x0
-+#define CLKMGR_BYPASS	0x4
-+#define CLKMGR_L4SRC	0x70
-+#define CLKMGR_PERPLL_SRC	0xAC
- 
- /* Clock bypass bits */
--#define MAINPLL_BYPASS (1<<0)
--#define SDRAMPLL_BYPASS (1<<1)
--#define SDRAMPLL_SRC_BYPASS (1<<2)
--#define PERPLL_BYPASS (1<<3)
--#define PERPLL_SRC_BYPASS (1<<4)
-+#define MAINPLL_BYPASS		(1<<0)
-+#define SDRAMPLL_BYPASS		(1<<1)
-+#define SDRAMPLL_SRC_BYPASS	(1<<2)
-+#define PERPLL_BYPASS		(1<<3)
-+#define PERPLL_SRC_BYPASS	(1<<4)
- 
- #define SOCFPGA_PLL_BG_PWRDWN		0
- #define SOCFPGA_PLL_EXT_ENA		1
-@@ -41,6 +43,17 @@
- #define SOCFPGA_PLL_DIVF_SHIFT	3
- #define SOCFPGA_PLL_DIVQ_MASK		0x003F0000
- #define SOCFPGA_PLL_DIVQ_SHIFT	16
-+#define SOCFGPA_MAX_PARENTS	3
++config MMC_DW_SOCFPGA
++	tristate "SOCFPGA specific extensions for Synopsys DW Memory Card Interface"
++	depends on MMC_DW
++	select MMC_DW_PLTFM
++	help
++	  This selects support for Altera SoCFPGA specific extensions to the
++	  Synopsys DesignWare Memory Card Interface driver.
 +
-+#define SOCFPGA_L4_MP_CLK		"l4_mp_clk"
-+#define SOCFPGA_L4_SP_CLK		"l4_sp_clk"
-+#define SOCFPGA_NAND_CLK		"nand_clk"
-+#define SOCFPGA_NAND_X_CLK		"nand_x_clk"
-+#define SOCFPGA_MMC_CLK			"mmc_clk"
-+#define SOCFPGA_DB_CLK			"gpio_db_clk"
+ config MMC_DW_PCI
+ 	tristate "Synopsys Designware MCI support on PCI bus"
+ 	depends on MMC_DW && PCI
+diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
+index cd32280..67718c1 100644
+--- a/drivers/mmc/host/Makefile
++++ b/drivers/mmc/host/Makefile
+@@ -42,6 +42,7 @@ obj-$(CONFIG_SDH_BFIN)		+= bfin_sdh.o
+ obj-$(CONFIG_MMC_DW)		+= dw_mmc.o
+ obj-$(CONFIG_MMC_DW_PLTFM)	+= dw_mmc-pltfm.o
+ obj-$(CONFIG_MMC_DW_EXYNOS)	+= dw_mmc-exynos.o
++obj-$(CONFIG_MMC_DW_SOCFPGA)	+= dw_mmc-socfpga.o
+ obj-$(CONFIG_MMC_DW_PCI)	+= dw_mmc-pci.o
+ obj-$(CONFIG_MMC_SH_MMCIF)	+= sh_mmcif.o
+ obj-$(CONFIG_MMC_JZ4740)	+= jz4740_mmc.o
+diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+index f013e7e..866edef 100644
+--- a/drivers/mmc/host/dw_mmc-exynos.c
++++ b/drivers/mmc/host/dw_mmc-exynos.c
+@@ -31,8 +31,6 @@
+ 					SDMMC_CLKSEL_CCLK_DRIVE(y) |	\
+ 					SDMMC_CLKSEL_CCLK_DIVIDER(z))
+ 
+-#define SDMMC_CMD_USE_HOLD_REG		BIT(29)
+-
+ #define EXYNOS4210_FIXED_CIU_CLK_DIV	2
+ #define EXYNOS4412_FIXED_CIU_CLK_DIV	4
+ 
+diff --git a/drivers/mmc/host/dw_mmc-socfpga.c b/drivers/mmc/host/dw_mmc-socfpga.c
+new file mode 100644
+index 0000000..4c19fd8
+--- /dev/null
++++ b/drivers/mmc/host/dw_mmc-socfpga.c
+@@ -0,0 +1,138 @@
++/*
++ * Altera SoCFPGA Specific Extensions for Synopsys DW Multimedia Card Interface driver
++ *
++ *  Copyright (C) 2012, Samsung Electronics Co., Ltd.
++ *  Copyright (C) 2013 Altera Corporation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * Taken from dw_mmc-exynos.c
++ */
++#include <linux/clk.h>
++#include <linux/mfd/syscon.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/dw_mmc.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
 +
-+#define div_mask(width)	((1 << (width)) - 1)
-+#define streq(a, b) (strcmp((a), (b)) == 0)
- 
- extern void __iomem *clk_mgr_base_addr;
- 
-@@ -49,6 +62,9 @@ struct socfpga_clk {
- 	char *parent_name;
- 	char *clk_name;
- 	u32 fixed_div;
-+	void __iomem *div_reg;
-+	u32 width;	/* only valid if div_reg != 0 */
-+	u32 shift;	/* only valid if div_reg != 0 */
- };
- #define to_socfpga_clk(p) container_of(p, struct socfpga_clk, hw.hw)
- 
-@@ -132,8 +148,9 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
- 
- 	socfpga_clk->hw.hw.init = &init;
- 
--	if (strcmp(clk_name, "main_pll") || strcmp(clk_name, "periph_pll") ||
--			strcmp(clk_name, "sdram_pll")) {
-+	if (streq(clk_name, "main_pll") ||
-+		streq(clk_name, "periph_pll") ||
-+		streq(clk_name, "sdram_pll")) {
- 		socfpga_clk->hw.bit_idx = SOCFPGA_PLL_EXT_ENA;
- 		clk_pll_ops.enable = clk_gate_ops.enable;
- 		clk_pll_ops.disable = clk_gate_ops.disable;
-@@ -148,6 +165,159 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
- 	return clk;
- }
- 
-+static u8 socfpga_clk_get_parent(struct clk_hw *hwclk)
++#include "dw_mmc.h"
++#include "dw_mmc-pltfm.h"
++
++#define SYSMGR_SDMMCGRP_CTRL_OFFSET		0x108
++#define DRV_CLK_PHASE_SHIFT_SEL_MASK	0x7
++#define SYSMGR_SDMMC_CTRL_SET(smplsel, drvsel)          \
++	((((smplsel) & 0x7) << 3) | (((drvsel) & 0x7) << 0))
++
++/* SOCFPGA implementation specific driver private data */
++struct dw_mci_socfpga_priv_data {
++	u8	ciu_div; /* card interface unit divisor */
++	u32	hs_timing; /* bitmask for CIU clock phase shift */
++	struct regmap   *sysreg; /* regmap for system manager register */
++};
++
++static int dw_mci_socfpga_priv_init(struct dw_mci *host)
 +{
-+	u32 l4_src;
-+	u32 perpll_src;
++	struct dw_mci_socfpga_priv_data *priv;
 +
-+	if (streq(hwclk->init->name, SOCFPGA_L4_MP_CLK)) {
-+		l4_src = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
-+		return l4_src &= 0x1;
-+	}
-+	if (streq(hwclk->init->name, SOCFPGA_L4_SP_CLK)) {
-+		l4_src = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
-+		return !!(l4_src & 2);
++	priv = devm_kzalloc(host->dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv) {
++		dev_err(host->dev, "mem alloc failed for private data\n");
++		return -ENOMEM;
 +	}
 +
-+	perpll_src = readl(clk_mgr_base_addr + CLKMGR_PERPLL_SRC);
-+	if (streq(hwclk->init->name, SOCFPGA_MMC_CLK))
-+		return perpll_src &= 0x3;
-+	if (streq(hwclk->init->name, SOCFPGA_NAND_CLK) ||
-+			streq(hwclk->init->name, SOCFPGA_NAND_X_CLK))
-+			return (perpll_src >> 2) & 3;
-+
-+	/* QSPI clock */
-+	return (perpll_src >> 4) & 3;
-+
-+}
-+
-+static int socfpga_clk_set_parent(struct clk_hw *hwclk, u8 parent)
-+{
-+	u32 src_reg;
-+
-+	if (streq(hwclk->init->name, SOCFPGA_L4_MP_CLK)) {
-+		src_reg = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
-+		src_reg &= ~0x1;
-+		src_reg |= parent;
-+		writel(src_reg, clk_mgr_base_addr + CLKMGR_L4SRC);
-+	} else if (streq(hwclk->init->name, SOCFPGA_L4_SP_CLK)) {
-+		src_reg = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
-+		src_reg &= ~0x2;
-+		src_reg |= (parent << 1);
-+		writel(src_reg, clk_mgr_base_addr + CLKMGR_L4SRC);
-+	} else {
-+		src_reg = readl(clk_mgr_base_addr + CLKMGR_PERPLL_SRC);
-+		if (streq(hwclk->init->name, SOCFPGA_MMC_CLK)) {
-+			src_reg &= ~0x3;
-+			src_reg |= parent;
-+		} else if (streq(hwclk->init->name, SOCFPGA_NAND_CLK) ||
-+			streq(hwclk->init->name, SOCFPGA_NAND_X_CLK)) {
-+			src_reg &= ~0xC;
-+			src_reg |= (parent << 2);
-+		} else {/* QSPI clock */
-+			src_reg &= ~0x30;
-+			src_reg |= (parent << 4);
-+		}
-+		writel(src_reg, clk_mgr_base_addr + CLKMGR_PERPLL_SRC);
++	priv->sysreg = syscon_regmap_lookup_by_compatible("altr,sys-mgr");
++	if (IS_ERR(priv->sysreg)) {
++		dev_err(host->dev, "regmap for altr,sys-mgr lookup failed.\n");
++		return PTR_ERR(priv->sysreg);
 +	}
++	host->priv = priv;
 +
 +	return 0;
 +}
 +
-+static unsigned long socfpga_clk_recalc_rate(struct clk_hw *hwclk,
-+	unsigned long parent_rate)
++static int dw_mci_socfpga_setup_clock(struct dw_mci *host)
 +{
-+	struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
-+	u32 div = 1, val;
++	struct dw_mci_socfpga_priv_data *priv = host->priv;
 +
-+	if (socfpgaclk->fixed_div)
-+		div = socfpgaclk->fixed_div;
-+	else if (socfpgaclk->div_reg) {
-+		val = readl(socfpgaclk->div_reg) >> socfpgaclk->shift;
-+		val &= div_mask(socfpgaclk->width);
-+		if (streq(hwclk->init->name, SOCFPGA_DB_CLK))
-+			div = val + 1;
-+		else
-+			div = (1 << val);
-+	}
++	clk_disable_unprepare(host->ciu_clk);
++	regmap_write(priv->sysreg, SYSMGR_SDMMCGRP_CTRL_OFFSET, priv->hs_timing);
++	clk_prepare_enable(host->ciu_clk);
 +
-+	return parent_rate / div;
++	host->bus_hz /= (priv->ciu_div + 1);
++	return 0;
 +}
 +
-+static struct clk_ops gateclk_ops = {
-+	.recalc_rate = socfpga_clk_recalc_rate,
-+	.get_parent = socfpga_clk_get_parent,
-+	.set_parent = socfpga_clk_set_parent,
++static void dw_mci_socfpga_prepare_command(struct dw_mci *host, u32 *cmdr)
++{
++	struct dw_mci_socfpga_priv_data *priv = host->priv;
++
++	if (priv->hs_timing & DRV_CLK_PHASE_SHIFT_SEL_MASK)
++		*cmdr |= SDMMC_CMD_USE_HOLD_REG;
++}
++
++static int dw_mci_socfpga_parse_dt(struct dw_mci *host)
++{
++	struct dw_mci_socfpga_priv_data *priv = host->priv;
++	struct device_node *np = host->dev->of_node;
++	u32 timing[2];
++	u32 div = 0;
++	int ret;
++
++	ret = of_property_read_u32(np, "altr,dw-mshc-ciu-div", &div);
++	if (ret)
++		dev_info(host->dev, "No dw-mshc-ciu-div specified, assuming 1");
++	priv->ciu_div = div;
++
++	ret = of_property_read_u32_array(np,
++			"altr,dw-mshc-sdr-timing", timing, 2);
++	if (ret)
++		return ret;
++
++	priv->hs_timing = SYSMGR_SDMMC_CTRL_SET(timing[0], timing[1]);
++	return 0;
++}
++
++static const struct dw_mci_drv_data socfpga_drv_data = {
++	.init			= dw_mci_socfpga_priv_init,
++	.setup_clock		= dw_mci_socfpga_setup_clock,
++	.prepare_command	= dw_mci_socfpga_prepare_command,
++	.parse_dt		= dw_mci_socfpga_parse_dt,
 +};
 +
-+static void __init socfpga_gate_clk_init(struct device_node *node,
-+	const struct clk_ops *ops)
++static const struct of_device_id dw_mci_socfpga_match[] = {
++	{ .compatible = "altr,socfpga-dw-mshc",
++			.data = &socfpga_drv_data, },
++	{},
++};
++MODULE_DEVICE_TABLE(of, dw_mci_socfpga_match);
++
++int dw_mci_socfpga_probe(struct platform_device *pdev)
 +{
-+	u32 clk_gate[2];
-+	u32 div_reg[3];
-+	u32 fixed_div;
-+	struct clk *clk;
-+	struct socfpga_clk *socfpga_clk;
-+	const char *clk_name = node->name;
-+	const char *parent_name[SOCFGPA_MAX_PARENTS];
-+	struct clk_init_data init;
-+	int rc;
-+	int i = 0;
++	const struct dw_mci_drv_data *drv_data;
++	const struct of_device_id *match;
 +
-+	socfpga_clk = kzalloc(sizeof(*socfpga_clk), GFP_KERNEL);
-+	if (WARN_ON(!socfpga_clk))
-+		return;
-+
-+	rc = of_property_read_u32_array(node, "clk-gate", clk_gate, 2);
-+	if (rc)
-+		clk_gate[0] = 0;
-+
-+	if (clk_gate[0]) {
-+		socfpga_clk->hw.reg = clk_mgr_base_addr + clk_gate[0];
-+		socfpga_clk->hw.bit_idx = clk_gate[1];
-+
-+		gateclk_ops.enable = clk_gate_ops.enable;
-+		gateclk_ops.disable = clk_gate_ops.disable;
-+	}
-+
-+	rc = of_property_read_u32(node, "fixed-divider", &fixed_div);
-+	if (rc)
-+		socfpga_clk->fixed_div = 0;
-+	else
-+		socfpga_clk->fixed_div = fixed_div;
-+
-+	rc = of_property_read_u32_array(node, "div-reg", div_reg, 3);
-+	if (!rc) {
-+		socfpga_clk->div_reg = clk_mgr_base_addr + div_reg[0];
-+		socfpga_clk->shift = div_reg[1];
-+		socfpga_clk->width = div_reg[2];
-+	} else {
-+		socfpga_clk->div_reg = 0;
-+	}
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
-+	init.name = clk_name;
-+	init.ops = ops;
-+	init.flags = 0;
-+	while (i < SOCFGPA_MAX_PARENTS && (parent_name[i] =
-+			of_clk_get_parent_name(node, i)) != NULL)
-+		i++;
-+
-+	init.parent_names = parent_name;
-+	init.num_parents = i;
-+	socfpga_clk->hw.hw.init = &init;
-+
-+	clk = clk_register(NULL, &socfpga_clk->hw.hw);
-+	if (WARN_ON(IS_ERR(clk))) {
-+		kfree(socfpga_clk);
-+		return;
-+	}
-+	rc = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	if (WARN_ON(rc))
-+		return;
++	match = of_match_node(dw_mci_socfpga_match, pdev->dev.of_node);
++	drv_data = match->data;
++	return dw_mci_pltfm_register(pdev, drv_data);
 +}
 +
- static void __init socfpga_pll_init(struct device_node *node)
- {
- 	socfpga_clk_init(node, &clk_pll_ops);
-@@ -160,6 +330,12 @@ static void __init socfpga_periph_init(struct device_node *node)
- }
- CLK_OF_DECLARE(socfpga_periph, "altr,socfpga-perip-clk", socfpga_periph_init);
- 
-+static void __init socfpga_gate_init(struct device_node *node)
-+{
-+	socfpga_gate_clk_init(node, &gateclk_ops);
-+}
-+CLK_OF_DECLARE(socfpga_gate, "altr,socfpga-gate-clk", socfpga_gate_init);
++static struct platform_driver dw_mci_socfpga_pltfm_driver = {
++	.probe		= dw_mci_socfpga_probe,
++	.remove		= __exit_p(dw_mci_pltfm_remove),
++	.driver		= {
++		.name		= "dwmmc_socfpga",
++		.of_match_table	= of_match_ptr(dw_mci_socfpga_match),
++		.pm		= &dw_mci_pltfm_pmops,
++	},
++};
 +
- void __init socfpga_init_clocks(void)
- {
- 	struct clk *clk;
++module_platform_driver(dw_mci_socfpga_pltfm_driver);
++
++MODULE_DESCRIPTION("Altera SOCFPGA Specific DW-MSHC Driver Extension");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:dwmmc-socfpga");
+diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
+index 0b74189..3700cb2 100644
+--- a/drivers/mmc/host/dw_mmc.h
++++ b/drivers/mmc/host/dw_mmc.h
+@@ -111,6 +111,7 @@
+ #define SDMMC_INT_ERROR			0xbfc2
+ /* Command register defines */
+ #define SDMMC_CMD_START			BIT(31)
++#define SDMMC_CMD_USE_HOLD_REG	BIT(29)
+ #define SDMMC_CMD_CCS_EXP		BIT(23)
+ #define SDMMC_CMD_CEATA_RD		BIT(22)
+ #define SDMMC_CMD_UPD_CLK		BIT(21)
 -- 
 1.7.9.5
