@@ -1,103 +1,113 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 24 May 2013 11:06:24 +0900
-Subject: [PATCH] ARM: mach-shmobile: r8a7790: add SATA support
-Message-ID: <1369361184-20862-1-git-send-email-horms+renesas@verge.net.au>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Fri, 24 May 2013 10:13:35 +0800
+Subject: [PATCH] arch: configuration, deleting 'CONFIG_BUG' since always
+ need it.
+In-Reply-To: <CAMuHMdUzcBuDupe4Fa6XieziGPMpPKC_k8X8gUUmDvLJ+Fe=Hg@mail.gmail.com>
+References: <519DCBEF.3090208@asianux.com> <201305231259.43750.arnd@arndb.de>
+ <20130523112401.GO18614@n2100.arm.linux.org.uk>
+ <201305231409.02359.arnd@arndb.de>
+ <20130523125033.GP18614@n2100.arm.linux.org.uk>
+ <CAMuHMdUzcBuDupe4Fa6XieziGPMpPKC_k8X8gUUmDvLJ+Fe=Hg@mail.gmail.com>
+Message-ID: <519ECCCF.8090909@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SATA clock for r8a7790 SoC (for both device tree and usual cases).
-Register SATA controller as a "late" platform device on r8a7790 SoC.
+On 05/23/2013 10:10 PM, Geert Uytterhoeven wrote:
+> On Thu, May 23, 2013 at 2:50 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> > On Thu, May 23, 2013 at 02:09:02PM +0200, Arnd Bergmann wrote:
+>>> >> On Thursday 23 May 2013, Russell King - ARM Linux wrote:
+>>>> >> > This is the problem you guys are missing - unreachable() means "we lose
+>>>> >> > control of the CPU at this point".
+>>> >>
+>>> >> I'm absolutely aware of this. Again, the current behaviour of doing nothing
+>>> >> at all isn't very different from undefined behavior when you get when you
+>>> >> get to the end of a function returning a pointer without a "return" statement,
+>>> >> or when you return from a function that has determined that it is not safe
+>>> >> to continue.
+>> >
+>> > Running off the end of a function like that is a different kettle of fish.
+>> > The execution path is still as the compiler intends - what isn't is that
+>> > the data returned is likely to be random trash.
+>> >
+>> > That's _quite_ different from the CPU starting to execute the contents
+>> > of a literal data pool.
+> I agree it's best to e.g. trap and reboot.
 
-Based on "ARM: mach-shmobile: r8a7779: add SATA support" by
-Vladimir Barinov.
+After read the arch/*/include/asm/bug.h,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
- arch/arm/mach-shmobile/setup-r8a7790.c | 21 +++++++++++++++++++++
- 2 files changed, 25 insertions(+)
+It seems panic() is not suitable for NOMMU platforms (only m68k use it,
+also need CONFIG_BUG and CONFIG_SUN3 enabled).
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index b393592..3619a52 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -50,6 +50,7 @@
- #define SMSTPCR2 0xe6150138
- #define SMSTPCR3 0xe615013c
- #define SMSTPCR7 0xe615014c
-+#define SMSTPCR8 0xe6150990
- 
- #define MODEMR		0xE6160060
- #define SDCKCR		0xE6150074
-@@ -180,6 +181,7 @@ static struct clk div6_clks[DIV6_NR] = {
- 
- /* MSTP */
- enum {
-+	MSTP814,
- 	MSTP721, MSTP720,
- 	MSTP304,
- 	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202,
-@@ -187,6 +189,7 @@ enum {
- };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP814] = SH_CLK_MSTP32(&p_clk, SMSTPCR8, 15, 0), /* SATA1 */
- 	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
- 	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
- 	[MSTP304] = SH_CLK_MSTP32(&cp_clk, SMSTPCR3, 4, 0), /* TPU0 */
-@@ -249,6 +252,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP202]),
- 	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP721]),
- 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
-+	CLKDEV_DEV_ID("sata_rcar.1", &mstp_clks[MSTP814]),
- };
- 
- #define R8A7790_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index ed7ee24..5a2a073 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -18,6 +18,7 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  */
- 
-+#include <linux/dma-mapping.h>
- #include <linux/irq.h>
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
-@@ -118,6 +119,25 @@ static inline void r8a7790_register_scif(int idx)
- 				      sizeof(struct plat_sci_port));
- }
- 
-+static __init void r8a7790_register_sata1(void)
-+{
-+
-+	struct resource res[] = {
-+		DEFINE_RES_MEM_NAMED(0xee300000, 0x200000, "rcar-sata"),
-+		DEFINE_RES_IRQ(gic_iid(106)),
-+	};
-+
-+	struct platform_device_info pdevinfo = {
-+		.name = "sata_rcar",
-+		.id = 1,
-+		.res = res,
-+		.num_res = ARRAY_SIZE(res),
-+		.dma_mask = DMA_BIT_MASK(32),
-+	};
-+
-+	platform_device_register_full(&pdevinfo);
-+}
-+
- static struct renesas_irqc_config irqc0_data = {
- 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
- };
-@@ -148,6 +168,7 @@ void __init r8a7790_add_standard_devices(void)
- 	r8a7790_register_scif(SCIF0);
- 	r8a7790_register_scif(SCIF1);
- 	r8a7790_register_irqc(0);
-+	r8a7790_register_sata1();
- }
- 
- void __init r8a7790_timer_init(void)
+And unreachable() is need followed with an asm inline instruction (arm,
+x86, powerpc mips...).
+
+And __builtin_trap() is "the mechanism used may vary from release to
+release so should not rely on any particular implementation" (ref to
+"http://gcc.gnu.org/onlinedocs/gcc/Other-Builtins.html", used by m68k,
+sparc, ia64).
+
+I can not find any *trap*() and *unreachable*() in "include/asm-generic/"
+
+I can not find any suitable implementation which 'generic' enough to add
+in "include/asm-generic/" (and in fact, CONFIG_BUG itself is not
+'generic' enough to be in "include/asm-generic/").
+
+
+At last, I still suggest to delete CONFIG_BUG, so most of architectures
+can skip this issue firstly.
+
+Then for specific architectures, also can get 3 benefits:
+
+a. the related maintainers can implement it as their own willing (not
+need discus it with another platform maintainers again);
+
+b. the related maintainers can free use the platform specific features
+(which can not be used in "include/asm-generic/");
+
+c. the related maintainers are more familiar their own architectures
+demands and requirements.
+
+
+
+----------- arch/m68k/include/asm/bug.h --------------------------------
+
+  1 #ifndef _M68K_BUG_H
+  2 #define _M68K_BUG_H
+  3
+  4 #ifdef CONFIG_MMU
+  5 #ifdef CONFIG_BUG
+  6 #ifdef CONFIG_DEBUG_BUGVERBOSE
+  7 #ifndef CONFIG_SUN3
+  8 #define BUG() do { \
+  9         printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
+ 10         __builtin_trap(); \
+ 11 } while (0)
+ 12 #else
+ 13 #define BUG() do { \
+ 14         printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__); \
+ 15         panic("BUG!"); \
+ 16 } while (0)
+ 17 #endif
+ 18 #else
+ 19 #define BUG() do { \
+ 20         __builtin_trap(); \
+ 21 } while (0)
+ 22 #endif
+ 23
+ 24 #define HAVE_ARCH_BUG
+ 25 #endif
+ 26 #endif /* CONFIG_MMU */
+ 27
+ 28 #include <asm-generic/bug.h>
+ 29
+ 30 #endif
+
+
+
+
+Thanks.
 -- 
-1.8.2.1
+Chen Gang
+
+Asianux Corporation
