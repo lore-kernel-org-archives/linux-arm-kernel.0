@@ -1,56 +1,86 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 24 May 2013 15:57:23 +0200
-Subject: [PATCH 2/2] ARM: dts: imx28: Adjust i2c interrupt bindings
-In-Reply-To: <1369382887.4117.34.camel@weser.hi.pengutronix.de>
-References: <1368713639-21485-1-git-send-email-fabio.estevam@freescale.com>
- <519E5732.1040800@free-electrons.com>
- <1369382887.4117.34.camel@weser.hi.pengutronix.de>
-Message-ID: <201305241557.23904.marex@denx.de>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 24 May 2013 18:02:32 +0400
+Subject: [PATCH] ARM: mach-shmobile: r8a7790: add SATA support
+In-Reply-To: <1369361184-20862-1-git-send-email-horms+renesas@verge.net.au>
+References: <1369361184-20862-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <519F72F8.1000204@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lucas Stach,
+Hello.
 
-> Am Donnerstag, den 23.05.2013, 19:51 +0200 schrieb Alexandre Belloni:
-> > Hi,
-> 
-> [...]
-> 
-> > > So while we _might_ be able to get the PIO mode to work on the i.MX23
-> > > there is nothing in the doc stating that it's even meant to work. Even
-> > > while PIO and DMA mode use the same internal mechanisms, there's still
-> > > plenty of opportunities of fail in there. After all PIO mode relies on
-> > > reading a debug register in the course of normal operation.
-> > > 
-> > > Only more extensive experimentation could show if we are in fact able
-> > > to make it work, a first shot of using PIO mode on MX23 failed, so it
-> > > might as well be that Juergens quick fix is correct and we have to
-> > > disable PIO mode on MX23 altogether. That said please stop slapping
-> > > the word "hack" over this patch until proven otherwise.
-> > 
-> > Still, Fabio and I have been experiencing the one second delay on
-> > i.mx28. From my experience, it appeared between 3.7 and 3.9, see:
-> > http://www.spinics.net/lists/linux-i2c/msg11985.html. I still didn't
-> > take the time to investigate more yet but it confirms that PIO mode is
-> > working on i.mx28 though with an annoying delay.
-> 
-> Just for the record: I know that PIO mode is functional on i.MX28
-> because I have it working on one of our customer boards. I am rather
-> much surprised it's still not working well for you, but haven't had a
-> chance to investigate yet. The i.MX28 RM explicitly describes how to
-> work with the PIO mode, so if it's not working this is bug somewhere.
+On 24-05-2013 6:06, Simon Horman wrote:
 
-I won't be surprised if there was more than one. The RM describes something , 
-but has many flaws. I'm sure you noticed that yourself.
+> Add SATA clock for r8a7790 SoC (for both device tree and usual cases).
 
-> This thread/patch is about a whole different problem, namely PIO mode
-> being non-functional on i.MX23. As the i.MX23 RM doesn't describe the
-> PIO mode, there is no indication that it's even meant to work on this
-> chip.
+     I don't see where you are adding clock for device tree case.
 
-I'm not against the patch per-se, but can we not get the best of this and 
-instead try some more to fix the PIO on MX23 so the MX23 users won't suffer 
-performance degradation on already weak CPU?
+> Register SATA controller as a "late" platform device on r8a7790 SoC.
 
-Best regards,
-Marek Vasut
+     Does R8A7790 have these "early" and "late" lists? I guess not.
+
+> Based on "ARM: mach-shmobile: r8a7779: add SATA support" by
+> Vladimir Barinov.
+
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>   arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
+>   arch/arm/mach-shmobile/setup-r8a7790.c | 21 +++++++++++++++++++++
+>   2 files changed, 25 insertions(+)
+
+> diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+> index b393592..3619a52 100644
+> --- a/arch/arm/mach-shmobile/clock-r8a7790.c
+> +++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+[...]
+> @@ -249,6 +252,7 @@ static struct clk_lookup lookups[] = {
+>   	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP202]),
+>   	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP721]),
+>   	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
+> +	CLKDEV_DEV_ID("sata_rcar.1", &mstp_clks[MSTP814]),
+>   };
+>
+>   #define R8A7790_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
+> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+> index ed7ee24..5a2a073 100644
+> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
+> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+[...]
+> @@ -118,6 +119,25 @@ static inline void r8a7790_register_scif(int idx)
+>   				      sizeof(struct plat_sci_port));
+>   }
+>
+> +static __init void r8a7790_register_sata1(void)
+
+    What's with SATA0?
+
+> +{
+> +
+> +	struct resource res[] = {
+
+    Non-static variable with an intializer? Won't this be a waste of 
+code? Wouldn't it be better to have it static __initdata?
+
+> +		DEFINE_RES_MEM_NAMED(0xee300000, 0x200000, "rcar-sata"),
+
+     2 megabytes? Won't it be a waste of memory?
+
+> +		DEFINE_RES_IRQ(gic_iid(106)),
+> +	};
+> +
+> +	struct platform_device_info pdevinfo = {
+
+    Same comment about non-static initialized structure...
+
+> +		.name = "sata_rcar",
+> +		.id = 1,
+> +		.res = res,
+> +		.num_res = ARRAY_SIZE(res),
+> +		.dma_mask = DMA_BIT_MASK(32),
+> +	};
+> +
+> +	platform_device_register_full(&pdevinfo);
+> +}
+> +
+
+WBR, Sergei
