@@ -1,26 +1,58 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 May 2013 10:55:53 +0200
-Subject: [PATCH v3 1/2] pinctrl: add MVF600 pinctrl driver
-In-Reply-To: <CAAQ0ZWTBZ=10B+0Zc4iZmvrr0hzdBKf1mn1CzhJokWE44dxsoA@mail.gmail.com>
-References: <1368685224-17915-1-git-send-email-b35083@freescale.com>
- <20130520033207.GD25113@S2101-09.ap.freescale.net>
- <CAAQ0ZWSZeqOEceN-KmDS4_BT27_4xCYjfFMj8sHkEonOXaoF_g@mail.gmail.com>
- <B56CDBE15CE27145A4B77D2D24263E851CBBA4@039-SN1MPN1-003.039d.mgd.msft.net>
- <CAAQ0ZWTBZ=10B+0Zc4iZmvrr0hzdBKf1mn1CzhJokWE44dxsoA@mail.gmail.com>
-Message-ID: <CACRpkdZ=67CWrPqFMU4FeES5OUyV5=Zz2fwy-GAMVHrNU6y6jA@mail.gmail.com>
+Date: Fri, 24 May 2013 10:59:50 +0200
+Subject: [PATCH v4 15/21] ARM: shmobile: armadillo-reference: Move st1232
+ reset GPIO to DT
+In-Reply-To: <1369138482-5871-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1369138482-5871-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CACRpkdYUQjtmzFzQBES-bcjjT5iTTXifa2BQSusBzMdTCRtyiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 5:24 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On 21 May 2013 15:56, Lu Jingchang-B35083 <B35083@freescale.com> wrote:
->> [Lu Jingchang-B35083]
->> I see you have Acked [PATCH v3 2/2] pinctrl: imx: add MVF600 support to imx pinctrl framework, do I need resend it as the first one. Thanks!
+On Tue, May 21, 2013 at 2:14 PM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
+
+> Reference the st1232 reset GPIO from the device tree and remove it from
+> board code.
 >
-> Since LinusW hasn't applied it, you should just resend.
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Now it appears I applied 2/2 but not 1/2 due to comments.
+> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+> @@ -43,6 +43,7 @@
+>                 interrupts = <2 0>; /* IRQ10: hwirq 2 on irqpin1 */
+>                 pinctrl-0 = <&st1232_pins>;
+>                 pinctrl-names = "default";
+> +               gpios = <&pfc 166 1>;
 
-Are they orthogonal or do I need to pull the applied patch out again?
+Just as a random example this becomes:
+
+gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
+
+Which is WAAAY more readable.
+
+> +++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+> @@ -158,7 +158,6 @@ clock_error:
+>   */
+>  static void __init eva_init(void)
+>  {
+> -
+>         r8a7740_clock_init(MD_CK0 | MD_CK2);
+>         eva_clock_init();
+>
+> @@ -171,12 +170,6 @@ static void __init eva_init(void)
+>
+>         r8a7740_add_standard_devices_dt();
+>
+> -       /*
+> -        * Touchscreen
+> -        * TODO: Move reset GPIO over to .dts when we can reference it
+> -        */
+> -       gpio_request_one(166, GPIOF_OUT_INIT_HIGH, NULL); /* TP_RST_B */
+> -
+
+Not really my business but I guess the driver is already augmented to pick its
+GPIO from the device tree in this case? And are you willingly breaking
+non-DT boots or something?
 
 Yours,
 Linus Walleij
