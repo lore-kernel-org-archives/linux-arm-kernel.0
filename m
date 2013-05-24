@@ -1,105 +1,57 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 24 May 2013 15:05:39 -0700
-Subject: [PATCH] ARM: avoid mis-detecting some V7 cores in the decompressor
-In-Reply-To: <20130523231531.GT18614@n2100.arm.linux.org.uk>
-References: <1368049671-22879-1-git-send-email-sboyd@codeaurora.org>
- <5193E424.9090605@codeaurora.org> <519E57D2.3050000@codeaurora.org>
- <20130523231531.GT18614@n2100.arm.linux.org.uk>
-Message-ID: <20130524220539.GB599@codeaurora.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 24 May 2013 15:15:41 -0700
+Subject: [PATCH] ARM: DTS: OMAP4: Panda/SDP: twl6030: fix mux for IRQ pin
+ and msecure line
+In-Reply-To: <87a9nkf3mu.fsf@linaro.org> (Kevin Hilman's message of "Fri, 24
+ May 2013 14:51:21 -0700")
+References: <1369423702-31501-1-git-send-email-khilman@linaro.org>
+ <20130524200954.GA2344@kahuna> <20130524203231.GA2555@kahuna>
+ <87obc0f54r.fsf@linaro.org>
+ <CAGo_u6oz1v1J-6z5W-X7CsOmi+7SAMicz1LZTv0sVXhej1DJ2Q@mail.gmail.com>
+ <87a9nkf3mu.fsf@linaro.org>
+Message-ID: <87ppwgdnxu.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24, Russell King - ARM Linux wrote:
-> On Thu, May 23, 2013 at 10:54:26AM -0700, Stephen Boyd wrote:
-> > On 05/15/13 12:38, Stephen Boyd wrote:
-> > > On 05/08/13 14:47, Stephen Boyd wrote:
-> > >> From: Brian Swetland <swetland@google.com>
-> > >>
-> > >> Currently v7 CPUs with an MIDR that has no bits set in the range
-> > >> [16:12] will be detected as old ARM CPUs with no caches and so
-> > >> the cache will never be turned on during decompression. ARM's
-> > >> Cortex chips have an 0xC in the range [16:12] so they never match
-> > >> this entry, but Qualcomm's Scorpion and Krait processors never
-> > >> set these bits to anything besides 0 so they always match.
-> > >>
-> > >> Skip this entry if we've compiled in support for v7 CPUs. This
-> > >> allows kernel decompression to happen nearly instantly instead of
-> > >> taking over 20 seconds.
-> > >>
-> > >> Signed-off-by: Brian Swetland <swetland@google.com>
-> > >> [sboyd: Clarified and extended commit text]
-> > >> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > >> ---
-> > > Ping?
-> > 
-> > Russell, shall I add this to the patch tracker?
-> 
-> Yes please.
-> 
+Kevin Hilman <khilman@linaro.org> writes:
 
-Ok, thanks.
+> Nishanth Menon <nm@ti.com> writes:
 
-I've noticed another problem now that our caches are used. On MSM
-we have TEXT_OFFSET set to at least 0x208000 if we've built-in
-support for MSM8x60/8960. If I boot a kernel with the MSM code
-built-in that requires the higher text offset, but I load my
-compressed kernel below that address (such as 0x0) the
-decompression fails.
+[...]
 
-This happens because the page tables are written into the
-compressed data region before we relocate ourself to a higher
-location.
+>> Actually 2 things:
+>>
+>> a) patch seems to do the wrong thing for 4460 - 0x18 offset should
+>> have been used instead of 0x14 which is correct for 4430?
+>
+> I see, thanks.  I'll double check the TRMs.
+>
+>> b) yes, I understand,  the current settings we did worked, but the
+>> mode(0) we are setting to is real weird - we are setting it up for
+>> clk0 out - I cant even think why it is even working in the first place
+>> :( - is it because we are pumping out sysclkout and as a result we are
+>> lucky that msecure is being sampled at the right point by twl6030
+>> allowing rtc access? either way, IMHO, the configuration is wrong.
+>
+> Ah, yes.  Mode zero is definitely wrong.   When I did the original patch
+> for legacy mode, I just duplicated the settings u-boot was using.  Guess
+> it's a fluke that it works.
 
-Here's some ascii art to show the problem
+Actually, for legacy mode, it's set correctly in mode 2.  This line:
 
-We start off at 0x0
+	omap_mux_init_signal("fref_clk0_out.sys_drm_msecure", OMAP_PIN_OUTPUT);
 
- 0x000000 +---------+
-          |         |
-          | zImage  |
- 0x208000 |---------| <- r4 (zreladdr)
-          | zImage  |
- 0x300000 +---------+ <- _edata
+does the right thing based on the signal name.    But for DT boot, I
+defintely screwed it up by setting it to mode (and putting it in the
+wrong padconf section.)
 
-Then we run far enough to call cache_on which goes ahead and
-calls __setup_mmu and sets up our page tables.
+Also, are you *really* sure about the offset difference between 4430 and
+4460 here?  I don't have access to NDA docs anymore, so I cannot double
+check this.
 
- 0x008000 +---------+
-          |         |
-          | zImage  |
-          |         |
- 0x204000 |---------|
-          |  pgdir  |
- 0x208000 |---------| <- r4 (zreladdr)
-          |         |
-          | zImage  |
-          |         |
- 0x300000 +---------+ <- _edata
+What I do know is that the legacy code is using 0x54 for both, and if I
+simply comment out that 'sys_drm_msecure' line above, RTC wake stops
+working (legacy boot) on both 4430 and 4460, so that seems like pretty
+stront evidence that it's the same offset on both.
 
-This is bad because we just wrote our page tables into the
-compressed data. Nobody notices though and we finish relocating
-ourselves and then we call decompress_kernel() which fails
-randomly. (BTW, why does error() sit in a while loop forever? We
-can't get any information about why the decompression failed if
-we have debug_ll enabled. I had to patch the error() routine to
-not while loop forever to get that print after do_decompress to
-be useful.)
-
-I see a few solutions.
-
- 1) Relocate with caches off and then turn on caches after we're
-    running in a location where we won't overwrite ourselves.
-
- 2) Have temporary page tables for the relocation phase that live
-    just below the location we're going to relocate to.
-
- 3) Force bootloaders loading these types of images to load the
-    zImage@least as high as the TEXT_OFFSET is compiled to.
-
-I don't think we can convince everyone that #3 is ok to do. I'm
-leaning towards #2 since we get all the benefits of the cache
-during the relocation phase but #1 is the obviously simple fix.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Kevin
