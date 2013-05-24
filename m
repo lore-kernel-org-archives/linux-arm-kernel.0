@@ -1,56 +1,21 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 May 2013 13:13:58 +0200
-Subject: [PATCH] ARM: ux500: enable the crypto and hash on all dbx500
-In-Reply-To: <20130524082758.GP22683@gmail.com>
-References: <1369378122-25897-1-git-send-email-linus.walleij@stericsson.com>
- <20130524082758.GP22683@gmail.com>
-Message-ID: <CACRpkdb1CZKoaG6nNF-yBC3Eovoe3_0BHa6uO-OQkePDcrkamg@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 May 2013 12:13:59 +0100
+Subject: [PATCH 02/11] x86: mm: Remove x86 version of huge_pmd_share.
+In-Reply-To: <1369328878-11706-3-git-send-email-steve.capper@linaro.org>
+References: <1369328878-11706-1-git-send-email-steve.capper@linaro.org>
+ <1369328878-11706-3-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130524111359.GE18272@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 10:27 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Fri, 24 May 2013, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> Commits:
->> "ARM: ux500: Add Device Tree nodes for the ux500 Crypt device"
->> "ARM: ux500: Add Device Tree nodes for the ux500 Hash device"
->>
->> Added the crypto and hash devices conditionally, i.e. so as to
->> be turned on per-board by setting an "status" property on the
->> device from "disabled" to "okay" on each device.
->>
->> This is wrong since this is an SoC feature, it is not board
->> dependent. It is the same ASIC under all circumstances and
->> functionality does not vary with board family.
->>
->> This moves the enablement into the SoC file.
->>
->> Cc: Lee Jones <lee.jones@linaro.org>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> ---
->>  arch/arm/boot/dts/dbx5x0.dtsi  | 4 ----
->>  arch/arm/boot/dts/snowball.dts | 8 --------
->>  2 files changed, 12 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
->> index f051963..cd5cd09 100644
->> --- a/arch/arm/boot/dts/dbx5x0.dtsi
->> +++ b/arch/arm/boot/dts/dbx5x0.dtsi
->> @@ -760,17 +760,13 @@
->>                       compatible = "stericsson,ux500-cryp";
->>                       reg = <0xa03cb000 0x1000>;
->>                       interrupts = <0 15 0x4>;
->> -
->
-> Why do you insist on removing all line spacings from the DTS file?
->
-> I saw you removing them in between nodes too.
+On Thu, May 23, 2013 at 06:07:49PM +0100, Steve Capper wrote:
+> The huge_pmd_share code has been copied over to mm/hugetlb.c to
+> make it accessible to other architectures.
+> 
+> Remove the x86 copy of the huge_pmd_share code and enable the
+> ARCH_WANT_HUGE_PMD_SHARE config flag. That way we reference the
+> general one.
+> 
+> Signed-off-by: Steve Capper <steve.capper@linaro.org>
 
-I was hit by a linespace when I was a child, since then I take
-every opportunity for revenge.
-
-If I keep the spacing, can I have your ACK?
-
-Yours,
-Linus Walleij
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
