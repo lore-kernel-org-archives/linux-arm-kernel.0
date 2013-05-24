@@ -1,140 +1,102 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 24 May 2013 11:44:57 +0200
-Subject: [PATCH 20/21] arm: kirkwood: openblocks-a6: group pinmux
- configurations
-In-Reply-To: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1369388699-25975-21-git-send-email-thomas.petazzoni@free-electrons.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 24 May 2013 18:47:24 +0900
+Subject: [PATCH v2] gpio-rcar: Add support for IRQ_TYPE_EDGE_BOTH
+Message-ID: <20130524094724.1510.80331.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of having one separate pinmux configuration for each LED, for
-each GPIO of the GPIO header, for each DIP switch, this patch groups
-them together in configurations that make sense together: LEDs on one
-side, GPIOs of the GPIO header on another side, and DIP switches on
-yet another side.
+From: Simon Horman <horms+renesas@verge.net.au>
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+As hardware support for this feature is not universal for all SoCs a flag,
+has_both_edge_trigger, has been added to the platform data of the driver to
+allow this feature to be enabled.
+
+The motivation for this is to allow use of the gpio-keys driver on the
+lager board which is based on the r8a7790 SoC. The V2 of this patch has been
+fully exercised using that driver on that board.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
- arch/arm/boot/dts/kirkwood-openblocks_a6.dts |   82 +++-----------------------
- 1 file changed, 9 insertions(+), 73 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-index a05b382..56e3161 100644
---- a/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-+++ b/arch/arm/boot/dts/kirkwood-openblocks_a6.dts
-@@ -83,12 +83,7 @@
- 		};
+ Changes since V1:
+ - Modified code to always set BOTHEDGE register if available
+ - Set BOTHEDGE before IOINTSEL
+ - Successfully tested triggering on both edges with SW2 on Lager
+
+ drivers/gpio/gpio-rcar.c                |   26 +++++++++++++++++++++-----
+ include/linux/platform_data/gpio-rcar.h |    1 +
+ 2 files changed, 22 insertions(+), 5 deletions(-)
+
+--- 0001/drivers/gpio/gpio-rcar.c
++++ work/drivers/gpio/gpio-rcar.c	2013-05-24 18:39:54.000000000 +0900
+@@ -49,6 +49,7 @@ struct gpio_rcar_priv {
+ #define POSNEG 0x20
+ #define EDGLEVEL 0x24
+ #define FILONOFF 0x28
++#define BOTHEDGE 0x4c
  
- 		pinctrl: pinctrl at 10000 {
--			pinctrl-0 = <&pmx_dip_sw0 &pmx_dip_sw1
--				     &pmx_dip_sw2 &pmx_dip_sw3
--				     &pmx_gpio_0 &pmx_gpio_1
--				     &pmx_gpio_2 &pmx_gpio_3
--				     &pmx_gpio_4 &pmx_gpio_5
--				     &pmx_gpio_6 &pmx_gpio_7>;
-+			pinctrl-0 = <&pmx_dip_switches &pmx_gpio_header>;
- 			pinctrl-names = "default";
+ static inline u32 gpio_rcar_read(struct gpio_rcar_priv *p, int offs)
+ {
+@@ -91,7 +92,8 @@ static void gpio_rcar_irq_enable(struct
+ static void gpio_rcar_config_interrupt_input_mode(struct gpio_rcar_priv *p,
+ 						  unsigned int hwirq,
+ 						  bool active_high_rising_edge,
+-						  bool level_trigger)
++						  bool level_trigger,
++						  bool both)
+ {
+ 	unsigned long flags;
  
- 			pmx_uart0: pmx-uart0 {
-@@ -108,63 +103,14 @@
- 				marvell,function = "sysrst";
- 			};
+@@ -108,6 +110,10 @@ static void gpio_rcar_config_interrupt_i
+ 	/* Configure edge or level trigger in EDGLEVEL */
+ 	gpio_rcar_modify_bit(p, EDGLEVEL, hwirq, !level_trigger);
  
--			pmx_dip_sw0: pmx-dip-sw0 {
--				marvell,pins = "mpp20";
-+			pmx_dip_switches: pmx-dip-switches {
-+				marvell,pins = "mpp20", "mpp21", "mpp22", "mpp23";
- 				marvell,function = "gpio";
- 			};
++	/* Select one edge or both edges in BOTHEDGE */
++	if (p->config.has_both_edge_trigger)
++		gpio_rcar_modify_bit(p, BOTHEDGE, hwirq, both);
++
+ 	/* Select "Interrupt Input Mode" in IOINTSEL */
+ 	gpio_rcar_modify_bit(p, IOINTSEL, hwirq, true);
  
--			pmx_dip_sw1: pmx-dip-sw1 {
--				marvell,pins = "mpp21";
--				marvell,function = "gpio";
--			};
--
--			pmx_dip_sw2: pmx-dip-sw2 {
--				marvell,pins = "mpp22";
--				marvell,function = "gpio";
--			};
--
--			pmx_dip_sw3: pmx-dip-sw3 {
--				marvell,pins = "mpp23";
--				marvell,function = "gpio";
--			};
--
--			pmx_gpio_0: pmx-gpio-0 {
--				marvell,pins = "mpp24";
--				marvell,function = "gpio";
--			};
--
--			pmx_gpio_1: pmx-gpio-1 {
--				marvell,pins = "mpp25";
--				marvell,function = "gpio";
--			};
--
--			pmx_gpio_2: pmx-gpio-2 {
--				marvell,pins = "mpp26";
--				marvell,function = "gpio";
--			};
--
--			pmx_gpio_3: pmx-gpio-3 {
--				marvell,pins = "mpp27";
--				marvell,function = "gpio";
--			};
--
--			pmx_gpio_4: pmx-gpio-4 {
--				marvell,pins = "mpp28";
--				marvell,function = "gpio";
--			};
--
--			pmx_gpio_5: pmx-gpio-5 {
--				marvell,pins = "mpp29";
--				marvell,function = "gpio";
--			};
--
--			pmx_gpio_6: pmx-gpio-6 {
--				marvell,pins = "mpp30";
--				marvell,function = "gpio";
--			};
--
--			pmx_gpio_7: pmx-gpio-7 {
--				marvell,pins = "mpp31";
-+			pmx_gpio_header: pmx-gpio-header {
-+				marvell,pins = "mpp24", "mpp25", "mpp26", "mpp27",
-+					       "mpp28", "mpp29", "mpp30", "mpp31";
- 				marvell,function = "gpio";
- 			};
+@@ -127,16 +133,26 @@ static int gpio_rcar_irq_set_type(struct
  
-@@ -178,18 +124,8 @@
- 				marvell,function = "gpio";
- 			};
+ 	switch (type & IRQ_TYPE_SENSE_MASK) {
+ 	case IRQ_TYPE_LEVEL_HIGH:
+-		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, true);
++		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, true,
++						      false);
+ 		break;
+ 	case IRQ_TYPE_LEVEL_LOW:
+-		gpio_rcar_config_interrupt_input_mode(p, hwirq, false, true);
++		gpio_rcar_config_interrupt_input_mode(p, hwirq, false, true,
++						      false);
+ 		break;
+ 	case IRQ_TYPE_EDGE_RISING:
+-		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, false);
++		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, false,
++						      false);
+ 		break;
+ 	case IRQ_TYPE_EDGE_FALLING:
+-		gpio_rcar_config_interrupt_input_mode(p, hwirq, false, false);
++		gpio_rcar_config_interrupt_input_mode(p, hwirq, false, false,
++						      false);
++		break;
++	case IRQ_TYPE_EDGE_BOTH:
++		if (!p->config.has_both_edge_trigger)
++			return -EINVAL;
++		gpio_rcar_config_interrupt_input_mode(p, hwirq, true, false,
++						      true);
+ 		break;
+ 	default:
+ 		return -EINVAL;
+--- 0001/include/linux/platform_data/gpio-rcar.h
++++ work/include/linux/platform_data/gpio-rcar.h	2013-05-24 18:25:06.000000000 +0900
+@@ -21,6 +21,7 @@ struct gpio_rcar_config {
+ 	unsigned int irq_base;
+ 	unsigned int number_of_pins;
+ 	const char *pctl_name;
++	unsigned has_both_edge_trigger:1;
+ };
  
--			pmx_led_red: pmx-led-red {
--				marvell,pins = "mpp41";
--				marvell,function = "gpio";
--			};
--
--			pmx_led_green: pmx-led-green {
--				marvell,pins = "mpp42";
--				marvell,function = "gpio";
--			};
--
--			pmx_led_yellow: pmx-led-yellow {
--				marvell,pins = "mpp43";
-+			pmx_leds: pmx-leds {
-+				marvell,pins = "mpp41", "mpp42", "mpp43";
- 				marvell,function = "gpio";
- 			};
- 		};
-@@ -197,7 +133,7 @@
- 
- 	gpio-leds {
- 		compatible = "gpio-leds";
--		pinctrl-0 = <&pmx_led_red &pmx_led_green &pmx_led_yellow>;
-+		pinctrl-0 = <&pmx_leds>;
- 		pinctrl-names = "default";
- 
- 		led-red {
--- 
-1.7.9.5
+ #define RCAR_GP_PIN(bank, pin)		(((bank) * 32) + (pin))
