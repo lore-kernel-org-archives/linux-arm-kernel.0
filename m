@@ -1,59 +1,85 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 24 May 2013 10:26:41 +0200
-Subject: [PATCH 1/1] ARM: at91: at91sam9n12: move external irq declatation
- to DT
-In-Reply-To: <1369349956-22985-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1369349956-22985-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <519F2441.4010000@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 24 May 2013 09:27:58 +0100
+Subject: [PATCH] ARM: ux500: enable the crypto and hash on all dbx500
+In-Reply-To: <1369378122-25897-1-git-send-email-linus.walleij@stericsson.com>
+References: <1369378122-25897-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130524082758.GP22683@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/05/2013 00:59, Jean-Christophe PLAGNIOL-VILLARD :
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Fri, 24 May 2013, Linus Walleij wrote:
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Stacked on at91-3.10-fixes. Thanks.
-
-
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Commits:
+> "ARM: ux500: Add Device Tree nodes for the ux500 Crypt device"
+> "ARM: ux500: Add Device Tree nodes for the ux500 Hash device"
+> 
+> Added the crypto and hash devices conditionally, i.e. so as to
+> be turned on per-board by setting an "status" property on the
+> device from "disabled" to "okay" on each device.
+> 
+> This is wrong since this is an SoC feature, it is not board
+> dependent. It is the same ASIC under all circumstances and
+> functionality does not vary with board family.
+> 
+> This moves the enablement into the SoC file.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->   arch/arm/boot/dts/at91sam9n12.dtsi |    1 +
->   arch/arm/mach-at91/at91sam9n12.c   |    6 ------
->   2 files changed, 1 insertion(+), 6 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-> index 566af32..d864f7a9 100644
-> --- a/arch/arm/boot/dts/at91sam9n12.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-> @@ -60,6 +60,7 @@
->   				compatible = "atmel,at91rm9200-aic";
->   				interrupt-controller;
->   				reg = <0xfffff000 0x200>;
-> +				atmel,external-irqs = <31>;
->   			};
->
->   			ramc0: ramc at ffffe800 {
-> diff --git a/arch/arm/mach-at91/at91sam9n12.c b/arch/arm/mach-at91/at91sam9n12.c
-> index 13cdbcd..c7d670d1 100644
-> --- a/arch/arm/mach-at91/at91sam9n12.c
-> +++ b/arch/arm/mach-at91/at91sam9n12.c
-> @@ -223,13 +223,7 @@ static void __init at91sam9n12_map_io(void)
->   	at91_init_sram(0, AT91SAM9N12_SRAM_BASE, AT91SAM9N12_SRAM_SIZE);
->   }
->
-> -void __init at91sam9n12_initialize(void)
-> -{
-> -	at91_extern_irq = (1 << AT91SAM9N12_ID_IRQ0);
-> -}
+>  arch/arm/boot/dts/dbx5x0.dtsi  | 4 ----
+>  arch/arm/boot/dts/snowball.dts | 8 --------
+>  2 files changed, 12 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+> index f051963..cd5cd09 100644
+> --- a/arch/arm/boot/dts/dbx5x0.dtsi
+> +++ b/arch/arm/boot/dts/dbx5x0.dtsi
+> @@ -760,17 +760,13 @@
+>  			compatible = "stericsson,ux500-cryp";
+>  			reg = <0xa03cb000 0x1000>;
+>  			interrupts = <0 15 0x4>;
 > -
->   AT91_SOC_START(at91sam9n12)
->   	.map_io = at91sam9n12_map_io,
->   	.register_clocks = at91sam9n12_register_clocks,
-> -	.init = at91sam9n12_initialize,
->   AT91_SOC_END
->
 
+Why do you insist on removing all line spacings from the DTS file?
+
+I saw you removing them in between nodes too.
+
+>  			v-ape-supply = <&db8500_vape_reg>;
+> -			status = "disabled";
+>  		};
+>  
+>  		hash at a03c2000 {
+>  			compatible = "stericsson,ux500-hash";
+>  			reg = <0xa03c2000 0x1000>;
+> -
+>  			v-ape-supply = <&db8500_vape_reg>;
+> -			status = "disabled";
+>  		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+> index bda002f..e8219cc7 100644
+> --- a/arch/arm/boot/dts/snowball.dts
+> +++ b/arch/arm/boot/dts/snowball.dts
+> @@ -356,13 +356,5 @@
+>  				};
+>  			};
+>  		};
+> -
+> -		cryp at a03cb000 {
+> -			status = "okay";
+> -		};
+> -
+> -		hash at a03c2000 {
+> -			status = "okay";
+> -		};
+>  	};
+>  };
 
 -- 
-Nicolas Ferre
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
