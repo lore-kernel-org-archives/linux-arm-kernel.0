@@ -1,57 +1,58 @@
 From: emilio@elopez.com.ar (=?ISO-8859-1?Q?Emilio_L=F3pez?=)
-Date: Fri, 24 May 2013 09:46:32 -0300
-Subject: [PATCHv3 1/6] net: Add EMAC ethernet driver found on Allwinner
- A10 SoC's
-In-Reply-To: <1369387394-9453-2-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 24 May 2013 09:53:07 -0300
+Subject: [PATCHv3 5/6] ARM: cubieboard: Enable ethernet (EMAC) support
+ in dts
+In-Reply-To: <1369387394-9453-6-git-send-email-maxime.ripard@free-electrons.com>
 References: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
- <1369387394-9453-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <519F6128.9060608@elopez.com.ar>
+ <1369387394-9453-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <519F62B3.8090302@elopez.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi,
 
 El 24/05/13 06:23, Maxime Ripard escribi?:
 > From: Stefan Roese <sr@denx.de>
 > 
-> The Allwinner A10 has an ethernet controller that seem to be developped
-> internally by them.
-> 
-> The exact feature set of this controller is unknown, since there is no
-> public documentation for this IP, and this driver is mostly the one
-> published by Allwinner that has been heavily cleaned up.
-> 
 > Signed-off-by: Stefan Roese <sr@denx.de>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
-
-(snip)
-
+>  arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+> index b70fe0d..32d9b18 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+> @@ -27,6 +27,21 @@
+>  	};
+>  
+>  	soc at 01c20000 {
+> +		emac: ethernet at 01c0b000 {
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&emac_pins_a>;
+> +			phy = <&phy0>;
+> +			status = "okay";
+> +		};
 > +
-> +config SUN4I_EMAC
-> +        tristate "Allwinner A10 EMAC support"
-> +	depends on ARCH_SUNXI
-> +	depends on OF
-> +	select CRC32
-> +	select NET_CORE
-> +	select MII
-> +	select REGULATOR_FIXED_VOLTAGE
-> +        ---help---
-> +          Support for Allwinner A10 EMAC ethernet driver.
+> +		mdio at 01c0b080 {
+> +			status = "okay";
 > +
-> +          To compile this driver as a module, choose M here.  The module
-> +          will be called sun4i-emac.
-> +
+> +			phy0: ethernet-phy at 0 {
+> +				reg = <0>;
+> +			};
 
-You also need to select REGULATOR when you select REGULATOR_FIXED_VOLTAGE
-
-I have attached a fixup patch you can use with git autosquash
+During my testing I found out that I needed to use 1 as reg for the
+driver to work. You can find a fixup patch enclosed that changes this;
+it's possible that some extra changes may also be needed (s/phy0/phy1/
+on the node?)
 
 Cheers,
 
 Emilio
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: fixup-regulator.patch
+Name: fixup-reg.patch
 Type: text/x-diff
-Size: 735 bytes
+Size: 711 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130524/1ad42136/attachment.bin>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130524/8a9338c8/attachment-0001.bin>
