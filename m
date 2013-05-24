@@ -1,38 +1,63 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 24 May 2013 14:10:32 +0200
-Subject: [GIT PULL] arm-soc: Xilinx zynq core - smp for v3.10
-In-Reply-To: <20130524112610.GX18614@n2100.arm.linux.org.uk>
-References: <890ef3b8-f536-4b00-9bd8-5ea50de3bf51@DB8EHSMHS032.ehs.local>
- <20130524112610.GX18614@n2100.arm.linux.org.uk>
-Message-ID: <744356bb-78fa-4592-97ef-0709fe65dbee@CH1EHSMHS025.ehs.local>
+From: khali@linux-fr.org (Jean Delvare)
+Date: Fri, 24 May 2013 14:20:17 +0200
+Subject: [I2C] informations + advice about messages handling
+In-Reply-To: <CA78C307B8F06747967D122FC656B15398644B@SERVEUR0.nvp.local>
+References: <CA78C307B8F06747967D122FC656B153986448@SERVEUR0.nvp.local>
+ <CAK7N6vpg6QUAKODKO2Msr4+GTASLDpA2cG1teQV3yiwt7D4SSw@mail.gmail.com>
+ <20130524094407.61d0ec42@endymion.delvare>
+ <CA78C307B8F06747967D122FC656B15398644A@SERVEUR0.nvp.local>
+ <20130524110706.6052493e@endymion.delvare>
+ <CA78C307B8F06747967D122FC656B15398644B@SERVEUR0.nvp.local>
+Message-ID: <20130524142017.52545a52@endymion.delvare>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Fri, 24 May 2013 11:52:54 +0200, Mylene Josserand wrote:
+> Right now, my company uses the "i2c_smbus_read/write_byte_data" 
+> functions to talk to devices through an application. On the datasheet of 
+> these devices, I search but did not seem to be SMBus compliant.
+> As it was a software which was using these functions, we thought that a 
+> driver (that I would write) should be better. And here I am ! I prefer 
+> to understand well the mechanism before coding anything and it is 
+> interesting !
 
-On 05/24/2013 01:26 PM, Russell King - ARM Linux wrote:
-> On Thu, Apr 04, 2013 at 09:47:09AM +0200, Michal Simek wrote:
->> Hi Arnd and Olof,
->>
->> please pull the following smp support to your arm-soc tree.
->>
->> This branch is based on zynq/clksrc/cleanup parts because
->> there are some dependencies on moving timer to generic location.
->>
->> I could based it on standard Linux tagged version but you will get
->> several conflicts you will have to resolve.
->> If you are OK to resolving these problems, please let me know
->> I will create another branch with core-smp changes which are not based
->> on zynq/clksrc/cleanup branch.
-> 
-> You might want to resolve this new warning:
-> 
-> arch/arm/mach-zynq/hotplug.c:1:0: warning: switch -mcpu=cortex-a9 conflicts with -march= switch
-> 
-> found by lastnights OMAP4430 randconfig build.
+If the application was using i2c_smbus_read/write_byte_data from
+user-space, then a kernel driver would call the same functions. No
+reason why this wouldn't work.
 
-Do you have that randconfig file?
-And can you please point me to the repo which is is used for this build?
+> (...)
+> Thanks for the explanation.
+> No problem, we have 2 devices used without drivers :
+> - an odometer PIC18F24201 : In the datasheet, there is a SMBus select 
+> bit but I don't know if it is SMBus compliant.
 
-Thanks,
-Michal
+Couldn't find the datasheet for this one, unfortunately.
+
+> - an audio codec tlv320aic3204 : There is a driver for this device but 
+> for some reasons, we did not use it. Did not find a "SMBus compliant" in 
+> its datasheet.
+
+The tlv320aic32x4 driver uses i2c_master_send, which is a shortcut to
+i2c_transfer. However it seems to only send 2 bytes on the bus at once,
+the same could be achieved with i2c_smbus_write_byte_data if needed.
+
+For completeness: a device might use transactions which are compliant
+with SMBus without being formally "SMBus-compliant", because SMBus has
+more constraints than just transaction types (I kept things simple
+originally to not confuse you.) This may explain why it isn't mentioned
+in the datasheet. Or just because the manufacturer did not care because
+they target fully I2C-capable systems anyway.
+
+What you have to look at is the transaction types. They are usually
+described in the datasheet. Then compare with either the SMBus
+specification or
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/i2c/smbus-protocol
+and if they match then you can use the i2c_smbus_*() calls.
+
+> (...)
+> Thanks a lot for your help !
+
+You're welcome.
+
+-- 
+Jean Delvare
