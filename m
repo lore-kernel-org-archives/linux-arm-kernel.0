@@ -1,21 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 May 2013 11:03:36 +0200
-Subject: [PATCH 0/3] pinctrl: pinctrl-single: Add full fledge support to
- configure multiple pins of different modules
-In-Reply-To: <1369145282-14419-1-git-send-email-prakash.pm@ti.com>
-References: <1369145282-14419-1-git-send-email-prakash.pm@ti.com>
-Message-ID: <CACRpkdZEsRaaE9dJLDNMzJZSLZ35pqS6XVj5KgCzJGG5nnvPQg@mail.gmail.com>
+Date: Fri, 24 May 2013 11:07:41 +0200
+Subject: [PATCH 4/6] pinctrl: samsung: Add support for SoC-specific
+ suspend/resume callbacks
+In-Reply-To: <1368807872-2601-5-git-send-email-t.figa@samsung.com>
+References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
+ <1368807872-2601-5-git-send-email-t.figa@samsung.com>
+Message-ID: <CACRpkdY-d3YYLJoWydakbT7P4wnBAK2XL7X0Fs0EcNSFakpUDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 4:07 PM, Manjunathappa, Prakash
-<prakash.pm@ti.com> wrote:
+On Fri, May 17, 2013 at 6:24 PM, Tomasz Figa <t.figa@samsung.com> wrote:
 
-> Based function-mask and submask preoperties patch allocates and registers pins.
-> Patch is fixes the issue reported and discussed here:
-> http://www.spinics.net/lists/arm-kernel/msg235213.html
+> SoC-specific driver might require additional save and restore of
+> registers. This patch adds pair of SoC-specific callbacks per pinctrl
+> device to account for this.
+>
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-I'd like Tony to ACK this, and Haojian to have a look at it before applying.
+Patch applied for fixes.
+
+Hm this is quite a lot of code for "fixes", can you confirm that
+the system is really unusable without all these patches?
 
 Yours,
 Linus Walleij
