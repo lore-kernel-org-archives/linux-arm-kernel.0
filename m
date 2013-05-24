@@ -1,9 +1,9 @@
-From: kgene.kim@gmail.com (Kukjin Kim)
-Date: Sat, 25 May 2013 06:46:28 +0900
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 25 May 2013 06:46:46 +0900
 Subject: [PATCH] ARM: SAMSUNG: devs: Add names to fimd0 IRQ resources
 In-Reply-To: <1368630584-30147-1-git-send-email-t.figa@samsung.com>
 References: <1368630584-30147-1-git-send-email-t.figa@samsung.com>
-Message-ID: <519FDFB4.50402@gmail.com>
+Message-ID: <519FDFC6.9010802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
