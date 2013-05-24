@@ -1,39 +1,24 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Thu, 23 May 2013 19:21:17 -0700 (PDT)
-Subject: [PATCH] ARM: mach-shmobile: r8a7790: add SATA support
-In-Reply-To: <878v352kb4.wl%kuninori.morimoto.gx@renesas.com>
-References: <1369361184-20862-1-git-send-email-horms+renesas@verge.net.au>
- <878v352kb4.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <877gip2k4l.wl%kuninori.morimoto.gx@renesas.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 24 May 2013 10:41:53 +0800
+Subject: [PATCH V2 4/6] ARM: dts: imx6q: add pinctrl for WEIM NOR
+In-Reply-To: <1369302906.444557883@f310.mail.ru>
+References: <1369296978-7669-1-git-send-email-b32955@freescale.com>
+ <1369301996.738631947@f310.mail.ru> <519DE6D0.2040909@freescale.com>
+ <1369302906.444557883@f310.mail.ru>
+Message-ID: <519ED371.4060703@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+? 2013?05?23? 17:55, Alexander Shiyan ??:
+>>> How we should define CS1 pin in your example for second device?
+>> But in the imx6q{dl}-sabreauto boards, we only have the NOR connected to
+>> WEIM.
+>> I do not need to worry about the second device.
+> OK, but you add "weim-NOR" to the arch/arm/boot/dts/imx6q.dtsi, not
+> in imx6qdl-sabreauto.dtsi, so you mean that this definition is generic.
+> Should it be moved to imx6qdl-sabreauto.dtsi then?
+okay. I will split out the CS pad to single pinctrl.
 
-Hi Simon
+thanks for your review.
 
-> > +static __init void r8a7790_register_sata1(void)
-> > +{
-> > +
-> > +	struct resource res[] = {
-> > +		DEFINE_RES_MEM_NAMED(0xee300000, 0x200000, "rcar-sata"),
-> > +		DEFINE_RES_IRQ(gic_iid(106)),
-> > +	};
-> > +
-> > +	struct platform_device_info pdevinfo = {
-> > +		.name = "sata_rcar",
-> > +		.id = 1,
-> > +		.res = res,
-> > +		.num_res = ARRAY_SIZE(res),
-> > +		.dma_mask = DMA_BIT_MASK(32),
-> > +	};
-> > +
-> > +	platform_device_register_full(&pdevinfo);
-> > +}
-
-This "using local variable" make sense.
-It don't need "__initdata"
-
-
-Best regards
----
-Kuninori Morimoto
+Huang Shijie
