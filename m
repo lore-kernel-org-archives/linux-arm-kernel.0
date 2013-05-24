@@ -1,47 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 24 May 2013 12:14:19 +0200
-Subject: [PATCHv3 2/6] net: Add MDIO bus driver for the Allwinner EMAC
-In-Reply-To: <CAGVrzcbyXiKCKxtOAj0gnG8eCQag8_xvmd9dUKACCbfW-2HN9Q@mail.gmail.com>
-References: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
- <1369387394-9453-3-git-send-email-maxime.ripard@free-electrons.com>
- <CAGVrzcbyXiKCKxtOAj0gnG8eCQag8_xvmd9dUKACCbfW-2HN9Q@mail.gmail.com>
-Message-ID: <20130524101419.GC8785@lukather>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 24 May 2013 17:59:18 +0800
+Subject: [PATCH v3 0/6] ARM: imx6q{dl}: add the WEIM driver
+Message-ID: <1369389564-13181-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+This patch set adds a new driver for WEIM in the imx6q{dl}-sabreauto boards.
 
-On Fri, May 24, 2013 at 10:42:30AM +0100, Florian Fainelli wrote:
-> Hello Maxime,
-> 
-> 2013/5/24 Maxime Ripard <maxime.ripard@free-electrons.com>
-> >
-> > This patch adds a separate driver for the MDIO interface of the
-> > Allwinner ethernet controllers.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  .../bindings/net/allwinner,sun4i-mdio.txt          |  26 +++
-> >  drivers/net/ethernet/allwinner/Kconfig             |   8 +
-> >  drivers/net/ethernet/allwinner/Makefile            |   1 +
-> >  drivers/net/ethernet/allwinner/sun4i-mdio.c        | 191 +++++++++++++++++++++
-> 
-> Ok, so you probably followed Thomas's example here with mvneta/mvmdio,
-> but all other MDIO bus drivers live in drivers/net/phy.
+The WEIM(Wireless External Interface Module) works like a bus.
+You can attach many different devices on it, such as NOR, onenand.
 
-Indeed I shamelessly followed Thomas here.
+In the case of i.MX6q-sabreauto, only the NOR is connected to WEIM.
 
-> Unfortunately, mvmdio lives in drivers/net/ethernet/marvell/mvmdio.c
-> which I should have noticed before. Whatever is good for you guys, but
-> we should probably start normalizing this now before more mdio drivers
-> get merged alongside their corresponding ethernet MAC users.
+v2 --> v3:
+	[0] split the NOR pinctrl.
+	[1] make the driver unloaded. change to bool type in Kconfig.
+	[2] use the of_platform_populate().
+	[3] remove the unused "interrupt" property from the Doc.
+v1 --> v2:
+	[0] remove used PADs.
+	[1] fix the wrong pad values, (thanks Alison Chaiken)
+	[2] remove the weim-cs-index.
+	[3] add "fsl" for the weim-cs-timing.
+	[4] remove the partitions info in the document.
+	[5] rewrite the drivers(follow Sascha and Shawn's comments)
 
-I'm fine with either way, just tell me where to put it and I'll happily
-do so.
 
-Maxime
+Huang Shijie (6):
+  drivers: bus: add a new driver for WEIM
+  ARM: dts: imx6q{dl}: fix the pin conflict between SPI and WEIM
+  ARM: dts: imx6qdl: add more information for WEIM
+  ARM: dts: imx6q: add pinctrls for WEIM NOR
+  ARM: dts: imx6dl: add pinctrls for WEIM NOR
+  ARM: dts: imx6qdl: enable the WEIM NOR
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+ Documentation/devicetree/bindings/bus/imx-weim.txt |   50 +++++++
+ arch/arm/boot/dts/imx6dl-sabreauto.dts             |    9 +-
+ arch/arm/boot/dts/imx6dl.dtsi                      |   60 +++++++++
+ arch/arm/boot/dts/imx6q-sabreauto.dts              |    9 +-
+ arch/arm/boot/dts/imx6q.dtsi                       |   61 +++++++++
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |   22 +++-
+ arch/arm/boot/dts/imx6qdl.dtsi                     |    4 +-
+ drivers/bus/Kconfig                                |    9 ++
+ drivers/bus/Makefile                               |    1 +
+ drivers/bus/imx-weim.c                             |  139 ++++++++++++++++++++
+ 10 files changed, 360 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/bus/imx-weim.txt
+ create mode 100644 drivers/bus/imx-weim.c
