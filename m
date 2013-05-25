@@ -1,32 +1,24 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 25 May 2013 10:53:36 +0900
-Subject: [PATCH 1/2] ARM: shmobile: r8a7790: implement CPU clock scaling
- for CPUFreq
-In-Reply-To: <20130525013252.GD24005@verge.net.au>
-References: <Pine.LNX.4.64.1305211202380.2863@axis700.grange>
- <20130525013252.GD24005@verge.net.au>
-Message-ID: <20130525015336.GK24005@verge.net.au>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 24 May 2013 23:53:19 -0400 (EDT)
+Subject: [PATCH V4] ARM: handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <20130523104303.GC16722@arm.com>
+References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
+ <20130523104303.GC16722@arm.com>
+Message-ID: <alpine.LFD.2.03.1305242350220.1918@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 25, 2013 at 10:32:53AM +0900, Simon Horman wrote:
-> On Tue, May 21, 2013 at 12:09:53PM +0200, Guennadi Liakhovetski wrote:
-> > This patch adds support for the Z-clock on r8a7790 SoCs, which is driving
-> > the Cortex A15 core. Adding an "operating-points" property to the CPU0 DT
-> > node and a regulator, this patch allows platforms to use the generic
-> > cpufreq-cpu0 driver to use SoC's DVFS capabilities.
-> > 
-> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> > ---
-> > 
-> > Since I cannot use the regulator, supplying the DVFS voltage to the CPU on 
-> > Lager, I only tested this patch without voltage adjustments, but that 
-> > shouldn't matter for this specific change. I did verify, using the 
-> > ondemand CPUFreq governor, that the frequency and the CPU performance 
-> > change, depending on CPU load.
-> 
-> Magnus,
-> 
-> could you please review this series?
+On Thu, 23 May 2013, Catalin Marinas wrote:
 
-I noticed there is a v2 of the series, could you review that instead?
+> An issue is that for kunmap_atomic() && VIVT we flush the same page
+> twice. I don't think we should remove the cache flushing in
+> __kunmap_atomic() for VIVT since not all kunmap_atomic() calls require
+> flush_kernel_dcache_page() (unless we just assume that highmem && vivt
+> don't work together).
+
+VIVT and highmem do work together.  Highmem for ARM was in fact 
+developed on such a platform.
+
+
+Nicolas
