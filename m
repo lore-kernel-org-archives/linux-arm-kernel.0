@@ -1,322 +1,97 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 25 May 2013 11:57:13 -0700
-Subject: [PATCH v4] ARM: sunxi: New watchdog driver for Allwinner A10/A13
-In-Reply-To: <1369499297-855-1-git-send-email-carlo.caione@gmail.com>
-References: <1369499297-855-1-git-send-email-carlo.caione@gmail.com>
-Message-ID: <20130525185713.GA28062@roeck-us.net>
+From: oliver+list@schinagl.nl (Oliver Schinagl)
+Date: Sat, 25 May 2013 21:25:51 +0200
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <20130525122208.GD17847@lukather>
+References: <1368797744-13737-1-git-send-email-oliver+list@schinagl.nl>
+ <1368797744-13737-2-git-send-email-oliver+list@schinagl.nl>
+ <51969EA9.1060602@free-electrons.com> <5197B82F.8010809@schinagl.nl>
+ <519FE0AE.2010102@schinagl.nl> <20130525122208.GD17847@lukather>
+Message-ID: <51A1103F.6000702@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 25, 2013 at 06:28:17PM +0200, Carlo Caione wrote:
-> This patch adds the driver for the watchdog found in the Allwinner A10 and
-> A13 SoCs. It has DT-support and uses the new watchdog framework.
-> 
-> Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
-> ---
->  drivers/watchdog/Kconfig     |  10 ++
->  drivers/watchdog/Makefile    |   1 +
->  drivers/watchdog/sunxi_wdt.c | 226 +++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 237 insertions(+)
->  create mode 100644 drivers/watchdog/sunxi_wdt.c
-> 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index e89fc31..8ad2238 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -299,6 +299,16 @@ config ORION_WATCHDOG
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called orion_wdt.
->  
-> +config SUNXI_WATCHDOG
-> +	tristate "Allwinner SoCs watchdog support"
-> +	depends on ARCH_SUNXI
-> +	select WATCHDOG_CORE
-> +	help
-> +	  Say Y here to include support for the watchdog timer
-> +	  in Allwinner SoCs.
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called sunxi_wdt.
-> +
->  config COH901327_WATCHDOG
->  	bool "ST-Ericsson COH 901 327 watchdog"
->  	depends on ARCH_U300
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index a300b94..5012d5f 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -47,6 +47,7 @@ obj-$(CONFIG_PNX4008_WATCHDOG) += pnx4008_wdt.o
->  obj-$(CONFIG_IOP_WATCHDOG) += iop_wdt.o
->  obj-$(CONFIG_DAVINCI_WATCHDOG) += davinci_wdt.o
->  obj-$(CONFIG_ORION_WATCHDOG) += orion_wdt.o
-> +obj-$(CONFIG_SUNXI_WATCHDOG) += sunxi_wdt.o
->  obj-$(CONFIG_COH901327_WATCHDOG) += coh901327_wdt.o
->  obj-$(CONFIG_STMP3XXX_RTC_WATCHDOG) += stmp3xxx_rtc_wdt.o
->  obj-$(CONFIG_NUC900_WATCHDOG) += nuc900_wdt.o
-> diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
-> new file mode 100644
-> index 0000000..57983c0
-> --- /dev/null
-> +++ b/drivers/watchdog/sunxi_wdt.c
-> @@ -0,0 +1,226 @@
-> +/*
-> + *      sunxi Watchdog Driver
-> + *
-> + *      Copyright (c) 2013 Carlo Caione
-> + *                    2012 Henrik Nordstrom
-> + *
-> + *      This program is free software; you can redistribute it and/or
-> + *      modify it under the terms of the GNU General Public License
-> + *      as published by the Free Software Foundation; either version
-> + *      2 of the License, or (at your option) any later version.
-> + *
-> + *      Based on xen_wdt.c
-> + *      (c) Copyright 2010 Novell, Inc.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/err.h>
-> +#include <linux/init.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/moduleparam.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/types.h>
-> +#include <linux/watchdog.h>
-> +
-> +#define WDT_MAX_TIMEOUT         16
-> +#define WDT_MIN_TIMEOUT         1
-> +#define WDT_MODE_TIMEOUT(n)     ((n) << 3)
-> +#define WDT_TIMEOUT_MASK        WDT_MODE_TIMEOUT(0x0F)
-> +
-> +#define WDT_CTRL                0x00
-> +#define WDT_CTRL_RELOAD         ((1 << 0) | (0x0a57 << 1))
-> +
-> +#define WDT_MODE                0x04
-> +#define WDT_MODE_EN             (1 << 0)
-> +#define WDT_MODE_RST_EN         (1 << 1)
-> +
-> +#define DRV_NAME		"sunxi-wdt"
-> +#define DRV_VERSION		"1.0"
-> +
-> +static bool nowayout = WATCHDOG_NOWAYOUT;
-> +static int heartbeat = WDT_MAX_TIMEOUT;
-> +
-> +/*
-> + * wdt_timeout_map maps the watchdog timer interval value in seconds to
-> + * the value of the register WDT_MODE bit 3:6
-> + *
-> + * [timeout seconds] = register value
-> + *
-> + */
-> +
-> +static const int wdt_timeout_map[] = {
-> +	[1] = 0b0001,  /* 1s  */
-> +	[2] = 0b0010,  /* 2s  */
-> +	[3] = 0b0011,  /* 3s  */
-> +	[4] = 0b0100,  /* 4s  */
-> +	[5] = 0b0101,  /* 5s  */
-> +	[6] = 0b0110,  /* 6s  */
-> +	[8] = 0b0111,  /* 8s  */
-> +	[10] = 0b1000, /* 10s */
-> +	[12] = 0b1001, /* 12s */
-> +	[14] = 0b1010, /* 14s */
-> +	[16] = 0b1011, /* 16s */
-> +};
-> +
-> +static int sunxi_wdt_ping(struct watchdog_device *sunxi_wdt_dev)
-> +{
-> +	void __iomem *wdt_base = watchdog_get_drvdata(sunxi_wdt_dev);
-> +
-> +	iowrite32(WDT_CTRL_RELOAD, wdt_base + WDT_CTRL);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sunxi_wdt_set_timeout(struct watchdog_device *sunxi_wdt_dev,
-> +		unsigned int timeout)
-> +{
-> +	u32 reg;
-> +	int ret = 0;
-> +	void __iomem *wdt_base = watchdog_get_drvdata(sunxi_wdt_dev);
-> +
-> +	if ((timeout > WDT_MAX_TIMEOUT) || (0 == wdt_timeout_map[timeout])) {
+On 05/25/13 14:22, Maxime Ripard wrote:
+> Hi Oliver,
+>
+> On Fri, May 24, 2013 at 11:50:38PM +0200, Oliver Schinagl wrote:
+>> On 05/18/13 19:19, Oliver Schinagl wrote:
+>> <snip>
+>>>>> +
+>>>>> +
+>>>>> +/* We read the entire key, using a look up table. Returned is only the
+>>>>> + * requested byte. This is of course slower then it could be and uses 4 times
+>>>>> + * more reads as needed but keeps code a little simpler.
+>>>>> + */
+>>>>> +u8 sunxi_sid_read_byte(const int key)
+>>>>> +{
+>>>>> +	u32 sid_key;
+>>>>> +	u8 ret;
+>>>>> +
+>>>>> +	ret = 0;
+>>>>> +	if (likely((key <= SUNXI_SID_SIZE))) {
+>>>>> +		sid_key = ioread32(p->sid_base + keys_lut[key >> 2]);
+>>>>> +		switch (key % 4) {
+>>>>> +		case 0:
+>>>>> +			ret = (sid_key >> 24) & 0xff;
+>>>>> +			break;
+>>>>> +		case 1:
+>>>>> +			ret = (sid_key >> 16) & 0xff;
+>>>>> +			break;
+>>>>> +		case 2:
+>>>>> +			ret = (sid_key >> 8) & 0xff;
+>>>>> +			break;
+>>>>> +		case 3:
+>>>>> +			ret = sid_key & 0xff;
+>>>>> +			break;
+>>>>> +		}
+>>>>> +	}
+>>>>
+>>>> Come on, you can do better. This lookup table is useless.
+>>> I didn't want to depend on the fixed layout of memory, but consider it
+>>> removed.
+>> But i'm not smart enough :p
+>>
+>> We can either use the look up table (which does have benefits as its
+>> potentially more future proof), or do some ((key >> 2) << 2) to
+>> 'drop' the LSB's that we want to ignore (unless there's some smarter
+>> way).
+>>
+>> Personally, I think the LUT is a little cleaner and more readable,
+>> but I guess if you look at poor efficiency, the lut costs some
+>> memory, the left/right shift cost an additional >> 2 ... what you
+>> prefer.
+>
+> What about:
+>
+> val = ioread32be(base + (key / 4));
+> val >>= (key % 4) * 8;
+> return val & 0xff;
+>
+> No lookup table, no weird swich statement, and you get the endianness
+> conversion only when you need it.
+Ok I think I like the Endianess, ioread32be does the right thing then? 
+I'll read up on that.
+As for key / 4; how will that work without the lut?
 
-While understand I do that Yoda programming in fashion is, never accept I would.
-Mantainer differently may think, though.
-Extra ( ) only confusing for me is too and no value it adds.
+Lets take byte 14 (out of the available 16). Byte 14 (0x0e) is located 
+in SID_KEY3, so base + 0x0c. We need to write a whole 32bit word to keep 
+with alignment, the registers go wakko if you do unaligned reads. So we 
+need to read the entire 32 bits, then find our byte.
 
-But seriously, I think it is not a good idea to expect the user to find valid
-timeouts. I think it would be much better to select the closest (larger) timeout
-if there is no exact match.
+key / 4 for 14 yields 0x03. So we have base + 0x03, which is not what we 
+want. We want base + 0x0c, which is either ((key >> 2) << 2)) Or, ((key 
+/ 4) * 4)) which to me, are both equally confusing. So we either use the 
+look up table, which is a little cleaner and is a bit more future proof 
+if either a) there's more 'eeprom like' storage which can be combined 
+herein or b) 'a' next version has non-continuing regions. Granted 
+neither is something to worry about right now.
 
-> +		ret = -EINVAL;
-> +		goto exit;
-> +	}
-> +
-> +	sunxi_wdt_dev->timeout = timeout;
-> +
-> +	reg = ioread32(wdt_base + WDT_MODE);
-> +	reg &= ~(WDT_TIMEOUT_MASK);
+Turl already mentioned the calculated shift, instead of the switch. I 
+agree to also like it better and have already rewritten that bit.
 
-Another unnecessary ( )
 
-> +	reg |= WDT_MODE_TIMEOUT(wdt_timeout_map[sunxi_wdt_dev->timeout]);
-> +	iowrite32(reg, wdt_base + WDT_MODE);
-> +
-> +	sunxi_wdt_ping(sunxi_wdt_dev);
-> +
-> +exit:
-> +	return ret;
-> +}
-> +
-> +static int sunxi_wdt_stop(struct watchdog_device *sunxi_wdt_dev)
-> +{
-> +	void __iomem *wdt_base = watchdog_get_drvdata(sunxi_wdt_dev);
-> +
-> +	iowrite32(0, wdt_base + WDT_MODE);
-> +
-> +	return 0;
-> +}
-> +
-> +static int sunxi_wdt_start(struct watchdog_device *sunxi_wdt_dev)
-> +{
-> +	u32 reg;
-> +	int ret = 0;
-> +	void __iomem *wdt_base = watchdog_get_drvdata(sunxi_wdt_dev);
-> +
-> +	ret = sunxi_wdt_set_timeout(sunxi_wdt_dev, sunxi_wdt_dev->timeout);
-> +	if (ret < 0)
-> +		goto exit;
-> +
-> +	reg = ioread32(wdt_base + WDT_MODE);
-> +	reg |= (WDT_MODE_RST_EN | WDT_MODE_EN);
-> +	iowrite32(reg, wdt_base + WDT_MODE);
-> +
-> +exit:
-> +	return ret;
-> +}
-> +
-> +static const struct watchdog_info sunxi_wdt_info = {
-> +	.identity	= DRV_NAME,
-> +	.options	= WDIOF_SETTIMEOUT |
-> +			  WDIOF_KEEPALIVEPING |
-> +			  WDIOF_MAGICCLOSE,
-> +};
-> +
-> +static const struct watchdog_ops sunxi_wdt_ops = {
-> +	.owner		= THIS_MODULE,
-> +	.start		= sunxi_wdt_start,
-> +	.stop		= sunxi_wdt_stop,
-> +	.ping		= sunxi_wdt_ping,
-> +	.set_timeout	= sunxi_wdt_set_timeout,
-> +};
-> +
-> +static struct watchdog_device sunxi_wdt_dev = {
-> +	.info		= &sunxi_wdt_info,
-> +	.ops		= &sunxi_wdt_ops,
-> +	.timeout	= WDT_MAX_TIMEOUT,
-> +	.max_timeout	= WDT_MAX_TIMEOUT,
-> +	.min_timeout	= WDT_MIN_TIMEOUT,
-> +};
-> +
-Wonder what happens if one instantiates this driver twice ?
-
-> +static int __init sunxi_wdt_probe(struct platform_device *pdev)
-> +{
-> +	int err;
-> +	struct resource *res;
-> +	void __iomem *wdt_base;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	wdt_base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(wdt_base)) {
-> +		err = PTR_ERR(wdt_base);
-> +		goto error_mem_out;
-
-Just return the error. No need for a goto to a return statement.
-
-> +	}
-> +
-> +	sunxi_wdt_dev.parent = &pdev->dev;
-> +	watchdog_init_timeout(&sunxi_wdt_dev, heartbeat, &pdev->dev);
-> +	watchdog_set_nowayout(&sunxi_wdt_dev, nowayout);
-> +
-> +	err = watchdog_register_device(&sunxi_wdt_dev);
-> +	if (unlikely(err))
-> +		goto error_wdt;
-> +
-> +	watchdog_set_drvdata(&sunxi_wdt_dev, wdt_base);
-> +
-> +	dev_info(&pdev->dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)",
-> +			sunxi_wdt_dev.timeout, nowayout);
-> +	return 0;
-> +
-> +error_wdt:
-> +	iounmap(wdt_base);
-
-This is no longer needed (and wrong). You'll notice that the entire error path
-is no longer needed, which is the whole point of having devm_ functions.
-
-> +error_mem_out:
-> +	return err;
-> +}
-> +
-> +static int __exit sunxi_wdt_remove(struct platform_device *pdev)
-> +{
-> +	void __iomem *wdt_base = watchdog_get_drvdata(&sunxi_wdt_dev);
-> +
-
-> +	sunxi_wdt_stop(&sunxi_wdt_dev);
-
-Even if nowayout is true ? Wonder how other drivers handle this.
-
-> +	watchdog_unregister_device(&sunxi_wdt_dev);
-> +	iounmap(wdt_base);
-
-Same as above.
-
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id sunxi_wdt_dt_ids[] = {
-> +	{ .compatible = "allwinner,sun4i-wdt" },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, sunxi_wdt_dt_ids);
-> +
-> +static struct platform_driver sunxi_wdt_driver = {
-> +	.probe		= sunxi_wdt_probe,
-> +	.remove		= sunxi_wdt_remove,
-> +	.driver		= {
-> +		.owner		= THIS_MODULE,
-> +		.name		= DRV_NAME,
-> +		.of_match_table	= of_match_ptr(sunxi_wdt_dt_ids)
-> +	},
-> +};
-> +
-> +module_platform_driver(sunxi_wdt_driver);
-> +
-> +module_param(heartbeat, int, 0);
-> +MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds");
-> +
-> +module_param(nowayout, bool, 0);
-> +MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
-> +		"(default=" __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
-> +
-> +MODULE_LICENSE("GPL");
-> +MODULE_AUTHOR("Carlo Caione <carlo.caione@gmail.com>");
-> +MODULE_AUTHOR("Henrik Nordstrom <henrik@henriknordstrom.net>");
-> +MODULE_DESCRIPTION("sunxi WatchDog Timer Driver");
-> +MODULE_VERSION(DRV_VERSION);
-> -- 
-> 1.8.2.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+If I made a really stupid thinking mistake or my math is somehow wrong, 
+feel free to point it out :) I don't mind manning up to my mistakes :)
+>
+> Maxime
+>
