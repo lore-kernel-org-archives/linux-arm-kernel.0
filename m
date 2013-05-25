@@ -1,39 +1,28 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Sat, 25 May 2013 10:24:34 +0900
-Subject: [RFC/PATCH v2 0/2] R-Car GPIO DT bindings
-In-Reply-To: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <20130525012434.GA24005@verge.net.au>
+Date: Sat, 25 May 2013 10:32:53 +0900
+Subject: [PATCH 1/2] ARM: shmobile: r8a7790: implement CPU clock scaling
+ for CPUFreq
+In-Reply-To: <Pine.LNX.4.64.1305211202380.2863@axis700.grange>
+References: <Pine.LNX.4.64.1305211202380.2863@axis700.grange>
+Message-ID: <20130525013252.GD24005@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 01:40:04PM +0200, Laurent Pinchart wrote:
-> Hello,
+On Tue, May 21, 2013 at 12:09:53PM +0200, Guennadi Liakhovetski wrote:
+> This patch adds support for the Z-clock on r8a7790 SoCs, which is driving
+> the Cortex A15 core. Adding an "operating-points" property to the CPU0 DT
+> node and a regulator, this patch allows platforms to use the generic
+> cpufreq-cpu0 driver to use SoC's DVFS capabilities.
 > 
-> Here's the second version of the gpio-rcar driver DT bindings. I've tested the
-> patches on the Marzen board (r8a7779).
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> ---
 > 
-> Once again I'd appreciate feedback on the DT bindings. I'm particularly
-> wondering whether getting the number of lines through the gpio-ranges property
-> instead of using a dedicated #gpio-lines property as in v1 is a good idea.
-> 
-> Changes since v1:
-> 
-> - Initialize the gpiochip dev field at probe time.
-> - Add the gpio-ranges property.
-> - Remove the #gpio-lines property. The number of lines is now passed through
->   the gpio-ranges property.
-> 
-> Laurent Pinchart (2):
->   gpio-rcar: Make the platform data gpio_base field signed
->   gpio-rcar: Add DT support
-> 
->  .../devicetree/bindings/gpio/renesas,gpio-rcar.txt | 52 +++++++++++++++++
->  drivers/gpio/gpio-rcar.c                           | 66 ++++++++++++++++++----
->  include/linux/platform_data/gpio-rcar.h            |  2 +-
->  3 files changed, 109 insertions(+), 11 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+> Since I cannot use the regulator, supplying the DVFS voltage to the CPU on 
+> Lager, I only tested this patch without voltage adjustments, but that 
+> shouldn't matter for this specific change. I did verify, using the 
+> ondemand CPUFreq governor, that the frequency and the CPU performance 
+> change, depending on CPU load.
 
-Hi Magnus,
+Magnus,
 
-could you please review these changes?
+could you please review this series?
