@@ -1,33 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Sat, 25 May 2013 15:42:17 +0900
-Subject: [GIT PULL] Renesas ARM sh73a0 SoC fix for v3.10 (repost)
-Message-ID: <1369464138-21530-1-git-send-email-horms+renesas@verge.net.au>
+Date: Sat, 25 May 2013 15:42:18 +0900
+Subject: [PATCH] ARM: shmobile: sh73a0: Update CMT clockevent rating to 80
+In-Reply-To: <1369464138-21530-1-git-send-email-horms+renesas@verge.net.au>
+References: <1369464138-21530-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1369464138-21530-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ Repost after hopefully resolving a local mail configuration problem ]
+Update the CMT clockevent rating from 125 to 80.
 
-Hi Arnd, Hi Olof,
+This resolves a boot-failure regression for kzm9g-reference in v3.10-rc1
+introduced by f7db706b132f11c79ae1d74b2382e0926cf31644 ("ARM: 7674/1: smp:
+Avoid dummy clockevent being preferred over real").
 
-The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+The patch noted above reduces the rating of dummy clockevent from 400 to 100.
+This patch reduces the rating of CMT so that it is once again less than that
+of the dummy clockevent.
 
-  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-sh73a0-fixes-for-v3.10
-
-for you to fetch changes up to 5f17a516534924d40e6e0a24dcfd06e397a68485:
-
-  ARM: shmobile: sh73a0: Update CMT clockevent rating to 80 (2013-05-22 23:47:48 +0900)
-
-----------------------------------------------------------------
-Update CMT clock rating for sh73a0 SoC to resolve boot failure
-on kzm9g-reference. This resolves a regression between v3.9 and v3.10-rc1.
-
-----------------------------------------------------------------
-Simon Horman (1):
-      ARM: shmobile: sh73a0: Update CMT clockevent rating to 80
-
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/setup-sh73a0.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index fdf3894..9696f36 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -252,7 +252,7 @@ static struct sh_timer_config cmt10_platform_data = {
+ 	.name = "CMT10",
+ 	.channel_offset = 0x10,
+ 	.timer_bit = 0,
+-	.clockevent_rating = 125,
++	.clockevent_rating = 80,
+ 	.clocksource_rating = 125,
+ };
+ 
+-- 
+1.7.10.4
