@@ -1,239 +1,33 @@
-From: dt.tangr@gmail.com (Daniel Tang)
-Date: Sat, 25 May 2013 21:08:07 +1000
-Subject: [RFC PATCHv4 6/6] irqchip: TI-Nspire irqchip support
-In-Reply-To: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
-References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
-Message-ID: <1369480087-24786-7-git-send-email-dt.tangr@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 25 May 2013 19:17:49 +0800
+Subject: clock framework: Don't disable a clock already enabled by boot
+ loader?
+In-Reply-To: <51A0655C.4020309@gmail.com>
+References: <519F60CA.6090302@de.bosch.com>
+ <20130524230021.GF31135@pengutronix.de>
+ <51A05351.7000501@gmail.com>
+ <20130525065434.GA7782@S2101-09.ap.freescale.net>
+ <51A0655C.4020309@gmail.com>
+Message-ID: <20130525111747.GC7782@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the interrupt controller on TI-Nspires.
+On Sat, May 25, 2013 at 09:16:44AM +0200, Dirk Behme wrote:
+> Yes, I know ;) But this is slightly different: In the end it
+> disables the complete clk_disable_unused() call, i.e. for all unused
+> clocks.
+> 
+> I'd like to set the flag CLK_IGNORE_UNUSED for just one clock. I.e.
+> I want to set a flag for an i.MX6 clock, and I want to set it only
+> for one clock.
+> 
+> What's the preferred way to do this?
 
-Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
----
- .../interrupt-controller/lsi,zevio-intc.txt        |  18 +++
- drivers/irqchip/Makefile                           |   1 +
- drivers/irqchip/irq-zevio.c                        | 177 +++++++++++++++++++++
- 3 files changed, 196 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/lsi,zevio-intc.txt
- create mode 100644 drivers/irqchip/irq-zevio.c
+I do not like the idea to set CLK_IGNORE_UNUSED in clock driver on clk
+basis.  If the clk is needed by some driver, why cannot the driver
+enable it using clk API?  Or if the clk is some fundamental one that
+does not clearly belong to particular IP block and no driver wants to
+manage it, we may want to not implement it in clock driver at all and
+just leave it to bootloader to set it up for once.
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/lsi,zevio-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/lsi,zevio-intc.txt
-new file mode 100644
-index 0000000..aee38e7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/lsi,zevio-intc.txt
-@@ -0,0 +1,18 @@
-+TI-NSPIRE interrupt controller
-+
-+Required properties:
-+- compatible: Compatible property value should be "lsi,zevio-intc".
-+
-+- reg: Physical base address of the controller and length of memory mapped
-+	region.
-+
-+- interrupt-controller : Identifies the node as an interrupt controller
-+
-+Example:
-+
-+interrupt-controller {
-+	compatible = "lsi,zevio-intc";
-+	interrupt-controller;
-+	reg = <0xDC000000 0x1000>;
-+	#interrupt-cells = <1>;
-+};
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index cda4cb5..f313d14 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -15,4 +15,5 @@ obj-$(CONFIG_SIRF_IRQ)			+= irq-sirfsoc.o
- obj-$(CONFIG_RENESAS_INTC_IRQPIN)	+= irq-renesas-intc-irqpin.o
- obj-$(CONFIG_RENESAS_IRQC)		+= irq-renesas-irqc.o
- obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
-+obj-$(CONFIG_ARCH_NSPIRE)		+= irq-zevio.o
- obj-$(CONFIG_ARCH_VT8500)		+= irq-vt8500.o
-diff --git a/drivers/irqchip/irq-zevio.c b/drivers/irqchip/irq-zevio.c
-new file mode 100644
-index 0000000..3101c2a
---- /dev/null
-+++ b/drivers/irqchip/irq-zevio.c
-@@ -0,0 +1,177 @@
-+/*
-+ *  linux/drivers/irqchip/irq-nspire-classic.c
-+ *
-+ *  Copyright (C) 2013 Daniel Tang <tangrs@tangrs.id.au>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2, as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/io.h>
-+#include <linux/irq.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+
-+#include <asm/mach/irq.h>
-+#include <asm/exception.h>
-+
-+#include "irqchip.h"
-+
-+#define IO_STATUS	0x000
-+#define IO_RAW_STATUS	0x004
-+#define IO_ENABLE	0x008
-+#define IO_DISABLE	0x00C
-+#define IO_CURRENT	0x020
-+#define IO_RESET	0x028
-+#define IO_MAX_PRIOTY	0x02C
-+
-+#define IO_IRQ_BASE	0x000
-+#define IO_FIQ_BASE	0x100
-+
-+#define IO_INVERT_SEL	0x200
-+#define IO_STICKY_SEL	0x204
-+#define IO_PRIORITY_SEL	0x300
-+
-+#define MAX_INTRS	32
-+#define FIQ_START	MAX_INTRS
-+
-+
-+static void __iomem *irq_io_base;
-+static struct irq_domain *nspire_irq_domain;
-+
-+static void nspire_irq_ack(struct irq_data *irqd)
-+{
-+	void __iomem *base = irq_io_base;
-+
-+	if (irqd->hwirq < FIQ_START)
-+		base += IO_IRQ_BASE;
-+	else
-+		base += IO_FIQ_BASE;
-+
-+	readl(base + IO_RESET);
-+}
-+
-+static void nspire_irq_unmask(struct irq_data *irqd)
-+{
-+	void __iomem *base = irq_io_base;
-+	int irqnr = irqd->hwirq;
-+
-+	if (irqnr < FIQ_START) {
-+		base += IO_IRQ_BASE;
-+	} else {
-+		irqnr -= MAX_INTRS;
-+		base += IO_FIQ_BASE;
-+	}
-+
-+	writel((1<<irqnr), base + IO_ENABLE);
-+}
-+
-+static void nspire_irq_mask(struct irq_data *irqd)
-+{
-+	void __iomem *base = irq_io_base;
-+	int irqnr = irqd->hwirq;
-+
-+	if (irqnr < FIQ_START) {
-+		base += IO_IRQ_BASE;
-+	} else {
-+		irqnr -= FIQ_START;
-+		base += IO_FIQ_BASE;
-+	}
-+
-+	writel((1<<irqnr), base + IO_DISABLE);
-+}
-+
-+static struct irq_chip nspire_irq_chip = {
-+	.name		= "nspire_irq",
-+	.irq_ack	= nspire_irq_ack,
-+	.irq_mask	= nspire_irq_mask,
-+	.irq_unmask	= nspire_irq_unmask,
-+};
-+
-+
-+static int nspire_irq_map(struct irq_domain *dom, unsigned int virq,
-+		irq_hw_number_t hw)
-+{
-+	irq_set_chip_and_handler(virq, &nspire_irq_chip, handle_level_irq);
-+	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
-+
-+	return 0;
-+}
-+
-+static struct irq_domain_ops nspire_irq_ops = {
-+	.map = nspire_irq_map,
-+	.xlate = irq_domain_xlate_onecell,
-+};
-+
-+static void init_base(void __iomem *base)
-+{
-+	/* Disable all interrupts */
-+	writel(~0, base + IO_DISABLE);
-+
-+	/* Accept interrupts of all priorities */
-+	writel(0xF, base + IO_MAX_PRIOTY);
-+
-+	/* Reset existing interrupts */
-+	readl(base + IO_RESET);
-+}
-+
-+static int process_base(void __iomem *base, struct pt_regs *regs)
-+{
-+	int irqnr;
-+
-+
-+	if (!readl(base + IO_STATUS))
-+		return 0;
-+
-+	irqnr = readl(base + IO_CURRENT);
-+	irqnr = irq_find_mapping(nspire_irq_domain, irqnr);
-+	handle_IRQ(irqnr, regs);
-+
-+	return 1;
-+}
-+
-+asmlinkage void __exception_irq_entry nspire_handle_irq(struct pt_regs *regs)
-+{
-+	while (process_base(irq_io_base + IO_FIQ_BASE, regs))
-+		;
-+	while (process_base(irq_io_base + IO_IRQ_BASE, regs))
-+		;
-+}
-+
-+static int __init nspire_of_init(struct device_node *node,
-+				struct device_node *parent)
-+{
-+	if (WARN_ON(irq_io_base))
-+		return -EBUSY;
-+
-+	irq_io_base = of_iomap(node, 0);
-+	BUG_ON(!irq_io_base);
-+
-+	/* Do not invert interrupt status bits */
-+	writel(~0, irq_io_base + IO_INVERT_SEL);
-+
-+	/* Disable sticky interrupts */
-+	writel(0, irq_io_base + IO_STICKY_SEL);
-+
-+	/* We don't use IRQ priorities. Set each IRQ to highest priority. */
-+	memset_io(irq_io_base + IO_PRIORITY_SEL, 0, MAX_INTRS * sizeof(u32));
-+
-+	/* Init IRQ and FIQ */
-+	init_base(irq_io_base + IO_IRQ_BASE);
-+	init_base(irq_io_base + IO_FIQ_BASE);
-+
-+	nspire_irq_domain = irq_domain_add_linear(node, MAX_INTRS,
-+						 &nspire_irq_ops, NULL);
-+
-+	BUG_ON(!nspire_irq_domain);
-+
-+	set_handle_irq(nspire_handle_irq);
-+
-+	pr_info("TI-NSPIRE classic IRQ controller\n");
-+	return 0;
-+}
-+
-+IRQCHIP_DECLARE(nspire_classic_irq, "lsi,zevio-intc", nspire_of_init);
---
-1.8.1.3
+Shawn
