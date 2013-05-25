@@ -1,115 +1,66 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 24 May 2013 17:24:21 -0700
-Subject: [PATCH v2] ARM: DTS: OMAP4: Panda/SDP: twl6030: fix mux for IRQ pin
- and msecure line
-Message-ID: <1369441461-18888-1-git-send-email-khilman@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 25 May 2013 09:39:50 +0900
+Subject: [PATCH 1/2] ARM: shmobile: irqpin: add a DT property to enable
+ masking on parent
+In-Reply-To: <Pine.LNX.4.64.1305241109530.1090@axis700.grange>
+References: <Pine.LNX.4.64.1305241109530.1090@axis700.grange>
+Message-ID: <20130525003950.GA4476@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Earlier commits ensured proper muxing of pins related to proper
-TWL6030 behavior: see commit 265a2bc8 (ARM: OMAP3: TWL4030: ensure
-sys_nirq1 is mux'd and wakeup enabled) and commit 1ef43369 (ARM:
-OMAP4: TWL: mux sys_drm_msecure as output for PMIC).
+On Fri, May 24, 2013 at 11:13:03AM +0200, Guennadi Liakhovetski wrote:
+> To disable spurious interrupts, that get triggered on certain hardware, the
+> irqpin driver masks them on the parent interrupt controller. To specify
+> such broken devices a .control_parent parameter can be provided in the
+> platform data. In the DT case we need a property, to do the same.
+> 
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
+> 
+> These two patches simply split the earlier "ARM: shmobile: irqpin: fix 
+> handling of spurious interrupts in DT case" patch into two parts. 
+> Otherwise no change.
 
-However these only fixed legacy boot and not DT boot.  For DT boot,
-the default mux values need to be set properly in DT.
+Magnus,
 
-Special thanks to Nishanth Menon for the review and catching some
-major flaws in earlier versions.
+could you please review this series?
 
-Tested on OMAP4430/Panda and OMAP4460/Panda-ES.
-
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
-Applies to v3.10-rc2
-
- arch/arm/boot/dts/omap4-panda-common.dtsi | 20 ++++++++++++++++++++
- arch/arm/boot/dts/omap4-sdp.dts           | 20 ++++++++++++++++++++
- 2 files changed, 40 insertions(+)
-
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index 03bd60d..eeb734e 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -56,9 +56,23 @@
- 	};
- };
- 
-+&omap4_pmx_wkup {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+			&twl6030_wkup_pins
-+	>;
-+
-+	twl6030_wkup_pins: pinmux_twl6030_wkup_pins {
-+		pinctrl-single,pins = <
-+			0x14 0x2        /* fref_clk0_out.sys_drm_msecure OUTPUT | MODE2 */
-+		>;
-+	};
-+};
-+
- &omap4_pmx_core {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <
-+			&twl6030_pins
- 			&twl6040_pins
- 			&mcpdm_pins
- 			&mcbsp1_pins
-@@ -66,6 +80,12 @@
- 			&tpd12s015_pins
- 	>;
- 
-+	twl6030_pins: pinmux_twl6030_pins {
-+		pinctrl-single,pins = <
-+			0x15e 0x4118	/* sys_nirq1.sys_nirq1 OMAP_WAKEUP_EN | INPUT_PULLUP | MODE0 */
-+		>;
-+	};
-+
- 	twl6040_pins: pinmux_twl6040_pins {
- 		pinctrl-single,pins = <
- 			0xe0 0x3	/* hdq_sio.gpio_127 OUTPUT | MODE3 */
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index a35d9cd..98505a2 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -142,9 +142,23 @@
- 	};
- };
- 
-+&omap4_pmx_wkup {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <
-+			&twl6030_wkup_pins
-+	>;
-+
-+	twl6030_wkup_pins: pinmux_twl6030_wkup_pins {
-+		pinctrl-single,pins = <
-+			0x14 0x2        /* fref_clk0_out.sys_drm_msecure OUTPUT | MODE2 */
-+		>;
-+	};
-+};
-+
- &omap4_pmx_core {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <
-+			&twl6030_pins
- 			&twl6040_pins
- 			&mcpdm_pins
- 			&dmic_pins
-@@ -179,6 +193,12 @@
- 		>;
- 	};
- 
-+	twl6030_pins: pinmux_twl6030_pins {
-+		pinctrl-single,pins = <
-+			0x15e 0x4118	/* sys_nirq1.sys_nirq1 OMAP_WAKEUP_EN | INPUT_PULLUP | MODE0 */
-+		>;
-+	};
-+
- 	twl6040_pins: pinmux_twl6040_pins {
- 		pinctrl-single,pins = <
- 			0xe0 0x3	/* hdq_sio.gpio_127 OUTPUT | MODE3 */
--- 
-1.8.2
+> 
+>  .../interrupt-controller/renesas,intc-irqpin.txt   |    2 ++
+>  drivers/irqchip/irq-renesas-intc-irqpin.c          |    7 +++++--
+>  2 files changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+> index c6f09b7..152b10a 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+> @@ -11,3 +11,5 @@ Optional properties:
+>    resource allocation properties
+>  - sense-bitfield-width: width of a single sense bitfield in the SENSE register,
+>    if different from the default 4 bits
+> +- control-parent: disable and enable interrupts on the parent interrupt
+> +  controller, needed for some broken implementations
+> diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
+> index 4aca1b2..82cec63 100644
+> --- a/drivers/irqchip/irq-renesas-intc-irqpin.c
+> +++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
+> @@ -348,11 +348,14 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/* deal with driver instance configuration */
+> -	if (pdata)
+> +	if (pdata) {
+>  		memcpy(&p->config, pdata, sizeof(*pdata));
+> -	else
+> +	} else {
+>  		of_property_read_u32(pdev->dev.of_node, "sense-bitfield-width",
+>  				     &p->config.sense_bitfield_width);
+> +		p->config.control_parent = of_property_read_bool(pdev->dev.of_node,
+> +								 "control-parent");
+> +	}
+>  	if (!p->config.sense_bitfield_width)
+>  		p->config.sense_bitfield_width = 4; /* default to 4 bits */
+>  
+> -- 
+> 1.7.2.5
+> 
