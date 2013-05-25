@@ -1,49 +1,100 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 25 May 2013 22:08:35 +0400
-Subject: [PATCH v2] ARM: shmobile: BOCK-W: add Ether support
-In-Reply-To: <20130525053007.GA9293@verge.net.au>
-References: <201305170141.59791.sergei.shtylyov@cogentembedded.com>
- <20130525053007.GA9293@verge.net.au>
-Message-ID: <51A0FE23.4090206@cogentembedded.com>
+Date: Sat, 25 May 2013 22:32:57 +0400
+Subject: [PATCH] ARM: mach-shmobile: r8a7790: add SATA support
+In-Reply-To: <20130525010309.GG4476@verge.net.au>
+References: <1369361184-20862-1-git-send-email-horms+renesas@verge.net.au>
+ <519F72F8.1000204@cogentembedded.com> <20130525010309.GG4476@verge.net.au>
+Message-ID: <51A103D9.4080600@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 25-05-2013 9:30, Simon Horman wrote:
+On 25-05-2013 5:03, Simon Horman wrote:
 
->> Register Ether device from bockw_init(), passing the platform data to it, adding
->> only the RMII pin group to bockw_pinctrl_map[].  Although the LINK signal exists
->> on the board, it's connected to the link/activity LED  output of the PHY, thus
->> the link disappears and reappears after each packet. We'd be better off ignoring
->> such signal and getting the link state from the PHY indirectly.
+>>> Add SATA clock for r8a7790 SoC (for both device tree and usual cases).
 
->> Also, Ether has pin conflict with VIN1, so the latter is not registered when the
->> 'sh_eth' driver is enabled now.
+>>      I don't see where you are adding clock for device tree case.
 
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>> Register SATA controller as a "late" platform device on r8a7790 SoC.
+
+>>      Does R8A7790 have these "early" and "late" lists? I guess not.
+
+>>> Based on "ARM: mach-shmobile: r8a7779: add SATA support" by
+>>> Vladimir Barinov.
+
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>> ---
+>>>   arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
+>>>   arch/arm/mach-shmobile/setup-r8a7790.c | 21 +++++++++++++++++++++
+>>>   2 files changed, 25 insertions(+)
+
+>>> diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+>>> index b393592..3619a52 100644
+>>> --- a/arch/arm/mach-shmobile/clock-r8a7790.c
+>>> +++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+>> [...]
+>>> @@ -249,6 +252,7 @@ static struct clk_lookup lookups[] = {
+>>>   	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP202]),
+>>>   	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP721]),
+>>>   	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
+>>> +	CLKDEV_DEV_ID("sata_rcar.1", &mstp_clks[MSTP814]),
+>>>   };
+>>>
+>>>   #define R8A7790_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
+>>> diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+>>> index ed7ee24..5a2a073 100644
+>>> --- a/arch/arm/mach-shmobile/setup-r8a7790.c
+>>> +++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+>> [...]
+>>> @@ -118,6 +119,25 @@ static inline void r8a7790_register_scif(int idx)
+>>>   				      sizeof(struct plat_sci_port));
+>>>   }
+
+>>> +static __init void r8a7790_register_sata1(void)
+
+>>     What's with SATA0?
+
+>>> +{
+>>> +
+>>> +	struct resource res[] = {
+
+>>     Non-static variable with an intializer? Won't this be a waste of
+>> code? Wouldn't it be better to have it static __initdata?
+
+> Sure, if you prefer that.
+
+    I don't know exactly what gcc will generate for the intializers but 
+expect nothing particularly good. The static intialized data should 
+definitely take up less space.
+
 >>
->> ---
->> The patch is atop of Simon's 'renesas.git' repo, 'renesas-next-20130515v2' tag
->> and my recent yet unapplied patches.
+>>> +		DEFINE_RES_MEM_NAMED(0xee300000, 0x200000, "rcar-sata"),
 
->> Note that it's compile and run time dependent on the current Linus' tree.
+>>      2 megabytes? Won't it be a waste of memory?
 
->> Changes from the original posting:
->> - refreshed the patch.
+> 2 megabytes is specified in the data sheet.
+> Do you think it is reasonable to use a smaller value?
 
-> Thanks, would it be possible for you to rebase it on top of
-> renesas-next-20130523.
+    We used 0x2000 for R8A7779 SATA device -- it should be enough to 
+cover all the registers.
 
-    You mean to base it on this tag without any intervening patches (it 
-is now on top of my patch series)? Anyway, I'll rebase my whole series 
-on this tag as I have time (I'm now working with the SATA driver to try 
-to add to it NCQ support and fixing errors I encounter on the way).
+>>> +		DEFINE_RES_IRQ(gic_iid(106)),
+>>> +	};
+>>> +
+>>> +	struct platform_device_info pdevinfo = {
 
-> renesas-next-20130523 is based on v3.10-rc2, so I think it should
-> have whatever dependencies that were in Linus's tree at the time
-> that you posted this patch.
+>>     Same comment about non-static initialized structure...
 
-     Yes, correct.
+>>> +		.name = "sata_rcar",
+>>> +		.id = 1,
+>>> +		.res = res,
+>>> +		.num_res = ARRAY_SIZE(res),
+>>> +		.dma_mask = DMA_BIT_MASK(32),
+>>> +	};
+>>> +
+>>> +	platform_device_register_full(&pdevinfo);
+>>> +}
+>>> +
 
 WBR, Sergei
