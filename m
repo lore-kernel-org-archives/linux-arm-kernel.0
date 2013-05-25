@@ -1,82 +1,73 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 25 May 2013 22:05:57 +0200
-Subject: [PATCH v2] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
-In-Reply-To: <1369467542-25519-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1369467542-25519-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20130525200557.GO24476@game.jcrosoft.org>
+From: adam@baker-net.org.uk (Adam Baker)
+Date: Sat, 25 May 2013 22:32:04 +0100
+Subject: Kirkwood CPU Freq driver
+Message-ID: <51A12DD4.9010907@baker-net.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09:39 Sat 25 May     , Alexandre Belloni wrote:
-> Fixes:
-> arch/arm/mach-at91/built-in.o: In function `ksz9021rn_phy_fixup':
-> :(.text+0x1174): undefined reference to `mdiobus_write'
-> :(.text+0x1188): undefined reference to `mdiobus_write'
-> :(.text+0x119c): undefined reference to `mdiobus_write'
-> :(.text+0x11b0): undefined reference to `mdiobus_write'
-> arch/arm/mach-at91/built-in.o: In function `sama5_dt_device_init':
-> :(.init.text+0x1e34): undefined reference to `phy_register_fixup_for_uid'
-> 
-> when CONFIG_PHYLIB is not selected.
-> ---
-> Changes in v2:
-> 	use IS_BUILTIN
-> 	use CONFIG_PHYLIB and not CONFIG_PHY
-> 
+Hi,
 
-I do not like this, I prefer we just drop the fixup by adding the dt support
-to the micrel phy as done for broadcom
+I've been trying to test Andrew Lunn's work creating a CPU Idle driver 
+for Kirkwood. The first problem I encountered was that somehow in 
+merging the patch the ARCH_HAS_CPUFREQ line appears to have got lost in 
+arch/arm/Kconfig so I put that back (this may not be an issue if you 
+build a multiarch kernel but I was targetting just Kirkwood)
 
-if !PHYLIB just add an inline declaration of 
-phy_register_fixup_for_uid
+--- a/arch/arm/Kconfig	2013-05-24 19:45:59.000000000 +0100
++++ b/arch/arm/Kconfig	2013-05-17 19:58:21.000000000 +0100
+@@ -567,6 +567,7 @@ config ARCH_DOVE
 
-so gcc will drop ksz9021rn_phy_fixup automatically
+  config ARCH_KIRKWOOD
+  	bool "Marvell Kirkwood"
++	select ARCH_HAS_CPUFREQ
+  	select ARCH_REQUIRE_GPIOLIB
+  	select CPU_FEROCEON
+  	select GENERIC_CLOCKEVENTS
 
-Best Regards,
-J.
-> 
->  arch/arm/mach-at91/board-dt-sama5.c | 22 ++++++++++++----------
->  1 file changed, 12 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
-> index 705305e..e9ce541 100644
-> --- a/arch/arm/mach-at91/board-dt-sama5.c
-> +++ b/arch/arm/mach-at91/board-dt-sama5.c
-> @@ -47,22 +47,24 @@ static int ksz9021rn_phy_fixup(struct phy_device *phy)
->  #define GMII_ERCR	11
->  #define GMII_ERDWR	12
->  
-> -	/* Set delay values */
-> -	value = GMII_RCCPSR | 0x8000;
-> -	phy_write(phy, GMII_ERCR, value);
-> -	value = 0xF2F4;
-> -	phy_write(phy, GMII_ERDWR, value);
-> -	value = GMII_RRDPSR | 0x8000;
-> -	phy_write(phy, GMII_ERCR, value);
-> -	value = 0x2222;
-> -	phy_write(phy, GMII_ERDWR, value);
-> +	if (IS_BUILTIN(CONFIG_PHYLIB)) {
-> +		/* Set delay values */
-> +		value = GMII_RCCPSR | 0x8000;
-> +		phy_write(phy, GMII_ERCR, value);
-> +		value = 0xF2F4;
-> +		phy_write(phy, GMII_ERDWR, value);
-> +		value = GMII_RRDPSR | 0x8000;
-> +		phy_write(phy, GMII_ERCR, value);
-> +		value = 0x2222;
-> +		phy_write(phy, GMII_ERDWR, value);
-> +	}
->  
->  	return 0;
->  }
->  
->  static void __init sama5_dt_device_init(void)
->  {
-> -	if (of_machine_is_compatible("atmel,sama5d3xcm"))
-> +	if (of_machine_is_compatible("atmel,sama5d3xcm") && IS_BUILTIN(CONFIG_PHYLIB))
->  		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
->  			ksz9021rn_phy_fixup);
->  
-> -- 
-> 1.8.1.2
-> 
+Then I saw that the driver needs a cpu definition and none of the 
+kirkwood dts files provide one. I believe all kirkwood SoCs are 
+uniprocessor so I created an entry in kirkwood.dtsi
+
+--- a/arch/arm/boot/dts/kirkwood.dtsi	2013-05-19 22:57:07.000000000 +0100
++++ b/arch/arm/boot/dts/kirkwood.dtsi	2013-05-19 23:10:32.000000000 +0100
+@@ -4,6 +4,18 @@
+  	compatible = "marvell,kirkwood";
+  	interrupt-parent = <&intc>;
+
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++		      device_type = "cpu";
++		      compatible = "marvell,feroceon";
++		      clocks = <&core_clk 1>, <&core_clk 3>, <&gate_clk 11>;
++		      clock-names = "cpu_clk", "ddrclk", "powersave";
++		};
++	};
++
+  	aliases {
+  	       gpio0 = &gpio0;
+  	       gpio1 = &gpio1;
+
+(Yes I know Thunderbird has mangled the wordwrap in the patch but as I'm 
+only providing it as a description of what I did not to be applied I 
+won't beat it into submission this time)
+
+As nothing seems to depend upon it I went with the CPU compatible type 
+as defined in Documentation/devicetree/bindings/arm/cpus.txt rather than 
+the marvell,sheeva-88SV131 in 
+Documentation/devicetree/bindings/arm/kirkwood.txt
+
+I tried putting some debug code in kirkwood_cpufreq_probe() and it 
+doesn't appear to be getting called.
+
+Have I
+
+a) misunderstood what kirkwood variants this driver is supposed to work with
+b) manged my CPU definition so it doesn't work
+or c) missed some other critical configuration step?
+
+Many thanks
+
+Adam
