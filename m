@@ -1,22 +1,27 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sat, 25 May 2013 05:22:40 -0700
-Subject: [PATCH] module: use a macro instead of platform_driver_register
-In-Reply-To: <51A040D2.20708@huawei.com>
-References: <51A040D2.20708@huawei.com>
-Message-ID: <20130525122240.GC3746@kroah.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sat, 25 May 2013 15:36:18 +0200
+Subject: [PATCH 00/21] ARM: kirkwood: improve pinmux configs in Device Tree
+In-Reply-To: <20130524183310.GA31290@titan.lakedaemon.net>
+References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130524183310.GA31290@titan.lakedaemon.net>
+Message-ID: <20130525153618.3a4fbc7b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 25, 2013 at 12:40:50PM +0800, Libo Chen wrote:
+Dear Jason Cooper,
+
+On Fri, 24 May 2013 14:33:10 -0400, Jason Cooper wrote:
+
+> >  27 files changed, 235 insertions(+), 240 deletions(-)
 > 
-> I found a lot of mistakes using struct platform_driver without owner
-> so I make a macro instead of the function platform_driver_register.
-> It can set owner in it, then guys don`t care about module owner again.
-> 
-> Signed-off-by: Libo Chen <libo.chen@huawei.com>
+> Whole series applied to mvebu/dt with one small change, s/affect/move/
+> on the Subjects.
 
-Nice job, that's the better way to fix this, I'll queue it up for 3.11.
+Ok, thanks!
 
-thanks,
-
-greg k-h
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
