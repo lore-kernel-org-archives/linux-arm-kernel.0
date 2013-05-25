@@ -1,73 +1,57 @@
-From: adam@baker-net.org.uk (Adam Baker)
-Date: Sat, 25 May 2013 22:32:04 +0100
-Subject: Kirkwood CPU Freq driver
-Message-ID: <51A12DD4.9010907@baker-net.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Sun, 26 May 2013 08:22:57 +0900
+Subject: [PATCH v2] ARM: shmobile: BOCK-W: add Ether support
+In-Reply-To: <51A0FE23.4090206@cogentembedded.com>
+References: <201305170141.59791.sergei.shtylyov@cogentembedded.com>
+ <20130525053007.GA9293@verge.net.au>
+ <51A0FE23.4090206@cogentembedded.com>
+Message-ID: <20130525232257.GA24131@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, May 25, 2013 at 10:08:35PM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+> On 25-05-2013 9:30, Simon Horman wrote:
+> 
+> >>Register Ether device from bockw_init(), passing the platform data to it, adding
+> >>only the RMII pin group to bockw_pinctrl_map[].  Although the LINK signal exists
+> >>on the board, it's connected to the link/activity LED  output of the PHY, thus
+> >>the link disappears and reappears after each packet. We'd be better off ignoring
+> >>such signal and getting the link state from the PHY indirectly.
+> 
+> >>Also, Ether has pin conflict with VIN1, so the latter is not registered when the
+> >>'sh_eth' driver is enabled now.
+> 
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>
+> >>---
+> >>The patch is atop of Simon's 'renesas.git' repo, 'renesas-next-20130515v2' tag
+> >>and my recent yet unapplied patches.
+> 
+> >>Note that it's compile and run time dependent on the current Linus' tree.
+> 
+> >>Changes from the original posting:
+> >>- refreshed the patch.
+> 
+> >Thanks, would it be possible for you to rebase it on top of
+> >renesas-next-20130523.
+> 
+>    You mean to base it on this tag without any intervening patches
+> (it is now on top of my patch series)? Anyway, I'll rebase my whole
+> series on this tag as I have time (I'm now working with the SATA
+> driver to try to add to it NCQ support and fixing errors I encounter
+> on the way).
 
-I've been trying to test Andrew Lunn's work creating a CPU Idle driver 
-for Kirkwood. The first problem I encountered was that somehow in 
-merging the patch the ARCH_HAS_CPUFREQ line appears to have got lost in 
-arch/arm/Kconfig so I put that back (this may not be an issue if you 
-build a multiarch kernel but I was targetting just Kirkwood)
+In general I would prefer for you to post patches that are based on my tree
+without any intervening patches as it makes it significantly easier for me
+to apply them.
 
---- a/arch/arm/Kconfig	2013-05-24 19:45:59.000000000 +0100
-+++ b/arch/arm/Kconfig	2013-05-17 19:58:21.000000000 +0100
-@@ -567,6 +567,7 @@ config ARCH_DOVE
-
-  config ARCH_KIRKWOOD
-  	bool "Marvell Kirkwood"
-+	select ARCH_HAS_CPUFREQ
-  	select ARCH_REQUIRE_GPIOLIB
-  	select CPU_FEROCEON
-  	select GENERIC_CLOCKEVENTS
-
-Then I saw that the driver needs a cpu definition and none of the 
-kirkwood dts files provide one. I believe all kirkwood SoCs are 
-uniprocessor so I created an entry in kirkwood.dtsi
-
---- a/arch/arm/boot/dts/kirkwood.dtsi	2013-05-19 22:57:07.000000000 +0100
-+++ b/arch/arm/boot/dts/kirkwood.dtsi	2013-05-19 23:10:32.000000000 +0100
-@@ -4,6 +4,18 @@
-  	compatible = "marvell,kirkwood";
-  	interrupt-parent = <&intc>;
-
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+		      device_type = "cpu";
-+		      compatible = "marvell,feroceon";
-+		      clocks = <&core_clk 1>, <&core_clk 3>, <&gate_clk 11>;
-+		      clock-names = "cpu_clk", "ddrclk", "powersave";
-+		};
-+	};
-+
-  	aliases {
-  	       gpio0 = &gpio0;
-  	       gpio1 = &gpio1;
-
-(Yes I know Thunderbird has mangled the wordwrap in the patch but as I'm 
-only providing it as a description of what I did not to be applied I 
-won't beat it into submission this time)
-
-As nothing seems to depend upon it I went with the CPU compatible type 
-as defined in Documentation/devicetree/bindings/arm/cpus.txt rather than 
-the marvell,sheeva-88SV131 in 
-Documentation/devicetree/bindings/arm/kirkwood.txt
-
-I tried putting some debug code in kirkwood_cpufreq_probe() and it 
-doesn't appear to be getting called.
-
-Have I
-
-a) misunderstood what kirkwood variants this driver is supposed to work with
-b) manged my CPU definition so it doesn't work
-or c) missed some other critical configuration step?
-
-Many thanks
-
-Adam
+> >renesas-next-20130523 is based on v3.10-rc2, so I think it should
+> >have whatever dependencies that were in Linus's tree at the time
+> >that you posted this patch.
+> 
+>     Yes, correct.
+> 
+> WBR, Sergei
+> 
