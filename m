@@ -1,96 +1,36 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Sat, 25 May 2013 10:03:09 +0900
-Subject: [PATCH] ARM: mach-shmobile: r8a7790: add SATA support
-In-Reply-To: <519F72F8.1000204@cogentembedded.com>
-References: <1369361184-20862-1-git-send-email-horms+renesas@verge.net.au>
- <519F72F8.1000204@cogentembedded.com>
-Message-ID: <20130525010309.GG4476@verge.net.au>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Fri, 24 May 2013 18:12:00 -0700
+Subject: [v2] ARM: mm: Get rid of L_PTE_USER ref from PAGE_S2_DEVICE
+Message-ID: <1369444320-28893-1-git-send-email-cdall@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 06:02:32PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 24-05-2013 6:06, Simon Horman wrote:
-> 
-> >Add SATA clock for r8a7790 SoC (for both device tree and usual cases).
-> 
->     I don't see where you are adding clock for device tree case.
-> 
-> >Register SATA controller as a "late" platform device on r8a7790 SoC.
-> 
->     Does R8A7790 have these "early" and "late" lists? I guess not.
-> 
-> >Based on "ARM: mach-shmobile: r8a7779: add SATA support" by
-> >Vladimir Barinov.
-> 
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >---
-> >  arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
-> >  arch/arm/mach-shmobile/setup-r8a7790.c | 21 +++++++++++++++++++++
-> >  2 files changed, 25 insertions(+)
-> 
-> >diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-> >index b393592..3619a52 100644
-> >--- a/arch/arm/mach-shmobile/clock-r8a7790.c
-> >+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-> [...]
-> >@@ -249,6 +252,7 @@ static struct clk_lookup lookups[] = {
-> >  	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP202]),
-> >  	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP721]),
-> >  	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
-> >+	CLKDEV_DEV_ID("sata_rcar.1", &mstp_clks[MSTP814]),
-> >  };
-> >
-> >  #define R8A7790_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
-> >diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-> >index ed7ee24..5a2a073 100644
-> >--- a/arch/arm/mach-shmobile/setup-r8a7790.c
-> >+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-> [...]
-> >@@ -118,6 +119,25 @@ static inline void r8a7790_register_scif(int idx)
-> >  				      sizeof(struct plat_sci_port));
-> >  }
-> >
-> >+static __init void r8a7790_register_sata1(void)
-> 
->    What's with SATA0?
-> 
-> >+{
-> >+
-> >+	struct resource res[] = {
-> 
->    Non-static variable with an intializer? Won't this be a waste of
-> code? Wouldn't it be better to have it static __initdata?
+THe L_PTE_USER actually has nothing to do with stage 2 mappings and the
+L_PTE_S2_RDWR value sets the readable bit, which was what L_PTE_USER
+was used for before proper handling of stage 2 memory defines.
 
-Sure, if you prefer that.
+Changelog:
+ [v2]: Change default mappings to be r/w instead of r/o, as per Marc
+       Zyngier's suggestion.
 
-> 
-> >+		DEFINE_RES_MEM_NAMED(0xee300000, 0x200000, "rcar-sata"),
-> 
->     2 megabytes? Won't it be a waste of memory?
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
+---
+ arch/arm/include/asm/pgtable.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-2 megabytes is specified in the data sheet.
-Do you think it is reasonable to use a smaller value?
-
-> 
-> >+		DEFINE_RES_IRQ(gic_iid(106)),
-> >+	};
-> >+
-> >+	struct platform_device_info pdevinfo = {
-> 
->    Same comment about non-static initialized structure...
-> 
-> >+		.name = "sata_rcar",
-> >+		.id = 1,
-> >+		.res = res,
-> >+		.num_res = ARRAY_SIZE(res),
-> >+		.dma_mask = DMA_BIT_MASK(32),
-> >+	};
-> >+
-> >+	platform_device_register_full(&pdevinfo);
-> >+}
-> >+
-> 
-> WBR, Sergei
-> 
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 9bcd262..8afc60c 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -97,7 +97,7 @@ extern pgprot_t		pgprot_s2_device;
+ #define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
+ #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+ #define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
+-#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_USER | L_PTE_S2_RDONLY)
++#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_S2_RDWR)
+ 
+ #define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN | L_PTE_NONE)
+ #define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
+-- 
+1.7.9.5
