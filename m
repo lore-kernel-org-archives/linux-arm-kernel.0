@@ -1,65 +1,33 @@
-From: dirk.behme@gmail.com (Dirk Behme)
-Date: Sat, 25 May 2013 07:59:45 +0200
-Subject: clock framework: Don't disable a clock already enabled by boot
- loader?
-In-Reply-To: <20130524230021.GF31135@pengutronix.de>
-References: <519F60CA.6090302@de.bosch.com>
- <20130524230021.GF31135@pengutronix.de>
-Message-ID: <51A05351.7000501@gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Sat, 25 May 2013 15:42:17 +0900
+Subject: [GIT PULL] Renesas ARM sh73a0 SoC fix for v3.10 (repost)
+Message-ID: <1369464138-21530-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+[ Repost after hopefully resolving a local mail configuration problem ]
 
-Am 25.05.2013 01:00, schrieb Sascha Hauer:
-> Hi Dirk,
->
-> On Fri, May 24, 2013 at 02:44:58PM +0200, Dirk Behme wrote:
->> Hi,
->>
->> we register a clock using clk_register_clkdev() etc already enabled
->> by a boot loader. We are doing only the clk_register_clkdev(), but
->> no clock_enable() etc on this clock.
->>
->> With this, enable_count for this clock is zero, while in fact it's
->> already on. I.e. the kernel doesn't know that it is on.
->>
->> This results in
->>
->> late_initcall(clk_disable_unused())
->>
->> disabling this clock because the kernel thinks it's unused.
->>
->> Is this the intended behavior?
->
-> Yes, and it's great since after this point the hardware state is in sync
-> with the enable counter.
->
->> Is there a way to let the kernel know
->> "the clock is enabled already, set enable_count != 0"? Or is the
->> only way to do this correctly calling clock_enable() on an already
->> enabled clock?
->
-> You could set the CLK_IGNORE_UNUSED flag in the clock, but I suggest to
-> just clk_get/clk_enable the clock in the driver using it.
+Hi Arnd, Hi Olof,
 
-Thanks for the fast answer! :)
+The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
 
-Hmm, but what's the best way to set a flag in
+  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
 
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/mach-imx/clk-imx6q.c
+are available in the git repository at:
 
-?
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-sh73a0-fixes-for-v3.10
 
-In mx6q_clocks_init() there doesn't seem to be an explicit interface 
-to set the flags?
+for you to fetch changes up to 5f17a516534924d40e6e0a24dcfd06e397a68485:
 
-I'm not sure if
+  ARM: shmobile: sh73a0: Update CMT clockevent rating to 80 (2013-05-22 23:47:48 +0900)
 
-clk[xxx]->flags |= CLK_IGNORE_UNUSED;
+----------------------------------------------------------------
+Update CMT clock rating for sh73a0 SoC to resolve boot failure
+on kzm9g-reference. This resolves a regression between v3.9 and v3.10-rc1.
 
-is the way to go?
+----------------------------------------------------------------
+Simon Horman (1):
+      ARM: shmobile: sh73a0: Update CMT clockevent rating to 80
 
-Best regards
-
-Dirk
+ arch/arm/mach-shmobile/setup-sh73a0.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
