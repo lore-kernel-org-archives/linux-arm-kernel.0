@@ -1,60 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 26 May 2013 22:32:45 +0200
-Subject: [GIT PULL] Nomadik clocks from device tree
-In-Reply-To: <CACRpkdY8xqi04cf-SJ69QvHr8qB6itqvgxMyNk+=Xrtz2FGVaA@mail.gmail.com>
-References: <CACRpkdY8xqi04cf-SJ69QvHr8qB6itqvgxMyNk+=Xrtz2FGVaA@mail.gmail.com>
-Message-ID: <CACRpkdaKtxKS0=1UOKJPQWKShRm2nHsUWSK5M+qSR6duXfGrxw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Sat, 25 May 2013 16:10:32 -0400
+Subject: [PATCH] i2c: sirf: move driver init from module_init to
+ subsys_initcall
+In-Reply-To: <CAGsJ_4zVOF8-g=emEGgP3atxkWdxMaQQiVZrZkht_WueTriSnw@mail.gmail.com>
+References: <1368672607-5536-1-git-send-email-Baohua.Song@csr.com>
+ <20130516093846.GA2927@katana>
+ <CAGsJ_4zVOF8-g=emEGgP3atxkWdxMaQQiVZrZkht_WueTriSnw@mail.gmail.com>
+Message-ID: <20130525201032.GD32043@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC people,
+On Thu, May 16, 2013 at 06:25:39PM +0800, Barry Song wrote:
+> 2013/5/16 Wolfram Sang <wsa@the-dreams.de>:
 
-I have accumulated more Nomadik patches so I'm reiterating this
-pull request with two new patches on top.
+> > What about deferred probing?
 
-Please pull them in for v3.11!
+> deferred probing could work but could not work for automative.
+> what we really want is that devices begin to work as early as
+> possible. we want i2c clients like lcd, camera begin to show images as
+> early as possible as an automative requirement.
 
-Yours,
-Linus Walleij
+Probe deferral should have at most a mimimal impact on the boot time -
+it's pretty much just changing the order providing the probe functions
+aren't excessively slow to defer.  If the probe functions are taking a
+long time to defer that's probably what needs looking at.
 
-
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
-
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
-tags/nomadik-dt-for-arm-soc
-
-for you to fetch changes up to 49932f5ef13fa6a5a8bd71cf2f0b721d0e0b495d:
-
-  ARM: nomadik: move the pin configuration to DT (2013-05-26 22:25:36 +0200)
-
-----------------------------------------------------------------
-Device tree patches for the Nomadik machine:
-- Move clock registration to the device tree
-- Support probing the MTU timer from the device tree
-- Register user LED and user key in the device tree
-- Update defconfig to account for user LED and user key
-- Move pin control mappings to the device tree
-
-----------------------------------------------------------------
-Linus Walleij (4):
-      ARM: nomadik: convert all clocks except timer to dt
-      ARM: nomadik: register clocksource from device tree
-      ARM: nomadik: add led and key for S8815
-      ARM: nomadik: move the pin configuration to DT
-
-Rabin Vincent (1):
-      clocksource: nomadik-mtu: support of probe
-
- .../devicetree/bindings/arm/ste-nomadik.txt        |   5 +
- arch/arm/boot/dts/ste-nomadik-s8815.dts            |  63 +++++++++
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi         | 145 ++++++++++++++++++++-
- arch/arm/configs/nhk8815_defconfig                 |   6 +
- arch/arm/mach-nomadik/Kconfig                      |   1 +
- arch/arm/mach-nomadik/cpu-8815.c                   |  73 +----------
- drivers/clk/clk-nomadik.c                          |  41 +-----
- drivers/clocksource/nomadik-mtu.c                  |  70 ++++++++--
- 8 files changed, 288 insertions(+), 116 deletions(-)
+If it really is probe deferral itself that's too slow then we ought to
+be looking at improving that rather than boding around it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130525/841929cb/attachment.sig>
