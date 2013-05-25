@@ -1,7 +1,7 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Fri, 24 May 2013 18:12:00 -0700
-Subject: [v2] ARM: mm: Get rid of L_PTE_USER ref from PAGE_S2_DEVICE
-Message-ID: <1369444320-28893-1-git-send-email-cdall@cs.columbia.edu>
+Date: Fri, 24 May 2013 18:12:39 -0700
+Subject: [PATCH v2] ARM: mm: Get rid of L_PTE_USER ref from PAGE_S2_DEVICE
+Message-ID: <1369444359-28962-1-git-send-email-cdall@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
