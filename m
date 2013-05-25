@@ -1,68 +1,36 @@
-From: clbchenlibo.chen@huawei.com (Libo Chen)
-Date: Sat, 25 May 2013 12:40:50 +0800
-Subject: [PATCH] module: use a macro instead of platform_driver_register
-Message-ID: <51A040D2.20708@huawei.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 25 May 2013 14:30:10 +0900
+Subject: [PATCH v2] ARM: shmobile: BOCK-W: add Ether support
+In-Reply-To: <201305170141.59791.sergei.shtylyov@cogentembedded.com>
+References: <201305170141.59791.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130525053007.GA9293@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, May 17, 2013 at 01:41:59AM +0400, Sergei Shtylyov wrote:
+> Register Ether device from bockw_init(), passing the platform data to it, adding
+> only the RMII pin group to bockw_pinctrl_map[].  Although the LINK signal exists
+> on the board, it's connected to the link/activity LED  output of the PHY, thus
+> the link disappears and reappears after each packet. We'd be better off ignoring
+> such signal and getting the link state from the PHY indirectly.
+> 
+> Also, Ether has pin conflict with VIN1, so the latter is not registered when the
+> 'sh_eth' driver is enabled now.
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> ---
+> The patch is atop of Simon's 'renesas.git' repo, 'renesas-next-20130515v2' tag
+> and my recent yet unapplied patches.
+> 
+> Note that it's compile and run time dependent on the current Linus' tree. 
+> 
+> Changes from the original posting:
+> - refreshed the patch.
 
-I found a lot of mistakes using struct platform_driver without owner
-so I make a macro instead of the function platform_driver_register.
-It can set owner in it, then guys don`t care about module owner again.
+Thanks, would it be possible for you to rebase it on top of
+renesas-next-20130523.
 
-Signed-off-by: Libo Chen <libo.chen@huawei.com>
----
- drivers/base/platform.c         |    8 +++++---
- include/linux/platform_device.h |    8 +++++++-
- 2 files changed, 12 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-index 9eda842..ed75cf6 100644
---- a/drivers/base/platform.c
-+++ b/drivers/base/platform.c
-@@ -523,11 +523,13 @@ static void platform_drv_shutdown(struct device *_dev)
- }
-
- /**
-- * platform_driver_register - register a driver for platform-level devices
-+ * __platform_driver_register - register a driver for platform-level devices
-  * @drv: platform driver structure
-  */
--int platform_driver_register(struct platform_driver *drv)
-+int __platform_driver_register(struct platform_driver *drv,
-+				struct module *owner)
- {
-+	drv->driver.owner = owner;
- 	drv->driver.bus = &platform_bus_type;
- 	if (drv->probe)
- 		drv->driver.probe = platform_drv_probe;
-@@ -538,7 +540,7 @@ int platform_driver_register(struct platform_driver *drv)
-
- 	return driver_register(&drv->driver);
- }
--EXPORT_SYMBOL_GPL(platform_driver_register);
-+EXPORT_SYMBOL_GPL(__platform_driver_register);
-
- /**
-  * platform_driver_unregister - unregister a driver for platform-level devices
-diff --git a/include/linux/platform_device.h b/include/linux/platform_device.h
-index 9abf1db..cd46ee5 100644
---- a/include/linux/platform_device.h
-+++ b/include/linux/platform_device.h
-@@ -180,7 +180,13 @@ struct platform_driver {
- 	const struct platform_device_id *id_table;
- };
-
--extern int platform_driver_register(struct platform_driver *);
-+/*
-+ * use a macro to avoid include chaining to get THIS_MODULE
-+ */
-+#define platform_driver_register(drv) \
-+	__platform_driver_register(drv, THIS_MODULE)
-+extern int __platform_driver_register(struct platform_driver *,
-+					struct module *);
- extern void platform_driver_unregister(struct platform_driver *);
-
- /* non-hotpluggable platform devices may use this so that probe() and
--- 
-1.7.1
+renesas-next-20130523 is based on v3.10-rc2, so I think it should
+have whatever dependencies that were in Linus's tree at the time
+that you posted this patch.
