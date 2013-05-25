@@ -1,59 +1,125 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Sat, 25 May 2013 09:59:08 +0900
-Subject: [PATCH] ARM: shmobile: marzen: Use error values in usb_power_*
-In-Reply-To: <519D217D.2060405@cogentembedded.com>
-References: <1369205290-6272-1-git-send-email-horms+renesas@verge.net.au>
- <1369205290-6272-2-git-send-email-horms+renesas@verge.net.au>
- <519D217D.2060405@cogentembedded.com>
-Message-ID: <20130525005908.GE4476@verge.net.au>
+Date: Sat, 25 May 2013 10:01:02 +0900
+Subject: [PATCH 05/11] ARM: shmobile: APE6EVM LAN9220 support
+In-Reply-To: <Pine.LNX.4.64.1305221911380.12715@axis700.grange>
+References: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
+ <1364954906-16014-6-git-send-email-horms+renesas@verge.net.au>
+ <Pine.LNX.4.64.1305171458550.31481@axis700.grange>
+ <20130522143204.GE32012@verge.net.au>
+ <Pine.LNX.4.64.1305221911380.12715@axis700.grange>
+Message-ID: <20130525010102.GF4476@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 11:50:21PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Wed, May 22, 2013 at 07:22:59PM +0200, Guennadi Liakhovetski wrote:
+> Hi Simon
 > 
-> On 05/22/2013 10:48 AM, Simon Horman wrote:
+> On Wed, 22 May 2013, Simon Horman wrote:
 > 
-> >This patch updates the marzen board code as if USB PHY isn't enabled
-> >they phy will have a value set by ERR_PTR() rather than be NULL.
-> >
-> >Without this patch a NULL pointer dereference  and kernel panic
-> >occurs on initialisation of USB on marzen.
-> >
-> >This resolves a regression introduced in 3.10-rc1 by
-> >b7fa5c2aec5be083eb2719b405089703608e9bc6
-> >("usb: phy: return -ENXIO when PHY layer isn't enabled").
-> >
-> >Tested-by: Nguyen Hong Ky <nh-ky@jinso.co.jp>
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >---
-> >  arch/arm/mach-shmobile/board-marzen.c | 6 +++---
-> >  1 file changed, 3 insertions(+), 3 deletions(-)
-> >
-> >diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-> >index 9105285..b9594e9 100644
-> >--- a/arch/arm/mach-shmobile/board-marzen.c
-> >+++ b/arch/arm/mach-shmobile/board-marzen.c
-> >@@ -212,8 +212,8 @@ static struct platform_device *marzen_devices[] __initdata = {
-> >  static struct usb_phy *phy;
-> >  static int usb_power_on(struct platform_device *pdev)
-> >  {
-> >-	if (!phy)
-> >-		return -EIO;
-> >+	if (IS_ERR(phy))
+> > On Fri, May 17, 2013 at 03:00:23PM +0200, Guennadi Liakhovetski wrote:
+> > > Hi Simon, Magnus
+> > > 
+> > > On Wed, 3 Apr 2013, Simon Horman wrote:
+> > > 
+> > > > From: Magnus Damm <damm@opensource.se>
+> > > > 
+> > > > Add LAN9220 support to the APE6EVM board using C and DT.
+> > > > At this point the PFC driver lacks DT bindings so to
+> > > > configure the PFC we use PINCTRL in C board code.
+> > > > 
+> > > > Signed-off-by: Magnus Damm <damm@opensource.se>
+> > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > > ---
+> > > >  arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   23 ++++++++++++++++++-
+> > > >  arch/arm/mach-shmobile/board-ape6evm.c |   38 ++++++++++++++++++++++++++++++++
+> > > >  2 files changed, 60 insertions(+), 1 deletion(-)
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > > > index 833f703..f603c69 100644
+> > > > --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > > > +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > > > @@ -16,7 +16,7 @@
+> > > >  	compatible = "renesas,ape6evm", "renesas,r8a73a4";
+> > > >  
+> > > >  	chosen {
+> > > > -		bootargs = "console=ttySC0,115200 ignore_loglevel";
+> > > > +		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp";
+> > > >  	};
+> > > >  
+> > > >  	memory at 40000000 {
+> > > > @@ -24,8 +24,29 @@
+> > > >  		reg = <0 0x40000000 0 0x40000000>;
+> > > >  	};
+> > > >  
+> > > > +	ape6evm_fixed_3v3: fixedregulator at 0 {
+> > > > +		compatible = "regulator-fixed";
+> > > > +		regulator-name = "3V3";
+> > > > +		regulator-min-microvolt = <3300000>;
+> > > > +		regulator-max-microvolt = <3300000>;
+> > > > +		regulator-always-on;
+> > > > +	};
+> > > > +
+> > > >  	lbsc {
+> > > >  		#address-cells = <1>;
+> > > >  		#size-cells = <1>;
+> > > > +
+> > > > +		ethernet at 8000000 {
+> > > > +			compatible = "smsc,lan9118", "smsc,lan9115";
+> > > > +			reg = <0x08000000 0x1000>;
+> > > > +			interrupt-parent = <&irqc1>;
+> > > > +			interrupts = <8 0x4>;
+> > > > +			phy-mode = "mii";
+> > > > +			reg-io-width = <4>;
+> > > > +			smsc,irq-active-high;
+> > > > +			smsc,irq-push-pull;
+> > > > +			vdd33a-supply = <&ape6evm_fixed_3v3>;
+> > > > +			vddvario-supply = <&ape6evm_fixed_3v3>;
+> > > > +		};
+> > > >  	};
+> > > >  };
+> > > 
+> > > The above didn't work in my tests without this:
+> > > 
+> > > diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts 
+> > > b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > > index f603c69..4fb0102 100644
+> > > --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > > +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > > @@ -33,8 +33,10 @@
+> > >  	};
+> > >  
+> > >  	lbsc {
+> > > +		compatible = "simple-bus";
+> > >  		#address-cells = <1>;
+> > >  		#size-cells = <1>;
+> > > +		ranges = <0 0 0 0x80000000>;
+> > >  
+> > >  		ethernet at 8000000 {
+> > >  			compatible = "smsc,lan9118", "smsc,lan9115";
+> > > 
+> > 
+> > Could you please post this as a formal patch and indicate
+> > if you would like it included as a fix in v3.10 or not?
 > 
->    And even before the mentioned commit the right check should have
-> been IS_ERR_OR_NULL().
+> Can do that, sure, just thought maybe it would be better to fix the 
+> original patch. Besides, I wasn't sure what the correct values for 
+> "ranges" are, I just picked up something, that would be sufficient for 
+> ethernet. But if more devices are added to it in the future, maybe 
+> different ranges values would be needed. I think actually, lbsc should map 
+> the 3 BSC areas, so, the correct property would be
 
-Yes, quite true.
+I believe the original patches are past the point where they
+can be updated.
 
-> Thanks for finding/fixing this. Too bad I'll have to respin my USB
-> patches now... :-)
+With regards to the correct values, perhaps Magnus can help here?
+
 > 
-> WBR, Sergei
+> +		ranges = <0 0 0 0x14000000>;
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Also, I am curious to know what your tests are.
 > 
+> Just booting with NFS root. I think, anything involving ethernet. Without 
+> the "simple-bus" property the lbsc node doesn't get scanned, so, no device 
+> is added. Without "ranges" addresses cannot be mapped correctly.
+
+Ok, it sounds like it should be fixed for v3.10.
