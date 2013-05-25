@@ -1,46 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 25 May 2013 14:47:28 -0300
-Subject: [PATCH] ARM: mx6: Use the same sdma firmware name for all mx6 variants
-Message-ID: <1369504048-19805-1-git-send-email-festevam@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 25 May 2013 22:08:35 +0400
+Subject: [PATCH v2] ARM: shmobile: BOCK-W: add Ether support
+In-Reply-To: <20130525053007.GA9293@verge.net.au>
+References: <201305170141.59791.sergei.shtylyov@cogentembedded.com>
+ <20130525053007.GA9293@verge.net.au>
+Message-ID: <51A0FE23.4090206@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+Hello.
 
-All the mx6 variants (quad, dual, solo and solo-lite) use the same sdma 
-firmware, so drop the the suffix from the file name.
+On 25-05-2013 9:30, Simon Horman wrote:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
- arch/arm/boot/dts/imx6sl.dtsi  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+>> Register Ether device from bockw_init(), passing the platform data to it, adding
+>> only the RMII pin group to bockw_pinctrl_map[].  Although the LINK signal exists
+>> on the board, it's connected to the link/activity LED  output of the PHY, thus
+>> the link disappears and reappears after each packet. We'd be better off ignoring
+>> such signal and getting the link state from the PHY indirectly.
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 42e461c..b6730cc 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -582,7 +582,7 @@
- 				interrupts = <0 2 0x04>;
- 				clocks = <&clks 155>, <&clks 155>;
- 				clock-names = "ipg", "ahb";
--				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6q.bin";
-+				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6.bin";
- 			};
- 		};
- 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index c5e5da0..9596000 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -594,7 +594,7 @@
- 				clocks = <&clks IMX6SL_CLK_SDMA>,
- 					 <&clks IMX6SL_CLK_SDMA>;
- 				clock-names = "ipg", "ahb";
--				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6sl.bin";
-+				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx6.bin";
- 			};
- 
- 			pxp: pxp at 020f0000 {
--- 
-1.8.1.2
+>> Also, Ether has pin conflict with VIN1, so the latter is not registered when the
+>> 'sh_eth' driver is enabled now.
+
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>> The patch is atop of Simon's 'renesas.git' repo, 'renesas-next-20130515v2' tag
+>> and my recent yet unapplied patches.
+
+>> Note that it's compile and run time dependent on the current Linus' tree.
+
+>> Changes from the original posting:
+>> - refreshed the patch.
+
+> Thanks, would it be possible for you to rebase it on top of
+> renesas-next-20130523.
+
+    You mean to base it on this tag without any intervening patches (it 
+is now on top of my patch series)? Anyway, I'll rebase my whole series 
+on this tag as I have time (I'm now working with the SATA driver to try 
+to add to it NCQ support and fixing errors I encounter on the way).
+
+> renesas-next-20130523 is based on v3.10-rc2, so I think it should
+> have whatever dependencies that were in Linus's tree at the time
+> that you posted this patch.
+
+     Yes, correct.
+
+WBR, Sergei
