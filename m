@@ -1,66 +1,59 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Sat, 25 May 2013 09:39:50 +0900
-Subject: [PATCH 1/2] ARM: shmobile: irqpin: add a DT property to enable
- masking on parent
-In-Reply-To: <Pine.LNX.4.64.1305241109530.1090@axis700.grange>
-References: <Pine.LNX.4.64.1305241109530.1090@axis700.grange>
-Message-ID: <20130525003950.GA4476@verge.net.au>
+Date: Sat, 25 May 2013 09:59:08 +0900
+Subject: [PATCH] ARM: shmobile: marzen: Use error values in usb_power_*
+In-Reply-To: <519D217D.2060405@cogentembedded.com>
+References: <1369205290-6272-1-git-send-email-horms+renesas@verge.net.au>
+ <1369205290-6272-2-git-send-email-horms+renesas@verge.net.au>
+ <519D217D.2060405@cogentembedded.com>
+Message-ID: <20130525005908.GE4476@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 11:13:03AM +0200, Guennadi Liakhovetski wrote:
-> To disable spurious interrupts, that get triggered on certain hardware, the
-> irqpin driver masks them on the parent interrupt controller. To specify
-> such broken devices a .control_parent parameter can be provided in the
-> platform data. In the DT case we need a property, to do the same.
+On Wed, May 22, 2013 at 11:50:21PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
+> On 05/22/2013 10:48 AM, Simon Horman wrote:
 > 
-> These two patches simply split the earlier "ARM: shmobile: irqpin: fix 
-> handling of spurious interrupts in DT case" patch into two parts. 
-> Otherwise no change.
+> >This patch updates the marzen board code as if USB PHY isn't enabled
+> >they phy will have a value set by ERR_PTR() rather than be NULL.
+> >
+> >Without this patch a NULL pointer dereference  and kernel panic
+> >occurs on initialisation of USB on marzen.
+> >
+> >This resolves a regression introduced in 3.10-rc1 by
+> >b7fa5c2aec5be083eb2719b405089703608e9bc6
+> >("usb: phy: return -ENXIO when PHY layer isn't enabled").
+> >
+> >Tested-by: Nguyen Hong Ky <nh-ky@jinso.co.jp>
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >---
+> >  arch/arm/mach-shmobile/board-marzen.c | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> >
+> >diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+> >index 9105285..b9594e9 100644
+> >--- a/arch/arm/mach-shmobile/board-marzen.c
+> >+++ b/arch/arm/mach-shmobile/board-marzen.c
+> >@@ -212,8 +212,8 @@ static struct platform_device *marzen_devices[] __initdata = {
+> >  static struct usb_phy *phy;
+> >  static int usb_power_on(struct platform_device *pdev)
+> >  {
+> >-	if (!phy)
+> >-		return -EIO;
+> >+	if (IS_ERR(phy))
+> 
+>    And even before the mentioned commit the right check should have
+> been IS_ERR_OR_NULL().
 
-Magnus,
+Yes, quite true.
 
-could you please review this series?
-
+> Thanks for finding/fixing this. Too bad I'll have to respin my USB
+> patches now... :-)
 > 
->  .../interrupt-controller/renesas,intc-irqpin.txt   |    2 ++
->  drivers/irqchip/irq-renesas-intc-irqpin.c          |    7 +++++--
->  2 files changed, 7 insertions(+), 2 deletions(-)
+> WBR, Sergei
 > 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-> index c6f09b7..152b10a 100644
-> --- a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-> @@ -11,3 +11,5 @@ Optional properties:
->    resource allocation properties
->  - sense-bitfield-width: width of a single sense bitfield in the SENSE register,
->    if different from the default 4 bits
-> +- control-parent: disable and enable interrupts on the parent interrupt
-> +  controller, needed for some broken implementations
-> diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
-> index 4aca1b2..82cec63 100644
-> --- a/drivers/irqchip/irq-renesas-intc-irqpin.c
-> +++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
-> @@ -348,11 +348,14 @@ static int intc_irqpin_probe(struct platform_device *pdev)
->  	}
->  
->  	/* deal with driver instance configuration */
-> -	if (pdata)
-> +	if (pdata) {
->  		memcpy(&p->config, pdata, sizeof(*pdata));
-> -	else
-> +	} else {
->  		of_property_read_u32(pdev->dev.of_node, "sense-bitfield-width",
->  				     &p->config.sense_bitfield_width);
-> +		p->config.control_parent = of_property_read_bool(pdev->dev.of_node,
-> +								 "control-parent");
-> +	}
->  	if (!p->config.sense_bitfield_width)
->  		p->config.sense_bitfield_width = 4; /* default to 4 bits */
->  
-> -- 
-> 1.7.2.5
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
