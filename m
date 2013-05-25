@@ -1,125 +1,96 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Sat, 25 May 2013 10:01:02 +0900
-Subject: [PATCH 05/11] ARM: shmobile: APE6EVM LAN9220 support
-In-Reply-To: <Pine.LNX.4.64.1305221911380.12715@axis700.grange>
-References: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
- <1364954906-16014-6-git-send-email-horms+renesas@verge.net.au>
- <Pine.LNX.4.64.1305171458550.31481@axis700.grange>
- <20130522143204.GE32012@verge.net.au>
- <Pine.LNX.4.64.1305221911380.12715@axis700.grange>
-Message-ID: <20130525010102.GF4476@verge.net.au>
+Date: Sat, 25 May 2013 10:03:09 +0900
+Subject: [PATCH] ARM: mach-shmobile: r8a7790: add SATA support
+In-Reply-To: <519F72F8.1000204@cogentembedded.com>
+References: <1369361184-20862-1-git-send-email-horms+renesas@verge.net.au>
+ <519F72F8.1000204@cogentembedded.com>
+Message-ID: <20130525010309.GG4476@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 07:22:59PM +0200, Guennadi Liakhovetski wrote:
-> Hi Simon
+On Fri, May 24, 2013 at 06:02:32PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> On Wed, 22 May 2013, Simon Horman wrote:
+> On 24-05-2013 6:06, Simon Horman wrote:
 > 
-> > On Fri, May 17, 2013 at 03:00:23PM +0200, Guennadi Liakhovetski wrote:
-> > > Hi Simon, Magnus
-> > > 
-> > > On Wed, 3 Apr 2013, Simon Horman wrote:
-> > > 
-> > > > From: Magnus Damm <damm@opensource.se>
-> > > > 
-> > > > Add LAN9220 support to the APE6EVM board using C and DT.
-> > > > At this point the PFC driver lacks DT bindings so to
-> > > > configure the PFC we use PINCTRL in C board code.
-> > > > 
-> > > > Signed-off-by: Magnus Damm <damm@opensource.se>
-> > > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > > ---
-> > > >  arch/arm/boot/dts/r8a73a4-ape6evm.dts  |   23 ++++++++++++++++++-
-> > > >  arch/arm/mach-shmobile/board-ape6evm.c |   38 ++++++++++++++++++++++++++++++++
-> > > >  2 files changed, 60 insertions(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > > > index 833f703..f603c69 100644
-> > > > --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > > > +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > > > @@ -16,7 +16,7 @@
-> > > >  	compatible = "renesas,ape6evm", "renesas,r8a73a4";
-> > > >  
-> > > >  	chosen {
-> > > > -		bootargs = "console=ttySC0,115200 ignore_loglevel";
-> > > > +		bootargs = "console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp";
-> > > >  	};
-> > > >  
-> > > >  	memory at 40000000 {
-> > > > @@ -24,8 +24,29 @@
-> > > >  		reg = <0 0x40000000 0 0x40000000>;
-> > > >  	};
-> > > >  
-> > > > +	ape6evm_fixed_3v3: fixedregulator at 0 {
-> > > > +		compatible = "regulator-fixed";
-> > > > +		regulator-name = "3V3";
-> > > > +		regulator-min-microvolt = <3300000>;
-> > > > +		regulator-max-microvolt = <3300000>;
-> > > > +		regulator-always-on;
-> > > > +	};
-> > > > +
-> > > >  	lbsc {
-> > > >  		#address-cells = <1>;
-> > > >  		#size-cells = <1>;
-> > > > +
-> > > > +		ethernet at 8000000 {
-> > > > +			compatible = "smsc,lan9118", "smsc,lan9115";
-> > > > +			reg = <0x08000000 0x1000>;
-> > > > +			interrupt-parent = <&irqc1>;
-> > > > +			interrupts = <8 0x4>;
-> > > > +			phy-mode = "mii";
-> > > > +			reg-io-width = <4>;
-> > > > +			smsc,irq-active-high;
-> > > > +			smsc,irq-push-pull;
-> > > > +			vdd33a-supply = <&ape6evm_fixed_3v3>;
-> > > > +			vddvario-supply = <&ape6evm_fixed_3v3>;
-> > > > +		};
-> > > >  	};
-> > > >  };
-> > > 
-> > > The above didn't work in my tests without this:
-> > > 
-> > > diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts 
-> > > b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > > index f603c69..4fb0102 100644
-> > > --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > > +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
-> > > @@ -33,8 +33,10 @@
-> > >  	};
-> > >  
-> > >  	lbsc {
-> > > +		compatible = "simple-bus";
-> > >  		#address-cells = <1>;
-> > >  		#size-cells = <1>;
-> > > +		ranges = <0 0 0 0x80000000>;
-> > >  
-> > >  		ethernet at 8000000 {
-> > >  			compatible = "smsc,lan9118", "smsc,lan9115";
-> > > 
-> > 
-> > Could you please post this as a formal patch and indicate
-> > if you would like it included as a fix in v3.10 or not?
+> >Add SATA clock for r8a7790 SoC (for both device tree and usual cases).
 > 
-> Can do that, sure, just thought maybe it would be better to fix the 
-> original patch. Besides, I wasn't sure what the correct values for 
-> "ranges" are, I just picked up something, that would be sufficient for 
-> ethernet. But if more devices are added to it in the future, maybe 
-> different ranges values would be needed. I think actually, lbsc should map 
-> the 3 BSC areas, so, the correct property would be
+>     I don't see where you are adding clock for device tree case.
+> 
+> >Register SATA controller as a "late" platform device on r8a7790 SoC.
+> 
+>     Does R8A7790 have these "early" and "late" lists? I guess not.
+> 
+> >Based on "ARM: mach-shmobile: r8a7779: add SATA support" by
+> >Vladimir Barinov.
+> 
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >---
+> >  arch/arm/mach-shmobile/clock-r8a7790.c |  4 ++++
+> >  arch/arm/mach-shmobile/setup-r8a7790.c | 21 +++++++++++++++++++++
+> >  2 files changed, 25 insertions(+)
+> 
+> >diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+> >index b393592..3619a52 100644
+> >--- a/arch/arm/mach-shmobile/clock-r8a7790.c
+> >+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+> [...]
+> >@@ -249,6 +252,7 @@ static struct clk_lookup lookups[] = {
+> >  	CLKDEV_DEV_ID("sh-sci.5", &mstp_clks[MSTP202]),
+> >  	CLKDEV_DEV_ID("sh-sci.6", &mstp_clks[MSTP721]),
+> >  	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
+> >+	CLKDEV_DEV_ID("sata_rcar.1", &mstp_clks[MSTP814]),
+> >  };
+> >
+> >  #define R8A7790_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
+> >diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+> >index ed7ee24..5a2a073 100644
+> >--- a/arch/arm/mach-shmobile/setup-r8a7790.c
+> >+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+> [...]
+> >@@ -118,6 +119,25 @@ static inline void r8a7790_register_scif(int idx)
+> >  				      sizeof(struct plat_sci_port));
+> >  }
+> >
+> >+static __init void r8a7790_register_sata1(void)
+> 
+>    What's with SATA0?
+> 
+> >+{
+> >+
+> >+	struct resource res[] = {
+> 
+>    Non-static variable with an intializer? Won't this be a waste of
+> code? Wouldn't it be better to have it static __initdata?
 
-I believe the original patches are past the point where they
-can be updated.
-
-With regards to the correct values, perhaps Magnus can help here?
+Sure, if you prefer that.
 
 > 
-> +		ranges = <0 0 0 0x14000000>;
+> >+		DEFINE_RES_MEM_NAMED(0xee300000, 0x200000, "rcar-sata"),
 > 
-> > Also, I am curious to know what your tests are.
-> 
-> Just booting with NFS root. I think, anything involving ethernet. Without 
-> the "simple-bus" property the lbsc node doesn't get scanned, so, no device 
-> is added. Without "ranges" addresses cannot be mapped correctly.
+>     2 megabytes? Won't it be a waste of memory?
 
-Ok, it sounds like it should be fixed for v3.10.
+2 megabytes is specified in the data sheet.
+Do you think it is reasonable to use a smaller value?
+
+> 
+> >+		DEFINE_RES_IRQ(gic_iid(106)),
+> >+	};
+> >+
+> >+	struct platform_device_info pdevinfo = {
+> 
+>    Same comment about non-static initialized structure...
+> 
+> >+		.name = "sata_rcar",
+> >+		.id = 1,
+> >+		.res = res,
+> >+		.num_res = ARRAY_SIZE(res),
+> >+		.dma_mask = DMA_BIT_MASK(32),
+> >+	};
+> >+
+> >+	platform_device_register_full(&pdevinfo);
+> >+}
+> >+
+> 
+> WBR, Sergei
+> 
