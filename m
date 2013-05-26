@@ -1,28 +1,62 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 26 May 2013 10:36:14 +0200
-Subject: Kirkwood CPU Freq driver
-In-Reply-To: <51A12DD4.9010907@baker-net.org.uk>
-References: <51A12DD4.9010907@baker-net.org.uk>
-Message-ID: <20130526083614.GB26249@lunn.ch>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 26 May 2013 10:34:30 +0200
+Subject: [GIT PULL] at91: USBA DT support for 3.11
+Message-ID: <20130526083430.GP24476@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 25, 2013 at 10:32:04PM +0100, Adam Baker wrote:
-> Hi,
-> 
-> I've been trying to test Andrew Lunn's work creating a CPU Idle
-> driver for Kirkwood.
+Arnd, Olof
 
-Hi Adam
+Second AT91 pull-request for 3.11
 
-Thanks for testing this. I must admit, i never tested it once the
-first rc came out. I clearly should of, because its broken. It was a
-three part patch series, and only part 1/3 made it in. Hence the
-issues you are seeing.
+This add the DT support the USBA present in the most recents AT91 SoC
+As agree with Arnd and Filipe we send the drivers via arm-soc
 
-Jason, please can you pick up:
+this is base on previous pull request at91-3.11-cleanup1+resolved
 
-https://patchwork.kernel.org/patch/2051401/
-https://patchwork.kernel.org/patch/2080931/
+Best Regards,
+J.
 
-	Andrew
+The following changes since commit 7a76f53b01685eda605fa15ccaa1ca90a7aa2c33:
+
+  ARM: at91: udpate defconfigs (2013-05-24 18:02:06 +0200)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-3.11-dt-usba
+
+for you to fetch changes up to e6a2ba4b6fc828917c66cd7ffafdfb7a889d7bee:
+
+  ARM: at91: sam9m10g45ek add udc DT support (2013-05-26 16:35:55 +0800)
+
+----------------------------------------------------------------
+ARM: at91: dt: add USBA support
+
+This patch serie finish to add the usb device support to dt for at91
+with the usba support present on the last at91 generation since sam9g45
+
+update driver & dt
+
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+
+----------------------------------------------------------------
+Jean-Christophe PLAGNIOL-VILLARD (7):
+      USB: gadget: atmel_usba: move global struct usba_ep usba_ep to struct usba_udc
+      USB: gadget: atmel_usba: allow multi instance
+      USB: gadget: atmel_usba: add DT support
+      ARM: at91: sam9x5 add udc DT support
+      ARM: at91: sam9x5ek add udc DT support
+      ARM: at91: sam9g45 add udc DT support
+      ARM: at91: sam9m10g45ek add udc DT support
+
+ Documentation/devicetree/bindings/usb/atmel-usb.txt |   82 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi                  |   62 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts              |    5 +++++
+ arch/arm/boot/dts/at91sam9x5.dtsi                   |   62 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi                 |    5 +++++
+ arch/arm/mach-at91/at91sam9g45.c                    |    2 ++
+ arch/arm/mach-at91/at91sam9x5.c                     |    2 ++
+ drivers/usb/gadget/Kconfig                          |    2 +-
+ drivers/usb/gadget/atmel_usba_udc.c                 |  264 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------------------------------------------
+ drivers/usb/gadget/atmel_usba_udc.h                 |    2 ++
+ 10 files changed, 407 insertions(+), 81 deletions(-)
