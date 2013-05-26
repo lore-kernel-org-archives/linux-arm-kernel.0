@@ -1,70 +1,78 @@
-From: rob@landley.net (Rob Landley)
-Date: Sat, 25 May 2013 19:27:52 -0500
-Subject: [PATCH] ARM: document the bigger pagetables needed for LPAE
-In-Reply-To: <1369410236-22398-1-git-send-email-javi.merino@arm.com> (from
- javi.merino@arm.com on Fri May 24 10:43:56 2013)
-Message-ID: <1369528072.2776.26@driftwood>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Sat, 25 May 2013 21:19:51 -0400
+Subject: [PATCH 0/4] Power off drivers for QNAP and LSXL.
+In-Reply-To: <20130123125328.GH1758@titan.lakedaemon.net>
+References: <1356697512-3950-1-git-send-email-andrew@lunn.ch>
+ <20130123125328.GH1758@titan.lakedaemon.net>
+Message-ID: <20130526011951.GB31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24/2013 10:43:56 AM, Javi Merino wrote:
-> The Booting documentation assumes that the initial pagetables are
-> 16KiB but since 1b6ba46 (ARM: LPAE: MMU setup for the 3-level page
-> table format) they are 20KiB for LPAE kernels.  Thus, the
-> recommendation to put atags or the dtb in the first 16KiB is wrong,
-> there's only 12KiB of space there in LPAE kernels, so update the
-> documentation accordingly.
-> ---
->  Documentation/arm/Booting |    9 +++++----
->  1 file changed, 5 insertions(+), 4 deletions(-)
-
-Acked-by: Rob Landley <rob@landley.net>
-
-With one comment:
-
-> diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
-> index 0c1f475..f6f9cd8 100644
-> --- a/Documentation/arm/Booting
-> +++ b/Documentation/arm/Booting
-> @@ -105,7 +105,7 @@ The tagged list should be stored in system RAM.
+On Wed, Jan 23, 2013 at 07:53:28AM -0500, Jason Cooper wrote:
+> On Fri, Dec 28, 2012 at 01:25:08PM +0100, Andrew Lunn wrote:
+> > This patchset contains two power off driver, moving existing code
+> > out of mach-kirkwood into drivers/power/reset.
+> > 
+> > QNAP NAS boards have a microcontroller connected to a UART. Sending
+> > the command to it turns the power off. There are Orion5x QNAP boards
+> > which can later use this driver, once they are converted to DT.
+> > 
+> > Kirkwood Buffalo Linkstation LSXL devices power off by restarting and
+> > letting the boot loader idle until the user hits a switch. There are
+> > again Orion5x devices which could use this driver in the future, once
+> > they are converted to DT. It also looks like some PXA devices could
+> > use it.
+> > 
+> > Patches #1 and #3 are the drivers, and #2 and #4 make use of the
+> > driver, removing C code and adding DT nodes.
+> > 
+> > The QNAP driver has been tested on a QNAP TS119+. The LSXL driver is
+> > currently untested.
+> > 
+> > git://github.com/lunn/linux.git v3.8-rc1-qnap-poweroff
+> > 
+> > Andrew Lunn (4):
+> >   Power: Reset: Driver to turn QNAP board power off.
+> >   ARM: Kirkwood: Make use of the QNAP Power off driver.
+> >   Power: Reset: Power off by restarting
+> >   ARM: Kirkwood: Convert LSXL to restart-poweroff driver.
+> > 
+> >  .../bindings/power_supply/qnap-poweroff.txt        |   14 +++
+> >  .../bindings/power_supply/restart-poweroff.txt     |    9 ++
+> >  arch/arm/boot/dts/kirkwood-lsxl.dtsi               |    4 +
+> >  arch/arm/boot/dts/kirkwood-ts219.dtsi              |    5 +
+> >  arch/arm/mach-kirkwood/Kconfig                     |    2 +
+> >  arch/arm/mach-kirkwood/board-lsxl.c                |   16 ---
+> >  arch/arm/mach-kirkwood/board-ts219.c               |    3 -
+> >  drivers/power/reset/Kconfig                        |   17 +++
+> >  drivers/power/reset/Makefile                       |    2 +
+> >  drivers/power/reset/qnap-poweroff.c                |  124 ++++++++++++++++++++
+> >  drivers/power/reset/restart-poweroff.c             |   67 +++++++++++
+> >  11 files changed, 244 insertions(+), 19 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/power_supply/qnap-poweroff.txt
+> >  create mode 100644 Documentation/devicetree/bindings/power_supply/restart-poweroff.txt
+> >  create mode 100644 drivers/power/reset/qnap-poweroff.c
+> >  create mode 100644 drivers/power/reset/restart-poweroff.c
 > 
->  The tagged list must be placed in a region of memory where neither
->  the kernel decompressor nor initrd 'bootp' program will overwrite
-> -it.  The recommended placement is in the first 16KiB of RAM.
-> +it.  The recommended placement is in the first 12KiB of RAM.
+> patches 2 and 4 applied to mvebu/dt with a dependency on:
 > 
->  4b. Setup the device tree
->  -------------------------
-> @@ -120,7 +120,7 @@ tagged list.
->  The boot loader must pass at a minimum the size and location of the
->  system memory, and the root filesystem location.  The dtb must be
->  placed in a region of memory where the kernel decompressor will not
-> -overwrite it.  The recommended placement is in the first 16KiB of RAM
-> +overwrite it.  The recommended placement is in the first 12KiB of RAM
->  with the caveat that it may not be located at physical address 0  
-> since
->  the kernel interprets a value of 0 in r2 to mean neither a tagged  
-> list
->  nor a dtb were passed.
-> @@ -137,8 +137,9 @@ then it is legal for the boot loader to call the  
-> zImage in flash
->  directly.
+>   git://git.infradead.org/battery-2.6.git master
 > 
->  The zImage may also be placed in system RAM (at any location) and
-> -called there.  Note that the kernel uses 16K of RAM below the image
-> -to store page tables.  The recommended placement is 32KiB into RAM.
-> +called there.  Note that the kernel may use up to 20KiB of RAM below
-> +the image to store page tables.  The recommended placement is 32KiB
-> +into RAM.
+> up to:
+> 
+>   ffd8f9a power/reset: Add a new driver implementing 'power off by restarting'
+> 
+> in order to pull in patches 1 and 3:
+> 
+>   ffd8f9a power/reset: Add a new driver implementing 'power off by restarting'
+>   e8fc721 power/reset: Add a new driver to turn QNAP board power off
 
-Now that we have three memory entires, possibly some sort of memory  
-layout would be in order?
+Yeah.... So thanks to Andrew for bringing this to my attention.
+Somewhere along the line, I must've dropped patches 2 and 4.
 
-    0k-12k   boot data (tagged list or device tree)
-   12k-32k   page tables
-   32k-xxx   kernel image
+Thankfully, patches 1 and 3 made it in, so I've just applied 2 and 4 to
+mvebu/boards.
 
-Perhaps at the end of section 4's introduction? It's not quite obvious  
-from the document...
+thx, and sorry for the delay.
 
-Rob
+Jason.
