@@ -1,65 +1,73 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Sun, 26 May 2013 21:38:31 +0800
-Subject: [PATCH v8, part3 03/14] mm/ARM64: kill poison_init_mem()
-In-Reply-To: <1369575522-26405-1-git-send-email-jiang.liu@huawei.com>
-References: <1369575522-26405-1-git-send-email-jiang.liu@huawei.com>
-Message-ID: <1369575522-26405-4-git-send-email-jiang.liu@huawei.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 26 May 2013 16:16:59 +0200
+Subject: [GIT PULL] ARM SoC cleanups for 3.11
+Message-ID: <20130526141659.GA9394@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use free_reserved_area() to poison initmem memory pages and kill
-poison_init_mem() on ARM64.
+Hi Arnd, Olof,
 
-Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm64/mm/init.c | 17 +++--------------
- 1 file changed, 3 insertions(+), 14 deletions(-)
+Here the pull request with the cleanup patches that I sent a few weeks
+ago about init_irq and map_io cleanups for platforms that were using the
+generic functions for both these callbacks.
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 997c634..a398eb9 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -197,14 +197,6 @@ void __init bootmem_init(void)
- 	max_pfn = max_low_pfn = max;
- }
- 
--/*
-- * Poison init memory with an undefined instruction (0x0).
-- */
--static inline void poison_init_mem(void *s, size_t count)
--{
--	memset(s, 0, count);
--}
--
- #ifndef CONFIG_SPARSEMEM_VMEMMAP
- static inline void free_memmap(unsigned long start_pfn, unsigned long end_pfn)
- {
-@@ -386,8 +378,7 @@ void __init mem_init(void)
- 
- void free_initmem(void)
- {
--	poison_init_mem(__init_begin, __init_end - __init_begin);
--	free_initmem_default(-1);
-+	free_initmem_default(0);
- }
- 
- #ifdef CONFIG_BLK_DEV_INITRD
-@@ -396,10 +387,8 @@ static int keep_initrd;
- 
- void free_initrd_mem(unsigned long start, unsigned long end)
- {
--	if (!keep_initrd) {
--		poison_init_mem((void *)start, PAGE_ALIGN(end) - start);
--		free_reserved_area((void *)start, (void *)end, -1, "initrd");
--	}
-+	if (!keep_initrd)
-+		free_reserved_area((void *)start, (void *)end, 0, "initrd");
- }
- 
- static int __init keepinitrd_setup(char *__unused)
+Please consider pulling it.
+
+Thanks,
+Maxime
+
+The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+
+  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+
+are available in the git repository at:
+
+  git://github.com/mripard/linux.git tags/arm-soc-cleanups-for-3.11
+
+for you to fetch changes up to 442f15083eb25229fb95820bced8bea70298a34b:
+
+  ARM: sunxi: Remove the .map_io function declaration (2013-05-24 10:24:43 +0200)
+
+----------------------------------------------------------------
+Cleanups in various machine definitions
+  - Patches to remove the .init_irq definition when using irqchip_init
+  - Make the ARM core code call debug_ll_io_init when no map_io callback is
+    declared
+  - Remove the .map_io definition in the various machines using it
+
+----------------------------------------------------------------
+Maxime Ripard (10):
+      ARM: nomadik: Remove init_irq declaration in machine description
+      ARM: spear: Remove init_irq declaration in machine description
+      ARM: sirf: Remove init_irq declaration in machine description
+      ARM: vexpress: Remove init_irq declaration in machine description
+      ARM: virt: Remove init_irq declaration in machine description
+      ARM: vt8500: Remove init_irq declaration in machine description
+      ARM: mmu: Call debug_ll_io_init if no map_io function is specified
+      ARM: highbank: remove the .map_io declaration
+      ARM: mxs: remove the .map_io declaration
+      ARM: sunxi: Remove the .map_io function declaration
+
+ arch/arm/mach-highbank/highbank.c |  1 -
+ arch/arm/mach-mxs/mach-mxs.c      |  1 -
+ arch/arm/mach-nomadik/cpu-8815.c  |  2 --
+ arch/arm/mach-prima2/common.c     |  4 ----
+ arch/arm/mach-spear/spear1310.c   |  2 --
+ arch/arm/mach-spear/spear1340.c   |  2 --
+ arch/arm/mach-spear/spear300.c    |  2 --
+ arch/arm/mach-spear/spear310.c    |  2 --
+ arch/arm/mach-spear/spear320.c    |  2 --
+ arch/arm/mach-spear/spear6xx.c    |  2 --
+ arch/arm/mach-sunxi/sunxi.c       | 17 -----------------
+ arch/arm/mach-sunxi/sunxi.h       | 20 --------------------
+ arch/arm/mach-vexpress/v2m.c      |  2 --
+ arch/arm/mach-virt/virt.c         |  2 --
+ arch/arm/mach-vt8500/vt8500.c     |  2 --
+ arch/arm/mm/mmu.c                 |  2 ++
+ 16 files changed, 2 insertions(+), 63 deletions(-)
+ delete mode 100644 arch/arm/mach-sunxi/sunxi.h
+
 -- 
-1.8.1.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
