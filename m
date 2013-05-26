@@ -1,63 +1,35 @@
-From: oliver+list@schinagl.nl (Oliver Schinagl)
-Date: Sun, 26 May 2013 12:53:30 +0200
-Subject: [linux-sunxi] [PATCHv2 1/6] i2c: sunxi: Add Allwinner A1X i2c
- driver
-In-Reply-To: <1369563642-4390-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1369563642-4390-1-git-send-email-maxime.ripard@free-electrons.com>
- <1369563642-4390-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <51A1E9AA.4000008@schinagl.nl>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 26 May 2013 15:12:46 +0300
+Subject: [PATCH 1/2] clocksource: dw_apb: remove unused header
+Message-ID: <1369570367-994-1-git-send-email-baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The time.h header seems not to be used by current code. Removing this include
+allows the driver to build on other architecture that do not have this header.
 
-Just replying because I want to understand certain choices you make, 
-absolutely not questioning your code!
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jamie Iles <jamie@jamieiles.com>
+Cc: Dinh Nguyen <dinguyen@altera.com>
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+ drivers/clocksource/dw_apb_timer_of.c |    1 -
+ 1 file changed, 1 deletion(-)
 
-On 05/26/13 12:20, Maxime Ripard wrote:
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/completion.h>
-You forgot to add #include <linux/bitops.h> for BIT()
-
-
-> +
-> +static void sunxi_i2c_write(struct sunxi_i2c_dev *i2c_dev, u16 reg, u8 value)
-> +{
-> +	writel(value, i2c_dev->membase + reg);
-Why writel? and why without (u32)value? I thought iowrite* where the 
-preferred calls and in this case, wouldn't we want writeb since value is u8?
-
-> +}
-> +
-> +static u32 sunxi_i2c_read(struct sunxi_i2c_dev *i2c_dev, u16 reg)
-> +{
-> +	return readl(i2c_dev->membase + reg);
-And here, readl does match the return of u32, but aren't we always 
-reading 8 bits since the TWI Data Register only uses the first 8 bits?
-So wouldn't we want to return u8 and readb?
-
-> +static int sunxi_i2c_probe(struct platform_device *pdev)
-> +{
-> +	struct sunxi_i2c_dev *i2c_dev;
-> +	struct device_node *np;
-> +	u32 freq, div_m, div_n;
-> +	struct resource res;
-I feel stupid for questioning this, since it only shows my lack of 
-knowledge, but
-If you declare all the memory here, isn't all the data lost after 
-exiting the _probe function? we pass a pointer to this memory in the 
-of_address_to_resource() function so that fills it, right?
-
-Or does after devm_ioremap_resource it no longer matter, since that 
-function got what it needed and useless after?
-
-Just asking because of the wdt driver and possibly mine that you told us 
-to change.
-
-
-
-Sorry for asking (again) maybe very obvious things. Just trying to learn.
-
-Oliver
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index ab09ed3..5a61ebc 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -21,7 +21,6 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ 
+-#include <asm/mach/time.h>
+ #include <asm/sched_clock.h>
+ 
+ static void timer_get_base_and_rate(struct device_node *np,
+-- 
+1.7.10.4
