@@ -1,64 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 26 May 2013 22:46:12 +0200
-Subject: [RFC PATCHv4 1/6] arm: TI-Nspire platform code
-In-Reply-To: <1369480087-24786-2-git-send-email-dt.tangr@gmail.com>
+Date: Sun, 26 May 2013 23:23:29 +0200
+Subject: [RFC PATCHv4 0/6] arm: Initial TI-Nspire support
+In-Reply-To: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
 References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
- <1369480087-24786-2-git-send-email-dt.tangr@gmail.com>
-Message-ID: <201305262246.12803.arnd@arndb.de>
+Message-ID: <201305262323.29519.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Saturday 25 May 2013, Daniel Tang wrote:
+> Changes between v3 and v4:
+> * Remove redundant clock-names in device tree
+> * Re-enable bus access to some peripherals on bootup
+> * Clean up nspire-classic-timer code.
+>   - Implement a nspire_timer_set_mode function
+>   - Removed messy IO_MATCHx and CNTL_MATCHx macros
+>   - Timer starts disabled to begin with
+>   - Interrupt handling code return IRQ_NONE for spurious interrupts
+>   - Delete unnessecary shift
+> * Change clk-nspire to use compatible property to determine IO type
+> * Change device tree bindings to have appropriate vendor prefixes
+> * Added device tree binding documentation
+> * Fix incorrect register addresses for clocks
+> * Use more specific .caps for CLCD
 
-> +static struct map_desc nspire_io_desc[] __initdata = {
-> +	{
-> +		.virtual	=  NSPIRE_EARLY_UART_VIRT_BASE,
-> +		.pfn		= __phys_to_pfn(NSPIRE_EARLY_UART_PHYS_BASE),
-> +		.length		= SZ_4K,
-> +		.type		= MT_DEVICE
-> +	},
+Looks really good now. I have a few more comments for the first patch,
+mostly for stuff that can be simplified based on stuff we merged in 3.10.
 
-You  can remove this now and call debug_ll_io_init() instead, so you can
-remove the duplicate definitions of the base addresses.
+The one remaining bit that sticks out is the clcd platform data. As I
+said before, I won't require you to convert that to DT in order to
+get your code merged, but I'd also really like to see that happen,
+as we will also need that to get rid of auxdata on the ARM reference
+platforms (integrator, versatile, realview, vexpress).
 
-> +	{
-> +		.virtual	=  NSPIRE_PWR_VIRT_BASE,
-> +		.pfn		= __phys_to_pfn(NSPIRE_PWR_PHYS_BASE),
-> +		.length		= SZ_4K,
-> +		.type		= MT_DEVICE
-> +	}
-> +};
+Are you motivated to look into those after the base patch gets
+merged into arm-soc?
 
-And I think this one can be replaced with a call to of_iomap:
-
-> +static void __init nspire_early_init(void)
-> +{
-> +	void __iomem *pwr = IOMEM(NSPIRE_PWR_VIRT_BASE);
-> +
-> +	/* Re-enable bus access to all peripherals */
-> +	writel(0, pwr + NSPIRE_PWR_BUS_DISABLE1);
-> +	writel(0, pwr + NSPIRE_PWR_BUS_DISABLE2);
-> +
-> +	pr_info("Re-enabled bus access to all peripherals\n");
-> +}
-
-Since it seems to be used only in this one function.
-
-> +DT_MACHINE_START(NSPIRE, "TI-NSPIRE")
-> +	.map_io		= nspire_map_io,
-> +	.init_irq	= irqchip_init,
-> +	.init_time	= nspire_init_time,
-> +	.init_machine	= nspire_init,
-> +	.init_early	= nspire_early_init,
-> +	.dt_compat	= nspire_dt_match,
-> +	.restart	= nspire_restart,
-> +MACHINE_END
-
-The reference to irqchip_init is now the default, so you can drop that too.
-nspire_init_time is still needed right now, but I'd like to initialize the
-clocks automatically soon, so that will go away in the future.
-
-Please reorder the other callbacks in call order, same as the structure
-definition.
+One comment on the merge path: While we can put any of the patches
+into the arm-soc tree, my preference is definitely for the clk,
+clksource, irqchip and input drivers to go through the respective
+maintainer trees. There are no dependencies to worry about, since
+each patch can compile standalone, and we just need to make sure
+they all get into 3.11 for your platform to work.
 
 	Arnd
