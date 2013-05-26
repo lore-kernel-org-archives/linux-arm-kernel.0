@@ -1,33 +1,33 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 26 May 2013 14:28:57 +0200
-Subject: [PATCH 1/1] mmc: of_mmc_spi: fix card detect irq
-Message-ID: <1369571337-9300-1-git-send-email-plagnioj@jcrosoft.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Sun, 26 May 2013 22:05:22 +0900
+Subject: [GIT PULL] Renesas ARM based emev2 SoC updates for v3.11
+Message-ID: <1369573523-10980-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-set missing irq type the IRQF_ONESHOT
+Hi Arnd, Hi Olof,
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: stable <stable@vger.kernel.org> # 3.4+
-Cc: linux-mmc at vger.kernel.org
----
- drivers/mmc/host/of_mmc_spi.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
 
-diff --git a/drivers/mmc/host/of_mmc_spi.c b/drivers/mmc/host/of_mmc_spi.c
-index d720b5e..cfb2e61 100644
---- a/drivers/mmc/host/of_mmc_spi.c
-+++ b/drivers/mmc/host/of_mmc_spi.c
-@@ -74,8 +74,8 @@ static int of_mmc_spi_init(struct device *dev,
- {
- 	struct of_mmc_spi *oms = to_of_mmc_spi(dev);
- 
--	return request_threaded_irq(oms->detect_irq, NULL, irqhandler, 0,
--				    dev_name(dev), mmc);
-+	return request_threaded_irq(oms->detect_irq, NULL, irqhandler,
-+		IRQF_ONESHOT, dev_name(dev), mmc);
- }
- 
- static void of_mmc_spi_exit(struct device *dev, void *mmc)
--- 
-1.7.10.4
+  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-emev2-for-v3.11
+
+for you to fetch changes up to 94a6af856df56ed39bb59ebe17bfa2d10fb333f2:
+
+  ARM: shmobile: emev2: Remove init_irq declaration in machine description (2013-05-22 21:42:03 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based emev2 SoC updates for v3.11
+
+Clean-up from Maxime Ripard to remove unnecessary init_irq declaration in
+machine description.
+
+----------------------------------------------------------------
+Maxime Ripard (1):
+      ARM: shmobile: emev2: Remove init_irq declaration in machine description
+
+ arch/arm/mach-shmobile/setup-emev2.c |    2 --
+ 1 file changed, 2 deletions(-)
