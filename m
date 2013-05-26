@@ -1,98 +1,33 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 26 May 2013 15:12:47 +0300
-Subject: [RFC PATCH 2/2] clocksource: dw_apb: allow build for architectures
- other than arm
-Message-ID: <1369570367-994-2-git-send-email-baruch@tkos.co.il>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 26 May 2013 14:28:57 +0200
+Subject: [PATCH 1/1] mmc: of_mmc_spi: fix card detect irq
+Message-ID: <1369571337-9300-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM is the only architecture providing sched_clock.h and setup_sched_clock().
-Implement sched_clock() for use by other architectures.
+set missing irq type the IRQF_ONESHOT
 
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jamie Iles <jamie@jamieiles.com>
-Cc: Dinh Nguyen <dinguyen@altera.com>
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: stable <stable@vger.kernel.org> # 3.4+
+Cc: linux-mmc at vger.kernel.org
 ---
- arch/arm/Kconfig                      |    1 +
- drivers/clocksource/Kconfig           |    3 +++
- drivers/clocksource/dw_apb_timer_of.c |   18 ++++++++++++++++++
- 3 files changed, 22 insertions(+)
+ drivers/mmc/host/of_mmc_spi.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 1cacda4..7489604 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -47,6 +47,7 @@ config ARM
- 	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
- 	select HAVE_PERF_EVENTS
- 	select HAVE_REGS_AND_STACK_ACCESS_API
-+	select HAVE_SETUP_SCHED_CLOCK
- 	select HAVE_SYSCALL_TRACEPOINTS
- 	select HAVE_UID16
- 	select KTIME_SCALAR
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index e507ab7..0fd6d13 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -1,3 +1,6 @@
-+config HAVE_SETUP_SCHED_CLOCK
-+	bool
-+
- config CLKSRC_OF
- 	bool
- 
-diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-index 5a61ebc..9fdb4d3 100644
---- a/drivers/clocksource/dw_apb_timer_of.c
-+++ b/drivers/clocksource/dw_apb_timer_of.c
-@@ -21,7 +21,11 @@
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- 
-+#ifdef CONFIG_HAVE_SETUP_SCHED_CLOCK
- #include <asm/sched_clock.h>
-+#else
-+#include <linux/sched.h>
-+#endif
- 
- static void timer_get_base_and_rate(struct device_node *np,
- 				    void __iomem **base, u32 *rate)
-@@ -73,6 +77,9 @@ static void add_clocksource(struct device_node *source_timer)
- }
- 
- static void __iomem *sched_io_base;
-+#ifndef CONFIG_HAVE_SETUP_SCHED_CLOCK
-+static u64 sched_clock_mult __read_mostly;
-+#endif
- 
- static u32 read_sched_clock(void)
+diff --git a/drivers/mmc/host/of_mmc_spi.c b/drivers/mmc/host/of_mmc_spi.c
+index d720b5e..cfb2e61 100644
+--- a/drivers/mmc/host/of_mmc_spi.c
++++ b/drivers/mmc/host/of_mmc_spi.c
+@@ -74,8 +74,8 @@ static int of_mmc_spi_init(struct device *dev,
  {
-@@ -97,7 +104,11 @@ static void init_sched_clock(void)
- 	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
- 	of_node_put(sched_timer);
+ 	struct of_mmc_spi *oms = to_of_mmc_spi(dev);
  
-+#ifdef CONFIG_HAVE_SETUP_SCHED_CLOCK
- 	setup_sched_clock(read_sched_clock, 32, rate);
-+#else
-+	sched_clock_mult = NSEC_PER_SEC / rate;
-+#endif
+-	return request_threaded_irq(oms->detect_irq, NULL, irqhandler, 0,
+-				    dev_name(dev), mmc);
++	return request_threaded_irq(oms->detect_irq, NULL, irqhandler,
++		IRQF_ONESHOT, dev_name(dev), mmc);
  }
  
- static const struct of_device_id osctimer_ids[] __initconst = {
-@@ -124,3 +135,10 @@ void __init dw_apb_timer_init(void)
- 
- 	init_sched_clock();
- }
-+
-+#ifndef CONFIG_HAVE_SETUP_SCHED_CLOCK
-+unsigned long long notrace sched_clock()
-+{
-+	return read_sched_clock() * sched_clock_mult;
-+}
-+#endif
+ static void of_mmc_spi_exit(struct device *dev, void *mmc)
 -- 
 1.7.10.4
