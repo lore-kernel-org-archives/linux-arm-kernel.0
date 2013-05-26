@@ -1,31 +1,74 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Sun, 26 May 2013 20:11:16 +0200
-Subject: [PATCHv4 6/6] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
-In-Reply-To: <201305242058.34332.arnd@arndb.de>
-References: <1369410080-436-1-git-send-email-dinguyen@altera.com>
- <201305241912.53751.arnd@arndb.de>
- <1369418588.9717.0.camel@linux-builds1>
- <201305242058.34332.arnd@arndb.de>
-Message-ID: <20130526181116.GA16409@amd.pavel.ucw.cz>
+From: oliver+list@schinagl.nl (Oliver Schinagl)
+Date: Sun, 26 May 2013 21:01:53 +0200
+Subject: [linux-sunxi] [PATCHv2 1/6] i2c: sunxi: Add Allwinner A1X i2c
+ driver
+In-Reply-To: <20130526132120.GJ17847@lukather>
+References: <1369563642-4390-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1369563642-4390-2-git-send-email-maxime.ripard@free-electrons.com>
+ <51A1E9AA.4000008@schinagl.nl> <20130526132120.GJ17847@lukather>
+Message-ID: <51A25C21.2060700@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2013-05-24 20:58:34, Arnd Bergmann wrote:
-> On Friday 24 May 2013, Dinh Nguyen wrote:
-> > I apologize for that. Will make sure to include a [PATCH 0/6] message in
-> > the future.
-> 
-> No worries, I actually saw now that my only other comment was also
-> wrong, as you have the binding I was looking for in patch 5/6.
+On 05/26/13 15:21, Maxime Ripard wrote:
 
-Could you take the series through your tree?
+>>> +static void sunxi_i2c_write(struct sunxi_i2c_dev *i2c_dev, u16 reg, u8 value)
+>>> +{
+>>> +	writel(value, i2c_dev->membase + reg);
+>> Why writel? and why without (u32)value? I thought iowrite* where the
+>> preferred calls and in this case, wouldn't we want writeb since
+>> value is u8?
+>
+> You're right, value should be a u32 here, thanks for noticing.
+>
+> For the iowrite* vs write*, there's no consensus, and as such no
+> preferred way. write* functions are doing an MMIO only access,
+> while iowrite functions can do MMIO and port I/O accesses.
+>
+> Note that it doesn't change anything on ARM, since there's no port IO on
+> ARM.
+Ah I see, missinformation on my end. Sorry.
 
-Patches 1,2,4,5/6 are mostly local to arch/arm, 3/6 is stuff Dinh is
-listed as a maintainer for, and 6/6 is fairly socfpga-specific,
-too. (I guess Dinh could add MAINTAINERs entry for that...).
+But why write 32 bits? The register is only 8 wide, with the rest being 
+'reserved'. Then again, the register IS 32 bits wide and probably will 
+haev 32 bits written to it? Correct?
 
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+>
+>>> +}
+>>> +
+>>> +static u32 sunxi_i2c_read(struct sunxi_i2c_dev *i2c_dev, u16 reg)
+>>> +{
+>>> +	return readl(i2c_dev->membase + reg);
+>> And here, readl does match the return of u32, but aren't we always
+>> reading 8 bits since the TWI Data Register only uses the first 8
+>> bits?
+>> So wouldn't we want to return u8 and readb?
+>
+> They are meant to be general purpose accessors, so we shouldn't focus
+> only on the data register.
+Ah yes, of course.
+
+>
+>>
+>>> +static int sunxi_i2c_probe(struct platform_device *pdev)
+>>> +{
+>>> +	struct sunxi_i2c_dev *i2c_dev;
+>>> +	struct device_node *np;
+>>> +	u32 freq, div_m, div_n;
+>>> +	struct resource res;
+>> I feel stupid for questioning this, since it only shows my lack of
+>> knowledge, but
+>> If you declare all the memory here, isn't all the data lost after
+>> exiting the _probe function? we pass a pointer to this memory in the
+>> of_address_to_resource() function so that fills it, right?
+>>
+>> Or does after devm_ioremap_resource it no longer matter, since that
+>> function got what it needed and useless after?
+>
+> The struct resource is only there to declare the base address and the
+> size of memory address. Once we have mapped it, we don't care about it
+> anymore.
+Thanks for clarifying that, I will adapt my driver to do the same.
+>
+> Maxime
+>
