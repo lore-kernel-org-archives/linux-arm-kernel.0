@@ -1,54 +1,40 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 26 May 2013 17:30:37 +0200
-Subject: [PATCH 0/5] ARM: at91: Calao USB-A926x switch completyl to dt and
- drop board file
-Message-ID: <20130526153037.GQ24476@game.jcrosoft.org>
+Date: Sun, 26 May 2013 17:33:39 +0200
+Subject: [PATCH 3/5] ARM: at91: dt: usb-a9263: add dataflash support
+In-Reply-To: <1369582421-25562-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20130526153037.GQ24476@game.jcrosoft.org>
+ <1369582421-25562-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1369582421-25562-3-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: gregory hermant <gregory.hermant@calao-systems.com>
+---
+ arch/arm/boot/dts/usb_a9263.dts |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-	The Follwing patch serie finish to swtich the Calao USB-A926x to DT
-	and drop the board file.
-
-	This is the first boards to be drop on at91
-
-The following changes since commit 24577c1b3ebf3eab6465bb112a6265e87400163e:
-
-  ARM: at91: dt: sam9260: add i2c gpio pinctrl (2013-05-26 16:56:39 +0800)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git j/for-3.11-calao-dt
-
-for you to fetch changes up to c3ea1d2cc2f543ee0646a75890e1a7be5dd82c0b:
-
-  ARM: at91: drop non DT: Calao USB-A96x (2013-05-26 23:32:23 +0800)
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (5):
-      ARM: at91: dt: usb-a9260: update shutdown controller
-      ARM: at91: dt: usb-a9263: update shutdown controller
-      ARM: at91: dt: usb-a9263: add dataflash support
-      ARM: at91: dt: add Calao USB-A9G20 low power version
-      ARM: at91: drop non DT: Calao USB-A96x
-
- arch/arm/boot/dts/Makefile                  |    1 +
- arch/arm/boot/dts/usb_a9260.dts             |    9 ++++++
- arch/arm/boot/dts/usb_a9263.dts             |   14 +++++++++
- arch/arm/boot/dts/usb_a9g20.dts             |   18 +----------
- arch/arm/boot/dts/usb_a9g20_common.dtsi     |   27 ++++++++++++++++
- arch/arm/boot/dts/usb_a9g20_lpw.dts         |   31 ++++++++++++++++++
- arch/arm/configs/at91_dt_defconfig          |    2 ++
- arch/arm/configs/at91sam9260_9g20_defconfig |    1 -
- arch/arm/configs/at91sam9263_defconfig      |    1 -
- arch/arm/mach-at91/Kconfig.non_dt           |   19 -----------
- arch/arm/mach-at91/Makefile                 |    3 --
- arch/arm/mach-at91/board-usb-a926x.c        |  384 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
- 12 files changed, 85 insertions(+), 425 deletions(-)
- create mode 100644 arch/arm/boot/dts/usb_a9g20_common.dtsi
- create mode 100644 arch/arm/boot/dts/usb_a9g20_lpw.dts
- delete mode 100644 arch/arm/mach-at91/board-usb-a926x.c
-
-Best Regards,
-J.
+diff --git a/arch/arm/boot/dts/usb_a9263.dts b/arch/arm/boot/dts/usb_a9263.dts
+index e7eb9ae..290e603 100644
+--- a/arch/arm/boot/dts/usb_a9263.dts
++++ b/arch/arm/boot/dts/usb_a9263.dts
+@@ -47,6 +47,16 @@
+ 				status = "okay";
+ 			};
+ 
++			spi0: spi at fffa4000 {
++				cs-gpios = <&pioB 15 GPIO_ACTIVE_HIGH>;
++				status = "okay";
++				mtd_dataflash at 0 {
++					compatible = "atmel,at45", "atmel,dataflash";
++					reg = <0>;
++					spi-max-frequency = <15000000>;
++				};
++			};
++
+ 			shdwc at fffffd10 {
+ 				atmel,wakeup-counter = <10>;
+ 				atmel,wakeup-rtt-timer;
+-- 
+1.7.10.4
