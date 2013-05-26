@@ -1,283 +1,82 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Sun, 26 May 2013 22:05:55 +0900
-Subject: [PATCH 4/6] ARM: shmobile: r8a73a4: add div6 clocks
-In-Reply-To: <1369573557-11071-1-git-send-email-horms+renesas@verge.net.au>
-References: <1369573557-11071-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1369573557-11071-5-git-send-email-horms+renesas@verge.net.au>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 26 May 2013 15:21:20 +0200
+Subject: [linux-sunxi] [PATCHv2 1/6] i2c: sunxi: Add Allwinner A1X i2c
+ driver
+In-Reply-To: <51A1E9AA.4000008@schinagl.nl>
+References: <1369563642-4390-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1369563642-4390-2-git-send-email-maxime.ripard@free-electrons.com>
+ <51A1E9AA.4000008@schinagl.nl>
+Message-ID: <20130526132120.GJ17847@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Sun, May 26, 2013 at 12:53:30PM +0200, Oliver Schinagl wrote:
+> 
+> Just replying because I want to understand certain choices you make,
+> absolutely not questioning your code!
+> 
+> On 05/26/13 12:20, Maxime Ripard wrote:
+> >+ * warranty of any kind, whether express or implied.
+> >+ */
+> >+
+> >+#include <linux/clk.h>
+> >+#include <linux/completion.h>
+> You forgot to add #include <linux/bitops.h> for BIT()
 
-DIV6 clocks control each core clocks.
+Ah, yes, thanks
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a73a4.c |  182 ++++++++++++++++++++++++++++----
- 1 file changed, 163 insertions(+), 19 deletions(-)
+> >+static void sunxi_i2c_write(struct sunxi_i2c_dev *i2c_dev, u16 reg, u8 value)
+> >+{
+> >+	writel(value, i2c_dev->membase + reg);
+> Why writel? and why without (u32)value? I thought iowrite* where the
+> preferred calls and in this case, wouldn't we want writeb since
+> value is u8?
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-index 147314a..f6227bb 100644
---- a/arch/arm/mach-shmobile/clock-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-@@ -28,19 +28,34 @@
- #define CPG_BASE 0xe6150000
- #define CPG_LEN 0x270
- 
--#define MPCKCR 0xe6150080
- #define SMSTPCR2 0xe6150138
- #define SMSTPCR5 0xe6150144
- 
- #define FRQCRA		0xE6150000
- #define FRQCRB		0xE6150004
--#define CKSCR		0xE61500C0
-+#define VCLKCR1		0xE6150008
-+#define VCLKCR2		0xE615000C
-+#define VCLKCR3		0xE615001C
-+#define VCLKCR4		0xE6150014
-+#define VCLKCR5		0xE6150034
-+#define ZBCKCR		0xE6150010
-+#define SD0CKCR		0xE6150074
-+#define SD1CKCR		0xE6150078
-+#define SD2CKCR		0xE615007C
-+#define MMC0CKCR	0xE6150240
-+#define MMC1CKCR	0xE6150244
-+#define FSIACKCR	0xE6150018
-+#define FSIBCKCR	0xE6150090
-+#define MPCKCR		0xe6150080
-+#define SPUVCKCR	0xE6150094
-+#define HSICKCR		0xE615026C
-+#define M4CKCR		0xE6150098
- #define PLLECR		0xE61500D0
- #define PLL1CR		0xE6150028
- #define PLL2CR		0xE615002C
- #define PLL2SCR		0xE61501F4
- #define PLL2HCR		0xE61501E4
--
-+#define CKSCR		0xE61500C0
- 
- #define CPG_MAP(o) ((o - CPG_BASE) + cpg_mapping.base)
- 
-@@ -81,6 +96,13 @@ SH_FIXED_RATIO_CLK(extal1_div2_clk,	extal1_clk,		div2);
- SH_FIXED_RATIO_CLK(extal2_div2_clk,	extal2_clk,		div2);
- SH_FIXED_RATIO_CLK(extal2_div4_clk,	extal2_clk,		div4);
- 
-+/* External FSIACK/FSIBCK clock */
-+static struct clk fsiack_clk = {
-+};
-+
-+static struct clk fsibck_clk = {
-+};
-+
- /*
-  *		PLL clocks
-  */
-@@ -170,6 +192,8 @@ static struct clk *main_clks[] = {
- 	&extal2_div4_clk,
- 	&main_clk,
- 	&main_div2_clk,
-+	&fsiack_clk,
-+	&fsibck_clk,
- 	&pll1_clk,
- 	&pll1_div2_clk,
- 	&pll2_clk,
-@@ -216,6 +240,111 @@ static struct clk div4_clks[DIV4_NR] = {
- 	[DIV4_HP]	= SH_CLK_DIV4(&pll1_clk, FRQCRB,  4, 0x0dff, 0),
- };
- 
-+enum {
-+	DIV6_ZB,
-+	DIV6_SDHI0, DIV6_SDHI1, DIV6_SDHI2,
-+	DIV6_MMC0, DIV6_MMC1,
-+	DIV6_VCK1, DIV6_VCK2, DIV6_VCK3, DIV6_VCK4, DIV6_VCK5,
-+	DIV6_FSIA, DIV6_FSIB,
-+	DIV6_MP, DIV6_M4, DIV6_HSI, DIV6_SPUV,
-+	DIV6_NR };
-+
-+static struct clk *div6_parents[8] = {
-+	[0] = &pll1_div2_clk,
-+	[1] = &pll2s_clk,
-+	[3] = &extal2_clk,
-+	[4] = &main_div2_clk,
-+	[6] = &extalr_clk,
-+};
-+
-+static struct clk *fsia_parents[4] = {
-+	[0] = &pll1_div2_clk,
-+	[1] = &pll2s_clk,
-+	[2] = &fsiack_clk,
-+};
-+
-+static struct clk *fsib_parents[4] = {
-+	[0] = &pll1_div2_clk,
-+	[1] = &pll2s_clk,
-+	[2] = &fsibck_clk,
-+};
-+
-+static struct clk *mp_parents[4] = {
-+	[0] = &pll1_div2_clk,
-+	[1] = &pll2s_clk,
-+	[2] = &extal2_clk,
-+	[3] = &extal2_clk,
-+};
-+
-+static struct clk *m4_parents[2] = {
-+	[0] = &pll2s_clk,
-+};
-+
-+static struct clk *hsi_parents[4] = {
-+	[0] = &pll2h_clk,
-+	[1] = &pll1_div2_clk,
-+	[3] = &pll2s_clk,
-+};
-+
-+/*** FIXME ***
-+ * SH_CLK_DIV6_EXT() macro doesn't care .mapping
-+ * but, it is necessary on R-Car (= ioremap() base CPG)
-+ * The difference between
-+ * SH_CLK_DIV6_EXT() <--> SH_CLK_MAP_DIV6_EXT()
-+ * is only .mapping
-+ */
-+#define SH_CLK_MAP_DIV6_EXT(_reg, _flags, _parents,			\
-+			    _num_parents, _src_shift, _src_width)	\
-+{									\
-+	.enable_reg	= (void __iomem *)_reg,				\
-+	.enable_bit	= 0, /* unused */				\
-+	.flags		= _flags | CLK_MASK_DIV_ON_DISABLE,		\
-+	.div_mask	= SH_CLK_DIV6_MSK,				\
-+	.parent_table	= _parents,					\
-+	.parent_num	= _num_parents,					\
-+	.src_shift	= _src_shift,					\
-+	.src_width	= _src_width,					\
-+	.mapping	= &cpg_mapping,					\
-+}
-+
-+static struct clk div6_clks[DIV6_NR] = {
-+	[DIV6_ZB] = SH_CLK_MAP_DIV6_EXT(ZBCKCR, CLK_ENABLE_ON_INIT,
-+				div6_parents, 2, 7, 1),
-+	[DIV6_SDHI0] = SH_CLK_MAP_DIV6_EXT(SD0CKCR, 0,
-+				div6_parents, 2, 6, 2),
-+	[DIV6_SDHI1] = SH_CLK_MAP_DIV6_EXT(SD1CKCR, 0,
-+				div6_parents, 2, 6, 2),
-+	[DIV6_SDHI2] = SH_CLK_MAP_DIV6_EXT(SD2CKCR, 0,
-+				div6_parents, 2, 6, 2),
-+	[DIV6_MMC0] = SH_CLK_MAP_DIV6_EXT(MMC0CKCR, 0,
-+				div6_parents, 2, 6, 2),
-+	[DIV6_MMC1] = SH_CLK_MAP_DIV6_EXT(MMC1CKCR, 0,
-+				div6_parents, 2, 6, 2),
-+	[DIV6_VCK1] = SH_CLK_MAP_DIV6_EXT(VCLKCR1, 0, /* didn't care bit[6-7] */
-+				div6_parents, ARRAY_SIZE(div6_parents), 12, 3),
-+	[DIV6_VCK2] = SH_CLK_MAP_DIV6_EXT(VCLKCR2, 0, /* didn't care bit[6-7] */
-+				div6_parents, ARRAY_SIZE(div6_parents), 12, 3),
-+	[DIV6_VCK3] = SH_CLK_MAP_DIV6_EXT(VCLKCR3, 0, /* didn't care bit[6-7] */
-+				div6_parents, ARRAY_SIZE(div6_parents), 12, 3),
-+	[DIV6_VCK4] = SH_CLK_MAP_DIV6_EXT(VCLKCR4, 0, /* didn't care bit[6-7] */
-+				div6_parents, ARRAY_SIZE(div6_parents), 12, 3),
-+	[DIV6_VCK5] = SH_CLK_MAP_DIV6_EXT(VCLKCR5, 0, /* didn't care bit[6-7] */
-+				div6_parents, ARRAY_SIZE(div6_parents), 12, 3),
-+	[DIV6_FSIA] = SH_CLK_MAP_DIV6_EXT(FSIACKCR, 0,
-+				fsia_parents, ARRAY_SIZE(fsia_parents), 6, 2),
-+	[DIV6_FSIB] = SH_CLK_MAP_DIV6_EXT(FSIBCKCR, 0,
-+				fsib_parents, ARRAY_SIZE(fsib_parents), 6, 2),
-+	[DIV6_MP] = SH_CLK_MAP_DIV6_EXT(MPCKCR, 0, /* it needs bit[9-11] control */
-+				mp_parents, ARRAY_SIZE(mp_parents), 6, 2),
-+	/* pll2s will be selected always for M4 */
-+	[DIV6_M4] = SH_CLK_MAP_DIV6_EXT(M4CKCR, 0, /* it needs bit[9] control */
-+				m4_parents, ARRAY_SIZE(m4_parents), 6, 1),
-+	[DIV6_HSI] = SH_CLK_MAP_DIV6_EXT(HSICKCR, 0, /* it needs bit[9] control */
-+				hsi_parents, ARRAY_SIZE(hsi_parents), 6, 2),
-+	[DIV6_SPUV] = SH_CLK_MAP_DIV6_EXT(SPUVCKCR, 0,
-+				mp_parents, ARRAY_SIZE(mp_parents), 6, 2),
-+};
-+
- /* MSTP */
- enum {
- 	MSTP217, MSTP216, MSTP207, MSTP206, MSTP204, MSTP203,
-@@ -224,12 +353,12 @@ enum {
- };
- 
- static struct clk mstp_clks[MSTP_NR] = {
--	[MSTP204] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR2, 4, 0), /* SCIFA0 */
--	[MSTP203] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR2, 3, 0), /* SCIFA1 */
--	[MSTP206] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR2, 6, 0), /* SCIFB0 */
--	[MSTP207] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR2, 7, 0), /* SCIFB1 */
--	[MSTP216] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR2, 16, 0), /* SCIFB2 */
--	[MSTP217] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR2, 17, 0), /* SCIFB3 */
-+	[MSTP204] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 4, 0), /* SCIFA0 */
-+	[MSTP203] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 3, 0), /* SCIFA1 */
-+	[MSTP206] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 6, 0), /* SCIFB0 */
-+	[MSTP207] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 7, 0), /* SCIFB1 */
-+	[MSTP216] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 16, 0), /* SCIFB2 */
-+	[MSTP217] = SH_CLK_MSTP32(&div6_clks[DIV6_MP],	SMSTPCR2, 17, 0), /* SCIFB3 */
- 	[MSTP522] = SH_CLK_MSTP32(&extal2_clk, SMSTPCR5, 22, 0), /* Thermal */
- };
- 
-@@ -240,6 +369,8 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("extal2",			&extal2_clk),
- 	CLKDEV_CON_ID("extal2_div2",		&extal2_div2_clk),
- 	CLKDEV_CON_ID("extal2_div4",		&extal2_div4_clk),
-+	CLKDEV_CON_ID("fsiack",			&fsiack_clk),
-+	CLKDEV_CON_ID("fsibck",			&fsibck_clk),
- 
- 	/* pll clock */
- 	CLKDEV_CON_ID("pll1",			&pll1_clk),
-@@ -248,6 +379,25 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("pll2s",			&pll2s_clk),
- 	CLKDEV_CON_ID("pll2h",			&pll2h_clk),
- 
-+	/* DIV6 */
-+	CLKDEV_CON_ID("zb",			&div6_clks[DIV6_ZB]),
-+	CLKDEV_CON_ID("sdhi0",			&div6_clks[DIV6_SDHI0]),
-+	CLKDEV_CON_ID("sdhi1",			&div6_clks[DIV6_SDHI1]),
-+	CLKDEV_CON_ID("sdhi2",			&div6_clks[DIV6_SDHI2]),
-+	CLKDEV_CON_ID("mmc0",			&div6_clks[DIV6_MMC0]),
-+	CLKDEV_CON_ID("mmc1",			&div6_clks[DIV6_MMC1]),
-+	CLKDEV_CON_ID("vck1",			&div6_clks[DIV6_VCK1]),
-+	CLKDEV_CON_ID("vck2",			&div6_clks[DIV6_VCK2]),
-+	CLKDEV_CON_ID("vck3",			&div6_clks[DIV6_VCK3]),
-+	CLKDEV_CON_ID("vck4",			&div6_clks[DIV6_VCK4]),
-+	CLKDEV_CON_ID("vck5",			&div6_clks[DIV6_VCK5]),
-+	CLKDEV_CON_ID("fsia",			&div6_clks[DIV6_FSIA]),
-+	CLKDEV_CON_ID("fsib",			&div6_clks[DIV6_FSIB]),
-+	CLKDEV_CON_ID("mp",			&div6_clks[DIV6_MP]),
-+	CLKDEV_CON_ID("m4",			&div6_clks[DIV6_M4]),
-+	CLKDEV_CON_ID("hsi",			&div6_clks[DIV6_HSI]),
-+	CLKDEV_CON_ID("spuv",			&div6_clks[DIV6_SPUV]),
-+
- 	/* MSTP */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
-@@ -263,19 +413,10 @@ static struct clk_lookup lookups[] = {
- 
- void __init r8a73a4_clock_init(void)
- {
--	void __iomem *cpg_base, *reg;
-+	void __iomem *reg;
- 	int k, ret = 0;
- 	u32 ckscr;
- 
--	/* fix MPCLK to EXTAL2 for now.
--	 * this is needed until more detailed clock topology is supported
--	 */
--	cpg_base = ioremap_nocache(CPG_BASE, CPG_LEN);
--	BUG_ON(!cpg_base);
--	reg = cpg_base + (MPCKCR - CPG_BASE);
--	iowrite32(ioread32(reg) | 1 << 7 | 0x0c, reg); /* set CKSEL */
--	iounmap(cpg_base);
--
- 	reg = ioremap_nocache(CKSCR, PAGE_SIZE);
- 	BUG_ON(!reg);
- 	ckscr = ioread32(reg);
-@@ -303,6 +444,9 @@ void __init r8a73a4_clock_init(void)
- 		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
- 
- 	if (!ret)
-+		ret = sh_clk_div6_reparent_register(div6_clks, DIV6_NR);
-+
-+	if (!ret)
- 		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
- 
- 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+You're right, value should be a u32 here, thanks for noticing.
+
+For the iowrite* vs write*, there's no consensus, and as such no
+preferred way. write* functions are doing an MMIO only access,
+while iowrite functions can do MMIO and port I/O accesses.
+
+Note that it doesn't change anything on ARM, since there's no port IO on
+ARM.
+
+> >+}
+> >+
+> >+static u32 sunxi_i2c_read(struct sunxi_i2c_dev *i2c_dev, u16 reg)
+> >+{
+> >+	return readl(i2c_dev->membase + reg);
+> And here, readl does match the return of u32, but aren't we always
+> reading 8 bits since the TWI Data Register only uses the first 8
+> bits?
+> So wouldn't we want to return u8 and readb?
+
+They are meant to be general purpose accessors, so we shouldn't focus
+only on the data register.
+
+> 
+> >+static int sunxi_i2c_probe(struct platform_device *pdev)
+> >+{
+> >+	struct sunxi_i2c_dev *i2c_dev;
+> >+	struct device_node *np;
+> >+	u32 freq, div_m, div_n;
+> >+	struct resource res;
+> I feel stupid for questioning this, since it only shows my lack of
+> knowledge, but
+> If you declare all the memory here, isn't all the data lost after
+> exiting the _probe function? we pass a pointer to this memory in the
+> of_address_to_resource() function so that fills it, right?
+> 
+> Or does after devm_ioremap_resource it no longer matter, since that
+> function got what it needed and useless after?
+
+The struct resource is only there to declare the base address and the
+size of memory address. Once we have mapped it, we don't care about it
+anymore.
+
+Maxime
+
 -- 
-1.7.10.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
