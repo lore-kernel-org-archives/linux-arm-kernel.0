@@ -1,30 +1,31 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 26 May 2013 14:05:13 -0400
-Subject: Kirkwood CPU Freq driver
-In-Reply-To: <20130526083614.GB26249@lunn.ch>
-References: <51A12DD4.9010907@baker-net.org.uk>
- <20130526083614.GB26249@lunn.ch>
-Message-ID: <20130526180513.GF31290@titan.lakedaemon.net>
+From: pavel@denx.de (Pavel Machek)
+Date: Sun, 26 May 2013 20:11:16 +0200
+Subject: [PATCHv4 6/6] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
+In-Reply-To: <201305242058.34332.arnd@arndb.de>
+References: <1369410080-436-1-git-send-email-dinguyen@altera.com>
+ <201305241912.53751.arnd@arndb.de>
+ <1369418588.9717.0.camel@linux-builds1>
+ <201305242058.34332.arnd@arndb.de>
+Message-ID: <20130526181116.GA16409@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 26, 2013 at 10:36:14AM +0200, Andrew Lunn wrote:
-> On Sat, May 25, 2013 at 10:32:04PM +0100, Adam Baker wrote:
-> > I've been trying to test Andrew Lunn's work creating a CPU Idle
-> > driver for Kirkwood.
+On Fri 2013-05-24 20:58:34, Arnd Bergmann wrote:
+> On Friday 24 May 2013, Dinh Nguyen wrote:
+> > I apologize for that. Will make sure to include a [PATCH 0/6] message in
+> > the future.
 > 
-> Thanks for testing this. I must admit, i never tested it once the
-> first rc came out. I clearly should of, because its broken. It was a
-> three part patch series, and only part 1/3 made it in. Hence the
-> issues you are seeing.
-> 
-> Jason, please can you pick up:
-> 
-> https://patchwork.kernel.org/patch/2051401/
-> https://patchwork.kernel.org/patch/2080931/
+> No worries, I actually saw now that my only other comment was also
+> wrong, as you have the binding I was looking for in patch 5/6.
 
-Yep, got them in now.  Sorry for the mix up.
+Could you take the series through your tree?
 
-thx,
+Patches 1,2,4,5/6 are mostly local to arch/arm, 3/6 is stuff Dinh is
+listed as a maintainer for, and 6/6 is fairly socfpga-specific,
+too. (I guess Dinh could add MAINTAINERs entry for that...).
 
-Jason.
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
