@@ -1,11 +1,54 @@
-From: upshead@nvr.ru (musfhd)
-Date: Sun, 26 May 2013 16:49:39 +0300
-Subject: =?koi8-r?B?wsXa1dDSxd7Oz8Ug0sXbxc7YxSDEzNEgzMDC2cgg18Hb?=
- =?koi8-r?B?ycgg18/Q0s/TycvP1w==?=
-Message-ID: <22306277.20130526172100@nvr.ru>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 26 May 2013 17:30:37 +0200
+Subject: [PATCH 0/5] ARM: at91: Calao USB-A926x switch completyl to dt and
+ drop board file
+Message-ID: <20130526153037.GQ24476@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-=D0=D2=C5=C4=CF=C2=D2=CF =D0=D2=CF=DB=D5 =CE=C1 =CE=C1=DB =D3=C1=CA=D4. =F7=
-=C1=CD =D0=CF=CC=C0=C2=C9=D4=D3=D1 =D4=CF =D2=CF=D7=CE=CF =F7=D9 =CE=C1 =CE=
-=C5=CD =D5=D7=C9=C4=C9=D4=C5. http://goo.gl/JzXkG?/EcOkY
+Hi,
+
+	The Follwing patch serie finish to swtich the Calao USB-A926x to DT
+	and drop the board file.
+
+	This is the first boards to be drop on at91
+
+The following changes since commit 24577c1b3ebf3eab6465bb112a6265e87400163e:
+
+  ARM: at91: dt: sam9260: add i2c gpio pinctrl (2013-05-26 16:56:39 +0800)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git j/for-3.11-calao-dt
+
+for you to fetch changes up to c3ea1d2cc2f543ee0646a75890e1a7be5dd82c0b:
+
+  ARM: at91: drop non DT: Calao USB-A96x (2013-05-26 23:32:23 +0800)
+
+----------------------------------------------------------------
+Jean-Christophe PLAGNIOL-VILLARD (5):
+      ARM: at91: dt: usb-a9260: update shutdown controller
+      ARM: at91: dt: usb-a9263: update shutdown controller
+      ARM: at91: dt: usb-a9263: add dataflash support
+      ARM: at91: dt: add Calao USB-A9G20 low power version
+      ARM: at91: drop non DT: Calao USB-A96x
+
+ arch/arm/boot/dts/Makefile                  |    1 +
+ arch/arm/boot/dts/usb_a9260.dts             |    9 ++++++
+ arch/arm/boot/dts/usb_a9263.dts             |   14 +++++++++
+ arch/arm/boot/dts/usb_a9g20.dts             |   18 +----------
+ arch/arm/boot/dts/usb_a9g20_common.dtsi     |   27 ++++++++++++++++
+ arch/arm/boot/dts/usb_a9g20_lpw.dts         |   31 ++++++++++++++++++
+ arch/arm/configs/at91_dt_defconfig          |    2 ++
+ arch/arm/configs/at91sam9260_9g20_defconfig |    1 -
+ arch/arm/configs/at91sam9263_defconfig      |    1 -
+ arch/arm/mach-at91/Kconfig.non_dt           |   19 -----------
+ arch/arm/mach-at91/Makefile                 |    3 --
+ arch/arm/mach-at91/board-usb-a926x.c        |  384 ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ 12 files changed, 85 insertions(+), 425 deletions(-)
+ create mode 100644 arch/arm/boot/dts/usb_a9g20_common.dtsi
+ create mode 100644 arch/arm/boot/dts/usb_a9g20_lpw.dts
+ delete mode 100644 arch/arm/mach-at91/board-usb-a926x.c
+
+Best Regards,
+J.
