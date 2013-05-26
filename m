@@ -1,33 +1,28 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Sun, 26 May 2013 14:54:34 +0800
-Subject: [PATCH] arch: arm: mach-msm: using strlcpy instead of strncpy
-Message-ID: <51A1B1AA.9090605@asianux.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 26 May 2013 10:36:14 +0200
+Subject: Kirkwood CPU Freq driver
+In-Reply-To: <51A12DD4.9010907@baker-net.org.uk>
+References: <51A12DD4.9010907@baker-net.org.uk>
+Message-ID: <20130526083614.GB26249@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, May 25, 2013 at 10:32:04PM +0100, Adam Baker wrote:
+> Hi,
+> 
+> I've been trying to test Andrew Lunn's work creating a CPU Idle
+> driver for Kirkwood.
 
-For NULL terminated string, need always be sure of ended by zero.
+Hi Adam
 
-Or the next 'ptr' in 'for' looping may cause issue.
+Thanks for testing this. I must admit, i never tested it once the
+first rc came out. I clearly should of, because its broken. It was a
+three part patch series, and only part 1/3 made it in. Hence the
+issues you are seeing.
 
+Jason, please can you pick up:
 
-Signed-off-by: Chen Gang <gang.chen@asianux.com>
----
- arch/arm/mach-msm/clock-debug.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+https://patchwork.kernel.org/patch/2051401/
+https://patchwork.kernel.org/patch/2080931/
 
-diff --git a/arch/arm/mach-msm/clock-debug.c b/arch/arm/mach-msm/clock-debug.c
-index 4886404..b0fbdf1 100644
---- a/arch/arm/mach-msm/clock-debug.c
-+++ b/arch/arm/mach-msm/clock-debug.c
-@@ -104,7 +104,7 @@ int __init clock_debug_add(struct clk *clock)
- 	if (!debugfs_base)
- 		return -ENOMEM;
- 
--	strncpy(temp, clock->dbg_name, ARRAY_SIZE(temp)-1);
-+	strlcpy(temp, clock->dbg_name, ARRAY_SIZE(temp));
- 	for (ptr = temp; *ptr; ptr++)
- 		*ptr = tolower(*ptr);
- 
--- 
-1.7.7.6
+	Andrew
