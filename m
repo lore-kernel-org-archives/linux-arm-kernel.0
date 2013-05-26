@@ -1,24 +1,29 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sun, 26 May 2013 14:02:29 -0400
-Subject: [PATCH v3 3/3] arm: kirkwood: Enable cpufreq and ondemand on
- kirkwood_defconfig
-In-Reply-To: <1359281244-31455-4-git-send-email-andrew@lunn.ch>
-References: <1359281244-31455-1-git-send-email-andrew@lunn.ch>
- <1359281244-31455-4-git-send-email-andrew@lunn.ch>
-Message-ID: <20130526180229.GE31290@titan.lakedaemon.net>
+Date: Sun, 26 May 2013 14:05:13 -0400
+Subject: Kirkwood CPU Freq driver
+In-Reply-To: <20130526083614.GB26249@lunn.ch>
+References: <51A12DD4.9010907@baker-net.org.uk>
+ <20130526083614.GB26249@lunn.ch>
+Message-ID: <20130526180513.GF31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 27, 2013 at 11:07:24AM +0100, Andrew Lunn wrote:
-> Now that we have a cpufreq driver for kirkwood, enable it in
-> kirkwood_defconfig and set the default governer to ondemand.
+On Sun, May 26, 2013 at 10:36:14AM +0200, Andrew Lunn wrote:
+> On Sat, May 25, 2013 at 10:32:04PM +0100, Adam Baker wrote:
+> > I've been trying to test Andrew Lunn's work creating a CPU Idle
+> > driver for Kirkwood.
 > 
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
->  arch/arm/configs/kirkwood_defconfig |    3 +++
->  1 file changed, 3 insertions(+)
+> Thanks for testing this. I must admit, i never tested it once the
+> first rc came out. I clearly should of, because its broken. It was a
+> three part patch series, and only part 1/3 made it in. Hence the
+> issues you are seeing.
+> 
+> Jason, please can you pick up:
+> 
+> https://patchwork.kernel.org/patch/2051401/
+> https://patchwork.kernel.org/patch/2080931/
 
-Applied to mvebu/defconfig
+Yep, got them in now.  Sorry for the mix up.
 
 thx,
 
