@@ -1,62 +1,85 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 26 May 2013 10:34:30 +0200
-Subject: [GIT PULL] at91: USBA DT support for 3.11
-Message-ID: <20130526083430.GP24476@game.jcrosoft.org>
+From: david.woodhouse@intel.com (Woodhouse, David)
+Date: Sun, 26 May 2013 09:30:00 +0000
+Subject: [PATCH v7] arm: use built-in byte swap function
+In-Reply-To: <51A19FDD.9040403@gmail.com>
+References: <20130129181046.GC25415@pd.tnic>
+ <alpine.LFD.2.02.1302082102380.6300@xanadu.home>
+ <20130219203115.114eab79e8d2099c6306d921@freescale.com>
+ <alpine.LFD.2.03.1302192151280.6419@syhkavp.arg>
+ <1361356696.13482.269.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302200835380.6419@syhkavp.arg>
+ <1361367842.13482.279.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302200905300.6419@syhkavp.arg>
+ <1361372008.13482.280.camel@i7.infradead.org>
+ <alpine.LFD.2.03.1302201040460.6419@syhkavp.arg>
+ <20130220214943.9b28a5b208da9f081387c55e@freescale.com>
+ <alpine.LFD.2.03.1302202327370.6419@syhkavp.arg>
+ <20130221005221.15279b1372501af12c1e4f32@freescale.com>
+ <alpine.LFD.2.03.1302211134160.6419@syhkavp.arg>
+ <20130221203327.6558f89277468f7ffffa6506@freescale.com>
+ <alpine.LFD.2.03.1302212219100.6419@syhkavp.arg>
+ <20130222194032.f7b44aefa5e2723d16767a1b@freescale.com>
+ <1361661654.18110.102.camel@shinybook.infradead.org>
+ <20130523114654.1f273241725205c6703b2226@freescale.com>
+ <51A19FDD.9040403@gmail.com>
+Message-ID: <1369560593.27719.67.camel@shinybook.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof
+On Sun, 2013-05-26 at 07:38 +0200, Dirk Behme wrote:
+> Am 23.05.2013 18:46, schrieb Kim Phillips:
+> > Enable the compiler intrinsic for byte swapping on arch ARM.  This
+> > allows the compiler to detect and be able to optimize out byte
+> > swappings, and has a very modest benefit on vmlinux size (Linaro gcc
+> > 4.8):
+> 
+> I'm no GCC tool chain expert, so I just have an understanding 
+> question: Could anyone kindly give a brief explanation (*) of what the 
+> advantage of this is on ARM?
+> 
+> http://comments.gmane.org/gmane.linux.kernel.cross-arch/16016
+> 
+> mentions "lwbrx/stwbrx on PowerPC, movbe on Atom". But for ARM?
+> 
+> I haven't understood yet why the __arch_swabXX() in 
+> arch/arm/include/asm/swab.h [1] aren't sufficient? How can this be 
+> done better? E.g. does anybody have a disassembly without/with this 
+> change to illustrate that?
 
-Second AT91 pull-request for 3.11
+The point is just that the compiler gets to *see* what's happening.
 
-This add the DT support the USBA present in the most recents AT91 SoC
-As agree with Arnd and Filipe we send the drivers via arm-soc
+See http://gcc.gnu.org/bugzilla/show_bug.cgi?id=55177 for a bunch of
+examples of things that GCC ought to be able to optimise, even without
+the CPU having load-and-swap instructions. Not that it always does;
+hence the PR. But there are some that it does currently manage,
+evidently.
 
-this is base on previous pull request at91-3.11-cleanup1+resolved
+You'll see this if you follow the link above, but as an example: imagine
+a code sequence that goes load, swap, mask, swap, store.
 
-Best Regards,
-J.
+With the swaps done by opaque inline asm, there's nothing the compiler
+can do to optimise this. But if it *knows* what's going on, it can
+optimise it into a single load, mask of a pre-byte-swapped constant, and
+store.
 
-The following changes since commit 7a76f53b01685eda605fa15ccaa1ca90a7aa2c33:
+Having said that, I can't actually answer your question ? I don't know
+which optimisations the compiler *is* doing to provide the "modest
+benefit" that Kim mentions; every class of optimisation I explicitly
+checked for was missing. Again, hence the PR. But evidently it does
+manage to get *something* right.
 
-  ARM: at91: udpate defconfigs (2013-05-24 18:02:06 +0200)
+-- 
+                Sent with Evolution's ActiveSync support.
 
-are available in the git repository at:
+David Woodhouse                            Open Source Technology Centre
+David.Woodhouse at intel.com                              Intel Corporation
 
-  git://github.com/at91linux/linux-at91.git tags/at91-3.11-dt-usba
 
-for you to fetch changes up to e6a2ba4b6fc828917c66cd7ffafdfb7a889d7bee:
 
-  ARM: at91: sam9m10g45ek add udc DT support (2013-05-26 16:35:55 +0800)
-
-----------------------------------------------------------------
-ARM: at91: dt: add USBA support
-
-This patch serie finish to add the usb device support to dt for at91
-with the usba support present on the last at91 generation since sam9g45
-
-update driver & dt
-
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (7):
-      USB: gadget: atmel_usba: move global struct usba_ep usba_ep to struct usba_udc
-      USB: gadget: atmel_usba: allow multi instance
-      USB: gadget: atmel_usba: add DT support
-      ARM: at91: sam9x5 add udc DT support
-      ARM: at91: sam9x5ek add udc DT support
-      ARM: at91: sam9g45 add udc DT support
-      ARM: at91: sam9m10g45ek add udc DT support
-
- Documentation/devicetree/bindings/usb/atmel-usb.txt |   82 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9g45.dtsi                  |   62 +++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts              |    5 +++++
- arch/arm/boot/dts/at91sam9x5.dtsi                   |   62 +++++++++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/at91sam9x5ek.dtsi                 |    5 +++++
- arch/arm/mach-at91/at91sam9g45.c                    |    2 ++
- arch/arm/mach-at91/at91sam9x5.c                     |    2 ++
- drivers/usb/gadget/Kconfig                          |    2 +-
- drivers/usb/gadget/atmel_usba_udc.c                 |  264 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-----------------------------------------------------------------
- drivers/usb/gadget/atmel_usba_udc.h                 |    2 ++
- 10 files changed, 407 insertions(+), 81 deletions(-)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: smime.p7s
+Type: application/x-pkcs7-signature
+Size: 4370 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130526/9c798d60/attachment-0001.bin>
