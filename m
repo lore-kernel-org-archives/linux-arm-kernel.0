@@ -1,47 +1,86 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 May 2013 12:00:43 +0200
-Subject: [PATCHv3 6/6] ARM: sun4i: cubieboard: Enable the i2c controllers
-In-Reply-To: <1369648843-1640-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1369648843-1640-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1369648843-1640-7-git-send-email-maxime.ripard@free-electrons.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 27 May 2013 18:02:40 +0800
+Subject: [PATCH v2] arm64: kernel: compiling issue,
+ need delete read_current_timer().
+In-Reply-To: <519B425D.4030806@asianux.com>
+References: <5199C725.8050102@asianux.com>
+ <168084c28e8ba5124c05553e97463172@localhost>
+ <20130520095606.GH31359@mudshark.cambridge.arm.com>
+ <519AF2DC.2040200@asianux.com>
+ <20130521085325.GB10453@mudshark.cambridge.arm.com>
+ <519B425D.4030806@asianux.com>
+Message-ID: <51A32F40.1050309@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Emilio L?pez <emilio@elopez.com.ar>
+Hello Maintainers:
 
-The Cubieboard makes use of the first two i2c controllers found on the
-Allwinner A10; i2c-0 is used internally for the PMIC, while i2c-1
-is exposed on the board headers. This patch enables them in the device
-tree.
+Please help check this patch whether OK, when you have time.
 
-Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Thanks.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index b70fe0d..0e22a28 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -41,6 +41,18 @@
- 			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c0_pins_a>;
-+			status = "okay";
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&i2c1_pins_a>;
-+			status = "okay";
-+		};
- 	};
- 
- 	leds {
+On 05/21/2013 05:46 PM, Chen Gang wrote:
+> 
+> Under arm64, we will calibrate the delay loop statically using a known
+> timer frequency, so delete read_current_timer(), or it will cause
+> compiling issue with allmodconfig.
+> 
+> The related error:
+>   ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
+>   ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
+>   ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
+>   ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
+> 
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm64/include/asm/timex.h |    6 +++---
+>  arch/arm64/kernel/time.c       |    6 ------
+>  2 files changed, 3 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/timex.h b/arch/arm64/include/asm/timex.h
+> index b24a31a..81a076e 100644
+> --- a/arch/arm64/include/asm/timex.h
+> +++ b/arch/arm64/include/asm/timex.h
+> @@ -16,14 +16,14 @@
+>  #ifndef __ASM_TIMEX_H
+>  #define __ASM_TIMEX_H
+>  
+> +#include <asm/arch_timer.h>
+> +
+>  /*
+>   * Use the current timer as a cycle counter since this is what we use for
+>   * the delay loop.
+>   */
+> -#define get_cycles()	({ cycles_t c; read_current_timer(&c); c; })
+> +#define get_cycles()	arch_counter_get_cntvct()
+>  
+>  #include <asm-generic/timex.h>
+>  
+> -#define ARCH_HAS_READ_CURRENT_TIMER
+> -
+>  #endif
+> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+> index a551f88..03dc371 100644
+> --- a/arch/arm64/kernel/time.c
+> +++ b/arch/arm64/kernel/time.c
+> @@ -68,12 +68,6 @@ unsigned long long notrace sched_clock(void)
+>  	return arch_timer_read_counter() * sched_clock_mult;
+>  }
+>  
+> -int read_current_timer(unsigned long *timer_value)
+> -{
+> -	*timer_value = arch_timer_read_counter();
+> -	return 0;
+> -}
+> -
+>  void __init time_init(void)
+>  {
+>  	u32 arch_timer_rate;
+> 
+
+
 -- 
-1.8.2.3
+Chen Gang
+
+Asianux Corporation
