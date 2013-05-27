@@ -1,33 +1,62 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 27 May 2013 18:49:55 +0800
-Subject: [PATCH] ARM: S5PV210: dependency issue, S5P_SLEEP is depend on
- ARM_CPU_SUSPEND
-In-Reply-To: <158201ce5ac2$a7843de0$f68cb9a0$%kim@samsung.com>
-References: <5199E4AF.7040607@asianux.com> <51A32FD4.4000001@asianux.com>
- <158201ce5ac2$a7843de0$f68cb9a0$%kim@samsung.com>
-Message-ID: <51A33A53.1050502@asianux.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 May 2013 12:53:14 +0200
+Subject: [RFC PATCHv4 4/6] clocksource: TI-Nspire timer support
+In-Reply-To: <1369480087-24786-5-git-send-email-dt.tangr@gmail.com>
+References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
+ <1369480087-24786-5-git-send-email-dt.tangr@gmail.com>
+Message-ID: <CACRpkda4Qe1e+dkcSgPLf5dcHASvOG=Y=Dvrnv=oGnon+FRzzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2013 06:12 PM, Kukjin Kim wrote:
->>>  config S5P_SLEEP
->>> > >  	bool
->>> > > +	select ARM_CPU_SUSPEND
-> Probably,
-> 
-> +	select ARM_CPU_SUSPEND if PM ?
-> 
-> selecting the S5P_SLEEP depends on PM though...
+On Sat, May 25, 2013 at 1:08 PM, Daniel Tang <dt.tangr@gmail.com> wrote:
 
-After reference another platform, they are really all "select
-ARM_CPU_SUSPEND if PM", we'd really better to follow by to let readers
-easy understanding.
+> Add clocksource and clockevent driver for the TI-Nspire.
+>
+> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
 
-I will send patch v2.
+This is *much* improved :-D
 
+But:
 
-Thanks.
--- 
-Chen Gang
+> +++ b/drivers/clocksource/zevio-timer.c
 
-Asianux Corporation
+> +static void zevio_timer_set_mode(enum clock_event_mode mode,
+> +               struct clock_event_device *dev)
+> +{
+> +       unsigned long flags;
+> +       struct zevio_timer *timer = container_of(dev,
+> +                       struct zevio_timer,
+> +                       clkevt);
+> +
+> +       local_irq_save(flags);
+> +
+> +       switch (mode) {
+> +       case CLOCK_EVT_MODE_PERIODIC:
+> +               /* Unsupported */
+> +               break;
+> +       case CLOCK_EVT_MODE_RESUME:
+> +       case CLOCK_EVT_MODE_ONESHOT:
+> +               /* Enable timer interrupts */
+> +               writel(TIMER_INTR_MSK, timer->interrupt_regs + IO_INTR_MSK);
+> +               writel(TIMER_INTR_ALL, timer->interrupt_regs + IO_INTR_ACK);
+> +               dev->mode = mode;
+> +               break;
+> +       case CLOCK_EVT_MODE_SHUTDOWN:
+> +       case CLOCK_EVT_MODE_UNUSED:
+> +               /* Disable timer interrupts */
+> +               writel(0, timer->interrupt_regs + IO_INTR_MSK);
+> +               writel(TIMER_INTR_ALL, timer->interrupt_regs + IO_INTR_ACK);
+> +               /* Stop timer */
+> +               writel(CNTL_STOP_TIMER, timer->timer1 + IO_CONTROL);
+> +               dev->mode = mode;
+> +               break;
+> +       }
+
+Surely both the compiler and checkpatch is complaining that this
+switch does not contain a default: clause?
+
+If you fix this you can add my:
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
