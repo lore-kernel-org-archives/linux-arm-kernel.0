@@ -1,82 +1,63 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 27 May 2013 09:50:29 +0200
-Subject: [GIT PULL] arm-soc: Xilinx zynq clock changes for v3.11
-Message-ID: <51A31045.1060406@monstr.eu>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Mon, 27 May 2013 13:24:39 +0530
+Subject: [PATCH] clk: tegra: fix clk_out parents list
+Message-ID: <1369641279-6894-1-git-send-email-pgaikwad@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+Number of parents for clk_out_2 and clk_out_3 was incorrectly set
+to clk_out1_parents. Even though it did not break anything since the
+size was same better to fix.
 
-please pull the following changes to your arm-soc tree.
-We haven't got any response from audience or clk maintainer
-but we discussed these changes with him in several threads.
-The major change is to have easy to going DT clock description
-in one node and do not describe the whole clock tree in details
-which none uses.
+Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
+---
+ drivers/clk/tegra/clk-tegra114.c |    4 ++--
+ drivers/clk/tegra/clk-tegra30.c  |    4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-Thanks,
-Michal
-
-
-The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
-
-  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
-
-are available in the git repository at:
-
-  git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-for-3.11
-
-for you to fetch changes up to 83d6e5996a34267e4402e6365c528bddd042ddf3:
-
-  clk: zynq: Remove deprecated clock code (2013-05-27 09:21:49 +0200)
-
-----------------------------------------------------------------
-arm: Xilinx Zynq clock changes for v3.11
-
-Change Xilinx Zynq DT clock description which
-reflects logical abstraction of Zynq's clock tree.
-
-- Refactor PLL driver
-- Use new clock controller driver
-- Change timer and uart drivers
-
-----------------------------------------------------------------
-Soren Brinkmann (4):
-      clk: zynq: Factor out PLL driver
-      clk: zynq: Add clock controller driver
-      arm: zynq: Migrate platform to clock controller
-      clk: zynq: Remove deprecated clock code
-
- Documentation/devicetree/bindings/clock/zynq-7000.txt | 123 ++++++++++++++-------
- arch/arm/boot/dts/zynq-7000.dtsi                      |  71 ++++--------
- arch/arm/boot/dts/zynq-zc702.dts                      |   4 -
- arch/arm/mach-zynq/slcr.c                             |   2 +-
- drivers/clk/Makefile                                  |   2 +-
- drivers/clk/clk-zynq.c                                | 378 --------------------------------------------------------------
- drivers/clk/zynq/Makefile                             |   3 +
- drivers/clk/zynq/clkc.c                               | 533 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/zynq/pll.c                                | 235 +++++++++++++++++++++++++++++++++++++++
- drivers/clocksource/cadence_ttc_timer.c               |  23 +++-
- drivers/tty/serial/xilinx_uartps.c                    |  85 +++++++++++---
- include/linux/clk/zynq.h                              |   8 +-
- 12 files changed, 972 insertions(+), 495 deletions(-)
- delete mode 100644 drivers/clk/clk-zynq.c
- create mode 100644 drivers/clk/zynq/Makefile
- create mode 100644 drivers/clk/zynq/clkc.c
- create mode 100644 drivers/clk/zynq/pll.c
-
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index e0ee077..6d438bb 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -1602,7 +1602,7 @@ static void __init tegra114_pmc_clk_init(void __iomem *pmc_base)
+ 
+ 	/* clk_out_2 */
+ 	clk = clk_register_mux(NULL, "clk_out_2_mux", clk_out2_parents,
+-			       ARRAY_SIZE(clk_out1_parents), 0,
++			       ARRAY_SIZE(clk_out2_parents), 0,
+ 			       pmc_base + PMC_CLK_OUT_CNTRL, 14, 3, 0,
+ 			       &clk_out_lock);
+ 	clks[clk_out_2_mux] = clk;
+@@ -1614,7 +1614,7 @@ static void __init tegra114_pmc_clk_init(void __iomem *pmc_base)
+ 
+ 	/* clk_out_3 */
+ 	clk = clk_register_mux(NULL, "clk_out_3_mux", clk_out3_parents,
+-			       ARRAY_SIZE(clk_out1_parents), 0,
++			       ARRAY_SIZE(clk_out3_parents), 0,
+ 			       pmc_base + PMC_CLK_OUT_CNTRL, 22, 3, 0,
+ 			       &clk_out_lock);
+ 	clks[clk_out_3_mux] = clk;
+diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
+index 985ad69..b62e140 100644
+--- a/drivers/clk/tegra/clk-tegra30.c
++++ b/drivers/clk/tegra/clk-tegra30.c
+@@ -1223,7 +1223,7 @@ static void __init tegra30_pmc_clk_init(void)
+ 
+ 	/* clk_out_2 */
+ 	clk = clk_register_mux(NULL, "clk_out_2_mux", clk_out2_parents,
+-			       ARRAY_SIZE(clk_out1_parents), 0,
++			       ARRAY_SIZE(clk_out2_parents), 0,
+ 			       pmc_base + PMC_CLK_OUT_CNTRL, 14, 3, 0,
+ 			       &clk_out_lock);
+ 	clk = clk_register_gate(NULL, "clk_out_2", "clk_out_2_mux", 0,
+@@ -1234,7 +1234,7 @@ static void __init tegra30_pmc_clk_init(void)
+ 
+ 	/* clk_out_3 */
+ 	clk = clk_register_mux(NULL, "clk_out_3_mux", clk_out3_parents,
+-			       ARRAY_SIZE(clk_out1_parents), 0,
++			       ARRAY_SIZE(clk_out3_parents), 0,
+ 			       pmc_base + PMC_CLK_OUT_CNTRL, 22, 3, 0,
+ 			       &clk_out_lock);
+ 	clk = clk_register_gate(NULL, "clk_out_3", "clk_out_3_mux", 0,
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130527/285c1f01/attachment.sig>
+1.7.4.1
