@@ -1,31 +1,23 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 27 May 2013 11:19:01 +0200
-Subject: [PATCH 00/21] ARM: kirkwood: improve pinmux configs in Device Tree
-In-Reply-To: <20130527.181018.461275386.yamagata@plathome.co.jp>
-References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130527.181018.461275386.yamagata@plathome.co.jp>
-Message-ID: <20130527111901.73fba8bf@skate>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 27 May 2013 02:23:39 -0700 (PDT)
+Subject: [PATCH 1/2] ARM: kirkwood: proper retain MAC address
+ workaround on DT ethernet
+In-Reply-To: <51A26B62.4050009@gmail.com>
+References: <1369253042-15082-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130525.210441.818472895703230779.davem@davemloft.net>
+ <51A26B62.4050009@gmail.com>
+Message-ID: <20130527.022339.791886107453761860.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Date: Sun, 26 May 2013 22:06:58 +0200
 
-On Mon, 27 May 2013 18:10:18 +0900 (JST), yamagata at plathome.co.jp wrote:
-> Dear Mr. Petazzoni
+> good you mention it. I added Grant on Cc and will give a short
+> sum-up why I casted the const from property->value away here.
 > 
-> > The last patch finally adds support for the init button of the
-> > Plathome OpenBlocks A6 platform.
-> 
-> I have checked the init button worked well with your three patches for
-> linux-3.10-rc3 and 3.9.4.
-> 
-> Tested-by: Atsushi Yamagata <yamagata@plathome.co.jp>
+> Maybe I overlooked the API for modifying the DT property but as
+> far as I've seen - there is no API for modifying it. And yes,
+> you are right, it is kind of an abuse of DT here.
 
-Thanks for your testing!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Sparc has an of_set_property(), it needs to become generic.
