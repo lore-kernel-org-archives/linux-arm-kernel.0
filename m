@@ -1,29 +1,74 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 27 May 2013 16:55:57 +0200
-Subject: [PATCH] clk: tegra: fix clk_out parents list
-In-Reply-To: <1369641279-6894-1-git-send-email-pgaikwad@nvidia.com>
-References: <1369641279-6894-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <20130527145557.GB9460@mithrandir>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 27 May 2013 10:58:28 -0400 (EDT)
+Subject: [RFC V7 PATCH 3/3] USB: OHCI: make ohci-pci a separate driver
+In-Reply-To: <1369657550-24101-4-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1305271056390.21231-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 27, 2013 at 01:24:39PM +0530, Prashant Gaikwad wrote:
-> Number of parents for clk_out_2 and clk_out_3 was incorrectly set
-> to clk_out1_parents. Even though it did not break anything since the
-> size was same better to fix.
+On Mon, 27 May 2013, Manjunath Goudar wrote:
 
-This last part of the sentence is hard to understand, I think you meant:
+> This patch splits the PCI portion of ohci-hcd out into its
+> own separate driver module, called ohci-pci.
+> 
+> The major point of difficulty lies in ohci-pci's many vendor- and
+> device-specific workarounds.  Some of them have to be applied before
+> calling ohci_start() some after, which necessitates a fair amount of
+> code motion.  The other platform drivers require much smaller changes.
+> 
+> The complete sb800_prefetch() function moved to ohci-q.c,because its
+> only related to ohci-pci driver.
+> 
+> V2:
+>   - few specific content of pci related code in ohci_pci_start function has been moved to ohci_pci_reset
+>     and rest of the generic code is written in ohci_start of ohci-hcd.c file.
+> V3:
+>  - ohci_restart() has been called in ohci_pci_reset() function for to reset the ohci pci.
+> 
+> V4:
+>  -sb800_prefetch() moved to ohci-q.c,because its only related to ohci-pci.
+>  -no longer _creating_ CONFIG_USB_OHCI_PCI,creating CONFIG_USB_OHCI_HCD_PCI.
+>  -overrides renamed with pci_override,its giving proper meaning.
+> 
+> V5:
+>  -sb800_prefetch() moved to pci-quirks.c,because its only related to pci.
+> 
+> V6:
+>  -sb800_prefetch() function has been moved to pci-quirks.c made as separate patch in 2/3.
+>  -Most of the generic ohci pci changes moved in 2/3 patch,now this is complete  ohci-pci separation patch.
+> 
+> V7:
+>  -Unrelated include file has been removed from ohci.h file.
 
-	Even though it did not break anything since the size was the
-	same, it should still be fixed.
+One tiny mistake still remains...
 
-Other than that:
+> @@ -242,94 +249,24 @@ static int ohci_pci_reset (struct usb_hcd *hcd)
+>  			ret = quirk(hcd);
+>  		}
+>  	}
+> -	if (ret == 0) {
+> -		ohci_hcd_init (ohci);
+> -		return ohci_init (ohci);
+> -	}
 
-Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130527/7121415c/attachment.sig>
+...
+
+> +	if (ret == 0)
+> +		ohci_setup(hcd);
+
+This should say
+
+		ret = ohci_setup(hcd);
+
+so that errors in ohci_setup() won't be ignored.
+
+> +	/*
+> +	* After ohci setup RWC may not be set for add-in PCI cards.
+> +	* This transfers PCI PM wakeup capabilities.
+> +	*/
+> +	if (device_can_wakeup(&pdev->dev))
+> +		ohci->hc_control |= OHCI_CTRL_RWC;
+>  	return ret;
+>  }
+
+Alan Stern
