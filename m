@@ -1,22 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 May 2013 13:39:07 +0200
-Subject: [PATCH] ARM: ux500: regulators: Remove misleading comment
-In-Reply-To: <1369227995-17142-1-git-send-email-lee.jones@linaro.org>
-References: <1369227995-17142-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYAd=X7rCj+Xs=cQ5CZf3-mpLpiGKjmfVZ+pC_QSq-+Kg@mail.gmail.com>
+From: rickard.andersson@stericsson.com (Rickard ANDERSSON)
+Date: Mon, 27 May 2013 13:40:55 +0200
+Subject: [PATCH V2 0/3] mmc: mmci: Support ap_sleep in cpuidle for ux500
+In-Reply-To: <1369302307-28540-1-git-send-email-ulf.hansson@stericsson.com>
+References: <1369302307-28540-1-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <C832F8F5D375BD43BFA11E82E0FE9FE0115A936A54@EXDCVYMBSTM005.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 3:06 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Acked-by: Rickard Andersson <rickard.andersson@stericsson.com>
 
-> This patch removes a comment which explains that the ab8505 platform
-> uses the same initialisation settings as the ab8500. Well when this
-> changed and the ab8505 started using its own set of initialisation
-> values, someone forgot to remove it.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+-----Original Message-----
+From: Ulf HANSSON 
+Sent: den 23 maj 2013 11:45
+To: linux-arm-kernel at lists.infradead.org; Russell King
+Cc: linux-mmc at vger.kernel.org; Chris Ball; Daniel Lezcano; Linus Walleij; Rickard ANDERSSON; Ulf Hansson
+Subject: [PATCH V2 0/3] mmc: mmci: Support ap_sleep in cpuidle for ux500
 
-Patch applied for ux500-core, thanks!
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Yours,
-Linus Walleij
+To be able to enter ap_sleep state in cpuidle were the APE power domain regulator will be cut, a register save and restore mechanism needs to be implemented. This patchset adapts to these restrictions.
+
+Ulf Hansson (3):
+  mmc: mmci: Use optional sleep pinctrl state
+  mmc: mmci: Adapt to register write restrictions
+  mmc: mmci: Save and restore register context
+
+ drivers/mmc/host/mmci.c |   75 +++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/mmc/host/mmci.h |    1 +
+ 2 files changed, 76 insertions(+)
+
+--
+1.7.10
