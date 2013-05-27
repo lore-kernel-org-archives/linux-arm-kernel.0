@@ -1,29 +1,30 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 27 May 2013 12:24:07 +0200
-Subject: [PATCH 1/2] ARM: kirkwood: proper retain MAC address workaround
- on DT ethernet
-In-Reply-To: <1369647565.3557.28.camel@pasglop>
-References: <1369253042-15082-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130525.210441.818472895703230779.davem@davemloft.net>
- <51A26B62.4050009@gmail.com>
- <20130527.022339.791886107453761860.davem@davemloft.net>
- <1369647565.3557.28.camel@pasglop>
-Message-ID: <51A33447.80305@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 May 2013 12:31:40 +0200
+Subject: [RFC PATCHv4 0/6] arm: Initial TI-Nspire support
+In-Reply-To: <30BA4666-664F-4DA4-A1D5-C2B8AA63C6AB@gmail.com>
+References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
+ <201305262323.29519.arnd@arndb.de>
+ <30BA4666-664F-4DA4-A1D5-C2B8AA63C6AB@gmail.com>
+Message-ID: <201305271231.40693.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/13 11:39, Benjamin Herrenschmidt wrote:
-> On Mon, 2013-05-27 at 02:23 -0700, David Miller wrote:
->> Sparc has an of_set_property(), it needs to become generic.
->
-> There is an of_update_property(), we could change the name though, yours
-> is nicer :-)
+On Monday 27 May 2013, Daniel Tang wrote:
+> > The one remaining bit that sticks out is the clcd platform data. As I
+> > said before, I won't require you to convert that to DT in order to
+> > get your code merged, but I'd also really like to see that happen,
+> > as we will also need that to get rid of auxdata on the ARM reference
+> > platforms (integrator, versatile, realview, vexpress).
+> 
+> How would you like me to convert the platform data to DT? AFAIK, the clcd
+> driver isn't aware of DT so the only way is to use the AUXDATA right now.
 
-Ben, David,
+Linus Walleij mentioned on IRC that Pawel Moll already posted a series
+that adds DT support for clcd:
 
-I had a quick look at sparc's of_set_property. Nothing special except it
-depends on OF_DYNAMIC at some place. Using of_update_property instead
-should be the correct function to use. Thanks for the hint, I'll update
-the patches accordingly and send v5 hopefully by today.
+http://lists.freedesktop.org/archives/dri-devel/2013-April/037519.html
 
-Sebastian
+The series does a few more things, but you can probbly split out the
+parts you need and base on that.
+
+	Arnd
