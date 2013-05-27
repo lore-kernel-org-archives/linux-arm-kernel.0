@@ -1,113 +1,32 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 27 May 2013 14:48:15 +0800
-Subject: [PATCH v3 4/6] ARM: dts: imx6q: add pinctrls for WEIM NOR
-In-Reply-To: <1369389564-13181-5-git-send-email-b32955@freescale.com>
-References: <1369389564-13181-1-git-send-email-b32955@freescale.com>
- <1369389564-13181-5-git-send-email-b32955@freescale.com>
-Message-ID: <20130527064813.GG7782@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 May 2013 08:56:19 +0200
+Subject: [RFC PATCHv4 1/6] arm: TI-Nspire platform code
+In-Reply-To: <3ED6FFF2-89E2-4426-8DDC-10B4E6C79F26@gmail.com>
+References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
+ <201305262246.12803.arnd@arndb.de>
+ <3ED6FFF2-89E2-4426-8DDC-10B4E6C79F26@gmail.com>
+Message-ID: <201305270856.19456.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 05:59:22PM +0800, Huang Shijie wrote:
-> Add two pinctrls for WEIM:
->    one for the weim nor, another for the chipselect.
+On Monday 27 May 2013, Daniel Tang wrote:
 > 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6q.dtsi |   61 ++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 61 insertions(+), 0 deletions(-)
+> On 27/05/2013, at 6:46 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > 
+> > 
+> >> +    {
+> >> +            .virtual        =  NSPIRE_PWR_VIRT_BASE,
+> >> +            .pfn            = __phys_to_pfn(NSPIRE_PWR_PHYS_BASE),
+> >> +            .length         = SZ_4K,
+> >> +            .type           = MT_DEVICE
+> >> +    }
+> >> +};
+> > 
+> > And I think this one can be replaced with a call to of_iomap:
 > 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index ed11bcf..7c5bcf4 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -323,6 +323,67 @@
->  						>;
->  					};
->  				};
-> +
-> +				weim {
-> +					pinctrl_weim_cs_0: weim_norgrp-1 {
+> Does of_iomap work that early in the boot process?
 
-To follow the naming pattern, the ones below are probably better.
+Not from map_io, but soon after. What is the fist place you
+really need it?
 
-pinctrl_weim_cs0_1: weimcs0grp-1
-
-> +						fsl,pins = <
-> +							MX6Q_PAD_EIM_CS0__EIM_CS0_B   0xb0b1
-> +							>;
-Nit: fix the indention please.
-
-> +					};
-> +
-> +					pinctrl_weim_nor_1: weim_norgrp-2 {
-
-s/weim_norgrp-2/weimnorgrp-1
-
-> +						fsl,pins = <
-> +							MX6Q_PAD_EIM_OE__EIM_OE_B     0xb0b1
-> +							MX6Q_PAD_EIM_RW__EIM_RW       0xb0b1
-> +							MX6Q_PAD_EIM_WAIT__EIM_WAIT_B 0xb060
-> +
-Nit: Remove this blank line.
-
-> +							/* data */
-> +							MX6Q_PAD_EIM_D16__EIM_DATA16 0xb0b1
-> +							MX6Q_PAD_EIM_D17__EIM_DATA17 0xb0b1
-> +							MX6Q_PAD_EIM_D18__EIM_DATA18 0xb0b1
-> +							MX6Q_PAD_EIM_D19__EIM_DATA19 0xb0b1
-> +							MX6Q_PAD_EIM_D20__EIM_DATA20 0xb0b1
-> +							MX6Q_PAD_EIM_D21__EIM_DATA21 0xb0b1
-> +							MX6Q_PAD_EIM_D22__EIM_DATA22 0xb0b1
-> +							MX6Q_PAD_EIM_D23__EIM_DATA23 0xb0b1
-> +							MX6Q_PAD_EIM_D24__EIM_DATA24 0xb0b1
-> +							MX6Q_PAD_EIM_D25__EIM_DATA25 0xb0b1
-> +							MX6Q_PAD_EIM_D26__EIM_DATA26 0xb0b1
-> +							MX6Q_PAD_EIM_D27__EIM_DATA27 0xb0b1
-> +							MX6Q_PAD_EIM_D28__EIM_DATA28 0xb0b1
-> +							MX6Q_PAD_EIM_D29__EIM_DATA29 0xb0b1
-> +							MX6Q_PAD_EIM_D30__EIM_DATA30 0xb0b1
-> +							MX6Q_PAD_EIM_D31__EIM_DATA31 0xb0b1
-> +
-Ditto
-
-Above comments apply on the next patch as well.
-
-Shawn
-
-> +							/* address */
-> +							MX6Q_PAD_EIM_A23__EIM_ADDR23 0xb0b1
-> +							MX6Q_PAD_EIM_A22__EIM_ADDR22 0xb0b1
-> +							MX6Q_PAD_EIM_A21__EIM_ADDR21 0xb0b1
-> +							MX6Q_PAD_EIM_A20__EIM_ADDR20 0xb0b1
-> +							MX6Q_PAD_EIM_A19__EIM_ADDR19 0xb0b1
-> +							MX6Q_PAD_EIM_A18__EIM_ADDR18 0xb0b1
-> +							MX6Q_PAD_EIM_A17__EIM_ADDR17 0xb0b1
-> +							MX6Q_PAD_EIM_A16__EIM_ADDR16 0xb0b1
-> +							MX6Q_PAD_EIM_DA15__EIM_AD15  0xb0b1
-> +							MX6Q_PAD_EIM_DA14__EIM_AD14  0xb0b1
-> +							MX6Q_PAD_EIM_DA13__EIM_AD13  0xb0b1
-> +							MX6Q_PAD_EIM_DA12__EIM_AD12  0xb0b1
-> +							MX6Q_PAD_EIM_DA11__EIM_AD11  0xb0b1
-> +							MX6Q_PAD_EIM_DA10__EIM_AD10  0xb0b1
-> +							MX6Q_PAD_EIM_DA9__EIM_AD09   0xb0b1
-> +							MX6Q_PAD_EIM_DA8__EIM_AD08   0xb0b1
-> +							MX6Q_PAD_EIM_DA7__EIM_AD07   0xb0b1
-> +							MX6Q_PAD_EIM_DA6__EIM_AD06   0xb0b1
-> +							MX6Q_PAD_EIM_DA5__EIM_AD05   0xb0b1
-> +							MX6Q_PAD_EIM_DA4__EIM_AD04   0xb0b1
-> +							MX6Q_PAD_EIM_DA3__EIM_AD03   0xb0b1
-> +							MX6Q_PAD_EIM_DA2__EIM_AD02   0xb0b1
-> +							MX6Q_PAD_EIM_DA1__EIM_AD01   0xb0b1
-> +							MX6Q_PAD_EIM_DA0__EIM_AD00   0xb0b1
-> +						>;
-> +					};
-> +
-> +				};
->  			};
->  		};
->  
-> -- 
-> 1.7.1
-> 
-> 
+	Arnd
