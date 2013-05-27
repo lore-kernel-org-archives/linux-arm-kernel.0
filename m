@@ -1,61 +1,40 @@
-From: maarten.lankhorst@canonical.com (Maarten Lankhorst)
-Date: Mon, 27 May 2013 17:23:00 +0200
-Subject: Introduce a new helper framework for buffer synchronization
-In-Reply-To: <014501ce5ac6$511a8500$f34f8f00$%dae@samsung.com>
-References: <CAAQKjZP=iOmHRpHZCbZD3v_RKUFSn0eM_WVZZvhe7F9g3eTmPA@mail.gmail.com>
- <CAF6AEGuDih-NR-VZCmQfqbvCOxjxreZRPGfhCyL12FQ1Qd616Q@mail.gmail.com>
- <006a01ce504e$0de3b0e0$29ab12a0$%dae@samsung.com>
- <CAF6AEGv2FiKMUpb5s4zHPdj4uVxnQWdVJWL-i1mOOZRxBvMZ4Q@mail.gmail.com>
- <00cf01ce512b$bacc5540$3064ffc0$%dae@samsung.com>
- <CAF6AEGuBexKUpTwm9cjGjkxCTKgEaDhAakeP0RN=rtLS6Qy=Mg@mail.gmail.com>
- <CAAQKjZP37koEPob6yqpn-WxxTh3+O=twyvRzDiEhVJTD8BxQzw@mail.gmail.com>
- <20130520211304.GV12292@phenom.ffwll.local>
- <20130520213033.GW12292@phenom.ffwll.local>
- <032701ce55f1$3e9ba4b0$bbd2ee10$%dae@samsung.com>
- <20130521074441.GZ12292@phenom.ffwll.local>
- <033a01ce5604$c32bd250$498376f0$%dae@samsung.com>
- <CAKMK7uHtk+A7CDZH3qHt+F3H_fdSsWwt-bEPn-N0919oOE+Jkg@mail.gmail.com>
- <012801ce57ba$a5a87fa0$f0f97ee0$%dae@samsung.com>
- <014501ce5ac6$511a8500$f34f8f00$%dae@samsung.com>
-Message-ID: <51A37A54.1040700@canonical.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 27 May 2013 23:36:14 +0800
+Subject: [PATCH] i2c: sirf: move driver init from module_init to
+ subsys_initcall
+In-Reply-To: <20130527121658.GA3660@sirena.org.uk>
+References: <1368672607-5536-1-git-send-email-Baohua.Song@csr.com>
+ <20130516093846.GA2927@katana>
+ <CAGsJ_4zVOF8-g=emEGgP3atxkWdxMaQQiVZrZkht_WueTriSnw@mail.gmail.com>
+ <20130525201032.GD32043@sirena.org.uk>
+ <CAGsJ_4y6SY6nNkbW+Yh8jx0WB4Pi9MO1W3xVZcrQcedGeD5ogQ@mail.gmail.com>
+ <20130527121658.GA3660@sirena.org.uk>
+Message-ID: <CAGsJ_4w867BhFvVze5BNaYheW75pMcOGhscz3wSZiia-neP59w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey,
+2013/5/27 Mark Brown <broonie@kernel.org>:
+> On Mon, May 27, 2013 at 09:54:56AM +0800, Barry Song wrote:
+>
+>> Mark, the case is not that deferred probing is slow or not. deferred
+>> probing is pretty good.
+>> the case is that we want to i2c and media connected with i2c probed
+>> earlier than other devices.
+>> in auto infotainment devices, we actually do some hacking in kernel
+>> that makes rear view work earlier than other device driver
+>> initialization with a kernel thread which take care of backing-car
+>> policy not only mechanism. that means, we make camera work to see
+>> backview image even earlier than other drivers' initialization.
+>> we don't want media deferred to wait for i2c. we want make some early
+>> jobs ready earlier.
+>
+> So this change makes no practical difference in mainline and exists to
+> support out of tree hacks for performance?  It doesn't seem like that
+> big a patch to carry along with the out of tree stuff...
 
-Op 27-05-13 12:38, Inki Dae schreef:
-> Hi all,
->
-> I have been removed previous branch and added new one with more cleanup.
-> This time, the fence helper doesn't include user side interfaces and cache
-> operation relevant codes anymore because not only we are not sure that
-> coupling those two things, synchronizing caches and buffer access between
-> CPU and CPU, CPU and DMA, and DMA and DMA with fences, in kernel side is a
-> good idea yet but also existing codes for user side have problems with badly
-> behaved or crashing userspace. So this could be more discussed later.
->
-> The below is a new branch,
-> 	
-> https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-exynos.git/?h=dma-f
-> ence-helper
->
-> And fence helper codes,
-> 	
-> https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-exynos.git/commit/?
-> h=dma-fence-helper&id=adcbc0fe7e285ce866e5816e5e21443dcce01005
->
-> And example codes for device driver,
-> 	
-> https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-exynos.git/commit/?
-> h=dma-fence-helper&id=d2ce7af23835789602a99d0ccef1f53cdd5caaae
->
-> I think the time is not yet ripe for RFC posting: maybe existing dma fence
-> and reservation need more review and addition work. So I'd glad for somebody
-> giving other opinions and advices in advance before RFC posting.
->
-NAK.
+yes. but i don't think we are easy to make those out-of-mainline hacks
+ be in mainline. but this patch is both ok to mainline and local tree.
+making local tree and mainline same as many as possible decreases our
+maintaince efforts totally.
 
-For examples for how to handle locking properly, see Documentation/ww-mutex-design.txt in my recent tree.
-I could list what I believe is wrong with your implementation, but real problem is that the approach you're taking is wrong.
-
-~Maarten
+-barry
