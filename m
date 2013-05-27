@@ -1,44 +1,95 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Mon, 27 May 2013 21:50:04 +1000
-Subject: [PATCH 1/2] ARM: kirkwood: proper retain MAC address workaround
- on DT ethernet
-In-Reply-To: <51A33447.80305@gmail.com>
-References: <1369253042-15082-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130525.210441.818472895703230779.davem@davemloft.net>
- <51A26B62.4050009@gmail.com>
- <20130527.022339.791886107453761860.davem@davemloft.net>
- <1369647565.3557.28.camel@pasglop> <51A33447.80305@gmail.com>
-Message-ID: <1369655404.3557.33.camel@pasglop>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 27 May 2013 14:05:13 +0200
+Subject: [PATCH v3] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
+In-Reply-To: <1369651702-9207-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1369651702-9207-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <51A34BF9.5000905@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-05-27 at 12:24 +0200, Sebastian Hesselbarth wrote:
-> > There is an of_update_property(), we could change the name though,
-> yours
-> > is nicer :-)
-> 
-> Ben, David,
-> 
-> I had a quick look at sparc's of_set_property. Nothing special except
-> it
-> depends on OF_DYNAMIC at some place. Using of_update_property instead
-> should be the correct function to use. Thanks for the hint, I'll
-> update
-> the patches accordingly and send v5 hopefully by today.
+On 27/05/2013 12:48, Alexandre Belloni :
+> Fixes:
+> arch/arm/mach-at91/built-in.o: In function `ksz9021rn_phy_fixup':
+> :(.text+0x1174): undefined reference to `mdiobus_write'
+> :(.text+0x1188): undefined reference to `mdiobus_write'
+> :(.text+0x119c): undefined reference to `mdiobus_write'
+> :(.text+0x11b0): undefined reference to `mdiobus_write'
+> arch/arm/mach-at91/built-in.o: In function `sama5_dt_device_init':
+> :(.init.text+0x1e34): undefined reference to `phy_register_fixup_for_uid'
+>
+> when CONFIG_PHYLIB is not selected.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+> Changes in v3:
+> 	added SoB
+> 	added Acked-By
 
-The only thing is that of_update_property() is a bit awkward to use,
-requiring the caller to provide an allocated struct property with
-associated allocated content. It also leaks the old property which
-is annoying but we haven't sorted out how to deal with allocation
-of properties and property content yet.
+A v3 is not needed simply for this. Thanks, anyway!
 
-It would be handy to be able to just do something like
+One question though: why not just add
 
-	of_set_property(node, name, ptr, len);
+         select PHYLIB
 
-However, that wouldn't help much with the allocation/leak problem,
-though at least it would be easier to use. It could also *try* to re-use
-the current allocation if the new content is of smaller or equal size.
+In Kconfig entry:
 
-Cheers,
-Ben.
+  config MACH_SAMA5_DT
+
+?
+
+(note that I like to play with everybody's nerves ;-))
+
+Bye,
+
+> Changes in v2:
+> 	use IS_BUILTIN
+> 	use CONFIG_PHYLIB and not CONFIG_PHY
+>
+>   arch/arm/mach-at91/board-dt-sama5.c | 22 ++++++++++++----------
+>   1 file changed, 12 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+> index 705305e..e9ce541 100644
+> --- a/arch/arm/mach-at91/board-dt-sama5.c
+> +++ b/arch/arm/mach-at91/board-dt-sama5.c
+> @@ -47,22 +47,24 @@ static int ksz9021rn_phy_fixup(struct phy_device *phy)
+>   #define GMII_ERCR	11
+>   #define GMII_ERDWR	12
+>
+> -	/* Set delay values */
+> -	value = GMII_RCCPSR | 0x8000;
+> -	phy_write(phy, GMII_ERCR, value);
+> -	value = 0xF2F4;
+> -	phy_write(phy, GMII_ERDWR, value);
+> -	value = GMII_RRDPSR | 0x8000;
+> -	phy_write(phy, GMII_ERCR, value);
+> -	value = 0x2222;
+> -	phy_write(phy, GMII_ERDWR, value);
+> +	if (IS_BUILTIN(CONFIG_PHYLIB)) {
+> +		/* Set delay values */
+> +		value = GMII_RCCPSR | 0x8000;
+> +		phy_write(phy, GMII_ERCR, value);
+> +		value = 0xF2F4;
+> +		phy_write(phy, GMII_ERDWR, value);
+> +		value = GMII_RRDPSR | 0x8000;
+> +		phy_write(phy, GMII_ERCR, value);
+> +		value = 0x2222;
+> +		phy_write(phy, GMII_ERDWR, value);
+> +	}
+>
+>   	return 0;
+>   }
+>
+>   static void __init sama5_dt_device_init(void)
+>   {
+> -	if (of_machine_is_compatible("atmel,sama5d3xcm"))
+> +	if (of_machine_is_compatible("atmel,sama5d3xcm") && IS_BUILTIN(CONFIG_PHYLIB))
+>   		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
+>   			ksz9021rn_phy_fixup);
+>
+>
+
+
+-- 
+Nicolas Ferre
