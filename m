@@ -1,52 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 27 May 2013 18:00:17 +0900
-Subject: [GIT PULL] Renesas ARM based r8a7790 SoC updates for v3.11
-Message-ID: <1369645224-3728-1-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 27 May 2013 18:00:45 +0900
+Subject: [PATCH 1/8] ARM: shmobile: sh73a0 pinmux platform device cleanup
+In-Reply-To: <1369645252-3847-1-git-send-email-horms+renesas@verge.net.au>
+References: <1369645252-3847-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1369645252-3847-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Hi Olof,
+From: Magnus Damm <damm@opensource.se>
 
-The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+Use DEFINE_RES_MEM() and platform_device_register_simple()
+to save a couple of lines of code.
 
-  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-sh73a0.c |   25 ++++++-------------------
+ 1 file changed, 6 insertions(+), 19 deletions(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-r8a7790-for-v3.11
-
-for you to fetch changes up to 3318ce6ff5a5dbebe472103966a2c6d7d9542ec3:
-
-  ARM: shmobile: clock-r8a7790: add TPU PWM support (2013-05-27 17:50:51 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based r8a7790 SoC updates for v3.11
-
-* Increased clock coverage by Kuninori Morimoto.
-* TOU PWM clock support by Laurent Pinchart.
-* Clean-up from Maxime Ripard to remove unnecessary init_irq declaration in
-  machine description.
-* Clean-up from Magnus Damm to remove unused GIC CPU interface portions
-  of r8a7790.dtsi
-* Clean-up from Laurent Pinchart to make clock arrays static
-
-----------------------------------------------------------------
-Kuninori Morimoto (3):
-      ARM: shmobile: r8a7790: add main clock
-      ARM: shmobile: r8a7790: add div4 clocks
-      ARM: shmobile: r8a7790: add div6 clocks
-
-Laurent Pinchart (2):
-      ARM: shmobile: r8a7790: Make private clock arrays static
-      ARM: shmobile: clock-r8a7790: add TPU PWM support
-
-Magnus Damm (1):
-      ARM: shmobile: Remove unused r8a7790 GIC CPU interface DT bits
-
-Maxime Ripard (1):
-      ARM: shmobile: r8a7790: Remove init_irq declaration in machine description
-
- arch/arm/boot/dts/r8a7790.dtsi         |    6 -
- arch/arm/mach-shmobile/clock-r8a7790.c |  238 +++++++++++++++++++++++++++++++-
- arch/arm/mach-shmobile/setup-r8a7790.c |    2 -
- 3 files changed, 231 insertions(+), 15 deletions(-)
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index fdf3894..f8f4261 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -61,29 +61,16 @@ void __init sh73a0_map_io(void)
+ 	iotable_init(sh73a0_io_desc, ARRAY_SIZE(sh73a0_io_desc));
+ }
+ 
+-static struct resource sh73a0_pfc_resources[] = {
+-	[0] = {
+-		.start	= 0xe6050000,
+-		.end	= 0xe6057fff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= 0xe605801c,
+-		.end	= 0xe6058027,
+-		.flags	= IORESOURCE_MEM,
+-	}
+-};
+-
+-static struct platform_device sh73a0_pfc_device = {
+-	.name		= "pfc-sh73a0",
+-	.id		= -1,
+-	.resource	= sh73a0_pfc_resources,
+-	.num_resources	= ARRAY_SIZE(sh73a0_pfc_resources),
++/* PFC */
++static const struct resource pfc_resources[] = {
++	DEFINE_RES_MEM(0xe6050000, 0x8000),
++	DEFINE_RES_MEM(0xe605801c, 0x000c),
+ };
+ 
+ void __init sh73a0_pinmux_init(void)
+ {
+-	platform_device_register(&sh73a0_pfc_device);
++	platform_device_register_simple("pfc-sh73a0", -1, pfc_resources,
++					ARRAY_SIZE(pfc_resources));
+ }
+ 
+ static struct plat_sci_port scif0_platform_data = {
+-- 
+1.7.10.4
