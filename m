@@ -1,31 +1,36 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 27 May 2013 20:06:33 +0530
-Subject: [PATCH v2 08/14] ARM: OMAP2+: AM43x: GP or HS ?
+Date: Mon, 27 May 2013 20:06:42 +0530
+Subject: [PATCH v2 09/14] ARM: OMAP2+: AM43x: SRAM base and size
 In-Reply-To: <cover.1369658705.git.afzal@ti.com>
 References: <cover.1369658705.git.afzal@ti.com>
-Message-ID: <7c2e50ddc9c6a3395147fbe1395985daf93abe8f.1369658705.git.afzal@ti.com>
+Message-ID: <7dd913330dbe9f364b7b27e5fd02180ce2a584c0.1369658705.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Detect whether GP or HS, similar to the AM335x way.
+From: Sanjeev Premi <premi@ti.com>
 
+This definition corresponds to the L3_OCMC0,
+as in case of AM33XX.
+
+Signed-off-by: Sanjeev Premi <premi@ti.com>
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/mach-omap2/id.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-omap2/sram.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index c9c3f7d..0c28ef6 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -55,7 +55,7 @@ int omap_type(void)
- 
- 	if (cpu_is_omap24xx()) {
- 		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
--	} else if (soc_is_am33xx()) {
-+	} else if (soc_is_am33xx() || soc_is_am43xx()) {
- 		val = omap_ctrl_readl(AM33XX_CONTROL_STATUS);
- 	} else if (cpu_is_omap34xx()) {
- 		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
+diff --git a/arch/arm/mach-omap2/sram.c b/arch/arm/mach-omap2/sram.c
+index 0ff0f06..4bd0968 100644
+--- a/arch/arm/mach-omap2/sram.c
++++ b/arch/arm/mach-omap2/sram.c
+@@ -119,6 +119,9 @@ static void __init omap_detect_sram(void)
+ 		if (soc_is_am33xx()) {
+ 			omap_sram_start = AM33XX_SRAM_PA;
+ 			omap_sram_size = 0x10000; /* 64K */
++		} else if (soc_is_am43xx()) {
++			omap_sram_start = AM33XX_SRAM_PA;
++			omap_sram_size = SZ_256K;
+ 		} else if (cpu_is_omap34xx()) {
+ 			omap_sram_start = OMAP3_SRAM_PA;
+ 			omap_sram_size = 0x10000; /* 64K */
 -- 
 1.7.12
