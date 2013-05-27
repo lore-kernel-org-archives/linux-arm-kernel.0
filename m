@@ -1,43 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 May 2013 12:41:04 +0200
-Subject: [PATCH 7/7] Documentation: Update binding for Nomadik and DBx5x
- based platforms
-In-Reply-To: <1369232581-18923-8-git-send-email-lee.jones@linaro.org>
-References: <1369232581-18923-1-git-send-email-lee.jones@linaro.org>
- <1369232581-18923-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYyZZSy4VgFc+Uo=5iAF++EPmHM0U2pHcLdkDZc=Xb_sQ@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 27 May 2013 15:33:57 +0530
+Subject: [PATCH v7 0/2] dma: imx-dma: OFTree support
+In-Reply-To: <1369562001-11494-1-git-send-email-mpa@pengutronix.de>
+References: <1369562001-11494-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130527100357.GA30200@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 4:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Sun, May 26, 2013 at 11:53:19AM +0200, Markus Pargmann wrote:
+> Hi,
+> 
+> this series adds support for the generic DMA DT bindings for imx-dma.
+> 
+> Regards,
+> 
+> Markus
+> 
+> 
+> Changes in v7:
+>  - rebased onto v3.10-rc2
+Applied thanks...
 
-> Change compatible string to something more standard.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
-> index 9a2f3f4..c3d8a89 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
-> @@ -1,8 +1,8 @@
->  ST Ericsson Nomadik pinmux controller
->
->  Required properties:
-> -- compatible: "stericsson,nmk-pinctrl", "stericsson,nmk-pinctrl-db8540",
-> -              "stericsson,nmk-pinctrl-stn8815"
-> +- compatible: "stericsson,db8500-pinctrl", "stericsson,db8540-pinctrl",
-> +              "stericsson,stn8815-pinctrl"
-
-OK...
-
->         pinctrl at 80157000 {
-> -               compatible = "stericsson,nmk-pinctrl";
-> +               compatible = "stericsson,u8500-pinctrl";
-
-This does not look like a supported compatible string?
-
-Yours,
-Linus Walleij
+--
+~Vinod
+> 
+> Markus Pargmann (2):
+>       dma: imx-dma: Add oftree support
+>       DMA: imx-dma: imxdma->dev used uninitialized
+> 
+>  .../devicetree/bindings/dma/fsl-imx-dma.txt        | 48 ++++++++++++++
+>  drivers/dma/imx-dma.c                              | 77 +++++++++++++++++++++-
+>  include/linux/platform_data/dma-imx.h              |  6 +-
+>  3 files changed, 126 insertions(+), 5 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/dma/fsl-imx-dma.txt
+> 
