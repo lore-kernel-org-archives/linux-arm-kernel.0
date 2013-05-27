@@ -1,35 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 27 May 2013 18:59:28 +0900
-Subject: [PATCH 4/9] ARM: shmobile: r8a7778: fix Ether device name
+Date: Mon, 27 May 2013 18:59:26 +0900
+Subject: [PATCH 2/9] ARM: shmobile: add GPIO IRQ macro
 In-Reply-To: <1369648773-7941-1-git-send-email-horms+renesas@verge.net.au>
 References: <1369648773-7941-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1369648773-7941-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1369648773-7941-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-While recasting the commit "ARM: shmobile: R8A7778: add Ether support", I made a
-typo in the platform device's name: used underscore instead of hyphen.
+R-Car series gpio_rcar driver can control GPIO IRQ today.
+It needs base IRQ number for gpio_rcar_config :: .irq_base
+This patch adds macro for GPIO IRQ.
+This patch was tested on Bock-W board
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7778.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/include/mach/irqs.h |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index d6ee521..45f0e45 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -96,7 +96,7 @@ static struct resource ether_resources[] = {
+diff --git a/arch/arm/mach-shmobile/include/mach/irqs.h b/arch/arm/mach-shmobile/include/mach/irqs.h
+index b2074e2..d241bfd 100644
+--- a/arch/arm/mach-shmobile/include/mach/irqs.h
++++ b/arch/arm/mach-shmobile/include/mach/irqs.h
+@@ -16,4 +16,9 @@
+ #define IRQPIN_BASE		2000
+ #define irq_pin(nr)		((nr) + IRQPIN_BASE)
  
- void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
- {
--	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
-+	platform_device_register_resndata(&platform_bus, "sh-eth", -1,
- 					  ether_resources,
- 					  ARRAY_SIZE(ether_resources),
- 					  pdata, sizeof(*pdata));
++/* GPIO IRQ */
++#define _GPIO_IRQ_BASE		2500
++#define GPIO_IRQ_BASE(x)	(_GPIO_IRQ_BASE + (32 * x))
++#define GPIO_IRQ(x, y)		(_GPIO_IRQ_BASE + (32 * x) + y)
++
+ #endif /* __ASM_MACH_IRQS_H */
 -- 
 1.7.10.4
