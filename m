@@ -1,48 +1,50 @@
-From: R64188@freescale.com (Jin Zhengxiong-R64188)
-Date: Mon, 27 May 2013 01:27:04 +0000
-Subject: [PATCH v3] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <20130523025059.GB2704@S2101-09.ap.freescale.net>
-References: <1368685096-13177-1-git-send-email-b35083@freescale.com>
- <20130520030523.GB25113@S2101-09.ap.freescale.net>
- <13F8657A829DAB49A2A937FD6FC10F790B3CDB85@039-SN2MPN1-012.039d.mgd.msft.net>
- <CAAQ0ZWRz+byPKxMjDH3zKsc0u4bmkPO_1u6w2H4Z7nD0z8+9ig@mail.gmail.com>
- <13F8657A829DAB49A2A937FD6FC10F790B3CECEB@039-SN2MPN1-012.039d.mgd.msft.net>
- <20130523025059.GB2704@S2101-09.ap.freescale.net>
-Message-ID: <13F8657A829DAB49A2A937FD6FC10F790B3D5056@039-SN2MPN1-012.039d.mgd.msft.net>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 27 May 2013 09:42:27 +0800
+Subject: [PATCH] arch: arm64: kernel: sprintf(), 'str' needs additional
+ 1 byte for failure processing
+In-Reply-To: <51A1E3B3.4060901@asianux.com>
+References: <51A1E3B3.4060901@asianux.com>
+Message-ID: <51A2BA03.4030006@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, May 22, 2013 at 08:59:20AM +0000, Jin Zhengxiong-R64188 wrote:
-> > [Jason Jin-R64188] For the lpuart itself, I do not think it will have
-> different version IP.
+On 05/26/2013 06:28 PM, Chen Gang wrote:
 > 
-> You can never tell in 5 or 10 years.  Also no major version doesn't
-> necessarily mean no minor updates or revise.
+> When failure occurs at the last looping cycle (when 'i == 0'), it will
+> print "bad PC value" instead of "(%08x) ", which needs additional 1
+> byte.
 > 
-> > The general name is sufficient and soc related name can introduce the
-> minor difference. If the there are update version, we can name it
-> lpuart2.0 or something like that.
-> >
+> If not add 1 byte, the str will not be NUL terminated, and the next
+> printk() will cause issue.
 > 
-> Yeah, if IP designers name it lpuart2.0, it surely works.  But from my
-> experience on IMX, hardware guys are not always properly updating IP name.
-> Then the version 2.0 becomes a versioning given by software people which
-> is improper to be used in compatible string.
-> 
-[Jason Jin-R64188] We had some internal discussion on this. For the lpuart itself, as we cannot get the version information at run time from the version register and lpuart is not publicly versioned, we agree to use the SoC name for lpuart. 
-However, if the version information can be got from the register at run time, or the version was publicly versioned. the general name still useful than the SoC name. 
-on the other side, the SoC itself may also have new versions, So the SoC name is also not a perfect solution.
 
-> >
+Oh, I type incorrect contents. It should be "If not add 1 byte, it will
+memory overflow"
+
+I will send patch v2.
+
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm64/kernel/traps.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> Think about it from "compatibility" point of view.  It does not cause
-> confusion but just help understand the compatible history.  Saying the
-> same IP is reused on LS-1 SoC, I do not see a problem with putting the
-> following compatible into LS-1 <soc>.dtsi under UART node, to tell that
-> the UART block on LS-1 is completely compatible with the one used on
-> MVF600.
+> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> index 61d7dd2..c2f68d2 100644
+> --- a/arch/arm64/kernel/traps.c
+> +++ b/arch/arm64/kernel/traps.c
+> @@ -100,7 +100,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
+>  {
+>  	unsigned long addr = instruction_pointer(regs);
+>  	mm_segment_t fs;
+> -	char str[sizeof("00000000 ") * 5 + 2 + 1], *p = str;
+> +	char str[sizeof("00000000 ") * 5 + 2 + 1 + 1], *p = str;
+>  	int i;
+>  
+>  	/*
 > 
->   compatible = "fsl,ls1-uart", "fsl,mvf600-uart";
-> 
-[Jason Jin-R64188] We'll leverage this compatible strings for compatible history. Thanks.
-By the way, we'll change the SoC name from mvf600 to vf610 to align the description in the document. 
+
+
+-- 
+Chen Gang
+
+Asianux Corporation
