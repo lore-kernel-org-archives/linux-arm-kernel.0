@@ -1,41 +1,34 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 27 May 2013 16:13:06 +0200
-Subject: [PATCH 1/1] mmc: of_mmc_spi: fix card detect irq
-In-Reply-To: <51A25ECA.2060001@cogentembedded.com>
-References: <1369571337-9300-1-git-send-email-plagnioj@jcrosoft.com>
- <51A25ECA.2060001@cogentembedded.com>
-Message-ID: <20130527141306.GS24476@game.jcrosoft.org>
+From: sanjay.rawat@linaro.org (Sanjay Singh Rawat)
+Date: Mon, 27 May 2013 20:02:37 +0530
+Subject: [PATCH 0/8] ARM: use cpu_do_idle for entering wfi mode
+Message-ID: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23:13 Sun 26 May     , Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 05/26/2013 04:28 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> >set missing irq type the IRQF_ONESHOT
-> >
-> >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >Cc: stable <stable@vger.kernel.org> # 3.4+
-> >Cc: linux-mmc at vger.kernel.org
-> >---
-> >  drivers/mmc/host/of_mmc_spi.c |    4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >
-> >diff --git a/drivers/mmc/host/of_mmc_spi.c b/drivers/mmc/host/of_mmc_spi.c
-> >index d720b5e..cfb2e61 100644
-> >--- a/drivers/mmc/host/of_mmc_spi.c
-> >+++ b/drivers/mmc/host/of_mmc_spi.c
-> >@@ -74,8 +74,8 @@ static int of_mmc_spi_init(struct device *dev,
-> >  {
-> >  	struct of_mmc_spi *oms = to_of_mmc_spi(dev);
-> >-	return request_threaded_irq(oms->detect_irq, NULL, irqhandler, 0,
-> >-				    dev_name(dev), mmc);
-> >+	return request_threaded_irq(oms->detect_irq, NULL, irqhandler,
-> >+		IRQF_ONESHOT, dev_name(dev), mmc);
-> 
->     Please don't change the indentation.
-too long > 80
+With this patch set we make use of cpu_do_idle to enter WFI mode,
+many platform are not clearing the data buffer before WFI or
+directly using the address instead of opcode. For the rest its good
+to have a common approach.
 
-Best Regards,
-J.
+Sanjay Singh Rawat (8):
+  ARM: EXYNOS: use generic cpu idle function for wfi
+  ARM: RealView: use generic cpu idle function for wfi
+  ARM: SPEAr: use generic cpu idle function for wfi
+  ARM: vexpress: use generic cpu idle function for wfi
+  ARM: zynq: use generic cpu idle function for wfi
+  ARM: ux500: use generic cpu idle function for wfi
+  ARM: msm: use generic cpu idle function for wfi
+  ARM: PRIMA2: use generic cpu idle function for wfi
+
+ arch/arm/mach-exynos/hotplug.c   |    9 ++-------
+ arch/arm/mach-msm/hotplug.c      |    9 ++-------
+ arch/arm/mach-prima2/hotplug.c   |    4 ++--
+ arch/arm/mach-realview/hotplug.c |    9 ++-------
+ arch/arm/mach-spear/hotplug.c    |    3 ++-
+ arch/arm/mach-ux500/hotplug.c    |    5 +++--
+ arch/arm/mach-vexpress/hotplug.c |    3 ++-
+ arch/arm/mach-zynq/hotplug.c     |    4 ++--
+ 8 files changed, 17 insertions(+), 29 deletions(-)
+
+-- 
+1.7.9.5
