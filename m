@@ -1,72 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 27 May 2013 18:59:32 +0900
-Subject: [PATCH 8/9] ARM: shmobile: r8a7778: Register SDHI device
+Date: Mon, 27 May 2013 18:59:30 +0900
+Subject: [PATCH 6/9] ARM: shmobile: r8a7778: Register PFC device
 In-Reply-To: <1369648773-7941-1-git-send-email-horms+renesas@verge.net.au>
 References: <1369648773-7941-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1369648773-7941-9-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1369648773-7941-7-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch adds SDHI register function which needs id number (= 0/1/2)
-
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/r8a7778.h |    2 ++
- arch/arm/mach-shmobile/setup-r8a7778.c        |   24 ++++++++++++++++++++++++
- 2 files changed, 26 insertions(+)
+ arch/arm/mach-shmobile/Kconfig                |    1 +
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |    1 +
+ arch/arm/mach-shmobile/setup-r8a7778.c        |   13 +++++++++++++
+ 3 files changed, 15 insertions(+)
 
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 1a517e2..06da4d3 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -37,6 +37,7 @@ config ARCH_R8A7740
+ 
+ config ARCH_R8A7778
+ 	bool "R-Car M1 (R8A77780)"
++	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select CPU_V7
+ 	select SH_CLK_CPG
+ 	select ARM_GIC
 diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-index 68053fc..ae65b45 100644
+index 951149e..68053fc 100644
 --- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
 +++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -18,6 +18,7 @@
- #ifndef __ASM_R8A7778_H__
- #define __ASM_R8A7778_H__
- 
-+#include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/sh_eth.h>
- 
- extern void r8a7778_add_standard_devices(void);
-@@ -29,5 +30,6 @@ extern void r8a7778_init_irq_dt(void);
+@@ -28,5 +28,6 @@ extern void r8a7778_init_irq(void);
+ extern void r8a7778_init_irq_dt(void);
  extern void r8a7778_clock_init(void);
  extern void r8a7778_init_irq_extpin(int irlm);
- extern void r8a7778_pinmux_init(void);
-+extern void r8a7778_sdhi_init(int id, struct sh_mobile_sdhi_info *info);
++extern void r8a7778_pinmux_init(void);
  
  #endif /* __ASM_R8A7778_H__ */
 diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index d82954b..4c32784 100644
+index 45f0e45..d82954b 100644
 --- a/arch/arm/mach-shmobile/setup-r8a7778.c
 +++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -115,6 +115,30 @@ void __init r8a7778_pinmux_init(void)
- 		ARRAY_SIZE(pfc_resources));
+@@ -102,6 +102,19 @@ void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
+ 					  pdata, sizeof(*pdata));
  }
  
-+/* SDHI */
-+static struct resource sdhi_resources[] = {
-+	/* SDHI0 */
-+	DEFINE_RES_MEM(0xFFE4C000, 0x100),
-+	DEFINE_RES_IRQ(gic_iid(0x77)),
-+	/* SDHI1 */
-+	DEFINE_RES_MEM(0xFFE4D000, 0x100),
-+	DEFINE_RES_IRQ(gic_iid(0x78)),
-+	/* SDHI2 */
-+	DEFINE_RES_MEM(0xFFE4F000, 0x100),
-+	DEFINE_RES_IRQ(gic_iid(0x76)),
++/* PFC */
++static struct resource pfc_resources[] = {
++	DEFINE_RES_MEM(0xfffc0000, 0x118),
 +};
 +
-+void __init r8a7778_sdhi_init(int id,
-+			      struct sh_mobile_sdhi_info *info)
++void __init r8a7778_pinmux_init(void)
 +{
-+	BUG_ON(id < 0 || id > 2);
-+
-+	platform_device_register_resndata(
-+		&platform_bus, "sh_mobile_sdhi", id,
-+		sdhi_resources + (2 * id), 2,
-+		info, sizeof(*info));
++	platform_device_register_simple(
++		"pfc-r8a7778", -1,
++		pfc_resources,
++		ARRAY_SIZE(pfc_resources));
 +}
 +
  void __init r8a7778_add_standard_devices(void)
