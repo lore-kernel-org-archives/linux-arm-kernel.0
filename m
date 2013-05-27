@@ -1,93 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 27 May 2013 19:37:26 +0200
-Subject: [PATCH 1/3] net: phy: prevent linking breakage
-In-Reply-To: <20130527163913.GO32299@pengutronix.de>
-References: <1369671524-14797-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1369671524-14797-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20130527163913.GO32299@pengutronix.de>
-Message-ID: <51A399D6.8030000@free-electrons.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 27 May 2013 22:02:00 +0400
+Subject: [PATCH 1/1] mmc: of_mmc_spi: fix card detect irq
+In-Reply-To: <20130527141306.GS24476@game.jcrosoft.org>
+References: <1369571337-9300-1-git-send-email-plagnioj@jcrosoft.com>
+ <51A25ECA.2060001@cogentembedded.com>
+ <20130527141306.GS24476@game.jcrosoft.org>
+Message-ID: <51A39F98.4010904@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/05/2013 18:39, Sascha Hauer wrote:
-> On Mon, May 27, 2013 at 06:18:42PM +0200, Alexandre Belloni wrote:
->> phy_register_fixup{,_for_uid,_for_id} are called from arch/, quite
->> often, there is no protection to check whether CONFIG_PHYLIB=y which is
->> the only case where this would work. Having phylib as a module or not
->> compiled at all will result in that kind of linking failure:
->>
->> arch/arm/mach-at91/built-in.o: In function `ksz9021rn_phy_fixup':
->> :(.text+0x1174): undefined reference to `mdiobus_write'
->> :(.text+0x1188): undefined reference to `mdiobus_write'
->> :(.text+0x119c): undefined reference to `mdiobus_write'
->> :(.text+0x11b0): undefined reference to `mdiobus_write'
->> arch/arm/mach-at91/built-in.o: In function `sama5_dt_device_init':
->> :(.init.text+0x1e34): undefined reference to `phy_register_fixup_for_uid'
->>
->> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> ---
->>  drivers/net/phy/phy_device.c |  6 ++++++
->>  include/linux/phy.h          | 12 ++++++++++++
->>  2 files changed, 18 insertions(+)
->>
->> diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
->> index 3657b4a..df36367 100644
->> --- a/drivers/net/phy/phy_device.c
->> +++ b/drivers/net/phy/phy_device.c
->> @@ -64,6 +64,11 @@ static int phy_attach_direct(struct net_device *dev, struct phy_device *phydev,
->>  			     u32 flags, phy_interface_t interface);
->>  
->>  /*
->> + *  phy_register_fixup{,_for_uid,_for_id} are called from arch/ so this won't
->> + *  work unless phylib is compiled in the kernel.
->> + */
->> +#ifdef CONFIG_PHYLIB
->> +/*
->>   * Creates a new phy_fixup and adds it to the list
->>   * @bus_id: A string which matches phydev->dev.bus_id (or PHY_ANY_ID)
->>   * @phy_uid: Used to match against phydev->phy_id (the UID of the PHY)
->> @@ -109,6 +114,7 @@ int phy_register_fixup_for_id(const char *bus_id,
->>  	return phy_register_fixup(bus_id, PHY_ANY_UID, 0xffffffff, run);
->>  }
->>  EXPORT_SYMBOL(phy_register_fixup_for_id);
->> +#endif /* CONFIG_PHYLIB */
->>  
->>  /*
->>   * Returns 1 if fixup matches phydev in bus_id and phy_uid.
->> diff --git a/include/linux/phy.h b/include/linux/phy.h
->> index 9e11039..3f998a6 100644
->> --- a/include/linux/phy.h
->> +++ b/include/linux/phy.h
->> @@ -556,12 +556,24 @@ int phy_start_interrupts(struct phy_device *phydev);
->>  void phy_print_status(struct phy_device *phydev);
->>  void phy_device_free(struct phy_device *phydev);
->>  
->> +/*
->> + *  phy_register_fixup{,_for_uid,_for_id} are called from arch/ so this won't
->> + *  work unless phylib is compiled in the kernel.
->> + *  Defining stubs allows to prevent linking errors.
->> + */
->> +#ifdef CONFIG_PHYLIB
->>  int phy_register_fixup(const char *bus_id, u32 phy_uid, u32 phy_uid_mask,
->>  		int (*run)(struct phy_device *));
->>  int phy_register_fixup_for_id(const char *bus_id,
->>  		int (*run)(struct phy_device *));
->>  int phy_register_fixup_for_uid(u32 phy_uid, u32 phy_uid_mask,
->>  		int (*run)(struct phy_device *));
->> +#else
->> +#define phy_register_fixup(a, b, c, d) do { } while (0)
->> +#define phy_register_fixup_for_id(a, b) do { } while (0)
->> +#define phy_register_fixup_for_uid(a, b, c) do { } while (0)
-> Use static inline functions here. This breaks if someone does result
-> checking on the functions which then expands to ret = do {} while (0);
-> Also we still have type safety for !CONFIG_PHYLIB.
+Hello.
 
-Right, I tried that first but forgot static so I had issues with
-redefinition of the functions. I even played with __weak at some point...
+On 27-05-2013 18:13, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-I'll wait a bit for comments before sending v2.
+>>> set missing irq type the IRQF_ONESHOT
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>> Cc: stable <stable@vger.kernel.org> # 3.4+
+>>> Cc: linux-mmc at vger.kernel.org
+>>> ---
+>>>   drivers/mmc/host/of_mmc_spi.c |    4 ++--
+>>>   1 file changed, 2 insertions(+), 2 deletions(-)
+
+>>> diff --git a/drivers/mmc/host/of_mmc_spi.c b/drivers/mmc/host/of_mmc_spi.c
+>>> index d720b5e..cfb2e61 100644
+>>> --- a/drivers/mmc/host/of_mmc_spi.c
+>>> +++ b/drivers/mmc/host/of_mmc_spi.c
+>>> @@ -74,8 +74,8 @@ static int of_mmc_spi_init(struct device *dev,
+>>>   {
+>>>   	struct of_mmc_spi *oms = to_of_mmc_spi(dev);
+>>> -	return request_threaded_irq(oms->detect_irq, NULL, irqhandler, 0,
+>>> -				    dev_name(dev), mmc);
+>>> +	return request_threaded_irq(oms->detect_irq, NULL, irqhandler,
+>>> +		IRQF_ONESHOT, dev_name(dev), mmc);
+
+>>      Please don't change the indentation.
+
+> too long > 80
+
+     Reflow it then into several lines.
+
+> Best Regards,
+> J.
+
+WBR, Sergei
