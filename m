@@ -1,18 +1,38 @@
-From: Ganesh.Kumar@harman.com (Kumar, Ganesh)
-Date: Mon, 27 May 2013 08:01:23 -0500
-Subject: VDSO for arm 32bit
-Message-ID: <634BB1CFA60ED14386C17849392C3EB202E52C9C0A@HICGWSEX01.ad.harman.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 27 May 2013 15:16:06 +0200
+Subject: [PATCH] ARM: nomadik: Update MMC defconfigs
+Message-ID: <1369660566-18997-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-? I'm working on OMAP5 on greg's LTS kernel 3.4.25, but I see there is
-no support for vdso for arm 32 bit.
-I'm planning to port it to arm 32 bit, is there any work under progress?
-would like to understand why the support for arm 32 bit is not there, any idea?
+Enable MMC_UNSAFE_RESUME to accomplish a proper suspend/resume cycle
+for SD/SDIO/(e)MMC.
 
-Thanks for your time.
+ARMMMCI host driver supports clock gating through runtime PM, thus
+MMC_CLKGATE is not needed. Moreover ARMMMCI can do scatter-gather which
+means we can explicity disable MMC_BLOCK_BOUNCE, since it's default
+enabled, to skip unnecessary bounce buffer copying.
 
-Thanks,
-GK
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ arch/arm/configs/nhk8815_defconfig |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/nhk8815_defconfig b/arch/arm/configs/nhk8815_defconfig
+index b01e763..606a080 100644
+--- a/arch/arm/configs/nhk8815_defconfig
++++ b/arch/arm/configs/nhk8815_defconfig
+@@ -94,7 +94,8 @@ CONFIG_I2C_NOMADIK=y
+ CONFIG_DEBUG_GPIO=y
+ # CONFIG_HWMON is not set
+ CONFIG_MMC=y
+-CONFIG_MMC_CLKGATE=y
++CONFIG_MMC_UNSAFE_RESUME=y
++# CONFIG_MMC_BLOCK_BOUNCE is not set
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_PL031=y
+-- 
+1.7.10
