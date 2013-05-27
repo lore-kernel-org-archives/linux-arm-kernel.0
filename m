@@ -1,47 +1,63 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 27 May 2013 14:54:36 -0400
-Subject: [GIT PULL] ARM: mvebu: fixes for v3.10 (round 3)
-Message-ID: <20130527185436.GN31290@titan.lakedaemon.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 27 May 2013 21:17:27 +0200
+Subject: [PATCHv3 0/6] Add I2C support for Allwinner SoCs
+In-Reply-To: <1369648843-1640-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1369648843-1640-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <2987322.J4qAl07e8R@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Maxime,
 
-The following changes since commit 489e138eec96f529c5e8d4cd3ea45882ecdbf5ca:
+On Monday 27 of May 2013 12:00:37 Maxime Ripard wrote:
+> Hi,
+> 
+> This patchset adds support for the I2C controller found on most of the
+> Allwinner SoCs, especially the already supported A10 and A13, and the
+> yet to come A31.
+> 
+> It has been tested on a A13-Olinuxino.
+> 
+> Thanks,
+> Maxime
+> 
+> Changes from v2:
+>   * Slightly modified the switch comments again
+>   * Removed the of_* calls in favor of platform_get_* functions
+> 
+> Changes from v1:
+>   * Added comments to the switch statements to clarify when the fall
+> through to the next case is made on purpose
+>   * Use devm_ioremap_resource instead of of_iomap
+>   * Moved the reset after enabling the clocks
+>   * Added Emilio Lopez' patch to add the available i2c controllers to
+> the cubieboard
+> 
+> Emilio L?pez (1):
+>   ARM: sun4i: cubieboard: Enable the i2c controllers
+> 
+> Maxime Ripard (5):
+>   i2c: sunxi: Add Allwinner A1X i2c driver
+>   ARM: sunxi: dt: Add i2c controller nodes to the DTSI
+>   ARM: sun4i: dt: Add i2c muxing options
+>   ARM: sun5i: dt: Add i2c muxing options
+>   ARM: sun5i: olinuxino: Enable the i2c controllers
+> 
+>  .../devicetree/bindings/i2c/i2c-sunxi.txt          |  19 +
+>  arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |  12 +
+>  arch/arm/boot/dts/sun4i-a10.dtsi                   |  48 +++
+>  arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |  18 +
+>  arch/arm/boot/dts/sun5i-a13.dtsi                   |  48 +++
+>  drivers/i2c/busses/Kconfig                         |  10 +
+>  drivers/i2c/busses/Makefile                        |   1 +
+>  drivers/i2c/busses/i2c-sunxi.c                     | 444
+> +++++++++++++++++++++ 8 files changed, 600 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-sunxi.txt
+>  create mode 100644 drivers/i2c/busses/i2c-sunxi.c
 
-  ARM: dts: mvebu: Fix wrong the address reg value for the L2-cache node (2013-05-20 17:44:54 +0000)
+All the patches look good to me.
 
-are available in the git repository at:
+Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-  git://git.infradead.org/users/jcooper/linux.git tags/fixes-3.10-3
-
-for you to fetch changes up to 6484ae0dcd6d45c3a3ab0442cb44fc1dddc53aec:
-
-  ARM: mvebu: Fix bug in coherency fabric low level init function (2013-05-23 17:35:51 +0000)
-
-----------------------------------------------------------------
-mvebu fixes for v3.10 round 3
-
- - mvebu
-    - fix register area length for sata and ethernet
-    - fix bug in coherency fabric low level init
-
- - kirkwood
-    - fix crash from pcie double init
-
-----------------------------------------------------------------
-Andrew Lunn (1):
-      ARM: Kirkwood: TS219: Fix crash by double PCIe instantiation
-
-Nadav Haklai (1):
-      ARM: mvebu: Fix bug in coherency fabric low level init function
-
-Thomas Petazzoni (2):
-      arm: mvebu: fix length of SATA registers area in .dtsi
-      arm: mvebu: fix length of Ethernet registers area in .dtsi
-
- arch/arm/boot/dts/armada-370-xp.dtsi     |  6 +++---
- arch/arm/boot/dts/armada-xp-mv78460.dtsi |  2 +-
- arch/arm/boot/dts/armada-xp.dtsi         |  2 +-
- arch/arm/mach-kirkwood/board-ts219.c     | 10 ----------
- arch/arm/mach-mvebu/coherency_ll.S       | 16 +++++++++++-----
- 5 files changed, 16 insertions(+), 20 deletions(-)
+Best regards,
+Tomasz
