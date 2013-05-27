@@ -1,20 +1,28 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Mon, 27 May 2013 13:07:53 +0100
-Subject: [PATCH 1/2] clocksource: dw_apb: remove unused header
-In-Reply-To: <1369570367-994-1-git-send-email-baruch@tkos.co.il>
-References: <1369570367-994-1-git-send-email-baruch@tkos.co.il>
-Message-ID: <20130527120753.GB3048@maple>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Mon, 27 May 2013 14:16:27 +0200
+Subject: [PATCH] ARM: ux500: select SND_SOC_UX500 for ux500
+In-Reply-To: <CACRpkdbB7KjzUCf72gqN3ooiWYYkaaPrZUEDeG8HuLk3pTB72A@mail.gmail.com>
+References: <1369402093-27817-1-git-send-email-fabio.baltieri@linaro.org>
+ <CACRpkdbB7KjzUCf72gqN3ooiWYYkaaPrZUEDeG8HuLk3pTB72A@mail.gmail.com>
+Message-ID: <20130527121627.GA29935@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 26, 2013 at 03:12:46PM +0300, Baruch Siach wrote:
-> The time.h header seems not to be used by current code. Removing this include
-> allows the driver to build on other architecture that do not have this header.
+On Mon, May 27, 2013 at 01:44:38PM +0200, Linus Walleij wrote:
+> On Fri, May 24, 2013 at 3:28 PM, Fabio Baltieri
+> <fabio.baltieri@linaro.org> wrote:
 > 
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jamie Iles <jamie@jamieiles.com>
+> > Enable ux500 specific ALSA SoC drivers by default on u8500_defconfig.
+> >
+> > Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> 
+> Thanks, patch applied to my defconfig branch.
+> 
+> Now I can finally use the Snowball board to run sidplay.
 
-Acked-by: Jamie Iles <jamie@jamieiles.com>
+Glad to be of help! :-)
+
+Fabio
+
+-- 
+Fabio Baltieri
