@@ -1,37 +1,32 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 27 May 2013 18:59:33 +0900
-Subject: [PATCH 9/9] ARM: shmobile: r8a7778: correct model name in Kconfig
-In-Reply-To: <1369648773-7941-1-git-send-email-horms+renesas@verge.net.au>
-References: <1369648773-7941-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1369648773-7941-10-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 27 May 2013 18:59:41 +0900
+Subject: [GIT PULL v2] Renesas ARM based sh7372 SoC updates for v3.11
+Message-ID: <1369648782-8024-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Hi Arnd, Hi Olof,
 
-The correct model name is R-Car M1A or R8A77781; R8A77780 corresponds to R-Car
-M1S which is a SH based SoC.
+The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-[horms+renesas at verge.net.au: manually applied to soc-r8a7778 branch]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 06da4d3..58eb689 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -36,7 +36,7 @@ config ARCH_R8A7740
- 	select RENESAS_INTC_IRQPIN
- 
- config ARCH_R8A7778
--	bool "R-Car M1 (R8A77780)"
-+	bool "R-Car M1A (R8A77781)"
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select CPU_V7
- 	select SH_CLK_CPG
--- 
-1.7.10.4
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-sh7372-for-v3.11
+
+for you to fetch changes up to 98a443fd3cb4460dd9bec09b3e1d602bc9efa93c:
+
+  ARM: shmobile: sh7372 pinmux platform device cleanup (2013-05-27 18:18:22 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based sh7372 SoC updates for v3.11
+
+* Clean-up from Magnus Damm to use DEFINE_RES_MEM() to slightly reduce code size
+
+----------------------------------------------------------------
+Magnus Damm (1):
+      ARM: shmobile: sh7372 pinmux platform device cleanup
+
+ arch/arm/mach-shmobile/setup-sh7372.c |   24 +++++-------------------
+ 1 file changed, 5 insertions(+), 19 deletions(-)
