@@ -1,42 +1,25 @@
 From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 27 May 2013 10:54:18 -0400 (EDT)
-Subject: [RFC V7 PATCH 1/3] USB: OHCI: prepare to make ohci-hcd a library
- module
-In-Reply-To: <1369657550-24101-2-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1305271050320.21231-100000@netrider.rowland.org>
+Date: Mon, 27 May 2013 10:55:21 -0400 (EDT)
+Subject: [RFC V7 PATCH 2/3] USB: OHCI: Generic changes to make ohci-pci
+ a separate driver
+In-Reply-To: <1369657550-24101-3-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1305271055020.21231-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 27 May 2013, Manjunath Goudar wrote:
 
-> This patch prepares ohci-hcd for being split up into a core
-> library and separate platform driver modules.  A generic
-> ohci_hc_driver structure is created, containing all the "standard"
-> values, and a new mechanism is added whereby a driver module can
-> specify a set of overrides to those values.  In addition the
-> ohci_restart(),ohci_suspend() and ohci_resume() routines need
-> to be EXPORTed for use by the drivers.
+> Note that this changes is part of separating the ohci pci host controller
+> driver from ohci-hcd host code.
+> This contains :
+>      -Moved sb800_prefetch() function from ohci-pci.c to pci-quirks.c file
+>       and EXPORTed, this is part of the effort to move the ohci pci related
+>       code to generic pci code.
+>      -Passed "device" argument instead  of "ohci_hcd" in sb800_prefetch()
+>       function to avoid extra include file in pci-quirks.c.
 > 
-> Added ohci_setip(() and ohci_start() routine for to start the generic
-> controller rather than each having its own idiosyncratic approach.
-> This allow to clean duplicated code in most of SOC driver
-> 
-> In V2:
->  -ohci_hcd_init() ohci_run() and ohci_stop() are not made non-static.
->  -Adds the ohci_setup() and ohci_start() routine.
+> V2:
+>      -Passed "device" argment instead of "pci_dev", then we use to_pci_dev()
+>       to get the "pci_dev" structure.
 
-There's one thing we forgot about:
-
-> +/* ohci_setup routine for generic controller initialization */
-> +
-> +int ohci_setup(struct usb_hcd *hcd)
-> +{
-> +	struct ohci_hcd		*ohci = hcd_to_ohci(hcd);
-> +
-> +	return ohci_init(ohci);
-> +}
-> +EXPORT_SYMBOL_GPL(ohci_setup);
-
-This routine needs to call ohci_hcd_init() before ohci_init().
-
-Alan Stern
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
