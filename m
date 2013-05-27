@@ -1,36 +1,31 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Mon, 27 May 2013 15:33:57 +0530
-Subject: [PATCH v7 0/2] dma: imx-dma: OFTree support
-In-Reply-To: <1369562001-11494-1-git-send-email-mpa@pengutronix.de>
-References: <1369562001-11494-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130527100357.GA30200@intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 May 2013 12:43:24 +0200
+Subject: [PATCH 0/7] ARM: ux500: Change naming convention for pinctrl
+In-Reply-To: <1369232581-18923-1-git-send-email-lee.jones@linaro.org>
+References: <1369232581-18923-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYWVSriZZ5grQJ-9XM6JF2NjpeXiKrE1uCYU0KpVT80sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 26, 2013 at 11:53:19AM +0200, Markus Pargmann wrote:
-> Hi,
-> 
-> this series adds support for the generic DMA DT bindings for imx-dma.
-> 
-> Regards,
-> 
-> Markus
-> 
-> 
-> Changes in v7:
->  - rebased onto v3.10-rc2
-Applied thanks...
+On Wed, May 22, 2013 at 4:22 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
---
-~Vinod
-> 
-> Markus Pargmann (2):
->       dma: imx-dma: Add oftree support
->       DMA: imx-dma: imxdma->dev used uninitialized
-> 
->  .../devicetree/bindings/dma/fsl-imx-dma.txt        | 48 ++++++++++++++
->  drivers/dma/imx-dma.c                              | 77 +++++++++++++++++++++-
->  include/linux/platform_data/dma-imx.h              |  6 +-
->  3 files changed, 126 insertions(+), 5 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/dma/fsl-imx-dma.txt
-> 
+> Our naming convention started off sensibly, but with the addition of
+> more supported platforms it's slipped a little. Most compatible strings
+> standardise themselves with "<vendor>,<device_name>-<device_type>",
+> which we had initially with "stericsson,nmk-pinctrl", but with more
+> devices to support we now have a tail, so we are using
+> "<vendor>,<driver_name>-<device_type>-<device_name>", which is
+> unsuitable.
+>
+> This patch-set ensures the standard convention is used again.
+
+I buy this. I have applied patches 1, 4 and 6 to the ux500-devicetree
+branch. I will apply the remaining patches to the Nomadik branch
+(which is in another tree).
+
+There might be some trivial conflict in drivers/pinctrl/pinctrl-nomadik.c
+as a result of this being split in two trees but it'll be manageable
+I think (will be resolved in ARM SoC).
+
+Yours,
+Linus Walleij
