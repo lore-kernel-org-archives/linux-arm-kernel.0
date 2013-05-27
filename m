@@ -1,50 +1,76 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 27 May 2013 18:59:31 +0900
-Subject: [PATCH 7/9] ARM: shmobile: r8a7778: add SDHI clock support
+Date: Mon, 27 May 2013 18:59:32 +0900
+Subject: [PATCH 8/9] ARM: shmobile: r8a7778: Register SDHI device
 In-Reply-To: <1369648773-7941-1-git-send-email-horms+renesas@verge.net.au>
 References: <1369648773-7941-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1369648773-7941-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1369648773-7941-9-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
+This patch adds SDHI register function which needs id number (= 0/1/2)
+
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7778.c |    7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |    2 ++
+ arch/arm/mach-shmobile/setup-r8a7778.c        |   24 ++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
-index 5cc271e..b251e4d 100644
---- a/arch/arm/mach-shmobile/clock-r8a7778.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7778.c
-@@ -103,12 +103,16 @@ static struct clk *main_clks[] = {
- };
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+index 68053fc..ae65b45 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+@@ -18,6 +18,7 @@
+ #ifndef __ASM_R8A7778_H__
+ #define __ASM_R8A7778_H__
  
- enum {
-+	MSTP323, MSTP322, MSTP321,
- 	MSTP114,
- 	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015,
- 	MSTP_NR };
++#include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/sh_eth.h>
  
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP323] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 23, 0), /* SDHI0 */
-+	[MSTP322] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 22, 0), /* SDHI1 */
-+	[MSTP321] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 21, 0), /* SDHI2 */
- 	[MSTP114] = SH_CLK_MSTP32(&p_clk, MSTPCR1, 14, 0), /* Ether */
- 	[MSTP026] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 26, 0), /* SCIF0 */
- 	[MSTP025] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 25, 0), /* SCIF1 */
-@@ -122,6 +126,9 @@ static struct clk mstp_clks[MSTP_NR] = {
+ extern void r8a7778_add_standard_devices(void);
+@@ -29,5 +30,6 @@ extern void r8a7778_init_irq_dt(void);
+ extern void r8a7778_clock_init(void);
+ extern void r8a7778_init_irq_extpin(int irlm);
+ extern void r8a7778_pinmux_init(void);
++extern void r8a7778_sdhi_init(int id, struct sh_mobile_sdhi_info *info);
  
- static struct clk_lookup lookups[] = {
- 	/* MSTP32 clocks */
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP323]), /* SDHI0 */
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
-+	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
- 	CLKDEV_DEV_ID("sh-eth",	&mstp_clks[MSTP114]), /* Ether */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
+ #endif /* __ASM_R8A7778_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index d82954b..4c32784 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -115,6 +115,30 @@ void __init r8a7778_pinmux_init(void)
+ 		ARRAY_SIZE(pfc_resources));
+ }
+ 
++/* SDHI */
++static struct resource sdhi_resources[] = {
++	/* SDHI0 */
++	DEFINE_RES_MEM(0xFFE4C000, 0x100),
++	DEFINE_RES_IRQ(gic_iid(0x77)),
++	/* SDHI1 */
++	DEFINE_RES_MEM(0xFFE4D000, 0x100),
++	DEFINE_RES_IRQ(gic_iid(0x78)),
++	/* SDHI2 */
++	DEFINE_RES_MEM(0xFFE4F000, 0x100),
++	DEFINE_RES_IRQ(gic_iid(0x76)),
++};
++
++void __init r8a7778_sdhi_init(int id,
++			      struct sh_mobile_sdhi_info *info)
++{
++	BUG_ON(id < 0 || id > 2);
++
++	platform_device_register_resndata(
++		&platform_bus, "sh_mobile_sdhi", id,
++		sdhi_resources + (2 * id), 2,
++		info, sizeof(*info));
++}
++
+ void __init r8a7778_add_standard_devices(void)
+ {
+ 	int i;
 -- 
 1.7.10.4
