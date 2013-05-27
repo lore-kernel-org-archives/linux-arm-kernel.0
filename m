@@ -1,46 +1,185 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 27 May 2013 22:02:00 +0400
-Subject: [PATCH 1/1] mmc: of_mmc_spi: fix card detect irq
-In-Reply-To: <20130527141306.GS24476@game.jcrosoft.org>
-References: <1369571337-9300-1-git-send-email-plagnioj@jcrosoft.com>
- <51A25ECA.2060001@cogentembedded.com>
- <20130527141306.GS24476@game.jcrosoft.org>
-Message-ID: <51A39F98.4010904@cogentembedded.com>
+From: dh.herrmann@gmail.com (David Herrmann)
+Date: Mon, 27 May 2013 20:22:21 +0200
+Subject: [PATCH v2] video: simplefb: add mode parsing function
+In-Reply-To: <1369626821-28494-1-git-send-email-acourbot@nvidia.com>
+References: <1369626821-28494-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <CANq1E4Qa6g-zrA6o_u3w6mpVcUk8-ZPPR+edu6EXgpk-kGQULQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi
 
-On 27-05-2013 18:13, Jean-Christophe PLAGNIOL-VILLARD wrote:
+On Mon, May 27, 2013 at 5:53 AM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+> The naming scheme of simplefb's mode is precise enough to allow building
+> the mode structure from it instead of using a static list of modes. This
+> patch introduces a function that does this. In case exotic modes that
+> cannot be represented from their name alone are needed, the static list
+> of modes is still available as a backup.
+>
+> It also changes the order in which colors are declared from MSB first to
+> the more standard LSB first.
+>
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> ---
+> Changes from v1:
+> - amended documentation following Stephen's suggestion
+> - allow parsing of bitfields larger than 9 bits
+> - made it clear that the parsing order of bits is changed with respect
+>   to the original patch
+>
+> Andrew, since this patch introduces a (small) change in the DT bindings,
+> could we try to merge it during the -rc cycle so we don't have to come
+> with a more complex solution in the future?
+>
+>  .../bindings/video/simple-framebuffer.txt          | 12 +++-
+>  drivers/video/simplefb.c                           | 72 +++++++++++++++++++++-
+>  2 files changed, 80 insertions(+), 4 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> index 3ea4605..18d03e2 100644
+> --- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> +++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+> @@ -10,8 +10,16 @@ Required properties:
+>  - width: The width of the framebuffer in pixels.
+>  - height: The height of the framebuffer in pixels.
+>  - stride: The number of bytes in each line of the framebuffer.
+> -- format: The format of the framebuffer surface. Valid values are:
+> -  - r5g6b5 (16-bit pixels, d[15:11]=r, d[10:5]=g, d[4:0]=b).
+> +- format: The format of the framebuffer surface. Described as a sequence of
+> +       channel/num-bits pairs, where each pair describes how many bits are used
+> +       by a given color channel. Value channels are "r" (red), "g" (green),
+> +       "b" (blue), "a" (alpha) and "x" (unused). Channels are listed in bit
+> +       order, starting from the LSB. For instance, a format named "r5g6b5"
+> +       describes a 16-bit format where red is encoded in the 5 less significant
+> +       bits, green in the 6 following ones, and blue in the 5 last:
+> +                               BBBBBGGG GGGRRRRR
+> +                               ^               ^
+> +                              MSB             LSB
 
->>> set missing irq type the IRQF_ONESHOT
+Is there a specific reason why we need arbitrary RGB formats? I have a
+KMS/DRM driver based on dvbe that can provide the exact same
+functionality as this fbdev driver (including an fbdev
+backwards-compat layer). However, DRM does not allow arbitrary formats
+but rather provides a huge list of supported formats.
 
->>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>> Cc: stable <stable@vger.kernel.org> # 3.4+
->>> Cc: linux-mmc at vger.kernel.org
->>> ---
->>>   drivers/mmc/host/of_mmc_spi.c |    4 ++--
->>>   1 file changed, 2 insertions(+), 2 deletions(-)
+If we apply this patch it will get very hard to support this with a
+KMS driver. So any reason why we cannot use the DRM FOURCC constants
+instead?
 
->>> diff --git a/drivers/mmc/host/of_mmc_spi.c b/drivers/mmc/host/of_mmc_spi.c
->>> index d720b5e..cfb2e61 100644
->>> --- a/drivers/mmc/host/of_mmc_spi.c
->>> +++ b/drivers/mmc/host/of_mmc_spi.c
->>> @@ -74,8 +74,8 @@ static int of_mmc_spi_init(struct device *dev,
->>>   {
->>>   	struct of_mmc_spi *oms = to_of_mmc_spi(dev);
->>> -	return request_threaded_irq(oms->detect_irq, NULL, irqhandler, 0,
->>> -				    dev_name(dev), mmc);
->>> +	return request_threaded_irq(oms->detect_irq, NULL, irqhandler,
->>> +		IRQF_ONESHOT, dev_name(dev), mmc);
+The dvbe proposal is available here: (also see the two following patches)
+  http://lkml.indiana.edu/hypermail/linux/kernel/1302.2/00274.html
 
->>      Please don't change the indentation.
+it provides a simple DRM driver that uses VESA / VBE. I am currently
+trying to rework it to "SimpleDRM" which can support arbitrary
+firmware framebuffers.
 
-> too long > 80
+Cheers
+David
 
-     Reflow it then into several lines.
-
-> Best Regards,
-> J.
-
-WBR, Sergei
+>  Example:
+>
+> diff --git a/drivers/video/simplefb.c b/drivers/video/simplefb.c
+> index e2e9e3e..1430752 100644
+> --- a/drivers/video/simplefb.c
+> +++ b/drivers/video/simplefb.c
+> @@ -21,6 +21,7 @@
+>   */
+>
+>  #include <linux/errno.h>
+> +#include <linux/ctype.h>
+>  #include <linux/fb.h>
+>  #include <linux/io.h>
+>  #include <linux/module.h>
+> @@ -82,8 +83,72 @@ struct simplefb_format {
+>         struct fb_bitfield transp;
+>  };
+>
+> +static struct simplefb_format *simplefb_parse_format(struct device *dev,
+> +                                                    const char *str)
+> +{
+> +       struct simplefb_format *format;
+> +       unsigned int offset = 0;
+> +       unsigned int i = 0;
+> +
+> +       format = devm_kzalloc(dev, sizeof(*format), GFP_KERNEL);
+> +       if (!format)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       while (str[i] != 0) {
+> +               struct fb_bitfield *field = NULL;
+> +               int length = 0;
+> +
+> +               switch (str[i++]) {
+> +               case 'r':
+> +               case 'R':
+> +                       field = &format->red;
+> +                       break;
+> +               case 'g':
+> +               case 'G':
+> +                       field = &format->green;
+> +                       break;
+> +               case 'b':
+> +               case 'B':
+> +                       field = &format->blue;
+> +                       break;
+> +               case 'a':
+> +               case 'A':
+> +                       field = &format->transp;
+> +                       break;
+> +               case 'x':
+> +               case 'X':
+> +                       break;
+> +               default:
+> +                       goto error;
+> +               }
+> +
+> +               if (!isdigit(str[i]))
+> +                       goto error;
+> +
+> +               while (isdigit(str[i])) {
+> +                       length = length * 10 + (str[i++] - '0');
+> +               }
+> +
+> +               if (field) {
+> +                       field->offset = offset;
+> +                       field->length = length;
+> +               }
+> +
+> +               offset += length;
+> +       }
+> +
+> +       format->bits_per_pixel = (offset + 7) & ~0x7;
+> +       format->name = str;
+> +       return format;
+> +
+> +error:
+> +       dev_err(dev, "Invalid format string\n");
+> +       return ERR_PTR(-EINVAL);
+> +}
+> +
+> +/* if you use exotic modes that simplefb_parse_format cannot decode, you can
+> +   specify them here. */
+>  static struct simplefb_format simplefb_formats[] = {
+> -       { "r5g6b5", 16, {11, 5}, {5, 6}, {0, 5}, {0, 0} },
+>  };
+>
+>  struct simplefb_params {
+> @@ -131,7 +196,10 @@ static int simplefb_parse_dt(struct platform_device *pdev,
+>                 params->format = &simplefb_formats[i];
+>                 break;
+>         }
+> -       if (!params->format) {
+> +       if (!params->format)
+> +               params->format = simplefb_parse_format(&pdev->dev, format);
+> +
+> +       if (IS_ERR(params->format)) {
+>                 dev_err(&pdev->dev, "Invalid format value\n");
+>                 return -EINVAL;
+>         }
+> --
+> 1.8.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
