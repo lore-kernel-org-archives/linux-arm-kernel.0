@@ -1,68 +1,54 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 27 May 2013 18:09:51 +0800
-Subject: [PATCH] arm64: kernel: compiling issue,
- need 'EXPORT_SYMBOL(clear_page)'
-In-Reply-To: <51A32FA5.3080200@asianux.com>
-References: <5199CCF9.4030305@asianux.com> <51A32FA5.3080200@asianux.com>
-Message-ID: <51A330EF.50104@asianux.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 27 May 2013 19:12:11 +0900
+Subject: [PATCH] ARM: S5PV210: dependency issue,
+ S5P_SLEEP is depend on ARM_CPU_SUSPEND
+In-Reply-To: <51A32FD4.4000001@asianux.com>
+References: <5199E4AF.7040607@asianux.com> <51A32FD4.4000001@asianux.com>
+Message-ID: <158201ce5ac2$a7843de0$f68cb9a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Oh, thanks, it is already applied, just now.
-
-It seems I need a little patience. :-)
-
-
-Thanks
-
-On 05/27/2013 06:04 PM, Chen Gang wrote:
+Chen Gang wrote:
+> 
 > Hello Maintainers:
 > 
+Hi,
+
 > Please help check this patch whether OK, when you have time.
 > 
 > 
 > Thanks.
 > 
-> On 05/20/2013 03:12 PM, Chen Gang wrote:
->>
->> Need 'EXPORT_SYMBOL(clear_page)' if building with allmodconfig.
->>
->> The related errors:
->>   ERROR: "clear_page" [fs/ocfs2/dlm/ocfs2_dlm.ko] undefined!
->>   ERROR: "clear_page" [fs/ntfs/ntfs.ko] undefined!
->>   ERROR: "clear_page" [fs/gfs2/gfs2.ko] undefined!
->>   ERROR: "clear_page" [fs/fuse/fuse.ko] undefined!
->>   ERROR: "clear_page" [fs/ext3/ext3.ko] undefined!
->>   ERROR: "clear_page" [fs/ext2/ext2.ko] undefined!
->>   ERROR: "clear_page" [fs/exofs/libore.ko] undefined!
->>   ERROR: "clear_page" [fs/exofs/exofs.ko] undefined!
->>   ERROR: "clear_page" [drivers/block/brd.ko] undefined!
->>
->>
->> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> ---
->>  arch/arm64/kernel/arm64ksyms.c |    1 +
->>  1 files changed, 1 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
->> index 7df1aad..41b4f62 100644
->> --- a/arch/arm64/kernel/arm64ksyms.c
->> +++ b/arch/arm64/kernel/arm64ksyms.c
->> @@ -34,6 +34,7 @@ EXPORT_SYMBOL(__strnlen_user);
->>  EXPORT_SYMBOL(__strncpy_from_user);
->>  
->>  EXPORT_SYMBOL(copy_page);
->> +EXPORT_SYMBOL(clear_page);
->>  
->>  EXPORT_SYMBOL(__copy_from_user);
->>  EXPORT_SYMBOL(__copy_to_user);
->>
-> 
-> 
+> On 05/20/2013 04:54 PM, Chen Gang wrote:
+> >
+> > When randconfig with MMU for arm s5pv210 (and select all cpu type),
+> > need let S5P_SLEEP depend on ARM_CPU_SUSPEND, or will cause issue below:
+> >
+> >   arch/arm/plat-samsung/built-in.o: In function `s3c_cpu_resume':
+> >   arch/arm/plat-samsung/s5p-sleep.S:83: undefined reference to
+> `cpu_resume'
+> >
+> >
+> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> > ---
+> >  arch/arm/plat-samsung/Kconfig |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-
+> samsung/Kconfig
+> > index f8ed2de..1d38541 100644
+> > --- a/arch/arm/plat-samsung/Kconfig
+> > +++ b/arch/arm/plat-samsung/Kconfig
+> > @@ -483,6 +483,7 @@ config S5P_PM
+> >
+> >  config S5P_SLEEP
+> >  	bool
+> > +	select ARM_CPU_SUSPEND
 
+Probably,
 
--- 
-Chen Gang
++	select ARM_CPU_SUSPEND if PM ?
 
-Asianux Corporation
+selecting the S5P_SLEEP depends on PM though...
+
+- Kukjin
