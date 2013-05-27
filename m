@@ -1,39 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 27 May 2013 18:00:23 +0900
-Subject: [PATCH 6/7] ARM: shmobile: Remove unused r8a7790 GIC CPU interface DT
- bits
-In-Reply-To: <1369645224-3728-1-git-send-email-horms+renesas@verge.net.au>
-References: <1369645224-3728-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1369645224-3728-7-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 27 May 2013 18:00:40 +0900
+Subject: [GIT PULL] Renesas ARM based sh7372 SoC updates for v3.11
+Message-ID: <1369645242-3803-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi Arnd, Hi Olof,
 
-Remove unused GIC CPU interface DT bits for r8a7790.
+The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7790.dtsi |    6 ------
- 1 file changed, 6 deletions(-)
+  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 7a17110..339d9b1 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -36,12 +36,6 @@
- 			<0 0xf1004000 0 0x2000>,
- 			<0 0xf1006000 0 0x2000>;
- 		interrupts = <1 9 0xf04>;
--
--		gic-cpuif at 4 {
--			compatible = "arm,gic-cpuif";
--			cpuif-id = <4>;
--			cpu = <&cpu0>;
--		};
- 	};
- 
- 	timer {
--- 
-1.7.10.4
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-sh7372-for-v3.11
+
+for you to fetch changes up to 98aaf628f866f530ce6829476e1c2ac98c9c4f60:
+
+  ARM: shmobile: sh7372 pinmux platform device cleanup (2013-05-22 21:46:25 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based sh7372 SoC updates for v3.11
+
+* Clean-up from Magnus Damm to use DEFINE_RES_MEM() to slightly reduce code size
+* Clean-up from Kuninori Morimoto to remove trailing ; from macros
+
+----------------------------------------------------------------
+Kuninori Morimoto (1):
+      ARM: shmobile: remove ";" from SH_FIXED_RATIO_CLK*() macro
+
+Magnus Damm (1):
+      ARM: shmobile: sh7372 pinmux platform device cleanup
+
+ arch/arm/mach-shmobile/include/mach/clock.h |    4 ++--
+ arch/arm/mach-shmobile/setup-sh7372.c       |   24 +++++-------------------
+ 2 files changed, 7 insertions(+), 21 deletions(-)
