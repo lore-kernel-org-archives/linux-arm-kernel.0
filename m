@@ -1,134 +1,56 @@
-From: manishv.b@ti.com (Vishwanathrao Badarkhe, Manish)
-Date: Mon, 27 May 2013 12:45:35 +0000
-Subject: [PATCH] ARM: dts: omap2plus: remove interrupt-parent property
-In-Reply-To: <A4887BF146CD57468F700B415D2F470158738C@DBDE01.ent.ti.com>
-References: <1362996002-15552-1-git-send-email-manishv.b@ti.com>
- <A4887BF146CD57468F700B415D2F470158738C@DBDE01.ent.ti.com>
-Message-ID: <A4887BF146CD57468F700B415D2F470159537D@DBDE04.ent.ti.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 27 May 2013 14:46:52 +0200
+Subject: [PATCH v3] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
+In-Reply-To: <51A34BF9.5000905@atmel.com>
+References: <1369651702-9207-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <51A34BF9.5000905@atmel.com>
+Message-ID: <51A355BC.6090309@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On 27/05/2013 14:05, Nicolas Ferre wrote:
+> On 27/05/2013 12:48, Alexandre Belloni :
+>> Fixes:
+>> arch/arm/mach-at91/built-in.o: In function `ksz9021rn_phy_fixup':
+>> :(.text+0x1174): undefined reference to `mdiobus_write'
+>> :(.text+0x1188): undefined reference to `mdiobus_write'
+>> :(.text+0x119c): undefined reference to `mdiobus_write'
+>> :(.text+0x11b0): undefined reference to `mdiobus_write'
+>> arch/arm/mach-at91/built-in.o: In function `sama5_dt_device_init':
+>> :(.init.text+0x1e34): undefined reference to
+>> `phy_register_fixup_for_uid'
+>>
+>> when CONFIG_PHYLIB is not selected.
+>>
+>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>> ---
+>> Changes in v3:
+>>     added SoB
+>>     added Acked-By
+>
+> A v3 is not needed simply for this. Thanks, anyway!
+>
 
-Are there any review comments on this patch?
-Could you please accept this patch if there are not any review comments?
+It was not much and I have to stop forgetting my SoB ;)
 
-Thanks and Regards
-Manish Badarkhe
+> One question though: why not just add
+>
+>         select PHYLIB
+>
+> In Kconfig entry:
+>
+>  config MACH_SAMA5_DT
+>
+> ?
+>
 
------Original Message-----
-From: Vishwanathrao Badarkhe, Manish 
-Sent: Friday, April 12, 2013 12:20 PM
-To: Vishwanathrao Badarkhe, Manish; devicetree-discuss at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-omap at vger.kernel.org
-Cc: tony at atomide.com; Cousson, Benoit; linux at arm.linux.org.uk
-Subject: RE: [PATCH] ARM: dts: omap2plus: remove interrupt-parent property
+That would simply mean that you have to enable NET when using a SAMA5
+which is not what every user will want.
 
-Hi Benoit,
-Are there any review comments on this patch? 
-Could you please accept this patch if there are not any review comments?
+Regards,
 
-Thanks
-Manish Badarkhe
-
------Original Message-----
-From: Vishwanathrao Badarkhe, Manish 
-Sent: Monday, March 11, 2013 3:30 PM
-To: devicetree-discuss at lists.ozlabs.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-omap at vger.kernel.org
-Cc: tony at atomide.com; Cousson, Benoit; linux at arm.linux.org.uk; Vishwanathrao Badarkhe, Manish
-Subject: [PATCH] ARM: dts: omap2plus: remove interrupt-parent property
-
-Removed interrupt-parent property from dts file as it is already
-with root node in dtsi file.
-
-Signed-off-by: Vishwanathrao Badarkhe, Manish <manishv.b@ti.com>
----
-:100644 100644 f624dc8... 36e839a... M	arch/arm/boot/dts/omap3-beagle.dts
-:100644 100644 e8ba1c2... a5375fd... M	arch/arm/boot/dts/omap3-evm.dts
-:100644 100644 4122efe... 389c9c7... M	arch/arm/boot/dts/omap4-panda.dts
-:100644 100644 43e5258... cdf5dfd... M	arch/arm/boot/dts/omap4-sdp.dts
-:100644 100644 6601e6a... 1d4a9d4... M	arch/arm/boot/dts/omap4-var-som.dts
- arch/arm/boot/dts/omap3-beagle.dts  |    1 -
- arch/arm/boot/dts/omap3-evm.dts     |    1 -
- arch/arm/boot/dts/omap4-panda.dts   |    2 --
- arch/arm/boot/dts/omap4-sdp.dts     |    2 --
- arch/arm/boot/dts/omap4-var-som.dts |    1 -
- 5 files changed, 0 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index f624dc8..36e839a 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -46,7 +46,6 @@
- 	twl: twl at 48 {
- 		reg = <0x48>;
- 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
--		interrupt-parent = <&intc>;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
-index e8ba1c2..a5375fd 100644
---- a/arch/arm/boot/dts/omap3-evm.dts
-+++ b/arch/arm/boot/dts/omap3-evm.dts
-@@ -34,7 +34,6 @@
- 	twl: twl at 48 {
- 		reg = <0x48>;
- 		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
--		interrupt-parent = <&intc>;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/omap4-panda.dts b/arch/arm/boot/dts/omap4-panda.dts
-index 4122efe..389c9c7 100644
---- a/arch/arm/boot/dts/omap4-panda.dts
-+++ b/arch/arm/boot/dts/omap4-panda.dts
-@@ -119,7 +119,6 @@
- 		reg = <0x48>;
- 		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
- 		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
--		interrupt-parent = <&gic>;
- 	};
- 
- 	twl6040: twl at 4b {
-@@ -127,7 +126,6 @@
- 		reg = <0x4b>;
- 		/* SPI = 0, IRQ# = 119, 4 = active high level-sensitive */
- 		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
--		interrupt-parent = <&gic>;
- 		ti,audpwron-gpio = <&gpio4 31 0>;  /* gpio line 127 */
- 
- 		vio-supply = <&v1v8>;
-diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
-index 43e5258..cdf5dfd 100644
---- a/arch/arm/boot/dts/omap4-sdp.dts
-+++ b/arch/arm/boot/dts/omap4-sdp.dts
-@@ -221,7 +221,6 @@
- 		reg = <0x48>;
- 		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
- 		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
--		interrupt-parent = <&gic>;
- 	};
- 
- 	twl6040: twl at 4b {
-@@ -229,7 +228,6 @@
- 		reg = <0x4b>;
- 		/* SPI = 0, IRQ# = 119, 4 = active high level-sensitive */
- 		interrupts = <0 119 4>; /* IRQ_SYS_2N cascaded to gic */
--		interrupt-parent = <&gic>;
- 		ti,audpwron-gpio = <&gpio4 31 0>;  /* gpio line 127 */
- 
- 		vio-supply = <&v1v8>;
-diff --git a/arch/arm/boot/dts/omap4-var-som.dts b/arch/arm/boot/dts/omap4-var-som.dts
-index 6601e6a..1d4a9d4 100644
---- a/arch/arm/boot/dts/omap4-var-som.dts
-+++ b/arch/arm/boot/dts/omap4-var-som.dts
-@@ -35,7 +35,6 @@
- 		reg = <0x48>;
- 		/* SPI = 0, IRQ# = 7, 4 = active high level-sensitive */
- 		interrupts = <0 7 4>; /* IRQ_SYS_1N cascaded to gic */
--		interrupt-parent = <&gic>;
- 	};
- };
- 
 -- 
-1.7.4.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
