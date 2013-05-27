@@ -1,88 +1,81 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 28 May 2013 00:03:28 +0200
-Subject: [PATCHv2 2/3] Add documentation for g762 driver
+Date: Tue, 28 May 2013 00:03:41 +0200
+Subject: [PATCHv2 3/3] Add DT bindings documentation for g762 driver
 In-Reply-To: <cover.1369687670.git.arno@natisbad.org>
 References: <cover.1369687670.git.arno@natisbad.org>
-Message-ID: <9e9904e9e0aed280afe547445bb471ba0229aa9e.1369687670.git.arno@natisbad.org>
+Message-ID: <eab66cea9ff30d44b82fc3ec6aee2bdb928a9cae.1369687670.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- Documentation/hwmon/g762 |   64 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
- create mode 100644 Documentation/hwmon/g762
+ Documentation/devicetree/bindings/hwmon/g762.txt |   57 ++++++++++++++++++++++
+ 1 file changed, 57 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/g762.txt
 
-diff --git a/Documentation/hwmon/g762 b/Documentation/hwmon/g762
+diff --git a/Documentation/devicetree/bindings/hwmon/g762.txt b/Documentation/devicetree/bindings/hwmon/g762.txt
 new file mode 100644
-index 0000000..b749fe1
+index 0000000..f7ac01a
 --- /dev/null
-+++ b/Documentation/hwmon/g762
-@@ -0,0 +1,64 @@
-+Kernel driver g762
-+==================
++++ b/Documentation/devicetree/bindings/hwmon/g762.txt
+@@ -0,0 +1,57 @@
++GMT G762/G763 PWM Fan controller
 +
-+The GMT G762 Fan Speed PWM Controller is connected directly to a fan
-+and performs closed-loop or open-loop control of the fan speed. Two
-+modes - PWM or DC - are supported by the device.
++Required node properties:
 +
-+For additional information, a detailed datasheet is available at
-+http://natisbad.org/NAS/ref/GMT_EDS-762_763-080710-0.2.pdf. sysfs
-+bindings are described in Documentation/hwmon/sysfs-interface.
++ - "compatible": must be either "gmt,g762" or "gmt,g763"
++ - "reg": I2C bus address of the device
 +
-+The following entries are available to the user in a subdirectory of
-+/sys/bus/i2c/drivers/g762/ to control the operation of the device.
-+This can be done manually using the following entries but is usually
-+done via a userland daemon like fancontrol.
++Optional properties:
 +
-+Note that those entries do not provide ways to setup the specific
-+hardware characteristics of the system (reference clock, pulses per
-+fan revolution, ...); Those can be modified via devicetree bindings
-+documented in Documentation/devicetree/bindings/hwmon/g762.txt.
++ - "pwm_mode": fan driving mode. 1 for PWM mode, 0 for linear.
 +
++ - "pwm_enable": fan speed control. 1 for open-loop, 2 for closed-loop.
 +
-+  fan1_target: set desired fan speed. This only makes sense in closed-loop
-+            fan speed control (i.e. when pwm1_enable is set to 2).
++ - "pwm_freq": reference clock frequency for PWM mode in Hz.
 +
-+  fan1_input: provide current fan rotation value in RPM as reported by
-+            the fan to the device.
++ - "fan_pulses": number of pulses per fan revolution. Supported values
++               are 2 and 4.
 +
-+  fan1_div: fan clock divisor. Supported value are 1, 2, 4 and 8.
++ - "fan_div": fan clock frequency divisor value. Supported values are 1,
++               2, 4 and 8. Default is 1.
 +
-+  fan1_fault: reports fan failure, i.e. no transition on fan gear pin for
-+            about 0.7s (if the fan is not voluntarily set off).
++ - "fan_target": initial target fan speed in RPM. Only works in closed-loop
++               fan speed control, i.e. when pwm_enable has already been set
++               to 2.
 +
-+  fan1_alarm: in closed-loop control mode, if fan RPM value is 25% out
-+            of the programmed value for over 6 seconds 'fan1_alarm' is
-+            set to 1.
++ - "fan_startv": fan startup voltage. Accepted values are 0, 1, 2 and 3.
++               The higher the more.
 +
-+  pwm1_enable: set current fan speed control mode i.e. 1 for manual fan
-+            speed control (open-loop) via pwm1 described below, 2 for
-+            automatic fan speed control (closed-loop) via fan1_target
-+            above (pwm1 is also usable).
++ - "pwm_polarity": pwm polarity. Accepted values are 0 (positive duty)
++               and 1 (negative duty).
 +
-+  pwm1_mode: set or get fan driving mode: 1 for PWM mode, 0 for DC mode.
++ - "fan_gear_mode": fan gear mode. Supported values are 0, 1 and 2.
 +
-+  pwm1: get or set PWM fan control value. This is an integer value
-+            between 0 and 255. 0 stops the fan, 255 makes it run at
-+            full speed. Note that the fan speed control mode (open vs
-+            closed-loop) must be set prior via pwm1_enable prior to
-+            passing a value via pwm1.
++If an optional property is not set in .dts file, then current value is kept
++unmodified (e.g. u-boot installed value).
 +
 +
-+Both in PWM mode ('pwm1_mode' set to 1) and DC mode ('pwm1_mode' set to 0),
-+when current fan speed control mode is open-loop ('pwm1_enable' set to 1),
-+the fan speed is programmed by setting a value between 0 and 255 via 'pwm1'
-+entry (0 stops the fan, 255 makes it run at full speed). In closed-loop mode
-+('pwm1_enable' set to 2), the expected rotation speed in RPM can be passed to
-+the chip via 'fan1_target'. In closed-loop mode, the target speed is compared
-+with current speed (available via 'fan1_input') by the device and a feedback
-+is performed to match that target value. The fan speed value is computed
-+based on the parameters associated with the physical characteristics of the
-+system: a reference clock source frequency, a number of pulses per fan
-+revolution, etc.
++Additional information on operational parameters for the device is available
++in Documentation/hwmon/g762. A detailed datasheet for the device is available
++at http://natisbad.org/NAS/refs/GMT_EDS-762_763-080710-0.2.pdf.
 +
-+Note that the driver will update its values at most once per second.
++Example g762 node:
++
++   g762: g762 at 3e {
++	compatible = "gmt,g762";
++	reg = <0x3e>;
++	pwm_mode = <1>;      /* closed-loop control */
++	pwm_enable = <2>;    /* PWM mode */
++	pwm_freq = <8192>;   /* PWM reference clock freq */
++	fan_pulses = <2>;    /* 2 pulses per rev */
++	fan_div = <2>;       /* fan clock divisor */
++	fan_target = <2000>; /* target fan speed at 2000 RPM */
++	fan_gear_mode = <0>; /* chip default */
++	fan_startv = <1>;    /* chip default */
++	pwm_polarity = <0>;  /* chip default */
++   };
++
 -- 
 1.7.10.4
