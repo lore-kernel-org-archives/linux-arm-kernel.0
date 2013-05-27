@@ -1,166 +1,265 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Mon, 27 May 2013 13:10:09 +0530
-Subject: [PATCH v2] clk: tegra: Use common of_clk_init function
-Message-ID: <1369640409-1981-1-git-send-email-pgaikwad@nvidia.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 27 May 2013 09:44:00 +0200
+Subject: [PATCH v3 1/6] drivers: bus: add a new driver for WEIM
+In-Reply-To: <1369389564-13181-2-git-send-email-b32955@freescale.com>
+References: <1369389564-13181-1-git-send-email-b32955@freescale.com>
+ <1369389564-13181-2-git-send-email-b32955@freescale.com>
+Message-ID: <20130527074400.GD32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use common of_clk_init() function for clocks initialization.
+On Fri, May 24, 2013 at 05:59:19PM +0800, Huang Shijie wrote:
+> The WEIM(Wireless External Interface Module) works like a bus.
+> You can attach many different devices on it, such as NOR, onenand.
+> 
+> In the case of i.MX6q-sabreauto, the NOR is connected to WEIM.
+> 
+> This patch also adds the devicetree binding document.
+> The driver only works when the devicetree is enabled.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  Documentation/devicetree/bindings/bus/imx-weim.txt |   50 +++++++
+>  drivers/bus/Kconfig                                |    9 ++
+>  drivers/bus/Makefile                               |    1 +
+>  drivers/bus/imx-weim.c                             |  139 ++++++++++++++++++++
+>  4 files changed, 199 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/bus/imx-weim.txt
+>  create mode 100644 drivers/bus/imx-weim.c
+> 
+> diff --git a/Documentation/devicetree/bindings/bus/imx-weim.txt b/Documentation/devicetree/bindings/bus/imx-weim.txt
+> new file mode 100644
+> index 0000000..e7a2950
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/bus/imx-weim.txt
+> @@ -0,0 +1,50 @@
+> +Device tree bindings for i.MX Wireless External Interface Module (WEIM)
+> +
+> +The term "wireless" does not imply that the WEIM is literally an interface
+> +without wires. It simply means that this module was originally designed for
+> +wireless and mobile applications that use low-power technology.
+> +
+> +The actual devices are instantiated from the child nodes of a WEIM node.
+> +
+> +Required properties:
+> +
+> + - compatible:		Should be set to "fsl,imx6q-weim"
+> + - reg:			A resource specifier for the register space
+> +			(see the example below)
+> + - clocks:		the clock, see the example below.
+> + - #address-cells:	Must be set to 2 to allow memory address translation
+> + - #size-cells:		Must be set to 1 to allow CS address passing
+> + - ranges:		Must be set up to reflect the memory layout with four
+> +			integer values for each chip-select line in use:
+> +
+> +			   <cs-number> 0 <physical address of mapping> <size>
+> +
+> +Timing property for child nodes. It is mandatory, not optional.
+> +
+> + - fsl,weim-cs-timing:	The timing array, contains 6 timing values for the
+> +			child node. We can get the CS index from the child
+> +			node's "reg" property. This property contains the values
+> +			for the registers EIM_CSnGCR1, EIM_CSnGCR2, EIM_CSnRCR1,
+> +			EIM_CSnRCR2, EIM_CSnWCR1, EIM_CSnWCR2 in this order.
+> +
+> +Example for an imx6q-sabreauto board, the NOR flash connected to the WEIM:
+> +
+> +	weim: weim at 021b8000 {
+> +		compatible = "fsl,imx6q-weim";
+> +		reg = <0x021b8000 0x4000>;
+> +		clocks = <&clks 196>;
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0 0x08000000 0x08000000>;
+> +
+> +		nor at 0,0 {
+> +			compatible = "cfi-flash";
+> +			reg = <0 0 0x02000000>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			bank-width = <2>;
+> +
+> +			fsl,weim-cs-timing = <0x00620081 0x00000001 0x1C022000
+> +					0x0000C000 0x1404a38e 0x00000000>;
+> +		};
+> +	};
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index b05ecab..46cd5bb 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -4,6 +4,15 @@
+>  
+>  menu "Bus devices"
+>  
+> +config IMX_WEIM
+> +	bool "Freescale EIM DRIVER"
+> +	depends on ARCH_MXC
+> +	help
+> +	  Driver for i.MX6 WEIM controller.
+> +	  The WEIM(Wireless External Interface Module) works like a bus.
+> +	  You can attach many different devices on it, such as NOR, onenand.
+> +	  But now, we only support the Parallel NOR.
+> +
+>  config MVEBU_MBUS
+>  	bool
+>  	depends on PLAT_ORION
+> diff --git a/drivers/bus/Makefile b/drivers/bus/Makefile
+> index 3c7b53c..436bbcc 100644
+> --- a/drivers/bus/Makefile
+> +++ b/drivers/bus/Makefile
+> @@ -2,6 +2,7 @@
+>  # Makefile for the bus drivers.
+>  #
+>  
+> +obj-$(CONFIG_IMX_WEIM)	+= imx-weim.o
+>  obj-$(CONFIG_MVEBU_MBUS) += mvebu-mbus.o
+>  obj-$(CONFIG_OMAP_OCP2SCP)	+= omap-ocp2scp.o
+>  
+> diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+> new file mode 100644
+> index 0000000..aef865d
+> --- /dev/null
+> +++ b/drivers/bus/imx-weim.c
+> @@ -0,0 +1,139 @@
+> +/*
+> + * EIM driver for Freescale's i.MX chips
+> + *
+> + * Copyright (C) 2013 Freescale Semiconductor, Inc.
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2. This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +#include <linux/module.h>
+> +#include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/of_device.h>
+> +
+> +struct imx_weim {
+> +	void __iomem *base;
+> +	struct clk *clk;
+> +};
+> +
+> +static const struct of_device_id weim_id_table[] = {
+> +	{ .compatible = "fsl,imx6q-weim", },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, weim_id_table);
+> +
+> +#define CS_TIMING_LEN 6
+> +#define CS_REG_RANGE  0x18
+> +
+> +/* Parse and set the timing for this device. */
+> +static int
+> +weim_timing_setup(struct platform_device *pdev, struct device_node *np)
+> +{
+> +	struct imx_weim *weim = platform_get_drvdata(pdev);
+> +	u32 value[CS_TIMING_LEN];
+> +	u32 cs_idx;
+> +	int ret;
+> +	int i;
+> +
+> +	/* get the CS index from this child node's "reg" property. */
+> +	ret = of_property_read_u32(np, "reg", &cs_idx);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* The weim has four chip selects. */
+> +	if (cs_idx > 3)
+> +		return -EINVAL;
+> +
+> +	ret = of_property_read_u32_array(np, "fsl,weim-cs-timing",
+> +					value, CS_TIMING_LEN);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* set the timing for WEIM */
+> +	for (i = 0; i < CS_TIMING_LEN; i++)
+> +		writel(value[i], weim->base + cs_idx * CS_REG_RANGE + i * 4);
+> +	return 0;
+> +}
+> +
+> +static void weim_parse_dt(struct platform_device *pdev)
+> +{
+> +	struct device_node *child;
+> +
+> +	for_each_child_of_node(pdev->dev.of_node, child) {
+> +		if (!child->name)
+> +			continue;
+> +
+> +		if (weim_timing_setup(pdev, child)) {
+> +			dev_err(&pdev->dev, "%s set timing failed.\n",
+> +				child->full_name);
+> +			continue;
+> +		}
 
-Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
----
+Since you know use of_platform_populate you can't skip erroneous devices
+anymore, so you have to bail out.
 
-Included initialization for T114 in V2.
+> +	}
+> +
+> +	if (of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev) < 0)
+> +		dev_err(&pdev->dev, "%s fail to create devices.\n",
+> +			pdev->dev.of_node->full_name);
+> +}
+> +
+> +static int weim_probe(struct platform_device *pdev)
+> +{
+> +	struct imx_weim *weim;
+> +	struct resource *res;
+> +	int ret = -EINVAL;
+> +
+> +	weim = devm_kzalloc(&pdev->dev, sizeof(*weim), GFP_KERNEL);
+> +	if (!weim) {
+> +		ret = -ENOMEM;
+> +		goto weim_err;
+> +	}
+> +	platform_set_drvdata(pdev, weim);
+> +
+> +	/* get the resource */
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	weim->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(weim->base)) {
+> +		ret = PTR_ERR(weim->base);
+> +		goto weim_err;
+> +	}
+> +
+> +	/* get the clock */
+> +	weim->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(weim->clk))
+> +		goto weim_err;
+> +
+> +	ret = clk_prepare_enable(weim->clk);
+> +	if (ret)
+> +		goto weim_err;
+> +
+> +	/* parse the device node */
+> +	weim_parse_dt(pdev);
+> +
+> +	dev_info(&pdev->dev, "WEIM driver registered.\n");
+> +	return 0;
+> +
+> +weim_err:
+> +	return ret;
+> +}
+> +
+> +static int weim_remove(struct platform_device *pdev)
+> +{
+> +	struct imx_weim *weim = platform_get_drvdata(pdev);
+> +
+> +	clk_disable_unprepare(weim->clk);
 
----
- arch/arm/mach-tegra/common.c     |    4 ++--
- drivers/clk/tegra/clk-tegra114.c |    3 ++-
- drivers/clk/tegra/clk-tegra20.c  |    3 ++-
- drivers/clk/tegra/clk-tegra30.c  |    3 ++-
- drivers/clk/tegra/clk.c          |   12 ------------
- drivers/clk/tegra/clk.h          |   18 ------------------
- include/linux/clk/tegra.h        |    1 -
- 7 files changed, 8 insertions(+), 36 deletions(-)
+I'm running out of ideas how to explain this. Just drop this remove
+function. You do not allow building this as module. If you did, then
+your first job here would be to unregister your child devices. Then
+afterwards you could disable the clock. If you just disable the clock
+without unregistering your children then all you do is to make the
+child devices nonfuntional.
 
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 9f852c6..95ce2a0 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -23,7 +23,7 @@
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/irqchip.h>
--#include <linux/clk/tegra.h>
-+#include <linux/clk-provider.h>
- 
- #include <asm/hardware/cache-l2x0.h>
- 
-@@ -59,7 +59,7 @@ u32 tegra_uart_config[4] = {
- #ifdef CONFIG_OF
- void __init tegra_dt_init_irq(void)
- {
--	tegra_clocks_init();
-+	of_clk_init(NULL);
- 	tegra_pmc_init();
- 	tegra_init_irq();
- 	irqchip_init();
-diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-index d78e16e..e0ee077 100644
---- a/drivers/clk/tegra/clk-tegra114.c
-+++ b/drivers/clk/tegra/clk-tegra114.c
-@@ -2030,7 +2030,7 @@ static void __init tegra114_clock_apply_init_table(void)
- 	tegra_init_from_table(init_table, clks, clk_max);
- }
- 
--void __init tegra114_clock_init(struct device_node *np)
-+static void __init tegra114_clock_init(struct device_node *np)
- {
- 	struct device_node *node;
- 	int i;
-@@ -2083,3 +2083,4 @@ void __init tegra114_clock_init(struct device_node *np)
- 
- 	tegra_cpu_car_ops = &tegra114_cpu_car_ops;
- }
-+CLK_OF_DECLARE(tegra114, "nvidia,tegra114-car", tegra114_clock_init);
-diff --git a/drivers/clk/tegra/clk-tegra20.c b/drivers/clk/tegra/clk-tegra20.c
-index 8292a00..a25e07c 100644
---- a/drivers/clk/tegra/clk-tegra20.c
-+++ b/drivers/clk/tegra/clk-tegra20.c
-@@ -1282,7 +1282,7 @@ static const struct of_device_id pmc_match[] __initconst = {
- 	{},
- };
- 
--void __init tegra20_clock_init(struct device_node *np)
-+static void __init tegra20_clock_init(struct device_node *np)
- {
- 	int i;
- 	struct device_node *node;
-@@ -1334,3 +1334,4 @@ void __init tegra20_clock_init(struct device_node *np)
- 
- 	tegra_cpu_car_ops = &tegra20_cpu_car_ops;
- }
-+CLK_OF_DECLARE(tegra20, "nvidia,tegra20-car", tegra20_clock_init);
-diff --git a/drivers/clk/tegra/clk-tegra30.c b/drivers/clk/tegra/clk-tegra30.c
-index c6921f5..985ad69 100644
---- a/drivers/clk/tegra/clk-tegra30.c
-+++ b/drivers/clk/tegra/clk-tegra30.c
-@@ -1953,7 +1953,7 @@ static const struct of_device_id pmc_match[] __initconst = {
- 	{},
- };
- 
--void __init tegra30_clock_init(struct device_node *np)
-+static void __init tegra30_clock_init(struct device_node *np)
- {
- 	struct device_node *node;
- 	int i;
-@@ -2004,3 +2004,4 @@ void __init tegra30_clock_init(struct device_node *np)
- 
- 	tegra_cpu_car_ops = &tegra30_cpu_car_ops;
- }
-+CLK_OF_DECLARE(tegra30, "nvidia,tegra30-car", tegra30_clock_init);
-diff --git a/drivers/clk/tegra/clk.c b/drivers/clk/tegra/clk.c
-index 923ca7e..86581ac 100644
---- a/drivers/clk/tegra/clk.c
-+++ b/drivers/clk/tegra/clk.c
-@@ -74,18 +74,6 @@ void __init tegra_init_from_table(struct tegra_clk_init_table *tbl,
- 	}
- }
- 
--static const struct of_device_id tegra_dt_clk_match[] = {
--	{ .compatible = "nvidia,tegra20-car", .data = tegra20_clock_init },
--	{ .compatible = "nvidia,tegra30-car", .data = tegra30_clock_init },
--	{ .compatible = "nvidia,tegra114-car", .data = tegra114_clock_init },
--	{ }
--};
--
--void __init tegra_clocks_init(void)
--{
--	of_clk_init(tegra_dt_clk_match);
--}
--
- tegra_clk_apply_init_table_func tegra_clk_apply_init_table;
- 
- void __init tegra_clocks_apply_init_table(void)
-diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-index e056562..11278a8 100644
---- a/drivers/clk/tegra/clk.h
-+++ b/drivers/clk/tegra/clk.h
-@@ -571,24 +571,6 @@ void tegra_init_from_table(struct tegra_clk_init_table *tbl,
- void tegra_init_dup_clks(struct tegra_clk_duplicate *dup_list,
- 		struct clk *clks[], int clk_max);
- 
--#ifdef CONFIG_ARCH_TEGRA_2x_SOC
--void tegra20_clock_init(struct device_node *np);
--#else
--static inline void tegra20_clock_init(struct device_node *np) {}
--#endif /* CONFIG_ARCH_TEGRA_2x_SOC */
--
--#ifdef CONFIG_ARCH_TEGRA_3x_SOC
--void tegra30_clock_init(struct device_node *np);
--#else
--static inline void tegra30_clock_init(struct device_node *np) {}
--#endif /* CONFIG_ARCH_TEGRA_3x_SOC */
--
--#ifdef CONFIG_ARCH_TEGRA_114_SOC
--void tegra114_clock_init(struct device_node *np);
--#else
--static inline void tegra114_clock_init(struct device_node *np) {}
--#endif /* CONFIG_ARCH_TEGRA114_SOC */
--
- typedef void (*tegra_clk_apply_init_table_func)(void);
- extern tegra_clk_apply_init_table_func tegra_clk_apply_init_table;
- 
-diff --git a/include/linux/clk/tegra.h b/include/linux/clk/tegra.h
-index 642789b..3670a4f 100644
---- a/include/linux/clk/tegra.h
-+++ b/include/linux/clk/tegra.h
-@@ -122,7 +122,6 @@ static inline void tegra_cpu_clock_resume(void)
- 
- void tegra_periph_reset_deassert(struct clk *c);
- void tegra_periph_reset_assert(struct clk *c);
--void tegra_clocks_init(void);
- void tegra_clocks_apply_init_table(void);
- 
- #endif /* __LINUX_CLK_TEGRA_H_ */
+Sascha
+
 -- 
-1.7.4.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
