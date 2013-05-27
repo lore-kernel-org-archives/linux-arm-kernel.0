@@ -1,22 +1,47 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 27 May 2013 12:29:11 +0100
-Subject: [PATCH] clk: use platform_{get,set}_drvdata()
-In-Reply-To: <000401ce581b$a9224600$fb66d200$@samsung.com>
-References: <000401ce581b$a9224600$fb66d200$@samsung.com>
-Message-ID: <20130527112910.GD21462@opensource.wolfsonmicro.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 May 2013 13:30:31 +0200
+Subject: [PATCH 3/6] ARM: ux500: Enable support for RPMB and Reliable
+ Write for eMMC
+In-Reply-To: <1369314830-3727-4-git-send-email-ulf.hansson@stericsson.com>
+References: <1369314830-3727-1-git-send-email-ulf.hansson@stericsson.com>
+ <1369314830-3727-4-git-send-email-ulf.hansson@stericsson.com>
+Message-ID: <CACRpkdbcQNAUNYnHwLRm2f+LdRmQZY=U9PBk8CPPxONmQFtXmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 10:11:46AM +0900, Jingoo Han wrote:
-> Use the wrapper functions for getting and setting the driver data using
-> platform_device instead of using dev_{get,set}_drvdata() with &pdev->dev,
-> so we can directly pass a struct platform_device.
+On Thu, May 23, 2013 at 3:13 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130527/1c991f42/attachment-0001.sig>
+> From: Ulf Hansson <ulf.hansson@linaro.org>
+>
+> By adding MMC_CAP_CMD23 for the eMMC devices, we can support RPMB
+> and Reliable Write. Additionally it will mean CMD12 will not be sent
+> to end a successful data transfer.
+>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+Patch applied to ux500-core, thanks,
+but Houston, we have a problem:
+
+I wanted to enable this also for the device tree boot
+path. But currently there are no bindings to state in the
+DT boot that CMD23 is supported.
+
+Could you create another patch that:
+
+- Add bindings to Documentation/devicetree/bindings/mmc/mmc.txt
+  for indicating that a host controller supports CMD23
+- Patch the ux500 DTS files to enable it.
+- Write a patch to mmci.c to augment
+  mmci_dt_populate_generic_pdata() to read the binding and
+  augment the caps from the device tree.
+
+There is also a complicated refactoring that need to happen any
+of these days:
+
+- Augment the MMC core and all drivers using DT boots to
+  parse any standard caps from the device tree insteaf of
+  putting code like mmci_dt_populate_generic_pdata() into
+  every driver.
+
+Yours,
+Linus Walleij
