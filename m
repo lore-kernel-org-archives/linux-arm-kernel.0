@@ -1,49 +1,39 @@
-From: dt.tangr@gmail.com (Daniel Tang)
-Date: Mon, 27 May 2013 20:56:24 +1000
-Subject: [RFC PATCHv4 4/6] clocksource: TI-Nspire timer support
-In-Reply-To: <CACRpkda4Qe1e+dkcSgPLf5dcHASvOG=Y=Dvrnv=oGnon+FRzzg@mail.gmail.com>
-References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
- <1369480087-24786-5-git-send-email-dt.tangr@gmail.com>
- <CACRpkda4Qe1e+dkcSgPLf5dcHASvOG=Y=Dvrnv=oGnon+FRzzg@mail.gmail.com>
-Message-ID: <69E1F2A1-CD4C-4B16-8664-6010C7217B8B@gmail.com>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 27 May 2013 18:57:35 +0800
+Subject: [PATCH v2] arch: arm: plat-samsung: dependency, S5P_SLEEP depends
+ on ARM_CPU_SUSPEND
+In-Reply-To: <51A33A53.1050502@asianux.com>
+References: <5199E4AF.7040607@asianux.com> <51A32FD4.4000001@asianux.com>
+ <158201ce5ac2$a7843de0$f68cb9a0$%kim@samsung.com>
+ <51A33A53.1050502@asianux.com>
+Message-ID: <51A33C1F.3000804@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 27/05/2013, at 8:53 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+When randconfig with MMU for arm s5pv210 (and select all cpu type),
+need let S5P_SLEEP depend on ARM_CPU_SUSPEND, or will cause issue below:
 
-> On Sat, May 25, 2013 at 1:08 PM, Daniel Tang <dt.tangr@gmail.com> wrote:
-> 
->> Add clocksource and clockevent driver for the TI-Nspire.
->> 
->> Signed-off-by: Daniel Tang <dt.tangr@gmail.com>
-> 
-> This is *much* improved :-D
+  arch/arm/plat-samsung/built-in.o: In function `s3c_cpu_resume':
+  arch/arm/plat-samsung/s5p-sleep.S:83: undefined reference to `cpu_resume'
 
-Awesome!
 
->> +               /* Disable timer interrupts */
->> +               writel(0, timer->interrupt_regs + IO_INTR_MSK);
->> +               writel(TIMER_INTR_ALL, timer->interrupt_regs + IO_INTR_ACK);
->> +               /* Stop timer */
->> +               writel(CNTL_STOP_TIMER, timer->timer1 + IO_CONTROL);
->> +               dev->mode = mode;
->> +               break;
->> +       }
-> 
-> Surely both the compiler and checkpatch is complaining that this
-> switch does not contain a default: clause?
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm/plat-samsung/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Neither in fact. checkpatch.pl gives me a all-clear.
-
-But, I'll clean it up anyway - seems cleaner that way XD.
-
-> 
-> If you fix this you can add my:
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Yours,
-> Linus Walleij
-
-Cheers,
-Daniel Tang
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index f8ed2de..b388d93 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -483,6 +483,7 @@ config S5P_PM
+ 
+ config S5P_SLEEP
+ 	bool
++	select ARM_CPU_SUSPEND if PM
+ 	help
+ 	  Internal config node to apply common S5P sleep management code.
+ 	  Can be selected by S5P and newer SoCs with similar sleep procedure.
+-- 
+1.7.7.6
