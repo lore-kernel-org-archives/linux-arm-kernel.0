@@ -1,74 +1,31 @@
 From: afzal@ti.com (Afzal Mohammed)
-Date: Mon, 27 May 2013 20:06:23 +0530
-Subject: [PATCH v2 07/14] ARM: OMAP2+: AM43x: early init
+Date: Mon, 27 May 2013 20:06:33 +0530
+Subject: [PATCH v2 08/14] ARM: OMAP2+: AM43x: GP or HS ?
 In-Reply-To: <cover.1369658705.git.afzal@ti.com>
 References: <cover.1369658705.git.afzal@ti.com>
-Message-ID: <82f3b2b672a45b971fd0bb34366a6af368015db0.1369658705.git.afzal@ti.com>
+Message-ID: <7c2e50ddc9c6a3395147fbe1395985daf93abe8f.1369658705.git.afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minimal early init - PRCM initialization not yet taken care.
-
-Control module is similar (base address, feature register etc.) as
-that of AM335x, while PRCM base address is different. Instead of
-adding a new header file for AM43x, PRCM base address is added in
-AM335x header file as it is similar to it to a large extent.
+Detect whether GP or HS, similar to the AM335x way.
 
 Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/mach-omap2/am33xx.h |  1 +
- arch/arm/mach-omap2/common.h |  1 +
- arch/arm/mach-omap2/io.c     | 14 ++++++++++++++
- 3 files changed, 16 insertions(+)
+ arch/arm/mach-omap2/id.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/am33xx.h b/arch/arm/mach-omap2/am33xx.h
-index 43296c1..5eef093 100644
---- a/arch/arm/mach-omap2/am33xx.h
-+++ b/arch/arm/mach-omap2/am33xx.h
-@@ -21,6 +21,7 @@
- #define AM33XX_SCM_BASE		0x44E10000
- #define AM33XX_CTRL_BASE	AM33XX_SCM_BASE
- #define AM33XX_PRCM_BASE	0x44E00000
-+#define AM43XX_PRCM_BASE	0x44DF0000
- #define AM33XX_TAP_BASE		(AM33XX_CTRL_BASE + 0x3FC)
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index c9c3f7d..0c28ef6 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -55,7 +55,7 @@ int omap_type(void)
  
- #endif /* __ASM_ARCH_AM33XX_H */
-diff --git a/arch/arm/mach-omap2/common.h b/arch/arm/mach-omap2/common.h
-index d555cf2..00f890e 100644
---- a/arch/arm/mach-omap2/common.h
-+++ b/arch/arm/mach-omap2/common.h
-@@ -96,6 +96,7 @@ void am33xx_init_early(void);
- void am35xx_init_early(void);
- void ti81xx_init_early(void);
- void am33xx_init_early(void);
-+void am43xx_init_early(void);
- void omap4430_init_early(void);
- void omap5_init_early(void);
- void omap3_init_late(void);	/* Do not use this one */
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 3a81221..f933f7f 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -586,6 +586,20 @@ void __init am33xx_init_early(void)
- }
- #endif
- 
-+#ifdef CONFIG_SOC_AM43XX
-+void __init am43xx_init_early(void)
-+{
-+	omap2_set_globals_tap(AM335X_CLASS,
-+			      AM33XX_L4_WK_IO_ADDRESS(AM33XX_TAP_BASE));
-+	omap2_set_globals_control(AM33XX_L4_WK_IO_ADDRESS(AM33XX_CTRL_BASE),
-+				  NULL);
-+	omap2_set_globals_prm(AM33XX_L4_WK_IO_ADDRESS(AM43XX_PRCM_BASE));
-+	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM43XX_PRCM_BASE), NULL);
-+	omap3xxx_check_revision();
-+	am33xx_check_features();
-+}
-+#endif
-+
- #ifdef CONFIG_ARCH_OMAP4
- void __init omap4430_init_early(void)
- {
+ 	if (cpu_is_omap24xx()) {
+ 		val = omap_ctrl_readl(OMAP24XX_CONTROL_STATUS);
+-	} else if (soc_is_am33xx()) {
++	} else if (soc_is_am33xx() || soc_is_am43xx()) {
+ 		val = omap_ctrl_readl(AM33XX_CONTROL_STATUS);
+ 	} else if (cpu_is_omap34xx()) {
+ 		val = omap_ctrl_readl(OMAP343X_CONTROL_STATUS);
 -- 
 1.7.12
