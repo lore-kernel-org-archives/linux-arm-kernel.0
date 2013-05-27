@@ -1,54 +1,29 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 27 May 2013 19:12:11 +0900
-Subject: [PATCH] ARM: S5PV210: dependency issue,
- S5P_SLEEP is depend on ARM_CPU_SUSPEND
-In-Reply-To: <51A32FD4.4000001@asianux.com>
-References: <5199E4AF.7040607@asianux.com> <51A32FD4.4000001@asianux.com>
-Message-ID: <158201ce5ac2$a7843de0$f68cb9a0$%kim@samsung.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 27 May 2013 12:24:07 +0200
+Subject: [PATCH 1/2] ARM: kirkwood: proper retain MAC address workaround
+ on DT ethernet
+In-Reply-To: <1369647565.3557.28.camel@pasglop>
+References: <1369253042-15082-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130525.210441.818472895703230779.davem@davemloft.net>
+ <51A26B62.4050009@gmail.com>
+ <20130527.022339.791886107453761860.davem@davemloft.net>
+ <1369647565.3557.28.camel@pasglop>
+Message-ID: <51A33447.80305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chen Gang wrote:
-> 
-> Hello Maintainers:
-> 
-Hi,
+On 05/27/13 11:39, Benjamin Herrenschmidt wrote:
+> On Mon, 2013-05-27 at 02:23 -0700, David Miller wrote:
+>> Sparc has an of_set_property(), it needs to become generic.
+>
+> There is an of_update_property(), we could change the name though, yours
+> is nicer :-)
 
-> Please help check this patch whether OK, when you have time.
-> 
-> 
-> Thanks.
-> 
-> On 05/20/2013 04:54 PM, Chen Gang wrote:
-> >
-> > When randconfig with MMU for arm s5pv210 (and select all cpu type),
-> > need let S5P_SLEEP depend on ARM_CPU_SUSPEND, or will cause issue below:
-> >
-> >   arch/arm/plat-samsung/built-in.o: In function `s3c_cpu_resume':
-> >   arch/arm/plat-samsung/s5p-sleep.S:83: undefined reference to
-> `cpu_resume'
-> >
-> >
-> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> > ---
-> >  arch/arm/plat-samsung/Kconfig |    1 +
-> >  1 files changed, 1 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-
-> samsung/Kconfig
-> > index f8ed2de..1d38541 100644
-> > --- a/arch/arm/plat-samsung/Kconfig
-> > +++ b/arch/arm/plat-samsung/Kconfig
-> > @@ -483,6 +483,7 @@ config S5P_PM
-> >
-> >  config S5P_SLEEP
-> >  	bool
-> > +	select ARM_CPU_SUSPEND
+Ben, David,
 
-Probably,
+I had a quick look at sparc's of_set_property. Nothing special except it
+depends on OF_DYNAMIC at some place. Using of_update_property instead
+should be the correct function to use. Thanks for the hint, I'll update
+the patches accordingly and send v5 hopefully by today.
 
-+	select ARM_CPU_SUSPEND if PM ?
-
-selecting the S5P_SLEEP depends on PM though...
-
-- Kukjin
+Sebastian
