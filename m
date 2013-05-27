@@ -1,25 +1,29 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 27 May 2013 10:55:21 -0400 (EDT)
-Subject: [RFC V7 PATCH 2/3] USB: OHCI: Generic changes to make ohci-pci
- a separate driver
-In-Reply-To: <1369657550-24101-3-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1305271055020.21231-100000@netrider.rowland.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 27 May 2013 16:55:57 +0200
+Subject: [PATCH] clk: tegra: fix clk_out parents list
+In-Reply-To: <1369641279-6894-1-git-send-email-pgaikwad@nvidia.com>
+References: <1369641279-6894-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <20130527145557.GB9460@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 May 2013, Manjunath Goudar wrote:
+On Mon, May 27, 2013 at 01:24:39PM +0530, Prashant Gaikwad wrote:
+> Number of parents for clk_out_2 and clk_out_3 was incorrectly set
+> to clk_out1_parents. Even though it did not break anything since the
+> size was same better to fix.
 
-> Note that this changes is part of separating the ohci pci host controller
-> driver from ohci-hcd host code.
-> This contains :
->      -Moved sb800_prefetch() function from ohci-pci.c to pci-quirks.c file
->       and EXPORTed, this is part of the effort to move the ohci pci related
->       code to generic pci code.
->      -Passed "device" argument instead  of "ohci_hcd" in sb800_prefetch()
->       function to avoid extra include file in pci-quirks.c.
-> 
-> V2:
->      -Passed "device" argment instead of "pci_dev", then we use to_pci_dev()
->       to get the "pci_dev" structure.
+This last part of the sentence is hard to understand, I think you meant:
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+	Even though it did not break anything since the size was the
+	same, it should still be fixed.
+
+Other than that:
+
+Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130527/7121415c/attachment.sig>
