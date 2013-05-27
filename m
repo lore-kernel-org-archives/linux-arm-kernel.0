@@ -1,54 +1,38 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 27 May 2013 14:28:39 +0200 (CEST)
-Subject: [RFC PATCHv4 4/6] clocksource: TI-Nspire timer support
-In-Reply-To: <CACRpkda4Qe1e+dkcSgPLf5dcHASvOG=Y=Dvrnv=oGnon+FRzzg@mail.gmail.com>
-References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
- <1369480087-24786-5-git-send-email-dt.tangr@gmail.com>
- <CACRpkda4Qe1e+dkcSgPLf5dcHASvOG=Y=Dvrnv=oGnon+FRzzg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1305271427320.4220@ionos>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 27 May 2013 14:30:15 +0200
+Subject: [PATCH] ARM: ux500: Update MMC configs for u8500 defconfig
+Message-ID: <1369657815-16236-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 May 2013, Linus Walleij wrote:
-> > +static void zevio_timer_set_mode(enum clock_event_mode mode,
-> > +               struct clock_event_device *dev)
-> > +{
-> > +       unsigned long flags;
-> > +       struct zevio_timer *timer = container_of(dev,
-> > +                       struct zevio_timer,
-> > +                       clkevt);
-> > +
-> > +       local_irq_save(flags);
-> > +
-> > +       switch (mode) {
-> > +       case CLOCK_EVT_MODE_PERIODIC:
-> > +               /* Unsupported */
-> > +               break;
-> > +       case CLOCK_EVT_MODE_RESUME:
-> > +       case CLOCK_EVT_MODE_ONESHOT:
-> > +               /* Enable timer interrupts */
-> > +               writel(TIMER_INTR_MSK, timer->interrupt_regs + IO_INTR_MSK);
-> > +               writel(TIMER_INTR_ALL, timer->interrupt_regs + IO_INTR_ACK);
-> > +               dev->mode = mode;
-> > +               break;
-> > +       case CLOCK_EVT_MODE_SHUTDOWN:
-> > +       case CLOCK_EVT_MODE_UNUSED:
-> > +               /* Disable timer interrupts */
-> > +               writel(0, timer->interrupt_regs + IO_INTR_MSK);
-> > +               writel(TIMER_INTR_ALL, timer->interrupt_regs + IO_INTR_ACK);
-> > +               /* Stop timer */
-> > +               writel(CNTL_STOP_TIMER, timer->timer1 + IO_CONTROL);
-> > +               dev->mode = mode;
-> > +               break;
-> > +       }
-> 
-> Surely both the compiler and checkpatch is complaining that this
-> switch does not contain a default: clause?
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Well, if you have a switch with an enum, the compiler complains if you
-do not have a case for each enum value and the above has all enum
-values covered AFAICT. :)
+Enable MMC_UNSAFE_RESUME to be accomplish a proper suspend/resume cycle
+for SD/SDIO/(e)MMC.
 
-Thanks,
+ARMMMCI host driver supports clock gating through runtime PM, thus
+MMC_CLKGATE is not needed. Moreover ARMMMCI can do scatter-gather which
+means we can explicity disable MMC_BLOCK_BOUNCE, since it's default
+enabled, to skip unnecessary bounce buffer copying.
 
-	tglx
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+ arch/arm/configs/u8500_defconfig |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+index da0614a..06aa294 100644
+--- a/arch/arm/configs/u8500_defconfig
++++ b/arch/arm/configs/u8500_defconfig
+@@ -78,7 +78,8 @@ CONFIG_USB_GADGET=y
+ CONFIG_USB_GADGET_MUSB_HDRC=y
+ CONFIG_USB_ETH=m
+ CONFIG_MMC=y
+-CONFIG_MMC_CLKGATE=y
++CONFIG_MMC_UNSAFE_RESUME=y
++# CONFIG_MMC_BLOCK_BOUNCE is not set
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+-- 
+1.7.10
