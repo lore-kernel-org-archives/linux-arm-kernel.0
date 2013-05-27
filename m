@@ -1,28 +1,25 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 27 May 2013 11:01:35 +0200
-Subject: [PATCH v7 1/2] dma: imx-dma: Add oftree support
-In-Reply-To: <1369562001-11494-2-git-send-email-mpa@pengutronix.de>
-References: <1369562001-11494-1-git-send-email-mpa@pengutronix.de>
- <1369562001-11494-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130527090135.GJ32299@pengutronix.de>
+Date: Mon, 27 May 2013 11:06:36 +0200
+Subject: [PATCH v6] video: imxfb: Add DT support
+In-Reply-To: <1369564538-21835-1-git-send-email-mpa@pengutronix.de>
+References: <1369564538-21835-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130527090636.GM32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 26, 2013 at 11:53:20AM +0200, Markus Pargmann wrote:
-> Adding devicetree support for imx-dma driver. Use driver name for
-> function 'imx_dma_is_general_purpose' because the devicename for
-> devicetree initialized devices is different.
+On Sun, May 26, 2013 at 12:35:38PM +0200, Markus Pargmann wrote:
+> Add devicetree support for imx framebuffer driver. It uses the generic
+> display bindings and helper functions.
 > 
 > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> Reviewed-by: Shawn Guo <shawn.guo@linaro.org>
-
-I haven't followed the DMA bindings discussion closely, so I can't say
-much to this, but from my POV:
+> Cc: Fabio Estevam <festevam@gmail.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
 Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
 Sascha
+
 
 -- 
 Pengutronix e.K.                           |                             |
