@@ -1,149 +1,86 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 27 May 2013 13:25:31 +0200
-Subject: [PATCH] ARM: ux500: bump MMC/SD max frequency for DT boots
-In-Reply-To: <1369653569-21855-1-git-send-email-linus.walleij@stericsson.com>
-References: <1369653569-21855-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CAPDyKFpETu5mmN6Z0vOA=WVHp05EFoGCinXfZkbKYORcZrx+UQ@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 27 May 2013 19:26:47 +0800
+Subject: [PATCH v3] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
+In-Reply-To: <1369651702-9207-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1369651702-9207-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <E0B30581-DD0A-46C5-B541-08F389F17018@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 May 2013 13:19, Linus Walleij <linus.walleij@stericsson.com> wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
->
-> In patch:
-> "ARM: ux500: Enable 100MHz for SD/SDIO/MMC devices"
-> the max frequency for the MMC/SD/SDIO adapters was
-> increased from 50 to 100MHz. Do the same for the
-> device tree boot path.
->
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: Gabriel Fernandez <gabriel.fernandez.st@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/boot/dts/ccu9540.dts     | 2 +-
->  arch/arm/boot/dts/href.dtsi       | 8 ++++----
->  arch/arm/boot/dts/hrefv60plus.dts | 8 ++++----
->  arch/arm/boot/dts/snowball.dts    | 4 ++--
->  4 files changed, 11 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/ccu9540.dts b/arch/arm/boot/dts/ccu9540.dts
-> index c72d7aa..b657d71 100644
-> --- a/arch/arm/boot/dts/ccu9540.dts
-> +++ b/arch/arm/boot/dts/ccu9540.dts
-> @@ -52,7 +52,7 @@
->                 // WLAN SDIO channel
->                 sdi1_per2 at 80118000 {
->                         arm,primecell-periphid = <0x10480180>;
-> -                       max-frequency = <50000000>;
-> +                       max-frequency = <100000000>;
->                         bus-width = <4>;
->
->                         status = "okay";
-> diff --git a/arch/arm/boot/dts/href.dtsi b/arch/arm/boot/dts/href.dtsi
-> index e315429..567a18b 100644
-> --- a/arch/arm/boot/dts/href.dtsi
-> +++ b/arch/arm/boot/dts/href.dtsi
-> @@ -108,7 +108,7 @@
->                 // External Micro SD slot
->                 sdi0_per1 at 80126000 {
->                         arm,primecell-periphid = <0x10480180>;
-> -                       max-frequency = <50000000>;
-> +                       max-frequency = <100000000>;
->                         bus-width = <4>;
->                         mmc-cap-sd-highspeed;
->                         mmc-cap-mmc-highspeed;
-> @@ -123,7 +123,7 @@
->                 // WLAN SDIO channel
->                 sdi1_per2 at 80118000 {
->                         arm,primecell-periphid = <0x10480180>;
-> -                       max-frequency = <50000000>;
-> +                       max-frequency = <100000000>;
->                         bus-width = <4>;
->
->                         status = "okay";
-> @@ -132,7 +132,7 @@
->                 // PoP:ed eMMC
->                 sdi2_per3 at 80005000 {
->                         arm,primecell-periphid = <0x10480180>;
-> -                       max-frequency = <50000000>;
-> +                       max-frequency = <100000000>;
->                         bus-width = <8>;
->                         mmc-cap-mmc-highspeed;
->
-> @@ -142,7 +142,7 @@
->                 // On-board eMMC
->                 sdi4_per2 at 80114000 {
->                         arm,primecell-periphid = <0x10480180>;
-> -                       max-frequency = <50000000>;
-> +                       max-frequency = <100000000>;
->                         bus-width = <8>;
->                         mmc-cap-mmc-highspeed;
->                         vmmc-supply = <&ab8500_ldo_aux2_reg>;
-> diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
-> index 5dfc73a..26f33a6f 100644
-> --- a/arch/arm/boot/dts/hrefv60plus.dts
-> +++ b/arch/arm/boot/dts/hrefv60plus.dts
-> @@ -34,7 +34,7 @@
->                 // External Micro SD slot
->                 sdi0_per1 at 80126000 {
->                         arm,primecell-periphid = <0x10480180>;
-> -                       max-frequency = <50000000>;
-> +                       max-frequency = <100000000>;
->                         bus-width = <4>;
->                         mmc-cap-sd-highspeed;
->                         mmc-cap-mmc-highspeed;
-> @@ -48,7 +48,7 @@
->                 // WLAN SDIO channel
->                 sdi1_per2 at 80118000 {
->                         arm,primecell-periphid = <0x10480180>;
-> -                       max-frequency = <50000000>;
-> +                       max-frequency = <100000000>;
->                         bus-width = <4>;
->
->                         status = "okay";
-> @@ -57,7 +57,7 @@
->                 // PoP:ed eMMC
->                 sdi2_per3 at 80005000 {
->                         arm,primecell-periphid = <0x10480180>;
-> -                       max-frequency = <50000000>;
-> +                       max-frequency = <100000000>;
->                         bus-width = <8>;
->                         mmc-cap-mmc-highspeed;
->
-> @@ -67,7 +67,7 @@
->                 // On-board eMMC
->                 sdi4_per2 at 80114000 {
->                         arm,primecell-periphid = <0x10480180>;
-> -                       max-frequency = <50000000>;
-> +                       max-frequency = <100000000>;
->                         bus-width = <8>;
->                         mmc-cap-mmc-highspeed;
->                         vmmc-supply = <&ab8500_ldo_aux2_reg>;
-> diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-> index e8219cc7..829a65f 100644
-> --- a/arch/arm/boot/dts/snowball.dts
-> +++ b/arch/arm/boot/dts/snowball.dts
-> @@ -129,7 +129,7 @@
->                 // External Micro SD slot
->                 sdi0_per1 at 80126000 {
->                         arm,primecell-periphid = <0x10480180>;
-> -                       max-frequency = <50000000>;
-> +                       max-frequency = <100000000>;
->                         bus-width = <4>;
->                         mmc-cap-mmc-highspeed;
->                         vmmc-supply = <&ab8500_ldo_aux3_reg>;
-> @@ -144,7 +144,7 @@
->                 // On-board eMMC
->                 sdi4_per2 at 80114000 {
->                         arm,primecell-periphid = <0x10480180>;
-> -                       max-frequency = <50000000>;
-> +                       max-frequency = <100000000>;
->                         bus-width = <8>;
->                         mmc-cap-mmc-highspeed;
->                         vmmc-supply = <&ab8500_ldo_aux2_reg>;
-> --
-> 1.7.11.3
->
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+On May 27, 2013, at 6:48 PM, Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+
+> Fixes:
+> arch/arm/mach-at91/built-in.o: In function `ksz9021rn_phy_fixup':
+> :(.text+0x1174): undefined reference to `mdiobus_write'
+> :(.text+0x1188): undefined reference to `mdiobus_write'
+> :(.text+0x119c): undefined reference to `mdiobus_write'
+> :(.text+0x11b0): undefined reference to `mdiobus_write'
+> arch/arm/mach-at91/built-in.o: In function `sama5_dt_device_init':
+> :(.init.text+0x1e34): undefined reference to `phy_register_fixup_for_uid'
+> 
+> when CONFIG_PHYLIB is not selected.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+
+no for this change
+
+add an inline version of phy_register_fixup_for_uid
+
+this will do the same for every platform
+
+> ---
+> Changes in v3:
+> 	added SoB
+> 	added Acked-By
+> 
+> Changes in v2:
+> 	use IS_BUILTIN
+> 	use CONFIG_PHYLIB and not CONFIG_PHY
+> 
+> arch/arm/mach-at91/board-dt-sama5.c | 22 ++++++++++++----------
+> 1 file changed, 12 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+> index 705305e..e9ce541 100644
+> --- a/arch/arm/mach-at91/board-dt-sama5.c
+> +++ b/arch/arm/mach-at91/board-dt-sama5.c
+> @@ -47,22 +47,24 @@ static int ksz9021rn_phy_fixup(struct phy_device *phy)
+> #define GMII_ERCR	11
+> #define GMII_ERDWR	12
+> 
+> -	/* Set delay values */
+> -	value = GMII_RCCPSR | 0x8000;
+> -	phy_write(phy, GMII_ERCR, value);
+> -	value = 0xF2F4;
+> -	phy_write(phy, GMII_ERDWR, value);
+> -	value = GMII_RRDPSR | 0x8000;
+> -	phy_write(phy, GMII_ERCR, value);
+> -	value = 0x2222;
+> -	phy_write(phy, GMII_ERDWR, value);
+> +	if (IS_BUILTIN(CONFIG_PHYLIB)) {
+> +		/* Set delay values */
+> +		value = GMII_RCCPSR | 0x8000;
+> +		phy_write(phy, GMII_ERCR, value);
+> +		value = 0xF2F4;
+> +		phy_write(phy, GMII_ERDWR, value);
+> +		value = GMII_RRDPSR | 0x8000;
+> +		phy_write(phy, GMII_ERCR, value);
+> +		value = 0x2222;
+> +		phy_write(phy, GMII_ERDWR, value);
+> +	}
+> 
+> 	return 0;
+> }
+> 
+> static void __init sama5_dt_device_init(void)
+> {
+> -	if (of_machine_is_compatible("atmel,sama5d3xcm"))
+> +	if (of_machine_is_compatible("atmel,sama5d3xcm") && IS_BUILTIN(CONFIG_PHYLIB))
+> 		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
+> 			ksz9021rn_phy_fixup);
+> 
+> -- 
+> 1.8.1.2
+> 
