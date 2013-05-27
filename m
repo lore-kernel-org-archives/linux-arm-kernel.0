@@ -1,27 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 May 2013 14:35:30 +0200
-Subject: [PATCH] ARM: ux500: Update MMC configs for u8500 defconfig
-In-Reply-To: <1369657815-16236-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1369657815-16236-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdYqBR-azYEpSTCATuuSP99v+qy72PyMt6MoDwVF_qF0vw@mail.gmail.com>
+From: philippe.begnic.st@gmail.com (Philippe Begnic)
+Date: Mon, 27 May 2013 14:41:28 +0200
+Subject: [PATCH 0/4] clk, mfd: u8540 clock tree definition
+Message-ID: <1369658492-31358-1-git-send-email-philippe.begnic.st@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 27, 2013 at 2:30 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+From: Philippe Begnic <philippe.begnic@st.com>
 
-> From: Ulf Hansson <ulf.hansson@linaro.org>
->
-> Enable MMC_UNSAFE_RESUME to be accomplish a proper suspend/resume cycle
-> for SD/SDIO/(e)MMC.
->
-> ARMMMCI host driver supports clock gating through runtime PM, thus
-> MMC_CLKGATE is not needed. Moreover ARMMMCI can do scatter-gather which
-> means we can explicity disable MMC_BLOCK_BOUNCE, since it's default
-> enabled, to skip unnecessary bounce buffer copying.
->
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Create U8540 clock tree definitions for common clock framework
 
-Thanks, patch applied to my ux500-defconfig branch.
+Philippe Begnic (4):
+  clk: ux500: Pass clock base adresses in initcall for u8540 and u9540
+  mfd: db8500: Update register definition for u8540 clock
+  mfd: db8500: Update BML clock register for db8580
+  clk: ux500: Clocks definition for u8540
 
-Yours,
-Linus Walleij
+ arch/arm/mach-ux500/cpu.c                 |    6 +-
+ drivers/clk/ux500/u8540_clk.c             |  564 ++++++++++++++++++++++++++++-
+ drivers/clk/ux500/u9540_clk.c             |    4 +-
+ drivers/mfd/db8500-prcmu.c                |    1 +
+ drivers/mfd/dbx500-prcmu-regs.h           |    1 +
+ include/linux/mfd/abx500/ab8500-sysctrl.h |    4 +-
+ include/linux/mfd/dbx500-prcmu.h          |   12 +
+ include/linux/platform_data/clk-ux500.h   |    6 +-
+ 8 files changed, 587 insertions(+), 11 deletions(-)
+
+-- 
+1.7.9.5
