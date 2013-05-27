@@ -1,28 +1,50 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 27 May 2013 11:06:36 +0200
-Subject: [PATCH v6] video: imxfb: Add DT support
-In-Reply-To: <1369564538-21835-1-git-send-email-mpa@pengutronix.de>
-References: <1369564538-21835-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130527090636.GM32299@pengutronix.de>
+From: yamagata@plathome.co.jp (yamagata at plathome.co.jp)
+Date: Mon, 27 May 2013 18:10:18 +0900 (JST)
+Subject: [PATCH 00/21] ARM: kirkwood: improve pinmux configs in Device Tree
+In-Reply-To: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130527.181018.461275386.yamagata@plathome.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 26, 2013 at 12:35:38PM +0200, Markus Pargmann wrote:
-> Add devicetree support for imx framebuffer driver. It uses the generic
-> display bindings and helper functions.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> Cc: Fabio Estevam <festevam@gmail.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Dear Mr. Petazzoni
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> The last patch finally adds support for the init button of the
+> Plathome OpenBlocks A6 platform.
 
-Sascha
+I have checked the init button worked well with your three patches for
+linux-3.10-rc3 and 3.9.4.
 
+Tested-by: Atsushi Yamagata <yamagata@plathome.co.jp>
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+BEGIN--------
+root at obsa6:~# evtest /dev/input/event0
+Input driver version is 1.0.1
+Input device ID: bus 0x19 vendor 0x1 product 0x1 version 0x100
+Input device name: "gpio_keys.2" 
+Supported events:
+  Event type 0 (EV_SYN)
+  Event type 1 (EV_KEY)
+    Event code 116 (KEY_POWER)
+Properties:
+Testing ... (interrupt to exit)
+Event: time 1369641859.652847, type 1 (EV_KEY), code 116 (KEY_POWER), value 1
+Event: time 1369641859.652847, -------------- SYN_REPORT ------------
+Event: time 1369641859.992842, type 1 (EV_KEY), code 116 (KEY_POWER), value 0
+Event: time 1369641859.992842, -------------- SYN_REPORT ------------
+Event: time 1369641860.582840, type 1 (EV_KEY), code 116 (KEY_POWER), value 1
+Event: time 1369641860.582840, -------------- SYN_REPORT ------------
+Event: time 1369641860.862840, type 1 (EV_KEY), code 116 (KEY_POWER), value 0
+Event: time 1369641860.862840, -------------- SYN_REPORT ------------
+Event: time 1369641861.332838, type 1 (EV_KEY), code 116 (KEY_POWER), value 1
+Event: time 1369641861.332838, -------------- SYN_REPORT ------------
+Event: time 1369641861.592839, type 1 (EV_KEY), code 116 (KEY_POWER), value 0
+Event: time 1369641861.592839, -------------- SYN_REPORT ------------
+^C
+root at obsa6:~#
+END--------
+
+Best regards
+
+Atsushi Yamagata
+--- Atsushi Yamagata
