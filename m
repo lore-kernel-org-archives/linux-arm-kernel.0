@@ -1,29 +1,32 @@
-From: dt.tangr@gmail.com (Daniel Tang)
-Date: Mon, 27 May 2013 14:07:05 +1000
-Subject: [RFC PATCHv4 1/6] arm: TI-Nspire platform code
-In-Reply-To: <201305262246.12803.arnd@arndb.de>
-References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
- <1369480087-24786-2-git-send-email-dt.tangr@gmail.com>
- <201305262246.12803.arnd@arndb.de>
-Message-ID: <3ED6FFF2-89E2-4426-8DDC-10B4E6C79F26@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 27 May 2013 13:57:37 +0800
+Subject: [PATCH v3] tty: serial: add Freescale lpuart driver support
+In-Reply-To: <13F8657A829DAB49A2A937FD6FC10F790B3D5056@039-SN2MPN1-012.039d.mgd.msft.net>
+References: <1368685096-13177-1-git-send-email-b35083@freescale.com>
+ <20130520030523.GB25113@S2101-09.ap.freescale.net>
+ <13F8657A829DAB49A2A937FD6FC10F790B3CDB85@039-SN2MPN1-012.039d.mgd.msft.net>
+ <CAAQ0ZWRz+byPKxMjDH3zKsc0u4bmkPO_1u6w2H4Z7nD0z8+9ig@mail.gmail.com>
+ <13F8657A829DAB49A2A937FD6FC10F790B3CECEB@039-SN2MPN1-012.039d.mgd.msft.net>
+ <20130523025059.GB2704@S2101-09.ap.freescale.net>
+ <13F8657A829DAB49A2A937FD6FC10F790B3D5056@039-SN2MPN1-012.039d.mgd.msft.net>
+Message-ID: <20130527055734.GD7782@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 27/05/2013, at 6:46 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Mon, May 27, 2013 at 01:27:04AM +0000, Jin Zhengxiong-R64188 wrote:
+> By the way, we'll change the SoC name from mvf600 to vf610 to align the description in the document. 
 > 
-> 
->> +	{
->> +		.virtual	=  NSPIRE_PWR_VIRT_BASE,
->> +		.pfn		= __phys_to_pfn(NSPIRE_PWR_PHYS_BASE),
->> +		.length		= SZ_4K,
->> +		.type		= MT_DEVICE
->> +	}
->> +};
-> 
-> And I think this one can be replaced with a call to of_iomap:
 
-Does of_iomap work that early in the boot process?
+Such product renaming in documents happen on IMX as well, but we do
+not bother to churn the source tree (file, function renaming) to catch
+up with it, as long as we know what it is.
 
-Cheers,
-Daniel Tang
+For this mvf600 to vf610 renaming, if you want to catch up with it, you
+will need to rename a bunch of files functions, compatibles in Jingchang's
+series, and it's probably fine even though it's not really necessary
+since they haven't been merged.  But for those which have been merged,
+like fec compatible string, doing this will probably piss off
+maintainers.  So I would suggest that we stick to name mvf600 in the
+source tree, and just be aware of it's the equivalent of vf610.
+
+Shawn
