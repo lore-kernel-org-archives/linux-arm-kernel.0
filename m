@@ -1,9 +1,9 @@
 From: sanjay.rawat@linaro.org (Sanjay Singh Rawat)
-Date: Mon, 27 May 2013 20:02:42 +0530
-Subject: [PATCH 5/8] ARM: zynq: use generic cpu idle function for wfi
+Date: Mon, 27 May 2013 20:02:44 +0530
+Subject: [PATCH 7/8] ARM: msm: use generic cpu idle function for wfi
 In-Reply-To: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
 References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
-Message-ID: <1369665166-13049-6-git-send-email-sanjay.rawat@linaro.org>
+Message-ID: <1369665166-13049-8-git-send-email-sanjay.rawat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,23 +11,28 @@ use cpu_do_idle for entering the wfi mode.
 
 Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
 ---
- arch/arm/mach-zynq/hotplug.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-msm/hotplug.c |    9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
-index c89672b..ef0d65d 100644
---- a/arch/arm/mach-zynq/hotplug.c
-+++ b/arch/arm/mach-zynq/hotplug.c
-@@ -64,8 +64,8 @@ static inline void zynq_platform_do_lowpower(unsigned int cpu, int *spurious)
- 	 * code will have already disabled interrupts
- 	 */
+diff --git a/arch/arm/mach-msm/hotplug.c b/arch/arm/mach-msm/hotplug.c
+index 326a872..1b03e5f 100644
+--- a/arch/arm/mach-msm/hotplug.c
++++ b/arch/arm/mach-msm/hotplug.c
+@@ -26,13 +26,8 @@ static inline void platform_do_lowpower(unsigned int cpu)
+ {
+ 	/* Just enter wfi for now. TODO: Properly shut off the cpu. */
  	for (;;) {
--		dsb();
--		wfi();
+-		/*
+-		 * here's the WFI
+-		 */
+-		asm("wfi"
+-		    :
+-		    :
+-		    : "memory", "cc");
 +		/* enter WFI mode */
 +		cpu_do_idle();
  
- 		/*
- 		 * Getting here, means that we have come out of WFI without
+ 		if (pen_release == cpu_logical_map(cpu)) {
+ 			/*
 -- 
 1.7.9.5
