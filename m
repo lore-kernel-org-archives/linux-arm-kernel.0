@@ -1,69 +1,225 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 27 May 2013 18:59:30 +0900
-Subject: [PATCH 6/9] ARM: shmobile: r8a7778: Register PFC device
+Date: Mon, 27 May 2013 18:59:29 +0900
+Subject: [PATCH 5/9] ARM: shmobile: r8a7778: use fixed ratio clock
 In-Reply-To: <1369648773-7941-1-git-send-email-horms+renesas@verge.net.au>
 References: <1369648773-7941-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1369648773-7941-7-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1369648773-7941-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+R-Car M1 has many clocks, and it is possible to
+read/use clock ratio of these clocks from FRQMRx.
+But, these ratio are fixed value and
+these are decided by MD pin status.
+
+This patch reads MD pin status,
+and used fixed ratio clock for other clocks.
+It was tesed on bock-w board.
+
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig                |    1 +
- arch/arm/mach-shmobile/include/mach/r8a7778.h |    1 +
- arch/arm/mach-shmobile/setup-r8a7778.c        |   13 +++++++++++++
- 3 files changed, 15 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7778.c |  149 +++++++++++++++++++++++++++++---
+ 1 file changed, 136 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 1a517e2..06da4d3 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -37,6 +37,7 @@ config ARCH_R8A7740
+diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
+index cd68552..5cc271e 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7778.c
++++ b/arch/arm/mach-shmobile/clock-r8a7778.c
+@@ -23,9 +23,23 @@
+  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+  */
  
- config ARCH_R8A7778
- 	bool "R-Car M1 (R8A77780)"
-+	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select CPU_V7
- 	select SH_CLK_CPG
- 	select ARM_GIC
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-index 951149e..68053fc 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -28,5 +28,6 @@ extern void r8a7778_init_irq(void);
- extern void r8a7778_init_irq_dt(void);
- extern void r8a7778_clock_init(void);
- extern void r8a7778_init_irq_extpin(int irlm);
-+extern void r8a7778_pinmux_init(void);
- 
- #endif /* __ASM_R8A7778_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 45f0e45..d82954b 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -102,6 +102,19 @@ void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
- 					  pdata, sizeof(*pdata));
- }
- 
-+/* PFC */
-+static struct resource pfc_resources[] = {
-+	DEFINE_RES_MEM(0xfffc0000, 0x118),
-+};
++/*
++ *     MD      MD      MD      MD       PLLA   PLLB    EXTAL   clki    clkz
++ *     19      18      12      11                      (HMz)   (MHz)   (MHz)
++ *----------------------------------------------------------------------------
++ *     1       0       0       0       x21     x21     38.00   800     800
++ *     1       0       0       1       x24     x24     33.33   800     800
++ *     1       0       1       0       x28     x28     28.50   800     800
++ *     1       0       1       1       x32     x32     25.00   800     800
++ *     1       1       0       1       x24     x21     33.33   800     700
++ *     1       1       1       0       x28     x21     28.50   800     600
++ *     1       1       1       1       x32     x24     25.00   800     600
++ */
 +
-+void __init r8a7778_pinmux_init(void)
-+{
-+	platform_device_register_simple(
-+		"pfc-r8a7778", -1,
-+		pfc_resources,
-+		ARRAY_SIZE(pfc_resources));
-+}
+ #include <linux/io.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
++#include <mach/clock.h>
+ #include <mach/common.h>
+ 
+ #define MSTPCR0		IOMEM(0xffc80030)
+@@ -37,6 +51,9 @@
+ #define MSTPCR4		IOMEM(0xffc80050)
+ #define MSTPCR5		IOMEM(0xffc80054)
+ #define MSTPCR6		IOMEM(0xffc80058)
++#define MODEMR		0xFFCC0020
 +
- void __init r8a7778_add_standard_devices(void)
++#define MD(nr)	BIT(nr)
+ 
+ /* ioremap() through clock mapping mandatory to avoid
+  * collision with ARM coherent DMA virtual memory range.
+@@ -47,14 +64,42 @@ static struct clk_mapping cpg_mapping = {
+ 	.len	= 0x80,
+ };
+ 
+-static struct clk clkp = {
+-	.rate   = 62500000, /* FIXME: shortcut */
+-	.flags  = CLK_ENABLE_ON_INIT,
++static struct clk extal_clk = {
++	/* .rate will be updated on r8a7778_clock_init() */
+ 	.mapping = &cpg_mapping,
+ };
+ 
++/*
++ * clock ratio of these clock will be updated
++ * on r8a7778_clock_init()
++ */
++SH_FIXED_RATIO_CLK_SET(plla_clk,	extal_clk, 1, 1);
++SH_FIXED_RATIO_CLK_SET(pllb_clk,	extal_clk, 1, 1);
++SH_FIXED_RATIO_CLK_SET(i_clk,		plla_clk,  1, 1);
++SH_FIXED_RATIO_CLK_SET(s_clk,		plla_clk,  1, 1);
++SH_FIXED_RATIO_CLK_SET(s1_clk,		plla_clk,  1, 1);
++SH_FIXED_RATIO_CLK_SET(s3_clk,		plla_clk,  1, 1);
++SH_FIXED_RATIO_CLK_SET(s4_clk,		plla_clk,  1, 1);
++SH_FIXED_RATIO_CLK_SET(b_clk,		plla_clk,  1, 1);
++SH_FIXED_RATIO_CLK_SET(out_clk,		plla_clk,  1, 1);
++SH_FIXED_RATIO_CLK_SET(p_clk,		plla_clk,  1, 1);
++SH_FIXED_RATIO_CLK_SET(g_clk,		plla_clk,  1, 1);
++SH_FIXED_RATIO_CLK_SET(z_clk,		pllb_clk,  1, 1);
++
+ static struct clk *main_clks[] = {
+-	&clkp,
++	&extal_clk,
++	&plla_clk,
++	&pllb_clk,
++	&i_clk,
++	&s_clk,
++	&s1_clk,
++	&s3_clk,
++	&s4_clk,
++	&b_clk,
++	&out_clk,
++	&p_clk,
++	&g_clk,
++	&z_clk,
+ };
+ 
+ enum {
+@@ -64,15 +109,15 @@ enum {
+ 	MSTP_NR };
+ 
+ static struct clk mstp_clks[MSTP_NR] = {
+-	[MSTP114] = SH_CLK_MSTP32(&clkp, MSTPCR1, 14, 0), /* Ether */
+-	[MSTP026] = SH_CLK_MSTP32(&clkp, MSTPCR0, 26, 0), /* SCIF0 */
+-	[MSTP025] = SH_CLK_MSTP32(&clkp, MSTPCR0, 25, 0), /* SCIF1 */
+-	[MSTP024] = SH_CLK_MSTP32(&clkp, MSTPCR0, 24, 0), /* SCIF2 */
+-	[MSTP023] = SH_CLK_MSTP32(&clkp, MSTPCR0, 23, 0), /* SCIF3 */
+-	[MSTP022] = SH_CLK_MSTP32(&clkp, MSTPCR0, 22, 0), /* SCIF4 */
+-	[MSTP021] = SH_CLK_MSTP32(&clkp, MSTPCR0, 21, 0), /* SCIF5 */
+-	[MSTP016] = SH_CLK_MSTP32(&clkp, MSTPCR0, 16, 0), /* TMU0 */
+-	[MSTP015] = SH_CLK_MSTP32(&clkp, MSTPCR0, 15, 0), /* TMU1 */
++	[MSTP114] = SH_CLK_MSTP32(&p_clk, MSTPCR1, 14, 0), /* Ether */
++	[MSTP026] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 26, 0), /* SCIF0 */
++	[MSTP025] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 25, 0), /* SCIF1 */
++	[MSTP024] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 24, 0), /* SCIF2 */
++	[MSTP023] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 23, 0), /* SCIF3 */
++	[MSTP022] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 22, 0), /* SCIF4 */
++	[MSTP021] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 21, 0), /* SCIF5 */
++	[MSTP016] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 16, 0), /* TMU0 */
++	[MSTP015] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 15, 0), /* TMU1 */
+ };
+ 
+ static struct clk_lookup lookups[] = {
+@@ -90,8 +135,86 @@ static struct clk_lookup lookups[] = {
+ 
+ void __init r8a7778_clock_init(void)
  {
- 	int i;
++	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
++	u32 mode;
+ 	int k, ret = 0;
+ 
++	BUG_ON(!modemr);
++	mode = ioread32(modemr);
++	iounmap(modemr);
++
++	switch (mode & (MD(19) | MD(18) | MD(12) | MD(11))) {
++	case MD(19):
++		extal_clk.rate = 38000000;
++		SH_CLK_SET_RATIO(&plla_clk_ratio,	21, 1);
++		SH_CLK_SET_RATIO(&pllb_clk_ratio,	21, 1);
++		break;
++	case MD(19) | MD(11):
++		extal_clk.rate = 33333333;
++		SH_CLK_SET_RATIO(&plla_clk_ratio,	24, 1);
++		SH_CLK_SET_RATIO(&pllb_clk_ratio,	24, 1);
++		break;
++	case MD(19) | MD(12):
++		extal_clk.rate = 28500000;
++		SH_CLK_SET_RATIO(&plla_clk_ratio,	28, 1);
++		SH_CLK_SET_RATIO(&pllb_clk_ratio,	28, 1);
++		break;
++	case MD(19) | MD(12) | MD(11):
++		extal_clk.rate = 25000000;
++		SH_CLK_SET_RATIO(&plla_clk_ratio,	32, 1);
++		SH_CLK_SET_RATIO(&pllb_clk_ratio,	32, 1);
++		break;
++	case MD(19) | MD(18) | MD(11):
++		extal_clk.rate = 33333333;
++		SH_CLK_SET_RATIO(&plla_clk_ratio,	24, 1);
++		SH_CLK_SET_RATIO(&pllb_clk_ratio,	21, 1);
++		break;
++	case MD(19) | MD(18) | MD(12):
++		extal_clk.rate = 28500000;
++		SH_CLK_SET_RATIO(&plla_clk_ratio,	28, 1);
++		SH_CLK_SET_RATIO(&pllb_clk_ratio,	21, 1);
++		break;
++	case MD(19) | MD(18) | MD(12) | MD(11):
++		extal_clk.rate = 25000000;
++		SH_CLK_SET_RATIO(&plla_clk_ratio,	32, 1);
++		SH_CLK_SET_RATIO(&pllb_clk_ratio,	24, 1);
++		break;
++	default:
++		BUG();
++	}
++
++	if (mode & MD(1)) {
++		SH_CLK_SET_RATIO(&i_clk_ratio,	1, 1);
++		SH_CLK_SET_RATIO(&s_clk_ratio,	1, 3);
++		SH_CLK_SET_RATIO(&s1_clk_ratio,	1, 6);
++		SH_CLK_SET_RATIO(&s3_clk_ratio,	1, 4);
++		SH_CLK_SET_RATIO(&s4_clk_ratio,	1, 8);
++		SH_CLK_SET_RATIO(&p_clk_ratio,	1, 12);
++		SH_CLK_SET_RATIO(&g_clk_ratio,	1, 12);
++		if (mode & MD(2)) {
++			SH_CLK_SET_RATIO(&b_clk_ratio,		1, 18);
++			SH_CLK_SET_RATIO(&out_clk_ratio,	1, 18);
++		} else {
++			SH_CLK_SET_RATIO(&b_clk_ratio,		1, 12);
++			SH_CLK_SET_RATIO(&out_clk_ratio,	1, 12);
++		}
++	} else {
++		SH_CLK_SET_RATIO(&i_clk_ratio,	1, 1);
++		SH_CLK_SET_RATIO(&s_clk_ratio,	1, 4);
++		SH_CLK_SET_RATIO(&s1_clk_ratio,	1, 8);
++		SH_CLK_SET_RATIO(&s3_clk_ratio,	1, 4);
++		SH_CLK_SET_RATIO(&s4_clk_ratio,	1, 8);
++		SH_CLK_SET_RATIO(&p_clk_ratio,	1, 16);
++		SH_CLK_SET_RATIO(&g_clk_ratio,	1, 12);
++		if (mode & MD(2)) {
++			SH_CLK_SET_RATIO(&b_clk_ratio,		1, 16);
++			SH_CLK_SET_RATIO(&out_clk_ratio,	1, 16);
++		} else {
++			SH_CLK_SET_RATIO(&b_clk_ratio,		1, 12);
++			SH_CLK_SET_RATIO(&out_clk_ratio,	1, 12);
++		}
++	}
++
+ 	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
+ 		ret = clk_register(main_clks[k]);
+ 
 -- 
 1.7.10.4
