@@ -1,63 +1,56 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 27 May 2013 21:17:27 +0200
-Subject: [PATCHv3 0/6] Add I2C support for Allwinner SoCs
-In-Reply-To: <1369648843-1640-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1369648843-1640-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <2987322.J4qAl07e8R@flatron>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Mon, 27 May 2013 12:58:04 -0700
+Subject: [PATCH v2] ARM: mm: Get rid of L_PTE_USER ref from PAGE_S2_DEVICE
+In-Reply-To: <b727cb23668cb98294ef0a75b31b38e6@localhost>
+References: <1369444359-28962-1-git-send-email-cdall@cs.columbia.edu>
+ <b727cb23668cb98294ef0a75b31b38e6@localhost>
+Message-ID: <CAEDV+g+ME+Sx2MKp_4ePjUsSpj+EaAxF4v9z-K1SM5bdD6txaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Monday 27 of May 2013 12:00:37 Maxime Ripard wrote:
-> Hi,
-> 
-> This patchset adds support for the I2C controller found on most of the
-> Allwinner SoCs, especially the already supported A10 and A13, and the
-> yet to come A31.
-> 
-> It has been tested on a A13-Olinuxino.
-> 
-> Thanks,
-> Maxime
-> 
-> Changes from v2:
->   * Slightly modified the switch comments again
->   * Removed the of_* calls in favor of platform_get_* functions
-> 
-> Changes from v1:
->   * Added comments to the switch statements to clarify when the fall
-> through to the next case is made on purpose
->   * Use devm_ioremap_resource instead of of_iomap
->   * Moved the reset after enabling the clocks
->   * Added Emilio Lopez' patch to add the available i2c controllers to
-> the cubieboard
-> 
-> Emilio L?pez (1):
->   ARM: sun4i: cubieboard: Enable the i2c controllers
-> 
-> Maxime Ripard (5):
->   i2c: sunxi: Add Allwinner A1X i2c driver
->   ARM: sunxi: dt: Add i2c controller nodes to the DTSI
->   ARM: sun4i: dt: Add i2c muxing options
->   ARM: sun5i: dt: Add i2c muxing options
->   ARM: sun5i: olinuxino: Enable the i2c controllers
-> 
->  .../devicetree/bindings/i2c/i2c-sunxi.txt          |  19 +
->  arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |  12 +
->  arch/arm/boot/dts/sun4i-a10.dtsi                   |  48 +++
->  arch/arm/boot/dts/sun5i-a13-olinuxino.dts          |  18 +
->  arch/arm/boot/dts/sun5i-a13.dtsi                   |  48 +++
->  drivers/i2c/busses/Kconfig                         |  10 +
->  drivers/i2c/busses/Makefile                        |   1 +
->  drivers/i2c/busses/i2c-sunxi.c                     | 444
-> +++++++++++++++++++++ 8 files changed, 600 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-sunxi.txt
->  create mode 100644 drivers/i2c/busses/i2c-sunxi.c
-
-All the patches look good to me.
-
-Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
-
-Best regards,
-Tomasz
+On Sat, May 25, 2013 at 3:02 AM, Marc Zyngier <maz@misterjones.org> wrote:
+> On Fri, 24 May 2013 18:12:39 -0700, Christoffer Dall
+> <cdall@cs.columbia.edu> wrote:
+>> THe L_PTE_USER actually has nothing to do with stage 2 mappings and the
+>> L_PTE_S2_RDWR value sets the readable bit, which was what L_PTE_USER
+>> was used for before proper handling of stage 2 memory defines.
+>>
+>> Changelog:
+>>  [v2]: Change default mappings to be r/w instead of r/o, as per Marc
+>>        Zyngier's suggestion.
+>>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Christoffer Dall <cdall@cs.columbia.edu>
+>> ---
+>>  arch/arm/include/asm/pgtable.h |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/include/asm/pgtable.h
+>> b/arch/arm/include/asm/pgtable.h
+>> index 9bcd262..8afc60c 100644
+>> --- a/arch/arm/include/asm/pgtable.h
+>> +++ b/arch/arm/include/asm/pgtable.h
+>> @@ -97,7 +97,7 @@ extern pgprot_t             pgprot_s2_device;
+>>  #define PAGE_HYP             _MOD_PROT(pgprot_kernel, L_PTE_HYP)
+>>  #define PAGE_HYP_DEVICE              _MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+>>  #define PAGE_S2                      _MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
+>> -#define PAGE_S2_DEVICE               _MOD_PROT(pgprot_s2_device, L_PTE_USER |
+>> L_PTE_S2_RDONLY)
+>> +#define PAGE_S2_DEVICE               _MOD_PROT(pgprot_s2_device, L_PTE_S2_RDWR)
+>>
+>>  #define __PAGE_NONE          __pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN
+> |
+>>  L_PTE_NONE)
+>>  #define __PAGE_SHARED                __pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
+>
+> Actually, there's a much better solution.
+>
+> Just get rid of PAGE_S2_DEVICE altogether, as it is completely useless. We
+> never have to enforce a memory type in S2 that is stronger than the guest's
+> view. If the guest insists on doing something silly (mapping a device as
+> normal memory, for example), we really don't have to fix things for them.
+>
+> See the patch I posted a while ago as part of my pending fixes series:
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2013-May/005827.html
+>
+yeah duh, I'll reply to that one.
