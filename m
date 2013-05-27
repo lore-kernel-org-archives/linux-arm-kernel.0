@@ -1,45 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 26 May 2013 23:23:29 +0200
-Subject: [RFC PATCHv4 0/6] arm: Initial TI-Nspire support
-In-Reply-To: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
-References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
-Message-ID: <201305262323.29519.arnd@arndb.de>
+From: R64188@freescale.com (Jin Zhengxiong-R64188)
+Date: Mon, 27 May 2013 01:27:04 +0000
+Subject: [PATCH v3] tty: serial: add Freescale lpuart driver support
+In-Reply-To: <20130523025059.GB2704@S2101-09.ap.freescale.net>
+References: <1368685096-13177-1-git-send-email-b35083@freescale.com>
+ <20130520030523.GB25113@S2101-09.ap.freescale.net>
+ <13F8657A829DAB49A2A937FD6FC10F790B3CDB85@039-SN2MPN1-012.039d.mgd.msft.net>
+ <CAAQ0ZWRz+byPKxMjDH3zKsc0u4bmkPO_1u6w2H4Z7nD0z8+9ig@mail.gmail.com>
+ <13F8657A829DAB49A2A937FD6FC10F790B3CECEB@039-SN2MPN1-012.039d.mgd.msft.net>
+ <20130523025059.GB2704@S2101-09.ap.freescale.net>
+Message-ID: <13F8657A829DAB49A2A937FD6FC10F790B3D5056@039-SN2MPN1-012.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 25 May 2013, Daniel Tang wrote:
-> Changes between v3 and v4:
-> * Remove redundant clock-names in device tree
-> * Re-enable bus access to some peripherals on bootup
-> * Clean up nspire-classic-timer code.
->   - Implement a nspire_timer_set_mode function
->   - Removed messy IO_MATCHx and CNTL_MATCHx macros
->   - Timer starts disabled to begin with
->   - Interrupt handling code return IRQ_NONE for spurious interrupts
->   - Delete unnessecary shift
-> * Change clk-nspire to use compatible property to determine IO type
-> * Change device tree bindings to have appropriate vendor prefixes
-> * Added device tree binding documentation
-> * Fix incorrect register addresses for clocks
-> * Use more specific .caps for CLCD
+> On Wed, May 22, 2013 at 08:59:20AM +0000, Jin Zhengxiong-R64188 wrote:
+> > [Jason Jin-R64188] For the lpuart itself, I do not think it will have
+> different version IP.
+> 
+> You can never tell in 5 or 10 years.  Also no major version doesn't
+> necessarily mean no minor updates or revise.
+> 
+> > The general name is sufficient and soc related name can introduce the
+> minor difference. If the there are update version, we can name it
+> lpuart2.0 or something like that.
+> >
+> 
+> Yeah, if IP designers name it lpuart2.0, it surely works.  But from my
+> experience on IMX, hardware guys are not always properly updating IP name.
+> Then the version 2.0 becomes a versioning given by software people which
+> is improper to be used in compatible string.
+> 
+[Jason Jin-R64188] We had some internal discussion on this. For the lpuart itself, as we cannot get the version information at run time from the version register and lpuart is not publicly versioned, we agree to use the SoC name for lpuart. 
+However, if the version information can be got from the register at run time, or the version was publicly versioned. the general name still useful than the SoC name. 
+on the other side, the SoC itself may also have new versions, So the SoC name is also not a perfect solution.
 
-Looks really good now. I have a few more comments for the first patch,
-mostly for stuff that can be simplified based on stuff we merged in 3.10.
-
-The one remaining bit that sticks out is the clcd platform data. As I
-said before, I won't require you to convert that to DT in order to
-get your code merged, but I'd also really like to see that happen,
-as we will also need that to get rid of auxdata on the ARM reference
-platforms (integrator, versatile, realview, vexpress).
-
-Are you motivated to look into those after the base patch gets
-merged into arm-soc?
-
-One comment on the merge path: While we can put any of the patches
-into the arm-soc tree, my preference is definitely for the clk,
-clksource, irqchip and input drivers to go through the respective
-maintainer trees. There are no dependencies to worry about, since
-each patch can compile standalone, and we just need to make sure
-they all get into 3.11 for your platform to work.
-
-	Arnd
+> >
+> 
+> Think about it from "compatibility" point of view.  It does not cause
+> confusion but just help understand the compatible history.  Saying the
+> same IP is reused on LS-1 SoC, I do not see a problem with putting the
+> following compatible into LS-1 <soc>.dtsi under UART node, to tell that
+> the UART block on LS-1 is completely compatible with the one used on
+> MVF600.
+> 
+>   compatible = "fsl,ls1-uart", "fsl,mvf600-uart";
+> 
+[Jason Jin-R64188] We'll leverage this compatible strings for compatible history. Thanks.
+By the way, we'll change the SoC name from mvf600 to vf610 to align the description in the document. 
