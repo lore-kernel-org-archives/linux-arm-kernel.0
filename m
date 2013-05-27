@@ -1,38 +1,46 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 27 May 2013 08:16:58 -0400
-Subject: [PATCH] i2c: sirf: move driver init from module_init to
- subsys_initcall
-In-Reply-To: <CAGsJ_4y6SY6nNkbW+Yh8jx0WB4Pi9MO1W3xVZcrQcedGeD5ogQ@mail.gmail.com>
-References: <1368672607-5536-1-git-send-email-Baohua.Song@csr.com>
- <20130516093846.GA2927@katana>
- <CAGsJ_4zVOF8-g=emEGgP3atxkWdxMaQQiVZrZkht_WueTriSnw@mail.gmail.com>
- <20130525201032.GD32043@sirena.org.uk>
- <CAGsJ_4y6SY6nNkbW+Yh8jx0WB4Pi9MO1W3xVZcrQcedGeD5ogQ@mail.gmail.com>
-Message-ID: <20130527121658.GA3660@sirena.org.uk>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Mon, 27 May 2013 17:55:47 +0530
+Subject: [RFC V7 PATCH 0/3] USB: OHCI: Start splitting up the driver
+In-Reply-To: <1365746856-7772-2-git-send-email-manjunath.goudar@linaro.org>
+References: <1365746856-7772-2-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1369657550-24101-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 27, 2013 at 09:54:56AM +0800, Barry Song wrote:
+This series of patches begins the process of splitting ohci-hcd up into
+a core library module and independent pci driver modules.
 
-> Mark, the case is not that deferred probing is slow or not. deferred
-> probing is pretty good.
-> the case is that we want to i2c and media connected with i2c probed
-> earlier than other devices.
-> in auto infotainment devices, we actually do some hacking in kernel
-> that makes rear view work earlier than other device driver
-> initialization with a kernel thread which take care of backing-car
-> policy not only mechanism. that means, we make camera work to see
-> backview image even earlier than other drivers' initialization.
-> we don't want media deferred to wait for i2c. we want make some early
-> jobs ready earlier.
+Patch 1/3 prepares the way by exporting a few functions from ohci-hcd
+and adding a new mechanism for platform-specific drivers to initialize
+their hc_driver structures.  This deserves to be done in the core
+because almost all of the entries in these structures are pure
+boilerplate -- practically none of the drivers need to override more
+than three of the standard core values.
 
-So this change makes no practical difference in mainline and exists to
-support out of tree hacks for performance?  It doesn't seem like that
-big a patch to carry along with the out of tree stuff...
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130527/ecbd0662/attachment.sig>
+Patch 2/3 is part of separating the ohci pci host controller
+driver from ohci-hcd host code.
+Moved sb800_prefetch() function from ohci-pci.c to pci-quirks.c file
+and EXPORTed, this is part of the effort to move the ohci pci related
+code to generic pci code.
+
+Patch 3/3  separate out ohci-pci into independent driver modules. 
+
+
+Manjunath Goudar (3):
+  USB: OHCI: prepare to make ohci-hcd a library module
+  USB: OHCI: Generic changes to make ohci-pci a separate driver
+  USB: OHCI: make ohci-pci a separate driver
+
+ drivers/usb/host/Kconfig      |    4 +-
+ drivers/usb/host/Makefile     |    3 +
+ drivers/usb/host/ohci-hcd.c   |  132 +++++++++++++++++++++++++----------
+ drivers/usb/host/ohci-hub.c   |    1 -
+ drivers/usb/host/ohci-pci.c   |  152 ++++++++++++-----------------------------
+ drivers/usb/host/ohci-q.c     |    6 +-
+ drivers/usb/host/ohci.h       |   17 +++++
+ drivers/usb/host/pci-quirks.c |   13 ++++
+ drivers/usb/host/pci-quirks.h |    2 +
+ 9 files changed, 181 insertions(+), 149 deletions(-)
+
+-- 
+1.7.9.5
