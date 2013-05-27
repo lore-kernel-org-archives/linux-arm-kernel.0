@@ -1,40 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 May 2013 17:02:09 +0200
-Subject: MUSB multiplatform work?
-Message-ID: <201305271702.09203.arnd@arndb.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 27 May 2013 17:10:07 +0200
+Subject: [PATCH v2] clk: tegra: Use common of_clk_init function
+In-Reply-To: <1369640409-1981-1-git-send-email-pgaikwad@nvidia.com>
+References: <1369640409-1981-1-git-send-email-pgaikwad@nvidia.com>
+Message-ID: <20130527151006.GC9460@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+On Mon, May 27, 2013 at 01:10:09PM +0530, Prashant Gaikwad wrote:
+> Use common of_clk_init() function for clocks initialization.
+> 
+> Signed-off-by: Prashant Gaikwad <pgaikwad@nvidia.com>
 
-We've gone through remaining work items for getting the ARM kernel
-to full multiplatform support again, and MUSB came up. I'm sure you
-have your own thoughts on this, but I'd like to know if there is
-already a plan in place.
-
->From what I can see, the driver in PIO mode should almost work
-on multiple platforms, but there are a couple of compile-time
-dependencies in it that need to be turned into run-time conditionals.
-In particular the TUSB version seem sufficiently different that
-it needs some extra work to be a true run-time option.
-
-The DMA support as far as I can tell has never been intended to
-be usable in a multiplatform setup, but that also seems doable.
-Looking just at the #ifdef statements in the driver, I found
-that the following things need to be addressed:
-
-* abstract musb_write_fifo and musb_read_fifo into callbacks
-* move fifo_mode setting into glue driver for runtime selection
-* turn TUSB compile-time switches into run-time conditionals
-* turn musb_ep_select into run-time switch
-* make is_dma_capable/is_cppi_enabled/tusb_dma_omap run-time conditionals
-* abtract dma_controller_create/destroy interface
-
-Aside from this, a recent discussion with Maxime has brought up
-that the Allwinner A1x platform (mach-sunxi) contains an MUSB variant
-that is currently used with an independently implemented device driver,
-see https://github.com/linux-sunxi/linux-sunxi/tree/sunxi-3.0/drivers/usb/sun5i_usb
-I wonder if you have any insight on how that can be integrated into
-musb, or whether it is likely to be a compatible version to start with.
-
-	Arnd
+Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130527/d8f48b1b/attachment.sig>
