@@ -1,52 +1,26 @@
-From: R64188@freescale.com (Jin Zhengxiong-R64188)
-Date: Mon, 27 May 2013 09:12:25 +0000
-Subject: [PATCH v3] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <20130527055734.GD7782@S2101-09.ap.freescale.net>
-References: <1368685096-13177-1-git-send-email-b35083@freescale.com>
- <20130520030523.GB25113@S2101-09.ap.freescale.net>
- <13F8657A829DAB49A2A937FD6FC10F790B3CDB85@039-SN2MPN1-012.039d.mgd.msft.net>
- <CAAQ0ZWRz+byPKxMjDH3zKsc0u4bmkPO_1u6w2H4Z7nD0z8+9ig@mail.gmail.com>
- <13F8657A829DAB49A2A937FD6FC10F790B3CECEB@039-SN2MPN1-012.039d.mgd.msft.net>
- <20130523025059.GB2704@S2101-09.ap.freescale.net>
- <13F8657A829DAB49A2A937FD6FC10F790B3D5056@039-SN2MPN1-012.039d.mgd.msft.net>
- <20130527055734.GD7782@S2101-09.ap.freescale.net>
-Message-ID: <13F8657A829DAB49A2A937FD6FC10F790B3D644B@039-SN2MPN1-012.039d.mgd.msft.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 27 May 2013 18:16:42 +0900
+Subject: [GIT PULL] Renesas ARM based sh7372 SoC updates for v3.11
+In-Reply-To: <1369645242-3803-1-git-send-email-horms+renesas@verge.net.au>
+References: <1369645242-3803-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130527091642.GC3911@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawn.guo at linaro.org]
-> Sent: Monday, May 27, 2013 1:58 PM
-> To: Jin Zhengxiong-R64188
-> Cc: grant.likely at linaro.org; Lu Jingchang-B35083; linux-
-> serial at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> gregkh at linuxfoundation.org; s.hauer at pengutronix.de
-> Subject: Re: [PATCH v3] tty: serial: add Freescale lpuart driver support
+On Mon, May 27, 2013 at 06:00:40PM +0900, Simon Horman wrote:
+> Hi Arnd, Hi Olof,
 > 
-> On Mon, May 27, 2013 at 01:27:04AM +0000, Jin Zhengxiong-R64188 wrote:
-> > By the way, we'll change the SoC name from mvf600 to vf610 to align the
-> description in the document.
-> >
+> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
 > 
-> Such product renaming in documents happen on IMX as well, but we do not
-> bother to churn the source tree (file, function renaming) to catch up
-> with it, as long as we know what it is.
+>   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
 > 
-> For this mvf600 to vf610 renaming, if you want to catch up with it, you
-> will need to rename a bunch of files functions, compatibles in
-> Jingchang's series, and it's probably fine even though it's not really
-> necessary since they haven't been merged.  But for those which have been
-> merged, like fec compatible string, doing this will probably piss off
-> maintainers.  So I would suggest that we stick to name mvf600 in the
-> source tree, and just be aware of it's the equivalent of vf610.
+> are available in the git repository at:
 > 
-> Shawn
-[Jason Jin-R64188] I think we need to align with the document as it's posted at Freescale website, otherwise, the inconsistency will confuse the customer. 
-please refer to:
-http://www.freescale.com/webapp/sps/site/prod_summary.jsp?code=VF6xx&fsrch=1&sr=5
-http://www.freescale.com/webapp/sps/site/homepage.jsp?code=VYBRID
-As the development work is ahead of the formal name posted outside, we continued to use the name for upstreaming patches. Sorry for taking into the confusion. For those patches aren't merged, please help to review them based on the new SoC name.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-sh7372-for-v3.11
+> 
+> for you to fetch changes up to 98aaf628f866f530ce6829476e1c2ac98c9c4f60:
+> 
+>   ARM: shmobile: sh7372 pinmux platform device cleanup (2013-05-22 21:46:25 +0900)
 
-For the merged FEC patch, we'd like to explain it to the maintainer, Or can we just keep the FEC compatible string as before("fsl, mvf600-fec")? And be aware of it's the equivalent of "fsl,vf610-fec"?
-
-Jason
+Please ignore this, it duplicates a patch that I have sent a separate pull
+request for.
