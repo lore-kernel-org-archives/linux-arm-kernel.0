@@ -1,74 +1,40 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 27 May 2013 10:58:28 -0400 (EDT)
-Subject: [RFC V7 PATCH 3/3] USB: OHCI: make ohci-pci a separate driver
-In-Reply-To: <1369657550-24101-4-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1305271056390.21231-100000@netrider.rowland.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 May 2013 17:02:09 +0200
+Subject: MUSB multiplatform work?
+Message-ID: <201305271702.09203.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 May 2013, Manjunath Goudar wrote:
+Hi Felipe,
 
-> This patch splits the PCI portion of ohci-hcd out into its
-> own separate driver module, called ohci-pci.
-> 
-> The major point of difficulty lies in ohci-pci's many vendor- and
-> device-specific workarounds.  Some of them have to be applied before
-> calling ohci_start() some after, which necessitates a fair amount of
-> code motion.  The other platform drivers require much smaller changes.
-> 
-> The complete sb800_prefetch() function moved to ohci-q.c,because its
-> only related to ohci-pci driver.
-> 
-> V2:
->   - few specific content of pci related code in ohci_pci_start function has been moved to ohci_pci_reset
->     and rest of the generic code is written in ohci_start of ohci-hcd.c file.
-> V3:
->  - ohci_restart() has been called in ohci_pci_reset() function for to reset the ohci pci.
-> 
-> V4:
->  -sb800_prefetch() moved to ohci-q.c,because its only related to ohci-pci.
->  -no longer _creating_ CONFIG_USB_OHCI_PCI,creating CONFIG_USB_OHCI_HCD_PCI.
->  -overrides renamed with pci_override,its giving proper meaning.
-> 
-> V5:
->  -sb800_prefetch() moved to pci-quirks.c,because its only related to pci.
-> 
-> V6:
->  -sb800_prefetch() function has been moved to pci-quirks.c made as separate patch in 2/3.
->  -Most of the generic ohci pci changes moved in 2/3 patch,now this is complete  ohci-pci separation patch.
-> 
-> V7:
->  -Unrelated include file has been removed from ohci.h file.
+We've gone through remaining work items for getting the ARM kernel
+to full multiplatform support again, and MUSB came up. I'm sure you
+have your own thoughts on this, but I'd like to know if there is
+already a plan in place.
 
-One tiny mistake still remains...
+>From what I can see, the driver in PIO mode should almost work
+on multiple platforms, but there are a couple of compile-time
+dependencies in it that need to be turned into run-time conditionals.
+In particular the TUSB version seem sufficiently different that
+it needs some extra work to be a true run-time option.
 
-> @@ -242,94 +249,24 @@ static int ohci_pci_reset (struct usb_hcd *hcd)
->  			ret = quirk(hcd);
->  		}
->  	}
-> -	if (ret == 0) {
-> -		ohci_hcd_init (ohci);
-> -		return ohci_init (ohci);
-> -	}
+The DMA support as far as I can tell has never been intended to
+be usable in a multiplatform setup, but that also seems doable.
+Looking just at the #ifdef statements in the driver, I found
+that the following things need to be addressed:
 
-...
+* abstract musb_write_fifo and musb_read_fifo into callbacks
+* move fifo_mode setting into glue driver for runtime selection
+* turn TUSB compile-time switches into run-time conditionals
+* turn musb_ep_select into run-time switch
+* make is_dma_capable/is_cppi_enabled/tusb_dma_omap run-time conditionals
+* abtract dma_controller_create/destroy interface
 
-> +	if (ret == 0)
-> +		ohci_setup(hcd);
+Aside from this, a recent discussion with Maxime has brought up
+that the Allwinner A1x platform (mach-sunxi) contains an MUSB variant
+that is currently used with an independently implemented device driver,
+see https://github.com/linux-sunxi/linux-sunxi/tree/sunxi-3.0/drivers/usb/sun5i_usb
+I wonder if you have any insight on how that can be integrated into
+musb, or whether it is likely to be a compatible version to start with.
 
-This should say
-
-		ret = ohci_setup(hcd);
-
-so that errors in ohci_setup() won't be ignored.
-
-> +	/*
-> +	* After ohci setup RWC may not be set for add-in PCI cards.
-> +	* This transfers PCI PM wakeup capabilities.
-> +	*/
-> +	if (device_can_wakeup(&pdev->dev))
-> +		ohci->hc_control |= OHCI_CTRL_RWC;
->  	return ret;
->  }
-
-Alan Stern
+	Arnd
