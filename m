@@ -1,35 +1,20 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 27 May 2013 10:11:07 +0300
-Subject: [PATCH] dmatest: do not allow to interrupt ongoing tests
-In-Reply-To: <Pine.LNX.4.64.1305242353210.7187@axis700.grange>
-References: <1369308593-3723-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <Pine.LNX.4.64.1305242353210.7187@axis700.grange>
-Message-ID: <1369638667.29283.197.camel@smile>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 27 May 2013 15:16:38 +0800
+Subject: [PATCH 1/2] ARM: imx: irq-common: Include header to avoid sparse
+ warning
+In-Reply-To: <1369425342-20153-1-git-send-email-festevam@gmail.com>
+References: <1369425342-20153-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130527071637.GL7782@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-05-24 at 23:55 +0200, Guennadi Liakhovetski wrote: 
-> On Thu, 23 May 2013, Andy Shevchenko wrote:
+On Fri, May 24, 2013 at 04:55:41PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> > When user interrupts ongoing transfers the dmatest may end up with console
-> > lockup, oops, or data mismatch. This patch prevents user to abort any ongoing
-> > test.
+> Fix the following sparse warning:
 > 
-> Personally I would be against such a change. What about interrupting the 
-> test with rmmod?
->  Is it still possible after this your patch or not? If not 
-> - this doesn't seem like a good idea to me. Why don't we just fix those 
-> bugs, that you're describing?
+> arch/arm/mach-imx/irq-common.c:24:5: warning: symbol 'mxc_set_irq_fiq' was not declared. Should it be static?
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-The behaviour of the module is returned to the same page by this patch
-as it was before (w/o debugfs).
-
-The user can interrupt tests by rmmod, but it will take time up to
-timeout.
-
-I appreciate if you can do a deeper analysis of what happened in
-case Will reported.
-
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Both applied, thanks.
