@@ -1,50 +1,45 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 27 May 2013 09:42:27 +0800
-Subject: [PATCH] arch: arm64: kernel: sprintf(), 'str' needs additional
- 1 byte for failure processing
-In-Reply-To: <51A1E3B3.4060901@asianux.com>
-References: <51A1E3B3.4060901@asianux.com>
-Message-ID: <51A2BA03.4030006@asianux.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 27 May 2013 09:54:56 +0800
+Subject: [PATCH] i2c: sirf: move driver init from module_init to
+ subsys_initcall
+In-Reply-To: <20130525201032.GD32043@sirena.org.uk>
+References: <1368672607-5536-1-git-send-email-Baohua.Song@csr.com>
+ <20130516093846.GA2927@katana>
+ <CAGsJ_4zVOF8-g=emEGgP3atxkWdxMaQQiVZrZkht_WueTriSnw@mail.gmail.com>
+ <20130525201032.GD32043@sirena.org.uk>
+Message-ID: <CAGsJ_4y6SY6nNkbW+Yh8jx0WB4Pi9MO1W3xVZcrQcedGeD5ogQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2013 06:28 PM, Chen Gang wrote:
-> 
-> When failure occurs at the last looping cycle (when 'i == 0'), it will
-> print "bad PC value" instead of "(%08x) ", which needs additional 1
-> byte.
-> 
-> If not add 1 byte, the str will not be NUL terminated, and the next
-> printk() will cause issue.
-> 
+2013/5/26 Mark Brown <broonie@kernel.org>:
+> On Thu, May 16, 2013 at 06:25:39PM +0800, Barry Song wrote:
+>> 2013/5/16 Wolfram Sang <wsa@the-dreams.de>:
+>
+>> > What about deferred probing?
+>
+>> deferred probing could work but could not work for automative.
+>> what we really want is that devices begin to work as early as
+>> possible. we want i2c clients like lcd, camera begin to show images as
+>> early as possible as an automative requirement.
+>
+> Probe deferral should have at most a mimimal impact on the boot time -
+> it's pretty much just changing the order providing the probe functions
+> aren't excessively slow to defer.  If the probe functions are taking a
+> long time to defer that's probably what needs looking at.
+>
+> If it really is probe deferral itself that's too slow then we ought to
+> be looking at improving that rather than boding around it.
 
-Oh, I type incorrect contents. It should be "If not add 1 byte, it will
-memory overflow"
+Mark, the case is not that deferred probing is slow or not. deferred
+probing is pretty good.
+the case is that we want to i2c and media connected with i2c probed
+earlier than other devices.
+in auto infotainment devices, we actually do some hacking in kernel
+that makes rear view work earlier than other device driver
+initialization with a kernel thread which take care of backing-car
+policy not only mechanism. that means, we make camera work to see
+backview image even earlier than other drivers' initialization.
+we don't want media deferred to wait for i2c. we want make some early
+jobs ready earlier.
 
-I will send patch v2.
-
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm64/kernel/traps.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index 61d7dd2..c2f68d2 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -100,7 +100,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
->  {
->  	unsigned long addr = instruction_pointer(regs);
->  	mm_segment_t fs;
-> -	char str[sizeof("00000000 ") * 5 + 2 + 1], *p = str;
-> +	char str[sizeof("00000000 ") * 5 + 2 + 1 + 1], *p = str;
->  	int i;
->  
->  	/*
-> 
-
-
--- 
-Chen Gang
-
-Asianux Corporation
+-barry
