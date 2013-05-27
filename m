@@ -1,123 +1,82 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 27 May 2013 09:49:37 +0200
-Subject: [PATCH v3 1/2] ARM:dts:mx53qsb: Add support for parallel display
-In-Reply-To: <1369404571-21356-1-git-send-email-rogerio.pimentel@freescale.com>
-References: <1369404571-21356-1-git-send-email-rogerio.pimentel@freescale.com>
-Message-ID: <20130527074937.GE32299@pengutronix.de>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 27 May 2013 09:50:29 +0200
+Subject: [GIT PULL] arm-soc: Xilinx zynq clock changes for v3.11
+Message-ID: <51A31045.1060406@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 11:09:30AM -0300, Rogerio Pimentel wrote:
-> Add support for CLAA WVGA display for i.MX53 QSB.
-> 
-> Signed-off-by: Rogerio Pimentel <rogerio.pimentel@freescale.com>
+Hi Arnd and Olof,
 
-Both:
+please pull the following changes to your arm-soc tree.
+We haven't got any response from audience or clk maintainer
+but we discussed these changes with him in several threads.
+The major change is to have easy to going DT clock description
+in one node and do not describe the whole clock tree in details
+which none uses.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Thanks,
+Michal
 
-Sascha
 
-> ---
-> Changes since V2:
-> Added status = "disabled" by default to avoid conflict with other
-> displays like HDMI card.
->  arch/arm/boot/dts/imx53-qsb.dts |   27 +++++++++++++++++++++++++++
->  arch/arm/boot/dts/imx53.dtsi    |   35 +++++++++++++++++++++++++++++++++++
->  2 files changed, 62 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx53-qsb.dts b/arch/arm/boot/dts/imx53-qsb.dts
-> index a885d37..8509db3 100644
-> --- a/arch/arm/boot/dts/imx53-qsb.dts
-> +++ b/arch/arm/boot/dts/imx53-qsb.dts
-> @@ -21,6 +21,33 @@
->  		reg = <0x70000000 0x40000000>;
->  	};
->  
-> +	display at di0 {
-> +		compatible = "fsl,imx-parallel-display";
-> +		crtcs = <&ipu 0>;
-> +		interface-pix-fmt = "rgb565";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_ipu_disp0_1>;
-> +		status = "disabled";
-> +		display-timings {
-> +			claawvga {
-> +				native-mode;
-> +				clock-frequency = <27000000>;
-> +				hactive = <800>;
-> +				vactive = <480>;
-> +				hback-porch = <40>;
-> +				hfront-porch = <60>;
-> +				vback-porch = <10>;
-> +				vfront-porch = <10>;
-> +				hsync-len = <20>;
-> +				vsync-len = <10>;
-> +				hsync-active = <0>;
-> +				vsync-active = <0>;
-> +				de-active = <1>;
-> +				pixelclk-active = <0>;
-> +			};
-> +		};
-> +	};
-> +
->  	gpio-keys {
->  		compatible = "gpio-keys";
->  
-> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-> index 2dbdc90..3a565ff 100644
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -544,6 +544,41 @@
->  					};
->  				};
->  
-> +				ipu_disp0 {
-> +					pinctrl_ipu_disp0_1: ipudisp0grp-1 {
-> +						fsl,pins = <
-> +						MX53_PAD_DI0_DISP_CLK__IPU_DI0_DISP_CLK	0x5
-> +						MX53_PAD_DI0_PIN15__IPU_DI0_PIN15		0x5
-> +						MX53_PAD_DI0_PIN2__IPU_DI0_PIN2		0x5
-> +						MX53_PAD_DI0_PIN3__IPU_DI0_PIN3 		0x5
-> +						MX53_PAD_DISP0_DAT0__IPU_DISP0_DAT_0		0x5
-> +						MX53_PAD_DISP0_DAT1__IPU_DISP0_DAT_1		0x5
-> +						MX53_PAD_DISP0_DAT2__IPU_DISP0_DAT_2		0x5
-> +						MX53_PAD_DISP0_DAT3__IPU_DISP0_DAT_3		0x5
-> +						MX53_PAD_DISP0_DAT4__IPU_DISP0_DAT_4		0x5
-> +						MX53_PAD_DISP0_DAT5__IPU_DISP0_DAT_5		0x5
-> +						MX53_PAD_DISP0_DAT6__IPU_DISP0_DAT_6		0x5
-> +						MX53_PAD_DISP0_DAT7__IPU_DISP0_DAT_7		0x5
-> +						MX53_PAD_DISP0_DAT8__IPU_DISP0_DAT_8		0x5
-> +						MX53_PAD_DISP0_DAT9__IPU_DISP0_DAT_9		0x5
-> +						MX53_PAD_DISP0_DAT10__IPU_DISP0_DAT_10		0x5
-> +						MX53_PAD_DISP0_DAT11__IPU_DISP0_DAT_11		0x5
-> +						MX53_PAD_DISP0_DAT12__IPU_DISP0_DAT_12		0x5
-> +						MX53_PAD_DISP0_DAT13__IPU_DISP0_DAT_13		0x5
-> +						MX53_PAD_DISP0_DAT14__IPU_DISP0_DAT_14		0x5
-> +						MX53_PAD_DISP0_DAT15__IPU_DISP0_DAT_15		0x5
-> +						MX53_PAD_DISP0_DAT16__IPU_DISP0_DAT_16		0x5
-> +						MX53_PAD_DISP0_DAT17__IPU_DISP0_DAT_17		0x5
-> +						MX53_PAD_DISP0_DAT18__IPU_DISP0_DAT_18		0x5
-> +						MX53_PAD_DISP0_DAT19__IPU_DISP0_DAT_19		0x5
-> +						MX53_PAD_DISP0_DAT20__IPU_DISP0_DAT_20		0x5
-> +						MX53_PAD_DISP0_DAT21__IPU_DISP0_DAT_21		0x5
-> +						MX53_PAD_DISP0_DAT22__IPU_DISP0_DAT_22		0x5
-> +						MX53_PAD_DISP0_DAT23__IPU_DISP0_DAT_23		0x5
-> +						>;
-> +					};
-> +				};
-> +
->  				ipu_disp1 {
->  					pinctrl_ipu_disp1_1: ipudisp1grp-1 {
->  						fsl,pins = <
-> -- 
-> 1.7.10.4
-> 
-> 
-> 
+The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+
+  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+
+are available in the git repository at:
+
+  git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-for-3.11
+
+for you to fetch changes up to 83d6e5996a34267e4402e6365c528bddd042ddf3:
+
+  clk: zynq: Remove deprecated clock code (2013-05-27 09:21:49 +0200)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq clock changes for v3.11
+
+Change Xilinx Zynq DT clock description which
+reflects logical abstraction of Zynq's clock tree.
+
+- Refactor PLL driver
+- Use new clock controller driver
+- Change timer and uart drivers
+
+----------------------------------------------------------------
+Soren Brinkmann (4):
+      clk: zynq: Factor out PLL driver
+      clk: zynq: Add clock controller driver
+      arm: zynq: Migrate platform to clock controller
+      clk: zynq: Remove deprecated clock code
+
+ Documentation/devicetree/bindings/clock/zynq-7000.txt | 123 ++++++++++++++-------
+ arch/arm/boot/dts/zynq-7000.dtsi                      |  71 ++++--------
+ arch/arm/boot/dts/zynq-zc702.dts                      |   4 -
+ arch/arm/mach-zynq/slcr.c                             |   2 +-
+ drivers/clk/Makefile                                  |   2 +-
+ drivers/clk/clk-zynq.c                                | 378 --------------------------------------------------------------
+ drivers/clk/zynq/Makefile                             |   3 +
+ drivers/clk/zynq/clkc.c                               | 533 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/zynq/pll.c                                | 235 +++++++++++++++++++++++++++++++++++++++
+ drivers/clocksource/cadence_ttc_timer.c               |  23 +++-
+ drivers/tty/serial/xilinx_uartps.c                    |  85 +++++++++++---
+ include/linux/clk/zynq.h                              |   8 +-
+ 12 files changed, 972 insertions(+), 495 deletions(-)
+ delete mode 100644 drivers/clk/clk-zynq.c
+ create mode 100644 drivers/clk/zynq/Makefile
+ create mode 100644 drivers/clk/zynq/clkc.c
+ create mode 100644 drivers/clk/zynq/pll.c
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130527/285c1f01/attachment.sig>
