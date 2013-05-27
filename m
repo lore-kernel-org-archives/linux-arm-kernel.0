@@ -1,59 +1,53 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 27 May 2013 12:37:15 +0200
-Subject: [PATCH v2] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
-In-Reply-To: <20130527080909.GB2919@ludovic.desroches@atmel.com>
-References: <1369467542-25519-1-git-send-email-alexandre.belloni@free-electrons.com>
- <20130525200557.GO24476@game.jcrosoft.org>
- <20130527080909.GB2919@ludovic.desroches@atmel.com>
-Message-ID: <51A3375B.3090205@free-electrons.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Mon, 27 May 2013 19:38:24 +0900
+Subject: Introduce a new helper framework for buffer synchronization
+In-Reply-To: <012801ce57ba$a5a87fa0$f0f97ee0$%dae@samsung.com>
+References: <CAAQKjZP=iOmHRpHZCbZD3v_RKUFSn0eM_WVZZvhe7F9g3eTmPA@mail.gmail.com>
+ <CAF6AEGuDih-NR-VZCmQfqbvCOxjxreZRPGfhCyL12FQ1Qd616Q@mail.gmail.com>
+ <006a01ce504e$0de3b0e0$29ab12a0$%dae@samsung.com>
+ <CAF6AEGv2FiKMUpb5s4zHPdj4uVxnQWdVJWL-i1mOOZRxBvMZ4Q@mail.gmail.com>
+ <00cf01ce512b$bacc5540$3064ffc0$%dae@samsung.com>
+ <CAF6AEGuBexKUpTwm9cjGjkxCTKgEaDhAakeP0RN=rtLS6Qy=Mg@mail.gmail.com>
+ <CAAQKjZP37koEPob6yqpn-WxxTh3+O=twyvRzDiEhVJTD8BxQzw@mail.gmail.com>
+ <20130520211304.GV12292@phenom.ffwll.local>
+ <20130520213033.GW12292@phenom.ffwll.local>
+ <032701ce55f1$3e9ba4b0$bbd2ee10$%dae@samsung.com>
+ <20130521074441.GZ12292@phenom.ffwll.local>
+ <033a01ce5604$c32bd250$498376f0$%dae@samsung.com>
+ <CAKMK7uHtk+A7CDZH3qHt+F3H_fdSsWwt-bEPn-N0919oOE+Jkg@mail.gmail.com>
+ <012801ce57ba$a5a87fa0$f0f97ee0$%dae@samsung.com>
+Message-ID: <014501ce5ac6$511a8500$f34f8f00$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/05/2013 10:09, Ludovic Desroches wrote:
-> On Sat, May 25, 2013 at 10:05:57PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
->> On 09:39 Sat 25 May     , Alexandre Belloni wrote:
->>> Fixes:
->>> arch/arm/mach-at91/built-in.o: In function `ksz9021rn_phy_fixup':
->>> :(.text+0x1174): undefined reference to `mdiobus_write'
->>> :(.text+0x1188): undefined reference to `mdiobus_write'
->>> :(.text+0x119c): undefined reference to `mdiobus_write'
->>> :(.text+0x11b0): undefined reference to `mdiobus_write'
->>> arch/arm/mach-at91/built-in.o: In function `sama5_dt_device_init':
->>> :(.init.text+0x1e34): undefined reference to `phy_register_fixup_for_uid'
->>>
->>> when CONFIG_PHYLIB is not selected.
-> Signed-off-by missing.
->
-> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->
+Hi all,
 
-I'll send a v3...
+I have been removed previous branch and added new one with more cleanup.
+This time, the fence helper doesn't include user side interfaces and cache
+operation relevant codes anymore because not only we are not sure that
+coupling those two things, synchronizing caches and buffer access between
+CPU and CPU, CPU and DMA, and DMA and DMA with fences, in kernel side is a
+good idea yet but also existing codes for user side have problems with badly
+behaved or crashing userspace. So this could be more discussed later.
 
->>> ---
->>> Changes in v2:
->>> 	use IS_BUILTIN
->>> 	use CONFIG_PHYLIB and not CONFIG_PHY
->>>
->> I do not like this, I prefer we just drop the fixup by adding the dt support
->> to the micrel phy as done for broadcom
->>
-> Yes it will be a better solution but we don't have it. Even if we add dt
-> support for micrel phy it won't go into 3.10 so it has to be fixed before the
-> release.
+The below is a new branch,
+	
+https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-exynos.git/?h=dma-f
+ence-helper
 
-The fixup is also done like that on i.mx6. I think we'll have to stick
-to that for now.
+And fence helper codes,
+	
+https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-exynos.git/commit/?
+h=dma-fence-helper&id=adcbc0fe7e285ce866e5816e5e21443dcce01005
 
->> if !PHYLIB just add an inline declaration of 
->> phy_register_fixup_for_uid
->>
->> so gcc will drop ksz9021rn_phy_fixup automatically
+And example codes for device driver,
+	
+https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-exynos.git/commit/?
+h=dma-fence-helper&id=d2ce7af23835789602a99d0ccef1f53cdd5caaae
 
-By using IS_BUILTIN, gcc is already optimizing out the offeding lines,
-else you would still get the linking error.
+I think the time is not yet ripe for RFC posting: maybe existing dma fence
+and reservation need more review and addition work. So I'd glad for somebody
+giving other opinions and advices in advance before RFC posting.
 
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+Inki Dae
