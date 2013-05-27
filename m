@@ -1,32 +1,76 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 27 May 2013 11:41:13 -0400
-Subject: [PATCH 00/21] ARM: kirkwood: improve pinmux configs in Device Tree
-In-Reply-To: <20130527.181018.461275386.yamagata@plathome.co.jp>
-References: <1369388699-25975-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130527.181018.461275386.yamagata@plathome.co.jp>
-Message-ID: <20130527154113.GG31290@titan.lakedaemon.net>
+From: robdclark@gmail.com (Rob Clark)
+Date: Mon, 27 May 2013 11:47:54 -0400
+Subject: Introduce a new helper framework for buffer synchronization
+In-Reply-To: <014501ce5ac6$511a8500$f34f8f00$%dae@samsung.com>
+References: <CAAQKjZP=iOmHRpHZCbZD3v_RKUFSn0eM_WVZZvhe7F9g3eTmPA@mail.gmail.com>
+ <CAF6AEGuDih-NR-VZCmQfqbvCOxjxreZRPGfhCyL12FQ1Qd616Q@mail.gmail.com>
+ <006a01ce504e$0de3b0e0$29ab12a0$%dae@samsung.com>
+ <CAF6AEGv2FiKMUpb5s4zHPdj4uVxnQWdVJWL-i1mOOZRxBvMZ4Q@mail.gmail.com>
+ <00cf01ce512b$bacc5540$3064ffc0$%dae@samsung.com>
+ <CAF6AEGuBexKUpTwm9cjGjkxCTKgEaDhAakeP0RN=rtLS6Qy=Mg@mail.gmail.com>
+ <CAAQKjZP37koEPob6yqpn-WxxTh3+O=twyvRzDiEhVJTD8BxQzw@mail.gmail.com>
+ <20130520211304.GV12292@phenom.ffwll.local>
+ <20130520213033.GW12292@phenom.ffwll.local>
+ <032701ce55f1$3e9ba4b0$bbd2ee10$%dae@samsung.com>
+ <20130521074441.GZ12292@phenom.ffwll.local>
+ <033a01ce5604$c32bd250$498376f0$%dae@samsung.com>
+ <CAKMK7uHtk+A7CDZH3qHt+F3H_fdSsWwt-bEPn-N0919oOE+Jkg@mail.gmail.com>
+ <012801ce57ba$a5a87fa0$f0f97ee0$%dae@samsung.com>
+ <014501ce5ac6$511a8500$f34f8f00$%dae@samsung.com>
+Message-ID: <CAF6AEGvGv539Ktdeg03n783nD+HofDamcJCLX93rzzKGOCV8_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All,
+On Mon, May 27, 2013 at 6:38 AM, Inki Dae <inki.dae@samsung.com> wrote:
+> Hi all,
+>
+> I have been removed previous branch and added new one with more cleanup.
+> This time, the fence helper doesn't include user side interfaces and cache
+> operation relevant codes anymore because not only we are not sure that
+> coupling those two things, synchronizing caches and buffer access between
+> CPU and CPU, CPU and DMA, and DMA and DMA with fences, in kernel side is a
+> good idea yet but also existing codes for user side have problems with badly
+> behaved or crashing userspace. So this could be more discussed later.
+>
+> The below is a new branch,
+>
+> https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-exynos.git/?h=dma-f
+> ence-helper
+>
+> And fence helper codes,
+>
+> https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-exynos.git/commit/?
+> h=dma-fence-helper&id=adcbc0fe7e285ce866e5816e5e21443dcce01005
+>
+> And example codes for device driver,
+>
+> https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-exynos.git/commit/?
+> h=dma-fence-helper&id=d2ce7af23835789602a99d0ccef1f53cdd5caaae
+>
+> I think the time is not yet ripe for RFC posting: maybe existing dma fence
+> and reservation need more review and addition work. So I'd glad for somebody
+> giving other opinions and advices in advance before RFC posting.
 
-On Mon, May 27, 2013 at 06:10:18PM +0900, yamagata at plathome.co.jp wrote:
-> > The last patch finally adds support for the init button of the
-> > Plathome OpenBlocks A6 platform.
-> 
-> I have checked the init button worked well with your three patches for
-> linux-3.10-rc3 and 3.9.4.
-> 
-> Tested-by: Atsushi Yamagata <yamagata@plathome.co.jp>
+thoughts from a *really* quick, pre-coffee, first look:
+* any sort of helper to simplify single-buffer sort of use-cases (v4l)
+probably wouldn't want to bake in assumption that seqno_fence is used.
+* I guess g2d is probably not actually a simple use case, since I
+expect you can submit blits involving multiple buffers :-P
+* otherwise, you probably don't want to depend on dmabuf, which is why
+reservation/fence is split out the way it is..  you want to be able to
+use a single reservation/fence mechanism within your driver without
+having to care about which buffers are exported to dmabuf's and which
+are not.  Creating a dmabuf for every GEM bo is too heavyweight.
 
-Added the above to the relevant patches, as well as Andrew's Ack's and
-his Tested-by's on topkick and ts219.
+I'm not entirely sure if reservation/fence could/should be made any
+simpler for multi-buffer users.  Probably the best thing to do is just
+get reservation/fence rolled out in a few drivers and see if some
+common patterns emerge.
 
-FYI: mvebu/dt has been rebased *after* tags/dt-3.11-2.  Actually, I
-rebased after '0e99b15 arm: mvebu: enable two USB interfaces on the
-Armada XP GP board'.  The important thing is that what was rebased is
-*not* in arm-soc, nor has a pending PR for arm-soc.
+BR,
+-R
 
-thx,
-
-Jason.
+>
+> Thanks,
+> Inki Dae
+>
