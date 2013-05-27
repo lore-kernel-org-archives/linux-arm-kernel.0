@@ -1,27 +1,52 @@
 From: list-09_linux_arm@tqsc.de (Markus Niebel)
-Date: Mon, 27 May 2013 10:19:08 +0200
-Subject: [PATCH RESEND v2 0/3] staging: fix parallel display regressions
-Message-ID: <1369642751-15555-1-git-send-email-list-09_linux_arm@tqsc.de>
+Date: Mon, 27 May 2013 10:19:10 +0200
+Subject: [PATCH RESEND v2 2/3] staging: drm/imx: fix spelling error for vsync
+ flag config
+In-Reply-To: <1369642751-15555-1-git-send-email-list-09_linux_arm@tqsc.de>
+References: <1369642751-15555-1-git-send-email-list-09_linux_arm@tqsc.de>
+Message-ID: <1369642751-15555-3-git-send-email-list-09_linux_arm@tqsc.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Niebel <Markus.Niebel@tqs.de>
 
-Support for VGA via TVE on i.MX53 causes regressions, which prevents
-parallel display from working. This series brings the parallel display
-functionality back.
+partial fix of changes from
+"staging: drm/imx: Add support for VGA via TVE on i.MX53"
 
-The updated series was tested with 3.10-rc2 on a TQMa53 module with
-modified device tree.
+Have to check for vsync_pin instead of hsync_pin to set Vsync_pol.
 
-Markus Niebel (3):
-  staging: drm/imx: set correct sync pins for display
-  staging: drm/imx: fix spelling error for vsync flag config
-  staging: drm/imx: revert vsync_cnt for di->id 1
+Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Tested-by: Philipp Zabel <p.zabel@pengutronix.de>
+Tested-by: Rogerio Pimentel <rpimentel.silva@gmail.com>
+---
+Resend:
+  - add Tested-by for Philip and Rogerio
+V2:
+  - no changes in patch
+  - add Acked-by from v1 of patch
 
- drivers/staging/imx-drm/imx-drm-core.c  |    2 +-
- drivers/staging/imx-drm/ipu-v3/ipu-di.c |   13 +++++++++----
- 2 files changed, 10 insertions(+), 5 deletions(-)
+ drivers/staging/imx-drm/ipu-v3/ipu-di.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+index 19d777e..e7b9c98 100644
+--- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
++++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+@@ -614,11 +614,11 @@ int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
+ 				di_gen |= DI_GEN_POLARITY_7;
+ 		}
+ 		if (sig->Vsync_pol) {
+-			if (sig->hsync_pin == 3)
++			if (sig->vsync_pin == 3)
+ 				di_gen |= DI_GEN_POLARITY_3;
+-			else if (sig->hsync_pin == 6)
++			else if (sig->vsync_pin == 6)
+ 				di_gen |= DI_GEN_POLARITY_6;
+-			else if (sig->hsync_pin == 8)
++			else if (sig->vsync_pin == 8)
+ 				di_gen |= DI_GEN_POLARITY_8;
+ 		}
+ 	}
 -- 
 1.7.9.5
