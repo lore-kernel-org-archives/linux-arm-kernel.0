@@ -1,38 +1,54 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 27 May 2013 14:27:15 +0200
-Subject: [PATCH 0/2] ARM: OMAP AM33XX: clock data: Enable clkout2 output
- on SoC pad
-In-Reply-To: <alpine.DEB.2.00.1305200246080.2656@utopia.booyaka.com>
-References: <1367919574-21353-1-git-send-email-hvaibhav@ti.com>
- <79CD15C6BA57404B839C016229A409A83EC8C081@DBDE04.ent.ti.com>
- <alpine.DEB.2.00.1305200246080.2656@utopia.booyaka.com>
-Message-ID: <51A35123.6040600@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 27 May 2013 14:28:39 +0200 (CEST)
+Subject: [RFC PATCHv4 4/6] clocksource: TI-Nspire timer support
+In-Reply-To: <CACRpkda4Qe1e+dkcSgPLf5dcHASvOG=Y=Dvrnv=oGnon+FRzzg@mail.gmail.com>
+References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
+ <1369480087-24786-5-git-send-email-dt.tangr@gmail.com>
+ <CACRpkda4Qe1e+dkcSgPLf5dcHASvOG=Y=Dvrnv=oGnon+FRzzg@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1305271427320.4220@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Paul,
-
-On 05/20/2013 04:47 AM, Paul Walmsley wrote:
-> On Fri, 17 May 2013, Hiremath, Vaibhav wrote:
+On Mon, 27 May 2013, Linus Walleij wrote:
+> > +static void zevio_timer_set_mode(enum clock_event_mode mode,
+> > +               struct clock_event_device *dev)
+> > +{
+> > +       unsigned long flags;
+> > +       struct zevio_timer *timer = container_of(dev,
+> > +                       struct zevio_timer,
+> > +                       clkevt);
+> > +
+> > +       local_irq_save(flags);
+> > +
+> > +       switch (mode) {
+> > +       case CLOCK_EVT_MODE_PERIODIC:
+> > +               /* Unsupported */
+> > +               break;
+> > +       case CLOCK_EVT_MODE_RESUME:
+> > +       case CLOCK_EVT_MODE_ONESHOT:
+> > +               /* Enable timer interrupts */
+> > +               writel(TIMER_INTR_MSK, timer->interrupt_regs + IO_INTR_MSK);
+> > +               writel(TIMER_INTR_ALL, timer->interrupt_regs + IO_INTR_ACK);
+> > +               dev->mode = mode;
+> > +               break;
+> > +       case CLOCK_EVT_MODE_SHUTDOWN:
+> > +       case CLOCK_EVT_MODE_UNUSED:
+> > +               /* Disable timer interrupts */
+> > +               writel(0, timer->interrupt_regs + IO_INTR_MSK);
+> > +               writel(TIMER_INTR_ALL, timer->interrupt_regs + IO_INTR_ACK);
+> > +               /* Stop timer */
+> > +               writel(CNTL_STOP_TIMER, timer->timer1 + IO_CONTROL);
+> > +               dev->mode = mode;
+> > +               break;
+> > +       }
 > 
->> Tony, Paul and Benoit,
->>
->> Any update on this series?
-> 
-> Most of the changes are DT-related, so it should probably go in via 
-> Beno?t.  I'll ack the clock side, but have a comment on patch 2, to be 
-> sent shortly.
+> Surely both the compiler and checkpatch is complaining that this
+> switch does not contain a default: clause?
 
-I've tried to apply that patch, but unfortunately, it does depend on
-that one:
-
-https://patchwork.kernel.org/patch/2212081/
-
-If you did not already pulled the first one I can take both with your
-acked-by.
-Otherwise, I can take only the DTS ones.
-
-Is that OK?
+Well, if you have a switch with an enum, the compiler complains if you
+do not have a case for each enum value and the above has all enum
+values covered AFAICT. :)
 
 Thanks,
-Benoit
+
+	tglx
