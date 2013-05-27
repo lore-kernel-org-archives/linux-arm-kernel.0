@@ -1,32 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 May 2013 08:56:19 +0200
-Subject: [RFC PATCHv4 1/6] arm: TI-Nspire platform code
-In-Reply-To: <3ED6FFF2-89E2-4426-8DDC-10B4E6C79F26@gmail.com>
-References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
- <201305262246.12803.arnd@arndb.de>
- <3ED6FFF2-89E2-4426-8DDC-10B4E6C79F26@gmail.com>
-Message-ID: <201305270856.19456.arnd@arndb.de>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 27 May 2013 10:11:07 +0300
+Subject: [PATCH] dmatest: do not allow to interrupt ongoing tests
+In-Reply-To: <Pine.LNX.4.64.1305242353210.7187@axis700.grange>
+References: <1369308593-3723-1-git-send-email-andriy.shevchenko@linux.intel.com>
+ <Pine.LNX.4.64.1305242353210.7187@axis700.grange>
+Message-ID: <1369638667.29283.197.camel@smile>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 May 2013, Daniel Tang wrote:
+On Fri, 2013-05-24 at 23:55 +0200, Guennadi Liakhovetski wrote: 
+> On Thu, 23 May 2013, Andy Shevchenko wrote:
 > 
-> On 27/05/2013, at 6:46 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > 
-> > 
-> >> +    {
-> >> +            .virtual        =  NSPIRE_PWR_VIRT_BASE,
-> >> +            .pfn            = __phys_to_pfn(NSPIRE_PWR_PHYS_BASE),
-> >> +            .length         = SZ_4K,
-> >> +            .type           = MT_DEVICE
-> >> +    }
-> >> +};
-> > 
-> > And I think this one can be replaced with a call to of_iomap:
+> > When user interrupts ongoing transfers the dmatest may end up with console
+> > lockup, oops, or data mismatch. This patch prevents user to abort any ongoing
+> > test.
 > 
-> Does of_iomap work that early in the boot process?
+> Personally I would be against such a change. What about interrupting the 
+> test with rmmod?
+>  Is it still possible after this your patch or not? If not 
+> - this doesn't seem like a good idea to me. Why don't we just fix those 
+> bugs, that you're describing?
 
-Not from map_io, but soon after. What is the fist place you
-really need it?
+The behaviour of the module is returned to the same page by this patch
+as it was before (w/o debugfs).
 
-	Arnd
+The user can interrupt tests by rmmod, but it will take time up to
+timeout.
+
+I appreciate if you can do a deeper analysis of what happened in
+case Will reported.
+
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
