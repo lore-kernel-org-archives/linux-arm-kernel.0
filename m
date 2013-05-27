@@ -1,33 +1,22 @@
-From: rickard.andersson@stericsson.com (Rickard ANDERSSON)
-Date: Mon, 27 May 2013 13:40:55 +0200
-Subject: [PATCH V2 0/3] mmc: mmci: Support ap_sleep in cpuidle for ux500
-In-Reply-To: <1369302307-28540-1-git-send-email-ulf.hansson@stericsson.com>
-References: <1369302307-28540-1-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <C832F8F5D375BD43BFA11E82E0FE9FE0115A936A54@EXDCVYMBSTM005.EQ1STM.local>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 May 2013 13:44:38 +0200
+Subject: [PATCH] ARM: ux500: select SND_SOC_UX500 for ux500
+In-Reply-To: <1369402093-27817-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1369402093-27817-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <CACRpkdbB7KjzUCf72gqN3ooiWYYkaaPrZUEDeG8HuLk3pTB72A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Rickard Andersson <rickard.andersson@stericsson.com>
+On Fri, May 24, 2013 at 3:28 PM, Fabio Baltieri
+<fabio.baltieri@linaro.org> wrote:
 
------Original Message-----
-From: Ulf HANSSON 
-Sent: den 23 maj 2013 11:45
-To: linux-arm-kernel at lists.infradead.org; Russell King
-Cc: linux-mmc at vger.kernel.org; Chris Ball; Daniel Lezcano; Linus Walleij; Rickard ANDERSSON; Ulf Hansson
-Subject: [PATCH V2 0/3] mmc: mmci: Support ap_sleep in cpuidle for ux500
+> Enable ux500 specific ALSA SoC drivers by default on u8500_defconfig.
+>
+> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 
-From: Ulf Hansson <ulf.hansson@linaro.org>
+Thanks, patch applied to my defconfig branch.
 
-To be able to enter ap_sleep state in cpuidle were the APE power domain regulator will be cut, a register save and restore mechanism needs to be implemented. This patchset adapts to these restrictions.
+Now I can finally use the Snowball board to run sidplay.
 
-Ulf Hansson (3):
-  mmc: mmci: Use optional sleep pinctrl state
-  mmc: mmci: Adapt to register write restrictions
-  mmc: mmci: Save and restore register context
-
- drivers/mmc/host/mmci.c |   75 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/mmc/host/mmci.h |    1 +
- 2 files changed, 76 insertions(+)
-
---
-1.7.10
+Yours,
+Linus Walleij
