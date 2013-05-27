@@ -1,34 +1,38 @@
 From: sanjay.rawat@linaro.org (Sanjay Singh Rawat)
-Date: Mon, 27 May 2013 20:02:37 +0530
-Subject: [PATCH 0/8] ARM: use cpu_do_idle for entering wfi mode
-Message-ID: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
+Date: Mon, 27 May 2013 20:02:38 +0530
+Subject: [PATCH 1/8] ARM: EXYNOS: use generic cpu idle function for wfi
+In-Reply-To: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
+References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
+Message-ID: <1369665166-13049-2-git-send-email-sanjay.rawat@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this patch set we make use of cpu_do_idle to enter WFI mode,
-many platform are not clearing the data buffer before WFI or
-directly using the address instead of opcode. For the rest its good
-to have a common approach.
+use cpu_do_idle for entering the WFI mode.
 
-Sanjay Singh Rawat (8):
-  ARM: EXYNOS: use generic cpu idle function for wfi
-  ARM: RealView: use generic cpu idle function for wfi
-  ARM: SPEAr: use generic cpu idle function for wfi
-  ARM: vexpress: use generic cpu idle function for wfi
-  ARM: zynq: use generic cpu idle function for wfi
-  ARM: ux500: use generic cpu idle function for wfi
-  ARM: msm: use generic cpu idle function for wfi
-  ARM: PRIMA2: use generic cpu idle function for wfi
+Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
+---
+ arch/arm/mach-exynos/hotplug.c |    9 ++-------
+ 1 file changed, 2 insertions(+), 7 deletions(-)
 
- arch/arm/mach-exynos/hotplug.c   |    9 ++-------
- arch/arm/mach-msm/hotplug.c      |    9 ++-------
- arch/arm/mach-prima2/hotplug.c   |    4 ++--
- arch/arm/mach-realview/hotplug.c |    9 ++-------
- arch/arm/mach-spear/hotplug.c    |    3 ++-
- arch/arm/mach-ux500/hotplug.c    |    5 +++--
- arch/arm/mach-vexpress/hotplug.c |    3 ++-
- arch/arm/mach-zynq/hotplug.c     |    4 ++--
- 8 files changed, 17 insertions(+), 29 deletions(-)
-
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index af90cfa..7fcedd8 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -98,13 +98,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ 		if (cpu == 1)
+ 			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
+ 
+-		/*
+-		 * here's the WFI
+-		 */
+-		asm(".word	0xe320f003\n"
+-		    :
+-		    :
+-		    : "memory", "cc");
++		/* enter WFI mode */
++		cpu_do_idle();
+ 
+ 		if (pen_release == cpu_logical_map(cpu)) {
+ 			/*
 -- 
 1.7.9.5
