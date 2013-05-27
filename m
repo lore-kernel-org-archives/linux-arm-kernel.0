@@ -1,75 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 27 May 2013 18:59:27 +0900
-Subject: [PATCH 3/9] ARM: shmobile: r8a7778: fixup Ether setup code position
+Date: Mon, 27 May 2013 18:59:33 +0900
+Subject: [PATCH 9/9] ARM: shmobile: r8a7778: correct model name in Kconfig
 In-Reply-To: <1369648773-7941-1-git-send-email-horms+renesas@verge.net.au>
 References: <1369648773-7941-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1369648773-7941-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1369648773-7941-10-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Ether setup code position was scattering.
-This patch fixes it up
+The correct model name is R-Car M1A or R8A77781; R8A77780 corresponds to R-Car
+M1S which is a SH based SoC.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+[horms+renesas at verge.net.au: manually applied to soc-r8a7778 branch]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7778.c |   28 ++++++++++++++--------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+ arch/arm/mach-shmobile/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 30b4a33..d6ee521 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -80,12 +80,6 @@ static struct sh_timer_config sh_tmu1_platform_data = {
- 	.clocksource_rating	= 200,
- };
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 06da4d3..58eb689 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -36,7 +36,7 @@ config ARCH_R8A7740
+ 	select RENESAS_INTC_IRQPIN
  
--/* Ether */
--static struct resource ether_resources[] = {
--	DEFINE_RES_MEM(0xfde00000, 0x400),
--	DEFINE_RES_IRQ(gic_iid(0x89)),
--};
--
- #define r8a7778_register_tmu(idx)			\
- 	platform_device_register_resndata(		\
- 		&platform_bus, "sh_tmu", idx,		\
-@@ -94,6 +88,20 @@ static struct resource ether_resources[] = {
- 		&sh_tmu##idx##_platform_data,		\
- 		sizeof(sh_tmu##idx##_platform_data))
- 
-+/* Ether */
-+static struct resource ether_resources[] = {
-+	DEFINE_RES_MEM(0xfde00000, 0x400),
-+	DEFINE_RES_IRQ(gic_iid(0x89)),
-+};
-+
-+void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
-+{
-+	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
-+					  ether_resources,
-+					  ARRAY_SIZE(ether_resources),
-+					  pdata, sizeof(*pdata));
-+}
-+
- void __init r8a7778_add_standard_devices(void)
- {
- 	int i;
-@@ -118,14 +126,6 @@ void __init r8a7778_add_standard_devices(void)
- 	r8a7778_register_tmu(1);
- }
- 
--void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
--{
--	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
--					  ether_resources,
--					  ARRAY_SIZE(ether_resources),
--					  pdata, sizeof(*pdata));
--}
--
- static struct renesas_intc_irqpin_config irqpin_platform_data = {
- 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
- 	.sense_bitfield_width = 2,
+ config ARCH_R8A7778
+-	bool "R-Car M1 (R8A77780)"
++	bool "R-Car M1A (R8A77781)"
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select CPU_V7
+ 	select SH_CLK_CPG
 -- 
 1.7.10.4
