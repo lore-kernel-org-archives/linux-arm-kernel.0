@@ -1,41 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 May 2013 15:57:13 +0200
-Subject: [PATCH v3] pinctrl: move subsystem mutex to pinctrl_dev struct
-In-Reply-To: <CAAG0J990rqDdG5WdOrVGqZ9tFgJmnmP18S=c6o9JNygTLHS6=g@mail.gmail.com>
-References: <1366988907-13485-1-git-send-email-linus.walleij@stericsson.com>
- <CAAG0J990rqDdG5WdOrVGqZ9tFgJmnmP18S=c6o9JNygTLHS6=g@mail.gmail.com>
-Message-ID: <CACRpkda4s_Qq-R3wZ0BQSxLWm1udR4Or=h28QdEcwt6BnwEb7A@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 27 May 2013 18:04:37 +0400
+Subject: [PATCH] ARM: shmobile: sh7372 pinmux platform device cleanup
+In-Reply-To: <1369648782-8024-2-git-send-email-horms+renesas@verge.net.au>
+References: <1369648782-8024-1-git-send-email-horms+renesas@verge.net.au>
+ <1369648782-8024-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <51A367F5.5040500@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 5:22 PM, James Hogan <james.hogan@imgtec.com> wrote:
-> On 26 April 2013 16:08, Linus Walleij <linus.walleij@stericsson.com> wrote:
->> @@ -608,7 +610,7 @@ static int pinconf_dbg_config_print(struct seq_file *s, void *d)
->>         bool found = false;
->>         unsigned long config;
->>
->> -       mutex_lock(&pinctrl_mutex);
->> +       mutex_lock(&pctldev->mutex);
->>
->>         /* Parse the pinctrl map and look for the elected pin/state */
->>         for_each_maps(maps_node, i, map) {
+Hello.
+
+On 27-05-2013 13:59, Simon Horman wrote:
+
+> From: Magnus Damm <damm@opensource.se>
+
+> Use DEFINE_RES_MEM() and platform_device_register_simple()
+> to save a couple of lines of code.
+
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>   arch/arm/mach-shmobile/setup-sh7372.c |   24 +++++-------------------
+>   1 file changed, 5 insertions(+), 19 deletions(-)
+
+> diff --git a/arch/arm/mach-shmobile/setup-sh7372.c b/arch/arm/mach-shmobile/setup-sh7372.c
+> index 5502d62..c70a3cc 100644
+> --- a/arch/arm/mach-shmobile/setup-sh7372.c
+> +++ b/arch/arm/mach-shmobile/setup-sh7372.c
+> @@ -62,29 +62,15 @@ void __init sh7372_map_io(void)
+[...]
+> +static const struct resource pfc_resources[] = {
+
+    This should have been annotated with __initdata... too late now, 
+need another patch.
+
+> +	DEFINE_RES_MEM(0xe6050000, 0x8000),
+> +	DEFINE_RES_MEM(0xe605800c, 0x001c),
+>   };
 >
-> This change causes an oops on v3.10-rc2 when you read pinconf-config
-> because pctldev is initialised to NULL and not set until inside the
-> loop.
+>   void __init sh7372_pinmux_init(void)
+>   {
+> -	platform_device_register(&sh7372_pfc_device);
+> +	platform_device_register_simple("pfc-sh7372", -1, pfc_resources,
+> +					ARRAY_SIZE(pfc_resources));
+>   }
 
-It is taking the wrong mutex. The function right below it is
-also iterating the maps, and then it shall take the maps
-mutex and nothing else.
-
-I just sent a patch fixing it up.
-
-> If this debugfs file
-> isn't meant to be specific to a pinctrl device should it be in the
-> root pinctrl directory instead of in each pinctrl device's directory?
-
-Yes. We need to fix this after this immediate fixup, for the next
-merge window.
-
-Yours,
-Linus Walleij
+WBR, Sergei
