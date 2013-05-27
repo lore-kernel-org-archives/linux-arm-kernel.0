@@ -1,129 +1,87 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 27 May 2013 17:59:51 +0900
-Subject: [PATCH 10/12] ARM: shmobile: r8a7740: Add CPUIdle
-In-Reply-To: <1369645193-3595-1-git-send-email-horms+renesas@verge.net.au>
-References: <1369645193-3595-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1369645193-3595-11-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 27 May 2013 18:00:20 +0900
+Subject: [PATCH 3/7] ARM: shmobile: r8a7790: add div6 clocks
+In-Reply-To: <1369645224-3728-1-git-send-email-horms+renesas@verge.net.au>
+References: <1369645224-3728-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1369645224-3728-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bastian Hecht <hechtb@gmail.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-We make use of the r8a7740 Suspend To Ram code to plug together a
-CPUIdle driver.
+DIV6 clocks control SD*/MMC* core clocks.
 
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Makefile               |    2 +-
- arch/arm/mach-shmobile/cpuidle-r8a7740.c      |   62 +++++++++++++++++++++++++
- arch/arm/mach-shmobile/include/mach/r8a7740.h |    1 +
- arch/arm/mach-shmobile/pm-r8a7740.c           |    1 +
- 4 files changed, 65 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-shmobile/cpuidle-r8a7740.c
+ arch/arm/mach-shmobile/clock-r8a7790.c |   34 ++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 0568894..2852dcf 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -30,7 +30,7 @@ obj-$(CONFIG_SUSPEND)		+= suspend.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- obj-$(CONFIG_ARCH_SHMOBILE)	+= pm-rmobile.o
- obj-$(CONFIG_ARCH_SH7372)	+= pm-sh7372.o sleep-sh7372.o
--obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o sleep-r8a7740.o
-+obj-$(CONFIG_ARCH_R8A7740)	+= pm-r8a7740.o sleep-r8a7740.o cpuidle-r8a7740.o
- obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
- obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index c85e643..a481003 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -52,6 +52,12 @@
  
-diff --git a/arch/arm/mach-shmobile/cpuidle-r8a7740.c b/arch/arm/mach-shmobile/cpuidle-r8a7740.c
-new file mode 100644
-index 0000000..48c7a6c
---- /dev/null
-+++ b/arch/arm/mach-shmobile/cpuidle-r8a7740.c
-@@ -0,0 +1,62 @@
-+/*
-+ * CPUIdle code for SoC r8a7740
-+ *
-+ * Copyright (C) 2013 Bastian Hecht
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+#include <linux/cpuidle.h>
-+#include <linux/module.h>
-+#include <asm/cpuidle.h>
-+#include <mach/common.h>
-+#include <mach/r8a7740.h>
-+
-+#if defined(CONFIG_SUSPEND) && defined(CONFIG_CPU_IDLE)
-+static int r8a7740_enter_a3sm_pll_on(struct cpuidle_device *dev,
-+					struct cpuidle_driver *drv, int index)
-+{
-+	r8a7740_enter_a3sm_common(1);
-+	return 1;
-+}
-+
-+static int r8a7740_enter_a3sm_pll_off(struct cpuidle_device *dev,
-+					struct cpuidle_driver *drv, int index)
-+{
-+	r8a7740_enter_a3sm_common(0);
-+	return 2;
-+}
-+
-+static struct cpuidle_driver r8a7740_cpuidle_driver = {
-+	.name			= "r8a7740_cpuidle",
-+	.owner			= THIS_MODULE,
-+	.en_core_tk_irqen	= 1,
-+	.state_count		= 3,
-+	.safe_state_index	= 0, /* C1 */
-+	.states[0] = ARM_CPUIDLE_WFI_STATE,
-+	.states[1] = {
-+		.name = "C2",
-+		.desc = "A3SM PLL ON",
-+		.exit_latency = 40,
-+		.target_residency = 30 + 40,
-+		.flags = CPUIDLE_FLAG_TIME_VALID,
-+		.enter = r8a7740_enter_a3sm_pll_on,
-+	},
-+	.states[2] = {
-+		.name = "C3",
-+		.desc = "A3SM PLL OFF",
-+		.exit_latency = 120,
-+		.target_residency = 30 + 120,
-+		.flags = CPUIDLE_FLAG_TIME_VALID,
-+		.enter = r8a7740_enter_a3sm_pll_off,
-+	},
+ #define MODEMR		0xE6160060
+ #define SDCKCR		0xE6150074
++#define SD2CKCR		0xE6150078
++#define SD3CKCR		0xE615007C
++#define MMC0CKCR	0xE6150240
++#define MMC1CKCR	0xE6150244
++#define SSPCKCR		0xE6150248
++#define SSPRSCKCR	0xE615024C
+ 
+ static struct clk_mapping cpg_mapping = {
+ 	.phys   = CPG_BASE,
+@@ -154,6 +160,23 @@ struct clk div4_clks[DIV4_NR] = {
+ 	[DIV4_SD1] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 0, 0x1de0, CLK_ENABLE_ON_INIT),
+ };
+ 
++/* DIV6 clocks */
++enum {
++	DIV6_SD2, DIV6_SD3,
++	DIV6_MMC0, DIV6_MMC1,
++	DIV6_SSP, DIV6_SSPRS,
++	DIV6_NR
 +};
 +
-+void r8a7740_cpuidle_init(void)
-+{
-+	shmobile_cpuidle_set_driver(&r8a7740_cpuidle_driver);
-+}
-+#else
-+void r8a7740_cpuidle_init(void) {}
-+#endif
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7740.h b/arch/arm/mach-shmobile/include/mach/r8a7740.h
-index 5cfe5d9..3b538e3 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7740.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7740.h
-@@ -545,6 +545,7 @@ extern void r8a7740_pinmux_init(void);
- extern void r8a7740_pm_init(void);
- extern void r8a7740_resume(void);
- extern void r8a7740_shutdown(void);
-+extern void r8a7740_cpuidle_init(void);
- extern void r8a7740_enter_a3sm_common(int);
++static struct clk div6_clks[DIV6_NR] = {
++	[DIV6_SD2]	= SH_CLK_DIV6(&pll1_div2_clk, SD2CKCR, 0),
++	[DIV6_SD3]	= SH_CLK_DIV6(&pll1_div2_clk, SD3CKCR, 0),
++	[DIV6_MMC0]	= SH_CLK_DIV6(&pll1_div2_clk, MMC0CKCR, 0),
++	[DIV6_MMC1]	= SH_CLK_DIV6(&pll1_div2_clk, MMC1CKCR, 0),
++	[DIV6_SSP]	= SH_CLK_DIV6(&pll1_div2_clk, SSPCKCR, 0),
++	[DIV6_SSPRS]	= SH_CLK_DIV6(&pll1_div2_clk, SSPRSCKCR, 0),
++};
++
+ /* MSTP */
+ enum { MSTP721, MSTP720,
+ 	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202, MSTP_NR };
+@@ -202,6 +225,14 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("sd0",		&div4_clks[DIV4_SD0]),
+ 	CLKDEV_CON_ID("sd1",		&div4_clks[DIV4_SD1]),
  
- #ifdef CONFIG_PM
-diff --git a/arch/arm/mach-shmobile/pm-r8a7740.c b/arch/arm/mach-shmobile/pm-r8a7740.c
-index fe3c867..2f196bd 100644
---- a/arch/arm/mach-shmobile/pm-r8a7740.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7740.c
-@@ -237,4 +237,5 @@ static void r8a7740_suspend_init(void) {}
- void __init r8a7740_pm_init(void)
- {
- 	r8a7740_suspend_init();
-+	r8a7740_cpuidle_init();
- }
++	/* DIV6 */
++	CLKDEV_CON_ID("sd2",		&div6_clks[DIV6_SD2]),
++	CLKDEV_CON_ID("sd3",		&div6_clks[DIV6_SD3]),
++	CLKDEV_CON_ID("mmc0",		&div6_clks[DIV6_MMC0]),
++	CLKDEV_CON_ID("mmc1",		&div6_clks[DIV6_MMC1]),
++	CLKDEV_CON_ID("ssp",		&div6_clks[DIV6_SSP]),
++	CLKDEV_CON_ID("ssprs",		&div6_clks[DIV6_SSPRS]),
++
+ 	/* MSTP */
+ 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
+ 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
+@@ -265,6 +296,9 @@ void __init r8a7790_clock_init(void)
+ 		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
+ 
+ 	if (!ret)
++		ret = sh_clk_div6_register(div6_clks, DIV6_NR);
++
++	if (!ret)
+ 		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
+ 
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
 -- 
 1.7.10.4
