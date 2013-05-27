@@ -1,42 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 May 2013 12:04:53 +0200
-Subject: [linux-sunxi] [PATCHv2 1/6] i2c: sunxi: Add Allwinner A1X i2c
- driver
-In-Reply-To: <51A25C21.2060700@schinagl.nl>
-References: <1369563642-4390-1-git-send-email-maxime.ripard@free-electrons.com>
- <1369563642-4390-2-git-send-email-maxime.ripard@free-electrons.com>
- <51A1E9AA.4000008@schinagl.nl> <20130526132120.GJ17847@lukather>
- <51A25C21.2060700@schinagl.nl>
-Message-ID: <20130527100453.GM17847@lukather>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 27 May 2013 18:04:21 +0800
+Subject: [PATCH] arm64: kernel: compiling issue,
+ need 'EXPORT_SYMBOL(clear_page)'
+In-Reply-To: <5199CCF9.4030305@asianux.com>
+References: <5199CCF9.4030305@asianux.com>
+Message-ID: <51A32FA5.3080200@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oliver,
+Hello Maintainers:
 
-On Sun, May 26, 2013 at 09:01:53PM +0200, Oliver Schinagl wrote:
-> On 05/26/13 15:21, Maxime Ripard wrote:
-> >For the iowrite* vs write*, there's no consensus, and as such no
-> >preferred way. write* functions are doing an MMIO only access,
-> >while iowrite functions can do MMIO and port I/O accesses.
-> >
-> >Note that it doesn't change anything on ARM, since there's no port IO on
-> >ARM.
-> Ah I see, missinformation on my end. Sorry.
+Please help check this patch whether OK, when you have time.
+
+
+Thanks.
+
+On 05/20/2013 03:12 PM, Chen Gang wrote:
 > 
-> But why write 32 bits? The register is only 8 wide, with the rest
-> being 'reserved'. Then again, the register IS 32 bits wide and
-> probably will haev 32 bits written to it? Correct?
+> Need 'EXPORT_SYMBOL(clear_page)' if building with allmodconfig.
+> 
+> The related errors:
+>   ERROR: "clear_page" [fs/ocfs2/dlm/ocfs2_dlm.ko] undefined!
+>   ERROR: "clear_page" [fs/ntfs/ntfs.ko] undefined!
+>   ERROR: "clear_page" [fs/gfs2/gfs2.ko] undefined!
+>   ERROR: "clear_page" [fs/fuse/fuse.ko] undefined!
+>   ERROR: "clear_page" [fs/ext3/ext3.ko] undefined!
+>   ERROR: "clear_page" [fs/ext2/ext2.ko] undefined!
+>   ERROR: "clear_page" [fs/exofs/libore.ko] undefined!
+>   ERROR: "clear_page" [fs/exofs/exofs.ko] undefined!
+>   ERROR: "clear_page" [drivers/block/brd.ko] undefined!
+> 
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm64/kernel/arm64ksyms.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
+> index 7df1aad..41b4f62 100644
+> --- a/arch/arm64/kernel/arm64ksyms.c
+> +++ b/arch/arm64/kernel/arm64ksyms.c
+> @@ -34,6 +34,7 @@ EXPORT_SYMBOL(__strnlen_user);
+>  EXPORT_SYMBOL(__strncpy_from_user);
+>  
+>  EXPORT_SYMBOL(copy_page);
+> +EXPORT_SYMBOL(clear_page);
+>  
+>  EXPORT_SYMBOL(__copy_from_user);
+>  EXPORT_SYMBOL(__copy_to_user);
+> 
 
-Yes, the register is 32 bits wide. However, and I didn't noticed it at
-first, that all the registers have the 3 upper bytes reserved.
-
-But you'll end up writing a 32 bits value to a 32 bit register register
-anyway, even if the relevant information is contained in the 8 first
-bits.
-
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Chen Gang
+
+Asianux Corporation
