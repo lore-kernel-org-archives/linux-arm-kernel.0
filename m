@@ -1,29 +1,98 @@
 From: philippe.begnic.st@gmail.com (Philippe Begnic)
-Date: Mon, 27 May 2013 14:41:28 +0200
-Subject: [PATCH 0/4] clk, mfd: u8540 clock tree definition
-Message-ID: <1369658492-31358-1-git-send-email-philippe.begnic.st@gmail.com>
+Date: Mon, 27 May 2013 14:41:29 +0200
+Subject: [PATCH 1/4] clk: ux500: Pass clock base adresses in initcall for
+ u8540 and u9540
+In-Reply-To: <1369658492-31358-1-git-send-email-philippe.begnic.st@gmail.com>
+References: <1369658492-31358-1-git-send-email-philippe.begnic.st@gmail.com>
+Message-ID: <1369658492-31358-2-git-send-email-philippe.begnic.st@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Philippe Begnic <philippe.begnic@st.com>
 
-Create U8540 clock tree definitions for common clock framework
+Align on u8500 version, pass clock base address in clk_init functions
+for u8540 and u9540.
 
-Philippe Begnic (4):
-  clk: ux500: Pass clock base adresses in initcall for u8540 and u9540
-  mfd: db8500: Update register definition for u8540 clock
-  mfd: db8500: Update BML clock register for db8580
-  clk: ux500: Clocks definition for u8540
+Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+Signed-off-by: Philippe Begnic <philippe.begnic@st.com>
+---
+ arch/arm/mach-ux500/cpu.c               |    6 ++++--
+ drivers/clk/ux500/u8540_clk.c           |    4 ++--
+ drivers/clk/ux500/u9540_clk.c           |    4 ++--
+ include/linux/platform_data/clk-ux500.h |    6 ++++--
+ 4 files changed, 12 insertions(+), 8 deletions(-)
 
- arch/arm/mach-ux500/cpu.c                 |    6 +-
- drivers/clk/ux500/u8540_clk.c             |  564 ++++++++++++++++++++++++++++-
- drivers/clk/ux500/u9540_clk.c             |    4 +-
- drivers/mfd/db8500-prcmu.c                |    1 +
- drivers/mfd/dbx500-prcmu-regs.h           |    1 +
- include/linux/mfd/abx500/ab8500-sysctrl.h |    4 +-
- include/linux/mfd/dbx500-prcmu.h          |   12 +
- include/linux/platform_data/clk-ux500.h   |    6 +-
- 8 files changed, 587 insertions(+), 11 deletions(-)
-
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index b6145ea..e6fb023 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -76,13 +76,15 @@ void __init ux500_init_irq(void)
+ 	} else if (cpu_is_u9540()) {
+ 		prcmu_early_init(U8500_PRCMU_BASE, SZ_8K - 1);
+ 		ux500_pm_init(U8500_PRCMU_BASE, SZ_8K - 1);
+-		u8500_clk_init(U8500_CLKRST1_BASE, U8500_CLKRST2_BASE,
++		u9540_clk_init(U8500_CLKRST1_BASE, U8500_CLKRST2_BASE,
+ 			       U8500_CLKRST3_BASE, U8500_CLKRST5_BASE,
+ 			       U8500_CLKRST6_BASE);
+ 	} else if (cpu_is_u8540()) {
+ 		prcmu_early_init(U8500_PRCMU_BASE, SZ_8K + SZ_4K - 1);
+ 		ux500_pm_init(U8500_PRCMU_BASE, SZ_8K + SZ_4K - 1);
+-		u8540_clk_init();
++		u8540_clk_init(U8500_CLKRST1_BASE, U8500_CLKRST2_BASE,
++			       U8500_CLKRST3_BASE, U8500_CLKRST5_BASE,
++			       U8500_CLKRST6_BASE);
+ 	}
+ }
+ 
+diff --git a/drivers/clk/ux500/u8540_clk.c b/drivers/clk/ux500/u8540_clk.c
+index 10adfd2..90f3c88 100644
+--- a/drivers/clk/ux500/u8540_clk.c
++++ b/drivers/clk/ux500/u8540_clk.c
+@@ -12,10 +12,10 @@
+ #include <linux/clk-provider.h>
+ #include <linux/mfd/dbx500-prcmu.h>
+ #include <linux/platform_data/clk-ux500.h>
+-
+ #include "clk.h"
+ 
+-void u8540_clk_init(void)
++void u8540_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
++		    u32 clkrst5_base, u32 clkrst6_base)
+ {
+ 	/* register clocks here */
+ }
+diff --git a/drivers/clk/ux500/u9540_clk.c b/drivers/clk/ux500/u9540_clk.c
+index dbc0191..4479478 100644
+--- a/drivers/clk/ux500/u9540_clk.c
++++ b/drivers/clk/ux500/u9540_clk.c
+@@ -12,10 +12,10 @@
+ #include <linux/clk-provider.h>
+ #include <linux/mfd/dbx500-prcmu.h>
+ #include <linux/platform_data/clk-ux500.h>
+-
+ #include "clk.h"
+ 
+-void u9540_clk_init(void)
++void u9540_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
++		    u32 clkrst5_base, u32 clkrst6_base)
+ {
+ 	/* register clocks here */
+ }
+diff --git a/include/linux/platform_data/clk-ux500.h b/include/linux/platform_data/clk-ux500.h
+index 320d9c3..9d98f3a 100644
+--- a/include/linux/platform_data/clk-ux500.h
++++ b/include/linux/platform_data/clk-ux500.h
+@@ -12,7 +12,9 @@
+ 
+ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+ 		    u32 clkrst5_base, u32 clkrst6_base);
+-void u9540_clk_init(void);
+-void u8540_clk_init(void);
++void u9540_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
++		    u32 clkrst5_base, u32 clkrst6_base);
++void u8540_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
++		    u32 clkrst5_base, u32 clkrst6_base);
+ 
+ #endif /* __CLK_UX500_H */
 -- 
 1.7.9.5
