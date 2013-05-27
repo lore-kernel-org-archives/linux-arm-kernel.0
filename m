@@ -1,27 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 May 2013 13:35:40 +0200
-Subject: [PATCH 6/6] ARM: ux500: Enable support for UHS-I SD-cards
-In-Reply-To: <1369314830-3727-7-git-send-email-ulf.hansson@stericsson.com>
-References: <1369314830-3727-1-git-send-email-ulf.hansson@stericsson.com>
- <1369314830-3727-7-git-send-email-ulf.hansson@stericsson.com>
-Message-ID: <CACRpkdaNLreLPfCRC6e=2kJ9NXMkNp_V_PEsirMFa+UvztHS5Q@mail.gmail.com>
+Date: Mon, 27 May 2013 13:37:37 +0200
+Subject: [PATCH] ARM: ux500: Provide supplies for AUX1, AUX2 and AUX3
+In-Reply-To: <1369394539-3713-1-git-send-email-lee.jones@linaro.org>
+References: <1369394539-3713-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZGHNG0uG+vicpQEQ0y61bAM0FTg-wMrZ3SbsW2Owf0PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 3:13 PM, Ulf Hansson <ulf.hansson@stericsson.com> wrote:
+On Fri, May 24, 2013 at 1:22 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> From: Ulf Hansson <ulf.hansson@linaro.org>
+> This patch fixes a bug introduced in the v3.10 merge window.
 >
-> By setting the host capabilities MMC_CAP_UHS_SDR12|25 for
-> the SD card device we enable support for UHS cards. The
-> supported mode is SDR12 and SDR25.
+> The AB8500 External Regulator driver has recently landed upstream,
+> which registers each of the 3 external regulators located on the
+> AB8500. If these regulators are marked as 'always on', there is a
+> potential for power-loss. If they're not and are seemingly unused
+> the Regulator subsystem will attempt to disable them to save power.
+> This causes an issue for AUX1, AUX2 and AUX3 as they obtain their
+> power from EXT3. So we're specifying that here to prevent EXT3 from
+> being powered down.
 >
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Patch applied for ux500-core.
-
-On the DT boot path this patch has the same problems
-and comments as patches 3,4,5.
+Applied for ux500-fixes, thanks!
 
 Yours,
 Linus Walleij
