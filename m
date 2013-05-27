@@ -1,98 +1,38 @@
-From: philippe.begnic.st@gmail.com (Philippe Begnic)
-Date: Mon, 27 May 2013 14:41:29 +0200
-Subject: [PATCH 1/4] clk: ux500: Pass clock base adresses in initcall for
- u8540 and u9540
-In-Reply-To: <1369658492-31358-1-git-send-email-philippe.begnic.st@gmail.com>
-References: <1369658492-31358-1-git-send-email-philippe.begnic.st@gmail.com>
-Message-ID: <1369658492-31358-2-git-send-email-philippe.begnic.st@gmail.com>
+From: ulf.hansson@stericsson.com (Ulf Hansson)
+Date: Mon, 27 May 2013 14:41:55 +0200
+Subject: [PATCH] ARM: u300: Update MMC configs for u300 defconfig
+Message-ID: <1369658515-18774-1-git-send-email-ulf.hansson@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philippe Begnic <philippe.begnic@st.com>
+From: Ulf Hansson <ulf.hansson@linaro.org>
 
-Align on u8500 version, pass clock base address in clk_init functions
-for u8540 and u9540.
+Enable MMC_UNSAFE_RESUME to be accomplish a proper suspend/resume cycle
+for SD/SDIO/(e)MMC.
 
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
-Signed-off-by: Philippe Begnic <philippe.begnic@st.com>
+ARMMMCI host driver supports clock gating through runtime PM, thus
+MMC_CLKGATE is not needed. Moreover ARMMMCI can do scatter-gather which
+means we can explicity disable MMC_BLOCK_BOUNCE, since it's default
+enabled, to skip unnecessary bounce buffer copying.
+
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- arch/arm/mach-ux500/cpu.c               |    6 ++++--
- drivers/clk/ux500/u8540_clk.c           |    4 ++--
- drivers/clk/ux500/u9540_clk.c           |    4 ++--
- include/linux/platform_data/clk-ux500.h |    6 ++++--
- 4 files changed, 12 insertions(+), 8 deletions(-)
+ arch/arm/configs/u300_defconfig |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index b6145ea..e6fb023 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -76,13 +76,15 @@ void __init ux500_init_irq(void)
- 	} else if (cpu_is_u9540()) {
- 		prcmu_early_init(U8500_PRCMU_BASE, SZ_8K - 1);
- 		ux500_pm_init(U8500_PRCMU_BASE, SZ_8K - 1);
--		u8500_clk_init(U8500_CLKRST1_BASE, U8500_CLKRST2_BASE,
-+		u9540_clk_init(U8500_CLKRST1_BASE, U8500_CLKRST2_BASE,
- 			       U8500_CLKRST3_BASE, U8500_CLKRST5_BASE,
- 			       U8500_CLKRST6_BASE);
- 	} else if (cpu_is_u8540()) {
- 		prcmu_early_init(U8500_PRCMU_BASE, SZ_8K + SZ_4K - 1);
- 		ux500_pm_init(U8500_PRCMU_BASE, SZ_8K + SZ_4K - 1);
--		u8540_clk_init();
-+		u8540_clk_init(U8500_CLKRST1_BASE, U8500_CLKRST2_BASE,
-+			       U8500_CLKRST3_BASE, U8500_CLKRST5_BASE,
-+			       U8500_CLKRST6_BASE);
- 	}
- }
- 
-diff --git a/drivers/clk/ux500/u8540_clk.c b/drivers/clk/ux500/u8540_clk.c
-index 10adfd2..90f3c88 100644
---- a/drivers/clk/ux500/u8540_clk.c
-+++ b/drivers/clk/ux500/u8540_clk.c
-@@ -12,10 +12,10 @@
- #include <linux/clk-provider.h>
- #include <linux/mfd/dbx500-prcmu.h>
- #include <linux/platform_data/clk-ux500.h>
--
- #include "clk.h"
- 
--void u8540_clk_init(void)
-+void u8540_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
-+		    u32 clkrst5_base, u32 clkrst6_base)
- {
- 	/* register clocks here */
- }
-diff --git a/drivers/clk/ux500/u9540_clk.c b/drivers/clk/ux500/u9540_clk.c
-index dbc0191..4479478 100644
---- a/drivers/clk/ux500/u9540_clk.c
-+++ b/drivers/clk/ux500/u9540_clk.c
-@@ -12,10 +12,10 @@
- #include <linux/clk-provider.h>
- #include <linux/mfd/dbx500-prcmu.h>
- #include <linux/platform_data/clk-ux500.h>
--
- #include "clk.h"
- 
--void u9540_clk_init(void)
-+void u9540_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
-+		    u32 clkrst5_base, u32 clkrst6_base)
- {
- 	/* register clocks here */
- }
-diff --git a/include/linux/platform_data/clk-ux500.h b/include/linux/platform_data/clk-ux500.h
-index 320d9c3..9d98f3a 100644
---- a/include/linux/platform_data/clk-ux500.h
-+++ b/include/linux/platform_data/clk-ux500.h
-@@ -12,7 +12,9 @@
- 
- void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
- 		    u32 clkrst5_base, u32 clkrst6_base);
--void u9540_clk_init(void);
--void u8540_clk_init(void);
-+void u9540_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
-+		    u32 clkrst5_base, u32 clkrst6_base);
-+void u8540_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
-+		    u32 clkrst5_base, u32 clkrst6_base);
- 
- #endif /* __CLK_UX500_H */
+diff --git a/arch/arm/configs/u300_defconfig b/arch/arm/configs/u300_defconfig
+index a5fa0d9..fd81a1b 100644
+--- a/arch/arm/configs/u300_defconfig
++++ b/arch/arm/configs/u300_defconfig
+@@ -49,7 +49,8 @@ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
+ # CONFIG_USB_SUPPORT is not set
+ CONFIG_MMC=y
+-CONFIG_MMC_CLKGATE=y
++CONFIG_MMC_UNSAFE_RESUME=y
++# CONFIG_MMC_BLOCK_BOUNCE is not set
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_RTC_CLASS=y
+ # CONFIG_RTC_HCTOSYS is not set
 -- 
-1.7.9.5
+1.7.10
