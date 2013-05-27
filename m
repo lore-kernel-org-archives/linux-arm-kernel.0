@@ -1,86 +1,42 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Mon, 27 May 2013 18:02:40 +0800
-Subject: [PATCH v2] arm64: kernel: compiling issue,
- need delete read_current_timer().
-In-Reply-To: <519B425D.4030806@asianux.com>
-References: <5199C725.8050102@asianux.com>
- <168084c28e8ba5124c05553e97463172@localhost>
- <20130520095606.GH31359@mudshark.cambridge.arm.com>
- <519AF2DC.2040200@asianux.com>
- <20130521085325.GB10453@mudshark.cambridge.arm.com>
- <519B425D.4030806@asianux.com>
-Message-ID: <51A32F40.1050309@asianux.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 27 May 2013 12:04:53 +0200
+Subject: [linux-sunxi] [PATCHv2 1/6] i2c: sunxi: Add Allwinner A1X i2c
+ driver
+In-Reply-To: <51A25C21.2060700@schinagl.nl>
+References: <1369563642-4390-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1369563642-4390-2-git-send-email-maxime.ripard@free-electrons.com>
+ <51A1E9AA.4000008@schinagl.nl> <20130526132120.GJ17847@lukather>
+ <51A25C21.2060700@schinagl.nl>
+Message-ID: <20130527100453.GM17847@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maintainers:
+Hi Oliver,
 
-Please help check this patch whether OK, when you have time.
+On Sun, May 26, 2013 at 09:01:53PM +0200, Oliver Schinagl wrote:
+> On 05/26/13 15:21, Maxime Ripard wrote:
+> >For the iowrite* vs write*, there's no consensus, and as such no
+> >preferred way. write* functions are doing an MMIO only access,
+> >while iowrite functions can do MMIO and port I/O accesses.
+> >
+> >Note that it doesn't change anything on ARM, since there's no port IO on
+> >ARM.
+> Ah I see, missinformation on my end. Sorry.
+> 
+> But why write 32 bits? The register is only 8 wide, with the rest
+> being 'reserved'. Then again, the register IS 32 bits wide and
+> probably will haev 32 bits written to it? Correct?
 
-Thanks.
+Yes, the register is 32 bits wide. However, and I didn't noticed it at
+first, that all the registers have the 3 upper bytes reserved.
 
-On 05/21/2013 05:46 PM, Chen Gang wrote:
-> 
-> Under arm64, we will calibrate the delay loop statically using a known
-> timer frequency, so delete read_current_timer(), or it will cause
-> compiling issue with allmodconfig.
-> 
-> The related error:
->   ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
->   ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
->   ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
->   ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
-> 
-> 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm64/include/asm/timex.h |    6 +++---
->  arch/arm64/kernel/time.c       |    6 ------
->  2 files changed, 3 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/timex.h b/arch/arm64/include/asm/timex.h
-> index b24a31a..81a076e 100644
-> --- a/arch/arm64/include/asm/timex.h
-> +++ b/arch/arm64/include/asm/timex.h
-> @@ -16,14 +16,14 @@
->  #ifndef __ASM_TIMEX_H
->  #define __ASM_TIMEX_H
->  
-> +#include <asm/arch_timer.h>
-> +
->  /*
->   * Use the current timer as a cycle counter since this is what we use for
->   * the delay loop.
->   */
-> -#define get_cycles()	({ cycles_t c; read_current_timer(&c); c; })
-> +#define get_cycles()	arch_counter_get_cntvct()
->  
->  #include <asm-generic/timex.h>
->  
-> -#define ARCH_HAS_READ_CURRENT_TIMER
-> -
->  #endif
-> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-> index a551f88..03dc371 100644
-> --- a/arch/arm64/kernel/time.c
-> +++ b/arch/arm64/kernel/time.c
-> @@ -68,12 +68,6 @@ unsigned long long notrace sched_clock(void)
->  	return arch_timer_read_counter() * sched_clock_mult;
->  }
->  
-> -int read_current_timer(unsigned long *timer_value)
-> -{
-> -	*timer_value = arch_timer_read_counter();
-> -	return 0;
-> -}
-> -
->  void __init time_init(void)
->  {
->  	u32 arch_timer_rate;
-> 
+But you'll end up writing a 32 bits value to a 32 bit register register
+anyway, even if the relevant information is contained in the 8 first
+bits.
 
+Maxime
 
 -- 
-Chen Gang
-
-Asianux Corporation
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
