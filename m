@@ -1,45 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 27 May 2013 18:00:49 +0900
-Subject: [PATCH 5/8] ARM: shmobile: sh73a0: Remove init_irq declaration in
- machine description
-In-Reply-To: <1369645252-3847-1-git-send-email-horms+renesas@verge.net.au>
-References: <1369645252-3847-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1369645252-3847-6-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 27 May 2013 18:00:24 +0900
+Subject: [PATCH 7/7] ARM: shmobile: clock-r8a7790: add TPU PWM support
+In-Reply-To: <1369645224-3728-1-git-send-email-horms+renesas@verge.net.au>
+References: <1369645224-3728-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1369645224-3728-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
-specified") removed the need to explictly setup the init_irq field in
-the machine description when using only irqchip_init. Remove that
-declaration for shmobile as well.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-sh73a0.c |    2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a7790.c |   11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index cd81832..9986515 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -22,7 +22,6 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
--#include <linux/irqchip.h>
- #include <linux/platform_device.h>
- #include <linux/of_platform.h>
- #include <linux/delay.h>
-@@ -974,7 +973,6 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
- 	.map_io		= sh73a0_map_io,
- 	.init_early	= sh73a0_init_delay,
- 	.nr_irqs	= NR_IRQS_LEGACY,
--	.init_irq	= irqchip_init,
- 	.init_machine	= sh73a0_add_standard_devices_dt,
- 	.dt_compat	= sh73a0_boards_compat_dt,
- MACHINE_END
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index bedd20c..b393592 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -48,6 +48,7 @@
+ #define CPG_LEN 0x1000
+ 
+ #define SMSTPCR2 0xe6150138
++#define SMSTPCR3 0xe615013c
+ #define SMSTPCR7 0xe615014c
+ 
+ #define MODEMR		0xE6160060
+@@ -178,11 +179,17 @@ static struct clk div6_clks[DIV6_NR] = {
+ };
+ 
+ /* MSTP */
+-enum { MSTP721, MSTP720,
+-	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202, MSTP_NR };
++enum {
++	MSTP721, MSTP720,
++	MSTP304,
++	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202,
++	MSTP_NR
++};
++
+ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
+ 	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
++	[MSTP304] = SH_CLK_MSTP32(&cp_clk, SMSTPCR3, 4, 0), /* TPU0 */
+ 	[MSTP216] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 16, 0), /* SCIFB2 */
+ 	[MSTP207] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 7, 0), /* SCIFB1 */
+ 	[MSTP206] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 6, 0), /* SCIFB0 */
 -- 
 1.7.10.4
