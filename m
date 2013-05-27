@@ -1,32 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 May 2013 12:32:03 +0200
-Subject: [RFC PATCHv4 0/6] arm: Initial TI-Nspire support
-In-Reply-To: <30BA4666-664F-4DA4-A1D5-C2B8AA63C6AB@gmail.com>
-References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
- <201305262323.29519.arnd@arndb.de>
- <30BA4666-664F-4DA4-A1D5-C2B8AA63C6AB@gmail.com>
-Message-ID: <201305271232.03644.arnd@arndb.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 27 May 2013 12:37:15 +0200
+Subject: [PATCH v2] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
+In-Reply-To: <20130527080909.GB2919@ludovic.desroches@atmel.com>
+References: <1369467542-25519-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <20130525200557.GO24476@game.jcrosoft.org>
+ <20130527080909.GB2919@ludovic.desroches@atmel.com>
+Message-ID: <51A3375B.3090205@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 May 2013, Daniel Tang wrote:
-> > On Saturday 25 May 2013, Daniel Tang wrote:
+On 27/05/2013 10:09, Ludovic Desroches wrote:
+> On Sat, May 25, 2013 at 10:05:57PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> On 09:39 Sat 25 May     , Alexandre Belloni wrote:
+>>> Fixes:
+>>> arch/arm/mach-at91/built-in.o: In function `ksz9021rn_phy_fixup':
+>>> :(.text+0x1174): undefined reference to `mdiobus_write'
+>>> :(.text+0x1188): undefined reference to `mdiobus_write'
+>>> :(.text+0x119c): undefined reference to `mdiobus_write'
+>>> :(.text+0x11b0): undefined reference to `mdiobus_write'
+>>> arch/arm/mach-at91/built-in.o: In function `sama5_dt_device_init':
+>>> :(.init.text+0x1e34): undefined reference to `phy_register_fixup_for_uid'
+>>>
+>>> when CONFIG_PHYLIB is not selected.
+> Signed-off-by missing.
+>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>
 
-> > The one remaining bit that sticks out is the clcd platform data. As I
-> > said before, I won't require you to convert that to DT in order to
-> > get your code merged, but I'd also really like to see that happen,
-> > as we will also need that to get rid of auxdata on the ARM reference
-> > platforms (integrator, versatile, realview, vexpress).
-> 
-> How would you like me to convert the platform data to DT? AFAIK, the
-> clcd driver isn't aware of DT so the only way is to use the AUXDATA right now.
+I'll send a v3...
 
-There are two basica approaches we could take:
+>>> ---
+>>> Changes in v2:
+>>> 	use IS_BUILTIN
+>>> 	use CONFIG_PHYLIB and not CONFIG_PHY
+>>>
+>> I do not like this, I prefer we just drop the fixup by adding the dt support
+>> to the micrel phy as done for broadcom
+>>
+> Yes it will be a better solution but we don't have it. Even if we add dt
+> support for micrel phy it won't go into 3.10 so it has to be fixed before the
+> release.
 
-a) add DT support to the clcd driver, using the of_get_videomode()
-helper and any other properties that need to be added.
+The fixup is also done like that on i.mx6. I think we'll have to stick
+to that for now.
 
-b) add a new KMS driver for this hardware that can be used as an
-alternative to the existing one and that works with DT.
+>> if !PHYLIB just add an inline declaration of 
+>> phy_register_fixup_for_uid
+>>
+>> so gcc will drop ksz9021rn_phy_fixup automatically
 
-	Arnd
+By using IS_BUILTIN, gcc is already optimizing out the offeding lines,
+else you would still get the linking error.
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
