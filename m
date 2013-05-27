@@ -1,62 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 27 May 2013 18:00:50 +0900
-Subject: [PATCH 6/8] ARM: shmobile: sh73a0: Always use shmobile_setup_delay()
+Date: Mon, 27 May 2013 18:00:49 +0900
+Subject: [PATCH 5/8] ARM: shmobile: sh73a0: Remove init_irq declaration in
+ machine description
 In-Reply-To: <1369645252-3847-1-git-send-email-horms+renesas@verge.net.au>
 References: <1369645252-3847-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1369645252-3847-7-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1369645252-3847-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Break out the function sh73a0_init_delay() that now
-gets called both for the C version of the code and
-the DT -reference boards. This way we handle both
-cases in the same way.
+Commit ebafed7a ("ARM: irq: Call irqchip_init if no init_irq function is
+specified") removed the need to explictly setup the init_irq field in
+the machine description when using only irqchip_init. Remove that
+declaration for shmobile as well.
 
-Allows us to boot with TWD only in the kernel configuration
-for C board code. TWD is not yet enabled in the case of
-DT -reference - this due to a dependency on CCF.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-sh73a0.c |   11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ arch/arm/mach-shmobile/setup-sh73a0.c |    2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index 9986515..8bb879f 100644
+index cd81832..9986515 100644
 --- a/arch/arm/mach-shmobile/setup-sh73a0.c
 +++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -915,11 +915,17 @@ void __init sh73a0_add_standard_devices(void)
- 			    ARRAY_SIZE(sh73a0_late_devices));
- }
- 
-+void __init sh73a0_init_delay(void)
-+{
-+	shmobile_setup_delay(1196, 44, 46); /* Cortex-A9 @ 1196MHz */
-+}
-+
- /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
- void __init __weak sh73a0_register_twd(void) { }
- 
- void __init sh73a0_earlytimer_init(void)
- {
-+	sh73a0_init_delay();
- 	sh73a0_clock_init();
- 	shmobile_earlytimer_init();
- 	sh73a0_register_twd();
-@@ -938,11 +944,6 @@ void __init sh73a0_add_early_devices(void)
- 
- #ifdef CONFIG_USE_OF
- 
--void __init sh73a0_init_delay(void)
--{
--	shmobile_setup_delay(1196, 44, 46); /* Cortex-A9 @ 1196MHz */
--}
--
- static const struct of_dev_auxdata sh73a0_auxdata_lookup[] __initconst = {
- 	{},
- };
+@@ -22,7 +22,6 @@
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+ #include <linux/irq.h>
+-#include <linux/irqchip.h>
+ #include <linux/platform_device.h>
+ #include <linux/of_platform.h>
+ #include <linux/delay.h>
+@@ -974,7 +973,6 @@ DT_MACHINE_START(SH73A0_DT, "Generic SH73A0 (Flattened Device Tree)")
+ 	.map_io		= sh73a0_map_io,
+ 	.init_early	= sh73a0_init_delay,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+-	.init_irq	= irqchip_init,
+ 	.init_machine	= sh73a0_add_standard_devices_dt,
+ 	.dt_compat	= sh73a0_boards_compat_dt,
+ MACHINE_END
 -- 
 1.7.10.4
