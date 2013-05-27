@@ -1,160 +1,155 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Mon, 27 May 2013 12:49:24 +0900
-Subject: [PATCH v2] mmc: dwmmc: let device core setup the default pin
- configuration
-In-Reply-To: <1364882999-31670-1-git-send-email-thomas.abraham@linaro.org>
-References: <1364882999-31670-1-git-send-email-thomas.abraham@linaro.org>
-Message-ID: <51A2D7C4.2060100@samsung.com>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Mon, 27 May 2013 12:53:41 +0900
+Subject: [PATCH v2] video: simplefb: add mode parsing function
+Message-ID: <1369626821-28494-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minor comment,
-Maybe Seungwon mentioned the prefix use as "dw_mmc".
+The naming scheme of simplefb's mode is precise enough to allow building
+the mode structure from it instead of using a static list of modes. This
+patch introduces a function that does this. In case exotic modes that
+cannot be represented from their name alone are needed, the static list
+of modes is still available as a backup.
 
-Best Regards,
-Jaehoon Chung
+It also changes the order in which colors are declared from MSB first to
+the more standard LSB first.
 
-On 04/02/2013 03:09 PM, Thomas Abraham wrote:
-> With device core now able to setup the default pin configuration,
-> the pin configuration code based on the deprecated Samsung specific
-> gpio bindings is removed.
-> 
-> Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> Tested-by: Doug Anderson <dianders@chromium.org>
-> ---
-> 
-> Hi Doug, Seungwon,
-> 
-> I apologize for the delaying in following up on the review comment.
-> The setup_bus callback support has been removed in this patch. I did
-> intend to retain the support for setup_bus callback in the previous
-> version of this patch since any new platform that might use this
-> driver and need such a callback would have this callback ready for
-> use. But it seems removing the setup_bus callback is preferred, so
-> I am fine with it.
-> 
-> Thomas.
-> 
->  drivers/mmc/host/dw_mmc-exynos.c |   38 --------------------------------------
->  drivers/mmc/host/dw_mmc.c        |   14 +-------------
->  drivers/mmc/host/dw_mmc.h        |    3 ---
->  3 files changed, 1 insertions(+), 54 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-> index 72fd0f2..467d043 100644
-> --- a/drivers/mmc/host/dw_mmc-exynos.c
-> +++ b/drivers/mmc/host/dw_mmc-exynos.c
-> @@ -152,43 +152,6 @@ static int dw_mci_exynos_parse_dt(struct dw_mci *host)
->  	return 0;
->  }
->  
-> -static int dw_mci_exynos_setup_bus(struct dw_mci *host,
-> -				struct device_node *slot_np, u8 bus_width)
-> -{
-> -	int idx, gpio, ret;
-> -
-> -	if (!slot_np)
-> -		return -EINVAL;
-> -
-> -	/* cmd + clock + bus-width pins */
-> -	for (idx = 0; idx < NUM_PINS(bus_width); idx++) {
-> -		gpio = of_get_gpio(slot_np, idx);
-> -		if (!gpio_is_valid(gpio)) {
-> -			dev_err(host->dev, "invalid gpio: %d\n", gpio);
-> -			return -EINVAL;
-> -		}
-> -
-> -		ret = devm_gpio_request(host->dev, gpio, "dw-mci-bus");
-> -		if (ret) {
-> -			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
-> -			return -EBUSY;
-> -		}
-> -	}
-> -
-> -	if (host->pdata->quirks & DW_MCI_QUIRK_BROKEN_CARD_DETECTION)
-> -		return 0;
-> -
-> -	gpio = of_get_named_gpio(slot_np, "samsung,cd-pinmux-gpio", 0);
-> -	if (gpio_is_valid(gpio)) {
-> -		if (devm_gpio_request(host->dev, gpio, "dw-mci-cd"))
-> -			dev_err(host->dev, "gpio [%d] request failed\n", gpio);
-> -	} else {
-> -		dev_info(host->dev, "cd gpio not available");
-> -	}
-> -
-> -	return 0;
-> -}
-> -
->  /* Exynos5250 controller specific capabilities */
->  static unsigned long exynos5250_dwmmc_caps[4] = {
->  	MMC_CAP_UHS_DDR50 | MMC_CAP_1_8V_DDR |
-> @@ -205,7 +168,6 @@ static const struct dw_mci_drv_data exynos5250_drv_data = {
->  	.prepare_command	= dw_mci_exynos_prepare_command,
->  	.set_ios		= dw_mci_exynos_set_ios,
->  	.parse_dt		= dw_mci_exynos_parse_dt,
-> -	.setup_bus		= dw_mci_exynos_setup_bus,
->  };
->  
->  static const struct of_device_id dw_mci_exynos_match[] = {
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 9834221..adb1b7d 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -1878,7 +1878,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->  	struct mmc_host *mmc;
->  	struct dw_mci_slot *slot;
->  	const struct dw_mci_drv_data *drv_data = host->drv_data;
-> -	int ctrl_id, ret;
-> +	int ctrl_id;
->  	u8 bus_width;
->  
->  	mmc = mmc_alloc_host(sizeof(struct dw_mci_slot), host->dev);
-> @@ -1935,14 +1935,6 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->  	else
->  		bus_width = 1;
->  
-> -	if (drv_data && drv_data->setup_bus) {
-> -		struct device_node *slot_np;
-> -		slot_np = dw_mci_of_find_slot_node(host->dev, slot->id);
-> -		ret = drv_data->setup_bus(host, slot_np, bus_width);
-> -		if (ret)
-> -			goto err_setup_bus;
-> -	}
-> -
->  	switch (bus_width) {
->  	case 8:
->  		mmc->caps |= MMC_CAP_8_BIT_DATA;
-> @@ -2006,10 +1998,6 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->  	queue_work(host->card_workqueue, &host->card_work);
->  
->  	return 0;
-> -
-> -err_setup_bus:
-> -	mmc_free_host(mmc);
-> -	return -EINVAL;
->  }
->  
->  static void dw_mci_cleanup_slot(struct dw_mci_slot *slot, unsigned int id)
-> diff --git a/drivers/mmc/host/dw_mmc.h b/drivers/mmc/host/dw_mmc.h
-> index 53b8fd9..0b74189 100644
-> --- a/drivers/mmc/host/dw_mmc.h
-> +++ b/drivers/mmc/host/dw_mmc.h
-> @@ -190,7 +190,6 @@ extern int dw_mci_resume(struct dw_mci *host);
->   * @prepare_command: handle CMD register extensions.
->   * @set_ios: handle bus specific extensions.
->   * @parse_dt: parse implementation specific device tree properties.
-> - * @setup_bus: initialize io-interface
->   *
->   * Provide controller implementation specific extensions. The usage of this
->   * data structure is fully optional and usage of each member in this structure
-> @@ -203,7 +202,5 @@ struct dw_mci_drv_data {
->  	void		(*prepare_command)(struct dw_mci *host, u32 *cmdr);
->  	void		(*set_ios)(struct dw_mci *host, struct mmc_ios *ios);
->  	int		(*parse_dt)(struct dw_mci *host);
-> -	int		(*setup_bus)(struct dw_mci *host,
-> -				struct device_node *slot_np, u8 bus_width);
->  };
->  #endif /* _DW_MMC_H_ */
-> 
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+---
+Changes from v1:
+- amended documentation following Stephen's suggestion
+- allow parsing of bitfields larger than 9 bits
+- made it clear that the parsing order of bits is changed with respect
+  to the original patch
+
+Andrew, since this patch introduces a (small) change in the DT bindings,
+could we try to merge it during the -rc cycle so we don't have to come
+with a more complex solution in the future?
+
+ .../bindings/video/simple-framebuffer.txt          | 12 +++-
+ drivers/video/simplefb.c                           | 72 +++++++++++++++++++++-
+ 2 files changed, 80 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+index 3ea4605..18d03e2 100644
+--- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
++++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+@@ -10,8 +10,16 @@ Required properties:
+ - width: The width of the framebuffer in pixels.
+ - height: The height of the framebuffer in pixels.
+ - stride: The number of bytes in each line of the framebuffer.
+-- format: The format of the framebuffer surface. Valid values are:
+-  - r5g6b5 (16-bit pixels, d[15:11]=r, d[10:5]=g, d[4:0]=b).
++- format: The format of the framebuffer surface. Described as a sequence of
++	channel/num-bits pairs, where each pair describes how many bits are used
++	by a given color channel. Value channels are "r" (red), "g" (green),
++	"b" (blue), "a" (alpha) and "x" (unused). Channels are listed in bit
++	order, starting from the LSB. For instance, a format named "r5g6b5"
++	describes a 16-bit format where red is encoded in the 5 less significant
++	bits, green in the 6 following ones, and blue in the 5 last:
++				BBBBBGGG GGGRRRRR
++				^               ^
++			       MSB             LSB
+ 
+ Example:
+ 
+diff --git a/drivers/video/simplefb.c b/drivers/video/simplefb.c
+index e2e9e3e..1430752 100644
+--- a/drivers/video/simplefb.c
++++ b/drivers/video/simplefb.c
+@@ -21,6 +21,7 @@
+  */
+ 
+ #include <linux/errno.h>
++#include <linux/ctype.h>
+ #include <linux/fb.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+@@ -82,8 +83,72 @@ struct simplefb_format {
+ 	struct fb_bitfield transp;
+ };
+ 
++static struct simplefb_format *simplefb_parse_format(struct device *dev,
++						     const char *str)
++{
++	struct simplefb_format *format;
++	unsigned int offset = 0;
++	unsigned int i = 0;
++
++	format = devm_kzalloc(dev, sizeof(*format), GFP_KERNEL);
++	if (!format)
++		return ERR_PTR(-ENOMEM);
++
++	while (str[i] != 0) {
++		struct fb_bitfield *field = NULL;
++		int length = 0;
++
++		switch (str[i++]) {
++		case 'r':
++		case 'R':
++			field = &format->red;
++			break;
++		case 'g':
++		case 'G':
++			field = &format->green;
++			break;
++		case 'b':
++		case 'B':
++			field = &format->blue;
++			break;
++		case 'a':
++		case 'A':
++			field = &format->transp;
++			break;
++		case 'x':
++		case 'X':
++			break;
++		default:
++			goto error;
++		}
++
++		if (!isdigit(str[i]))
++			goto error;
++
++		while (isdigit(str[i])) {
++			length = length * 10 + (str[i++] - '0');
++		}
++
++		if (field) {
++			field->offset = offset;
++			field->length = length;
++		}
++
++		offset += length;
++	}
++
++	format->bits_per_pixel = (offset + 7) & ~0x7;
++	format->name = str;
++	return format;
++
++error:
++	dev_err(dev, "Invalid format string\n");
++	return ERR_PTR(-EINVAL);
++}
++
++/* if you use exotic modes that simplefb_parse_format cannot decode, you can
++   specify them here. */
+ static struct simplefb_format simplefb_formats[] = {
+-	{ "r5g6b5", 16, {11, 5}, {5, 6}, {0, 5}, {0, 0} },
+ };
+ 
+ struct simplefb_params {
+@@ -131,7 +196,10 @@ static int simplefb_parse_dt(struct platform_device *pdev,
+ 		params->format = &simplefb_formats[i];
+ 		break;
+ 	}
+-	if (!params->format) {
++	if (!params->format)
++		params->format = simplefb_parse_format(&pdev->dev, format);
++
++	if (IS_ERR(params->format)) {
+ 		dev_err(&pdev->dev, "Invalid format value\n");
+ 		return -EINVAL;
+ 	}
+-- 
+1.8.3
