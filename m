@@ -1,49 +1,70 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 28 May 2013 11:27:13 -0400 (EDT)
-Subject: [PATCH V8 3/3] USB: OHCI: make ohci-pci a separate driver
-In-Reply-To: <1369746291-21788-4-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1305281126340.1030-100000@iolanthe.rowland.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 28 May 2013 11:40:47 -0400
+Subject: [PATCH 00/10] clk: mvebu: restructure SoC clock drivers
+In-Reply-To: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130528154047.GT31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 May 2013, Manjunath Goudar wrote:
+Thomas, Sebastian,
 
-> This patch splits the PCI portion of ohci-hcd out into its
-> own separate driver module, called ohci-pci.
-> 
-> The major point of difficulty lies in ohci-pci's many vendor- and
-> device-specific workarounds.  Some of them have to be applied before
-> calling ohci_start() some after, which necessitates a fair amount of
-> code motion.  The other platform drivers require much smaller changes.
-> 
-> The complete sb800_prefetch() function moved to ohci-q.c,because its
-> only related to ohci-pci driver.
-> 
-> USB_OHCI_HCD_PCI symbol no longer dependence on STB03xxx, PPC_MPC52xx and
-> USB_OHCI_HCD_PPC_OF that's what removed.
-> 
-> V2:
->   - few specific content of pci related code in ohci_pci_start function has been moved to ohci_pci_reset
->     and rest of the generic code is written in ohci_start of ohci-hcd.c file.
-> V3:
->  - ohci_restart() has been called in ohci_pci_reset() function for to reset the ohci pci.
-> 
-> V4:
->  -sb800_prefetch() moved to ohci-q.c,because its only related to ohci-pci.
->  -no longer _creating_ CONFIG_USB_OHCI_PCI,creating CONFIG_USB_OHCI_HCD_PCI.
->  -overrides renamed with pci_override,its giving proper meaning.
-> 
-> V5:
->  -sb800_prefetch() moved to pci-quirks.c,because its only related to pci.
-> 
-> V6:
->  -sb800_prefetch() function has been moved to pci-quirks.c made as separate patch in 2/3.
->  -Most of the generic ohci pci changes moved in 2/3 patch,now this is complete  ohci-pci separation patch.
-> 
-> V7:
->  -Unrelated include file has been removed from ohci.h file.
-> 
-> V8:
->  -USB_OHCI_HCD_PCI symbol does not dependence on STB03xxx, PPC_MPC52xx and USB_OHCI_HCD_PPC_OF.
+In order to avoid losing changes between this series and mvebu/pcie,
+I've rebased this series on top of mvebu/pcie and incorporated the
+correct conflict resolution into this series.  See below...
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+On Sat, May 11, 2013 at 03:08:00AM +0200, Sebastian Hesselbarth wrote:
+> Marvell EBU SoCs share some common clock functions that register core
+> clocks or clock gates from SoC specific data. These clock drivers are
+> organized by function and over time the drivers filled up with #ifdefs
+> to separate different SoC specific code.
+> 
+> This patch set first adds a new element to clock gate descriptors to
+> allow to pass clk flags per clock gate. (Patch 1)
+> 
+> Then it restructures MVEBU clock drivers into common clock setup and
+> SoC specific files and Kconfig options. The driver's init functions
+> are also registered to get called with of_clk_init. (Patches 2, 3-6)
+> 
+> It then switches Dove, Kirkwood, and Armada 370/XP to make use of
+> of_clk_init instead of mvebu_clocks_init. (Patches 7-9)
+> 
+> Finally, all obsolete files and Kconfig options are removed. (Patch 10)
+> 
+> It has been tested on CuBox (Dove) and Dockstar (Kirkwood) by me.
+> Armada 370 and XP are compile tested only and should get their Tested-by
+> from Thomas and Gregory, respectively.
+> 
+> @Mike: As this only touches MVEBU related code, I suggest to take it
+> all through the corresponding ARM branch.
+> 
+> Sebastian Hesselbarth (10):
+>   clk: mvebu: introduce per-clock-gate flags
+
+I updated armada_370_gating_descr[] and armada_xp_gating_descr[] to
+incorporate Thomas' pcie changes.
+
+>   clk: mvebu: add common clock functions for core clk and clk gating
+>   clk: mvebu: add Dove SoC-centric clock init
+>   clk: mvebu: add Kirkwood SoC-centric clock init
+
+>   clk: mvebu: add Armada 370 SoC-centric clock init
+>   clk: mvebu: add Armada XP SoC-centric clock init
+
+I then migrated the changes above to these two commits.
+
+>   ARM: dove: move DT boards to SoC-centric clock init
+>   ARM: kirkwood: move DT boards to SoC-centric clock init
+>   ARM: mvebu: move DT boards to SoC-centric clock init
+
+>   clk: mvebu: desintegrate obsolete file
+
+Obviously, the diffstat changed slightly here.
+
+I'm posting the revised version as replies to patches 1, 5 and 6. Please
+let me know if I messed it up.  I'd like to send the PR for these
+shortly.
+
+thx,
+
+Jason.
