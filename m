@@ -1,24 +1,30 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 28 May 2013 10:41:20 +0200
-Subject: [PATCH v3 0/5] ARM: dts: OMAP2+: use preprocessor for device trees
-In-Reply-To: <1369666354-29152-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1369666354-29152-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <51A46DB0.5020508@epfl.ch>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 28 May 2013 09:59:35 +0100
+Subject: [PATCH v2 3/4] ARM: mm: HugeTLB support for LPAE systems.
+In-Reply-To: <20130524110306.GC18272@arm.com>
+References: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
+ <1369323080-9673-4-git-send-email-steve.capper@linaro.org>
+ <20130524110306.GC18272@arm.com>
+Message-ID: <20130528085934.GA15590@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 05/27/2013 04:52 PM, Florian Vaussard wrote:
-> Hello,
+On Fri, May 22, 2013 at 12:03:06PM +0100, Catalin Marinas wrote:
+> On Thu, May 23, 2013 at 04:31:19PM +0100, Steve Capper wrote:
+> > From: Catalin Marinas <catalin.marinas@arm.com>
+> > 
+> > This patch adds support for hugetlbfs based on the x86 implementation.
+> 
+> Can we not share the x86 code as you are proposing for arm64 already?
 >
-> Following a similar proposal by Stephen Warren for tegra [1], this series
-> makes use of the C preprocessor when compiling OMAP DT files, and
-> accomplishes some improvements to improve overall readability.
->
 
-I realized that I should also address am* devices. I will wait for comments
-on this version, then post a v4. Sorry for the noise.
+Yes, we can. I didn't want one patch set dependent on another so opted to
+make the ARMv7 one self-contained for now. I was planning on changing this
+with a future patch.
 
-Regards,
-
-Florian
+Cheers,
+-- 
+Steve
+ 
+> -- 
+> Catalin
