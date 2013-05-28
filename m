@@ -1,39 +1,66 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 28 May 2013 10:08:40 +0200
-Subject: [PATCH 3/3 v3] net/macb: Try to optimize struct macb layout
-In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B723A@saturn3.aculab.com>
-References: <cover.1368608928.git.nicolas.ferre@atmel.com>
- <d0bc206ace3baaf681e111ba07c4d0b576839bb4.1368608928.git.nicolas.ferre@atmel.com>
- <AE90C24D6B3A694183C094C60CF0A2F6026B723A@saturn3.aculab.com>
-Message-ID: <51A46608.2020906@atmel.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 28 May 2013 10:19:10 +0200
+Subject: [PATCH] arch: configuration, deleting 'CONFIG_BUG' since always
+ need it.
+In-Reply-To: <20130523100409.GK18614@n2100.arm.linux.org.uk>
+References: <519DCBEF.3090208@asianux.com>
+ <20130523090534.GJ18614@n2100.arm.linux.org.uk>
+ <CAMuHMdWez-j1Maa3BD7ucmzv0_zFJnChERQiHFmkCaZUzG0_AA@mail.gmail.com>
+ <201305231139.38233.arnd@arndb.de>
+ <20130523100409.GK18614@n2100.arm.linux.org.uk>
+Message-ID: <20130528081910.GA29557@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/05/2013 11:37, David Laight :
->> From: Havard Skinnemoen <havard@skinnemoen.net>
->
->> Move the NAPI struct below that since it is used
->> from the interrupt handler. This field is also marked as
->> ___cacheline_aligned_in_smp.
->
-> Is that a good idea if the cache line size is 256 bytes?
-> Indeed is that ever sane - except for a few special structures
-> that really need it, and are guaranteed to be allocated
-> with that much alignment.
 
-I do not know if that was really needed, it was a recommendation by Ben.
-(previous email here:
-https://patchwork.kernel.org/patch/1887101/
-)
+* Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Anyway, it seems that this patch needs more work whereas the others of 
-the series are not commented.
+> So, if you want to use this, then you should update the CONFIG_BUG text 
+> to include a warning to this effect:
+> 
+>      Warning: if CONFIG_BUG is turned off, and control flow reaches
+>      a BUG(), the system behaviour will be undefined.
+> 
+> so that people can make an informed choice about this, because at the
+> moment:
+> 
+>           Disabling this option eliminates support for BUG and WARN, reducing
+>           the size of your kernel image and potentially quietly ignoring
+>           numerous fatal conditions. You should only consider disabling this
+>           option for embedded systems with no facilities for reporting errors.
+>           Just say Y.
+> 
+> will become completely misleading.  Turning this option off will _not_ 
+> result in "quietly ignoring numerous fatal conditions".
 
-So maybe, I can resend patches 1, 2 for making this big enhancement go 
-forward (as it is in review process for quite a long time...).
-David, do you want me to resend or can you retrieve these v3 patches in 
-patchwork?
+I'm fine with adding your text as a clarification - but I think 'quietly 
+ignoring fatal conditions' very much implies an undefined outcome if that 
+unexpected condition does occur: the code might crash, it might corrupt 
+memory or it might do some other unexpected thing.
 
-Best regards,
--- 
-Nicolas Ferre
+There are many other places that do a BUG_ON() of a NULL pointer or so, or 
+of a zero refcount, or a not held lock - and turning the BUG_ON() off 
+makes the code unpredictable _anyway_ - even if the compiler does not 
+notice an uninitialized variable.
+
+So pretty much any weakening of BUG_ON() _will_ make the kernel more 
+unpredictable.
+
+> And I come back to one of my previous arguments - is it not better to 
+> panic() if we hit one of these conditions so that the system can try to 
+> do a panic-reboot rather than continue blindly into the unknown?
+
+It will often continue blindly into the unknown even if the compiler is 
+happy ...
+
+The only difference is that it's "unpredictable" in a way not visible from 
+the C code: the code won't necessarily fall through the BUG() when hitting 
+that condition - although in practice it probably will.
+
+So I think the same principle applies to it as to any other debugging 
+code: it's fine to be able to turn debugging off. It's a performance 
+versus kernel robustness/determinism trade-off.
+
+Thanks,
+
+	Ingo
