@@ -1,18 +1,53 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 May 2013 14:27:13 +0800
-Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
-In-Reply-To: <201305280656.27472.marex@denx.de>
-References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
- <CAOMZO5DRuKrECnYDtZ0wOK6_vpW95Cwc3xf7LT+VT_B7eV3gug@mail.gmail.com>
- <20130528014348.GA19608@S2101-09.ap.freescale.net>
- <201305280656.27472.marex@denx.de>
-Message-ID: <20130528062711.GB19608@S2101-09.ap.freescale.net>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 28 May 2013 12:05:45 +0530
+Subject: [PATCH v6 0/9] Generic PHY Framework
+In-Reply-To: <519AFF95.9060002@ti.com>
+References: <1367229812-30574-1-git-send-email-kishon@ti.com>
+ <519AFF95.9060002@ti.com>
+Message-ID: <51A45041.2030105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 06:56:27AM +0200, Marek Vasut wrote:
-> What is the problem you observe?
-> 
-The audio playback gives silent output.
+Hi,
 
-Shawn
+On Tuesday 21 May 2013 10:31 AM, Kishon Vijay Abraham I wrote:
+> Hi,
+>
+> On Monday 29 April 2013 03:33 PM, Kishon Vijay Abraham I wrote:
+>> Added a generic PHY framework that provides a set of APIs for the PHY
+>> drivers
+>> to create/destroy a PHY and APIs for the PHY users to obtain a
+>> reference to
+>> the PHY with or without using phandle.
+>>
+>> This framework will be of use only to devices that uses external PHY (PHY
+>> functionality is not embedded within the controller).
+>>
+>> The intention of creating this framework is to bring the phy drivers
+>> spread
+>> all over the Linux kernel to drivers/phy to increase code re-use and to
+>> increase code maintainability.
+>>
+>> Comments to make PHY as bus wasn't done because PHY devices can be
+>> part of
+>> other bus and making a same device attached to multiple bus leads to bad
+>> design.
+>>
+>> If the PHY driver has to send notification on connect/disconnect, the PHY
+>> driver should make use of the extcon framework. Using this susbsystem
+>> to use extcon framwork will have to be analysed.
+>>
+>> Making omap-usb2 and twl4030 to use this framework is provided as a
+>> sample.
+>>
+>> This patch series is developed on linux-next tree.
+>
+> Any comments on this patch series?
+
+Ping..
+
+This series is needed for usb3 phy/sata phy and can also be used by 
+certain video phys. I think it's important to get this in.
+
+Thanks
+Kishon
