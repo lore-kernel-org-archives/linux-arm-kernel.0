@@ -1,21 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 28 May 2013 14:43:37 +0100
-Subject: [PATCH v8, part3 03/14] mm/ARM64: kill poison_init_mem()
-In-Reply-To: <1369575522-26405-4-git-send-email-jiang.liu@huawei.com>
-References: <1369575522-26405-1-git-send-email-jiang.liu@huawei.com>
- <1369575522-26405-4-git-send-email-jiang.liu@huawei.com>
-Message-ID: <20130528134336.GA15546@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 28 May 2013 15:47:49 +0200
+Subject: [PATCHv2 0/3] Add G762/G763 PWM fan controller
+In-Reply-To: <20130528122940.GA29012@roeck-us.net>
+References: <cover.1369687670.git.arno@natisbad.org>
+ <152190814.eApXVbVBPA@wuerfel> <87li6z2yxj.fsf@natisbad.org>
+ <20130528111921.GD11547@mithrandir>
+ <20130528122940.GA29012@roeck-us.net>
+Message-ID: <20130528134734.GA12585@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 26, 2013 at 02:38:31PM +0100, Jiang Liu wrote:
-> Use free_reserved_area() to poison initmem memory pages and kill
-> poison_init_mem() on ARM64.
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
+On Tue, May 28, 2013 at 05:29:40AM -0700, Guenter Roeck wrote:
+> On Tue, May 28, 2013 at 01:19:23PM +0200, Thierry Reding wrote:
+> > On Tue, May 28, 2013 at 12:15:04PM +0200, Arnaud Ebalard wrote:
+> > > Hi Arnd,
+> > > 
+> > > Arnd Bergmann <arnd@arndb.de> writes:
+> > > 
+> > > > On Tuesday 28 May 2013 00:02:29 Arnaud Ebalard wrote:
+> > > >> 
+> > > >> This series adds support for GMT G762/G763. This work is based on a
+> > > >> basic version for 2.6.31 kernel developed Olivier Mouchet for LaCie
+> > > >> NAS. Updates have been performed to run on recent kernels. Support has
+> > > >> been completed and additional features added: ability to configure
+> > > >> various characteristics from .dts file, better initialization, alarms
+> > > >> and error reporting support, gear mode, polarity, fan pulse per
+> > > >> revolution, fan startup voltage control.
+> > > >
+> > > > I wonder if this could be split into two separate drivers, one for
+> > > > the pwm subsystem, and one for a hardware-independent fan controller
+> > > > based on the pwm interfaces.
+> > > 
+> > > To be honest, I wouldn't even know how to start in order to do that.
+> > > Additionally, it would be worth the effort if other drivers could be
+> > > easily refactored using this idea. I'll let hwmon people provide some
+> > > feedback and try and comply with their directions (based on the cpu
+> > > cycle I can spend on this).
+> > 
+> > What Arnd proposes doesn't sounds like a very good idea. PWM-controlled
+> > fans should be able to work just fine using a generic driver that uses
+> > the PWM framework, similar to the PWM backlight and LED drivers.
+> > 
+> Isn't that exactly what Arnd proposed ?
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Oh, right. I meant to say: "What Arnd proposes sounds like a very good
+idea." =) Sorry for the confusion.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130528/da4412f3/attachment.sig>
