@@ -1,45 +1,132 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 May 2013 21:02:43 -0700
-Subject: [PATCH 1/8] ARM: shmobile: sh73a0 pinmux platform device cleanup
-In-Reply-To: <51A36A02.9050200@cogentembedded.com>
-References: <1369645252-3847-1-git-send-email-horms+renesas@verge.net.au>
- <1369645252-3847-2-git-send-email-horms+renesas@verge.net.au>
- <51A36A02.9050200@cogentembedded.com>
-Message-ID: <20130528040243.GM13532@quad.lixom.net>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 28 May 2013 13:04:33 +0900
+Subject: Introduce a new helper framework for buffer synchronization
+In-Reply-To: <CAKMK7uG1T-w=rVfORzdSk9LWN_aXqqCiG87UdhjutfbS=rpzbg@mail.gmail.com>
+References: <CAAQKjZP=iOmHRpHZCbZD3v_RKUFSn0eM_WVZZvhe7F9g3eTmPA@mail.gmail.com>
+ <CAF6AEGuDih-NR-VZCmQfqbvCOxjxreZRPGfhCyL12FQ1Qd616Q@mail.gmail.com>
+ <006a01ce504e$0de3b0e0$29ab12a0$%dae@samsung.com>
+ <CAF6AEGv2FiKMUpb5s4zHPdj4uVxnQWdVJWL-i1mOOZRxBvMZ4Q@mail.gmail.com>
+ <00cf01ce512b$bacc5540$3064ffc0$%dae@samsung.com>
+ <CAF6AEGuBexKUpTwm9cjGjkxCTKgEaDhAakeP0RN=rtLS6Qy=Mg@mail.gmail.com>
+ <CAAQKjZP37koEPob6yqpn-WxxTh3+O=twyvRzDiEhVJTD8BxQzw@mail.gmail.com>
+ <20130520211304.GV12292@phenom.ffwll.local>
+ <20130520213033.GW12292@phenom.ffwll.local>
+ <032701ce55f1$3e9ba4b0$bbd2ee10$%dae@samsung.com>
+ <20130521074441.GZ12292@phenom.ffwll.local>
+ <033a01ce5604$c32bd250$498376f0$%dae@samsung.com>
+ <CAKMK7uHtk+A7CDZH3qHt+F3H_fdSsWwt-bEPn-N0919oOE+Jkg@mail.gmail.com>
+ <012801ce57ba$a5a87fa0$f0f97ee0$%dae@samsung.com>
+ <014501ce5ac6$511a8500$f34f8f00$%dae@samsung.com>
+ <CAF6AEGvGv539Ktdeg03n783nD+HofDamcJCLX93rzzKGOCV8_Q@mail.gmail.com>
+ <CAKMK7uG1T-w=rVfORzdSk9LWN_aXqqCiG87UdhjutfbS=rpzbg@mail.gmail.com>
+Message-ID: <005801ce5b58$76008bc0$6201a340$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 27, 2013 at 06:13:22PM +0400, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 27-05-2013 13:00, Simon Horman wrote:
-> 
-> >From: Magnus Damm <damm@opensource.se>
-> 
-> >Use DEFINE_RES_MEM() and platform_device_register_simple()
-> >to save a couple of lines of code.
-> 
-> >Signed-off-by: Magnus Damm <damm@opensource.se>
-> >Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >---
-> >  arch/arm/mach-shmobile/setup-sh73a0.c |   25 ++++++-------------------
-> >  1 file changed, 6 insertions(+), 19 deletions(-)
-> 
-> >diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-> >index fdf3894..f8f4261 100644
-> >--- a/arch/arm/mach-shmobile/setup-sh73a0.c
-> >+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-> >@@ -61,29 +61,16 @@ void __init sh73a0_map_io(void)
-> [...]
-> >+/* PFC */
-> >+static const struct resource pfc_resources[] = {
-> 
->    Should have been annotated as __initdata... too late, need
-> another patch.
-
-See comments on other patches/pull requests, I think there's time to revisit
-this. I.e. I'll hold off on pulling this based on the other feedback.
 
 
--Olof
+> -----Original Message-----
+> From: daniel.vetter at ffwll.ch [mailto:daniel.vetter at ffwll.ch] On Behalf Of
+> Daniel Vetter
+> Sent: Tuesday, May 28, 2013 1:02 AM
+> To: Rob Clark
+> Cc: Inki Dae; Maarten Lankhorst; linux-fbdev; YoungJun Cho; Kyungmin Park;
+> myungjoo.ham; DRI mailing list; linux-arm-kernel at lists.infradead.org;
+> linux-media at vger.kernel.org
+> Subject: Re: Introduce a new helper framework for buffer synchronization
+> 
+> On Mon, May 27, 2013 at 5:47 PM, Rob Clark <robdclark@gmail.com> wrote:
+> > On Mon, May 27, 2013 at 6:38 AM, Inki Dae <inki.dae@samsung.com> wrote:
+> >> Hi all,
+> >>
+> >> I have been removed previous branch and added new one with more
+cleanup.
+> >> This time, the fence helper doesn't include user side interfaces and
+> cache
+> >> operation relevant codes anymore because not only we are not sure that
+> >> coupling those two things, synchronizing caches and buffer access
+> between
+> >> CPU and CPU, CPU and DMA, and DMA and DMA with fences, in kernel side
+> is a
+> >> good idea yet but also existing codes for user side have problems with
+> badly
+> >> behaved or crashing userspace. So this could be more discussed later.
+> >>
+> >> The below is a new branch,
+> >>
+> >> https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-
+> exynos.git/?h=dma-f
+> >> ence-helper
+> >>
+> >> And fence helper codes,
+> >>
+> >> https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-
+> exynos.git/commit/?
+> >> h=dma-fence-helper&id=adcbc0fe7e285ce866e5816e5e21443dcce01005
+> >>
+> >> And example codes for device driver,
+> >>
+> >> https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-
+> exynos.git/commit/?
+> >> h=dma-fence-helper&id=d2ce7af23835789602a99d0ccef1f53cdd5caaae
+> >>
+> >> I think the time is not yet ripe for RFC posting: maybe existing dma
+> fence
+> >> and reservation need more review and addition work. So I'd glad for
+> somebody
+> >> giving other opinions and advices in advance before RFC posting.
+> >
+> > thoughts from a *really* quick, pre-coffee, first look:
+> > * any sort of helper to simplify single-buffer sort of use-cases (v4l)
+> > probably wouldn't want to bake in assumption that seqno_fence is used.
+> 
+> Yeah, which is why Maarten&I discussed ideas already for what needs to
+> be improved in the current dma-buf interface code to make this Just
+> Work. At least as long as a driver doesn't want to add new fences,
+> which would be especially useful for all kinds of gpu access.
+> 
+> > * I guess g2d is probably not actually a simple use case, since I
+> > expect you can submit blits involving multiple buffers :-P
+> 
+> Yeah, on a quick read the current fence helper code seems to be a bit
+> limited in scope.
+> 
+> > * otherwise, you probably don't want to depend on dmabuf, which is why
+> > reservation/fence is split out the way it is..  you want to be able to
+> > use a single reservation/fence mechanism within your driver without
+> > having to care about which buffers are exported to dmabuf's and which
+> > are not.  Creating a dmabuf for every GEM bo is too heavyweight.
+> 
+> That's pretty much the reason that reservations are free-standing from
+> dma_bufs. The idea is to embed them into the gem/ttm/v4l buffer
+> object. Maarten also has some helpers to keep track of multi-buffer
+> ww_mutex locking and fence attaching in his reservation helpers, but I
+> think we should wait with those until we have drivers using them.
+> 
+> For now I think the priority should be to get the basic stuff in and
+> ttm as the first user established. Then we can go nuts later on.
+> 
+> > I'm not entirely sure if reservation/fence could/should be made any
+> > simpler for multi-buffer users.  Probably the best thing to do is just
+> > get reservation/fence rolled out in a few drivers and see if some
+> > common patterns emerge.
+> 
+> I think we can make the 1 buffer per dma op (i.e. 1:1
+> dma_buf->reservation : fence mapping) work fairly simple in dma_buf
+> with maybe a dma_buf_attachment_start_dma/end_dma helpers. But there's
+> also still the open that currently there's no way to flush cpu caches
+> for dma access without unmapping the attachement (or resorting to
+
+
+That was what I tried adding user interfaces to dmabuf: coupling
+synchronizing caches and buffer access between CPU and CPU, CPU and DMA, and
+DMA and DMA with fences in kernel side. We need something to do between
+mapping and unmapping attachment.
+
+> trick which might not work), so we have a few gaping holes in the
+> interface already anyway.
+> -Daniel
+> --
+> Daniel Vetter
+> Software Engineer, Intel Corporation
+> +41 (0) 79 365 57 48 - http://blog.ffwll.ch
