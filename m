@@ -1,31 +1,33 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 May 2013 16:03:25 -0400
-Subject: [PATCH 00/10] clk: mvebu: restructure SoC clock drivers
-In-Reply-To: <51A50D0F.5010909@gmail.com>
-References: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130528154047.GT31290@titan.lakedaemon.net>
- <20130528175343.77c6353d@skate>
- <20130528165401.GX31290@titan.lakedaemon.net>
- <51A50D0F.5010909@gmail.com>
-Message-ID: <20130528200325.GF31290@titan.lakedaemon.net>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 28 May 2013 13:09:20 -0700 (PDT)
+Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
+In-Reply-To: <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1369741403-25315-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20130528.130920.1604291112518863799.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 10:01:19PM +0200, Sebastian Hesselbarth wrote:
-> On 05/28/2013 06:54 PM, Jason Cooper wrote:
-> >>On Tue, 28 May 2013 11:40:47 -0400, Jason Cooper wrote:
-> >>>I'm posting the revised version as replies to patches 1, 5 and 6. Please
-> >>>let me know if I messed it up.  I'd like to send the PR for these
-> >>>shortly.
-> >
-> >$ git checkout v3.10-rc3
-> >$ git merge mvebu/of_pci
-> >$ git merge mvebu/pcie
-> >$ git merge mvebu/seb_clk
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Date: Tue, 28 May 2013 13:43:21 +0200
+
+> phy_register_fixup{,_for_uid,_for_id} are called from arch/, quite
+> often, there is no protection to check whether CONFIG_PHYLIB=y which is
+> the only case where this would work. Having phylib as a module or not
+> compiled at all will result in that kind of linking failure:
 > 
-> After manually resolving a merge conflict in arch/arm/mach-mvebu/Kconfig
-> I can see no obvious regression on neither Dove nor Kirkwood.
+> arch/arm/mach-at91/built-in.o: In function `ksz9021rn_phy_fixup':
+> :(.text+0x1174): undefined reference to `mdiobus_write'
+> :(.text+0x1188): undefined reference to `mdiobus_write'
+> :(.text+0x119c): undefined reference to `mdiobus_write'
+> :(.text+0x11b0): undefined reference to `mdiobus_write'
+> arch/arm/mach-at91/built-in.o: In function `sama5_dt_device_init':
+> :(.init.text+0x1e34): undefined reference to `phy_register_fixup_for_uid'
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Great, thanks, Sebastian!
+This is the wrong way to go about this.
 
-Jason.
+If the arch code absolutely requires CONFIG_PHYLIB=y then express that
+dependency in the arch Kconfig.  The arch code in question should not
+be compiled at all if CONFIG_PHYLIB has an incompatible setting.
