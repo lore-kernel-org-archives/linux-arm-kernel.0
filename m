@@ -1,44 +1,48 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 28 May 2013 13:52:27 -0400 (EDT)
-Subject: [PATCH V4] ARM: handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <20130528095528.GA14329@arm.com>
-References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
- <20130523104303.GC16722@arm.com>
- <alpine.LFD.2.03.1305242350220.1918@syhkavp.arg>
- <20130528095528.GA14329@arm.com>
-Message-ID: <alpine.LFD.2.03.1305281340240.1918@syhkavp.arg>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 28 May 2013 18:53:24 +0100
+Subject: [PATCH v4 0/4] xen/arm: CONFIG_PARAVIRT and stolen ticks
+ accounting
+Message-ID: <alpine.DEB.2.02.1305281835080.4799@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 May 2013, Catalin Marinas wrote:
+Hi all,
+this patch series introduces stolen ticks accounting for Xen on ARM.
+Stolen ticks are clocksource ticks that have been "stolen" from the cpu,
+typically because Linux is running in a virtual machine and the vcpu has
+been descheduled.
+To account for these ticks we introduce CONFIG_PARAVIRT and pv_time_ops
+so that we can make use of:
 
-> On Sat, May 25, 2013 at 04:53:19AM +0100, Nicolas Pitre wrote:
-> > On Thu, 23 May 2013, Catalin Marinas wrote:
-> > 
-> > > An issue is that for kunmap_atomic() && VIVT we flush the same page
-> > > twice. I don't think we should remove the cache flushing in
-> > > __kunmap_atomic() for VIVT since not all kunmap_atomic() calls require
-> > > flush_kernel_dcache_page() (unless we just assume that highmem && vivt
-> > > don't work together).
-> > 
-> > VIVT and highmem do work together.  Highmem for ARM was in fact 
-> > developed on such a platform.
-> 
-> Thanks for confirming. Do you remember why kunmap() doesn't (need to)
-> flush the cache alias (for VIVT)? Or if it does, where?
-
-kunmap() calls kunmap_high() which actually does not unmap anything but 
-only decrement a use count.  The page is kept around in case it is 
-kmap()'d again, in which case the kmap() will be almost free and the 
-page still warm.
-
-It is only when the kmap() for a new page runs out of free pkmap  
-entries that the unused but still mapped pages are unmapped.  This 
-unmapping is done in flush_all_zero_pkmaps() where all the unused pages 
-are all unmapped at once.  The cache for all those pages is flushed with 
-flush_cache_kmaps() which on ARM maps to flush_cache_all() when the 
-cache is VIVT.
+kernel/sched/cputime.c:steal_account_process_tick
 
 
-Nicolas
+
+Stefano Stabellini (4):
+      xen: move xen_setup_runstate_info and get_runstate_snapshot to drivers/xen/time.c
+      kernel: missing include in cputime.c
+      arm: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+      xen/arm: account for stolen ticks
+
+ arch/arm/Kconfig                |   20 +++++++++
+ arch/arm/include/asm/paravirt.h |   19 ++++++++
+ arch/arm/kernel/Makefile        |    1 +
+ arch/arm/kernel/paravirt.c      |   25 +++++++++++
+ arch/arm/xen/enlighten.c        |   21 +++++++++
+ arch/ia64/xen/time.c            |   48 +++------------------
+ arch/x86/xen/time.c             |   76 +--------------------------------
+ drivers/xen/Makefile            |    2 +-
+ drivers/xen/time.c              |   91 +++++++++++++++++++++++++++++++++++++++
+ include/xen/xen-ops.h           |    5 ++
+ kernel/sched/cputime.c          |    1 +
+ 11 files changed, 191 insertions(+), 118 deletions(-)
+ create mode 100644 arch/arm/include/asm/paravirt.h
+ create mode 100644 arch/arm/kernel/paravirt.c
+ create mode 100644 drivers/xen/time.c
+
+
+git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git lost_ticks_4
+
+Cheers,
+
+Stefano
