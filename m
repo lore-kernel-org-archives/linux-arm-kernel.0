@@ -1,32 +1,60 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 28 May 2013 15:21:04 +0100
-Subject: [RFC PATCHv4 0/6] arm: Initial TI-Nspire support
-In-Reply-To: <CACRpkdaQfaPQdJ1SDN--JDqcrXs8p6=FaDN+4KtKZF6nLtOvvw@mail.gmail.com>
-References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
- <201305262323.29519.arnd@arndb.de>
- <30BA4666-664F-4DA4-A1D5-C2B8AA63C6AB@gmail.com>
- <201305271232.03644.arnd@arndb.de>	<1369738481.3148.9.camel@hornet>
- <CACRpkdaQfaPQdJ1SDN--JDqcrXs8p6=FaDN+4KtKZF6nLtOvvw@mail.gmail.com>
-Message-ID: <1369750864.2939.1.camel@hornet>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 28 May 2013 15:25:11 +0100
+Subject: [PATCH v3 7/7] ARM: KVM: drop use of PAGE_S2_DEVICE
+In-Reply-To: <CAEDV+gJSM4EpGNV=fN+i6s2K9z6taMzmuNjVf_KyvTUvPaZAwg@mail.gmail.com>
+References: <1368529900-22572-1-git-send-email-marc.zyngier@arm.com>
+ <1368529900-22572-8-git-send-email-marc.zyngier@arm.com>
+ <CAEDV+gJeeQUOOLjFpkvoPk7e=csjmvvefhdp1miiWtosABwW6Q@mail.gmail.com>
+ <51A482CE.1090509@arm.com>
+ <CAEDV+gJSM4EpGNV=fN+i6s2K9z6taMzmuNjVf_KyvTUvPaZAwg@mail.gmail.com>
+Message-ID: <51A4BE47.7080009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-05-28 at 15:16 +0100, Linus Walleij wrote:
-> On Tue, May 28, 2013 at 12:54 PM, Pawel Moll <pawel.moll@arm.com> wrote:
-> > On Mon, 2013-05-27 at 11:32 +0100, Arnd Bergmann wrote:
-> >> b) add a new KMS driver for this hardware that can be used as an
-> >> alternative to the existing one and that works with DT.
-> >
-> > There are people working on this, just trying to jump through some legal
-> > hoops to post a RFC. Once this is done we'll be in an interesting
-> > position of two amba_bus drivers "competing" for the same amba_bus
-> > device, which I'm not sure how to deal with right now...
-> 
-> Make them mutually exclusive in Kconfig?
+On 28/05/13 15:16, Christoffer Dall wrote:
+> On Tue, May 28, 2013 at 3:11 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> On 27/05/13 21:01, Christoffer Dall wrote:
+>>> On Tue, May 14, 2013 at 4:11 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> At the moment, when mapping a device into Stage-2 for a guest,
+>>>> we override whatever the guest uses by forcing a device memory
+>>>> type in Stage-2.
+>>>>
+>>>> While this is not exactly wrong, this isn't really the "spirit" of
+>>>> the architecture. The hardware shouldn't have to cope for a broken
+>>>> guest mapping to a device as normal memory.
+>>>>
+>>>
+>>> So I'm trying to think of a scenario where this feature in the
+>>> architecture would actually be useful, and it sounds like from you
+>>> guys that it's only useful to properly run a broken guest.
+>>>
+>>> Are we 100% sure that a malicious guest can't leverage this to break
+>>> isolation? I'm thinking something along the lines of writing to a
+>>> device (for example the gic virtual cpu interface) with a cached
+>>> mapping. If such a write is in fact written back to cache, and not
+>>> evicted from the cache before a later time, where a different VM is
+>>> running, can't that adversely affect the other VM?
+>>>
+>>> Probably this can never happen, but I wasn't able to convince myself
+>>> of this from going through the ARM ARM...?
+>>
+>> I think you definitely have a point here, and I completely missed that
+>> case. A shared device (like the GIC virtual CPU interface) must be
+>> forced to a device memory type, otherwise we cannot ensure strict
+>> isolation of guests.
+>>
+>> I'll drop this patch from my series and add PAGE_S2_DEVICE back to the
+>> arm64 port.
+>>
+> We still need to get rid of the USER bit in the definition, and since
+> that's a purely arch/arm/* patch I assume it should go through RMK's
+> tree. Will you ack the other patch?
 
-Certainly an option.
+Sure. Just also drop the call to kvm_set_s2pte_writable in
+kvm_phys_addr_ioremap, which is not required now that PAGE_S2_DEVICE
+implies RW. With that, you can add my Ack.
 
-I wouldn't mind having both compiled as modules and loading one or the
-other, but it wouldn't fly with "=y"...
 
-Pawe?
+	M.
+-- 
+Jazz is not dead. It just smells funny...
