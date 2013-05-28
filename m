@@ -1,147 +1,75 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 28 May 2013 18:54:31 +0100
-Subject: [PATCH v4 3/4] arm: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <alpine.DEB.2.02.1305281835080.4799@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1305281835080.4799@kaball.uk.xensource.com>
-Message-ID: <1369763672-12919-3-git-send-email-stefano.stabellini@eu.citrix.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 28 May 2013 14:02:27 -0400
+Subject: [PATCH 2/2] net: mv643xx_eth: proper initialization for
+ Kirkwood SoCs
+In-Reply-To: <20130524173306.GA30022@obsidianresearch.com>
+References: <1369253042-15082-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130522201607.GA18823@obsidianresearch.com>
+ <20130523160111.GP31290@titan.lakedaemon.net>
+ <20130523171112.GB31281@obsidianresearch.com>
+ <20130523172339.GQ31290@titan.lakedaemon.net>
+ <20130523175357.GB2821@obsidianresearch.com>
+ <20130523184028.GU31290@titan.lakedaemon.net>
+ <20130523190140.GA4010@obsidianresearch.com>
+ <20130524164636.GV31290@titan.lakedaemon.net>
+ <20130524173306.GA30022@obsidianresearch.com>
+Message-ID: <20130528180227.GY31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM.
+Jason,
 
-The only paravirt interface supported is pv_time_ops.steal_clock, so no
-runtime pvops patching needed.
+Sorry, I meant to get back to this earlier and it slipped off of my
+plate. :(
 
-This allows us to make use of steal_account_process_tick for stolen
-ticks accounting.
+On Fri, May 24, 2013 at 11:33:06AM -0600, Jason Gunthorpe wrote:
+> On Fri, May 24, 2013 at 12:46:36PM -0400, Jason Cooper wrote:
+> 
+> > > Why are you not keen on this? It seems like normal device driver
+> > > practice, that is what the data field of of_device_id is typically
+> > > used for..
+> > 
+> > I'm not keen on it because we don't have a document saying "All kirkwood
+> > SoCs need PSC1 set to X after reset."  We know it, but have we tested
+> > the 6282?
+> 
+> I disagree. The manul is very clear how PSC1 must be set for proper
+> operation. Clk125BypassEn bit is used only for loopback testing, it
+> should never set for driver operation. Similarly PortReset must be
+> cleared for driver operation.
+> 
+> It is always safe for the driver to clear these bits, if it knows they
+> are available.  In fact, I would argue the driver should always clear
+> these bits so that the bootloader isn't relied on to do it. It doesn't
+> matter if the SOC errantly sets the bit or not, it can *always* be
+> safely cleared.
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-CC: linux at arm.linux.org.uk
-CC: will.deacon at arm.com
-CC: nico at linaro.org
-CC: marc.zyngier at arm.com
-CC: cov at codeaurora.org
-CC: arnd at arndb.de
-CC: olof at lixom.net
+Great!
 
-Changes in v3:
-- improve commit description and Kconfig help text;
-- no need to initialize pv_time_ops;
-- add PARAVIRT_TIME_ACCOUNTING.
----
- arch/arm/Kconfig                |   20 ++++++++++++++++++++
- arch/arm/include/asm/paravirt.h |   19 +++++++++++++++++++
- arch/arm/kernel/Makefile        |    1 +
- arch/arm/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
- 4 files changed, 65 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/asm/paravirt.h
- create mode 100644 arch/arm/kernel/paravirt.c
+> Further, I compared my 88F6282/88F6283 manual against the public
+> 88F6180/88F619x/88F6281 spec and confirmed that the PSC1 layout is the
+> same.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 49d993c..5621a02 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1786,12 +1786,32 @@ config XEN_DOM0
- 	def_bool y
- 	depends on XEN
- 
-+config PARAVIRT
-+	bool "Enable paravirtualization code"
-+	---help---
-+	  This changes the kernel so it can modify itself when it is run
-+	  under a hypervisor, potentially improving performance significantly
-+	  over full virtualization.
-+
-+config PARAVIRT_TIME_ACCOUNTING
-+	bool "Paravirtual steal time accounting"
-+	select PARAVIRT
-+	default n
-+	---help---
-+	  Select this option to enable fine granularity task steal time
-+	  accounting. Time spent executing other tasks in parallel with
-+	  the current vCPU is discounted from the vCPU power. To account for
-+	  that, there can be a small performance impact.
-+
-+	  If in doubt, say N here.
-+
- config XEN
- 	bool "Xen guest support on ARM (EXPERIMENTAL)"
- 	depends on ARM && AEABI && OF
- 	depends on CPU_V7 && !CPU_V6
- 	depends on !GENERIC_ATOMIC64
- 	select ARM_PSCI
-+	select PARAVIRT
- 	help
- 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
- 
-diff --git a/arch/arm/include/asm/paravirt.h b/arch/arm/include/asm/paravirt.h
-new file mode 100644
-index 0000000..3b95bc6
---- /dev/null
-+++ b/arch/arm/include/asm/paravirt.h
-@@ -0,0 +1,19 @@
-+#ifndef _ASM_ARM_PARAVIRT_H
-+#define _ASM_ARM_PARAVIRT_H
-+
-+struct static_key;
-+extern struct static_key paravirt_steal_enabled;
-+extern struct static_key paravirt_steal_rq_enabled;
-+
-+struct pv_time_ops {
-+	unsigned long long (*steal_clock)(int cpu);
-+};
-+extern struct pv_time_ops pv_time_ops;
-+
-+static inline u64 paravirt_steal_clock(int cpu)
-+{
-+	return pv_time_ops.steal_clock(cpu);
-+}
-+
-+
-+#endif
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 5f3338e..d911db6 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -76,6 +76,7 @@ obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
- ifneq ($(CONFIG_ARCH_EBSA110),y)
-   obj-y		+= io.o
- endif
-+obj-$(CONFIG_PARAVIRT)	+= paravirt.o
- 
- head-y			:= head$(MMUEXT).o
- obj-$(CONFIG_DEBUG_LL)	+= debug.o
-diff --git a/arch/arm/kernel/paravirt.c b/arch/arm/kernel/paravirt.c
-new file mode 100644
-index 0000000..53f371e
---- /dev/null
-+++ b/arch/arm/kernel/paravirt.c
-@@ -0,0 +1,25 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copyright (C) 2013 Citrix Systems
-+ *
-+ * Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-+ */
-+
-+#include <linux/export.h>
-+#include <linux/jump_label.h>
-+#include <linux/types.h>
-+#include <asm/paravirt.h>
-+
-+struct static_key paravirt_steal_enabled;
-+struct static_key paravirt_steal_rq_enabled;
-+
-+struct pv_time_ops pv_time_ops;
-+EXPORT_SYMBOL_GPL(pv_time_ops);
--- 
-1.7.2.5
+Even better.
+
+> So all of these SOC's can share a driver compatible string.
+
+Ok, "marvell,kirkwood-eth" works for me then.  I think Sebastian already
+has patches for that.
+
+> AFAICT the only reason the driver doesn't touch PSC1 today is because
+> the PSC1 was introduced in a later IP revision and its presence isn't
+> auto-detectable.
+
+Makes sense.
+
+> The last bit of the puzzle to get bootloader independence on kirkwood
+> is to encode the phy interface type (GMII/RGMII/BASE-X) in the DT so
+> the entire PSC1 can be set by the driver..
+
+Hmm, let's work on that separately, and later.  I've snowballed this
+attempt enough ;-)
+
+Thanks for digging into this for us,
+
+Jason.
