@@ -1,44 +1,90 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 28 May 2013 05:29:40 -0700
-Subject: [PATCHv2 0/3] Add G762/G763 PWM fan controller
-In-Reply-To: <20130528111921.GD11547@mithrandir>
-References: <cover.1369687670.git.arno@natisbad.org>
- <152190814.eApXVbVBPA@wuerfel> <87li6z2yxj.fsf@natisbad.org>
- <20130528111921.GD11547@mithrandir>
-Message-ID: <20130528122940.GA29012@roeck-us.net>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 28 May 2013 14:42:55 +0200
+Subject: [PATCH] cpuidle: improve governor Kconfig options
+In-Reply-To: <51A4A1A4.1070008@linaro.org>
+References: <1369688458-9114-1-git-send-email-daniel.lezcano@linaro.org>
+ <1578834.dvFIpyCvrt@vostro.rjw.lan> <51A4A1A4.1070008@linaro.org>
+Message-ID: <5938372.bcA6BTeOGP@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 01:19:23PM +0200, Thierry Reding wrote:
-> On Tue, May 28, 2013 at 12:15:04PM +0200, Arnaud Ebalard wrote:
-> > Hi Arnd,
+On Tuesday, May 28, 2013 02:23:00 PM Daniel Lezcano wrote:
+> On 05/28/2013 01:46 PM, Rafael J. Wysocki wrote:
+> > On Monday, May 27, 2013 11:00:58 PM Daniel Lezcano wrote:
+> >> Each governor is suitable for different kernel configurations: the menu
+> >> governor suits better for a tickless system, while the ladder governor fits
+> >> better for a periodic timer tick system.
+> >>
+> >> The Kconfig does not allow to [un]select a governor, thus both are compiled in
+> >> the kernel but the init order makes the menu governor to be the last one to be
+> >> registered, so becoming the default. The only way to switch back to the ladder
+> >> governor is to enable the sysfs governor switch in the kernel command line.
+> >>
+> >> Because it seems nobody complained about this, the menu governor is used by
+> >> default most of the time on the system, having both governors is not really
+> >> necessary on a tickless system but there isn't a config option to disable one
+> >> or another governor.
+> >>
+> >> Create a submenu for cpuidle and add a label for each governor, so we can see
+> >> the option in the menu config and enable/disable it.
+> >>
+> >> The governors will be enabled depending on the CONFIG_NO_HZ option:
+> >>  - If CONFIG_NO_HZ is set, then the menu governor is selected and the ladder
+> >>    governor is optional, defaulting to 'no'
 > > 
-> > Arnd Bergmann <arnd@arndb.de> writes:
-> > 
-> > > On Tuesday 28 May 2013 00:02:29 Arnaud Ebalard wrote:
-> > >> 
-> > >> This series adds support for GMT G762/G763. This work is based on a
-> > >> basic version for 2.6.31 kernel developed Olivier Mouchet for LaCie
-> > >> NAS. Updates have been performed to run on recent kernels. Support has
-> > >> been completed and additional features added: ability to configure
-> > >> various characteristics from .dts file, better initialization, alarms
-> > >> and error reporting support, gear mode, polarity, fan pulse per
-> > >> revolution, fan startup voltage control.
-> > >
-> > > I wonder if this could be split into two separate drivers, one for
-> > > the pwm subsystem, and one for a hardware-independent fan controller
-> > > based on the pwm interfaces.
-> > 
-> > To be honest, I wouldn't even know how to start in order to do that.
-> > Additionally, it would be worth the effort if other drivers could be
-> > easily refactored using this idea. I'll let hwmon people provide some
-> > feedback and try and comply with their directions (based on the cpu
-> > cycle I can spend on this).
+> > Why not defaulting to 'yes'?  That'd be backwards compatible, wouldn't it?
 > 
-> What Arnd proposes doesn't sounds like a very good idea. PWM-controlled
-> fans should be able to work just fine using a generic driver that uses
-> the PWM framework, similar to the PWM backlight and LED drivers.
-> 
-Isn't that exactly what Arnd proposed ?
+> Yes, that wouldn't be backward compatible but who wants the ladder
+> governor which is less efficient with a tickless system ?
 
-Guenter
+I don't know and this isn't the right question to ask I think.
+
+You need to ask who uses the ladder governor with CONFIG_NO_HZ and you need to
+avoid making changes that aren't backwards compatible if you don't know the
+answer (which I'm pretty sure is the case).
+
+I'd prefer to default to 'yes' to start with and then to change the
+default to 'no' after a couple of cycles, possibly.
+
+> >>  - If CONFIG_NO_HZ is not set, then the ladder governor is selected and the
+> >>    menu governor is optional, defaulting to 'no'
+> > 
+> > Are you sure this is not going to introduce regressions with CONFIG_NO_HZ
+> > unset?
+> 
+> Yes, a system configured with a periodic tick will use the ladder
+> instead of the menu governor (which is less efficient on this
+> configuration).
+
+Well, "less efficient" meaning what exactly?  Less power-efficient or less
+efficient performance-wise?
+
+> Currently the default is the menu governor with a periodic tick system
+> because both governors are compiled in and the init order makes the menu
+> governor to be enabled instead of the 'ladder'.
+
+I understand that.
+
+> We can set both to 'yes' by default but in this case, I suggest to add
+> in the code a 'preferred' governor depending on tickless or not, so the
+> right governor is chosen at boot time depending on CONFIG_NO_HZ.
+> 
+> Otherwise, I am not sure people running servers (with a periodic tick)
+> will change their kernel command line option to enable the sysfs
+> governor switch to change the governor to ladder, neither they are aware
+> ladder is better for their system.
+> 
+> I am open to any suggestion.
+
+I think the change to make the governor preference depend on CONFIG_NO_HZ
+kind of makes sense.  However, I'd default to 'yes' for both governors in both
+configurations to start with (which basically means that the ordering will now
+depend on CONFIG_NO_HZ).
+
+Thanks,
+Rafael
+
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
