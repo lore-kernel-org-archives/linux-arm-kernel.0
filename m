@@ -1,46 +1,73 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 May 2013 14:38:22 -0400
-Subject: [GIT PULL] ARM: mvebu: boards for v3.11 (round 2 cumulative)
-Message-ID: <20130528183822.GC31290@titan.lakedaemon.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 28 May 2013 11:33:15 -0700
+Subject: [PATCH] ARM: DTS: OMAP4: Panda/SDP: twl6030: fix mux for IRQ pin
+ and msecure line
+In-Reply-To: <CAGo_u6ruWQwSB8Z0BRLda7HunTyr9mGpx4eMSGdQZkCxKxbHbg@mail.gmail.com>
+ (Nishanth Menon's message of "Sun, 26 May 2013 12:35:51 -0500")
+References: <1369423702-31501-1-git-send-email-khilman@linaro.org>
+ <20130524200954.GA2344@kahuna> <20130524203231.GA2555@kahuna>
+ <87obc0f54r.fsf@linaro.org>
+ <CAGo_u6oz1v1J-6z5W-X7CsOmi+7SAMicz1LZTv0sVXhej1DJ2Q@mail.gmail.com>
+ <87a9nkf3mu.fsf@linaro.org> <87ppwgdnxu.fsf@linaro.org>
+ <CAGo_u6ruWQwSB8Z0BRLda7HunTyr9mGpx4eMSGdQZkCxKxbHbg@mail.gmail.com>
+Message-ID: <87a9nfc5uc.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Nishanth Menon <nm@ti.com> writes:
 
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+> On Fri, May 24, 2013 at 5:15 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>> Kevin Hilman <khilman@linaro.org> writes:
+>>
+>>> Nishanth Menon <nm@ti.com> writes:
+>>
+>> [...]
+>>
+>>>> Actually 2 things:
+>>>>
+>>>> a) patch seems to do the wrong thing for 4460 - 0x18 offset should
+>>>> have been used instead of 0x14 which is correct for 4430?
+>>>
+>>> I see, thanks.  I'll double check the TRMs.
+>>>
+>>>> b) yes, I understand,  the current settings we did worked, but the
+>>>> mode(0) we are setting to is real weird - we are setting it up for
+>>>> clk0 out - I cant even think why it is even working in the first place
+>>>> :( - is it because we are pumping out sysclkout and as a result we are
+>>>> lucky that msecure is being sampled at the right point by twl6030
+>>>> allowing rtc access? either way, IMHO, the configuration is wrong.
+>>>
+>>> Ah, yes.  Mode zero is definitely wrong.   When I did the original patch
+>>> for legacy mode, I just duplicated the settings u-boot was using.  Guess
+>>> it's a fluke that it works.
+>>
+>> Actually, for legacy mode, it's set correctly in mode 2.  This line:
+>>
+>>         omap_mux_init_signal("fref_clk0_out.sys_drm_msecure", OMAP_PIN_OUTPUT);
+>>
+>> does the right thing based on the signal name.    But for DT boot, I
+>> defintely screwed it up by setting it to mode (and putting it in the
+>> wrong padconf section.)
+>>
+>> Also, are you *really* sure about the offset difference between 4430 and
+>> 4460 here?  I don't have access to NDA docs anymore, so I cannot double
+>> check this.
+>>
+>> What I do know is that the legacy code is using 0x54 for both, and if I
+>> simply comment out that 'sys_drm_msecure' line above, RTC wake stops
+>> working (legacy boot) on both 4430 and 4460, so that seems like pretty
+>> stront evidence that it's the same offset on both.
+> Schematics are public for PandaBoard ES and PandaBoard - as you can
+> see from that the registers connected are definitely different.
 
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+What I see from both schematics is that SYS_DRM_MSECURE is available on
+a few different pads, but on both 4430 and 4460, one of the places is in
+mode 2 of FREF_CLK0_OUT, which is at offset 0x54 on both SoCs.
 
-are available in the git repository at:
+Based on that reading, and the fact that not correctly muxing that pad
+to mode 2 on *both* 4430 and 4460 makes the RTC work, I'm rather
+convinced that the offset should be the same for 4430 and 4460.
 
-  git://git.infradead.org/users/jcooper/linux.git tags/boards-3.11-2
+What am I missing?
 
-for you to fetch changes up to 391a16c7783a64309dc930c6d454372d7a8beb12:
-
-  ARM: Kirkwood: Convert LSXL to restart-poweroff driver. (2013-05-26 01:12:34 +0000)
-
-----------------------------------------------------------------
-mvebu board changes for v3.11 (round 2)
-
- - kirkwood
-    - QNAP use power-off driver
-    - LSXL use restart-poweroff driver
-
-----------------------------------------------------------------
-Andrew Lunn (2):
-      ARM: Kirkwood: Make use of the QNAP Power off driver.
-      ARM: Kirkwood: Convert LSXL to restart-poweroff driver.
-
-Simon Baatz (1):
-      ARM: Kirkwood: add DT support for Sheevaplug and Sheevaplug eSATA
-
- arch/arm/boot/dts/kirkwood-lsxl.dtsi      |  4 ++++
- arch/arm/boot/dts/kirkwood-ts219.dtsi     |  5 +++++
- arch/arm/mach-kirkwood/Kconfig            |  9 +++++++++
- arch/arm/mach-kirkwood/Makefile           |  1 +
- arch/arm/mach-kirkwood/board-dt.c         |  4 ++++
- arch/arm/mach-kirkwood/board-lsxl.c       | 16 ----------------
- arch/arm/mach-kirkwood/board-sheevaplug.c | 27 +++++++++++++++++++++++++++
- arch/arm/mach-kirkwood/board-ts219.c      |  3 ---
- arch/arm/mach-kirkwood/common.h           |  5 +++++
- 9 files changed, 55 insertions(+), 19 deletions(-)
- create mode 100644 arch/arm/mach-kirkwood/board-sheevaplug.c
+Kevin
