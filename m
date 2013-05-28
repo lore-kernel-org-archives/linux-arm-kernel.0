@@ -1,53 +1,32 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 28 May 2013 17:00:57 +0200
-Subject: [PATCH] ARM: mxs: icoll: Fix interrupts gpio bank 0
-Message-ID: <1369753257-11091-1-git-send-email-mpa@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 28 May 2013 17:05:46 +0200
+Subject: [PATCH v4 8/8] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <CAOMZO5BJ7h=_cqSUG6X25SHTMe5ym1_nToj5P_PMR9bxN+B2Ow@mail.gmail.com>
+References: <1361878774-6382-1-git-send-email-p.zabel@pengutronix.de>
+ <1361878774-6382-9-git-send-email-p.zabel@pengutronix.de>
+ <CAOMZO5BJ7h=_cqSUG6X25SHTMe5ym1_nToj5P_PMR9bxN+B2Ow@mail.gmail.com>
+Message-ID: <1369753546.4000.4.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxs interrupt controller does not support polling for interrupts,
-but the driver still does it, which is a relict from
-pre-MULTI_IRQ_HANDLER times.
+Hi Fabio,
 
-The existing code assumes that 0x7f means no interrupt, but this value
-is an actually valid irq number, namely gpio bank 0's irq. This results
-in the driver not detecting when irq 0x7f is active which makes the
-machine effectively dead lock.
+Am Montag, den 27.05.2013, 13:25 -0300 schrieb Fabio Estevam:
+> On Tue, Feb 26, 2013 at 8:39 AM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> > This driver implements a reset controller device that toggles gpios
+> > connected to reset pins of peripheral ICs. The delay between assertion
+> > and de-assertion of the reset signal can be configured.
+> >
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> 
+> Looks good and it is a very useful binding.
+> 
+> Will anyone apply this?
 
-This patch removes the interrupt poll loop and allows usage of gpio0
-interrupt without an infinite loop.
+I have tried to address Olof's concerns by making the gpio-reset driver
+only handle a single gpio per device.
 
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Cc: stable at vger.kernel.org
----
- drivers/irqchip/irq-mxs.c | 14 ++++----------
- 1 file changed, 4 insertions(+), 10 deletions(-)
+I'll send a new patch for review.
 
-diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
-index 29889bb..63b3d4e 100644
---- a/drivers/irqchip/irq-mxs.c
-+++ b/drivers/irqchip/irq-mxs.c
-@@ -76,16 +76,10 @@ asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
- {
- 	u32 irqnr;
- 
--	do {
--		irqnr = __raw_readl(icoll_base + HW_ICOLL_STAT_OFFSET);
--		if (irqnr != 0x7f) {
--			__raw_writel(irqnr, icoll_base + HW_ICOLL_VECTOR);
--			irqnr = irq_find_mapping(icoll_domain, irqnr);
--			handle_IRQ(irqnr, regs);
--			continue;
--		}
--		break;
--	} while (1);
-+	irqnr = __raw_readl(icoll_base + HW_ICOLL_STAT_OFFSET);
-+	__raw_writel(irqnr, icoll_base + HW_ICOLL_VECTOR);
-+	irqnr = irq_find_mapping(icoll_domain, irqnr);
-+	handle_IRQ(irqnr, regs);
- }
- 
- static int icoll_irq_domain_map(struct irq_domain *d, unsigned int virq,
--- 
-1.8.2.rc2
+regards
+Philipp
