@@ -1,48 +1,30 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 28 May 2013 18:53:24 +0100
-Subject: [PATCH v4 0/4] xen/arm: CONFIG_PARAVIRT and stolen ticks
- accounting
-Message-ID: <alpine.DEB.2.02.1305281835080.4799@kaball.uk.xensource.com>
+Date: Tue, 28 May 2013 18:54:30 +0100
+Subject: [PATCH v4 2/4] kernel: missing include in cputime.c
+In-Reply-To: <alpine.DEB.2.02.1305281835080.4799@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1305281835080.4799@kaball.uk.xensource.com>
+Message-ID: <1369763672-12919-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
-this patch series introduces stolen ticks accounting for Xen on ARM.
-Stolen ticks are clocksource ticks that have been "stolen" from the cpu,
-typically because Linux is running in a virtual machine and the vcpu has
-been descheduled.
-To account for these ticks we introduce CONFIG_PARAVIRT and pv_time_ops
-so that we can make use of:
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+CC: mingo at redhat.com
+CC: peterz at infradead.org
+---
+ kernel/sched/cputime.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-kernel/sched/cputime.c:steal_account_process_tick
-
-
-
-Stefano Stabellini (4):
-      xen: move xen_setup_runstate_info and get_runstate_snapshot to drivers/xen/time.c
-      kernel: missing include in cputime.c
-      arm: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-      xen/arm: account for stolen ticks
-
- arch/arm/Kconfig                |   20 +++++++++
- arch/arm/include/asm/paravirt.h |   19 ++++++++
- arch/arm/kernel/Makefile        |    1 +
- arch/arm/kernel/paravirt.c      |   25 +++++++++++
- arch/arm/xen/enlighten.c        |   21 +++++++++
- arch/ia64/xen/time.c            |   48 +++------------------
- arch/x86/xen/time.c             |   76 +--------------------------------
- drivers/xen/Makefile            |    2 +-
- drivers/xen/time.c              |   91 +++++++++++++++++++++++++++++++++++++++
- include/xen/xen-ops.h           |    5 ++
- kernel/sched/cputime.c          |    1 +
- 11 files changed, 191 insertions(+), 118 deletions(-)
- create mode 100644 arch/arm/include/asm/paravirt.h
- create mode 100644 arch/arm/kernel/paravirt.c
- create mode 100644 drivers/xen/time.c
-
-
-git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git lost_ticks_4
-
-Cheers,
-
-Stefano
+diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
+index cc2dc3ee..a5d1a9b 100644
+--- a/kernel/sched/cputime.c
++++ b/kernel/sched/cputime.c
+@@ -5,6 +5,7 @@
+ #include <linux/static_key.h>
+ #include <linux/context_tracking.h>
+ #include "sched.h"
++#include <asm/paravirt.h>
+ 
+ 
+ #ifdef CONFIG_IRQ_TIME_ACCOUNTING
+-- 
+1.7.2.5
