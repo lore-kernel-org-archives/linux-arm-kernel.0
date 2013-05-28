@@ -1,35 +1,173 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 May 2013 19:52:57 -0700
-Subject: [GIT PULL] Samsung fixes-3 for v3.10
-In-Reply-To: <519FF6DB.5040002@samsung.com>
-References: <519FF6DB.5040002@samsung.com>
-Message-ID: <CAOesGMjEESQ1a6V3AC2RqGQTwk++Zq2FwZVQT0C=ToP1gTwR3w@mail.gmail.com>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Tue, 28 May 2013 11:06:26 +0800
+Subject: [PATCH] arm: prima2: move to generic reset controller driver framework
+Message-ID: <1369710386-23303-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 24, 2013 at 4:25 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
->
->   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-fixes-3
->
-> for you to fetch changes up to 15f504f0c2038b9a0f1569c9ce34def61f0c65be:
->
->   ARM: SAMSUNG: Add names to fimd0 IRQ resources (2013-05-25 06:49:43 +0900)
->
-> ----------------------------------------------------------------
-> Fixes following for v3.10
-> - to get usb2 working on the Chromebook with adding the
->   usb phy node for usb2 on exynos5250
-> - supporting exynos4210 rev0 SoC
-> - exynos5440 restart applying only to powered-on domains
-> - drm-exynos probe failure with adding resource names to
->   fimd0 platform device
+this moves to generic IP module reset framework, and make other drivers
+use common device_reset() API.
 
-Pulled, thanks.
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/boot/dts/atlas6.dtsi |  3 +-
+ arch/arm/boot/dts/marco.dtsi  |  3 +-
+ arch/arm/boot/dts/prima2.dtsi |  3 +-
+ arch/arm/mach-prima2/rstc.c   | 71 ++++++++++++++++++++++++++-----------------
+ 4 files changed, 49 insertions(+), 31 deletions(-)
 
--Olof
+diff --git a/arch/arm/boot/dts/atlas6.dtsi b/arch/arm/boot/dts/atlas6.dtsi
+index 7d1a279..ffe5203 100644
+--- a/arch/arm/boot/dts/atlas6.dtsi
++++ b/arch/arm/boot/dts/atlas6.dtsi
+@@ -56,9 +56,10 @@
+ 				#clock-cells = <1>;
+ 			};
+ 
+-			reset-controller at 88010000 {
++			rstc: reset-controller at 88010000 {
+ 				compatible = "sirf,prima2-rstc";
+ 				reg = <0x88010000 0x1000>;
++				#reset-cells = <1>;
+ 			};
+ 
+ 			rsc-controller at 88020000 {
+diff --git a/arch/arm/boot/dts/marco.dtsi b/arch/arm/boot/dts/marco.dtsi
+index 1579c34..0c9647d 100644
+--- a/arch/arm/boot/dts/marco.dtsi
++++ b/arch/arm/boot/dts/marco.dtsi
+@@ -58,9 +58,10 @@
+ 			#size-cells = <1>;
+ 			ranges = <0xc2000000 0xc2000000 0x1000000>;
+ 
+-			reset-controller at c2000000 {
++			rstc: reset-controller at c2000000 {
+ 				compatible = "sirf,marco-rstc";
+ 				reg = <0xc2000000 0x10000>;
++				#reset-cells = <1>;
+ 			};
+ 		};
+ 
+diff --git a/arch/arm/boot/dts/prima2.dtsi b/arch/arm/boot/dts/prima2.dtsi
+index 3329719..5ecf1f9 100644
+--- a/arch/arm/boot/dts/prima2.dtsi
++++ b/arch/arm/boot/dts/prima2.dtsi
+@@ -65,9 +65,10 @@
+ 				#clock-cells = <1>;
+ 			};
+ 
+-			reset-controller at 88010000 {
++			rstc: reset-controller at 88010000 {
+ 				compatible = "sirf,prima2-rstc";
+ 				reg = <0x88010000 0x1000>;
++				#reset-cells = <1>;
+ 			};
+ 
+ 			rsc-controller at 88020000 {
+diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
+index 435019c..a4d77eb 100644
+--- a/arch/arm/mach-prima2/rstc.c
++++ b/arch/arm/mach-prima2/rstc.c
+@@ -13,44 +13,24 @@
+ #include <linux/device.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/reset-controller.h>
++
++#define SIRFSOC_RSTBIT_NUM	64
+ 
+ void __iomem *sirfsoc_rstc_base;
+ static DEFINE_MUTEX(rstc_lock);
+ 
+-static struct of_device_id rstc_ids[]  = {
+-	{ .compatible = "sirf,prima2-rstc" },
+-	{ .compatible = "sirf,marco-rstc" },
+-	{},
+-};
+-
+-static int __init sirfsoc_of_rstc_init(void)
+-{
+-	struct device_node *np;
+-
+-	np = of_find_matching_node(NULL, rstc_ids);
+-	if (!np)
+-		panic("unable to find compatible rstc node in dtb\n");
+-
+-	sirfsoc_rstc_base = of_iomap(np, 0);
+-	if (!sirfsoc_rstc_base)
+-		panic("unable to map rstc cpu registers\n");
+-
+-	of_node_put(np);
+-
+-	return 0;
+-}
+-early_initcall(sirfsoc_of_rstc_init);
+-
+-int sirfsoc_reset_device(struct device *dev)
++static int sirfsoc_reset_module(struct reset_controller_dev *rcdev,
++					unsigned long sw_reset_idx)
+ {
+-	u32 reset_bit;
++	u32 reset_bit = sw_reset_idx;
+ 
+-	if (of_property_read_u32(dev->of_node, "reset-bit", &reset_bit))
++	if (reset_bit >= SIRFSOC_RSTBIT_NUM)
+ 		return -EINVAL;
+ 
+ 	mutex_lock(&rstc_lock);
+ 
+-	if (of_device_is_compatible(dev->of_node, "sirf,prima2-rstc")) {
++	if (of_device_is_compatible(rcdev->of_node, "sirf,prima2-rstc")) {
+ 		/*
+ 		 * Writing 1 to this bit resets corresponding block. Writing 0 to this
+ 		 * bit de-asserts reset signal of the corresponding block.
+@@ -80,6 +60,41 @@ int sirfsoc_reset_device(struct device *dev)
+ 	return 0;
+ }
+ 
++static struct reset_control_ops sirfsoc_rstc_ops = {
++	.reset = sirfsoc_reset_module,
++};
++
++static struct reset_controller_dev sirfsoc_reset_controller = {
++	.ops = &sirfsoc_rstc_ops,
++	.nr_resets = SIRFSOC_RSTBIT_NUM,
++};
++
++static struct of_device_id rstc_ids[]  = {
++	{ .compatible = "sirf,prima2-rstc" },
++	{ .compatible = "sirf,marco-rstc" },
++	{},
++};
++
++static int __init sirfsoc_of_rstc_init(void)
++{
++	struct device_node *np = of_find_matching_node(NULL, rstc_ids);
++	if (!np)
++		goto out;
++
++	sirfsoc_rstc_base = of_iomap(np, 0);
++	if (!sirfsoc_rstc_base)
++		panic("unable to map rstc cpu registers\n");
++
++	sirfsoc_reset_controller.of_node = np;
++
++	if (IS_ENABLED(CONFIG_RESET_CONTROLLER))
++		reset_controller_register(&sirfsoc_reset_controller);
++
++out:
++	return 0;
++}
++arch_initcall(sirfsoc_of_rstc_init);
++
+ #define SIRFSOC_SYS_RST_BIT  BIT(31)
+ 
+ void sirfsoc_restart(char mode, const char *cmd)
+-- 
+1.8.2.3
+
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
