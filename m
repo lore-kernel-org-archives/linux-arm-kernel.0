@@ -1,27 +1,37 @@
-From: Ganesh.Kumar@harman.com (Kumar, Ganesh)
-Date: Tue, 28 May 2013 02:48:33 -0500
-Subject: VDSO for arm 32bit
-In-Reply-To: <20899.25935.838288.45383@pilspetsen.it.uu.se>
-References: <634BB1CFA60ED14386C17849392C3EB202E52C9C0A@HICGWSEX01.ad.harman.com>
- <20899.25935.838288.45383@pilspetsen.it.uu.se>
-Message-ID: <634BB1CFA60ED14386C17849392C3EB202E52C9E87@HICGWSEX01.ad.harman.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 28 May 2013 00:58:09 -0700
+Subject: [PATCH v2] input: sirfsoc_pwrc: add onkey input driver for CSR
+ SiRFprimaII PWRC
+In-Reply-To: <1369709258-14529-1-git-send-email-Baohua.Song@csr.com>
+References: <1369709258-14529-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <20130528075808.GA19496@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mikel,
+Hi Barry,
 
-Kumar, Ganesh writes:
- > Hi All,
- >
- > ? I'm working on OMAP5 on greg's LTS kernel 3.4.25, but I see there is  > no support for vdso for arm 32 bit.
- > I'm planning to port it to arm 32 bit, is there any work under progress?
- > would like to understand why the support for arm 32 bit is not there, any idea?
+On Tue, May 28, 2013 at 10:47:38AM +0800, Barry Song wrote:
+> +	/*
+> +	 * For a typical Linux system, we report KEY_SUSPEND to trigger apm-power.c
+> +	 * to queue a SUSPEND APM event
+> +	 */
+> +	input_event(pwrcdrv->input, EV_PWR, KEY_SUSPEND, 1);
+> +	input_sync(pwrcdrv->input);
+> +
+> +	/*
+> +	 * Todo: report KEY_POWER event for Android platforms, Android PowerManager
+> +	 * will handle the suspend and powerdown/hibernation
+> +	 */
+> +
+...
 
-> 32-bit ARM has a "kuser" page at a fixed virtual address, which exports a few critical routines to user-space.  With that, a vdso is mostly redundant.
+> +
+> +	pwrcdrv->input->evbit[0] = BIT_MASK(EV_PWR) | BIT_MASK(EV_KEY);
+> +	set_bit(KEY_POWER, pwrcdrv->input->keybit);
 
-  Thanks for the info, my main idea is to get the gettimeofday exported through the kuser helper,tried looking at the sources
-but I could not find anything related to that seems done in the mainline kernel tree for arm cortex, am I missing something here?
-I plan to do that if its not available yet, right now I've started with the kernel doc for the kuser, any pointers further
-to get the gettimeofday up and running using the kuser, Thanks in advance for your time.
+Why are we setting up KEY_POWER if we do not send this event?
 
---GK
+Thanks.
+
+-- 
+Dmitry
