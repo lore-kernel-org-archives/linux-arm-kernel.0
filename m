@@ -1,25 +1,51 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 May 2013 19:26:47 +0200
-Subject: [PATCH v2 2/5] irqchip: mmp: support irqchip
-In-Reply-To: <1369707707-30295-3-git-send-email-haojian.zhuang@gmail.com>
+Date: Tue, 28 May 2013 19:32:44 +0200
+Subject: [PATCH v2 4/5] ARM: mmp: move irqs head file
+In-Reply-To: <1369707707-30295-5-git-send-email-haojian.zhuang@gmail.com>
 References: <1369707707-30295-1-git-send-email-haojian.zhuang@gmail.com>
- <1369707707-30295-3-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <201305281926.47790.arnd@arndb.de>
+ <1369707707-30295-5-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <201305281932.44663.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 28 May 2013, Haojian Zhuang wrote:
->         icu_data[0].domain = irq_domain_add_legacy(node, nr_irqs, 0, 0,
->                                                    &mmp_irq_domain_ops,
->                                                    &icu_data[0]);
+> Since irq-mmp driver includes <mach/irqs.h>, it blocks the multiple
+> platform build. So move the head file into include/linux/irqchip/
+> directory.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 
-Is there anything stopping you from converting to the linear domain now?
+I disagree with simply moving the file. Let's check first what is actually
+needed from it.
 
-> +IRQCHIP_DECLARE(mmp_intc, "mrvl,mmp-intc", mmp_of_init);
-> +IRQCHIP_DECLARE(mmp2_intc, "mrvl,mmp2-intc", mmp2_of_init);
-> +IRQCHIP_DECLARE(mmp2_mux_intc, "mrvl,mmp2-mux-intc", mmp2_mux_of_init);
+>  arch/arm/mach-mmp/aspenite.c                                         | 2 +-
+>  arch/arm/mach-mmp/avengers_lite.c                                    | 2 +-
+>  arch/arm/mach-mmp/brownstone.c                                       | 2 +-
+>  arch/arm/mach-mmp/devices.c                                          | 2 +-
+>  arch/arm/mach-mmp/flint.c                                            | 2 +-
+>  arch/arm/mach-mmp/gplugd.c                                           | 2 +-
+>  arch/arm/mach-mmp/jasper.c                                           | 2 +-
+>  arch/arm/mach-mmp/mmp2.c                                             | 2 +-
+>  arch/arm/mach-mmp/pm-mmp2.c                                          | 2 +-
+>  arch/arm/mach-mmp/pm-pxa910.c                                        | 2 +-
+>  arch/arm/mach-mmp/pxa168.c                                           | 2 +-
+>  arch/arm/mach-mmp/pxa910.c                                           | 2 +-
+>  arch/arm/mach-mmp/tavorevb.c                                         | 2 +-
+>  arch/arm/mach-mmp/teton_bga.c                                        | 2 +-
+>  arch/arm/mach-mmp/time.c                                             | 2 +-
+>  arch/arm/mach-mmp/ttc_dkb.c                                          | 2 +-
+>  drivers/gpio/gpio-pxa.c                                              | 3 +--
+>  drivers/irqchip/irq-mmp.c                                            | 3 +--
+>  arch/arm/mach-mmp/include/mach/irqs.h => include/linux/irqchip/mmp.h | 0
+>  19 files changed, 18 insertions(+), 20 deletions(-)
+>  rename arch/arm/mach-mmp/include/mach/irqs.h => include/linux/irqchip/mmp.h (100%)
 
-Please put each line directly after the function it refers to,
-similar to how we do it for EXPORT_SYMBOL.
+My guess is that the long list of IRQ numbers is only needed for legacy
+board files. That list would better be put into arch/arm/mach-mmp/irqs.h.
+
+Try to move as much as you can from the include/linux/irqchip/mmp.h
+file into that new header. Some constants (e.g irq base numbers
+and mmio addresses) can be passed into the icu_init_irq/mmp2_init_icu
+functions as arguments so you don't need them in the global header.
 
 	Arnd
