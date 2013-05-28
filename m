@@ -1,57 +1,29 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 28 May 2013 13:43:23 +0200
-Subject: [PATCHv2 3/3] arm: imx: don't check for CONFIG_PHYLIB as builtin
-In-Reply-To: <1369741403-25315-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1369741403-25315-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1369741403-25315-4-git-send-email-alexandre.belloni@free-electrons.com>
+From: aida.mynzhasova@skitlab.ru (Aida Mynzhasova)
+Date: Tue, 28 May 2013 15:46:17 +0400
+Subject: [PATCH] ARM: OMAP: fix IVA2 module base address
+Message-ID: <1369741577-21984-1-git-send-email-aida.mynzhasova@skitlab.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/mach-imx/mach-imx6q.c | 23 ++++++++++-------------
- 1 file changed, 10 insertions(+), 13 deletions(-)
+This patch corrects the base address of IVA2 module on omap3430.
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 5536fd8..9094849 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -99,16 +99,14 @@ soft:
- /* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
- static int ksz9021rn_phy_fixup(struct phy_device *phydev)
- {
--	if (IS_BUILTIN(CONFIG_PHYLIB)) {
--		/* min rx data delay */
--		phy_write(phydev, 0x0b, 0x8105);
--		phy_write(phydev, 0x0c, 0x0000);
--
--		/* max rx/tx clock delay, min rx/tx control delay */
--		phy_write(phydev, 0x0b, 0x8104);
--		phy_write(phydev, 0x0c, 0xf0f0);
--		phy_write(phydev, 0x0b, 0x104);
--	}
-+	/* min rx data delay */
-+	phy_write(phydev, 0x0b, 0x8105);
-+	phy_write(phydev, 0x0c, 0x0000);
-+
-+	/* max rx/tx clock delay, min rx/tx control delay */
-+	phy_write(phydev, 0x0b, 0x8104);
-+	phy_write(phydev, 0x0c, 0xf0f0);
-+	phy_write(phydev, 0x0b, 0x104);
+Signed-off-by: Aida Mynzhasova <aida.mynzhasova@skitlab.ru>
+---
+ arch/arm/mach-omap2/prcm-common.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+index c7d355f..d5ec044 100644
+--- a/arch/arm/mach-omap2/prcm-common.h
++++ b/arch/arm/mach-omap2/prcm-common.h
+@@ -37,7 +37,7 @@
+ #define OMAP2430_MDM_MOD				0xc00
  
- 	return 0;
- }
-@@ -139,9 +137,8 @@ put_clk:
- 
- static void __init imx6q_sabrelite_init(void)
- {
--	if (IS_BUILTIN(CONFIG_PHYLIB))
--		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
--				ksz9021rn_phy_fixup);
-+	phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
-+				   ksz9021rn_phy_fixup);
- 	imx6q_sabrelite_cko1_setup();
- }
- 
+ /* IVA2 module is < base on 3430 */
+-#define OMAP3430_IVA2_MOD				-0x800
++#define OMAP3430_IVA2_MOD				0x800
+ #define OMAP3430ES2_SGX_MOD				GFX_MOD
+ #define OMAP3430_CCR_MOD				PLL_MOD
+ #define OMAP3430_DSS_MOD				0x600
 -- 
-1.8.1.2
+1.7.10.4
