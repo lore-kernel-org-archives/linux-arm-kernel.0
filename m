@@ -1,45 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 May 2013 10:56:22 -0400
-Subject: [GIT PULL v2] ARM: mvebu: fixes for v3.10 (round 3)
-In-Reply-To: <20130527185436.GN31290@titan.lakedaemon.net>
-References: <20130527185436.GN31290@titan.lakedaemon.net>
-Message-ID: <20130528145622.GS31290@titan.lakedaemon.net>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 28 May 2013 17:00:57 +0200
+Subject: [PATCH] ARM: mxs: icoll: Fix interrupts gpio bank 0
+Message-ID: <1369753257-11091-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof,
+The mxs interrupt controller does not support polling for interrupts,
+but the driver still does it, which is a relict from
+pre-MULTI_IRQ_HANDLER times.
 
-Updated to move two non-critical patches to mvebu/fixes-non-critical
+The existing code assumes that 0x7f means no interrupt, but this value
+is an actually valid irq number, namely gpio bank 0's irq. This results
+in the driver not detecting when irq 0x7f is active which makes the
+machine effectively dead lock.
 
+This patch removes the interrupt poll loop and allows usage of gpio0
+interrupt without an infinite loop.
 
-The following changes since commit 489e138eec96f529c5e8d4cd3ea45882ecdbf5ca:
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Cc: stable at vger.kernel.org
+---
+ drivers/irqchip/irq-mxs.c | 14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
 
-  ARM: dts: mvebu: Fix wrong the address reg value for the L2-cache node (2013-05-20 17:44:54 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/jcooper/linux.git tags/fixes-3.10-3
-
-for you to fetch changes up to b60b61d41220c8d34e2c62a748bc78bc5d40585e:
-
-  ARM: mvebu: Fix bug in coherency fabric low level init function (2013-05-28 14:50:08 +0000)
-
-----------------------------------------------------------------
-mvebu fixes for v3.10 round 3
-
- - mvebu
-    - fix bug in coherency fabric low level init
-
- - kirkwood
-    - fix crash from pcie double init
-
-----------------------------------------------------------------
-Andrew Lunn (1):
-      ARM: Kirkwood: TS219: Fix crash by double PCIe instantiation
-
-Nadav Haklai (1):
-      ARM: mvebu: Fix bug in coherency fabric low level init function
-
- arch/arm/mach-kirkwood/board-ts219.c | 10 ----------
- arch/arm/mach-mvebu/coherency_ll.S   | 16 +++++++++++-----
- 2 files changed, 11 insertions(+), 15 deletions(-)
+diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
+index 29889bb..63b3d4e 100644
+--- a/drivers/irqchip/irq-mxs.c
++++ b/drivers/irqchip/irq-mxs.c
+@@ -76,16 +76,10 @@ asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 irqnr;
+ 
+-	do {
+-		irqnr = __raw_readl(icoll_base + HW_ICOLL_STAT_OFFSET);
+-		if (irqnr != 0x7f) {
+-			__raw_writel(irqnr, icoll_base + HW_ICOLL_VECTOR);
+-			irqnr = irq_find_mapping(icoll_domain, irqnr);
+-			handle_IRQ(irqnr, regs);
+-			continue;
+-		}
+-		break;
+-	} while (1);
++	irqnr = __raw_readl(icoll_base + HW_ICOLL_STAT_OFFSET);
++	__raw_writel(irqnr, icoll_base + HW_ICOLL_VECTOR);
++	irqnr = irq_find_mapping(icoll_domain, irqnr);
++	handle_IRQ(irqnr, regs);
+ }
+ 
+ static int icoll_irq_domain_map(struct irq_domain *d, unsigned int virq,
+-- 
+1.8.2.rc2
