@@ -1,45 +1,88 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 May 2013 14:40:35 -0400
-Subject: [GIT PULL] ARM: mvebu: defconfig changes for v3.11 (round 3
- cumulative)
-Message-ID: <20130528184035.GD31290@titan.lakedaemon.net>
+From: jgchunter@gmail.com (Jon Hunter)
+Date: Tue, 28 May 2013 19:41:54 +0100
+Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
+In-Reply-To: <20130523201358.GI31836@blackmetal.musicnaut.iki.fi>
+References: <20130513205302.GA3157@blackmetal.musicnaut.iki.fi>
+ <20130516180933.GG5600@atomide.com>
+ <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
+ <20130516214430.GN5600@atomide.com> <20130520174621.GI10378@atomide.com>
+ <20130521173936.GE31836@blackmetal.musicnaut.iki.fi>
+ <519BCCEC.8010303@gmail.com>
+ <20130522212054.GG31836@blackmetal.musicnaut.iki.fi>
+ <519E67AD.6070702@gmail.com>
+ <20130523201358.GI31836@blackmetal.musicnaut.iki.fi>
+Message-ID: <51A4FA72.2070402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+On 23/05/13 21:13, Aaro Koskinen wrote:
+> On Thu, May 23, 2013 at 08:02:05PM +0100, Jon Hunter wrote:
+>> On 22/05/13 22:20, Aaro Koskinen wrote:
+>>> On Tue, May 21, 2013 at 08:37:16PM +0100, Jon Hunter wrote:
+>>>> On 21/05/13 18:39, Aaro Koskinen wrote:
+>>>>> On Mon, May 20, 2013 at 10:46:21AM -0700, Tony Lindgren wrote:
+>>>>>> * Tony Lindgren <tony@atomide.com> [130516 14:50]:
+>>>>>>> * Aaro Koskinen <aaro.koskinen@iki.fi> [130516 14:05]:
+>>>>>>>> On Thu, May 16, 2013 at 11:09:34AM -0700, Tony Lindgren wrote:
+>>>>>>>>> * Aaro Koskinen <aaro.koskinen@iki.fi> [130513 13:58]:
+>>>>>>>>>> I tested 3.10-rc1 on OMAP1 / Nokia 770, and Retu MFD probe is broken:
+>>>>>>>>>>
+>>>>>>>>>> [    2.264221] retu-mfd 2-0001: Retu v3.2 found
+>>>>>>>>>> [    2.281951] retu-mfd 2-0001: Failed to allocate IRQs: -12
+>>>>>>>>>> [    2.300140] retu-mfd: probe of 2-0001 failed with error -12
+>>>>>>>>>>
+>>>>>>>>>> The error is coming from regmap code. According to git bisect, it is
+>>>>>>>>>> caused by:
+>>>>>>>>>>
+>>>>>>>>>> 	commit ede4d7a5b9835510fd1f724367f68d2fa4128453
+>>>>>>>>>> 	Author: Jon Hunter <jon-hunter@ti.com>
+>>>>>>>>>> 	Date:   Fri Mar 1 11:22:47 2013 -0600
+>>>>>>>>>>
+>>>>>>>>>> 	    gpio/omap: convert gpio irq domain to linear mapping
+>>>>>>>>>>
+>>>>>>>>>> The commit does not anymore revert cleanly, and I haven't yet tried
+>>>>>>>>>> crafting a manual revert, so any fix proposals/ideas are welcome...
+>>>>>>>>>
+>>>>>>>>> Hmm this might be a bit trickier to fix. Obviously the real solution
+>>>>>>>>> is to convert omap1 to SPARSE_IRQ like we did for omap2+.
+>>>>>>>>>
+>>>>>>>>> For the -rc cycle, it might be possible to fix this by adding a
+>>>>>>>>> different irq_to_gpio() and gpio_to_irq() functions for omap1.
+>>>>>>>>
+>>>>>>>> The commit reverts cleanly if we also revert
+>>>>>>>> 3513cdeccc647d41c4a9ff923af17deaaac04a66 (gpio/omap: optimise interrupt
+>>>>>>>> service routine), which seems to be just some minor optimization. The
+>>>>>>>> result is below, and with it 770 works again.
+>>>>>>>
+>>>>>>> Hmm in this case it seems that we should just fix it rather than go back
+>>>>>>> to the old code, so let's take a look at that first.
+>>>>>>
+>>>>>> Does the following fix it for you or do we need to fix something else
+>>>>>> there too?
+>>>>>
+>>>>> Thanks, that fixes Retu probe on 770.
+>>>>
+>>>> Sorry for not responding sooner, but I have been moving. 
+>>>>
+>>>> From looking at the code it appears that the regmap_add_irq_chip()
+>>>> is failing in the retu driver. I am not sure if this will work, 
+>>>> but have you tried making the following change to the retu driver 
+>>>> so that it also uses irq_domain_add_linear() as well? Just a thought ...
+>>>
+>>> This will trigger WARNING: at drivers/base/regmap/regmap-irq.c:514.
+>>
+>> Sorry, there is another change needed. Can you try ...
+> 
+> I will try this. However, I would also like to point out that Retu works
+> fine on N800/N810 (OMAP2). If the problem is in Retu, why only OMAP1
+> is affected?
 
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+The problem is not with retu or the gpio driver per-se, its just that
+now they are conflicting because the way the irq domains are being
+allocated. So probably just getting lucky on the n8xx. I had tested on
+omap1-4 and had not seen any problems, but none of my boards used the
+retu driver.
 
-are available in the git repository at:
-
-  git://git.infradead.org/users/jcooper/linux.git tags/defconfig-3.11-3
-
-for you to fetch changes up to 3f4c6f43c73fc42f99f58d54e6425a06df89213f:
-
-  arm: kirkwood: Enable cpufreq and ondemand on kirkwood_defconfig (2013-05-26 18:01:03 +0000)
-
-----------------------------------------------------------------
-mvebu defconfig changes for v3.11 (round 3)
-
- - kirkwood
-    - enable cpufreq and ondemand governor
-
-----------------------------------------------------------------
-Andrew Lunn (2):
-      ARM: Kirkwood: Enable USB 3.0 in kirkwood_defconfig
-      arm: kirkwood: Enable cpufreq and ondemand on kirkwood_defconfig
-
-Ezequiel Garcia (1):
-      ARM: mvebu: Add support for USB storage class in mvebu_defconfig
-
-Jason Cooper (1):
-      ARM: kirkwood: enable Sheevaplug DT in defconfig
-
-Thomas Petazzoni (2):
-      arm: mvebu: update defconfig with PCI and USB support
-      arm: kirkwood: update defconfig with PCIe driver and board updates
-
- arch/arm/configs/kirkwood_defconfig | 10 +++++++---
- arch/arm/configs/mvebu_defconfig    |  4 ++++
- 2 files changed, 11 insertions(+), 3 deletions(-)
+Cheers
+Jon
