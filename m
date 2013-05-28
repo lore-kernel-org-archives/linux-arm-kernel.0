@@ -1,55 +1,22 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 28 May 2013 13:57:51 +0900
-Subject: [PATCH v2] video: simplefb: add mode parsing function
-In-Reply-To: <51A42ED5.2060104@wwwdotorg.org>
-References: <1369626821-28494-1-git-send-email-acourbot@nvidia.com>
- <51A42ED5.2060104@wwwdotorg.org>
-Message-ID: <CAAVeFuLYe6xuzV4Y_r8GXoPWd8n3fn=jyp06hRTJVE-t1pf9eg@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 28 May 2013 10:48:02 +0530
+Subject: [RFC PATCH 1/4] arm: omap: Add phy binding info for musb in plat
+ data
+In-Reply-To: <1368796954-3499-1-git-send-email-kishon@ti.com>
+References: <1368796954-3499-1-git-send-email-kishon@ti.com>
+Message-ID: <51A43E0A.8090201@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 1:13 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/26/2013 09:53 PM, Alexandre Courbot wrote:
->> The naming scheme of simplefb's mode is precise enough to allow building
->> the mode structure from it instead of using a static list of modes. This
->> patch introduces a function that does this. In case exotic modes that
->> cannot be represented from their name alone are needed, the static list
->> of modes is still available as a backup.
->>
->> It also changes the order in which colors are declared from MSB first to
->> the more standard LSB first.
->>
->> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->> ---
->> Changes from v1:
->> - amended documentation following Stephen's suggestion
->> - allow parsing of bitfields larger than 9 bits
->> - made it clear that the parsing order of bits is changed with respect
->>   to the original patch
->>
->> Andrew, since this patch introduces a (small) change in the DT bindings,
->> could we try to merge it during the -rc cycle so we don't have to come
->> with a more complex solution in the future?
->
-> So, I think we shouldn't change the DT binding at all now. The original
-> driver is now merged for 3.10, and I think it's far too late to take
-> code that implements new features for 3.10. This means that we couldn't
-> merge this patch until 3.11. However, by then, we shouldn't be changing
-> the DT binding in incompatible ways. Olof has already published some
-> U-Boot binaries that use the current binding, and on IRC indicated he'd
-> prefer not to change the binding because of that.
->
-> As such, we should either:
->
-> a) Just add new entries into the format array that already exists in the
-> driver. Given David's response, this might be simplest.
->
-> b) Extend the DT binding in a 100% backwards-compatible way, which would
-> mean defaulting the bit-order to match the existing 1 format, and adding
-> a new Boolean property to indicate that the format string is specified
-> in the other order.
+Hi Tony,
 
-a) is definitely simpler, so let's do that and drop this patch. Sorry
-about the noise.
+On Friday 17 May 2013 06:52 PM, Kishon Vijay Abraham I wrote:
+> In order for controllers to get PHY in case of non dt boot, the phy
+> binding information (phy label) should be added in the platform
+> data of the controller.
 
-Alex.
+This series would be needed to get MUSB working in OMAP3 boards for 
+non-dt boot case. Do you think this is good enough to go in this rc cycle?
+
+Thanks
+Kishon
