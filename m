@@ -1,146 +1,177 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 28 May 2013 16:47:51 +0200
-Subject: [PATCH v6 03/10] ASoC: imx-pcm-fiq: Introduce pcm-fiq-params
+Date: Tue, 28 May 2013 16:47:52 +0200
+Subject: [PATCH v6 04/10] ASoC: fsl-ssi: Add support for imx-pcm-fiq
 In-Reply-To: <1369752478-30260-1-git-send-email-mpa@pengutronix.de>
 References: <1369752478-30260-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1369752478-30260-4-git-send-email-mpa@pengutronix.de>
+Message-ID: <1369752478-30260-5-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleaner parameter passing for imx-pcm-fiq. Create a seperated fiq-params
-struct to pass all arguments.
+Add support for non-dma pcm for imx platforms with imx-pcm-fiq support.
+Instead of imx-pcm-audio, in this case imx-pcm-fiq-audio device is added
+and the SIER flags are set differently.
+
+We need imx-pcm-fiq for some boards that use an incompatible codec.
+imx-pcm-fiq handles those codecs differently and allows to operate with
+them. DMA is not possible because some data sent by the codecs, e.g.
+wm9712, is not in the datastream. Also some data is mixed up in the
+fifos, so that we need to sort them out manually.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
 
 Notes:
-    Changes in v6:
-     - After rebasing onto Shawn's imx-pcm cleanups, the imx_pcm_fiq_params are now
-       passed as function arguments instead of platform driver data.
+    Changes in v4:
+     - Add a comment about the reason why we add a imx-pcm-fiq device.
+     - Change commit message to include information about the usage of imx-pcm-fiq
     
     Changes in v3:
-     - Using snd_dmaengine_dai_dma_data for dma_params after rebasing onto
-       dmaengine cleanups.
+     - Rename bool "dma" to "use_dma"
 
- sound/soc/fsl/imx-pcm-fiq.c | 18 ++++++++++--------
- sound/soc/fsl/imx-pcm.h     | 12 +++++++++++-
- sound/soc/fsl/imx-ssi.c     |  7 ++++++-
- sound/soc/fsl/imx-ssi.h     |  1 +
- 4 files changed, 28 insertions(+), 10 deletions(-)
+ sound/soc/fsl/fsl_ssi.c | 77 +++++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 65 insertions(+), 12 deletions(-)
 
-diff --git a/sound/soc/fsl/imx-pcm-fiq.c b/sound/soc/fsl/imx-pcm-fiq.c
-index 310d902..3b2ba99 100644
---- a/sound/soc/fsl/imx-pcm-fiq.c
-+++ b/sound/soc/fsl/imx-pcm-fiq.c
-@@ -22,6 +22,7 @@
- #include <linux/slab.h>
+diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
+index 2f2d837..cf20d6d 100644
+--- a/sound/soc/fsl/fsl_ssi.c
++++ b/sound/soc/fsl/fsl_ssi.c
+@@ -8,6 +8,26 @@
+  * This file is licensed under the terms of the GNU General Public License
+  * version 2.  This program is licensed "as is" without any warranty of any
+  * kind, whether express or implied.
++ *
++ *
++ * Some notes why imx-pcm-fiq is used instead of DMA on some boards:
++ *
++ * The i.MX SSI core has some nasty limitations in AC97 mode. While most
++ * sane processor vendors have a FIFO per AC97 slot, the i.MX has only
++ * one FIFO which combines all valid receive slots. We cannot even select
++ * which slots we want to receive. The WM9712 with which this driver
++ * was developed with always sends GPIO status data in slot 12 which
++ * we receive in our (PCM-) data stream. The only chance we have is to
++ * manually skip this data in the FIQ handler. With sampling rates different
++ * from 48000Hz not every frame has valid receive data, so the ratio
++ * between pcm data and GPIO status data changes. Our FIQ handler is not
++ * able to handle this, hence this driver only works with 48000Hz sampling
++ * rate.
++ * Reading and writing AC97 registers is another challenge. The core
++ * provides us status bits when the read register is updated with *another*
++ * value. When we read the same register two times (and the register still
++ * contains the same value) these status bits are not set. We work
++ * around this by not polling these bits but only wait a fixed delay.
+  */
  
- #include <sound/core.h>
-+#include <sound/dmaengine_pcm.h>
- #include <sound/initval.h>
- #include <sound/pcm.h>
- #include <sound/pcm_params.h>
-@@ -32,6 +33,7 @@
- #include <linux/platform_data/asoc-imx-ssi.h>
+ #include <linux/init.h>
+@@ -121,11 +141,13 @@ struct fsl_ssi_private {
  
- #include "imx-ssi.h"
-+#include "imx-pcm.h"
- 
- struct imx_pcm_runtime_data {
- 	unsigned int period;
-@@ -366,9 +368,9 @@ static struct snd_soc_platform_driver imx_soc_platform_fiq = {
- 	.pcm_free	= imx_pcm_fiq_free,
- };
- 
--int imx_pcm_fiq_init(struct platform_device *pdev)
-+int imx_pcm_fiq_init(struct platform_device *pdev,
-+		struct imx_pcm_fiq_params *params)
- {
--	struct imx_ssi *ssi = platform_get_drvdata(pdev);
- 	int ret;
- 
- 	ret = claim_fiq(&fh);
-@@ -377,15 +379,15 @@ int imx_pcm_fiq_init(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	mxc_set_irq_fiq(ssi->irq, 1);
--	ssi_irq = ssi->irq;
-+	mxc_set_irq_fiq(params->irq, 1);
-+	ssi_irq = params->irq;
- 
--	imx_pcm_fiq = ssi->irq;
-+	imx_pcm_fiq = params->irq;
- 
--	imx_ssi_fiq_base = (unsigned long)ssi->base;
-+	imx_ssi_fiq_base = (unsigned long)params->base;
- 
--	ssi->dma_params_tx.maxburst = 4;
--	ssi->dma_params_rx.maxburst = 6;
-+	params->dma_params_tx->maxburst = 4;
-+	params->dma_params_rx->maxburst = 6;
- 
- 	ret = snd_soc_register_platform(&pdev->dev, &imx_soc_platform_fiq);
- 	if (ret)
-diff --git a/sound/soc/fsl/imx-pcm.h b/sound/soc/fsl/imx-pcm.h
-index 67f656c..9695ed0 100644
---- a/sound/soc/fsl/imx-pcm.h
-+++ b/sound/soc/fsl/imx-pcm.h
-@@ -32,6 +32,15 @@ imx_pcm_dma_params_init_data(struct imx_dma_data *dma_data,
- 		dma_data->peripheral_type = IMX_DMATYPE_SSI;
- }
- 
-+struct imx_pcm_fiq_params {
-+	int irq;
-+	void __iomem *base;
-+
-+	/* Pointer to original ssi driver to setup tx rx sizes */
-+	struct snd_dmaengine_dai_dma_data *dma_params_rx;
-+	struct snd_dmaengine_dai_dma_data *dma_params_tx;
-+};
-+
- #ifdef CONFIG_SND_SOC_IMX_PCM_DMA
- int imx_pcm_dma_init(struct platform_device *pdev);
- void imx_pcm_dma_exit(struct platform_device *pdev);
-@@ -47,7 +56,8 @@ static inline void imx_pcm_dma_exit(struct platform_device *pdev)
- #endif
- 
- #ifdef CONFIG_SND_SOC_IMX_PCM_FIQ
--int imx_pcm_fiq_init(struct platform_device *pdev);
-+int imx_pcm_fiq_init(struct platform_device *pdev,
-+		struct imx_pcm_fiq_params *params);
- void imx_pcm_fiq_exit(struct platform_device *pdev);
- #else
- static inline int imx_pcm_fiq_init(struct platform_device *pdev)
-diff --git a/sound/soc/fsl/imx-ssi.c b/sound/soc/fsl/imx-ssi.c
-index a8362be..16ae16d 100644
---- a/sound/soc/fsl/imx-ssi.c
-+++ b/sound/soc/fsl/imx-ssi.c
-@@ -590,7 +590,12 @@ static int imx_ssi_probe(struct platform_device *pdev)
- 		goto failed_register;
- 	}
- 
--	ret = imx_pcm_fiq_init(pdev);
-+	ssi->fiq_params.irq = ssi->irq;
-+	ssi->fiq_params.base = ssi->base;
-+	ssi->fiq_params.dma_params_rx = &ssi->dma_params_rx;
-+	ssi->fiq_params.dma_params_tx = &ssi->dma_params_tx;
-+
-+	ret = imx_pcm_fiq_init(pdev, &ssi->fiq_params);
- 	if (ret)
- 		goto failed_pcm_fiq;
- 
-diff --git a/sound/soc/fsl/imx-ssi.h b/sound/soc/fsl/imx-ssi.h
-index d5003ce..fb1616b 100644
---- a/sound/soc/fsl/imx-ssi.h
-+++ b/sound/soc/fsl/imx-ssi.h
-@@ -209,6 +209,7 @@ struct imx_ssi {
+ 	bool new_binding;
+ 	bool ssi_on_imx;
++	bool use_dma;
+ 	struct clk *clk;
  	struct snd_dmaengine_dai_dma_data dma_params_tx;
+ 	struct snd_dmaengine_dai_dma_data dma_params_rx;
  	struct imx_dma_data filter_data_tx;
  	struct imx_dma_data filter_data_rx;
 +	struct imx_pcm_fiq_params fiq_params;
  
- 	int enabled;
- };
+ 	struct {
+ 		unsigned int rfrc;
+@@ -355,7 +377,12 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
+ 		 */
+ 
+ 		/* Enable the interrupts and DMA requests */
+-		write_ssi(SIER_FLAGS, &ssi->sier);
++		if (ssi_private->use_dma)
++			write_ssi(SIER_FLAGS, &ssi->sier);
++		else
++			write_ssi(CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TFE0_EN |
++					CCSR_SSI_SIER_RIE |
++					CCSR_SSI_SIER_RFF0_EN, &ssi->sier);
+ 
+ 		/*
+ 		 * Set the watermark for transmit FIFI 0 and receive FIFO 0. We
+@@ -549,7 +576,7 @@ static int fsl_ssi_dai_probe(struct snd_soc_dai *dai)
+ {
+ 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(dai);
+ 
+-	if (ssi_private->ssi_on_imx) {
++	if (ssi_private->ssi_on_imx && ssi_private->use_dma) {
+ 		dai->playback_dma_data = &ssi_private->dma_params_tx;
+ 		dai->capture_dma_data = &ssi_private->dma_params_rx;
+ 	}
+@@ -694,6 +721,8 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	       sizeof(fsl_ssi_dai_template));
+ 	ssi_private->cpu_dai_drv.name = ssi_private->name;
+ 
++	ssi_private->use_dma = !of_property_read_bool(np, "fsl,imx-fiq");
++
+ 	/* Get the addresses and IRQ */
+ 	ret = of_address_to_resource(np, 0, &res);
+ 	if (ret) {
+@@ -715,12 +744,15 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 		goto error_iomap;
+ 	}
+ 
+-	/* The 'name' should not have any slashes in it. */
+-	ret = request_irq(ssi_private->irq, fsl_ssi_isr, 0, ssi_private->name,
+-			  ssi_private);
+-	if (ret < 0) {
+-		dev_err(&pdev->dev, "could not claim irq %u\n", ssi_private->irq);
+-		goto error_irqmap;
++	if (ssi_private->use_dma) {
++		/* The 'name' should not have any slashes in it. */
++		ret = request_irq(ssi_private->irq, fsl_ssi_isr, 0,
++				ssi_private->name, ssi_private);
++		if (ret < 0) {
++			dev_err(&pdev->dev, "could not claim irq %u\n",
++					ssi_private->irq);
++			goto error_irqmap;
++		}
+ 	}
+ 
+ 	/* Are the RX and the TX clocks locked? */
+@@ -769,7 +801,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 		 */
+ 		ret = of_property_read_u32_array(pdev->dev.of_node,
+ 					"fsl,ssi-dma-events", dma_events, 2);
+-		if (ret) {
++		if (ret && !ssi_private->use_dma) {
+ 			dev_err(&pdev->dev, "could not get dma events\n");
+ 			goto error_clk;
+ 		}
+@@ -808,9 +840,30 @@ static int fsl_ssi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	if (ssi_private->ssi_on_imx) {
+-		ret = imx_pcm_dma_init(pdev);
+-		if (ret)
+-			goto error_dev;
++		if (!ssi_private->use_dma) {
++
++			/*
++			 * Some boards use an incompatible codec. To get it
++			 * working, we are using imx-fiq-pcm-audio, that
++			 * can handle those codecs. DMA is not possible in this
++			 * situation.
++			 */
++
++			ssi_private->fiq_params.irq = ssi_private->irq;
++			ssi_private->fiq_params.base = ssi_private->ssi;
++			ssi_private->fiq_params.dma_params_rx =
++				&ssi_private->dma_params_rx;
++			ssi_private->fiq_params.dma_params_tx =
++				&ssi_private->dma_params_tx;
++
++			ret = imx_pcm_fiq_init(pdev, &ssi_private->fiq_params);
++			if (ret)
++				goto error_dev;
++		} else {
++			ret = imx_pcm_dma_init(pdev);
++			if (ret)
++				goto error_dev;
++		}
+ 	}
+ 
+ 	/*
 -- 
 1.8.2.1
