@@ -1,20 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 28 May 2013 11:15:25 -0600
-Subject: [GIT PULL] ARM: tegra: DT-related fixes needed by the USB tree
-In-Reply-To: <1368831045-19105-1-git-send-email-swarren@wwwdotorg.org>
-References: <1368831045-19105-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <51A4E62D.7020206@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 May 2013 19:20:37 +0200
+Subject: [PATCH] arch: configuration,
+ deleting 'CONFIG_BUG' since always need it.
+In-Reply-To: <51A4D618.3080208@zytor.com>
+References: <519DCBEF.3090208@asianux.com> <201305281743.52649.arnd@arndb.de>
+ <51A4D618.3080208@zytor.com>
+Message-ID: <201305281920.37452.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2013 04:50 PM, Stephen Warren wrote:
-> Felipe, (and Alan, Greg),
+On Tuesday 28 May 2013, H. Peter Anvin wrote:
+> On 05/28/2013 08:43 AM, Arnd Bergmann wrote:
+> > 
+> > Right, that is what the patch I just posted does.
+> > 
+> > On a related note, I found that WARN_ON() can no longer be compiled
+> > out since there is already code that relies on the side-effects of
+> > the condition. I assume that was an intentional change I missed,
+> > since it used to be defined so that you could remove it completely.
+> > 
 > 
-> These are the changes from the Tegra tree that need to be merged
-> before the Tegra USB driver patches 4-8 from Venu can be applied. Recall
-> that we had previously agreed on this approach for v3.9, but Venu's
-> patches didn't end up being ready until now, unfortunately. I note
-> that Venu's patches affect both the Tegra USB and PHY drivers.
+> It is possible to define WARN_ON() as:
+> 
+> #define WARN_ON(x) ((void)(x))
+> 
+> ... which preserves side effects.
 
-Felipe, do you know when you plan to pull this into the USB tree, and
-apply Venu's patches? Thanks.
+Yes, actually the return value has to be maintained as well.
+The current (!CONFIG_BUG) default implementation is
+
+#define WARN_ON(condition) ({                                           \
+        int __ret_warn_on = !!(condition);                              \
+        unlikely(__ret_warn_on);                                        \
+})
+
+which seems fine.
+
+#define WARN_ON(condition) unlikely(!!(condition))
+
+is probably just as good.
+
+	Arnd
