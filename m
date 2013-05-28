@@ -1,25 +1,51 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Tue, 28 May 2013 11:50:40 +0200
-Subject: [PATCH] dts: am33xx: Correct properties on gpmc node
-In-Reply-To: <1369729497-11897-1-git-send-email-larsi@wh2.tu-dresden.de> (Lars
- Poeschel's message of "Tue, 28 May 2013 10:24:57 +0200")
-References: <1369729497-11897-1-git-send-email-larsi@wh2.tu-dresden.de>
-Message-ID: <87mwrfbfgv.fsf@dell.be.48ers.dk>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Tue, 28 May 2013 15:24:01 +0530
+Subject: [PATCH V2] ARM: dts: Correct the base address of pinctrl_3 on
+ Exynos5250
+Message-ID: <1369734841-9900-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Lars" == Lars Poeschel <larsi@wh2.tu-dresden.de> writes:
+This patch corrects the base address of pinctrl_3 on Exynos5250
+platform.
 
- Lars> From: Lars Poeschel <poeschel@lemonage.de>
- Lars> The gpmc driver is actually looking for "gpmc,num-cs" and
- Lars> "gpmc,num-waitpins" properties in DT. The binding doc also states
- Lars> this.
- Lars> Correct the properties in the dts to provide the right values for the
- Lars> gpmc driver.
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+---
+Changes since V1:
+	- Added platform name in the subject line.
 
- Lars> Signed-off-by: Lars Poeschel <poeschel@lemonage.de>
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    2 +-
+ arch/arm/boot/dts/exynos5250.dtsi         |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
-
+diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+index d1650fb..ded558b 100644
+--- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
++++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+@@ -763,7 +763,7 @@
+ 		};
+ 	};
+ 
+-	pinctrl at 03680000 {
++	pinctrl at 03860000 {
+ 		gpz: gpz {
+ 			gpio-controller;
+ 			#gpio-cells = <2>;
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index 7154e3d..e9bfd13 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -169,9 +169,9 @@
+ 		interrupts = <0 50 0>;
+ 	};
+ 
+-	pinctrl_3: pinctrl at 03680000 {
++	pinctrl_3: pinctrl at 03860000 {
+ 		compatible = "samsung,exynos5250-pinctrl";
+-		reg = <0x0368000 0x1000>;
++		reg = <0x03860000 0x1000>;
+ 		interrupts = <0 47 0>;
+ 	};
+ 
 -- 
-Bye, Peter Korsgaard
+1.7.4.4
