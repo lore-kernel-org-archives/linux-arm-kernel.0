@@ -1,60 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 28 May 2013 15:25:11 +0100
-Subject: [PATCH v3 7/7] ARM: KVM: drop use of PAGE_S2_DEVICE
-In-Reply-To: <CAEDV+gJSM4EpGNV=fN+i6s2K9z6taMzmuNjVf_KyvTUvPaZAwg@mail.gmail.com>
-References: <1368529900-22572-1-git-send-email-marc.zyngier@arm.com>
- <1368529900-22572-8-git-send-email-marc.zyngier@arm.com>
- <CAEDV+gJeeQUOOLjFpkvoPk7e=csjmvvefhdp1miiWtosABwW6Q@mail.gmail.com>
- <51A482CE.1090509@arm.com>
- <CAEDV+gJSM4EpGNV=fN+i6s2K9z6taMzmuNjVf_KyvTUvPaZAwg@mail.gmail.com>
-Message-ID: <51A4BE47.7080009@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 28 May 2013 16:25:55 +0200
+Subject: [PATCH 3/7] ARM: ux500: Standardise Pinctrl compatible string for
+ Nomadik based platforms
+In-Reply-To: <1369232581-18923-4-git-send-email-lee.jones@linaro.org>
+References: <1369232581-18923-1-git-send-email-lee.jones@linaro.org>
+ <1369232581-18923-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZ8vf0sQuhonTpUoB7vV=UgmY1hiJwhDEphnCxH=MXK1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/05/13 15:16, Christoffer Dall wrote:
-> On Tue, May 28, 2013 at 3:11 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 27/05/13 21:01, Christoffer Dall wrote:
->>> On Tue, May 14, 2013 at 4:11 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> At the moment, when mapping a device into Stage-2 for a guest,
->>>> we override whatever the guest uses by forcing a device memory
->>>> type in Stage-2.
->>>>
->>>> While this is not exactly wrong, this isn't really the "spirit" of
->>>> the architecture. The hardware shouldn't have to cope for a broken
->>>> guest mapping to a device as normal memory.
->>>>
->>>
->>> So I'm trying to think of a scenario where this feature in the
->>> architecture would actually be useful, and it sounds like from you
->>> guys that it's only useful to properly run a broken guest.
->>>
->>> Are we 100% sure that a malicious guest can't leverage this to break
->>> isolation? I'm thinking something along the lines of writing to a
->>> device (for example the gic virtual cpu interface) with a cached
->>> mapping. If such a write is in fact written back to cache, and not
->>> evicted from the cache before a later time, where a different VM is
->>> running, can't that adversely affect the other VM?
->>>
->>> Probably this can never happen, but I wasn't able to convince myself
->>> of this from going through the ARM ARM...?
->>
->> I think you definitely have a point here, and I completely missed that
->> case. A shared device (like the GIC virtual CPU interface) must be
->> forced to a device memory type, otherwise we cannot ensure strict
->> isolation of guests.
->>
->> I'll drop this patch from my series and add PAGE_S2_DEVICE back to the
->> arm64 port.
->>
-> We still need to get rid of the USER bit in the definition, and since
-> that's a purely arch/arm/* patch I assume it should go through RMK's
-> tree. Will you ack the other patch?
+On Wed, May 22, 2013 at 4:22 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Sure. Just also drop the call to kvm_set_s2pte_writable in
-kvm_phys_addr_ioremap, which is not required now that PAGE_S2_DEVICE
-implies RW. With that, you can add my Ack.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/mach-nomadik/cpu-8815.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-nomadik/cpu-8815.c b/arch/arm/mach-nomadik/cpu-8815.c
+> index 59f6ff5..316fe82 100644
+> --- a/arch/arm/mach-nomadik/cpu-8815.c
+> +++ b/arch/arm/mach-nomadik/cpu-8815.c
+> @@ -288,7 +288,7 @@ static struct of_dev_auxdata cpu8815_auxdata_lookup[] __initdata = {
+>                 "gpio.2", NULL),
+>         OF_DEV_AUXDATA("st,nomadik-gpio", NOMADIK_GPIO3_BASE,
+>                 "gpio.3", NULL),
+> -       OF_DEV_AUXDATA("stericsson,nmk-pinctrl-stn8815", 0,
+> +       OF_DEV_AUXDATA("stericsson,stn8815-pinctrl", 0,
+>                 "pinctrl-stn8815", NULL),
+>         OF_DEV_AUXDATA("arm,primecell", NOMADIK_UART0_BASE,
+>                 "uart0", NULL),
 
+I've dropped this platform data in the HEAD (now also in ARM SoC)
+after moving the pinctrl configuration to the DTS, so this no longer
+applies.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Yours,
+Linus Walleij
