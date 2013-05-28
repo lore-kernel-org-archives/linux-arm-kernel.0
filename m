@@ -1,14 +1,13 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 May 2013 14:34:22 -0400
-Subject: [GIT PULL] ARM: mvebu: cleanup for v3.11 (round 3 cumulative)
-Message-ID: <20130528183422.GA31290@titan.lakedaemon.net>
+Date: Tue, 28 May 2013 14:36:17 -0400
+Subject: [GIT PULL] ARM: mvebu: soc changes for v3.11 (round 2 cumulative)
+Message-ID: <20130528183617.GB31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Olof,
 
-This is the latest for cleanup, and the summary includes everything so
-far for this window.
+summary is cumulative.
 
 
 The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
@@ -17,29 +16,28 @@ The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
 are available in the git repository at:
 
-  git://git.infradead.org/users/jcooper/linux.git tags/cleanup-3.11-3
+  git://git.infradead.org/users/jcooper/linux.git tags/soc-3.11-2
 
-for you to fetch changes up to c589f9b4b51317cfc530812fe90a9895bd51430e:
+for you to fetch changes up to efde309297a08e32d89e4a96c4051e86dcd50b45:
 
-  arm: mvebu: mark functions of armada-370-xp.c as static (2013-05-21 13:44:32 +0000)
+  arm: kirkwood: Instantiate cpufreq driver (2013-05-26 17:56:24 +0000)
 
 ----------------------------------------------------------------
-mvebu cleanup for v3.11 (round 3)
+mvebu soc changes for v3.11 (round 2)
 
- - mvebu
-    - mark functions in armada-370-xp.c as static
+ - kirkwood
+    - use the cpufreq driver
 
 ----------------------------------------------------------------
 Andrew Lunn (1):
-      ARM: Orion: Remove redundant init_dma_coherent_pool_size()
-
-Maxime Ripard (1):
-      ARM: mvebu: Remove init_irq declaration in machine description
+      arm: kirkwood: Instantiate cpufreq driver
 
 Thomas Petazzoni (1):
-      arm: mvebu: mark functions of armada-370-xp.c as static
+      arm: kirkwood: use the default of match table
 
- arch/arm/mach-kirkwood/common.c     |  6 ------
- arch/arm/mach-mvebu/armada-370-xp.c | 15 +++------------
- arch/arm/mach-orion5x/common.c      |  7 -------
- 3 files changed, 3 insertions(+), 25 deletions(-)
+ arch/arm/Kconfig                                  |  1 +
+ arch/arm/mach-kirkwood/board-dt.c                 |  9 +++------
+ arch/arm/mach-kirkwood/common.c                   | 23 +++++++++++++++++++++++
+ arch/arm/mach-kirkwood/common.h                   |  2 ++
+ arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  2 ++
+ 5 files changed, 31 insertions(+), 6 deletions(-)
