@@ -1,47 +1,25 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 28 May 2013 10:38:15 +0100
-Subject: [PATCH 7/7] Documentation: Update binding for Nomadik and DBx5x
- based platforms
-In-Reply-To: <CACRpkdYyZZSy4VgFc+Uo=5iAF++EPmHM0U2pHcLdkDZc=Xb_sQ@mail.gmail.com>
-References: <1369232581-18923-1-git-send-email-lee.jones@linaro.org>
- <1369232581-18923-8-git-send-email-lee.jones@linaro.org>
- <CACRpkdYyZZSy4VgFc+Uo=5iAF++EPmHM0U2pHcLdkDZc=Xb_sQ@mail.gmail.com>
-Message-ID: <20130528093815.GH22683@gmail.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Tue, 28 May 2013 11:50:40 +0200
+Subject: [PATCH] dts: am33xx: Correct properties on gpmc node
+In-Reply-To: <1369729497-11897-1-git-send-email-larsi@wh2.tu-dresden.de> (Lars
+ Poeschel's message of "Tue, 28 May 2013 10:24:57 +0200")
+References: <1369729497-11897-1-git-send-email-larsi@wh2.tu-dresden.de>
+Message-ID: <87mwrfbfgv.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >  Required properties:
-> > -- compatible: "stericsson,nmk-pinctrl", "stericsson,nmk-pinctrl-db8540",
-> > -              "stericsson,nmk-pinctrl-stn8815"
-> > +- compatible: "stericsson,db8500-pinctrl", "stericsson,db8540-pinctrl",
-> > +              "stericsson,stn8815-pinctrl"
-> 
-> OK...
-> 
-> >         pinctrl at 80157000 {
-> > -               compatible = "stericsson,nmk-pinctrl";
-> > +               compatible = "stericsson,u8500-pinctrl";
-> 
-> This does not look like a supported compatible string?
+>>>>> "Lars" == Lars Poeschel <larsi@wh2.tu-dresden.de> writes:
 
-Do you still think this, or did you change you mind?
+ Lars> From: Lars Poeschel <poeschel@lemonage.de>
+ Lars> The gpmc driver is actually looking for "gpmc,num-cs" and
+ Lars> "gpmc,num-waitpins" properties in DT. The binding doc also states
+ Lars> this.
+ Lars> Correct the properties in the dts to provide the right values for the
+ Lars> gpmc driver.
 
-If so, what makes you think it? How does it differ from:
+ Lars> Signed-off-by: Lars Poeschel <poeschel@lemonage.de>
 
-compatible = "arm,cortex-a9-twd-timer";
-compatible = "arm,rtc-pl031";
-compatible = "stericsson,db8500-gpio",
-compatible = "stericsson,db8500-musb",
-compatible = "stericsson,db8500-dma40",
-compatible = "stericsson,db8500-prcmu";
-compatible = "stericsson,db8500-prcmu-timer-4";
-compatible = "stericsson,db8500-thermal";
-compatible = "stericsson,db8500-prcmu-regulator";
-
-
+Acked-by: Peter Korsgaard <jacmet@sunsite.dk>
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Bye, Peter Korsgaard
