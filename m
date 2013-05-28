@@ -1,39 +1,77 @@
-From: ratbert.chuang@gmail.com (Po-Yu Chuang)
-Date: Tue, 28 May 2013 18:48:20 +0800
-Subject: [PATCH] ARM: map_init_section flushes incorrect pmd
-Message-ID: <1369738100-11152-1-git-send-email-ratbert.chuang@gmail.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Tue, 28 May 2013 11:49:52 +0100
+Subject: [PATCH] ARM: document the bigger pagetables needed for LPAE
+In-Reply-To: <1369528072.2776.26@driftwood>
+References: <1369410236-22398-1-git-send-email-javi.merino@arm.com>
+ <1369528072.2776.26@driftwood>
+Message-ID: <20130528104952.GD2776@e102654-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This bug was introduced in commit e651eab0.
-Some v4/v5 platforms failed to boot due to this.
+On Sun, May 26, 2013 at 01:27:52AM +0100, Rob Landley wrote:
+> On 05/24/2013 10:43:56 AM, Javi Merino wrote:
+> > The Booting documentation assumes that the initial pagetables are
+> > 16KiB but since 1b6ba46 (ARM: LPAE: MMU setup for the 3-level page
+> > table format) they are 20KiB for LPAE kernels.  Thus, the
+> > recommendation to put atags or the dtb in the first 16KiB is wrong,
+> > there's only 12KiB of space there in LPAE kernels, so update the
+> > documentation accordingly.
+> > ---
+> >  Documentation/arm/Booting |    9 +++++----
+> >  1 file changed, 5 insertions(+), 4 deletions(-)
+> 
+> Acked-by: Rob Landley <rob@landley.net>
 
-Signed-off-by: Po-Yu Chuang <ratbert.chuang@gmail.com>
----
- arch/arm/mm/mmu.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Thanks.  As Catalin pointed out, I'm missing my SoB.
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e0d8565..19a43f8 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -620,6 +620,8 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
- 			unsigned long end, phys_addr_t phys,
- 			const struct mem_type *type)
- {
-+	pmd_t *p = pmd;
-+
- #ifndef CONFIG_ARM_LPAE
- 	/*
- 	 * In classic MMU format, puds and pmds are folded in to
-@@ -638,7 +640,7 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
- 		phys += SECTION_SIZE;
- 	} while (pmd++, addr += SECTION_SIZE, addr != end);
- 
--	flush_pmd_entry(pmd);
-+	flush_pmd_entry(p);
- }
- 
- static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
--- 
-1.7.9.5
+> With one comment:
+> 
+> > diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
+> > index 0c1f475..f6f9cd8 100644
+> > --- a/Documentation/arm/Booting
+> > +++ b/Documentation/arm/Booting
+> > @@ -105,7 +105,7 @@ The tagged list should be stored in system RAM.
+> > 
+> >  The tagged list must be placed in a region of memory where neither
+> >  the kernel decompressor nor initrd 'bootp' program will overwrite
+> > -it.  The recommended placement is in the first 16KiB of RAM.
+> > +it.  The recommended placement is in the first 12KiB of RAM.
+> > 
+> >  4b. Setup the device tree
+> >  -------------------------
+> > @@ -120,7 +120,7 @@ tagged list.
+> >  The boot loader must pass at a minimum the size and location of the
+> >  system memory, and the root filesystem location.  The dtb must be
+> >  placed in a region of memory where the kernel decompressor will not
+> > -overwrite it.  The recommended placement is in the first 16KiB of RAM
+> > +overwrite it.  The recommended placement is in the first 12KiB of RAM
+> >  with the caveat that it may not be located at physical address 0  
+> > since
+> >  the kernel interprets a value of 0 in r2 to mean neither a tagged  
+> > list
+> >  nor a dtb were passed.
+> > @@ -137,8 +137,9 @@ then it is legal for the boot loader to call the  
+> > zImage in flash
+> >  directly.
+> > 
+> >  The zImage may also be placed in system RAM (at any location) and
+> > -called there.  Note that the kernel uses 16K of RAM below the image
+> > -to store page tables.  The recommended placement is 32KiB into RAM.
+> > +called there.  Note that the kernel may use up to 20KiB of RAM below
+> > +the image to store page tables.  The recommended placement is 32KiB
+> > +into RAM.
+> 
+> Now that we have three memory entires, possibly some sort of memory  
+> layout would be in order?
+> 
+>     0k-12k   boot data (tagged list or device tree)
+>    12k-32k   page tables
+>    32k-xxx   kernel image
+> 
+> Perhaps at the end of section 4's introduction? It's not quite obvious  
+> from the document...
+
+Sounds like a good idea, I'll add it and send a v2.
+
+Cheers,
+Javi
