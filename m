@@ -1,55 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 May 2013 10:23:13 +0100
-Subject: VDSO for arm 32bit
-In-Reply-To: <634BB1CFA60ED14386C17849392C3EB202E52C9E87@HICGWSEX01.ad.harman.com>
-References: <634BB1CFA60ED14386C17849392C3EB202E52C9C0A@HICGWSEX01.ad.harman.com>
- <20899.25935.838288.45383@pilspetsen.it.uu.se>
- <634BB1CFA60ED14386C17849392C3EB202E52C9E87@HICGWSEX01.ad.harman.com>
-Message-ID: <20130528092313.GA10474@mudshark.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 May 2013 10:28:41 +0100
+Subject: [GIT PULL] ux500 DMA40 device tree migration base
+In-Reply-To: <20130528031320.GD13532@quad.lixom.net>
+References: <CACRpkdZjr=48_GJxsoYgK7DFUqLs10x4o9yky3MzNR7vh24ogA@mail.gmail.com>
+ <20130528031320.GD13532@quad.lixom.net>
+Message-ID: <20130528092841.GG22683@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 08:48:33AM +0100, Kumar, Ganesh wrote:
-> Hi Mikel,
+On Mon, 27 May 2013, Olof Johansson wrote:
+
+> On Thu, May 23, 2013 at 09:34:22PM +0200, Linus Walleij wrote:
+> > Hi ARM SoC folks,
+> > 
+> > here is a patch set that Lee has been chiseling out recently. I've
+> > accumulated it in my ux500 tree and piled ACKs on the first 36
+> > patches of the patch set. Basically that includes ACKs from
+> > subsystem maintainers Vinod Koul and Herbert Xu for affected
+> > parts.
+> > 
+> > We need to get this into Linux-next to proceed with further
+> > migration on top of it. All have been circulated on the lists for
+> > a while.
+> > 
+> > Please pull this into an apropriate ARM SoC branch for v3.11!
+> > 
+> > If we can get ACKs for the rest of the patches in Lee's set these
+> > will arrive on top of this base as soon as they are ready.
+> > 
+> > Yours,
+> > Linus Walleij
+> > 
+> > The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+> > 
+> >   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> > tags/ux500-dma40-for-arm-soc
 > 
-> Kumar, Ganesh writes:
->  > Hi All,
->  >
->  > ? I'm working on OMAP5 on greg's LTS kernel 3.4.25, but I see there is  > no support for vdso for arm 32 bit.
->  > I'm planning to port it to arm 32 bit, is there any work under progress?
->  > would like to understand why the support for arm 32 bit is not there, any idea?
+> Thanks, pulled into next/drivers.
 > 
-> > 32-bit ARM has a "kuser" page at a fixed virtual address, which exports a few critical routines to user-space.  With that, a vdso is mostly redundant.
-> 
->   Thanks for the info, my main idea is to get the gettimeofday exported through the kuser helper,tried looking at the sources
-> but I could not find anything related to that seems done in the mainline kernel tree for arm cortex, am I missing something here?
-> I plan to do that if its not available yet, right now I've started with the kernel doc for the kuser, any pointers further
-> to get the gettimeofday up and running using the kuser, Thanks in advance for your time.
+> I see the conversions have been made the brute-force way instead of keeping
+> backwards compatibility and cleaning up drivers before removing no longer
+> needed board code. That should be fine, as long as you don't introduce too
+> crazy dependencies (and conflicts) in the code you're talking about adding on
+> top. 
 
-Be careful here. I had a crack at a gtod implementation for the vectors page
-in the past, but decided to drop it because it quickly became a maintenance
-nightmare. Since the layout of the vectors page must be fixed (as userspace
-jumps to the absolute addresses for the helpers), having large, complicated
-functions (which gtod does become as you quickly start using the stack to
-store all of the shared state with the kernel) means that you can quickly
-back yourself into a corner where the layout of the code cannot change
-without breaking the ABI.
+It's not as bad as you make it sound. The platform devices which we
+converted over were either already converted (mmci, amba-pl011), not
+used (crypt, hash, musb) or broken (mop500-asoc). So it really should
+be no big deal.
 
-On top of that, new clock types are added more often than you might think
-(not to mention bug fixes in the implementation itself), and you end up in
-a horrible situation where you'd end up deprecating one implementation and
-adding gettimeofday2 or something equally nasty at a different offset.
-
-Maybe this can be solved by adding loads of padding between the different
-functions and hoping for the best, but I think a better solution would be to
-try and add something which is actually a vdso but preserves the function
-offsets of the current helpers, thus preserving the ABI. That could then
-replace the vectors page and newer C libraries could make use of the vdso
-functionality. Of course, that's a lot more work and people might have
-objections to the approach.
-
-Finally, I assume you're only interested in the co-processor backed
-architected timers for this? I know some people were toying with exposing
-memory-mapped timers to userspace, but that really scares me.
-
-Will
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
