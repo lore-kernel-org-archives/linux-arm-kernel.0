@@ -1,35 +1,18 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Tue, 28 May 2013 11:54:48 +0530
-Subject: [PATCH] ARM: OMAP2+: timer: initialize before using oh_name
-Message-ID: <1369722288-15592-1-git-send-email-afzal@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 28 May 2013 14:27:13 +0800
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
+In-Reply-To: <201305280656.27472.marex@denx.de>
+References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5DRuKrECnYDtZ0wOK6_vpW95Cwc3xf7LT+VT_B7eV3gug@mail.gmail.com>
+ <20130528014348.GA19608@S2101-09.ap.freescale.net>
+ <201305280656.27472.marex@denx.de>
+Message-ID: <20130528062711.GB19608@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_property_read_string_index(...,&oh_name) in omap_dm_timer_init_one
-does not alter the value of 'oh_name' even if the relevant function
-fails and as 'oh_name' in stack may have a non-zero value, it would
-be misunderstood by timer code that DT has specified "ti,hwmod"
-property for timer. 'oh_name' in this scenario would be a junk value,
-this would result in module not being enabled by hwmod API's for
-timer, and in turn crash.
+On Tue, May 28, 2013 at 06:56:27AM +0200, Marek Vasut wrote:
+> What is the problem you observe?
+> 
+The audio playback gives silent output.
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
- arch/arm/mach-omap2/timer.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
-index f8b23b8..8e0c390 100644
---- a/arch/arm/mach-omap2/timer.c
-+++ b/arch/arm/mach-omap2/timer.c
-@@ -220,7 +220,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
- 					 int posted)
- {
- 	char name[10]; /* 10 = sizeof("gptXX_Xck0") */
--	const char *oh_name;
-+	const char *oh_name = NULL;
- 	struct device_node *np;
- 	struct omap_hwmod *oh;
- 	struct resource irq, mem;
--- 
-1.7.12
+Shawn
