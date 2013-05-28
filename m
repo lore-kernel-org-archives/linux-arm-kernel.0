@@ -1,120 +1,68 @@
-From: b35083@freescale.com (Jingchang Lu)
-Date: Tue, 28 May 2013 17:12:21 +0800
-Subject: [PATCH v4 2/4] ARM: imx: add initial support for VF610
-In-Reply-To: <1369732343-2982-1-git-send-email-b35083@freescale.com>
-References: <1369732343-2982-1-git-send-email-b35083@freescale.com>
-Message-ID: <1369732343-2982-3-git-send-email-b35083@freescale.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Tue, 28 May 2013 15:32:54 +0530
+Subject: [PATCH V3 0/4] clk: Samsung: audss: Register audio subsytem clocks
+ using common clk framework
+Message-ID: <1369735378-10003-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial support for Freescale Vybrid VF610 SoC.
+Samsung S5PV210 and Exynos SoC has a separate subsystem for audio. This subsystem
+has a internal clock controller which controls i2s0 and pcm0 clocks. This patch
+series adds the Samsung audio subsytem clock to the common clock framework and
+provides the I2S controllers clock information in the dtsi file.
 
-Signed-off-by: Jingchang Lu <b35083@freescale.com>
----
-v4:
-  Follow internal suggestions to name the soc name as VF610.
-  Use of_clk_init() call initilizing clocks.
-v3:
-  Split one big arch support patch into small patches.
-  Remove unused #include header lines.
-  Use common mxc restart function.
+This patch series is made based on Kukjin Kim for-next branch
 
- arch/arm/mach-imx/Kconfig      | 15 +++++++++++++
- arch/arm/mach-imx/Makefile     |  2 ++
- arch/arm/mach-imx/mach-vf610.c | 48 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 65 insertions(+)
- create mode 100644 arch/arm/mach-imx/mach-vf610.c
+Changes since V2:
+	- Removed s5pv210 compatible name from driver as it is
+	  not yet supported which is different from Exynos series
+	  audio subsystem clock conroller.
+	- Removed clkdev lookup support and added alias names in
+	  the i2s0 controller node.
+Changes since V1:
+        - Reworked on all review comments by Sylwester Nawrocki
+        - Added a header file for all clock indexes as requested by Sylwester
+        - Added different compatible names for s5pv210, exynos4 and exynos5
+        - Registered the pcm clocks with common clock framework
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index a402248..b7eddbd 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -835,6 +835,21 @@ config SOC_IMX6SL
- 	help
- 	  This enables support for Freescale i.MX6 SoloLite processor.
- 
-+config SOC_VF610
-+	bool "Vybrid Family VF610 support"
-+	select CPU_V7
-+	select ARM_GIC
-+	select CLKSRC_OF
-+	select PINCTRL
-+	select PINCTRL_VF610
-+	select VF_PIT_TIMER
-+	select PL310_ERRATA_588369 if CACHE_PL310
-+	select PL310_ERRATA_727915 if CACHE_PL310
-+	select PL310_ERRATA_769419 if CACHE_PL310
-+
-+	help
-+	  This enable support for Freescale Vybrid VF610 processor.
-+
- endif
- 
- source "arch/arm/mach-imx/devices/Kconfig"
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 2a4754d..054f039 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -112,4 +112,6 @@ obj-$(CONFIG_MACH_EUKREA_MBIMXSD51_BASEBOARD) += eukrea_mbimxsd51-baseboard.o
- obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
- obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
- 
-+obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
-+
- obj-y += devices/
-diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
-new file mode 100644
-index 0000000..709fac3
---- /dev/null
-+++ b/arch/arm/mach-imx/mach-vf610.c
-@@ -0,0 +1,48 @@
-+/*
-+ * Copyright 2012-2013 Freescale Semiconductor, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/of_platform.h>
-+#include <linux/clocksource.h>
-+#include <linux/irqchip.h>
-+#include <linux/clk-provider.h>
-+#include <asm/mach/arch.h>
-+#include <asm/hardware/cache-l2x0.h>
-+
-+#include "common.h"
-+
-+static void __init vf610_init_machine(void)
-+{
-+	mxc_arch_reset_init_dt();
-+	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+}
-+
-+static void __init vf610_init_irq(void)
-+{
-+	l2x0_of_init(0, ~0UL);
-+	irqchip_init();
-+}
-+
-+static void __init vf610_init_time(void)
-+{
-+	of_clk_init(NULL);
-+	clocksource_of_init();
-+}
-+
-+static const char *vf610_dt_compat[] __initdata = {
-+	"fsl,vf610",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(VYBRID_VF610, "Freescale Vybrid VF610 (Device Tree)")
-+	.init_irq	= vf610_init_irq,
-+	.init_time	= vf610_init_time,
-+	.init_machine   = vf610_init_machine,
-+	.dt_compat	= vf610_dt_compat,
-+	.restart	= mxc_restart,
-+MACHINE_END
+Padmavathi Venna (4):
+  ARM: samsung: use #include for all device trees
+  clk: samsung: register audio subsystem clocks using common clock
+    framework
+  ARM: dts: add Exynos audio subsystem clock controller node
+  ARM: dts: add clock provider information for i2s controllers in
+    Exynos5250
+
+ .../bindings/clock/clk-samsung-audss.txt           |   64 ++++++++++
+ arch/arm/boot/dts/exynos4.dtsi                     |    2 +-
+ arch/arm/boot/dts/exynos4210-origen.dts            |    2 +-
+ arch/arm/boot/dts/exynos4210-smdkv310.dts          |    2 +-
+ arch/arm/boot/dts/exynos4210-trats.dts             |    2 +-
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |    2 +-
+ arch/arm/boot/dts/exynos4210.dtsi                  |    4 +-
+ arch/arm/boot/dts/exynos4212.dtsi                  |    2 +-
+ arch/arm/boot/dts/exynos4412-odroidx.dts           |    2 +-
+ arch/arm/boot/dts/exynos4412-origen.dts            |    2 +-
+ arch/arm/boot/dts/exynos4412-smdk4412.dts          |    2 +-
+ arch/arm/boot/dts/exynos4412.dtsi                  |    2 +-
+ arch/arm/boot/dts/exynos4x12.dtsi                  |    4 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts           |    2 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    2 +-
+ arch/arm/boot/dts/exynos5250-snow.dts              |    4 +-
+ arch/arm/boot/dts/exynos5250.dtsi                  |   23 +++-
+ arch/arm/boot/dts/exynos5440-sd5v1.dts             |    2 +-
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts          |    2 +-
+ arch/arm/boot/dts/exynos5440.dtsi                  |    2 +-
+ arch/arm/boot/dts/s3c2416-smdk2416.dts             |    2 +-
+ arch/arm/boot/dts/s3c2416.dtsi                     |    4 +-
+ arch/arm/boot/dts/s3c24xx.dtsi                     |    2 +-
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-samsung-audss.c            |  133 ++++++++++++++++++++
+ include/dt-bindings/clk/samsung-audss-clk.h        |   25 ++++
+ 26 files changed, 269 insertions(+), 27 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/clk-samsung-audss.txt
+ create mode 100644 drivers/clk/samsung/clk-samsung-audss.c
+ create mode 100644 include/dt-bindings/clk/samsung-audss-clk.h
+
 -- 
-1.8.0
+1.7.4.4
