@@ -1,124 +1,100 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 28 May 2013 10:16:29 -0300
-Subject: [PATCH v2] ARM: dt: Use the 'model' field for printing the hardware
- revision
-Message-ID: <1369746989-19470-1-git-send-email-fabio.estevam@freescale.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 28 May 2013 15:23:37 +0200
+Subject: [PATCH] cpuidle: improve governor Kconfig options
+In-Reply-To: <5938372.bcA6BTeOGP@vostro.rjw.lan>
+References: <1369688458-9114-1-git-send-email-daniel.lezcano@linaro.org>
+ <1578834.dvFIpyCvrt@vostro.rjw.lan> <51A4A1A4.1070008@linaro.org>
+ <5938372.bcA6BTeOGP@vostro.rjw.lan>
+Message-ID: <51A4AFD9.3020109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting a device tree kernel, we get the following output from 
-'cat /proc/cpuinfo': 
+On 05/28/2013 02:42 PM, Rafael J. Wysocki wrote:
+> On Tuesday, May 28, 2013 02:23:00 PM Daniel Lezcano wrote:
+>> On 05/28/2013 01:46 PM, Rafael J. Wysocki wrote:
+>>> On Monday, May 27, 2013 11:00:58 PM Daniel Lezcano wrote:
+>>>> Each governor is suitable for different kernel configurations: the menu
+>>>> governor suits better for a tickless system, while the ladder governor fits
+>>>> better for a periodic timer tick system.
+>>>>
+>>>> The Kconfig does not allow to [un]select a governor, thus both are compiled in
+>>>> the kernel but the init order makes the menu governor to be the last one to be
+>>>> registered, so becoming the default. The only way to switch back to the ladder
+>>>> governor is to enable the sysfs governor switch in the kernel command line.
+>>>>
+>>>> Because it seems nobody complained about this, the menu governor is used by
+>>>> default most of the time on the system, having both governors is not really
+>>>> necessary on a tickless system but there isn't a config option to disable one
+>>>> or another governor.
+>>>>
+>>>> Create a submenu for cpuidle and add a label for each governor, so we can see
+>>>> the option in the menu config and enable/disable it.
+>>>>
+>>>> The governors will be enabled depending on the CONFIG_NO_HZ option:
+>>>>  - If CONFIG_NO_HZ is set, then the menu governor is selected and the ladder
+>>>>    governor is optional, defaulting to 'no'
+>>>
+>>> Why not defaulting to 'yes'?  That'd be backwards compatible, wouldn't it?
+>>
+>> Yes, that wouldn't be backward compatible but who wants the ladder
+>> governor which is less efficient with a tickless system ?
+> 
+> I don't know and this isn't the right question to ask I think.
+> 
+> You need to ask who uses the ladder governor with CONFIG_NO_HZ and you need to
+> avoid making changes that aren't backwards compatible if you don't know the
+> answer (which I'm pretty sure is the case).
+> 
+> I'd prefer to default to 'yes' to start with and then to change the
+> default to 'no' after a couple of cycles, possibly.
+> 
+>>>>  - If CONFIG_NO_HZ is not set, then the ladder governor is selected and the
+>>>>    menu governor is optional, defaulting to 'no'
+>>>
+>>> Are you sure this is not going to introduce regressions with CONFIG_NO_HZ
+>>> unset?
+>>
+>> Yes, a system configured with a periodic tick will use the ladder
+>> instead of the menu governor (which is less efficient on this
+>> configuration).
+> 
+> Well, "less efficient" meaning what exactly?  Less power-efficient or less
+> efficient performance-wise?
 
-$ cat /proc/cpuinfo 
-processor       : 0
-model name      : ARMv7 Processor rev 5 (v7l)
-BogoMIPS        : 531.66
-Features        : swp half thumb fastmult vfp edsp neon vfpv3 tls 
-CPU implementer : 0x41
-CPU architecture: 7
-CPU variant     : 0x2
-CPU part        : 0xc08
-CPU revision    : 5
+less power efficient.
 
-Hardware        : Freescale i.MX51 (Device Tree Support)
-Revision        : 0000
-Serial          : 0000000000000000
+>> Currently the default is the menu governor with a periodic tick system
+>> because both governors are compiled in and the init order makes the menu
+>> governor to be enabled instead of the 'ladder'.
+> 
+> I understand that.
+> 
+>> We can set both to 'yes' by default but in this case, I suggest to add
+>> in the code a 'preferred' governor depending on tickless or not, so the
+>> right governor is chosen at boot time depending on CONFIG_NO_HZ.
+>>
+>> Otherwise, I am not sure people running servers (with a periodic tick)
+>> will change their kernel command line option to enable the sysfs
+>> governor switch to change the governor to ladder, neither they are aware
+>> ladder is better for their system.
+>>
+>> I am open to any suggestion.
+> 
+> I think the change to make the governor preference depend on CONFIG_NO_HZ
+> kind of makes sense.  However, I'd default to 'yes' for both governors in both
+> configurations to start with (which basically means that the ordering will now
+> depend on CONFIG_NO_HZ).
 
-The Hardware line does not really describe the hardware type, as it is reading
-the information from the dt 'machine' field.
+Ok, no problem. I will respin the patch.
 
-In the dt case, read the 'model' field instead, so that we can have a better
-description output as follows:
+Thanks for the review
 
-Hardware        : Freescale i.MX51 Babbage Board
+  -- Daniel
 
-The hardware output string is unchanged for the non-dt kernel case.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Fix typo in 'architecture'
- arch/arm/include/asm/mach/arch.h |  1 +
- arch/arm/kernel/devtree.c        | 15 ++++++++-------
- arch/arm/kernel/setup.c          |  7 ++++++-
- 3 files changed, 15 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/include/asm/mach/arch.h b/arch/arm/include/asm/mach/arch.h
-index 308ad7d..113d4af 100644
---- a/arch/arm/include/asm/mach/arch.h
-+++ b/arch/arm/include/asm/mach/arch.h
-@@ -23,6 +23,7 @@ struct smp_operations;
- struct machine_desc {
- 	unsigned int		nr;		/* architecture number	*/
- 	const char		*name;		/* architecture name	*/
-+	const char		*model;		/* architecture model */
- 	unsigned long		atag_offset;	/* tagged list (relative) */
- 	const char *const 	*dt_compat;	/* array of device tree
- 						 * 'compatible' strings	*/
-diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-index 5af04f6..90d541a 100644
---- a/arch/arm/kernel/devtree.c
-+++ b/arch/arm/kernel/devtree.c
-@@ -178,7 +178,6 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
- 	struct machine_desc *mdesc, *mdesc_best = NULL;
- 	unsigned int score, mdesc_score = ~1;
- 	unsigned long dt_root;
--	const char *model;
- 
- #ifdef CONFIG_ARCH_MULTIPLATFORM
- 	DT_MACHINE_START(GENERIC_DT, "Generic DT based system")
-@@ -224,12 +223,14 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
- 		dump_machine_table(); /* does not return */
- 	}
- 
--	model = of_get_flat_dt_prop(dt_root, "model", NULL);
--	if (!model)
--		model = of_get_flat_dt_prop(dt_root, "compatible", NULL);
--	if (!model)
--		model = "<unknown>";
--	pr_info("Machine: %s, model: %s\n", mdesc_best->name, model);
-+	mdesc_best->model = of_get_flat_dt_prop(dt_root, "model", NULL);
-+	if (!mdesc_best->model)
-+		mdesc_best->model = of_get_flat_dt_prop(dt_root, "compatible",
-+							NULL);
-+	if (!mdesc_best->model)
-+		mdesc_best->model = "<unknown>";
-+	pr_info("Machine: %s, model: %s\n", mdesc_best->name,
-+		mdesc_best->model);
- 
- 	/* Retrieve various information from the /chosen node */
- 	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 79e8d2f..d22f24b 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -137,6 +137,7 @@ EXPORT_SYMBOL(elf_platform);
- 
- static const char *cpu_name;
- static const char *machine_name;
-+static const char *model_name;
- static char __initdata cmd_line[COMMAND_LINE_SIZE];
- struct machine_desc *machine_desc __initdata;
- 
-@@ -786,6 +787,7 @@ void __init setup_arch(char **cmdline_p)
- 		mdesc = setup_machine_tags(__atags_pointer, __machine_arch_type);
- 	machine_desc = mdesc;
- 	machine_name = mdesc->name;
-+	model_name = mdesc->model;
- 
- 	setup_dma_zone(mdesc);
- 
-@@ -950,7 +952,10 @@ static int c_show(struct seq_file *m, void *v)
- 		seq_printf(m, "CPU revision\t: %d\n\n", cpuid & 15);
- 	}
- 
--	seq_printf(m, "Hardware\t: %s\n", machine_name);
-+	if (model_name)
-+		seq_printf(m, "Hardware\t: %s\n", model_name);
-+	else
-+		seq_printf(m, "Hardware\t: %s\n", machine_name);
- 	seq_printf(m, "Revision\t: %04x\n", system_rev);
- 	seq_printf(m, "Serial\t\t: %08x%08x\n",
- 		   system_serial_high, system_serial_low);
 -- 
-1.8.1.2
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
