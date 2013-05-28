@@ -1,28 +1,27 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Tue, 28 May 2013 07:55:32 -0700
-Subject: [PATCH] arch: configuration, deleting 'CONFIG_BUG' since always
- need it.
-In-Reply-To: <20130528081910.GA29557@gmail.com>
-References: <519DCBEF.3090208@asianux.com>
- <20130523090534.GJ18614@n2100.arm.linux.org.uk>
- <CAMuHMdWez-j1Maa3BD7ucmzv0_zFJnChERQiHFmkCaZUzG0_AA@mail.gmail.com>
- <201305231139.38233.arnd@arndb.de>
- <20130523100409.GK18614@n2100.arm.linux.org.uk>
- <20130528081910.GA29557@gmail.com>
-Message-ID: <51A4C564.4040301@zytor.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 28 May 2013 09:07:58 -0600
+Subject: [PATCH v2 0/5] ARM: dts: OMAP2+: use preprocessor for device trees
+In-Reply-To: <1369323421-4180-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1369323421-4180-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <51A4C84E.4070005@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2013 01:19 AM, Ingo Molnar wrote:
+On 05/23/2013 09:36 AM, Florian Vaussard wrote:
+> Hello,
 > 
-> So I think the same principle applies to it as to any other debugging 
-> code: it's fine to be able to turn debugging off. It's a performance 
-> versus kernel robustness/determinism trade-off.
+> Following a similar proposal by Stephen Warren for tegra [1], this series
+> makes use of the C preprocessor when compiling OMAP DT files, and
+> accomplishes some improvements to improve overall readability.
 > 
+> Patch 1 is a preparation for the rest of the series.
+> Patch 2 uses existing constants for GPIOs. Patch 3 does the same for
+> IRQs. Patch 4 creates a new header for OMAP's padmux, and patch 5 uses
+> it to simplify pinctrl DT.
+> 
+> For all targets, the .dtb files were diff-tested before and after
+> applying the series to guarantee identity.
 
-I suspect, rather, that BUG() should turn into a trap (or jump to a
-death routine) under any circumstances.  The one thing that can be
-omitted for small configurations are the annotations, which only serve
-to output a more human-readable error message.
+The series briefly,
 
-	-hpa
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
