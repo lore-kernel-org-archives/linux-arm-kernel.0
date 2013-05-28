@@ -1,34 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 28 May 2013 14:55:48 +0800
-Subject: [PATCH] thermal: step_wise: cdev only needs update on a new target
- state
-Message-ID: <1369724148-15087-1-git-send-email-shawn.guo@linaro.org>
+From: yegorslists@googlemail.com (yegorslists at googlemail.com)
+Date: Tue, 28 May 2013 09:21:01 +0200
+Subject: [PATCH v2] usb: musb: fix clock naming
+Message-ID: <1369725661-3114-1-git-send-email-yegorslists@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cooling device only needs update on a new target state.  Since we
-already check old target in thermal_zone_trip_update(), we can do one
-more check to see if it's a new target state.  If not, we can reasonably
-save some uncecesary code execution.
+From: Yegor Yefremov <yegorslists@googlemail.com>
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+'ick' was changed to 'hsotgusb_ick'
+'fck' was changed to 'hsotgusb_fck'
+
+Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
 ---
- drivers/thermal/step_wise.c |    3 +++
- 1 file changed, 3 insertions(+)
+v2: CC linux-usb mailing list
 
-diff --git a/drivers/thermal/step_wise.c b/drivers/thermal/step_wise.c
-index 4d4ddae..0afbd86 100644
---- a/drivers/thermal/step_wise.c
-+++ b/drivers/thermal/step_wise.c
-@@ -133,6 +133,9 @@ static void thermal_zone_trip_update(struct thermal_zone_device *tz, int trip)
- 		old_target = instance->target;
- 		instance->target = get_target_state(instance, trend, throttle);
+ drivers/usb/musb/am35x.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/musb/am35x.c b/drivers/usb/musb/am35x.c
+index 2231850..92b5b23 100644
+--- a/drivers/usb/musb/am35x.c
++++ b/drivers/usb/musb/am35x.c
+@@ -477,14 +477,14 @@ static int am35x_probe(struct platform_device *pdev)
+ 		goto err1;
+ 	}
  
-+		if (old_target == instance->target)
-+			continue;
-+
- 		/* Activate a passive thermal instance */
- 		if (old_target == THERMAL_NO_TARGET &&
- 			instance->target != THERMAL_NO_TARGET)
+-	phy_clk = clk_get(&pdev->dev, "fck");
++	phy_clk = clk_get(&pdev->dev, "hsotgusb_ick");
+ 	if (IS_ERR(phy_clk)) {
+ 		dev_err(&pdev->dev, "failed to get PHY clock\n");
+ 		ret = PTR_ERR(phy_clk);
+ 		goto err3;
+ 	}
+ 
+-	clk = clk_get(&pdev->dev, "ick");
++	clk = clk_get(&pdev->dev, "hsotgusb_fck");
+ 	if (IS_ERR(clk)) {
+ 		dev_err(&pdev->dev, "failed to get clock\n");
+ 		ret = PTR_ERR(clk);
 -- 
-1.7.9.5
+1.7.7
