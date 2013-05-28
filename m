@@ -1,13 +1,9 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 May 2013 14:36:17 -0400
-Subject: [GIT PULL] ARM: mvebu: soc changes for v3.11 (round 2 cumulative)
-Message-ID: <20130528183617.GB31290@titan.lakedaemon.net>
+Date: Tue, 28 May 2013 14:38:22 -0400
+Subject: [GIT PULL] ARM: mvebu: boards for v3.11 (round 2 cumulative)
+Message-ID: <20130528183822.GC31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Olof,
-
-summary is cumulative.
 
 
 The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
@@ -16,28 +12,35 @@ The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
 are available in the git repository at:
 
-  git://git.infradead.org/users/jcooper/linux.git tags/soc-3.11-2
+  git://git.infradead.org/users/jcooper/linux.git tags/boards-3.11-2
 
-for you to fetch changes up to efde309297a08e32d89e4a96c4051e86dcd50b45:
+for you to fetch changes up to 391a16c7783a64309dc930c6d454372d7a8beb12:
 
-  arm: kirkwood: Instantiate cpufreq driver (2013-05-26 17:56:24 +0000)
+  ARM: Kirkwood: Convert LSXL to restart-poweroff driver. (2013-05-26 01:12:34 +0000)
 
 ----------------------------------------------------------------
-mvebu soc changes for v3.11 (round 2)
+mvebu board changes for v3.11 (round 2)
 
  - kirkwood
-    - use the cpufreq driver
+    - QNAP use power-off driver
+    - LSXL use restart-poweroff driver
 
 ----------------------------------------------------------------
-Andrew Lunn (1):
-      arm: kirkwood: Instantiate cpufreq driver
+Andrew Lunn (2):
+      ARM: Kirkwood: Make use of the QNAP Power off driver.
+      ARM: Kirkwood: Convert LSXL to restart-poweroff driver.
 
-Thomas Petazzoni (1):
-      arm: kirkwood: use the default of match table
+Simon Baatz (1):
+      ARM: Kirkwood: add DT support for Sheevaplug and Sheevaplug eSATA
 
- arch/arm/Kconfig                                  |  1 +
- arch/arm/mach-kirkwood/board-dt.c                 |  9 +++------
- arch/arm/mach-kirkwood/common.c                   | 23 +++++++++++++++++++++++
- arch/arm/mach-kirkwood/common.h                   |  2 ++
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  2 ++
- 5 files changed, 31 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/kirkwood-lsxl.dtsi      |  4 ++++
+ arch/arm/boot/dts/kirkwood-ts219.dtsi     |  5 +++++
+ arch/arm/mach-kirkwood/Kconfig            |  9 +++++++++
+ arch/arm/mach-kirkwood/Makefile           |  1 +
+ arch/arm/mach-kirkwood/board-dt.c         |  4 ++++
+ arch/arm/mach-kirkwood/board-lsxl.c       | 16 ----------------
+ arch/arm/mach-kirkwood/board-sheevaplug.c | 27 +++++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/board-ts219.c      |  3 ---
+ arch/arm/mach-kirkwood/common.h           |  5 +++++
+ 9 files changed, 55 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm/mach-kirkwood/board-sheevaplug.c
