@@ -1,42 +1,39 @@
-From: adrienverge@gmail.com (=?UTF-8?Q?Adrien_Verg=C3=A9?=)
-Date: Tue, 28 May 2013 14:29:09 -0400
-Subject: [PATCH] ARM: omap2plus_defconfig: enable USB_PHY and NOP_USB_XCEIV
-Message-ID: <CANsc=4W8cW3jQs8yN_j8DZyEo7GkMejNc4Vw65A4iW+GuasBaw@mail.gmail.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 28 May 2013 14:31:10 -0400
+Subject: [GIT PULL] ARM: mvebu: fixes-non-critical for v3.11
+Message-ID: <20130528183110.GZ31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On OMAP2+ platforms, USB support needs physical layer signalling and
-the NOP USB Transceiver driver since v3.10. This patch enables USB_PHY
-and NOP_USB_XCEIV in omap2plus_defconfig. These two are harmless to
-the kernel stability, and useful since they are required for USB and
-Ethernet (over USB) support.
+Olof,
 
-We do not enable USB_EHCI_HCD here because all features aren't fully
-supported yet.
+As asked, these were pulled out of mvebu/fixes.
 
-This patch applies to Linux 3.10-rc3.
 
-Cc: Roger Quadros <rogerq@ti.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Felipe Balbi <balbi@ti.com>
-Signed-off-by: Adrien Verg? <adrienverge@gmail.com>
----
- arch/arm/configs/omap2plus_defconfig |    2 ++
- 1 file changed, 2 insertions(+)
+The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
 
-diff --git a/arch/arm/configs/omap2plus_defconfig
-b/arch/arm/configs/omap2plus_defconfig
-index abbe319..2ac0ffb 100644
---- a/arch/arm/configs/omap2plus_defconfig
-+++ b/arch/arm/configs/omap2plus_defconfig
-@@ -210,6 +210,8 @@ CONFIG_USB_WDM=y
- CONFIG_USB_STORAGE=y
- CONFIG_USB_LIBUSUAL=y
- CONFIG_USB_TEST=y
-+CONFIG_USB_PHY=y
-+CONFIG_NOP_USB_XCEIV=y
- CONFIG_USB_GADGET=y
- CONFIG_USB_GADGET_DEBUG=y
- CONFIG_USB_GADGET_DEBUG_FILES=y
--- 
-1.7.10.4
+  Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/jcooper/linux.git tags/fixes-non-3.11-1
+
+for you to fetch changes up to cf8088c5cac6ce20d914b9131533844b9291a054:
+
+  arm: mvebu: fix length of Ethernet registers area in .dtsi (2013-05-28 14:48:28 +0000)
+
+----------------------------------------------------------------
+mvebu fixes non-critical for v3.11 (round 1)
+
+ - mvebu
+    - fix register area length in dtsi for ethernet and sata
+
+----------------------------------------------------------------
+Thomas Petazzoni (2):
+      arm: mvebu: fix length of SATA registers area in .dtsi
+      arm: mvebu: fix length of Ethernet registers area in .dtsi
+
+ arch/arm/boot/dts/armada-370-xp.dtsi     | 6 +++---
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi | 2 +-
+ arch/arm/boot/dts/armada-xp.dtsi         | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
