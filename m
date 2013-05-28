@@ -1,54 +1,80 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 May 2013 16:24:33 -0400
-Subject: [GIT PULL 2/5] ARM: mvebu: pcie driver for v3.11 (round 2 cumulative)
-In-Reply-To: <20130528202140.GG31290@titan.lakedaemon.net>
+Date: Tue, 28 May 2013 16:26:32 -0400
+Subject: [GIT PULL 3/5] ARM: kirkwood: pcie driver for v3.11
+In-Reply-To: <20130528202433.GH31290@titan.lakedaemon.net>
 References: <20130528202140.GG31290@titan.lakedaemon.net>
-Message-ID: <20130528202433.GH31290@titan.lakedaemon.net>
+ <20130528202433.GH31290@titan.lakedaemon.net>
+Message-ID: <20130528202632.GI31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-The following changes since commit 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
-
-  of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/jcooper/linux.git tags/pcie-3.11-2
-
-for you to fetch changes up to 3d9939c92efdd4ced672b94994959ca71b141cb8:
+The following changes since commit 3d9939c92efdd4ced672b94994959ca71b141cb8:
 
   pci: mvebu: fix return value check in mvebu_pcie_probe() (2013-05-27 15:51:56 +0000)
 
-----------------------------------------------------------------
-mvebu pcie driver for v3.11 (round 2, bugfix)
+are available in the git repository at:
 
- - mvebu pcie
-    - fix return value check in mvebu_pcie_probe()
+  git://git.infradead.org/users/jcooper/linux.git tags/pcie_kw-3.11
+
+for you to fetch changes up to 0d0632f523fa040b307688ae421a1debf79af2d7:
+
+  arm: kirkwood: convert db-88f6281/db-88f6282 to the Device Tree (2013-05-27 16:02:13 +0000)
+
+----------------------------------------------------------------
+mvebu pcie driver (kirkwood) for v3.11
+
+ - kirkwood
+    - enable pcie driver
+    - migrate boards over to pcie dt init
 
 depends
- - mvebu/of_pci
+ - mvebu/pcie
+    - mvebu/of_pci
 
 ----------------------------------------------------------------
-Thomas Petazzoni (4):
-      clk: mvebu: create parent-child relation for PCIe clocks on Armada 370
-      clk: mvebu: add more PCIe clocks for Armada XP
-      pci: PCIe driver for Marvell Armada 370/XP systems
-      arm: mvebu: PCIe support is now available on mvebu
+Thomas Petazzoni (8):
+      pci: mvebu: enable driver usage on Kirkwood
+      arm: kirkwood: move PCIe window init to legacy driver
+      arm: kirkwood: add SoC-level Device Tree data for PCIe interfaces
+      arm: kirkwood: convert Iomega Iconnect to use DT for the PCIe interface
+      arm: kirkwood: convert MPL CEC4 to use DT for the PCIe interface
+      arm: kirkwood: convert ZyXEL NSA310 to use DT for the PCIe interface
+      arm: kirkwood: convert QNAP TS219 to use DT for the PCIe interface
+      arm: kirkwood: convert db-88f6281/db-88f6282 to the Device Tree
 
-Wei Yongjun (1):
-      pci: mvebu: fix return value check in mvebu_pcie_probe()
-
- .../devicetree/bindings/pci/mvebu-pci.txt          | 220 ++++++
- arch/arm/mach-mvebu/Kconfig                        |   2 +
- drivers/clk/mvebu/clk-gating-ctrl.c                |  18 +-
- drivers/pci/Kconfig                                |   2 +
- drivers/pci/Makefile                               |   3 +
- drivers/pci/host/Kconfig                           |   8 +
- drivers/pci/host/Makefile                          |   1 +
- drivers/pci/host/pci-mvebu.c                       | 880 +++++++++++++++++++++
- 8 files changed, 1128 insertions(+), 6 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/mvebu-pci.txt
- create mode 100644 drivers/pci/host/Kconfig
- create mode 100644 drivers/pci/host/Makefile
- create mode 100644 drivers/pci/host/pci-mvebu.c
+ .../devicetree/bindings/pci/mvebu-pci.txt          |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/kirkwood-6281.dtsi               |  31 ++++++
+ arch/arm/boot/dts/kirkwood-6282.dtsi               |  48 +++++++++
+ arch/arm/boot/dts/kirkwood-db-88f6281.dts          |  30 ++++++
+ arch/arm/boot/dts/kirkwood-db-88f6282.dts          |  34 +++++++
+ arch/arm/boot/dts/kirkwood-db.dtsi                 |  89 +++++++++++++++++
+ arch/arm/boot/dts/kirkwood-iconnect.dts            |   8 ++
+ arch/arm/boot/dts/kirkwood-mplcec4.dts             |   8 ++
+ arch/arm/boot/dts/kirkwood-nsa310.dts              |   8 ++
+ arch/arm/boot/dts/kirkwood-ts219-6281.dts          |   3 +-
+ arch/arm/boot/dts/kirkwood-ts219-6282.dts          |   3 +-
+ arch/arm/boot/dts/kirkwood-ts219.dtsi              |   9 +-
+ arch/arm/boot/dts/kirkwood.dtsi                    |   1 +
+ arch/arm/mach-kirkwood/Kconfig                     |  21 ++--
+ arch/arm/mach-kirkwood/Makefile                    |   3 +-
+ arch/arm/mach-kirkwood/board-db88f628x-bp.c        |  24 +++++
+ arch/arm/mach-kirkwood/board-dt.c                  |   6 ++
+ arch/arm/mach-kirkwood/board-iconnect.c            |   8 --
+ arch/arm/mach-kirkwood/board-mplcec4.c             |   1 -
+ arch/arm/mach-kirkwood/board-nsa310.c              |  25 -----
+ arch/arm/mach-kirkwood/board-ts219.c               |  10 --
+ arch/arm/mach-kirkwood/common.c                    |  24 -----
+ arch/arm/mach-kirkwood/common.h                    |   6 ++
+ arch/arm/mach-kirkwood/db88f6281-bp-setup.c        | 108 ---------------------
+ arch/arm/mach-kirkwood/pcie.c                      |  22 +++++
+ drivers/pci/host/Kconfig                           |   2 +-
+ drivers/pci/host/pci-mvebu.c                       |   1 +
+ 28 files changed, 339 insertions(+), 197 deletions(-)
+ create mode 100644 arch/arm/boot/dts/kirkwood-db-88f6281.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-db-88f6282.dts
+ create mode 100644 arch/arm/boot/dts/kirkwood-db.dtsi
+ create mode 100644 arch/arm/mach-kirkwood/board-db88f628x-bp.c
+ delete mode 100644 arch/arm/mach-kirkwood/board-nsa310.c
+ delete mode 100644 arch/arm/mach-kirkwood/db88f6281-bp-setup.c
