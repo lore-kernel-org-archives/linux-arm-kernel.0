@@ -1,117 +1,60 @@
-From: inki.dae@samsung.com (Inki Dae)
-Date: Tue, 28 May 2013 12:56:57 +0900
-Subject: Introduce a new helper framework for buffer synchronization
-In-Reply-To: <CAF6AEGvGv539Ktdeg03n783nD+HofDamcJCLX93rzzKGOCV8_Q@mail.gmail.com>
-References: <CAAQKjZP=iOmHRpHZCbZD3v_RKUFSn0eM_WVZZvhe7F9g3eTmPA@mail.gmail.com>
- <CAF6AEGuDih-NR-VZCmQfqbvCOxjxreZRPGfhCyL12FQ1Qd616Q@mail.gmail.com>
- <006a01ce504e$0de3b0e0$29ab12a0$%dae@samsung.com>
- <CAF6AEGv2FiKMUpb5s4zHPdj4uVxnQWdVJWL-i1mOOZRxBvMZ4Q@mail.gmail.com>
- <00cf01ce512b$bacc5540$3064ffc0$%dae@samsung.com>
- <CAF6AEGuBexKUpTwm9cjGjkxCTKgEaDhAakeP0RN=rtLS6Qy=Mg@mail.gmail.com>
- <CAAQKjZP37koEPob6yqpn-WxxTh3+O=twyvRzDiEhVJTD8BxQzw@mail.gmail.com>
- <20130520211304.GV12292@phenom.ffwll.local>
- <20130520213033.GW12292@phenom.ffwll.local>
- <032701ce55f1$3e9ba4b0$bbd2ee10$%dae@samsung.com>
- <20130521074441.GZ12292@phenom.ffwll.local>
- <033a01ce5604$c32bd250$498376f0$%dae@samsung.com>
- <CAKMK7uHtk+A7CDZH3qHt+F3H_fdSsWwt-bEPn-N0919oOE+Jkg@mail.gmail.com>
- <012801ce57ba$a5a87fa0$f0f97ee0$%dae@samsung.com>
- <014501ce5ac6$511a8500$f34f8f00$%dae@samsung.com>
- <CAF6AEGvGv539Ktdeg03n783nD+HofDamcJCLX93rzzKGOCV8_Q@mail.gmail.com>
-Message-ID: <005701ce5b57$667c7d40$337577c0$%dae@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 27 May 2013 20:58:48 -0700
+Subject: [GIT PULL] Renesas ARM based r8a7740 SoC updates for v3.11
+In-Reply-To: <1369645193-3595-1-git-send-email-horms+renesas@verge.net.au>
+References: <1369645193-3595-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130528035848.GK13532@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Simon,
 
-
-> -----Original Message-----
-> From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-
-> owner at vger.kernel.org] On Behalf Of Rob Clark
-> Sent: Tuesday, May 28, 2013 12:48 AM
-> To: Inki Dae
-> Cc: Maarten Lankhorst; Daniel Vetter; linux-fbdev; YoungJun Cho; Kyungmin
-> Park; myungjoo.ham; DRI mailing list;
-linux-arm-kernel at lists.infradead.org;
-> linux-media at vger.kernel.org
-> Subject: Re: Introduce a new helper framework for buffer synchronization
+On Mon, May 27, 2013 at 05:59:41PM +0900, Simon Horman wrote:
+> Hi Arnd, Hi Olof,
 > 
-> On Mon, May 27, 2013 at 6:38 AM, Inki Dae <inki.dae@samsung.com> wrote:
-> > Hi all,
-> >
-> > I have been removed previous branch and added new one with more cleanup.
-> > This time, the fence helper doesn't include user side interfaces and
-> cache
-> > operation relevant codes anymore because not only we are not sure that
-> > coupling those two things, synchronizing caches and buffer access
-> between
-> > CPU and CPU, CPU and DMA, and DMA and DMA with fences, in kernel side is
-> a
-> > good idea yet but also existing codes for user side have problems with
-> badly
-> > behaved or crashing userspace. So this could be more discussed later.
-> >
-> > The below is a new branch,
-> >
-> > https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-
-> exynos.git/?h=dma-f
-> > ence-helper
-> >
-> > And fence helper codes,
-> >
-> > https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-
-> exynos.git/commit/?
-> > h=dma-fence-helper&id=adcbc0fe7e285ce866e5816e5e21443dcce01005
-> >
-> > And example codes for device driver,
-> >
-> > https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-
-> exynos.git/commit/?
-> > h=dma-fence-helper&id=d2ce7af23835789602a99d0ccef1f53cdd5caaae
-> >
-> > I think the time is not yet ripe for RFC posting: maybe existing dma
-> fence
-> > and reservation need more review and addition work. So I'd glad for
-> somebody
-> > giving other opinions and advices in advance before RFC posting.
+> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
 > 
-> thoughts from a *really* quick, pre-coffee, first look:
-> * any sort of helper to simplify single-buffer sort of use-cases (v4l)
-> probably wouldn't want to bake in assumption that seqno_fence is used.
-> * I guess g2d is probably not actually a simple use case, since I
-> expect you can submit blits involving multiple buffers :-P
-
-I don't think so. One and more buffers can be used: seqno_fence also has
-only one buffer. Actually, we have already applied this approach to most
-devices; multimedia, gpu and display controller. And this approach shows
-more performance; reduced power consumption against traditional way. And g2d
-example is just to show you how to apply my approach to device driver.
-
-> * otherwise, you probably don't want to depend on dmabuf, which is why
-> reservation/fence is split out the way it is..  you want to be able to
-> use a single reservation/fence mechanism within your driver without
-> having to care about which buffers are exported to dmabuf's and which
-> are not.  Creating a dmabuf for every GEM bo is too heavyweight.
-
-Right. But I think we should dealt with this separately. Actually, we are
-trying to use reservation for gpu pipe line synchronization such as sgx sync
-object and this approach is used without dmabuf. In order words, some device
-can use only reservation for such pipe line synchronization and at the same
-time, fence helper or similar thing with dmabuf for buffer synchronization.
-
+>   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
 > 
-> I'm not entirely sure if reservation/fence could/should be made any
-> simpler for multi-buffer users.  Probably the best thing to do is just
-> get reservation/fence rolled out in a few drivers and see if some
-> common patterns emerge.
+> are available in the git repository at:
 > 
-> BR,
-> -R
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-r8a7740-for-v3.11
 > 
-> >
-> > Thanks,
-> > Inki Dae
-> >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> for you to fetch changes up to 0a9e1c1eef2b050a16685952ce20575348b94d5c:
+> 
+>   ARM: shmobile: clock-r8a7740: add TPU PWM support (2013-05-27 17:45:27 +0900)
+> 
+> ----------------------------------------------------------------
+> Renesas ARM based r8a7740 SoC updates for v3.11
+> 
+> * Clean-ups from Kuninori Morimoto, Magnus Damm and Laurent Pinchart.
+> * Extended clock coverage by Bastian Hecht.
+> * Support for initialising GIC from OF by Bastian Hecht.
+> * Support for reference DT initialisation by Bastian Hecht.
+>   This is used in conjunction with other changes initialise
+>   the Armadillo 800 eva board in DT as much as possible.
+> * Suspend to RAM and CPUIdle support by Bastian Hecht
+> * Build fix for fallout by Arnd Bergmann from suspend to RAM change.
+
+So, looking at this branch, I think you need to reorganize your patches a bit.
+You seem to have fallen back to the case of only sorting patches by what
+Renesas SoC they are for, while they are clearly of different kinds such that
+we would prefer to see them sorted differently for arm-soc.
+
+For example, the fix from Arnd should go in a shared shmobile fixes branch,
+ideally. Some of the DT initialization should maybe go in a separate
+(shmobile-shared) DT branch. Clock, suspend/resume and other patches can go in
+a shared SoC branch across all of shmobile though.
+
+Care to respin? I had a handful of comments on the patches as well, and I'll
+continue to look at some of the other ones.
+
+Since you'll have to respin, we might as well see the reshuffling into shared
+shmobile branches, so I'll drop the three merges I had already done of
+SoC-specific branches. I'll follow up on the ones I claimed to have merged.
+None had been pushed out anyway.
+
+
+Regards,
+
+-Olof
