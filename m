@@ -1,26 +1,29 @@
 From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 28 May 2013 15:57:01 -0700
-Subject: build failure: linux-next: ARM/SH-mobile defconfigs: kota2, marzen
-Message-ID: <87txlmaf2a.fsf@linaro.org>
+Date: Tue, 28 May 2013 15:57:52 -0700
+Subject: build failure: linux-next: ARM defconfig: u8500
+Message-ID: <CAGa+x87czosA=tWh1KRTSSqMyLckMHwNP7hrRXdokaLsSaaikA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-Both kota2_defconfig and marzen_defconfig started failing in the most
-recnet linux-next (next-20130527) but were successful in the previous
-build (next-20130523).
+u8500_defconfig started failing to build in linux next (next-20130527)
+but was previously building (next-20130523.)  The build failure looks
+like a failed merge attempt:
 
-Both fail wit this error:
+/work/kernel/next/drivers/pinctrl/pinctrl-abx500.c: In function
+'abx500_gpio_probe':
+/work/kernel/next/drivers/pinctrl/pinctrl-abx500.c:898:1: error:
+expected expression before '<<' token
+/work/kernel/next/drivers/pinctrl/pinctrl-abx500.c:900:21: error:
+'struct abx500_pinctrl' has no member named 'lock'
+/work/kernel/next/drivers/pinctrl/pinctrl-abx500.c:901:1: error:
+expected expression before '==' token
+/work/kernel/next/drivers/pinctrl/pinctrl-abx500.c:904:1: error:
+expected expression before '>>' token
+make[3]: *** [drivers/pinctrl/pinctrl-abx500.o] Error 1
 
-drivers/built-in.o: In function `sh_mobile_sdhi_probe':
-/work/kernel/next/drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to `shdma_chan_filter'
-make[1]: *** [vmlinux] Error 1
-make[1]: Target `_all' not remade because of errors.
-
-Full build logs are available here:
-
-  https://ci.linaro.org/jenkins/job/khilman-kernel-arm-next/arch=arm,defconfig=kota2_defconfig,label=kernel_cloud/54/console
-  https://ci.linaro.org/jenkins/job/khilman-kernel-arm-next/arch=arm,defconfig=marzen_defconfig,label=kernel_cloud/54/console
+Full build log available here:
+  https://ci.linaro.org/jenkins/job/khilman-kernel-arm-next/arch=arm,defconfig=u8500_defconfig,label=kernel_cloud/54/console
 
 Kevin
