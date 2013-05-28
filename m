@@ -1,45 +1,49 @@
-From: arnd@linaro.org (Arnd Bergmann)
-Date: Tue, 28 May 2013 22:11:28 +0200
-Subject: [PATCH V8 0/3] USB: OHCI: Start splitting up the driver
-In-Reply-To: <1369746291-21788-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1365746856-7772-2-git-send-email-manjunath.goudar@linaro.org>
- <1369746291-21788-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <201305282211.28563.arnd@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 28 May 2013 16:21:40 -0400
+Subject: [GIT PULL 1/5] of/pci dependency for mvebu/arm-soc (resend)
+Message-ID: <20130528202140.GG31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 May 2013, Manjunath Goudar wrote:
-> This series of patches begins the process of splitting ohci-hcd up into
-> a core library module and independent pci driver modules.
-> 
+Olof,
 
-Seems to basically work now, but I'm getting run-time errors after
-loading the driver, with patch 1/3 applied:
+This is a resend of the previous PR.  For mvebu/of_pci it is the exact
+same.
 
-[15916.438452] input: Logitech USB-PS/2 Optical Mouse as /devices/pci0000:00/0000:00:12.0/usb3/3-1/3-1:1.0/input/input26
-[15916.438584] hid-generic 0003:046D:C050.0017: input,hidraw0: USB HID v1.10 Mouse [Logitech USB-PS/2 Optical Mouse] on usb-0000:00:12.0-1/input0
-[15917.465597] usb 3-3: new full-speed USB device number 3 using ohci-pci
-[15917.636712] usb 3-3: New USB device found, idVendor=0ccd, idProduct=0077
-[15917.636717] usb 3-3: New USB device strings: Mfr=1, Product=2, SerialNumber=0
-[15917.636721] usb 3-3: Product: USB PnP Sound Device
-[15917.636724] usb 3-3: Manufacturer: C-Media Electronics Inc.      
-[15917.812827] input: C-Media Electronics Inc.       USB PnP Sound Device as /devices/pci0000:00/0000:00:12.0/usb3/3-3/3-3:1.3/input/input27
-[15917.812919] hid-generic 0003:0CCD:0077.0018: input,hidraw1: USB HID v1.00 Device [C-Media Electronics Inc.       USB PnP Sound Device] on usb-0000:00:12.0-3/input3
-[15918.789906] cannot submit urb (err = -18)
-[15918.790163] cannot submit urb (err = -18)
-[15918.842095] usb 7-1: new full-speed USB device number 2 using ohci-pci
-[15919.883135] cannot submit urb (err = -18)
-[15919.883604] cannot submit urb (err = -18)
-[15919.883613] cannot submit urb (err = -18)
-[15919.883616] cannot submit urb (err = -18)
-[15919.883619] cannot submit urb (err = -18)
-[15919.883623] cannot submit urb (err = -18)
-[15919.883626] cannot submit urb (err = -18)
-[15919.883629] cannot submit urb (err = -18)
-[15919.883632] cannot submit urb (err = -18)
-[15919.883639] delay: estimated 354, actual 1
-[15919.883644] cannot submit urb (err = -18)
-[15919.883647] delay: estimated 353, actual 0
-[15919.883651] cannot submit urb (err = -18)
 
-	Arnd
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/users/jcooper/linux.git tags/of_pci-3.11
+
+for you to fetch changes up to 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
+
+  of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
+
+----------------------------------------------------------------
+of/pci changes for v3.11
+
+ - parse DT ranges property
+ - add of_pci_get_devfn()
+ - add of_pci_parse_bus_range()
+
+Note:
+ - mvebu/pcie will depend on this branch
+ - work by LinusW and possibly Arnd will depend on this branch
+
+----------------------------------------------------------------
+Andrew Murray (1):
+      of/pci: Provide support for parsing PCI DT ranges property
+
+Thierry Reding (2):
+      of/pci: Add of_pci_get_devfn() function
+      of/pci: Add of_pci_parse_bus_range() function
+
+ drivers/of/address.c       | 67 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/of/of_pci.c        | 59 ++++++++++++++++++++++++++++++++++++----
+ include/linux/of_address.h | 48 +++++++++++++++++++++++++++++++++
+ include/linux/of_pci.h     |  2 ++
+ 4 files changed, 171 insertions(+), 5 deletions(-)
