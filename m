@@ -1,39 +1,46 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 28 May 2013 19:24:15 +0300
-Subject: [PATCh V10 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
-In-Reply-To: <Pine.LNX.4.44L0.1305131012090.1389-100000@iolanthe.rowland.org>
-References: <1368424303-10629-5-git-send-email-chao.xie@marvell.com>
- <Pine.LNX.4.44L0.1305131012090.1389-100000@iolanthe.rowland.org>
-Message-ID: <20130528162415.GA28253@arwen.pp.htv.fi>
+Date: Tue, 28 May 2013 19:27:15 +0300
+Subject: [PATCH 20/39] usb: musb: ux500: move channel number knowledge
+ into the driver
+In-Reply-To: <CACRpkdYjjDp+7hzGtAchyy3+5Vxc8jK5THGCETkAO_V9Hj9Ssw@mail.gmail.com>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYjjDp+7hzGtAchyy3+5Vxc8jK5THGCETkAO_V9Hj9Ssw@mail.gmail.com>
+Message-ID: <20130528162715.GB28253@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, May 13, 2013 at 10:13:44AM -0400, Alan Stern wrote:
-> On Mon, 13 May 2013, Chao Xie wrote:
+On Wed, May 15, 2013 at 07:18:01PM +0200, Linus Walleij wrote:
+> On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> > Originaly, ehci driver will call the callbacks in platform data
-> > for PHY initialization and shut down.
-> > With PHY driver, it will call the APIs provided by PHY driver
-> > for PHY initialization and shutdown. It removes the callbacks
-> > in platform data, and at same time it removes one block in the
-> > way of enabling device tree for ehci driver.
+> > For all ux500 based platforms the maximum number of end-points are used.
+> > Move this knowledge into the driver so we can relinquish the burden from
+> > platform data. This also removes quite a bit of complexity from the driver
+> > and will aid us when we come to enable the driver for Device Tree.
+> >
+> > Cc: Felipe Balbi <balbi@ti.com>
+> > Cc: linux-usb at vger.kernel.org
+> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> > Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> I wonder if this is the sort of thing that should be handled in 
-> ehci-hcd.c rather than in all the different platform glue drivers.
+> I guess this stuff is dependent on the stuff Fabio has recently sent to
+> Felipe for the ux500 musb DMA so these musb patches should
+> primarily go through his tree.
 > 
-> Felipe, what do you think?  Are the required actions now sufficiently 
-> generic that a single source file can take care of them?
+> It seems like the later changes to the platform code
+> (arch/arm/mach-ux500) may be sufficiently orthogonal
+> so it can be done out-of-order?
+> 
+> I can't merge any of this without Felipes ACKs in any
+> case.
 
-Sorry for the delay, was on business trip and now on vacations. Anyway,
-I agree with you. Our PHY layer should be generic enough that it should
-be usable by ehci-hcd itself. If we have any missing method, let's add
-it generically.
-
-cheers
-
-ps: dropping this from my queue for now.
+Do you want to take this yourself ? I haven't fully read the series yet,
+but seems like this depends on the rest of the series. If you want to
+take it, let me know I can ack the patches as soon as I'm done
+reviewing.
 
 -- 
 balbi
@@ -43,4 +50,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 836 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130528/39627b15/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130528/eab373a0/attachment.sig>
