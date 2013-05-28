@@ -1,113 +1,54 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 28 May 2013 13:24:17 -0700
-Subject: [RFC PATCH 2/2] clocksource: dw_apb: allow build for architectures
- other than arm
-In-Reply-To: <1369570367-994-2-git-send-email-baruch@tkos.co.il>
-References: <1369570367-994-2-git-send-email-baruch@tkos.co.il>
-Message-ID: <51A51271.2070506@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 28 May 2013 16:24:33 -0400
+Subject: [GIT PULL 2/5] ARM: mvebu: pcie driver for v3.11 (round 2 cumulative)
+In-Reply-To: <20130528202140.GG31290@titan.lakedaemon.net>
+References: <20130528202140.GG31290@titan.lakedaemon.net>
+Message-ID: <20130528202433.GH31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2013 05:12 AM, Baruch Siach wrote:
-> ARM is the only architecture providing sched_clock.h and setup_sched_clock().
-> Implement sched_clock() for use by other architectures.
->
-> Cc: Ingo Molnar <mingo@redhat.com>
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jamie Iles <jamie@jamieiles.com>
-> Cc: Dinh Nguyen <dinguyen@altera.com>
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
-> ---
->   arch/arm/Kconfig                      |    1 +
->   drivers/clocksource/Kconfig           |    3 +++
->   drivers/clocksource/dw_apb_timer_of.c |   18 ++++++++++++++++++
->   3 files changed, 22 insertions(+)
->
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 1cacda4..7489604 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -47,6 +47,7 @@ config ARM
->   	select HAVE_OPROFILE if (HAVE_PERF_EVENTS)
->   	select HAVE_PERF_EVENTS
->   	select HAVE_REGS_AND_STACK_ACCESS_API
-> +	select HAVE_SETUP_SCHED_CLOCK
->   	select HAVE_SYSCALL_TRACEPOINTS
->   	select HAVE_UID16
->   	select KTIME_SCALAR
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index e507ab7..0fd6d13 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -1,3 +1,6 @@
-> +config HAVE_SETUP_SCHED_CLOCK
-> +	bool
-> +
->   config CLKSRC_OF
->   	bool
->   
-> diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-> index 5a61ebc..9fdb4d3 100644
-> --- a/drivers/clocksource/dw_apb_timer_of.c
-> +++ b/drivers/clocksource/dw_apb_timer_of.c
-> @@ -21,7 +21,11 @@
->   #include <linux/of_address.h>
->   #include <linux/of_irq.h>
->   
-> +#ifdef CONFIG_HAVE_SETUP_SCHED_CLOCK
->   #include <asm/sched_clock.h>
-> +#else
-> +#include <linux/sched.h>
-> +#endif
->   
->   static void timer_get_base_and_rate(struct device_node *np,
->   				    void __iomem **base, u32 *rate)
-> @@ -73,6 +77,9 @@ static void add_clocksource(struct device_node *source_timer)
->   }
->   
->   static void __iomem *sched_io_base;
-> +#ifndef CONFIG_HAVE_SETUP_SCHED_CLOCK
-> +static u64 sched_clock_mult __read_mostly;
-> +#endif
->   
->   static u32 read_sched_clock(void)
->   {
-> @@ -97,7 +104,11 @@ static void init_sched_clock(void)
->   	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
->   	of_node_put(sched_timer);
->   
-> +#ifdef CONFIG_HAVE_SETUP_SCHED_CLOCK
->   	setup_sched_clock(read_sched_clock, 32, rate);
-> +#else
-> +	sched_clock_mult = NSEC_PER_SEC / rate;
-> +#endif
->   }
 
-Can you rework this to not use #ifdefs within the function? They make it 
-annoying to read the code.
+The following changes since commit 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
 
-Instead maybe have a local setup_sched_clock() function that sets the 
-mult value for the !CONFIG_HAVE_SETUP_SCHED_CLOCK case?
+  of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
 
->   
->   static const struct of_device_id osctimer_ids[] __initconst = {
-> @@ -124,3 +135,10 @@ void __init dw_apb_timer_init(void)
->   
->   	init_sched_clock();
->   }
-> +
-> +#ifndef CONFIG_HAVE_SETUP_SCHED_CLOCK
-> +unsigned long long notrace sched_clock()
-> +{
-> +	return read_sched_clock() * sched_clock_mult;
-> +}
-> +#endif
+are available in the git repository at:
 
-Also, can you try to condense the number of #ifndef 
-CONFIG_HAVE_SETUP_SCHED_CLOCK checks to one, and consolidate the needed 
-functions all in that one conditional?
+  git://git.infradead.org/users/jcooper/linux.git tags/pcie-3.11-2
 
-thanks
--john
+for you to fetch changes up to 3d9939c92efdd4ced672b94994959ca71b141cb8:
+
+  pci: mvebu: fix return value check in mvebu_pcie_probe() (2013-05-27 15:51:56 +0000)
+
+----------------------------------------------------------------
+mvebu pcie driver for v3.11 (round 2, bugfix)
+
+ - mvebu pcie
+    - fix return value check in mvebu_pcie_probe()
+
+depends
+ - mvebu/of_pci
+
+----------------------------------------------------------------
+Thomas Petazzoni (4):
+      clk: mvebu: create parent-child relation for PCIe clocks on Armada 370
+      clk: mvebu: add more PCIe clocks for Armada XP
+      pci: PCIe driver for Marvell Armada 370/XP systems
+      arm: mvebu: PCIe support is now available on mvebu
+
+Wei Yongjun (1):
+      pci: mvebu: fix return value check in mvebu_pcie_probe()
+
+ .../devicetree/bindings/pci/mvebu-pci.txt          | 220 ++++++
+ arch/arm/mach-mvebu/Kconfig                        |   2 +
+ drivers/clk/mvebu/clk-gating-ctrl.c                |  18 +-
+ drivers/pci/Kconfig                                |   2 +
+ drivers/pci/Makefile                               |   3 +
+ drivers/pci/host/Kconfig                           |   8 +
+ drivers/pci/host/Makefile                          |   1 +
+ drivers/pci/host/pci-mvebu.c                       | 880 +++++++++++++++++++++
+ 8 files changed, 1128 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/mvebu-pci.txt
+ create mode 100644 drivers/pci/host/Kconfig
+ create mode 100644 drivers/pci/host/Makefile
+ create mode 100644 drivers/pci/host/pci-mvebu.c
