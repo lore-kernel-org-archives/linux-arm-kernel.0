@@ -1,67 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 May 2013 23:22:46 -0700
-Subject: [PATCH 04/12] ARM: shmobile: r8a7740: Add DT name to clock list
- for CMT10
-In-Reply-To: <20130528052944.GC25005@verge.net.au>
-References: <1369645193-3595-1-git-send-email-horms+renesas@verge.net.au>
- <1369645193-3595-5-git-send-email-horms+renesas@verge.net.au>
- <20130528032948.GF13532@quad.lixom.net>
- <20130528052944.GC25005@verge.net.au>
-Message-ID: <20130528062246.GB20031@quad.lixom.net>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Tue, 28 May 2013 11:54:48 +0530
+Subject: [PATCH] ARM: OMAP2+: timer: initialize before using oh_name
+Message-ID: <1369722288-15592-1-git-send-email-afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 02:29:44PM +0900, Simon Horman wrote:
-> On Mon, May 27, 2013 at 08:29:48PM -0700, Olof Johansson wrote:
-> > Hi,
-> > 
-> > On Mon, May 27, 2013 at 05:59:45PM +0900, Simon Horman wrote:
-> > > From: Bastian Hecht <hechtb@gmail.com>
-> > > 
-> > > This adds temporarily the alternative device name to the clock list
-> > > that is used when booting via Device Tree setup.
-> > 
-> > > 
-> > > Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > ---
-> > >  arch/arm/mach-shmobile/clock-r8a7740.c |    1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
-> > > index 5bd8da0..8fc396a 100644
-> > > --- a/arch/arm/mach-shmobile/clock-r8a7740.c
-> > > +++ b/arch/arm/mach-shmobile/clock-r8a7740.c
-> > > @@ -582,6 +582,7 @@ static struct clk_lookup lookups[] = {
-> > >  	CLKDEV_DEV_ID("e6cc0000.sci",		&mstp_clks[MSTP230]),
-> > >  
-> > >  	CLKDEV_DEV_ID("sh_cmt.10",		&mstp_clks[MSTP329]),
-> > > +	CLKDEV_DEV_ID("e6138010.timer",		&mstp_clks[MSTP329]),
-> > >  	CLKDEV_DEV_ID("sh_fsi2",		&mstp_clks[MSTP328]),
-> > >  	CLKDEV_DEV_ID("i2c-sh_mobile.1",	&mstp_clks[MSTP323]),
-> > >  	CLKDEV_DEV_ID("renesas_usbhs",		&mstp_clks[MSTP320]),
-> > > -- 
-> > > 1.7.10.4
-> > > 
-> > 
-> > Usually this is instead handled by adding entries to OF_DEV_AUXDATA() to
-> > rename the device in the board file. Would you mind doing that instead?
-> 
-> Magnus has indicated in the past that he prefers this method over
-> using OF_DEV_AUXDATA() and the above is consistent with other
-> shmobile code.
+of_property_read_string_index(...,&oh_name) in omap_dm_timer_init_one
+does not alter the value of 'oh_name' even if the relevant function
+fails and as 'oh_name' in stack may have a non-zero value, it would
+be misunderstood by timer code that DT has specified "ti,hwmod"
+property for timer. 'oh_name' in this scenario would be a junk value,
+this would result in module not being enabled by hwmod API's for
+timer, and in turn crash.
 
-Ho hum. That's 180 degrees opposite to how we've been doing it on all
-other ARM platforms. :)
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
+---
+ arch/arm/mach-omap2/timer.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Once you guys have clock bindings for device tree, the aliases should be
-possible to remove. That's where having them as auxdata is useful, since it's
-just one place and it's also obvious just what clocks and what drivers need
-aliases on device tree.
-
-Where are you guys at on your plans for getting DT_based clock going? That will
-sort of indicate just how temporary these clock alaises will be. I'm guessing
-we'll be living with them for a while though?
-
-
--Olof
+diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+index f8b23b8..8e0c390 100644
+--- a/arch/arm/mach-omap2/timer.c
++++ b/arch/arm/mach-omap2/timer.c
+@@ -220,7 +220,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+ 					 int posted)
+ {
+ 	char name[10]; /* 10 = sizeof("gptXX_Xck0") */
+-	const char *oh_name;
++	const char *oh_name = NULL;
+ 	struct device_node *np;
+ 	struct omap_hwmod *oh;
+ 	struct resource irq, mem;
+-- 
+1.7.12
