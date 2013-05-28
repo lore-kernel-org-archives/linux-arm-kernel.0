@@ -1,336 +1,277 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Tue, 28 May 2013 15:32:55 +0530
-Subject: [PATCH V3 1/4] ARM: samsung: use #include for all device trees
+Date: Tue, 28 May 2013 15:32:56 +0530
+Subject: [PATCH V3 2/4] clk: samsung: register audio subsystem clocks using
+ common clock framework
 In-Reply-To: <1369735378-10003-1-git-send-email-padma.v@samsung.com>
 References: <1369735378-10003-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1369735378-10003-2-git-send-email-padma.v@samsung.com>
+Message-ID: <1369735378-10003-3-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace /include/ (dtc) with #include (C pre-processor) for all
-Samsung DT files
+Audio subsystem is introduced in s5pv210 and exynos platforms.
+This has seperate clock controller which can control i2s0 and
+pcm0 clocks. This patch registers the audio subsystem clocks
+with the common clock framework on Exynos family.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
- arch/arm/boot/dts/exynos4.dtsi                  |    2 +-
- arch/arm/boot/dts/exynos4210-origen.dts         |    2 +-
- arch/arm/boot/dts/exynos4210-smdkv310.dts       |    2 +-
- arch/arm/boot/dts/exynos4210-trats.dts          |    2 +-
- arch/arm/boot/dts/exynos4210-universal_c210.dts |    2 +-
- arch/arm/boot/dts/exynos4210.dtsi               |    4 ++--
- arch/arm/boot/dts/exynos4212.dtsi               |    2 +-
- arch/arm/boot/dts/exynos4412-odroidx.dts        |    2 +-
- arch/arm/boot/dts/exynos4412-origen.dts         |    2 +-
- arch/arm/boot/dts/exynos4412-smdk4412.dts       |    2 +-
- arch/arm/boot/dts/exynos4412.dtsi               |    2 +-
- arch/arm/boot/dts/exynos4x12.dtsi               |    4 ++--
- arch/arm/boot/dts/exynos5250-arndale.dts        |    2 +-
- arch/arm/boot/dts/exynos5250-smdk5250.dts       |    2 +-
- arch/arm/boot/dts/exynos5250-snow.dts           |    4 ++--
- arch/arm/boot/dts/exynos5250.dtsi               |    4 ++--
- arch/arm/boot/dts/exynos5440-sd5v1.dts          |    2 +-
- arch/arm/boot/dts/exynos5440-ssdk5440.dts       |    2 +-
- arch/arm/boot/dts/exynos5440.dtsi               |    2 +-
- arch/arm/boot/dts/s3c2416-smdk2416.dts          |    2 +-
- arch/arm/boot/dts/s3c2416.dtsi                  |    4 ++--
- arch/arm/boot/dts/s3c24xx.dtsi                  |    2 +-
- 22 files changed, 27 insertions(+), 27 deletions(-)
+ .../bindings/clock/clk-samsung-audss.txt           |   64 ++++++++++
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-samsung-audss.c            |  133 ++++++++++++++++++++
+ include/dt-bindings/clk/samsung-audss-clk.h        |   25 ++++
+ 4 files changed, 223 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/clk-samsung-audss.txt
+ create mode 100644 drivers/clk/samsung/clk-samsung-audss.c
+ create mode 100644 include/dt-bindings/clk/samsung-audss-clk.h
 
-diff --git a/arch/arm/boot/dts/exynos4.dtsi b/arch/arm/boot/dts/exynos4.dtsi
-index bed40ee..3f94fe8 100644
---- a/arch/arm/boot/dts/exynos4.dtsi
-+++ b/arch/arm/boot/dts/exynos4.dtsi
-@@ -19,7 +19,7 @@
-  * published by the Free Software Foundation.
-  */
- 
--/include/ "skeleton.dtsi"
-+#include "skeleton.dtsi"
- 
- / {
- 	interrupt-parent = <&gic>;
-diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
-index bcf8079..5f851d7 100644
---- a/arch/arm/boot/dts/exynos4210-origen.dts
-+++ b/arch/arm/boot/dts/exynos4210-origen.dts
-@@ -15,7 +15,7 @@
- */
- 
- /dts-v1/;
--/include/ "exynos4210.dtsi"
-+#include "exynos4210.dtsi"
- 
- / {
- 	model = "Insignal Origen evaluation board based on Exynos4210";
-diff --git a/arch/arm/boot/dts/exynos4210-smdkv310.dts b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-index 91332b7..9c01b71 100644
---- a/arch/arm/boot/dts/exynos4210-smdkv310.dts
-+++ b/arch/arm/boot/dts/exynos4210-smdkv310.dts
-@@ -15,7 +15,7 @@
- */
- 
- /dts-v1/;
--/include/ "exynos4210.dtsi"
-+#include "exynos4210.dtsi"
- 
- / {
- 	model = "Samsung smdkv310 evaluation board based on Exynos4210";
-diff --git a/arch/arm/boot/dts/exynos4210-trats.dts b/arch/arm/boot/dts/exynos4210-trats.dts
-index 9a14484..94eebff 100644
---- a/arch/arm/boot/dts/exynos4210-trats.dts
-+++ b/arch/arm/boot/dts/exynos4210-trats.dts
-@@ -13,7 +13,7 @@
- */
- 
- /dts-v1/;
--/include/ "exynos4210.dtsi"
-+#include "exynos4210.dtsi"
- 
- / {
- 	model = "Samsung Trats based on Exynos4210";
-diff --git a/arch/arm/boot/dts/exynos4210-universal_c210.dts b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-index 345cdb5..889cdad 100644
---- a/arch/arm/boot/dts/exynos4210-universal_c210.dts
-+++ b/arch/arm/boot/dts/exynos4210-universal_c210.dts
-@@ -13,7 +13,7 @@
- */
- 
- /dts-v1/;
--/include/ "exynos4210.dtsi"
-+#include "exynos4210.dtsi"
- 
- / {
- 	model = "Samsung Universal C210 based on Exynos4210 rev0";
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index 366795a..75c2756 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -19,8 +19,8 @@
-  * published by the Free Software Foundation.
- */
- 
--/include/ "exynos4.dtsi"
--/include/ "exynos4210-pinctrl.dtsi"
-+#include "exynos4.dtsi"
-+#include "exynos4210-pinctrl.dtsi"
- 
- / {
- 	compatible = "samsung,exynos4210";
-diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-index c0f60f4..6f34d7f 100644
---- a/arch/arm/boot/dts/exynos4212.dtsi
-+++ b/arch/arm/boot/dts/exynos4212.dtsi
-@@ -17,7 +17,7 @@
-  * published by the Free Software Foundation.
- */
- 
--/include/ "exynos4x12.dtsi"
-+#include "exynos4x12.dtsi"
- 
- / {
- 	compatible = "samsung,exynos4212";
-diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
-index 53bc8bf..7bb8d48 100644
---- a/arch/arm/boot/dts/exynos4412-odroidx.dts
-+++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-@@ -12,7 +12,7 @@
- */
- 
- /dts-v1/;
--/include/ "exynos4412.dtsi"
-+#include "exynos4412.dtsi"
- 
- / {
- 	model = "Hardkernel ODROID-X board based on Exynos4412";
-diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
-index 790a999..df097b5 100644
---- a/arch/arm/boot/dts/exynos4412-origen.dts
-+++ b/arch/arm/boot/dts/exynos4412-origen.dts
-@@ -13,7 +13,7 @@
- */
- 
- /dts-v1/;
--/include/ "exynos4412.dtsi"
-+#include "exynos4412.dtsi"
- 
- / {
- 	model = "Insignal Origen evaluation board based on Exynos4412";
-diff --git a/arch/arm/boot/dts/exynos4412-smdk4412.dts b/arch/arm/boot/dts/exynos4412-smdk4412.dts
-index c52b01f..1e816fa 100644
---- a/arch/arm/boot/dts/exynos4412-smdk4412.dts
-+++ b/arch/arm/boot/dts/exynos4412-smdk4412.dts
-@@ -13,7 +13,7 @@
- */
- 
- /dts-v1/;
--/include/ "exynos4412.dtsi"
-+#include "exynos4412.dtsi"
- 
- / {
- 	model = "Samsung SMDK evaluation board based on Exynos4412";
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index 270b389..e743e67 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -17,7 +17,7 @@
-  * published by the Free Software Foundation.
- */
- 
--/include/ "exynos4x12.dtsi"
-+#include "exynos4x12.dtsi"
- 
- / {
- 	compatible = "samsung,exynos4412";
-diff --git a/arch/arm/boot/dts/exynos4x12.dtsi b/arch/arm/boot/dts/exynos4x12.dtsi
-index e3380a7..8896bb5 100644
---- a/arch/arm/boot/dts/exynos4x12.dtsi
-+++ b/arch/arm/boot/dts/exynos4x12.dtsi
-@@ -17,8 +17,8 @@
-  * published by the Free Software Foundation.
- */
- 
--/include/ "exynos4.dtsi"
--/include/ "exynos4x12-pinctrl.dtsi"
-+#include "exynos4.dtsi"
-+#include "exynos4x12-pinctrl.dtsi"
- 
- / {
- 	aliases {
-diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-index 02cfc76..8e27120 100644
---- a/arch/arm/boot/dts/exynos5250-arndale.dts
-+++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-@@ -10,7 +10,7 @@
- */
- 
- /dts-v1/;
--/include/ "exynos5250.dtsi"
-+#include "exynos5250.dtsi"
- 
- / {
- 	model = "Insignal Arndale evaluation board based on EXYNOS5250";
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index 3e0c792..f2a025e 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -10,7 +10,7 @@
- */
- 
- /dts-v1/;
--/include/ "exynos5250.dtsi"
-+#include "exynos5250.dtsi"
- 
- / {
- 	model = "SAMSUNG SMDK5250 board based on EXYNOS5250";
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index d449feb..fd711e2 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -9,8 +9,8 @@
- */
- 
- /dts-v1/;
--/include/ "exynos5250.dtsi"
--/include/ "cros5250-common.dtsi"
-+#include "exynos5250.dtsi"
-+#include "cros5250-common.dtsi"
- 
- / {
- 	model = "Google Snow";
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 9dfc6de..bccda67 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -17,8 +17,8 @@
-  * published by the Free Software Foundation.
- */
- 
--/include/ "skeleton.dtsi"
--/include/ "exynos5250-pinctrl.dtsi"
-+#include "skeleton.dtsi"
-+#include "exynos5250-pinctrl.dtsi"
- 
- / {
- 	compatible = "samsung,exynos5250";
-diff --git a/arch/arm/boot/dts/exynos5440-sd5v1.dts b/arch/arm/boot/dts/exynos5440-sd5v1.dts
-index ef747b5..5e84c5f 100644
---- a/arch/arm/boot/dts/exynos5440-sd5v1.dts
-+++ b/arch/arm/boot/dts/exynos5440-sd5v1.dts
-@@ -10,7 +10,7 @@
- */
- 
- /dts-v1/;
--/include/ "exynos5440.dtsi"
-+#include "exynos5440.dtsi"
- 
- / {
- 	model = "SAMSUNG SD5v1 board based on EXYNOS5440";
-diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-index d55042b..2fd6646 100644
---- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-+++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-@@ -10,7 +10,7 @@
- */
- 
- /dts-v1/;
--/include/ "exynos5440.dtsi"
-+#include "exynos5440.dtsi"
- 
- / {
- 	model = "SAMSUNG SSDK5440 board based on EXYNOS5440";
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index f6b1c89..13b40b3 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -9,7 +9,7 @@
-  * published by the Free Software Foundation.
- */
- 
--/include/ "skeleton.dtsi"
-+#include "skeleton.dtsi"
- 
- / {
- 	compatible = "samsung,exynos5440";
-diff --git a/arch/arm/boot/dts/s3c2416-smdk2416.dts b/arch/arm/boot/dts/s3c2416-smdk2416.dts
-index ad1dd09..59594cf 100644
---- a/arch/arm/boot/dts/s3c2416-smdk2416.dts
-+++ b/arch/arm/boot/dts/s3c2416-smdk2416.dts
-@@ -9,7 +9,7 @@
-  */
- 
- /dts-v1/;
--/include/ "s3c2416.dtsi"
-+#include "s3c2416.dtsi"
- 
- / {
- 	model = "SMDK2416";
-diff --git a/arch/arm/boot/dts/s3c2416.dtsi b/arch/arm/boot/dts/s3c2416.dtsi
-index 6809324..e6555bd 100644
---- a/arch/arm/boot/dts/s3c2416.dtsi
-+++ b/arch/arm/boot/dts/s3c2416.dtsi
-@@ -8,8 +8,8 @@
-  * published by the Free Software Foundation.
-  */
- 
--/include/ "s3c24xx.dtsi"
--/include/ "s3c2416-pinctrl.dtsi"
-+#include "s3c24xx.dtsi"
-+#include "s3c2416-pinctrl.dtsi"
- 
- / {
- 	model = "Samsung S3C2416 SoC";
-diff --git a/arch/arm/boot/dts/s3c24xx.dtsi b/arch/arm/boot/dts/s3c24xx.dtsi
-index cab46ff..2d1d7dc 100644
---- a/arch/arm/boot/dts/s3c24xx.dtsi
-+++ b/arch/arm/boot/dts/s3c24xx.dtsi
-@@ -8,7 +8,7 @@
-  * published by the Free Software Foundation.
-  */
- 
--/include/ "skeleton.dtsi"
-+#include "skeleton.dtsi"
- 
- / {
- 	compatible = "samsung,s3c24xx";
+diff --git a/Documentation/devicetree/bindings/clock/clk-samsung-audss.txt b/Documentation/devicetree/bindings/clock/clk-samsung-audss.txt
+new file mode 100644
+index 0000000..07a7ed4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/clk-samsung-audss.txt
+@@ -0,0 +1,64 @@
++* Samsung Audio Subsystem Clock Controller
++
++The Samsung Audio Subsystem clock controller generates and supplies clocks
++to Audio Subsystem block available in the S5PV210 and Exynos SoCs. The clock
++binding described here is applicable to all SoC's in Exynos family.
++
++Required Properties:
++
++- compatible: should be one of the following:
++  - "samsung,exynos4210-audss-clock" - controller compatible with all Exynos4 SoCs.
++  - "samsung,exynos5250-audss-clock" - controller compatible with all Exynos5 SoCs.
++
++- reg: physical base address and length of the controller's register set.
++
++- #clock-cells: should be 1.
++
++The following is the list of clocks generated by the controller. Each clock is
++assigned an identifier and client nodes use this identifier to specify the
++clock which they consume. Some of the clocks are available only on a particular
++Exynos4 SoC and this is specified where applicable.
++
++Provided clocks:
++
++Clock           ID      SoC (if specific)
++-----------------------------------------------
++
++mout_audss      0
++mout_i2s        1
++dout_srp        2
++dout_bus        3
++dout_i2s        4
++srp_clk         5
++i2s_bus         6
++sclk_i2s        7
++pcm_bus         8
++sclk_pcm        9
++
++Example 1: An example of a clock controller node is listed below.
++
++clock_audss: audss-clock-controller at 3810000 {
++	compatible = "samsung,exynos5250-audss-clock";
++	reg = <0x03810000 0x0C>;
++	#clock-cells = <1>;
++};
++
++Example 2: I2S controller node that consumes the clock generated by the clock
++           controller. Refer to the standard clock bindings for information
++           about 'clocks' and 'clock-names' property.
++
++i2s0: i2s at 03830000 {
++	compatible = "samsung,i2s-v5";
++	reg = <0x03830000 0x100>;
++	dmas = <&pdma0 10
++		&pdma0 9
++		&pdma0 8>;
++	dma-names = "tx", "rx", "tx-sec";
++	clocks = <&clock_audss SAMSUNG_I2S_BUS>,
++		<&clock_audss SAMSUNG_I2S_BUS>,
++		<&clock_audss SAMSUNG_SCLK_I2S>,
++		<&clock_audss SAMSUNG_MOUT_AUDSS>,
++		<&clock_audss SAMSUNG_MOUT_I2S>;
++	clock-names = "iis", "i2s_opclk0", "i2s_opclk1",
++	"mout_audss", "mout_i2s";
++};
+diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
+index b7c232e..5425fa8 100644
+--- a/drivers/clk/samsung/Makefile
++++ b/drivers/clk/samsung/Makefile
+@@ -6,3 +6,4 @@ obj-$(CONFIG_COMMON_CLK)	+= clk.o clk-pll.o
+ obj-$(CONFIG_ARCH_EXYNOS4)	+= clk-exynos4.o
+ obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
+ obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
++obj-$(CONFIG_PLAT_SAMSUNG)	+= clk-samsung-audss.o
+diff --git a/drivers/clk/samsung/clk-samsung-audss.c b/drivers/clk/samsung/clk-samsung-audss.c
+new file mode 100644
+index 0000000..534cdef
+--- /dev/null
++++ b/drivers/clk/samsung/clk-samsung-audss.c
+@@ -0,0 +1,133 @@
++/*
++ * Copyright (c) 2013 Samsung Electronics Co., Ltd.
++ * Author: Padmavathi Venna <padma.v@samsung.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Common Clock Framework support for Audio Subsystem Clock Controller.
++*/
++
++#include <linux/clkdev.h>
++#include <linux/io.h>
++#include <linux/clk-provider.h>
++#include <linux/of_address.h>
++#include <linux/syscore_ops.h>
++
++#include <dt-bindings/clk/samsung-audss-clk.h>
++
++static DEFINE_SPINLOCK(lock);
++static struct clk **clk_table;
++static void __iomem *reg_base;
++static struct clk_onecell_data clk_data;
++
++#define ASS_CLK_SRC 0x0
++#define ASS_CLK_DIV 0x4
++#define ASS_CLK_GATE 0x8
++
++static unsigned long reg_save[][2] = {
++	{ASS_CLK_SRC,  0},
++	{ASS_CLK_DIV,  0},
++	{ASS_CLK_GATE, 0},
++};
++
++/* list of all parent clock list */
++static const char *mout_audss_p[] = { "fin_pll", "fout_epll" };
++static const char *mout_i2s_p[] = { "mout_audss", "cdclk0", "sclk_audio0" };
++
++#ifdef CONFIG_PM_SLEEP
++static int samsung_audss_clk_suspend(void)
++{
++	int i;
++
++	for (i = 0; i < 3; i++)
++		reg_save[i][1] = readl(reg_base + reg_save[i][0]);
++
++	return 0;
++}
++
++static void samsung_audss_clk_resume(void)
++{
++	int i;
++
++	for (i = 0; i < 3; i++)
++		writel(reg_save[i][1], reg_base + reg_save[i][0]);
++}
++
++static struct syscore_ops samsung_audss_clk_syscore_ops = {
++	.suspend	= samsung_audss_clk_suspend,
++	.resume		= samsung_audss_clk_resume,
++};
++#endif /* CONFIG_PM_SLEEP */
++
++/* register samsung_audss clocks */
++void __init samsung_audss_clk_init(struct device_node *np)
++{
++	reg_base = of_iomap(np, 0);
++	if (!reg_base) {
++		pr_err("%s: failed to map audss registers\n", __func__);
++		return;
++	}
++
++	clk_table = kzalloc(sizeof(struct clk *) * SAMSUNG_AUDSS_MAX_CLKS,
++				GFP_KERNEL);
++	if (!clk_table) {
++		pr_err("%s: could not allocate clk lookup table\n", __func__);
++		return;
++	}
++
++	clk_data.clks = clk_table;
++	clk_data.clk_num = SAMSUNG_AUDSS_MAX_CLKS;
++	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
++
++	clk_table[SAMSUNG_MOUT_AUDSS] = clk_register_mux(NULL, "mout_audss",
++				mout_audss_p, ARRAY_SIZE(mout_audss_p), 0,
++				reg_base + ASS_CLK_SRC, 0, 1, 0, &lock);
++
++	clk_table[SAMSUNG_MOUT_I2S] = clk_register_mux(NULL, "mout_i2s",
++				mout_i2s_p, ARRAY_SIZE(mout_i2s_p), 0,
++				reg_base + ASS_CLK_SRC, 2, 2, 0, &lock);
++
++	clk_table[SAMSUNG_DOUT_SRP] = clk_register_divider(NULL, "dout_srp",
++				"mout_audss", 0, reg_base + ASS_CLK_DIV, 0, 4,
++				0, &lock);
++
++	clk_table[SAMSUNG_DOUT_BUS] = clk_register_divider(NULL, "dout_bus",
++				"dout_srp", 0, reg_base + ASS_CLK_DIV, 4, 4, 0,
++				&lock);
++
++	clk_table[SAMSUNG_DOUT_I2S] = clk_register_divider(NULL, "dout_i2s",
++				"mout_i2s", 0, reg_base + ASS_CLK_DIV, 8, 4, 0,
++				&lock);
++
++	clk_table[SAMSUNG_SRP_CLK] = clk_register_gate(NULL, "srp_clk",
++				"dout_srp", CLK_SET_RATE_PARENT,
++				reg_base + ASS_CLK_GATE, 0, 0, &lock);
++
++	clk_table[SAMSUNG_I2S_BUS] = clk_register_gate(NULL, "i2s_bus",
++				"dout_bus", CLK_SET_RATE_PARENT,
++				reg_base + ASS_CLK_GATE, 2, 0, &lock);
++
++	clk_table[SAMSUNG_SCLK_I2S] = clk_register_gate(NULL, "sclk_i2s",
++				"dout_i2s", CLK_SET_RATE_PARENT,
++				reg_base + ASS_CLK_GATE, 3, 0, &lock);
++
++	clk_table[SAMSUNG_PCM_BUS] = clk_register_gate(NULL, "pcm_bus",
++				 "sclk_pcm", CLK_SET_RATE_PARENT,
++				reg_base + ASS_CLK_GATE, 4, 0, &lock);
++
++	clk_table[SAMSUNG_SCLK_PCM] = clk_register_gate(NULL, "sclk_pcm",
++				"div_pcm0", CLK_SET_RATE_PARENT,
++				reg_base + ASS_CLK_GATE, 5, 0, &lock);
++
++#ifdef CONFIG_PM_SLEEP
++	register_syscore_ops(&samsung_audss_clk_syscore_ops);
++#endif
++
++	pr_info("Exynos: Audss: clock setup completed\n");
++}
++CLK_OF_DECLARE(exynos4210_audss_clk, "samsung,exynos4210-audss-clock",
++		samsung_audss_clk_init);
++CLK_OF_DECLARE(exynos5250_audss_clk, "samsung,exynos5250-audss-clock",
++		samsung_audss_clk_init);
+diff --git a/include/dt-bindings/clk/samsung-audss-clk.h b/include/dt-bindings/clk/samsung-audss-clk.h
+new file mode 100644
+index 0000000..d335555
+--- /dev/null
++++ b/include/dt-bindings/clk/samsung-audss-clk.h
+@@ -0,0 +1,25 @@
++/*
++ * This header provides constants for Samsung audio subsystem
++ * clock controller.
++ *
++ * The constants defined in this header are being used in dts
++ * and samsung audss driver.
++ */
++
++#ifndef _DT_BINDINGS_CLK_SAMSUNG_AUDSS_H
++#define _DT_BINDINGS_CLK_SAMSUNG_AUDSS_H
++
++#define SAMSUNG_MOUT_AUDSS	0
++#define SAMSUNG_MOUT_I2S	1
++#define SAMSUNG_DOUT_SRP	2
++#define SAMSUNG_DOUT_BUS	3
++#define SAMSUNG_DOUT_I2S	4
++#define SAMSUNG_SRP_CLK		5
++#define SAMSUNG_I2S_BUS		6
++#define SAMSUNG_SCLK_I2S	7
++#define SAMSUNG_PCM_BUS		8
++#define SAMSUNG_SCLK_PCM	9
++
++#define SAMSUNG_AUDSS_MAX_CLKS	10
++
++#endif
 -- 
 1.7.4.4
