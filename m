@@ -1,51 +1,33 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Tue, 28 May 2013 15:24:01 +0530
-Subject: [PATCH V2] ARM: dts: Correct the base address of pinctrl_3 on
- Exynos5250
-Message-ID: <1369734841-9900-1-git-send-email-padma.v@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 28 May 2013 15:25:16 +0530
+Subject: [PATCH 3/8] ARM: SPEAr: use generic cpu idle function for wfi
+In-Reply-To: <1369665166-13049-4-git-send-email-sanjay.rawat@linaro.org>
+References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
+ <1369665166-13049-4-git-send-email-sanjay.rawat@linaro.org>
+Message-ID: <CAKohpo=dVM_gd31h3sG0d0_hKcCfaHLtwfF3RXL453bE9K+L2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch corrects the base address of pinctrl_3 on Exynos5250
-platform.
+On 27 May 2013 20:02, Sanjay Singh Rawat <sanjay.rawat@linaro.org> wrote:
+> use cpu_do_idle for entering the wfi mode.
+>
+> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
+> ---
+>  arch/arm/mach-spear/hotplug.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-spear/hotplug.c b/arch/arm/mach-spear/hotplug.c
+> index d97749c..6dbd3dc 100644
+> --- a/arch/arm/mach-spear/hotplug.c
+> +++ b/arch/arm/mach-spear/hotplug.c
+> @@ -55,7 +55,8 @@ static inline void cpu_leave_lowpower(void)
+>  static inline void spear13xx_do_lowpower(unsigned int cpu, int *spurious)
+>  {
+>         for (;;) {
+> -               wfi();
+> +               /* enter WFI mode */
+> +               cpu_do_idle();
+>
+>                 if (pen_release == cpu) {
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
-Changes since V1:
-	- Added platform name in the subject line.
-
- arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    2 +-
- arch/arm/boot/dts/exynos5250.dtsi         |    4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-index d1650fb..ded558b 100644
---- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-@@ -763,7 +763,7 @@
- 		};
- 	};
- 
--	pinctrl at 03680000 {
-+	pinctrl at 03860000 {
- 		gpz: gpz {
- 			gpio-controller;
- 			#gpio-cells = <2>;
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 7154e3d..e9bfd13 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -169,9 +169,9 @@
- 		interrupts = <0 50 0>;
- 	};
- 
--	pinctrl_3: pinctrl at 03680000 {
-+	pinctrl_3: pinctrl at 03860000 {
- 		compatible = "samsung,exynos5250-pinctrl";
--		reg = <0x0368000 0x1000>;
-+		reg = <0x03860000 0x1000>;
- 		interrupts = <0 47 0>;
- 	};
- 
--- 
-1.7.4.4
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
