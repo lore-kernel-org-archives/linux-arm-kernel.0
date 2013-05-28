@@ -1,28 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 May 2013 19:28:40 -0700
-Subject: [GIT PULL] Renesas ARM and SH based SoC pinmux fixes for v3.10 #2
-In-Reply-To: <1369461157-19256-1-git-send-email-horms+renesas@verge.net.au>
-References: <1369461157-19256-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130528022840.GA13532@quad.lixom.net>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Tue, 28 May 2013 11:31:22 +0900
+Subject: [PATCH v2] video: simplefb: add mode parsing function
+In-Reply-To: <CANq1E4Qa6g-zrA6o_u3w6mpVcUk8-ZPPR+edu6EXgpk-kGQULQ@mail.gmail.com>
+References: <1369626821-28494-1-git-send-email-acourbot@nvidia.com>
+ <CANq1E4Qa6g-zrA6o_u3w6mpVcUk8-ZPPR+edu6EXgpk-kGQULQ@mail.gmail.com>
+Message-ID: <CAAVeFuJssMGNi=7gtxHjgaS9s+VTkfBme+T68=Zf7Ech2+hMQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 25, 2013 at 02:52:36PM +0900, Simon Horman wrote:
-> Hi Arnd, Hi Olof,
-> 
-> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
-> 
->   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-pinmux-fixes2-for-v3.10
+Hi David,
 
-Hi Simon,
+On Tue, May 28, 2013 at 3:22 AM, David Herrmann <dh.herrmann@gmail.com> wrote:
+> If we apply this patch it will get very hard to support this with a
+> KMS driver. So any reason why we cannot use the DRM FOURCC constants
+> instead?
 
-For fixes, especially if you have only one per branch, please just
-send one pull so we don't get a crazy number of merge changesets in the
-history. We don't split them into categories during -rcs.
+I don't see any. Maybe Stephen can confirm.
 
+> The dvbe proposal is available here: (also see the two following patches)
+>   http://lkml.indiana.edu/hypermail/linux/kernel/1302.2/00274.html
+>
+> it provides a simple DRM driver that uses VESA / VBE. I am currently
+> trying to rework it to "SimpleDRM" which can support arbitrary
+> firmware framebuffers.
 
--Olof
+Ok. I am personally fine with using FOURCC codes for describing video
+modes. Maybe we can just drop this patch if it gets in your way.
+
+Alex.
