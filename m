@@ -1,30 +1,58 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 28 May 2013 09:59:35 +0100
-Subject: [PATCH v2 3/4] ARM: mm: HugeTLB support for LPAE systems.
-In-Reply-To: <20130524110306.GC18272@arm.com>
-References: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
- <1369323080-9673-4-git-send-email-steve.capper@linaro.org>
- <20130524110306.GC18272@arm.com>
-Message-ID: <20130528085934.GA15590@linaro.org>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Tue, 28 May 2013 17:06:15 +0800
+Subject: [PATCH -next] dmaengine: ste_dma40: fix error return code in
+ d40_probe()
+Message-ID: <CAPgLHd-Mw4MQwS8=p9+ZBHHehH7B-Hs49BqiUMrq-aV_5M4pQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 22, 2013 at 12:03:06PM +0100, Catalin Marinas wrote:
-> On Thu, May 23, 2013 at 04:31:19PM +0100, Steve Capper wrote:
-> > From: Catalin Marinas <catalin.marinas@arm.com>
-> > 
-> > This patch adds support for hugetlbfs based on the x86 implementation.
-> 
-> Can we not share the x86 code as you are proposing for arm64 already?
->
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Yes, we can. I didn't want one patch set dependent on another so opted to
-make the ARMv7 one self-contained for now. I was planning on changing this
-with a future patch.
+In many of the error handling case, the return value 'ret' not set
+and 0 will be return from d40_probe() even if error, but we should
+return a negative error code instead in those error handling case.
+This patch fixed them, and also removed useless variable 'err'.
 
-Cheers,
--- 
-Steve
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+ drivers/dma/ste_dma40.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index 71bf4ec..cbf9c62 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -3474,7 +3474,6 @@ failure:
  
-> -- 
-> Catalin
+ static int __init d40_probe(struct platform_device *pdev)
+ {
+-	int err;
+ 	int ret = -ENOENT;
+ 	struct d40_base *base;
+ 	struct resource *res = NULL;
+@@ -3576,6 +3575,7 @@ static int __init d40_probe(struct platform_device *pdev)
+ 		if (IS_ERR(base->lcpa_regulator)) {
+ 			d40_err(&pdev->dev, "Failed to get lcpa_regulator\n");
+ 			base->lcpa_regulator = NULL;
++			ret = PTR_ERR(base->lcpa_regulator);
+ 			goto failure;
+ 		}
+ 
+@@ -3590,13 +3590,13 @@ static int __init d40_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	base->initialized = true;
+-	err = d40_dmaengine_init(base, num_reserved_chans);
+-	if (err)
++	ret = d40_dmaengine_init(base, num_reserved_chans);
++	if (ret)
+ 		goto failure;
+ 
+ 	base->dev->dma_parms = &base->dma_parms;
+-	err = dma_set_max_seg_size(base->dev, STEDMA40_MAX_SEG_SIZE);
+-	if (err) {
++	ret = dma_set_max_seg_size(base->dev, STEDMA40_MAX_SEG_SIZE);
++	if (ret) {
+ 		d40_err(&pdev->dev, "Failed to set dma max seg size\n");
+ 		goto failure;
+ 	}
