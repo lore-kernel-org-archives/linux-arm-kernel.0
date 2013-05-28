@@ -1,31 +1,32 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Tue, 28 May 2013 17:07:54 +0800
-Subject: [PATCH -next] dmaengine: ste_dma40: add missing iounmap() on error in
- d40_probe()
-Message-ID: <CAPgLHd9kMzZ_ZY6zm0MZ+P6dHq73i_GdCsxhpUOt-V9nf08tWA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 May 2013 10:21:33 +0100
+Subject: [PATCH] ARM: ux500: add ABx500 pinctrl tables
+In-Reply-To: <1369726413-18676-1-git-send-email-linus.walleij@stericsson.com>
+References: <1369726413-18676-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130528092133.GE22683@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Tue, 28 May 2013, Linus Walleij wrote:
 
-Add the missing iounmap() before return from d40_probe()
-in the error handling case.
+> From: Patrice Chotard <patrice.chotard@st.com>
+> 
+> This adds pin control tables for the ABx500 (AB8500 and
+> AB8505) PMIC, which also happens to act as a multimedia
+> pin expander on the ux500 platforms.
+> 
+> Cc: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  arch/arm/mach-ux500/board-mop500-pins.c | 262 ++++++++++++++++++++++++++++++++
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/dma/ste_dma40.c | 2 ++
- 1 file changed, 2 insertions(+)
+Patch looks good to me. I don't see anything untoward:
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 71bf4ec..018c2f7 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -3612,6 +3612,8 @@ failure:
- 			kmem_cache_destroy(base->desc_slab);
- 		if (base->virtbase)
- 			iounmap(base->virtbase);
-+		if (base->lcpa_base)
-+			iounmap(base->lcpa_base);
- 
- 		if (base->lcla_pool.base && base->plat_data->use_esram_lcla) {
- 			iounmap(base->lcla_pool.base);
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
